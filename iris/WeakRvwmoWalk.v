@@ -212,9 +212,8 @@ Definition wlk_inv (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     THE THREE BOOKKEEPING CLAUSES (image, [pst 0], [dv 0]) are true BY
     CONSTRUCTION of [WeakRvwmoCert3.cert_segment'] — it builds its output by
     [cand_snoc]/[pst_snoc]/[dv_snoc], none of which touches the image or
-    index 0 — but that theorem does not STATE them and this file may not
-    edit it.  They are therefore part of the supply, and recorded as (O-E)
-    in §7: a three-line strengthening of [cert_segment']'s conclusion. *)
+    index 0 — and (O-E) is now CLOSED: [cert_segment'] STATES all three, so
+    §4.1 delivers them and nothing supplies them by hand. *)
 Definition wlk_step (G : gexec) (d0 : dev_state) (St : cyc_state) (n : nat)
     : Prop :=
   ∃ (o : segout) (S' : cyc_state) (w : geid) (m : wmsg),
@@ -463,58 +462,157 @@ Qed.
 
     §3 reduced the walk to "one certified segment per write".  This section
     says what a certified segment IS — [WeakRvwmoCert3.cert_segment'] at
-    [Ctx := cpol_ctx G W x] — and names, at the position each is honestly
-    stated, the pieces the certification still owes.
+    [Ctx := cpol_ctx G W x] and [Cls := wcls_at G W x] — and names, at the
+    position each is honestly stated, the pieces the certification still
+    owes.
 
-    THE FOUR NAMED OBLIGATIONS, in [cert_segment']'s own vocabulary:
+    THE LEDGER IS TWO ITEMS.  §4.0 closes (W-3) and (W-4); §4.0b states
+    what is left:
 
-      [wcls]  the STEP CLASSIFICATION.  The read policy's own output: the
-              appended label is [G]'s own at a non-witness position, or the
-              candidate's latest-source read at a witness one, and an
-              appended WRITE lands at its [gwix].  This is what
-              [WeakRvwmoGlue2.cpol_Hpres] cannot supply and says so:
-              [lbl_reidx] is exactly the relation that lets the read
-              indices differ.  It is DATA, decidable from the log — a
-              read's source at index [t] is in the log iff [t] is at most
-              the current write count, and the walk appends writes in gmo
-              order, so the position decides it.
+      [wub]   (W-2), (P-3) [wit_fence_ub] at the next position — a
+              HYPOTHESIS by design ([WeakRvwmoCert3] §2.1): a witness
+              raises [w_vrOld] byte-agnostically and that reaches a later
+              read's floor only through a publishing fence, so the
+              obligation is guarded and vacuous at a witness with no such
+              fence.
 
-      [wub]   (P-3) [wit_fence_ub] at the next position — a HYPOTHESIS by
-              design ([WeakRvwmoCert3] §2.1): a witness raises [w_vrOld]
-              byte-agnostically and that reaches a later read's floor only
-              through a publishing fence, so the obligation is guarded and
-              vacuous at a witness with no such fence.
-
-      [wnw]   the witness set does not name the hart's NEXT position —
-              a property of [W], checkable where the cycle fixes it.
-
-      [wpol]  the READ/REGISTER POLICY, carrying (P-4) PROGRESS.  This is
-              where [WeakRvwmoCert3.boundary_reconverge_run] is applied:
-              at a SUBSTITUTED read the certified run and the emission sit
-              at different monad nodes ([WeakEvProv.taint_closure_load]),
-              and that either REACHES its instruction boundary is the EWPs'
+      [wpol]  (W-1), the READ/REGISTER POLICY, carrying (P-4) PROGRESS and
+              now also (W-3)'s classification.  This is where
+              [WeakRvwmoCert3.boundary_reconverge_run] is applied: at a
+              SUBSTITUTED read the certified run and the emission sit at
+              different monad nodes ([WeakEvProv.taint_closure_load]), and
+              that either REACHES its instruction boundary is the EWPs'
               content, not a graph-side lemma.  At an unsubstituted read
               the two runs are in lockstep and the clause is
               [WeakEvProv.instr_dagree_ev] plus
               [WeakRvwmoCert3.cpol_read]. *)
 
-Definition wcls (G : gexec) (W : geid → Prop) (x : agent) (Q : lbl → Prop)
-    : Prop :=
-  ∀ (c0 : cand) (lb lb' : lbl),
-    cpol_ctx G W x c0 → srvwmo_consistent c0 → Q lb → lbl_reidx lb lb' →
-    mstep_ok (cand_last_st c0) x lb' →
-    cstep_cls G W x c0 lb' ∧
-    (lb_is_w lb' = true →
-       gwix G (x, gcnt x (cd_tr c0)) = S (length (cd_log_end c0))).
+Definition wsrc_le (G : gexec) (n : nat) (e : geid) : Prop :=
+  ∀ aq base ts vs, gx_lbl G e = Some (WeakAxiomatic.LLoad aq base ts vs) →
+    ∀ (j : nat) t, ts !! j = Some t → (t ≤ n)%nat.
+
+(** … and its negation, POSITIVELY: the walk's witness set at log length
+    [n]. *)
+Definition wwit (G : gexec) (n : nat) (e : geid) : Prop :=
+  ∃ aq base ts vs,
+    gx_lbl G e = Some (WeakAxiomatic.LLoad aq base ts vs) ∧
+    ∃ (j : nat) t, ts !! j = Some t ∧ (n < t)%nat.
+
+Lemma wsrc_le_not_wwit G n e : wsrc_le G n e → ¬ wwit G n e.
+Proof.
+  intros Hle (aq & base & ts & vs & Hl & j & t & Hj & Hlt).
+  have Hle' := Hle aq base ts vs Hl j t Hj. lia.
+Qed.
+
+Lemma not_wwit_wsrc_le G n e : ¬ wwit G n e → wsrc_le G n e.
+Proof.
+  intros Hnw aq base ts vs Hl j t Hj.
+  destruct (decide (t ≤ n)%nat) as [Hle|Hlt]; [exact Hle|].
+  exfalso. apply Hnw. exists aq, base, ts, vs.
+  split; [exact Hl|]. exists j, t. split; [exact Hj|lia].
+Qed.
+
+(** (W-4)'s content: a WRITE position is never a witness. *)
+Lemma wwit_not_w G n e l :
+  gx_lbl G e = Some l → lb_is_w l = true → ¬ wwit G n e.
+Proof.
+  intros Hl Hw (aq & base & ts & vs & Hl' & _).
+  rewrite Hl' in Hl. injection Hl as <-. by simpl in Hw.
+Qed.
+
+(** THE GRAPH-SIDE DATUM the walk carries for the hart it is running: every
+    read of hart [x] draws on a write the log has already reached.  It is
+    decidable from [G] and [n], and it is what makes the segment need no
+    substitution. *)
+Definition wrow_in_log (G : gexec) (x : agent) (n : nat) : Prop :=
+  ∀ k, (1 ≤ k)%nat → wsrc_le G n (x, k).
+
+Definition wnw (W : geid → Prop) (x : agent) : Prop :=
+  ∀ (c0 : cand), ¬ W (x, S (gcnt x (cd_tr c0))).
+
+(** (W-4), DISCHARGED. *)
+Theorem wnw_of_pfx (G : gexec) (x : agent) (n : nat) :
+  wrow_in_log G x n → wnw (wwit G n) x.
+Proof. intros Hrow c0. apply wsrc_le_not_wwit, Hrow. lia. Qed.
+
+(** ** 4.0a (W-3): the classification, read off the log *)
+
+(** THE PER-STEP CLASSIFICATION, as [WeakRvwmoGlue2.cpol_ctx_snoc] wants it.
+    This is [WeakRvwmoCert3.cert_segment']'s [Cls] at the walk's instance. *)
+Definition wcls_at (G : gexec) (W : geid → Prop) (x : agent) (c0 : cand)
+    (lb' : lbl) : Prop :=
+  cstep_cls G W x c0 lb' ∧
+  (lb_is_w lb' = true →
+     gwix G (x, gcnt x (cd_tr c0)) = S (length (cd_log_end c0))).
+
+(** At a NON-witness position the classification IS [G]'s own label, and
+    the write clause is [wlog_pfx] read forward: the log has length [n], so
+    "the appended write is [G]'s [(n+1)]-st" says exactly [gwix = S n]. *)
+Theorem wcls_of_pfx (G : gexec) (n : nat) (x : agent) (c0 : cand) (lb' : lbl) :
+  wlog_pfx G n (cd_log_end c0) →
+  gx_lbl G (x, gcnt x (cd_tr c0)) = Some lb' →
+  ¬ wwit G n (x, gcnt x (cd_tr c0)) →
+  (lb_is_w lb' = true → gwix G (x, gcnt x (cd_tr c0)) = S n) →
+  wcls_at G (wwit G n) x c0 lb'.
+Proof.
+  intros [Hlen _] Hl HnW Hix. split.
+  - left. by split.
+  - intros Hw. by rewrite (Hix Hw) Hlen.
+Qed.
+
+(** A log message's byte IS the graph write's byte. *)
+Lemma gmsg_byte G w a v m :
+  gwrites_byte G w a v → gmsg G w = Some m → msg_byte m a = Some v.
+Proof.
+  intros (l & base & vs & j & Hl & Hwr & Hj & Hb) Hm.
+  rewrite /gmsg Hl Hwr in Hm. injection Hm as <-.
+  rewrite /msg_byte /=. case_bool_decide as Hba; last first.
+  { exfalso. apply Hba. rewrite -Hb /WeakAxiomatic.acc_addr. lia. }
+  rewrite -Hb.
+  replace (Z.to_nat (WeakAxiomatic.acc_addr base j - base)) with j
+    by (rewrite /WeakAxiomatic.acc_addr; lia).
+  exact Hj.
+Qed.
+
+(** (W-3)'s READ half: [src_in_log] IS "every source index is at most the
+    current write count", at a candidate whose log is the gmo prefix.  This
+    is the sentence the ledger's (W-3) called DATA, proved. *)
+Theorem src_in_log_of_pfx (G : gexec) (n : nat) (c : cand) (e : geid)
+    (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8)) :
+  gload_value G →
+  cd_img c = gx_img G →
+  wlog_pfx G n (cd_log_end c) →
+  gx_lbl G e = Some (WeakAxiomatic.LLoad aq base ts vs) →
+  length vs = length ts →
+  wsrc_le G n e →
+  src_in_log c base ts vs.
+Proof.
+  intros Hlv Himg [Hlen Hpfx] Hl Hlenv Hle.
+  split; [exact Hlenv|]. intros j t v Hj Hv.
+  have Hrb : greads_byte G e (WeakAxiomatic.acc_addr base j) t v.
+  { by exists (WeakAxiomatic.LLoad aq base ts vs), base, ts, vs, j. }
+  destruct (Hlv _ _ _ _ Hrb) as [Hval _].
+  have Ht : (t ≤ n)%nat := Hle aq base ts vs Hl j t Hj.
+  destruct t as [|t'].
+  - by rewrite log_byte_0 Himg.
+  - destruct Hval as (w & Hw & Hwb & _).
+    rewrite log_byte_S.
+    have Hlt : (t' < n)%nat by lia.
+    rewrite -(Hpfx t' w Hlt Hw).
+    destruct (gmsg G w) as [m|] eqn:Hm.
+    + rewrite /=. by apply (gmsg_byte G w _ v m).
+    + exfalso. destruct Hwb as (l & base' & vs' & j' & Hl' & Hwr & _).
+      by rewrite /gmsg Hl' Hwr in Hm.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 4.0b THE TWO REMAINING OBLIGATIONS *)
 
 Definition wub (G : gexec) (W : geid → Prop) (x : agent) : Prop :=
   ∀ (c0 : cand) (lb' : lbl) (ev' : nat → geid),
     ctrace_prefix G (cand_snoc c0 (EStep x lb')) ev' W →
     wit_fence_ub G (cand_snoc c0 (EStep x lb')) ev' W
       (x, S (gcnt x (cd_tr c0))).
-
-Definition wnw (W : geid → Prop) (x : agent) : Prop :=
-  ∀ (c0 : cand), ¬ W (x, S (gcnt x (cd_tr c0))).
 
 Definition wpol (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
     (d0 : dev_state) (T : list wreg) (Q : lbl → Prop) : Prop :=
@@ -532,43 +630,65 @@ Definition wpol (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
       cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
       mstep_ok (cand_last_st c0) x lb' ∧
       lbl_reidx lb lb' ∧
+      wcls_at G W x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
 
-(** ** 4.1 THE SEGMENT, from the emission and the four obligations
+(** ** 4.1 THE SEGMENT, from the emission and the REDUCED ledger
 
-    (P-1) is DISCHARGED here — [WeakRvwmoGlue2.cpol_Hpres] is exactly the
-    [Hpres] [cert_segment'] asks for at [Ctx := cpol_ctx G W x] — so the
-    only inputs left are the emission block, the invariant at the current
-    state, and the four named obligations above. *)
-Theorem wlk_seg_of_cert (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
+    (P-1) is DISCHARGED here — [WeakRvwmoGlue2.cpol_ctx_snoc] is exactly the
+    [Hpres] [cert_segment'] asks for at [Ctx := cpol_ctx G W x], once the
+    classification travels with the step ([Cls := wcls_at G W x], §4.0a) —
+    so the inputs left are the emission block, the invariant at the current
+    state, the graph-side datum [wrow_in_log] (which discharges (W-4)), and
+    the TWO obligations (W-1) [wpol] and (W-2) [wub].  The RMW block's own
+    policy ([WeakRvwmoCert3.cpolp], (O-F)) rides alongside [wpol]; at an
+    RMW-free row it is [WeakRvwmoCert3.cpolp_of_rmwfree]. *)
+Theorem wlk_seg_of_cert (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (d0 : dev_state) (T : list wreg) (Q : lbl → Prop)
-    (HQrmw : ∀ lb, Q lb → lb_rmwfree lb)
     (k0 : nat) (ws0 : wstate) (rowseg : list lbl) (es : list eitem)
     (pfin : pexv6) (m0 : M unit) (rs10 : regstate) (fn0 : ofence)
     (ib0 : oib32) (St : cyc_state) (rs20 : regstate) :
   gwf G →
-  wcls G W x Q → wub G W x → wnw W x → wpol G W x cpu d0 T Q →
+  (* (W-4), DISCHARGED: the walk's witness set is log-decided *)
+  wrow_in_log G x n →
+  (* (W-2) *)
+  wub G (wwit G n) x →
+  (* (W-1), carrying (W-3)'s classification and (P-4) progress *)
+  wpol G (wwit G n) x cpu d0 T Q →
+  (* (O-F): the fused RMW block's policy *)
+  cpolp x cpu d0 T (cpol_ctx G (wwit G n) x) (wcls_at G (wwit G n) x) Q →
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
   Forall Q rowseg →
   cst_ok d0 St →
-  cpol_ctx G W x (cst_c St) →
+  cpol_ctx G (wwit G n) x (cst_c St) →
   cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
   dreg_agree (λ nn, nn ∉ T) rs10 rs20 →
   w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 →
   ∃ (St' : cyc_state) (tradd : list estep),
     seg_step d0 (SegOut x rowseg (cd_end (cst_c St)) tradd) St St' ∧
-    cpol_ctx G W x (cst_c St') ∧
-    cd_img (cst_c St') = cd_img (cst_c St).
+    cpol_ctx G (wwit G n) x (cst_c St') ∧
+    (* (O-E), DELIVERED — [cert_segment'] states all three *)
+    cd_img (cst_c St') = cd_img (cst_c St) ∧
+    cst_pst St' 0%nat = cst_pst St 0%nat ∧
+    cst_dv St' 0%nat = cst_dv St 0%nat.
 Proof.
-  intros Hwf Hcls Hub Hnw Hpol Hem HQ Hok Hctx Hp Hag Hrelp.
-  destruct (seg_step_of_segment x cpu d0 T Q HQrmw (cpol_ctx G W x)
-              (cpol_Hpres G W x Q Hwf Hcls Hub Hnw) Hpol
+  intros Hwf Hrow Hub Hpol Hpolp Hem HQ Hok Hctx Hp Hag Hrelp.
+  have Hpres : ∀ (c0 : cand) (lb lb' : lbl),
+      cpol_ctx G (wwit G n) x c0 → srvwmo_consistent c0 → Q lb →
+      lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
+      wcls_at G (wwit G n) x c0 lb' →
+      cpol_ctx G (wwit G n) x (cand_snoc c0 (EStep x lb')).
+  { intros c0 lb lb' Hctx0 Hc0 HQ0 Hri Hok0 [Hcl Hix].
+    eapply cpol_ctx_snoc;
+      [exact Hwf|exact Hctx0|exact Hcl|exact Hix|exact (Hub c0 lb')
+      |exact (wnw_of_pfx G x n Hrow c0)]. }
+  destruct (seg_step_of_segment x cpu d0 T Q (cpol_ctx G (wwit G n) x)
+              (wcls_at G (wwit G n) x) Hpres Hpol Hpolp
               k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St rs20
               Hem HQ Hok Hctx Hp Hag Hrelp)
-    as (St' & tradd & Hstep & Hctx').
-  exists St', tradd. split_and!; [exact Hstep|exact Hctx'|].
-  destruct Hctx as (ev & Hgt & _ & _). destruct Hctx' as (ev' & Hgt' & _ & _).
-  by rewrite (ctp_img _ _ _ _ Hgt') (ctp_img _ _ _ _ Hgt).
+    as (St' & tradd & Hstep & Hctx' & Himg & Hpst0 & Hdv0).
+  exists St', tradd.
+  split_and!; [exact Hstep|exact Hctx'|exact Himg|exact Hpst0|exact Hdv0].
 Qed.
 
 (** ** 4.2 THE WALK'S SUPPLY, and the theorem
@@ -726,6 +846,9 @@ Print Assumptions walk_supply_of_steps.
 Print Assumptions hemit_app.
 Print Assumptions seg_step_msgs.
 Print Assumptions wlk_step_of_seg.
+Print Assumptions wnw_of_pfx.
+Print Assumptions wcls_of_pfx.
+Print Assumptions src_in_log_of_pfx.
 Print Assumptions wlk_seg_of_cert.
 Print Assumptions walk_policy_steps.
 Print Assumptions walk_supply_of_policy.
@@ -734,16 +857,18 @@ Print Assumptions t2lin_of_l2'''.
 Print Assumptions xv6_rvwmo_safe_modulo_walk.
 
 (* ====================================================================== *)
-(** * 7. WHAT REMAINS, EXACTLY
+(** * 7. WHAT REMAINS, EXACTLY — THE LEDGER, CLOSED TO TWO ITEMS
 
     (R-2) is no longer opaque: [walk_supply] IS [walk_policy], the
     per-state certification supply, and the reduction is proved
-    ([walk_supply_of_policy]).  What the policy still owes, at the position
-    each obligation is honestly stated:
+    ([walk_supply_of_policy]).  What [wlk_seg_of_cert] — the route that
+    BUILDS one such step out of [WeakRvwmoCert3.cert_segment'] — still asks
+    is exactly two obligations plus one graph-side datum:
 
     (W-1) THE READ/REGISTER POLICY [wpol] — the certification's real
-          content, and where (P-4) PROGRESS lives.  At an UNSUBSTITUTED
-          read the two runs are in lockstep and the clause is
+          content, where (P-4) PROGRESS lives and where (W-3)'s
+          CLASSIFICATION now lives too.  At an UNSUBSTITUTED read the two
+          runs are in lockstep and the clause is
           [WeakEvProv.instr_dagree_ev] (equal labels, register files still
           agreeing off the taint set) plus [WeakRvwmoCert3.cpol_read] (the
           admissibility, with [floor_ok] discharged).  At a SUBSTITUTED one
@@ -759,33 +884,49 @@ Print Assumptions xv6_rvwmo_safe_modulo_walk.
           at a witness with no publishing fence between it and the read
           whose floor it would raise ([WeakRvwmoCert3] §2.1).
 
-    (W-3) [wcls] — the step classification, which is DATA: the walk appends
-          writes in gmo order, so at log length [n] a read's graph source
-          at index [t] is in the log iff [t ≤ n], and the position decides
-          whether the step is [G]'s own label or the candidate's
-          latest-source read.  Its second half — an appended WRITE lands at
-          its [gwix] — is the same arithmetic read forward.
+    THE DATUM: [wrow_in_log G x n] — "hart [x]'s reads all draw on writes
+    the log has reached".  Decidable from [G] and the write count, with no
+    semantic content; it is what makes the segment substitution-free, and
+    it discharges the old (W-4).
 
-    (W-4) [wnw] — "[W] does not name the hart's next position", a property
-          of the witness SET, checkable where the cycle fixes it
-          (§4e: [W] is segment 1's entry plus its poloc-later reads,
-          [WeakRvwmoCert3.W_poloc_closed]).
+    ------------------------------------------------------------------------
+    WHAT MOVED, AND WHY (this session):
 
-    (O-E) THE THREE BOOKKEEPING EQUATIONS of [wlk_step] (image, [pst 0],
-          [dv 0]).  [WeakRvwmoCert3.cert_segment'] establishes all three BY
-          CONSTRUCTION — it extends by [cand_snoc]/[pst_snoc]/[dv_snoc],
-          none of which touches the image or index 0 — but its conclusion
-          does not STATE them, and this file may not edit it (new leaves
-          only).  The image half is already free here
-          ([wlk_seg_of_cert] reads it off [cpol_ctx]'s [ctp_img]); the two
-          supply halves are a two-line addition to [cert_segment']'s
-          conclusion.
+    (O-E) CLOSED.  [WeakRvwmoCert3.cert_segment'] now STATES the three
+          bookkeeping equations ([cd_img c' = cd_img c], [pst' 0 = pst 0],
+          [dv' 0 = dv 0]); [WeakRvwmoCert4.seg_step_of_segment] and §4.1
+          carry them through, so [walk_policy]'s three clauses are free at
+          the route that builds it.
 
-    (O-F) THE RMW SEGMENT.  [cert_segment'] refutes the [HEpair] block
-          through [HQrmw], so a segment whose row contains a fused [LRmw]
-          is out of scope; [WeakRvwmoCert3] §4 ([cert_block_pair],
-          [cert_rmw_ok]) supplies the missing block and the walk's [Q] can
-          be widened once that is threaded through the iteration.
+    (W-3) ABSORBED INTO (W-1).  The classification is not derivable from
+          [lbl_reidx] — that relation is exactly what LETS the appended
+          label's read indices differ — so no graph-side lemma can pin it;
+          it is the READ POLICY's output.  [cert_segment'] therefore gained
+          a [Cls] parameter which the policy DELIVERS and [Hpres]
+          CONSUMES, and [WeakRvwmoGlue2.cpol_Hpres]'s separate [Hcls]
+          premise is gone.  Its two log-side halves are proved here:
+          [wcls_of_pfx] (the arithmetic: an appended write lands at
+          [S (length log)], [wlog_pfx] read forward) and
+          [src_in_log_of_pfx] (the read: [src_in_log] from [wlog_pfx] +
+          [gload_value] + "every source index is at most the write count").
+
+    (W-4) CLOSED.  The walk's witness set is LOG-DECIDED ([wwit]: a load
+          with a graph source above the current write count).  A write
+          position is never a witness ([wwit_not_w]), and [wnw_of_pfx]
+          discharges [wnw] from [wrow_in_log].
+
+    (O-F) CLOSED.  [cert_segment']'s [HEpair] case is no longer refuted:
+          the fused exclusive pair is certified in place, by the pair
+          policy [WeakRvwmoCert3.cpolp] together with §3.3a/§3.3b's
+          [cblkp_intro] / [cert_block_snoc_pair].  The appended label is
+          [G]'s OWN ([lbl_reidx_refl]) because an RMW is never a witness
+          ([WeakRvwmoCert3.witness_not_aq]).  The old [HQrmw] refutation
+          survives as one instance of the policy
+          ([WeakRvwmoCert3.cpolp_of_rmwfree]), so every earlier caller is
+          unchanged up to that adapter, and §4.5's
+          [WeakRvwmoCert3.cert_block_pair] is what discharges the policy at
+          a real site (its [cert_rmw_latest] — the RMW's G-source IS the
+          log's latest — is the one semantic point).
 
     NON-VACUITY is [WeakRvwmoCycWit.v]: a two-hart LB graph with a real
     [RacyD] cycle, [rvwmo_minus_deps_consistent] and [gdexec_qconf], on

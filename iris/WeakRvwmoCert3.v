@@ -531,6 +531,221 @@ Proof.
   by apply (cert_read_in_log' G c ev W x aq base ts vs).
 Qed.
 
+(** ** 3.3a [cblkp] — the [HEpair] block with its annotations exposed
+
+    The [cblk] twin: an [adm_run true] prefix, the exclusive READ, an
+    [LInstr]-free [adm_run false] middle, and the conditional WRITE.  The
+    read and write lists are the four stretches' concatenation. *)
+Definition cblkp (cpu : CPU) (d0 : dev_state) (ws : wstate) (lb : lbl)
+    (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32) : Prop :=
+  ∃ ls1 ma rsa fna iba da rdsA wrsA annA
+    mm rsm fnm ibm dm rdsB wrsB annB
+    ls2 mm2 rsm2 fnm2 ibm2 dm2 rdsC wrsC annC rdsD wrsD annD,
+    (∀ l0, l0 ∈ ls1 → lb_admin true l0) ∧
+    phrun cpu ls1 rdsA wrsA annA m rs fn ib d0 ma rsa fna iba da ∧
+    hlbl_realizes_pair (PHart cpu ma rsa fna iba)
+      (PHart cpu mm2 rsm2 fnm2 ibm2) ws lb l1 l2 ∧
+    phrun cpu [l1] rdsB wrsB annB ma rsa fna iba da mm rsm fnm ibm dm ∧
+    (∀ l0, l0 ∈ ls2 → lb_admin false l0) ∧
+    phrun cpu ls2 rdsC wrsC annC mm rsm fnm ibm dm mm2 rsm2 fnm2 ibm2 dm2 ∧
+    phrun cpu [l2] rdsD wrsD annD mm2 rsm2 fnm2 ibm2 dm2 m' rs' fn' ib' d0 ∧
+    rds = rdsA ++ rdsB ++ rdsC ++ rdsD ∧
+    wrs = wrsA ++ wrsB ++ wrsC ++ wrsD.
+
+Lemma cblkp_intro cpu d0 ws lb l1 l2 ls1 pa da pm dm ls2 pm2 dm2
+    m rs fn ib m' rs' fn' ib' :
+  adm_run true (PHart cpu m rs fn ib) d0 ls1 pa da →
+  hlbl_realizes_pair pa pm2 ws lb l1 l2 →
+  pstep_ev pa da l1 pm dm →
+  adm_run false pm dm ls2 pm2 dm2 →
+  pstep_ev pm2 dm2 l2 (PHart cpu m' rs' fn' ib') d0 →
+  ∃ rds wrs, cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib'.
+Proof.
+  intros Har1 Hre Hst1 Har2 Hst2.
+  destruct (adm_run_phart true _ _ d0 ls1 da Har1 cpu m rs fn ib eq_refl)
+    as (ma & rsa & fna & iba & ->).
+  destruct (pstep_ev_phart cpu ma rsa fna iba da l1 pm dm Hst1)
+    as (mm & rsm & fnm & ibm & ->).
+  destruct (adm_run_phart false _ _ dm ls2 dm2 Har2 cpu mm rsm fnm ibm eq_refl)
+    as (mm2 & rsm2 & fnm2 & ibm2 & ->).
+  destruct (pevrun_phrun ls1 _ d0 _ da (adm_run_pevrun _ _ _ _ _ _ Har1)
+              cpu m rs fn ib ma rsa fna iba eq_refl eq_refl)
+    as (rdsA & wrsA & annA & HA).
+  destruct (pevrun_phrun [l1] _ da _ dm
+              (pevrun_more l1 [] _ da _ dm _ dm Hst1 (pevrun_nil _ _))
+              cpu ma rsa fna iba mm rsm fnm ibm eq_refl eq_refl)
+    as (rdsB & wrsB & annB & HB).
+  destruct (pevrun_phrun ls2 _ dm _ dm2 (adm_run_pevrun _ _ _ _ _ _ Har2)
+              cpu mm rsm fnm ibm mm2 rsm2 fnm2 ibm2 eq_refl eq_refl)
+    as (rdsC & wrsC & annC & HC).
+  destruct (pevrun_phrun [l2] _ dm2 _ d0
+              (pevrun_more l2 [] _ dm2 _ d0 _ d0 Hst2 (pevrun_nil _ _))
+              cpu mm2 rsm2 fnm2 ibm2 m' rs' fn' ib' eq_refl eq_refl)
+    as (rdsD & wrsD & annD & HD).
+  exists (rdsA ++ rdsB ++ rdsC ++ rdsD), (wrsA ++ wrsB ++ wrsC ++ wrsD).
+  exists ls1, ma, rsa, fna, iba, da, rdsA, wrsA, annA.
+  exists mm, rsm, fnm, ibm, dm, rdsB, wrsB, annB.
+  exists ls2, mm2, rsm2, fnm2, ibm2, dm2, rdsC, wrsC, annC, rdsD, wrsD, annD.
+  split_and!; [|exact HA|exact Hre|exact HB| |exact HC|exact HD
+              |reflexivity|reflexivity].
+  - by eapply adm_run_admin.
+  - by eapply adm_run_admin.
+Qed.
+
+Lemma cblkp_elim cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
+  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+  ∃ ls1 pa da pm dm ls2 pm2 dm2,
+    adm_run true (PHart cpu m rs fn ib) d0 ls1 pa da ∧
+    hlbl_realizes_pair pa pm2 ws lb l1 l2 ∧
+    pstep_ev pa da l1 pm dm ∧
+    adm_run false pm dm ls2 pm2 dm2 ∧
+    pstep_ev pm2 dm2 l2 (PHart cpu m' rs' fn' ib') d0.
+Proof.
+  intros (ls1 & ma & rsa & fna & iba & da & rdsA & wrsA & annA &
+          mm & rsm & fnm & ibm & dm & rdsB & wrsB & annB &
+          ls2 & mm2 & rsm2 & fnm2 & ibm2 & dm2 & rdsC & wrsC & annC &
+          rdsD & wrsD & annD & Had1 & HA & Hre & HB & Had2 & HC & HD & _ & _).
+  exists ls1, (PHart cpu ma rsa fna iba), da, (PHart cpu mm rsm fnm ibm), dm.
+  exists ls2, (PHart cpu mm2 rsm2 fnm2 ibm2), dm2.
+  split_and!.
+  - apply (pevrun_adm_run true _ d0 ls1 _ da
+             (phrun_pevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ HA) Had1).
+  - exact Hre.
+  - apply pevrun_single_inv. by eapply phrun_pevrun.
+  - apply (pevrun_adm_run false _ dm ls2 _ dm2
+             (phrun_pevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ HC) Had2).
+  - apply pevrun_single_inv. by eapply phrun_pevrun.
+Qed.
+
+Lemma cblkp_relp cpu d0 ws ws' lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
+  w_relp ws' = w_relp ws →
+  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+  cblkp cpu d0 ws' lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib'.
+Proof.
+  intros Hr (ls1 & ma & rsa & fna & iba & da & rdsA & wrsA & annA &
+          mm & rsm & fnm & ibm & dm & rdsB & wrsB & annB &
+          ls2 & mm2 & rsm2 & fnm2 & ibm2 & dm2 & rdsC & wrsC & annC &
+          rdsD & wrsD & annD & Had1 & HA & Hre & HB & Had2 & HC & HD & -> & ->).
+  exists ls1, ma, rsa, fna, iba, da, rdsA, wrsA, annA.
+  exists mm, rsm, fnm, ibm, dm, rdsB, wrsB, annB.
+  exists ls2, mm2, rsm2, fnm2, ibm2, dm2, rdsC, wrsC, annC, rdsD, wrsD, annD.
+  split_and!; [exact Had1|exact HA| |exact HB|exact Had2|exact HC|exact HD
+              |reflexivity|reflexivity].
+  by eapply hlbl_realizes_pair_relp.
+Qed.
+
+(** ** 3.3b The pair block, APPENDED *)
+Theorem cert_block_snoc_pair (c : cand) (x : agent) (pst : nat → list pexv6)
+    (dv : nat → dev_state) cpu d0 lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
+  srvwmo_consistent c →
+  exec_prog_ok' pstep_ev pcls_ev pst dv (cand_exec c) →
+  pst (cd_end c) !! x = Some (PHart cpu m rs fn ib) →
+  dv (cd_end c) = d0 →
+  cblkp cpu d0 (ms_ws (cand_last_st c) x) lb l1 l2 rds wrs
+    m rs fn ib m' rs' fn' ib' →
+  mstep_ok (cand_last_st c) x lb →
+  srvwmo_consistent (cand_snoc c (EStep x lb)) ∧
+  exec_prog_ok' pstep_ev pcls_ev
+    (pst_snoc c pst x (PHart cpu m' rs' fn' ib')) (dv_snoc c dv d0)
+    (cand_exec (cand_snoc c (EStep x lb))).
+Proof.
+  intros Hc Hpo Hp Hdv Hblk Hok. split; [by apply snoc_consistent|].
+  destruct (cblkp_elim cpu d0 _ lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' Hblk)
+    as (ls1 & pa & da & pm & dm & ls2 & pm2 & dm2 & Har1 & Hre & Hs1 & Har2 & Hs2).
+  eapply (exec_prog_ok'_snoc_pair c x _ pa da ls1 l1 l2 lb pm dm ls2 pm2 dm2
+            _ d0);
+    [exact Hpo|exact Hp| |exact Hre|exact Hs1|exact Har2|exact Hs2].
+  by rewrite Hdv.
+Qed.
+
+(** ** 3.3c THE PAIR POLICY, and the shape that RETIRES [HQrmw]
+
+    The iteration's [HEpair] case used to be discharged by REFUTATION: [Q]
+    was required [lb_rmwfree], so a fused pair could not occur.  (O-F)
+    replaces that refutation by a POLICY of the pair's own — [cpolp] below,
+    [Hpol']'s twin for [cblkp] — and the refutation survives as one
+    instance of it ([cpolp_of_rmwfree]), so every earlier caller is
+    unchanged up to that adapter.
+
+    NOTE THE MISSING [lbl_reidx]: an RMW is never RE-INDEXED, because an RMW
+    is never a WITNESS ([witness_not_aq] §1.4 — xv6's is an [amoswap.aq],
+    and an acquire is gmo-before every later event of its own hart, so it
+    cannot be a cycle's backward step).  The pair policy therefore hands
+    back [G]'s own label, and §4.5's [cert_block_pair] is what discharges it
+    at a real site. *)
+Definition cpolp (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg)
+    (Ctx : cand → Prop) (Cls : cand → lbl → Prop) (Q : lbl → Prop) : Prop :=
+  ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l1 l2 : wlabel)
+    (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+    srvwmo_consistent c0 →
+    Ctx c0 →
+    Q lb →
+    w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
+    dreg_agree (λ n, n ∉ T) rs1 rs2 →
+    cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    ∃ rs2',
+      cblkp cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
+      mstep_ok (cand_last_st c0) x lb ∧
+      Cls c0 lb ∧
+      dreg_agree (λ n, n ∉ T) rs1' rs2'.
+
+(** A [cblkp] block's label IS an RMW — the pair's realization says so. *)
+Lemma cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
+  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+  ¬ lb_rmwfree lb.
+Proof.
+  intros (ls1 & ma & rsa & fna & iba & da & rdsA & wrsA & annA &
+          mm & rsm & fnm & ibm & dm & rdsB & wrsB & annB &
+          ls2 & mm2 & rsm2 & fnm2 & ibm2 & dm2 & rdsC & wrsC & annC &
+          rdsD & wrsD & annD & _ & _ & Hre & _ & _ & _ & _ & _ & _).
+  destruct Hre as (aq & rl & base & tvs & data & asrc1 & asrc2 & vsrc2 &
+                   _ & _ & _ & _ & ->).
+  intros H. exact H.
+Qed.
+
+(** … so an RMW-FREE [Q] gives the pair policy vacuously: this is the OLD
+    [HQrmw] refutation, packaged as a policy. *)
+Lemma cpolp_of_rmwfree (x : agent) (cpu : CPU) (d0 : dev_state)
+    (T : list wreg) (Ctx : cand → Prop) (Cls : cand → lbl → Prop)
+    (Q : lbl → Prop) :
+  (∀ lb, Q lb → lb_rmwfree lb) → cpolp x cpu d0 T Ctx Cls Q.
+Proof.
+  intros HQrmw c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+    _ _ HQ _ _ Hblk.
+  exfalso. exact (cblkp_rmw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hblk (HQrmw lb HQ)).
+Qed.
+
+(** [WeakRvwmoCert2.pol_store], carrying the (trivial) classification the
+    [Cls] parameter now asks for. *)
+Lemma pol_store' (x : agent) (cpu : CPU) (d0 : dev_state) :
+  ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+    (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+    srvwmo_consistent c0 →
+    lb_store_ne lb →
+    w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
+    dreg_agree (λ n, n ∉ []) rs1 rs2 →
+    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    ∃ lb' l' rds' wrs' rs2',
+      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+      mstep_ok (cand_last_st c0) x lb' ∧
+      lbl_reidx lb lb' ∧
+      True ∧
+      dreg_agree (λ n, n ∉ []) rs1' rs2'.
+Proof.
+  intros c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' Hc Hlb Hrelp Hag Hblk.
+  destruct (pol_store x cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib
+              m' rs1' fn' ib' Hc Hlb Hrelp Hag Hblk)
+    as (lb' & l' & rds' & wrs' & rs2' & H1 & H2 & H3 & H4).
+  exists lb', l', rds', wrs', rs2'.
+  split_and!; [exact H1|exact H2|exact H3|exact I|exact H4].
+Qed.
+
 (** ** 3.4 [cert_segment'] — the iteration with the read policy discharged
 
     [WeakRvwmoCert2.cert_segment] verbatim, with TWO changes:
@@ -550,7 +765,7 @@ Qed.
         [WeakRvwmoCert2.cert_segment] (§6.3). *)
 Section segment'.
   Context (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg).
-  Context (Q : lbl -> Prop) (HQrmw : forall lb, Q lb -> lb_rmwfree lb).
+  Context (Q : lbl -> Prop).
 
   (** THE CARRIED CONTEXT, abstract.  The INTENDED instance is
       [Ctx := cpol_ctx G W x] (§3.3), at which [Hpol']'s read clause is
@@ -558,9 +773,18 @@ Section segment'.
       [WeakRvwmoCert2.cert_segment] verbatim (§6). *)
   Context (Ctx : cand → Prop).
 
+  (** (W-3) THE STEP CLASSIFICATION, as a parameter.  The appended label's
+      classification — [WeakRvwmoGlue2.cstep_cls] at the intended instance —
+      is the READ POLICY's own output, not a fact about [lbl_reidx]: that
+      relation is precisely what LETS the indices differ.  So the policy
+      DELIVERS [Cls c0 lb'] and [Hpres] CONSUMES it.  At
+      [Cls := λ _ _, True] nothing changes. *)
+  Context (Cls : cand → lbl → Prop).
+
   Context (Hpres : ∀ (c0 : cand) (lb lb' : lbl),
       Ctx c0 → srvwmo_consistent c0 → Q lb → lbl_reidx lb lb' →
       mstep_ok (cand_last_st c0) x lb' →
+      Cls c0 lb' →
       Ctx (cand_snoc c0 (EStep x lb'))).
 
   Context (Hpol' : ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
@@ -577,7 +801,13 @@ Section segment'.
         cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
         mstep_ok (cand_last_st c0) x lb' ∧
         lbl_reidx lb lb' ∧
+        Cls c0 lb' ∧
         dreg_agree (λ n, n ∉ T) rs1' rs2').
+
+  (** (O-F) THE PAIR POLICY (§3.3c).  This REPLACES the old [HQrmw]
+      refutation; [cpolp_of_rmwfree] recovers the refutation, so an
+      RMW-free [Q] costs its callers exactly one adapter. *)
+  Context (Hpolp : cpolp x cpu d0 T Ctx Cls Q).
 
   Theorem cert_segment' k0 ws0 rowseg p es pfin :
     hemit (λ _, d0) k0 ws0 rowseg p es pfin →
@@ -606,7 +836,15 @@ Section segment'.
         pfin = PHart cpu m1 rs11 fn1 ib1 ∧
         dreg_agree (λ n, n ∉ T) rs11 rs21 ∧
         w_relp (ms_ws (cand_last_st c') x)
-        = w_relp (row_ws_aux k0 ws0 rowseg).
+        = w_relp (row_ws_aux k0 ws0 rowseg) ∧
+        (** (O-E) THE THREE BOOKKEEPING EQUATIONS.  The iteration extends by
+            [cand_snoc]/[pst_snoc]/[dv_snoc] only, and none of those touches
+            the image or index 0 — so the certified candidate carries the
+            SAME image and the SAME boot state as the one it started from.
+            [WeakRvwmoWalk]'s [wlk_inv] needs exactly these three. *)
+        cd_img c' = cd_img c ∧
+        pst' 0%nat = pst 0%nat ∧
+        dv' 0%nat = dv 0%nat.
   Proof.
     induction 1 as [k ws p
                    |k ws lb row p ls pa da l p' es pfin Har Hre Hst Hem IH
@@ -616,7 +854,8 @@ Section segment'.
     - (* EMPTY SEGMENT *)
       exists c, pst, dv, [], m0, rs10, rs20, fn0, ib0.
       split_and!; [by rewrite app_nil_r| |constructor|exact Hc|exact Hctx
-                  |exact Hpo|exact Hp|exact Hdv|reflexivity|exact Hag|exact Hrelp].
+                  |exact Hpo|exact Hp|exact Hdv|reflexivity|exact Hag|exact Hrelp
+                  |reflexivity|reflexivity|reflexivity].
       intros s Hs. by apply elem_of_nil in Hs.
     - (* ONE BLOCK, then the rest *)
       apply Forall_cons_1 in Hrf as [Hlb Hrf].
@@ -632,7 +871,7 @@ Section segment'.
         as (rds & wrs & Hblk).
       destruct (Hpol' c ws lb l rds wrs m0 rs10 rs20 fn0 ib0 m1 rs11 fn1 ib1
                   Hc Hctx Hlb Hrelp Hag Hblk)
-        as (lb' & l' & rds' & wrs' & rs21 & Hblk2 & Hok & Hri & Hag2).
+        as (lb' & l' & rds' & wrs' & rs21 & Hblk2 & Hok & Hri & Hcl & Hag2).
       destruct (cert_block_snoc c x pst dv cpu d0 lb' l' rds' wrs'
                   m0 rs20 fn0 ib0 m1 rs21 fn1 ib1 Hc Hpo Hp Hdv
                   (cblk_relp cpu d0 ws (ms_ws (cand_last_st c) x) lb' l'
@@ -641,7 +880,7 @@ Section segment'.
       set (c2 := cand_snoc c (EStep x lb')).
       set (pst2 := pst_snoc c pst x (PHart cpu m1 rs21 fn1 ib1)).
       set (dv2 := dv_snoc c dv d0).
-      have Hctx2 : Ctx c2 := Hpres c lb lb' Hctx Hc Hlb Hri Hok.
+      have Hctx2 : Ctx c2 := Hpres c lb lb' Hctx Hc Hlb Hri Hok Hcl.
       have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
       have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m1 rs21 fn1 ib1).
       { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
@@ -656,19 +895,80 @@ Section segment'.
                   Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
-            & Hrelpf).
+            & Hrelpf & Himg2 & Hpst02 & Hdv02).
       exists c', pst', dv', (EStep x lb' :: tradd), m2, rs12, rs22, fn2, ib2.
       split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'|exact Hctx'
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
-                   |exact Hrelpf].
+                   |exact Hrelpf| | | ].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
-    - (* THE FUSED EXCLUSIVE PAIR is excluded by [Q]'s [lb_rmwfree] *)
-      exfalso. apply Forall_cons_1 in Hrf as [Hlb _].
-      apply HQrmw in Hlb.
-      destruct Hre as (aq & rl & base & tvs & data & asrc1 & asrc2 & vsrc2 &
-                       _ & _ & _ & _ & ->).
-      exact Hlb.
+      + rewrite Himg2 /c2 cand_snoc_img //.
+      + rewrite Hpst02 /pst2
+          (pst_snoc_le c pst x (PHart cpu m1 rs21 fn1 ib1) 0%nat
+             (Nat.le_0_l _)) //.
+      + rewrite Hdv02 /dv2 (dv_snoc_le c dv d0 0%nat (Nat.le_0_l _)) //.
+    - (* (O-F) THE FUSED EXCLUSIVE PAIR, CERTIFIED — the same five moves as
+         the [HEone] block, with [cblkp]/[cpolp]/[cert_block_snoc_pair] in
+         place of [cblk]/[Hpol']/[cert_block_snoc], and with the appended
+         label [G]'s OWN ([lbl_reidx_refl]): an RMW is never re-indexed
+         because it is never a witness ([witness_not_aq]). *)
+      apply Forall_cons_1 in Hrf as [Hlb Hrf].
+      destruct (adm_run_phart true _ _ d0 ls1 da Har1 cpu m0 rs10 fn0 ib0 eq_refl)
+        as (ma & rsa & fna & iba & Hpa).
+      rewrite Hpa in Har1 Hst1 Hre.
+      destruct (pstep_ev_phart cpu ma rsa fna iba da l1 pm dm Hst1)
+        as (mb & rsb & fnb & ibb & Hpm).
+      rewrite Hpm in Hst1 Har2.
+      destruct (adm_run_phart false _ _ dm ls2 dm2 Har2 cpu mb rsb fnb ibb eq_refl)
+        as (mc & rsc & fnc & ibc & Hpm2).
+      rewrite Hpm2 in Har2 Hst2 Hre.
+      destruct (pstep_ev_phart cpu mc rsc fnc ibc dm2 l2 p' d0 Hst2)
+        as (m1 & rs11 & fn1 & ib1 & Hp').
+      rewrite Hp' in Hst2.
+      destruct (cblkp_intro cpu d0 ws lb l1 l2 ls1
+                  (PHart cpu ma rsa fna iba) da (PHart cpu mb rsb fnb ibb) dm
+                  ls2 (PHart cpu mc rsc fnc ibc) dm2
+                  m0 rs10 fn0 ib0 m1 rs11 fn1 ib1 Har1 Hre Hst1 Har2 Hst2)
+        as (rds & wrs & Hblk).
+      destruct (Hpolp c ws lb l1 l2 rds wrs m0 rs10 rs20 fn0 ib0
+                  m1 rs11 fn1 ib1 Hc Hctx Hlb Hrelp Hag Hblk)
+        as (rs21 & Hblk2 & Hok & Hcl & Hag2).
+      destruct (cert_block_snoc_pair c x pst dv cpu d0 lb l1 l2 rds wrs
+                  m0 rs20 fn0 ib0 m1 rs21 fn1 ib1 Hc Hpo Hp Hdv
+                  (cblkp_relp cpu d0 ws (ms_ws (cand_last_st c) x) lb l1 l2
+                     rds wrs m0 rs20 fn0 ib0 m1 rs21 fn1 ib1 Hrelp Hblk2)
+                  Hok) as (Hc2 & Hpo2).
+      set (c2 := cand_snoc c (EStep x lb)).
+      set (pst2 := pst_snoc c pst x (PHart cpu m1 rs21 fn1 ib1)).
+      set (dv2 := dv_snoc c dv d0).
+      have Hctx2 : Ctx c2
+        := Hpres c lb lb Hctx Hc Hlb (lbl_reidx_refl lb) Hok Hcl.
+      have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
+      have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m1 rs21 fn1 ib1).
+      { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
+        apply list_lookup_insert. exact (lookup_lt_Some _ _ _ Hp). }
+      have Hdv2 : dv2 (cd_end c2) = d0.
+      { rewrite Hend /dv2 (dv_snoc_gt c dv d0 (S (cd_end c)) ltac:(lia)) //. }
+      have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
+                  = w_relp (lbl_post k ws lb).
+      { rewrite /c2 cand_snoc_relp Hrelp. by rewrite lbl_post_relp. }
+      destruct (IH Hrf m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
+                  Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
+        as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
+            Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
+            & Hrelpf & Himg2 & Hpst02 & Hdv02).
+      exists c', pst', dv', (EStep x lb :: tradd), m2, rs12, rs22, fn2, ib2.
+      split_and!; [| |constructor; [apply lbl_reidx_refl|exact Hf2]
+                   |exact Hc'|exact Hctx'
+                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
+                   |exact Hrelpf| | | ].
+      + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
+      + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
+      + rewrite Himg2 /c2 cand_snoc_img //.
+      + rewrite Hpst02 /pst2
+          (pst_snoc_le c pst x (PHart cpu m1 rs21 fn1 ib1) 0%nat
+             (Nat.le_0_l _)) //.
+      + rewrite Hdv02 /dv2 (dv_snoc_le c dv d0 0%nat (Nat.le_0_l _)) //.
   Qed.
 End segment'.
 
@@ -779,112 +1079,7 @@ Proof.
   - rewrite cand_last_img cand_last_log. exact Hlat.
 Qed.
 
-(** ** 4.4 [cblkp] — the [HEpair] block with its annotations exposed
-
-    The [cblk] twin: an [adm_run true] prefix, the exclusive READ, an
-    [LInstr]-free [adm_run false] middle, and the conditional WRITE.  The
-    read and write lists are the four stretches' concatenation. *)
-Definition cblkp (cpu : CPU) (d0 : dev_state) (ws : wstate) (lb : lbl)
-    (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
-    (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
-    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32) : Prop :=
-  ∃ ls1 ma rsa fna iba da rdsA wrsA annA
-    mm rsm fnm ibm dm rdsB wrsB annB
-    ls2 mm2 rsm2 fnm2 ibm2 dm2 rdsC wrsC annC rdsD wrsD annD,
-    (∀ l0, l0 ∈ ls1 → lb_admin true l0) ∧
-    phrun cpu ls1 rdsA wrsA annA m rs fn ib d0 ma rsa fna iba da ∧
-    hlbl_realizes_pair (PHart cpu ma rsa fna iba)
-      (PHart cpu mm2 rsm2 fnm2 ibm2) ws lb l1 l2 ∧
-    phrun cpu [l1] rdsB wrsB annB ma rsa fna iba da mm rsm fnm ibm dm ∧
-    (∀ l0, l0 ∈ ls2 → lb_admin false l0) ∧
-    phrun cpu ls2 rdsC wrsC annC mm rsm fnm ibm dm mm2 rsm2 fnm2 ibm2 dm2 ∧
-    phrun cpu [l2] rdsD wrsD annD mm2 rsm2 fnm2 ibm2 dm2 m' rs' fn' ib' d0 ∧
-    rds = rdsA ++ rdsB ++ rdsC ++ rdsD ∧
-    wrs = wrsA ++ wrsB ++ wrsC ++ wrsD.
-
-Lemma cblkp_intro cpu d0 ws lb l1 l2 ls1 pa da pm dm ls2 pm2 dm2
-    m rs fn ib m' rs' fn' ib' :
-  adm_run true (PHart cpu m rs fn ib) d0 ls1 pa da →
-  hlbl_realizes_pair pa pm2 ws lb l1 l2 →
-  pstep_ev pa da l1 pm dm →
-  adm_run false pm dm ls2 pm2 dm2 →
-  pstep_ev pm2 dm2 l2 (PHart cpu m' rs' fn' ib') d0 →
-  ∃ rds wrs, cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib'.
-Proof.
-  intros Har1 Hre Hst1 Har2 Hst2.
-  destruct (adm_run_phart true _ _ d0 ls1 da Har1 cpu m rs fn ib eq_refl)
-    as (ma & rsa & fna & iba & ->).
-  destruct (pstep_ev_phart cpu ma rsa fna iba da l1 pm dm Hst1)
-    as (mm & rsm & fnm & ibm & ->).
-  destruct (adm_run_phart false _ _ dm ls2 dm2 Har2 cpu mm rsm fnm ibm eq_refl)
-    as (mm2 & rsm2 & fnm2 & ibm2 & ->).
-  destruct (pevrun_phrun ls1 _ d0 _ da (adm_run_pevrun _ _ _ _ _ _ Har1)
-              cpu m rs fn ib ma rsa fna iba eq_refl eq_refl)
-    as (rdsA & wrsA & annA & HA).
-  destruct (pevrun_phrun [l1] _ da _ dm
-              (pevrun_more l1 [] _ da _ dm _ dm Hst1 (pevrun_nil _ _))
-              cpu ma rsa fna iba mm rsm fnm ibm eq_refl eq_refl)
-    as (rdsB & wrsB & annB & HB).
-  destruct (pevrun_phrun ls2 _ dm _ dm2 (adm_run_pevrun _ _ _ _ _ _ Har2)
-              cpu mm rsm fnm ibm mm2 rsm2 fnm2 ibm2 eq_refl eq_refl)
-    as (rdsC & wrsC & annC & HC).
-  destruct (pevrun_phrun [l2] _ dm2 _ d0
-              (pevrun_more l2 [] _ dm2 _ d0 _ d0 Hst2 (pevrun_nil _ _))
-              cpu mm2 rsm2 fnm2 ibm2 m' rs' fn' ib' eq_refl eq_refl)
-    as (rdsD & wrsD & annD & HD).
-  exists (rdsA ++ rdsB ++ rdsC ++ rdsD), (wrsA ++ wrsB ++ wrsC ++ wrsD).
-  exists ls1, ma, rsa, fna, iba, da, rdsA, wrsA, annA.
-  exists mm, rsm, fnm, ibm, dm, rdsB, wrsB, annB.
-  exists ls2, mm2, rsm2, fnm2, ibm2, dm2, rdsC, wrsC, annC, rdsD, wrsD, annD.
-  split_and!; [|exact HA|exact Hre|exact HB| |exact HC|exact HD
-              |reflexivity|reflexivity].
-  - by eapply adm_run_admin.
-  - by eapply adm_run_admin.
-Qed.
-
-Lemma cblkp_elim cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
-  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
-  ∃ ls1 pa da pm dm ls2 pm2 dm2,
-    adm_run true (PHart cpu m rs fn ib) d0 ls1 pa da ∧
-    hlbl_realizes_pair pa pm2 ws lb l1 l2 ∧
-    pstep_ev pa da l1 pm dm ∧
-    adm_run false pm dm ls2 pm2 dm2 ∧
-    pstep_ev pm2 dm2 l2 (PHart cpu m' rs' fn' ib') d0.
-Proof.
-  intros (ls1 & ma & rsa & fna & iba & da & rdsA & wrsA & annA &
-          mm & rsm & fnm & ibm & dm & rdsB & wrsB & annB &
-          ls2 & mm2 & rsm2 & fnm2 & ibm2 & dm2 & rdsC & wrsC & annC &
-          rdsD & wrsD & annD & Had1 & HA & Hre & HB & Had2 & HC & HD & _ & _).
-  exists ls1, (PHart cpu ma rsa fna iba), da, (PHart cpu mm rsm fnm ibm), dm.
-  exists ls2, (PHart cpu mm2 rsm2 fnm2 ibm2), dm2.
-  split_and!.
-  - apply (pevrun_adm_run true _ d0 ls1 _ da
-             (phrun_pevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ HA) Had1).
-  - exact Hre.
-  - apply pevrun_single_inv. by eapply phrun_pevrun.
-  - apply (pevrun_adm_run false _ dm ls2 _ dm2
-             (phrun_pevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ HC) Had2).
-  - apply pevrun_single_inv. by eapply phrun_pevrun.
-Qed.
-
-Lemma cblkp_relp cpu d0 ws ws' lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
-  w_relp ws' = w_relp ws →
-  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
-  cblkp cpu d0 ws' lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib'.
-Proof.
-  intros Hr (ls1 & ma & rsa & fna & iba & da & rdsA & wrsA & annA &
-          mm & rsm & fnm & ibm & dm & rdsB & wrsB & annB &
-          ls2 & mm2 & rsm2 & fnm2 & ibm2 & dm2 & rdsC & wrsC & annC &
-          rdsD & wrsD & annD & Had1 & HA & Hre & HB & Had2 & HC & HD & -> & ->).
-  exists ls1, ma, rsa, fna, iba, da, rdsA, wrsA, annA.
-  exists mm, rsm, fnm, ibm, dm, rdsB, wrsB, annB.
-  exists ls2, mm2, rsm2, fnm2, ibm2, dm2, rdsC, wrsC, annC, rdsD, wrsD, annD.
-  split_and!; [exact Had1|exact HA| |exact HB|exact Had2|exact HC|exact HD
-              |reflexivity|reflexivity].
-  by eapply hlbl_realizes_pair_relp.
-Qed.
-
-(** THE MIRROR, at the pair: an untainted pair block runs step for step from
+(** ** 4.4 THE MIRROR, at the pair: an untainted pair block runs step for step from
     the certified register file — [WeakRvwmoCert2.cert_block_mirror]'s twin,
     off [hlbl_realizes_pair_rs]. *)
 Theorem cert_block_pair_mirror (P : wreg → Prop) cpu d0 ws lb l1 l2 rds wrs
@@ -921,31 +1116,7 @@ Proof.
   by eapply hlbl_realizes_pair_rs.
 Qed.
 
-(** ** 4.5 The pair block, APPENDED *)
-Theorem cert_block_snoc_pair (c : cand) (x : agent) (pst : nat → list pexv6)
-    (dv : nat → dev_state) cpu d0 lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
-  srvwmo_consistent c →
-  exec_prog_ok' pstep_ev pcls_ev pst dv (cand_exec c) →
-  pst (cd_end c) !! x = Some (PHart cpu m rs fn ib) →
-  dv (cd_end c) = d0 →
-  cblkp cpu d0 (ms_ws (cand_last_st c) x) lb l1 l2 rds wrs
-    m rs fn ib m' rs' fn' ib' →
-  mstep_ok (cand_last_st c) x lb →
-  srvwmo_consistent (cand_snoc c (EStep x lb)) ∧
-  exec_prog_ok' pstep_ev pcls_ev
-    (pst_snoc c pst x (PHart cpu m' rs' fn' ib')) (dv_snoc c dv d0)
-    (cand_exec (cand_snoc c (EStep x lb))).
-Proof.
-  intros Hc Hpo Hp Hdv Hblk Hok. split; [by apply snoc_consistent|].
-  destruct (cblkp_elim cpu d0 _ lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' Hblk)
-    as (ls1 & pa & da & pm & dm & ls2 & pm2 & dm2 & Har1 & Hre & Hs1 & Har2 & Hs2).
-  eapply (exec_prog_ok'_snoc_pair c x _ pa da ls1 l1 l2 lb pm dm ls2 pm2 dm2
-            _ d0);
-    [exact Hpo|exact Hp| |exact Hre|exact Hs1|exact Har2|exact Hs2].
-  by rewrite Hdv.
-Qed.
-
-(** THE PAIR, CERTIFIED: the untainted mirror plus §4.3's admissibility.
+(** ** 4.5 THE PAIR, CERTIFIED: the untainted mirror plus §4.3's admissibility.
     This is (O-1) closed — an [amoswap.aq] block is now inside the
     certification's reach, at [G]'s own label. *)
 Theorem cert_block_pair (T : list wreg) G c ev W (x : agent)
@@ -1176,13 +1347,15 @@ Section nonvacuity3.
       = Some (EStep 0%nat (WeakAxiomatic.LStore false (pa_z ev_flag)
                              (wbytes 4 WeakLock.lock_one) WCplain)).
   Proof.
-    destruct (cert_segment' 0%nat cpu d0 [] lb_store_ne lb_store_ne_rmwfree
-                (λ _ : cand, True)
-                (λ c0 lb lb' _ _ _ _ _, I)
+    destruct (cert_segment' 0%nat cpu d0 [] lb_store_ne
+                (λ _ : cand, True) (λ _ _, True)
+                (λ c0 lb lb' _ _ _ _ _ _, I)
                 (λ c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
                    Hc _ Hlb H1 H2 H3,
-                   pol_store 0%nat cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0
+                   pol_store' 0%nat cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0
                      m' rs1' fn' ib' Hc Hlb H1 H2 H3)
+                (cpolp_of_rmwfree 0%nat cpu d0 [] (λ _ : cand, True)
+                   (λ _ _, True) lb_store_ne lb_store_ne_rmwfree)
                 0%nat ws_init ev_row (ev_p0 cpu rs ib) _ _
                 (nv_hemit cpu rs ib d0) nv_row_class
                 ev_x2.2 rs None ib eq_refl
@@ -1191,7 +1364,7 @@ Section nonvacuity3.
                 eq_refl eq_refl (dreg_agree_refl _ _)
                 ltac:(by rewrite (sm_ws img0)))
       as (c' & pst' & dv' & tradd & m1 & rs11 & rs21 & fn1 & ib1 &
-          Htr & Hag & Hf2 & Hc' & _ & Hpo' & _ & _ & _ & _ & _).
+          Htr & Hag & Hf2 & Hc' & _ & Hpo' & _ & _ & _ & _ & _ & _ & _ & _).
     exists c', pst', dv', tradd. split_and!;
       [by rewrite Htr|exact Hag|exact Hf2|exact Hc'|exact Hpo'|].
     by apply (seg_exit_write 0%nat ev_row tradd 0%nat).
@@ -1295,7 +1468,27 @@ Qed.
           when B2e-3c fixes the witness set.
 
     (P-4) PROGRESS (§5): that a certified remainder REACHES its boundary.
-          The EWPs' content; an explicit hypothesis by design. *)
+          The EWPs' content; an explicit hypothesis by design.
+
+    NOT OPEN ANY MORE (this session):
+
+    (O-1)/(O-F) THE FUSED EXCLUSIVE PAIR.  [cert_segment']'s [HEpair] case
+          is certified in place — by [cpolp] (§3.3c), the pair's own policy
+          — instead of refuted by [HQrmw].  [cpolp_of_rmwfree] recovers the
+          refutation for an RMW-free [Q]; §4.5's [cert_block_pair] is what
+          discharges the policy at a real site.  The appended label is
+          [G]'s OWN, because an RMW is never a witness ([witness_not_aq]).
+
+    (O-E) THE THREE BOOKKEEPING EQUATIONS are now STATED by
+          [cert_segment']: the certified candidate carries the same image
+          and the same index-0 process/device state as the one it started
+          from.  [WeakRvwmoWalk]'s [wlk_inv] consumes exactly those.
+
+    (W-3) THE STEP CLASSIFICATION travels with the step: [cert_segment']'s
+          [Cls] parameter is DELIVERED by the read policy and CONSUMED by
+          [Hpres].  It could not be otherwise — [lbl_reidx] is precisely
+          the relation that lets the appended label's read indices differ
+          from [G]'s, so no graph-side fact pins it. *)
 
 (* ====================================================================== *)
 (** * 8. AUDIT *)
@@ -1309,6 +1502,8 @@ Print Assumptions cert_floor_ok.
 Print Assumptions cert_read_in_log'.
 Print Assumptions cpol_read.
 Print Assumptions cert_segment'.
+Print Assumptions cblkp_rmw.
+Print Assumptions cpolp_of_rmwfree.
 Print Assumptions floor_ok_of_latest.
 Print Assumptions cert_rmw_latest.
 Print Assumptions cert_rmw_ok.

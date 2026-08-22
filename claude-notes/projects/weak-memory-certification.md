@@ -21,12 +21,34 @@ substituted at the empty log, hart 1's true).  FINDING: without the
 `ds_ld` emits the rule-13 edge, making LB INCONSISTENT — the announce
 is what resets `ds_ld`.  Whole tree green; all at the five axioms.
 
+**LEDGER CLOSED (same day):** (O-E) `cert_segment'` states the three
+bookkeeping equations; (O-F) the RMW block is certified in place
+(`cpolp`, never a witness); (W-4) `wnw` from the log-decided witness
+set `wwit`; (W-3) `wcls` ABSORBED into the policy's `Cls` output
+(finding: the classification is not derivable from graph/log facts —
+`lbl_reidx` is exactly the relation that lets indices differ).  The
+walk's remaining hypotheses: **(W-1) `wpol`** (the read/register
+policy, carrying progress and the classification) and **(W-2) `wub`**
+(`wit_fence_ub`), plus the graph datum `wrow_in_log`.
+
+**R-1(B) SLICE 1 LANDED:** `tools/gen_pins.py` + `KernelPinsDef.v` +
+`KernelPins.v` — 1611 loads certified by one 0.3 s reflection lemma
+(`image_pinnedb`, `pins_cover`): 991 Stack / 3 PerCpu / 247 Ctrl /
+2 Fence / 138 Dep / 162 Call / 68 Residue; the store-unpinned residue
+is exactly the ten lock-payload sites; `userret`/`swtch` the ownership
+idioms.  Python-trusted: full-path coverage (reported), callee
+summaries (next).
+
 **WHAT REMAINS:**
-1. Close the walk's ledger: (O-E) strengthen `cert_segment'`'s
-   conclusion (two lines in Cert3); (W-3)/(W-4) from the gmo-order
-   policy; (O-F) the RMW segment (`cert_block_pair` exists);
-   (W-1)/(W-2) are the genuine hypotheses (progress = the EWPs; the
-   fence hook).
+1. R-1(B) slice 2: callee summaries for the ~30 leaf helpers (162
+   `Call` sites), path coverage re-checked in Rocq (both branch arms),
+   then THE BRIDGE: a `PCtrl/PFence/PDep` witness at a row read's site
+   ⇒ `seg_pin` at the graph level (the emission's items carry the same
+   roles — relate `KernelPinsDef.taint_step` to `WeakRvwmoConf.dstep`).
+   The 68 + 10 residue ⇒ the `WProt` convention (A) as M4 ports them.
+1b. (W-1)/(W-2) are the EWPs' content (progress; the fence hook) —
+   state them once against the WP package and discharge from the
+   adequacy theorem (a sibling export), not per site.
 2. **R-1, L2′ proper** — (A) the `WProt` port convention; (B)
    `gen_pins.py` + `KernelPinsDef.v` (§4g.1), then the bridge to
    `seg_pin`.
