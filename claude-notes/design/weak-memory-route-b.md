@@ -989,28 +989,41 @@ hypotheses of `cs_kill`, machine-grounded.
   kernel-level exhaustiveness claim; its failure mode is a site whose
   xv6 code is genuinely weak-memory-unsafe, and it is repaired by the
   Iris invariant (a fence or a lock), never by a premise.
-- **B1b — THE DEVICE ORDER IS THE OPEN DESIGN POINT (noted 2026-08-22).**
-  `exec_prog_ok'` is TRACE-indexed with ONE global device sequence
-  `dv : nat → dev_state` (`dv (S k)` is the post-fabric of the k-th
-  step), while `gdexec_conf`'s `dvp : agent → nat → dev_state` is
-  per-hart, row-indexed.  A global `dv` exists for a linearized cand
-  only if the per-hart device sequences CHAIN along the trace — i.e.
-  the device-touching events (and the admin `LDev` items riding in
-  their `adm_star` runs) are totally ordered in a way the
-  linearization preserves.  `R` does not contain that order today, so
-  a topological order of `R` may interleave two harts' MMIO runs
-  differently from `G`'s gmo and no `dv` threads.  Resolution to
-  build: make the FABRIC ORDER graph data — `Rdev := gmo restricted to
-  the fabric-touching events` (honest: MMIO is serialized by the
-  interconnect and the M5 fence discipline pins it into gmo), add it
-  to `R` (still ⊆ gmo, so `R_acyclic`/`topo_linearizes`/hulls extend
-  verbatim — it is a sixth arm), and state `gdexec_conf`'s device
-  parameter along that chain (`dvp` = the global fabric trace composed
-  with "the fabric position of hart i's n-th event", with non-fabric
-  steps leaving the device unchanged).  Do NOT try to derive the
-  device order from the lock structure (that would need the exports
-  at the very realization B1b is building).  Read `WeakAxRealize.v`
-  §adm_star/`LDev` and `WeakRvwmoConf.v` (S-d) before designing.
+- **B1b — DESIGNED (2026-08-22, on a read-only probe; the earlier
+  "`Rdev` from the labels" idea is WRONG and retracted).**  Facts:
+  MMIO loads/stores of a hart are NOT memory events — the instance
+  emits the admin label `LDev` for any `dev_addr` access
+  (`WeakEvInst.v` ~296/329), so `proj_lbl … LDev = None` and no graph
+  row carries a fabric access; `LDev` is admitted in both `adm_star
+  true` and `adm_star false`, so any hart's administrative run may
+  move the fabric; the disk is a graph agent (its DMA is real
+  `LLoad`/`LStore`) whose device steps are likewise admin.
+  `pdev_ev_ok` (`WeakEvInst.v` ~1496) says non-`LDev` steps are
+  fabric-PRESERVING and fabric-BLIND (`∀ d0, pstep p d0 l p' d0`).  In
+  `exec_prog_ok'` the fabric therefore moves only inside the admin
+  stars, and a global `dv` for an interleaving of per-hart emissions
+  exists iff the per-hart fabric sequences CHAIN across the trace
+  (DEV-CHAIN: hart i's k-th post-fabric = the next step's hart's
+  pre-fabric).  STAGING: (B1b-1) FABRIC QUIESCENCE — `em_devfree em :=
+  LDev ∉ em_labels em`; then every `dvp i` is constant `d0`, `dv :=
+  λ _, d0` threads through ANY interleaving, and by fabric-blindness
+  the emission replays at whatever fabric the run is at.  Two pure
+  lemmas carry it (`hemit_devfree_const`, `hemit_devfree_reindex`,
+  both by induction on `hemit` with `pdev_ev_ok`); then the
+  interleaving theorem `gdexec_qconf boot GD → hull … → ∃ c pst,
+  srvwmo_consistent c ∧ cd_img c = gx_img ∧ pst 0 = boot-list ∧
+  exec_prog_ok' pstep_ev pcls_ev pst (λ _, d0) (cand_exec c)`, plus
+  the `pst 0`/`dv 0`/`cd_img` boot equations T1 consumes.  This is an
+  HONEST MILESTONE (the tier-2 capstone for device-quiet executions),
+  not the final theorem.  (B1b-2) THE FABRIC ORDER AS BUNDLE DATA: the
+  conformance bundle gains the global fabric trace and, per row
+  event, the fabric positions its block's `LDev` items occupy; the
+  induced order on row events (`gd_dev`, ⊆ gmo as an axiom — the M5
+  fence discipline is what makes hardware honor it) becomes a sixth
+  `R` arm, so `R_acyclic`/`topo_linearizes`/hulls extend as for
+  deps, and DEV-CHAIN holds for every linear extension.  The
+  single-active-agent relaxation (`ρ i k = k`, `dv := dvp i`) is what
+  §4d.2(2)'s solo runs need and comes for free.
 - **B1b, B3, R6** as before (B1b now supplies `exec_prog_ok'` for a hull's
   linearization).
 
@@ -1122,6 +1135,28 @@ names", and there are two ways to get it:
   (ii) is cleaner and sound-by-construction; (i) keeps the machine
   untouched.  Lean (ii) unless the instance's `RegRead` capture is
   awkward; probe that first.
+DECIDED (2026-08-22, on the read-only probe): **(ii) DYNAMIC
+PROVENANCE.**  Evidence: `RegRead` is answered silently from `rs`
+(`WeakEvLang.v` ~687, `WeakEvInst.v` ~284) with no accumulator, and the
+one natural home for a per-instruction read set is the announced-bits
+channel `oib32 := option (mword 32)` widened to carry `list wreg`,
+reset at the two instruction boundaries (`Ret tt` and
+`InstrAnnounce`); `erw_of`'s SOURCE component is the only consumer to
+change (the DESTINATION stays decoded — D-4's "which node is `rd`"
+join); the machine only joins `srcs` into views (`srcs_view`,
+`regw_post`, `ctrl_post`) and its sole side condition
+`srcs_view_bounded` is `∀ l`; `dstep`/`dedges` are generic; nothing
+outside `WeakEvLang`/`WeakEvInst` ties `srcs` to `deps_of_bits` (the
+`vm_compute` witnesses are `Example`s to re-record).  The generic
+determinism spine exists: `WeakEvLift.esil_node_agree` /
+`erun_silent_sound` (silent nodes) and `WpDecodeBridge.exec_goodb_congr`
+(decode); the soundness lemma adds "equal memory-read answers".
+Option (i) would be ≈20 base forms × (execute + fetch + walk + CSR)
+Sail inventories with no memory-arm congruence to lean on.  FIRST
+PROBE (the build's step 0): widen `oib32`, make the `RegRead` arm
+record `r` and the boundaries reset, and check `pcls_ev_erasable` and
+`esil_node_agree`/`erun_silent_sound` still go through; ~64 `wgib`
+sites are the mechanical blast radius.
 Order of work for B2e-3b, revised: (1) the satp-provenance edge in the
 emission (`dstep` + the instance's CSR write annotation); (2) the
 soundness lemma, stated once over `pstep_ev` ("agreement on named
