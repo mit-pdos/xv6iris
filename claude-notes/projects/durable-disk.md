@@ -360,6 +360,40 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       + `HLw`, `= restrict(A)` via (a), wf — the commit fupd for
       `fs_commit_permit_named` assembles generically, no exit arm
       states install-arithmetic.
+- [ ] **G1-impl.** The rows, as Coq (execution-ready once F2 lands;
+      Opus lane). `LogInv.v`: `Definition op_pending (om) : gset Z :=
+      map_fold (fun _ e acc => e.1.2 ∪ acc) ∅ om`; FUSE
+      `log_batch ∗ log_mirror_clean` into one bundle
+      `log_state bn γfs cov ls n LB (pend : gset Z)` binding
+      `∃ W L D M A` with the existing log_batch rows plus:
+      `log_mirror_half M ∗ ⌜lm_hdr M ls = (0,[])⌝`,
+      (a) `⌜dom A = fs_home_set cov ls⌝ ∗ ⌜fs_durable_wf_body A⌝ ∗
+      ⌜∀ b ∈ fs_home_set cov ls, b ∉ pend -> L !! b = A !! b⌝`,
+      (b) `⌜∀ b ∈ fs_home_set cov ls, b ∉ LB -> lm_view M b =
+      <the bytes of L at b>⌝`. `log_res` passes `pend := op_pending om`.
+      Touch points: the four `log_*_step` transitions; `ProofLogWrite`'s
+      repack (free: the written block is in its op's `e.1.2` after
+      `log_record_step`, so `pend` grows — row (a)'s domain shrinks;
+      row (b): b joins LB); `ProofBeginOp`/`ProofEndOp`
+      checkout/deposit (`eo_open_of_batch`/`eo_open_to_batch` now
+      destructure `log_state`; at the commit checkout `out = 0` gives
+      `pend = ∅`, hence `L = A` on homes); `ProofSysSync`; the boot
+      establishment (A₀ := the boot image's home restriction, `wf_body`
+      via `FsWfImg.fsimg_durable_wf` — which needs `fs_links_eq` ADDED
+      to `FsCfgBoot.fs_boot_image_wf` as conjunct (13), discharged at
+      the image by `FsImgCheck.fsimg_links_eq`, threaded through
+      `BootShared`/`SystemAdequacy`/`FsAdequacyImg` premises).
+      INTERIM DISCHARGE at the 26 arms: until G2's real per-op
+      preservation lands, each `end_op` arm may re-establish row (a)
+      only if its op wrote nothing (A := A) — arms whose ops DO write
+      need the real proof, so G1-impl and G2 land TOGETHER per-arm:
+      start with the read-only ops (kexec, kexit, sys_chdir,
+      fileclose-no-write arms) and the no-op paths, and hold a
+      PLACEHOLDER row-(a) escape (`A` re-chosen := L's home
+      restriction, wf via a `fs_durable_wf_body`-placeholder-style
+      gate lemma `log_state_TODO_rebase`) for the writing arms so the
+      tree stays green while G2 proceeds arm by arm; the gate lemma's
+      deletion is G2's completion check.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
