@@ -368,6 +368,7 @@ Require Import BioInv.
 Require Import FsReady FsCfg.
 Require Import FirstTok.  (* [first_done] -- syscall_env's last conjunct *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] -- what the producer below takes *)
+Require Import ParkCap.      (* [park_token] -- the park, handed down through [syscall_env] *)
 Require Import SpecSyscall.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -978,7 +979,14 @@ Section SyscallVocab.
         exactly where forkret will discharge it -- its boot arm persists the
         store and seals the file system, its steady arm already holds
         both halves. *)
-     FirstTok.first_done)%I.
+     FirstTok.first_done ∗
+     (* ...AND THE WORLD A CHILD'S PARK NEEDS ([SyscParkEnv.park_world]),
+        appended LAST for the same positional reason: fork hands it down
+        to kfork, which builds the child's trap-loop environment from it.
+        The parker of THIS process supplied it ([UsertrapRes.ut_park_caps])
+        and [syscall_env_park] copies it in. *)
+     park_world (fcn_procs fn) ∗
+     park_token (fcn_procs fn))%I.
 
   (* ===================================================================== *)
   (* ...AND ITS PRODUCER.  [SpecSyscall.SYSCALL]'s [syscall_env_park].       *)
@@ -1033,9 +1041,11 @@ Section SyscallVocab.
     procs_inv (fcn_procs fn) -∗
     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
     first_done -∗
+    park_world (fcn_procs fn) -∗
+    park_token (fcn_procs fn) -∗
     syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
   Proof.
-    iIntros (Hties Hj Hplock Hdq) "#Hextra #Hwl #Hft #Hprocs #Hdg #Hdone".
+    iIntros (Hties Hj Hplock Hdq) "#Hextra #Hwl #Hft #Hprocs #Hdg #Hdone #Hworld #Htok".
     iDestruct "Hextra" as "(#Hnextpid & #Hpav & #Htick & #Hcons)".
     iDestruct "Hdone" as "[#Hcell #Hrdy]".
     pose proof Hties as Ht.
@@ -1059,7 +1069,9 @@ Section SyscallVocab.
       iFrame "Hprocs Hdg".
       iSplitR; [rewrite Hdlock Hdisk Hpd Hpav Hpu; iExact "Hdlk"|].
       iExact "Hrdy". }
-    rewrite /first_done. iFrame "Hcell Hrdy".
+    iSplitR; [rewrite /first_done; iFrame "Hcell Hrdy"|].
+    iSplitR; [iExact "Hworld"|].
+    iExact "Htok".
   Qed.
 
   (* THE CONSOLE, reached on its own rather than through [syscall_env_all].
@@ -1089,7 +1101,17 @@ Section SyscallVocab.
   Lemma syscall_env_first (γf : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) :
     syscall_env γf pj bn fn -∗ FirstTok.first_done.
-  Proof. by iIntros "(_ & _ & _ & $)". Qed.
+  Proof. by iIntros "(_ & _ & _ & $ & _)". Qed.
+
+  Lemma syscall_env_world (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) :
+    syscall_env γf pj bn fn -∗ park_world (fcn_procs fn).
+  Proof. by iIntros "(_ & _ & _ & _ & $ & _)". Qed.
+
+  Lemma syscall_env_token (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) :
+    syscall_env γf pj bn fn -∗ park_token (fcn_procs fn).
+  Proof. by iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and
@@ -3067,16 +3089,21 @@ Section SyscallArms.
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & #Hireg & _)".
     iEval (rewrite Hdev) in "Hitable".
-    (* the child's token's source *)
+    (* the child's token's source, and the world its park needs *)
     iDestruct (syscall_env_first with "Henvc") as "#Hfdone".
+    iDestruct (syscall_env_world with "Henvc") as "#Hworld".
+    iDestruct (syscall_env_token with "Henvc") as "#Htoken".
+    (* the proc array at [fn]'s OWN spelling: the world and the token are
+       stated there, so the callee is instantiated there too *)
+    iDestruct "Hfsenv" as "(_ & #Hprocs' & _)".
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
-              γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
+              (fcn_procs fn) (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
               (fcn_inodestart fn) (fcn_nib fn)
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hfdone Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs' Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hworld Htoken Hfdone Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }

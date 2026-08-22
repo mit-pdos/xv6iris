@@ -68,7 +68,8 @@ Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Require Import UserFrame.  (* [u_regs_pc_is]: the pc_is bundle in u_regs *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import ParkCap.   (* [park_token] *)
+Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -225,7 +226,8 @@ Section Res.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UV.usertrap_res_bare (CID := h)) N av
+        (fun h : CpuId => UV.usertrap_res_bare (CID := h))
+        (park_token (un_s N)) N av
     := UV.usertrap_res_bare_park N av.
 
 End Res.

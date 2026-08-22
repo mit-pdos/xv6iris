@@ -424,6 +424,12 @@ Section KforkPrologue.
            and a generic 14-word existential cannot be split back into those.
            The uvmcopy-FAILURE continuation above keeps [own_ctx], because
            freeproc's [fp_rest] wants exactly that and nothing sharper. *)
+        (* ...AND THE CHILD'S BIO UNITS AND FREE KERNEL STACK, no longer
+           dropped here: the success path's park is the PAID one now
+           ([SpecForkretParkPaid]), anchored on the stack and carrying the
+           three units into the child's residue ([UsertrapRes.park_own]). *)
+        bslots 3 -∗
+        ProcDefs.kstack_free npa -∗
         (∃ (ks : mword 64) (rest : list (mword 64)),
            ⌜length rest = 12%nat⌝ ∗
            ProcDefs.is_kstack npa ks ∗
@@ -1287,7 +1293,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
-                        Hmk Hheld Hhart Hfdsp Hirsp [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
+                        Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.

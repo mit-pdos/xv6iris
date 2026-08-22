@@ -174,6 +174,7 @@ Require Import SpecProcinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -258,6 +259,15 @@ Definition wp_kfork_sconf_body
      kfork keeps allocproc's empty-table disjunct and handles it (the
      [return -1]).  Only [userinit] runs in the counted regime.  *)
   procs_avail None -∗
+  (* THE WORLD THE CHILD'S PARK NEEDS ([SyscParkEnv.park_world]) -- see
+     [SpecSysFork]; kfork builds the child's trap-loop environment
+     ([UsertrapRes.park_env]) out of it at its first release. *)
+  park_world γs -∗
+  (* ...AND THE PARK ITSELF, as a resource ([ParkCap.park_token]): this is
+     what lets kfork be proved WITHOUT a functor over the park's proof --
+     which would be a module cycle, since that proof runs the trap loop
+     kfork sits inside.  See ParkCap.v. *)
+  park_token γs -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is

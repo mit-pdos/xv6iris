@@ -107,7 +107,7 @@ Section ProofSysFork.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv #Hireg Henv #Hpav #Hfdone Hpriv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hpriv Hcont".
     iPoseProof (sf_00 with "Htext") as "Hi00".
     iPoseProof (sf_02 with "Htext") as "Hi02".
     iPoseProof (sf_04 with "Htext") as "Hi04".
@@ -188,7 +188,7 @@ Section ProofSysFork.
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hireg Henvn Hpav Hfdone Hpriv").
+                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hfdone Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henvr & %Hrv)".
     (* ...and back to the bundle sys_fork's own contract hands on. *)

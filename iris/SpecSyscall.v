@@ -141,6 +141,7 @@ Require Import FileInv.      (* [is_ftable] *)
 Require Import DiskInv.      (* [disk_geom] *)
 Require Import FirstTok.     (* [first_done] -- what the environment's producer takes *)
 Require Import SyscParkEnv. (* [sysc_park_extra] -- and the four rows it does not *)
+Require Import ParkCap.     (* [park_token] -- the park, as the resource fork hands down *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -326,7 +327,26 @@ Module Type SYSCALL.
       procs_inv (fcn_procs fn) -∗
       disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
       first_done -∗
+      (* the world a child's park needs, copied in -- see [ProofSyscall]'s
+         [syscall_env] *)
+      park_world (fcn_procs fn) -∗
+      (* ...and THE PARK TOKEN ([ParkCap.park_token]): the park itself, as
+         the resource a process hands its children.  Supplied at the
+         resume, by forkret, which holds it outright. *)
+      park_token (fcn_procs fn) -∗
       syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+
+  (* ...and read back out, for fork's sake *)
+  Parameter syscall_env_world :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names),
+      syscall_env γf pj bn fn -∗ park_world (fcn_procs fn).
+  Parameter syscall_env_token :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names),
+      syscall_env γf pj bn fn -∗ park_token (fcn_procs fn).
 
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,

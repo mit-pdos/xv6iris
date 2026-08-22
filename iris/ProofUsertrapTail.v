@@ -139,7 +139,7 @@ Section ProofUsertrapTail.
     iIntros "#Htext Hpc Hcg Hcl (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct "Hcaps" as "(#Hpi & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
-                           & #Hgeom & #Hav & #Hties & #Hfsr)".
+                           & #Hgeom & #Hav & #Hties & #Hfsr & #Hpw)".
     iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & _)".
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
     iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)

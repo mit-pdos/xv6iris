@@ -22,7 +22,7 @@
    `Filedup`/`Idup`'s own transitive callees, not from this file. *)
 Require Import LinkMyproc LinkAllocproc LinkUvmcopy LinkFreeproc.
 Require Import LinkRelease LinkAcquire LinkFiledup LinkIdup.
-Require Import LinkSafestrcpy LinkForkretPark.
+Require Import LinkSafestrcpy.
 Require Import ProofKforkMain.
 
 (* The functor is [KforkProof], not [Kfork]: tools/proof_coverage.py matches
@@ -32,4 +32,4 @@ Require Import ProofKforkMain.
    file in the tree uses the same bare `<F>Proof` convention. *)
 Module Kfork := KforkProof
   Myproc AllocprocGen Uvmcopy Freeproc Release Acquire
-  Filedup Idup Safestrcpy ForkretPark.
+  Filedup Idup Safestrcpy.

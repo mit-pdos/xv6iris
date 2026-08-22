@@ -71,18 +71,19 @@ Require Import FsCrash.
 Require Import UserPtTree.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
+Require Import SpecSysExec.   (* [K_sys_exec] -- usertrap's budget bottoms out in exec *)
+Require Import SpecUsertrap.  (* [usertrap_ret_ms] / [usertrap_entry_ms]; the fit check moved to UtResFits.v *)
 Require Import FsCfg.    (* [fsc_printk] etc -- the ambient names the ties point at *)
 Require Import FirstTok.     (* [first_done] -- what the park's closer is handed *)
-Require Import SyscParkEnv.  (* [sysc_park_extra] -- the park's syscall-side rows *)
+Require Import SyscParkEnv.  (* [sysc_park_extra] / [park_world] -- the park's syscall-side rows *)
+Require Import ConsoleInv WireInv TrampPt KptExecMap.   (* [park_world_open]'s rows *)
 Require Import FsReady.
 Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
 Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)
 Require Import DiskInv.          (* [disk_geom] / [disk_res] *)
 Require Import SpecDevintr.
 Require Import SpecPrintk.
-Require Import SpecSyscall.
 Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
-Require Import SpecUsertrap.   (* USERTRAP_RES -- the fit is checked at the foot *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -110,7 +111,10 @@ Import Defs.
    [intr_on] pays for them out of its.  Only the syscall arm needs it, but a
    function has one budget.  The other four arms never re-enable, so they
    fit in [4 + K_syscall] and nothing there notices. *)
-Notation K_usertrap := ((4 + kv_frame_slots + K_syscall)%nat) (only parsing).
+(* [K_syscall] is [SpecSyscall]'s notation for [4 + K_sys_exec]; this file
+   sits BELOW [SpecSyscall] now (ParkCap.v says why), so it spells it out.
+   Same term, so every consumer stated at [K_syscall] is unaffected. *)
+Notation K_usertrap := ((4 + kv_frame_slots + (4 + K_sys_exec))%nat) (only parsing).
 Section UsertrapRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -541,6 +545,23 @@ Section UsertrapRes.
      is_tickslock γtl ∗
      procs_inv γs)%I.
 
+  (* [SyscParkEnv.park_world], opened: its first six rows ARE
+     [devintr_caps_any] at the ambient names. *)
+  Lemma park_world_open (γs : list gname) :
+    park_world γs -∗
+    ∃ (γtl : gname) (pd pav pu : mword 64),
+      devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu ∗
+      sysc_park_extra γtl ∗
+      wire_inv ∗ kmap_at tramp_vpn tramp_ppn KP_rx ∗
+      (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip).
+  Proof.
+    iIntros "H". iDestruct "H" as (γtl pd pav pu)
+      "(#Hdev & #Hcc & #Hgeom & #Hdlk & #Htl & #Hpi & #Hcr & #Hnp & #Hpav & #Hwire & #Hkmap & #Hip)".
+    iExists γtl, pd, pav, pu. iFrame "Hwire Hkmap Hip".
+    iSplitR; [rewrite /devintr_caps_any; iFrame "Hdev Hcc Hgeom Hdlk Htl Hpi"|].
+    rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".
+  Qed.
+
   Global Instance devintr_caps_any_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps_any γu γv γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps_any. apply _. Qed.
@@ -601,7 +622,12 @@ Section UsertrapRes.
      (* the file system as fileclose/kexit see it: the ambient [fs_ready]
         and the ties from [un_fn N]'s fields to the ambient names *)
      ⌜fclose_ties (un_fn N)⌝ ∗
-     FsReady.fs_ready)%I.
+     FsReady.fs_ready ∗
+     (* ...AND THE WORLD A CHILD'S PARK NEEDS ([SyscParkEnv.park_world]):
+        what fork hands down.  It is here so that usertrap can pass it to
+        syscall and syscall to sys_fork; the parker of THIS process put it
+        here ([ut_park_caps]). *)
+     park_world (un_s N))%I.
 
   Global Instance ut_caps_persistent N : Persistent (ut_caps N).
   Proof. rewrite /ut_caps. apply _. Qed.
@@ -650,7 +676,8 @@ Section UsertrapRes.
        (un_pd N) (un_pav N) (un_pu N) ∗
      is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
      is_ftable (un_ft N) (un_f N) ∗
-     disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N))%I.
+     disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
+     park_world (un_s N))%I.
 
   Global Instance ut_park_caps_persistent N : Persistent (ut_park_caps N).
   Proof. rewrite /ut_park_caps. apply _. Qed.
@@ -664,7 +691,7 @@ Section UsertrapRes.
   Lemma ut_caps_of_park (N : ut_names) :
     ut_park_caps N -∗ FsReady.fs_ready -∗ ut_caps N.
   Proof.
-    iIntros "(%Hties & %Hpr & #Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg) #Hfs".
+    iIntros "(%Hties & %Hpr & #Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg & #Hpw) #Hfs".
     (* the eighteen field equations, spelled at the RECORD's fields rather
        than at [un_fn]'s projections of them, so every [rewrite] below is
        syntactic.  [Hties] itself is kept whole: it is conjunct 17. *)
@@ -712,7 +739,8 @@ Section UsertrapRes.
     iSplitR; [iExact "Hdg"|].
     iSplitR; [rewrite Hkalloc; iExact "Hkav"|].
     iSplitR; [iPureIntro; exact Hties|].
-    iExact "Hfs".
+    iSplitR; [iExact "Hfs"|].
+    iExact "Hpw".
   Qed.
 
   (* vmfault's and the kalloc cone's bundle, assembled out of three
@@ -1539,7 +1567,7 @@ Section UsertrapRes.
      see its definition. *)
   Lemma ut_nx_bound (b : bool) (av nx : nat) :
     (K_usertrap <= av)%nat -> (trap_res b + nx)%nat = (av - 4)%nat ->
-    (K_syscall <= nx)%nat.
+    (4 + K_sys_exec <= nx)%nat.
   Proof.
     unfold trap_res. destruct b; lia.
   Qed.
@@ -1552,7 +1580,7 @@ Section UsertrapRes.
      demands, and why [K_usertrap] carries the summand at all. *)
   Lemma ut_nx_bound_off (av nx : nat) :
     (K_usertrap <= av)%nat -> (trap_res false + nx)%nat = (av - 4)%nat ->
-    (kv_frame_slots + K_syscall <= nx)%nat.
+    (kv_frame_slots + (4 + K_sys_exec) <= nx)%nat.
   Proof. unfold trap_res. lia. Qed.
 
   (* WHAT THE FLIP AT +0x9e TAKES OUT OF THE PER-CPU BUNDLE.  The enabling
@@ -1613,6 +1641,15 @@ Definition ut_park_intro_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (URB : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (* WHAT THE SYSCALL ENVIRONMENT WANTS BESIDE THE FILE SYSTEM, supplied
+       at the RESUME like [first_done] and the timer capability: an abstract
+       [W] here, the fit check instantiates it ([UtResFits]).  It is the
+       channel through which a process's park token reaches its children
+       ([ParkCap.park_token]) -- and the reason it arrives at the resume
+       rather than at the park is that the parker holds it only under a
+       later (the token is a guarded fixpoint), while forkret holds it
+       outright. *)
+    (W : iProp Σ)
     (N : ut_names) (av : nat) : Prop :=
   ut_wf N ->
   (K_usertrap <= av)%nat ->
@@ -1624,6 +1661,7 @@ Definition ut_park_intro_body
           there, and [V'] is the descriptor it handed back -- see [ut_tfk]. *)
        ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
        FirstTok.first_done -∗
+       W -∗
        (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
           not owned by the record: it is [mcounteren]/[stimecmp] at THAT
           hart, minted in that hart's own boot chain (see
@@ -1641,16 +1679,18 @@ Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+    (W : iProp Σ)
     (N : ut_names) (av : nat) :
   ut_wf N ->
   (K_usertrap <= av)%nat ->
   ut_park_caps N -∗
-  (FirstTok.first_done -∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
+  (FirstTok.first_done -∗ W -∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
   park_own N -∗
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
      FirstTok.first_done -∗
+     W -∗
      (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
         not owned by the record: it is [mcounteren]/[stimecmp] at THAT
         hart, minted in that hart's own boot chain (see
@@ -1666,8 +1706,8 @@ Lemma ut_res_bare_park
        (add_vec (un_ks N) (mword_of_int 4096))).
 Proof.
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' V') "%Hupt #Htfk #Hdone #Htc Htrap Hpriv Hfd Hiref".
-  iDestruct ("Hderive" with "Hdone") as "Hsys".
+  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+  iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
   iDestruct "Hown" as "(Hbs & Hip)".
@@ -1767,146 +1807,3 @@ Qed.
 (* itself still abstract (SpecSyscall's contract is ASSUMED), so the        *)
 (* definition can only be written under a SYSCALL.                         *)
 (* ---------------------------------------------------------------------- *)
-(* ---------------------------------------------------------------------- *)
-(* THE PARK'S CHANNEL THROUGH THE MODULE TYPES.                             *)
-(* ---------------------------------------------------------------------- *)
-(* [usertrap_res_bare] is a [Parameter] of [SpecUsertrap.USERTRAP_RES], and *)
-(* that is right for every CONSUMER of the residue: the trap loop threads    *)
-(* it opaquely and nothing outside [ProofUsertrap] should know its shape.    *)
-(* A PARK IS NOT A CONSUMER.  It has to PRODUCE one, for a process that has  *)
-(* never trapped, and no amount of threading gets you a resource you do not  *)
-(* have -- which is why parking a fresh process has been assumed since kfork *)
-(* was written.                                                             *)
-(*                                                                          *)
-(* So the residue gets exactly ONE producer-side entry, stated at            *)
-(* [ut_park_intro_body] above and proved by [UtResFits] below (and by        *)
-(* [ProofUsertrap], which is the sealed one).  The syscall environment stays *)
-(* abstract throughout: what crosses the boundary is a closer, not a bundle. *)
-(*                                                                          *)
-(* THIS CANNOT LIVE IN [SpecUsertrap.v].  That file is REQUIRED BY this one  *)
-(* (its foot is the [<: USERTRAP_RES] fit check), so it cannot name          *)
-(* [ut_names], [ut_caps], [park_own] or [ut_res_bare] -- the whole           *)
-(* vocabulary such a parameter needs.  Hence the two module types here.      *)
-(* ---------------------------------------------------------------------- *)
-Module Type USERTRAP_RES_PARK.
-  Include SpecUsertrap.USERTRAP_RES.
-  Parameter usertrap_res_bare_park :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (N : ut_names) (av : nat),
-      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h)) N av.
-End USERTRAP_RES_PARK.
-
-(* ...and the same entry beside the boundary theorem, which is what
-   [ProofUsertrap] is sealed at.  Module subtyping is structural, so a
-   module of this type serves anywhere [USERTRAP_RES_PARK] is wanted. *)
-Module Type USERTRAP_PARK.
-  Include SpecUsertrap.USERTRAP.
-  Parameter usertrap_res_bare_park :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (N : ut_names) (av : nat),
-      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h)) N av.
-End USERTRAP_PARK.
-
-Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
-
-  Definition usertrap_res
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res (SY.syscall_env).
-
-  Definition usertrap_res_parked
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_parked (SY.syscall_env).
-
-  Lemma usertrap_res_tlb_close
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
-    usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
-  Proof. exact (ut_res_tlb_close (SY.syscall_env) pt ksp kroot). Qed.
-
-  Lemma usertrap_res_tlb_open
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res pt ksp -∗
-    ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_tlb_open (SY.syscall_env) pt ksp). Qed.
-
-  Definition usertrap_res_bare
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_bare (SY.syscall_env).
-
-  Lemma usertrap_res_pt_close
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_pt_close (SY.syscall_env) pt ksp). Qed.
-
-  Lemma usertrap_res_pt_open
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
-  Proof. exact (ut_res_pt_open (SY.syscall_env) pt ksp). Qed.
-
-  Lemma usertrap_res_bare_norm
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
-  Proof. exact (ut_res_bare_norm (SY.syscall_env) pt ksp). Qed.
-
-  Lemma usertrap_res_tf_open
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗
-    ∃ (kroot : mword 44) (ws : list (mword 64)),
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-      (∀ ws' : list (mword 64),
-         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_open (SY.syscall_env) pt ksp). Qed.
-
-  Lemma usertrap_res_csrs_open
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗
-    hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_csrs_open (SY.syscall_env) pt ksp). Qed.
-
-  Lemma usertrap_res_sstc
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
-  Proof. exact (ut_res_bare_sstc (SY.syscall_env) pt ksp). Qed.
-
-  Lemma usertrap_res_tf_csrs_open
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-    usertrap_res_bare pt ksp -∗
-    ∃ (kroot : mword 44) (ws : list (mword 64)),
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
-      tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
-      (∀ ws' : list (mword 64),
-         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
-         usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp). Qed.
-
-  (* THE PRODUCER, ASSEMBLED.  Two halves, and the seam between them is the
-     whole reason this is provable at all: [ut_res_bare_park] turns
-     [ut_park_caps] plus [FirstTok.first_done] into [ut_caps]
-     ([ut_caps_of_park]) and takes the environment as a WAND, and
-     [SY.syscall_env_park] is that wand.  Neither half owns the file system;
-     both are handed it at the moment the record resumes, which is the only
-     moment anybody has it. *)
-  Lemma usertrap_res_bare_park
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (N : ut_names) (av : nat) :
-      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h)) N av.
-  Proof.
-    rewrite /ut_park_intro_body /usertrap_res_bare.
-    intros Hwf Hav.
-    pose proof Hwf as Hwf2.
-    destruct Hwf2 as (Hj & Hplock & _ & _).
-    iIntros "#Henv Hown".
-    iDestruct "Henv" as "[#Hcaps #Hextra]".
-    iApply (ut_res_bare_park (SY.syscall_env) N av Hwf Hav
-            with "Hcaps [] Hown").
-    iIntros "#Hdone".
-    iDestruct "Hcaps" as "(%Hties & _ & #Hprocs & _ & _ & #Hwl & #Hft & #Hdg)".
-    iApply (SY.syscall_env_park (un_f N) (un_w N) (un_ft N) (un_tk N)
-              (un_fn N) Hties Hj Hplock eq_refl
-            with "Hextra Hwl Hft Hprocs Hdg Hdone").
-  Qed.
-
-End UtResFits.

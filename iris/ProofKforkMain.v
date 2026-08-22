@@ -141,7 +141,7 @@ Require Import SpecAcquire.
 Require Import SpecFiledup.
 Require Import SpecIdup.
 Require Import SpecSafestrcpy.
-Require Import SpecForkretPark.
+Require Import SpecForkretPark SyscParkEnv ParkCap.
 Require Import SpecKfork.
 Require Import ProofKforkParts.
 Require Import ProofKfork.
@@ -193,13 +193,13 @@ Qed.
 Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
              (FP : FREEPROC) (RL : RELEASE) (AQ : ACQUIRE)
              (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
-             (FRP : FORKRET_PARK) : KFORK.
+             : KFORK.
 
   Module B6 := KforkPrologue MP AP UC.
   Module B1 := KforkB1 FP RL.
   Module B3 := KforkB3 FD.
   Module B4 := KforkB4 ID SS.
-  Module B5 := KforkB5 AQ RL FRP.
+  Module B5 := KforkB5 AQ RL.
 
 Section KforkArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
@@ -478,6 +478,9 @@ Section KforkArms.
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
     ProcGeom.hart_at_any npa -∗
     FdSlots.fd_slots FDSPARE -∗
+    (* the child's bio units and free kernel stack, for the paid park *)
+    bslots 3 -∗
+    ProcDefs.kstack_free npa -∗
     (∃ (ks : mword 64) (rest : list (mword 64)),
        ⌜length rest = 12%nat⌝ ∗
        ProcDefs.is_kstack npa ks ∗
@@ -495,6 +498,10 @@ Section KforkArms.
     iref_slots (1 + IREFSPARE) -∗
     (* the child's token's source, straight through to [B4.kfk_b4] *)
     first_done -∗
+    (* ...and the world its park needs, and the park itself, straight
+       through to [B5.kfk_b5] *)
+    park_world γs -∗
+    park_token γs -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -509,8 +516,8 @@ Section KforkArms.
       Hofnull Hcwdnull Hbelow.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
-             Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
-             Hitb Hitinv #Hireg Hirs #Hfdone Hcont".
+             Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
+             Hitb Hitinv #Hireg Hirs #Hfdone #Hworld #Htoken Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
     rewrite /kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
@@ -585,7 +592,7 @@ Section KforkArms.
     iSpecialize ("Hb3app" with "Htext Hft").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                     Hheld Hhart Hfd Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
+                     Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
             Hcg Hcpu Hpc Hpv [HCpriv]").
     - unfold NOFILE. lia.
     - split_and!.
@@ -625,16 +632,17 @@ Section KforkArms.
       iEval (rewrite Hnpa) in "Hkctx".
       iEval (rewrite Hnpa) in "Hpvcx4".
       iEval (rewrite Hnpa) in "Hmk".
+      iEval (rewrite Hnpa) in "Hkst".
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
       (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
          own [b = match lvl ...] premise) rather than as the [match] itself:
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
-      iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb b
+      iApply (B5.kfk_b5 γs γf γw γl γl2 j mf4 K lvl eb b
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
-                with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock
-                      Hheld Hhart Hpvcx4 Hmk Hfd Hirsp Hks Hkctx").
+                with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
+                      Hheld Hhart Hpvcx4 Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
@@ -719,7 +727,7 @@ Section KforkMain.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv #Hireg Henv #Hpav #Hfdone Hpv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
@@ -779,7 +787,7 @@ Section KforkMain.
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst).
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv HCp #Hmk Hheld Hhart Hfd Hirs Hctx Hpay Hcpu
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
@@ -793,7 +801,7 @@ Section KforkMain.
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
-                      Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone
+                      Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken
                       [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is

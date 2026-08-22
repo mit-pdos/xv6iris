@@ -121,12 +121,13 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
-Require Import UsertrapRes.
+Require Import UsertrapRes UtResFits.
 Require Import FsReady.
 Require Import FirstTok.
 Require Import SpecUsertrap.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
+Require Import ParkCap.   (* [park_token] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -137,6 +138,9 @@ Definition forkret_park_pkg
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (* what the closer is handed at the resume beside [first_done] -- the
+       park token, abstract here; see [SpecForkret] and ParkCap.v *)
+    (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (* [ksp] is spelled out rather than [let]-bound: this bundle is DESTRUCTED
@@ -180,6 +184,7 @@ Definition forkret_park_pkg
       ⌜proc_pt_wf pt'⌝ -∗
       UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
       FirstTok.first_done -∗
+      W -∗
  (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
     [IntrDefs.sie_cap] now (see the note there), so the residue cannot
     assemble the kernel bundle at the trap without one -- and it must be
@@ -193,50 +198,9 @@ Definition forkret_park_pkg
       iref_slots IREFSPARE -∗
       URes h pt' (add_vec ks (mword_of_int 4096))))%I.
 
-(* THE PACKAGE, OUT OF THE PARK'S CHANNEL.  [UsertrapRes.ut_park_intro_body]
-   is the one producer-side entry the residue's module types carry, and a
-   parker holds it as [usertrap_res_bare_park]; this turns it into the
-   package above.  Everything else the package wants is a persistent row
-   the parker holds anyway, plus the child's free stack and slot marker out
-   of allocproc's post.  [forkret_yield] is the pair the channel takes apart
-   ([ut_trap_parked] and [proc_priv_nopt]); the two page-table facts are the
-   loop's and are dropped. *)
-Lemma forkret_park_pkg_of_park
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-    (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (N : ut_names) (av : nat) :
-  ut_park_intro_body URB N av ->
-  ut_wf N ->
-  (K_usertrap <= av)%nat ->
-  kernel_text -∗
-  wire_inv -∗
-  kmap_at tramp_vpn tramp_ppn KP_rx -∗
-  pslot_used_at (un_pj N) -∗
-  stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) av -∗
-  park_env N -∗
-  park_own N -∗
-  forkret_park_pkg URB (un_s N) (un_f N) (un_pj N) (un_ks N) (un_pid N) av.
-Proof.
-  iIntros (Hpark Hwf Hav) "#Htext #Hwire #Hkmap Hslot Hstack #Henv Hown".
-  iAssert (procs_inv (un_s N)) as "#Hprocs".
-  { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & _ & $ & _)". }
-  iPoseProof (Hpark Hwf Hav) as "Hchan".
-  iDestruct ("Hchan" with "Henv Hown") as "Hclose".
-  rewrite /forkret_park_pkg.
-  iSplitR; [iExact "Htext"|].
-  iSplitR; [iExact "Hwire"|].
-  iSplitR; [iExact "Hkmap"|].
-  iSplitR; [iExact "Hprocs"|].
-  iSplitL "Hslot"; [iExact "Hslot"|].
-  iSplitL "Hstack"; [iExact "Hstack"|].
-  iIntros (h pt' V') "%Hupt %Hnorm %Hptwf #Htfk #Hdone #Htc (Htrap & Hpriv) Hfd Hiref".
-  clear Hnorm Hptwf.
-  iApply ("Hclose" $! h pt' V' with "[%] Htfk Hdone Htc Htrap Hpriv Hfd Hiref").
-  exact Hupt.
-Qed.
-
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) : Prop :=
   (length rest = 12%nat) ->
@@ -257,7 +221,13 @@ Definition forkret_park_paid_body
        [KSTACK_AV = 342] too, which is not a coincidence: a caller that
      hands over a whole free kernel stack satisfies this exactly. *)
   (K_usertrap <= av)%nat ->
-  ⊢ forkret_park_pkg URes γs γf pa ks pid av -∗
+  (* THE PACKAGE IS TAKEN UNDER A LATER.  The proof uses none of it before
+     the context's own [▷] ([ProofForkretPark]'s [iNext]), and that is what
+     lets [ParkCap.park_token] -- whose cap this is -- be a guarded
+     fixpoint: the package's closer names the token, and a parker holds the
+     token only under a later. *)
+  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks pid av -∗
+    ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     proc_priv γf pa pid V -∗
@@ -268,16 +238,25 @@ Definition forkret_park_paid_body
 Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
-     [UsertrapRes.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
+     [UtResFits.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
      [usertrap_res_bare_park]: the residue stays opaque to every CONSUMER,
      and the one party that has to BUILD one -- whoever parks a process that
      has never trapped -- gets a closer instead.  See that file's "THE
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
-  Include UsertrapRes.USERTRAP_RES_PARK.
+  Include UtResFits.USERTRAP_RES_PARK.
   Parameter forkret_park_paid :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate) (av : nat),
-      forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
         γs γf pa ks rest pid V av.
+  (* ...AND THE TOKEN, which is the park as every parker sees it
+     ([ParkCap.park_token]): the cap above at [W := the token] plus the
+     residue's channel, tied into the fixpoint.  This is the one entry the
+     parkers use; the statement above is its proof. *)
+  Parameter park_token_intro :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (γs : list gname),
+      ⊢ park_token γs.
 End FORKRET_PARK_PAID.

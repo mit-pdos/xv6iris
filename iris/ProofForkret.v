@@ -81,6 +81,7 @@ Require Import SpecFsinit SpecKexec SpecPanic.
 Require Import PrintkArgs.  (* [PkAStr] / [pk_desc_res] -- panic's message shape *)
 Require Import FsReady.
 Require Import SpecUserretClosed.
+Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
 From Kernel Require KernelInstrs.
@@ -144,7 +145,8 @@ Section Res.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UC.usertrap_res_bare (CID := h)) N av
+        (fun h : CpuId => UC.usertrap_res_bare (CID := h))
+        (park_token (un_s N)) N av
     := UC.usertrap_res_bare_park N av.
 
   (* the kernel table's invariant, read off the translation residue without
@@ -181,7 +183,7 @@ End Res.
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (j : nat) (γf : gname)
+    (W : iProp Σ) (j : nat) (γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
@@ -215,12 +217,14 @@ Lemma fkr_tail
      hands it straight to the closer, which is the party that cannot have
      it (SpecForkret.v's last header section). *)
   FirstTok.first_done -∗
+  W -∗
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
      UsertrapRes.ut_tfk (CID := h) ksp V' -∗
      FirstTok.first_done -∗
+     W -∗
      (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
         [IntrDefs.sie_cap] now (see the note there), so the residue cannot
         assemble the kernel bundle at the trap without one -- and it must be
@@ -234,7 +238,7 @@ Lemma fkr_tail
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone Hyield".
+  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone HW Hyield".
   iPoseProof (fkr_64 with "Htext") as "Hi64".
   iPoseProof (fkr_68 with "Htext") as "Hi68".
   iPoseProof (fkr_6a with "Htext") as "Hi6a".
@@ -712,7 +716,7 @@ Proof.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
   iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
-               with "[%] [%] [%] Htfk' Hdone Htc Hyld")
+               with "[%] [%] [%] Htfk' Hdone HW Htc Hyld")
     as "Hures"; [reflexivity | exact Hnorm | exact Hptwf |].
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
@@ -796,7 +800,7 @@ Qed.
 
 Lemma fkr_boot
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (j : nat) (γs : list gname) (γl γf : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
@@ -837,12 +841,14 @@ Lemma fkr_boot
      [↦₄□ 0], and [fs_ready_establish] seals the file system.  So unlike
      [fkr_tail], the boot arm does not take it as a premise -- it produces
      the thing it owes. *)
+  W -∗
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
      UsertrapRes.ut_tfk (CID := h) ksp V' -∗
      FirstTok.first_done -∗
+     W -∗
      (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
         [IntrDefs.sie_cap] now (see the note there), so the residue cannot
         assemble the kernel bundle at the trap without one -- and it must be
@@ -861,7 +867,7 @@ Proof.
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
   assert (Hav2fs : (K_fsinit <= av2)%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
-           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi Hyield".
+           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hyield".
   iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hebb.
   iPoseProof (fkr_14 with "Htext") as "Hi14".
   iPoseProof (fkr_18 with "Htext") as "Hi18".
@@ -1656,19 +1662,19 @@ Proof.
     iDestruct (cpu_claim_ext_transport CIDk CIDk6 eb p
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     (* ...and the two arms MEET at +0x64, which is [fkr_tail]. *)
-    iApply (fkr_tail j γf pid
+    iApply (fkr_tail W j γf pid
               (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V')))
               ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
-                    Hpriv Hdone Hyield").
+                    Hpriv Hdone HW Hyield").
 Qed.
 
 Theorem wp_forkret
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (j : nat) (γs : list gname) (γl γf : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
-    wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h))
+    wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
       j γs γl γf pid V ks m av av2 eb.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
@@ -1683,7 +1689,7 @@ Proof.
   (* the frame's six slots come off the top and go back on at the exit *)
   assert (Havsum : av = (6 + (trap_res eb + av2))%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Htc Hclm
-           Hlocked HR #Hks Hpv Hyield".
+           Hlocked HR #Hks Hpv HW Hyield".
   (* p->lock IS the process table's slot [j] -- which is why this contract
      takes [procs_inv] and no longer takes an [is_lock] of its own. *)
   iDestruct (procs_inv_lookup γs j γl Hgl with "Hpinv") as "#Hislock".
@@ -1933,10 +1939,10 @@ Proof.
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iDestruct (cpu_claim_ext_transport CID CIDr eb p
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
-    iApply (fkr_boot (CID := CIDr) j γs γl γf pid V ks mr av av2 eb
+    iApply (fkr_boot (CID := CIDr) W j γs γl γf pid V ks mr av av2 eb
               Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
-                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi Hyield"). }
+                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hyield"). }
   (* ---------------- THE STEADY ARM: [first] is 0, the boot arm is dead -- *)
   iDestruct (first_tok_of_done with "Hdone") as "#Hftok".
   (* the token's steady disjunct IS [first_done]; keep the bundled form for
@@ -2056,10 +2062,10 @@ Proof.
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   (* the steady arm's [first_done] IS [first_tok]'s persistent steady
      disjunct, read at +0x24; it goes straight to the tail. *)
-  iApply (fkr_tail (CID := CID6) j γf pid V ks T4 av av2 eb
+  iApply (fkr_tail (CID := CID6) W j γf pid V ks T4 av av2 eb
             Hjlt Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
-                Hdone2 Hyield").
+                Hdone2 HW Hyield").
 Qed.
 
 End ForkretProof.

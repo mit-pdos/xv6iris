@@ -112,7 +112,8 @@ Require Import SpecAllocproc.
 Require Import SpecNameiRootBoot.
 Require Import SpecRelease.
 Require Import SpecForkretPark.
-Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID], [forkret_park_pkg_of_park] *)
+Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
+Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] *)
 Require Import FsReady.               (* [fs_geom_ok] *)
@@ -717,7 +718,6 @@ Section ProofUserinit.
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (fgo_loggeom Hgeomok)]. }
-    assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iAssert (park_env N) as "#Henv".
     { iAssert (disk_geom fsc_disk pd pav pu ∗ is_tickslock γtl)%I as "[#Hgeom #Htl]".
       { iDestruct "Hdcaps" as "(_ & _ & $ & _ & $ & _)". }
@@ -730,7 +730,13 @@ Section ProofUserinit.
         iSplitR; [iExact "Hdcaps"|].
         iSplitR; [iExact "Hwaitlk"|].
         iSplitR; [iExact "Hftable"|].
-        iExact "Hgeom". }
+        iSplitR; [iExact "Hgeom"|].
+        (* the world a child's park will need, handed down from here *)
+        rewrite /park_world. iExists γtl, pd, pav, pu.
+        iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6)".
+        iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hpav".
+        iSplitR; [iExists γp; iExact "Hlpid"|].
+        iExists iv1. iExact "Hip1". }
       iSplitR; [iExists γp; iExact "Hlpid"|].
       iSplitR; [iExact "Hpav"|].
       iSplitR; [iExact "Htl"|].
@@ -738,12 +744,13 @@ Section ProofUserinit.
     iAssert (park_own N) with "[Hbsl]" as "Hown".
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (kstack_free_at with "Hks Hkfree") as "Hstack".
-    iDestruct (forkret_park_pkg_of_park (fun h : CpuId => FP.usertrap_res_bare (CID := h))
-                 N KSTACK_AV (FP.usertrap_res_bare_park N KSTACK_AV) Hwf Hkav
-                 with "Htext Hwire Htramp Hmk Hstack Henv Hown") as "Hpkg".
-    iMod (FP.forkret_park_paid γs γf (proc_addr j) ks rest pid (upd_cwd V ipv) KSTACK_AV
-            Hrest (ex_intro _ j (conj eq_refl Hj)) Hkav
-            with "Hpkg Hks Hctx Hpriv Hfd Hirs") as "Hpctx".
+    (* THE TOKEN: the park, proved once at the top ([FP.park_token_intro])
+       and from here on a resource every process hands its children. *)
+    iPoseProof (FP.park_token_intro γs) as "#Htoken".
+    iMod (park_token_park N rest (upd_cwd V ipv) Hwf Hrest
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown [Hks Hctx Hpriv Hfd Hirs]")
+      as "Hpctx".
+    { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".
     iEval (rewrite uin_pwhole_runnable) in "Hpwhole".

@@ -93,7 +93,7 @@ Require Import SpecDevintr SpecVmfault.
 Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall.
-Require Import SpecUsertrap UsertrapRes.
+Require Import SpecUsertrap UsertrapRes UtResFits ParkCap.
 Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import ProcPtOwn.  (* [proc_pt] / [ud_norm] -- the bare residue drops the address space *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
@@ -111,9 +111,9 @@ Set Printing Depth 40.
 Module UsertrapProof (SY : SYSCALL) (PK : PRINTK_GEN) (MP : MYPROC)
                      (KI : KILLED) (SK : SETKILLED) (DE : DEVINTR)
                      (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
-                     (KE : KEXIT) (KV : KERNELVEC) : UsertrapRes.USERTRAP_PARK.
+                     (KE : KEXIT) (KV : KERNELVEC) : UtResFits.USERTRAP_PARK.
 
-(* THE PARK'S PRODUCER, at this file's [SY].  [UsertrapRes.UtResFits] is the
+(* THE PARK'S PRODUCER, at this file's [SY].  [UtResFits.UtResFits] is the
    fit check that has always been written under a [SYSCALL] for exactly this
    reason -- it can name [SY.syscall_env] -- so the entry is proved there and
    re-exported here rather than restated.  Its [usertrap_res_bare] is
@@ -1188,7 +1188,8 @@ Definition usertrap_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
-      (fun h : CpuId => Fits.usertrap_res_bare (CID := h)) N av
+      (fun h : CpuId => Fits.usertrap_res_bare (CID := h))
+        (park_token (un_s N)) N av
   := Fits.usertrap_res_bare_park N av.
 
 Lemma usertrap_res_csrs_open

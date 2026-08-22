@@ -80,6 +80,8 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
+Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
+Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import SpecAcquire SpecRelease.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -124,7 +126,7 @@ Section PstateUsedHelper.
   Proof. rewrite pstate_whole_split unclaimed_USED. done. Qed.
 End PstateUsedHelper.
 
-Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (FP : FORKRET_PARK).
+Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE).
 
 Section ProofKforkB5.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
@@ -142,7 +144,7 @@ Section ProofKforkB5.
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
   Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId}
-      (γs : list gname) (γf γw γl : gname) (j : nat)
+      (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Vc : pprivate)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
@@ -173,6 +175,15 @@ Section ProofKforkB5.
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
     SchedCtx.procs_inv γs -∗
     WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string WaitInv.wait_res -∗
+    (* THE PAID PARK'S ROWS: the open-file table, the world
+       ([SyscParkEnv.park_world] -- device complement, console, the two
+       global locks, the slot ledger, wire invariant, trampoline claim, an
+       initproc share) and the file system's steady token (only its
+       [fs_geom_ok] is read here; forkret is who pays the file system). *)
+    FileInv.is_ftable γft γf -∗
+    park_world γs -∗
+    park_token γs -∗
+    FirstTok.first_done -∗
     SchedCtx.proc_held cpu_id j γl USED ch -∗
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
     ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Vc -∗
@@ -183,6 +194,10 @@ Section ProofKforkB5.
     ProcAvail.pslot_used_at (ProcGeom.proc_addr j) -∗
     FdSlots.fd_slots FDSPARE -∗
     IrefSlots.iref_slots IREFSPARE -∗
+    (* the child's bio units and free kernel stack: the residue's
+       [park_own] and the package's anchor *)
+    bslots 3 -∗
+    ProcDefs.kstack_free (ProcGeom.proc_addr j) -∗
     ProcDefs.is_kstack (ProcGeom.proc_addr j) ks -∗
     SwtchCtx.ctx_cells (ProcGeom.p_context (ProcGeom.proc_addr j))
       (SpecForkretPark.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
@@ -196,13 +211,52 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl Hheld Hhart Hpriv #Hmk Hfd Hirsp Hks Hctx Hcont".
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv #Hmk
+             Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
-    (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
-    (* on the raw context allocproc left, before releasing.               *)
+    (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via the *)
+    (* PAID park on the raw context allocproc left, before releasing.     *)
+    (* The record [N] is the child's trap-loop environment: every file-    *)
+    (* system field ambient ([fclose_ties]), the names out of the world    *)
+    (* bundle, the slot and stack allocproc's -- exactly userinit's move   *)
+    (* ([ProofUserinit]), with the world handed down by the parent instead  *)
+    (* of by main.                                                         *)
     (* -------------------------------------------------------------- *)
-    iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd Hirsp")
+    iDestruct (park_world_open with "Hworld") as (γtl pd pav pu)
+      "(#Hdcaps & #Hextra & #Hwire & #Htramp & #Hipx)".
+    iDestruct "Hipx" as (iv1) "#Hip1".
+    iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
+    iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
+    { iDestruct "Hfdone" as "[_ #Hrdy]". iApply (FsReady.fs_ready_geom with "Hrdy"). }
+    pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
+                 γtl fsc_printk fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
+                 iv1 DfracDiscarded fsc_kalloc fsc_kpages fsc_ireg fsc_ic fsc_itlock
+                 fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid_c).
+    assert (Hwf : ut_wf N).
+    { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
+    iAssert (park_env N) as "#Henv".
+    { iAssert (disk_geom fsc_disk pd pav pu) as "#Hgeom".
+      { iDestruct "Hdcaps" as "(_ & _ & $ & _)". }
+      rewrite /park_env /ut_park_caps.
+      iSplitL; [| iExact "Hextra"].
+      iSplitR; [iPureIntro; constructor; reflexivity|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iExact "Hpinv"|].
+      iSplitR; [iExact "Hks"|].
+      iSplitR; [iExact "Hdcaps"|].
+      iSplitR; [iExact "Hwl"|].
+      iSplitR; [iExact "Hft"|].
+      iSplitR; [iExact "Hgeom"|].
+      iExact "Hworld". }
+    iAssert (park_own N) with "[Hbsl]" as "Hown_park".
+    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
+    iMod (park_token_park N rest Vc Hwf Hrest
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".
+    { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
+      (* the two files each define forkret's entry; the constants are equal *)
+      iExact "Hctx". }
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".

@@ -108,7 +108,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import IrefSlots.
 Require Import SpecUsertrap.
-Require Import UsertrapRes.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
+Require Import UsertrapRes UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -315,12 +315,12 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
 
 Module Type USERVEC.
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
-     [UsertrapRes.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
+     [UtResFits.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
      [usertrap_res_bare_park]: the residue stays opaque to every CONSUMER,
      and the one party that has to BUILD one -- whoever parks a process that
      has never trapped -- gets a closer instead.  See that file's "THE
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
-  Include UsertrapRes.USERTRAP_RES_PARK.
+  Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)

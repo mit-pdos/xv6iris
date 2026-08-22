@@ -57,10 +57,11 @@ Require Import ProcAvail.
 Require Import TfPage36.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
-Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import ParkCap.   (* [park_token] *)
+Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
 
-Module UservecProof (UT : UsertrapRes.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
+Module UservecProof (UT : UtResFits.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
 Section UservecAllPt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -79,7 +80,8 @@ Section UservecAllPt.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UT.usertrap_res_bare (CID := h)) N av
+        (fun h : CpuId => UT.usertrap_res_bare (CID := h))
+        (park_token (un_s N)) N av
     := UT.usertrap_res_bare_park N av.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UT.usertrap_res_sstc.

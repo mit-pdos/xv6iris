@@ -49,6 +49,16 @@ Require Import SpecAllocpid.  (* [alp_pid_lock] / [nextpid_res] *)
 Require Import ProcAvail.     (* [procs_avail] *)
 Require Import TicksInv.      (* [is_tickslock] *)
 Require Import ConsoleInv.    (* [console_ready] *)
+Require Import SchedCtx.      (* [procs_inv] *)
+Require Import WpUart.        (* [dev_inv] *)
+Require Import SpecConsoleintr.  (* [console_caps] *)
+Require Import DiskPtsto DiskInv.  (* [disk_geom] / [disk_res] / [d_lock] *)
+Require Import WireInv.       (* [wire_inv] *)
+Require Import TrampPt KptExecMap. (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
+Require Import KernelText.
+Require Import FsCfg.         (* the ambient device names *)
+Require Import FileInvDefs.   (* [fileG] -- which carries [fscfg] *)
+From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -70,3 +80,40 @@ Section SyscParkEnv.
   Proof. rewrite /sysc_park_extra. apply _. Qed.
 
 End SyscParkEnv.
+
+Section ParkWorld.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+
+  (* THE PARK'S WORLD, as a process hands it to its children.  A parent that
+     forks builds the child's trap-loop environment, and the rows the child
+     needs beyond the file system and beyond what [sysc_park_extra] /
+     [syscall_env] already carry are: the device complement at the AMBIENT
+     names ([UsertrapRes.devintr_caps_any]'s six members, spelled out here
+     because this file sits below that one), the console, the PLIC wire
+     invariant, the trampoline claim, and a persistent share of the
+     [initproc] cell.  All persistent, all existing before any process
+     runs; the ticks lock's gname and the ring pages are existential
+     because a child's record may name them fresh.  Stated once so that
+     one premise threads usertrap -> syscall -> sys_fork -> kfork. *)
+  Definition park_world (γs : list gname) : iProp Σ :=
+    (∃ (γtl : gname) (pd pav pu : mword 64),
+       dev_inv fsc_uart fsc_disk ∗
+       console_caps fsc_uart ∗
+       disk_geom fsc_disk pd pav pu ∗
+       is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) ∗
+       is_tickslock γtl ∗
+       procs_inv γs ∗
+       console_ready ∗
+       (* [sysc_park_extra]'s other two rows, so that this bundle covers all
+          of it: the nextpid lock and the sealed slot ledger *)
+       (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string nextpid_res) ∗
+       procs_avail None ∗
+       wire_inv ∗
+       kmap_at tramp_vpn tramp_ppn KP_rx ∗
+       (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip))%I.
+
+  Global Instance park_world_persistent γs : Persistent (park_world γs).
+  Proof. rewrite /park_world. apply _. Qed.
+
+End ParkWorld.

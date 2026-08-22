@@ -201,7 +201,7 @@ Require Import IrefSlots ProcAvail.
 Require Import SpecPrepareReturn.
 Require Import SpecKexec.
 Require Import SpecUsertrap.
-Require Import UsertrapRes.
+Require Import UsertrapRes UtResFits.
 Require Import FsReady.    (* [fs_ready] -- [first_done]'s second half *)
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 From Kernel Require KernelSyms.
@@ -240,6 +240,12 @@ Definition wp_forkret_gen_body
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (* WHAT THE RESIDUE CLOSER IS HANDED BESIDE [first_done] -- the park
+       token ([ParkCap.park_token]) in practice, abstract here: forkret
+       holds it ([W -∗] below), reads nothing off it, and hands it to the
+       closer at its tail.  The parker holds it only under a later, so the
+       package cannot carry it outright; see ParkCap.v. *)
+    (W : iProp Σ)
     (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
@@ -282,6 +288,7 @@ Definition wp_forkret_gen_body
   (* ---- the process ---- *)
   is_kstack p ks -∗
   proc_priv γf p pid V -∗
+  W -∗
   (* ---- the residue closer -- see the header ---- *)
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
@@ -296,6 +303,7 @@ Definition wp_forkret_gen_body
         [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for
         why the closer's builder cannot own either half. *)
      FirstTok.first_done -∗
+     W -∗
      (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
         [IntrDefs.sie_cap] now (see the note there), so the residue cannot
         assemble the kernel bundle at the trap without one -- and it must be
@@ -313,17 +321,18 @@ Definition wp_forkret_gen_body
    [usertrap_res_bare] and at nothing else, so this contract is too. *)
 Module Type FORKRET.
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
-     [UsertrapRes.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
+     [UtResFits.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
      [usertrap_res_bare_park]: the residue stays opaque to every CONSUMER,
      and the one party that has to BUILD one -- whoever parks a process that
      has never trapped -- gets a closer instead.  See that file's "THE
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
-  Include UsertrapRes.USERTRAP_RES_PARK.
+  Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_forkret :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γf : gname)
       (pid : mword 32) (V : pprivate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
         j γs γl γf pid V ks m av av2 eb.
 End FORKRET.

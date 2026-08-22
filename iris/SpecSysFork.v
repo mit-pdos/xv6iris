@@ -80,6 +80,7 @@ Require Import SpecKfork.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -122,6 +123,12 @@ Definition wp_sys_fork_sconf_body
   (* the proc table's sealed regime, threaded to kfork's allocproc
      ([ProcAvail.v]); persistent, so it costs nothing to carry *)
   procs_avail None -∗
+  (* THE WORLD THE CHILD'S PARK NEEDS ([SyscParkEnv.park_world]): the
+     device complement, console, wire invariant, trampoline claim and an
+     [initproc] share, all persistent, read out of the parent's
+     [syscall_env] and handed straight down to kfork. *)
+  park_world γs -∗
+  park_token γs -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is
