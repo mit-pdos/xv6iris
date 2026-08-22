@@ -88,6 +88,9 @@ Everything below is on `main` and VM-green with `make audit-only` at the
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
+- branch `worktree-agent-a771acd0806be1fdd`: the FsEff
+  build-performance pass (next-steps item 1; statements frozen,
+  proof-internal only, before/after measurements required).
 - branch `worktree-agent-aed3d383025baf0eb`: G1-impl (`log_state`
   fusion + row (b) + `op_pending` + the `fs_links_eq` boot threading;
   spec = the G1-impl item; row (a) EXCLUDED by staging; premise-debt,
