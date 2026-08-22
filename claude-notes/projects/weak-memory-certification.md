@@ -1,5 +1,53 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-22, THIRD PASS — end of the session) — READ THIS
+## FIRST; the two checkpoints below it are the design record and the
+## mid-session landing record
+
+**Landed since the second-pass checkpoint (commit order):** B1b-1 the
+quiescent supply derivation (`WeakRvwmoSupply.v`, `supply_of_qconf`,
+`cand_ws_relp`) — `75aadd32`; B2e-3b slice 2a DYNAMIC PROVENANCE
+(DEC-7; `WeakEvProv.v`'s spine) — `a8bf11ed`; the T2-LIN INDUCTION
+SKELETON (`WeakRvwmoLinInd.v`: `cycle_kill`, `t2lin_of_cycle_kill`,
+`hull_realizable_of_acyclic`, non-vacuity both ways) + the `hemit`
+witness (`WeakRvwmoConfWit.v`, the real `sw &started`) — `cbdeacd7`;
+B1b-2 the FABRIC ORDER as bundle data (`WeakRvwmoFab.v`: `gfexec`,
+`RacyF`, `topo_linearizes_F`, `supply_of_fconf`; a vacuity in the
+orchestrator's own bundle spec caught and fixed by `hemitf`) —
+`63bb2e89`; B2e-3b slice 2b the PER-INSTRUCTION SOUNDNESS LEMMA
+(`WeakEvProv.v` §§6–10: `instr_dagree`/`instr_dagree_ev` — the
+certified run can be built to follow the emission step for step,
+hence equal write labels; `taint_closure`/`taint_closure_load`; a
+non-vacuity fragment) — this commit.  Everything Closed or at the five
+rv64d reservation axioms; tree green after each bottom-of-tree edit.
+
+**THE REMAINING CHAIN, in order:**
+1. **B2e-3b slice 3 — the certification induction** (route-b §4e
+   "SLICES 2b/3, STATED"): the gmo-ordered induction over an SCC's
+   writes maintaining the per-hart taint invariant, at the quiescent
+   fabric (B1b-1) first; it needs the per-form inventory for "which
+   register a load's `RegWrite` taints" (the decoder's `rd`, DEC-4's
+   join) and composes `instr_dagree` (untainted instruction ⇒ equal
+   labels) with `taint_closure_load` (a substituted read taints `rd`).
+   Its honest boundary: a tainted value reaching the PC is a control
+   divergence — excluded by ctrl-deps into stores and `sret`/`mret`'s
+   DEC-6 role, but NOT for a trap taken on a tainted address; decide
+   whether the solo run's traps are covered by the EWPs (they are pf
+   steps of the verified program) or excluded by classification.
+2. **B2e-3c — discharge `cycle_kill`** (the three arms at the certified
+   configuration: pinned / CS-chained via `_lockalt` + `_prot` /
+   bad via φ), composed with `hull_realizable_of_acyclic` (the IH
+   realized) and T1's run.  This is L2′ proper.
+3. **B1b-2's residue** (`WeakRvwmoFab.v` §8 O1–O5: the conformance
+   restriction to `gf_hull`; the `cycle_kill_F` mirror); an
+   `LDev`-emitting witness (none exists in the tree).
+4. **B3** assembly (`t2lin_supply` ∘ T1 ∘ adequacy with `gfexec_conf`
+   as the conformance hypothesis), **R6**; the width-4/8 lift of
+   `wprot_store`; `WeakRvwmoLock`'s failed-swap arm (witness hygiene).
+
+**Tree:** `xv6-riscv/` remains off `XV6_REV`; never `make proofs` from
+the root; `make -f CoqMakefile` inside `iris/` only.
+
 ## CHECKPOINT (2026-08-22, SECOND PASS — end of the build session)
 ## READ THIS FIRST; the design-session checkpoint right below stays as the
 ## design record (its "next session" list is superseded by this one)
