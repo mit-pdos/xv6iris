@@ -987,7 +987,6 @@ SpecMainSecondary.v
 ProofMainSecondary.v
 LinkMainSecondary.v
 BootBridge.v
-CrashProto.v
 BootChain.v
 BootShared.v
 CodeBalloc.v
