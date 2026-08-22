@@ -1434,20 +1434,73 @@ are pinned transitively through the data load's address provenance
 globals (`kernel_pagetable`, `initproc`, `sb`, the `bcache` bases —
 "written only before `started = 1`").
 
-THE CHECKER'S SHAPE (adopt): two layers mirroring `tools/gen_sites.py`
-/ `iris/KernelSitesDef.v`, Python UNTRUSTED.  (1) `tools/gen_pins.py`:
-intra-function CFG from the same fuelled walk, forward taint over
-`WeakDeps.deps_of_bits`' roles, callee-summary table for the ~30 leaf
-helpers (first store; returns-a-branched-value), emitting per non-`sp`
-load a WITNESS `Stack | PerCpu | Ctrl pc' | Fence pc' | Dep pc' | Prot
-lock | Residue` into `tools/pins.json` + a `pins.md` audit.  (2)
-`iris/KernelPinsDef.v`: `pinnedb fuel pc witness : bool` re-checking
-the witness by `vm_compute` (successor in the same function, role
-membership via `deps_of_bits`), a `forallb` over `text_pcs`, ONE
-reflection lemma `image_pinnedb = true` in `image_disciplineb`'s trust
-shape; per-site lemmas only for the residue.  Then the bridge to
-`l2_claim`: a pinned witness at the site of a row's read yields
-`seg_pin` at the graph level (the row's items carry the same roles).
+THE CHECKER, AS BUILT (slices 1 and 2 landed; supersedes the sketch).
+Two layers mirroring `tools/gen_sites.py` / `iris/KernelSitesDef.v`, with
+Python UNTRUSTED.  (1) `tools/gen_pins.py` emits, per load site, a witness
+`PStack | PPerCpu pc0 | PCtrl pc' own | PFence pc' own | PDep pc' own |
+PCall pc' | PResidue` into `tools/pins.json` + a `pins.md` audit.  (2)
+`iris/KernelPinsDef.v` re-checks each witness by `vm_compute`, with roles
+ONLY through `WeakDeps.deps_of_bits`; `iris/KernelPins.v` carries the table
+and the two reflection lemmas `image_pinnedb` / `pins_cover`.
+
+WHAT SLICE 2 MOVED INSIDE ROCQ (slice 1 trusted all three to Python):
+- CONTROL FLOW IS DECODED, by `kflow_of`, not read off the roles.  `c.j`
+  has no role, so slice 1's role-driven walk stepped past an unconditional
+  compressed jump; no landed witness crossed one, but the checker would
+  have taken it.  New surface: the four PC-relative immediate decoders
+  (`imm_b`/`imm_j`/`imm_cb`/`imm_cj`), cross-checked whole-image against
+  objdump's printed targets by `gen_pins.audit_targets` (1688 agreeing, 0
+  disagreeing) plus two `Example`s in the Rocq file.
+- THE WALK DESCENDS INTO CALLEES.  `pstep` keeps a RETURN STACK (depth
+  `pin_depth = 2`); a direct `jal` pushes, a `ret` pops, and both the
+  fall-through walk `fwalk` and the all-paths search follow direct jumps.
+  So a witness pc may name a branch INSIDE a callee and Rocq walks there —
+  the callee-summary table in `pins.md` is an AUDIT artifact that nothing
+  downstream reads.
+- BOTH BRANCH ARMS.  `pdfs` is a fuel-bounded DFS with a visited set over
+  the same `pstep`; every certifying witness carries it, so "every path out
+  of this load reaches a pin before the hart's next store" is a `vm_compute`
+  fact rather than the `all_paths` Python column.
+
+THE ONE NEW ASSUMPTION, RECORDED IN THE WITNESS.  A callee's first act is
+to spill to its own frame, so call descent is worthless unless a store
+through `sp` is not the publication the pin is about.  Each certifying
+witness carries `own : bool`: `false` = no store was skipped (nothing
+beyond the image is assumed), `true` = stores based on `sp` were skipped,
+i.e. the exact dual of the `PStack` LOAD class.  The census splits them.
+
+CENSUS AT `9dd28f5e` (1611 loads): 991 Stack + 3 PerCpu + 280 Ctrl + 2
+Fence + 170 Dep certifying = **1446**, of which only **59** need `own =
+true`; residue 65 `PCall` (a call past depth 2, or an indirect call) + 100
+`PResidue`.  Slice 1 was 1381 certifying, fall-through only.  Of the 162
+slice-1 `PCall` sites, 64 became `Ctrl`/`Dep` (32 + 32), 65 stayed `PCall`,
+33 moved to the residue — descending shows most of them genuinely store
+before pinning.  Exactly ONE site was DOWNGRADED by the all-paths check
+(`kexec+0x11c`, a `PDep` slice 1 accepted on the fall-through path); it is
+kept as the negative `Example` `pin_kexec_not_all_paths`.
+
+THE BRIDGE: `iris/WeakRvwmoPinBridge.v`.  §1–§2 PROVE the emission-side
+arithmetic with no hypothesis (`row_deps_item`: an edge one item emits is
+an edge of the emission; `dedges_reg`/`dedges_ctl`; `ds_run_ctl_sub`: the
+control set never shrinks, which is the whole content of "a control
+dependency taints EVERY po-later store").  §3 states the ONE hypothesis,
+`checker_taint_sub_prov`: if the checker's walk from the load at `pcL` (row
+position `j`) reaches `pc'` carrying register `r`, then the emission's
+`dprov r` just before `pc'`'s item contains `j`.  It is a hypothesis
+because both sides already run the SAME decoder — `taint_step` is
+`deps_rd`/`deps_rd2` of `deps_of_bits`, `dstep`'s `LRegW` arm is
+`dsrcs_pos` of `erw_of`'s list off the same announced word — but nothing
+yet lines an emission's ITEM LIST up with the checker's PC walk (it needs
+the announce-boundary structure of `pstep_ev` runs, plus DEC-7's dynamic
+read set being a superset, which `erw_srcs_covers` gives pointwise but not
+along a run).  §4–§6 PROVE from it: `pdep_row_deps`, `pctrl_row_deps`,
+`seg_pin_of_row_deps` (conformance closes it), `seg_pin_of_row_fence` (no
+hypothesis at all), and `pin_seg_pin` in Glue's vocabulary.  §7 is the
+INSTANCE on `WeakRvwmoAdm`'s computed stretch: the checker's taint says
+`a5` still carries the `main+0x16` load at `main+0x1e`, its decoder says
+that branch's control sources are `[DReg 15]`, and `WeakRvwmoAdm.lc_ctrl`
+says the instance EMITS `LCtrl [DReg 15]` there — the two lists are the
+same list, by `vm_compute`, on real image bytes.
 
 ## 5. Honest residual risks — OPEN
 

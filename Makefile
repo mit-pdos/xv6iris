@@ -242,7 +242,7 @@ check-sites:
 	$(PYTHON) $(GENSITES) --iris $(IRIS) --kernel-rocq $(KDUMP) --emit-coq --check
 	git diff --exit-code -- tools/sites.json tools/sites.md $(IRIS)/KernelSites.v
 
-# The LOAD-SITE PIN census, R-1(B) slice 1: a sibling of gen-sites one level
+# The LOAD-SITE PIN census, R-1(B) slices 1-2: a sibling of gen-sites one level
 # up -- it classifies every load by what the kernel does with the value
 # before its hart's next store.
 #
