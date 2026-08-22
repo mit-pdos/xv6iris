@@ -39,7 +39,11 @@ POSE_LINE = re.compile(r'^[ \t]*(?:iPoseProof \(\w+ with "Htext"\) as "[^"\s]+"\
                        re.M)
 # a conforming call site: the instr hypothesis is the third thing handed to a
 # leaf, and the sentence ends on this line
-SITE = re.compile(r'^([ \t]*)(.*with "Hcg Hpc )([^"\s]+?)(?=[ "])([^"]*")\)\.$', re.M)
+# A leaf application whose sentence ends on this line.  The instruction
+# hypothesis is found by NAME anywhere in the specialisation list, not by
+# position: leaves disagree about where it sits ("Hcg Hpc Hi24" but also
+# "Hcg Htext Hpc Hi24", and WpTimerinit's "Hmm Hpmpc Hpaddr Hpc Hfile Hi10").
+SITE = re.compile(r'^([ \t]*)(.*with ")([^"]*)("\)\.)$', re.M)
 # [iClear "Ha Hb Hc".] -- the names may span a line break (ProofSysLink)
 CLEAR = re.compile(r'([ \t]*)iClear "([^"]*)"\s*\.')
 # every double-quoted string; an Iris hypothesis name only ever appears inside
@@ -66,21 +70,27 @@ def scan(src):
     for m in POSE.finditer(src):
         poses.setdefault(m.group(2), []).append((m.start(), m.group(1)))
 
+    def resolve(hyp, at):
+        earlier = [l for off, l in poses.get(hyp, ()) if off < at]
+        return earlier[-1] if earlier else None
+
     resolved, sites, unposed = {}, [], {}
     for m in SITE.finditer(src):
-        hyp = m.group(3)
-        if hyp not in poses:
-            continue                 # not an instr hypothesis at all
-        earlier = [l for off, l in poses[hyp] if off < m.start()]
-        if not earlier:              # used before it is ever posed
+        named = [t for t in m.group(3).split() if t in poses]
+        if len(named) != 1:
+            continue          # no instr fact here, or two -- leave it alone
+        hyp = named[0]
+        lemma = resolve(hyp, m.start())
+        if lemma is None:                    # used before it is ever posed
             unposed[hyp] = unposed.get(hyp, 0) + 1
             continue
-        resolved[m.start()] = earlier[-1]
+        resolved[m.start()] = (hyp, lemma)
         sites.append(m)
 
     accounted = {}
     for m in sites:
-        accounted[m.group(3)] = accounted.get(m.group(3), 0) + 1
+        h = resolved[m.start()][0]
+        accounted[h] = accounted.get(h, 0) + 1
 
     # [iClear "Hi"] of a fact we are about to stop posing is DEAD once the pose
     # goes, so it is accounted for here and deleted by convert().  Files written
@@ -122,12 +132,15 @@ def convert(src):
     nsite = [0]
 
     def repl(m):
-        indent, pre, _hyp, post = m.groups()
-        lemma = resolved.get(m.start())
-        if lemma is None:
+        indent, pre, args, post = m.groups()
+        got = resolved.get(m.start())
+        if got is None:
             return m.group(0)          # not an instr fact -- leave it alone
+        hyp, lemma = got
+        toks = args.split(' ')
+        toks[toks.index(hyp)] = '[]'
         nsite[0] += 1
-        return (indent + pre + '[]' + post + ').\n'
+        return (indent + pre + ' '.join(toks) + post + '\n'
                 + indent + '{ iApply (' + lemma + ' with "Htext"). }')
 
     # Rewrite the SITES FIRST: `resolved` is keyed by offsets into `src`, so
