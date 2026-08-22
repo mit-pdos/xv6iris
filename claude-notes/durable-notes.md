@@ -117,7 +117,13 @@ change that produced it.
   stdpp ones (`list_basics.filter_app`, `list_relations.NoDup_app`/`_filter`/
   `_Permutation`), use `NoDup_cons_1_1`/`_1_2` and `Forall_lookup_1`/`_2`.
   `filter_cons`, `elem_of_list_filter`, `list_filter_filter`, `list_filter_iff`,
-  `NoDup_alt`, `NoDup_lookup` are stdpp-only and safe.  Related paper cuts:
+  `NoDup_alt`, `NoDup_lookup` are stdpp-only and safe.  Also in the family
+  (2026-08-23): **`Forall_cons` resolves to Stdlib's CONSTRUCTOR** ("Unable to
+  find an instance for the variable x") — use `Forall_cons_1`/`Forall_cons_2`;
+  `by split_and!` fails on a `True` conjunct in this import context — write
+  `split_and!; [exact I|…]`; and `apply lem in H` on an `iff` lemma picks the
+  BACKWARD direction (`apply elem_of_remove_dups in H` yields
+  `x ∈ remove_dups (remove_dups l)`) — use `apply (proj1 lem) in H`.  Related paper cuts:
   `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
   fails with "Cannot find witness" until `cbn in H`; in the same import
   context `if decide P then _ else _` does NOT elaborate (the scrutinee is
