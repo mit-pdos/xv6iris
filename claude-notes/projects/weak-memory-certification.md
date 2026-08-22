@@ -1,5 +1,50 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-24, TWELFTH PASS — end of session) — READ THIS FIRST
+
+**THE RESIDUE, EXACTLY.**  `WeakRvwmoPreNorm2.v` settles where
+`gwrow_gmo` comes from.  `normalize_ww2` (acyclic case) is 8 lines —
+`topo_linearizes` ALREADY performs the ascent (`gpow ⊆ RacyD`) — so the
+exchange kit is not needed; the real content is `normalize_ww3`: the
+linearization section goes through with `gpow` narrowed to SAME-HART
+WRITE→WRITE po (`RwwD`), still yielding `gwrow_gmo`, and `RwwD` does NOT
+contain LB's read→write edges, so cyclic graphs pre-normalize.
+`gwrow_seg_iff` closes off "restrict to covered ranges" (vacuous —
+the walk covers every write).  `Rwwt` (= `gpoww ∪ rf ∪ ppo ∪ deps`)
+transports along `gd_equiv` and its acyclicity is NECESSARY for any
+member to have `gwrow_gmo`; `RwwD ∖ Rwwt = co ∪ fr` — F2′'s arms.
+`wsupply_orbit_pull` was the WRONG statement (it assumed the inversion
+away — `wsupply_orbit_pull_forces_gwrow`); replaced by
+`cycle_kill_of_member` (the kill run at the normalized member,
+conformant by `gdexec_qconf_ren`) under (i) `ww_residue := RwwD`
+-acyclicity (implied by `RacyD`-acyclicity, not by consistency) and
+(ii) `orbit_cycle_transport` — free for `Rwwt`, residual for `co`/`fr`.
+Whole tree green; five rv64d axioms / Closed.
+
+**THE STANDING RESULT.**  `xv6_rvwmo_safe_modulo_l2''` (Walk2/PreNorm):
+for every RVWMO⁻(+deps)-consistent, `gdexec_qconf`-conformant
+execution (device-quiet), tier 1's safety conclusion under
+(R-1) `l2_claim` [its kernel content reduced to the `WProt` port
+convention + the static pin check, 1446/1611 sites certified, bridge
+proved modulo R-3], (R-2a) `wsupply_res` [bounds + the witness set —
+graph facts], (R-2b) `gwrow_gmo` [⇐ `ww_residue` + the `co`/`fr`
+transport].  The capstone's assumptions are tier 1's five axioms.
+
+**WHAT REMAINS, in order:** (1) the `co`/`fr` transport residual of
+`orbit_cycle_transport` (read-pinned pairs transport — state it via
+`gco_rows_rel_mono`'s condition on the cycle's own pairs) and
+`ww_residue`'s discharge for cyclic graphs (an `RwwD` cycle needs two
+same-hart writes inverted AND a cross-hart path back — show it is an
+`R`-cycle through write-pinned edges, killable by the arms); (2) R-1:
+R-3 (`pstep_ev` runs emit `erw_of` groups at the announced word), the
+165 non-certified sites (the `WProt` convention for the ten
+lock-payload sites as M4 ports them; the ~5 ownership idioms), the
+final `l2_claim` assembly; (3) the F-variant's glue mirror, R6,
+`wprot_store` width lift, `WeakRvwmoLock`'s failed-swap arm, the
+decoder audit.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-24, ELEVENTH PASS) — READ THIS FIRST
 
 **THE GENERIC WALK PASSES ITS ACCEPTANCE TEST.**  After three repairs
