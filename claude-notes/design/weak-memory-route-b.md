@@ -1182,6 +1182,46 @@ quiescence) and the log = `P`'s messages ++ the certified ones.  The
 always admissible); its hart's later same-byte reads are witnesses
 too (poloc), and its taint reaches exactly the registers the dynamic
 flow says.
+SLICE 3's SHAPE AND ITS ONE OPEN RISK (2026-08-23, before building).
+Certify only what the cycle kill reads: around the `R`-cycle, start at
+a BACKWARD step `(r₁, z₁)` (`z₁ < r₁`, `r₁` the witness — every cycle
+has one, `caus_cycle_gviol`/F2) and certify the exit writes in CYCLE
+order: `x₁` runs through `z₁` with `r₁` substituted; then `x₂` runs
+through `z₂` with `r₂` reading `z₁` truly (in the log); … up to `z_k`.
+Nothing po-between a witness `r` and its `z` can depend on `r` (such a
+dependent write `y` would have `r < y` by deps, so `y` is not below
+`z` … and if `y` is an acquire, rule 5 puts it below `z` and so below
+`r`, contradiction) — so the segments' lock operations are untainted
+and `instr_dagree` applies to every instruction of each segment.  A
+hart's events AFTER its substituted witness are poisoned and are not
+certified; the kill never needs them.  THE OBJECT is a CAND extended
+by solo blocks: from a realized `c_P` (`hull_realizable_of_acyclic`)
+append, per instruction, the hart's block at the current log — a read
+whose G-source is in the log reads it, otherwise the latest message —
+keeping `exec_prog_ok'` (the per-block `adm_run`/`pstep_ev` shape is
+`hemit`'s, re-indexed to the trace) and `srvwmo_consistent`.
+
+THE OPEN RISK: the certified run's `co` need not be `G`'s `co` for
+pairs the cycle entangles (a write `v` causally after `z` but `co`
+-before `x`'s own earlier write `y`), and a read-pinned disagreement
+would mean the certified run is a legitimate execution that is NOT
+`G`'s — its export facts then do not transfer to `G`'s lock-byte
+order.  Expected resolution: the cycle kill needs `co` only on lock
+bytes and only between the segments' own acquires/releases, which the
+cycle order itself pins (F2′: read-pinned pairs are preserved);
+confirm this when stating the kill arms (B2e-3c), and if a
+counter-shape appears, certify in a `co`-respecting order instead of
+cycle order (the two agree on pinned pairs).
+
+SUB-SLICES: (3a) `cand_extend_block` — append one hart's next
+instruction block to a realized cand at the current log, reads taking
+the latest message (always admissible) or a named in-log source
+(admissible under the cand-side coherence rule — check
+`WeakAxiomatic`'s load-value/`ax_*` for reading an older message),
+preserving `exec_prog_ok'` and `srvwmo_consistent`; (3b) the segment
+certification (iterate 3a with `instr_dagree`/`taint_closure_load`
+from the `hemit_states` of `G`'s emission), concluding the exit
+write's label; (3c) the cycle-order iteration.
 Order of work for B2e-3b, revised: (1) the satp-provenance edge in the
 emission (`dstep` + the instance's CSR write annotation); (2) the
 soundness lemma, stated once over `pstep_ev` ("agreement on named
