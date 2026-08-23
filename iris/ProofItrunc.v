@@ -2020,9 +2020,13 @@ Section ItruncIArm.
     (* the handle's payload IS the caller's logged content.  [bm_held_content]
        states the block number with [uint]; ours is [bv_unsigned]. *)
     iEval (rewrite -Huc) in "Hindblk".
-    iDestruct (bm_held_content bn γfs γd dev cov kk pidv dev
-                 (bm_ind bm : mword 32) bs0 _ bsd0
-                 (ind_bytes (bm_ent bm)) d0 with "Hindblk Hheld") as %Hbsl.
+    iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hrow".
+    iApply fupd_wp.
+    iMod (bm_held_content ⊤ bn γfs γd dev cov kk pidv dev
+            (bm_ind bm : mword 32) _ _ _ _ _ logN_top
+            with "Hrow Hindblk Hheld")
+      as "(%Hbsl & Hindblk & Hheld)".
+    iModIntro.
     iEval (rewrite Huc) in "Hindblk".
     (* ===== +0x5a mv s4,a0 : s4 := bp ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (IT + 0x5a)) Rs4 Ra0

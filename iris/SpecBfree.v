@@ -169,7 +169,7 @@ Definition wp_bfree_gen_body
   (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
      half of the handshake -- its EXCLUSIVE ownership token.  Holding the
      token is what makes the panic dead. *)
-  fs_chalf γfs (bv_unsigned bno) bs -∗
+  fsblock (fs_bytes γfs) (bv_unsigned bno) bs -∗
   blk_own γfs (bv_unsigned bno) -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
@@ -296,7 +296,7 @@ Definition wp_bfree_sconf_body
   (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
      half of the handshake -- its EXCLUSIVE ownership token.  Holding the
      token is what makes the panic dead. *)
-  fs_chalf γfs (bv_unsigned bno) bs -∗
+  fsblock (fs_bytes γfs) (bv_unsigned bno) bs -∗
   blk_own γfs (bv_unsigned bno) -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗

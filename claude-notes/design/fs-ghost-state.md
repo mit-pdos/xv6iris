@@ -36,20 +36,52 @@ fragment in a client's hand MEANS, who mints/spends it, and why it exists.
 
 ## 1. Disk and buffer layer
 
+THE LINE THAT ORGANIZES THIS LAYER IS **HOME BLOCK vs LOG-REGION BLOCK**
+(`fs_home_set cov logstart` = `cov ∖ log_region_set logstart`).  A home
+block belongs to the file system and its owner holds the EXCLUSIVE byte run
+`fsblock`; a log-region block is the log's own storage and is not in the
+file system's byte view at all, so its owner (`log_state`, and initlog
+before it) holds the cache's parked half `fs_chalf`.
+
 | piece | type / home | meaning |
 |---|---|---|
-| `fs_chalf γfs bno bs` | ½ of `bno ↪[fs_cache γfs] bs` (`ghost_map`, `FsBlocks.v`) | the PARKED half of block `bno`'s cache entry — what the buffer cache believes the block holds.  The bio payload holds the other half; holding this one means no `ireg_write_au`/`ireg_claim_au`/`ireg_free_au` at any inum of that block can fire — it is §16.2's serializer as a resource.  Minted at `bread`, returned at `brelse`. |
-| `fsblock gL bno bs` | a run of BSIZE **full** `ghost_map Z (bv 8)` elements (`FsBlocks.v`) | block `bno`'s bytes in the LOGGED VIEW `L`, owned EXCLUSIVELY.  Tied to the cache entry inside `fs_bytes_inv` (`logN`).  `fs-log.md` §"The ghost state". |
+| `fsblock (fs_bytes γfs) bno bs` | a run of BSIZE **full** `ghost_map Z (bv 8)` elements (`FsBlocks.v`) | block `bno`'s bytes in the LOGGED VIEW `L`, owned EXCLUSIVELY.  THIS is what every home-block owner above the log holds: `BitmapInv`'s bitmap block and free pool, `InodeRegion.ireg_blk`, `InodeInv.ind_blk`/`blk_res`, the icache escrow's payloads, `FsImgBridge`'s boot bundle.  Sealed with `Typeclasses Opaque` — see the trap below. |
+| `fs_chalf γfs bno bs` | ½ of `bno ↪[fs_cache γfs] bs` (`ghost_map`, `FsBlocks.v`) | the PARKED half of block `bno`'s cache entry — what the buffer cache believes.  After durable-disk 1c-flip only TWO kinds of holder are left: the log's own storage (`log_state`'s header + slot rows; `SpecWriteHead`, `ProofEndOp`'s write_log, install_trans's log copies), and a handle's MACHINERY half carried out of a bio payload (`ds_held_L`, `IgetLic`'s `BufL`).  A HOME block's parked half lives inside `fs_bytes_inv` and no mortal ever holds one. |
+| `fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home` | `inv logN …` (`FsBlocks.v`) | the tie: the byte auth, the home blocks' parked cache halves, `bytes_tie`, `bytes_dom`.  Three carriers hand it out and every bread client holds one — `LogInv.log_ctx`, `BitmapInv.bitmap_inv`, `InodeRegion.ireg_inv` — plus an explicit premise at the two readers that hold none (`readi`, `bmap`, whose kit is `None` on the read path). |
+| `fs_bytes_any γfs` | `∃ home, fs_bytes_inv …` (`FsBlocks.v`) | the home-set-free form of that row.  It is enough for every consumer because **holding the run IS being a home block**: `fsblock_home` derives `b ∈ home` from the byte auth and `bytes_dom`, so neither crossing takes a membership premise. |
 | `fs_dirty` | second `ghost_map` in `fs_names` | per-block pinned/dirty flag tying the buffer cache to the log's write set (`LogInv.v:718`). |
-| `fs_own` | third `ghost_map` (`Excl`-style per-block token) | the exclusive per-block ownership token behind the buffer sleep-lock discipline. |
-| `bio_ctx` / `fs_view` | the buffer-cache invariant | owns the physical buffer array and the `fs_L`/`fs_dirty` authorities; `fs_view γfs γd dev cov` is the fs-side lens on it. |
+| `fs_own` | third `ghost_map` (`Excl`-style per-block token), `blk_own` | the exclusive per-block ownership token.  **REDUNDANT since the flip** wherever it was carried only for disjointness: `fsblock_excl` gives `blk_own_ne`'s conclusion directly, so `InodeInv.blkmap_wf`'s injectivity, `BitmapInv.free_pool_own_used`'s panic refutation and `IcacheEscrow`'s `blk_res` token no longer need it.  Kept until stage 2 replaces the pool with `free_bitmap Γ`. |
+| `bio_ctx` / `fs_view` | the buffer-cache invariant | owns the physical buffer array and the `fs_cache`/`fs_dirty` payload halves; `fs_view γfs γd dev cov` is the fs-side lens on it. |
+
+**The two crossings** (`FsBlocks.v`), both fupds at any `E ⊇ ↑logN`:
+`fs_bytes_agree`/`fs_bytes_agree_any` — a bread client's `fsblock` against
+the handle's payload half gives `bsm = bs`; and `fsblock_update` —
+log_write's ghost step, moving both maps.  Every reader that used to close
+by an auth-free ½/½ entailment is now one of these, which is why the
+readers above gained `↑logN ⊆ E`.
+
+**`fsblock` IS SEALED WITH `Typeclasses Opaque`, AND IT HAS TO BE.**  It is
+a 1024-element `big_sepL` under two `Definition`s and `iFrame` resolves its
+`Frame` instances up to delta: a bare `iFrame` at a goal holding
+`fsblock gL b (bitmap_bytes used)` unfolds through `byte_range` into the
+whole run and does not come back — measured as a `BitmapInv.bitmap_res_close`
+that ran past ten minutes with no error.  Sealing the two heads leaves
+`rewrite /fsblock` and the declared `Timeless` instances working and makes
+`iFrame` treat a block run as one atom.
+
+**AND THE ROW CANNOT RIDE WITH THE BLOCK.**  The obvious simplification —
+bundle `fs_bytes_any γfs` into the per-block resource so no reader needs a
+premise — is not available: `fs_bytes_any` contains an `inv`, which is not
+TIMELESS, and `ireg_blk`/`ireg_body`/`bitmap_res`/`blk_res` are all required
+to be timeless by the `>`-strips their accessors do.  The row therefore
+rides on the three (persistent, non-timeless) invariant carriers instead.
 
 ## 1b. The block bitmap (`BitmapInv.v`, invariant `bitmapN`)
 
 | piece | type / home | meaning |
 |---|---|---|
-| `bitmap_inv γfs bms cov ls size` | `inv bitmapN (∃ used, bitmap_res …)` | THE OWNER of the free-space state: the pure `bitmap_ok`, the bitmap block's `fs_chalf` at `bitmap_bytes used`, and the FREE POOL (one `fs_chalf`+`blk_own` per clear bit) — at an EXISTENTIAL set no contract names.  Persistent; a `fs_ready` conjunct (`fs_ready_bitmap`); allocated once in `fs_cfg_alloc`'s era fupd. |
-| `bitmap_read` / `bitmap_read_own` | mask-preserving openings | between `bread` and `brelse`, the handle's machinery half against the parked client half names `∃ used, bs = bitmap_bytes used ∧ bitmap_ok`; the `_own` form adds `b ∈ used` from the caller's `blk_own` — the "freeing free block" panic refutation. |
+| `bitmap_inv γfs bms cov ls size` | `inv bitmapN (∃ used, bitmap_res …)` ∗ the byte view's row | THE OWNER of the free-space state: the pure `bitmap_ok`, the bitmap block's `fsblock` at `bitmap_bytes used`, and the FREE POOL (one `fsblock`+`blk_own` per clear bit) — at an EXISTENTIAL set no contract names.  It also CARRIES `fs_bytes_inv … (fs_home_set cov ls)`, which is what its readers open (`bitmap_inv_bytes`, `bitmap_inv_bytes_at`).  Persistent; a `fs_ready` conjunct (`fs_ready_bitmap`); allocated once in `fs_cfg_alloc`'s era fupd. |
+| `bitmap_read` / `bitmap_read_own` | mask-preserving openings, `↑logN ⊆ E` | between `bread` and `brelse`, the handle's machinery half against the invariant's byte run names `∃ used, bs = bitmap_bytes used ∧ bitmap_ok`; the `_own` form adds `b ∈ used` from the caller's `blk_own` — the "freeing free block" panic refutation. |
 | `bitmap_alloc_au` / `bitmap_free_au` | `wp_log_write_au` suppliers | the ONLY moments the client half leaves the invariant: balloc's sets a bit and takes `free_blk bi` (+ its cov/log facts) out of the pool; bfree's clears a bit and deposits the caller's `free_blk b`.  Stated at the CALLER's set, `bitmap_bytes_eq_*` bridge to the parked one. |
 | `blk_own γfs b` | full `ghost_map` element (`FsBlocks.v`) | unchanged: the exclusive per-block token balloc hands out and bfree consumes; its exclusivity against the pool is the alloc/free handshake. |
 

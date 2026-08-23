@@ -1885,6 +1885,9 @@ Section EndOpBlocks.
               Hopen Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
+    (* the byte view's row, for install_trans's recovering arm (unused on
+       the commit path, but the contract is arm-agnostic) *)
+    iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hbinv".
     rewrite /eo_open.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
@@ -2122,7 +2125,7 @@ Section EndOpBlocks.
               ltac:(intros Hab; discriminate)
               ltac:(lkbelow)
               ltac:(intros Hab; discriminate)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv [] Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv [] Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW Hbinv HauthL HauthD Hent Hu2
                     [] [Hmirc]").
     all: try lkbelow.
     (* the recovering arm's printk credential: nothing at recovering = 0 *)
@@ -2586,6 +2589,9 @@ Section EndOpBlocks.
               Hopen Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
+    (* the byte view's row, for install_trans's recovering arm (unused on
+       the commit path, but the contract is arm-agnostic) *)
+    iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hbinv".
     iDestruct "Hlfz" as "[#Hdevc #Hstc]".
     rewrite /eo_open.
     iDestruct "Hopen" as
@@ -4082,10 +4088,10 @@ Section ProofEndOp.
        it would erase a name they still spell. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     cbn in Hbm. subst b.
-    iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & #Hswlb)".
+    iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & #Hswlb & #Hbinv)".
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx".
     { rewrite /log_ctx. iSplitR; [iExact "Hlock"|]. iSplitR; [iExact "Hdevc"|].
-      iSplitR; [iExact "Hstc" | iExact "Hswlb"]. }
+      iSplitR; [iExact "Hstc"|]. iSplitR; [iExact "Hswlb" | iExact "Hbinv"]. }
     iAssert (eo_cont (CID0 := CID)  j pidv dq m K eb eb lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /eo_cont; iExact "Hcont"|].
     (* ===== PROLOGUE: the eight-slot frame ===== *)

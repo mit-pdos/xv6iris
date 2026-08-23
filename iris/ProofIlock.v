@@ -1048,7 +1048,7 @@ Section IlockLoad.
        needs only the machinery half, and the record is the slot the inum's
        arithmetic lands on. *)
     iMod (ireg_read_blk ⊤ gi gfs inodestart nib (ireg_bi inum) bs0
-            ltac:(solve_ndisj) (ireg_bi_lt inum nib Hinlt) with "Hireg [HL]")
+            ltac:(solve_ndisj) logN_top (ireg_bi_lt inum nib Hinlt) with "Hireg [HL]")
       as "(%Hdsx & HL)".
     { rewrite -(ireg_bi_iblock inum inodestart). iExact "HL". }
     iEval (rewrite -(ireg_bi_iblock inum inodestart)) in "HL".
@@ -1106,7 +1106,7 @@ Section IlockLoad.
             & Hfv)".
         iMod (ireg_read ⊤ gi gfs inodestart nib inum dn0
                 (IBLOCK inum inodestart) (diblk_bytes ds)
-                ltac:(solve_ndisj) Hinlt eq_refl with "Hireg Hdn HL")
+                ltac:(solve_ndisj) logN_top Hinlt eq_refl with "Hireg Hdn HL")
           as "(%Hex & Hdn & HL)".
         destruct Hex as (ds1 & Hwf1 & Hbs1 & Hagr1).
         assert (Hds1 : ds1 = ds)
@@ -1150,7 +1150,7 @@ Section IlockLoad.
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
         + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
                   (IBLOCK inum inodestart) (diblk_bytes ds) o g
-                  ltac:(solve_ndisj) Hfills Hinlt eq_refl Hdswf eq_refl
+                  ltac:(solve_ndisj) logN_top Hfills Hinlt eq_refl Hdswf eq_refl
                   ltac:(rewrite Hagr; exact Htnz)
                   with "Hireg Hmk Hcl HL") as "(%Hfresh & %Hty & Hwb & Hdn & HL)".
           rewrite Hagr in Hfresh. rewrite Hagr in Hty.

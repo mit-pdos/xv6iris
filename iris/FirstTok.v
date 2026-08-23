@@ -335,7 +335,7 @@ Section FirstTok.
         ⌜first_fsinit_pures dk sb⌝ ∗
         log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) ∗
         log_free_tok icfg_log ∗
-        fs_chalf fsc_fs 1 (FsCrash.fs_blocks dk 1) ∗
+        fsblock (fs_bytes fsc_fs) 1 (FsCrash.fs_blocks dk 1) ∗
         ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
         ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
         ireg_boot ∗
@@ -363,7 +363,7 @@ Section FirstTok.
            first process's, R3 *)
         ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
                                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb),
-           fs_chalf fsc_fs b (FsCrash.fs_blocks dk b) ∗ blk_own fsc_fs b).
+           fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b) ∗ blk_own fsc_fs b).
   Proof.
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb vlock v_start v_dev v_nc v_n vname vcpu sb_old)

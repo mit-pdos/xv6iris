@@ -2964,6 +2964,8 @@ Section ProofDirlinkMain.
           { iEval (rewrite HL6a2). iFrame. }
           iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+          (* the byte view's row (durable-disk 1c-flip step 3) *)
+          iPoseProof (ireg_inv_bytes with "Hiregi") as "#Hrow".
           iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol Vpr
@@ -2978,7 +2980,7 @@ Section ProofDirlinkMain.
                     (* readi's own floor is "bcache"(4); dirlink's is
                        "itable"(2), and [locks_below_mono] weakens it. *)
                     ltac:(lkbelow)
-                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }

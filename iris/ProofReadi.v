@@ -1127,6 +1127,8 @@ Section ReadiLoop.
     pc_is (mword_of_int (RI + 0x7c) : mword 64) -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
+    (* see [SpecReadi] -- readi holds no invariant of its own *)
+    fs_bytes_any γfs -∗
     kalloc_env γa None -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
@@ -1184,7 +1186,7 @@ Section ReadiLoop.
       by (rewrite Hubno; exact Hbcov).
     assert (Hblt' : (uint (blkmap_get bm fbn : mword 32) < 2147483648)%Z)
       by (rewrite Hubno; exact Hblt).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hrow #Hkenv #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -1270,7 +1272,7 @@ Section ReadiLoop.
               cov logstart dev ip bm data fbn pidv (rd_q user dq) dqd
               A3 (K - 14)%nat eb b
               _ (if user then upd_upt V PI else V) HKbm Hgeom0 Hfbnlt Hwf Hbnzz Hj Hgl HA3a0 HA3a1
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hidev Hmap Hblocks Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hrow Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
     iIntros (CIDa4 Hqa4 mB)
@@ -1452,7 +1454,11 @@ Section ReadiLoop.
     iEval (rewrite -Hubno) in "Hfsb1".
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (rd_held_k with "Hheld") as %Hkklt.
-    iDestruct (rd_held_content with "Hfsb1 Hheld") as %Hbs0eq.
+    iApply fupd_wp.
+    iMod (rd_held_content ⊤ bn γfs γd dev cov _ pidv dev _
+            _ _ _ _ _ logN_top with "Hrow Hfsb1 Hheld")
+      as "(%Hbs0eq & Hfsb1 & Hheld)".
+    iModIntro.
     subst bsB.
     iDestruct (rd_held_swap with "Hheld") as "[Hbuf Hheldback]".
     (* ===== +0x92 c.mv s2,a0 : s2 := bp ===== *)
@@ -2158,7 +2164,7 @@ Section ReadiLoop.
           iApply (IH CIDc11 (tot + mm)%nat P2 G3
                     ltac:(lia) Hext2 ltac:(lia)
                     HG3sp HG3s6 HG3s7 HG3s4 HG3s1 HG3s5 HG3s3 HG3s9 HG3s8
-                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hkenv Hprocs
+                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hprocs
                           Hdevi Hdgeom Hdlock Hframe Hidev
                           Hmeta Hmap Hblocks Hdst2 Hsl Hcont").
       - (* ====== THE COPY OUT FAULTED -- only reachable on the USER arm,
@@ -2496,7 +2502,7 @@ Section ReadiMain.
        here: its bound is guarded by the size test and so is derived in the
        fall-through arm below, where the guard has been discharged.  Only
        a3 is read before the test. *)
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hrow #Hkenv Hidev
               Hmeta Hmap Hblocks Hdst #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iAssert (rd_cont (ktb := ktb) (CID0 := CID) γfs bn γf dev ip bm data dn user off n
                dst_olds V pidv dq dqd j m K eb b lks)%I with "[Hcont]" as "Hcont";
@@ -3282,7 +3288,7 @@ Section ReadiMain.
                 ltac:(replace (off + 0)%nat with off by lia;
                       replace (nc - 0)%nat with nc by lia; lia)
                 HU3sp HU3s6 HU3s7 HU3s4 HU3s1 HU3s5 HU3s3 HU3s9 HU3s8
-                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hkenv Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hidev
                       Hmeta Hmap Hblocks Hdst Hsl Hcont"). }
     (* ===== +0x2c bgeu a5,a4 : does the read fit inside the file? ===== *)

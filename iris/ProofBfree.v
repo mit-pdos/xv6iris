@@ -659,6 +659,8 @@ Section BfreeTail.
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT0a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
+              (* the byte view's mask (durable-disk 1c-flip step 4) *)
+              ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
@@ -1373,7 +1375,7 @@ Section ProofBfreeMain.
     iEval (rewrite HbnoB) in "HL".
     iApply fupd_wp.
     iMod (bitmap_read_own ⊤ γfs bmapstart cov logstart size bi bs0
-            ltac:(solve_ndisj) Hbirange with "Hbminv Hown HL")
+            ltac:(solve_ndisj) logN_top Hbirange with "Hbminv Hown HL")
       as "(%Hex & Hown & HL)".
     iEval (rewrite -HbnoB) in "HL".
     iDestruct ("Hbackl" with "HL") as "Hheld".

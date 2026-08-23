@@ -412,7 +412,8 @@ Section IgetLic.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -510,7 +511,8 @@ Section IgetLic.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -563,6 +565,8 @@ Section IgetLic.
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
       (bno : Z) (ds : list dinode) :
     ↑iregN ⊆ E ->
+    (* [ireg_read]'s, inherited (durable-disk 1c-flip step 3) *)
+    ↑logN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
@@ -570,11 +574,11 @@ Section IgetLic.
     ⌜bv_unsigned (di_type dn) <> 0⌝ ∗
     dinode_at γi inum dn ∗ iname γi γfs inodestart inum (BufL bno ds).
   Proof.
-    iIntros (HE Hin) "#Hinv Hdn Hbuf". rewrite /iname.
+    iIntros (HE HEl Hin) "#Hinv Hdn Hbuf". rewrite /iname.
     iDestruct "Hbuf" as "(Hhalf & %Hb & %Hwf & %Hnz & Hboot)".
     rewrite /fs_chalf.
     iMod (ireg_read E γi γfs inodestart nib inum dn
-            bno (diblk_bytes ds) HE Hin Hb
+            bno (diblk_bytes ds) HE HEl Hin Hb
             with "Hinv Hdn Hhalf") as "(%Hex & Hdn & Hhalf)".
     destruct Hex as (ds' & Hwf' & Hbytes & Hslot).
     assert (Hdseq : ds' = ds)
@@ -726,6 +730,51 @@ Section IgetLic.
       [^iregN] open and cannot re-open it.  So the region's half comes IN as
       an argument, and the constructor's [bno] tie comes out of the LICENCE
       itself (SIMP-1).  Everything is borrowed: the conclusion is pure. *)
+  (* THE BufL ROW'S BLOCK TRANSPORT, ON ITS OWN (durable-disk 1c-flip
+     step 3).  [iname_mint_ok] below used to meet the licence's machinery
+     half against the region's parked CACHE half by an auth-free
+     agreement; the region now owns the block's EXCLUSIVE byte run, so the
+     two maps meet only inside [FsBlocks.fs_bytes_inv].  That is a fupd,
+     and [iname_mint_ok]'s conclusion is pure -- so the crossing is split
+     off here and [iname_mint_ok] takes its result as a PURE premise, which
+     keeps the five-row table an entailment and its one consumer's
+     [iDestruct ... as %] shape.  Only the [BufL] row does any work. *)
+  Lemma iname_buf_list (E : coPset) (home : gset Z)
+      (γi : gname) (γfs : fs_names) (inodestart : Z)
+      (inum : bv 32) (l : ilic) (ds : list dinode) :
+    ↑logN ⊆ E ->
+    diblk_wf ds ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    fsblock (fs_bytes γfs) (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    iname γi γfs inodestart inum l ={E}=∗
+    ⌜forall (bno : Z) (ds0 : list dinode), l = BufL bno ds0 -> ds0 = ds⌝ ∗
+    fsblock (fs_bytes γfs) (IBLOCK inum inodestart) (diblk_bytes ds) ∗
+    iname γi γfs inodestart inum l.
+  Proof.
+    iIntros (HE Hwf) "#Hbinv Hfsb Hl".
+    destruct l as [fl | d' | tyc | bno ds0 |];
+      [ iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate
+      | iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate
+      | iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate
+      |
+      | iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate ].
+    iEval (rewrite /iname) in "Hl".
+    iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot)".
+    iEval (rewrite Hbno /fs_chalf) in "Hhalf".
+    iMod (fs_bytes_agree E (fs_bytes γfs) (fs_cache γfs) home
+            (IBLOCK inum inodestart) (diblk_bytes ds) (diblk_bytes ds0)
+            HE with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
+    assert (Hdseq : ds0 = ds)
+      by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
+    iModIntro. iFrame "Hfsb".
+    iSplitR.
+    { iPureIntro. intros bno' ds1 Heq. injection Heq as _ <-. exact Hdseq. }
+    rewrite /iname /fs_chalf.
+    iEval (rewrite -Hbno) in "Hhalf".
+    iFrame "Hhalf Hboot". iPureIntro.
+    split; [exact Hbno | split; [exact Hwf0 | exact Hnz0]].
+  Qed.
+
   Lemma iname_mint_ok (γi : gname) (γfs : fs_names) (inodestart : Z)
       (inum : bv 32) (l : ilic) (ds : list dinode) (mm : gmap Z dinode)
       (wl wdu wdt g r : nat) (c : ctyUR)
@@ -735,15 +784,16 @@ Section IgetLic.
     ireg_root_ok (bv_unsigned inum) (ds !!! islot inum) (wl + wdu + wdt) ->
     ireg_claim_ok c f (ds !!! islot inum) ->
     mm !! bv_unsigned inum = Some (ds !!! islot inum) ->
+    (* the [BufL] row's block transport, from [iname_buf_list] above *)
+    (forall (bno : Z) (ds0 : list dinode), l = BufL bno ds0 -> ds0 = ds) ->
     ghost_map_auth γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n (ds !!! islot inum) -∗
-    fs_chalf γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
     iname γi γfs inodestart inum l -∗
     ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0
      /\ (is_claim l = false -> c = None)⌝.
   Proof.
-    intros Hwf Hlok Hrt Hclm Hmd.
+    intros Hwf Hlok Hrt Hclm Hmd Hbuf.
     (* bridge (a): a named record is neither free nor a claim box *)
     assert (Hnzb : bv_unsigned (di_nlink (ds !!! islot inum)) <> 0 ->
                    bv_unsigned (di_type (ds !!! islot inum)) <> 0 /\ c = None).
@@ -759,7 +809,7 @@ Section IgetLic.
     { intros Hw. apply Hnzb.
       destruct Hlok as [Hle _].
       pose proof (di_nlink_nonneg (ds !!! islot inum)). lia. }
-    iIntros "Ha Hla Hfsb Hsh Hl". rewrite /iname /is_claim.
+    iIntros "Ha Hla Hsh Hl". rewrite /iname /is_claim.
     destruct l as [fl | d' | tyc | bno ds0 |].
     - (* (a) LinkedL *)
       iDestruct (ireg_rcol_paid_ge with "Hla Hl") as %Hw1.
@@ -781,10 +831,7 @@ Section IgetLic.
     - (* (e) BufL -- the buffer's type fact, transported; the boot one-shot
          against the c column's shelter *)
       iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot)".
-      rewrite Hbno /fs_chalf.
-      iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
-      assert (Hdseq : ds0 = ds)
-        by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
+      assert (Hdseq : ds0 = ds) by exact (Hbuf bno ds0 eq_refl).
       subst ds0.
       iAssert (⌜c = None⌝)%I as %Hc0.
       { iDestruct "Hsh" as "[%Hn | Hopen]"; [by iPureIntro |].
@@ -829,7 +876,8 @@ Section IgetLic.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi

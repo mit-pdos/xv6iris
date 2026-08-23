@@ -324,6 +324,13 @@ Definition wp_readi_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  readi is the one
+     whole-block reader in the tree that holds NO log/region/bitmap
+     invariant -- by design, it takes no [log_ctx] -- so the row it needs
+     to turn "the buffer holds [bsl]" into "[bsl] is what my byte run says"
+     comes in as its own premise.  Persistent, and every caller has one
+     ([InodeRegion.ireg_inv_bytes]). *)
+  fs_bytes_any γfs -∗
   (* either_copyout's user arm reaches copyout, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
   (* ip->dev: read, never written -- a FRACTION *)

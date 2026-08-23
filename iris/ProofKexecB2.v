@@ -1351,6 +1351,8 @@ Section KexecB2Loops.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDd CIDd6 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+      (* the byte view's row (durable-disk 1c-flip step 3) *)
+      iPoseProof (log_ctx_bytes_any with "Hlogc") as "#Hrow".
       iApply (Readi.wp_readi_sconf KT0 gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat eb
@@ -1360,7 +1362,7 @@ Section KexecB2Loops.
                       pose proof Hszb as Hs; rewrite Hmb in Hs; lia)
                 Hjp Hgs HD6a0
                 ltac:(rewrite HD6a1; vm_compute; reflexivity) HD6a3 HD6a4
-                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hka Hidev Hmeta Hmap
+                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hrow Hka Hidev Hmeta Hmap
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
       all: try lkbelow.
       { iSplitL "Hdst"; [iExact "Hdst" | iExact "Hppid"]. }

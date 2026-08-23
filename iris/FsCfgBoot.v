@@ -335,11 +335,11 @@ Section FsCfgBootPool.
                       (fs_data_of P (fs_dinode P sb z))) -∗
     (* [fs_boot_ghosts]' two block big-ops, UNPAIRED as it hands them over,
        and cut down to [C] by the era fupd's own peels *)
-    ([∗ set] b ∈ C, fs_chalf γfs b (P b)) -∗
+    ([∗ set] b ∈ C, fsblock (fs_bytes γfs) b (P b)) -∗
     ([∗ set] b ∈ C, blk_own γfs b) -∗
     ipool γfs γi cov (sb_logstart sb) (region_inums icfg_nib)
       ∗ ([∗ set] b ∈ C ∖ fs_live_blocks P sb A,
-           fs_chalf γfs b (P b) ∗ blk_own γfs b).
+           fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b).
   Proof.
     iIntros (Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC)
             "Hcnt Hmir Hoff Hdv Hfv Hout Hdlk Hfsb Hown".
@@ -400,13 +400,13 @@ Section FsCfgBootPool.
     iDestruct (big_sepS_sep_2 with "Hfsb Hown") as "Hblk".
     rewrite /fs_live_blocks.
     iDestruct (big_sepS_carve
-                 (fun b => fs_chalf γfs b (P b) ∗ blk_own γfs b)%I
+                 (fun b => fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b)%I
                  C (elements A) (fs_inode_blocks_set P sb)
                  (NoDup_elements A) Hsub Hdisj with "Hblk") as "[Hpc Hrem]".
     iSplitR "Hrem"; [| iExact "Hrem"].
     iDestruct (big_sepS_of_elements
                  (fun i => [∗ set] b ∈ fs_inode_blocks_set P sb i,
-                             (fs_chalf γfs b (P b) ∗ blk_own γfs b))%I A
+                             (fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b))%I A
                  with "Hpc") as "Hpc".
     (* ---- the region's payout, split along the same subset ------------ *)
     iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
@@ -879,7 +879,7 @@ Section FsCfgBootBitmap.
     fs_blocks_full P ->
     (forall b : Z, fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov) ->
     ([∗ set] b ∈ fs_bitmap_spent P sb,
-       fs_chalf γfs b (P b) ∗ blk_own γfs b) -∗
+       fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b) -∗
     bitmap_res γfs (FsImg.sb_bmapstart sb) cov (FsImg.sb_logstart sb)
       (FsImg.sb_size sb) (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))).
   Proof.
@@ -1111,7 +1111,7 @@ Section FsCfgBootEra.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* block 1: the superblock's own block, whose bytes pin what bread
         returns to the image *)
-     fs_chalf fsc_fs 1 (P 1) ∗
+     fsblock (fs_bytes fsc_fs) 1 (P 1) ∗
      (* initlog's FsBlocks material.  [L]/[D] are universally quantified in
         [SpecFsinit]'s contract, so an existential here is exactly right --
         with the ONE pure fact the era's own mint establishes and initlog
@@ -1139,7 +1139,7 @@ Section FsCfgBootEra.
         did not spend.  At an image whose [cov] is exactly its own block
         range this is empty; it is kept because [cov] is a parameter. *)
      ([∗ set] b ∈ fsc_cov ∖ Rspent,
-        fs_chalf fsc_fs b (P b) ∗ blk_own fsc_fs b))%I.
+        fsblock (fs_bytes fsc_fs) b (P b) ∗ blk_own fsc_fs b))%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
       (P : Z -> list (bv 8)) (Rspent : gset Z) :
@@ -1147,7 +1147,7 @@ Section FsCfgBootEra.
       log_free_tok icfg_log ∗
       ireg_boot ∗
       ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-      fs_chalf fsc_fs 1 (P 1) ∗
+      fsblock (fs_bytes fsc_fs) 1 (P 1) ∗
       (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
          ⌜forall b : Z, b ∈ fsc_cov -> L !! b = Some (P b)⌝ ∗
          ghost_map_auth (fs_cache fsc_fs) 1 L ∗
@@ -1158,7 +1158,7 @@ Section FsCfgBootEra.
          ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno fsc_logst i) bs) ∗
       bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
       ([∗ set] b ∈ fsc_cov ∖ Rspent,
-         fs_chalf fsc_fs b (P b) ∗ blk_own fsc_fs b).
+         fsblock (fs_bytes fsc_fs) b (P b) ∗ blk_own fsc_fs b).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -1430,6 +1430,37 @@ Section FsCfgBootEra.
     { apply elem_of_subseteq. intros b Hb. pose proof (HlogI b Hb).
       apply elem_of_difference. split; [apply Hcovmeta; lia |].
       rewrite elem_of_singleton. lia. }
+    (* THE HOME SET, and the two facts the flipped mint's peel needs
+       (durable-disk 1c-flip step 1): it is a subset of [cov], and block 1
+       -- the superblock -- is in it, so its resource is the EXCLUSIVE byte
+       run rather than a cache half. *)
+    assert (Hhomesub : fs_home_set cov (sb_logstart sb) ⊆ cov).
+    { rewrite /fs_home_set. apply elem_of_subseteq. intros b Hb.
+      apply elem_of_difference in Hb as [Hc _]. exact Hc. }
+    assert (H1home : ({[ (1:Z) ]} : gset Z)
+                     ⊆ fs_home_set cov (sb_logstart sb)).
+    { rewrite /fs_home_set. apply elem_of_subseteq. intros b Hb.
+      apply elem_of_singleton in Hb as ->. apply elem_of_difference.
+      split; [apply Hcovmeta; lia |]. intros Hc. pose proof (HlogI 1 Hc). lia. }
+    (* the mint's [cov]-minus-home half IS the log region *)
+    assert (Hcancel : cov ∖ fs_home_set cov (sb_logstart sb)
+                      = log_region_set (sb_logstart sb)).
+    { rewrite /fs_home_set. apply set_eq. intros x. split.
+      - intros Hx. apply elem_of_difference in Hx as [Hc Hn].
+        destruct (decide (x ∈ log_region_set (sb_logstart sb))) as [Hr | Hr];
+          [exact Hr |].
+        exfalso. apply Hn. apply elem_of_difference. split; assumption.
+      - intros Hx. apply elem_of_difference.
+        split; [apply Hcovmeta; pose proof (HlogI x Hx); lia |].
+        intros Hd. apply elem_of_difference in Hd as [_ Hn]. exact (Hn Hx). }
+    (* ...and peeling block 1 off the home set leaves exactly the set the
+       old [cov]-first peel left *)
+    assert (Hsetcomm : fs_home_set cov (sb_logstart sb)
+                         ∖ ({[ (1:Z) ]} : gset Z)
+                       = (cov ∖ ({[ (1:Z) ]} : gset Z))
+                           ∖ log_region_set (sb_logstart sb)).
+    { rewrite /fs_home_set !difference_difference_l_L. f_equal.
+      apply union_comm_L. }
     assert (Hiregcov : ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib
                        ⊆ (cov ∖ ({[ (1:Z) ]} : gset Z))
                            ∖ log_region_set (sb_logstart sb)).
@@ -1513,26 +1544,32 @@ Section FsCfgBootEra.
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
     (* ---- 4. the block layer's ghosts -------------------------------- *)
-    iMod (fs_boot_ghosts γv dk ndisk cov ROOTDEV E Hcovin with "Hdisk")
-      as (γfs) "(Hpool & HaL & HaD & Hdty & Hfsb & Hown)".
-    (* ---- 5. THE THREE PEELS ----------------------------------------- *)
-    iDestruct (big_sepS_sep_2 with "Hfsb Hown") as "Hblk".
-    iDestruct (big_sepS_split_sub _ cov ({[ (1:Z) ]} : gset Z) H1cov
+    iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
+            ROOTDEV E Hcovin Hhomesub with "Hdisk")
+      as (γfs) "(Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl & Hown)".
+    (* ---- 5. THE PEELS ------------------------------------------------
+       THE MINT ALREADY SPLIT THE LOG REGION OFF (durable-disk 1c-flip):
+       [Hchl] is the log's own storage, at the parked cache halves
+       [log_state] wants, and [Hfsb] is every HOME block at its exclusive
+       byte run.  So the log peel is gone from here and the other two run
+       over the home set. *)
+    rewrite Hcancel.
+    iDestruct (fs_log_region_split γfs dk (sb_logstart sb) with "Hchl")
+      as "[Hhdr Hslots]".
+    iDestruct (big_sepS_split_sub _ cov (fs_home_set cov (sb_logstart sb))
+                 Hhomesub with "Hown") as "[HownH _]".
+    iDestruct (big_sepS_sep_2 with "Hfsb HownH") as "Hblk".
+    iDestruct (big_sepS_split_sub _ _ ({[ (1:Z) ]} : gset Z) H1home
                  with "Hblk") as "[Hb1 Hblk]".
-    iDestruct (big_sepS_split_sub _ _ (log_region_set (sb_logstart sb))
-                 Hlogcov with "Hblk") as "[Hblog Hblk]".
+    iEval (rewrite Hsetcomm) in "Hblk".
     iDestruct (big_sepS_split_sub _ _
                  (ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
                  Hiregcov with "Hblk") as "[Hbireg Hblk]".
     iEval (rewrite big_sepS_singleton) in "Hb1".
     iDestruct "Hb1" as "[Hb1 _]".
-    iEval (rewrite big_sepS_sep) in "Hblog".
-    iDestruct "Hblog" as "[Hblog _]".
-    iDestruct (fs_log_region_split γfs dk (sb_logstart sb) with "Hblog")
-      as "[Hhdr Hslots]".
     iEval (rewrite big_sepS_sep) in "Hbireg".
     iDestruct "Hbireg" as "[Hbireg _]".
-    iDestruct (ireg_blk_of_set (fun b => fs_chalf γfs b (fs_blocks dk b))
+    iDestruct (ireg_blk_of_set (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b))
                  (FsImg.sb_inodestart sb) icfg_nib with "Hbireg")
       as "Hbireg".
     iEval (rewrite big_sepS_sep) in "Hblk".
@@ -1541,6 +1578,7 @@ Section FsCfgBootEra.
     iAssert (ireg_boot) with "[Hboot]" as "Hboot".
     { rewrite /ireg_boot /ity_pending. iExact "Hboot". }
     iMod (ireg_alloc E γfs (FsImg.sb_inodestart sb) icfg_nib
+            (fs_home_set cov (sb_logstart sb))
             (fun bi : nat =>
                fs_blocks dk (FsImg.sb_inodestart sb + Z.of_nat bi))
             (fs_link_count (fs_blocks dk) sb) Hnib32 eq_refl
@@ -1548,7 +1586,7 @@ Section FsCfgBootEra.
             ltac:(intros dss Hdl Hdwf Hde;
                   exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
                            Hwf Hrw Hdl Hdwf Hde Hnib32))
-            with "Hla HcntR Hrcpt HmirR Hep Hbireg Hboot Hrauth")
+            with "Hla HcntR Hrcpt HmirR Hep Hbireg Hbinv Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
@@ -1699,12 +1737,12 @@ Section FsCfgBootEra.
         + intros Hc. pose proof (HiregI _ Hc). lia.
         + intros Hc. exact (Hnu (Hlive Hc)). }
     iDestruct (big_sepS_split_sub
-                 (fun b => fs_chalf γfs b (fs_blocks dk b) ∗ blk_own γfs b)%I
+                 (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b) ∗ blk_own γfs b)%I
                  _ (fs_bitmap_spent (fs_blocks dk) sb) Hbmsub with "Hrem")
       as "[Hbmspent Hrem]".
     iDestruct (bitmap_res_of_image γfs (fs_blocks dk) sb cov Hwf Hfull
                  Hcovdata with "Hbmspent") as "Hbmres".
-    iMod (bitmap_inv_alloc E with "Hbmres") as "#Hbmres".
+    iMod (bitmap_inv_alloc E with "Hbinv Hbmres") as "#Hbmres".
     (* ---- 8. the gname-only mints, and the record -------------------- *)
     iMod (bio_names_ghost_alloc with "Hsa Hsf") as (bn) "Hbio".
     iMod lock_ghost_alloc as (git) "Hitlk".

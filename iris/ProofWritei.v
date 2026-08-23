@@ -2259,6 +2259,8 @@ Section WriteiLoop.
     iDestruct (wi_src_bare γf j pidv dq user (upd_upt V PI) V
                  (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
       as "[Hppid Hsrcback]".
+    (* the byte view's row (durable-disk 1c-flip step 3) *)
+    iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hrow".
     iApply (BM.wp_bmap_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart (ba_bms A) (ba_size A) dev (ba_pr A)
               ip bmI dataI fbn nI (bool_decide (ba_bms A ∈ SI)) SI
@@ -2270,7 +2272,7 @@ Section WriteiLoop.
               Hgeom0 Hgok Hprkc
               ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
               Hfbnlt HwfI Hj Hgl HA3a0 HA3a1
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hpanenv Hbio Hlctx Hidev Hmap
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hpanenv Hbio Hrow Hlctx Hidev Hmap
                     Hblocks Hppid
                     Hszc Hbmsc Hbminv
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
@@ -2608,7 +2610,11 @@ Section WriteiLoop.
       iEval (rewrite -Hubno) in "Hfsb1".
       iEval (rewrite /bio_locked) in "Hheld".
       iDestruct (wi_held_k with "Hheld") as %Hkklt.
-      iDestruct (wi_held_content with "Hfsb1 Hheld") as %Hbs0eq.
+      iApply fupd_wp.
+      iMod (wi_held_content ⊤ bn γfs γd dev cov _ pidv dev _
+              _ _ _ _ _ logN_top with "Hrow Hfsb1 Hheld")
+        as "(%Hbs0eq & Hfsb1 & Hheld)".
+      iModIntro.
       subst bsB.
       iDestruct (wi_held_swap with "Hheld") as "[Hbuf Hheldback]".
       (* ===== +0x98 c.mv s1,a0 : s1 := bp ===== *)

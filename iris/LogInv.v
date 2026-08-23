@@ -1188,7 +1188,16 @@ Section LogInv.
         in, pins the crash record's arm to THIS era ([FsCrash.fs_arm_acc]'s
         squeeze).  Persistent, so it rides the context every log function
         already threads. *)
-     swap_lb (S gen_id))%I.
+     swap_lb (S gen_id) ∗
+     (* THE BYTE VIEW'S INVARIANT ROW (durable-disk 1c-flip step 3/4).
+        Every home block's owner above the log now holds the EXCLUSIVE
+        [FsBlocks.fsblock] rather than the cache's parked half, so the
+        auth-free half/half agreement a [bread] client used to close by
+        entailment is gone: it opens THIS invariant instead.  It rides
+        [log_ctx] because [log_ctx] is already threaded to [log_write] and
+        already carries [cov] and [logstart], so not one call site moves. *)
+     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs)
+                  (fs_home_set cov logstart))%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -1214,9 +1223,23 @@ Section LogInv.
     log_ctx γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
   Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
 
+  (* the byte view's row, off the context every log function threads *)
+  Lemma log_ctx_bytes γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & $)". Qed.
+
+  (* ...and the home-set-free form every bread client above takes *)
+  Lemma log_ctx_bytes_any γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ fs_bytes_any γfs.
+  Proof.
+    iIntros "H". iPoseProof (log_ctx_bytes with "H") as "Hb".
+    rewrite /fs_bytes_any. iExists (fs_home_set cov logstart). iExact "Hb".
+  Qed.
+
   Lemma log_ctx_swap γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $)". Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $ & _)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)

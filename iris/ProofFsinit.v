@@ -217,7 +217,7 @@ Section FsinitDefs.
         sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
         InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-        fs_chalf γfs 1 bs_sb -∗
+        fsblock (fs_bytes γfs) 1 bs_sb -∗
         log_ctx icfg_log bn γfs cov logstart dev -∗
         bslots 3 -∗
         iref_slot -∗
@@ -301,7 +301,7 @@ Section FsinitEpilogue.
     sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
     InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-    fs_chalf γfs 1 bs_sb -∗
+    fsblock (fs_bytes γfs) 1 bs_sb -∗
     log_ctx icfg_log bn γfs cov logstart dev -∗
     bslots 3 -∗
     iref_slot -∗
@@ -582,6 +582,12 @@ Section FsinitMain.
               #Hdlock Hsl Hiref Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
+    (* THE BYTE VIEW'S ROW, off the bitmap invariant fsinit already holds
+       (durable-disk 1c-flip): initlog needs it at the NAMED home set, to
+       put into [LogInv.log_ctx]; block 1's own read needs the home-set-free
+       form. *)
+    iPoseProof (bitmap_inv_bytes_at with "Hbm") as "#Hbrow".
+    iPoseProof (bitmap_inv_bytes with "Hbm") as "#Hbany".
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size dev v_magic v_size v_nblocks v_nlog bs_sb
                pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
@@ -813,7 +819,10 @@ Section FsinitMain.
     iDestruct (iu_held_k with "Hheld") as %Hkk.
     iDestruct (ds_held_L with "Hheld") as "[HpL Hheldback]".
     iEval (rewrite Hbnou) in "HpL".
-    iDestruct (ghost_map_elem_agree with "HpL Hfsb") as %Hbs0.
+    iApply fupd_wp.
+    iMod (fs_bytes_agree_any ⊤ γfs 1 bs_sb bs0 logN_top
+            with "Hbany Hfsb HpL") as "(%Hbs0 & Hfsb & HpL)".
+    iModIntro.
     iEval (rewrite -Hbnou) in "HpL".
     iDestruct ("Hheldback" with "HpL") as "Hheld".
     subst bs0.
@@ -1399,7 +1408,8 @@ Section FsinitMain.
     (* the clean image's header decode is empty, so the three header
        well-formedness premises and the home-halves row are all trivial *)
     iAssert ([∗ list] i ↦ b0 ∈ (hdr_dec bs_hdr).2,
-               fs_chalf γfs b0 ((fun _ : nat => ([] : list (bv 8))) i))%I
+               fsblock (fs_bytes γfs) b0
+                 ((fun _ : nat => ([] : list (bv 8))) i))%I
       as "Hnilhomes".
     { rewrite (hdr_dec_zero bs_hdr Hhdr0). cbn. done. }
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs γpr
@@ -1421,7 +1431,7 @@ Section FsinitMain.
                     Hpenv Hnilhomes Hgen Hmirror
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
-                    Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk HauthL HauthD
+                    Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbrow HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34").
     all: try lkbelow.
     iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 _ Hlctx".

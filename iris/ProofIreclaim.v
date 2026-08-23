@@ -2605,7 +2605,7 @@ Section IreclaimScan.
       iApply fupd_wp.
       iEval (rewrite Hbno (ireg_bi_iblock inum inodestart)) in "HpL".
       iMod (ireg_read_blk ⊤ γi γfs inodestart nib (ireg_bi inum) bs0
-              ltac:(solve_ndisj) (ireg_bi_lt inum nib Hnib)
+              ltac:(solve_ndisj) logN_top (ireg_bi_lt inum nib Hnib)
               with "Hireg HpL") as "(%Hex & HpL)".
       iModIntro.
       iEval (rewrite -(ireg_bi_iblock inum inodestart) -Hbno) in "HpL".

@@ -1,8 +1,8 @@
 (* InodeRegion.v -- THE INODE REGION: the dinode blocks' owner, and the
-   per-inum fragment that replaces the coarse [fs_chalf] premise in every
+   per-inum fragment that replaces the coarse whole-block premise in every
    inode-layer contract.  Design: claude-notes/design/fs-icache.md, §11-§12.
 
-   [FsBlocks.fs_chalf] is the write permission for a block, and a dinode
+   [FsBlocks.fsblock] is the write permission for a block, and a dinode
    block holds SIXTEEN inodes -- so any contract that takes the block's
    half for the duration of a call is unsatisfiable by two lock holders in
    the same block (§11.1).  The fix is a CHANGE OF GRANULARITY: callers
@@ -20,11 +20,11 @@
    and a checkout could never prove the arm is parked.
 
    So the region is ONE-ARMED, and the only moment the client half leaves
-   it is log_write's own ghost step (ProofLogWrite.v's [fs_chalf_update], a
+   it is log_write's own ghost step (ProofLogWrite.v's [fsblock_update], a
    single [iMod] between two instruction dispatches, at mask ⊤).
    [ireg_write_au] below is the atomic update iupdate hands to the
    generalized SpecLogWrite premise: it opens the region THERE, lets
-   [fs_chalf_update] run against the withdrawn half, and re-parks the block
+   [fsblock_update] run against the withdrawn run, and re-parks the block
    at the new bytes while retagging the caller's [dinode_at] in the same
    opening.  [ireg_read] is ilock's side: one mask-preserving opening in
    which the caller's payload machinery half pins the region's bytes and
@@ -1344,7 +1344,7 @@ Section InodeRegion.
   (* THE per-inum resource: this inum's on-disk record is [dn].  EXCLUSIVE
      (a full-fraction ghost_map element), keyed by the inum's value; the
      block address falls out of [IBLOCK] and never needs a second ghost.
-     This is what replaces [fs_chalf γfs (IBLOCK inum inodestart)
+     This is what replaces [fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
      (diblk_bytes ds)] in SpecIupdate / SpecIlock / SpecWritei /
      SpecItrunc / SpecFileread (§11.3). *)
   Definition dinode_at (γi : gname) (inum : bv 32) (dn : dinode) : iProp Σ :=
@@ -2253,7 +2253,7 @@ Section InodeRegion.
       (m : gmap Z dinode) (bi : nat) : iProp Σ :=
     (∃ ds : list dinode,
        ⌜diblk_wf ds⌝ ∗ ⌜ireg_couple m bi ds⌝ ∗
-       fs_chalf γfs (inodestart + Z.of_nat bi) (diblk_bytes ds) ∗
+       fsblock (fs_bytes γfs) (inodestart + Z.of_nat bi) (diblk_bytes ds) ∗
        [∗ list] i ∈ seq 0 16,
          ireg_slot γi (16 * Z.of_nat bi + Z.of_nat i)%Z (ds !!! i))%I.
 
@@ -2358,17 +2358,58 @@ Section InodeRegion.
 
   Definition iregN : namespace := nroot .@ "ireg".
 
+  (* THE BYTE VIEW'S ROW, AS THE REGION SEES IT (durable-disk 1c-flip
+     step 3).  [ireg_blk] above now holds the EXCLUSIVE byte run
+     [fsblock (fs_bytes γfs)] instead of the cache's parked half, so the
+     auth-free half/half agreement every reader used to close by
+     entailment is gone: a reader opens [fs_bytes_inv] instead, and to do
+     that it needs the invariant AND the fact that its block is one of the
+     home blocks the invariant covers.
+
+     THE HOME SET IS BOUND HERE, NOT A PARAMETER OF [ireg_inv], AND THAT
+     IS A DELIBERATE DEVIATION from the flip's ruling (2) -- see
+     claude-notes/projects/durable-disk.md item 1c.  Measured before
+     deviating: [ireg_inv] appears in the STATEMENT of 203 definitions
+     across 74 files, nearly all of them syscall-level contracts
+     ([wp_sys_open_sconf_body], [SpecKexec.fs_fabric],
+     [FsSyscalls.fs_world_all]) that have no business naming the block
+     layer's home set and no way to obtain one; IcacheRef.v's own header
+     already records that "[ireg_inv], whose arity is fixed by 30-odd fs
+     contracts" is why the icfg class exists.  Threading a [gset Z]
+     through all of them is the leak fs-state.md §0 forbids.
+
+     NOTHING IS WEAKENED BY BINDING IT HERE.  The set is a [gset Z], not
+     a ghost name (the ghost names ARE explicit: [fs_bytes γfs] and
+     [fs_cache γfs]); the coverage clause pins everything the region can
+     ever need of it -- every one of the region's own blocks is in it --
+     and no consumer of the region ever mentions a home block that is not
+     one of those.  A second invariant at [logN] over the same [fs_bytes
+     γfs] cannot exist anyway: its body demands the byte map's AUTH, of
+     which there is one. *)
+  Notation ireg_bytes := fs_bytes_any (only parsing).
+
   Definition ireg_inv (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
-    inv iregN (ireg_body γi γfs inodestart nib).
+    (inv iregN (ireg_body γi γfs inodestart nib) ∗
+     ireg_bytes γfs)%I.
 
   Global Instance ireg_inv_persistent γi γfs inodestart nib :
     Persistent (ireg_inv γi γfs inodestart nib).
   Proof. apply _. Qed.
 
+  Lemma ireg_inv_bytes γi γfs inodestart nib :
+    ireg_inv γi γfs inodestart nib -∗ fs_bytes_any γfs.
+  Proof. iIntros "[_ $]". Qed.
+
+  (* [logN] and [iregN] are distinct namespaces, so a reader that has
+     [iregN] open may still open the byte view. *)
+  Lemma logN_iregN_disj : (↑logN : coPset) ## ↑iregN.
+  Proof. solve_ndisj. Qed.
+
+
   Global Instance ireg_blk_timeless γi γfs inodestart m bi :
     Timeless (ireg_blk γi γfs inodestart m bi).
-  Proof. rewrite /ireg_blk /fs_chalf. apply _. Qed.
+  Proof. rewrite /ireg_blk. apply _. Qed.
 
   Global Instance ireg_body_timeless γi γfs inodestart nib :
     Timeless (ireg_body γi γfs inodestart nib).
@@ -2466,6 +2507,11 @@ Section InodeRegion.
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
       (b : Z) (bsl : list (bv 8)) :
     ↑iregN ⊆ E ->
+    (* THE FLIP'S ONE ADDITION (durable-disk 1c-flip step 3): the region
+       holds the block's EXCLUSIVE byte run, not a cache half, so pinning
+       the caller's bread bytes is an OPEN of the byte view's invariant
+       rather than an auth-free agreement. *)
+    ↑logN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     b = IBLOCK inum inodestart ->
     ireg_inv γi γfs inodestart nib -∗
@@ -2475,15 +2521,21 @@ Section InodeRegion.
        diblk_wf ds /\ bsl = diblk_bytes ds /\ ds !!! islot inum = dn⌝ ∗
     dinode_at γi inum dn ∗ (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE Hin Hb) "#Hinv Hdn Hhalf".
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iIntros (HE HEl Hin Hb) "#Hinv Hdn Hhalf".
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hrb" as (home) "#Hbinv".
+    assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
+      by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & Hsl)".
-    rewrite /fs_chalf -(ireg_bi_iblock inum inodestart) -Hb.
-    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    rewrite -(ireg_bi_iblock inum inodestart) -Hb.
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
+            b (diblk_bytes ds) bsl HlogI with "Hbinv Hfsb Hhalf")
+      as "(%Hbytes & Hfsb & Hhalf)".
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hslot : ds !!! islot inum = dn).
@@ -2493,7 +2545,7 @@ Section InodeRegion.
     iMod ("Hclose" with "[Ha Hreg Hfsb Hsl Hback]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Hsl]"); [done |].
-      iExists ds. rewrite /fs_chalf (ireg_bi_iblock inum inodestart) in Hb.
+      iExists ds. rewrite (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" | iExact "Hsl"]. }
     iModIntro. iFrame "Hdn Hhalf". iPureIntro.
@@ -2529,7 +2581,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -2593,7 +2646,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -2647,19 +2701,27 @@ Section InodeRegion.
   Lemma ireg_read_blk (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (bi : nat) (bsl : list (bv 8)) :
     ↑iregN ⊆ E ->
+    (* see [ireg_read] (durable-disk 1c-flip step 3) *)
+    ↑logN ⊆ E ->
     (bi < nib)%nat ->
     ireg_inv γi γfs inodestart nib -∗
     ((inodestart + Z.of_nat bi) ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     ⌜exists ds : list dinode, diblk_wf ds /\ bsl = diblk_bytes ds⌝ ∗
     ((inodestart + Z.of_nat bi) ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE Hbi) "#Hinv Hhalf".
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iIntros (HE HEl Hbi) "#Hinv Hhalf".
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hrb" as (home) "#Hbinv".
+    assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
+      by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib bi Hbi with "Hblks")
       as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & Hsl)".
-    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
+            (inodestart + Z.of_nat bi) (diblk_bytes ds) bsl HlogI
+            with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     iMod ("Hclose" with "[Ha Hreg Hfsb Hsl Hback]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Hsl]"); [done |].
@@ -2685,9 +2747,9 @@ Section InodeRegion.
   (*  THE FOUR ARM MOVES (§12.2 for the first, §16.3/§16.4 for the rest)  *)
   (* ------------------------------------------------------------------ *)
 
-  (* Exactly the shape SpecLogWrite's generalized fs_chalf premise takes:
+  (* Exactly the shape SpecLogWrite's generalized byte-run premise takes:
      the fupd opens the region and surrenders the block's client half at
-     whatever the parked bytes are; log_write's own [fs_chalf_update]
+     whatever the parked bytes are; log_write's own [fsblock_update]
      agreement (against the machinery half in the caller's handle) is what
      delivers [bsl' = diblk_bytes ds], and [diblk_bytes_inj] then pins the
      parked LIST to the [ds] the caller learned at its bread.  The closing
@@ -2729,9 +2791,9 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -2740,7 +2802,8 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -2905,9 +2968,9 @@ Section InodeRegion.
        which is the whole point of the clause. *)
     ireg_open -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        (* THE CLAIM (§2.4): the c column goes [None -> Some] in the same
           ghost step that writes the box, and the exclusive fragment is
@@ -2921,7 +2984,8 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -3165,7 +3229,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -3283,7 +3348,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -3343,7 +3409,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -3385,7 +3452,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -3482,9 +3550,9 @@ Section InodeRegion.
        token is in hand. *)
     ifreeze_post rg (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ imark γi (bv_unsigned inum)
                           ∗ ifreeze_off (bv_unsigned inum)).
@@ -3494,7 +3562,8 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -3771,6 +3840,9 @@ Section InodeRegion.
       (inodestart : Z) (nib : nat) (inum : bv 32) (ds : list dinode)
       (b : Z) (bsl : list (bv 8)) (o : ilkc) (gy : gname) :
     ↑iregN ⊆ E ->
+    (* see [ireg_read] -- the byte view's open replaces the half/half
+       agreement (durable-disk 1c-flip step 3) *)
+    ↑logN ⊆ E ->
     (* [ShotK] never reaches the fill -- see [ilk_fills]. *)
     ilk_fills o ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
@@ -3804,19 +3876,25 @@ Section InodeRegion.
     dinode_at γi inum (ds !!! islot inum) ∗
     (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE Hfills Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
+    iIntros (HE HEl Hfills Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hrb" as (home) "#Hbinv".
+    assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
+      by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds0) "(>%Hwf0 & >%Hcp0 & >Hfsb & >Hsls)".
-    rewrite /fs_chalf -(ireg_bi_iblock inum inodestart) -Hb.
-    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    rewrite -(ireg_bi_iblock inum inodestart) -Hb.
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
+            b (diblk_bytes ds0) bsl HlogI with "Hbinv Hfsb Hhalf")
+      as "(%Hbytes & Hfsb & Hhalf)".
     assert (Hds0 : ds0 = ds).
     { apply (diblk_bytes_inj ds0 ds Hwf0 Hwf). rewrite -Hbytes -Hbsl. reflexivity. }
     subst ds0.
@@ -3895,7 +3973,7 @@ Section InodeRegion.
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Hmk Hla Hep Hslback Hrf Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      rewrite /fs_chalf (ireg_bi_iblock inum inodestart) in Hb.
+      rewrite (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
       iApply ("Hslback" $! (ds !!! islot inum) with "[Hmk Hla Hep Hrf Hcnt Hfdisj Hfrcp]").
@@ -3944,7 +4022,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -4114,9 +4193,9 @@ Section InodeRegion.
        and a holder's ilock/iunlock pair is undisturbed. *)
     ireg_link_pin pin (bv_unsigned inum) dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilink_fl fl (bv_unsigned inum) ∗
@@ -4128,7 +4207,8 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -4329,9 +4409,9 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilink (bv_unsigned inum)).
@@ -4373,9 +4453,9 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilinkd (bv_unsigned inum)).
@@ -4426,9 +4506,9 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ifreeze_off (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn'
@@ -4488,7 +4568,7 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilink_fl fl (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (* THE DEPOSIT (fs-log.md §G.17).  This is the ONLY writer in the
          kernel that LOWERS nlink, hence the only one that can park a fresh
          zero, hence the only one that owes the receipt.  It hands the
@@ -4502,7 +4582,7 @@ Section InodeRegion.
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4511,7 +4591,8 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -4709,11 +4790,11 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilink (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4738,11 +4819,11 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilinkd (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4773,11 +4854,11 @@ Section InodeRegion.
     ilinkdp (bv_unsigned inum) pv -∗
     iparent (bv_unsigned inum) pv -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4812,6 +4893,8 @@ Section InodeRegion.
       (inodestart : Z) (nib : nat) (inum : bv 32)
       (b : Z) (bsl : list (bv 8)) :
     ↑iregN ⊆ E ->
+    (* see [ireg_read] (durable-disk 1c-flip step 3) *)
+    ↑logN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     b = IBLOCK inum inodestart ->
     ireg_inv γi γfs inodestart nib -∗
@@ -4823,18 +4906,24 @@ Section InodeRegion.
     ilink (bv_unsigned inum) ∗
     (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE Hin Hb) "#Hinv Hfrag Hhalf".
+    iIntros (HE HEl Hin Hb) "#Hinv Hfrag Hhalf".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hrb" as (home) "#Hbinv".
+    assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
+      by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
-    rewrite /fs_chalf -(ireg_bi_iblock inum inodestart) -Hb.
-    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    rewrite -(ireg_bi_iblock inum inodestart) -Hb.
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
+            b (diblk_bytes ds) bsl HlogI with "Hbinv Hfsb Hhalf")
+      as "(%Hbytes & Hfsb & Hhalf)".
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
@@ -4850,7 +4939,7 @@ Section InodeRegion.
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      rewrite /fs_chalf (ireg_bi_iblock inum inodestart) in Hb.
+      rewrite (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj Hfrcp]").
@@ -4896,7 +4985,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -4972,7 +5062,8 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
@@ -5032,7 +5123,8 @@ Section InodeRegion.
     (ireg_lcols z ==∗ ireg_lcols z ∗ Q) ={E}=∗ Q.
   Proof.
     iIntros (HE Hz) "#Hinv Hmove".
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     iDestruct "Hreg" as (mr) "(%Hcov & Hauth & Hlends)".
     iDestruct (ireg_lends_acc z Hz with "Hlends") as "[Hcol Hback]".

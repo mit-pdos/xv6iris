@@ -2251,7 +2251,8 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -2355,7 +2356,8 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -2460,6 +2462,9 @@ Section IcacheRefInvReg.
   Lemma ireg_icnt_lic_acc (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (l : ilic) (n : nat) :
     ↑iregN ⊆ E ->
+    (* the [BufL] row's block transport crosses the byte view
+       (durable-disk 1c-flip step 3) *)
+    ↑logN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     iname γi γfs inodestart inum l -∗
@@ -2476,11 +2481,12 @@ Section IcacheRefInvReg.
            icnt_half (bv_unsigned inum) m ∗
            runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE Hin) "#Hinv Hl Hhalf".
+    iIntros (HE HEl Hin) "#Hinv Hl Hhalf".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -2505,10 +2511,19 @@ Section IcacheRefInvReg.
        ALLOCATED, and at any non-[ClaimL] licence it is UNCLAIMED.  The
        block half comes in because the [BufL] row transports a decoded type
        fact and this accessor already holds [↑iregN] open. *)
+    (* THE BufL ROW'S BLOCK TRANSPORT (durable-disk 1c-flip step 3): the
+       region owns the block's EXCLUSIVE byte run now, so meeting it
+       against the licence's machinery half is an open of the byte view's
+       invariant -- a fupd, run here, ahead of the (still pure) table. *)
     iEval (rewrite -(ireg_bi_iblock inum inodestart)) in "Hfsb".
+    iDestruct "Hrb" as (home) "#Hbinv".
+    iMod (iname_buf_list (E ∖ ↑iregN) home γi γfs inodestart inum l ds
+            ltac:(apply subseteq_difference_r;
+                  [apply logN_iregN_disj | exact HEl]) Hwf
+            with "Hbinv Hfsb Hl") as "(%Hbuf & Hfsb & Hl)".
     iDestruct (iname_mint_ok γi γfs inodestart inum l ds mrg
-                 wl wdu wdt gl rl cl pl fz n Hwf Hlok Hrt Hclm Hmd
-                 with "Ha Hla Hfsb Hdisj Hl") as %[Hty0 Hcl0].
+                 wl wdu wdt gl rl cl pl fz n Hwf Hlok Hrt Hclm Hmd Hbuf
+                 with "Ha Hla Hdisj Hl") as %[Hty0 Hcl0].
     iEval (rewrite (ireg_bi_iblock inum inodestart)) in "Hfsb".
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
@@ -2621,7 +2636,8 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -2716,7 +2732,8 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
@@ -2793,6 +2810,9 @@ Section IcacheRefInvReg.
       (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
       (l : ilic) (q qt : Qp) (n : positive) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    (* the region's [BufL] row crosses the byte view (durable-disk
+       1c-flip step 3) *)
+    ↑logN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, n) ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
@@ -2818,7 +2838,7 @@ Section IcacheRefInvReg.
          (* THE MINTED UNIT, flavoured by the licence presented *)
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin HMk Hno) "#Hinv #Hrinv Hhalf Htok Hislot Hoff Hcnt".
+    iIntros (HE HER HEL Hin HMk Hno) "#Hinv #Hrinv Hhalf Htok Hislot Hoff Hcnt".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -2827,7 +2847,8 @@ Section IcacheRefInvReg.
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     (* ---- region: the SECOND open, nested inside the icache's hole ---- *)
     iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            l (Pos.to_nat n) ltac:(solve_ndisj) Hin
+            l (Pos.to_nat n) ltac:(solve_ndisj)
+            ltac:(apply subseteq_difference_r; [solve_ndisj | exact HEL]) Hin
             with "Hrinv Hoff Hcnt") as "[Hoff Hrback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
@@ -2882,6 +2903,9 @@ Section IcacheRefInvReg.
       (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
       (l : ilic) (qt qn : Qp) (n : positive) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    (* the region's [BufL] row crosses the byte view (durable-disk
+       1c-flip step 3) *)
+    ↑logN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
@@ -2907,7 +2931,7 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hislot Hsel Hoff Hcnt".
+    iIntros (HE HER HEL Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hislot Hsel Hoff Hcnt".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -2915,7 +2939,8 @@ Section IcacheRefInvReg.
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            l (Pos.to_nat n) ltac:(solve_ndisj) Hin
+            l (Pos.to_nat n) ltac:(solve_ndisj)
+            ltac:(apply subseteq_difference_r; [solve_ndisj | exact HEL]) Hin
             with "Hrinv Hoff Hcnt") as "[Hoff Hrback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
@@ -3349,6 +3374,9 @@ Section IcacheRefInvReg.
       (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
       (l : ilic) (qt qn s : Qp) (n : positive) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    (* the region's [BufL] row crosses the byte view (durable-disk
+       1c-flip step 3) *)
+    ↑logN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
@@ -3369,9 +3397,9 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hlv Hislot Hsel Hoff Hcnt".
+    iIntros (HE HER HEL Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hlv Hislot Hsel Hoff Hcnt".
     iMod (iref_incr_store_au Eo γi γfs inodestart nib M k inum l qt qn n
-            HE HER Hin HMk Hq Hno
+            HE HER HEL Hin HMk Hq Hno
             with "Hinv Hrinv Hhalf Hislot Hsel Hoff Hcnt")
       as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
@@ -3408,6 +3436,9 @@ Section IcacheRefInvReg.
       (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (l : ilic)
       (q : Qp) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    (* the region's [BufL] row crosses the byte view (durable-disk
+       1c-flip step 3) *)
+    ↑logN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     (* the index bound is the CALLER's here and nowhere else in the family:
        a FREE slot is not in [M], so [icM_wf]'s domain clause cannot supply
@@ -3442,7 +3473,7 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) 1%nat ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin Hk HMk Hq) "#Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt".
+    iIntros (HE HER HEL Hin Hk HMk Hq) "#Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -3450,7 +3481,8 @@ Section IcacheRefInvReg.
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     (* ---- region: the nested open, the token pinning the column ---- *)
     iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            l 0%nat ltac:(solve_ndisj) Hin
+            l 0%nat ltac:(solve_ndisj)
+            ltac:(apply subseteq_difference_r; [solve_ndisj | exact HEL]) Hin
             with "Hrinv Hl Hcnt") as "[Hl Hrback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".

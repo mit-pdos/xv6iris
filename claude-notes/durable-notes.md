@@ -158,6 +158,48 @@ file, and delete the line when the file goes.
 - **`git reset --hard` in a shared tree is `git stash`'s destructive twin, with a TOCTOU window.** A stamp/sync script that inventories dirty files, backs them up, then resets in a later step will silently destroy any file that turned dirty BETWEEN the inventory and the reset — a live lane needs only seconds to dirty a tracked file (GR-24 lost a lane's in-flight `DirLinks.v` exactly this way; recovered only because the post-stamp verification re-diffed). Rule: re-run `git status --porcelain` IMMEDIATELY before the reset and abort if any tracked file appears that was not in the backup inventory; prefer `git checkout <commit> -- <paths>` over whole-tree `reset --hard` when live lanes share the tree.
 - Everything about what makes a file slow and how to measure it is in [`optimization.md`](optimization.md).
 
+## `iFrame` RESOLVES ITS INSTANCES UP TO DELTA, SO A BIG-OP BEHIND A
+## `Definition` IS A HANG — SEAL IT WITH `Typeclasses Opaque`
+
+A predicate that unfolds to a `big_sepL` over a block-sized list is a fine
+*abstraction* and a catastrophic *frame target*. `iFrame`'s `Frame`
+instances are found by typeclass resolution, which unfolds transparent
+constants: point a bare `iFrame` at a goal holding
+`FsBlocks.fsblock gL b (bitmap_bytes used)` — two `Definition`s over a
+1024-element `big_sepL` — and it unfolds through `byte_range` into the whole
+run and does not come back. Measured: a three-line
+`BitmapInv.bitmap_res_close` (`iIntros; rewrite /bitmap_res; iSplitR; iFrame`)
+ran past **ten minutes** with no error and no output, i.e. it reads as a
+broken proof in a file you just edited. `coqc -time` names the stalling
+sentence, and it is the `iFrame`.
+
+**The fix is one line at the definition, not a rewritten proof:**
+`Global Typeclasses Opaque byte_range fsblock.` after the definitions and
+their declared instances. `rewrite /fsblock` and every declared `Timeless`
+instance still work, and `iFrame` then treats a block run as one atom —
+which is what every consumer wants of it anyway. `Opaque` alone is NOT the
+right tool (it does not stop instance search); `Typeclasses Opaque` is.
+
+The rule generalizes: **any `Definition` whose body is a big-op over a
+literal-sized list should be `Typeclasses Opaque` from the day it is
+written**, for the same reason `FsImg.fs_bmap_set` is `Global Opaque`
+(the conversion-checker twin of this trap, elsewhere in this file).
+
+## A LEMMA'S `` `{...}`` BINDER LIST MUST MATCH THE DEFINITION IT IS ABOUT
+
+Stating a projection out of a big bundled `iProp` with a SHORTER
+typeclass-binder list than the definition's does not fail — Coq synthesizes
+the missing instance, and if that search goes through an opaque `solve_inG`
+(`FileInv.subG_fileΣ` is the one in this tree) the elaboration explodes.
+`SpecKexec.fs_fabric` takes `!fileG Σ` and `` `{CID : CpuId}``; a one-line
+`fs_fabric_bytes` written without them made `SpecKexec.v` run for seven
+minutes and then get **OOM-killed** (`make` reports `Error 137`, which the
+build note elsewhere here attributes to `-j` above `RAM_GB/2` — so the
+symptom points at the wrong cause). **Copy the definition's binder list
+verbatim.** And prefer no new lemma at all when the callers have already
+destructured the bundle: the three `ProofKexec*` sites wanted
+`log_ctx_bytes_any` on the `#Hlogc` they already held.
+
 ## `set_solver` DOES NOT WORK OVER `gset (mword n)`
 
 This one is NOT fixed by `iris/FastSetSolver.v`'s override (which cures the

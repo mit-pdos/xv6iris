@@ -1476,6 +1476,8 @@ Section IallocClaim.
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
+              (* the byte view's mask (durable-disk 1c-flip step 4) *)
+              ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -2260,7 +2262,7 @@ Section IallocScan.
       iApply fupd_wp.
       iEval (rewrite Hbno (ireg_bi_iblock inum inodestart)) in "HpL".
       iMod (ireg_read_blk ⊤ γi γfs inodestart nib (ireg_bi inum) bs0
-              ltac:(solve_ndisj) (ireg_bi_lt inum nib Hnib)
+              ltac:(solve_ndisj) logN_top (ireg_bi_lt inum nib Hnib)
               with "Hireg HpL") as "(%Hex & HpL)".
       iModIntro.
       iEval (rewrite -(ireg_bi_iblock inum inodestart) -Hbno) in "HpL".

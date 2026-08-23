@@ -256,7 +256,7 @@ Definition wp_initlog_sconf_body
      At boot the log layer still holds every covered block's client half;
      recovery is the one pass that moves them (to the slots' logged
      contents, under the same existential the slots arrive with). *)
-  ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2, fs_chalf γfs b (Bh i)) -∗
+  ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2, fsblock (fs_bytes γfs) b (Bh i)) -∗
   (* the era certificate: the swap installs custody AT [gen_id], and the
      registry element + started lower bound are exactly what identifies it *)
   gen_cert -∗
@@ -298,6 +298,13 @@ Definition wp_initlog_sconf_body
   lh_n_pa ↦₄ v_n -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) -∗
   (* ---- the FsBlocks material the batch is assembled from ---- *)
+  (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 1/5).  It comes in
+     rather than being minted here: [FsBlocks.fs_alloc] allocated the byte
+     map and its invariant at the era's mint, one layer below.  initlog
+     needs it twice -- the RECOVERING install moves each home block's byte
+     run ([ProofInstallTrans]'s recovering arm), and [LogInv.log_ctx] --
+     which initlog is what builds -- carries it out to every log client. *)
+  fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart) -∗
   ghost_map_auth (fs_cache γfs) 1 L -∗
   ghost_map_auth (fs_dirty γfs) 1 D -∗
   (* the LOG SIDE's dirty halves, over the whole covered range, all false:
@@ -340,7 +347,7 @@ Definition wp_initlog_sconf_body
       (* the entries' home halves back, at the INSTALLED (logged) contents
          -- existential, exactly as the slots' own halves came in *)
       ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2,
-         ∃ bs : list (bv 8), fs_chalf γfs b bs) -∗
+         ∃ bs : list (bv 8), fsblock (fs_bytes γfs) b bs) -∗
       (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
          initlog was handed is now sealed inside the "log" spinlock's
          resource.  No existential: the names came in, so the boot client

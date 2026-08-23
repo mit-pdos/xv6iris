@@ -350,6 +350,20 @@ Definition wp_install_trans_sconf_body
   (* the logged view's authority: FROZEN at commit time (install writes the
      disk, not L); at recovering = 1 it MOVES, entry by entry, to the slots'
      logged contents ([it_rec_L] -- see its header) *)
+  (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3/5).  ONLY THE
+     RECOVERING ARM uses it, and that arm is the one place in the tree
+     where a HOME block's owner-side resource is moved from outside the
+     file system: recovery installs the on-disk log's write set over the
+     home blocks, so their content really does change and both maps have
+     to follow it.  (1a made recovery a ghost no-op for the MIRROR, not for
+     the block layer's two content maps; the flip's step 5 asked whether
+     the arm could hold nothing, and it cannot -- the mint indexes the byte
+     view at the CRASHED disk.)  So the arm now holds each home block's
+     EXCLUSIVE byte run and moves it with [FsBlocks.fsblock_update],
+     opening [logN] for the crossing; the row is persistent and both
+     callers have one (end_op off [LogInv.log_ctx], initlog off fsinit's
+     own). *)
+  fs_bytes_any γfs -∗
   ghost_map_auth (fs_cache γfs) 1 L -∗
   (* the pinned-set authority: exactly W's entries go back to false at
      commit time; nothing moves at recovery (nothing is pinned in a fresh
@@ -365,7 +379,7 @@ Definition wp_install_trans_sconf_body
          covered block's client half, and the L update is what moves it. *)
   ([∗ list] i ↦ w ∈ W,
      fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-     (if recovering then fs_chalf γfs (uint w) (Bh i)
+     (if recovering then fsblock (fs_bytes γfs) (uint w) (Bh i)
       else (uint w) ↪[fs_dirty γfs]{#(1/2)} true)) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
   bslots 2 -∗
@@ -424,7 +438,7 @@ Definition wp_install_trans_sconf_body
         (if recovering then D else dirty_clear D (map uint W)) -∗
       ([∗ list] i ↦ w ∈ W,
          fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
-         (if recovering then fs_chalf γfs (uint w) (Lw i)
+         (if recovering then fsblock (fs_bytes γfs) (uint w) (Lw i)
           else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
       (* the two units back, PLUS -- at commit time -- one per entry: each
          bunpin frees the pin unit log_write's bpin absorbed.  The bunpin

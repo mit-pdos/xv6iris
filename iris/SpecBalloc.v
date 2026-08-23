@@ -252,7 +252,7 @@ Definition wp_balloc_sconf_body
           ⌜bv_unsigned blk <> 0⌝ ∗
           ⌜bv_unsigned blk ∈ cov⌝ ∗
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-          fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+          fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
           (* THE FRESHNESS CLAIM, and the reason it has to be a resource
              rather than a pure fact: [fs_chalf] is a HALF ghost_map element,
              so two of them at one key compose to a valid full element and
@@ -383,7 +383,7 @@ Definition wp_balloc_gen_body
           ⌜bv_unsigned blk <> 0⌝ ∗
           ⌜bv_unsigned blk ∈ cov⌝ ∗
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-          fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+          fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
           blk_own γfs (bv_unsigned blk) ∗
           log_opS γ (if cr then S u else u)
                     (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗

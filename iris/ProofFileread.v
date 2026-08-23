@@ -2254,6 +2254,8 @@ Section ProofFileread.
                by (rewrite HJ6a4; apply rd_arg32_small; lia).
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
+             (* the byte view's row (durable-disk 1c-flip step 3) *)
+             iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
              iApply (Readi.wp_readi_sconf KT0 γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
@@ -2266,7 +2268,7 @@ Section ProofFileread.
                        _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
                        HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4' Hbelow
-                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").
              all: try lkbelow.

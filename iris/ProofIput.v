@@ -1595,7 +1595,7 @@ Section IputFreePath.
     iDestruct (ipo_held_L with "Hheld") as "[HpL Hheldback0]".
     iApply fupd_wp.
     iMod (ireg_read ⊤ γi γfs inodestart nib inum dn (uint bno) bs0
-            ltac:(solve_ndisj) Hnib Hbno
+            ltac:(solve_ndisj) logN_top Hnib Hbno
             with "Hireg Hdn HpL") as "(%Hex & Hdn & HpL)".
     iModIntro.
     iDestruct ("Hheldback0" with "HpL") as "Hheld".
@@ -1787,6 +1787,8 @@ Section IputFreePath.
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
+              (* the byte view's mask (durable-disk 1c-flip step 4) *)
+              ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.

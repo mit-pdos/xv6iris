@@ -1162,13 +1162,17 @@ Section ProofInitlog.
               #Hpenvpk Hhomes #Hcert Hmirf
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
-              Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
+              Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
     (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
        half at a NAMED picture and the swap receipt PowerOn's custody hook
        already earned.  There is no boot swap here any more; every write
        below is a value-chained one. *)
     iDestruct "Hmirf" as "[Hmirh #Hswlb]".
+    (* the home-set-free form install_trans takes *)
+    iAssert (fs_bytes_any γfs) as "#Hbany".
+    { rewrite /fs_bytes_any. iExists (fs_home_set cov logstart).
+      iExact "Hbrow". }
     (* THE eb-GUARD-TO-b-GUARD BRIDGE.  The complement's transports carry an
        [eb]-indexed guard and every chain fact a straight-line stretch
        produces is [b]-indexed; at level 0 [cpu_own_eb_agree] gives [eb = b]
@@ -2036,13 +2040,13 @@ Section ProofInitlog.
     (* the entries' home halves, re-indexed at the write set *)
     iEval (rewrite -(il_W_uint bs_hdr)) in "Hhomes".
     iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
-               fs_chalf γfs (uint w) (Bh i))%I with "[Hhomes]" as "Hhomes".
+               fsblock (fs_bytes γfs) (uint w) (Bh i))%I with "[Hhomes]" as "Hhomes".
     { iEval (change (map uint ?l) with (uint <$> l)) in "Hhomes".
       iEval (rewrite big_sepL_fmap) in "Hhomes". iExact "Hhomes". }
     (* the per-entry rows the recovering install takes *)
     iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
                fs_chalf γfs (log_slot_bno logstart i) (ys !!! i) ∗
-               fs_chalf γfs (uint w) (Bh i))%I
+               fsblock (fs_bytes γfs) (uint w) (Bh i))%I
       with "[Hslotfst Hhomes]" as "Hents".
     { rewrite big_sepL_sep. iSplitL "Hslotfst"; [iExact "Hslotfst" | iExact "Hhomes"]. }
     (* the entries are covered home blocks *)
@@ -2100,7 +2104,7 @@ Section ProofInitlog.
               _ Vpr HKit Hgeomok Hj Hgl
               HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg
               Hbelow Hpkg
-              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells HLauth HDauth
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells Hbany HLauth HDauth
                     Hents Hs2 [] [Hmirh]").
     all: try lkbelow.
     { iModIntro. iExact "Hpenvpk". }
@@ -2226,7 +2230,7 @@ Section ProofInitlog.
         iIntros "H". iExists _. iExact "H". }
     (* the installed home halves, under the postcondition's existential *)
     iAssert ([∗ list] i ↦ bb ∈ (hdr_dec bs_hdr).2,
-               ∃ bs0 : list (bv 8), fs_chalf γfs bb bs0)%I
+               ∃ bs0 : list (bv 8), fsblock (fs_bytes γfs) bb bs0)%I
       with "[Hhomes]" as "Hhomesout".
     { iEval (rewrite -(il_W_uint bs_hdr)).
       iEval (change (map uint ?l) with (uint <$> l)).
@@ -2695,7 +2699,8 @@ Section ProofInitlog.
     { rewrite /log_ctx.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
-      iSplitR; [iExact "Hstp" | iExact "Hswlb"]. }
+      iSplitR; [iExact "Hstp"|].
+      iSplitR; [iExact "Hswlb" | iExact "Hbrow"]. }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".

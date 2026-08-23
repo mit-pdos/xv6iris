@@ -520,7 +520,7 @@ Section ItruncDefs.
     (forall t : nat, (t < MAXFILE)%nat -> t <> i ->
        blkmap_get bm' t = blkmap_get bm t) ->
     inode_blocks γfs bm data -∗
-      (fs_chalf γfs (bv_unsigned (blkmap_get bm i)) (data i) ∗
+      (fsblock (fs_bytes γfs) (bv_unsigned (blkmap_get bm i)) (data i) ∗
        blk_own γfs (bv_unsigned (blkmap_get bm i))) ∗
       inode_blocks γfs bm' data.
   Proof.
@@ -570,7 +570,7 @@ Section ItruncDefs.
   Lemma blk_res_nz (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) :
     bv_unsigned w <> 0 ->
     blk_res γfs w bs -∗
-      fs_chalf γfs (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w).
+      fsblock (fs_bytes γfs) (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w).
   Proof.
     intros Hnz. rewrite /blk_res.
     destruct (decide (bv_unsigned w = 0)) as [Hc|_];
@@ -595,7 +595,7 @@ Section ItruncDefs.
   Lemma ind_res_nz (γfs : fs_names) (bmx : blkmap) :
     bv_unsigned (bm_ind bmx) <> 0 ->
     ind_res γfs bmx -∗
-      fs_chalf γfs (bv_unsigned (bm_ind bmx)) (ind_bytes (bm_ent bmx)) ∗
+      fsblock (fs_bytes γfs) (bv_unsigned (bm_ind bmx)) (ind_bytes (bm_ent bmx)) ∗
       blk_own γfs (bv_unsigned (bm_ind bmx)).
   Proof.
     intros Hnz. rewrite /ind_res /ind_blk /ind_tok.

@@ -41,9 +41,16 @@
 
    ---- WHY [blk_own] IS WHAT MAKES THE HANDSHAKE SOUND ----------------
 
-   [fs_chalf] is a HALF ghost_map element: two owners each holding a half
-   of one key are perfectly consistent, so no amount of [fs_chalf]
-   reasoning says a block is unowned.  [blk_own] is the FULL element and
+   REDUNDANT SINCE THE CONSUMER FLIP, AND KEPT ONLY BECAUSE STAGE 2
+   RETIRES IT WITH THE POOL (durable-disk 1c-flip step 5).  The argument
+   below was written when the content resource was [fs_chalf], a HALF
+   ghost_map element: two owners each holding a half of one key are
+   perfectly consistent, so no amount of [fs_chalf] reasoning says a block
+   is unowned.  The pool and every home-block owner hold the EXCLUSIVE byte
+   run [fsblock] now, and [FsBlocks.fsblock_excl] does both jobs below on
+   its own -- [free_pool_own_used]'s panic refutation especially, since two
+   owners of one block's bytes is already [False].  [blk_own] is the FULL
+   element and
    is therefore EXCLUSIVE, and the pool holds one per clear bit.  That
    single fact does both jobs:
 
@@ -212,7 +219,8 @@ Section BitmapRes.
      the pool makes no promise about a free block's bytes, and bzero is
      what makes the allocated one all-zero) and its EXCLUSIVE token *)
   Definition free_blk (γfs : fs_names) (b : Z) : iProp Σ :=
-    (∃ bs : list (bv 8), ⌜length bs = BSIZE⌝ ∗ fs_chalf γfs b bs ∗ blk_own γfs b)%I.
+    (∃ bs : list (bv 8), ⌜length bs = BSIZE⌝ ∗
+       fsblock (fs_bytes γfs) b bs ∗ blk_own γfs b)%I.
 
   Definition free_set (size : Z) (used : gset Z) : gset Z :=
     (list_to_set (seqZ 0 size) : gset Z) ∖ used.
@@ -235,21 +243,21 @@ Section BitmapRes.
   Definition bitmap_res (γfs : fs_names) (bmapstart : Z)
       (cov : gset Z) (logstart size : Z) (used : gset Z) : iProp Σ :=
     (⌜bitmap_ok cov logstart size used⌝ ∗
-     fs_chalf γfs bmapstart (bitmap_bytes used) ∗
+     fsblock (fs_bytes γfs) bmapstart (bitmap_bytes used) ∗
      free_pool γfs size used)%I.
 
   Lemma bitmap_res_open (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (used : gset Z) :
     bitmap_res γfs bms cov ls size used -∗
       ⌜bitmap_ok cov ls size used⌝ ∗
-      fs_chalf γfs bms (bitmap_bytes used) ∗
+      fsblock (fs_bytes γfs) bms (bitmap_bytes used) ∗
       free_pool γfs size used.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma bitmap_res_close (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (used : gset Z) :
     bitmap_ok cov ls size used ->
-    fs_chalf γfs bms (bitmap_bytes used) -∗
+    fsblock (fs_bytes γfs) bms (bitmap_bytes used) -∗
     free_pool γfs size used -∗
     bitmap_res γfs bms cov ls size used.
   Proof.
@@ -348,7 +356,7 @@ Section BitmapRes.
      the token *)
   Lemma free_blk_intro (γfs : fs_names) (b : Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
-    fs_chalf γfs b bs -∗ blk_own γfs b -∗ free_blk γfs b.
+    fsblock (fs_bytes γfs) b bs -∗ blk_own γfs b -∗ free_blk γfs b.
   Proof.
     iIntros (Hlen) "Hb Ho". rewrite /free_blk. iExists bs.
     iSplitR; [iPureIntro; exact Hlen|]. iFrame.
@@ -391,7 +399,7 @@ Section BitmapRes.
 
   Global Instance bitmap_res_timeless γfs bms cov ls size used :
     Timeless (bitmap_res γfs bms cov ls size used).
-  Proof. rewrite /bitmap_res /free_pool /free_blk /fs_chalf /blk_own. apply _. Qed.
+  Proof. rewrite /bitmap_res /free_pool /free_blk /blk_own. apply _. Qed.
 
   Definition bitmapN : namespace := nroot .@ "bitmap".
 
@@ -403,9 +411,19 @@ Section BitmapRes.
     Timeless (bitmap_body γfs bms cov ls size).
   Proof. rewrite /bitmap_body. apply _. Qed.
 
+  (* THE BYTE VIEW'S ROW RIDES HERE (durable-disk 1c-flip step 3).  The
+     bitmap block and every free block are HOME blocks and are now owned as
+     EXCLUSIVE byte runs, so a reader can no longer pin its bread bytes by
+     an auth-free half/half agreement -- it opens [fs_bytes_inv].  Unlike
+     [InodeRegion.ireg_inv] this invariant already carries [cov] and [ls],
+     so the home set is NAMED here rather than bound, and the bitmap
+     block's own membership rides beside it (nothing else states it: it is
+     [bitmap_geom_ok]'s, and [bitmap_ok] speaks only about the blocks the
+     pool holds). *)
   Definition bitmap_inv (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) : iProp Σ :=
-    inv bitmapN (bitmap_body γfs bms cov ls size).
+    (inv bitmapN (bitmap_body γfs bms cov ls size) ∗
+     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls))%I.
 
   Global Instance bitmap_inv_persistent γfs bms cov ls size :
     Persistent (bitmap_inv γfs bms cov ls size).
@@ -415,12 +433,36 @@ Section BitmapRes.
      [FsCfgBoot.bitmap_res_of_image], goes in and the set is forgotten *)
   Lemma bitmap_inv_alloc (E : coPset) (γfs : fs_names) (bms : Z)
       (cov : gset Z) (ls size : Z) (used : gset Z) :
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
     bitmap_res γfs bms cov ls size used ={E}=∗
     bitmap_inv γfs bms cov ls size.
   Proof.
-    iIntros "H". iApply inv_alloc. iNext. rewrite /bitmap_body.
-    iExists used. iExact "H".
+    iIntros "#Hbinv H".
+    iMod (inv_alloc bitmapN E (bitmap_body γfs bms cov ls size)
+            with "[H]") as "#Hi".
+    { iNext. rewrite /bitmap_body. iExists used. iExact "H". }
+    iModIntro. rewrite /bitmap_inv. iFrame "Hi Hbinv".
   Qed.
+
+  (* the row at its NAMED home set -- what a client that has to build
+     [LogInv.log_ctx] needs (fsinit, for initlog) *)
+  Lemma bitmap_inv_bytes_at (γfs : fs_names) (bms : Z) (cov : gset Z)
+      (ls size : Z) :
+    bitmap_inv γfs bms cov ls size -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls).
+  Proof. iIntros "(_ & $)". Qed.
+
+  Lemma bitmap_inv_bytes (γfs : fs_names) (bms : Z) (cov : gset Z)
+      (ls size : Z) :
+    bitmap_inv γfs bms cov ls size -∗ fs_bytes_any γfs.
+  Proof.
+    iIntros "(_ & Hb)". rewrite /fs_bytes_any.
+    iExists (fs_home_set cov ls). iExact "Hb".
+  Qed.
+
+  (* [logN] and [bitmapN] are distinct namespaces *)
+  Lemma logN_bitmapN_disj : (↑logN : coPset) ## ↑bitmapN.
+  Proof. solve_ndisj. Qed.
 
   (* ---- the two pure bridges between the caller's set and the parked one *)
 
@@ -487,19 +529,27 @@ Section BitmapRes.
   Lemma bitmap_read (E : coPset) (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (bsl : list (bv 8)) :
     ↑bitmapN ⊆ E ->
+    (* THE FLIP'S ONE ADDITION (durable-disk 1c-flip step 3): the parked
+       resource is the block's EXCLUSIVE byte run, so pinning the caller's
+       bread bytes is an OPEN of the byte view's invariant. *)
+    ↑logN ⊆ E ->
     bitmap_inv γfs bms cov ls size -∗
     (bms ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     ⌜exists used : gset Z,
        bsl = bitmap_bytes used /\ bitmap_ok cov ls size used⌝ ∗
     (bms ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE) "#Hinv Hhalf".
-    iMod (inv_acc E bitmapN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iIntros (HE HEl) "#Hinv Hhalf".
+    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
+    assert (HlogB : (↑logN : coPset) ⊆ E ∖ ↑bitmapN)
+      by (apply subseteq_difference_r; [apply logN_bitmapN_disj | exact HEl]).
+    iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (used) "(>%Hok & >Hfsb & >Hpool)".
-    rewrite /fs_chalf.
-    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    iMod (fs_bytes_agree (E ∖ ↑bitmapN) (fs_bytes γfs) (fs_cache γfs)
+            (fs_home_set cov ls) bms (bitmap_bytes used) bsl HlogB
+            with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. rewrite /bitmap_res /fs_chalf.
+    { iNext. rewrite /bitmap_body. iExists used. rewrite /bitmap_res.
       iFrame. done. }
     iModIntro. iFrame "Hhalf". iPureIntro. exists used. auto.
   Qed.
@@ -510,6 +560,8 @@ Section BitmapRes.
   Lemma bitmap_read_own (E : coPset) (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (b : Z) (bsl : list (bv 8)) :
     ↑bitmapN ⊆ E ->
+    (* see [bitmap_read] (durable-disk 1c-flip step 3) *)
+    ↑logN ⊆ E ->
     0 <= b < size ->
     bitmap_inv γfs bms cov ls size -∗
     blk_own γfs b -∗
@@ -519,14 +571,18 @@ Section BitmapRes.
     blk_own γfs b ∗
     (bms ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE Hb) "#Hinv Hown Hhalf".
-    iMod (inv_acc E bitmapN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iIntros (HE HEl Hb) "#Hinv Hown Hhalf".
+    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
+    assert (HlogB : (↑logN : coPset) ⊆ E ∖ ↑bitmapN)
+      by (apply subseteq_difference_r; [apply logN_bitmapN_disj | exact HEl]).
+    iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (used) "(>%Hok & >Hfsb & >Hpool)".
-    rewrite /fs_chalf.
-    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    iMod (fs_bytes_agree (E ∖ ↑bitmapN) (fs_bytes γfs) (fs_cache γfs)
+            (fs_home_set cov ls) bms (bitmap_bytes used) bsl HlogB
+            with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     iDestruct (free_pool_own_used γfs size used b Hb with "Hown Hpool") as %Hin.
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. rewrite /bitmap_res /fs_chalf.
+    { iNext. rewrite /bitmap_body. iExists used. rewrite /bitmap_res.
       iFrame. done. }
     iModIntro. iFrame "Hown Hhalf". iPureIntro. exists used. auto.
   Qed.
@@ -548,13 +604,14 @@ Section BitmapRes.
     bi ∉ u0 ->
     bitmap_inv γfs bms cov ls size -∗
     |={E, E ∖ ↑bitmapN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs bms bsl' ∗
+      fsblock (fs_bytes γfs) bms bsl' ∗
       (⌜bsl' = bitmap_bytes u0⌝ -∗
-       fs_chalf γfs bms (bitmap_bytes (u0 ∪ {[bi]})) ={E ∖ ↑bitmapN, E}=∗
+       fsblock (fs_bytes γfs) bms (bitmap_bytes (u0 ∪ {[bi]})) ={E ∖ ↑bitmapN, E}=∗
        free_blk γfs bi ∗ ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set ls)⌝).
   Proof.
     iIntros (HE Hsz Hbi Hnu) "#Hinv".
-    iMod (inv_acc E bitmapN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
+    iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (u1) "(>%Hok & >Hfsb & >Hpool)".
     iModIntro. iExists (bitmap_bytes u1). iFrame "Hfsb".
     iIntros (Hbytes) "Hfsb'".
@@ -583,12 +640,13 @@ Section BitmapRes.
     bitmap_inv γfs bms cov ls size -∗
     free_blk γfs b -∗
     |={E, E ∖ ↑bitmapN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs bms bsl' ∗
+      fsblock (fs_bytes γfs) bms bsl' ∗
       (⌜bsl' = bitmap_bytes u0⌝ -∗
-       fs_chalf γfs bms (bitmap_bytes (u0 ∖ {[b]})) ={E ∖ ↑bitmapN, E}=∗ emp).
+       fsblock (fs_bytes γfs) bms (bitmap_bytes (u0 ∖ {[b]})) ={E ∖ ↑bitmapN, E}=∗ emp).
   Proof.
     iIntros (HE Hb Hcov Hlog) "#Hinv Hblk".
-    iMod (inv_acc E bitmapN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
+    iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (u1) "(>%Hok & >Hfsb & >Hpool)".
     iModIntro. iExists (bitmap_bytes u1). iFrame "Hfsb".
     iIntros (Hbytes) "Hfsb'".

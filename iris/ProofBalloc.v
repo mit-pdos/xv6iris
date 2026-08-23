@@ -225,7 +225,7 @@ Section BallocDefs.
      (⌜bv_unsigned rv <> 0⌝ ∗
       ⌜bv_unsigned rv ∈ cov⌝ ∗
       ⌜~ (bv_unsigned rv ∈ log_region_set logstart)⌝ ∗
-      fs_chalf γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) ∗
+      fsblock (fs_bytes γfs) (bv_unsigned rv) (replicate BSIZE (bv_0 8)) ∗
       blk_own γfs (bv_unsigned rv) ∗
       log_opS γ (if cr then S u else u)
                 (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]})))%I.
@@ -258,7 +258,7 @@ Section BallocDefs.
             ⌜bv_unsigned blk <> 0⌝ ∗
             ⌜bv_unsigned blk ∈ cov⌝ ∗
             ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-            fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+            fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
             blk_own γfs (bv_unsigned blk) ∗
             log_opS γ (if cr then S u else u)
                       (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
@@ -1242,7 +1242,7 @@ Section BallocRestore.
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 2 -∗
-    fs_chalf γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
+    fsblock (fs_bytes γfs) (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
     blk_own γfs (bv_unsigned rv) -∗
     log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]}) -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
@@ -1525,7 +1525,7 @@ Section BallocBzero.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
-    fs_chalf γfs bi bsD -∗
+    fsblock (fs_bytes γfs) bi bsD -∗
     blk_own γfs bi -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
@@ -1666,7 +1666,14 @@ Section BallocBzero.
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk2.
     iEval (rewrite -HbnoD) in "HfsbD".
-    iDestruct (iu_held_content with "HfsbD Hheld") as %Hbs0.
+    (* THE CROSSING IS AN OPEN NOW (durable-disk 1c-flip step 3): the row
+       comes off the bitmap invariant this proof already holds. *)
+    iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hrow".
+    iApply fupd_wp.
+    iMod (iu_held_content ⊤ bn γfs γd dev cov kk2 pidv dev bnoD
+            _ _ _ _ _ logN_top with "Hrow HfsbD Hheld")
+      as "(%Hbs0 & HfsbD & Hheld)".
+    iModIntro.
     subst bs0.
     iDestruct (iu_held_swap with "Hheld") as "[Hbuf Hheldback]".
     iDestruct (ba_buf_all (bpa kk2) bnoD (mword_of_int 0 : mword 32) bsD
@@ -2351,6 +2358,8 @@ Section BallocAlloc.
               HKlw HbnoBlt Hkk HA3a0
               ltac:(rewrite HbnoB; exact Hbmcov)
               ltac:(rewrite HbnoB; exact Hbmlog)
+              (* the byte view's mask (durable-disk 1c-flip step 4) *)
+              ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
@@ -3441,7 +3450,7 @@ Section BallocMain.
               ⌜bv_unsigned blk <> 0⌝ ∗
               ⌜bv_unsigned blk ∈ cov⌝ ∗
               ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-              fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+              fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
               blk_own γfs (bv_unsigned blk) ∗
               log_opS γ (if cr then S u else u)
                         (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
@@ -4197,7 +4206,7 @@ Section BallocMain.
     iDestruct (bio_held_fs_L with "Hheld") as "[HL Hbackl]".
     iApply fupd_wp.
     iMod (bitmap_read ⊤ γfs bmapstart cov logstart size bs0
-            ltac:(solve_ndisj) with "Hbminv [HL]") as "(%Hex & HL)".
+            ltac:(solve_ndisj) logN_top with "Hbminv [HL]") as "(%Hex & HL)".
     { iEval (rewrite HbnoB) in "HL". iExact "HL". }
     iDestruct ("Hbackl" with "[HL]") as "Hheld".
     { iEval (rewrite -HbnoB) in "HL". iExact "HL". }

@@ -684,23 +684,49 @@ Section IupdateRes.
     iSplitL "H5"; [iExact "H5" |]. iSplitL "H6"; [iExact "H6" |]. iExact "H7".
   Qed.
 
-  (* THE COUPLING: the caller's own [fs_chalf] half against the handle's
+  (* THE COUPLING: the caller's own EXCLUSIVE byte run against the handle's
      machinery half pins the buffer's logical content -- which is what
-     makes the bytes bread returned BE [diblk_bytes ds]. *)
-  Lemma iu_held_content (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+     makes the bytes bread returned BE [diblk_bytes ds].
+
+     A FUPD, NOT AN ENTAILMENT (durable-disk 1c-flip step 3).  The caller
+     owns the block's bytes outright now, so there is no second half of the
+     cache element in its hand and the auth-free agreement it used to close
+     by [fs_chalf_m*_agree] does not exist; what relates the two maps is
+     [FsBlocks.fs_bytes_inv], and reading it is an open.  Hence the byte
+     view's row, the block's home membership and [↑logN ⊆ E]. *)
+  Lemma iu_held_content (E : coPset) (bn : bio_names) (γfs : fs_names)
+      (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
-    fs_chalf γfs (uint bno) bs0 -∗
-    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
-    ⌜bsl = bs0⌝.
+    ↑logN ⊆ E ->
+    fs_bytes_any γfs -∗
+    fsblock (fs_bytes γfs) (uint bno) bs0 -∗
+    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d ={E}=∗
+    ⌜bsl = bs0⌝ ∗ fsblock (fs_bytes γfs) (uint bno) bs0 ∗
+    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d.
   Proof.
-    rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
+    iIntros (HE) "#Hbinv Hc Hheld".
+    iEval (rewrite /bio_held /bio_pay /fs_view /=) in "Hheld".
+    iDestruct "Hheld" as "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
     destruct d.
-    - iDestruct "Hpay" as "[Hm _]".
-      iApply (fs_chalf_mdirty_agree with "Hc Hm").
-    - iDestruct "Hpay" as "[Hm _]".
-      iApply (fs_chalf_mclean_agree with "Hc Hm").
+    - iEval (rewrite /fs_mdirty) in "Hpay".
+      iDestruct "Hpay" as "[[HL HD] Hq]".
+      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+              with "Hbinv Hc HL")
+        as "(%Heq & Hc & HL)".
+      iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
+      rewrite /bio_held /bio_pay /fs_view /=.
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
+    - iEval (rewrite /fs_mclean) in "Hpay".
+      iDestruct "Hpay" as "[[HL HD] %He]".
+      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+              with "Hbinv Hc HL")
+        as "(%Heq & Hc & HL)".
+      iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
+      rewrite /bio_held /bio_pay /fs_view /=.
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
   Qed.
 
   (* the buffer's byte LIST, as the [ByteBuf] window the slot accessor

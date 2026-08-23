@@ -1434,7 +1434,10 @@ Section ProofIget.
                  arm at +0x7c, the half into [islot2]'s live one. *)
               iMod (iref_alloc_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib
                       M e inum l (1/2/2)%Qp
-                      ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib He HMe
+                      ltac:(solve_ndisj) ltac:(solve_ndisj)
+                      ltac:(apply subseteq_difference_r;
+                            [solve_ndisj | apply logN_top])
+                      Hnib He HMe
                       ig_quarter_lt
                       with "Hinv Hrinv Hhalf Hisl Hlic Hfoff Hicnt0")
                 as "[Hcell Hback2]".
@@ -2027,7 +2030,10 @@ Section ProofIget.
              comes straight back, and travels on to [Hcont2]. *)
           iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib M j inum l
                   qj (qj'/2)%Qp nj
-                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMj Hqv Hno1
+                  ltac:(solve_ndisj) ltac:(solve_ndisj)
+                  ltac:(apply subseteq_difference_r;
+                        [solve_ndisj | apply logN_top])
+                  Hnib HMj Hqv Hno1
                   with "Hinv Hrinv Hhalf Hisl Hselj Hlic Hicnt") as "[Hcell Hback2]".
           iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
           iMod ("Hback2" with "Hcell")

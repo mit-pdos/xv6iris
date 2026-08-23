@@ -1626,6 +1626,8 @@ Section ProofDirlookupMain.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDl CIDB6 eb pj
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+        (* the byte view's row (durable-disk 1c-flip step 3) *)
+        iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
         iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
@@ -1637,7 +1639,7 @@ Section ProofDirlookupMain.
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                  with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.
         iIntros (CIDrd Hsrd mrd tot P')

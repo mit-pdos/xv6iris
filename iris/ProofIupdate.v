@@ -146,10 +146,10 @@ Section IupdateDefs.
       (inum : mword 32) (dn : dinode) (ds : list dinode) (e0 : nat)
       (Pout : iProp Σ) : iProp Σ :=
     (|={⊤, ⊤ ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-       fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗ log_epoch_lb γ v ∗
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗ log_epoch_lb γ v ∗
        (⌜bsl' = diblk_bytes ds⌝ -∗
         logged_at γ e0 (IBLOCK inum inodestart) -∗ ⌜(v <= e0)%nat⌝ -∗
-        fs_chalf γfs (IBLOCK inum inodestart)
+        fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                 (diblk_bytes (<[islot inum := dn]> ds))
         ={⊤ ∖ ↑iregN, ⊤}=∗ Pout))%I.
 
@@ -531,6 +531,8 @@ Section IupdateTail.
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
+              (* the byte view's mask (durable-disk 1c-flip step 4) *)
+              ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS [Hau] Hheld").
     all: try lkbelow.
@@ -1355,7 +1357,7 @@ Section ProofIupdateMain.
     iDestruct (bio_held_fs_L with "Hheld") as "[HpL Hheldback0]".
     iApply fupd_wp.
     iMod (ireg_read ⊤ γi γfs inodestart nib inum dn0 (uint bno) bs0
-            ltac:(solve_ndisj) Hnib Hbno
+            ltac:(solve_ndisj) logN_top Hnib Hbno
             with "Hireg Hdn HpL") as "(%Hex & Hdn & HpL)".
     iModIntro.
     iDestruct ("Hheldback0" with "HpL") as "Hheld".

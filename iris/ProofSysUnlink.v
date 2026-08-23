@@ -2673,6 +2673,8 @@ Section ProofSysUnlinkBody.
     panic_env -∗
     pc_is (mword_of_int (SU + 0x106)) -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
+    (* the byte view's row, for readi's crossing (durable-disk 1c-flip) *)
+    fs_bytes_any gfs -∗
     kalloc_env ga None -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -2722,7 +2724,7 @@ Section ProofSysUnlinkBody.
     assert (H16jj : Z.of_nat (16 * jj) < 2 ^ 31)
       by (assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity);
           lia).
-    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hbio #Hkenv #Hprocs #Hdev #Hgeo
+    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hbio #Hrow #Hkenv #Hprocs #Hdev #Hgeo
              #Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot HcE HcD HX".
     (* ===== +0x106 c.li a4,16 ===== *)
     iApply (wp_cli_s_sconf (CID := CID0) (mword_of_int (SU + 0x106)) Ra4
@@ -2880,7 +2882,7 @@ Section ProofSysUnlinkBody.
               ltac:(rewrite HN6a4;
                     apply (rd_arg32_small 16); vm_compute; reflexivity)
               (Hlb "bcache"%string)
-              with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hkenv Hidev Hmeta
+              with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hrow Hkenv Hidev Hmeta
                     Hmap Hblocks [Hbuf Hpidq] Hprocs Hdev Hgeo Hdlk Hbslot").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -3101,7 +3103,7 @@ Section ProofSysUnlinkBody.
         iApply (IH CID14 (S jj) N10
                   (fun jj0 => file_byte dati (16 * jj + jj0)%nat)
                   ltac:(lia) Hmore ltac:(lia) Hdead' HN10regs
-                  with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hkenv Hprocs Hdev Hgeo
+                  with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hrow Hkenv Hprocs Hdev Hgeo
                         Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot
                         HcE HcD HX").
       + (* ---- the EMPTY EXIT: fall to +0x12c, j to +0x8a ---- *)
@@ -3220,6 +3222,8 @@ Section ProofSysUnlinkBody.
     panic_env -∗
     pc_is (mword_of_int (SU + 0xf8)) -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
+    (* the byte view's row, for readi's crossing (durable-disk 1c-flip) *)
+    fs_bytes_any gfs -∗
     kalloc_env ga None -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -3252,7 +3256,7 @@ Section ProofSysUnlinkBody.
           lia).
     assert (Hcsa4 : is_cs_idx Ra4 = false) by (vm_compute; reflexivity).
     assert (Hcsa5 : is_cs_idx Ra5 = false) by (vm_compute; reflexivity).
-    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hbio #Hkenv #Hprocs #Hdev #Hgeo
+    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hbio #Hrow #Hkenv #Hprocs #Hdev #Hgeo
              #Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot HcE HcD HX".
     (* ===== +0xf8 lw a4,76(s2) -- ip->size ===== *)
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -3370,7 +3374,7 @@ Section ProofSysUnlinkBody.
                 ltac:(lia) ltac:(lia) ltac:(lia)
                 ltac:(intros k Hk2 Hklt; exfalso; lia)
                 HM3regs
-                with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hkenv Hprocs Hdev Hgeo
+                with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hrow Hkenv Hprocs Hdev Hgeo
                       Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot
                       HcE HcD HX").
   Qed.
@@ -3946,6 +3950,8 @@ Section ProofSysUnlinkBody.
                 Hivalidi
                 Hdlnki Hdiati Hdviewi Hfviewi Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
                 Hnm2 HbP H27lo H27hi H30 Hseamk Hcont" as "HX".
+      (* the byte view's row (durable-disk 1c-flip step 3) *)
+      iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
       iApply (su_w4 (CID0 := CID8) gs jx gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev ks
                 (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
@@ -3954,7 +3960,7 @@ Section ProofSysUnlinkBody.
                 m M5 sp0 K eb b lks _
                 (upd_upt V P1) Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal eq_refl Hioki Htyzi
                 Hnlzi Hddixi HM5regs
-                with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hkenv Hprocs Hdev Hgeo
+                with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hrow Hkenv Hprocs Hdev Hgeo
                       Hdlk Hidevi Hmetai [Haddrsi Hindi] Hblocksi HbE Hpidq
                       Hbs1 [] [] HX").
       { rewrite /inode_map. iFrame "Haddrsi Hindi". }

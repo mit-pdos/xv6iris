@@ -881,8 +881,13 @@ Section IcacheBootRegion.
   Qed.
 
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
-      (bss : nat -> list (bv 8)) (W : Z -> nat) :
+      (home : gset Z) (bss : nat -> list (bv 8)) (W : Z -> nat) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
+    (* THE REGION'S BLOCKS ARE HOME BLOCKS (durable-disk 1c-flip step 3):
+       [ireg_blk] holds each one's EXCLUSIVE byte run now, so the region's
+       readers cross into the byte view and [InodeRegion.ireg_bytes] is
+       what carries the crossing.  No coverage premise: holding the run IS
+       being a home block ([FsBlocks.fsblock_home]). *)
     (* N-4 PHASE B: the lend column family is indexed at [icfg_nib] (see
        [InodeRegion.ireg_lends] for why), and boot is the one place that has
        to know the two agree.  The caller is [FsCfgBoot], which calls this
@@ -933,7 +938,8 @@ Section IcacheBootRegion.
        hand them over ([IcacheRef.icfg_alloc]). *)
     ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
-       fs_chalf γfs (inodestart + Z.of_nat bi) (bss bi)) -∗
+       fsblock (fs_bytes γfs) (inodestart + Z.of_nat bi) (bss bi)) -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
     (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
        (fs-fragments.md §7.12) -- carried, never consumed here *)
     ireg_boot -∗
@@ -957,7 +963,7 @@ Section IcacheBootRegion.
     intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0).
-    iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks Hboot Hrauth".
+    iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -1125,9 +1131,12 @@ Section IcacheBootRegion.
       iSplitL "Hb"; [iExact "Hb" | iExact "Hsl"]. }
     iMod (inv_alloc iregN E (ireg_body γi γfs inodestart nib) with "[Hbody]")
       as "#Hinv"; [by iNext |].
+    iAssert (ireg_inv γi γfs inodestart nib) as "#Hrinv".
+    { rewrite /ireg_inv. iFrame "Hinv". rewrite /fs_bytes_any.
+      iExists home. iFrame "Hbinv". }
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
-    iFrame "Hinv Hboot Hlics Hflics". iExact "Hout".
+    iFrame "Hrinv Hboot Hlics Hflics". iExact "Hout".
   Qed.
 
 End IcacheBootRegion.

@@ -206,6 +206,55 @@ Proof.
   - intros Hb. exists (fs_blocks dk b). exact (fs_C0_lookup dk cov b Hb).
 Qed.
 
+(* [fs_C0]'s block lengths, the premise [FsBlocks.fs_alloc]'s byte mint
+   takes: every covered block's content is a whole block. *)
+Lemma fs_C0_lengths (dk : Z -> bv 8) (cov : gset Z) :
+  forall b bs, fs_C0 dk cov !! b = Some bs -> length bs = BSIZE.
+Proof.
+  intros b bs Hb.
+  destruct (fs_C0_lookup_Some dk cov b bs Hb) as [_ ->].
+  exact (fs_blocks_length dk b).
+Qed.
+
+(* THE HOME/LOG-REGION SPLIT, at the level of the content map: restricting
+   [fs_C0] to a set of blocks is [fs_C0] at that set.  Both halves of
+   [FsBlocks.fs_alloc]'s output are named this way, so neither consumer
+   ever sees a [filter]. *)
+Lemma fs_C0_filter_in (dk : Z -> bv 8) (cov S : gset Z) :
+  S ⊆ cov ->
+  base.filter (fun kv : Z * list (bv 8) => kv.1 ∈ S) (fs_C0 dk cov)
+    = fs_C0 dk S.
+Proof.
+  intros Hsub. apply map_eq. intros b.
+  destruct (decide (b ∈ S)) as [Hin | Hout].
+  - rewrite (fs_C0_lookup dk S b Hin).
+    apply map_lookup_filter_Some. split; [| exact Hin].
+    exact (fs_C0_lookup dk cov b (Hsub b Hin)).
+  - assert (Hnone : fs_C0 dk S !! b = None).
+    { apply not_elem_of_dom. rewrite fs_C0_dom. exact Hout. }
+    rewrite Hnone. apply map_lookup_filter_None. right.
+    intros bs _. exact Hout.
+Qed.
+
+Lemma fs_C0_filter_out (dk : Z -> bv 8) (cov S : gset Z) :
+  base.filter (fun kv : Z * list (bv 8) => kv.1 ∉ S) (fs_C0 dk cov)
+    = fs_C0 dk (cov ∖ S).
+Proof.
+  apply map_eq. intros b.
+  destruct (decide (b ∈ cov ∖ S)) as [Hin | Hout].
+  - rewrite (fs_C0_lookup dk (cov ∖ S) b Hin).
+    apply elem_of_difference in Hin as [Hcov Hns].
+    apply map_lookup_filter_Some. split; [| exact Hns].
+    exact (fs_C0_lookup dk cov b Hcov).
+  - assert (Hnone : fs_C0 dk (cov ∖ S) !! b = None).
+    { apply not_elem_of_dom. rewrite fs_C0_dom. exact Hout. }
+    rewrite Hnone. apply map_lookup_filter_None.
+    destruct (decide (b ∈ cov)) as [Hcov | Hcov].
+    + right. intros bs _ Hns. apply Hout.
+      apply elem_of_difference. split; [exact Hcov | exact Hns].
+    + left. apply not_elem_of_dom. rewrite fs_C0_dom. exact Hcov.
+Qed.
+
 Lemma fs_D0_lookup (dk : Z -> bv 8) (cov : gset Z) (b : Z) :
   b ∈ cov -> fs_D0 dk cov !! b = Some false.
 Proof.
@@ -329,28 +378,41 @@ Section FsBoot.
 
   (* THE GHOST STEP.  The era's byte mint in, the logged-view ghosts out,
      with the pool bundles [bio_init] wants and the FsBlocks material
-     [initlog] wants. *)
+     [initlog] wants.
+
+     [home] IS A PARAMETER (durable-disk 1c-flip): the mint splits its
+     per-block client resource along it -- a home block's owner gets the
+     EXCLUSIVE byte run [fsblock], the log region's blocks keep the parked
+     cache half [fs_chalf] that [LogInv.log_state] parks -- and the byte
+     view's invariant row comes out with them.  The one caller passes
+     [fs_home_set cov logstart]. *)
   Lemma fs_boot_ghosts (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
-      (cov : gset Z) (dev : mword 32) (E : coPset) :
+      (cov home : gset Z) (dev : mword 32) (E : coPset) :
     fs_cov_in cov ndisk ->
+    home ⊆ cov ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
     ∃ γfs : fs_names,
       ([∗ set] b ∈ cov, pool_blk (fs_view γfs γv dev cov) b) ∗
       ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
+      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
-      ([∗ set] b ∈ cov, fs_chalf γfs b (fs_blocks dk b)) ∗
+      ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (fs_blocks dk b)) ∗
+      ([∗ set] b ∈ cov ∖ home, fs_chalf γfs b (fs_blocks dk b)) ∗
       ([∗ set] b ∈ cov, blk_own γfs b).
   Proof.
-    iIntros (Hcov) "Hm".
+    iIntros (Hcov Hsub) "Hm".
     iDestruct (fs_boot_carve γv dk ndisk cov Hcov with "Hm") as "Hblk".
-    iMod (fs_alloc (fs_C0 dk cov)) as (γfs) "(HaL & HaD & Hpm)".
+    iMod (fs_alloc E (fs_C0 dk cov) home (fs_C0_lengths dk cov)
+            ltac:(rewrite fs_C0_dom; exact Hsub))
+      as (γfs) "(HaL & HaD & #Hinv & Hpm & Hfb & Hcl)".
+    rewrite (fs_C0_filter_in dk cov home Hsub) (fs_C0_filter_out dk cov home).
+    iDestruct (fs_C0_big with "Hfb") as "Hfb".
+    iDestruct (fs_C0_big with "Hcl") as "Hcl".
     iDestruct (fs_C0_big with "Hpm") as "Hpm".
     (* SCOPE the split.  A bare [rewrite !big_sepS_sep] rewrites the whole
        [envs_entails] -- hypotheses AND the (existentially quantified)
        conclusion -- and does not come back. *)
-    iEval (rewrite big_sepS_sep) in "Hpm".
-    iDestruct "Hpm" as "[Hfsb Hpm]".
     iEval (rewrite big_sepS_sep) in "Hpm".
     iDestruct "Hpm" as "[Hmc Hpm]".
     iEval (rewrite big_sepS_sep) in "Hpm".
@@ -361,7 +423,7 @@ Section FsBoot.
       iApply (big_sepS_mono with "H"). intros b Hb.
       iIntros "[Hd Hc]". rewrite /pool_blk /fs_view. cbn [bv_gd bv_clean].
       iExists (fs_blocks dk b). iFrame "Hd Hc". }
-    rewrite /fs_D0. iFrame "HaL HaD Hdty Hfsb Hown".
+    rewrite /fs_D0. iFrame "HaL HaD Hinv Hdty Hfb Hcl Hown".
   Qed.
 
 (* ====================================================================== *)
@@ -484,12 +546,19 @@ Section FsBoot.
       ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
+      (* THE BYTE VIEW'S ROW, persistent, re-exported to every consumer
+         above (durable-disk 1c-flip step 1) *)
+      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart) ∗
       fs_chalf γfs (log_hdr_bno logstart)
               (fs_blocks dk (log_hdr_bno logstart)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
          ∃ bs : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs) ∗
-      ([∗ set] b ∈ cov ∖ log_region_set logstart,
-         fs_chalf γfs b (fs_blocks dk b)) ∗
+      (* THE HOME BLOCKS, at the EXCLUSIVE byte run.  The log region's own
+         two rows above stay [fs_chalf]: the log's storage is not in the
+         file system's byte view, which is exactly why [home] is
+         [fs_home_set] and not [cov]. *)
+      ([∗ set] b ∈ fs_home_set cov logstart,
+         fsblock (fs_bytes γfs) b (fs_blocks dk b)) ∗
       (* the exclusive per-block tokens, whole and undivided: the log
          region's own blocks are owned by the log layer, everything else by
          whoever the (future) bitmap invariant hands them to.  Purely
@@ -499,15 +568,32 @@ Section FsBoot.
     iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
     destruct Hgeom as [Hcovok Hsub].
-    iMod (fs_boot_ghosts γv dk ndisk cov dev E Hcov with "Hm")
-      as (γfs) "(Hpool & HaL & HaD & Hdty & Hfsb & Hown)".
+    iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov logstart) dev E
+            Hcov ltac:(rewrite /fs_home_set; apply elem_of_subseteq;
+                       intros x Hx; apply elem_of_difference in Hx as [Hc _];
+                       exact Hc)
+            with "Hm")
+      as (γfs) "(Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog & Hown)".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
             with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
     iModIntro. iExists bn, γfs.
-    iDestruct (big_sepS_split_sub _ cov (log_region_set logstart) Hsub
-                 with "Hfsb") as "[Hlog Hrest]".
+    (* the mint's [fs_chalf] half is [cov] minus the home set, i.e. the log
+       region itself -- the [∖∖] cancels because the region is covered *)
+    (* [set_solver] is not used HERE (nor anywhere in this file): the goal
+       is small but the context is the whole boot bundle, and stdpp's
+       closing step walks it -- durable-notes' measured trap. *)
+    assert (Hcancel : cov ∖ fs_home_set cov logstart = log_region_set logstart).
+    { rewrite /fs_home_set. apply set_eq. intros x. split.
+      - intros Hx. apply elem_of_difference in Hx as [Hc Hn].
+        destruct (decide (x ∈ log_region_set logstart)) as [Hr | Hr];
+          [exact Hr |].
+        exfalso. apply Hn. apply elem_of_difference.
+        split; [exact Hc | exact Hr].
+      - intros Hx. apply elem_of_difference. split; [exact (Hsub x Hx) |].
+        intros Hd. apply elem_of_difference in Hd as [_ Hn]. exact (Hn Hx). }
+    rewrite Hcancel.
     iDestruct (fs_log_region_split with "Hlog") as "[Hhdr Hslots]".
-    iFrame "Hctx Hsl HaL HaD Hdty Hhdr Hslots Hrest Hown".
+    iFrame "Hctx Hsl HaL HaD Hdty Hinv Hhdr Hslots Hrest Hown".
   Qed.
 
 End FsBoot.

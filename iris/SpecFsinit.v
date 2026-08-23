@@ -366,7 +366,7 @@ Definition wp_fsinit_sconf_body
   (* IN: block 1's client half, which is what pins the bytes bread returns
      to the image; and 32 bytes of RAW .bss at [&sb], which is all the
      superblock is until +0x26 runs. *)
-  fs_chalf γfs 1 bs_sb -∗
+  fsblock (fs_bytes γfs) 1 bs_sb -∗
   ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ sb_old i) -∗
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
@@ -449,7 +449,7 @@ Definition wp_fsinit_sconf_body
       InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
       BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
       (* block 1's client half, untouched -- bread/brelse do not write it *)
-      fs_chalf γfs 1 bs_sb -∗
+      fsblock (fs_bytes γfs) 1 bs_sb -∗
       (* THE LOG LAYER, BUILT by initlog at +0x4e and already USED by
          ireclaim at +0x54.  It does not cross the boundary as an input.
          AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log

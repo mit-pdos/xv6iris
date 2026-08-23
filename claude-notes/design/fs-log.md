@@ -187,11 +187,26 @@ and "what the file system owns".
   `lh_n + total_outstanding_units <= LOGBLOCKS` and
   `#active_ops = outstanding-cell`.
 
-**WHERE THE FLIP STANDS.** The byte view, its invariant and the three
-crossings are proven in `FsBlocks.v`; the consumers above the log still hold
-the cache's parked half (`fs_chalf`) rather than `fsblock`. What that flip
-costs, and the two shapes it forces (`log_write`'s AU mask, the recovering
-install's home-block halves), is `projects/durable-disk.md` item 1c.
+**THE FLIP HAS LANDED** (durable-disk 1c-flip): every home-block owner above
+the log holds `fsblock (fs_bytes γfs)`, every bread client's agreement is one
+of the two fupds, and `fs_chalf` survives only for the log's OWN storage and
+for a handle's machinery half. Three things the flip settled that this
+section could not predict:
+- **Membership is derived, not threaded.** `fsblock_home` reads `b ∈ home`
+  off the byte auth and `bytes_dom`, so neither crossing takes a membership
+  premise and no consumer above the log ever names a `gset Z`. The
+  home-set-free row `fs_bytes_any γfs` is what everything carries.
+- **The row cannot ride with the block.** It contains an `inv`, which is not
+  timeless, and `ireg_blk`/`ireg_body`/`bitmap_res`/`blk_res` are all
+  required timeless. It rides on the three persistent invariant carriers
+  (`log_ctx`, `bitmap_inv`, `ireg_inv`) instead, plus an explicit premise at
+  the two readers that hold none of them (readi, bmap).
+- **The recovering install does NOT hold nothing.** 1a made recovery a ghost
+  no-op for the mirror, not for the two content maps: the mint indexes the
+  byte view at the CRASHED disk, so recovery really does move each home
+  block. That arm holds the `fsblock` and calls `fsblock_update`.
+The per-consumer detail is `fs-ghost-state.md` §1 and
+`projects/durable-disk.md` item 1c.
 
 ## The bio rework (Ψ-parametric; bio never reads Ψ)
 

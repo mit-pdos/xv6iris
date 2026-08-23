@@ -320,6 +320,12 @@ Definition wp_bmap_sconf_body
   printk_env γpr γu γd -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  bmap reads the
+     indirect block and pins its bytes against the region's byte run, which
+     is an open of [FsBlocks.fs_bytes_inv]; the kit that would otherwise
+     carry the row is [None] on the read path, so it comes in on its own.
+     Persistent, and every caller has one. *)
+  fs_bytes_any γfs -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev, read (never written) on all four balloc/bread call paths --
      a FRACTION, so the caller keeps its own copy *)
@@ -497,6 +503,12 @@ Definition wp_bmap_gen_body
   printk_env γpr γu γd -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  bmap reads the
+     indirect block and pins its bytes against the region's byte run, which
+     is an open of [FsBlocks.fs_bytes_inv]; the kit that would otherwise
+     carry the row is [None] on the read path, so it comes in on its own.
+     Persistent, and every caller has one. *)
+  fs_bytes_any γfs -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
   inode_map γfs ip bm -∗
@@ -703,6 +715,12 @@ Definition wp_bmap_noalloc_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  bmap reads the
+     indirect block and pins its bytes against the region's byte run, which
+     is an open of [FsBlocks.fs_bytes_inv]; the kit that would otherwise
+     carry the row is [None] on the read path, so it comes in on its own.
+     Persistent, and every caller has one. *)
+  fs_bytes_any γfs -∗
   i_dev ip ↦₄{dqd} dev -∗
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗

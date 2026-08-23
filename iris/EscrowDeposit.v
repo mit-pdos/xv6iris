@@ -83,9 +83,9 @@ Section EscrowDeposit.
        in at [FrzOff] for whoever peels the pool entry next. *)
     redeem_ticketA gd -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
+      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fs_chalf γfs (IBLOCK inum inodestart)
+       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        (* RULING G, THE RETURN LEG (iclaim-ledger.md §6′).  iput BORROWS the
           regime -- the sealed [ireg_open] a runtime freezer must exhibit, or
@@ -104,7 +104,8 @@ Section EscrowDeposit.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi

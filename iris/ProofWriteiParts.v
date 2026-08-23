@@ -511,20 +511,37 @@ Section WriteiRes.
     bio_held bn V k pidv dev bno bs bsl bsd d -∗ ⌜(k < NBUF)%nat⌝.
   Proof. rewrite /bio_held. iIntros "(%A & _)". done. Qed.
 
-  Lemma wi_held_content (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma wi_held_content (E : coPset) (bn : bio_names) (γfs : fs_names)
+      (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
-    fs_chalf γfs (uint bno) bs0 -∗
-    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
-    ⌜bsl = bs0⌝.
+    ↑logN ⊆ E ->
+    fs_bytes_any γfs -∗
+    fsblock (fs_bytes γfs) (uint bno) bs0 -∗
+    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d ={E}=∗
+    ⌜bsl = bs0⌝ ∗ fsblock (fs_bytes γfs) (uint bno) bs0 ∗
+    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d.
   Proof.
-    rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
+    iIntros (HE) "#Hrow Hc Hheld".
+    iEval (rewrite /bio_held /bio_pay /fs_view /=) in "Hheld".
+    iDestruct "Hheld" as "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
     destruct d.
-    - iDestruct "Hpay" as "[Hm _]".
-      iApply (fs_chalf_mdirty_agree with "Hc Hm").
-    - iDestruct "Hpay" as "[Hm _]".
-      iApply (fs_chalf_mclean_agree with "Hc Hm").
+    - iEval (rewrite /fs_mdirty) in "Hpay".
+      iDestruct "Hpay" as "[[HL HD] Hq]".
+      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+              with "Hrow Hc HL") as "(%Heq & Hc & HL)".
+      iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
+      rewrite /bio_held /bio_pay /fs_view /=.
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
+    - iEval (rewrite /fs_mclean) in "Hpay".
+      iDestruct "Hpay" as "[[HL HD] %He]".
+      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+              with "Hrow Hc HL") as "(%Heq & Hc & HL)".
+      iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
+      rewrite /bio_held /bio_pay /fs_view /=.
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
   Qed.
 
 End WriteiRes.

@@ -43,9 +43,22 @@
      that job: it is a HALF, so two owners each holding a half of one key
      is perfectly consistent, and the layer above (the inode block map)
      needs "two file indices never name one disk block" -- [blk_own_ne].
-     The byte view's [fsblock_excl] gives that directly, so [blk_own] is
-     retired when the consumers flip (durable-disk 1c / fs-state.md #2);
-     until then nothing holds its auth and nothing needs it. *)
+
+     REDUNDANT SINCE THE CONSUMER FLIP (durable-disk 1c-flip step 5), AND
+     KEPT ONLY BECAUSE STAGE 2 DELETES IT WITH THE POOL.  Every site that
+     carried [blk_own] for DISJOINTNESS now also holds the block's
+     EXCLUSIVE byte run, and [fsblock_excl] gives [blk_own_ne]'s
+     conclusion directly:
+       - [InodeInv]'s [blkmap_wf] injectivity (the block map's [ind_blk]
+         and [blk_res] both carry the run now),
+       - [BitmapInv.free_pool_own_used], bfree's "freeing a free block"
+         panic refutation -- two owners of one block's bytes is already
+         [False],
+       - [IcacheEscrow]'s [blk_res]/[ind_tok] token beside [ind_blk].
+     What [blk_own] still does that [fsblock] does not is name a block
+     whose CONTENT nobody has committed to (the free pool's members), and
+     that is exactly what [free_bitmap Γ] replaces in stage 2
+     (fs-state.md §2).  Nothing holds its auth and nothing needs it. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -62,9 +75,16 @@ Local Open Scope Z_scope.
 
 
 Record fs_names := MkFsNames {
-  fs_cache     : gname;   (* the logged view *)
+  fs_cache : gname;   (* the bio-side block CACHE map C *)
   fs_dirty : gname;   (* the pinned-set flag *)
   fs_own   : gname;   (* the exclusive per-block ownership token *)
+  (* THE LOGGED VIEW L, keyed by BYTE ADDRESS (durable-disk 1c-flip).  The
+     FS-facing view: its elements are FULL, hence EXCLUSIVE, and every home
+     block's owner above the log holds [fsblock fs_bytes b bs] where it used
+     to hold the cache's parked half [fs_chalf].  Tied to [fs_cache] inside
+     [fs_bytes_inv] (section [FsBytes] below), which is also where the home
+     blocks' parked cache halves now live. *)
+  fs_bytes : gname;
 }.
 
 Section FsBlocks.
@@ -179,41 +199,6 @@ Section FsBlocks.
     iModIntro. iFrame. done.
   Qed.
 
-  (* allocation, from an initial content map (the mkfs image's covered
-     range): the two auths, and PER BLOCK all four client-side pieces --
-     the fs_chalf client half, the machinery-clean payload (which pairs
-     with the boot-side [disk_block]s to form [bio_init]'s pool bundles),
-     the LOG-SIDE dirty half (which stocks [log_state]'s all-false
-     big-op), and the exclusive [blk_own] token (which the allocator layer
-     above will hand out and take back).  All four, explicitly: an affine
-     iFrame dropping one of them compiles and strands initlog -- or, for
-     [blk_own], strands the block permanently, since no auth exists to
-     re-mint it.
-     The ownership map's AUTH is deliberately dropped here: its authority
-     belongs to the bitmap/free-block invariant, which does not exist yet,
-     and the elements' exclusivity needs no auth. *)
-  Lemma fs_alloc (L0 : gmap Z (list (bv 8))) :
-    ⊢ |==> ∃ γ : fs_names,
-      ghost_map_auth (fs_cache γ) 1 L0 ∗
-      ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
-      [∗ map] bno ↦ bs ∈ L0,
-        fs_chalf γ bno bs ∗ fs_mclean γ bno bs ∗
-        (bno ↪[fs_dirty γ]{#(1/2)} false) ∗ blk_own γ bno.
-  Proof.
-    iMod (ghost_map_alloc L0) as (γL) "[HaL HL]".
-    iMod (ghost_map_alloc ((fun _ => false) <$> L0)) as (γD) "[HaD HD]".
-    iMod (ghost_map_alloc ((fun _ => tt) <$> L0)) as (γO) "[_ HO]".
-    iModIntro. iExists (MkFsNames γL γD γO). iFrame "HaL HaD".
-    rewrite !big_sepM_fmap.
-    iCombine "HL HD" as "H". rewrite -big_sepM_sep.
-    iCombine "H HO" as "H". rewrite -big_sepM_sep.
-    iApply (big_sepM_mono with "H").
-    intros bno bs Hbs. iIntros "[[HL HD] HO]".
-    iDestruct "HL" as "[HL1 HL2]".
-    iDestruct "HD" as "[HD1 HD2]".
-    rewrite /fs_chalf /fs_mclean /blk_own. iFrame.
-  Qed.
-
 End FsBlocks.
 
 (* ===================================================================== *)
@@ -261,6 +246,13 @@ Lemma blk_range_disj (b b' a : Z) :
 Proof. unfold BSZ. lia. Qed.
 
 Definition logN : namespace := nroot .@ "fslogbytes".
+
+(* the mask side condition every reader at the top mask discharges.  Proved
+   ONCE, here, in an empty context: [set_solver] inside a syscall-altitude
+   proof walks the whole context (durable-notes), and every call site of
+   [fs_bytes_agree] below is at [⊤] or at [⊤] minus one namespace. *)
+Lemma logN_top : (↑logN : coPset) ⊆ ⊤.
+Proof. set_solver. Qed.
 
 Section FsBytes.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
@@ -472,16 +464,47 @@ Section FsBytes.
   (*  5.  What a bread client gets: C(b) IS L's bytes at b               *)
   (* ------------------------------------------------------------------ *)
 
+  (* HOLDING THE RUN IS BEING A HOME BLOCK, so neither crossing takes a
+     membership premise.  [bytes_dom] says [L] resides EXACTLY the home
+     blocks' byte range, and a [fsblock] at [b] resides [b]'s first byte in
+     [L]; two block ranges that share a byte are one block
+     ([blk_range_disj]).  Deriving it here rather than threading it is what
+     keeps every reader above -- the inode region's, the bitmap's, bmap's,
+     readi's, writei's -- free of a [gset Z] premise it has no way to
+     discharge (bmap holds no covered-ness fact at all). *)
+  Lemma fsblock_home (gL : gname) (L : gmap Z (bv 8)) (home : gset Z)
+      (b : Z) (bs : list (bv 8)) :
+    bytes_dom L home ->
+    ghost_map_auth gL 1 L -∗ fsblock gL b bs -∗ ⌜b ∈ home⌝.
+  Proof.
+    iIntros (Hdm) "Ha [%Hlb Hr]".
+    iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
+    rewrite Z.add_0_r in Hsub.
+    assert (Hfst : is_Some ((map_seqZ (b * BSZ) bs : gmap Z (bv 8))
+                              !! (b * BSZ))).
+    { apply lookup_map_seqZ_is_Some. rewrite Hlb BSZ_BSIZE.
+      unfold BSZ. lia. }
+    destruct Hfst as [v Hv].
+    assert (HL : L !! (b * BSZ) = Some v)
+      by exact (lookup_weaken _ _ _ _ Hv Hsub).
+    destruct (proj1 (Hdm (b * BSZ)) (mk_is_Some _ _ HL))
+      as (b' & Hb' & Hr').
+    iPureIntro.
+    rewrite (blk_range_disj b b' (b * BSZ)
+               ltac:(unfold BSZ; lia) Hr'). exact Hb'.
+  Qed.
+
   Lemma fs_bytes_agree (E : coPset) gL gc home b bs bsm :
-    ↑logN ⊆ E -> b ∈ home ->
+    ↑logN ⊆ E ->
     fs_bytes_inv gL gc home -∗
     fsblock gL b bs -∗
     (b ↪[gc]{#(1/2)} bsm) ={E}=∗
       ⌜bsm = bs⌝ ∗ fsblock gL b bs ∗ (b ↪[gc]{#(1/2)} bsm).
   Proof.
-    iIntros (HE Hb) "#Hinv Hfb Hm".
+    iIntros (HE) "#Hinv Hfb Hm".
     iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
     assert (Hin : is_Some (C !! b)).
     { apply elem_of_dom. rewrite Hdom. exact Hb. }
     destruct Hin as [bsi Hbsi].
@@ -514,7 +537,7 @@ Section FsBytes.
 
   Lemma fsblock_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
       (b : Z) (bs bs_new bsm : list (bv 8)) :
-    ↑logN ⊆ E -> b ∈ home -> length bs_new = BSIZE ->
+    ↑logN ⊆ E -> length bs_new = BSIZE ->
     fs_bytes_inv gL gc home -∗
     ghost_map_auth gc 1 C -∗
     fsblock gL b bs -∗
@@ -524,9 +547,10 @@ Section FsBytes.
       fsblock gL b bs_new ∗
       (b ↪[gc]{#(1/2)} bs_new).
   Proof.
-    iIntros (HE Hb Hlnew) "#Hinv Hca Hfb Hm".
+    iIntros (HE Hlnew) "#Hinv Hca Hfb Hm".
     iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (L C0) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
     assert (Hin : is_Some (C0 !! b)).
     { apply elem_of_dom. rewrite Hdom. exact Hb. }
     destruct Hin as [bsi Hbsi].
@@ -715,3 +739,153 @@ Section FsBytes.
   Qed.
 
 End FsBytes.
+
+(* SEALED AGAINST TYPECLASS RESOLUTION, AND IT HAS TO BE.  [fsblock] is a
+   1024-element [big_sepL] under two [Definition]s, and [iFrame] resolves
+   its [Frame] instances up to delta: point a bare [iFrame] at a goal
+   holding [fsblock gL b (bitmap_bytes used)] and it unfolds through
+   [byte_range] into the whole run and does not come back -- measured, as a
+   [BitmapInv.bitmap_res_close] that ran past ten minutes with no error
+   (durable-notes: a per-file build over five minutes is a bug).  Sealing
+   the two heads leaves [rewrite /fsblock] and the declared [Timeless]
+   instances working and makes [iFrame] treat a block run as one atom,
+   which is what every consumer above the log wants of it. *)
+Global Typeclasses Opaque byte_range fsblock.
+
+(* ===================================================================== *)
+(*  THE ERA'S MINT  (durable-disk 1c-flip, step 1)                        *)
+(*                                                                       *)
+(*  One lemma allocates every ghost the block layer owns and splits its   *)
+(*  per-block output along the HOME/LOG-REGION line, because that line is *)
+(*  where the two views part company:                                    *)
+(*                                                                       *)
+(*    - a HOME block ([b] in [home]) belongs to the file system, so its   *)
+(*      client resource is the EXCLUSIVE byte run [fsblock fs_bytes];     *)
+(*      its parked cache half is swallowed by [fs_bytes_inv] on the way   *)
+(*      in and no mortal ever holds one again;                           *)
+(*    - a LOG-REGION block is the log's OWN storage, which is not in the  *)
+(*      file system's byte view at all ([home] is [cov] minus             *)
+(*      [log_region_set]), so it keeps the parked cache half [fs_chalf]   *)
+(*      that [log_state] parks.                                          *)
+(*                                                                       *)
+(*  The machinery halves, the log side's dirty halves and the exclusive   *)
+(*  [blk_own] tokens are per-block over the WHOLE map and are handed out  *)
+(*  undivided -- they know nothing about the split.                      *)
+(* ===================================================================== *)
+
+Section FsMint.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
+
+  (* THE ROW EVERY BREAD CLIENT ABOVE THE LOG CARRIES.  The home set is
+     bound because no consumer needs to name it: holding the block's byte
+     run IS being a home block ([fsblock_home]), and the byte map's AUTH --
+     of which there is exactly one -- is inside the invariant, so two
+     invariants at [logN] over one [fs_bytes γ] cannot disagree about it.
+     What a consumer needs is only that SOME such invariant exists, which
+     is what this says.  Three carriers hand it out and every client of the
+     block layer holds one of them: [LogInv.log_ctx], [BitmapInv.bitmap_inv]
+     and [InodeRegion.ireg_inv]. *)
+  Definition fs_bytes_any (γ : fs_names) : iProp Σ :=
+    (∃ home : gset Z, fs_bytes_inv (fs_bytes γ) (fs_cache γ) home)%I.
+
+  Global Instance fs_bytes_any_persistent γ : Persistent (fs_bytes_any γ).
+  Proof. apply _. Qed.
+
+  (* the bread client's crossing, at that row: what used to be an auth-free
+     half/half entailment is this fupd (durable-disk 1c-flip step 3) *)
+  Lemma fs_bytes_agree_any (E : coPset) (γ : fs_names) (b : Z)
+      (bs bsm : list (bv 8)) :
+    ↑logN ⊆ E ->
+    fs_bytes_any γ -∗
+    fsblock (fs_bytes γ) b bs -∗
+    (b ↪[fs_cache γ]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs⌝ ∗ fsblock (fs_bytes γ) b bs ∗
+      (b ↪[fs_cache γ]{#(1/2)} bsm).
+  Proof.
+    iIntros (HE) "Hrow Hfb Hm". iDestruct "Hrow" as (home) "#Hinv".
+    iApply (fs_bytes_agree E (fs_bytes γ) (fs_cache γ) home b bs bsm HE
+              with "Hinv Hfb Hm").
+  Qed.
+
+  (* the two halves of a map along a decidable predicate on the key *)
+  Lemma fs_split_filter {V : Type} (m : gmap Z V) (S : gset Z)
+      (Phi : Z -> V -> iProp Σ) :
+    ([∗ map] k ↦ v ∈ m, Phi k v)
+      ⊢ ([∗ map] k ↦ v ∈ filter (fun kv => kv.1 ∈ S) m, Phi k v)
+        ∗ ([∗ map] k ↦ v ∈ filter (fun kv => kv.1 ∉ S) m, Phi k v).
+  Proof.
+    rewrite -big_sepM_union; [| apply map_disjoint_filter_complement].
+    rewrite map_filter_union_complement //.
+  Qed.
+
+  Lemma fs_filter_dom {V : Type} (m : gmap Z V) (S : gset Z) :
+    S ⊆ dom m -> dom (filter (fun kv => kv.1 ∈ S) m) = S.
+  Proof.
+    intros Hsub. apply set_eq. intros b. rewrite elem_of_dom. split.
+    - intros [v Hv]. apply map_lookup_filter_Some in Hv as [_ Hin]. exact Hin.
+    - intros Hin. destruct (proj1 (elem_of_dom m b) (Hsub b Hin)) as [v Hv].
+      exists v. apply map_lookup_filter_Some. split; [exact Hv | exact Hin].
+  Qed.
+
+  (* THE GHOST STEP the era runs once.  [L0] is the mkfs image's covered
+     content map, [home] the covered range minus the log's own storage.
+     All FIVE client-side pieces come out explicitly: an affine [iFrame]
+     dropping one of them compiles and strands initlog -- or, for
+     [blk_own], strands the block permanently, since no auth exists to
+     re-mint it.
+     The ownership map's AUTH is deliberately dropped: its authority
+     belongs to the bitmap/free-block invariant, which does not exist yet,
+     and the elements' exclusivity needs no auth. *)
+  Lemma fs_alloc (E : coPset) (L0 : gmap Z (list (bv 8))) (home : gset Z) :
+    (forall b bs, L0 !! b = Some bs -> length bs = BSIZE) ->
+    home ⊆ dom L0 ->
+    ⊢ |={E}=> ∃ γ : fs_names,
+      ghost_map_auth (fs_cache γ) 1 L0 ∗
+      ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
+      fs_bytes_inv (fs_bytes γ) (fs_cache γ) home ∗
+      ([∗ map] bno ↦ bs ∈ L0,
+         fs_mclean γ bno bs ∗ (bno ↪[fs_dirty γ]{#(1/2)} false) ∗
+         blk_own γ bno) ∗
+      ([∗ map] bno ↦ bs ∈ filter (fun kv => kv.1 ∈ home) L0,
+         fsblock (fs_bytes γ) bno bs) ∗
+      ([∗ map] bno ↦ bs ∈ filter (fun kv => kv.1 ∉ home) L0,
+         fs_chalf γ bno bs).
+  Proof.
+    iIntros (Hlen Hsub).
+    iMod (ghost_map_alloc L0) as (γC) "[HaC HC]".
+    iMod (ghost_map_alloc ((fun _ => false) <$> L0)) as (γD) "[HaD HD]".
+    iMod (ghost_map_alloc ((fun _ => tt) <$> L0)) as (γO) "[_ HO]".
+    rewrite !big_sepM_fmap.
+    (* peel each block's cache element into its two halves *)
+    iAssert ([∗ map] bno ↦ bs ∈ L0,
+               (bno ↪[γC]{#(1/2)} bs) ∗ (bno ↪[γC]{#(1/2)} bs))%I
+      with "[HC]" as "HC".
+    { iApply (big_sepM_mono with "HC"). intros bno bs _.
+      iIntros "H". iDestruct "H" as "[$ $]". }
+    rewrite big_sepM_sep. iDestruct "HC" as "[HCm HCp]".
+    (* the parked halves split along [home]: the home ones are swallowed
+       by the byte invariant, the log region's stay parked as [fs_chalf] *)
+    iDestruct (fs_split_filter L0 home (fun bno bs => bno ↪[γC]{#(1/2)} bs)%I
+                 with "HCp") as "[HCh HCl]".
+    iMod (fs_bytes_alloc E γC (filter (fun kv => kv.1 ∈ home) L0)
+            with "HCh") as (γL) "[#Hinv Hfb]".
+    { intros b bs Hb. apply map_lookup_filter_Some in Hb as [Hb _].
+      exact (Hlen b bs Hb). }
+    rewrite (fs_filter_dom L0 home Hsub).
+    iModIntro. iExists (MkFsNames γC γD γO γL).
+    rewrite /fs_chalf /fs_mclean /blk_own /=.
+    iFrame "HaC HaD Hinv Hfb HCl".
+    iAssert ([∗ map] bno ↦ bs ∈ L0,
+               (bno ↪[γD]{#(1/2)} false) ∗ (bno ↪[γD]{#(1/2)} false))%I
+      with "[HD]" as "HD".
+    { iApply (big_sepM_mono with "HD"). intros bno bs _.
+      iIntros "H". iDestruct "H" as "[$ $]". }
+    rewrite big_sepM_sep. iDestruct "HD" as "[HD1 HD2]".
+    iCombine "HCm HD1" as "H". rewrite -big_sepM_sep.
+    iCombine "H HD2" as "H". rewrite -big_sepM_sep.
+    iCombine "H HO" as "H". rewrite -big_sepM_sep.
+    iApply (big_sepM_mono with "H").
+    intros bno bs _. iIntros "[[[HC HD1] HD2] HO]". iFrame.
+  Qed.
+
+End FsMint.

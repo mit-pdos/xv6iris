@@ -442,7 +442,7 @@ Section ImageRes.
     dinode_wf dn -> fs_blocks_full P ->
     fs_inode_ok P sb dn -> fs_slot_inj P dn ->
     ([∗ set] b ∈ (list_to_set (fs_inode_blocks P dn) : gset Z),
-       fs_chalf γfs b (P b) ∗ blk_own γfs b) -∗
+       fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b) -∗
     inode_blocks γfs (img_blkmap P dn) (fs_data_of P dn)
       ∗ ind_res γfs (img_blkmap P dn).
   Proof.
