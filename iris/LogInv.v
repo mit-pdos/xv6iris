@@ -835,6 +835,47 @@ Section LogInv.
     log_mirror_tie M L cov ls LB.
   Proof. exact I. Qed.
 
+  (* READY, AND DELIBERATELY UNUSED (durable-disk flip-B).  This is the
+     deposit half of the gate above, proved: once end_op's committer carries
+     the mirror's VALUE across the commit cycle -- which it now does, through
+     [FsCrash]'s value-chained permits -- row (b) at the deposit is pure
+     bookkeeping over the chain.  The three chain facts it asks for are
+     exactly what [ProofEndOp]'s [eo_minst_hit] / [eo_minst_miss] /
+     [eo_ext] invariants deliver:
+
+       - every LOGGED home block ends at its logged content (the install
+         pass wrote [Lw j] there),
+       - every OTHER home block is where it was at the checkout (no write in
+         the cycle touches it: the fills go to slots, the commit and the
+         clear to the header, the installs to [W]'s blocks alone),
+       - and the logged view agrees with [Lw] at every entry (the copy
+         loop's own ghost step).
+
+     It is NOT wired in, because [log_mirror_tie] is still [True] and its
+     OTHER establishment site -- boot ([ProofInitlog]) -- is still a wall
+     until stage H2a mints the era's mirror at a named value.  Switching the
+     gate on is one line there plus [eo_open_to_batch] calling this instead
+     of [log_mirror_tie_pending]. *)
+  Lemma log_mirror_tie_deposit (M M' : log_mirror) (L : gmap Z (list (bv 8)))
+      (cov : gset Z) (ls : Z) (LB : gset Z) (W : list Z)
+      (Lw : nat -> list (bv 8)) :
+    LB = list_to_set W ->
+    log_mirror_tie_body M L cov ls LB ->
+    (* the install pass's effect at the logged blocks... *)
+    (forall (j : nat) (b : Z), W !! j = Some b -> lm_view M' b = Lw j) ->
+    (* ...and its absence everywhere else on the home set *)
+    (forall b : Z, b ∈ fs_home_set cov ls -> b ∉ LB -> lm_view M' b = lm_view M b) ->
+    (* the logged view, at the entries the batch wrote *)
+    (forall (j : nat) (b : Z), W !! j = Some b -> L !! b = Some (Lw j)) ->
+    log_mirror_tie_body M' L cov ls ∅.
+  Proof.
+    intros -> Htie Hhit Hmiss HLw b Hb _.
+    destruct (decide (b ∈ (list_to_set W : gset Z))) as [Hin|Hout].
+    - apply elem_of_list_to_set, elem_of_list_lookup in Hin as [j Hj].
+      rewrite (HLw j b Hj) (Hhit j b Hj) //.
+    - rewrite (Hmiss b Hb Hout). exact (Htie b Hb Hout).
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
   (* ---------------------------------------------------------------- *)

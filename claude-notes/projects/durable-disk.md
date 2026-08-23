@@ -293,6 +293,66 @@ See the G1-impl entry for the site table.
      ready-but-unused lemma (the tie's switch-on still waits on the
      BOOT side = H2a). `SpecEndOp` gains the client-fupd premise,
      the 26 callers supply the trivial one.
+   - [x] **flip-B** (G3's adoption). **DONE**, as landed:
+     - E2''s block-level `_v` primitives could not be consumed as they
+       stood: the machine is SECTOR-atomic, so every WAL write owes a
+       two-landing chain and only the at-forms had sector-level
+       builders. flip-B built the value-chained half of §6 —
+       `FsCrash.fs_v_sector0_rec` / `fs_v_sector1_rec` (a landing at a
+       NAMED picture), `fs_commit_v_sector0_rec` (the commit point,
+       taking the client premise), `fs_clear_v_sector0_rec` (the
+       preserving clear), and the four sequential builders
+       `fs_{logfill,install}_v_seq_permit`,
+       `fs_commit_named_seq_permit`, `fs_clear_keep_seq_permit`.
+       THE ONE THING THE AT-FORMS NEVER HAD TO NAME is the half-written
+       block: `blk_sec0` / `blk_sec1` are those two rows and
+       `LogDefs.lm_upd_idem` + `lm_upd_sec_01` / `lm_upd_sec_10` are why
+       ONE receipt still serves both landing orders. The length side
+       condition the second composition needs (`length old = BSIZE`,
+       true because the picture agrees with the disk on the extent)
+       travels INSIDE the first landing's receipt rather than as a
+       premise nobody upstream could discharge — that is the one design
+       point worth remembering.
+     - The commit and the clear take the caller's OFF-HEADER view `V`
+       plus `∀ b ≠ hdr, lm_view M0 b = V b`, so the receipt and the
+       client premise are the same terms in both landing orders (only
+       one of the two has moved the header row when the shift runs).
+       `ProofEndOp` instantiates `V := lm_view Mc`, so the premise is
+       `eq_refl`.
+     - `ProofEndOp`: `eo_open_of_batch` yields `(M0, ⌜lm_hdr M0 ls =
+       (0,[])⌝, log_mirror_half M0)`; `eo_loop` carries `Mc` with the
+       two-row invariant (clean header + `∀ i < t, lm_view Mc (slot i)
+       = Lw i`); `eo_commit` takes `Mc` + those rows + the client
+       premise. The install chain is the TERM `eo_minst ls W Lw M t`
+       with `eo_minst_miss` / `_hdr` / `_hit`; the clear's caught-up
+       premise is `eo_minst_hit` against the carried slot row, i.e.
+       arithmetic on the chain and nothing about the disk. `fr_D` no
+       longer moves at the steady clear.
+     - SPEC-SHAPE CHANGES (both forced, both clean): `SpecWriteHead`'s
+       `Q` became a FAMILY `list (bv 8) -> iProp` over the header image
+       it lays down (the commit's receipt names `bs'`);
+       `SpecInstallTrans`'s `R` became CURSOR-INDEXED
+       `nat -> iProp` (`R i` in, `R (S i)` out) and its generator names
+       the bytes as `Lw i` instead of quantifying them (install_trans
+       writes exactly the log copy). Old consumers instantiate at the
+       constant family (`ProofInitlog`).
+     - `SpecEndOp` gained `FsCrash.end_op_pres cov logstart` (:=
+       `∀ V Ws, fs_commit_pres V cov ls Ws`, the exact shape
+       `fs_commit_v_sector0_rec` takes); its 30 call sites across 16
+       files discharge it with `FsCrash.end_op_pres_placeholder`.
+     - READY BUT UNUSED: `LogInv.log_mirror_tie_deposit` proves row (b)
+       at the deposit from three chain facts. The gate is NOT switched —
+       boot (`ProofInitlog`) is still a wall until H2a.
+     - LEFTOVER (not done, deliberate): the four AT-FORM sequential
+       builders `fs_{logfill,install,commit,clear}_seq_permit` now have
+       ZERO consumers, and deleting them cascades into
+       `fs_at_sector_rec` / `fs_hdr_sector1_rec` /
+       `fs_commit_sector0_rec` (`fs_clear_sector0_rec` survives —
+       `fs_boot_head_sector0_rec` uses it) plus six comment references
+       in `SpecBwrite` / `SpecEndOp` / `SpecInstallTrans` /
+       `SpecWriteHead` / `SpecSysSync` / `RiscvPtsto`. Do it with, or
+       just after, H2a's value-chained boot permits, which will want the
+       same sector machinery at a named picture.
    - **flip-C** (closes over A+B): the ledger entries gain object
      sets, `op_pending` moves to objects, row (a) enters `log_state`,
      the 26 arms wire their G2 lemmas through flip-A's fold, the
@@ -512,6 +572,15 @@ the same way. E2's mirror did NOT change shape: the receipt chains through
       and threads the chained `M` value through `write_log`/commit/
       installs/clear — `SpecEndOp`'s client-fupd premise enters THEN
       (one 26-arm sweep, not two).
+      **SUPERSEDED IN PART BY flip-B (2026-08-23):** these four are the
+      BLOCK-level forms and the machine is sector-atomic, so nothing can
+      consume them; flip-B built the SECTOR-level family beside them
+      (`fs_v_sector0_rec` / `fs_v_sector1_rec` /
+      `fs_commit_v_sector0_rec` / `fs_clear_v_sector0_rec`, and the four
+      `_seq_permit` builders over them) and that is what `ProofEndOp`
+      spends. The four block-level `_v` forms are now consumer-free;
+      keep them as the readable statement of what the chain does, or
+      delete them with the at-form cleanup flip-B left behind.
 - [x] **E3. Preserving clear (as landed).** `fs_clear_permit_keep`:
       the caught-up premise is pure on the chained mirror value
       ("home = slot" at every entry, true BY COMPUTATION after the
@@ -810,9 +879,10 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
         landed without an axiom (which the audit baseline forbids) —
         (1) end_op's deposit (`ProofEndOp.eo_open_to_batch`): the commit
         runs through the AT-FORM permits, whose `Q` is `log_mirror_at ls h`,
-        so the post-install mirror VALUE is existential → **G3** discharges
-        it, by re-pointing `ProofEndOp` at E2''s value-chained primitives
-        and threading the chained `M`; (2) boot (`ProofInitlog`): the era's
+        so the post-install mirror VALUE is existential → **G3/flip-B has
+        now discharged this half**: the deposit holds a NAMED `M`, and
+        `LogInv.log_mirror_tie_deposit` proves row (b) from it — the gate
+        stays on only because of (2); (2) boot (`ProofInitlog`): the era's
         half comes from `fs_swap_permit_rec`'s `Q`, whose value
         `mirror_of (fs_blocks dk')` lives under the permit's own ∀-bound
         `dk` → **H2**'s re-founded boot (or a value-chained
@@ -960,7 +1030,8 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
-- [ ] **G3.** `ProofEndOp` discharges E2's premise from G1's row. It is
+- [x] **G3.** DONE as flip-B (see next-steps item 3 for the landed
+      shape). Original text: `ProofEndOp` discharges E2's premise from G1's row. It is
       also what switches ROW (b) ON at the deposit: re-point the commit
       path at `fs_logfill_permit_v` / `fs_install_permit_v` /
       `fs_commit_permit_named` / `fs_clear_permit_keep`, thread the chained

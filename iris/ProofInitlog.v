@@ -1986,7 +1986,7 @@ Section ProofInitlog.
               cov logstart dev true ((hdr_dec bs_hdr).1)
               (il_W bs_hdr ((hdr_dec bs_hdr).1))
               (fun k : nat => ys !!! k) Bh L D pidv dq
-              C2 (K - 6)%nat eb b (fs_era_custody)
+              C2 (K - 6)%nat eb b (fun _ : nat => fs_era_custody)
               _ Vpr HKit Hgeomok Hj Hgl
               HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg
               Hbelow Hpkg
@@ -1997,9 +1997,9 @@ Section ProofInitlog.
     (* THE RECOVERY-SIDE PERMITS, one generator over the era custody
        ([FsCrash.fs_recover_seq_permit]): every write is to a decoded home
        block, so it cannot corrupt the durable header ([hdr_wf_wr_out]). *)
-    { iModIntro. iIntros (i w bs') "%Hwi %Hlen' Hcust".
+    { iModIntro. iIntros (i w) "%Hwi %Hlen' Hcust".
       iDestruct "Hcert" as "(_ & Hstc2 & Hregc2)".
-      iApply (fs_recover_seq_permit cov logstart (uint w) bs'
+      iApply (fs_recover_seq_permit cov logstart (uint w) (ys !!! i)
                 ltac:(exact Hlen')
                 ltac:(intros dk o sbs Hfit Hwdk;
                       apply (hdr_wf_sub_out cov logstart (uint w) o sbs dk Hfit);
@@ -2152,7 +2152,8 @@ Section ProofInitlog.
               (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1)) (fun k : nat => ys !!! k) L)
               pidv dq
               D2 (K - 6)%nat eb b
-              (log_mirror_at logstart (0%nat, []) ∗ swap_lb (S gen_id))%I
+              (fun _ : list (bv 8) =>
+                 log_mirror_at logstart (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ Vpr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hcust2]").

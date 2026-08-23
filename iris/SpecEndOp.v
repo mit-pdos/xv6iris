@@ -125,6 +125,21 @@ Definition wp_end_op_sconf_body
      etc.) surface no order premise of their own for their callers to
      satisfy, so nothing about them is stated here. *)
   locks_below lks "log" ->
+  (* THE CLIENT'S PRESERVATION PREMISE (durable-disk ruling 2.5, flip-B).
+     end_op is the ONE place the durable state moves for a client, and the
+     machine layer cannot know that the state it moves TO is still a
+     well-formed file system: [FsCrash.fs_commit_v_sector0_rec] therefore
+     takes that implication, and this is the same statement, quantified
+     over the picture and the write set (no caller of end_op can see
+     which commit it will run).
+
+     IT IS TRIVIAL TODAY and every caller discharges it with
+     [FsCrash.end_op_pres_placeholder]: [FsWf.fs_durable_wf] is F1's
+     placeholder.  The SHAPE is what lands now -- at the switch-on
+     ([fs_durable_wf := fs_durable_wf_body]) only the discharge changes,
+     and stage G's per-op ledger is what will supply it; the plumbing here
+     does not move again. *)
+  end_op_pres cov logstart ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   trap_csrs_ext KT1 eb -∗

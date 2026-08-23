@@ -190,7 +190,7 @@ Definition wp_install_trans_sconf_body
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (R : iProp Σ) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.install_trans in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -295,14 +295,22 @@ Definition wp_install_trans_sconf_body
      Each generated permit is the SEQUENTIAL one (sector-atomic-disk.md
      §6e): a home block lands one 512-byte sector at a time, and the chain
      threads [R] from one landing to the next.
-     ([FsCrash.fs_install_seq_permit] is exactly this shape, at
-     [R := LogInv.log_mirror_at ls (n, map uint W)].  Its [▷] is what the
-     bwrite's own [▷ Q] postcondition hands back, and a client whose [R] is
-     timeless -- the mirror half is -- strips it inside the fupd.) *)
-  □ (∀ (i : nat) (w : SailStdpp.Values.mword 32) (bs' : list (bv 8)),
-       ⌜W !! i = Some w⌝ -∗ ⌜length bs' = 1024%nat⌝ -∗ ▷ R -∗
-       disk_seq_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
-  ▷ R -∗
+     THE GENERATOR IS CURSOR-INDEXED (durable-disk flip-B): entry [i]
+     consumes [R i] and returns [R (S i)], because a VALUE-chained client
+     -- end_op's committer, which carries a picture of the whole durable
+     disk -- moves to a different resource at every entry
+     ([FsCrash.fs_install_v_seq_permit] at
+     [R i := log_mirror_half (Mi i)], the chained [lm_upd]s).  The
+     at-form's single [R] is the constant family.  The bytes are NOT
+     quantified either: install_trans writes exactly the log copy's
+     content [Lw i] (the memmove is a copy of the slot), so naming them
+     is what lets the client's [Q] mention them.  Its [▷] is what the
+     bwrite's own [▷ Q] postcondition hands back, and a client whose [R]
+     is timeless -- the mirror half is -- strips it inside the fupd.) *)
+  □ (∀ (i : nat) (w : SailStdpp.Values.mword 32),
+       ⌜W !! i = Some w⌝ -∗ ⌜length (Lw i) = 1024%nat⌝ -∗ ▷ R i -∗
+       disk_seq_permit gen_id (Some ((1024 * uint w)%Z, Lw i)) (R (S i))) -∗
+  ▷ R 0%nat -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -336,7 +344,7 @@ Definition wp_install_trans_sconf_body
          is SKIPPED at recovery, so nothing extra comes back there. *)
       bslots (2 + (if recovering then 0%nat else length W)) -∗
       (* the threaded resource, back from the last entry's DMA completion *)
-      ▷ R -∗
+      ▷ R n -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -356,7 +364,7 @@ Module Type INSTALL_TRANS.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (R : iProp Σ) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (R : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate),
       wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs γpr
                                   cov logstart dev recovering n W Lw Bh L D
                                   pidv dq m K eb b R lks Vpr.

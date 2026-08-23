@@ -497,6 +497,36 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* THE CLIENT'S PRESERVATION OBLIGATION AT A COMMIT (ruling 2.5).           *)
+(*                                                                          *)
+(* A commit moves the durable state from the home restriction of [V] to      *)
+(* that restriction with the log's [Ws] installed over it, and NOTHING in    *)
+(* the machine or log layers can know the result is still a well-formed      *)
+(* file system: that is the CLIENT's fact.  Naming it here -- rather than    *)
+(* spelling the implication at each site -- is what lets [SpecEndOp]'s       *)
+(* premise, [fs_commit_v_sector0_rec]'s hypothesis and the eventual real     *)
+(* discharge be literally the same statement, so the switch-on               *)
+(* ([fs_durable_wf := fs_durable_wf_body]) changes only what proves it.      *)
+(* It is TRIVIAL today: [fs_durable_wf] is F1's placeholder.                 *)
+(* ---------------------------------------------------------------------- *)
+Definition fs_commit_pres (V : Z -> list (bv 8)) (cov : gset Z) (ls : Z)
+    (Ws : list Z) : Prop :=
+  fs_durable_wf (fs_restrict V (fs_home_set cov ls)) ->
+  fs_durable_wf (fs_install V ls Ws (fs_restrict V (fs_home_set cov ls))).
+
+(* the whole-interface form: what [SpecEndOp]'s callers supply, since no
+   caller of end_op can see which picture or which write set the commit
+   will run at. *)
+Definition end_op_pres (cov : gset Z) (ls : Z) : Prop :=
+  forall (V : Z -> list (bv 8)) (Ws : list Z), fs_commit_pres V cov ls Ws.
+
+(* THE GATE, at the interface: trivially true while [fs_durable_wf] is F1's
+   placeholder.  Its call sites are the switch-on's rework list, exactly as
+   [FsWf.fs_durable_wf_placeholder]'s are. *)
+Lemma end_op_pres_placeholder (cov : gset Z) (ls : Z) : end_op_pres cov ls.
+Proof. intros V Ws _. exact (fs_durable_wf_placeholder _). Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 1c'. THE MIRROR's MEANING (durable-disk stage E2).                       *)
 (*                                                                          *)
 (* [RiscvPtsto.log_mirror] is the SHAPE; this is what makes a recorded       *)
@@ -625,6 +655,15 @@ Proof. intros Hb Hj ->. by apply Hb, log_slot_in_region. Qed.
 Lemma home_ne_hdr (ls b : Z) :
   b ∉ log_region_set ls -> b <> log_hdr_bno ls.
 Proof. intros Hb ->. by apply Hb, log_hdr_in_region. Qed.
+
+(* ...and the reading of it a HOME-SET membership gives, which is what the
+   value-chained header permits use to say that their caller's off-header
+   view covers every home block (durable-disk flip-B). *)
+Lemma home_set_ne_hdr (cov : gset Z) (ls b : Z) :
+  b ∈ fs_home_set cov ls -> b <> log_hdr_bno ls.
+Proof.
+  rewrite /fs_home_set elem_of_difference. intros [_ Hb]. by apply home_ne_hdr.
+Qed.
 
 (* --- [fs_restrict], pointwise --- *)
 
@@ -1067,6 +1106,154 @@ Lemma sector1_len (bs : list (bv 8)) :
 Proof.
   intro Hlen. rewrite length_take length_drop Hlen bsize_two_sectors. lia.
 Qed.
+
+(* ---- THE BLOCK PICTURE ONE LANDING LEAVES BEHIND (durable-disk flip-B).
+   The at-form permits never had to name it -- their receipt exposes the
+   header READING, which a non-header landing does not move -- but a
+   VALUE-chained permit does: its receipt is the half at a closed term, so
+   the half-written block needs a name.  Two names, one per sector, and the
+   two composition lemmas that say both landing orders end at [bs]. ---- *)
+
+Definition blk_sec0 (old bs : list (bv 8)) : list (bv 8) :=
+  take virtio_sector_bytes bs ++ drop virtio_sector_bytes old.
+
+Definition blk_sec1 (old bs : list (bv 8)) : list (bv 8) :=
+  take virtio_sector_bytes old ++ drop virtio_sector_bytes bs.
+
+Lemma blk_sec0_len (old bs : list (bv 8)) :
+  length old = BSIZE -> length bs = BSIZE -> length (blk_sec0 old bs) = BSIZE.
+Proof.
+  intros Ho Hb. rewrite /blk_sec0 length_app length_take length_drop Ho Hb.
+  rewrite bsize_two_sectors. lia.
+Qed.
+
+Lemma blk_sec1_len (old bs : list (bv 8)) :
+  length old = BSIZE -> length bs = BSIZE -> length (blk_sec1 old bs) = BSIZE.
+Proof.
+  intros Ho Hb. rewrite /blk_sec1 length_app length_take length_drop Ho Hb.
+  rewrite bsize_two_sectors. lia.
+Qed.
+
+(* the header's READING is a sector-0 reading, so sector 1's landing leaves
+   the first 512 bytes -- and therefore the decode -- exactly where it was *)
+Lemma blk_sec1_take0 (old bs : list (bv 8)) :
+  (virtio_sector_bytes <= length old)%nat ->
+  take virtio_sector_bytes (blk_sec1 old bs) = take virtio_sector_bytes old.
+Proof.
+  intro Ho. rewrite /blk_sec1.
+  assert (Hl : length (take virtio_sector_bytes old) = virtio_sector_bytes)
+    by (rewrite length_take; lia).
+  rewrite take_app_le; [| lia]. rewrite take_take Nat.min_id //.
+Qed.
+
+Lemma blk_sec0_take0 (old bs : list (bv 8)) :
+  length bs = BSIZE ->
+  take virtio_sector_bytes (blk_sec0 old bs) = take virtio_sector_bytes bs.
+Proof.
+  intro Hb. rewrite /blk_sec0.
+  assert (Hl : length (take virtio_sector_bytes bs) = virtio_sector_bytes)
+    by exact (sector0_len bs Hb).
+  rewrite take_app_le; [| lia]. rewrite take_take Nat.min_id //.
+Qed.
+
+(* SECTOR 0 THEN SECTOR 1 *)
+Lemma blk_sec_01 (old bs : list (bv 8)) :
+  length bs = BSIZE -> blk_sec1 (blk_sec0 old bs) bs = bs.
+Proof.
+  intro Hb. rewrite /blk_sec1 (blk_sec0_take0 old bs Hb). apply take_drop.
+Qed.
+
+(* ...AND SECTOR 1 THEN SECTOR 0, at the same picture -- which is what lets
+   ONE receipt serve both branches of the sequential permit. *)
+Lemma blk_sec_10 (old bs : list (bv 8)) :
+  length old = BSIZE -> blk_sec0 (blk_sec1 old bs) bs = bs.
+Proof.
+  intro Ho. rewrite /blk_sec0 /blk_sec1.
+  assert (Hl : length (take virtio_sector_bytes old) = virtio_sector_bytes)
+    by (rewrite length_take Ho bsize_two_sectors; lia).
+  rewrite drop_app_length'; [| exact (eq_sym Hl)]. apply take_drop.
+Qed.
+
+(* ...and the two landings, physically: what [fs_blocks] holds at the written
+   block afterwards, as a function of the PRE-image's row alone. *)
+Lemma fs_blocks_blk_sec0 (dk : Z -> bv 8) (blk : Z) (bs : list (bv 8)) :
+  length bs = BSIZE ->
+  fs_blocks (disk_write dk (blk * Z.of_nat BSIZE + Z.of_nat 0)%Z
+               (take virtio_sector_bytes bs)) blk
+  = blk_sec0 (fs_blocks dk blk) bs.
+Proof.
+  intro Hlen.
+  assert (Hs0 : length (take virtio_sector_bytes bs) = virtio_sector_bytes)
+    by exact (sector0_len bs Hlen).
+  assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
+    by (rewrite Hs0 bsize_two_sectors; lia).
+  rewrite (fs_blocks_splice dk blk 0 (take virtio_sector_bytes bs) Hfit).
+  rewrite /blk_sec0 take_0 /= Hs0 //.
+Qed.
+
+Lemma fs_blocks_blk_sec1 (dk : Z -> bv 8) (blk : Z) (bs : list (bv 8)) :
+  length bs = BSIZE ->
+  fs_blocks (disk_write dk (blk * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+               (take virtio_sector_bytes (drop virtio_sector_bytes bs))) blk
+  = blk_sec1 (fs_blocks dk blk) bs.
+Proof.
+  intro Hlen.
+  assert (Hs1 : length (take virtio_sector_bytes (drop virtio_sector_bytes bs))
+                = virtio_sector_bytes)
+    by exact (sector1_len bs Hlen).
+  assert (Hfit : (virtio_sector_bytes
+                  + length (take virtio_sector_bytes (drop virtio_sector_bytes bs))
+                  <= BSIZE)%nat)
+    by (rewrite Hs1 bsize_two_sectors; lia).
+  rewrite (fs_blocks_splice dk blk virtio_sector_bytes _ Hfit).
+  rewrite /blk_sec1 Hs1.
+  rewrite (take_ge (drop virtio_sector_bytes bs));
+    [| rewrite length_drop Hlen bsize_two_sectors; lia].
+  rewrite (drop_ge (fs_blocks dk blk));
+    [| rewrite fs_blocks_length bsize_two_sectors; lia].
+  rewrite app_nil_r //.
+Qed.
+
+(* ---- THE PICTURE UNDER A TORN BLOCK WRITE, in either landing order.  ONE
+   value comes out of both, and that is what lets a value-chained permit's
+   two branches share a single receipt (the at-forms got this for free: the
+   header READING they expose does not move at a non-header block). ---- *)
+
+Lemma lm_hdr_upd_ne (M : log_mirror) (ls blk : Z) (bs : list (bv 8)) :
+  blk <> log_hdr_bno ls -> lm_hdr (lm_upd M blk bs) ls = lm_hdr M ls.
+Proof.
+  intro Hne.
+  rewrite /lm_hdr
+    (lm_upd_view_ne M blk (log_hdr_bno ls) bs (not_eq_sym Hne)) //.
+Qed.
+
+(* the HEADER's own row, moved by its SECOND sector: the picture changes and
+   the reading does not -- "the commit is atomic", at the chained value *)
+Lemma lm_hdr_upd_hdr_sec1 (M : log_mirror) (ls : Z) (bs : list (bv 8)) :
+  ((lm_hdr M ls).1 <= LOGBLOCKS)%nat ->
+  (virtio_sector_bytes <= length (lm_view M (log_hdr_bno ls)))%nat ->
+  lm_hdr (lm_upd M (log_hdr_bno ls)
+            (blk_sec1 (lm_view M (log_hdr_bno ls)) bs)) ls
+  = lm_hdr M ls.
+Proof.
+  intros Hn Ho. rewrite /lm_hdr lm_upd_view_eq.
+  apply (hdr_dec_sector0_eq (lm_view M (log_hdr_bno ls))); [exact Hn|].
+  exact (blk_sec1_take0 _ bs Ho).
+Qed.
+
+Lemma lm_upd_sec_01 (M : log_mirror) (blk : Z) (bs : list (bv 8)) :
+  length bs = BSIZE ->
+  lm_upd (lm_upd M blk (blk_sec0 (lm_view M blk) bs)) blk
+    (blk_sec1 (lm_view (lm_upd M blk (blk_sec0 (lm_view M blk) bs)) blk) bs)
+  = lm_upd M blk bs.
+Proof. intro Hb. rewrite lm_upd_view_eq (blk_sec_01 _ bs Hb) lm_upd_idem //. Qed.
+
+Lemma lm_upd_sec_10 (M : log_mirror) (blk : Z) (bs : list (bv 8)) :
+  length (lm_view M blk) = BSIZE ->
+  lm_upd (lm_upd M blk (blk_sec1 (lm_view M blk) bs)) blk
+    (blk_sec0 (lm_view (lm_upd M blk (blk_sec1 (lm_view M blk) bs)) blk) bs)
+  = lm_upd M blk bs.
+Proof. intro Ho. rewrite lm_upd_view_eq (blk_sec_10 _ bs Ho) lm_upd_idem //. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1d. The record the escrow is over, and its well-formedness.             *)
@@ -3660,4 +3847,828 @@ Section fs_crash_seam.
       iApply (fs_recover_permit_rec cov ls _ Hs1 with "Hreg Hst Hcust").
   Qed.
 
+
+  (* ==================================================================== *)
+  (* (7) THE VALUE-CHAINED SEQUENTIAL PERMITS (durable-disk flip-B).       *)
+  (*                                                                      *)
+  (* The §6 builders expose the header READING only, which is all a caller *)
+  (* needs in order to keep writing -- and exactly what the DEPOSIT could  *)
+  (* not use ([LogInv.log_mirror_tie]'s wall: the post-commit picture was  *)
+  (* existential).  These are their value-chained twins: the caller hands  *)
+  (* its half at a NAMED [M0] and gets it back at a closed term, so        *)
+  (* end_op's committer carries a picture of the whole durable disk        *)
+  (* across the fills, the commit, the installs and the clear.             *)
+  (*                                                                      *)
+  (* The one thing the at-forms never had to name is the HALF-WRITTEN      *)
+  (* block: a torn landing moves the picture at the block it lands in and  *)
+  (* a value receipt has to say to what.  [blk_sec0] / [blk_sec1] are      *)
+  (* those two rows, [lm_upd_sec_01] / [lm_upd_sec_10] are why one receipt *)
+  (* still serves both landing orders, and the length side condition the   *)
+  (* second composition needs travels INSIDE the first landing's receipt   *)
+  (* (the picture agrees with the disk on the extent, so its rows are      *)
+  (* [BSIZE] long) rather than as a premise nobody upstream could give.    *)
+  (* ==================================================================== *)
+
+  (* ---- (7a) ONE LANDING, at a named picture.  The caller's pure
+     obligation is its row of the §3 table, exactly as [fs_at_sector_rec]'s
+     is; what is new is that the receipt is the half at a TERM. ---- *)
+  Lemma fs_v_sector0_rec `{GEN : GenId} (cov : gset Z) (ls : Z) (blk : Z)
+      (bs : list (bv 8)) (M0 : log_mirror) :
+    length bs = BSIZE ->
+    blk ∈ cov ∪ log_region_set ls ->
+    (forall (r : fs_rec) (dk : Z -> bv 8),
+       log_mirror_ok M0 (fs_blocks dk) cov ls ->
+       fs_rec_wf r (fs_blocks dk) cov ls ->
+       fs_rec_wf r (fs_blocks (disk_write dk
+          (blk * Z.of_nat BSIZE + Z.of_nat 0)%Z (take virtio_sector_bytes bs)))
+          cov ls) ->
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    ▷ log_mirror_half M0 -∗
+    fs_rec_permit cov ls gen_id
+      (Some ((blk * Z.of_nat BSIZE + Z.of_nat 0)%Z, take virtio_sector_bytes bs))
+      (log_mirror_half (lm_upd M0 blk (blk_sec0 (lm_view M0 blk) bs))
+       ∗ ⌜length (lm_view M0 blk) = BSIZE⌝).
+  Proof.
+    intros Hlen Hext Hwf. iIntros "#Hreg #Hswlb Hmir".
+    assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
+      by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    cbn [wr_apply fst snd].
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwfr & Harm)".
+    rewrite /log_mirror_half. iMod "Hmir".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    pose proof (Hok blk Hext) as Hrow.
+    assert (Hlold : length (lm_view M0 blk) = BSIZE)
+      by (rewrite Hrow; apply fs_blocks_length).
+    assert (Hnew : fs_blocks (disk_write dk
+                     (blk * Z.of_nat BSIZE + Z.of_nat 0)%Z
+                     (take virtio_sector_bytes bs)) blk
+                   = blk_sec0 (lm_view M0 blk) bs)
+      by (rewrite Hrow; exact (fs_blocks_blk_sec0 dk blk bs Hlen)).
+    iMod ("Hclose" $! (disk_write dk (blk * Z.of_nat BSIZE + Z.of_nat 0)%Z
+                        (take virtio_sector_bytes bs))
+            (lm_upd M0 blk (blk_sec0 (lm_view M0 blk) bs)) with "[%]")
+      as "[Harm Hmir]".
+    { rewrite -Hnew.
+      exact (log_mirror_ok_upd_sector M0 dk cov ls blk 0
+               (take virtio_sector_bytes bs) Hfit Hok). }
+    iModIntro.
+    iSplitL "Hhist Harm".
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. exact (Hwf r dk Hok Hwfr). }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
+    iPureIntro. exact Hlold.
+  Qed.
+
+  Lemma fs_v_sector1_rec `{GEN : GenId} (cov : gset Z) (ls : Z) (blk : Z)
+      (bs : list (bv 8)) (M0 : log_mirror) :
+    length bs = BSIZE ->
+    blk ∈ cov ∪ log_region_set ls ->
+    (forall (r : fs_rec) (dk : Z -> bv 8),
+       log_mirror_ok M0 (fs_blocks dk) cov ls ->
+       fs_rec_wf r (fs_blocks dk) cov ls ->
+       fs_rec_wf r (fs_blocks (disk_write dk
+          (blk * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+          (take virtio_sector_bytes (drop virtio_sector_bytes bs)))) cov ls) ->
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    ▷ log_mirror_half M0 -∗
+    fs_rec_permit cov ls gen_id
+      (Some ((blk * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z,
+             take virtio_sector_bytes (drop virtio_sector_bytes bs)))
+      (log_mirror_half (lm_upd M0 blk (blk_sec1 (lm_view M0 blk) bs))
+       ∗ ⌜length (lm_view M0 blk) = BSIZE⌝).
+  Proof.
+    intros Hlen Hext Hwf. iIntros "#Hreg #Hswlb Hmir".
+    assert (Hfit : (virtio_sector_bytes
+                    + length (take virtio_sector_bytes
+                                (drop virtio_sector_bytes bs)) <= BSIZE)%nat)
+      by (rewrite (sector1_len bs Hlen) bsize_two_sectors; lia).
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    cbn [wr_apply fst snd].
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwfr & Harm)".
+    rewrite /log_mirror_half. iMod "Hmir".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    pose proof (Hok blk Hext) as Hrow.
+    assert (Hlold : length (lm_view M0 blk) = BSIZE)
+      by (rewrite Hrow; apply fs_blocks_length).
+    assert (Hnew : fs_blocks (disk_write dk
+                     (blk * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+                     (take virtio_sector_bytes (drop virtio_sector_bytes bs))) blk
+                   = blk_sec1 (lm_view M0 blk) bs)
+      by (rewrite Hrow; exact (fs_blocks_blk_sec1 dk blk bs Hlen)).
+    iMod ("Hclose" $! (disk_write dk
+                        (blk * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+                        (take virtio_sector_bytes (drop virtio_sector_bytes bs)))
+            (lm_upd M0 blk (blk_sec1 (lm_view M0 blk) bs)) with "[%]")
+      as "[Harm Hmir]".
+    { rewrite -Hnew.
+      exact (log_mirror_ok_upd_sector M0 dk cov ls blk virtio_sector_bytes
+               (take virtio_sector_bytes (drop virtio_sector_bytes bs)) Hfit Hok). }
+    iModIntro.
+    iSplitL "Hhist Harm".
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. exact (Hwf r dk Hok Hwfr). }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
+    iPureIntro. exact Hlold.
+  Qed.
+
+  (* ---- (7b) THE COMMIT POINT, at a named picture.  Two differences from
+     [fs_commit_sector0_rec]: the new committed view is a TERM the caller can
+     read (so the receipt is AT a state it can name), and the CLIENT's
+     preservation premise (ruling 2.5) enters -- [fs_commit_pres], pure while
+     [P_wf] is.  The premise is stated at [V], the caller's OFF-HEADER view,
+     because both landing orders reach this shift and only one of them has
+     already moved the header row: a statement mentioning [lm_view M0] at the
+     header could not serve both branches with ONE receipt. ---- *)
+  Lemma fs_commit_v_sector0_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (M0 : log_mirror) (V : Z -> list (bv 8))
+      (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_dec bs = (nn, Ws) ->
+    (nn <= LOGBLOCKS)%nat ->
+    NoDup Ws ->
+    (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
+    lm_hdr M0 ls = (0%nat, []) ->
+    (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
+    fs_commit_pres V cov ls Ws ->
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    ▷ log_mirror_half M0 -∗
+    fs_rec_permit cov ls gen_id
+      (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
+             take virtio_sector_bytes bs))
+      (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
+          (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+       ∗ fs_receipt_any (fs_install V ls Ws (fs_restrict V (fs_home_set cov ls)))
+       ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
+  Proof.
+    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hcli. iIntros "#Hreg #Hswlb Hmir".
+    assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hdec /=; lia).
+    assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
+      by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    cbn [wr_apply fst snd].
+    set (dk' := disk_write dk (log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z
+                  (take virtio_sector_bytes bs)).
+    assert (Hdec' : hdr_dec (fs_blocks dk' (log_hdr_bno ls)) = (nn, Ws))
+      by (unfold dk'; rewrite (hdr_dec_blk_sector0 dk ls bs Hlen Hbound); exact Hdec).
+    assert (Hmiss : forall c, c <> log_hdr_bno ls -> fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc;
+          exact (fs_blocks_sub_ne dk _ c 0 (take virtio_sector_bytes bs) Hfit Hc)).
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite /log_mirror_half. iMod "Hmir".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    pose proof (Hok (log_hdr_bno ls) (log_hdr_in_ext cov ls)) as Hrow.
+    assert (Hlold : length (lm_view M0 (log_hdr_bno ls)) = BSIZE)
+      by (rewrite Hrow; apply fs_blocks_length).
+    assert (Hnew : fs_blocks dk' (log_hdr_bno ls)
+                   = blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs)
+      by (unfold dk'; rewrite Hrow;
+          exact (fs_blocks_blk_sec0 dk (log_hdr_bno ls) bs Hlen)).
+    (* the disk, the picture and [V] are ONE map off the header block *)
+    assert (Hres : fs_restrict (fs_blocks dk) (fs_home_set cov ls)
+                   = fs_restrict V (fs_home_set cov ls)).
+    { apply fs_restrict_ext. intros b Hb.
+      rewrite -(Hok b (fs_home_in_ext cov ls b Hb)).
+      apply Hoff. exact (home_set_ne_hdr cov ls b Hb). }
+    set (D' := fs_install V ls Ws (fs_restrict V (fs_home_set cov ls))).
+    assert (HD' : fs_install (fs_blocks dk) ls
+                    (hdr_dec (fs_blocks dk' (log_hdr_bno ls))).2
+                    (fs_restrict (fs_blocks dk) (fs_home_set cov ls)) = D').
+    { rewrite Hdec' /= Hres. apply fs_install_ext_P. intros j Hj.
+      assert (Hjlt : (j < LOGBLOCKS)%nat).
+      { pose proof (hdr_dec_length bs) as Hl. rewrite Hdec /= in Hl. lia. }
+      rewrite -(Hok (log_slot_bno ls j) (log_slot_in_ext cov ls j Hjlt)).
+      apply Hoff. apply log_slot_ne_hdr. }
+    destruct Hwf as (Hrec & Hlast & Hhwf & Hdwf).
+    assert (Hdk0 : hdr_dec (fs_blocks dk (log_hdr_bno ls)) = (0%nat, []))
+      by (rewrite -Hrow; exact HM0).
+    assert (Hn0 : hdr_n (fs_blocks dk (log_hdr_bno ls)) = 0)
+      by (rewrite -hdr_dec_n Hdk0 //).
+    assert (HfrD : fr_D r = fs_restrict V (fs_home_set cov ls))
+      by (rewrite -Hres; exact (proj1 (fs_recovery_clean _ _ _ _ Hn0) Hrec)).
+    iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
+            with "Hhist") as "Hhist"; [by eexists|].
+    iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".
+    iMod ("Hclose" $! dk'
+            (lm_upd M0 (log_hdr_bno ls)
+               (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs)) with "[%]")
+      as "[Harm Hmir]".
+    { rewrite -Hnew. unfold dk'.
+      exact (log_mirror_ok_upd_sector M0 dk cov ls (log_hdr_bno ls) 0
+               (take virtio_sector_bytes bs) Hfit Hok). }
+    iModIntro.
+    iSplitL "Hhist Harm".
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
+      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split_and!.
+      - rewrite -HD'.
+        exact (fs_recovery_commit (fs_blocks dk) (fs_blocks dk') cov ls
+                 (fs_blocks dk' (log_hdr_bno ls)) eq_refl Hmiss).
+      - rewrite last_snoc. reflexivity.
+      - rewrite /hdr_wf Hdec' /=.
+        split_and!; [exact Hnn | exact Hnd | exact Hin].
+      - apply Hcli. rewrite -HfrD. exact Hdwf. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
+    iSplitR "".
+    { rewrite /fs_receipt_any. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /fs_receipt. iExists (fr_hist r). iExact "Hlb". }
+    iPureIntro. exact Hlold.
+  Qed.
+
+  (* ---- (7c) THE PRESERVING CLEAR's FIRST SECTOR (stage E3, at a named
+     picture).  [fr_D] does NOT move: the caught-up premise -- "the home
+     block already holds what its log slot holds", stated at the caller's
+     off-header view [V] -- is pure COMPUTATION on the chained value after
+     the install pass, and it is exactly [fs_recovery_clear_keeps]'s missing
+     home-side picture. ---- *)
+  Lemma fs_clear_v_sector0_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (M0 : log_mirror) (V : Z -> list (bv 8))
+      (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    lm_hdr M0 ls = (nn, Ws) ->
+    (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
+    (forall (j : nat) (b : Z), Ws !! j = Some b -> V b = V (log_slot_bno ls j)) ->
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    ▷ log_mirror_half M0 -∗
+    fs_rec_permit cov ls gen_id
+      (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
+             take virtio_sector_bytes bs))
+      (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
+          (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+       ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
+  Proof.
+    intros Hlen Hn0 HM0 Hoff Hcaught. iIntros "#Hreg #Hswlb Hmir".
+    assert (Hz : hdr_dec bs = (0%nat, [])) by exact (hdr_dec_zero bs Hn0).
+    assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hz /=; lia).
+    assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
+      by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    cbn [wr_apply fst snd].
+    set (dk' := disk_write dk (log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z
+                  (take virtio_sector_bytes bs)).
+    assert (Hdec' : hdr_dec (fs_blocks dk' (log_hdr_bno ls)) = (0%nat, []))
+      by (unfold dk'; rewrite (hdr_dec_blk_sector0 dk ls bs Hlen Hbound); exact Hz).
+    assert (Hn0' : hdr_n (fs_blocks dk' (log_hdr_bno ls)) = 0)
+      by (rewrite -hdr_dec_n Hdec' //).
+    assert (Hmiss : forall c, c <> log_hdr_bno ls -> fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc;
+          exact (fs_blocks_sub_ne dk _ c 0 (take virtio_sector_bytes bs) Hfit Hc)).
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite /log_mirror_half. iMod "Hmir".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    pose proof (Hok (log_hdr_bno ls) (log_hdr_in_ext cov ls)) as Hrow.
+    assert (Hlold : length (lm_view M0 (log_hdr_bno ls)) = BSIZE)
+      by (rewrite Hrow; apply fs_blocks_length).
+    assert (Hnew : fs_blocks dk' (log_hdr_bno ls)
+                   = blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs)
+      by (unfold dk'; rewrite Hrow;
+          exact (fs_blocks_blk_sec0 dk (log_hdr_bno ls) bs Hlen)).
+    destruct Hwf as (Hrec & Hlast & Hhwf & Hdwf).
+    pose proof Hhwf as (Hbnd & Hndw & Hhome).
+    assert (Hdkh : hdr_dec (fs_blocks dk (log_hdr_bno ls)) = (nn, Ws))
+      by (rewrite -Hrow; exact HM0).
+    iMod ("Hclose" $! dk'
+            (lm_upd M0 (log_hdr_bno ls)
+               (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs)) with "[%]")
+      as "[Harm Hmir]".
+    { rewrite -Hnew. unfold dk'.
+      exact (log_mirror_ok_upd_sector M0 dk cov ls (log_hdr_bno ls) 0
+               (take virtio_sector_bytes bs) Hfit Hok). }
+    iModIntro.
+    iSplitL "Hhist Harm".
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split_and!.
+      - refine (fs_recovery_clear_keeps (fs_blocks dk) (fs_blocks dk')
+                  (fr_D r) cov ls (fs_blocks dk' (log_hdr_bno ls))
+                  eq_refl Hn0' Hmiss _ _ Hrec).
+        { exact Hndw. }
+        intros j b Hjb. rewrite Hdkh /= in Hjb.
+        assert (Hbc : b ∈ cov /\ b ∉ log_region_set ls).
+        { apply Hhome. rewrite Hdkh /=.
+          exact (elem_of_list_lookup_2 _ _ _ Hjb). }
+        assert (Hbhome : b ∈ fs_home_set cov ls)
+          by (rewrite /fs_home_set elem_of_difference; tauto).
+        apply fs_restrict_lookup_Some. split; [exact Hbhome|].
+        assert (Hjlt : (j < LOGBLOCKS)%nat).
+        { apply lookup_lt_Some in Hjb.
+          pose proof (hdr_dec_length (fs_blocks dk (log_hdr_bno ls))) as Hl.
+          rewrite Hdkh /= in Hl Hbnd. lia. }
+        rewrite -(Hok b (fs_home_in_ext cov ls b Hbhome)).
+        rewrite -(Hok (log_slot_bno ls j) (log_slot_in_ext cov ls j Hjlt)).
+        rewrite (Hoff b (home_set_ne_hdr cov ls b Hbhome)).
+        rewrite (Hoff (log_slot_bno ls j) (log_slot_ne_hdr ls j)).
+        symmetry. exact (Hcaught j b Hjb).
+      - exact Hlast.
+      - apply hdr_wf_zero. exact Hn0'.
+      - exact Hdwf. (* THE POINT: the committed view does not move *) }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
+    iPureIntro. exact Hlold.
+  Qed.
+
+  (* ---- (7d) LOG FILL, sequentially and by value. ---- *)
+  Lemma fs_logfill_v_seq_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (i : nat)
+      (M0 : log_mirror) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    (i < LOGBLOCKS)%nat ->
+    lm_hdr M0 ls = (0%nat, []) ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_half M0 -∗
+    disk_seq_permit gen_id (Some ((1024 * log_slot_bno ls i)%Z, bs))
+      (log_mirror_half (lm_upd M0 (log_slot_bno ls i) bs)).
+  Proof.
+    intros Hlen Hi HM0. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    assert (Hne : log_slot_bno ls i <> log_hdr_bno ls) by apply log_slot_ne_hdr.
+    assert (Hext : log_slot_bno ls i ∈ cov ∪ log_region_set ls)
+      by exact (log_slot_in_ext cov ls i Hi).
+    assert (Hf0 : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
+      by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
+    assert (Hf1 : (virtio_sector_bytes
+                   + length (take virtio_sector_bytes (drop virtio_sector_bytes bs))
+                   <= BSIZE)%nat)
+      by (rewrite (sector1_len bs Hlen) bsize_two_sectors; lia).
+    assert (Hwf0 : forall (M : log_mirror), lm_hdr M ls = (0%nat, []) ->
+              forall (r : fs_rec) (dk : Z -> bv 8),
+                log_mirror_ok M (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks (disk_write dk
+                   (log_slot_bno ls i * Z.of_nat BSIZE + Z.of_nat 0)%Z
+                   (take virtio_sector_bytes bs))) cov ls)
+      by (intros M HM r dk Hok Hwfr;
+          exact (fs_rec_wf_logfill_sector cov ls i M 0 _ r dk Hi Hf0 HM Hok Hwfr)).
+    assert (Hwf1 : forall (M : log_mirror), lm_hdr M ls = (0%nat, []) ->
+              forall (r : fs_rec) (dk : Z -> bv 8),
+                log_mirror_ok M (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks (disk_write dk
+                   (log_slot_bno ls i * Z.of_nat BSIZE
+                    + Z.of_nat virtio_sector_bytes)%Z
+                   (take virtio_sector_bytes (drop virtio_sector_bytes bs))))
+                   cov ls)
+      by (intros M HM r dk Hok Hwfr;
+          exact (fs_rec_wf_logfill_sector cov ls i M virtio_sector_bytes _ r dk
+                   Hi Hf1 HM Hok Hwfr)).
+    assert (HMs0 : lm_hdr (lm_upd M0 (log_slot_bno ls i)
+                     (blk_sec0 (lm_view M0 (log_slot_bno ls i)) bs)) ls
+                   = (0%nat, []))
+      by (rewrite (lm_hdr_upd_ne M0 ls (log_slot_bno ls i) _ Hne); exact HM0).
+    assert (HMs1 : lm_hdr (lm_upd M0 (log_slot_bno ls i)
+                     (blk_sec1 (lm_view M0 (log_slot_bno ls i)) bs)) ls
+                   = (0%nat, []))
+      by (rewrite (lm_hdr_upd_ne M0 ls (log_slot_bno ls i) _ Hne); exact HM0).
+    iApply (disk_seq_permit_two gen_id _ _ (wr_nsectors_block _ bs Hlen)).
+    rewrite (wr_sector_blk0 (log_slot_bno ls i) bs)
+            (wr_sector_blk1 (log_slot_bno ls i) bs).
+    iSplit.
+    - (* SECTOR 0 FIRST *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 (log_slot_bno ls i)
+                    (blk_sec0 (lm_view M0 (log_slot_bno ls i)) bs))
+                 ∗ ⌜length (lm_view M0 (log_slot_bno ls i)) = BSIZE⌝)%I _
+                with "[] [Hmir]").
+      { iIntros "[Hm _]".
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 (log_slot_bno ls i)
+                         (blk_sec0 (lm_view M0 (log_slot_bno ls i)) bs))
+                      (log_slot_bno ls i)
+                      (blk_sec1 (lm_view (lm_upd M0 (log_slot_bno ls i)
+                         (blk_sec0 (lm_view M0 (log_slot_bno ls i)) bs))
+                         (log_slot_bno ls i)) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 (log_slot_bno ls i)
+                        (blk_sec0 (lm_view M0 (log_slot_bno ls i)) bs))
+                        (log_slot_bno ls i)) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          rewrite -(lm_upd_sec_01 M0 (log_slot_bno ls i) bs Hlen).
+          iExact "Hm2". }
+        iApply (fs_v_sector1_rec cov ls (log_slot_bno ls i) bs _ Hlen Hext
+                  (Hwf1 _ HMs0)
+                  with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_v_sector0_rec cov ls (log_slot_bno ls i) bs M0 Hlen Hext
+                (Hwf0 M0 HM0) with "Hreg Hswlb [Hmir]").
+      iNext. iExact "Hmir".
+    - (* SECTOR 1 FIRST *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 (log_slot_bno ls i)
+                    (blk_sec1 (lm_view M0 (log_slot_bno ls i)) bs))
+                 ∗ ⌜length (lm_view M0 (log_slot_bno ls i)) = BSIZE⌝)%I _
+                with "[] [Hmir]").
+      { iIntros "[Hm %Hlold]".
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 (log_slot_bno ls i)
+                         (blk_sec1 (lm_view M0 (log_slot_bno ls i)) bs))
+                      (log_slot_bno ls i)
+                      (blk_sec0 (lm_view (lm_upd M0 (log_slot_bno ls i)
+                         (blk_sec1 (lm_view M0 (log_slot_bno ls i)) bs))
+                         (log_slot_bno ls i)) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 (log_slot_bno ls i)
+                        (blk_sec1 (lm_view M0 (log_slot_bno ls i)) bs))
+                        (log_slot_bno ls i)) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          rewrite -(lm_upd_sec_10 M0 (log_slot_bno ls i) bs Hlold).
+          iExact "Hm2". }
+        iApply (fs_v_sector0_rec cov ls (log_slot_bno ls i) bs _ Hlen Hext
+                  (Hwf0 _ HMs1)
+                  with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_v_sector1_rec cov ls (log_slot_bno ls i) bs M0 Hlen Hext
+                (Hwf1 M0 HM0) with "Hreg Hswlb [Hmir]").
+      iNext. iExact "Hmir".
+  Qed.
+
+  (* ---- (7e) INSTALL, sequentially and by value. ---- *)
+  Lemma fs_install_v_seq_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (nn : nat) (Ws : list Z) (i : nat) (b : Z) (M0 : log_mirror)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    NoDup Ws ->
+    (length Ws <= LOGBLOCKS)%nat ->
+    Ws !! i = Some b ->
+    b ∈ cov ->
+    b ∉ log_region_set ls ->
+    lm_hdr M0 ls = (nn, Ws) ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    ▷ log_mirror_half M0 -∗
+    disk_seq_permit gen_id (Some ((1024 * b)%Z, bs))
+      (log_mirror_half (lm_upd M0 b bs)).
+  Proof.
+    intros Hlen Hnd Hwlen Hi Hbc Hb HM0. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    assert (Hne : b <> log_hdr_bno ls) by by apply home_ne_hdr.
+    assert (Hext : b ∈ cov ∪ log_region_set ls)
+      by (apply elem_of_union; by left).
+    assert (Hf0 : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
+      by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
+    assert (Hf1 : (virtio_sector_bytes
+                   + length (take virtio_sector_bytes (drop virtio_sector_bytes bs))
+                   <= BSIZE)%nat)
+      by (rewrite (sector1_len bs Hlen) bsize_two_sectors; lia).
+    assert (Hwf0 : forall (M : log_mirror), lm_hdr M ls = (nn, Ws) ->
+              forall (r : fs_rec) (dk : Z -> bv 8),
+                log_mirror_ok M (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks (disk_write dk
+                   (b * Z.of_nat BSIZE + Z.of_nat 0)%Z
+                   (take virtio_sector_bytes bs))) cov ls)
+      by (intros M HM r dk Hok Hwfr;
+          exact (fs_rec_wf_install_sector cov ls nn Ws i b M 0 _ r dk
+                   Hnd Hwlen Hi Hb Hf0 HM Hok Hwfr)).
+    assert (Hwf1 : forall (M : log_mirror), lm_hdr M ls = (nn, Ws) ->
+              forall (r : fs_rec) (dk : Z -> bv 8),
+                log_mirror_ok M (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks dk) cov ls ->
+                fs_rec_wf r (fs_blocks (disk_write dk
+                   (b * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+                   (take virtio_sector_bytes (drop virtio_sector_bytes bs))))
+                   cov ls)
+      by (intros M HM r dk Hok Hwfr;
+          exact (fs_rec_wf_install_sector cov ls nn Ws i b M virtio_sector_bytes
+                   _ r dk Hnd Hwlen Hi Hb Hf1 HM Hok Hwfr)).
+    assert (HMs0 : lm_hdr (lm_upd M0 b (blk_sec0 (lm_view M0 b) bs)) ls
+                   = (nn, Ws))
+      by (rewrite (lm_hdr_upd_ne M0 ls b _ Hne); exact HM0).
+    assert (HMs1 : lm_hdr (lm_upd M0 b (blk_sec1 (lm_view M0 b) bs)) ls
+                   = (nn, Ws))
+      by (rewrite (lm_hdr_upd_ne M0 ls b _ Hne); exact HM0).
+    iApply (disk_seq_permit_two gen_id _ _ (wr_nsectors_block _ bs Hlen)).
+    rewrite (wr_sector_blk0 b bs) (wr_sector_blk1 b bs).
+    iSplit.
+    - (* SECTOR 0 FIRST *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 b (blk_sec0 (lm_view M0 b) bs))
+                 ∗ ⌜length (lm_view M0 b) = BSIZE⌝)%I _ with "[] [Hmir]").
+      { iIntros "[Hm _]".
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 b (blk_sec0 (lm_view M0 b) bs)) b
+                      (blk_sec1 (lm_view (lm_upd M0 b
+                         (blk_sec0 (lm_view M0 b) bs)) b) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 b
+                        (blk_sec0 (lm_view M0 b) bs)) b) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          rewrite -(lm_upd_sec_01 M0 b bs Hlen). iExact "Hm2". }
+        iApply (fs_v_sector1_rec cov ls b bs _ Hlen Hext
+                  (Hwf1 _ HMs0)
+                  with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_v_sector0_rec cov ls b bs M0 Hlen Hext (Hwf0 M0 HM0)
+                with "Hreg Hswlb Hmir").
+    - (* SECTOR 1 FIRST *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 b (blk_sec1 (lm_view M0 b) bs))
+                 ∗ ⌜length (lm_view M0 b) = BSIZE⌝)%I _ with "[] [Hmir]").
+      { iIntros "[Hm %Hlold]".
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 b (blk_sec1 (lm_view M0 b) bs)) b
+                      (blk_sec0 (lm_view (lm_upd M0 b
+                         (blk_sec1 (lm_view M0 b) bs)) b) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 b
+                        (blk_sec1 (lm_view M0 b) bs)) b) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          rewrite -(lm_upd_sec_10 M0 b bs Hlold). iExact "Hm2". }
+        iApply (fs_v_sector0_rec cov ls b bs _ Hlen Hext
+                  (Hwf0 _ HMs1)
+                  with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_v_sector1_rec cov ls b bs M0 Hlen Hext (Hwf1 M0 HM0)
+                with "Hreg Hswlb Hmir").
+  Qed.
+
+  (* ---- (7f) THE COMMIT, sequentially and by value.  THE POINT OF THE WHOLE
+     campaign, now with a NAME on both sides of the jump: the pre-image's log
+     is clean per the caller's picture, so the invariant's [fr_D] IS the home
+     restriction of [V], and the post-image's is that with [Ws] installed. ---- *)
+  Lemma fs_commit_named_seq_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (M0 : log_mirror) (V : Z -> list (bv 8))
+      (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_dec bs = (nn, Ws) ->
+    (nn <= LOGBLOCKS)%nat ->
+    NoDup Ws ->
+    (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
+    lm_hdr M0 ls = (0%nat, []) ->
+    (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
+    fs_commit_pres V cov ls Ws ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_half M0 -∗
+    disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
+       ∗ fs_receipt_any (fs_install V ls Ws (fs_restrict V (fs_home_set cov ls)))).
+  Proof.
+    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hcli.
+    iIntros "#Hseam #Hreg #Hswlb Hmir".
+    assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
+      by exact (log_hdr_in_ext cov ls).
+    assert (Hwfh : forall (M : log_mirror) (r : fs_rec) (dk : Z -> bv 8),
+              log_mirror_ok M (fs_blocks dk) cov ls ->
+              fs_rec_wf r (fs_blocks dk) cov ls ->
+              fs_rec_wf r (fs_blocks (disk_write dk
+                 (log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+                 (take virtio_sector_bytes (drop virtio_sector_bytes bs)))) cov ls)
+      by (intros M r dk _ Hwfr;
+          exact (fs_rec_wf_hdr_sector1 cov ls _ r dk (sector1_len bs Hlen) Hwfr)).
+    iApply (disk_seq_permit_two gen_id _ _ (wr_nsectors_block _ bs Hlen)).
+    rewrite (wr_sector_blk0 (log_hdr_bno ls) bs)
+            (wr_sector_blk1 (log_hdr_bno ls) bs).
+    iSplit.
+    - (* SECTOR 0 FIRST: the commit, then a landing recovery cannot see *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
+                    (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                 ∗ fs_receipt_any (fs_install V ls Ws
+                     (fs_restrict V (fs_home_set cov ls)))
+                 ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
+                with "[] [Hmir]").
+      { iIntros "(Hm & #Hrc & _)".
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                      (log_hdr_bno ls)
+                      (blk_sec1 (lm_view (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                         (log_hdr_bno ls)) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
+                        (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                        (log_hdr_bno ls)) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          iSplitL "Hm2".
+          { rewrite -(lm_upd_sec_01 M0 (log_hdr_bno ls) bs Hlen). iExact "Hm2". }
+          iExact "Hrc". }
+        iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs _ Hlen Hext
+                  (Hwfh _) with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_commit_v_sector0_rec cov ls M0 V nn Ws bs Hlen Hdec Hnn Hnd Hin
+                HM0 Hoff Hcli with "Hreg Hswlb [Hmir]").
+      iNext. iExact "Hmir".
+    - (* SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
+                    (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                 ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
+                with "[] [Hmir]").
+      { iIntros "[Hm %Hlold]".
+        assert (HM1 : lm_hdr (lm_upd M0 (log_hdr_bno ls)
+                        (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) ls
+                      = (0%nat, [])).
+        { rewrite (lm_hdr_upd_hdr_sec1 M0 ls bs); [exact HM0 | | ].
+          - rewrite HM0 /=. unfold LOGBLOCKS. lia.
+          - rewrite Hlold bsize_two_sectors. lia. }
+        assert (HoffM1 : forall c : Z, c <> log_hdr_bno ls ->
+                  lm_view (lm_upd M0 (log_hdr_bno ls)
+                     (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) c = V c).
+        { intros c Hc.
+          rewrite (lm_upd_view_ne M0 (log_hdr_bno ls) c _ Hc). exact (Hoff c Hc). }
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                      (log_hdr_bno ls)
+                      (blk_sec0 (lm_view (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                         (log_hdr_bno ls)) bs))
+                   ∗ fs_receipt_any (fs_install V ls Ws
+                       (fs_restrict V (fs_home_set cov ls)))
+                   ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
+                        (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                        (log_hdr_bno ls)) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "(Hm2 & Hrc & _)". iApply disk_write_permit_intro.
+          iSplitL "Hm2".
+          { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
+          iExact "Hrc". }
+        iApply (fs_commit_v_sector0_rec cov ls _ V nn Ws bs Hlen Hdec Hnn Hnd Hin
+                  HM1 HoffM1 Hcli with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
+                (Hwfh M0) with "Hreg Hswlb [Hmir]").
+      iNext. iExact "Hmir".
+  Qed.
+
+  (* ---- (7g) THE PRESERVING CLEAR, sequentially and by value (stage E3).
+     [fr_D] does not move at all, so the steady state stops re-basing: the
+     caught-up premise is COMPUTATION on the value the install chain left. ---- *)
+  Lemma fs_clear_keep_seq_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (M0 : log_mirror) (V : Z -> list (bv 8))
+      (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    (nn <= LOGBLOCKS)%nat ->
+    lm_hdr M0 ls = (nn, Ws) ->
+    (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
+    (forall (j : nat) (b : Z), Ws !! j = Some b -> V b = V (log_slot_bno ls j)) ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_half M0 -∗
+    disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)).
+  Proof.
+    intros Hlen Hn0 Hnn HM0 Hoff Hcaught. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
+      by exact (log_hdr_in_ext cov ls).
+    assert (Hwfh : forall (M : log_mirror) (r : fs_rec) (dk : Z -> bv 8),
+              log_mirror_ok M (fs_blocks dk) cov ls ->
+              fs_rec_wf r (fs_blocks dk) cov ls ->
+              fs_rec_wf r (fs_blocks (disk_write dk
+                 (log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z
+                 (take virtio_sector_bytes (drop virtio_sector_bytes bs)))) cov ls)
+      by (intros M r dk _ Hwfr;
+          exact (fs_rec_wf_hdr_sector1 cov ls _ r dk (sector1_len bs Hlen) Hwfr)).
+    iApply (disk_seq_permit_two gen_id _ _ (wr_nsectors_block _ bs Hlen)).
+    rewrite (wr_sector_blk0 (log_hdr_bno ls) bs)
+            (wr_sector_blk1 (log_hdr_bno ls) bs).
+    iSplit.
+    - (* SECTOR 0 FIRST *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
+                    (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                 ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
+                with "[] [Hmir]").
+      { iIntros "[Hm _]".
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                      (log_hdr_bno ls)
+                      (blk_sec1 (lm_view (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                         (log_hdr_bno ls)) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
+                        (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                        (log_hdr_bno ls)) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          rewrite -(lm_upd_sec_01 M0 (log_hdr_bno ls) bs Hlen). iExact "Hm2". }
+        iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs _ Hlen Hext
+                  (Hwfh _) with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_clear_v_sector0_rec cov ls M0 V nn Ws bs Hlen Hn0 HM0 Hoff
+                Hcaught with "Hreg Hswlb [Hmir]").
+      iNext. iExact "Hmir".
+    - (* SECTOR 1 FIRST *)
+      iApply (fs_permit_of_rec with "Hseam").
+      iApply (fs_rec_permit_mono cov ls gen_id _
+                (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
+                    (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                 ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
+                with "[] [Hmir]").
+      { iIntros "[Hm %Hlold]".
+        assert (HM1 : lm_hdr (lm_upd M0 (log_hdr_bno ls)
+                        (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) ls
+                      = (nn, Ws)).
+        { rewrite (lm_hdr_upd_hdr_sec1 M0 ls bs); [exact HM0 | | ].
+          - rewrite HM0 /=. exact Hnn.
+          - rewrite Hlold bsize_two_sectors. lia. }
+        assert (HoffM1 : forall c : Z, c <> log_hdr_bno ls ->
+                  lm_view (lm_upd M0 (log_hdr_bno ls)
+                     (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) c = V c).
+        { intros c Hc.
+          rewrite (lm_upd_view_ne M0 (log_hdr_bno ls) c _ Hc). exact (Hoff c Hc). }
+        iApply (fs_permit_of_rec with "Hseam").
+        iApply (fs_rec_permit_mono cov ls gen_id _
+                  (log_mirror_half (lm_upd
+                      (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                      (log_hdr_bno ls)
+                      (blk_sec0 (lm_view (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                         (log_hdr_bno ls)) bs))
+                   ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
+                        (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                        (log_hdr_bno ls)) = BSIZE⌝)%I _
+                  with "[] [Hm]").
+        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
+          rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
+        iApply (fs_clear_v_sector0_rec cov ls _ V nn Ws bs Hlen Hn0 HM1 HoffM1
+                  Hcaught with "Hreg Hswlb [Hm]").
+        iNext. iExact "Hm". }
+      iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
+                (Hwfh M0) with "Hreg Hswlb [Hmir]").
+      iNext. iExact "Hmir".
+  Qed.
 End fs_crash_seam.

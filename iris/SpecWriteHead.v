@@ -97,7 +97,7 @@ Definition wp_write_head_sconf_body
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -153,7 +153,7 @@ Definition wp_write_head_sconf_body
      consumes the third hypothesis instead. *)
   (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
      ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -182,8 +182,12 @@ Definition wp_write_head_sconf_body
       ⌜hdr_n bs' = Z.of_nat n⌝ -∗
       ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
       bslot -∗
-      (* the permit's RECEIPT, back from the DMA completion *)
-      ▷ Q -∗
+      (* the permit's RECEIPT, back from the DMA completion -- AT the header
+         image this call laid down, which is what makes [Q] a FAMILY over
+         [bs'] (durable-disk flip-B: the commit's receipt is the mirror half
+         at [lm_upd M (log_hdr_bno logstart) bs'], a value that mentions the
+         bytes; the clear's is the same shape) *)
+      ▷ Q bs' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -200,7 +204,7 @@ Module Type WRITE_HEAD.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Vpr : pprivate),
       wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb b Q lks Vpr.
 End WRITE_HEAD.

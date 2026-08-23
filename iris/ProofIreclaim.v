@@ -2010,6 +2010,7 @@ Section IreclaimOrphan.
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
     all: try lkbelow.
+    all: try exact (FsCrash.end_op_pres_placeholder _ _).
     iIntros (CID26 Hq26 mE) "%Hcseo Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc6e : ret_pc (OH !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6e))
