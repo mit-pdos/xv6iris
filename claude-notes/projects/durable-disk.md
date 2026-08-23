@@ -93,9 +93,12 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-(nothing in flight; flip-A and flip-B merged. F3.5's dirent transport
-bundles remain [~] in §5½; the at-form sector builders' cleanup rides
-H2a per the flip-B bullet.)
+- branch `worktree-agent-a6d25e11aa9e976a8`: flip-C1 (the object
+  ledger plumbing with row (a) gated; spec = the flip-C bullet's C1
+  half).
+
+(F3.5's dirent transport bundles remain [~] in §5½; the at-form sector
+builders' cleanup rides H2a per the flip-B bullet.)
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
