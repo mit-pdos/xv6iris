@@ -86,6 +86,34 @@ Section EffUnlinkEntry.
   Local Notation root_wf_intro := (root_wf_intro P sb Hp Hsb HW3 u Hu Hbm HW7 HW8 nib Hnibz Hreg rd Hrd Hdok Hlkg Horph) (only parsing).
   Local Notation dots_flat := (dots_flat P sb Hp Hsb HW3 u Hu Hbm HW7 HW8 nib Hnibz Hreg rd Hrd Hdok Hlkg Horph) (only parsing).
 
+  (* THE INODE-REGION BOUND that every [Hdec] case split asks for.  Written
+     inline as [ltac:(lia)] it is a general-purpose closer at a ~180-
+     hypothesis site whose goal carries a division: 2-4 s PER SITE, and
+     there are dozens.  [match goal] finds the range hypothesis whatever it
+     is called there and hands the answer over as a term; the [lia] arm is
+     the fallback for the few sites that have no such hypothesis. *)
+  Local Ltac irng :=
+    match goal with
+    | H : 0 <= ?z < sb_ninodes sb |- 0 <= ?z < _ =>
+        exact (iblk_z_range sb z H)
+    | H : 0 < ?z < sb_ninodes sb |- 0 <= ?z < _ =>
+        exact (iblk_z_range sb z
+                 (conj (Z.lt_le_incl _ _ (proj1 H)) (proj2 H)))
+    | _ => lia
+    end.
+
+  (* THE BLOCK-DISJOINTNESS SIDE CONDITIONS of [HaE]: a data block is
+     neither inode block (nor the bitmap block).  One bound hypothesis and
+     the two [iblock_bounds] readings answer every one of them -- but
+     spelled as a bare [lia] it is a general-purpose closer meeting this
+     proof's ~180-hypothesis context, and those sentences measured 4-9 s
+     EACH.  [match goal] names the bound; [clear -] hands [lia] the two
+     region facts it actually uses. *)
+  Local Ltac blk_ne d3 i3 :=
+    match goal with
+    | H : _ <= ?b < _ |- ?b <> _ => clear - H d3 i3; lia
+    end.
+
   (* ---- counting bounds and the target-kept reach transfer -------------- *)
 
   Local Lemma mjoin_seq_split_a (F : nat -> list Z) (a n m : nat) :
@@ -254,7 +282,7 @@ Section EffUnlinkEntry.
     set (dni' := di_nlink_dec dni).
     set (P' := eff_unlink_entry d k i).
     assert (Hdlive : bv_unsigned (di_type dn) <> 0)
-      by (rewrite Hdty; unfold T_DIR_z; lia).
+      by (rewrite Hdty; unfold T_DIR_z; discriminate).
     assert (Hilive : bv_unsigned (di_type dni) <> 0)
       by (unfold T_FILE_z, T_DEVICE_z in Hity; lia).
     assert (Hinotdir : bv_unsigned (di_type dni) <> T_DIR_z)
@@ -367,7 +395,7 @@ Section EffUnlinkEntry.
             apply (fdi_ent_zero _ _ _ Hdok_d (k' - FS_NDIRECT)%nat).
             + unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *. lia.
             + rewrite Nat2Z.inj_sub by exact Hdk. fold szd. lia. }
-        apply HaE; [| unfold fs_data_start in *; lia].
+        apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
         intros Hc.
         apply Hne.
         apply (Hslotinj k' (k / 64)%nat ltac:(lia) ltac:(lia)).
@@ -384,7 +412,7 @@ Section EffUnlinkEntry.
         apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
         rewrite fs_slot_max. exact Hnz12. }
       pose proof (blocks_range d _ Hd Hdlive Hin') as Hbr.
-      apply HaE; [| unfold fs_data_start in *; lia].
+      apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
       intros Hc.
       assert (Hfe : fs_slot P dn FS_MAXFILE = fs_slot P dn (k / 64)).
       { rewrite fs_slot_max, (fs_slot_blk dn (k / 64)%nat HkbM). exact Hc. }
@@ -409,7 +437,7 @@ Section EffUnlinkEntry.
       intros b Hb. apply HaE.
       - intros ->. exact (blocks_cross z d _ Hz Hd Hnd' Hnz Hdlive Hb Ha_in).
       - pose proof (blocks_range z b Hz Hnz Hb) as Hbr.
-        unfold fs_data_start in Hbr. lia. }
+        unfold fs_data_start in Hbr. clear -Hbr Hibd3 Hibi3. lia. }
     assert (HindI : fs_ind_ents P' dni' = fs_ind_ents P dni).
     { transitivity (fs_ind_ents P' dni);
         [exact (fs_ind_ents_meta P' dni dni' Haddri') |].
@@ -420,7 +448,7 @@ Section EffUnlinkEntry.
         apply (fs_slot_elem_dok P sb dni); [exact Hdok_i | lia |].
         rewrite fs_slot_max. exact Hnz12. }
       pose proof (blocks_range i _ ltac:(lia) Hilive Hin') as Hbr.
-      apply HaE; [| unfold fs_data_start in *; lia].
+      apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
       intros Hc.
       refine (blocks_cross i d (fs_blk_addr P dn (k / 64)%nat)
                 ltac:(lia) Hd ltac:(intros Hcc; exact (Hdi_ne (eq_sym Hcc)))
@@ -439,7 +467,7 @@ Section EffUnlinkEntry.
           apply (fs_slot_elem_dok P sb dni); [exact Hdok_i | lia |].
           rewrite (fs_slot_blk dni k0 Hk0). exact Hnz. }
         pose proof (blocks_range i _ ltac:(lia) Hilive Hin') as Hbr.
-        apply HaE; [| unfold fs_data_start in *; lia].
+        apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
         intros Hc.
         refine (blocks_cross i d (fs_blk_addr P dn (k / 64)%nat)
                   ltac:(lia) Hd
@@ -458,7 +486,7 @@ Section EffUnlinkEntry.
     assert (Htyp : forall z : Z, 0 <= z < sb_ninodes sb ->
               bv_unsigned (di_type (fs_dinode P' sb z))
               = bv_unsigned (di_type (fs_dinode P sb z))).
-    { intros z Hz. rewrite (Hdec z ltac:(lia)).
+    { intros z Hz. rewrite (Hdec z ltac:(irng)).
       destruct (decide (z = i)) as [-> | Hzi];
         [rewrite Htyi'; reflexivity | reflexivity]. }
     assert (Hentd : forall f : fname,
@@ -468,7 +496,7 @@ Section EffUnlinkEntry.
       rewrite (tree_ent_dir_eq P' d Hd)
         by (rewrite (Htyp d Hd); exact Hdty).
       unfold fs_file_data.
-      rewrite (Hdec d ltac:(lia)).
+      rewrite (Hdec d ltac:(irng)).
       rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
       fold dn szd nrec. rewrite Hview. reflexivity. }
     assert (Hentt : forall f : fname,
@@ -487,7 +515,7 @@ Section EffUnlinkEntry.
           rewrite Htyi'. exact Hinotdir.
       - apply tree_ent_untouched. intros Hjr.
         apply node_at_untouched; [exact Hjr | |].
-        + rewrite (Hdec j ltac:(lia)), decide_False by exact Hji.
+        + rewrite (Hdec j ltac:(irng)), decide_False by exact Hji.
           reflexivity.
         + intros Hjl k0 Hk0.
           destruct (Hunt j Hjr Hjd Hji Hjl) as (_ & Hdata & _ & _).
@@ -564,11 +592,11 @@ Section EffUnlinkEntry.
                     if bool_decide (Z.of_nat x ∈ rd)
                     then fs_dir_tickets_at P' sb (Z.of_nat x) else [])
                  (Z.to_nat (sb_ninodes sb)) (Z.to_nat d) z
-                 ltac:(lia)).
+                 ltac:(clear -Hd; lia)).
       - rewrite Z2Nat.id by lia.
         rewrite bool_decide_eq_true_2 by exact Hd_rd.
         unfold fs_dir_tickets_at. cbv zeta.
-        rewrite (Hdec d ltac:(lia)).
+        rewrite (Hdec d ltac:(irng)).
         rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
         fold dn.
         rewrite (proj2 (Z.eqb_eq _ _) Hdty).
@@ -578,14 +606,14 @@ Section EffUnlinkEntry.
         apply bool_decide_eq_true_1 in Hg.
         destruct (proj1 (Hrd _) Hg) as (Hxr & Hxty & _).
         assert (Hxd : Z.of_nat x <> d)
-          by (intros Hc; apply Hxm; lia).
+          by (intros Hc; apply Hxm; clear -Hc; lia).
         assert (Hxi : Z.of_nat x <> i)
           by (intros Hc; rewrite Hc in Hxty; exact (Hinotdir Hxty)).
         assert (Hxl : bv_unsigned (di_type (fs_dinode P sb (Z.of_nat x)))
                       <> 0)
-          by (rewrite Hxty; unfold T_DIR_z; lia).
+          by (rewrite Hxty; unfold T_DIR_z; discriminate).
         apply tickets_at_untouched; [exact Hxr | |].
-        + rewrite (Hdec (Z.of_nat x) ltac:(lia)).
+        + rewrite (Hdec (Z.of_nat x) (iblk_ix_range sb x Hx)).
           rewrite decide_False by exact Hxi. reflexivity.
         + intros _ k0 Hk0.
           destruct (Hunt _ Hxr Hxd Hxi Hxl) as (_ & Hdata & _ & _).
@@ -649,7 +677,7 @@ Section EffUnlinkEntry.
     constructor.
     - exact Hsb.
     - apply fs_inodes_dwf_intro. intros z Hz Hnz'.
-      rewrite (Hdec z ltac:(lia)) in Hnz' |- *.
+      rewrite (Hdec z ltac:(irng)) in Hnz' |- *.
       destruct (decide (z = i)) as [-> | Hzi]; [exact Hdwfi |].
       destruct (decide (z = d)) as [-> | Hzd]; [exact Hdwfd |].
       destruct (Hunt z Hz Hzd Hzi Hnz') as (_ & _ & _ & Hdwf).
@@ -659,7 +687,8 @@ Section EffUnlinkEntry.
         { unfold fs_used_blocks. f_equal. apply list_fmap_ext.
           intros idx x Hx. apply lookup_seq in Hx as [-> Hidx].
           cbv beta zeta.
-          rewrite (Hdec (Z.of_nat (0 + idx)) ltac:(lia)).
+          rewrite (Hdec (Z.of_nat (0 + idx))
+                     (iblk_ix_range sb (0 + idx) Hidx)).
           destruct (decide (Z.of_nat (0 + idx) = i)) as [Heq | Hzi].
           { rewrite Heq. fold dni. rewrite Htyi'.
             destruct (bv_unsigned (di_type dni) =? 0); [reflexivity |].
@@ -670,7 +699,8 @@ Section EffUnlinkEntry.
             exact Hblkd. }
           destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat (0 + idx))))
                     =? 0) eqn:Ez; [reflexivity |].
-          destruct (Hunt (Z.of_nat (0 + idx)) ltac:(lia) Hzd Hzi
+          destruct (Hunt (Z.of_nat (0 + idx))
+                      (inum_ix_range sb (0 + idx) Hidx) Hzd Hzi
                       (proj1 (Z.eqb_neq _ _) Ez)) as (_ & _ & Hbl & _).
           exact Hbl. }
         unfold fs_used_set. rewrite Hused. exact Hu.
@@ -681,7 +711,7 @@ Section EffUnlinkEntry.
       + apply root_wf_intro.
         * rewrite (Htyp ROOTINO Hd). exact Hdty.
         * unfold fs_file_data.
-          rewrite (Hdec ROOTINO ltac:(lia)).
+          rewrite (Hdec ROOTINO (iblk_root_range sb Hnin1)).
           rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
           fold dn szd nrec. rewrite Hview.
           rewrite lookup_delete_ne
@@ -695,7 +725,7 @@ Section EffUnlinkEntry.
         { intros Hc. apply Hinotdir. unfold dni. rewrite <- Hc.
           exact (fs_root_wf_type P sb HW7). }
         apply root_wf_untouched.
-        * rewrite (Hdec ROOTINO ltac:(pose proof Hnin1; unfold ROOTINO; lia)).
+        * rewrite (Hdec ROOTINO (iblk_root_range sb Hnin1)).
           rewrite decide_False by (intros Hc; exact (Hri Hc)).
           reflexivity.
         * intros k0 Hk0.
@@ -707,7 +737,7 @@ Section EffUnlinkEntry.
           exact (Hdata k0).
     - (* the dots *)
       apply fs_dots_all_intro. intros z Hz Hdty'.
-      rewrite (Hdec z ltac:(lia)) in Hdty' |- *.
+      rewrite (Hdec z ltac:(irng)) in Hdty' |- *.
       destruct (decide (z = i)) as [-> | Hzi].
       { exfalso. rewrite Htyi' in Hdty'. exact (Hinotdir Hdty'). }
       destruct (decide (z = d)) as [-> | Hzd].
@@ -717,7 +747,7 @@ Section EffUnlinkEntry.
         * intros j Hj. exact (Hwagree 1%nat ltac:(lia) j Hj).
         * exact (dots_bool_at d Hd Hdty).
       + assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-          by (rewrite Hdty'; unfold T_DIR_z; lia).
+          by (rewrite Hdty'; unfold T_DIR_z; discriminate).
         destruct (Hunt z Hz Hzd Hzi Hzl) as (_ & Hdata & _ & _).
         apply (fs_dots_wf_win P P' z (fs_dinode P sb z) (fs_dinode P sb z)).
         * lia.
@@ -731,18 +761,18 @@ Section EffUnlinkEntry.
     - exists nib. split; [exact Hnibz |].
       apply fs_region_wf_intro.
       + intros z Hz Hzn.
-        rewrite (Hdec z ltac:(lia)).
+        rewrite (Hdec z ltac:(irng)).
         rewrite decide_False by lia.
         apply (fs_region_free_spec P sb nib z
                  (fs_region_wf_free P sb nib Hreg)); lia.
       + intros z Hz Hfree.
-        rewrite (Hdec z ltac:(lia)) in Hfree |- *.
+        rewrite (Hdec z ltac:(irng)) in Hfree |- *.
         destruct (decide (z = i)) as [-> | Hzi].
         { exfalso. rewrite Htyi' in Hfree. exact (Hilive Hfree). }
         apply (fs_region_nlink_free P sb nib z
                  (fs_region_wf_nlink P sb nib Hreg)); [lia | exact Hfree].
       + intros z Hz.
-        rewrite (Hdec z ltac:(lia)).
+        rewrite (Hdec z ltac:(irng)).
         destruct (decide (z = i)) as [-> | Hzi].
         * rewrite Hnli'u.
           pose proof (fs_region_nlink_short P sb nib i
@@ -768,7 +798,7 @@ Section EffUnlinkEntry.
         destruct (proj1 (Hrd z) Hz) as (Hzr & Hzty & _).
         destruct (decide (z = d)) as [-> | Hzd].
         * assert (Hdecd : fs_dinode P' sb d = dn).
-          { rewrite (Hdec d ltac:(lia)).
+          { rewrite (Hdec d ltac:(irng)).
             rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
             reflexivity. }
           rewrite Hdecd.
@@ -800,16 +830,16 @@ Section EffUnlinkEntry.
         * assert (Hzi : z <> i)
             by (intros Hc; rewrite Hc in Hzty; exact (Hinotdir Hzty)).
           assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-            by (rewrite Hzty; unfold T_DIR_z; lia).
+            by (rewrite Hzty; unfold T_DIR_z; discriminate).
           destruct (Hunt z Hzr Hzd Hzi Hzl) as (_ & Hdata & _ & _).
           apply dir_ok_untouched; [exact Hz | | |].
-          -- rewrite (Hdec z ltac:(lia)).
+          -- rewrite (Hdec z ltac:(irng)).
              rewrite decide_False by exact Hzi. reflexivity.
           -- intros k0 Hk0. exact (Hdata k0).
           -- intros w0 Hw0 Hwl Hw0'. exfalso. apply Hwl.
              rewrite <- (Htyp w0 Hw0). exact Hw0'.
       + intros z Hz. cbv zeta.
-        rewrite (Hdec z ltac:(lia)).
+        rewrite (Hdec z ltac:(irng)).
         destruct (decide (z = i)) as [-> | Hzi].
         * rewrite Htyi'. intros Hnz.
           rewrite Hnli'u.
@@ -832,15 +862,15 @@ Section EffUnlinkEntry.
           destruct (bool_decide
                       (bv_unsigned (di_type (fs_dinode P sb z))
                        = T_DIR_z));
-            destruct (bool_decide (z = ROOTINO)); lia.
+            destruct (bool_decide (z = ROOTINO)); (clear -Hc Hold; lia).
       + intros z Hz Hty' Hnin.
-        rewrite (Hdec z ltac:(lia)) in Hty' |- *.
+        rewrite (Hdec z ltac:(irng)) in Hty' |- *.
         destruct (decide (z = i)) as [-> | Hzi].
         { exfalso. rewrite Htyi' in Hty'. exact (Hinotdir Hty'). }
         destruct (decide (z = d)) as [-> | Hzd].
         { exfalso. exact (Hnin Hd_rd). }
         assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-          by (rewrite Hty'; unfold T_DIR_z; lia).
+          by (rewrite Hty'; unfold T_DIR_z; discriminate).
         destruct (Hunt z Hz Hzd Hzi Hzl) as (_ & Hdata & _ & _).
         apply (dots_only_untouched P' (fs_dinode P sb z)).
         * exact (fdi_size _ _ _ (dok_at z Hz Hzl)).
@@ -893,9 +923,9 @@ Section EffUnlinkEntry.
     set (P' := eff_unlink_entry d k i).
     assert (Hdi_ne : d <> i) by (intros Hc; exact (Hid_ne (eq_sym Hc))).
     assert (Hdlive : bv_unsigned (di_type dn) <> 0)
-      by (rewrite Hdty; unfold T_DIR_z; lia).
+      by (rewrite Hdty; unfold T_DIR_z; discriminate).
     assert (Hilive : bv_unsigned (di_type dni) <> 0)
-      by (rewrite Hity; unfold T_DIR_z; lia).
+      by (rewrite Hity; unfold T_DIR_z; discriminate).
     assert (Hd_rd : d ∈ rd)
       by (apply (Hrd d); split; [lia | split; [exact Hdty | exact Hdre]]).
     pose proof (Hdok d Hd_rd) as Hddok. fold dn in Hddok.
@@ -1171,8 +1201,8 @@ Section EffUnlinkEntry.
             apply (fdi_ent_zero _ _ _ Hdok_d (k' - FS_NDIRECT)%nat).
             + unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *. lia.
             + rewrite Nat2Z.inj_sub by exact Hdk. fold szd. lia. }
-        apply HaE; [| unfold fs_data_start in *; lia
-                    | unfold fs_data_start in *; lia].
+        apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3
+                    | unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
         intros Hc.
         apply Hne.
         apply (Hslotinj k' (k / 64)%nat ltac:(lia) ltac:(lia)).
@@ -1191,8 +1221,8 @@ Section EffUnlinkEntry.
         apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
         rewrite fs_slot_max. exact Hnz12. }
       pose proof (blocks_range d _ Hd Hdlive Hin') as Hbr.
-      apply HaE; [| unfold fs_data_start in *; lia
-                  | unfold fs_data_start in *; lia].
+      apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3
+                  | unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
       intros Hc.
       assert (Hfe : fs_slot P dn FS_MAXFILE = fs_slot P dn (k / 64)).
       { rewrite fs_slot_max, (fs_slot_blk dn (k / 64)%nat HkbM). exact Hc. }
@@ -1217,9 +1247,9 @@ Section EffUnlinkEntry.
       intros b Hb. apply HaE.
       - intros ->. exact (blocks_cross z d _ Hz Hd Hnd' Hnz Hdlive Hb Ha_in).
       - pose proof (blocks_range z b Hz Hnz Hb) as Hbr.
-        unfold fs_data_start in Hbr. lia.
+        unfold fs_data_start in Hbr. clear -Hbr Hibd3 Hibi3. lia.
       - pose proof (blocks_range z b Hz Hnz Hb) as Hbr.
-        unfold fs_data_start in Hbr. lia. }
+        unfold fs_data_start in Hbr. clear -Hbr Hibd3 Hibi3. lia. }
     assert (HindI : fs_ind_ents P' dni' = fs_ind_ents P dni).
     { transitivity (fs_ind_ents P' dni);
         [exact (fs_ind_ents_meta P' dni dni' Haddri') |].
@@ -1230,8 +1260,8 @@ Section EffUnlinkEntry.
         apply (fs_slot_elem_dok P sb dni); [exact Hdok_i | lia |].
         rewrite fs_slot_max. exact Hnz12. }
       pose proof (blocks_range i _ ltac:(lia) Hilive Hin') as Hbr.
-      apply HaE; [| unfold fs_data_start in *; lia
-                  | unfold fs_data_start in *; lia].
+      apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3
+                  | unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
       intros Hc.
       refine (blocks_cross i d (fs_blk_addr P dn (k / 64)%nat)
                 ltac:(lia) Hd ltac:(intros Hcc; exact (Hdi_ne (eq_sym Hcc)))
@@ -1250,8 +1280,8 @@ Section EffUnlinkEntry.
           apply (fs_slot_elem_dok P sb dni); [exact Hdok_i | lia |].
           rewrite (fs_slot_blk dni k0 Hk0). exact Hnz. }
         pose proof (blocks_range i _ ltac:(lia) Hilive Hin') as Hbr.
-        apply HaE; [| unfold fs_data_start in *; lia
-                    | unfold fs_data_start in *; lia].
+        apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3
+                    | unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
         intros Hc.
         refine (blocks_cross i d (fs_blk_addr P dn (k / 64)%nat)
                   ltac:(lia) Hd
@@ -1270,7 +1300,7 @@ Section EffUnlinkEntry.
     assert (Htyp : forall z : Z, 0 <= z < sb_ninodes sb ->
               bv_unsigned (di_type (fs_dinode P' sb z))
               = bv_unsigned (di_type (fs_dinode P sb z))).
-    { intros z Hz. rewrite (Hdec z ltac:(lia)).
+    { intros z Hz. rewrite (Hdec z ltac:(irng)).
       destruct (decide (z = i)) as [-> | Hzi];
         [rewrite Htyi'; reflexivity |].
       destruct (decide (z = d)) as [-> | Hzd];
@@ -1297,7 +1327,7 @@ Section EffUnlinkEntry.
       rewrite (tree_ent_dir_eq P' d Hd)
         by (rewrite (Htyp d Hd); exact Hdty).
       unfold fs_file_data.
-      rewrite (Hdec d ltac:(lia)).
+      rewrite (Hdec d ltac:(irng)).
       rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
       rewrite decide_True by reflexivity.
       rewrite Hszd'e. fold szd nrec. rewrite Hview. reflexivity. }
@@ -1323,7 +1353,7 @@ Section EffUnlinkEntry.
       - apply tree_ent_untouched. intros _. exact Hnodei.
       - apply tree_ent_untouched. intros Hjr.
         apply node_at_untouched; [exact Hjr | |].
-        + rewrite (Hdec j ltac:(lia)).
+        + rewrite (Hdec j ltac:(irng)).
           rewrite decide_False by exact Hji.
           rewrite decide_False by exact Hjd. reflexivity.
         + intros Hjl k0 Hk0.
@@ -1494,13 +1524,14 @@ Section EffUnlinkEntry.
                     if bool_decide (Z.of_nat x ∈ rd')
                     then fs_dir_tickets_at P' sb (Z.of_nat x) else [])
                  (Z.to_nat (sb_ninodes sb)) (Z.to_nat d) (Z.to_nat i) z
-                 ltac:(lia) ltac:(lia) ltac:(lia)).
+                 ltac:(clear -Hd; lia) ltac:(clear -Hirange; lia)
+                 ltac:(clear -Hd Hirange Hid_ne; lia)).
       - (* segment [d] *)
         rewrite Z2Nat.id by lia.
         rewrite bool_decide_eq_true_2 by exact Hd_rd'.
         rewrite bool_decide_eq_true_2 by exact Hd_rd.
         unfold fs_dir_tickets_at. cbv zeta.
-        rewrite (Hdec d ltac:(lia)).
+        rewrite (Hdec d ltac:(irng)).
         rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
         rewrite decide_True by reflexivity.
         rewrite Htyd'. fold dn.
@@ -1515,8 +1546,10 @@ Section EffUnlinkEntry.
         rewrite fs_tick_count_nil.
         rewrite (Hsegi z). lia.
       - intros x Hx Hxd Hxi. cbv beta.
-        assert (Hxdz : Z.of_nat x <> d) by (intros Hc; apply Hxd; lia).
-        assert (Hxiz : Z.of_nat x <> i) by (intros Hc; apply Hxi; lia).
+        assert (Hxdz : Z.of_nat x <> d)
+          by (intros Hc; apply Hxd; clear -Hc; lia).
+        assert (Hxiz : Z.of_nat x <> i)
+          by (intros Hc; apply Hxi; clear -Hc; lia).
         rewrite (bool_decide_ext (Z.of_nat x ∈ rd') (Z.of_nat x ∈ rd)
                    (Hrd'mem (Z.of_nat x) Hxiz)).
         destruct (bool_decide (Z.of_nat x ∈ rd)) eqn:Hg; [| reflexivity].
@@ -1524,9 +1557,9 @@ Section EffUnlinkEntry.
         destruct (proj1 (Hrd _) Hg) as (Hxr & Hxty & _).
         assert (Hxl : bv_unsigned (di_type (fs_dinode P sb (Z.of_nat x)))
                       <> 0)
-          by (rewrite Hxty; unfold T_DIR_z; lia).
+          by (rewrite Hxty; unfold T_DIR_z; discriminate).
         apply tickets_at_untouched; [exact Hxr | |].
-        + rewrite (Hdec (Z.of_nat x) ltac:(lia)).
+        + rewrite (Hdec (Z.of_nat x) (iblk_ix_range sb x Hx)).
           rewrite decide_False by exact Hxiz.
           rewrite decide_False by exact Hxdz. reflexivity.
         + intros _ k0 Hk0.
@@ -1581,7 +1614,7 @@ Section EffUnlinkEntry.
     constructor.
     - exact Hsb.
     - apply fs_inodes_dwf_intro. intros z Hz Hnz'.
-      rewrite (Hdec z ltac:(lia)) in Hnz' |- *.
+      rewrite (Hdec z ltac:(irng)) in Hnz' |- *.
       destruct (decide (z = i)) as [-> | Hzi]; [exact Hdwfi |].
       destruct (decide (z = d)) as [-> | Hzd]; [exact Hdwfd |].
       destruct (Hunt z Hz Hzd Hzi Hnz') as (_ & _ & _ & Hdwf).
@@ -1591,7 +1624,8 @@ Section EffUnlinkEntry.
         { unfold fs_used_blocks. f_equal. apply list_fmap_ext.
           intros idx x Hx. apply lookup_seq in Hx as [-> Hidx].
           cbv beta zeta.
-          rewrite (Hdec (Z.of_nat (0 + idx)) ltac:(lia)).
+          rewrite (Hdec (Z.of_nat (0 + idx))
+                     (iblk_ix_range sb (0 + idx) Hidx)).
           destruct (decide (Z.of_nat (0 + idx) = i)) as [Heq | Hzi].
           { rewrite Heq. fold dni. rewrite Htyi'.
             destruct (bv_unsigned (di_type dni) =? 0); [reflexivity |].
@@ -1602,7 +1636,8 @@ Section EffUnlinkEntry.
             exact Hblkd. }
           destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat (0 + idx))))
                     =? 0) eqn:Ez; [reflexivity |].
-          destruct (Hunt (Z.of_nat (0 + idx)) ltac:(lia) Hzd Hzi
+          destruct (Hunt (Z.of_nat (0 + idx))
+                      (inum_ix_range sb (0 + idx) Hidx) Hzd Hzi
                       (proj1 (Z.eqb_neq _ _) Ez)) as (_ & _ & Hbl & _).
           exact Hbl. }
         unfold fs_used_set. rewrite Hused. exact Hu.
@@ -1613,7 +1648,7 @@ Section EffUnlinkEntry.
       + apply root_wf_intro.
         * rewrite (Htyp ROOTINO Hd). exact Hdty.
         * unfold fs_file_data.
-          rewrite (Hdec ROOTINO ltac:(lia)).
+          rewrite (Hdec ROOTINO (iblk_root_range sb Hnin1)).
           rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
           rewrite decide_True by reflexivity.
           rewrite Hszd'e. fold szd nrec. rewrite Hview.
@@ -1625,7 +1660,7 @@ Section EffUnlinkEntry.
       + assert (Hrl : bv_unsigned (di_type (fs_dinode P sb ROOTINO)) <> 0).
         { rewrite (fs_root_wf_type P sb HW7). unfold T_DIR_z. lia. }
         apply root_wf_untouched.
-        * rewrite (Hdec ROOTINO ltac:(pose proof Hnin1; unfold ROOTINO; lia)).
+        * rewrite (Hdec ROOTINO (iblk_root_range sb Hnin1)).
           rewrite decide_False by (intros Hc; exact (Hiroot (eq_sym Hc))).
           rewrite decide_False by (intros Hc; exact (Hdroot (eq_sym Hc))).
           reflexivity.
@@ -1638,7 +1673,7 @@ Section EffUnlinkEntry.
           exact (Hdata k0).
     - (* the dots *)
       apply fs_dots_all_intro. intros z Hz Hdty'.
-      rewrite (Hdec z ltac:(lia)) in Hdty' |- *.
+      rewrite (Hdec z ltac:(irng)) in Hdty' |- *.
       destruct (decide (z = i)) as [-> | Hzi].
       + apply (fs_dots_wf_win P P' i dni dni').
         * rewrite Hszi'. lia.
@@ -1656,7 +1691,7 @@ Section EffUnlinkEntry.
           -- intros j Hj. exact (Hwagree 1%nat ltac:(lia) j Hj).
           -- exact (dots_bool_at d Hd Hdty).
         * assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-            by (rewrite Hdty'; unfold T_DIR_z; lia).
+            by (rewrite Hdty'; unfold T_DIR_z; discriminate).
           destruct (Hunt z Hz Hzd Hzi Hzl) as (_ & Hdata & _ & _).
           apply (fs_dots_wf_win P P' z (fs_dinode P sb z)
                    (fs_dinode P sb z)).
@@ -1671,13 +1706,13 @@ Section EffUnlinkEntry.
     - exists nib. split; [exact Hnibz |].
       apply fs_region_wf_intro.
       + intros z Hz Hzn.
-        rewrite (Hdec z ltac:(lia)).
+        rewrite (Hdec z ltac:(irng)).
         rewrite decide_False by lia.
         rewrite decide_False by lia.
         apply (fs_region_free_spec P sb nib z
                  (fs_region_wf_free P sb nib Hreg)); lia.
       + intros z Hz Hfree.
-        rewrite (Hdec z ltac:(lia)) in Hfree |- *.
+        rewrite (Hdec z ltac:(irng)) in Hfree |- *.
         destruct (decide (z = i)) as [-> | Hzi].
         { exfalso. rewrite Htyi' in Hfree. exact (Hilive Hfree). }
         destruct (decide (z = d)) as [-> | Hzd].
@@ -1685,7 +1720,7 @@ Section EffUnlinkEntry.
         apply (fs_region_nlink_free P sb nib z
                  (fs_region_wf_nlink P sb nib Hreg)); [lia | exact Hfree].
       + intros z Hz.
-        rewrite (Hdec z ltac:(lia)).
+        rewrite (Hdec z ltac:(irng)).
         destruct (decide (z = i)) as [-> | Hzi].
         { rewrite Hnli'u. lia. }
         destruct (decide (z = d)) as [-> | Hzd].
@@ -1718,7 +1753,7 @@ Section EffUnlinkEntry.
         destruct (proj1 (Hrd z) Hzrd) as (Hzr & Hzty & _).
         destruct (decide (z = d)) as [-> | Hzd].
         * assert (Hdecd : fs_dinode P' sb d = dnd').
-          { rewrite (Hdec d ltac:(lia)).
+          { rewrite (Hdec d ltac:(irng)).
             rewrite decide_False by (intros Hc; exact (Hdi_ne Hc)).
             rewrite decide_True by reflexivity. reflexivity. }
           rewrite Hdecd.
@@ -1749,17 +1784,17 @@ Section EffUnlinkEntry.
                by (intros Hc; exact (Hbnk_dd' Hc)).
              exact Hdd.
         * assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-            by (rewrite Hzty; unfold T_DIR_z; lia).
+            by (rewrite Hzty; unfold T_DIR_z; discriminate).
           destruct (Hunt z Hzr Hzd Hzi Hzl) as (_ & Hdata & _ & _).
           apply dir_ok_untouched; [exact Hzrd | | |].
-          -- rewrite (Hdec z ltac:(lia)).
+          -- rewrite (Hdec z ltac:(irng)).
              rewrite decide_False by exact Hzi.
              rewrite decide_False by exact Hzd. reflexivity.
           -- intros k0 Hk0. exact (Hdata k0).
           -- intros w0 Hw0 Hwl Hw0'. exfalso. apply Hwl.
              rewrite <- (Htyp w0 Hw0). exact Hw0'.
       + intros z Hz. cbv zeta.
-        rewrite (Hdec z ltac:(lia)).
+        rewrite (Hdec z ltac:(irng)).
         destruct (decide (z = i)) as [-> | Hzi].
         * intros Hnz.
           rewrite Hnli'u.
@@ -1786,7 +1821,7 @@ Section EffUnlinkEntry.
                by (rewrite Htyd'; exact Hdty).
              rewrite (bool_decide_eq_true_2
                         (bv_unsigned (di_type dn) = T_DIR_z) Hdty) in Hold.
-             destruct (bool_decide (d = ROOTINO)); lia.
+             destruct (bool_decide (d = ROOTINO)); (clear -Hc Hold; lia).
           -- intros Hnz.
              pose proof (Hcount z) as Hc. unfold otick in Hc.
              rewrite (bool_decide_eq_false_2 (i = z)
@@ -1797,9 +1832,9 @@ Section EffUnlinkEntry.
              destruct (bool_decide
                          (bv_unsigned (di_type (fs_dinode P sb z))
                           = T_DIR_z));
-               destruct (bool_decide (z = ROOTINO)); lia.
+               destruct (bool_decide (z = ROOTINO)); (clear -Hc Hold; lia).
       + intros z Hz Hty' Hnin.
-        rewrite (Hdec z ltac:(lia)) in Hty' |- *.
+        rewrite (Hdec z ltac:(irng)) in Hty' |- *.
         destruct (decide (z = i)) as [-> | Hzi].
         { (* the new orphan is dots-only, and its data is untouched *)
           intros k0 Hk02 Hk0n Hlive'.
@@ -1820,7 +1855,7 @@ Section EffUnlinkEntry.
         assert (Hznrd : z ∉ rd).
         { intros Hc. apply Hnin. apply (Hrd'mem z Hzi). exact Hc. }
         assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-          by (rewrite Hty'; unfold T_DIR_z; lia).
+          by (rewrite Hty'; unfold T_DIR_z; discriminate).
         destruct (Hunt z Hz Hzd Hzi Hzl) as (_ & Hdata & _ & _).
         apply (dots_only_untouched P' (fs_dinode P sb z)).
         * exact (fdi_size _ _ _ (dok_at z Hz Hzl)).

@@ -196,6 +196,54 @@ Proof.
     apply fs_dinode_wf.
 Qed.
 
+(* THE INDEX-RANGE SIDE CONDITIONS, PROVED ONCE IN AN EMPTY CONTEXT.
+
+   Every effect proof case-splits [fs_dinode] with a local [Hdec] whose
+   premise is the inode region's width [16 * (sb_ninodes sb / 16 + 1)]
+   ([Section IblkGeom]'s [N]), sweeps the inode region with a [Z.to_nat]
+   index, and drives the ticket joins at [Z.to_nat] inums.  The resulting
+   side conditions are the six statements below, and every one of them was
+   originally spliced in as an inline [ltac:(lia)].
+
+   THAT IS WHAT THE BAND'S COMPILE TIME WAS.  A general-purpose closer is
+   priced by its CALL SITE, and these sites sit ~180 hypotheses deep with
+   ~45 of them arithmetic; the division in the region width then makes
+   [lia] eliminate [Z.div] over all of them.  The identical goal measured
+   19.7 s and 12.6 s per site in [FsEffCreateEntry] against 1.5 s for the
+   same rewrite where the context is smaller -- and, because a [lia]
+   certificate reifies the hypotheses it was handed, it was also the whole
+   of that file's 53 s of [Qed].  Proved here, in an empty context, each is
+   free and the callers pass it by name. *)
+Lemma inum_ix_range (sb : fs_sb) (x : nat) :
+  (x < Z.to_nat (sb_ninodes sb))%nat -> 0 <= Z.of_nat x < sb_ninodes sb.
+Proof. intros Hx. lia. Qed.
+
+Lemma inum_to_nat_lt (sb : fs_sb) (z : Z) :
+  0 <= z < sb_ninodes sb -> (Z.to_nat z < Z.to_nat (sb_ninodes sb))%nat.
+Proof. intros Hz. lia. Qed.
+
+Lemma inum_to_nat_ne (z z' : Z) :
+  0 <= z -> 0 <= z' -> z <> z' -> Z.to_nat z <> Z.to_nat z'.
+Proof. intros Hz Hz' Hne Hc. apply Hne. lia. Qed.
+
+Lemma iblk_z_range (sb : fs_sb) (z : Z) :
+  0 <= z < sb_ninodes sb -> 0 <= z < 16 * (sb_ninodes sb / 16 + 1).
+Proof.
+  intros Hz.
+  pose proof (Z.div_mod (sb_ninodes sb) 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound (sb_ninodes sb) 16 ltac:(lia)) as Hmb.
+  lia.
+Qed.
+
+Lemma iblk_ix_range (sb : fs_sb) (x : nat) :
+  (x < Z.to_nat (sb_ninodes sb))%nat ->
+  0 <= Z.of_nat x < 16 * (sb_ninodes sb / 16 + 1).
+Proof. intros Hx. apply iblk_z_range, inum_ix_range. exact Hx. Qed.
+
+Lemma iblk_root_range (sb : fs_sb) :
+  1 < sb_ninodes sb -> 0 <= ROOTINO < 16 * (sb_ninodes sb / 16 + 1).
+Proof. intros H1. apply iblk_z_range. unfold ROOTINO. lia. Qed.
+
 (* the region-wide arithmetic the decode lemmas below run on *)
 Section IblkGeom.
   Context (sb : fs_sb) (Hok : fs_sb_ok sb).
@@ -1594,7 +1642,7 @@ Section EffectsWf.
     intros Hz Hdin Hdata Htys.
     destruct (proj1 (Hrd z) Hz) as (Hzr & Hzty & _).
     assert (Hlive : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-      by (rewrite Hzty; unfold T_DIR_z; lia).
+      by (rewrite Hzty; unfold T_DIR_z; discriminate).
     pose proof (dok_at z Hzr Hlive) as Hdz.
     pose proof (fdi_size _ _ _ Hdz) as Hszb.
     pose proof (proj1 (bv_unsigned_in_range _
@@ -1658,7 +1706,7 @@ Section EffectsWf.
     intros Hdin Hdata.
     pose proof (fs_root_wf_type P sb HW7) as Hty.
     assert (Hlive : bv_unsigned (di_type (fs_dinode P sb ROOTINO)) <> 0)
-      by (rewrite Hty; unfold T_DIR_z; lia).
+      by (rewrite Hty; unfold T_DIR_z; discriminate).
     pose proof Hnin1 as Hn1.
     pose proof (dok_at ROOTINO ltac:(unfold ROOTINO; lia) Hlive) as Hdr.
     pose proof (fdi_size _ _ _ Hdr) as Hszb.
@@ -2106,7 +2154,7 @@ Section EffectsWf.
     intros Hj Hty f.
     rewrite (tree_ent_of_disk Q sb j f Hj).
     rewrite (node_at_live Q sb j)
-      by (rewrite Hty; unfold T_DIR_z; lia).
+      by (rewrite Hty; unfold T_DIR_z; discriminate).
     unfold node_of. rewrite decide_True by exact Hty.
     reflexivity.
   Qed.

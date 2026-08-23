@@ -17,6 +17,19 @@ so the last line in the log is the stalling sentence. If the slow line is a
   min of two interleaved runs — never by diffing per-file times between two
   parallel builds. Run-to-run variance on a 30 s file is ±10 s in **both**
   directions, so untouched files routinely "improve" by 10 s.
+- **`iris/.lia.cache` MAKES A WARM MEASUREMENT LIE, BY UP TO 9×.** micromega
+  persists every `lia` certificate in a per-DIRECTORY `.lia.cache` (with
+  `.nia.cache` beside it), both gitignored and both excluded from the VM push,
+  so they survive everything. `FsEffCreateEntry.v` measured **23 s warm and
+  216 s with the cache deleted**, and the cache itself had reached 780 MB.
+  Two consequences for any A/B. (1) The FIRST compile after an edit re-derives
+  every certificate the edit moved, so a change that improves a file reads as
+  a 3× REGRESSION on the run that introduces it — the same source measured
+  17.3 s, then 43.0 s, then 15.9 s over three consecutive `coqc`s — the
+  middle one being the first compile after the edit. Always take the second
+  reading. (2) Compare cold against cold when the number you want is
+  what CI or a fresh worktree pays: `rm -f .lia.cache` before each arm. The
+  gap is not noise, it is the whole certificate search.
 - **`-async-proofs off`** when the question involves `Qed`: `coqc` offloads
   kernel-checking to a `rocqworker` that `-time` does not count, so `-time`'s
   sum can be tiny while the wall is minutes.
@@ -374,6 +387,79 @@ worth 20× on individual files.
   The name-free branch must use `match` (not `lazymatch`) over the hypotheses so
   it picks the right one of the six-to-nine disequalities a transport carries —
   an Ltac body cannot mention a hypothesis its own `injection` introduced.
+
+### `lia` IS A GENERAL-PURPOSE CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT
+
+The whole cost of the stage-F2 effect band (`iris/FsEff*.v`: eight PURE files,
+no Iris, no `set_solver`, no `vm_compute`) was one tactic. `coqc -profile-ltac`
+put **86.8 % of `FsEffCreateEntry.v` in `lia`** — `xlia` 70.3 % LOCAL,
+`Zify.zify` 12.5 % — across 381 calls whose goals are three atoms wide. What
+they cost is their CALL SITE: a monolithic whole-transaction proof carries
+~180 hypotheses, ~45 of them arithmetic, two of those mentioning `Z.div`, and
+every call reifies the lot and re-eliminates the divisions. Cold, that file
+was **593.9 s**; it is 65.0 s now, and the band went **946 s → 133 s**.
+
+Three fixes, in the order they paid:
+
+1. **A side condition that is the SAME at every call site belongs in a lemma
+   proved where the context is EMPTY.** Each effect proof case-splits
+   `fs_dinode` through a local `Hdec` whose premise is the inode region's
+   width, `0 <= z < 16 * (sb_ninodes sb / 16 + 1)`, and all 124 sites spelled
+   it `ltac:(lia)`. At the ticket sweeps that identical goal measured **19.7 s
+   and 12.6 s per site**; `FsEffBase.v`'s six `iblk_*_range` / `inum_*`
+   lemmas make it free. That is "Inline `ltac:` in argument position" again —
+   but note WHY it is worth hunting rather than tolerating: **a `lia`
+   certificate reifies the hypotheses it was handed, so the PROOF TERM
+   carries them too.** Those two sentences were also the whole of that file's
+   53 s of `Qed`, which fell to 5 s with them and needed no separate work.
+2. **`clear -H..` before a `lia` at a deep site — and use `match goal` to NAME
+   the hypothesis, so one `Local Ltac` covers a whole family.** `destruct
+   (bool_decide …); destruct (bool_decide …); lia`, closing the four arms of
+   the links sweep from two equations already in hand, was 4.6 s; `(clear -Hc
+   Hold; lia)` is free. Where the wanted hypothesis is named differently at
+   every site, match it by SHAPE and pass the answer as a term:
+
+   ```coq
+   Local Ltac blk_ne d3 i3 :=
+     match goal with
+     | H : _ <= ?b < _ |- ?b <> _ => clear - H d3 i3; lia
+     end.
+   Local Ltac irng :=
+     match goal with
+     | H : 0 <= ?z < sb_ninodes sb |- 0 <= ?z < _ =>
+         exact (iblk_z_range sb z H)
+     | _ => lia
+     end.
+   ```
+
+   Two mechanics. **The fixed facts must be PARAMETERS of the tactic, never
+   names written inside its body**: `clear`'s arguments are globalised when
+   the `Ltac` is defined, so a body saying `clear - H Hibd3` fails at the
+   *definition* with *"Hypothesis Hibd3 was not found in the current
+   environment"* — which reads like a broken proof and is a scoping error.
+   And keep a `| _ => lia` last arm: the fallback makes the rewrite a
+   drop-in, so the conversion is one `sed` over the call sites (48 `Hdec`
+   sites in seven files, one pass, zero fixups).
+3. **Close a CONCRETE goal with `discriminate`, not `lia`.** 46 sites of
+   `rewrite Hty; unfold T_DIR_z; lia` prove `1 <> 0` and still paid the
+   context scan. Worth ~2 % of the band — the smallest of the three, listed
+   because it is the cheapest to spot.
+
+| file | cold before | cold after |
+|---|---|---|
+| `FsEffCreateEntry` | **593.9 s** | 65.0 s |
+| `FsEffLinkEntry` | 275.5 s | 30.5 s |
+| `FsEffUnlinkEntry` | 45.3 s | 9.3 s |
+| `FsEffAllocBlock` | 23.6 s | 20.6 s |
+| the other four | 7.9 s | 7.4 s |
+
+**Negative results from the same afternoon — do not redo them.** The suspects
+that looked structural were all null: the common-ground `Section` closing
+under `Set Default Proof Using "All"`, the seven per-file blocks of ~45
+`Local Notation`s re-applying its seventeen context arguments, the `set … in
+*` chains, and the ticket `mjoin` over `seq 0 (Z.to_nat (sb_ninodes sb))`.
+`FsEffBase.v`, which carries the entire common-ground section, is **3.4 s**,
+and it did not move.
 
 ## Framing: name the context side, construct the goal side
 
