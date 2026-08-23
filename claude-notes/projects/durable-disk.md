@@ -891,6 +891,21 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       orphan's ".." ticket has no `nlink` paying for it). Orphan dirs
       (live, unreachable, empty-but-dots) are excluded from the normal
       pool stocking and routed to the `ireclaim` path's resources.
+- [ ] **H2a. The era's mirror is BORN TRUE** (pinned 2026-08-23; this
+      is the boot-wall killer). PowerOn allocates the per-era mirror
+      `ghost_var` anyway (`RiscvAdequacy` mints it at a dummy value);
+      allocate it at `mirror_of (fs_blocks (v_disk g'))` instead — the
+      PowerOn arm has `g'` concretely — and hand
+      `log_mirror_half (mirror_of (fs_blocks (v_disk g')))` (a NAMED
+      value) through `power_boot_res`. The boot code then owns a
+      correct picture from the first instruction: the boot `log_state`
+      pack's row (b) becomes pure computation (discharging G1-impl's
+      `log_mirror_tie_pending` boot gate), the custody swap installs
+      the other half with `log_mirror_ok` already true, and initlog's
+      final head-write chains `lm_upd` through a value-chained
+      `fs_boot_head_permit_v` exactly like the steady permits. Cost:
+      the era-alloc site, a `power_boot_res` row, and the boot
+      threading — no new ghost.
 - [ ] **H2.** Blocks where physical ≠ `D` (the committed log's homes)
       are minted dirty-at-boot: logged = slot content, bio holds them
       out of the clean pool; `initlog`/`install_trans` recovering arms
