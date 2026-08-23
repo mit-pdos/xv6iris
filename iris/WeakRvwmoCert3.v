@@ -32,6 +32,12 @@
         [gatomicity] and the log dictionary, so the pair needs no floor
         argument at all ([floor_ok_of_latest]).
 
+    (4) [cert_segment''] (§5b) — obligation (O-2), INTEGRATED.  The
+        iteration's invariant is no longer "the two runs are at the same
+        node" but [csync]: the same node, OR — after a witness — both runs
+        inside the SAME instruction's silent tail, re-converging at its
+        boundary.  See §5b's own header.
+
     (3) [boundary_reconverge] (§5) — obligation (O-2).  After a witness the
         two runs are at different monad nodes; they re-converge at the next
         instruction BOUNDARY, which is [Interface.Ret tt] — a CONSTANT of
@@ -1333,6 +1339,845 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** * 5b. RE-CONVERGENCE, INTEGRATED: [cert_segment'']
+
+    §5 proves that two runs that have parted company at a witness are back
+    at the SAME node once both reach the instruction BOUNDARY.  This section
+    puts that into the segment iteration, so that a genuinely substituted
+    read no longer has to land at the emission's OWN successor node —
+    which is what [WeakRvwmoWalk.wwit_vindep] demanded, and what no real
+    load can do, since a load writes its destination register.  (What
+    [wwit_vindep] costs at the WALK is a separate matter and is NOT settled
+    here: see §5b.4 and §7 (N-D).)
+
+    THE INVARIANT MOVES from "the two runs are at the same node" to [csync]:
+    EITHER the same node ([clockstep], with the register files agreeing off
+    the taint set [T]), OR — after a witness — both runs sit inside the SAME
+    INSTRUCTION's silent tail ([tail_silent]) and re-converge at its
+    boundary.
+
+    THE THREE INGREDIENTS.
+
+    (1) [tail_silent T m] — a STRUCTURAL property of the monad node: every
+        node from here to the instruction's end is one of the always-
+        steppable administrative outcomes, and every register written is a
+        dependency carrier the taint set already holds.  It is checkable AT
+        A NODE, which the old [wwit_vindep] was not, and it is inhabited at
+        a load whose value is USED ([WeakRvwmoCycWit2]).  Its write clause
+        is the crude one — see §7 (N-T) for the real nine-node tail of
+        [lw a5,0(a4)] and the paired law it needs.
+
+    (2) [tail_silent_run] — TERMINATION IS A THEOREM, NOT A HYPOTHESIS.
+        [Interface.iMon] is an INDUCTIVE type, so a node is a well-founded
+        tree and "the hart reaches [Interface.Ret tt]" is an induction on
+        [tail_silent], not an appeal to progress.  Nothing here uses
+        [WeakRvwmoProgress.cert_progress] or any [reaches_boundary]
+        assumption.
+
+    (3) [witness_instr_tail_silent] — BETWEEN A WITNESS AND THE NEXT
+        BOUNDARY THERE IS NO MEMORY LABEL.  The emission's own
+        administrative stretch out of the witness's successor cannot END at
+        a node realizing a row label (a [tail_silent] node emits only
+        administrative labels), so it necessarily FACTORS through
+        [Interface.Ret tt]: [ls = ls1 ++ LInstr :: ls2].  The certified run
+        reaches the same boundary by (2), takes the SAME tick, and the two
+        are in lockstep again off [T].
+
+    (4) [Nd] and [ndreach] (§5b.4) — the REACHABILITY parameter, handed to
+        the policy at every block.  Without it a site datum about the node
+        cannot be discharged from the label the policy is given, which is
+        the whole reason [wwit_vindep] had to be a premise.
+
+    WHAT THE INTEGRATION COSTS, named: [Hrds]/[Hrdsp], "no block of this
+    segment reads a carrier the taint set holds" — the dependency-freedom
+    of a witness, at [T = []] trivially true; and the device-quiet clause
+    [LDev ∉ es.*1], which [WeakRvwmoSupply.em_devfree] already supplies (it
+    is what keeps the PLIC arm of [WeakEvProv.pstep_hw], whose write
+    [sig_seip] is not a carrier, out of a divergent tail).
+    Nothing below is [Admitted] or [Axiom]-ed. *)
+
+Definition oc_silent {A : Type}
+    (oc : Interface.outcome (λ _ : Type, exception) A) : Prop :=
+  match oc with
+  | Interface.RegRead _ _ | Interface.RegWrite _ _ _
+  | Interface.BranchAnnounce _ _ | Interface.CacheOp _ | Interface.TlbOp _
+  | Interface.TakeException _ | Interface.ReturnException _
+  | Interface.TranslationStart _ | Interface.TranslationEnd _
+  | Interface.CycleCount | Interface.Message _ | Interface.GetCycleCount
+      => True
+  | _ => False
+  end.
+
+Inductive tail_silent (T : list wreg) : M unit → Prop :=
+| ts_ret (y : unit) : tail_silent T (Interface.Ret y)
+| ts_next (A : Type) (oc : Interface.outcome (λ _ : Type, exception) A)
+    (k : A → M unit) :
+    oc_silent oc →
+    (∀ r, r ∈ pnode_wrs (Interface.Next oc k) →
+       ∃ n, ereg_num r = Some n ∧ n ∈ T) →
+    (∀ v : A, tail_silent T (k v)) →
+    tail_silent T (Interface.Next oc k).
+
+Lemma oc_silent_step (A : Type) (oc : Interface.outcome (λ _ : Type, exception) A)
+    (k : A → M unit) rs ib d l m' ors fn' d' oib :
+  oc_silent oc →
+  pnode_step (Interface.Next oc k) rs ib d l m' ors fn' d' oib →
+  lb_admin true l ∧ l ≠ LInstr ∧ ibn_ann (Interface.Next oc k) = false ∧
+  fn' = None ∧ d' = d ∧ ∃ v : A, m' = k v.
+Proof.
+  destruct oc; simpl; intros Hs Hst; try (by destruct Hs);
+    try (destruct Hst as (-> & -> & -> & -> & -> & _);
+         split_and!; [exact I|done|reflexivity|reflexivity|reflexivity
+                     |by eexists]).
+  - (* RegWrite *)
+    destruct Hst as (-> & -> & -> & -> & -> & _).
+    split_and!; [| |reflexivity|reflexivity|reflexivity|by eexists];
+      by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg).
+Qed.
+
+Lemma oc_silent_step_exists (A : Type)
+    (oc : Interface.outcome (λ _ : Type, exception) A)
+    (k : A → M unit) rs ib d :
+  oc_silent oc →
+  ∃ l m' ors oib,
+    pnode_step (Interface.Next oc k) rs ib d l m' ors None d oib.
+Proof.
+  destruct oc; simpl; intros Hs; try (by destruct Hs);
+    by eexists _, _, _, _; split_and!.
+Qed.
+
+Theorem tail_silent_run (T : list wreg) (cpu : CPU) (d0 : dev_state)
+    (m : M unit) :
+  tail_silent T m →
+  ∀ (rs : regstate) (ib : oib32),
+  ∃ (ls : list wlabel) (rds : list wreg) (wrs : list register) (ann : bool)
+    (rs' : regstate) (ib' : oib32),
+    (∀ l0, l0 ∈ ls → lb_admin true l0) ∧ LInstr ∉ ls ∧
+    phrun cpu ls rds wrs ann m rs None ib d0
+      (Interface.Ret tt) rs' None ib' d0 ∧
+    (∀ r, r ∈ wrs → ∃ n, ereg_num r = Some n ∧ n ∈ T).
+Proof.
+  induction 1 as [y|A oc k Hs Hw IHts IH]; intros rs ib.
+  - destruct y. exists [], [], [], false, rs, ib.
+    split_and!; [by intros l0 Hl0; apply elem_of_nil in Hl0
+                |by apply not_elem_of_nil
+                |apply phrun_nil
+                |by intros r Hr; apply elem_of_nil in Hr].
+  - destruct (oc_silent_step_exists A oc k rs ib d0 Hs)
+      as (l & m' & ors & oib & Hst).
+    destruct (oc_silent_step A oc k rs ib d0 l m' ors None d0 oib Hs Hst)
+      as (Had & Hne & Hann & _ & _ & (v & ->)).
+    destruct (IH v (default rs ors) (default ib oib))
+      as (ls & rds & wrs & ann & rs' & ib' & Hadm & Hni & Hrun & Hws).
+    exists (l :: ls), (pnode_rds (Interface.Next oc k) ++ rds),
+      (pnode_wrs (Interface.Next oc k) ++ wrs), (ibn_ann (Interface.Next oc k) || ann),
+      rs', ib'.
+    split_and!.
+    + intros l0 Hl0. apply elem_of_cons in Hl0 as [->|Hl0]; [exact Had|by apply Hadm].
+    + intros Hin. apply elem_of_cons in Hin as [Hin|Hin]; [by apply Hne|done].
+    + eapply phrun_more; [|exact Hrun]. left. by split_and!.
+    + intros r Hr. apply elem_of_app in Hr as [Hr|Hr]; [by apply Hw|by apply Hws].
+Qed.
+
+Lemma adm_step_node (cpu : CPU) (m : M unit) (rs : regstate) (ib : oib32)
+    (d : dev_state) (l : wlabel) (p1 : pexv6) (d1 : dev_state) :
+  l ≠ LDev →
+  pstep_ev (PHart cpu m rs None ib) d l p1 d1 →
+  ∃ (m' : M unit) (ors : option regstate) (fn' : ofence) (oib : option oib32),
+    p1 = PHart cpu m' (default rs ors) fn' (default ib oib) ∧
+    pnode_step m rs ib d l m' ors fn' d1 oib.
+Proof.
+  intros Hne Hst.
+  destruct p1 as [cpu1 m1 rs1 fn1 ib1|dp1]; [|by destruct Hst].
+  destruct Hst as (-> & ors & oib & -> & -> & [Hn|Hp]).
+  - exists m1, ors, fn1, oib. by split.
+  - exfalso. by destruct Hp as (-> & _).
+Qed.
+
+Lemma tail_silent_adm (T : list wreg) (cpu : CPU)
+    (ls : list wlabel) (p pa : pexv6) (d da : dev_state) :
+  adm_run true p d ls pa da →
+  ∀ (m : M unit) (rs : regstate) (ib : oib32),
+    p = PHart cpu m rs None ib → tail_silent T m → LDev ∉ ls →
+    (∃ (ma : M unit) (rsa : regstate) (iba : oib32)
+       (rds : list wreg) (wrs : list register) (ann : bool),
+       pa = PHart cpu ma rsa None iba ∧ da = d ∧ tail_silent T ma ∧
+       phrun cpu ls rds wrs ann m rs None ib d ma rsa None iba d ∧
+       (∀ r, r ∈ wrs → ∃ n, ereg_num r = Some n ∧ n ∈ T))
+    ∨ (∃ (ls1 ls2 : list wlabel) (rds1 : list wreg) (wrs1 : list register)
+         (ann1 : bool) (rsb : regstate) (ibb : oib32) (tick : bool),
+         ls = ls1 ++ LInstr :: ls2 ∧
+         phrun cpu ls1 rds1 wrs1 ann1 m rs None ib d
+           (Interface.Ret tt) rsb None ibb d ∧
+         (∀ r, r ∈ wrs1 → ∃ n, ereg_num r = Some n ∧ n ∈ T) ∧
+         adm_run true (PHart cpu (riscv_step tick) rsb None ib_none) d ls2 pa da).
+Proof.
+  induction 1 as [p d|p d l p1 d1 ls pa da Ha Hs Hrun IH];
+    intros m rs ib -> Hts Hni.
+  - left. exists m, rs, ib, [], [], false.
+    split_and!; [reflexivity|reflexivity|exact Hts|apply phrun_nil
+                |by intros r Hr; apply elem_of_nil in Hr].
+  - have Hld : l ≠ LDev.
+    { intros ->. apply Hni, elem_of_list_here. }
+    have Hni' : LDev ∉ ls.
+    { intros Hin. apply Hni, elem_of_list_further, Hin. }
+    destruct (adm_step_node cpu m rs ib d l p1 d1 Hld Hs)
+      as (m' & ors & fn' & oib & -> & Hnst).
+    destruct Hts as [y|A oc k Hsil Hw Hts].
+    + (* THE BOUNDARY *)
+      destruct y.
+      destruct Hnst as (tick & -> & -> & -> & -> & -> & ->).
+      right. exists [], ls, [], [], false, rs, ib, tick.
+      split_and!; [reflexivity|apply phrun_nil
+                  |by intros r Hr; apply elem_of_nil in Hr|exact Hrun].
+    + (* INSIDE THE INSTRUCTION *)
+      destruct (oc_silent_step A oc k rs ib d l m' ors fn' d1 oib Hsil Hnst)
+        as (Had & Hne & Hann & -> & -> & (v & ->)).
+      destruct (IH (k v) (default rs ors) (default ib oib) eq_refl (Hts v) Hni')
+        as [(ma & rsa & iba & rds & wrs & ann & -> & -> & Htsa & Hrun2 & Hws)
+           |(ls1 & ls2 & rds1 & wrs1 & ann1 & rsb & ibb & tick & -> & Hrun2
+             & Hws & Hadm2)].
+      * left. exists ma, rsa, iba, (pnode_rds (Interface.Next oc k) ++ rds),
+          (pnode_wrs (Interface.Next oc k) ++ wrs),
+          (ibn_ann (Interface.Next oc k) || ann).
+        split_and!; [reflexivity|reflexivity|exact Htsa| |].
+        { eapply phrun_more; [|exact Hrun2]. left. by split_and!. }
+        intros r Hr. apply elem_of_app in Hr as [Hr|Hr];
+          [by apply Hw|by apply Hws].
+      * right. exists (l :: ls1), ls2,
+          (pnode_rds (Interface.Next oc k) ++ rds1),
+          (pnode_wrs (Interface.Next oc k) ++ wrs1),
+          (ibn_ann (Interface.Next oc k) || ann1), rsb, ibb, tick.
+        split_and!; [reflexivity| | |exact Hadm2].
+        { eapply phrun_more; [|exact Hrun2]. left. by split_and!. }
+        intros r Hr. apply elem_of_app in Hr as [Hr|Hr];
+          [by apply Hw|by apply Hws].
+Qed.
+
+Lemma tail_silent_no_label (T : list wreg) (cpu : CPU) (ma : M unit)
+    (rsa : regstate) (iba : oib32) (da : dev_state)
+    (l : wlabel) (p' : pexv6) (d' : dev_state) :
+  tail_silent T ma →
+  ¬ lb_admin true l →
+  pstep_ev (PHart cpu ma rsa None iba) da l p' d' → False.
+Proof.
+  intros Hts Hna Hst.
+  have Hld : l ≠ LDev by intros ->; apply Hna; exact I.
+  destruct (adm_step_node cpu ma rsa iba da l p' d' Hld Hst)
+    as (m' & ors & fn' & oib & _ & Hnst).
+  destruct Hts as [y|A oc k Hsil Hw Hts].
+  - destruct y. destruct Hnst as (tick & -> & _). by apply Hna.
+  - destruct (oc_silent_step A oc k rsa iba da l m' ors fn' d' oib Hsil Hnst)
+      as (Had & _). by apply Hna.
+Qed.
+
+(** [witness_instr_tail_silent]: BETWEEN A WITNESS READ AND THE NEXT
+    INSTRUCTION BOUNDARY THERE IS NO MEMORY LABEL.  Stated where the
+    segment iteration needs it: the emission's own administrative stretch
+    out of the substituted read's successor node — the stretch that ends at
+    the node realizing the NEXT row label — necessarily factors through the
+    instruction's boundary [Interface.Ret tt].  The prefix is silent
+    ([LInstr] ∉ [ls1], and every label in it is administrative because the
+    whole stretch is), writes only carriers the taint set already holds,
+    and leaves the fabric alone; the suffix restarts at [riscv_step tick].
+    Nothing here is an assumption about progress: [tail_silent] is a
+    STRUCTURAL property of the monad node, and [M unit] is an INDUCTIVE
+    type, so termination at the boundary is a theorem
+    ([tail_silent_run]). *)
+Theorem witness_instr_tail_silent (T : list wreg) (cpu : CPU)
+    (m : M unit) (rs : regstate) (ib : oib32) (d da : dev_state)
+    (ls : list wlabel) (ma : M unit) (rsa : regstate) (fna : ofence)
+    (iba : oib32) (l : wlabel)
+    (p' : pexv6) (d' : dev_state) :
+  tail_silent T m →
+  LDev ∉ ls →
+  adm_run true (PHart cpu m rs None ib) d ls (PHart cpu ma rsa fna iba) da →
+  ¬ lb_admin true l →
+  pstep_ev (PHart cpu ma rsa fna iba) da l p' d' →
+  ∃ (ls1 ls2 : list wlabel) (rds1 : list wreg) (wrs1 : list register)
+    (ann1 : bool) (rsb : regstate) (ibb : oib32) (tick : bool),
+    ls = ls1 ++ LInstr :: ls2 ∧
+    phrun cpu ls1 rds1 wrs1 ann1 m rs None ib d
+      (Interface.Ret tt) rsb None ibb d ∧
+    (∀ r, r ∈ wrs1 → ∃ n, ereg_num r = Some n ∧ n ∈ T) ∧
+    adm_run true (PHart cpu (riscv_step tick) rsb None ib_none) d ls2
+      (PHart cpu ma rsa fna iba) da.
+Proof.
+  intros Hts Hni Hadm Hre Hst.
+  destruct (tail_silent_adm T cpu ls _ _ d da Hadm m rs ib eq_refl Hts Hni)
+    as [(ma2 & rsa2 & iba2 & rds & wrs & ann & Heq & -> & Htsa & _ & _)
+       |(ls1 & ls2 & rds1 & wrs1 & ann1 & rsb & ibb & tick & Hsp & Hrun
+         & Hws & Hadm2)].
+  - exfalso. injection Heq as H1 H2 H3 H4. subst.
+    by eapply tail_silent_no_label.
+  - by exists ls1, ls2, rds1, wrs1, ann1, rsb, ibb, tick.
+Qed.
+
+Lemma phrun_app (cpu : CPU) ls1 rds1 wrs1 ann1 ls2 rds2 wrs2 ann2
+    m rs fn ib d m1 rs1' fn1 ib1 d1 m2 rs2' fn2 ib2 d2 :
+  phrun cpu ls1 rds1 wrs1 ann1 m rs fn ib d m1 rs1' fn1 ib1 d1 →
+  phrun cpu ls2 rds2 wrs2 ann2 m1 rs1' fn1 ib1 d1 m2 rs2' fn2 ib2 d2 →
+  phrun cpu (ls1 ++ ls2) (rds1 ++ rds2) (wrs1 ++ wrs2) (ann1 || ann2)
+    m rs fn ib d m2 rs2' fn2 ib2 d2.
+Proof.
+  intros H1. revert ls2 rds2 wrs2 ann2 m2 rs2' fn2 ib2 d2.
+  induction H1 as [m rs fn ib d
+                  |l ls rdsa rdsb wsa wsb anna annb m rs fn ib d
+                   ma orsa fna oiba da mb rsb fnb ibb db Hstep Hrun IH];
+    intros ls2 rds2 wrs2 ann2 m2 rs2' fn2 ib2 d2 H2; [exact H2|].
+  rewrite -!app_assoc -orb_assoc.
+  eapply phrun_more; [exact Hstep|]. by apply IH.
+Qed.
+
+Lemma cblk_pre (cpu : CPU) (d0 : dev_state) (ws : wstate) (lb : lbl)
+    (l : wlabel) (rds : list wreg) (wrs : list register)
+    (ls0 : list wlabel) (rds0 : list wreg) (wrs0 : list register)
+    (ann0 : bool) (m0 : M unit) (rs0 : regstate) (fn0 : ofence)
+    (ib0 : oib32) (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32) :
+  (∀ l0, l0 ∈ ls0 → lb_admin true l0) →
+  phrun cpu ls0 rds0 wrs0 ann0 m0 rs0 fn0 ib0 d0 m rs fn ib d0 →
+  cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+  cblk cpu d0 ws lb l (rds0 ++ rds) (wrs0 ++ wrs) m0 rs0 fn0 ib0 m' rs' fn' ib'.
+Proof.
+  intros Hadm0 Hrun0 (ls & ma & rsa & fna & iba & da & rdsA & wrsA & annA
+                      & rdsB & wrsB & annB & Hadm & HA & Hre & HB & -> & ->).
+  exists (ls0 ++ ls), ma, rsa, fna, iba, da, (rds0 ++ rdsA), (wrs0 ++ wrsA),
+    (ann0 || annA), rdsB, wrsB, annB.
+  split_and!; [| |exact Hre|exact HB|by rewrite app_assoc|by rewrite app_assoc].
+  - intros l0 Hl0. apply elem_of_app in Hl0 as [Hl0|Hl0];
+      [by apply Hadm0|by apply Hadm].
+  - by eapply phrun_app; [exact Hrun0|exact HA].
+Qed.
+
+Definition clockstep (T : list wreg)
+    (m1 : M unit) (rs1 : regstate) (fn1 : ofence) (ib1 : oib32)
+    (m2 : M unit) (rs2 : regstate) (fn2 : ofence) (ib2 : oib32) : Prop :=
+  m2 = m1 ∧ fn2 = fn1 ∧ ib2 = ib1 ∧ dreg_agree (λ n, n ∉ T) rs1 rs2.
+
+Definition csync (T : list wreg)
+    (m1 : M unit) (rs1 : regstate) (fn1 : ofence) (ib1 : oib32)
+    (m2 : M unit) (rs2 : regstate) (fn2 : ofence) (ib2 : oib32) : Prop :=
+  clockstep T m1 rs1 fn1 ib1 m2 rs2 fn2 ib2
+  ∨ (fn1 = None ∧ fn2 = None ∧ tail_silent T m1 ∧ tail_silent T m2 ∧
+     dreg_agree (λ n, n ∉ T) rs1 rs2).
+
+Lemma boundary_step_tick (rs : regstate) (ib : oib32) (d : dev_state)
+    (tick : bool) :
+  pnode_step (Interface.Ret tt) rs ib d LInstr (riscv_step tick) None None d
+    (Some ib_none).
+Proof. rewrite /pnode_step. by exists tick. Qed.
+
+Theorem csync_advance (T : list wreg) (cpu : CPU) (d0 : dev_state)
+    (m1 : M unit) (rs1 : regstate) (fn1 : ofence) (ib1 : oib32)
+    (m2 : M unit) (rs2 : regstate) (fn2 : ofence) (ib2 : oib32)
+    (ls : list wlabel) (ma : M unit) (rsa : regstate) (fna : ofence)
+    (iba : oib32) (da : dev_state) (l : wlabel)
+    (p' : pexv6) (d' : dev_state) :
+  csync T m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 →
+  LDev ∉ ls →
+  adm_run true (PHart cpu m1 rs1 fn1 ib1) d0 ls (PHart cpu ma rsa fna iba) da →
+  ¬ lb_admin true l →
+  pstep_ev (PHart cpu ma rsa fna iba) da l p' d' →
+  ∃ (mc : M unit) (rs1c rs2c : regstate) (fnc : ofence) (ibc : oib32)
+    (lsc lspre lsq : list wlabel) (rdsp rdsq : list wreg)
+    (wrsp wrsq : list register) (annp annq : bool),
+    adm_run true (PHart cpu mc rs1c fnc ibc) d0 lsc
+      (PHart cpu ma rsa fna iba) da ∧
+    (∀ l0, l0 ∈ lspre → lb_admin true l0) ∧
+    phrun cpu lspre rdsp wrsp annp m2 rs2 fn2 ib2 d0 mc rs2c fnc ibc d0 ∧
+    (** THE EMISSION'S OWN PREFIX to the common node — what makes the
+        reachability parameter [Nd] of §5b.4 closed under the advance. *)
+    (∀ l0, l0 ∈ lsq → lb_admin true l0) ∧
+    phrun cpu lsq rdsq wrsq annq m1 rs1 fn1 ib1 d0 mc rs1c fnc ibc d0 ∧
+    dreg_agree (λ n, n ∉ T) rs1c rs2c.
+Proof.
+  intros [(-> & -> & -> & Hag)|(-> & -> & Hts1 & Hts2 & Hag)] Hni Hadm Hre Hst.
+  - exists m1, rs1, rs2, fn1, ib1, ls, [], [], [], [], [], [], false, false.
+    split_and!; [exact Hadm|by intros l0 Hl0; apply elem_of_nil in Hl0
+                |apply phrun_nil|by intros l0 Hl0; apply elem_of_nil in Hl0
+                |apply phrun_nil|exact Hag].
+  - destruct (witness_instr_tail_silent T cpu m1 rs1 ib1 d0 da ls ma rsa fna
+                iba l p' d' Hts1 Hni Hadm Hre Hst)
+      as (ls1 & ls2 & rds1 & wrs1 & ann1 & rsb & ibb & tick & Hsp & Hrun1
+          & Hws1 & Hadm2).
+    destruct (tail_silent_run T cpu d0 m2 Hts2 rs2 ib2)
+      as (lsq & rdsq & wrsq & annq & rs2b & ib2b & Hadmq & Hniq & Hrunq & Hwsq).
+    have Hbnd : phrun cpu [LInstr] [] [] true (Interface.Ret tt) rs2b None ib2b
+                  d0 (riscv_step tick) rs2b None ib_none d0.
+    { eapply (phrun_more cpu LInstr [] [] [] [] [] true false);
+        [left; split_and!;
+           [reflexivity|by apply boundary_step_tick|reflexivity|reflexivity
+           |reflexivity]|apply phrun_nil]. }
+    have Hbnd1 : phrun cpu [LInstr] [] [] true (Interface.Ret tt) rsb None ibb
+                   d0 (riscv_step tick) rsb None ib_none d0.
+    { eapply (phrun_more cpu LInstr [] [] [] [] [] true false);
+        [left; split_and!;
+           [reflexivity|by apply boundary_step_tick|reflexivity|reflexivity
+           |reflexivity]|apply phrun_nil]. }
+    have Hadm1 : ∀ l0, l0 ∈ ls1 → lb_admin true l0.
+    { intros l0 Hl0. eapply (adm_run_admin true _ d0 ls _ da Hadm).
+      rewrite Hsp. apply elem_of_app. by left. }
+    exists (riscv_step tick), rsb, rs2b, None, ib_none, ls2, (lsq ++ [LInstr]),
+      (ls1 ++ [LInstr]),
+      (rdsq ++ []), (rds1 ++ []), (wrsq ++ []), (wrs1 ++ []),
+      (annq || true), (ann1 || true).
+    split_and!; [exact Hadm2| |by eapply phrun_app; [exact Hrunq|exact Hbnd]
+                | |by eapply phrun_app; [exact Hrun1|exact Hbnd1]|].
+    + intros l0 Hl0. apply elem_of_app in Hl0 as [Hl0|Hl0];
+        [by apply Hadmq|].
+      apply elem_of_list_singleton in Hl0. by subst.
+    + intros l0 Hl0. apply elem_of_app in Hl0 as [Hl0|Hl0];
+        [by apply Hadm1|].
+      apply elem_of_list_singleton in Hl0. by subst.
+    + eapply (taint_closure (λ n, n ∉ T) cpu ls1 rds1 wrs1 ann1
+                m1 rs1 None ib1 d0 (Interface.Ret tt) rsb None ibb d0
+                cpu lsq rdsq wrsq annq m2 rs2 None ib2 d0
+                (Interface.Ret tt) rs2b None ib2b d0 Hag Hrun1 Hrunq).
+      intros r Hr. apply elem_of_app in Hr as [Hr|Hr].
+      * destruct (Hws1 r Hr) as (n & Hn & Hin). exists n. split; [exact Hn|].
+        intros Hno. by apply Hno.
+      * destruct (Hwsq r Hr) as (n & Hn & Hin). exists n. split; [exact Hn|].
+        intros Hno. by apply Hno.
+Qed.
+
+Lemma cblkp_pre (cpu : CPU) (d0 : dev_state) (ws : wstate) (lb : lbl)
+    (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
+    (ls0 : list wlabel) (rds0 : list wreg) (wrs0 : list register)
+    (ann0 : bool) (m0 : M unit) (rs0 : regstate) (fn0 : ofence)
+    (ib0 : oib32) (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32) :
+  (∀ l0, l0 ∈ ls0 → lb_admin true l0) →
+  phrun cpu ls0 rds0 wrs0 ann0 m0 rs0 fn0 ib0 d0 m rs fn ib d0 →
+  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+  cblkp cpu d0 ws lb l1 l2 (rds0 ++ rds) (wrs0 ++ wrs)
+    m0 rs0 fn0 ib0 m' rs' fn' ib'.
+Proof.
+  intros Hadm0 Hrun0
+    (ls1 & ma & rsa & fna & iba & da & rdsA & wrsA & annA &
+     mm & rsm & fnm & ibm & dm & rdsB & wrsB & annB &
+     ls2 & mm2 & rsm2 & fnm2 & ibm2 & dm2 & rdsC & wrsC & annC &
+     rdsD & wrsD & annD & Had1 & HA & Hre & HB & Had2 & HC & HD & -> & ->).
+  exists (ls0 ++ ls1), ma, rsa, fna, iba, da, (rds0 ++ rdsA), (wrs0 ++ wrsA),
+    (ann0 || annA).
+  exists mm, rsm, fnm, ibm, dm, rdsB, wrsB, annB.
+  exists ls2, mm2, rsm2, fnm2, ibm2, dm2, rdsC, wrsC, annC, rdsD, wrsD, annD.
+  split_and!; [| |exact Hre|exact HB|exact Had2|exact HC|exact HD
+              |by rewrite app_assoc|by rewrite app_assoc].
+  - intros l0 Hl0. apply elem_of_app in Hl0 as [Hl0|Hl0];
+      [by apply Hadm0|by apply Had1].
+  - by eapply phrun_app; [exact Hrun0|exact HA].
+Qed.
+
+Definition cpolpr (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg)
+    (Nd : nat → M unit → Prop)
+    (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
+    (Q : nat → lbl → Prop) : Prop :=
+  ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l1 l2 : wlabel)
+    (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+    srvwmo_consistent c0 →
+    Ctx k c0 →
+    Q k lb →
+    w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
+    dreg_agree (λ n, n ∉ T) rs1 rs2 →
+    rds_ok (λ n, n ∉ T) rds →
+    Nd k m →
+    cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    ∃ rs2',
+      cblkp cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
+      mstep_ok (cand_last_st c0) x lb ∧
+      Cls c0 lb ∧
+      dreg_agree (λ n, n ∉ T) rs1' rs2'.
+
+Lemma cpolpr_of_cpolp x cpu d0 T Nd Ctx Cls Q :
+  cpolp x cpu d0 T Ctx Cls Q → cpolpr x cpu d0 T Nd Ctx Cls Q.
+Proof.
+  intros H k c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+    Hc Hctx HQ Hrelp Hag _ _ Hblk.
+  by eapply H.
+Qed.
+
+(** ** 5b.4 [ndreach] — THE REACHABILITY PARAMETER, and why the policy needs it
+
+    [Hpol''] is handed a [cblk] and the site's LABEL; a site datum about the
+    monad NODE ([tail_silent], the read-set clause [rds_ok], or the old
+    same-node demand [WeakRvwmoWalk.wwit_vindep]) is NOT a consequence of
+    the label, so a node-blind policy interface can only take such data as
+    named premises.  [cert_segment''] therefore carries an abstract
+    reachability predicate [Nd : nat → M unit → Prop] — "the hart can be at
+    this node with [k] row events behind it" — hands [Nd k m] to the policy
+    at every block, and asks only that [Nd] be closed under (a) an
+    administrative stretch and (b) one block.  [ndreach] is the canonical
+    instance: those two closures ARE its constructors, so the caller pays
+    nothing to use it, and a concrete site inverts it to name the node. *)
+Inductive ndreach (cpu : CPU) (d0 : dev_state) (Q : nat → lbl → Prop)
+    (k0 : nat) (m0 : M unit) : nat → M unit → Prop :=
+| nd_start : ndreach cpu d0 Q k0 m0 k0 m0
+| nd_adm (k : nat) (m m' : M unit) (rs rs' : regstate) (fn fn' : ofence)
+    (ib ib' : oib32) (ls : list wlabel) (rds : list wreg)
+    (wrs : list register) (ann : bool) :
+    ndreach cpu d0 Q k0 m0 k m →
+    (∀ l0, l0 ∈ ls → lb_admin true l0) →
+    phrun cpu ls rds wrs ann m rs fn ib d0 m' rs' fn' ib' d0 →
+    ndreach cpu d0 Q k0 m0 k m'
+| nd_blk (k : nat) (m m' : M unit) (ws : wstate) (lb : lbl) (l : wlabel)
+    (rds : list wreg) (wrs : list register) (rs rs' : regstate)
+    (fn fn' : ofence) (ib ib' : oib32) :
+    ndreach cpu d0 Q k0 m0 k m → Q k lb →
+    cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+    ndreach cpu d0 Q k0 m0 (S k) m'
+| nd_blkp (k : nat) (m m' : M unit) (ws : wstate) (lb : lbl)
+    (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
+    (rs rs' : regstate) (fn fn' : ofence) (ib ib' : oib32) :
+    ndreach cpu d0 Q k0 m0 k m → Q k lb →
+    cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+    ndreach cpu d0 Q k0 m0 (S k) m'.
+
+Fixpoint lastlb (l : list lbl) : option lbl :=
+  match l with [] => None | [a] => Some a | _ :: t => lastlb t end.
+
+Definition seg_locked (rowseg : list lbl) (Pin : Prop) : Prop :=
+  match lastlb rowseg with None => Pin | Some lbz => lb_is_w lbz = true end.
+
+Lemma lastlb_cons (a : lbl) (l : list lbl) : ∃ z, lastlb (a :: l) = Some z.
+Proof. revert a. induction l as [|b l IH]; intros a; [by exists a|apply IH]. Qed.
+
+Lemma seg_locked_cons (lb : lbl) (row : list lbl) (Pin Pmid : Prop) :
+  seg_locked (lb :: row) Pin → (lb_is_w lb = true → Pmid) → seg_locked row Pmid.
+Proof.
+  rewrite /seg_locked. destruct row as [|a row'].
+  - simpl. intros H HP. by apply HP.
+  - destruct (lastlb_cons a row') as (z & Hz).
+    have -> : lastlb (lb :: a :: row') = lastlb (a :: row') by reflexivity.
+    rewrite Hz. by intros H _.
+Qed.
+
+Lemma hlbl_realizes_pair_notadm p pm ws lb l1 l2 instr :
+  hlbl_realizes_pair p pm ws lb l1 l2 → ¬ lb_admin instr l1.
+Proof.
+  intros (aq & rl & base & tvs & data & asrc1 & asrc2 & vsrc2 & -> & _) H.
+  exact H.
+Qed.
+
+Section segment''.
+  Context (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg).
+  Context (Q : nat -> lbl -> Prop).
+  Context (Ctx : nat → cand → Prop).
+  Context (Cls : cand → lbl → Prop).
+
+  Context (Hpres : ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
+      Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx_w lb lb' →
+      mstep_ok (cand_last_st c0) x lb' →
+      Cls c0 lb' →
+      Ctx (S k) (cand_snoc c0 (EStep x lb'))).
+
+  Context (Hrds : ∀ (k : nat) (lb : lbl) (ws : wstate) (l : wlabel)
+      (rds : list wreg) (wrs : list register)
+      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
+      Q k lb → cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+      rds_ok (λ n, n ∉ T) rds).
+
+  Context (Hrdsp : ∀ (k : nat) (lb : lbl) (ws : wstate) (l1 l2 : wlabel)
+      (rds : list wreg) (wrs : list register)
+      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
+      Q k lb → cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+      rds_ok (λ n, n ∉ T) rds).
+
+  (** (N-D) THE REACHABILITY PARAMETER (§5b.4): what pins the block's own
+      monad NODE, so that a site datum about the node — [tail_silent], the
+      read-set clause, the same-node demand an RMW-free load site may prefer
+      — is DISCHARGEABLE rather than assumed.  Its two closure laws are
+      [ndreach]'s own constructors. *)
+  Context (Nd : nat → M unit → Prop).
+
+  Context (HNdadm : ∀ (k : nat) (m m' : M unit) (rs rs' : regstate)
+      (fn fn' : ofence) (ib ib' : oib32) (ls : list wlabel)
+      (rds : list wreg) (wrs : list register) (ann : bool),
+      Nd k m → (∀ l0, l0 ∈ ls → lb_admin true l0) →
+      phrun cpu ls rds wrs ann m rs fn ib d0 m' rs' fn' ib' d0 → Nd k m').
+
+  Context (HNdblk : ∀ (k : nat) (m m' : M unit) (ws : wstate) (lb : lbl)
+      (l : wlabel) (rds : list wreg) (wrs : list register)
+      (rs rs' : regstate) (fn fn' : ofence) (ib ib' : oib32),
+      Nd k m → Q k lb →
+      cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' → Nd (S k) m').
+
+  Context (HNdblkp : ∀ (k : nat) (m m' : M unit) (ws : wstate) (lb : lbl)
+      (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
+      (rs rs' : regstate) (fn fn' : ofence) (ib ib' : oib32),
+      Nd k m → Q k lb →
+      cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' → Nd (S k) m').
+
+  Context (Hpol'' : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl)
+      (l : wlabel)
+      (rds : list wreg) (wrs : list register)
+      (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+      (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+      srvwmo_consistent c0 →
+      Ctx k c0 →
+      Q k lb →
+      w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
+      dreg_agree (λ n, n ∉ T) rs1 rs2 →
+      rds_ok (λ n, n ∉ T) rds →
+      Nd k m →
+      cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+      ∃ lb' l' rds' wrs' rs2' (m2' : M unit) (fn2' : ofence) (ib2' : oib32),
+        cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
+        mstep_ok (cand_last_st c0) x lb' ∧
+        lbl_reidx_w lb lb' ∧
+        Cls c0 lb' ∧
+        csync T m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
+        (lb_is_w lb = true →
+           clockstep T m' rs1' fn' ib' m2' rs2' fn2' ib2')).
+
+  Context (Hpolp : cpolpr x cpu d0 T Nd Ctx Cls Q).
+
+  Theorem cert_segment'' k0 ws0 rowseg p es pfin :
+    hemit (λ _, d0) k0 ws0 rowseg p es pfin →
+    LDev ∉ es.*1 →
+    (∀ i lb, rowseg !! i = Some lb → Q (k0 + i)%nat lb) →
+    ∀ m0 rs10 fn0 ib0, p = PHart cpu m0 rs10 fn0 ib0 →
+    Nd k0 m0 →
+    ∀ (c : cand) (pst : nat → list pexv6) (dv : nat → dev_state)
+      (m20 : M unit) (rs20 : regstate) (fn20 : ofence) (ib20 : oib32),
+      srvwmo_consistent c →
+      Ctx k0 c →
+      exec_prog_ok' pstep_ev pcls_ev pst dv (cand_exec c) →
+      pst (cd_end c) !! x = Some (PHart cpu m20 rs20 fn20 ib20) →
+      dv (cd_end c) = d0 →
+      csync T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 →
+      w_relp (ms_ws (cand_last_st c) x) = w_relp ws0 →
+      ∃ (c' : cand) (pst' : nat → list pexv6) (dv' : nat → dev_state)
+        (tradd : list estep) (m1 : M unit) (rs11 : regstate)
+        (fn1 : ofence) (ib1 : oib32)
+        (m21 : M unit) (rs21 : regstate) (fn21 : ofence) (ib21 : oib32),
+        cd_tr c' = cd_tr c ++ tradd ∧
+        (∀ s, s ∈ tradd → es_ag s = x) ∧
+        Forall2 lbl_reidx_w rowseg ((λ s, es_lb s) <$> tradd) ∧
+        srvwmo_consistent c' ∧
+        Ctx (k0 + length rowseg)%nat c' ∧
+        exec_prog_ok' pstep_ev pcls_ev pst' dv' (cand_exec c') ∧
+        pst' (cd_end c') !! x = Some (PHart cpu m21 rs21 fn21 ib21) ∧
+        dv' (cd_end c') = d0 ∧
+        pfin = PHart cpu m1 rs11 fn1 ib1 ∧
+        csync T m1 rs11 fn1 ib1 m21 rs21 fn21 ib21 ∧
+        (seg_locked rowseg (clockstep T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20) →
+           clockstep T m1 rs11 fn1 ib1 m21 rs21 fn21 ib21) ∧
+        w_relp (ms_ws (cand_last_st c') x)
+        = w_relp (row_ws_aux k0 ws0 rowseg) ∧
+        cd_img c' = cd_img c ∧
+        pst' 0%nat = pst 0%nat ∧
+        dv' 0%nat = dv 0%nat ∧
+        (∀ y, y ≠ x → pst' (cd_end c') !! y = pst (cd_end c) !! y) ∧
+        (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st c') y)
+                    = w_relp (ms_ws (cand_last_st c) y)).
+  Proof.
+    induction 1 as [k ws p
+                   |k ws lb row p ls pa da l p' es pfin Har Hre Hst Hem IH
+                   |k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin
+                    Har1 Hre Hst1 Har2 Hst2 Hem IH];
+      intros Hdev Hrf m0 rs10 fn0 ib0 -> Hnd c pst dv m20 rs20 fn20 ib20
+             Hc Hctx Hpo Hp Hdvc Hsync Hrelp.
+    - (* EMPTY SEGMENT *)
+      exists c, pst, dv, [], m0, rs10, fn0, ib0, m20, rs20, fn20, ib20.
+      split_and!; [by rewrite app_nil_r| |constructor|exact Hc
+                  |(rewrite /= Nat.add_0_r; exact Hctx)
+                  |exact Hpo|exact Hp|exact Hdvc|reflexivity|exact Hsync
+                  | |exact Hrelp
+                  |reflexivity|reflexivity|reflexivity
+                  |(intros y _; reflexivity)|(intros y _; reflexivity)].
+      + intros s Hs. by apply elem_of_nil in Hs.
+      + rewrite /seg_locked /=. by intros H.
+    - (* ONE BLOCK, then the rest *)
+      have Hlb : Q k lb.
+      { have H0 := Hrf 0%nat lb eq_refl. by rewrite Nat.add_0_r in H0. }
+      have Hrf' : forall i lb0, row !! i = Some lb0 -> Q (S k + i)%nat lb0.
+      { intros i lb0 Hi. have H0 := Hrf (S i) lb0 Hi.
+        by replace (S k + i)%nat with (k + S i)%nat by lia. }
+      rewrite eblock_fst in Hdev.
+      destruct (not_elem_of_block LDev ls l (es.*1) Hdev)
+        as (Hni & Hlne & Hdev').
+      destruct (adm_run_phart true _ _ d0 ls da Har cpu m0 rs10 fn0 ib0 eq_refl)
+        as (ma & rsa & fna & iba & Hpa).
+      rewrite Hpa in Hst Hre Har.
+      destruct (pstep_ev_phart cpu ma rsa fna iba da l p' d0 Hst)
+        as (m1 & rs11 & fn1 & ib1 & Hp').
+      rewrite Hp' in Hst.
+      destruct (csync_advance T cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20
+                  ls ma rsa fna iba da l _ _ Hsync Hni Har
+                  (hlbl_realizes_notadm _ _ _ _ true Hre) Hst)
+        as (mc & rs1c & rs2c & fnc & ibc & lsc & lspre & lsq & rdsp & rdsq
+            & wrsp & wrsq & annp & annq
+            & Hadmc & Hadmpre & Hrunpre & Hadmq & Hrunq & Hagc).
+      destruct (cblk_intro cpu d0 ws lb l lsc (PHart cpu ma rsa fna iba) da
+                  mc rs1c fnc ibc m1 rs11 fn1 ib1 Hadmc Hre Hst)
+        as (rds & wrs & Hblk).
+      have Hrdsok : rds_ok (fun n => n ∉ T) rds
+        := Hrds k lb ws l rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb Hblk.
+      have Hndc : Nd k mc
+        := HNdadm k m0 mc rs10 rs1c fn0 fnc ib0 ibc lsq rdsq wrsq annq
+             Hnd Hadmq Hrunq.
+      have Hnd1 : Nd (S k) m1
+        := HNdblk k mc m1 ws lb l rds wrs rs1c rs11 fnc fn1 ibc ib1
+             Hndc Hlb Hblk.
+      destruct (Hpol'' k c ws lb l rds wrs mc rs1c rs2c fnc ibc
+                  m1 rs11 fn1 ib1 Hc Hctx Hlb Hrelp Hagc Hrdsok Hndc Hblk)
+        as (lb' & l' & rds' & wrs' & rs2' & m2' & fn2' & ib2' &
+            Hblk2 & Hok & Hri & Hcl & Hsync2 & Hw2).
+      have Hblk3 : cblk cpu d0 (ms_ws (cand_last_st c) x) lb' l'
+                     (rdsp ++ rds') (wrsp ++ wrs')
+                     m20 rs20 fn20 ib20 m2' rs2' fn2' ib2'.
+      { eapply cblk_relp; [exact Hrelp|].
+        eapply cblk_pre; [exact Hadmpre|exact Hrunpre|exact Hblk2]. }
+      destruct (cert_block_snoc c x pst dv cpu d0 lb' l' (rdsp ++ rds')
+                  (wrsp ++ wrs') m20 rs20 fn20 ib20 m2' rs2' fn2' ib2'
+                  Hc Hpo Hp Hdvc Hblk3 Hok) as (Hc2 & Hpo2).
+      set (c2 := cand_snoc c (EStep x lb')).
+      set (pst2 := pst_snoc c pst x (PHart cpu m2' rs2' fn2' ib2')).
+      set (dv2 := dv_snoc c dv d0).
+      have Hctx2 : Ctx (S k) c2 := Hpres k c lb lb' Hctx Hc Hlb Hri Hok Hcl.
+      have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
+      have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m2' rs2' fn2' ib2').
+      { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
+        apply list_lookup_insert. exact (lookup_lt_Some _ _ _ Hp). }
+      have Hdv2 : dv2 (cd_end c2) = d0.
+      { rewrite Hend /dv2 (dv_snoc_gt c dv d0 (S (cd_end c)) ltac:(lia)) //. }
+      have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
+                  = w_relp (lbl_post k ws lb).
+      { rewrite /c2 cand_snoc_relp Hrelp (lbl_reidx_w_relp _ lb lb' Hri).
+        by rewrite lbl_post_relp. }
+      destruct (IH Hdev' Hrf' m1 rs11 fn1 ib1 Hp' Hnd1 c2 pst2 dv2
+                  m2' rs2' fn2' ib2' Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hsync2 Hrelp2)
+        as (c' & pst' & dv' & tradd & m2 & rs12 & fn2 & ib2 &
+            m22 & rs22 & fn22 & ib22 &
+            Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hsyncf
+            & Hlockf & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
+      exists c', pst', dv', (EStep x lb' :: tradd), m2, rs12, fn2, ib2,
+        m22, rs22, fn22, ib22.
+      split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'
+                   |(rewrite /= Nat.add_succ_r; exact Hctx')
+                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hsyncf
+                   | |exact Hrelpf| | | | | ].
+      + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
+      + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
+      + intros Hlk. apply Hlockf.
+        exact (seg_locked_cons lb row _ _ Hlk Hw2).
+      + rewrite Himg2 /c2 cand_snoc_img //.
+      + rewrite Hpst02 /pst2
+          (pst_snoc_le c pst x (PHart cpu m2' rs2' fn2' ib2') 0%nat
+             (Nat.le_0_l _)) //.
+      + rewrite Hdv02 /dv2 (dv_snoc_le c dv d0 0%nat (Nat.le_0_l _)) //.
+      + intros y Hy. rewrite (Hfr2 y Hy) Hend /pst2
+          (pst_snoc_gt c pst x (PHart cpu m2' rs2' fn2' ib2') (S (cd_end c))
+             ltac:(lia)).
+        by rewrite list_lookup_insert_ne.
+      + intros y Hy. rewrite (Hfrp2 y Hy) /c2.
+        by rewrite (cand_snoc_relp_ne c x y lb' Hy).
+    - (* THE FUSED EXCLUSIVE PAIR *)
+      have Hlb : Q k lb.
+      { have H0 := Hrf 0%nat lb eq_refl. by rewrite Nat.add_0_r in H0. }
+      have Hrf' : forall i lb0, row !! i = Some lb0 -> Q (S k + i)%nat lb0.
+      { intros i lb0 Hi. have H0 := Hrf (S i) lb0 Hi.
+        by replace (S k + i)%nat with (k + S i)%nat by lia. }
+      rewrite eblock_fst eblock_fst in Hdev.
+      destruct (not_elem_of_block LDev ls1 l1 (ls2 ++ l2 :: es.*1) Hdev)
+        as (Hni1 & Hl1ne & Hdev1).
+      destruct (not_elem_of_block LDev ls2 l2 (es.*1) Hdev1)
+        as (Hni2 & Hl2ne & Hdev').
+      destruct (adm_run_phart true _ _ d0 ls1 da Har1 cpu m0 rs10 fn0 ib0
+                  eq_refl) as (ma & rsa & fna & iba & Hpa).
+      rewrite Hpa in Har1 Hst1 Hre.
+      destruct (pstep_ev_phart cpu ma rsa fna iba da l1 pm dm Hst1)
+        as (mb & rsb & fnb & ibb & Hpm).
+      rewrite Hpm in Hst1 Har2.
+      destruct (adm_run_phart false _ _ dm ls2 dm2 Har2 cpu mb rsb fnb ibb
+                  eq_refl) as (mc2 & rsc2 & fnc2 & ibc2 & Hpm2).
+      rewrite Hpm2 in Har2 Hst2 Hre.
+      destruct (pstep_ev_phart cpu mc2 rsc2 fnc2 ibc2 dm2 l2 p' d0 Hst2)
+        as (m1 & rs11 & fn1 & ib1 & Hp').
+      rewrite Hp' in Hst2.
+      destruct (csync_advance T cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20
+                  ls1 ma rsa fna iba da l1 _ _ Hsync Hni1 Har1
+                  (hlbl_realizes_pair_notadm _ _ _ _ _ _ true Hre) Hst1)
+        as (mc & rs1c & rs2c & fnc & ibc & lsc & lspre & lsq & rdsp & rdsq
+            & wrsp & wrsq & annp & annq
+            & Hadmc & Hadmpre & Hrunpre & Hadmq & Hrunq & Hagc).
+      destruct (cblkp_intro cpu d0 ws lb l1 l2 lsc
+                  (PHart cpu ma rsa fna iba) da (PHart cpu mb rsb fnb ibb) dm
+                  ls2 (PHart cpu mc2 rsc2 fnc2 ibc2) dm2
+                  mc rs1c fnc ibc m1 rs11 fn1 ib1 Hadmc Hre Hst1 Har2 Hst2)
+        as (rds & wrs & Hblk).
+      have Hrdsok : rds_ok (fun n => n ∉ T) rds
+        := Hrdsp k lb ws l1 l2 rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb Hblk.
+      have Hndc : Nd k mc
+        := HNdadm k m0 mc rs10 rs1c fn0 fnc ib0 ibc lsq rdsq wrsq annq
+             Hnd Hadmq Hrunq.
+      have Hnd1 : Nd (S k) m1
+        := HNdblkp k mc m1 ws lb l1 l2 rds wrs rs1c rs11 fnc fn1 ibc ib1
+             Hndc Hlb Hblk.
+      destruct (Hpolp k c ws lb l1 l2 rds wrs mc rs1c rs2c fnc ibc
+                  m1 rs11 fn1 ib1 Hc Hctx Hlb Hrelp Hagc Hrdsok Hndc Hblk)
+        as (rs2' & Hblk2 & Hok & Hcl & Hag2).
+      have Hblk3 : cblkp cpu d0 (ms_ws (cand_last_st c) x) lb l1 l2
+                     (rdsp ++ rds) (wrsp ++ wrs)
+                     m20 rs20 fn20 ib20 m1 rs2' fn1 ib1.
+      { eapply cblkp_relp; [exact Hrelp|].
+        eapply cblkp_pre; [exact Hadmpre|exact Hrunpre|exact Hblk2]. }
+      destruct (cert_block_snoc_pair c x pst dv cpu d0 lb l1 l2
+                  (rdsp ++ rds) (wrsp ++ wrs)
+                  m20 rs20 fn20 ib20 m1 rs2' fn1 ib1
+                  Hc Hpo Hp Hdvc Hblk3 Hok) as (Hc2 & Hpo2).
+      set (c2 := cand_snoc c (EStep x lb)).
+      set (pst2 := pst_snoc c pst x (PHart cpu m1 rs2' fn1 ib1)).
+      set (dv2 := dv_snoc c dv d0).
+      have Hctx2 : Ctx (S k) c2
+        := Hpres k c lb lb Hctx Hc Hlb (lbl_reidx_w_refl lb) Hok Hcl.
+      have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
+      have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m1 rs2' fn1 ib1).
+      { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
+        apply list_lookup_insert. exact (lookup_lt_Some _ _ _ Hp). }
+      have Hdv2 : dv2 (cd_end c2) = d0.
+      { rewrite Hend /dv2 (dv_snoc_gt c dv d0 (S (cd_end c)) ltac:(lia)) //. }
+      have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
+                  = w_relp (lbl_post k ws lb).
+      { rewrite /c2 cand_snoc_relp Hrelp. by rewrite lbl_post_relp. }
+      have Hsync2 : csync T m1 rs11 fn1 ib1 m1 rs2' fn1 ib1.
+      { left. by split_and!. }
+      destruct (IH Hdev' Hrf' m1 rs11 fn1 ib1 Hp' Hnd1 c2 pst2 dv2
+                  m1 rs2' fn1 ib1 Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hsync2 Hrelp2)
+        as (c' & pst' & dv' & tradd & m2 & rs12 & fn2 & ib2 &
+            m22 & rs22 & fn22 & ib22 &
+            Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hsyncf
+            & Hlockf & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
+      exists c', pst', dv', (EStep x lb :: tradd), m2, rs12, fn2, ib2,
+        m22, rs22, fn22, ib22.
+      split_and!; [| |constructor; [apply lbl_reidx_w_refl|exact Hf2]
+                   |exact Hc'|(rewrite /= Nat.add_succ_r; exact Hctx')
+                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hsyncf
+                   | |exact Hrelpf| | | | | ].
+      + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
+      + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
+      + intros Hlk. apply Hlockf.
+        refine (seg_locked_cons lb row _ _ Hlk _). intros _. by split_and!.
+      + rewrite Himg2 /c2 cand_snoc_img //.
+      + rewrite Hpst02 /pst2
+          (pst_snoc_le c pst x (PHart cpu m1 rs2' fn1 ib1) 0%nat
+             (Nat.le_0_l _)) //.
+      + rewrite Hdv02 /dv2 (dv_snoc_le c dv d0 0%nat (Nat.le_0_l _)) //.
+      + intros y Hy. rewrite (Hfr2 y Hy) Hend /pst2
+          (pst_snoc_gt c pst x (PHart cpu m1 rs2' fn1 ib1) (S (cd_end c))
+             ltac:(lia)).
+        by rewrite list_lookup_insert_ne.
+      + intros y Hy. rewrite (Hfrp2 y Hy) /c2.
+        by rewrite (cand_snoc_relp_ne c x y lb Hy).
+  Qed.
+End segment''.
+
+(* ====================================================================== *)
 (** * 6. NON-VACUITY
 
     Four inhabitations, one per moving part: the certified correspondence
@@ -1516,6 +2361,36 @@ Qed.
     Nothing below is [Admitted]; these are the statements this file does NOT
     make, so that B2e-3c inherits an exact list.
 
+    (N-D) THE POLICY INTERFACE IS NODE-BLIND, and that — not progress — is
+          what stands between §5b and the removal of
+          [WeakRvwmoWalk.wwit_vindep].  [Hpol''] is handed a [cblk] and the
+          site's LABEL; every datum §5b needs about a witness site
+          ([tail_silent] of the read's successors, the read-set clause
+          [rds_ok], or the same-node demand a value-independent node
+          satisfies) is a property of the monad NODE, which no label
+          determines.  §5b.4 supplies the parameter that fixes this —
+          [Nd : nat → M unit → Prop], closed under one administrative
+          stretch and one block, with [ndreach] as the canonical instance —
+          and [cert_segment''] hands [Nd k m] to the policy at every block.
+          WHAT REMAINS is to thread it through
+          [WeakRvwmoCert4.seg_step_of_segment], [WeakRvwmoWalk]'s [wpol]/
+          [wblk_pol_at] family and [wlk_inv'], at which point
+          [WeakRvwmoWalk.wwit_site]'s machine half is discharged from the
+          node (at [WeakRvwmoWalk2.cyg], from
+          [WeakRvwmoCycWit.cy_pstep_ld'] — its load node's successor is the
+          same at every answer, so the LOCKSTEP arm of [csync] serves it and
+          [T = []] suffices).
+
+    (N-T) THE TAINT FRAME IS UNPAIRED.  [csync]'s diverged arm re-converges
+          through [WeakEvProv.taint_closure], which demands that EVERY
+          register a divergent remainder writes be a dependency carrier the
+          taint set holds.  The real tail of [lw a5,0(a4)] (measured in
+          [WeakRvwmoCycWit2]) writes [a5] — a carrier — but also [PC] and
+          [minstret], whose [ereg_num] is [None]; both runs write them with
+          the SAME value, and only a PAIRED law can say so.  Until it
+          exists, [tail_silent] admits the destination write and the
+          boundary, not the full nine-node tail.
+
     (P-1) [Hpres] — the ctrace bookkeeping ([cert_segment'] §3.4): that
           appending the certified label to a candidate carrying
           [cpol_ctx G W x] leaves it carrying [cpol_ctx G W x].  It is
@@ -1569,6 +2444,10 @@ Print Assumptions cert_floor_ok.
 Print Assumptions cert_read_in_log'.
 Print Assumptions cpol_read.
 Print Assumptions cert_segment'.
+Print Assumptions tail_silent_run.
+Print Assumptions witness_instr_tail_silent.
+Print Assumptions csync_advance.
+Print Assumptions cert_segment''.
 Print Assumptions cblkp_rmw.
 Print Assumptions cpolp_of_rmwfree.
 Print Assumptions floor_ok_of_latest.

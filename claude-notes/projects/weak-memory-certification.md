@@ -44,8 +44,66 @@ value" — true at the real node, `cy_node_vindep`), not a coincidence.
 `wsupply_res`: the hart bound derived; `wrmw_site` derived; the
 writer-scope clause named (`wsupply_res_no_disk_writes`: disk DMA
 stores excluded); `∃ W` stays (the frozen set is chosen, not data).
-NEXT: integrate re-convergence into `cert_segment'` so `wwit_vindep`
-disappears; then re-run the audit.
+RE-CONVERGENCE, INTEGRATED (2026-08-23), and what it changed.
+`WeakRvwmoCert3` §5b lands `cert_segment''`: the iteration's invariant is
+generalized from "the two runs are at the same node" to `csync` — the same
+node (`clockstep`, register files agreeing off the taint set `T`), OR,
+after a witness, both runs inside the SAME instruction's silent tail
+(`tail_silent`), re-converging at its boundary.  Three findings worth
+keeping:
+- **TERMINATION AT THE BOUNDARY IS A THEOREM, NOT A HYPOTHESIS.**
+  `Interface.iMon` is an INDUCTIVE type, so a monad node is a well-founded
+  tree and `tail_silent_run` builds the run to `Interface.Ret tt` by
+  induction on `tail_silent`.  Nothing in §5b uses `WeakRvwmoProgress.
+  cert_progress`, and no `reaches_boundary` premise exists.  What IS
+  program-specific is only the SHAPE — "the rest of this instruction is
+  administrative" — and that is `tail_silent`, a structural predicate on
+  the node, checkable at a site.
+- **`witness_instr_tail_silent`**: the emission's own administrative
+  stretch out of a witness's successor CANNOT end at a node realizing a row
+  label (a `tail_silent` node emits only administrative labels), so it
+  necessarily factors through the boundary: `ls = ls1 ++ LInstr :: ls2`.
+  That is what makes "between a witness and the boundary there is no memory
+  label" a theorem rather than an appeal to "one access per instruction".
+  It needs the emission device-quiet (`LDev ∉ es.*1`, which `em_devfree`
+  already gives) so the PLIC arm of `pstep_hw` cannot interleave.
+- **THE REAL BLOCKER IS NOT PROGRESS, IT IS THAT THE POLICY INTERFACE IS
+  NODE-BLIND.**  `wblk_pol_at` is handed a `cblk` and the site's LABEL;
+  every witness datum — `tail_silent`, the read-set clause `rds_ok`, and
+  the old `wwit_vindep` — is a property of the monad NODE, which no label
+  determines.  §5b.4 supplies the fix as a parameter: `Nd : nat → M unit →
+  Prop`, closed under one administrative stretch and one block (`ndreach`
+  is the canonical instance whose constructors ARE those closures), handed
+  to the policy at every block by `cert_segment''`.  THREADING `Nd`
+  through `WeakRvwmoCert4.seg_step_of_segment`, `WeakRvwmoWalk`'s
+  `wpol`/`wblk_pol_at`/`wsite_ok` family and `wlk_inv'` is what actually
+  retires `wwit_vindep` — at `cyg` the site datum is then discharged from
+  `WeakRvwmoCycWit.cy_pstep_ld'` (its load node's successor is the same at
+  every answer, so `csync`'s LOCKSTEP arm serves it and `T = []` suffices).
+  NOT DONE; `wwit_site` still carries `wwit_vindep` and `cyg_walk'` still
+  takes it as a named premise.
+- **THE TAINT FRAME IS UNPAIRED** (`WeakEvProv.taint_closure` demands every
+  register a divergent remainder writes be a carrier in the taint set).
+  The real tail of `lw a5,0(a4)` is NINE nodes — measured:
+  `RegWrite x15` (the loaded value), `hart_state` r,r, `nextPC` r,
+  `PC` w, `PC` r, `minstret_increment` r, `minstret` r,w — then
+  `Interface.Ret tt`.  Of its three writes only `x15` is a carrier
+  (`ereg_num PC = None`, `ereg_num minstret = None`), though BOTH runs
+  write `PC` and `minstret` with the same value.  Admitting the full real
+  tail needs a PAIRED law (`tail_par`: one arm for the tainted write, after
+  which the continuations are the same term, and one for the shared node,
+  discharged by `phrun_dagree`), not a bigger taint set.
+NON-VACUITY: `WeakRvwmoCycWit2.v` (a LEAF, NOT in `_CoqProject` — add the
+line `WeakRvwmoCycWit2.v` after `WeakRvwmoWalk2.v`) inhabits `tail_silent`,
+`csync`'s diverged arm and the re-convergence at a load whose VALUE IS USED
+(written into the real destination `a5`) and whose two runs carry DIFFERENT
+values — the two conditions `cy_node_vindep`'s value-INDEPENDENT node could
+not test.  Real there: the load REQUEST (`ld_reql`, hart 1's spin load at
+`main+0x16`) and the destination register; hand-built: the tail, for the
+reason in the previous bullet.
+NEXT: thread `Nd` (and the `csync`-shaped policy conclusion) through Cert4
+/ Walk / Progress / Walk2 so `wwit_vindep` disappears; then the paired
+taint law; then re-run the audit.
 LESSON for the discipline: "assumptions Closed + tree green" is not
 enough — every NEW hypothesis needs a non-coincidental satisfiability
 witness, and a witness constructed to make a hypothesis hold is the
