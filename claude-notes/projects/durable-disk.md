@@ -73,14 +73,14 @@ baseline", read the current three. Landed, in order:
   (link floor removed — orphans), W6 scoped to reachable dirs, the
   agreement suite, `fs_links_eq` + its image check (22.3 s), and the
   mkfs discharge `FsWfImg.fsimg_durable_wf`.
-- **Stage F2, 8/8 pending merge**: seven semantic-effect update lemmas
+- **Stage F2 COMPLETE, 8/8**: eight semantic-effect update lemmas
   landed (`FsEffBase.v` + one file per effect — the one-file-per-effect
   split is an OWNER RULING, keep it), preconditions as discovered (see
   the F2 entry: mkdir fuses the dots block; unlink-dir needs
   `nlink i = 1` and `..` pinned to the parent; free_inode fuses
-  trunc+bfree+type:=0; alloc splits direct/indirect-entry arms). The
-  EIGHTH effect (fused indirect-block allocation at `fbn = 12`) is IN
-  FLIGHT on an agent worktree branch (see "In flight" below).
+  trunc+bfree+type:=0; alloc splits direct/indirect-entry arms, and the
+  boundary crossing at `fbn = 12` is its own fused two-block effect
+  `FsEffAllocIndBlock.eff_alloc_ind_block`).
 - **Stage H0**: the adequacy pure-projection hook
   (`Ppure`/`Hproj` on `wp_power_loop` + `riscv_power_adequacy`,
   `FsCrash.P_fs_project`, `SystemAdequacy.fs_boot_pure`) — the channel
@@ -93,9 +93,7 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-- branch `worktree-agent-a3c9c688bcd01522c`: effect 8
-  (`eff_alloc_ind_block`, spec = the F2 entry's deferral note; on the
-  optimized FsEff base, with the worktree build-safety procedure).
+(nothing in flight)
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
@@ -110,7 +108,10 @@ for the G1-flip/G2 arms; `fs_links_eq` is conjunct (13) end to end.
 See the G1-impl entry for the site table.
 
 **Next steps, in order (all specs live in this file):**
-1. Merge the in-flight effect-8 branch (above) when it reports.
+1. ~~Effect 8~~ DONE and MERGED: `eff_alloc_ind_block` landed
+   (`iris/FsEffAllocIndBlock.v`, 3.5 s on the VM); the F2 entry's
+   delta (7) records its statement. G2 can now cross a file's
+   12-block boundary.
 2. **G2**: the per-op preservation lemmas, STANDALONE (pure statements
    composing the F2 effects per op; no log_state dependency; fully
    parallelizable — one Opus agent per op batch). The 12 ops and their
@@ -394,9 +395,10 @@ list.
       fs_links_eq + fs_region_wf + parse + cov ⊇ [1, size)` — E4
       consumes it (`FsWfImg.v` is new: `FsCrash` Require-Exports `FsWf`,
       so the `fs_restrict`-level statement cannot live in `FsWf.v`).
-- [~] **F2.** LANDED except one arm: per-effect files `iris/FsEffBase.v`
+- [x] **F2.** DONE (8/8). Per-effect files `iris/FsEffBase.v`
       + `FsEff{WriteData,Trunc,FreeInode,LinkEntry,UnlinkEntry,
-      CreateEntry,AllocBlock}.v`. The base file holds the single-block
+      CreateEntry,AllocBlock,AllocIndBlock}.v`. The base file holds the
+      single-block
       `fs_upd` combinator, the dinode-block RE-ENCODE effect
       (`eff_dinode` writes `diblk_bytes (<[islot i := dn']> (fs_iblk …))`
       so an op postcondition at `diblk_bytes (<[…]> ds)` matches after
@@ -433,9 +435,21 @@ list.
       (5) `eff_alloc_file_block (i fbn fresh sz')` covers the direct
       and indirect-ENTRY arms with `fbn ≠ 12`; (6) dirent-writing
       effects take `i < 65536` (the record stores a bv 16; nothing
-      bounds ninodes). LEFT: the fused indirect-block allocation
-      (`fbn = 12`, TWO fresh blocks in one effect — an eighth effect;
-      until it lands G2 cannot cross a file's 12-block boundary).
+      bounds ninodes); (7) the boundary crossing is
+      `eff_alloc_ind_block (i fresh_ind fresh_data sz')` at
+      `Z.of_nat 12 = fs_nblk (di_size dn)` / `fs_nblk sz' = 13` —
+      TWO fresh blocks in one effect (`fdi_ind_zero` admits no wf
+      intermediate), taking `fresh_ind <> fresh_data` and BOTH bits
+      cleared in the pre-transaction bitmap (the committed view does not
+      move mid-transaction, so both of balloc's postconditions are read
+      off the same block). Its indirect-block content is spelled
+      `BlockWords.ind_bytes (<[0%nat := Z_to_bv 32 fresh_data]>
+      (replicate FS_NINDIRECT (bv_0 32)))`, i.e. ProofBmap's own
+      `ind_bytes (<[q := blk]> (bm_ent bmI))` at `q = 0` with
+      `bm_ent bmI` the block balloc bzeroed — the bzero+entry-write
+      COMPOSITION at the entry level rather than a second `fs_upd`, so
+      the op postcondition matches by conversion. The fresh data block
+      is `replicate BSIZE (bv_0 8)`, `eff_alloc_file_block`'s spelling.
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 
