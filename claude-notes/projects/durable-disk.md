@@ -611,6 +611,16 @@ defect (kernel-defects.md entry resolved) and the invariant adjusts:
       write-into-existing arm no longer needs the alloc to have
       happened in the same transaction) — and add the now-expressible
       `writei` failure-arm effects (alloc-without-size-move).
+- [ ] **F3.4** The create-`fail:` tail (batch (2) finding (a)): one
+      `eff_dinode` rewrite of a FREE slot (written then freed inside
+      the transaction, net a free-slot re-encode) — the cheap ninth
+      effect; mknod/mkdir/open inherit its arm lemma.
+- [ ] **F3.5** The TRANSPORT BUNDLE (batch (2) finding (e)): each
+      `eff_*_wfv` exports a uniform bundle (parse invariance, the
+      touched inodes' decode, tree/reachability invariance where it
+      holds) so chained arms stop re-deriving footprints;
+      `FsOpOpen`'s two transport lemmas and `FsOpFilewrite`'s
+      `ws_apply_blocks` are the prototypes.
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 
