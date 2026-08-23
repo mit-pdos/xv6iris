@@ -1790,8 +1790,8 @@ Section FsCfgBootEra.
     iSplitR; [iExact "Hireginv" |].
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "HaL HaD".
-    { iExists (fs_L0 dk cov), (fs_D0 dk cov).
-      iSplitR; [iPureIntro; exact (fs_L0_lookup dk cov) |].
+    { iExists (fs_C0 dk cov), (fs_D0 dk cov).
+      iSplitR; [iPureIntro; exact (fs_C0_lookup dk cov) |].
       iSplitL "HaL"; [iExact "HaL" | iExact "HaD"]. }
     iSplitL "Hdty"; [iExact "Hdty" |].
     iSplitL "Hhdr"; [iExact "Hhdr" |].
