@@ -93,8 +93,8 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-- branch `worktree-agent-aa925cea3bd172b04`: stage F3, the
-  beyond-size invariant sweep (spec = §5½, F3.1–F3.5).
+(nothing in flight; F3 merged — F3.5's dirent transport bundles
+remain [~] in §5½)
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
