@@ -1069,6 +1069,7 @@ InodeRef.v
 InodeLock.v
 FsImgBridge.v
 InodeRegion.v
+FsStateEra.v
 EscrowInode.v
 EscrowDeposit.v
 FsRep.v
