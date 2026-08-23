@@ -208,6 +208,71 @@ Lemma blk_range_disj (b b' a : Z) :
   b = b'.
 Proof. unfold BSZ. lia. Qed.
 
+(* ===================================================================== *)
+(*  THE SUB-RANGE SPLICE (durable-disk 2b-0)                             *)
+(*                                                                       *)
+(*  A writer above the log owns a SUB-RANGE of a block -- an inode        *)
+(*  record's 64 bytes, a directory entry's 16 -- and log_writes the WHOLE *)
+(*  buffer it is a piece of.  [blk_splice off sub bs] is the whole-block  *)
+(*  content its stores produce: [bs] with [sub] written at [off] and      *)
+(*  every other byte untouched.  It is the shape the writer's own stores  *)
+(*  have anyway, which is why the side condition is stated with it        *)
+(*  rather than with a pointwise "agrees outside [off, off+|sub|)":       *)
+(*  a caller discharges it by [reflexivity] on the term it just built.    *)
+(*                                                                       *)
+(*  ALL LIST REASONING HERE IS AT THE [take]/[drop]/[++] LEVEL and never  *)
+(*  at the element level: the lists are 1024 long and the block layer's   *)
+(*  rule is that nothing ever computes one (durable-notes).              *)
+(* ===================================================================== *)
+
+Definition blk_splice (off : nat) (sub bs : list (bv 8)) : list (bv 8) :=
+  take off bs ++ sub ++ drop (off + length sub) bs.
+
+Lemma blk_splice_length (off : nat) (sub bs : list (bv 8)) :
+  (off + length sub <= length bs)%nat ->
+  length (blk_splice off sub bs) = length bs.
+Proof.
+  intros H. rewrite /blk_splice !length_app length_take length_drop. lia.
+Qed.
+
+(* the whole-block instance: splicing a full-width run at 0 IS the run *)
+Lemma blk_splice_whole (sub bs : list (bv 8)) :
+  length sub = length bs -> blk_splice 0 sub bs = sub.
+Proof.
+  intros H. rewrite /blk_splice take_0 app_nil_l /=.
+  rewrite drop_ge; [| lia]. by rewrite app_nil_r.
+Qed.
+
+Lemma blk_splice_lookup_lt (off : nat) (sub bs : list (bv 8)) (j : nat) :
+  (off <= length bs)%nat -> (j < off)%nat ->
+  blk_splice off sub bs !! j = bs !! j.
+Proof.
+  intros Hb Hj. rewrite /blk_splice lookup_app_l.
+  - by apply lookup_take.
+  - rewrite length_take. lia.
+Qed.
+
+Lemma blk_splice_lookup_mid (off : nat) (sub bs : list (bv 8)) (j : nat) :
+  (off <= length bs)%nat -> (off <= j)%nat -> (j < off + length sub)%nat ->
+  blk_splice off sub bs !! j = sub !! (j - off)%nat.
+Proof.
+  intros Hb H1 H2. rewrite /blk_splice.
+  rewrite lookup_app_r; [| rewrite length_take; lia].
+  rewrite length_take_le; [| lia].
+  rewrite lookup_app_l; [done | lia].
+Qed.
+
+Lemma blk_splice_lookup_ge (off : nat) (sub bs : list (bv 8)) (j : nat) :
+  (off <= length bs)%nat -> (off + length sub <= j)%nat ->
+  blk_splice off sub bs !! j = bs !! j.
+Proof.
+  intros Hb Hj. rewrite /blk_splice.
+  rewrite lookup_app_r; [| rewrite length_take; lia].
+  rewrite length_take_le; [| lia].
+  rewrite lookup_app_r; [| lia].
+  rewrite lookup_drop. f_equal. lia.
+Qed.
+
 Definition logN : namespace := nroot .@ "fslogbytes".
 
 (* the mask side condition every reader at the top mask discharges.  Proved
@@ -314,6 +379,39 @@ Section FsBytes.
       specialize (Hs1 H1 _ _ Hx). specialize (Hs2 H2 _ _ Hy). congruence.
     - symmetry. apply lookup_ge_None. rewrite -Hlen.
       by apply lookup_ge_None.
+  Qed.
+
+  (* ...AND THE SUB-RANGE READING OF IT (durable-disk 2b-0).  A run pinned
+     to the authority INSIDE a longer run's span is that run's slice --
+     which is how the sub-block writer learns what the other 960 bytes of
+     its block are without ever holding them: the cache entry is [L] read
+     at the block's whole range ([bytes_tie]), and the writer's own run is
+     [L] read at its own. *)
+  Lemma map_seqZ_slice (xs ys : list (bv 8)) (start : Z) (o : nat)
+      (L : gmap Z (bv 8)) :
+    (o + length ys <= length xs)%nat ->
+    (map_seqZ start xs : gmap Z (bv 8)) ⊆ L ->
+    (map_seqZ (start + Z.of_nat o) ys : gmap Z (bv 8)) ⊆ L ->
+    ys = take (length ys) (drop o xs).
+  Proof.
+    intros Hle H1 H2. apply list_eq. intros k.
+    destruct (decide (k < length ys)%nat) as [Hk|Hk].
+    - destruct (lookup_lt_is_Some_2 ys k Hk) as [y Hy].
+      rewrite Hy. symmetry.
+      rewrite lookup_take; [| exact Hk]. rewrite lookup_drop.
+      assert (Hxs : is_Some (xs !! (o + k)%nat))
+        by (apply lookup_lt_is_Some; lia).
+      destruct Hxs as [x Hx]. rewrite Hx. f_equal.
+      apply (lookup_map_seqZ_Some_inv (start + Z.of_nat o)) in Hy.
+      apply (lookup_map_seqZ_Some_inv start) in Hx.
+      pose proof (lookup_weaken _ _ _ _ Hy H2) as HL1.
+      pose proof (lookup_weaken _ _ _ _ Hx H1) as HL2.
+      assert (Heq : start + Z.of_nat o + Z.of_nat k
+                    = start + Z.of_nat (o + k)%nat) by lia.
+      rewrite Heq in HL1. congruence.
+    - rewrite (lookup_ge_None_2 ys k); [| lia].
+      symmetry. apply lookup_ge_None_2.
+      rewrite length_take length_drop. lia.
   Qed.
 
   (* what the auth says about an owned run *)
@@ -495,26 +593,40 @@ Section FsBytes.
     iExFalso. iApply (fsblock_excl with "H1 H2").
   Qed.
 
+  (* AT SUB-BLOCK GRANULARITY (durable-disk 2b-0): owning ANY nonempty run
+     inside block [b]'s width is being a home block.  [fsblock_home] is the
+     whole-block instance and nothing that uses it moves. *)
+  Lemma byte_range_home (gL : gname) (L : gmap Z (bv 8)) (home : gset Z)
+      (b : Z) (off : nat) (bs : list (bv 8)) :
+    bytes_dom L home ->
+    (off < BSIZE)%nat -> (0 < length bs)%nat ->
+    ghost_map_auth gL 1 L -∗ byte_range gL b (Z.of_nat off) bs -∗ ⌜b ∈ home⌝.
+  Proof.
+    iIntros (Hdm Hoff Hpos) "Ha Hr".
+    iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
+    assert (Hfst : is_Some ((map_seqZ (b * BSZ + Z.of_nat off) bs
+                               : gmap Z (bv 8)) !! (b * BSZ + Z.of_nat off))).
+    { apply lookup_map_seqZ_is_Some. lia. }
+    destruct Hfst as [v Hv].
+    assert (HL : L !! (b * BSZ + Z.of_nat off) = Some v)
+      by exact (lookup_weaken _ _ _ _ Hv Hsub).
+    destruct (proj1 (Hdm (b * BSZ + Z.of_nat off)) (mk_is_Some _ _ HL))
+      as (b' & Hb' & Hr').
+    iPureIntro.
+    assert (Hoz : Z.of_nat off < BSZ).
+    { rewrite -BSZ_BSIZE. apply Nat2Z.inj_lt. exact Hoff. }
+    rewrite (blk_range_disj b b' (b * BSZ + Z.of_nat off)
+               ltac:(lia) Hr'). exact Hb'.
+  Qed.
+
   Lemma fsblock_home (gL : gname) (L : gmap Z (bv 8)) (home : gset Z)
       (b : Z) (bs : list (bv 8)) :
     bytes_dom L home ->
     ghost_map_auth gL 1 L -∗ fsblock gL b bs -∗ ⌜b ∈ home⌝.
   Proof.
     iIntros (Hdm) "Ha [%Hlb Hr]".
-    iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
-    rewrite Z.add_0_r in Hsub.
-    assert (Hfst : is_Some ((map_seqZ (b * BSZ) bs : gmap Z (bv 8))
-                              !! (b * BSZ))).
-    { apply lookup_map_seqZ_is_Some. rewrite Hlb BSZ_BSIZE.
-      unfold BSZ. lia. }
-    destruct Hfst as [v Hv].
-    assert (HL : L !! (b * BSZ) = Some v)
-      by exact (lookup_weaken _ _ _ _ Hv Hsub).
-    destruct (proj1 (Hdm (b * BSZ)) (mk_is_Some _ _ HL))
-      as (b' & Hb' & Hr').
-    iPureIntro.
-    rewrite (blk_range_disj b b' (b * BSZ)
-               ltac:(unfold BSZ; lia) Hr'). exact Hb'.
+    iApply (byte_range_home gL L home b 0%nat bs Hdm
+              BSIZE_pos ltac:(rewrite Hlb; exact BSIZE_pos) with "Ha Hr").
   Qed.
 
   (* HOLDING THE RUN IS BEING A HOME BLOCK, as a fupd at the row rather
@@ -568,68 +680,122 @@ Section FsBytes.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  6.  log_write's ghost step                                         *)
+  (*  6.  log_write's ghost step, AT BYTE-RANGE GRANULARITY              *)
   (*                                                                     *)
-  (*  The whole-block instance of §3's byte-range update: the writer      *)
-  (*  presents the block's full byte run and the handle's cache half,     *)
-  (*  the log presents the cache auth (it holds log.lock), the invariant  *)
-  (*  supplies the cache element's other half and the byte auth.  What is *)
-  (*  LEARNED is that the checked-out buffer's parked bytes are exactly   *)
-  (*  the writer's view -- so the writer never has to name them.          *)
+  (*  The writer presents ONLY the sub-range it owns ([sub_old] at        *)
+  (*  [off]) plus the handle's cache half; the log presents the cache     *)
+  (*  auth (it holds log.lock); the invariant supplies the cache          *)
+  (*  element's other half and the byte auth.  THE OTHER 960 BYTES ARE    *)
+  (*  LEARNED, NEVER PRESENTED: the cache entry is [L] read at the        *)
+  (*  block's whole range ([bytes_tie]) and the writer's run is [L] read  *)
+  (*  at its own, so [map_seqZ_slice] identifies the writer's bytes with  *)
+  (*  the slice of the checked-out buffer -- which is what makes an       *)
+  (*  inode record's 64 bytes (or a dirent's 16) enough to log_write the  *)
+  (*  whole block.  The new cache content is the SPLICE, i.e. exactly     *)
+  (*  what the writer's own stores produced.                             *)
+  (*                                                                     *)
+  (*  [length sub_new = length sub_old] is GUARDED by the block's width   *)
+  (*  because the width is not known until the invariant is open; the     *)
+  (*  whole-block corollary below is what that guard buys (it has no      *)
+  (*  [length bsm] premise to give).                                      *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma fsblock_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
-      (b : Z) (bs bs_new bsm : list (bv 8)) :
-    ↑logN ⊆ E -> length bs_new = BSIZE ->
+  Lemma byte_range_log_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
+      (b : Z) (off : nat) (sub_old sub_new bs_old : list (bv 8)) :
+    ↑logN ⊆ E ->
+    (off + length sub_old <= BSIZE)%nat ->
+    (0 < length sub_old)%nat ->
+    (length bs_old = BSIZE -> length sub_new = length sub_old) ->
     fs_bytes_inv gL gc home -∗
     ghost_map_auth gc 1 C -∗
-    fsblock gL b bs -∗
-    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
-      ⌜bsm = bs /\ C !! b = Some bs⌝ ∗
-      ghost_map_auth gc 1 (<[b := bs_new]> C) ∗
-      fsblock gL b bs_new ∗
-      (b ↪[gc]{#(1/2)} bs_new).
+    byte_range gL b (Z.of_nat off) sub_old -∗
+    (b ↪[gc]{#(1/2)} bs_old) ={E}=∗
+      ⌜C !! b = Some bs_old /\ length bs_old = BSIZE /\
+        sub_old = take (length sub_old) (drop off bs_old)⌝ ∗
+      ghost_map_auth gc 1 (<[b := blk_splice off sub_new bs_old]> C) ∗
+      byte_range gL b (Z.of_nat off) sub_new ∗
+      (b ↪[gc]{#(1/2)} blk_splice off sub_new bs_old).
   Proof.
-    iIntros (HE Hlnew) "#Hinv Hca Hfb Hm".
+    iIntros (HE Hoff Hpos Hshape) "#Hinv Hca Hr Hm".
     iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (L C0) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
-    iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
+    iDestruct (byte_range_home gL L home b off sub_old Hdm
+                 ltac:(lia) Hpos with "Ha Hr") as %Hb.
     assert (Hin : is_Some (C0 !! b)).
     { apply elem_of_dom. rewrite Hdom. exact Hb. }
     destruct Hin as [bsi Hbsi].
     iDestruct (big_sepM_insert_acc _ _ b bsi Hbsi with "HC") as "[Hi Hback]".
-    iDestruct (ghost_map_elem_agree with "Hm Hi") as %->.
-    iDestruct "Hfb" as "[%Hlb Hr]".
+    iDestruct (ghost_map_elem_agree with "Hm Hi") as %Hbso.
+    subst bsi.
+    assert (Hlbo : length bs_old = BSIZE) by exact (Hlens b bs_old Hbsi).
+    specialize (Hshape Hlbo).
     iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
-    rewrite Z.add_0_r in Hsub.
-    assert (Hbe : bs = bsi).
-    { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
-      - rewrite Hlb (Hlens b bsi Hbsi) //.
-      - exact (Htie b bsi Hbsi). }
+    (* THE 960 BYTES, LEARNED *)
+    assert (Hslice : sub_old = take (length sub_old) (drop off bs_old)).
+    { apply (map_seqZ_slice bs_old sub_old (b * BSZ) off L);
+        [rewrite Hlbo; lia | exact (Htie b bs_old Hbsi) | exact Hsub]. }
+    assert (Hlsp : length (blk_splice off sub_new bs_old) = BSIZE).
+    { rewrite blk_splice_length; [exact Hlbo | rewrite Hshape Hlbo; lia]. }
     (* the cache element moves: both halves plus the log's auth *)
     iCombine "Hm Hi" as "He".
     iDestruct (ghost_map_lookup with "Hca He") as %Hclk.
-    iMod (ghost_map_update bs_new with "Hca He") as "[Hca He]".
+    iMod (ghost_map_update (blk_splice off sub_new bs_old) with "Hca He")
+      as "[Hca He]".
     iDestruct "He" as "[Hm Hi]".
-    (* the byte view moves *)
-    iMod (byte_range_update gL L b 0 bs bs_new with "Ha Hr") as "[Ha Hr]".
-    { rewrite Hlnew Hlb //. }
-    rewrite Z.add_0_r.
-    assert (Hdomeq : dom (map_seqZ (b * BSZ) bs_new : gmap Z (bv 8))
-                     = dom (map_seqZ (b * BSZ) bsi : gmap Z (bv 8))).
+    (* the byte view moves ON EXACTLY THE WRITER'S BYTES *)
+    iMod (byte_range_update gL L b (Z.of_nat off) sub_old sub_new
+            Hshape with "Ha Hr") as "[Ha Hr]".
+    (* the new keys are the old ones: same start, same length *)
+    assert (Hdomeq : dom (map_seqZ (b * BSZ + Z.of_nat off) sub_new
+                            : gmap Z (bv 8))
+                     = dom (map_seqZ (b * BSZ + Z.of_nat off) sub_old
+                              : gmap Z (bv 8))).
     { apply set_eq. intros a.
-      rewrite !elem_of_dom !lookup_map_seqZ_is_Some.
-      rewrite Hlnew (Hlens b bsi Hbsi). done. }
-    assert (Hnew_sub : dom (map_seqZ (b * BSZ) bs_new : gmap Z (bv 8)) ⊆ dom L).
-    { rewrite Hdomeq. apply subseteq_dom. exact (Htie b bsi Hbsi). }
+      rewrite !elem_of_dom !lookup_map_seqZ_is_Some. rewrite Hshape. done. }
+    assert (Hnew_sub : dom (map_seqZ (b * BSZ + Z.of_nat off) sub_new
+                              : gmap Z (bv 8)) ⊆ dom L).
+    { rewrite Hdomeq. apply subseteq_dom. exact Hsub. }
+    assert (Hoz : Z.of_nat off + Z.of_nat (length sub_old) <= BSZ).
+    { rewrite -BSZ_BSIZE -Nat2Z.inj_add. apply Nat2Z.inj_le. lia. }
     assert (Hrange : forall a,
-              is_Some ((map_seqZ (b * BSZ) bs_new : gmap Z (bv 8)) !! a) ->
+              is_Some ((map_seqZ (b * BSZ + Z.of_nat off) sub_new
+                          : gmap Z (bv 8)) !! a) ->
               b * BSZ <= a < b * BSZ + BSZ).
     { intros a Hs. apply lookup_map_seqZ_is_Some in Hs.
-      rewrite Hlnew BSZ_BSIZE in Hs. lia. }
+      rewrite Hshape in Hs. lia. }
+    (* the spliced block still reads off the moved authority *)
+    assert (Htieb : (map_seqZ (b * BSZ) (blk_splice off sub_new bs_old)
+                       : gmap Z (bv 8))
+                    ⊆ (map_seqZ (b * BSZ + Z.of_nat off) sub_new
+                         : gmap Z (bv 8)) ∪ L).
+    { apply map_subseteq_spec. intros a v Hav.
+      apply lookup_map_seqZ_Some in Hav as [Hge Hlk].
+      destruct (decide (off <= Z.to_nat (a - b * BSZ)
+                        /\ Z.to_nat (a - b * BSZ) < off + length sub_new)%nat)
+        as [[Hj1 Hj2] | Hjout].
+      - (* inside the writer's own run: the left map has it *)
+        rewrite blk_splice_lookup_mid in Hlk; [| lia | lia | lia].
+        apply lookup_union_Some_raw. left.
+        apply lookup_map_seqZ_Some. split; [lia |].
+        replace (Z.to_nat (a - (b * BSZ + Z.of_nat off)))
+          with (Z.to_nat (a - b * BSZ) - off)%nat by lia.
+        exact Hlk.
+      - (* outside it: the byte is the checked-out buffer's, hence [L]'s *)
+        assert (Hbsl : bs_old !! Z.to_nat (a - b * BSZ) = Some v).
+        { destruct (decide (Z.to_nat (a - b * BSZ) < off)%nat) as [Hlt | Hge2].
+          - rewrite blk_splice_lookup_lt in Hlk; [exact Hlk | lia | lia].
+          - rewrite blk_splice_lookup_ge in Hlk; [exact Hlk | lia | lia]. }
+        apply lookup_union_Some_raw. right. split.
+        + apply eq_None_not_Some. intros Hs.
+          apply lookup_map_seqZ_is_Some in Hs. lia.
+        + pose proof (map_subseteq_spec
+                        (map_seqZ (b * BSZ) bs_old : gmap Z (bv 8)) L) as [Hs _].
+          apply (Hs (Htie b bs_old Hbsi) a v).
+          apply lookup_map_seqZ_Some. split; [lia | exact Hbsl]. }
     iMod ("Hclose" with "[Ha Hback Hi]") as "_".
-    { iNext. iExists ((map_seqZ (b * BSZ) bs_new : gmap Z (bv 8)) ∪ L),
-                     (<[b := bs_new]> C0).
+    { iNext.
+      iExists ((map_seqZ (b * BSZ + Z.of_nat off) sub_new : gmap Z (bv 8)) ∪ L),
+              (<[b := blk_splice off sub_new bs_old]> C0).
       iFrame "Ha".
       iSplitL.
       { iApply ("Hback" with "Hi"). }
@@ -642,8 +808,7 @@ Section FsBytes.
         + rewrite lookup_insert_ne in Hb'; [| done]. exact (Hlens b' bs' Hb').
       - intros b' bs' Hb'.
         destruct (decide (b' = b)) as [->|Hne].
-        + rewrite lookup_insert in Hb'. injection Hb' as <-.
-          apply map_union_subseteq_l.
+        + rewrite lookup_insert in Hb'. injection Hb' as <-. exact Htieb.
         + rewrite lookup_insert_ne in Hb'; [| done].
           apply map_subseteq_spec. intros a v Hav.
           apply lookup_union_Some_raw. right. split.
@@ -663,9 +828,40 @@ Section FsBytes.
           * apply elem_of_dom. apply Hnew_sub. apply elem_of_dom. by exists v.
           * by exists v.
         + intros Hs. apply lookup_union_is_Some. by right. }
+    iModIntro. iFrame "Hca Hm Hr". iPureIntro. auto.
+  Qed.
+
+  (* THE WHOLE-BLOCK COROLLARY, at its old statement so that nothing which
+     uses it moves: the writer that happens to own the entire run presents
+     it at [off = 0], and the splice of a full-width run IS that run. *)
+  Lemma fsblock_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
+      (b : Z) (bs bs_new bsm : list (bv 8)) :
+    ↑logN ⊆ E -> length bs_new = BSIZE ->
+    fs_bytes_inv gL gc home -∗
+    ghost_map_auth gc 1 C -∗
+    fsblock gL b bs -∗
+    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs /\ C !! b = Some bs⌝ ∗
+      ghost_map_auth gc 1 (<[b := bs_new]> C) ∗
+      fsblock gL b bs_new ∗
+      (b ↪[gc]{#(1/2)} bs_new).
+  Proof.
+    iIntros (HE Hlnew) "#Hinv Hca Hfb Hm".
+    iDestruct "Hfb" as "[%Hlb Hr]".
+    iMod (byte_range_log_update E gL gc home C b 0%nat bs bs_new bsm HE
+            ltac:(rewrite Hlb; lia) ltac:(rewrite Hlb; exact BSIZE_pos)
+            ltac:(intros Hbm; rewrite Hlnew Hlb //)
+            with "Hinv Hca Hr Hm")
+      as "((%Hclk & %Hlbm & %Hslice) & Hca & Hr & Hm)".
+    (* the buffer's parked bytes ARE the writer's run: [take BSIZE] of a
+       block-wide list is the list *)
+    assert (Hbe : bsm = bs).
+    { rewrite Hslice drop_0 Hlb. symmetry. apply take_ge. lia. }
+    assert (Hsp : blk_splice 0 bs_new bsm = bs_new).
+    { apply blk_splice_whole. rewrite Hlnew Hlbm //. }
+    iEval (rewrite Hsp) in "Hca". iEval (rewrite Hsp) in "Hm".
     iModIntro. rewrite /fsblock.
-    iSplitR.
-    { iPureIntro. split; [congruence | rewrite Hbe; exact Hclk]. }
+    iSplitR; [iPureIntro; split; [exact Hbe | rewrite -Hbe; exact Hclk] |].
     iFrame "Hca Hm Hr". iPureIntro. exact Hlnew.
   Qed.
 

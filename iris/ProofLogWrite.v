@@ -1761,25 +1761,29 @@ Section ProofLogWrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* THE WHOLE-FUNCTION PROOF, at the most general (atomic-update) contract.
-     [wp_log_write_gen] below is its degenerate instance at a held [fsblock],
+  (* THE WHOLE-FUNCTION PROOF, at the most general (byte-range atomic-update)
+     contract.  [wp_log_write_au] below is its whole-block instance,
+     [wp_log_write_gen] that one's degenerate instance at a held [fsblock],
      and [wp_log_write_sconf] the set-forgetting instance of that. *)
-  Lemma wp_log_write_au
+  Lemma wp_log_write_au_range
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (off len : nat) (sub_new : list (bv 8))
       (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
       (Psi : gmap Z (list (bv 8)) -> iProp Σ)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
-                           bs bsl bsd d u cr Sb e0 vlb Psi Efs Φfsb m n eb p K b lks.
+    : wp_log_write_au_range_body bn γ γfs γd cov logstart dev k pidv bno
+                                 bs bsl bsd d u off len sub_new
+                                 cr Sb e0 vlb Psi Efs Φfsb m n eb p K b lks.
   Proof.
-    cbv beta delta [wp_log_write_au_body].
-    intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog HlogE Hno.
+    cbv beta delta [wp_log_write_au_range_body].
+    intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog HlogE
+           Hwin Hlenpos Hshape Hno.
     (* the budget resource this run delivers, threaded opaquely through the
        lw_* helpers -- none of them inspects it *)
     pose (Bud := (log_opSwe γ (if cr then S u else u) (Sb ∪ {[uint bno]})
@@ -2242,26 +2246,36 @@ Section ProofLogWrite.
        epoch.  [Hwit] (minted above, both arms) and this comparison are the
        two inputs the closing wand takes; together they are exactly
        [InodeRegion.izrcpt]'s witness disjunct. *)
-    iMod "Hau" as (bsl' v') "(Hfsb & #Hvlb' & HauClose)".
+    iMod "Hau" as (sub_old v') "(%Hlsub & Hfsb & #Hvlb' & HauClose)".
     (* [e0] is already [Ep] here -- a live entry is born at the current
        epoch, [subst] above -- so this IS the comparison the wand wants. *)
     iDestruct (log_epoch_lb_le γ Ep v' with "Hepa Hvlb'") as %Hvle'.
-    iMod (fsblock_update Efs (fs_bytes γfs) (fs_cache γfs)
-            (fs_home_set cov logstart) L (uint bno) bsl' bs bsl
-            HlogE Hlenbs
+    (* THE CROSSING, AT THE WRITER'S OWN WINDOW (durable-disk 2b-0).  The
+       caller surrendered only [sub_old]; the other bytes of the block are
+       LEARNED here, from the log's tie between the cache entry and the
+       byte view, and the new cache content is the SPLICE -- which the
+       shape premise then identifies with the buffer's own [bs]. *)
+    iMod (byte_range_log_update Efs (fs_bytes γfs) (fs_cache γfs)
+            (fs_home_set cov logstart) L (uint bno) off sub_old sub_new bsl
+            HlogE ltac:(lia) ltac:(lia)
+            ltac:(intros Hlb; destruct (Hshape Hlenbs Hlb) as [Hsn _]; lia)
             with "Hbinv HLauth Hfsb HpL")
-      as "((%Hbsl1 & %Hllk) & HLauth & Hfsb & HpL)".
-    (* [Hbsl1 : bsl = bsl'] -- [fsblock_update]'s output is stated as
-       [bsm = bs], i.e. CACHE HALF = BYTE RUN, so it lands with the
-       handle's [bsl] on the LEFT.  Substituting [bsl'] away keeps [Hllk]
-       in its old shape ([L !! uint bno = Some bsl]) for everything
-       downstream. *)
-    subst bsl'.
+      as "((%Hllk & %Hlenbsl & %Hslice) & HLauth & Hfsb & HpL)".
+    (* the block's width is nameable only HERE, so the writer's shape
+       obligation is discharged here too -- and the cache's new content is
+       then literally the buffer's bytes, which is what everything
+       downstream (the payload, the arms' rows, the post) is stated at. *)
+    destruct (Hshape Hlenbs Hlenbsl) as [Hlsn Hbsplice].
+    iEval (rewrite -Hbsplice) in "HLauth".
+    iEval (rewrite -Hbsplice) in "HpL".
     (* THE PARKED PAYLOAD CROSSES THE CLIENT'S UPDATE (durable-disk 1d',
        item 3).  A [log_write] writes no disk block, so the committed view
        -- and with it the payload's index -- does not move: the payload goes
        in at [lm_committed M cov logstart] and comes back at the same index,
        whatever the client did inside it. *)
+    assert (Hauin : length bsl = BSIZE /\ length sub_new = len /\
+                    sub_old = take len (drop off bsl)).
+    { split_and!; [exact Hlenbsl | exact Hlsn | rewrite -Hlsub; exact Hslice]. }
     iDestruct ("HauClose" with "[//] Hwit [//] Hfsb") as "HauClose".
     iMod ("HauClose" $! (lm_committed M cov logstart) with "Hpsi")
       as "[Hpsi HPhifsb]".
@@ -2799,6 +2813,46 @@ Section ProofLogWrite.
                 HTAregs HTAa5 HTAa4 HTAa2 HTAa1
                 with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hbslot Hbnoc
                       HW Hjhead Hncell Hcl Hcont").
+  Qed.
+
+  (* THE WHOLE-BLOCK ATOMIC-UPDATE CONTRACT (durable-disk 2b-0), unchanged
+     from what its five suppliers were written against, as the range form's
+     instance at [off := 0], [len := BSIZE], [sub_new := bs].  BOTH of the
+     range form's side conditions are discharged from the block's width --
+     which is precisely why they are guarded by it: a caller of THIS form
+     knows [length bs = BSIZE] only from inside the handle, and this
+     derivation never opens one.  [lw_au_whole] does the same for the fupd:
+     the range form hands its writer the two widths as wand inputs, so the
+     whole-block reading [take BSIZE (drop 0 bsl) = bsl] is available
+     exactly where it is needed. *)
+  Lemma wp_log_write_au
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γd : disk_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (k : nat) (pidv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
+      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Efs : coPset) (Φfsb : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
+      (K : nat) (b : bool) (lks : gset string)
+    : wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
+                           bs bsl bsd d u cr Sb e0 vlb Psi Efs Φfsb m n eb p K b lks.
+  Proof.
+    cbv beta delta [wp_log_write_au_body].
+    intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog HlogE Hno.
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hlctx Hbslot #Hvlb #Hcredit Hop Hau Hheld Hcont".
+    iApply (wp_log_write_au_range bn γ γfs γd cov logstart dev k pidv bno
+              bs bsl bsd d u 0%nat BSIZE bs cr Sb e0 vlb Psi Efs Φfsb
+              m n eb p K b lks
+              HK Hnoff Hk Ha0 Hcovbno Hnotlog HlogE
+              ltac:(lia) ltac:(unfold BSIZE; lia)
+              ltac:(intros Hlb Hlbsl; split;
+                    [exact Hlb | symmetry; apply blk_splice_whole; lia])
+              Hno
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hvlb Hcredit Hop
+                    [Hau] Hheld Hcont").
+    iApply (lw_au_whole γ γfs (uint bno) Efs bs bsl Φfsb e0 Psi with "Hau").
   Qed.
 
   (* THE EPOCH-EXPOSED CONTRACT (fs-log.md §G.20), derived from the

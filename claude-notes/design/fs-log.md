@@ -459,6 +459,44 @@ the payload, which is what keeps the five AU suppliers (ialloc's
 `ireg_claim_au`, iupdate's three region steps, bfree's and balloc's bitmap
 steps, iput's deposit) byte-stable.
 
+#### `log_write` at BYTE-RANGE granularity (durable-disk 2b-0)
+
+`SpecLogWrite.wp_log_write_au_range_body` is the form the whole-function
+proof proves; every other form is derived from it. It carries a window
+`off`/`len` and the new sub-range `sub_new`, and its AU surrenders
+`⌜length sub_old = len⌝ ∗ FsBlocks.byte_range (fs_bytes γfs) (uint bno)
+(Z.of_nat off) sub_old` where the whole-block form surrenders an `fsblock`.
+That is what lets a writer owning an inode record's 64 bytes — or a
+dirent's 16 — `log_write` the whole buffer, and it has to: `rec_owned` is 64
+bytes and two inodes of ONE block are checked out at once in `mknod`
+itself. **The other 960 bytes are never presented.**
+`FsBlocks.byte_range_log_update` learns them from the log's own tie (the
+cache entry is `L` read at the block's whole range, `bytes_tie`), so it can
+report to the closing wand `⌜length bsl = BSIZE ∧ length sub_new = len ∧
+sub_old = take len (drop off bsl)⌝` and move the cache to
+`blk_splice off sub_new bsl` — the splice being exactly the whole-block
+content the writer's own stores produced.
+
+The writer's ONE obligation is that shape,
+
+    length bs = BSIZE → length bsl = BSIZE →
+      length sub_new = len ∧ bs = blk_splice off sub_new bsl
+
+**guarded by the block's width, because the width is nameable only inside
+the handle** — and that guard is the whole reason `wp_log_write_au` is a
+COROLLARY (`off := 0`, `len := BSIZE`, `sub_new := bs`, its fupd converted
+by the `lw_au_whole` adapter) instead of a second whole-function proof: a
+derivation that must discharge a side condition before entering the WP
+cannot open `bio_held` to find the width. For the same reason the two
+widths ride OUT as wand inputs rather than in as premises.
+`wp_log_write_au` keeps its old statement verbatim, so its five suppliers
+and the whole `_gene`/`_gen`/`_sconf` chain below it are unchanged, and
+`FsBlocks.fsblock_update` survives as the `off = 0` corollary of the
+crossing. `SpecLogWrite.lw_au_rec` is the record-slot corollary the inode
+region's flip uses: slot `k`'s 64 bytes at `64·k`, stated over
+`FsStateDefs.byte_range (fs_gamma_L γfs)` through
+`FsBytesGamma.gamma_byte_range` and carrying no receipt.
+
 **Row (b) is real, and it is what makes the commit's contract
 client-free.** `log_mirror_tie_body M L cov logstart LB` says: at every
 HOME block outside the batch's logged set, the logged view `L` holds

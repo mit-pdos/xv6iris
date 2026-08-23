@@ -79,6 +79,8 @@ Require Import CpuOwn.
 Require Import DiskPtsto.
 Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import FsBytesGamma.  (* [fs_gamma_L]/[gamma_byte_range]: the record-slot
+                                 corollary is stated at the ABSTRACT view's run *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -337,6 +339,196 @@ Definition wp_log_write_au_body
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE ATOMIC-UPDATE FORM AT BYTE-RANGE GRANULARITY (durable-disk 2b-0)  *)
+(*                                                                       *)
+(*  THE WRITER OF AN OBJECT SMALLER THAN A BLOCK -- an inode record's 64  *)
+(*  bytes, a directory entry's 16 -- owns only that object's run and can  *)
+(*  never present the whole [fsblock]: [rec_owned] is 64 bytes, and two   *)
+(*  inodes of ONE block are checked out at once in mknod itself ([dp],    *)
+(*  [ip]), so the whole-block form is not merely inconvenient there, it   *)
+(*  is unownable.  This form takes the sub-range the writer HAS.          *)
+(*                                                                       *)
+(*  WHAT THE OTHER 960 BYTES COST: nothing.  The ghost step learns them   *)
+(*  from the log's own tie ([FsBlocks.byte_range_log_update]) -- the      *)
+(*  cache entry is the byte view read at the block's whole range -- so    *)
+(*  the writer's obligation is only the SHAPE of its own stores: the      *)
+(*  buffer it hands to log_write differs from the block's logged content  *)
+(*  [bsl] exactly inside [off, off + len).                                *)
+(*                                                                       *)
+(*  BOTH SIDE CONDITIONS ARE GUARDED BY THE BLOCK'S WIDTH, and that is    *)
+(*  what makes [wp_log_write_au] a corollary rather than a second proof:  *)
+(*  a caller of the whole-block form has [length bs = BSIZE] only inside  *)
+(*  the handle, and the derivation cannot open it.  Under the guard the   *)
+(*  whole-block instance ([off := 0], [len := BSIZE], [sub_new := bs]) is *)
+(*  discharged by [lia] and [blk_splice_whole].                           *)
+(*                                                                       *)
+(*  Everything else -- the ledger, the credit, the epoch anchor, the      *)
+(*  parked payload crossing the update, the two arms' rows -- is          *)
+(*  [wp_log_write_au_body]'s, unchanged; see its header for all of it.    *)
+(* ===================================================================== *)
+Definition wp_log_write_au_range_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γd : disk_names)
+    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (k : nat) (pidv bno : mword 32)
+    (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+    (off len : nat) (sub_new : list (bv 8))
+    (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
+    (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+    (Efs : coPset) (Φfsb : iProp Σ)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64)
+    (K : nat) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.log_write in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+  (K_log_write <= K)%nat ->
+  (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+  (* a0 is the buffer being logged *)
+  (k < NBUF)%nat ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* the block is a covered HOME block: never the log's own storage *)
+  uint bno ∈ cov ->
+  ~ (uint bno ∈ log_region_set logstart) ->
+  ↑logN ⊆ Efs ->
+  (* THE WRITER'S WINDOW: a nonempty run inside the block *)
+  (off + len <= BSIZE)%nat ->
+  (0 < len)%nat ->
+  (* THE ONE OBLIGATION THE SUB-RANGE WRITER OWES: its stores moved the
+     buffer only inside the window.  Guarded by the block's width, which
+     is not nameable outside the handle -- see the header. *)
+  (length bs = BSIZE -> length bsl = BSIZE ->
+     length sub_new = len /\ bs = blk_splice off sub_new bsl) ->
+  (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
+  locks_below lks "log" ->
+  sie_cap_gpr KT1 m K b p -∗
+  cpu_own n eb p b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx_at Psi γ bn γfs cov logstart dev -∗
+  bslot -∗
+  log_epoch_lb γ vlb -∗
+  log_credit γ cr Sb e0 (uint bno) -∗
+  log_opSe γ (S u) Sb e0 -∗
+  (* THE CALLER'S VIEW OF ITS OWN OBJECT, AS AN ATOMIC UPDATE.  The fupd
+     surrenders the run at WHATEVER content the caller's invariant parked
+     ([sub_old], existential, at the window's width); the closing wand is
+     told what the log's tie says that content WAS -- the slice of the
+     checked-out buffer at [off] -- takes the run back at the written
+     bytes, and pays out the caller's receipt. *)
+  (|={⊤, Efs}=> ∃ (sub_old : list (bv 8)) (v : nat),
+     ⌜length sub_old = len⌝ ∗
+     FsBlocks.byte_range (fs_bytes γfs) (uint bno) (Z.of_nat off) sub_old ∗
+     log_epoch_lb γ v ∗
+     (⌜length bsl = BSIZE /\ length sub_new = len /\
+       sub_old = take len (drop off bsl)⌝ -∗
+      logged_at γ e0 (uint bno) -∗ ⌜(v <= e0)%nat⌝ -∗
+      FsBlocks.byte_range (fs_bytes γfs) (uint bno) (Z.of_nat off) sub_new -∗
+      ∀ D0 : gmap Z (list (bv 8)),
+        Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)) -∗
+  (* the checked-out buffer, payload still indexed at the old content *)
+  bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own n eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    log_opSwe γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno) vlb e0 -∗
+    Φfsb -∗
+    bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
+    bslot -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* THE WHOLE-BLOCK ADAPTER (durable-disk 2b-0).  [wp_log_write_au]'s fupd,
+   read as the range form's at [off := 0], [len := BSIZE].  The surrender
+   half is [fsblock] unfolded; only the closing wand differs, and only
+   because the range form tells the writer what the log's tie says its
+   run WAS ([take BSIZE (drop 0 bsl)]) where the whole-block form can say
+   [bsl] outright.  Both facts the conversion needs -- the block's width
+   and the buffer's -- ride in as wand inputs, so this adapter takes no
+   premise and every landed [wp_log_write_au] supplier is unchanged. *)
+Lemma lw_au_whole `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
+    (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
+    (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
+    (Psi : gmap Z (list (bv 8)) -> iProp Σ) :
+  (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
+     fsblock (fs_bytes γfs) bno bsl' ∗ log_epoch_lb γ v ∗
+     (⌜bsl' = bsl⌝ -∗ logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
+      fsblock (fs_bytes γfs) bno bs -∗
+      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb))
+  -∗
+  (|={⊤, Efs}=> ∃ (sub_old : list (bv 8)) (v : nat),
+     ⌜length sub_old = BSIZE⌝ ∗
+     FsBlocks.byte_range (fs_bytes γfs) bno (Z.of_nat 0) sub_old ∗
+     log_epoch_lb γ v ∗
+     (⌜length bsl = BSIZE /\ length bs = BSIZE /\
+       sub_old = take BSIZE (drop 0 bsl)⌝ -∗
+      logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
+      FsBlocks.byte_range (fs_bytes γfs) bno (Z.of_nat 0) bs -∗
+      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)).
+Proof.
+  iIntros "Hau". iMod "Hau" as (bsl' v) "(Hfb & Hlb & Hcl)".
+  rewrite /fsblock. iDestruct "Hfb" as "[%Hl Hr]".
+  iModIntro. iExists bsl', v.
+  iSplitR; [iPureIntro; exact Hl |]. iFrame "Hr Hlb".
+  iIntros "(%Hlbsl & %Hlbs & %Hslice) Hwit %Hv Hr".
+  iApply ("Hcl" with "[] Hwit [] [Hr]").
+  - iPureIntro. rewrite Hslice drop_0. apply take_ge. lia.
+  - iPureIntro. exact Hv.
+  - rewrite /fsblock. iFrame "Hr". iPureIntro. exact Hlbs.
+Qed.
+
+(* THE RECORD-SLOT COROLLARY (durable-disk 2b-0, item 4), the shape the
+   inode region's flip needs: slot [kslot]'s 64 bytes at [64 * kslot] of
+   its inode block, stated over the ABSTRACT view record's run
+   ([FsStateDefs.byte_range] at [Γ_L], i.e. [rec_owned]'s own spelling)
+   and carrying no receipt.  [FsBytesGamma.gamma_byte_range] is the whole
+   bridge -- the two spellings multiply by [FsImg.BSIZE_z] and
+   [FsBlocks.BSZ], both 1024 -- and the degenerate anchor is
+   [lw_au_lb0]'s: the bound is parked at 0 and both extra wand inputs are
+   dropped, so a region supplier writes exactly the fupd it can build
+   from [rec_owned_acc]. *)
+Lemma lw_au_rec `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
+    (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
+    (kslot : nat) (bsl rec_new : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
+    (Psi : gmap Z (list (bv 8)) -> iProp Σ) :
+  (|={⊤, Efs}=> ∃ rec_old : list (bv 8),
+     ⌜length rec_old = 64%nat⌝ ∗
+     FsStateDefs.byte_range (fs_gamma_L γfs) bno
+       (Z.of_nat (64 * kslot)) rec_old ∗
+     (⌜rec_old = take 64%nat (drop (64 * kslot)%nat bsl)⌝ -∗
+      FsStateDefs.byte_range (fs_gamma_L γfs) bno
+        (Z.of_nat (64 * kslot)) rec_new ={Efs, ⊤}=∗ Φfsb))
+  -∗
+  (|={⊤, Efs}=> ∃ (sub_old : list (bv 8)) (v : nat),
+     ⌜length sub_old = 64%nat⌝ ∗
+     FsBlocks.byte_range (fs_bytes γfs) bno (Z.of_nat (64 * kslot)) sub_old ∗
+     log_epoch_lb γ v ∗
+     (⌜length bsl = BSIZE /\ length rec_new = 64%nat /\
+       sub_old = take 64%nat (drop (64 * kslot)%nat bsl)⌝ -∗
+      logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
+      FsBlocks.byte_range (fs_bytes γfs) bno (Z.of_nat (64 * kslot)) rec_new -∗
+      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)).
+Proof.
+  iIntros "Hau".
+  iMod (log_epoch_lb_0 γ) as "#Hlb0".
+  iMod "Hau" as (rec_old) "(%Hl & Hr & Hcl)".
+  iModIntro. iExists rec_old, 0%nat.
+  rewrite -!gamma_byte_range.
+  iSplitR; [iPureIntro; exact Hl |]. iFrame "Hr Hlb0".
+  iIntros "(%Hlbsl & %Hlrec & %Hslice) _ _ Hr %D0 Hpsi".
+  iMod ("Hcl" with "[//] Hr") as "HPhi".
+  iModIntro. iFrame "Hpsi HPhi".
+Qed.
+
+(* the record geometry: sixteen 64-byte slots to a block, which is the
+   window premise [wp_log_write_au_range_body] takes *)
+Lemma lw_rec_window (kslot : nat) :
+  (kslot < 16)%nat -> (64 * kslot + 64 <= BSIZE)%nat.
+Proof. unfold BSIZE. lia. Qed.
+
 (* THE DEGENERATE ANCHOR, AS AN ADAPTER (fs-log.md §G.17, blocker 4).
    Every AU supplier that owes NO receipt -- ialloc's [ireg_claim_au],
    iupdate's two ordinary region steps, and the held-[fsblock] form below --
@@ -514,10 +706,34 @@ Definition wp_log_write_sconf_body
   WP (Loop : expr riscv_lang).
 
 Module Type LOG_WRITE.
-  (* THE ATOMIC-UPDATE FORM -- the one the whole-function proof proves.
-     [wp_log_write_gen] is its degenerate instance at a held [fsblock], and
-     [wp_log_write_sconf] forgets the credit set on top of that; both are
-     kept as their own parameters so no existing caller moves. *)
+  (* THE BYTE-RANGE ATOMIC-UPDATE FORM -- the one the whole-function proof
+     proves (durable-disk 2b-0).  Everything below is derived from it:
+     [wp_log_write_au] is its whole-block instance ([off := 0],
+     [len := BSIZE]) through [lw_au_whole], [wp_log_write_gene] the
+     degenerate anchor at a HELD run, and so on down.  A writer of a
+     sub-block object -- an inode record, a dirent -- uses THIS one, with
+     [lw_au_rec] for the record slot's shape. *)
+  Parameter wp_log_write_au_range :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γd : disk_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (k : nat) (pidv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (off len : nat) (sub_new : list (bv 8))
+      (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
+      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Efs : coPset) (Φfsb : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
+      (K : nat) (b : bool) (lks : gset string),
+      wp_log_write_au_range_body bn γ γfs γd cov logstart dev k pidv bno
+                                 bs bsl bsd d u off len sub_new
+                                 cr Sb e0 vlb Psi Efs Φfsb m n eb p K b lks.
+
+  (* THE WHOLE-BLOCK ATOMIC-UPDATE FORM, unchanged: the range form at
+     [off = 0], [len = BSIZE].  [wp_log_write_gen] is its degenerate
+     instance at a held [fsblock], and [wp_log_write_sconf] forgets the
+     credit set on top of that; all of them are kept as their own
+     parameters so no existing caller moves. *)
   Parameter wp_log_write_au :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)

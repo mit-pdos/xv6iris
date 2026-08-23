@@ -630,7 +630,27 @@ map at home blocks); 1d lands last.
           2b-inode sequenced region → payload → links with a green
           checkpoint pushed after each — the three share the `dinode_at`
           seam and are not separable in substance.
-      - [ ] **2b-0.** Byte-granular `log_write`.
+      - [x] **2b-0. Byte-granular `log_write` — LANDED.**
+        `FsBlocks.byte_range_log_update` is the crossing: the writer
+        presents ONLY its own run and the handle's cache half, the other
+        960 bytes are read off `bytes_tie`, and the cache moves to
+        `blk_splice off sub_new bs_old` (the splice the writer's stores
+        produced).  `fsblock_update` and `fsblock_home` survive as its
+        `off = 0` corollaries, so nothing that used them moved.
+        `SpecLogWrite.wp_log_write_au_range_body` is what the
+        whole-function proof proves; `wp_log_write_au` KEEPS ITS OLD
+        STATEMENT and is derived from it at `off := 0`/`len := BSIZE`
+        through the `lw_au_whole` adapter, so **the five AU suppliers and
+        `_gene`/`_gen`/`_sconf` are byte-stable** and 2b-inode adapts only
+        the call sites that actually want a sub-range.  The writer's shape
+        obligation is GUARDED by `length bs = BSIZE → length bsl = BSIZE`
+        (the width is nameable only inside `bio_held`, which the
+        derivation cannot open) — see fs-log.md's interface section.
+        `lw_au_rec` is the record-slot corollary over
+        `FsStateDefs.byte_range (fs_gamma_L γfs)`, and `lw_rec_window` the
+        `64·k + 64 ≤ BSIZE` premise; `SpecLogWrite.v` now Requires
+        `FsBytesGamma` (which shadows the bare `byte_range` — the FsBlocks
+        one is spelled qualified there).
       - [ ] **2b-A.** B2, B5, B3's `fs_link`/`fs_top` + boot allocation,
         `fs_gamma_L` reading them, `ireg_free_au` deleted.
       - [ ] **2b-inode.** Region → payload → links.
