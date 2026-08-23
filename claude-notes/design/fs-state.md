@@ -255,3 +255,112 @@ local facts (a dirent insert keeps names unique; a truncate frees every
 owned block; …), which become lemmas beside the predicate that uses them.
 The rest is deleted when the `Γ`-predicates replace their consumers, not
 before.
+
+## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
+
+Five files, 1687 lines, all in `iris/_CoqProject` after `BitmapEnc.v`:
+
+| file | lines | holds |
+|---|---|---|
+| `FsStateDefs.v` | 164 | the record `fs_view_names` (`fsΦ`/`γlink`/`γtop`), `byte_range`, `blk_owned`, `phi_excl`, `GTimeless` |
+| `FsStateLink.v` | 327 | the link RA, its law, its two moves, the generic gather/scatter |
+| `FsStateInode.v` | 713 | `fs_node`, `inode_local`, `rec_owned`, `ind_owned`, `inode_phi`, `ent_toks`, `inode_ghost`, `inode_owned`, `dir_owned`, the readings, the encode lemmas |
+| `FsStateBitmap.v` | 172 | `free_pool`, `free_bitmap`, `bitmap_alloc`, `bitmap_free` |
+| `FsState.v` | 311 | `sb_owned`, `fs_inodes`, `fs_state`, `fs_view`, `fs_footprint`, `fs_state_mint` |
+
+Nothing is imported from any `Proof*`/`Spec*`/invariant file; the whole
+stack sits on `FsImg`/`DinodeEnc`/`BitmapEnc`/`FsTree`/`BlockWords` plus
+plain Iris.
+
+**The RA.** `linkUR := gmapUR Z (authR natUR)` — one auth-of-nat per inum,
+all inums in ONE ghost-map element at `γlink`.  `natUR`'s `op` is `+` and
+its `≼` is `≤`, so the law IS `auth_both_valid_discrete` + `nat_included`;
+`k` separate tokens compose because `◯ 1 ⋅ ◯ 1 = ◯ 2`.  One camera keyed by
+inum (rather than one gname per inum) is what lets `fs_state_mint` allocate
+every auth AND every token of the new instance in a single `own_alloc`.  No
+existing class serves (the tree's unique `ghost_mapG Σ Z (bv 8)` is the byte
+view's and must not be duplicated), so there are two new CAPACITY-ONLY
+classes, `fsLinkG` and `fsTopG` (`ghost_mapG Σ Z fs_node`).  Neither is a
+member of `Xv6G.xv6G`, so a file may bind both without a second instance
+path; folding them into the bundle is 2b/2c's call.
+
+Where the built shape differs from §2, and why:
+
+- **The geometry is a parameter.**  `rec_owned Γ sb i dn`, `inode_owned Γ sb
+  i n`, `fs_inodes Γ sb I` and `free_bitmap Γ sb u` take the superblock;
+  §2's spelling elides it.  `IBLOCK`/`islot`/`sb_bmapstart`/`sb_size` are
+  reused from `FsImg`, not duplicated.
+- **A directory's tokens live INSIDE `inode_owned`**, not beside it.  §2
+  writes `dir_owned Γ d n := inode_owned Γ d n ∗ (the entry reading, with
+  tokens)`, but `fs_inodes` is the one `∗` over `inode_owned`, so tokens
+  hung off `dir_owned` would sit outside `fs_state` entirely.  So
+  `inode_owned` carries `ent_toks Γ n` (empty for a non-directory, since
+  `dir_entries n = ∅` there) and the directory-local clauses, and
+  `dir_owned Γ sb d n := inode_owned Γ sb d n ∗ ⌜fn_is_dir n = true⌝` is the
+  READING.
+- **`inode_owned` is factored as `inode_phi ∗ inode_ghost`** — the Φ-only
+  half and the Φ-free half.  That factoring is what makes `fs_state_mint` a
+  transport rather than a re-derivation: `fs_state_split` lifts it to
+  `fs_state Γ S ⊣⊢ fs_footprint Γ S ∗ fs_ghost Γ S`, and `fs_ghost` splits
+  again into `fs_links (γlink Γ) I ∗ fs_pure S` (persistent).
+- **`fs_state_rec` carries the superblock's raw BYTES** (`fss_sbb`) beside
+  the parsed `fs_sb`.  Two reasons: the tree has no superblock ENCODER (only
+  `FsImg.fs_parse_sb`), and `fs_footprint` has to be a function of `S`
+  alone, which an existential over the bytes would break.  `sb_owned`'s one
+  local clause is `fs_parse_sb (λ _, bs) = Some sb`.
+- **`free_bitmap Γ sb u` is indexed by the USED set**, matching
+  `BitmapEnc.bm_bytes`' argument; §2's `F` is the free set.  The pool is a
+  `big_sepL` over `seqZ 0 (sb_size sb)` whose element is `emp` at a set bit
+  and `∃ bs, blk_owned Γ b bs` at a clear one, so "take a block out" and
+  "hand a block in" are one `big_sepL_delete` plus one `big_sepL_proper`.
+- **The readings are named [fn_*].**  `fn_file_bytes n` and `dir_entries n`
+  are §2's `file_bytes`/`dir_entries`; the first is prefixed because
+  `FsTree.file_bytes` is a different function (over a raw `data` map) that
+  it is defined in terms of.  `dir_entries n` is `∅` for a non-directory,
+  which is what makes `ent_toks` vacuous there.
+- **The mint's gnames come out existentially.**  `own_alloc` cannot target a
+  given gname, so
+  `fs_state_mint ΓD ΓL S : fs_state ΓD S -∗ fs_footprint ΓL S ==∗ ∃ gl gt,
+  fs_state ΓD S ∗ fs_state (MkFsView (fsΦ ΓL) gl gt) S` — `ΓL` carries only
+  the target `fsΦ`, its gname fields being unread (`fs_footprint_gname`).
+  `fs_view_mint` is the same with `γtop`'s auth allocated at `S`'s inode map
+  and one `top_frag` handed back per inode (§4).
+- **The link family's validity is READ OFF the durable instance.**
+  `fs_links_valid : fs_links g I -∗ ⌜✓ link_elem I⌝` gathers the whole
+  family into one `own` and applies `own_valid`.  That is the ONLY place the
+  cross-inode fact "#tokens ≤ nlink everywhere" is ever produced, it is not
+  a clause, and it is never maintained — the logged instance inherits it
+  from the committed one, which inherits it from its own allocation.
+- **`nlink` is counted at `nat`**: `fn_nlink n := Z.to_nat (bv_unsigned
+  (di_nlink (fn_rec n)))`, since the RA's counter is `nat`.  The `≤ 32767`
+  clause is stated at `Z` (a `nat` literal that large elaborates to an
+  opaque `Nat.of_num_uint` — durable-notes).
+
+Left out, with the reason:
+
+- **The dirent-INSERT view equation.**  `FsTree` proves the removal delta
+  outright (`dir_view_zero`, lifted here as `dir_entries_zero`) but has no
+  `dir_view data' nrec' = <[s := t]> (dir_view data nrec)` — only the
+  uniqueness preservation `dir_names_unique_write`.  So `ent_toks_insert`
+  and `dir_owned_link` take the entry-map delta as a PREMISE, which is the
+  shape a caller has anyway.  Proving that equation in `FsTree` is a small
+  self-contained job and belongs there, not here.
+- **`inode_local` preservation lemmas** beyond the two readings
+  (`inode_local_data_owned`, `inode_local_beyond_size`).  Each mover's pure
+  side condition is `inode_local i n'` as a premise; which of them a given
+  arm needs is stage 3's evidence, and writing them speculatively would be
+  the near-duplicate family the guiding principle warns about.
+
+Two things 2b should know before it starts:
+
+- **Four names collide with live ones**, all at different types (so a
+  mis-resolution is a type error, never silent): `byte_range` and `fs_view`
+  with `FsBlocks`'s, `link_auth` with `IcacheRef`'s ten-argument ledger, and
+  `free_pool` with `BitmapInv`'s — the last being exactly the thing
+  `free_bitmap` replaces.  The design names are kept; a file that needs both
+  spells one of them qualified.
+- **The byte arithmetic lines up by conversion, not by name.**
+  `FsStateDefs.byte_range` multiplies by `FsImg.BSIZE_z`, `FsBlocks.byte_range`
+  by `FsBlocks.BSZ`; both delta-reduce to `1024`, so at `Φ_L a v := a ↪[gL] v`
+  the two runs are convertible.  Nothing needs a bridge lemma, but do not
+  expect a `rewrite` between them to fire.

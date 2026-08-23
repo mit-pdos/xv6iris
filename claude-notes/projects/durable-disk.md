@@ -291,14 +291,80 @@ map at home blocks); 1d lands last.
 
 ## Stage 2 — the file system predicates
 
-- [ ] **2a. `FsState.v`**: `Γ`, `byte_range`, `blk_owned`, `rec_owned`,
-      `inode_owned`, `dir_owned`, `free_bitmap`, `fs_inodes`, `fs_state`,
-      `fs_view`, the link RA (`link_auth`/`link_tok`, an auth-nat with
-      `#tokens ≤ auth`), exactly `fs-state.md` §2, Γ-parametric, with the
-      per-kind encode lemmas beside each predicate (from `DinodeEnc`,
-      `BitmapEnc`, `FsTree.dir_written_at`/`dir_view`, `BlockWords`) and
-      `fs_state_mint` (§1).  Pure, iris-generic, no dependency on any
-      `Proof*`.  Verify functoriality: the mint lemma is proven here.
+- [x] **2a. `FsState.v`** — LANDED, as FIVE files (1687 lines), all in
+      `iris/_CoqProject` after `BitmapEnc.v`.  The "as built" section is
+      `fs-state.md` §7; only what a reader of this list needs is here.
+      - `FsStateDefs.v` (164): `fs_view_names` (`fsΦ`/`γlink`/`γtop`; the
+        field is `fsΦ`, not `Φ`, so it does not shadow the proofmode's
+        binder), `byte_range`, `blk_owned`, and the two properties of an
+        ABSTRACT `fsΦ` that consumers need and cannot prove — `phi_excl`
+        (a `Prop` premise, the lifted `fsblock_excl`) and the class
+        `GTimeless`.  `byte_range`/`blk_owned` are `Typeclasses Opaque`
+        from day one.
+      - `FsStateLink.v` (327): `linkUR := gmapUR Z (authR natUR)` — one
+        auth-of-nat per inum in ONE element at `γlink`.  `natUR`'s `op` is
+        `+` and its `≼` is `≤`, so the law `link_auth Γ i n ∗ (k tokens)
+        ⊢ k ≤ n` IS `auth_both_valid_discrete` + `nat_included` (stated at
+        both `link_toks Γ i k` and a `[∗ list]` of `link_tok`s).
+        `link_mint`/`link_return` are the two moves.  ONE camera keyed by
+        inum (not one gname per inum) is what lets the mint allocate every
+        auth and every token in a single `own_alloc`.  Two new
+        CAPACITY-ONLY classes, `fsLinkG` here and `fsTopG`
+        (`ghost_mapG Σ Z fs_node`) in `FsState.v`; neither is an
+        `Xv6G.xv6G` member, so binding both is not a second instance path.
+        Nothing duplicates the tree's unique `ghost_mapG Σ Z (bv 8)`.
+      - `FsStateInode.v` (713): `fs_node = { rec ; ent ; blk }` over EVERY
+        nonzero `addrs` entry regardless of `size` (F3), `inode_local`
+        (15 clauses, every one about ONE inode; the only inum it mentions
+        is the "." entry's, which is the inode's own), `rec_owned`,
+        `ind_owned`, `inode_phi`, `ent_toks`, `inode_ghost`,
+        `inode_owned = inode_phi ∗ inode_ghost`, `dir_owned`, the readings
+        (`fn_file_bytes`, `dir_entries`, `fn_orphan`), and the encode
+        lemmas — every one an ACCESSOR, since at an abstract `fsΦ` there
+        is no update to make and the log's `byte_range_update` is what
+        moves the bytes.
+      - `FsStateBitmap.v` (172): `free_bitmap Γ sb u`, indexed by the USED
+        set; `bitmap_alloc` and `bitmap_free`, the latter deriving "the bit
+        reads allocated" from `phi_excl` — the "freeing a free block"
+        panic arm is dead by exclusivity, not by a clause.
+      - `FsState.v` (311): `sb_owned`, `fs_inodes` (the one `∗`),
+        `fs_state`, `fs_view`, `top_frag`, and THE MINT.
+      - **THE MINT IS A TRANSPORT.**  `fs_state_split : fs_state Γ S ⊣⊢
+        fs_footprint Γ S ∗ fs_ghost Γ S` factors the Φ-only half from the
+        Φ-free half; `fs_ghost_split` factors that again into
+        `fs_links (γlink Γ) I ∗ fs_pure S` (persistent).  `fs_state_mint`
+        reads `⌜✓ link_elem I⌝` off the durable instance's own `own`
+        (`fs_links_valid`), allocates the new family, and reuses the pure
+        half.  THAT IS THE ONLY PLACE the cross-inode fact "#tokens ≤ nlink
+        everywhere" is ever produced — it is not a clause, is not
+        maintained, and the logged instance inherits it from the committed
+        one.  `fs_view_mint` additionally allocates `γtop` at `S`'s inode
+        map and hands back one `top_frag` per inode.
+      - DEVIATIONS from §2 (full list in `fs-state.md` §7): the geometry
+        (`sb`) is a parameter of `rec_owned`/`inode_owned`/`fs_inodes`/
+        `free_bitmap`; a directory's TOKENS live inside `inode_owned`
+        (§2 hangs them off `dir_owned`, which would put them outside
+        `fs_state`, since `fs_inodes` iterates `inode_owned`), and
+        `dir_owned` is the reading `inode_owned ∗ ⌜is_dir⌝`; the abstract
+        state carries the superblock's RAW BYTES beside the parsed record
+        (there is no encoder in the tree, only `fs_parse_sb`, and the
+        footprint must be a function of `S`); `free_bitmap` is indexed by
+        the used set (`bm_bytes`' argument), not the free set; the mint's
+        fresh gnames come out existentially, since `own_alloc` cannot
+        target a given gname.
+      - NOT DONE, and it belongs in `FsTree.v`: the dirent-INSERT view
+        equation.  `FsTree` proves the removal delta outright
+        (`dir_view_zero`) but has no
+        `dir_view data' nrec' = <[s := t]> (dir_view data nrec)`, only the
+        uniqueness preservation `dir_names_unique_write`.  So
+        `ent_toks_insert`/`dir_owned_link` take the entry-map delta as a
+        premise — the shape a caller has anyway.  Small, self-contained,
+        and `FsTree`'s to prove.
+      - NOT DONE, deliberately: speculative `inode_local` preservation
+        lemmas.  Each mover takes `inode_local i n'` as a premise; which
+        ones stage 3's arms actually need is stage 3's evidence, and
+        writing the cross-product now is the near-duplicate family the
+        guiding principle warns about.
 - [ ] **2b. Re-state the in-memory owners over `Γ_L`**: `InodeRegion`'s
       `ireg_blk`/`ireg_slot` coupling (`InodeRegion.v:2252-2258`,
       `:1448-1452`) becomes `rec_owned Γ_L`; `ic_loaded`'s payload

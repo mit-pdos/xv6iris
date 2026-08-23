@@ -783,6 +783,11 @@ UmCovered.v
 PtFree.v
 BarePt.v
 BitmapEnc.v
+FsStateDefs.v
+FsStateLink.v
+FsStateInode.v
+FsStateBitmap.v
+FsState.v
 BitmapInv.v
 SpecVmfault.v
 CodeVmfault.v
