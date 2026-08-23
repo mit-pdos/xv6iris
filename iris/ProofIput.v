@@ -1762,8 +1762,9 @@ Section IputFreePath.
                     = add_vec_int (mword_of_int (KernelSyms.iput + 0xba) : mword 64) 4)
       by (rewrite /R5; apply upd_eq).
     (* ---- the deposit's AU, adapted to log_write's anchor form ---- *)
-    iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn' ds ge gr gd rg
-                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hdswf Hdn'wf Hdn'ty Hnlst
+    iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn'
+                  (diblk_bytes ds) ge gr gd rg
+                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hdn'wf Hdn'ty Hnlst
                   with "Hireg Hesc Hdn Hdep") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
@@ -1772,8 +1773,11 @@ Section IputFreePath.
        The plain form is recovered immediately, so nothing else moves. *)
     iDestruct "Hlctx" as (Psi) "#Hlctxa".
     iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
-    iDestruct (lw_au_lb0 γ γfs (uint bno) (⊤ ∖ ↑iregN)
-                 (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds)
+    (* the RECORD-granular adapter (durable-disk 2b-inode-1): the deposit
+       writes one 64-byte slot, so [lw_au_rec] is what carries it into
+       [log_write]'s sub-range atomic update. *)
+    iDestruct (lw_au_rec γ γfs (uint bno) (⊤ ∖ ↑iregN)
+                 (DinodeEnc.islot inum) (diblk_bytes ds) (dinode_bytes dn')
                  (committedA ge ∗ ireg_regime rg)%I e0 Psi with "Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
@@ -1783,8 +1787,22 @@ Section IputFreePath.
     iRename "Hop" into "HopS".
     iAssert (log_credit γ cru Sb e0 (uint bno)) as "#Hcrd";
       [rewrite Hbno; iExact "Hcrd0" |].
-    iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
+    assert (Hslot16 : (DinodeEnc.islot inum < 16)%nat)
+      by exact (DinodeEnc.islot_lt inum).
+    assert (Hsplice :
+              length (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) = BSIZE ->
+              length (diblk_bytes ds) = BSIZE ->
+              length (dinode_bytes dn') = 64%nat /\
+              diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)
+              = blk_splice (64 * DinodeEnc.islot inum)%nat (dinode_bytes dn')
+                           (diblk_bytes ds)).
+    { intros _ _. split;
+        [ exact (dinode_bytes_length dn' Hdn'wf)
+        | exact (diblk_bytes_splice ds (DinodeEnc.islot inum) dn'
+                   Hdswf Hdn'wf Hslot16) ]. }
+    iApply (LW.wp_log_write_au_range bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
+              (64 * DinodeEnc.islot inum)%nat 64%nat (dinode_bytes dn')
               cru Sb e0 v Psi (⊤ ∖ ↑iregN) (committedA ge ∗ ireg_regime rg)%I
               R5 0%nat eb pj K b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
@@ -1792,6 +1810,9 @@ Section IputFreePath.
               ltac:(rewrite Hbno; exact Hlog)
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
+              (SpecLogWrite.lw_rec_window (DinodeEnc.islot inum) Hslot16)
+              ltac:(lia)
+              Hsplice
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.

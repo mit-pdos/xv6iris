@@ -41,6 +41,8 @@ Require Import RiscvPtsto.
 Require Import LogInv.
 Require Import FsBlocks.
 Require Import DinodeEnc.
+Require Import FsStateInode.
+Require Import FsBytesGamma.
 Require Import InodeRegion.
 Require Import EscrowDefs.
 Require Import EscrowInode.
@@ -52,11 +54,10 @@ Section EscrowDeposit.
 
   Lemma ireg_free_deposit_au (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (ds : list dinode) (ge gr gd : gname) (rg : bool) :
+      (bsl : list (bv 8)) (ge gr gd : gname) (rg : bool) :
     ↑iregN ⊆ E ->
     ↑escAN (bv_unsigned inum) ⊆ E ∖ ↑iregN ->
     (bv_unsigned inum < 16 * Z.of_nat nib)%Z ->
-    diblk_wf ds ->
     dinode_wf dn' ->
     bv_unsigned (di_type dn') = 0 ->
     di_nlink_stable dn' dn ->
@@ -84,11 +85,19 @@ Section EscrowDeposit.
        out at [FrzPost], the column steps to [FrzOff], and the token goes back
        in at [FrzOff] for whoever peels the pool entry next. *)
     redeem_ticketA gd -∗
-    |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
-      (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
-               (diblk_bytes (<[islot inum := dn']> ds))
+    (* RECORD-GRANULAR since durable-disk 2b-inode-1, exactly as
+       [InodeRegion.ireg_write_au] is: the deposit surrenders the corpse's
+       OWN 64-byte run and takes it back at the type-0 record.  [bsl] is
+       the checked-out buffer's logged content and rides only in the wand's
+       ignored equality, so this fupd is [SpecLogWrite.lw_au_rec]'s
+       left-hand side verbatim. *)
+    |={E, E ∖ ↑iregN}=> ∃ rec_old : list (bv 8),
+      ⌜length rec_old = 64%nat⌝ ∗
+      FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
+        (Z.of_nat (64 * islot inum)) rec_old ∗
+      (⌜rec_old = take 64%nat (drop (64 * islot inum)%nat bsl)⌝ -∗
+       FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
+         (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        (* RULING G, THE RETURN LEG (iclaim-ledger.md §6′).  iput BORROWS the
           regime -- the sealed [ireg_open] a runtime freezer must exhibit, or
           the exclusive [ireg_boot] ireclaim's boot thread carries instead --
@@ -101,32 +110,37 @@ Section EscrowDeposit.
           -- which needs it on every iteration -- would not close. *)
        ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg).
   Proof.
-    iIntros (HE Hesc_mask Hin Hwf Hdn' Hz Hnl) "#Hinv #Hesc Hdn Hdep".
+    iIntros (HE Hesc_mask Hin Hdn' Hz Hnl) "#Hinv #Hesc Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    assert (Hwfi : diblk_wf (<[islot inum := dn']> ds))
-      by exact (diblk_wf_insert ds (islot inum) dn' Hwf Hdn').
     iDestruct "Hinv" as "[#Hiinv #Hrb]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds0) "(>%Hwf0 & >%Hcp0 & >Hrec & >Hsls)".
-    (* durable-disk 2b-inode-1: the region parks the sixteen RECORD runs; the
-       deposit still surrenders the BLOCK, so it gathers them here and splits
-       them again at the re-park. *)
-    iDestruct (ireg_recs_to_blk γfs inodestart (ireg_bi inum) ds0 Hwf0
-                with "Hrec") as "Hfsb".
-    iModIntro.
-    rewrite (ireg_bi_iblock inum inodestart).
-    iExists (diblk_bytes ds0).
-    iFrame "Hfsb".
-    iIntros (Hbytes) "Hfsb'".
-    assert (Hds0 : ds0 = ds) by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
-    subst ds0.
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp0 & >Hrec & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    (* the coupling names the region's record at this slot -- what
+       [diblk_bytes_inj] used to do through the block's bytes *)
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm0.
+    assert (Hdeq0 : ds !!! islot inum = dn).
+    { pose proof (Hcp0 (islot inum) Hsl) as Hc.
+      rewrite -ireg_key_split in Hc. congruence. }
+    assert (Hdnwf : dinode_wf dn)
+      by (rewrite -Hdeq0; exact (ireg_blk_slot ds (islot inum) Hwf Hsl)).
+    assert (Hwfi : diblk_wf (<[islot inum := dn']> ds))
+      by exact (diblk_wf_insert ds (islot inum) dn' Hwf Hdn').
+    iDestruct (ireg_recs_acc_upd γfs inodestart (ireg_bi inum) ds (islot inum)
+                 Hsl Hlen16 with "Hrec") as "[Hrun Hrecback]".
+    iEval (rewrite Hkey Hdeq0) in "Hrun".
+    iEval (rewrite (rec_owned_at_IBLOCK (fs_gamma_L γfs) inodestart inum dn))
+      in "Hrun".
+    iModIntro. iExists (dinode_bytes dn).
+    iSplitR; [iPureIntro; exact (dinode_bytes_length dn Hdnwf) |].
+    iFrame "Hrun".
+    iIntros (_) "Hrun".
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
@@ -140,10 +154,7 @@ Section EscrowDeposit.
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     rewrite /dinode_at.
-    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
-    assert (Hdeq : ds !!! islot inum = dn).
-    { pose proof (Hcp0 (islot inum) Hsl) as Hc.
-      rewrite -ireg_key_split in Hc. congruence. }
+    pose proof Hdeq0 as Hdeq.
     rewrite Hdeq in Hlok. rewrite Hdeq in Hrt.
     assert (Hnl0' : bv_unsigned (di_nlink dn') = 0) by exact (proj2 Hnl Hz).
     assert (Hnl0 : bv_unsigned (di_nlink dn) = 0).
@@ -224,6 +235,10 @@ Section EscrowDeposit.
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
     set (m' := <[bv_unsigned inum := dn']> m).
+    iEval (rewrite -(rec_owned_at_IBLOCK (fs_gamma_L γfs) inodestart inum dn'))
+      in "Hrun".
+    iEval (rewrite -Hkey) in "Hrun".
+    iDestruct ("Hrecback" $! dn' with "Hrun") as "Hrecb".
     (* ===== THE DEPOSIT: rebind + escA_deposit + split + park PENDING ===== *)
     iDestruct "Hrf" as (ge0 gr0) "Hrf".
     iEval (rewrite /reg_full) in "Hrf".
@@ -239,19 +254,18 @@ Section EscrowDeposit.
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
+      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
           as [Hj _].
         exact (Hne (eq_sym Hj)). }
       iExists (<[islot inum := dn']> ds).
-      iSplitR; [iPureIntro; exact (diblk_wf_insert ds (islot inum) dn' Hwf Hdn') |].
+      iSplitR; [iPureIntro; exact Hwfi |].
       iSplitR.
       { iPureIntro. intros i Hi.
-        destruct Hwf as [Hlen _].
         destruct (decide (i = islot inum)) as [->|Hne].
         - rewrite /m' -(ireg_key_split inum) lookup_insert.
           rewrite list_lookup_total_insert; [done | lia].
@@ -262,9 +276,7 @@ Section EscrowDeposit.
             exact (Hne (eq_sym Hi')). }
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
-      iSplitL "Hfsb'";
-        [iApply (ireg_recs_of_blk γfs inodestart (ireg_bi inum)
-                   (<[islot inum := dn']> ds) Hwfi with "Hfsb'") |].
+      iSplitL "Hrecb"; [iExact "Hrecb" |].
       iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl

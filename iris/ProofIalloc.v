@@ -1468,9 +1468,31 @@ Section IallocClaim.
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     iPoseProof (log_credit_own γ false Sb e0 (uint bno) ltac:(discriminate))
       as "#Hcrd".
-    iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
+    (* THE RECORD-GRANULAR FORM (durable-disk 2b-inode-1): ialloc's
+       memset+stores move exactly the claimed slot's 64 bytes of the
+       buffer, so the shape obligation is [InodeRegion.diblk_bytes_splice]
+       at that slot. *)
+    assert (Hslot16 : (DinodeEnc.islot inum < 16)%nat)
+      by exact (DinodeEnc.islot_lt inum).
+    assert (Hfrwf : dinode_wf (ialloc_fresh ty))
+      by exact (fresh_shape_wf _ (ialloc_fresh_shape ty Hty)).
+    assert (Hsplice :
+              length (diblk_bytes
+                        (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds)) = BSIZE ->
+              length (diblk_bytes ds) = BSIZE ->
+              length (dinode_bytes (ialloc_fresh ty)) = 64%nat /\
+              diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds)
+              = blk_splice (64 * DinodeEnc.islot inum)%nat
+                           (dinode_bytes (ialloc_fresh ty)) (diblk_bytes ds)).
+    { intros _ _. split;
+        [ exact (dinode_bytes_length _ Hfrwf)
+        | exact (diblk_bytes_splice ds (DinodeEnc.islot inum) (ialloc_fresh ty)
+                   Hdswf Hfrwf Hslot16) ]. }
+    iApply (LW.wp_log_write_au_range bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
               (diblk_bytes ds) bsd d0 u
+              (64 * DinodeEnc.islot inum)%nat 64%nat
+              (dinode_bytes (ialloc_fresh ty))
               (* THE ANCHOR IS NO LONGER THE UNIT (iclaim-ledger.md §2.4 /
                  IIIb step 4): [ireg_claim_au]'s closing wand delivers the
                  [c]-column receipt, so log_write carries it out for us. *)
@@ -1481,6 +1503,9 @@ Section IallocClaim.
               ltac:(rewrite Hbno; exact Hlog)
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
+              (SpecLogWrite.lw_rec_window (DinodeEnc.islot inum) Hslot16)
+              ltac:(lia)
+              Hsplice
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1490,7 +1515,7 @@ Section IallocClaim.
       (* log_write's own two closing inputs (the epoch witness and its
          bound) are still dropped -- one adapter line, fs-log.md §G.17 --
          but the ANCHOR is now [iclaim]; see the instantiation above. *)
-      iApply lw_au_lb0.
+      iApply lw_au_rec.
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
                 ltac:(solve_ndisj) Hnib Hdswf Ht0
                 (ialloc_fresh_shape ty Hty) with "Hireg Hiopen"). }
