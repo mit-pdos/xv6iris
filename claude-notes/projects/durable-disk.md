@@ -93,7 +93,12 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-(nothing in flight)
+- branch `worktree-agent-ae97a632a827fea83`: G2 batch (1), filewrite
+  chains (`FsOpFilewrite.v`).
+- branch `worktree-agent-afe0f27a7dd82c407`: G2 batch (2), the create
+  side (`FsOpMknod/Mkdir/Open/Link.v`).
+- branch `worktree-agent-af881e3fbbf6947e4`: G2 batch (3), the free
+  side (`FsOpUnlink/IputFree/Ireclaim.v`).
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
