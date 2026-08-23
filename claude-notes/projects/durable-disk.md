@@ -169,6 +169,56 @@ See the G1-impl entry for the site table.
    eff_create_dir_entry; filewrite = eff_alloc_file_block* +
    eff_write_file_data* (+ eff_alloc_ind_block at the boundary);
    sys_unlink = eff_unlink_entry (+ trunc/free on the nlink=0 path)).
+   **BATCH (3) IS LANDED** (`iris/FsOpIputFree.v`, `iris/FsOpUnlink.v`,
+   `iris/FsOpIreclaim.v`; 1.4 / 1.6 / 1.0 s single-file, audit unchanged
+   at THREE). Two theorems carry it, and both were forced by the tree
+   rather than planned:
+   (i) THE FUSION, `eff_iput_free_fuse`. This xv6 revision's iput frees
+   in TWO log_write groups — `itrunc` (record zeroed, bits cleared;
+   `eff_trunc`) and then `ifree` (`dip->type = 0`, a SECOND re-encode of
+   the same inode block) — both inside one transaction, so the net BYTES
+   are the COMPOSITION `eff_iput_free := eff_free_inode ∘ eff_trunc`,
+   not the fused effect; and for a DIRECTORY orphan there is NO wf view
+   in between (a typed dir of size 0 has lost its dots, so W8 fails), so
+   the arm cannot be discharged one effect at a time. The composition is
+   proved EQUAL AS FUNCTIONS to `eff_free_inode`, which removes the
+   difficulty at the byte level: `ifree`'s re-encode overwrites
+   `itrunc`'s record (`fs_iblk_eff_dinode` reads the written block back,
+   then `list_insert_insert`) and its bitmap write re-lays the bytes
+   `itrunc` left (the truncated record names no block; round trip by
+   `fs_bmap_set_bm_bytes`, the direction `FsImg.bm_bytes_fs_bmap_set`
+   did not have). `eff_trunc`'s `type <> T_DIR` premise is thereby never
+   met, only avoided.
+   (ii) THE ORPHAN CHARACTERISATION, `fs_orphan_char`: at a wf view a
+   LIVE inode has `nlink = 0` IFF it is UNREACHABLE. The `<-` half is
+   `rtick_unreachable` plus "the root is reachable"; the `->` half is
+   new — `rch_pred` (the FIRST-ARRIVAL predecessor, `rch_no_in`'s
+   converse, so the predecessor is not the node itself and its record
+   bears a ticket) plus `rtick_of_record`. This is THE precondition
+   transport of the free side: `eff_free_inode_wfv` asks for
+   unreachability, which no xv6 path ever computes; what the code tests
+   is `ip->nlink == 0` (iput's `last`, ireclaim's scan) and what an
+   unlink arm carries forward is a DECREMENTED nlink. With it each
+   sys_unlink free arm is three lines and the FILE arm needs no in-edge
+   counting at all (the dir arm's `nlink = 1` premise was doing that
+   work only because F2 needed the `rd` delta).
+   NO TRANSPORT GAP was found. The arms: sys_unlink file/dir × survives
+   / frees (`op_unlink_{file,dir}_wfv`, `op_unlink_{file,dir}_free_wfv`
+   — the file arm alone needs `nlink = 1` added, the dir arm already has
+   it) plus the failure arms (identity, `op_unlink_bad_wfv`); the
+   iput-free family (`op_iput_free_wfv` at the composed net,
+   `op_iput_free_fused_wfv`, and `op_iput_keep_wfv` for the non-free
+   arms) which fileclose / kexit / sys_chdir invoke unchanged; ireclaim
+   as the iterated corollary (`op_ireclaim_wfv` over a NoDup orphan
+   list, `op_ireclaim_prefix_wfv` for EVERY intermediate commit — the
+   sweep is one transaction per orphan). The view-level transport across
+   `eff_unlink_entry` (`op_unlink_parse` / `op_unlink_dinode` /
+   `op_unlink_target_range`) and across `eff_free_inode`
+   (`eff_free_inode_parse` / `_dinode` / `_out`) is what G3 will thread.
+   Reusable plumbing left at the top of `FsOpIputFree.v`: `fs_upd_upd`,
+   `fs_bmap_set_bm_bytes`, `fs_iblk_upd`, `fs_iblk_eff_dinode`,
+   `rch_pred` — the last two belong in `FsEffBase.v` as soon as a second
+   consumer appears.
 3. **The row-(a) flip + G3** (one coordinated sweep): add row (a) to
    `log_state`, wire the G2 lemmas into the 26 arms, re-point
    `ProofEndOp` at the value-chained primitives (threading the chained
@@ -694,6 +744,10 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       preservation lemmas STANDALONE first (pure statements against F2's
       effect vocabulary — no `log_state` dependency, fully parallelizable
       across agents).
+      **The FREE SIDE (batch (3)) is DONE**:
+      `iris/FsOpIputFree.v` (the fusion + the orphan characterisation),
+      `iris/FsOpUnlink.v`, `iris/FsOpIreclaim.v` — the checkpoint's step 2
+      carries what they say and why.
       **What the arm table is missing (found by batch (2), 2026-08-23;
       all three need a ruling BEFORE the G1-flip).**
       (a) **create's `fail:` tail is not identity, and not an F2

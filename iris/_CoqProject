@@ -650,6 +650,9 @@ FsOpMknod.v
 FsOpMkdir.v
 FsOpOpen.v
 FsOpLink.v
+FsOpIputFree.v
+FsOpUnlink.v
+FsOpIreclaim.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v
