@@ -820,6 +820,79 @@ Section EraRes.
       iExact "Hbk".
   Qed.
 
+  (* ALL THE SLOTS AT ONCE, IN ONE OPEN -- which is what makes the payload
+     flip cheap for readi/writei/bmap/itrunc.  Each of those four takes
+     [InodeLock.inode_ok] as a premise and every conjunct of it but this one
+     is pure [inode_local] or the [*]; so a walk that holds the bundle pays
+     ONE fupd and its callees' contracts do not move.  Opening the byte
+     invariant once and reading every slot off the auth is strictly cheaper
+     than 269 [fsblock_home_open]s, and it is the only shape that keeps the
+     [Prop] a single quantified statement. *)
+  Lemma inode_owned_era_home_all (E : coPset) (γfs : fs_names) (γi : gname)
+      (inum : bv 32) (n : fs_node) (home : gset Z) :
+    ↑logN ⊆ E ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    inode_owned_era γfs γi inum n ={E}=∗
+      ⌜forall k : nat, (k <= MAXFILE)%nat ->
+          bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
+          bv_unsigned (bm_slot (bm_of n) k) ∈ home⌝
+      ∗ inode_owned_era γfs γi inum n.
+  Proof.
+    iIntros (HE) "#Hinv Hn".
+    iDestruct "Hn" as "(Hd & Hb & Hi & Ht & %Hl)".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iAssert (⌜forall k : nat, (k <= MAXFILE)%nat ->
+               bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
+               bv_unsigned (bm_slot (bm_of n) k) ∈ home⌝)%I as %Hall.
+    { iIntros (k Hk Hnz).
+      rewrite (bm_of_slot n k (inl_rec_wf Hl) Hk) in Hnz |- *.
+      destruct (decide (k = MAXFILE)) as [-> | Hkm].
+      - iEval (rewrite /ind_owned (decide_False _ _ Hnz) gamma_blk_owned)
+          in "Hi".
+        iApply (fsblock_home (fs_bytes γfs) L home (fn_indb n)
+                  (ind_bytes (fn_ent n)) Hdm with "Ha Hi").
+      - assert (Hklt : (k < MAXFILE)%nat) by (clear - Hk Hkm; lia).
+        destruct (proj2 (inl_blk_dom Hl k
+                    ltac:(rewrite -MAXFILE_FS; exact Hklt)) Hnz) as [bs Hbs].
+        iDestruct (big_sepM_lookup _ _ k bs Hbs with "Hb") as "Hbk".
+        iEval (rewrite gamma_blk_owned) in "Hbk".
+        iApply (fsblock_home (fs_bytes γfs) L home (fn_naddr n k) bs Hdm
+                  with "Ha Hbk"). }
+    iMod ("Hclose" with "[Ha HC]") as "_".
+    { iNext. iExists L, C. by iFrame. }
+    iModIntro. iSplitR; [done |].
+    rewrite /inode_owned_era. iFrame. done.
+  Qed.
+
+  (* ...AND THE WHOLE OF [InodeLock.inode_ok], WHICH IS THE POINT.  The
+     home set IS [cov] minus the log's own storage ([LogDefs.fs_home_set]),
+     so the coverage conjunct's two halves fall out of one [elem_of_difference]
+     and nothing new is assumed.  The one fact left over is "this inode is
+     allocated" ([di_type <> 0]), which is the payload's own conjunct and
+     not a property of the node. *)
+  Lemma inode_owned_era_ok (E : coPset) (γfs : fs_names) (γi : gname)
+      (inum : bv 32) (n : fs_node) (cov : gset Z) (ls : Z) :
+    ↑logN ⊆ E ->
+    bv_unsigned (di_type (fn_rec n)) <> 0 ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
+    inode_owned_era γfs γi inum n ={E}=∗
+      ⌜inode_ok cov ls (fn_rec n) (bm_of n) (fn_data n)⌝
+      ∗ inode_owned_era γfs γi inum n.
+  Proof.
+    iIntros (HE Hty) "#Hinv Hn".
+    iDestruct (inode_owned_era_local with "Hn") as %Hl.
+    iDestruct (inode_owned_era_slot_inj with "Hn") as %Hinj.
+    iMod (inode_owned_era_home_all E γfs γi inum n (fs_home_set cov ls) HE
+            with "Hinv Hn") as "[%Hhome Hn]".
+    iModIntro. iFrame "Hn". iPureIntro.
+    apply (inode_ok_of_local (bv_unsigned inum) n cov ls Hl);
+      [| exact Hinj | exact Hty].
+    intros k Hk Hnz.
+    pose proof (Hhome k Hk Hnz) as Hin.
+    rewrite /fs_home_set elem_of_difference in Hin. exact Hin.
+  Qed.
+
   (* ---- THE RECORD WRITE ---------------------------------------------- *)
 
   (* A RECORD MOVE UPDATES THREE THINGS AT ONCE, and that is the whole
