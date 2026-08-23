@@ -290,15 +290,14 @@ only as placeholders).  **They are all DELETED in the tree** — the last of
 them by durable-disk 1d, which also deleted their 30 + 6 gate call sites;
 `end_op` now takes no FS-facing premise at all.
 
-The whole of §5 above is LANDED (durable-disk 1d/1d'); the one thing the
-interface still names that stage 2 will move is the durable gname.
-`fs_dstep`'s `∀ g` is not a generalisation anyone wanted: `γD` is
-`FsCrash.fcn_view` of a record the crash predicate binds EXISTENTIALLY, so
-no client can name it, and a step at an arbitrary gname is the strongest
-thing statable today.  Hoisting `fcn_view` into `RiscvPtsto.riscvFixedGS`
-— stage 2's job, and the same seam-equation move `riscv_swap_name` already
-makes — turns that binder into a parameter and the step into the client's
-debt at the real durable name.
+The whole of §5 above is LANDED (durable-disk 1d/1d'/2c-pre), the durable
+gname included: `γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS`
+field, so `fs_dstep γD D D'` is the client's debt AT THE REAL DURABLE
+NAME.  `LogDefs.v` takes the gname as an argument (it sits below
+`RiscvPtsto` and may not import it); `log_psi_commit`, `log_psi_spend` and
+`FsCrash.fs_commit_L_sector0_rec` spell it AMBIENTLY as
+`riscv_dview_name`, the way every file already spells `riscv_disk_name`,
+so `log_ctx_at` and `fs_crash_seam` keep their arities.
 
 ## 6. What this supersedes in the tree
 

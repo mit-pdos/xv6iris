@@ -898,6 +898,13 @@ Section LogInv.
   (*  that reading total), and RETURNS the prepared durable step that the    *)
   (*  commit permit runs later, at mask [empty], with [gamma_D]'s auth and   *)
   (*  [P_wf] lent to it ([LogDefs.fs_dstep]).                                *)
+  (*                                                                         *)
+  (*  THE STEP IS AT THE REAL DURABLE NAME: [gamma_D] is                     *)
+  (*  [RiscvPtsto.riscv_dview_name], a FIXED-layer FIELD, so it is spelled   *)
+  (*  AMBIENTLY here -- exactly as [riscv_disk_name] is -- and neither this  *)
+  (*  law nor [log_ctx_at] grows an argument for it.  (The standing rule is  *)
+  (*  explicit gnames; a fixed-layer name every file already has in scope    *)
+  (*  through [riscvFixedGS] is the one kind this tree passes ambiently.)    *)
   (*                                                                        *)
   (*  PERSISTENT is not a weakening: the LINEARITY stage 2's debt needs      *)
   (*  lives inside [Psi D0], which this update consumes; what is uniform is  *)
@@ -915,7 +922,8 @@ Section LogInv.
         ==∗
         (ghost_map_auth (fs_bytes γfs) 1 Lb ∗
          Psi (lm_logged L cov ls) ∗
-         fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))%I.
+         fs_dstep riscv_dview_name
+           (lm_committed M cov ls) (lm_logged L cov ls)))%I.
 
   Global Instance log_psi_commit_persistent Psi γfs cov ls :
     Persistent (log_psi_commit Psi γfs cov ls).
@@ -1218,7 +1226,7 @@ Section LogInv.
     ghost_map_auth (fs_cache γfs) 1 L -∗
     Psi (lm_committed M cov ls) ={E}=∗
       ghost_map_auth (fs_cache γfs) 1 L ∗ Psi (lm_logged L cov ls) ∗
-      fs_dstep (lm_committed M cov ls) (lm_logged L cov ls).
+      fs_dstep riscv_dview_name (lm_committed M cov ls) (lm_logged L cov ls).
   Proof.
     iIntros (HE) "#Hinv #Hlaw Hca Hpsi".
     iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE|].

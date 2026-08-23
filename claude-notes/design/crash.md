@@ -187,7 +187,18 @@ Three principles, in order of force:
 2. **One fixed-layer gname `γdisk` for the durable bytes.** The machine layer
    (`state_interp`) holds `● v_disk` at it; PowerOn preserves `v_disk`, so
    the auth is simply still right in the new era — nothing is re-minted and
-   nothing is re-associated. The crash predicate `P_fs` owns the `◯`
+   nothing is re-associated. **The FIXED-layer gname roster is six wide**
+   (`RiscvPtsto.riscvFixedGS`; every one of them is a `Pc`/`HPc`/`Hproj`/
+   `Hswap`/`boot_fixedGS` argument in `RiscvAdequacy` and rides the
+   `boot_fixedGS` seam equation into the boot cone): `riscv_gen_name`,
+   `riscv_start_name`, `riscv_registry_name`, `riscv_disk_name` (+ its
+   `riscv_disk_size`), `riscv_swap_name`, and `riscv_dview_name` — the
+   COMMITTED BYTE VIEW `γD` (`fs-state.md` §1's `Φ_D`), which rides
+   `riscv_disk_name`'s own `DiskImg.diskImgG`, the tree's unique
+   `ghost_mapG Σ Z (bv 8)`, so it costs no new functor. Adequacy mints
+   `γD`'s map EMPTY — the machine layer cannot compute the image's
+   committed view and must not name it — and `FsCrash.P_fs_alloc` fills it
+   at `fs_dbytes D₀` in the same update. The crash predicate `P_fs` owns the `◯`
    fragments (all of them, forever). Auth/frag agreement IS the tie:
    `disk_tie`, `fs_tie_interp` and the `dk`-indexing of `riscv_crash_pred`
    go away; whoever opens `crashN` with the auth in scope learns
@@ -317,11 +328,15 @@ rather than a pure sweep:
   (fr_D r))` — its exclusive elements, which are `fs-state.md` §1's `Φ_D`
   and are `P_wf`'s. `fs_dbytes` is the byte flattening of a block map
   (block `b`'s byte `i` at `b·BSIZE + i`).
-* `γD` is `fs_crash_names`'s new `fcn_view`, allocated with the record in
-  `P_fs_alloc`. It is fixed-LAYER in the sense that matters (never
-  re-minted, no mortal ever holds an element); it is not yet a
-  `riscvFixedGS` field, and hoisting it there is stage 2's job — the era
-  needs to name it only when `Γ_D` becomes `fs_view Γ_D`.
+* `γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS` FIELD (never
+  re-minted, no mortal ever holds an element). It is not in
+  `fs_crash_names`: a gname the crash predicate binds existentially cannot
+  be named by a client, and the log's parked payload and the commit debt
+  have to name it. `P_fs` / `P_fs_rec_named` / `P_fs_named` take it as
+  their fourth explicit fixed name `γv`, beside `γsw`/`γreg`/`γst`;
+  `P_fs_rec` and `P_fs_any` — hence `fs_crash_seam`, whose arity does not
+  move — read it ambiently off the record, exactly as they read
+  `riscv_disk_name`.
 * **It moves only at the commit.** Every preserving permit frames the pair;
   `fs_commit_L_sector0_rec` moves it at the `D'` it already computes (`L` on
   the home set) by RUNNING THE CLIENT'S PREPARED STEP — since durable-disk
@@ -338,9 +353,12 @@ rather than a pure sweep:
   argument or ambient class, it makes no difference — reaches all of them.
   Stage 2 replaces the body by `fs_view Γ_D`, which CONTAINS it, at which
   point `fs_dstep_rebase` stops holding and the client's debt is the only
-  way to build the commit's step. **`fs_dstep`'s gname is `∀`-quantified**
-  because `fcn_view` sits under `P_fs`'s existential; hoisting it into
-  `riscvFixedGS` (stage 2) is what turns that binder into a parameter.
+  way to build the commit's step. **`fs_dstep`'s gname is a PARAMETER**
+  (`fs_dstep γD D D'`). `LogDefs.v` sits below `RiscvPtsto` and may not
+  import it, so the name is an argument there; `LogInv.log_psi_commit` and
+  `FsCrash`'s seam section, which both carry `riscvGS`, instantiate it
+  AMBIENTLY at `riscv_dview_name` — the one kind of gname this tree does
+  not thread explicitly, and the reason `log_ctx_at`'s arity did not move.
 
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 

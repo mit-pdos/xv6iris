@@ -439,6 +439,30 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      under any write at all.  A machine constant of this boot (adequacy's
      [ndisk]), fixed-layer like the name. *)
   riscv_disk_size : nat;
+  (* THE COMMITTED BYTE VIEW'S NAME (claude-notes/design/fs-state.md section
+     1; durable-disk 2c-pre).  A second FIXED-layer [ghost_map Z (bv 8)]
+     name, typed by the SAME [riscvF_diskGS] above -- the tree's unique
+     source of that instance -- and therefore costing no new functor.  It
+     names the COMMITTED (durable) byte view [D]: its authority and ALL of
+     its elements live inside the crash predicate ([FsCrash.P_fs]'s two
+     [gamma_D] conjuncts), so, exactly like [riscv_disk_name]'s fragments,
+     no thread that can die ever holds one.
+
+     WHY IT IS FIXED-LAYER RATHER THAN A FIELD OF [FsCrash.fs_crash_names]:
+     the file system's durable instance [Gamma_D] is a family of predicates
+     stated over [Phi_D a v := a -> v at gamma_D], and a CLIENT -- the log's
+     parked payload, the commit debt -- has to NAME it.  A gname bound
+     existentially inside the crash predicate cannot be named from outside.
+     Here it is a PARAMETER of [LogDefs.fs_dstep], so that step is the
+     client's real debt at the real durable name.
+
+     The machine layer never touches it: unlike [riscv_disk_name], whose
+     auth is [state_interp]'s fixed conjunct, this name's auth is inside
+     [crashN] from the first instant.  Adequacy allocates the map EMPTY and
+     hands the authority to the crash predicate, which fills it at the
+     image's committed view ([FsCrash.P_fs_alloc]) -- the machine layer
+     cannot compute that view and must not name it. *)
+  riscv_dview_name : gname;
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
      durability invariant over the durable disk, sealed into [crash_inv]
      below.  A bare [iProp Σ] again (it was [dk]-indexed while the tie was a

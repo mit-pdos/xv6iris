@@ -356,18 +356,19 @@ Section FsDurableView.
      those may not be owned by anything mortal (crash.md, principle 1), so
      they are [P_wf]'s and live inside [crashN].
 
-     THE GNAME IS UNIVERSALLY QUANTIFIED, and that is forced by where
-     [gamma_D] sits today: it is [FsCrash.fcn_view] of a record the crash
-     predicate binds EXISTENTIALLY, so no client can name it.  At stage 2,
-     when [fcn_view] is hoisted into [RiscvPtsto.riscvFixedGS] beside
-     [riscv_swap_name] (the worklist's [Pc]/[HPc]/[Hproj]/[Hswap]/
-     [boot_fixedGS] move), this binder becomes a PARAMETER and the step is
-     the client's debt at the real durable name.  Today's trivial witness
-     is [fs_dstep_rebase] below. *)
-  Definition fs_dstep (D D' : gmap Z (list (bv 8))) : iProp Σ :=
-    (∀ g : gname,
-       ghost_map_auth g 1 (fs_dbytes D) -∗ fs_dview g (fs_dbytes D) ==∗
-       ghost_map_auth g 1 (fs_dbytes D') ∗ fs_dview g (fs_dbytes D'))%I.
+     THE GNAME IS A PARAMETER, and it is the REAL durable name.  [gamma_D]
+     is [RiscvPtsto.riscv_dview_name], a FIXED-layer field, so every
+     consumer holding a [riscvFixedGS] can spell it and the step is the
+     client's actual debt at the committed view.  This file sits BELOW
+     [RiscvPtsto] and may not import it, so the name arrives here as an
+     argument; [LogInv.log_psi_commit] and [FsCrash]'s seam section, which
+     do have the record, instantiate it AMBIENTLY at [riscv_dview_name] --
+     the same way they spell [riscv_disk_name], and the one kind of gname
+     this tree does not thread explicitly.  The trivial witness is
+     [fs_dstep_rebase] below. *)
+  Definition fs_dstep (g : gname) (D D' : gmap Z (list (bv 8))) : iProp Σ :=
+    (ghost_map_auth g 1 (fs_dbytes D) -∗ fs_dview g (fs_dbytes D) ==∗
+     ghost_map_auth g 1 (fs_dbytes D') ∗ fs_dview g (fs_dbytes D'))%I.
 
   (* THE TRIVIAL INSTANTIATION, AND IT IS A PARAMETER OF THIS STAGE, NOT A
      THEOREM ABOUT THE FILE SYSTEM: while [P_wf] is a bare byte map the
@@ -376,9 +377,10 @@ Section FsDurableView.
      Stage 2 replaces the body of [fs_dview] by [fs_view Gamma_D] and this
      lemma STOPS holding -- which is the point: the step then carries the
      file system's own content and only the client can build it. *)
-  Lemma fs_dstep_rebase (D D' : gmap Z (list (bv 8))) : ⊢ fs_dstep D D'.
+  Lemma fs_dstep_rebase (g : gname) (D D' : gmap Z (list (bv 8))) :
+    ⊢ fs_dstep g D D'.
   Proof.
-    rewrite /fs_dstep. iIntros (g) "Ha Hd".
+    rewrite /fs_dstep. iIntros "Ha Hd".
     iApply (fs_dview_rebase g (fs_dbytes D) (fs_dbytes D') with "Ha Hd").
   Qed.
 End FsDurableView.

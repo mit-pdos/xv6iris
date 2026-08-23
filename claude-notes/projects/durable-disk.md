@@ -643,6 +643,33 @@ map at home blocks); 1d lands last.
       the commit AU's discharge from the debt; `FsAdequacyImg` builds
       `fs_view Γ_D` from `fs.img` once (the only place the image is
       decoded).
+      - [x] **2c-pre. `γD` hoisted into the FIXED layer.**  LANDED.
+            `RiscvPtsto.riscvFixedGS` gains `riscv_dview_name`, riding
+            `riscvF_diskGS` (the tree's unique `ghost_mapG Σ Z (bv 8)`),
+            so no new Σ field.  `Pc`/`HPc`/`Hproj`/`Hswap`/`boot_fixedGS`
+            and the seam equation take a FIFTH gname, threaded exactly as
+            `riscv_swap_name` is.  Adequacy allocates the map EMPTY (the
+            machine layer cannot compute the image's committed view);
+            `HPc` hands `ghost_map_auth γdv 1 ∅` to the client and
+            `FsCrash.P_fs_alloc` fills it at `fs_dbytes D₀` with
+            `fs_dview_rebase`.
+            `fs_crash_names` loses `fcn_view`; `P_fs` / `P_fs_rec_named` /
+            `P_fs_named` (and `P_fs_alloc`/`_clean`, `P_fs_project`,
+            `P_fs_swap`, `P_fs_rec_agree`, `P_fs_rec_named_wf`) take it as
+            a fourth explicit fixed name `γv`; `P_fs_rec`/`P_fs_any` — and
+            therefore `fs_crash_seam`, unchanged in arity across its 90
+            files — read `riscv_dview_name` ambiently.
+            `LogDefs.fs_dstep γD D D'` is a PARAMETER (the `∀ g` is gone),
+            `fs_dstep_rebase γD D D'` with it.
+            **DEVIATION, taken deliberately and ratified by the task:**
+            `LogInv.log_psi_commit` / `log_psi_spend` and
+            `FsCrash.fs_commit_L_sector0_rec` / `fs_commit_L_seq_permit`
+            spell the gname AMBIENTLY (`fs_dstep riscv_dview_name …`)
+            rather than taking it as an argument, so `log_ctx_at` keeps
+            its arity across its ~20 threading sites and `ProofEndOp` /
+            `ProofInitlog` need no edit at all.  A FIXED-layer name every
+            file already has through `riscvFixedGS` is the one kind this
+            tree passes ambiently — `riscv_disk_name`'s precedent.
 
 ## Stage 3 — the vertical spike: `sys_mknod`
 
