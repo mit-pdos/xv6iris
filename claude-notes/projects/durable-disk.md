@@ -640,6 +640,15 @@ map at home blocks); 1d lands last.
         moved through three `ProofItrunc` call sites; delete them with the
         next change that touches itrunc.
 - [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
+      - RULE for 2c (from 2c-pre, 2026-08-23): the fixed layer now carries
+        two client-only gnames (`riscv_swap_name`, `riscv_dview_name`)
+        threaded positionally through `Pc`/`HPc`/`Hproj`/`Hswap`/
+        `boot_fixedGS`.  `Γ_D`'s remaining ghosts (`γlink_D`, `γtop_D`)
+        go in ONE bundle field (a record of the durable FS gnames), not
+        as a third and fourth positional name.  `P_fs_alloc`'s
+        `ghost_map_auth γv 1 ∅` premise is the sole allocator's claim —
+        to pre-populate `γD` in adequacy, change `HPc`'s premise, do not
+        add a conjunct beside it.
       the commit AU's discharge from the debt; `FsAdequacyImg` builds
       `fs_view Γ_D` from `fs.img` once (the only place the image is
       decoded).
