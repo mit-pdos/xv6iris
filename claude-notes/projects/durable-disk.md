@@ -364,17 +364,33 @@ the same way. E2's mirror did NOT change shape: the receipt chains through
       `fs_clear_permit` stays for the current consumer until G adopts
       the primitives. Recovery-side permits keep re-basing until
       stage H makes them ghost no-ops.
-  FLIP-TIME STABILITY (recorded 2026-08-23): per-BLOCK finalize
-  responsibility fails on SHARED dir blocks — an op's full-block
-  postcondition goes stale under interleaved creates/unlinks in the
-  same block. The argument is per-RECORD: each op owns its dirent
-  record k (nobody else writes it while the op is open); a block still
-  pending via another open op is THAT op's responsibility (row (a)
-  exempts it); the last finalizer's block content is A's current block
-  ⊕ its own record, because every other finalize already folded its
-  record into A. So the flip needs the pending bookkeeping refined to
-  note record ownership for dir blocks (or an equivalent per-record
-  stability lemma), not just the block-set `e.1.2`.
+  FLIP DESIGN OF RECORD (2026-08-23, superseding the per-record note):
+  **object-granular pending.** Per-BLOCK finalize responsibility fails
+  on shared blocks, and sharing is the NORM, not a corner: the bitmap
+  block is shared by every allocating op in a group, inode blocks pack
+  16 dinode slots, dir blocks pack records. Per-record deposit schemes
+  and last-holder folding both go stale. The clean shape:
+  - `Inductive fsobj := ORec (d : Z) (k : nat) | OBit (b : Z)
+    | OSlot (i : Z) | OBlk (b : Z)` — dir records, bitmap bits,
+    dinode slots, whole data blocks (the four sharing granularities,
+    mirroring the resource layer's own: dv slots, free_pool bits,
+    ireg slots, data payloads).
+  - The op ledger entry gains an OBJECT set beside the block set
+    (`e.1.2` stays for the LOGBLOCKS budget); `op_pending` becomes the
+    object union.
+  - Row (a) is restated as OBJECT-WISE AGREEMENT: `A ~[pend] L` :=
+    for every object not in pend, A and L decode identically AT that
+    object (records via the dirent decode, bits via fs_bit, slots via
+    fs_dinode-at-slot, data blocks whole), plus the per-block residue
+    clauses that make the decomposition byte-complete; a TILING
+    COMPLETENESS lemma recovers `A = L` on homes at `pend = ∅`.
+  - FINALIZE: an ending op folds exactly ITS OWN objects — its G2
+    composition lemma applied to A — and its knowledge is stable
+    because object ownership is exclusive while the op is open (dir
+    lock per record slot, balloc's bit, the inode lock per slot). No
+    deposits, no last-holder case, no ordering constraint.
+  - wf(A) preservation per finalize = the G2 lemma verbatim; the
+    agreement bookkeeping is separate and mechanical.
 - [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
       literal image (a `FsImgCheck`-style computation, cheap — the
       sweeps already run there).
