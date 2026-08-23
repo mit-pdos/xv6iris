@@ -123,8 +123,33 @@ See the G1-impl entry for the site table.
    single-effect ops are free (their lemma IS the F2 wrapper); the
    content is PRECONDITION TRANSPORT across chained effects (each
    step's preconditions at the intermediate view). Batches:
-   (1) filewrite — the alloc*/write* chains incl. the 12-block
-   crossing; (2) the create side — sys_open O_CREATE (+O_TRUNC),
+   (1) filewrite — DONE (`iris/FsOpFilewrite.v`, 3.0 s cold, axiom-free):
+   step datum `wstep` = `ws_alloc fbn fresh sz' | ws_alloc_ind fi fd sz'
+   | ws_write fbn bs sz'` at a FIXED `(sb, i)` (section variables), with
+   `ws_apply`/`ws_run` (`fold_left`), the decode-level `ws_pre` AT THE
+   CURRENT VIEW, the sequential `ws_pre_chain`, and ONE induction
+   `ws_run_ok` (wf + `fs_parse_sb = Some sb` + type-invariance + the
+   bitmap clause) with `ws_run_wf`/`_parse`/`_type`/`_file_type`/`_bit`/
+   `_size` as its named corollaries. The transport is per-step
+   (`ws_apply_blocks` — the three-block footprint, one lemma; then
+   `ws_apply_parse` / `_wf` / `_type` / `_size` / `_bit`(+`_false`))
+   plus the premise-rebuilders `ws_pre_alloc_after`,
+   `ws_pre_alloc_ind_after`, `ws_pre_write_after` and the
+   no-side-condition `ws_pre_write_after_alloc(_ind)`. Worked corollary
+   `ws_appends_wf`: `ws_appends fi fr bsf szf n0 k` (per block: the
+   alloc arm chosen by `decide (fbn = 12)`, then the write at the same
+   size) preserves `fs_durable_wf_view`, all premises read at the PRE-
+   transaction view — target sizes, balloc's cleared bits, `fr`
+   injective, the indirect block only when the range crosses 12. A
+   short write is the same lemma at a smaller `k`; a `T_DEVICE`
+   filewrite writes no disk block (identity, no lemma). TWO
+   MEASURED FACTS worth keeping: `zify` does NOT model `Z.div` in this
+   build (it abstracts the quotient), so a division fact needs
+   `Z.div_mod` posed by hand — `FsOpFilewrite.fs_nblk_pos` is the one
+   place, everything else treats `fs_nblk` as an atom; and `repeat
+   split` DESTROYS an `fs_durable_wf_view` conjunct (it is an `∃`, one
+   constructor, so `split` opens it with an evar) — spell those chains
+   `split; [..|]`. (2) the create side — sys_open O_CREATE (+O_TRUNC),
    sys_mkdir, sys_mknod, sys_link (incl. the nlink rollback arm, net
    identity); (3) the free side — sys_unlink file/dir arms with the
    trunc/free path, fileclose's iput-free path, ireclaim. Read-only

@@ -645,6 +645,7 @@ FsEffUnlinkEntry.v
 FsEffCreateEntry.v
 FsEffAllocBlock.v
 FsEffAllocIndBlock.v
+FsOpFilewrite.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v
