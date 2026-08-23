@@ -2606,7 +2606,7 @@ Section ProofInitlog.
          recovering install moved the two at exactly the same blocks to
          exactly the same bytes.  So the row is arithmetic on the chain. *)
       iSplitR.
-      { iPureIntro. apply log_mirror_tie_of_body.
+      { iPureIntro.
         intros bb Hbb _.
         rewrite /fs_home_set in Hbb.
         apply elem_of_difference in Hbb as [Hbcov Hbout].

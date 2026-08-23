@@ -125,21 +125,15 @@ Definition wp_end_op_sconf_body
      etc.) surface no order premise of their own for their callers to
      satisfy, so nothing about them is stated here. *)
   locks_below lks "log" ->
-  (* THE CLIENT'S PRESERVATION PREMISE (durable-disk ruling 2.5, flip-B).
-     end_op is the ONE place the durable state moves for a client, and the
-     machine layer cannot know that the state it moves TO is still a
-     well-formed file system: [FsCrash.fs_commit_v_sector0_rec] therefore
-     takes that implication, and this is the same statement, quantified
-     over the picture and the write set (no caller of end_op can see
-     which commit it will run).
-
-     IT IS TRIVIAL TODAY and every caller discharges it with
-     [FsCrash.end_op_pres_placeholder]: [FsWf.fs_durable_wf] is F1's
-     placeholder.  The SHAPE is what lands now -- at the switch-on
-     ([fs_durable_wf := fs_durable_wf_body]) only the discharge changes,
-     and stage G's per-op ledger is what will supply it; the plumbing here
-     does not move again. *)
-  end_op_pres cov logstart ->
+  (* NO PRESERVATION PREMISE (durable-disk 1b).  end_op is the ONE place the
+     durable state moves for a client, and the log now proves for itself
+     what it moves TO: the commit permit
+     ([FsCrash.fs_commit_L_seq_permit]) concludes [D' = L|home] out of its
+     own two rows -- row (b) at the commit picture and the batch's slot
+     contents -- so nothing about pictures, write sets or install
+     arithmetic reaches a caller of end_op.  The old [FsCrash.end_op_pres],
+     quantified over a picture no caller could name, is deleted with its 30
+     placeholder discharges. *)
   (* THE CLIENT'S FINALIZE PREMISE (durable-disk flip-C1).  The other half
      of the same ruling, and the one that is the OP's rather than the
      machine's: when this transaction retires, the objects it claimed leave

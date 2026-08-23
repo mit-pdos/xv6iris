@@ -15,13 +15,12 @@ is deleted (stage I).
 
 **Where the tree is:** stages A, B, D, H0 of the old list stand (fixed-gname
 durable disk, `hdr_wf`, general `initlog`/`install_trans`, the adequacy
-pure-projection hook).  EVERYTHING the FS layer states about durability
-today is a placeholder: `FsWf.v:42` `fs_durable_wf := True`;
-`end_op_pres_placeholder` ×30, `end_op_fin_placeholder` ×30,
-`log_row_a_pending` ×6, `log_mirror_tie_pending` ×3 (the boot site is gone
-— 1a).  Row (b)'s deposit half is proven and unused
-(`LogInv.log_mirror_tie_deposit`); `log_mirror_tie_of_body` is the honest
-way past the gate for a site that can already prove the body.
+pure-projection hook).  What the FS layer still states about durability
+with a placeholder: `FsWf.v:42` `fs_durable_wf := True`;
+`end_op_fin_placeholder` ×30, `log_row_a_pending` ×6.  Row (b) is REAL
+(1b): `LogInv.log_state` carries `log_mirror_tie_body`, both
+establishment sites prove it, and the commit permit turns it into
+`D' = L|home`.
 
 ## Working rules (keep)
 
@@ -116,16 +115,15 @@ map at home blocks); 1d lands last.
         learn); the closing head write is `fs_clear_keep_seq_permit`, whose
         caught-up premise is `lm_install_hit`/`_miss` plus the slot
         equation; the `log_state` pack is at the NAMED `lm_upd (lm_install
-        …) (log_hdr_bno ls) bs'` and its row (b) is PROVEN, through
-        `LogInv.log_mirror_tie_of_body` (the honest way past the still-gated
-        `log_mirror_tie`) and the new `SpecInstallTrans.it_rec_L_hit`/`_miss`.
-        Row (a) stays gated — it is 1b/1d's.
-      - FOR 1b: `LogDefs.lm_install` is `ProofEndOp.eo_minst` generalised
+        …) (log_hdr_bno ls) bs'` and its row (b) is PROVEN, off the new
+        `SpecInstallTrans.it_rec_L_hit`/`_miss`.
+        Row (a) stays gated — it is 1d's.
+      - `LogDefs.lm_install` is `ProofEndOp.eo_minst` generalised
         (block-keyed, over the header's own `list Z` write set, and its
         duplicate-freedom premise is the INJECTIVITY it is used through
         rather than a `NoDup` — the bare name resolves to two different
-        inductives in this tree).  Re-point `eo_minst` at it and the
-        duplicate goes.
+        inductives in this tree).  `eo_minst` is still a duplicate of it;
+        see 1b's last bullet for what re-pointing costs.
       - `fr_D` no longer re-bases anywhere on the boot path.  AUDIT: the
         boot path's only disk writes are the recovering install's home
         blocks and the closing header, and both now carry the mirror half.
@@ -135,37 +133,62 @@ map at home blocks); 1d lands last.
         halves, which at a dirty log has to be routed out of the coverage
         remainder by the decoded write set, plus `hdr_wf`-shaped premises at
         fsinit's level.
-- [ ] **1b. Row (b) through `ProofEndOp`; the commit concludes `D' = L|home`.**
-      - `eo_open_of_batch` (`ProofEndOp.v:776-811`) DROPS `LB`, `pend`,
-        `%Hmtie`, `%Hrowa` (`:797-798`); `eo_open` (`:756-775`) has no slot.
-        Re-export `⌜log_mirror_tie_body M₀ L cov ls LB⌝` and
-        `LB = list_to_set (map uint W)`; carry through `eo_loop`
-        (`:2452-2515`) beside `HLw`/`HMcslot` to `eo_commit` (`:1815-1873`).
-        The fills write log SLOTS, so the row transports from `M₀` to `Mc`
-        for free (`fs_home_set = cov ∖ log_region_set`).
-      - The permit's sole application site is `:1936-1944` (`V := lm_view Mc`,
-        `Ws := map uint W`); at `∅` the only spatial hypothesis is
-        `log_mirror_half Mc`.  The four PURE facts that conclude
-        `D' = L|home`: row (b) at `Mc`; `HMcslot` (`:1841`); `HLw` (`:1834`);
-        and `dom L ⊇ fs_home_set cov ls` — stated NOWHERE reachable today
-        (the only `dom` fact is `FsBoot.v:202` at the boot mint): add
-        `⌜dom L = cov⌝` to `log_state`.  `log_mirror_tie_deposit` is, up to
-        one rewrite, the same arithmetic (`fs_install V ls Ws (…)` IS
-        `fs_restrict (lm_view M_postinstall) home` along `eo_minst`'s chain).
-      - New commit permit in `FsCrash.v` beside `fs_commit_v_sector0_rec`
-        (`:4011-4120`, spent at `:4111`): takes `⌜D' = L|home⌝`'s
-        ingredients, lends the `γD` auth (1d) to a client basic update,
-        and NO client pure premise.  `fs_commit_pres` (`:496-514`),
-        `end_op_pres` (`:516-527`), the `Hcli` threading (`FsCrash.v:4021,
-        4111, 4466, 4521, 4562`; `ProofEndOp.v:1844, 1943, 2470, 3723, 3988,
-        4929`), `SpecEndOp.v:130-142`, and the 30 `end_op_pres_placeholder`
-        call sites across 16 files (two idioms: `ltac:(apply …)` positional
-        in `ProofSys*`, `all: try exact (…)` in `Proof*`) — DELETED.
-      - `eo_open_to_batch` (`:827-867`, gate at `:856`) calls
-        `log_mirror_tie_deposit`; `ProofLogWrite.v:2488`/`:2605` (the two
-        free maintenance sites) prove the row; the gate `log_mirror_tie` /
-        `log_mirror_tie_pending` / `log_mirror_tie_of_body` dies, `_body`
-        and `_deposit` survive.
+- [x] **1b. Row (b) through `ProofEndOp`; the commit concludes
+      `D' = L|home`.** LANDED.
+      - Row (b) is UNGATED: `LogInv.log_state` carries
+        `⌜log_mirror_tie_body M L cov logstart LB⌝` outright.
+        `log_mirror_tie`, `log_mirror_tie_pending` and
+        `log_mirror_tie_of_body` are DELETED; `_body` and `_deposit`
+        survive.  Maintenance is free everywhere it was predicted to be:
+        `ProofLogWrite`'s absorb arm (the scan found `bno` in `LB`, so the
+        one key `L` moves at is off the row's domain) and its append arm
+        (`LB` grows by exactly that key); `ProofBeginOp.bo_batch_lhn`
+        re-exports the row verbatim.  `ProofInitlog`'s boot pack drops the
+        `_of_body` hop and proves the body directly.
+      - `ProofEndOp.eo_open_of_batch` re-exports `⌜LB = list_to_set (map
+        uint W)⌝` and the row at `list_to_set (map uint W)`;
+        `eo_loop` carries it through the fuel induction (a fill writes a
+        SLOT, so `home_set_not_region` kills both the `L` insert and the
+        `lm_upd`); `eo_commit` takes it and spends it.
+        `eo_open_to_batch` takes the row at `∅` as a PREMISE and the
+        deposit site computes it with `LogInv.log_mirror_tie_deposit` —
+        the arithmetic belongs where the chain is held, not inside the
+        packing lemma.
+      - **The log's commit contract**, `FsCrash.fs_commit_L_seq_permit`
+        (with `fs_commit_L_sector0_rec` under it), replacing
+        `fs_commit_named_seq_permit` / `fs_commit_v_sector0_rec`.  It takes
+        NO client premise; its two new pure premises are the log's own
+        rows, stated at the caller's off-header view `V` (the sibling
+        `fs_clear_keep_seq_permit`'s style, and it makes the sector-1-first
+        landing order free):
+        `∀ b ∈ fs_home_set cov ls, b ∉ Ws → L !! b = Some (V b)` and
+        `∀ i b, Ws !! i = Some b → L !! b = Some (V (log_slot_bno ls i))`.
+        Conclusion: the receipt is at
+        `fs_restrict (dv_of_D L) (fs_home_set cov ls)` — the LOGGED VIEW on
+        the home set.  The install arithmetic is
+        `FsCrash.fs_install_is_logged` and never leaves `FsCrash.v`.
+      - DELETED: `FsCrash.fs_commit_pres`, `end_op_pres`,
+        `end_op_pres_placeholder`; the `Hcli`/`Hpres` threading through
+        `FsCrash`/`ProofEndOp`; `SpecEndOp`'s `end_op_pres` premise; and its
+        30 call sites across 16 files.  `end_op` now has NO FS-facing pure
+        premise.  `end_op_fin` / `end_op_fin_placeholder` are untouched
+        (1d's).
+      - DEVIATION, and it is a simplification: **no `⌜dom L = cov⌝` was
+        added to `log_state`.**  It is not needed.  The two row premises
+        above pin `L` at every home block — row (b) on `home ∖ Ws`, the
+        slot equation on `Ws` — which IS the domain fact on `home`, in the
+        two pieces it splits into, and `home` is all the conclusion reads.
+        So the boot distribution (`FsBoot`/`FsCfgBoot`/`FirstTok`) was not
+        touched at all, and `log_state` gained no conjunct.
+      - NOT DONE (it was conditional): `eo_minst` was NOT re-pointed at
+        `LogDefs.lm_install`.  The two are the same pass at
+        `Ws = map uint W`, but `lm_install` indexes with `Ws !!! t` where
+        `eo_minst` uses `uint (W !!! t)`, so the bridge is a real lemma plus
+        a rewrite at ~10 sites inside `eo_commit`'s tail — churn with no
+        statement change, on top of a change that already moves
+        `FsCrash`/`LogInv`/`ProofEndOp`.  Worth doing on its own; the three
+        readings (`eo_minst_miss`/`_hdr`/`_hit`) map one-to-one onto
+        `lm_install_miss`/`_hdr`/`_hit`.
 - [~] **1c. Byte-keyed logged view with FULL-element clients; bio's share
       moves to the block CACHE map.**  The byte layer, its invariant and
       the three crossings are LANDED in `FsBlocks.v`; the CONSUMER FLIP is

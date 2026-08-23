@@ -2481,11 +2481,15 @@ Section ProofLogWrite.
             iSplitL "Hcovb"; [iExact "Hcovb" | iExact "Hcovrest"]. }
           iFrame "Hhdr Hlogr Hpool Hmirh".
           iSplitR; [iPureIntro; exact Hmhdr|].
-          (* ROW (b), the ABSORB arm.  Free once the tie's body is switched
-             on (durable-disk G3): [LB] does not move and the scan found
-             [bno] in it ([HbnoLB]), so the only key [L] moves at is already
-             outside the row's domain. *)
-          iSplitR; [iPureIntro; apply log_mirror_tie_pending|].
+          (* ROW (b), the ABSORB arm.  FREE: [LB] does not move and the scan
+             found [bno] in it ([HbnoLB]), so the only key [L] moves at is
+             already outside the row's domain. *)
+          iSplitR.
+          { iPureIntro. intros b' Hb' HbLB.
+            assert (Hne : uint bno <> b')
+              by (intros Heq; apply HbLB; rewrite -Heq; exact HbnoLB).
+            rewrite (lookup_insert_ne L (uint bno) b' bs Hne).
+            exact (Hmtie b' Hb' HbLB). }
           (* ROW (a), the ABSORB arm (durable-disk flip-C1).  Free once the
              row's body is switched on, and for the reason the object
              declaration exists: [L] moves only at [uint bno], the ledger
@@ -2599,10 +2603,16 @@ Section ProofLogWrite.
             rewrite (lw_bd_snoc W bno x Hxne). done. }
           iFrame "Hhdr Hlogr Hpool Hmirh".
           iSplitR; [iPureIntro; exact Hmhdr|].
-          (* ROW (b), the APPEND arm.  Free once the tie's body is switched
-             on (durable-disk G3): [LB] grows by exactly [uint bno], the one
-             key [L] moves at, so the row's domain shrinks by it. *)
-          iSplitR; [iPureIntro; apply log_mirror_tie_pending|].
+          (* ROW (b), the APPEND arm.  FREE: [LB] grows by exactly [uint bno],
+             the one key [L] moves at, so the row's domain shrinks by it. *)
+          iSplitR.
+          { iPureIntro. intros b' Hb' HbLB.
+            assert (Hne : uint bno <> b').
+            { intros Heq. apply HbLB. rewrite -Heq.
+              apply elem_of_union_r, elem_of_singleton. reflexivity. }
+            rewrite (lookup_insert_ne L (uint bno) b' bs Hne).
+            apply (Hmtie b' Hb').
+            intros Hin. apply HbLB, elem_of_union_l. exact Hin. }
           (* ROW (a), the APPEND arm (durable-disk flip-C1) -- the same
              argument as the absorb arm's, and it does not read [LB]: the
              row is about OBJECTS, and the objects of [uint bno] went

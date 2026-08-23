@@ -802,83 +802,50 @@ Section LogInv.
     log_mirror_at ls (0%nat, []).
 
   (* ---------------------------------------------------------------- *)
-  (*  ROW (b): THE MIRROR TIE (durable-disk stage G1)                  *)
+  (*  ROW (b): THE MIRROR TIE (durable-disk stage G1; UNGATED, 1b)      *)
   (*                                                                    *)
   (*  OUTSIDE THE BATCH, THE ERA'S PICTURE OF THE DURABLE DISK IS THE     *)
   (*  LOGGED VIEW.  A home block that is not in [LB] has not been         *)
   (*  written since the last commit, so its home block on the physical    *)
   (*  disk -- which is what [lm_view M] records -- still holds the        *)
-  (*  logged bytes.  It is what turns the commit's [D' = restrict L]      *)
-  (*  into an equation about the PHYSICAL pre-image, i.e. what lets       *)
-  (*  [FsCrash.fs_commit_named_seq_permit]'s conclusion be assembled      *)
-  (*  generically instead of at each of end_op's 26 exit arms             *)
-  (*  (durable-disk.md stage G1 row (b)).                                *)
+  (*  logged bytes.  It is what turns the commit's [D' = L|home] into an  *)
+  (*  equation about the PHYSICAL pre-image, i.e. what lets the commit    *)
+  (*  permit ([FsCrash.fs_commit_L_seq_permit]) conclude the new          *)
+  (*  committed view generically instead of at each of end_op's 26 exit   *)
+  (*  arms.                                                              *)
   (*                                                                     *)
-  (*  IT IS GATED, AND THE GATE IS VISIBLE DEBT -- read this before        *)
-  (*  using it.  The real content is [log_mirror_tie_body], under its      *)
-  (*  own name; [log_mirror_tie] -- what [log_state] actually carries --   *)
-  (*  is [True] until the two ESTABLISHMENT sites can produce the body:   *)
+  (*  IT IS THE REAL ROW: [log_state] carries this body, there is no      *)
+  (*  gate, and both establishment sites prove it --                      *)
   (*                                                                     *)
-  (*   - end_op's DEPOSIT ([ProofEndOp.eo_open_to_batch]).  The commit     *)
-  (*     runs [write_head] / [install_trans] / [write_head] through the    *)
-  (*     permits whose AT-FORM [Q] is [log_mirror_at ls h]: the mirror     *)
-  (*     VALUE is existential, so the deposit cannot say what              *)
-  (*     [lm_view M'] is at any block.                                     *)
-  (*     DISCHARGER: stage G3, which re-points [ProofEndOp] at E2''s       *)
-  (*     value-chained primitives ([fs_logfill_v_seq_permit],              *)
-  (*     [fs_install_v_seq_permit] -- whose [Q] returns the half at        *)
-  (*     [lm_upd M0 blk bs] -- [fs_commit_named_seq_permit] and            *)
-  (*     [fs_clear_keep_seq_permit]) and threads [M] through the           *)
-  (*     copy loop, the installs and the clear.  With the chain in hand    *)
-  (*     the deposit is arithmetic: an install writes [L]'s bytes to the   *)
-  (*     home block of every [b ∈ LB], and touches nothing else, so the    *)
-  (*     post-commit picture agrees with [L] on the WHOLE home set.        *)
+  (*   - end_op's DEPOSIT ([ProofEndOp.eo_open_to_batch], through         *)
+  (*     [log_mirror_tie_deposit] below): the committer chains the        *)
+  (*     mirror's VALUE across the fills, the commit, the installs and    *)
+  (*     the clear, so the deposit is arithmetic -- an install writes     *)
+  (*     [L]'s bytes to the home block of every [b ∈ LB] and touches      *)
+  (*     nothing else, so the post-commit picture agrees with [L] on the  *)
+  (*     WHOLE home set.                                                  *)
   (*                                                                     *)
-  (*   - boot ([ProofInitlog]) -- DONE (durable-disk 1a).  The era's        *)
-  (*     mirror is born at the picture of the disk it boots on and its      *)
-  (*     custody arm is installed in the same fupd, so the boot's whole     *)
-  (*     write chain is value-carrying and the pack proves the body         *)
-  (*     ([log_mirror_tie_of_body] below) instead of calling the gate.      *)
+  (*   - boot ([ProofInitlog]).  The era's mirror is born at the picture  *)
+  (*     of the disk it boots on and its custody arm is installed in the  *)
+  (*     same fupd, so the boot's whole write chain is value-carrying and *)
+  (*     the pack computes the row off it.                                *)
   (*                                                                     *)
-  (*  The SWITCH-ON is one line -- [log_mirror_tie := log_mirror_tie_body] *)
-  (*  -- and [log_mirror_tie_pending]'s call sites are then exactly the    *)
-  (*  places that owe a proof.  Until then every MAINTENANCE site          *)
-  (*  (log_write's two arms, begin_op) is free, which is what row (b) is   *)
-  (*  designed to be: [log_write] moves [L] only at a block it puts into   *)
-  (*  [LB] in the same critical section, so the row's domain only shrinks. *)
+  (*  Every MAINTENANCE site (log_write's two arms, begin_op) is free,    *)
+  (*  which is what row (b) is designed to be: [log_write] moves [L]      *)
+  (*  only at a block it puts into [LB] in the same critical section, so  *)
+  (*  the row's domain only shrinks.                                      *)
   (* ---------------------------------------------------------------- *)
   Definition log_mirror_tie_body (M : log_mirror) (L : gmap Z (list (bv 8)))
       (cov : gset Z) (ls : Z) (LB : gset Z) : Prop :=
     forall b : Z, b ∈ fs_home_set cov ls -> b ∉ LB ->
       L !! b = Some (lm_view M b).
 
-  Definition log_mirror_tie (M : log_mirror) (L : gmap Z (list (bv 8)))
-      (cov : gset Z) (ls : Z) (LB : gset Z) : Prop := True.
-
-  (* THE GATE.  Every use marks a site the switch-on turns into an error. *)
-  Lemma log_mirror_tie_pending (M : log_mirror) (L : gmap Z (list (bv 8)))
-      (cov : gset Z) (ls : Z) (LB : gset Z) :
-    log_mirror_tie M L cov ls LB.
-  Proof. exact I. Qed.
-
-  (* THE HONEST WAY IN, for a site that can already PROVE the row.  A caller
-     that has the body does not go through the gate: it goes through this,
-     which the switch-on turns into the identity without touching the call
-     site.  [ProofInitlog]'s boot pack is the first such site (durable-disk
-     1a: the era's mirror is born at the disk's own picture, so row (b) at
-     boot is computation on the install chain). *)
-  Lemma log_mirror_tie_of_body (M : log_mirror) (L : gmap Z (list (bv 8)))
-      (cov : gset Z) (ls : Z) (LB : gset Z) :
-    log_mirror_tie_body M L cov ls LB -> log_mirror_tie M L cov ls LB.
-  Proof. intros _. exact I. Qed.
-
-  (* READY, AND DELIBERATELY UNUSED (durable-disk flip-B).  This is the
-     deposit half of the gate above, proved: once end_op's committer carries
-     the mirror's VALUE across the commit cycle -- which it now does, through
-     [FsCrash]'s value-chained permits -- row (b) at the deposit is pure
-     bookkeeping over the chain.  The three chain facts it asks for are
-     exactly what [ProofEndOp]'s [eo_minst_hit] / [eo_minst_miss] /
-     [eo_ext] invariants deliver:
+  (* THE DEPOSIT, proved: once end_op's committer carries the mirror's
+     VALUE across the commit cycle -- which it does, through [FsCrash]'s
+     value-chained permits -- row (b) at the deposit is pure bookkeeping
+     over the chain.  The three chain facts it asks for are exactly what
+     [ProofEndOp]'s [eo_minst_hit] / [eo_minst_miss] / [eo_ext] invariants
+     deliver:
 
        - every LOGGED home block ends at its logged content (the install
          pass wrote [Lw j] there),
@@ -886,13 +853,7 @@ Section LogInv.
          the cycle touches it: the fills go to slots, the commit and the
          clear to the header, the installs to [W]'s blocks alone),
        - and the logged view agrees with [Lw] at every entry (the copy
-         loop's own ghost step).
-
-     It is NOT wired in yet, because [log_mirror_tie] is still [True].  The
-     boot establishment site is DONE (durable-disk 1a: [ProofInitlog]'s pack
-     proves the body and goes through [log_mirror_tie_of_body]), so what is
-     left of the switch-on is the one-line definition change plus
-     [eo_open_to_batch] calling this instead of [log_mirror_tie_pending]. *)
+         loop's own ghost step). *)
   Lemma log_mirror_tie_deposit (M M' : log_mirror) (L : gmap Z (list (bv 8)))
       (cov : gset Z) (ls : Z) (LB : gset Z) (W : list Z)
       (Lw : nat -> list (bv 8)) :
@@ -924,7 +885,7 @@ Section LogInv.
   (*  and flip-A gave the vocabulary for.                               *)
   (*                                                                    *)
   (*  IT IS GATED, AND THE GATE IS VISIBLE DEBT -- the same idiom as     *)
-  (*  [log_mirror_tie] above and [FsWf.fs_durable_wf].  The real content *)
+  (*  row (b) above and [FsWf.fs_durable_wf].  The real content          *)
   (*  is [log_row_a_body], under its own name; [log_row_a] -- what       *)
   (*  [log_state] actually carries -- is [True] until the arms can       *)
   (*  produce the body.  WHY GATED, per site:                            *)
@@ -1006,8 +967,7 @@ Section LogInv.
   (*  [log_opSe]), and the authoritative value lives in the ledger,      *)
   (*  where [log_end_step] hands it back.  So end_op instantiates this   *)
   (*  at the retiring entry's own [So] and the caller supplies the       *)
-  (*  quantified statement -- the same shape                             *)
-  (*  [FsCrash.end_op_pres] takes, and for the same reason.              *)
+  (*  quantified statement.                                              *)
   (*                                                                    *)
   (*  WHAT AN ARM SUPPLIES AT flip-C2, and nothing else: its G2          *)
   (*  preservation lemma ([FsOp*.op_*_ok], i.e. F2's [eff_*_wfv] at the  *)
@@ -1028,9 +988,7 @@ Section LogInv.
       log_row_a L cov ls pend -> log_row_a L cov ls (pend ∖ F).
 
   (* THE GATE, at the interface: trivially true while [log_row_a] is the
-     placeholder, exactly as [FsCrash.end_op_pres_placeholder] is while
-     [FsWf.fs_durable_wf] is.  Its call sites are the switch-on's rework
-     list. *)
+     placeholder.  Its call sites are the switch-on's rework list. *)
   Lemma end_op_fin_placeholder (cov : gset Z) (ls : Z) : end_op_fin cov ls.
   Proof. intros F L pend _. exact (log_row_a_pending _ _ _ _). Qed.
 
@@ -1102,8 +1060,8 @@ Section LogInv.
           header reading is [log_mirror_clean]'s, spelled out because [M]
           is this bundle's own binder now. *)
        log_mirror_half M ∗ ⌜lm_hdr M logstart = (0%nat, [])⌝ ∗
-       (* ROW (b), gated -- see [log_mirror_tie] above *)
-       ⌜log_mirror_tie M L cov logstart LB⌝ ∗
+       (* ROW (b) -- see [log_mirror_tie_body] above *)
+       ⌜log_mirror_tie_body M L cov logstart LB⌝ ∗
        (* ROW (a), gated -- see [log_row_a] above *)
        ⌜log_row_a L cov logstart pend⌝)%I.
 

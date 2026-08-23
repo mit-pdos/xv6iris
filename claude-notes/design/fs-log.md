@@ -319,17 +319,26 @@ and no ghost laws about Ψ).
         fsblock (log header) _ ∗ [∗ i < LOGBLOCKS] fsblock (logstart+1+i) _
         (* client halves of the log region — the log IS their client *)
         ∗ log_mirror_half M ∗ ⌜lm_hdr M logstart = (0, [])⌝
-        ∗ ⌜log_mirror_tie M L cov logstart LB⌝   (* durable-disk row (b) *)
+        ∗ ⌜log_mirror_tie_body M L cov logstart LB⌝  (* durable-disk row (b) *)
 
 `log_state` also takes a `pend` parameter — the union of the open ops'
 already-logged sets (`LogInv.op_pending om`, passed from `log_res`). It is
 what durable-disk's stage-G row (a) will exclude from its abstract-view
 agreement; until that lands the bundle does not read it, and the two moves
-(`log_state_pend_mono` for the growing transitions, `log_state_pend` for
-end_op's retire) say which sites survive the flip. `log_mirror_tie` is
-likewise GATED to `True` — the real body is `log_mirror_tie_body`, and
-`LogInv.v`'s header at the definition names the two walls (end_op's deposit,
-boot) and their dischargers.
+(`log_state_pend_mono` for the growing transitions, `log_state_fin` for
+end_op's retire) say which sites survive the flip.
+
+**Row (b) is real, and it is what makes the commit's contract
+client-free.** `log_mirror_tie_body M L cov logstart LB` says: at every
+HOME block outside the batch's logged set, the logged view `L` holds
+exactly what the era's picture of the physical disk holds. Its two
+establishment sites both prove it — boot (`ProofInitlog`: the mirror is
+born at the picture of the disk the era boots on, so `L` and the picture
+are one walk over one image) and end_op's deposit
+(`LogInv.log_mirror_tie_deposit` off the value the committer chains through
+the fills, the commit, the installs and the clear) — and every maintenance
+site is free, because `log_write` moves `L` only at a block it puts into
+`LB` in the same critical section.
 
 Transitions mirror the code exactly: `end_op`'s last-out path sets cmt := 1
 under the lock and TAKES `log_state` out linearly; commit runs with it (no
@@ -366,8 +375,31 @@ locks — matching the code); re-acquires, deposits, cmt := 0.
     half), bwrite, brelse ×2. After: log area's L = physical log area
     contents = the batch's home values.
   - write_head: bread(header), write n + W into bytes, γL-update, bwrite,
-    brelse. When n > 0 this is THE COMMIT POINT (stage 4: D := L over W;
-    stages 1–3: nothing extra).
+    brelse. When n > 0 this is THE COMMIT POINT, and the permit it spends is
+    **the log's whole contract to its client**:
+
+        FsCrash.fs_commit_L_seq_permit cov ls M0 V L nn Ws bs
+
+    with premises that are the log's own rows and NOTHING of the client's —
+    the header bytes' decode, the write set's geometry, the caller's
+    off-header view `V`, row (b) at the commit picture
+    (`∀ b ∈ home, b ∉ Ws → L !! b = Some (V b)`) and the batch's entries
+    (`∀ i b, Ws !! i = Some b → L !! b = Some (V (log_slot_bno ls i))`) —
+    and the conclusion
+
+        disk_seq_permit … (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
+                           ∗ fs_receipt_any (fs_restrict (dv_of_D L)
+                                               (fs_home_set cov ls)))
+
+    i.e. **the committed view moved to `L` on the home set**. The install
+    arithmetic (`fs_install V ls Ws (fs_restrict V home) = L|home`,
+    `FsCrash.fs_install_is_logged`) is discharged INSIDE the permit and
+    never leaves `FsCrash.v`: pictures, write sets and slot indices do not
+    appear above `SpecEndOp`. There is no `end_op_pres`, no
+    `fs_commit_pres`, and `end_op` carries no FS-facing pure premise at
+    all. Note what the two row premises buy beyond the equation: together
+    they pin `L` at every home block, so no separate `dom L` hypothesis is
+    needed — they ARE the domain fact, in the two pieces it splits into.
   - install_trans(recovering=0): per tail — bread both; the home handle
     arrives Dirty with bytes already = L(W[i]) (frozen), so the memmove
     rewrites equal content; bwrite (home disk := L); extract bref, flip

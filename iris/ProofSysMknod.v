@@ -886,7 +886,6 @@ Section ProofSysMknodM1Tail.
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 20)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(lkbelow)
-              ltac:(apply FsCrash.end_op_pres_placeholder)
               ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -1796,7 +1795,6 @@ Section ProofSysMknodBody.
                   bn g gfs cov logstart dev n2 pid (DfracOwn (1/4))
                   P1 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                  ltac:(apply FsCrash.end_op_pres_placeholder)
                   ltac:(apply LogInv.end_op_fin_placeholder)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk Hop").

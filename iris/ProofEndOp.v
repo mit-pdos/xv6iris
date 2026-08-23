@@ -422,7 +422,7 @@ Lemma eo_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
 Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
 (* the batch's home-blocks row, restated at the DECODED header's spelling --
-   what [FsCrash.fs_commit_named_seq_permit]'s home-blocks premise wants *)
+   what [FsCrash.fs_commit_L_seq_permit]'s home-blocks premise wants *)
 Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
   (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
   forall b : Z, b ∈ map uint W -> b ∈ cov /\ b ∉ log_region_set logstart.
@@ -789,6 +789,12 @@ Section EndOpDefs.
          clear, which is what makes the clear's caught-up fact and the
          deposit's row (b) computations rather than walls. *)
       ⌜lm_hdr M0 logstart = (0%nat, [])⌝ ∗
+      (* ROW (b) LEAVES THE CHECKOUT (durable-disk 1b).  It is what the
+         commit permit turns into [D' = L|home], so it has to travel beside
+         the mirror's value all the way to [eo_commit]; [LB] rides with it
+         because [log_res]'s ledger tie is stated over that name. *)
+      ⌜LB = list_to_set (map uint W)⌝ ∗
+      ⌜log_mirror_tie_body M0 L cov logstart (list_to_set (map uint W))⌝ ∗
       log_mirror_half M0 ∗
       eo_open bn γfs cov logstart n W L D (fun _ => []) 0.
   Proof.
@@ -800,6 +806,8 @@ Section EndOpDefs.
     iSplitR; [iPureIntro; exact Hnd|].
     iSplitR; [iPureIntro; exact Hwok|].
     iSplitR; [iPureIntro; exact Hmhdr|].
+    iSplitR; [iPureIntro; exact HLB|].
+    iSplitR; [iPureIntro; rewrite -HLB; exact Hmtie|].
     iSplitL "Hmirh"; [iExact "Hmirh"|].
     iSplitL "Hncell"; [iExact "Hncell"|].
     iSplitL "HW"; [iExact "HW"|].
@@ -817,22 +825,21 @@ Section EndOpDefs.
      not read it yet (durable-disk G1-impl: row (a) is stage G's flip); the
      one caller re-deposits at [op_pending om] with [om = ∅].
 
-     ROW (b) IS STILL DISCHARGED BY THE GATE HERE, but the WALL IS GONE
-     (durable-disk flip-B): the half now arrives at a NAMED [M] -- the value
-     the whole commit cycle chained -- so the row is provable, by
-     [LogInv.log_mirror_tie_deposit], the moment the gate's other
-     establishment site (boot, [ProofInitlog]; stage H2a) can produce it
-     too.  Switching it on is that lemma in place of the [_pending] call
-     below. *)
+     ROW (b) IS A PREMISE (durable-disk 1b), and the caller computes it with
+     [LogInv.log_mirror_tie_deposit] off the value the whole commit cycle
+     chained: the arithmetic belongs at the site that HOLDS the chain, not
+     inside the packing lemma.  At the [n = 0] fast deposit it is the
+     checkout's own row, unchanged. *)
   Lemma eo_open_to_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (pend : gset fsobj) (M : log_mirror) :
     lm_hdr M logstart = (0%nat, []) ->
+    log_mirror_tie_body M L cov logstart ∅ ->
     log_mirror_half M -∗
     eo_open bn γfs cov logstart 0 [] L D Lw 0 -∗
     log_state bn γfs cov logstart 0 ∅ pend.
   Proof.
-    intros Hmhdr.
+    intros Hmhdr Hmtie.
     rewrite /log_state /eo_open.
     iIntros "Hmirh (Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & _ & Hlogr & Hpool)".
     iExists [], L, D, M.
@@ -853,7 +860,7 @@ Section EndOpDefs.
     iSplitL "Hpool"; [iExact "Hpool"|].
     iSplitL "Hmirh"; [iExact "Hmirh"|].
     iSplitR; [iPureIntro; exact Hmhdr|].
-    iSplitR; [iPureIntro; apply log_mirror_tie_pending|].
+    iSplitR; [iPureIntro; exact Hmtie|].
     (* ROW (a) AT THE DEPOSIT, gated (durable-disk flip-C1).  This is the
        COMMIT re-deposit, and it is the easy half: the caller re-deposits at
        [op_pending om] with [om = ∅] ([ProofEndOp]'s own [Hommt]), so the
@@ -1837,11 +1844,11 @@ Section EndOpBlocks.
     lm_hdr Mc logstart = (0%nat, []) ->
     (forall i : nat, (i < n)%nat ->
        lm_view Mc (log_slot_bno logstart i) = Lw i) ->
-    (* THE CLIENT'S PRESERVATION PREMISE (ruling 2.5), threaded from
-       [SpecEndOp]: the committed view this write jumps to is still a
-       well-formed file system.  TRIVIAL today -- [fs_durable_wf] is F1's
-       placeholder -- and the switch-on changes only what discharges it. *)
-    end_op_pres cov logstart ->
+    (* ROW (b) AT THE COMMIT (durable-disk 1b).  Off the batch's own blocks
+       the logged view IS the era's picture of the durable disk.  Together
+       with the two rows above it is everything the commit permit needs to
+       conclude [D' = L|home] -- there is NO client premise here any more. *)
+    log_mirror_tie_body Mc L cov logstart (list_to_set (map uint W)) ->
     eo_regs m M ->
     (* threaded through unchanged to [eo_tail]'s own re-acquire of "log" --
        [eo_commit] itself never touches the lock. *)
@@ -1871,7 +1878,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hpres Hregs Hbelow.
+    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hrow Hregs Hbelow.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
@@ -1922,9 +1929,8 @@ Section EndOpBlocks.
               (fun bs' : list (bv 8) =>
                  log_mirror_half (lm_upd Mc (log_hdr_bno logstart) bs')
                  ∗ fs_receipt_any
-                     (fs_install (lm_view Mc) logstart (map uint W)
-                        (fs_restrict (lm_view Mc)
-                           (fs_home_set cov logstart))))%I lks Vpr
+                     (fs_restrict (dv_of_D L) (fs_home_set cov logstart)))%I
+              lks Vpr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
                     [Hmirc]").
@@ -1935,13 +1941,22 @@ Section EndOpBlocks.
        and the mirror half comes back at the header picture the write just
        laid down, which is what the install fupds below then read. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iApply (fs_commit_named_seq_permit cov logstart Mc (lm_view Mc) n
+      iApply (fs_commit_L_seq_permit cov logstart Mc (lm_view Mc) L n
                 (map uint W) bs'
                 ltac:(exact Hlen') ltac:(exact Hdec')
                 ltac:(exact Hn30) ltac:(by apply NoDup_ListNoDup)
                 ltac:(exact (eo_hdr_in W cov logstart Hwok))
                 HMchdr (fun _ _ => eq_refl)
-                (Hpres (lm_view Mc) (map uint W))
+                (* ROW (b), with the write set spelled as a LIST *)
+                ltac:(intros b Hb HbW; apply (Hrow b Hb); intros Hc;
+                      apply elem_of_list_to_set in Hc; exact (HbW Hc))
+                (* the entries: the logged value of a home block is what the
+                   copy loop put in its slot *)
+                ltac:(intros i b Hb;
+                      destruct (eo_map_lookup_inv W i b Hb) as (v & Hv & ->);
+                      rewrite (HMcslot i
+                                 ltac:(apply lookup_lt_Some in Hv; lia));
+                      exact (HLw i v Hv))
                 with "Hseam Hregc Hswlb Hmirc"). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
@@ -2384,6 +2399,51 @@ Section EndOpBlocks.
                           (log_hdr_bno logstart) bs2) logstart = (0%nat, [])).
     { rewrite /lm_hdr lm_upd_view_eq. apply hdr_dec_zero.
       rewrite Hhdrn2. reflexivity. }
+    (* ROW (b) AT THE DEPOSIT (durable-disk 1b), by
+       [LogInv.log_mirror_tie_deposit] off the chain this proof carried: the
+       install pass wrote [Lw j] to the home block of every entry, nothing
+       in the cycle touched any OTHER home block (the fills go to slots, the
+       commit and the clear to the header), and the copy loop's ghost step
+       says [L] agrees with [Lw] at every entry.  The two header inserts are
+       off the row's domain by [home_set_ne_hdr]. *)
+    assert (Hdep : log_mirror_tie_body
+                     (lm_upd (eo_minst logstart W Lw
+                                (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+                        (log_hdr_bno logstart) bs2)
+                     (<[log_hdr_bno logstart := bs2]>
+                        (<[log_hdr_bno logstart := bs1]> L))
+                     cov logstart ∅).
+    { apply (log_mirror_tie_deposit Mc _ _ cov logstart
+               (list_to_set (map uint W)) (map uint W) Lw eq_refl).
+      - (* the checkout's row, at the [L] the deposit parks *)
+        intros b Hb HbW.
+        pose proof (FsCrash.home_set_ne_hdr cov logstart b Hb) as Hbh.
+        rewrite !(lookup_insert_ne _ _ _ _ (not_eq_sym Hbh)).
+        exact (Hrow b Hb HbW).
+      - (* every LOGGED home block ends at its logged content *)
+        intros jj b Hb.
+        destruct (eo_map_lookup_inv W jj b Hb) as (v & Hv & ->).
+        assert (Hjlt : (jj < n)%nat) by (apply lookup_lt_Some in Hv; lia).
+        rewrite (lm_upd_view_ne _ _ _ _ (Hnehdr jj v Hv)).
+        exact (eo_minst_hit logstart W Lw
+                 (lm_upd Mc (log_hdr_bno logstart) bs1) n jj v
+                 Hnd ltac:(lia) Hjlt Hv).
+      - (* ...and no other home block moved at all *)
+        intros b Hb HbW.
+        pose proof (FsCrash.home_set_ne_hdr cov logstart b Hb) as Hbh.
+        rewrite (lm_upd_view_ne _ _ _ _ Hbh).
+        rewrite (eo_minst_miss logstart W Lw
+                   (lm_upd Mc (log_hdr_bno logstart) bs1) n b ltac:(lia)
+                   ltac:(intros k u Hk Hu Heq; apply HbW; rewrite -Heq;
+                         apply elem_of_list_to_set;
+                         exact (elem_of_list_lookup_2 _ k _
+                                  (eo_map_lookup W k u Hu)))).
+        exact (lm_upd_view_ne Mc (log_hdr_bno logstart) b bs1 Hbh).
+      - (* the logged view, at the entries the batch wrote *)
+        intros jj b Hb.
+        destruct (eo_map_lookup_inv W jj b Hb) as (v & Hv & ->).
+        rewrite !(lookup_insert_ne _ _ _ _ (not_eq_sym (Hnehdr jj v Hv))).
+        exact (HLw jj v Hv). }
     iAssert (log_state bn γfs cov logstart 0 ∅ ∅)
       with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool Hmirc]" as "Hbatch".
     { iApply (eo_open_to_batch bn γfs cov logstart
@@ -2392,7 +2452,7 @@ Section EndOpBlocks.
                 (lm_upd (eo_minst logstart W Lw
                            (lm_upd Mc (log_hdr_bno logstart) bs1) n)
                    (log_hdr_bno logstart) bs2)
-                Hfinhdr with "Hmirc").
+                Hfinhdr Hdep with "Hmirc").
       rewrite /eo_open.
       iSplitL "Hncell"; [iExact "Hncell"|].
       iSplitR; [by iApply big_sepL_nil|].
@@ -2465,9 +2525,6 @@ Section EndOpBlocks.
     (n = length W /\ (n <= LOGBLOCKS)%nat) ->
     NoDup (map uint W) ->
     (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
-    (* threaded to [eo_commit] verbatim: this loop's own writes never move
-       the committed view, so nothing here consumes it *)
-    end_op_pres cov logstart ->
     (* threaded through the whole fuel induction unchanged (no acquire in
        this loop's own body) to [eo_commit] -> [eo_tail]'s re-acquire. *)
     locks_below lks "log" ->
@@ -2485,6 +2542,10 @@ Section EndOpBlocks.
     lm_hdr Mc logstart = (0%nat, []) ->
     (forall i : nat, (i < t)%nat ->
        lm_view Mc (log_slot_bno logstart i) = Lw i) ->
+    (* ROW (b) RIDES THE COPY LOOP UNTOUCHED (durable-disk 1b): every write
+       the loop makes goes to a log SLOT, and a slot is not a home block, so
+       neither [L] nor the picture moves anywhere the row looks. *)
+    log_mirror_tie_body Mc L cov logstart (list_to_set (map uint W)) ->
     eo_regs m M ->
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat t) : mword 64) ->
     M !!! Regidx Rs4 = log_addr ->
@@ -2514,11 +2575,11 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hj Hgl Hshape Hnd Hwok Hpres Hbelow.
+    intros HK Hgeom Hj Hgl Hshape Hnd Hwok Hbelow.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
-      intros CID0 t M L Lw Mc Ht Hfuel HLw HMchdr HMcslot Hregs HMs2 HMs4 HMs5;
+      intros CID0 t M L Lw Mc Ht Hfuel HLw HMchdr HMcslot Hrow Hregs HMs2 HMs4 HMs5;
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
@@ -3623,6 +3684,20 @@ Section EndOpBlocks.
         rewrite /Lw' eo_ext_eq. exact Hlkhome.
       - assert (Hit2 : (i < t)%nat) by lia.
         rewrite /Lw' (eo_ext_lt Lw t bs2 i Hit2). exact (HLw i v Hit2 Hv). }
+    (* ROW (b) AT THE BUMPED CURSOR: the fill wrote a SLOT, so neither the
+       key [L] moved at nor the block the picture moved at is a home
+       block. *)
+    assert (Hrow' : log_mirror_tie_body Mc'
+                      (<[uint bnol := bs2]> L) cov logstart
+                      (list_to_set (map uint W))).
+    { intros b Hb HbW.
+      assert (Hbs : b <> log_slot_bno logstart t)
+        by (apply (FsCrash.home_ne_slot logstart b t
+                     (FsCrash.home_set_not_region cov logstart b Hb));
+            exact (eo_t_lt_lb t n Ht Hn30)).
+      rewrite Hubnol (lookup_insert_ne _ _ _ _ (not_eq_sym Hbs)).
+      rewrite /Mc' (lm_upd_view_ne Mc (log_slot_bno logstart t) b bs2 Hbs).
+      exact (Hrow b Hb HbW). }
     assert (Hseq : seq 0 (S t) = seq 0 t ++ [t]) by (rewrite seq_S; reflexivity).
     iAssert ([∗ list] i ∈ seq 0 (S t),
                fs_chalf γfs (log_slot_bno logstart i) (Lw' i))%I
@@ -3681,7 +3756,7 @@ Section EndOpBlocks.
       iDestruct (eo_cont_shift (CIDa := CIDa21) (CIDb := CIDa25)  j pidv dq m K eb eb lks Vpr
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Mc' Hlt
-                (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot
+                (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot Hrow'
                 HJ3regs HJ3s2 HJ3s4 HJ3s5
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                       Hopen Hcont").
@@ -3720,7 +3795,7 @@ Section EndOpBlocks.
                 Vpr HK (conj Hcovok Hlogsub) Hj Hgl (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
-                HMc'hdr HMc'slot Hpres
+                HMc'hdr HMc'slot Hrow'
                 HJ3regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                       Hopen Hcont").
@@ -3985,7 +4060,7 @@ Section ProofEndOp.
                            cov logstart dev u pidv dq m K eb b lks Vpr.
   Proof.
     cbv beta zeta delta [wp_end_op_sconf_body].
-    intros HK Hgeom Hj Hgl Hbelow Hpres Hfin.
+    intros HK Hgeom Hj Hgl Hbelow Hfin.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
@@ -4674,7 +4749,7 @@ Section ProofEndOp.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       (* ---- the batch, opened for the commit body ---- *)
       iDestruct (eo_open_of_batch with "Hbatch") as (W L D M0)
-        "(%Hshape & %Hnd & %Hwok & %HM0hdr & Hmirc & Hopen)".
+        "(%Hshape & %Hnd & %Hwok & %HM0hdr & %HLBW & %HM0row & Hmirc & Hopen)".
       pose proof Hshape as [HnW Hn30].
       rewrite /eo_open.
       iDestruct "Hopen" as
@@ -4744,7 +4819,7 @@ Section ProofEndOp.
         iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs2)  j pidv dq m K eb eb lks Vpr
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iDestruct (eo_open_to_batch bn γfs cov logstart L D (fun _ => []) ∅ M0
-                     HM0hdr with "Hmirc Hopen") as "Hbatch".
+                     HM0hdr HM0row with "Hmirc Hopen") as "Hbatch".
         iApply (eo_tail (CID0 := CIDs2)  γs j γl bn γ γfs cov logstart dev pidv dq
                   m V1 K eb lks Vpr HK HV1regsE Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
@@ -4926,10 +5001,10 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply (eo_loop γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev
                   nl W D pidv dq m K eb lks Vpr nl
-                  HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hpres Hbelow
+                  HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) M0 ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HM0hdr ltac:(intros i Hi; lia)
-                  HY4regs HY4s2 HY4s4 HY4s5
+                  HM0row HY4regs HY4s2 HY4s4 HY4s5
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                         Hopen Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)

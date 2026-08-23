@@ -3084,7 +3084,6 @@ Section ProofSysLinkBody.
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
                                       (upd_upt V P2) ltac:(exact Keo) Hgeom Hj Hgl
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      ltac:(apply FsCrash.end_op_pres_placeholder)
                                       ltac:(apply LogInv.end_op_fin_placeholder)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").

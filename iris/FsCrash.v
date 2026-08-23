@@ -496,36 +496,6 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* THE CLIENT'S PRESERVATION OBLIGATION AT A COMMIT (ruling 2.5).           *)
-(*                                                                          *)
-(* A commit moves the durable state from the home restriction of [V] to      *)
-(* that restriction with the log's [Ws] installed over it, and NOTHING in    *)
-(* the machine or log layers can know the result is still a well-formed      *)
-(* file system: that is the CLIENT's fact.  Naming it here -- rather than    *)
-(* spelling the implication at each site -- is what lets [SpecEndOp]'s       *)
-(* premise, [fs_commit_v_sector0_rec]'s hypothesis and the eventual real     *)
-(* discharge be literally the same statement, so the switch-on               *)
-(* ([fs_durable_wf := fs_durable_wf_body]) changes only what proves it.      *)
-(* It is TRIVIAL today: [fs_durable_wf] is F1's placeholder.                 *)
-(* ---------------------------------------------------------------------- *)
-Definition fs_commit_pres (V : Z -> list (bv 8)) (cov : gset Z) (ls : Z)
-    (Ws : list Z) : Prop :=
-  fs_durable_wf (fs_restrict V (fs_home_set cov ls)) ->
-  fs_durable_wf (fs_install V ls Ws (fs_restrict V (fs_home_set cov ls))).
-
-(* the whole-interface form: what [SpecEndOp]'s callers supply, since no
-   caller of end_op can see which picture or which write set the commit
-   will run at. *)
-Definition end_op_pres (cov : gset Z) (ls : Z) : Prop :=
-  forall (V : Z -> list (bv 8)) (Ws : list Z), fs_commit_pres V cov ls Ws.
-
-(* THE GATE, at the interface: trivially true while [fs_durable_wf] is F1's
-   placeholder.  Its call sites are the switch-on's rework list, exactly as
-   [FsWf.fs_durable_wf_placeholder]'s are. *)
-Lemma end_op_pres_placeholder (cov : gset Z) (ls : Z) : end_op_pres cov ls.
-Proof. intros V Ws _. exact (fs_durable_wf_placeholder _). Qed.
-
-(* ---------------------------------------------------------------------- *)
 (* 1c'. THE MIRROR's MEANING (durable-disk stage E2).                       *)
 (*                                                                          *)
 (* [RiscvPtsto.log_mirror] is the SHAPE; this is what makes a recorded       *)
@@ -663,6 +633,13 @@ Lemma home_set_ne_hdr (cov : gset Z) (ls b : Z) :
 Proof.
   rewrite /fs_home_set elem_of_difference. intros [_ Hb]. by apply home_ne_hdr.
 Qed.
+
+(* ...and the same reading with the region left standing, which is what
+   row (b)'s MAINTENANCE wants: every write the commit cycle makes lands in
+   the log region (a slot, or the header), so it is off the row's domain. *)
+Lemma home_set_not_region (cov : gset Z) (ls b : Z) :
+  b ∈ fs_home_set cov ls -> b ∉ log_region_set ls.
+Proof. rewrite /fs_home_set elem_of_difference. tauto. Qed.
 
 (* --- [fs_restrict], pointwise --- *)
 
@@ -805,6 +782,57 @@ Proof.
             (fs_install_hit P ls W D j k Hnd Hj).
     by rewrite (HP j k Hj).
   - rewrite !fs_install_miss //. by apply HD.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE COMMIT'S WHOLE ARITHMETIC (durable-disk 1b).                         *)
+(*                                                                          *)
+(* INSTALLING THE BATCH OVER THE HOME RESTRICTION OF THE PRE-COMMIT IMAGE    *)
+(* LANDS EXACTLY ON THE LOGGED VIEW [L].  The two hypotheses are the log's   *)
+(* own rows and nothing else:                                               *)
+(*                                                                          *)
+(*  - OFF the batch, the logged view IS the physical home block -- this is   *)
+(*    [LogInv.log_mirror_tie_body], row (b), read through the caller's       *)
+(*    off-header view [V];                                                   *)
+(*  - AT the batch, the logged value of an entry's home block is the         *)
+(*    content that entry's log SLOT holds -- which is the copy loop's own    *)
+(*    ghost step composed with the slot row the committer chains.            *)
+(*                                                                          *)
+(* Because the two together pin [L] at every home block, no separate domain  *)
+(* hypothesis about [L] is needed: they ARE the domain fact on [home], in    *)
+(* the only two pieces it splits into.                                       *)
+(* ---------------------------------------------------------------------- *)
+Lemma fs_install_is_logged (V : Z -> list (bv 8)) (L : gmap Z (list (bv 8)))
+    (cov : gset Z) (ls : Z) (Ws : list Z) :
+  NoDup Ws ->
+  (forall b : Z, b ∈ Ws -> b ∈ fs_home_set cov ls) ->
+  (forall b : Z, b ∈ fs_home_set cov ls -> b ∉ Ws -> L !! b = Some (V b)) ->
+  (forall (i : nat) (b : Z), Ws !! i = Some b ->
+     L !! b = Some (V (log_slot_bno ls i))) ->
+  fs_install V ls Ws (fs_restrict V (fs_home_set cov ls))
+  = fs_restrict (dv_of_D L) (fs_home_set cov ls).
+Proof.
+  intros Hnd Hin Hmiss Hhit. apply map_eq. intros b.
+  destruct (decide (b ∈ fs_home_set cov ls)) as [Hb|Hb].
+  - assert (Hrb : fs_restrict (dv_of_D L) (fs_home_set cov ls) !! b
+                  = Some (dv_of_D L b))
+      by (apply fs_restrict_lookup_Some; done).
+    rewrite Hrb.
+    destruct (decide (b ∈ Ws)) as [Hbw|Hbw].
+    + apply elem_of_list_lookup_1 in Hbw as [i Hi].
+      rewrite (fs_install_hit V ls Ws (fs_restrict V (fs_home_set cov ls))
+                 i b Hnd Hi).
+      rewrite /dv_of_D (Hhit i b Hi) //.
+    + rewrite (fs_install_miss V ls Ws (fs_restrict V (fs_home_set cov ls))
+                 b Hbw).
+      assert (Hrv : fs_restrict V (fs_home_set cov ls) !! b = Some (V b))
+        by (apply fs_restrict_lookup_Some; done).
+      rewrite Hrv /dv_of_D (Hmiss b Hb Hbw) //.
+  - assert (Hbw : b ∉ Ws) by (intros Hc; exact (Hb (Hin b Hc))).
+    rewrite (fs_install_miss V ls Ws (fs_restrict V (fs_home_set cov ls))
+               b Hbw).
+    rewrite (fs_restrict_lookup_None V (fs_home_set cov ls) b Hb).
+    rewrite (fs_restrict_lookup_None (dv_of_D L) (fs_home_set cov ls) b Hb) //.
 Qed.
 
 (* --- THE FOUR RECOVERY TRANSITIONS --- *)
@@ -2243,8 +2271,8 @@ Section fs_crash_seam.
   (* THE ONLY WRITE PERMITS LEFT, and that is the point.  The earlier      *)
   (* at-forms exposed the header READING only, which is all a caller needs *)
   (* in order to keep writing -- and exactly what a DEPOSIT could not use  *)
-  (* ([LogInv.log_mirror_tie]'s wall: the post-commit picture was          *)
-  (* existential).  Here the caller hands its half at a NAMED [M0] and     *)
+  (* (row (b) needs the post-commit picture's VALUE, and the at-form left  *)
+  (* it existential).  Here the caller hands its half at a NAMED [M0] and  *)
   (* gets it back at a closed term, so a committer carries a picture of    *)
   (* the whole durable disk across the fills, the commit, the installs and *)
   (* the clear -- and so does a BOOT, since durable-disk 1a gives the era  *)
@@ -2391,17 +2419,28 @@ Section fs_crash_seam.
     iPureIntro. exact Hlold.
   Qed.
 
-  (* ---- (7b) THE COMMIT POINT, at a named picture.  Two things set it
-     apart from an unnamed sector-level commit: the new committed view is a
-     TERM the caller can read (so the receipt is AT a state it can name),
-     and the CLIENT's
-     preservation premise (ruling 2.5) enters -- [fs_commit_pres], pure while
-     [P_wf] is.  The premise is stated at [V], the caller's OFF-HEADER view,
-     because both landing orders reach this shift and only one of them has
-     already moved the header row: a statement mentioning [lm_view M0] at the
-     header could not serve both branches with ONE receipt. ---- *)
-  Lemma fs_commit_v_sector0_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
-      (M0 : log_mirror) (V : Z -> list (bv 8))
+  (* ---- (7b) THE COMMIT POINT, AT THE LOGGED VIEW (durable-disk 1b).
+     The new committed view is a TERM the caller can read -- and the term is
+     [L] on the home set, NOT install arithmetic: the install is the log's
+     own business and stays inside this lemma ([fs_install_is_logged]).
+     THERE IS NO CLIENT PURE PREMISE.  What used to be [fs_commit_pres] --
+     "the state this write jumps to is still a well-formed file system",
+     quantified over a picture no caller of end_op could name -- is gone;
+     what replaces it is the log's own two rows, both of which the committer
+     proves for itself:
+
+       [Htie]  row (b) at the commit ([LogInv.log_mirror_tie_body], read
+               through [Hoff] at the caller's off-header view [V]), and
+       [Hslot] the entries' slot contents, i.e. the copy loop's ghost step
+               composed with the chained slot picture.
+
+     The premises about the picture are stated at [V], the caller's
+     OFF-HEADER view, because both landing orders reach this shift and only
+     one of them has already moved the header row: a statement mentioning
+     [lm_view M0] at the header could not serve both branches with ONE
+     receipt. ---- *)
+  Lemma fs_commit_L_sector0_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (M0 : log_mirror) (V : Z -> list (bv 8)) (L : gmap Z (list (bv 8)))
       (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_dec bs = (nn, Ws) ->
@@ -2410,7 +2449,11 @@ Section fs_crash_seam.
     (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
     lm_hdr M0 ls = (0%nat, []) ->
     (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
-    fs_commit_pres V cov ls Ws ->
+    (* ROW (b) at the commit *)
+    (forall b : Z, b ∈ fs_home_set cov ls -> b ∉ Ws -> L !! b = Some (V b)) ->
+    (* the batch's own entries: home block = its slot's logged content *)
+    (forall (i : nat) (b : Z), Ws !! i = Some b ->
+       L !! b = Some (V (log_slot_bno ls i))) ->
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     ▷ log_mirror_half M0 -∗
@@ -2419,10 +2462,11 @@ Section fs_crash_seam.
              take virtio_sector_bytes bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
           (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
-       ∗ fs_receipt_any (fs_install V ls Ws (fs_restrict V (fs_home_set cov ls)))
+       ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))
        ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
   Proof.
-    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hcli. iIntros "#Hreg #Hswlb Hmir".
+    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Htie Hslot.
+    iIntros "#Hreg #Hswlb Hmir".
     assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hdec /=; lia).
     assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
       by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
@@ -2461,11 +2505,19 @@ Section fs_crash_seam.
     { apply fs_restrict_ext. intros b Hb.
       rewrite -(Hok b (fs_home_in_ext cov ls b Hb)).
       apply Hoff. exact (home_set_ne_hdr cov ls b Hb). }
-    set (D' := fs_install V ls Ws (fs_restrict V (fs_home_set cov ls))).
+    (* THE COMMITTED VIEW, BY NAME: the logged view on the home set.  The
+       install arithmetic is discharged here and never leaves this file. *)
+    assert (Hlogd : fs_install V ls Ws (fs_restrict V (fs_home_set cov ls))
+                    = fs_restrict (dv_of_D L) (fs_home_set cov ls)).
+    { apply (fs_install_is_logged V L cov ls Ws Hnd);
+        [ intros b Hb; rewrite /fs_home_set;
+          apply elem_of_difference; exact (Hin b Hb)
+        | exact Htie | exact Hslot ]. }
+    set (D' := fs_restrict (dv_of_D L) (fs_home_set cov ls)).
     assert (HD' : fs_install (fs_blocks dk) ls
                     (hdr_dec (fs_blocks dk' (log_hdr_bno ls))).2
                     (fs_restrict (fs_blocks dk) (fs_home_set cov ls)) = D').
-    { rewrite Hdec' /= Hres. apply fs_install_ext_P. intros j Hj.
+    { rewrite Hdec' /= Hres /D' -Hlogd. apply fs_install_ext_P. intros j Hj.
       assert (Hjlt : (j < LOGBLOCKS)%nat).
       { pose proof (hdr_dec_length bs) as Hl. rewrite Hdec /= in Hl. lia. }
       rewrite -(Hok (log_slot_bno ls j) (log_slot_in_ext cov ls j Hjlt)).
@@ -2500,7 +2552,14 @@ Section fs_crash_seam.
       - rewrite last_snoc. reflexivity.
       - rewrite /hdr_wf Hdec' /=.
         split_and!; [exact Hnn | exact Hnd | exact Hin].
-      - apply Hcli. rewrite -HfrD. exact Hdwf. }
+      (* THE [P_wf] CONJUNCT.  [FsWf.fs_durable_wf] is still [True] (stage 2
+         instantiates it), so it is discharged here, ONCE, instead of by a
+         premise threaded through end_op's 26 exit arms.
+         *** LANE 1d / STAGE 2 SLOT ***: this is where the client's basic
+         update over the lent [γD] auth runs -- it takes [D'] by name (it is
+         [L] on the home set, right above) and re-establishes [P_wf] at it.
+         Nothing else in this proof moves when it lands. *)
+      - exact (fs_durable_wf_placeholder D'). }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
     iSplitR "".
@@ -2841,12 +2900,16 @@ Section fs_crash_seam.
                 with "Hreg Hswlb Hmir").
   Qed.
 
-  (* ---- (7f) THE COMMIT, sequentially and by value.  THE POINT OF THE WHOLE
-     campaign, now with a NAME on both sides of the jump: the pre-image's log
-     is clean per the caller's picture, so the invariant's [fr_D] IS the home
-     restriction of [V], and the post-image's is that with [Ws] installed. ---- *)
-  Lemma fs_commit_named_seq_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
-      (M0 : log_mirror) (V : Z -> list (bv 8))
+  (* ---- (7f) THE LOG'S COMMIT CONTRACT, sequentially and by value
+     (durable-disk 1b).  THE POINT OF THE WHOLE campaign, and it takes NO
+     client premise: the pre-image's log is clean per the caller's picture,
+     so the invariant's [fr_D] IS the home restriction of [V], and the
+     post-image's is the LOGGED VIEW [L] on the home set.  The write set,
+     the slot contents and the install pass are the log's own arithmetic and
+     do not appear in the conclusion -- what the client sees is
+     [D' = L|home], which is what its debt is stated against. ---- *)
+  Lemma fs_commit_L_seq_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (M0 : log_mirror) (V : Z -> list (bv 8)) (L : gmap Z (list (bv 8)))
       (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_dec bs = (nn, Ws) ->
@@ -2855,16 +2918,20 @@ Section fs_crash_seam.
     (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
     lm_hdr M0 ls = (0%nat, []) ->
     (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
-    fs_commit_pres V cov ls Ws ->
+    (* ROW (b) at the commit ([LogInv.log_mirror_tie_body], through [Hoff]) *)
+    (forall b : Z, b ∈ fs_home_set cov ls -> b ∉ Ws -> L !! b = Some (V b)) ->
+    (* the batch's own entries: home block = its slot's logged content *)
+    (forall (i : nat) (b : Z), Ws !! i = Some b ->
+       L !! b = Some (V (log_slot_bno ls i))) ->
     fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_half M0 -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
-       ∗ fs_receipt_any (fs_install V ls Ws (fs_restrict V (fs_home_set cov ls)))).
+       ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
   Proof.
-    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hcli.
+    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hrow Hslot.
     iIntros "#Hseam #Hreg #Hswlb Hmir".
     assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
       by exact (log_hdr_in_ext cov ls).
@@ -2885,8 +2952,8 @@ Section fs_crash_seam.
       iApply (fs_rec_permit_mono cov ls gen_id _
                 (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
                     (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
-                 ∗ fs_receipt_any (fs_install V ls Ws
-                     (fs_restrict V (fs_home_set cov ls)))
+                 ∗ fs_receipt_any
+                     (fs_restrict (dv_of_D L) (fs_home_set cov ls))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
                 with "[] [Hmir]").
       { iIntros "(Hm & #Hrc & _)".
@@ -2910,8 +2977,8 @@ Section fs_crash_seam.
         iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs _ Hlen Hext
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
-      iApply (fs_commit_v_sector0_rec cov ls M0 V nn Ws bs Hlen Hdec Hnn Hnd Hin
-                HM0 Hoff Hcli with "Hreg Hswlb [Hmir]").
+      iApply (fs_commit_L_sector0_rec cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
+                Hin HM0 Hoff Hrow Hslot with "Hreg Hswlb [Hmir]").
       iNext. iExact "Hmir".
     - (* SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit *)
       iApply (fs_permit_of_rec with "Hseam").
@@ -2941,8 +3008,8 @@ Section fs_crash_seam.
                       (blk_sec0 (lm_view (lm_upd M0 (log_hdr_bno ls)
                          (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                          (log_hdr_bno ls)) bs))
-                   ∗ fs_receipt_any (fs_install V ls Ws
-                       (fs_restrict V (fs_home_set cov ls)))
+                   ∗ fs_receipt_any
+                       (fs_restrict (dv_of_D L) (fs_home_set cov ls))
                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                         (log_hdr_bno ls)) = BSIZE⌝)%I _
@@ -2951,8 +3018,8 @@ Section fs_crash_seam.
           iSplitL "Hm2".
           { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
           iExact "Hrc". }
-        iApply (fs_commit_v_sector0_rec cov ls _ V nn Ws bs Hlen Hdec Hnn Hnd Hin
-                  HM1 HoffM1 Hcli with "Hreg Hswlb [Hm]").
+        iApply (fs_commit_L_sector0_rec cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
+                  Hin HM1 HoffM1 Hrow Hslot with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
                 (Hwfh M0) with "Hreg Hswlb [Hmir]").
