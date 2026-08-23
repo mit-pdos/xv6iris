@@ -820,7 +820,7 @@ map at home blocks); 1d lands last.
         record runs park in `iregN` only because of the shared-block
         scanners.
       - [~] **2b-inode-2 (the PAYLOAD flip).**  THE BUNDLE AND ITS WHOLE
-        DICTIONARY ARE LANDED (`iris/FsStateEra.v`, NEW, ~1000 lines, one
+        DICTIONARY ARE LANDED (`iris/FsStateEra.v`, NEW, 1228 lines, one
         `_CoqProject` row after `InodeRegion.v`); NO CONSUMER HAS MOVED.
         Read the finding at the end of this bullet before sequencing the
         rest — the remaining work is ONE atomic change, not a sequence.
@@ -841,8 +841,9 @@ map at home blocks); 1d lands last.
           induction and the 268-way case split never reaches a use site.
           The direction a flip uses is `bm_of`: `ic_loaded`'s `data` is
           EXISTENTIAL, so the payload picks the node first and reads the
-          old model off it — no extensionality between two `data`
-          functions is needed anywhere.
+          old model off it, and NO RESOURCE ever has to be moved between
+          two `data` functions.  The payload's PURE directory facts do
+          have to move, and that is the `fb_agree` transport below.
         - **`inode_ok` COMES BACK, IN ONE fupd.**
           `inode_owned_era_home_all` reads `blkmap_wf`'s coverage conjunct
           at EVERY slot from a single `inv_acc` of `FsBlocks.fs_bytes_inv`
@@ -917,6 +918,23 @@ map at home blocks); 1d lands last.
           `dv_of (fn_rec n) (fn_data n)` — still a function of `n` — is the
           zero-churn option; re-indexing at `dir_entries n` is the design's
           shape and moves `DirViewLend`/`namex`'s custody chain with it.
+        - **WHAT IS LEFT, in the order a lane would do it.**  (1) The
+          BOOT VALUE: `FsCfgBoot.fs_cfg_alloc` still allocates `γtop` at
+          the ZERO map (`fs_boot_inodes nib`), and it must become the
+          IMAGE's node map — `bnode (image record) (img_blkmap P dn)
+          (fs_data_of P dn)` per allocated inum, whose `inode_local` is
+          `inode_local_of_ok_data` off `FsImgBridge.img_inode_ok` +
+          `fio_type` + `fdo_gran` + `img_dir_uniq` + `fs_dots_wf_ok`.
+          Its `✓ link_elem I` premise is then NOT the token-free one:
+          the image's directories have entries, so the tokens are real and
+          the validity is `fsimg_wf`'s W9 + conjunct (13)
+          `FsImg.fs_links_eq` — no new image sweep, but not free either.
+          (2) The ROUTING: `BootShared`'s `iClear` of the bundle becomes a
+          hand-off, region IN/PENDING arms for free records and
+          `ipool_alloc` for allocated ones.  (3) The PAYLOAD SWAP itself,
+          atomically, per the bullet above.  (4) The consumers.
+          (1)–(4) are ONE lane; (1) alone is inert, because a top fragment
+          with no owner claims nothing and is `iClear`ed either way.
       - OPEN, for the orchestrator: `SpecBfree`'s two premises
         `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
         UNUSED (they only fed `bitmap_ok_del`).  Left in place rather than
