@@ -142,15 +142,28 @@ Section IupdateDefs.
   (* the ghost step itself, at the sixteen-dinode list the walk learned at
      its own bread: exactly [SpecLogWrite.wp_log_write_au]'s premise, with
      the payout abstracted. *)
+  (* RECORD-GRANULAR SINCE durable-disk 2b-inode-1: what the step
+     surrenders is the flushed inode's OWN 64-byte run at [64 * islot inum]
+     of its block, not the whole block -- literally
+     [SpecLogWrite.wp_log_write_au_range_body]'s atomic-update premise at
+     [off := 64 * islot inum], [len := 64], [sub_new := dinode_bytes dn].
+     [ds] stays the index because the walk has it (it decoded the buffer at
+     its own bread) and because [bsl := diblk_bytes ds] is what the log's
+     tie compares against. *)
   Definition iu_region_au (γ : log_names) (γfs : fs_names) (inodestart : Z)
       (inum : mword 32) (dn : dinode) (ds : list dinode) (e0 : nat)
       (Psi : gmap Z (list (bv 8)) -> iProp Σ) (Pout : iProp Σ) : iProp Σ :=
-    (|={⊤, ⊤ ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-       fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗ log_epoch_lb γ v ∗
-       (⌜bsl' = diblk_bytes ds⌝ -∗
+    (|={⊤, ⊤ ∖ ↑iregN}=> ∃ (sub_old : list (bv 8)) (v : nat),
+       ⌜length sub_old = 64%nat⌝ ∗
+       FsBlocks.byte_range (fs_bytes γfs) (IBLOCK inum inodestart)
+         (Z.of_nat (64 * islot inum)) sub_old ∗ log_epoch_lb γ v ∗
+       (⌜length (diblk_bytes ds) = BSIZE /\
+         length (dinode_bytes dn) = 64%nat /\
+         sub_old = take 64%nat
+                     (drop (64 * islot inum)%nat (diblk_bytes ds))⌝ -∗
         logged_at γ e0 (IBLOCK inum inodestart) -∗ ⌜(v <= e0)%nat⌝ -∗
-        fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
-                (diblk_bytes (<[islot inum := dn]> ds)) -∗
+        FsBlocks.byte_range (fs_bytes γfs) (IBLOCK inum inodestart)
+          (Z.of_nat (64 * islot inum)) (dinode_bytes dn) -∗
         ∀ D0 : gmap Z (list (bv 8)),
           Psi D0 ={⊤ ∖ ↑iregN, ⊤}=∗ Psi D0 ∗ Pout))%I.
 
@@ -200,11 +213,12 @@ Section IupdateDefs.
     (* the ordinary flush owes no receipt ([InodeRegion.ireg_ep_mono]
        carries it for free), so its anchor is the unit: one adapter line
        and both region lemmas below are unchanged. *)
-    rewrite /iu_region_au. iApply lw_au_lb0.
+    rewrite /iu_region_au. iApply lw_au_rec.
     rewrite /ireg_out. case_decide as Hty.
     - exfalso. exact (Hnzty Hty).
-    - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
-                ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty Hstab Hnlk
+    - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn
+                (diblk_bytes ds)
+                ltac:(solve_ndisj) Hnib Hdnwf Hty Hstab Hnlk
                 with "Hireg Hdn").
   Qed.
 
@@ -252,9 +266,10 @@ Section IupdateDefs.
     (* nlink RISES here, so the receipt is vacuous at the written record
        and the anchor is the unit -- the same one adapter line the ordinary
        step takes. *)
-    rewrite /iu_region_au. iApply lw_au_lb0.
-    iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn ds fl pin
-              ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hbump Hgrd
+    rewrite /iu_region_au. iApply lw_au_rec.
+    iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn
+              (diblk_bytes ds) fl pin
+              ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hbump Hgrd
               Hfl Hnfl Hflp
               with "Hireg Hdn Hpin").
   Qed.
@@ -296,23 +311,31 @@ Section IupdateDefs.
   Proof.
     intros Hnib Hdnwf Hnz Hstab Hnl. iIntros "#Hireg Hfrag Hrc" (Psi ds) "%Hdswf Hdn".
     rewrite /iu_region_au.
-    iMod (ireg_write_unlink_fl ⊤ γi γfs inodestart nib inum dn0 dn ds fl
-            ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hnl
-            with "Hireg Hdn Hfrag") as (bsl' v) "(Hfsb & #Hvlb & Hcl)".
+    iMod (ireg_write_unlink_fl ⊤ γi γfs inodestart nib inum dn0 dn
+            (diblk_bytes ds) fl
+            ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hnl
+            with "Hireg Hdn Hfrag") as (rec_old v) "(%Hlr & Hrun & #Hvlb & Hcl)".
+    iEval (rewrite FsBytesGamma.gamma_byte_range) in "Hrun".
     iDestruct "Hrc" as "[[%Hlg %Hist] | %Hnzd]".
     - (* THE WITNESS ROUTE *)
       subst γ inodestart.
-      iModIntro. iExists bsl', v. iFrame "Hfsb Hvlb".
-      iIntros "%Hbs #Hwit %Hle Hfsb". iIntros (D0) "Hpsi".
-      iMod ("Hcl" with "[//] [] Hfsb") as "Hout".
+      iModIntro. iExists rec_old, v.
+      iSplitR; [iPureIntro; exact Hlr |]. iFrame "Hrun Hvlb".
+      iIntros "(%Hlbsl & %Hlrec & %Hslice) #Hwit %Hle Hrun". iIntros (D0) "Hpsi".
+      iEval (rewrite -FsBytesGamma.gamma_byte_range) in "Hrun".
+      iMod ("Hcl" with "[] [] Hrun") as "Hout".
+      { iPureIntro. exact Hslice. }
       { rewrite /izrcpt iblk_of_IBLOCK. iIntros (_).
         iRight. iExists e0. iFrame "Hwit". iPureIntro. exact Hle. }
       iModIntro. iFrame "Hpsi Hout".
     - (* THE VACUOUS ROUTE *)
       iMod (log_epoch_lb_0 γ) as "#Hlb0".
-      iModIntro. iExists bsl', 0%nat. iFrame "Hfsb Hlb0".
-      iIntros "%Hbs _ _ Hfsb". iIntros (D0) "Hpsi".
-      iMod ("Hcl" with "[//] [] Hfsb") as "Hout".
+      iModIntro. iExists rec_old, 0%nat.
+      iSplitR; [iPureIntro; exact Hlr |]. iFrame "Hrun Hlb0".
+      iIntros "(%Hlbsl & %Hlrec & %Hslice) _ _ Hrun". iIntros (D0) "Hpsi".
+      iEval (rewrite -FsBytesGamma.gamma_byte_range) in "Hrun".
+      iMod ("Hcl" with "[] [] Hrun") as "Hout".
+      { iPureIntro. exact Hslice. }
       { rewrite /izrcpt. iIntros (H0). exfalso. exact (Hnzd H0). }
       iModIntro. iFrame "Hpsi Hout".
   Qed.
@@ -402,6 +425,11 @@ Section IupdateTail.
     iu_thr m M ->
     M !!! Regidx Rs2 = bnode kk ->
     (kk < NBUF)%nat ->
+    (* the two encoding facts the RECORD-granular [log_write] needs
+       (durable-disk 2b-inode-1); both are the walk's own, established at
+       its bread and by [iu_dinode_wf]. *)
+    diblk_wf ds ->
+    dinode_wf dn ->
     uint bno = IBLOCK inum inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
@@ -454,8 +482,20 @@ Section IupdateTail.
             dev pidv dq dqd dqn dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hbelow.
-    pose proof HK as HK'. 
+    intros HK Hsp Hthr Hs2 Hkk Hdswf Hdnwf Hbno Hcov Hlog Hbelow.
+    pose proof HK as HK'.
+    (* iupdate's stores move exactly this inode's 64 bytes of the buffer *)
+    assert (Hslot16 : (islot inum < 16)%nat) by exact (islot_lt inum).
+    assert (Hsplice : length (diblk_bytes (<[islot inum := dn]> ds)) = BSIZE ->
+                      length (diblk_bytes ds) = BSIZE ->
+                      length (dinode_bytes dn) = 64%nat /\
+                      diblk_bytes (<[islot inum := dn]> ds)
+                      = blk_splice (64 * islot inum)%nat (dinode_bytes dn)
+                                   (diblk_bytes ds)).
+    { intros _ _. split;
+        [ exact (dinode_bytes_length dn Hdnwf)
+        | exact (diblk_bytes_splice ds (islot inum) dn Hdswf Hdnwf Hslot16) ]. }
+    
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb #Hcrd0 Hop Hau Hheld Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -524,8 +564,13 @@ Section IupdateTail.
        spells it [uint bno].  [Hbno] is that one equation. *)
     iAssert (log_credit γ cru Sb e0 (uint bno)) as "#Hcrd";
       [rewrite Hbno; iExact "Hcrd0" |].
-    iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
+    (* THE RECORD-GRANULAR FORM (durable-disk 2b-inode-1): iupdate's stores
+       move exactly this inode's 64 bytes of the buffer, so what it hands
+       [log_write] is the sub-range form, and the shape obligation is the
+       encoding fact [InodeRegion.diblk_bytes_splice]. *)
+    iApply (LW.wp_log_write_au_range bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
+              (64 * islot inum)%nat 64%nat (dinode_bytes dn)
               cru Sb e0 v Psi (⊤ ∖ ↑iregN) Pout
               T1 0%nat eb (proc_addr j) (K - 4)%nat b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
@@ -533,6 +578,9 @@ Section IupdateTail.
               ltac:(rewrite Hbno; exact Hlog)
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
+              (SpecLogWrite.lw_rec_window (islot inum) Hslot16)
+              ltac:(lia)
+              Hsplice
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS [Hau] Hheld").
     all: try lkbelow.
@@ -1928,7 +1976,7 @@ Section ProofIupdateMain.
               dev
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Psi Pout
               pidv dq dqd dqn dqs m mM K eb b lks
-              Vpr HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hbelow
+              Vpr HK HmMsp HmMthr HmMs2 Hkk Hdswf Hdnwf Hbno Hcov Hlog Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hbio Hlctxa Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
                     Hsl Hvlb Hcrd0 Hop Hau Hheld [Hcont]").
