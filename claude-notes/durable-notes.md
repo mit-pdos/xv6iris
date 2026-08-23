@@ -133,6 +133,16 @@ change that produced it.
   surfaces at an IMAGE definition ("pa_z … has type Z while expected
   Arch.pa"), not where the graph is built.  `||` in an intro pattern
   fails the same way (`[|tgt|tgt||]` → write `[ | tgt | tgt | | ]`).
+- **AN EQUATION BETWEEN TWO MONAD TERMS (`M unit`) CLOSES ONLY BY LAZY
+  CONVERSION** (`exact_no_check (@eq_refl (M unit) …)`, 3 s in
+  `WeakEvProv2.la_head_succ`); `vm_cast_no_check` on the identical goal did
+  not converge in three runs (2, 2, >8 min at a flat 0.72 GB) — the VM must
+  read back the NORMAL FORM of the monad term, i.e. every unexecuted branch
+  of the Sail step function under every continuation's binder, while lazy
+  conversion compares whnfs and short-circuits on syntactic equality.  Rule:
+  `vm_cast_no_check` when the result is a label/count/request/register;
+  lazy conversion when it is a monad term (the "compare the two final
+  regstates" shortcut dies the same way).
 - **NEVER `simpl`/`/=`/`done` A GOAL MENTIONING `krole pc`/`kw pc` AT A
   VARIABLE `pc`** (2026-08-23, the pin bridge): `kw` bottoms out in
   `KernelInstrs.kernel_bytes !! a` and reduction tries to unfold the whole

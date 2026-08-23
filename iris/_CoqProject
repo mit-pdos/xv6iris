@@ -1128,6 +1128,7 @@ WeakRvwmoProgress.v
 WeakRvwmoPinBridge.v
 WeakRvwmoWalk2.v
 WeakRvwmoCycWit2.v
+WeakEvProv2.v
 WeakRvwmoPreNorm.v
 WeakRvwmoPreNorm2.v
 WeakRvwmoPinBridge2.v
