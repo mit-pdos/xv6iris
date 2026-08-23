@@ -713,7 +713,99 @@ map at home blocks); 1d lands last.
           the `FsState*` stack is under active development, and folding it
           into the bundle would put its cone in front of the 767 files that
           bind `xv6G`.  `xv6Σ` gained `fsLinkΣ; fsTopΣ`.
-      - [ ] **2b-inode.** Region → payload → links.
+      - [~] **2b-inode-1 (the REGION flip).**  LANDED IN PART, and its
+        second half is BLOCKED on a ruling — read the finding below before
+        sequencing 2b-inode-2.
+        - [x] **The region's byte unit is the RECORD.**  `InodeRegion.ireg_blk`
+          parked one whole inode block's exclusive `fsblock`; it now parks
+          the sixteen 64-byte runs that block is made of, each spelled
+          `FsStateInode.rec_owned_at (fs_gamma_L γfs) inodestart z d` — the
+          same predicate `rec_owned` is the superblock reading of, so the
+          region and `inode_owned` name one thing.  `ireg_recs_blk` is the
+          `⊣⊢` between the two spellings (off `rec_owned_at_diblk`'s
+          sixteen-fold split at the region's own `16·bi + k` indexing plus
+          `FsBytesGamma.gamma_blk_owned`), `ireg_recs_acc_upd` is
+          `ireg_slots_acc_upd`'s byte-side twin, and `rec_owned_at_IBLOCK`
+          is the one-line bridge from the region's `istart + z/16`,
+          `64·(z mod 16)` spelling to `DinodeEnc`'s `IBLOCK`/`islot` pair.
+          The three accessors that agree bread bytes against the region
+          (`ireg_read`, `ireg_read_blk`, `ireg_withdraw`, plus `IcacheInv`'s
+          BufL transport) gather the block in one line and are otherwise
+          unchanged.  `IcacheBoot.ireg_alloc` hands the image's block run in
+          as its sixteen record runs.
+        - [x] **EVERY REGION MOVER IS BYTE-GRANULAR.**  `ireg_write_au`,
+          `ireg_write_link_fl`/`_link`/`_link_d`/`_link_p`,
+          `ireg_write_unlink_fl`/`_unlink`/`_unlink_d`/`_unlink_p`,
+          `ireg_claim_au` and `EscrowDeposit.ireg_free_deposit_au` all
+          surrender the flushed slot's own 64-byte run and are literally
+          `SpecLogWrite.lw_au_rec`'s left-hand side; the three walks
+          (`ProofIupdate`, `ProofIalloc`, `ProofIput`) apply
+          `wp_log_write_au_range` in place of `wp_log_write_au`.  **The `ds`
+          parameter and its `diblk_wf ds` premise are gone from eight of the
+          nine** (only `ireg_claim_au` keeps a list, renamed `dsc`, because
+          it holds no caller fragment — see below), and with them the
+          `⌜bsl' = diblk_bytes ds⌝` wand premise and the `diblk_bytes_inj`
+          round trip.  What replaces `ds` is `bsl`, the checked-out buffer's
+          logged content, appearing ONLY in the wand's ignored
+          `⌜rec_old = take 64 (drop (64·islot inum) bsl)⌝` — kept so the
+          fupd matches `lw_au_rec` verbatim.  Two new pure encoding facts
+          in `InodeRegion`: `diblk_bytes_slice` (the buffer's slice at
+          `64·k` decodes to record `k`) and `diblk_bytes_splice` (writing
+          one record IS a `blk_splice` of the block), the latter being
+          `wp_log_write_au_range_body`'s shape obligation and the only new
+          thing each walk has to prove.
+        - [x] `FsStateInode`'s record-only half moved into its own
+          `Section RecOwned` over a bare `Σ`.  Stated inside the link RA's
+          section, `rec_owned_at` and the split were discharged over
+          `fsLinkG Σ`, and `InodeRegion` — which cannot bind that class
+          without putting it in `ireg_inv`'s type, hence in 30-odd fs
+          contracts — then failed at `Qed` with "Attempt to save an
+          incomplete proof" (durable-notes' capacity-class trap).
+        - [ ] **NOT DONE, AND IT NEEDS A RULING: THE BYTES CANNOT TRAVEL
+          WITH THE CHECKED-OUT RECORD AS 2b-inode-1's task ruled.**  The
+          task's step 1 asked for `rec_owned_at` on the IN/PENDING arms and
+          NOTHING byte-shaped on the MARKED one (`ic_loaded` carrying the
+          run instead).  That is unprovable as it stands, for a reason that
+          is not a proof-skill problem:
+          - The only things that know the byte view's VALUE at a range are
+            the owners of its ELEMENTS and the holder of its auth.  With a
+            marked slot's 64 bytes checked out, the region owns neither, so
+            it cannot state — let alone maintain — "the byte view at slot
+            `z`'s range is `dinode_bytes (m !!! z)`".
+          - Two live accessors need exactly that fact at a slot they hold
+            no fragment for.  **`ireg_claim_au`**: ialloc scans the buffer,
+            reads `type == 0` at slot `k`, and the mover must refute the
+            MARKED arm (whose clause gives `di_type d ≠ 0`).  Today that
+            refutation is the coupling through the block's bytes; with the
+            bytes gone there is no route, and the mover cannot even PRODUCE
+            the run to surrender.  **`ireg_read_blk`**: ireclaim's and
+            ialloc's scan conclude `bsl = diblk_bytes ds` for a whole
+            block, which stops being provable the moment one slot is
+            checked out.
+          - Options for the orchestrator, in the order they cost:
+            (i) leave the record's bytes region-side for a MARKED slot too
+            (what is landed) and let the checkout carry `dinode_at` alone —
+            every mover already opens the region at its write, so nothing
+            is lost except that `inode_owned Γ_L`'s `rec_owned` conjunct
+            cannot be assembled in a holder's hand;
+            (ii) split the record: the region keeps the two `di_type` bytes
+            and the other 62 travel — the refutation then works (the type
+            halfword is region-side at every slot) and every writer's
+            window stays contiguous, at the cost of `rec_owned` no longer
+            being one run;
+            (iii) region-side ½ of every record's byte elements with the
+            holder's ½, recombined at the mover — refutation works,
+            `rec_owned` stays one run, but ownership is no longer the
+            EXCLUSIVE full elements fs-state.md §1 rules;
+            (iv) re-found ialloc's free-slot choice on something other than
+            the buffer scan — no such argument exists from what ialloc
+            holds (its only serialiser is the buffer).
+        - [ ] **DEFERRED to 2b-inode-2, and why.**  `ic_loaded`'s new
+          `rec_owned_at` conjunct (step 2) and the `γtop` fragment threading
+          (step 5) both presuppose the checkout carrying the bytes, so both
+          wait on the ruling above.  Nothing else in 2b-inode-2 (the
+          payload and the links) is blocked by it.
+      - [ ] **2b-inode-2.** Payload → links.
       - OPEN, for the orchestrator: `SpecBfree`'s two premises
         `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
         UNUSED (they only fed `bitmap_ok_del`).  Left in place rather than

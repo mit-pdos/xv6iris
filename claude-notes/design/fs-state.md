@@ -441,7 +441,15 @@ Left out, with the reason:
   (`rec_owned_sb`, whose `0 ≤ i < 2^32` premise is REAL — `fs_inum_bv` is
   `Z_to_bv 32` and wraps).  `rec_owned_at_diblk` is the 16-fold
   split/gather at the inode region's own numbering (`16·bi + k`, `ds !!! k`,
-  over `seq 0 16`), so it composes with `InodeRegion.ireg_blk` directly.
+  over `seq 0 16`), so it composes with `InodeRegion.ireg_blk` directly —
+  which is what `ireg_blk` now HOLDS (2b-inode-1: the region parks sixteen
+  record runs, not one `fsblock`).  **The record-only half lives in its own
+  `Section RecOwned` over a bare `Σ`, not in `Section InodeOwned`**: it is
+  about bytes alone, and stated inside the link RA's section every one of
+  its lemmas is discharged over `fsLinkG Σ` — which `InodeRegion` cannot
+  bind without putting the class into `ireg_inv`'s type, and whose absence
+  surfaces as a SHELVED instance goal and "Attempt to save an incomplete
+  proof" at the consumer's `Qed`.
 - **`γlink`/`γtop` have a home: `FsBlocks.fs_names`' `fs_link`/`fs_top`,**
   which `FsBytesGamma.fs_gamma_L` reads.  They are PARAMETERS of `fs_alloc`
   and `fs_boot_ghosts` (the block layer must not name `fs_node`) and are

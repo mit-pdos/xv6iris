@@ -830,6 +830,24 @@ not.
 
 ## 11. THE INODE REGION: refine the block half into per-inum fragments
 
+> **THE REGION NO LONGER OWNS BLOCKS (durable-disk 2b-inode-1).**  Where
+> this section and §12 say the region parks
+> `fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds)` — "the coarse
+> half NEVER LEAVES the region" — read it as the sixteen 64-byte RECORD
+> runs that block is made of: `ireg_blk` parks
+> `FsStateInode.rec_owned_at (fs_gamma_L γfs) inodestart z d` per slot, the
+> same predicate every stage-2 file-system predicate is stated over
+> ([`fs-state.md`](fs-state.md) §2 and §7's B5).  `InodeRegion.ireg_recs_blk`
+> is the `⊣⊢` between the two spellings and the three accessors that agree
+> bread bytes against the region still use the block one.  Every MOVER is
+> record-granular: what crosses `log_write`'s ghost step is one 64-byte run
+> through `SpecLogWrite.lw_au_rec`, not a block, so §11.1's "two locked
+> inodes in the same block" is answered in the BYTES as well as in the
+> fragments.  §12.3's `diblk_bytes_inj` survives only where a whole block
+> is still decoded (`ireg_read`, `ireg_read_blk`, `ireg_withdraw`).
+> Whether the run TRAVELS with a checked-out record is open and ruled on in
+> [`../projects/durable-disk.md`](../projects/durable-disk.md) item 2b-inode-1.
+
 §10.5 left one thing open: who owns the dinode blocks, so that `ilock` can
 conclude the pool entry it takes describes the dinode the block actually
 holds. This section answers it. The answer is not "a bigger pool" -- it is
