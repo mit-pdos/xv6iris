@@ -805,6 +805,20 @@ map at home blocks); 1d lands last.
           (step 5) both presuppose the checkout carrying the bytes, so both
           wait on the ruling above.  Nothing else in 2b-inode-2 (the
           payload and the links) is blocked by it.
+      - **RULED (owner-confirmed, 2026-08-23): option (i).**  The marked
+        slot's run stays REGION-SIDE; `dinode_at` is the holder's
+        exclusive record proxy (agreement pins the value, exclusivity
+        confers write permission; the write is an AU that borrows the run
+        for the linearization point).  This is a DISTRIBUTION choice, not
+        a principle change: the region invariant is era-mortal, so
+        crash-safety is indifferent — what forces it is that ialloc/
+        ireclaim read OTHER slots' bytes through the buffer holding no
+        per-slot resource, so the era invariant must keep the bytes↔state
+        tie total over a shared block.  The general principle stands:
+        `D`-facts are NEVER checked out (crashN stays whole); `L`-facts
+        check out freely (era-mortal, lost-at-crash is the semantics);
+        record runs park in `iregN` only because of the shared-block
+        scanners.
       - [ ] **2b-inode-2.** Payload → links.
       - OPEN, for the orchestrator: `SpecBfree`'s two premises
         `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
