@@ -2411,7 +2411,7 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; exact Hmhdr|].
       (* ROW (b) AT BOOT, gated -- the second of durable-disk G1-impl's two
          walls.  The era's mirror half arrives from
-         [FsCrash.fs_swap_permit_rec]'s [Q], whose value
+         [FsCrash.fs_boot_head_seq_permit]'s [Q], whose value
          ([mirror_of (fs_blocks dk')]) lives under the permit's own
          universally quantified [dk], so nothing here can name it.  Stage
          H2's re-founded boot (or a value-chained swap) discharges it; the

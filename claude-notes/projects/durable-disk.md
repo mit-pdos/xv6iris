@@ -45,23 +45,18 @@ half is proven and unused (`LogInv.log_mirror_tie_deposit`, `:889-905`).
 - [x] Twelve stale agent worktrees pruned (all their commits were on `main`).
 - [x] Design of record written (`fs-state.md`), ruling 3 in `crash.md`,
       old worklist archived.
-- [ ] **0a. Dead crash-side code.**  `FsCrash.v` (4674 lines) carries
-      ≈1690 dead lines.  Delete, build, audit, push:
-      (i) already consumer-free and unrecorded: the nine block-level
-      `_rec` forms `fs_swap_permit_rec` (`:2135-2201`),
-      `fs_{logfill,commit,install,clear}_permit_rec` (`:2239-2563`),
+- [x] **0a. Dead crash-side code deleted** — `FsCrash.v` 4674 → 3523 lines
+      (1151 removed): the nine consumer-free block-level `_rec` permits
+      (`fs_swap_permit_rec`, `fs_{logfill,commit,install,clear}_permit_rec`,
       `fs_{logfill,install}_permit_v_rec`, `fs_commit_permit_named_rec`,
-      `fs_clear_permit_keep_rec` (`:2564-2910`) — 712 lines;
-      (ii) the flip-B leftovers: `fs_{logfill,install,commit,clear}_seq_permit`
-      (`:3492-3724`), `fs_at_sector_rec` (`:3071-3124`),
-      `fs_hdr_sector1_any_rec` (`:3195-3246`), `fs_commit_sector0_rec`
-      (`:3247-3328`) — 421 lines, plus comment-only references in
-      `RiscvPtsto.v`, `SpecBwrite.v`, `SpecEndOp.v`, `ProofEndOp.v:425`,
-      `SpecSysSync.v:27`, `SpecWriteHead.v:44`.  NOT `fs_hdr_sector1_rec`
-      (live at `:3775`) and NOT `fs_clear_sector0_rec` (live) — they die
-      with 1a.
-      (iii) the four block-level `_v` forms named in the old E2' entry are
-      in (i).
+      `fs_clear_permit_keep_rec`) and the flip-B leftovers
+      (`fs_{logfill,install,commit,clear}_seq_permit`, `fs_at_sector_rec`,
+      `fs_hdr_sector1_any_rec`, `fs_commit_sector0_rec`), with the
+      comment-only references in `RiscvPtsto.v`, `SpecBwrite.v`,
+      `SpecEndOp.v`, `ProofEndOp.v`, `SpecSysSync.v`, `SpecWriteHead.v`,
+      `LogInv.v` and `ProofInitlog.v` re-pointed at the live sequential
+      permits.  `fs_hdr_sector1_rec` and `fs_clear_sector0_rec` stay —
+      they are live and die with 1a.
 
 ## Stage 1 — the log's contract (owner: "prove the log upholds its contract first")
 

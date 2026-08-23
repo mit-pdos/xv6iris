@@ -41,8 +41,9 @@
    following little-endian words.  The first is what initlog's clean-image
    path needs (it re-reads the header it just wrote, and its precondition is
    that n = 0 there); the second is what identifies the durable state this
-   write commits to ([FsCrash.fs_commit_seq_permit] decodes the header it is
-   handed), so when n > 0 this bwrite is THE COMMIT POINT (D := L over W).
+   write commits to ([FsCrash.fs_commit_named_seq_permit] decodes the header
+   it is handed), so when n > 0 this bwrite is THE COMMIT POINT
+   (D := L over W).
 
    write_head sleeps (bread, bwrite, brelse), so it threads the full
    running-process bundle exactly as SpecBread.v does, plus the disk
@@ -150,8 +151,9 @@ Definition wp_write_head_sconf_body
      is atomic" is proved, since [hdr_dec] reads bytes [0, 124) only.  At [n = 0] (initlog's clear, and the clear that ends a
      commit) [hdr_n bs' = 0] plus [FsCrash.hdr_dec_zero] pins the whole
      decoding, which is all a clear's fupd needs
-     ([FsCrash.fs_clear_seq_permit]); the COMMIT arm ([_commit_seq_permit])
-     consumes the third hypothesis instead. *)
+     ([FsCrash.fs_clear_keep_seq_permit]); the COMMIT arm
+     ([FsCrash.fs_commit_named_seq_permit]) consumes the third hypothesis
+     instead. *)
   (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
      ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
      disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗

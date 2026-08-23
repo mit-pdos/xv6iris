@@ -125,7 +125,7 @@ Definition wp_bwrite_sconf_body
      [1024 * bno ..].  A WRITE's permit is NOT free the way a READ's is, and
      that is the honest content of the indexed crash predicate: every one of
      the three log.c call sites supplies a REAL durability fupd
-     ([FsCrash.fs_logfill_seq_permit] and its siblings), and there is no
+     ([FsCrash.fs_logfill_v_seq_permit] and its siblings), and there is no
      [Pc]-generic way to write a disk block.
 
      A 512-BYTE SECTOR IS ATOMIC AND A 1024-BYTE BLOCK IS NOT

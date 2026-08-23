@@ -422,7 +422,7 @@ Lemma eo_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
 Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
 (* the batch's home-blocks row, restated at the DECODED header's spelling --
-   what [fs_commit_seq_permit]'s [hdr_wf] premise wants *)
+   what [FsCrash.fs_commit_named_seq_permit]'s home-blocks premise wants *)
 Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
   (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
   forall b : Z, b ∈ map uint W -> b ∈ cov /\ b ∉ log_region_set logstart.
