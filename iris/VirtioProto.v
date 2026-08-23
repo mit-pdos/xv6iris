@@ -1153,7 +1153,7 @@ Section VirtioProto.
      lands atomically and a 1024-byte BLOCK does not, so an OUT request's
      data reaches the durable image one sector at a time -- through the
      device's volatile cache, at the DRAINS ([VirtioModel.virtio_drain_step],
-     claude-notes/projects/async-disk.md) -- and each drain is its own
+     claude-notes/completed/async-disk.md) -- and each drain is its own
      linearization point.  The request's obligation is therefore a SINGLE
      SEQUENTIAL permit ([RiscvPtsto.disk_seq_permit]) that unfolds a branch
      at a time: the channel cell at [vs_perm sl] carries it, each drain
@@ -1182,7 +1182,7 @@ Section VirtioProto.
   Global Instance slot_perms_done_timeless γ sl : Timeless (slot_perms_done γ sl).
   Proof. rewrite /slot_perms_done. apply _. Qed.
 
-  (* INDEXED BY WHAT IS STILL OWED (claude-notes/projects/async-disk.md).
+  (* INDEXED BY WHAT IS STILL OWED (claude-notes/completed/async-disk.md).
      [td] is the set of sector indices whose bytes have NOT yet reached the
      durable image -- the sequential permit's own index, which is why the
      [perm_pend] row below takes it verbatim and the publish site needs no
@@ -1265,7 +1265,7 @@ Section VirtioProto.
      explicitly.  What stays here is exactly the queue/slot/claim protocol,
      which SHOULD die with the era: in-flight requests vanish at the device
      reset. *)
-  (* WHAT EACH PENDING SLOT STILL OWES (claude-notes/projects/async-disk.md).
+  (* WHAT EACH PENDING SLOT STILL OWES (claude-notes/completed/async-disk.md).
      The device's volatile write CACHE ([VirtioModel.v_cache]) belongs to the
      HEAD request -- the one at [v_seen], i.e. protocol position [vp_nc] --
      and every other pending slot has drained nothing at all, so its whole
@@ -1364,7 +1364,7 @@ Section VirtioProto.
           ⌜v_seen v = wrap16 (vp_nc pr)⌝ ∗
           ⌜v_used_idx v = wrap16 (vp_nc pr)⌝ ∗
           ⌜read_bytes dma (used_idx_pa (v_cfg v)) 2 = Some (wrap16 (vp_nc pr))⌝ ∗
-          (* XV6 DECLINED THE WRITE CACHE (claude-notes/projects/async-disk.md
+          (* XV6 DECLINED THE WRITE CACHE (claude-notes/completed/async-disk.md
              §2).  [virtio_disk_init] writes DRIVER_FEATURES with the word
              the C computes -- zero at this device's offer
              ([VirtioModel.virtio_xv6_features]) -- so bit 9 (FLUSH) is not
@@ -1710,7 +1710,7 @@ Section VirtioProto.
   (* ==================================================================== *)
 
   (* THE WRITE CACHE IS PART OF THE PROTOCOL NOW
-     (claude-notes/projects/async-disk.md): what the device is still holding
+     (claude-notes/completed/async-disk.md): what the device is still holding
      decides which branch of an in-flight write's sequential permit is
      outstanding, so a store that carried the protocol across on
      cfg/seen/used alone has to leave [v_cache] and [v_taken] alone too.
@@ -1727,7 +1727,7 @@ Section VirtioProto.
   Qed.
 
   (* ==================================================================== *)
-  (* THE THEOREM WORTH NAMING (claude-notes/projects/async-disk.md §2)     *)
+  (* THE THEOREM WORTH NAMING (claude-notes/completed/async-disk.md §2)     *)
   (* ==================================================================== *)
 
   (* XV6'S DISK IS WRITETHROUGH BECAUSE XV6 DECLINED FLUSH.  The device this
@@ -2029,7 +2029,7 @@ Section VirtioProto.
   Qed.
 
   (* THE CAPTURE -- the head write request's data enters the device's
-     volatile cache (claude-notes/projects/async-disk.md §1).  It reads the
+     volatile cache (claude-notes/completed/async-disk.md §1).  It reads the
      driver's buffer through the DMA lease ONCE, exactly as the old sector
      step did, and NOTHING ELSE MOVES: no memory write, no used-ring entry,
      no interrupt, and -- the point -- no DURABLE disk byte.  So there is no

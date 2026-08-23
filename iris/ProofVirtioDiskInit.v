@@ -334,7 +334,7 @@ Definition vdi_c (st dfeat qsel qnum : Z) (rdy : bool) (d a u : Arch.pa)
 Definition vdi_cw (c : virtio_cfg) (off : Z) (sw : bv 32) (c' : virtio_cfg)
   : Prop :=
   (* ...AND IT STILL DECLINES THE WRITE CACHE
-     (claude-notes/projects/async-disk.md §2).  [VirtioProto]'s not-live arm
+     (claude-notes/completed/async-disk.md §2).  [VirtioProto]'s not-live arm
      carries [virtio_wce (v_cfg v) = false] so that
      [VirtioProto.virtio_proto_writethrough] can be stated unconditionally,
      which makes every pre-flip write owe it.  Thirteen of the fourteen do not

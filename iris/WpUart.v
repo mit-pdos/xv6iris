@@ -979,7 +979,7 @@ Section DevLoops.
       iFrame "Htie Hsa".
       iApply "IH".
     - (* THE CAPTURE: the head write request's data enters the device's
-         VOLATILE cache (claude-notes/projects/async-disk.md).  It reads the
+         VOLATILE cache (claude-notes/completed/async-disk.md).  It reads the
          driver's buffer off the bus once -- which is the only reason this
          arm carries a memory view at all -- and moves NOTHING else: no byte
          memory (the step's [m' = m]), no used ring, no ISR, no consumed
