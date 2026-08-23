@@ -1,5 +1,19 @@
 # Project: the FS block layer — stage 4, the crash instantiation
 
+> **SUPERSEDED IN PART by `durable-disk.md` lane 1a (2026-08-23).** The
+> recovery-side permit family this file describes as live
+> (`fs_era_custody`, `fs_recover_permit`, `fs_boot_head_permit`,
+> `log_mirror_full`) is DELETED: the era's mirror is born true and custody
+> is installed at birth (`FsCrash.P_fs_swap`, `LogDefs.log_mirror_born`),
+> the recovering install runs the steady-state `fs_install_v_seq_permit`
+> chain and the closing head-write `fs_clear_keep_seq_permit`, and
+> `fr_D` never re-bases. Item (1) below is therefore done at the log
+> layer; what is still open of it is only `hdr_n bs_hdr = 0` on
+> `SpecFsinit`/`FirstTok` (fsinit's supply of the entries' home halves at
+> a dirty log), tracked as durable-disk's "old H3". Items (2) and the
+> phase-D2 decision stand. Read the passages naming the deleted family as
+> history.
+
 > **Audited 2026-08-22 — STILL OPEN, and it is proof work, not cleanup.**
 > What remains: (1) real `n > 0` recovery — `SpecInitlog.v:164` still takes
 > `hdr_n bs_hdr = 0` and `:204` consumes `log_mirror_full`, `ProofInitlog`'s
