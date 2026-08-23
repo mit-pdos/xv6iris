@@ -1,0 +1,257 @@
+# fs-state — the file system as nested separation-logic predicates, at two views
+
+DESIGN OF RECORD for the durable-disk project (ruled by the owner,
+2026-08-23, over a review of what stages E–G of the previous worklist had
+landed).  Worklist: [`../projects/durable-disk.md`](../projects/durable-disk.md).
+The crash-side mechanics it sits on: [`crash.md`](crash.md).  The previous,
+superseded approach (a byte-level committed view, pure whole-state
+well-formedness, per-op preservation lemmas, an object-granular pending
+ledger) is archived with its history in
+[`../completed/durable-disk-byteview.md`](../completed/durable-disk-byteview.md);
+nobody reads that for guidance.
+
+## 0. The guiding rule: LOCAL reasoning
+
+Every spec in this design must let a proof about one inode, one directory
+or one block be done **without bringing the whole file system into the
+proof context**.  Concretely:
+
+- No predicate above `inode_owned` states a pure fact about more than one
+  inode.  Whole-state pure predicates (`fs_durable_wf`, `fsimg_wf`-style
+  sweeps, "every used block belongs to exactly one inode", "nlink equals
+  the number of entries") DO NOT EXIST in this design.  Where such a fact
+  is needed it is a consequence of ownership (the `∗`) or of a resource
+  algebra's own law (a counting RA), never a maintained clause.
+- Disjointness is never stated.  Exclusive ownership gives the frame rule,
+  and the frame rule gives independence of concurrent operations.  The one
+  exclusivity law ever invoked is `own x ∗ own x ⊢ False`, used exactly as
+  `l ↦ _ ∗ l ↦ _ ⊢ False` is used everywhere in Iris — to learn that two
+  owned things are different objects — never as an invariant.
+- There is no "tree".  The abstraction is a SET of inodes, some of which
+  decode as directories.  Reachability, acyclicity and the tree structure
+  of directories are not part of this project and appear nowhere below.
+- The log knows nothing about the file system.  It exposes bytes and two
+  logically-atomic linearization points, and parks an opaque client
+  payload.  Sector atomicity, pictures, write lists and install arithmetic
+  never appear above `SpecLogWrite`/`SpecEndOp`.
+
+## 1. The view record `Γ`, and the byte points-to
+
+```
+Γ := { Φ     : Z → bv 8 → iProp Σ   (* byte ownership, by BYTE ADDRESS *)
+     ; γlink : gname                (* the link-counting family *)
+     ; γtop  : gname }              (* the top-level abstract map *)
+```
+
+Every predicate below takes `Γ` explicitly (the standing rule: ghost names
+are parameters, not a config-class dependency).  The file system is
+instantiated TWICE with the same definitions:
+
+- **`Γ_D`, the committed (durable) view.**  `Φ_D a v := a ↪[γD] v`, the
+  FULL element of a fixed-layer byte-keyed `ghost_map Z (bv 8)` whose auth
+  is the committed byte view `D` inside `P_disk` (`crash.md`).  `γlink_D`,
+  `γtop_D` are fixed-layer gnames.  The whole instance lives inside
+  `crashN` (`P_wf`, §4); no mortal ever holds a piece of it (ruling 1).
+- **`Γ_L`, the logged (in-era) view.**  `Φ_L a v := a ↪[fs_L] v`, the FULL
+  element of the era's byte-keyed logged view whose auth the log owns
+  (§5).  `γlink_L`, `γtop_L` are era-minted and die with the era — correct,
+  because the logged view (uncommitted writes, their link tokens, their
+  abstract values) must vanish at a crash.
+
+**Bytes, not blocks, on both sides.**  The durable disk is byte-addressed
+already (`DiskImg.disk_img_bytes`).  `fs_L` is re-keyed from block to byte
+so that an inode record can own ITS 64 bytes of an inode block.  A
+`bread` is "a block's worth of bytes arrive, most of which the caller does
+not own"; `log_write` is block-granular at the device and byte-granular in
+the ghost update (§5).  Ownership is EXCLUSIVE (full elements) — this is
+what lets `free_bitmap`'s argument in §2 run, and it is why the bio layer's
+agreement share moves to a bio-side map (§5).
+
+**Functoriality in `Γ`.**  Every non-`Φ` component of `Γ` is an
+allocatable ghost, the ghost components live INSIDE the nested structure
+(never in a side invariant), and there is ONE mint lemma
+
+```
+fs_state_mint : fs_state Γ_D S -∗ (footprint S at Φ_L) ==∗ fs_state Γ_D S ∗ fs_state Γ_L S
+```
+
+that walks the durable instance and allocates `Γ_L`'s ghosts to match
+(for each directory, as many fresh link tokens as it holds entries with
+tokens, drawn from freshly allocated `link_auth`s).  That lemma IS the
+boot mint (stage H1 of the worklist); there is no image decoding at boot.
+
+## 2. The nested predicates
+
+```
+fs_state   Γ S        := sb_owned Γ S.sb ∗ fs_inodes Γ S.inodes ∗ free_bitmap Γ S.free
+fs_inodes  Γ I        := [∗ map] i ↦ n ∈ I, inode_owned Γ i n          (* the one ∗-iteration *)
+inode_owned Γ i n     := rec_owned Γ i n.rec
+                         ∗ [∗ k ∈ slots n] blk_owned Γ (addr n k) (blocks n k)
+                         ∗ (ind_owned Γ n when the indirect block exists)
+                         ∗ link_auth Γ i (nlink n.rec)
+                         ∗ ⌜local clauses⌝
+dir_owned  Γ d n      := inode_owned Γ d n ∗ (the entry reading, with tokens, below)
+rec_owned  Γ i dn     := byte_range Γ (IBLOCK i) (64·slot i) (dinode_bytes dn)
+blk_owned  Γ b bs     := byte_range Γ b 0 bs                   (length bs = BSIZE)
+byte_range Γ b off bs := [∗ list] k ↦ v ∈ bs, Γ.Φ (b·BSIZE + off + k) v
+free_bitmap Γ F       := blk_owned Γ bmapstart (bm_bytes F)
+                         ∗ [∗ b ∈ free_set F] ∃ bs, blk_owned Γ b bs
+```
+
+- **The inode node** `n = { rec; blocks : slot → bytes }` ranges over EVERY
+  nonzero `addrs` entry (direct and, via the owned indirect block,
+  indirect), REGARDLESS of `rec.size`.  An inode may own blocks beyond
+  its size (`itrunc` frees them all; `writei`'s partial-failure commit
+  leaves one) — the F3 ruling, built into the representation.  The
+  abstract byte-sequence is a READING, not the ownership:
+  `file_bytes n := take rec.size (concat blocks)`;
+  `dir_entries n := dir_view (file_bytes n)`.  The one local clause the
+  reading needs to be total is `bm_covers` (every slot below
+  `nblk rec.size` is allocated).  Distinctness of an inode's own blocks is
+  the `∗`.
+- **Local clauses of `inode_owned`**: `type ∈ {DIR, FILE, DEV}`;
+  `size ≤ MAXFILE`; `bm_covers`; `type = 0 → nlink = 0`; `nlink ≤ 32767`.
+  Of `dir_owned`: `16 ∣ size`; "." ↦ self and ".." present; names unique.
+  Of `free_bitmap`: nothing beyond the encoding (the block's bytes are
+  `bm_bytes F`).  There is NO clause at `fs_inodes` or `fs_state` level.
+- **`free_bitmap`, CSL-style.**  It owns the bitmap block and, for every
+  block whose bit reads FREE (xv6: bit = 0), the block itself.  `bfree`
+  hands a block in: if its bit read free, `free_bitmap` would already own
+  it — two owners of one block — so the bit reads allocated and the
+  "freeing free block" panic arm is dead.  `balloc` flips a free bit and
+  takes that block out of the `∗`.  Nobody carries a bit resource; there
+  is no "used set" and no completeness clause (a block nobody owns is a
+  lost resource, which is what a leaked block is).
+- **Links are a counting RA, not an equation.**  `inode_owned Γ i n` holds
+  `link_auth Γ i (nlink n.rec)`; every directory entry OTHER THAN "."
+  inside `dir_owned` holds one `link_tok Γ target`.  The RA's law gives
+  `#tokens ≤ nlink`, and that is the direction safety uses: at `nlink = 0`
+  no entry points at the inode, so it may be freed.  The tokens move
+  where the code moves the counts, with both inodes locked as the code
+  has them: `create` mints `link_tok i` from `ip`'s auth into `dp`'s new
+  entry; `link`/`unlink` move one between the two locked inodes; `mkdir`
+  moves one from `dp`'s auth into the child's ".." entry; unlinking a
+  directory returns that token to `dp` and leaves the child's ".." entry
+  TOKENLESS — the orphan form, which is exactly this kernel's "grey"
+  record (`fs-icache.md` §20).  `isdirempty` is a local check on the
+  child's entries.  The `≥` direction (no over-count) would only rule out
+  an unfreeable file — a leak, not a corruption — and is not stated.
+
+## 3. In flight, not inconsistent
+
+Mid-transaction states (a block taken by `balloc` that no inode points at
+yet; an inode record written before its directory entry) are NOT
+"inconsistent views" — in resource terms they are pieces CHECKED OUT of
+`fs_state Γ_L` into the open operation's hand, exactly as a locked inode
+is.  The logged view is always `fs_state Γ_L S_L` minus what open
+operations and lock holders hold; each piece returns at its new value
+when its holder releases it (the `log_write` AU / `iunlockput` — where the
+holder actually owns it; at `end_op` an arm holds nothing, see the 2026-08-23
+survey in the archived worklist).  At group quiescence (`out = 0`) every
+operation has ended, nothing is in flight, and the view is whole.
+
+Consequences: there is no "row (a)", no abstract target state `A`, no
+pure well-formedness projection, and NO per-operation finalize obligation
+at `end_op`.  An operation's entire contribution is the sequence of LOCAL
+steps at its AUs.
+
+## 4. The two views and the top
+
+```
+fs_view Γ := ∃ S, ghost_map_auth Γ.γtop 1 S ∗ fs_state Γ S
+```
+
+- **Durable**: `P_wf := fs_view Γ_D`, held WHOLE inside `crashN`.  `γtop_D`
+  is the durable abstract state; mortals never hold its fragments.  What a
+  mortal may hold about durability is a PERSISTENT receipt minted from
+  `γtop_D` at commit (the contents layer's sync receipts, `crash.md`).
+- **Logged**: `fs_view Γ_L`, whose body lives in the log's parked payload
+  (§5) so that it is at hand at every `log_write` and at commit, MINUS the
+  pieces currently checked out.  A holder of `inode_owned Γ_L i n` also
+  holds the fragment `i ↪[γtop_L] n`, which is how it updates the top at
+  its AU (auth in the payload + its own fragment).
+- The shape is the same at both views; only where the body sits and the
+  piecewise checkout differ.  That is what makes a later userspace layer
+  compatible: a program owning file `f` holds `f ↪[γtop_L] n`, reached
+  through syscall-level AUs whose linearization point is where the
+  fragment moves — the same pattern as the inode holder's today.
+
+**The debt** — the only place two objects ever meet, and only as
+composition.  The payload holds `Dbt`, a stored basic update from the
+durable instance at the last commit to the durable instance at the
+current logged values:
+
+```
+Dbt : fs_view-body Γ_D (at S₀) ∗ γD_auth D₀ ==∗ fs_view-body Γ_D (at S_L) ∗ γD_auth D'
+```
+
+`iModIntro` at batch start; each `log_write` AU composes one per-object
+`Γ_D` step — the SAME local lemma it just ran on its `Γ_L` resources,
+instantiated at the other `Γ`, with the `Γ_D` resources supplied as the
+debt's input (never owned by the writer).  Its intermediate resources are
+`fs_state`-minus-in-flight ∗ in-flight, never required to be anything; at
+`out = 0` the chain ends at the whole `fs_view Γ_D` at `S_L`.  If the era
+dies, the chain dies in the payload and `P_wf` still holds the last
+commit: uncommitted work vanishes, as it should.  The commit AU (§5) is
+the debt plus the byte-level fact the log supplies.
+
+## 5. The log's interface (FS-agnostic, logically atomic)
+
+The log exposes, and knows, only this:
+
+- **The logged byte view `fs_L`**, a byte-keyed `ghost_map`: the log holds
+  the AUTH in `log_state`; clients hold FULL elements (`Φ_L`).  `L` cannot
+  move without the log (freeze-by-auth during commit, as today).
+- **Bio's agreement share moves out of `fs_L`.**  Today the client and the
+  bio machinery each hold ½ of one block element so that `bread` can
+  return `bytes = L(b)` by agreement without the log lock.  With the
+  client owning the full element, bio holds halves of a bio-side cache
+  map `γcache`, tied to `L` inside a log-layer INVARIANT
+  `inv logN (auth L ∗ auth C ∗ ⌜C = L on cached blocks⌝)` that
+  `log_write` opens under its lock and a `bread` client opens to turn
+  `bytes = C(b)` into `bytes = L(b)`.  One-time re-plumb of `FsBlocks` and
+  the bio `Ψ` instantiation; the price of exclusive ownership.
+- **A parked client payload `Ψ D₀ L`** in `log_state`, Ψ-parametric
+  exactly as `bio_view` is for bio: the log stores it, never reads it,
+  indexes it by the last committed byte view `D₀` (which the log knows by
+  value once the era's mirror is born true — H2a) and the current `L`,
+  and hands it to the client's AUs at the two linearization points.  It
+  is parked in the log, not in a separate FS invariant, because whatever
+  the committer needs at the commit instant must already be in the log's
+  hands (the last-ending operation cannot know it is last), and
+  `log.lock` already serializes every `log_write`.
+- **`log_write(b)`'s AU**:
+  `∀ L, fs_L-elements for the bytes that change ∗ Ψ D₀ L ={E}=∗ elements at
+  the new bytes ∗ Ψ D₀ L' ∗ Q`.  The client opens whatever it likes inside
+  (its own invariants, the parked `fs_view Γ_L` body) to move its pieces,
+  its top fragment and the debt.  Since the log learns the checked-out
+  buffer's bytes equal `L(b)` on every byte (via `γcache`), and the
+  writer's stores touched only its range, the update needs elements only
+  for the bytes that differ — byte-range ownership works above a
+  block-granular device.
+- **The commit AU**, consumed by the log's permit at mask `∅`, so it must
+  be a basic update the client prepared in advance (the debt):
+  `⌜D' = L|home⌝ -∗ Ψ D₀ L ∗ γD_auth D₀ ==∗ Ψ D' L ∗ γD_auth D'`.  The log
+  LENDS the `γD` auth for the instant — the same move the machine layer
+  makes when it lends `γdisk` to `P_fs` (`crash.md`, stage A3).  The log
+  proves `D' = L|home` internally (row (b), `log_mirror_tie_body`).
+- **`end_op`**: no FS-specific premise at all.
+
+`FsCrash.end_op_pres`, `fs_commit_pres`, `LogInv.end_op_fin`, the
+`∀ V Ws` / `∀ F L pend` shapes, the object ledger in `op_entry`, `FsObj*`,
+`log_row_a*` are REJECTED and deleted: they leaked the log's internals
+upward and, being quantified over pictures no caller can name, were not
+dischargeable by any arm (they were green only as placeholders).
+
+## 6. What this supersedes in the tree
+
+The stage-F/G pure layer (`FsWf.v`, `FsEff*.v`, `FsOp*.v`, `FsObj*.v`,
+`FsWfImg.v`, ≈15k lines) proved whole-state preservation of whole-state
+pure predicates, which this design never states.  What survives is the
+ENCODING vocabulary each `*_owned` predicate uses for its own tie
+(`dinode_bytes`/`fs_dinode`, `dirent`/`dir_view`, `bm_bytes`, the indirect
+block, from `FsImg.v`/`DinodeEnc.v`/`BitmapEnc.v`/`FsTree.v`), and the
+local facts (a dirent insert keeps names unique; a truncate frees every
+owned block; …), which become lemmas beside the predicate that uses them.
+The rest is deleted when the `Γ`-predicates replace their consumers, not
+before.
