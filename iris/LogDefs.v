@@ -2,6 +2,7 @@
    propositions shared with layers that do not need the log invariant. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
+From Stdlib Require Import FunctionalExtensionality.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gset.
 From iris.base_logic.lib Require Import own ghost_var ghost_map mono_nat.
@@ -104,6 +105,19 @@ Proof. rewrite /lm_upd /=. by rewrite decide_True. Qed.
 Lemma lm_upd_view_ne (M : log_mirror) (b c : Z) (bs : list (bv 8)) :
   c <> b -> lm_view (lm_upd M b bs) c = lm_view M c.
 Proof. intros Hc. rewrite /lm_upd /=. by rewrite decide_False. Qed.
+
+(* THE PICTURE IS A POINTWISE MAP, so two updates at the SAME block collapse
+   to the later one.  This is what makes a torn write's two landings end at
+   ONE value whichever order the device chooses (durable-disk stage E2', the
+   value-chained permits' composition), and it is the only place the mirror's
+   record equality is ever needed -- hence the one functional-extensionality
+   use, which the assumption audit already carries. *)
+Lemma lm_upd_idem (M : log_mirror) (b : Z) (x y : list (bv 8)) :
+  lm_upd (lm_upd M b x) b y = lm_upd M b y.
+Proof.
+  rewrite /lm_upd /=. f_equal. apply functional_extensionality. intro c.
+  by destruct (decide (c = b)).
+Qed.
 
 Section LogMirrorDefs.
   Context `{!riscvGS Σ}.

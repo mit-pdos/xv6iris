@@ -41,8 +41,9 @@
    following little-endian words.  The first is what initlog's clean-image
    path needs (it re-reads the header it just wrote, and its precondition is
    that n = 0 there); the second is what identifies the durable state this
-   write commits to ([FsCrash.fs_commit_seq_permit] decodes the header it is
-   handed), so when n > 0 this bwrite is THE COMMIT POINT (D := L over W).
+   write commits to ([FsCrash.fs_commit_named_seq_permit] decodes the header
+   it is handed), so when n > 0 this bwrite is THE COMMIT POINT
+   (D := L over W).
 
    write_head sleeps (bread, bwrite, brelse), so it threads the full
    running-process bundle exactly as SpecBread.v does, plus the disk
@@ -75,7 +76,8 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import BioDefs.
+Require Import LogDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -97,7 +99,7 @@ Definition wp_write_head_sconf_body
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -149,11 +151,12 @@ Definition wp_write_head_sconf_body
      is atomic" is proved, since [hdr_dec] reads bytes [0, 124) only.  At [n = 0] (initlog's clear, and the clear that ends a
      commit) [hdr_n bs' = 0] plus [FsCrash.hdr_dec_zero] pins the whole
      decoding, which is all a clear's fupd needs
-     ([FsCrash.fs_clear_seq_permit]); the COMMIT arm ([_commit_seq_permit])
-     consumes the third hypothesis instead. *)
+     ([FsCrash.fs_clear_keep_seq_permit]); the COMMIT arm
+     ([FsCrash.fs_commit_named_seq_permit]) consumes the third hypothesis
+     instead. *)
   (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
      ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -182,8 +185,12 @@ Definition wp_write_head_sconf_body
       ⌜hdr_n bs' = Z.of_nat n⌝ -∗
       ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
       bslot -∗
-      (* the permit's RECEIPT, back from the DMA completion *)
-      ▷ Q -∗
+      (* the permit's RECEIPT, back from the DMA completion -- AT the header
+         image this call laid down, which is what makes [Q] a FAMILY over
+         [bs'] (durable-disk flip-B: the commit's receipt is the mirror half
+         at [lm_upd M (log_hdr_bno logstart) bs'], a value that mentions the
+         bytes; the clear's is the same shape) *)
+      ▷ Q bs' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -200,7 +207,7 @@ Module Type WRITE_HEAD.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Vpr : pprivate),
       wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb b Q lks Vpr.
 End WRITE_HEAD.

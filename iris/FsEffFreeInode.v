@@ -4,10 +4,8 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.
 Require Import BioDefs.
-Require Import DirentEnc.
 Require Import DinodeEnc.
 Require Import BitmapEnc.
-Require Import InodeDefs.
 Require Import DirView.
 Require Import FsTree.
 Require Import FsImg.
@@ -21,7 +19,7 @@ Section EffFreeInode.
   Context (Hp : fs_parse_sb P = Some sb).
   Context (Hsb : fs_sb_wf sb = true).
   Context (HW3 : fs_inodes_dwf P sb = true).
-  Context (u : gset Z) (Hu : fs_used_set P sb = Some u).
+  Context (u : gset Z) (Hu : fs_ent_set P sb = Some u).
   Context (Hbm : fs_bitmap_wf P sb u = true).
   Context (HW7 : fs_root_wf P sb = true).
   Context (HW8 : fs_dots_all P sb = true).
@@ -116,7 +114,7 @@ Section EffFreeInode.
       (sb_bmapstart sb)
       (bm_bytes BSIZE
          (fs_bmap_set BSIZE (P (sb_bmapstart sb))
-          ∖ list_to_set (fs_inode_blocks P (fs_dinode P sb i)))).
+          ∖ list_to_set (fs_inode_ents P (fs_dinode P sb i)))).
 
   Lemma eff_free_inode_wf (i : Z) :
     0 <= i < sb_ninodes sb ->
@@ -168,7 +166,7 @@ Section EffFreeInode.
     assert (HbmB : P' (sb_bmapstart sb)
                    = bm_bytes BSIZE
                        (fs_bmap_set BSIZE (P (sb_bmapstart sb))
-                        ∖ list_to_set (fs_inode_blocks P dn))).
+                        ∖ list_to_set (fs_inode_ents P dn))).
     { unfold P', eff_free_inode. apply fs_upd_at. }
     assert (Hdec : forall z : Z, 0 <= z < 16 * (sb_ninodes sb / 16 + 1) ->
               fs_dinode P' sb z
@@ -186,8 +184,8 @@ Section EffFreeInode.
               /\ (forall k : nat,
                     fs_data_of P' (fs_dinode P sb z) k
                     = fs_data_of P (fs_dinode P sb z) k)
-              /\ fs_inode_blocks P' (fs_dinode P sb z)
-                 = fs_inode_blocks P (fs_dinode P sb z)
+              /\ fs_inode_ents P' (fs_dinode P sb z)
+                 = fs_inode_ents P (fs_dinode P sb z)
               /\ fs_inode_dwf P' sb (fs_dinode P sb z)
                  = fs_inode_dwf P sb (fs_dinode P sb z)).
     { intros z Hz Hnz. apply inode_untouched; try assumption.
@@ -268,12 +266,12 @@ Section EffFreeInode.
     - exists u''. split; [exact Hu'' |].
       apply (bitmap_wf_of_set P' u''
                (fs_bmap_set BSIZE (P (sb_bmapstart sb))
-                ∖ list_to_set (fs_inode_blocks P dn))); [exact HbmB |].
+                ∖ list_to_set (fs_inode_ents P dn))); [exact HbmB |].
       intros b Hb.
       rewrite elem_of_difference, elem_of_list_to_set.
       rewrite (old_bit_iff b Hb), (Hu''mem b).
       assert (Hmeta : b < fs_data_start sb ->
-                ~ b ∈ fs_inode_blocks P dn).
+                ~ b ∈ fs_inode_ents P dn).
       { intros Hlt Hin.
         pose proof (blocks_range i b Hi Hlive Hin). lia. }
       tauto.
@@ -374,6 +372,224 @@ Section EffFreeInode.
         * exact (Horph z Hz Hty' Hnin).
   Qed.
 
+  (* ==================================================================== *)
+  (*  16bis.  EFFECT 9 -- RE-ENCODING A FREE SLOT (create's [fail:] tail)  *)
+  (*                                                                       *)
+  (*  sys_open/sys_mknod/sys_mkdir's [fail:] label: [create] has already   *)
+  (*  ialloc'd inum [i] and written its record; the arm then [iunlockput]s *)
+  (*  it, and with the reference dropped inside the same transaction       *)
+  (*  [iput] truncates and frees it again.  The transaction's NET on the   *)
+  (*  committed view is therefore one [iupdate] of a slot that was FREE    *)
+  (*  BEFORE and is free after -- a re-encode, not an allocation.  Nothing *)
+  (*  of the invariant reads a free record beyond its type and its link    *)
+  (*  count, so the whole obligation is the region sweep's two clauses.    *)
+  (* ==================================================================== *)
+
+  Definition eff_free_slot (i : Z) : Z -> list (bv 8) :=
+    eff_dinode P sb i (di_free_v (fs_dinode P sb i)).
+
+  Lemma eff_free_slot_wf (i : Z) :
+    0 <= i < sb_ninodes sb ->
+    bv_unsigned (di_type (fs_dinode P sb i)) = 0 ->
+    fs_durable_wf_view (eff_free_slot i).
+  Proof.
+    intros Hi Hfree.
+    set (dn := fs_dinode P sb i) in *.
+    set (dn' := di_free_v dn).
+    set (P' := eff_free_slot i).
+    assert (Htype' : bv_unsigned (di_type dn') = 0).
+    { unfold dn'. cbn [di_type di_free_v].
+      change (bv_unsigned (bv_0 16)) with 0. reflexivity. }
+    assert (Hnlink' : di_nlink dn' = di_nlink dn) by reflexivity.
+    assert (Haddrs' : di_addrs dn' = replicate 13 (bv_0 32)) by reflexivity.
+    assert (Hwf' : dinode_wf dn') by (apply di_free_v_wf).
+    destruct (fs_sb_ok_meta sb Hok) as (Hm1 & Hm2 & Hm3).
+    pose proof Hnin_le as HninN.
+    assert (HiN : 0 <= i < 16 * (sb_ninodes sb / 16 + 1)) by lia.
+    destruct (iblock_bounds sb Hok i HiN) as (Hib1 & Hib2 & Hib3).
+    assert (HaE : forall b : Z,
+              b <> IBLOCK (fs_inum_bv i) (sb_inodestart sb) -> P' b = P b).
+    { intros b Hb. unfold P', eff_free_slot.
+      exact (eff_dinode_out sb _ _ _ _ Hb). }
+    assert (HsbU : P' SB_BNO = P SB_BNO)
+      by (apply HaE; unfold SB_BNO in *; lia).
+    assert (HbmU : P' (sb_bmapstart sb) = P (sb_bmapstart sb))
+      by (apply HaE; lia).
+    assert (Hdec : forall z : Z, 0 <= z < 16 * (sb_ninodes sb / 16 + 1) ->
+              fs_dinode P' sb z
+              = if decide (z = i) then dn' else fs_dinode P sb z).
+    { intros z Hz. exact (eff_dinode_dec sb Hok P i dn' z Hwf' HiN Hz). }
+    (* every LIVE inode is a different one, and nothing it reads moved *)
+    assert (Hunt : forall z : Z, 0 <= z < sb_ninodes sb ->
+              bv_unsigned (di_type (fs_dinode P sb z)) <> 0 ->
+              z <> i
+              /\ fs_ind_ents P' (fs_dinode P sb z)
+                 = fs_ind_ents P (fs_dinode P sb z)
+              /\ (forall k : nat,
+                    fs_data_of P' (fs_dinode P sb z) k
+                    = fs_data_of P (fs_dinode P sb z) k)
+              /\ fs_inode_ents P' (fs_dinode P sb z)
+                 = fs_inode_ents P (fs_dinode P sb z)
+              /\ fs_inode_dwf P' sb (fs_dinode P sb z)
+                 = fs_inode_dwf P sb (fs_dinode P sb z)).
+    { intros z Hz Hnz.
+      assert (Hne : z <> i) by (intros ->; exact (Hnz Hfree)).
+      split; [exact Hne |].
+      apply inode_untouched; try assumption.
+      intros b Hb. apply HaE.
+      pose proof (blocks_range z b Hz Hnz Hb) as Hbr.
+      unfold fs_data_start in *. lia. }
+    assert (Htyp : forall z : Z, 0 <= z < sb_ninodes sb ->
+              bv_unsigned (di_type (fs_dinode P' sb z))
+              = bv_unsigned (di_type (fs_dinode P sb z))).
+    { intros z Hz. rewrite (Hdec z ltac:(irng)).
+      destruct (decide (z = i)) as [-> | Hne];
+        [rewrite Htype'; exact (eq_sym Hfree) | reflexivity]. }
+    assert (Hnode : forall z : Z, 0 <= z < sb_ninodes sb ->
+              node_at P' sb z = node_at P sb z).
+    { intros z Hz.
+      destruct (decide (bv_unsigned (di_type (fs_dinode P sb z)) = 0))
+        as [Hz0 | Hzl].
+      - rewrite (node_at_free P' sb z ltac:(rewrite (Htyp z Hz); exact Hz0)).
+        rewrite (node_at_free P sb z Hz0). reflexivity.
+      - destruct (Hunt z Hz Hzl) as (Hne & _ & Hdata & _ & _).
+        apply node_at_untouched;
+          [exact Hz
+          | rewrite (Hdec z ltac:(irng)), decide_False by exact Hne;
+            reflexivity
+          | intros _ k Hk; exact (Hdata k)]. }
+    assert (Htree : forall (j : Z) (f : fname),
+              tree_ent (tree_of_disk P' sb) j f = tree_ent t j f).
+    { intros j f. apply tree_ent_untouched. intros Hjr. exact (Hnode j Hjr). }
+    pose proof (reach_iff_of_ent P' Htree) as Hreach.
+    assert (Hsupply : fs_rtickets P' sb rd = fs_rtickets P sb rd).
+    { unfold fs_rtickets. apply tick_mjoin_ext.
+      intros x Hx. cbv beta.
+      destruct (bool_decide (Z.of_nat x ∈ rd)) eqn:Hg; [| reflexivity].
+      apply bool_decide_eq_true_1 in Hg.
+      destruct (proj1 (Hrd _) Hg) as (Hxr & Hxty & _).
+      assert (Hxl : bv_unsigned (di_type (fs_dinode P sb (Z.of_nat x))) <> 0)
+        by (rewrite Hxty; unfold T_DIR_z; discriminate).
+      destruct (Hunt _ Hxr Hxl) as (Hne & _ & Hdata & _ & _).
+      apply tickets_at_untouched;
+        [exact Hxr
+        | rewrite (Hdec (Z.of_nat x) (iblk_ix_range sb x (proj2 Hx))),
+            decide_False by exact Hne; reflexivity
+        | intros _ k Hk; exact (Hdata k)]. }
+    (* --- assemble ------------------------------------------------------ *)
+    exists sb. split.
+    { rewrite (fs_parse_sb_ext P P' HsbU). exact Hp. }
+    constructor.
+    - exact Hsb.
+    - apply fs_inodes_dwf_intro. intros z Hz Hnz'.
+      rewrite (Htyp z Hz) in Hnz'.
+      destruct (Hunt z Hz Hnz') as (Hne & _ & _ & _ & Hdwf).
+      rewrite (Hdec z ltac:(irng)), decide_False by exact Hne.
+      rewrite Hdwf. exact (dwf_bool_at z Hz Hnz').
+    - exists u. split.
+      + assert (Hused : fs_ent_blocks P' sb = fs_ent_blocks P sb).
+        { unfold fs_ent_blocks. f_equal. apply list_fmap_ext.
+          intros idx x Hx. apply lookup_seq in Hx as [-> Hidx].
+          cbv beta zeta.
+          rewrite (Hdec (Z.of_nat (0 + idx))
+                     (iblk_ix_range sb (0 + idx) Hidx)).
+          destruct (decide (Z.of_nat (0 + idx) = i)) as [Heq | Hne].
+          - rewrite Heq. fold dn. rewrite Htype', Hfree. reflexivity.
+          - destruct (bv_unsigned
+                        (di_type (fs_dinode P sb (Z.of_nat (0 + idx))))
+                      =? 0) eqn:Ez; [reflexivity |].
+            destruct (Hunt (Z.of_nat (0 + idx))
+                        (inum_ix_range sb (0 + idx) Hidx)
+                        (proj1 (Z.eqb_neq _ _) Ez)) as (_ & _ & _ & Hbl & _).
+            exact Hbl. }
+        unfold fs_ent_set. rewrite Hused. exact Hu.
+      + unfold fs_bitmap_wf in Hbm |- *. cbv zeta in Hbm |- *.
+        rewrite HbmU. exact Hbm.
+    - assert (Hrl : bv_unsigned (di_type (fs_dinode P sb ROOTINO)) <> 0).
+      { rewrite (fs_root_wf_type P sb HW7). unfold T_DIR_z. lia. }
+      pose proof Hnin1 as Hn1.
+      destruct (Hunt ROOTINO ltac:(unfold ROOTINO; lia) Hrl)
+        as (Hne & _ & Hdata & _ & _).
+      apply root_wf_untouched.
+      + rewrite (Hdec ROOTINO (iblk_root_range sb Hnin1)),
+          decide_False by exact Hne. reflexivity.
+      + intros k Hk. exact (Hdata k).
+    - apply fs_dots_all_intro. intros z Hz Hdty.
+      rewrite (Htyp z Hz) in Hdty.
+      assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
+        by (rewrite Hdty; unfold T_DIR_z; discriminate).
+      destruct (Hunt z Hz Hzl) as (Hne & _ & Hdata & _ & _).
+      rewrite (Hdec z ltac:(irng)), decide_False by exact Hne.
+      apply (fs_dots_wf_win P P' z (fs_dinode P sb z) (fs_dinode P sb z)).
+      + reflexivity.
+      + apply (dir_win_agree_blocks _ _ FS_MAXFILE);
+          [intros k Hk; exact (Hdata k) | unfold FS_MAXFILE, BSIZE; lia].
+      + apply (dir_win_agree_blocks _ _ FS_MAXFILE);
+          [intros k Hk; exact (Hdata k) | unfold FS_MAXFILE, BSIZE; lia].
+      + exact (dots_bool_at z Hz Hdty).
+    - exists nib. split; [exact Hnibz |].
+      apply fs_region_wf_intro.
+      + intros z Hz Hzn.
+        rewrite (Hdec z ltac:(irng)).
+        destruct (decide (z = i)) as [-> | Hne]; [exact Htype' |].
+        apply (fs_region_free_spec P sb nib z
+                 (fs_region_wf_free P sb nib Hreg)); lia.
+      + intros z Hz Hfr.
+        rewrite (Hdec z ltac:(irng)) in Hfr |- *.
+        destruct (decide (z = i)) as [-> | Hne].
+        * rewrite Hnlink'.
+          apply (fs_region_nlink_free P sb nib i
+                   (fs_region_wf_nlink P sb nib Hreg)); [lia | exact Hfree].
+        * apply (fs_region_nlink_free P sb nib z
+                   (fs_region_wf_nlink P sb nib Hreg)); [lia | exact Hfr].
+      + intros z Hz.
+        rewrite (Hdec z ltac:(irng)).
+        destruct (decide (z = i)) as [-> | Hne].
+        * rewrite Hnlink'.
+          apply (fs_region_nlink_short P sb nib i
+                   (fs_region_wf_nlink P sb nib Hreg)). lia.
+        * apply (fs_region_nlink_short P sb nib z
+                   (fs_region_wf_nlink P sb nib Hreg)). lia.
+    - exists rd.
+      split; [| split; [| split]].
+      + intros z. rewrite (Hrd z).
+        destruct (decide (0 <= z < sb_ninodes sb)) as [Hzr | Hzr].
+        * rewrite (Htyp z Hzr).
+          split; intros (A & B & C); (split; [exact A |]);
+            (split; [exact B |]).
+          -- apply (Hreach z). exact C.
+          -- apply (Hreach z) in C. exact C.
+        * split; intros (A & _); [lia | lia].
+      + intros z Hz.
+        destruct (proj1 (Hrd z) Hz) as (Hzr & Hzty & _).
+        assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
+          by (rewrite Hzty; unfold T_DIR_z; discriminate).
+        destruct (Hunt z Hzr Hzl) as (Hne & _ & Hdata & _ & _).
+        apply dir_ok_untouched;
+          [ exact Hz
+          | rewrite (Hdec z ltac:(irng)), decide_False by exact Hne;
+            reflexivity
+          | intros k Hk; exact (Hdata k) |].
+        intros w Hw Hwl Hw0. exfalso. apply Hwl.
+        rewrite <- (Htyp w Hw). exact Hw0.
+      + intros z Hz. cbv zeta.
+        rewrite (Hdec z ltac:(irng)).
+        unfold fs_rtick. rewrite Hsupply.
+        destruct (decide (z = i)) as [-> | Hne].
+        * rewrite Htype'. intros Hc. exfalso. exact (Hc eq_refl).
+        * exact (Hlkg z Hz).
+      + intros z Hz Hty0 Hnin.
+        rewrite (Htyp z Hz) in Hty0.
+        assert (Hzl : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
+          by (rewrite Hty0; unfold T_DIR_z; discriminate).
+        destruct (Hunt z Hz Hzl) as (Hne & _ & Hdata & _ & _).
+        rewrite (Hdec z ltac:(irng)), decide_False by exact Hne.
+        apply (dots_only_untouched P' (fs_dinode P sb z)).
+        * exact (fdi_size _ _ _ (dok_at z Hz Hzl)).
+        * intros k Hk. exact (Hdata k).
+        * exact (Horph z Hz Hty0 Hnin).
+  Qed.
+
 End EffFreeInode.
 
 (* the [fs_durable_wf_view]-level wrappers -- the shape stage G2
@@ -397,4 +613,21 @@ Proof.
   destruct Hregx as (nib & Hnibz & Hreg).
   destruct HW9 as (rd & Hrd & Hdok & Hlkg & Horph).
   apply (eff_free_inode_wf P sb Hp Hsb HW3 u Hu Hbm HW7 HW8 nib Hnibz Hreg rd Hrd Hdok Hlkg Horph); assumption.
+Qed.
+
+Lemma eff_free_slot_wfv (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  fs_durable_wf_view P ->
+  fs_parse_sb P = Some sb ->
+  0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) = 0 ->
+  fs_durable_wf_view (eff_free_slot P sb i).
+Proof.
+  intros Hv Hp. intros.
+  destruct Hv as (sb0 & Hp0 & Hsw).
+  assert (Hse : sb0 = sb) by congruence. subst sb0.
+  destruct Hsw as [Hsb HW3 HW45 HW7 HW8 Hregx HW9].
+  destruct HW45 as (u & Hu & Hbm).
+  destruct Hregx as (nib & Hnibz & Hreg).
+  destruct HW9 as (rd & Hrd & Hdok & Hlkg & Horph).
+  apply (eff_free_slot_wf P sb Hp Hsb HW3 u Hu Hbm HW7 HW8 nib Hnibz Hreg rd Hrd Hdok Hlkg Horph); assumption.
 Qed.

@@ -1986,7 +1986,7 @@ Section ProofInitlog.
               cov logstart dev true ((hdr_dec bs_hdr).1)
               (il_W bs_hdr ((hdr_dec bs_hdr).1))
               (fun k : nat => ys !!! k) Bh L D pidv dq
-              C2 (K - 6)%nat eb b (fs_era_custody)
+              C2 (K - 6)%nat eb b (fun _ : nat => fs_era_custody)
               _ Vpr HKit Hgeomok Hj Hgl
               HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg
               Hbelow Hpkg
@@ -1997,9 +1997,9 @@ Section ProofInitlog.
     (* THE RECOVERY-SIDE PERMITS, one generator over the era custody
        ([FsCrash.fs_recover_seq_permit]): every write is to a decoded home
        block, so it cannot corrupt the durable header ([hdr_wf_wr_out]). *)
-    { iModIntro. iIntros (i w bs') "%Hwi %Hlen' Hcust".
+    { iModIntro. iIntros (i w) "%Hwi %Hlen' Hcust".
       iDestruct "Hcert" as "(_ & Hstc2 & Hregc2)".
-      iApply (fs_recover_seq_permit cov logstart (uint w) bs'
+      iApply (fs_recover_seq_permit cov logstart (uint w) (ys !!! i)
                 ltac:(exact Hlen')
                 ltac:(intros dk o sbs Hfit Hwdk;
                       apply (hdr_wf_sub_out cov logstart (uint w) o sbs dk Hfit);
@@ -2152,7 +2152,8 @@ Section ProofInitlog.
               (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1)) (fun k : nat => ys !!! k) L)
               pidv dq
               D2 (K - 6)%nat eb b
-              (log_mirror_at logstart (0%nat, []) ∗ swap_lb (S gen_id))%I
+              (fun _ : list (bv 8) =>
+                 log_mirror_at logstart (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ Vpr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hcust2]").
@@ -2410,12 +2411,20 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; exact Hmhdr|].
       (* ROW (b) AT BOOT, gated -- the second of durable-disk G1-impl's two
          walls.  The era's mirror half arrives from
-         [FsCrash.fs_swap_permit_rec]'s [Q], whose value
+         [FsCrash.fs_boot_head_seq_permit]'s [Q], whose value
          ([mirror_of (fs_blocks dk')]) lives under the permit's own
          universally quantified [dk], so nothing here can name it.  Stage
          H2's re-founded boot (or a value-chained swap) discharges it; the
          argument is at [LogInv.log_mirror_tie]. *)
-      iPureIntro. apply log_mirror_tie_pending. }
+      iSplitR; [iPureIntro; apply log_mirror_tie_pending|].
+      (* ROW (a) AT BOOT, gated (durable-disk flip-C1).  The real content is
+         [A0 := the image's home restriction] with [fs_durable_wf_body A0]
+         off [FsWfImg.fsimg_durable_wf] and [FsCfgBoot]'s conjunct (13),
+         which stage G1 landed for exactly this -- but the agreement half
+         needs [L] and the era's picture to be ONE reading of one image,
+         which is stage H2a's re-founded boot.  So it rides H2a beside row
+         (b); the argument is at [LogInv.log_row_a]. *)
+      iPureIntro. apply log_row_a_pending. }
     iAssert (log_res γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.

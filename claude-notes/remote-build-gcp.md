@@ -33,6 +33,36 @@ to be done for 'real-all'" and exits 0 — a GREEN-LOOKING NO-OP (the
 top-level Makefile wraps the switch itself; the sub-make form does
 not). Either way, verify
 `md5sum kernel-rocq/*.v user-rocq/*.v` is unchanged after any remote run.
+**NEITHER OPTION WORKS AS WRITTEN FROM A WORKTREE — measured 2026-08-23,
+and here is the recipe that does.** The sync applies `--filter=':- .gitignore'`,
+so (1) is a no-op: `/xv6-riscv` is gitignored and the `cp -a` never reaches
+the VM (check with `run-on-gcp --no-sync ls -d xv6-riscv`), which leaves the
+top-level `make` on the dangerous clone-and-re-dump path anyway. And (2) dies
+twice: `iris/CoqMakefile` is gitignored too, so the remote has none
+(`make: *** No rule to make target 'CoqMakefile'`), and `*.vo` is in
+`ROCQ_EXCLUDES`, so on a fresh remote tree the iris sub-make has no
+`../kernel-rocq/*.vo`, `../user-rocq/*.vo` or `../model-xv6iris/*.vo` and no
+rule to build them (`No rule to make target '../kernel-rocq/KernelElfRaw.vo'`).
+What works — and never touches a dump rule, so the tracked image cannot move
+— is to drive each sub-tree through its OWN generated `CoqMakefile`:
+
+```sh
+run-on-gcp opam exec --switch=/shared/xv6rocq -- bash -c '
+  set -e
+  for d in model-xv6iris kernel-rocq user-rocq; do
+    cd $d && coq_makefile -f _CoqProject -o CoqMakefile >/dev/null 2>&1
+    make -f CoqMakefile -j180; cd ..
+  done
+  cd iris && coq_makefile -f _CoqProject -o CoqMakefile >/dev/null 2>&1
+  make -f CoqMakefile -j180 -k'
+```
+
+Cold that is ~1320 files and finished well inside the usual full-build
+budget; `run-on-gcp --no-sync make audit-only` afterwards is the audit (it
+needs no `CoqMakefile` of its own — it reads the flags out of
+`iris/_CoqProject`). Adding `-vo`-less `Probe.v`-style scratch files to the
+worktree is harmless: they sync but nothing in `_CoqProject` builds them.
+
 Related: on a FRESH remote tree, the top-level `$(USER_DIR)/_%` rule
 races the xv6 C build under `-j 192` (bogus `file format not recognized` /
 `undefined reference` errors) — build `xv6-riscv` once serially first.

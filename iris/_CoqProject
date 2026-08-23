@@ -645,6 +645,17 @@ FsEffUnlinkEntry.v
 FsEffCreateEntry.v
 FsEffAllocBlock.v
 FsEffAllocIndBlock.v
+FsOpFilewrite.v
+FsOpMknod.v
+FsOpMkdir.v
+FsOpOpen.v
+FsOpLink.v
+FsOpIputFree.v
+FsOpUnlink.v
+FsOpIreclaim.v
+FsObjType.v
+FsObj.v
+FsObjEff.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v

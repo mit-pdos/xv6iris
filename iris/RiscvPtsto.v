@@ -944,8 +944,8 @@ Qed.
    to say what the predicate does under that move.  There is therefore NO
    [Pc]-generic write permit, and no bridge lemma either: the four WAL write
    kinds each prove their own fupd against the FS's own crash predicate
-   ([FsCrash.fs_logfill_seq_permit] / [_commit_seq_permit] /
-   [_install_seq_permit] / [_clear_seq_permit], phase C2b/D1 stage 4).  The earlier placeholder premise
+   ([FsCrash.fs_logfill_v_seq_permit] / [_commit_named_seq_permit] /
+   [_install_v_seq_permit] / [_clear_keep_seq_permit], phase C2b/D1 stage 4).  The earlier placeholder premise
    [crash_pred_indifferent], which said the system promises nothing about
    durability, was DELETED when those landed rather than discharged: it is
    FALSE at the real [P_fs], so keeping it would have made every WAL

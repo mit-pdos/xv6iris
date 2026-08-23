@@ -1566,6 +1566,8 @@ Section ProofFileclose.
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hpbare
                           Hprocs Hdev Hgeod Hdlkd Hop").
           all: try lkbelow.
+          all: try exact (FsCrash.end_op_pres_placeholder _ _).
+          all: try exact (LogInv.end_op_fin_placeholder _ _).
           iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpbare".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).

@@ -172,8 +172,14 @@ Record fs_durable_sweeps (P : Z -> list (bv 8)) (sb : fs_sb) : Prop := {
      one -- sweeping [fs_inodes_wf] here would make the predicate false
      at exactly the orphan states stage H's [ireclaim] consumes. *)
   fdw_inodes : fs_inodes_dwf P sb = true;
+  (* W4/W5, ENTRY-DERIVED (durable-disk F3.1): under the beyond-size
+     ruling an inode owns every nonzero entry, so the used set is
+     [FsImg.fs_ent_set] -- [fs_used_set]'s size-indexed reading is the
+     IMAGE check's, and [FsImg.fs_ent_set_used] bridges the two where no
+     entry sits beyond the size.  Still an IFF against the bitmap: there
+     is no leak arm. *)
   fdw_used : exists u : gset Z,                                   (* W4/5 *)
-      fs_used_set P sb = Some u /\ fs_bitmap_wf P sb u = true;
+      fs_ent_set P sb = Some u /\ fs_bitmap_wf P sb u = true;
   fdw_root : fs_root_wf P sb = true;                              (* W7  *)
   fdw_dots : fs_dots_all P sb = true;                             (* W8  *)
   (* the inode-region tail and L3/L4, at the geometry's own [nib]
@@ -441,10 +447,7 @@ Lemma fs_ind_ents_agree (P P' : Z -> list (bv 8)) (sb : fs_sb)
   fs_ind_ents P' dn = fs_ind_ents P dn.
 Proof.
   intros Hok Hag. apply fs_ind_ents_ext. intros Hnz. apply Hag.
-  destruct (Z.le_gt_cases (fs_nblk (bv_unsigned (di_size dn)))
-              (Z.of_nat FS_NDIRECT)) as [Hle | Hgt].
-  - exfalso. apply Hnz. exact (fdi_ind_zero P sb dn Hok Hle).
-  - exact (fdi_ind P sb dn Hok Hgt).
+  exact (fdi_ind_ok P sb dn Hok Hnz).
 Qed.
 
 Lemma fs_blk_addr_agree (P P' : Z -> list (bv 8)) (sb : fs_sb)
@@ -457,29 +460,20 @@ Proof.
   rewrite (fs_ind_ents_agree P P' sb dn Hok Hag). reflexivity.
 Qed.
 
-(* a nonzero block address of a legal-size inode is a data block --
-   BELOW the [FS_MAXFILE] index bound, which is where every consumer
-   ([node_of], the dir readers) stays *)
+(* a nonzero block address is a data block -- the ENTRY clauses of
+   [fs_inode_dok], with no reference to the size at all (durable-disk
+   F3.1: a beyond-size entry is owned, not zero) *)
 Lemma fs_blk_addr_range (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
     (k : nat) :
   fs_inode_dok P sb dn -> (k < FS_MAXFILE)%nat ->
   fs_blk_addr P dn k <> 0 ->
   fs_data_start sb <= fs_blk_addr P dn k < sb_size sb.
 Proof.
-  intros Hok Hk Hnz. unfold fs_blk_addr in *.
+  intros Hok Hk Hnz. unfold fs_blk_addr in Hnz |- *.
   destruct (Nat.ltb_spec k FS_NDIRECT) as [Hd | Hd].
-  - destruct (Z.lt_ge_cases (Z.of_nat k)
-                (fs_nblk (bv_unsigned (di_size dn)))) as [Hlt | Hge].
-    + exact (fdi_direct P sb dn Hok k Hd Hlt).
-    + exfalso. apply Hnz. exact (fdi_direct_zero P sb dn Hok k Hd Hge).
-  - assert (Hj : (k - FS_NDIRECT < FS_NINDIRECT)%nat)
-      by (unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *; lia).
-    destruct (Z.lt_ge_cases (Z.of_nat (k - FS_NDIRECT))
-                (fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT))
-      as [Hlt | Hge].
-    + exact (fdi_ent P sb dn Hok (k - FS_NDIRECT)%nat Hj Hlt).
-    + exfalso. apply Hnz.
-      exact (fdi_ent_zero P sb dn Hok (k - FS_NDIRECT)%nat Hj Hge).
+  - exact (fdi_direct_ok P sb dn Hok k Hd Hnz).
+  - apply (fdi_ent_ok P sb dn Hok (k - FS_NDIRECT)%nat);
+      [unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *; lia | exact Hnz].
 Qed.
 
 Lemma fs_data_of_agree (P P' : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
@@ -496,14 +490,14 @@ Proof.
   apply Z.eqb_neq. exact E.
 Qed.
 
-Lemma fs_inode_blocks_agree (P P' : Z -> list (bv 8)) (sb : fs_sb)
+Lemma fs_inode_ents_agree (P P' : Z -> list (bv 8)) (sb : fs_sb)
     (dn : dinode) :
   fs_inode_dok P sb dn ->
   (forall b : Z, fs_data_start sb <= b < sb_size sb -> P' b = P b) ->
-  fs_inode_blocks P' dn = fs_inode_blocks P dn.
+  fs_inode_ents P' dn = fs_inode_ents P dn.
 Proof.
-  intros Hok Hag. unfold fs_inode_blocks.
-  rewrite (fs_ind_ents_agree P P' sb dn Hok Hag). reflexivity.
+  intros Hok Hag. apply fs_inode_ents_det; [reflexivity |].
+  exact (fs_ind_ents_agree P P' sb dn Hok Hag).
 Qed.
 
 Lemma fs_inode_dwf_agree (P P' : Z -> list (bv 8)) (sb : fs_sb)
@@ -577,27 +571,27 @@ Section sweep_agree.
 
   (* --- W4 ------------------------------------------------------------- *)
 
-  Lemma fs_used_blocks_agree :
-    fs_inodes_dwf P sb = true -> fs_used_blocks P' sb = fs_used_blocks P sb.
+  Lemma fs_ent_blocks_agree :
+    fs_inodes_dwf P sb = true -> fs_ent_blocks P' sb = fs_ent_blocks P sb.
   Proof.
     intros HW3.
     destruct (fs_sb_ok_geom sb Hok) as (_ & _ & _ & Hn1 & Hn16 & _).
-    unfold fs_used_blocks. f_equal. apply list_fmap_ext.
+    unfold fs_ent_blocks. f_equal. apply list_fmap_ext.
     intros idx x Hx. apply lookup_seq in Hx as [-> Hx]. cbv beta zeta.
     rewrite (fs_dinode_agree P P' sb (Z.of_nat (0 + idx)) Hok Hag
                ltac:(lia)).
     destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat (0 + idx))))
               =? 0) eqn:Ety; [reflexivity |].
-    apply (fs_inode_blocks_agree P P' sb); [| exact HagD].
+    apply (fs_inode_ents_agree P P' sb); [| exact HagD].
     apply (fs_inodes_dwf_spec P sb (Z.of_nat (0 + idx)) HW3 ltac:(lia)).
     apply Z.eqb_neq. exact Ety.
   Qed.
 
-  Lemma fs_used_set_agree :
-    fs_inodes_dwf P sb = true -> fs_used_set P' sb = fs_used_set P sb.
+  Lemma fs_ent_set_agree :
+    fs_inodes_dwf P sb = true -> fs_ent_set P' sb = fs_ent_set P sb.
   Proof.
-    intros HW3. unfold fs_used_set.
-    rewrite (fs_used_blocks_agree HW3). reflexivity.
+    intros HW3. unfold fs_ent_set.
+    rewrite (fs_ent_blocks_agree HW3). reflexivity.
   Qed.
 
   (* --- W5 ------------------------------------------------------------- *)
@@ -844,7 +838,7 @@ Proof.
   - exact Hsb.
   - exact (fs_inodes_dwf_agree P P' sb Hok Hag HW3).
   - destruct HW45 as (u & Hu & Hbm). exists u. split.
-    + rewrite (fs_used_set_agree P P' sb Hok Hag HW3). exact Hu.
+    + rewrite (fs_ent_set_agree P P' sb Hok Hag HW3). exact Hu.
     + rewrite (fs_bitmap_wf_agree P P' sb Hok Hag u). exact Hbm.
   - exact (fs_root_wf_agree P P' sb Hok Hag HW3 HW7).
   - exact (fs_dots_all_agree P P' sb Hok Hag HW3 HW8).
@@ -966,7 +960,8 @@ Proof.
   - exact Hsb.
   - exact (fs_inodes_wf_dwf P sb HW3).
   - destruct (fsimg_wf_used P sb Hwf) as (u & Hu & _ & Hbm).
-    exists u. split; [exact Hu | exact Hbm].
+    exists u. split; [| exact Hbm].
+    rewrite (fs_ent_set_used P sb Hok HW3). exact Hu.
   - exact HW7.
   - exact HW8.
   - exists nib. split; [exact Hnib | exact Hrw].

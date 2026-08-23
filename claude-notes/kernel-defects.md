@@ -306,6 +306,68 @@ every proof naming an address moves. The procedure and the gate that must pass
 first are in [`durable-notes.md`](durable-notes.md) §"Changing the kernel
 SOURCE".
 
+## RESOLVED (owner ruling 2026-08-23): NOT a defect — `writei`'s
+## partial-failure commits are xv6's design; the INVARIANT adjusts
+## (durable-disk stage F3)
+
+**The ruling**: an inode may own allocated data blocks beyond
+`nblk(ip->size)`. The code-side witness is `itrunc`, which frees
+`addrs[0..NDIRECT)` and the whole indirect range REGARDLESS of size —
+beyond-size entries are owned by the inode (a later `writei` reuses them
+via `bmap`; truncation reclaims them), not leaked. The invariant's used
+set becomes ENTRY-derived (all nonzero `addrs`/indirect entries of live
+inodes), W4/W5 stays an iff, and `fdi_direct_zero`/`fdi_ind_zero` are
+deleted — see durable-disk stage F3 for the sweep. The entry below is
+kept for the analysis (which arms commit what, and where).
+
+## The original candidate (2026-08-23, found by durable-disk stage G2) — `writei`'s
+## partial-failure arms commit a block that is marked USED and owned by
+## nobody UNDER THE OLD size-derived reading
+
+`writei` breaks out of its loop in two places and then falls through to
+`iupdate(ip)` regardless:
+
+```c
+uint addr = bmap(ip, off/BSIZE);
+if (addr == 0) break;                      // (A) balloc: out of blocks
+...
+if (either_copyin(bp->data + (off % BSIZE), user_src, src, m) == -1) {
+  log_write(bp); brelse(bp); break;        // (B) a bad user source
+}
+```
+
+Both leave `off` where it was (the `off += m` lives in the `for`-update,
+which a `break` skips), so `if (off > ip->size) ip->size = off` does
+nothing — while `bmap` has ALREADY installed the block it allocated into
+`ip->addrs` (or into the indirect block), and `balloc` has ALREADY set the
+bitmap bit. `SpecBmap`'s own contract says so out loud: its `a0 = 0` arm
+refuses to claim `bm' = bm`, "the indirect-path failure can already have
+allocated and installed the INDIRECT block before failing on the data
+block".
+
+**The committed state is then outside the FS's own invariant**, on two
+counts, whenever the break happens at a BLOCK BOUNDARY (`off` a multiple
+of `BSIZE`, so the allocated index is exactly `fs_nblk(size)`):
+
+- `FsImg.fs_inode_blocks` is indexed by `nb = fs_nblk (di_size dn)`, so an
+  `addrs` entry at index `>= nb` belongs to no inode's block list — the
+  bitmap bit is set and `FsImg.fs_bitmap_wf` is an **iff**, so W4/W5 is
+  FALSE.  The block is leaked until the file is truncated.
+- `fs_inode_dok`'s `fdi_direct_zero` (arm B, index `< 12`) or
+  `fdi_ind_zero` (arm A at `size = 12*BSIZE`, the indirect-block install)
+  is FALSE, so W3 is too.
+
+Arm A is reachable from every writer when the disk fills, including
+`dirlink` on a directory that is exactly twelve blocks (`dirlink` copies
+from KERNEL memory, so arm B is filewrite's alone — `sys_write` with a
+buffer whose second page is unmapped, breaking at a block boundary).
+
+RESOLUTION: option (2)'s spirit, but sharper than "weaken" — the
+size-derived reading was simply the WRONG model of xv6's ownership
+(itrunc's full-range loop is the design's own statement of it); the
+entry-derived used set keeps the iff and drops the zero clauses instead
+of adding arms. Ruled by the owner; the sweep is durable-disk stage F3.
+
 ## How to tell a kernel defect from a spec problem
 
 **The tell is scaffolding.**

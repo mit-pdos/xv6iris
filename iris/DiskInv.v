@@ -41,7 +41,7 @@ Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskPtsto.
 Require Import VirtioProto.
-Require Import PermInv.
+Require Import Xv6Cameras.
 Require Import KptPt.
 Require Import KMap.
 Require Export BufOwn.

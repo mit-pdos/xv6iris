@@ -37,6 +37,16 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import BioDefs.
 Require Import FsBlocks.
+Require Import FsImg.   (* [fs_sb], [fs_parse_sb]: row (a) names the geometry *)
+Require Import FsWf.    (* [fs_durable_wf_body], [dv_of_D]: row (a) real body *)
+Require Import FsObj.   (* [fsobj], [views_agree_off]: the flip's object layer *)
+(* EXPORT, not Import: [op_entry]'s object component is part of this file's
+   ABI, so every client that declares objects to [log_write] or reads the
+   ledger back needs the constructors in scope.  [FsObjType] is two imports
+   deep, so this costs nothing -- and it keeps [OBlk] spellable in the
+   log_write callers without each of them naming a file they otherwise have
+   no business importing. *)
+Require Export FsObjType.
 Require Export LogDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -173,9 +183,10 @@ Qed.
    [om = ∅].  A witness from an older batch then has [e < e0] of every
    later op and is simply unusable -- indexing instead of revocation.
 
-   NOTE THE RE-ASSOCIATION: [(nat * gset Z * nat)] is
-   [((nat * gset Z) * nat)], so the budget is [e.1.1], the already-logged
-   set is [e.1.2] and the birth epoch is [e.2]. *)
+   NOTE THE RE-ASSOCIATION: [(nat * gset Z * nat * gset fsobj)] is
+   [(((nat * gset Z) * nat) * gset fsobj)], so the budget is [e.1.1.1],
+   the already-logged set is [e.1.1.2], the birth epoch is [e.1.2] and the
+   OBJECT set (durable-disk flip-C1, [op_pending] below) is [e.2]. *)
 (* [op_entry] and [logG] are defined in Xv6Cameras.v; the argument for
    both the SET and the EPOCH field is above.  The epoch reads the
    AMBIENT [mono_natG] off [riscvGS] ([riscvF_genGS], RiscvPtsto.v)
@@ -186,25 +197,25 @@ Qed.
 
 (* the sum of all remaining budgets -- the SETS play no part in the tie *)
 Definition op_sum (om : gmap nat op_entry) : nat :=
-  map_fold (fun _ e acc => (e.1.1 + acc)%nat) 0%nat om.
+  map_fold (fun _ e acc => (e.1.1.1 + acc)%nat) 0%nat om.
 
 Lemma op_sum_empty : op_sum ∅ = 0%nat.
 Proof. reflexivity. Qed.
 
 Lemma op_sum_insert (om : gmap nat op_entry) (i : nat) (e : op_entry) :
   om !! i = None ->
-  op_sum (<[i := e]> om) = (e.1.1 + op_sum om)%nat.
+  op_sum (<[i := e]> om) = (e.1.1.1 + op_sum om)%nat.
 Proof.
   intros Hi. rewrite /op_sum.
   apply (map_fold_insert_L
-           (fun (_ : nat) (e : op_entry) (acc : nat) => (e.1.1 + acc)%nat));
+           (fun (_ : nat) (e : op_entry) (acc : nat) => (e.1.1.1 + acc)%nat));
     [|exact Hi].
   intros j1 j2 z1 z2 y _ _ _. lia.
 Qed.
 
 Lemma op_sum_delete (om : gmap nat op_entry) (i : nat) (e : op_entry) :
   om !! i = Some e ->
-  op_sum om = (e.1.1 + op_sum (delete i om))%nat.
+  op_sum om = (e.1.1.1 + op_sum (delete i om))%nat.
 Proof.
   intros Hi.
   rewrite -{1}(insert_delete om i e Hi).
@@ -214,14 +225,14 @@ Qed.
 (* the conservative bound begin_op's guard reasons with: every entry is
    at most b, so the sum is at most size * b *)
 Lemma op_sum_bound (om : gmap nat op_entry) (b : nat) :
-  (forall i e, om !! i = Some e -> (e.1.1 <= b)%nat) ->
+  (forall i e, om !! i = Some e -> (e.1.1.1 <= b)%nat) ->
   (op_sum om <= size om * b)%nat.
 Proof.
   induction om as [|i e om Hi IH] using map_ind.
   { intros _. rewrite op_sum_empty map_size_empty. lia. }
   intros Hb.
   rewrite op_sum_insert // map_size_insert_None //.
-  assert (Hu : (e.1.1 <= b)%nat).
+  assert (Hu : (e.1.1.1 <= b)%nat).
   { apply (Hb i). rewrite lookup_insert //. }
   assert (Hrest : (op_sum om <= size om * b)%nat).
   { apply IH. intros j v Hj. apply (Hb j).
@@ -234,15 +245,15 @@ Qed.
    Stated on the ENTRY so the set component is free to change at the same
    time, which is exactly what the append path does. *)
 Lemma op_sum_spend (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z)
-    (e0 : nat) :
-  om !! i = Some (S u, Sb, e0) ->
-  op_sum (<[i := (u, Sb', e0)]> om) = (op_sum om - 1)%nat.
+    (e0 : nat) (So So' : gset fsobj) :
+  om !! i = Some (S u, Sb, e0, So) ->
+  op_sum (<[i := (u, Sb', e0, So')]> om) = (op_sum om - 1)%nat.
 Proof.
   intros Hi.
-  assert (Hj : <[i := (u, Sb', e0)]> om !! i = Some (u, Sb', e0))
+  assert (Hj : <[i := (u, Sb', e0, So')]> om !! i = Some (u, Sb', e0, So'))
     by apply lookup_insert.
-  rewrite (op_sum_delete om i (S u, Sb, e0) Hi).
-  rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
+  rewrite (op_sum_delete om i (S u, Sb, e0, So) Hi).
+  rewrite (op_sum_delete (<[i := (u, Sb', e0, So')]> om) i (u, Sb', e0, So') Hj).
   rewrite delete_insert_delete. cbn. lia.
 Qed.
 
@@ -250,27 +261,36 @@ Qed.
    whole point: the tie [n + op_sum om <= LOGBLOCKS] survives a log_write
    that does not grow [n]. *)
 Lemma op_sum_absorb (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z)
-    (e0 : nat) :
-  om !! i = Some (u, Sb, e0) ->
-  op_sum (<[i := (u, Sb', e0)]> om) = op_sum om.
+    (e0 : nat) (So So' : gset fsobj) :
+  om !! i = Some (u, Sb, e0, So) ->
+  op_sum (<[i := (u, Sb', e0, So')]> om) = op_sum om.
 Proof.
   intros Hi.
-  assert (Hj : <[i := (u, Sb', e0)]> om !! i = Some (u, Sb', e0))
+  assert (Hj : <[i := (u, Sb', e0, So')]> om !! i = Some (u, Sb', e0, So'))
     by apply lookup_insert.
-  rewrite (op_sum_delete om i (u, Sb, e0) Hi).
-  rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
+  rewrite (op_sum_delete om i (u, Sb, e0, So) Hi).
+  rewrite (op_sum_delete (<[i := (u, Sb', e0, So')]> om) i (u, Sb', e0, So') Hj).
   rewrite delete_insert_delete. reflexivity.
 Qed.
 
 (* ------------------------------------------------------------------ *)
 (*  THE OPEN OPS' PENDING SET (durable-disk stage G1)                   *)
 (*                                                                     *)
-(*  The union of every LIVE operation's already-logged set -- the       *)
-(*  blocks some open transaction has written into the batch and has not *)
-(*  yet ended.  It is what the abstract-view row (a) of [log_state]     *)
-(*  excludes from its agreement: between [begin_op] and [end_op] the    *)
-(*  logged view [L] and the committed view [A] may differ at exactly    *)
-(*  these blocks and nowhere else.                                     *)
+(*  The union of every LIVE operation's OBJECT set -- the objects some  *)
+(*  open transaction has claimed and not yet finalized.  It is what the *)
+(*  abstract-view row (a) of [log_state] excludes from its agreement:   *)
+(*  between [begin_op] and [end_op] the logged view [L] and the         *)
+(*  committed view [A] may differ at exactly these objects and nowhere  *)
+(*  else.                                                              *)
+(*                                                                     *)
+(*  IT USED TO BE THE BLOCK UNION (stage G1), AND THAT IS THE THING     *)
+(*  flip-C MOVED.  Per-BLOCK finalize responsibility fails on shared    *)
+(*  blocks and sharing is the norm, not a corner: the bitmap block is   *)
+(*  shared by every allocating op in a group, an inode block packs 16   *)
+(*  dinode slots, a dir block 64 records.  The block union survives     *)
+(*  nowhere -- the LOGBLOCKS budget and the credit-soundness clause     *)
+(*  both read [e.1.1.2] directly off the entry ([log_res]), never       *)
+(*  through a fold -- so there is no block-level [op_pending] any more. *)
 (*                                                                     *)
 (*  Stated as a [map_fold] rather than a union over [map_to_list] so    *)
 (*  every law below is one [map_fold_weak_ind], and so that it is       *)
@@ -279,20 +299,20 @@ Qed.
 (*  the fold at a use site, and no law reaches for [set_solver] on a    *)
 (*  whole map (durable-notes.md's set_solver rules).                    *)
 (* ------------------------------------------------------------------ *)
-Definition op_pending (om : gmap nat op_entry) : gset Z :=
-  map_fold (fun _ e acc => e.1.2 ∪ acc) ∅ om.
+Definition op_pending (om : gmap nat op_entry) : gset fsobj :=
+  map_fold (fun _ e acc => e.2 ∪ acc) ∅ om.
 
 Lemma op_pending_empty : op_pending ∅ = ∅.
 Proof. reflexivity. Qed.
 
 (* THE CHARACTERISATION.  Every other law is a corollary. *)
-Lemma op_pending_elem_of (om : gmap nat op_entry) (b : Z) :
-  b ∈ op_pending om <-> exists i e, om !! i = Some e /\ b ∈ e.1.2.
+Lemma op_pending_elem_of (om : gmap nat op_entry) (b : fsobj) :
+  b ∈ op_pending om <-> exists i e, om !! i = Some e /\ b ∈ e.2.
 Proof.
   rewrite /op_pending.
   apply (map_fold_weak_ind
-           (fun (r : gset Z) (m : gmap nat op_entry) =>
-              b ∈ r <-> exists i e, m !! i = Some e /\ b ∈ e.1.2)).
+           (fun (r : gset fsobj) (m : gmap nat op_entry) =>
+              b ∈ r <-> exists i e, m !! i = Some e /\ b ∈ e.2)).
   - split.
     + intros Hb. exfalso. exact (not_elem_of_empty b Hb).
     + intros (i & e & Hi & _). rewrite lookup_empty in Hi. discriminate.
@@ -312,7 +332,7 @@ Qed.
 
 (* a live entry's set is pending *)
 Lemma op_pending_lookup (om : gmap nat op_entry) (i : nat) (e : op_entry) :
-  om !! i = Some e -> e.1.2 ⊆ op_pending om.
+  om !! i = Some e -> e.2 ⊆ op_pending om.
 Proof.
   intros Hi b Hb. apply op_pending_elem_of. exists i, e. done.
 Qed.
@@ -324,7 +344,7 @@ Qed.
    the premise is discharged. *)
 Lemma op_pending_insert_mono (om : gmap nat op_entry) (i : nat)
     (e' : op_entry) :
-  (forall e, om !! i = Some e -> e.1.2 ⊆ e'.1.2) ->
+  (forall e, om !! i = Some e -> e.2 ⊆ e'.2) ->
   op_pending om ⊆ op_pending (<[i := e']> om).
 Proof.
   intros Hgrow b Hb. apply op_pending_elem_of.
@@ -341,7 +361,7 @@ Qed.
    own set is the only thing that leaves the pending union. *)
 Lemma op_pending_delete (om : gmap nat op_entry) (i : nat) (e : op_entry) :
   om !! i = Some e ->
-  op_pending om ⊆ e.1.2 ∪ op_pending (delete i om).
+  op_pending om ⊆ e.2 ∪ op_pending (delete i om).
 Proof.
   intros Hi b Hb.
   apply op_pending_elem_of in Hb as (j & e' & Hj & Hb).
@@ -435,10 +455,20 @@ Section LogInv.
      free at the mint ([log_begin_step], where the ledger authority's own
      [⌜1 <= E⌝] clause and [e0 = E] give it), pure, and therefore
      ABI-invisible: every landed caller stays byte-stable. *)
+  (* THE OBJECT SET IS EXISTENTIALLY CLOSED HERE (durable-disk flip-C1),
+     and that is a deliberate ABI decision, not an omission.  A client never
+     names its own objects: what it declares is per-log_write (the [Ob]
+     parameter of [log_spend_step] / [log_record_step], threaded from
+     [SpecLogWrite]), and what it needs back is a budget claim.  Exposing
+     the accumulated set would put a [gset fsobj] into [log_op] and hence
+     into every begin -> ... -> end threading in the tree -- writei, itrunc,
+     dirlink, all of the syscall arms -- for a value none of them reads.
+     end_op's own proof gets the set from the LEDGER instead ([log_end_step]
+     returns it), which is where it is authoritative anyway. *)
   Definition log_opSe (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat)
     : iProp Σ :=
-    ((∃ i : nat, i ↪[ln_ops γ] (u, Sb, e0)) ∗ log_epoch_lb γ e0 ∗
-     ⌜(1 <= e0)%nat⌝)%I.
+    ((∃ (i : nat) (So : gset fsobj), i ↪[ln_ops γ] (u, Sb, e0, So)) ∗
+     log_epoch_lb γ e0 ∗ ⌜(1 <= e0)%nat⌝)%I.
 
   (* the lb read off an entry, which is what a parker/observer actually
      carries out of the op's scope *)
@@ -780,7 +810,7 @@ Section LogInv.
   (*  disk -- which is what [lm_view M] records -- still holds the        *)
   (*  logged bytes.  It is what turns the commit's [D' = restrict L]      *)
   (*  into an equation about the PHYSICAL pre-image, i.e. what lets       *)
-  (*  [FsCrash.fs_commit_permit_named]'s conclusion be assembled          *)
+  (*  [FsCrash.fs_commit_named_seq_permit]'s conclusion be assembled      *)
   (*  generically instead of at each of end_op's 26 exit arms             *)
   (*  (durable-disk.md stage G1 row (b)).                                *)
   (*                                                                     *)
@@ -791,21 +821,21 @@ Section LogInv.
   (*                                                                     *)
   (*   - end_op's DEPOSIT ([ProofEndOp.eo_open_to_batch]).  The commit     *)
   (*     runs [write_head] / [install_trans] / [write_head] through the    *)
-  (*     AT-FORM permits ([FsCrash.fs_logfill_permit] and friends), whose  *)
-  (*     [Q] is [log_mirror_at ls h] -- the mirror VALUE is existential,   *)
-  (*     so the deposit cannot say what [lm_view M'] is at any block.      *)
+  (*     permits whose AT-FORM [Q] is [log_mirror_at ls h]: the mirror     *)
+  (*     VALUE is existential, so the deposit cannot say what              *)
+  (*     [lm_view M'] is at any block.                                     *)
   (*     DISCHARGER: stage G3, which re-points [ProofEndOp] at E2''s       *)
-  (*     value-chained primitives ([fs_logfill_permit_v],                  *)
-  (*     [fs_install_permit_v] -- whose [Q] returns the half at            *)
-  (*     [lm_upd M0 blk bs] -- [fs_commit_permit_named] and                *)
-  (*     [fs_clear_permit_keep]) and threads the chained [M] through the   *)
+  (*     value-chained primitives ([fs_logfill_v_seq_permit],              *)
+  (*     [fs_install_v_seq_permit] -- whose [Q] returns the half at        *)
+  (*     [lm_upd M0 blk bs] -- [fs_commit_named_seq_permit] and            *)
+  (*     [fs_clear_keep_seq_permit]) and threads [M] through the           *)
   (*     copy loop, the installs and the clear.  With the chain in hand    *)
   (*     the deposit is arithmetic: an install writes [L]'s bytes to the   *)
   (*     home block of every [b ∈ LB], and touches nothing else, so the    *)
   (*     post-commit picture agrees with [L] on the WHOLE home set.        *)
   (*                                                                     *)
   (*   - boot ([ProofInitlog]).  The era's half arrives from               *)
-  (*     [FsCrash.fs_swap_permit_rec]'s [Q], which is again                *)
+  (*     [FsCrash.fs_boot_head_seq_permit]'s [Q], which is again           *)
   (*     [log_mirror_at ls (0, [])]: the value the swap sets               *)
   (*     ([mirror_of (fs_blocks dk')]) is under the permit's own           *)
   (*     universally quantified [dk] and cannot be named by the caller.    *)
@@ -835,6 +865,168 @@ Section LogInv.
     log_mirror_tie M L cov ls LB.
   Proof. exact I. Qed.
 
+  (* READY, AND DELIBERATELY UNUSED (durable-disk flip-B).  This is the
+     deposit half of the gate above, proved: once end_op's committer carries
+     the mirror's VALUE across the commit cycle -- which it now does, through
+     [FsCrash]'s value-chained permits -- row (b) at the deposit is pure
+     bookkeeping over the chain.  The three chain facts it asks for are
+     exactly what [ProofEndOp]'s [eo_minst_hit] / [eo_minst_miss] /
+     [eo_ext] invariants deliver:
+
+       - every LOGGED home block ends at its logged content (the install
+         pass wrote [Lw j] there),
+       - every OTHER home block is where it was at the checkout (no write in
+         the cycle touches it: the fills go to slots, the commit and the
+         clear to the header, the installs to [W]'s blocks alone),
+       - and the logged view agrees with [Lw] at every entry (the copy
+         loop's own ghost step).
+
+     It is NOT wired in, because [log_mirror_tie] is still [True] and its
+     OTHER establishment site -- boot ([ProofInitlog]) -- is still a wall
+     until stage H2a mints the era's mirror at a named value.  Switching the
+     gate on is one line there plus [eo_open_to_batch] calling this instead
+     of [log_mirror_tie_pending]. *)
+  Lemma log_mirror_tie_deposit (M M' : log_mirror) (L : gmap Z (list (bv 8)))
+      (cov : gset Z) (ls : Z) (LB : gset Z) (W : list Z)
+      (Lw : nat -> list (bv 8)) :
+    LB = list_to_set W ->
+    log_mirror_tie_body M L cov ls LB ->
+    (* the install pass's effect at the logged blocks... *)
+    (forall (j : nat) (b : Z), W !! j = Some b -> lm_view M' b = Lw j) ->
+    (* ...and its absence everywhere else on the home set *)
+    (forall b : Z, b ∈ fs_home_set cov ls -> b ∉ LB -> lm_view M' b = lm_view M b) ->
+    (* the logged view, at the entries the batch wrote *)
+    (forall (j : nat) (b : Z), W !! j = Some b -> L !! b = Some (Lw j)) ->
+    log_mirror_tie_body M' L cov ls ∅.
+  Proof.
+    intros -> Htie Hhit Hmiss HLw b Hb _.
+    destruct (decide (b ∈ (list_to_set W : gset Z))) as [Hin|Hout].
+    - apply elem_of_list_to_set, elem_of_list_lookup in Hin as [j Hj].
+      rewrite (HLw j b Hj) (Hhit j b Hj) //.
+    - rewrite (Hmiss b Hb Hout). exact (Htie b Hb Hout).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  ROW (a): THE ABSTRACT-VIEW AGREEMENT (durable-disk flip-C)        *)
+  (*                                                                    *)
+  (*  BETWEEN COMMITS THE LOGGED VIEW IS THE COMMITTED VIEW, EXCEPT AT   *)
+  (*  THE OBJECTS SOME OPEN TRANSACTION HAS CLAIMED.  [A] -- the         *)
+  (*  committed picture the next commit will install -- is existential   *)
+  (*  here (it is not a resource; nothing owns it, and every op's        *)
+  (*  finalize replaces it), which is exactly the shape stage G1 planned *)
+  (*  and flip-A gave the vocabulary for.                               *)
+  (*                                                                    *)
+  (*  IT IS GATED, AND THE GATE IS VISIBLE DEBT -- the same idiom as     *)
+  (*  [log_mirror_tie] above and [FsWf.fs_durable_wf].  The real content *)
+  (*  is [log_row_a_body], under its own name; [log_row_a] -- what       *)
+  (*  [log_state] actually carries -- is [True] until the arms can       *)
+  (*  produce the body.  WHY GATED, per site:                            *)
+  (*                                                                    *)
+  (*   - MAINTENANCE at log_write.  Writing block [b] into [L] weakens   *)
+  (*     the row only if every leaf of [b] is masked, which the writer's *)
+  (*     declared object set [Ob] must cover.  Today's writers declare   *)
+  (*     the COARSE [{[OBlk b]}] and that does cover it; the obligation  *)
+  (*     is [FsObj.obj_masked_blk] and it is flip-C2's to discharge      *)
+  (*     (per arm, as the declarations refine to records / bits / slots).*)
+  (*                                                                    *)
+  (*   - FINALIZE at end_op.  An ending op folds exactly ITS OWN objects:*)
+  (*     [FsObj.views_agree_fold] off its per-effect footprint, with     *)
+  (*     [FsWf]'s own [eff_*_wfv] carrying [fs_durable_wf_body] across   *)
+  (*     the same step.  That pair is [end_op_fin] below, and it is      *)
+  (*     flip-C2's per-arm work.                                        *)
+  (*                                                                    *)
+  (*   - BOOT ([ProofInitlog]).  [A0] is the image's home restriction    *)
+  (*     and [fs_durable_wf_body] of it comes from                       *)
+  (*     [FsWfImg.fsimg_durable_wf] off [FsCfgBoot]'s conjunct (13),     *)
+  (*     which G1 landed for exactly this.  It rides H2a, like row (b).  *)
+  (*                                                                    *)
+  (*  The SWITCH-ON is one line -- [log_row_a := log_row_a_body] -- and  *)
+  (*  [log_row_a_pending]'s call sites are then exactly the places that  *)
+  (*  owe a proof.  Note what does NOT move at the switch-on:            *)
+  (*  [end_op_fin]'s statement, and therefore none of its 30 call        *)
+  (*  sites, because it is stated OVER [log_row_a] rather than over the  *)
+  (*  body.                                                             *)
+  (* ---------------------------------------------------------------- *)
+
+  (* THE REAL BODY.  [sb] is pinned by [fs_durable_wf_body] itself (its
+     own first conjunct is [fs_parse_sb (dv_of_D A) = Some sb]); it is
+     named here because [views_agree_off] reads the geometry to decide
+     which tiling a block takes, and a relation cannot go looking for it
+     under someone else's existential. *)
+  Definition log_row_a_body (L : gmap Z (list (bv 8))) (cov : gset Z)
+      (ls : Z) (pend : gset fsobj) : Prop :=
+    exists (A : gmap Z (list (bv 8))) (sb : fs_sb),
+      dom A = fs_home_set cov ls /\
+      fs_parse_sb (dv_of_D A) = Some sb /\
+      fs_durable_wf_body A /\
+      views_agree_off (dv_of_D A) (dv_of_D L) sb pend.
+
+  Definition log_row_a (L : gmap Z (list (bv 8))) (cov : gset Z)
+      (ls : Z) (pend : gset fsobj) : Prop := True.
+
+  (* THE GATE.  Every use marks a site the switch-on turns into an error. *)
+  Lemma log_row_a_pending (L : gmap Z (list (bv 8))) (cov : gset Z)
+      (ls : Z) (pend : gset fsobj) :
+    log_row_a L cov ls pend.
+  Proof. exact I. Qed.
+
+  (* MONOTONE IN [pend], which is why every GROWING transition is free:
+     more pending is a WEAKER row.  Stated over the body, since that is
+     where the content is; [FsObj.views_agree_off_mono] is its whole
+     proof, and it is what [log_state_pend_mono] rests on after the
+     switch-on. *)
+  Lemma log_row_a_body_mono (L : gmap Z (list (bv 8))) (cov : gset Z)
+      (ls : Z) (pend pend' : gset fsobj) :
+    pend ⊆ pend' ->
+    log_row_a_body L cov ls pend -> log_row_a_body L cov ls pend'.
+  Proof.
+    intros Hsub (A & sb & Hdom & Hp & Hwf & Hag).
+    exists A, sb. split_and!; [done..|].
+    exact (views_agree_off_mono _ _ _ _ _ Hsub Hag).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE FINALIZE BUNDLE (durable-disk flip-C1)                       *)
+  (*                                                                    *)
+  (*  WHAT AN ENDING OP OWES ROW (a), AS ONE PARAMETER.  [F] is the      *)
+  (*  retiring op's OBJECT set and the obligation is that folding it     *)
+  (*  out of the pending union keeps the row -- i.e. exactly             *)
+  (*  "[A] can be advanced over my objects and stay well-formed".        *)
+  (*                                                                    *)
+  (*  WHY [F] IS UNIVERSALLY QUANTIFIED RATHER THAN A PARAMETER OF THE   *)
+  (*  SPEC.  No caller of end_op can NAME its object set: the client     *)
+  (*  token [log_op] closes it existentially on purpose (see             *)
+  (*  [log_opSe]), and the authoritative value lives in the ledger,      *)
+  (*  where [log_end_step] hands it back.  So end_op instantiates this   *)
+  (*  at the retiring entry's own [So] and the caller supplies the       *)
+  (*  quantified statement -- the same shape                             *)
+  (*  [FsCrash.end_op_pres] takes, and for the same reason.              *)
+  (*                                                                    *)
+  (*  WHAT AN ARM SUPPLIES AT flip-C2, and nothing else: its G2          *)
+  (*  preservation lemma ([FsOp*.op_*_ok], i.e. F2's [eff_*_wfv] at the  *)
+  (*  op's literal), its flip-A fold ([FsObjEff.eff_*_fold], stated at   *)
+  (*  the op's own per-block [log_write] equations), and those per-block *)
+  (*  equations.  THE ONE THING THIS STATEMENT DOES NOT YET HAND THE ARM *)
+  (*  is the third of those -- the equations relate [L] to the arm's     *)
+  (*  effect and [L] is quantified here -- and the carrier is named:     *)
+  (*  stage G2 threads the write sites' side conditions to the per-op    *)
+  (*  obligation, and it arrives as an extra HYPOTHESIS inside this      *)
+  (*  body.  Adding one moves no call site, because every site           *)
+  (*  discharges through [end_op_fin_placeholder], whose statement is    *)
+  (*  the whole of [end_op_fin].  That is why the INTERFACE shape is     *)
+  (*  final now and only the body can still grow.                        *)
+  (* ---------------------------------------------------------------- *)
+  Definition end_op_fin (cov : gset Z) (ls : Z) : Prop :=
+    forall (F : gset fsobj) (L : gmap Z (list (bv 8))) (pend : gset fsobj),
+      log_row_a L cov ls pend -> log_row_a L cov ls (pend ∖ F).
+
+  (* THE GATE, at the interface: trivially true while [log_row_a] is the
+     placeholder, exactly as [FsCrash.end_op_pres_placeholder] is while
+     [FsWf.fs_durable_wf] is.  Its call sites are the switch-on's rework
+     list. *)
+  Lemma end_op_fin_placeholder (cov : gset Z) (ls : Z) : end_op_fin cov ls.
+  Proof. intros F L pend _. exact (log_row_a_pending _ _ _ _). Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
   (* ---------------------------------------------------------------- *)
@@ -843,11 +1035,13 @@ Section LogInv.
      the FsBlocks ghosts; cov -- the covered range the bio layer runs at;
      logstart -- the sb's log start block.  [n] is a parameter (not an
      existential) because the ledger's sum tie in [log_res] mentions it.
-     [pend] is the OPEN OPS' pending set ([op_pending om] at the one call
-     site, [log_res]); it is what stage G's abstract-view row (a) excludes
-     from its agreement, and until row (a) lands the bundle does not read
-     it -- see [log_state_pend_mono] / [log_state_pend] below, which are
-     the two lemmas the flip commit will re-prove.
+     [pend] is the OPEN OPS' pending OBJECT set ([op_pending om] at the
+     one call site, [log_res]); it is what row (a) below excludes from its
+     agreement.  The bundle READS it now (durable-disk flip-C1) -- the row
+     is carried, gated -- and the two moves are [log_state_pend_mono]
+     (growth, free forever) and [log_state_fin] (the ending op's exact
+     shrink).  The old unconditional [log_state_pend] is GONE: it was the
+     G1 debt site, and the object-set delete split retires it.
 
      THE MIRROR RIDES HERE (durable-disk stage G1's fusion).  [M] was an
      existential inside [log_mirror_clean]; it is a binder of this bundle
@@ -855,7 +1049,7 @@ Section LogInv.
      disk to the logged view -- can be stated at all.  The header reading
      is unchanged, so nothing above this file grew a binder. *)
   Definition log_state (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) : iProp Σ :=
+      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset fsobj) : iProp Σ :=
     (∃ (W : list (SailStdpp.Values.mword 32))
        (L : gmap Z (list (bv 8))) (D : gmap Z bool) (M : log_mirror),
        ⌜n = length W /\ (n <= LOGBLOCKS)%nat⌝ ∗
@@ -902,31 +1096,59 @@ Section LogInv.
           is this bundle's own binder now. *)
        log_mirror_half M ∗ ⌜lm_hdr M logstart = (0%nat, [])⌝ ∗
        (* ROW (b), gated -- see [log_mirror_tie] above *)
-       ⌜log_mirror_tie M L cov logstart LB⌝)%I.
+       ⌜log_mirror_tie M L cov logstart LB⌝ ∗
+       (* ROW (a), gated -- see [log_row_a] above *)
+       ⌜log_row_a L cov logstart pend⌝)%I.
 
   (* THE PENDING SET MOVES, in the two shapes the transitions need.
 
      GROWTH ([begin_op]'s mint, [log_write]'s two ledger steps) is free
-     forever: row (a) only ever weakens as more blocks go pending.  This
-     lemma keeps its statement across stage G's flip. *)
+     forever: row (a) only ever weakens as more objects go pending, which
+     is [log_row_a_body_mono] = [FsObj.views_agree_off_mono].  This lemma
+     keeps its statement across the switch-on; only its proof changes. *)
   Lemma log_state_pend_mono (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB pend pend' : gset Z) :
+      (logstart : Z) (n : nat) (LB : gset Z) (pend pend' : gset fsobj) :
     pend ⊆ pend' ->
     log_state bn γfs cov logstart n LB pend -∗
     log_state bn γfs cov logstart n LB pend'.
-  Proof. intros _. rewrite /log_state. iIntros "H". iExact "H". Qed.
+  Proof.
+    intros Hsub. rewrite /log_state.
+    iIntros "H". iDestruct "H" as (W L D M)
+      "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 & H13 &
+        H14 & H15 & H16 & _)".
+    iExists W, L, D, M.
+    (* THE GATE.  [iFrame] closes the row's pure conjunct by [done] while
+       [log_row_a] is [True]; naming the lemma keeps this a grep-able call
+       site of it, and the switch-on turns the line into an error. *)
+    pose proof (log_row_a_pending L cov logstart pend') as Hrow.
+    iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16".
+  Qed.
 
-  (* SHRINKAGE ([end_op]'s retire, where the ending op's blocks leave the
-     pending union) is FREE ONLY WHILE ROW (a) IS ABSENT.  Stage G's flip
-     replaces this lemma by the per-op preservation obligation: the
-     retiring op must move the abstract view [A] to [A ⊕ L] on its own
-     blocks and re-prove [fs_durable_wf_body] of the result (durable-disk
-     stage G2, the 26 exit arms).  Its call sites are that sweep's list. *)
-  Lemma log_state_pend (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB pend pend' : gset Z) :
+  (* SHRINKAGE -- [end_op]'s retire, where the ending op's OBJECTS leave
+     the pending union.  This is what replaced stage G1's unconditional
+     [log_state_pend]: the caller no longer asserts that the row does not
+     care, it BRINGS the row's obligation for its own object set
+     ([end_op_fin], instantiated at the retiring entry's [So]).  The
+     re-deposit is then exact -- [op_pending_delete] gives
+     [op_pending om ∖ So ⊆ op_pending (delete i om)] and
+     [log_state_pend_mono] closes the gap -- so there is no debt left at
+     the site and nothing here to re-prove at the switch-on. *)
+  Lemma log_state_fin (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+      (logstart : Z) (n : nat) (LB : gset Z) (F pend : gset fsobj) :
+    end_op_fin cov logstart ->
     log_state bn γfs cov logstart n LB pend -∗
-    log_state bn γfs cov logstart n LB pend'.
-  Proof. rewrite /log_state. iIntros "H". iExact "H". Qed.
+    log_state bn γfs cov logstart n LB (pend ∖ F).
+  Proof.
+    intros Hfin. rewrite /log_state.
+    iIntros "H".
+    iDestruct "H" as (W L D M)
+      "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 & H13 &
+        H14 & H15 & H16 & %Hrow)".
+    iExists W, L, D, M.
+    (* the caller's bundle, spent at the retiring op's own object set *)
+    pose proof (Hfin F L pend Hrow) as Hrow'.
+    iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16".
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)
@@ -941,7 +1163,7 @@ Section LogInv.
        l_ncommit ↦₄ nc ∗
        ghost_map_auth (ln_ops γ) 1 om ∗
        ⌜size om = out⌝ ∗
-       ⌜forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
+       ⌜forall i e, om !! i = Some e -> (e.1.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
        (* from the guard: (out+1)*MAXOPBLOCKS <= LOGBLOCKS at every
           increment, so the cell word stays a faithful small int *)
        ⌜(out <= 3)%nat⌝ ∗
@@ -963,7 +1185,7 @@ Section LogInv.
           epoch.  Maintained for free by the bump's placement -- the commit
           re-deposit runs with [out = 0], hence [om = ∅], so a bump never
           has a live entry to falsify (ProofEndOp's own [Hommt]). *)
-       ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
+       ⌜forall i e, om !! i = Some e -> e.1.2 = E⌝ ∗
        (* ...and the registry never runs ahead of the epoch: every row was
           minted at the epoch current when it was minted, and the epoch only
           grows.  This is the half that turns [e0 <= e] into [e = E]. *)
@@ -978,7 +1200,7 @@ Section LogInv.
              after all), lh.n would grow, and no budget unit would be
              spent -- breaking the tie above.  Vacuous while committing,
              where out = 0 forces om = empty. *)
-          ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
+          ⌜forall i e, om !! i = Some e -> e.1.1.2 ⊆ LB⌝ ∗
           (* ...and the registry's twin of it: a witness minted THIS epoch
              names a block that really is in the header.  Older rows are
              unconstrained, which is exactly the self-invalidation -- they
@@ -1050,7 +1272,7 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗
     mono_nat_auth_own (ln_ep γ) 1 E ==∗
     ∃ i, ⌜om !! i = None⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅, E)]> om) ∗
+      ghost_map_auth (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅, E, ∅)]> om) ∗
       mono_nat_auth_own (ln_ep γ) 1 E ∗
       log_opSe γ MAXOPBLOCKS ∅ E.
   Proof.
@@ -1058,10 +1280,11 @@ Section LogInv.
     set (i := fresh (dom om)).
     assert (Hi : om !! i = None).
     { apply not_elem_of_dom. apply is_fresh. }
-    iMod (ghost_map_insert i (MAXOPBLOCKS, ∅, E) Hi with "Ha") as "[Ha He]".
+    iMod (ghost_map_insert i (MAXOPBLOCKS, ∅, E, (∅ : gset fsobj)) Hi
+           with "Ha") as "[Ha He]".
     iDestruct (log_epoch_lb_get with "Hep") as "[Hep #Hlb]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha Hep".
-    rewrite /log_opSe. iSplitL "He"; [iExists i; iFrame|].
+    rewrite /log_opSe. iSplitL "He"; [iExists i, (∅ : gset fsobj); iFrame|].
     iSplitR; [iApply "Hlb"|]. iPureIntro. exact Hpos.
   Qed.
 
@@ -1069,7 +1292,7 @@ Section LogInv.
      (out+1)*MAXOPBLOCKS test implies the exact sum tie after the mint *)
   Lemma log_reserve_ok (n out : nat) (om : gmap nat op_entry) :
     size om = out ->
-    (forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat) ->
+    (forall i e, om !! i = Some e -> (e.1.1.1 <= MAXOPBLOCKS)%nat) ->
     (n + (out + 1) * MAXOPBLOCKS <= LOGBLOCKS)%nat ->
     (n + (MAXOPBLOCKS + op_sum om) <= LOGBLOCKS)%nat.
   Proof.
@@ -1084,36 +1307,37 @@ Section LogInv.
      lh.block[] -- lh.n grows by one and the tie is preserved because the
      sum drops by one ([op_sum_spend]). *)
   Lemma log_spend_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
-      (e0 : nat) (b : Z) :
+      (e0 : nat) (b : Z) (Ob : gset fsobj) :
     ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ (S u) Sb e0 ==∗
-    ∃ i, ⌜om !! i = Some (S u, Sb, e0)⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
+    ∃ i So, ⌜om !! i = Some (S u, Sb, e0, So)⌝ ∗
+      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0, So ∪ Ob)]> om) ∗
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof.
     iIntros "Ha He". rewrite /log_opSe.
     (* the lb is PERSISTENT and the positivity clause PURE, so every step
        below is a re-pack, not a transfer: both survive the update
        untouched at the SAME [e0] *)
-    iDestruct "He" as "(He & #Hlb & %Hpos)". iDestruct "He" as (i) "He".
+    iDestruct "He" as "(He & #Hlb & %Hpos)". iDestruct "He" as (i So) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
-    iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
-    iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    iSplitL "He"; [iExists i; iFrame|].
+    iMod (ghost_map_update (u, Sb ∪ {[b]}, e0, So ∪ Ob) with "Ha He")
+      as "[Ha He]".
+    iModIntro. iExists i, So. iSplitR; [done|]. iFrame "Ha".
+    iSplitL "He"; [iExists i, (So ∪ Ob); iFrame|].
     iSplitR; [iApply "Hlb"|]. iPureIntro. exact Hpos.
   Qed.
 
   (* log_write's ABSORB read: an op that holds a credit for [b] really has
      [b] in lh.block[].  Pure lookup -- nothing is spent and nothing moves;
      the caller combines the returned entry with [log_res]'s
-     [e.2 ⊆ LB] clause to place [b] in the header. *)
+     [e.1.1.2 ⊆ LB] clause to place [b] in the header. *)
   Lemma log_absorb_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
       (e0 : nat) :
     ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
-    ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝.
+    ∃ i So, ⌜om !! i = Some (u, Sb, e0, So)⌝.
   Proof.
-    iIntros "Ha (He & _ & _)". iDestruct "He" as (i) "He".
+    iIntros "Ha (He & _ & _)". iDestruct "He" as (i So) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
-    iExists i. done.
+    iExists i, So. done.
   Qed.
 
   (* log_write's GROUP absorb (fs-log.md §G.19): the block is in lh.block[]
@@ -1128,36 +1352,42 @@ Section LogInv.
      insert is the identity map) -- which is why the credited arm needs no
      case split on WHICH credit was presented. *)
   Lemma log_record_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
-      (e0 : nat) (b : Z) :
+      (e0 : nat) (b : Z) (Ob : gset fsobj) :
     ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 ==∗
-    ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
+    ∃ i So, ⌜om !! i = Some (u, Sb, e0, So)⌝ ∗
+      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0, So ∪ Ob)]> om) ∗
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof.
     iIntros "Ha He". rewrite /log_opSe.
     (* the lb is PERSISTENT and the positivity clause PURE, so this is a
        re-pack, not a transfer *)
-    iDestruct "He" as "(He & #Hlb & %Hpos)". iDestruct "He" as (i) "He".
+    iDestruct "He" as "(He & #Hlb & %Hpos)". iDestruct "He" as (i So) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
-    iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
-    iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    iSplitL "He"; [iExists i; iFrame|].
+    iMod (ghost_map_update (u, Sb ∪ {[b]}, e0, So ∪ Ob) with "Ha He")
+      as "[Ha He]".
+    iModIntro. iExists i, So. iSplitR; [done|]. iFrame "Ha".
+    iSplitL "He"; [iExists i, (So ∪ Ob); iFrame|].
     iSplitR; [iApply "Hlb"|]. iPureIntro. exact Hpos.
   Qed.
 
   (* end_op's retire: the whole entry goes -- SET AND ALL, which is what
      revokes every absorption credit this op handed out -- and the sum
      drops by exactly the returned budget *)
+  (* ...AND THE OBJECT SET COMES BACK WITH IT (durable-disk flip-C1).  It is
+     the ONE place the retiring op's objects can be named -- the client token
+     closes them existentially -- and it is what end_op instantiates the
+     finalize bundle [end_op_fin] at, so that [log_state_fin]'s shrink is the
+     retiring entry's own set and nothing wider. *)
   Lemma log_end_step γ (om : gmap nat op_entry) (u : nat) :
     ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u ==∗
-    ∃ i Sb e0, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
+    ∃ i Sb e0 So, ⌜om !! i = Some (u, Sb, e0, So)⌝ ∗
       ghost_map_auth (ln_ops γ) 1 (delete i om).
   Proof.
     iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
+    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i So) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_delete with "Ha He") as "Ha".
-    iModIntro. iExists i, Sb, e0. by iFrame.
+    iModIntro. iExists i, Sb, e0, So. by iFrame.
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's
@@ -1172,7 +1402,7 @@ Section LogInv.
     ⌜(1 <= size om)%nat⌝.
   Proof.
     iIntros "Ha He". rewrite /log_opSe.
-    iDestruct "He" as "(He & _ & _)". iDestruct "He" as (i) "He".
+    iDestruct "He" as "(He & _ & _)". iDestruct "He" as (i So) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -1195,7 +1425,7 @@ Section LogInv.
     ⌜(1 <= size om)%nat⌝.
   Proof.
     iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
+    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i So) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -1223,7 +1453,7 @@ Section LogInv.
   Lemma log_use_group (γ : log_names) (om : gmap nat op_entry) (E : nat)
       (X : gset (nat * Z)) (LB : gset Z)
       (u : nat) (Sb : gset Z) (e0 e : nat) (b : Z) :
-    (forall i x, om !! i = Some x -> x.2 = E) ->
+    (forall i x, om !! i = Some x -> x.1.2 = E) ->
     (forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat) ->
     (forall c : Z, ((E, c) : nat * Z) ∈ X -> c ∈ LB) ->
     (e0 <= e)%nat ->
@@ -1235,8 +1465,8 @@ Section LogInv.
   Proof.
     intros Hlive Hcap Hreg Hle.
     iIntros "Hao Hax He Hw".
-    iDestruct (log_absorb_step γ om u Sb e0 with "Hao He") as (i) "%Hi".
-    assert (He0 : e0 = E) by exact (Hlive i (u, Sb, e0) Hi).
+    iDestruct (log_absorb_step γ om u Sb e0 with "Hao He") as (i So) "%Hi".
+    assert (He0 : e0 = E) by exact (Hlive i (u, Sb, e0, So) Hi).
     iDestruct (logged_at_in with "Hax Hw") as %Hin.
     assert (HeE : (e <= E)%nat) by exact (Hcap e b Hin).
     assert (Hee : e = E) by lia.
@@ -1258,10 +1488,10 @@ Section LogInv.
   Lemma log_credit_use (γ : log_names) (om : gmap nat op_entry) (E : nat)
       (X : gset (nat * Z)) (LB : gset Z)
       (u : nat) (Sb : gset Z) (e0 : nat) (b : Z) (cr : bool) :
-    (forall i x, om !! i = Some x -> x.2 = E) ->
+    (forall i x, om !! i = Some x -> x.1.2 = E) ->
     (forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat) ->
     (forall c : Z, ((E, c) : nat * Z) ∈ X -> c ∈ LB) ->
-    (forall i x, om !! i = Some x -> x.1.2 ⊆ LB) ->
+    (forall i x, om !! i = Some x -> x.1.1.2 ⊆ LB) ->
     ghost_map_auth (ln_ops γ) 1 om -∗
     own (ln_lg γ) (● X) -∗
     log_opSe γ u Sb e0 -∗
@@ -1273,8 +1503,8 @@ Section LogInv.
     destruct cr; [| iPureIntro; discriminate].
     iDestruct "Hcr" as "[%Hin | Hw]".
     - (* own-set: my entry's set is in the header *)
-      iDestruct (log_absorb_step γ om u Sb e0 with "Hao He") as (i) "%Hi".
-      pose proof (Hsub i (u, Sb, e0) Hi) as Hs. cbn in Hs.
+      iDestruct (log_absorb_step γ om u Sb e0 with "Hao He") as (i So) "%Hi".
+      pose proof (Hsub i (u, Sb, e0, So) Hi) as Hs. cbn in Hs.
       iPureIntro. intros _. exact (elem_of_weaken _ _ _ Hin Hs).
     - (* group: a witness no older than my op's birth *)
       iDestruct "Hw" as (e) "[#Hw %Hle]".

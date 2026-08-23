@@ -87,7 +87,8 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeWriteHead.
 Require Import SpecBread SpecBwrite SpecBrelse.
-Require Import FsCrash.
+Require Import BioDefs.
+Require Import LogDefs.
 Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -468,7 +469,7 @@ Section WriteHeadDefs.
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
-      (Q : iProp Σ) : iProp Σ :=
+      (Q : list (bv 8) -> iProp Σ) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
         ⌜callee_saved m mf⌝ -∗
@@ -485,7 +486,7 @@ Section WriteHeadDefs.
         ⌜hdr_n bs' = Z.of_nat n⌝ -∗
         ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
         bslot -∗
-        ▷ Q -∗
+        ▷ Q bs' -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
@@ -528,7 +529,7 @@ Section WriteHeadBlocks.
       (pidv : mword 32) (dq : dfrac)
       (k : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
       (f : nat -> bv 8)
-      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (Q : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (Q : list (bv 8) -> iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
@@ -572,7 +573,7 @@ Section WriteHeadBlocks.
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-       disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+       disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗
     wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -667,7 +668,7 @@ Section WriteHeadBlocks.
       by exact (wh_hdr_dec f n W HnW HnB Hf4 Henc).
     iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat eb
-              (f <$> seq 0 1024) bsd0 b Q
+              (f <$> seq 0 1024) bsd0 b (Q (f <$> seq 0 1024))
               _ Vpr HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm]").
@@ -1034,7 +1035,7 @@ Section WriteHeadBlocks.
       (pidv : mword 32) (dq : dfrac)
       (kk : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat)
-      (Q : iProp Σ) :
+      (Q : list (bv 8) -> iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
@@ -1083,7 +1084,7 @@ Section WriteHeadBlocks.
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-       disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+       disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗
     wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1333,7 +1334,7 @@ Section ProofWriteHead.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Vpr : pprivate)
     : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb b Q lks Vpr.
   Proof.

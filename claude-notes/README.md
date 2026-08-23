@@ -60,6 +60,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   proof interface that keeps step granularity out of proof granularity, and the
   phasing (the tree is red across the port — read §6 before starting).
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy.
+- **[`fs-state.md`](design/fs-state.md)** — DESIGN OF RECORD for the
+  durable-disk project: the view record `Γ`, byte-level ownership on both
+  the durable and logged sides, `inode_owned`/`dir_owned`/`free_bitmap`/
+  `fs_state` as nested predicates with link TOKENS and no whole-state pure
+  clauses, "in flight, not inconsistent", the debt, the log's FS-agnostic
+  interface, and what it supersedes.
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
   split, the crash-spanning disk invariant.
@@ -126,15 +132,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 Three remain open (audited against the tree 2026-08-22; each file's top
 banner says precisely what is left):
 
-- **[`durable-disk.md`](projects/durable-disk.md)** — THE TWO RULINGS OF
-  2026-08-22 on the crash layer: the adequacy theorem's per-era disk
-  hypothesis was refutable (the theorem was vacuous); the durable disk is
-  one fixed gname owned by `P_fs`; ruling 2 splits `P_fs` into
-  `P_disk ∗ P_wf` around the committed-view ghost `D`, makes recovery
-  logically invisible, and derives every machine permit from `end_op`'s
-  one client fupd. Stages A/B/D1/D2 landed; open: E (crash layer),
-  F (pure `fs_durable_wf` + update lemmas), G (the per-op preservation sweep,
-  the long pole), H (boot re-founding), I (delete `Himg`).
+- **[`durable-disk.md`](projects/durable-disk.md)** — xv6 correctness
+  across crashes INCLUDING FS consistency, under RULING 3 (2026-08-23):
+  the file system as nested SL predicates at two views (`design/fs-state.md`),
+  the log's contract first (custody at birth, row (b), byte-keyed `fs_L`,
+  the parked payload and two AUs), then the predicates, then a `sys_mknod`
+  spike.  Stages A/B/D/H0 stand; everything FS-side is still a
+  placeholder.  The byte-view attempt is archived in
+  `completed/durable-disk-byteview.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
   (today both carry a clean-image premise), `sys_sync`'s empty
@@ -159,6 +164,10 @@ banner says precisely what is left):
   on the owner's call. §10 is the long-run tree-level direction.
 
 ## `completed/` — finished projects, archived for reference
+
+`durable-disk-byteview.md` (2026-08-23) is NOT a finished project: it is
+the superseded byte-view worklist of the live durable-disk effort, kept
+for its two surveys' findings; `projects/durable-disk.md` is current.
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
 **Nobody reads these for current guidance**, so they are the one place a

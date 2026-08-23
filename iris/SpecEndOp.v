@@ -125,6 +125,42 @@ Definition wp_end_op_sconf_body
      etc.) surface no order premise of their own for their callers to
      satisfy, so nothing about them is stated here. *)
   locks_below lks "log" ->
+  (* THE CLIENT'S PRESERVATION PREMISE (durable-disk ruling 2.5, flip-B).
+     end_op is the ONE place the durable state moves for a client, and the
+     machine layer cannot know that the state it moves TO is still a
+     well-formed file system: [FsCrash.fs_commit_v_sector0_rec] therefore
+     takes that implication, and this is the same statement, quantified
+     over the picture and the write set (no caller of end_op can see
+     which commit it will run).
+
+     IT IS TRIVIAL TODAY and every caller discharges it with
+     [FsCrash.end_op_pres_placeholder]: [FsWf.fs_durable_wf] is F1's
+     placeholder.  The SHAPE is what lands now -- at the switch-on
+     ([fs_durable_wf := fs_durable_wf_body]) only the discharge changes,
+     and stage G's per-op ledger is what will supply it; the plumbing here
+     does not move again. *)
+  end_op_pres cov logstart ->
+  (* THE CLIENT'S FINALIZE PREMISE (durable-disk flip-C1).  The other half
+     of the same ruling, and the one that is the OP's rather than the
+     machine's: when this transaction retires, the objects it claimed leave
+     the log's pending union, and row (a) of [LogInv.log_state] -- "the
+     logged view is the committed view except at pending objects" -- has to
+     hold again over them.  [LogInv.end_op_fin] is that obligation, and it
+     is what replaced stage G1's unconditional [LogInv.log_state_pend]: the
+     re-deposit at the fast path is now exact, so the log layer carries no
+     debt of its own here.
+
+     [F] is quantified INSIDE the definition rather than being a parameter
+     of this spec, because no caller can name its own object set: the op
+     token closes it existentially and the authoritative value is the
+     ledger's, which end_op reads back at [LogInv.log_end_step].
+
+     IT IS TRIVIAL TODAY and every caller discharges it with
+     [LogInv.end_op_fin_placeholder]: row (a) is carried GATED
+     ([LogInv.log_row_a] is [True]).  At the switch-on the arm's supply is
+     its G2 preservation lemma plus flip-A's fold -- and nothing about this
+     line, or about any of the 30 call sites, moves. *)
+  end_op_fin cov logstart ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   trap_csrs_ext KT1 eb -∗
@@ -137,7 +173,7 @@ Definition wp_end_op_sconf_body
      the machine layer's crash predicate with THIS file system's [P_fs].  It
      is what lets the commit path's four writes -- the log fills, the commit
      header, the installs and the clear -- carry REAL durability fupds
-     ([FsCrash.fs_logfill_seq_permit] and its three siblings).  The era
+     ([FsCrash.fs_logfill_v_seq_permit] and its three siblings).  The era
      certificate beside it is what identifies the crash record's checked-out
      arm as THIS era's; the swap receipt the same squeeze needs rides
      [log_ctx] already. *)

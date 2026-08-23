@@ -13,7 +13,6 @@
    [NameiInitPinned.v] instead is what put the whole namex link cone (336
    files, 57 [Link*.v]) into every client of those files -- [SpecKexecPinned.v]
    among them, a [Spec*.v] that does not use the closed form at all. *)
-Require Import SpecNameiTr.
 Require Import DirViewPin.
 Require Import NameiInitPinned.
 Require Import LinkNameiTr.

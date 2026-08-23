@@ -90,7 +90,8 @@ Require Import IcacheEscrow.
 Require Import CodeFsinit.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
-Require Import FsCrash.   (* [hdr_dec], for the general initlog premises *)
+Require Import BioDefs.   (* [hdr_dec], for the general initlog premises *)
+Require Import LogDefs.
 Require Import SpecPrintk.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.

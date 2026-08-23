@@ -285,8 +285,21 @@ MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)
 # `<:` (transparent ascription) is accepted too: the tree's convention is the
 # opaque `:` (see design/spec-modules.md), but a stray `<:` must not make a
 # proven+linked function silently read as `assumed`.
+#
+# The ascribed type may be QUALIFIED by the library that declares it
+# (`ProofUsertrap.v`: `... : UtResFits.USERTRAP_PARK.`), which happens whenever
+# the module type lives in a file other than the one stating the spec.  Only the
+# last component names the `Module Type`, and it is what `MODTYPE_DECL` records,
+# so drop the dotted prefix -- reading `UtResFits` as the type is a silent
+# coverage downgrade, since no `Module Type UtResFits` exists to match a spec
+# against.  `verify_impl_modtypes` turns exactly that mismatch into an error.
 MODIMPL_DECL = re.compile(
-    r"^\s*Module\s+(\w+)\s*((?:\(\s*\w+\s*:\s*\w+\s*\)\s*)*)<?:\s*(\w+)\s*\.", re.M)
+    r"^\s*Module\s+(\w+)\s*((?:\(\s*\w+\s*:\s*\w+\s*\)\s*)*)"
+    r"<?:\s*(?:\w+\.)*(\w+)\s*\.", re.M)
+# `Include SpecUsertrap.USERTRAP.` inside a `Module Type` -- module-type
+# inheritance.  A module ascribed to the INCLUDING type exports everything the
+# INCLUDED one declares, so it discharges that spec too.
+MODTYPE_INCLUDE = re.compile(r"^\s*Include\s+(?:\w+\.)*(\w+)\s*\.", re.M)
 # `Module Kfree := KfreeProof Acquire MemsetPage Release.`
 MODINST_DECL = re.compile(r"^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.", re.M)
 
@@ -433,6 +446,8 @@ class Spec:
 class Proofs:
     specs: list = field(default_factory=list)
     modtype_file: dict = field(default_factory=dict)      # MODTYPE -> Spec file
+    modtype_includes: dict = field(default_factory=lambda: defaultdict(set))
+    # MODTYPE -> {MODTYPE it Includes}
     impl: dict = field(default_factory=dict)              # functor -> (file, modtype)
     impl_admits: dict = field(default_factory=dict)       # functor -> [line, ...]
     instances: dict = field(default_factory=dict)         # module -> (functor, [args])
@@ -610,6 +625,16 @@ def scan_proofs(repo: str) -> Proofs:
                     offset=int(m.group(2), 0) if m.group(2) else 0,
                     whole=runs_to_end(text, m.group(1), local_defs)))
 
+            # An `Include` anywhere inside a `Module Type` block widens what a
+            # module of that type exports.  Scanned after the keyword chain
+            # rather than inside it, because `Include` is not a chunk keyword:
+            # it lands in whatever chunk precedes it -- usually the `Module
+            # Type` line's own chunk, which is why this runs once that line has
+            # already opened `cur_modtype`.
+            if cur_modtype:
+                for inc in MODTYPE_INCLUDE.findall(text):
+                    p.modtype_includes[cur_modtype].add(inc)
+
     # A Module Type may export a thin instantiation of an indexed body
     # (wp_f_sconf_body := wp_f_pre_body ... pre); credit the pc-pinning body
     # through the delegation, transitively.
@@ -640,6 +665,27 @@ def require_closure(p: Proofs, start: str) -> set:
     return seen
 
 
+def modtype_closure(p: Proofs, modtype: str) -> set:
+    """`modtype` and every `Module Type` it transitively `Include`s.
+
+    A module ascribed to the including type exports the included type's
+    `Parameter`s too, so it discharges those specs as much as its own -- Rocq's
+    module subtyping is structural, and `Include` is how these specs stack a
+    boundary theorem on top of a residue interface.  Without this, a spec whose
+    `Module Type` is only reached through an `Include` (`SpecUsertrap.USERTRAP`,
+    which `UtResFits.USERTRAP_PARK` includes and `ProofUsertrap` is sealed at)
+    reads as `assumed` even though a `Link*.v` instantiates its proof.
+    """
+    seen, stack = set(), [modtype]
+    while stack:
+        m = stack.pop()
+        if m in seen:
+            continue
+        seen.add(m)
+        stack.extend(p.modtype_includes.get(m, ()))
+    return seen
+
+
 def module_status(p: Proofs, modtype: str):
     """Find the linked instance discharging `modtype`, with its caveats.
 
@@ -647,7 +693,7 @@ def module_status(p: Proofs, modtype: str):
     """
     for inst, (functor, _) in p.instances.items():
         impl = p.impl.get(functor)
-        if impl and impl[1] == modtype:
+        if impl and modtype in modtype_closure(p, impl[1]):
             return inst, p.inst_file[inst], instance_caveats(p, inst)
     return None
 
@@ -694,8 +740,27 @@ def instance_caveats(p: Proofs, inst: str, _seen=None) -> list:
 # 3. joining the two sides
 # --------------------------------------------------------------------------
 
+def verify_impl_modtypes(p: Proofs) -> list:
+    """Every ascribed module type must be a `Module Type` this build declares.
+
+    The ascription is the ONLY link from a proof functor back to the spec it
+    discharges, and a name that matches no declaration cannot join to anything
+    -- so the function it proves silently reads as `assumed`, a coverage
+    downgrade with no error anywhere.  That is exactly how a qualified
+    ascription (`: UtResFits.USERTRAP_PARK.`) used to read as the module type
+    `UtResFits`.  Failing loudly here keeps the next unhandled spelling from
+    costing coverage quietly.
+    """
+    return [f"{file}: Module {functor} is ascribed to `{mt}`, which no "
+            f"`Module Type` in the build declares -- the proof cannot be "
+            f"joined to any spec, so what it proves is reported as merely "
+            f"assumed"
+            for functor, (file, mt) in sorted(p.impl.items())
+            if mt not in p.modtype_file]
+
+
 def classify(funcs: dict, p: Proofs, repo: str) -> list:
-    errors = []
+    errors = verify_impl_modtypes(p)
     by_name = {}
     for f in funcs.values():
         for n in [f.name] + f.aliases:

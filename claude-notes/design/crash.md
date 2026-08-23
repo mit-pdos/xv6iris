@@ -297,6 +297,23 @@ Refines the ruling above; worklist stages E–I in
    `⌜wf(L)⌝ + ⌜install of the batch over D = L⌝` — no `end_op` exit arm
    states install-arithmetic.
 
+### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
+
+Supersedes decisions 4–5 above in their CONTENT (the mechanics of
+`P_disk`, the lent auth, row (b), H2a stand).  The design of record is
+[`fs-state.md`](fs-state.md): the file system is one family of nested
+separation-logic predicates `fs_state Γ S` (inodes own their record bytes
+and their data blocks, directories own their entries with link TOKENS,
+the free bitmap owns the free blocks), instantiated at a durable view
+`Γ_D` (inside `crashN`, whole) and a logged view `Γ_L` (in the log's
+parked client payload, piecewise checked out).  There is no pure
+whole-state well-formedness, no abstract target state, no per-op
+finalize; the commit is the log lending the `γD` auth to a client-composed
+basic update (the debt).  The log exposes byte-keyed `fs_L`, a parked
+opaque payload, and two logically-atomic AUs — nothing else.  The
+byte-view worklist that preceded this ruling is archived with its history
+in [`../completed/durable-disk-byteview.md`](../completed/durable-disk-byteview.md).
+
 ### The previous shape (superseded 2026-08-22): per-era, re-minted at every boot
 
 Kept for the reasoning it records — the stranded-fragment problem is real and

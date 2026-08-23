@@ -5,10 +5,8 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.
 Require Import BioDefs.
-Require Import DirentEnc.
 Require Import DinodeEnc.
 Require Import BitmapEnc.
-Require Import InodeDefs.
 Require Import DirView.
 Require Import FsTree.
 Require Import FsImg.
@@ -22,7 +20,7 @@ Section EffWriteData.
   Context (Hp : fs_parse_sb P = Some sb).
   Context (Hsb : fs_sb_wf sb = true).
   Context (HW3 : fs_inodes_dwf P sb = true).
-  Context (u : gset Z) (Hu : fs_used_set P sb = Some u).
+  Context (u : gset Z) (Hu : fs_ent_set P sb = Some u).
   Context (Hbm : fs_bitmap_wf P sb u = true).
   Context (HW7 : fs_root_wf P sb = true).
   Context (HW8 : fs_dots_all P sb = true).
@@ -117,17 +115,24 @@ Section EffWriteData.
               (di_set_size (fs_dinode P sb i) (Z_to_bv 32 sz')))
       (fs_blk_addr P (fs_dinode P sb i) fbn) bs.
 
+  (* RE-PREMISED (durable-disk F3.2/F3.3): the target block need only be
+     an ALLOCATED slot -- not a below-size one -- and the size may move
+     anywhere the coverage clause still holds, which is what lets the
+     append arm run [eff_alloc_file_block] (no size move) and then this
+     one, instead of demanding that the two happen at once. *)
   Lemma eff_write_file_data_wf (i : Z) (fbn : nat) (bs : list (bv 8))
       (sz' : Z) :
     0 <= i < sb_ninodes sb ->
     (bv_unsigned (di_type (fs_dinode P sb i)) = T_FILE_z
      \/ bv_unsigned (di_type (fs_dinode P sb i)) = T_DEVICE_z) ->
-    Z.of_nat fbn < fs_nblk (bv_unsigned (di_size (fs_dinode P sb i))) ->
-    fs_nblk sz' = fs_nblk (bv_unsigned (di_size (fs_dinode P sb i))) ->
+    (fbn < FS_MAXFILE)%nat ->
+    fs_blk_addr P (fs_dinode P sb i) fbn <> 0 ->
     0 <= sz' <= Z.of_nat FS_MAXFILE * BSIZE_z ->
+    (forall k : nat, (k < FS_MAXFILE)%nat -> Z.of_nat k < fs_nblk sz' ->
+       fs_blk_addr P (fs_dinode P sb i) k <> 0) ->
     fs_durable_wf_view (eff_write_file_data i fbn bs sz').
   Proof.
-    intros Hi Hty Hfbn Hnbe Hsz'.
+    intros Hi Hty HfbnM Hfbn Hsz' Hcov.
     assert (Hm32 : bv_modulus 32 = 4294967296) by reflexivity.
     set (dn := fs_dinode P sb i) in *.
     set (dn' := di_set_size dn (Z_to_bv 32 sz')).
@@ -151,16 +156,14 @@ Section EffWriteData.
     pose proof (sbo_bmapstart sb Hok) as Hbmst.
     pose proof Hnin_le as HninN.
     assert (HiN : 0 <= i < 16 * (sb_ninodes sb / 16 + 1)) by lia.
-    assert (HfbnM : (fbn < FS_MAXFILE)%nat).
-    { pose proof (fs_nblk_max (bv_unsigned (di_size dn)) Hsz0 Hcap). lia. }
     pose (a := fs_blk_addr P dn fbn).
     assert (HaE : fs_blk_addr P dn fbn = a) by reflexivity.
+    assert (Ha0 : a <> 0) by exact Hfbn.
     assert (Ha_rng : fs_data_start sb <= a < sb_size sb)
-      by (apply (blk_addr_covered i fbn Hi Hlive HfbnM Hfbn)).
-    assert (Ha0 : a <> 0) by (unfold fs_data_start in Ha_rng; lia).
-    assert (Ha_in : a ∈ fs_inode_blocks P dn).
+      by (exact (fs_blk_addr_range P sb dn fbn Hdi HfbnM Hfbn)).
+    assert (Ha_in : a ∈ fs_inode_ents P dn).
     { unfold a. rewrite <- (fs_slot_blk dn fbn HfbnM).
-      apply (fs_slot_elem_dok P sb dn); [exact Hdi | lia |].
+      apply (fs_inode_ents_slot P dn); [lia |].
       rewrite (fs_slot_blk dn fbn HfbnM). exact Ha0. }
     assert (HoutA : forall b : Z,
               b <> a -> b <> IBLOCK (fs_inum_bv i) (sb_inodestart sb) ->
@@ -191,8 +194,8 @@ Section EffWriteData.
               /\ (forall k : nat,
                     fs_data_of P' (fs_dinode P sb z) k
                     = fs_data_of P (fs_dinode P sb z) k)
-              /\ fs_inode_blocks P' (fs_dinode P sb z)
-                 = fs_inode_blocks P (fs_dinode P sb z)
+              /\ fs_inode_ents P' (fs_dinode P sb z)
+                 = fs_inode_ents P (fs_dinode P sb z)
               /\ fs_inode_dwf P' sb (fs_dinode P sb z)
                  = fs_inode_dwf P sb (fs_dinode P sb z)).
     { intros z Hz Hne Hnz. apply inode_untouched; try assumption.
@@ -215,23 +218,32 @@ Section EffWriteData.
                       Hfe) as Hcc.
         lia.
       - assert (Hin' : bv_unsigned (di_addrs dn !!! 12%nat)
-                       ∈ fs_inode_blocks P dn).
+                       ∈ fs_inode_ents P dn).
         { rewrite <- (fs_slot_max P dn).
-          apply (fs_slot_elem_dok P sb dn); [exact Hdi | lia |].
+          apply (fs_inode_ents_slot P dn); [lia |].
           rewrite fs_slot_max. exact Hnz12. }
         pose proof (blocks_range i _ Hi Hlive Hin') as Hbr.
         unfold fs_data_start in Hbr. lia. }
-    assert (HblkI : fs_inode_blocks P' dn' = fs_inode_blocks P dn).
-    { unfold fs_inode_blocks. cbv zeta.
-      rewrite HindI, Haddrs', Hsz'u, Hnbe. reflexivity. }
-    assert (HdwfI : fs_inode_dwf P' sb dn' = true).
-    { pose proof (dwf_bool_at i Hi Hlive) as Hold.
-      unfold fs_inode_dwf in Hold |- *. cbv zeta in Hold |- *.
-      rewrite HindI, Haddrs', Htype', Hsz'u, Hnbe.
-      rewrite !andb_true_iff in Hold |- *.
-      destruct Hold as [[[[Ho1 Ho2] Ho3] Ho4] Ho5].
-      repeat split; try assumption.
-      apply Z.leb_le. lia. }
+    assert (HblkI : fs_inode_ents P' dn' = fs_inode_ents P dn).
+    { (* the entry list does not read the size (durable-disk F3.1) *)
+      apply fs_inode_ents_det; assumption. }
+    assert (HdokI : fs_inode_dok P' sb dn').
+    { assert (Hdok'P : fs_inode_dok P sb dn')
+        by (apply (fs_inode_dok_size P sb dn dn' Hdi Htype' Haddrs');
+            [rewrite Hsz'u; lia
+            | intros k Hk Hlt; apply (Hcov k Hk); rewrite Hsz'u in Hlt;
+              exact Hlt]).
+      constructor.
+      - exact (fdi_type _ _ _ Hdok'P).
+      - exact (fdi_size _ _ _ Hdok'P).
+      - exact (fdi_direct _ _ _ Hdok'P).
+      - exact (fdi_direct_ok _ _ _ Hdok'P).
+      - exact (fdi_ind_ok _ _ _ Hdok'P).
+      - exact (fdi_ind _ _ _ Hdok'P).
+      - rewrite HindI. exact (fdi_ent _ _ _ Hdok'P).
+      - rewrite HindI. exact (fdi_ent_ok _ _ _ Hdok'P). }
+    assert (HdwfI : fs_inode_dwf P' sb dn' = true)
+      by exact (fs_inode_dok_dwf P' sb dn' HdokI).
     (* every tree edge is unmoved *)
     assert (Htree : forall (j : Z) (f : fname),
               tree_ent (tree_of_disk P' sb) j f = tree_ent t j f).
@@ -286,8 +298,8 @@ Section EffWriteData.
       destruct (Hunt z Hz Hne Hnz') as (_ & _ & _ & Hdwf).
       rewrite Hdwf. exact (dwf_bool_at z Hz Hnz').
     - exists u. split.
-      + assert (Hused : fs_used_blocks P' sb = fs_used_blocks P sb).
-        { unfold fs_used_blocks. f_equal. apply list_fmap_ext.
+      + assert (Hused : fs_ent_blocks P' sb = fs_ent_blocks P sb).
+        { unfold fs_ent_blocks. f_equal. apply list_fmap_ext.
           intros idx x Hx. apply lookup_seq in Hx as [-> Hidx].
           cbv beta zeta.
           rewrite (Hdec (Z.of_nat (0 + idx))
@@ -302,7 +314,7 @@ Section EffWriteData.
                         (inum_ix_range sb (0 + idx) Hidx) Hne
                         (proj1 (Z.eqb_neq _ _) Ez)) as (_ & _ & Hbl & _).
             exact Hbl. }
-        unfold fs_used_set. rewrite Hused. exact Hu.
+        unfold fs_ent_set. rewrite Hused. exact Hu.
       + unfold fs_bitmap_wf in Hbm |- *. cbv zeta in Hbm |- *.
         rewrite HbmU. exact Hbm.
     - apply root_wf_untouched.
@@ -415,9 +427,11 @@ Lemma eff_write_file_data_wfv (P : Z -> list (bv 8)) (sb : fs_sb)
   0 <= i < sb_ninodes sb ->
   (bv_unsigned (di_type (fs_dinode P sb i)) = T_FILE_z
    \/ bv_unsigned (di_type (fs_dinode P sb i)) = T_DEVICE_z) ->
-  Z.of_nat fbn < fs_nblk (bv_unsigned (di_size (fs_dinode P sb i))) ->
-  fs_nblk sz' = fs_nblk (bv_unsigned (di_size (fs_dinode P sb i))) ->
+  (fbn < FS_MAXFILE)%nat ->
+  fs_blk_addr P (fs_dinode P sb i) fbn <> 0 ->
   0 <= sz' <= Z.of_nat FS_MAXFILE * BSIZE_z ->
+  (forall k : nat, (k < FS_MAXFILE)%nat -> Z.of_nat k < fs_nblk sz' ->
+     fs_blk_addr P (fs_dinode P sb i) k <> 0) ->
   fs_durable_wf_view (eff_write_file_data P sb i fbn bs sz').
 Proof.
   intros Hv Hp. intros.

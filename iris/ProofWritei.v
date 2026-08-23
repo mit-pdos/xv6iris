@@ -3107,6 +3107,10 @@ Section WriteiLoop.
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
                     (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
+                    (* the coarse object declaration: a data-block splice
+                       masks the whole block (durable-disk flip-C1; flip-C2
+                       refines it to the [ORec]s the splice touches) *)
+                    {[OBlk (uint (blkmap_get bm2 fbn : mword 32))]}
                     F2 0%nat eb (proc_addr j) (K - 14)%nat b lks
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HF2a0 Hbcovlw Hbloglw
@@ -3636,6 +3640,10 @@ Section WriteiLoop.
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
                     (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
+                    (* the coarse object declaration: a data-block splice
+                       masks the whole block (durable-disk flip-C1; flip-C2
+                       refines it to the [ORec]s the splice touches) *)
+                    {[OBlk (uint (blkmap_get bm2 fbn : mword 32))]}
                     J2 0%nat eb (proc_addr j) (K - 14)%nat b lks
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HJ2a0 Hbcovlw Hbloglw
