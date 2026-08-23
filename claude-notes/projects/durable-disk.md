@@ -903,9 +903,19 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       `log_mirror_tie_pending` boot gate), the custody swap installs
       the other half with `log_mirror_ok` already true, and initlog's
       final head-write chains `lm_upd` through a value-chained
-      `fs_boot_head_permit_v` exactly like the steady permits. Cost:
-      the era-alloc site, a `power_boot_res` row, and the boot
-      threading — no new ghost.
+      `fs_boot_head_permit_v` exactly like the steady permits.
+      CORRECTED (same day): the born value alone is NOT enough — a
+      later permit's `dk` is ∀-bound, so the ok-tie must be CARRIED
+      FROM BIRTH, i.e. PowerOn also installs the CUSTODY ARM at birth:
+      a second client hook in the PowerOn arm (H0's pattern — the arm
+      holds `state_interp`'s auth AND `crashN`, so `fs_arm_swap`'s
+      ok-clause is true by construction against the real disk). The
+      era then starts WITH custody + its named half + `swap_lb`; the
+      boot swap and `fs_era_custody`'s `log_mirror_full` arm are
+      DELETED — no write ever re-bases, which is ruling 2.4
+      ("recovery is logically invisible") made literal. Cost: the
+      second PowerOn hook (Hswap, beside Hproj), the era-alloc site,
+      a `power_boot_res` row, and the boot threading — no new ghost.
 - [ ] **H2.** Blocks where physical ≠ `D` (the committed log's homes)
       are minted dirty-at-boot: logged = slot content, bio holds them
       out of the clean pool; `initlog`/`install_trans` recovering arms
