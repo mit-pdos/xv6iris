@@ -532,15 +532,108 @@ map at home blocks); 1d lands last.
         disjointness, and `FsBlocks.fsblock_ne` (NEW, the one-line
         `↦`-distinctness idiom off `fsblock_excl`) gives it directly.
         23 statement sites across 20 files.
-      - [ ] `InodeRegion`'s `ireg_blk`/`ireg_slot` coupling
-        (`InodeRegion.v:2252-2258`, `:1448-1452`) becomes `rec_owned Γ_L`.
-      - [ ] `ic_loaded`'s payload (`IcacheEscrow.v:811-832`: `dinode_at`,
-        `inode_blocks`, `ind_res`, `dir_links`, `dv_ride`) becomes
-        `inode_owned Γ_L i n` + the top fragment.
-      - [ ] `dir_links`'s `dlc_bound`/`dlc_lower` and the link ledger's L1
-        become the link RA.  The `ipool` (uncached inodes) holds
-        `inode_owned Γ_L` pieces under the itable spin lock — fine, since
-        only the holder of a locked inode ever updates one.
+      - **THE INODE PIECES, cut per the 2026-08-23 survey.  FIVE FINDINGS,
+        RULED (the survey's load-bearing facts are recorded here):**
+        - **B1 (lane 2b-0, prerequisite).**  `log_write`'s five AU forms
+          take/return a WHOLE-BLOCK `fsblock` and `FsBlocks.fsblock_update`
+          wants the full run — but `rec_owned` is 64 bytes and two inodes
+          of one block are checked out at once in `mknod` itself (`dp`,
+          `ip`).  `byte_range_update` exists (1c); the crossing that learns
+          the other 960 bytes from `bytes_tie` + the cache half, and the
+          `SpecLogWrite`/`ProofLogWrite` restatement at byte-range
+          granularity, do not.  2b-0 builds them; the AU call sites adapt
+          in 2b-inode.
+        - **B2 (lane 2b-A).**  `inode_local`'s `inl_dir_dot`/`inl_dir_dotdot`
+          are guarded only by `fn_is_dir` and are FALSE at a size-0
+          `T_DIR` — the claim box after `ialloc(T_DIR)` and the corpse
+          after `itrunc`.  RULED: guard both by `fn_nlink n ≠ 0` (the
+          tree's own `DirView.dir_dots_ix` guard; what the C guarantees).
+          `inl_dir_uniq`/`inl_dir_size` hold at size 0 and stay unguarded;
+          an orphan owes no dots clause — its tokenless ".." is the orphan
+          form regardless.
+        - **B3 (lane 2b-A).**  `γlink`/`γtop` have no home (`fs_gamma_L`
+          fills them with a placeholder, legal only because
+          `free_bitmap_at` reads neither; `inode_owned` reads both).
+          RULED: two gname fields in `fs_names` (`fs_link`, `fs_top`),
+          allocated at boot from the image for now, through the six-file
+          boot distribution 2b-bitmap walked.  Stage 4's `fs_state_mint`
+          replaces that boot path; the transport lemma is unaffected.
+        - **B5 (lane 2b-A).**  Geometry-free `rec_owned_at Γ istart z dn`
+          beside `rec_owned` (the `free_bitmap_at` pattern) + the 16-fold
+          `diblk_bytes ↔ sixteen rec_owned` split/gather.
+        - **B4:** the dirent-INSERT bullet was stale (2a' landed it).
+        - Free deletion: `InodeRegion.ireg_free_au` is dead (comments
+          only; iput frees through `EscrowDeposit.ireg_free_deposit_au`).
+        - **THE MAPPING:** `dinode_at`'s bytes → `rec_owned`;
+          `inode_blocks` → the `[∗ map]` over `fn_blk` (allocated slots
+          only — kills the 268-element framing hazard); `ind_res` →
+          `ind_owned`; `blkmap_wf` lengths/no-ind/covers/size →
+          `inode_local`; injectivity → the `∗`; coverage → derived
+          (`fsblock_home`); `blk_holes_zero`/`di_addrs = bm_cells` →
+          vanish (`fn_blk` is partial).  `dir_links` + ledger columns
+          `wl/wdu/wdt/g/p` → `ent_toks` + `link_auth Γ` (the RA law IS
+          L1); `dlc_lower`, `dir_orphan_clean`, `dir_dots_ix`'s index
+          half, `ireg_dir_ok`/`ireg_par_ok`/`ireg_root_ok`/`ireg_dir_wl0`
+          and `igrey` all DIE (`igrey` = the tokenless ".." of the orphan
+          form).  KEPT, kernel bookkeeping with no counterpart:
+          `inode_meta`/`inode_addrs` (the in-memory `struct inode`),
+          `dir_ok` (other inums in range), `icnt_half`/`ireg_ref_ok`, the
+          claim column, the freeze columns, `imark` (ilock's fill must be
+          exhaustive without the itable lock), `ireg_ep`/`izrcpt`, the
+          lend columns and `dv_ride`/`fv_ride` (re-indexed at
+          `dir_entries n` / `fn_file_bytes n`).
+        - **`dinode_at γi` STAYS beside `i ↪[γtop] n`** as a record-only
+          ghost: the region's remaining clauses are about records whose
+          bytes it no longer holds, the region may not name `fs_node`,
+          and `γtop`'s auth is behind `logN`.  A holder carries both; the
+          movers move both; `fn_rec n = d` is maintained by the movers.
+        - **WHERE a parked `inode_owned` lives:** free/claim-box/pending
+          records → the region's IN/PENDING arm holds `rec_owned` + the
+          top fragment (`ireg_claim_au` is the one AU where the fragment
+          is not in the caller's hand); allocated-uncached → `ipool_alloc`
+          under the itable spin lock (never read by a fupd — every disk
+          write holds the sleeplock); allocated-cached → `ic_loaded`.
+        - **LINKS as moves:** `ireg_write_link`'s mint becomes
+          `FsStateLink.link_mint` at `ip`'s `iupdate`, the token
+          travelling in hand to `dp`'s `writei` AU (`dir_owned_link` +
+          `ent_toks_insert`) as `ilink` does today (`ProofCreate.v:4964`
+          → `ProofDirlink.v:2343`); the `nlink < 32767` premise stays
+          where the C's guard supplies it.  `rmdir`: `dir_owned_orphan`
+          hands the child's ".." token back and the parent `link_return`s
+          it; `dir_owned_unlink` on the parent's record returns the
+          child's token into the child's auth.
+        - **THE MKNOD PATH is covered by landed movers at every AU:**
+          `rec_owned_acc` (ialloc's type store; iupdate), `link_mint`,
+          `inode_phi_blk_move` + `dir_owned_link` (writei's dir write —
+          dirlink's guard `dir_first … = None` SURVIVES into
+          `SpecDirlink`'s post), `bitmap_alloc` + `inode_phi_blk_add`/
+          `_ind_*` (the append crossing).  The ONE real discard on the
+          path: `ProofSysMknod.v:1688` swallows create's whole `made`
+          clause (`nlink = 1`, `dn = create_made …`, type/major/minor).
+        - **iput's free path** = `inode_phi_trunc` (iterates `fn_blk`;
+          "frees every owned block" is definitional, F3) + `bitmap_free`
+          per block (the panic arm dead by exclusivity) + `rec_owned_acc`
+          to `set_ditype0`; the type-0 node is what the PENDING arm
+          parks.  `SpecIput`/`SpecIunlockput` export NO discriminant and
+          need none.
+        - **CENSUS:** `dinode_at` 122 statement sites / 26 files;
+          `inode_blocks` 89; 10-arg `link_auth` 66; `dir_links` 64;
+          `ic_loaded` 41 statement / 87 proof-script; 86 files touch at
+          least one.  DELETE after the link flip: `DirLinks.v` (2009) +
+          `DirView`'s `dlc_*`/`dir_dots_ix`/`dir_orphan_clean` (~330).
+          KEEP: `DirViewLend.v` (the pinned-lookup lend is a different
+          problem), `DirViewG.v` (re-index), `InodeInv.v` (only
+          `ind_blk`/`ind_res`/`blk_res`/`inode_blocks` go).  Rename
+          traps: `Lemma dinode_at` in `FsOpFilewrite.v:390`, `Lemma
+          ipool_alloc` in `IcacheBoot.v:1281`.
+        - **LANES:** 2b-0 ∥ 2b-A (disjoint files), then ONE serial lane
+          2b-inode sequenced region → payload → links with a green
+          checkpoint pushed after each — the three share the `dinode_at`
+          seam and are not separable in substance.
+      - [ ] **2b-0.** Byte-granular `log_write`.
+      - [ ] **2b-A.** B2, B5, B3's `fs_link`/`fs_top` + boot allocation,
+        `fs_gamma_L` reading them, `ireg_free_au` deleted.
+      - [ ] **2b-inode.** Region → payload → links.
       - OPEN, for the orchestrator: `SpecBfree`'s two premises
         `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
         UNUSED (they only fed `bitmap_ok_del`).  Left in place rather than
