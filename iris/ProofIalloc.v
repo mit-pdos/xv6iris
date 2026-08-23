@@ -1469,9 +1469,6 @@ Section IallocClaim.
                  IIIb step 4): [ireg_claim_au]'s closing wand delivers the
                  [c]-column receipt, so log_write carries it out for us. *)
               false Sb e0 0%nat (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
-              (* the coarse object declaration: this write masks the whole
-                 block (durable-disk flip-C1; flip-C2 refines it to [OSlot]) *)
-              {[OBlk (uint bno)]}
               W5 0%nat true (proc_addr j) (K - 8)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)

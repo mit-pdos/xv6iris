@@ -1909,8 +1909,6 @@ Section BallocBzero.
     iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kk2 pidv bnoD
               (replicate BSIZE (bv_0 8)) bsD bsd0 d0 (if cr then S u else u)
               false (Sb ∪ {[bmapstart]})
-              (* the coarse object declaration: a whole-block zero fill *)
-              {[OBlk (uint bnoD)]}
               Z9 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw2 Hlvl Hkk2 HZ9a0
               ltac:(rewrite HbnoD; exact Hbicov)
@@ -2351,9 +2349,6 @@ Section BallocAlloc.
               (1 + u)%nat cr Sb e0 0%nat (⊤ ∖ ↑bitmapN)
               (free_blk γfs bi ∗
                ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I
-              (* the coarse object declaration: this write masks the whole
-                 block (durable-disk flip-C1; flip-C2 refines it to [OBit]) *)
-              {[OBlk (uint bnoB)]}
               A3 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw HbnoBlt Hkk HA3a0
               ltac:(rewrite HbnoB; exact Hbmcov)

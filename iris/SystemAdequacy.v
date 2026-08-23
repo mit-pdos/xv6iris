@@ -165,7 +165,7 @@ Definition fs_boot_image_eras (sb : fs_sb) (nib : nat) (cov : gset Z)
 Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
   fs_extent cov ls XV6_DISK_BYTES /\
   exists D : gmap Z (list (bv 8)),
-    fs_recovery (fs_blocks dk) D cov ls /\ fs_durable_wf D /\
+    fs_recovery (fs_blocks dk) D cov ls /\
     hdr_wf (fs_blocks dk) cov ls.
 
 Section SystemBoot.

@@ -653,9 +653,6 @@ FsOpLink.v
 FsOpIputFree.v
 FsOpUnlink.v
 FsOpIreclaim.v
-FsObjType.v
-FsObj.v
-FsObjEff.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v
@@ -1070,7 +1067,6 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 FsImgBridge.v
-FsWfImg.v
 InodeRegion.v
 EscrowInode.v
 EscrowDeposit.v

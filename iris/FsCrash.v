@@ -50,7 +50,7 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Export BioDefs.  (* preserve [BSIZE] for existing importers *)
 Require Export LogDefs.  (* [hdr_dec]/[le_word], the mirror readings *)
-Require Export FsWf.  (* [fs_durable_wf], the P_wf conjunct (ruling 2) *)
+Require Export FsWf.  (* [dv_of_D]: the committed view as a total reading *)
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
@@ -412,28 +412,11 @@ Qed.
 (* the HOME blocks ([LogDefs.fs_home_set], re-exported: the covered range
    minus the log's own storage) *)
 
-(* a total block view, restricted to a finite set of block numbers *)
-Definition fs_restrict (P : Z -> list (bv 8)) (s : gset Z)
-    : gmap Z (list (bv 8)) :=
-  set_to_map (fun b => (b, P b)) s.
+(* [fs_restrict] MOVED DOWN to LogDefs (durable-disk 1d): the LOG has to
+   name the committed view it parks the client's payload at, and it may not
+   import this file.  Re-exported through [Require Export LogDefs] above. *)
 
-Lemma fs_restrict_lookup_Some (P : Z -> list (bv 8)) (s : gset Z)
-    (b : Z) (v : list (bv 8)) :
-  fs_restrict P s !! b = Some v <-> b ∈ s /\ v = P b.
-Proof.
-  rewrite /fs_restrict lookup_set_to_map; last by intros y y' _ _ ?.
-  split.
-  - intros (x & Hx & Hf). injection Hf as Hb Hv. subst. done.
-  - intros [Hb ->]. exists b. done.
-Qed.
-
-Lemma fs_restrict_dom (P : Z -> list (bv 8)) (s : gset Z) :
-  dom (fs_restrict P s) = s.
-Proof.
-  apply set_eq. intros b. rewrite elem_of_dom. split.
-  - intros [v Hv]. by apply fs_restrict_lookup_Some in Hv as [? _].
-  - intros Hb. eexists. apply fs_restrict_lookup_Some. done.
-Qed.
+(* the pointwise theory of [fs_restrict] moved DOWN to LogDefs with it *)
 
 (* INSTALLING the on-disk log over the home map: entry [i] of the write set
    takes its content from log slot [i].  A [foldr] over the INDEX list
@@ -441,12 +424,8 @@ Qed.
    ([log_slot_bno logstart i]) is a function of the index.  The step is a
    NAMED function (not an inline lambda) so that every lemma below unifies
    against the same head rather than against a fresh beta-redex. *)
-Definition fs_install_step (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
-    (i : nat) (m : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
-  match W !! i with
-  | Some b => <[ b := P (log_slot_bno logstart i) ]> m
-  | None => m
-  end.
+(* [fs_install_step] and [fs_install] MOVED DOWN to LogDefs, with
+   [fs_restrict], for the same reason.  Their theory stays here. *)
 
 Lemma fs_install_step_Some (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
     (i : nat) (b : Z) (m : gmap Z (list (bv 8))) :
@@ -459,14 +438,7 @@ Lemma fs_install_step_None (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
   W !! i = None -> fs_install_step P logstart W i m = m.
 Proof. rewrite /fs_install_step. by intros ->. Qed.
 
-Definition fs_install (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
-    (D : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
-  foldr (fs_install_step P logstart W) D (seq 0 (length W)).
 
-Lemma fs_install_nil (P : Z -> list (bv 8)) (logstart : Z)
-    (D : gmap Z (list (bv 8))) :
-  fs_install P logstart [] D = D.
-Proof. reflexivity. Qed.
 
 (* THE RECOVERY RELATION.  [D] is what a reboot would find, read off the
    physical disk [P] alone: the header block decides whether the log is
@@ -643,27 +615,6 @@ Proof. rewrite /fs_home_set elem_of_difference. tauto. Qed.
 
 (* --- [fs_restrict], pointwise --- *)
 
-Lemma fs_restrict_lookup_None (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
-  b ∉ s -> fs_restrict P s !! b = None.
-Proof.
-  intros Hb. destruct (fs_restrict P s !! b) as [v|] eqn:Hv; [|reflexivity].
-  apply fs_restrict_lookup_Some in Hv as [Hin _]. done.
-Qed.
-
-Lemma fs_restrict_lookup (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
-  fs_restrict P s !! b = (if decide (b ∈ s) then Some (P b) else None).
-Proof.
-  destruct (decide (b ∈ s)) as [Hb|Hb].
-  - by apply fs_restrict_lookup_Some.
-  - by apply fs_restrict_lookup_None.
-Qed.
-
-Lemma fs_restrict_ext (P P' : Z -> list (bv 8)) (s : gset Z) :
-  (forall b, b ∈ s -> P' b = P b) -> fs_restrict P' s = fs_restrict P s.
-Proof.
-  intros HP. apply map_eq. intros b. rewrite !fs_restrict_lookup.
-  destruct (decide (b ∈ s)) as [Hb|Hb]; [|reflexivity]. by rewrite (HP b Hb).
-Qed.
 
 (* THE MISSING RESTRICT LEMMA the log-fill / commit / clear transitions all
    need: a write OUTSIDE the restricted set does not move the restriction. *)
@@ -1305,20 +1256,37 @@ Definition fs_rec_wf (r : fs_rec) (P : Z -> list (bv 8))
   (* the on-disk header's invariant (1b' above): without it the record
      would read the image beyond the durable extent, and [P_fs_rec_agree]
      -- the machine-image agreement every permit runs on -- would be false *)
-  hdr_wf P cov logstart /\
-  (* THE [P_wf] CONJUNCT (ruling 2, crash.md "The split crash predicate"):
-     the committed view is FS-well-formed.  Stated about [fr_D] ONLY --
-     never about [P] -- which is what makes it invariant under every
-     re-indexing ([P_fs_rec_agree]) and under every permit that preserves
-     the committed view (logfill, install, the preserving clear).  Pure
-     while [fs_durable_wf]'s body is the F1 placeholder; it becomes a
-     separate iProp conjunct of [P_fs] when the contents layer adds
-     durable ghosts. *)
-  fs_durable_wf (fr_D r).
+  hdr_wf P cov logstart.
+(* THE [P_wf] CONJUNCT IS NO LONGER HERE, AND IT IS NO LONGER PURE
+   (durable-disk 1d).  It used to be [FsWf.fs_durable_wf (fr_D r)] -- a
+   whole-state pure sweep, with body [True].  Ruling 3
+   (claude-notes/design/fs-state.md) has no whole-state pure predicate at
+   all: the durable file system is a family of nested SEPARATION-LOGIC
+   predicates at the view [Gamma_D], so the conjunct is an [iProp], it
+   lives in [P_fs] beside the byte view's authority, and this layer keeps
+   it OPAQUE ([fs_dview] below).  What survives here is exactly what the
+   WAL layer proves for itself: recovery, the history's last element and
+   the on-disk header's invariant. *)
 
 Lemma fs_rec_wf_hist_ne r P cov logstart :
   fs_rec_wf r P cov logstart -> fr_hist r <> [].
 Proof. intros (_ & Hlast & _) Hnil. rewrite Hnil in Hlast. discriminate. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1d'. THE DURABLE BYTE VIEW, AND THE FS LAYER'S OPAQUE CONJUNCT          *)
+(*      (durable-disk 1d; claude-notes/design/fs-state.md §1 and §4).      *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE BYTE FLATTENING of a committed block view: block [b]'s [i]th byte
+   lives at [b * BSIZE + i], which is the addressing [DiskImg.disk_img_bytes]
+   and [FsBlocks.byte_range] already use.  [gamma_D]'s authority is held at
+   this map inside [P_fs], so the committed view is a BYTE map exactly as
+   [fs-state.md] §1 asks, while the WAL layer goes on reasoning about the
+   BLOCK map [fr_D] it recovers. *)
+Definition fs_dbytes (D : gmap Z (list (bv 8))) : gmap Z (bv 8) :=
+  map_fold (fun (b : Z) (bs : list (bv 8)) (acc : gmap Z (bv 8)) =>
+              map_seqZ (b * Z.of_nat BSIZE) bs ∪ acc) ∅ D.
+
 
 (* ---------------------------------------------------------------------- *)
 (* 1d''. THE RECORD, UNDER ONE 512-BYTE LANDING.                           *)
@@ -1342,7 +1310,7 @@ Lemma fs_rec_wf_logfill_sector (cov : gset Z) (ls : Z) (i : nat)
   fs_rec_wf r (fs_blocks (disk_write dk
      (log_slot_bno ls i * Z.of_nat BSIZE + Z.of_nat o)%Z sbs)) cov ls.
 Proof.
-  intros Hi Hfit HM Hok (Hrec & Hlast & Hhwf & Hdwf).
+  intros Hi Hfit HM Hok (Hrec & Hlast & Hhwf).
   assert (Hmiss : forall c, c <> log_slot_bno ls i ->
             fs_blocks (disk_write dk
                (log_slot_bno ls i * Z.of_nat BSIZE + Z.of_nat o)%Z sbs) c
@@ -1357,7 +1325,6 @@ Proof.
   - exact Hlast.
   - refine (hdr_wf_ext _ _ _ _ _ Hhwf).
     apply Hmiss, not_eq_sym, log_slot_ne_hdr.
-  - exact Hdwf.
 Qed.
 
 (* INSTALL.  The header names [b] at index [i], so recovery re-installs it
@@ -1374,7 +1341,7 @@ Lemma fs_rec_wf_install_sector (cov : gset Z) (ls : Z) (nn : nat) (Ws : list Z)
   fs_rec_wf r (fs_blocks (disk_write dk
      (b * Z.of_nat BSIZE + Z.of_nat o)%Z sbs)) cov ls.
 Proof.
-  intros Hnd Hwlen Hi Hb Hfit HM Hok (Hrec & Hlast & Hhwf & Hdwf).
+  intros Hnd Hwlen Hi Hb Hfit HM Hok (Hrec & Hlast & Hhwf).
   assert (Hmiss : forall c, c <> b ->
             fs_blocks (disk_write dk (b * Z.of_nat BSIZE + Z.of_nat o)%Z sbs) c
             = fs_blocks dk c)
@@ -1387,7 +1354,6 @@ Proof.
   - exact Hlast.
   - refine (hdr_wf_ext _ _ _ _ _ Hhwf).
     apply Hmiss, not_eq_sym. by apply home_ne_hdr.
-  - exact Hdwf.
 Qed.
 
 (* THE HEADER's SECOND SECTOR -- "the commit is atomic".  Nothing recovery
@@ -1402,7 +1368,7 @@ Lemma fs_rec_wf_hdr_sector1 (cov : gset Z) (ls : Z) (sbs : list (bv 8))
      (log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat virtio_sector_bytes)%Z sbs))
      cov ls.
 Proof.
-  intros Hlen (Hrec & Hlast & Hhwf & Hdwf).
+  intros Hlen (Hrec & Hlast & Hhwf).
   rewrite -virtio_sector_size_bytes.
   assert (Hfit : (virtio_sector_bytes + length sbs <= BSIZE)%nat)
     by (rewrite Hlen bsize_two_sectors; lia).
@@ -1423,7 +1389,6 @@ Proof.
              (proj1 Hhwf) Hsec Hmiss Hrec).
   - exact Hlast.
   - exact (hdr_wf_sector0 (fs_blocks dk) _ cov ls Hsec Hhwf).
-  - exact Hdwf.
 Qed.
 
 (* ...and the reading the header's FIRST sector leaves behind, which is what
@@ -1479,6 +1444,14 @@ Record fs_crash_names := MkFsCrashNames {
      (the trap DiskImg.v's header records). *)
   fcn_reg   : gname;
   fcn_start : gname;
+  (* THE DURABLE BYTE VIEW's gname (durable-disk 1d): the [ghost_map Z
+     (bv 8)] whose AUTHORITY is held at [fs_dbytes (fr_D r)] inside [P_fs]
+     and whose ELEMENTS are the FS layer's [Phi_D] (fs-state.md §1),
+     parked inside [fs_dview] and therefore inside [crashN] -- so no
+     thread that can die ever holds one (crash.md, principle 1).  It moves
+     ONLY at the commit.  Allocated by [P_fs_alloc] with the record; see
+     [fs_dview]'s header for why it is not (yet) a [riscvFixedGS] field. *)
+  fcn_view  : gname;
 }.
 
 Section fs_crash.
@@ -1753,12 +1726,82 @@ Section fs_crash.
      Everything a client ever learns at a crash comes out of the second
      conjunct; the index is what makes it a statement about the REAL disk
      rather than about a ghost. *)
+  (* ==================================================================== *)
+  (* 2c. [P_wf]: THE FS LAYER'S HALF OF THE CRASH PREDICATE                *)
+  (*     (durable-disk 1d; claude-notes/design/fs-state.md §1 and §4)      *)
+  (* ==================================================================== *)
+
+  (* THE DURABLE VIEW'S OWNERSHIP: the FULL element of the byte-keyed
+     [ghost_map Z (bv 8)] for every byte of the committed view.  This is
+     [fs-state.md] §1's [Phi_D] over the whole home range, and it is what
+     [P_fs] holds beside the byte view's AUTHORITY -- so the two meet only
+     inside [crashN], and no thread that can die ever owns a durable
+     resource (crash.md, principle 1).
+
+     A SEALED DEFINITION AND NOT A PARAMETER, and that is the one place
+     this lane deviated from its spec.  The parameter form was measured
+     first: [P_fs_any] sits inside [FsCrash.fs_crash_seam], which is
+     threaded -- by name, in the STATEMENT -- through 90 files, up to
+     [SpecKexec.fs_fabric], [FsReady.fs_ready] and [UsertrapRes].  An
+     [iProp]-valued parameter reaches all of them whether it is an explicit
+     argument (arity) or an ambient class (a [Context] line per section,
+     and then per section of every file that mentions any of THEIR
+     statements).  That is exactly the cone 1c-flip's ratified deviation
+     refused for [ireg_inv]'s [home], for the same reason.  So the slot is
+     a definition with honest content: the durable byte view's exclusive
+     elements, sealed, with the two facts the crash layer needs about it
+     ([fs_dview_timeless] and [fs_dview_rebase]) proved once.  Stage 2
+     REPLACES the body by [fs_view Gamma_D] -- which CONTAINS this, since
+     [Phi_D a v := a ↪[γD] v] -- and [fs_dview_rebase] becomes the client's
+     debt (fs-state.md §4): an input the payload supplies, not a free
+     move.  Nothing above this file names the body, so that replacement
+     moves no statement. *)
+  Definition fs_dview (g : gname) (B : gmap Z (bv 8)) : iProp Σ :=
+    ([∗ map] a ↦ v ∈ B, a ↪[g] v)%I.
+
+  Global Instance fs_dview_timeless g B : Timeless (fs_dview g B).
+  Proof. rewrite /fs_dview. apply _. Qed.
+
+  (* [iFrame] must treat a whole-disk [big_sepM] as ONE atom
+     (durable-notes.md, "a big-op behind a Definition is a hang"). *)
+  Global Typeclasses Opaque fs_dview.
+
+  (* WHAT THE COMMIT DOES TO IT: auth and elements together move to any
+     byte view at all.  Whole-map delete then whole-map insert -- no domain
+     premise, because the elements ARE the domain.  This is the move the
+     commit permit makes when [fr_D] advances, and the shape stage 2's
+     debt refines (there the client supplies the step; here the durable
+     side is a bare byte map, so the step is unconditional). *)
+  Lemma fs_dview_rebase (g : gname) (B B' : gmap Z (bv 8)) :
+    ghost_map_auth g 1 B -∗ fs_dview g B ==∗
+      ghost_map_auth g 1 B' ∗ fs_dview g B'.
+  Proof.
+    rewrite /fs_dview. iIntros "Ha Hd".
+    iMod (ghost_map_delete_big B with "Ha Hd") as "Ha".
+    rewrite map_difference_diag.
+    iMod (ghost_map_insert_big B' with "Ha") as "[Ha Hd]";
+      [apply map_disjoint_empty_r|].
+    rewrite right_id_L. by iFrame.
+  Qed.
+
   Definition P_fs (γs : fs_crash_names) (cov : gset Z) (logstart : Z)
       (dk : Z -> bv 8) : iProp Σ :=
     (∃ r : fs_rec,
        fs_hist_auth (fcn_hist γs) (fr_hist r) ∗
        ⌜fs_rec_wf r (fs_blocks dk) cov logstart⌝ ∗
-       fs_arm γs cov logstart dk)%I.
+       fs_arm γs cov logstart dk ∗
+       (* ---- P_wf's SIDE (durable-disk 1d) ------------------------------
+          The durable byte view's AUTHORITY, at the byte flattening of the
+          committed home map, and the FS layer's own conjunct at that same
+          byte view.  Both are indexed by [fr_D r], so a permit that does
+          not move the committed view frames them untouched and the COMMIT
+          is the one write that advances them -- which is exactly ruling
+          2's "commit is the only write kind that moves [D]".  Neither is
+          a statement about [dk]: they are invariant under every
+          re-indexing ([P_fs_rec_agree]), for the reason the old pure
+          conjunct was. *)
+       ghost_map_auth (fcn_view γs) 1 (fs_dbytes (fr_D r)) ∗
+       fs_dview (fcn_view γs) (fs_dbytes (fr_D r)))%I.
 
   (* THE CRASH PREDICATE AS ADEQUACY FIXES IT, at RAW gnames.  Adequacy
      allocates the swap counter, the generation registry and the started
@@ -1847,10 +1890,10 @@ Section fs_crash.
       split; [reflexivity |]. apply elem_of_seq. lia. }
     rewrite /P_fs_rec_named. iIntros "H". iDestruct "H" as (γs) "[%Hseq H]".
     iExists γs. iSplitR; [iPureIntro; exact Hseq|].
-    rewrite /P_fs. iDestruct "H" as (r) "(Hh & %Hwf & Harm)".
+    rewrite /P_fs. iDestruct "H" as (r) "(Hh & %Hwf & Harm & Hva & Hvw)".
     iExists r. iFrame "Hh". iSplitR.
     { iPureIntro. rewrite /fs_rec_wf in Hwf *.
-      destruct Hwf as (Hrec & Hlast & Hhwf & Hdwf).
+      destruct Hwf as (Hrec & Hlast & Hhwf).
       pose proof Hhwf as (Hlen & _ & _).
       assert (Hhdreq : fs_blocks dk' (log_hdr_bno ls)
                        = fs_blocks dk (log_hdr_bno ls))
@@ -1865,8 +1908,9 @@ Section fs_crash.
         intros i Hi. rewrite hdr_dec_length in Hi.
         apply Hlog, Hslot. lia.
       - exact Hlast.
-      - exact (hdr_wf_ext _ _ _ _ Hhdreq Hhwf).
-      - exact Hdwf. }
+      - exact (hdr_wf_ext _ _ _ _ Hhdreq Hhwf). }
+    (* [P_wf]'s side is not about [dk]: both conjuncts are at [fr_D r] *)
+    iFrame "Hva Hvw".
     rewrite /fs_arm. iDestruct "Harm" as (c) "[Hsw Harm]". iExists c. iFrame "Hsw".
     iDestruct "Harm" as "[$ | Harm]". iRight.
     iDestruct "Harm" as (g'') "[%Hc Hc]". iExists g''. iSplitR; [done|].
@@ -1943,13 +1987,13 @@ Section fs_crash.
       (dk : Z -> bv 8) :
     P_fs_rec_named γsw γreg γst cov ls dk -∗
       ⌜exists D : gmap Z (list (bv 8)),
-         fs_recovery (fs_blocks dk) D cov ls /\ fs_durable_wf D /\
+         fs_recovery (fs_blocks dk) D cov ls /\
          hdr_wf (fs_blocks dk) cov ls⌝.
   Proof.
     rewrite /P_fs_rec_named /P_fs.
     iIntros "H". iDestruct "H" as (γs) "[_ H]".
     iDestruct "H" as (r) "(_ & %Hwf & _)".
-    iPureIntro. destruct Hwf as (Hrec & _ & Hhdr & Hdwf).
+    iPureIntro. destruct Hwf as (Hrec & _ & Hhdr).
     exists (fr_D r). split_and!; assumption.
   Qed.
 
@@ -1966,7 +2010,7 @@ Section fs_crash.
        ▷ P_fs_named γd N γsw γreg γst cov ls ∗
        ⌜fs_extent cov ls N /\
         exists D : gmap Z (list (bv 8)),
-          fs_recovery (fs_blocks dk) D cov ls /\ fs_durable_wf D /\
+          fs_recovery (fs_blocks dk) D cov ls /\
           hdr_wf (fs_blocks dk) cov ls⌝).
   Proof.
     iIntros "Ha HP". iMod "HP".
@@ -2037,7 +2081,7 @@ Section fs_crash.
                  (eq_sym Hrd) Hext with "HPr") as "HPr".
     rewrite /P_fs_rec_named. iDestruct "HPr" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
-    rewrite /P_fs. iDestruct "HPfs" as (r) "(Hh & %Hwf & Harm)".
+    rewrite /P_fs. iDestruct "HPfs" as (r) "(Hh & %Hwf & Harm & Hva & Hvw)".
     (* the two halves: one stays with the era, one goes into the arm *)
     iEval (rewrite -Qp.half_half) in "HM".
     iDestruct (ghost_var_split with "HM") as "[HMe HMc]".
@@ -2053,11 +2097,11 @@ Section fs_crash.
     iEval (rewrite Hsw) in "Hswlb".
     (* repack at [dk], then re-index back to the record's own image *)
     iAssert (P_fs_rec_named γsw γreg γst cov ls dk)
-      with "[Hh Harm]" as "HPr".
+      with "[Hh Harm Hva Hvw]" as "HPr".
     { rewrite /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists r. iFrame "Hh". iSplitR; [iPureIntro; exact Hwf|].
-      iExact "Harm". }
+      iFrame "Hva Hvw". iExact "Harm". }
     iDestruct (P_fs_rec_agree γsw γreg γst cov ls N dk dk0
                  Hrd Hext with "HPr") as "HPr".
     iModIntro. iModIntro. iFrame "Hsa Ha HMe Hswlb".
@@ -2089,6 +2133,11 @@ Section fs_crash.
      provable from nothing.  The client instantiates
      [Pc := fun dk => ∃ γs, P_fs γs cov logstart dk] and discharges the
      obligation with this lemma. *)
+  (* ...AND IT NOW MINTS THE DURABLE BYTE VIEW (durable-disk 1d):
+     [gamma_D] is allocated here, at the byte flattening of the image's
+     committed home map, and the elements it hands back ARE the FS layer's
+     conjunct.  This is where the durable file system is born, and it is
+     where stage 2c's image decode lands. *)
   Lemma P_fs_alloc (γsw γreg γst : gname) (dk0 : Z -> bv 8)
       (D0 : gmap Z (list (bv 8))) (cov : gset Z) (logstart : Z) :
     fs_recovery (fs_blocks dk0) D0 cov logstart ->
@@ -2099,16 +2148,16 @@ Section fs_crash.
   Proof.
     intros Hrec Hhwf. iIntros "Hsw".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
-    iModIntro. iExists (MkFsCrashNames γh γsw γreg γst).
+    iMod (ghost_map_alloc (fs_dbytes D0)) as (γv) "[Hva Hvw]".
+    iModIntro. iExists (MkFsCrashNames γh γsw γreg γst γv).
     iSplitR; [iPureIntro; done|].
-    iSplitL "Hauth Hsw".
+    iSplitL "Hauth Hsw Hva Hvw".
     - rewrite /P_fs. iExists (MkFsRec D0 [D0]).
       iFrame "Hauth".
       iSplitR.
       { iPureIntro. rewrite /fs_rec_wf /=.
-        split_and!;
-          [exact Hrec | reflexivity | exact Hhwf
-          | exact (fs_durable_wf_placeholder _) (* E4: the image discharge *)]. }
+        split_and!; [exact Hrec | reflexivity | exact Hhwf]. }
+      iSplitR "Hva Hvw"; [| rewrite /fs_dview; iFrame "Hva Hvw"].
       iApply fs_arm_at_rest. iExact "Hsw".
     - rewrite /fs_receipt /=. iExists []. iExact "Hlb".
   Qed.
@@ -2317,7 +2366,7 @@ Section fs_crash_seam.
     iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
-    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwfr & Harm)".
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwfr & Harm & Hva & Hvw)".
     rewrite /log_mirror_half. iMod "Hmir".
     iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
@@ -2343,10 +2392,12 @@ Section fs_crash_seam.
       exact (log_mirror_ok_upd_sector M0 dk cov ls blk 0
                (take virtio_sector_bytes bs) Hfit Hok). }
     iModIntro.
-    iSplitL "Hhist Harm".
+    iSplitL "Hhist Harm Hva Hvw".
     { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
-      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      rewrite /P_fs. iExists r. iFrame "Hhist".
+      (* [P_wf]'s side is at [fr_D r], which this write does not move *)
+      iSplitR; [| iFrame "Hva Hvw"; iExact "Harm"].
       iPureIntro. exact (Hwf r dk Hok Hwfr). }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
@@ -2382,7 +2433,7 @@ Section fs_crash_seam.
     iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
-    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwfr & Harm)".
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwfr & Harm & Hva & Hvw)".
     rewrite /log_mirror_half. iMod "Hmir".
     iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
@@ -2409,10 +2460,12 @@ Section fs_crash_seam.
       exact (log_mirror_ok_upd_sector M0 dk cov ls blk virtio_sector_bytes
                (take virtio_sector_bytes (drop virtio_sector_bytes bs)) Hfit Hok). }
     iModIntro.
-    iSplitL "Hhist Harm".
+    iSplitL "Hhist Harm Hva Hvw".
     { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
-      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      rewrite /P_fs. iExists r. iFrame "Hhist".
+      (* [P_wf]'s side is at [fr_D r], which this write does not move *)
+      iSplitR; [| iFrame "Hva Hvw"; iExact "Harm"].
       iPureIntro. exact (Hwf r dk Hok Hwfr). }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
@@ -2482,7 +2535,7 @@ Section fs_crash_seam.
     iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
-    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm & Hva & Hvw)".
     rewrite /log_mirror_half. iMod "Hmir".
     iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
@@ -2522,13 +2575,23 @@ Section fs_crash_seam.
       { pose proof (hdr_dec_length bs) as Hl. rewrite Hdec /= in Hl. lia. }
       rewrite -(Hok (log_slot_bno ls j) (log_slot_in_ext cov ls j Hjlt)).
       apply Hoff. apply log_slot_ne_hdr. }
-    destruct Hwf as (Hrec & Hlast & Hhwf & Hdwf).
+    destruct Hwf as (Hrec & Hlast & Hhwf).
     assert (Hdk0 : hdr_dec (fs_blocks dk (log_hdr_bno ls)) = (0%nat, []))
       by (rewrite -Hrow; exact HM0).
     assert (Hn0 : hdr_n (fs_blocks dk (log_hdr_bno ls)) = 0)
       by (rewrite -hdr_dec_n Hdk0 //).
     assert (HfrD : fr_D r = fs_restrict V (fs_home_set cov ls))
       by (rewrite -Hres; exact (proj1 (fs_recovery_clean _ _ _ _ Hn0) Hrec)).
+    (* ---- THE DURABLE VIEW ADVANCES (durable-disk 1d).  This is the one
+       write kind that moves the committed view, so it is the one place the
+       byte view's authority and [P_wf] move -- together, in one step, and
+       at a [D'] the caller can NAME (it is [L] on the home set, computed
+       just above).  [fs_dview_rebase] is the whole of it at stage 1d;
+       stage 2 turns it into the client-prepared basic update the log's
+       parked payload supplies (fs-state.md §4's debt), and the [D'] it
+       takes is this same term. ---- *)
+    iMod (fs_dview_rebase (fcn_view γs) (fs_dbytes (fr_D r)) (fs_dbytes D')
+            with "Hva Hvw") as "[Hva Hvw]".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
     iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".
@@ -2540,11 +2603,11 @@ Section fs_crash_seam.
       exact (log_mirror_ok_upd_sector M0 dk cov ls (log_hdr_bno ls) 0
                (take virtio_sector_bytes bs) Hfit Hok). }
     iModIntro.
-    iSplitL "Hhist Harm".
+    iSplitL "Hhist Harm Hva Hvw".
     { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
-      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iFrame "Hhist". iSplitR; [| iFrame "Hva Hvw"; iExact "Harm"].
       iPureIntro. rewrite /fs_rec_wf /=. split_and!.
       - rewrite -HD'.
         exact (fs_recovery_commit (fs_blocks dk) (fs_blocks dk') cov ls
@@ -2552,14 +2615,7 @@ Section fs_crash_seam.
       - rewrite last_snoc. reflexivity.
       - rewrite /hdr_wf Hdec' /=.
         split_and!; [exact Hnn | exact Hnd | exact Hin].
-      (* THE [P_wf] CONJUNCT.  [FsWf.fs_durable_wf] is still [True] (stage 2
-         instantiates it), so it is discharged here, ONCE, instead of by a
-         premise threaded through end_op's 26 exit arms.
-         *** LANE 1d / STAGE 2 SLOT ***: this is where the client's basic
-         update over the lent [γD] auth runs -- it takes [D'] by name (it is
-         [L] on the home set, right above) and re-establishes [P_wf] at it.
-         Nothing else in this proof moves when it lands. *)
-      - exact (fs_durable_wf_placeholder D'). }
+      }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
     iSplitR "".
@@ -2612,7 +2668,7 @@ Section fs_crash_seam.
     iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
-    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm & Hva & Hvw)".
     rewrite /log_mirror_half. iMod "Hmir".
     iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
@@ -2629,7 +2685,7 @@ Section fs_crash_seam.
                    = blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs)
       by (unfold dk'; rewrite Hrow;
           exact (fs_blocks_blk_sec0 dk (log_hdr_bno ls) bs Hlen)).
-    destruct Hwf as (Hrec & Hlast & Hhwf & Hdwf).
+    destruct Hwf as (Hrec & Hlast & Hhwf).
     pose proof Hhwf as (Hbnd & Hndw & Hhome).
     assert (Hdkh : hdr_dec (fs_blocks dk (log_hdr_bno ls)) = (nn, Ws))
       by (rewrite -Hrow; exact HM0).
@@ -2641,10 +2697,12 @@ Section fs_crash_seam.
       exact (log_mirror_ok_upd_sector M0 dk cov ls (log_hdr_bno ls) 0
                (take virtio_sector_bytes bs) Hfit Hok). }
     iModIntro.
-    iSplitL "Hhist Harm".
+    iSplitL "Hhist Harm Hva Hvw".
     { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
-      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      rewrite /P_fs. iExists r. iFrame "Hhist".
+      (* [P_wf]'s side is at [fr_D r]: the preserving clear does not move it *)
+      iSplitR; [| iFrame "Hva Hvw"; iExact "Harm"].
       iPureIntro. rewrite /fs_rec_wf /=. split_and!.
       - refine (fs_recovery_clear_keeps (fs_blocks dk) (fs_blocks dk')
                   (fr_D r) cov ls (fs_blocks dk' (log_hdr_bno ls))
@@ -2668,7 +2726,7 @@ Section fs_crash_seam.
         symmetry. exact (Hcaught j b Hjb).
       - exact Hlast.
       - apply hdr_wf_zero. exact Hn0'.
-      - exact Hdwf. (* THE POINT: the committed view does not move *) }
+      }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
     iPureIntro. exact Hlold.

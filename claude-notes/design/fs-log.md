@@ -337,11 +337,40 @@ and no ghost laws about Ψ).
         ∗ ⌜log_mirror_tie_body M L cov logstart LB⌝  (* durable-disk row (b) *)
 
 `log_state` also takes a `pend` parameter — the union of the open ops'
-already-logged sets (`LogInv.op_pending om`, passed from `log_res`). It is
-what durable-disk's stage-G row (a) will exclude from its abstract-view
-agreement; until that lands the bundle does not read it, and the two moves
-(`log_state_pend_mono` for the growing transitions, `log_state_fin` for
-end_op's retire) say which sites survive the flip.
+already-logged BLOCK sets (`LogInv.op_pending om`, passed from `log_res`) —
+and **the bundle does not read it** (durable-disk 1d). It used to be the
+place stage G's abstract-view "row (a)" would have excluded from its
+agreement; ruling 3 ([`fs-state.md`](fs-state.md) §3) deletes row (a),
+the abstract target state and the per-op finalize obligation outright, so
+both moves (`log_state_pend_mono`, `log_state_fin`) are the identity and
+`pend` survives only as the name of what the ledger's union is.
+
+### The log's FS-agnostic interface, and what of it is landed (durable-disk 1d)
+
+The interface of record is [`fs-state.md`](fs-state.md) §5: byte-keyed
+`fs_L`, an opaque parked client payload, two logically-atomic AUs, and
+nothing else. As of lane 1d:
+
+* **LANDED** — `end_op` has **no FS-facing premise at all**. 1b deleted
+  `FsCrash.end_op_pres`; 1d deletes `LogInv.end_op_fin` (row (a)'s per-op
+  finalize) with its 30 call sites, the `Ob : gset fsobj` writer
+  declaration on all four `SpecLogWrite` forms, the object component of
+  `op_entry`, and `FsObj*`/`FsWfImg`.
+* **LANDED** — the log layer can NAME the committed view it would index a
+  payload by: `LogDefs.lm_committed M cov ls` (1a's `fs_recovery_of_mirror`
+  term, moved down with `fs_restrict` / `fs_install` so the log does not
+  have to import the crash layer), `LogDefs.lm_logged L cov ls` (the view a
+  commit installs), and `LogDefs.lm_committed_clean` — the bridge that
+  turns row (b) at the empty batch into `lm_committed M' = lm_logged L`,
+  which is exactly what an `end_op` re-deposit needs to re-park a payload.
+* **NOT LANDED** — the parked payload itself and `log_write`'s payload AU.
+  The measured design is in
+  [`../projects/durable-disk.md`](../projects/durable-disk.md) item 1d;
+  the short version is that `Ψ` must be indexed by the committed view
+  ALONE (not by `L`), and that `log_ctx` must bind it EXISTENTIALLY —
+  `log_ctx γ bn γfs cov ls dev := ∃ Ψ, log_ctx_at Ψ γ …` — because
+  `log_ctx` appears by name in the statements of 78 files, `SpecKexec`,
+  `FsReady` and every syscall contract among them.
 
 **Row (b) is real, and it is what makes the commit's contract
 client-free.** `log_mirror_tie_body M L cov logstart LB` says: at every

@@ -5421,7 +5421,6 @@ Section ProofSysUnlinkBody.
               g gfs cov logstart dev n3 pid (DfracOwn (1/4)) E3 (K - 30)%nat
               eb b lks (upd_upt V P1) Keo Hgeom Hj Hgl
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpanenv Hbio Hlog Hseam Hgen
                     Hpidq Hprocs Hdev Hgeo Hdlk [HopS]").
     { rewrite /log_op. iExists Sb3. iExact "HopS". }
@@ -7338,7 +7337,6 @@ Section ProofSysUnlinkBody.
               g gfs cov logstart dev n3 pid (DfracOwn (1/4)) E3 (K - 30)%nat
               eb b lks (upd_upt V P1) Keo Hgeom Hj Hgl
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpanenv Hbio Hlog Hseam Hgen
                     Hpidq Hprocs Hdev Hgeo Hdlk [HopS]").
     { rewrite /log_op. iExists Sb3. iExact "HopS". }

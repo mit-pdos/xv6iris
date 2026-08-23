@@ -774,7 +774,7 @@ Section EndOpDefs.
      bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
   Lemma eo_open_of_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset fsobj) :
+      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) :
     log_state bn γfs cov logstart n LB pend -∗
     ∃ (W : list (mword 32)) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (M0 : log_mirror),
@@ -800,7 +800,7 @@ Section EndOpDefs.
   Proof.
     rewrite /log_state /eo_open.
     iIntros "H". iDestruct "H" as (W L D M)
-      "(%Hlen & %HLB & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirh & %Hmhdr & %Hmtie & %Hrowa)".
+      "(%Hlen & %HLB & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirh & %Hmhdr & %Hmtie)".
     iExists W, L, D, M.
     iSplitR; [iPureIntro; exact Hlen|].
     iSplitR; [iPureIntro; exact Hnd|].
@@ -822,8 +822,8 @@ Section EndOpDefs.
   Qed.
 
   (* THE DEPOSIT.  [pend] is universally quantified because the bundle does
-     not read it yet (durable-disk G1-impl: row (a) is stage G's flip); the
-     one caller re-deposits at [op_pending om] with [om = ∅].
+     not read it (ruling 3: there is no row (a)); the one caller
+     re-deposits at [op_pending om] with [om = ∅].
 
      ROW (b) IS A PREMISE (durable-disk 1b), and the caller computes it with
      [LogInv.log_mirror_tie_deposit] off the value the whole commit cycle
@@ -832,7 +832,7 @@ Section EndOpDefs.
      checkout's own row, unchanged. *)
   Lemma eo_open_to_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
-      (Lw : nat -> list (bv 8)) (pend : gset fsobj) (M : log_mirror) :
+      (Lw : nat -> list (bv 8)) (pend : gset Z) (M : log_mirror) :
     lm_hdr M logstart = (0%nat, []) ->
     log_mirror_tie_body M L cov logstart ∅ ->
     log_mirror_half M -∗
@@ -860,15 +860,7 @@ Section EndOpDefs.
     iSplitL "Hpool"; [iExact "Hpool"|].
     iSplitL "Hmirh"; [iExact "Hmirh"|].
     iSplitR; [iPureIntro; exact Hmhdr|].
-    iSplitR; [iPureIntro; exact Hmtie|].
-    (* ROW (a) AT THE DEPOSIT, gated (durable-disk flip-C1).  This is the
-       COMMIT re-deposit, and it is the easy half: the caller re-deposits at
-       [op_pending om] with [om = ∅] ([ProofEndOp]'s own [Hommt]), so the
-       pending set is empty and the row is the tiling theorem
-       ([FsObj.views_agree_tiling]) at [A = L].  What it still needs is the
-       row IN, which is [log_state]'s own conjunct at the checkout -- so the
-       switch-on threads it through [eo_open] rather than proving it here. *)
-    iPureIntro. apply log_row_a_pending.
+    iPureIntro. exact Hmtie.
   Qed.
 
   (* ---- the payload's pieces, extracted / re-assembled without a case
@@ -4066,7 +4058,7 @@ Section ProofEndOp.
                            cov logstart dev u pidv dq m K eb b lks Vpr.
   Proof.
     cbv beta zeta delta [wp_end_op_sconf_body].
-    intros HK Hgeom Hj Hgl Hbelow Hfin.
+    intros HK Hgeom Hj Hgl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
@@ -4384,23 +4376,23 @@ Section ProofEndOp.
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
     iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
-    iMod (log_end_step with "Hoauth Hop") as (i0 Sb0 e00 So0) "(%Hi0 & Hoauth)".
+    iMod (log_end_step with "Hoauth Hop") as (i0 Sb0 e00) "(%Hi0 & Hoauth)".
     assert (Hszd : size (delete i0 om) = (out - 1)%nat).
     { rewrite map_size_delete Hi0 Hsz. symmetry. apply Nat.sub_1_r. }
-    assert (Hbndd : forall i e, delete i0 om !! i = Some e -> (e.1.1.1 <= MAXOPBLOCKS)%nat).
+    assert (Hbndd : forall i e, delete i0 om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat).
     { intros i e Hv. apply (Hbnd i e). rewrite lookup_delete_Some in Hv.
       exact (proj2 Hv). }
     (* DELETING an entry only shrinks the map, so every surviving op's
        credit clause is the one it already had *)
-    assert (Hsubd : forall i e, delete i0 om !! i = Some e -> e.1.1.2 ⊆ LB).
+    assert (Hsubd : forall i e, delete i0 om !! i = Some e -> e.1.2 ⊆ LB).
     { intros i e Hv. apply (Hsub i e). rewrite lookup_delete_Some in Hv.
       exact (proj2 Hv). }
     (* ...and so is its birth epoch: retiring an op cannot re-date another *)
-    assert (Hlived : forall i e, delete i0 om !! i = Some e -> e.1.2 = Ep).
+    assert (Hlived : forall i e, delete i0 om !! i = Some e -> e.2 = Ep).
     { intros i e Hv. apply (Hlive i e). rewrite lookup_delete_Some in Hv.
       exact (proj2 Hv). }
     assert (Hsumd : (nl + op_sum (delete i0 om) <= LOGBLOCKS)%nat).
-    { pose proof (op_sum_delete om i0 (u, Sb0, e00, So0) Hi0) as Hd. cbn in Hd. lia. }
+    { pose proof (op_sum_delete om i0 (u, Sb0, e00) Hi0) as Hd. cbn in Hd. lia. }
     assert (Hout3d : ((out - 1) <= 3)%nat) by lia.
     assert (Hout1 : (1 <= out)%nat) by lia.
     (* ===== +0x1a c.lw a5,28(s1) : a5 := log.outstanding ===== *)
@@ -5039,33 +5031,24 @@ Section ProofEndOp.
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
         iSplitR; [iPureIntro; exact Hsubd|].
         iSplitR; [iPureIntro; exact Hreg|].
-        (* THE PENDING SET SHRINKS, AND THE RE-DEPOSIT IS NOW EXACT
-           (durable-disk flip-C1).  Stage G1 got here with the
-           unconditional [log_state_pend] -- THE debt site -- because a
-           block-level pending union has no exact split at a retire: another
-           open op may hold the same block.  With the union taken over
-           OBJECTS the split is exact, and it is two steps:
-
-             [log_state_fin] folds THIS op's objects out, spending the
-             caller's finalize bundle ([Hfin], instantiated at the retiring
-             entry's own [So0] -- the ledger's value, which is why
-             [log_end_step] hands it back);
-
-             [log_state_pend_mono] then grows [op_pending om ∖ So0] to
-             [op_pending (delete i0 om)], which is [op_pending_delete]
-             rearranged: everything still pending after the retire either
-             was another op's all along or was never this op's.
-
-           No gate, no debt: this site is finished, and the switch-on
-           changes only what proves [end_op_fin] at the CALLERS. *)
-        assert (Hshrink : op_pending om ∖ So0 ⊆ op_pending (delete i0 om)).
+        (* THE PENDING SET SHRINKS, AND THE RE-DEPOSIT IS EXACT
+           (durable-disk 1d).  The retiring op's own already-logged BLOCK
+           set leaves the union, and the two steps are [log_state_fin]
+           (the retire's exact shrink, which owes the log NOTHING now that
+           ruling 3 has deleted row (a) -- flip-C1's [end_op_fin] bundle is
+           gone with it) and [log_state_pend_mono] (growing
+           [op_pending om ∖ Sb0] back to [op_pending (delete i0 om)],
+           which is [op_pending_delete] rearranged: everything still
+           pending after the retire either was another op's all along or
+           was never this op's). *)
+        assert (Hshrink : op_pending om ∖ Sb0 ⊆ op_pending (delete i0 om)).
         { intros o Ho. apply elem_of_difference in Ho as [Hin Hout].
-          pose proof (op_pending_delete om i0 (u, Sb0, e00, So0) Hi0 o Hin)
+          pose proof (op_pending_delete om i0 (u, Sb0, e00) Hi0 o Hin)
             as Hu.
           apply elem_of_union in Hu as [Hmine | Hother];
             [exfalso; exact (Hout Hmine) | exact Hother]. }
         iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hshrink).
-        iApply (log_state_fin _ _ _ _ _ _ So0 (op_pending om) Hfin).
+        iApply (log_state_fin _ _ _ _ _ _ Sb0 (op_pending om)).
         iExact "Hbatch". }
       assert (HT4regsE : eo_regsE m T4).
       { rewrite /eo_regsE. split.

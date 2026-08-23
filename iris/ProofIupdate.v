@@ -524,9 +524,6 @@ Section IupdateTail.
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               cru Sb e0 v (⊤ ∖ ↑iregN) Pout
-              (* the coarse object declaration: this write masks the whole
-                 block (durable-disk flip-C1; flip-C2 refines it to [OSlot]) *)
-              {[OBlk (uint bno)]}
               T1 0%nat eb (proc_addr j) (K - 4)%nat b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)

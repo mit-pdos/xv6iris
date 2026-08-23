@@ -367,7 +367,7 @@ Section BoProps.
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
   Lemma bo_batch_lhn (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset fsobj) :
+      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) :
     log_state bn γfs cov logstart n LB pend -∗
     ⌜(n <= LOGBLOCKS)%nat⌝ ∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
@@ -375,7 +375,7 @@ Section BoProps.
        log_state bn γfs cov logstart n LB pend).
   Proof.
     iIntros "H". rewrite /log_state.
-    iDestruct "H" as (W L D M) "(%Hlen & %HLB & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirh & %Hmhdr & %Hmtie & %Hrowa)".
+    iDestruct "H" as (W L D M) "(%Hlen & %HLB & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirh & %Hmhdr & %Hmtie)".
     iSplitR; [iPureIntro; exact (proj2 Hlen)|].
     iFrame "Hn". iIntros "Hn".
     iExists W, L, D, M.
@@ -385,8 +385,7 @@ Section BoProps.
     iSplitR; [iPureIntro; exact Hcv|].
     iFrame "Hn Hblk Hjunk HL HD Hdirty Hhdr Hsl Hpool Hmirh".
     iSplitR; [iPureIntro; exact Hmhdr|].
-    iSplitR; [iPureIntro; exact Hmtie|].
-    iPureIntro; exact Hrowa.
+    iPureIntro; exact Hmtie.
   Qed.
 
   (* The exit continuation, control at +0x58 (the store has already
@@ -1382,18 +1381,18 @@ Section BoBodies.
                  l_ncommit ↦₄ nc ∗
                  ghost_map_auth (ln_ops γ) 1 om ∗
                  ⌜size om = out⌝ ∗
-                 ⌜forall i e, om !! i = Some e -> (e.1.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
+                 ⌜forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
                  ⌜(out <= 3)%nat⌝ ∗
                  ⌜cmt = true -> out = 0%nat⌝ ∗
                  mono_nat_auth_own (ln_ep γ) 1 E ∗
                  ⌜(1 <= E)%nat⌝ ∗
                  own (ln_lg γ) (● X) ∗
-                 ⌜forall i e, om !! i = Some e -> e.1.2 = E⌝ ∗
+                 ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
                  ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
                  (if cmt then emp
                   else ∃ (n : nat) (LB : gset Z),
                        ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
-                       ⌜forall i e, om !! i = Some e -> e.1.1.2 ⊆ LB⌝ ∗
+                       ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
                        ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
                        log_state bn γfs cov logstart n LB (op_pending om)))%I
         with "[Hout Hcmt Hnc Hauth Hepa Hxa Hrest]" as "Hres".
@@ -1700,7 +1699,7 @@ Section BoBodies.
         iAssert (log_res γ bn γfs cov logstart)
           with "[Hout Hcmt Hnc Hauth Hepa Hxa Hlhn Hbclose]" as "Hres".
         { rewrite /log_res.
-          iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, ∅, Ep, (∅ : gset fsobj))]> om), Ep, Xr.
+          iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, (∅ : gset Z), Ep)]> om), Ep, Xr.
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR.
           { iPureIntro. rewrite map_size_insert_None; [ by rewrite Hsz | exact Hi ]. }
@@ -1708,7 +1707,7 @@ Section BoBodies.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
-              assert (e = (MAXOPBLOCKS, ∅, Ep, (∅ : gset fsobj))) as -> by congruence.
+              assert (e = (MAXOPBLOCKS, (∅ : gset Z), Ep)) as -> by congruence.
               apply Nat.le_refl.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hbnd k e Hk). }
           iSplitR; [iPureIntro; exact (bo_guard_out3 out n Hle)|].
@@ -1721,13 +1720,13 @@ Section BoBodies.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
-              assert (e = (MAXOPBLOCKS, ∅, Ep, (∅ : gset fsobj))) as -> by congruence.
+              assert (e = (MAXOPBLOCKS, (∅ : gset Z), Ep)) as -> by congruence.
               reflexivity.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hlive k e Hk). }
           (* the registry and the epoch are untouched by a begin_op *)
           iSplitR; [iPureIntro; exact Hcap|].
           iExists n, LB. iSplitR.
-          { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, ∅, Ep, (∅ : gset fsobj)) Hi).
+          { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, (∅ : gset Z), Ep) Hi).
             exact (log_reserve_ok n out om Hsz Hbnd (bo_guard_sum out n Hle)). }
           iSplitR.
           (* THE FRESH OP HAS LOGGED NOTHING, so its credit set is empty and
@@ -1736,7 +1735,7 @@ Section BoBodies.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
-              assert (e = (MAXOPBLOCKS, ∅, Ep, (∅ : gset fsobj))) as -> by congruence.
+              assert (e = (MAXOPBLOCKS, (∅ : gset Z), Ep)) as -> by congruence.
               apply empty_subseteq.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }
           iSplitR; [iPureIntro; exact Hreg|].
@@ -1745,7 +1744,7 @@ Section BoBodies.
              gets bigger and every row of [log_state] that excludes it only
              weakens.  Free at this site, forever. *)
           assert (Hpm : op_pending om
-                        ⊆ op_pending (<[i := (MAXOPBLOCKS, ∅, Ep, (∅ : gset fsobj))]> om)).
+                        ⊆ op_pending (<[i := (MAXOPBLOCKS, (∅ : gset Z), Ep)]> om)).
           { apply op_pending_insert_mono. intros e He.
             rewrite Hi in He. discriminate. }
           iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpm).

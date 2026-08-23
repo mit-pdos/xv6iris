@@ -39,21 +39,16 @@ Require Import FsImg.       (* the sweeps this predicate is built from *)
 
 Local Open Scope Z_scope.
 
-Definition fs_durable_wf (D : gmap Z (list (bv 8))) : Prop := True.
-
-(* THE GATE (delete together with the placeholder body).  Every use of this
-   lemma marks a site that may NOT survive the switch-on of the real body:
-     - the recovery-side permits' RE-BASE of [fr_D] (stage H makes them
-       ghost no-ops first);
-     - the commit permit's compat wrapper (stage G supplies the real
-       preservation fupd);
-     - [P_fs_alloc]'s establishment (stage E4 discharges it at the image
-       via [fsimg_durable_wf]).
-   When the switch-on replaces the body, this lemma becomes unprovable and
-   each use site surfaces as an error -- that is the mechanism, not an
-   accident. *)
-Lemma fs_durable_wf_placeholder (D : gmap Z (list (bv 8))) : fs_durable_wf D.
-Proof. exact I. Qed.
+(* [fs_durable_wf] AND ITS PLACEHOLDER ARE GONE (durable-disk 1d).  The
+   crash record's fourth conjunct was [fs_durable_wf (fr_D r)] with body
+   [True]; ruling 3 (claude-notes/design/fs-state.md) has no whole-state
+   pure well-formedness at all, so the slot is now a SEPARATION-LOGIC
+   conjunct of [FsCrash.P_fs] over the durable byte view
+   ([FsCrash.fs_dview]) and nothing pure survives here.  What the rest of
+   this file still provides -- [dv_of_D], [fs_durable_wf_view] and the
+   [FsEff*]/[FsOp*] theory over it -- stays until stage 2 decides its fate
+   (fs-state.md §6); NOTHING in the crash or log layer reads it any
+   more. *)
 
 (* ====================================================================== *)
 (*  1.  THE VIEW OF A FINITE BLOCK MAP                                     *)

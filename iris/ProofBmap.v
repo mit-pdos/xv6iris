@@ -415,11 +415,10 @@ Section BmapKit.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat) (cr : bool) (Sb : gset Z)
-      (Ob : gset fsobj)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gen_body (GEN := GENa) (CID := CIDa) bn γ γfs γd cov logstart dev k pidv bno
-                              bs bsl bsd d u cr Sb Ob m n eb p K b lks.
+                              bs bsl bsd d u cr Sb m n eb p K b lks.
 End BmapKit.
 
 (* THE CORE CONTRACT.  Deliberately NOT named [wp_..._body]: the coverage
@@ -1954,10 +1953,6 @@ Section BmapTail.
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
                   (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1
-                  (* the coarse object declaration: an indirect-block entry
-                     write masks the whole block (durable-disk flip-C1;
-                     flip-C2 refines it to the [ORec] the entry sits in) *)
-                  {[OBlk (uint (bm_ind bmI : mword 32))]}
                   G2 0%nat eb (proc_addr j) (K - 6)%nat b lks
                   HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HG2a0
                   ltac:(rewrite Huind; exact Hicov)

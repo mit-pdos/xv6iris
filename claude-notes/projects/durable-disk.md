@@ -15,12 +15,14 @@ is deleted (stage I).
 
 **Where the tree is:** stages A, B, D, H0 of the old list stand (fixed-gname
 durable disk, `hdr_wf`, general `initlog`/`install_trans`, the adequacy
-pure-projection hook).  What the FS layer still states about durability
-with a placeholder: `FsWf.v:42` `fs_durable_wf := True`;
-`end_op_fin_placeholder` ×30, `log_row_a_pending` ×6.  Row (b) is REAL
-(1b): `LogInv.log_state` carries `log_mirror_tie_body`, both
-establishment sites prove it, and the commit permit turns it into
-`D' = L|home`.
+pure-projection hook).  Row (b) is REAL (1b): `LogInv.log_state` carries
+`log_mirror_tie_body`, both establishment sites prove it, and the commit
+permit turns it into `D' = L|home`.  **THERE IS NO PLACEHOLDER LEFT ON
+THIS PATH** (1d): `fs_durable_wf := True`, `end_op_fin_placeholder` ×30
+and `log_row_a_pending` ×6 are all deleted, with the object ledger, the
+four `FsObj*`/`FsWfImg` files and row (a) itself.  What is still OPEN in
+stage 1 is the log's parked payload and `log_write`'s payload AU — item
+1d's items 2/3/4, with the measured design recorded there.
 
 ## Working rules (keep)
 
@@ -262,32 +264,147 @@ map at home blocks); 1d lands last.
         `logN` at `⊤`); `it_ghost_step` became a `={⊤}=∗` and its
         recovering arm no longer needs `it_pay_bs` -- `fsblock_update` is
         what learns the payload's bytes.  The commit arm is untouched.
-- [ ] **1d. The parked payload and the two AUs; `γD`.**
-      - `γD : ghost_map Z (bv 8)` (byte-keyed), fixed-layer gname beside
-        `riscv_disk_name`; its auth is `fr_D` inside `P_disk`
-        (`FsCrash.v:1262-1290`, `fs_rec`); `P_fs` gains
-        `P_wf : iProp` as an OPAQUE, timeless parameter of the crash layer
-        (`P_fs_named_timeless` `:1906` and `P_fs_rec_agree` `:1801` take
-        it as a side condition).  The FS instantiates it in stage 2.
-      - `LogInv.log_state` parks `Ψ D₀ L` (Ψ a parameter of `log_ctx`, as
-        `bio_view` is of bio); `D₀` is the value 1a exports.
-      - `SpecLogWrite`'s four forms (`_au`, `_gene`, `_gen`, `_sconf`) take
-        the §5 AU instead of the `Ob : gset fsobj` declaration; the eleven
-        suppliers (balloc ×2, ialloc, iput, iupdate, bfree, writei ×2,
-        bmap, the two `ProofBmap` contract suppliers) instantiate it at
-        their current content (moving their `fsblock` + whatever their
-        invariant holds — stage 2 re-states those invariants over
-        `inode_owned Γ_L`; here the AU's SHAPE lands).
-      - `SpecEndOp` loses `end_op_fin` (`LogInv.v:990-1029`,
-        `SpecEndOp.v:143-163`, 30 call sites); the commit path runs the
-        payload's debt through the 1b permit with the lent `γD` auth.
-      - DELETE: `FsObj.v`, `FsObjEff.v`, `FsObjType.v`; the object set in
-        `Xv6Cameras.op_entry` (back to `(nat * gset Z * nat)`, the three
-        projections lose one `.1`); `op_pending` over objects;
-        `log_row_a`/`_body`/`_pending`/`_body_mono` (`LogInv.v:908-971`);
-        `log_state_fin`'s bundle; `FsWfImg.v`.  `FsWf.v` and the
-        `FsEff*`/`FsOp*` files stay until stage 2 decides what survives
-        (`fs-state.md` §6).
+- [~] **1d. The parked payload and the two AUs; `γD`.**  PARTIALLY
+      LANDED (three commits, tree green at each, audit at baseline).
+      Items 1, 5 and 6 of the lane's spec are DONE; items 2, 3 and 4 (the
+      parked payload and `log_write`'s payload AU) are NOT, and the design
+      for them is measured and recorded below.
+
+      **LANDED — the object ledger and row (a) are gone (spec items 5, 6).**
+      - `Xv6Cameras.op_entry` is `(nat * gset Z * nat)` again (budget
+        `e.1.1`, already-logged blocks `e.1.2`, birth epoch `e.2`); the
+        three projections each lost one `.1`, one regex over the five
+        files flip-C1 touched.  `op_pending` is the BLOCK union again.
+        `log_opSe` / `log_begin_step` / `log_spend_step` /
+        `log_absorb_step` / `log_record_step` / `log_end_step` lost the
+        object component; the client token's ABI never exposed it, so no
+        begin → … → end threading moved.
+      - `LogInv.log_row_a`, `_body`, `_pending`, `_body_mono` and
+        `log_state`'s row (a) conjunct are DELETED with their six call
+        sites.  `log_state` still takes `pend` and does not read it; both
+        moves (`log_state_pend_mono`, `log_state_fin`) are the identity,
+        and `log_state_fin` lost its bundle argument.
+      - `LogInv.end_op_fin` / `end_op_fin_placeholder`, `SpecEndOp`'s
+        premise and its **30 call sites** across 16 files are DELETED.
+        With 1b's `end_op_pres`, **`end_op` has no FS-facing premise at
+        all** — `fs-state.md` §5's last bullet, literally.
+      - The `Ob : gset fsobj` parameter of `SpecLogWrite`'s four forms and
+        of `log_spend_step`/`log_record_step` is gone, with the eleven
+        `{[OBlk …]}` literals and `ProofBmap.log_write_contract`'s binder.
+      - `FsObj.v`, `FsObjEff.v`, `FsObjType.v`, `FsWfImg.v` DELETED (and
+        out of `_CoqProject`).  `FsWf.v` and `FsEff*`/`FsOp*` stay, but
+        NOTHING in the crash or log layer imports them: `LogInv.v` dropped
+        `FsImg`, `FsWf` and `FsObj*` outright.
+
+      **LANDED — `γD` and `P_wf` (spec item 1).**
+      - `FsWf.fs_durable_wf` (body `True`) and `fs_durable_wf_placeholder`
+        are DELETED.  `fs_rec_wf` is the WAL layer's three conjuncts.
+      - `fs_crash_names` gains `fcn_view : gname` — a byte-keyed
+        `ghost_map Z (bv 8)` riding `DiskImg.diskImgG`, allocated with the
+        record in `P_fs_alloc` at `fs_dbytes D0` (the byte flattening of
+        the image's committed home map).
+      - `P_fs` carries `ghost_map_auth (fcn_view γs) 1 (fs_dbytes (fr_D r))`
+        (`P_disk`'s) and `fs_dview (fcn_view γs) (fs_dbytes (fr_D r))`
+        (`P_wf`'s — `fs-state.md` §1's `Φ_D` over the home range).  Both
+        live inside `crashN`; no mortal holds either.
+      - Every preserving permit frames the pair; the COMMIT
+        (`fs_commit_L_sector0_rec`) runs `fs_dview_rebase` at the `D'` it
+        already names.  The `*** LANE 1d / STAGE 2 SLOT ***` comment is
+        replaced by the move it reserved.
+      - **DEVIATION, measured:** `P_wf` is a SEALED DEFINITION
+        (`FsCrash.fs_dview`, `Typeclasses Opaque`, with `fs_dview_timeless`
+        and `fs_dview_rebase`) rather than an opaque parameter.
+        `P_fs_any` sits inside `fs_crash_seam`, which appears BY NAME in
+        the statements of **90 files** (`SpecKexec.fs_fabric`,
+        `FsReady.fs_ready`, `UsertrapRes`, every syscall contract), so an
+        `iProp`-valued parameter reaches all of them whether it is an
+        explicit argument or an ambient class — the cone 1c-flip's
+        ratified deviation refused for `ireg_inv`'s `home`.  The body is
+        honest content and stage 2 replaces it by `fs_view Γ_D`, which
+        CONTAINS it; nothing above `FsCrash.v` names the body.
+      - `γD` is likewise in `fs_crash_names` rather than `riscvFixedGS`.
+        Nothing at 1d needs to name it from outside `P_fs`; stage 2 does
+        (for `Γ_D.Φ_D`), and the hoist is `Pc`/`HPc`/`Hproj`/`Hswap`/
+        `boot_fixedGS` gaining a fifth gname — the same seam-equation move
+        `riscv_swap_name` already makes.
+      - `SystemAdequacy.fs_boot_pure` drops the `fs_durable_wf D` conjunct.
+
+      **LANDED — the log can name `D₀`.**  `fs_restrict`, `fs_install_step`
+      and `fs_install` moved DOWN from `FsCrash.v` to `LogDefs.v` (their
+      theory stays), joined by `lm_committed M cov ls` (1a's
+      `fs_recovery_of_mirror` term under its own name), `lm_logged L cov ls`
+      (the view a commit installs) and `lm_committed_clean` — row (b) at
+      the empty batch turns `lm_committed M'` into `lm_logged L`, which is
+      exactly what an `end_op` re-deposit needs to re-park a payload.
+
+      **NOT LANDED — the payload and the AUs (spec items 2, 3, 4), and the
+      design that was measured for them.**  The shape below was written and
+      `LogInv.v` compiled green at it before the lane stopped; it was
+      reverted rather than left half-threaded.
+      - **Ψ's arity: `Ψ : gmap Z (list (bv 8)) → iProp Σ`, indexed by the
+        committed view ALONE**, not by `L` as `fs-state.md` §5 writes it.
+        The logged view needs no index: stage 2's payload is `fs_view Γ_L`,
+        whose abstract state is existential (§4) and whose byte content is
+        pinned to `L` by the ELEMENTS it holds against the log's auth (1c).
+        An `L` index is not merely redundant, it is FATAL to item 3: it
+        would make every `log_write`'s AU re-index the payload, which no
+        client can do for an arbitrary `Ψ`, so the eleven suppliers could
+        not "return the payload untouched (frame it)" and the interface
+        could not be proven Ψ-parametrically at all.  With the `D₀` index
+        the payload goes in and comes back UNCHANGED at a `log_write`, and
+        moves at the commit and nowhere else — where `γD` moves too.
+      - **Ψ's packaging: an EXISTENTIAL in `log_ctx`.**  Measured:
+        `log_ctx` appears in **78 files**, `log_state` at 98 occurrences,
+        `log_res` in 13 — and the 78 include `SpecKexec.fs_fabric`,
+        `FsReady.fs_ready`, `UsertrapRes` and every syscall contract, none
+        of which has any business naming a file-system payload.  So:
+        `log_ctx_at Ψ γ bn γfs cov ls dev` is the Ψ-named form (the lock at
+        `log_res Ψ …`, plus the payload's commit law), and
+        `log_ctx γ bn γfs cov ls dev := ∃ Ψ, log_ctx_at Ψ γ …` keeps the
+        arity that 78 files already thread.  It stays persistent, and a
+        client that must name `Ψ` (log_write's callers, end_op's
+        committer) opens the existential IN ITS PROOF — sound because only
+        one log lock is ever allocated, and invisible above because the
+        eleven suppliers only frame the payload.  A CLASS was refuted for
+        `log_ctx` the same way it was for `P_wf`: the instance would have
+        to be in scope in every file that mentions any statement in the
+        cone.
+      - **The client's whole obligation is one persistent law**, carried by
+        `log_ctx_at`:
+        `log_psi_commit Ψ cov ls := □ (∀ M L, Ψ (lm_committed M cov ls) ==∗
+        Ψ (lm_logged L cov ls))`.
+        Persistent is not a weakening: the LINEARITY stage 2's debt needs
+        lives inside `Ψ D₀`, which this update consumes; what is uniform is
+        only the right to spend it at a commit, which the log must have in
+        every batch.  `ProofInitlog` discharges it at `Ψ := fun _ => emp`
+        with no boot-chain threading at all, because `log_ctx`'s
+        existential lets the BOOT choose the witness.
+      - **THE FINDING THE ORCHESTRATOR SHOULD RULE ON.**  The commit AU as
+        item 4 states it — `⌜D' = L on home⌝ -∗ Ψ D₀ ∗ γD_auth D₀ ==∗
+        Ψ D' ∗ γD_auth D'` — is NOT dischargeable by any `Ψ` a client can
+        choose, at any stage, in that form.  Moving `ghost_map_auth γD 1 B`
+        to `B'` requires the ELEMENTS of `B`, and those may not be owned by
+        anything mortal (crash.md principle 1), so they are `P_wf`'s and
+        live in `crashN`.  Either the durable side's advance stays inside
+        the permit (what landed: `fs_dview_rebase`, and the client's law is
+        purely about `Ψ`), or the AU takes `P_wf` as a third input and the
+        permit LENDS both — which is the shape stage 2's debt wants, and
+        which needs the payload to be nameable at the commit permit.  The
+        landed split is forward-compatible with either: `fs_dview_rebase`
+        is a lemma, not a premise, so adding the client input later changes
+        `fs_commit_L_sector0_rec`'s statement and nothing else.
+      - **What the remaining work is**, in order: `log_state`/`log_res`
+        gain `Ψ` (green already); `SpecLogWrite`'s four forms take
+        `log_ctx_at Ψ` and the AU hands `Ψ D₀` in and out (`lw_au_lb0` is
+        the adapter that keeps the five AU suppliers byte-stable);
+        `ProofLogWrite` frames the payload at the ghost step (its `M` does
+        not move at a `log_write`, so the index does not either);
+        `ProofBeginOp`/`ProofInitlog`/`ProofSysSync` re-pack one more
+        conjunct; and `ProofEndOp`'s commit path carries `Ψ (lm_committed
+        M0 …)` from `eo_open_of_batch` to `eo_open_to_batch`, spending
+        `log_psi_commit` once and closing with `lm_committed_clean`.
+        `ProofEndOp` is the only deep one: the payload must ride beside
+        `log_mirror_half` through `eo_loop` / `eo_commit`.
 
 ## Stage 2 — the file system predicates
 

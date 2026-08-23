@@ -2609,9 +2609,8 @@ Section ProofInitlog.
          [L] from the era's disk, the mirror was born at that disk, and the
          recovering install moved the two at exactly the same blocks to
          exactly the same bytes.  So the row is arithmetic on the chain. *)
-      iSplitR.
-      { iPureIntro.
-        intros bb Hbb _.
+      iPureIntro.
+      { intros bb Hbb _.
         rewrite /fs_home_set in Hbb.
         apply elem_of_difference in Hbb as [Hbcov Hbout].
         assert (Hbhdr : bb <> log_hdr_bno logstart)
@@ -2647,15 +2646,7 @@ Section ProofInitlog.
           rewrite (lm_install_miss M ((hdr_dec bs_hdr).2)
                      (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) bb
                      HnnW Hmiss2).
-          exact (HLmir bb Hbcov). }
-      (* ROW (a) AT BOOT, gated (durable-disk flip-C1).  The real content is
-         [A0 := the image's home restriction] with [fs_durable_wf_body A0]
-         off [FsWfImg.fsimg_durable_wf] and [FsCfgBoot]'s conjunct (13),
-         which stage G1 landed for exactly this -- but the agreement half
-         needs [L] and the era's picture to be ONE reading of one image,
-         which is stage H2a's re-founded boot.  So it rides H2a beside row
-         (b); the argument is at [LogInv.log_row_a]. *)
-      iPureIntro. apply log_row_a_pending. }
+          exact (HLmir bb Hbcov). } }
     iAssert (log_res γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.

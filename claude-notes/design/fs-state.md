@@ -239,9 +239,24 @@ The log exposes, and knows, only this:
 
 `FsCrash.end_op_pres`, `fs_commit_pres`, `LogInv.end_op_fin`, the
 `∀ V Ws` / `∀ F L pend` shapes, the object ledger in `op_entry`, `FsObj*`,
-`log_row_a*` are REJECTED and deleted: they leaked the log's internals
-upward and, being quantified over pictures no caller can name, were not
-dischargeable by any arm (they were green only as placeholders).
+`FsWfImg`, `log_row_a*` and `FsWf.fs_durable_wf` were REJECTED because
+they leaked the log's internals upward and, being quantified over pictures
+no caller can name, were not dischargeable by any arm (they were green
+only as placeholders).  **They are all DELETED in the tree** — the last of
+them by durable-disk 1d, which also deleted their 30 + 6 gate call sites;
+`end_op` now takes no FS-facing premise at all.
+
+**One correction to the payload's arity, measured by 1d and not yet
+landed**: `Ψ` should be indexed by `D₀` ALONE, not by `D₀` and `L`.  The
+logged view needs no index — the payload's `Γ_L` content is pinned to `L`
+by the byte ELEMENTS it holds against the log's auth, and `fs_view Γ_L`
+binds its state existentially (§4) — and an `L` index would make every
+`log_write`'s AU re-index the payload, which no client can do for an
+arbitrary `Ψ`, so no supplier could frame it and the interface could not
+be proven Ψ-parametrically at all.  See
+[`../projects/durable-disk.md`](../projects/durable-disk.md) item 1d for
+that, for the existential packaging of `Ψ` in `log_ctx`, and for why the
+commit AU's `γD_auth` input needs `P_wf` beside it.
 
 ## 6. What this supersedes in the tree
 

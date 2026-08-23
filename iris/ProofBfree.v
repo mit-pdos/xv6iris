@@ -652,9 +652,6 @@ Section BfreeTail.
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 u cr Sb e0
               0%nat (⊤ ∖ ↑bitmapN) emp%I
-              (* the coarse object declaration: this write masks the whole
-                 block (durable-disk flip-C1; flip-C2 refines it to [OBit]) *)
-              {[OBlk (uint bnoB)]}
               T0 0%nat b (proc_addr j) (K - 4)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT0a0
               ltac:(rewrite Hbno; exact Hcov)

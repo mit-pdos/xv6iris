@@ -302,6 +302,36 @@ Refines the ruling above; worklist stages E–I in
    `⌜wf(L)⌝ + ⌜install of the batch over D = L⌝` — no `end_op` exit arm
    states install-arithmetic.
 
+### `P_disk` / `P_wf` as they actually stand (durable-disk 1d, landed 2026-08-23)
+
+Decision 1's split is now real in the tree, and the FS half is a RESOURCE
+rather than a pure sweep:
+
+* `FsCrash.fs_rec_wf` is exactly the WAL layer's own three conjuncts —
+  `fs_recovery`, `last (fr_hist r) = Some (fr_D r)`, `hdr_wf`. The fourth
+  (`FsWf.fs_durable_wf (fr_D r)`, body `True`) is DELETED, together with
+  `fs_durable_wf` and `fs_durable_wf_placeholder`.
+* `P_fs` gains two conjuncts, both indexed by `fr_D r`:
+  `ghost_map_auth (fcn_view γs) 1 (fs_dbytes (fr_D r))` — the durable BYTE
+  view's authority, `P_disk`'s — and `fs_dview (fcn_view γs) (fs_dbytes
+  (fr_D r))` — its exclusive elements, which are `fs-state.md` §1's `Φ_D`
+  and are `P_wf`'s. `fs_dbytes` is the byte flattening of a block map
+  (block `b`'s byte `i` at `b·BSIZE + i`).
+* `γD` is `fs_crash_names`'s new `fcn_view`, allocated with the record in
+  `P_fs_alloc`. It is fixed-LAYER in the sense that matters (never
+  re-minted, no mortal ever holds an element); it is not yet a
+  `riscvFixedGS` field, and hoisting it there is stage 2's job — the era
+  needs to name it only when `Γ_D` becomes `fs_view Γ_D`.
+* **It moves only at the commit.** Every preserving permit frames the pair;
+  `fs_commit_L_sector0_rec` runs `fs_dview_rebase` at the `D'` it already
+  computes (`L` on the home set). `fs_dview` is `Typeclasses Opaque`.
+* `P_wf` is a SEALED DEFINITION, not a parameter, and that is a measured
+  deviation: `P_fs_any` sits inside `fs_crash_seam`, which appears by name
+  in the statements of 90 files, so an `iProp`-valued parameter — explicit
+  argument or ambient class, it makes no difference — reaches all of them.
+  Stage 2 replaces the body by `fs_view Γ_D`, which CONTAINS it, and turns
+  `fs_dview_rebase` into the client's debt.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of

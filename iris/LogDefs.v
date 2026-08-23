@@ -121,6 +121,118 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* THE COMMITTED VIEW, AS A FUNCTION OF A PICTURE (durable-disk 1d).       *)
+(*                                                                         *)
+(* These three used to live in [FsCrash.v] and moved DOWN here because the *)
+(* LOG has to name the value it parks the client's payload at, and the log *)
+(* layer may not import the crash layer.  Their theory (recovery, the      *)
+(* install lemmas, the permits) stays in [FsCrash.v], which re-exports     *)
+(* this file.                                                             *)
+(* ---------------------------------------------------------------------- *)
+
+(* a total block view, restricted to a finite set of block numbers *)
+Definition fs_restrict (P : Z -> list (bv 8)) (s : gset Z)
+    : gmap Z (list (bv 8)) :=
+  set_to_map (fun b => (b, P b)) s.
+
+(* INSTALLING the on-disk log over the home map: entry [i] of the write set
+   takes its content from log slot [i].  A [foldr] over the INDEX list
+   rather than over [W] itself, because the content's block number
+   ([log_slot_bno logstart i]) is a function of the index.  The step is a
+   NAMED function (not an inline lambda) so that every lemma in [FsCrash.v]
+   unifies against the same head rather than against a fresh beta-redex. *)
+Definition fs_install_step (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (m : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
+  match W !! i with
+  | Some b => <[ b := P (log_slot_bno logstart i) ]> m
+  | None => m
+  end.
+
+Definition fs_install (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
+  foldr (fs_install_step P logstart W) D (seq 0 (length W)).
+
+Lemma fs_restrict_lookup_Some (P : Z -> list (bv 8)) (s : gset Z)
+    (b : Z) (v : list (bv 8)) :
+  fs_restrict P s !! b = Some v <-> b ∈ s /\ v = P b.
+Proof.
+  rewrite /fs_restrict lookup_set_to_map; last by intros y y' _ _ ?.
+  split.
+  - intros (x & Hx & Hf). injection Hf as Hb Hv. subst. done.
+  - intros [Hb ->]. exists b. done.
+Qed.
+
+Lemma fs_restrict_dom (P : Z -> list (bv 8)) (s : gset Z) :
+  dom (fs_restrict P s) = s.
+Proof.
+  apply set_eq. intros b. rewrite elem_of_dom. split.
+  - intros [v Hv]. by apply fs_restrict_lookup_Some in Hv as [? _].
+  - intros Hb. eexists. apply fs_restrict_lookup_Some. done.
+Qed.
+
+Lemma fs_restrict_lookup_None (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  b ∉ s -> fs_restrict P s !! b = None.
+Proof.
+  intros Hb. destruct (fs_restrict P s !! b) as [v|] eqn:Hv; [|reflexivity].
+  apply fs_restrict_lookup_Some in Hv as [Hin _]. done.
+Qed.
+
+Lemma fs_restrict_lookup (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  fs_restrict P s !! b = (if decide (b ∈ s) then Some (P b) else None).
+Proof.
+  destruct (decide (b ∈ s)) as [Hb|Hb].
+  - by apply fs_restrict_lookup_Some.
+  - by apply fs_restrict_lookup_None.
+Qed.
+
+Lemma fs_restrict_ext (P P' : Z -> list (bv 8)) (s : gset Z) :
+  (forall b, b ∈ s -> P' b = P b) -> fs_restrict P' s = fs_restrict P s.
+Proof.
+  intros HP. apply map_eq. intros b. rewrite !fs_restrict_lookup.
+  destruct (decide (b ∈ s)) as [Hb|Hb]; [|reflexivity]. by rewrite (HP b Hb).
+Qed.
+
+Lemma fs_install_nil (P : Z -> list (bv 8)) (logstart : Z)
+    (D : gmap Z (list (bv 8))) :
+  fs_install P logstart [] D = D.
+Proof. reflexivity. Qed.
+
+(* THE COMMITTED VIEW A PICTURE RECOVERS TO -- [FsCrash.fs_recovery_of_mirror]'s
+   term, under its own name.  This is what durable-disk 1a bought: with the
+   era's mirror born true, the era knows [fr_D] BY VALUE, with no disk in
+   it, so the log can index the client's parked payload by it. *)
+Definition lm_committed (M : log_mirror) (cov : gset Z) (ls : Z)
+    : gmap Z (list (bv 8)) :=
+  fs_install (lm_view M) ls (lm_hdr M ls).2
+    (fs_restrict (lm_view M) (fs_home_set cov ls)).
+
+(* ...and the committed view a LOGGED view yields on the home set: what a
+   commit installs, and the index the parked payload comes back at.  The
+   reading is spelled out rather than written through [FsWf.dv_of_D],
+   which lives ABOVE this file -- the two are the same term up to delta,
+   so a crash-layer proof that holds [fs_restrict (dv_of_D L) …] closes
+   against this one by [reflexivity]. *)
+Definition lm_logged (L : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z)
+    : gmap Z (list (bv 8)) :=
+  fs_restrict (fun b => default [] (L !! b)) (fs_home_set cov ls).
+
+(* THE CLEAN PICTURE'S COMMITTED VIEW IS THE LOGGED VIEW (durable-disk 1d).
+   Between commits the on-disk header is clean, so nothing is installed and
+   the committed view is just the picture on the home set -- and row (b)
+   ([LogInv.log_mirror_tie_body] at the empty batch) says the picture and
+   the logged map agree there.  This is what lets [end_op]'s re-deposit
+   park the client's payload at the index the commit produced. *)
+Lemma lm_committed_clean (M : log_mirror) (L : gmap Z (list (bv 8)))
+    (cov : gset Z) (ls : Z) :
+  lm_hdr M ls = (0%nat, []) ->
+  (forall b : Z, b ∈ fs_home_set cov ls -> L !! b = Some (lm_view M b)) ->
+  lm_committed M cov ls = lm_logged L cov ls.
+Proof.
+  intros Hhdr Hrow. rewrite /lm_committed /lm_logged Hhdr /= fs_install_nil.
+  symmetry. apply fs_restrict_ext. intros b Hb. by rewrite (Hrow b Hb).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* THE INSTALL PASS'S PICTURE, AS A TERM (durable-disk 1a).                 *)
 (*                                                                         *)
 (* An install pass overwrites home block [Ws[i]] with the logged content    *)

@@ -85,7 +85,6 @@ Require Import Riscv.rv64d_types.
 Require Import RiscvLang.     (* [CPU]                                        *)
 Require Import VirtioQueue.   (* [vslot]; brings [virtio_cfg] / [disk_wr]     *)
 Require Import DinodeEnc.     (* [dinode]                                     *)
-Require Import FsObjType.     (* [fsobj]: the ledger entry's object set        *)
 
 Local Open Scope Z_scope.
 
@@ -319,31 +318,22 @@ Proof. solve_inG. Qed.
 
 (* One outstanding op's entry: its remaining BUDGET, the set of blocks it
    has ALREADY logged (so a re-log of a block already in lh.block[] costs
-   nothing), the epoch it was minted in, and -- since durable-disk flip-C1
-   -- the set of OBJECTS it has claimed.
+   nothing), and the epoch it was minted in.
 
-   WHY BOTH SETS.  The block set is the LOGBLOCKS accounting: it is what
-   makes a re-log free and what [log_res] ties to lh.block[].  The object
-   set is row (a)'s: an open transaction may move the logged view away
-   from the committed one only at the objects it has claimed, and blocks
-   are far too coarse a claim for that -- the bitmap block is shared by
-   every allocating op in a group, an inode block packs 16 dinode slots
-   and a dir block 64 records.  Per-block finalize responsibility fails on
-   exactly those; per-OBJECT responsibility is exclusive while the op is
-   open, which is the whole argument of the flip (durable-disk.md, "FLIP
-   DESIGN OF RECORD").  So the two coexist and neither is derivable from
-   the other.
+   THE OBJECT SET IS GONE (durable-disk 1d).  flip-C1 appended a
+   [gset fsobj] here for row (a) of [LogInv.log_state] -- "the logged view
+   is the committed view except at the objects some open transaction has
+   claimed".  Ruling 3 (claude-notes/design/fs-state.md) deletes row (a)
+   outright: there is no abstract committed picture [A] and no per-op
+   finalize obligation, so nothing reads an object set and the entry is
+   back to its three fields.
 
-   NOTE THE RE-ASSOCIATION: [(nat * gset Z * nat * gset fsobj)] is
-   [(((nat * gset Z) * nat) * gset fsobj)], so the budget is [e.1.1.1],
-   the already-logged set is [e.1.1.2], the birth epoch is [e.1.2] and the
-   object set is [e.2].  The object set was appended rather than spliced
-   so that the three older projections shift UNIFORMLY (each gains one
-   [.1]) -- which is what made the flip's sweep mechanical.  The design
-   argument for the block set and the epoch is in LogInv.v, above
-   [Definition op_sum]; for the object set, above [Definition
-   op_pending]. *)
-Definition op_entry : Type := (nat * gset Z * nat * gset fsobj)%type.
+   NOTE THE RE-ASSOCIATION: [(nat * gset Z * nat)] is
+   [((nat * gset Z) * nat)], so the budget is [e.1.1], the already-logged
+   set is [e.1.2] and the birth epoch is [e.2].  The design argument for
+   the block set and the epoch is in LogInv.v, above [Definition
+   op_sum]. *)
+Definition op_entry : Type := (nat * gset Z * nat)%type.
 
 (* THE EPOCH USES THE AMBIENT [mono_natG] FROM [riscvGS] (the power layer's
    [riscvF_genGS], RiscvPtsto.v) -- NOT a new field here.  A second

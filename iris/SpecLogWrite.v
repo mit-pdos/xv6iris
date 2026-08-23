@@ -79,7 +79,6 @@ Require Import CpuOwn.
 Require Import DiskPtsto.
 Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsObjType.  (* [fsobj]/[OBlk]: the writer's object declaration *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -95,7 +94,7 @@ Definition wp_log_write_gen_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-    (cr : bool) (Sb : gset Z) (Ob : gset fsobj)
+    (cr : bool) (Sb : gset Z)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -198,17 +197,6 @@ Definition wp_log_write_gen_body
    [Φfsb := fsblock (fs_bytes γfs) (uint bno) bs], and the fupd is two iModIntros --
    that is [wp_log_write_gen] below, derived, so no existing caller
    moves. *)
-    (* THE WRITER'S OBJECT DECLARATION (durable-disk flip-C1).  What this
-       log_write puts into the ledger's OBJECT set for the calling op --
-       the objects of [bno] the write is allowed to move [L] at, and hence
-       the ones row (a) stops requiring agreement on until this op ends.
-       DECLARING MORE IS ALWAYS SOUND (row (a) only weakens); declaring too
-       little is what the maintenance obligation rules out, and that
-       obligation is gated with row (a) itself ([LogInv.log_row_a]).
-       Every writer today declares the COARSE [{[OBlk (uint bno)]}], which
-       masks the whole block; flip-C2 refines the fs-level writers to
-       [ORec] / [OBit] / [OSlot] arm by arm, and this parameter is the
-       place that refinement happens -- no interface moves again. *)
 Definition wp_log_write_au_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (bn : bio_names)
@@ -217,7 +205,7 @@ Definition wp_log_write_au_body
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
-    (Efs : coPset) (Φfsb : iProp Σ) (Ob : gset fsobj)
+    (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -385,7 +373,7 @@ Definition wp_log_write_gene_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-    (cr : bool) (Sb : gset Z) (e0 : nat) (Ob : gset fsobj)
+    (cr : bool) (Sb : gset Z) (e0 : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -444,7 +432,7 @@ Definition wp_log_write_sconf_body
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
-    (bs bsl bsd : list (bv 8)) (d : bool) (u : nat) (Ob : gset fsobj)
+    (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -512,11 +500,11 @@ Module Type LOG_WRITE.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
-      (Efs : coPset) (Φfsb : iProp Σ) (Ob : gset fsobj)
+      (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
-                           bs bsl bsd d u cr Sb e0 vlb Efs Φfsb Ob m n eb p K b lks.
+                           bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p K b lks.
 
   (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20).  Derived from the
      atomic-update one at a held [fs_chalf] and the trivial anchor, and it is
@@ -527,11 +515,11 @@ Module Type LOG_WRITE.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-      (cr : bool) (Sb : gset Z) (e0 : nat) (Ob : gset fsobj)
+      (cr : bool) (Sb : gset Z) (e0 : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
-                             bs bsl bsd d u cr Sb e0 Ob m n eb p K b lks.
+                             bs bsl bsd d u cr Sb e0 m n eb p K b lks.
 
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
      set-forgetting instance of this at [cr = false]; it is kept as its own
@@ -543,20 +531,20 @@ Module Type LOG_WRITE.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-      (cr : bool) (Sb : gset Z) (Ob : gset fsobj)
+      (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gen_body bn γ γfs γd cov logstart dev k pidv bno
-                            bs bsl bsd d u cr Sb Ob m n eb p K b lks.
+                            bs bsl bsd d u cr Sb m n eb p K b lks.
 
   Parameter wp_log_write_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
-      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat) (Ob : gset fsobj)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_sconf_body bn γ γfs γd cov logstart dev k pidv bno
-                              bs bsl bsd d u Ob m n eb p K b lks.
+                              bs bsl bsd d u m n eb p K b lks.
 End LOG_WRITE.
