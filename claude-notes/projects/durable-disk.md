@@ -46,7 +46,12 @@ completions (principle 1) or from `P_fs`'s own pure content (opening
 ## 1½. STATE AT THE FOURTH CHECKPOINT (handoff point)
 
 Everything below is on `main` and VM-green with `make audit-only` at the
-8-entry baseline after every commit. Landed, in order:
+audit baseline after every commit. THE BASELINE MOVED 2026-08-22 (another
+lane's `bf1d615b`: the Sail platform externs are bound in
+`xv6iris_extras.v`): it is now THREE entries —
+`xv6iris_extras.resv_matches`, `xv6iris_extras.resv_is_valid`,
+`functional_extensionality_dep` — wherever this file says "8-entry
+baseline", read the current three. Landed, in order:
 
 - **Stages A, B, D1, D2** (see the stage sections): the fixed-gname
   durable disk, `hdr_wf`, general `initlog`/`install_trans` at the log
