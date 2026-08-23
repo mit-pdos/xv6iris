@@ -43,7 +43,6 @@ Require Import BlockWords.
 Require Import DirentEnc.
 Require Import DinodeEnc.
 Require Import BitmapEnc.
-Require Import InodeDefs.
 Require Import DirView.
 Require Import FsTree.
 Require Import FsImg.

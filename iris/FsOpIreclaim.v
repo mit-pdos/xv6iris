@@ -38,12 +38,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.
-Require Import BioDefs.
 Require Import DinodeEnc.
 Require Import FsImg.
 Require Import FsWf.
 Require Import FsEffBase.
-Require Import FsEffFreeInode.
 Require Import FsOpIputFree.
 
 Local Open Scope Z_scope.

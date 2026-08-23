@@ -70,12 +70,10 @@ From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.  (* [nth_byte_assemble_len] *)
 Require Import BioDefs.          (* [BSIZE] *)
 Require Import BlockWords.       (* [ind_bytes] and its lookups *)
-Require Import DirentEnc.
 Require Import DinodeEnc.
 Require Import BitmapEnc.
 Require Import InodeDefs.        (* [file_byte] *)
 Require Import DirView.
-Require Import FsTree.
 Require Import FsImg.
 Require Import FsWf.
 Require Export FsObjType.  (* [fsobj] + its [Countable]; see the note below *)

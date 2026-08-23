@@ -55,10 +55,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.
-Require Import BioDefs.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import FsTree.
 Require Import FsImg.
 Require Import FsWf.
 Require Import FsEffBase.

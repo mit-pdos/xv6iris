@@ -48,7 +48,7 @@ Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
-Require Import PermInv.
+Require Import Xv6Cameras.
 Require Import SpecWakeup SpecAcquire SpecRelease.
 Require Import CodeVirtioDiskIntr.
 Require Import SpecVirtioDiskIntr.

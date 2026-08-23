@@ -69,7 +69,6 @@ Require Import DirView.
 Require Import FsTree.
 Require Import FsImg.
 Require Import FsWf.
-Require Import FsEffBase.
 Require Import FsEffCreateEntry.
 Require Import FsEffFreeInode.
 

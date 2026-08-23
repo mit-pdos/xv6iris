@@ -87,7 +87,8 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeWriteHead.
 Require Import SpecBread SpecBwrite SpecBrelse.
-Require Import FsCrash.
+Require Import BioDefs.
+Require Import LogDefs.
 Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

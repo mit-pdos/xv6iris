@@ -75,7 +75,8 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import BioDefs.
+Require Import LogDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

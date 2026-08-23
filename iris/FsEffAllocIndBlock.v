@@ -36,10 +36,8 @@ From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.
 Require Import BioDefs.
 Require Import BlockWords.
-Require Import DirentEnc.
 Require Import DinodeEnc.
 Require Import BitmapEnc.
-Require Import InodeDefs.
 Require Import DirView.
 Require Import FsTree.
 Require Import FsImg.
