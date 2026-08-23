@@ -104,6 +104,24 @@ reason in the previous bullet.
 NEXT: thread `Nd` (and the `csync`-shaped policy conclusion) through Cert4
 / Walk / Progress / Walk2 so `wwit_vindep` disappears; then the paired
 taint law; then re-run the audit.
+RE-AUDIT after the Nd migration (2026-08-24): `wwit_vindep` retired and
+the value clause gone, BUT `wsupply`'s `wrds_free d0 T` quantifies over
+EVERY block from ANY node ("no emitted block reads a carrier in `T`") —
+false for any `T ≠ []` at a real execution — so the capstone's `∃ W T`
+is satisfiable only at `T = []`: witnesses whose value is never used
+(the `cy_m` shape).  The diverged-arm machinery is PROVED to work
+(`w2_seg_step_diverged` at `T = [x15]`; the real tail via
+`WeakEvProv2.tpar`), but a global fixed `T` with a global read-freedom
+clause was a shortcut.  NEXT (the honest design): per-hart ACCUMULATED
+taint (`T_x` grows at each witness by the tail's written carriers,
+`taint_closure`/`tpar`), a THIRD row-relation arm for POISONED reads
+(any non-write label at a position whose instruction reads a tainted
+carrier — a load whose address depends on the witness; its G-label is
+unreproducible and, not feeding the exit, is irrelevant to the kill),
+and an explicit boundary for the FAULT case (a poisoned address that
+traps changes control flow — either excluded by classification or
+shown to be a pf run the EWPs cover but the row does not follow).
+Only exits are required untainted (deps-independence).
 LESSON for the discipline: "assumptions Closed + tree green" is not
 enough — every NEW hypothesis needs a non-coincidental satisfiability
 witness, and a witness constructed to make a hypothesis hold is the
