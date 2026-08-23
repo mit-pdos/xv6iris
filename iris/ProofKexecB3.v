@@ -3370,6 +3370,7 @@ Section KexecB3Close.
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
     all: try exact (FsCrash.end_op_pres_placeholder _ _).
+    all: try exact (LogInv.end_op_fin_placeholder _ _).
     iIntros (CIDe Hse M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc1ae : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KXB + 0x1ae))
       by (rewrite HB3ra; cpcw).

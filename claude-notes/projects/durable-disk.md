@@ -93,12 +93,9 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-- branch `worktree-agent-a6d25e11aa9e976a8`: flip-C1 (the object
-  ledger plumbing with row (a) gated; spec = the flip-C bullet's C1
-  half).
-
-(F3.5's dirent transport bundles remain [~] in §5½; the at-form sector
-builders' cleanup rides H2a per the flip-B bullet.)
+(nothing in flight; flip-A, flip-B and flip-C1 merged. F3.5's dirent
+transport bundles remain [~] in §5½; the at-form sector builders'
+cleanup rides H2a per the flip-B bullet.)
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
@@ -108,9 +105,12 @@ G1-impl is MERGED (no longer in flight): `log_state` + `op_pending`
 landed; row (b) rides the GATED `log_mirror_tie` (interim `True`;
 `log_mirror_tie_pending` is the gate, dischargers G3 (the deposit,
 via the value-chained primitives) and H2 (the boot pack)); the
-`ProofEndOp` fast-path re-deposit carries the `log_state_pend` debt
-for the G1-flip/G2 arms; `fs_links_eq` is conjunct (13) end to end.
-See the G1-impl entry for the site table.
+`fs_links_eq` is conjunct (13) end to end.
+See the G1-impl entry for the site table.  **`log_state_pend` is gone
+as of flip-C1** — the object-level pending union has an exact delete
+split, so the fast-path re-deposit is `log_state_fin` +
+`log_state_pend_mono` and carries no debt; the G1-impl entry's
+description of it is history.
 
 **Next steps, in order (all specs live in this file):**
 1. ~~Effect 8~~ DONE and MERGED: `eff_alloc_ind_block` landed
@@ -351,25 +351,86 @@ See the G1-impl entry for the site table.
        `SpecWriteHead` / `SpecSysSync` / `RiscvPtsto`. Do it with, or
        just after, H2a's value-chained boot permits, which will want the
        same sector machinery at a named picture.
-   - **flip-C** (closes over A+B), STAGED like G1-impl:
-     **flip-C1** (plumbing, green with a gate): `op_entry` gains an
-     OBJECT set (`gset fsobj`; the block set stays for the LOGBLOCKS
-     budget), `op_pending` moves to objects, `log_state` gains row (a)
-     GATED (`log_row_a` with interim body `True`;
-     `log_row_a_pending` the gate — the real body is `∃ A, dom/wf/
-     views_agree_off A L sb (op_pending om)` in flip-A's vocabulary),
-     `SpecEndOp` gains the FINALIZE premise in its final shape (the
-     op's object set + its effect datum + the fold/wf obligations as
-     one bundle — design the bundle so an arm's supply is its G2
-     lemma + flip-A fold + its per-block L-equations and nothing
-     else), arms supply their object sets with the wf/fold halves
-     trivially dischargeable through the gate. The `log_state_pend`
-     debt site retires (the object-set delete split is exact).
-     **flip-C2** (content, parallelizable in batches): each arm's real
+   - [x] **flip-C1** (plumbing, green with a gate). **DONE**, as landed:
+     - THE OBJECT SET IS IN THE ENTRY, IN PLACE, not in a sibling map.
+       `Xv6Cameras.op_entry := (nat * gset Z * nat * gset fsobj)` --
+       budget `e.1.1.1`, blocks `e.1.1.2`, epoch `e.1.2`, objects
+       `e.2`; appended rather than spliced so the three old
+       projections shift UNIFORMLY (each gains one `.1`) and the sweep
+       was one regex over five files.  The import inversion the task
+       feared was NOT forced: the four-constructor inductive and its
+       `Countable` moved into a new two-import file
+       **`iris/FsObjType.v`** (`ZArith` + stdpp `countable`), which
+       `Xv6Cameras` Requires and `FsObj` Require-Exports.  That is the
+       shape `Xv6Cameras` already uses for `DinodeEnc.dinode` and
+       `VirtioQueue.vslot`, so its cone grew by one trivial file
+       instead of by the whole `FsWf` band.  `LogInv` Require-EXPORTS
+       `FsObjType` (the constructors are part of its ABI now) and
+       Require-Imports `FsImg`/`FsWf`/`FsObj` for row (a)'s body.
+     - `op_pending : gmap nat op_entry -> gset fsobj` is the OBJECT
+       union; the block-level one is DELETED, not renamed -- it had
+       exactly one consumer (`log_state`'s `pend`), because the
+       LOGBLOCKS budget and the credit-soundness clause read
+       `e.1.1.2` straight off the entry.  All six laws keep their
+       names and their proofs.
+     - THE CLIENT TOKEN DOES NOT EXPOSE THE SET.  `log_opSe` closes it
+       existentially (`∃ i So, i ↪[ln_ops γ] (u, Sb, e0, So)`), so
+       `log_op`'s ABI is byte-stable and no begin -> ... -> end
+       threading in the tree grew a binder.  `log_end_step` hands the
+       set back -- the only place it is authoritative -- and that is
+       what end_op instantiates the finalize bundle at.
+     - THE WRITER DECLARES ITS OBJECTS: `(Ob : gset fsobj)` is threaded
+       through ALL FOUR `SpecLogWrite` forms (`_au`, `_gene`, `_gen`,
+       `_sconf`) and into `log_spend_step` / `log_record_step`, whose
+       update is `So ∪ Ob`.  Eleven call sites, every one declaring the
+       coarse `{[OBlk (uint bno)]}`: balloc x2, ialloc, iput, iupdate,
+       bfree, writei x2, bmap's indirect-entry write, and the two
+       `exact (LW.wp_log_write_gen …)` contract suppliers in
+       `ProofBmap` (which needed only the extra binder).  flip-C2
+       refines the declarations per arm and NO interface moves again.
+     - ROW (a), GATED, in `LogInv`: `log_state` carries
+       `⌜log_row_a L cov logstart pend⌝` (interim body `True`,
+       `log_row_a_pending` the gate), and the real body is
+       `log_row_a_body L cov ls pend := ∃ A sb, dom A = fs_home_set cov
+       ls ∧ fs_parse_sb (dv_of_D A) = Some sb ∧ fs_durable_wf_body A ∧
+       views_agree_off (dv_of_D A) (dv_of_D L) sb pend`.
+       `log_row_a_body_mono` (= `FsObj.views_agree_off_mono`) is
+       beside it.  FOUR gate sites, all commented with their
+       discharger: log_write's absorb and append arms (free -- the
+       block's objects go pending in the same critical section that
+       moves `L`), end_op's commit re-deposit (`om = ∅`, so the tiling
+       theorem), boot (`ProofInitlog`, rides H2a with row (b)).
+     - THE FINALIZE BUNDLE, verbatim:
+       `LogInv.end_op_fin cov ls := ∀ (F : gset fsobj) (L : gmap Z
+       (list (bv 8))) (pend : gset fsobj), log_row_a L cov ls pend ->
+       log_row_a L cov ls (pend ∖ F)`, discharged everywhere by
+       `LogInv.end_op_fin_placeholder`.  `F` is ∀-quantified rather
+       than a parameter of `SpecEndOp` BECAUSE no caller can name its
+       own object set (the token closes it); end_op instantiates at
+       the ledger's `So`.  Stated over the GATED `log_row_a`, so the
+       switch-on changes the obligation without touching the
+       statement -- and adding the per-block L-equations to the body
+       later (stage G2's threading; they are the one thing this shape
+       does not yet hand an arm) moves no call site either, since
+       every site goes through the placeholder.
+     - `log_state_pend` IS RETIRED.  `log_state_fin` takes the bundle
+       and shrinks by `F`; `ProofEndOp`'s fast path then closes with
+       `op_pending om ∖ So ⊆ op_pending (delete i0 om)` (that is
+       `op_pending_delete` rearranged) and `log_state_pend_mono`.  No
+       gate, no debt at the site.
+     - SWEEP SIZE: 30 `SpecEndOp` call sites across 16 files, in
+       flip-B's own two shapes (22 positional `ltac:(apply …)`, 8
+       `all: try exact (… _ _)`), each gaining one line.
+   - **flip-C2** (content, parallelizable in batches): each arm's real
      bundle — G2 lemma + fold + the two flip-A premises (`off_meta`
      per data block; mkdir's dots-block distinctness) + the dv-bridge
-     for create's name-uniqueness — then the `log_row_a` gate
-     switches and dies.
+     for create's name-uniqueness — plus the two maintenance sites
+     (log_write's arms, where the declared `Ob` must cover the block's
+     leaves — `FsObj.obj_masked_blk` for today's coarse declaration)
+     and the per-block L-equations' carrier (stage G2's threading from
+     the write sites, which arrives as a hypothesis INSIDE
+     `end_op_fin`'s body). Then the `log_row_a` gate switches and
+     dies.
 4. **H1–H3**: the boot re-founding (mint at `D` off `fs_boot_pure`,
    dirty-at-boot blocks, ghost-no-op recovery arms replacing D1/D2's
    L-moving ones, orphan routing to ireclaim, D3's clean-header
@@ -1037,9 +1098,14 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       ⌜∀ b ∈ fs_home_set cov ls, b ∉ pend -> L !! b = A !! b⌝` — flips on
       in ONE commit once G2's lemmas exist (a per-arm escape cannot gate
       on a false lemma: `fs_durable_wf_body` has been REAL since F1).
-      The rework list is `log_state_pend`'s call sites plus the boot
-      establishment (`A₀` := the image's home restriction, `wf_body` via
-      `FsWfImg.fsimg_durable_wf` off conjunct (13)).
+      **SUPERSEDED BY flip-C1 (2026-08-23):** row (a) is LANDED AND
+      GATED under `LogInv.log_row_a` / `log_row_a_body`, at the OBJECT
+      granularity the flip chose rather than the block one written
+      above; `log_state_pend` is gone and the rework list is
+      `log_row_a_pending`'s four call sites plus the boot
+      establishment (`A₀` := the image's home restriction, `wf_body`
+      via `FsWfImg.fsimg_durable_wf` off conjunct (13)).  See the
+      flip-C1 bullet in next-steps item 3.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.

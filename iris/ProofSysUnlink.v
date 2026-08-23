@@ -5416,6 +5416,7 @@ Section ProofSysUnlinkBody.
               eb b lks (upd_upt V P1) Keo Hgeom Hj Hgl
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               ltac:(apply FsCrash.end_op_pres_placeholder)
+              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpanenv Hbio Hlog Hseam Hgen
                     Hpidq Hprocs Hdev Hgeo Hdlk [HopS]").
     { rewrite /log_op. iExists Sb3. iExact "HopS". }
@@ -7333,6 +7334,7 @@ Section ProofSysUnlinkBody.
               eb b lks (upd_upt V P1) Keo Hgeom Hj Hgl
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               ltac:(apply FsCrash.end_op_pres_placeholder)
+              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpanenv Hbio Hlog Hseam Hgen
                     Hpidq Hprocs Hdev Hgeo Hdlk [HopS]").
     { rewrite /log_op. iExists Sb3. iExact "HopS". }

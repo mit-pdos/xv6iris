@@ -78,6 +78,7 @@ Require Import DirView.
 Require Import FsTree.
 Require Import FsImg.
 Require Import FsWf.
+Require Export FsObjType.  (* [fsobj] + its [Countable]; see the note below *)
 
 Local Open Scope Z_scope.
 
@@ -85,39 +86,11 @@ Local Open Scope Z_scope.
 (*  1.  THE OBJECT                                                         *)
 (* ====================================================================== *)
 
-(* The four sharing granularities of the resource layer, as one type:
-   dir/data records ([dv] slots and file payloads), bitmap bits (the free
-   pool), dinode slots ([ireg]), and whole blocks. *)
-Inductive fsobj :=
-| ORec (b : Z) (k : nat)   (* bytes [16k, 16k+16) of block [b]           *)
-| OBit (b : Z)             (* the allocation bit OF block number [b]     *)
-| OSlot (i : Z)            (* dinode record of inum [i]                  *)
-| OBlk (b : Z).            (* all of block [b] (a MASK, see the header)  *)
-
-Global Instance fsobj_eq_dec : EqDecision fsobj.
-Proof. solve_decision. Defined.
-
-Definition fsobj_enc (o : fsobj) : Z * nat + Z + Z + Z :=
-  match o with
-  | ORec b k => inl (inl (inl (b, k)))
-  | OBit b => inl (inl (inr b))
-  | OSlot i => inl (inr i)
-  | OBlk b => inr b
-  end.
-
-Definition fsobj_dec (c : Z * nat + Z + Z + Z) : fsobj :=
-  match c with
-  | inl (inl (inl (b, k))) => ORec b k
-  | inl (inl (inr b)) => OBit b
-  | inl (inr i) => OSlot i
-  | inr b => OBlk b
-  end.
-
-Lemma fsobj_dec_enc (o : fsobj) : fsobj_dec (fsobj_enc o) = o.
-Proof. by destruct o. Qed.
-
-Global Instance fsobj_countable : Countable fsobj :=
-  inj_countable' fsobj_enc fsobj_dec fsobj_dec_enc.
+(* [fsobj] itself, its [EqDecision] and its [Countable] instance live in
+   [FsObjType.v] -- a two-import file below [Xv6Cameras], because the log's
+   ledger entry stores a [gset fsobj] and the camera class that holds the
+   ledger cannot see this band.  Re-exported above, so importing [FsObj]
+   still puts the constructors in scope. *)
 
 (* ====================================================================== *)
 (*  2.  GEOMETRY: WHICH BLOCKS EXIST, AND WHICH SCHEME TILES THEM          *)

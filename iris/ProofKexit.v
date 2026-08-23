@@ -1809,6 +1809,7 @@ Section KexitRest.
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hseam Hgen Hpbare Hprocs Hdev Hgeo Hdlk Hop").
     all: try lkbelow.
     all: try exact (FsCrash.end_op_pres_placeholder _ _).
+    all: try exact (LogInv.end_op_fin_placeholder _ _).
     iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpbare".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x5c))

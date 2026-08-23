@@ -2364,6 +2364,7 @@ Section ProofFilewrite.
                     Hppid Hprocs Hdev Hgeo Hdlk Hlogop").
     all: try lkbelow.
     all: try exact (FsCrash.end_op_pres_placeholder _ _).
+    all: try exact (LogInv.end_op_fin_placeholder _ _).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDeo Hseo meo) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".

@@ -218,6 +218,7 @@ Section ProofSysLinkTails.
               g gfs cov logstart dev u pidv dq M1 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               ltac:(apply FsCrash.end_op_pres_placeholder)
+              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -552,6 +553,7 @@ Section ProofSysLinkTails.
               g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               ltac:(apply FsCrash.end_op_pres_placeholder)
+              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -875,6 +877,7 @@ Section ProofSysLinkTails.
               g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               ltac:(apply FsCrash.end_op_pres_placeholder)
+              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -1507,6 +1510,7 @@ Section ProofSysLinkTails.
               g gfs cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               ltac:(apply FsCrash.end_op_pres_placeholder)
+              ltac:(apply LogInv.end_op_fin_placeholder)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     { rewrite Heb /trap_csrs_ext. done. }

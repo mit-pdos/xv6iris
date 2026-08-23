@@ -2416,7 +2416,15 @@ Section ProofInitlog.
          universally quantified [dk], so nothing here can name it.  Stage
          H2's re-founded boot (or a value-chained swap) discharges it; the
          argument is at [LogInv.log_mirror_tie]. *)
-      iPureIntro. apply log_mirror_tie_pending. }
+      iSplitR; [iPureIntro; apply log_mirror_tie_pending|].
+      (* ROW (a) AT BOOT, gated (durable-disk flip-C1).  The real content is
+         [A0 := the image's home restriction] with [fs_durable_wf_body A0]
+         off [FsWfImg.fsimg_durable_wf] and [FsCfgBoot]'s conjunct (13),
+         which stage G1 landed for exactly this -- but the agreement half
+         needs [L] and the era's picture to be ONE reading of one image,
+         which is stage H2a's re-founded boot.  So it rides H2a beside row
+         (b); the argument is at [LogInv.log_row_a]. *)
+      iPureIntro. apply log_row_a_pending. }
     iAssert (log_res γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
