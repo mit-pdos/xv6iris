@@ -25,8 +25,13 @@ The corruption surfaces far away, as
 `FsImgCheck.v: "eq_refl" has type "true = true" while it is expected to
 have type "fsimg_wf fsimg_P fsimg_sb = true"`. Two safe options, in
 preference order: (1) `cp -a /shared/xv6iris-5/xv6-riscv <worktree>/`
-BEFORE the first sync; (2) build only the proofs:
-`run-on-gcp make -C iris -f CoqMakefile -j180 -k`. Either way, verify
+BEFORE the first sync; (2) build only the proofs — but that form MUST go through opam:
+`run-on-gcp opam exec --switch=/shared/xv6rocq -- make -C iris -f
+CoqMakefile -j180 -k`. Without the `opam exec`, `rocq` is not on PATH,
+`.CoqMakefile.d` regeneration silently fails, and make prints "Nothing
+to be done for 'real-all'" and exits 0 — a GREEN-LOOKING NO-OP (the
+top-level Makefile wraps the switch itself; the sub-make form does
+not). Either way, verify
 `md5sum kernel-rocq/*.v user-rocq/*.v` is unchanged after any remote run.
 Related: on a FRESH remote tree, the top-level `$(USER_DIR)/_%` rule
 races the xv6 C build under `-j 192` (bogus `file format not recognized` /
