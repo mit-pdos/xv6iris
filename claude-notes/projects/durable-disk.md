@@ -348,10 +348,25 @@ See the G1-impl entry for the site table.
        `SpecWriteHead` / `SpecSysSync` / `RiscvPtsto`. Do it with, or
        just after, H2a's value-chained boot permits, which will want the
        same sector machinery at a named picture.
-   - **flip-C** (closes over A+B): the ledger entries gain object
-     sets, `op_pending` moves to objects, row (a) enters `log_state`,
-     the 26 arms wire their G2 lemmas through flip-A's fold, the
-     `log_state_pend` debt site retires.
+   - **flip-C** (closes over A+B), STAGED like G1-impl:
+     **flip-C1** (plumbing, green with a gate): `op_entry` gains an
+     OBJECT set (`gset fsobj`; the block set stays for the LOGBLOCKS
+     budget), `op_pending` moves to objects, `log_state` gains row (a)
+     GATED (`log_row_a` with interim body `True`;
+     `log_row_a_pending` the gate — the real body is `∃ A, dom/wf/
+     views_agree_off A L sb (op_pending om)` in flip-A's vocabulary),
+     `SpecEndOp` gains the FINALIZE premise in its final shape (the
+     op's object set + its effect datum + the fold/wf obligations as
+     one bundle — design the bundle so an arm's supply is its G2
+     lemma + flip-A fold + its per-block L-equations and nothing
+     else), arms supply their object sets with the wf/fold halves
+     trivially dischargeable through the gate. The `log_state_pend`
+     debt site retires (the object-set delete split is exact).
+     **flip-C2** (content, parallelizable in batches): each arm's real
+     bundle — G2 lemma + fold + the two flip-A premises (`off_meta`
+     per data block; mkdir's dots-block distinctness) + the dv-bridge
+     for create's name-uniqueness — then the `log_row_a` gate
+     switches and dies.
 4. **H1–H3**: the boot re-founding (mint at `D` off `fs_boot_pure`,
    dirty-at-boot blocks, ghost-no-op recovery arms replacing D1/D2's
    L-moving ones, orphan routing to ireclaim, D3's clean-header
