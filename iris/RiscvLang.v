@@ -414,19 +414,30 @@ Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
       mem_view m mv ->
       virtio_req_step d.(dvirtio) mv = Some (v', w) ->
       disk_step d m (set_dvirtio d v') (w ∪ m)
-  (* A DISK WRITE IS ATOMIC AT THE SECTOR, NOT AT THE REQUEST
-     (claude-notes/completed/sector-atomic-disk.md).  The data of an
-     outstanding write request lands 512 bytes at a time, in ANY order, each
-     landing its own step -- so a power cycle between two of them leaves a
-     half-written BLOCK on the disk, which is exactly what real hardware
-     does.  The step reads the bus (hence the same existentially-quantified
-     view as [DiskStepDma]) and writes only the DISK: the byte memory is
-     untouched, no used-ring entry is produced and no interrupt is raised.
-     The request completes -- [DiskStepDma] above -- only once every sector
-     has landed ([VirtioModel.virtio_sectors_done]). *)
-  | DiskStepSector (mv : vmem) (i : nat) v' :
+  (* THE DISK HAS A VOLATILE WRITE-BACK CACHE
+     (claude-notes/projects/async-disk.md), so an outstanding WRITE request
+     reaches the durable image in two separate autonomous actions.  FIRST the
+     CAPTURE: the device reads the driver's data buffer off the bus (hence
+     the same existentially-quantified view as [DiskStepDma]) and deposits
+     every sector of it in its own cache.  It writes NO byte memory, produces
+     no used-ring entry, raises no interrupt, and -- the point -- moves no
+     DURABLE disk byte: a crash here loses the whole request. *)
+  | DiskStepCapture (mv : vmem) v' :
       mem_view m mv ->
-      virtio_sector_step d.(dvirtio) mv i = Some v' ->
+      virtio_capture_step d.(dvirtio) mv = Some v' ->
+      disk_step d m (set_dvirtio d v') m
+  (* ...and THEN the DRAINS: one cached 512-byte sector reaches the durable
+     image per step, in ANY order, at times of the device's own choosing --
+     so a power cycle between two of them leaves a half-written BLOCK on the
+     disk, which is exactly what real hardware does
+     (claude-notes/completed/sector-atomic-disk.md).  A drain reads NOTHING
+     off the bus: the bytes are the device's own, which is why this arm
+     carries no memory view at all.  WHEN the request may complete relative
+     to its drains is [VirtioModel.virtio_complete_ok], and it is decided by
+     the feature word the driver negotiated: xv6 declines the cache, so for
+     xv6 every drain precedes the completion. *)
+  | DiskStepDrain (s : Z) v' :
+      virtio_drain_step d.(dvirtio) s = Some v' ->
       disk_step d m (set_dvirtio d v') m
   (* ... and when the queue the driver published is MALFORMED, the device may
      do anything at all: [w] is arbitrary, so this constructor lets the disk
