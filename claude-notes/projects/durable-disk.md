@@ -229,6 +229,15 @@ map at home blocks); 1d lands last.
            inside `logN`.  Either that arm opens `logN` and moves both
            maps, or **1a lands first** and the arm holds nothing.  1a
            first is the cheaper order.
+      - RULED (orchestrator, 2026-08-23, within the design): (1) the flip
+        runs AFTER 1a is on `main` — `ProofInstallTrans`'s recovering arm
+        holds `fs_chalf` for the header's home blocks and moves `C` at
+        them; under 1a it holds nothing ("recovery is a ghost no-op"), and
+        that is the one non-mechanical site; (2) `ireg_inv` gains an
+        explicit `home : gset Z` parameter (it has neither `cov` nor
+        `logstart`) — explicit parameters are the rule; (3) the flip is its
+        own lane, **1c-flip**, launched once 1a lands, with steps 1–4
+        above as its spec.
 - [ ] **1d. The parked payload and the two AUs; `γD`.**
       - `γD : ghost_map Z (bv 8)` (byte-keyed), fixed-layer gname beside
         `riscv_disk_name`; its auth is `fr_D` inside `P_disk`
