@@ -323,14 +323,24 @@ rather than a pure sweep:
   `riscvFixedGS` field, and hoisting it there is stage 2's job — the era
   needs to name it only when `Γ_D` becomes `fs_view Γ_D`.
 * **It moves only at the commit.** Every preserving permit frames the pair;
-  `fs_commit_L_sector0_rec` runs `fs_dview_rebase` at the `D'` it already
-  computes (`L` on the home set). `fs_dview` is `Typeclasses Opaque`.
+  `fs_commit_L_sector0_rec` moves it at the `D'` it already computes (`L` on
+  the home set) by RUNNING THE CLIENT'S PREPARED STEP — since durable-disk
+  1d' the permit takes `LogDefs.fs_dstep (fs_restrict V home)
+  (fs_restrict (dv_of_D L) home)` as a spatial argument and LENDS both the
+  auth and `P_wf` to it for the instant, which is `fs-state.md` §5's commit
+  law made real. `fs_dview_rebase` is the TRIVIAL witness a Ψ-free client
+  supplies (`LogDefs.fs_dstep_rebase`), not something the permit performs.
+  `fs_dview` is `Typeclasses Opaque` and lives in `LogDefs.v` (the LOG has
+  to state the step and may not import this layer).
 * `P_wf` is a SEALED DEFINITION, not a parameter, and that is a measured
   deviation: `P_fs_any` sits inside `fs_crash_seam`, which appears by name
   in the statements of 90 files, so an `iProp`-valued parameter — explicit
   argument or ambient class, it makes no difference — reaches all of them.
-  Stage 2 replaces the body by `fs_view Γ_D`, which CONTAINS it, and turns
-  `fs_dview_rebase` into the client's debt.
+  Stage 2 replaces the body by `fs_view Γ_D`, which CONTAINS it, at which
+  point `fs_dstep_rebase` stops holding and the client's debt is the only
+  way to build the commit's step. **`fs_dstep`'s gname is `∀`-quantified**
+  because `fcn_view` sits under `P_fs`'s existential; hoisting it into
+  `riscvFixedGS` (stage 2) is what turns that binder into a parameter.
 
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 

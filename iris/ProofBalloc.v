@@ -2339,14 +2339,20 @@ Section BallocAlloc.
     iDestruct (bitmap_alloc_au ⊤ γfs bmapstart cov logstart size used bi
                  ltac:(solve_ndisj) (proj2 Hsize) Hbirange Hbinu
                  with "Hbminv") as "Hau0".
+    (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
+       atomic-update contract is stated over the Psi-NAMED context, because
+       the AU hands the log's parked payload to the client's own update.
+       The plain form is recovered immediately, so nothing else moves. *)
+    iDestruct "Hlctx" as (Psi) "#Hlctxa".
+    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
                  (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used)
                  (free_blk γfs bi ∗
-                  ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I e0
+                  ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I e0 Psi
                  with "Hau0") as "Hau".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used) bsdX dX
-              (1 + u)%nat cr Sb e0 0%nat (⊤ ∖ ↑bitmapN)
+              (1 + u)%nat cr Sb e0 0%nat Psi (⊤ ∖ ↑bitmapN)
               (free_blk γfs bi ∗
                ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I
               A3 0%nat eb (proc_addr j) (K - 10)%nat b lks
@@ -2356,7 +2362,7 @@ Section BallocAlloc.
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
     { iEval (rewrite HbnoB). iExact "Hau". }
     iIntros (CID6 Hq6 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hblk Hlk Hsl".

@@ -2574,7 +2574,13 @@ Section ProofInitlog.
                               (log_hdr_bno logstart) bs') logstart
                     = (0%nat, [])).
     { rewrite /lm_hdr lm_upd_view_eq Hhdec //. }
-    iAssert (log_state bn γfs cov logstart 0%nat ∅ ∅)
+    (* THE BOOT PICKS THE PAYLOAD, AND IT PICKS THE TRIVIAL ONE
+       (durable-disk 1d').  [LogInv.log_ctx]'s existential is what lets it:
+       nothing in the boot chain threads a [Psi], and no caller above ever
+       names one.  [Psi := fun _ => emp] is a PARAMETER of this stage, not a
+       theorem -- stage 2c replaces it by [fs_view Gamma_L]'s body and the
+       law below stops being free. *)
+    iAssert (log_state (fun _ => emp)%I bn γfs cov logstart 0%nat ∅ ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_state.
       iExists ([] : list (mword 32)),
@@ -2609,6 +2615,7 @@ Section ProofInitlog.
          [L] from the era's disk, the mirror was born at that disk, and the
          recovering install moved the two at exactly the same blocks to
          exactly the same bytes.  So the row is arithmetic on the chain. *)
+      iSplitR; [| done ].
       iPureIntro.
       { intros bb Hbb _.
         rewrite /fs_home_set in Hbb.
@@ -2647,7 +2654,7 @@ Section ProofInitlog.
                      (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) bb
                      HnnW Hmiss2).
           exact (HLmir bb Hbcov). } }
-    iAssert (log_res γ bn γfs cov logstart)
+    iAssert (log_res (fun _ => emp)%I γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
@@ -2684,14 +2691,24 @@ Section ProofInitlog.
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
-            (log_res γ bn γfs cov logstart)
+            (log_res (fun _ => emp)%I γ bn γfs cov logstart)
             with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
-    { rewrite /log_ctx.
+    { rewrite /log_ctx. iExists (fun _ => emp)%I. rewrite /log_ctx_at.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp"|].
-      iSplitR; [iExact "Hswlb" | iExact "Hbrow"]. }
+      iSplitR; [iExact "Hswlb"|].
+      iSplitR; [iExact "Hbrow"|].
+      (* THE CLIENT'S COMMIT LAW, AT THE TRIVIAL PAYLOAD.  The payload is
+         [emp], so the only content of the law is the PREPARED DURABLE STEP,
+         and while [P_wf] is a bare byte map that step is
+         [LogDefs.fs_dstep_rebase] -- the unconditional re-base the commit
+         permit used to perform itself.  Both halves are this stage's
+         parameters and are called out as such. *)
+      rewrite /log_psi_commit. iModIntro.
+      iIntros (M0 L0 Lb0) "(Ha & _ & _)". iModIntro.
+      iFrame "Ha". iSplitR; [done|]. iApply fs_dstep_rebase. }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".

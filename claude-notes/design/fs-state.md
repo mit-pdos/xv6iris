@@ -211,30 +211,74 @@ The log exposes, and knows, only this:
   `log_write` opens under its lock and a `bread` client opens to turn
   `bytes = C(b)` into `bytes = L(b)`.  One-time re-plumb of `FsBlocks` and
   the bio `Ψ` instantiation; the price of exclusive ownership.
-- **A parked client payload `Ψ D₀ L`** in `log_state`, Ψ-parametric
-  exactly as `bio_view` is for bio: the log stores it, never reads it,
-  indexes it by the last committed byte view `D₀` (which the log knows by
-  value once the era's mirror is born true — H2a) and the current `L`,
-  and hands it to the client's AUs at the two linearization points.  It
-  is parked in the log, not in a separate FS invariant, because whatever
-  the committer needs at the commit instant must already be in the log's
-  hands (the last-ending operation cannot know it is last), and
-  `log.lock` already serializes every `log_write`.
+- **A parked client payload `Ψ D₀`** in `log_state`, Ψ-parametric exactly
+  as `bio_view` is for bio: the log stores it, never reads it, and indexes
+  it by the **committed view alone** — `D₀ = lm_committed M cov ls`, which
+  the log knows by value once the era's mirror is born true (H2a).  It is
+  parked in the log, not in a separate FS invariant, because whatever the
+  committer needs at the commit instant must already be in the log's hands
+  (the last-ending operation cannot know it is last), and `log.lock`
+  already serializes every `log_write`.
+
+  **The index is the committed view and NOT the logged one.**  The logged
+  view needs no index: the payload's `Γ_L` content is pinned to `L` by the
+  byte ELEMENTS it holds against the log's auth, and `fs_view Γ_L` binds
+  its state existentially (§4).  An `L` index is not merely redundant, it
+  is FATAL: it would make every `log_write`'s AU RE-INDEX the payload,
+  which no client can do for an arbitrary `Ψ`, so no supplier could frame
+  it and the interface could not be proven Ψ-parametrically at all.
+
+  `Ψ` is packaged EXISTENTIALLY in the log's context — `log_ctx_at Ψ …` is
+  the Ψ-named form and `log_ctx … := ∃ Ψ, log_ctx_at Ψ …` — so the 78 files
+  that thread the log's context keep their arity and none of them ever
+  names a file-system payload; a client that must name `Ψ` opens the
+  existential in its own proof, and the BOOT picks the witness.
 - **`log_write(b)`'s AU**:
-  `∀ L, fs_L-elements for the bytes that change ∗ Ψ D₀ L ={E}=∗ elements at
-  the new bytes ∗ Ψ D₀ L' ∗ Q`.  The client opens whatever it likes inside
-  (its own invariants, the parked `fs_view Γ_L` body) to move its pieces,
-  its top fragment and the debt.  Since the log learns the checked-out
-  buffer's bytes equal `L(b)` on every byte (via `γcache`), and the
-  writer's stores touched only its range, the update needs elements only
-  for the bytes that differ — byte-range ownership works above a
-  block-granular device.
-- **The commit AU**, consumed by the log's permit at mask `∅`, so it must
-  be a basic update the client prepared in advance (the debt):
-  `⌜D' = L|home⌝ -∗ Ψ D₀ L ∗ γD_auth D₀ ==∗ Ψ D' L ∗ γD_auth D'`.  The log
-  LENDS the `γD` auth for the instant — the same move the machine layer
-  makes when it lends `γdisk` to `P_fs` (`crash.md`, stage A3).  The log
-  proves `D' = L|home` internally (row (b), `log_mirror_tie_body`).
+  `fs_L-elements for the bytes that change ∗ (∀ D₀, Ψ D₀ ={E}=∗ Ψ D₀ ∗ Q)`.
+  The payload goes in and comes back at the SAME index — a `log_write`
+  writes no disk block, so the committed view does not move — and `D₀` is
+  `∀`-bound because it is the log's own parked index, which no caller can
+  name.  The client opens whatever it likes inside (its own invariants, the
+  parked `fs_view Γ_L` body) to move its pieces, its top fragment and the
+  debt.  Since the log learns the checked-out buffer's bytes equal `L(b)`
+  on every byte (via `γcache`), and the writer's stores touched only its
+  range, the update needs elements only for the bytes that differ —
+  byte-range ownership works above a block-granular device.
+- **The commit law, and the prepared step it RETURNS.**  The commit's own
+  update is consumed by the log's permit at mask `∅`, so it must be a basic
+  update the client prepared in advance (the debt).  What prepares it is the
+  client's ONE persistent law, carried by `log_ctx_at`:
+
+  ```
+  log_psi_commit Ψ γfs cov ls :=
+    □ (∀ M L Lb,
+         (γL_auth Lb ∗ ⌜Lb is L's bytes on home⌝ ∗ Ψ (lm_committed M cov ls))
+         ==∗
+         (γL_auth Lb ∗ Ψ (lm_logged L cov ls)
+          ∗ fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))
+  ```
+
+  where `fs_dstep D D' := ∀ g, γD_auth (bytes D) ∗ P_wf(g, bytes D) ==∗
+  γD_auth (bytes D') ∗ P_wf(g, bytes D')`.
+
+  **The law takes the log's byte-view AUTH as an input and gives it back**,
+  and that is load-bearing.  A law of the naive shape
+  `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))` is NOT provable for a
+  real payload: quantified over an arbitrary `L` with nothing else in hand,
+  the client cannot know that `L` is the view its own elements describe, and
+  the debt it owes is specific to the ACTUAL logged view.  With the auth
+  lent, the client agrees its elements against it and learns the real `L`.
+
+  The permit LENDS `γD`'s auth AND `P_wf` to the returned step for the
+  instant — the same move the machine layer makes when it lends `γdisk` to
+  `P_fs` (`crash.md`, stage A3) — and that is forced: moving
+  `ghost_map_auth γD 1 B` needs the ELEMENTS of `B`, and those may not be
+  owned by anything mortal (crash.md principle 1), so they are `P_wf`'s.
+  The log proves `D' = L|home` internally (row (b), `log_mirror_tie_body`).
+  Today's `P_wf` is a bare byte map, so the trivial witness
+  (`fs_dstep_rebase`) discharges the step and the boot's `Ψ := fun _ => emp`
+  discharges the law; both are PARAMETERS of stage 1 and stop holding once
+  `P_wf` becomes `fs_view Γ_D`.
 - **`end_op`**: no FS-specific premise at all.
 
 `FsCrash.end_op_pres`, `fs_commit_pres`, `LogInv.end_op_fin`, the
@@ -246,17 +290,15 @@ only as placeholders).  **They are all DELETED in the tree** — the last of
 them by durable-disk 1d, which also deleted their 30 + 6 gate call sites;
 `end_op` now takes no FS-facing premise at all.
 
-**One correction to the payload's arity, measured by 1d and not yet
-landed**: `Ψ` should be indexed by `D₀` ALONE, not by `D₀` and `L`.  The
-logged view needs no index — the payload's `Γ_L` content is pinned to `L`
-by the byte ELEMENTS it holds against the log's auth, and `fs_view Γ_L`
-binds its state existentially (§4) — and an `L` index would make every
-`log_write`'s AU re-index the payload, which no client can do for an
-arbitrary `Ψ`, so no supplier could frame it and the interface could not
-be proven Ψ-parametrically at all.  See
-[`../projects/durable-disk.md`](../projects/durable-disk.md) item 1d for
-that, for the existential packaging of `Ψ` in `log_ctx`, and for why the
-commit AU's `γD_auth` input needs `P_wf` beside it.
+The whole of §5 above is LANDED (durable-disk 1d/1d'); the one thing the
+interface still names that stage 2 will move is the durable gname.
+`fs_dstep`'s `∀ g` is not a generalisation anyone wanted: `γD` is
+`FsCrash.fcn_view` of a record the crash predicate binds EXISTENTIALLY, so
+no client can name it, and a step at an arbitrary gname is the strongest
+thing statable today.  Hoisting `fcn_view` into `RiscvPtsto.riscvFixedGS`
+— stage 2's job, and the same seam-equation move `riscv_swap_name` already
+makes — turns that binder into a parameter and the step into the client's
+debt at the real durable name.
 
 ## 6. What this supersedes in the tree
 

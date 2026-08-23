@@ -345,11 +345,11 @@ the abstract target state and the per-op finalize obligation outright, so
 both moves (`log_state_pend_mono`, `log_state_fin`) are the identity and
 `pend` survives only as the name of what the ledger's union is.
 
-### The log's FS-agnostic interface, and what of it is landed (durable-disk 1d)
+### The log's FS-agnostic interface, as it stands (durable-disk 1d/1d')
 
 The interface of record is [`fs-state.md`](fs-state.md) §5: byte-keyed
 `fs_L`, an opaque parked client payload, two logically-atomic AUs, and
-nothing else. As of lane 1d:
+nothing else. All of it is LANDED:
 
 * **LANDED** — `end_op` has **no FS-facing premise at all**. 1b deleted
   `FsCrash.end_op_pres`; 1d deletes `LogInv.end_op_fin` (row (a)'s per-op
@@ -363,14 +363,117 @@ nothing else. As of lane 1d:
   commit installs), and `LogDefs.lm_committed_clean` — the bridge that
   turns row (b) at the empty batch into `lm_committed M' = lm_logged L`,
   which is exactly what an `end_op` re-deposit needs to re-park a payload.
-* **NOT LANDED** — the parked payload itself and `log_write`'s payload AU.
-  The measured design is in
-  [`../projects/durable-disk.md`](../projects/durable-disk.md) item 1d;
-  the short version is that `Ψ` must be indexed by the committed view
-  ALONE (not by `L`), and that `log_ctx` must bind it EXISTENTIALLY —
-  `log_ctx γ bn γfs cov ls dev := ∃ Ψ, log_ctx_at Ψ γ …` — because
-  `log_ctx` appears by name in the statements of 78 files, `SpecKexec`,
-  `FsReady` and every syscall contract among them.
+* **LANDED** — the parked payload, `log_write`'s payload AU and the commit's
+  client-prepared durable step (below).
+
+#### The parked payload and its one law
+
+`Ψ : gmap Z (list (bv 8)) → iProp Σ`, indexed by the **committed view
+alone**. `LogInv.log_state Ψ …` parks `Ψ (lm_committed M cov logstart)`
+beside the era's mirror half and row (b); `log_res Ψ …` is the lock's
+resource; `log_ctx_at Ψ γ bn γfs cov ls dev` is the Ψ-named context and
+
+    log_ctx γ bn γfs cov ls dev := ∃ Ψ, log_ctx_at Ψ γ bn γfs cov ls dev
+
+keeps the arity the **78 files** that thread the log's context already
+have — `SpecKexec.fs_fabric`, `FsReady.fs_ready`, `UsertrapRes` and every
+syscall contract among them, none of which has any business naming a
+file-system payload. The four clients that must name `Ψ` (`log_write`'s AU
+callers, `begin_op`, `end_op`, `sys_sync`) open the existential IN THEIR
+OWN PROOF, which is sound because only one log lock is ever allocated;
+`log_ctx_of_at` recovers the plain form for everything else they call.
+The boot chooses the witness (`ProofInitlog`: `Ψ := fun _ => emp`), so no
+boot-chain threading exists at all.
+
+**Why the committed view alone.** The logged view needs no index: the
+payload's content is pinned to `L` by the byte ELEMENTS it holds against
+the log's auth (1c), and an `L` index would make every `log_write`'s AU
+RE-INDEX the payload, which no client can do for an arbitrary `Ψ` — so the
+eleven suppliers could not frame it and the interface could not be proven
+Ψ-parametrically at all. With the `D₀` index the payload goes in and comes
+back UNCHANGED at a `log_write` and moves at the COMMIT and nowhere else,
+which is where `γD` moves too.
+
+**THE LAW TAKES THE BYTE-VIEW AUTH AS AN INPUT AND GIVES IT BACK, and that
+is what makes it dischargeable at all.** The tempting shape,
+`□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))`, is unprovable for any
+payload with real content: quantified over an arbitrary logged view with
+nothing else in hand, the client cannot know that `L` is the view its own
+elements describe, and the debt it owes is specific to that view. So:
+
+    LogInv.log_psi_commit Ψ γfs cov ls :=
+      □ (∀ M L Lb,
+           (ghost_map_auth (fs_bytes γfs) 1 Lb
+            ∗ ⌜FsBlocks.bytes_home_at Lb L (fs_home_set cov ls)⌝
+            ∗ Ψ (lm_committed M cov ls))
+           ==∗
+           (ghost_map_auth (fs_bytes γfs) 1 Lb
+            ∗ Ψ (lm_logged L cov ls)
+            ∗ LogDefs.fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))
+
+`bytes_home_at Lb L home` is `bytes_dom Lb home` plus "every home block's
+entry of `L` is a whole block whose bytes are `Lb`'s", i.e. exactly what
+pins `Lb` to the byte flattening of `L` on the home set; the committer
+derives it with `FsBlocks.fs_bytes_home_of` from the invariant's parked
+halves and the cache auth it holds. `log_psi_commit` is PERSISTENT, and
+that is not a weakening: the LINEARITY stage 2's debt needs lives inside
+`Ψ D₀`, which this update consumes; what is uniform is only the right to
+spend it at a commit, which the log must have in every batch.
+
+`LogInv.log_psi_spend` is the crossing: holding the batch (hence `L`
+frozen by the checked-out cache auth), open `logN`, lend the byte auth,
+spend the law, close. `ProofEndOp`'s committer does it ONCE per batch, at
+mask ⊤ at the top of `eo_commit` — where `L` is final and `log.lock` is
+not held (that is what the committing flag buys). The COPY LOOP carries the
+payload at its parked index instead, as a resource at a FIXED map `D0` with
+the pure tie `D0 = lm_committed Mc cov logstart`; every fill writes a log
+SLOT, so `LogDefs.lm_committed_upd_ne` re-establishes the tie in one line
+at the back edge.
+
+#### The commit's prepared step
+
+    LogDefs.fs_dstep D D' :=
+      ∀ g : gname, ghost_map_auth g 1 (fs_dbytes D) -∗ fs_dview g (fs_dbytes D)
+                   ==∗ ghost_map_auth g 1 (fs_dbytes D') ∗ fs_dview g (fs_dbytes D')
+
+`fs_dview` is `P_wf`'s body and `fs_dbytes` the byte flattening; both moved
+DOWN from `FsCrash.v` to `LogDefs.v` so the log can STATE the step (the log
+layer may not import the crash layer), and `FsCrash.v` re-exports `LogDefs`,
+so no reading of `fs_dview` moved. `FsCrash.fs_commit_L_sector0_rec` and
+`fs_commit_L_seq_permit` take the step as a SPATIAL argument at the caller's
+off-header view — `fs_dstep (fs_restrict V home) (fs_restrict (dv_of_D L)
+home)`, one term for both landing orders — and LEND `γD`'s auth and `P_wf`
+to it at the commit instant. The unconditional re-base is the TRIVIAL
+witness a Ψ-free client supplies (`LogDefs.fs_dstep_rebase`), not something
+the permit performs, and it is a PARAMETER of this stage: once `P_wf`
+becomes `fs_view Γ_D` it stops holding, which is the point.
+
+**The gname is universally quantified, and that is forced.** `γD` is
+`FsCrash.fcn_view` of a record `P_fs` binds EXISTENTIALLY, so no client can
+name it. Stage 2's hoist of `fcn_view` into `RiscvPtsto.riscvFixedGS`
+(the worklist's `Pc`/`HPc`/`Hproj`/`Hswap`/`boot_fixedGS` move) is what
+turns this binder into a parameter and the step into the client's debt at
+the real durable name.
+
+#### `log_write`'s payload AU
+
+`SpecLogWrite.wp_log_write_au_body` gains a `Ψ` parameter, takes
+`log_ctx_at Ψ …`, and its closing wand gains
+
+    … -∗ fsblock (fs_bytes γfs) (uint bno) bs -∗
+    ∀ D₀ : gmap Z (list (bv 8)), Ψ D₀ ={Efs, ⊤}=∗ Ψ D₀ ∗ Φfsb
+
+— the payload in and out at the SAME index, because a `log_write` writes no
+disk block and so does not move the committed view. `D₀` is `∀`-bound
+because it is `log_state`'s own `lm_committed M cov logstart`, which no
+caller can name; a stage-2 client uses the crossing to move its checked-out
+pieces' shadow and to compose one per-object durable step into the debt
+inside `Ψ D₀`. The other three forms (`_gene`, `_gen`, `_sconf`) keep the
+plain `log_ctx` and open the existential in their own derivations, so no
+landed caller of theirs moves. `lw_au_lb0` gained a `Ψ` argument and frames
+the payload, which is what keeps the five AU suppliers (ialloc's
+`ireg_claim_au`, iupdate's three region steps, bfree's and balloc's bitmap
+steps, iput's deposit) byte-stable.
 
 **Row (b) is real, and it is what makes the commit's contract
 client-free.** `log_mirror_tie_body M L cov logstart LB` says: at every

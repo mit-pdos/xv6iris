@@ -1766,9 +1766,15 @@ Section IputFreePath.
                   ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hdswf Hdn'wf Hdn'ty Hnlst
                   with "Hireg Hesc Hdn Hdep") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
+    (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
+       atomic-update contract is stated over the Psi-NAMED context, because
+       the AU hands the log's parked payload to the client's own update.
+       The plain form is recovered immediately, so nothing else moves. *)
+    iDestruct "Hlctx" as (Psi) "#Hlctxa".
+    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     iDestruct (lw_au_lb0 γ γfs (uint bno) (⊤ ∖ ↑iregN)
                  (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds)
-                 (committedA ge ∗ ireg_regime rg)%I e0 with "Hau0") as "Hau".
+                 (committedA ge ∗ ireg_regime rg)%I e0 Psi with "Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1779,7 +1785,7 @@ Section IputFreePath.
       [rewrite Hbno; iExact "Hcrd0" |].
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
-              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge ∗ ireg_regime rg)%I
+              cru Sb e0 v Psi (⊤ ∖ ↑iregN) (committedA ge ∗ ireg_regime rg)%I
               R5 0%nat eb pj K b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1787,7 +1793,7 @@ Section IputFreePath.
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.
     iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS [#Hcom Hgreg] Hlk Hsl".
     (* NO POOL ENTRY IS ASSEMBLED HERE (IVd).  The bundle was parked at the

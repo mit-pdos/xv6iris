@@ -1458,6 +1458,12 @@ Section IallocClaim.
     (* ialloc's credit is [emp]: this is an ordinary uncredited spend
        ([cr := false]), so log_write's relaxed credited premise (§G.19) costs
        it exactly one [log_credit_own] at the vacuous implication. *)
+    (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
+       atomic-update contract is stated over the Psi-NAMED context, because
+       the AU hands the log's parked payload to the client's own update.
+       The plain form is recovered immediately, so nothing else moves. *)
+    iDestruct "Hlctx" as (Psi) "#Hlctxa".
+    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     iPoseProof (log_credit_own γ false Sb e0 (uint bno) ltac:(discriminate))
@@ -1468,7 +1474,7 @@ Section IallocClaim.
               (* THE ANCHOR IS NO LONGER THE UNIT (iclaim-ledger.md §2.4 /
                  IIIb step 4): [ireg_claim_au]'s closing wand delivers the
                  [c]-column receipt, so log_write carries it out for us. *)
-              false Sb e0 0%nat (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
+              false Sb e0 0%nat Psi (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
               W5 0%nat true (proc_addr j) (K - 8)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1478,7 +1484,7 @@ Section IallocClaim.
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcrd HopS [] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
       (* log_write's own two closing inputs (the epoch witness and its

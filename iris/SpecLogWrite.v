@@ -205,6 +205,7 @@ Definition wp_log_write_au_body
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
+    (Psi : gmap Z (list (bv 8)) -> iProp Σ)
     (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -232,7 +233,13 @@ Definition wp_log_write_au_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  (* THE Psi-NAMED CONTEXT (durable-disk 1d').  This is the ONE form that
+     needs it: the client's atomic update below is handed the log's parked
+     payload, so the payload's index function has to be nameable, and the
+     lock's resource is [LogInv.log_res Psi ...].  A caller opens
+     [LogInv.log_ctx]'s existential in its own proof and recovers the plain
+     form with [LogInv.log_ctx_of_at] for everything else it calls. *)
+  log_ctx_at Psi γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
   bslot -∗
   (* THE CALLER'S EPOCH ANCHOR (fs-log.md §G.17, blocker 4).  Persistent and
@@ -279,10 +286,24 @@ Definition wp_log_write_au_body
      [log_opSwe] post are untouched: they are the DEPOSITOR's tier (a
      receipt ordered against an anchor the caller can name), and this is
      the WRITER's. *)
+  (* THE PARKED PAYLOAD CROSSES THE AU, AND IT COMES BACK AT THE SAME INDEX
+     (durable-disk 1d', item 3; fs-state.md section 5).  [log_write] holds
+     [log.lock], hence the payload, at exactly this ghost step, so it hands
+     it to the client's closing wand and takes it back.  The index [D0] is
+     UNIVERSALLY QUANTIFIED because it is the committed view the log's own
+     batch is parked at ([LogInv.log_state]'s [lm_committed M cov logstart]),
+     which no caller can name -- and it does not MOVE here: a [log_write]
+     writes no disk block, so the committed view stands and the payload's
+     index with it.  A stage-2 client uses the crossing to move its checked-
+     out pieces' shadow and to compose one per-object durable step into the
+     debt that lives inside [Psi D0]; a client with no payload work frames
+     it, which is what [lw_au_lb0] below does for every landed supplier. *)
   (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
      fsblock (fs_bytes γfs) (uint bno) bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 (uint bno) -∗ ⌜(v <= e0)%nat⌝ -∗
-      fsblock (fs_bytes γfs) (uint bno) bs ={Efs, ⊤}=∗ Φfsb)) -∗
+      fsblock (fs_bytes γfs) (uint bno) bs -∗
+      ∀ D0 : gmap Z (list (bv 8)),
+        Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)) -∗
   (* the checked-out buffer, payload still indexed at the old content *)
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -326,7 +347,8 @@ Definition wp_log_write_au_body
    carry the writer's anchor without any of them moving. *)
 Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
-    (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat) :
+    (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
+    (Psi : gmap Z (list (bv 8)) -> iProp Σ) :
   (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
      fsblock (fs_bytes γfs) bno bsl' ∗
      (⌜bsl' = bsl⌝ -∗ fsblock (fs_bytes γfs) bno bs ={Efs, ⊤}=∗ Φfsb))
@@ -334,13 +356,16 @@ Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
   (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
      fsblock (fs_bytes γfs) bno bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
-      fsblock (fs_bytes γfs) bno bs ={Efs, ⊤}=∗ Φfsb)).
+      fsblock (fs_bytes γfs) bno bs -∗
+      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)).
 Proof.
   iIntros "Hau".
   iMod (log_epoch_lb_0 γ) as "#Hlb0".
   iMod "Hau" as (bsl') "[Hfsb Hcl]".
   iModIntro. iExists bsl', 0%nat. iFrame "Hfsb Hlb0".
-  iIntros "%Hbs _ _ Hfsb". iApply ("Hcl" with "[//] Hfsb").
+  iIntros "%Hbs _ _ Hfsb %D0 Hpsi".
+  iMod ("Hcl" with "[//] Hfsb") as "HPhi".
+  iModIntro. iFrame "Hpsi HPhi".
 Qed.
 
 (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20, the epoch tier).
@@ -500,11 +525,12 @@ Module Type LOG_WRITE.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
+      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
-                           bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p K b lks.
+                           bs bsl bsd d u cr Sb e0 vlb Psi Efs Φfsb m n eb p K b lks.
 
   (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20).  Derived from the
      atomic-update one at a held [fs_chalf] and the trivial anchor, and it is

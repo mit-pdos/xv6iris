@@ -1264,7 +1264,7 @@ Definition fs_rec_wf (r : fs_rec) (P : Z -> list (bv 8))
    all: the durable file system is a family of nested SEPARATION-LOGIC
    predicates at the view [Gamma_D], so the conjunct is an [iProp], it
    lives in [P_fs] beside the byte view's authority, and this layer keeps
-   it OPAQUE ([fs_dview] below).  What survives here is exactly what the
+   it OPAQUE ([LogDefs.fs_dview]).  What survives here is exactly what the
    WAL layer proves for itself: recovery, the history's last element and
    the on-disk header's invariant. *)
 
@@ -1277,15 +1277,10 @@ Proof. intros (_ & Hlast & _) Hnil. rewrite Hnil in Hlast. discriminate. Qed.
 (*      (durable-disk 1d; claude-notes/design/fs-state.md §1 and §4).      *)
 (* ---------------------------------------------------------------------- *)
 
-(* THE BYTE FLATTENING of a committed block view: block [b]'s [i]th byte
-   lives at [b * BSIZE + i], which is the addressing [DiskImg.disk_img_bytes]
-   and [FsBlocks.byte_range] already use.  [gamma_D]'s authority is held at
-   this map inside [P_fs], so the committed view is a BYTE map exactly as
-   [fs-state.md] §1 asks, while the WAL layer goes on reasoning about the
-   BLOCK map [fr_D] it recovers. *)
-Definition fs_dbytes (D : gmap Z (list (bv 8))) : gmap Z (bv 8) :=
-  map_fold (fun (b : Z) (bs : list (bv 8)) (acc : gmap Z (bv 8)) =>
-              map_seqZ (b * Z.of_nat BSIZE) bs ∪ acc) ∅ D.
+(* [fs_dbytes] -- the byte flattening of a committed block view -- and
+   [fs_dview] / [fs_dstep] with it, live in [LogDefs.v] (durable-disk 1d'):
+   the LOG has to state the commit's prepared step and may not import this
+   file.  This file re-exports [LogDefs], so nothing downstream moved. *)
 
 
 (* ---------------------------------------------------------------------- *)
@@ -1731,58 +1726,13 @@ Section fs_crash.
   (*     (durable-disk 1d; claude-notes/design/fs-state.md §1 and §4)      *)
   (* ==================================================================== *)
 
-  (* THE DURABLE VIEW'S OWNERSHIP: the FULL element of the byte-keyed
-     [ghost_map Z (bv 8)] for every byte of the committed view.  This is
-     [fs-state.md] §1's [Phi_D] over the whole home range, and it is what
-     [P_fs] holds beside the byte view's AUTHORITY -- so the two meet only
-     inside [crashN], and no thread that can die ever owns a durable
-     resource (crash.md, principle 1).
-
-     A SEALED DEFINITION AND NOT A PARAMETER, and that is the one place
-     this lane deviated from its spec.  The parameter form was measured
-     first: [P_fs_any] sits inside [FsCrash.fs_crash_seam], which is
-     threaded -- by name, in the STATEMENT -- through 90 files, up to
-     [SpecKexec.fs_fabric], [FsReady.fs_ready] and [UsertrapRes].  An
-     [iProp]-valued parameter reaches all of them whether it is an explicit
-     argument (arity) or an ambient class (a [Context] line per section,
-     and then per section of every file that mentions any of THEIR
-     statements).  That is exactly the cone 1c-flip's ratified deviation
-     refused for [ireg_inv]'s [home], for the same reason.  So the slot is
-     a definition with honest content: the durable byte view's exclusive
-     elements, sealed, with the two facts the crash layer needs about it
-     ([fs_dview_timeless] and [fs_dview_rebase]) proved once.  Stage 2
-     REPLACES the body by [fs_view Gamma_D] -- which CONTAINS this, since
-     [Phi_D a v := a ↪[γD] v] -- and [fs_dview_rebase] becomes the client's
-     debt (fs-state.md §4): an input the payload supplies, not a free
-     move.  Nothing above this file names the body, so that replacement
-     moves no statement. *)
-  Definition fs_dview (g : gname) (B : gmap Z (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ v ∈ B, a ↪[g] v)%I.
-
-  Global Instance fs_dview_timeless g B : Timeless (fs_dview g B).
-  Proof. rewrite /fs_dview. apply _. Qed.
-
-  (* [iFrame] must treat a whole-disk [big_sepM] as ONE atom
-     (durable-notes.md, "a big-op behind a Definition is a hang"). *)
-  Global Typeclasses Opaque fs_dview.
-
-  (* WHAT THE COMMIT DOES TO IT: auth and elements together move to any
-     byte view at all.  Whole-map delete then whole-map insert -- no domain
-     premise, because the elements ARE the domain.  This is the move the
-     commit permit makes when [fr_D] advances, and the shape stage 2's
-     debt refines (there the client supplies the step; here the durable
-     side is a bare byte map, so the step is unconditional). *)
-  Lemma fs_dview_rebase (g : gname) (B B' : gmap Z (bv 8)) :
-    ghost_map_auth g 1 B -∗ fs_dview g B ==∗
-      ghost_map_auth g 1 B' ∗ fs_dview g B'.
-  Proof.
-    rewrite /fs_dview. iIntros "Ha Hd".
-    iMod (ghost_map_delete_big B with "Ha Hd") as "Ha".
-    rewrite map_difference_diag.
-    iMod (ghost_map_insert_big B' with "Ha") as "[Ha Hd]";
-      [apply map_disjoint_empty_r|].
-    rewrite right_id_L. by iFrame.
-  Qed.
+  (* [P_wf]'s body -- [LogDefs.fs_dview] -- and the commit's prepared step
+     [LogDefs.fs_dstep] were moved DOWN to [LogDefs.v] by durable-disk 1d',
+     because [LogInv.log_psi_commit] has to STATE the step and the log layer
+     may not import this file.  Their headers, including why [P_wf] is a
+     sealed definition rather than a parameter and why [fs_dstep]'s gname is
+     universally quantified, are there.  This file re-exports [LogDefs], so
+     every reading of [fs_dview] above and below is unchanged. *)
 
   Definition P_fs (γs : fs_crash_names) (cov : gset Z) (logstart : Z)
       (dk : Z -> bv 8) : iProp Σ :=
@@ -2510,6 +2460,22 @@ Section fs_crash_seam.
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     ▷ log_mirror_half M0 -∗
+    (* THE CLIENT'S PREPARED DURABLE STEP (durable-disk 1d', item 4).  The
+       commit is the one write kind that moves the committed view, so it is
+       the one place [gamma_D]'s authority and [P_wf] move -- and they move
+       by running a basic update the CLIENT built earlier, at the log's own
+       linearization point, where its invariants were openable.  This lemma
+       LENDS both to it for the instant, at mask [empty]; the step's inputs
+       and outputs are the auth and [LogDefs.fs_dview], and the step is
+       stated at [V], the caller's OFF-HEADER view, for the same reason
+       every other picture premise here is: both landing orders reach this
+       shift and only one of them has moved the header row.
+
+       [LogDefs.fs_dstep_rebase] is the trivial witness, which is what the
+       boot's payload ([Psi := fun _ => emp]) and every Psi-free caller
+       supply; stage 2's real payload supplies its debt instead. *)
+    fs_dstep (fs_restrict V (fs_home_set cov ls))
+             (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     fs_rec_permit cov ls gen_id
       (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
              take virtio_sector_bytes bs))
@@ -2519,7 +2485,7 @@ Section fs_crash_seam.
        ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
   Proof.
     intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Htie Hslot.
-    iIntros "#Hreg #Hswlb Hmir".
+    iIntros "#Hreg #Hswlb Hmir Hstep".
     assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hdec /=; lia).
     assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
       by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
@@ -2582,16 +2548,16 @@ Section fs_crash_seam.
       by (rewrite -hdr_dec_n Hdk0 //).
     assert (HfrD : fr_D r = fs_restrict V (fs_home_set cov ls))
       by (rewrite -Hres; exact (proj1 (fs_recovery_clean _ _ _ _ Hn0) Hrec)).
-    (* ---- THE DURABLE VIEW ADVANCES (durable-disk 1d).  This is the one
+    (* ---- THE DURABLE VIEW ADVANCES (durable-disk 1d').  This is the one
        write kind that moves the committed view, so it is the one place the
-       byte view's authority and [P_wf] move -- together, in one step, and
-       at a [D'] the caller can NAME (it is [L] on the home set, computed
-       just above).  [fs_dview_rebase] is the whole of it at stage 1d;
-       stage 2 turns it into the client-prepared basic update the log's
-       parked payload supplies (fs-state.md §4's debt), and the [D'] it
-       takes is this same term. ---- *)
-    iMod (fs_dview_rebase (fcn_view γs) (fs_dbytes (fr_D r)) (fs_dbytes D')
-            with "Hva Hvw") as "[Hva Hvw]".
+       byte view's authority and [P_wf] move -- together, in one step, at a
+       [D'] the caller can NAME (it is [L] on the home set, computed just
+       above), and by running the CLIENT'S OWN prepared step: the auth and
+       [P_wf] are LENT to it here and handed straight back at [D'].  The old
+       unconditional [fs_dview_rebase] is now the trivial WITNESS a Psi-free
+       caller supplies, not something this permit performs. ---- *)
+    iEval (rewrite -HfrD) in "Hstep".
+    iMod ("Hstep" $! (fcn_view γs) with "Hva Hvw") as "[Hva Hvw]".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
     iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".
@@ -2985,12 +2951,18 @@ Section fs_crash_seam.
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_half M0 -∗
+    (* THE CLIENT'S PREPARED DURABLE STEP -- see
+       [fs_commit_L_sector0_rec], which is where it is spent.  It rides
+       BOTH landing orders: the two branches of [disk_seq_permit_two] are an
+       Iris conjunction, so each of them gets the whole context. *)
+    fs_dstep (fs_restrict V (fs_home_set cov ls))
+             (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
   Proof.
     intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hrow Hslot.
-    iIntros "#Hseam #Hreg #Hswlb Hmir".
+    iIntros "#Hseam #Hreg #Hswlb Hmir Hstep".
     assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
       by exact (log_hdr_in_ext cov ls).
     assert (Hwfh : forall (M : log_mirror) (r : fs_rec) (dk : Z -> bv 8),
@@ -3013,7 +2985,7 @@ Section fs_crash_seam.
                  ∗ fs_receipt_any
                      (fs_restrict (dv_of_D L) (fs_home_set cov ls))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
-                with "[] [Hmir]").
+                with "[] [Hmir Hstep]").
       { iIntros "(Hm & #Hrc & _)".
         iApply (fs_permit_of_rec with "Hseam").
         iApply (fs_rec_permit_mono cov ls gen_id _
@@ -3036,7 +3008,7 @@ Section fs_crash_seam.
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_commit_L_sector0_rec cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
-                Hin HM0 Hoff Hrow Hslot with "Hreg Hswlb [Hmir]").
+                Hin HM0 Hoff Hrow Hslot with "Hreg Hswlb [Hmir] Hstep").
       iNext. iExact "Hmir".
     - (* SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit *)
       iApply (fs_permit_of_rec with "Hseam").
@@ -3044,7 +3016,7 @@ Section fs_crash_seam.
                 (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
                     (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
-                with "[] [Hmir]").
+                with "[Hstep] [Hmir]").
       { iIntros "[Hm %Hlold]".
         assert (HM1 : lm_hdr (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) ls
@@ -3071,13 +3043,13 @@ Section fs_crash_seam.
                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                         (log_hdr_bno ls)) = BSIZE⌝)%I _
-                  with "[] [Hm]").
+                  with "[] [Hm Hstep]").
         { iIntros "(Hm2 & Hrc & _)". iApply disk_write_permit_intro.
           iSplitL "Hm2".
           { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
           iExact "Hrc". }
         iApply (fs_commit_L_sector0_rec cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
-                  Hin HM1 HoffM1 Hrow Hslot with "Hreg Hswlb [Hm]").
+                  Hin HM1 HoffM1 Hrow Hslot with "Hreg Hswlb [Hm] Hstep").
         iNext. iExact "Hm". }
       iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
                 (Hwfh M0) with "Hreg Hswlb [Hmir]").

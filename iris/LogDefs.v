@@ -16,6 +16,7 @@ Require Import RiscvPtsto.
    of LogDefs already has WpLock in its transitive closure (FsCrash and
    IcacheRef require it directly), so nothing downstream gains a dependency. *)
 Require Import WpLockAt.
+Require Import BioDefs.   (* [BSIZE]: the byte flattening below is block-indexed *)
 Require Export Xv6Cameras.  (* [logG], [op_entry] *)
 Local Open Scope Z_scope.
 
@@ -231,6 +232,156 @@ Proof.
   intros Hhdr Hrow. rewrite /lm_committed /lm_logged Hhdr /= fs_install_nil.
   symmetry. apply fs_restrict_ext. intros b Hb. by rewrite (Hrow b Hb).
 Qed.
+
+(* THE CLEAN PICTURE'S COMMITTED VIEW, WITHOUT A LOGGED MAP.  With the
+   on-disk header clean nothing is installed, so the committed view is just
+   the picture restricted to the home blocks.  This is the form the commit
+   permit's client-prepared step is stated at -- the caller's OFF-HEADER
+   view [V] -- because both landing orders of the header write reach that
+   shift and only one of them has already moved the header row. *)
+Lemma lm_committed_of_clean (M : log_mirror) (cov : gset Z) (ls : Z) :
+  lm_hdr M ls = (0%nat, []) ->
+  lm_committed M cov ls = fs_restrict (lm_view M) (fs_home_set cov ls).
+Proof. intros Hhdr. rewrite /lm_committed Hhdr /= fs_install_nil //. Qed.
+
+(* ...AND IT IS BLIND TO A WRITE OUTSIDE THE HOME SET.  The copy loop's
+   fills go to log SLOTS, so neither the header reading nor the home
+   restriction moves: the client's parked payload keeps its index across
+   the whole loop, which is what lets [ProofEndOp]'s fuel induction carry
+   it as a resource at a FIXED map. *)
+Lemma lm_committed_upd_ne (M : log_mirror) (cov : gset Z) (ls b : Z)
+    (bs : list (bv 8)) :
+  lm_hdr M ls = (0%nat, []) ->
+  b <> log_hdr_bno ls ->
+  b ∉ fs_home_set cov ls ->
+  lm_committed (lm_upd M b bs) cov ls = lm_committed M cov ls.
+Proof.
+  intros Hhdr Hne Hnh.
+  assert (Hhdr' : lm_hdr (lm_upd M b bs) ls = (0%nat, [])).
+  { rewrite /lm_hdr (lm_upd_view_ne M b (log_hdr_bno ls) bs (not_eq_sym Hne)).
+    exact Hhdr. }
+  rewrite (lm_committed_of_clean _ cov ls Hhdr')
+          (lm_committed_of_clean M cov ls Hhdr).
+  apply fs_restrict_ext. intros c Hc.
+  apply (lm_upd_view_ne M b c bs). intro Hbad. apply Hnh. rewrite -Hbad. exact Hc.
+Qed.
+
+(* The logged view is blind to a write outside the home set for the same
+   reason: [lm_logged] only ever reads [L] at a home block. *)
+Lemma lm_logged_insert_ne (L : gmap Z (list (bv 8))) (cov : gset Z)
+    (ls b : Z) (bs : list (bv 8)) :
+  b ∉ fs_home_set cov ls ->
+  lm_logged (<[b := bs]> L) cov ls = lm_logged L cov ls.
+Proof.
+  intros Hb. apply fs_restrict_ext. intros c Hc.
+  rewrite lookup_insert_ne; [reflexivity|].
+  intro Hbad. apply Hb. rewrite Hbad. exact Hc.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE DURABLE BYTE VIEW, AND THE COMMIT'S PREPARED STEP (durable-disk     *)
+(* 1d'; claude-notes/design/fs-state.md section 1 and section 4).          *)
+(*                                                                         *)
+(* [fs_dview] is [P_wf] -- the FS layer's half of the crash predicate --    *)
+(* and [fs_dstep] is the basic update the CLIENT prepares and the commit    *)
+(* permit runs.  Both live here, in the geometry's own file, and not        *)
+(* beside [P_fs] in [FsCrash.v], for one reason: the LOG has to STATE the   *)
+(* prepared step (it is what [LogInv.log_psi_commit] returns) and the log   *)
+(* layer may not import the crash layer.  [FsCrash.v] re-exports this file, *)
+(* so every existing reading of [fs_dview] is unchanged.                    *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE BYTE FLATTENING of a committed block view: block [b]'s [i]th byte
+   lives at [b * BSIZE + i], which is the addressing [DiskImg.disk_img_bytes]
+   and [FsBlocks.byte_range] already use.  [gamma_D]'s authority is held at
+   this map inside [P_fs], so the committed view is a BYTE map exactly as
+   [fs-state.md] section 1 asks, while the WAL layer goes on reasoning about
+   the BLOCK map [fr_D] it recovers. *)
+Definition fs_dbytes (D : gmap Z (list (bv 8))) : gmap Z (bv 8) :=
+  map_fold (fun (b : Z) (bs : list (bv 8)) (acc : gmap Z (bv 8)) =>
+              map_seqZ (b * Z.of_nat BSIZE) bs ∪ acc) ∅ D.
+
+Section FsDurableView.
+  Context `{!diskImgG Σ}.
+
+  (* THE DURABLE VIEW'S OWNERSHIP: the FULL element of the byte-keyed
+     [ghost_map Z (bv 8)] for every byte of the committed view.  This is
+     [fs-state.md] section 1's [Phi_D] over the whole home range, and it is
+     what [P_fs] holds beside the byte view's AUTHORITY -- so the two meet
+     only inside [crashN], and no thread that can die ever owns a durable
+     resource (crash.md, principle 1).
+
+     A SEALED DEFINITION AND NOT A PARAMETER, and that is a measured
+     deviation of lane 1d: [FsCrash.P_fs_any] sits inside
+     [FsCrash.fs_crash_seam], which is threaded -- by name, in the
+     STATEMENT -- through 90 files, up to [SpecKexec.fs_fabric],
+     [FsReady.fs_ready] and [UsertrapRes].  An [iProp]-valued parameter
+     reaches all of them whether it is an explicit argument (arity) or an
+     ambient class (a [Context] line per section, and then per section of
+     every file that mentions any of THEIR statements).  So the slot is a
+     definition with honest content, sealed, and stage 2 REPLACES the body
+     by [fs_view Gamma_D] -- which CONTAINS this, since
+     [Phi_D a v := a -> v at gamma_D]. *)
+  Definition fs_dview (g : gname) (B : gmap Z (bv 8)) : iProp Σ :=
+    ([∗ map] a ↦ v ∈ B, a ↪[g] v)%I.
+
+  Global Instance fs_dview_timeless g B : Timeless (fs_dview g B).
+  Proof. rewrite /fs_dview. apply _. Qed.
+
+  (* [iFrame] must treat a whole-disk [big_sepM] as ONE atom
+     (durable-notes.md, "a big-op behind a Definition is a hang"). *)
+  Global Typeclasses Opaque fs_dview.
+
+  (* WHAT A COMMIT DOES TO IT: auth and elements together move to any byte
+     view at all.  Whole-map delete then whole-map insert -- no domain
+     premise, because the elements ARE the domain. *)
+  Lemma fs_dview_rebase (g : gname) (B B' : gmap Z (bv 8)) :
+    ghost_map_auth g 1 B -∗ fs_dview g B ==∗
+      ghost_map_auth g 1 B' ∗ fs_dview g B'.
+  Proof.
+    rewrite /fs_dview. iIntros "Ha Hd".
+    iMod (ghost_map_delete_big B with "Ha Hd") as "Ha".
+    rewrite map_difference_diag.
+    iMod (ghost_map_insert_big B' with "Ha") as "[Ha Hd]";
+      [apply map_disjoint_empty_r|].
+    rewrite right_id_L. by iFrame.
+  Qed.
+
+  (* THE COMMIT'S PREPARED STEP (durable-disk 1d', item 4).  The client
+     builds this at the LOG's linearization point, where its own invariants
+     are openable, and the commit permit runs it later, at mask [empty],
+     with [gamma_D]'s authority and [P_wf] LENT to it for the instant.
+     That is the only shape the commit AU can have: moving
+     [ghost_map_auth gamma_D 1 B] to [B'] needs the ELEMENTS of [B], and
+     those may not be owned by anything mortal (crash.md, principle 1), so
+     they are [P_wf]'s and live inside [crashN].
+
+     THE GNAME IS UNIVERSALLY QUANTIFIED, and that is forced by where
+     [gamma_D] sits today: it is [FsCrash.fcn_view] of a record the crash
+     predicate binds EXISTENTIALLY, so no client can name it.  At stage 2,
+     when [fcn_view] is hoisted into [RiscvPtsto.riscvFixedGS] beside
+     [riscv_swap_name] (the worklist's [Pc]/[HPc]/[Hproj]/[Hswap]/
+     [boot_fixedGS] move), this binder becomes a PARAMETER and the step is
+     the client's debt at the real durable name.  Today's trivial witness
+     is [fs_dstep_rebase] below. *)
+  Definition fs_dstep (D D' : gmap Z (list (bv 8))) : iProp Σ :=
+    (∀ g : gname,
+       ghost_map_auth g 1 (fs_dbytes D) -∗ fs_dview g (fs_dbytes D) ==∗
+       ghost_map_auth g 1 (fs_dbytes D') ∗ fs_dview g (fs_dbytes D'))%I.
+
+  (* THE TRIVIAL INSTANTIATION, AND IT IS A PARAMETER OF THIS STAGE, NOT A
+     THEOREM ABOUT THE FILE SYSTEM: while [P_wf] is a bare byte map the
+     durable side can be re-based unconditionally, so the boot's payload
+     ([Psi := fun _ => emp]) discharges its law with this and nothing else.
+     Stage 2 replaces the body of [fs_dview] by [fs_view Gamma_D] and this
+     lemma STOPS holding -- which is the point: the step then carries the
+     file system's own content and only the client can build it. *)
+  Lemma fs_dstep_rebase (D D' : gmap Z (list (bv 8))) : ⊢ fs_dstep D D'.
+  Proof.
+    rewrite /fs_dstep. iIntros (g) "Ha Hd".
+    iApply (fs_dview_rebase g (fs_dbytes D) (fs_dbytes D') with "Ha Hd").
+  Qed.
+End FsDurableView.
 
 (* ---------------------------------------------------------------------- *)
 (* THE INSTALL PASS'S PICTURE, AS A TERM (durable-disk 1a).                 *)

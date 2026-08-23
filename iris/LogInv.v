@@ -873,7 +873,56 @@ Section LogInv.
      so that row (b) -- which relates the era's picture of the durable
      disk to the logged view -- can be stated at all.  The header reading
      is unchanged, so nothing above this file grew a binder. *)
-  Definition log_state (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  (* ---------------------------------------------------------------- *)
+  (*  THE CLIENT'S PARKED PAYLOAD, AND ITS ONE LAW (durable-disk 1d')   *)
+  (*  claude-notes/design/fs-state.md section 5.                         *)
+  (*                                                                     *)
+  (*  The log stores an OPAQUE client payload and never reads it.  It is  *)
+  (*  indexed by the COMMITTED VIEW ALONE -- [lm_committed M cov ls], the *)
+  (*  value durable-disk 1a's born-true mirror lets the era compute -- and *)
+  (*  NOT by the logged view: the payload's own content is pinned to [L]   *)
+  (*  by the byte ELEMENTS it holds against the log's auth, and an [L]     *)
+  (*  index would make every [log_write]'s AU re-index the payload, which  *)
+  (*  no client can do for an arbitrary [Psi].  With the [D0] index the    *)
+  (*  payload goes in and comes back UNCHANGED at a [log_write] and moves  *)
+  (*  at the COMMIT and nowhere else -- where [gamma_D] moves too.          *)
+  (*                                                                       *)
+  (*  THE LAW TAKES THE BYTE-VIEW AUTH AS AN INPUT AND GIVES IT BACK, and   *)
+  (*  that is the correction the orchestrator ruled on.  A law quantified   *)
+  (*  over an arbitrary logged view with nothing else in hand --            *)
+  (*  [forall M L, Psi (lm_committed M) ==> Psi (lm_logged L)] -- is not     *)
+  (*  provable for a real stage-2 payload, whose debt is specific to the     *)
+  (*  ACTUAL logged view.  So the log lends its authority for the instant:   *)
+  (*  the client agrees the elements it owns against it, learns the real     *)
+  (*  [L] on the home set ([FsBlocks.bytes_home_at] is the tie that makes    *)
+  (*  that reading total), and RETURNS the prepared durable step that the    *)
+  (*  commit permit runs later, at mask [empty], with [gamma_D]'s auth and   *)
+  (*  [P_wf] lent to it ([LogDefs.fs_dstep]).                                *)
+  (*                                                                        *)
+  (*  PERSISTENT is not a weakening: the LINEARITY stage 2's debt needs      *)
+  (*  lives inside [Psi D0], which this update consumes; what is uniform is  *)
+  (*  only the RIGHT to spend it at a commit, which the log must have in     *)
+  (*  every batch.  [ProofInitlog] discharges it at [Psi := fun _ => emp]    *)
+  (*  with [LogDefs.fs_dstep_rebase] and no boot-chain threading at all,     *)
+  (*  because [log_ctx]'s existential lets the BOOT choose the witness.      *)
+  (* ---------------------------------------------------------------- *)
+  Definition log_psi_commit (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (γfs : fs_names) (cov : gset Z) (ls : Z) : iProp Σ :=
+    (□ ∀ (M : log_mirror) (L : gmap Z (list (bv 8))) (Lb : gmap Z (bv 8)),
+        (ghost_map_auth (fs_bytes γfs) 1 Lb ∗
+         ⌜bytes_home_at Lb L (fs_home_set cov ls)⌝ ∗
+         Psi (lm_committed M cov ls))
+        ==∗
+        (ghost_map_auth (fs_bytes γfs) 1 Lb ∗
+         Psi (lm_logged L cov ls) ∗
+         fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))%I.
+
+  Global Instance log_psi_commit_persistent Psi γfs cov ls :
+    Persistent (log_psi_commit Psi γfs cov ls).
+  Proof. apply _. Qed.
+
+  Definition log_state (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) : iProp Σ :=
     (∃ (W : list (SailStdpp.Values.mword 32))
        (L : gmap Z (list (bv 8))) (D : gmap Z bool) (M : log_mirror),
@@ -921,7 +970,14 @@ Section LogInv.
           is this bundle's own binder now. *)
        log_mirror_half M ∗ ⌜lm_hdr M logstart = (0%nat, [])⌝ ∗
        (* ROW (b) -- see [log_mirror_tie_body] above *)
-       ⌜log_mirror_tie_body M L cov logstart LB⌝)%I.
+       ⌜log_mirror_tie_body M L cov logstart LB⌝ ∗
+       (* THE CLIENT'S PARKED PAYLOAD (durable-disk 1d'), at the committed
+          view this era's mirror computes.  It is parked HERE, in the log's
+          own lock resource, and not in a separate FS invariant, because
+          whatever the committer needs at the commit instant must already be
+          in the log's hands (the last-ending operation cannot know it is
+          last) and [log.lock] already serializes every [log_write]. *)
+       Psi (lm_committed M cov logstart))%I.
 
   (* THE PENDING SET MOVES, in the two shapes the transitions need, and
      BOTH ARE THE IDENTITY (durable-disk 1d): the bundle does not read
@@ -931,11 +987,12 @@ Section LogInv.
      ruling 3 ever grows one -- would land here and nowhere else.
 
      GROWTH: [begin_op]'s mint and [log_write]'s two ledger steps. *)
-  Lemma log_state_pend_mono (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Lemma log_state_pend_mono (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB pend pend' : gset Z) :
     pend ⊆ pend' ->
-    log_state bn γfs cov logstart n LB pend -∗
-    log_state bn γfs cov logstart n LB pend'.
+    log_state Psi bn γfs cov logstart n LB pend -∗
+    log_state Psi bn γfs cov logstart n LB pend'.
   Proof. intros _. rewrite /log_state. iIntros "H". iExact "H". Qed.
 
   (* SHRINKAGE -- [end_op]'s retire, where the ending op's already-logged
@@ -943,17 +1000,19 @@ Section LogInv.
      argument is GONE with row (a): the retiring op owes the log nothing
      ([SpecEndOp] has no FS-facing premise at all now), and the fast path
      closes with [op_pending_delete] alone. *)
-  Lemma log_state_fin (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Lemma log_state_fin (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB F pend : gset Z) :
-    log_state bn γfs cov logstart n LB pend -∗
-    log_state bn γfs cov logstart n LB (pend ∖ F).
+    log_state Psi bn γfs cov logstart n LB pend -∗
+    log_state Psi bn γfs cov logstart n LB (pend ∖ F).
   Proof. rewrite /log_state. iIntros "H". iExact "H". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)
   (* ---------------------------------------------------------------- *)
 
-  Definition log_res (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition log_res (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) : iProp Σ :=
     (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32)
        (om : gmap nat op_entry) (E : nat) (X : gset (nat * Z)),
@@ -1005,15 +1064,24 @@ Section LogInv.
              unconstrained, which is exactly the self-invalidation -- they
              can never be used, because using one needs [e = E]. *)
           ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
-          log_state bn γfs cov logstart n LB (op_pending om)))%I.
+          log_state Psi bn γfs cov logstart n LB (op_pending om)))%I.
 
   (* the persistent bundle every log function shares: the sealed lock and
      the two cells initlog wrote once and froze *)
-  Definition log_ctx (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  (* THE Psi-NAMED FORM.  [log_ctx] below is its existential closure, so the
+     78 files that thread the log's context keep their arity and none of them
+     ever names a file-system payload; a client that MUST name [Psi] --
+     [log_write]'s AU callers, [end_op]'s committer -- opens the existential
+     IN ITS OWN PROOF, which is sound because only one log lock is ever
+     allocated.  A CLASS was refuted the same way [P_wf]'s parameter form
+     was: the instance would have to be in scope in every file that mentions
+     any statement in the cone. *)
+  Definition log_ctx_at (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=
     (is_lock (ln_lk γ) log_addr "log"%string
-       (log_res γ bn γfs cov logstart) ∗
+       (log_res Psi γ bn γfs cov logstart) ∗
      l_dev ↦₄□ dev ∗
      l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
      (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
@@ -1031,11 +1099,40 @@ Section LogInv.
         [log_ctx] because [log_ctx] is already threaded to [log_write] and
         already carries [cov] and [logstart], so not one call site moves. *)
      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs)
-                  (fs_home_set cov logstart))%I.
+                  (fs_home_set cov logstart) ∗
+     (* THE PAYLOAD'S COMMIT LAW (durable-disk 1d').  Persistent, so it
+        rides the context every log function already threads; it is the
+        WHOLE of the client's obligation. *)
+     log_psi_commit Psi γfs cov logstart)%I.
+
+  Global Instance log_ctx_at_persistent Psi γ bn γfs cov logstart dev :
+    Persistent (log_ctx_at Psi γ bn γfs cov logstart dev).
+  Proof. apply _. Qed.
+
+  Definition log_ctx (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z)
+      (dev : SailStdpp.Values.mword 32) : iProp Σ :=
+    (∃ Psi : gmap Z (list (bv 8)) -> iProp Σ,
+       log_ctx_at Psi γ bn γfs cov logstart dev)%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
   Proof. apply _. Qed.
+
+  Lemma log_ctx_of_at Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗
+    log_ctx γ bn γfs cov logstart dev.
+  Proof. iIntros "H". iExists Psi. iExact "H". Qed.
+
+  Lemma log_ctx_at_lock Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗
+    is_lock (ln_lk γ) log_addr "log"%string (log_res Psi γ bn γfs cov logstart).
+  Proof. rewrite /log_ctx_at. iIntros "($ & _)". Qed.
+
+  Lemma log_ctx_at_psi Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗
+    log_psi_commit Psi γfs cov logstart.
+  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
   (* THE FROZEN CELLS ALONE -- log_ctx minus the lock.  The COMMITTER-ONLY
      helpers (write_head, install_trans) run with NO lock held (that is what
@@ -1053,15 +1150,37 @@ Section LogInv.
     Persistent (log_frozen logstart dev).
   Proof. apply _. Qed.
 
+  Lemma log_ctx_at_frozen Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
+  Proof. rewrite /log_ctx_at /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
+
   Lemma log_ctx_frozen γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
-  Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
+  Proof.
+    rewrite /log_ctx. iIntros "H". iDestruct "H" as (Psi) "H".
+    iApply (log_ctx_at_frozen with "H").
+  Qed.
 
   (* the byte view's row, off the context every log function threads *)
+  Lemma log_ctx_at_bytes Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
+  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
+
   Lemma log_ctx_bytes γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & $)". Qed.
+  Proof.
+    rewrite /log_ctx. iIntros "H". iDestruct "H" as (Psi) "H".
+    iApply (log_ctx_at_bytes with "H").
+  Qed.
+
+  Lemma log_ctx_at_bytes_any Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗ fs_bytes_any γfs.
+  Proof.
+    iIntros "H". iPoseProof (log_ctx_at_bytes with "H") as "Hb".
+    rewrite /fs_bytes_any. iExists (fs_home_set cov logstart). iExact "Hb".
+  Qed.
 
   (* ...and the home-set-free form every bread client above takes *)
   Lemma log_ctx_bytes_any γ bn γfs cov logstart dev :
@@ -1071,9 +1190,48 @@ Section LogInv.
     rewrite /fs_bytes_any. iExists (fs_home_set cov logstart). iExact "Hb".
   Qed.
 
+  Lemma log_ctx_at_swap Psi γ bn γfs cov logstart dev :
+    log_ctx_at Psi γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
+  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & $ & _)". Qed.
+
   Lemma log_ctx_swap γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $ & _)". Qed.
+  Proof.
+    rewrite /log_ctx. iIntros "H". iDestruct "H" as (Psi) "H".
+    iApply (log_ctx_at_swap with "H").
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  SPENDING THE LAW (durable-disk 1d').  The committer holds the log  *)
+  (*  lock's batch -- hence the CACHE auth, hence [L] frozen -- and opens *)
+  (*  the byte view's invariant at [logN] to LEND the byte auth to the    *)
+  (*  client's law.  What comes back is the payload re-indexed at the      *)
+  (*  committed view this batch is about to produce, and the prepared      *)
+  (*  durable step the commit permit runs.  Spent ONCE per batch.          *)
+  (* ---------------------------------------------------------------- *)
+  Lemma log_psi_spend (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (γfs : fs_names) (cov : gset Z) (ls : Z) (E : coPset)
+      (M : log_mirror) (L : gmap Z (list (bv 8))) :
+    ↑logN ⊆ E ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
+    log_psi_commit Psi γfs cov ls -∗
+    ghost_map_auth (fs_cache γfs) 1 L -∗
+    Psi (lm_committed M cov ls) ={E}=∗
+      ghost_map_auth (fs_cache γfs) 1 L ∗ Psi (lm_logged L cov ls) ∗
+      fs_dstep (lm_committed M cov ls) (lm_logged L cov ls).
+  Proof.
+    iIntros (HE) "#Hinv #Hlaw Hca Hpsi".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (Lb C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct (fs_bytes_home_of (fs_cache γfs) L C Lb (fs_home_set cov ls)
+                 Hdom Hlens Htie Hdm with "Hca HC") as %Hbh.
+    iMod ("Hlaw" $! M L Lb with "[Ha Hpsi]") as "(Ha & Hpsi & Hstep)".
+    { iSplitL "Ha"; [iExact "Ha"|].
+      iSplitR; [iPureIntro; exact Hbh|]. iExact "Hpsi". }
+    iMod ("Hclose" with "[Ha HC]") as "_".
+    { iNext. iExists Lb, C. iFrame "Ha HC". iPureIntro. auto. }
+    iModIntro. iFrame "Hca Hpsi Hstep".
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)
