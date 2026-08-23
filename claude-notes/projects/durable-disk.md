@@ -149,12 +149,20 @@ See the G1-impl entry for the site table.
    place, everything else treats `fs_nblk` as an atom; and `repeat
    split` DESTROYS an `fs_durable_wf_view` conjunct (it is an `∃`, one
    constructor, so `split` opens it with an evar) — spell those chains
-   `split; [..|]`. (2) the create side — sys_open O_CREATE (+O_TRUNC),
-   sys_mkdir, sys_mknod, sys_link (incl. the nlink rollback arm, net
-   identity); (3) the free side — sys_unlink file/dir arms with the
-   trunc/free path, fileclose's iput-free path, ireclaim. Read-only
-   arms (kexec, kexit, sys_chdir, fileread-side) have identity effects
-   and need no lemma. Net effects PER ARM must be read off the actual
+   `split; [..|]`. (2) the create side — DONE (see the G2 batch (2)
+   entry in §6: four files, eight lemmas, and two arms the plan called
+   identity that are not). (3) the free side — DONE
+   (`FsOpUnlink/IputFree/Ireclaim.v`): the two carrying theorems are
+   `eff_iput_free_fuse` (this revision's iput frees in TWO groups,
+   itrunc then ifree; a truncated typed dir has no wf intermediate, so
+   the composition is proven EQUAL to `eff_free_inode` as functions)
+   and `fs_orphan_char` (at a wf view a live inode has `nlink = 0` iff
+   it is unreachable — the transport of the whole free side; the code
+   only ever tests nlink). CORRECTIONS to the arm table: kexit and
+   sys_chdir are NOT read-only (both iput a cwd ref and can free —
+   `FsOpIputFree` covers them); `SpecIput.v`'s transcribed source
+   comment still shows the pre-split iput (same net). Read-only arms
+   (kexec, fileread-side) have identity effects and need no lemma. Net effects PER ARM must be read off the actual
    Spec*/Proof* files (the survey's 26-arm table). The 12 ops and their
    26 exit arms are enumerated in the 2026-08-22 survey (§Stage G);
    each op = a composition of effects (e.g. sys_mkdir =
@@ -614,12 +622,115 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
         to grow a name are `BootShared.boot_shared_alloc` and
         `ProofMain`'s `wp_main_boot_sconf_body`. Nothing consumes it yet —
         it is row (a)'s `A₀` premise, prepared.
+- [x] **G2 batch (2) — THE CREATE SIDE.** DONE (`iris/FsOpMknod.v`,
+      `FsOpMkdir.v`, `FsOpOpen.v`, `FsOpLink.v`, all in `_CoqProject`;
+      1.0–1.15 s each, every lemma `Closed under the global context`).
+      Eight lemmas. `op_mknod_ok` / `op_mkdir_ok` / `op_open_created_ok`
+      / `op_open_trunc_ok` / `op_link_ok` are the F2 wrappers at the
+      op's own literal (`eff_create_entry` at `ty = T_DEVICE` and at
+      `T_FILE`, `eff_create_dir_entry`, `eff_trunc`, `eff_link_entry`);
+      `op_open_created_trunc_ok` is the batch's ONE chained arm
+      (O_CREATE + O_TRUNC on a made file); `op_link_rollback_id` /
+      `op_link_rollback_wf` are sys_link's three `bad:` routes.
+      Six results beyond the briefed statements:
+      (i) **THE TRANSPORT IS ONE FACT.** Chaining `eff_trunc` after
+      `eff_create_entry` needs only that the third block the create
+      writes — the parent's dirent block — is a DATA block
+      (`FsOpOpen.create_dirblk_range`, off `FsEffBase.blk_addr_covered`
+      with `fdo_gran` + `fdi_size`); given that, `fs_parse_sb` and the
+      child's decoded type both transport, by `fs_parse_sb_ext` and
+      `eff_dinode_dec` (`FsOpOpen.eff_create_entry_transport`). Any
+      later create-side chain reuses those two lemmas verbatim.
+      (ii) **THE ROLLBACK IS AN EQUATION**, not a wf step:
+      `op_link_rollback_id : link_rollback P sb i b = P b`, under
+      `diblk_wf ds`, `P (IBLOCK …) = diblk_bytes ds` and
+      `nlink < 65535` (sys_link's NLINK_MAX guard gives `< 32767`).
+      `link_rollback` spells the arm's two writes at the values the
+      code stores — each re-encodes the record the PREVIOUS view
+      decodes. Its two supporting laws are general and belong to the
+      `eff_dinode` algebra, so they are candidates to move into
+      `FsEffBase.v` at the lane merge: `FsOpLink.fs_iblk_of_diblk` (the
+      list-level reading of `FsImg.fs_dinode_of_diblk`) and
+      `FsOpLink.eff_dinode_id` (an iupdate that writes back the record
+      it just read is a NO-OP on the view).
+      (iii) **THREE ARMS THE BATCH PLAN CALLS IDENTITY AND ARE NOT** —
+      recorded under G2 below, because all three are cross-cutting.
+      (iv) The one precondition of the create-side wrappers with no
+      guard behind it in the C is `fs_reachable P sb d` (the code tests
+      `dp->nlink != 0`, which is NOT reachability). It is a THREADING
+      job, not a hole: a path witness is exactly what
+      `namei-pinned-lookup.md`'s landed N-1..N-5 give
+      nameiparent/namei. Nothing in batch (2) weakens it.
+      (v) **THE GROWING APPEND IS A SECOND SUCCESS SUB-ARM, and F2's
+      wrappers do not cover it.** `eff_create_entry` /
+      `eff_link_entry` / `eff_create_dir_entry` all take the
+      reuse-or-append disjunction whose append branch is
+      `16 (k+1) <= fs_nblk sz * BSIZE` — the record fits a block the
+      parent ALREADY owns. When the parent's records exactly fill its
+      last block (`nrec` a multiple of 64, i.e. `sz = fs_nblk sz *
+      1024`), dirlink's `writei` instead runs bmap and ALLOCATES: the
+      arm is `eff_create_entry ∘ eff_alloc_file_block` at
+      `fbn = fs_nblk sz`, `sz' = sz + 16` (`eff_alloc_file_block_wfv`
+      already carries the T_DIR clause `(16 | sz') ∧ sz = fbn*BSIZE`,
+      so F2 anticipated it). It was NOT proved in batch (2) because of
+      the export gap in (vi).
+      (vi) **THE EXPORT GAP THAT BLOCKS EVERY TREE-TOUCHING CHAIN.**
+      The `eff_*_wf` proofs all establish `tree_of_disk P' sb =
+      tree_of_disk P sb` (or its edge delta) internally, and export
+      NOTHING but `fs_durable_wf_view`. So a chain whose SECOND effect
+      has a `fs_reachable` / type / size precondition cannot transport
+      it. Batch (2)'s create∘trunc escaped only because `eff_trunc`'s
+      preconditions mention neither the tree nor sizes. The fix is one
+      uniform TRANSPORT BUNDLE per effect, beside each `_wfv`:
+      `fs_parse_sb` invariance, `fs_dinode` at every touched inum, and
+      `tree_of_disk` invariance (or its stated delta). `FsOpOpen`'s
+      `create_dirblk_range` + `eff_create_entry_transport` are that
+      bundle for `eff_create_entry`, written outside the effect file
+      because the lanes ran in parallel; they should move next to the
+      wrapper at the merge.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms. Prove the per-op
       preservation lemmas STANDALONE first (pure statements against F2's
       effect vocabulary — no `log_state` dependency, fully parallelizable
       across agents).
+      **What the arm table is missing (found by batch (2), 2026-08-23;
+      all three need a ruling BEFORE the G1-flip).**
+      (a) **create's `fail:` tail is not identity, and not an F2
+      effect.** `SpecCreate`'s failure family is N / G / F-BAD /
+      A-FAIL / FAIL, and FAIL is the only member that WRITES: ialloc's
+      type store, the three halfword stores + `iupdate`, the
+      `ip->nlink = 0` store, and then `iunlockput(ip)` — ref 1, valid,
+      `nlink = 0`, so IPUT FREES (itrunc, `ip->type = 0`, `iupdate`).
+      Net on the committed view: ONE `eff_dinode` AT A FREE SLOT —
+      record `i` is type-0 before and after, but major/minor/nlink/
+      size/addrs all move; on the T_DIR copy the dots block is
+      allocated and freed again, so the bitmap round-trips. That is a
+      NINTH effect (`eff_free_slot`), and a cheap one: a type-0 record
+      is invisible to `fs_used_blocks`, to `node_at` (`node_at_free` on
+      both sides) and to every live-inode sweep, so only
+      `fs_region_nlink`'s L3/L4 has anything to say about it.
+      sys_mknod, sys_mkdir and sys_open's O_CREATE route all inherit
+      it.
+      (b) **EVERY `iput` MAY FREE.** `SpecIput` is explicit — "xv6's
+      iput always MAY truncate and no caller can know in advance which
+      arm runs" — so any arm that drops the LAST reference to an
+      `nlink = 0` inode also runs one `eff_free_inode`. That includes
+      the `iput`s inside namei/nameiparent and every failure arm's
+      `iunlockput` (create's ARM G iunlockputs a `dp` whose `nlink` its
+      own guard just found ZERO). So the 26-arm table's "identity"
+      labels mean "identity APART FROM iput's free path", and what is
+      wanted is a GENERAL composition — `eff_free_inode` at inum `j`
+      after an arbitrary effect at `i ≠ j` — not a per-arm lemma. The
+      four batch-(2) files carry this caveat in their headers.
+      (c) **`writei`'s PARTIAL-FAILURE arms commit a state W3 and W4/W5
+      call impossible** — a block marked used and owned by nobody, and
+      an `addrs` entry past the inode's own `nblk`. Registered in
+      `kernel-defects.md` (2026-08-23 candidate) with the two arms, the
+      block-boundary condition and the three options; it is batch (1)'s
+      wall (filewrite), but it also reaches the create side through
+      `dirlink`'s `writei` on a twelve-block directory when balloc
+      fails. **G2 cannot close until this is ruled on.**
 - [ ] **G1-flip.** Row (a) — `∃ A` beside `log_state`'s four binders,
       `⌜dom A = fs_home_set cov ls⌝ ∗ ⌜fs_durable_wf_body A⌝ ∗
       ⌜∀ b ∈ fs_home_set cov ls, b ∉ pend -> L !! b = A !! b⌝` — flips on

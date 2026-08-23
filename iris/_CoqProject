@@ -646,6 +646,10 @@ FsEffCreateEntry.v
 FsEffAllocBlock.v
 FsEffAllocIndBlock.v
 FsOpFilewrite.v
+FsOpMknod.v
+FsOpMkdir.v
+FsOpOpen.v
+FsOpLink.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v
