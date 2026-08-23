@@ -629,8 +629,48 @@ Definition lbl_reidx_sub (lb lb' : lbl) : Prop :=
   | _ => False
   end.
 
+(** ** THE THIRD ARM: A POISONED BLOCK
+
+    A block whose instruction READS A TAINTED CARRIER — a register the
+    certified run does not agree with the emission on, because an earlier
+    witness put a different value there — cannot be MIRRORED: the address
+    it computes is the certified run's own, not [G]'s.  Its certified
+    label is therefore related to the row's by nothing but the KIND CLASS:
+    a load stays a load (of ANY footprint, at [aq = false], served by the
+    candidate's latest sources — see [WeakRvwmoWalk.pois_ok]), a fence
+    ONLY a load can be poisoned: a fence block reads no register at all, so
+    a site discharges its poisoned obligation by REFUTING the premise
+    ([WeakRvwmoWalk.wpois_site] is guarded by "the block's read set meets
+    the taint").
+
+    A WRITE IS NEVER POISONED here, by construction of the arm: the walk's
+    segments exit at a write, and the exit's own read-set freedom is a
+    SITE obligation ([WeakRvwmoWalk.wexit_ut], §4.5c') rather than a
+    property of this relation.  That is what keeps [lbl_reidx_w_store]
+    true, hence the exit message verbatim. *)
+Definition lbl_poisoned (lb lb' : lbl) : Prop :=
+  match lb with
+  | WeakAxiomatic.LLoad _ _ _ _ =>
+      match lb' with
+      | WeakAxiomatic.LLoad aq' _ ts' vs' =>
+          aq' = false ∧ length vs' = length ts'
+      | _ => False
+      end
+  | _ => False
+  end.
+
+Lemma lbl_poisoned_notw lb lb' :
+  lbl_poisoned lb lb' → lb_is_w lb = false ∧ lb_is_w lb' = false.
+Proof.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
+                 |aq rl base ts rvs wvs kc];
+    destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'|
+                     aq' rl' base' ts' rvs' wvs' kc'];
+    by intros H.
+Qed.
+
 Definition lbl_reidx_w (lb lb' : lbl) : Prop :=
-  lbl_reidx lb lb' ∨ lbl_reidx_sub lb lb'.
+  lbl_reidx lb lb' ∨ lbl_reidx_sub lb lb' ∨ lbl_poisoned lb lb'.
 
 Lemma lbl_reidx_w_refl lb : lbl_reidx_w lb lb.
 Proof. left. apply lbl_reidx_refl. Qed.
@@ -638,16 +678,20 @@ Proof. left. apply lbl_reidx_refl. Qed.
 Lemma lbl_reidx_w_of lb lb' : lbl_reidx lb lb' → lbl_reidx_w lb lb'.
 Proof. by left. Qed.
 
-(** THE EXIT WRITE IS STILL VERBATIM — the substituted arm is a load's. *)
+Lemma lbl_reidx_w_pois lb lb' : lbl_poisoned lb lb' → lbl_reidx_w lb lb'.
+Proof. by right; right. Qed.
+
+(** THE EXIT WRITE IS STILL VERBATIM — the substituted and the poisoned
+    arms are a non-write's. *)
 Lemma lbl_reidx_w_store rl base vs kc lb' :
   lbl_reidx_w (WeakAxiomatic.LStore rl base vs kc) lb' →
   lb' = WeakAxiomatic.LStore rl base vs kc.
-Proof. by intros [H|H]. Qed.
+Proof. by intros [H|[H|H]]. Qed.
 
 Lemma lbl_reidx_w_fence pr pw sr sw lb' :
   lbl_reidx_w (WeakAxiomatic.LFence pr pw sr sw) lb' →
   lb' = WeakAxiomatic.LFence pr pw sr sw.
-Proof. by intros [H|H]. Qed.
+Proof. by intros [H|[H|H]]. Qed.
 
 Lemma lbl_reidx_sub_relp b lb lb' :
   lbl_reidx_sub lb lb' → lpost_relp b lb' = lpost_relp b lb.
@@ -658,10 +702,21 @@ Proof.
     by intros H.
 Qed.
 
+Lemma lbl_poisoned_relp b lb lb' :
+  lbl_poisoned lb lb' → lpost_relp b lb' = lpost_relp b lb.
+Proof.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc];
+    destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'|
+                     aq' rl' base' ts' rvs' wvs' kc'];
+    intros H; try (by destruct H); by injection H as -> -> -> ->.
+Qed.
+
 Lemma lbl_reidx_w_relp b lb lb' :
   lbl_reidx_w lb lb' → lpost_relp b lb' = lpost_relp b lb.
 Proof.
-  intros [H|H]; [by apply lbl_reidx_relp|by apply lbl_reidx_sub_relp].
+  intros [H|[H|H]];
+    [by apply lbl_reidx_relp|by apply lbl_reidx_sub_relp
+    |by apply lbl_poisoned_relp].
 Qed.
 
 (** … and it moves neither the write bit nor, therefore, the message. *)
@@ -670,7 +725,7 @@ Proof.
   destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc];
     destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'|
                      aq' rl' base' ts' rvs' wvs' kc'];
-    intros [H|H]; try (by simplify_eq); try (by destruct H).
+    intros [H|[H|H]]; try (by simplify_eq); try (by destruct H).
 Qed.
 
 Lemma lbl_reidx_w_notw lb lb' :

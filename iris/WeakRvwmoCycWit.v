@@ -1209,7 +1209,7 @@ Section walkrun.
            ([cyg_values_differ]) — the old proof took [lbl_reidx]'s
            value-preserving arm, which is exactly what the coincidence
            bought. *)
-        right. rewrite /cw_lb0 /latest_read_lbl /=. split_and!;
+        right; left. rewrite /cw_lb0 /latest_read_lbl /=. split_and!;
           [reflexivity|reflexivity|reflexivity| |]; by vm_compute.
       + apply lbl_reidx_w_refl.
   Qed.

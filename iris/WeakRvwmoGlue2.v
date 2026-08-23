@@ -323,7 +323,23 @@ Definition cstep_cls (G : gexec) (W : geid → Prop) (x : agent) (c : cand)
    ∃ (base : Z) (n : nat) (ts0 : list nat) (vs0 : list (bv 8)),
      gx_lbl G (x, gcnt x (cd_tr c))
        = Some (WeakAxiomatic.LLoad false base ts0 vs0) ∧
-     length ts0 = n ∧ l = latest_read_lbl c false base n).
+     length ts0 = n ∧ l = latest_read_lbl c false base n) ∨
+  (** THE POISONED ARM (the per-hart taint migration).  The block read a
+      TAINTED carrier, so the certified label is the machine's own — a
+      latest-source read at a footprint [G] does not name.  Nothing beyond
+      "both are non-writes" relates it to [G]'s label at the position, and
+      nothing downstream needs more: the log, [ctp_wix] and the exit
+      message are all about writes. *)
+  ((∃ lb0 : lbl, gx_lbl G (x, gcnt x (cd_tr c)) = Some lb0 ∧
+                 lb_is_w lb0 = false) ∧
+   cpois_lbl c l ∧
+   (** the two discriminators (see [WeakRvwmoCert3.cpois_step]): the label
+       is not [G]'s own, and it is not at [G]'s footprint *)
+   gx_lbl G (x, gcnt x (cd_tr c)) ≠ Some l ∧
+   ¬ (∃ (base : Z) (n : nat) (ts0 : list nat) (vs0 : list (bv 8)),
+        gx_lbl G (x, gcnt x (cd_tr c))
+          = Some (WeakAxiomatic.LLoad false base ts0 vs0) ∧
+        length ts0 = n ∧ l = latest_read_lbl c false base n)).
 
 Lemma latest_read_lbl_congr (c1 c2 : cand) (aq : bool) (base : Z) (n : nat) :
   cd_img c1 = cd_img c2 → cd_log_end c1 = cd_log_end c2 →
@@ -356,13 +372,21 @@ Proof.
   have Hte : take (length (cd_tr c)) (cd_tr c) = cd_tr c
     by (apply take_ge; lia).
   (* [G]'s label at the appended position, in the NON-witness case *)
-  have Hlbl_ev : ¬ W (x, gcnt x (cd_tr c)) →
-                 gx_lbl G (x, gcnt x (cd_tr c)) = Some l.
-  { intros HnW. destruct Hcls as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)]. }
-  (* a WITNESS label is a load, so an appended WRITE is never a witness *)
-  have Hw_notW : lb_is_w l = true → ¬ W (x, gcnt x (cd_tr c)).
-  { intros Hw HW. destruct Hcls as [[HnW _]|[_ (base & n & ts0 & vs0 & _ & _ & ->)]];
-      [by destruct (HnW HW)|by rewrite latest_read_not_w in Hw]. }
+  (* a WITNESS and a POISONED label are both loads, so an appended WRITE
+     carries [G]'s own label and its position is outside [W] *)
+  have Hlbl_w : lb_is_w l = true →
+                ¬ W (x, gcnt x (cd_tr c)) ∧
+                gx_lbl G (x, gcnt x (cd_tr c)) = Some l.
+  { intros Hw.
+    destruct Hcls as [[HnW H]|[[_ (base & n & ts0 & vs0 & _ & _ & ->)]
+                              |(_ & Hpl & _ & _)]];
+      [by split|by rewrite latest_read_not_w in Hw
+      |by rewrite (cpois_lbl_notw c l Hpl) in Hw]. }
+  have Hlbl_ev : lb_is_w l = true →
+                 gx_lbl G (x, gcnt x (cd_tr c)) = Some l
+    := λ Hw, proj2 (Hlbl_w Hw).
+  have Hw_notW : lb_is_w l = true → ¬ W (x, gcnt x (cd_tr c))
+    := λ Hw, proj1 (Hlbl_w Hw).
   destruct Hgt as [Himg Hag Hpos Hstep Hwix Hlog].
   have Hlt : ∀ p s, cd_tr (cand_snoc c (EStep x l)) !! p = Some s →
     (p < length (cd_tr c))%nat →
@@ -396,14 +420,30 @@ Proof.
       rewrite ev_snoc_end /= take_app_le // Hte //.
   - intros p s Hs. destruct (decide (p < length (cd_tr c))%nat) as [Hp|Hp].
     + destruct (Hlt p s Hs Hp) as (Hs' & Hev & _ & _ & Hpre).
-      rewrite Hev Hpre. by apply Hstep.
+      destruct (Hstep p s Hs') as [[HnW Hl]|[[HW Hw]|Hpo]].
+      * left. rewrite Hev. by split.
+      * right; left. rewrite /cwit_step Hev Hpre. by split.
+      * right; right. rewrite /cpois_step /cwit_step Hev Hpre. exact Hpo.
     + destruct (Hend p s Hs Hp) as (-> & ->). rewrite ev_snoc_end.
-      destruct Hcls as [[HnW Hl]|[HW (base & n & ts0 & vs0 & Hl & Hn & Hleq)]].
+      destruct Hcls as [[HnW Hl]|[[HW (base & n & ts0 & vs0 & Hl & Hn & Hleq)]
+                                 |(Hg0 & (base & n & Hleq) & Hne & Hnw)]].
       * left. by split.
-      * right. split; [exact HW|].
+      * right; left. split; [exact HW|].
+        rewrite /cwit_step ev_snoc_end.
         exists base, n, ts0, vs0. split_and!; [exact Hl|exact Hn|].
         rewrite /= Hleq. apply latest_read_lbl_congr;
           [by rewrite cd_pre_snoc_img|by rewrite cd_pre_snoc_log].
+      * right; right. rewrite /cpois_step /cwit_step ev_snoc_end.
+        split_and!.
+        -- exact Hg0.
+        -- exists base, n. rewrite /= Hleq. apply latest_read_lbl_congr;
+             [by rewrite cd_pre_snoc_img|by rewrite cd_pre_snoc_log].
+        -- rewrite /=. exact Hne.
+        -- intros (base1 & n1 & ts1 & vs1 & Hl1 & Hn1 & Hlb1). apply Hnw.
+           exists base1, n1, ts1, vs1. split_and!; [exact Hl1|exact Hn1|].
+           rewrite /= in Hlb1. rewrite Hlb1.
+           apply latest_read_lbl_congr;
+             [by rewrite cd_pre_snoc_img|by rewrite cd_pre_snoc_log].
   - intros p s Hs Hw. destruct (decide (p < length (cd_tr c))%nat) as [Hp|Hp].
     + destruct (Hlt p s Hs Hp) as (Hs' & Hev & _ & Hlg & _).
       rewrite Hev Hlg. by apply (Hwix p s Hs' Hw).
@@ -428,8 +468,7 @@ Proof.
       { destruct (lb_wr l) as [[base vs]|] eqn:Hwr.
         - by destruct l; simplify_eq/=.
         - exfalso. rewrite /es_msg /= Hwr /= in Hle. lia. }
-      have Hl : gx_lbl G (x, gcnt x (cd_tr c)) = Some l
-        := Hlbl_ev (Hw_notW Hwl).
+      have Hl : gx_lbl G (x, gcnt x (cd_tr c)) = Some l := Hlbl_ev Hwl.
       destruct (lb_is_w_wr l Hwl) as (base & vs & Hwr).
       have Hmsg : es_msg (EStep x l) = [WMsg base vs (Some x) (lb_cls l)]
         by rewrite /es_msg /= Hwr.
@@ -461,6 +500,109 @@ Qed.
     of the next position is NO LONGER part of the context (the tenth pass's
     OBSTRUCTION 2: it made the context unsatisfiable at a witness) — it is
     a premise of [WeakRvwmoCert3.cpol_read] instead. *)
+(** THE POISONED STEP'S OWN OBLIGATION, at the label the policy appends.
+    Its three premises say "this label IS the poisoned arm": it is a
+    latest-source read of the candidate, it is NOT [G]'s own label (so the
+    step is not a TRUE one) and it is not at [G]'s footprint (so the step is
+    not a WITNESS).  At a true, witness, store, fence or RMW step all three
+    cannot hold together, so the obligation is FREE there — which is why
+    only the poisoned site pays for it.
+
+    What it owes is exactly what a later TRUE read of the SAME hart needs
+    of it in the floor invariant [WeakRvwmoCert3.cinv_replay]: the poisoned
+    load's footprint misses that read's bytes (W-a), and its sources are
+    log-bounded where a publishing fence would expose them (W-b). *)
+Definition cstep_pois_ok (G : gexec) (x : agent) (c : cand) (l : lbl)
+    : Prop :=
+  cpois_lbl c l →
+  gx_lbl G (x, gcnt x (cd_tr c)) ≠ Some l →
+  ¬ (∃ (base : Z) (n : nat) (ts0 : list nat) (vs0 : list (bv 8)),
+       gx_lbl G (x, gcnt x (cd_tr c))
+         = Some (WeakAxiomatic.LLoad false base ts0 vs0) ∧
+       length ts0 = n ∧ l = latest_read_lbl c false base n) →
+  ∀ k, (S (gcnt x (cd_tr c)) ≤ k)%nat →
+    (∀ a, gaccesses G (x, k) a → ¬ lbl_touches l a) ∧
+    (fhook G (x, k) (S (gcnt x (cd_tr c))) true →
+       gvis_ub G (x, k) (length (cd_log_end c))).
+
+(** THE POISONED INVARIANT EXTENDS BY ONE STEP.  A poisoned position of
+    the longer candidate is either an OLD one — where [cd_pre] and [ev] are
+    the candidate's own, so the carried clause applies at the shrunken
+    range of future positions — or the APPENDED one, where
+    [cstep_pois_ok] is exactly the obligation. *)
+Lemma gcnt_snoc_le (c : cand) (x y : agent) (l : lbl) :
+  (gcnt y (cd_tr c) ≤ gcnt y (cd_tr (cand_snoc c (EStep x l))))%nat.
+Proof.
+  rewrite cand_snoc_tr /gcnt list_basics.filter_app length_app. lia.
+Qed.
+
+(** THE INVARIANT TRANSPORTS ALONG THE INDEXING: any two [ev]s a candidate
+    is a [ctrace_prefix] under agree on every position of its trace
+    ([ctp_ev_eq]), and [pois_ok_hart] reads nothing else. *)
+Lemma pois_ok_hart_ev G c ev1 ev2 W (x : agent) :
+  ctrace_prefix G c ev1 W → ctrace_prefix G c ev2 W →
+  pois_ok_hart G c ev1 x → pois_ok_hart G c ev2 x.
+Proof.
+  intros H1 H2 H p s Hs Hpo Hag k Hk.
+  have Hev : ev2 p = ev1 p
+    by rewrite (ctp_ev_eq G c ev2 W p s H2 Hs) (ctp_ev_eq G c ev1 W p s H1 Hs).
+  rewrite Hev. rewrite Hev in Hag. apply (H p s Hs); [|exact Hag|exact Hk].
+  move: Hpo. rewrite /cpois_step /cwit_step Hev //.
+Qed.
+
+Lemma pois_ok_hart_snoc G (x y : agent) (c : cand) (l : lbl)
+    (ev : nat → geid) :
+  pois_ok_hart G c ev y →
+  (x = y → cstep_pois_ok G x c l) →
+  pois_ok_hart G (cand_snoc c (EStep x l))
+    (ev_snoc c ev (x, gcnt x (cd_tr c))) y.
+Proof.
+  intros Hpd Hstp p s Hs Hpo Hag k Hk.
+  destruct (decide (p < length (cd_tr c))%nat) as [Hp|Hp].
+  - have Hs' : cd_tr c !! p = Some s by rewrite cand_snoc_tr_lt // in Hs.
+    have Hev : ev_snoc c ev (x, gcnt x (cd_tr c)) p = ev p
+      by apply ev_snoc_lt.
+    have Htk : take p (cd_tr (cand_snoc c (EStep x l))) = take p (cd_tr c)
+      by (rewrite /= take_app_le //; lia).
+    have Hpre : cd_pre (cand_snoc c (EStep x l)) p = cd_pre c p.
+    { rewrite /cd_pre cand_snoc_img. by rewrite Htk. }
+    have Hlg : cd_log (cand_snoc c (EStep x l)) p = cd_log c p
+      by (apply cand_snoc_log; rewrite /cd_end; lia).
+    have Hpo' : cpois_step G c ev p s.
+    { move: Hpo. rewrite /cpois_step /cwit_step Hev Hpre //. }
+    rewrite Hlg Hev. rewrite Hev in Hag.
+    apply (Hpd p s Hs' Hpo' Hag).
+    have Hle := gcnt_snoc_le c x y l. lia.
+  - have Hb := lookup_lt_Some _ _ _ Hs.
+    rewrite cand_snoc_tr length_app /= in Hb.
+    have Hpe : p = length (cd_tr c) by lia. subst p.
+    have Hse : s = EStep x l.
+    { move: Hs. rewrite cand_snoc_tr
+        (lookup_app_r (cd_tr c) [EStep x l] (length (cd_tr c))
+           (Nat.le_refl _)) Nat.sub_diag /=. by intros [= <-]. }
+    subst s.
+    have Hev := ev_snoc_end c ev (x, gcnt x (cd_tr c)).
+    rewrite Hev.
+    have Hlg : cd_log (cand_snoc c (EStep x l)) (length (cd_tr c))
+             = cd_log_end c.
+    { rewrite (cand_snoc_log c (EStep x l) (length (cd_tr c))
+                 (Nat.le_refl _)) /cd_log_end /cd_end //. }
+    rewrite Hlg /=.
+    destruct Hpo as ((lb0 & Hl0 & Hw0) & Hpl & Hne & Hnw).
+    rewrite Hev in Hne. rewrite /cwit_step Hev in Hnw.
+    rewrite Hev in Hag. simpl in Hag. subst y.
+    rewrite gcnt_cand_snoc_self in Hk.
+    apply (Hstp eq_refl); [| | |exact Hk].
+    + destruct Hpl as (base & n & Hlb). exists base, n.
+      rewrite /= in Hlb. rewrite Hlb. apply latest_read_lbl_congr;
+        [by rewrite cd_pre_snoc_img|by rewrite cd_pre_snoc_log].
+    + rewrite /= in Hne. exact Hne.
+    + intros (base & n & ts0 & vs0 & Hl1 & Hn1 & Hlb1). apply Hnw.
+      exists base, n, ts0, vs0. split_and!; [exact Hl1|exact Hn1|].
+      rewrite /= Hlb1. apply latest_read_lbl_congr;
+        [by rewrite cd_pre_snoc_img|by rewrite cd_pre_snoc_log].
+Qed.
+
 Theorem cpol_ctx_snoc G W (x : agent) (c : cand) (l : lbl) :
   gwf G →
   cpol_ctx G W x c →
@@ -470,15 +612,17 @@ Theorem cpol_ctx_snoc G W (x : agent) (c : cand) (l : lbl) :
   (∀ ev', ctrace_prefix G (cand_snoc c (EStep x l)) ev' W →
      wit_fence_ub G (cand_snoc c (EStep x l)) ev' W
        (x, S (gcnt x (cd_tr c)))) →
+  cstep_pois_ok G x c l →
   cpol_ctx G W x (cand_snoc c (EStep x l)).
 Proof.
-  intros Hwf (ev & Hgt & _) Hcls Hix Hub.
+  intros Hwf (ev & Hgt & _ & Hpd) Hcls Hix Hub Hstp.
   have Hgt' : ctrace_prefix G (cand_snoc c (EStep x l))
                 (ev_snoc c ev (x, gcnt x (cd_tr c))) W
     := ctrace_prefix_snoc G c ev W x l Hwf Hgt Hcls Hix.
   exists (ev_snoc c ev (x, gcnt x (cd_tr c))).
   rewrite gcnt_cand_snoc_self. split_and!;
-    [exact Hgt'|exact (Hub _ Hgt')].
+    [exact Hgt'|exact (Hub _ Hgt')
+    |by apply pois_ok_hart_snoc; [exact Hpd|intros _; exact Hstp]].
 Qed.
 
 (** ** 3.1b (P-1), in [cert_segment']'s own [Hpres] shape *)
@@ -492,7 +636,10 @@ Theorem cpol_Hpres G W (x : agent) (Q : lbl → Prop) :
      mstep_ok (cand_last_st c0) x lb' →
      cstep_cls G W x c0 lb' ∧
      (lb_is_w lb' = true →
-        gwix G (x, gcnt x (cd_tr c0)) = S (length (cd_log_end c0)))) →
+        gwix G (x, gcnt x (cd_tr c0)) = S (length (cd_log_end c0))) ∧
+     (* the POISONED arm's floor obligation at the appended label — FREE at
+        every arm but the poisoned one *)
+     cstep_pois_ok G x c0 lb') →
   (* (P-3) [wit_fence_ub] at the next position *)
   (∀ (c0 : cand) (lb' : lbl) (ev' : nat → geid),
      ctrace_prefix G (cand_snoc c0 (EStep x lb')) ev' W →
@@ -504,9 +651,9 @@ Theorem cpol_Hpres G W (x : agent) (Q : lbl → Prop) :
     cpol_ctx G W x (cand_snoc c0 (EStep x lb')).
 Proof.
   intros Hwf Hcls Hub c0 lb lb' Hctx Hc HQ Hri Hok.
-  destruct (Hcls c0 lb lb' Hctx Hc HQ Hri Hok) as (Hcl & Hix).
+  destruct (Hcls c0 lb lb' Hctx Hc HQ Hri Hok) as (Hcl & Hix & Hstp).
   eapply cpol_ctx_snoc;
-    [exact Hwf|exact Hctx|exact Hcl|exact Hix|exact (Hub c0 lb')].
+    [exact Hwf|exact Hctx|exact Hcl|exact Hix|exact (Hub c0 lb')|exact Hstp].
 Qed.
 
 (** ** 3.2 A certified configuration IS a [run_data] *)

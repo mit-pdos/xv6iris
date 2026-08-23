@@ -139,6 +139,46 @@ Qed.
     [WeakRvwmoFloor.gtrace_prefix] with its label clause split.  The LOG
     clauses are verbatim: a witness is a READ, so it contributes no message
     and the log is still exactly the gmo prefix. *)
+(** THE POISONED POSITION, as a named predicate.  The certified step's
+    label bears NO relation to [G]'s beyond both being non-writes — the
+    block's instruction read a tainted carrier, so the address it computed
+    is the certified run's own.  What the label DOES satisfy is the only
+    thing the rest of the development needs of it: it is the candidate's
+    own LATEST-SOURCE read at some footprint ([cpois_lbl]), which is what
+    makes its timestamps bounded by the log and its admissibility
+    [WeakRvwmoCert2.cert_read_witness]'s. *)
+Definition cpois_lbl (c0 : cand) (l : lbl) : Prop :=
+  ∃ (base : Z) (n : nat), l = latest_read_lbl c0 false base n.
+
+(** THE WITNESS SHAPE, named: [G]'s OWN footprint, read at the candidate's
+    latest sources.  Naming it is what keeps the poisoned arm DISJOINT from
+    the witness arm — a poisoned step is one whose footprint is not [G]'s. *)
+Definition cwit_step (G : gexec) (c : cand) (ev : nat → geid) (p : nat)
+    (s : estep) : Prop :=
+  ∃ (base : Z) (n : nat) (ts0 : list nat) (vs0 : list (bv 8)),
+    gx_lbl G (ev p) = Some (WeakAxiomatic.LLoad false base ts0 vs0) ∧
+    length ts0 = n ∧
+    es_lb s = latest_read_lbl (cd_pre c p) false base n.
+
+Definition cpois_step (G : gexec) (c : cand) (ev : nat → geid) (p : nat)
+    (s : estep) : Prop :=
+  (∃ lb0 : lbl, gx_lbl G (ev p) = Some lb0 ∧ lb_is_w lb0 = false) ∧
+  cpois_lbl (cd_pre c p) (es_lb s) ∧
+  (** NOT a true step and NOT a witness step: the two discriminators that
+      make [cpois_step] name exactly the third arm. *)
+  gx_lbl G (ev p) ≠ Some (es_lb s) ∧
+  ¬ cwit_step G c ev p s.
+
+Lemma cpois_lbl_notw c0 l : cpois_lbl c0 l → lb_is_w l = false.
+Proof. by intros (base & n & ->). Qed.
+
+(** WHICH BYTE A LABEL'S READ HALF TOUCHES. *)
+Definition lbl_touches (l : lbl) (a : Z) : Prop :=
+  ∃ (base : Z) (ts : list nat) (vs : list (bv 8)),
+    lb_rd l = Some (base, ts, vs) ∧
+    ∃ (j : nat) (t : nat), ts !! j = Some t ∧
+      WeakAxiomatic.acc_addr base j = a.
+
 Record ctrace_prefix (G : gexec) (c : cand) (ev : nat → geid)
     (W : geid → Prop) : Prop := {
   ctp_img : cd_img c = gx_img G;
@@ -152,11 +192,19 @@ Record ctrace_prefix (G : gexec) (c : cand) (ev : nat → geid)
      split needs no [Decision (W _)]. *)
   ctp_step : ∀ p s, cd_tr c !! p = Some s →
               (¬ W (ev p) ∧ gx_lbl G (ev p) = Some (es_lb s)) ∨
-              (W (ev p) ∧
-               ∃ (base : Z) (n : nat) (ts0 : list nat) (vs0 : list (bv 8)),
-                 gx_lbl G (ev p) = Some (WeakAxiomatic.LLoad false base ts0 vs0) ∧
-                 length ts0 = n ∧
-                 es_lb s = latest_read_lbl (cd_pre c p) false base n);
+              (W (ev p) ∧ cwit_step G c ev p s) ∨
+              (** THE POISONED ARM (the per-hart taint migration).  A block
+                  whose instruction reads a TAINTED carrier computes the
+                  certified run's OWN address, not [G]'s, so the position
+                  carries no graph relation at all — only the kind class
+                  ([WeakRvwmoCert2.lbl_poisoned]) and, with it, the two
+                  things the rest of the record needs: the step is a
+                  NON-WRITE (so the log and [ctp_wix] are untouched) and so
+                  is [G]'s label there (so the row's write list is
+                  unchanged).  §4d.2(2): a hart's events after its
+                  substituted witness are poisoned and are not certified;
+                  the kill never needs them. *)
+              cpois_step G c ev p s;
   ctp_wix : ∀ p s, cd_tr c !! p = Some s → lb_is_w (es_lb s) = true →
               gwix G (ev p) = S (length (cd_log c p));
   ctp_log : ∀ s : nat, (0 < s)%nat →
@@ -179,14 +227,16 @@ Proof.
 Qed.
 
 Lemma gtrace_of_ctrace_prefix G c ev W :
-  ctrace_prefix G c ev W → (∀ p, ¬ W (ev p)) → gtrace_prefix G c ev.
+  ctrace_prefix G c ev W → (∀ p, ¬ W (ev p)) →
+  (∀ p s, cd_tr c !! p = Some s → ¬ cpois_step G c ev p s) →
+  gtrace_prefix G c ev.
 Proof.
-  intros [H1 H2 H3 H4 H5 H6] Hno. split.
+  intros [H1 H2 H3 H4 H5 H6] Hno Hnp. split.
   - exact H1.
   - exact H2.
   - exact H3.
-  - intros p s Hs. destruct (H4 p s Hs) as [[_ H]|[HW _]];
-      [exact H|by destruct (Hno p)].
+  - intros p s Hs. destruct (H4 p s Hs) as [[_ H]|[[HW _]|Hp]];
+      [exact H|by destruct (Hno p)|by destruct (Hnp p s Hs)].
   - exact H5.
   - exact H6.
 Qed.
@@ -194,21 +244,36 @@ Qed.
 (** The two implications the disjunction packs, as usable projections. *)
 Lemma ctp_lbl G c ev W p s :
   ctrace_prefix G c ev W → cd_tr c !! p = Some s → ¬ W (ev p) →
+  ¬ cpois_step G c ev p s →
   gx_lbl G (ev p) = Some (es_lb s).
 Proof.
-  intros [_ _ _ H4 _ _] Hs HnW.
-  destruct (H4 p s Hs) as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)].
+  intros [_ _ _ H4 _ _] Hs HnW Hnp.
+  destruct (H4 p s Hs) as [[_ H]|[[HW _]|Hp]];
+    [exact H|by destruct (HnW HW)|by destruct (Hnp Hp)].
+Qed.
+
+(** AND THE FORM THE WRITE SIDE USES: an appended WRITE is neither a
+    witness nor poisoned, so its label IS [G]'s. *)
+Lemma ctp_lbl_w G c ev W p s :
+  ctrace_prefix G c ev W → cd_tr c !! p = Some s →
+  lb_is_w (es_lb s) = true →
+  gx_lbl G (ev p) = Some (es_lb s).
+Proof.
+  intros [_ _ _ H4 _ _] Hs Hw.
+  destruct (H4 p s Hs) as [[_ H]|[[_ (base & n & ts0 & vs0 & _ & _ & Hlb)]
+                                 |(_ & Hpl & _)]];
+    [exact H| |by rewrite (cpois_lbl_notw _ _ Hpl) in Hw].
+  exfalso. rewrite Hlb /latest_read_lbl in Hw. discriminate Hw.
 Qed.
 
 Lemma ctp_wit G c ev W p s :
   ctrace_prefix G c ev W → cd_tr c !! p = Some s → W (ev p) →
-  ∃ (base : Z) (n : nat) (ts0 : list nat) (vs0 : list (bv 8)),
-    gx_lbl G (ev p) = Some (WeakAxiomatic.LLoad false base ts0 vs0) ∧
-    length ts0 = n ∧
-    es_lb s = latest_read_lbl (cd_pre c p) false base n.
+  ¬ cpois_step G c ev p s →
+  cwit_step G c ev p s.
 Proof.
-  intros [_ _ _ H4 _ _] Hs HW.
-  destruct (H4 p s Hs) as [[HnW _]|[_ H]]; [by destruct (HnW HW)|exact H].
+  intros [_ _ _ H4 _ _] Hs HW Hnp.
+  destruct (H4 p s Hs) as [[HnW _]|[[_ H]|Hp]];
+    [by destruct (HnW HW)|exact H|by destruct (Hnp Hp)].
 Qed.
 
 Lemma ctp_ev_eq G c ev W p s :
@@ -316,6 +381,43 @@ Definition wit_fence_ub (G : gexec) (c : cand) (ev : nat → geid)
   ∀ p s, cd_tr c !! p = Some s → W (ev p) → (ev p).1 = r.1 →
     fhook G r (S (ev p).2) true → gvis_ub G r (length (cd_log c p)).
 
+(** ** 2.1' [pois_ok_at] — the SAME two side conditions, at a POISONED
+    position
+
+    A poisoned step reads the candidate's latest sources at a footprint the
+    MACHINE chose, so neither of the two facts the witness step is given
+    for free is available: (W-a) the footprint's disjointness from [a] does
+    not follow from [W_poloc_closed] (the graph cannot see the address the
+    certified run computed), and (W-b) the log bound does not follow from
+    [wit_fence_ub] (the position need not be in [W] at all).  Both are
+    therefore stated here, at the same shape, and discharged where the
+    poisoned site is chosen ([WeakRvwmoWalk.wpdA]). *)
+Definition pois_ok_at (G : gexec) (c : cand) (ev : nat → geid) (r : geid)
+    : Prop :=
+  ∀ p s, cd_tr c !! p = Some s → cpois_step G c ev p s → (ev p).1 = r.1 →
+    (∀ a, gaccesses G r a → ¬ lbl_touches (es_lb s) a) ∧
+    (fhook G r (S (ev p).2) true → gvis_ub G r (length (cd_log c p))).
+
+(** … AND THE FORM THE CONTEXT CARRIES, quantified over the hart's FUTURE
+    positions so that it survives every snoc.  This is what makes the
+    poisoned arm's floor obligation an INVARIANT (discharged step by step,
+    at each poisoned label, by [WeakRvwmoGlue2.cstep_pois_ok]) rather than
+    a universal over candidates — which would be false, since
+    [ctrace_prefix] permits a poisoned step at any read position. *)
+Definition pois_ok_hart (G : gexec) (c : cand) (ev : nat → geid)
+    (x : agent) : Prop :=
+  ∀ p s, cd_tr c !! p = Some s → cpois_step G c ev p s → (ev p).1 = x →
+    ∀ k, (gcnt x (cd_tr c) ≤ k)%nat →
+      (∀ a, gaccesses G (x, k) a → ¬ lbl_touches (es_lb s) a) ∧
+      (fhook G (x, k) (S (ev p).2) true →
+         gvis_ub G (x, k) (length (cd_log c p))).
+
+Lemma pois_ok_at_of_hart G c ev x :
+  pois_ok_hart G c ev x → pois_ok_at G c ev (x, gcnt x (cd_tr c)).
+Proof.
+  intros H p s Hs Hpo Hag. exact (H p s Hs Hpo Hag _ (Nat.le_refl _)).
+Qed.
+
 (** ** 2.2 THE WITNESS STEP
 
     Two of the six clauses move, and each is paid for once: [coh a] does
@@ -350,20 +452,24 @@ Qed.
 
 (** ** 2.3 THE REPLAY
 
-    [WeakRvwmoFloor.finv_replay] with one extra case split: a TRUE position
-    steps by [finv_step] (G's own label), a WITNESS by [cinv_step_wit]. *)
+    [WeakRvwmoFloor.finv_replay] with TWO extra case splits: a TRUE position
+    steps by [finv_step] (G's own label), a WITNESS and a POISONED position
+    both by [cinv_step_wit] — the same latest-source read, differing only in
+    where its two side conditions come from ([W_poloc_closed] +
+    [wit_fence_ub] at a witness, [pois_ok_at] at a poisoned one). *)
 Lemma cinv_replay G (Hwf : gwf G) (Hppo : gppo_gmo G) (Hlv : gload_value G)
     (r : geid) (a : Z) (Hrr : glbl_is G r lb_is_r) (Hra : gaccesses G r a)
     (c : cand) (ev : nat → geid) (W : geid → Prop) (p : nat) :
   ctrace_prefix G c ev W →
   W_poloc_closed G W →
   wit_fence_ub G c ev W r →
+  pois_ok_at G c ev r →
   ¬ W r →
   (gcnt r.1 (cd_tr c) ≤ r.2)%nat →
   (p ≤ length (cd_tr c))%nat →
   cinv G r a (gcnt r.1 (take p (cd_tr c))) (ms_ws (stt (cand_exec c) p) r.1).
 Proof.
-  intros Hgt Hpc Hwub HnW Hcnt.
+  intros Hgt Hpc Hwub Hpd HnW Hcnt.
   pose proof Hgt as Hgt0.
   destruct Hgt0 as [Himg Hagf Hposf Hstepf Hwixf Hlogf].
   induction p as [|p IH]; intros Hp.
@@ -386,7 +492,24 @@ Proof.
     { have Hle := gcnt_take_le r.1 (cd_tr c) (S p).
       rewrite (gcnt_step_eq r.1 (cd_tr c) p s Hs Hag) in Hle. lia. }
     have HIH := IH ltac:(lia).
-    destruct (Hstepf p s Hs) as [[HnWp Hlblp]|[HW Hwitp]]; last first.
+    destruct (Hstepf p s Hs) as [[HnWp Hlblp]|[[HW Hwitp]|Hpois]]; last first.
+    + (* ------------------------ A POISONED STEP --------------------- *)
+      destruct (Hpd p s Hs Hpois ltac:(rewrite Hev //)) as (Hdisj & Hub).
+      destruct Hpois as (_ & (base & n & Hlb) & _ & _).
+      rewrite Hlb /latest_read_lbl.
+      apply (cinv_step_wit G Hwf Hppo Hlv r a Hrr Hra);
+        [| |exact HIH].
+      * intros j t Hj Heq. apply (Hdisj a Hra).
+        exists base, (lrd_ts (cd_pre c p) base n),
+          (lrd_vs (cd_pre c p) base n).
+        rewrite Hlb /latest_read_lbl.
+        split; [reflexivity|]. exists j, t. split; [exact Hj|exact Heq].
+      * intros Hfh j t Hj.
+        destruct (lrd_ts_lookup (cd_pre c p) base n j t Hj) as (_ & ->).
+        rewrite cd_pre_log.
+        apply (gvis_ub_down G r _ (length (cd_log c p)));
+          [apply latest_ts_le|].
+        apply Hub. rewrite Hev /=. exact Hfh.
     + (* ------------------------- A WITNESS ------------------------- *)
       destruct Hwitp as (base & n & ts0 & vs0 & Hlg & Hn & Hlb).
       have Hlen0 : length vs0 = length ts0 := gshape G Hwf _ _ Hlg.
@@ -433,6 +556,7 @@ Theorem floor_of_cgraph G c ev W (i : agent) (r : geid) (a : Z) (t : nat)
   ctrace_prefix G c ev W →
   W_poloc_closed G W →
   wit_fence_ub G c ev W r →
+  pois_ok_at G c ev r →
   ¬ W r →
   r = (i, gcnt i (cd_tr c)) →
   greads_byte G r a t v →
@@ -441,7 +565,7 @@ Theorem floor_of_cgraph G c ev W (i : agent) (r : geid) (a : Z) (t : nat)
       (Nat.max (load_vpre (ms_ws (stt (cand_exec c) (length (cd_tr c))) i) aq)
                (coh (ms_ws (stt (cand_exec c) (length (cd_tr c))) i) a)).
 Proof.
-  intros (Hwf & Hppo & Hlv & _) Hgt Hpc Hwub HnW Hr Hrb Haq.
+  intros (Hwf & Hppo & Hlv & _) Hgt Hpc Hwub Hpd HnW Hr Hrb Haq.
   have Hrr : glbl_is G r lb_is_r.
   { destruct Hrb as (l & base & ts & vs & j & Hl & Hrd & _).
     exists l. split; [exact Hl|]. destruct l; simplify_eq/=; done. }
@@ -454,7 +578,7 @@ Proof.
   have Hte : take (length (cd_tr c)) (cd_tr c) = cd_tr c
     by (apply take_ge; lia).
   have Hinv := cinv_replay G Hwf Hppo Hlv r a Hrr Hra c ev W
-                 (length (cd_tr c)) Hgt Hpc Hwub HnW ltac:(lia) ltac:(lia).
+                 (length (cd_tr c)) Hgt Hpc Hwub Hpd HnW ltac:(lia) ltac:(lia).
   rewrite Hte -Hk in Hinv.
   destruct Hinv as (_ & Hcoh & Hrn & Hrel & _ & _).
   apply (no_writes_in_of_ub G Hwf Hlv r a t v); [exact Hrb| |].
@@ -477,18 +601,19 @@ Theorem cert_floor_ok G c ev W (i : agent) (aq : bool) (base : Z)
   ctrace_prefix G c ev W →
   W_poloc_closed G W →
   wit_fence_ub G c ev W (i, gcnt i (cd_tr c)) →
+  pois_ok_at G c ev (i, gcnt i (cd_tr c)) →
   ¬ W (i, gcnt i (cd_tr c)) →
   gx_lbl G (i, gcnt i (cd_tr c)) = Some (WeakAxiomatic.LLoad aq base ts vs) →
   floor_ok c i aq base ts.
 Proof.
-  intros Hcons Hgt Hpc Hwub HnW Hl j t Hj.
+  intros Hcons Hgt Hpc Hwub Hpd HnW Hl j t Hj.
   pose proof Hcons as (Hwf & _ & _ & _).
   have Hlen : length vs = length ts := gshape G Hwf _ _ Hl.
   destruct (lookup_lt_is_Some_2 vs j
               ltac:(rewrite Hlen; by eapply lookup_lt_Some)) as [v Hv].
   apply (floor_of_cgraph G c ev W i (i, gcnt i (cd_tr c))
            (WeakAxiomatic.acc_addr base j) t v aq);
-    [exact Hcons|exact Hgt|exact Hpc|exact Hwub|exact HnW|done| |].
+    [exact Hcons|exact Hgt|exact Hpc|exact Hwub|exact Hpd|exact HnW|done| |].
   - by exists (WeakAxiomatic.LLoad aq base ts vs), base, ts, vs, j.
   - intros ->. by exists (WeakAxiomatic.LLoad true base ts vs).
 Qed.
@@ -504,12 +629,13 @@ Theorem cert_read_in_log' G c ev W (i : agent) (aq : bool) (base : Z)
   ctrace_prefix G c ev W →
   W_poloc_closed G W →
   wit_fence_ub G c ev W (i, gcnt i (cd_tr c)) →
+  pois_ok_at G c ev (i, gcnt i (cd_tr c)) →
   ¬ W (i, gcnt i (cd_tr c)) →
   gx_lbl G (i, gcnt i (cd_tr c)) = Some (WeakAxiomatic.LLoad aq base ts vs) →
   src_in_log c base ts vs →
   mstep_ok (cand_last_st c) i (WeakAxiomatic.LLoad aq base ts vs).
 Proof.
-  intros Hcons Hgt Hpc Hwub HnW Hl Hsrc.
+  intros Hcons Hgt Hpc Hwub Hpd HnW Hl Hsrc.
   apply cert_read_in_log; [exact Hsrc|].
   by apply (cert_floor_ok G c ev W i aq base ts vs).
 Qed.
@@ -535,7 +661,10 @@ Qed.
     [latest_bytes_ok]). *)
 Definition cpol_ctx (G : gexec) (W : geid → Prop) (x : agent) (c : cand) : Prop :=
   ∃ ev, ctrace_prefix G c ev W ∧
-        wit_fence_ub G c ev W (x, gcnt x (cd_tr c)).
+        wit_fence_ub G c ev W (x, gcnt x (cd_tr c)) ∧
+        (** the POISONED arm's floor obligation, carried (see
+            [pois_ok_hart]) *)
+        pois_ok_hart G c ev x.
 
 (** The payoff, packaged: at a candidate carrying the context whose own
     position is NOT a witness, an in-log read of [G]'s own label is
@@ -548,8 +677,10 @@ Corollary cpol_read (G : gexec) (W : geid → Prop) (x : agent) (c : cand)
   src_in_log c base ts vs →
   mstep_ok (cand_last_st c) x (WeakAxiomatic.LLoad aq base ts vs).
 Proof.
-  intros Hcons Hpc (ev & Hgt & Hwub) HnW Hl Hsrc.
-  by apply (cert_read_in_log' G c ev W x aq base ts vs).
+  intros Hcons Hpc (ev & Hgt & Hwub & Hpd) HnW Hl Hsrc.
+  apply (cert_read_in_log' G c ev W x aq base ts vs);
+    [exact Hcons|exact Hgt|exact Hpc|exact Hwub
+    |by apply pois_ok_at_of_hart|exact HnW|exact Hl|exact Hsrc].
 Qed.
 
 (** ** 3.3a [cblkp] — the [HEpair] block with its annotations exposed
@@ -727,6 +858,19 @@ Proof.
   destruct Hre as (aq & rl & base & tvs & data & asrc1 & asrc2 & vsrc2 &
                    _ & _ & _ & _ & ->).
   intros H. exact H.
+Qed.
+
+(** … hence a fused pair is a WRITE, which is what makes the surviving
+    read-set side condition [Hrdsp] an obligation at the segment's EXIT
+    only ([WeakRvwmoWalk.wexit_ut]). *)
+Lemma cblkp_is_w cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' :
+  cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+  lb_is_w lb = true.
+Proof.
+  intros Hblk.
+  have Hr : ¬ lb_rmwfree lb
+    := cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' Hblk.
+  destruct lb; [by destruct (Hr I)|reflexivity|by destruct (Hr I)|reflexivity].
 Qed.
 
 (** … so an RMW-FREE [Q] gives the pair policy vacuously: this is the OLD
@@ -1662,6 +1806,51 @@ Definition csync (T : list wreg)
   ∨ (fn1 = None ∧ fn2 = None ∧ tail_silent T m1 ∧ tail_silent T m2 ∧
      dreg_agree (λ n, n ∉ T) rs1 rs2).
 
+(** ** 5b.2' THE TAINT GROWS, AND EVERY INVARIANT WEAKENS WITH IT
+
+    The per-hart taint of route-b §4e is ACCUMULATED — a witness or a
+    poisoned block adds the carriers it wrote — so every predicate the
+    iteration carries must be MONOTONE in the taint set.  All three are,
+    and for the same reason: they only ever ask a register to be UNtainted
+    or a written carrier to be tainted, and both weaken as [T] grows. *)
+Lemma dreg_agree_taint_mono (T T' : list wreg) (rs1 rs2 : regstate) :
+  T ⊆ T' → dreg_agree (λ n, n ∉ T) rs1 rs2 →
+  dreg_agree (λ n, n ∉ T') rs1 rs2.
+Proof.
+  intros Hsub. apply dreg_agree_mono. intros n Hn Hin. by apply Hn, Hsub.
+Qed.
+
+Lemma rds_ok_taint_mono (T T' : list wreg) (l : list wreg) :
+  T ⊆ T' → rds_ok (λ n, n ∉ T') l → rds_ok (λ n, n ∉ T) l.
+Proof. intros Hsub H n Hn Hin. by apply (H n Hn), Hsub. Qed.
+
+Lemma tail_silent_mono (T T' : list wreg) (m : M unit) :
+  T ⊆ T' → tail_silent T m → tail_silent T' m.
+Proof.
+  intros Hsub. induction 1 as [y|A oc k Hs Hw _ IH];
+    [apply ts_ret|apply ts_next; [exact Hs| |exact IH]].
+  intros r Hr. destruct (Hw r Hr) as (n & Hn & Hin).
+  exists n. split; [exact Hn|by apply Hsub].
+Qed.
+
+Lemma clockstep_mono (T T' : list wreg) m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 :
+  T ⊆ T' → clockstep T m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 →
+  clockstep T' m1 rs1 fn1 ib1 m2 rs2 fn2 ib2.
+Proof.
+  intros Hsub (-> & -> & -> & Hag). split_and!;
+    [reflexivity|reflexivity|reflexivity|by eapply dreg_agree_taint_mono].
+Qed.
+
+Lemma csync_mono (T T' : list wreg) m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 :
+  T ⊆ T' → csync T m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 →
+  csync T' m1 rs1 fn1 ib1 m2 rs2 fn2 ib2.
+Proof.
+  intros Hsub [Hc|(-> & -> & Ht1 & Ht2 & Hag)];
+    [left; by eapply clockstep_mono|right].
+  split_and!; [reflexivity|reflexivity|by eapply tail_silent_mono
+              |by eapply tail_silent_mono|by eapply dreg_agree_taint_mono].
+Qed.
+
 Lemma boundary_step_tick (rs : regstate) (ib : oib32) (d : dev_state)
     (tick : bool) :
   pnode_step (Interface.Ret tt) rs ib d LInstr (riscv_step tick) None None d
@@ -1769,8 +1958,8 @@ Proof.
   - by eapply phrun_app; [exact Hrun0|exact HA].
 Qed.
 
-Definition cpolpr (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg)
-    (Nd : nat → M unit → Prop)
+Definition cpolpr (x : agent) (cpu : CPU) (d0 : dev_state)
+    (Tf : nat → list wreg) (Nd : nat → M unit → Prop)
     (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
     (Q : nat → lbl → Prop) : Prop :=
   ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l1 l2 : wlabel)
@@ -1781,18 +1970,18 @@ Definition cpolpr (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg)
     Ctx k c0 →
     Q k lb →
     w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
-    dreg_agree (λ n, n ∉ T) rs1 rs2 →
-    rds_ok (λ n, n ∉ T) rds →
+    dreg_agree (λ n, n ∉ Tf k) rs1 rs2 →
+    rds_ok (λ n, n ∉ Tf k) rds →
     Nd k m →
     cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ rs2',
       cblkp cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
       mstep_ok (cand_last_st c0) x lb ∧
       Cls c0 lb ∧
-      dreg_agree (λ n, n ∉ T) rs1' rs2'.
+      dreg_agree (λ n, n ∉ Tf k) rs1' rs2'.
 
 Lemma cpolpr_of_cpolp x cpu d0 T Nd Ctx Cls Q :
-  cpolp x cpu d0 T Ctx Cls Q → cpolpr x cpu d0 T Nd Ctx Cls Q.
+  cpolp x cpu d0 T Ctx Cls Q → cpolpr x cpu d0 (λ _, T) Nd Ctx Cls Q.
 Proof.
   intros H k c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
     Hc Hctx HQ Hrelp Hag _ _ Hblk.
@@ -1887,7 +2076,19 @@ Proof.
 Qed.
 
 Section segment''.
-  Context (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg).
+  Context (x : agent) (cpu : CPU) (d0 : dev_state).
+
+  (** THE PER-HART TAINT, INDEXED BY ROW POSITION (route-b §4e, the
+      per-hart ACCUMULATED taint).  [Tf k] is the acting hart's taint set
+      when it stands at row position [k]; it GROWS at every block whose
+      certified run parts company with the emission — a witness read, or a
+      POISONED block — by the carriers that block's tail writes.  A fixed
+      global [T] was the shortcut the audit caught: it forced
+      "no emitted block reads a carrier in [T]" to hold at EVERY block of
+      every hart, which is false at any real execution for [T ≠ []]. *)
+  Context (Tf : nat → list wreg).
+  Context (Hmono : ∀ k, Tf k ⊆ Tf (S k)).
+
   Context (Q : nat -> lbl -> Prop).
   Context (Ctx : nat → cand → Prop).
   Context (Cls : cand → lbl → Prop).
@@ -1905,21 +2106,21 @@ Section segment''.
       [ndreach]'s own constructors. *)
   Context (Nd : nat → M unit → Prop).
 
-  Context (Hrds : ∀ (k : nat) (lb : lbl) (ws : wstate) (l : wlabel)
-      (rds : list wreg) (wrs : list register)
-      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
-      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
-      Q k lb → Nd k m →
-      cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
-      rds_ok (λ n, n ∉ T) rds).
-
+  (** THE READ-SET SIDE CONDITION SURVIVES ONLY FOR THE FUSED PAIR — an
+      RMW, hence a WRITE, hence the segment's EXIT.  This is
+      [WeakRvwmoWalk.wexit_ut] ("the exit's instruction reads no tainted
+      carrier"): a poisoned WRITE would make the certified run's exit
+      message a different one, so the walk's whole log arithmetic depends
+      on it.  For NON-write blocks the demand is GONE: the policy below
+      case-splits on it instead, and serves the failing case by the
+      POISONED arm ([WeakRvwmoCert2.lbl_poisoned]). *)
   Context (Hrdsp : ∀ (k : nat) (lb : lbl) (ws : wstate) (l1 l2 : wlabel)
       (rds : list wreg) (wrs : list register)
       (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
       (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
       Q k lb → Nd k m →
       cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
-      rds_ok (λ n, n ∉ T) rds).
+      rds_ok (λ n, n ∉ Tf k) rds).
 
   Context (HNdadm : ∀ (k : nat) (m m' : M unit) (rs rs' : regstate)
       (fn fn' : ofence) (ib ib' : oib32) (ls : list wlabel)
@@ -1948,8 +2149,7 @@ Section segment''.
       Ctx k c0 →
       Q k lb →
       w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
-      dreg_agree (λ n, n ∉ T) rs1 rs2 →
-      rds_ok (λ n, n ∉ T) rds →
+      dreg_agree (λ n, n ∉ Tf k) rs1 rs2 →
       Nd k m →
       cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
       ∃ lb' l' rds' wrs' rs2' (m2' : M unit) (fn2' : ofence) (ib2' : oib32),
@@ -1957,11 +2157,11 @@ Section segment''.
         mstep_ok (cand_last_st c0) x lb' ∧
         lbl_reidx_w lb lb' ∧
         Cls c0 lb' ∧
-        csync T m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
+        csync (Tf (S k)) m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
         (lb_is_w lb = true →
-           clockstep T m' rs1' fn' ib' m2' rs2' fn2' ib2')).
+           clockstep (Tf (S k)) m' rs1' fn' ib' m2' rs2' fn2' ib2')).
 
-  Context (Hpolp : cpolpr x cpu d0 T Nd Ctx Cls Q).
+  Context (Hpolp : cpolpr x cpu d0 Tf Nd Ctx Cls Q).
 
   Theorem cert_segment'' k0 ws0 rowseg p es pfin :
     hemit (λ _, d0) k0 ws0 rowseg p es pfin →
@@ -1976,7 +2176,7 @@ Section segment''.
       exec_prog_ok' pstep_ev pcls_ev pst dv (cand_exec c) →
       pst (cd_end c) !! x = Some (PHart cpu m20 rs20 fn20 ib20) →
       dv (cd_end c) = d0 →
-      csync T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 →
+      csync (Tf k0) m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 →
       w_relp (ms_ws (cand_last_st c) x) = w_relp ws0 →
       ∃ (c' : cand) (pst' : nat → list pexv6) (dv' : nat → dev_state)
         (tradd : list estep) (m1 : M unit) (rs11 : regstate)
@@ -1991,9 +2191,12 @@ Section segment''.
         pst' (cd_end c') !! x = Some (PHart cpu m21 rs21 fn21 ib21) ∧
         dv' (cd_end c') = d0 ∧
         pfin = PHart cpu m1 rs11 fn1 ib1 ∧
-        csync T m1 rs11 fn1 ib1 m21 rs21 fn21 ib21 ∧
-        (seg_locked rowseg (clockstep T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20) →
-           clockstep T m1 rs11 fn1 ib1 m21 rs21 fn21 ib21) ∧
+        csync (Tf (k0 + length rowseg)%nat) m1 rs11 fn1 ib1
+          m21 rs21 fn21 ib21 ∧
+        (seg_locked rowseg
+           (clockstep (Tf k0) m0 rs10 fn0 ib0 m20 rs20 fn20 ib20) →
+           clockstep (Tf (k0 + length rowseg)%nat) m1 rs11 fn1 ib1
+             m21 rs21 fn21 ib21) ∧
         w_relp (ms_ws (cand_last_st c') x)
         = w_relp (row_ws_aux k0 ws0 rowseg) ∧
         cd_img c' = cd_img c ∧
@@ -2017,13 +2220,14 @@ Section segment''.
       exists c, pst, dv, [], m0, rs10, fn0, ib0, m20, rs20, fn20, ib20.
       split_and!; [by rewrite app_nil_r| |constructor|exact Hc
                   |(rewrite /= Nat.add_0_r; exact Hctx)
-                  |exact Hpo|exact Hp|exact Hdvc|reflexivity|exact Hsync
+                  |exact Hpo|exact Hp|exact Hdvc|reflexivity
+                  |(rewrite /= Nat.add_0_r; exact Hsync)
                   | |exact Hrelp
                   |reflexivity|reflexivity|reflexivity
                   |(intros y _; reflexivity)|(intros y _; reflexivity)
                   |(rewrite /= Nat.add_0_r; exact Hnd)].
       + intros s Hs. by apply elem_of_nil in Hs.
-      + rewrite /seg_locked /=. by intros H.
+      + rewrite /seg_locked /= Nat.add_0_r. by intros H.
     - (* ONE BLOCK, then the rest *)
       have Hlb : Q k lb.
       { have H0 := Hrf 0%nat lb eq_refl. by rewrite Nat.add_0_r in H0. }
@@ -2039,7 +2243,7 @@ Section segment''.
       destruct (pstep_ev_phart cpu ma rsa fna iba da l p' d0 Hst)
         as (m1 & rs11 & fn1 & ib1 & Hp').
       rewrite Hp' in Hst.
-      destruct (csync_advance T cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20
+      destruct (csync_advance (Tf k) cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20
                   ls ma rsa fna iba da l _ _ Hsync Hni Har
                   (hlbl_realizes_notadm _ _ _ _ true Hre) Hst)
         as (mc & rs1c & rs2c & fnc & ibc & lsc & lspre & lsq & rdsp & rdsq
@@ -2051,14 +2255,11 @@ Section segment''.
       have Hndc : Nd k mc
         := HNdadm k m0 mc rs10 rs1c fn0 fnc ib0 ibc lsq rdsq wrsq annq
              Hnd Hadmq Hrunq.
-      have Hrdsok : rds_ok (fun n => n ∉ T) rds
-        := Hrds k lb ws l rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb Hndc
-             Hblk.
       have Hnd1 : Nd (S k) m1
         := HNdblk k mc m1 ws lb l rds wrs rs1c rs11 fnc fn1 ibc ib1
              Hndc Hlb Hblk.
       destruct (Hpol'' k c ws lb l rds wrs mc rs1c rs2c fnc ibc
-                  m1 rs11 fn1 ib1 Hc Hctx Hlb Hrelp Hagc Hrdsok Hndc Hblk)
+                  m1 rs11 fn1 ib1 Hc Hctx Hlb Hrelp Hagc Hndc Hblk)
         as (lb' & l' & rds' & wrs' & rs2' & m2' & fn2' & ib2' &
             Hblk2 & Hok & Hri & Hcl & Hsync2 & Hw2).
       have Hblk3 : cblk cpu d0 (ms_ws (cand_last_st c) x) lb' l'
@@ -2093,12 +2294,13 @@ Section segment''.
         m22, rs22, fn22, ib22.
       split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'
                    |(rewrite /= Nat.add_succ_r; exact Hctx')
-                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hsyncf
+                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin
+                   |(rewrite /= Nat.add_succ_r; exact Hsyncf)
                    | |exact Hrelpf| | | | |
                    |(rewrite /= Nat.add_succ_r; exact Hndf)].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
-      + intros Hlk. apply Hlockf.
+      + rewrite /= Nat.add_succ_r. intros Hlk. apply Hlockf.
         exact (seg_locked_cons lb row _ _ Hlk Hw2).
       + rewrite Himg2 /c2 cand_snoc_img //.
       + rewrite Hpst02 /pst2
@@ -2134,7 +2336,7 @@ Section segment''.
       destruct (pstep_ev_phart cpu mc2 rsc2 fnc2 ibc2 dm2 l2 p' d0 Hst2)
         as (m1 & rs11 & fn1 & ib1 & Hp').
       rewrite Hp' in Hst2.
-      destruct (csync_advance T cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20
+      destruct (csync_advance (Tf k) cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20
                   ls1 ma rsa fna iba da l1 _ _ Hsync Hni1 Har1
                   (hlbl_realizes_pair_notadm _ _ _ _ _ _ true Hre) Hst1)
         as (mc & rs1c & rs2c & fnc & ibc & lsc & lspre & lsq & rdsp & rdsq
@@ -2148,7 +2350,7 @@ Section segment''.
       have Hndc : Nd k mc
         := HNdadm k m0 mc rs10 rs1c fn0 fnc ib0 ibc lsq rdsq wrsq annq
              Hnd Hadmq Hrunq.
-      have Hrdsok : rds_ok (fun n => n ∉ T) rds
+      have Hrdsok : rds_ok (fun n => n ∉ Tf k) rds
         := Hrdsp k lb ws l1 l2 rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb
              Hndc Hblk.
       have Hnd1 : Nd (S k) m1
@@ -2180,8 +2382,9 @@ Section segment''.
       have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
                   = w_relp (lbl_post k ws lb).
       { rewrite /c2 cand_snoc_relp Hrelp. by rewrite lbl_post_relp. }
-      have Hsync2 : csync T m1 rs11 fn1 ib1 m1 rs2' fn1 ib1.
-      { left. by split_and!. }
+      have Hsync2 : csync (Tf (S k)) m1 rs11 fn1 ib1 m1 rs2' fn1 ib1.
+      { left. split_and!; [reflexivity|reflexivity|reflexivity|].
+        eapply dreg_agree_taint_mono; [apply Hmono|exact Hag2]. }
       destruct (IH Hdev' Hrf' m1 rs11 fn1 ib1 Hp' Hnd1 c2 pst2 dv2
                   m1 rs2' fn1 ib1 Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hsync2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & fn2 & ib2 &
@@ -2192,13 +2395,16 @@ Section segment''.
         m22, rs22, fn22, ib22.
       split_and!; [| |constructor; [apply lbl_reidx_w_refl|exact Hf2]
                    |exact Hc'|(rewrite /= Nat.add_succ_r; exact Hctx')
-                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hsyncf
+                   |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin
+                   |(rewrite /= Nat.add_succ_r; exact Hsyncf)
                    | |exact Hrelpf| | | | |
                    |(rewrite /= Nat.add_succ_r; exact Hndf)].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
-      + intros Hlk. apply Hlockf.
-        refine (seg_locked_cons lb row _ _ Hlk _). intros _. by split_and!.
+      + rewrite /= Nat.add_succ_r. intros Hlk. apply Hlockf.
+        refine (seg_locked_cons lb row _ _ Hlk _). intros _.
+        split_and!; [reflexivity|reflexivity|reflexivity|].
+        eapply dreg_agree_taint_mono; [apply Hmono|exact Hag2].
       + rewrite Himg2 /c2 cand_snoc_img //.
       + rewrite Hpst02 /pst2
           (pst_snoc_le c pst x (PHart cpu m1 rs2' fn1 ib1) 0%nat
@@ -2240,11 +2446,20 @@ Lemma wit_fence_ub_empty G W r :
   wit_fence_ub G (Cand (gx_img G) []) (λ _, (0%nat, 0%nat)) W r.
 Proof. by intros [|p] s Hs. Qed.
 
+Lemma pois_ok_at_empty G r :
+  pois_ok_at G (Cand (gx_img G) []) (λ _, (0%nat, 0%nat)) r.
+Proof. by intros [|p] s Hs. Qed.
+
+Lemma pois_ok_hart_empty G x :
+  pois_ok_hart G (Cand (gx_img G) []) (λ _, (0%nat, 0%nat)) x.
+Proof. by intros [|p] s Hs. Qed.
+
 Lemma cpol_ctx_empty G W (x : agent) :
   cpol_ctx G W x (Cand (gx_img G) []).
 Proof.
   exists (λ _, (0%nat, 0%nat)). split_and!;
-    [apply ctrace_prefix_empty|apply wit_fence_ub_empty].
+    [apply ctrace_prefix_empty|apply wit_fence_ub_empty
+    |apply pois_ok_hart_empty].
 Qed.
 
 (** ** 6.2 THE FLOOR, at a real graph read
@@ -2266,7 +2481,8 @@ Proof.
   apply (cert_floor_ok G (Cand (gx_img G) []) (λ _, (0%nat, 0%nat)) W i
            aq base ts vs);
     [exact Hcons|apply ctrace_prefix_empty|exact Hpc
-    |apply wit_fence_ub_empty|by rewrite Hz|by rewrite Hz].
+    |apply wit_fence_ub_empty|apply pois_ok_at_empty|by rewrite Hz
+    |by rewrite Hz].
 Qed.
 
 (** ** 6.3 [cert_segment'] on the REAL [sw &started] block

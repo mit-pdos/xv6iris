@@ -89,6 +89,8 @@ Require Import WeakRvwmoCert3.
 Require Import WeakRvwmoCert4.
 Require Import WeakRvwmoWalk.
 Require Import WeakRvwmoCycWit.
+Require Import WeakSailComplete.
+Require Import WeakEvProv2.
 
 Local Open Scope Z_scope.
 
@@ -590,7 +592,6 @@ Section w2seg.
     srvwmo_consistent c0 → w2_Ctx k c0 → w2_Q k lb →
     w_relp (ms_ws (cand_last_st c0) 0%nat) = w_relp ws →
     dreg_agree (λ n, n ∉ w2_T) rs1 rs1b →
-    rds_ok (λ n, n ∉ w2_T) rds →
     w2_Nd k m →
     cblk cpu d0 ws lb l rds wrs m rs1 fn ib1 m' rs1' fn' ib1' →
     ∃ lb' l' rds' wrs' rs2' (m2' : M unit) (fn2' : ofence) (ib2' : oib32),
@@ -602,7 +603,10 @@ Section w2seg.
       (lb_is_w lb = true →
          clockstep w2_T m' rs1' fn' ib1' m2' rs2' fn2' ib2').
   Proof.
-    intros Hc Hctx (Hk & ->) Hrelp Hag Hrds Hnd Hblk.
+    intros Hc Hctx (Hk & ->) Hrelp Hag Hnd Hblk.
+    have Hrds : rds_ok (λ n, n ∉ w2_T) rds
+      := w2_Hrds k w2_lb ws l rds wrs m rs1 fn ib1 m' rs1' fn' ib1'
+           (conj Hk eq_refl) Hnd Hblk.
     rewrite (w2_nd_pin k m Hnd Hk) in Hblk.
     destruct (w2_blk_subst cpu d0 ws false (pa_z ev_flag) (ld_ts t) (ld_vs w)
                 l rds wrs rs1 fn ib1 m' rs1' fn' ib1'
@@ -622,7 +626,7 @@ Section w2seg.
     split_and!.
     - rewrite (w2_nd_pin k m Hnd Hk). exact Hblk3.
     - by apply cert_read_witness.
-    - right. rewrite /latest_read_lbl /=. split_and!;
+    - right; left. rewrite /latest_read_lbl /=. split_and!;
         [reflexivity|reflexivity|reflexivity| |].
       + reflexivity.
       + reflexivity.
@@ -653,8 +657,9 @@ Section w2seg.
       tail_silent w2_T m21.
   Proof.
     intros Hag.
-    destruct (seg_step_of_segment 0%nat cpu d0 w2_T w2_Q w2_Ctx
-                (λ _ _, True) w2_Nd w2_Hpres w2_Hrds w2_Hrdsp
+    destruct (seg_step_of_segment 0%nat cpu d0 (λ _ : nat, w2_T) w2_Q w2_Ctx
+                (λ _ _, True) w2_Nd (λ _ : nat, reflexivity w2_T)
+                w2_Hpres w2_Hrdsp
                 (λ k m m' rs' rs'' fn fn' ib' ib'' ls rds wrs ann Hnd Ha Hr,
                    nd_adm cpu d0 w2_Q 0%nat w2_m k m m' rs' rs'' fn fn'
                      ib' ib'' ls rds wrs ann Hnd Ha Hr)
@@ -688,6 +693,375 @@ Section w2seg.
       [exact Hts1|exact Hts2].
   Qed.
 End w2seg.
+
+(* ====================================================================== *)
+(** * 3d. THE POISONED BLOCK — the per-hart-taint migration's own witness
+
+    THE AUDIT'S RULE, at the arm the migration added.  §3c inhabits the
+    WITNESS route: a substituted read at [G]'s own footprint.  The POISONED
+    route ([WeakRvwmoCert2.lbl_poisoned], [WeakRvwmoWalk.wpois_site]) is a
+    different claim — the block's instruction READS A TAINTED CARRIER, so
+    the certified run computes a DIFFERENT ADDRESS and no mirror exists —
+    and it needs its own inhabitation, at a NON-EMPTY taint, or the whole
+    arm is the vacuity the audit is about.
+
+    WHAT IS REAL: the read REQUEST's every field but the address is the
+    real [lw a5,0(a4)]'s ([WeakRvwmoCycWit.cy_rreq] over
+    [WeakRvwmoConfWit2.ld_reql]); both addresses are real RAM addresses of
+    the booted image ([cy_A] = [&started], [cy_B] = [&started+8], with
+    [cy_A_ram]/[cy_B_ram]); the carrier read is [a5] = [x15] — the register
+    [WeakRvwmoCycWit2] §1's witness load WRITES, so the taint really is the
+    one a witness creates; the destination [a4] = [x14] is a carrier too,
+    which is how the taint GROWS.
+
+    WHAT IS HAND-BUILT: the block's two-node shape — a [RegRead] of [a5]
+    followed by the load, and a one-node tail.  The real nine-node tail of
+    [lw] is admitted by [WeakEvProv2.la_tail_par] (see §4(a)); it is not
+    wired in here, for the reason §4(b) records.
+
+    WHAT IS PROVED BELOW, and it is exactly the arm's content:
+      - the block's READ SET holds the tainted carrier, so
+        [WeakRvwmoCert2.cert_block_mirror] does not apply and the policy's
+        case split really lands on the poisoned branch ([w3_not_rds_ok]);
+      - the two runs' labels are related by [lbl_poisoned] and by NEITHER
+        [lbl_reidx] NOR [lbl_reidx_sub] ([w3_poisoned], [w3_not_reidx]) —
+        the third arm is necessary, not decorative;
+      - the two runs end at DIFFERENT nodes, in [csync]'s DIVERGED arm at
+        the GROWN taint ([w3_csync_grown]), and NOT in lockstep
+        ([w3_not_clockstep]) — the accumulation is real. *)
+
+Definition w3_src : register := R_bitvector_64 x15.
+Definition w3_dst : register := R_bitvector_64 x14.
+
+(** THE TAINT, BEFORE AND AFTER: [x15] is what the witness load of §1
+    wrote; [x14] is what THIS load writes. *)
+Definition w3_T0 : list wreg := [15%nat].
+Definition w3_T1 : list wreg := [15%nat; 14%nat].
+
+Lemma w3_dst_num : ereg_num w3_dst = Some 14%nat.
+Proof. by vm_compute. Qed.
+
+Lemma w3_taint_grows : w3_T0 ⊆ w3_T1 ∧ (14%nat ∈ w3_T1) ∧ (14%nat ∉ w3_T0).
+Proof.
+  split_and!.
+  - intros n Hn. apply elem_of_list_singleton in Hn as ->.
+    apply elem_of_list_here.
+  - apply elem_of_list_further, elem_of_list_here.
+  - intros Hn. apply elem_of_list_singleton in Hn. done.
+Qed.
+
+Definition w3_val (ans : (bv (8 * 4) * option bool + Arch.abort)%type)
+    : type_of_register w3_dst :=
+  match ans with
+  | inl (w, _) => Z_to_bv 64 (bv_unsigned w)
+  | inr _ => Z_to_bv 64 0
+  end.
+
+Definition w3_k1 (v : type_of_register w3_dst) : M unit :=
+  Interface.Next (Interface.RegWrite w3_dst None v) (fun _ => Interface.Ret tt).
+
+Definition w3_ld (a : Arch.pa) : M unit :=
+  Interface.Next (Interface.MemRead 4 (cy_rreq a))
+    (fun ans => w3_k1 (w3_val ans)).
+
+(** THE ADDRESS DEPENDS ON THE TAINTED CARRIER — this is what a poisoned
+    block IS. *)
+Definition w3_addr (v : type_of_register w3_src) : Arch.pa :=
+  if bool_decide (bv_unsigned v = 0%Z) then cy_A else cy_B.
+
+Definition w3_m : M unit :=
+  Interface.Next (Interface.RegRead w3_src None)
+    (fun v => w3_ld (w3_addr v)).
+
+Lemma w3_rds : pnode_rds w3_m = [15%nat].
+Proof. by vm_compute. Qed.
+
+(** … so the block's read set MEETS the taint: the mirror is unavailable
+    and the policy's case split lands on the poisoned branch. *)
+Lemma w3_not_rds_ok : ¬ rds_ok (fun n => n ∉ w3_T0) (pnode_rds w3_m).
+Proof.
+  intros H. have H15 := H 15%nat ltac:(rewrite w3_rds; apply elem_of_list_here).
+  apply H15, elem_of_list_here.
+Qed.
+
+Lemma w3_addr_ram (v : type_of_register w3_src) : dev_addr (w3_addr v) = false.
+Proof.
+  rewrite /w3_addr. case_bool_decide; [apply cy_A_ram|apply cy_B_ram].
+Qed.
+
+(** ONE ADMINISTRATIVE STEP: the register read.  It is [LSilent], it moves
+    the monad to the address the value determines, and it is what puts the
+    carrier into the block's read set. *)
+Lemma w3_regread (cpu : CPU) (rs : regstate) (ib : oib32) (d : dev_state) :
+  phrun cpu [LSilent] ([15%nat] ++ []) ([] ++ []) (false || false)
+    w3_m rs None ib d
+    (w3_ld (w3_addr (register_lookup w3_src rs))) rs None (ib_rd ib w3_src) d.
+Proof.
+  apply (phrun_more cpu LSilent [] [15%nat] [] [] [] false false
+           w3_m rs None ib d
+           (w3_ld (w3_addr (register_lookup w3_src rs))) None None
+           (Some (ib_rd ib w3_src)) d);
+    [|apply phrun_nil].
+  left. split_and!;
+    [reflexivity| |by rewrite w3_rds|reflexivity|reflexivity].
+  rewrite /pnode_step /w3_m /=. by split_and!.
+Qed.
+
+(** THE LOAD NODE STEPS AT EVERY ANSWER of its own width. *)
+Lemma w3_ld_step (cpu : CPU) (rs : regstate) (ib : oib32) (d : dev_state)
+    (a : Arch.pa) (tvs : list (nat * bv 8)) :
+  dev_addr a = false → length tvs = 4%nat →
+  ∃ v : type_of_register w3_dst,
+    pstep_ev (PHart cpu (w3_ld a) rs None ib) d
+      (WeakPromise.LLoad false false (pa_z a) tvs [])
+      (PHart cpu (w3_k1 v) rs None ib) d.
+Proof.
+  intros Hram Hlen.
+  have Hl2 : length tvs.*2 = N.to_nat 4 by rewrite length_fmap Hlen.
+  destruct (bv_of_bytes 4 tvs.*2 Hl2) as (w2 & Hw2).
+  exists (w3_val (inl (w2, None))).
+  rewrite /pstep_ev /w3_ld. split; [reflexivity|].
+  exists None, None. split_and!; [reflexivity|reflexivity|]. left.
+  rewrite /pstep_node /pnode_step /=. rewrite Hram.
+  split; [reflexivity|]. left. split; [reflexivity|].
+  exists w2, tvs. split_and!; try reflexivity; [by rewrite Hlen|].
+  intros j Hj. by apply Hw2.
+Qed.
+
+Lemma w3_realizes (cpu : CPU) (rs : regstate) (ib : oib32) (ws : wstate)
+    (a : Arch.pa) (tvs : list (nat * bv 8)) :
+  hlbl_realizes (PHart cpu (w3_ld a) rs None ib) ws
+    (WeakAxiomatic.LLoad false (pa_z a) tvs.*1 tvs.*2)
+    (WeakPromise.LLoad false false (pa_z a) tvs []).
+Proof. rewrite /hlbl_realizes. split_and!; [done|done|done|reflexivity]. Qed.
+
+(** THE BLOCK, at whatever the tainted carrier holds. *)
+Theorem w3_blk (cpu : CPU) (d0 : dev_state) (ws : wstate) (rs : regstate)
+    (ib : oib32) (tvs : list (nat * bv 8)) :
+  length tvs = 4%nat →
+  ∃ (v : type_of_register w3_dst) (rds : list wreg) (wrs : list register),
+    cblk cpu d0 ws
+      (WeakAxiomatic.LLoad false
+         (pa_z (w3_addr (register_lookup w3_src rs))) tvs.*1 tvs.*2)
+      (WeakPromise.LLoad false false
+         (pa_z (w3_addr (register_lookup w3_src rs))) tvs [])
+      rds wrs w3_m rs None ib (w3_k1 v) rs None (ib_rd ib w3_src) ∧
+    (** … and the block's READ SET holds the tainted carrier, which is what
+        makes the policy take the POISONED branch. *)
+    15%nat ∈ rds.
+Proof.
+  intros Hlen.
+  set a := w3_addr (register_lookup w3_src rs).
+  destruct (w3_ld_step cpu rs (ib_rd ib w3_src) d0 a tvs
+              (w3_addr_ram _) Hlen) as (v & Hst).
+  destruct (pevrun_phrun [WeakPromise.LLoad false false (pa_z a) tvs []]
+              _ d0 _ d0
+              (pevrun_more _ [] _ d0 _ d0 _ d0 Hst (pevrun_nil _ _))
+              cpu (w3_ld a) rs None (ib_rd ib w3_src)
+              (w3_k1 v) rs None (ib_rd ib w3_src) eq_refl eq_refl)
+    as (rdsB & wrsB & annB & HB).
+  exists v, (([15%nat] ++ []) ++ rdsB), (([] ++ []) ++ wrsB).
+  split.
+  - exists [LSilent], (w3_ld a), rs, None, (ib_rd ib w3_src), d0,
+      ([15%nat] ++ []), ([] ++ []), (false || false), rdsB, wrsB, annB.
+    split_and!;
+      [|apply w3_regread|apply w3_realizes|exact HB|reflexivity|reflexivity].
+    intros l0 Hl0. apply elem_of_list_singleton in Hl0 as ->. exact I.
+  - apply elem_of_app. left. apply elem_of_app. left. apply elem_of_list_here.
+Qed.
+
+(** ** 3d.1 THE TWO RUNS, AND THE THREE FACTS THE ARM RESTS ON
+
+    [rs1] is the emission's register file, [w3_rs2 rs1] the certified run's:
+    they agree OFF the taint and differ AT it, which is exactly the state a
+    witness leaves behind ([WeakEvProv.taint_closure_load]). *)
+Definition w3_rs2 (rs : regstate) : regstate :=
+  register_set w3_src (Z_to_bv 64 1) rs.
+
+Lemma w3_agree (rs : regstate) :
+  dreg_agree (fun n => n ∉ w3_T0) rs (w3_rs2 rs).
+Proof.
+  intros r Hr. rewrite /w3_rs2. destruct (decide (r = w3_src)) as [->|Hne].
+  - exfalso. apply (Hr 15%nat w2_rd_num), elem_of_list_here.
+  - by rewrite register_lookup_set_ne.
+Qed.
+
+Lemma w3_lookup2 (rs : regstate) :
+  register_lookup w3_src (w3_rs2 rs) = Z_to_bv 64 1.
+Proof. apply register_lookup_set. Qed.
+
+(** THE TWO ADDRESSES REALLY DIFFER when the carrier does. *)
+Lemma w3_addr0 : w3_addr (Z_to_bv 64 0) = cy_A.
+Proof. by vm_compute. Qed.
+Lemma w3_addr1 : w3_addr (Z_to_bv 64 1) = cy_B.
+Proof. by vm_compute. Qed.
+Lemma w3_zA_zB : pa_z cy_A ≠ pa_z cy_B.
+Proof. rewrite -/zA -/zB zA_val zB_val. by vm_compute. Qed.
+
+(** (i) THE THIRD ARM IS INHABITED — and it is the ONLY one that relates
+    the two labels: their ADDRESSES differ, which both [lbl_reidx] (same
+    address AND same values) and [lbl_reidx_sub] (same address) forbid. *)
+Theorem w3_poisoned (ts1 ts2 : list nat) (vs1 vs2 : list (bv 8)) :
+  length vs2 = length ts2 →
+  lbl_poisoned
+    (WeakAxiomatic.LLoad false (pa_z cy_A) ts1 vs1)
+    (WeakAxiomatic.LLoad false (pa_z cy_B) ts2 vs2).
+Proof. by intros H. Qed.
+
+Theorem w3_not_reidx (ts1 ts2 : list nat) (vs1 vs2 : list (bv 8)) :
+  ¬ lbl_reidx
+      (WeakAxiomatic.LLoad false (pa_z cy_A) ts1 vs1)
+      (WeakAxiomatic.LLoad false (pa_z cy_B) ts2 vs2) ∧
+  ¬ lbl_reidx_sub
+      (WeakAxiomatic.LLoad false (pa_z cy_A) ts1 vs1)
+      (WeakAxiomatic.LLoad false (pa_z cy_B) ts2 vs2).
+Proof.
+  split.
+  - intros (_ & Hb & _). by apply w3_zA_zB.
+  - intros (_ & _ & Hb & _). by apply w3_zA_zB.
+Qed.
+
+(** (ii) THE TAIL IS SILENT AT THE GROWN TAINT — and only at it: the
+    block's own destination [x14] is written by the tail, so [w3_T0] does
+    NOT admit it and [w3_T1] does.  This is the ACCUMULATION, at the node. *)
+Lemma w3_tail_silent (v : type_of_register w3_dst) :
+  tail_silent w3_T1 (w3_k1 v).
+Proof.
+  apply ts_next; [exact I| |intros u; destruct u; apply ts_ret].
+  intros r Hr. rewrite /pnode_wrs /= in Hr.
+  apply elem_of_list_singleton in Hr. subst r.
+  exists 14%nat. split; [exact w3_dst_num|].
+  apply elem_of_list_further, elem_of_list_here.
+Qed.
+
+(** … and [w3_T0] does NOT admit it: the tail writes a CARRIER the old
+    taint does not hold, which is precisely why the taint has to GROW at
+    this block rather than stay fixed (the audit's finding). *)
+Lemma w3_tail_writes_dst (v : type_of_register w3_dst) :
+  pnode_wrs (w3_k1 v) = [w3_dst] ∧ ereg_num w3_dst = Some 14%nat ∧
+  (14%nat ∉ w3_T0).
+Proof.
+  split_and!; [reflexivity|exact w3_dst_num|].
+  intros Hn. by apply elem_of_list_singleton in Hn.
+Qed.
+
+(** (iii) THE TWO RUNS ARE IN [csync]'s DIVERGED ARM at the GROWN taint …
+    and NOT in lockstep: the successor nodes carry the two different loaded
+    values ([w2_nodes_differ]'s argument at this node). *)
+Theorem w3_csync_grown (v1 v2 : type_of_register w3_dst) (rs1' rs2' : regstate)
+    (ib' : oib32) :
+  dreg_agree (fun n => n ∉ w3_T1) rs1' rs2' →
+  csync w3_T1 (w3_k1 v1) rs1' None ib' (w3_k1 v2) rs2' None ib'.
+Proof.
+  intros Hag. right.
+  split_and!; [reflexivity|reflexivity|apply w3_tail_silent
+              |apply w3_tail_silent|exact Hag].
+Qed.
+
+Lemma w3_nodes_differ (v1 v2 : type_of_register w3_dst) :
+  v1 ≠ v2 → w3_k1 v1 ≠ w3_k1 v2.
+Proof.
+  intros Hne Heq. apply Hne.
+  have Hpr : ∀ v, register_lookup w3_dst (register_set w3_dst v ld_rs0) = v
+    by intros v; apply register_lookup_set.
+  have Hf : ∀ m : M unit,
+      match esil_node_any ld_rs0 m with
+      | Some (rs', _) => register_lookup w3_dst rs'
+      | None => Z_to_bv 64 0
+      end = match esil_node_any ld_rs0 m with
+            | Some (rs', _) => register_lookup w3_dst rs'
+            | None => Z_to_bv 64 0
+            end := λ m, eq_refl.
+  have H1 : match esil_node_any ld_rs0 (w3_k1 v1) with
+            | Some (rs', _) => register_lookup w3_dst rs'
+            | None => Z_to_bv 64 0
+            end = v1 by rewrite /w3_k1 /=; apply Hpr.
+  have H2 : match esil_node_any ld_rs0 (w3_k1 v2) with
+            | Some (rs', _) => register_lookup w3_dst rs'
+            | None => Z_to_bv 64 0
+            end = v2 by rewrite /w3_k1 /=; apply Hpr.
+  by rewrite -H1 -H2 Heq.
+Qed.
+
+Theorem w3_not_clockstep (v1 v2 : type_of_register w3_dst)
+    (rs1' rs2' : regstate) (ib' : oib32) :
+  v1 ≠ v2 →
+  ¬ clockstep w3_T1 (w3_k1 v1) rs1' None ib' (w3_k1 v2) rs2' None ib'.
+Proof.
+  intros Hne (Heq & _ & _ & _).
+  exact (w3_nodes_differ v2 v1 (fun H => Hne (eq_sym H)) Heq).
+Qed.
+
+(** ** 3d.2 THE WITNESS, ASSEMBLED
+
+    Both blocks exist, at the SAME node, from register files that agree off
+    the taint: the emission's reads [cy_A], the certified run's reads
+    [cy_B], the two labels are [lbl_poisoned]-related and nothing weaker
+    relates them, the block's read set holds the tainted carrier, and the
+    exit is [csync]'s DIVERGED arm at the taint the block itself grew.
+    This is [WeakRvwmoWalk.poisoned_no_fault]'s and
+    [WeakRvwmoWalk.wpois_site]'s content at a concrete node — with the ONE
+    residual named there, the fault boundary, discharged HERE by
+    construction ([cy_A_ram]/[cy_B_ram]: both addresses are mapped RAM). *)
+Theorem w3_pair (cpu : CPU) (d0 : dev_state) (ws : wstate) (rs : regstate)
+    (ib : oib32) (tvs1 tvs2 : list (nat * bv 8)) :
+  register_lookup w3_src rs = Z_to_bv 64 0 →
+  length tvs1 = 4%nat → length tvs2 = 4%nat →
+  ∃ (v1 v2 : type_of_register w3_dst)
+    (rds1 rds2 : list wreg) (wrs1 wrs2 : list register)
+    (l1 l2 : wlabel),
+    (* the emission's block: address [cy_A] *)
+    cblk cpu d0 ws
+      (WeakAxiomatic.LLoad false (pa_z cy_A) tvs1.*1 tvs1.*2) l1 rds1 wrs1
+      w3_m rs None ib (w3_k1 v1) rs None (ib_rd ib w3_src) ∧
+    (* the certified run's block, from the SAME node: address [cy_B] *)
+    cblk cpu d0 ws
+      (WeakAxiomatic.LLoad false (pa_z cy_B) tvs2.*1 tvs2.*2) l2 rds2 wrs2
+      w3_m (w3_rs2 rs) None ib (w3_k1 v2) (w3_rs2 rs) None (ib_rd ib w3_src) ∧
+    (* the register files agree off the taint … *)
+    dreg_agree (fun n => n ∉ w3_T0) rs (w3_rs2 rs) ∧
+    (* … the block's read set MEETS it, so no mirror exists … *)
+    15%nat ∈ rds1 ∧ ¬ rds_ok (fun n => n ∉ w3_T0) rds1 ∧
+    (* … the two labels are related by the POISONED arm and by nothing
+       weaker … *)
+    lbl_poisoned
+      (WeakAxiomatic.LLoad false (pa_z cy_A) tvs1.*1 tvs1.*2)
+      (WeakAxiomatic.LLoad false (pa_z cy_B) tvs2.*1 tvs2.*2) ∧
+    ¬ lbl_reidx
+      (WeakAxiomatic.LLoad false (pa_z cy_A) tvs1.*1 tvs1.*2)
+      (WeakAxiomatic.LLoad false (pa_z cy_B) tvs2.*1 tvs2.*2) ∧
+    ¬ lbl_reidx_sub
+      (WeakAxiomatic.LLoad false (pa_z cy_A) tvs1.*1 tvs1.*2)
+      (WeakAxiomatic.LLoad false (pa_z cy_B) tvs2.*1 tvs2.*2) ∧
+    (* … and the exit is [csync]'s DIVERGED arm at the GROWN taint. *)
+    csync w3_T1 (w3_k1 v1) rs None (ib_rd ib w3_src)
+      (w3_k1 v2) (w3_rs2 rs) None (ib_rd ib w3_src).
+Proof.
+  intros Hv Hl1 Hl2.
+  have HA : w3_addr (register_lookup w3_src rs) = cy_A
+    by rewrite Hv w3_addr0.
+  have HB : w3_addr (register_lookup w3_src (w3_rs2 rs)) = cy_B
+    by rewrite w3_lookup2 w3_addr1.
+  destruct (w3_blk cpu d0 ws rs ib tvs1 Hl1)
+    as (v1 & rds1 & wrs1 & Hb1 & Hin1).
+  destruct (w3_blk cpu d0 ws (w3_rs2 rs) ib tvs2 Hl2)
+    as (v2 & rds2 & wrs2 & Hb2 & Hin2).
+  rewrite HA in Hb1. rewrite HB in Hb2.
+  exists v1, v2, rds1, rds2, wrs1, wrs2,
+    (WeakPromise.LLoad false false (pa_z cy_A) tvs1 []),
+    (WeakPromise.LLoad false false (pa_z cy_B) tvs2 []).
+  split_and!.
+  - exact Hb1.
+  - exact Hb2.
+  - apply w3_agree.
+  - exact Hin1.
+  - intros H. exact (H 15%nat Hin1 (elem_of_list_here _ _)).
+  - by apply w3_poisoned; rewrite length_fmap length_fmap.
+  - apply (proj1 (w3_not_reidx _ _ _ _)).
+  - apply (proj2 (w3_not_reidx _ _ _ _)).
+  - apply w3_csync_grown.
+    eapply dreg_agree_taint_mono; [apply (proj1 w3_taint_grows)|apply w3_agree].
+Qed.
 
 (* ====================================================================== *)
 (** * 4. WHAT THIS WITNESS LEAVES OPEN
@@ -738,3 +1112,5 @@ Print Assumptions w2_blk_subst.
 Print Assumptions w2_seg_step_diverged.
 Print Assumptions w2_reaches_boundary.
 Print Assumptions w2_reconverge.
+Print Assumptions w3_blk.
+Print Assumptions w3_pair.

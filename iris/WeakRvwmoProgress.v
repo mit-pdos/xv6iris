@@ -421,10 +421,11 @@ Lemma cpol_ctx_of_ctrace (G : gexec) (x : agent) (n : nat) (c : cand)
     (ev : nat → geid) :
   wrow_in_log' G x n →
   ctrace_prefix G c ev (wwit G n) →
+  pois_ok_hart G c ev x →
   cpol_ctx G (wwit G n) x c.
 Proof.
-  intros Hrow Hpc. exists ev. split_and!;
-    [exact Hpc|by apply wit_fence_ub_vacuous].
+  intros Hrow Hpc Hpd. exists ev. split_and!;
+    [exact Hpc|by apply wit_fence_ub_vacuous|exact Hpd].
 Qed.
 
 (* ====================================================================== *)
@@ -470,9 +471,9 @@ Proof.
   intros Hcons Hpc Hrow Hrdsf Hndok Hem Hdev HQ Hok Hctx Hp Hnd Hsync Hrelp.
   eapply (wlk_seg_of_cert G n x cpu d0 T Nd k0 kz ws0 rowseg es pfin m0 rs10
             fn0 ib0 St m20 rs20 fn20 ib20);
-    [exact Hcons|exact Hpc|by apply wub_of_row|exact Hrdsf|exact Hndok
-    |exact Hem|exact Hdev|exact HQ|exact Hok|exact Hctx|exact Hp|exact Hnd
-    |exact Hsync|exact Hrelp].
+    [exact Hcons|exact Hpc|by apply wub_of_row|exact Hrdsf
+    |exact Hndok|exact Hem|exact Hdev|exact HQ|exact Hok|exact Hctx|exact Hp
+    |exact Hnd|exact Hsync|exact Hrelp].
 Qed.
 
 (** ** 5.2 THE PER-STATE RESIDUE, REPAIRED
@@ -541,8 +542,8 @@ Proof.
   have Hok : cst_ok d0 St by destruct Hinv as (? & _).
   destruct (wlk_seg_of_cert G n x cpu d0 T Nd k0 (k0 + length pre)%nat ws0
               (pre ++ [WeakAxiomatic.LStore rl base vs kc]) es pfin m0 rs10
-              fn0 ib0 St m0 rs20 fn0 ib0 Hcons Hpc Hub Hrdsf Hndok Hem Hdev
-              HQ Hok Hctx Hp Hnd
+              fn0 ib0 St m0 rs20 fn0 ib0 Hcons Hpc Hub Hrdsf Hndok Hem
+              Hdev HQ Hok Hctx Hp Hnd
               (or_introl (conj eq_refl (conj eq_refl (conj eq_refl Hag))))
               Hrelp)
     as (St' & tradd & Hstep & _ & Himg & Hpst & Hdv).

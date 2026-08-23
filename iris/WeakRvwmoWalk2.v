@@ -375,8 +375,10 @@ Proof.
     as (lb' & l' & rds' & wrs' & rs2' & _ & _ & Hri & (Hcl & _) & _).
   have Hlb : lb' = WeakAxiomatic.LStore rl base vs kc
     := lbl_reidx_w_store rl base vs kc lb' Hri.
-  destruct Hcl as [[_ Hl]|[_ (base0 & n0 & ts0 & vs0 & _ & _ & Heq)]].
+  destruct Hcl as [[_ Hl]|[[_ (base0 & n0 & ts0 & vs0 & _ & _ & Heq)]
+                          |(_ & (base0 & n0 & Heq) & _ & _)]].
   - by rewrite Hlb in Hl.
+  - exfalso. rewrite Hlb in Heq. by rewrite /latest_read_lbl in Heq.
   - exfalso. rewrite Hlb in Heq. by rewrite /latest_read_lbl in Heq.
 Qed.
 
@@ -787,8 +789,8 @@ Theorem xv6_rvwmo_safe_modulo_l2' (Σ : gFunctors)
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
      gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
-     ∃ (W : geid → Prop) (T : list wreg),
-       wsupply (xboot σ0) (wgdev σ0) (gd_g GD) W T (xN σ0)) →
+     ∃ (W : geid → Prop) (tm : agent → nat → list wreg),
+       wsupply (xboot σ0) (wgdev σ0) (gd_g GD) W tm (xN σ0)) →
   ∀ GD : gdexec,
     rvwmo_minus_deps_consistent GD →
     gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
@@ -1148,8 +1150,23 @@ Qed.
 
 Lemma cyg_wsite_supply (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
     (d0 : dev_state) :
-  wsite_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 cyg cyW [].
+  wsite_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 cyg cyW (λ _ _, []).
 Proof.
+  (* AT THE EMPTY TAINT both new clauses are free: [rds_ok (∉ [])] holds of
+     every read set, so [wexit_ut] is [not_elem_of_nil] and the poisoned
+     arm's premise is refutable — no block of this graph is poisoned. *)
+  have Hut : ∀ p, wexit_ut d0 [] (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat) p.
+  { intros p cpu ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' _ _ _ nn _.
+    apply not_elem_of_nil. }
+  have Hut1 : ∀ (y : agent) p,
+      wexit_ut d0 [] (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) y) p.
+  { intros y p cpu ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' _ _ _ nn _.
+    apply not_elem_of_nil. }
+  have Hpo1 : ∀ (y : agent) p,
+      wpois_site cyg cyW y d0 [] []
+        (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) y) p.
+  { intros y p c0 cpu ws lb l rds wrs m rs1' rs2' fn ib m' rs1'' fn' ib''
+      _ _ _ Hnr _ _. exfalso. apply Hnr. intros nn _. apply not_elem_of_nil. }
   intros n x kz p lb Hat Hp _ Hl.
   destruct n as [|[|n]].
   - (* THE FIRST WRITE: hart 0's store, at row position 1 *)
@@ -1157,32 +1174,35 @@ Proof.
     destruct p as [|[|p]]; [| |exfalso; simpl in Hp; lia].
     + destruct (cyg_lbl _ _ Hl) as [[_ ->]|[[He _]|[[He _]|[He _]]]];
         [|by simplify_eq|by simplify_eq|by simplify_eq].
-      split; [by intros Hn; destruct (Hn I)|]. right.
-      split_and!; [reflexivity|exact cyg_wit00|apply cyg_wwit_site00].
+      split_and!; [by intros Hn; destruct (Hn I)| |apply Hut1|apply Hpo1].
+      right. split_and!; [reflexivity|exact cyg_wit00|apply cyg_wwit_site00].
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[_ ->]|[[He _]|[He _]]]];
         [by simplify_eq| |by simplify_eq|by simplify_eq].
-      split; [by intros Hn; destruct (Hn I)|]. left. split;
+      split_and!; [by intros Hn; destruct (Hn I)| |apply Hut1|apply Hpo1].
+      left. split;
         [by apply cyW_ne|by apply (cyg_wsrc_le_store 0%nat _ _ Hl)].
   - (* THE SECOND WRITE: hart 1's store, at row position 1 *)
     rewrite cyg_at2 in Hat. simplify_eq.
     destruct p as [|[|p]]; [| |exfalso; simpl in Hp; lia].
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[_ ->]|[He _]]]];
         [by simplify_eq|by simplify_eq| |by simplify_eq].
-      split; [by intros Hn; destruct (Hn I)|]. left. split; [by apply cyW_ne|].
+      split_and!; [by intros Hn; destruct (Hn I)| |apply Hut1|apply Hpo1].
+      left. split; [by apply cyW_ne|].
       intros aq base ts vs Hl2 j t Hj.
       rewrite Hl2 in Hl. injection Hl as Ha Hb Hc Hd. subst.
       destruct j as [|[|[|[|j]]]]; try (by rewrite /cy_ts1 /= in Hj);
         injection Hj as <-; lia.
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[He _]|[_ ->]]]];
         [by simplify_eq|by simplify_eq|by simplify_eq|].
-      split; [by intros Hn; destruct (Hn I)|]. left. split;
+      split_and!; [by intros Hn; destruct (Hn I)| |apply Hut1|apply Hpo1].
+      left. split;
         [by apply cyW_ne|by apply (cyg_wsrc_le_store 1%nat _ _ Hl)].
   - exfalso. rewrite /gwrite_at cyg_gwrites /= in Hat. done.
 Qed.
 
 Theorem cyg_wsupply (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
     (d0 : dev_state) :
-  wsupply (cy_boot cpu0 cpu1 rs0 rs1) d0 cyg cyW [] 2%nat.
+  wsupply (cy_boot cpu0 cpu1 rs0 rs1) d0 cyg cyW (λ _ _, []) 2%nat.
 Proof.
   split_and!.
   - exact cyg_gwrow.
@@ -1192,7 +1212,7 @@ Proof.
     destruct x as [|[|x]]; [| |lia]; by eexists _, _, _, _, _.
   - exact cyg_W_poloc'.
   - exact cyg_wubA.
-  - apply wrds_free_nil.
+  - by intros x k.
   - apply cyg_wsite_supply.
 Qed.
 
@@ -1212,16 +1232,17 @@ Proof.
   { intros x _.
     exact (wemit_of_qconf (cy_boot cpu0 cpu1 rs0 rs1) d0 cy_img 2%nat cygd x
              (cyg_qconf cpu0 cpu1 rs0 rs1 d0)). }
-  destruct (wlk_run' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW []
+  destruct (wlk_run' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
+              (λ _ _, [])
               (λ St n Hinv Hn,
                  wlk_step'_of_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat
-                   cyg cyW [] St n cyg_consistent
+                   cyg cyW (λ _ _, []) St n cyg_consistent
                    (cyg_wsupply cpu0 cpu1 rs0 rs1 d0)
                    Hinv Hn)
               2%nat 0%nat
               (wlk_start (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg)
-              (wlk_start_inv' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW []
-                 Hwf Hem0)
+              (wlk_start_inv' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
+                 (λ _ _, []) Hwf Hem0)
               ltac:(by rewrite cyg_gwrites))
     as (l & Sf & Hrun & Hok & Himg & Hpst & Hdv & Hpfx).
   exists l, (wlk_start (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg), Sf.

@@ -874,7 +874,7 @@ Qed.
 Lemma wsupply_orbit_pull_forces_gwrow (boot : agent → pexv6)
     (d0 : dev_state) (N : nat) (GD GD' : gdexec) :
   wsupply_orbit_pull boot d0 N →
-  gd_equiv GD GD' → (∃ W T, wsupply boot d0 (gd_g GD') W T N) →
+  gd_equiv GD GD' → (∃ W tm, wsupply boot d0 (gd_g GD') W tm N) →
   gwrow_gmo (gd_g GD).
 Proof.
   intros Hpull Heq Hw.

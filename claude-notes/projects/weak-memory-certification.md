@@ -1,5 +1,56 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## THE HONEST LEDGER (2026-08-24, THIRTEENTH PASS — end of session)
+## READ THIS FIRST; the AUDIT block and the twelfth-pass checkpoint below
+## are its history
+
+`xv6_rvwmo_safe_modulo_l2''` (PreNorm/Walk2) — tier 1's conclusion for
+every RVWMO⁻(+deps)-consistent, `gdexec_qconf`-conformant (device-quiet)
+execution; `Print Assumptions` = tier 1's five rv64d axioms; every
+hypothesis below is a NAMED theorem premise, none an axiom.
+- (R-1) `l2_claim`: per cycle segment, `seg_pin ∨ cs_hyps ∨ Bad`.  Its
+  kernel content = the `WProt` port convention + the static pin check
+  (1446/1611 sites certified; bridge proved modulo R-3) + the per-site
+  side conditions in `cs_hyps` (`n0 < gwix ACQ`, the protected write
+  does not touch the lock word, `lock_word_byte`) — `lock_pattern` is
+  GONE (replaced by `acq_row`; `lkw2` witnesses the new hypotheses where
+  the old fails).
+- (R-2a) `wsupply_res` = the writer-scope clause (boot PHart for every
+  writing agent — disk DMA stores EXCLUDED, named) + `∃ W tm`: the
+  frozen witness set with `W_poloc_closed` and `wubA`, the per-hart
+  MONOTONE taint map, and `wsite_supply` (per position: the RMW site,
+  the classification `wsite_cls`, and at WRITE positions `wexit_ut` —
+  the exit's instruction reads no tainted carrier: its DEC-7 discharge
+  (a tainted carrier at `z` ⇒ a `row_deps` edge from the witness ⇒ the
+  witness is below `z`) is stated, NOT proved).  Inside `wsite_cls` at
+  a poisoned position: `wpois_site`, which contains
+  `poisoned_no_fault` (the poisoned load's address is mapped — a
+  KERNEL claim of `l2_claim`'s kind; discharged by construction at the
+  instance).
+- (R-2b) `gwrow_gmo` ⇐ `normalize_ww3` + `ww_residue` (`RwwD`-acyclic)
+  + the `co`/`fr` transport arms of `orbit_cycle_transport` (still owed).
+- Scope: device-quiet (`em_devfree`, constant fabric); the full bundle
+  via `fconf_trace_realize` needs the glue mirror (F-a/F-b).
+WHAT THE MACHINERY PROVES END-TO-END: the generic walk derives the LB
+cycle's certification (`cyg_walk'`, values DIFFERING, no coincidence);
+the diverged arm fires on the real spin-load node
+(`w2_seg_step_diverged`); the real nine-node tail re-converges under the
+paired law (`la_tail_par`); the poisoned arm is inhabited at a block
+(`w3_blk`, taint grows `[15]→[15;14]`, nodes differ) but NOT yet inside a
+whole segment (the real tail across the instruction boundary is not
+wired into `seg_step_of_segment`).
+WHAT REMAINS, in order: (1) `wexit_ut`'s DEC-7 discharge (the
+`PinBridge2`-style induction over the emission); (2) the poisoned arm
+inside a full segment (wire `tpar`/`la_tail_par` into
+`seg_step_of_segment`'s boundary crossing); (3) R-1: R-3, the 165
+sites, the final assembly; (4) `ww_residue` + the `co`/`fr` transport;
+(5) F-a/F-b, R6, `wprot_store` width, `WeakRvwmoLock`'s failed-swap arm,
+the decoder audit.  THE RULE that found three vacuities this session:
+every new hypothesis gets a non-coincidental satisfiability witness,
+and a witness constructed to make a hypothesis hold is the vacuity.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## AUDIT (2026-08-24, on the user's question "are miscellaneous unproven
 ## premises re-appearing?") — YES; READ BEFORE THE TWELFTH-PASS CHECKPOINT
 
@@ -126,6 +177,34 @@ LESSON for the discipline: "assumptions Closed + tree green" is not
 enough — every NEW hypothesis needs a non-coincidental satisfiability
 witness, and a witness constructed to make a hypothesis hold is the
 vacuity it was meant to catch.
+
+LANDED (the per-hart taint migration).  `wrds_free` is GONE from
+`wsupply`; the taint is `tm : agent -> nat -> list wreg`, monotone
+along each row, and `wlk_inv'` identifies each hart's process with its
+emission off `tm x (gcnt x ...)`.  `cert_segment''`/`seg_step_of_segment`
+take `Tf : nat -> list wreg` with `Tf k ⊆ Tf (S k)`; `csync`/`clockstep`/
+`tail_silent`/`dreg_agree` are monotone in it (`csync_mono` &c).  The
+POISONED arm is a third disjunct of `lbl_reidx_w` (`lbl_poisoned`, loads
+only), of `ctp_step` (`cpois_step`, discriminated from the witness arm
+`cwit_step` by "not G's label" + "not G's footprint") and of
+`cstep_cls`; the policy `wblk_pol_at'` case-splits on
+`rds_ok (∉ tm k) rds` (`rds_ok_dec`).  THE OBSTRUCTION THE DESIGN DID
+NOT NAME: a poisoned load's address is the MACHINE's, so `cinv_replay`'s
+(W-a)/(W-b) for a later TRUE read of the same hart follow from neither
+`W_poloc_closed` nor `wit_fence_ub`.  A universal over candidates is
+FALSE (ctrace_prefix permits a poisoned step anywhere), so it is carried
+as an INVARIANT: `pois_ok_hart` inside `cpol_ctx`/`wctx'`/`wlk_inv'`,
+extended one step at a time by `cstep_pois_ok` (a clause of `wcls_at`,
+free at every non-poisoned route) via `pois_ok_hart_snoc`.  Residuals,
+all per-position and in `wsite_supply`: `wexit_ut` (= exit_untainted, to
+be discharged by DEC-7 dynamic provenance, NOT proved), `wpois_site`,
+and `poisoned_no_fault` inside it — a KERNEL claim of `l2_claim`'s kind,
+recorded in `WeakRvwmoWalk` §7's ledger.  NON-VACUITY: `WeakRvwmoCycWit2`
+§3d (`w3_pair`) — the real `lw` request at two real RAM addresses, a
+`RegRead a5` prefix putting the tainted carrier in the block's read set,
+the two runs' labels related by `lbl_poisoned` and by NEITHER
+`lbl_reidx` NOR `lbl_reidx_sub`, and `csync`'s diverged arm at the taint
+the block itself grew.
 
 ## CHECKPOINT (2026-08-24, TWELFTH PASS — end of session) — READ THIS FIRST
 

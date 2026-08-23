@@ -864,9 +864,13 @@ Definition wsupply_res (boot : agent → pexv6) (d0 : dev_state) (G : gexec)
     (N : nat) : Prop :=
   (∀ x k lb, gx_lbl G (x, k) = Some lb → lb_is_w lb = true →
      ∃ cpu m rs fn ib, boot x = PHart cpu m rs fn ib) ∧
-  (∃ (W : geid → Prop) (T : list wreg),
-     W_poloc_closed G W ∧ wubA G W ∧ wrds_free d0 T ∧
-     wsite_supply boot d0 G W T).
+  (∃ (W : geid → Prop) (tm : agent → nat → list wreg),
+     W_poloc_closed G W ∧ wubA G W ∧
+     (** the PER-HART ACCUMULATED taint, monotone along each row: what
+         replaces the old global [wrds_free], which the audit found
+         satisfiable only at [T = []] *)
+     (∀ x k, tm x k ⊆ tm x (S k)) ∧
+     wsite_supply boot d0 G W tm).
 
 (** THE DISK SCOPE, MADE EXPLICIT.  An agent that is not a [PHart] at boot
     — the disk, whose DMA writes are real [LStore]s in the graph — writes
@@ -887,9 +891,10 @@ Lemma wsupply_of_gwrow (boot : agent → pexv6) (d0 : dev_state) (G : gexec)
     (N : nat) :
   gwrow_gmo G →
   (∀ x k, is_Some (gx_lbl G (x, k)) → (x < N)%nat) →
-  wsupply_res boot d0 G N → ∃ W T, wsupply boot d0 G W T N.
+  wsupply_res boot d0 G N →
+  ∃ W tm, wsupply boot d0 G W tm N.
 Proof.
-  intros H14 H1 (H2 & (W & T & H3 & H4 & H5 & H6)). exists W, T.
+  intros H14 H1 (H2 & (W & tm & H3 & H4 & H5 & H6)). exists W, tm.
   by split_and!.
 Qed.
 
@@ -905,8 +910,8 @@ Qed.
 Definition wsupply_orbit_pull (boot : agent → pexv6) (d0 : dev_state)
     (N : nat) : Prop :=
   ∀ GD GD', gd_equiv GD GD' →
-    (∃ W T, wsupply boot d0 (gd_g GD') W T N) →
-    ∃ W T, wsupply boot d0 (gd_g GD) W T N.
+    (∃ W tm, wsupply boot d0 (gd_g GD') W tm N) →
+    ∃ W tm, wsupply boot d0 (gd_g GD) W tm N.
 
 Theorem wsupply_of_prenorm (boot : agent → pexv6) (d0 : dev_state)
     (im : image) (nh N : nat) (GD : gdexec) :
@@ -918,7 +923,7 @@ Theorem wsupply_of_prenorm (boot : agent → pexv6) (d0 : dev_state)
      rvwmo_minus_deps_consistent GD' → gdexec_qconf boot d0 im nh GD' →
      wsupply_res boot d0 (gd_g GD') N) →
   kill_ww_K2 GD → kill_ww_K3 GD → kill_ww_K4 GD →
-  ∃ W T, wsupply boot d0 (gd_g GD) W T N.
+  ∃ W tm, wsupply boot d0 (gd_g GD) W tm N.
 Proof.
   intros HnN Hcons Hq Hpull Hres HK2 HK3 HK4.
   destruct (normalize_ww GD Hcons HK2 HK3 HK4) as (GD' & Heq & Hrow).
