@@ -740,11 +740,116 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(*  2b.  THE PAYLOAD'S OWN SHAPE FACTS                                    *)
+(* ===================================================================== *)
+
+(* A PAYLOAD NAMES ITS RECORD, ITS BLOCK MAP AND ITS DATA SEPARATELY, AND
+   THE NODE IS [bnode] OF THE THREE.  Reading the node's own [bm_of] /
+   [fn_data] back at the payload's [bm] / [data] needs exactly these five
+   representational equations -- every one of them a conjunct of
+   [InodeLock.inode_ok], so a producer that had [inode_ok] has them and
+   nothing new is owed.  They are what the EXPENSIVE half of [inode_ok]
+   (the coverage sweep and the injectivity) is derived THROUGH: the
+   payload keeps the cheap shape, the [*] and the byte view's auth supply
+   the rest ([inode_owned_era_bnode_ok] below). *)
+Definition node_shape_ok (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) : Prop :=
+  di_addrs dn = bm_cells bm
+  /\ length (bm_dir bm) = NDIRECT
+  /\ length (bm_ent bm) = NINDIRECT
+  /\ (bv_unsigned (bm_ind bm) = 0 -> bm_ent bm = replicate NINDIRECT (bv_0 32))
+  /\ blk_holes_zero bm data.
+
+Lemma node_shape_ok_of_inode_ok (cov : gset Z) (ls : Z)
+    (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  inode_ok cov ls dn bm data -> node_shape_ok dn bm data.
+Proof.
+  intros (Hbw & _ & Haddr & _ & _ & Hh & _).
+  destruct Hbw as (Hd & He & Hi & _ & _).
+  split_and!; [exact Haddr | exact Hd | exact He | exact Hi | exact Hh].
+Qed.
+
+Lemma node_shape_ok_holes (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  node_shape_ok dn bm data -> blk_holes_zero bm data.
+Proof. intros (_ & _ & _ & _ & H). exact H. Qed.
+
+(* the round trip the payload uses: [bm_of] of the node IS the payload's
+   own block map *)
+Lemma bm_of_bnode (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  node_shape_ok dn bm data -> bm_of (bnode dn bm data) = bm.
+Proof.
+  intros (Haddr & Hd & _ & _ & _).
+  rewrite /bm_of /bnode /=. rewrite Haddr /bm_cells.
+  destruct bm as [dir ind ent]; simpl in *.
+  assert (Htk : take NDIRECT (dir ++ [ind]) = dir).
+  { rewrite -Hd. apply take_app_length. }
+  rewrite Htk. f_equal.
+  rewrite lookup_total_app_r; [| rewrite Hd; lia].
+  rewrite Hd Nat.sub_diag //.
+Qed.
+
+Lemma fn_data_bnode (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) (k : nat) :
+  node_shape_ok dn bm data -> (k < MAXFILE)%nat ->
+  fn_data (bnode dn bm data) k = data k.
+Proof.
+  intros Hs Hk.
+  exact (bnode_data dn bm data k (node_shape_ok_holes _ _ _ Hs) Hk).
+Qed.
+
+(* [inode_ok]'s two [data]-facing conjuncts stop at MAXFILE, so a [data]
+   that agrees below MAXFILE satisfies exactly the same statement *)
+Lemma inode_ok_data_ext (cov : gset Z) (ls : Z) (dn : dinode) (bm : blkmap)
+    (data data' : nat -> list (bv 8)) :
+  (forall k : nat, (k < MAXFILE)%nat -> data k = data' k) ->
+  inode_ok cov ls dn bm data -> inode_ok cov ls dn bm data'.
+Proof.
+  intros Hext (Hbw & Hcov & Haddr & Hty & Hsz & Hh & Hsi).
+  split_and!;
+    [exact Hbw | exact Hcov | exact Haddr | exact Hty | exact Hsz | |].
+  - intros k Hk Hz. rewrite -(Hext k Hk). exact (Hh k Hk Hz).
+  - intros k Hk. rewrite -(Hext k Hk). exact (Hsi k Hk).
+Qed.
+
+(* THE THREE RECORD-ONLY FACTS [inode_ok] DOES NOT CARRY, as one premise.
+   A re-park re-establishes exactly this of its new record; everything
+   else [inode_local] wants comes out of [inode_ok]. *)
+Definition inode_rec_local (dn : dinode) : Prop :=
+  (bv_unsigned (di_type dn) = 0 \/ bv_unsigned (di_type dn) = T_DIR_z
+   \/ bv_unsigned (di_type dn) = T_FILE_z
+   \/ bv_unsigned (di_type dn) = T_DEVICE_z)
+  /\ bv_unsigned (di_nlink dn) <= 32767
+  /\ (bv_unsigned (di_type dn) = T_DIR_z -> (16 | bv_unsigned (di_size dn))).
+
+Lemma inode_rec_local_of (i : Z) (n : fs_node) :
+  inode_local i n -> inode_rec_local (fn_rec n).
+Proof.
+  intros Hl. split_and!.
+  - exact (inl_type Hl).
+  - exact (inl_nlink Hl).
+  - intros Hd. apply (inl_dir_size Hl). rewrite /fn_is_dir /fn_type Hd.
+    apply bool_decide_eq_true. reflexivity.
+Qed.
+
+Lemma inode_local_of_ok_rec (i : Z) (cov : gset Z) (ls : Z)
+    (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  inode_ok cov ls dn bm data ->
+  inode_rec_local dn ->
+  dir_uniq dn data ->
+  dir_dots_ix i dn data ->
+  inode_local i (bnode dn bm data).
+Proof.
+  intros Hok (Hty & Hnl & Hgr) Hu Hd.
+  exact (inode_local_of_ok_data i cov ls dn bm data Hok Hty Hnl Hgr Hu Hd).
+Qed.
+
+(* ===================================================================== *)
 (*  3.  THE RESOURCE BRIDGE, AND THE BUNDLE                              *)
 (* ===================================================================== *)
 
 Section EraRes.
-  Context `{!riscvGS Σ, !xv6G Σ, !fsLinkG Σ, !fsTopG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fsLinkG Σ}.
 
   Local Lemma era_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.
@@ -1223,6 +1328,91 @@ Section EraRes.
     { rewrite Hblk big_sepM_empty. done. }
     { rewrite /ind_owned (decide_True _ _ Hind). done. }
     iModIntro. iFrame.
+  Qed.
+
+  (* ---- THE PAYLOAD'S SPELLING OF THE BUNDLE -------------------------- *)
+
+  (* [IcacheEscrow]'s payloads name a record, a block map and a total
+     [data] and the node is [bnode] of the three; these three lemmas are
+     that spelling of [_to] / [_of] / [_ok], and they are what every
+     consumer of a payload actually applies.  Each takes only
+     [node_shape_ok], which every producer reads off its own
+     [inode_ok]. *)
+
+  Lemma inode_blocks_data_ext (γfs : fs_names) (bm : blkmap)
+      (data data' : nat -> list (bv 8)) :
+    (forall k : nat, (k < MAXFILE)%nat -> data k = data' k) ->
+    inode_blocks γfs bm data ⊣⊢ inode_blocks γfs bm data'.
+  Proof.
+    intros Hext. rewrite /inode_blocks.
+    apply big_sepL_proper. intros j k Hj.
+    apply lookup_seq in Hj as [Heq Hlt].
+    assert (Hk : (k < MAXFILE)%nat) by lia.
+    rewrite (Hext k Hk) //.
+  Qed.
+
+  Lemma inode_owned_era_bnode_to (γfs : fs_names) (γi : gname) (inum : bv 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    node_shape_ok dn bm data ->
+    inode_owned_era γfs γi inum (bnode dn bm data) -∗
+      dinode_at γi inum dn
+      ∗ ind_res γfs bm
+      ∗ inode_blocks γfs bm data
+      ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data).
+  Proof.
+    intros Hs. iIntros "Hn".
+    iDestruct (inode_owned_era_to with "Hn") as "(Hd & Hi & Hb & Ht)".
+    rewrite (bm_of_bnode dn bm data Hs).
+    rewrite (inode_blocks_data_ext γfs bm (fn_data (bnode dn bm data)) data
+               (fun k Hk => fn_data_bnode dn bm data k Hs Hk)).
+    iFrame.
+  Qed.
+
+  Lemma inode_owned_era_bnode_of (γfs : fs_names) (γi : gname) (inum : bv 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    node_shape_ok dn bm data ->
+    inode_local (bv_unsigned inum) (bnode dn bm data) ->
+    dinode_at γi inum dn -∗
+    ind_res γfs bm -∗
+    inode_blocks γfs bm data -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) -∗
+    inode_owned_era γfs γi inum (bnode dn bm data).
+  Proof.
+    intros Hs Hl. iIntros "Hd Hi Hb Ht".
+    iApply (inode_owned_era_of γfs γi inum (bnode dn bm data) Hl
+              with "[Hd] [Hi] [Hb] Ht").
+    - iExact "Hd".
+    - rewrite (bm_of_bnode dn bm data Hs). iExact "Hi".
+    - rewrite (bm_of_bnode dn bm data Hs).
+      rewrite (inode_blocks_data_ext γfs bm (fn_data (bnode dn bm data)) data
+                 (fun k Hk => fn_data_bnode dn bm data k Hs Hk)).
+      iExact "Hb".
+  Qed.
+
+  (* the whole of [InodeLock.inode_ok], at the payload's own spelling --
+     one fupd at [logN], which is what keeps a payload from having to
+     MAINTAIN the coverage sweep and the injectivity *)
+  Lemma inode_owned_era_bnode_ok (E : coPset) (γfs : fs_names) (γi : gname)
+      (inum : bv 32) (dn : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) (cov : gset Z) (ls : Z) :
+    ↑logN ⊆ E ->
+    node_shape_ok dn bm data ->
+    bv_unsigned (di_type dn) <> 0 ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
+    inode_owned_era γfs γi inum (bnode dn bm data) ={E}=∗
+      ⌜inode_ok cov ls dn bm data⌝
+      ∗ inode_owned_era γfs γi inum (bnode dn bm data).
+  Proof.
+    iIntros (HE Hs Hty) "#Hinv Hn".
+    assert (Hty' : bv_unsigned (di_type (fn_rec (bnode dn bm data))) <> 0)
+      by exact Hty.
+    iMod (inode_owned_era_ok E γfs γi inum (bnode dn bm data) cov ls HE Hty'
+            with "Hinv Hn") as "[%Hok Hn]".
+    iModIntro. iFrame "Hn". iPureIntro.
+    rewrite (bm_of_bnode dn bm data Hs) in Hok.
+    apply (inode_ok_data_ext cov ls dn bm (fn_data (bnode dn bm data)) data);
+      [| exact Hok].
+    intros k Hk. exact (fn_data_bnode dn bm data k Hs Hk).
   Qed.
 
 End EraRes.

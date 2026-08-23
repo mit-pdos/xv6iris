@@ -72,6 +72,13 @@ Class xv6G (Σ : gFunctors) := Xv6G {
   xv6_log        :: logG Σ;
   xv6_fscrash    :: fsCrashG Σ;
   xv6_ireg       :: iregG Σ;
+  (* ---- the ERA'S TOP MAP, a member since durable-disk 2b-inode-3 -----
+     A checked-out payload carries its fragment ([IcacheEscrow.ic_loaded]
+     holds [FsState.top_frag]), so the class reaches [ProcInv.proc_priv]
+     through [FirstTok.first_boot_persist] and from there essentially every
+     proof file; membership is what keeps that from being an explicit
+     binder in ~400 of them.  See the note at [Xv6Cameras.fsTopG]. *)
+  xv6_fstop      :: fsTopG Σ;
   (* ---- the three that came OUT of [FileInvDefs.fileG] ---------------
      [fileG] carried these as superclasses so that the ~100 files merely
      mentioning [proc_priv] need not name the pipe and cache layers.  The
@@ -94,7 +101,7 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ ].
+     fsCrashΣ; iregΣ; fsTopΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ ].
 
 Global Instance subG_xv6GΣ {Σ} : subG xv6GΣ Σ -> xv6G Σ.
 Proof. solve_inG. Qed.

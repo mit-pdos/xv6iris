@@ -245,7 +245,7 @@ Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
   (* B3: not [xv6G] members -- see the note at [FsCfgBoot]'s era section *)
-  Context `{!fsLinkG Σ, !fsTopG Σ}.
+  Context `{!fsLinkG Σ}.
   Context `{GEN : GenId}.
 
   (* NO [fileG] AND NO [icacheG] BINDER ANY MORE (fs-cfg-boot.md stage
@@ -388,7 +388,7 @@ End SystemBoot.
 
 Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ, !fsTopG Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
        [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
@@ -562,7 +562,7 @@ Qed.
 
 Theorem xv6_fs_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ, !fsTopG Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ}
     (g : gstate) (cov : gset Z)
     (D0 : gmap Z (list (bv 8)))
     (sb : fs_sb) (nib : nat)

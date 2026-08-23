@@ -85,6 +85,7 @@ Require Import Riscv.rv64d_types.
 Require Import RiscvLang.     (* [CPU]                                        *)
 Require Import VirtioQueue.   (* [vslot]; brings [virtio_cfg] / [disk_wr]     *)
 Require Import DinodeEnc.     (* [dinode]                                     *)
+Require Import FsNode.        (* [fs_node] -- the era top map's value type    *)
 
 Local Open Scope Z_scope.
 
@@ -385,6 +386,29 @@ Class iregG (Σ : gFunctors) := IregG {
 }.
 Definition iregΣ : gFunctors := #[ghost_mapΣ Z dinode].
 Global Instance subG_iregΣ {Σ} : subG iregΣ Σ -> iregG Σ.
+Proof. solve_inG. Qed.
+
+(* ---- the ERA'S TOP MAP (theory: FsState.v) -------------------------- *)
+
+(* [fs_state.md]'s [γtop]: inum |-> the era's abstract inode.  It is a
+   MEMBER because since durable-disk 2b-inode-3 a checked-out payload
+   carries its fragment ([IcacheEscrow.ic_loaded] holds
+   [FsState.top_frag]), so the class reaches [ProcInv.proc_priv] through
+   [FirstTok.first_boot_persist] and from there essentially every proof
+   file in the tree; the alternative to membership is an explicit binder in
+   ~400 of them.  The one thing that had to move for it is the record
+   [fs_node] itself ([FsNode.v]); the whole [FsState*] theory stays where
+   it is, and this file's cone grows by one leaf over [DinodeEnc], which it
+   already requires.
+
+   THE STANDING RULE APPLIES: a file at or above [Xv6G.v] binds [xv6G] and
+   NOT this class.  The [FsState*] stack, which sits below the bundle,
+   binds it alone. *)
+Class fsTopG (Σ : gFunctors) := FsTopG {
+  fs_top_inG :: ghost_mapG Σ Z fs_node;
+}.
+Definition fsTopΣ : gFunctors := #[ghost_mapΣ Z fs_node].
+Global Instance subG_fsTopΣ {Σ} : subG fsTopΣ Σ -> fsTopG Σ.
 Proof. solve_inG. Qed.
 
 (* ===================================================================== *)

@@ -171,6 +171,17 @@ Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeplocks] below *)
 Require Import InodeRegion.
+(* durable-disk 2b-inode-3: the payload's OWNERSHIP is the era bundle.
+   [FsState] for [top_frag], [FsBytesGamma] for [fs_gamma_L], [FsStateEra]
+   for [inode_owned_era] and the payload dictionary ([bnode],
+   [node_shape_ok], [inode_rec_local] and the three [_bnode_*] bridges).
+   Placed here, after [InodeRegion], because this file spells none of the
+   four names the [FsState*] stack shadows ([fs_view], [byte_range],
+   [link_auth], [free_pool]) -- checked. *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import LogDefs.       (* [fs_home_set] -- [ic_loaded_open]'s row *)
+Require Import FsStateEra.
 Require Import EscrowDefs.
 Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
 Require Import IrefSlots.
@@ -469,6 +480,25 @@ Section IcacheEscrow.
      row, §20.17.5's residue, and [sys_unlink]'s own input premise, since a
      live NON-dot record under it forces the home's count nonzero, which is
      [DirLinks.dir_links_unlink]'s home-live premise. *)
+  (* ...AND ITS OWNERSHIP IS THE ERA BUNDLE (durable-disk 2b-inode-3).
+     The three RESOURCE conjuncts [dinode_at] / [ind_res] / [inode_blocks]
+     are gone; what stands in their place is
+     [FsStateEra.inode_owned_era] at this arm's own node, which CONTAINS all
+     three and carries the era's abstract value ([FsState.top_frag]) beside
+     them.  [IcacheBoot.ipool_shape_alloc] assembles it and
+     [FsStateEra.inode_owned_era_bnode_to] takes it apart, both off
+     [inode_ok]'s own representational half ([FsStateEra.node_shape_ok]).
+
+     [inode_ok] STAYS A PURE CONJUNCT, and that is a deliberate deviation
+     from 2b-inode-2's plan (which had it derived on demand by
+     [FsStateEra.inode_owned_era_bnode_ok], a fupd at [logN]).  It costs
+     nothing -- every producer proved it before the flip and still does --
+     and it is what keeps the flip from moving a single consumer's MASK:
+     with it, [ic_loaded_open] is an ordinary entailment, so no walk has to
+     find a [logN]-open window at the point where it unpacks its payload,
+     and no arm that unpacks inside an [iInv] becomes unprovable.  The
+     derivation is landed and is what an arm that would rather NOT maintain
+     the coverage sweep or the injectivity uses. *)
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
@@ -478,9 +508,7 @@ Section IcacheEscrow.
        ⌜dir_orphan_clean dn0 data0⌝ ∗
        ⌜dir_uniq dn0 data0⌝ ∗
        dir_links (bv_unsigned inum) dn0 data0 ∗
-       dinode_at γi inum dn0 ∗
-       ind_res γfs bm0 ∗
-       inode_blocks γfs bm0 data0 ∗
+       inode_owned_era γfs γi inum (bnode dn0 bm0 data0) ∗
        (* ...AND THE CONTENTS HOLD, TIED (namei-pinned-lookup.md §9 W2).  The
           tie is DEFINITIONAL (Revision 1): the abstract entry map is a
           function of the record and the bytes this arm already owns, so the
@@ -509,7 +537,17 @@ Section IcacheEscrow.
            value, and the fill that re-ties it [dv_set]s to the fresh
            record's own [dv_of]. *)
         (∃ e, dv_ride (bv_unsigned inum) e) ∗
-        (∃ b, fv_ride (bv_unsigned inum) b)))%I.
+        (∃ b, fv_ride (bv_unsigned inum) b) ∗
+        (* ...AND THE ERA'S ABSTRACT VALUE, UNTIED FOR THE SAME REASON
+           (durable-disk 2b-inode-3).  Every inum in the region owns exactly
+           one [top_frag]; on the ALLOCATED arm it rides tied inside
+           [inode_owned_era], and a free inum's has to be somewhere or
+           ialloc could never mint the bundle for the inode it claims.  It
+           is the POOL's marker arm and not the region's slot because this
+           is where a free inum's other untied holds already live, and
+           because the region's [ireg_slot] is destructured at twenty
+           accessors that have no business seeing it. *)
+        (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
 
   (* THE AWAIT ARM (iclaim-ledger.md §1.2/§1.3): the entry a FREER has parked
      on its way to the off-lock deposit.  It is the whole point of B2's
@@ -612,8 +650,15 @@ Section IcacheEscrow.
          choice -- and the placement is what lets the AWAIT arm below carry
          the STANDING freeze in the same escrow, which is the refuter §1.3
          always wanted. *)
-      ∨ pool_pending γi (bv_unsigned inum)
-      ∨ pool_await γi (bv_unsigned inum)))%I.
+      (* THE ERA'S ABSTRACT VALUE RIDES BESIDE THE TWO IN-TRANSITION ARMS
+         (durable-disk 2b-inode-3), untied, exactly as it does on the
+         marker arm inside [ipool_shape_np].  It sits OUTSIDE
+         [pool_pending] / [pool_await] so that neither of those keeps its
+         [γfs]-free arity. *)
+      ∨ (pool_pending γi (bv_unsigned inum)
+         ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))
+      ∨ (pool_await γi (bv_unsigned inum)
+         ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))))%I.
 
   (* OPTION A (b)(ii): turn a pending-CAPABLE pool shape into the Timeless
      [ipool_shape_np] the escrow's unloaded arm needs, REDEEMING a genuine
@@ -709,7 +754,7 @@ Section IcacheEscrow.
     ifreeze_off (bv_unsigned inum).
   Proof.
     iIntros (HE HER HERE Hin) "#Hrinv Hl H". rewrite /ipool_shape.
-    iDestruct "H" as "[Hcnt [Hmir [[Hnp Hoff] | [Hpp | Haw]]]]".
+    iDestruct "H" as "[Hcnt [Hmir [[Hnp Hoff] | [[Hpp Htop] | [Haw Htop]]]]]".
     - iModIntro. iFrame "Hl Hnp Hcnt Hmir Hoff".
     - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk & Hdv & Hfv)".
       iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
@@ -727,7 +772,8 @@ Section IcacheEscrow.
       iSplitR "Hcnt Hmir Hoff".
       { rewrite /ipool_shape_np. iRight.
         iSplitL "Hmk"; [iExact "Hmk" |].
-        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
+        iSplitL "Hdv"; [iExact "Hdv" |].
+        iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]. }
       iFrame "Hcnt Hmir Hoff".
     - (* THE AWAIT ARM (§1.3, as A⁗ rebuilt it).  There is no [committedA]
          until the off-lock deposit runs, so the peel cannot redeem -- and
@@ -749,7 +795,8 @@ Section IcacheEscrow.
       iSplitR "Hcnt Hmir Hoff".
       { rewrite /ipool_shape_np. iRight.
         iSplitL "Hmk"; [iExact "Hmk" |].
-        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
+        iSplitL "Hdv"; [iExact "Hdv" |].
+        iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]. }
       iFrame "Hcnt Hmir Hoff".
   Qed.
 
@@ -816,11 +863,17 @@ Section IcacheEscrow.
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
        dir_links (bv_unsigned inum) dn data ∗
-       dinode_at γi inum dn ∗
+       (* THE OWNERSHIP IS THE ERA BUNDLE (durable-disk 2b-inode-3), at this
+          payload's own node.  It CONTAINS what three conjuncts used to say
+          separately -- [dinode_at], [ind_res] and [inode_blocks] -- and
+          adds the era's abstract value [top_frag], which is what a holder
+          retags at its writes ([InodeRegion.ireg_top_retag]).  A consumer
+          that wants the old shape back applies [ic_loaded_open], an
+          ordinary entailment; see [ipool_alloc]'s note for why [inode_ok]
+          stays a conjunct rather than being derived. *)
+       inode_owned_era γfs γi inum (bnode dn bm data) ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
-       ind_res γfs bm ∗
-       inode_blocks γfs bm data ∗
        (* ...AND THE CONTENTS HOLD, TIED, the twin of [ipool_alloc]'s: see
           there.  A checked-out holder therefore owns the abstract contents
           outright while it owns the bytes, which is what makes every write
@@ -1623,9 +1676,20 @@ Section IcacheEscrow.
      that re-parks a loaded slot rebuilds it.  Measured at ProofCreate's
      eight construction sites: 90-172 s per bare-[iFrame] close, free by
      name here. *)
+  (* THE CLOSE, AS IT STANDS SINCE durable-disk 2b-inode-3: the SAME
+     argument list as before plus the era's abstract value [top_frag] and
+     the three record-only facts [inode_ok] does not carry
+     ([FsStateEra.inode_rec_local] -- the type enumeration, the nlink bound
+     and a directory's 16-divisible size).  Both are the walk's own
+     evidence: the fragment is what it retagged at its writes
+     ([InodeRegion.ireg_top_retag]) and the three facts are what its record
+     delta preserved.  [inode_ok] stays a PREMISE here rather than a
+     conjunct of the payload -- every producer already had it, and it is
+     what [FsStateEra.inode_local_of_ok_rec] needs. *)
   Lemma ic_mk_loaded γfs γi cov logstart k (inum : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
+    inode_rec_local dn ->
     dir_ok icfg_nib dn data ->
     dir_dots_ix (bv_unsigned inum) dn data ->
     dir_orphan_clean dn data ->
@@ -1636,18 +1700,78 @@ Section IcacheEscrow.
     inode_addrs (ientry k) (bm_cells bm) -∗
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) -∗
     dv_ride (bv_unsigned inum) (dv_of dn data) -∗
     fv_ride (bv_unsigned inum) (fv_of dn data) -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
-    intros Hok Hdok Hddix Hdoc Hduq. iIntros "Hl Hd Hm Ha Hr Hb Hv Hw".
+    intros Hok Hrl Hdok Hddix Hdoc Hduq.
+    iIntros "Hl Hd Hm Ha Hr Hb Ht Hv Hw".
+    pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
+    pose proof (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn bm
+                  data Hok Hrl Hduq Hddix) as Hloc.
+    pose proof Hok as Hok'. destruct Hok' as (_ & _ & _ & Hty & _ & _ & _).
     rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [done |]. iSplitR; [done |].
-    iSplitL "Hl"; [iExact "Hl" |]. iSplitL "Hd"; [iExact "Hd" |].
+    iSplitL "Hl"; [iExact "Hl" |].
+    iSplitR "Hm Ha Hv Hw".
+    { iApply (inode_owned_era_bnode_of γfs γi inum dn bm data Hsh Hloc
+                with "Hd Hr Hb Ht"). }
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
+    iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
+  Qed.
+
+  (* THE OPEN, the other half of the same seam, and it is an ORDINARY
+     ENTAILMENT.  It hands back EXACTLY the conjunct list [ic_loaded] used
+     to have, in the same order, plus the two things the era bundle knows
+     and the old payload did not: the era's abstract value [top_frag]
+     (which a re-park retags, [InodeRegion.ireg_top_retag]) and
+     [FsStateEra.inode_rec_local] of the record, which a re-park owes of
+     its NEW record and gets here for its old one.  So a consumer's whole
+     cost is one line -- this lemma in place of the [rewrite /ic_loaded] it
+     used to do -- and two extra names in its destructuring pattern.  No
+     mask moves; see [ipool_alloc]'s note. *)
+  Lemma ic_loaded_open γfs γi cov logstart k (inum : mword 32)
+      (dn : dinode) (bm : blkmap) :
+    ic_loaded γfs γi cov logstart k inum dn bm -∗
+    ∃ (data : nat -> list (bv 8)),
+      ⌜inode_ok cov logstart dn bm data⌝ ∗
+      ⌜dir_ok icfg_nib dn data⌝ ∗
+      ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
+      ⌜dir_orphan_clean dn data⌝ ∗
+      ⌜dir_uniq dn data⌝ ∗
+      ⌜inode_rec_local dn⌝ ∗
+      dir_links (bv_unsigned inum) dn data ∗
+      dinode_at γi inum dn ∗
+      inode_meta (ientry k) dn ∗
+      inode_addrs (ientry k) (bm_cells bm) ∗
+      ind_res γfs bm ∗
+      inode_blocks γfs bm data ∗
+      top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) ∗
+      dv_ride (bv_unsigned inum) (dv_of dn data) ∗
+      fv_ride (bv_unsigned inum) (fv_of dn data).
+  Proof.
+    iIntros "H". rewrite /ic_loaded.
+    iDestruct "H" as (data)
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
+    pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
+    iDestruct (inode_owned_era_local with "Hn") as %Hloc.
+    iDestruct (inode_owned_era_bnode_to γfs γi inum dn bm data Hsh with "Hn")
+      as "(Hd & Hr & Hb & Ht)".
+    iExists data.
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+    iSplitR; [iPureIntro;
+              exact (inode_rec_local_of (bv_unsigned inum)
+                       (bnode dn bm data) Hloc) |].
+    iSplitL "Hl"; [iExact "Hl" |].
+    iSplitL "Hd"; [iExact "Hd" |].
+    iSplitL "Hm"; [iExact "Hm" |].
+    iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" |].
     iSplitL "Hb"; [iExact "Hb" |].
+    iSplitL "Ht"; [iExact "Ht" |].
     iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
   Qed.
 
@@ -2320,12 +2444,13 @@ Section IcacheEscrow.
         [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr"; iExact "Hp" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind &
-          Hblks & Hdv & Hfv)".
+        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hera & Hmeta &
+          Haddrs & Hdv & Hfv)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
-      { rewrite /bm_cells length_app (blkmap_wf_dir_len _ _ _ Hwf). reflexivity. }
+      { rewrite /bm_cells length_app (blkmap_wf_dir_len _ _ _ Hwf).
+        reflexivity. }
       iSplitL "Hmeta Haddrs".
       { rewrite /inode_raw. iSplitL "Hmeta"; [by iExists dn |].
         iExists (bm_cells bm). iSplitR; [iPureIntro; exact Hcelllen |].
@@ -2488,12 +2613,16 @@ Section IcacheEscrow.
        evicted and which the AWAIT arm parks untied (§9 W2) *)
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
     (∃ b, fv_ride (bv_unsigned inum) b) -∗
+    (* ...and the era's abstract value, untied, which the freer's payload
+       carried in ([FsStateEra.inode_owned_era]'s [top_frag]) *)
+    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv". rewrite /ipool_shape.
+    iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv Htop". rewrite /ipool_shape.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight. iRight. rewrite /pool_await. iExists ge, gr, gd, rg.
+    iRight. iRight. iSplitR "Htop"; [| iExact "Htop"].
+    rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" |].
     iSplitL "Htk"; [iExact "Htk" |].
     iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
@@ -2517,22 +2646,24 @@ Section IcacheEscrow.
     redeem_ticketA gr -∗
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
     (∃ b, fv_ride (bv_unsigned inum) b) -∗
+    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
          ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv Hfv".
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv Hfv Htop".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
     iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
-    iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv";
+    iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv Htop";
       [| iSplitL "Hgf2"; [iExact "Hgf2" |]].
     { iApply ic_close_empty. rewrite /ic_empty_arm.
       iExists dev, inum, (valid_word v). iFrame. }
     rewrite /ipool_shape. iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight. iRight. rewrite /pool_await. iExists ge, gr, gd, rg.
+    iRight. iRight. iSplitR "Htop"; [| iExact "Htop"].
+    rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" |].
     iSplitL "Htk"; [iExact "Htk" |].
     iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].

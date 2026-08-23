@@ -130,6 +130,17 @@ Require Import DinodeEnc.
    same holds for [FsStateDefs.byte_range] against [FsBlocks]'s; this file
    spells neither unqualified. *)
 Require Import FsStateInode.
+(* [fsTopG] / [top_frag] -- the era's abstract inode map.  A CAPACITY class,
+   so it must be IMPORTed and not merely required (durable-notes), and it is
+   imported HERE, before [IcacheRef], for the collision reason the paragraph
+   above gives: [FsState] re-exports [FsStateLink]'s [link_auth] and
+   [FsStateDefs]'s [byte_range], both of which have live twins below.
+   [fsTopG] itself is NOT taken from here: it is an [Xv6G.xv6G] member
+   (durable-disk 2b-inode-3) and arrives with the [Require Export
+   Xv6Cameras] at the end of this block, which is what puts it in every
+   importer's scope without carrying the [FsState*] stack's colliding
+   names along. *)
+Require Import FsState.
 Require Import FsBytesGamma.
 (* THE LINK LEDGER's algebra and its ambient gname (design §20.2).
    EXPORTED, not merely imported: [ireg_slot] parks [IcacheRef.link_auth],
@@ -1415,7 +1426,7 @@ Proof. rewrite /imark_key. lia. Qed.
 
 Section InodeRegion.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
-            !logG Σ}.
+            !logG Σ, !fsTopG Σ}.
   Context `{ICFG : icfg}.
 
   (* THE per-inum resource: this inum's on-disk record is [dn].  EXCLUSIVE
@@ -2593,10 +2604,61 @@ Section InodeRegion.
      which there is one. *)
   Notation ireg_bytes := fs_bytes_any (only parsing).
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE ERA'S TOP MAP: WHERE ITS AUTHORITY LIVES (durable-disk         *)
+  (*  2b-inode-3)                                                        *)
+  (* ------------------------------------------------------------------ *)
+
+  (* A CHECKED-OUT HOLDER CARRIES [FsState.top_frag] -- the era's abstract
+     value of its inode, inside [FsStateEra.inode_owned_era] -- and a
+     [ghost_map] element cannot be RETAGGED without its authority.  Every
+     write in this kernel moves the node (a record write, a data block, a
+     truncation), so a payload that could not retag would be immutable and
+     no walk could re-park at its new value.  The authority therefore needs
+     a home that a walk can reach at ANY instant.
+
+     IT IS ITS OWN INVARIANT, NOT A CONJUNCT OF [ireg_body], for two
+     reasons.  (i) A mover that has [iregN] OPEN -- every region write is
+     one -- must still be able to retag; a conjunct inside the region's own
+     body is unreachable there.  (ii) [ireg_body] is destructured at twenty
+     accessors in this file and none of them has any business seeing the
+     abstract map.  The handle rides in [ireg_inv] because that is the
+     ambient FS credential every contract in the cone already carries
+     (durable-notes: put a new ambient credential in the bundle the cone
+     already threads).
+
+     THE BODY IS UNTIED, AND SAYS SO.  Nothing here relates [I] to the
+     bytes: stage 2c moves the whole [fs_view Γ_L] body into the log's
+     parked payload, where the tie is the design's, and this invariant is
+     retired with it.  What it provides in the meantime is exactly the
+     UPDATE right the fragments need, which is sound at any [I]. *)
+  Definition ftopN : namespace := nroot .@ "ftop".
+
+  Definition ftop_body (γfs : fs_names) : iProp Σ :=
+    (∃ I : gmap Z fs_node, ghost_map_auth (fs_top γfs) 1 I)%I.
+
+  Definition ftop_inv (γfs : fs_names) : iProp Σ :=
+    inv ftopN (ftop_body γfs).
+
+  Global Instance ftop_inv_persistent γfs : Persistent (ftop_inv γfs).
+  Proof. apply _. Qed.
+
+  Global Instance ftop_body_timeless γfs : Timeless (ftop_body γfs).
+  Proof. rewrite /ftop_body. apply _. Qed.
+
+  Lemma ftop_alloc (E : coPset) (γfs : fs_names) (I : gmap Z fs_node) :
+    ghost_map_auth (fs_top γfs) 1 I ={E}=∗ ftop_inv γfs.
+  Proof.
+    iIntros "Ha".
+    iMod (inv_alloc ftopN E (ftop_body γfs) with "[Ha]") as "#Hi".
+    { iNext. rewrite /ftop_body. iExists I. iExact "Ha". }
+    iModIntro. iExact "Hi".
+  Qed.
+
   Definition ireg_inv (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
     (inv iregN (ireg_body γi γfs inodestart nib) ∗
-     ireg_bytes γfs)%I.
+     ireg_bytes γfs ∗ ftop_inv γfs)%I.
 
   Global Instance ireg_inv_persistent γi γfs inodestart nib :
     Persistent (ireg_inv γi γfs inodestart nib).
@@ -2604,11 +2666,40 @@ Section InodeRegion.
 
   Lemma ireg_inv_bytes γi γfs inodestart nib :
     ireg_inv γi γfs inodestart nib -∗ fs_bytes_any γfs.
-  Proof. iIntros "[_ $]". Qed.
+  Proof. iIntros "(_ & $ & _)". Qed.
 
-  (* [logN] and [iregN] are distinct namespaces, so a reader that has
-     [iregN] open may still open the byte view. *)
+  Lemma ireg_inv_ftop γi γfs inodestart nib :
+    ireg_inv γi γfs inodestart nib -∗ ftop_inv γfs.
+  Proof. iIntros "(_ & _ & $)". Qed.
+
+  (* THE RETAG, ALONE.  A walk that has already moved the region's record
+     proxy (iupdate did it, at the region's own AU) and only owes the
+     abstract value takes this one; it opens nothing but [ftopN]. *)
+  Lemma ireg_top_retag (E : coPset) (γfs : fs_names) (i : Z)
+      (n n' : fs_node) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE) "#Hi Hf".
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">HI". iDestruct "HI" as (I) "Ha".
+    rewrite /top_frag /fs_gamma_L /=.
+    iMod (ghost_map_update n' with "Ha Hf") as "[Ha Hf]".
+    iMod ("Hclose" with "[Ha]") as "_".
+    { iNext. rewrite /ftop_body. iExists (<[i := n']> I). iExact "Ha". }
+    iModIntro. iExact "Hf".
+  Qed.
+
+  (* [logN], [iregN] and [ftopN] are pairwise distinct namespaces, so a
+     reader that has one open may still open the others. *)
   Lemma logN_iregN_disj : (↑logN : coPset) ## ↑iregN.
+  Proof. solve_ndisj. Qed.
+
+  Lemma logN_ftopN_disj : (↑logN : coPset) ## ↑ftopN.
+  Proof. solve_ndisj. Qed.
+
+  Lemma iregN_ftopN_disj : (↑iregN : coPset) ## ↑ftopN.
   Proof. solve_ndisj. Qed.
 
 
@@ -2727,7 +2818,7 @@ Section InodeRegion.
     dinode_at γi inum dn ∗ (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl Hin Hb) "#Hinv Hdn Hhalf".
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iDestruct "Hrb" as (home) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
@@ -2792,7 +2883,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -2857,7 +2948,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -2921,7 +3012,7 @@ Section InodeRegion.
     ((inodestart + Z.of_nat bi) ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl Hbi) "#Hinv Hhalf".
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iDestruct "Hrb" as (home) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
@@ -3026,7 +3117,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3210,7 +3301,7 @@ Section InodeRegion.
     pose proof (fresh_shape_wf dn' Hfr) as Hdn'.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3480,7 +3571,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3599,7 +3690,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3660,7 +3751,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3703,7 +3794,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3903,7 +3994,7 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iDestruct "Hrb" as (home) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
@@ -4048,7 +4139,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4235,7 +4326,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4641,7 +4732,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4975,7 +5066,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iDestruct "Hrb" as (home) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
@@ -5054,7 +5145,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -5131,7 +5222,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -5192,7 +5283,7 @@ Section InodeRegion.
     (ireg_lcols z ==∗ ireg_lcols z ∗ Q) ={E}=∗ Q.
   Proof.
     iIntros (HE Hz) "#Hinv Hmove".
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     iDestruct "Hreg" as (mr) "(%Hcov & Hauth & Hlends)".

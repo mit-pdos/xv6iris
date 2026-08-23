@@ -80,11 +80,58 @@ Require Import FsStateBitmap.
 Require Import FsBytesGamma.
 Require Import FsImg.
 Require Import FsImgBridge.
+Require Import FsStateEra.     (* [bnode] / [inode_rec_local] -- the era node *)
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
 Local Open Scope Z_scope.
+
+(* ===================================================================== *)
+(*  THE ERA'S INITIAL INODE MAP IS THE IMAGE'S (durable-disk 2b-inode-3)  *)
+(* ===================================================================== *)
+
+(* ONE INUM'S NODE, AS THE IMAGE HAS IT.  [FsStateEra.bnode] of the image's
+   record, the image's block map and the image's data -- which is EXACTLY
+   the node [IcacheBoot.ipool_shape_alloc] ties this inum's [top_frag] to,
+   so boot's fragment and the pool's arm name one value by construction and
+   no equation is ever stated.
+
+   A FREE inum gets one too, and it is honest: [fs_dinode] at a free slot
+   is the image's own type-0 record, whose [di_addrs] is all zeros, so
+   [bnode] of it owns no block.  The pool's marker arm carries the fragment
+   UNTIED, so nothing reads that value until ialloc re-ties it. *)
+Definition img_node (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : fs_node :=
+  bnode (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+        (fs_data_of P (fs_dinode P sb z)).
+
+Definition img_nodes (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+  : gmap Z fs_node :=
+  list_to_map ((fun z => (z, img_node P sb z))
+                 <$> elements (region_inums nib)).
+
+Lemma img_nodes_keys (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+  ((fun z => (z, img_node P sb z)) <$> elements (region_inums nib)).*1
+  = elements (region_inums nib).
+Proof.
+  rewrite -list_fmap_compose.
+  rewrite (list_fmap_ext _ id); [apply list_fmap_id | intros; reflexivity].
+Qed.
+
+Lemma img_nodes_nodup (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+  base.NoDup (((fun z => (z, img_node P sb z))
+                 <$> elements (region_inums nib)).*1).
+Proof. rewrite img_nodes_keys. apply NoDup_elements. Qed.
+
+Lemma img_nodes_lookup (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  z ∈ region_inums nib -> img_nodes P sb nib !! z = Some (img_node P sb z).
+Proof.
+  intros Hz. rewrite /img_nodes.
+  apply elem_of_list_to_map; [apply img_nodes_nodup |].
+  apply elem_of_list_fmap. exists z. split; [reflexivity |].
+  by apply elem_of_elements.
+Qed.
 
 (* THE BLOCKS THE LIVE INODES BETWEEN THEM CLAIM.  The carve's own
    spelling, so the remainder [cov ∖ fs_live_blocks P sb A] -- which
@@ -301,6 +348,12 @@ Section FsCfgBootPool.
        sweeps (mkfs rounds the region up: at the literal image
        [ninodes = 200] while [16 * 13 = 208]) *)
     fs_region_free P sb icfg_nib = true ->
+    (* L4 AT THE REGION'S WIDTH (durable-disk 2b-inode-3): the nlink bound
+       is one of the three record-only facts [inode_ok] does not carry, and
+       [FsStateEra.inode_local_of_ok_rec] needs it.  It is
+       [FsImg.fs_region_wf]'s second half, so [fs_cfg_alloc] already has
+       it and no new image sweep is added. *)
+    fs_region_nlink P sb icfg_nib = true ->
     fs_blocks_full P ->
     FsImg.sb_ninodes sb <= 16 * Z.of_nat icfg_nib ->
     16 * Z.of_nat icfg_nib <= 2 ^ 32 ->
@@ -334,6 +387,13 @@ Section FsCfgBootPool.
        keys, from the same sweep and with the same uniformity *)
     ([∗ set] z ∈ region_inums icfg_nib,
        fv_ride z (fv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
+    (* ...AND THE ERA'S ABSTRACT VALUE, AT THE IMAGE'S OWN NODE
+       (durable-disk 2b-inode-3).  One [FsState.top_frag] per region inum,
+       allocated by [FsState.fs_boot_alloc_at] at [img_nodes]; the value is
+       uniform over the whole region exactly as the two contents holds' is,
+       and at a LIVE inum it is the very node the allocated arm ties to. *)
+    ([∗ set] z ∈ region_inums icfg_nib,
+       top_frag (fs_gamma_L γfs) z (img_node P sb z)) -∗
     (* [ireg_alloc]'s payout, verbatim: the fragment at a live inum, the
        marker at a free one *)
     ([∗ set] z ∈ region_inums icfg_nib,
@@ -347,8 +407,8 @@ Section FsCfgBootPool.
       ∗ ([∗ set] b ∈ C ∖ fs_live_blocks P sb A,
            fsblock (fs_bytes γfs) b (P b)).
   Proof.
-    intros Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC.
-    iIntros "Hcnt Hmir Hoff Hdv Hfv Hout Hdlk Hblk".
+    intros Hwf Hrf Hrnl Hfull Hnin Hnib HA Hcov HcovC.
+    iIntros "Hcnt Hmir Hoff Hdv Hfv Htop Hout Hdlk Hblk".
     (* ---- the pure preliminaries, all from the sweeps' lookup specs --- *)
     pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
     destruct (fsimg_wf_used P sb Hwf) as (u & _ & Hnd & _).
@@ -371,6 +431,16 @@ Section FsCfgBootPool.
               bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
               fs_dir_ok P sb z (fs_dinode P sb z))
       by (intros z Hz Hd; exact (fsimg_wf_dir P sb z Hwf (Hran z Hz) Hd)).
+    (* THE THREE RECORD-ONLY FACTS (durable-disk 2b-inode-3), each off the
+       image sweep that already proves it: the type enumeration is
+       [FsImg.fio_type], the nlink bound is L4 at the region's width, and a
+       directory's 16-divisible size is [FsImg.fdo_gran]. *)
+    assert (Hrl : forall z : Z, z ∈ A -> inode_rec_local (fs_dinode P sb z)).
+    { intros z Hz. split_and!.
+      - right. exact (fio_type P sb (fs_dinode P sb z) (Hok z Hz)).
+      - apply (fs_region_nlink_short P sb icfg_nib z Hrnl).
+        destruct (Hran z Hz) as [Hlo Hhi]. lia.
+      - intros Hd. exact (fdo_gran P sb z (fs_dinode P sb z) (Hdir z Hz Hd)). }
     (* the FREE arm's fact: outside [A] the record is typed 0, whether it is
        below [ninodes] (by [A]'s characterisation) or in the tail (W's
        companion [fs_region_free]) *)
@@ -442,18 +512,32 @@ Section FsCfgBootPool.
       apply elem_of_difference in Hz as [Hz1 _].
       rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
       iIntros "H". iExists _. iExact "H". }
+    (* ...and the era's abstract value, split along the same subset *)
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
+                 with "Htop") as "[HtopA HtopF]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
+               ∃ n : fs_node,
+                 top_frag (fs_gamma_L γfs)
+                          (bv_unsigned (mword_of_int z : mword 32)) n)%I
+      with "[HtopF]" as "HtopF".
+    { iApply (big_sepS_mono with "HtopF"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 _].
+      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
+      iIntros "H". iExists _. iExact "H". }
     (* ---- the allocated arm, one named application per inum ----------- *)
     iDestruct (big_sepS_sep_2 with "HoutA Hdlk") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha Hpc") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha HdvA") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha HfvA") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha HtopA") as "Ha".
     iApply (ipool_alloc γfs γi cov (sb_logstart sb)
               (region_inums icfg_nib) A HARs
-              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF").
+              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF HtopF").
     iApply (big_sepS_mono with "Ha"). intros z Hz.
+    pose proof (Hrl z Hz) as Hrlz.
     rewrite (region_inum_faithful icfg_nib z Hnib (HAR z Hz)).
     rewrite /fs_inode_blocks_set.
-    iIntros "[[[[Hreg Hdl] Hblks] Hdv] Hfv]".
+    iIntros "[[[[[Hreg Hdl] Hblks] Hdv] Hfv] Htopz]".
     iExists (fs_dinode P sb z), (img_blkmap P (fs_dinode P sb z)),
             (fs_data_of P (fs_dinode P sb z)).
     iSplitR.
@@ -461,6 +545,7 @@ Section FsCfgBootPool.
       exact (img_inode_ok P sb cov (sb_logstart sb) (fs_dinode P sb z)
                (fs_dinode_wf P sb z) Hsb eq_refl Hfull Hcov
                (Hok z Hz) (Hty z Hz) (Hinj z Hz)). }
+    iSplitR; [iPureIntro; exact Hrlz |].
     iSplitR.
     { iPureIntro.
       exact (img_dir_ok P sb z (fs_dinode P sb z) icfg_nib Hnin
@@ -483,6 +568,7 @@ Section FsCfgBootPool.
                 (fs_dinode P sb z) (Hty z Hz) with "Hreg"). }
     iSplitL "Hind"; [iExact "Hind" |].
     iSplitL "Hblks"; [iExact "Hblks" |].
+    iSplitL "Htopz"; [rewrite /img_node; iExact "Htopz" |].
     iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
@@ -931,7 +1017,7 @@ Section FsCfgBootEra.
      and are deliberately NOT members of [Xv6G.xv6G]: the whole [FsState*]
      stack is under active development, and folding it into the bundle would
      put its cone in front of the 767 files that bind [xv6G]. *)
-  Context `{!fsLinkG Σ, !fsTopG Σ}.
+  Context `{!fsLinkG Σ}.
   Context `{GEN : GenId}.
 
   (* ---- two list/set conversions the era fupd needs -------------------- *)
@@ -1341,6 +1427,20 @@ Section FsCfgBootEra.
     apply link_elem_valid_no_ents. exact (fs_boot_inodes_no_ents nib).
   Qed.
 
+  (* the era's initial top map, as a big-op over the region's inums --
+     which is the shape the pool's stocking takes (durable-disk
+     2b-inode-3) *)
+  Lemma big_sepM_img_nodes (Φ : Z -> fs_node -> iProp Σ)
+      (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+    ([∗ map] i ↦ n ∈ img_nodes P sb nib, Φ i n)
+    ⊣⊢ ([∗ set] z ∈ region_inums nib, Φ z (img_node P sb z)).
+  Proof.
+    rewrite /img_nodes.
+    rewrite (big_sepM_list_to_map Φ _ (img_nodes_nodup P sb nib)).
+    rewrite big_sepL_fmap /=.
+    rewrite big_sepS_elements //.
+  Qed.
+
   Lemma fs_cfg_alloc (γd : uart_names) (γv : disk_names)
       (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (cov : gset Z)
       (nib : nat) (E : coPset) :
@@ -1373,19 +1473,21 @@ Section FsCfgBootEra.
        [BioInitAt.bio_free_tok] carries both. *)
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (ICFG : icfg) (FSC : fscfg),
-      (* ---- durable-disk 2b-A / B3: THE ERA'S TWO FS-STATE GHOSTS ----
-         The link family and the top map, both allocated here from
-         [fs_boot_inodes nib] and handed out WHOLE: the top map's auth, one
-         fragment per inum, and the family bundle
-         ([FsStateInode.inode_link_scatter] opens each element into
-         [link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n] at
-         [FsBytesGamma.fs_gamma_L fsc_fs]).  Like the two pins below it is a
-         LEADING conjunct so that a caller with no consumer drops it in one
-         step and the ten ties + two kits stay byte-identical to
-         [fs_boot_supply].  Its consumer is 2b-inode: the inode region is
-         where these must come to rest, since nothing else outlives fsinit. *)
-      ghost_map_auth (fs_top fsc_fs) 1 (fs_boot_inodes nib) ∗
-      ([∗ map] i ↦ n ∈ fs_boot_inodes nib, i ↪[fs_top fsc_fs] n) ∗
+      (* ---- durable-disk 2b-inode-3: THE TOP MAP IS ROUTED, NOT HANDED
+         OUT.  It is allocated at the IMAGE's node map ([img_nodes]) rather
+         than at the zero map, its AUTHORITY goes into
+         [InodeRegion.ftop_inv] (which [ireg_inv] then carries, so every fs
+         contract in the cone has it), and its per-inum FRAGMENTS go into
+         the free pool -- tied inside [IcacheEscrow.ipool_alloc] at a live
+         inum, untied on the marker arm at a free one.  Nothing about the
+         top map leaves this lemma any more.
+
+         THE LINK FAMILY STILL DOES, and is still at the ZERO map: the
+         bundle deliberately excludes the link ghosts (they are the links
+         step's), and [✓ link_elem] is free there while at the image it is
+         W9 + conjunct (13) [FsImg.fs_links_eq].  Like the two pins below it
+         is a LEADING conjunct so that a caller with no consumer drops it in
+         one step. *)
       fs_links (fs_link fsc_fs) (fs_boot_inodes nib) ∗
       (* ---- N-5.1 (W5a): ROOT'S PIN, THE ONE NEW CONJUNCT ----
          The stocking spends [ROOTINO]'s mint licence while it still holds
@@ -1589,11 +1691,32 @@ Section FsCfgBootEra.
     (* ---- 4. the block layer's ghosts -------------------------------- *)
     (* B3: the two file-system-state ghosts first, so [fs_boot_ghosts] can
        put their names in [γfs] (the block layer allocates neither). *)
-    iMod (fs_boot_alloc (fs_boot_inodes icfg_nib) (fs_boot_inodes_valid icfg_nib))
+    (* durable-disk 2b-inode-3: the LINK family at the zero map (its
+       [✓ link_elem] is free there and the links step is still ahead), the
+       TOP map at the IMAGE's node map -- a plain [ghost_map] owes no
+       validity at all, which is what makes the image value affordable
+       here. *)
+    iMod (fs_boot_alloc_at (fs_boot_inodes icfg_nib)
+            (img_nodes (fs_blocks dk) sb icfg_nib)
+            (fs_boot_inodes_valid icfg_nib))
       as (γlk γtp) "(Htopa & Htopf & Hlnk)".
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
             ROOTDEV γlk γtp E Hcovin Hhomesub with "Hdisk")
       as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl)".
+    (* ---- durable-disk 2b-inode-3: THE TOP MAP IS ROUTED HERE ---------
+       Its AUTHORITY becomes [InodeRegion.ftop_inv], the invariant
+       [ireg_inv] carries from here on -- that is what makes a checked-out
+       holder able to RETAG its [top_frag] at a write, which is the whole
+       reason the fragment can ride in the payload.  Its FRAGMENTS become
+       the free pool's, one per region inum, tied at a live inum and untied
+       on the marker arm.  Neither leaves this lemma. *)
+    iEval (rewrite -Htp) in "Htopa".
+    iEval (rewrite -Htp) in "Htopf".
+    iMod (ftop_alloc E γfs (img_nodes (fs_blocks dk) sb icfg_nib)
+            with "Htopa") as "#Hftopi".
+    iEval (rewrite (big_sepM_img_nodes
+                      (fun i n => top_frag (fs_gamma_L γfs) i n)
+                      (fs_blocks dk) sb icfg_nib)) in "Htopf".
     (* ---- 5. THE PEELS ------------------------------------------------
        THE MINT ALREADY SPLIT THE LOG REGION OFF (durable-disk 1c-flip):
        [Hchl] is the log's own storage, at the parked cache halves
@@ -1625,7 +1748,7 @@ Section FsCfgBootEra.
             ltac:(intros dss Hdl Hdwf Hde;
                   exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
                            Hwf Hrw Hdl Hdwf Hde Hnib32))
-            with "Hla HcntR Hrcpt HmirR Hep Hbireg Hbinv Hboot Hrauth")
+            with "Hla HcntR Hrcpt HmirR Hep Hbireg Hbinv Hftopi Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
@@ -1724,9 +1847,10 @@ Section FsCfgBootEra.
                      ∖ log_region_set (sb_logstart sb))
                     ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
                  (fs_live_set (fs_blocks dk) sb)
-                 Hwf (fs_region_wf_free _ _ _ Hrw) Hfull Hnin Hnib32
+                 Hwf (fs_region_wf_free _ _ _ Hrw)
+                 (fs_region_wf_nlink _ _ _ Hrw) Hfull Hnin Hnib32
                  (fs_live_set_elem_of (fs_blocks dk) sb) Hcovdata HcovC
-                 with "HcntP HmirP Hoff Hdv Hfv Hout Hdlk HfsbC")
+                 with "HcntP HmirP Hoff Hdv Hfv Htopf Hout Hdlk HfsbC")
       as "[Hipool Hrem]".
     (* ---- 7b. DEBT (D): the bitmap block and the free pool ------------ *)
     (* every member of [fs_bitmap_spent] survives all four peels: it is
@@ -1829,9 +1953,7 @@ Section FsCfgBootEra.
       rewrite 6!elem_of_difference 4!elem_of_union. tauto. }
     rewrite Hset.
     (* ---- B3: the era's two fs-state ghosts, the post's first rows ---- *)
-    rewrite Hlk Htp.
-    iSplitL "Htopa"; [iExact "Htopa" |].
-    iSplitL "Htopf"; [iExact "Htopf" |].
+    rewrite Hlk.
     iSplitL "Hlnk"; [iExact "Hlnk" |].
     (* ---- N-5.1 (W5a): root's pin, the post's first conjunct ---- *)
     iSplitL "Hpinr"; [iExact "Hpinr" |].

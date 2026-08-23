@@ -34,13 +34,21 @@ Require Import BioDefs.
 Require Import BitmapEnc.
 Require Import DinodeEnc.
 Require Import FsImg.
+(* [fsTopG] -- an [Xv6G.xv6G] MEMBER since durable-disk 2b-inode-3 (see the
+   note at [Xv6Cameras.fsTopG]).  IMPORTED, not exported, and imported
+   BEFORE the [FsState*] exports below: [Xv6Cameras] declares the icache
+   ledger's [linkUR], which is a different camera from [FsStateLink]'s of
+   the same name, and the LAST import wins (durable-notes, "AND WHERE THAT
+   IMPORT COLLIDES, PUT IT EARLY").  Nothing above this file needs the class
+   from here -- every one of them binds the bundle instead. *)
+Require Import Xv6Cameras.
 Require Export FsStateInode.
 Require Export FsStateBitmap.
 
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
-(*  1.  The abstract state, and the top map's capacity class           *)
+(*  1.  The abstract state                                             *)
 (* ------------------------------------------------------------------ *)
 
 Record fs_state_rec := MkFsS {
@@ -49,15 +57,6 @@ Record fs_state_rec := MkFsS {
   fss_inodes : gmap Z fs_node;        (* the inodes, by inum              *)
   fss_used   : gset Z;                (* the bitmap's SET bits (in use)   *)
 }.
-
-Class fsTopG (Σ : gFunctors) := FsTopG {
-  fs_top_inG :: ghost_mapG Σ Z fs_node;
-}.
-
-Definition fsTopΣ : gFunctors := #[ ghost_mapΣ Z fs_node ].
-
-Global Instance subG_fsTopΣ Σ : subG fsTopΣ Σ -> fsTopG Σ.
-Proof. solve_inG. Qed.
 
 Section FsState.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
@@ -267,18 +266,33 @@ Section FsState.
      [FsStateInode.inode_link_scatter] opens into
      [link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n] at any [Γ] whose [γlink] is
      [gl]).  This is what [FsBoot.fs_boot_ghosts] runs. *)
+  (* THE TWO MAPS ARE INDEPENDENT (durable-disk 2b-inode-3), and the general
+     form is the one boot uses.  The TOP map is a plain [ghost_map] and owes
+     NO validity at all, so it may be allocated at the IMAGE's nodes; the
+     LINK family's [✓ link_elem] is a claim about tokens-<=-nlink over the
+     whole family, so while the link step is still ahead it is allocated at
+     the zero map, where the obligation is free ([link_elem_valid_no_ents]).
+     [fs_boot_alloc] is this at [IL = IT]. *)
+  Lemma fs_boot_alloc_at (IL IT : gmap Z fs_node) :
+    ✓ link_elem IL ->
+    ⊢ |==> ∃ gl gt : gname,
+        ghost_map_auth gt 1 IT
+        ∗ ([∗ map] i ↦ n ∈ IT, i ↪[gt] n)
+        ∗ fs_links gl IL.
+  Proof.
+    intros Hv.
+    iMod (fs_links_alloc IL Hv) as (gl) "Hl".
+    iMod (ghost_map_alloc IT) as (gt) "[Ha Hf]".
+    iModIntro. iExists gl, gt. iFrame.
+  Qed.
+
   Lemma fs_boot_alloc (I : gmap Z fs_node) :
     ✓ link_elem I ->
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 I
         ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
         ∗ fs_links gl I.
-  Proof.
-    intros Hv.
-    iMod (fs_links_alloc I Hv) as (gl) "Hl".
-    iMod (ghost_map_alloc I) as (gt) "[Ha Hf]".
-    iModIntro. iExists gl, gt. iFrame.
-  Qed.
+  Proof. exact (fs_boot_alloc_at I I). Qed.
 
   (* The two directions of the factoring, AS WANDS.  A bare [rewrite] of an
      [⊣⊢] inside the proofmode rewrites the CONTEXT and the CONCLUSION

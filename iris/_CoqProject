@@ -617,6 +617,7 @@ BioInitAt.v
 FsBlocks.v
 BlockWords.v
 DinodeEnc.v
+FsNode.v
 DirentEnc.v
 ElfEnc.v
 PStringBytes.v

@@ -40,6 +40,7 @@ Require Import DirView.
 Require Import InodeDefs.
 Require Import FsTree.
 Require Import FsImg.
+Require Export FsNode.        (* [fs_node] -- the record; see its header *)
 Require Export FsStateLink.
 
 Local Open Scope Z_scope.
@@ -48,14 +49,10 @@ Local Open Scope Z_scope.
 (*  1.  The node, and its readings                                     *)
 (* ------------------------------------------------------------------ *)
 
-Record fs_node := MkNode {
-  fn_rec : dinode;                    (* the 64-byte on-disk record        *)
-  fn_ent : list (bv 32);              (* the indirect block's entry array  *)
-  fn_blk : gmap nat (list (bv 8));    (* slot |-> block contents           *)
-}.
-
-Global Instance fs_node_inhabited : Inhabited fs_node :=
-  populate (MkNode inhabitant [] ∅).
+(* [fs_node] and its [Inhabited] instance are FsNode.v's, re-exported above:
+   the top map's capacity class is an [Xv6G.xv6G] member since durable-disk
+   2b-inode-3, so the TYPE its camera is over had to move below
+   [Xv6Cameras.v].  Everything else about the node is here. *)
 
 Definition fn_type (n : fs_node) : Z := bv_unsigned (di_type (fn_rec n)).
 Definition fn_size (n : fs_node) : Z := bv_unsigned (di_size (fn_rec n)).

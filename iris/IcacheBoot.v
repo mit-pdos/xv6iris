@@ -104,6 +104,12 @@ Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+(* durable-disk 2b-inode-3: the pool's allocated arm is the era bundle.
+   [FsState] for [top_frag], [FsBytesGamma] for [fs_gamma_L], [FsStateEra]
+   for [bnode] / [inode_rec_local] / [inode_owned_era_bnode_of]. *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import FsTree.
@@ -940,6 +946,12 @@ Section IcacheBootRegion.
     ([∗ list] bi ∈ seq 0 nib,
        fsblock (fs_bytes γfs) (inodestart + Z.of_nat bi) (bss bi)) -∗
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    (* THE ERA'S TOP-MAP AUTHORITY, AS ITS INVARIANT (durable-disk
+       2b-inode-3).  [ireg_inv] carries it, so this lemma has to be handed
+       one; the caller ([FsCfgBoot.fs_cfg_alloc]) allocates it with
+       [InodeRegion.ftop_alloc] off the map [FsState.fs_boot_alloc] just
+       minted.  Persistent, so it rides through untouched. *)
+    ftop_inv γfs -∗
     (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
        (fs-fragments.md §7.12) -- carried, never consumed here *)
     ireg_boot -∗
@@ -963,7 +975,7 @@ Section IcacheBootRegion.
     intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0).
-    iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv Hboot Hrauth".
+    iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv #Hftopi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -1141,7 +1153,7 @@ Section IcacheBootRegion.
     iMod (inv_alloc iregN E (ireg_body γi γfs inodestart nib) with "[Hbody]")
       as "#Hinv"; [by iNext |].
     iAssert (ireg_inv γi γfs inodestart nib) as "#Hrinv".
-    { rewrite /ireg_inv. iFrame "Hinv". rewrite /fs_bytes_any.
+    { rewrite /ireg_inv. iFrame "Hinv Hftopi". rewrite /fs_bytes_any.
       iExists home. iFrame "Hbinv". }
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
@@ -1202,15 +1214,23 @@ Section IcacheBootPool.
        any and the first fill sets it. *)
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
     (∃ b, fv_ride (bv_unsigned inum) b) -∗
+    (* ...AND THE ERA'S ABSTRACT VALUE, UNTIED, for the contents holds'
+       reason verbatim (durable-disk 2b-inode-3): every inum in the region
+       owns exactly one [FsState.top_frag], and a FREE inum's rides on the
+       marker arm so that ialloc has one to tie when it claims the slot.
+       Boot's value is the image's own node -- see
+       [FsCfgBoot.img_nodes]. *)
+    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
     imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir Hoff Hdv Hfv Hmk".
+    iIntros "Hcnt Hmir Hoff Hdv Hfv Htop Hmk".
     rewrite /ipool_shape /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iLeft. iSplitR "Hoff"; [| iExact "Hoff"].
     iRight. iSplitL "Hmk"; [iExact "Hmk" |].
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+    iSplitL "Hdv"; [iExact "Hdv" |].
+    iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"].
   Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
@@ -1238,6 +1258,13 @@ Section IcacheBootPool.
       (logstart : Z) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
+    (* the three record-only facts [inode_ok] does not carry
+       (durable-disk 2b-inode-3): the type enumeration, the nlink bound and
+       a directory's 16-divisible size.  At the image they are
+       [FsImg.fio_type], [FsImg.fs_region_nlink_short] and [FsImg.fdo_gran];
+       [FsStateEra.inode_local_of_ok_rec] takes them and derives the whole
+       of [FsStateInode.inode_local]. *)
+    inode_rec_local dn ->
     dir_ok icfg_nib dn data ->
     dir_dots_ix (bv_unsigned inum) dn data ->
     dir_orphan_clean dn data ->
@@ -1247,6 +1274,11 @@ Section IcacheBootPool.
     ifreeze_off (bv_unsigned inum) -∗
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
+    (* ...AND THE ERA'S ABSTRACT VALUE, TIED to this arm's own node
+       (durable-disk 2b-inode-3).  The four resources above are what
+       [FsStateEra.inode_owned_era] is assembled OUT of, and this is its
+       fourth piece. *)
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) -∗
     (* ...and the CONTENTS HOLD, TIED to the image's own record and bytes
        (namei-pinned-lookup.md §9 W2/W3): the boot client sets the value with
        a free [dv_set] before it gets here, so nothing in this file has to
@@ -1256,12 +1288,16 @@ Section IcacheBootPool.
     fv_ride (bv_unsigned inum) (fv_of dn data) -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok Hdok Hddix Hdoc Hduq)
-            "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Hdv Hfv".
+    iIntros (Hok Hrl Hdok Hddix Hdoc Hduq)
+            "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop Hdv Hfv".
+    pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
+    pose proof (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn bm
+                  data Hok Hrl Hduq Hddix) as Hloc.
     rewrite /ipool_shape /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iLeft. iSplitR "Hoff"; [| iExact "Hoff"]. iLeft.
+    rewrite /ipool_alloc.
     iExists dn, bm, data.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
@@ -1269,7 +1305,10 @@ Section IcacheBootPool.
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |].
-    iFrame "Hdn Hind Hblk Hdv Hfv".
+    iSplitR "Hdv Hfv".
+    { iApply (inode_owned_era_bnode_of γfs γi inum dn bm data Hsh Hloc
+                with "Hdn Hind Hblk Htop"). }
+    iFrame "Hdv Hfv".
   Qed.
 
   (* the pool is a [∗ set], so it splits and rejoins along any subset *)
@@ -1301,6 +1340,7 @@ Section IcacheBootPool.
     ([∗ set] z ∈ A,
        ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
          ⌜inode_ok cov logstart dn bm data⌝ ∗
+         ⌜inode_rec_local dn⌝ ∗
          ⌜dir_ok icfg_nib dn data⌝ ∗
          ⌜dir_dots_ix (bv_unsigned (mword_of_int z : mword 32)) dn data⌝ ∗
          ⌜dir_orphan_clean dn data⌝ ∗
@@ -1308,6 +1348,11 @@ Section IcacheBootPool.
          dir_links (bv_unsigned (mword_of_int z : mword 32)) dn data ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data ∗
+         (* ...and the era's abstract value, TIED to this bundle's own node
+            for the contents holds' reason verbatim (durable-disk
+            2b-inode-3) *)
+         top_frag (fs_gamma_L γfs) (bv_unsigned (mword_of_int z : mword 32))
+                  (bnode dn bm data) ∗
          (* the CONTENTS HOLD rides INSIDE the allocated bundle, because the
             value it is tied to is this bundle's own [dn]/[data] and nothing
             outside the existential can name them (§9 W2). *)
@@ -1321,9 +1366,13 @@ Section IcacheBootPool.
        ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e) -∗
     ([∗ set] z ∈ R ∖ A,
        ∃ b, fv_ride (bv_unsigned (mword_of_int z : mword 32)) b) -∗
+    ([∗ set] z ∈ R ∖ A,
+       ∃ n : fs_node,
+         top_frag (fs_gamma_L γfs)
+                  (bv_unsigned (mword_of_int z : mword 32)) n) -∗
     ipool γfs γi cov logstart R.
   Proof.
-    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hdvf Hfvf".
+    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hdvf Hfvf Htopf".
     (* the ledger pair splits along the same subset the pool does *)
     rewrite (union_difference_L A R Hsub) !big_sepS_union; [| set_solver ..].
     iDestruct "Hcnts" as "[HcA HcF]". iDestruct "Hoffs" as "[HoA HoF]".
@@ -1336,19 +1385,20 @@ Section IcacheBootPool.
       iDestruct (big_sepS_sep_2 with "Hlg0 HoA") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Ha") as "Ha".
       iApply (big_sepS_mono with "Ha"). intros z _.
-      iIntros "[[[Hcnt Hmir] Hoff] (%dn & %bm & %data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq
-                & Hdlk & Hdn & Hind & Hblk & Hdv & Hfv)]".
-      iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok Hddix Hdoc Hduq
-                with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Hdv Hfv").
+      iIntros "[[[Hcnt Hmir] Hoff] (%dn & %bm & %data & %Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq
+                & Hdlk & Hdn & Hind & Hblk & Htop & Hdv & Hfv)]".
+      iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hrl Hdok Hddix Hdoc Hduq
+                with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop Hdv Hfv").
     - rewrite /ipool.
       iDestruct (big_sepS_sep_2 with "HcF HmF") as "Hlg0".
       iDestruct (big_sepS_sep_2 with "Hlg0 HoF") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hdvf") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hfvf") as "Hlg".
+      iDestruct (big_sepS_sep_2 with "Hlg Htopf") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hf") as "Hf".
       iApply (big_sepS_mono with "Hf"). intros z _.
-      iIntros "[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Hmk]".
-      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hdv Hfv Hmk").
+      iIntros "[[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Htop] Hmk]".
+      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hdv Hfv Htop Hmk").
   Qed.
 
   (* ...and the case that needs no image theory at all: an image whose inodes
@@ -1372,11 +1422,15 @@ Section IcacheBootPool.
     ([∗ set] z ∈ region_inums nib, ifreeze_off z) -∗
     ([∗ set] z ∈ region_inums nib, dv_ride z ∅) -∗
     ([∗ set] z ∈ region_inums nib, fv_ride z []) -∗
+    (* ...and the era's abstract value at every inum, untied (durable-disk
+       2b-inode-3) *)
+    ([∗ set] z ∈ region_inums nib,
+       ∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool γfs γi cov logstart (region_inums nib).
   Proof.
-    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs H". rewrite /ipool.
+    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs Htops H". rewrite /ipool.
     iDestruct (region_key_shift nib (fun z => icnt_half z 0%nat) Hnib
                 with "Hcnts") as "Hcnts".
     iDestruct (region_key_shift nib (fun z => frzm_h z false) Hnib
@@ -1387,14 +1441,18 @@ Section IcacheBootPool.
                 with "Hdvs") as "Hdvs".
     iDestruct (region_key_shift nib (fun z => fv_ride z []) Hnib
                 with "Hfvs") as "Hfvs".
+    iDestruct (region_key_shift nib
+                 (fun z => ∃ n : fs_node, top_frag (fs_gamma_L γfs) z n)%I Hnib
+                with "Htops") as "Htops".
     iDestruct (big_sepS_sep_2 with "Hcnts Hmirs") as "Hlg0".
     iDestruct (big_sepS_sep_2 with "Hlg0 Hoffs") as "Hlg1".
     iDestruct (big_sepS_sep_2 with "Hlg1 Hdvs") as "Hlg2".
-    iDestruct (big_sepS_sep_2 with "Hlg2 Hfvs") as "Hlg".
+    iDestruct (big_sepS_sep_2 with "Hlg2 Hfvs") as "Hlg3".
+    iDestruct (big_sepS_sep_2 with "Hlg3 Htops") as "Hlg".
     iDestruct (big_sepS_sep_2 with "Hlg H") as "H".
     iApply (big_sepS_mono with "H"). intros z Hz.
-    iIntros "[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Hout]".
-    iApply (ipool_shape_free with "Hcnt Hmir Hoff [Hdv] [Hfv]");
+    iIntros "[[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Htop] Hout]".
+    iApply (ipool_shape_free with "Hcnt Hmir Hoff [Hdv] [Hfv] Htop");
       [by iExists ∅ | by iExists [] |].
     iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
               (image_dinode dss z) (H0 z Hz) with "Hout").
