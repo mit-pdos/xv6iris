@@ -61,50 +61,113 @@ Plus the **cache overlay invariant** tying L to the machine:
 
 ## The ghost state
 
-- **`γL : ghost_map Z (list (bv 8))`** — the logged view L. THE AUTH LIVES
-  IN `log_res` (the log spinlock's resource, cmt=false arm). Each covered
-  block's elem is split ½/½:
-  - `fsblock bno bs := bno ↪[γL]{#½} bs` — the CLIENT half. Held by the
-    layer above (inode/bitmap owners; for the log area, the header block and
-    the sb: by the log layer itself, inside `log_res`). This is the
-    FS-facing points-to for logical block content.
+The block layer carries TWO content maps, and which one a resource is a
+share of is the whole distinction between "what the buffer cache believes"
+and "what the file system owns".
+
+- **`fs_cache : ghost_map Z (list (bv 8))`** — the bio-side block CACHE map
+  `C`. THE AUTH LIVES IN `log_state` (the log spinlock's resource), which is
+  the freeze: during commit the committer owns the auth outright, so `C`
+  cannot move and "log slot i contains `C(W[i])`" survives from write_log to
+  install_trans with no extra ghost. Each covered block's element is split
+  ½/½:
   - the MACHINERY half rides inside the bio layer (pool → escrow → handle),
-    as the payload `Ψ` below. Two ½s agree with no auth in sight — that is
-    bread's postcondition. Updating needs auth + both halves — that is what
-    makes `log_write` (under log.lock) and the committer (who checks the
-    auth out) THE ONLY writers of L. A client holding both halves still
-    cannot move L: no auth. This freeze-by-auth is load-bearing: during
-    commit the committer owns the auth outright, so L is frozen and
-    "log slot i contains L(W[i])" survives from write_log to install_trans
-    with no extra ghost.
+    as the payloads `fs_mclean`/`fs_mdirty` below;
+  - the PARKED half is `fs_chalf γ b bs := b ↪[fs_cache γ]{#½} bs`. For the
+    log's own storage (the header block and the LOGBLOCKS slots) it sits in
+    `log_state`; for a HOME block it belongs inside the byte view's
+    invariant (below).
+  Two halves agree with no auth in sight; UPDATING needs the auth plus both
+  halves, so `log_write` (under log.lock) and the committer are the only
+  writers of `C`.
+
+- **The logged view `L`, keyed by BYTE ADDRESS** — `ghost_map Z (bv 8)`
+  (`FsBlocks.v`, `byte_range` / `fsblock`). This is the FS-facing view
+  (`fs-state.md` §1's `Φ_L`), and its elements are FULL, i.e. EXCLUSIVE:
+
+      byte_range gL b off bs := [∗ list] k ↦ v ∈ bs, (b*BSZ + off + k) ↪[gL] v
+      fsblock    gL b bs     := ⌜length bs = BSIZE⌝ ∗ byte_range gL b 0 bs
+
+  Exclusivity is what lets the layer above own a SUB-BLOCK object (an inode
+  record, a directory entry) and what makes `free_bitmap`'s "a block nobody
+  else can own" argument run. It is also why bio may hold no share of this
+  map at all — hence the cache map above.
+
+  **Typing:** the byte map is a `ghost_map Z (bv 8)`, and this tree has
+  exactly ONE source of that instance, `DiskImg.diskImgG` via
+  `RiscvPtsto.riscvF_diskGS` (DiskImg.v's header says why). The logged view
+  rides that class at its own gname; a second `ghost_mapG Σ Z (bv 8)` field
+  is a second Σ slot and breaks the disk image's own auth/fragment pairing.
+
+- **The tie, in one invariant** — `fs_bytes_inv gL gc home`, at namespace
+  `logN`, body
+
+      ∃ L C, ghost_map_auth gL 1 L
+             ∗ ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#½} bs)
+             ∗ ⌜dom C = home⌝ ∗ ⌜every C entry is BSIZE long⌝
+             ∗ ⌜bytes_tie L C⌝ ∗ ⌜bytes_dom L home⌝
+
+  `bytes_tie` says each cache entry is read off `L` at the block's byte
+  range (`map_seqZ (b*BSZ) bs ⊆ L`); `bytes_dom` says `L` resides EXACTLY
+  the byte range of `home` — which is the `dom L ⊇ fs_home_set` fact the
+  commit's row (b) needs and that nothing else states.
+
+  The invariant holds the byte auth and the home blocks' PARKED cache
+  halves. That placement is deliberate: the cache auth stays in `log_state`
+  outright, so the freeze and every proof riding it (write_head,
+  install_trans, end_op's write_log) is untouched by the re-keying, and
+  the only thing that has to open `logN` is a resource that crosses the two
+  maps. The body is TIMELESS, and has to be: `log_write` opens it inside the
+  same ghost step that fires the client's atomic update, with no program
+  step left to absorb a `▷`.
+
+  The two crossings, both in `FsBlocks.v`:
+  - `fs_bytes_agree` — a bread client's `fsblock` against the handle's
+    payload half gives `bsm = bs`. This REPLACES the old auth-free ½/½
+    agreement, and it is a fupd at any `E ⊇ ↑logN`, so every client that
+    used to conclude by entailment now opens `logN`. The row reaches
+    `log_write` as a conjunct of `log_ctx` (already threaded) and the
+    bitmap's clients as a conjunct of `bitmap_inv`; `SpecLogWrite`'s
+    atomic update keeps its `|={⊤,Efs}=>` shape and gains only the side
+    condition `↑logN ⊆ Efs`, because `log_write` opens `logN` INSIDE the
+    opened AU rather than around it.
+  - `fsblock_update` — log_write's ghost step: invariant + cache auth +
+    the writer's `fsblock` + the handle's cache half, out come the learned
+    `⌜bsm = bs ∧ C !! b = Some bs⌝` and both maps moved. The byte-granular
+    engine under it is `byte_range_update` (`∀ off bs bs'`), stated at
+    byte-range granularity so stage 2's sub-block owners use it without the
+    log moving again.
+  - `fs_bytes_alloc` is the mint: the home blocks' parked cache halves go
+    in, the byte map is allocated at their explosion and the invariant with
+    it, and one `fsblock` per home block comes out.
+
 - **`γown : ghost_map Z unit`** — the EXCLUSIVE per-block ownership token,
-  `blk_own γ b := b ↪[fs_own γ] tt` (`FsBlocks.v`). `fsblock` cannot play
-  this role: it is a HALF, so two owners each holding a half of one key is
-  perfectly consistent (machine-checked — the two halves `iCombine` into a
-  valid full element, no contradiction). A FULL-fraction element is
-  incompatible with itself, which gives `blk_own_excl` and hence
+  `blk_own γ b := b ↪[fs_own γ] tt` (`FsBlocks.v`). A FULL-fraction element
+  is incompatible with itself, which gives `blk_own_excl` and hence
   **`blk_own_ne : blk_own γ b1 -∗ blk_own γ b2 -∗ ⌜b1 ≠ b2⌝`** — the fact
   the inode layer's block-map injectivity (`blkmap_wf`, `fs-inode.md`)
-  rests on. **No auth exists yet, and none is needed**: exclusivity of the
+  rests on. **No auth exists, and none is needed**: exclusivity of the
   elements is an auth-free property. The authority over this map belongs
-  to the bitmap/free-block invariant (`balloc`, still assumed), which is
-  where "block `b`'s token is in the free pool" will be stated;
-  `fs_alloc` therefore drops the auth it allocates and mints one token per
-  covered block into the per-block bundle, and `fs_boot_bundle` hands the
-  whole `[∗ set] b ∈ cov, blk_own γfs b` to the boot client. Note the
-  consequence of having no auth: a dropped token is dropped forever —
-  nothing can re-mint it.
+  to the bitmap/free-block invariant, which is where "block `b`'s token is
+  in the free pool" is stated; `fs_alloc` therefore drops the auth it
+  allocates and mints one token per covered block into the per-block
+  bundle, and `fs_boot_bundle` hands the whole
+  `[∗ set] b ∈ cov, blk_own γfs b` to the boot client. Consequence of
+  having no auth: a dropped token is dropped forever. (`blk_own` is
+  retired when `free_bitmap Γ` replaces the pool; `fs-state.md` §2.)
+
 - **`γdirty : ghost_map Z bool`** — per covered block, is it in the current
   pinned write set (logged-uncommitted-or-uninstalled)? Auth + one ½ in
-  `log_res` (the ½ recording W-membership); the other ½ rides with the
-  machinery L-half. Flipped false→true by log_write (auth + handle half +
-  log_res half all present under log.lock), true→false by install_trans at
-  bunpin time.
+  `log_state` (the ½ recording W-membership); the other ½ rides with the
+  machinery cache half. Flipped false→true by log_write (auth + handle half
+  + log_state half all present under log.lock), true→false by install_trans
+  at bunpin time.
+
 - **The bio payloads** (bio stays FS-agnostic; these are the log layer's
   instantiation of bio's two opaque parameters):
 
-      Ψc bno bs := bno ↪[γL]{#½} bs ∗ bno ↪[γdirty]{#½} false   (* clean *)
-      Ψd bno bs := bno ↪[γL]{#½} bs ∗ bno ↪[γdirty]{#½} true    (* dirty *)
+      Ψc bno bs := bno ↪[fs_cache]{#½} bs ∗ bno ↪[fs_dirty]{#½} false
+      Ψd bno bs := bno ↪[fs_cache]{#½} bs ∗ bno ↪[fs_dirty]{#½} true
 
   **The payloads must be TIMELESS, and `bio_view` demands the proofs as
   record fields** (`bv_clean_tl`/`bv_dirty_tl`): they ride the escrow,
@@ -112,9 +175,7 @@ Plus the **cache overlay invariant** tying L to the machine:
   left to absorb a `▷` — the same constraint that shaped `disk_inv`
   (completed/crash.md M5b). An arbitrary-iProp payload breaks every
   opener, and on the checkout path the withdrawn bundle IS the payload,
-  so no opener-local workaround exists. No real client is constrained:
-  "bs is the logical content" is ghost state (the log instance is two
-  ghost_map halves).
+  so no opener-local workaround exists.
 
 - **Pin witnesses**: no new ghost — the existing Arc `bref` from BioInv. The
   dirty escrow arm HOLDS the bref that log_write's bpin minted; the refcnt
@@ -125,6 +186,12 @@ Plus the **cache overlay invariant** tying L to the machine:
   active operation holding u unused units). Invariant in log_res:
   `lh_n + total_outstanding_units <= LOGBLOCKS` and
   `#active_ops = outstanding-cell`.
+
+**WHERE THE FLIP STANDS.** The byte view, its invariant and the three
+crossings are proven in `FsBlocks.v`; the consumers above the log still hold
+the cache's parked half (`fs_chalf`) rather than `fsblock`. What that flip
+costs, and the two shapes it forces (`log_write`'s AU mask, the recovering
+install's home-block halves), is `projects/durable-disk.md` item 1c.
 
 ## The bio rework (Ψ-parametric; bio never reads Ψ)
 

@@ -28,7 +28,7 @@
    the block's old logical content [bsl] -- not [bio_locked], which is
    precisely why it cannot brelse the buffer yet.  log_write moves the
    logged view L(bno) from [bsl] to [bs] (the log lock's authority plus the
-   caller's [fsblock] half plus the handle's payload half), so the handle
+   caller's [fs_chalf] half plus the handle's payload half), so the handle
    comes back RE-INDEXED and DIRTY: [bio_locked ... bs bsd true], which is
    what brelse will accept.
 
@@ -146,7 +146,7 @@ Definition wp_log_write_gen_body
      ABSORBS, lh.n does not grow, and THE UNIT COMES BACK. *)
   log_opS γ (S u) Sb -∗
   (* the caller's own view of the block, at its OLD content *)
-  fsblock γfs (uint bno) bsl -∗
+  fs_chalf γfs (uint bno) bsl -∗
   (* the checked-out buffer.  [bio_held], NOT [bio_locked]: the caller has
      typically edited the bytes, so bs <> bsl and the payload is still
      indexed at bsl. *)
@@ -162,7 +162,7 @@ Definition wp_log_write_gen_body
        is also handed straight back *)
     log_opS γ (if cr then S u else u) (Sb ∪ {[uint bno]}) -∗
     (* L(bno) is now the bytes the caller wrote *)
-    fsblock γfs (uint bno) bs -∗
+    fs_chalf γfs (uint bno) bs -∗
     (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
@@ -171,7 +171,7 @@ Definition wp_log_write_gen_body
   WP (Loop : expr riscv_lang).
 
 (* THE ATOMIC-UPDATE FORM (claude-notes/design/fs-icache.md, §12): the
-   caller's [fsblock] half arrives through a fupd fired at log_write's own
+   caller's [fs_chalf] half arrives through a fupd fired at log_write's own
    ghost step instead of sitting in its hands for the whole call.
 
    WHY THIS EXISTS.  A dinode block's client half lives in the inode
@@ -180,13 +180,13 @@ Definition wp_log_write_gen_body
    per-block exclusive resource, so a §11.4-style checkout window has
    nothing to deposit and is unstatable.  The only sound moment for the
    half to leave the region is the single ghost step where the logged
-   view actually moves -- ProofLogWrite's [fsblock_update], a pure ghost
+   view actually moves -- ProofLogWrite's [fs_chalf_update], a pure ghost
    moment between two instruction dispatches at mask ⊤.  This premise
    opens the caller's invariant exactly there:
 
    - the fupd surrenders the half at WHATEVER content the invariant
      parked ([bsl'], existential);
-   - [fsblock_update]'s own agreement against the handle's payload half
+   - [fs_chalf_update]'s own agreement against the handle's payload half
      is what pins [bsl' = bsl] -- the caller never has to know the
      invariant's content in advance;
    - the closing fupd takes the half back at the WRITTEN bytes and pays
@@ -194,7 +194,7 @@ Definition wp_log_write_gen_body
      [dinode_at], via InodeRegion.ireg_write_au).
 
    A caller that HOLDS the half is the degenerate instance: [Efs := ⊤],
-   [Φfsb := fsblock γfs (uint bno) bs], and the fupd is two iModIntros --
+   [Φfsb := fs_chalf γfs (uint bno) bs], and the fupd is two iModIntros --
    that is [wp_log_write_gen] below, derived, so no existing caller
    moves. *)
     (* THE WRITER'S OBJECT DECLARATION (durable-disk flip-C1).  What this
@@ -283,9 +283,9 @@ Definition wp_log_write_au_body
      receipt ordered against an anchor the caller can name), and this is
      the WRITER's. *)
   (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
-     fsblock γfs (uint bno) bsl' ∗ log_epoch_lb γ v ∗
+     fs_chalf γfs (uint bno) bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 (uint bno) -∗ ⌜(v <= e0)%nat⌝ -∗
-      fsblock γfs (uint bno) bs ={Efs, ⊤}=∗ Φfsb)) -∗
+      fs_chalf γfs (uint bno) bs ={Efs, ⊤}=∗ Φfsb)) -∗
   (* the checked-out buffer, payload still indexed at the old content *)
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -321,7 +321,7 @@ Definition wp_log_write_au_body
 
 (* THE DEGENERATE ANCHOR, AS AN ADAPTER (fs-log.md §G.17, blocker 4).
    Every AU supplier that owes NO receipt -- ialloc's [ireg_claim_au],
-   iupdate's two ordinary region steps, and the held-fsblock form below --
+   iupdate's two ordinary region steps, and the held-fs_chalf form below --
    states its fupd without an anchor and without the two extra wand inputs.
    This is the whole conversion: park the bound at ZERO, where
    [LogInv.log_epoch_lb_0] mints it for free, and drop both inputs on the
@@ -331,13 +331,13 @@ Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
     (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat) :
   (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
-     fsblock γfs bno bsl' ∗
-     (⌜bsl' = bsl⌝ -∗ fsblock γfs bno bs ={Efs, ⊤}=∗ Φfsb))
+     fs_chalf γfs bno bsl' ∗
+     (⌜bsl' = bsl⌝ -∗ fs_chalf γfs bno bs ={Efs, ⊤}=∗ Φfsb))
   -∗
   (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
-     fsblock γfs bno bsl' ∗ log_epoch_lb γ v ∗
+     fs_chalf γfs bno bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
-      fsblock γfs bno bs ={Efs, ⊤}=∗ Φfsb)).
+      fs_chalf γfs bno bs ={Efs, ⊤}=∗ Φfsb)).
 Proof.
   iIntros "Hau".
   iMod (log_epoch_lb_0 γ) as "#Hlb0".
@@ -406,7 +406,7 @@ Definition wp_log_write_gene_body
   (* THE RESERVATION, WITH THE BIRTH EPOCH NAMED *)
   log_opSe γ (S u) Sb e0 -∗
   (* the caller's own view of the block, at its OLD content *)
-  fsblock γfs (uint bno) bsl -∗
+  fs_chalf γfs (uint bno) bsl -∗
   (* the checked-out buffer, payload still indexed at the old content *)
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -420,7 +420,7 @@ Definition wp_log_write_gene_body
     log_opSe γ (if cr then S u else u) (Sb ∪ {[uint bno]}) e0 -∗
     logged_at γ e0 (uint bno) -∗
     (* L(bno) is now the bytes the caller wrote *)
-    fsblock γfs (uint bno) bs -∗
+    fs_chalf γfs (uint bno) bs -∗
     (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY *)
@@ -467,7 +467,7 @@ Definition wp_log_write_sconf_body
   (* one unit of this operation's reservation, spent unconditionally *)
   log_op γ (S u) -∗
   (* the caller's own view of the block, at its OLD content *)
-  fsblock γfs (uint bno) bsl -∗
+  fs_chalf γfs (uint bno) bsl -∗
   (* the checked-out buffer.  [bio_held], NOT [bio_locked]: the caller has
      typically edited the bytes, so bs <> bsl and the payload is still
      indexed at bsl. *)
@@ -481,7 +481,7 @@ Definition wp_log_write_sconf_body
     (* the unit is gone *)
     log_op γ u -∗
     (* L(bno) is now the bytes the caller wrote *)
-    fsblock γfs (uint bno) bs -∗
+    fs_chalf γfs (uint bno) bs -∗
     (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
@@ -491,7 +491,7 @@ Definition wp_log_write_sconf_body
 
 Module Type LOG_WRITE.
   (* THE ATOMIC-UPDATE FORM -- the one the whole-function proof proves.
-     [wp_log_write_gen] is its degenerate instance at a held fsblock, and
+     [wp_log_write_gen] is its degenerate instance at a held fs_chalf, and
      [wp_log_write_sconf] forgets the credit set on top of that; both are
      kept as their own parameters so no existing caller moves. *)
   Parameter wp_log_write_au :
@@ -508,7 +508,7 @@ Module Type LOG_WRITE.
                            bs bsl bsd d u cr Sb e0 vlb Efs Φfsb Ob m n eb p K b lks.
 
   (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20).  Derived from the
-     atomic-update one at a held [fsblock] and the trivial anchor, and it is
+     atomic-update one at a held [fs_chalf] and the trivial anchor, and it is
      [wp_log_write_gen] that is derived from THIS, by closing the epoch. *)
   Parameter wp_log_write_gene :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)

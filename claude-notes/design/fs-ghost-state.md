@@ -38,7 +38,8 @@ fragment in a client's hand MEANS, who mints/spends it, and why it exists.
 
 | piece | type / home | meaning |
 |---|---|---|
-| `fsblock γfs bno bs` | ½ of `bno ↪[fs_L] bs` (`ghost_map`, `FsBlocks.v:70`) | the client half of block `bno`'s **logged content**.  The log invariant holds the other half; holding this half means no `ireg_write_au`/`ireg_claim_au`/`ireg_free_au` at any inum of that block can fire — it is §16.2's serializer as a resource.  Minted at `bread`, returned at `brelse`. |
+| `fs_chalf γfs bno bs` | ½ of `bno ↪[fs_cache γfs] bs` (`ghost_map`, `FsBlocks.v`) | the PARKED half of block `bno`'s cache entry — what the buffer cache believes the block holds.  The bio payload holds the other half; holding this one means no `ireg_write_au`/`ireg_claim_au`/`ireg_free_au` at any inum of that block can fire — it is §16.2's serializer as a resource.  Minted at `bread`, returned at `brelse`. |
+| `fsblock gL bno bs` | a run of BSIZE **full** `ghost_map Z (bv 8)` elements (`FsBlocks.v`) | block `bno`'s bytes in the LOGGED VIEW `L`, owned EXCLUSIVELY.  Tied to the cache entry inside `fs_bytes_inv` (`logN`).  `fs-log.md` §"The ghost state". |
 | `fs_dirty` | second `ghost_map` in `fs_names` | per-block pinned/dirty flag tying the buffer cache to the log's write set (`LogInv.v:718`). |
 | `fs_own` | third `ghost_map` (`Excl`-style per-block token) | the exclusive per-block ownership token behind the buffer sleep-lock discipline. |
 | `bio_ctx` / `fs_view` | the buffer-cache invariant | owns the physical buffer array and the `fs_L`/`fs_dirty` authorities; `fs_view γfs γd dev cov` is the fs-side lens on it. |
@@ -47,7 +48,7 @@ fragment in a client's hand MEANS, who mints/spends it, and why it exists.
 
 | piece | type / home | meaning |
 |---|---|---|
-| `bitmap_inv γfs bms cov ls size` | `inv bitmapN (∃ used, bitmap_res …)` | THE OWNER of the free-space state: the pure `bitmap_ok`, the bitmap block's `fsblock` half at `bitmap_bytes used`, and the FREE POOL (one `fsblock`+`blk_own` per clear bit) — at an EXISTENTIAL set no contract names.  Persistent; a `fs_ready` conjunct (`fs_ready_bitmap`); allocated once in `fs_cfg_alloc`'s era fupd. |
+| `bitmap_inv γfs bms cov ls size` | `inv bitmapN (∃ used, bitmap_res …)` | THE OWNER of the free-space state: the pure `bitmap_ok`, the bitmap block's `fs_chalf` at `bitmap_bytes used`, and the FREE POOL (one `fs_chalf`+`blk_own` per clear bit) — at an EXISTENTIAL set no contract names.  Persistent; a `fs_ready` conjunct (`fs_ready_bitmap`); allocated once in `fs_cfg_alloc`'s era fupd. |
 | `bitmap_read` / `bitmap_read_own` | mask-preserving openings | between `bread` and `brelse`, the handle's machinery half against the parked client half names `∃ used, bs = bitmap_bytes used ∧ bitmap_ok`; the `_own` form adds `b ∈ used` from the caller's `blk_own` — the "freeing free block" panic refutation. |
 | `bitmap_alloc_au` / `bitmap_free_au` | `wp_log_write_au` suppliers | the ONLY moments the client half leaves the invariant: balloc's sets a bit and takes `free_blk bi` (+ its cov/log facts) out of the pool; bfree's clears a bit and deposits the caller's `free_blk b`.  Stated at the CALLER's set, `bitmap_bytes_eq_*` bridge to the parked one. |
 | `blk_own γfs b` | full `ghost_map` element (`FsBlocks.v`) | unchanged: the exclusive per-block token balloc hands out and bfree consumes; its exclusivity against the pool is the alloc/free handshake. |

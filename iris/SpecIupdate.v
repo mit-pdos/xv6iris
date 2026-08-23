@@ -27,7 +27,7 @@
    ON-DISK RECORD, which comes back at [dn] -- the in-memory inode.
 
    THE BLOCK PREMISE IS GONE (claude-notes/design/fs-icache.md, §11.3 and
-   §12).  [fsblock] is per BLOCK and a dinode block holds SIXTEEN inodes,
+   §12).  [fs_chalf] is per BLOCK and a dinode block holds SIXTEEN inodes,
    so a contract that takes the block's half for the duration of the call
    is unsatisfiable by two lock holders in the same block.  The inode
    REGION ([InodeRegion.v]) owns the halves instead and never lets them

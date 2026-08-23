@@ -148,7 +148,7 @@
      premise is [< 2^31]), and on the -1 arm [dn' = dn] outright;
    - [inode_sized], because writei touches only the blocks its range
      straddles.  Every other index keeps [data i], whose length no resource
-     in the cone constrains ([FsBlocks.fsblock] is a bare ghost_map half --
+     in the cone constrains ([FsBlocks.fs_chalf] is a bare ghost_map half --
      InodeInv.v 503-506), and again on the -1 arm [data' = data].
 
    So both would have to be PREMISES, at which point they would ripple into
@@ -180,7 +180,7 @@
    -- including [n = 0].  So writei needs everything iupdate needs
    ([i_inum], [inode_meta], the [sb + 24] field, and -- since C2 -- the
    inode REGION's [ireg_inv] plus this inum's own [dinode_at] fragment
-   instead of the block's [fsblock] half) on top of everything bmap needs.
+   instead of the block's [fs_chalf] half) on top of everything bmap needs.
 
    THE REGION'S RECORD IS NOT [dn].  [dn0] is what the region currently
    holds for this inum, which is STALE by construction (that is what the

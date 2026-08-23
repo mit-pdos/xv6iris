@@ -368,7 +368,7 @@ Section IallocBytes.
   Qed.
 
   (* THE MACHINERY HALF, out of the handle and back.  [ireg_read_blk] needs
-     the block's OTHER [fs_L] half to pin the region's parked bytes to the
+     the block's OTHER [fs_cache] half to pin the region's parked bytes to the
      ones bread returned, and the handle's payload carries exactly that -- on
      BOTH polarities.  [ProofIupdate.iu_held_L] verbatim; a Proof file may
      not require another Proof file, so it is restated here. *)
@@ -376,8 +376,8 @@ Section IallocBytes.
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
+      (uint bno ↪[fs_cache γfs]{#(1/2)} bsl) ∗
+      ((uint bno ↪[fs_cache γfs]{#(1/2)} bsl) -∗
        bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.

@@ -51,7 +51,7 @@
    The bundles are ALSO what carry the per-block exclusive [blk_own]
    tokens, and those are the only thing that can re-establish
    [blkmap_wf]'s injectivity when balloc's block is installed --
-   [fsblock] is a half element, so two at one key are consistent.
+   [fs_chalf] is a half element, so two at one key are consistent.
 
    THE BUDGET IS SPEND-AT-MOST, not spend-exactly: [log_op γ n] in with
    (5 <= n), and [log_op γ n'] out with (n - 5 <= n' <= n).  bmap cannot
@@ -325,7 +325,7 @@ Definition wp_bmap_sconf_body
      a FRACTION, so the caller keeps its own copy *)
   i_dev ip ↦₄{dqd} dev -∗
   (* THE BLOCK MAP, and THE FILE'S DATA BLOCKS.  Both, because balloc hands
-     the freshly allocated DATA block's [fsblock] half (and its exclusive
+     the freshly allocated DATA block's [fs_chalf] half (and its exclusive
      [blk_own] token) to bmap and there is nowhere else to put them: the
      design doc's "the fresh half is deposited into the bundle" is exactly
      this, and a bmap that returned only [inode_map] would strand the block

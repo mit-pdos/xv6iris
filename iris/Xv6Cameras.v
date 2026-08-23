@@ -297,7 +297,14 @@ Proof. solve_inG. Qed.
 (* ===================================================================== *)
 
 Class fsLogG (Σ : gFunctors) := FsLogG {
+  (* the bio-side block CACHE map: what the buffer cache believes each
+     covered block's bytes are.  Its halves ride in the bio payloads. *)
   fsL_inG :: ghost_mapG Σ Z (list (bv 8));
+  (* THE LOGGED VIEW L, keyed by BYTE ADDRESS (durable-disk 1c), is typed
+     by [DiskImg.diskImgG] -- the tree's UNIQUE source of the
+     [ghost_mapG Σ Z (bv 8)] instance (RiscvPtsto.riscvF_diskGS).  A
+     second field here would be a second, non-interacting Sigma slot and
+     would break the disk image's own auth/fragment pairing. *)
   fsdirty_inG :: ghost_mapG Σ Z bool;
   fsown_inG :: ghost_mapG Σ Z unit;
 }.

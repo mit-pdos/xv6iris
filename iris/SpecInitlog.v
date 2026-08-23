@@ -245,7 +245,7 @@ Definition wp_initlog_sconf_body
      At boot the log layer still holds every covered block's client half;
      recovery is the one pass that moves them (to the slots' logged
      contents, under the same existential the slots arrive with). *)
-  ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2, fsblock γfs b (Bh i)) -∗
+  ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2, fs_chalf γfs b (Bh i)) -∗
   (* the era certificate: the swap installs custody AT [gen_id], and the
      registry element + started lower bound are exactly what identifies it *)
   gen_cert -∗
@@ -287,16 +287,16 @@ Definition wp_initlog_sconf_body
   lh_n_pa ↦₄ v_n -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) -∗
   (* ---- the FsBlocks material the batch is assembled from ---- *)
-  ghost_map_auth (fs_L γfs) 1 L -∗
+  ghost_map_auth (fs_cache γfs) 1 L -∗
   ghost_map_auth (fs_dirty γfs) 1 D -∗
   (* the LOG SIDE's dirty halves, over the whole covered range, all false:
      nothing is logged yet *)
   ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false) -∗
   (* the log region's CLIENT halves: the header at the clean-image content,
      the thirty slots at anything *)
-  fsblock γfs (log_hdr_bno logstart) bs_hdr -∗
+  fs_chalf γfs (log_hdr_bno logstart) bs_hdr -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
-     ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs) -∗
+     ∃ bs : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs) -∗
   (* THE SLOT POOL, STOCKED.  initlog is where [log_state]'s pool comes
      from: at n = 0 the batch wants [bslots ((LOGBLOCKS - 0) + 2)] =
      32 units, and initlog needs a working pair of its own on top (its
@@ -329,7 +329,7 @@ Definition wp_initlog_sconf_body
       (* the entries' home halves back, at the INSTALLED (logged) contents
          -- existential, exactly as the slots' own halves came in *)
       ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2,
-         ∃ bs : list (bv 8), fsblock γfs b bs) -∗
+         ∃ bs : list (bv 8), fs_chalf γfs b bs) -∗
       (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
          initlog was handed is now sealed inside the "log" spinlock's
          resource.  No existential: the names came in, so the boot client

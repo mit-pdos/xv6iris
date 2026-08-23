@@ -53,7 +53,7 @@
    255, so the branch always falls through.  Refuted, not proved.
 
    THE COUPLING THAT MAKES THE INDIRECT ARM WORK is [bm_held_content]: the
-   caller's own [fsblock] half for the indirect block (inside [inode_map]'s
+   caller's own [fs_chalf] half for the indirect block (inside [inode_map]'s
    [ind_res]) against the bio handle's machinery half pins the buffer's
    bytes to [ind_bytes (bm_ent bm)] -- so the word the code reads out of
    [bp->data + 4*(bn-12)] IS entry [bn-12] of the pure entry list.
@@ -61,7 +61,7 @@
    FRESHNESS.  Each of the three installs has to re-establish
    [blkmap_wf]'s injectivity, and the ONLY thing that can is balloc's
    exclusive [blk_own] token against the tokens inside [inode_map] /
-   [inode_blocks] ([InodeInv.inode_fresh]); [fsblock] is a half element and
+   [inode_blocks] ([InodeInv.inode_fresh]); [fs_chalf] is a half element and
    two at one key are consistent.  That is also why bmap takes
    [inode_blocks]: the fresh DATA block's half is deposited there. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.

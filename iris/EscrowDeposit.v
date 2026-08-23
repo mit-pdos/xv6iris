@@ -83,9 +83,9 @@ Section EscrowDeposit.
        in at [FrzOff] for whoever peels the pool entry next. *)
     redeem_ticketA gd -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        (* RULING G, THE RETURN LEG (iclaim-ledger.md §6′).  iput BORROWS the
           regime -- the sealed [ireg_open] a runtime freezer must exhibit, or

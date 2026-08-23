@@ -285,7 +285,7 @@ Section FirstTok.
      inside opaquely.
 
      ROWS.  The pure block; kit 2 (TEN rows since (f0): the log free token,
-     [ireg_boot], [ireg_inv], block 1's [fsblock], the [fs_L]/[fs_dirty]
+     [ireg_boot], [ireg_inv], block 1's [fs_chalf], the [fs_cache]/[fs_dirty]
      auths, the dirty halves, the log header + slots, [bitmap_inv], the
      coverage remainder); rows (A) -- the 32 raw [&sb] bytes and the whole
      [struct log], carved in [BootShared.boot_bss_carve]; row (B) --
@@ -329,7 +329,7 @@ Section FirstTok.
         ⌜first_fsinit_pures dk sb⌝ ∗
         log_mirror_full ∗
         log_free_tok icfg_log ∗
-        fsblock fsc_fs 1 (FsCrash.fs_blocks dk 1) ∗
+        fs_chalf fsc_fs 1 (FsCrash.fs_blocks dk 1) ∗
         ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
         ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
         ireg_boot ∗
@@ -342,20 +342,20 @@ Section FirstTok.
         l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
         ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
         (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
-           ghost_map_auth (fs_L fsc_fs) 1 L ∗
+           ghost_map_auth (fs_cache fsc_fs) 1 L ∗
            ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
         ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
-        fsblock fsc_fs (log_hdr_bno fsc_logst)
+        fs_chalf fsc_fs (log_hdr_bno fsc_logst)
                 (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) ∗
         ([∗ list] i ∈ seq 0 LOGBLOCKS,
-           ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
+           ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno fsc_logst i) bs) ∗
         bslots ((LOGBLOCKS + 2) + 2 + 1)%nat ∗
         iref_slots 2 ∗
         (* the coverage remainder, which fsinit does not take: it is the
            first process's, R3 *)
         ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
                                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb),
-           fsblock fsc_fs b (FsCrash.fs_blocks dk b) ∗ blk_own fsc_fs b).
+           fs_chalf fsc_fs b (FsCrash.fs_blocks dk b) ∗ blk_own fsc_fs b).
   Proof.
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb vlock v_start v_dev v_nc v_n vname vcpu sb_old)

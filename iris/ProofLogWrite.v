@@ -307,7 +307,7 @@ Section LogWriteDefs.
   (* [Fb] is THE CALLER'S RECEIPT for the logged view -- opaque here, and
      threaded through every block exactly like [Bud].  The whole-function
      proof instantiates it with the atomic update's [Φfsb]; the derived
-     [wp_log_write_gen] takes [Φfsb := fsblock γfs (uint bno) bs], which is
+     [wp_log_write_gen] takes [Φfsb := fs_chalf γfs (uint bno) bs], which is
      the shape this used to be spelled with. *)
   Definition lw_cont `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
@@ -432,7 +432,7 @@ Section LogWriteDefs.
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
-    (uint bno ↪[fs_L γfs]{#(1/2)} bsl ∗
+    (uint bno ↪[fs_cache γfs]{#(1/2)} bsl ∗
      uint bno ↪[fs_dirty γfs]{#(1/2)} d ∗
      (if d then ∃ q : Qp, bref bn k q dv bno else ⌜bsd = bsl⌝)).
   Proof.
@@ -444,7 +444,7 @@ Section LogWriteDefs.
   Lemma lw_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs bsd : list (bv 8)) :
-    uint bno ↪[fs_L γfs]{#(1/2)} bs -∗
+    uint bno ↪[fs_cache γfs]{#(1/2)} bs -∗
     uint bno ↪[fs_dirty γfs]{#(1/2)} true -∗
     (∃ q : Qp, bref bn k q dv bno) -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bs bsd true.
@@ -1757,7 +1757,7 @@ Section ProofLogWrite.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WHOLE-FUNCTION PROOF, at the most general (atomic-update) contract.
-     [wp_log_write_gen] below is its degenerate instance at a held [fsblock],
+     [wp_log_write_gen] below is its degenerate instance at a held [fs_chalf],
      and [wp_log_write_sconf] the set-forgetting instance of that. *)
   Lemma wp_log_write_au
       (bn : bio_names)
@@ -2218,9 +2218,9 @@ Section ProofLogWrite.
     iDestruct (lw_pay_split with "Hbpay") as "(HpL & HpD & Hextra)".
     (* ---- the logged view moves to the caller's bytes.  THE ATOMIC UPDATE
        IS FIRED HERE, and nowhere else: this is the one ghost moment between
-       two instruction dispatches at which the caller's [fsblock] half has to
+       two instruction dispatches at which the caller's [fs_chalf] half has to
        exist, so the invariant it lives in is opened across exactly this step
-       and shut again before the next dispatch.  [fsblock_update]'s own
+       and shut again before the next dispatch.  [fs_chalf_update]'s own
        agreement against the handle's payload half is what pins the parked
        content [bsl'] to the [bsl] the handle is indexed at -- the caller
        never has to know it in advance. ---- *)
@@ -2236,9 +2236,9 @@ Section ProofLogWrite.
     (* [e0] is already [Ep] here -- a live entry is born at the current
        epoch, [subst] above -- so this IS the comparison the wand wants. *)
     iDestruct (log_epoch_lb_le γ Ep v' with "Hepa Hvlb'") as %Hvle'.
-    iMod (fsblock_update γfs L (uint bno) bsl' bs bsl with "HLauth Hfsb HpL")
+    iMod (fs_chalf_update γfs L (uint bno) bsl' bs bsl with "HLauth Hfsb HpL")
       as "((%Hbsl1 & %Hllk) & HLauth & Hfsb & HpL)".
-    (* [Hbsl1 : bsl = bsl'] -- [fsblock_update]'s output is stated as
+    (* [Hbsl1 : bsl = bsl'] -- [fs_chalf_update]'s output is stated as
        [bs' = bs], i.e. HALF = FSBLOCK, so it lands with the handle's [bsl]
        on the LEFT.  Substituting [bsl'] away keeps [Hllk] in its old shape
        ([L !! uint bno = Some bsl]) for everything downstream. *)
@@ -2778,7 +2778,7 @@ Section ProofLogWrite.
   Qed.
 
   (* THE EPOCH-EXPOSED CONTRACT (fs-log.md §G.20), derived from the
-     atomic-update one at a held [fsblock] and the trivial anchor
+     atomic-update one at a held [fs_chalf] and the trivial anchor
      ([vlb := 0], so the [⌜vlb <= e0⌝] the post carries is free and gets
      dropped here).  NOTHING IS FORGOTTEN: the entry comes back at the very
      [e0] that went in, which is the one thing [wp_log_write_gen] below
@@ -2802,7 +2802,7 @@ Section ProofLogWrite.
        its callers no epoch anchor of their own *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (wp_log_write_au bn γ γfs γd cov logstart dev k pidv bno
-              bs bsl bsd d u cr Sb e0 0%nat ⊤ (fsblock γfs (uint bno) bs)%I Ob
+              bs bsl bsd d u cr Sb e0 0%nat ⊤ (fs_chalf γfs (uint bno) bs)%I Ob
               m n eb p K b lks
               HK Hnoff Hk Ha0 Hcovbno Hnotlog Hno
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
@@ -2821,7 +2821,7 @@ Section ProofLogWrite.
     iIntros "_ _ _ Hfsb". iModIntro. iExact "Hfsb".
   Qed.
 
-  (* THE HELD-fsblock CONTRACT, derived from the epoch-exposed one by
+  (* THE HELD-fs_chalf CONTRACT, derived from the epoch-exposed one by
      CLOSING the epoch: a caller that threads [log_opS] opens its own [e0]
      with [log_opS_named], builds the credit's own-set disjunct from the pure
      premise it already had ([log_credit_own]), and drops both the epoch and

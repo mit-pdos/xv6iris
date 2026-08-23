@@ -53,7 +53,7 @@
    (the batch's own client half plus the handle's payload half plus the
    checked-out authority); the home block is bread and brelse'd UNTOUCHED,
    and its bytes are learned from the AUTHORITY (one [ghost_map_lookup]
-   against the payload's half -- there is no client [fsblock] for a home
+   against the payload's half -- there is no client [fs_chalf] for a home
    block on the committer's side, which is exactly the premise
    install_trans now takes).  That per-iteration fact is what discharges
    install_trans's ⌜forall i w, W !! i = Some w -> L !! uint w = Some (Lw i)⌝:
@@ -68,7 +68,7 @@
    (LOGBLOCKS - 0) + 2 = 32, and (32 - n) - 2 + (2 + n) = 32.
 
    THE RE-ACQUIRE KNOWS committing IS STILL SET without any extra ghost: the
-   committer holds [ghost_map_auth (fs_L γfs) 1 L] out of the batch, and
+   committer holds [ghost_map_auth (fs_cache γfs) 1 L] out of the batch, and
    log_res's cmt = false arm holds one too -- two authorities at fraction 1
    are contradictory ([ghost_map_auth_valid_2]).
 
@@ -763,14 +763,14 @@ Section EndOpDefs.
      ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) ∗
      ([∗ list] i ∈ seq n (LOGBLOCKS - n),
         ∃ junk : mword 32, lh_block i ↦₄ junk) ∗
-     ghost_map_auth (fs_L γfs) 1 L ∗
+     ghost_map_auth (fs_cache γfs) 1 L ∗
      ghost_map_auth (fs_dirty γfs) 1 D ∗
      ([∗ set] b ∈ cov,
         b ↪[fs_dirty γfs]{#(1/2)} (bool_decide (b ∈ map uint W))) ∗
-     (∃ bsh, fsblock γfs (log_hdr_bno logstart) bsh) ∗
-     ([∗ list] i ∈ seq 0 t, fsblock γfs (log_slot_bno logstart i) (Lw i)) ∗
+     (∃ bsh, fs_chalf γfs (log_hdr_bno logstart) bsh) ∗
+     ([∗ list] i ∈ seq 0 t, fs_chalf γfs (log_slot_bno logstart i) (Lw i)) ∗
      ([∗ list] i ∈ seq t (LOGBLOCKS - t),
-        ∃ bs, fsblock γfs (log_slot_bno logstart i) bs) ∗
+        ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs) ∗
      bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
   Lemma eo_open_of_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
@@ -871,7 +871,7 @@ Section EndOpDefs.
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
-    (uint bno ↪[fs_L γfs]{#(1/2)} bsl ∗
+    (uint bno ↪[fs_cache γfs]{#(1/2)} bsl ∗
      uint bno ↪[fs_dirty γfs]{#(1/2)} d ∗
      (if d then ∃ q : Qp, bref bn k q dv bno else True)).
   Proof.
@@ -883,7 +883,7 @@ Section EndOpDefs.
   Lemma eo_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs : list (bv 8)) (d : bool) :
-    (uint bno ↪[fs_L γfs]{#(1/2)} bs) -∗
+    (uint bno ↪[fs_cache γfs]{#(1/2)} bs) -∗
     (uint bno ↪[fs_dirty γfs]{#(1/2)} d) -∗
     (if d then ∃ q : Qp, bref bn k q dv bno else True) -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bs bs d.
@@ -894,13 +894,13 @@ Section EndOpDefs.
   Qed.
 
   (* the payload's L-half against the checked-out AUTHORITY: the only way a
-     committer can learn a HOME block's bytes (there is no client [fsblock]
+     committer can learn a HOME block's bytes (there is no client [fs_chalf]
      for a home block on this side).  Pure conclusion, so the [iDestruct]
      keeps the payload. *)
   Lemma eo_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
-    ghost_map_auth (fs_L γfs) 1 L -∗
+    ghost_map_auth (fs_cache γfs) 1 L -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
     ⌜L !! uint bno = Some bsl⌝.
   Proof.
@@ -1437,7 +1437,7 @@ Section EndOpBlocks.
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr)
       "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
-    (* committing IS still set: the committer holds the batch's fs_L
+    (* committing IS still set: the committer holds the batch's fs_cache
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
     2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & Hb2)".
@@ -1771,29 +1771,29 @@ Section EndOpBlocks.
   Lemma eo_entries_in (γfs : fs_names) (logstart : Z) (W : list (mword 32))
       (Lw : nat -> list (bv 8)) (n : nat) :
     n = length W ->
-    ([∗ list] i ∈ seq 0 n, fsblock γfs (log_slot_bno logstart i) (Lw i)) -∗
+    ([∗ list] i ∈ seq 0 n, fs_chalf γfs (log_slot_bno logstart i) (Lw i)) -∗
     ([∗ list] i ↦ w ∈ W, (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
-    ([∗ list] i ↦ w ∈ W, fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
+    ([∗ list] i ↦ w ∈ W, fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
                          (uint w) ↪[fs_dirty γfs]{#(1/2)} true).
   Proof.
     intros ->. iIntros "Ha Hb". rewrite big_sepL_sep.
     iSplitL "Ha"; [| iExact "Hb"].
     iEval (rewrite (eo_seq_of_list W
-             (fun i => fsblock γfs (log_slot_bno logstart i) (Lw i)))) in "Ha".
+             (fun i => fs_chalf γfs (log_slot_bno logstart i) (Lw i)))) in "Ha".
     iExact "Ha".
   Qed.
 
   Lemma eo_entries_out (γfs : fs_names) (logstart : Z) (W : list (mword 32))
       (Lw : nat -> list (bv 8)) (n : nat) :
     n = length W ->
-    ([∗ list] i ↦ w ∈ W, fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
+    ([∗ list] i ↦ w ∈ W, fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
                          (uint w) ↪[fs_dirty γfs]{#(1/2)} false) -∗
-    ([∗ list] i ∈ seq 0 n, ∃ bs, fsblock γfs (log_slot_bno logstart i) bs) ∗
+    ([∗ list] i ∈ seq 0 n, ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs) ∗
     ([∗ list] i ↦ w ∈ W, (uint w) ↪[fs_dirty γfs]{#(1/2)} false).
   Proof.
     intros ->. rewrite big_sepL_sep. iIntros "[Ha $]".
     iEval (rewrite (eo_seq_of_list W
-             (fun i => ∃ bs, fsblock γfs (log_slot_bno logstart i) bs)%I)).
+             (fun i => ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs)%I)).
     iApply (big_sepL_mono with "Ha"). intros i w Hw. iIntros "H". iExists _. iExact "H".
   Qed.
 
@@ -2364,10 +2364,10 @@ Section EndOpBlocks.
       iApply (eo_seq_join (fun i => ∃ junk : mword 32, lh_block i ↦₄ junk)%I
                 n (LOGBLOCKS - n)%nat with "HWj Hjunk"). }
     iAssert ([∗ list] i ∈ seq 0 LOGBLOCKS,
-               ∃ bs, fsblock γfs (log_slot_bno logstart i) bs)%I
+               ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs)%I
       with "[Hdone Hrest]" as "Hlogr".
     { iEval (rewrite {1}Hsq).
-      iApply (eo_seq_join (fun i => ∃ bs, fsblock γfs (log_slot_bno logstart i) bs)%I
+      iApply (eo_seq_join (fun i => ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs)%I
                 n (LOGBLOCKS - n)%nat with "Hdone Hrest"). }
     assert (Hp4 : ((LOGBLOCKS - 0) + 2)%nat = ((LOGBLOCKS - n) + (1 + (1 + length W)))%nat)
       by (unfold LOGBLOCKS in *; lia).
@@ -3295,7 +3295,7 @@ Section EndOpBlocks.
         exact (proj2 HH2regs c Hcs N2 N8 N9 N18 N19 N20 N21). }
     (* ---- THE GHOST STEP: the log slot's logged content := the home bytes ---- *)
     iDestruct (eo_pay_split with "Hpay1") as "(HpL1 & HpD1 & Hextra1)".
-    iMod (fsblock_update γfs L (uint bnol) bsold bs2 bs1
+    iMod (fs_chalf_update γfs L (uint bnol) bsold bs2 bs1
             with "HauthL Hslotfb HpL1") as "((%Hbs1 & %Hlkslot) & HauthL & Hslotfb & HpL1)".
     iDestruct (eo_pay_mk bn γfs γd dev cov k1 dev bnol bs2 d1
                  with "HpL1 HpD1 Hextra1") as "Hpay1".
@@ -3625,7 +3625,7 @@ Section EndOpBlocks.
         rewrite /Lw' (eo_ext_lt Lw t bs2 i Hit2). exact (HLw i v Hit2 Hv). }
     assert (Hseq : seq 0 (S t) = seq 0 t ++ [t]) by (rewrite seq_S; reflexivity).
     iAssert ([∗ list] i ∈ seq 0 (S t),
-               fsblock γfs (log_slot_bno logstart i) (Lw' i))%I
+               fs_chalf γfs (log_slot_bno logstart i) (Lw' i))%I
       with "[Hdone Hslotfb]" as "Hdone".
     { rewrite Hseq big_sepL_app. iSplitL "Hdone".
       - iApply (big_sepL_mono with "Hdone"). intros i x Hx.

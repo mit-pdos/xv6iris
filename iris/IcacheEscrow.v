@@ -234,7 +234,7 @@ Section IcacheEscrow.
   Proof. rewrite /inode_raw. apply _. Qed.
 
   Global Instance ind_blk_timeless γfs bm : Timeless (ind_blk γfs bm).
-  Proof. rewrite /ind_blk /fsblock. case_decide; apply _. Qed.
+  Proof. rewrite /ind_blk /fs_chalf. case_decide; apply _. Qed.
 
   Global Instance ind_tok_timeless γfs bm : Timeless (ind_tok γfs bm).
   Proof. rewrite /ind_tok. case_decide; apply _. Qed.
@@ -243,7 +243,7 @@ Section IcacheEscrow.
   Proof. rewrite /ind_res. apply _. Qed.
 
   Global Instance blk_res_timeless γfs w bs : Timeless (blk_res γfs w bs).
-  Proof. rewrite /blk_res /fsblock. case_decide; apply _. Qed.
+  Proof. rewrite /blk_res /fs_chalf. case_decide; apply _. Qed.
 
   Global Instance inode_blocks_timeless γfs bm data :
     Timeless (inode_blocks γfs bm data).

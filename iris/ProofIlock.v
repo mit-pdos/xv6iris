@@ -52,7 +52,7 @@
    handle and [InodeRegion.ireg_read] fires it against the payload's
    [dinode_at], which pins the buffer's bytes to [diblk_bytes ds] AND names
    this inum's slot ([ds !!! islot inum = dn]).  That single move replaces
-   v1's [fsblock] premise, its [diblk_wf] premise and its conditional
+   v1's [fs_chalf] premise, its [diblk_wf] premise and its conditional
    slot-agreement premise (§11.3).  From there [diblk_slot_acc] hands out
    slot [inum mod IPB] as six typed pieces and takes them back UNCHANGED
    (ilock only reads the buffer, which is why the block comes back at [ds]
@@ -1035,7 +1035,7 @@ Section IlockLoad.
     (* THE COUPLING, through the REGION rather than a caller-held block:
        the handle's machinery half against the payload's [dinode_at] pins
        the buffer's bytes to [diblk_bytes ds] AND names this inum's slot.
-       That one move is v1's [fsblock] premise, its [diblk_wf] premise and
+       That one move is v1's [fs_chalf] premise, its [diblk_wf] premise and
        its conditional slot-agreement premise, all three (§11.3). *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
@@ -1067,7 +1067,7 @@ Section IlockLoad.
        marker is what makes that exhaustive: it refutes the region's OUT arm
        outright, so no itable-wide uniqueness argument is needed. *)
     iAssert (|={⊤}=>
-               ((IBLOCK inum inodestart) ↪[fs_L gfs]{#(1/2)} (diblk_bytes ds)) ∗
+               ((IBLOCK inum inodestart) ↪[fs_cache gfs]{#(1/2)} (diblk_bytes ds)) ∗
                ((dinode_at gi inum dn ∗
                  ireg_wd_back o g (bv_unsigned inum) ∗
                  (∃ (fl : bool) (bm : blkmap) (data : nat -> list (bv 8)),

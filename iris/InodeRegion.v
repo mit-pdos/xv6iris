@@ -1,8 +1,8 @@
 (* InodeRegion.v -- THE INODE REGION: the dinode blocks' owner, and the
-   per-inum fragment that replaces the coarse [fsblock] premise in every
+   per-inum fragment that replaces the coarse [fs_chalf] premise in every
    inode-layer contract.  Design: claude-notes/design/fs-icache.md, §11-§12.
 
-   [FsBlocks.fsblock] is the write permission for a block, and a dinode
+   [FsBlocks.fs_chalf] is the write permission for a block, and a dinode
    block holds SIXTEEN inodes -- so any contract that takes the block's
    half for the duration of a call is unsatisfiable by two lock holders in
    the same block (§11.1).  The fix is a CHANGE OF GRANULARITY: callers
@@ -15,16 +15,16 @@
    the region across its log_write and parking it back after.  That escrow
    cannot state its checked-out arm: during the window the thread's own
    log_write footprint ([bio_held] + the client half) holds EVERY per-block
-   exclusive resource -- [disk_block] in full, both [fs_L] halves, the
+   exclusive resource -- [disk_block] in full, both [fs_cache] halves, the
    machinery dirty half -- so by conservation the arm has nothing to hold,
    and a checkout could never prove the arm is parked.
 
    So the region is ONE-ARMED, and the only moment the client half leaves
-   it is log_write's own ghost step (ProofLogWrite.v's [fsblock_update], a
+   it is log_write's own ghost step (ProofLogWrite.v's [fs_chalf_update], a
    single [iMod] between two instruction dispatches, at mask ⊤).
    [ireg_write_au] below is the atomic update iupdate hands to the
    generalized SpecLogWrite premise: it opens the region THERE, lets
-   [fsblock_update] run against the withdrawn half, and re-parks the block
+   [fs_chalf_update] run against the withdrawn half, and re-parks the block
    at the new bytes while retagging the caller's [dinode_at] in the same
    opening.  [ireg_read] is ilock's side: one mask-preserving opening in
    which the caller's payload machinery half pins the region's bytes and
@@ -1344,7 +1344,7 @@ Section InodeRegion.
   (* THE per-inum resource: this inum's on-disk record is [dn].  EXCLUSIVE
      (a full-fraction ghost_map element), keyed by the inum's value; the
      block address falls out of [IBLOCK] and never needs a second ghost.
-     This is what replaces [fsblock γfs (IBLOCK inum inodestart)
+     This is what replaces [fs_chalf γfs (IBLOCK inum inodestart)
      (diblk_bytes ds)] in SpecIupdate / SpecIlock / SpecWritei /
      SpecItrunc / SpecFileread (§11.3). *)
   Definition dinode_at (γi : gname) (inum : bv 32) (dn : dinode) : iProp Σ :=
@@ -2253,7 +2253,7 @@ Section InodeRegion.
       (m : gmap Z dinode) (bi : nat) : iProp Σ :=
     (∃ ds : list dinode,
        ⌜diblk_wf ds⌝ ∗ ⌜ireg_couple m bi ds⌝ ∗
-       fsblock γfs (inodestart + Z.of_nat bi) (diblk_bytes ds) ∗
+       fs_chalf γfs (inodestart + Z.of_nat bi) (diblk_bytes ds) ∗
        [∗ list] i ∈ seq 0 16,
          ireg_slot γi (16 * Z.of_nat bi + Z.of_nat i)%Z (ds !!! i))%I.
 
@@ -2368,7 +2368,7 @@ Section InodeRegion.
 
   Global Instance ireg_blk_timeless γi γfs inodestart m bi :
     Timeless (ireg_blk γi γfs inodestart m bi).
-  Proof. rewrite /ireg_blk /fsblock. apply _. Qed.
+  Proof. rewrite /ireg_blk /fs_chalf. apply _. Qed.
 
   Global Instance ireg_body_timeless γi γfs inodestart nib :
     Timeless (ireg_body γi γfs inodestart nib).
@@ -2470,10 +2470,10 @@ Section InodeRegion.
     b = IBLOCK inum inodestart ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    (b ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    (b ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     ⌜exists ds : list dinode,
        diblk_wf ds /\ bsl = diblk_bytes ds /\ ds !!! islot inum = dn⌝ ∗
-    dinode_at γi inum dn ∗ (b ↪[fs_L γfs]{#(1/2)} bsl).
+    dinode_at γi inum dn ∗ (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE Hin Hb) "#Hinv Hdn Hhalf".
     iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
@@ -2482,7 +2482,7 @@ Section InodeRegion.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & Hsl)".
-    rewrite /fsblock -(ireg_bi_iblock inum inodestart) -Hb.
+    rewrite /fs_chalf -(ireg_bi_iblock inum inodestart) -Hb.
     iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -2493,7 +2493,7 @@ Section InodeRegion.
     iMod ("Hclose" with "[Ha Hreg Hfsb Hsl Hback]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Hsl]"); [done |].
-      iExists ds. rewrite /fsblock (ireg_bi_iblock inum inodestart) in Hb.
+      iExists ds. rewrite /fs_chalf (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" | iExact "Hsl"]. }
     iModIntro. iFrame "Hdn Hhalf". iPureIntro.
@@ -2649,9 +2649,9 @@ Section InodeRegion.
     ↑iregN ⊆ E ->
     (bi < nib)%nat ->
     ireg_inv γi γfs inodestart nib -∗
-    ((inodestart + Z.of_nat bi) ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    ((inodestart + Z.of_nat bi) ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     ⌜exists ds : list dinode, diblk_wf ds /\ bsl = diblk_bytes ds⌝ ∗
-    ((inodestart + Z.of_nat bi) ↪[fs_L γfs]{#(1/2)} bsl).
+    ((inodestart + Z.of_nat bi) ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE Hbi) "#Hinv Hhalf".
     iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
@@ -2685,9 +2685,9 @@ Section InodeRegion.
   (*  THE FOUR ARM MOVES (§12.2 for the first, §16.3/§16.4 for the rest)  *)
   (* ------------------------------------------------------------------ *)
 
-  (* Exactly the shape SpecLogWrite's generalized fsblock premise takes:
+  (* Exactly the shape SpecLogWrite's generalized fs_chalf premise takes:
      the fupd opens the region and surrenders the block's client half at
-     whatever the parked bytes are; log_write's own [fsblock_update]
+     whatever the parked bytes are; log_write's own [fs_chalf_update]
      agreement (against the machinery half in the caller's handle) is what
      delivers [bsl' = diblk_bytes ds], and [diblk_bytes_inj] then pins the
      parked LIST to the [ds] the caller learned at its bread.  The closing
@@ -2729,9 +2729,9 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -2905,9 +2905,9 @@ Section InodeRegion.
        which is the whole point of the clause. *)
     ireg_open -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        (* THE CLAIM (§2.4): the c column goes [None -> Some] in the same
           ghost step that writes the box, and the exclusive fragment is
@@ -3482,9 +3482,9 @@ Section InodeRegion.
        token is in hand. *)
     ifreeze_post rg (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ imark γi (bv_unsigned inum)
                           ∗ ifreeze_off (bv_unsigned inum)).
@@ -3793,7 +3793,7 @@ Section InodeRegion.
        UNDER RULING C' THE CLAIM ARM IS A CONVERSION and the pair it takes
        is [iclaim ∗ runit_claim]: see [ireg_wd_lic]. *)
     ireg_wd_lic o gy (bv_unsigned inum) -∗
-    (b ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    (b ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     (* THE TYPED PAYOUT (iclaim-ledger.md §5.2(a), item 7b): the claim was
        minted at the type [ialloc] wrote, the claim pin says the box's record
        still has it, and the spend hands the equation to create's fill.  That
@@ -3802,7 +3802,7 @@ Section InodeRegion.
     ⌜ireg_wd_ty o (ds !!! islot inum)⌝ ∗
     ireg_wd_back o gy (bv_unsigned inum) ∗
     dinode_at γi inum (ds !!! islot inum) ∗
-    (b ↪[fs_L γfs]{#(1/2)} bsl).
+    (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE Hfills Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
     pose proof (islot_lt inum) as Hsl.
@@ -3815,7 +3815,7 @@ Section InodeRegion.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds0) "(>%Hwf0 & >%Hcp0 & >Hfsb & >Hsls)".
-    rewrite /fsblock -(ireg_bi_iblock inum inodestart) -Hb.
+    rewrite /fs_chalf -(ireg_bi_iblock inum inodestart) -Hb.
     iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
     assert (Hds0 : ds0 = ds).
     { apply (diblk_bytes_inj ds0 ds Hwf0 Hwf). rewrite -Hbytes -Hbsl. reflexivity. }
@@ -3895,7 +3895,7 @@ Section InodeRegion.
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Hmk Hla Hep Hslback Hrf Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      rewrite /fsblock (ireg_bi_iblock inum inodestart) in Hb.
+      rewrite /fs_chalf (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
       iApply ("Hslback" $! (ds !!! islot inum) with "[Hmk Hla Hep Hrf Hcnt Hfdisj Hfrcp]").
@@ -4114,9 +4114,9 @@ Section InodeRegion.
        and a holder's ilock/iunlock pair is undisturbed. *)
     ireg_link_pin pin (bv_unsigned inum) dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilink_fl fl (bv_unsigned inum) ∗
@@ -4329,9 +4329,9 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilink (bv_unsigned inum)).
@@ -4373,9 +4373,9 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilinkd (bv_unsigned inum)).
@@ -4426,9 +4426,9 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ifreeze_off (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn'
@@ -4488,7 +4488,7 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilink_fl fl (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       (* THE DEPOSIT (fs-log.md §G.17).  This is the ONLY writer in the
          kernel that LOWERS nlink, hence the only one that can park a fresh
          zero, hence the only one that owes the receipt.  It hands the
@@ -4502,7 +4502,7 @@ Section InodeRegion.
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4709,11 +4709,11 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilink (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4738,11 +4738,11 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilinkd (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4773,11 +4773,11 @@ Section InodeRegion.
     ilinkdp (bv_unsigned inum) pv -∗
     iparent (bv_unsigned inum) pv -∗
     |={E, E ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗
       log_epoch_lb icfg_log v ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        izrcpt (bv_unsigned inum) dn' v -∗
-       fsblock γfs (IBLOCK inum inodestart)
+       fs_chalf γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
@@ -4816,12 +4816,12 @@ Section InodeRegion.
     b = IBLOCK inum inodestart ->
     ireg_inv γi γfs inodestart nib -∗
     ilink (bv_unsigned inum) -∗
-    (b ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    (b ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     ⌜exists ds : list dinode,
        diblk_wf ds /\ bsl = diblk_bytes ds /\
        bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝ ∗
     ilink (bv_unsigned inum) ∗
-    (b ↪[fs_L γfs]{#(1/2)} bsl).
+    (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE Hin Hb) "#Hinv Hfrag Hhalf".
     pose proof (islot_lt inum) as Hsl.
@@ -4833,7 +4833,7 @@ Section InodeRegion.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
-    rewrite /fsblock -(ireg_bi_iblock inum inodestart) -Hb.
+    rewrite /fs_chalf -(ireg_bi_iblock inum inodestart) -Hb.
     iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
@@ -4850,7 +4850,7 @@ Section InodeRegion.
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      rewrite /fsblock (ireg_bi_iblock inum inodestart) in Hb.
+      rewrite /fs_chalf (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj Hfrcp]").
@@ -4938,7 +4938,7 @@ Section InodeRegion.
   (* ------------------------------------------------------------------ *)
 
   (* [ireg_link_alloc]'s shape with the BLOCK HALF removed: it reads
-     nothing, so it needs no [fs_L] credential and no [ds], and it takes no
+     nothing, so it needs no [fs_cache] credential and no [ds], and it takes no
      fragment in.  Mask-preserving, like every other ledger move (§20.2:
      the update is purely ghost, so it threads through no contract and a
      caller may fire it at any point in its own proof).

@@ -25,7 +25,7 @@
 
    The requested block must be covered by the client view and on the
    view's device; a caller that knows the block's logical content (its own
-   [fsblock] half against the handle's payload half) learns the returned
+   [fs_chalf] half against the handle's payload half) learns the returned
    bytes by agreement -- the bio layer hands the payload out opaquely.
 
    The function sleeps (acquiresleep; rw's two sleeps), so it threads the

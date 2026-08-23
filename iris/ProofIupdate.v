@@ -146,10 +146,10 @@ Section IupdateDefs.
       (inum : mword 32) (dn : dinode) (ds : list dinode) (e0 : nat)
       (Pout : iProp Σ) : iProp Σ :=
     (|={⊤, ⊤ ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
-       fsblock γfs (IBLOCK inum inodestart) bsl' ∗ log_epoch_lb γ v ∗
+       fs_chalf γfs (IBLOCK inum inodestart) bsl' ∗ log_epoch_lb γ v ∗
        (⌜bsl' = diblk_bytes ds⌝ -∗
         logged_at γ e0 (IBLOCK inum inodestart) -∗ ⌜(v <= e0)%nat⌝ -∗
-        fsblock γfs (IBLOCK inum inodestart)
+        fs_chalf γfs (IBLOCK inum inodestart)
                 (diblk_bytes (<[islot inum := dn]> ds))
         ={⊤ ∖ ↑iregN, ⊤}=∗ Pout))%I.
 

@@ -23,11 +23,11 @@
      - the header cells it READS: lh.n at [lh_n_pa] and lh.block[i] at
        [lh_block i] for i < n = length W.  Both come back UNCHANGED --
        write_head only copies the in-memory header OUT to the buffer.
-     - the logged-view AUTHORITY [ghost_map_auth (fs_L γfs) 1 L].  This is
+     - the logged-view AUTHORITY [ghost_map_auth (fs_cache γfs) 1 L].  This is
        the freeze-by-auth: while the committer holds it nobody else can
        move L, and write_head needs it because it rewrites the header
        BLOCK's logical content.
-     - the header block's own client half [fsblock γfs (log_hdr_bno
+     - the header block's own client half [fs_chalf γfs (log_hdr_bno
        logstart) bsh] -- the log is its own client for the header and the
        LOGBLOCKS slots.  It comes back at the new content [bs'], with the
        authority updated at that one key.
@@ -136,9 +136,9 @@ Definition wp_write_head_sconf_body
   lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
   ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
   (* the freeze: the logged view's authority *)
-  ghost_map_auth (fs_L γfs) 1 L -∗
+  ghost_map_auth (fs_cache γfs) 1 L -∗
   (* the header block's client half, at whatever it currently holds *)
-  (∃ bsh : list (bv 8), fsblock γfs (log_hdr_bno logstart) bsh) -∗
+  (∃ bsh : list (bv 8), fs_chalf γfs (log_hdr_bno logstart) bsh) -∗
   (* the slot unit for its bread *)
   bslot -∗
   (* THE CRASH PERMIT for the header write (phase C2b/D1 stage 3).  The
@@ -178,8 +178,8 @@ Definition wp_write_head_sconf_body
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
       ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
       (* the authority back, moved at exactly the header block's key *)
-      ghost_map_auth (fs_L γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
-      fsblock γfs (log_hdr_bno logstart) bs' -∗
+      ghost_map_auth (fs_cache γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
+      fs_chalf γfs (log_hdr_bno logstart) bs' -∗
       (* the two facts stated about the new header image: its n field, and
          the full (n, W) encoding the copy loop laid down *)
       ⌜hdr_n bs' = Z.of_nat n⌝ -∗

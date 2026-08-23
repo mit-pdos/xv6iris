@@ -400,7 +400,7 @@ Qed.
    did not have.**  The icache's indirect-block resource holds the block AT
    [BlockWords.ind_bytes e] for a [bv 32] entry list [e]; the image side has
    [fs_ind_ents], the [Z]s DECODED out of that same block.  This says the
-   two are the same 1024 bytes, so the [fsblock] half the boot fupd holds
+   two are the same 1024 bytes, so the [fs_chalf] half the boot fupd holds
    for the home block IS the resource the pool's allocated arm asks for.
    [fs_le_word_at] above is the per-field converse (bytes -> value); this is
    value -> bytes, 256 entries at once, and it bottoms out in the tree's one
@@ -1245,7 +1245,7 @@ Definition fs_used_blocks (P : Z -> list (bv 8)) (sb : fs_sb) : list Z :=
 
 (* WHY (W4): two inodes naming one disk block would make
    [InodeInv.blkmap_wf]'s injectivity clause unprovable across the region
-   and the [fsblock]/[blk_own] halves of two inodes claim one key.  The
+   and the [fs_chalf]/[blk_own] halves of two inodes claim one key.  The
    check is [O(n log n)] -- one gset -- and its answer is the used set W5
    then reads. *)
 Definition fs_used_set (P : Z -> list (bv 8)) (sb : fs_sb) : option (gset Z) :=
@@ -1526,7 +1526,7 @@ Qed.
 (* ---- W4 READ THE OTHER WAY: THE INODES' BLOCK SETS ARE DISJOINT ------ *)
 
 (* **WHY THIS READING TOO.**  The stocking of the inode pool hands each
-   live inode the [fsblock]/[blk_own] pair of every block it names, carved
+   live inode the [fs_chalf]/[blk_own] pair of every block it names, carved
    out of the ONE big-op the era fupd holds over [cov]
    ([FsBoot.big_sepS_carve]).  A carve needs its pieces PAIRWISE DISJOINT
    -- two inodes naming one block would have the carve claim one key twice

@@ -225,7 +225,7 @@ Section BallocDefs.
      (⌜bv_unsigned rv <> 0⌝ ∗
       ⌜bv_unsigned rv ∈ cov⌝ ∗
       ⌜~ (bv_unsigned rv ∈ log_region_set logstart)⌝ ∗
-      fsblock γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) ∗
+      fs_chalf γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) ∗
       blk_own γfs (bv_unsigned rv) ∗
       log_opS γ (if cr then S u else u)
                 (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]})))%I.
@@ -258,7 +258,7 @@ Section BallocDefs.
             ⌜bv_unsigned blk <> 0⌝ ∗
             ⌜bv_unsigned blk ∈ cov⌝ ∗
             ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-            fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+            fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
             blk_own γfs (bv_unsigned blk) ∗
             log_opS γ (if cr then S u else u)
                       (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
@@ -1242,7 +1242,7 @@ Section BallocRestore.
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 2 -∗
-    fsblock γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
+    fs_chalf γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
     blk_own γfs (bv_unsigned rv) -∗
     log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]}) -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
@@ -1525,7 +1525,7 @@ Section BallocBzero.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
-    fsblock γfs bi bsD -∗
+    fs_chalf γfs bi bsD -∗
     blk_own γfs bi -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
@@ -3441,7 +3441,7 @@ Section BallocMain.
               ⌜bv_unsigned blk <> 0⌝ ∗
               ⌜bv_unsigned blk ∈ cov⌝ ∗
               ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-              fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+              fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
               blk_own γfs (bv_unsigned blk) ∗
               log_opS γ (if cr then S u else u)
                         (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗

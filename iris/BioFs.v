@@ -34,8 +34,8 @@ Section BioFs.
       (dev : mword 32) (cov : gset Z) (kb : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
+      (uint bno ↪[fs_cache γfs]{#(1/2)} bsl) ∗
+      ((uint bno ↪[fs_cache γfs]{#(1/2)} bsl) -∗
        bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.

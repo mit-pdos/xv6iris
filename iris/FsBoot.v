@@ -171,24 +171,24 @@ Qed.
 (* the domain law is one [elem_of_dom] unfold.                              *)
 (* ---------------------------------------------------------------------- *)
 
-Definition fs_L0 (dk : Z -> bv 8) (cov : gset Z) : gmap Z (list (bv 8)) :=
+Definition fs_C0 (dk : Z -> bv 8) (cov : gset Z) : gmap Z (list (bv 8)) :=
   map_imap (fun b (_ : unit) => Some (fs_blocks dk b)) (gset_to_gmap () cov).
 
 Definition fs_D0 (dk : Z -> bv 8) (cov : gset Z) : gmap Z bool :=
-  (fun _ => false) <$> fs_L0 dk cov.
+  (fun _ => false) <$> fs_C0 dk cov.
 
-Lemma fs_L0_lookup (dk : Z -> bv 8) (cov : gset Z) (b : Z) :
-  b ∈ cov -> fs_L0 dk cov !! b = Some (fs_blocks dk b).
+Lemma fs_C0_lookup (dk : Z -> bv 8) (cov : gset Z) (b : Z) :
+  b ∈ cov -> fs_C0 dk cov !! b = Some (fs_blocks dk b).
 Proof.
-  intros Hb. rewrite /fs_L0 map_lookup_imap lookup_gset_to_gmap.
+  intros Hb. rewrite /fs_C0 map_lookup_imap lookup_gset_to_gmap.
   rewrite option_guard_True; [reflexivity | exact Hb].
 Qed.
 
-Lemma fs_L0_lookup_Some (dk : Z -> bv 8) (cov : gset Z) (b : Z)
+Lemma fs_C0_lookup_Some (dk : Z -> bv 8) (cov : gset Z) (b : Z)
     (bs : list (bv 8)) :
-  fs_L0 dk cov !! b = Some bs -> b ∈ cov /\ bs = fs_blocks dk b.
+  fs_C0 dk cov !! b = Some bs -> b ∈ cov /\ bs = fs_blocks dk b.
 Proof.
-  rewrite /fs_L0 map_lookup_imap lookup_gset_to_gmap.
+  rewrite /fs_C0 map_lookup_imap lookup_gset_to_gmap.
   destruct (decide (b ∈ cov)) as [Hin|Hout].
   (* [cbn] with no delta list here is a 7 s trap: it unfolds [fs_blocks]
      into a [disk_read] of 1024 bytes.  Name the two constants. *)
@@ -198,18 +198,18 @@ Proof.
     discriminate.
 Qed.
 
-Lemma fs_L0_dom (dk : Z -> bv 8) (cov : gset Z) :
-  dom (fs_L0 dk cov) = cov.
+Lemma fs_C0_dom (dk : Z -> bv 8) (cov : gset Z) :
+  dom (fs_C0 dk cov) = cov.
 Proof.
   apply set_eq. intros b. rewrite elem_of_dom. split.
-  - intros [bs Hbs]. exact (proj1 (fs_L0_lookup_Some dk cov b bs Hbs)).
-  - intros Hb. exists (fs_blocks dk b). exact (fs_L0_lookup dk cov b Hb).
+  - intros [bs Hbs]. exact (proj1 (fs_C0_lookup_Some dk cov b bs Hbs)).
+  - intros Hb. exists (fs_blocks dk b). exact (fs_C0_lookup dk cov b Hb).
 Qed.
 
 Lemma fs_D0_lookup (dk : Z -> bv 8) (cov : gset Z) (b : Z) :
   b ∈ cov -> fs_D0 dk cov !! b = Some false.
 Proof.
-  intros Hb. rewrite /fs_D0 lookup_fmap (fs_L0_lookup dk cov b Hb) //.
+  intros Hb. rewrite /fs_D0 lookup_fmap (fs_C0_lookup dk cov b Hb) //.
 Qed.
 
 (* ====================================================================== *)
@@ -313,18 +313,18 @@ Section FsBoot.
 (* 4. THE FsBlocks HANDSHAKE.                                             *)
 (* ====================================================================== *)
 
-  (* [fs_alloc]'s per-block bundle arrives as a [∗ map] over [fs_L0]; every
+  (* [fs_alloc]'s per-block bundle arrives as a [∗ map] over [fs_C0]; every
      consumer wants a [∗ set] over [cov].  One conversion, once. *)
-  Lemma fs_L0_big (Φ : Z -> list (bv 8) -> iProp Σ) (dk : Z -> bv 8)
+  Lemma fs_C0_big (Φ : Z -> list (bv 8) -> iProp Σ) (dk : Z -> bv 8)
       (cov : gset Z) :
-    ([∗ map] b ↦ bs ∈ fs_L0 dk cov, Φ b bs)
+    ([∗ map] b ↦ bs ∈ fs_C0 dk cov, Φ b bs)
       ⊢ [∗ set] b ∈ cov, Φ b (fs_blocks dk b).
   Proof.
     etrans.
     { apply (big_sepM_mono _ (fun b (_ : list (bv 8)) => Φ b (fs_blocks dk b))).
       intros b bs Hb.
-      destruct (fs_L0_lookup_Some dk cov b bs Hb) as [_ ->]. done. }
-    rewrite big_sepM_dom fs_L0_dom //.
+      destruct (fs_C0_lookup_Some dk cov b bs Hb) as [_ ->]. done. }
+    rewrite big_sepM_dom fs_C0_dom //.
   Qed.
 
   (* THE GHOST STEP.  The era's byte mint in, the logged-view ghosts out,
@@ -336,16 +336,16 @@ Section FsBoot.
     disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
     ∃ γfs : fs_names,
       ([∗ set] b ∈ cov, pool_blk (fs_view γfs γv dev cov) b) ∗
-      ghost_map_auth (fs_L γfs) 1 (fs_L0 dk cov) ∗
+      ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
-      ([∗ set] b ∈ cov, fsblock γfs b (fs_blocks dk b)) ∗
+      ([∗ set] b ∈ cov, fs_chalf γfs b (fs_blocks dk b)) ∗
       ([∗ set] b ∈ cov, blk_own γfs b).
   Proof.
     iIntros (Hcov) "Hm".
     iDestruct (fs_boot_carve γv dk ndisk cov Hcov with "Hm") as "Hblk".
-    iMod (fs_alloc (fs_L0 dk cov)) as (γfs) "(HaL & HaD & Hpm)".
-    iDestruct (fs_L0_big with "Hpm") as "Hpm".
+    iMod (fs_alloc (fs_C0 dk cov)) as (γfs) "(HaL & HaD & Hpm)".
+    iDestruct (fs_C0_big with "Hpm") as "Hpm".
     (* SCOPE the split.  A bare [rewrite !big_sepS_sep] rewrites the whole
        [envs_entails] -- hypotheses AND the (existentially quantified)
        conclusion -- and does not come back. *)
@@ -431,11 +431,11 @@ Section FsBoot.
      slots.  The header keeps its NAMED content; the slots go existential
      (which is all [log_state] records for them). *)
   Lemma fs_log_region_split (γfs : fs_names) (dk : Z -> bv 8) (logstart : Z) :
-    ([∗ set] b ∈ log_region_set logstart, fsblock γfs b (fs_blocks dk b))
-      ⊢ fsblock γfs (log_hdr_bno logstart)
+    ([∗ set] b ∈ log_region_set logstart, fs_chalf γfs b (fs_blocks dk b))
+      ⊢ fs_chalf γfs (log_hdr_bno logstart)
                 (fs_blocks dk (log_hdr_bno logstart)) ∗
         ([∗ list] i ∈ seq 0 LOGBLOCKS,
-           ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs).
+           ∃ bs : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs).
   Proof.
     rewrite /log_region_set.
     rewrite big_sepS_union;
@@ -443,7 +443,7 @@ Section FsBoot.
          rewrite elem_of_list_to_set; apply log_hdr_not_slot ].
     rewrite big_sepS_singleton.
     rewrite (big_sepS_list_to_set
-               (fun b => fsblock γfs b (fs_blocks dk b))
+               (fun b => fs_chalf γfs b (fs_blocks dk b))
                ((fun i => log_slot_bno logstart i) <$> seq 0 LOGBLOCKS)
                (log_slot_list_nodup logstart)).
     rewrite big_sepL_fmap.
@@ -481,15 +481,15 @@ Section FsBoot.
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (bn : bio_names) (γfs : fs_names),
       bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS_FS ∗
-      ghost_map_auth (fs_L γfs) 1 (fs_L0 dk cov) ∗
+      ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
-      fsblock γfs (log_hdr_bno logstart)
+      fs_chalf γfs (log_hdr_bno logstart)
               (fs_blocks dk (log_hdr_bno logstart)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
-         ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs) ∗
+         ∃ bs : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs) ∗
       ([∗ set] b ∈ cov ∖ log_region_set logstart,
-         fsblock γfs b (fs_blocks dk b)) ∗
+         fs_chalf γfs b (fs_blocks dk b)) ∗
       (* the exclusive per-block tokens, whole and undivided: the log
          region's own blocks are owned by the log layer, everything else by
          whoever the (future) bitmap invariant hands them to.  Purely

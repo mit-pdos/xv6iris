@@ -26,7 +26,7 @@
    (4) THE HANDLE.  [bm_held_swap] exchanges the traveling bytes inside a
        [bio_held] (the whole of what bmap does to the buffer), and
        [bm_held_content] is the agreement that identifies those bytes with
-       the caller's own [fsblock] half -- i.e. with [ind_bytes (bm_ent bm)].
+       the caller's own [fs_chalf] half -- i.e. with [ind_bytes (bm_ent bm)].
        That agreement is the load-bearing coupling of the indirect arm: it
        is what makes the word the code reads out of the buffer BE the entry
        list's entry [q]. *)
@@ -420,14 +420,14 @@ Section BmapRes.
     bio_held bn V k pidv dev bno bs bsl bsd d -∗ ⌜(k < NBUF)%nat⌝.
   Proof. rewrite /bio_held. iIntros "(%A & _)". done. Qed.
 
-  (* THE COUPLING of the indirect arm: the caller's own [fsblock] half
+  (* THE COUPLING of the indirect arm: the caller's own [fs_chalf] half
      against the handle's machinery half pins the buffer's logical content.
      With [bio_locked] (bs = bsl) that is the BYTES, which is what makes the
      word the code reads out of [bp->data] be the entry list's entry. *)
   Lemma bm_held_content (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
-    fsblock γfs (uint bno) bs0 -∗
+    fs_chalf γfs (uint bno) bs0 -∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
     ⌜bsl = bs0⌝.
   Proof.
@@ -435,9 +435,9 @@ Section BmapRes.
     iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
     destruct d.
     - iDestruct "Hpay" as "[Hm _]".
-      iApply (fsblock_mdirty_agree with "Hc Hm").
+      iApply (fs_chalf_mdirty_agree with "Hc Hm").
     - iDestruct "Hpay" as "[Hm _]".
-      iApply (fsblock_mclean_agree with "Hc Hm").
+      iApply (fs_chalf_mclean_agree with "Hc Hm").
   Qed.
 
 End BmapRes.

@@ -33,7 +33,7 @@
 
    - SUCCESS -- a nonzero block b, with the two facts every FS-layer
      consumer of a block number needs ([b] is covered, and it is NOT one of
-     the log's own storage blocks), plus b's own [fsblock] half at ALL
+     the log's own storage blocks), plus b's own [fs_chalf] half at ALL
      ZEROES: bzero has already log_written the block as a zero block, so
      the caller receives a zeroed block and not an arbitrary one.  Spends
      TWO budget units -- the bitmap's log_write plus bzero's.
@@ -74,7 +74,7 @@
    SpecInitlog.v takes [sb + 20].  The bitmap block and its FREE POOL live
    in [BitmapInv.bitmap_inv], a persistent Iris invariant at an
    EXISTENTIAL set: the contract says nothing about which bits are set,
-   and the postcondition's [fsblock] + [blk_own] come out of the pool at
+   and the postcondition's [fs_chalf] + [blk_own] come out of the pool at
    log_write's own ghost step ([BitmapInv.bitmap_alloc_au], the supplier
    for [SpecLogWrite.wp_log_write_au]).  This is [InodeRegion]'s shape,
    one layer over; claude-notes/design/fs-bitmap.md has the argument.
@@ -252,9 +252,9 @@ Definition wp_balloc_sconf_body
           ⌜bv_unsigned blk <> 0⌝ ∗
           ⌜bv_unsigned blk ∈ cov⌝ ∗
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-          fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+          fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
           (* THE FRESHNESS CLAIM, and the reason it has to be a resource
-             rather than a pure fact: [fsblock] is a HALF ghost_map element,
+             rather than a pure fact: [fs_chalf] is a HALF ghost_map element,
              so two of them at one key compose to a valid full element and
              say nothing about disjointness.  [blk_own] is the FULL element,
              so a caller that also holds one per block its own structures
@@ -383,7 +383,7 @@ Definition wp_balloc_gen_body
           ⌜bv_unsigned blk <> 0⌝ ∗
           ⌜bv_unsigned blk ∈ cov⌝ ∗
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-          fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+          fs_chalf γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
           blk_own γfs (bv_unsigned blk) ∗
           log_opS γ (if cr then S u else u)
                     (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗

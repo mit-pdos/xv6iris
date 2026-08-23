@@ -439,7 +439,7 @@ Section WriteHeadDefs.
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
-    (uint bno ↪[fs_L γfs]{#(1/2)} bsl ∗
+    (uint bno ↪[fs_cache γfs]{#(1/2)} bsl ∗
      uint bno ↪[fs_dirty γfs]{#(1/2)} d ∗
      (if d then ∃ q : Qp, bref bn k q dv bno else True)).
   Proof.
@@ -451,7 +451,7 @@ Section WriteHeadDefs.
   Lemma wh_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs : list (bv 8)) (d : bool) :
-    (uint bno ↪[fs_L γfs]{#(1/2)} bs) -∗
+    (uint bno ↪[fs_cache γfs]{#(1/2)} bs) -∗
     (uint bno ↪[fs_dirty γfs]{#(1/2)} d) -∗
     (if d then ∃ q : Qp, bref bn k q dv bno else True) -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bs bs d.
@@ -481,8 +481,8 @@ Section WriteHeadDefs.
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
         ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-        ghost_map_auth (fs_L γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
-        fsblock γfs (log_hdr_bno logstart) bs' -∗
+        ghost_map_auth (fs_cache γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
+        fs_chalf γfs (log_hdr_bno logstart) bs' -∗
         ⌜hdr_n bs' = Z.of_nat n⌝ -∗
         ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
         bslot -∗
@@ -564,11 +564,11 @@ Section WriteHeadBlocks.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wh_frame m -∗
     wh_hold bn (fs_view γfs γd dev cov) k pidv dev bno f bsd0 -∗
-    (logstart ↪[fs_L γfs]{#(1/2)} bs0) -∗
+    (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
     (logstart ↪[fs_dirty γfs]{#(1/2)} d0) -∗
     (if d0 then ∃ q : Qp, bref bn k q dev bno else True) -∗
-    ghost_map_auth (fs_L γfs) 1 L -∗
-    fsblock γfs (log_hdr_bno logstart) bsh -∗
+    ghost_map_auth (fs_cache γfs) 1 L -∗
+    fs_chalf γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
@@ -700,7 +700,7 @@ Section WriteHeadBlocks.
     { intros c Hcs N2 N8 N9 N18.
       rewrite (callee_saved_lookup Hcs1_cs c Hcs). exact (HT2thr c Hcs N2 N8 N9 N18). }
     (* ---- THE GHOST STEP: the logged view moves at the header's key ---- *)
-    iMod (fsblock_update γfs L (log_hdr_bno logstart) bsh (f <$> seq 0 1024) bs0
+    iMod (fs_chalf_update γfs L (log_hdr_bno logstart) bsh (f <$> seq 0 1024) bs0
             with "HLauth Hfsb HpL") as "((%Hbs0 & %Hlk) & HLauth & Hfsb & HpL)".
     (* ---- and the payload is re-paired at the written bytes ---- *)
     iEval (rewrite -Hbnou) in "HpL".
@@ -1075,11 +1075,11 @@ Section WriteHeadBlocks.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wh_frame m -∗
     wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f bsd0 -∗
-    (logstart ↪[fs_L γfs]{#(1/2)} bs0) -∗
+    (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
     (logstart ↪[fs_dirty γfs]{#(1/2)} d0) -∗
     (if d0 then ∃ q : Qp, bref bn kk q dev bno else True) -∗
-    ghost_map_auth (fs_L γfs) 1 L -∗
-    fsblock γfs (log_hdr_bno logstart) bsh -∗
+    ghost_map_auth (fs_cache γfs) 1 L -∗
+    fs_chalf γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗

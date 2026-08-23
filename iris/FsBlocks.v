@@ -1,44 +1,57 @@
-(* FsBlocks.v -- the log layer's LOGGED-VIEW ghost over the FS block range,
-   and its instantiation of the bio layer's client view (bio_view).
+(* FsBlocks.v -- the block layer's two content maps, and the log layer's
+   instantiation of the bio layer's client view (bio_view).
 
-   Design: claude-notes/design/fs-log.md.  Two ghost maps over block
-   numbers, each entry split half/half:
+   Design: claude-notes/design/fs-log.md, section "The ghost state".
 
-   - γL (the logged view L): D overlaid with every log_write of the current
-     open batch.  [fsblock] is the CLIENT half -- the FS layer's points-to
-     for logical block content; the machinery half rides inside the bio
-     layer as the payload below.  Two halves agree with no auth in sight
-     (that is bread's postcondition); UPDATING needs the auth, which lives
-     in the log lock's resource (LogInv.v, stage 2) -- so log_write (under
-     log.lock) and the committer (who checks the auth out) are the only
-     writers of L.  That freeze-by-auth is what carries "log slot i holds
-     L(W[i])" from write_log through install_trans.
+   THERE ARE TWO CONTENT MAPS, and which one a resource is a share of is
+   the whole distinction between "what the buffer cache believes" and
+   "what the file system owns".
 
-   - γdirty: is the block in the current pinned write set
+   - [fs_cache] -- the bio-side block CACHE map C, keyed by BLOCK number,
+     values whole-block byte lists.  Its AUTH lives in the log lock's
+     resource ([LogInv.log_state]), which is the freeze: during commit the
+     committer owns the auth outright, so C cannot move and "log slot i
+     holds C(W[i])" carries from write_log through install_trans.  Each
+     covered block's element is split half/half: the MACHINERY half rides
+     inside the bio layer (pool -> escrow -> handle) as the payloads
+     [fs_mclean]/[fs_mdirty] below, and the PARKED half is [fs_chalf].
+     Two halves agree with no auth in sight; UPDATING needs the auth plus
+     both halves, so log_write (under log.lock) and the committer are the
+     only writers of C.
+
+   - the LOGGED VIEW L, keyed by BYTE ADDRESS -- section [FsBytes] at the
+     bottom of this file.  [byte_range] / [fsblock] are runs of FULL,
+     therefore EXCLUSIVE, ghost_map elements, which is what lets the layer
+     above own a SUB-BLOCK object and why bio may hold no share of this
+     map at all.  The two maps are tied inside [fs_bytes_inv] (namespace
+     [logN]), which is also where the home blocks' PARKED cache halves
+     live.
+
+   - [fs_dirty]: is the block in the current pinned write set
      (logged-uncommitted-or-uninstalled)?  Half in the payload, half (plus
      the auth) in the log lock's resource, recording exactly the membership
      of lh.block[].  Flipped false->true by log_write, true->false by
      install_trans at its bunpin.
 
-   The bio payloads: clean = L-half + dirty-half-at-false; dirty = L-half +
-   dirty-half-at-true.  Bio moves them opaquely; only holders of the log
-   auth convert.
+   The bio payloads: clean = cache-half + dirty-half-at-false; dirty =
+   cache-half + dirty-half-at-true.  Bio moves them opaquely; only holders
+   of the cache auth convert.
 
-   - γown (the EXCLUSIVE per-block ownership token, [blk_own]): a third
-     ghost map, unit-valued, whose elements are FULL-fraction and therefore
-     incompatible with themselves.  It exists because [fsblock] cannot do
+   - [fs_own] (the EXCLUSIVE per-block ownership token, [blk_own]): a
+     unit-valued ghost map whose elements are FULL-fraction and therefore
+     incompatible with themselves.  It exists because [fs_chalf] cannot do
      that job: it is a HALF, so two owners each holding a half of one key
      is perfectly consistent, and the layer above (the inode block map)
      needs "two file indices never name one disk block" -- [blk_own_ne].
-     The AUTHORITY over this map belongs to the bitmap/free-block
-     invariant, which is not designed yet; until it is, nothing holds the
-     auth and nothing needs it.  Only the elements' exclusivity is
-     load-bearing, and that holds with no auth in sight. *)
+     The byte view's [fsblock_excl] gives that directly, so [blk_own] is
+     retired when the consumers flip (durable-disk 1c / fs-state.md #2);
+     until then nothing holds its auth and nothing needs it. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac.
 From iris.base_logic.lib Require Import ghost_map.
+From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvPtsto.
@@ -49,7 +62,7 @@ Local Open Scope Z_scope.
 
 
 Record fs_names := MkFsNames {
-  fs_L     : gname;   (* the logged view *)
+  fs_cache     : gname;   (* the logged view *)
   fs_dirty : gname;   (* the pinned-set flag *)
   fs_own   : gname;   (* the exclusive per-block ownership token *)
 }.
@@ -59,10 +72,10 @@ Section FsBlocks.
 
   (* the FS layer's points-to for a block's logical content (the client
      half of the logged view) *)
-  Definition fsblock (γ : fs_names) (bno : Z) (bs : list (bv 8)) : iProp Σ :=
-    bno ↪[fs_L γ]{#(1/2)} bs.
+  Definition fs_chalf (γ : fs_names) (bno : Z) (bs : list (bv 8)) : iProp Σ :=
+    bno ↪[fs_cache γ]{#(1/2)} bs.
 
-  (* EXCLUSIVE ownership of a block.  Unlike [fsblock] (a half, so two
+  (* EXCLUSIVE ownership of a block.  Unlike [fs_chalf] (a half, so two
      holders of one key are consistent) this token is a FULL-fraction
      ghost_map element: nobody else can hold one at the same block.  The
      inode layer's block-map injectivity is [blk_own_ne] below. *)
@@ -92,10 +105,10 @@ Section FsBlocks.
 
   (* the machinery halves: the bio payloads *)
   Definition fs_mclean (γ : fs_names) (bno : Z) (bs : list (bv 8)) : iProp Σ :=
-    (bno ↪[fs_L γ]{#(1/2)} bs ∗ bno ↪[fs_dirty γ]{#(1/2)} false)%I.
+    (bno ↪[fs_cache γ]{#(1/2)} bs ∗ bno ↪[fs_dirty γ]{#(1/2)} false)%I.
 
   Definition fs_mdirty (γ : fs_names) (bno : Z) (bs : list (bv 8)) : iProp Σ :=
-    (bno ↪[fs_L γ]{#(1/2)} bs ∗ bno ↪[fs_dirty γ]{#(1/2)} true)%I.
+    (bno ↪[fs_cache γ]{#(1/2)} bs ∗ bno ↪[fs_dirty γ]{#(1/2)} true)%I.
 
   Global Instance fs_mclean_timeless γ b bs : Timeless (fs_mclean γ b bs).
   Proof. apply _. Qed.
@@ -109,18 +122,18 @@ Section FsBlocks.
       (fun b bs => fs_mclean_timeless γ b bs)
       (fun b bs => fs_mdirty_timeless γ b bs).
 
-  (* what a caller of bread learns on contact: its own fsblock half against
+  (* what a caller of bread learns on contact: its own fs_chalf half against
      the handle's machinery half pins the returned bytes.  Stated for both
      payload polarities. *)
-  Lemma fsblock_mclean_agree γ bno bs bs' :
-    fsblock γ bno bs -∗ fs_mclean γ bno bs' -∗ ⌜bs' = bs⌝.
+  Lemma fs_chalf_mclean_agree γ bno bs bs' :
+    fs_chalf γ bno bs -∗ fs_mclean γ bno bs' -∗ ⌜bs' = bs⌝.
   Proof.
     iIntros "Hc [Hm _]".
     iDestruct (ghost_map_elem_agree with "Hm Hc") as %Heq. done.
   Qed.
 
-  Lemma fsblock_mdirty_agree γ bno bs bs' :
-    fsblock γ bno bs -∗ fs_mdirty γ bno bs' -∗ ⌜bs' = bs⌝.
+  Lemma fs_chalf_mdirty_agree γ bno bs bs' :
+    fs_chalf γ bno bs -∗ fs_mdirty γ bno bs' -∗ ⌜bs' = bs⌝.
   Proof.
     iIntros "Hc [Hm _]".
     iDestruct (ghost_map_elem_agree with "Hm Hc") as %Heq. done.
@@ -128,14 +141,14 @@ Section FsBlocks.
 
   (* the logged-view update (log_write's ghost step): auth + both halves.
      The auth is the log lock's (stage 2); nothing else can move L. *)
-  Lemma fsblock_update γ (L : gmap Z (list (bv 8))) bno bs bs_new bs' :
-    ghost_map_auth (fs_L γ) 1 L -∗
-    fsblock γ bno bs -∗
-    (bno ↪[fs_L γ]{#(1/2)} bs') ==∗
+  Lemma fs_chalf_update γ (L : gmap Z (list (bv 8))) bno bs bs_new bs' :
+    ghost_map_auth (fs_cache γ) 1 L -∗
+    fs_chalf γ bno bs -∗
+    (bno ↪[fs_cache γ]{#(1/2)} bs') ==∗
     ⌜bs' = bs /\ L !! bno = Some bs⌝ ∗
-    ghost_map_auth (fs_L γ) 1 (<[bno := bs_new]> L) ∗
-    fsblock γ bno bs_new ∗
-    (bno ↪[fs_L γ]{#(1/2)} bs_new).
+    ghost_map_auth (fs_cache γ) 1 (<[bno := bs_new]> L) ∗
+    fs_chalf γ bno bs_new ∗
+    (bno ↪[fs_cache γ]{#(1/2)} bs_new).
   Proof.
     iIntros "Ha Hc Hm".
     iDestruct (ghost_map_elem_agree with "Hc Hm") as %->.
@@ -168,7 +181,7 @@ Section FsBlocks.
 
   (* allocation, from an initial content map (the mkfs image's covered
      range): the two auths, and PER BLOCK all four client-side pieces --
-     the fsblock client half, the machinery-clean payload (which pairs
+     the fs_chalf client half, the machinery-clean payload (which pairs
      with the boot-side [disk_block]s to form [bio_init]'s pool bundles),
      the LOG-SIDE dirty half (which stocks [log_state]'s all-false
      big-op), and the exclusive [blk_own] token (which the allocator layer
@@ -181,10 +194,10 @@ Section FsBlocks.
      and the elements' exclusivity needs no auth. *)
   Lemma fs_alloc (L0 : gmap Z (list (bv 8))) :
     ⊢ |==> ∃ γ : fs_names,
-      ghost_map_auth (fs_L γ) 1 L0 ∗
+      ghost_map_auth (fs_cache γ) 1 L0 ∗
       ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
       [∗ map] bno ↦ bs ∈ L0,
-        fsblock γ bno bs ∗ fs_mclean γ bno bs ∗
+        fs_chalf γ bno bs ∗ fs_mclean γ bno bs ∗
         (bno ↪[fs_dirty γ]{#(1/2)} false) ∗ blk_own γ bno.
   Proof.
     iMod (ghost_map_alloc L0) as (γL) "[HaL HL]".
@@ -198,7 +211,507 @@ Section FsBlocks.
     intros bno bs Hbs. iIntros "[[HL HD] HO]".
     iDestruct "HL" as "[HL1 HL2]".
     iDestruct "HD" as "[HD1 HD2]".
-    rewrite /fsblock /fs_mclean /blk_own. iFrame.
+    rewrite /fs_chalf /fs_mclean /blk_own. iFrame.
   Qed.
 
 End FsBlocks.
+
+(* ===================================================================== *)
+(*  THE LOGGED VIEW L, KEYED BY BYTE ADDRESS  (durable-disk 1c)          *)
+(*                                                                       *)
+(*  Design of record: claude-notes/design/fs-state.md §0/§1/§5.  The     *)
+(*  FS-facing view of a block's content is no longer the HALF of a       *)
+(*  block-keyed element -- it is a run of FULL, byte-keyed ghost_map     *)
+(*  elements, one per byte address [b*BSIZE + off + k].  Full elements   *)
+(*  are EXCLUSIVE, which is what lets the layer above own a SUB-BLOCK    *)
+(*  object (an inode record, a directory entry) and what makes           *)
+(*  [free_bitmap]'s "a block nobody else can own" argument run.          *)
+(*                                                                      *)
+(*  The price of exclusivity is that bio can no longer hold a share of   *)
+(*  this map: the buffer cache's belief about a block rides in the       *)
+(*  block-keyed CACHE map ([fs_cache], the payloads' [fs_chalf]) and the *)
+(*  two are tied inside the log-layer invariant [fs_bytes_inv] below.    *)
+(*  A [bread] client turns "the payload says the buffer holds [bsm]"     *)
+(*  into "[bsm] is what my byte elements say" by OPENING that invariant; *)
+(*  the old auth-free half/half agreement is gone.                       *)
+(*                                                                      *)
+(*  Everything here is stated over BARE GHOST NAMES (the standing rule:  *)
+(*  ghost names are parameters).                                        *)
+(*                                                                      *)
+(*  TYPING.  The byte map is a [ghost_map Z (bv 8)], and this tree has   *)
+(*  exactly ONE source of that instance -- [DiskImg.diskImgG], reached   *)
+(*  through [RiscvPtsto.riscvF_diskGS] (see DiskImg.v's header).  A      *)
+(*  second field in [fsLogG] would be a second, non-interacting Sigma    *)
+(*  slot and would break the disk image's own auth/fragment pairing, so  *)
+(*  the logged view rides the same class at its own gname.               *)
+(* ===================================================================== *)
+
+(* [BSIZE] at Z.  Stated at Z and never at nat: a nat equality against a
+   four-digit literal materialises a unary chain (durable-notes). *)
+Definition BSZ : Z := 1024.
+
+Lemma BSZ_BSIZE : Z.of_nat BSIZE = BSZ.
+Proof. vm_compute. reflexivity. Qed.
+
+(* two distinct blocks' byte ranges do not meet *)
+Lemma blk_range_disj (b b' a : Z) :
+  b * BSZ <= a < b * BSZ + BSZ ->
+  b' * BSZ <= a < b' * BSZ + BSZ ->
+  b = b'.
+Proof. unfold BSZ. lia. Qed.
+
+Definition logN : namespace := nroot .@ "fslogbytes".
+
+Section FsBytes.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
+
+  (* ------------------------------------------------------------------ *)
+  (*  1.  The points-to run                                              *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [bs] resides at byte offset [off] of block [b], at FULL ownership. *)
+  Definition byte_range (gL : gname) (b off : Z) (bs : list (bv 8)) : iProp Σ :=
+    ([∗ list] k ↦ v ∈ bs, (b * BSZ + off + Z.of_nat k) ↪[gL] v)%I.
+
+  (* the whole-block form: every current consumer of the old block half
+     spells this. *)
+  Definition fsblock (gL : gname) (b : Z) (bs : list (bv 8)) : iProp Σ :=
+    (⌜length bs = BSIZE⌝ ∗ byte_range gL b 0 bs)%I.
+
+  Global Instance byte_range_timeless gL b off bs :
+    Timeless (byte_range gL b off bs).
+  Proof. apply _. Qed.
+  Global Instance fsblock_timeless gL b bs : Timeless (fsblock gL b bs).
+  Proof. apply _. Qed.
+
+  Lemma fsblock_length gL b bs : fsblock gL b bs -∗ ⌜length bs = BSIZE⌝.
+  Proof. iIntros "[% _]". done. Qed.
+
+  Lemma BSIZE_pos : (0 < BSIZE)%nat.
+  Proof. apply Nat2Z.inj_lt. rewrite BSZ_BSIZE. unfold BSZ. lia. Qed.
+
+  (* THE POINT OF THE RE-KEYING.  Two owners of one block's bytes is a
+     contradiction -- the old block-keyed HALF was consistent with itself,
+     which is exactly why [blk_own] had to exist as a separate token. *)
+  Lemma fsblock_excl gL b bs bs' :
+    fsblock gL b bs -∗ fsblock gL b bs' -∗ False.
+  Proof.
+    iIntros "[%Hl Hr] [%Hl' Hr']".
+    assert (Hs : is_Some (bs !! 0%nat)).
+    { apply lookup_lt_is_Some. rewrite Hl. exact BSIZE_pos. }
+    destruct Hs as [v Hv].
+    assert (Hs' : is_Some (bs' !! 0%nat)).
+    { apply lookup_lt_is_Some. rewrite Hl'. exact BSIZE_pos. }
+    destruct Hs' as [v' Hv'].
+    rewrite /byte_range.
+    iDestruct (big_sepL_lookup _ _ 0%nat v Hv with "Hr") as "H1".
+    iDestruct (big_sepL_lookup _ _ 0%nat v' Hv' with "Hr'") as "H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hval _].
+    exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hval).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2.  The run as a map, so the ghost_map big-op lemmas apply         *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma big_sepM_map_seqZ (Phi : Z -> bv 8 -> iProp Σ) (start : Z)
+      (xs : list (bv 8)) :
+    ([∗ map] a ↦ v ∈ (map_seqZ start xs : gmap Z (bv 8)), Phi a v)
+    ⊣⊢ ([∗ list] k ↦ v ∈ xs, Phi (start + Z.of_nat k) v).
+  Proof.
+    revert start. induction xs as [|x xs IH]; intros start.
+    - simpl. rewrite big_sepM_empty //.
+    - rewrite map_seqZ_cons big_sepM_insert; [| apply map_seqZ_cons_disjoint].
+      rewrite IH big_sepL_cons.
+      assert (Hz : start + Z.of_nat 0 = start) by lia. rewrite Hz.
+      f_equiv. apply big_sepL_proper. intros k y _.
+      assert (Hs : Z.succ start + Z.of_nat k = start + Z.of_nat (S k)) by lia.
+      rewrite Hs //.
+  Qed.
+
+  Lemma byte_range_map (gL : gname) (b off : Z) (bs : list (bv 8)) :
+    byte_range gL b off bs ⊣⊢
+      ([∗ map] a ↦ v ∈ (map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)),
+         a ↪[gL] v).
+  Proof. rewrite /byte_range big_sepM_map_seqZ //. Qed.
+
+  (* two runs pinned to the same authority at the same start and length
+     are the same run *)
+  Lemma map_seqZ_inj (xs ys : list (bv 8)) (start : Z) (L : gmap Z (bv 8)) :
+    length xs = length ys ->
+    (map_seqZ start xs : gmap Z (bv 8)) ⊆ L ->
+    (map_seqZ start ys : gmap Z (bv 8)) ⊆ L ->
+    xs = ys.
+  Proof.
+    intros Hlen H1 H2. apply list_eq. intros k.
+    destruct (xs !! k) as [x|] eqn:Hx.
+    - assert (Hy : is_Some (ys !! k)).
+      { apply lookup_lt_is_Some. rewrite -Hlen.
+        apply lookup_lt_is_Some. by exists x. }
+      destruct Hy as [y Hy]. rewrite Hy. f_equal.
+      apply (lookup_map_seqZ_Some_inv start) in Hx.
+      apply (lookup_map_seqZ_Some_inv start) in Hy.
+      pose proof (map_subseteq_spec (map_seqZ start xs : gmap Z (bv 8)) L) as [Hs1 _].
+      pose proof (map_subseteq_spec (map_seqZ start ys : gmap Z (bv 8)) L) as [Hs2 _].
+      specialize (Hs1 H1 _ _ Hx). specialize (Hs2 H2 _ _ Hy). congruence.
+    - symmetry. apply lookup_ge_None. rewrite -Hlen.
+      by apply lookup_ge_None.
+  Qed.
+
+  (* what the auth says about an owned run *)
+  Lemma byte_range_lookup gL (L : gmap Z (bv 8)) b off bs :
+    ghost_map_auth gL 1 L -∗ byte_range gL b off bs -∗
+    ⌜(map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)) ⊆ L⌝.
+  Proof.
+    iIntros "Ha Hr". rewrite byte_range_map.
+    iApply (ghost_map_lookup_big with "Ha Hr").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  3.  THE UPDATE, AT BYTE-RANGE GRANULARITY                          *)
+  (*                                                                     *)
+  (*  Stated at [off]/[bs]/[bs'] rather than at whole blocks so that     *)
+  (*  stage 2's sub-block owners (an inode record, a dirent) use it      *)
+  (*  without the log moving again.  It is the pure ghost step: the auth *)
+  (*  plus the FULL elements of the bytes that change.                   *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma byte_range_update_at gL (L : gmap Z (bv 8)) (start : Z)
+      (bs bs' : list (bv 8)) :
+    length bs' = length bs ->
+    ghost_map_auth gL 1 L -∗
+    ([∗ list] k ↦ v ∈ bs, (start + Z.of_nat k) ↪[gL] v) ==∗
+    ghost_map_auth gL 1 ((map_seqZ start bs' : gmap Z (bv 8)) ∪ L) ∗
+    ([∗ list] k ↦ v ∈ bs', (start + Z.of_nat k) ↪[gL] v).
+  Proof.
+    revert bs' start L. induction bs as [|x bs IH]; intros bs' start L Hlen.
+    - destruct bs'; [| simpl in Hlen; lia].
+      iIntros "Ha _". simpl. rewrite left_id_L. by iFrame.
+    - destruct bs' as [|x' bs']; [simpl in Hlen; lia |].
+      simpl in Hlen.
+      iIntros "Ha Hr". rewrite big_sepL_cons.
+      iDestruct "Hr" as "[Hhd Htl]".
+      assert (Hz : start + Z.of_nat 0 = start) by lia.
+      rewrite Hz.
+      iMod (ghost_map_update x' with "Ha Hhd") as "[Ha Hhd]".
+      iAssert ([∗ list] k ↦ v ∈ bs, (Z.succ start + Z.of_nat k) ↪[gL] v)%I
+        with "[Htl]" as "Htl".
+      { iApply (big_sepL_proper with "Htl"). intros k y _.
+        assert (Hs : start + Z.of_nat (S k) = Z.succ start + Z.of_nat k) by lia.
+        rewrite Hs //. }
+      iMod (IH bs' (Z.succ start) (<[start := x']> L) ltac:(lia) with "Ha Htl")
+        as "[Ha Htl]".
+      iModIntro.
+      rewrite map_seqZ_cons.
+      rewrite -(insert_union_l (map_seqZ (Z.succ start) bs') L start x').
+      rewrite (insert_union_r (map_seqZ (Z.succ start) bs') L start x');
+        [| apply map_seqZ_cons_disjoint].
+      iFrame "Ha".
+      rewrite big_sepL_cons Hz. iFrame "Hhd".
+      iApply (big_sepL_proper with "Htl"). intros k y _.
+      assert (Hs : Z.succ start + Z.of_nat k = start + Z.of_nat (S k)) by lia.
+      rewrite Hs //.
+  Qed.
+
+  Lemma byte_range_update gL (L : gmap Z (bv 8)) b off bs bs' :
+    length bs' = length bs ->
+    ghost_map_auth gL 1 L -∗ byte_range gL b off bs ==∗
+    ghost_map_auth gL 1 ((map_seqZ (b * BSZ + off) bs' : gmap Z (bv 8)) ∪ L) ∗
+    byte_range gL b off bs'.
+  Proof.
+    intros Hlen. rewrite /byte_range.
+    iIntros "Ha Hr".
+    iApply (byte_range_update_at gL L (b * BSZ + off) bs bs' Hlen with "Ha Hr").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  4.  THE LOG-LAYER INVARIANT: the cache map against the byte view   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [L] resides exactly the byte range of the covered (home) blocks. *)
+  Definition bytes_dom (L : gmap Z (bv 8)) (home : gset Z) : Prop :=
+    forall a, is_Some (L !! a)
+              <-> exists b, b ∈ home /\ b * BSZ <= a < b * BSZ + BSZ.
+
+  (* every cache entry reads off [L] *)
+  Definition bytes_tie (L : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) : Prop :=
+    forall b bs, C !! b = Some bs ->
+                 (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ⊆ L.
+
+  (* THE BODY.  [gL] is the byte view's name, [gc] the cache's.  The
+     invariant holds the byte AUTH and, per home block, the cache
+     element's OTHER half -- the half the FS client used to hold.  That
+     placement is what keeps [log_state] (the spinlock resource) holding
+     the cache auth OUTRIGHT, so the freeze-by-auth during commit, and
+     every proof that rides it (write_head, install_trans, end_op's
+     write_log), is untouched by the re-keying.
+
+     TIMELESS, and it has to be: [log_write] opens it inside the same
+     ghost step that fires the client's atomic update, with no program
+     step left to absorb a later. *)
+  Definition fs_bytes_body (gL gc : gname) (home : gset Z) : iProp Σ :=
+    (∃ (L : gmap Z (bv 8)) (C : gmap Z (list (bv 8))),
+       ghost_map_auth gL 1 L ∗
+       ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#(1/2)} bs) ∗
+       ⌜dom C = home⌝ ∗
+       ⌜forall b bs, C !! b = Some bs -> length bs = BSIZE⌝ ∗
+       ⌜bytes_tie L C⌝ ∗ ⌜bytes_dom L home⌝)%I.
+
+  Global Instance fs_bytes_body_timeless gL gc home :
+    Timeless (fs_bytes_body gL gc home).
+  Proof. apply _. Qed.
+
+  Definition fs_bytes_inv (gL gc : gname) (home : gset Z) : iProp Σ :=
+    inv logN (fs_bytes_body gL gc home).
+
+  Global Instance fs_bytes_inv_persistent gL gc home :
+    Persistent (fs_bytes_inv gL gc home).
+  Proof. apply _. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  5.  What a bread client gets: C(b) IS L's bytes at b               *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma fs_bytes_agree (E : coPset) gL gc home b bs bsm :
+    ↑logN ⊆ E -> b ∈ home ->
+    fs_bytes_inv gL gc home -∗
+    fsblock gL b bs -∗
+    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs⌝ ∗ fsblock gL b bs ∗ (b ↪[gc]{#(1/2)} bsm).
+  Proof.
+    iIntros (HE Hb) "#Hinv Hfb Hm".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    assert (Hin : is_Some (C !! b)).
+    { apply elem_of_dom. rewrite Hdom. exact Hb. }
+    destruct Hin as [bsi Hbsi].
+    iDestruct (big_sepM_lookup_acc _ _ b bsi Hbsi with "HC") as "[Hi Hback]".
+    iDestruct (ghost_map_elem_agree with "Hm Hi") as %->.
+    iDestruct "Hfb" as "[%Hlb Hr]".
+    iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
+    rewrite Z.add_0_r in Hsub.
+    assert (Hbe : bs = bsi).
+    { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
+      - rewrite Hlb (Hlens b bsi Hbsi) //.
+      - exact (Htie b bsi Hbsi). }
+    iMod ("Hclose" with "[Ha Hback Hi]") as "_".
+    { iNext. iExists L, C. iFrame "Ha". iSplitL; [by iApply "Hback" |].
+      iPureIntro. auto. }
+    iModIntro. iFrame "Hm". rewrite /fsblock. iFrame "Hr".
+    iSplit; [iPureIntro; congruence | done].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  6.  log_write's ghost step                                         *)
+  (*                                                                     *)
+  (*  The whole-block instance of §3's byte-range update: the writer      *)
+  (*  presents the block's full byte run and the handle's cache half,     *)
+  (*  the log presents the cache auth (it holds log.lock), the invariant  *)
+  (*  supplies the cache element's other half and the byte auth.  What is *)
+  (*  LEARNED is that the checked-out buffer's parked bytes are exactly   *)
+  (*  the writer's view -- so the writer never has to name them.          *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma fsblock_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
+      (b : Z) (bs bs_new bsm : list (bv 8)) :
+    ↑logN ⊆ E -> b ∈ home -> length bs_new = BSIZE ->
+    fs_bytes_inv gL gc home -∗
+    ghost_map_auth gc 1 C -∗
+    fsblock gL b bs -∗
+    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs /\ C !! b = Some bs⌝ ∗
+      ghost_map_auth gc 1 (<[b := bs_new]> C) ∗
+      fsblock gL b bs_new ∗
+      (b ↪[gc]{#(1/2)} bs_new).
+  Proof.
+    iIntros (HE Hb Hlnew) "#Hinv Hca Hfb Hm".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (L C0) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    assert (Hin : is_Some (C0 !! b)).
+    { apply elem_of_dom. rewrite Hdom. exact Hb. }
+    destruct Hin as [bsi Hbsi].
+    iDestruct (big_sepM_insert_acc _ _ b bsi Hbsi with "HC") as "[Hi Hback]".
+    iDestruct (ghost_map_elem_agree with "Hm Hi") as %->.
+    iDestruct "Hfb" as "[%Hlb Hr]".
+    iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
+    rewrite Z.add_0_r in Hsub.
+    assert (Hbe : bs = bsi).
+    { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
+      - rewrite Hlb (Hlens b bsi Hbsi) //.
+      - exact (Htie b bsi Hbsi). }
+    (* the cache element moves: both halves plus the log's auth *)
+    iCombine "Hm Hi" as "He".
+    iDestruct (ghost_map_lookup with "Hca He") as %Hclk.
+    iMod (ghost_map_update bs_new with "Hca He") as "[Hca He]".
+    iDestruct "He" as "[Hm Hi]".
+    (* the byte view moves *)
+    iMod (byte_range_update gL L b 0 bs bs_new with "Ha Hr") as "[Ha Hr]".
+    { rewrite Hlnew Hlb //. }
+    rewrite Z.add_0_r.
+    assert (Hdomeq : dom (map_seqZ (b * BSZ) bs_new : gmap Z (bv 8))
+                     = dom (map_seqZ (b * BSZ) bsi : gmap Z (bv 8))).
+    { apply set_eq. intros a.
+      rewrite !elem_of_dom !lookup_map_seqZ_is_Some.
+      rewrite Hlnew (Hlens b bsi Hbsi). done. }
+    assert (Hnew_sub : dom (map_seqZ (b * BSZ) bs_new : gmap Z (bv 8)) ⊆ dom L).
+    { rewrite Hdomeq. apply subseteq_dom. exact (Htie b bsi Hbsi). }
+    assert (Hrange : forall a,
+              is_Some ((map_seqZ (b * BSZ) bs_new : gmap Z (bv 8)) !! a) ->
+              b * BSZ <= a < b * BSZ + BSZ).
+    { intros a Hs. apply lookup_map_seqZ_is_Some in Hs.
+      rewrite Hlnew BSZ_BSIZE in Hs. lia. }
+    iMod ("Hclose" with "[Ha Hback Hi]") as "_".
+    { iNext. iExists ((map_seqZ (b * BSZ) bs_new : gmap Z (bv 8)) ∪ L),
+                     (<[b := bs_new]> C0).
+      iFrame "Ha".
+      iSplitL.
+      { iApply ("Hback" with "Hi"). }
+      iPureIntro. split; [| split; [| split]].
+      - rewrite dom_insert_L Hdom.
+        assert (Hbh : b ∈ home) by exact Hb. set_solver.
+      - intros b' bs' Hb'.
+        destruct (decide (b' = b)) as [->|Hne].
+        + rewrite lookup_insert in Hb'. congruence.
+        + rewrite lookup_insert_ne in Hb'; [| done]. exact (Hlens b' bs' Hb').
+      - intros b' bs' Hb'.
+        destruct (decide (b' = b)) as [->|Hne].
+        + rewrite lookup_insert in Hb'. injection Hb' as <-.
+          apply map_union_subseteq_l.
+        + rewrite lookup_insert_ne in Hb'; [| done].
+          apply map_subseteq_spec. intros a v Hav.
+          apply lookup_union_Some_raw. right. split.
+          * apply eq_None_not_Some. intros Hs.
+            pose proof (Hrange a Hs) as Hrg.
+            apply lookup_map_seqZ_Some in Hav as [Hge Hlk].
+            assert (Hlt : a < b' * BSZ + BSZ).
+            { apply lookup_lt_Some in Hlk.
+              rewrite (Hlens b' bs' Hb') in Hlk.
+              revert Hlk. rewrite -BSZ_BSIZE. lia. }
+            exact (Hne (blk_range_disj b' b a (conj Hge Hlt) Hrg)).
+          * pose proof (map_subseteq_spec
+                          (map_seqZ (b' * BSZ) bs' : gmap Z (bv 8)) L) as [Hs _].
+            exact (Hs (Htie b' bs' Hb') a v Hav).
+      - intros a. rewrite -Hdm. split.
+        + intros [v Hv]. apply lookup_union_Some_raw in Hv as [Hv | [_ Hv]].
+          * apply elem_of_dom. apply Hnew_sub. apply elem_of_dom. by exists v.
+          * by exists v.
+        + intros Hs. apply lookup_union_is_Some. by right. }
+    iModIntro. rewrite /fsblock.
+    iSplitR.
+    { iPureIntro. split; [congruence | rewrite Hbe; exact Hclk]. }
+    iFrame "Hca Hm Hr". iPureIntro. exact Hlnew.
+  Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (*  7.  THE MINT                                                       *)
+  (*                                                                     *)
+  (*  The byte view is born from the cache map: one FULL byte run per     *)
+  (*  home block, and the cache elements' spare halves are swallowed by   *)
+  (*  the invariant on the way in.  This is what the boot-time            *)
+  (*  distribution calls once, in place of handing every FS client a      *)
+  (*  block half.                                                        *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma byte_map_grow (gL : gname) (C : gmap Z (list (bv 8)))
+      (L0 : gmap Z (bv 8)) (h0 : gset Z) :
+    (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
+    (forall b, b ∈ dom C -> b ∉ h0) ->
+    bytes_dom L0 h0 ->
+    ghost_map_auth gL 1 L0 ==∗
+    ∃ L : gmap Z (bv 8),
+      ⌜bytes_dom L (h0 ∪ dom C)⌝ ∗ ⌜bytes_tie L C⌝ ∗
+      ghost_map_auth gL 1 L ∗ ([∗ map] b ↦ bs ∈ C, fsblock gL b bs).
+  Proof.
+    revert L0 h0.
+    induction C as [|b bs C' Hb IH] using map_ind;
+      intros L0 h0 Hlen Hfresh Hdm.
+    - iIntros "Ha". iModIntro. iExists L0.
+      rewrite dom_empty_L right_id_L big_sepM_empty.
+      iFrame "Ha". iPureIntro. split; [exact Hdm |].
+      intros b' bs' Hb'. rewrite lookup_empty in Hb'. done.
+    - iIntros "Ha".
+      iMod (IH L0 h0 with "Ha") as (L') "(%Hdm' & %Htie' & Ha & HC)".
+      { intros b' bs' Hb'. apply (Hlen b' bs').
+        rewrite lookup_insert_ne; [done |]. congruence. }
+      { intros b' Hb'. apply Hfresh. rewrite dom_insert_L. set_solver. }
+      { exact Hdm. }
+      (* the new block's byte run is fresh *)
+      assert (Hbnot : b ∉ h0 ∪ dom C').
+      { intros Hin. apply elem_of_union in Hin as [Hin | Hin].
+        - apply (Hfresh b); [| exact Hin]. rewrite dom_insert_L. set_solver.
+        - apply elem_of_dom in Hin as [x Hx]. congruence. }
+      assert (Hlb : length bs = BSIZE).
+      { apply (Hlen b bs). by rewrite lookup_insert. }
+      assert (Hdisj : (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ##ₘ L').
+      { apply map_disjoint_spec. intros a v1 v2 H1 H2.
+        assert (Hr1 : b * BSZ <= a < b * BSZ + BSZ).
+        { assert (Hs1 : is_Some ((map_seqZ (b * BSZ) bs : gmap Z (bv 8)) !! a))
+            by (by exists v1).
+          apply lookup_map_seqZ_is_Some in Hs1.
+          rewrite Hlb BSZ_BSIZE in Hs1. exact Hs1. }
+        assert (Hs : is_Some (L' !! a)) by (by exists v2).
+        apply Hdm' in Hs as (b'' & Hb'' & Hr2).
+        apply Hbnot. rewrite (blk_range_disj b b'' a Hr1 Hr2). exact Hb''. }
+      iMod (ghost_map_insert_big
+              (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) Hdisj with "Ha")
+        as "[Ha Hnew]".
+      iModIntro.
+      iExists ((map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ∪ L').
+      iSplitR.
+      { iPureIntro. intros a. split.
+        - intros Hs. apply lookup_union_is_Some in Hs as [Hs | Hs].
+          + exists b. split.
+            * rewrite dom_insert_L. set_solver.
+            * apply lookup_map_seqZ_is_Some in Hs.
+              rewrite Hlb BSZ_BSIZE in Hs. exact Hs.
+          + apply Hdm' in Hs as (b'' & Hb'' & Hr).
+            exists b''. split; [| exact Hr].
+            rewrite dom_insert_L. set_solver.
+        - intros (b'' & Hb'' & Hr). apply lookup_union_is_Some.
+          rewrite dom_insert_L in Hb''.
+          destruct (decide (b'' = b)) as [->|Hne].
+          + left. apply lookup_map_seqZ_is_Some.
+            rewrite Hlb BSZ_BSIZE. exact Hr.
+          + right. apply Hdm'. exists b''. split; [| exact Hr]. set_solver. }
+      iSplitR.
+      { iPureIntro. intros b' bs' Hb'.
+        destruct (decide (b' = b)) as [->|Hne].
+        - rewrite lookup_insert in Hb'. injection Hb' as <-.
+          apply map_union_subseteq_l.
+        - rewrite lookup_insert_ne in Hb'; [| done].
+          etrans; [exact (Htie' b' bs' Hb') |].
+          by apply map_union_subseteq_r. }
+      iFrame "Ha".
+      rewrite big_sepM_insert; [| exact Hb].
+      iSplitL "Hnew".
+      { rewrite /fsblock /byte_range.
+        iSplitR; [iPureIntro; exact Hlb |].
+        rewrite big_sepM_map_seqZ.
+        iApply (big_sepL_proper with "Hnew"). intros k y _.
+        assert (Hz : b * BSZ + Z.of_nat k = b * BSZ + 0 + Z.of_nat k) by lia.
+        rewrite Hz //. }
+      iExact "HC".
+  Qed.
+
+  Lemma fs_bytes_alloc (E : coPset) (gc : gname) (C : gmap Z (list (bv 8))) :
+    (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
+    ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#(1/2)} bs) ={E}=∗
+      ∃ gL : gname,
+        fs_bytes_inv gL gc (dom C) ∗
+        ([∗ map] b ↦ bs ∈ C, fsblock gL b bs).
+  Proof.
+    iIntros (Hlen) "HC".
+    iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (gL) "Ha".
+    iMod (byte_map_grow gL C ∅ ∅ Hlen with "Ha") as (L) "(%Hdm & %Htie & Ha & Hfb)".
+    { intros b' _. set_solver. }
+    { intros a. split.
+      - intros [v Hv]. rewrite lookup_empty in Hv. done.
+      - intros (b' & Hb' & _). set_solver. }
+    rewrite left_id_L in Hdm.
+    iMod (inv_alloc logN E (fs_bytes_body gL gc (dom C)) with "[Ha HC]") as "#Hinv".
+    { iNext. iExists L, C. iFrame "Ha HC". iPureIntro. auto. }
+    iModIntro. iExists gL. iFrame "Hinv Hfb".
+  Qed.
+
+End FsBytes.

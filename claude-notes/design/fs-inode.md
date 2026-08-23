@@ -79,11 +79,17 @@ quantified clause each.
   list was all-zero too. Vacuous on the resulting `bm'` (its `bm_ind` is
   nonzero) and preserved everywhere else.
 
-### Injectivity is NOT derivable from `fsblock` — the ownership token
+### Injectivity is NOT derivable from the CACHE half — the ownership token
+
+(Superseded once the byte view's consumers flip: `FsBlocks.fsblock` is now
+a run of FULL byte elements and `fsblock_excl` gives injectivity directly,
+which is what retires `blk_own`. `fs-state.md` §2, `durable-disk.md` 1c.
+The reading below is why the token exists while clients still hold
+`fs_chalf`.)
 
 The first draft of this document asserted that "`balloc`'s freshness
 re-establishes injectivity at every insertion". **That was wrong, and it
-blocked bmap's proof.** `fsblock γ b bs` is `b ↪[fs_L γ]{#(1/2)} bs` — a
+blocked bmap's proof.** `fs_chalf γ b bs` is `b ↪[fs_cache γ]{#(1/2)} bs` — a
 HALF. Two owners each holding a half of one key is perfectly consistent:
 they `iCombine` into a valid full element (machine-checked). The third half
 that *would* contradict is the machinery half, and it lives inside
@@ -92,7 +98,7 @@ Adding `inode_blocks` does not rescue it either: aliasing then merely yields
 `data i = replicate BSIZE 0`, which is not absurd.
 
 So the layer needs an **exclusive** per-block ownership token, and it lives
-in the block layer beside `γL` and `γdirty` (not bolted onto the inode
+in the block layer beside `fs_cache` and `fs_dirty` (not bolted onto the inode
 layer — "which owner holds block `b`" is FS-block-layer state, and it is
 what the bitmap invariant will need when `balloc` is finally proved):
 

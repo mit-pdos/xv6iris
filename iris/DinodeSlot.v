@@ -684,13 +684,13 @@ Section IupdateRes.
     iSplitL "H5"; [iExact "H5" |]. iSplitL "H6"; [iExact "H6" |]. iExact "H7".
   Qed.
 
-  (* THE COUPLING: the caller's own [fsblock] half against the handle's
+  (* THE COUPLING: the caller's own [fs_chalf] half against the handle's
      machinery half pins the buffer's logical content -- which is what
      makes the bytes bread returned BE [diblk_bytes ds]. *)
   Lemma iu_held_content (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
-    fsblock γfs (uint bno) bs0 -∗
+    fs_chalf γfs (uint bno) bs0 -∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
     ⌜bsl = bs0⌝.
   Proof.
@@ -698,9 +698,9 @@ Section IupdateRes.
     iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
     destruct d.
     - iDestruct "Hpay" as "[Hm _]".
-      iApply (fsblock_mdirty_agree with "Hc Hm").
+      iApply (fs_chalf_mdirty_agree with "Hc Hm").
     - iDestruct "Hpay" as "[Hm _]".
-      iApply (fsblock_mclean_agree with "Hc Hm").
+      iApply (fs_chalf_mclean_agree with "Hc Hm").
   Qed.
 
   (* the buffer's byte LIST, as the [ByteBuf] window the slot accessor
@@ -739,7 +739,7 @@ Section IupdateRes.
   Qed.
 
   (* THE MACHINERY HALF, out of the handle and back.  [InodeInv.ireg_read_blk]
-     needs the block's OTHER [fs_L] half to pin the region's parked bytes to
+     needs the block's OTHER [fs_cache] half to pin the region's parked bytes to
      the ones bread returned, and the handle's payload carries exactly that --
      on BOTH polarities.
 
@@ -752,8 +752,8 @@ Section IupdateRes.
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
+      (uint bno ↪[fs_cache γfs]{#(1/2)} bsl) ∗
+      ((uint bno ↪[fs_cache γfs]{#(1/2)} bsl) -∗
        bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.

@@ -1293,7 +1293,7 @@ Section IreclaimOrphan.
         client half out of the handle and hands back a wand to return it.
         That half, at bytes which decode to a record with a nonzero type,
         IS licence (e) -- and it is STRONGER than §20.4's [bio_locked]
-        sketch: the [fs_L] element sits at half-plus-half, so while this
+        sketch: the [fs_cache] element sits at half-plus-half, so while this
         walk holds one half no [ireg_write_au] / [ireg_claim_au] /
         [ireg_free_au] at ANY inum of this block can fire (§7.1.3, §16.2's
         serialiser as a resource fact rather than a paragraph).
@@ -1319,7 +1319,7 @@ Section IreclaimOrphan.
        exactly like the block half beside it. *)
     iAssert (iname γi γfs inodestart inum (BufL (uint bno) ds))
       with "[HpL Hboot]" as "Hlic".
-    { rewrite /iname /fsblock -Hbseq. iFrame "HpL Hboot". iPureIntro.
+    { rewrite /iname /fs_chalf -Hbseq. iFrame "HpL Hboot". iPureIntro.
       (* THE BLOCK TIE, discharged HERE and only here (SIMP-1): this walk is
          the one site in the tree that presents licence (e), and the real
          equation is its own [Hbnoeq]. *)
@@ -1338,10 +1338,10 @@ Section IreclaimOrphan.
        rest home carries. *)
     iDestruct (runit_any_intro with "Hru") as "Hru".
     (* ...and the half goes straight back into the handle, unspent.  The
-       unfolding is done IN the hypothesis: [fs_L]'s ghost_map notation is
+       unfolding is done IN the hypothesis: [fs_cache]'s ghost_map notation is
        not in scope in this file, and writing the target proposition out
        would import it for one line. *)
-    iEval (rewrite /iname /fsblock -Hbseq) in "Hlic".
+    iEval (rewrite /iname /fs_chalf -Hbseq) in "Hlic".
     iDestruct "Hlic" as "(HpL & _ & _ & _ & Hboot)".
     iDestruct ("Hlkback" with "HpL") as "Hlk".
     iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0)

@@ -62,7 +62,9 @@ half is proven and unused (`LogInv.log_mirror_tie_deposit`, `:889-905`).
 
 The log's interface after this stage is `fs-state.md` §5 and nothing else.
 Four lanes; 1a and 1b share `FsCrash.v`/`ProofEndOp.v` and run in
-sequence; 1c is independent of both; 1d lands last.
+sequence; 1c's byte layer is independent, but its CONSUMER FLIP wants 1a
+landed first (1c's step 5: the recovering install still moves the cache
+map at home blocks); 1d lands last.
 
 - [ ] **1a. H2 + H2a together: custody at birth, recovery a ghost no-op.**
       The old H2a was right and under-costed; its "no write ever re-bases"
@@ -147,31 +149,86 @@ sequence; 1c is independent of both; 1d lands last.
         free maintenance sites) prove the row; the gate `log_mirror_tie` /
         `log_mirror_tie_pending` (`LogInv.v:803-888`) dies, `_body` and
         `_deposit` survive.
-- [ ] **1c. Byte-keyed `fs_L` with FULL-element clients; bio's share moves to `γcache`.**
-      - `FsBlocks.v:62-70`: `fs_L : ghost_map Z (bv 8)` keyed by byte
-        address; `fsblock b bs := [∗ list] k ↦ v ∈ bs, (b·BSIZE+k) ↪[fs_L] v`
-        at dfrac 1 (the derived whole-block form keeps every current
-        consumer's interface); `blk_own` stays for now (it is deleted when
-        `free_bitmap Γ` replaces the pool in stage 2).
-      - The bio payloads `Ψc`/`Ψd` (`fs-log.md` §"The ghost state") stop
-        holding an `fs_L` half: bio holds halves of a bio-side
-        `γcache : ghost_map Z (list (bv 8))` (block-keyed is fine there);
-        a log-layer INVARIANT `inv logN (∃ L C, auth L ∗ auth C ∗
-        ⌜∀ b cached, C b = bytes of L at b⌝)` — the `fs_L` auth moves from
-        the spinlock resource `log_state` (`LogInv.v:1077`) into this
-        invariant, with `log_state` keeping what it needs to freeze `L`
-        during commit (a ½ of the auth, or a token) — `log_write` opens it
-        under `log.lock`; `bread`'s client opens it to turn `bytes = C(b)`
-        into `bytes = L(b)`.  Timelessness of every payload is kept.
-      - `log_write`'s ghost update becomes: learn the checked-out buffer's
-        bytes equal `L(b)` on every byte (`γcache` half vs its auth), the
-        writer's stores touched only its range (the buffer's memory
-        points-tos), update the `fs_L` elements of the bytes that differ
-        (auth + the writer's full elements).  `ProofLogWrite`'s absorb and
-        append arms, `ProofBread`/`ProofBrelse`/`ProofBwrite` and the bio
-        escrow proofs are the footprint.
-      - `dom L = cov` (at byte granularity: the covered blocks' byte range)
-        as a `logN` conjunct — 1b's missing fact.
+- [~] **1c. Byte-keyed logged view with FULL-element clients; bio's share
+      moves to the block CACHE map.**  The byte layer, its invariant and
+      the three crossings are LANDED in `FsBlocks.v`; the CONSUMER FLIP is
+      what is left.  Design: `fs-log.md` §"The ghost state".
+      - LANDED.
+        - The old block-keyed map is the CACHE map: `fs_names`' field is
+          `fs_cache`, its parked half is `fs_chalf γ b bs`, `FsBoot`'s
+          initial map is `fs_C0`.  Every consumer of the old `fsblock` was
+          renamed to `fs_chalf`, which frees the name `fsblock` for the
+          byte form.
+        - `byte_range gL b off bs` and `fsblock gL b bs` over a
+          `ghost_map Z (bv 8)` at dfrac 1.  TYPING: the byte map rides
+          `DiskImg.diskImgG` (`RiscvPtsto.riscvF_diskGS`), the tree's
+          UNIQUE `ghost_mapG Σ Z (bv 8)`; a second field in `fsLogG` is a
+          second Σ slot and breaks the disk image's own auth/fragment
+          pairing (it does, measurably: `RiscvAdequacy`'s
+          `ghost_map_auth γdisk 1 ∅` stops framing).
+        - `fs_bytes_inv gL gc home` at `logN`: the byte auth, the home
+          blocks' parked cache halves, `bytes_tie` (each cache entry is
+          `L` read at the block's byte range) and `bytes_dom` (`L` resides
+          EXACTLY `home`'s byte range — this IS 1b's missing
+          `dom L ⊇ fs_home_set`, at byte granularity).  Body TIMELESS.
+        - `fs_bytes_agree` (replaces the ½/½ agreement; a fupd at any
+          `E ⊇ ↑logN`), `fsblock_update` (log_write's ghost step:
+          invariant + cache auth + writer's `fsblock` + handle's cache
+          half), `byte_range_update` (`∀ off bs bs'` — the stage-2-ready
+          engine, so sub-block owners need no further log change),
+          `fs_bytes_alloc` (the mint).
+      - THE FREEZE, and why.  The cache AUTH stays in `log_state`
+        OUTRIGHT and the invariant holds only the parked HALF.  So the
+        commit's freeze-by-auth, `write_head`, `install_trans` and
+        `end_op`'s `write_log` are untouched by the re-keying.  The
+        alternative (splitting the cache auth ½/½ with `logN`) was
+        rejected: it makes every `C`-update site open `logN` for nothing.
+      - LEFT: the flip.  It is ONE indivisible step — nothing above the
+        log can move until the mint moves — in this order:
+        1. `fs_alloc` takes `home`, calls `fs_bytes_alloc` on the home
+           restriction of `C0`, and hands out `fsblock` for a home block,
+           `fs_chalf` for a log-region one.  `FsBoot.fs_boot_ghosts` /
+           `fs_boot_bundle`, `FsCfgBoot`'s kit and `FirstTok.first_fsinit`
+           re-export the split plus the persistent `fs_bytes_inv` row.
+        2. Every home-block client's invariant re-states its parked
+           resource as `fsblock`: `BitmapInv` (bitmap block + free pool),
+           `InodeRegion` (`ireg_blks`), `InodeInv`, `IgetLic`'s `BufL`,
+           `IcacheBoot`/`IcacheEscrow`/`EscrowDeposit`, `FsImgBridge`.
+           `log_state`'s header + slot rows stay `fs_chalf` — the log's
+           own storage is NOT in the FS byte view, which is why `home` is
+           `cov ∖ log_region_set logstart` and not `cov`.
+        3. Every bread client's agreement becomes a fupd taking
+           `fs_bytes_inv` and `↑logN ⊆ E`: `DinodeSlot.iu_held_content`,
+           `InodeRegion.ireg_read` and its three siblings,
+           `BitmapInv.bitmap_read`/`_own`, `ProofBmapParts`,
+           `ProofReadiParts`, `ProofWriteiParts`, `ProofInitlog`'s local
+           copy, `ProofInstallTrans.it_pay_bs`.  These are the specs above
+           the log whose statements MUST change, and the reason is the ½
+           form itself: an auth-free agreement does not exist once the
+           client's ownership is exclusive.
+        4. `SpecLogWrite`'s AU KEEPS its shape `|={⊤,Efs}=> … ={Efs,⊤}=∗`.
+           `log_write` opens `logN` INSIDE the opened AU, at mask `Efs`,
+           so all the spec gains is the pure side condition
+           `↑logN ⊆ Efs` — satisfied by every supplier as written
+           (`⊤∖↑iregN`, `⊤∖↑bitmapN`, and `⊤` for the degenerate
+           `wp_log_write_gen`).  `ProofLogWrite`'s ghost step then calls
+           the new `fsblock_update` between `iMod "Hau"` and
+           `iMod "HauClose"`.
+           WHERE THE PERSISTENT ROW COMES FROM: `log_ctx γ bn γfs cov
+           logstart dev` is already threaded to `log_write`, so
+           `fs_bytes_inv` is a conjunct of it and no call site moves.
+           `bitmap_inv` likewise has `cov`/`ls` and can carry its own.
+           `ireg_inv γi γfs inodestart nib` has neither, so it takes a
+           `home : gset Z` parameter (or `ireg_read` takes the row) —
+           that is the one arity change the flip forces.
+        5. THE OPEN POINT, and it decides the lane order: the RECOVERING
+           install (`ProofInstallTrans`'s `recovering = true` arm, in
+           `it_cont`/`it_out`, fed by `ProofInitlog`'s `Hhomes`) holds
+           `fs_chalf` for the HOME blocks of the on-disk header's write
+           set and MOVES `C` at them.  After the flip those halves are
+           inside `logN`.  Either that arm opens `logN` and moves both
+           maps, or **1a lands first** and the arm holds nothing.  1a
+           first is the cheaper order.
 - [ ] **1d. The parked payload and the two AUs; `γD`.**
       - `γD : ghost_map Z (bv 8)` (byte-keyed), fixed-layer gname beside
         `riscv_disk_name`; its auth is `fr_D` inside `P_disk`

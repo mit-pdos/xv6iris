@@ -54,7 +54,7 @@
        proved.
 
    THE COUPLING THAT MAKES THE LOOP WORK is [rd_held_content]: the
-   block's own [fsblock] half, borrowed out of [inode_blocks] with
+   block's own [fs_chalf] half, borrowed out of [inode_blocks] with
    [inode_blocks_acc], against the bio handle's machinery half pins the
    buffer's bytes to [data fbn].  either_copyout then reads exactly the
    window [o, o+m) of that list, so the byte it delivered at destination

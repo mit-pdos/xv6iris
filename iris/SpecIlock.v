@@ -64,7 +64,7 @@
    The three persistent invariants replace what v1 asked a caller to own
    outright: [itable_inv] (the [ref] words -- v1's [i_ref ip ↦₄{dqr} refv]
    premise was UNSATISFIABLE, design §4), [ic_escrow] (the entry's content),
-   [ireg_inv] (the inode region -- v1's [fsblock] of the whole inode block,
+   [ireg_inv] (the inode region -- v1's [fs_chalf] of the whole inode block,
    plus its [diblk_wf] and its conditional-slot premise, all three of which
    §11.3 retires).  The sleeplock protects only [ic_tok cn k], the checkout
    token; the CONTENT travels through the escrow, because iget rewrites a

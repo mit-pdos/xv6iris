@@ -44,7 +44,7 @@
    and the log side's DIRTY half of the home block:
 
      [∗ list] i |-> w in W,
-        fsblock (log_slot_bno logstart i)   (Lw i) *   (* its log copy    *)
+        fs_chalf (log_slot_bno logstart i)   (Lw i) *   (* its log copy    *)
         (uint w) |->[fs_dirty]{1/2} true
 
    plus the PURE tie for the home side:
@@ -52,12 +52,12 @@
      forall i w, W !! i = Some w -> L !! uint w = Some (Lw i)
 
    A COMMITTER-SIDE CONTRACT WITNESSES HOME CONTENT THROUGH THE AUTHORITY IT
-   HOLDS, NOT THROUGH A CLIENT HALF -- a home block's [fsblock] is
+   HOLDS, NOT THROUGH A CLIENT HALF -- a home block's [fs_chalf] is
    UNOBTAINABLE here.  The home blocks' client halves belong to the FS layer
    above by construction (log_write hands each one back to its caller, and
    [log_state] retains only the log REGION's), so end_op -- the only caller
    with a non-empty write set -- could never discharge such a premise.  What
-   the committer does hold is [ghost_map_auth (fs_L γfs) 1 L], and one
+   the committer does hold is [ghost_map_auth (fs_cache γfs) 1 L], and one
    [ghost_map_lookup] against the payload the bread returns pins the home
    block's bytes to [L !! uint w], which the pure premise identifies with
    [Lw i].  The log slot's client half stays a resource: it rides in
@@ -73,7 +73,7 @@
    -- bwrite moves the home block's disk cell, which is the whole point of
    the pass.
 
-   [ghost_map_auth (fs_L γfs) 1 L] rides through UNCHANGED: install writes
+   [ghost_map_auth (fs_cache γfs) 1 L] rides through UNCHANGED: install writes
    the DISK, not the logical view (the memmove writes bytes already equal to
    the logged content).  [ghost_map_auth (fs_dirty γfs) 1 D] does move: each
    entry's flip true -> false at its bunpin needs the authority plus both
@@ -208,7 +208,7 @@ Definition wp_install_trans_sconf_body
   NoDup (map uint W) ->
   (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
   (* THE HOME SIDE'S CONTENT WITNESS, as a fact about the authority below:
-     a client [fsblock] for a home block cannot be had on the committer's
+     a client [fs_chalf] for a home block cannot be had on the committer's
      side (see the header).  COMMIT-TIME ONLY: at recovering = 1 the home
      block holds its OLD content -- the whole point of the pass -- and the
      caller supplies the home CLIENT halves instead (the [if recovering]
@@ -263,7 +263,7 @@ Definition wp_install_trans_sconf_body
   (* the logged view's authority: FROZEN at commit time (install writes the
      disk, not L); at recovering = 1 it MOVES, entry by entry, to the slots'
      logged contents ([it_rec_L] -- see its header) *)
-  ghost_map_auth (fs_L γfs) 1 L -∗
+  ghost_map_auth (fs_cache γfs) 1 L -∗
   (* the pinned-set authority: exactly W's entries go back to false at
      commit time; nothing moves at recovery (nothing is pinned in a fresh
      era, and the bunpin is skipped) *)
@@ -277,8 +277,8 @@ Definition wp_install_trans_sconf_body
          left there ([Bh i]) -- at boot the log layer still holds every
          covered block's client half, and the L update is what moves it. *)
   ([∗ list] i ↦ w ∈ W,
-     fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-     (if recovering then fsblock γfs (uint w) (Bh i)
+     fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+     (if recovering then fs_chalf γfs (uint w) (Bh i)
       else (uint w) ↪[fs_dirty γfs]{#(1/2)} true)) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
   bslots 2 -∗
@@ -331,13 +331,13 @@ Definition wp_install_trans_sconf_body
       (* the in-memory header, unchanged (lh.n := 0 is the CALLER's store) *)
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
       ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-      ghost_map_auth (fs_L γfs) 1
+      ghost_map_auth (fs_cache γfs) 1
         (if recovering then it_rec_L W Lw L else L) -∗
       ghost_map_auth (fs_dirty γfs) 1
         (if recovering then D else dirty_clear D (map uint W)) -∗
       ([∗ list] i ↦ w ∈ W,
-         fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-         (if recovering then fsblock γfs (uint w) (Lw i)
+         fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+         (if recovering then fs_chalf γfs (uint w) (Lw i)
           else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
       (* the two units back, PLUS -- at commit time -- one per entry: each
          bunpin frees the pin unit log_write's bpin absorbed.  The bunpin

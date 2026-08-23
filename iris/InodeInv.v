@@ -37,8 +37,8 @@
 
    [inode_map] is the block MAP -- the thirteen addrs cells plus, when the
    indirect entry is nonzero, the indirect block's own logical content as
-   an [fsblock] at the byte ENCODING of the entry list ([BlockWords.v]'s
-   [ind_bytes]).  [inode_blocks] is the file's DATA -- one [fsblock] per
+   an [fs_chalf] at the byte ENCODING of the entry list ([BlockWords.v]'s
+   [ind_bytes]).  [inode_blocks] is the file's DATA -- one [fs_chalf] per
    allocated file index.  They are split because bmap needs only the first
    and a whole-file operation needs both.  ip->dev rides separately as a
    fractional cell ([i_dev ip |->4{dq} dev]); bmap only reads it. *)
@@ -501,7 +501,7 @@ Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
 (* [bfree] hands the freed block back to [BitmapInv.free_blk], whose
    [length bs = BSIZE] conjunct is the obligation; [inode_blocks] names a
    block's contents but says nothing about their length, and
-   [FsBlocks.fsblock] is a bare ghost_map half with no length side
+   [FsBlocks.fs_chalf] is a bare ghost_map half with no length side
    condition anywhere above it.  So the fact is not derivable and must be
    CARRIED.
 
@@ -520,7 +520,7 @@ Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
    [inode_blocks] and [blk_holes_zero] stop at MAXFILE.  [i < MAXFILE] is
    all itrunc's loops touch.
 
-   The design note argues the BETTER home is [fsblock] itself (the length
+   The design note argues the BETTER home is [fs_chalf] itself (the length
    is a block-layer truth, and [BitmapInv.free_blk] already pairs the two
    by hand); that change is recorded there and left unmade.               *)
 Definition inode_sized (data : nat -> list (bv 8)) : Prop :=
@@ -759,10 +759,10 @@ Section InodeRes.
      entry list.  Nothing when there is no indirect block. *)
   Definition ind_blk (γfs : fs_names) (bm : blkmap) : iProp Σ :=
     (if decide (bv_unsigned (bm_ind bm) = 0) then True
-     else fsblock γfs (bv_unsigned (bm_ind bm)) (ind_bytes (bm_ent bm)))%I.
+     else fs_chalf γfs (bv_unsigned (bm_ind bm)) (ind_bytes (bm_ent bm)))%I.
 
   (* ...and the EXCLUSIVE ownership token for that same block.  Split off
-     from the content half deliberately: [fsblock] is a HALF ghost_map
+     from the content half deliberately: [fs_chalf] is a HALF ghost_map
      element, so two of them at one key are consistent and carry no
      disjointness at all; [blk_own] is the full element and is the only
      thing that can re-establish [blkmap_wf]'s injectivity when a freshly
@@ -779,11 +779,11 @@ Section InodeRes.
   Definition inode_map (γfs : fs_names) (ip : mword 64) (bm : blkmap) : iProp Σ :=
     (inode_addrs ip (bm_cells bm) ∗ ind_res γfs bm)%I.
 
-  (* --- inode_blocks: one fsblock per allocated file index ------------- *)
+  (* --- inode_blocks: one fs_chalf per allocated file index ------------- *)
 
   Definition blk_res (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) : iProp Σ :=
     (if decide (bv_unsigned w = 0) then True
-     else fsblock γfs (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w))%I.
+     else fs_chalf γfs (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w))%I.
 
   Definition inode_blocks (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) : iProp Σ :=
@@ -792,7 +792,7 @@ Section InodeRes.
   (* ------------------------------------------------------------------ *)
   (*  BUILDING [inode_blocks] FROM BLOCK-GRANULAR RESOURCES              *)
   (*                                                                     *)
-  (*  A boot client (and, in general, anyone holding one [fsblock]/       *)
+  (*  A boot client (and, in general, anyone holding one [fs_chalf]/       *)
   (*  [blk_own] pair per DISK BLOCK NUMBER) has its resources keyed by    *)
   (*  block number; [inode_blocks] is keyed by FILE INDEX.  This is that  *)
   (*  change of granularity, and it is stated so that the 268-element     *)
@@ -886,12 +886,12 @@ Section InodeRes.
     (forall i : nat, (i < MAXFILE)%nat ->
        bv_unsigned (blkmap_get bm i) <> 0 ->
        data i = ct (bv_unsigned (blkmap_get bm i))) ->
-    ([∗ set] b ∈ V, fsblock γfs b (ct b) ∗ blk_own γfs b) -∗
+    ([∗ set] b ∈ V, fs_chalf γfs b (ct b) ∗ blk_own γfs b) -∗
     inode_blocks γfs bm data.
   Proof.
     intros Hinj Hmem Hdata. rewrite /inode_blocks.
     apply (big_sepS_reindex
-             (fun b => fsblock γfs b (ct b) ∗ blk_own γfs b)%I
+             (fun b => fs_chalf γfs b (ct b) ∗ blk_own γfs b)%I
              (fun i => blk_res γfs (blkmap_get bm i) (data i))
              (fun i => bv_unsigned (blkmap_get bm i))
              (seq 0 MAXFILE) V).
@@ -933,7 +933,7 @@ Section InodeRes.
        data i = ct (bv_unsigned (blkmap_get bm i))) ->
     (bv_unsigned (bm_ind bm) <> 0 ->
        ind_bytes (bm_ent bm) = ct (bv_unsigned (bm_ind bm))) ->
-    ([∗ set] b ∈ U, fsblock γfs b (ct b) ∗ blk_own γfs b) -∗
+    ([∗ set] b ∈ U, fs_chalf γfs b (ct b) ∗ blk_own γfs b) -∗
     inode_blocks γfs bm data ∗ ind_res γfs bm.
   Proof.
     intros Hinj Hmem Hdata Hib.
@@ -974,7 +974,7 @@ Section InodeRes.
           - rewrite (bm_slot_lt bm i Hi) bm_slot_top. apply bv_eq, Heq. }
         lia. }
       rewrite (big_sepS_delete
-                 (fun b => fsblock γfs b (ct b) ∗ blk_own γfs b)%I U
+                 (fun b => fs_chalf γfs b (ct b) ∗ blk_own γfs b)%I U
                  (bv_unsigned (bm_ind bm)) Hind).
       iIntros "[Hi Hrest]". iSplitR "Hi".
       { iApply (inode_blocks_of_slots γfs bm (U ∖ {[bv_unsigned (bm_ind bm)]})
@@ -1084,10 +1084,10 @@ Section InodeRes.
       (data : nat -> list (bv 8)) (i : nat) :
     (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
     inode_blocks γfs bm data -∗
-      (fsblock γfs (bv_unsigned (blkmap_get bm i)) (data i) ∗
+      (fs_chalf γfs (bv_unsigned (blkmap_get bm i)) (data i) ∗
        blk_own γfs (bv_unsigned (blkmap_get bm i))) ∗
       (∀ bs : list (bv 8),
-         fsblock γfs (bv_unsigned (blkmap_get bm i)) bs -∗
+         fs_chalf γfs (bv_unsigned (blkmap_get bm i)) bs -∗
          blk_own γfs (bv_unsigned (blkmap_get bm i)) -∗
          inode_blocks γfs bm (<[i := bs]> data)).
   Proof.
@@ -1129,7 +1129,7 @@ Section InodeRes.
     blkmap_get bm' bn = b ->
     (forall i : nat, (i < MAXFILE)%nat -> i <> bn -> blkmap_get bm' i = blkmap_get bm i) ->
     inode_blocks γfs bm data -∗
-    fsblock γfs (bv_unsigned b) bs -∗
+    fs_chalf γfs (bv_unsigned b) bs -∗
     blk_own γfs (bv_unsigned b) -∗
     inode_blocks γfs bm' (<[bn := bs]> data).
   Proof.
@@ -1165,7 +1165,7 @@ Section InodeRes.
      for a block [b] -- which is exactly what balloc's success arm hands
      over -- rules [b] out of every nonzero slot the inode already names,
      because the bundles hold a token for each of those.
-     This is the ONLY route to injectivity: [fsblock] is a HALF ghost_map
+     This is the ONLY route to injectivity: [fs_chalf] is a HALF ghost_map
      element, so two of them at one key compose to a perfectly valid full
      element and carry no disjointness whatever.  [ind_tok] rather than
      [ind_res] is the premise so a caller that has spent the indirect

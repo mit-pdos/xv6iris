@@ -92,7 +92,7 @@ Local Open Scope Z_scope.
       [BufL]     (e)  the caller holds the inode BLOCK's client half at
                       bytes that decode to a record with a nonzero type.
                       §7.1.3's improvement on §20.4: the resource is
-                      [FsBlocks.fsblock], one level below [bio_locked], and
+                      [FsBlocks.fs_chalf], one level below [bio_locked], and
                       it is STRONGER -- the element sits at ½+½, so a client
                       holding one half means no [ireg_write_au] /
                       [ireg_claim_au] / [ireg_free_au] at ANY inum of that
@@ -107,7 +107,7 @@ Local Open Scope Z_scope.
 
 (*  THREE CONSTRUCTORS CARRY DATA, AND THAT IS FORCED BY "THE SAME [l]".
     §7.1.1 wrote (a), (c) and (e) with the licence's content hidden behind a
-    [∃] -- [∃ d, dinode_at …], [∃ ds, fsblock …].  A post that returns the
+    [∃] -- [∃ d, dinode_at …], [∃ ds, fs_chalf …].  A post that returns the
     licence "at the same [l]" then returns a DIFFERENT resource: the caller
     lends [dinode_at γi inum dn] and gets back [∃ d, dinode_at γi inum d],
     which no walk can put back into its payload.  The borrow is only a
@@ -356,7 +356,7 @@ Section IgetLic.
        here it is discharged once, by the one presenter in the tree
        ([ProofIreclaim]'s boot walk), and no other caller ever sees it. *)
     | BufL bno ds =>
-                 (fsblock γfs bno (diblk_bytes ds) ∗                  (* e *)
+                 (fs_chalf γfs bno (diblk_bytes ds) ∗                  (* e *)
                   ⌜bno = IBLOCK inum inodestart⌝ ∗
                   ⌜diblk_wf ds⌝ ∗
                   ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝ ∗
@@ -572,7 +572,7 @@ Section IgetLic.
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hbuf". rewrite /iname.
     iDestruct "Hbuf" as "(Hhalf & %Hb & %Hwf & %Hnz & Hboot)".
-    rewrite /fsblock.
+    rewrite /fs_chalf.
     iMod (ireg_read E γi γfs inodestart nib inum dn
             bno (diblk_bytes ds) HE Hin Hb
             with "Hinv Hdn Hhalf") as "(%Hex & Hdn & Hhalf)".
@@ -737,7 +737,7 @@ Section IgetLic.
     mm !! bv_unsigned inum = Some (ds !!! islot inum) ->
     ghost_map_auth γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n (ds !!! islot inum) -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    fs_chalf γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
     iname γi γfs inodestart inum l -∗
     ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0
@@ -781,7 +781,7 @@ Section IgetLic.
     - (* (e) BufL -- the buffer's type fact, transported; the boot one-shot
          against the c column's shelter *)
       iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot)".
-      rewrite Hbno /fsblock.
+      rewrite Hbno /fs_chalf.
       iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
       assert (Hdseq : ds0 = ds)
         by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).

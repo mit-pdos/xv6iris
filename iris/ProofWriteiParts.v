@@ -514,7 +514,7 @@ Section WriteiRes.
   Lemma wi_held_content (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
-    fsblock γfs (uint bno) bs0 -∗
+    fs_chalf γfs (uint bno) bs0 -∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
     ⌜bsl = bs0⌝.
   Proof.
@@ -522,9 +522,9 @@ Section WriteiRes.
     iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
     destruct d.
     - iDestruct "Hpay" as "[Hm _]".
-      iApply (fsblock_mdirty_agree with "Hc Hm").
+      iApply (fs_chalf_mdirty_agree with "Hc Hm").
     - iDestruct "Hpay" as "[Hm _]".
-      iApply (fsblock_mclean_agree with "Hc Hm").
+      iApply (fs_chalf_mclean_agree with "Hc Hm").
   Qed.
 
 End WriteiRes.

@@ -117,7 +117,7 @@ Definition cov_ok (cov : gset Z) : Prop :=
 
 (* The log's own storage is part of the covered range: the log layer is
    the CLIENT of the header block and the LOGBLOCKS slots (log_state holds
-   their [fsblock] halves), and write_head / write_log / install_trans
+   their [fs_chalf] halves), and write_head / write_log / install_trans
    [bread] them, which needs them covered. *)
 Definition log_geom_ok (cov : gset Z) (logstart : Z) : Prop :=
   cov_ok cov /\ log_region_set logstart ⊆ cov.
@@ -1069,7 +1069,7 @@ Section LogInv.
        ([∗ list] i ∈ seq n (LOGBLOCKS - n),
           ∃ junk : SailStdpp.Values.mword 32, lh_block i ↦₄ junk) ∗
        (* the freeze-by-auth: both FsBlocks auths live HERE *)
-       ghost_map_auth (fs_L γfs) 1 L ∗
+       ghost_map_auth (fs_cache γfs) 1 L ∗
        ghost_map_auth (fs_dirty γfs) 1 D ∗
        (* the log side's dirty halves, over the WHOLE covered range,
           recording exactly W's membership (the bio payloads hold the
@@ -1078,9 +1078,9 @@ Section LogInv.
           b ↪[fs_dirty γfs]{#(1/2)} (bool_decide (b ∈ map uint W))) ∗
        (* the log region's CLIENT halves: the log is its own client for
           the header block and the LOGBLOCKS slots *)
-       (∃ bsh, fsblock γfs (log_hdr_bno logstart) bsh) ∗
+       (∃ bsh, fs_chalf γfs (log_hdr_bno logstart) bsh) ∗
        ([∗ list] i ∈ seq 0 LOGBLOCKS,
-          ∃ bs, fsblock γfs (log_slot_bno logstart i) bs) ∗
+          ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs) ∗
        (* THE SLOT POOL: one [bslot] per free log slot, plus a working
           margin of 2 (the committer's two in-flight breads; the copy
           loop and install both hold at most two buffers at once).  This

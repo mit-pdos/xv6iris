@@ -38,14 +38,14 @@
    iteration:
 
      1. bread(log slot) -- the handle's payload L-half against the batch's
-        [fsblock (log_slot_bno logstart tail) (Lw tail)] pins its bytes to
+        [fs_chalf (log_slot_bno logstart tail) (Lw tail)] pins its bytes to
         [Lw tail].  Its dirty flag is NOT needed: brelse takes either.
      2. bread(home) -- the payload's DIRTY half against the caller's half
         at true forces d = true (so the payload parks the pin's [bref]),
         and its L-half against the AUTHORITY ([it_pay_bs_auth], one
         [ghost_map_lookup]) pins the bytes to [L !! uint w], which the
         spec's pure premise identifies with [Lw tail].  There is no client
-        [fsblock] for a home block on the committer's side -- see
+        [fs_chalf] for a home block on the committer's side -- see
         SpecInstallTrans.v's header.
      3. memmove copies [Lw tail] onto [Lw tail]: the destination bytes are
         unchanged AS A VALUE, which is what keeps the handle [bio_locked].
@@ -626,13 +626,13 @@ Section InstallTransDefs.
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
         ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-        ghost_map_auth (fs_L γfs) 1
+        ghost_map_auth (fs_cache γfs) 1
           (if recovering then it_rec_L W Lw L else L) -∗
         ghost_map_auth (fs_dirty γfs) 1
           (if recovering then D else dirty_clear D (map uint W)) -∗
         ([∗ list] i ↦ w ∈ W,
-           fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-           (if recovering then fsblock γfs (uint w) (Lw i)
+           fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+           (if recovering then fs_chalf γfs (uint w) (Lw i)
             else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
         bslots (2 + (if recovering then 0%nat else length W)) -∗
         ▷ R -∗
@@ -677,13 +677,13 @@ Section InstallTransDefs.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) : iProp Σ :=
     (lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
      ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) ∗
-     ghost_map_auth (fs_L γfs) 1
+     ghost_map_auth (fs_cache γfs) 1
        (if recovering then it_rec_L W Lw L else L) ∗
      ghost_map_auth (fs_dirty γfs) 1
        (if recovering then D else dirty_clear D (map uint W)) ∗
      ([∗ list] i ↦ w ∈ W,
-        fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-        (if recovering then fsblock γfs (uint w) (Lw i)
+        fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+        (if recovering then fs_chalf γfs (uint w) (Lw i)
          else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) ∗
      bslots (2 + (if recovering then 0%nat else length W)))%I.
 
@@ -692,7 +692,7 @@ Section InstallTransDefs.
   Lemma it_pay_bs (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd bs0 : list (bv 8)) (d : bool) :
-    fsblock γfs (uint bno) bs0 -∗
+    fs_chalf γfs (uint bno) bs0 -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗ ⌜bsl = bs0⌝.
   Proof.
     rewrite /bio_pay /fs_view /=. destruct d.
@@ -702,14 +702,14 @@ Section InstallTransDefs.
       iDestruct (ghost_map_elem_agree with "Hm Hc") as %Heq. done.
   Qed.
 
-  (* THE COMMITTER'S OWN WITNESS.  A home block's client [fsblock] is
+  (* THE COMMITTER'S OWN WITNESS.  A home block's client [fs_chalf] is
      unobtainable on this side (SpecInstallTrans.v's header), so its bytes
      are read out of the AUTHORITY install_trans holds instead.  Pure
      conclusion, so the payload survives the [iDestruct]. *)
   Lemma it_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
-    ghost_map_auth (fs_L γfs) 1 L -∗
+    ghost_map_auth (fs_cache γfs) 1 L -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
     ⌜L !! uint bno = Some bsl⌝.
   Proof.
@@ -738,7 +738,7 @@ Section InstallTransDefs.
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd true -∗
-    ((uint bno) ↪[fs_L γfs]{#(1/2)} bsl ∗
+    ((uint bno) ↪[fs_cache γfs]{#(1/2)} bsl ∗
      (uint bno) ↪[fs_dirty γfs]{#(1/2)} true ∗
      (∃ q : Qp, bref bn k q dv bno)).
   Proof. rewrite /bio_pay /fs_view /= /fs_mdirty. iIntros "[[$ $] $]". Qed.
@@ -747,7 +747,7 @@ Section InstallTransDefs.
   Lemma it_pay_clean (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl : list (bv 8)) :
-    (uint bno) ↪[fs_L γfs]{#(1/2)} bsl -∗
+    (uint bno) ↪[fs_cache γfs]{#(1/2)} bsl -∗
     (uint bno) ↪[fs_dirty γfs]{#(1/2)} false -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsl false.
   Proof.
@@ -777,7 +777,7 @@ Section InstallTransDefs.
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd false -∗
-    ((uint bno) ↪[fs_L γfs]{#(1/2)} bsl ∗
+    ((uint bno) ↪[fs_cache γfs]{#(1/2)} bsl ∗
      (uint bno) ↪[fs_dirty γfs]{#(1/2)} false).
   Proof. rewrite /bio_pay /fs_view /= /fs_mclean. iIntros "[[$ $] _]". Qed.
 
@@ -806,20 +806,20 @@ Section InstallTransDefs.
     W !! t = Some w ->
     (recovering = false -> L !! uint w = Some (Lw t)) ->
     (recovering = true -> D !! uint w = Some false) ->
-    ghost_map_auth (fs_L γfs) 1
+    ghost_map_auth (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L t else L) -∗
     ghost_map_auth (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take t W))) -∗
-    (if recovering then fsblock γfs (uint w) (Bh t)
+    (if recovering then fs_chalf γfs (uint w) (Bh t)
      else (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
     bio_pay bn (fs_view γfs γd dev cov) k2 dev w bs2 bsd2 d2 ==∗
     ⌜bs2 = (if recovering then Bh t else Lw t)⌝ ∗
-    ghost_map_auth (fs_L γfs) 1
+    ghost_map_auth (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L (S t) else L) ∗
     ghost_map_auth (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take (S t) W))) ∗
     bio_pay bn (fs_view γfs γd dev cov) k2 dev w (Lw t) (Lw t) false ∗
-    (if recovering then fsblock γfs (uint w) (Lw t)
+    (if recovering then fs_chalf γfs (uint w) (Lw t)
      else (uint w) ↪[fs_dirty γfs]{#(1/2)} false) ∗
     (if recovering then emp else ∃ q : Qp, bref bn k2 q dev w).
   Proof.
@@ -830,7 +830,7 @@ Section InstallTransDefs.
       iDestruct (it_pay_d_auth with "HauthD Hpay") as %Hd2.
       rewrite (HD eq_refl) in Hd2. injection Hd2 as <-.
       iDestruct (it_pay_open_clean with "Hpay") as "[HLhalf Hdhalf]".
-      iMod (fsblock_update γfs (it_rec_L_upto W Lw L t) (uint w) (Bh t) (Lw t)
+      iMod (fs_chalf_update γfs (it_rec_L_upto W Lw L t) (uint w) (Bh t) (Lw t)
               with "HauthL Hsnd HLhalf") as "(_ & HauthL & Hsnd & HLhalf)".
       iEval (rewrite -(it_rec_L_upto_S W Lw L t w Hw)) in "HauthL".
       iModIntro.
@@ -880,12 +880,12 @@ Section InstallTransDefs.
       (Lw Bh : nat -> list (bv 8))
       (t : nat) (l : list (mword 32)) :
     ([∗ list] i ↦ v ∈ l,
-       fsblock γfs (log_slot_bno logstart ((t + S i)%nat)) (Lw ((t + S i)%nat)) ∗
-       (if recovering then fsblock γfs (uint v) (Bh ((t + S i)%nat))
+       fs_chalf γfs (log_slot_bno logstart ((t + S i)%nat)) (Lw ((t + S i)%nat)) ∗
+       (if recovering then fs_chalf γfs (uint v) (Bh ((t + S i)%nat))
         else (uint v) ↪[fs_dirty γfs]{#(1/2)} true))
     ⊢ ([∗ list] i ↦ v ∈ l,
-       fsblock γfs (log_slot_bno logstart ((S t + i)%nat)) (Lw ((S t + i)%nat)) ∗
-       (if recovering then fsblock γfs (uint v) (Bh ((S t + i)%nat))
+       fs_chalf γfs (log_slot_bno logstart ((S t + i)%nat)) (Lw ((S t + i)%nat)) ∗
+       (if recovering then fs_chalf γfs (uint v) (Bh ((S t + i)%nat))
         else (uint v) ↪[fs_dirty γfs]{#(1/2)} true)).
   Proof.
     apply big_sepL_mono. intros k y _.
@@ -1754,17 +1754,17 @@ Section InstallTransBlocks.
     it_frame m -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-    ghost_map_auth (fs_L γfs) 1
+    ghost_map_auth (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L t else L) -∗
     ghost_map_auth (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take t W))) -∗
     ([∗ list] i ↦ w ∈ take t W,
-       fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-       (if recovering then fsblock γfs (uint w) (Lw i)
+       fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+       (if recovering then fs_chalf γfs (uint w) (Lw i)
         else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
     ([∗ list] i ↦ w ∈ drop t W,
-       fsblock γfs (log_slot_bno logstart ((t + i)%nat)) (Lw ((t + i)%nat)) ∗
-       (if recovering then fsblock γfs (uint w) (Bh ((t + i)%nat))
+       fs_chalf γfs (log_slot_bno logstart ((t + i)%nat)) (Lw ((t + i)%nat)) ∗
+       (if recovering then fs_chalf γfs (uint w) (Bh ((t + i)%nat))
         else (uint w) ↪[fs_dirty γfs]{#(1/2)} true)) -∗
     bslots (2 + (if recovering then 0%nat else t)) -∗
     (* the per-entry crash permits, and the resource they thread *)
@@ -2455,8 +2455,8 @@ Section InstallTransBlocks.
     (* ---- the batch's pieces, re-formed at tail+1 ---- *)
     iDestruct ("Hblkback" with "Hblk") as "Hblks".
     iAssert ([∗ list] i ↦ v ∈ take (S t) W,
-               fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-               (if recovering then fsblock γfs (uint v) (Lw i)
+               fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+               (if recovering then fs_chalf γfs (uint v) (Lw i)
                 else (uint v) ↪[fs_dirty γfs]{#(1/2)} false))%I
       with "[Hdone Hfblog Hsnd2]" as "Hdone".
     { rewrite (take_S_r W t w Hw) big_sepL_app (it_take_len W t (it_lt_len_le t n W Ht HnW)).
@@ -3228,8 +3228,8 @@ Section ProofInstallTrans.
       assert (HQ11regs : it_lregs recovering m Q11 0%nat).
       { rewrite /it_lregs. split_and!; assumption. }
       iAssert ([∗ list] i ↦ w ∈ take 0 W,
-                 fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-                 (if recovering then fsblock γfs (uint w) (Lw i)
+                 fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗
+                 (if recovering then fs_chalf γfs (uint w) (Lw i)
                   else (uint w) ↪[fs_dirty γfs]{#(1/2)} false))%I as "Hdone".
       { done. }
       (* at a FIXED flag the loop's cursor-0 rows are the entry rows by

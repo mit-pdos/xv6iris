@@ -2,7 +2,7 @@
 
    Everything in this file is RESOURCE CONSTRUCTION: pure decoding of the
    mkfs image's inode blocks, plus the ghost steps that turn what boot
-   already owns -- the dinode blocks' [fsblock] halves, the fifty entries'
+   already owns -- the dinode blocks' [fs_chalf] halves, the fifty entries'
    raw cells, iinit's fifty [sl_fresh]es and the zeroed itable spinlock --
    into the four persistent things every icache contract takes:
 
@@ -34,7 +34,7 @@
    THE POOL IS DIFFERENT.  [IcacheEscrow.ipool_shape]'s ALLOCATED arm carries
    [InodeLock.inode_ok] -- a well-formed block map inside [cov], the size cap
    (§13.5), [blk_holes_zero] and [inode_sized] -- together with the file's
-   own [fsblock]s and its indirect block's [blk_own].  Nothing anywhere in
+   own [fs_chalf]s and its indirect block's [blk_own].  Nothing anywhere in
    this tree yet says that the mkfs image's allocated inodes have those
    properties, and no amount of decoding will produce them: they are a claim
    about which BLOCKS the image's inodes own and that those runs are
@@ -294,7 +294,7 @@ Proof.
   rewrite Hd Hm !Nat2Z.id. reflexivity.
 Qed.
 
-(* [FsBoot.fs_L0]'s shape: an [map_imap] over [gset_to_gmap], so the lookup
+(* [FsBoot.fs_C0]'s shape: an [map_imap] over [gset_to_gmap], so the lookup
    law needs no [NoDup] bookkeeping and the domain law is one unfold. *)
 Definition ireg_M0 (dss : list (list dinode)) (nib : nat) : gmap Z dinode :=
   map_imap (fun z (_ : unit) => Some (image_dinode dss z))
@@ -464,7 +464,7 @@ Section IcacheBootRegion.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
-  (* [FsBoot.fs_L0_big], for this map *)
+  (* [FsBoot.fs_C0_big], for this map *)
   Lemma ireg_M0_big (Phi : Z -> dinode -> iProp Σ)
       (dss : list (list dinode)) (nib : nat) :
     ([∗ map] z ↦ dn ∈ ireg_M0 dss nib, Phi z dn)
@@ -933,7 +933,7 @@ Section IcacheBootRegion.
        hand them over ([IcacheRef.icfg_alloc]). *)
     ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
-       fsblock γfs (inodestart + Z.of_nat bi) (bss bi)) -∗
+       fs_chalf γfs (inodestart + Z.of_nat bi) (bss bi)) -∗
     (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
        (fs-fragments.md §7.12) -- carried, never consumed here *)
     ireg_boot -∗

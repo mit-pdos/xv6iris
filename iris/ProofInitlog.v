@@ -539,18 +539,18 @@ Section InitlogDefs.
     ⊢ ([∗ list] i ↦ x ∈ ([] : list A), Psi i x).
   Proof. first [ done | rewrite big_sepL_nil; done ]. Qed.
 
-  (* the client's own [fsblock] half against the handle's machinery half
+  (* the client's own [fs_chalf] half against the handle's machinery half
      pins the bytes bread returned -- for either payload polarity *)
   Lemma il_pay_agree (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32) (z : Z)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     uint bno = z ->
-    fsblock γfs z bs -∗
+    fs_chalf γfs z bs -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗ ⌜bsl = bs⌝.
   Proof.
     intros <-. rewrite /bio_pay /fs_view /=. destruct d.
-    - iIntros "Hc [Hm _]". iApply (fsblock_mdirty_agree with "Hc Hm").
-    - iIntros "Hc [Hm _]". iApply (fsblock_mclean_agree with "Hc Hm").
+    - iIntros "Hc [Hm _]". iApply (fs_chalf_mdirty_agree with "Hc Hm").
+    - iIntros "Hc [Hm _]". iApply (fs_chalf_mclean_agree with "Hc Hm").
   Qed.
 
 End InitlogDefs.
@@ -1901,10 +1901,10 @@ Section ProofInitlog.
     (* THE SLOT CONTENTS, NAMED: the thirty existential client halves give
        up a contents function; the first [nh] feed the recovering install *)
     iDestruct (il_sepL_exist
-                 (fun _ x bs => fsblock γfs (log_slot_bno logstart x) bs)
+                 (fun _ x bs => fs_chalf γfs (log_slot_bno logstart x) bs)
                  (seq 0 LOGBLOCKS) with "Hslotsfs") as (ys) "[%Hyslen Hslotsn]".
     iAssert ([∗ list] k ↦ _ ∈ seq 0 LOGBLOCKS,
-               fsblock γfs (log_slot_bno logstart k) (ys !!! k))%I
+               fs_chalf γfs (log_slot_bno logstart k) (ys !!! k))%I
       with "[Hslotsn]" as "Hslotsn".
     { iApply (big_sepL_mono with "Hslotsn"). intros k x Hk.
       apply lookup_seq in Hk as [-> _]. done. }
@@ -1917,23 +1917,23 @@ Section ProofInitlog.
     iEval (rewrite Hsp30 big_sepL_app) in "Hslotsn".
     iDestruct "Hslotsn" as "[Hslotfst Hslotrest]".
     iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
-               fsblock γfs (log_slot_bno logstart i) (ys !!! i))%I
+               fs_chalf γfs (log_slot_bno logstart i) (ys !!! i))%I
       with "[Hslotfst]" as "Hslotfst".
     { iApply (il_sepL_reindex (seq 0 ((hdr_dec bs_hdr).1))
                 (il_W bs_hdr ((hdr_dec bs_hdr).1))
-                (fun i => fsblock γfs (log_slot_bno logstart i) (ys !!! i))
+                (fun i => fs_chalf γfs (log_slot_bno logstart i) (ys !!! i))
                 ltac:(rewrite il_W_length length_seq; reflexivity)
                 with "Hslotfst"). }
     (* the entries' home halves, re-indexed at the write set *)
     iEval (rewrite -(il_W_uint bs_hdr)) in "Hhomes".
     iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
-               fsblock γfs (uint w) (Bh i))%I with "[Hhomes]" as "Hhomes".
+               fs_chalf γfs (uint w) (Bh i))%I with "[Hhomes]" as "Hhomes".
     { iEval (change (map uint ?l) with (uint <$> l)) in "Hhomes".
       iEval (rewrite big_sepL_fmap) in "Hhomes". iExact "Hhomes". }
     (* the per-entry rows the recovering install takes *)
     iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
-               fsblock γfs (log_slot_bno logstart i) (ys !!! i) ∗
-               fsblock γfs (uint w) (Bh i))%I
+               fs_chalf γfs (log_slot_bno logstart i) (ys !!! i) ∗
+               fs_chalf γfs (uint w) (Bh i))%I
       with "[Hslotfst Hhomes]" as "Hents".
     { rewrite big_sepL_sep. iSplitL "Hslotfst"; [iExact "Hslotfst" | iExact "Hhomes"]. }
     (* the era's crash custody, out of the whole boot mirror *)
@@ -2072,17 +2072,17 @@ Section ProofInitlog.
     iDestruct "Hents" as "[Hslotfst Hhomes]".
     (* the slots, back under their existential for the batch *)
     iAssert ([∗ list] i ∈ seq 0 LOGBLOCKS,
-               ∃ bs0 : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs0)%I
+               ∃ bs0 : list (bv 8), fs_chalf γfs (log_slot_bno logstart i) bs0)%I
       with "[Hslotfst Hslotrest]" as "Hslotsfs".
     { iEval (rewrite Hsp30 big_sepL_app).
       iSplitL "Hslotfst".
       - iEval (rewrite (il_seq_body ((hdr_dec bs_hdr).1)
                  (fun x => (∃ bs0 : list (bv 8),
-                     fsblock γfs (log_slot_bno logstart x) bs0)%I))).
+                     fs_chalf γfs (log_slot_bno logstart x) bs0)%I))).
         iApply (il_sepL_reindex (il_W bs_hdr ((hdr_dec bs_hdr).1))
                   (seq 0 ((hdr_dec bs_hdr).1))
                   (fun i => (∃ bs0 : list (bv 8),
-                      fsblock γfs (log_slot_bno logstart i) bs0)%I)
+                      fs_chalf γfs (log_slot_bno logstart i) bs0)%I)
                   ltac:(rewrite il_W_length length_seq; reflexivity)).
         iApply (big_sepL_mono with "Hslotfst"). intros k y Hy.
         iIntros "H". iExists _. iExact "H".
@@ -2092,7 +2092,7 @@ Section ProofInitlog.
         iIntros "H". iExists _. iExact "H". }
     (* the installed home halves, under the postcondition's existential *)
     iAssert ([∗ list] i ↦ bb ∈ (hdr_dec bs_hdr).2,
-               ∃ bs0 : list (bv 8), fsblock γfs bb bs0)%I
+               ∃ bs0 : list (bv 8), fs_chalf γfs bb bs0)%I
       with "[Hhomes]" as "Hhomesout".
     { iEval (rewrite -(il_W_uint bs_hdr)).
       iEval (change (map uint ?l) with (uint <$> l)).

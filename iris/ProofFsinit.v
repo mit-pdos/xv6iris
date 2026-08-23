@@ -217,7 +217,7 @@ Section FsinitDefs.
         sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
         InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-        fsblock γfs 1 bs_sb -∗
+        fs_chalf γfs 1 bs_sb -∗
         log_ctx icfg_log bn γfs cov logstart dev -∗
         bslots 3 -∗
         iref_slot -∗
@@ -301,7 +301,7 @@ Section FsinitEpilogue.
     sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
     InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-    fsblock γfs 1 bs_sb -∗
+    fs_chalf γfs 1 bs_sb -∗
     log_ctx icfg_log bn γfs cov logstart dev -∗
     bslots 3 -∗
     iref_slot -∗
@@ -1398,7 +1398,7 @@ Section FsinitMain.
     (* the clean image's header decode is empty, so the three header
        well-formedness premises and the home-halves row are all trivial *)
     iAssert ([∗ list] i ↦ b0 ∈ (hdr_dec bs_hdr).2,
-               fsblock γfs b0 ((fun _ : nat => ([] : list (bv 8))) i))%I
+               fs_chalf γfs b0 ((fun _ : nat => ([] : list (bv 8))) i))%I
       as "Hnilhomes".
     { rewrite (hdr_dec_zero bs_hdr Hhdr0). cbn. done. }
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs γpr
