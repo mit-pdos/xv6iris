@@ -653,6 +653,8 @@ FsOpLink.v
 FsOpIputFree.v
 FsOpUnlink.v
 FsOpIreclaim.v
+FsObj.v
+FsObjEff.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v

@@ -223,12 +223,64 @@ See the G1-impl entry for the site table.
    consumer appears.
 3. **The flip/G3 complex**, decomposed (specs: the flip design-of-
    record block above + E2'/G1-impl entries):
-   - **flip-A** (pure, independent): `fsobj` (records/bits/slots/
-     blocks), the agreement relation `A ~[pend] L` with its per-block
-     residue clauses and the TILING COMPLETENESS lemma (`pend = ∅ ⇒
-     A = L` on homes), per-effect OBJECT FOOTPRINTS (each F3-final
-     effect names the objects it moves), and the fold lemmas (an op's
-     finalize = its G2 lemma + agreement bookkeeping).
+   - **flip-A** DONE (`iris/FsObj.v` 2.8 s, `iris/FsObjEff.v` 2.2 s
+     single-file; pure, no Iris -- `FsObj` sits on `FsWf` alone,
+     `FsObjEff` adds the eight `FsEff*`).  One line per deliverable:
+     - `fsobj := ORec (b : Z) (k : nat) | OBit b | OSlot i | OBlk b`
+       with `EqDecision` + `Countable` (`inj_countable'`), and **ORec is
+       addressed BY BLOCK, not by (dir inum, record index)**: the tiling
+       lemma is then arithmetic and an object cannot rename itself when a
+       block map moves inside a group (itrunc frees, balloc re-hands);
+       the cost is the dv-to-block bridge, which was already flip-C's.
+     - The decomposition of a block is GEOMETRIC, not role-dependent --
+       `[inodestart, bmapstart)` tiles into 16 `OSlot`s, `bmapstart` into
+       8192 `OBit`s, and EVERY other home block (the superblock and the
+       whole data region alike) into 64 sixteen-byte `ORec`s.  The
+       design's open question (does a data block's dir-content role come
+       from `A` or from `L`?) is thereby DISSOLVED: a file data block is
+       record-tiled too, and a whole-block write is `OBlk b`, which is
+       not a leaf (`obj_leaf`) but MASKS b's leaves (`obj_masked`).
+     - `obj_agree A L sb o`: records agree BYTE-wise (the dirent decode
+       is lossy and a data block is arbitrary bytes, so a decode-level
+       record clause could not tile), slots at `fs_dinode` (matching
+       `eff_dinode`'s own re-encode frame), bits at `fs_bit`, `OBlk`
+       whole.  The RESIDUE that makes this byte-complete is the size
+       clause `view_sized` (every home block is `BSIZE`; true of the disk
+       and preserved by every effect) -- with it no trailing-junk clause
+       is needed anywhere.
+     - `views_agree_off A L sb pend` = a 3-field record (`view_sized A`,
+       `view_sized L`, agreement at every UNMASKED leaf); monotone in
+       `pend` (`views_agree_off_mono` = `log_state_pend_mono`'s content).
+     - TILING COMPLETENESS: `views_agree_tiling : fs_sb_ok sb ->
+       views_agree_off A L sb ∅ -> fs_obj_home sb b -> A b = L b`, over
+       `fs_obj_home` = `{SB_BNO} ∪ [inodestart, size)` = exactly
+       `fs_durable_wf_view_ext`'s footprint; corollaries
+       `views_agree_tiling_sb` (same `fs_parse_sb`), `_wf`
+       (`fs_durable_wf_view` transfers to `L`) and `_gmap` (`DA = DL` at
+       `dv_of_D` when both doms are the home set).  Its one new
+       ingredient is the inode round trip `diblk_bytes_fs_iblk_at`: a
+       full block IS the encoding of its own sixteen decodes.
+     - FOLD: `views_agree_fold` -- frame off `F`, `view_sized (eff A)`,
+       and the BLOCK equations on `set_map obj_blk F` give
+       `views_agree_off (eff A) L sb (pend ∖ F)`.  `F ⊆ pend` is NOT
+       needed and is not a premise.
+     - Per effect (ten constants -- the eight plus `eff_free_slot` and
+       `eff_create_dir_entry`): `foot_X`, `eff_X_frame`, `eff_X_sized`,
+       `eff_X_fold`, the last stated at the op's own per-block
+       `log_write` equations, so an arm invokes the PAIR `eff_X_wfv` +
+       `eff_X_fold`.  Every frame is `step_{dinode,splice,bmap,whole}`
+       composed outermost-first (the step lemmas name the layer's shape
+       so `apply` can read the intermediate view off the goal).
+     - TWO PREMISES THE ARMS OWE that F2 did not ask for: `off_meta sb a`
+       for every data block written (discharged by `blk_addr_off_meta` +
+       `dok_of_wfv` from the wf view), and -- for mkdir alone -- that the
+       fresh dots block is not the parent's own record block
+       (`fs_blk_addr .. <> fb`; `fb ∉ u` gives it).  Without the second
+       the create-dir frame is FALSE, not just unprovable.
+     - Granularity note: a 4-byte indirect-entry write
+       (`eff_alloc_file_block` above NDIRECT) claims the whole 16-byte
+       record it sits in, i.e. four entries; sound because an indirect
+       block belongs to one inode and its writer holds that inode's lock.
    - **flip-B** (G3's adoption, independent): `ProofEndOp` re-pointed
      at the value-chained primitives — destructure `log_mirror_clean`
      to a NAMED `M0` at `eo_open`, chain `lm_upd` through write_log's
