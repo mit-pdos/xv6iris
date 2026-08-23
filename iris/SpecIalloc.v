@@ -213,6 +213,15 @@ Definition wp_ialloc_sconf_body
   (* the type actually installs an ALLOCATED record; [fresh_shape] and
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
+  (* ...AND IT IS ONE OF THE FOUR (durable-disk 2b-inode-3).  The claim box
+     ialloc installs is a record whose type came out of nowhere, and the
+     inode region's (L5) -- [FsStateInode.inode_local]'s [inl_type], which
+     the fill has to pay at that box -- cannot be re-established from the
+     type-0 record it replaces.  So the enumeration travels with the [ty]
+     argument, from the three syscalls that write a literal.  It implies
+     the clause above; both are kept so that no existing discharge
+     moves. *)
+  InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
@@ -391,6 +400,15 @@ Definition wp_ialloc_gen_body
   (* the type actually installs an ALLOCATED record; [fresh_shape] and
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
+  (* ...AND IT IS ONE OF THE FOUR (durable-disk 2b-inode-3).  The claim box
+     ialloc installs is a record whose type came out of nowhere, and the
+     inode region's (L5) -- [FsStateInode.inode_local]'s [inl_type], which
+     the fill has to pay at that box -- cannot be re-established from the
+     type-0 record it replaces.  So the enumeration travels with the [ty]
+     argument, from the three syscalls that write a literal.  It implies
+     the clause above; both are kept so that no existing discharge
+     moves. *)
+  InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->

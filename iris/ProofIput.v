@@ -106,6 +106,13 @@ Require Import ProcGeom.
 Require Import IcacheRef.
 Require Import WpUart.
 Require Import DiskPtsto.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3).  IMPORTED
+   BEFORE [FsBlocks] on purpose: the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
@@ -2628,9 +2635,9 @@ Section IputFreePath.
     (* ---- unpack the checked-out payload for itrunc ---- *)
     iEval (rewrite /ic_payload_at) in "Hpayl".
     iDestruct "Hpayl" as "[Hlk2 _]".
-    iDestruct "Hlk2" as (data2)
-      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind & Hblks
-        & Hdv2 & Hfv2)".
+    iDestruct (ic_loaded_open with "Hlk2") as (data2)
+      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & %Hrl2 & Hdlk2 & Hdat & Hmeta & Haddrs
+        & Hind & Hblks & Htop2 & Hdv2 & Hfv2)".
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     (* ---- transport the cpu bundle to the itrunc call site (CIDm2) ---- *)
@@ -3185,8 +3192,12 @@ Section IputFreePath.
        and forgets the value; the next fill of this inum re-ties it off the
        record it reads.  So the freer parks what it has and proves nothing. *)
     iDestruct (ipool_shape_await γfs γi cov logstart inum ge gr gd rg
-                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2]") as "Hgap";
-      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2) |].
+                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2] [Htop2]") as "Hgap";
+      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2)
+      (* ...and the era's abstract value goes back untied with them
+         (durable-disk 2b-inode-3): the await arm is byte-less and forgets
+         the node exactly as it forgets the two contents holds. *)
+      | by iExists (era_node dn bm data2) |].
     iDestruct (ipool_insert γfs γi cov logstart
                  (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum)
                  ltac:(apply fl_notin_diff; exact Hincid) with "[Hgap] Hpool") as "Hpool".
@@ -4252,8 +4263,9 @@ Section IputFreePath.
     (* ===== +0x4a lh a4,74(s1) : nlink, a PLAIN read off the held payload ===== *)
     iEval (rewrite /ic_payload_at) in "Hpayl".
     iDestruct "Hpayl" as "[Hlk #Hshot]".
-    iDestruct "Hlk" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+    iDestruct (ic_loaded_open with "Hlk") as (data)
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & %Hrl & Hdlk & Hdat & Hmeta & Haddrs & Hind
+        & Hblks & Htop & Hdv & Hfv)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -4321,15 +4333,14 @@ Section IputFreePath.
       iApply fupd_wp.
       iInv "Hesc" as ">Hbody" "Hclose".
       iAssert (ic_payload_at γfs γi cov logstart k inum ga dn bm)
-        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk]" as "Hpayl".
+        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop
+               Hdv Hfv]" as "Hpayl".
       { rewrite /ic_payload_at.
-        iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
-        iSplitR; [iPureIntro; exact Hok |].
-        iSplitR; [iPureIntro; exact Hdok |].
-        iSplitR; [iPureIntro; exact Hddix |].
-        iSplitR; [iPureIntro; exact Hdoc |].
-        iSplitR; [iPureIntro; exact Hduq |].
-        iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
+        iSplitR "Hshot"; [| iExact "Hshot"].
+        iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hok Hrl Hdok Hddix Hdoc Hduq
+                  with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
+                        Hblks Htop Hdv Hfv").
+        rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
@@ -4553,15 +4564,14 @@ Section IputFreePath.
     (* ===== 0x5a: ip_free_locked's ENTRY.  Re-pack the payload, mint the
        re-assembly wand, hand the bundle over. ===== *)
     iAssert (ic_payload_at γfs γi cov logstart k inum ga dn bm)
-      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk]" as "Hpayl".
+      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop
+             Hdv Hfv]" as "Hpayl".
     { rewrite /ic_payload_at.
-      iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
-      iSplitR; [iPureIntro; exact Hok |].
-      iSplitR; [iPureIntro; exact Hdok |].
-      iSplitR; [iPureIntro; exact Hddix |].
-      iSplitR; [iPureIntro; exact Hdoc |].
-      iSplitR; [iPureIntro; exact Hduq |].
-      iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
+      iSplitR "Hshot"; [| iExact "Hshot"].
+      iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hok Hrl Hdok Hddix Hdoc Hduq
+                with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
+                      Hblks Htop Hdv Hfv").
+      rewrite /inode_meta. iFrame. }
     iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
     { rewrite /iref_tok. iFrame. }
     iAssert (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
