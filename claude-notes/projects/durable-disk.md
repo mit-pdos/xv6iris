@@ -93,12 +93,62 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-- branch `worktree-agent-a82720569ff33183d`: flip-C2a (the eleven
-  log_write declarations refined to fine objects + per-site soundness
-  lemmas).
+**Nothing in flight.** The flip-C2a lane was STOPPED before completion
+at the 2026-08-23 handoff (its worktree
+`.claude/worktrees/agent-a82720569ff33183d` holds no committed work —
+relaunch C2a from its spec below rather than resuming the worktree).
 
-(F3.5's dirent transport bundles remain [~] in §5½; the at-form sector
-builders' cleanup rides H2a per the flip-B bullet.)
+**HANDOFF NOTE (2026-08-23, end of the Fable session).** Landed and
+pushed, all VM-green with `make audit-only` at the three-entry baseline
+(`xv6iris_extras.resv_matches`, `resv_is_valid`,
+`functional_extensionality_dep`): stages A–F3 complete (the whole pure
+layer through the beyond-size ruling; F2 at 8/8 effects), H0 (the
+adequacy projection hook), G1-impl, G2 (all three batches), and the
+flip through C1 — flip-A (the object layer), flip-B (end_op commits by
+VALUE; the steady clear preserves `fr_D`; the deposit-side tie lemma
+ready-but-unused), flip-C1 (the object ledger, row (a) gated, the
+finalize bundle; `log_state_pend` retired).
+
+**The remaining path, in order — every item's spec is in this file:**
+1. **flip-C2a**: the eleven `log_write` object declarations refined
+   from `{[OBlk (uint bno)]}` to fine objects (bitmap writes →
+   `{[OBit b]}`, inode-block writes → `{[OSlot inum]}`, bmap's
+   indirect-entry write → its `ORec`, data writes stay `OBlk` with the
+   writei-dir sharing question to settle) + per-site `lw_obj_*`
+   soundness lemmas as FsObjEff corollaries. Coarse declarations
+   reproduce the last-holder problem at the fold — that is the whole
+   point of this lane.
+2. **flip-C2b** (three parallel batches mirroring G2's): each arm's
+   real finalize content as STANDALONE lemmas — its G2 preservation
+   lemma + its flip-A fold + its per-block L-equations against
+   `log_row_a_body`, plus the two flip-A premises (`off_meta` per data
+   block; mkdir's dots-block distinctness) and the dv-bridge for
+   create's name-uniqueness.
+3. **flip-C2c** (the flip commit; DESIGN-REVIEW the bridge first): the
+   ghost-postcondition→L-equations bridge (the arm's knowledge of L at
+   its objects, extracted from its carried dv/inode/bitmap ghost facts
+   at the end_op call), wire the 30 arms' real bundles, switch
+   `log_row_a` and delete its gate.
+4. **H1–H3 with H2a** (custody-at-birth; discharges BOTH boot gates —
+   `log_mirror_tie_pending` and `log_row_a_pending`'s boot sites —
+   plus D3; deletes the re-basing recovery arms and the at-form sector
+   builders per the flip-B bullet).
+5. **The switch-on**: `fs_durable_wf := fs_durable_wf_body`, delete
+   `fs_durable_wf_placeholder` and `end_op_pres_placeholder`/
+   `end_op_fin_placeholder`; every use site (grep) is the rework list;
+   E4 closes via `FsWfImg.fsimg_durable_wf`.
+6. **Stage I**: delete `Himg`/`fs_boot_image_eras`/
+   `fsimg_at_every_era`; `xv6_boot_era` consumes H0's `fs_boot_pure`
+   premise instead; adequacy assumes exactly era 0's `fs.img`.
+
+**Working rules that proved out** (keep): design pinned by the
+orchestrator before any lane launches; focused execution on Opus
+agents in ISOLATED WORKTREES (read remote-build-gcp.md's worktree
+recipe — corrected three times this session, the current text is the
+truth); linearize agent commits (reset/cherry-pick, no merge commits);
+verify the MERGED tree on the VM + the audit before every push; grep
+build logs for plain `Error`; the checkpoint's in-flight list names
+every live branch.
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
