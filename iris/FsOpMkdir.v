@@ -35,11 +35,10 @@
 (*                exit, whose test is [type == T_FILE]      -- IDENTITY.    *)
 (*   ARM A-FAIL   ialloc found no free inode                -- IDENTITY.    *)
 (*                                                                          *)
-(*   ARM FAIL     create's [fail:] tail.  NOT identity and NOT an F2        *)
-(*                effect; see the closing note of [FsOpMknod.v].  On the    *)
-(*                directory copy it also frees the dots block it had just   *)
-(*                allocated (iput's itrunc), so the bitmap round-trips and  *)
-(*                the net is again the free-slot rewrite of record [i].     *)
+(*   ARM FAIL     create's [fail:] tail -- the free-slot rewrite of        *)
+(*                record [i] ([op_mkdir_fail_ok] below).  On the           *)
+(*                directory copy it also frees the dots block it had just  *)
+(*                allocated (iput's itrunc), so the bitmap round-trips.    *)
 (*                                                                          *)
 (*                                                                          *)
 (* A SECOND SUCCESS SUB-ARM is NOT closed here: when the parent's records   *)
@@ -76,6 +75,7 @@ Require Import FsImg.
 Require Import FsWf.
 Require Import FsEffBase.
 Require Import FsEffCreateEntry.
+Require Import FsEffFreeInode.
 
 Local Open Scope Z_scope.
 
@@ -123,3 +123,23 @@ Proof.
   exact (eff_create_dir_entry_wfv P sb d k name i fb Hv Hp Hd Hd16 Hdty Hdre
            Hnl Hi Hi16 Hifree Hfb Hbit Hlen Hnn Hnone Harm).
 Qed.
+
+(* ======================================================================= *)
+(*  create's [fail:] TAIL -- the ninth effect, wired (durable-disk F3.4)    *)
+(*                                                                          *)
+(*  [SpecCreate]'s FAIL member is the only one that WRITES: [ialloc] takes  *)
+(*  a free slot and types it, [dirlink] then fails, and [iunlockput] drops  *)
+(*  the last reference at [nlink = 0] so [iput] frees the slot again inside *)
+(*  the same transaction.  The transaction's NET on the committed view is   *)
+(*  therefore ONE [eff_dinode] at a slot that was free before and is free   *)
+(*  after -- [FsEffFreeInode.eff_free_slot].  mknod, mkdir and open's       *)
+(*  O_CREATE arm share it verbatim: the arm never reaches the parent.       *)
+(* ======================================================================= *)
+
+Lemma op_mkdir_fail_ok (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  fs_durable_wf_view P ->
+  fs_parse_sb P = Some sb ->
+  0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) = 0 ->
+  fs_durable_wf_view (eff_free_slot P sb i).
+Proof. exact (eff_free_slot_wfv P sb i). Qed.

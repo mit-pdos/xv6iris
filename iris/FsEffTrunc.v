@@ -21,7 +21,7 @@ Section EffTrunc.
   Context (Hp : fs_parse_sb P = Some sb).
   Context (Hsb : fs_sb_wf sb = true).
   Context (HW3 : fs_inodes_dwf P sb = true).
-  Context (u : gset Z) (Hu : fs_used_set P sb = Some u).
+  Context (u : gset Z) (Hu : fs_ent_set P sb = Some u).
   Context (Hbm : fs_bitmap_wf P sb u = true).
   Context (HW7 : fs_root_wf P sb = true).
   Context (HW8 : fs_dots_all P sb = true).
@@ -111,7 +111,7 @@ Section EffTrunc.
       (sb_bmapstart sb)
       (bm_bytes BSIZE
          (fs_bmap_set BSIZE (P (sb_bmapstart sb))
-          ∖ list_to_set (fs_inode_blocks P (fs_dinode P sb i)))).
+          ∖ list_to_set (fs_inode_ents P (fs_dinode P sb i)))).
 
   Lemma eff_trunc_wf (i : Z) :
     0 <= i < sb_ninodes sb ->
@@ -148,7 +148,7 @@ Section EffTrunc.
     assert (HbmB : P' (sb_bmapstart sb)
                    = bm_bytes BSIZE
                        (fs_bmap_set BSIZE (P (sb_bmapstart sb))
-                        ∖ list_to_set (fs_inode_blocks P dn))).
+                        ∖ list_to_set (fs_inode_ents P dn))).
     { unfold P', eff_trunc. apply fs_upd_at. }
     assert (Hdec : forall z : Z, 0 <= z < 16 * (sb_ninodes sb / 16 + 1) ->
               fs_dinode P' sb z
@@ -166,8 +166,8 @@ Section EffTrunc.
               /\ (forall k : nat,
                     fs_data_of P' (fs_dinode P sb z) k
                     = fs_data_of P (fs_dinode P sb z) k)
-              /\ fs_inode_blocks P' (fs_dinode P sb z)
-                 = fs_inode_blocks P (fs_dinode P sb z)
+              /\ fs_inode_ents P' (fs_dinode P sb z)
+                 = fs_inode_ents P (fs_dinode P sb z)
               /\ fs_inode_dwf P' sb (fs_dinode P sb z)
                  = fs_inode_dwf P sb (fs_dinode P sb z)).
     { intros z Hz Hnz. apply inode_untouched; try assumption.
@@ -226,7 +226,7 @@ Section EffTrunc.
       exact Hbl. }
     { rewrite (Hdec i HiN), decide_True by reflexivity.
       rewrite Htype', (proj2 (Z.eqb_neq _ _) Hlive).
-      exact (zeroed_blocks_nil P' dn' Hsize'). }
+      exact (zeroed_blocks_nil P' dn' Haddrs'). }
     (* assemble *)
     exists sb. split.
     { rewrite (fs_parse_sb_ext P P' HsbU). exact Hp. }
@@ -243,12 +243,12 @@ Section EffTrunc.
     - exists u''. split; [exact Hu'' |].
       apply (bitmap_wf_of_set P' u''
                (fs_bmap_set BSIZE (P (sb_bmapstart sb))
-                ∖ list_to_set (fs_inode_blocks P dn))); [exact HbmB |].
+                ∖ list_to_set (fs_inode_ents P dn))); [exact HbmB |].
       intros b Hb.
       rewrite elem_of_difference, elem_of_list_to_set.
       rewrite (old_bit_iff b Hb), (Hu''mem b).
       assert (Hmeta : b < fs_data_start sb ->
-                ~ b ∈ fs_inode_blocks P dn).
+                ~ b ∈ fs_inode_ents P dn).
       { intros Hlt Hin.
         pose proof (blocks_range i b Hi Hlive Hin). lia. }
       tauto.

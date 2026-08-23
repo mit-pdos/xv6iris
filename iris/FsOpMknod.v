@@ -71,6 +71,7 @@ Require Import FsImg.
 Require Import FsWf.
 Require Import FsEffBase.
 Require Import FsEffCreateEntry.
+Require Import FsEffFreeInode.
 
 Local Open Scope Z_scope.
 
@@ -116,35 +117,21 @@ Proof.
 Qed.
 
 (* ======================================================================= *)
-(*  THE ONE ARM THIS FILE DOES NOT CLOSE -- create's [fail:] tail           *)
+(*  create's [fail:] TAIL -- the ninth effect, wired (durable-disk F3.4)    *)
 (*                                                                          *)
-(*  [SpecCreate]'s failure family is N / G / F-BAD / A-FAIL / FAIL, and     *)
-(*  FAIL is the only member that WRITES.  Its sequence is                    *)
-(*                                                                          *)
-(*      ialloc      IBLOCK(i) := type ty                                     *)
-(*      iupdate     IBLOCK(i) := major/minor/nlink=1                          *)
-(*      dirlink(dp,name,ip->inum) FAILS.  Its ONE non-writing failure     *)
-(*                  is writei's [off + n > MAXFILE*BSIZE] early return    *)
-(*                  (the directory is at its maximum size); the OTHER,    *)
-(*                  bmap returning 0 with the disk full, writes -- and    *)
-(*                  what it writes is the register entry of 2026-08-23    *)
-(*                  in claude-notes/kernel-defects.md, a state W3 and     *)
-(*                  W4/W5 call impossible.  The net below is the FIRST    *)
-(*                  route's.                                              *)
-(*      ip->nlink = 0; iupdate                                               *)
-(*      iunlockput(ip) -- ref 1, valid, nlink = 0, so IPUT FREES:             *)
-(*                  itrunc (nothing to free on the T_DEVICE arm)             *)
-(*                  ip->type = 0; iupdate                                     *)
-(*                                                                          *)
-(*  so its NET effect on the committed view is ONE [eff_dinode] at a FREE    *)
-(*  slot: record [i] goes from one type-0 record to another (type 0 again,   *)
-(*  but major/minor/nlink/size/addrs all rewritten).  That is not identity,  *)
-(*  and F2 has no wrapper for it -- a "free-slot rewrite" effect is a NINTH  *)
-(*  effect the F2 list does not carry.  It is CHEAP (the tree, the tickets,  *)
-(*  the bitmap and every live-inode sweep are untouched, because [node_at]   *)
-(*  of a type-0 record is [node_at_free] on both sides and [fs_used_blocks]  *)
-(*  sums LIVE inodes only), but it is an effect-file proof, not a           *)
-(*  composition, so it is recorded here for the F2 owner rather than         *)
-(*  smuggled in.  sys_mkdir and sys_open's O_CREATE arm                     *)
-(*  inherit exactly the same hole -- see [FsOpMkdir] and [FsOpOpen].        *)
+(*  [SpecCreate]'s FAIL member is the only one that WRITES: [ialloc] takes  *)
+(*  a free slot and types it, [dirlink] then fails, and [iunlockput] drops  *)
+(*  the last reference at [nlink = 0] so [iput] frees the slot again inside *)
+(*  the same transaction.  The transaction's NET on the committed view is   *)
+(*  therefore ONE [eff_dinode] at a slot that was free before and is free   *)
+(*  after -- [FsEffFreeInode.eff_free_slot].  mknod, mkdir and open's       *)
+(*  O_CREATE arm share it verbatim: the arm never reaches the parent.       *)
 (* ======================================================================= *)
+
+Lemma op_mknod_fail_ok (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  fs_durable_wf_view P ->
+  fs_parse_sb P = Some sb ->
+  0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) = 0 ->
+  fs_durable_wf_view (eff_free_slot P sb i).
+Proof. exact (eff_free_slot_wfv P sb i). Qed.

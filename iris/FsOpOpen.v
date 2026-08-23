@@ -35,8 +35,8 @@
 (* block, so the superblock and the child's inode block survive it.         *)
 (*                                                                          *)
 (* create's [fail:] tail is the one arm of the O_CREATE route that is       *)
-(* neither identity nor an F2 effect; the closing note of [FsOpMknod.v]     *)
-(* states what it nets to and what is missing.                              *)
+(* not identity: it nets to the free-slot rewrite of record [i]             *)
+(* ([op_open_create_fail_ok] below).                                        *)
 (*                                                                          *)
 (*                                                                          *)
 (* A SECOND SUCCESS SUB-ARM is NOT closed here: when the parent's records   *)
@@ -73,6 +73,7 @@ Require Import FsWf.
 Require Import FsEffBase.
 Require Import FsEffCreateEntry.
 Require Import FsEffTrunc.
+Require Import FsEffFreeInode.
 
 Local Open Scope Z_scope.
 
@@ -293,3 +294,23 @@ Proof.
   - lia.
   - left. rewrite Hty'. exact Hty.
 Qed.
+
+(* ======================================================================= *)
+(*  create's [fail:] TAIL -- the ninth effect, wired (durable-disk F3.4)    *)
+(*                                                                          *)
+(*  [SpecCreate]'s FAIL member is the only one that WRITES: [ialloc] takes  *)
+(*  a free slot and types it, [dirlink] then fails, and [iunlockput] drops  *)
+(*  the last reference at [nlink = 0] so [iput] frees the slot again inside *)
+(*  the same transaction.  The transaction's NET on the committed view is   *)
+(*  therefore ONE [eff_dinode] at a slot that was free before and is free   *)
+(*  after -- [FsEffFreeInode.eff_free_slot].  mknod, mkdir and open's       *)
+(*  O_CREATE arm share it verbatim: the arm never reaches the parent.       *)
+(* ======================================================================= *)
+
+Lemma op_open_create_fail_ok (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  fs_durable_wf_view P ->
+  fs_parse_sb P = Some sb ->
+  0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) = 0 ->
+  fs_durable_wf_view (eff_free_slot P sb i).
+Proof. exact (eff_free_slot_wfv P sb i). Qed.

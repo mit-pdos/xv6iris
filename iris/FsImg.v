@@ -2382,9 +2382,20 @@ Qed.
    sane addrs with [nlink = 0].  The durable invariant
    [FsWf.fs_durable_wf_body] therefore sweeps THIS form; [fs_inode_wf]
    stays as-is for the boot readings (at a clean mkfs image the two
-   coincide, [fs_inodes_wf_dwf]).  The body is [fs_inode_wf]'s minus the
-   one clause; at a milestone [fs_inode_wf] can be folded to
-   [(1 <=? nlink) && fs_inode_dwf].                                      *)
+   coincide, [fs_inodes_wf_dwf]).
+
+   **THE BEYOND-SIZE RULING (durable-disk F3; kernel-defects.md's
+   RESOLVED [writei] entry).**  An inode MAY own allocated data blocks
+   beyond [nblk(size)]: [itrunc] frees [addrs[0..NDIRECT)] and the whole
+   indirect range REGARDLESS of the size, so a beyond-size entry is owned,
+   not leaked, and [writei]'s partial-failure commits -- which install a
+   block and then leave [ip->size] alone -- are inside the design.  So the
+   durable form does NOT carry [fs_inode_wf]'s "an entry at or above
+   [nb] is zero" clauses; what it says of EVERY entry is the resource
+   layer's own [InodeInv.blkmap_wf] clause, "a nonzero entry is a data
+   block", with [InodeInv.bm_covers]' clause ("every index below the size
+   is allocated") beside it as the separate below-size reading.  The two
+   together are exactly the boolean's two branches.                      *)
 Definition fs_inode_dwf (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
   : bool :=
   let sz := bv_unsigned (di_size dn) in
@@ -2397,16 +2408,23 @@ Definition fs_inode_dwf (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
   (sz <=? Z.of_nat FS_MAXFILE * BSIZE_z) &&
   List.forallb
     (fun k => let a := bv_unsigned (di_addrs dn !!! k) in
-              if Z.of_nat k <? nb then fs_addr_ok sb a else a =? 0)
+              if Z.of_nat k <? nb
+              then fs_addr_ok sb a else (a =? 0) || fs_addr_ok sb a)
     (seq 0 FS_NDIRECT) &&
-  (if nb <=? Z.of_nat FS_NDIRECT then ib =? 0 else fs_addr_ok sb ib) &&
+  (if nb <=? Z.of_nat FS_NDIRECT
+   then (ib =? 0) || fs_addr_ok sb ib else fs_addr_ok sb ib) &&
   List.forallb
     (fun j => let e := es !!! j in
               if Z.of_nat j <? nb - Z.of_nat FS_NDIRECT
-              then fs_addr_ok sb e else e =? 0)
+              then fs_addr_ok sb e else (e =? 0) || fs_addr_ok sb e)
     (seq 0 FS_NINDIRECT).
 
-(* [fs_inode_ok] minus [fio_nlink], field for field *)
+(* [fs_inode_ok] with its three "zero above the size" clauses replaced by
+   the three ENTRY clauses of the ruling above (a nonzero entry, wherever
+   it sits, is a data block).  The below-size clauses stay verbatim: they
+   are the pure reading of [InodeInv.bm_covers], which the resource layer
+   keeps as its own conjunct beside [blkmap_wf] and which every write path
+   maintains. *)
 Record fs_inode_dok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
   : Prop := {
   fdi_type : bv_unsigned (di_type dn) = T_DIR_z
@@ -2416,19 +2434,19 @@ Record fs_inode_dok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
   fdi_direct : forall k : nat, (k < FS_NDIRECT)%nat ->
       Z.of_nat k < fs_nblk (bv_unsigned (di_size dn)) ->
       fs_data_start sb <= bv_unsigned (di_addrs dn !!! k) < sb_size sb;
-  fdi_direct_zero : forall k : nat, (k < FS_NDIRECT)%nat ->
-      fs_nblk (bv_unsigned (di_size dn)) <= Z.of_nat k ->
-      bv_unsigned (di_addrs dn !!! k) = 0;
-  fdi_ind_zero : fs_nblk (bv_unsigned (di_size dn)) <= Z.of_nat FS_NDIRECT ->
-      bv_unsigned (di_addrs dn !!! 12%nat) = 0;
+  fdi_direct_ok : forall k : nat, (k < FS_NDIRECT)%nat ->
+      bv_unsigned (di_addrs dn !!! k) <> 0 ->
+      fs_data_start sb <= bv_unsigned (di_addrs dn !!! k) < sb_size sb;
+  fdi_ind_ok : bv_unsigned (di_addrs dn !!! 12%nat) <> 0 ->
+      fs_data_start sb <= bv_unsigned (di_addrs dn !!! 12%nat) < sb_size sb;
   fdi_ind : Z.of_nat FS_NDIRECT < fs_nblk (bv_unsigned (di_size dn)) ->
       fs_data_start sb <= bv_unsigned (di_addrs dn !!! 12%nat) < sb_size sb;
   fdi_ent : forall j : nat, (j < FS_NINDIRECT)%nat ->
       Z.of_nat j < fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT ->
       fs_data_start sb <= fs_ind_ents P dn !!! j < sb_size sb;
-  fdi_ent_zero : forall j : nat, (j < FS_NINDIRECT)%nat ->
-      fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT <= Z.of_nat j ->
-      fs_ind_ents P dn !!! j = 0;
+  fdi_ent_ok : forall j : nat, (j < FS_NINDIRECT)%nat ->
+      fs_ind_ents P dn !!! j <> 0 ->
+      fs_data_start sb <= fs_ind_ents P dn !!! j < sb_size sb;
 }.
 
 Lemma fs_inode_dwf_ok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
@@ -2442,19 +2460,124 @@ Proof.
   - intros k Hk Hlt. apply fs_addr_ok_spec.
     pose proof (forallb_seq _ FS_NDIRECT k Hdir Hk) as Hk'.
     cbv beta zeta in Hk'. rewrite (proj2 (Z.ltb_lt _ _) Hlt) in Hk'. exact Hk'.
-  - intros k Hk Hge. apply Z.eqb_eq.
+  - intros k Hk Hnz. apply fs_addr_ok_spec.
     pose proof (forallb_seq _ FS_NDIRECT k Hdir Hk) as Hk'.
-    cbv beta zeta in Hk'. rewrite (proj2 (Z.ltb_ge _ _) Hge) in Hk'. exact Hk'.
-  - intros Hle. apply Z.eqb_eq.
-    rewrite (proj2 (Z.leb_le _ _) Hle) in Hind. exact Hind.
+    cbv beta zeta in Hk'.
+    destruct (Z.of_nat k <? fs_nblk (bv_unsigned (di_size dn)));
+      [exact Hk' |].
+    rewrite orb_true_iff in Hk'. destruct Hk' as [Hz | Hok']; [| exact Hok'].
+    exfalso. exact (Hnz (proj1 (Z.eqb_eq _ _) Hz)).
+  - intros Hnz. apply fs_addr_ok_spec.
+    destruct (fs_nblk (bv_unsigned (di_size dn)) <=? Z.of_nat FS_NDIRECT);
+      [| exact Hind].
+    rewrite orb_true_iff in Hind. destruct Hind as [Hz | Hok']; [| exact Hok'].
+    exfalso. exact (Hnz (proj1 (Z.eqb_eq _ _) Hz)).
   - intros Hgt. apply fs_addr_ok_spec.
     rewrite (proj2 (Z.leb_gt _ _) Hgt) in Hind. exact Hind.
   - intros j Hj Hlt. apply fs_addr_ok_spec.
     pose proof (forallb_seq _ FS_NINDIRECT j Hent Hj) as Hj'.
     cbv beta zeta in Hj'. rewrite (proj2 (Z.ltb_lt _ _) Hlt) in Hj'. exact Hj'.
-  - intros j Hj Hge. apply Z.eqb_eq.
+  - intros j Hj Hnz. apply fs_addr_ok_spec.
     pose proof (forallb_seq _ FS_NINDIRECT j Hent Hj) as Hj'.
-    cbv beta zeta in Hj'. rewrite (proj2 (Z.ltb_ge _ _) Hge) in Hj'. exact Hj'.
+    cbv beta zeta in Hj'.
+    destruct (Z.of_nat j
+              <? fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT);
+      [exact Hj' |].
+    rewrite orb_true_iff in Hj'. destruct Hj' as [Hz | Hok']; [| exact Hok'].
+    exfalso. exact (Hnz (proj1 (Z.eqb_eq _ _) Hz)).
+Qed.
+
+(* MOVING THE SIZE (durable-disk F3.2).  The entry clauses do not read
+   the size at all, so a size move owes exactly [InodeInv.bm_covers]' own
+   obligation at the NEW size -- which is why the size move is not fused
+   into an allocation: fusing it would force the append equation back. *)
+Lemma fs_inode_dok_size (P : Z -> list (bv 8)) (sb : fs_sb)
+    (dn dn' : dinode) :
+  fs_inode_dok P sb dn ->
+  di_type dn' = di_type dn ->
+  di_addrs dn' = di_addrs dn ->
+  bv_unsigned (di_size dn') <= Z.of_nat FS_MAXFILE * BSIZE_z ->
+  (forall k : nat, (k < FS_MAXFILE)%nat ->
+     Z.of_nat k < fs_nblk (bv_unsigned (di_size dn')) ->
+     fs_blk_addr P dn k <> 0) ->
+  fs_inode_dok P sb dn'.
+Proof.
+  intros Hd Ht Ha Hcap Hcov.
+  assert (HDM : (FS_NDIRECT + FS_NINDIRECT)%nat = FS_MAXFILE)
+    by reflexivity.
+  assert (HNI : (0 < FS_NINDIRECT)%nat) by (unfold FS_NINDIRECT; lia).
+  assert (Hent : fs_ind_ents P dn' = fs_ind_ents P dn)
+    by (unfold fs_ind_ents; rewrite Ha; reflexivity).
+  constructor; rewrite ?Ht, ?Ha, ?Hent.
+  - exact (fdi_type P sb dn Hd).
+  - exact Hcap.
+  - intros k Hk Hlt. apply (fdi_direct_ok P sb dn Hd k Hk).
+    pose proof (Hcov k ltac:(lia) Hlt) as Hnz.
+    unfold fs_blk_addr in Hnz.
+    rewrite (proj2 (Nat.ltb_lt k FS_NDIRECT) Hk) in Hnz. exact Hnz.
+  - exact (fdi_direct_ok P sb dn Hd).
+  - exact (fdi_ind_ok P sb dn Hd).
+  - intros Hgt. apply (fdi_ind_ok P sb dn Hd).
+    intros Hz.
+    pose proof (Hcov FS_NDIRECT ltac:(lia) Hgt) as Hnz.
+    unfold fs_blk_addr in Hnz.
+    rewrite (proj2 (Nat.ltb_ge FS_NDIRECT FS_NDIRECT) ltac:(lia)) in Hnz.
+    apply Hnz. rewrite Nat.sub_diag.
+    unfold fs_ind_ents. rewrite Hz.
+    apply lookup_total_replicate_2. unfold FS_NINDIRECT. lia.
+  - intros j Hj Hlt. apply (fdi_ent_ok P sb dn Hd j Hj).
+    pose proof (Hcov (FS_NDIRECT + j)%nat ltac:(lia) ltac:(lia)) as Hnz.
+    unfold fs_blk_addr in Hnz.
+    rewrite (proj2 (Nat.ltb_ge (FS_NDIRECT + j) FS_NDIRECT) ltac:(lia))
+      in Hnz.
+    replace (FS_NDIRECT + j - FS_NDIRECT)%nat with j in Hnz by lia.
+    exact Hnz.
+  - exact (fdi_ent_ok P sb dn Hd).
+Qed.
+
+(* THE RECORD AND THE BOOLEAN ARE THE SAME CLAIM.  Every effect proof
+   establishes the [dok] clauses of the record it writes; this turns that
+   into the [fs_inodes_dwf] sweep's own boolean, so no proof re-derives
+   the branch structure of [fs_inode_dwf] by hand. *)
+Lemma fs_inode_dok_dwf (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
+  fs_inode_dok P sb dn -> fs_inode_dwf P sb dn = true.
+Proof.
+  intros Hd. unfold fs_inode_dwf. cbv zeta.
+  rewrite !andb_true_iff.
+  split; [split; [split; [split |] |] |].
+  - destruct (fdi_type P sb dn Hd) as [Ht | [Ht | Ht]]; rewrite Ht;
+      reflexivity.
+  - apply Z.leb_le. exact (fdi_size P sb dn Hd).
+  - rewrite List.forallb_forall. intros k Hk.
+    apply elem_of_list_In, elem_of_seq in Hk. cbv beta zeta.
+    destruct (Z.ltb_spec (Z.of_nat k)
+                (fs_nblk (bv_unsigned (di_size dn)))) as [Hlt | Hge].
+    + apply fs_addr_ok_spec.
+      exact (fdi_direct P sb dn Hd k ltac:(lia) Hlt).
+    + destruct (decide (bv_unsigned (di_addrs dn !!! k) = 0))
+        as [Hz | Hnz].
+      * rewrite Hz. reflexivity.
+      * rewrite orb_true_iff. right. apply fs_addr_ok_spec.
+        exact (fdi_direct_ok P sb dn Hd k ltac:(lia) Hnz).
+  - destruct (Z.leb_spec (fs_nblk (bv_unsigned (di_size dn)))
+                (Z.of_nat FS_NDIRECT)) as [Hle | Hgt].
+    + destruct (decide (bv_unsigned (di_addrs dn !!! 12%nat) = 0))
+        as [Hz | Hnz].
+      * rewrite Hz. reflexivity.
+      * rewrite orb_true_iff. right. apply fs_addr_ok_spec.
+        exact (fdi_ind_ok P sb dn Hd Hnz).
+    + apply fs_addr_ok_spec. exact (fdi_ind P sb dn Hd Hgt).
+  - rewrite List.forallb_forall. intros j Hj.
+    apply elem_of_list_In, elem_of_seq in Hj. cbv beta zeta.
+    destruct (Z.ltb_spec (Z.of_nat j)
+                (fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT))
+      as [Hlt | Hge].
+    + apply fs_addr_ok_spec.
+      exact (fdi_ent P sb dn Hd j ltac:(lia) Hlt).
+    + destruct (decide (fs_ind_ents P dn !!! j = 0)) as [Hz | Hnz].
+      * rewrite Hz. reflexivity.
+      * rewrite orb_true_iff. right. apply fs_addr_ok_spec.
+        exact (fdi_ent_ok P sb dn Hd j ltac:(lia) Hnz).
 Qed.
 
 Lemma fs_inode_ok_dok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
@@ -2464,18 +2587,48 @@ Proof.
   - exact (fio_type P sb dn Hok).
   - exact (fio_size P sb dn Hok).
   - exact (fio_direct P sb dn Hok).
-  - exact (fio_direct_zero P sb dn Hok).
-  - exact (fio_ind_zero P sb dn Hok).
+  - intros k Hk Hnz.
+    destruct (Z.lt_ge_cases (Z.of_nat k)
+                (fs_nblk (bv_unsigned (di_size dn)))) as [Hlt | Hge];
+      [exact (fio_direct P sb dn Hok k Hk Hlt) |].
+    exfalso. exact (Hnz (fio_direct_zero P sb dn Hok k Hk Hge)).
+  - intros Hnz.
+    destruct (Z.lt_ge_cases (Z.of_nat FS_NDIRECT)
+                (fs_nblk (bv_unsigned (di_size dn)))) as [Hlt | Hge];
+      [exact (fio_ind P sb dn Hok Hlt) |].
+    exfalso. exact (Hnz (fio_ind_zero P sb dn Hok Hge)).
   - exact (fio_ind P sb dn Hok).
   - exact (fio_ent P sb dn Hok).
-  - exact (fio_ent_zero P sb dn Hok).
+  - intros j Hj Hnz.
+    destruct (Z.lt_ge_cases (Z.of_nat j)
+                (fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT))
+      as [Hlt | Hge]; [exact (fio_ent P sb dn Hok j Hj Hlt) |].
+    exfalso. exact (Hnz (fio_ent_zero P sb dn Hok j Hj Hge)).
 Qed.
 
 Lemma fs_inode_wf_dwf (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
   fs_inode_wf P sb dn = true -> fs_inode_dwf P sb dn = true.
 Proof.
   unfold fs_inode_wf, fs_inode_dwf. cbv zeta.
-  rewrite !andb_true_iff. tauto.
+  rewrite !andb_true_iff.
+  intros [[[[[Hty Hnl] Hsz] Hdir] Hind] Hent].
+  split; [split; [split |] |].
+  - split; [exact Hty | exact Hsz].
+  - rewrite List.forallb_forall. intros k Hk.
+    apply elem_of_list_In, elem_of_seq in Hk.
+    pose proof (forallb_seq _ FS_NDIRECT k Hdir ltac:(lia)) as Hk'.
+    cbv beta zeta in Hk' |- *.
+    destruct (Z.of_nat k <? fs_nblk (bv_unsigned (di_size dn)));
+      [exact Hk' | rewrite Hk'; reflexivity].
+  - destruct (fs_nblk (bv_unsigned (di_size dn)) <=? Z.of_nat FS_NDIRECT);
+      [rewrite Hind; reflexivity | exact Hind].
+  - rewrite List.forallb_forall. intros j Hj.
+    apply elem_of_list_In, elem_of_seq in Hj.
+    pose proof (forallb_seq _ FS_NINDIRECT j Hent ltac:(lia)) as Hj'.
+    cbv beta zeta in Hj' |- *.
+    destruct (Z.of_nat j
+              <? fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT);
+      [exact Hj' | rewrite Hj'; reflexivity].
 Qed.
 
 Definition fs_inodes_dwf (P : Z -> list (bv 8)) (sb : fs_sb) : bool :=
@@ -2510,6 +2663,596 @@ Proof.
   destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat x))) =? 0);
     [reflexivity |].
   apply fs_inode_wf_dwf. exact Hx.
+Qed.
+
+(* ====================================================================== *)
+(*  11bis.  THE ENTRY-DERIVED USED SET (durable-disk stage F3.1)           *)
+(*                                                                        *)
+(*  Under the beyond-size ruling the durable used set cannot be indexed    *)
+(*  by [nblk(size)]: an inode owns EVERY nonzero entry, and [itrunc]       *)
+(*  frees exactly those.  So the durable W4/W5 pair reads this family --   *)
+(*  one inode's nonzero slots, joined over the live inums -- while         *)
+(*  [fs_used_blocks]/[fs_used_set] above stay exactly as they are for the  *)
+(*  IMAGE check ([fsimg_wf], whose [vm_compute] must not move).  The two   *)
+(*  agree wherever no entry sits beyond the size, which is exactly         *)
+(*  [fs_inode_ok]: [fs_inode_ents_blocks] below is that bridge, and it is  *)
+(*  an EQUATION, not a permutation -- the indirect block heads both lists  *)
+(*  and the filter of a "nonzero below [nb], zero above" entry run IS the  *)
+(*  below-[nb] prefix.                                                    *)
+(*                                                                        *)
+(*  THE SLOT LIST IS SPELLED AS A CONCATENATION, NOT AS A 269-WIDE         *)
+(*  [fs_slot]-INDEXED FMAP, and that is forced (durable-notes, the        *)
+(*  definition-nobody-computes-but-the-unifier-will rule): every          *)
+(*  [fs_slot] at an indirect index carries its own copy of                 *)
+(*  [fs_ind_ents P dn], so the fmap form makes ONE conversion check        *)
+(*  expand 256 copies of a 256-element list and a [f_equal] then runs for  *)
+(*  a quarter of an hour with no error.  Here [fs_ind_ents P dn] occurs    *)
+(*  ONCE; [fs_slot_list_lookup] is the index bijection onto               *)
+(*  [InodeInv.bm_slot]'s numbering.                                        *)
+(* ====================================================================== *)
+
+(* ---- the list plumbing the filter reading needs ---------------------- *)
+
+Lemma filter_all_true {A : Type} (p : A -> bool) (l : list A) :
+  (forall x : A, x ∈ l -> p x = true) -> List.filter p l = l.
+Proof.
+  induction l as [| a l IH]; intros H; [reflexivity |].
+  cbn [List.filter]. rewrite (H a (elem_of_list_here a l)).
+  f_equal. apply IH. intros x Hx. apply H, elem_of_list_further, Hx.
+Qed.
+
+Lemma filter_all_false {A : Type} (p : A -> bool) (l : list A) :
+  (forall x : A, x ∈ l -> p x = false) -> List.filter p l = [].
+Proof.
+  induction l as [| a l IH]; intros H; [reflexivity |].
+  cbn [List.filter]. rewrite (H a (elem_of_list_here a l)).
+  apply IH. intros x Hx. apply H, elem_of_list_further, Hx.
+Qed.
+
+Lemma fmap_seq_split {A : Type} (f : nat -> A) (m r : nat) :
+  (f <$> seq 0 (m + r)) = ((f <$> seq 0 m) ++ (f <$> seq m r))%list.
+Proof.
+  rewrite List.seq_app, Nat.add_0_l, fmap_app. reflexivity.
+Qed.
+
+(* the whole point: a run that is nonzero below [m] and zero from [m] to
+   [n] filters to its own below-[m] prefix *)
+Lemma filter_nz_prefix (f : nat -> Z) (n m : nat) :
+  (m <= n)%nat ->
+  (forall k : nat, (k < m)%nat -> f k <> 0) ->
+  (forall k : nat, (m <= k)%nat -> (k < n)%nat -> f k = 0) ->
+  List.filter (fun a => negb (a =? 0)) (f <$> seq 0 n) = f <$> seq 0 m.
+Proof.
+  intros Hmn Hlo Hhi.
+  replace n with (m + (n - m))%nat by lia.
+  rewrite (fmap_seq_split f m (n - m)), List.filter_app.
+  rewrite (filter_all_true _ (f <$> seq 0 m)).
+  2:{ intros x Hx. apply elem_of_list_fmap in Hx as (k & -> & Hk).
+      apply elem_of_seq in Hk.
+      apply negb_true_iff, Z.eqb_neq, Hlo. lia. }
+  rewrite (filter_all_false _ (f <$> seq m (n - m))).
+  2:{ intros x Hx. apply elem_of_list_fmap in Hx as (k & -> & Hk).
+      apply elem_of_seq in Hk.
+      apply negb_false_iff, Z.eqb_eq, Hhi; lia. }
+  apply List.app_nil_r.
+Qed.
+
+(* a total-lookup fmap over a list's own length is that list *)
+Lemma list_total_seq {A : Type} `{Inhabited A} (l : list A) :
+  ((fun j => l !!! j) <$> seq 0 (length l)) = l.
+Proof.
+  apply list_eq. intros k. rewrite list_lookup_fmap.
+  destruct (Nat.lt_ge_cases k (length l)) as [Hk | Hk].
+  - rewrite (lookup_seq_lt 0 _ k Hk).
+    cbn [fmap option_fmap option_map]. rewrite Nat.add_0_l.
+    rewrite (list_lookup_total_alt l k).
+    destruct (l !! k) as [a|] eqn:E; [reflexivity |].
+    exfalso. apply lookup_ge_None in E. lia.
+  - rewrite (lookup_seq_ge 0 _ k Hk). symmetry.
+    apply lookup_ge_None. lia.
+Qed.
+
+(* NO DUPLICATES IN THE FILTER MEANS THE KEPT POSITIONS ARE UNIQUE -- the
+   only reading of [NoDup] the injectivity clause wants *)
+Lemma NoDup_filter_lookup_inj {A : Type} (p : A -> bool) (l : list A) :
+  NoDup (List.filter p l) ->
+  forall (i j : nat) (x : A),
+    l !! i = Some x -> l !! j = Some x -> p x = true -> i = j.
+Proof.
+  revert l. induction l as [| a l IH]; intros Hnd i j x Hi Hj Hp.
+  { destruct i; discriminate. }
+  cbn [List.filter] in Hnd.
+  assert (Hkeep : forall (m : nat), l !! m = Some x ->
+            x ∈ List.filter p l).
+  { intros m Hm. apply elem_of_list_In, List.filter_In.
+    split; [apply elem_of_list_In, (elem_of_list_lookup_2 l m x Hm) | exact Hp]. }
+  destruct i as [| i']; destruct j as [| j']; cbn [lookup list_lookup] in Hi, Hj.
+  - reflexivity.
+  - injection Hi as ->. exfalso.
+    rewrite Hp in Hnd.
+    exact (NoDup_cons_1_1 x (List.filter p l) Hnd (Hkeep j' Hj)).
+  - injection Hj as ->. exfalso.
+    rewrite Hp in Hnd.
+    exact (NoDup_cons_1_1 x (List.filter p l) Hnd (Hkeep i' Hi)).
+  - assert (Hnd' : NoDup (List.filter p l)).
+    { destruct (p a);
+        [exact (NoDup_cons_1_2 a (List.filter p l) Hnd) | exact Hnd]. }
+    f_equal. exact (IH Hnd' i' j' x Hi Hj Hp).
+Qed.
+
+(* the geometry fact the entry clauses turn into "nonzero" *)
+Lemma fs_data_start_pos (sb : fs_sb) : fs_sb_ok sb -> 0 < fs_data_start sb.
+Proof.
+  intros Hok. unfold fs_data_start.
+  pose proof (sbo_bmapstart sb Hok).
+  pose proof (sbo_inodestart sb Hok).
+  pose proof (sbo_logstart sb Hok).
+  pose proof (sbo_nlog sb Hok).
+  pose proof (sbo_ninodes sb Hok). unfold ROOTINO in *.
+  pose proof (Z.div_pos (sb_ninodes sb) 16 ltac:(lia) ltac:(lia)). lia.
+Qed.
+
+(* the slot reader sees the record only through [di_addrs] and the view
+   only through [fs_ind_ents] -- the two facts every transport establishes *)
+Lemma fs_slot_det (P P' : Z -> list (bv 8)) (dn dn' : dinode) (k : nat) :
+  di_addrs dn' = di_addrs dn -> fs_ind_ents P' dn' = fs_ind_ents P dn ->
+  fs_slot P' dn' k = fs_slot P dn k.
+Proof.
+  intros Ha He. unfold fs_slot, fs_blk_addr. rewrite Ha, He. reflexivity.
+Qed.
+
+Lemma fs_slot_lt (P : Z -> list (bv 8)) (dn : dinode) (i : nat) :
+  (i < FS_MAXFILE)%nat -> fs_slot P dn i = fs_blk_addr P dn i.
+Proof.
+  intros Hi. unfold fs_slot. rewrite decide_False by lia. reflexivity.
+Qed.
+
+(* ---- one inode's slots, listed, and its nonzero ones ----------------- *)
+
+Definition fs_slot_list (P : Z -> list (bv 8)) (dn : dinode) : list Z :=
+  (bv_unsigned (di_addrs dn !!! 12%nat)
+   :: (((fun k => bv_unsigned (di_addrs dn !!! k)) <$> seq 0 FS_NDIRECT)
+       ++ fs_ind_ents P dn))%list.
+
+(* [InodeInv.bm_slot]'s index, as a position in [fs_slot_list] *)
+Definition fs_run_ix (i : nat) : nat :=
+  if decide (i = FS_MAXFILE) then 0%nat else S i.
+
+Lemma fs_run_ix_inj (i j : nat) :
+  (i <= FS_MAXFILE)%nat -> (j <= FS_MAXFILE)%nat ->
+  fs_run_ix i = fs_run_ix j -> i = j.
+Proof.
+  unfold fs_run_ix. intros Hi Hj H.
+  destruct (decide (i = FS_MAXFILE)) as [-> | Hi'];
+    destruct (decide (j = FS_MAXFILE)) as [-> | Hj'];
+    [reflexivity | discriminate | discriminate | injection H as H; exact H].
+Qed.
+
+Lemma fs_slot_list_lookup (P : Z -> list (bv 8)) (dn : dinode) (i : nat) :
+  (i <= FS_MAXFILE)%nat ->
+  fs_slot_list P dn !! fs_run_ix i = Some (fs_slot P dn i).
+Proof.
+  intros Hi. unfold fs_slot_list, fs_run_ix.
+  destruct (decide (i = FS_MAXFILE)) as [-> | Hne].
+  - rewrite fs_slot_max. reflexivity.
+  - assert (HiM : (i < FS_MAXFILE)%nat) by lia.
+    change ((bv_unsigned (di_addrs dn !!! 12%nat)
+             :: (((fun k => bv_unsigned (di_addrs dn !!! k))
+                    <$> seq 0 FS_NDIRECT) ++ fs_ind_ents P dn)) !! S i)
+      with ((((fun k => bv_unsigned (di_addrs dn !!! k))
+                <$> seq 0 FS_NDIRECT) ++ fs_ind_ents P dn) !! i).
+    rewrite (fs_slot_lt P dn i HiM). unfold fs_blk_addr.
+    destruct (Nat.ltb_spec i FS_NDIRECT) as [Hd | Hd].
+    + rewrite lookup_app_l by (rewrite length_fmap, length_seq; lia).
+      rewrite list_lookup_fmap, (lookup_seq_lt 0 _ i Hd).
+      reflexivity.
+    + rewrite lookup_app_r by (rewrite length_fmap, length_seq; lia).
+      rewrite length_fmap, length_seq.
+      rewrite (list_lookup_total_alt (fs_ind_ents P dn) (i - FS_NDIRECT)%nat).
+      destruct (fs_ind_ents P dn !! (i - FS_NDIRECT)%nat) as [a|] eqn:E;
+        [reflexivity |].
+      exfalso. apply lookup_ge_None in E.
+      rewrite fs_ind_ents_length in E.
+      unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *. lia.
+Qed.
+
+Lemma fs_slot_list_elem (P : Z -> list (bv 8)) (dn : dinode) (b : Z) :
+  b ∈ fs_slot_list P dn ->
+  exists i : nat, (i <= FS_MAXFILE)%nat /\ fs_slot P dn i = b.
+Proof.
+  assert (HDM : (FS_NDIRECT + FS_NINDIRECT)%nat = FS_MAXFILE) by reflexivity.
+  unfold fs_slot_list. intros Hb.
+  apply elem_of_cons in Hb as [-> | Hb].
+  - exists FS_MAXFILE. split; [lia | rewrite fs_slot_max; reflexivity].
+  - apply elem_of_app in Hb as [Hb | Hb].
+    + apply elem_of_list_fmap in Hb as (k & -> & Hk).
+      apply elem_of_seq in Hk.
+      assert (HkD : (k < FS_NDIRECT)%nat) by lia.
+      assert (HkM : (k < FS_MAXFILE)%nat) by lia.
+      exists k. split; [lia |].
+      rewrite (fs_slot_lt P dn k HkM). unfold fs_blk_addr.
+      rewrite (proj2 (Nat.ltb_lt k FS_NDIRECT) HkD). reflexivity.
+    + apply elem_of_list_lookup in Hb as (j & Hj).
+      assert (Hjl : (j < FS_NINDIRECT)%nat).
+      { apply lookup_lt_Some in Hj. rewrite fs_ind_ents_length in Hj.
+        exact Hj. }
+      exists (FS_NDIRECT + j)%nat.
+      split; [lia |].
+      rewrite (fs_slot_ent P dn (FS_NDIRECT + j)%nat
+                 ltac:(lia) ltac:(lia)).
+      replace (FS_NDIRECT + j - FS_NDIRECT)%nat with j by lia.
+      rewrite (list_lookup_total_alt (fs_ind_ents P dn) j), Hj.
+      reflexivity.
+Qed.
+
+Definition fs_inode_ents (P : Z -> list (bv 8)) (dn : dinode) : list Z :=
+  List.filter (fun a => negb (a =? 0)) (fs_slot_list P dn).
+
+(* a nonzero slot is a member... *)
+Lemma fs_inode_ents_slot (P : Z -> list (bv 8)) (dn : dinode) (i : nat) :
+  (i <= FS_MAXFILE)%nat -> fs_slot P dn i <> 0 ->
+  fs_slot P dn i ∈ fs_inode_ents P dn.
+Proof.
+  intros Hi Hnz. unfold fs_inode_ents.
+  apply elem_of_list_In, List.filter_In. split.
+  - apply elem_of_list_In, elem_of_list_lookup.
+    exists (fs_run_ix i). exact (fs_slot_list_lookup P dn i Hi).
+  - apply negb_true_iff, Z.eqb_neq. exact Hnz.
+Qed.
+
+(* ...and every member is one *)
+Lemma fs_inode_ents_elem (P : Z -> list (bv 8)) (dn : dinode) (b : Z) :
+  b ∈ fs_inode_ents P dn ->
+  exists i : nat, (i <= FS_MAXFILE)%nat /\ fs_slot P dn i = b /\ b <> 0.
+Proof.
+  unfold fs_inode_ents. intros Hb.
+  apply elem_of_list_In, List.filter_In in Hb as (Hin & Hnz).
+  apply elem_of_list_In in Hin.
+  destruct (fs_slot_list_elem P dn b Hin) as (i & Hi & Heq).
+  exists i. split; [exact Hi |]. split; [exact Heq |].
+  apply negb_true_iff, Z.eqb_neq in Hnz. exact Hnz.
+Qed.
+
+(* every entry a live inode names is a data block -- the entry clauses of
+   [fs_inode_dok], read at membership altitude *)
+Lemma fs_inode_ents_range (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
+    (b : Z) :
+  fs_inode_dok P sb dn -> b ∈ fs_inode_ents P dn ->
+  fs_data_start sb <= b < sb_size sb.
+Proof.
+  intros Hd Hb.
+  destruct (fs_inode_ents_elem P dn b Hb) as (i & Hi & Heq & Hnz).
+  rewrite <- Heq in Hnz |- *.
+  destruct (decide (i = FS_MAXFILE)) as [-> | Hne].
+  - rewrite fs_slot_max in Hnz |- *. exact (fdi_ind_ok P sb dn Hd Hnz).
+  - assert (Hlt : (i < FS_MAXFILE)%nat) by lia.
+    destruct (Nat.lt_ge_cases i FS_NDIRECT) as [Hdir | Hdir].
+    + rewrite (fs_slot_direct P dn i Hdir) in Hnz |- *.
+      exact (fdi_direct_ok P sb dn Hd i Hdir Hnz).
+    + rewrite (fs_slot_ent P dn i Hdir Hlt) in Hnz |- *.
+      apply (fdi_ent_ok P sb dn Hd (i - FS_NDIRECT)%nat);
+        [unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *; lia | exact Hnz].
+Qed.
+
+(* [InodeInv.blkmap_wf]'s injectivity clause, off the duplicate-freedom of
+   ONE inode's entry list *)
+Lemma fs_slot_inj_of_ents (P : Z -> list (bv 8)) (dn : dinode) :
+  NoDup (fs_inode_ents P dn) -> fs_slot_inj P dn.
+Proof.
+  unfold fs_inode_ents. intros Hnd i j Hi Hj Hnz Heq.
+  apply (fs_run_ix_inj i j Hi Hj).
+  apply (NoDup_filter_lookup_inj _ (fs_slot_list P dn) Hnd _ _
+           (fs_slot P dn i)).
+  - exact (fs_slot_list_lookup P dn i Hi).
+  - rewrite Heq. exact (fs_slot_list_lookup P dn j Hj).
+  - apply negb_true_iff, Z.eqb_neq. exact Hnz.
+Qed.
+
+(* the entry list depends on the record only through [di_addrs] and on the
+   view only through [fs_ind_ents] -- the two transport premises every
+   effect proof already establishes *)
+Lemma fs_inode_ents_det (P P' : Z -> list (bv 8)) (dn dn' : dinode) :
+  di_addrs dn' = di_addrs dn -> fs_ind_ents P' dn' = fs_ind_ents P dn ->
+  fs_inode_ents P' dn' = fs_inode_ents P dn.
+Proof.
+  intros Ha He. unfold fs_inode_ents, fs_slot_list.
+  rewrite Ha, He. reflexivity.
+Qed.
+
+(* the three chunks, for a proof that changes one of them *)
+Lemma fs_inode_ents_alt (P : Z -> list (bv 8)) (dn : dinode) :
+  fs_inode_ents P dn
+  = ((if bv_unsigned (di_addrs dn !!! 12%nat) =? 0
+      then [] else [bv_unsigned (di_addrs dn !!! 12%nat)])
+     ++ List.filter (fun a => negb (a =? 0))
+          ((fun k => bv_unsigned (di_addrs dn !!! k)) <$> seq 0 FS_NDIRECT)
+     ++ List.filter (fun a => negb (a =? 0)) (fs_ind_ents P dn))%list.
+Proof.
+  unfold fs_inode_ents, fs_slot_list.
+  cbn [List.filter]. rewrite List.filter_app.
+  destruct (bv_unsigned (di_addrs dn !!! 12%nat) =? 0); reflexivity.
+Qed.
+
+(* ---- THE ALLOC DELTA: one empty slot becomes a block ------------------ *)
+
+(* [NoDup] and membership travel along a permutation; the used set is a
+   MULTISET fact, and an allocation inserts its block in the middle of the
+   slot run rather than at the end. *)
+Lemma NoDup_perm {A : Type} (l1 l2 : list A) :
+  l1 ≡ₚ l2 -> NoDup l1 -> NoDup l2.
+Proof.
+  intros Hp Hnd. apply NoDup_ListNoDup.
+  apply (Permutation_NoDup Hp). apply NoDup_ListNoDup. exact Hnd.
+Qed.
+
+Lemma elem_of_perm {A : Type} (l1 l2 : list A) (x : A) :
+  l1 ≡ₚ l2 -> x ∈ l1 -> x ∈ l2.
+Proof.
+  intros Hp Hx. apply elem_of_list_In.
+  apply (Permutation_in _ Hp). apply elem_of_list_In. exact Hx.
+Qed.
+
+Lemma filter_nz_mid (A B : list Z) (a : Z) :
+  a <> 0 ->
+  List.filter (fun x => negb (x =? 0)) (A ++ a :: B)
+  ≡ₚ (List.filter (fun x => negb (x =? 0)) (A ++ 0 :: B) ++ [a])%list.
+Proof.
+  intros Ha. rewrite !List.filter_app. cbn [List.filter].
+  rewrite (proj2 (negb_true_iff _) (proj2 (Z.eqb_neq _ _) Ha)).
+  change (0 =? 0) with true. cbn [negb].
+  rewrite <- List.app_assoc.
+  apply Permutation_app_head, Permutation_cons_append.
+Qed.
+
+Lemma filter_nz_upd_perm (l : list Z) (j : nat) (a : Z) :
+  l !! j = Some 0 -> a <> 0 ->
+  List.filter (fun x => negb (x =? 0)) (<[j := a]> l)
+  ≡ₚ (List.filter (fun x => negb (x =? 0)) l ++ [a])%list.
+Proof.
+  intros Hj Ha.
+  assert (Hlen : (j < length l)%nat) by (apply lookup_lt_Some in Hj; lia).
+  pose proof (filter_nz_mid (take j l) (drop (S j) l) a Ha) as Hm.
+  rewrite (take_drop_middle l j 0 Hj) in Hm.
+  rewrite (insert_take_drop l j a Hlen). exact Hm.
+Qed.
+
+Lemma fs_slot_list_length (P : Z -> list (bv 8)) (dn : dinode) :
+  length (fs_slot_list P dn) = S FS_MAXFILE.
+Proof.
+  unfold fs_slot_list. cbn [length].
+  rewrite length_app, length_fmap, length_seq, fs_ind_ents_length.
+  reflexivity.
+Qed.
+
+Lemma fs_run_ix_surj (k : nat) :
+  (k < S FS_MAXFILE)%nat ->
+  exists i : nat, (i <= FS_MAXFILE)%nat /\ fs_run_ix i = k.
+Proof.
+  intros Hk. unfold fs_run_ix. destruct k as [| k'].
+  - exists FS_MAXFILE. split; [lia |].
+    destruct (decide (FS_MAXFILE = FS_MAXFILE)); [reflexivity | congruence].
+  - exists k'. split; [lia |].
+    destruct (decide (k' = FS_MAXFILE)) as [-> | Hne]; [lia | reflexivity].
+Qed.
+
+(* the slot list after ONE slot moves -- the shape [bmap]'s install has *)
+Lemma fs_slot_list_upd (P P' : Z -> list (bv 8)) (dn dn' : dinode)
+    (j : nat) (a : Z) :
+  (j <= FS_MAXFILE)%nat ->
+  fs_slot P' dn' j = a ->
+  (forall k : nat, (k <= FS_MAXFILE)%nat -> k <> j ->
+     fs_slot P' dn' k = fs_slot P dn k) ->
+  fs_slot_list P' dn' = <[fs_run_ix j := a]> (fs_slot_list P dn).
+Proof.
+  intros Hj Ha Hkeep.
+  assert (Hjl : (fs_run_ix j < S FS_MAXFILE)%nat).
+  { unfold fs_run_ix. destruct (decide (j = FS_MAXFILE)); lia. }
+  apply list_eq. intros k.
+  destruct (Nat.lt_ge_cases k (S FS_MAXFILE)) as [Hk | Hk].
+  - destruct (fs_run_ix_surj k Hk) as (i & Hi & <-).
+    rewrite (fs_slot_list_lookup P' dn' i Hi).
+    destruct (decide (i = j)) as [-> | Hne].
+    + rewrite list_lookup_insert
+        by (rewrite fs_slot_list_length; exact Hjl).
+      rewrite Ha. reflexivity.
+    + rewrite list_lookup_insert_ne
+        by (intros Hc; exact (Hne (fs_run_ix_inj i j Hi Hj (eq_sym Hc)))).
+      rewrite (fs_slot_list_lookup P dn i Hi), (Hkeep i Hi Hne).
+      reflexivity.
+  - rewrite lookup_ge_None_2 by (rewrite fs_slot_list_length; lia).
+    symmetry. apply lookup_ge_None_2.
+    rewrite length_insert, fs_slot_list_length. lia.
+Qed.
+
+(* THE ALLOC-SIDE ENTRY-LIST DELTA: filling an EMPTY slot adds exactly the
+   fresh block to the inode's entry multiset. *)
+Lemma fs_inode_ents_upd (P P' : Z -> list (bv 8)) (dn dn' : dinode)
+    (j : nat) (a : Z) :
+  (j <= FS_MAXFILE)%nat -> a <> 0 ->
+  fs_slot P dn j = 0 -> fs_slot P' dn' j = a ->
+  (forall k : nat, (k <= FS_MAXFILE)%nat -> k <> j ->
+     fs_slot P' dn' k = fs_slot P dn k) ->
+  fs_inode_ents P' dn' ≡ₚ (fs_inode_ents P dn ++ [a])%list.
+Proof.
+  intros Hj Ha Hz Ha' Hkeep.
+  unfold fs_inode_ents.
+  rewrite (fs_slot_list_upd P P' dn dn' j a Hj Ha' Hkeep).
+  apply filter_nz_upd_perm; [| exact Ha].
+  rewrite (fs_slot_list_lookup P dn j Hj), Hz. reflexivity.
+Qed.
+
+(* ---- the join over the live inums ------------------------------------ *)
+
+Definition fs_ent_blocks (P : Z -> list (bv 8)) (sb : fs_sb) : list Z :=
+  mjoin ((fun i => let dn := fs_dinode P sb (Z.of_nat i) in
+                    if bv_unsigned (di_type dn) =? 0 then []
+                    else fs_inode_ents P dn)
+            <$> seq 0 (Z.to_nat (sb_ninodes sb))).
+
+Definition fs_ent_set (P : Z -> list (bv 8)) (sb : fs_sb) : option (gset Z) :=
+  gset_nodup (fs_ent_blocks P sb).
+
+Lemma fs_ent_set_nodup (P : Z -> list (bv 8)) (sb : fs_sb) (u : gset Z) :
+  fs_ent_set P sb = Some u -> NoDup (fs_ent_blocks P sb).
+Proof. apply gset_nodup_NoDup. Qed.
+
+Lemma fs_ent_set_elem (P : Z -> list (bv 8)) (sb : fs_sb) (u : gset Z)
+    (b : Z) :
+  fs_ent_set P sb = Some u -> (b ∈ u <-> b ∈ fs_ent_blocks P sb).
+Proof. intros H. exact (gset_nodup_set _ u H b). Qed.
+
+Lemma fs_ent_blocks_inode (P : Z -> list (bv 8)) (sb : fs_sb) (i b : Z) :
+  0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) <> 0 ->
+  b ∈ fs_inode_ents P (fs_dinode P sb i) ->
+  b ∈ fs_ent_blocks P sb.
+Proof.
+  intros Hi Hnz Hb. unfold fs_ent_blocks.
+  apply elem_of_list_join. eexists. split; [exact Hb |].
+  apply elem_of_list_fmap. exists (Z.to_nat i). split.
+  - rewrite Z2Nat.id by lia.
+    destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
+      [| reflexivity].
+    exfalso. apply Hnz, Z.eqb_eq, E.
+  - apply elem_of_seq. lia.
+Qed.
+
+Lemma fs_ent_blocks_nodup_inode (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  NoDup (fs_ent_blocks P sb) -> 0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) <> 0 ->
+  NoDup (fs_inode_ents P (fs_dinode P sb i)).
+Proof.
+  intros Hnd Hi Hnz. unfold fs_ent_blocks in Hnd.
+  apply (NoDup_mjoin_elem _ _ Hnd).
+  apply elem_of_list_fmap. exists (Z.to_nat i). split.
+  - rewrite Z2Nat.id by lia.
+    destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
+      [| reflexivity].
+    exfalso. apply Hnz, Z.eqb_eq, E.
+  - apply elem_of_seq. lia.
+Qed.
+
+Definition fs_inode_ents_set (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z)
+  : gset Z := list_to_set (fs_inode_ents P (fs_dinode P sb i)).
+
+Lemma fs_inode_ents_disjoint (P : Z -> list (bv 8)) (sb : fs_sb) (i j : Z) :
+  NoDup (fs_ent_blocks P sb) ->
+  0 <= i < sb_ninodes sb -> 0 <= j < sb_ninodes sb -> i <> j ->
+  bv_unsigned (di_type (fs_dinode P sb i)) <> 0 ->
+  bv_unsigned (di_type (fs_dinode P sb j)) <> 0 ->
+  fs_inode_ents_set P sb i ## fs_inode_ents_set P sb j.
+Proof.
+  intros Hnd Hi Hj Hne Hti Htj.
+  apply elem_of_disjoint. intros b Hb1 Hb2.
+  unfold fs_inode_ents_set in Hb1, Hb2.
+  rewrite elem_of_list_to_set in Hb1. rewrite elem_of_list_to_set in Hb2.
+  unfold fs_ent_blocks in Hnd.
+  apply (NoDup_mjoin_cross _ (Z.to_nat i) (Z.to_nat j)
+           (fs_inode_ents P (fs_dinode P sb i))
+           (fs_inode_ents P (fs_dinode P sb j)) b Hnd);
+    [ | | lia | exact Hb1 | exact Hb2].
+  - rewrite list_lookup_fmap, (lookup_seq_lt 0 _ (Z.to_nat i)) by lia.
+    cbn [fmap option_fmap option_map].
+    rewrite Nat.add_0_l, Z2Nat.id by lia.
+    rewrite (proj2 (Z.eqb_neq _ _) Hti). reflexivity.
+  - rewrite list_lookup_fmap, (lookup_seq_lt 0 _ (Z.to_nat j)) by lia.
+    cbn [fmap option_fmap option_map].
+    rewrite Nat.add_0_l, Z2Nat.id by lia.
+    rewrite (proj2 (Z.eqb_neq _ _) Htj). reflexivity.
+Qed.
+
+(* ---- THE BRIDGE: where no entry sits beyond the size, the two readings  *)
+(*      are the SAME LIST                                                  *)
+
+Lemma fs_inode_ents_blocks (P : Z -> list (bv 8)) (sb : fs_sb)
+    (dn : dinode) :
+  fs_sb_ok sb -> fs_inode_ok P sb dn ->
+  fs_inode_ents P dn = fs_inode_blocks P dn.
+Proof.
+  intros Hsbok Hok.
+  assert (HDM : (FS_NDIRECT + FS_NINDIRECT)%nat = FS_MAXFILE) by reflexivity.
+  pose proof (fs_data_start_pos sb Hsbok) as Hds.
+  assert (Hnb : fs_nblk (bv_unsigned (di_size dn)) <= Z.of_nat FS_MAXFILE).
+  { apply fs_nblk_max;
+      [exact (proj1 (bv_unsigned_in_range _ _))
+      | exact (fio_size P sb dn Hok)]. }
+  assert (Hnb0 : 0 <= fs_nblk (bv_unsigned (di_size dn))).
+  { unfold fs_nblk, BSIZE_z.
+    pose proof (proj1 (bv_unsigned_in_range 32 (di_size dn))).
+    apply Z.div_pos; lia. }
+  rewrite fs_inode_ents_alt.
+  unfold fs_inode_blocks. cbv zeta.
+  set (nb := fs_nblk (bv_unsigned (di_size dn))) in *.
+  (* the direct chunk *)
+  assert (Hdir : List.filter (fun a => negb (a =? 0))
+                   ((fun k => bv_unsigned (di_addrs dn !!! k))
+                      <$> seq 0 FS_NDIRECT)
+                 = ((fun k => bv_unsigned (di_addrs dn !!! k))
+                      <$> seq 0 (Z.to_nat (Z.min nb (Z.of_nat FS_NDIRECT))))).
+  { apply filter_nz_prefix; [lia | |].
+    - intros k Hk.
+      pose proof (fio_direct P sb dn Hok k ltac:(lia) ltac:(lia)). lia.
+    - intros k Hlo Hhi.
+      exact (fio_direct_zero P sb dn Hok k Hhi ltac:(lia)). }
+  (* the indirect chunk *)
+  assert (Hent : List.filter (fun a => negb (a =? 0)) (fs_ind_ents P dn)
+                 = ((fun j => fs_ind_ents P dn !!! j)
+                      <$> seq 0 (Z.to_nat (nb - Z.of_nat FS_NDIRECT)))).
+  { rewrite <- (list_total_seq (fs_ind_ents P dn)) at 1.
+    rewrite fs_ind_ents_length.
+    apply filter_nz_prefix; [lia | |].
+    - intros j Hj.
+      pose proof (fio_ent P sb dn Hok j ltac:(lia) ltac:(lia)). lia.
+    - intros j Hlo Hhi.
+      exact (fio_ent_zero P sb dn Hok j Hhi ltac:(lia)). }
+  rewrite Hdir, Hent. f_equal.
+  destruct (Z.ltb_spec (Z.of_nat FS_NDIRECT) nb) as [Hgt | Hle].
+  - assert (Hib : bv_unsigned (di_addrs dn !!! 12%nat) <> 0).
+    { pose proof (fio_ind P sb dn Hok Hgt). lia. }
+    rewrite (proj2 (Z.eqb_neq _ _) Hib). reflexivity.
+  - rewrite (proj2 (Z.eqb_eq _ _) (fio_ind_zero P sb dn Hok Hle)).
+    reflexivity.
+Qed.
+
+Lemma fs_ent_blocks_used (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fs_sb_ok sb -> fs_inodes_wf P sb = true ->
+  fs_ent_blocks P sb = fs_used_blocks P sb.
+Proof.
+  intros Hsbok HW3. unfold fs_ent_blocks, fs_used_blocks. f_equal.
+  apply list_fmap_ext. intros idx x Hx.
+  apply lookup_seq in Hx as [-> Hx]. cbv beta zeta.
+  destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat (0 + idx))))
+            =? 0) eqn:Ety; [reflexivity |].
+  apply (fs_inode_ents_blocks P sb _ Hsbok).
+  apply (fs_inodes_wf_spec P sb (Z.of_nat (0 + idx)) HW3 ltac:(lia)).
+  apply Z.eqb_neq. exact Ety.
+Qed.
+
+(* THE DISCHARGE THE IMAGE SIDE NEEDS: the image's own W4 answer IS the
+   durable one.  No new computation -- a proof about the two readings, not
+   a second sweep. *)
+Lemma fs_ent_set_used (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fs_sb_ok sb -> fs_inodes_wf P sb = true ->
+  fs_ent_set P sb = fs_used_set P sb.
+Proof.
+  intros Hsbok HW3. unfold fs_ent_set, fs_used_set.
+  rewrite (fs_ent_blocks_used P sb Hsbok HW3). reflexivity.
+Qed.
+
+(* [InodeInv.bm_covers]' shape at the DURABLE record -- the below-size
+   clauses, read through [fs_blk_addr] as [fs_inode_ok_blk] reads them *)
+Lemma fs_inode_dok_blk (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
+    (k : nat) :
+  fs_inode_dok P sb dn -> (k < FS_MAXFILE)%nat ->
+  Z.of_nat k < fs_nblk (bv_unsigned (di_size dn)) ->
+  fs_data_start sb <= fs_blk_addr P dn k < sb_size sb.
+Proof.
+  intros Hd Hk Hnb. unfold fs_blk_addr.
+  destruct (Nat.ltb_spec k FS_NDIRECT) as [Hdd | Hdd].
+  - exact (fdi_direct P sb dn Hd k Hdd Hnb).
+  - apply (fdi_ent P sb dn Hd (k - FS_NDIRECT)%nat).
+    + unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *. lia.
+    + rewrite Nat2Z.inj_sub by exact Hdd. lia.
 Qed.
 
 (* ---- THE DURABLE-STATE SHARPENING OF (L1) ----------------------------

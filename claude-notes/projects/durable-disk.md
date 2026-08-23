@@ -543,7 +543,9 @@ list.
       `fs_parse_sb`; the fresh-block premise is the CLEARED BITMAP BIT —
       balloc's own postcondition — since `u` is existential in the
       view). STATEMENT DELTAS vs the briefed seven, each forced and
-      recorded at its lemma: (1) create splits into `eff_create_entry
+      recorded at its lemma (items (4), (5) and (7) are SUPERSEDED by
+      F3.2 -- the size moves split out, an alloc is one empty slot, and
+      the indirect crossing is ONE block; read them with §5½): (1) create splits into `eff_create_entry
       (d k name i ty maj min)` (mknod's device pair is part of the
       written record) and `eff_create_dir_entry (d k name i fb)` — a
       typed dir without its dots block has NO wf intermediate, so
@@ -587,41 +589,85 @@ entries as owned (a later `writei` reuses them via `bmap`; truncation
 reclaims them). `writei`'s partial-failure commits are therefore NOT a
 defect (kernel-defects.md entry resolved) and the invariant adjusts:
 
-- [ ] **F3.1** `FsWf`: delete `fdi_direct_zero`/`fdi_ind_zero`; the
-      entry clauses become "each `addrs`/indirect entry is 0 or a
-      data-region block, all nonzero entries mutually distinct". The
-      USED SET becomes entry-derived: all nonzero entries (+ the
-      indirect block itself when the pointer is nonzero) of live
-      inodes — W4/W5 stays an IFF, no leak arm. `FsImg`'s own
-      `fs_used_set` stays for the image check (the two agree at the
-      mkfs image, where beyond-size entries are zero); the discharge
-      bridges them. CHECK the resource layer's spelling first
-      (`InodeInv.blkmap_wf`/`inode_ok`'s `blk_holes_zero` — the landed
-      `ProofWritei` failure arms already accommodate the behavior, so
-      the resource clauses are the template for the pure ones).
-- [ ] **F3.2** Re-premise the F2 effects: alloc's precondition is
-      SLOT-EMPTINESS (`addrs !!! fbn = 0` / indirect entry 0), the
-      append-position equation and the size fusion are dropped (size
-      moves become their own cheap effect or a parameter); `eff_trunc`
-      frees ALL nonzero entries (matching itrunc's loop, which it must
-      already — verify); re-derive the `used_grow`/NoDup lemmas over
-      entry-derived counting. The F2 statement freeze is LIFTED by
-      this ruling for exactly these premises.
-- [ ] **F3.3** Sweep the FsOp lemmas (batches 1–3) onto the new
-      premises — filewrite's chain SIMPLIFIES (no append equation; the
-      write-into-existing arm no longer needs the alloc to have
-      happened in the same transaction) — and add the now-expressible
-      `writei` failure-arm effects (alloc-without-size-move).
-- [ ] **F3.4** The create-`fail:` tail (batch (2) finding (a)): one
-      `eff_dinode` rewrite of a FREE slot (written then freed inside
-      the transaction, net a free-slot re-encode) — the cheap ninth
-      effect; mknod/mkdir/open inherit its arm lemma.
-- [ ] **F3.5** The TRANSPORT BUNDLE (batch (2) finding (e)): each
-      `eff_*_wfv` exports a uniform bundle (parse invariance, the
-      touched inodes' decode, tree/reachability invariance where it
-      holds) so chained arms stop re-deriving footprints;
-      `FsOpOpen`'s two transport lemmas and `FsOpFilewrite`'s
-      `ws_apply_blocks` are the prototypes.
+- [x] **F3.1** DONE. `FsImg.fs_inode_dok`'s three "zero above the
+      size" clauses are gone; the entry clauses are `fdi_direct_ok` /
+      `fdi_ind_ok` / `fdi_ent_ok` ("a nonzero entry, wherever it sits,
+      is a data block"), with `fdi_direct` / `fdi_ind` / `fdi_ent` kept
+      VERBATIM as the pure reading of `InodeInv.bm_covers` (the resource
+      layer keeps coverage as its own conjunct beside `blkmap_wf`, so
+      the pure layer does too -- and dropping it would have made every
+      dirent effect take "the target block is not a hole" as a new
+      premise).  `fs_inode_dwf`'s three `else` branches changed from
+      `a =? 0` to `(a =? 0) || fs_addr_ok sb a`, so the boolean is
+      unchanged in COST and `fs_inode_dok_dwf` / `fs_inode_dok_size`
+      now turn the record into the boolean (no effect proof re-derives
+      the branch structure).  The entry-derived used set is
+      `fs_slot_list` (the indirect block, then the 12 direct cells,
+      then `fs_ind_ents` -- ONE occurrence of the entry decode, spelled
+      as a concatenation and NOT as a 269-wide `fs_slot`-indexed fmap,
+      which cost a 15-minute conversion), `fs_inode_ents` = its nonzero
+      filter, `fs_ent_blocks` = the join over live inums,
+      `fs_ent_set` = its `gset_nodup`.  W4/W5 is still an IFF.
+      `FsImg.fs_used_set` is untouched and `FsImgCheck` recomputes
+      nothing; the bridge is an EQUATION, `fs_inode_ents_blocks`
+      (`fs_sb_ok` + `fs_inode_ok` -> the two per-inode lists are the
+      same list), lifted to `fs_ent_set_used`, and `FsWf`'s
+      `fsimg_durable_wf_view` discharges W4/W5 through it.
+      `fs_slot_inj_of_ents` replaces the `fs_slot_pos` index bijection
+      (NoDup of a filter, no positional arithmetic).
+- [x] **F3.2** DONE, and the size SPLIT OUT rather than kept fused --
+      forced, not chosen: with the coverage clause retained, a fused
+      size move to `nblk(sz') = fbn+1` re-derives `fbn = nblk(size)`
+      from slot emptiness, so the append equation comes back.  Split,
+      `eff_alloc_file_block i fbn fresh` takes SLOT EMPTINESS
+      (`fs_slot P dn fbn = 0`) plus "the indirect block exists when
+      `12 <= fbn`" and nothing else, and it is `writei`'s
+      partial-failure commit VERBATIM (a block installed, `ip->size`
+      left alone) with no chaining.  `eff_alloc_ind_block` collapses
+      from the fused TWO-block effect to ONE (deleting `fdi_ind_zero`
+      makes "indirect block allocated, no entries yet" a wf
+      intermediate), premise `addrs[NDIRECT] = 0`.  The size move rides
+      `eff_write_file_data`, whose premises became "the target slot is
+      allocated" + `bm_covers` at the NEW size (`fs_inode_dok_size`).
+      `eff_trunc` / `eff_free_inode` WERE size-derived and are fixed:
+      they free `fs_inode_ents`, i.e. every nonzero entry, which is
+      itrunc's real loop; `zeroed_blocks_nil` now reads the zeroed
+      `addrs`, not the zeroed size.  `used_grow` became
+      `FsEffBase.ent_grow`, shared and stated over a PERMUTATION (an
+      allocation fills a slot in the MIDDLE of the run), off
+      `fs_inode_ents_upd` / `filter_nz_upd_perm`.
+- [x] **F3.3** DONE.  `FsOpFilewrite`'s chain: `wstep` loses both
+      `sz'` parameters, `ws_alloc_ind` loses its data block, and the
+      NDIRECT crossing is `ws_alloc_pre` (the indirect block) followed
+      by the ordinary `ws_alloc` -- so a partial failure is a PREFIX of
+      the same step list and needs no new datum.  New `ws_apply_slot`
+      (the block-map transport) and `wfv_cov` / `wfv_slot_inj` carry
+      the write step's coverage premise across the allocation;
+      `ws_append_ok` is the per-block bundle the induction runs on.
+      `FsOp{Mknod,Mkdir,Open,Link,Unlink,IputFree,Ireclaim}` needed NO
+      premise change -- only the entry-derived spelling of the used
+      set, which is a rename.  No statement anywhere got a stronger
+      premise.
+- [x] **F3.4** DONE.  `FsEffFreeInode.eff_free_slot` (one `eff_dinode`
+      at a slot that was free before and after) + `eff_free_slot_wfv`;
+      `FsOp{Mknod,Mkdir,Open}` carry `op_*_fail_ok` and their
+      "this arm is not closed" notes are deleted.
+- [~] **F3.5** PARTLY DONE -- no owner question, just unfinished.
+      LANDED: the two-record ("meta") transports in `FsEffBase`
+      (`node_at_meta`, `tickets_at_meta`, `dir_ok_meta`,
+      `dots_only_meta`, `root_wf_meta`, generalising the `_untouched`
+      forms from record EQUALITY to type+size+data agreement -- what an
+      effect that moves one `addrs` cell can actually offer), the
+      block-map transport exported by both alloc effects
+      (`eff_alloc_file_block_slot` / `eff_alloc_ind_block_slot`, the
+      second half of their `_wf` conjunction) and `ws_apply_slot` at
+      the chain level, plus `fs_slot_det` / `fs_ind_ents_meta12` /
+      `fs_inode_ents_det`.  REMAINING: the dirent effects
+      (`eff_create_entry` / `eff_create_dir_entry` / `eff_link_entry` /
+      `eff_unlink_entry`) still export only `fs_durable_wf_view`, so
+      `FsOpOpen`'s `create_dirblk_range` + `eff_create_entry_transport`
+      have not moved next to their effect and G2 batch (2)'s finding
+      (v) (the growing append) is still open.
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 

@@ -227,7 +227,7 @@ Proof.
   assert (HP1BM : P1 BM
                   = bm_bytes BSIZE
                       (fs_bmap_set BSIZE (P BM)
-                       ∖ list_to_set (fs_inode_blocks P dn))).
+                       ∖ list_to_set (fs_inode_ents P dn))).
   { unfold P1, eff_trunc. apply fs_upd_at. }
   assert (HP1out : forall c : Z, c <> BM -> P1 c = eff_dinode P sb i T c).
   { intros c Hc. unfold P1, eff_trunc. apply fs_upd_ne. exact Hc. }
@@ -242,11 +242,11 @@ Proof.
     rewrite (fs_iblk_upd (eff_dinode P sb i T) sb i BM _ Hok Hi
                ltac:(lia)).
     exact (fs_iblk_eff_dinode P sb i T Hok Hi HTwf). }
-  assert (Hblk1 : fs_inode_blocks P1 (fs_dinode P1 sb i) = []).
-  { rewrite Hdin1. unfold fs_inode_blocks. cbv zeta. reflexivity. }
+  assert (Hblk1 : fs_inode_ents P1 (fs_dinode P1 sb i) = []).
+  { rewrite Hdin1. unfold fs_inode_ents. cbv zeta. reflexivity. }
   assert (Hbm1 : fs_bmap_set BSIZE (P1 BM)
                  = fs_bmap_set BSIZE (P BM)
-                   ∖ list_to_set (fs_inode_blocks P dn)).
+                   ∖ list_to_set (fs_inode_ents P dn)).
   { rewrite HP1BM. apply fs_bmap_set_bm_bytes.
     intros b Hb. exact (fs_bmap_set_diff_range BSIZE (P BM) _ b Hb). }
   assert (Hfree1 : di_free_v (fs_dinode P1 sb i) = di_free_v dn)
@@ -276,7 +276,7 @@ Section Orphan.
   Context (Hp : fs_parse_sb P = Some sb).
   Context (Hsb : fs_sb_wf sb = true).
   Context (HW3 : fs_inodes_dwf P sb = true).
-  Context (u : gset Z) (Hu : fs_used_set P sb = Some u).
+  Context (u : gset Z) (Hu : fs_ent_set P sb = Some u).
   Context (Hbm : fs_bitmap_wf P sb u = true).
   Context (HW7 : fs_root_wf P sb = true).
   Context (HW8 : fs_dots_all P sb = true).

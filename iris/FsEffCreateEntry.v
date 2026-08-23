@@ -22,7 +22,7 @@ Section EffCreateEntry.
   Context (Hp : fs_parse_sb P = Some sb).
   Context (Hsb : fs_sb_wf sb = true).
   Context (HW3 : fs_inodes_dwf P sb = true).
-  Context (u : gset Z) (Hu : fs_used_set P sb = Some u).
+  Context (u : gset Z) (Hu : fs_ent_set P sb = Some u).
   Context (Hbm : fs_bitmap_wf P sb u = true).
   Context (HW7 : fs_root_wf P sb = true).
   Context (HW8 : fs_dots_all P sb = true).
@@ -284,9 +284,9 @@ Section EffCreateEntry.
     assert (Ha0 : fs_blk_addr P dn (k / 64) <> 0)
       by (destruct (fs_sb_ok_meta sb Hok) as (Hx1 & Hx2 & Hx3);
           unfold fs_data_start in *; lia).
-    assert (Ha_in : fs_blk_addr P dn (k / 64) ∈ fs_inode_blocks P dn).
+    assert (Ha_in : fs_blk_addr P dn (k / 64) ∈ fs_inode_ents P dn).
     { rewrite <- (fs_slot_blk dn (k / 64)%nat HkbM).
-      apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
+      apply (fs_inode_ents_slot P dn); [lia |].
       rewrite (fs_slot_blk dn (k / 64)%nat HkbM). exact Ha0. }
     destruct (fs_sb_ok_meta sb Hok) as (Hm1 & Hm2 & Hm3).
     pose proof Hnin_le as HninN.
@@ -335,19 +335,9 @@ Section EffCreateEntry.
     { intros k' Hne Hnz.
       destruct (Nat.lt_ge_cases k' FS_MAXFILE) as [Hk' | Hk'].
       - assert (Hrng : fs_data_start sb <= fs_blk_addr P dn k' < sb_size sb).
-        { apply (blk_addr_covered d k' Hd Hdlive Hk').
-          destruct (Z.lt_ge_cases (Z.of_nat k') (fs_nblk szd)) as [| Hge];
-            [assumption |].
-          exfalso. apply Hnz.
-          destruct (Nat.lt_ge_cases k' FS_NDIRECT) as [Hdk | Hdk].
-          - unfold fs_blk_addr.
-            rewrite (proj2 (Nat.ltb_lt k' FS_NDIRECT) Hdk).
-            exact (fdi_direct_zero _ _ _ Hdok_d k' Hdk Hge).
-          - unfold fs_blk_addr.
-            rewrite (proj2 (Nat.ltb_ge k' FS_NDIRECT) Hdk).
-            apply (fdi_ent_zero _ _ _ Hdok_d (k' - FS_NDIRECT)%nat).
-            + unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *. lia.
-            + rewrite Nat2Z.inj_sub by exact Hdk. fold szd. lia. }
+        { (* the ENTRY clauses: a nonzero address is a data block,
+             whatever the size says (durable-disk F3.1) *)
+          exact (fs_blk_addr_range P sb dn k' Hdok_d Hk' Hnz). }
         apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3
                     | unfold fs_data_start in *; blk_ne Hibd3 Hibi3].
         intros Hc.
@@ -363,9 +353,9 @@ Section EffCreateEntry.
         [exact (fs_ind_ents_meta P' dn dnd' Haddrd') |].
       apply fs_ind_ents_ext. intros Hnz12.
       assert (Hin' : bv_unsigned (di_addrs dn !!! 12%nat)
-                     ∈ fs_inode_blocks P dn).
+                     ∈ fs_inode_ents P dn).
       { rewrite <- (fs_slot_max P dn).
-        apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
+        apply (fs_inode_ents_slot P dn); [lia |].
         rewrite fs_slot_max. exact Hnz12. }
       pose proof (blocks_range d _ Hd Hdlive Hin') as Hbr.
       apply HaE; [| unfold fs_data_start in *; blk_ne Hibd3 Hibi3
@@ -386,8 +376,8 @@ Section EffCreateEntry.
               /\ (forall k0 : nat,
                     fs_data_of P' (fs_dinode P sb z) k0
                     = fs_data_of P (fs_dinode P sb z) k0)
-              /\ fs_inode_blocks P' (fs_dinode P sb z)
-                 = fs_inode_blocks P (fs_dinode P sb z)
+              /\ fs_inode_ents P' (fs_dinode P sb z)
+                 = fs_inode_ents P (fs_dinode P sb z)
               /\ fs_inode_dwf P' sb (fs_dinode P sb z)
                  = fs_inode_dwf P sb (fs_dinode P sb z)).
     { intros z Hz Hnd' Hni' Hnz. apply inode_untouched; try assumption.
@@ -403,8 +393,8 @@ Section EffCreateEntry.
     assert (Hdwfi : fs_inode_dwf P' sb dni' = true).
     { apply (zeroed_dwf P' dni' Hsizei' Haddri').
       rewrite Htyi'. unfold T_FILE_z, T_DEVICE_z in Hty. tauto. }
-    assert (Hblki : fs_inode_blocks P' dni' = []).
-    { exact (zeroed_blocks_nil P' dni' Hsizei'). }
+    assert (Hblki : fs_inode_ents P' dni' = []).
+    { exact (zeroed_blocks_nil P' dni' Haddri'). }
     (* the written record, at the view *)
     assert (Hwrit : dir_written_at data (fs_data_of P' dnd') k name w).
     { apply (dirent_written P' dn dnd' k w name Hlen Hnn Haddrd' HindD
@@ -586,9 +576,9 @@ Section EffCreateEntry.
       destruct Hold as [[[[Ho1 Ho2] Ho3] Ho4] Ho5].
       repeat split; try assumption.
       apply Z.leb_le. lia. }
-    assert (Hblkd : fs_inode_blocks P' dnd' = fs_inode_blocks P dn).
-    { unfold fs_inode_blocks. cbv zeta.
-      rewrite HindD, Haddrd', Hszd'u, Hnb'. fold szd. reflexivity. }
+    assert (Hblkd : fs_inode_ents P' dnd' = fs_inode_ents P dn).
+    { (* the entry list does not read the size (durable-disk F3.1) *)
+      apply fs_inode_ents_det; assumption. }
     exists sb. split.
     { rewrite (fs_parse_sb_ext P P' HsbU). exact Hp. }
     constructor.
@@ -600,8 +590,8 @@ Section EffCreateEntry.
       destruct (Hunt z Hz Hzd Hzi Hnz') as (_ & _ & _ & Hdwf).
       rewrite Hdwf. exact (dwf_bool_at z Hz Hnz').
     - exists u. split.
-      + assert (Hused : fs_used_blocks P' sb = fs_used_blocks P sb).
-        { unfold fs_used_blocks. f_equal. apply list_fmap_ext.
+      + assert (Hused : fs_ent_blocks P' sb = fs_ent_blocks P sb).
+        { unfold fs_ent_blocks. f_equal. apply list_fmap_ext.
           intros idx x Hx. apply lookup_seq in Hx as [-> Hidx].
           cbv beta zeta.
           rewrite (Hdec (Z.of_nat (0 + idx))
@@ -621,7 +611,7 @@ Section EffCreateEntry.
                       (inum_ix_range sb (0 + idx) Hidx) Hzd Hzi
                       (proj1 (Z.eqb_neq _ _) Ez)) as (_ & _ & Hbl & _).
           exact Hbl. }
-        unfold fs_used_set. rewrite Hused. exact Hu.
+        unfold fs_ent_set. rewrite Hused. exact Hu.
       + unfold fs_bitmap_wf in Hbm |- *. cbv zeta in Hbm |- *.
         rewrite HbmU. exact Hbm.
     - (* the root *)
@@ -847,18 +837,18 @@ Section EffCreateEntry.
   Local Lemma used_add (P' : Z -> list (bv 8)) (i : Z) (nb : list Z) :
     0 <= i < sb_ninodes sb ->
     ((if bv_unsigned (di_type (fs_dinode P sb i)) =? 0 then []
-      else fs_inode_blocks P (fs_dinode P sb i)) = []) ->
+      else fs_inode_ents P (fs_dinode P sb i)) = []) ->
     ((if bv_unsigned (di_type (fs_dinode P' sb i)) =? 0 then []
-      else fs_inode_blocks P' (fs_dinode P' sb i)) = nb) ->
+      else fs_inode_ents P' (fs_dinode P' sb i)) = nb) ->
     NoDup nb ->
     (forall b : Z, b ∈ nb -> b ∉ u) ->
     (forall z : Z, 0 <= z < sb_ninodes sb -> z <> i ->
        (if bv_unsigned (di_type (fs_dinode P' sb z)) =? 0 then []
-        else fs_inode_blocks P' (fs_dinode P' sb z))
+        else fs_inode_ents P' (fs_dinode P' sb z))
        = (if bv_unsigned (di_type (fs_dinode P sb z)) =? 0 then []
-          else fs_inode_blocks P (fs_dinode P sb z))) ->
+          else fs_inode_ents P (fs_dinode P sb z))) ->
     exists u'' : gset Z,
-      fs_used_set P' sb = Some u''
+      fs_ent_set P' sb = Some u''
       /\ (forall b : Z, b ∈ u'' <-> (b ∈ u \/ b ∈ nb)).
   Proof.
     intros Hi Hoi Hni Hnd0 Hfresh Hsame.
@@ -866,14 +856,14 @@ Section EffCreateEntry.
     set (F := fun x : nat =>
                 let dn0 := fs_dinode P sb (Z.of_nat x) in
                 if bv_unsigned (di_type dn0) =? 0 then []
-                else fs_inode_blocks P dn0).
+                else fs_inode_ents P dn0).
     set (G := fun x : nat =>
                 let dn0 := fs_dinode P' sb (Z.of_nat x) in
                 if bv_unsigned (di_type dn0) =? 0 then []
-                else fs_inode_blocks P' dn0).
-    assert (HFold : fs_used_blocks P sb = mjoin (F <$> seq 0 n))
+                else fs_inode_ents P' dn0).
+    assert (HFold : fs_ent_blocks P sb = mjoin (F <$> seq 0 n))
       by reflexivity.
-    assert (HGold : fs_used_blocks P' sb = mjoin (G <$> seq 0 n))
+    assert (HGold : fs_ent_blocks P' sb = mjoin (G <$> seq 0 n))
       by reflexivity.
     assert (HFi : F (Z.to_nat i) = []).
     { unfold F. cbv zeta. rewrite Z2Nat.id by lia. exact Hoi. }
@@ -905,7 +895,7 @@ Section EffCreateEntry.
                                (n - S (Z.to_nat i))))%list
               <-> b ∈ u).
     { intros b.
-      rewrite (fs_used_set_elem P sb u b Hu).
+      rewrite (fs_ent_set_elem P sb u b Hu).
       rewrite HFold, HsplF, HFi.
       rewrite app_nil_l.
       reflexivity. }
@@ -916,7 +906,7 @@ Section EffCreateEntry.
       rewrite app_nil_l in Hnd1. exact Hnd1. }
     apply stdpp.list_relations.NoDup_app in Hnd_old.
     destruct Hnd_old as (Hnd1 & Hdisj12 & Hnd2).
-    assert (Hnd' : NoDup (fs_used_blocks P' sb)).
+    assert (Hnd' : NoDup (fs_ent_blocks P' sb)).
     { rewrite HGold, HsplG.
       apply stdpp.list_relations.NoDup_app.
       split; [exact Hnd1 |]. split.
@@ -930,7 +920,7 @@ Section EffCreateEntry.
         intros b Hb1 Hb2.
         apply (Hfresh b Hb1). apply Hold_mem.
         apply elem_of_app. right. exact Hb2. }
-    destruct (gset_nodup_of_NoDup (fs_used_blocks P' sb) Hnd')
+    destruct (gset_nodup_of_NoDup (fs_ent_blocks P' sb) Hnd')
       as (u'' & Hu'').
     exists u''. split; [exact Hu'' |].
     intros b.
@@ -1229,9 +1219,9 @@ Section EffCreateEntry.
                    Hkbnb)).
     assert (Ha0 : fs_blk_addr P dn (k / 64) <> 0)
       by (unfold fs_data_start in *; lia).
-    assert (Ha_in : fs_blk_addr P dn (k / 64) ∈ fs_inode_blocks P dn).
+    assert (Ha_in : fs_blk_addr P dn (k / 64) ∈ fs_inode_ents P dn).
     { rewrite <- (fs_slot_blk dn (k / 64)%nat HkbM).
-      apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
+      apply (fs_inode_ents_slot P dn); [lia |].
       rewrite (fs_slot_blk dn (k / 64)%nat HkbM). exact Ha0. }
     assert (Hafb : fs_blk_addr P dn (k / 64) <> fb).
     { intros Hc. apply Hfbu.
@@ -1304,22 +1294,12 @@ Section EffCreateEntry.
     { intros k' Hne Hnz.
       destruct (Nat.lt_ge_cases k' FS_MAXFILE) as [Hk' | Hk'].
       - assert (Hrng : fs_data_start sb <= fs_blk_addr P dn k' < sb_size sb).
-        { apply (blk_addr_covered d k' ltac:(lia) Hdlive Hk').
-          destruct (Z.lt_ge_cases (Z.of_nat k') (fs_nblk szd)) as [| Hge];
-            [assumption |].
-          exfalso. apply Hnz.
-          destruct (Nat.lt_ge_cases k' FS_NDIRECT) as [Hdk | Hdk].
-          - unfold fs_blk_addr.
-            rewrite (proj2 (Nat.ltb_lt k' FS_NDIRECT) Hdk).
-            exact (fdi_direct_zero _ _ _ Hdok_d k' Hdk Hge).
-          - unfold fs_blk_addr.
-            rewrite (proj2 (Nat.ltb_ge k' FS_NDIRECT) Hdk).
-            apply (fdi_ent_zero _ _ _ Hdok_d (k' - FS_NDIRECT)%nat).
-            + unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *. lia.
-            + rewrite Nat2Z.inj_sub by exact Hdk. fold szd. lia. }
-        assert (Hinb : fs_blk_addr P dn k' ∈ fs_inode_blocks P dn).
+        { (* the ENTRY clauses: a nonzero address is a data block,
+             whatever the size says (durable-disk F3.1) *)
+          exact (fs_blk_addr_range P sb dn k' Hdok_d Hk' Hnz). }
+        assert (Hinb : fs_blk_addr P dn k' ∈ fs_inode_ents P dn).
         { rewrite <- (fs_slot_blk dn k' Hk').
-          apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
+          apply (fs_inode_ents_slot P dn); [lia |].
           rewrite (fs_slot_blk dn k' Hk'). exact Hnz. }
         apply HaE; [| | unfold fs_data_start in *; blk_ne Hibd3 Hibi3
                     | unfold fs_data_start in *; blk_ne Hibd3 Hibi3
@@ -1339,9 +1319,9 @@ Section EffCreateEntry.
         [exact (fs_ind_ents_meta P' dn dnd' Haddrd') |].
       apply fs_ind_ents_ext. intros Hnz12.
       assert (Hin' : bv_unsigned (di_addrs dn !!! 12%nat)
-                     ∈ fs_inode_blocks P dn).
+                     ∈ fs_inode_ents P dn).
       { rewrite <- (fs_slot_max P dn).
-        apply (fs_slot_elem_dok P sb dn); [exact Hdok_d | lia |].
+        apply (fs_inode_ents_slot P dn); [lia |].
         rewrite fs_slot_max. exact Hnz12. }
       pose proof (blocks_range d _ ltac:(lia) Hdlive Hin') as Hbr.
       apply HaE; [| | unfold fs_data_start in *; blk_ne Hibd3 Hibi3
@@ -1365,8 +1345,8 @@ Section EffCreateEntry.
               /\ (forall k0 : nat,
                     fs_data_of P' (fs_dinode P sb z) k0
                     = fs_data_of P (fs_dinode P sb z) k0)
-              /\ fs_inode_blocks P' (fs_dinode P sb z)
-                 = fs_inode_blocks P (fs_dinode P sb z)
+              /\ fs_inode_ents P' (fs_dinode P sb z)
+                 = fs_inode_ents P (fs_dinode P sb z)
               /\ fs_inode_dwf P' sb (fs_dinode P sb z)
                  = fs_inode_dwf P sb (fs_dinode P sb z)).
     { intros z Hz Hnd' Hni' Hnz. apply inode_untouched; try assumption.
@@ -1398,15 +1378,25 @@ Section EffCreateEntry.
       reflexivity. }
     assert (Hblkaddrc0 : fs_blk_addr P' dnc 0 = fb).
     { unfold fs_blk_addr. cbn [Nat.ltb Nat.leb]. exact Haddrc0. }
-    assert (Hblkc : fs_inode_blocks P' dnc = [fb]).
-    { unfold fs_inode_blocks. cbv zeta.
-      rewrite Hindc, Hszc.
-      change (fs_nblk 32) with 1.
-      change (Z.of_nat FS_NDIRECT <? 1) with false.
-      change (Z.to_nat (Z.min 1 (Z.of_nat FS_NDIRECT))) with 1%nat.
-      change (Z.to_nat (1 - Z.of_nat FS_NDIRECT)) with 0%nat.
-      cbn [seq fmap list_fmap app].
-      rewrite Haddrc0. reflexivity. }
+    assert (Hblkc : fs_inode_ents P' dnc = [fb]).
+    { (* ialloc+mkdir's record names ONE block: [addrs[0]] *)
+      rewrite fs_inode_ents_alt.
+      rewrite (Haddrc12 12%nat ltac:(lia)).
+      change (bv_unsigned (bv_0 32)) with 0. cbn [Z.eqb app].
+      rewrite Hindc.
+      rewrite (filter_all_false (fun a : Z => negb (a =? 0))
+                 (replicate FS_NINDIRECT 0)).
+      2:{ intros x Hx. apply elem_of_replicate in Hx as [-> _]. reflexivity. }
+      rewrite List.app_nil_r.
+      rewrite (filter_nz_prefix
+                 (fun k => bv_unsigned (di_addrs dnc !!! k)) FS_NDIRECT 1%nat).
+      - cbn [seq fmap list_fmap]. rewrite Haddrc0. reflexivity.
+      - unfold FS_NDIRECT. lia.
+      - intros q Hq. replace q with 0%nat by lia.
+        rewrite Haddrc0. lia.
+      - intros q Hlo Hhi.
+        rewrite (Haddrc12 q ltac:(unfold FS_NDIRECT in *; lia)).
+        reflexivity. }
     destruct (child_facts P' i d fb ltac:(lia) Hi16 ltac:(lia) Hd16
                 Hfb0 Hfb32 HfbB) as (Hci0 & Hcb0 & Hci1 & Hcb1).
     fold dnc in Hci0, Hcb0, Hci1, Hcb1.
@@ -1524,9 +1514,9 @@ Section EffCreateEntry.
       destruct Hold as [[[[Ho1 Ho2] Ho3] Ho4] Ho5].
       repeat split; try assumption.
       apply Z.leb_le. lia. }
-    assert (Hblkd : fs_inode_blocks P' dnd' = fs_inode_blocks P dn).
-    { unfold fs_inode_blocks. cbv zeta.
-      rewrite HindD, Haddrd', Hszd'u, Hnb'. fold szd. reflexivity. }
+    assert (Hblkd : fs_inode_ents P' dnd' = fs_inode_ents P dn).
+    { (* the entry list does not read the size (durable-disk F3.1) *)
+      apply fs_inode_ents_det; assumption. }
     (* --- the tree ------------------------------------------------------ *)
     assert (Htyp : forall z : Z, 0 <= z < sb_ninodes sb -> z <> i ->
               bv_unsigned (di_type (fs_dinode P' sb z))

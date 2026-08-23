@@ -76,7 +76,7 @@ Section UnlinkPost.
   Context (Hp : fs_parse_sb P = Some sb).
   Context (Hsb : fs_sb_wf sb = true).
   Context (HW3 : fs_inodes_dwf P sb = true).
-  Context (u : gset Z) (Hu : fs_used_set P sb = Some u).
+  Context (u : gset Z) (Hu : fs_ent_set P sb = Some u).
   Context (Hbm : fs_bitmap_wf P sb u = true).
   Context (HW7 : fs_root_wf P sb = true).
   Context (HW8 : fs_dots_all P sb = true).
