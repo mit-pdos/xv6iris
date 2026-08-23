@@ -1295,7 +1295,7 @@ Section IreclaimOrphan.
         IS licence (e) -- and it is STRONGER than §20.4's [bio_locked]
         sketch: the [fs_cache] element sits at half-plus-half, so while this
         walk holds one half no [ireg_write_au] / [ireg_claim_au] /
-        [ireg_free_au] at ANY inum of this block can fire (§7.1.3, §16.2's
+        [EscrowDeposit.ireg_free_deposit_au] at ANY inum of this block can fire (§7.1.3, §16.2's
         serialiser as a resource fact rather than a paragraph).
 
         BOOT-ONLY: sheltered by the pre-userspace one-shot [ireg_boot]

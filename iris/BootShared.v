@@ -20,6 +20,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.  (* [nth_byte], for [first_bytes] below *)
 Require Import RiscvLang RiscvPtsto.
+(* durable-disk 2b-A / B3: the two file-system-state capacity classes
+   ([fsLinkG]/[fsTopG]) this file's [Context] binds, so that their instance
+   fields are ACTIVE here.  Required EARLY on purpose: [FsState] exports four
+   names that collide with live ones ([fs_view], [link_auth], [byte_range],
+   [blk_owned]), and the later imports are what shadow them again. *)
+Require Import FsState.
 Require Import HartTp.
 Require Import KMap KptPt KptGhost.
 Require Import StackOwn.
@@ -1050,6 +1056,11 @@ Section BootAlloc.
      such cycle: its only instance is [subG] on the functor list. *)
   Context `{FGP : fileGpreS Σ}.
   Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
+  (* durable-disk 2b-A / B3: [FsCfgBoot.fs_cfg_alloc] allocates the era's
+     link family and top map, so its two capacity classes travel with it.
+     They are NOT [xv6G] members (see the note at [FsCfgBoot]'s era
+     section), so they are bound here beside the other non-members. *)
+  Context `{!fsLinkG Σ, !fsTopG Σ}.
   Context `{GEN : GenId}.
 
   (* The two PER-HART GHOST BUNDLES, NAMED -- and the naming is load-bearing:
@@ -1475,10 +1486,15 @@ Section BootAlloc.
          that gname is the era's -- the same one-line restatement this
          lemma's postcondition used to do at its very end *)
       rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
+    (* THE MASK PREMISE IS NAMED, not spliced: an inline [ltac:] inside the
+       application term is elaborated BEFORE the conclusion is unified, and
+       this file cannot spell [iregN] anyway (durable-notes inline-[ltac:]
+       trap).  [FsCfgBoot.fs_cfg_iregN_top] is that fact. *)
     iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
             Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
-            ltac:(solve_ndisj)
-            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "[Hpinr [Hfpinr Hfs]]".
+            fs_cfg_iregN_top
+            with "Hdimg Hbsauth Hbslots") as (ICFG FSC)
+        "[Htopa [Htopf [Hlnk [Hpinr [Hfpinr Hfs]]]]]".
     (* N-5.1 (W5a) / N-5.2A: ROOT'S PIN AND /INIT'S CONTENTS PIN ARE BOTH
        DROPPED HERE, deliberately.  They are affine, and nothing on this side
        of the boot chain consumes them: transporting either would mean
@@ -1489,6 +1505,14 @@ Section BootAlloc.
        fview pin, N-5.2B's kexec re-walk; both are stated against
        [fs_cfg_alloc]'s conjuncts directly. *)
     iClear "Hpinr". iClear "Hfpinr".
+    (* durable-disk 2b-A / B3: THE ERA'S LINK FAMILY AND TOP MAP ARE DROPPED
+       HERE, and that is the seam 2b-inode picks up.  The auth, the per-inum
+       top fragments and the family bundle all exist -- [fs_cfg_alloc]
+       allocated them -- but nothing in the tree can hold them yet: the only
+       structure that outlives fsinit and is indexed by inum is the inode
+       REGION, and re-stating it over [Γ_L] is 2b-inode's work.  Routing them
+       is a one-line change here once it has a home. *)
+    iClear "Htopa". iClear "Htopf". iClear "Hlnk".
     (* [fileG_of]'s two projections ARE the two minted records, by iota.
        Named, so the postcondition's row needs no conversion step inside the
        proofmode. *)

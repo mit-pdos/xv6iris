@@ -85,7 +85,7 @@ Local Open Scope Z_scope.
       [ClaimL]   (d)  the detached fragment of a claim box.  NOTHING MINTS
                       AN [iclaim] TODAY and nothing may: §7.1.5's theorem
                       says any region clause strong enough to found (d) is a
-                      clause [ireg_free_au] must re-establish, so (d) and
+                      clause [EscrowDeposit.ireg_free_deposit_au] must re-establish, so (d) and
                       the walled increment F1.5c/F1.5d are ONE increment.
                       The constructor is R11's honesty marker, kept visible
                       in the source and never instantiated.
@@ -95,7 +95,7 @@ Local Open Scope Z_scope.
                       [FsBlocks.fs_chalf], one level below [bio_locked], and
                       it is STRONGER -- the element sits at ½+½, so a client
                       holding one half means no [ireg_write_au] /
-                      [ireg_claim_au] / [ireg_free_au] at ANY inum of that
+                      [ireg_claim_au] / [EscrowDeposit.ireg_free_deposit_au] at ANY inum of that
                       block can fire while it is held.  That is §16.2's
                       serialiser as a resource fact.
       [RootL]    (f)  the inum is the root's.  The landed root clause

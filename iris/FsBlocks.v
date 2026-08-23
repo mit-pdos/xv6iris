@@ -76,6 +76,15 @@ Record fs_names := MkFsNames {
      [fs_bytes_inv] (section [FsBytes] below), which is also where the home
      blocks' parked cache halves now live. *)
   fs_bytes : gname;
+  (* THE TWO FILE-SYSTEM-STATE GHOSTS (durable-disk 2b-A / B3).  Both are
+     bare [gname]s here on purpose: this file is the BLOCK layer and must not
+     name [FsStateInode.fs_node] or [FsStateLink.linkUR].  They are ALLOCATED
+     one level up, in [FsBoot.fs_boot_ghosts], and passed to [fs_alloc] --
+     the standing rule that a ghost name is a parameter, not a new
+     config-class dependency.  [FsBytesGamma.fs_gamma_L] reads them as the
+     era's [Γ_L.γlink] / [Γ_L.γtop]. *)
+  fs_link : gname;   (* the link-counting family ([FsStateLink.linkUR])   *)
+  fs_top  : gname;   (* the top-level abstract map ([Z -> fs_node])       *)
 }.
 
 Section FsBlocks.
@@ -1070,10 +1079,13 @@ Section FsMint.
      content map, [home] the covered range minus the log's own storage.
      All FOUR client-side pieces come out explicitly: an affine [iFrame]
      dropping one of them compiles and strands initlog. *)
-  Lemma fs_alloc (E : coPset) (L0 : gmap Z (list (bv 8))) (home : gset Z) :
+  Lemma fs_alloc (E : coPset) (γlk γtp : gname)
+      (L0 : gmap Z (list (bv 8))) (home : gset Z) :
     (forall b bs, L0 !! b = Some bs -> length bs = BSIZE) ->
     home ⊆ dom L0 ->
     ⊢ |={E}=> ∃ γ : fs_names,
+      (* the two ghosts the caller allocated, named back to it *)
+      ⌜fs_link γ = γlk⌝ ∗ ⌜fs_top γ = γtp⌝ ∗
       ghost_map_auth (fs_cache γ) 1 L0 ∗
       ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
       fs_bytes_inv (fs_bytes γ) (fs_cache γ) home ∗
@@ -1104,7 +1116,8 @@ Section FsMint.
     { intros b bs Hb. apply map_lookup_filter_Some in Hb as [Hb _].
       exact (Hlen b bs Hb). }
     rewrite (fs_filter_dom L0 home Hsub).
-    iModIntro. iExists (MkFsNames γC γD γL).
+    iModIntro. iExists (MkFsNames γC γD γL γlk γtp).
+    iSplitR; [done |]. iSplitR; [done |].
     rewrite /fs_chalf /fs_mclean /=.
     iFrame "HaC HaD Hinv Hfb HCl".
     iAssert ([∗ map] bno ↦ bs ∈ L0,

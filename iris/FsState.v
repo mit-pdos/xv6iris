@@ -219,6 +219,67 @@ Section FsState.
     rewrite /fs_links /link_elem. by iApply big_opM_own_1.
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (*  5b. THE BOOT ALLOCATION (B3)                                      *)
+  (*                                                                    *)
+  (*  Stage 4's [fs_state_mint] takes the family's validity OFF the      *)
+  (*  durable instance ([fs_links_valid]).  At boot there is no durable  *)
+  (*  instance to read it off, so the boot OWES it -- and that debt is   *)
+  (*  stated here as a PREMISE, not hidden: [✓ link_elem I] IS the       *)
+  (*  tokens-<=-nlink law of the initial map.  It is discharged for free *)
+  (*  at a map of entry-less nodes ([link_elem_valid_no_ents] below);    *)
+  (*  a map read off the image discharges it from [FsImg.fs_links_wf]    *)
+  (*  (W9: every live directory has [nlink = 1] and no incoming ticket)  *)
+  (*  and [FsImg.fs_links_eq] (the file-nlink equality).                 *)
+  (* ---------------------------------------------------------------- *)
+
+  (* A node with no directory entries carries no tokens, so its whole
+     contribution to the family is its own auth. *)
+  Lemma link_elem_no_ents (I : gmap Z fs_node) :
+    (forall i n, I !! i = Some n -> dir_entries n = ∅) ->
+    link_elem I ≡ (fun n => (● (fn_nlink n) : authR natUR)) <$> I.
+  Proof.
+    induction I as [| i n I Hi IH] using map_ind; intros Hall.
+    - rewrite /link_elem big_opM_empty fmap_empty //.
+    - assert (Hin : <[i := n]> I !! i = Some n) by (rewrite lookup_insert //).
+      assert (Hrest : forall j m, I !! j = Some m -> dir_entries m = ∅).
+      { intros j m Hj. apply (Hall j m).
+        rewrite lookup_insert_ne; [exact Hj |].
+        intros ->. rewrite Hi in Hj. done. }
+      rewrite /link_elem big_opM_insert //.
+      rewrite {1}/link_elem_node (Hall i n Hin) big_opM_empty right_id.
+      rewrite -/(link_elem I) (IH Hrest) fmap_insert.
+      rewrite insert_singleton_op; [done |]. rewrite lookup_fmap Hi //.
+  Qed.
+
+  Lemma link_elem_valid_no_ents (I : gmap Z fs_node) :
+    (forall i n, I !! i = Some n -> dir_entries n = ∅) -> ✓ link_elem I.
+  Proof.
+    intros Hall. rewrite (link_elem_no_ents I Hall).
+    intros j. rewrite lookup_fmap.
+    destruct (I !! j) as [n |] eqn:E; [| done].
+    rewrite /= Some_valid. by apply auth_auth_valid.
+  Qed.
+
+  (* BOTH era ghosts, allocated together from a map of nodes: the top map's
+     AUTH plus one fragment per inum, and the link family with every inum's
+     auth and every directory entry's token (the [fs_links] bundle, which
+     [FsStateInode.inode_link_scatter] opens into
+     [link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n] at any [Γ] whose [γlink] is
+     [gl]).  This is what [FsBoot.fs_boot_ghosts] runs. *)
+  Lemma fs_boot_alloc (I : gmap Z fs_node) :
+    ✓ link_elem I ->
+    ⊢ |==> ∃ gl gt : gname,
+        ghost_map_auth gt 1 I
+        ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
+        ∗ fs_links gl I.
+  Proof.
+    intros Hv.
+    iMod (fs_links_alloc I Hv) as (gl) "Hl".
+    iMod (ghost_map_alloc I) as (gt) "[Ha Hf]".
+    iModIntro. iExists gl, gt. iFrame.
+  Qed.
+
   (* The two directions of the factoring, AS WANDS.  A bare [rewrite] of an
      [⊣⊢] inside the proofmode rewrites the CONTEXT and the CONCLUSION
      together and desyncs them (durable-notes.md), and every consumer of the

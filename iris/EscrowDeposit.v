@@ -3,8 +3,10 @@
    A leaf above EscrowInode/InodeRegion: it opens [ireg_inv], absorbs the
    freer's fragment, DEPOSITS the region marker into the 0x86-minted escrow
    ([escA_deposit] -> [committedA]), rebinds+splits the marked slot's [reg_full]
-   (structural since the reg-fold), and parks the region PENDING arm.  Body =
-   [InodeRegion.ireg_free_au] with the closing action swapped.  In its own file
+   (structural since the reg-fold), and parks the region PENDING arm.  It is
+   THE region's type-0 write -- the only one the reordered kernel has -- with
+   the deposit as its closing action, and it lives here and not in
+   [InodeRegion] because the escrow has to be open beside the region.  In its own file
    so the fs-cone imports it needs ([DiskPtsto]/[LogInv]/[FsBlocks]/[DinodeEnc])
    do not disturb [EscrowInode]'s escrow proofs (import-order/instance hygiene,
    as in the EscrowRegionA de-risk).
@@ -61,7 +63,7 @@ Section EscrowDeposit.
     ireg_inv γi γfs inodestart nib -∗
     escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
     dinode_at γi inum dn -∗
-    (* THE FREEZE, RETIRED HERE (iclaim-ledger.md §1.4, and [ireg_free_au]'s
+    (* THE FREEZE, RETIRED HERE (iclaim-ledger.md §1.4, and this mover's
        own row in RULING A's mover table).  The deposit is a type-0 write over
        a slot the pin constrains, so it cannot re-park an untouched f column:
        it takes the [FrzPost] token the walk carries from iput+0x8a and steps
@@ -123,9 +125,8 @@ Section EscrowDeposit.
     iEval (rewrite Hkey) in "Hslot".
     (* THE LEDGER's FULL ARITY since §2.2/§2.3: the [icnt] half, the two
        in-transition pins and the f column's boot-shelter clause all ride in
-       the ∃ beside the seven original columns.  [ireg_free_au]'s pattern
-       verbatim -- this accessor IS that lemma with the closing action
-       swapped, and every consumer of the slot destructures it identically. *)
+       the ∃ beside the seven original columns.  The region's own slot pattern
+       verbatim -- every consumer of the slot destructures it identically. *)
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
@@ -157,8 +158,8 @@ Section EscrowDeposit.
     (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's own
        [dinode_at] put this open on the MARKED arm, whose clause says
        [cl = None].  The deposit is a byte-writing mover, so §2.4's "writes
-       cannot dent the pin" applies to it exactly as it does to
-       [ireg_free_au]: no premise, no obligation, nothing to re-establish. *)
+       cannot dent the pin" applies to it exactly as it does to every other
+       byte mover: no premise, no obligation, nothing to re-establish. *)
     assert (Hclm' : ireg_claim_ok cl (Some (Excl FrzOff)) dn')
       by (rewrite (proj2 Ht2); exact I).
     (* THE RETIRE (§1.4).  The token pins the column at [FrzPost]

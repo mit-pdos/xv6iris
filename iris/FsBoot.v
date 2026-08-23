@@ -386,12 +386,19 @@ Section FsBoot.
      cache half [fs_chalf] that [LogInv.log_state] parks -- and the byte
      view's invariant row comes out with them.  The one caller passes
      [fs_home_set cov logstart]. *)
+  (* [γlk]/[γtp] ARE PARAMETERS, not minted here (durable-disk 2b-A / B3).
+     The two file-system-state ghosts are cameras this file does not know --
+     [FsStateLink.linkUR] and a [ghost_map Z fs_node] -- and the block layer
+     must not name [fs_node].  [FsCfgBoot.fs_cfg_alloc] allocates them from
+     the era's inode map and passes them down; all this lemma does is put
+     them in [γfs] and name them back to the caller. *)
   Lemma fs_boot_ghosts (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
-      (cov home : gset Z) (dev : mword 32) (E : coPset) :
+      (cov home : gset Z) (dev : mword 32) (γlk γtp : gname) (E : coPset) :
     fs_cov_in cov ndisk ->
     home ⊆ cov ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
     ∃ γfs : fs_names,
+      ⌜fs_link γfs = γlk⌝ ∗ ⌜fs_top γfs = γtp⌝ ∗
       ([∗ set] b ∈ cov, pool_blk (fs_view γfs γv dev cov) b) ∗
       ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
@@ -402,9 +409,9 @@ Section FsBoot.
   Proof.
     iIntros (Hcov Hsub) "Hm".
     iDestruct (fs_boot_carve γv dk ndisk cov Hcov with "Hm") as "Hblk".
-    iMod (fs_alloc E (fs_C0 dk cov) home (fs_C0_lengths dk cov)
+    iMod (fs_alloc E γlk γtp (fs_C0 dk cov) home (fs_C0_lengths dk cov)
             ltac:(rewrite fs_C0_dom; exact Hsub))
-      as (γfs) "(HaL & HaD & #Hinv & Hpm & Hfb & Hcl)".
+      as (γfs) "(%Hlk & %Htp & HaL & HaD & #Hinv & Hpm & Hfb & Hcl)".
     rewrite (fs_C0_filter_in dk cov home Hsub) (fs_C0_filter_out dk cov home).
     iDestruct (fs_C0_big with "Hfb") as "Hfb".
     iDestruct (fs_C0_big with "Hcl") as "Hcl".
@@ -415,6 +422,7 @@ Section FsBoot.
     iEval (rewrite big_sepS_sep) in "Hpm".
     iDestruct "Hpm" as "[Hmc Hdty]".
     iModIntro. iExists γfs.
+    iSplitR; [done |]. iSplitR; [done |].
     iSplitL "Hblk Hmc".
     { iDestruct (big_sepS_sep_2 with "Hblk Hmc") as "H".
       iApply (big_sepS_mono with "H"). intros b Hb.
@@ -515,7 +523,8 @@ Section FsBoot.
      verbatim, in order; the pool bundle it also wants is what this lemma
      manufactures out of the mint. *)
   Lemma fs_boot_bundle (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
-      (cov : gset Z) (logstart : Z) (dev : mword 32) (E : coPset) :
+      (cov : gset Z) (logstart : Z) (dev : mword 32) (γlk γtp : gname)
+      (E : coPset) :
     fs_cov_in cov ndisk ->
     log_geom_ok cov logstart ->
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -539,6 +548,7 @@ Section FsBoot.
        together at the era, and the fragments come straight back out below. *)
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (bn : bio_names) (γfs : fs_names),
+      ⌜fs_link γfs = γlk⌝ ∗ ⌜fs_top γfs = γtp⌝ ∗
       bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS_FS ∗
       ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
@@ -560,15 +570,17 @@ Section FsBoot.
     iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
     destruct Hgeom as [Hcovok Hsub].
-    iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov logstart) dev E
+    iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov logstart) dev
+            γlk γtp E
             Hcov ltac:(rewrite /fs_home_set; apply elem_of_subseteq;
                        intros x Hx; apply elem_of_difference in Hx as [Hc _];
                        exact Hc)
             with "Hm")
-      as (γfs) "(Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog)".
+      as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog)".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
             with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
     iModIntro. iExists bn, γfs.
+    iSplitR; [done |]. iSplitR; [done |].
     (* the mint's [fs_chalf] half is [cov] minus the home set, i.e. the log
        region itself -- the [∖∖] cancels because the region is covered *)
     (* [set_solver] is not used HERE (nor anywhere in this file): the goal

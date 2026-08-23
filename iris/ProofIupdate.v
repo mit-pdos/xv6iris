@@ -179,7 +179,7 @@ Section IupdateDefs.
      and the payout [InodeRegion.ireg_out] is still written that way (§16.4)
      so that no landed caller's continuation moves a character.  But the
      free arm is now DEAD here (iclaim-ledger.md §3.1, RULING A): since
-     [InodeRegion.ireg_free_au] retires the freeze in the same step it takes
+     [EscrowDeposit.ireg_free_deposit_au] retires the freeze in the same step it takes
      an [ifreeze_post] token, which no generic caller of iupdate holds, and
      the only type-0 write left in the reordered kernel goes through the
      off-lock DEPOSIT.  So the contract narrows to [di_type dn <> 0], the

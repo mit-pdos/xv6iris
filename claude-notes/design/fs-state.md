@@ -418,6 +418,42 @@ Left out, with the reason:
   arm needs is stage 3's evidence, and writing them speculatively would be
   the near-duplicate family the guiding principle warns about.
 
+### 2b-A's additions (B2, B5, B3's names)
+
+- **The dots clauses are GUARDED by `fn_nlink n ≠ 0`.**  `inl_dir_dot` and
+  `inl_dir_dotdot` are false at a size-0 `T_DIR` record, and this kernel has
+  two of them — the claim box `ialloc` installs and the corpse `itrunc`
+  leaves.  `inl_dir_size`/`inl_dir_uniq` hold at size 0 and stay unguarded;
+  an orphan owes no dots clause and needs none (its ".." is tokenless
+  whatever the entry says).
+- **`fn_bare`** is the shape all three of this kernel's contentless records
+  share (`di_addrs = replicate 13 0`, `fn_ent` all zero, `fn_blk = ∅`,
+  size 0, nlink 0): the image's free record, `ialloc_fresh ty`, and
+  `set_ditype0` of a truncated record.  `inode_local_bare` holds of it AT
+  ANY TYPE — that is what the guard buys — and `inode_owned_bare_move` is
+  the ONE mover for both the claim box and the corpse: only the record's
+  bytes move, `nlink` is 0 on both sides so the auth passes through
+  untouched, and `inode_local` of the target is re-established rather than
+  assumed.  There is deliberately no second lemma.
+- **`rec_owned_at Γ istart z dn`** is the geometry-free record ownership (64
+  bytes at offset `64·(z mod 16)` of block `istart + z/16`), the
+  `free_bitmap_at` pattern; `rec_owned` is its superblock reading
+  (`rec_owned_sb`, whose `0 ≤ i < 2^32` premise is REAL — `fs_inum_bv` is
+  `Z_to_bv 32` and wraps).  `rec_owned_at_diblk` is the 16-fold
+  split/gather at the inode region's own numbering (`16·bi + k`, `ds !!! k`,
+  over `seq 0 16`), so it composes with `InodeRegion.ireg_blk` directly.
+- **`γlink`/`γtop` have a home: `FsBlocks.fs_names`' `fs_link`/`fs_top`,**
+  which `FsBytesGamma.fs_gamma_L` reads.  They are PARAMETERS of `fs_alloc`
+  and `fs_boot_ghosts` (the block layer must not name `fs_node`) and are
+  allocated in `FsCfgBoot.fs_cfg_alloc` by `FsState.fs_boot_alloc`, whose
+  `✓ link_elem I` premise IS the tokens-≤-nlink law the boot owes.  The
+  initial map is the ZERO map over the region's inums, not the image's:
+  `linkUR` has no authority over which KEYS exist, so a family allocated at
+  `ε` can never be extended, while `● 0` per inum rises to the record's real
+  `nlink` with the auth in hand.  The classes `fsLinkG`/`fsTopG` are bound
+  explicitly at each boot file rather than folded into `Xv6G.xv6G`, so that
+  editing this stack does not rebuild the 767 files that bind the bundle.
+
 Two things 2b should know before it starts:
 
 - **Four names collide with live ones**, all at different types (so a

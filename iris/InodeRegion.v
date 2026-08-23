@@ -64,8 +64,11 @@
                       one with NO caller resource at all.  This is §16.4's
                       claim box: the fragment never leaves the invariant, so
                       no interleaving can strand a concurrent fill.
-     [ireg_free_au]   iput's [ip->type = 0; iupdate] -- absorb the fragment,
-                      pay out the marker.
+     the FREE          iput's [ip->type = 0; iupdate] -- absorb the fragment,
+                      pay out the marker.  It lives ABOVE this file, as
+                      [EscrowDeposit.ireg_free_deposit_au]: the off-lock
+                      deposit is the only type-0 write the reordered kernel
+                      has, and it needs the escrow beside the region.
      [ireg_withdraw]  ilock's FIRST fill of a claimed inum -- deposit the
                       marker, take the fragment.  The marker is what makes
                       that case analysis exhaustive.
@@ -86,13 +89,13 @@
    THE LEDGER'S CLAUSES ARE (L1) AND (L3), stated in [ireg_link_ok] below
    and re-established by all six arm moves.  Their payoff is two lines:
    [ireg_link_ok_alloc] ("an outstanding fragment means an ALLOCATED
-   record") and [ireg_free_au]'s own [w = 0] ("at the instant an inode is
+   record") and [EscrowDeposit.ireg_free_deposit_au]'s own [w = 0] ("at the instant an inode is
    freed nothing names it").  [ireg_link_alloc] at the end of the file is
    the accessor that cashes the first for a caller holding the inum's
    dinode block.  What is still NOT stated is §20.2's (L2) and the
    [c = None] half of (L3): nothing mints an [iclaim] yet, and the free
    cannot re-establish [c = None] without consuming one -- see
-   [ireg_free_au]'s note and design §20.15.
+   [EscrowDeposit.ireg_free_deposit_au]'s note and design §20.15.
 
    ---- WHAT IS DELIBERATELY NOT HERE ------------------------------------
 
@@ -359,7 +362,7 @@ Proof. intros (_ & _ & _ & Hnl). exact Hnl. Qed.
    cannot dent the pin" is the observation that every byte-writing mover
    consumes the caller's [dinode_at] and therefore runs at the MARKED arm,
    where the slot's own clause ([ireg_marked_ok] below) says [c = None] --
-   so [ireg_write_au], [ireg_free_au] and the two link movers re-establish
+   so [ireg_write_au], [EscrowDeposit.ireg_free_deposit_au] and the two link movers re-establish
    the pin vacuously and none of them grows a premise.  The one mover that
    moves a slot from the claimed (IN) arm to the marked one is
    [ireg_withdraw], and that is exactly §2.4's spend site: it CONSUMES an
@@ -472,7 +475,7 @@ Inductive ilkc : Type :=
    at [ireg_claim_au].  THERE IS NO SUCH STANDING CLAUSE ON THE LANE: [r] rode
    the ledger entirely unconstrained (its charter at [IcacheRef.v:296] has zero
    consumers).  It is (R2), and (R2) is only PRESERVABLE with (R1) beside it:
-   the one mover that writes a zero type is [ireg_free_au], which holds
+   the one mover that writes a zero type is [EscrowDeposit.ireg_free_deposit_au], which holds
    [ifreeze_post] and therefore [n = 0] by the freeze pin -- and (R1) turns
    that into [r = rc = 0].  So the ruling's "all units die at the free's
    count-0" is exactly (R1), stated.  The three conjuncts are ONE predicate so
@@ -482,7 +485,7 @@ Inductive ilkc : Type :=
    the count move, which is every count mover by construction (iget's two
    up-counts and idup mint, iput's two closes spend).  (R2) is stable at every
    type-preserving flush, vacuous at [ireg_claim_au] (a [fresh_shape] record
-   has a nonzero type) and paid at [ireg_free_au] as above.  (R3) is vacuous
+   has a nonzero type) and paid at [EscrowDeposit.ireg_free_deposit_au] as above.  (R3) is vacuous
    at [c = None], established at [ireg_claim_au] from (R2) at the OLD (type-0)
    record, and preserved at the plain mint by [IgetLic.iname_not_claimed] --
    the §2.6-pattern table lemma, twin of the landed [iname_not_frozen]. *)
@@ -502,7 +505,7 @@ Lemma ireg_ref_ok_le (r rc n : nat) (c : ctyUR) (d : dinode) :
   ireg_ref_ok r rc n c d -> (r + rc <= n)%nat.
 Proof. intros [H _]. exact H. Qed.
 
-(* (R1) at a count-0 slot -- [ireg_free_au]'s payment *)
+(* (R1) at a count-0 slot -- [EscrowDeposit.ireg_free_deposit_au]'s payment *)
 Lemma ireg_ref_ok_count0 (r rc n : nat) (c : ctyUR) (d : dinode) :
   ireg_ref_ok r rc n c d -> n = 0%nat -> r = 0%nat /\ rc = 0%nat.
 Proof. intros [Hle _] Hn. rewrite Hn in Hle. split; lia. Qed.
@@ -657,7 +660,7 @@ Definition ireg_marked_ok (c : ctyUR) (d : dinode) : Prop :=
    raises [di_nlink] off zero, so it takes a new pure premise
    [bv_unsigned (di_nlink dn) <> 0] and the pin's contrapositive
    ([ireg_frz_ok_nz]) then refutes frozen outright -- one premise, in hand at
-   its one raising site.  [ireg_free_au] writes [di_type = 0] over a frozen
+   its one raising site.  [EscrowDeposit.ireg_free_deposit_au] writes [di_type = 0] over a frozen
    slot, which is exactly iput's own free: it now TAKES [ifreeze_post] and
    RETIRES it in the same move, so the [FrzPost] arm dissolves as the type
    goes to zero.  Every other arm mover re-establishes the pin for free
@@ -878,7 +881,7 @@ Proof. right. reflexivity. Qed.
 
      the SECOND conjunct -- a flush that CLEARS the type leaves [nlink]
      at zero.  That is iput's free path, whose C-level guard is literally
-     [ip->nlink == 0], and it is what lets [ireg_free_au] derive [w = 0]
+     [ip->nlink == 0], and it is what lets [EscrowDeposit.ireg_free_deposit_au] derive [w = 0]
      -- i.e. "a free inode is named by no live directory record" --
      INSIDE the region, with no caller obligation at all (§20.9(c)).
 
@@ -1001,7 +1004,7 @@ Proof. exact (proj1 (bv_unsigned_in_range _ (di_nlink d))). Qed.
      [ireg_claim_au]     REFUTED at the root: the caller's buffer shows
                          [di_type = 0], (L3) forces [di_nlink = 0], and
                          [w < 0] is absurd.  ialloc can never claim the root.
-     [ireg_free_au]      REFUTED at the root by the same two steps from its
+     [EscrowDeposit.ireg_free_deposit_au]      REFUTED at the root by the same two steps from its
                          own [di_nlink dn = 0].  iput can never free the root.
      [ireg_withdraw]     record, count and authority all unchanged.
 
@@ -1124,7 +1127,7 @@ Proof. intros Hnl H Hz. exact (ireg_wlt_succ _ _ w (H Hz) Hnl). Qed.
                           [wd] only weakens the antecedent.
      [ireg_claim_au]      REFUTED into vacuity: (L3) at the type-0 record
                           forces the SUM to zero, hence [wd = 0].
-     [ireg_free_au]       the same, from its own [di_nlink dn = 0].
+     [EscrowDeposit.ireg_free_deposit_au]       the same, from its own [di_nlink dn = 0].
      [ireg_withdraw]      record, counts and authority all unchanged. *)
 Definition ireg_dir_ty : Z := 1.
 
@@ -1512,7 +1515,7 @@ Section InodeRegion.
      iput's free path carries its own [dn] across the sleeplock window, and
      [di_nlink_stable]'s second conjunct -- which this file always
      documented and S5f could not state -- carries the zero into
-     [ireg_free_au].  Both clauses then land with no caller obligation
+     [EscrowDeposit.ireg_free_deposit_au].  Both clauses then land with no caller obligation
      anywhere and no signature move: the six arm moves below each
      re-establish [ireg_link_ok] from what they already have.
 
@@ -1904,7 +1907,7 @@ Section InodeRegion.
 
        (R1) [r + rc <= n] COUPLES THE UNITS TO THE IN-CORE COUNT, and it has
        to -- §5'.2's establish route for the pin runs [ireg_claim_au] <- (R2)
-       <- [ireg_free_au] <- "the count is zero", and (R1) is the only thing
+       <- [EscrowDeposit.ireg_free_deposit_au] <- "the count is zero", and (R1) is the only thing
        that carries a zero count to a zero unit column.  Every alternative was
        probed and refuted: a fragment can force a column UP, never to zero, so
        no premise and no token on the free can replace it; a [FrzPost]-gated
@@ -2759,7 +2762,7 @@ Section InodeRegion.
      THE TYPE PREMISE (§16.4).  Since §16.3 a FREE record's fragment lives
      in the invariant, so an unconditional payout would be wrong for a
      type-0 [dn']: the slot's arm has to flip and the marker has to come
-     out.  That is [ireg_free_au] below; this lemma keeps the arm where it
+     out.  That is [EscrowDeposit.ireg_free_deposit_au] below; this lemma keeps the arm where it
      is and therefore demands an allocated [dn'].  Every ordinary caller
      has it from [InodeLock.inode_ok].
 
@@ -2771,7 +2774,7 @@ Section InodeRegion.
      not a theorem of the model, which is what §19.1(i) refuted.  With the
      disjunction below it IS a theorem of the region: a flush either clears
      the type (iput's [ip->type = 0], the LEFT disjunct -- and that route
-     actually leaves through [ireg_free_au], so here the left disjunct is
+     actually leaves through [EscrowDeposit.ireg_free_deposit_au], so here the left disjunct is
      dead against [Hnz] and only records the shape) or leaves it exactly
      where it was.  The premise only TRAVELS: the proof body does not move,
      and every caller in the tree discharges it today ([ProofWritei] and
@@ -2841,7 +2844,7 @@ Section InodeRegion.
        move across an ordinary flush, so the cap the ledger already had is
        the SAME cap -- one rewrite, no arithmetic.  (L3) is vacuous -- an
        ordinary flush writes a nonzero type, which is [Hnz], and the
-       clearing flush leaves through [ireg_free_au] instead. *)
+       clearing flush leaves through [EscrowDeposit.ireg_free_deposit_au] instead. *)
     assert (Hlok' : ireg_link_ok dn' (wl + wdu + wdt)).
     { rewrite /ireg_link_ok (proj1 Hnl).
       split_and!;
@@ -3484,235 +3487,6 @@ Section InodeRegion.
                 with "Hla Hep Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hfz Hcnth".
     iExists (ds !!! islot inum). iPureIntro. exact Hfrz.
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  iput's FREE (§16.3's dual)                                          *)
-  (* ------------------------------------------------------------------ *)
-
-  (* [ip->type = 0; iupdate(ip)] -- the one place an inode goes back to the
-     free pool.  The caller's fragment is ABSORBED into the invariant and
-     what comes out is the MARKER, which is exactly what iput's last close
-     re-parks (and what [IcacheEscrow.ipool_shape]'s free arm now is).
-
-     THE NLINK PREMISE, AND WHAT IT PROVES (design §20.6's iput row -- the
-     user's premise (3), proved).  [di_nlink_stable dn' dn]'s SECOND
-     conjunct fires here, because the flushed record's type IS zero: so
-     [di_nlink dn' = 0], and the FIRST conjunct then pins [di_nlink dn = 0]
-     too.  (L1) at the old record therefore collapses to [w = 0]: **at the
-     instant an inode is freed, no live directory record names it, and no
-     [ilink] fragment for it exists anywhere in the system.**  Proved
-     inside the region, with no caller obligation beyond the one iput's own
-     C-level [ip->nlink == 0] test already supplies (§20.9(c)).
-
-     WHAT THIS LEMMA DOES *NOT* DO, and why (fs-sysfile S5f/S5g).  §20.5 wants
-     the free to re-establish "[c = None] at a type-0 record", which is the
-     clause that would make [ireg_claim_au]'s [iclaim] payout mintable.  It
-     cannot: setting an exclusive claim slot back to [None] is not a
-     frame-preserving update while the claimant's fragment is outstanding,
-     so the free would have to CONSUME [iclaim inum] -- and iput holds no
-     such token.  §20.7's own text records the same fact from the other
-     end ("[ireg_free_au]'s new [c = None] premise has no discharge in
-     [ProofIput] today") and prices (M1) as the carrier.  So the claim
-     component exists in the algebra and the ledger carries it, but no
-     clause constrains it and nothing mints it yet.
-
-     AND (M1) IS NOT ONE CLAUSE ANYWHERE (fs-sysfile S5g, design §20.15).
-     It needs [r <= 1] -- the ABSENCE of other references -- which no
-     [nat]-counter authority yields from the presence of one fragment; and
-     iput's free runs AFTER its [release] at +0x5c, so any count fact would
-     have to cross the lock.  §20.2's "the whole §14 machine is unnecessary
-     here" is true of the [w] half, which the free reads off the AUTHORITY
-     above, and false of the [r] half.  Stage E is unpriced again. *)
-  Lemma ireg_free_au (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (ds : list dinode) (rg : bool) :
-    ↑iregN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    diblk_wf ds ->
-    dinode_wf dn' ->
-    bv_unsigned (di_type dn') = 0 ->
-    di_nlink_stable dn' dn ->
-    ireg_inv γi γfs inodestart nib -∗
-    dinode_at γi inum dn -∗
-    (* THE FREEZE, RETIRED IN THE SAME MOVE (iclaim-ledger.md §3.1, RULING
-       A's mover table).  This is the one mover that writes a type-0 record
-       over a slot the pin constrains, so with the pin's type conjunct landed
-       it can no longer re-park an untouched f column: it takes the
-       [FrzPost] token the walk is holding and steps the column back to
-       [FrzOff], so the pin's post arm DISSOLVES exactly as the type goes to
-       zero.  The token comes back as [ifreeze_off], which is what the pool
-       bundle wants ([IcacheEscrow]'s free arm).
-       IT IS THE DEPOSIT'S PRIVATE MOVER NOW.  [SpecIupdate] narrowed to
-       [di_type dn' <> 0] (§3.1), which deletes generic iupdate's free
-       branch; the only type-0 write left in the reordered kernel is the
-       off-lock ifree, and that goes through [EscrowDeposit] -- where the
-       token is in hand. *)
-    ifreeze_post rg (bv_unsigned inum) -∗
-    |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-      fsblock (fs_bytes γfs) (IBLOCK inum inodestart) bsl' ∗
-      (⌜bsl' = diblk_bytes ds⌝ -∗
-       fsblock (fs_bytes γfs) (IBLOCK inum inodestart)
-               (diblk_bytes (<[islot inum := dn']> ds))
-       ={E ∖ ↑iregN, E}=∗ imark γi (bv_unsigned inum)
-                          ∗ ifreeze_off (bv_unsigned inum)).
-  Proof.
-    iIntros (HE Hin Hwf Hdn' Hz Hnl) "#Hinv Hdn Hfz".
-    pose proof (islot_lt inum) as Hsl.
-    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
-                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct "Hinv" as "[#Hiinv #Hrb]".
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
-    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
-    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
-                with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds0) "(>%Hwf0 & >%Hcp0 & >Hfsb & >Hsls)".
-    iModIntro.
-    rewrite (ireg_bi_iblock inum inodestart).
-    iExists (diblk_bytes ds0).
-    iFrame "Hfsb".
-    iIntros (Hbytes) "Hfsb'".
-    assert (Hds0 : ds0 = ds) by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
-    subst ds0.
-    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
-                with "Hsls") as "[Hslot Hslback]".
-    iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
-    { iExFalso.
-      iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
-    rewrite /dinode_at.
-    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
-    assert (Hdeq : ds !!! islot inum = dn).
-    { pose proof (Hcp0 (islot inum) Hsl) as Hc.
-      rewrite -ireg_key_split in Hc. congruence. }
-    rewrite Hdeq in Hlok. rewrite Hdeq in Hrt.
-    (* THE FREE IS WHERE THE LEDGER CERTIFIES "UNNAMED" (design §20.6's iput
-       row; the user's premise (3), proved).  [di_nlink_stable]'s SECOND
-       conjunct fires here because the flushed record's type IS zero -- and
-       it is the one iput carries across its sleeplock window now that
-       [ic_open_held] is record-parametric (§20.14's (R1)).  It gives
-       [di_nlink dn' = 0]; the first conjunct then pins [di_nlink dn = 0]
-       too; and (L1) at the OLD record collapses to [w = 0]:
-
-         at the instant an inode is freed, no live directory record names
-         it, and no [ilink] fragment for it exists anywhere in the system.
-
-       Proved inside the region, with no caller obligation beyond iput's own
-       C-level [ip->nlink == 0] test (§20.9(c)). *)
-    assert (Hnl0' : bv_unsigned (di_nlink dn') = 0) by exact (proj2 Hnl Hz).
-    assert (Hnl0 : bv_unsigned (di_nlink dn) = 0).
-    { rewrite -(proj1 Hnl). exact Hnl0'. }
-    assert (Hw0 : (wl + wdu + wdt = 0)%nat)
-      by exact (ireg_wle_zero (bv_unsigned (di_nlink dn)) _ (proj1 Hlok) Hnl0).
-    (* ...at BOTH flavours, which is the widened form of the same sentence:
-       at the instant an inode is freed no live directory record names it,
-       whatever its namer knew about its type. *)
-    destruct (ireg_sum_zero3 wl wdu wdt Hw0) as (Hz1 & Hz2 & Hz3).
-    assert (Hlok' : ireg_link_ok dn' (wl + wdu + wdt)).
-    { rewrite Hz1 Hz2 Hz3.
-      split_and!; [lia | intros _; exact Hnl0' | rewrite Hnl0'; lia]. }
-    assert (Hdir' : ireg_dir_ok dn' (wdu + wdt))
-      by (rewrite Hz2 Hz3; exact (ireg_dir_ok_zero dn')).
-    assert (Hwl0' : ireg_dir_wl0 dn' wl)
-      by (rewrite Hz1; exact (ireg_dir_wl0_zero dn')).
-    (* THE ROOT IS NOT FREEABLE, and it is the SAME two steps as the claim's
-       (§20.4's (f) row).  [Hnl0] is the count iput tested at +0x40 and found
-       zero; the old clause refutes the root at any such record.  So the free
-       does not have to re-establish a strict cap over a zero -- **iput can
-       never free the root** -- and again no premise on the mover, no
-       obligation on the walk. *)
-    assert (Hnr : bv_unsigned inum <> ireg_root)
-      by exact (ireg_root_ok_ne _ dn _ Hrt Hnl0).
-    assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
-      by exact (ireg_root_ok_nonroot _ dn' _ Hnr).
-    (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's
-       own [dinode_at] put this open on the MARKED arm, whose clause says
-       [cl = None]. *)
-    assert (Hclm' : ireg_claim_ok cl (Some (Excl FrzOff)) dn')
-      by (rewrite (proj2 Ht2); exact I).
-    (* THE RETIRE (§3.1).  The token pins the column at [FrzPost] and the
-       step hands it back at [FrzOff]; the pin at the type-0 record it is
-       about to park is then vacuous, which is the whole reason the mover
-       takes the token rather than a premise. *)
-    iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
-    (* RULING R's (R2), PAID AT THE ONE MOVER THAT WRITES A ZERO TYPE
-       (iclaim-ledger.md §5'.2's "all units die at the free's count-0",
-       stated).  The walk's [FrzPost] token pins the in-core count at ZERO
-       through the freeze pin, and (R1) -- [r + rc <= n] -- turns that into
-       [r = rc = 0].  So the clause at the type-0 record the free is about to
-       park is the all-zero one, and the mover owes NOTHING new: no premise,
-       no token beyond the [ifreeze_post] it already takes.  This is the
-       eviction-accounting tripwire §5'.4 flagged, and it closes on the pin
-       the ledger already carried. *)
-    iDestruct "Hla" as (rcl) "[Hla %Href]".
-    assert (Hcn0 : cn = 0%nat) by exact (proj2 (proj2 Hfrz)).
-    (* ...and the pay-off line: the walk's [FrzPost] token pins the in-core
-       count at ZERO ([Hcn0]) and (R1) collapses both r columns, so the
-       clause at the type-0 record this mover parks is [ireg_ref_ok_zero]. *)
-    destruct (ireg_ref_ok_count0 rl rcl cn cl (ds !!! islot inum) Href Hcn0)
-      as [Hrl0 Hrcl0].
-    assert (Href0 : forall d0 : dinode, ireg_ref_ok rl rcl cn cl d0)
-      by (intros d0; rewrite Hrl0 Hrcl0; exact (ireg_ref_ok_zero cn cl d0)).
-    iMod (link_freeze_step _ _ _ _ _ _ _ _ (FrzPost rg) FrzOff with "Hla Hfz")
-      as "[Hla Hoff]".
-    assert (Hfrz' : ireg_frz_ok (Some (Excl FrzOff)) cn dn')
-      by exact (ireg_frz_ok_off cn dn').
-    (* the free writes a zero over a zero: [Hnl0] above IS the receipt's
-       antecedent already discharged at the old record (fs-log.md §G.17) *)
-    assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
-                  bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
-    { intros _. rewrite Hdeq. exact Hnl0. }
-    iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
-                 with "Hep") as "Hep".
-    iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
-    set (m' := <[bv_unsigned inum := dn']> m).
-    (* THE RECEIPT RIDES THROUGH: neither the old column ([FrzPost]) nor the
-       new one ([FrzOff]) is [FrzPre], so the slot's clause is on its
-       [frzown] arm both sides and the deposit never touches it. *)
-    iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl (FrzPost rg)))
-                 ltac:(reflexivity) with "Hfrcp") as "[Hrcpt Hmr]".
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrf Hcnt Hrcpt Hmr]") as "_".
-    { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrf Hcnt Hrcpt Hmr]").
-      { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
-        rewrite (ireg_key_split inum). intros Hc.
-        destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
-          as [Hj _].
-        exact (Hne (eq_sym Hj)). }
-      iExists (<[islot inum := dn']> ds).
-      iSplitR; [iPureIntro; exact (diblk_wf_insert ds (islot inum) dn' Hwf Hdn') |].
-      iSplitR.
-      { iPureIntro. intros i Hi.
-        destruct Hwf as [Hlen _].
-        destruct (decide (i = islot inum)) as [->|Hne].
-        - rewrite /m' -(ireg_key_split inum) lookup_insert.
-          rewrite list_lookup_total_insert; [done | lia].
-        - rewrite /m' lookup_insert_ne; last first.
-          { rewrite (ireg_key_split inum). intros Hc.
-            destruct (ireg_key_inj (ireg_bi inum) (ireg_bi inum)
-                        (islot inum) i Hsl Hi Hc) as [_ Hi'].
-            exact (Hne (eq_sym Hi')). }
-          rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
-          exact (Hcp0 i Hi). }
-      iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrf Hcnt Hrcpt Hmr]").
-      rewrite Hkey.
-      iDestruct (ireg_rcol_intro (bv_unsigned inum) wl wdu wdt gl cl rl pl
-                   (Some (Excl FrzOff)) cn rcl dn' (Href0 dn')
-                   with "Hla") as "Hla".
-      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
-                (Some (Excl FrzOff)) cn
-                Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz'
-                with "Hla Hep Hdisj Hcnt [] [Hrcpt Hmr]").
-      { iApply ireg_fsh_off. }
-      { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
-                  ltac:(reflexivity) with "Hrcpt Hmr"). }
-      iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hz | iExact "Hdn"] | iExact "Hrf"]. }
-    iModIntro. rewrite /ifreeze_off. iFrame "Hmk Hoff".
   Qed.
 
   (* ------------------------------------------------------------------ *)

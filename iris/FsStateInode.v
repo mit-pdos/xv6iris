@@ -120,8 +120,21 @@ Record inode_local (i : Z) (n : fs_node) : Prop := MkInodeLocal {
      sibling of it -- see [dir_owned] below, which is the reading. *)
   inl_dir_size   : fn_is_dir n = true -> (16 | fn_size n);
   inl_dir_uniq   : fn_is_dir n = true -> dir_names_unique (fn_data n) (fn_nrec n);
-  inl_dir_dot    : fn_is_dir n = true -> dir_entries n !! DOT = Some i;
-  inl_dir_dotdot : fn_is_dir n = true -> is_Some (dir_entries n !! DOTDOT);
+  (* THE DOTS ARE GUARDED BY [nlink <> 0] (B2 of the 2026-08-23 survey).
+     A [T_DIR] record at size 0 holds no records at all, hence no "." and no
+     "..", and this kernel really does produce two of them: the CLAIM BOX
+     [ialloc] installs (type [T_DIR], size 0, nlink 0 -- before [mkdir]'s two
+     [dirlink]s run) and the CORPSE [itrunc] leaves (every block freed, size
+     0, nlink 0, still typed until [iput] clears it).  Both sit at
+     [nlink = 0], which is the tree's own guard ([DirView.dir_dots_ix] is
+     stated the same way) and is what the C guarantees: a directory some name
+     reaches has had [mkdir] run on it.  [inl_dir_uniq] and [inl_dir_size]
+     hold at size 0 and stay UNGUARDED.  An ORPHAN owes no dots clause and
+     needs none: its ".." is TOKENLESS whatever the entry says (section 8). *)
+  inl_dir_dot    : fn_is_dir n = true -> fn_nlink n <> 0%nat ->
+                     dir_entries n !! DOT = Some i;
+  inl_dir_dotdot : fn_is_dir n = true -> fn_nlink n <> 0%nat ->
+                     is_Some (dir_entries n !! DOTDOT);
 }.
 
 Global Arguments inl_rec_wf {_ _} _.
@@ -164,6 +177,119 @@ Proof.
     rewrite (inl_blk_top Hl k) // in Hbs. lia. }
   split; [done |]. split; [| by eapply inl_blk_len].
   apply (inl_blk_dom Hl k Hk). by exists bs.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  2a. THE BARE NODE, and [inode_local] of it                         *)
+(*                                                                     *)
+(*  A node with no blocks, no indirect block, size 0 and nlink 0.       *)
+(*  THREE of this kernel's records are bare, and they are the same      *)
+(*  shape, so this is ONE definition and not three:                     *)
+(*                                                                      *)
+(*    - the FREE record ([di_type = 0]) the mkfs image is full of;       *)
+(*    - the CLAIM BOX [ialloc] installs ([SpecIalloc.ialloc_fresh ty]:   *)
+(*      the zero record with the type halfword set);                     *)
+(*    - the CORPSE [itrunc] then [iput] leave ([ProofIput.set_ditype0]   *)
+(*      of a record whose blocks and size [itrunc] already cleared).      *)
+(*                                                                      *)
+(*  [inode_local] holds of a bare node AT ANY TYPE, which is exactly     *)
+(*  what B2's guard above buys: without it a bare [T_DIR] node would     *)
+(*  owe a "." entry that it cannot have.  The mover is                   *)
+(*  [inode_owned_bare_move] in section 7.                                *)
+(* ------------------------------------------------------------------ *)
+
+Lemma dir_nrec_zero : dir_nrec 0 = 0%nat.
+Proof. reflexivity. Qed.
+
+Definition fn_bare (n : fs_node) : Prop :=
+  (* [13] is [FS_NDIRECT + 1], spelled as [dinode_wf] spells it *)
+  di_addrs (fn_rec n) = replicate 13 (bv_0 32)
+  /\ fn_ent n = replicate FS_NINDIRECT (bv_0 32)
+  /\ fn_blk n = ∅
+  /\ fn_size n = 0
+  /\ fn_nlink n = 0%nat.
+
+Lemma fn_bare_wf n : fn_bare n -> dinode_wf (fn_rec n).
+Proof. intros (Ha & _). rewrite /dinode_wf Ha length_replicate //. Qed.
+
+Lemma fn_bare_indb n : fn_bare n -> fn_indb n = 0.
+Proof.
+  intros (Ha & _). rewrite /fn_indb Ha.
+  rewrite lookup_total_replicate_2; [| rewrite /FS_NDIRECT; lia].
+  by change (bv_unsigned (bv_0 32)) with 0.
+Qed.
+
+Lemma fn_bare_naddr n k : fn_bare n -> (k < FS_MAXFILE)%nat -> fn_naddr n k = 0.
+Proof.
+  intros (Ha & He & _) Hk. rewrite /fn_naddr.
+  case_decide as Hd.
+  - rewrite Ha lookup_total_replicate_2; [| rewrite /FS_NDIRECT in Hd; lia].
+    by change (bv_unsigned (bv_0 32)) with 0.
+  - rewrite He lookup_total_replicate_2;
+      [| rewrite /FS_NINDIRECT /FS_NDIRECT; rewrite /FS_MAXFILE in Hk;
+         rewrite /FS_NDIRECT in Hd; lia].
+    by change (bv_unsigned (bv_0 32)) with 0.
+Qed.
+
+Lemma fn_bare_nrec n : fn_bare n -> fn_nrec n = 0%nat.
+Proof. intros (_ & _ & _ & Hsz & _). rewrite /fn_nrec Hsz //. Qed.
+
+(* a bare node's entry map is EMPTY at either type: [dir_nrec 0 = 0] and
+   [dir_view _ 0 = ∅] ([FsTree.dir_view_nil]). *)
+Lemma dir_entries_bare n : fn_bare n -> dir_entries n = ∅.
+Proof.
+  intros Hb. rewrite /dir_entries.
+  destruct (fn_is_dir n); [| done].
+  rewrite (fn_bare_nrec n Hb). apply dir_view_nil.
+Qed.
+
+Lemma fn_bare_orphan n : fn_bare n -> fn_orphan n = true.
+Proof.
+  intros (_ & _ & _ & _ & Hnl). rewrite /fn_orphan bool_decide_eq_true_2 //.
+Qed.
+
+(* the all-zero record: the mkfs image's free inode, and the node the boot
+   allocation starts every inum at (2b-A's [fs_boot_alloc]). *)
+Definition fn_zero : fs_node :=
+  MkNode (MkDinode (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 32)
+                   (replicate 13 (bv_0 32)))
+         (replicate FS_NINDIRECT (bv_0 32)) ∅.
+
+Lemma fn_bare_zero : fn_bare fn_zero.
+Proof.
+  rewrite /fn_bare /fn_zero /fn_size /fn_nlink /=.
+  split_and!; try reflexivity; by change (bv_unsigned (bv_0 32)) with 0.
+Qed.
+
+Lemma inode_local_bare i n :
+  fn_bare n ->
+  (fn_type n = 0 \/ fn_type n = T_DIR_z
+   \/ fn_type n = T_FILE_z \/ fn_type n = T_DEVICE_z) ->
+  inode_local i n.
+Proof.
+  intros Hb Hty.
+  pose proof Hb as (Ha & He & Hblk & Hsz & Hnl).
+  assert (Hnl0 : bv_unsigned (di_nlink (fn_rec n)) = 0).
+  { pose proof (bv_unsigned_in_range _ (di_nlink (fn_rec n))) as [Hlo _].
+    rewrite /fn_nlink in Hnl. lia. }
+  split.
+  - exact (fn_bare_wf n Hb).
+  - rewrite He length_replicate //.
+  - intros _. exact He.
+  - intros k Hk. rewrite Hblk lookup_empty (fn_bare_naddr n k Hb Hk).
+    split; [by intros [? ?] | done].
+  - intros k _. by rewrite Hblk lookup_empty.
+  - intros k bs Hbs. rewrite Hblk lookup_empty in Hbs. done.
+  - exact Hty.
+  - rewrite Hsz. rewrite /BSIZE_z /FS_MAXFILE. lia.
+  - intros k _ Hlt. exfalso. rewrite Hsz in Hlt.
+    assert (0 <= Z.of_nat k * BSIZE_z); [rewrite /BSIZE_z; nia | lia].
+  - intros _. exact Hnl.
+  - rewrite Hnl0. lia.
+  - intros _. rewrite Hsz. by exists 0.
+  - intros _. rewrite (fn_bare_nrec n Hb). intros j k Hj. exfalso. lia.
+  - intros _ Hne. exfalso. exact (Hne Hnl).
+  - intros _ Hne. exfalso. exact (Hne Hnl).
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -227,6 +353,139 @@ Section InodeOwned.
   Definition rec_owned Γ (sb : fs_sb) (i : Z) (dn : dinode) : iProp Σ :=
     byte_range Γ (IBLOCK (fs_inum_bv i) (sb_inodestart sb))
                  (Z.of_nat (64 * islot (fs_inum_bv i))) (dinode_bytes dn).
+
+  (* ---------------------------------------------------------------- *)
+  (*  3b. B5: the GEOMETRY-FREE reading, and sixteen records per block  *)
+  (*                                                                    *)
+  (*  [rec_owned] takes an [fs_sb]; the inode REGION has no superblock,  *)
+  (*  only [icfg_ist] and an inum as a plain [Z].  So the record's       *)
+  (*  ownership is stated once over the two numbers it actually uses --  *)
+  (*  the [FsStateBitmap.free_bitmap_at] pattern -- and [rec_owned] is   *)
+  (*  its superblock reading.                                            *)
+  (* ---------------------------------------------------------------- *)
+
+  (* inum [z]'s 64 bytes: offset [64 * (z mod 16)] of block [istart + z/16].
+     [InodeRegion.iblk_of_IBLOCK] is the same numbering equality one level
+     up, and holds there by [reflexivity] for the same reason. *)
+  Definition rec_owned_at Γ (istart z : Z) (dn : dinode) : iProp Σ :=
+    byte_range Γ (istart + z `div` 16) (64 * (z `mod` 16)) (dinode_bytes dn).
+
+  Global Instance rec_owned_at_timeless `{!GTimeless Γ} istart z dn :
+    Timeless (rec_owned_at Γ istart z dn).
+  Proof. rewrite /rec_owned_at. apply _. Qed.
+
+  (* THE RANGE PREMISE IS REAL, not slack: [rec_owned] goes through
+     [FsImg.fs_inum_bv i = Z_to_bv 32 i], which WRAPS.  Every caller has it
+     ([sb_ninodes] is far below 2^32); it is the premise
+     [FsEffBase.fs_inum_bv_unsigned] takes for the same reason. *)
+  Lemma rec_owned_sb Γ sb i dn :
+    0 <= i < 2 ^ 32 ->
+    rec_owned Γ sb i dn ⊣⊢ rec_owned_at Γ (sb_inodestart sb) i dn.
+  Proof.
+    intros Hi.
+    assert (H32 : bv_modulus 32 = (2 ^ 32)%Z) by (vm_compute; reflexivity).
+    assert (Hbv : bv_unsigned (fs_inum_bv i) = i).
+    { rewrite /fs_inum_bv. apply Z_to_bv_small. rewrite H32. lia. }
+    pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
+    assert (Hblk : IBLOCK (fs_inum_bv i) (sb_inodestart sb)
+                   = sb_inodestart sb + i `div` 16)
+      by (rewrite /IBLOCK Hbv; lia).
+    assert (Hoff : Z.of_nat (64 * islot (fs_inum_bv i)) = 64 * (i `mod` 16)).
+    { rewrite /islot Hbv Nat2Z.inj_mul Z2Nat.id; [reflexivity | lia]. }
+    rewrite /rec_owned /rec_owned_at Hblk Hoff //.
+  Qed.
+
+  (* ---- the 16-fold split/gather ------------------------------------ *)
+
+  (* two generic big-op readings, both about the INDEX only *)
+  Lemma big_sepL_seq0 (Ψ : nat -> iProp Σ) (n : nat) :
+    ([∗ list] j ∈ seq 0 n, Ψ j) ⊣⊢ ([∗ list] k ↦ _ ∈ seq 0 n, Ψ k).
+  Proof.
+    apply big_sepL_proper. intros k j Hk.
+    apply lookup_seq in Hk as [-> _]. done.
+  Qed.
+
+  Lemma big_sepL_len_irrel {A B : Type} (l : list A) (l' : list B)
+      (Ψ : nat -> iProp Σ) :
+    length l = length l' ->
+    ([∗ list] k ↦ _ ∈ l, Ψ k) ⊣⊢ ([∗ list] k ↦ _ ∈ l', Ψ k).
+  Proof.
+    revert l' Ψ. induction l as [| x l IH]; intros l' Ψ Hlen.
+    - destruct l' as [| y l']; [done | simpl in Hlen; lia].
+    - destruct l' as [| y l']; [simpl in Hlen; lia |].
+      rewrite !big_sepL_cons. apply bi.sep_proper; [done |].
+      apply (IH l' (fun k => Ψ (S k))). simpl in Hlen. lia.
+  Qed.
+
+  (* a run of records is the concatenation of their byte runs -- one
+     [byte_range_app] per record, off [dinode_bytes_length] *)
+  Lemma byte_range_diblk Γ (b off : Z) (ds : list dinode) :
+    Forall dinode_wf ds ->
+    byte_range Γ b off (diblk_bytes ds)
+    ⊣⊢ [∗ list] k ↦ d ∈ ds,
+         byte_range Γ b (off + 64 * Z.of_nat k) (dinode_bytes d).
+  Proof.
+    revert off. induction ds as [| d ds IH]; intros off Hall.
+    { rewrite diblk_bytes_nil byte_range_nil big_sepL_nil //. }
+    inversion Hall as [| xd xds Hd Hds]; subst.
+    rewrite diblk_bytes_cons byte_range_app (dinode_bytes_length d Hd).
+    rewrite big_sepL_cons.
+    apply bi.sep_proper.
+    - assert (Hz : off + 64 * Z.of_nat 0%nat = off) by lia. rewrite Hz //.
+    - rewrite (IH (off + Z.of_nat 64%nat) Hds).
+      apply big_sepL_proper. intros k y _.
+      assert (Hz : off + Z.of_nat 64%nat + 64 * Z.of_nat k
+                   = off + 64 * Z.of_nat (S k)) by lia.
+      rewrite Hz //.
+  Qed.
+
+  (* slot [k] of block [bi] IS inum [16*bi + k] *)
+  Lemma rec_owned_at_slot Γ (istart bi : Z) (k : nat) dn :
+    (k < 16)%nat ->
+    rec_owned_at Γ istart (16 * bi + Z.of_nat k) dn
+    ⊣⊢ byte_range Γ (istart + bi) (64 * Z.of_nat k) (dinode_bytes dn).
+  Proof.
+    intros Hk. rewrite /rec_owned_at.
+    assert (Hk0 : Z.of_nat k `div` 16 = 0) by (apply Z.div_small; lia).
+    assert (Hd : (16 * bi + Z.of_nat k) `div` 16 = bi).
+    { rewrite (Z.mul_comm 16 bi) Z.div_add_l; [| lia]. rewrite Hk0. lia. }
+    assert (Hm : (16 * bi + Z.of_nat k) `mod` 16 = Z.of_nat k).
+    { rewrite (Z.mul_comm 16 bi) Z.add_comm Z_mod_plus_full.
+      apply Z.mod_small. lia. }
+    rewrite Hd Hm //.
+  Qed.
+
+  (* THE SPLIT/GATHER.  One inode block's byte run IS its sixteen records,
+     at the region's own numbering ([16*bi + k], which is what
+     [InodeRegion.ireg_blk]'s slot big-op is indexed by). *)
+  Lemma rec_owned_at_diblk Γ (istart bi : Z) (ds : list dinode) :
+    diblk_wf ds ->
+    byte_range Γ (istart + bi) 0 (diblk_bytes ds)
+    ⊣⊢ [∗ list] k ∈ seq 0 16,
+         rec_owned_at Γ istart (16 * bi + Z.of_nat k) (ds !!! k).
+  Proof.
+    intros [Hlen Hall].
+    rewrite (byte_range_diblk Γ (istart + bi) 0 ds Hall).
+    rewrite (big_sepL_seq0
+               (fun k => rec_owned_at Γ istart (16 * bi + Z.of_nat k)
+                                      (ds !!! k)) 16).
+    rewrite (big_sepL_proper
+               (fun k d => byte_range Γ (istart + bi) (0 + 64 * Z.of_nat k)
+                                      (dinode_bytes d))
+               (fun k (_ : dinode) =>
+                  byte_range Γ (istart + bi) (64 * Z.of_nat k)
+                             (dinode_bytes (ds !!! k))) ds); last first.
+    { intros k d Hkd. rewrite (list_lookup_total_correct ds k d Hkd).
+      assert (Hz : 0 + 64 * Z.of_nat k = 64 * Z.of_nat k) by lia.
+      rewrite Hz //. }
+    rewrite (big_sepL_len_irrel ds (seq 0 16)
+               (fun k => byte_range Γ (istart + bi) (64 * Z.of_nat k)
+                                    (dinode_bytes (ds !!! k))));
+      [| rewrite Hlen length_seq //].
+    apply big_sepL_proper. intros k j Hk.
+    apply lookup_seq in Hk as [_ Hlt].
+    rewrite (rec_owned_at_slot Γ istart bi k (ds !!! k) Hlt) //.
+  Qed.
 
   Definition ind_owned Γ (n : fs_node) : iProp Σ :=
     (if decide (fn_indb n = 0) then emp
@@ -404,6 +663,42 @@ Section InodeOwned.
                       (Z.of_nat (64 * islot (fs_inum_bv i))) (dinode_bytes dn')
          -∗ rec_owned Γ sb i dn').
   Proof. iIntros "H". iFrame "H". by iIntros "H". Qed.
+
+  (* (a') THE BARE MOVE -- the ONE mover the claim box and the corpse both
+     use.  Section 2a's [fn_bare] covers three records of the same shape, so
+     this is one lemma and not a family: at [ialloc] the old node is the FREE
+     record and the new one is [SpecIalloc.ialloc_fresh ty] (the type
+     halfword set, everything else zero); at [iput]'s free the old node is
+     what [itrunc] left (blocks gone, size 0, nlink 0) and the new one is
+     [ProofIput.set_ditype0] of it.  Only the RECORD's bytes move -- a bare
+     node owns nothing else -- and [inode_local] of the target is
+     RE-ESTABLISHED here rather than taken as a premise, which is exactly
+     what B2's guard makes possible: a bare [T_DIR] node owes no "." entry.
+     [nlink] is 0 on both sides, so the auth passes through untouched. *)
+  Lemma inode_owned_bare_move Γ sb i n n' :
+    fn_bare n -> fn_bare n' ->
+    (fn_type n' = 0 \/ fn_type n' = T_DIR_z
+     \/ fn_type n' = T_FILE_z \/ fn_type n' = T_DEVICE_z) ->
+    inode_owned Γ sb i n ⊢
+      rec_owned Γ sb i (fn_rec n)
+      ∗ (rec_owned Γ sb i (fn_rec n') -∗ inode_owned Γ sb i n').
+  Proof.
+    intros Hb Hb' Hty.
+    pose proof Hb' as (Ha' & He' & Hblk' & Hsz' & Hnl').
+    assert (Hnn : fn_nlink n' = fn_nlink n).
+    { destruct Hb as (_ & _ & _ & _ & Hnl). rewrite Hnl Hnl' //. }
+    pose proof (fn_bare_indb n' Hb') as Hind'.
+    pose proof (dir_entries_bare n' Hb') as Hent'.
+    pose proof (inode_local_bare i n' Hb' Hty) as Hloc'.
+    rewrite /inode_owned /inode_phi /inode_ghost.
+    iIntros "[(Hr & _ & _) (Ha & _ & _)]". iFrame "Hr". iIntros "Hr".
+    iSplitL "Hr".
+    { rewrite Hblk' big_sepM_empty /ind_owned (decide_True _ _ Hind').
+      iFrame "Hr". auto. }
+    rewrite /ent_toks Hent' big_sepM_empty Hnn.
+    iSplitL "Ha"; [iExact "Ha" |].
+    iSplitR; [auto |]. iPureIntro. exact Hloc'.
+  Qed.
 
   (* the record write inside a whole inode.  The addresses may move (this is
      also the "attach a freshly allocated direct block" step), as long as no

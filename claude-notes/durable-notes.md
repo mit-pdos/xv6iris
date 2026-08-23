@@ -200,6 +200,37 @@ verbatim.** And prefer no new lemma at all when the callers have already
 destructured the bundle: the three `ProofKexec*` sites wanted
 `log_ctx_bytes_any` on the `#Hlogc` they already held.
 
+## A CAPACITY CLASS MUST BE **IMPORTED**, NOT MERELY REQUIRED, OR ITS FIELD
+## INSTANCES ARE INERT — AND THE FAILURE IS "INCOMPLETE PROOF" AT `Qed`
+
+`Class fsTopG Σ := FsTopG { fs_top_inG :: ghost_mapG Σ Z fs_node }` declares
+its field an instance, but that declaration is only ACTIVE where the class'''s
+file is `Import`ed.  A file that reaches the class through a transitive
+`Require` can still NAME it — `Context `{!fsTopG Σ}` parses and elaborates —
+and typeclass resolution will still fail to use the section variable.  The
+symptom is not an instance error: `iMod` SHELVES the unresolved instance
+goal, the proof script runs to the end, and `Qed` reports
+**"Attempt to save an incomplete proof"** with no location inside the proof.
+The one-line diagnosis is `Unshelve. all: match goal with |- ?G => idtac
+"SHELVED:" G end.` before the `Qed`; the fix is `Require Import` of the
+class'''s file.
+
+**And where that import collides, put it EARLY.**  A `Require Import` of a
+file whose exports shadow live names (the `FsState*` stack exports
+`fs_view`, `link_auth`, `byte_range`, `blk_owned`, all of which have live
+twins) is safe if it comes BEFORE the imports that define the twins: the
+LAST import wins, so an early position restores every colliding name and
+leaves only the new ones.  `FsCfgBoot`/`BootShared`/`SystemAdequacy` all put
+`Require Import FsState.` at the top of their project requires for exactly
+this reason.
+
+A second inline-`ltac:` trap from the same effort: adding a conjunct to a
+big fupd'''s postcondition broke `iMod (lem … ltac:(solve_ndisj) with "…")`
+with a bare "No applicable tactic", because the spliced tactic is elaborated
+before the conclusion is unified.  Name the premise as its own lemma
+(`FsCfgBoot.fs_cfg_iregN_top`) rather than splicing it — which also lets a
+caller that cannot spell the namespace supply it.
+
 ## `set_solver` DOES NOT WORK OVER `gset (mword n)`
 
 This one is NOT fixed by `iris/FastSetSolver.v`'s override (which cures the

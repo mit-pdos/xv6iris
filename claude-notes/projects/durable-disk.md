@@ -562,8 +562,10 @@ map at home blocks); 1d lands last.
           beside `rec_owned` (the `free_bitmap_at` pattern) + the 16-fold
           `diblk_bytes ↔ sixteen rec_owned` split/gather.
         - **B4:** the dirent-INSERT bullet was stale (2a' landed it).
-        - Free deletion: `InodeRegion.ireg_free_au` is dead (comments
-          only; iput frees through `EscrowDeposit.ireg_free_deposit_au`).
+        - Free deletion: `InodeRegion.ireg_free_au` is DELETED; every
+          comment naming it now names `EscrowDeposit.ireg_free_deposit_au`,
+          which is the live mover (iput frees off the lock, through the
+          escrow deposit).
         - **THE MAPPING:** `dinode_at`'s bytes → `rec_owned`;
           `inode_blocks` → the `[∗ map]` over `fn_blk` (allocated slots
           only — kills the 268-element framing hazard); `ind_res` →
@@ -651,8 +653,66 @@ map at home blocks); 1d lands last.
         `64·k + 64 ≤ BSIZE` premise; `SpecLogWrite.v` now Requires
         `FsBytesGamma` (which shadows the bare `byte_range` — the FsBlocks
         one is spelled qualified there).
-      - [ ] **2b-A.** B2, B5, B3's `fs_link`/`fs_top` + boot allocation,
-        `fs_gamma_L` reading them, `ireg_free_au` deleted.
+      - [x] **2b-A.** B2, B5, `ireg_free_au`'s deletion, and B3's names,
+        allocated at boot.  **What is LEFT of B3 is the ROUTING, not the
+        allocation:**
+        - `inode_local`'s two dots clauses are guarded by `fn_nlink n ≠ 0`
+          (B2).  `FsStateInode` gained `fn_bare` — no blocks, no indirect,
+          size 0, nlink 0, `di_addrs = replicate 13 0` — and
+          `inode_local_bare`, which holds AT ANY TYPE and is what the guard
+          buys.  The claim box and the corpse are ONE mover,
+          `inode_owned_bare_move` (bare → bare, only the record's bytes
+          move, `inode_local` re-established rather than assumed): at
+          `ialloc` the target is `ialloc_fresh ty`, at iput's free it is
+          `set_ditype0` of what itrunc left.  Both are `fn_bare`, so there
+          is no second lemma.
+        - `rec_owned_at Γ istart z dn` (B5), `rec_owned_sb` its superblock
+          reading (premise `0 ≤ i < 2^32` — `fs_inum_bv` WRAPS, so this is
+          real), and `rec_owned_at_diblk`: one inode block's byte run IS
+          `[∗ list] k ∈ seq 0 16, rec_owned_at Γ istart (16·bi + k)
+          (ds !!! k)`, i.e. `ireg_blk`'s own slot indexing.  Off
+          `byte_range_diblk` (induction on the record list) plus two generic
+          big-op readings, `big_sepL_seq0` and `big_sepL_len_irrel`.
+        - `fs_names` gained `fs_link`/`fs_top`; `FsBytesGamma.fs_gamma_L`
+          reads them (`gamma_no_gname` is gone).  `fs_alloc` takes the two
+          as PARAMETERS and names them back (`⌜fs_link γ = γlk⌝ ∗
+          ⌜fs_top γ = γtp⌝`) — the block layer must not name `fs_node`.
+          `fs_boot_ghosts`/`fs_boot_bundle` forward them.
+        - `FsState.fs_boot_alloc I` allocates both from a node map, with
+          `✓ link_elem I` as an HONEST premise — that is `fs_links_valid`'s
+          content, which the boot owes because it has no durable instance to
+          read it off.  `FsCfgBoot.fs_cfg_alloc` runs it at
+          `fs_boot_inodes nib = gset_to_gmap fn_zero (region_inums nib)` and
+          discharges the premise by `link_elem_valid_no_ents` (no entries,
+          so no tokens).  The whole bundle — the top auth, one `top_frag`
+          per inum, and `fs_links` — comes out as `fs_cfg_alloc`'s LEADING
+          conjunct, beside the two pins.
+        - **LEFT: the bundle has no home, so `BootShared` drops it**
+          (`iClear`, beside the two pins).  The only per-inum structure that
+          outlives fsinit is the inode REGION, and re-stating it over `Γ_L`
+          is 2b-inode's.  Routing is a one-line change at that `iClear`.
+        - **AND THE INITIAL MAP IS THE ZERO MAP, NOT THE IMAGE'S.**  Nothing
+          ties `γtop` to bytes yet (no `inode_owned` at `Γ_L` exists), so it
+          claims nothing false, and it is the only shape the family can GROW
+          from: `linkUR = gmapUR Z (authR natUR)` has NO authority over which
+          KEYS exist, so a family allocated at `ε` can never be extended
+          (nothing mints `{[i := ● n]}` out of nothing) — while `● 0` at
+          every inum rises to the record's real `nlink` with the auth in
+          hand (`nat_local_update`).  So **2b-inode CANNOT mint per-inum
+          fragments at the first `ilock` unless the region holds what boot
+          allocated**; the fragments must travel, not be re-created.  Stage 4
+          replaces the allocation with `fs_state_mint` off `P_wf` anyway,
+          which is why no image decoder was built (fs-state.md §1: "there is
+          no image decoding at boot").  Discharging `✓ link_elem I` at the
+          image's own map, when someone wants it, is `fsimg_wf`'s W9
+          (`fs_links_wf`: every live directory has `nlink = 1` and zero
+          incoming tickets) plus conjunct (13) `FsImg.fs_links_eq` (the
+          file-nlink equality) — no new sweep.
+        - `fsLinkG`/`fsTopG` are bound explicitly in `FsCfgBoot`,
+          `BootShared` and `SystemAdequacy` and are NOT `Xv6G.xv6G` members:
+          the `FsState*` stack is under active development, and folding it
+          into the bundle would put its cone in front of the 767 files that
+          bind `xv6G`.  `xv6Σ` gained `fsLinkΣ; fsTopΣ`.
       - [ ] **2b-inode.** Region → payload → links.
       - OPEN, for the orchestrator: `SpecBfree`'s two premises
         `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now

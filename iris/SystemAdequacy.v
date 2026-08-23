@@ -36,6 +36,12 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
+(* durable-disk 2b-A / B3: the era's two file-system-state capacity classes.
+   Required EARLY so the later imports shadow [FsState]'s four colliding
+   exports again ([fs_view], [link_auth], [byte_range], [blk_owned]); the
+   IMPORT is what makes [fsLinkG]/[fsTopG]'s instance fields active, which a
+   bare [Require] does not. *)
+Require Import FsState.
 Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -171,6 +177,8 @@ Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
 Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
+  (* B3: not [xv6G] members -- see the note at [FsCfgBoot]'s era section *)
+  Context `{!fsLinkG Σ, !fsTopG Σ}.
   Context `{GEN : GenId}.
 
   (* NO [fileG] AND NO [icacheG] BINDER ANY MORE (fs-cfg-boot.md stage
@@ -313,7 +321,7 @@ End SystemBoot.
 
 Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ, !fsTopG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (* the hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
@@ -421,7 +429,7 @@ Proof.
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
@@ -462,7 +470,7 @@ Qed.
 
 Theorem xv6_fs_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ, !fsTopG Σ}
     (g : gstate) (cov : gset Z)
     (D0 : gmap Z (list (bv 8)))
     (sb : fs_sb) (nib : nat)
@@ -548,7 +556,7 @@ Proof.
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
@@ -580,7 +588,7 @@ Qed.
    chain application in §2 above. *)
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].
+  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ; fsLinkΣ; fsTopΣ ].
 
 (* THE ASSUMPTION AUDIT'S TARGET, and it stays in THIS file deliberately.
 

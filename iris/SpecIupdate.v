@@ -177,7 +177,7 @@ Definition wp_iupdate_sconf_body
   (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
      flush no longer serves a type-CLEARING write.  It used to: the payout
      [InodeRegion.ireg_out] case-splits on the type and the zero arm went
-     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     through [EscrowDeposit.ireg_free_deposit_au], which is iput's free.  Since
      RULING A that mover RETIRES the freeze in the same step and therefore
      takes the [ifreeze_post] token, which no generic caller of iupdate
      holds -- so the free arm leaves this contract and becomes the
@@ -359,7 +359,7 @@ Definition wp_iupdate_gen_body
   (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
      flush no longer serves a type-CLEARING write.  It used to: the payout
      [InodeRegion.ireg_out] case-splits on the type and the zero arm went
-     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     through [EscrowDeposit.ireg_free_deposit_au], which is iput's free.  Since
      RULING A that mover RETIRES the freeze in the same step and therefore
      takes the [ifreeze_post] token, which no generic caller of iupdate
      holds -- so the free arm leaves this contract and becomes the
@@ -541,7 +541,7 @@ Definition wp_iupdate_cred_body
   (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
      flush no longer serves a type-CLEARING write.  It used to: the payout
      [InodeRegion.ireg_out] case-splits on the type and the zero arm went
-     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     through [EscrowDeposit.ireg_free_deposit_au], which is iput's free.  Since
      RULING A that mover RETIRES the freeze in the same step and therefore
      takes the [ifreeze_post] token, which no generic caller of iupdate
      holds -- so the free arm leaves this contract and becomes the
@@ -715,7 +715,7 @@ Definition wp_iupdate_credgen_body
   (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
      flush no longer serves a type-CLEARING write.  It used to: the payout
      [InodeRegion.ireg_out] case-splits on the type and the zero arm went
-     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     through [EscrowDeposit.ireg_free_deposit_au], which is iput's free.  Since
      RULING A that mover RETIRES the freeze in the same step and therefore
      takes the [ifreeze_post] token, which no generic caller of iupdate
      holds -- so the free arm leaves this contract and becomes the
@@ -838,7 +838,7 @@ Definition wp_iupdate_credgen_body
 (*  clause FALSE -- the write is unprovable there, not merely             *)
 (*  unsupported.  Every caller has it from [InodeLock.inode_ok]; the       *)
 (*  ordinary body does not need it only because [ireg_out]'s type-0 arm    *)
-(*  leaves through [InodeRegion.ireg_free_au] instead.                     *)
+(*  leaves through [EscrowDeposit.ireg_free_deposit_au] instead.                     *)
 (*                                                                        *)
 (*  A FIFTH PARAMETER, POSITIONAL, for the reason the fourth is one (the   *)
 (*  banner above): no existing caller's arity moves, and the four landed   *)

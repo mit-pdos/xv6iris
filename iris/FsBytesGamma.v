@@ -21,12 +21,13 @@
    will NOT fire (fs-state.md section 7, last bullet), which is exactly why
    these are stated once, here, and never re-derived at a use site.
 
-   THE LINK AND TOP GNAMES ARE NOT SUPPLIED HERE.  [fs_gamma_L] fills them
-   with a fixed placeholder because no predicate stated over the byte view
-   alone -- [FsStateBitmap.free_bitmap_at], which is the whole of the
-   bitmap's in-memory owner -- ever reads them; [free_bitmap_at_gname] is
-   that fact, and it is what lets stage 2c's real [Γ_L], carrying the era's
-   allocated [γlink]/[γtop], own the very same predicate. *)
+   THE LINK AND TOP GNAMES COME OUT OF [fs_names] (durable-disk 2b-A / B3).
+   [fs_gamma_L] reads [FsBlocks.fs_link] and [FsBlocks.fs_top], the two
+   fields [FsBoot.fs_boot_ghosts] allocates for the era; there is no
+   placeholder left.  Nothing stated over the byte view ALONE reads them --
+   [FsStateBitmap.free_bitmap_at], which is the whole of the bitmap's
+   in-memory owner, does not, and [free_bitmap_at_gname] is that fact -- so
+   the bitmap's predicate is unchanged by their arrival. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -47,12 +48,9 @@ Local Open Scope Z_scope.
 Section Bridge.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
 
-  (* the placeholder the two ghost fields carry; see the header *)
-  Definition gamma_no_gname : gname := 1%positive.
-
   Definition fs_gamma_L (γfs : fs_names) : fs_view_names Σ :=
     MkFsView (fun (a : Z) (v : bv 8) => (a ↪[fs_bytes γfs] v)%I)
-             gamma_no_gname gamma_no_gname.
+             (fs_link γfs) (fs_top γfs).
 
   (* two owners of one byte is [False] -- the concrete instance of
      [FsStateDefs.phi_excl], and the only exclusivity law the design ever

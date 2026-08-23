@@ -40,6 +40,13 @@ From iris.base_logic.lib Require Import invariants own ghost_map ghost_var mono_
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvModelBytes.
+(* THE ERA'S FILE-SYSTEM-STATE GHOSTS (durable-disk 2b-A / B3).  Required
+   HERE, ahead of everything else, on purpose: [FsState] exports four names
+   that collide with live ones ([fs_view] with [FsBlocks]', [link_auth]
+   with [IcacheRef]'s ten-argument ledger, [byte_range]/[blk_owned] with
+   [FsBlocks]'), and an earlier [Require Import] is exactly what lets the
+   later ones win -- fs-state.md section 7's last two bullets. *)
+Require Import FsState.
 (* the four name records [fscfg] carries and this file must be able to spell *)
 Require Import WpUart.         (* [uart_names]  *)
 Require Import VirtioModel.    (* [disk_read]    *)
@@ -910,8 +917,21 @@ End FsCfgBootBitmap.
 (*  THE TWO BOOT KITS (ruling R6), GHOST ROWS ONLY                         *)
 (* ====================================================================== *)
 
+(* [fs_cfg_alloc]'s mask premise, NAMED.  Its one caller ([BootShared]) does
+   not import [InodeRegion], so it cannot spell [iregN]; and an inline
+   [ltac:(solve_ndisj)] inside the application term is elaborated before the
+   conclusion is unified, which stopped working when the era fupd's post grew
+   its B3 rows.  A named lemma is neither. *)
+Lemma fs_cfg_iregN_top : (↑iregN : coPset) ⊆ ⊤.
+Proof. solve_ndisj. Qed.
+
 Section FsCfgBootEra.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
+  (* B3: the two file-system-state cameras.  They are CAPACITY-ONLY classes
+     and are deliberately NOT members of [Xv6G.xv6G]: the whole [FsState*]
+     stack is under active development, and folding it into the bundle would
+     put its cone in front of the 767 files that bind [xv6G]. *)
+  Context `{!fsLinkG Σ, !fsTopG Σ}.
   Context `{GEN : GenId}.
 
   (* ---- two list/set conversions the era fupd needs -------------------- *)
@@ -1287,6 +1307,40 @@ Section FsCfgBootEra.
         (7) [dir_links_of_region] + [ipool_alloc_of_image] -> the stocked
             pool;
         (8) the gname-only mints, and FSC.                                *)
+  (* ---- THE ERA'S INITIAL INODE MAP (durable-disk 2b-A / B3) ----------
+     Every inum of the inode region at the ZERO node: no blocks, no
+     indirect, size 0, nlink 0, type 0 ([FsStateInode.fn_zero]).  It is NOT
+     the image's inode map, and it does not claim to be -- nothing ties
+     [γtop] to any bytes yet, because no [inode_owned] at [Γ_L] exists in
+     the tree.  What it IS is the only shape from which the family can ever
+     GROW: [linkUR = gmapUR Z (authR natUR)] has no authority over which
+     KEYS exist, so a family allocated at [ε] can never be extended (nothing
+     mints [{[i := ● n]}] out of nothing), while [● 0] at every inum can be
+     raised to the record's real [nlink] with the auth in hand
+     ([nat_local_update]).  Stage 4 replaces the whole allocation with
+     [FsState.fs_state_mint] off [P_wf], which is why no image decode is
+     built here. *)
+  Definition fs_boot_inodes (nib : nat) : gmap Z fs_node :=
+    gset_to_gmap fn_zero (region_inums nib).
+
+  Lemma fs_boot_inodes_no_ents (nib : nat) (i : Z) (n : fs_node) :
+    fs_boot_inodes nib !! i = Some n -> dir_entries n = ∅.
+  Proof.
+    rewrite /fs_boot_inodes. intros Hi.
+    apply lookup_gset_to_gmap_Some in Hi as [_ Heq].
+    rewrite -Heq. exact (dir_entries_bare fn_zero fn_bare_zero).
+  Qed.
+
+  (* THE BOOT'S OWN OBLIGATION, DISCHARGED.  [✓ link_elem I] is the
+     tokens-<=-nlink law of the initial map -- the fact [FsState.fs_links_valid]
+     READS OFF the durable instance at the mint, and which the boot, having no
+     durable instance, owes.  At the zero map it is free: no node has an entry,
+     so no token exists and every inum's auth stands alone. *)
+  Lemma fs_boot_inodes_valid (nib : nat) : ✓ link_elem (fs_boot_inodes nib).
+  Proof.
+    apply link_elem_valid_no_ents. exact (fs_boot_inodes_no_ents nib).
+  Qed.
+
   Lemma fs_cfg_alloc (γd : uart_names) (γv : disk_names)
       (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (cov : gset Z)
       (nib : nat) (E : coPset) :
@@ -1319,6 +1373,20 @@ Section FsCfgBootEra.
        [BioInitAt.bio_free_tok] carries both. *)
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (ICFG : icfg) (FSC : fscfg),
+      (* ---- durable-disk 2b-A / B3: THE ERA'S TWO FS-STATE GHOSTS ----
+         The link family and the top map, both allocated here from
+         [fs_boot_inodes nib] and handed out WHOLE: the top map's auth, one
+         fragment per inum, and the family bundle
+         ([FsStateInode.inode_link_scatter] opens each element into
+         [link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n] at
+         [FsBytesGamma.fs_gamma_L fsc_fs]).  Like the two pins below it is a
+         LEADING conjunct so that a caller with no consumer drops it in one
+         step and the ten ties + two kits stay byte-identical to
+         [fs_boot_supply].  Its consumer is 2b-inode: the inode region is
+         where these must come to rest, since nothing else outlives fsinit. *)
+      ghost_map_auth (fs_top fsc_fs) 1 (fs_boot_inodes nib) ∗
+      ([∗ map] i ↦ n ∈ fs_boot_inodes nib, i ↪[fs_top fsc_fs] n) ∗
+      fs_links (fs_link fsc_fs) (fs_boot_inodes nib) ∗
       (* ---- N-5.1 (W5a): ROOT'S PIN, THE ONE NEW CONJUNCT ----
          The stocking spends [ROOTINO]'s mint licence while it still holds
          the root directory's contents element WHOLE, so the pin leaves boot
@@ -1519,9 +1587,13 @@ Section FsCfgBootEra.
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
     (* ---- 4. the block layer's ghosts -------------------------------- *)
+    (* B3: the two file-system-state ghosts first, so [fs_boot_ghosts] can
+       put their names in [γfs] (the block layer allocates neither). *)
+    iMod (fs_boot_alloc (fs_boot_inodes icfg_nib) (fs_boot_inodes_valid icfg_nib))
+      as (γlk γtp) "(Htopa & Htopf & Hlnk)".
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
-            ROOTDEV E Hcovin Hhomesub with "Hdisk")
-      as (γfs) "(Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl)".
+            ROOTDEV γlk γtp E Hcovin Hhomesub with "Hdisk")
+      as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl)".
     (* ---- 5. THE PEELS ------------------------------------------------
        THE MINT ALREADY SPLIT THE LOG REGION OFF (durable-disk 1c-flip):
        [Hchl] is the log's own storage, at the parked cache halves
@@ -1756,6 +1828,11 @@ Section FsCfgBootEra.
          FULL failing pass". *)
       rewrite 6!elem_of_difference 4!elem_of_union. tauto. }
     rewrite Hset.
+    (* ---- B3: the era's two fs-state ghosts, the post's first rows ---- *)
+    rewrite Hlk Htp.
+    iSplitL "Htopa"; [iExact "Htopa" |].
+    iSplitL "Htopf"; [iExact "Htopf" |].
+    iSplitL "Hlnk"; [iExact "Hlnk" |].
     (* ---- N-5.1 (W5a): root's pin, the post's first conjunct ---- *)
     iSplitL "Hpinr"; [iExact "Hpinr" |].
     iSplitL "Hfpinr"; [iExact "Hfpinr" |].
