@@ -1371,7 +1371,7 @@ Section ProofMain.
        kit 2 at the transport site below, at main+0x9e. ---- *)
     main_sb_raw -∗
     main_log_raw -∗
-    log_mirror_full -∗
+    log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) -∗
     iref_slots 2 -∗
     iref_slots_auth -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗

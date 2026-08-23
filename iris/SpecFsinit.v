@@ -259,6 +259,7 @@ Definition wp_fsinit_sconf_body
     (sb_old : nat -> bv 8)                     (* the .bss bytes memmove kills *)
     (* ---- initlog's own bundle, threaded verbatim ---- *)
     (bs_hdr : list (bv 8))
+    (M : log_mirror)            (* the era's BORN-TRUE picture (1a) *)
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (vlock : mword 32) (vname vcpu : mword 64)
     (v_start v_dev v_nc v_n : mword 32)
@@ -314,8 +315,18 @@ Definition wp_fsinit_sconf_body
   cov_below cov size ->
   (* (g) initlog's STAGE-2 CLEAN-IMAGE precondition: the on-disk log header
          says n = 0, so read_head's copy loop and install_trans's recovery
-         pass are both dead.  Real recovery is stage 4. *)
+         pass are both dead.  [SpecInitlog] itself no longer asks for it
+         (durable-disk 1a: initlog's contract is general and its recovering
+         arms are ghost no-ops); what still needs it HERE is fsinit's own
+         supply of the entries' home client halves, which at a dirty log
+         would have to be routed out of the coverage remainder by the
+         decoded write set.  That is old H3 and it is a separate lane. *)
   hdr_n bs_hdr = 0 ->
+  (* (g') THE ERA'S TWO READINGS OF ONE IMAGE (durable-disk 1a): the logged
+         view and the era's born-true mirror agree on the covered range.
+         Threaded verbatim into [initlog], where it is what makes the boot
+         [log_state] pack's row (b) provable. *)
+  (forall b : Z, b ∈ cov -> L !! b = Some (lm_view M b)) ->
   (* ---- ireclaim's printk, as a hypothesis and not a functor ---- *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
@@ -339,10 +350,11 @@ Definition wp_fsinit_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
-  (* initlog's crash seam, era certificate and era mirror variable *)
+  (* initlog's crash seam, era certificate and the era's BORN-TRUE mirror
+     half + swap receipt (durable-disk 1a) *)
   fs_crash_seam cov logstart -∗
   gen_cert -∗
-  log_mirror_full -∗
+  log_mirror_born M -∗
   (* THE LOG'S FOUR GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE
      [icfg_log]'s.  Threaded straight into [initlog] at +0x4e, which fills
      them rather than minting its own.  See the header: this is the
@@ -473,6 +485,7 @@ Module Type FSINIT.
       (bs_sb : list (bv 8))
       (sb_old : nat -> bv 8)
       (bs_hdr : list (bv 8))
+      (M : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
@@ -484,6 +497,6 @@ Module Type FSINIT.
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
-                           bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
+                           bs_hdr M L D vlock vname vcpu v_start v_dev v_nc v_n
                            pidv dq m K eb b lks Vpr.
 End FSINIT.

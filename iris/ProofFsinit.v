@@ -539,6 +539,7 @@ Section FsinitMain.
       (bs_sb : list (bv 8))
       (sb_old : nat -> bv 8)
       (bs_hdr : list (bv 8))
+      (Mbrn : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
@@ -550,13 +551,13 @@ Section FsinitMain.
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
-                           bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
+                           bs_hdr Mbrn L D vlock vname vcpu v_start v_dev v_nc v_n
                            pidv dq m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_fsinit_sconf_body].
     intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hmagic Hvni Hvis Hvbs Hvls
            Hn1 Hnnib Hn31 Hdevc Hnibc Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
-           Hbmlog Hcovb Hhdr0 Hpk Hj Hgl Ha0 Hbelow.
+           Hbmlog Hcovb Hhdr0 HLmir Hpk Hj Hgl Ha0 Hbelow.
     subst v_ninodes. subst v_inodestart. subst v_bmapstart.
     subst v_logstart.
     pose proof HK as HK'. 
@@ -1402,7 +1403,8 @@ Section FsinitMain.
       as "Hnilhomes".
     { rewrite (hdr_dec_zero bs_hdr Hhdr0). cbn. done. }
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs γpr
-              cov logstart dev sb_base bs_hdr (fun _ : nat => ([] : list (bv 8))) L D
+              cov logstart dev sb_base bs_hdr (fun _ : nat => ([] : list (bv 8)))
+              Mbrn L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hj Hgl
@@ -1411,7 +1413,7 @@ Section FsinitMain.
               ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn;
                     intros b0 Hb0; destruct (not_elem_of_nil b0 Hb0))
               Hpk
-              HQ9a0 HQ9a1 HDall
+              HQ9a0 HQ9a1 HDall HLmir
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)

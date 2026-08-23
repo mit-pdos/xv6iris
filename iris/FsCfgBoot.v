@@ -1073,12 +1073,13 @@ Section FsCfgBootEra.
             [l_start], [l_dev], [l_out], [l_cmt], [l_ncommit], [lh_n_pa],
             the thirty [lh_block i].  Producer:
             [BootShared.boot_bss_carve] / [boot_shared_alloc]'s globals row.
-        (B) [LogDefs.log_mirror_full].  Producer:
+        (B) [LogDefs.log_mirror_born].  Producer:
             [BootShared.boot_shared_alloc] -- it is the ERA's mirror
             variable ([RiscvPtsto.mirror_name] = [era_mirror_name
-            riscv_eraGS], minted by [RiscvAdequacy] at power-on and handed
-            through [power_boot_res] at BootShared.v:874/1020), so this fupd
-            cannot mint it and must not try to.
+            riscv_eraGS]), which [RiscvAdequacy] mints at power-on AT THE
+            PICTURE OF THE DISK THE ERA BOOTS ON and whose other half its
+            custody hook puts straight into [FsCrash.P_fs] (durable-disk
+            1a), so this fupd cannot mint it and must not try to.
         (C) [IrefSlots.iref_slot] (one unit, for ireclaim's iget/iput pair)
             and [BioDefs.bslots 35].  Producers: the boot-shared
             [iref_slots IREFSLOTS] row, and [bio_init_at]'s POSTCONDITION
@@ -1112,8 +1113,14 @@ Section FsCfgBootEra.
         returns to the image *)
      fs_chalf fsc_fs 1 (P 1) ∗
      (* initlog's FsBlocks material.  [L]/[D] are universally quantified in
-        [SpecFsinit]'s contract, so an existential here is exactly right. *)
+        [SpecFsinit]'s contract, so an existential here is exactly right --
+        with the ONE pure fact the era's own mint establishes and initlog
+        needs (durable-disk 1a): the logged view IS the image, block by
+        block, on the covered range.  The era's mirror is born at that same
+        image, so [L] and the mirror are two readings of one thing, which is
+        what turns the boot [log_state] pack's row (b) into computation. *)
      (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
+        ⌜forall b : Z, b ∈ fsc_cov -> L !! b = Some (P b)⌝ ∗
         ghost_map_auth (fs_cache fsc_fs) 1 L ∗
         ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
      ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
@@ -1142,6 +1149,7 @@ Section FsCfgBootEra.
       ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
       fs_chalf fsc_fs 1 (P 1) ∗
       (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
+         ⌜forall b : Z, b ∈ fsc_cov -> L !! b = Some (P b)⌝ ∗
          ghost_map_auth (fs_cache fsc_fs) 1 L ∗
          ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
       ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
@@ -1782,7 +1790,8 @@ Section FsCfgBootEra.
     iSplitR; [iExact "Hireginv" |].
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "HaL HaD".
-    { iExists (fs_C0 dk cov), (fs_D0 dk cov).
+    { iExists (fs_L0 dk cov), (fs_D0 dk cov).
+      iSplitR; [iPureIntro; exact (fs_L0_lookup dk cov) |].
       iSplitL "HaL"; [iExact "HaL" | iExact "HaD"]. }
     iSplitL "Hdty"; [iExact "Hdty" |].
     iSplitL "Hhdr"; [iExact "Hhdr" |].

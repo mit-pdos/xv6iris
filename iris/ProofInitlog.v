@@ -511,6 +511,35 @@ Section InitlogDefs.
     apply lookup_seq in Hk as [-> _]. done.
   Qed.
 
+  (* the logged view's authority reads a client half's content off (the log
+     layer holds BOTH at boot, so this costs nothing) *)
+  Lemma il_fsb_lookup (γfs : fs_names) (L : gmap Z (list (bv 8)))
+      (b : Z) (bs : list (bv 8)) :
+    ghost_map_auth (fs_cache γfs) 1 L -∗ fs_chalf γfs b bs -∗ ⌜L !! b = Some bs⌝.
+  Proof.
+    rewrite /fs_chalf. iIntros "Ha Hb".
+    iApply (ghost_map_lookup with "Ha Hb").
+  Qed.
+
+  (* ...and the same over a whole family, in one pass: what the recovering
+     install needs is EVERY slot's content named in [L] (durable-disk 1a) *)
+  Lemma il_fsb_all (γfs : fs_names) (L : gmap Z (list (bv 8)))
+      (f : nat -> Z) (ys : nat -> list (bv 8)) (l : list nat) :
+    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ([∗ list] k ∈ l, fs_chalf γfs (f k) (ys k)) -∗
+    ⌜forall k : nat, k ∈ l -> L !! f k = Some (ys k)⌝.
+  Proof.
+    induction l as [|x l IH].
+    - iIntros "Ha Hs". iPureIntro. intros k Hk.
+      exfalso. exact (not_elem_of_nil k Hk).
+    - iIntros "Ha Hs". rewrite big_sepL_cons.
+      iDestruct "Hs" as "[Hx Hs]".
+      iDestruct (il_fsb_lookup with "Ha Hx") as %Hlk.
+      iDestruct (IH with "Ha Hs") as %Hall.
+      iPureIntro. intros k Hk.
+      apply elem_of_cons in Hk as [->|Hk]; [exact Hlk | exact (Hall k Hk)].
+  Qed.
+
   (* the 30 header cells, re-formed from the decoded run and the junk tail *)
   Lemma il_cells_join (bs : list (bv 8)) (nh : nat) :
     (nh <= LOGBLOCKS)%nat ->
@@ -1113,6 +1142,7 @@ Section ProofInitlog.
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
       (Bh : nat -> list (bv 8))
+      (M : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
@@ -1120,13 +1150,13 @@ Section ProofInitlog.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
-                            cov logstart dev sb bs_hdr Bh L D
+                            cov logstart dev sb bs_hdr Bh M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hbnd Hndup Hin Hpk
-           Hma0 Hma1 HDf Hbelow.
+           Hma0 Hma1 HDf HLmir Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam
               #Hpenvpk Hhomes #Hcert Hmirf
@@ -1134,6 +1164,11 @@ Section ProofInitlog.
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
+    (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
+       half at a NAMED picture and the swap receipt PowerOn's custody hook
+       already earned.  There is no boot swap here any more; every write
+       below is a value-chained one. *)
+    iDestruct "Hmirf" as "[Hmirh #Hswlb]".
     (* THE eb-GUARD-TO-b-GUARD BRIDGE.  The complement's transports carry an
        [eb]-indexed guard and every chain fact a straight-line stretch
        produces is [b]-indexed; at level 0 [cpu_own_eb_agree] gives [eb = b]
@@ -1154,6 +1189,57 @@ Section ProofInitlog.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
+    (* ---- THE ERA'S PICTURE IS THE LOGGED VIEW AT THE HEADER (1a).  Read
+       off here, where the auth and the header's client half are both in
+       hand: it is what makes [lm_hdr M logstart] the header initlog is
+       about to bread, hence what lets every install permit below name the
+       write set the on-disk header records. ---- *)
+    iDestruct (il_fsb_lookup with "HLauth Hfsb") as %Hhdrlk.
+    assert (Hhdrmir : lm_view M (log_hdr_bno logstart) = bs_hdr).
+    { pose proof (HLmir logstart Hhdrcov) as Hm.
+      rewrite /log_hdr_bno. rewrite /log_hdr_bno in Hhdrlk.
+      rewrite Hhdrlk in Hm. by injection Hm. }
+    assert (HMhdr : lm_hdr M logstart = hdr_dec bs_hdr)
+      by (rewrite /lm_hdr Hhdrmir //).
+    (* every entry the on-disk header names is a covered HOME block, so it
+       is neither the header nor a slot -- the side condition every reading
+       of the install chain asks for *)
+    assert (Hentne : forall (i : nat) (bb : Z),
+              (hdr_dec bs_hdr).2 !! i = Some bb -> bb <> log_hdr_bno logstart).
+    { intros i bb Hi.
+      destruct (Hin bb (elem_of_list_lookup_2 _ _ _ Hi)) as [_ Hout].
+      intros ->. exact (Hout (log_hdr_in_region logstart)). }
+    assert (Hentslot : forall (i k : nat) (bb : Z),
+              (hdr_dec bs_hdr).2 !! i = Some bb -> (k < LOGBLOCKS)%nat ->
+              bb <> log_slot_bno logstart k).
+    { intros i k bb Hi Hk.
+      destruct (Hin bb (elem_of_list_lookup_2 _ _ _ Hi)) as [_ Hout].
+      intros ->. exact (Hout (log_slot_in_region logstart k Hk)). }
+    assert (HWlen : length ((hdr_dec bs_hdr).2) = (hdr_dec bs_hdr).1)
+      by apply hdr_dec_length.
+    (* the header's write set is duplicate-free, in the INJECTIVITY form the
+       two install chains ([LogDefs.lm_install_hit] on the mirror,
+       [SpecInstallTrans.it_rec_L_hit] on the logged view) are stated at *)
+    (* [FsCrash]'s [NoDup] is stdpp's; this file's bare one is the
+       stdlib inductive.  Convert once. *)
+    assert (HndupS : base.NoDup ((hdr_dec bs_hdr).2))
+      by (by apply NoDup_ListNoDup).
+    assert (HinjWs : forall (i k : nat) (c : Z),
+              (hdr_dec bs_hdr).2 !! i = Some c ->
+              (hdr_dec bs_hdr).2 !! k = Some c -> i = k).
+    { intros i k c H1 H2.
+      apply (NoDup_lookup ((hdr_dec bs_hdr).2) i k c);
+        [ first [exact Hndup | by apply NoDup_ListNoDup] | exact H1 | exact H2]. }
+    assert (Hinjw : forall (i k : nat) (v v' : mword 32),
+              il_W bs_hdr ((hdr_dec bs_hdr).1) !! i = Some v ->
+              il_W bs_hdr ((hdr_dec bs_hdr).1) !! k = Some v' ->
+              uint v = uint v' -> i = k).
+    { intros i k v v' H1 H2 Heq.
+      apply (HinjWs i k (uint v)).
+      - rewrite -(il_W_uint bs_hdr).
+        exact (it_map_lookup (il_W bs_hdr ((hdr_dec bs_hdr).1)) i v H1).
+      - rewrite -(il_W_uint bs_hdr) Heq.
+        exact (it_map_lookup (il_W bs_hdr ((hdr_dec bs_hdr).1)) k v' H2). }
     (* ---- the "log" string literal, out of the data image ---- *)
     assert (Hlogs : forall jj bt, cstring_bytes "log"%string !! jj = Some bt ->
                      KernelData.kernel_data !! (log_name_str + Z.of_nat jj)%Z
@@ -1908,6 +1994,29 @@ Section ProofInitlog.
       with "[Hslotsn]" as "Hslotsn".
     { iApply (big_sepL_mono with "Hslotsn"). intros k x Hk.
       apply lookup_seq in Hk as [-> _]. done. }
+    (* ...AND THE SLOTS' CONTENTS ARE THE ERA'S PICTURE THERE (durable-disk
+       1a).  The boot mint built [L] from the era's disk and the era's
+       mirror was born at that same disk, so the bytes the recovering
+       install is about to copy into the home blocks are already NAMED in
+       the mirror.  That is what turns the closing clear's caught-up premise
+       -- home = slot at every entry -- into computation on the chain. *)
+    iEval (rewrite -(il_seq_body LOGBLOCKS
+             (fun k => fs_chalf γfs (log_slot_bno logstart k) (ys !!! k))))
+      in "Hslotsn".
+    iDestruct (il_fsb_all γfs L (fun k => log_slot_bno logstart k)
+                 (fun k => ys !!! k) (seq 0 LOGBLOCKS)
+                 with "HLauth Hslotsn") as %Hyslk.
+    iEval (rewrite (il_seq_body LOGBLOCKS
+             (fun k => fs_chalf γfs (log_slot_bno logstart k) (ys !!! k))))
+      in "Hslotsn".
+    assert (Hysmir : forall k : nat, (k < LOGBLOCKS)%nat ->
+              ys !!! k = lm_view M (log_slot_bno logstart k)).
+    { intros k Hk.
+      assert (Hkc : log_slot_bno logstart k ∈ cov)
+        by (apply Hlogsub, log_slot_in_region; lia).
+      pose proof (HLmir _ Hkc) as H1.
+      rewrite (Hyslk k ltac:(apply elem_of_seq; lia)) in H1.
+      by injection H1. }
     assert (Hsp30 : seq 0 LOGBLOCKS
                     = seq 0 ((hdr_dec bs_hdr).1)
                       ++ seq ((hdr_dec bs_hdr).1) (LOGBLOCKS - (hdr_dec bs_hdr).1)).
@@ -1936,8 +2045,6 @@ Section ProofInitlog.
                fs_chalf γfs (uint w) (Bh i))%I
       with "[Hslotfst Hhomes]" as "Hents".
     { rewrite big_sepL_sep. iSplitL "Hslotfst"; [iExact "Hslotfst" | iExact "Hhomes"]. }
-    (* the era's crash custody, out of the whole boot mirror *)
-    iDestruct (fs_era_custody_boot with "Hmirf") as "Hcust".
     (* the entries are covered home blocks *)
     assert (Hwok' : forall w : mword 32, w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1) ->
               uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)).
@@ -1986,28 +2093,54 @@ Section ProofInitlog.
               cov logstart dev true ((hdr_dec bs_hdr).1)
               (il_W bs_hdr ((hdr_dec bs_hdr).1))
               (fun k : nat => ys !!! k) Bh L D pidv dq
-              C2 (K - 6)%nat eb b (fun _ : nat => fs_era_custody)
+              C2 (K - 6)%nat eb b
+              (fun i : nat =>
+                 log_mirror_half (lm_install M ((hdr_dec bs_hdr).2)
+                                    (fun k : nat => ys !!! k) i))
               _ Vpr HKit Hgeomok Hj Hgl
               HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg
               Hbelow Hpkg
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells HLauth HDauth
-                    Hents Hs2 [] [Hcust]").
+                    Hents Hs2 [] [Hmirh]").
     all: try lkbelow.
     { iModIntro. iExact "Hpenvpk". }
-    (* THE RECOVERY-SIDE PERMITS, one generator over the era custody
-       ([FsCrash.fs_recover_seq_permit]): every write is to a decoded home
-       block, so it cannot corrupt the durable header ([hdr_wf_wr_out]). *)
-    { iModIntro. iIntros (i w) "%Hwi %Hlen' Hcust".
+    (* THE RECOVERING INSTALL'S PERMITS, one generator over the CURSOR-INDEXED
+       mirror chain (durable-disk 1a).  Entry [i] overwrites home block
+       [Ws[i]] with the slot's content -- which is exactly the STEADY-STATE
+       shape [FsCrash.fs_install_v_seq_permit] proves: the on-disk header
+       still names the block being overwritten, so recovery re-installs it
+       anyway and [fr_D] does not move.  Recovery is a ghost no-op here
+       because custody was installed at birth; the era's picture goes in at
+       [lm_install ... i] and comes back at [lm_install ... (S i)]. *)
+    { iModIntro. iIntros (i w) "%Hwi %Hlen' Hmi".
       iDestruct "Hcert" as "(_ & Hstc2 & Hregc2)".
-      iApply (fs_recover_seq_permit cov logstart (uint w) (ys !!! i)
-                ltac:(exact Hlen')
-                ltac:(intros dk o sbs Hfit Hwdk;
-                      apply (hdr_wf_sub_out cov logstart (uint w) o sbs dk Hfit);
-                      [ apply FsCrash.home_ne_hdr;
-                        exact (proj2 (Hwok' w (elem_of_list_lookup_2 _ _ _ Hwi)))
-                      | exact Hwdk ])
-                with "Hseam Hregc2 Hstc2 Hcust"). }
-    { iNext. iExact "Hcust". }
+      assert (Hwsi : (hdr_dec bs_hdr).2 !! i = Some (uint w)).
+      { rewrite -(il_W_uint bs_hdr).
+        exact (it_map_lookup (il_W bs_hdr ((hdr_dec bs_hdr).1)) i w Hwi). }
+      assert (Hilt : (i < length ((hdr_dec bs_hdr).2))%nat)
+        by exact (lookup_lt_Some _ _ _ Hwsi).
+      assert (Hile : (i <= length ((hdr_dec bs_hdr).2))%nat) by lia.
+      assert (Hnei : forall (k : nat) (bb : Z), (k < i)%nat ->
+                (hdr_dec bs_hdr).2 !! k = Some bb -> bb <> log_hdr_bno logstart)
+        by (intros k bb _ Hk; exact (Hentne k bb Hk)).
+      destruct (Hwok' w (elem_of_list_lookup_2 _ _ _ Hwi)) as [Hbcov Hblog].
+      assert (HWle : (length ((hdr_dec bs_hdr).2) <= LOGBLOCKS)%nat)
+        by (rewrite HWlen; exact Hbnd).
+      assert (HMi : lm_hdr (lm_install M ((hdr_dec bs_hdr).2)
+                              (fun k : nat => ys !!! k) i) logstart
+                    = ((hdr_dec bs_hdr).1, (hdr_dec bs_hdr).2)).
+      { rewrite (lm_install_hdr M ((hdr_dec bs_hdr).2)
+                   (fun k : nat => ys !!! k) logstart i Hile Hnei) HMhdr.
+        apply surjective_pairing. }
+      cbn [lm_install].
+      rewrite (list_lookup_total_correct ((hdr_dec bs_hdr).2) i (uint w) Hwsi).
+      iApply (fs_install_v_seq_permit cov logstart ((hdr_dec bs_hdr).1)
+                ((hdr_dec bs_hdr).2) i (uint w)
+                (lm_install M ((hdr_dec bs_hdr).2) (fun k : nat => ys !!! k) i)
+                (ys !!! i) Hlen' HndupS HWle Hwsi Hbcov Hblog HMi
+                with "Hseam Hregc2 Hswlb [Hmi]").
+      iNext. iExact "Hmi". }
+    { iNext. iExact "Hmirh". }
     iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
                              Hncell Hcells HLauth HDauth Hents Hs2 HRcust".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)
@@ -2060,8 +2193,9 @@ Section ProofInitlog.
     { iApply (ili_6c with "Htext"). }
     iIntros (CID32 Hs32) "Hcg Hpc Hncell".
     iEval (rewrite Hlhad2) in "Hncell".
-    (* the custody's later strips on this step (fs_era_custody is timeless) *)
-    iDestruct "HRcust" as ">Hcust2".
+    (* the install chain's last picture; its later strips on this step
+       (the mirror half is timeless) *)
+    iDestruct "HRcust" as ">Hmirn".
     (* the cells re-formed for the batch, the homes for the postcondition *)
     iAssert ([∗ list] i ∈ seq 0 LOGBLOCKS,
                ∃ wj : mword 32, lh_block i ↦₄ wj)%I
@@ -2145,6 +2279,42 @@ Section ProofInitlog.
     assert (Hshape0 : (0%nat = length ([] : list (mword 32))
                        /\ (0 <= LOGBLOCKS)%nat)).
     { split; [reflexivity | unfold LOGBLOCKS; lia]. }
+    (* ---- THE INSTALL CHAIN'S END, READ TWICE (durable-disk 1a).  The
+       closing clear needs the on-disk header's reading (unchanged: no entry
+       is the header) and the CAUGHT-UP fact (every entry's home block now
+       holds its slot's content).  Both are computation on the chain plus
+       the born-true equation between the era's picture and [L]. ---- *)
+    assert (HnnW : ((hdr_dec bs_hdr).1 <= length ((hdr_dec bs_hdr).2))%nat)
+      by (rewrite HWlen; lia).
+    assert (Hneall : forall (k : nat) (bb : Z), (k < (hdr_dec bs_hdr).1)%nat ->
+              (hdr_dec bs_hdr).2 !! k = Some bb -> bb <> log_hdr_bno logstart)
+      by (intros k bb _ Hk; exact (Hentne k bb Hk)).
+    assert (HMn : lm_hdr (lm_install M ((hdr_dec bs_hdr).2)
+                            (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
+                    logstart = ((hdr_dec bs_hdr).1, (hdr_dec bs_hdr).2)).
+    { rewrite (lm_install_hdr M ((hdr_dec bs_hdr).2) (fun k : nat => ys !!! k)
+                 logstart ((hdr_dec bs_hdr).1) HnnW Hneall) HMhdr.
+      apply surjective_pairing. }
+    assert (Hcaught : forall (jw : nat) (bb : Z),
+              (hdr_dec bs_hdr).2 !! jw = Some bb ->
+              lm_view (lm_install M ((hdr_dec bs_hdr).2)
+                         (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1)) bb
+              = lm_view (lm_install M ((hdr_dec bs_hdr).2)
+                           (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
+                  (log_slot_bno logstart jw)).
+    { intros jw bb Hjw.
+      assert (Hjlt : (jw < (hdr_dec bs_hdr).1)%nat)
+        by (rewrite -HWlen; exact (lookup_lt_Some _ _ _ Hjw)).
+      assert (Hslotne : forall (i : nat) (c : Z),
+                (i < (hdr_dec bs_hdr).1)%nat ->
+                (hdr_dec bs_hdr).2 !! i = Some c ->
+                c <> log_slot_bno logstart jw)
+        by (intros i c _ Hi; exact (Hentslot i jw c Hi ltac:(lia))).
+      rewrite (lm_install_hit M ((hdr_dec bs_hdr).2) (fun k : nat => ys !!! k)
+                 ((hdr_dec bs_hdr).1) jw bb HinjWs HnnW Hjlt Hjw).
+      rewrite (lm_install_miss M ((hdr_dec bs_hdr).2) (fun k : nat => ys !!! k)
+                 ((hdr_dec bs_hdr).1) (log_slot_bno logstart jw) HnnW Hslotne).
+      apply Hysmir. lia. }
     iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
@@ -2152,23 +2322,33 @@ Section ProofInitlog.
               (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1)) (fun k : nat => ys !!! k) L)
               pidv dq
               D2 (K - 6)%nat eb b
-              (fun _ : list (bv 8) =>
-                 log_mirror_at logstart (0%nat, []) ∗ swap_lb (S gen_id))%I
+              (fun bs' : list (bv 8) =>
+                 log_mirror_half (lm_upd
+                   (lm_install M ((hdr_dec bs_hdr).2)
+                      (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
+                   (log_hdr_bno logstart) bs'))%I
               _ Vpr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
-                    Hs1u [Hcust2]").
+                    Hs1u [Hmirn]").
     all: try lkbelow.
     { iExists bs_hdr. iExact "Hfsb". }
-    (* THE BOOT'S FINAL HEADER WRITE (durable-disk stage D1): uniform in
-       whether the recovering install already swapped custody in --
-       [FsCrash.fs_boot_head_seq_permit] takes the era custody either way, and
-       both arms land the same [Q]: the era's clean mirror half plus the
-       swap receipt. *)
+    (* THE BOOT'S FINAL HEADER WRITE (durable-disk 1a): the PRESERVING CLEAR,
+       the same one the steady state uses.  [fr_D] does not move -- the
+       caught-up premise ("every entry's home block holds its slot's
+       content") is computation on the install chain the era just walked,
+       and the era's picture is the disk's because it was born so.  There is
+       no swap here and nothing re-bases. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
       iDestruct "Hcert" as "(_ & Hstc & Hregc)".
-      iApply (fs_boot_head_seq_permit cov logstart bs' ltac:(exact Hlen')
-                ltac:(rewrite Hhn'; reflexivity)
-                with "Hseam Hregc Hstc Hcust2"). }
+      iApply (fs_clear_keep_seq_permit cov logstart
+                (lm_install M ((hdr_dec bs_hdr).2)
+                   (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
+                (lm_view (lm_install M ((hdr_dec bs_hdr).2)
+                   (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1)))
+                ((hdr_dec bs_hdr).1) ((hdr_dec bs_hdr).2) bs'
+                Hlen' ltac:(rewrite Hhn'; reflexivity) Hbnd HMn
+                (fun c (_ : c <> log_hdr_bno logstart) => eq_refl) Hcaught
+                with "Hseam Hregc Hswlb Hmirn"). }
     iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid
                                  Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
@@ -2376,21 +2556,30 @@ Section ProofInitlog.
               = false).
     { intro z. apply bool_decide_eq_false_2. apply not_elem_of_nil. }
     iApply fupd_wp.
-    (* ---- THE SWAP'S RECEIPT, off the write's permit (stage 3) ----
-       Both halves are timeless, so the [▷] the permit channel puts on them
-       strips inside this update: the era's mirror half goes into the batch
-       and the swap lower bound into [log_ctx]. *)
-    iMod "HQ" as "[Hmirc #Hswlb]".
-    iAssert (log_mirror_clean logstart) with "[Hmirc]" as "Hmirc";
-      [rewrite /log_mirror_clean; iExact "Hmirc"|].
+    (* ---- THE CHAIN'S LAST PICTURE, off the clear's permit (durable-disk
+       1a).  The mirror half is timeless, so the [▷] the permit channel puts
+       on it strips inside this update.  There is no swap receipt to collect
+       here any more: custody was installed at birth and [Hswlb] has been in
+       hand since the first instruction. *)
+    iMod "HQ" as "Hmirc".
+    (* the era's picture after the whole boot: the install chain, then the
+       clear's header.  Its header reading is the clean one by computation
+       on the bytes write_head laid down. *)
+    assert (Hmhdr : lm_hdr (lm_upd (lm_install M ((hdr_dec bs_hdr).2)
+                              (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
+                              (log_hdr_bno logstart) bs') logstart
+                    = (0%nat, [])).
+    { rewrite /lm_hdr lm_upd_view_eq Hhdec //. }
     iAssert (log_state bn γfs cov logstart 0%nat ∅ ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
-    { rewrite /log_state /log_mirror_clean /log_mirror_at.
-      iDestruct "Hmirc" as (M0) "[Hmirh %Hmhdr]".
+    { rewrite /log_state.
       iExists ([] : list (mword 32)),
               (<[log_hdr_bno logstart := bs']>
                  (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1))
-                    (fun k : nat => ys !!! k) L)), D, M0.
+                    (fun k : nat => ys !!! k) L)), D,
+              (lm_upd (lm_install M ((hdr_dec bs_hdr).2)
+                         (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
+                      (log_hdr_bno logstart) bs').
       iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
       (* the fresh batch has logged nothing: LB = list_to_set [] = empty *)
       iSplitR; [iPureIntro; reflexivity|].
@@ -2407,16 +2596,54 @@ Section ProofInitlog.
       iSplitL "Hfsb"; [iExists bs'; iExact "Hfsb"|].
       iSplitL "Hslotsfs"; [iExact "Hslotsfs"|].
       iSplitL "Hpool"; [iExact "Hpool"|].
-      iSplitL "Hmirh"; [iExact "Hmirh"|].
+      iSplitL "Hmirc"; [iExact "Hmirc"|].
       iSplitR; [iPureIntro; exact Hmhdr|].
-      (* ROW (b) AT BOOT, gated -- the second of durable-disk G1-impl's two
-         walls.  The era's mirror half arrives from
-         [FsCrash.fs_boot_head_seq_permit]'s [Q], whose value
-         ([mirror_of (fs_blocks dk')]) lives under the permit's own
-         universally quantified [dk], so nothing here can name it.  Stage
-         H2's re-founded boot (or a value-chained swap) discharges it; the
-         argument is at [LogInv.log_mirror_tie]. *)
-      iSplitR; [iPureIntro; apply log_mirror_tie_pending|].
+      (* ROW (b) AT BOOT, PROVEN (durable-disk 1a) -- one of the two walls
+         G1-impl left, and custody at birth is what brings it down.  Outside
+         the batch the era's picture of the durable disk IS the logged view,
+         and at boot both sides are ONE walk over ONE image: the mint built
+         [L] from the era's disk, the mirror was born at that disk, and the
+         recovering install moved the two at exactly the same blocks to
+         exactly the same bytes.  So the row is arithmetic on the chain. *)
+      iSplitR.
+      { iPureIntro. apply log_mirror_tie_of_body.
+        intros bb Hbb _.
+        rewrite /fs_home_set in Hbb.
+        apply elem_of_difference in Hbb as [Hbcov Hbout].
+        assert (Hbhdr : bb <> log_hdr_bno logstart)
+          by (intros ->; exact (Hbout (log_hdr_in_region logstart))).
+        rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hbhdr)).
+        rewrite (lm_upd_view_ne _ _ _ _ Hbhdr).
+        destruct (decide (bb ∈ (hdr_dec bs_hdr).2)) as [Hin'|Hout'].
+        - apply elem_of_list_lookup in Hin' as [jj Hjj].
+          assert (Hjlt : (jj < (hdr_dec bs_hdr).1)%nat)
+            by (rewrite -HWlen; exact (lookup_lt_Some _ _ _ Hjj)).
+          assert (Hmapjj : map uint (il_W bs_hdr ((hdr_dec bs_hdr).1)) !! jj
+                           = Some bb)
+            by (rewrite (il_W_uint bs_hdr); exact Hjj).
+          destruct (it_map_lookup_inv _ jj bb Hmapjj) as (w0 & Hw0 & ->).
+          rewrite (it_rec_L_hit (il_W bs_hdr ((hdr_dec bs_hdr).1))
+                     (fun k : nat => ys !!! k) L jj w0 Hinjw Hw0).
+          rewrite (lm_install_hit M ((hdr_dec bs_hdr).2)
+                     (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) jj
+                     (uint w0) HinjWs HnnW Hjlt Hjj).
+          reflexivity.
+        - assert (Hmiss : forall (i : nat) (w0 : mword 32),
+                    il_W bs_hdr ((hdr_dec bs_hdr).1) !! i = Some w0 ->
+                    uint w0 <> bb).
+          { intros i w0 Hi Heq. apply Hout'. rewrite -(il_W_uint bs_hdr) -Heq.
+            exact (elem_of_list_lookup_2 _ i _ (it_map_lookup _ i w0 Hi)). }
+          rewrite (it_rec_L_miss (il_W bs_hdr ((hdr_dec bs_hdr).1))
+                     (fun k : nat => ys !!! k) L bb Hmiss).
+          assert (Hmiss2 : forall (i : nat) (c : Z),
+                    (i < (hdr_dec bs_hdr).1)%nat ->
+                    (hdr_dec bs_hdr).2 !! i = Some c -> c <> bb).
+          { intros i c _ Hi Heq. apply Hout'. subst c.
+            exact (elem_of_list_lookup_2 _ i _ Hi). }
+          rewrite (lm_install_miss M ((hdr_dec bs_hdr).2)
+                     (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) bb
+                     HnnW Hmiss2).
+          exact (HLmir bb Hbcov). }
       (* ROW (a) AT BOOT, gated (durable-disk flip-C1).  The real content is
          [A0 := the image's home restriction] with [fs_durable_wf_body A0]
          off [FsWfImg.fsimg_durable_wf] and [FsCfgBoot]'s conjunct (13),

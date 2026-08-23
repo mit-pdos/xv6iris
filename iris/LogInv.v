@@ -834,15 +834,11 @@ Section LogInv.
   (*     home block of every [b ∈ LB], and touches nothing else, so the    *)
   (*     post-commit picture agrees with [L] on the WHOLE home set.        *)
   (*                                                                     *)
-  (*   - boot ([ProofInitlog]).  The era's half arrives from               *)
-  (*     [FsCrash.fs_boot_head_seq_permit]'s [Q], which is again           *)
-  (*     [log_mirror_at ls (0, [])]: the value the swap sets               *)
-  (*     ([mirror_of (fs_blocks dk')]) is under the permit's own           *)
-  (*     universally quantified [dk] and cannot be named by the caller.    *)
-  (*     DISCHARGER: stage H2's re-founded boot (the era mint runs at [D]  *)
-  (*     read out of [P_fs], so the mirror's value and [L]'s are the same  *)
-  (*     reading of one image), or a value-chained [fs_swap_permit_v]      *)
-  (*     stated at [mirror_of (fs_blocks dk')].                            *)
+  (*   - boot ([ProofInitlog]) -- DONE (durable-disk 1a).  The era's        *)
+  (*     mirror is born at the picture of the disk it boots on and its      *)
+  (*     custody arm is installed in the same fupd, so the boot's whole     *)
+  (*     write chain is value-carrying and the pack proves the body         *)
+  (*     ([log_mirror_tie_of_body] below) instead of calling the gate.      *)
   (*                                                                     *)
   (*  The SWITCH-ON is one line -- [log_mirror_tie := log_mirror_tie_body] *)
   (*  -- and [log_mirror_tie_pending]'s call sites are then exactly the    *)
@@ -865,6 +861,17 @@ Section LogInv.
     log_mirror_tie M L cov ls LB.
   Proof. exact I. Qed.
 
+  (* THE HONEST WAY IN, for a site that can already PROVE the row.  A caller
+     that has the body does not go through the gate: it goes through this,
+     which the switch-on turns into the identity without touching the call
+     site.  [ProofInitlog]'s boot pack is the first such site (durable-disk
+     1a: the era's mirror is born at the disk's own picture, so row (b) at
+     boot is computation on the install chain). *)
+  Lemma log_mirror_tie_of_body (M : log_mirror) (L : gmap Z (list (bv 8)))
+      (cov : gset Z) (ls : Z) (LB : gset Z) :
+    log_mirror_tie_body M L cov ls LB -> log_mirror_tie M L cov ls LB.
+  Proof. intros _. exact I. Qed.
+
   (* READY, AND DELIBERATELY UNUSED (durable-disk flip-B).  This is the
      deposit half of the gate above, proved: once end_op's committer carries
      the mirror's VALUE across the commit cycle -- which it now does, through
@@ -881,11 +888,11 @@ Section LogInv.
        - and the logged view agrees with [Lw] at every entry (the copy
          loop's own ghost step).
 
-     It is NOT wired in, because [log_mirror_tie] is still [True] and its
-     OTHER establishment site -- boot ([ProofInitlog]) -- is still a wall
-     until stage H2a mints the era's mirror at a named value.  Switching the
-     gate on is one line there plus [eo_open_to_batch] calling this instead
-     of [log_mirror_tie_pending]. *)
+     It is NOT wired in yet, because [log_mirror_tie] is still [True].  The
+     boot establishment site is DONE (durable-disk 1a: [ProofInitlog]'s pack
+     proves the body and goes through [log_mirror_tie_of_body]), so what is
+     left of the switch-on is the one-line definition change plus
+     [eo_open_to_batch] calling this instead of [log_mirror_tie_pending]. *)
   Lemma log_mirror_tie_deposit (M M' : log_mirror) (L : gmap Z (list (bv 8)))
       (cov : gset Z) (ls : Z) (LB : gset Z) (W : list Z)
       (Lw : nat -> list (bv 8)) :

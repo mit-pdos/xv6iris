@@ -548,68 +548,39 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      `cov`), and the pool/escrow arms that DO tie physical to logical
      (`pool_blk`'s shared `bs`, the clean arm's `⌜bsd = bs⌝`) are parked
      under `bcache.lock`. The CHECKED-OUT arm is precisely the place for
-     that era-side custody, so recovery's swap has to land first.
+     that era-side custody, and PowerOn installs it before the era's first
+     instruction runs (`design/crash.md`, "Custody at birth").
    The stage-2 clean-image spec becomes the n = 0 corollary.
-   - **AN ERA LEARNS THE ON-DISK HEADER ONLY BY HAVING WRITTEN IT, AND THAT
-     CAPS WHAT RECOVERY CAN CLAIM** (phase D2). A crash permit is a
-     stateless view shift over a UNIVERSALLY QUANTIFIED image `dk`, and the
-     only channel from the image into client-visible knowledge is the
-     custody arm's `log_mirror_ok M (fs_blocks dk) ls`. A swap installs
-     `M := mirror_of (fs_blocks dk) ls` — true, but at an image the client
-     cannot name, so the picture it hands back is OPAQUE (`Q` is fixed at
-     permit-creation time and cannot mention `dk`). The steady state is
-     fine: `fs_commit_permit` writes the header, so its `Q` names the
-     picture from the BYTES IT WROTE. Recovery only READS the header, and a
-     read's permit carries no data (`disk_wr = option (Z * list (bv 8))` —
-     `None` for a read). Consequences, all forced:
-     - recovery's `install_trans` writes CANNOT be `fs_install_permit`s
-       (which need `Ws !! i = Some b` for the DECODED on-disk header);
-     - they are `FsCrash.fs_recover_permit`s instead — RE-BASING writes,
-       which set `fr_D` to whatever the post-write image recovers to
-       (always available: `fs_recovery` is a total function of the image,
-       `fs_recovery_total`) and extend the history by it. Sound, and
-       nothing later cashes the difference: every earlier receipt stays
-       valid because the history only grows, and the post-recovery state is
-       pinned by the FINAL header write anyway;
-     - what is NOT provable this way is the WAL's COMPLETENESS claim ("what
-       recovery leaves behind IS the last committed state"). Safety —
-       `P_fs` stays well formed across every recovery write, custody is
-       this era's, `log_ctx` comes out — is unaffected.
-     **The fix, when completeness is wanted, is a read-data-indexed permit**:
-     make a READ's `Q` a FUNCTION of the delivered bytes (`Q (disk_read dk
-     off len)`), so the header bread's own permit can hand back
-     `log_mirror_at (hdr_dec bs)` at the bytes `bread` returns. That is a
-     machine-layer interface change of the same size as phase C2b — saved
-     PREDICATES rather than saved props in `PermInv`, a read-data equation
-     at `WpUart`'s completion (the analogue of `vslot_post_wr`), the permit
-     premise on `SpecVirtioDiskRw`/`SpecBread`, and a trivial instance at
-     every existing bread caller. It is the only known way to close the gap:
-     tying a client-held `disk_block` fragment to `dk` instead would need
-     the era image AUTH inside the stateless fupd, and that lives in
-     `state_interp`.
-   - **THE SWAP CANNOT BE A PLAIN GHOST STEP outside a write's permit**, which
-     is why "swap first, then install with full knowledge" is not on the
-     table. Retiring the incumbent arm needs `c <= S gen_id` — "no later era
-     has swapped" — and the only source of that bound is the STARTED-
-     GENERATIONS AUTH (`fs_arm_le` against the arm's `gen_started`). That auth
-     lives in `state_interp` and reaches a client only through
-     `wp_disk_step`'s callback, i.e. only inside a permit's fupd. A client
-     holds `gen_started gen_id`, a LOWER bound, which is the wrong direction.
-     (Opening `crashN` directly would give the record but not the auth.)
-   - **THE RECOVERY-SIDE PERMIT FAMILY IS UNIFORM IN `n`, AND HAS TO BE.**
-     `SpecInstallTrans` takes its per-entry permits as a `□`-generator over
-     one threaded resource, so the entry that performs the swap cannot have
-     a different contract from the rest. `FsCrash.fs_era_custody` is the
-     disjunction that makes it uniform — `log_mirror_full` (the boot mint,
-     no custody taken yet) `∨` `log_mirror_any ∗ swap_lb (S gen_id)`
-     (custody taken, picture unrecorded) — and `fs_recover_permit` consumes
-     and re-establishes it, swapping on first use. `fs_boot_head_permit`
-     closes the boot the same way for initlog's final `write_head`: at
-     `n = 0` no install ran and it IS `fs_swap_permit`; at `n > 0` the first
-     install already swapped and it is `fs_clear_permit` carrying the swap
-     receipt through. Both land `log_mirror_at (0, []) ∗ swap_lb (S gen_id)`,
-     which is what keeps initlog's postcondition — hence `log_ctx` — free of
-     `n`.
+   - **AN ERA LEARNS THE ON-DISK HEADER BY HAVING WRITTEN IT — OR BY HAVING
+     BEEN BORN KNOWING IT.** A crash permit is a stateless view shift over a
+     UNIVERSALLY QUANTIFIED image `dk`, and the only channel from the image
+     into client-visible knowledge is the custody arm's
+     `log_mirror_ok M (fs_blocks dk) ls`. The steady state is fine: the
+     commit permit WRITES the header, so its `Q` names the picture from the
+     bytes it wrote. Recovery only READS it, and a read's permit carries no
+     data (`disk_wr = option (Z * list (bv 8))` — `None` for a read), so for
+     a while recovery's writes had to RE-BASE `fr_D` and the WAL's
+     completeness claim was out of reach.
+     **That gap is closed by giving the era custody AT BIRTH** rather than
+     by making a read's `Q` data-indexed (`design/crash.md`, "Custody at
+     birth"): PowerOn allocates the era's mirror variable at
+     `mirror_of (fs_blocks dk)` for the machine's OWN `dk` and installs the
+     custody arm in the same fupd, so the era's picture is true of the
+     physical disk from its first instruction and the boot's write set is
+     the header's own decoding, named. Recovery's `install_trans` writes are
+     therefore the ORDINARY value-chained install permits and the closing
+     `write_head` is the ORDINARY preserving clear; nothing on the boot path
+     re-bases anything, and `initlog`'s postcondition is still free of `n`
+     because the clear lands the same clean picture at every `n`.
+   - **THE SWAP IS A PLAIN GHOST STEP — but only at PowerOn.** Retiring the
+     incumbent arm needs `c <= S gen_id` ("no later era has swapped"), and
+     the only source of that upper bound is the STARTED-GENERATIONS AUTH
+     (`fs_arm_le` against the arm's `gen_started`). That auth lives in
+     `state_interp`, so no client fupd can reach it — which is why the swap
+     could not be done from inside the kernel proof, and had to ride a
+     write's permit while it lived there. `wp_power_loop`'s PowerOn arm DOES
+     hold `state_interp`, and that is the whole reason the swap moved there.
+
 5. **sys_sync** = a persistent receipt: the record carries a fixed
    mono-list of committed D's; commit appends; sys_sync's post is a
    lower-bound receipt that the caller's pre-call writes are durable.

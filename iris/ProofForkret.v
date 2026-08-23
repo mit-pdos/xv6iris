@@ -919,7 +919,10 @@ Proof.
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
                       [Hhdr0 [H1cov H1log]]].
-  iDestruct "Hauths" as (L D) "[HauthL HauthD]".
+  (* the era's two readings of one image (durable-disk 1a): the boot mint
+     built [L] from the era's disk, which is the same disk the era's mirror
+     was born at.  Threaded straight through fsinit into initlog. *)
+  iDestruct "Hauths" as (L D) "(%HLdk & HauthL & HauthD)".
   (* fsinit borrows one reference unit and gives it back; kexec wants two,
      which is why the token carries two. *)
   iDestruct (iref_slots_split 1 1 with "Hirs2") as "[Hirs1 Hirs1b]".
@@ -985,12 +988,13 @@ Proof.
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
             (FsCrash.fs_blocks dk 1) sb_old
-            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) L D
+            (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))
+            (FsCrash.mirror_of (FsCrash.fs_blocks dk)) L D
             vlock vname vcpu v_start v_dev v_nc v_n
             pid (DfracOwn 1) B6 av2 eb eb ∅ V
             Hav2fs Hlg H1cov H1log Himg Hmagic eq_refl eq_refl eq_refl eq_refl
             Hn1 Hnnib Hn31 eq_refl eq_refl Hdev Hnib0
-            Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb Hhdr0 Hpkc Hjlt Hgl
+            Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb Hhdr0 HLdk Hpkc Hjlt Hgl
             HB6a0 ltac:(lkbelow)
             with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseam Hgen
                   Hmirf Hlfree Hb1 Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks

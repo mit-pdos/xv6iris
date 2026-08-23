@@ -247,12 +247,15 @@ Refines the ruling above; worklist stages E–I in
    bitmap / link-ledger stocks) runs at `D`, read out of `P_fs` in the
    era fupd — never at the raw boot disk. Its well-formedness premises
    come from `⌜fs_durable_wf D⌝`.
-3. **Recovery is logically invisible.** A dirty-log boot is the
-   post-commit pre-install steady state: logged view = slot content,
-   home block physically stale, dirty-at-boot true. `initlog` /
-   `install_trans` move NO exposed ghost state (no `γL` movement; the
-   recovering memmove is content-preserving at the logical level, since
-   `D` at a home block IS the slot's content by construction).
+3. **Recovery is logically invisible** — LANDED (durable-disk 1a). A
+   dirty-log boot is the post-commit pre-install steady state: logged
+   view = slot content, home block physically stale, dirty-at-boot true.
+   `initlog` / `install_trans`'s recovering arms move no exposed ghost
+   state: the recovering install runs the STEADY-STATE crash permit
+   (`fs_install_v_seq_permit`) over a cursor-indexed chain of the era's
+   mirror, and the closing header write runs the preserving clear
+   (`fs_clear_keep_seq_permit`), so `fr_D` does not move at boot at all.
+   The old re-basing recovery permits are deleted.
 4. **The FS layer never sees a machine permit.** Commit is the only
    write kind that moves `D` — logfill and install change physical
    bytes recovery ignores or reproduces, clear preserves `D` via
@@ -273,12 +276,14 @@ Refines the ruling above; worklist stages E–I in
    the physical disk on `cov ∪ log_region` by `log_mirror_ok`.
    Maintainable because the WAL's own writes are the only writes to the
    durable extent (installs know the bytes they write), and the custody
-   arm's per-era `ghost_var` + boot swap already solve the mortality
-   problem for exactly this shape (a stranded old-era half is abandoned
-   with its era; the new era swaps in its own var at the real disk's
-   picture). `fr_D` is then a pure function of the mirror picture — the
-   era knows the committed view BY VALUE — and no bio-layer fact is
-   ever needed inside a permit.
+   arm's per-era `ghost_var` solves the mortality problem for exactly
+   this shape: a stranded old-era half is abandoned with its era, and
+   the new era's own var is BORN at the real disk's picture with the
+   custody arm installed in the same instant (see "Custody at birth"
+   below). `fr_D` is then a pure function of the mirror picture — the
+   era knows the committed view BY VALUE
+   (`FsCrash.fs_recovery_of_mirror`) — and no bio-layer fact is ever
+   needed inside a permit.
 5. **`fs_durable_wf`** is THE well-formedness invariant of the durable
    committed view — the property every reachable committed state has and
    every commit preserves. It states the content sweeps generally
@@ -314,6 +319,41 @@ opaque payload, and two logically-atomic AUs — nothing else.  The
 byte-view worklist that preceded this ruling is archived with its history
 in [`../completed/durable-disk-byteview.md`](../completed/durable-disk-byteview.md).
 
+### Custody at birth: the PowerOn arm's two client hooks (landed 2026-08-23)
+
+The era's mirror `ghost_var` is allocated at PowerOn **at the picture of
+the disk the era boots on**, and the crash record's custody arm is
+installed in the SAME fupd. A born-true value alone would not be enough:
+a later WAL permit's disk image is `∀`-bound, so the ok-tie between the
+picture and the physical disk has to be carried FROM BIRTH.
+
+`wp_power_loop`'s PowerOn arm is the only place in the system that holds
+both sides — `state_interp`'s durable auth and `crash_inv` — so it takes
+TWO client hooks, and the pair is the shape to copy for anything else the
+boot must LEARN rather than assume:
+
+- **`Hproj`** runs BEFORE the step's mask shrink, at the dying machine,
+  and reads a PURE consequence of the crash predicate off the durable
+  auth (`FsCrash.P_fs_project`). Non-destructive; a `◇`, not a fupd,
+  because the arm runs it inside the step's own `|={⊤,∅}=>`.
+- **`Hswap`** runs AFTER `iMod "Hback"` — mask back at ⊤, the era record
+  and its mirror variable already allocated — opens `crashN`, and moves
+  the mirror variable's other half into the record's custody arm
+  (`FsCrash.P_fs_swap`, which is `P_fs_project`'s pattern plus
+  `fs_arm_swap` at `mirror_of (fs_blocks dk)`). It is a **basic update
+  under a `◇`**, for two independent reasons: the arm runs it with
+  `crashN` open, so a ⊤-indexed fupd could not be eliminated there, and
+  the client's obligation is stated at RAW gnames in a context that
+  carries `invGpreS` and no `invGS`, so no fupd exists to write it with.
+  The `◇` is what lets the client strip the crash predicate's later.
+
+The client's picture function reaches the machine layer as a parameter
+`Mof : (Z -> bv 8) -> log_mirror` (no FS constant may appear below
+`SystemAdequacy`); `power_boot_res` hands the boot the era's HALF at
+`Mof (v_disk g')` plus `swap_lb (S gen)`, and the boot chain carries that
+pair — `LogDefs.log_mirror_born` — to `initlog`. There is no boot swap
+and no whole-variable form left: **no write on the boot path re-bases
+`fr_D`**, which is decision 3 made literal.
 ### The previous shape (superseded 2026-08-22): per-era, re-minted at every boot
 
 Kept for the reasoning it records — the stranded-fragment problem is real and

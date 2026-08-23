@@ -58,7 +58,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    consumes is [power_boot_res]'s own ([power_boot_res_unpack]'s [Hdimg]),
    which this lemma used to hand back untouched and its one caller dropped
    on the floor. *)
-Require Import Xv6Cameras.        (* [log_mirror_full]: kit-2's row (B) *)
+Require Import Xv6Cameras.        (* the mirror's camera: kit-2's row (B) *)
+Require Import LogDefs.           (* [log_mirror_born]: kit-2's row (B) *)
 Require Import BioDefs.        (* [fs_blocks] *)
 Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
@@ -1095,7 +1096,8 @@ Section BootAlloc.
      that form at [riscv_eraGS] BY DELTA (RiscvPtsto §"the era's names"), so
      the unpacking is pure conversion and there is nothing to prove. *)
   Lemma power_boot_res_unpack (g : gstate) (ndisk : nat) :
-    power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g ⊢
+    power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
+      (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g ⊢
       ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) ∗
       boot_raw_bytes g ∗
       kmap_auth kmap_M0 ∗
@@ -1120,10 +1122,17 @@ Section BootAlloc.
          exists. *)
       disk_img_bytes disk_img_name 0
         (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
-      (* the era's LOG-REGION MIRROR variable, whole (phase C2b/D1 stage 3):
-         [initlog] splits it, keeping one half in [LogInv.log_state] and
-         handing the other to [FsCrash.P_fs]'s arm at its swap *)
-      ghost_var mirror_name 1 (MkLogMirror (fun _ => [])) ∗
+      (* the era's LOG-REGION MIRROR, BORN TRUE AND IN CUSTODY
+         (durable-disk 1a): PowerOn allocated the variable at the picture of
+         the disk this era boots on and handed the OTHER half to
+         [FsCrash.P_fs]'s custody arm in the same fupd, so what comes out
+         here is the era's half at a NAMED picture plus the swap receipt.
+         SPELLED as two rows, not as [LogDefs.log_mirror_born]: this lemma
+         is pure conversion, and the bundle would re-associate the pair
+         against [power_boot_res]'s own right-nested chain. *)
+      log_mirror_half (FsCrash.mirror_of
+         (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))) ∗
+      swap_lb (S gen_id) ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -1230,7 +1239,8 @@ Section BootAlloc.
        [power_boot_res] hands over is at [v_disk (g.(gdev).(dvirtio))], and
        nothing in [boot_facts] says what those bytes are. *)
     fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) ndisk sb nib cov ->
-    power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
+    power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
+      (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ)
              (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
@@ -1274,13 +1284,14 @@ Section BootAlloc.
          used to leave here and be dropped by the one caller.  It is now
          SPENT below, by [FsCfgBoot.fs_cfg_alloc], which is what turns those
          bytes into the file system's block ghosts (fs-log.md stage 4). *)
-      (* the era's log-region mirror variable, straight through: it is
-         kit 2's row (B) -- [FsCfgBoot.fs_kit_fsinit_ghost]'s header says so
-         and says why the era fupd must NOT try to mint it -- and
-         [LogDefs.log_mirror_full], which [initlog] takes, is this row's
-         [∃ M].  Kept at the CONCRETE genesis value rather than weakened to
-         [log_mirror_full] here, so nothing is lost on the way to fsinit. *)
-      ghost_var mirror_name 1 (MkLogMirror (fun _ => [])) ∗
+      (* the era's log-region mirror, straight through: it is kit 2's
+         row (B) -- [FsCfgBoot.fs_kit_fsinit_ghost]'s header says so and
+         says why the era fupd must NOT try to mint it -- and since
+         durable-disk 1a it is VALUE-BEARING all the way to [initlog]: the
+         era's half at the picture of its own disk, plus the swap receipt
+         its custody-at-birth earned. *)
+      log_mirror_born (FsCrash.mirror_of
+         (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗
@@ -1315,7 +1326,8 @@ Section BootAlloc.
     iIntros "H".
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
-        Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
+        Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
+        #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [rodata_end] ---- *)
@@ -1550,7 +1562,9 @@ Section BootAlloc.
     iSplitR; [iExact "Hdone" |].
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hkauth"; [iExact "Hkauth" |].
-    iSplitL "Hmir"; [iExact "Hmir" |].
+    iSplitL "Hmir".
+    { rewrite /log_mirror_born.
+      iSplitL "Hmir"; [iExact "Hmir" | iExact "Hswlb"]. }
     iSplitL "Hpages"; [iExact "Hpages" |].
     iSplitL "Hirauth"; [iExact "Hirauth" |].
     iSplitL "Hirslot"; [iExact "Hirslot" |].

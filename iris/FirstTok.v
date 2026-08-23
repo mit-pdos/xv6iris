@@ -289,7 +289,8 @@ Section FirstTok.
      auths, the dirty halves, the log header + slots, [bitmap_inv], the
      coverage remainder); rows (A) -- the 32 raw [&sb] bytes and the whole
      [struct log], carved in [BootShared.boot_bss_carve]; row (B) --
-     [LogDefs.log_mirror_full], the ERA's mirror variable; row (C) --
+     [LogDefs.log_mirror_born], the ERA's mirror half at the disk's own
+     picture plus the swap receipt; row (C) --
      [IrefSlots.iref_slots 2] and the 35 [bslots], neither of which the era
      fupd can mint ([bio_init_at] produces the slots at main+0x8e).
 
@@ -315,7 +316,12 @@ Section FirstTok.
        l_cmt ↦₄ (mword_of_int 0 : mword 32) ∗
        l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
        ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
-       (* row (B) *) log_mirror_full ∗
+       (* row (B), value-bearing (durable-disk 1a): the era's mirror HALF at
+          the picture of the disk this bundle is indexed by, plus the swap
+          receipt.  PowerOn allocated it there and put the other half into
+          [FsCrash.P_fs]'s custody arm in the same fupd, so there is no boot
+          swap left to do and nothing on the boot path re-bases [fr_D]. *)
+       log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) ∗
        (* row (C) *) iref_slots 2 ∗
        bslots ((LOGBLOCKS + 2) + 2 + 1)%nat)%I.
 
@@ -327,7 +333,7 @@ Section FirstTok.
         (vlock v_start v_dev v_nc v_n : mword 32) (vname vcpu : mword 64)
         (sb_old : nat -> bv 8),
         ⌜first_fsinit_pures dk sb⌝ ∗
-        log_mirror_full ∗
+        log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) ∗
         log_free_tok icfg_log ∗
         fs_chalf fsc_fs 1 (FsCrash.fs_blocks dk 1) ∗
         ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
@@ -342,6 +348,8 @@ Section FirstTok.
         l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
         ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
         (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
+           ⌜forall b : Z, b ∈ fsc_cov ->
+              L !! b = Some (FsCrash.fs_blocks dk b)⌝ ∗
            ghost_map_auth (fs_cache fsc_fs) 1 L ∗
            ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
         ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗

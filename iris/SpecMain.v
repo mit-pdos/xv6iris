@@ -573,7 +573,7 @@ Section SpecMain.
        why).  It reached [boot_shared_alloc]'s postcondition already and
        dead-ended there; stage (f) threads it to main, which parks it in
        [FirstTok.first_fsinit] for initlog. ---- *)
-    log_mirror_full -∗
+    log_mirror_born (FsCrash.mirror_of (FsCrash.fs_blocks dk)) -∗
     (* ---- ROW (C), first half: TWO iref-slot units.  One is for
        ireclaim's iget/iput pair inside fsinit, which hands it back; the
        pair is what [SpecKexec] takes, and forkret's [if (first)] arm calls

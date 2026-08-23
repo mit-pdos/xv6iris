@@ -175,6 +175,93 @@ Qed.
 Lemma it_rec_L_nil (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) :
   it_rec_L [] Lw L = L.
 Proof. reflexivity. Qed.
+
+(* ITS TWO LOOKUPS (durable-disk 1a).  The recovered view is the checkout
+   view with the batch's entries overwritten by their slots' contents, so a
+   block the pass never wrote reads through and one it did wrote reads the
+   slot -- which is what [ProofInitlog]'s boot [log_state] pack needs in
+   order to prove row (b) instead of gating it.  Same shape as the mirror
+   chain's [LogDefs.lm_install_miss] / [lm_install_hit], because they are
+   the same pass seen through two ghosts. *)
+Lemma it_map_lookup (W : list (SailStdpp.Values.mword 32)) (i : nat)
+    (w : SailStdpp.Values.mword 32) :
+  W !! i = Some w -> map uint W !! i = Some (uint w).
+Proof.
+  intro H. change (map uint W) with (uint <$> W).
+  rewrite list_lookup_fmap H. reflexivity.
+Qed.
+
+Lemma it_map_lookup_inv (W : list (SailStdpp.Values.mword 32)) (j : nat)
+    (b : Z) :
+  map uint W !! j = Some b ->
+  exists w : SailStdpp.Values.mword 32, W !! j = Some w /\ b = uint w.
+Proof.
+  intro H. change (map uint W) with (uint <$> W) in H.
+  rewrite list_lookup_fmap in H.
+  destruct (W !! j) as [w|] eqn:Hw; [| discriminate].
+  cbn in H. injection H as <-. by exists w.
+Qed.
+
+Lemma it_rec_L_upto_miss (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) (t : nat) (c : Z) :
+  (forall (i : nat) (w : SailStdpp.Values.mword 32),
+     (i < t)%nat -> W !! i = Some w -> uint w <> c) ->
+  it_rec_L_upto W Lw L t !! c = L !! c.
+Proof.
+  induction t as [|t IH]; [reflexivity|]. intros Hne.
+  destruct (W !! t) as [w|] eqn:Hw.
+  - rewrite (it_rec_L_upto_S W Lw L t w Hw).
+    rewrite lookup_insert_ne; [| exact (Hne t w ltac:(lia) Hw)].
+    apply IH. intros i v Hi Hv. exact (Hne i v ltac:(lia) Hv).
+  - rewrite /it_rec_L_upto seq_S foldl_app /= /it_rec_L_step Hw.
+    apply IH. intros i v Hi Hv. exact (Hne i v ltac:(lia) Hv).
+Qed.
+
+(* the duplicate-freedom premise is the INJECTIVITY it is used through, not
+   a [NoDup]: the bare name resolves to two different inductives in this
+   tree, and every caller can supply this shape from whichever it holds. *)
+Lemma it_rec_L_upto_hit (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) (t j : nat)
+    (w : SailStdpp.Values.mword 32) :
+  (forall (i k : nat) (v v' : SailStdpp.Values.mword 32),
+     W !! i = Some v -> W !! k = Some v' -> uint v = uint v' -> i = k) ->
+  (j < t)%nat -> W !! j = Some w ->
+  it_rec_L_upto W Lw L t !! uint w = Some (Lw j).
+Proof.
+  intros Hinj. revert j. induction t as [|t IH]; [lia|]. intros j Hj Hw.
+  destruct (decide (j = t)) as [->|Hne].
+  - rewrite (it_rec_L_upto_S W Lw L t w Hw) lookup_insert //.
+  - destruct (W !! t) as [v|] eqn:Hv.
+    + assert (Hneq : uint v <> uint w)
+        by (intro Hc; exact (Hne (eq_sym (Hinj t j v w Hv Hw Hc)))).
+      rewrite (it_rec_L_upto_S W Lw L t v Hv) lookup_insert_ne; [| exact Hneq].
+      apply IH; [lia | exact Hw].
+    + rewrite /it_rec_L_upto seq_S foldl_app /= /it_rec_L_step Hv.
+      apply IH; [lia | exact Hw].
+Qed.
+
+Lemma it_rec_L_miss (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) (c : Z) :
+  (forall (i : nat) (w : SailStdpp.Values.mword 32),
+     W !! i = Some w -> uint w <> c) ->
+  it_rec_L W Lw L !! c = L !! c.
+Proof.
+  intros Hne. rewrite /it_rec_L. apply it_rec_L_upto_miss.
+  intros i w _ Hw. exact (Hne i w Hw).
+Qed.
+
+Lemma it_rec_L_hit (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) (j : nat)
+    (w : SailStdpp.Values.mword 32) :
+  (forall (i k : nat) (v v' : SailStdpp.Values.mword 32),
+     W !! i = Some v -> W !! k = Some v' -> uint v = uint v' -> i = k) ->
+  W !! j = Some w ->
+  it_rec_L W Lw L !! uint w = Some (Lw j).
+Proof.
+  intros Hinj Hw. rewrite /it_rec_L.
+  apply (it_rec_L_upto_hit W Lw L (length W) j w Hinj
+           (lookup_lt_Some W j w Hw) Hw).
+Qed.
 Definition wp_install_trans_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     

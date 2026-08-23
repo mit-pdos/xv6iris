@@ -7,6 +7,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gset.
 From iris.base_logic.lib Require Import own ghost_var ghost_map mono_nat.
 Require Import RiscvModelBytes.
+Require Import RiscvLang.   (* [GenId]/[gen_id]: the born-true mirror row is per-era *)
 Require Import RiscvPtsto.
 (* [lock_free_tok] / [lock_ghost_alloc]: the "log" spinlock's ghost name is
    one of [log_names]'s four, so the free-state bundle below cannot be
@@ -119,12 +120,76 @@ Proof.
   by destruct (decide (c = b)).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE INSTALL PASS'S PICTURE, AS A TERM (durable-disk 1a).                 *)
+(*                                                                         *)
+(* An install pass overwrites home block [Ws[i]] with the logged content    *)
+(* [Lw i], one entry at a time, and the crash permits that ride it are      *)
+(* CURSOR-INDEXED ([SpecInstallTrans]'s [R : nat -> iProp]) because a       *)
+(* value-chained client hands its mirror half back at a DIFFERENT value per *)
+(* entry.  This is that chain, over the header's own write set, plus the    *)
+(* three readings its callers need: what it does to a block it never writes *)
+(* ([lm_install_miss]), what it does to the on-disk header's reading        *)
+(* ([lm_install_hdr]), and what it leaves at an installed block             *)
+(* ([lm_install_hit]).  The last one is half of the CAUGHT-UP fact          *)
+(* ([FsCrash.fs_clear_keep_seq_permit]'s premise): home = slot at every     *)
+(* entry, by computation on the chained value and nothing about the disk.   *)
+(* ---------------------------------------------------------------------- *)
+Fixpoint lm_install (M : log_mirror) (Ws : list Z)
+    (Lw : nat -> list (bv 8)) (t : nat) : log_mirror :=
+  match t with
+  | O => M
+  | S t' => lm_upd (lm_install M Ws Lw t') (Ws !!! t') (Lw t')
+  end.
+
+Lemma lm_install_miss (M : log_mirror) (Ws : list Z)
+    (Lw : nat -> list (bv 8)) (t : nat) (c : Z) :
+  (t <= length Ws)%nat ->
+  (forall (i : nat) (b : Z), (i < t)%nat -> Ws !! i = Some b -> b <> c) ->
+  lm_view (lm_install M Ws Lw t) c = lm_view M c.
+Proof.
+  induction t as [|t IH]; [reflexivity|].
+  intros Ht Hne. cbn [lm_install].
+  destruct (lookup_lt_is_Some_2 Ws t ltac:(lia)) as [b Hb].
+  rewrite (list_lookup_total_correct Ws t b Hb).
+  rewrite (lm_upd_view_ne _ _ _ _ (not_eq_sym (Hne t b ltac:(lia) Hb))).
+  apply IH; [lia | intros i v Hi Hv; exact (Hne i v ltac:(lia) Hv)].
+Qed.
+
+Lemma lm_install_hdr (M : log_mirror) (Ws : list Z)
+    (Lw : nat -> list (bv 8)) (ls : Z) (t : nat) :
+  (t <= length Ws)%nat ->
+  (forall (i : nat) (b : Z), (i < t)%nat -> Ws !! i = Some b ->
+     b <> log_hdr_bno ls) ->
+  lm_hdr (lm_install M Ws Lw t) ls = lm_hdr M ls.
+Proof.
+  intros Ht Hne. rewrite /lm_hdr (lm_install_miss M Ws Lw t _ Ht Hne) //.
+Qed.
+
+(* THE DUPLICATE-FREEDOM PREMISE IS THE INJECTIVITY IT IS USED THROUGH,
+   not a [NoDup]: two files in this tree resolve the bare name to two
+   different inductives (stdlib's and stdpp's), and a caller can always
+   supply this shape from whichever one it holds. *)
+Lemma lm_install_hit (M : log_mirror) (Ws : list Z)
+    (Lw : nat -> list (bv 8)) (t j : nat) (b : Z) :
+  (forall (i k : nat) (c : Z), Ws !! i = Some c -> Ws !! k = Some c -> i = k) ->
+  (t <= length Ws)%nat ->
+  (j < t)%nat -> Ws !! j = Some b ->
+  lm_view (lm_install M Ws Lw t) b = Lw j.
+Proof.
+  induction t as [|t IH]; [lia|]. intros Hinj Ht Hj Hb. cbn [lm_install].
+  destruct (lookup_lt_is_Some_2 Ws t ltac:(lia)) as [v Hv].
+  rewrite (list_lookup_total_correct Ws t v Hv).
+  destruct (decide (j = t)) as [->|Hne].
+  - rewrite Hv in Hb. injection Hb as ->. by rewrite lm_upd_view_eq.
+  - assert (Hneq : b <> v).
+    { intro Hc. apply Hne. apply (Hinj j t b Hb). rewrite Hc. exact Hv. }
+    rewrite (lm_upd_view_ne _ _ _ _ Hneq).
+    apply IH; [exact Hinj | lia | lia | exact Hb].
+Qed.
+
 Section LogMirrorDefs.
   Context `{!riscvGS Σ}.
-
-  (* The whole variable before crash custody takes one half. *)
-  Definition log_mirror_full : iProp Σ :=
-    (∃ M : log_mirror, ghost_var mirror_name 1 M)%I.
 
   (* The era's half, at a NAMED picture -- what a WAL caller chains its
      knowledge of the durable disk through. *)
@@ -139,6 +204,26 @@ Section LogMirrorDefs.
   Proof. rewrite /log_mirror_half. apply _. Qed.
   Global Instance log_mirror_at_timeless ls h : Timeless (log_mirror_at ls h).
   Proof. rewrite /log_mirror_at /log_mirror_half. apply _. Qed.
+
+  (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a).
+     PowerOn allocates the era's mirror variable at the picture of the disk
+     the era actually boots on AND installs the crash record's custody arm
+     in the SAME fupd ([FsCrash.P_fs_swap]), so the boot client starts with
+     a NAMED half plus the swap receipt rather than with the whole variable
+     and a swap still to do.  This is the row the boot chain carries from
+     [RiscvAdequacy.power_boot_res] all the way to [initlog], and it is what
+     makes every boot-path disk write a value-chained one: nothing on the
+     boot path re-bases [fr_D], so [initlog] and [install_trans]'s
+     recovering arms move no exposed ghost state.
+
+     The old whole-variable form ([log_mirror_full]) is GONE with the boot
+     swap it existed for. *)
+  Definition log_mirror_born `{GEN : GenId} (M : log_mirror) : iProp Σ :=
+    (log_mirror_half M ∗ swap_lb (S gen_id))%I.
+
+  Global Instance log_mirror_born_timeless `{GEN : GenId} M :
+    Timeless (log_mirror_born M).
+  Proof. rewrite /log_mirror_born /log_mirror_half /swap_lb. apply _. Qed.
 End LogMirrorDefs.
 
 Record log_names := MkLogNames {

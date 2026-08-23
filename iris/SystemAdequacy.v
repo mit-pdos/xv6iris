@@ -60,7 +60,7 @@ Require Import FirstTok.    (* [fs_extent_of_image] *)
    that way: this file sits on the strictly serial build tail. *)
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
-Require Import LogDefs.   (* [log_mirror_full] -- row (B) of the fsinit bundle *)
+Require Import LogDefs.   (* [log_mirror_born] -- row (B) of the fsinit bundle *)
 Require Import Xv6Cameras.  (* its record constructors *)
 Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
    computation and no literal image comes with it -- [FsImgCheck.v] is what
@@ -206,7 +206,8 @@ Section SystemBoot.
        premise is [Hcp] read at the FS's own [Pc].  The seam is assembled
        from it below and rides [first_tok] to forkret's first arm. *)
     riscv_crash_pred = P_fs_any cov (FsImg.sb_logstart sb) ->
-    power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
+    power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
+      (fun dk => mirror_of (fs_blocks dk)) g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
@@ -252,12 +253,11 @@ Section SystemBoot.
     (* one row out of [boot_shared_alloc], two premises at [BootChain] -- the
        halves are what main spends and drops separately *)
     iDestruct "Hmdata" as "[Hmfirst Hmnext]".
-    (* THE ERA'S MIRROR VARIABLE NO LONGER DEAD-ENDS (fs-cfg-boot.md (f-2)):
-       it is row (B) of [FirstTok.first_fsinit], and main parks it there for
-       initlog.  Weakened from the concrete genesis value to
-       [LogDefs.log_mirror_full], which is the shape [SpecInitlog] takes. *)
-    iAssert log_mirror_full with "[Hmir]" as "Hmir";
-      [rewrite /log_mirror_full; iExists _; iExact "Hmir" |].
+    (* THE ERA'S MIRROR IS ROW (B) of [FirstTok.first_fsinit], and main
+       parks it there for initlog.  Since durable-disk 1a it arrives
+       VALUE-BEARING -- the era's half at the picture of its own disk plus
+       the swap receipt -- so there is nothing to weaken here: what
+       [boot_shared_alloc] hands over IS the shape [SpecInitlog] takes. *)
     iDestruct (big_sepL_cpu_peel with "Hharts") as "[Hh0 Hhrest]".
     (* the three device threads' invariants, off the one device fabric *)
     iDestruct (dev_inv_uart with "Hdev") as "#Huinv".
@@ -399,6 +399,15 @@ Proof.
            ltac:(intros γd γsw γreg γst dk;
                  exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst cov
                           (FsImg.sb_logstart sb) dk))
+           (* CUSTODY AT BIRTH (durable-disk 1a): the era's mirror is the
+              picture of the era's own disk, and [P_fs_swap] IS the hook's
+              obligation -- it installs [P_fs]'s custody arm at that
+              variable in the same fupd, so the era boots already holding a
+              true picture and the swap receipt. *)
+           (fun dk => mirror_of (fs_blocks dk))
+           ltac:(intros γd γsw γreg γst Er gen dk;
+                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
+                          (FsImg.sb_logstart sb) dk Er gen))
            Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
@@ -520,6 +529,15 @@ Proof.
            ltac:(intros γd γsw γreg γst dk;
                  exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst cov
                           (FsImg.sb_logstart sb) dk))
+           (* CUSTODY AT BIRTH (durable-disk 1a): the era's mirror is the
+              picture of the era's own disk, and [P_fs_swap] IS the hook's
+              obligation -- it installs [P_fs]'s custody arm at that
+              variable in the same fupd, so the era boots already holding a
+              true picture and the swap receipt. *)
+           (fun dk => mirror_of (fs_blocks dk))
+           ltac:(intros γd γsw γreg γst Er gen dk;
+                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
+                          (FsImg.sb_logstart sb) dk Er gen))
            Hgen0 Hpow).
   intros F HE gen g' Hbf Hpure Hshape.
   (* THE RECORD'S SHAPE, destructed: every projection below reduces, which

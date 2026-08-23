@@ -171,6 +171,7 @@ Definition wp_initlog_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
     (bs_hdr : list (bv 8))
     (Bh : nat -> list (bv 8))   (* the entries' CRASHED home contents *)
+    (M : log_mirror)            (* the era's BORN-TRUE picture (1a) *)
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (* the raw struct log cells initlog is handed *)
     (vlock : mword 32) (vname vcpu : mword 64)
@@ -212,6 +213,16 @@ Definition wp_initlog_sconf_body
      whole covered range (the halves below say the same thing per block;
      the pure form is what the recovering install's contract consumes) *)
   (forall b : Z, b ∈ cov -> D !! b = Some false) ->
+  (* THE ERA'S TWO READINGS OF ONE IMAGE (durable-disk 1a).  The boot mint
+     built [L] from the era's disk and the era's mirror was BORN at that
+     same disk's picture, so on the covered range the logged view IS the
+     mirror's.  It is the whole content of "the era knows the durable disk
+     by value": with it, the header [initlog] breads and every slot the
+     recovering install copies are NAMED in the mirror, so the install
+     chain's [lm_upd]s and the closing clear's caught-up premise are
+     computation rather than a fact about the disk.  It is also what makes
+     row (b) of the boot [log_state] pack provable instead of gated. *)
+  (forall b : Z, b ∈ cov -> L !! b = Some (lm_view M b)) ->
   (* initlog's cone (its own bread/brelse, install_trans's bread/brelse/
      bwrite/bunpin, write_head's bread/bwrite/brelse) never dips below
      "bcache" (4); [initlock] itself carries no order premise. *)
@@ -249,13 +260,13 @@ Definition wp_initlog_sconf_body
   (* the era certificate: the swap installs custody AT [gen_id], and the
      registry element + started lower bound are exactly what identifies it *)
   gen_cert -∗
-  (* THE ERA'S LOG-REGION MIRROR VARIABLE (phase C2b/D1 stage 2), whole: no
-     custody of the crash record has been taken yet, so both halves are the
-     era's, and [initlog] is what splits them -- one into [log_state] (the
-     era's continuing half), one into [P_fs]'s checked-out arm when the swap
-     lands (stage 3).  It comes from the era boot bundle, minted at PowerOn
-     beside the disk image map. *)
-  log_mirror_full -∗
+  (* THE ERA'S LOG-REGION MIRROR, BORN TRUE AND IN CUSTODY (durable-disk
+     1a).  PowerOn allocated the variable at the picture of the disk this
+     era boots on and installed [P_fs]'s custody arm in the same fupd, so
+     what arrives here is the era's HALF at a NAMED picture plus the swap
+     receipt -- there is no boot swap left to do, and every write on the
+     boot path is a value-chained one that re-bases nothing. *)
+  log_mirror_born M -∗
   (* THE FOUR GNAMES, AT THEIR GENESIS VALUES (fs-cfg-boot.md staging step
      1).  The era fupd minted them -- they are [IcacheRef.icfg_log]'s value
      -- and this is the receipt initlog spends to BUILD the layer at them:
@@ -352,6 +363,7 @@ Module Type INITLOG.
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
       (Bh : nat -> list (bv 8))
+      (M : log_mirror)
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
@@ -359,7 +371,7 @@ Module Type INITLOG.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
-                            cov logstart dev sb bs_hdr Bh L D
+                            cov logstart dev sb bs_hdr Bh M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks Vpr.
 End INITLOG.

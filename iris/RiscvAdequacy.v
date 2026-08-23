@@ -859,7 +859,17 @@ Section power.
      RAM shape; the recipe is [riscv_system_adequacy]'s Htext/Hdata
      blocks). *)
   Definition power_boot_res (HE : riscvEraGS) (gen : nat)
-      (D : CPU -> gset register) (nproc ndisk : nat) (g' : gstate) : iProp Σ :=
+      (D : CPU -> gset register) (nproc ndisk : nat)
+      (* THE CLIENT'S MIRROR PICTURE OF A DISK IMAGE (durable-disk 1a).
+         The era's mirror variable is BORN TRUE -- allocated at the picture
+         of the disk this era actually boots on -- and the crash record's
+         custody arm is installed in the same PowerOn fupd, so the boot
+         client starts with a NAMED half and the swap receipt and no boot
+         write ever re-bases anything.  What "the picture of a disk" IS is
+         the FS layer's business ([FsCrash.mirror_of ∘ FsCrash.fs_blocks]),
+         and no FS constant may appear this far down, so it arrives as this
+         function parameter. *)
+      (Mof : (Z -> bv 8) -> log_mirror) (g' : gstate) : iProp Σ :=
     (([∗ list] c ∈ enum CPU, [∗ set] r ∈ D c,
         ghost_map_elem (era_reg_name HE c) r (DfracOwn 1)
           (existT r (register_lookup r (g'.(gregs) c)))) ∗
@@ -913,14 +923,18 @@ Section power.
         the log's block views) hold image fragments and still boot twice. *)
      disk_img_bytes (era_disk_name HE) 0
        (disk_read (v_disk (g'.(gdev).(dvirtio))) 0 ndisk) ∗
-     (* THE ERA'S LOG-REGION MIRROR VARIABLE, whole (phase C2b/D1 stage 3).
-        Minted here beside the image map and for the same reason: a fixed one
-        could never be re-paired after a crash.  BOTH halves go to the boot
-        client -- the FS layer's [initlog] splits them, keeping one in
-        [LogInv.log_state] and handing the other to [FsCrash.P_fs]'s
-        checked-out arm at its swap.  The value is the VACUOUS picture; the
-        first true one is what the swap installs. *)
-     ghost_var (era_mirror_name HE) 1 (MkLogMirror (fun _ => [])) ∗
+     (* THE ERA'S LOG-REGION MIRROR VARIABLE, HALF, AT THE PICTURE OF THE
+        DISK THIS ERA BOOTS ON (durable-disk 1a).  Minted here beside the
+        image map and for the same reason a fixed one could not work: a
+        fixed variable could never be re-paired after a crash.  The OTHER
+        half went into [FsCrash.P_fs]'s custody arm in the same fupd
+        ([Hswap] below), so custody is installed AT BIRTH and the era's
+        picture is true of the physical disk from the first instruction --
+        which is what makes every boot-path write a value-chained one and
+        [initlog]'s recovering arms ghost no-ops.  The swap receipt beside
+        it is what a WAL fupd curries to prove the arm is still its own. *)
+     ghost_var (era_mirror_name HE) (1/2) (Mof (v_disk (g'.(gdev).(dvirtio)))) ∗
+     swap_lb (S gen) ∗
      (* the crash-spanning invariant: FIXED-layer, so every boot gets the
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
@@ -945,6 +959,39 @@ Section power.
       (Hproj : forall dk : Z -> bv 8,
          ⊢ disk_fixed_auth dk -∗ ▷ riscv_crash_pred -∗
            ◇ (disk_fixed_auth dk ∗ ▷ riscv_crash_pred ∗ ⌜Ppure dk⌝))
+      (* the client's picture of a disk image (see [power_boot_res]) *)
+      (Mof : (Z -> bv 8) -> log_mirror)
+      (* THE CUSTODY HOOK (durable-disk 1a), the second client hook and the
+         reason the era's mirror can be BORN TRUE.  A born-true value alone
+         is not enough: a later WAL permit's disk image is ∀-bound, so the
+         ok-tie between the picture and the physical disk has to be CARRIED
+         FROM BIRTH -- i.e. the crash record's custody arm must be installed
+         at the same instant.  This proof is the only place that can do it:
+         it holds [state_interp]'s durable auth AND [crash_inv], so the
+         arm's ok-clause is true by construction against the real disk.
+         It runs ONCE per PowerOn, at mask ⊤ (the era record and its mirror
+         variable already exist, which is why it cannot ride [Hproj]'s
+         site), takes the WHOLE mirror variable and hands back the era's
+         half plus the swap receipt; the started auth and the durable auth
+         are lent and returned untouched.
+
+         A BASIC UPDATE UNDER A [◇], exactly as [Hproj] is a [◇] -- and for
+         the same two reasons.  The arm runs this with [crashN] OPEN, so a
+         ⊤-indexed fupd could not be eliminated there; and the client is
+         stated at the RAW gnames in a context that has no [invGS] at all
+         (the crash predicate is chosen before the fixed record exists), so
+         no fupd is available to write it with.  The [◇] is what lets the
+         client strip the crash predicate's later (its own predicate is
+         timeless); nothing here does anything but move ghosts. *)
+      (Hswap : forall (HE : riscvEraGS) (gen : nat) (dk : Z -> bv 8),
+         ⊢ era_registered gen HE -∗ gen_started gen -∗
+           start_auth (gen + 1)%nat -∗ disk_fixed_auth dk -∗
+           ghost_var (era_mirror_name HE) 1 (Mof dk) -∗
+           ▷ riscv_crash_pred ==∗
+             ◇ (start_auth (gen + 1)%nat ∗ disk_fixed_auth dk ∗
+                ▷ riscv_crash_pred ∗
+                ghost_var (era_mirror_name HE) (1/2) (Mof dk) ∗
+                swap_lb (S gen)))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -955,7 +1002,7 @@ Section power.
       (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
          boot_facts g' ->
          Ppure (v_disk (g'.(gdev).(dvirtio))) ->
-         ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
+         ⊢ power_boot_res HE gen D nproc ndisk Mof g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
             WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
@@ -1052,6 +1099,10 @@ Section power.
       assert (Hdk2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (gdev g2)))
         by (rewrite Hvirt2; reflexivity).
       rewrite Hdk2 in Hpure.
+      (* ...and the fixed auth moves with it, HERE rather than at the
+         framing below: the custody hook runs against the RESET machine's
+         image, because that is the image the era's mirror is born at. *)
+      iEval (rewrite Hdk2) in "Htie".
       (* fresh era: registers, memory, devices, and the per-era kernel
          ghosts, all at brand-new names *)
       iMod (reg_alloc_cpus g2.(gregs) D (enum CPU) (NoDup_enum CPU))
@@ -1088,10 +1139,11 @@ Section power.
          dropped at PowerOff, fragments and all. *)
       iMod (disk_img_alloc (v_disk (g2.(gdev).(dvirtio))) ndisk)
         as (γdisk) "[Hdauth Hdfrags]".
-      (* this era's FS log-region mirror, minted fresh like the image map;
-         BOTH halves go to the boot client, which pairs one into [P_fs]'s
-         checked-out arm at [initlog]'s swap. *)
-      iMod (ghost_var_alloc (MkLogMirror (fun _ => [])))
+      (* this era's FS log-region mirror, minted fresh like the image map --
+         and BORN TRUE (durable-disk 1a): at the client's picture of the
+         disk the reset machine carries, not at a dummy.  One half goes to
+         the boot client, the other into [P_fs]'s custody arm below. *)
+      iMod (ghost_var_alloc (Mof (v_disk (g2.(gdev).(dvirtio)))))
         as (γmir) "Hmir".
       iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
       iMod (ghost_map_alloc (resv_map g2.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
@@ -1110,12 +1162,27 @@ Section power.
       iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hbornlb".
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
+      (* CUSTODY AT BIRTH (durable-disk 1a).  The mask is back at ⊤ and the
+         era record exists, so this is where the second client hook runs:
+         open [crashN], hand the swap hook the era certificate, the started
+         auth, the durable auth and the WHOLE mirror variable, and get back
+         the era's half plus the swap receipt.  Nothing else moves -- the
+         two auths are lent and returned -- and the crash predicate goes
+         straight back in. *)
+      assert (Hsg : (g.(ggen) + 1)%nat = S g.(ggen)) by lia.
+      iAssert (gen_started g.(ggen)) as "#Hgst".
+      { rewrite /gen_started -Hsg. iExact "Hstartlb". }
+      iInv "Hcinv" as "HPsw" "Hclosesw".
+      iMod (Hswap HE g.(ggen) (v_disk (g2.(gdev).(dvirtio)))
+              with "HRelem Hgst Hsauth Htie Hmir HPsw")
+        as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb)".
+      iMod ("Hclosesw" with "HPsw") as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
                 Hdfrags Hmir Hresvfrags]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
         iFrame "Helems".
         iSplitL "Hresvfrags".
         { destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
@@ -1124,9 +1191,7 @@ Section power.
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
         iSplitR; [|iExact "HRelem"].
-        assert (Hsg : (g.(ggen) + 1)%nat = S g.(ggen)) by lia.
-        iEval (rewrite Hsg) in "Hstartlb".
-        iExact "Hstartlb". }
+        iExact "Hgst". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
       iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth".
@@ -1136,10 +1201,8 @@ Section power.
         rewrite Hgen2 Hpow2.
         (* the FS tie is FRAMED across the boot too: [boot_shape] resets the
            device but KEEPS [v_disk] ([VirtioModel.virtio_reset]), so the
-           machine-side half is still at the right image ([Hdk2], posed at
-           the step above where the projection needed it -- [Htie] is already
-           unfolded to the bare auth there). *)
-        iEval (rewrite Hdk2) in "Htie".
+           machine-side half is still at the right image ([Hdk2], applied to
+           [Htie] at the step above, where the custody hook needed it). *)
         rewrite /disk_fixed_interp.
         iFrame "Hgauth Hsauth Htie".
         iExists (<[g.(ggen) := HE]> R). iFrame "HRauth".
@@ -1233,6 +1296,29 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
          ▷ Pc γdisk γsw γreg γst -∗
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
             ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
+    (* THE CUSTODY HOOK (durable-disk 1a), stated at the same raw gnames as
+       [Hproj] and for the same reason.  [Mof] is the client's picture of a
+       disk image; the era's mirror variable is allocated at [Mof] of the
+       disk the era boots on, and this hook is what puts the OTHER half into
+       the client's crash predicate in the same fupd -- so the era's picture
+       is true of the physical disk from its first instruction and no boot
+       write ever re-bases it.  Everything else it takes is LENT: the
+       started auth, the durable auth and the predicate all come straight
+       back. *)
+    (Mof : (Z -> bv 8) -> log_mirror)
+    (Hswap : forall (γdisk γsw γreg γst : gname) (E : riscvEraGS)
+                    (gen : nat) (dk : Z -> bv 8),
+       ⊢ gen ↪[γreg]□ E -∗
+         mono_nat_lb_own γst (S gen) -∗
+         mono_nat_auth_own γst 1 (gen + 1)%nat -∗
+         disk_img_auth_sized γdisk ndisk dk -∗
+         ghost_var (era_mirror_name E) 1 (Mof dk) -∗
+         ▷ Pc γdisk γsw γreg γst ==∗
+           ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
+              disk_img_auth_sized γdisk ndisk dk ∗
+              ▷ Pc γdisk γsw γreg γst ∗
+              ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
+              mono_nat_lb_own γsw (S gen)))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
        is told about that machine is [RiscvLang.boot_facts] (RAM total and
@@ -1266,7 +1352,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname),
           F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
                 (Pc γdisk γswap γreg γstart)) ->
-       ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
+       ⊢ power_boot_res HE gen D nproc ndisk Mof g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
           WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
@@ -1333,6 +1419,7 @@ Proof.
       by (exists Hinv, γgen, γstart, γreg, γfdisk, γswap; reflexivity).
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
               (Hproj γfdisk γswap γreg γstart)
+              Mof (Hswap γfdisk γswap γreg γstart)
               (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
               with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".

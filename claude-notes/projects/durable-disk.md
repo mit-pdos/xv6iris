@@ -18,8 +18,10 @@ durable disk, `hdr_wf`, general `initlog`/`install_trans`, the adequacy
 pure-projection hook).  EVERYTHING the FS layer states about durability
 today is a placeholder: `FsWf.v:42` `fs_durable_wf := True`;
 `end_op_pres_placeholder` ×30, `end_op_fin_placeholder` ×30,
-`log_row_a_pending` ×6, `log_mirror_tie_pending` ×4.  Row (b)'s deposit
-half is proven and unused (`LogInv.log_mirror_tie_deposit`, `:889-905`).
+`log_row_a_pending` ×6, `log_mirror_tie_pending` ×3 (the boot site is gone
+— 1a).  Row (b)'s deposit half is proven and unused
+(`LogInv.log_mirror_tie_deposit`); `log_mirror_tie_of_body` is the honest
+way past the gate for a site that can already prove the body.
 
 ## Working rules (keep)
 
@@ -66,58 +68,73 @@ sequence; 1c's byte layer is independent, but its CONSUMER FLIP wants 1a
 landed first (1c's step 5: the recovering install still moves the cache
 map at home blocks); 1d lands last.
 
-- [ ] **1a. H2 + H2a together: custody at birth, recovery a ghost no-op.**
-      The old H2a was right and under-costed; its "no write ever re-bases"
-      presupposes H2's recovering install, so they land as ONE lane.
-      - `RiscvAdequacy.v`: the per-era mirror is allocated at a DUMMY
-        (`:1087-1090`, `MkLogMirror (fun _ => [])`) and handed out whole by
-        `power_boot_res` (`:915-919`).  Allocate it at
-        `mirror_of (fs_blocks (v_disk (dvirtio (gdev g'))))`; add a second
-        client hook `Hswap` placed AFTER `iMod "Hback"` at `:1108` (mask
-        back to ⊤, era record and `γmir` exist, `Hsauth` at `ggen+1`) — NOT
-        at `Hproj`'s site (`:1018-1022`, before the era exists):
-        `∀ HE gen dk, era_registered gen HE -∗ gen_started gen -∗ start_auth (gen+1)
-        -∗ disk_fixed_auth dk -∗ ghost_var (era_mirror_name HE) 1 (mirror_of (fs_blocks dk))
-        -∗ ▷ riscv_crash_pred ={⊤}=∗ start_auth (gen+1) ∗ disk_fixed_auth dk
-        ∗ ▷ riscv_crash_pred ∗ ghost_var … (1/2) (mirror_of (fs_blocks dk)) ∗ swap_lb (S gen)`
-        (needs the auth for the same reason `Hproj` does: `P_fs_named`
-        closes `dk` existentially, `FsCrash.v:1766-1772`).  `power_boot_res`
-        hands out the NAMED half + `swap_lb`.  The single-generation twin at
-        `:583` needs a trivial instance.
-      - `FsCrash.v`: supply `Hswap` from `fs_arm_swap` (`:1644-1668`) +
-        `mirror_of_ok` (`:556`).  DELETE `fs_era_custody` (`:2890-2931`),
-        `log_mirror_any` (`:2462-2488`), `fs_recover_permit(_rec)`
-        (`:2932-3054`), `fs_recover_seq_permit` (`:3797-3874`),
-        `fs_swap_sector0_rec` (`:3398-3467`), `fs_boot_head_sector0_rec`
-        (`:3468-3491`), `fs_boot_head_seq_permit` (`:3743-3796`),
-        `fs_hdr_sector1_rec` (`:3125-3194`), `fs_clear_sector0_rec`
-        (`:3329-3397`) — 557 lines.  After this, every boot-path disk
-        write carries the mirror half (audit that precondition; it is
-        sound, nothing re-bases).
-      - The boot chain: `SystemAdequacy.v:255-260` weakens to
-        `log_mirror_full` — dies; `Hboot` binds `g'` (`RiscvAdequacy.v:1236`)
-        so `xv6_boot_era` names `dk_boot`.  Six interfaces change from
-        `log_mirror_full` to the value-carrying row: `FirstTok.v:318/330`
-        → `SpecMain.v:576` → `ProofMain.v:1374` → `BootChain.v:699` →
-        `SpecFsinit.v:345` → `SpecInitlog.v:258`.  `BootShared.v:1097-1129`
-        and `:1277-1283`, `:1551` carry the named value.
-      - `ProofInitlog.v`: `:1939-1940` (`fs_era_custody_boot`) deleted; the
-        recovering install (`:1989`, `:1997-2009`, today the CONSTANT
-        family `fun _ => fs_era_custody`) re-pointed at
-        `fs_install_v_seq_permit` with a cursor-indexed `lm_upd`-chained
-        family — an `eo_minst`-analogue (`ProofEndOp.v:584-660`) whose
-        `Lw i` are the slot contents `bread` learns in the recovering loop,
-        threaded through the loop invariant (`SpecInstallTrans`'s `R` is
-        already cursor-indexed); the final head-write (`:2150-2171`)
-        re-pointed at `fs_clear_keep_seq_permit` (`FsCrash.v:4573-`); the
-        `log_state` pack (`:2388-2427`) at a NAMED `M`, row (b) by
-        computation — `log_mirror_tie_pending`'s boot site dies.
-      - `fr_D` no longer re-bases anywhere (ruling 2.3/2.4 made literal);
-        `SpecFsinit.v:318` / `FirstTok.v:275` drop `hdr_n = 0` (old H3).
-      - Silver lining to USE: with custody at birth the era knows `fr_D`
-        BY VALUE (`fs_install (lm_view M_born) ls (lm_hdr M_born ls).2 (…)`);
-        export it from the hook as a pure fact — it is what 1d's payload
-        index `D₀` is.
+- [x] **1a. H2 + H2a: custody at birth, recovery a ghost no-op.** LANDED.
+      - `RiscvAdequacy`: `power_boot_res` takes the client's picture
+        function `Mof : (Z -> bv 8) -> log_mirror` and hands out the era's
+        mirror HALF at `Mof (v_disk g')` plus `swap_lb (S gen)`.  PowerOn
+        allocates the variable there and runs a SECOND client hook after
+        `iMod "Hback"` (mask ⊤; the era record and `γmir` exist), which
+        opens `crashN` and installs the custody arm:
+        `∀ HE gen dk, era_registered gen HE -∗ gen_started gen -∗
+        start_auth (gen+1) -∗ disk_fixed_auth dk -∗
+        ghost_var (era_mirror_name HE) 1 (Mof dk) -∗ ▷ riscv_crash_pred ==∗
+        ◇ (start_auth (gen+1) ∗ disk_fixed_auth dk ∗ ▷ riscv_crash_pred ∗
+        ghost_var … (1/2) (Mof dk) ∗ swap_lb (S gen))`.
+        **A basic update under `◇`, not a `={⊤}=∗`** — forced twice: the arm
+        runs the hook with `crashN` OPEN, so a ⊤-indexed fupd cannot be
+        eliminated there, and the raw-gname form at `riscv_power_adequacy`
+        is stated in a context carrying `invGpreS` and no `invGS`, so no
+        fupd exists to write it with at all.  The `◇` is what lets the
+        client strip the crash predicate's later.  `Mof` is a parameter
+        because no FS constant may appear below `SystemAdequacy`.
+      - `FsCrash`: `P_fs_swap` discharges the hook — `P_fs_project`'s
+        pattern (lend the durable auth, re-index the record at the
+        machine's `dk`, `fs_arm_swap` at `mirror_of (fs_blocks dk)` with
+        `mirror_of_ok`, re-index back).  DELETED, 547 lines (3523 → 2976):
+        `fs_era_custody`/`_boot`, `log_mirror_any`/`_intro`,
+        `fs_recover_permit`/`_rec`, `fs_recover_seq_permit`,
+        `fs_swap_sector0_rec`, `fs_boot_head_sector0_rec`,
+        `fs_boot_head_seq_permit`, `fs_hdr_sector1_rec`,
+        `fs_clear_sector0_rec`, `hdr_wf_hdr_sector1`.  The silver lining is
+        `fs_recovery_of_mirror`: the era knows `fr_D` BY VALUE, as
+        `fs_install (lm_view M) ls (lm_hdr M ls).2 (fs_restrict (lm_view M)
+        (fs_home_set cov ls))` — that term is 1d's `D₀`.
+      - The boot row is `LogDefs.log_mirror_born M := log_mirror_half M ∗
+        swap_lb (S gen_id)`; `log_mirror_full` is DELETED with the boot swap
+        it existed for.  It rides `SystemAdequacy` → `BootShared` →
+        `SpecMain`/`ProofMain` → `BootChain` → `FirstTok.first_fsinit` →
+        `SpecFsinit` → `SpecInitlog`, at `mirror_of (fs_blocks dk)` for the
+        bundle's own `dk`.  ONE new pure premise travels beside it — the
+        era's two readings of one image, `∀ b ∈ cov, L !! b = Some (lm_view
+        M b)` — produced inside `FsCfgBoot.fs_kit_fsinit_ghost` from
+        `FsBoot.fs_L0_lookup`.
+      - `ProofInitlog`: the recovering install is the STEADY-STATE permit
+        `fs_install_v_seq_permit` over the cursor-indexed family
+        `R i := log_mirror_half (lm_install M Ws Lw i)`
+        (`LogDefs.lm_install`/`_miss`/`_hdr`/`_hit`, `Ws = (hdr_dec
+        bs_hdr).2`, `Lw i = ys !!! i` the slot contents the loop's `bread`s
+        learn); the closing head write is `fs_clear_keep_seq_permit`, whose
+        caught-up premise is `lm_install_hit`/`_miss` plus the slot
+        equation; the `log_state` pack is at the NAMED `lm_upd (lm_install
+        …) (log_hdr_bno ls) bs'` and its row (b) is PROVEN, through
+        `LogInv.log_mirror_tie_of_body` (the honest way past the still-gated
+        `log_mirror_tie`) and the new `SpecInstallTrans.it_rec_L_hit`/`_miss`.
+        Row (a) stays gated — it is 1b/1d's.
+      - FOR 1b: `LogDefs.lm_install` is `ProofEndOp.eo_minst` generalised
+        (block-keyed, over the header's own `list Z` write set, and its
+        duplicate-freedom premise is the INJECTIVITY it is used through
+        rather than a `NoDup` — the bare name resolves to two different
+        inductives in this tree).  Re-point `eo_minst` at it and the
+        duplicate goes.
+      - `fr_D` no longer re-bases anywhere on the boot path.  AUDIT: the
+        boot path's only disk writes are the recovering install's home
+        blocks and the closing header, and both now carry the mirror half.
+      - NOT DONE, and it is a lane of its own: `hdr_n bs_hdr = 0` stays on
+        `SpecFsinit`/`FirstTok` (old H3).  `SpecInitlog` does not want it;
+        what still does is fsinit's own supply of the ENTRIES' home client
+        halves, which at a dirty log has to be routed out of the coverage
+        remainder by the decoded write set, plus `hdr_wf`-shaped premises at
+        fsinit's level.
 - [ ] **1b. Row (b) through `ProofEndOp`; the commit concludes `D' = L|home`.**
       - `eo_open_of_batch` (`ProofEndOp.v:776-811`) DROPS `LB`, `pend`,
         `%Hmtie`, `%Hrowa` (`:797-798`); `eo_open` (`:756-775`) has no slot.
@@ -147,8 +164,8 @@ map at home blocks); 1d lands last.
       - `eo_open_to_batch` (`:827-867`, gate at `:856`) calls
         `log_mirror_tie_deposit`; `ProofLogWrite.v:2488`/`:2605` (the two
         free maintenance sites) prove the row; the gate `log_mirror_tie` /
-        `log_mirror_tie_pending` (`LogInv.v:803-888`) dies, `_body` and
-        `_deposit` survive.
+        `log_mirror_tie_pending` / `log_mirror_tie_of_body` dies, `_body`
+        and `_deposit` survive.
 - [~] **1c. Byte-keyed logged view with FULL-element clients; bio's share
       moves to the block CACHE map.**  The byte layer, its invariant and
       the three crossings are LANDED in `FsBlocks.v`; the CONSUMER FLIP is
