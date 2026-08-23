@@ -31,7 +31,7 @@
    [fn_rec n] IS the value of [dinode_at] and [n] IS the value of the top
    fragment: the bundle names each once, so both ties are maintained BY
    CONSTRUCTION and neither is ever a clause.  A record write therefore
-   moves all three together, which is what [inode_owned_era_rec_upd] does.
+   moves all three together, which is what [inode_owned_era_retag] does.
 
    ---- THE DICTIONARY ---------------------------------------------------
 
@@ -893,18 +893,61 @@ Section EraRes.
     rewrite /fs_home_set elem_of_difference in Hin. exact Hin.
   Qed.
 
-  (* ---- THE RECORD WRITE ---------------------------------------------- *)
+  (* ---- THE MOVERS -------------------------------------------------- *)
 
-  (* A RECORD MOVE UPDATES THREE THINGS AT ONCE, and that is the whole
-     content of "[fn_rec n] is maintained by construction": the region's
-     proxy, the era's top fragment, and the node the block big-op is
-     indexed by.  The addresses may not move at a slot the node ALREADY
-     owns ([FsStateInode.fn_addrs_kept]) -- which still allows attaching a
-     freshly allocated block, exactly as [inode_phi_rec_move] does.
+  (* the definition, as a wand pair, for a caller that wants the pieces *)
+  Lemma inode_owned_era_split (γfs : fs_names) (γi : gname) (inum : bv 32)
+      (n : fs_node) :
+    inode_owned_era γfs γi inum n
+    ⊣⊢ dinode_at γi inum (fn_rec n)
+        ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+             FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n k) bs)
+        ∗ ind_owned (fs_gamma_L γfs) n
+        ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n
+        ∗ ⌜inode_local (bv_unsigned inum) n⌝.
+  Proof. done. Qed.
 
-     Both authorities are LENT: the region's ([γi]) is inside [iregN] and
-     the top's is inside the log's parked payload, so a walk holds neither
-     and both arrive at the AU. *)
+  (* THE ONE MOVER.  Every change to a checked-out inode -- the record
+     write, one data block's bytes, an appended block, a truncation -- is
+     "hand back the new node's FOOTPRINT and retag the two ghosts", so it
+     is one general lemma and not a family (the guiding principle's rule
+     against a cross-product of near-duplicates).  The specialisations
+     below are its readings.
+
+     Both authorities are LENT: the region's ([γi]) lives inside [iregN]
+     and the top's inside the log's parked payload, so a walk holds neither
+     and both arrive at the AU.  [inode_local] of the TARGET is a premise
+     -- which of its clauses a given arm has to re-establish is that arm's
+     evidence, and writing the cross-product here would be the speculative
+     family 2a deliberately did not write. *)
+  Lemma inode_owned_era_retag (γfs : fs_names) (γi : gname) (inum : bv 32)
+      (R : gmap Z dinode) (I : gmap Z fs_node) (n n' : fs_node) :
+    inode_local (bv_unsigned inum) n' ->
+    ghost_map_auth γi 1 R -∗
+    ghost_map_auth (fs_top γfs) 1 I -∗
+    dinode_at γi inum (fn_rec n) -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) n -∗
+    ([∗ map] k ↦ bs ∈ fn_blk n',
+       FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n' k) bs) -∗
+    ind_owned (fs_gamma_L γfs) n' ==∗
+      ghost_map_auth γi 1 (<[bv_unsigned inum := fn_rec n']> R)
+      ∗ ghost_map_auth (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
+      ∗ inode_owned_era γfs γi inum n'.
+  Proof.
+    intros Hl'. iIntros "HaR HaI Hd Ht Hb Hi".
+    rewrite /dinode_at.
+    iMod (ghost_map_update (fn_rec n') with "HaR Hd") as "[HaR Hd]".
+    rewrite /top_frag /fs_gamma_L /=.
+    iMod (ghost_map_update n' with "HaI Ht") as "[HaI Ht]".
+    iModIntro. iFrame "HaR HaI".
+    rewrite /inode_owned_era /dinode_at /top_frag /fs_gamma_L /=.
+    iFrame "Hd Ht Hb Hi". done.
+  Qed.
+
+  (* (a) THE RECORD WRITE -- iupdate, ialloc's retag, the link moves.  The
+     addresses may not move at a slot the node ALREADY owns
+     ([FsStateInode.fn_addrs_kept]), which still allows attaching a freshly
+     allocated block, exactly as [inode_phi_rec_move] does. *)
   Lemma inode_owned_era_rec_upd (γfs : fs_names) (γi : gname) (inum : bv 32)
       (R : gmap Z dinode) (I : gmap Z fs_node) (n n' : fs_node) :
     fn_blk n' = fn_blk n ->
@@ -921,18 +964,72 @@ Section EraRes.
   Proof.
     intros Hblk Hent Hind Hkept Hl'.
     iIntros "HaR HaI (Hd & Hb & Hi & Ht & %Hl)".
-    rewrite /dinode_at.
-    iMod (ghost_map_update (fn_rec n') with "HaR Hd") as "[HaR Hd]".
-    rewrite /top_frag /fs_gamma_L /=.
-    iMod (ghost_map_update n' with "HaI Ht") as "[HaI Ht]".
-    iModIntro. iFrame "HaR HaI".
-    rewrite /inode_owned_era /dinode_at /top_frag /fs_gamma_L /=.
-    iFrame "Hd Ht". iSplitL "Hb".
+    iApply (inode_owned_era_retag γfs γi inum R I n n' Hl'
+              with "HaR HaI Hd Ht [Hb] [Hi]").
     - rewrite Hblk. iApply (big_sepM_mono with "Hb").
       intros k bs Hk; simpl.
       assert (Hs : is_Some (fn_blk n !! k)) by (by exists bs).
       rewrite (Hkept k Hs) //.
-    - rewrite /ind_owned Hind Hent. iFrame "Hi". done.
+    - rewrite /ind_owned Hind Hent. iExact "Hi".
+  Qed.
+
+  (* (a') ONE DATA BLOCK, CHECKED OUT AND BACK -- writei's and bmap's AU.
+     The two ghosts come out UNTOUCHED (a block write moves neither the
+     record nor, through [fn_set_blk], the addressing), so what the caller
+     hands the AU is the block alone and what closes the step is
+     [inode_owned_era_retag] at [fn_set_blk n k bs'].  Stated with the
+     returner quantified over the NEW contents, because the writer does not
+     know them until the log's update has run. *)
+  Lemma inode_owned_era_blk_acc (γfs : fs_names) (γi : gname) (inum : bv 32)
+      (n : fs_node) (k : nat) (bs : list (bv 8)) :
+    fn_blk n !! k = Some bs ->
+    inode_owned_era γfs γi inum n -∗
+      FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n k) bs
+      ∗ dinode_at γi inum (fn_rec n)
+      ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n
+      ∗ ind_owned (fs_gamma_L γfs) (fn_set_blk n k bs)
+      ∗ (∀ bs' : list (bv 8),
+           FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n k) bs' -∗
+           [∗ map] j ↦ b ∈ fn_blk (fn_set_blk n k bs'),
+             FsStateDefs.blk_owned (fs_gamma_L γfs)
+               (fn_naddr (fn_set_blk n k bs') j) b).
+  Proof.
+    intros Hk. iIntros "(Hd & Hb & Hi & Ht & %Hl)".
+    iDestruct (big_sepM_insert_acc _ _ k bs Hk with "Hb") as "[Hbk Hback]".
+    iFrame "Hbk Hd Ht".
+    iSplitL "Hi"; [rewrite /ind_owned /fn_set_blk /=; iExact "Hi" |].
+    iIntros (bs') "Hbk'".
+    rewrite /fn_set_blk /= fn_naddr_set_blk.
+    iApply ("Hback" with "Hbk'").
+  Qed.
+
+  (* (b) THE TRUNCATION -- [SpecItrunc]'s post, as the [fn_blk = ∅] node.
+     "Frees every owned block" is DEFINITIONAL here, which is the F3 ruling
+     built into the representation: the blocks the caller gets back to hand
+     [FsStateBitmap.bitmap_free] are exactly [fn_blk n]'s, INCLUDING the
+     ones beyond the size, and the old indirect block comes with them. *)
+  Lemma inode_owned_era_trunc (γfs : fs_names) (γi : gname) (inum : bv 32)
+      (R : gmap Z dinode) (I : gmap Z fs_node) (n n' : fs_node) :
+    fn_blk n' = ∅ ->
+    fn_indb n' = 0 ->
+    inode_local (bv_unsigned inum) n' ->
+    ghost_map_auth γi 1 R -∗
+    ghost_map_auth (fs_top γfs) 1 I -∗
+    inode_owned_era γfs γi inum n ==∗
+      ghost_map_auth γi 1 (<[bv_unsigned inum := fn_rec n']> R)
+      ∗ ghost_map_auth (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
+      ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+           FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n k) bs)
+      ∗ ind_owned (fs_gamma_L γfs) n
+      ∗ inode_owned_era γfs γi inum n'.
+  Proof.
+    intros Hblk Hind Hl'.
+    iIntros "HaR HaI (Hd & Hb & Hi & Ht & %Hl)".
+    iMod (inode_owned_era_retag γfs γi inum R I n n' Hl'
+            with "HaR HaI Hd Ht [] []") as "(HaR & HaI & Hn)".
+    { rewrite Hblk big_sepM_empty. done. }
+    { rewrite /ind_owned (decide_True _ _ Hind). done. }
+    iModIntro. iFrame.
   Qed.
 
 End EraRes.
