@@ -182,12 +182,12 @@ Qed.
 Corollary xv6_power_adequacy_fsimg (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (Hdisk : fsimg_at_every_era g) :
-  forall t2 g2 e2,
+  forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\
+    xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb) g2.
 Proof.
-  apply (xv6_power_adequacy_xv6Σ g fsimg_sb fsimg_nib fsimg_cov Hgen0 Hpow
+  apply (xv6_trace_invariant g fsimg_sb fsimg_nib fsimg_cov Hgen0 Hpow
            (fsimg_boot_image_eras g Hdisk)).
 Qed.
 
@@ -222,10 +222,10 @@ Corollary xv6_fs_adequacy_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk)
     (Hdisk' : fsimg_at_every_era g) :
-  forall t2 g2 e2,
+  forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\
+    xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb) g2.
 Proof.
   (* [logstart] IS NO LONGER AN ARGUMENT: [xv6_fs_adequacy] now takes the
      crash predicate at the SUPERBLOCK'S own log start (fs-cfg-boot.md stage
@@ -233,7 +233,13 @@ Proof.
      [FsImg.sb_logstart fsimg_sb] IS the [2] this corollary used to pass,
      by conversion on the record literal. *)
   apply (xv6_fs_adequacy xv6Σ g fsimg_cov (FsImgDisk.fsimg_D0 fsimg_cov)
-           fsimg_sb fsimg_nib Hgen0 Hpow).
+           fsimg_sb fsimg_nib
+           (* THE TRACE INVARIANT, at the FS's own durability record: the
+              same [phi] [SystemAdequacy.xv6_fs_trace_invariant] takes for the
+              power theorem, discharged by the same [xv6_trace_hook]. *)
+           (xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb))
+           (xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb))
+           Hgen0 Hpow).
   - (* mkfs's obligation.  [fsimg_P] IS [fs_blocks fsimg_dk], so once the
        disk is rewritten to the image this is literally [fsimg_recovery]. *)
     rewrite Hdisk. exact (FsImgDisk.fsimg_recovery fsimg_cov).

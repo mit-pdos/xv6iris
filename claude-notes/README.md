@@ -59,7 +59,7 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   interleave with other harts. The placement rule, the fused-AMO window, the
   proof interface that keeps step granularity out of proof granularity, and the
   phasing (the tree is red across the port — read §6 before starting).
-- **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy.
+- **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy, and the TRACE INVARIANT hook `Hphi`: how a pure consequence of any Iris invariant is exported to every state of the CSL-free execution, which conjunct of `state_interp` each kind of fact comes from, and what `wp_strong_adequacy` still leaves on the table.
 - **[`fs-state.md`](design/fs-state.md)** — DESIGN OF RECORD for the
   durable-disk project: the view record `Γ`, byte-level ownership on both
   the durable and logged sides, `inode_owned`/`dir_owned`/`free_bitmap`/

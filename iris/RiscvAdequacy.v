@@ -1271,6 +1271,127 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
     _ _ γdisk ndisk γdview Pcp γswap.
 
+(* ---------------------------------------------------------------------- *)
+(* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
+(*                                                                        *)
+(* [riscv_power_adequacy]'s [Hphi] below takes the WHOLE [power_interp],   *)
+(* and NOTHING about it is disk-specific: a client may read its pure fact  *)
+(* off ANY conjunct.  What the conjuncts are, and what each one buys:      *)
+(*                                                                        *)
+(*   FIXED (present at every state, power on OR off, because a power cycle *)
+(*   preserves them):                                                     *)
+(*     [gen_auth] / [start_auth]  -- the generation and start counters     *)
+(*     [disk_fixed_interp]        -- the durable disk's auth, at           *)
+(*                                  [v_disk (dvirtio (gdev g))]           *)
+(*     the era registry                                                   *)
+(*                                                                        *)
+(*   PER-ERA (inside [era_interp], and only while [gpow g = true] -- with  *)
+(*   the power off there is no era, hence nothing to say):                 *)
+(*     [gregs_interp_at E g.(gregs)]      -- every hart's registers        *)
+(*     [gen_heap_interp .. g.(gmem)]      -- the whole memory image        *)
+(*     [dev_interp_at E g.(gdev)]         -- the DEVICE FABRIC: a half     *)
+(*        [ghost_var] each at [duart], [dplic] and [dvirtio], so a client  *)
+(*        holding the other half in its invariant reads the UART's or the  *)
+(*        PLIC's or the virtio device's exact state off the machine        *)
+(*     [disk_dur_interp] / [resv_auth_at] -- the era's image map and the   *)
+(*        reservation mirror, plus the PURE conjunct [⌜resv_ok g⌝]         *)
+(*                                                                        *)
+(* The helpers below are ADAPTERS, not the interface: each pulls one       *)
+(* conjunct out so a client can run its own auth/fragment agreement        *)
+(* against it.  [power_interp_disk_auth] is the disk's; [power_interp_era] *)
+(* is the gateway to every per-era one (memory, registers, UART, PLIC,     *)
+(* virtio); [power_interp_resv_ok] is the degenerate case where the fact   *)
+(* is ALREADY pure in [state_interp] and no invariant is needed at all.    *)
+(* A client wanting a conjunct none of these names destructs               *)
+(* [power_interp] itself -- it is a plain separating conjunction.          *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE DISK CONJUNCT OF [state_interp], ON ITS OWN.  [disk_fixed_interp] is a
+   FIXED conjunct of [power_interp] -- it is there with the power OFF (there
+   is no era then, so no [era_interp] and no image map at all) and both power
+   arms frame it -- so this projection is available at EVERY state of the
+   trace, including the ones between a PowerOff and the next PowerOn.  That
+   is what makes a disk-shaped trace invariant provable in the first place. *)
+Lemma power_interp_disk_auth {Σ : gFunctors} `{!riscvFixedGS Σ} (g : gstate) :
+  power_interp g -∗ disk_fixed_auth (v_disk (dvirtio (gdev g))).
+Proof. iIntros "(_ & _ & Htie & _)". iExact "Htie". Qed.
+
+(* [Hproj]'s SHAPE, PROMOTED TO [Hphi]'s.  A client that has already proved
+   its crash predicate's pure reading of the disk -- which it must have, since
+   [riscv_power_adequacy] asks for exactly that as [Hproj] in order to feed
+   each BOOT -- gets the trace invariant for the same lemma and no new proof
+   obligation.  The auth is borrowed and returned inside [Hproj]; here it is
+   simply dropped, because at the end of the trace nothing is owed. *)
+Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
+    (ndisk : nat) (Pc : gname -> gname -> gname -> gname -> gname -> iProp Σ)
+    (Ppure : (Z -> bv 8) -> Prop)
+    (Hproj : forall (γdisk γsw γreg γst γdv : gname) (dk : Z -> bv 8),
+       ⊢ disk_img_auth_sized γdisk ndisk dk -∗
+         ▷ Pc γdisk γsw γreg γst γdv -∗
+         ◇ (disk_img_auth_sized γdisk ndisk dk ∗
+            ▷ Pc γdisk γsw γreg γst γdv ∗ ⌜Ppure dk⌝))
+    (Hinv : invGS Σ) (γgen γstart γreg γdisk γdview γswap : gname)
+    (g' : gstate) :
+  ⊢ @power_interp Σ
+       (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview γswap
+          (Pc γdisk γswap γreg γstart γdview)) g' -∗
+    ▷ Pc γdisk γswap γreg γstart γdview -∗
+    ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
+Proof.
+  iIntros "Hsi HP".
+  iDestruct (power_interp_disk_auth with "Hsi") as "Htie".
+  rewrite /disk_fixed_auth /=.
+  iDestruct (Hproj γdisk γswap γreg γstart γdview
+               (v_disk (dvirtio (gdev g'))) with "Htie HP")
+    as ">(_ & _ & %Hp)".
+  iModIntro. iPureIntro. exact Hp.
+Qed.
+
+(* THE ERA CONJUNCT, AT THE CLIENT'S OWN ERA.  This is the gateway to
+   everything that is NOT the durable disk.  A client that holds an era's
+   registration receipt [era_registered gen E] -- which is exactly what
+   [power_boot_res] hands every boot, and what a fixed-layer predicate can
+   keep hold of across the era's life (this is how [FsCrash.P_fs]'s custody
+   arm identifies its own era) -- gets [era_interp E g], whose conjuncts are
+   the register interpretation, the memory heap, and the device fabric's
+   three half-[ghost_var]s.  From there a UART fact, a memory fact or a
+   register fact is the SAME two-line agreement the disk case is; nothing
+   about the channel privileges the disk.
+
+   THE [gpow] HYPOTHESIS IS REAL AND NOT AN ARTEFACT: between a PowerOff and
+   the next PowerOn the machine has no era, so its registers and memory are
+   not described by any ghost state.  A per-era trace invariant is therefore
+   necessarily of the shape [gpow g = true -> ...]; only the fixed conjuncts
+   support an unconditional one. *)
+Lemma power_interp_era {Σ : gFunctors} `{!riscvFixedGS Σ}
+    (g : gstate) (E : riscvEraGS) :
+  g.(gpow) = true ->
+  power_interp g -∗ era_registered g.(ggen) E -∗ era_interp E g.
+Proof.
+  intros Hpw. iIntros "(_ & _ & _ & HR) #Hreg".
+  iDestruct "HR" as (R) "(HRauth & _ & Hera)".
+  iEval (rewrite Hpw) in "Hera".
+  iDestruct "Hera" as (E') "(%Hlk & Hera)".
+  iDestruct (ghost_map_lookup with "HRauth Hreg") as %Hlk'.
+  rewrite Hlk in Hlk'. apply Some_inj in Hlk' as ->. iExact "Hera".
+Qed.
+
+(* THE DEGENERATE CASE: a fact that is ALREADY pure inside [state_interp],
+   so no client invariant is involved at all.  [resv_ok] -- every hart's LR
+   reservation names bytes that are actually in RAM -- is a step invariant of
+   the language carried as a conjunct of [era_interp], and this reads it out.
+   Kept as the smallest possible witness that [Hphi] is not a disk channel:
+   its proof touches [era_interp], never [disk_fixed_interp], and it needs no
+   [era_registered] receipt because the fact does not mention the era. *)
+Lemma power_interp_resv_ok {Σ : gFunctors} `{!riscvFixedGS Σ} (g : gstate) :
+  power_interp g -∗ ⌜g.(gpow) = true -> resv_ok g⌝.
+Proof.
+  iIntros "(_ & _ & _ & HR)". iDestruct "HR" as (R) "(_ & _ & Hera)".
+  destruct (g.(gpow)) eqn:Hpw; last (iPureIntro; discriminate).
+  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & %Hok)".
+  iPureIntro. intros _. exact Hok.
+Qed.
+
 (* THE POWER ADEQUACY: the machine starts POWERED OFF with nothing ever
    run; if the client can boot ANY era from ANY reset state, every
    configuration reachable under any schedule of power-cycles, hart steps
@@ -1336,6 +1457,50 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               ▷ Pc γdisk γsw γreg γst γdv ∗
               ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
               mono_nat_lb_own γsw (S gen)))
+    (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
+       [Ppure]/[Hproj] above extract a pure fact from [Pc] and feed it INTO a
+       boot; these two export one OUT of the whole execution.
+
+       [phi] is any pure statement about the OPERATIONAL state -- the same
+       [gstate] the CSL-free semantics steps, with no ghost state and no
+       [iProp] anywhere in it -- and [Hphi] is the only shape such a statement
+       can be proved in:
+
+         state_interp g' ∗ ▷ I ⊢ ◇ ⌜phi g'⌝
+
+       Both halves are forced.  [I] is the client's invariant, and the ONLY
+       one nameable here is the crash predicate [Pc]: it is allocated by THIS
+       proof into the fixed layer ([crash_inv]), so it is the same invariant
+       at every point of the trace and across every power cycle, while
+       everything an era allocates dies with the era and has no name in this
+       statement.  A client that wants more invariants conjoins them into its
+       own [Pc] -- [Pc] is an arbitrary [iProp], so nothing is lost.  And
+       [state_interp] is forced because it is the ONLY tie between the logic
+       and [g']: [Pc] on its own cannot mention the machine at all, so every
+       pure consequence has to be read off an auth/fragment agreement against
+       [power_interp]'s own conjuncts (its durable disk auth, its register and
+       memory interpretations, its device fabric).
+
+       CONSUMPTIVE, unlike [Hproj]: this runs at the END of the trace, where
+       nothing is owed to anybody, so the client may take both apart.  The
+       [◇] is what strips [Pc]'s [▷] (an arbitrary [Pc] is not timeless, so
+       the later cannot be stripped before handing it over); it is absorbed by
+       the fancy update this is run under.
+
+       Stated at the RAW gnames, exactly as [HPc], [Hproj] and [Hswap] are,
+       and for the same reason: the client writes [Pc] in a context that has
+       no [riscvFixedGS] at all, so the record has to be spelled out as the
+       [boot_fixedGS] literal this proof actually builds.  Every projection
+       out of it then reduces by iota. *)
+    (phi : gstate -> Prop)
+    (Hphi : forall (Hinv : invGS Σ)
+                   (γgen γstart γreg γdisk γdview γswap : gname)
+                   (g' : gstate),
+       ⊢ @power_interp Σ
+            (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview γswap
+               (Pc γdisk γswap γreg γstart γdview)) g' -∗
+         ▷ Pc γdisk γswap γreg γstart γdview -∗
+         ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
        is told about that machine is [RiscvLang.boot_facts] (RAM total and
@@ -1375,15 +1540,26 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
           WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
           WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
           WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
-  forall t2 g2 e2,
+  (* EVERY configuration the CSL-free semantics can reach, under any
+     schedule of power cycles, hart steps and device steps, is reducible AND
+     satisfies [phi].  The second conjunct is the trace invariant: [g2] is
+     universally quantified over [rtc erased_step], so proving it at an
+     ARBITRARY reachable state is exactly "[phi] holds at every state of the
+     execution" -- no per-step machinery is needed, the quantifier IS the
+     trace statement.  (This is what [iris.program_logic.adequacy]'s
+     [wp_invariance] is the packaged form of; we cannot use that corollary
+     directly, since it fixes a single initial thread and
+     [num_laters_per_step := 0], so we take the same conclusion out of
+     [wp_strong_adequacy] itself.) *)
+  forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
 Proof.
-  intros t2 g2 e2 Hrtc He2.
+  intros t2 g2 Hrtc.
   apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
-  cut (forall e : expr riscv_lang, e ∈ t2 -> not_stuck e g2).
-  { intros Hns. destruct (Hns e2 He2) as [[v Hv]|Hred];
+  cut ((forall e : expr riscv_lang, e ∈ t2 -> not_stuck e g2) /\ phi g2).
+  { intros [Hns Hph]. split; [|exact Hph].
+    intros e2 He2. destruct (Hns e2 He2) as [[v Hv]|Hred];
       [discriminate Hv|exact Hred]. }
   eapply (wp_strong_adequacy Σ riscv_lang NotStuck
             [PowerLoopE : expr riscv_lang] g n κs t2 g2 _
@@ -1415,6 +1591,10 @@ Proof.
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γdview γswap
               (Pc γfdisk γswap γreg γstart γdview)).
+  (* the client's trace hook at the gnames just allocated.  [F] is a local
+     DEFINITION, so this statement and the one the final observation below
+     faces are convertible. *)
+  pose proof (Hphi Hinv γgen γstart γreg γfdisk γdview γswap) as Hph.
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -1445,7 +1625,24 @@ Proof.
               Mof (Hswap γfdisk γswap γreg γstart γdview)
               (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
               with "Hcinv"). }
+  (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.
+
+     [Hns] is [wp_strong_adequacy]'s own not-stuck clause, as before.  The
+     second conjunct is the new one, and this is the one place in the system
+     where it can be proved: the continuation hands over [state_interp] AT
+     THE LAST STATE OF THE TRACE ([Hsi], which is [power_interp g2] by the
+     [iExists] above), and its fancy update runs at [⊤ ⇛ ∅] -- so every
+     invariant in the world may be OPENED AND NEVER CLOSED.  That is the
+     whole content of Iris's adequacy at the [wsat] level: world satisfaction
+     is spent, in exchange for a PURE fact (the soundness lemma underneath,
+     [step_fupdN_soundness_gen], demands a [Plain] conclusion, which is
+     precisely why [phi] has to be a [Prop] about [g2] and not an [iProp]).
+
+     So: open [crashN] and drop its closing update on the floor, hand the
+     client both halves of the tie, and take the pure fact back. *)
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
+  iInv "Hcinv" as "HP" "Hclose".
+  iDestruct (Hph g2 with "Hsi HP") as ">%Hphig2".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
-  iPureIntro. intros e He. exact (Hns e eq_refl He).
+  iPureIntro. split; [intros e He; exact (Hns e eq_refl He) | exact Hphig2].
 Qed.

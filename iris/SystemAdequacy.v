@@ -174,6 +174,73 @@ Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
     fs_recovery (fs_blocks dk) D cov ls /\
     hdr_wf (fs_blocks dk) cov ls.
 
+(* ...AND THE SAME FACT AS A TRACE HOOK.  [fs_boot_pure] above is delivered
+   INTO each boot, by [riscv_power_adequacy]'s [Hproj] channel.  This is the
+   shape that exports it OUT of the whole execution: the trace obligation
+   [Hphi], at the crash predicate this file always uses.
+
+   IT IS THE SAME LEMMA.  [FsCrash.P_fs_project] is what discharges [Hproj];
+   [RiscvAdequacy.disk_proj_trace] is the adapter that promotes a
+   [Hproj]-shaped projection to a [Hphi]-shaped one, by pulling the durable
+   disk's auth out of [state_interp] ([RiscvAdequacy.power_interp_disk_auth]
+   -- a FIXED conjunct, so it is there at every state of the trace, powered
+   on or off).  Nothing new is proved and nothing new is assumed. *)
+Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
+    (cov : gset Z) (ls : Z)
+    (Hinv : invGS Σ) (γgen γstart γreg γd γdv γsw : gname) (g' : gstate) :
+  ⊢ @power_interp Σ
+       (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
+          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls)) g' -∗
+    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls -∗
+    ◇ ⌜fs_boot_pure cov ls (v_disk (g'.(gdev).(dvirtio)))⌝.
+Proof.
+  exact (disk_proj_trace XV6_DISK_BYTES
+           (fun a b c d e => P_fs_named a XV6_DISK_BYTES b c d e cov ls)
+           (fs_boot_pure cov ls)
+           (fun a b c d e dk =>
+              P_fs_project a XV6_DISK_BYTES b c d e cov ls dk)
+           Hinv γgen γstart γreg γd γdv γsw g').
+Qed.
+
+(* ...AND A [phi] THAT IS NOT ABOUT THE DISK AT ALL, beside it.
+
+   [fs_boot_pure] is read off the crash INVARIANT (through the durable
+   disk's auth); [resv_ok] is read straight off [state_interp]'s ERA
+   conjunct, with no invariant involved.  They are put in ONE [phi] here on
+   purpose: [phi] is a single [Prop], so a client that wants several facts
+   conjoins them, and the two conjuncts below travel through two entirely
+   different conjuncts of [state_interp].  That is the demonstration that
+   [riscv_power_adequacy]'s trace channel is not a disk channel.
+
+   The [gpow] guard on the second is forced and is not a weakness: between a
+   PowerOff and the next PowerOn there IS no era, so registers, memory and
+   the device fabric are described by no ghost state at all.  A UART or
+   memory invariant would be stated the same way -- guarded by [gpow], via
+   [RiscvAdequacy.power_interp_era] and the client's own era receipt. *)
+Definition xv6_trace_pure (cov : gset Z) (ls : Z) (g : gstate) : Prop :=
+  (* THE DISK, from the crash invariant *)
+  fs_boot_pure cov ls (v_disk (g.(gdev).(dvirtio))) /\
+  (* NOT THE DISK: the reservation invariant, from the era conjunct *)
+  (g.(gpow) = true -> resv_ok g).
+
+Lemma xv6_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
+    (cov : gset Z) (ls : Z)
+    (Hinv : invGS Σ) (γgen γstart γreg γd γdv γsw : gname) (g' : gstate) :
+  ⊢ @power_interp Σ
+       (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
+          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls)) g' -∗
+    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls -∗
+    ◇ ⌜xv6_trace_pure cov ls g'⌝.
+Proof.
+  iIntros "Hsi HP".
+  (* the era-side fact first: its conclusion is PURE, so [state_interp] is
+     not spent and the disk projection still has it *)
+  iDestruct (power_interp_resv_ok with "Hsi") as %Hresv.
+  iDestruct (fs_trace_hook Σ cov ls Hinv γgen γstart γreg γd γdv γsw g'
+               with "Hsi HP") as ">%Hdisk".
+  iModIntro. iPureIntro. split; [exact Hdisk | exact Hresv].
+Qed.
+
 Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
@@ -323,6 +390,28 @@ Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ, !fsTopG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (* THE TRACE INVARIANT, PASSED THROUGH TO
+       [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
+       story).  [phi] is any pure statement about the OPERATIONAL state, and
+       [Hphi] proves it from the two things adequacy holds at every point of
+       the trace: [state_interp] -- the only bridge between the logic and
+       [gstate] -- and the fixed-layer crash invariant, whose predicate here
+       IS the file system's durability record [FsCrash.P_fs_named].  The
+       conclusion then carries [phi] at EVERY reachable state, not just at
+       the boot states [Ppure] is delivered to.
+
+       Stated at the [boot_fixedGS] literal, exactly as the theorem below
+       consumes it, so every field projection reduces by iota; the client
+       never has to see a [riscvFixedGS] it did not build. *)
+    (phi : gstate -> Prop)
+    (Hphi : forall (Hinv : invGS Σ)
+                   (γgen γstart γreg γd γdv γsw : gname) (g' : gstate),
+       ⊢ @power_interp Σ
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+                  (FsImg.sb_logstart sb))) g' -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov (FsImg.sb_logstart sb) -∗
+         ◇ ⌜phi g'⌝)
     (* the hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
        kernel image, the per-hart reset registers, the reset devices -- is
@@ -338,10 +427,9 @@ Theorem xv6_power_adequacy Σ
        reducibility.  [FsAdequacyImg.v] discharges it at the literal mkfs
        image. *)
     (Himg : fs_boot_image_eras sb nib cov) :
-  forall t2 g2 e2,
+  forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
 Proof.
   (* THE CRASH SLOT IS NO LONGER [True] HERE, AND THE STATEMENT IS UNCHANGED
      (fs-cfg-boot.md stage (f)).  This theorem used to instantiate
@@ -417,6 +505,10 @@ Proof.
            ltac:(intros γd γsw γreg γst γdv Er gen dk;
                  exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst γdv cov
                           (FsImg.sb_logstart sb) dk Er gen))
+           (* THE TRACE HOOK, threaded straight through: this layer fixes the
+              crash predicate but says nothing about what the client reads off
+              it, so [phi]/[Hphi] pass down unexamined. *)
+           phi Hphi
            Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
@@ -474,6 +566,28 @@ Theorem xv6_fs_adequacy Σ
     (g : gstate) (cov : gset Z)
     (D0 : gmap Z (list (bv 8)))
     (sb : fs_sb) (nib : nat)
+    (* THE TRACE INVARIANT, PASSED THROUGH TO
+       [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
+       story).  [phi] is any pure statement about the OPERATIONAL state, and
+       [Hphi] proves it from the two things adequacy holds at every point of
+       the trace: [state_interp] -- the only bridge between the logic and
+       [gstate] -- and the fixed-layer crash invariant, whose predicate here
+       IS the file system's durability record [FsCrash.P_fs_named].  The
+       conclusion then carries [phi] at EVERY reachable state, not just at
+       the boot states [Ppure] is delivered to.
+
+       Stated at the [boot_fixedGS] literal, exactly as the theorem below
+       consumes it, so every field projection reduces by iota; the client
+       never has to see a [riscvFixedGS] it did not build. *)
+    (phi : gstate -> Prop)
+    (Hphi : forall (Hinv : invGS Σ)
+                   (γgen γstart γreg γd γdv γsw : gname) (g' : gstate),
+       ⊢ @power_interp Σ
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+                  (FsImg.sb_logstart sb))) g' -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov (FsImg.sb_logstart sb) -∗
+         ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* mkfs's obligation, at the image the machine powers on with.
        [logstart] IS THE SUPERBLOCK'S OWN, no longer a free parameter
@@ -490,10 +604,9 @@ Theorem xv6_fs_adequacy Σ
        instantiates it at the image's own range).  [xv6_power_adequacy]'s
        note is the whole story. *)
     (Himg : fs_boot_image_eras sb nib cov) :
-  forall t2 g2 e2,
+  forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
 Proof.
   (* the durable disk's extent, read off the image at the first boot state
      ([PowerBoot.boot_gstate g] is one; [fs_extent] says nothing about the
@@ -548,6 +661,10 @@ Proof.
            ltac:(intros γd γsw γreg γst γdv Er gen dk;
                  exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst γdv cov
                           (FsImg.sb_logstart sb) dk Er gen))
+           (* THE TRACE HOOK, threaded straight through: this layer fixes the
+              crash predicate but says nothing about what the client reads off
+              it, so [phi]/[Hphi] pass down unexamined. *)
+           phi Hphi
            Hgen0 Hpow).
   intros F HE gen g' Hbf Hpure Hshape.
   (* THE RECORD'S SHAPE, destructed: every projection below reduces, which
@@ -606,13 +723,62 @@ Definition xv6Σ : gFunctors :=
    [vm_compute] stays off this file's strictly serial build tail. *)
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (phi : gstate -> Prop)
+    (Hphi : forall (Hinv : invGS xv6Σ)
+                   (γgen γstart γreg γd γdv γsw : gname) (g' : gstate),
+       ⊢ @power_interp xv6Σ
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+                  (FsImg.sb_logstart sb))) g' -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+             (FsImg.sb_logstart sb) -∗
+         ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (Himg : fs_boot_image_eras sb nib cov) :
-  forall t2 g2 e2,
+  forall t2 g2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
-Proof. apply (xv6_power_adequacy xv6Σ g sb nib cov Hgen0 Hpow Himg). Qed.
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
+Proof.
+  apply (xv6_power_adequacy xv6Σ g sb nib cov phi Hphi Hgen0 Hpow Himg).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4b. THE TRACE INVARIANT AT A NON-TRIVIAL [phi], DISK AND NON-DISK.      *)
+(*                                                                        *)
+(* [phi] above is a parameter, so the theorem is only as strong as what a  *)
+(* client puts in it -- and [fun _ => True] is a legal choice.  This       *)
+(* corollary is the demonstration that the slot is not vacuous: it         *)
+(* instantiates [phi] at [fs_boot_pure], the pure content of the FS's      *)
+(* DURABILITY invariant [FsCrash.P_fs_named] (the durable extent's         *)
+(* geometry, plus: the physical image recovers to a committed view that is *)
+(* FS-well-formed, and its log header is well-formed), and concludes it at *)
+(* EVERY state the CSL-free operational semantics can reach -- across      *)
+(* every power cycle, since [crash_inv] is fixed-layer and hence the same  *)
+(* invariant at every era.                                                 *)
+(*                                                                        *)
+(* IT COSTS NO NEW PROOF.  [FsCrash.P_fs_project] is already the           *)
+(* obligation [Hproj] -- the projection the power theorem runs at each     *)
+(* PowerOn to tell a boot what disk it is booting on -- and                *)
+(* [RiscvAdequacy.disk_proj_trace] is the adapter that promotes exactly    *)
+(* that shape to [Hphi]'s.  The two hooks read the same fact off the same  *)
+(* invariant; the difference is only where it is delivered (into a boot,   *)
+(* versus out of the whole execution).                                     *)
+(* ---------------------------------------------------------------------- *)
+
+Corollary xv6_trace_invariant (g : gstate)
+    (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (Himg : fs_boot_image_eras sb nib cov) :
+  forall t2 g2,
+    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\
+    xv6_trace_pure cov (FsImg.sb_logstart sb) g2.
+Proof.
+  apply (xv6_power_adequacy_xv6Σ g sb nib cov
+           (xv6_trace_pure cov (FsImg.sb_logstart sb))
+           (xv6_trace_hook xv6Σ cov (FsImg.sb_logstart sb))
+           Hgen0 Hpow Himg).
+Qed.
 
 (* THE ASSUMPTION AUDIT IS [SystemAssumptions.v], NOT A LINE HERE.
    [Print Assumptions xv6_power_adequacy_xv6Σ] used to sit at this point, and
