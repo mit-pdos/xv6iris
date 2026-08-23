@@ -113,8 +113,19 @@ See the G1-impl entry for the site table.
    delta (7) records its statement. G2 can now cross a file's
    12-block boundary.
 2. **G2**: the per-op preservation lemmas, STANDALONE (pure statements
-   composing the F2 effects per op; no log_state dependency; fully
-   parallelizable — one Opus agent per op batch). The 12 ops and their
+   composing the F2 effects per op ARM; no log_state dependency; fully
+   parallelizable — one Opus agent per batch, one file per op). The
+   single-effect ops are free (their lemma IS the F2 wrapper); the
+   content is PRECONDITION TRANSPORT across chained effects (each
+   step's preconditions at the intermediate view). Batches:
+   (1) filewrite — the alloc*/write* chains incl. the 12-block
+   crossing; (2) the create side — sys_open O_CREATE (+O_TRUNC),
+   sys_mkdir, sys_mknod, sys_link (incl. the nlink rollback arm, net
+   identity); (3) the free side — sys_unlink file/dir arms with the
+   trunc/free path, fileclose's iput-free path, ireclaim. Read-only
+   arms (kexec, kexit, sys_chdir, fileread-side) have identity effects
+   and need no lemma. Net effects PER ARM must be read off the actual
+   Spec*/Proof* files (the survey's 26-arm table). The 12 ops and their
    26 exit arms are enumerated in the 2026-08-22 survey (§Stage G);
    each op = a composition of effects (e.g. sys_mkdir =
    eff_create_dir_entry; filewrite = eff_alloc_file_block* +
@@ -348,6 +359,17 @@ the same way. E2's mirror did NOT change shape: the receipt chains through
       `fs_clear_permit` stays for the current consumer until G adopts
       the primitives. Recovery-side permits keep re-basing until
       stage H makes them ghost no-ops.
+  FLIP-TIME STABILITY (recorded 2026-08-23): per-BLOCK finalize
+  responsibility fails on SHARED dir blocks — an op's full-block
+  postcondition goes stale under interleaved creates/unlinks in the
+  same block. The argument is per-RECORD: each op owns its dirent
+  record k (nobody else writes it while the op is open); a block still
+  pending via another open op is THAT op's responsibility (row (a)
+  exempts it); the last finalizer's block content is A's current block
+  ⊕ its own record, because every other finalize already folded its
+  record into A. So the flip needs the pending bookkeeping refined to
+  note record ownership for dir blocks (or an equivalent per-record
+  stability lemma), not just the block-set `e.1.2`.
 - [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
       literal image (a `FsImgCheck`-style computation, cheap — the
       sweeps already run there).
