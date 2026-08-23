@@ -427,6 +427,12 @@ GHOST mirror deliberately is not.
 
 ## Recorded modeling choices
 
+- The disk has a VOLATILE WRITE-BACK CACHE unless the driver declines
+  `VIRTIO_BLK_F_FLUSH` (`completed/async-disk.md`, 2026-08-23): a write may
+  complete before its sectors are on the medium, cached sectors drain in any
+  order, and PowerOn's `virtio_reset` drops the cache. xv6 declines FLUSH, so
+  its writes are durable at completion — proved, not assumed
+  (`VirtioProto.virtio_proto_writethrough`).
 - Disk writes are SECTOR-ATOMIC, not block-atomic (ruled 2026-08-22;
   campaign in `completed/sector-atomic-disk.md`). A 512-byte sector lands
   atomically; an xv6 block (BSIZE = 1024 = 2 sectors) lands one sector per

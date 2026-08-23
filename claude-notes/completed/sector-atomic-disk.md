@@ -1,6 +1,7 @@
 # sector-atomic-disk — a 512-byte sector write is atomic, a 1024-byte block write is NOT
 
-STATUS: COMPLETE (2026-08-22, `b227bb54` on main): ANY-ORDER sector tearing,
+STATUS: COMPLETE (2026-08-22, `b227bb54` on main; the landed set became the
+device's write CACHE in `async-disk.md`, 2026-08-23): ANY-ORDER sector tearing,
 reads atomic, ONE sequential permit per request (§6e). Tree green at the
 eight-axiom baseline, 188/190 proven. Kept as the record; §6 is the design
 finding worth reading (why independent per-sector permits cannot work).

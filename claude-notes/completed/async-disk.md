@@ -1,6 +1,6 @@
 # async-disk — the disk has a volatile WRITE-BACK cache; xv6 gets writethrough by declining FLUSH
 
-STATUS: RULED (owner, 2026-08-23): make the disk model asynchronous — a
+STATUS: COMPLETE (2026-08-23, on main): the disk model IS asynchronous — a
 write request may COMPLETE before its data is durable, cached sectors drain
 to the disk in ANY order across requests, a power cycle drops the cache —
 unless the driver declines the cache, which xv6 does. Design lane: Fable;
@@ -182,7 +182,7 @@ the three-entry baseline (`durable-notes.md`); coverage 188.
    `crashN`, spends the permit's LEAF), CAPTURE (opens `diskN` only),
    DRAIN (opens `diskN` + `permN` + `crashN`, `perm_step_kq` on the
    branch), wild (refuted), latch, stutter.
-- **Stage 3 — notes (Fable).** `design/device.md`, `design/virtio-driver.md`,
+- **Stage 3 — notes (Fable).** DONE 2026-08-23. `design/device.md`, `design/virtio-driver.md`,
   `design/crash.md` "Recorded modeling choices" (the cache is volatile; the
   theorem), `completed/sector-atomic-disk.md` cross-reference; move here to
   `completed/`. ☐

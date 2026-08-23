@@ -172,6 +172,27 @@ completion arm consumes the leaf (image untouched). Clients see only
 the leaf. The two-ended `∧` (`disk_seq_permit_two`) is the only form the FS
 layer builds.
 
+**The write-back cache (campaign `completed/async-disk.md`, landed
+2026-08-23).** The landed set became the device's cache: `v_cache : sector ↦
+512 bytes` + `v_taken`, filled by a CAPTURE step (the one step that reads
+the buffer through the lease — `virtio_proto_capture_step`, a plain wand, no
+ghost moves) and emptied by DRAIN steps (`virtio_proto_drain_step`: hands out
+the sequential permit's branch at `wr_sector (vs_wr sl) i`, owes the
+residual, moves the era image — and takes NO memory interp and NO bus view,
+since the bytes come from the cache). `slot_pend_res` is indexed by the
+sectors still OWED (`vs_kept sl td` is the complement), not by the cache's
+domain: between publish and capture nothing is cached yet the permit is at
+its root, and `v_taken` is what tells the two empty caches apart. The
+protocol carries `⌜virtio_wce (v_cfg v) = false⌝` in BOTH arms (from the
+init proof's `DRIVER_FEATURES = 0` against the device's `FLUSH|CONFIG_WCE`
+offer) and the writethrough invariant `vp_wt` (cache ⊆ the head request's
+sectors; untaken ⇒ empty); the write-back completion and a FLUSH request are
+refuted inside `virtio_proto_step` (the gate forces `vs_todo = ∅`;
+`slot_pin_ok`'s type pin excludes FLUSH), and a drain on a dead queue is
+refuted from the not-live arm's `v_cache = ∅`. The named theorem is
+`virtio_proto_writethrough`; the client permit shape `disk_seq_permit` is
+unchanged, so nothing above the driver moved.
+
 When the queue is not live, `virtio_proto` degenerates to the empty lease +
 empty auths (what adequacy allocates; `virtio_proto_init`).
 

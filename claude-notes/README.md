@@ -168,6 +168,12 @@ no remaining work and no cleanup — move its file here rather than deleting it,
 and lift any broadly-applicable lesson up into the design or durable notes
 first.
 
+- **[`async-disk.md`](completed/async-disk.md)** — the disk has a VOLATILE
+  write-back cache by default (the device offers FLUSH|CONFIG_WCE; capture /
+  drain-any-order / gated completion; a power cycle drops the cache). xv6
+  declines FLUSH, and `virtio_proto_writethrough` (no axioms) is the proof
+  that its writes are durable at completion — the disk assumption became a
+  theorem about the driver. §4 records what a FLUSH-negotiating driver owes.
 - **[`sector-atomic-disk.md`](completed/sector-atomic-disk.md)** — disk
   writes are SECTOR-atomic (512 B); a block (1024 B) lands one sector per
   device step in ANY order; the commit is atomic because the 124-byte log
