@@ -482,7 +482,7 @@ are the links step's, and their absence is what lets the bundle land
 without touching `DirLinks.v`.
 
 - **THE DICTIONARY to the kernel's in-memory model, both ways.**
-  `node_of dn bm data` and `bm_of n`, with `node_of (fn_rec n) (bm_of n)
+  `bnode dn bm data` and `bm_of n`, with `bnode (fn_rec n) (bm_of n)
   (fn_data n) = n` under `inode_local`.  `InodeInv`'s `blkmap` model is
   KEPT (readi/writei/bmap/itrunc are stated over it); `fn_blk` is built by
   `blk_of_seq`, a sealed recursion over the index range, so its lookup law
@@ -509,6 +509,18 @@ without touching `DirLinks.v`.
   node, F3's "frees every owned block" being definitional) are its
   readings; there is deliberately no larger family, and `inode_local` of
   the TARGET is a premise for the reason §7's last bullet gives.
+- **THE DIRENT READINGS ARE EXTENSIONAL BELOW THE RECORD COUNT.**
+  `fb_agree data data' N` carries `dir_inum` / `dir_name` / `dir_liveb` /
+  `dir_matchb` / `dir_first` / `dir_view` / `dir_names_unique` /
+  `dir_uniq` / `dir_dots_ix`: every dirent reading of record `k` touches
+  file bytes `16k .. 16k+15`, so the only bound any of them needs is
+  `16·nrec`.  It exists because `fn_data (bnode dn bm data)` agrees with
+  `data` BELOW MAXFILE and cannot agree above it (`fn_blk` is partial by
+  design), so a directory fact stated over a payload's total `data` has to
+  be transported; `inode_local_of_ok_data` is `inode_local_of_ok` called
+  through it, and is the form a producer actually has.  These belong in
+  `DirView.v`/`FsTree.v` beside `dfirst_ext`/`bname_ext`/`bview_ext` and
+  sit in `FsStateEra.v` only while it is their one consumer.
 - **What `inode_ok` does NOT imply, and where each fact comes from
   instead**: the type ENUMERATION (`FsImg.fio_type` at boot,
   `InodeRegion.ireg_wd_ty` at a marker fill, transferred at every

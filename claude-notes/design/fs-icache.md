@@ -50,7 +50,7 @@ Three things follow, and they are what a reader of this file needs:
   premises and `InodeInv`'s pure blkmap model stays.
 - **`data` STOPS BEING A TOTAL FUNCTION.**  `fn_blk` is a `gmap` over the
   ALLOCATED slots, which is what kills the 268-element framing hazard this
-  file records at `IcacheEscrow.v`. `FsStateEra.node_of` / `bm_of` are the
+  file records at `IcacheEscrow.v`. `FsStateEra.bnode` / `bm_of` are the
   dictionary both ways; the direction a payload uses is `bm_of`, because
   `ic_loaded`'s `data` is existential and re-existentialises at `fn_data n`.
 - **THE SWAP IS ATOMIC.**  The bundle CONTAINS the data blocks, so it

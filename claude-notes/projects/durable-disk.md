@@ -834,8 +834,8 @@ map at home blocks); 1d lands last.
           once — so neither is a clause.  The LINK ghosts are deliberately
           out: they are step 3's, and leaving them out is what let this
           land without touching `DirLinks.v`.
-        - **The dictionary, both ways.**  `node_of dn bm data` /
-          `bm_of n`, with `node_of (fn_rec n) (bm_of n) (fn_data n) = n`
+        - **The dictionary, both ways.**  `bnode dn bm data` /
+          `bm_of n`, with `bnode (fn_rec n) (bm_of n) (fn_data n) = n`
           under `inode_local`.  `fn_blk` is built by `blk_of_seq`, its own
           SEALED recursion over the index range, so its lookup law is one
           induction and the 268-way case split never reaches a use site.
@@ -891,16 +891,24 @@ map at home blocks); 1d lands last.
           is `FsImg.fs_region_nlink_short` (L4), maintained by
           `InodeRegion.ireg_link_ok`.  `inode_local_of_ok` takes exactly
           those four as premises and derives the other eleven.
-        - **THE ONE PIECE THE FLIP STILL NEEDS AND THAT IS NOT HERE: a
-          `dir_view` EXTENSIONALITY over `data`,** i.e. `(∀ b < MAXFILE,
-          data b = data' b) → dir_view data nrec = dir_view data' nrec`
-          under the size cap.  It is needed exactly once, to move the
-          image's `dir_dots_ix`/`dir_uniq` (stated at `fs_data_of P dn`)
-          onto `fn_data (node_of ..)` (which differs above MAXFILE and
-          cannot not).  It belongs in `FsTree.v`/`DirView.v` beside
-          `dfirst_ext`/`bname_ext`/`bview_ext`, which are its pieces; every
-          OTHER site avoids it, because a payload's `data` is existential
-          and re-existentialises at `fn_data n`.
+        - **THE DIRENT READINGS ARE EXTENSIONAL BELOW THE RECORD COUNT,
+          and that transport is landed too.**  `fb_agree data data' N` (the
+          flat byte view agrees below `N`) carries `dir_inum`, `dir_name`,
+          `dir_liveb`, `dir_matchb`, `dir_first`, `dir_view`,
+          `dir_names_unique`, `dir_uniq` and `dir_dots_ix` — every dirent
+          reading of record `k` touches file bytes `16k .. 16k+15` and
+          nothing else, so the only bound any of them needs is `16·nrec`.
+          It is what moves a directory fact stated over a payload's TOTAL
+          `data` (the shape `dir_dots_ix`/`dir_uniq` come in, at the image
+          and at every re-park) onto `fn_data (bnode ..)`, which agrees
+          below MAXFILE and cannot agree above it.
+          `inode_local_of_ok_data` is `inode_local_of_ok` called through
+          it, and is the form a producer actually has.
+          **HOME: these belong in `DirView.v`/`FsTree.v` beside
+          `dfirst_ext`/`bname_ext`/`bview_ext`, which are their pieces.**
+          They sit in `FsStateEra.v` while it is their only consumer, so
+          that landing them costs no rebuild of those files' cones; move
+          them when the payload flips.
         - **A DECISION THE FLIP MUST TAKE, recorded so it is not taken by
           accident: `dv_ride`'s value.**  `fv_of dn (fn_data n)` IS
           `fn_file_bytes n`, so `fv_ride` re-indexes for free.  `dv_of dn
