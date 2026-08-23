@@ -537,14 +537,15 @@ Definition cs_hyps (GD : gdexec) (P : Z → Z → Prop) (log : list wmsg)
   ∃ (b a : Z) (ACQ REL : geid),
     (* the byte is a REGISTERED protected byte of the lock word at [b] *)
     P a b ∧
-    lock_word_byte log b ∧ lock_pattern (gd_g GD) b ∧
+    lock_word_byte log b ∧
     (* the previous exit: an owned plain write of the protected byte,
        inside the log, not touching the lock word *)
     (∃ v, gwrites_byte (gd_g GD) prev a v) ∧ gcls (gd_g GD) prev WCplain ∧
     (gwix (gd_g GD) prev ≤ length log)%nat ∧
     (∀ v, ¬ gwrites_byte (gd_g GD) prev b v) ∧
     (* the reader's row: its acquire, its section, its release fence *)
-    lock_acq (gd_g GD) b ACQ ∧ glbl_is (gd_g GD) ACQ lb_aq ∧
+    lock_acq (gd_g GD) b ACQ ∧ acq_row (gd_g GD) b ACQ ∧
+    glbl_is (gd_g GD) ACQ lb_aq ∧
     (gwix (gd_g GD) ACQ ≤ length log)%nat ∧
     lock_cs (gd_g GD) b ACQ REL ∧
     gpo (gd_g GD) ACQ (sg_entry s) ∧
@@ -562,13 +563,13 @@ Lemma cs_hyps_cert GD P log prev s :
   cert (gd_g GD) prev s.
 Proof.
   intros (Hcons & _ & _) Hlog Hpr
-    (b & a & ACQ & REL & HP & Hlwb & Hpat & Hwa & Hcl & Hlew & Hnob & Hacq &
-     Haq & HleA & Hcs & Hpoe & Hfen & Hpox & Hmx & Hhart & Hside) Hx.
+    (b & a & ACQ & REL & HP & Hlwb & Hwa & Hcl & Hlew & Hnob & Hacq &
+     Hrow & Haq & HleA & Hcs & Hpoe & Hfen & Hpox & Hmx & Hhart & Hside) Hx.
   destruct (Hpr a b HP) as (n0 & r0 & h & Hprot & Hat & Halt).
   destruct (Hside n0 r0 Hprot) as (Hr0 & Hn0A).
   apply CSchained.
   exact (cs_chained (gd_g GD) log b a n0 r0 h prev (sg_entry s) (sg_exit s)
-           ACQ REL Hcons Hlog Hlwb Halt Hpat Hprot Hwa Hcl Hr0 Hlew Hnob
+           ACQ REL Hcons Hlog Hlwb Halt Hrow Hprot Hwa Hcl Hr0 Hlew Hnob
            Hacq Haq Hn0A HleA Hcs Hpoe Hfen Hx Hpox Hmx Hhart).
 Qed.
 

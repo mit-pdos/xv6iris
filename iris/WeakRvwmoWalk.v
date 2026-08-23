@@ -374,12 +374,6 @@ Qed.
 
 (** ** 3.2 A non-write step contributes no message *)
 
-Lemma lbl_reidx_notw lb lb' :
-  lbl_reidx lb lb' → lb_is_w lb = false → lb_is_w lb' = false.
-Proof.
-  destruct lb; destruct lb'; simpl; try done; by intros ->.
-Qed.
-
 Lemma es_msg_notw (s : estep) : lb_is_w (es_lb s) = false → es_msg s = [].
 Proof. rewrite /es_msg. by destruct (es_lb s). Qed.
 
@@ -417,7 +411,7 @@ Proof.
   destruct k2 as [|lst k2]; [by inversion Hk2|].
   apply Forall2_cons_1 in Hk2 as [Hlst Hnil].
   apply Forall2_nil_inv_l in Hnil. subst k2.
-  apply lbl_reidx_store in Hlst. subst lst.
+  apply lbl_reidx_w_store in Hlst. subst lst.
   (* split the appended trace at the same place *)
   have Hlen : length (so_tr o) = S (length k1).
   { have Hl := f_equal length Hk. rewrite length_fmap length_app /= in Hl. lia. }
@@ -445,7 +439,7 @@ Proof.
     have Hy : k1 !! i = Some (es_lb s0)
       by rewrite -Hk1' list_lookup_fmap Hi.
     destruct (Forall2_lookup_r _ _ _ _ _ Hk1 Hy) as (lb & Hlb & Hri).
-    eapply lbl_reidx_notw; [exact Hri|].
+    eapply lbl_reidx_w_notw; [exact Hri|].
     by eapply (Forall_lookup_1 _ _ _ _ Hpre Hlb). }
   (* ... and the store contributes exactly its own message *)
   rewrite (seg_step_log d0 o St St' Hst) Hsplit tr_msgs_app.
@@ -698,7 +692,7 @@ Definition wpol_flat (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
     ∃ lb' l' rds' wrs' rs2',
       cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
       mstep_ok (cand_last_st c0) x lb' ∧
-      lbl_reidx lb lb' ∧
+      lbl_reidx_w lb lb' ∧
       wcls_at G W x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
 
@@ -714,23 +708,43 @@ Definition wpol_flat (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
         backward step.
       - [latest_bytes_ok] — [cert_read_witness]'s ONLY demand: the
         footprint's bytes exist at the candidate's latest source.
-      - THE VALUES AGREE.  [lbl_reidx] frees the read INDICES and nothing
-        else, so the candidate's latest bytes must be [G]'s own read
-        values.  (This is the one place the route is not free: the walk
-        substitutes a TIMESTAMP, never a value.)
+      - THE SUBSTITUTION RE-CONVERGES ([WeakRvwmoCert2.cblk_vfree]).  This
+        is what the site datum USED to hide.  It carried a third clause,
+        [lrd_vs c base (length ts) = vs] — "the candidate's latest bytes
+        ARE [G]'s own read values" — because [WeakRvwmoCert2.lbl_reidx]
+        frees a read's INDICES and nothing else.  No graph fact supplies
+        that equation, and a witness graph built so that it holds tests
+        nothing: with the values equal the substitution is no substitution,
+        and the acceptance test passes by coincidence.  The clause is GONE.
+        What genuinely has to hold is the machine-side fact
+        [WeakRvwmoCert2.cblk_subst] does NOT give — that reading the
+        candidate's own bytes leaves the hart at the SAME monad node, so
+        the segment iteration can go on ([WeakRvwmoCert2] (O-2), in the one
+        form the iteration needs).  It is an honest obligation, discharged
+        where the machine is known: at a node whose continuation does not
+        branch on the value read ([WeakRvwmoCycWit.cyg_vindep]).
 
-    All three are functions of [G] and the write count alone — the
-    candidate is pinned by [cd_img c = gx_img G] and [wlog_pfx G n] — so
-    this is a SITE datum, indexed by the row position like the rest of
-    [wsite_ok]. *)
-Definition wwit_site (G : gexec) (n : nat) (x : agent) (p : nat) : Prop :=
-  ∀ (c : cand) (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8)),
-    cd_img c = gx_img G →
-    wlog_pfx G n (cd_log_end c) →
+    The first two are functions of [G] and the write count alone — the
+    candidate is pinned by [cd_img c = gx_img G] and [wlog_pfx G n]; the
+    third is about the verified program at that site.  Both are indexed by
+    the row position, like the rest of [wsite_ok]. *)
+Definition wwit_vindep (G : gexec) (x : agent) (p : nat) : Prop :=
+  ∀ (cpu : CPU) (d0 : dev_state) (ws : wstate) (aq : bool) (base : Z)
+    (ts : list nat) (vs : list (bv 8)) (l : wlabel) (rds : list wreg)
+    (wrs : list register) (m : M unit) (rs : regstate) (fn : ofence)
+    (ib : oib32) (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
     gx_lbl G (x, p) = Some (WeakAxiomatic.LLoad aq base ts vs) →
-    aq = false ∧
-    latest_bytes_ok c base (length ts) ∧
-    lrd_vs c base (length ts) = vs.
+    cblk cpu d0 ws (WeakAxiomatic.LLoad aq base ts vs) l rds wrs
+      m rs fn ib m' rs' fn' ib' →
+    cblk_vfree cpu d0 ws aq base ts l rds wrs m rs fn ib m' rs' fn' ib'.
+
+Definition wwit_site (G : gexec) (n : nat) (x : agent) (p : nat) : Prop :=
+  (∀ (c : cand) (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8)),
+     cd_img c = gx_img G →
+     wlog_pfx G n (cd_log_end c) →
+     gx_lbl G (x, p) = Some (WeakAxiomatic.LLoad aq base ts vs) →
+     aq = false ∧ latest_bytes_ok c base (length ts)) ∧
+  wwit_vindep G x p.
 
 (** THE SITE DATUM: [G]'s label at row position [p], the log index a write
     there must carry, RMW-freedom, and — only where the position IS a
@@ -786,7 +800,7 @@ Definition wpol (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     ∃ lb' l' rds' wrs' rs2',
       cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
       mstep_ok (cand_last_st c0) x lb' ∧
-      lbl_reidx lb lb' ∧
+      lbl_reidx_w lb lb' ∧
       wcls_at G (wwit G n) x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
 
@@ -839,7 +853,7 @@ Theorem wblk_pol_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (rs2' : regstate),
     cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
     mstep_ok (cand_last_st c0) x lb' ∧
-    lbl_reidx lb lb' ∧
+    lbl_reidx_w lb lb' ∧
     wcls_at G (wwit G n) x c0 lb' ∧
     dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
 Proof.
@@ -853,7 +867,7 @@ Proof.
   - (* ------------------------- THE TRUE ROUTE ------------------------- *)
     have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)) := wsrc_le_not_wwit _ _ _ Hle.
     exists lb, l, rds, wrs, rs2'.
-    split_and!; [exact Hblk2| |apply lbl_reidx_refl
+    split_and!; [exact Hblk2| |apply lbl_reidx_w_refl
                 |by apply (wcls_of_pfx G (wwit G n) n x c0 lb)|exact Hag2].
     destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
                    |aq rl base ts rvs wvs kc].
@@ -868,21 +882,22 @@ Proof.
     have Hlb : lb = WeakAxiomatic.LLoad aq base ts vs.
     { rewrite Hl' in Hl. by injection Hl as <-. }
     subst lb.
-    destruct (Hwit HW c0 aq base ts vs Himg Hpfx Hl')
-      as (-> & Hbytes & Hvals).
-    have Htsnd : (wit_tvs c0 base (length ts)).*2 = vs
-      by rewrite wit_tvs_snd Hvals.
-    destruct (cblk_load_retime cpu d0 ws false base ts vs l rds wrs
-                m rs2 fn ib m' rs2' fn' ib' (wit_tvs c0 base (length ts))
-                Hblk2 Htsnd) as (l2 & rds2 & wrs2 & Hblk3).
+    destruct (Hwit HW) as (Hgs & Hvf).
+    destruct (Hgs c0 aq base ts vs Himg Hpfx Hl') as (-> & Hbytes).
+    destruct (Hvf cpu d0 ws false base ts vs l rds wrs
+                m rs2 fn ib m' rs2' fn' ib' Hl' Hblk2
+                (wit_tvs c0 base (length ts))
+                (wit_tvs_length c0 base (length ts)))
+      as (l2 & rds2 & wrs2 & Hblk3).
     rewrite (wit_tvs_lbl c0 false base (length ts)) in Hblk3.
     exists (latest_read_lbl c0 false base (length ts)), l2, rds2, wrs2, rs2'.
     split_and!.
     + exact Hblk3.
     + by apply cert_read_witness.
-    + rewrite /latest_read_lbl /=. split_and!;
-        [reflexivity|reflexivity|exact Hvals|].
-      by rewrite /lrd_ts length_fmap length_seq.
+    + right. rewrite /latest_read_lbl /=. split_and!;
+        [reflexivity|reflexivity|reflexivity| |].
+      * by rewrite /lrd_ts length_fmap length_seq.
+      * apply lrd_length.
     + by apply (wcls_of_wit G (wwit G n) x c0 base ts vs).
     + exact Hag2.
 Qed.
@@ -913,7 +928,7 @@ Theorem wctx_pres (G : gexec) (n : nat) (x : agent) (k0 kz : nat) :
   wub G (wwit G n) x →
   ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
     wctx G n x kz k c0 → srvwmo_consistent c0 → wQ G n x k0 kz k lb →
-    lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
+    lbl_reidx_w lb lb' → mstep_ok (cand_last_st c0) x lb' →
     wcls_at G (wwit G n) x c0 lb' →
     wctx G n x kz (S k) (cand_snoc c0 (EStep x lb')).
 Proof.
@@ -937,7 +952,7 @@ Proof.
       destruct lb as [aq0 b0 ts0 vs0|rl base vs kc|pr pw sr sw
                      |aq0 rl0 b0 ts0 rv0 wv0 kc0]; try by simpl in Hw.
       have Hlb' : lb' = WeakAxiomatic.LStore rl base vs kc
-        := lbl_reidx_store rl base vs kc lb' Hri.
+        := lbl_reidx_w_store rl base vs kc lb' Hri.
       subst lb'.
       have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)).
       { rewrite Hgc.
@@ -965,7 +980,7 @@ Proof.
       have Hw : lb_is_w lb = false.
       { destruct (lb_is_w lb) eqn:Hb; [|done].
         exfalso. apply Hne. by apply Hiff. }
-      have Hw' : lb_is_w lb' = false by eapply lbl_reidx_notw.
+      have Hw' : lb_is_w lb' = false by eapply lbl_reidx_w_notw.
       rewrite (es_msg_notw (EStep x lb') Hw') app_nil_r.
       have -> : wlogn n kz (S k) = n.
       { rewrite /wlogn (bool_decide_eq_true_2 (S k ≤ kz)%nat); [done|lia]. }
@@ -1340,7 +1355,7 @@ Theorem wblk_pol_at' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
     (rs2' : regstate),
     cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
     mstep_ok (cand_last_st c0) x lb' ∧
-    lbl_reidx lb lb' ∧
+    lbl_reidx_w lb lb' ∧
     wcls_at G W x c0 lb' ∧
     dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
 Proof.
@@ -1353,7 +1368,7 @@ Proof.
   destruct Hcl as [[HnW Hle]|[HW [Hwit Hwsite]]].
   - (* ------------------------- THE TRUE ROUTE ------------------------- *)
     exists lb, l, rds, wrs, rs2'.
-    split_and!; [exact Hblk2| |apply lbl_reidx_refl
+    split_and!; [exact Hblk2| |apply lbl_reidx_w_refl
                 |by apply (wcls_of_pfx G W n x c0 lb)|exact Hag2].
     destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
                    |aq rl base ts rvs wvs kc].
@@ -1382,21 +1397,22 @@ Proof.
     have Hlb : lb = WeakAxiomatic.LLoad aq base ts vs.
     { rewrite Hl' in Hl. by injection Hl as <-. }
     subst lb.
-    destruct (Hwsite c0 aq base ts vs Himg Hpfx Hl')
-      as (-> & Hbytes & Hvals).
-    have Htsnd : (wit_tvs c0 base (length ts)).*2 = vs
-      by rewrite wit_tvs_snd Hvals.
-    destruct (cblk_load_retime cpu d0 ws false base ts vs l rds wrs
-                m rs2 fn ib m' rs2' fn' ib' (wit_tvs c0 base (length ts))
-                Hblk2 Htsnd) as (l2 & rds2 & wrs2 & Hblk3).
+    destruct Hwsite as (Hgs & Hvf).
+    destruct (Hgs c0 aq base ts vs Himg Hpfx Hl') as (-> & Hbytes).
+    destruct (Hvf cpu d0 ws false base ts vs l rds wrs
+                m rs2 fn ib m' rs2' fn' ib' Hl' Hblk2
+                (wit_tvs c0 base (length ts))
+                (wit_tvs_length c0 base (length ts)))
+      as (l2 & rds2 & wrs2 & Hblk3).
     rewrite (wit_tvs_lbl c0 false base (length ts)) in Hblk3.
     exists (latest_read_lbl c0 false base (length ts)), l2, rds2, wrs2, rs2'.
     split_and!.
     + exact Hblk3.
     + by apply cert_read_witness.
-    + rewrite /latest_read_lbl /=. split_and!;
-        [reflexivity|reflexivity|exact Hvals|].
-      by rewrite /lrd_ts length_fmap length_seq.
+    + right. rewrite /latest_read_lbl /=. split_and!;
+        [reflexivity|reflexivity|reflexivity| |].
+      * by rewrite /lrd_ts length_fmap length_seq.
+      * apply lrd_length.
     + by apply (wcls_of_wit G W x c0 base ts vs).
     + exact Hag2.
 Qed.
@@ -1416,7 +1432,7 @@ Definition wpol' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
     ∃ lb' l' rds' wrs' rs2',
       cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
       mstep_ok (cand_last_st c0) x lb' ∧
-      lbl_reidx lb lb' ∧
+      lbl_reidx_w lb lb' ∧
       wcls_at G W x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
 
@@ -1441,24 +1457,13 @@ Proof.
 Qed.
 
 (** ** 4.5e The context is preserved, at the frozen set *)
-(** [lbl_reidx] moves only a read's INDICES, so it moves neither the
-    write bit nor the message ([lbl_reidx_notw]'s positive twin). *)
-Lemma lbl_reidx_isw lb lb' : lbl_reidx lb lb' → lb_is_w lb' = lb_is_w lb.
-Proof.
-  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
-                 |aq rl base ts rvs wvs kc];
-    destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'
-                    |aq' rl' base' ts' rvs' wvs' kc'];
-    by intros H.
-Qed.
-
 Theorem wctx'_pres (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
     (k0 kz : nat) :
   gwf G →
   wubA G W →
   ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
     wctx' G W n x kz k c0 → srvwmo_consistent c0 → wQ' G W n x k0 kz k lb →
-    lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
+    lbl_reidx_w lb lb' → mstep_ok (cand_last_st c0) x lb' →
     wcls_at G W x c0 lb' →
     wctx' G W n x kz (S k) (cand_snoc c0 (EStep x lb')).
 Proof.
@@ -1487,7 +1492,7 @@ Proof.
       have Hlbl : gx_lbl G (x, gcnt x (cd_tr c0)) = Some lb'.
       { destruct Hcl as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)]. }
       have Hw' : lb_is_w lb' = true
-        by rewrite (lbl_reidx_isw lb lb' Hri).
+        by rewrite (lbl_reidx_w_isw lb lb' Hri).
       destruct (lb_is_w_wr lb' Hw') as (base & vs & Hwr).
       have Hwix : gwix G (x, gcnt x (cd_tr c0)) = S n
         by rewrite (Hix Hw') Hlen.
@@ -1508,7 +1513,7 @@ Proof.
       have Hw : lb_is_w lb = false.
       { destruct (lb_is_w lb) eqn:Hb; [|done].
         exfalso. apply Hne. by apply Hiff. }
-      have Hw' : lb_is_w lb' = false by eapply lbl_reidx_notw.
+      have Hw' : lb_is_w lb' = false by eapply lbl_reidx_w_notw.
       rewrite (es_msg_notw (EStep x lb') Hw') app_nil_r.
       have -> : wlogn n kz (S k) = n.
       { rewrite /wlogn (bool_decide_eq_true_2 (S k ≤ kz)%nat); [done|lia]. }

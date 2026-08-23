@@ -409,7 +409,7 @@ Definition seg_step (d0 : dev_state) (o : segout) (S S' : cyc_state) : Prop :=
   so_off o = cd_end (cst_c S) ∧
   cd_tr (cst_c S') = cd_tr (cst_c S) ++ so_tr o ∧
   (∀ s, s ∈ so_tr o → es_ag s = so_hart o) ∧
-  Forall2 lbl_reidx (so_row o) ((λ s, es_lb s) <$> so_tr o).
+  Forall2 lbl_reidx_w (so_row o) ((λ s, es_lb s) <$> so_tr o).
 
 (** THE WALK.  Segment 1 is the one with the SUBSTITUTED entry (its source
     is gmo-above its own exit — the backward step); every later segment's
@@ -478,7 +478,7 @@ Theorem seg_step_of_segment (x : agent) (cpu : CPU) (d0 : dev_state)
     (T : list wreg) (Q : nat → lbl → Prop)
     (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
     (Hpres : ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
-        Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx lb lb' →
+        Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx_w lb lb' →
         mstep_ok (cand_last_st c0) x lb' → Cls c0 lb' →
         Ctx (S k) (cand_snoc c0 (EStep x lb')))
     (Hpol' : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
@@ -492,7 +492,7 @@ Theorem seg_step_of_segment (x : agent) (cpu : CPU) (d0 : dev_state)
         ∃ lb' l' rds' wrs' rs2',
           cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
           mstep_ok (cand_last_st c0) x lb' ∧
-          lbl_reidx lb lb' ∧
+          lbl_reidx_w lb lb' ∧
           Cls c0 lb' ∧
           dreg_agree (λ n, n ∉ T) rs1' rs2')
     (* (O-F) the pair policy — [WeakRvwmoCert3.cpolp]; an RMW-free [Q] gets
@@ -641,12 +641,12 @@ Theorem cert_cycle (d0 : dev_state) (l : list segout) (S0 Sf : cyc_state) :
   (* (d) every appended step is the certifying hart's, and the row
          correspondence survives *)
   (∀ o, o ∈ l → (∀ s, s ∈ so_tr o → es_ag s = so_hart o) ∧
-                Forall2 lbl_reidx (so_row o) ((λ s, es_lb s) <$> so_tr o)).
+                Forall2 lbl_reidx_w (so_row o) ((λ s, es_lb s) <$> so_tr o)).
 Proof.
   intros Hrun.
   destruct (segs_run_ok d0 l S0 Sf Hrun) as (Hc & Hpo & Hdv).
   have Hseg : ∀ o, o ∈ l → (∀ s, s ∈ so_tr o → es_ag s = so_hart o) ∧
-                 Forall2 lbl_reidx (so_row o) ((λ s, es_lb s) <$> so_tr o).
+                 Forall2 lbl_reidx_w (so_row o) ((λ s, es_lb s) <$> so_tr o).
   { intros o Ho.
     destruct (segs_run_elem d0 l S0 Sf Hrun o Ho)
       as (S1 & S2 & (_ & _ & _ & _ & Hag & Hf2)).

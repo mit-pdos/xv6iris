@@ -214,6 +214,17 @@ Definition cy_tvs (ts : list nat) : list (nat * bv 8) := zip ts cy_bytes.
 Definition cy_wl_ld (a : Arch.pa) (ts : list nat) : wlabel :=
   WeakPromise.LLoad false false (pa_z a) (cy_tvs ts) [].
 
+(** THE LOAD'S wlabel AT ARBITRARY ANSWERS.  [cy_wl_ld] fixes the bytes to
+    [cy_bytes]; the SUBSTITUTED read of §4 answers with the ERA IMAGE's
+    bytes, which (since the image was made to differ, §3) are NOT
+    [cy_bytes].  So the witness needs the load at a free answer list. *)
+Definition cy_wl_ld' (a : Arch.pa) (tvs : list (nat * bv 8)) : wlabel :=
+  WeakPromise.LLoad false false (pa_z a) tvs [].
+
+Lemma cy_wl_ld_eq (a : Arch.pa) (ts : list nat) :
+  cy_wl_ld a ts = cy_wl_ld' a (cy_tvs ts).
+Proof. reflexivity. Qed.
+
 Definition cy_wl_st (a : Arch.pa) : wlabel :=
   WeakPromise.LStore false (pa_z a) (wbytes 4 lock_one)
     (deps_asrc (deps_of_ib (ib_bits cy_ib1)))
@@ -258,6 +269,42 @@ Proof.
   intros j Hj. rewrite (cy_tvs_snd ts Hts). apply cy_bytes_nth. by simpl in Hj.
 Qed.
 
+(** … AND AT ARBITRARY ANSWERS.  The [MemRead] node's continuation IGNORES
+    the value read (§1.2), so the successor node is [cy_pa] whatever the
+    bytes are: this is [WeakRvwmoCert2.cblk_vfree]'s content at the concrete
+    node, and it is what makes a GENUINE value substitution servable here
+    (the runs re-converge immediately). *)
+Lemma cy_pstep_ld' (aL aS : Arch.pa) (cpu : CPU) (rs : regstate)
+    (d : dev_state) (tvs : list (nat * bv 8)) :
+  dev_addr aL = false → length tvs = 4%nat →
+  pstep_ev (cy_p0 aL aS cpu rs) d (cy_wl_ld' aL tvs) (cy_pa aS cpu rs) d.
+Proof.
+  intros Hram Hlen.
+  have Hl2 : length tvs.*2 = N.to_nat 4 by rewrite length_fmap Hlen.
+  destruct (bv_of_bytes 4 tvs.*2 Hl2) as (w2 & Hw2).
+  rewrite /pstep_ev /cy_p0 /cy_pa. split; [reflexivity|].
+  exists None, None. split_and!; [reflexivity|reflexivity|].
+  left. rewrite /pstep_node /cy_m /pnode_step /=.
+  rewrite Hram. split; [reflexivity|]. left. split; [reflexivity|].
+  exists w2, tvs. split_and!;
+    [by rewrite Hlen| |reflexivity|reflexivity|reflexivity|reflexivity
+    |reflexivity|reflexivity].
+  intros j Hj. by apply Hw2.
+Qed.
+
+(** THE VALUE-INDEPENDENCE, STATED.  Two answer lists of the read's own
+    width, one step each, the SAME successor node — the fact
+    [WeakRvwmoWalk.wwit_vindep] asks of a witness site, at the site the
+    walk actually visits. *)
+Theorem cy_node_vindep (aL aS : Arch.pa) (cpu : CPU) (rs : regstate)
+    (d : dev_state) (tvs tvs2 : list (nat * bv 8)) :
+  dev_addr aL = false → length tvs = 4%nat → length tvs2 = 4%nat →
+  pstep_ev (cy_p0 aL aS cpu rs) d (cy_wl_ld' aL tvs) (cy_pa aS cpu rs) d ∧
+  pstep_ev (cy_p0 aL aS cpu rs) d (cy_wl_ld' aL tvs2) (cy_pa aS cpu rs) d.
+Proof.
+  intros Hram H1 H2. split; by apply cy_pstep_ld'.
+Qed.
+
 Lemma cy_pstep_ann (aS : Arch.pa) (cpu : CPU) (rs : regstate) (d : dev_state) :
   pstep_ev (cy_pa aS cpu rs) d LInstr (cy_p1 aS cpu rs) d.
 Proof.
@@ -292,6 +339,14 @@ Proof.
   intros Hts. rewrite /hlbl_realizes /cy_wl_ld.
   split_and!; [done|done|done|].
   rewrite /proj_lbl (cy_tvs_fst ts Hts) (cy_tvs_snd ts Hts) //.
+Qed.
+
+Lemma cy_realizes_ld' (aL aS : Arch.pa) (cpu : CPU) (rs : regstate)
+    (ws : wstate) (tvs : list (nat * bv 8)) :
+  hlbl_realizes (cy_p0 aL aS cpu rs) ws
+    (WeakAxiomatic.LLoad false (pa_z aL) tvs.*1 tvs.*2) (cy_wl_ld' aL tvs).
+Proof.
+  rewrite /hlbl_realizes /cy_wl_ld'. split_and!; [done|done|done|reflexivity].
 Qed.
 
 Lemma cy_realizes_st (aS : Arch.pa) (cpu : CPU) (rs : regstate) (ws : wstate) :
@@ -390,14 +445,22 @@ Qed.
 Definition cy_ts2 : list nat := [2%nat; 2%nat; 2%nat; 2%nat].
 Definition cy_ts1 : list nat := [1%nat; 1%nat; 1%nat; 1%nat].
 
-(** The era image: both words already hold [lock_one]'s bytes.  That is not
-    cosmetic — [WeakRvwmoCert2.lbl_reidx] lets a certified read differ from
-    the graph's only in its TIMESTAMPS, so the substituted read of §4 must
-    return the same BYTES, and its source is the image. *)
-Definition cy_img : image := λ a,
-  if bool_decide (zA ≤ a < zA + 4) then cy_bytes !! Z.to_nat (a - zA)
-  else if bool_decide (zB ≤ a < zB + 4) then cy_bytes !! Z.to_nat (a - zB)
-  else Some (bv_0 8).
+(** THE ERA IMAGE — AND THE POINT OF THE FIX.  It USED to hold [lock_one]'s
+    bytes at BOTH words, and that was not cosmetic but VACUITY: the old
+    [WeakRvwmoCert2.lbl_reidx] let a certified read differ from the graph's
+    only in its TIMESTAMPS, so [WeakRvwmoWalk.wwit_site] demanded the
+    candidate's latest bytes BE [G]'s read values, and this image was built
+    to make that demand true.  A witness constructed to satisfy a
+    hypothesis tests nothing.
+
+    Now the image holds ZERO at [zA] — and hart 0's witness read draws on
+    the image, while [G] says it reads hart 1's store of [lock_one].  So
+    the substituted read really does return a DIFFERENT VALUE from the
+    row's ([cyg_values_differ]), and the walk below has to work with the
+    values differing.  The bytes at [zB] are irrelevant either way: by the
+    time hart 1's TRUE read runs, [zB]'s latest source is hart 0's store,
+    which is in the log. *)
+Definition cy_img : image := λ _, Some (bv_0 8).
 
 Definition cyg : gexec :=
   GExec cy_img
@@ -717,9 +780,12 @@ Qed.
     THE READ POLICY, in the concrete: hart 0's load is the SUBSTITUTED one
     (its graph source is hart 1's store, which the log does not yet hold),
     so it reads the ERA IMAGE — [WeakRvwmoCert.latest_read_lbl] at the
-    empty log — and [lbl_reidx] holds because the image carries the same
-    bytes.  Hart 1's load is TRUE: by the time it runs, hart 0's store IS
-    in the log at index 1, which is exactly its graph source. *)
+    empty log — which now holds ZERO where [G]'s row says [lock_one]
+    ([cyg_values_differ]).  [WeakRvwmoCert2.lbl_reidx_w] holds by its
+    SUBSTITUTED arm (same footprint, free values), and the appended step
+    carries the IMAGE's bytes, not [G]'s.  Hart 1's load is TRUE: by the
+    time it runs, hart 0's store IS in the log at index 1, which is exactly
+    its graph source. *)
 
 (** The "other agent" twin of [WeakRvwmoCert2.cand_snoc_relp] now lives in
     [WeakRvwmoCert2] ([cand_snoc_relp_ne]), where the segment iteration's own
@@ -750,9 +816,19 @@ Section walkrun.
   Lemma cw_log2 : cd_log_end cw_c2 = [WMsg zB cy_bytes (Some 0%nat) WCplain].
   Proof. by rewrite /cw_c2 /cw_c1 !cd_log_end_snoc. Qed.
 
-  Lemma cw_lb0_eq :
-    cw_lb0 = WeakAxiomatic.LLoad false zA [0%nat; 0%nat; 0%nat; 0%nat] cy_bytes.
-  Proof. rewrite /cw_lb0 /latest_read_lbl. by vm_compute. Qed.
+  Lemma cw_lb0_tvs :
+    cw_lb0 = WeakAxiomatic.LLoad false zA
+               (wit_tvs cw_c0 zA 4).*1 (wit_tvs cw_c0 zA 4).*2.
+  Proof. by rewrite wit_tvs_lbl. Qed.
+
+  Lemma cw_tvs0_len : length (wit_tvs cw_c0 zA 4) = 4%nat.
+  Proof. apply wit_tvs_length. Qed.
+
+  (** THE SUBSTITUTED READ'S TIMESTAMPS ARE THE EMPTY LOG'S, i.e. all 0 —
+      the era image.  Its VALUES are the image's, and §4.2b says they are
+      NOT [G]'s. *)
+  Lemma cw_lb0_ts : lrd_ts cw_c0 zA 4 = [0%nat; 0%nat; 0%nat; 0%nat].
+  Proof. by vm_compute. Qed.
 
   Lemma cw_lb2_eq :
     cw_lb2 = WeakAxiomatic.LLoad false zB cy_ts1 cy_bytes.
@@ -800,14 +876,14 @@ Section walkrun.
   Proof. reflexivity. Qed.
 
   Lemma cw_relp1 : w_relp (ms_ws (cand_last_st cw_c1) 0%nat) = false.
-  Proof. by rewrite /cw_c1 cand_snoc_relp cw_relp0 cw_lb0_eq. Qed.
+  Proof. by rewrite /cw_c1 cand_snoc_relp cw_relp0 /cw_lb0 /latest_read_lbl. Qed.
 
   Lemma cw_relp3 : w_relp (ms_ws (cand_last_st cw_c3) 1%nat) = false.
   Proof.
     rewrite /cw_c3 cand_snoc_relp /cw_c2 (cand_snoc_relp_ne _ 0%nat 1%nat);
       [|done].
     rewrite /cw_c1 (cand_snoc_relp_ne _ 0%nat 1%nat); [|done].
-    by rewrite cw_relp0_1 cw_lb2_eq.
+    by rewrite cw_relp0_1 /cw_lb2 /latest_read_lbl.
   Qed.
 
   (** ** 4.5 The process supply, one [exec_prog_ok'_snoc] per event *)
@@ -834,13 +910,14 @@ Section walkrun.
     exec_prog_ok' pstep_ev pcls_ev cw_pst1 cw_dv1 (cand_exec cw_c1).
   Proof.
     apply (exec_prog_ok'_snoc cw_c0 0%nat (cy_p0 cy_A cy_B cpu0 rs0)
-             (cy_p0 cy_A cy_B cpu0 rs0) d0 [] (cy_wl_ld cy_A [0%nat;0%nat;0%nat;0%nat])
+             (cy_p0 cy_A cy_B cpu0 rs0) d0 []
+             (cy_wl_ld' cy_A (wit_tvs cw_c0 zA 4))
              cw_lb0 (cy_pa cy_B cpu0 rs0) d0 cw_pst0 cw_dv0).
     - apply cw_prog0.
     - reflexivity.
     - apply ARnil.
-    - rewrite cw_lb0_eq. by apply cy_realizes_ld.
-    - apply cy_pstep_ld; [apply cy_A_ram|reflexivity].
+    - rewrite cw_lb0_tvs. apply cy_realizes_ld'.
+    - apply cy_pstep_ld'; [apply cy_A_ram|apply cw_tvs0_len].
   Qed.
 
   Lemma cw_prog2 :
@@ -886,6 +963,31 @@ Section walkrun.
   Definition cw_S2 : cyc_state := CSt cw_c2 cw_pst2 cw_dv2.
   Definition cw_S4 : cyc_state := CSt cw_c4 cw_pst4 cw_dv4.
 
+  (** ** 4.2b THE VALUES REALLY DIFFER — the anti-coincidence lemma
+
+      [G]'s row says hart 0's read returns [cy_bytes] ([lock_one]'s bytes,
+      hart 1's store value).  The CERTIFIED step returns the era image's
+      bytes.  They are not the same list, and this lemma is here so that
+      nobody can re-introduce the coincidence silently: it fails the moment
+      [cy_img] is put back to [lock_one] at [zA]. *)
+  Theorem cyg_values_differ : lrd_vs cw_c0 zA 4 ≠ cy_bytes.
+  Proof.
+    intros Heq.
+    have H0 : cy_bytes !! 0%nat = Some (nth_byte lock_one 0%nat)
+      by apply cy_bytes_nth; lia.
+    have H1 : lrd_vs cw_c0 zA 4 !! 0%nat = Some (bv_0 8) by vm_compute.
+    rewrite Heq H0 in H1.
+    have H2 := H1. injection H2 as H2. vm_compute in H2. discriminate.
+  Qed.
+
+  (** … and the certified step's label IS the substituted one. *)
+  Corollary cw_lb0_ne_row :
+    cw_lb0 ≠ WeakAxiomatic.LLoad false zA (lrd_ts cw_c0 zA 4) cy_bytes.
+  Proof.
+    rewrite /cw_lb0 /latest_read_lbl. intros Heq.
+    apply cyg_values_differ. congruence.
+  Qed.
+
   Definition cw_o0 : segout :=
     SegOut 0%nat (cy_row cy_A cy_B cy_ts2) 0%nat
            [EStep 0%nat cw_lb0; EStep 0%nat cw_lb1].
@@ -908,8 +1010,13 @@ Section walkrun.
     - intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|].
       apply elem_of_cons in Hs as [->|Hs]; [done|by apply elem_of_nil in Hs].
     - rewrite /cy_row. apply Forall2_cons_2; [|apply Forall2_cons_2; [|done]].
-      + rewrite cw_lb0_eq. by split_and!.
-      + reflexivity.
+      + (* THE SUBSTITUTED ARM: same footprint, DIFFERENT values
+           ([cyg_values_differ]) — the old proof took [lbl_reidx]'s
+           value-preserving arm, which is exactly what the coincidence
+           bought. *)
+        right. rewrite /cw_lb0 /latest_read_lbl /=. split_and!;
+          [reflexivity|reflexivity|reflexivity| |]; by vm_compute.
+      + apply lbl_reidx_w_refl.
   Qed.
 
   Lemma cw_seg1 : seg_step d0 cw_o1 cw_S2 cw_S4.
@@ -918,8 +1025,8 @@ Section walkrun.
     - intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|].
       apply elem_of_cons in Hs as [->|Hs]; [done|by apply elem_of_nil in Hs].
     - rewrite /cy_row. apply Forall2_cons_2; [|apply Forall2_cons_2; [|done]].
-      + rewrite cw_lb2_eq. by split_and!.
-      + reflexivity.
+      + left. rewrite cw_lb2_eq. by split_and!.
+      + apply lbl_reidx_w_refl.
   Qed.
 
   (** ** 4.7 … as [WeakRvwmoWalk]'s own steps
@@ -1035,4 +1142,7 @@ Print Assumptions cyg_deps_consistent.
 Print Assumptions cyg_qconf.
 Print Assumptions cyg_cycle.
 Print Assumptions cyg_segments.
+Print Assumptions cy_pstep_ld'.
+Print Assumptions cy_node_vindep.
+Print Assumptions cyg_values_differ.
 Print Assumptions cyg_walk.

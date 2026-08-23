@@ -373,7 +373,7 @@ Proof.
               Hc Hctx HQ Hrelp Hag Hblk)
     as (lb' & l' & rds' & wrs' & rs2' & _ & _ & Hri & (Hcl & _) & _).
   have Hlb : lb' = WeakAxiomatic.LStore rl base vs kc
-    := lbl_reidx_store rl base vs kc lb' Hri.
+    := lbl_reidx_w_store rl base vs kc lb' Hri.
   destruct Hcl as [[_ Hl]|[_ (base0 & n0 & ts0 & vs0 & _ & _ & Heq)]].
   - by rewrite Hlb in Hl.
   - exfalso. rewrite Hlb in Heq. by rewrite /latest_read_lbl in Heq.
@@ -909,10 +909,18 @@ Proof.
     |destruct Hpo as (_ & Hlt & _); rewrite He /= in Hlt; lia].
 Qed.
 
-(** THE WITNESS SITE DATUM at hart 0's load.  The candidate is pinned by
-    the two [wctx] clauses — image [gx_img cyg], log the gmo prefix of
-    length 0, i.e. EMPTY — so all three components compute. *)
-Lemma cyg_wwit_site00 : wwit_site cyg 0%nat 0%nat 0%nat.
+(** THE WITNESS SITE DATUM at hart 0's load, GRAPH HALF.  The candidate is
+    pinned by the two [wctx] clauses — image [gx_img cyg], log the gmo
+    prefix of length 0, i.e. EMPTY — so both components compute.  The THIRD
+    component the datum used to carry, [lrd_vs c base 4 = vs], is GONE: it
+    was the vacuity, and [WeakRvwmoCycWit.cyg_values_differ] now says it is
+    FALSE at this very site. *)
+Lemma cyg_wwit_site00_graph :
+  ∀ (c : cand) (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8)),
+    cd_img c = gx_img cyg →
+    wlog_pfx cyg 0%nat (cd_log_end c) →
+    gx_lbl cyg (0%nat, 0%nat) = Some (WeakAxiomatic.LLoad aq base ts vs) →
+    aq = false ∧ latest_bytes_ok c base (length ts).
 Proof.
   intros c aq base ts vs Himg Hpfx Hl.
   have Hlog : cd_log_end c = [].
@@ -921,15 +929,37 @@ Proof.
     [|by simplify_eq|by simplify_eq|by simplify_eq].
   injection Hl2 as Ha Hb Hc Hd. subst.
   have H4 : length cy_ts2 = 4%nat := eq_refl.
-  rewrite H4. split_and!; [reflexivity| |].
-  - intros j Hj. rewrite Hlog Himg.
-    destruct j as [|[|[|[|j]]]]; try lia; vm_compute; by eexists.
-  - rewrite /lrd_vs Hlog Himg. by vm_compute.
+  rewrite H4. split; [reflexivity|].
+  intros j Hj. rewrite Hlog Himg.
+  destruct j as [|[|[|[|j]]]]; try lia; vm_compute; by eexists.
 Qed.
+
+(** … AND THE MACHINE HALF, WHICH IS A PREMISE AND SAYS SO.
+
+    [wwit_vindep] is what the value-equality clause was standing in for:
+    the substituted read returns the CANDIDATE's bytes, so the hart must
+    still land at the emission's own successor node
+    ([WeakRvwmoCert2.cblk_vfree]) or [cert_segment'] cannot continue.  At
+    [cyg]'s witness the FACT is true and machine-checked —
+    [WeakRvwmoCycWit.cy_node_vindep]: the [MemRead] node's continuation
+    ignores the value, so any four bytes step to the same successor.
+
+    IT IS NOT PLUMBED THROUGH, and that is the honest residue this fix
+    exposes.  [wwit_vindep] quantifies over EVERY [cblk] carrying the
+    site's label, because that is all [wblk_pol_at] is handed; the concrete
+    node is known only to [wlk_inv']'s [wemit]/[pex_dag] clauses, which the
+    policy interface does not see.  Closing it means carrying the emission
+    node down to the policy (a reachability clause in [wlk_inv'] plus a
+    [pex_dag]-keyed [wwit_vindep]) — priced, not done.  Until then every
+    statement below that needs a witness position takes it as a NAMED
+    premise rather than pretending. *)
+Lemma cyg_wwit_site00 (Hvnd : wwit_vindep cyg 0%nat 0%nat) :
+  wwit_site cyg 0%nat 0%nat 0%nat.
+Proof. split; [exact cyg_wwit_site00_graph|exact Hvnd]. Qed.
 
 (** THE SITE DATA at [cyg]'s FIRST segment — the one the old shape could
     not state: row position 0 is a WITNESS. *)
-Lemma cyg_wQ_seg0 (i : nat) (lb : lbl) :
+Lemma cyg_wQ_seg0 (Hvnd : wwit_vindep cyg 0%nat 0%nat) (i : nat) (lb : lbl) :
   cy_row cy_A cy_B cy_ts2 !! i = Some lb →
   wQ cyg 0%nat 0%nat 0%nat 1%nat (0 + i)%nat lb.
 Proof.
@@ -940,7 +970,7 @@ Proof.
     + reflexivity.
     + by intros H.
     + exact I.
-    + intros _. exact cyg_wwit_site00.
+    + intros _. exact (cyg_wwit_site00 Hvnd).
   - (* the exit store, at row position 1 *)
     split_and!; [lia|lia| |split; [done|done]].
     split_and!.
@@ -959,8 +989,8 @@ Qed.
     ([WeakRvwmoCycWit.cy_hart_conf]) and the site data above.  Nothing here
     builds a block or chooses a label by hand: the substituted read is the
     POLICY's choice. *)
-Theorem cyg_step0_generic (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
-    (d0 : dev_state) :
+Theorem cyg_step0_generic (Hvnd : wwit_vindep cyg 0%nat 0%nat)
+    (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
   wlk_step cyg d0 (cw_S0 cpu0 cpu1 rs0 rs1 d0) 0%nat.
 Proof.
   destruct (wlk_seg_of_cert cyg 0%nat 0%nat cpu0 d0 0%nat 1%nat ws_init
@@ -972,7 +1002,7 @@ Proof.
               cyg_consistent (cyg_W_poloc 0%nat) (cyg_wub 0%nat 0%nat)
               (cy_hart_conf 0%nat cy_A cy_B cy_ts2 cpu0 rs0 d0
                  cy_A_ram cy_B_ram eq_refl)
-              cyg_wQ_seg0 (cw_S0_ok cpu0 cpu1 rs0 rs1 d0))
+              (cyg_wQ_seg0 Hvnd) (cw_S0_ok cpu0 cpu1 rs0 rs1 d0))
     as (St' & tradd & Hstep & _ & Himg & Hpst & Hdv).
   - split_and!; [exact cyg_ctx0|reflexivity|apply wlog_pfx_nil].
   - reflexivity.
@@ -1054,7 +1084,8 @@ Proof.
   rewrite Hl2 in Hl. injection Hl as <-. by simpl in Hw.
 Qed.
 
-Lemma cyg_wsite_supply : wsite_supply cyg cyW.
+Lemma cyg_wsite_supply (Hvnd : wwit_vindep cyg 0%nat 0%nat) :
+  wsite_supply cyg cyW.
 Proof.
   intros n x kz p lb Hat Hp _ Hl.
   destruct n as [|[|n]].
@@ -1064,7 +1095,7 @@ Proof.
     + destruct (cyg_lbl _ _ Hl) as [[_ ->]|[[He _]|[[He _]|[He _]]]];
         [|by simplify_eq|by simplify_eq|by simplify_eq].
       split; [by intros Hn; destruct (Hn I)|]. right.
-      split_and!; [reflexivity|exact cyg_wit00|exact cyg_wwit_site00].
+      split_and!; [reflexivity|exact cyg_wit00|exact (cyg_wwit_site00 Hvnd)].
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[_ ->]|[[He _]|[He _]]]];
         [by simplify_eq| |by simplify_eq|by simplify_eq].
       split; [by intros Hn; destruct (Hn I)|]. left. split;
@@ -1086,7 +1117,8 @@ Proof.
   - exfalso. rewrite /gwrite_at cyg_gwrites /= in Hat. done.
 Qed.
 
-Theorem cyg_wsupply (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) :
+Theorem cyg_wsupply (Hvnd : wwit_vindep cyg 0%nat 0%nat)
+    (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) :
   wsupply (cy_boot cpu0 cpu1 rs0 rs1) cyg cyW 2%nat.
 Proof.
   split_and!.
@@ -1097,12 +1129,13 @@ Proof.
     destruct x as [|[|x]]; [| |lia]; by eexists _, _, _, _, _.
   - exact cyg_W_poloc'.
   - exact cyg_wubA.
-  - exact cyg_wsite_supply.
+  - exact (cyg_wsite_supply Hvnd).
 Qed.
 
 (** THE ACCEPTANCE TEST: [WeakRvwmoCycWit.cyg_walk]'s conclusion, from the
     generic engine — the invariant, the start, and the per-graph datum. *)
-Theorem cyg_walk' (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
+Theorem cyg_walk' (Hvnd : wwit_vindep cyg 0%nat 0%nat)
+    (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
   ∃ (l : list segout) (S0 Sf : cyc_state),
     segs_run d0 l S0 Sf ∧
     cd_img (cst_c Sf) = gx_img cyg ∧
@@ -1119,7 +1152,8 @@ Proof.
   destruct (wlk_run' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
               (λ St n Hinv Hn,
                  wlk_step'_of_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat
-                   cyg cyW St n cyg_consistent (cyg_wsupply cpu0 cpu1 rs0 rs1)
+                   cyg cyW St n cyg_consistent
+                   (cyg_wsupply Hvnd cpu0 cpu1 rs0 rs1)
                    Hinv Hn)
               2%nat 0%nat
               (wlk_start (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg)
@@ -1152,6 +1186,7 @@ Print Assumptions qconf_seg_take.
 Print Assumptions cyg_wQ_seg1.
 Print Assumptions cyg_wnw_seg1.
 Print Assumptions cyg_ctx0.
+Print Assumptions cyg_wwit_site00_graph.
 Print Assumptions cyg_wwit_site00.
 Print Assumptions cyg_wQ_seg0.
 Print Assumptions cyg_step0_generic.

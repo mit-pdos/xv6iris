@@ -26,6 +26,26 @@ Reading `xv6_rvwmo_safe_modulo_l2''`'s actual hypotheses:
   writes (the disk is a graph agent with real `LStore`s).
 - TRUSTED/OWED, documented: `own` (59 pin witnesses), R-3, the
   F-variant's `tr_dev_ordered` guard, the checker's Python-trusted parts.
+FIXED (same day): (a) `lock_pattern` is out of the kill — replaced by
+the per-site row fact `acq_row` (the acquire's read entry names zero);
+the contended-lock witness `lkw2` (a failed swap before the reader's
+acquire) discharges every `cs_chained` hypothesis while
+`lkw2_no_pattern` refutes the old one — Closed.  (b) `lbl_reidx_w` lets
+a witness read carry ARBITRARY values (same footprint, `aq = false`);
+`wwit_site`'s value clause is gone; `cy_img` is now all-zero so the LB
+witness's substituted value DIFFERS from the row's
+(`cyg_values_differ`, Closed).  WHAT (b) EXPOSED: a genuinely
+substituted read lands at a DIFFERENT monad node, and `cert_segment'`'s
+invariant is "same node" — the re-convergence lemma (Cert3
+`boundary_reconverge_run`, O-2) is not yet integrated into the
+segment induction; so the generic walk at a witness now carries the
+named premise `wwit_vindep` ("the read's continuation ignores the
+value" — true at the real node, `cy_node_vindep`), not a coincidence.
+`wsupply_res`: the hart bound derived; `wrmw_site` derived; the
+writer-scope clause named (`wsupply_res_no_disk_writes`: disk DMA
+stores excluded); `∃ W` stays (the frozen set is chosen, not data).
+NEXT: integrate re-convergence into `cert_segment'` so `wwit_vindep`
+disappears; then re-run the audit.
 LESSON for the discipline: "assumptions Closed + tree green" is not
 enough — every NEW hypothesis needs a non-coincidental satisfiability
 witness, and a witness constructed to make a hypothesis hold is the

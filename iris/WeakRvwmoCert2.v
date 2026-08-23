@@ -588,6 +588,95 @@ Proof.
           | by intros (-> & -> & -> & -> & -> & -> & _) ].
 Qed.
 
+(** ** 4.3a THE WITNESS-AWARE CORRESPONDENCE
+
+    [lbl_reidx] frees a read's INDICES and nothing else, so a certified
+    read must hand back [G]'s own VALUES.  AT A WITNESS THAT IS FALSE.  The
+    certified label there is the candidate's LATEST-source read
+    ([WeakRvwmoCert.latest_read_lbl]), whose values are the CANDIDATE's own
+    bytes and have no reason whatever to be [G]'s: the walk substitutes a
+    value, not only a timestamp.  Demanding that they coincide is what made
+    [WeakRvwmoWalk.wwit_site] carry [lrd_vs c base n = vs] — a clause no
+    graph fact supplies, and one that a witness graph BUILT so the values
+    agree does not test.
+
+    [lbl_reidx_sub] is the honest correspondence at a witness, and it is
+    exactly [WeakRvwmoCert3.ctrace_prefix]'s own witness arm: the same
+    FOOTPRINT (base, width), PLAIN ([aq = false], [witness_not_aq]) and
+    ARBITRARY values.
+
+    WHERE THE POSITION-INDEXED PRECISION LIVES.  [lbl_reidx_w] is the
+    disjunction of the two, so the row correspondence alone does not say
+    WHICH positions were substituted.  It does not have to: the
+    classification the policy delivers per step
+    ([WeakRvwmoGlue2.cstep_cls], carried into [ctrace_prefix]'s [ctp_step])
+    already names the witness set and pins the substituted label to
+    [latest_read_lbl] at exactly those positions — that is the
+    position-indexed statement, and it was always the one downstream reads.
+    A store, a fence and an RMW are unaffected either way ([lbl_reidx_sub]
+    is inhabited only at a LOAD), which is why every consumer of the row
+    correspondence — the exit write, the write bit, the release-pending
+    bit — comes through unchanged. *)
+Definition lbl_reidx_sub (lb lb' : lbl) : Prop :=
+  match lb with
+  | WeakAxiomatic.LLoad aq base ts _ =>
+      match lb' with
+      | WeakAxiomatic.LLoad aq' base' ts' vs' =>
+          aq = false ∧ aq' = false ∧ base' = base ∧
+          length ts' = length ts ∧ length vs' = length ts'
+      | _ => False
+      end
+  | _ => False
+  end.
+
+Definition lbl_reidx_w (lb lb' : lbl) : Prop :=
+  lbl_reidx lb lb' ∨ lbl_reidx_sub lb lb'.
+
+Lemma lbl_reidx_w_refl lb : lbl_reidx_w lb lb.
+Proof. left. apply lbl_reidx_refl. Qed.
+
+Lemma lbl_reidx_w_of lb lb' : lbl_reidx lb lb' → lbl_reidx_w lb lb'.
+Proof. by left. Qed.
+
+(** THE EXIT WRITE IS STILL VERBATIM — the substituted arm is a load's. *)
+Lemma lbl_reidx_w_store rl base vs kc lb' :
+  lbl_reidx_w (WeakAxiomatic.LStore rl base vs kc) lb' →
+  lb' = WeakAxiomatic.LStore rl base vs kc.
+Proof. by intros [H|H]. Qed.
+
+Lemma lbl_reidx_w_fence pr pw sr sw lb' :
+  lbl_reidx_w (WeakAxiomatic.LFence pr pw sr sw) lb' →
+  lb' = WeakAxiomatic.LFence pr pw sr sw.
+Proof. by intros [H|H]. Qed.
+
+Lemma lbl_reidx_sub_relp b lb lb' :
+  lbl_reidx_sub lb lb' → lpost_relp b lb' = lpost_relp b lb.
+Proof.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc];
+    destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'|
+                     aq' rl' base' ts' rvs' wvs' kc'];
+    by intros H.
+Qed.
+
+Lemma lbl_reidx_w_relp b lb lb' :
+  lbl_reidx_w lb lb' → lpost_relp b lb' = lpost_relp b lb.
+Proof.
+  intros [H|H]; [by apply lbl_reidx_relp|by apply lbl_reidx_sub_relp].
+Qed.
+
+(** … and it moves neither the write bit nor, therefore, the message. *)
+Lemma lbl_reidx_w_isw lb lb' : lbl_reidx_w lb lb' → lb_is_w lb' = lb_is_w lb.
+Proof.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc];
+    destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'|
+                     aq' rl' base' ts' rvs' wvs' kc'];
+    intros [H|H]; try (by simplify_eq); try (by destruct H).
+Qed.
+
+Lemma lbl_reidx_w_notw lb lb' :
+  lbl_reidx_w lb lb' → lb_is_w lb = false → lb_is_w lb' = false.
+Proof. intros H Hw. by rewrite (lbl_reidx_w_isw lb lb' H). Qed.
+
 (** The load block's two ends, computed. *)
 Lemma hlbl_realizes_load p ws aq base (tvs : list (nat * bv 8)) :
   hlbl_realizes p ws (WeakAxiomatic.LLoad aq base tvs.*1 tvs.*2)
@@ -727,6 +816,47 @@ Proof.
     exists ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB2, wrsB2, annB2.
     split_and!; [exact Hadm|exact HA| |exact HB2|reflexivity|reflexivity].
     by rewrite /hlbl_realizes.
+Qed.
+
+(** ** 4.3b THE SUBSTITUTION'S MACHINE-SIDE COST, NAMED
+
+    [cblk_subst] substitutes a load block's values but lands at a DIFFERENT
+    successor node [m2] — that is the whole content of "the runs part
+    company at a witness".  The segment iteration, however, continues from
+    the EMISSION's own successor node ([cert_segment]'s invariant: the two
+    runs are at the same node), so a witness position is servable only when
+    the substituted read re-converges IMMEDIATELY.  [cblk_vfree] is exactly
+    that statement — (O-2) in the one form the iteration needs — and making
+    it an explicit obligation is what the old value-coincidence clause was
+    hiding: with [lrd_vs c base n = vs] the substitution was no
+    substitution at all, so [cblk_load_retime] sufficed
+    ([cblk_vfree_of_retime] below is precisely that degenerate case). *)
+Definition cblk_vfree (cpu : CPU) (d0 : dev_state) (ws : wstate)
+    (aq : bool) (base : Z) (ts : list nat) (l : wlabel)
+    (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32) : Prop :=
+  ∀ tvs2 : list (nat * bv 8), length tvs2 = length ts →
+    ∃ l2 rds2 wrs2,
+      cblk cpu d0 ws (WeakAxiomatic.LLoad aq base tvs2.*1 tvs2.*2) l2 rds2 wrs2
+        m rs fn ib m' rs' fn' ib'.
+
+(** THE DEGENERATE CASE: if the substituted values are the ones the block
+    already read, [cblk_vfree] is [cblk_load_retime] and costs nothing.
+    This is the shape the old [wwit_site] forced, and it is why the
+    obligation was invisible. *)
+Lemma cblk_vfree_of_retime cpu d0 ws aq base ts vs l rds wrs
+    m rs fn ib m' rs' fn' ib' :
+  cblk cpu d0 ws (WeakAxiomatic.LLoad aq base ts vs) l rds wrs
+    m rs fn ib m' rs' fn' ib' →
+  ∀ tvs2 : list (nat * bv 8), tvs2.*2 = vs →
+    ∃ l2 rds2 wrs2,
+      cblk cpu d0 ws (WeakAxiomatic.LLoad aq base tvs2.*1 tvs2.*2) l2 rds2 wrs2
+        m rs fn ib m' rs' fn' ib'.
+Proof.
+  intros Hblk tvs2 Hts.
+  by apply (cblk_load_retime cpu d0 ws aq base ts vs l rds wrs
+              m rs fn ib m' rs' fn' ib' tvs2 Hblk).
 Qed.
 
 (** THE IN-LOG READ ([src_in_log]) — the block, transported and retimed. *)
@@ -990,7 +1120,7 @@ Section segment.
         (fn1 : ofence) (ib1 : oib32),
         cd_tr c' = cd_tr c ++ tradd ∧
         (∀ s, s ∈ tradd → es_ag s = x) ∧
-        Forall2 lbl_reidx rowseg ((λ s, es_lb s) <$> tradd) ∧
+        Forall2 lbl_reidx_w rowseg ((λ s, es_lb s) <$> tradd) ∧
         srvwmo_consistent c' ∧
         exec_prog_ok' pstep_ev pcls_ev pst' dv' (cand_exec c') ∧
         pst' (cd_end c') !! x = Some (PHart cpu m1 rs21 fn1 ib1) ∧
@@ -1041,14 +1171,14 @@ Section segment.
       { rewrite Hend /dv2 (dv_snoc_gt c dv d0 (S (cd_end c)) ltac:(lia)) //. }
       have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
                   = w_relp (lbl_post k ws lb).
-      { rewrite /c2 cand_snoc_relp Hrelp (lbl_reidx_relp _ lb lb' Hri).
+      { rewrite /c2 cand_snoc_relp Hrelp (lbl_reidx_w_relp _ lb lb' (lbl_reidx_w_of _ _ Hri)).
         by rewrite lbl_post_relp. }
       destruct (IH Hrf m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
                   Hc2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
             Htr & Hag' & Hf2 & Hc' & Hpo' & Hp'' & Hdv' & Hfin & Hagf & Hrelpf).
       exists c', pst', dv', (EStep x lb' :: tradd), m2, rs12, rs22, fn2, ib2.
-      split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'|exact Hpo'|exact Hp''
+      split_and!; [| |constructor; [by left|exact Hf2]|exact Hc'|exact Hpo'|exact Hp''
                    |exact Hdv'|exact Hfin|exact Hagf|exact Hrelpf].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
@@ -1068,7 +1198,7 @@ End segment.
     address, data and class included, at the certifying hart. *)
 Lemma seg_exit_write (x : agent) (rowseg : list lbl) (tradd : list estep)
     (j : nat) rl base vs kc :
-  Forall2 lbl_reidx rowseg ((λ s, es_lb s) <$> tradd) →
+  Forall2 lbl_reidx_w rowseg ((λ s, es_lb s) <$> tradd) →
   (∀ s, s ∈ tradd → es_ag s = x) →
   rowseg !! j = Some (WeakAxiomatic.LStore rl base vs kc) →
   tradd !! j = Some (EStep x (WeakAxiomatic.LStore rl base vs kc)).
@@ -1078,7 +1208,7 @@ Proof.
   rewrite list_lookup_fmap in Hy.
   apply fmap_Some in Hy as (s & Hs & ->).
   have Hlb : es_lb s = WeakAxiomatic.LStore rl base vs kc
-    by apply lbl_reidx_store.
+    by apply lbl_reidx_w_store.
   have Hx : es_ag s = x by apply Hag, (elem_of_list_lookup_2 _ j).
   rewrite Hs. destruct s as [a b]; simpl in Hlb, Hx. by rewrite Hlb Hx.
 Qed.
@@ -1164,7 +1294,7 @@ Section nonvacuity.
       (tradd : list estep),
       cd_tr c' = tradd ∧
       (∀ s, s ∈ tradd → es_ag s = 0%nat) ∧
-      Forall2 lbl_reidx ev_row ((λ s, es_lb s) <$> tradd) ∧
+      Forall2 lbl_reidx_w ev_row ((λ s, es_lb s) <$> tradd) ∧
       srvwmo_consistent c' ∧
       exec_prog_ok' pstep_ev pcls_ev pst' dv' (cand_exec c') ∧
       tradd !! 0%nat
@@ -1271,5 +1401,6 @@ Print Assumptions cert_read_in_log.
 Print Assumptions cert_read_witness.
 Print Assumptions cert_rmw_latest_ok.
 Print Assumptions cert_segment.
+Print Assumptions cblk_vfree_of_retime.
 Print Assumptions seg_exit_write.
 Print Assumptions cert_segment_nonvacuous.

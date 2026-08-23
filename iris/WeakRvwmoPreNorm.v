@@ -812,17 +812,81 @@ Qed.
     [WeakRvwmoWalk.wsupply] is the booted-hart bookkeeping and the WITNESS
     SET: its two side conditions and the per-position classification. *)
 
+(** THE HART BOUND IS NOT A HYPOTHESIS — it is [gdexec_qconf]'s hart-count
+    clause read off the row list, and it was drift that it ever sat in the
+    residue. *)
+Lemma qconf_hart_bound (boot : agent → pexv6) (d0 : dev_state) (im : image)
+    (nh : nat) (GD : gdexec) :
+  gdexec_qconf boot d0 im nh GD →
+  ∀ x k, is_Some (gx_lbl (gd_g GD) (x, k)) → (x < nh)%nat.
+Proof.
+  intros Hq x k [l Hl].
+  have Hnh : (length (gx_prog (gd_g GD)) ≤ nh)%nat
+    := gdexec_qconf_nharts _ _ _ _ _ Hq.
+  rewrite /gx_lbl /= in Hl.
+  destruct (gx_prog (gd_g GD) !! x) as [row|] eqn:Hrow; [|done].
+  apply lookup_lt_Some in Hrow. lia.
+Qed.
+
+(** THE RESIDUE, with the drift removed.  Two clauses left:
+
+    (1) THE WRITER SCOPE.  Every agent that WRITES in [G] is a [PHart] at
+        boot.  This is not plumbing — it is a real SCOPE RESTRICTION, and
+        [wsupply_res_no_disk_writes] below names it: the disk agent is a
+        graph agent with genuine [LStore]s (DMA), and it is not a [PHart],
+        so the residue as stated covers only executions in which the disk
+        does not write.  Keep it, but know what it costs.
+
+    (2) THE WITNESS SET and its two side conditions.  [W_poloc_closed] and
+        [wubA] are genuine graph obligations on the FROZEN set:
+        - [W_poloc_closed] does hold for the LOG-DECIDED set at a FIXED
+          count ([wwit G n]) — coherence forces a same-byte po-later read's
+          source not to precede the earlier read's, so it too exceeds [n].
+          It does NOT follow for the frozen [W] the walk carries, because
+          [W] is one set for EVERY count while [wwit G n] varies with the
+          count: the walk freezes [W] precisely because [ctrace_prefix] is
+          not monotone under a shrinking witness set (ELEVENTH-PASS
+          checkpoint).  So the [∃ W] cannot be replaced by [W := wwit G n]
+          data, and the clause stays.
+        - [wubA] is NOT [WeakRvwmoProgress.wub_of_row]'s vacuity: that one
+          needs the hart to carry NO witness at any position, which is
+          exactly the case the walk must now serve.
+          [WeakRvwmoProgress.wub_of_witness] gives it only for a witness
+          that steps BACK over the read in question, i.e. only once [W] is
+          known to consist of cycle backward steps — a property of the set,
+          which is what [∃ W] is choosing.  So it stays too.
+        - [wrmw_site] is NO LONGER in the residue at all: [wsite_supply]
+          asks for it only at a non-[lb_rmwfree] position, and
+          [WeakRvwmoWalk.wcpolp_at] consumes it through [cert_rmw_ok],
+          whose latest-source content is [WeakRvwmoCert.cert_rmw_latest]'s
+          [gatomicity] + log-dictionary derivation. *)
 Definition wsupply_res (boot : agent → pexv6) (G : gexec) (N : nat) : Prop :=
-  (∀ x k, is_Some (gx_lbl G (x, k)) → (x < N)%nat) ∧
   (∀ x k lb, gx_lbl G (x, k) = Some lb → lb_is_w lb = true →
      ∃ cpu m rs fn ib, boot x = PHart cpu m rs fn ib) ∧
   (∃ W : geid → Prop,
      W_poloc_closed G W ∧ wubA G W ∧ wsite_supply G W).
 
-Lemma wsupply_of_gwrow (boot : agent → pexv6) (G : gexec) (N : nat) :
-  gwrow_gmo G → wsupply_res boot G N → ∃ W, wsupply boot G W N.
+(** THE DISK SCOPE, MADE EXPLICIT.  An agent that is not a [PHart] at boot
+    — the disk, whose DMA writes are real [LStore]s in the graph — writes
+    NOTHING in any graph the residue admits. *)
+Lemma wsupply_res_no_disk_writes (boot : agent → pexv6) (G : gexec) (N : nat)
+    (x : agent) :
+  wsupply_res boot G N →
+  (∀ cpu m rs fn ib, boot x ≠ PHart cpu m rs fn ib) →
+  ∀ k lb, gx_lbl G (x, k) = Some lb → lb_is_w lb = false.
 Proof.
-  intros H14 (H1 & H2 & (W & H3 & H4 & H5)). exists W. by split_and!.
+  intros (Hw & _) Hnp k lb Hl.
+  destruct (lb_is_w lb) eqn:Hb; [|done]. exfalso.
+  destruct (Hw x k lb Hl Hb) as (cpu & m & rs & fn & ib & Hp).
+  exact (Hnp cpu m rs fn ib Hp).
+Qed.
+
+Lemma wsupply_of_gwrow (boot : agent → pexv6) (G : gexec) (N : nat) :
+  gwrow_gmo G →
+  (∀ x k, is_Some (gx_lbl G (x, k)) → (x < N)%nat) →
+  wsupply_res boot G N → ∃ W, wsupply boot G W N.
+Proof.
+  intros H14 H1 (H2 & (W & H3 & H4 & H5)). exists W. by split_and!.
 Qed.
 
 (** THE ONE STEP THE ORBIT COSTS, NAMED.  [normalize_ww] delivers
@@ -840,6 +904,7 @@ Definition wsupply_orbit_pull (boot : agent → pexv6) (N : nat) : Prop :=
 
 Theorem wsupply_of_prenorm (boot : agent → pexv6) (d0 : dev_state)
     (im : image) (nh N : nat) (GD : gdexec) :
+  (nh ≤ N)%nat →
   rvwmo_minus_deps_consistent GD →
   gdexec_qconf boot d0 im nh GD →
   wsupply_orbit_pull boot N →
@@ -849,13 +914,14 @@ Theorem wsupply_of_prenorm (boot : agent → pexv6) (d0 : dev_state)
   kill_ww_K2 GD → kill_ww_K3 GD → kill_ww_K4 GD →
   ∃ W, wsupply boot (gd_g GD) W N.
 Proof.
-  intros Hcons Hq Hpull Hres HK2 HK3 HK4.
+  intros HnN Hcons Hq Hpull Hres HK2 HK3 HK4.
   destruct (normalize_ww GD Hcons HK2 HK3 HK4) as (GD' & Heq & Hrow).
   pose proof Heq as (π & Hrows & Hwp & Hdeps & Hcons').
+  have Hq' : gdexec_qconf boot d0 im nh GD' by eapply gdexec_qconf_ren.
   apply (Hpull GD GD' Heq).
   apply (wsupply_of_gwrow boot (gd_g GD') N Hrow).
-  apply (Hres GD' Hcons').
-  by eapply gdexec_qconf_ren.
+  - intros x k Hs. have Hx := qconf_hart_bound boot d0 im nh GD' Hq' x k Hs. lia.
+  - by apply (Hres GD' Hcons').
 Qed.
 
 (** THE CAPSTONE, with (R-2) SPLIT.  [xv6_rvwmo_safe_modulo_l2']'s single
@@ -912,7 +978,10 @@ Proof.
   apply (xv6_rvwmo_safe_modulo_l2' Σ gen σ0 D Nm P Hfr Hwp Hwpp Hl2).
   intros GD Hcons Hq.
   apply (wsupply_of_gwrow (xboot σ0) (gd_g GD) (xN σ0));
-    [by apply Hrow|by apply Hres].
+    [by apply Hrow
+    |exact (qconf_hart_bound (xboot σ0) (wgdev σ0) (img_z (wgimg σ0))
+              (xN σ0) GD Hq)
+    |by apply Hres].
 Qed.
 
 (** … and the same capstone with (R-2b) traded for the orbit pull-back and
@@ -959,7 +1028,8 @@ Proof.
   intros GD Hcons Hq.
   destruct (Hkill GD Hcons Hq) as (HK2 & HK3 & HK4).
   exact (wsupply_of_prenorm (xboot σ0) (wgdev σ0) (img_z (wgimg σ0))
-           (xN σ0) (xN σ0) GD Hcons Hq Hpull Hres HK2 HK3 HK4).
+           (xN σ0) (xN σ0) GD (Nat.le_refl _) Hcons Hq Hpull Hres
+           HK2 HK3 HK4).
 Qed.
 
 (* ====================================================================== *)

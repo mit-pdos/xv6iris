@@ -76,7 +76,18 @@
         pair shows the conclusion shape is not vacuous and that the kill is
         certificate-driven.
 
-    A LEAF: nothing imports this file. *)
+    WHAT THIS FILE DOES **NOT** ASSUME (the 2026-08-24 audit item (a)).
+    [WeakRvwmoLock.cs_kill] is stated over the GLOBAL value protocol
+    [lock_pattern]/[lock_paired]; that file is the witness kit's arithmetic
+    and is left as it stands.  THE KILL RUN HERE CONSUMES THE EXPORTS —
+    [wlp_alt] (F3'), [wprot_at] (F3''), [log_of] — AND THE READER'S OWN ROW,
+    NEVER THE GLOBAL PATTERN, which route-b sect 4d.1 F4 shows is FALSE for
+    xv6 (a failed [amoswap.w.aq] writes 1 over 1; a pipe's lock byte is
+    memset over its lifetime) and which [WeakRvwmoProbeSwap.swg_no_pattern]
+    refutes at a contended lock.  See [acq_row] in §3 for the per-site row
+    fact that took its place, and §6b for the contended-lock witness.
+
+    A LEAF: [WeakRvwmoGlue] and the pin bridges import this file. *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list relations.
 From stdpp Require Import bitvector.definitions.
@@ -368,6 +379,55 @@ Proof.
   rewrite Htr in Htid. by injection Htid as <-.
 Qed.
 
+(** THE ACQUIRE'S OWN ROW — WHAT REPLACES THE GLOBAL VALUE PATTERN.
+
+    [WeakRvwmoLock.lock_pattern G b] says the image starts [b] free AND that
+    EVERY [b]-write is a release or an acquire-reading-zero.  Route-b
+    §4d.1 F4 shows it is false for xv6 twice over, and
+    [WeakRvwmoProbeSwap.swg_no_pattern] machine-checks the first half: a
+    FAILED [amoswap.w.aq] writes 1 over 1, so it is neither.
+
+    Everything this file ever took from the pattern it took AT ONE EVENT —
+    the reader's SUCCESSFUL acquire — and only from the pattern's second
+    clause.  So the hypothesis is replaced by that event's own ROW DATA:
+    the acquire's read entry at [b] names the free byte.  This is §4d.3′'s
+    "a SUCCESSFUL acquire is one whose READ ENTRY is zero, a ROW fact"
+    verbatim; it is per-site (hence lifetime-aware for free), and it says
+    NOTHING about any other [b]-write — a failed swap, a memset, a fresh
+    [initlock] are all admitted, they are simply not its subject.
+
+    The pattern's FIRST clause (the image's initial zero) is not used here
+    at all: what the reader's acquire needs is that the FOLD is free just
+    below it, and the fold starts at [None] at the registration point [n0]
+    with [n0 < gwix ACQ] (a hypothesis of [cs_chained], and of
+    [WeakRvwmoGlue.cs_hyps]) making the acquire post-registration — [wlp_at]
+    territory, not the image's.  And the pattern's second clause AT THE
+    OTHER [b]-writes is not needed either: [acq_src] / [acq_ts_lt] /
+    [acq_src_rel] are all consequences of [rvwmo_minus_consistent] alone
+    (atomicity, load-value, poloc), and the writer-side acquire is
+    identified through [wprot_at] + [lock_word_byte], i.e. through the log's
+    exported shape ([wlp_at]'s [wlock_shaped]) rather than through any
+    global claim about the graph's writes. *)
+Definition acq_row (G : gexec) (b : Z) (A : geid) : Prop :=
+  ∃ t, greads_byte G A b t lock_free.
+
+(** A row WITH a read entry IS a read: [greads_byte] already demands
+    [lb_rd], so the [glbl_is … lb_is_r] half of [lock_acq_read] is free. *)
+Lemma acq_row_is_r G b A : acq_row G b A → glbl_is G A lb_is_r.
+Proof.
+  intros (t & l & base & ts & vs & j & Hl & Hrd & _). exists l.
+  split; [done|]. by destruct l; [|discriminate Hrd|discriminate Hrd|].
+Qed.
+
+(** … and where the pattern DOES hold — an uncontended witness, §6 — it
+    gives the row fact, so no site that satisfied the old hypothesis loses
+    anything. *)
+Lemma acq_row_of_pattern G b A :
+  lock_pattern G b → lock_acq G b A → acq_row G b A.
+Proof.
+  intros Hpat Hacq. by destruct (lock_acq_read G b A Hpat Hacq) as [_ Ht].
+Qed.
+
 (** THE FOLD IS FREE AT AN ACQUIRE.  F3′'s locality fact (i), read off the
     ROW: the acquire's read entry at [b] names a zero value, so its co-
     predecessor (atomicity + load-value, [WeakRvwmoLock] §2) is a release
@@ -375,15 +435,15 @@ Qed.
     [b]-writing messages, is therefore FREE just before it. *)
 Lemma acq_fold_free G log b n0 h ACQ :
   rvwmo_minus_consistent G → log_of G log → lock_word_byte log b →
-  wlp_alt log b n0 h → lock_pattern G b → lock_acq G b ACQ →
+  wlp_alt log b n0 h → acq_row G b ACQ → lock_acq G b ACQ →
   (gwix G ACQ ≤ length log)%nat →
   wlp_holder_at log b n0 (gwix G ACQ - 1)%nat = Some None.
 Proof.
-  intros Hcons Hlog Hlwb Halt Hpat Hacq Hle.
+  intros Hcons Hlog Hlwb Halt Hrow Hacq Hle.
   pose proof Hcons as (Hwf & _ & _ & _).
   pose proof (lock_acq_gwrites G b ACQ Hwf Hacq) as HAw.
   pose proof (gwix_pos G ACQ HAw) as Hpos.
-  destruct (lock_acq_read G b ACQ Hpat Hacq) as [_ (t & Hrd)].
+  destruct Hrow as (t & Hrd).
   pose proof (acq_ts_lt G b ACQ t Hcons Hacq Hrd) as Htlt.
   assert (Hquiet : ∀ r mr, (t ≤ r < gwix G ACQ - 1)%nat → log !! r = Some mr →
                     msg_byte mr b = None).
@@ -450,8 +510,10 @@ Theorem cs_chained (G : gexec) (log : list wmsg) (b a : Z) (n0 r0 : nat)
   rvwmo_minus_consistent G →
   (* the log, the fold, and the byte/word bridge *)
   log_of G log → lock_word_byte log b → wlp_alt log b n0 h →
-  (* the graph-side value protocol on the lock byte *)
-  lock_pattern G b →
+  (* the reader's acquire is a SUCCESSFUL one — its ROW's read entry at [b]
+     names the free byte.  This per-site fact REPLACES the global (and, for
+     xv6, false) [WeakRvwmoLock.lock_pattern]; see [acq_row]. *)
+  acq_row G b ACQ →
   (* F3″ at the protected byte *)
   wprot_at log a b n0 r0 →
   (* the PREVIOUS EXIT [w]: an owned plain write of the protected byte,
@@ -468,7 +530,7 @@ Theorem cs_chained (G : gexec) (log : list wmsg) (b a : Z) (n0 r0 : nat)
   ACQ.1 ≠ w.1 →
   gmo_lt G w exit.
 Proof.
-  intros Hcons Hlog Hlwb Halt Hpat Hpr Hwa Hcl Hr0 Hlew Hnob
+  intros Hcons Hlog Hlwb Halt Hrow Hpr Hwa Hcl Hr0 Hlew Hnob
          Hacq Haq Hn0A HleA Hcs Hpoe Hfen Hcross Hpox Hmx Hhart.
   pose proof Hcons as (Hwf & Hppo & _ & _). pose proof Hwf as (Hnd & _ & _).
   pose proof (lock_acq_gwrites G b ACQ Hwf Hacq) as HAw.
@@ -481,10 +543,10 @@ Proof.
               Hwa Hcl)
     as (q & mq & Hq & Hlk & Hs & Hnz & Ht & Hfree & Hno & _).
   (* F3′ locality: the fold is FREE just before the reader's acquire *)
-  pose proof (acq_fold_free G log b n0 h ACQ Hcons Hlog Hlwb Halt Hpat Hacq
+  pose proof (acq_fold_free G log b n0 h ACQ Hcons Hlog Hlwb Halt Hrow Hacq
                 HleA) as HfreeA.
   (* ppo rule 5: the reader's acquire is gmo-before its segment's exit *)
-  destruct (lock_acq_read G b ACQ Hpat Hacq) as [HrA _].
+  pose proof (acq_row_is_r G b ACQ Hrow) as HrA.
   assert (HmoAx : gmo_lt G ACQ exit) by (by eapply acq_gmo_after).
   destruct (log_of_write G log w Hwf Hlog Hw Hlew) as (mw & Hmw & Hgw).
   (* the two acquires are distinct events *)
@@ -875,6 +937,13 @@ Proof.
   - intros Heq. by apply WeakLitmus.b0_ne_b1.
 Qed.
 
+(** The reader's ROW fact — [acq_row], which [cs_chained] now takes in place
+    of [lock_pattern].  On [lkw] the global pattern happens to hold too
+    ([lkw_pattern], the lock is UNCONTENDED), so the two agree here; §6b's
+    contended witness is where they part. *)
+Lemma lkw_acq_row : acq_row lkw 0%Z ACQr.
+Proof. exact (acq_row_of_pattern lkw 0%Z ACQr lkw_pattern lkw_acq_r). Qed.
+
 Lemma lkw_rel_r : lock_rel lkw 0%Z RELr.
 Proof. by exists (LStore true 0 z4 WCrel), 0%Z, z4, 0%nat. Qed.
 
@@ -1037,7 +1106,7 @@ Proof.
   - exact lkw_log_of.
   - exact lkw_lwb.
   - exact lkw_alt.
-  - exact lkw_pattern.
+  - exact lkw_acq_row.
   - exact lkw_wprot.
   - exact lkw_wp_data.
   - exact lkw_wp_plain.
@@ -1062,6 +1131,520 @@ Corollary lkw_cert : cert lkw Wp (Seg 1%nat ENT RELr).
 Proof. apply CSchained. exact lkw_cs_chained. Qed.
 
 (* ====================================================================== *)
+(** * 6b. NON-VACUITY (c): THE CS ARM AT A *CONTENDED* LOCK
+
+    [lkw] is UNCONTENDED, so [WeakRvwmoLock.lock_pattern] happens to hold on
+    it — which is precisely what made it a weak record for the repaired
+    hypotheses: it could not tell the old (false) hypothesis from the new
+    (per-site) ones.  [lkw2] is [lkw] with ONE extra event: hart 1 SPINS
+    ONCE — a failed [amoswap.w.aq] that READS the 1 hart 0's acquire wrote
+    and WRITES 1 again — before its successful acquire.  This is
+    [WeakRvwmoProbeSwap.swg]'s shape, at [lkw]'s 4-byte lock word and with
+    [lkw]'s CS orientation.
+
+      [lkw2_no_pattern]  : ¬ [lock_pattern lkw2 0] — the OLD hypothesis is
+                           FALSE here, for exactly F4(a)'s reason;
+      [lkw2_cs_chained]  : every hypothesis of [cs_chained] is discharged on
+                           [lkw2]/[lkw2_log] and its conclusion DERIVED.
+
+    So the new hypotheses hold exactly where the old one failed.  The
+    mechanism is [alt_step]: over a HELD word an exclusive nonzero message
+    leaves the holder unchanged ([alt_step_fail]), so the fold walks past the
+    failed swap without noticing it, and [wprot_writer_cs]'s "no zero-word
+    message between the holder's acquire and its protected write" clause is
+    satisfied WITH the failed swap sitting inside that stretch.
+
+      hart 0 (the writer)                 hart 1 (the reader)
+      (0,0) ACQw amoswap.aq 0:0->1 (img)  (1,0) SWP2 amoswap.aq 0:1->1
+      (0,1) Wp   STORE d := 1 (WCplain)              reads (0,0)   <<<< NEW
+      (0,2) FENCE rw,rw                   (1,1) ACQ2 amoswap.aq 0:0->1
+      (0,3) RELw store 0 := 0                        reads (0,3)
+                                          (1,2) ENT2 LOAD d, reads (0,1)
+                                          (1,3) FENCE rw,rw
+                                          (1,4) REL2 store 0 := 0
+
+    gmo — ACQw, SWP2, Wp, RELw, ACQ2, ENT2, REL2 — puts the failed swap
+    immediately after its own source, which is what atomicity needs at it.
+    Write indices: ACQw 1, SWP2 2, Wp 3, RELw 4, ACQ2 5, REL2 6. *)
+
+Definition lkw2 : gexec :=
+  GExec imgw
+    [[LRmw true false 0 [0%nat; 0%nat; 0%nat; 0%nat] z4 o4 WCexcl;
+      LStore false 8 [WeakLitmus.b1] WCplain;
+      LFence true true true true;
+      LStore true 0 z4 WCrel];
+     [LRmw true false 0 [1%nat; 1%nat; 1%nat; 1%nat] o4 o4 WCexcl;
+      LRmw true false 0 [4%nat; 4%nat; 4%nat; 4%nat] z4 o4 WCexcl;
+      LLoad false 8 [3%nat] [WeakLitmus.b1];
+      LFence true true true true;
+      LStore true 0 z4 WCrel]]
+    [(0%nat, 0%nat); (1%nat, 0%nat); (0%nat, 1%nat); (0%nat, 3%nat);
+     (1%nat, 1%nat); (1%nat, 2%nat); (1%nat, 4%nat)].
+
+Local Notation SWP2 := (1%nat, 0%nat).
+Local Notation ACQ2 := (1%nat, 1%nat).
+Local Notation ENT2 := (1%nat, 2%nat).
+Local Notation REL2 := (1%nat, 4%nat).
+
+Lemma o4_lookup (a : Z) : (0 ≤ a < 4)%Z → o4 !! Z.to_nat a = Some WeakLitmus.b1.
+Proof.
+  intros Ha. assert (Hk : (Z.to_nat a < 4)%nat) by lia.
+  by destruct (Z.to_nat a) as [|[|[|[|k]]]]; [| | | |lia].
+Qed.
+
+Lemma imgw_in2 (a : Z) : (0 ≤ a < 4)%Z → gx_img lkw2 a = Some WeakLitmus.b0.
+Proof.
+  intros Ha. assert (Hd : ((0 ≤ a < 4)%Z ∨ a = 8%Z)) by (by left).
+  change (gx_img lkw2 a) with (imgw a). rewrite /imgw.
+  by rewrite (bool_decide_eq_true_2 _ Hd).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 6b.1 Inversions and the position / index arithmetic *)
+
+Lemma lkw2_nodup : NoDup (gx_gmo lkw2).
+Proof.
+  repeat constructor; rewrite ?elem_of_list_In; simpl; intuition congruence.
+Qed.
+
+Lemma lkw2_gpos_of (n : nat) (e : geid) : gx_gmo lkw2 !! n = Some e → gpos lkw2 e = n.
+Proof. apply gpos_of_lookup, lkw2_nodup. Qed.
+
+Lemma lkw2_gwix_of (n : nat) (w : geid) :
+  gwrites lkw2 !! n = Some w → gwix lkw2 w = S n.
+Proof. apply gwix_of_lookup, lkw2_nodup. Qed.
+
+Lemma lkw2_p0 : gpos lkw2 ACQw = 0%nat. Proof. by apply lkw2_gpos_of. Qed.
+Lemma lkw2_p1 : gpos lkw2 SWP2 = 1%nat. Proof. by apply lkw2_gpos_of. Qed.
+Lemma lkw2_p2 : gpos lkw2 Wp   = 2%nat. Proof. by apply lkw2_gpos_of. Qed.
+Lemma lkw2_p3 : gpos lkw2 RELw = 3%nat. Proof. by apply lkw2_gpos_of. Qed.
+Lemma lkw2_p4 : gpos lkw2 ACQ2 = 4%nat. Proof. by apply lkw2_gpos_of. Qed.
+Lemma lkw2_p5 : gpos lkw2 ENT2 = 5%nat. Proof. by apply lkw2_gpos_of. Qed.
+Lemma lkw2_p6 : gpos lkw2 REL2 = 6%nat. Proof. by apply lkw2_gpos_of. Qed.
+
+Lemma lkw2_gwrites : gwrites lkw2 = [ACQw; SWP2; Wp; RELw; ACQ2; REL2].
+Proof. by vm_compute. Qed.
+
+Lemma lkw2_x1 : gwix lkw2 ACQw = 1%nat. Proof. by apply lkw2_gwix_of; vm_compute. Qed.
+Lemma lkw2_x2 : gwix lkw2 SWP2 = 2%nat. Proof. by apply lkw2_gwix_of; vm_compute. Qed.
+Lemma lkw2_x3 : gwix lkw2 Wp   = 3%nat. Proof. by apply lkw2_gwix_of; vm_compute. Qed.
+Lemma lkw2_x4 : gwix lkw2 RELw = 4%nat. Proof. by apply lkw2_gwix_of; vm_compute. Qed.
+Lemma lkw2_x5 : gwix lkw2 ACQ2 = 5%nat. Proof. by apply lkw2_gwix_of; vm_compute. Qed.
+Lemma lkw2_x6 : gwix lkw2 REL2 = 6%nat. Proof. by apply lkw2_gwix_of; vm_compute. Qed.
+
+Lemma lkw2_mem_inv (e : geid) :
+  gmem lkw2 e →
+  e = ACQw ∨ e = Wp ∨ e = RELw ∨ e = SWP2 ∨ e = ACQ2 ∨ e = ENT2 ∨ e = REL2.
+Proof.
+  intros (l & Hl & Hm). destruct e as [i k]. rewrite /gx_lbl /= in Hl.
+  destruct i as [|[|i]]; simpl in Hl; [| |done];
+    destruct k as [|[|[|[|[|k]]]]]; simplify_eq/=; naive_solver.
+Qed.
+
+Lemma lkw2_gmo_mem (e : geid) : gmem lkw2 e → e ∈ gx_gmo lkw2.
+Proof.
+  intros [->|[->|[->|[->|[->|[->| ->]]]]]]%lkw2_mem_inv;
+    rewrite /gx_gmo /= !elem_of_cons; naive_solver.
+Qed.
+
+Lemma lkw2_mo (e1 e2 : geid) :
+  gmem lkw2 e1 → gmem lkw2 e2 → (gpos lkw2 e1 < gpos lkw2 e2)%nat →
+  gmo_lt lkw2 e1 e2.
+Proof.
+  intros H1 H2 Hlt.
+  split_and!; [by apply lkw2_gmo_mem|by apply lkw2_gmo_mem|exact Hlt].
+Qed.
+
+(** gmo IS per-hart program order here too. *)
+Lemma lkw2_gmo_po (e1 e2 : geid) :
+  gmem lkw2 e1 → gmem lkw2 e2 → e1.1 = e2.1 → (e1.2 < e2.2)%nat →
+  gmo_lt lkw2 e1 e2.
+Proof.
+  intros Hm1 Hm2 Hag Hlt.
+  split_and!; [by apply lkw2_gmo_mem|by apply lkw2_gmo_mem|].
+  apply lkw2_mem_inv in Hm1. apply lkw2_mem_inv in Hm2.
+  destruct Hm1 as [->|[->|[->|[->|[->|[->| ->]]]]]];
+    destruct Hm2 as [->|[->|[->|[->|[->|[->| ->]]]]]];
+    simpl in Hag, Hlt; try lia;
+    rewrite ?lkw2_p0 ?lkw2_p1 ?lkw2_p2 ?lkw2_p3 ?lkw2_p4 ?lkw2_p5 ?lkw2_p6;
+    lia.
+Qed.
+
+(** The write footprints. *)
+Lemma lkw2_wr (e : geid) (a : Z) (v : bv 8) :
+  gwrites_byte lkw2 e a v →
+  (e = ACQw ∧ (0 ≤ a < 4)%Z ∧ v = WeakLitmus.b1) ∨
+  (e = Wp   ∧ a = 8%Z ∧ v = WeakLitmus.b1) ∨
+  (e = RELw ∧ (0 ≤ a < 4)%Z ∧ v = WeakLitmus.b0) ∨
+  (e = SWP2 ∧ (0 ≤ a < 4)%Z ∧ v = WeakLitmus.b1) ∨
+  (e = ACQ2 ∧ (0 ≤ a < 4)%Z ∧ v = WeakLitmus.b1) ∨
+  (e = REL2 ∧ (0 ≤ a < 4)%Z ∧ v = WeakLitmus.b0).
+Proof.
+  intros (l & b & vs & j & Hl & Hwr & Hv & Ha).
+  destruct e as [i k]. rewrite /gx_lbl /= in Hl.
+  destruct i as [|[|i]]; simpl in Hl; [| |done];
+    destruct k as [|[|[|[|[|k]]]]]; simplify_eq/=;
+    destruct j as [|[|[|[|j]]]]; simplify_eq/=;
+    rewrite /acc_addr /=; naive_solver lia.
+Qed.
+
+(** The read footprints.  THE HEART OF THE CONTENTION: [SWP2]'s read entry
+    at byte 0 names [b1], NOT the free byte. *)
+Lemma lkw2_rd (e : geid) (a : Z) (t : nat) (v : bv 8) :
+  greads_byte lkw2 e a t v →
+  (e = ACQw ∧ (0 ≤ a < 4)%Z ∧ t = 0%nat ∧ v = WeakLitmus.b0) ∨
+  (e = SWP2 ∧ (0 ≤ a < 4)%Z ∧ t = 1%nat ∧ v = WeakLitmus.b1) ∨
+  (e = ACQ2 ∧ (0 ≤ a < 4)%Z ∧ t = 4%nat ∧ v = WeakLitmus.b0) ∨
+  (e = ENT2 ∧ a = 8%Z ∧ t = 3%nat ∧ v = WeakLitmus.b1).
+Proof.
+  intros (l & b & ts & vs & j & Hl & Hrd & Ht & Hv & Ha).
+  destruct e as [i k]. rewrite /gx_lbl /= in Hl.
+  destruct i as [|[|i]]; simpl in Hl; [| |done];
+    destruct k as [|[|[|[|[|k]]]]]; simplify_eq/=;
+    destruct j as [|[|[|[|j]]]]; simplify_eq/=;
+    rewrite /acc_addr /=; naive_solver lia.
+Qed.
+
+Lemma lkw2_wr_lock (w : geid) (a : Z) (v : bv 8) :
+  gwrites_byte lkw2 w a v → (0 ≤ a < 4)%Z →
+  (w = ACQw ∧ v = WeakLitmus.b1) ∨ (w = SWP2 ∧ v = WeakLitmus.b1) ∨
+  (w = RELw ∧ v = WeakLitmus.b0) ∨ (w = ACQ2 ∧ v = WeakLitmus.b1) ∨
+  (w = REL2 ∧ v = WeakLitmus.b0).
+Proof.
+  intros [(->&_&->)|[(_&Hab&_)|[(->&_&->)|[(->&_&->)|[(->&_&->)|(->&_&->)]]]]]%lkw2_wr
+         Ha.
+  - by left.
+  - lia.
+  - by (right; right; left).
+  - by (right; left).
+  - by (right; right; right; left).
+  - by (right; right; right; right).
+Qed.
+
+Lemma lkw2_wr_data (w : geid) (v : bv 8) :
+  gwrites_byte lkw2 w 8%Z v → w = Wp ∧ v = WeakLitmus.b1.
+Proof.
+  intros [(_&Hab&_)|[(->&_&->)|[(_&Hab&_)|[(_&Hab&_)|[(_&Hab&_)|(_&Hab&_)]]]]]%lkw2_wr;
+    [lia|done|lia|lia|lia|lia].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 6b.2 [lkw2] is RVWMO⁻-consistent — a contended lock is a LEGITIMATE
+       execution, so the witness is not an artefact of an impossible graph *)
+
+Theorem lkw2_consistent : rvwmo_minus_consistent lkw2.
+Proof.
+  split_and!.
+  - (* gwf *) split_and!.
+    + exact lkw2_nodup.
+    + intros e. split.
+      * intros He. rewrite /gx_gmo /= !elem_of_cons elem_of_nil in He.
+        destruct He as [->|[->|[->|[->|[->|[->|[->|[]]]]]]]];
+          eexists; split; reflexivity.
+      * apply lkw2_gmo_mem.
+    + intros i p k l Hp Hk.
+      destruct i as [|[|i]]; simplify_eq/=;
+        destruct k as [|[|[|[|[|k]]]]]; simplify_eq/=; done.
+  - (* ppo⁻ ⊆ gmo *)
+    intros e1 e2 Hppo.
+    destruct (gppo_gmem lkw2 e1 e2 Hppo) as [Hm1 Hm2].
+    destruct (gppo_po_lt lkw2 e1 e2 Hppo) as [Hag Hlt].
+    by apply lkw2_gmo_po.
+  - (* load value *)
+    intros e a t v Hrd.
+    destruct (lkw2_rd e a t v Hrd)
+      as [(->&Ha&->&->)|[(->&Ha&->&->)|[(->&Ha&->&->)|(->&->&->&->)]]].
+    + (* ACQw reads the image *)
+      split; [by apply imgw_in2|].
+      intros w' v' Hw' Hvis. exfalso.
+      destruct Hvis as [(_ & _ & Hp)|(_ & Hoff & _)].
+      * rewrite lkw2_p0 in Hp. lia.
+      * simpl in Hoff. lia.
+    + (* SWP2 — the FAILED swap — reads hart 0's acquire *)
+      split.
+      * exists ACQw. split_and!.
+        { by vm_compute. }
+        { eapply (gwrites_byte_of lkw2 ACQw
+                    (LRmw true false 0 [0%nat;0%nat;0%nat;0%nat] z4 o4 WCexcl)
+                    0%Z o4); [done|done|lia|].
+          replace (a - 0)%Z with a by lia. by apply o4_lookup. }
+        { left. apply lkw2_mo; [by eexists|by eexists|].
+          rewrite lkw2_p0 lkw2_p1. lia. }
+      * intros w' v' Hw' Hvis.
+        destruct (lkw2_wr_lock w' a v' Hw' Ha)
+          as [[-> _]|[[-> _]|[[-> _]|[[-> _]|[-> _]]]]].
+        { rewrite lkw2_x1. lia. }
+        { exfalso. destruct Hvis as [Hmo|(_ & Hoff & _)];
+            [by eapply gmo_lt_irrefl|simpl in Hoff; lia]. }
+        { exfalso. destruct Hvis as [(_ & _ & Hp)|(_ & Hoff & _)];
+            [rewrite lkw2_p3 lkw2_p1 in Hp; lia|simpl in Hoff; lia]. }
+        { exfalso. destruct Hvis as [(_ & _ & Hp)|(_ & Hoff & _)];
+            [rewrite lkw2_p4 lkw2_p1 in Hp; lia|simpl in Hoff; lia]. }
+        { exfalso. destruct Hvis as [(_ & _ & Hp)|(_ & Hoff & _)];
+            [rewrite lkw2_p6 lkw2_p1 in Hp; lia|simpl in Hoff; lia]. }
+    + (* ACQ2 — the SUCCESSFUL acquire — reads hart 0's release *)
+      split.
+      * exists RELw. split_and!.
+        { by vm_compute. }
+        { eapply (gwrites_byte_of lkw2 RELw (LStore true 0 z4 WCrel) 0%Z z4);
+            [done|done|lia|].
+          replace (a - 0)%Z with a by lia. by apply z4_lookup. }
+        { left. apply lkw2_mo; [by eexists|by eexists|].
+          rewrite lkw2_p3 lkw2_p4. lia. }
+      * intros w' v' Hw' Hvis.
+        destruct (lkw2_wr_lock w' a v' Hw' Ha)
+          as [[-> _]|[[-> _]|[[-> _]|[[-> _]|[-> _]]]]].
+        { rewrite lkw2_x1. lia. }
+        { rewrite lkw2_x2. lia. }
+        { rewrite lkw2_x4. lia. }
+        { exfalso. destruct Hvis as [Hmo|(_ & Hoff & _)];
+            [by eapply gmo_lt_irrefl|simpl in Hoff; lia]. }
+        { exfalso. destruct Hvis as [(_ & _ & Hp)|(_ & Hoff & _)];
+            [rewrite lkw2_p6 lkw2_p4 in Hp; lia|simpl in Hoff; lia]. }
+    + (* ENT2 reads the payload *)
+      split.
+      * exists Wp. split_and!.
+        { by vm_compute. }
+        { by exists (LStore false 8 [WeakLitmus.b1] WCplain), 8%Z,
+                    [WeakLitmus.b1], 0%nat. }
+        { left. apply lkw2_mo; [by eexists|by eexists|].
+          rewrite lkw2_p2 lkw2_p5. lia. }
+      * intros w' v' Hw' Hvis.
+        destruct (lkw2_wr_data w' v' Hw') as [-> _]. rewrite lkw2_x3. lia.
+  - (* atomicity — each RMW's source is its immediate co-predecessor *)
+    intros e a t v Hrd Hw w' v' Hw' [Hlo Hhi].
+    destruct (lkw2_rd e a t v Hrd)
+      as [(->&Ha&->&->)|[(->&Ha&->&->)|[(->&Ha&->&->)|(->&->&->&->)]]].
+    + rewrite lkw2_x1 in Hhi. lia.
+    + rewrite lkw2_x2 in Hhi. lia.
+    + rewrite lkw2_x5 in Hhi. lia.
+    + destruct Hw as (l & Hl & Hlw). rewrite /gx_lbl /= in Hl. by simplify_eq.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 6b.3 THE OLD HYPOTHESIS IS FALSE HERE — F4(a), at this graph *)
+
+Lemma lkw2_swp_wr : gwrites_byte lkw2 SWP2 0%Z WeakLitmus.b1.
+Proof.
+  by exists (LRmw true false 0 [1%nat;1%nat;1%nat;1%nat] o4 o4 WCexcl),
+            0%Z, o4, 0%nat.
+Qed.
+
+Theorem lkw2_no_pattern : ¬ lock_pattern lkw2 0%Z.
+Proof.
+  intros [_ Hpat].
+  destruct (Hpat SWP2 WeakLitmus.b1 lkw2_swp_wr) as [(_ & _ & (t & Hrd))|Hz].
+  - destruct (lkw2_rd SWP2 0%Z t lock_free Hrd)
+      as [(Hc&_)|[(_&_&_&Hv)|[(Hc&_)|(Hc&_)]]];
+      [by simplify_eq| |by simplify_eq|by simplify_eq].
+    exact (WeakLitmus.b0_ne_b1 Hv).
+  - exact (WeakLitmus.b0_ne_b1 (eq_sym Hz)).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 6b.4 The reader's row, its section, and the payload *)
+
+Lemma lkw2_acq2 : lock_acq lkw2 0%Z ACQ2.
+Proof.
+  exists WeakLitmus.b1. split.
+  - by exists (LRmw true false 0 [4%nat;4%nat;4%nat;4%nat] z4 o4 WCexcl),
+              0%Z, o4, 0%nat.
+  - intros Heq. by apply WeakLitmus.b0_ne_b1.
+Qed.
+
+(** THE NEW HYPOTHESIS, at the same site the old one failed: the SUCCESSFUL
+    acquire's own read entry at byte 0 names the free byte.  The failed swap
+    [SWP2] is a [b]-write with no such entry — and [acq_row] does not ask it
+    for one. *)
+Lemma lkw2_acq_row : acq_row lkw2 0%Z ACQ2.
+Proof.
+  exists 4%nat.
+  by exists (LRmw true false 0 [4%nat;4%nat;4%nat;4%nat] z4 o4 WCexcl),
+            0%Z, [4%nat;4%nat;4%nat;4%nat], z4, 0%nat.
+Qed.
+
+Lemma lkw2_rel2 : lock_rel lkw2 0%Z REL2.
+Proof. by exists (LStore true 0 z4 WCrel), 0%Z, z4, 0%nat. Qed.
+
+Lemma lkw2_aq2 : glbl_is lkw2 ACQ2 lb_aq.
+Proof.
+  by exists (LRmw true false 0 [4%nat;4%nat;4%nat;4%nat] z4 o4 WCexcl).
+Qed.
+
+Theorem lkw2_cs_r : lock_cs lkw2 0%Z ACQ2 REL2.
+Proof.
+  apply lock_cs_intro; [exact lkw2_consistent| | | |].
+  - split_and!; [done|simpl; lia|by eexists|by eexists].
+  - exact lkw2_acq2.
+  - exact lkw2_rel2.
+  - intros x v Hx Hag Hlo Hhi.
+    destruct (lkw2_wr_lock x 0%Z v Hx ltac:(lia))
+      as [[-> _]|[[-> _]|[[-> _]|[[-> _]|[-> _]]]]]; simpl in *; lia.
+Qed.
+
+Lemma lkw2_fence_r : gfence_covers lkw2 ENT2 REL2.
+Proof.
+  exists true, true, true, true. split_and!.
+  - split_and!; [done|simpl; lia|].
+    exists 3%nat. split_and!; [simpl; lia|simpl; lia|done].
+  - left. split; [by exists (LLoad false 8 [3%nat] [WeakLitmus.b1])|done].
+  - right. split; [by exists (LStore true 0 z4 WCrel)|done].
+Qed.
+
+Lemma lkw2_grf : grf lkw2 Wp ENT2.
+Proof.
+  exists 8%Z, 3%nat, WeakLitmus.b1. split.
+  - by exists (LLoad false 8 [3%nat] [WeakLitmus.b1]), 8%Z, [3%nat],
+              [WeakLitmus.b1], 0%nat.
+  - by vm_compute.
+Qed.
+
+Lemma lkw2_wp_plain : gcls lkw2 Wp WCplain.
+Proof. by exists (LStore false 8 [WeakLitmus.b1] WCplain). Qed.
+
+Lemma lkw2_wp_data : ∃ v, gwrites_byte lkw2 Wp 8%Z v.
+Proof.
+  exists WeakLitmus.b1.
+  by exists (LStore false 8 [WeakLitmus.b1] WCplain), 8%Z, [WeakLitmus.b1], 0%nat.
+Qed.
+
+Lemma lkw2_wp_no_lock : ∀ v, ¬ gwrites_byte lkw2 Wp 0%Z v.
+Proof.
+  intros v Hv.
+  by destruct (lkw2_wr_lock Wp 0%Z v Hv ltac:(lia))
+    as [[Hc _]|[[Hc _]|[[Hc _]|[[Hc _]|[Hc _]]]]].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 6b.5 The log, and the three exported predicates on it
+
+    The log carries the failed swap as an ORDINARY [WCexcl] nonzero message
+    at position 1; [wlp_alt] folds straight past it ([alt_step_fail]), and
+    [wprot_at] never looks at it (it is not [WCplain]). *)
+
+Definition lkw2_log : list wmsg :=
+  [ WMsg 0%Z o4 (Some 0%nat) WCexcl;                (* ACQw *)
+    WMsg 0%Z o4 (Some 1%nat) WCexcl;                (* SWP2 — the FAILED swap *)
+    WMsg 8%Z [WeakLitmus.b1] (Some 0%nat) WCplain;  (* Wp   *)
+    WMsg 0%Z z4 (Some 0%nat) WCrel;                 (* RELw *)
+    WMsg 0%Z o4 (Some 1%nat) WCexcl;                (* ACQ2 *)
+    WMsg 0%Z z4 (Some 1%nat) WCrel ].               (* REL2 *)
+
+Lemma lkw2_log_of : log_of lkw2 lkw2_log.
+Proof.
+  intros p m. rewrite /gwrite_at lkw2_gwrites /lkw2_log.
+  destruct p as [|[|[|[|[|[|p]]]]]]; simpl.
+  1-6: split;
+    [ intros [= <-]; eexists; split; [reflexivity|by vm_compute]
+    | intros (w & Hw & Hm); injection Hw as <-; vm_compute in Hm;
+      by simplify_eq ].
+  split; [by intros [=]|by intros (w & [=] & _)].
+Qed.
+
+Lemma lkw2_log_0 : lkw2_log !! 0%nat = Some (WMsg 0%Z o4 (Some 0%nat) WCexcl).
+Proof. reflexivity. Qed.
+Lemma lkw2_log_1 : lkw2_log !! 1%nat = Some (WMsg 0%Z o4 (Some 1%nat) WCexcl).
+Proof. reflexivity. Qed.
+Lemma lkw2_log_2 :
+  lkw2_log !! 2%nat = Some (WMsg 8%Z [WeakLitmus.b1] (Some 0%nat) WCplain).
+Proof. reflexivity. Qed.
+Lemma lkw2_log_3 : lkw2_log !! 3%nat = Some (WMsg 0%Z z4 (Some 0%nat) WCrel).
+Proof. reflexivity. Qed.
+Lemma lkw2_log_4 : lkw2_log !! 4%nat = Some (WMsg 0%Z o4 (Some 1%nat) WCexcl).
+Proof. reflexivity. Qed.
+Lemma lkw2_log_5 : lkw2_log !! 5%nat = Some (WMsg 0%Z z4 (Some 1%nat) WCrel).
+Proof. reflexivity. Qed.
+Lemma lkw2_log_hi (p : nat) :
+  lkw2_log !! (S (S (S (S (S (S p)))))) = None.
+Proof. reflexivity. Qed.
+
+Lemma lkw2_log_len : length lkw2_log = 6%nat.
+Proof. reflexivity. Qed.
+
+Lemma lkw2_lwb : lock_word_byte lkw2_log 0%Z.
+Proof.
+  intros p m v Hp Hb Hv. destruct p as [|[|[|[|[|[|p]]]]]].
+  - rewrite lkw2_log_0 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_o4_0 in Hb. injection Hb as Heq.
+    exfalso. exact (WeakLitmus.b0_ne_b1 (eq_sym (eq_trans Heq Hv))).
+  - rewrite lkw2_log_1 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_o4_0 in Hb. injection Hb as Heq.
+    exfalso. exact (WeakLitmus.b0_ne_b1 (eq_sym (eq_trans Heq Hv))).
+  - rewrite lkw2_log_2 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_d_0 in Hb. discriminate.
+  - rewrite lkw2_log_3 in Hp. injection Hp as Hm. subst m. reflexivity.
+  - rewrite lkw2_log_4 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_o4_0 in Hb. injection Hb as Heq.
+    exfalso. exact (WeakLitmus.b0_ne_b1 (eq_sym (eq_trans Heq Hv))).
+  - rewrite lkw2_log_5 in Hp. injection Hp as Hm. subst m. reflexivity.
+  - rewrite lkw2_log_hi in Hp. discriminate.
+Qed.
+
+(** THE FOLD TOLERATES THE FAILED SWAP.  Positions 0…5 send the holder
+    [None → Some 0 → Some 0 (the failed swap, unchanged) → Some 0 (the
+    payload store does not write the word) → None → Some 1 → None]. *)
+Lemma lkw2_alt : wlp_alt lkw2_log 0%Z 0 None.
+Proof. split; [simpl; lia|by vm_compute]. Qed.
+
+Lemma lkw2_wprot : wprot_at lkw2_log 8%Z 0%Z 0 0.
+Proof.
+  split; [lia|]. intros p m Hp _ Hs Hk. destruct p as [|[|[|[|[|[|p]]]]]].
+  - rewrite lkw2_log_0 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_o4_8 in Hs. by destruct Hs.
+  - rewrite lkw2_log_1 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_o4_8 in Hs. by destruct Hs.
+  - rewrite lkw2_log_2 in Hp. injection Hp as Hm. subst m. by vm_compute.
+  - rewrite lkw2_log_3 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_z4_8 in Hs. by destruct Hs.
+  - rewrite lkw2_log_4 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_o4_8 in Hs. by destruct Hs.
+  - rewrite lkw2_log_5 in Hp. injection Hp as Hm. subst m.
+    rewrite msg_byte_z4_8 in Hs. by destruct Hs.
+  - rewrite lkw2_log_hi in Hp. discriminate.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 6b.6 THE INSTANTIATION AT THE CONTENDED LOCK
+
+    Every hypothesis of [cs_chained] discharged, its conclusion derived —
+    on a graph where [lock_pattern] is refuted ([lkw2_no_pattern]).  The
+    writer-first window order again: hart 0's section (acquire at log
+    position 0, release at 3) closes before hart 1's opens (position 4),
+    with hart 1's FAILED swap sitting at position 1, inside hart 0's
+    section, disturbing nothing. *)
+
+Theorem lkw2_cs_chained : gmo_lt lkw2 Wp REL2.
+Proof.
+  eapply (cs_chained lkw2 lkw2_log 0%Z 8%Z 0 0 None Wp ENT2 REL2 ACQ2 REL2).
+  - exact lkw2_consistent.
+  - exact lkw2_log_of.
+  - exact lkw2_lwb.
+  - exact lkw2_alt.
+  - exact lkw2_acq_row.
+  - exact lkw2_wprot.
+  - exact lkw2_wp_data.
+  - exact lkw2_wp_plain.
+  - rewrite lkw2_x3. lia.
+  - rewrite lkw2_x3 lkw2_log_len. lia.
+  - exact lkw2_wp_no_lock.
+  - exact lkw2_acq2.
+  - exact lkw2_aq2.
+  - rewrite lkw2_x5. lia.
+  - rewrite lkw2_x5 lkw2_log_len. lia.
+  - exact lkw2_cs_r.
+  - split_and!; [done|simpl; lia|by eexists|by eexists].
+  - exact lkw2_fence_r.
+  - left. exact lkw2_grf.
+  - split_and!; [done|simpl; lia|by eexists|by eexists].
+  - by eexists.
+  - simpl. lia.
+Qed.
+
+(** … and the certificate the composition consumes. *)
+Corollary lkw2_cert : cert lkw2 Wp (Seg 1%nat ENT2 REL2).
+Proof. apply CSchained. exact lkw2_cs_chained. Qed.
+
+(* ====================================================================== *)
 (** * 7. AUDIT *)
 
 Print Assumptions cycle_kill_arms.
@@ -1071,5 +1654,8 @@ Print Assumptions release_between_graph.
 Print Assumptions acq_fold_free.
 Print Assumptions lkw_consistent.
 Print Assumptions lkw_cs_chained.
+Print Assumptions lkw2_consistent.
+Print Assumptions lkw2_no_pattern.
+Print Assumptions lkw2_cs_chained.
 Print Assumptions lbg_pinned_would_kill.
 Print Assumptions lbg_pinned_absent.

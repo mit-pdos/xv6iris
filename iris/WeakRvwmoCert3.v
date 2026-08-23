@@ -751,7 +751,7 @@ Lemma pol_store' (x : agent) (cpu : CPU) (d0 : dev_state) :
     ∃ lb' l' rds' wrs' rs2',
       cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
       mstep_ok (cand_last_st c0) x lb' ∧
-      lbl_reidx lb lb' ∧
+      lbl_reidx_w lb lb' ∧
       True ∧
       dreg_agree (λ n, n ∉ []) rs1' rs2'.
 Proof.
@@ -760,7 +760,7 @@ Proof.
               m' rs1' fn' ib' Hc Hlb Hrelp Hag Hblk)
     as (lb' & l' & rds' & wrs' & rs2' & H1 & H2 & H3 & H4).
   exists lb', l', rds', wrs', rs2'.
-  split_and!; [exact H1|exact H2|exact H3|exact I|exact H4].
+  split_and!; [exact H1|exact H2|by left|exact I|exact H4].
 Qed.
 
 (** ** 3.4 [cert_segment'] — the iteration with the read policy discharged
@@ -814,7 +814,7 @@ Section segment'.
   Context (Cls : cand → lbl → Prop).
 
   Context (Hpres : ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
-      Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx lb lb' →
+      Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx_w lb lb' →
       mstep_ok (cand_last_st c0) x lb' →
       Cls c0 lb' →
       Ctx (S k) (cand_snoc c0 (EStep x lb'))).
@@ -833,7 +833,7 @@ Section segment'.
       ∃ lb' l' rds' wrs' rs2',
         cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
         mstep_ok (cand_last_st c0) x lb' ∧
-        lbl_reidx lb lb' ∧
+        lbl_reidx_w lb lb' ∧
         Cls c0 lb' ∧
         dreg_agree (λ n, n ∉ T) rs1' rs2').
 
@@ -860,7 +860,7 @@ Section segment'.
         (fn1 : ofence) (ib1 : oib32),
         cd_tr c' = cd_tr c ++ tradd ∧
         (∀ s, s ∈ tradd → es_ag s = x) ∧
-        Forall2 lbl_reidx rowseg ((λ s, es_lb s) <$> tradd) ∧
+        Forall2 lbl_reidx_w rowseg ((λ s, es_lb s) <$> tradd) ∧
         srvwmo_consistent c' ∧
         Ctx (k0 + length rowseg)%nat c' ∧
         exec_prog_ok' pstep_ev pcls_ev pst' dv' (cand_exec c') ∧
@@ -935,7 +935,7 @@ Section segment'.
       { rewrite Hend /dv2 (dv_snoc_gt c dv d0 (S (cd_end c)) ltac:(lia)) //. }
       have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
                   = w_relp (lbl_post k ws lb).
-      { rewrite /c2 cand_snoc_relp Hrelp (lbl_reidx_relp _ lb lb' Hri).
+      { rewrite /c2 cand_snoc_relp Hrelp (lbl_reidx_w_relp _ lb lb' Hri).
         by rewrite lbl_post_relp. }
       destruct (IH Hrf' m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
                   Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
@@ -999,7 +999,7 @@ Section segment'.
       set (pst2 := pst_snoc c pst x (PHart cpu m1 rs21 fn1 ib1)).
       set (dv2 := dv_snoc c dv d0).
       have Hctx2 : Ctx (S k) c2
-        := Hpres k c lb lb Hctx Hc Hlb (lbl_reidx_refl lb) Hok Hcl.
+        := Hpres k c lb lb Hctx Hc Hlb (lbl_reidx_w_refl lb) Hok Hcl.
       have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
       have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m1 rs21 fn1 ib1).
       { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
@@ -1015,7 +1015,7 @@ Section segment'.
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
             & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
       exists c', pst', dv', (EStep x lb :: tradd), m2, rs12, rs22, fn2, ib2.
-      split_and!; [| |constructor; [apply lbl_reidx_refl|exact Hf2]
+      split_and!; [| |constructor; [apply lbl_reidx_w_refl|exact Hf2]
                    |exact Hc'|(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
                    |exact Hrelpf| | | | | ].
@@ -1403,7 +1403,7 @@ Section nonvacuity3.
       (tradd : list estep),
       cd_tr c' = tradd ∧
       (∀ s, s ∈ tradd → es_ag s = 0%nat) ∧
-      Forall2 lbl_reidx ev_row ((λ s, es_lb s) <$> tradd) ∧
+      Forall2 lbl_reidx_w ev_row ((λ s, es_lb s) <$> tradd) ∧
       srvwmo_consistent c' ∧
       exec_prog_ok' pstep_ev pcls_ev pst' dv' (cand_exec c') ∧
       tradd !! 0%nat
