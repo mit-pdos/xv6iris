@@ -167,7 +167,7 @@ Section VtLeaves.
          /\ virtio_isr_ok v'
          /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
          /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-         /\ v_landed v' = v_landed v) ->
+         /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v) ->
     sie_cap_gpr KT1 m n false p -∗
     pc_is pc -∗ instr pc rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     dev_inv γu γd -∗
@@ -310,7 +310,7 @@ Section VtLeaves.
                 /\ virtio_isr_ok v'
                 /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
                 /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-                /\ v_landed v' = v_landed v).
+                /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v).
     { intros v Hv. exact (virtio_ack_write_ok v _ Hv). }
     iApply (wp_vt_sw_dev γu γd (mword_of_int (KernelSyms.virtio_disk_intr + 0x2a)) true a5_idx a4_idx
               (mword_of_int 100 : mword 12) B3 n

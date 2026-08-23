@@ -790,7 +790,7 @@ Section ProofVirtioDiskRwE.
                 /\ virtio_isr_ok v'
                 /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
                 /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-                /\ v_landed v' = v_landed v).
+                /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v).
     { intros v Hvok. rewrite vdrwe_notify_off.
       apply (virtio_notify_write_ok v (mword_of_int 0 : mword 32));
         [ vm_compute; reflexivity | exact Hvok ]. }

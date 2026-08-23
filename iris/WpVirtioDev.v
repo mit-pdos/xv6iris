@@ -92,7 +92,7 @@ Lemma virtio_ack_write_ok (v : virtio_state) (w : bv 32) :
     /\ virtio_isr_ok v'
     /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
     /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-    /\ v_landed v' = v_landed v.
+    /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v.
 Proof.
   intro Hok. eexists. split; [ reflexivity |].
   split_and!; [| reflexivity .. ].
@@ -109,7 +109,7 @@ Lemma virtio_notify_write_ok (v : virtio_state) (w : bv 32) :
     /\ virtio_isr_ok v'
     /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
     /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-    /\ v_landed v' = v_landed v.
+    /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v.
 Proof.
   intros Hw Hok. exists v.
   assert (Hz : (bv_unsigned w =? 0) = true) by (apply Z.eqb_eq; exact Hw).
@@ -855,11 +855,12 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword
        /\ virtio_isr_ok v'
        /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
        /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-       (* AND THE LANDED SET (sector-atomic-disk.md stage 2): an in-flight
-          write's landed sectors decide which of its crash permits are still
-          pending, so a protocol-neutral store has to leave them alone.  Both
-          stores the live driver makes do. *)
-       /\ v_landed v' = v_landed v) ->
+       (* AND THE VOLATILE WRITE CACHE (claude-notes/projects/async-disk.md):
+          what the device is still holding decides which branch of an
+          in-flight write's sequential permit is outstanding, so a
+          protocol-neutral store has to leave both fields alone.  Both stores
+          the live driver makes do. *)
+       /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v) ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
@@ -886,8 +887,8 @@ Proof.
   { done. }
   { iIntros (v Hvok) "Hproto _".
     destruct (Hwrite v Hvok)
-      as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk' & Hland').
-    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused' Hland'
+      as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk' & Hca' & Htk').
+    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused' Hca' Htk'
                  with "Hproto") as "Hproto".
     iModIntro. iExists v'.
     iSplitR; [iPureIntro; exact Hvw|].

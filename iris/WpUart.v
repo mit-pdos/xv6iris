@@ -900,7 +900,8 @@ Section DevLoops.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' m' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [mv vnew w Hview Hdisk | mv i vnew Hview Hsect
+    destruct Hstep as [mv vnew w Hview Hdisk | mv vnew Hview Hcap
+                      | s vnew Hdrain
                       | mv w Hview Hstall | p' Hirq Hlatch |].
     - (* the disk completes a queued request.  This is the only step that
          touches the byte memory, and the ONLY thing that justifies it is the
@@ -977,33 +978,66 @@ Section DevLoops.
       { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
       iFrame "Htie Hsa".
       iApply "IH".
-    - (* ONE SECTOR OF AN IN-FLIGHT WRITE LANDS -- THE COMMIT INSTANT
-         (claude-notes/completed/sector-atomic-disk.md).  A 512-byte sector is
-         atomic and a 1024-byte block is not, so this is the ONLY step in the
-         whole machine at which the durable image MOVES: the client's
-         per-sector view shift runs here, on the crash predicate, at the
-         instant those 512 bytes become durable.  A power cycle between two of
-         these leaves a half-written block, which is exactly what real
-         hardware does and what the FS layer must survive.
+    - (* THE CAPTURE: the head write request's data enters the device's
+         VOLATILE cache (claude-notes/projects/async-disk.md).  It reads the
+         driver's buffer off the bus once -- which is the only reason this
+         arm carries a memory view at all -- and moves NOTHING else: no byte
+         memory (the step's [m' = m]), no used ring, no ISR, no consumed
+         index, and NO DURABLE DISK BYTE.  So there is no permit to spend and
+         [crashN] is NOT opened here: a power cycle between the capture and
+         the drains loses the whole request, which is exactly what the
+         client's still-unspent sequential permit says.  Both the era image
+         auth and the FS tie are FRAMED. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      rewrite Hv in Hcap.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iDestruct (virtio_proto_capture_step γd vs m mv vnew Hview Hcap
+                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iMod ("Hclose" with "[Hv' Hlease]") as "_".
+      { iNext. iExists vnew. iFrame "Hv' Hlease".
+        iPureIntro. exact (virtio_capture_step_isr_ok vs mv vnew Hvok Hcap). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
+        by (rewrite Hv; exact (virtio_capture_step_disk vs mv vnew Hcap)).
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iEval (rewrite <- Hdk) in "Htie".
+      iFrame "Htie Hsa".
+      iApply "IH".
+    - (* ONE CACHED SECTOR DRAINS -- THE COMMIT INSTANT
+         (claude-notes/completed/sector-atomic-disk.md, restated for the
+         write cache).  A 512-byte sector is atomic and a 1024-byte block is
+         not, so this is the ONLY step in the whole machine at which the
+         durable image MOVES: the client's per-sector view shift runs here,
+         on the crash predicate, at the instant those 512 bytes become
+         durable.  A power cycle between two of these leaves a half-written
+         block, which is exactly what real hardware does and what the FS
+         layer must survive.
+
+         THE STEP READS NOTHING OFF THE BUS -- the bytes are the device's
+         own, out of its cache -- so this arm carries NO memory view and
+         needs no DMA lease at all; the byte memory is untouched (the step's
+         [m' = m]) and so are the used ring, the ISR and the consumed index.
+         The request is still in flight until its completion, two arms up.
 
          The completion arm above still opens [crashN] too, but it spends the
          sequential permit's LEAF, which is indexed at [None] and is
          therefore the IDENTITY on the fixed auth ([wr_apply None dk = dk]) --
          that leaf is where a READ's client receipt lives and what keeps that
-         arm direction-agnostic (sector-atomic-disk.md §6e).
-
-         The byte memory is UNTOUCHED (the step's [m' = m]) and so are the
-         used ring, the ISR and the consumed index -- the request is still in
-         flight until its completion, one arm up. *)
+         arm direction-agnostic (sector-atomic-disk.md §6e). *)
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
-      rewrite Hv in Hsect.
+      rewrite Hv in Hdrain.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
       iEval (rewrite -Himg Hv) in "Hdur".
-      iMod (virtio_proto_sector_step γd vs m mv i vnew Hview Hsect
-              with "Hmem Hdur Hlease")
-        as (kq wr todo) "(%Hitd & %Hwr & Hpend & Hback)".
+      iMod (virtio_proto_drain_step γd vs s vnew Hdrain with "Hdur Hlease")
+        as (kq wr i todo) "(%Hitd & %Hwr & Hpend & Hback)".
       assert (Hpost : wr_apply (wr_sector wr i) (v_disk (dvirtio d))
                       = v_disk vnew)
         by (rewrite Hv Hwr; reflexivity).
@@ -1012,7 +1046,7 @@ Section DevLoops.
       (* CONSUME AND RE-DEPOSIT (sector-atomic-disk.md §6e): the branch the
          device took is spent and the RESIDUAL obligation for the remaining
          sectors goes straight back into the same cell.  The request's cell
-         only reaches the done state at its completion, one arm up. *)
+         only reaches the done state at its completion. *)
       iMod (perm_step_kq gen_id (dn_perm γd) kq wr todo i
               (v_disk (dvirtio d)) n Hitd
               with "Hpbody Hpend Hsa [//] Htie HP")
@@ -1020,12 +1054,12 @@ Section DevLoops.
       iMod "Hmclose" as "_".
       iEval (rewrite Hpost) in "Htie".
       iMod ("Hcclose" with "HP") as "_".
-      iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
+      iDestruct ("Hback" with "Hdone") as "(Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
-        iPureIntro. exact (virtio_sector_step_isr_ok vs mv i vnew Hvok Hsect). }
+        iPureIntro. exact (virtio_drain_step_isr_ok vs s vnew Hvok Hdrain). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
-      iModIntro. iFrame "Hgr Hmem' Hdev'".
+      iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
       iEval (rewrite Himg) in "Hdauth'".
       iSplitL "Hdauth'".

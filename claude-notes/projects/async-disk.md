@@ -122,7 +122,7 @@ the three-entry baseline (`durable-notes.md`); coverage 188.
   `wr_fold_all`-style reassembly for drains (a drained sector's bytes are
   what capture stored). `RiscvLang.v`: `DiskStepCapture (mv)`,
   `DiskStepDrain (s)` (replacing `DiskStepSector`), memory unchanged in both.
-  `VirtioQueue.v` pure part (`vslot_post` etc.). ☐
+  `VirtioQueue.v` pure part (`vslot_post` etc.). ☑
 - **Stage 2 — Iris (Opus).** `ProofVirtioDiskInit` (the negotiation
   computes to 0), `VirtioProto` (the `wce = false` row and the
   writethrough invariant; `virtio_proto_capture_step`,
@@ -130,7 +130,58 @@ the three-entry baseline (`durable-notes.md`); coverage 188.
   completion), `WpUart.wp_disk_loop` (capture/drain arms; refute WB
   completion and FLUSH), `DiskInv`/`SpecVirtioDiskRw`/`ProofVirtioDiskRw*`
   only where the slot's bytes row changed; `RiscvAdequacy`/`BootShared`
-  for the new fields' reset lemmas. Name `virtio_proto_writethrough`. ☐
+  for the new fields' reset lemmas. Name `virtio_proto_writethrough`. ☑
+
+### Stage 2, as built (2026-08-23) -- five recorded deviations
+
+1. **`slot_pend_res` is indexed by what is still OWED, not by the cache
+   domain and not by the landed set.** The plan's "indexed by
+   `vs_todo sl (dom (v_cache v))`" is wrong for the window between the
+   PUBLISH and the CAPTURE: nothing is cached there, so that expression is
+   `∅` -- the sequential permit's LEAF -- while nothing has drained and the
+   client's permit is still at its ROOT. `v_taken` is what tells the two
+   empty caches apart, so the protocol row is
+   `pend_todo pr (v_cache v) (v_taken v) p sl` (`VirtioProto.v:1281`):
+   `vs_todo sl (dom (v_cache v))` once the head is taken, and
+   `VirtioQueue.vs_all sl` (every sector) before that and for every
+   non-head slot. `vs_torn` keeps its meaning on the complement,
+   `VirtioQueue.vs_kept sl td` -- so nothing downstream of `vs_torn` moved,
+   and the publish site gets the index `PermInv.perm_deposit_kq` already
+   hands back (`vs_all sl` = `set_seq 0 (wr_nsectors (vs_wr sl))`), which
+   removed a conversion rather than adding one.
+2. **The `wce = false` row rides the NOT-LIVE arm too.** The plan asks for
+   `virtio_proto_writethrough : virtio_proto γ v ⊢ ⌜virtio_wce (v_cfg v) =
+   false⌝` unconditionally; "not live" does NOT imply "declined the cache"
+   (a driver can write DRIVER_FEATURES before DRIVER_OK), so the row has to
+   be on both arms. That gives `virtio_proto_cfg_write` a new premise --
+   which is bundled into `ProofVirtioDiskInit.vdi_cw` rather than added to
+   `wp_vdi_sw`, so all fourteen pre-flip call sites are untouched
+   (`vcw` discharges it; `cbn [vc_dfeat]` FIRST, because the configuration
+   records carry the queue-page addresses and `vm_compute` on a goal with a
+   section variable hangs).
+3. **`virtio_proto_capture_step` is a plain wand, not an update.** The
+   capture moves no ghost state at all: the head slot's owed set is
+   `vs_all sl` before it (untaken) and `vs_todo sl (dom (vslot_cache sl))`
+   after it, and `VirtioQueue.vs_todo_full` says those are the same set.
+   So the accessor is `gen_heap_interp m -∗ virtio_proto γ v -∗
+   gen_heap_interp m ∗ virtio_proto γ v'`.
+4. **`virtio_proto_drain_step` takes NO memory interp and NO bus view.**
+   The drain reads nothing off the bus, so what identifies the drained key
+   with a sector index of the head slot is the protocol's writethrough row
+   alone (`vp_wt` + `VirtioQueue.vproto_drain_det`). Stage 1's deviation (1)
+   -- a drain is enabled by the cache even on a dead queue -- is discharged
+   exactly as ruled: the not-live arm's own `⌜v_cache v = ∅⌝` row.
+5. **Neither the write-back completion nor a FLUSH needs refuting in
+   `wp_disk_loop`.** Both refutations are INTERNAL to `virtio_proto_step`:
+   the write-back completion by `VirtioModel.virtio_req_step_wt_cache`
+   (from the `wce = false` row + `vp_wt`), and a FLUSH because
+   `slot_pin_ok`'s `spo_type` pins every published request to IN or OUT, so
+   `vproto_step_det` never produces one. The completion arm of
+   `wp_disk_loop` is therefore byte-for-byte the old one apart from the
+   arm's position. The disk loop's new shape is: DMA completion (opens
+   `crashN`, spends the permit's LEAF), CAPTURE (opens `diskN` only),
+   DRAIN (opens `diskN` + `permN` + `crashN`, `perm_step_kq` on the
+   branch), wild (refuted), latch, stutter.
 - **Stage 3 — notes (Fable).** `design/device.md`, `design/virtio-driver.md`,
   `design/crash.md` "Recorded modeling choices" (the cache is volatile; the
   theorem), `completed/sector-atomic-disk.md` cross-reference; move here to

@@ -743,7 +743,8 @@ Section VdrwdLeaves.
     sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ phys_map pin -∗ phys_map wrb -∗ slot_pend_res γd ∅ sl -∗
+    disk_pub γd np -∗ phys_map pin -∗ phys_map wrb -∗
+    slot_pend_res γd (vs_all sl) sl -∗
     ( sie_cap_gpr KT1 m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
       disk_pub γd (S np) -∗ disk_receipt γd np sl pin -∗
@@ -1837,8 +1838,11 @@ Section VdrwdP4.
       - iSplitR.
         + iPureIntro. unfold vs_is_out, vs_data, vdrwd_slot, vdrwd_sldata, vdrwd_out.
           cbn [rw_slot vs_req vr_type]. intro Ho. rewrite Ho. reflexivity.
-        + (* NOTHING HAS LANDED YET *)
-          iSplitR; [iPureIntro; apply vs_torn_empty|].
+        + (* NOTHING HAS DRAINED YET: the whole write is still owed, so the
+             torn set is empty ([vs_kept_full]) and the permit is at its
+             ROOT -- which is exactly the index [PermInv.perm_deposit_kq]
+             handed the enqueuer back. *)
+          iSplitR; [iPureIntro; rewrite vs_kept_full; apply vs_torn_empty|].
           iSplitL "Hdisk".
           * rewrite (vdrwd_slot_off kq b h wr sector
                        (vdrwd_sldata wr bs_buf bs_disk)
@@ -1847,7 +1851,7 @@ Section VdrwdP4.
           * (* [vs_perm (vdrwd_slot kq …) = kq] by conversion; the entry's
                INDEX has to be rewritten to the slot's own [vs_wr], and its
                remaining set is every sector -- nothing has landed. *)
-            rewrite /vs_todo difference_empty_L.
+            rewrite /vs_all.
             rewrite (vdrwd_slot_wr kq b h wr sector bs_buf bs_disk sec_off Hoff).
             iExact "Hpend". }
     iIntros "Hcg Hpc Hpub Hrcpt".

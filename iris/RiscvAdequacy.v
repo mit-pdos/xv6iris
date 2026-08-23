@@ -740,11 +740,15 @@ Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g
        satisfies this too ([virtio_reset] zeroes both). *)
     (Hvseen : v_seen g.(gdev).(dvirtio) = zero16)
     (Hvuidx : v_used_idx g.(gdev).(dvirtio) = zero16)
-    (* ...and nothing of an in-flight write has LANDED
-       (claude-notes/completed/sector-atomic-disk.md): the not-live arm of
-       [virtio_proto] records the landed set at ∅, which is what the live
-       flip needs.  A reset device satisfies this ([virtio_reset_landed]). *)
-    (Hvlanded : v_landed g.(gdev).(dvirtio) = ∅)
+    (* ...and the device's VOLATILE WRITE CACHE is empty and untaken, and the
+       driver has negotiated nothing (claude-notes/projects/async-disk.md):
+       the not-live arm of [virtio_proto] records all three, which is what
+       the live flip needs and what refutes the drain arm of
+       [WpUart.wp_disk_loop] on a dead queue.  A reset device satisfies them
+       ([virtio_reset_cache]/[_taken]/[_wce]). *)
+    (Hvcache : v_cache g.(gdev).(dvirtio) = ∅)
+    (Hvtaken : v_taken g.(gdev).(dvirtio) = false)
+    (Hvwce : virtio_wce (v_cfg g.(gdev).(dvirtio)) = false)
     (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
        PLIC plan): the interrupt-status register holds only defined bits.  A
        reset device does. *)
@@ -781,7 +785,7 @@ Proof.
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
   iMod (disk_ghosts_alloc gen_id g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx
-          Hvlanded)
+          Hvcache Hvtaken Hvwce)
     as (γv) "(%Himg & Hproto & _ & _ & _ & Hpbody)".
   iMod (dev_inv_alloc _ γ γv
           with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto] Hpbody") as "#Hinv".

@@ -1082,6 +1082,69 @@ Proof.
     apply elem_of_seq. lia.
 Qed.
 
+(* THE REQUEST'S WHOLE SECTOR INDEX SET -- what the sequential permit's ROOT
+   is indexed at, and what a freshly published request still owes.  A READ
+   owes nothing, so this is empty for it.  ([PermInv.perm_deposit_kq] hands
+   the client's permit out at exactly this set, which is why the publish site
+   needs no conversion at all.) *)
+Definition vs_all (sl : vslot) : gset nat :=
+  set_seq 0 (wr_nsectors (vs_wr sl)).
+
+Lemma vs_all_elem (sl : vslot) (i : nat) :
+  i ∈ vs_all sl <-> (i < wr_nsectors (vs_wr sl))%nat.
+Proof. unfold vs_all. rewrite elem_of_set_seq. lia. Qed.
+
+(* what is still owed is always part of it *)
+Lemma vs_todo_sub (sl : vslot) (S : gset Z) : vs_todo sl S ⊆ vs_all sl.
+Proof.
+  intros x Hx. apply vs_todo_elem in Hx as [Hlt _].
+  exact (proj2 (vs_all_elem sl x) Hlt).
+Qed.
+
+(* ...and a READ's is empty outright *)
+Lemma vs_all_read (sl : vslot) : vs_is_out sl = false -> vs_all sl = ∅.
+Proof.
+  intro Hin. apply set_eq. intro x.
+  assert (Hz : wr_nsectors (vs_wr sl) = 0%nat)
+    by (unfold vs_wr; rewrite Hin; reflexivity).
+  split.
+  - intro Hx. apply vs_all_elem in Hx. rewrite Hz in Hx. lia.
+  - intro Hx. by apply elem_of_empty in Hx.
+Qed.
+
+(* -- THE SECTORS THAT HAVE ALREADY DRAINED, as the complement of what is
+   still owed.  [VirtioProto.slot_pend_res] is indexed by the OWED set (the
+   permit's own index), and [vs_torn] speaks about the LANDED one, so this is
+   the one conversion between the two vocabularies. *)
+Definition vs_kept (sl : vslot) (td : gset nat) : gset nat :=
+  vs_all sl ∖ td.
+
+(* AT THE PUBLISH nothing has landed *)
+Lemma vs_kept_full (sl : vslot) : vs_kept sl (vs_all sl) = ∅.
+Proof. unfold vs_kept. apply difference_diag_L. Qed.
+
+(* ...AT THE COMPLETION everything has *)
+Lemma vs_kept_nil (sl : vslot) : vs_kept sl ∅ = vs_all sl.
+Proof. unfold vs_kept. apply difference_empty_L. Qed.
+
+(* ...and ONE DRAIN moves exactly its own sector across *)
+Lemma vs_kept_step (sl : vslot) (td : gset nat) (i : nat) :
+  (i < wr_nsectors (vs_wr sl))%nat ->
+  vs_kept sl (td ∖ {[ i ]}) = {[ i ]} ∪ vs_kept sl td.
+Proof.
+  intro Hi.
+  assert (Hin : i ∈ vs_all sl) by exact (proj2 (vs_all_elem sl i) Hi).
+  unfold vs_kept. apply set_eq. intro x.
+  rewrite elem_of_union, elem_of_singleton, !elem_of_difference,
+          elem_of_singleton.
+  split.
+  - intros [Hx Hn]. destruct (decide (x = i)) as [Heq|Hne]; [by left|].
+    right. split; [exact Hx|]. intro Htd. apply Hn. by split.
+  - intros [Heq|[Hx Hn]].
+    + rewrite Heq. split; [exact Hin|]. intros [_ Hne]. by apply Hne.
+    + split; [exact Hx|]. intros [Htd _]. by apply Hn.
+Qed.
+
 (* a READ owes nothing per-sector *)
 Lemma vs_todo_read (sl : vslot) (S : gset Z) :
   vs_is_out sl = false -> vs_todo sl S = ∅.

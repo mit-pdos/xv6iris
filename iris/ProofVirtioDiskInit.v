@@ -333,6 +333,17 @@ Definition vdi_c (st dfeat qsel qnum : Z) (rdy : bool) (d a u : Arch.pa)
    status word -- all compute, because [c] is concrete). *)
 Definition vdi_cw (c : virtio_cfg) (off : Z) (sw : bv 32) (c' : virtio_cfg)
   : Prop :=
+  (* ...AND IT STILL DECLINES THE WRITE CACHE
+     (claude-notes/projects/async-disk.md §2).  [VirtioProto]'s not-live arm
+     carries [virtio_wce (v_cfg v) = false] so that
+     [VirtioProto.virtio_proto_writethrough] can be stated unconditionally,
+     which makes every pre-flip write owe it.  Thirteen of the fourteen do not
+     touch [vc_dfeat] at all; the DRIVER_FEATURES write is the one that
+     decides it, and the word xv6 computes is ZERO at this device's offer
+     ([VirtioModel.virtio_xv6_features]).  Bundling it into [vdi_cw] rather
+     than adding a premise to [wp_vdi_sw] is what keeps the fourteen call
+     sites untouched: they all discharge this by [vcw]. *)
+  virtio_wce c' = false /\
   forall v : virtio_state, v_cfg v = c -> virtio_write v off sw = Some (set_vcfg v c').
 
 (* ...and the read counterpart: the value is determined by [c] alone (which
@@ -344,9 +355,18 @@ Definition vdi_cr (c : virtio_cfg) (off : Z) (w : bv 32) : Prop :=
 (* name-free (an Ltac body cannot mention a hypothesis by literal name --
    claude-notes/durable-notes.md) *)
 Ltac vcw :=
-  let v := fresh "v" in let H := fresh "Hcv" in
-  intros v H; unfold virtio_write, set_vcfg, vdi_c, virtio_cfg0, virtio_init_cfg;
-  cbv zeta; rewrite ?H; reflexivity.
+  split;
+  [ (* the cache-mode half: [c'] is CONCRETE at every call site, so the
+       feature word's bit 9 computes.  [cbn] first -- the configuration
+       records carry the queue-page ADDRESSES, which are section variables,
+       and [vm_compute] on a goal containing one HANGS
+       (claude-notes/durable-notes.md); after the projection there is nothing
+       but a literal left. *)
+    unfold virtio_wce, vdi_c, virtio_cfg0, virtio_init_cfg;
+    cbn [vc_dfeat]; vm_compute; reflexivity
+  | let v := fresh "v" in let H := fresh "Hcv" in
+    intros v H; unfold virtio_write, set_vcfg, vdi_c, virtio_cfg0, virtio_init_cfg;
+    cbv zeta; rewrite ?H; reflexivity ].
 Ltac vcr :=
   let v := fresh "v" in let H := fresh "Hcv" in
   intros v H; unfold virtio_read, vdi_c, virtio_cfg0, virtio_init_cfg;
@@ -384,7 +404,9 @@ Section VdiLeaves.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0 Hl1 Hcw. destruct Hg as (Hr & Hal & Hcan & Hdv).
+    intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0 Hl1 Hcw0.
+    destruct Hcw0 as [Hcwce Hcw].
+    destruct Hg as (Hr & Hal & Hcan & Hdv).
     assert (Hsw' : (autocast (T := mword)
                       (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = sw).
     { rewrite (rget_ne m rs2 Hrs2tp). exact Hsw. }
@@ -402,11 +424,12 @@ Section VdiLeaves.
               with "Hcg Hpc Hinstr Hdinv Hvc []").
     { iIntros (v Hvok) "Hproto Hmine".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui & Hld).
+        as %(Hcv & Hsn & Hui & Hca & Htk).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (set_vcfg v c') c'
               ltac:(rewrite Hcv; exact Hl0) Hl1 eq_refl
-              ltac:(exact Hsn) ltac:(exact Hui) ltac:(exact Hld)
+              ltac:(exact Hsn) ltac:(exact Hui)
+              ltac:(exact Hca) ltac:(exact Htk) ltac:(exact Hcwce)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (set_vcfg v c').
       iSplitR.
@@ -459,11 +482,12 @@ Section VdiLeaves.
               with "Hcg Hpc Hinstr Hdinv Hvc []").
     { iIntros (v Hvok) "Hproto Hmine".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui & Hld).
+        as %(Hcv & Hsn & Hui & Hca & Htk).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (virtio_reset v) virtio_cfg0
               ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl
-              ltac:(apply virtio_reset_landed)
+              ltac:(apply virtio_reset_cache) ltac:(apply virtio_reset_taken)
+              ltac:(by vm_compute)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (virtio_reset v).
       iSplitR.
@@ -504,7 +528,8 @@ Section VdiLeaves.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0 Hcw Hpal Hdisj.
+    intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0 Hcw0 Hpal Hdisj.
+    destruct Hcw0 as [Hcwce Hcw].
     destruct Hg as (Hr & Hal & Hcan & Hdv).
     assert (Hsw' : (autocast (T := mword)
                       (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = sw).
@@ -526,11 +551,11 @@ Section VdiLeaves.
     { iFrame "Hvc Hidx Hpage". }
     { iIntros (v Hvok) "Hproto (Hmine & Hidx & Hpage)".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui & Hld).
+        as %(Hcv & Hsn & Hui & Hca & Htk).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_intro γv v (set_vcfg v (virtio_init_cfg pd pav pu))
               pd pav pu ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl
-              eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage")
+              eq_refl eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage")
         as "(Hproto & Hpub & #Hcfg)".
       iModIntro. iExists (set_vcfg v (virtio_init_cfg pd pav pu)).
       iSplitR.
@@ -1286,13 +1311,16 @@ Section ProofVirtioDiskInit.
     (* +0x076 lw a4,16(a4) : DEVICE_FEATURES *)
     iApply (wp_vdi_lw γv (mword_of_int (KernelSyms.virtio_disk_init + 0x076)) true (mword_of_int 14 : mword 5)
               (mword_of_int 14 : mword 5) (mword_of_int 16 : mword 12) B21 (K - 4)%nat Q3
-              (mword_of_int 0x10001010) 16 (Z_to_bv 32 0) pp ltac:(vm_compute; discriminate)
+              (mword_of_int 0x10001010) 16 (Z_to_bv 32 virtio_device_features) pp
+              ltac:(vm_compute; discriminate)
               ltac:(rewrite HB21a4; bvc) vg_010 ltac:(vm_compute; reflexivity)
               ltac:(nzd) ltac:(rdok) ltac:(vcr)
               with "Hcg Hpc [] Hdinv Hvc").
     { iApply (vdi_076 with "Htext"). }
     iIntros "Hcg Hpc Hvc".
-    pose (B22 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0 : mword 32))]> B21).
+    pose (B22 := <[Regidx (mword_of_int 14 : mword 5)
+                   := regval_into_reg (sign_extend' 64
+                        (Z_to_bv 32 virtio_device_features : mword 32))]> B21).
     assert (Hp078 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x076) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x078)) by pcs.
     iEval (rewrite Hp078) in "Hpc".
     (* +0x078 lui a3,0xc7ffe *)
@@ -2147,8 +2175,11 @@ Section ProofVirtioDiskInit.
               H4 (K - 4)%nat Q8 Q9 (mword_of_int 0x10001084) 132 (word_hi pd) pp ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rewrite HH4a5; bvc) vg_084 ltac:(vm_compute; reflexivity)
               ltac:(rewrite HH4a4; apply trunc32_sext64) ltac:(reflexivity) ltac:(reflexivity)
-              ltac:(intros v Hcv; unfold virtio_write, set_vcfg, vdi_c; cbv zeta;
-                    rewrite Hcv HD; reflexivity)
+              ltac:(split;
+                    [ unfold virtio_wce, vdi_c; cbn [vc_dfeat];
+                      vm_compute; reflexivity
+                    | intros v Hcv; unfold virtio_write, set_vcfg, vdi_c;
+                      cbv zeta; rewrite Hcv HD; reflexivity ])
               with "Hcg Hpc [] Hdinv Hvc").
     { iApply (vdi_120 with "Htext"). }
     iIntros "Hcg Hpc Hvc".
@@ -2218,8 +2249,11 @@ Section ProofVirtioDiskInit.
               H8 (K - 4)%nat Q10 Q11 (mword_of_int 0x10001094) 148 (Z_to_bv 32 0 : mword 32) pp ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rewrite HH8a4; bvc) vg_094 ltac:(vm_compute; reflexivity)
               ltac:(rewrite HH8a5; bvc) ltac:(reflexivity) ltac:(reflexivity)
-              ltac:(intros v Hcv; unfold virtio_write, set_vcfg, vdi_c; cbv zeta;
-                    rewrite Hcv HA; reflexivity)
+              ltac:(split;
+                    [ unfold virtio_wce, vdi_c; cbn [vc_dfeat];
+                      vm_compute; reflexivity
+                    | intros v Hcv; unfold virtio_write, set_vcfg, vdi_c;
+                      cbv zeta; rewrite Hcv HA; reflexivity ])
               with "Hcg Hpc [] Hdinv Hvc").
     { iApply (vdi_134 with "Htext"). }
     iIntros "Hcg Hpc Hvc".
@@ -2281,8 +2315,11 @@ Section ProofVirtioDiskInit.
               H11 (K - 4)%nat Q12 Q13 (mword_of_int 0x100010a4) 164 (Z_to_bv 32 0 : mword 32) pp ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rewrite HH11a4; bvc) vg_0a4 ltac:(vm_compute; reflexivity)
               ltac:(rewrite HH11a5; bvc) ltac:(reflexivity) ltac:(reflexivity)
-              ltac:(intros v Hcv; unfold virtio_write, set_vcfg, vdi_c; cbv zeta;
-                    rewrite Hcv HU; reflexivity)
+              ltac:(split;
+                    [ unfold virtio_wce, vdi_c; cbn [vc_dfeat];
+                      vm_compute; reflexivity
+                    | intros v Hcv; unfold virtio_write, set_vcfg, vdi_c;
+                      cbv zeta; rewrite Hcv HU; reflexivity ])
               with "Hcg Hpc [] Hdinv Hvc").
     { iApply (vdi_144 with "Htext"). }
     iIntros "Hcg Hpc Hvc".
