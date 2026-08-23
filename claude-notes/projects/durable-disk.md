@@ -120,7 +120,6 @@ map at home blocks); 1d lands last.
         equation; the `log_state` pack is at the NAMED `lm_upd (lm_install
         …) (log_hdr_bno ls) bs'` and its row (b) is PROVEN, off the new
         `SpecInstallTrans.it_rec_L_hit`/`_miss`.
-        Row (a) stays gated — it is 1d's.
       - `LogDefs.lm_install` is `ProofEndOp.eo_minst` generalised
         (block-keyed, over the header's own `list Z` write set, and its
         duplicate-freedom premise is the INJECTIVITY it is used through
@@ -174,8 +173,7 @@ map at home blocks); 1d lands last.
         `end_op_pres_placeholder`; the `Hcli`/`Hpres` threading through
         `FsCrash`/`ProofEndOp`; `SpecEndOp`'s `end_op_pres` premise; and its
         30 call sites across 16 files.  `end_op` now has NO FS-facing pure
-        premise.  `end_op_fin` / `end_op_fin_placeholder` are untouched
-        (1d's).
+        premise.
       - DEVIATION, and it is a simplification: **no `⌜dom L = cov⌝` was
         added to `log_state`.**  It is not needed.  The two row premises
         above pin `L` at every home block — row (b) on `home ∖ Ws`, the
