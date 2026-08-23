@@ -17,12 +17,20 @@ environment (`ROCQ_MACHINE_TYPE=c3d-standard-180 ./gcp-rocq/run-on-gcp …`).
 
 ## Daily use
 
-**From a git WORKTREE** (agent lanes): the bare `run-on-gcp make` fails —
-`xv6-riscv/` is gitignored, so a worktree has no clone and the remote `make`
-tries to rebuild the ELF/fs.img. Use the explicit
-`run-on-gcp make -C iris -f CoqMakefile -j180 -k` form (the tracked
-`kernel-rocq/` sources are all the iris build needs); verify any re-dump the
-remote performs is byte-identical (md5) before trusting it.
+**From a git WORKTREE** (agent lanes): the bare `run-on-gcp make` is
+DANGEROUS, not just broken — `xv6-riscv/` is gitignored, so a worktree has
+no clone; the remote `make` then builds its OWN xv6 and the dump rules
+OVERWRITE the tracked `kernel-rocq/FsImgRaw.v` from a different `fs.img`.
+The corruption surfaces far away, as
+`FsImgCheck.v: "eq_refl" has type "true = true" while it is expected to
+have type "fsimg_wf fsimg_P fsimg_sb = true"`. Two safe options, in
+preference order: (1) `cp -a /shared/xv6iris-5/xv6-riscv <worktree>/`
+BEFORE the first sync; (2) build only the proofs:
+`run-on-gcp make -C iris -f CoqMakefile -j180 -k`. Either way, verify
+`md5sum kernel-rocq/*.v user-rocq/*.v` is unchanged after any remote run.
+Related: on a FRESH remote tree, the top-level `$(USER_DIR)/_%` rule
+races the xv6 C build under `-j 192` (bogus `file format not recognized` /
+`undefined reference` errors) — build `xv6-riscv` once serially first.
 
 
 From any project directory:
