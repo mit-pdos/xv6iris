@@ -106,13 +106,20 @@ Section EscrowDeposit.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    assert (Hwfi : diblk_wf (<[islot inum := dn']> ds))
+      by exact (diblk_wf_insert ds (islot inum) dn' Hwf Hdn').
     iDestruct "Hinv" as "[#Hiinv #Hrb]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds0) "(>%Hwf0 & >%Hcp0 & >Hfsb & >Hsls)".
+    iDestruct "Hblk" as (ds0) "(>%Hwf0 & >%Hcp0 & >Hrec & >Hsls)".
+    (* durable-disk 2b-inode-1: the region parks the sixteen RECORD runs; the
+       deposit still surrenders the BLOCK, so it gathers them here and splits
+       them again at the re-park. *)
+    iDestruct (ireg_recs_to_blk γfs inodestart (ireg_bi inum) ds0 Hwf0
+                with "Hrec") as "Hfsb".
     iModIntro.
     rewrite (ireg_bi_iblock inum inodestart).
     iExists (diblk_bytes ds0).
@@ -255,7 +262,9 @@ Section EscrowDeposit.
             exact (Hne (eq_sym Hi')). }
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
-      iSplitL "Hfsb'"; [iExact "Hfsb'" |].
+      iSplitL "Hfsb'";
+        [iApply (ireg_recs_of_blk γfs inodestart (ireg_bi inum)
+                   (<[islot inum := dn']> ds) Hwfi with "Hfsb'") |].
       iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl

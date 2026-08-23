@@ -345,8 +345,17 @@ Qed.
 (*  3.  The node's byte ownership                                      *)
 (* ------------------------------------------------------------------ *)
 
-Section InodeOwned.
-  Context `{!fsLinkG Σ}.
+(* THE RECORD-ONLY HALF IS RA-FREE, AND THAT IS LOAD-BEARING
+   (durable-disk 2b-inode-1).  [rec_owned]/[rec_owned_at] and the sixteen-
+   fold split are about BYTES alone; stating them inside the link RA's
+   section would discharge every one of them over [fsLinkG Σ], and a
+   consumer without that class in context -- [InodeRegion], whose
+   [ireg_inv] arity is fixed by 30-odd fs contracts -- would then leave an
+   unresolvable instance goal SHELVED and fail at [Qed] with "Attempt to
+   save an incomplete proof" (durable-notes, the capacity-class trap).  So
+   they live in their own section over a bare [Σ]. *)
+Section RecOwned.
+  Context {Σ : gFunctors}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* inum [i]'s 64-byte slot of its inode block *)
@@ -486,6 +495,16 @@ Section InodeOwned.
     apply lookup_seq in Hk as [_ Hlt].
     rewrite (rec_owned_at_slot Γ istart bi k (ds !!! k) Hlt) //.
   Qed.
+
+End RecOwned.
+
+(* ------------------------------------------------------------------ *)
+(*  3c. ...and the rest of the inode, which DOES read the link RA      *)
+(* ------------------------------------------------------------------ *)
+
+Section InodeOwned.
+  Context `{!fsLinkG Σ}.
+  Implicit Types Γ : fs_view_names Σ.
 
   Definition ind_owned Γ (n : fs_node) : iProp Σ :=
     (if decide (fn_indb n = 0) then emp

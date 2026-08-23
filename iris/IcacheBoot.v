@@ -1117,18 +1117,27 @@ Section IcacheBootRegion.
       iApply (big_sepL_mono with "H").
       intros idx bi Hbi. apply lookup_seq in Hbi as [-> Hidx].
       iIntros "[Hb Hsl]". rewrite /ireg_blk. iExists (dss !!! idx).
-      iSplitR.
-      { iPureIntro.
-        apply (Forall_lookup_1 _ dss idx); [exact Hwf |].
+      assert (Hwfb : diblk_wf (dss !!! idx)).
+      { apply (Forall_lookup_1 _ dss idx); [exact Hwf |].
         apply list_lookup_lookup_total_lt. lia. }
+      iSplitR; [iPureIntro; exact Hwfb |].
       iSplitR.
       { iPureIntro. intros i Hi.
         apply lookup_union_Some_l.
         rewrite (ireg_M0_lookup dss nib _); last first.
         { apply region_inums_spec. lia. }
         rewrite (image_dinode_slot dss idx i Hi) //. }
-      rewrite -(He idx Hidx).
-      iSplitL "Hb"; [iExact "Hb" | iExact "Hsl"]. }
+      (* the image block's bytes, named as the decoded list's encoding --
+         in the HYPOTHESIS now, since the goal no longer spells the block *)
+      iEval (rewrite (He idx Hidx)) in "Hb".
+      (* durable-disk 2b-inode-1: the image block's byte run is handed to the
+         region as its SIXTEEN RECORD RUNS ([InodeRegion.ireg_recs_of_blk],
+         i.e. [FsStateInode.rec_owned_at_diblk]'s split), which is the shape
+         [ireg_blk] parks now. *)
+      iSplitL "Hb";
+        [iApply (ireg_recs_of_blk γfs inodestart idx (dss !!! idx) Hwfb
+                   with "Hb")
+        | iExact "Hsl"]. }
     iMod (inv_alloc iregN E (ireg_body γi γfs inodestart nib) with "[Hbody]")
       as "#Hinv"; [by iNext |].
     iAssert (ireg_inv γi γfs inodestart nib) as "#Hrinv".

@@ -2491,7 +2491,11 @@ Section IcacheRefInvReg.
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
     iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
                 with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hrec & >Hsls)".
+    (* durable-disk 2b-inode-1: the region parks the sixteen RECORD runs;
+       gather them into the block spelling the [BufL] row transport takes. *)
+    iDestruct (ireg_recs_to_blk γfs inodestart (ireg_bi inum) ds Hwf
+                with "Hrec") as "Hfsb".
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
@@ -2539,7 +2543,9 @@ Section IcacheRefInvReg.
       iApply ("Hback" $! mrg with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj Hfrcp]");
         [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iSplitL "Hfsb";
+        [iApply (ireg_recs_of_blk γfs inodestart (ireg_bi inum) ds Hwf
+                   with "Hfsb") |].
       iEval (rewrite -Hins).
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
