@@ -215,11 +215,30 @@ See the G1-impl entry for the site table.
    `fs_bmap_set_bm_bytes`, `fs_iblk_upd`, `fs_iblk_eff_dinode`,
    `rch_pred` — the last two belong in `FsEffBase.v` as soon as a second
    consumer appears.
-3. **The row-(a) flip + G3** (one coordinated sweep): add row (a) to
-   `log_state`, wire the G2 lemmas into the 26 arms, re-point
-   `ProofEndOp` at the value-chained primitives (threading the chained
-   `M` through write_log/commit/installs/clear — this discharges any
-   G1-impl premise-debt), `SpecEndOp` gains the client fupd.
+3. **The flip/G3 complex**, decomposed (specs: the flip design-of-
+   record block above + E2'/G1-impl entries):
+   - **flip-A** (pure, independent): `fsobj` (records/bits/slots/
+     blocks), the agreement relation `A ~[pend] L` with its per-block
+     residue clauses and the TILING COMPLETENESS lemma (`pend = ∅ ⇒
+     A = L` on homes), per-effect OBJECT FOOTPRINTS (each F3-final
+     effect names the objects it moves), and the fold lemmas (an op's
+     finalize = its G2 lemma + agreement bookkeeping).
+   - **flip-B** (G3's adoption, independent): `ProofEndOp` re-pointed
+     at the value-chained primitives — destructure `log_mirror_clean`
+     to a NAMED `M0` at `eo_open`, chain `lm_upd` through write_log's
+     fills, `fs_commit_permit_named` (client fupd TRIVIAL while
+     `fs_durable_wf` is the placeholder — the shape lands now, the
+     content at the switch-on), the installs' `_v` forms, and
+     `fs_clear_permit_keep` (the caught-up fact is computation on the
+     chained value; fr_D stops re-basing at the steady clear).
+     Deliver the deposit-side `log_mirror_tie_body` proof as a
+     ready-but-unused lemma (the tie's switch-on still waits on the
+     BOOT side = H2a). `SpecEndOp` gains the client-fupd premise,
+     the 26 callers supply the trivial one.
+   - **flip-C** (closes over A+B): the ledger entries gain object
+     sets, `op_pending` moves to objects, row (a) enters `log_state`,
+     the 26 arms wire their G2 lemmas through flip-A's fold, the
+     `log_state_pend` debt site retires.
 4. **H1–H3**: the boot re-founding (mint at `D` off `fs_boot_pure`,
    dirty-at-boot blocks, ghost-no-op recovery arms replacing D1/D2's
    L-moving ones, orphan routing to ireclaim, D3's clean-header
