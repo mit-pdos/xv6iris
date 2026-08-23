@@ -90,6 +90,14 @@ Require Import FdSlots.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioDefs.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
@@ -1349,9 +1357,7 @@ Section ProofSysLinkBody.
             by exact (sl_regs_cs m sp0 _ _ R0 mil Hcsil HR0regs).
           assert (Hils1 : (mil !!! Regidx Rs1 : mword 64) = ientry kk)
             by exact (sl_regs_s1 _ _ _ _ _ Hilregs).
-          iDestruct "Hload" as (dat)
-            "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
-              Hblocks & Hdview & Hfview)".
+          iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_type) in "Hity".
           iEval (rewrite /i_nlink) in "Hinl".
@@ -1417,8 +1423,9 @@ Section ProofSysLinkBody.
                with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
                       Hfview]"
                as "Hload".
-             { rewrite /ic_loaded. iExists dat.
+             { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
                iSplitR; [iPureIntro; exact Hiok |].
+               iSplitR; [iPureIntro; exact Hrl_dat |].
                iSplitR; [iPureIntro; exact Hdok |].
                iSplitR; [iPureIntro; exact Hddix |].
                iSplitR; [iPureIntro; exact Hdoc |].
@@ -1572,8 +1579,9 @@ Section ProofSysLinkBody.
                 iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
                   with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks
                          Hdlnk Hdview Hfview]" as "Hload".
-                { rewrite /ic_loaded. iExists dat.
+                { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
                   iSplitR; [iPureIntro; exact Hiok |].
+                  iSplitR; [iPureIntro; exact Hrl_dat |].
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
                   iSplitR; [iPureIntro; exact Hdoc |].
@@ -1850,9 +1858,10 @@ Section ProofSysLinkBody.
                                   (eq_sym (sl_setnl_size dn _)))) in "Hfview".
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
                   with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Hdview Hfview]" as "Hload".
-                { rewrite /ic_loaded. iExists dat.
+                { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
+                  iSplitR; [iPureIntro; exact Hrl_dat |].
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
                   iSplitR;
@@ -2177,9 +2186,7 @@ Section ProofSysLinkBody.
                    iDestruct (ity_shot_agree with "Hshotd Hshotd2") as %Htyd0.
                    assert (Htyd : di_type dnd = SpecDirlookup.T_DIR)
                      by (symmetry; exact Htyd0).
-                   iDestruct "Hloadd" as (datd)
-                     "(%Hdiok & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd &
-                       Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd)".
+                   iDestruct (ic_loaded_open with "Hloadd") as (datd)"(%Hdiok & %Hrl_datd & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd & Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
                    (*                                                              *)
@@ -2626,8 +2633,9 @@ Section ProofSysLinkBody.
                        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
                          with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd Hfviewd]"
                            as "Hloadd".
-                       { rewrite /ic_loaded. iExists datd.
+                       { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datd.
                          iSplitR; [iPureIntro; exact Hdiok |].
+                         iSplitR; [iPureIntro; exact Hrl_datd |].
                          iSplitR; [iPureIntro; exact Hddok |].
                          iSplitR; [iPureIntro; exact Hddixd |].
                          iSplitR; [iPureIntro; exact Hdocd |].
@@ -2871,8 +2879,9 @@ Section ProofSysLinkBody.
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd
                                      Hfviewd]"
                               as "Hloadd".
-                            { rewrite /ic_loaded. iExists datd'.
+                            { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
+                              iSplitR; [iPureIntro; exact Hrl_datd' |].
                               iSplitR; [iPureIntro; exact Hddok' |].
                               iSplitR; [iPureIntro; exact Hddix' |].
                               iSplitR; [iPureIntro; exact Hdoc' |].
@@ -3285,8 +3294,9 @@ Section ProofSysLinkBody.
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd
                                      Hfviewd]"
                               as "Hloadd".
-                            { rewrite /ic_loaded. iExists datd'.
+                            { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
+                              iSplitR; [iPureIntro; exact Hrl_datd' |].
                               iSplitR; [iPureIntro; exact Hddok' |].
                               iSplitR; [iPureIntro; exact Hddix' |].
                               iSplitR; [iPureIntro; exact Hdoc' |].

@@ -1095,15 +1095,6 @@ Section IlockLoad.
                     ⌜dir_uniq dn data⌝ ∗
                     dir_links (bv_unsigned inum) dn data ∗
                     ind_res gfs bm ∗ inode_blocks gfs bm data ∗
-                    (* ...and the ERA'S ABSTRACT VALUE, at the node the fill
-                       is about to park (durable-disk 2b-inode-3).  The pool
-                       arm carries it TIED (inside
-                       [FsStateEra.inode_owned_era]) and transfers it; the
-                       CLAIM-BOX arm carries it untied on the marker and
-                       retags it here, with the same one-line move the two
-                       contents holds make. *)
-                    top_frag (fs_gamma_L gfs) (bv_unsigned inum)
-                             (era_node dn bm data) ∗
                     (* the CONTENTS HOLD, TIED to the record the fill just
                        decoded (namei-pinned-lookup.md §9 W3).  The pool arm
                        carries it tied already and transfers it; the CLAIM-BOX
@@ -1114,7 +1105,16 @@ Section IlockLoad.
                        the pool arm transfers it tied, the claim-box arm
                        [fv_set_rt]s its untied one to the fresh record's own
                        (empty) bytes. *)
-                    fv_ride (bv_unsigned inum) (fv_of dn data)))
+                    fv_ride (bv_unsigned inum) (fv_of dn data) ∗
+                    (* ...and the ERA'S ABSTRACT VALUE, at the node the fill
+                       is about to park (durable-disk 2b-inode-3).  The pool
+                       arm carries it TIED (inside
+                       [FsStateEra.inode_owned_era]) and transfers it; the
+                       CLAIM-BOX arm carries it untied on the marker and
+                       retags it here, with the same one-line move the two
+                       contents holds make. *)
+                    top_frag (fs_gamma_L gfs) (bv_unsigned inum)
+                             (era_node dn bm data)))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL Hcl]" as ">[HL Hrest]".
     { (* NO PEEL HERE ANY MORE (iclaim-ledger.md §3.5 item 7).  OPTION A
@@ -1266,8 +1266,8 @@ Section IlockLoad.
                               ltac:(rewrite (fresh_shape_nlink dn Hfr0); lia)) |].
           iSplitR "Hdv Hfv Htop"; [iApply il_ind_res_empty |].
           iSplitR "Hdv Hfv Htop"; [iApply il_blocks_empty |].
-          iSplitL "Htop"; [iExact "Htop" |].
-          iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
+          iSplitL "Hdv"; [iExact "Hdv" |].
+          iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]. }
     (* THE FILL SPENDS THE GENERATION'S ONE-SHOT (design §17.6 (3)), at the
        only instruction in this kernel that knows [di_type]: the record has
        just been decoded off the buffer, and [dn] is fixed for the rest of
@@ -2057,7 +2057,7 @@ Section IlockLoad.
        through, exactly as v1's dead arm did ===== *)
     iDestruct "Hal" as (fl bm data)
       "(%Hfr & %Hpost & %Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hindres
-        & Hblocks & Htop & Hdview & Hfview)".
+        & Hblocks & Hdview & Hfview & Htop)".
     (* keep the whole fact: the re-pack at the epilogue hands it to
        [IcacheEscrow.ic_mk_loaded] (durable-notes: a [Prop] you only pass
        along is destructured for READING and rebuilt from the SAVED
@@ -2134,7 +2134,7 @@ Section IlockLoad.
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
                     Hdep Hidev Hinumc Hvalid
                     [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk
-                     Htop Hdview Hfview]
+                     Hdview Hfview Htop]
                     Hshot Hfoff Hwb [Hcont]").
     { (* the cells are held at [ip]; [ic_loaded] names them at the SLOT.
          [Hip] is the equation, and with the payload behind [ic_mk_loaded]
@@ -2142,7 +2142,7 @@ Section IlockLoad.
          (now folded) goal. *)
       iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hokw Hrl Hdok Hddix Hdoc Hduq
                 with "Hdlk Hdn [Hmty Hmmaj Hmmin Hmnl Hmsz] [Haddrs] Hindres
-                      Hblocks Htop Hdview Hfview").
+                      Hblocks Hdview Hfview Htop").
       - rewrite /inode_meta -Hip.
         iSplitL "Hmty"; [iExact "Hmty" |]. iSplitL "Hmmaj"; [iExact "Hmmaj" |].
         iSplitL "Hmmin"; [iExact "Hmmin" |]. iSplitL "Hmnl"; [iExact "Hmnl" |].
@@ -2566,7 +2566,7 @@ Section ProofIlockMain.
       { destruct o as [tyc | | tys].
         - iDestruct "Hcl" as "[Hcl _]".
           iDestruct (ic_loaded_open with "Hlk") as (datx)
-            "(%Hokx & %Hdokx & %Hddixx & %Hdocx & %Hduqx & %Hrlx & Hdlkx & Hdnx & Hrestx)".
+            "(%Hokx & %Hrlx & %Hdokx & %Hddixx & %Hdocx & %Hduqx & Hdlkx & Hdnx & Hrestx)".
           iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dnp tyc
                   ltac:(solve_ndisj) Hinlt with "Hireg Hdnx Hcl") as %[].
         - iModIntro. iSplitL "Hlk"; [iExact "Hlk" |].

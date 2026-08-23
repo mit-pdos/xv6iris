@@ -832,6 +832,23 @@ Proof.
     apply bool_decide_eq_true. reflexivity.
 Qed.
 
+(* HOW A WRITER RE-ESTABLISHES IT.  Every write in this kernel keeps the
+   record's TYPE (an ordinary flush, a link/unlink count move, a size
+   growth) -- [InodeRegion.di_type_stable]'s right disjunct -- so the
+   enumeration rides, and what is left is the two facts the write itself
+   decides: the new count is still a non-negative short, and a directory's
+   size is still 16-divisible.  Both are one line at every site. *)
+Lemma inode_rec_local_same_type (dn dn' : dinode) :
+  inode_rec_local dn ->
+  di_type dn' = di_type dn ->
+  bv_unsigned (di_nlink dn') <= 32767 ->
+  (bv_unsigned (di_type dn') = T_DIR_z -> (16 | bv_unsigned (di_size dn'))) ->
+  inode_rec_local dn'.
+Proof.
+  intros (Hty & _ & _) Heq Hnl Hgr. split_and!; [| exact Hnl | exact Hgr].
+  rewrite Heq. exact Hty.
+Qed.
+
 Lemma inode_local_of_ok_rec (i : Z) (cov : gset Z) (ls : Z)
     (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
   inode_ok cov ls dn bm data ->

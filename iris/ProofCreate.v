@@ -108,6 +108,14 @@ Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
@@ -2937,9 +2945,7 @@ Section ProofCreateMain.
          a one-shot per generation, so the two readings agree. *)
       iDestruct (ity_shot_agree with "Hshotd Hshotl") as %Htyd.
       assert (Htydir : di_type dnl = SpecDirlookup.T_DIR) by (symmetry; exact Htyd).
-      iDestruct "Hload" as (datl)
-        "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs &
-          Hind & Hblocks & Hdview & Hfview)".
+      iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
       iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
       iEval (rewrite /i_nlink) in "Hinl".
       (* ===== +0x2a lh a5,74(s1) : dp->nlink -- THE GUARD (9da28f5) ==== *)
@@ -3823,10 +3829,7 @@ Section ProofCreateMain.
              assert (Hp060 : add_vec_int (mword_of_int (CK + 0x5c) : mword 64) 4
                              = mword_of_int (CK + 0x60)) by pcw.
              iEval (rewrite Hp060) in "Hpc".
-             iDestruct "Hcload" as (datc)
-               "(%Hciok & %Hcdok & %Hcddix & %Hcdoc & %Hcduq & Hcdlnk & Hcdiat & Hcmeta
-                 & Hcaddrs & Hcind &
-                 Hcblocks & Hcdview & Hcfview)".
+             iDestruct (ic_loaded_open with "Hcload") as (datc)"(%Hciok & %Hrl_datc & %Hcdok & %Hcddix & %Hcdoc & %Hcduq & Hcdlnk & Hcdiat & Hcmeta & Hcaddrs & Hcind & Hcblocks & Hcdview & Hcfview)".
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
              iEval (rewrite /i_type) in "Hcity".
              (* ===== +0x60 lhu a5,68(s2) : ip->type, ZERO-extended ==== *)
@@ -4780,10 +4783,7 @@ Section ProofCreateMain.
                     (ientry kslot) ty major minor Ma Mo Hcs3 Hs3 HAregs).
       pose proof HMoregs as HMoR.
       destruct HMoR as (M2 & M8 & M9 & M18 & M19 & M20 & M21 & M22 & Mthr).
-      iDestruct "Hcload" as (datc)
-        "(%Hciok & %Hcdok & %Hcddix & %Hcdoc & %Hcduq & Hcdlnk & Hcdiat & Hcmeta
-          & Hcaddrs & Hcind &
-          Hcblocks & Hcdview & Hcfview)".
+      iDestruct (ic_loaded_open with "Hcload") as (datc)"(%Hciok & %Hrl_datc & %Hcdok & %Hcddix & %Hcdoc & %Hcduq & Hcdlnk & Hcdiat & Hcmeta & Hcaddrs & Hcind & Hcblocks & Hcdview & Hcfview)".
       (* the child's record acquires [cr_setf]'s four fields below and NONE
          of them is [di_size], so its contents value never moves; convert the
          hold once, here (namei-pinned-lookup.md §9 W3). *)
@@ -5479,8 +5479,9 @@ Section ProofCreateMain.
              iModIntro.
              iAssert (ic_loaded γfs γi cov logstart kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview]" as "Hload".
-             { rewrite /ic_loaded. iExists data'.
+             { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists data'.
                iSplitR; [iPureIntro; exact Hiok' |].
+               iSplitR; [iPureIntro; exact Hrl_data' |].
                iSplitR; [iPureIntro; rewrite -Hnib; exact Hdok' |].
                iSplitR; [iPureIntro; exact Hddix' |].
                iSplitR; [iPureIntro;
@@ -7162,10 +7163,11 @@ Section ProofCreateMain.
     iAssert (ic_loaded γfs γi cov logstart kslot cinum
                (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc)
       with "[Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview]" as "Hcload".
-    { rewrite /ic_loaded. iExists datc.
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datc.
       iSplitR; [iPureIntro;
                 exact (cr_setf_inode_ok cov logstart dc bmc datc major minor
                          _ Hciok) |].
+      iSplitR; [iPureIntro; exact Hrl_datc |].
       iSplitR; [iPureIntro;
                 exact (cr_setf_dir_ok icfg_nib dc datc major minor
                          _ Hcdok') |].
@@ -7294,8 +7296,9 @@ Section ProofCreateMain.
        over -- and the walk has already undone its own failing append. *)
     iAssert (ic_loaded γfs γi cov logstart kd dind dp bmp)
       with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview]" as "Hload".
-    { rewrite /ic_loaded. iExists datap.
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datap.
       iSplitR; [iPureIntro; exact Hiok |].
+      iSplitR; [iPureIntro; exact Hrl_datap |].
       iSplitR; [iPureIntro; rewrite -Hnib; exact Hdok |].
       iSplitR; [iPureIntro; exact Hddix |].
       iSplitR; [iPureIntro; exact (cr_doc_of_live dp dp datap eq_refl Hnl0) |].

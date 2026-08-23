@@ -74,6 +74,14 @@ Require Import PageGeom.
 Require Import ProcGeom.
 Require Import DiskPtsto.
 Require Import BioDefs.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
@@ -321,6 +329,11 @@ Section KexecB2Res.
     ic_loaded gfs gi cov logstart kf inumf dnf bmf ⊢
     ∃ datl : nat -> list (bv 8),
       ⌜inode_ok cov logstart dnf bmf datl⌝ ∗
+      (* durable-disk 2b-inode-3: the payload's record-only facts and the
+         era's abstract value ride the same self-cancelling bracket the two
+         contents holds do -- readi moves no byte, so the node does not
+         move and the SEAL hands both back unchanged. *)
+      ⌜inode_rec_local dnf⌝ ∗
       ⌜dir_ok icfg_nib dnf datl⌝ ∗
       ⌜dir_dots_ix (bv_unsigned inumf) dnf datl⌝ ∗
       ⌜dir_orphan_clean dnf datl⌝ ∗
@@ -341,22 +354,27 @@ Section KexecB2Res.
          self-cancelling argument, equally caller-invisible) touch of the
          pair.  For KEXEC in particular it is the load-bearing one: the
          file whose bytes this bracket is opened over IS /init. *)
-      fv_ride (bv_unsigned inumf) (fv_of dnf datl).
+      fv_ride (bv_unsigned inumf) (fv_of dnf datl) ∗
+      top_frag (fs_gamma_L gfs) (bv_unsigned inumf) (era_node dnf bmf datl).
   Proof.
-    rewrite /ic_loaded /inode_map.
-    iIntros "(%datl & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
-              Haddrs & Hind & Hbl & Hdv & Hfv)".
+    rewrite /inode_map.
+    iIntros "H".
+    iDestruct (ic_loaded_open with "H") as (datl)
+      "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
+        Haddrs & Hind & Hbl & Hdv & Hfv & Htop)".
     iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
+    iSplitR; [iPureIntro; exact Hrl |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
-    iSplitR "Hbl Hdv Hfv";
+    iSplitR "Hbl Htop Hdv Hfv";
       [| iSplitL "Hbl"; [iExact "Hbl" |];
-         iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]].
+         iSplitL "Hdv"; [iExact "Hdv" |];
+         iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]].
     iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
   Qed.
 
@@ -364,6 +382,7 @@ Section KexecB2Res.
       (logstart : Z) (kf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) :
     inode_ok cov logstart dnf bmf datl ->
+    inode_rec_local dnf ->
     dir_ok icfg_nib dnf datl ->
     dir_dots_ix (bv_unsigned inumf) dnf datl ->
     dir_orphan_clean dnf datl ->
@@ -377,21 +396,14 @@ Section KexecB2Res.
        there is no other source for it (§9 W2). *)
     dv_ride (bv_unsigned inumf) (dv_of dnf datl) -∗
     fv_ride (bv_unsigned inumf) (fv_of dnf datl) -∗
+    top_frag (fs_gamma_L gfs) (bv_unsigned inumf) (era_node dnf bmf datl) -∗
     ic_loaded gfs gi cov logstart kf inumf dnf bmf.
   Proof.
-    intros Hok Hdok Hddix Hdoc Hduq. rewrite /ic_loaded /inode_map.
-    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv Hfv". iExists datl.
-    iSplitR; [iPureIntro; exact Hok |].
-    iSplitR; [iPureIntro; exact Hdok |].
-    iSplitR; [iPureIntro; exact Hddix |].
-    iSplitR; [iPureIntro; exact Hdoc |].
-    iSplitR; [iPureIntro; exact Hduq |].
-    iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
-    iSplitL "Hmeta"; [iExact "Hmeta" |].
-    iSplitL "Haddrs"; [iExact "Haddrs" |].
-    iSplitL "Hind"; [iExact "Hind" |].
-    iSplitL "Hbl"; [iExact "Hbl" |].
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+    intros Hok Hrl Hdok Hddix Hdoc Hduq. rewrite /inode_map.
+    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv Hfv Htop".
+    iApply (ic_mk_loaded gfs gi cov logstart kf inumf dnf bmf datl
+              Hok Hrl Hdok Hddix Hdoc Hduq
+              with "Hdlk Hdiat Hmeta Haddrs Hind Hbl Hdv Hfv Htop").
   Qed.
 
   (* ------------------------------------------------------------------ *)

@@ -345,6 +345,14 @@ Require Import InodeInv.
 Require Import InodeLock.
 Require Import DirView.
 Require Import DirLinks.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import LogInv.
 Require Import FdSlots FileInvDefs.
 (* [ProcGeom] for [proc_addr] / [p_pid]: [ProcInv] Requires but does not
@@ -1883,9 +1891,7 @@ Section ProofFilewrite.
     (* ---- PEEL the checked-out bundle.  The valid cell is beside the
            content (SpecIlock v2) and it IS [FileOff.off_mark]. ---- *)
     rewrite /ic_loaded.
-    iDestruct "Hlk" as (datal)
-      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres
-       & Hblocks & Hdview & Hfview)".
+    iDestruct (ic_loaded_open with "Hlk") as (datal)"(%Hiok & %Hrl_datal & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Hdview & Hfview)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2122,6 +2128,7 @@ Section ProofFilewrite.
               /\ inode_ok (fwn_cov fn) (fwn_logstart fn) dn' bm' data'
               /\ dir_ok icfg_nib dn' data'
               /\ di_type dn' = di_type dnl
+              /\ di_nlink dn' = di_nlink dnl
               /\ dn0' = dn').
     { destruct Harms as
         [(Hm1 & _ & Htot0 & _ & Hbmq & Hdataq & Hdnq & Hdn0q & _)
@@ -2136,6 +2143,7 @@ Section ProofFilewrite.
         + exact (fw_inode_ok_rebuild _ _ _ _ _ Hbmwf Hbmcov Hdaddr Hdty Hszb
                    Hholes Hsized).
         + exact (fw_dir_ok_same icfg_nib dnl datal Hnodir).
+        + reflexivity.
         + reflexivity.
         + reflexivity.
       - exists (Z.of_nat tot). subst dn' dn0'.
@@ -2165,8 +2173,10 @@ Section ProofFilewrite.
         + exact (fw_dir_ok_wi icfg_nib dnl bm' (Z.to_nat (bv_unsigned v)) tot
                    data' Hnodir).
         + apply fw_wi_type.
+        + reflexivity.
         + reflexivity. }
-    destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hdn0q).
+    destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hnlq
+                       & Hdn0q).
     (* the RESOURCE twin of [Hdok2] (design §20.3).  filewrite cannot reach a
        T_DIR inode -- sys_open refuses writable directories, which is what
        [Hnodir] records -- so the twin is [emp] at the record writei
@@ -2174,6 +2184,13 @@ Section ProofFilewrite.
        incoming [Hdlnk] was [emp] for the same reason and is dropped. *)
     assert (Hnodir' : bv_unsigned (di_type dn') <> T_DIR_z)
       by (rewrite Htyq; exact Hnodir).
+    (* the three record-only facts at writei's output (durable-disk
+       2b-inode-3): the type and the count ride, and the directory clause is
+       vacuous at a record filewrite has already refuted as a directory. *)
+    assert (Hrl2 : inode_rec_local dn').
+    { apply (inode_rec_local_same_type dnl dn' Hrl_datal Htyq).
+      - rewrite Hnlq. exact (proj1 (proj2 Hrl_datal)).
+      - intros Hd. exfalso. exact (Hnodir' Hd). }
     (* ---- +0xa4 c.mv s1,a0 : park the count ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (FW + 0xac)) Rs1 Ra0 mwi (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2220,20 +2237,29 @@ Section ProofFilewrite.
        determined garbage -- the fd is provably not a directory here -- and
        the fragment is WHOLE, so the move is one free own-update and no delta
        is proved. *)
+    (* the payload's last name carries [fv_ride * top_frag]; writei MOVED
+       the record and the blocks, so the ride is set and the era's abstract
+       value is RETAGGED at the new node (durable-disk 2b-inode-3). *)
+    iDestruct "Hfview" as "[Hfview Htop]".
     iMod (dvw_set_rt ⊤ (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib
             (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
             (fv_of dnl datal) (fv_of dn' data')
             ltac:(solve_ndisj) with "Hireg Hdview Hfview")
       as "[Hdview Hfview]".
+    iMod (ireg_top_retag ⊤ (fwn_fs fn) (bv_unsigned inum)
+            (era_node dnl bml datal) (era_node dn' bm' data')
+            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
     { rewrite -P8. iExact "Hmark". }
     iAssert (ic_loaded (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
                (fwn_logstart fn) ik inum dn' bm')
-      with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview]" as "Hlk".
-    { rewrite /ic_loaded /inode_map. iExists data'.
+      with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hlk".
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
+      iSplitR; [iPureIntro; exact Hrl2 |].
       iSplitR; [iPureIntro; exact Hdok2 |].
       iSplitR; [iPureIntro;
                 exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
@@ -2242,7 +2268,8 @@ Section ProofFilewrite.
       iSplitR; [iPureIntro; exact (dir_uniq_not_dir dn' data' Hnodir') |].
       iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
-      rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview". }
+      rewrite Hdn0q.
+      iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview Htop". }
     (* ---- +0xb4 ld a0,24(s2) ; +0xb8 jal ra,iunlock ---- *)
     assert (Hpip3 : add_vec (rget X0 Rs2)
                       (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip kx).

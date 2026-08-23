@@ -64,6 +64,14 @@ Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
@@ -1192,9 +1200,7 @@ Section ProofSysLinkTails.
     assert (Hilthr : sl_thr m mil).
     { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
       exact (HM2thr c Hc N2 N8 N9 N18). }
-    iDestruct "Hload" as (dat)
-      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
-        & Hblocks & Hdview & Hfview)".
+    iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_nlink) in "Hinl".
     (* THE TYPE, ACROSS THE CALLER'S OWN [iunlock].  [ilock] hands back a
@@ -1393,10 +1399,31 @@ Section ProofSysLinkTails.
       in "Hdview".
     iEval (rewrite (fv_of_size dn dn' dat (eq_sym (sl_setnl_size dn _))))
       in "Hfview".
+    (* THE ERA'S ABSTRACT VALUE IS RETAGGED (durable-disk 2b-inode-3): the
+       payload's last name carries [fv_ride * top_frag], the flush MOVED
+       the record, and [InodeRegion.ireg_top_retag] is the one-line move.
+       It opens [ftopN] alone, so no mask this walk holds is disturbed. *)
+    iDestruct "Hfview" as "[Hfview Htop]".
+    iApply fupd_wp.
+    iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
+            (era_node dn bm dat) (era_node dn' bm dat)
+            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") |].
+    iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kk inum dn' bm)
-      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview]" as "Hload".
-    { rewrite /ic_loaded. iExists dat.
+      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hload".
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
       iSplitR; [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
+      (* [sl_setnl] moves the COUNT and nothing else, so the type and the
+         size ride, the new count is BELOW one the region already bounded
+         ([Hdec]) and the directory clause is vacuous at a non-directory
+         (durable-disk 2b-inode-3). *)
+      iSplitR; [iPureIntro;
+                apply (inode_rec_local_same_type dn dn' Hrl_dat
+                         (sl_setnl_type dn _));
+                [ pose proof (proj1 (proj2 Hrl_dat)); lia
+                | intros Hd; exfalso; apply Hnotdir;
+                  rewrite /dn' sl_setnl_type in Hd; exact Hd ] |].
       iSplitR; [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
       iSplitR; [iPureIntro; exact (sl_setnl_ddix _ dn dat _ Hnz Hddix) |].
       iSplitR; [iPureIntro; apply dir_orphan_clean_not_dir;
@@ -1405,7 +1432,8 @@ Section ProofSysLinkTails.
                 rewrite /dn' sl_setnl_type; exact Hnotdir |].
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.
-      iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks Hdview Hfview". }
+      iDestruct "Hmap" as "[Ha Hi]".
+      iFrame "Ha Hi Hblocks Hdview Hfview Htop". }
     iDestruct (sl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* ===== +0x10a c.mv a0,s1 ===== *)

@@ -62,6 +62,14 @@ Require Import ProcGeom.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.              (* [dir_links_not_dir] *)
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED EARLY on purpose
+   -- the [FsState*] stack exports [fs_view] and [byte_range], both of which
+   have live twins below, and the LAST import wins (durable-notes, "AND
+   WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks.              (* [fs_names] *)
 Require Import BioDefs.               (* [BSIZE] *)
 Require Import InodeInv.
@@ -779,13 +787,27 @@ Section ProofSysOpenPublish.
     - apply inode_sized_zero.
   Qed.
 
+  (* itrunc keeps the record's TYPE and its COUNT and zeroes the size, so
+     the three record-only facts (durable-disk 2b-inode-3) ride across it:
+     the enumeration by the type, the short by the count, and a directory's
+     granularity vacuously at size 0. *)
+  Lemma so_trunc_rec_local (dn : dinode) :
+    inode_rec_local dn -> inode_rec_local (di_trunc dn).
+  Proof.
+    intros Hrl. apply (inode_rec_local_same_type dn (di_trunc dn) Hrl eq_refl).
+    - exact (proj1 (proj2 Hrl)).
+    - intros _. change (di_size (di_trunc dn)) with (bv_0 32).
+      change (bv_unsigned (bv_0 32)) with 0. by exists 0.
+  Qed.
+
   (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
      ind_res] is itrunc's [inode_map]. *)
   Lemma so_loaded_open (gfs : fs_names) (gi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     ∃ data : nat -> list (bv 8),
-      ⌜inode_ok cov logstart dn bm data⌝ ∗ ⌜dir_ok icfg_nib dn data⌝ ∗
+      ⌜inode_ok cov logstart dn bm data⌝ ∗ ⌜inode_rec_local dn⌝ ∗
+      ⌜dir_ok icfg_nib dn data⌝ ∗
       dir_links (bv_unsigned inum) dn data ∗
       dinode_at gi inum dn ∗
       inode_meta (ientry k) dn ∗
@@ -795,10 +817,16 @@ Section ProofSysOpenPublish.
          three clauses this peel discards, the hold is a RESOURCE and the
          re-seal below cannot conjure it, so it must come out here. *)
       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-      fv_ride (bv_unsigned inum) (fv_of dn data).
+      fv_ride (bv_unsigned inum) (fv_of dn data) ∗
+      (* ...and the era's abstract value (durable-disk 2b-inode-3): itrunc
+         MOVES the record, so the walk retags it between this peel and the
+         seal below ([InodeRegion.ireg_top_retag]). *)
+      top_frag (fs_gamma_L gfs) (bv_unsigned inum) (era_node dn bm data).
   Proof.
-    iIntros "(%data & %Hok & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
-              Haddr & Hind & Hblk & Hdv & Hfv)".
+    iIntros "H".
+    iDestruct (ic_loaded_open with "H") as (data)
+      "(%Hok & %Hrl & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
+        Haddr & Hind & Hblk & Hdv & Hfv & Htop)".
     (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
        [inode_blocks] tail is large (171 s at this site).  The arity sweep's
        third, fourth and fifth pure conjuncts [Hddix]/[Hdoc]/[Hduq] are bound
@@ -807,6 +835,7 @@ Section ProofSysOpenPublish.
        uniqueness clause are all discarded here. *)
     iExists data.
     iSplit; [iPureIntro; exact Hok |].
+    iSplit; [iPureIntro; exact Hrl |].
     iSplit; [iPureIntro; exact Hdir |].
     iSplitL "Hlnk"; [iExact "Hlnk" |].
     iSplitL "Hat"; [iExact "Hat" |].
@@ -814,7 +843,8 @@ Section ProofSysOpenPublish.
     iSplitL "Haddr Hind".
     { rewrite /inode_map. iSplitL "Haddr"; [iExact "Haddr" | iExact "Hind"]. }
     iSplitL "Hblk"; [iExact "Hblk" |].
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+    iSplitL "Hdv"; [iExact "Hdv" |].
+    iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"].
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
@@ -822,6 +852,7 @@ Section ProofSysOpenPublish.
       (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_type dn) <> T_DIR_z ->
+    inode_rec_local dn ->
     dinode_at gi inum (di_trunc dn) -∗
     inode_meta (ientry k) (di_trunc dn) -∗
     inode_map gfs (ientry k) bm_empty -∗
@@ -834,13 +865,21 @@ Section ProofSysOpenPublish.
             (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
     fv_ride (bv_unsigned inum)
             (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
+    (* ...and the RETAGGED abstract value, at the truncated node *)
+    top_frag (fs_gamma_L gfs) (bv_unsigned inum)
+             (era_node (di_trunc dn) bm_empty
+                       (fun _ => replicate BSIZE (bv_0 8))) -∗
     ic_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty.
   Proof.
-    intros Hnz Hnd. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv".
+    intros Hnz Hnd Hrl. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv Htop".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
     iApply (ic_mk_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
               (so_trunc_ok cov logstart dn Hnz)
+              (* itrunc keeps the TYPE and zeroes the count and the size, so
+                 the three record-only facts ride (durable-disk
+                 2b-inode-3) *)
+              (so_trunc_rec_local dn Hrl)
               (dir_ok_not_dir icfg_nib (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
               (dir_dots_ix_not_dir (bv_unsigned inum) (di_trunc dn) _
@@ -849,7 +888,7 @@ Section ProofSysOpenPublish.
                  ltac:(rewrite Hty; exact Hnd))
               (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
-              with "[] Hat Hmeta Haddr Hind Hblk Hdv Hfv").
+              with "[] Hat Hmeta Haddr Hind Hblk Hdv Hfv Htop").
     iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).
     rewrite Hty. exact Hnd.
   Qed.

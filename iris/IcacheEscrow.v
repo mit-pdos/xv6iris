@@ -1700,13 +1700,13 @@ Section IcacheEscrow.
     inode_addrs (ientry k) (bm_cells bm) -∗
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
-    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
     dv_ride (bv_unsigned inum) (dv_of dn data) -∗
     fv_ride (bv_unsigned inum) (fv_of dn data) -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
     intros Hok Hrl Hdok Hddix Hdoc Hduq.
-    iIntros "Hl Hd Hm Ha Hr Hb Ht Hv Hw".
+    iIntros "Hl Hd Hm Ha Hr Hb Hv Hw Ht".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     pose proof (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn bm
                   data Hok Hrl Hduq Hddix) as Hloc.
@@ -1732,27 +1732,47 @@ Section IcacheEscrow.
      cost is one line -- this lemma in place of the [rewrite /ic_loaded] it
      used to do -- and two extra names in its destructuring pattern.  No
      mask moves; see [ipool_alloc]'s note. *)
+  (* THE FLAT SHAPE: [ic_loaded]'s OLD conjunct list, in the OLD order, with
+     the two things the era bundle knows and the old payload did not --
+     [FsStateEra.inode_rec_local] of the record (second, so that a producer
+     that had [inode_ok] proves the two together) and the era's abstract
+     value [FsState.top_frag] (just before the two contents holds, which it
+     rides beside everywhere else).  It is what the ~forty consumer sites
+     open and close through, so the flip costs each of them one lemma name,
+     one pure conjunct and one framed hypothesis instead of a rewritten
+     re-pack.  [ic_loaded_flat] and [ic_loaded_open] are the two directions;
+     [ic_mk_loaded] is the same close with the pieces as separate wands. *)
+  Definition ic_loaded_flat_body (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32)
+      (dn : dinode) (bm : blkmap) : iProp Σ :=
+    (∃ (data : nat -> list (bv 8)),
+       ⌜inode_ok cov logstart dn bm data⌝ ∗
+       ⌜inode_rec_local dn⌝ ∗
+       ⌜dir_ok icfg_nib dn data⌝ ∗
+       ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
+       ⌜dir_orphan_clean dn data⌝ ∗
+       ⌜dir_uniq dn data⌝ ∗
+       dir_links (bv_unsigned inum) dn data ∗
+       dinode_at γi inum dn ∗
+       inode_meta (ientry k) dn ∗
+       inode_addrs (ientry k) (bm_cells bm) ∗
+       ind_res γfs bm ∗
+       inode_blocks γfs bm data ∗
+       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
+       (* LAST, and that position is load-bearing: a consumer's existing
+          eight-name spatial pattern binds its last name to
+          [fv_ride ∗ top_frag], so the flip costs the ~forty payload sites
+          one PURE conjunct and no re-plumbing of any [with "[...]"]
+          selection at all. *)
+       fv_ride (bv_unsigned inum) (fv_of dn data) ∗
+       top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data))%I.
+
   Lemma ic_loaded_open γfs γi cov logstart k (inum : mword 32)
       (dn : dinode) (bm : blkmap) :
     ic_loaded γfs γi cov logstart k inum dn bm -∗
-    ∃ (data : nat -> list (bv 8)),
-      ⌜inode_ok cov logstart dn bm data⌝ ∗
-      ⌜dir_ok icfg_nib dn data⌝ ∗
-      ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
-      ⌜dir_orphan_clean dn data⌝ ∗
-      ⌜dir_uniq dn data⌝ ∗
-      ⌜inode_rec_local dn⌝ ∗
-      dir_links (bv_unsigned inum) dn data ∗
-      dinode_at γi inum dn ∗
-      inode_meta (ientry k) dn ∗
-      inode_addrs (ientry k) (bm_cells bm) ∗
-      ind_res γfs bm ∗
-      inode_blocks γfs bm data ∗
-      top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) ∗
-      dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-      fv_ride (bv_unsigned inum) (fv_of dn data).
+    ic_loaded_flat_body γfs γi cov logstart k inum dn bm.
   Proof.
-    iIntros "H". rewrite /ic_loaded.
+    iIntros "H". rewrite /ic_loaded /ic_loaded_flat_body.
     iDestruct "H" as (data)
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
@@ -1761,18 +1781,32 @@ Section IcacheEscrow.
       as "(Hd & Hr & Hb & Ht)".
     iExists data.
     iSplitR; [iPureIntro; exact Hok |].
-    iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [iPureIntro;
               exact (inode_rec_local_of (bv_unsigned inum)
                        (era_node dn bm data) Hloc) |].
+    iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitL "Hl"; [iExact "Hl" |].
     iSplitL "Hd"; [iExact "Hd" |].
     iSplitL "Hm"; [iExact "Hm" |].
     iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" |].
     iSplitL "Hb"; [iExact "Hb" |].
-    iSplitL "Ht"; [iExact "Ht" |].
-    iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
+    iSplitL "Hv"; [iExact "Hv" |].
+    iSplitL "Hw"; [iExact "Hw" | iExact "Ht"].
+  Qed.
+
+  Lemma ic_loaded_flat γfs γi cov logstart k (inum : mword 32)
+      (dn : dinode) (bm : blkmap) :
+    ic_loaded_flat_body γfs γi cov logstart k inum dn bm -∗
+    ic_loaded γfs γi cov logstart k inum dn bm.
+  Proof.
+    rewrite /ic_loaded_flat_body. iIntros "H".
+    iDestruct "H" as (data)
+      "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr & Hb
+        & Hv & Hw & Ht)".
+    iApply (ic_mk_loaded γfs γi cov logstart k inum dn bm data
+              Hok Hrl Hdok Hddix Hdoc Hduq
+              with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
   Qed.
 
   (* ------------------------------------------------------------------ *)

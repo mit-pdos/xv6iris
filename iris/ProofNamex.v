@@ -128,6 +128,14 @@ Require Import ProcGeom.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
@@ -3143,9 +3151,7 @@ Section ProofNamexMain.
                    pose proof Hmilregs as HmilR.
                    destruct HmilR as (Y2 & Y8 & Y9 & Y19 & Y20 & Y21 & Y22
                                       & Y23 & Y24 & Y25 & Ythr).
-                   iDestruct "Hload" as (datl)
-                     "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
-                       Hblocks & Hdview & Hfview)".
+                   iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
                    iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
                    iEval (rewrite /i_type) in "Hity".
                    (* +0xc6 lh a5,68(s4) : ip->type *)
@@ -3273,8 +3279,9 @@ Section ProofNamexMain.
                      iAssert (ic_loaded gfs gi cov logstart ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
                               Hblocks Hdlnk Hdview Hfview]" as "Hload".
-                     { rewrite /ic_loaded. iExists datl.
+                     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
+                       iSplitR; [iPureIntro; exact Hrl_datl |].
                        iSplitR; [iPureIntro; exact Hdok |].
                        iSplitR; [iPureIntro; exact Hddix |].
                        iSplitR; [iPureIntro; exact Hdoc |].
@@ -3617,8 +3624,9 @@ Section ProofNamexMain.
                        iAssert (ic_loaded gfs gi cov logstart ik iinum dnl bml)
                          with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
                                 Hblocks Hdlnk Hdview Hfview]" as "Hload".
-                       { rewrite /ic_loaded. iExists datl.
+                       { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                          iSplitR; [iPureIntro; exact Hiok |].
+                         iSplitR; [iPureIntro; exact Hrl_datl |].
                          iSplitR; [iPureIntro; exact Hdok |].
                          iSplitR; [iPureIntro; exact Hddix |].
                          iSplitR; [iPureIntro; exact Hdoc |].
@@ -3999,8 +4007,9 @@ Section ProofNamexMain.
                                     bml)
                            with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview Hfview]"
                            as "Hload".
-                         { rewrite /ic_loaded. iExists datl.
+                         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                            iSplitR; [iPureIntro; exact Hiok |].
+                           iSplitR; [iPureIntro; exact Hrl_datl |].
                            iSplitR; [iPureIntro; exact Hdok |].
                            iSplitR; [iPureIntro; exact Hddix |].
                            iSplitR; [iPureIntro; exact Hdoc |].
@@ -4623,8 +4632,9 @@ Section ProofNamexMain.
                      iAssert (ic_loaded gfs gi cov logstart ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
                               Hblocks Hdlnk Hdview Hfview]" as "Hload".
-                     { rewrite /ic_loaded. iExists datl.
+                     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
+                       iSplitR; [iPureIntro; exact Hrl_datl |].
                        iSplitR; [iPureIntro; exact Hdok |].
                        iSplitR; [iPureIntro; exact Hddix |].
                        iSplitR; [iPureIntro; exact Hdoc |].

@@ -68,6 +68,14 @@ Require Import WpUart.
 Require Import ByteBuf.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
@@ -2320,9 +2328,7 @@ Section ProofSysUnlinkBody.
         { rewrite HR12a2 su_offcell_sp. unfold pa_add.
           apply stack_off_nonzero; [exact Hspb | lia]. }
         (* the locked directory, opened for readi's bundle *)
-        iDestruct "Hload" as (datd)
-          "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs &
-            Hind & Hblocks & Hdview & Hfview)".
+        iDestruct (ic_loaded_open with "Hload") as (datd)"(%Hiok & %Hrl_datd & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
         pose proof Hiok as Hiok0.
         destruct Hiok as (Hbmwf & Hbmcv & Hbmc & Htynz & Hszcap & Hiokrest).
         assert (Hinums : dir_inums_ok datd
@@ -2504,10 +2510,11 @@ Section ProofSysUnlinkBody.
                        with "H27lo H27hi") as "H27".
           iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
             with "[Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview]" as "Hload".
-          { rewrite /ic_loaded. iExists datd. iFrame "Hdlnk Hdiat Hmeta
+          { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
+            iExists datd. iFrame "Hdlnk Hdiat Hmeta
               Haddrs Hind Hblocks Hdview Hfview". iPureIntro. split_and!;
-              [ exact Hiok0 | exact Hdok | exact Hddix | exact Hdoc
-              | exact Hduq ]. }
+              [ exact Hiok0 | exact Hrl_datd | exact Hdok | exact Hddix
+              | exact Hdoc | exact Hduq ]. }
           iDestruct (cpu_own_transport CID20 CID22 0 eb (proc_addr jx) b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Tails.su_tail_d (CID0 := CID22) gs jx gl gu gd gk pd pav pu
@@ -3813,9 +3820,7 @@ Section ProofSysUnlinkBody.
       by exact (su_regs_cs m sp0 _ _ _ R0 mil Hcsil HR0regs).
     (* [ip]'s loaded bundle, opened: the +0x8a seam wants it in pieces and
        the [lh]s below read two of its meta cells *)
-    iDestruct "Hloadi" as (dati)
-      "(%Hioki & %Hdoki & %Hddixi & %Hdoci & %Hduqi & Hdlnki & Hdiati & Hmetai &
-        Haddrsi & Hindi & Hblocksi & Hdviewi & Hfviewi)".
+    iDestruct (ic_loaded_open with "Hloadi") as (dati)"(%Hioki & %Hrl_dati & %Hdoki & %Hddixi & %Hdoci & %Hduqi & Hdlnki & Hdiati & Hmetai & Haddrsi & Hindi & Hblocksi & Hdviewi & Hfviewi)".
     (* ===== +0x78 lh a5,74(s2) -- ip->nlink ===== *)
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
@@ -3980,18 +3985,18 @@ Section ProofSysUnlinkBody.
         (* both bundles repacked: neither release below opens them *)
         iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
           with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd]" as "Hloadd".
-        { rewrite /ic_loaded. iExists datd.
+        { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
+          iExists datd.
           iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd".
-          iPureIntro. split_and!;
-            [exact Hiok | exact Hdok | exact Hddix | exact Hdoc | exact Hduq]. }
+          iPureIntro. split_and!;[exact Hiok | exact Hrl_datd | exact Hdok | exact Hddix | exact Hdoc | exact Hduq]. }
         iAssert (ic_loaded gfs gi cov logstart ks
                    (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                    dni bmi)
           with "[Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi]" as "Hloadi".
-        { rewrite /ic_loaded. iExists dati.
+        { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
+          iExists dati.
           iFrame "Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi".
-          iPureIntro. split_and!;
-            [exact Hioki | exact Hdoki | exact Hddixi | exact Hdoci
+          iPureIntro. split_and!;[exact Hioki | exact Hrl_dati | exact Hdoki | exact Hddixi | exact Hdoci
             | exact Hduqi]. }
         (* the buffers and slot 27, put back for the tail *)
         iDestruct (su_nm_join (pa_stk sp0 10) bnm0 nf with "Hnm14 Hnm2")
@@ -4963,11 +4968,11 @@ Section ProofSysUnlinkBody.
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum dnW bm')
       with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd]" as "Hloadd".
-    { rewrite /ic_loaded. iExists data'.
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
+          iExists data'.
       rewrite Hdn0W.
       iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd".
-      iPureIntro. split_and!;
-        [exact Hiok' | exact Hdok' | exact Hddix' | exact Hdoc'
+      iPureIntro. split_and!;[exact Hiok' | exact Hrl_data' | exact Hdok' | exact Hddix' | exact Hdoc'
         | exact Hduq']. }
     iAssert (ity_shot gyd (di_type dnW)) as "#Hshotd2".
     { rewrite Hty'v. iExact "Hshotd". }

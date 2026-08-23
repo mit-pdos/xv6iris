@@ -715,8 +715,8 @@ Section ProofFilestat.
         exact (HQ3thr c Hcs N2 N8 N9 N18 N20). }
       (* ---- PEEL the checked-out bundle for stati's metadata cells ---- *)
       iDestruct (ic_loaded_open with "Hlk") as (data)
-        "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & %Hrl & Hdlk & Hdnat & Hmeta & Haddrs
-          & Hindres & Hblocks & Htop & Hdview & Hfview)".
+        "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs
+          & Hindres & Hblocks & Hdview & Hfview & Htop)".
       iEval (rewrite -Hipk) in "Hmeta".
       iEval (rewrite -Hipk) in "Hidev".
       iEval (rewrite -Hipk) in "Hinum".
@@ -889,7 +889,7 @@ Section ProofFilestat.
                  ikk inm dnl bml)
         with "[Hdnat Hmeta Haddrs Hindres Hblocks Hdlk Htop Hdview Hfview]" as "Hlk".
       { iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hiok Hrl Hdok Hddix Hdoc Hduq
-                  with "Hdlk Hdnat Hmeta Haddrs Hindres Hblocks Htop Hdview Hfview"). }
+                  with "Hdlk Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview Htop"). }
       (* +0x36 c.ld a0,24(s1) *)
       assert (Hpip3 : add_vec (rget mst Rs1)
                         (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip k).

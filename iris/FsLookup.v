@@ -1059,8 +1059,8 @@ Section FsLookupDots.
   Proof.
     intros Hty.
     iIntros "H". iDestruct (ic_loaded_open with "H") as (data)
-      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & %Hrl & Hdlnk & Hdiat & Hmeta &
-        Haddrs & Hind & Hblocks & Htop & Hdv & Hfv)".
+      "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta &
+        Haddrs & Hind & Hblocks & Hdv & Hfv & Htop)".
     assert (Hrep : node_rep (NDir (dir_view data (dnrec dn))) dn data).
     { unfold node_rep, dnrec. split_and!;
         [exact Hty | exact (Hduq Hty) | reflexivity]. }
@@ -1074,7 +1074,7 @@ Section FsLookupDots.
     iDestruct "Hfd" as "(Hdiat & Hblocks & _)".
     iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data
               Hiok Hrl Hdok Hddix Hdoc Hduq
-              with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop Hdv Hfv").
+              with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdv Hfv Htop").
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)

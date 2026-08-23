@@ -81,6 +81,14 @@ Require Import ProcInv.
 Require Import WpUart LogInv.
 Require Import BioDefs.
 Require Import ConsoleInv.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED EARLY on purpose
+   -- the [FsState*] stack exports [fs_view] and [byte_range], both of which
+   have live twins below, and the LAST import wins (durable-notes, "AND
+   WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -2055,9 +2063,7 @@ Section ProofFileread.
                     cells arrive addressed by SLOT; the file layer speaks the
                     [ip] its own [f->ip] cell holds. ---- *)
              rewrite /ic_loaded.
-             iDestruct "Hlk" as (data)
-               "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
-                 & Hblocks & Hdview & Hfview)".
+             iDestruct (ic_loaded_open with "Hlk") as (data)"(%Hiok & %Hrl_data & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Hdview & Hfview)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
@@ -2360,12 +2366,13 @@ Section ProofFileread.
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                            (frn_logstart fn) ikk inm dnl bml)
                   with "[Hdnat Hmeta Hmap Hblocks Hdlk Hdview Hfview]" as "Hlk".
-                { rewrite /ic_loaded /inode_map -Hipk. iExists data.
+                { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
                     | exact Hszb | exact Hholes | exact Hsized]|].
                   (* §15(a): readi changed no byte, so the directory-wf
                      conjunct goes back exactly as it came out *)
+                  iSplitR; [iPureIntro; exact Hrl_data |].
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
                   iSplitR; [iPureIntro; exact Hdoc |].
@@ -2642,12 +2649,13 @@ Section ProofFileread.
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                            (frn_logstart fn) ikk inm dnl bml)
                   with "[Hdnat Hmeta Hmap Hblocks Hdlk Hdview Hfview]" as "Hlk".
-                { rewrite /ic_loaded /inode_map -Hipk. iExists data.
+                { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
                     | exact Hszb | exact Hholes | exact Hsized]|].
                   (* §15(a): readi changed no byte, so the directory-wf
                      conjunct goes back exactly as it came out *)
+                  iSplitR; [iPureIntro; exact Hrl_data |].
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
                   iSplitR; [iPureIntro; exact Hdoc |].

@@ -2636,8 +2636,8 @@ Section IputFreePath.
     iEval (rewrite /ic_payload_at) in "Hpayl".
     iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct (ic_loaded_open with "Hlk2") as (data2)
-      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & %Hrl2 & Hdlk2 & Hdat & Hmeta & Haddrs
-        & Hind & Hblks & Htop2 & Hdv2 & Hfv2)".
+      "(%Hok2 & %Hrl2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & Hdlk2 & Hdat & Hmeta & Haddrs
+        & Hind & Hblks & Hdv2 & Hfv2 & Htop2)".
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     (* ---- transport the cpu bundle to the itrunc call site (CIDm2) ---- *)
@@ -4264,8 +4264,8 @@ Section IputFreePath.
     iEval (rewrite /ic_payload_at) in "Hpayl".
     iDestruct "Hpayl" as "[Hlk #Hshot]".
     iDestruct (ic_loaded_open with "Hlk") as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & %Hrl & Hdlk & Hdat & Hmeta & Haddrs & Hind
-        & Hblks & Htop & Hdv & Hfv)".
+      "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind
+        & Hblks & Hdv & Hfv & Htop)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -4339,7 +4339,7 @@ Section IputFreePath.
         iSplitR "Hshot"; [| iExact "Hshot"].
         iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hok Hrl Hdok Hddix Hdoc Hduq
                   with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
-                        Hblks Htop Hdv Hfv").
+                        Hblks Hdv Hfv Htop").
         rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
@@ -4570,7 +4570,7 @@ Section IputFreePath.
       iSplitR "Hshot"; [| iExact "Hshot"].
       iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hok Hrl Hdok Hddix Hdoc Hduq
                 with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
-                      Hblks Htop Hdv Hfv").
+                      Hblks Hdv Hfv Htop").
       rewrite /inode_meta. iFrame. }
     iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
     { rewrite /iref_tok. iFrame. }

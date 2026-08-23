@@ -83,6 +83,14 @@ Require Import ProcGeom.
 Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioDefs.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
@@ -1049,8 +1057,8 @@ Section KexecB3Body.
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     iDestruct (kxc_load_peel with "Hload") as
-      (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Hmap
-               & Hblocks & Hdview & Hfview)".
+      (datl) "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
+               & Hmap & Hblocks & Hdview & Hfview & Htop)".
     pose proof Hiok as Hiok'.
     destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv V with "Hpriv")
@@ -1088,8 +1096,8 @@ Section KexecB3Body.
     iEval (rewrite HU5a2) in "Hphb".
     iDestruct ("Hpvbk" with "Hppid") as "Hpriv".
     iDestruct (kxc_load_seal gfs gi cov logstart kf inumf dnf bmf datl
-                 Hiok Hdok Hddix Hdoc Hduq
-                 with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview Hfview") as "Hload".
+                 Hiok Hrl Hdok Hddix Hdoc Hduq
+                 with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop") as "Hload".
     iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
     iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                  inumf dnf bmf gilf gislf

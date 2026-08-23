@@ -59,6 +59,14 @@ Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
@@ -405,11 +413,13 @@ Section ProofSysOpenBody.
     inode_meta (ientry k) dn ∗
     (inode_meta (ientry k) dn -∗ ic_loaded gfs gi cov logstart k inum dn bm).
   Proof.
-    iIntros "(%data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr &
-             Hb & Hv & Hw)".
+    iIntros "H".
+    iDestruct (ic_loaded_open with "H") as (data)
+      "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr &
+        Hb & Hv & Hw & Ht)".
     iFrame "Hm". iIntros "Hm".
-    iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data Hok Hdok Hddix
-              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw").
+    iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data Hok Hrl Hdok Hddix
+              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
   Qed.
 
   Local Lemma so_type_acc (ip : mword 64) (dn : dinode) :
@@ -977,7 +987,8 @@ Section ProofSysOpenBody.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* the locked record, opened whole for the one callee that rewrites it *)
     iDestruct (so_loaded_open with "Hload")
-      as (data) "(%Hok & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk & Hdv & Hfv)".
+      as (data) "(%Hok & %Hrl & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk & Hdv & Hfv
+                  & Htop)".
     destruct Hok as (Hbwf & Hbcov & Haddrs & Htynz & Hszcap & Hholes & Hsized).
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
     iApply (Itrunc.wp_itrunc_sconf (CID := CID15) gs jx gl gu gd gk pd pav pu
@@ -1025,8 +1036,18 @@ Section ProofSysOpenBody.
             (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8)))
             ltac:(solve_ndisj) with "Hireg Hdv Hfv") as "[Hdv Hfv]".
     iModIntro.
-    iDestruct (so_trunc_loaded gfs gi cov logstart kk inum dn Htynz Htynd
-                 with "Hat Hmeta Hmap Hblk Hdv Hfv") as "Hload".
+    (* itrunc MOVED the record and every block, so the era's abstract value
+       is retagged at the truncated node before the seal (durable-disk
+       2b-inode-3).  [ftopN] alone is opened. *)
+    iApply fupd_wp.
+    iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
+            (era_node dn bm data)
+            (era_node (di_trunc dn) bm_empty (fun _ => replicate BSIZE (bv_0 8)))
+            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") |].
+    iModIntro.
+    iDestruct (so_trunc_loaded gfs gi cov logstart kk inum dn Htynz Htynd Hrl
+                 with "Hat Hmeta Hmap Hblk Hdv Hfv Htop") as "Hload".
     (* ===== +0x154 c.j +0xb8 ===== *)
     iApply (wp_cj_s_sconf (CID := CID16) (mword_of_int (SO + 0x154))
               (sign_extend' 21 (concat_vec (mword_of_int 1970 : mword 11) ('b"0")))

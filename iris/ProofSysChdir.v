@@ -100,6 +100,14 @@ Require Import KernelDataInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
+(* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
+   [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
+   [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
+   [byte_range], both of which have live twins below, and the LAST import
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+Require Import FsState.
+Require Import FsBytesGamma.
+Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
@@ -1568,9 +1576,7 @@ Section ProofSysChdirBody.
         assert (Hilthr : sc_thr m mil).
         { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
           exact (HP0thr c Hc N2' N8 N9 N18). }
-        iDestruct "Hload" as (dat)
-          "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
-            & Hblocks & Hdview & Hfview)".
+        iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
         (* ============ +0x38 lh a4,68(s1) -- ip->type ============ *)
@@ -1702,8 +1708,9 @@ Section ProofSysChdirBody.
             with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
                    Hfview]"
             as "Hload".
-          { rewrite /ic_loaded. iExists dat.
+          { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
             iSplitR; [iPureIntro; exact Hiok |].
+            iSplitR; [iPureIntro; exact Hrl_dat |].
             iSplitR; [iPureIntro; exact Hdok |].
             iSplitR; [iPureIntro; exact Hddix |].
             iSplitR; [iPureIntro; exact Hdoc |].
@@ -2071,8 +2078,9 @@ Section ProofSysChdirBody.
             with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
                    Hfview]"
             as "Hload".
-          { rewrite /ic_loaded. iExists dat.
+          { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
             iSplitR; [iPureIntro; exact Hiok |].
+            iSplitR; [iPureIntro; exact Hrl_dat |].
             iSplitR; [iPureIntro; exact Hdok |].
             iSplitR; [iPureIntro; exact Hddix |].
             iSplitR; [iPureIntro; exact Hdoc |].
