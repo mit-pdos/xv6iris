@@ -462,6 +462,62 @@ Left out, with the reason:
   explicitly at each boot file rather than folded into `Xv6G.xv6G`, so that
   editing this stack does not rebuild the 767 files that bind the bundle.
 
+### 2b-inode-2's additions: the IN-ERA bundle (`FsStateEra.v`)
+
+`inode_owned_era Γ γi inum n` is §2's `inode_owned` as a CHECKED-OUT
+holder carries it, under 2b-inode-1's ruling (i): the record's 64 bytes
+stay region-side, so `rec_owned` is replaced by `InodeRegion.dinode_at`,
+the holder's exclusive record PROXY, and the era's abstract value rides
+beside it as `top_frag`:
+
+    dinode_at γi inum (fn_rec n)
+  ∗ [∗ map] k ↦ bs ∈ fn_blk n, blk_owned Γ (fn_naddr n k) bs
+  ∗ ind_owned Γ n ∗ top_frag Γ (bv_unsigned inum) n
+  ∗ ⌜inode_local (bv_unsigned inum) n⌝
+
+`fn_rec n` IS the proxy's value and `n` IS the fragment's: the bundle names
+each once, so both ties are maintained BY CONSTRUCTION and neither is ever
+a clause.  The LINK ghosts (`link_auth`, `ent_toks`) are NOT in it — they
+are the links step's, and their absence is what lets the bundle land
+without touching `DirLinks.v`.
+
+- **THE DICTIONARY to the kernel's in-memory model, both ways.**
+  `node_of dn bm data` and `bm_of n`, with `node_of (fn_rec n) (bm_of n)
+  (fn_data n) = n` under `inode_local`.  `InodeInv`'s `blkmap` model is
+  KEPT (readi/writei/bmap/itrunc are stated over it); `fn_blk` is built by
+  `blk_of_seq`, a sealed recursion over the index range, so its lookup law
+  is one induction and the 268-way split never reaches a use site.  The
+  direction a payload uses is `bm_of`: a payload's `data` is
+  EXISTENTIALLY bound, so it picks the node first and reads the old model
+  off it, and no extensionality between two `data` functions is needed.
+- **THE TWO `blkmap_wf` CONJUNCTS `inode_local` DOES NOT HAVE ARE READ OFF
+  OWNERSHIP, which is §0's rule made concrete.**  Injectivity is the `∗`
+  (`inode_owned_era_slot_inj`, through `blk_owned_ne`); coverage is
+  holding the run (`inode_owned_era_home_all`, ONE `inv_acc` of
+  `FsBlocks.fs_bytes_inv` for all 269 slots — the auth is what knows the
+  byte view's domain).  `inode_owned_era_ok` composes them into the whole
+  of `InodeLock.inode_ok` in one fupd at `logN`, with `di_type ≠ 0` — the
+  payload's own "this inode is allocated", not a property of the node — as
+  its one premise.  **That is why a payload flip does not move
+  readi/writei/bmap/itrunc's contracts.**
+- **ONE MOVER.**  `inode_owned_era_retag`: hand back the new node's
+  FOOTPRINT, retag the two ghosts.  Both authorities are LENT (the
+  region's from `iregN`, the top's from the log's parked payload), so a
+  walk holds neither and both arrive at the AU.  `_split`, `_rec_upd` (at
+  `fn_addrs_kept`), `_blk_acc` (one block out and back, ghosts untouched,
+  returner quantified over the NEW contents) and `_trunc` (the `fn_blk = ∅`
+  node, F3's "frees every owned block" being definitional) are its
+  readings; there is deliberately no larger family, and `inode_local` of
+  the TARGET is a premise for the reason §7's last bullet gives.
+- **What `inode_ok` does NOT imply, and where each fact comes from
+  instead**: the type ENUMERATION (`FsImg.fio_type` at boot,
+  `InodeRegion.ireg_wd_ty` at a marker fill, transferred at every
+  eviction), `16 ∣ size` (`FsImg.fdo_gran`), the two dots
+  (`fdo_dot`/`fdo_dotdot`, i.e. W8) and `nlink ≤ 32767`
+  (`FsImg.fs_region_nlink_short`, maintained by `ireg_link_ok`).
+  `inode_local_of_ok` takes exactly those four and derives the other
+  eleven clauses.
+
 Two things 2b should know before it starts:
 
 - **Four names collide with live ones**, all at different types (so a

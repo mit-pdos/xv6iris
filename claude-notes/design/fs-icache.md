@@ -16,6 +16,56 @@ Read [`fs-inode.md`](fs-inode.md)'s "`ilock` / `iunlock` — the LOAD, and
 the icache seam" first: the sleeplock-side of an entry is settled there and
 is not restated here.
 
+## BANNER — `ic_loaded`'s PAYLOAD under the durable-disk design
+
+**`ic_loaded` is UNCHANGED in the tree; the predicate that will replace its
+disk half exists and is proven beside it.**  Everything below in this file
+describes the payload as it is; this banner says what it becomes and what
+the change costs, so that a reader does not have to reconcile the two.
+
+`iris/FsStateEra.v`'s `inode_owned_era Γ γi inum n` is the IN-ERA bundle of
+[`fs-state.md`](fs-state.md) §2, at ruling (i) of the inode
+region (a checked-out inode does NOT carry its record's bytes — those park
+region-side, because `ialloc`'s and `ireclaim`'s free-slot scans read OTHER
+slots out of a shared inode block):
+
+    dinode_at γi inum (fn_rec n)          -- the exclusive record PROXY
+  ∗ [∗ map] k ↦ bs ∈ fn_blk n, blk_owned Γ (fn_naddr n k) bs
+  ∗ ind_owned Γ n
+  ∗ top_frag Γ (bv_unsigned inum) n       -- the era's abstract value
+  ∗ ⌜inode_local (bv_unsigned inum) n⌝
+
+It replaces, in `ic_loaded` and in `ipool_shape`'s allocated arm, exactly
+`ind_res ∗ inode_blocks ∗ ⌜inode_ok …⌝` (the `dinode_at` is already there).
+Three things follow, and they are what a reader of this file needs:
+
+- **`inode_ok` DOES NOT DISAPPEAR from the contracts above.**
+  `FsStateEra.inode_owned_era_ok` produces the WHOLE of
+  `InodeLock.inode_ok` from the bundle in ONE fupd at `logN`: the coverage
+  conjunct off `FsBlocks.fs_bytes_inv`'s auth (one open for all 269 slots,
+  `inode_owned_era_home_all`), the injectivity conjunct off the `∗`
+  (`blk_owned_ne`), everything else off `inode_local`.  Its one premise is
+  `di_type ≠ 0` — "this inode is allocated", the payload's own conjunct and
+  not a property of the node.  So readi/writei/bmap/itrunc keep their
+  premises and `InodeInv`'s pure blkmap model stays.
+- **`data` STOPS BEING A TOTAL FUNCTION.**  `fn_blk` is a `gmap` over the
+  ALLOCATED slots, which is what kills the 268-element framing hazard this
+  file records at `IcacheEscrow.v`. `FsStateEra.node_of` / `bm_of` are the
+  dictionary both ways; the direction a payload uses is `bm_of`, because
+  `ic_loaded`'s `data` is existential and re-existentialises at `fn_data n`.
+- **THE SWAP IS ATOMIC.**  The bundle CONTAINS the data blocks, so it
+  cannot coexist with `inode_blocks` — two owners of one run — and the pool
+  and the loaded arm convert into each other at every fill and every
+  eviction.  `ipool_alloc`, `ic_loaded`, the region's parking, boot's
+  stocking and every consumer move together or not at all.
+
+The `dv_ride`/`fv_ride` holds re-index with the node: `fv_of dn (fn_data n)`
+IS `fn_file_bytes n`, while `dv_of dn (fn_data n)` and `dir_entries n` agree
+on a DIRECTORY and differ on a file (determined garbage vs `∅`) — which of
+the two the payload carries is a decision the flip takes, recorded in
+[`../projects/durable-disk.md`](../projects/durable-disk.md)'s 2b-inode-2
+bullet along with the rest of the remaining work.
+
 ---
 
 ## 1. The `itable`'s geometry

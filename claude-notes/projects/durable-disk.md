@@ -819,7 +819,96 @@ map at home blocks); 1d lands last.
         check out freely (era-mortal, lost-at-crash is the semantics);
         record runs park in `iregN` only because of the shared-block
         scanners.
-      - [ ] **2b-inode-2.** Payload → links.
+      - [~] **2b-inode-2 (the PAYLOAD flip).**  THE BUNDLE AND ITS WHOLE
+        DICTIONARY ARE LANDED (`iris/FsStateEra.v`, NEW, ~1000 lines, one
+        `_CoqProject` row after `InodeRegion.v`); NO CONSUMER HAS MOVED.
+        Read the finding at the end of this bullet before sequencing the
+        rest — the remaining work is ONE atomic change, not a sequence.
+        - **The bundle** (`inode_owned_era Γ γi inum n`), under ruling (i):
+          `dinode_at γi inum (fn_rec n)` ∗ `[∗ map] k ↦ bs ∈ fn_blk n,
+          blk_owned Γ (fn_naddr n k) bs` ∗ `ind_owned Γ n` ∗
+          `top_frag Γ (bv_unsigned inum) n` ∗ `⌜inode_local (bv_unsigned
+          inum) n⌝`.  The record's 64 bytes are NOT in it (they park
+          region-side); `fn_rec n = dinode_at`'s value and `n = top_frag`'s
+          value are maintained BY CONSTRUCTION — the bundle names each
+          once — so neither is a clause.  The LINK ghosts are deliberately
+          out: they are step 3's, and leaving them out is what let this
+          land without touching `DirLinks.v`.
+        - **The dictionary, both ways.**  `node_of dn bm data` /
+          `bm_of n`, with `node_of (fn_rec n) (bm_of n) (fn_data n) = n`
+          under `inode_local`.  `fn_blk` is built by `blk_of_seq`, its own
+          SEALED recursion over the index range, so its lookup law is one
+          induction and the 268-way case split never reaches a use site.
+          The direction a flip uses is `bm_of`: `ic_loaded`'s `data` is
+          EXISTENTIAL, so the payload picks the node first and reads the
+          old model off it — no extensionality between two `data`
+          functions is needed anywhere.
+        - **`inode_ok` COMES BACK, IN ONE fupd.**
+          `inode_owned_era_home_all` reads `blkmap_wf`'s coverage conjunct
+          at EVERY slot from a single `inv_acc` of `FsBlocks.fs_bytes_inv`
+          (the auth is what knows the byte view's domain);
+          `inode_owned_era_slot_inj` reads the injectivity conjunct off the
+          `∗` through `blk_owned_ne`; `inode_owned_era_ok` composes them at
+          `home := fs_home_set cov ls` into the WHOLE of
+          `InodeLock.inode_ok`, with `di_type ≠ 0` (the payload's own fact,
+          not a property of the node) as its one premise.  **That is what
+          keeps readi/writei/bmap/itrunc's contracts unmoved when the
+          payload flips** — a walk pays one fupd at `logN` and its callees'
+          `inode_ok` premises are unchanged.  `InodeInv`'s pure blkmap
+          model therefore STAYS, exactly as the KEEP verdict says.
+        - **ONE mover, not a family.**  `inode_owned_era_retag` — "hand
+          back the new node's footprint and retag the two ghosts", both
+          authorities LENT (the region's from `iregN`, the top's from the
+          log's parked payload).  Readings: `_split`, `_rec_upd` (at
+          `fn_addrs_kept`), `_blk_acc` (one data block out and back, the
+          two ghosts untouched, returner quantified over the NEW contents),
+          `_trunc` (`SpecItrunc`'s post as the `fn_blk = ∅` node; "frees
+          every owned block" is DEFINITIONAL — F3 — so what comes back for
+          `bitmap_free` is exactly `fn_blk n`'s blocks, the ones beyond the
+          size included, plus the old indirect block).
+        - **THE FLIP IS ATOMIC ACROSS {boot, `ipool_alloc`, `ic_loaded`,
+          the region's parking, every consumer} — it CANNOT be sliced.**
+          The reason is resource-exclusive, not stylistic: the era bundle
+          CONTAINS the data blocks, so it cannot coexist with
+          `inode_blocks` (two owners of one run) — every payload must swap
+          in one step.  And the two payloads convert into each other at
+          every eviction and every fill, so flipping `ipool_alloc` alone
+          needs `top_frag` for pooled inums, which is the boot routing;
+          flipping `ic_loaded` alone needs it at the fill.  Budget the flip
+          as one lane over ~40 files (`ic_loaded` 240 mentions / 52 files,
+          44 of them `rewrite /ic_loaded`; `inode_ok` ~110 sites;
+          `inode_blocks` ~110), not as three.
+        - **EVERY `inl_*` CLAUSE HAS A PRODUCER — checked, so `inode_local`
+          is not the blocker it looks like.**  The one that is NOT an
+          `inode_ok` conjunct and looks unsourceable is `inl_type` (the
+          type is one of 0 / T_DIR / T_FILE / T_DEVICE, where `inode_ok`
+          says only "nonzero"): it comes from `FsImg.fio_type` at boot
+          (through `FsImgBridge.img_inode_ok`'s own premise), from
+          `ireg_wd_ty` on the marker fill, and rides every eviction.
+          `inl_dir_size` is `FsImg.fdo_gran`, `inl_dir_uniq` is
+          `fdo_unique` (= `FsImgBridge.img_dir_uniq`), the two dots are
+          `fdo_dot`/`fdo_dotdot` (= `fs_dots_wf_ok`, W8), and `inl_nlink`
+          is `FsImg.fs_region_nlink_short` (L4), maintained by
+          `InodeRegion.ireg_link_ok`.  `inode_local_of_ok` takes exactly
+          those four as premises and derives the other eleven.
+        - **THE ONE PIECE THE FLIP STILL NEEDS AND THAT IS NOT HERE: a
+          `dir_view` EXTENSIONALITY over `data`,** i.e. `(∀ b < MAXFILE,
+          data b = data' b) → dir_view data nrec = dir_view data' nrec`
+          under the size cap.  It is needed exactly once, to move the
+          image's `dir_dots_ix`/`dir_uniq` (stated at `fs_data_of P dn`)
+          onto `fn_data (node_of ..)` (which differs above MAXFILE and
+          cannot not).  It belongs in `FsTree.v`/`DirView.v` beside
+          `dfirst_ext`/`bname_ext`/`bview_ext`, which are its pieces; every
+          OTHER site avoids it, because a payload's `data` is existential
+          and re-existentialises at `fn_data n`.
+        - **A DECISION THE FLIP MUST TAKE, recorded so it is not taken by
+          accident: `dv_ride`'s value.**  `fv_of dn (fn_data n)` IS
+          `fn_file_bytes n`, so `fv_ride` re-indexes for free.  `dv_of dn
+          (fn_data n)` is NOT `dir_entries n`: they agree on a DIRECTORY
+          and differ on a file (determined garbage vs `∅`).  Keeping
+          `dv_of (fn_rec n) (fn_data n)` — still a function of `n` — is the
+          zero-churn option; re-indexing at `dir_entries n` is the design's
+          shape and moves `DirViewLend`/`namex`'s custody chain with it.
       - OPEN, for the orchestrator: `SpecBfree`'s two premises
         `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
         UNUSED (they only fed `bitmap_ok_del`).  Left in place rather than
