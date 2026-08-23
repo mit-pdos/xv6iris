@@ -306,9 +306,23 @@ every proof naming an address moves. The procedure and the gate that must pass
 first are in [`durable-notes.md`](durable-notes.md) §"Changing the kernel
 SOURCE".
 
-## CANDIDATE (2026-08-23, found by durable-disk stage G2) — `writei`'s
-## PARTIAL-FAILURE arms commit a block that is marked USED and owned by
-## NOBODY, and an inode whose `addrs` reach past its own `nblk`
+## RESOLVED (owner ruling 2026-08-23): NOT a defect — `writei`'s
+## partial-failure commits are xv6's design; the INVARIANT adjusts
+## (durable-disk stage F3)
+
+**The ruling**: an inode may own allocated data blocks beyond
+`nblk(ip->size)`. The code-side witness is `itrunc`, which frees
+`addrs[0..NDIRECT)` and the whole indirect range REGARDLESS of size —
+beyond-size entries are owned by the inode (a later `writei` reuses them
+via `bmap`; truncation reclaims them), not leaked. The invariant's used
+set becomes ENTRY-derived (all nonzero `addrs`/indirect entries of live
+inodes), W4/W5 stays an iff, and `fdi_direct_zero`/`fdi_ind_zero` are
+deleted — see durable-disk stage F3 for the sweep. The entry below is
+kept for the analysis (which arms commit what, and where).
+
+## The original candidate (2026-08-23, found by durable-disk stage G2) — `writei`'s
+## partial-failure arms commit a block that is marked USED and owned by
+## nobody UNDER THE OLD size-derived reading
 
 `writei` breaks out of its loop in two places and then falls through to
 `iupdate(ip)` regardless:
@@ -348,17 +362,11 @@ Arm A is reachable from every writer when the disk fills, including
 from KERNEL memory, so arm B is filewrite's alone — `sys_write` with a
 buffer whose second page is unmapped, breaking at a block boundary).
 
-**This is scaffolding of exactly the shape §"How to tell" warns about**: a
-total function with no panic whose contract needs a case split to say the
-callee installed a block nobody asked for. Options, in preference order:
-(1) fix the C — have `writei` undo the install on the break (or have
-`bmap` not install until the data block is in hand), which is a few lines
-and makes `fs_durable_wf_body` true as stated; (2) weaken W3 + W4/W5 to
-admit an over-`nblk` `addrs` entry that IS counted as used, which costs
-`fs_inode_blocks` a second shape and every effect proof a case; (3) leave
-it and accept that `fs_durable_wf_body` is false on those arms — not an
-option, since stage G2 must discharge them. Nothing has been decided; the
-durable-disk worklist's G2 entry cites this.
+RESOLUTION: option (2)'s spirit, but sharper than "weaken" — the
+size-derived reading was simply the WRONG model of xv6's ownership
+(itrunc's full-range loop is the design's own statement of it); the
+entry-derived used set keeps the iff and drops the zero clauses instead
+of adding arms. Ruled by the owner; the sweep is durable-disk stage F3.
 
 ## How to tell a kernel defect from a spec problem
 

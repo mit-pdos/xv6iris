@@ -93,12 +93,7 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-- branch `worktree-agent-ae97a632a827fea83`: G2 batch (1), filewrite
-  chains (`FsOpFilewrite.v`).
-- branch `worktree-agent-afe0f27a7dd82c407`: G2 batch (2), the create
-  side (`FsOpMknod/Mkdir/Open/Link.v`).
-- branch `worktree-agent-af881e3fbbf6947e4`: G2 batch (3), the free
-  side (`FsOpUnlink/IputFree/Ireclaim.v`).
+(nothing in flight; all three G2 batches merged)
 
 The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
 statements byte-identical; the lia-vs-context rules are in
@@ -581,6 +576,41 @@ list.
       COMPOSITION at the entry level rather than a second `fs_upd`, so
       the op postcondition matches by conversion. The fresh data block
       is `replicate BSIZE (bv_0 8)`, `eff_alloc_file_block`'s spelling.
+
+## 5½. Stage F3 — the beyond-size ruling (owner, 2026-08-23)
+
+**An inode may own allocated data blocks beyond `nblk(ip->size)`.** The
+code-side witness is `itrunc`: it frees `addrs[0..NDIRECT)` and the whole
+indirect range REGARDLESS of size — xv6's design treats beyond-size
+entries as owned (a later `writei` reuses them via `bmap`; truncation
+reclaims them). `writei`'s partial-failure commits are therefore NOT a
+defect (kernel-defects.md entry resolved) and the invariant adjusts:
+
+- [ ] **F3.1** `FsWf`: delete `fdi_direct_zero`/`fdi_ind_zero`; the
+      entry clauses become "each `addrs`/indirect entry is 0 or a
+      data-region block, all nonzero entries mutually distinct". The
+      USED SET becomes entry-derived: all nonzero entries (+ the
+      indirect block itself when the pointer is nonzero) of live
+      inodes — W4/W5 stays an IFF, no leak arm. `FsImg`'s own
+      `fs_used_set` stays for the image check (the two agree at the
+      mkfs image, where beyond-size entries are zero); the discharge
+      bridges them. CHECK the resource layer's spelling first
+      (`InodeInv.blkmap_wf`/`inode_ok`'s `blk_holes_zero` — the landed
+      `ProofWritei` failure arms already accommodate the behavior, so
+      the resource clauses are the template for the pure ones).
+- [ ] **F3.2** Re-premise the F2 effects: alloc's precondition is
+      SLOT-EMPTINESS (`addrs !!! fbn = 0` / indirect entry 0), the
+      append-position equation and the size fusion are dropped (size
+      moves become their own cheap effect or a parameter); `eff_trunc`
+      frees ALL nonzero entries (matching itrunc's loop, which it must
+      already — verify); re-derive the `used_grow`/NoDup lemmas over
+      entry-derived counting. The F2 statement freeze is LIFTED by
+      this ruling for exactly these premises.
+- [ ] **F3.3** Sweep the FsOp lemmas (batches 1–3) onto the new
+      premises — filewrite's chain SIMPLIFIES (no append equation; the
+      write-into-existing arm no longer needs the alloc to have
+      happened in the same transaction) — and add the now-expressible
+      `writei` failure-arm effects (alloc-without-size-move).
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 
