@@ -1057,10 +1057,10 @@ Section FsLookupDots.
               (dir_view data (dnrec dn)) dn bm data -∗
          ic_loaded gfs gi cov logstart k inum dn bm).
   Proof.
-    intros Hty. rewrite /ic_loaded.
-    iIntros "H". iDestruct "H" as (data)
-      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta &
-        Haddrs & Hind & Hblocks & Hdv & Hfv)".
+    intros Hty.
+    iIntros "H". iDestruct (ic_loaded_open with "H") as (data)
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & %Hrl & Hdlnk & Hdiat & Hmeta &
+        Haddrs & Hind & Hblocks & Htop & Hdv & Hfv)".
     assert (Hrep : node_rep (NDir (dir_view data (dnrec dn))) dn data).
     { unfold node_rep, dnrec. split_and!;
         [exact Hty | exact (Hduq Hty) | reflexivity]. }
@@ -1072,13 +1072,9 @@ Section FsLookupDots.
       iPureIntro. exact Hrep. }
     iIntros "Hfd". rewrite /fdir inum_of_self.
     iDestruct "Hfd" as "(Hdiat & Hblocks & _)".
-    iExists data.
-    iSplitR; [iPureIntro; exact Hiok |].
-    iSplitR; [iPureIntro; exact Hdok |].
-    iSplitR; [iPureIntro; exact Hddix |].
-    iSplitR; [iPureIntro; exact Hdoc |].
-    iSplitR; [iPureIntro; exact Hduq |].
-    iFrame "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdv Hfv".
+    iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data
+              Hiok Hrl Hdok Hddix Hdoc Hduq
+              with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop Hdv Hfv").
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)

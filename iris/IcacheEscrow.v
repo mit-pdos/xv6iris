@@ -173,8 +173,8 @@ Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeploc
 Require Import InodeRegion.
 (* durable-disk 2b-inode-3: the payload's OWNERSHIP is the era bundle.
    [FsState] for [top_frag], [FsBytesGamma] for [fs_gamma_L], [FsStateEra]
-   for [inode_owned_era] and the payload dictionary ([bnode],
-   [node_shape_ok], [inode_rec_local] and the three [_bnode_*] bridges).
+   for [inode_owned_era] and the payload dictionary ([era_node],
+   [node_shape_ok], [inode_rec_local] and the three [_era_node_*] bridges).
    Placed here, after [InodeRegion], because this file spells none of the
    four names the [FsState*] stack shadows ([fs_view], [byte_range],
    [link_auth], [free_pool]) -- checked. *)
@@ -486,12 +486,12 @@ Section IcacheEscrow.
      [FsStateEra.inode_owned_era] at this arm's own node, which CONTAINS all
      three and carries the era's abstract value ([FsState.top_frag]) beside
      them.  [IcacheBoot.ipool_shape_alloc] assembles it and
-     [FsStateEra.inode_owned_era_bnode_to] takes it apart, both off
+     [FsStateEra.inode_owned_era_era_node_to] takes it apart, both off
      [inode_ok]'s own representational half ([FsStateEra.node_shape_ok]).
 
      [inode_ok] STAYS A PURE CONJUNCT, and that is a deliberate deviation
      from 2b-inode-2's plan (which had it derived on demand by
-     [FsStateEra.inode_owned_era_bnode_ok], a fupd at [logN]).  It costs
+     [FsStateEra.inode_owned_era_era_node_ok], a fupd at [logN]).  It costs
      nothing -- every producer proved it before the flip and still does --
      and it is what keeps the flip from moving a single consumer's MASK:
      with it, [ic_loaded_open] is an ordinary entailment, so no walk has to
@@ -508,7 +508,7 @@ Section IcacheEscrow.
        ⌜dir_orphan_clean dn0 data0⌝ ∗
        ⌜dir_uniq dn0 data0⌝ ∗
        dir_links (bv_unsigned inum) dn0 data0 ∗
-       inode_owned_era γfs γi inum (bnode dn0 bm0 data0) ∗
+       inode_owned_era γfs γi inum (era_node dn0 bm0 data0) ∗
        (* ...AND THE CONTENTS HOLD, TIED (namei-pinned-lookup.md §9 W2).  The
           tie is DEFINITIONAL (Revision 1): the abstract entry map is a
           function of the record and the bytes this arm already owns, so the
@@ -871,7 +871,7 @@ Section IcacheEscrow.
           that wants the old shape back applies [ic_loaded_open], an
           ordinary entailment; see [ipool_alloc]'s note for why [inode_ok]
           stays a conjunct rather than being derived. *)
-       inode_owned_era γfs γi inum (bnode dn bm data) ∗
+       inode_owned_era γfs γi inum (era_node dn bm data) ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
        (* ...AND THE CONTENTS HOLD, TIED, the twin of [ipool_alloc]'s: see
@@ -1700,7 +1700,7 @@ Section IcacheEscrow.
     inode_addrs (ientry k) (bm_cells bm) -∗
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
-    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
     dv_ride (bv_unsigned inum) (dv_of dn data) -∗
     fv_ride (bv_unsigned inum) (fv_of dn data) -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
@@ -1716,7 +1716,7 @@ Section IcacheEscrow.
     iSplitR; [done |]. iSplitR; [done |].
     iSplitL "Hl"; [iExact "Hl" |].
     iSplitR "Hm Ha Hv Hw".
-    { iApply (inode_owned_era_bnode_of γfs γi inum dn bm data Hsh Hloc
+    { iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
                 with "Hd Hr Hb Ht"). }
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
@@ -1748,7 +1748,7 @@ Section IcacheEscrow.
       inode_addrs (ientry k) (bm_cells bm) ∗
       ind_res γfs bm ∗
       inode_blocks γfs bm data ∗
-      top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) ∗
+      top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) ∗
       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
       fv_ride (bv_unsigned inum) (fv_of dn data).
   Proof.
@@ -1757,14 +1757,14 @@ Section IcacheEscrow.
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     iDestruct (inode_owned_era_local with "Hn") as %Hloc.
-    iDestruct (inode_owned_era_bnode_to γfs γi inum dn bm data Hsh with "Hn")
+    iDestruct (inode_owned_era_era_node_to γfs γi inum dn bm data Hsh with "Hn")
       as "(Hd & Hr & Hb & Ht)".
     iExists data.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [iPureIntro;
               exact (inode_rec_local_of (bv_unsigned inum)
-                       (bnode dn bm data) Hloc) |].
+                       (era_node dn bm data) Hloc) |].
     iSplitL "Hl"; [iExact "Hl" |].
     iSplitL "Hd"; [iExact "Hd" |].
     iSplitL "Hm"; [iExact "Hm" |].

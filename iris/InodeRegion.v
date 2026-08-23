@@ -1216,6 +1216,21 @@ Proof. intros Hnl H Hz. exact (ireg_wlt_succ _ _ w (H Hz) Hnl). Qed.
      [ireg_withdraw]      record, counts and authority all unchanged. *)
 Definition ireg_dir_ty : Z := 1.
 
+(* ...and the other two, for (L5) below, spelled the same way and for
+   [ireg_dir_ty]'s reason verbatim: [DirView.T_DIR_z] and [FsImg.T_FILE_z] /
+   [T_DEVICE_z] live in files this one does not import, the three values are
+   equal by [reflexivity], and a consumer that speaks the tree's names
+   rewrites once ([ireg_ty_names] below). *)
+Definition ireg_file_ty : Z := 2.
+Definition ireg_dev_ty : Z := 3.
+
+(* (L5)'s statement, named so that the four movers and [ireg_withdraw]'s
+   post all spell it once. *)
+Definition ireg_ty_ok (d : dinode) : Prop :=
+  bv_unsigned (di_type d) = 0 \/ bv_unsigned (di_type d) = ireg_dir_ty
+  \/ bv_unsigned (di_type d) = ireg_file_ty
+  \/ bv_unsigned (di_type d) = ireg_dev_ty.
+
 Definition ireg_dir_ok (d : dinode) (wd : nat) : Prop :=
   (0 < wd)%nat -> bv_unsigned (di_type d) = ireg_dir_ty.
 
@@ -1624,10 +1639,24 @@ Section InodeRegion.
      LOWERS it.  The exception is [ireg_write_link], which is why that
      mover, alone of the six, takes a premise about the OLD count: the
      kernel's own guard, without which (L4) is not preservable at all. *)
+  (* (L5) THE TYPE IS ONE OF THE FOUR (durable-disk 2b-inode-3).  It is
+     [FsStateInode.inode_local]'s [inl_type], and it has no other producer:
+     2b-inode-2 recorded it as coming from [ireg_wd_ty] "on the marker
+     fill", which is FALSE as landed -- [ireg_wd_ty (ClaimK ty) d] is
+     [di_type d = ty] with [ty] unconstrained, and at [PlainK] it is
+     [True].  So the REGION is where it has to be maintained: it is the
+     record's home, the image satisfies it ([FsImg.fio_type] at a live
+     inode, type 0 at a free one) and every kernel writer writes one of the
+     four.  Stated as a fourth clause of THIS predicate rather than as a
+     new conjunct of [ireg_slot] because the six arm moves already
+     re-establish [ireg_link_ok] of their new record, so nothing
+     destructures differently and no [iSplitR] moves.  It is what makes
+     [ireg_withdraw] able to pay [inode_local] at the claim box. *)
   Definition ireg_link_ok (d : dinode) (w : nat) : Prop :=
     (w <= Z.to_nat (bv_unsigned (di_nlink d)))%nat                    (* L1 *)
     /\ (bv_unsigned (di_type d) = 0 -> bv_unsigned (di_nlink d) = 0)  (* L3 *)
-    /\ bv_unsigned (di_nlink d) <= 32767.                             (* L4 *)
+    /\ bv_unsigned (di_nlink d) <= 32767                              (* L4 *)
+    /\ ireg_ty_ok d.                                                  (* L5 *)
 
   (* (L1)'s contrapositive, and the reason the ledger exists: a record with
      an outstanding fragment is ALLOCATED.  Pure, so that every arm move
@@ -1643,7 +1672,26 @@ Section InodeRegion.
      WRITER needs and the two above do not mention. *)
   Lemma ireg_link_ok_short (d : dinode) (w : nat) :
     ireg_link_ok d w -> bv_unsigned (di_nlink d) <= 32767.
-  Proof. intros [_ [_ H4]]. exact H4. Qed.
+  Proof. intros (_ & _ & H4 & _). exact H4. Qed.
+
+  (* (L5) read off the same way -- what a fill needs of the record it is
+     about to park ([FsStateEra.inode_rec_local]'s first component). *)
+  Lemma ireg_link_ok_ty (d : dinode) (w : nat) :
+    ireg_link_ok d w -> ireg_ty_ok d.
+  Proof. intros (_ & _ & _ & H5). exact H5. Qed.
+
+  (* ...and how every WRITER re-establishes it: a flush either clears the
+     type or leaves it alone ([di_type_stable], the premise
+     [ireg_write_au] / [ireg_write_link] / [ireg_write_unlink] already
+     take), so (L5) rides for free at all three.  The claim is the one
+     mover that writes a type out of nowhere, and it takes (L5) as its own
+     premise. *)
+  Lemma ireg_ty_ok_stable (dn' dn : dinode) (w : nat) :
+    di_type_stable dn' dn -> ireg_link_ok dn w -> ireg_ty_ok dn'.
+  Proof.
+    intros [H0 | Heq] Hlok; [by left |].
+    rewrite /ireg_ty_ok Heq. exact (ireg_link_ok_ty dn w Hlok).
+  Qed.
 
   (* ...and (L3)+(L1) at a FREE record: nothing names it. *)
   Lemma ireg_link_ok_free (d : dinode) (w : nat) :
@@ -3171,7 +3219,8 @@ Section InodeRegion.
       split_and!;
         [ exact (proj1 Hlok)
         | intros H0; exfalso; exact (Hnz H0)
-        | exact (ireg_link_ok_short dn _ Hlok) ]. }
+        | exact (ireg_link_ok_short dn _ Hlok)
+        | exact (ireg_ty_ok_stable dn' dn _ Hstab Hlok) ]. }
     (* THE ROOT CLAUSE RIDES ON THE SAME EQUALITY: an ordinary flush moves
        neither the count nor the ledger, so the strict cap is the SAME cap. *)
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
@@ -3270,6 +3319,14 @@ Section InodeRegion.
     diblk_wf dsc ->
     bv_unsigned (di_type (dsc !!! islot inum)) = 0 ->
     fresh_shape dn' ->
+    (* (L5), the ONE clause a claim cannot ride in on (durable-disk
+       2b-inode-3): the claim box's type comes out of nowhere -- it is
+       [ialloc]'s [ty] argument -- so the enumeration is the one thing the
+       region cannot re-establish from the record it is replacing.  Every
+       caller writes a literal ([T_FILE]/[T_DIR]/[T_DEVICE], out of
+       create's [type] argument), so it is discharged where the literal
+       is. *)
+    ireg_ty_ok dn' ->
     (* OPTION A: the pending arm is refuted from [ireg_body]'s own registry
        ([Hreg], carried out of the open below): read this inum's [reg_full] and
        collide it with the arm's [reg_half] (fraction overflow).  No premise. *)
@@ -3296,7 +3353,7 @@ Section InodeRegion.
           ([ireg_withdraw]). *)
        ={E ∖ ↑iregN, E}=∗ iclaim (bv_unsigned inum) (di_type dn')).
   Proof.
-    iIntros (HE Hin Hwfc Ht0c Hfr) "#Hinv #Hopen".
+    iIntros (HE Hin Hwfc Ht0c Hfr Htyc) "#Hinv #Hopen".
     pose proof (islot_lt inum) as Hsl.
     pose proof (fresh_shape_wf dn' Hfr) as Hdn'.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
@@ -3386,7 +3443,8 @@ Section InodeRegion.
     { rewrite Hz1 Hz2 Hz3. split_and!;
         [ lia
         | intros H0; exfalso; exact (proj1 Hfr H0)
-        | rewrite (fresh_shape_nlink dn' Hfr); lia ]. }
+        | rewrite (fresh_shape_nlink dn' Hfr); lia
+        | exact Htyc ]. }
     assert (Hdir' : ireg_dir_ok dn' (wdu + wdt))
       by (rewrite Hz2 Hz3; exact (ireg_dir_ok_zero dn')).
     assert (Hwl0' : ireg_dir_wl0 dn' wl)
@@ -3985,6 +4043,12 @@ Section InodeRegion.
        is [create_fresh_ty]'s [di_type dnc = ty], sourced. *)
     ⌜fresh_shape (ds !!! islot inum)⌝ ∗
     ⌜ireg_wd_ty o (ds !!! islot inum)⌝ ∗
+    (* (L5) LEAVES WITH THE RECORD (durable-disk 2b-inode-3).  The claim
+       box's fill has to park [FsStateInode.inode_local] of a node whose
+       record is this one, and the type enumeration is the one clause that
+       has no other source (see (L5)'s note at [ireg_link_ok]).  Free here:
+       the mover has the slot open and reads it off. *)
+    ⌜ireg_ty_ok (ds !!! islot inum)⌝ ∗
     ireg_wd_back o gy (bv_unsigned inum) ∗
     dinode_at γi inum (ds !!! islot inum) ∗
     (b ↪[fs_cache γfs]{#(1/2)} bsl).
@@ -4102,6 +4166,8 @@ Section InodeRegion.
       iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | reflexivity] | iExact "Hmk"] | iExact "Hrf"]. }
     iModIntro. iSplitR; [iPureIntro; exact Hfresh |].
     iSplitR; [iPureIntro; exact Hty |].
+    iSplitR;
+      [iPureIntro; exact (ireg_link_ok_ty (ds !!! islot inum) _ Hlok) |].
     iFrame "Hwback Hfr Hhalf".
   Qed.
 
@@ -4453,7 +4519,8 @@ Section InodeRegion.
                  (bv_unsigned (di_nlink dn')) _
                  (di_nlink_nonneg dn) (proj1 Hlok) Hnl).
       - intros H0. exfalso. exact (Hnz H0).
-      - exact Hsh'. }
+      - exact Hsh'.
+      - exact (ireg_ty_ok_stable dn' dn _ Hstab Hlok). }
     (* ...AND SO DOES THE ROOT'S STRICT CAP, for the same reason and in the
        same ghost step: [w] and [nlink] rise together, so a strict
        inequality is preserved with nothing to prove about WHICH inum this
@@ -4865,7 +4932,8 @@ Section InodeRegion.
          whole reason only the raising mover takes a premise: [Hnl] here
          reads [old = new + 1], so the new count is BELOW a count the
          invariant already bounded. *)
-      - pose proof (ireg_link_ok_short _ _ Hlok). lia. }
+      - pose proof (ireg_link_ok_short _ _ Hlok). lia.
+      - exact (ireg_ty_ok_stable dn' dn _ Hstab Hlok). }
     (* THE ROOT CLAUSE FALLS ON BOTH SIDES AT ONCE TOO, and THIS is the mover
        the chartered form ([1 <= di_nlink] alone) could not survive: it would
        need [2 <= di_nlink dn] and have only [1 <= di_nlink dn].  Strictness

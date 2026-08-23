@@ -164,7 +164,11 @@ Section EscrowDeposit.
     destruct (ireg_sum_zero3 wl wdu wdt Hw0) as (Hzz1 & Hzz2 & Hzz3).
     assert (Hlok' : ireg_link_ok dn' (wl + wdu + wdt)).
     { rewrite Hzz1 Hzz2 Hzz3.
-      split_and!; [lia | intros _; exact Hnl0' | rewrite Hnl0'; lia]. }
+      split_and!;
+        [lia | intros _; exact Hnl0' | rewrite Hnl0'; lia
+        (* (L5) at the free deposit: the record it writes is TYPE 0, which
+           is the clause's own first disjunct (durable-disk 2b-inode-3) *)
+        | by left]. }
     assert (Hdir' : ireg_dir_ok dn' (wdu + wdt))
       by (rewrite Hzz2 Hzz3; exact (ireg_dir_ok_zero dn')).
     assert (Hwl0' : ireg_dir_wl0 dn' wl)

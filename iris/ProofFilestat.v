@@ -714,10 +714,9 @@ Section ProofFilestat.
         rewrite (callee_saved_lookup Hcsil c Hcs).
         exact (HQ3thr c Hcs N2 N8 N9 N18 N20). }
       (* ---- PEEL the checked-out bundle for stati's metadata cells ---- *)
-      rewrite /ic_loaded.
-      iDestruct "Hlk" as (data)
-        "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
-          & Hblocks & Hdview & Hfview)".
+      iDestruct (ic_loaded_open with "Hlk") as (data)
+        "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & %Hrl & Hdlk & Hdnat & Hmeta & Haddrs
+          & Hindres & Hblocks & Htop & Hdview & Hfview)".
       iEval (rewrite -Hipk) in "Hmeta".
       iEval (rewrite -Hipk) in "Hidev".
       iEval (rewrite -Hipk) in "Hinum".
@@ -888,14 +887,9 @@ Section ProofFilestat.
       iEval (rewrite Hipk) in "Hinum".
       iAssert (ic_loaded (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn) (fsn_logstart fn)
                  ikk inm dnl bml)
-        with "[Hdnat Hmeta Haddrs Hindres Hblocks Hdlk Hdview Hfview]" as "Hlk".
-      { rewrite /ic_loaded. iExists data.
-        iSplitR; [iPureIntro; exact Hiok |].
-        iSplitR; [iPureIntro; exact Hdok |].
-        iSplitR; [iPureIntro; exact Hddix |].
-        iSplitR; [iPureIntro; exact Hdoc |].
-        iSplitR; [iPureIntro; exact Hduq |].
-        iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
+        with "[Hdnat Hmeta Haddrs Hindres Hblocks Hdlk Htop Hdview Hfview]" as "Hlk".
+      { iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hiok Hrl Hdok Hddix Hdoc Hduq
+                  with "Hdlk Hdnat Hmeta Haddrs Hindres Hblocks Htop Hdview Hfview"). }
       (* +0x36 c.ld a0,24(s1) *)
       assert (Hpip3 : add_vec (rget mst Rs1)
                         (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip k).

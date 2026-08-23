@@ -80,7 +80,7 @@ Require Import FsStateBitmap.
 Require Import FsBytesGamma.
 Require Import FsImg.
 Require Import FsImgBridge.
-Require Import FsStateEra.     (* [bnode] / [inode_rec_local] -- the era node *)
+Require Import FsStateEra.     (* [era_node] / [inode_rec_local] -- the era node *)
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -91,7 +91,7 @@ Local Open Scope Z_scope.
 (*  THE ERA'S INITIAL INODE MAP IS THE IMAGE'S (durable-disk 2b-inode-3)  *)
 (* ===================================================================== *)
 
-(* ONE INUM'S NODE, AS THE IMAGE HAS IT.  [FsStateEra.bnode] of the image's
+(* ONE INUM'S NODE, AS THE IMAGE HAS IT.  [FsStateEra.era_node] of the image's
    record, the image's block map and the image's data -- which is EXACTLY
    the node [IcacheBoot.ipool_shape_alloc] ties this inum's [top_frag] to,
    so boot's fragment and the pool's arm name one value by construction and
@@ -99,10 +99,10 @@ Local Open Scope Z_scope.
 
    A FREE inum gets one too, and it is honest: [fs_dinode] at a free slot
    is the image's own type-0 record, whose [di_addrs] is all zeros, so
-   [bnode] of it owns no block.  The pool's marker arm carries the fragment
+   [era_node] of it owns no block.  The pool's marker arm carries the fragment
    UNTIED, so nothing reads that value until ialloc re-ties it. *)
 Definition img_node (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : fs_node :=
-  bnode (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+  era_node (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
         (fs_data_of P (fs_dinode P sb z)).
 
 Definition img_nodes (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
@@ -888,7 +888,8 @@ Section FsCfgBootPool.
     image_free_nlink dss nib /\ image_nlink_short dss nib /\
     image_root_alive (fs_link_count P sb) dss nib /\
     image_link_le (fs_link_count P sb) dss nib
-    /\ image_dir_wl0 (fs_link_count P sb) dss nib.
+    /\ image_dir_wl0 (fs_link_count P sb) dss nib
+    /\ image_ty_ok dss nib.
   Proof.
     intros Hwf Hrw Hl Hdwf He Hnib.
     assert (Hbr : forall z : Z, z ∈ region_inums nib ->
@@ -908,7 +909,24 @@ Section FsCfgBootPool.
        wants root-alive first. *)
     destruct (image_link_premises P sb dss nib Hwf Hl Hdwf He Hnib)
       as (Hle & Hw0 & Hrt).
-    split; [exact Hrt |]. split; [exact Hle | exact Hw0].
+    split; [exact Hrt |]. split; [exact Hle |]. split; [exact Hw0 |].
+    (* (L5), the TYPE ENUMERATION (durable-disk 2b-inode-3).  Two arms and
+       no new sweep: below [ninodes] a record is either free (type 0) or
+       live, and [FsImg.fio_type] is exactly the enumeration at a live one;
+       at or above [ninodes] the [fs_region_free] half of [fs_region_wf]
+       says the type is 0.  [InodeRegion]'s three constants and
+       [DirView]/[FsImg]'s three are the same 1/2/3, by conversion. *)
+    intros z Hz. rewrite (Hbr z Hz). apply region_inums_spec in Hz.
+    destruct (decide (bv_unsigned (di_type (fs_dinode P sb z)) = 0))
+      as [H0 | Hnz]; [by left |].
+    destruct (Z_lt_ge_dec z (FsImg.sb_ninodes sb)) as [Hlt | Hge].
+    - destruct (fio_type P sb (fs_dinode P sb z)
+                  (fsimg_wf_inode P sb z Hwf ltac:(lia) Hnz))
+        as [Hd | [Hf | Hv]]; [by right; left | by right; right; left
+                             | by right; right; right].
+    - exfalso. apply Hnz.
+      exact (fs_region_free_spec P sb nib z (fs_region_wf_free _ _ _ Hrw)
+               ltac:(lia) ltac:(lia) ltac:(lia)).
   Qed.
 
 End FsCfgBootPool.
@@ -1064,7 +1082,7 @@ Section FsCfgBootEra.
              postcondition (the [sl_fresh]es exist only after [iinit] runs,
              fs-cfg-boot.md "What must NOT move here").
         (P2) [bio_init_at]'s physical premises -- [bcache_addr ↦₄ 0], its
-             name and cpu cells, the thirty [sl_fresh (buf_lock (bnode k))]
+             name and cpu cells, the thirty [sl_fresh (buf_lock (era_node k))]
              and the thirty zeroed [struct buf] rows, and
              [BcacheInv.bcache_lru bhead (blist 0 NBUF)].  Producer: binit's
              postcondition + [boot_bss_carve].

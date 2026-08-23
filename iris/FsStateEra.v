@@ -41,11 +41,11 @@
    stated over it and a wholesale restatement of those four is out of
    scope.  So the two models are related here, in BOTH directions:
 
-     bnode dn bm data : fs_node        (blkmap + total data -> node)
+     era_node dn bm data : fs_node        (blkmap + total data -> node)
      bm_of  n           : blkmap         (node -> blkmap)
 
-   with [bnode (fn_rec n) (bm_of n) (fn_data n) = n] under
-   [inode_local] ([bnode_bm_of]).  The direction a payload FLIP uses is
+   with [era_node (fn_rec n) (bm_of n) (fn_data n) = n] under
+   [inode_local] ([era_node_bm_of]).  The direction a payload FLIP uses is
    [bm_of]: a payload whose [data] is EXISTENTIALLY bound (which is exactly
    what [IcacheEscrow.ic_loaded] has) picks the node first and reads the
    old model off it, so no extensionality between two [data] functions is
@@ -194,7 +194,7 @@ Proof.
 Qed.
 
 (* a blkmap and a TOTAL data function, as a node *)
-Definition bnode (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
+Definition era_node (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
   : fs_node := MkNode dn (bm_ent bm) (node_blk bm data).
 
 (* ...and a node, as a blkmap.  [bm_cells] is [di_addrs] verbatim under
@@ -277,42 +277,42 @@ Proof.
   exact (bm_of_get n k Hwf ltac:(lia)).
 Qed.
 
-(* ---- [fn_*] of [bnode] --------------------------------------------- *)
+(* ---- [fn_*] of [era_node] --------------------------------------------- *)
 
-Lemma bnode_rec dn bm data : fn_rec (bnode dn bm data) = dn.
+Lemma era_node_rec dn bm data : fn_rec (era_node dn bm data) = dn.
 Proof. reflexivity. Qed.
-Lemma bnode_ent dn bm data : fn_ent (bnode dn bm data) = bm_ent bm.
+Lemma era_node_ent dn bm data : fn_ent (era_node dn bm data) = bm_ent bm.
 Proof. reflexivity. Qed.
-Lemma bnode_blk dn bm data : fn_blk (bnode dn bm data) = node_blk bm data.
+Lemma era_node_blk dn bm data : fn_blk (era_node dn bm data) = node_blk bm data.
 Proof. reflexivity. Qed.
 
-Lemma bnode_naddr dn bm data k :
+Lemma era_node_naddr dn bm data k :
   di_addrs dn = bm_cells bm -> length (bm_dir bm) = NDIRECT ->
   (k < MAXFILE)%nat ->
-  fn_naddr (bnode dn bm data) k = bv_unsigned (blkmap_get bm k).
+  fn_naddr (era_node dn bm data) k = bv_unsigned (blkmap_get bm k).
 Proof.
-  intros Haddr Hlen Hk. rewrite /fn_naddr /blkmap_get /bnode /= -NDIRECT_FS.
+  intros Haddr Hlen Hk. rewrite /fn_naddr /blkmap_get /era_node /= -NDIRECT_FS.
   destruct (decide (k < NDIRECT)%nat) as [Hlt | Hge]; [| reflexivity].
   rewrite Haddr /bm_cells lookup_total_app_l; [reflexivity |].
   rewrite Hlen. exact Hlt.
 Qed.
 
-Lemma bnode_indb dn bm data :
+Lemma era_node_indb dn bm data :
   di_addrs dn = bm_cells bm -> length (bm_dir bm) = NDIRECT ->
-  fn_indb (bnode dn bm data) = bv_unsigned (bm_ind bm).
+  fn_indb (era_node dn bm data) = bv_unsigned (bm_ind bm).
 Proof.
-  intros Haddr Hlen. rewrite /fn_indb /bnode /= Haddr /bm_cells.
+  intros Haddr Hlen. rewrite /fn_indb /era_node /= Haddr /bm_cells.
   rewrite lookup_total_app_r;
     [| rewrite Hlen /FS_NDIRECT /NDIRECT; lia].
   rewrite Hlen /FS_NDIRECT /NDIRECT.
   assert (He : (12 - 12)%nat = 0%nat) by lia. rewrite He. reflexivity.
 Qed.
 
-Lemma bnode_data dn bm data k :
+Lemma era_node_data dn bm data k :
   blk_holes_zero bm data -> (k < MAXFILE)%nat ->
-  fn_data (bnode dn bm data) k = data k.
+  fn_data (era_node dn bm data) k = data k.
 Proof.
-  intros Hh Hk. rewrite /fn_data /bnode /= node_blk_lookup.
+  intros Hh Hk. rewrite /fn_data /era_node /= node_blk_lookup.
   destruct (decide ((k < MAXFILE)%nat /\ bv_unsigned (blkmap_get bm k) <> 0))
     as [_ | Hc]; [reflexivity |].
   assert (Hz : bv_unsigned (blkmap_get bm k) = 0).
@@ -323,14 +323,14 @@ Qed.
 
 (* ---- THE ROUNDTRIP --------------------------------------------------- *)
 
-Lemma bnode_bm_of (i : Z) (n : fs_node) :
-  inode_local i n -> bnode (fn_rec n) (bm_of n) (fn_data n) = n.
+Lemma era_node_bm_of (i : Z) (n : fs_node) :
+  inode_local i n -> era_node (fn_rec n) (bm_of n) (fn_data n) = n.
 Proof.
   intros Hl.
   pose proof (inl_blk_dom Hl) as Hdom.
   pose proof (inl_blk_top Hl) as Htop.
   pose proof (inl_rec_wf Hl) as Hwf.
-  rewrite /bnode. destruct n as [dn ent blk]; simpl in *.
+  rewrite /era_node. destruct n as [dn ent blk]; simpl in *.
   f_equal. apply map_eq. intros k. rewrite node_blk_lookup.
   destruct (decide (k < MAXFILE)%nat) as [Hk | Hk].
   - rewrite (bm_of_get (MkNode dn ent blk) k Hwf Hk).
@@ -444,17 +444,17 @@ Proof.
   exact (inode_sized_of_local i n Hl).
 Qed.
 
-(* ---- ...AND THE OTHER WAY: [inode_local] of [bnode] ---------------- *)
+(* ---- ...AND THE OTHER WAY: [inode_local] of [era_node] ---------------- *)
 
 (* THE FOUR FACTS [inode_ok] DOES NOT CARRY, as premises.  Three of them
    ARE payload conjuncts already ([FsTree.dir_uniq],
    [DirView.dir_dots_ix], and the "16 divides the size" fact every
    directory producer establishes); the fourth, the TYPE ENUMERATION, has
    no producer in the in-memory chain -- see the header.
-   The directory clauses are read at [fn_data (bnode ..)], not at
+   The directory clauses are read at [fn_data (era_node ..)], not at
    [data]: a payload whose [data] is existentially bound re-existentialises
    at the node's own reading, so nothing ever has to relate two [data]
-   functions.  [bnode_data] is the transport for a caller that does hold
+   functions.  [era_node_data] is the transport for a caller that does hold
    [data] concretely. *)
 Lemma inode_local_of_ok (i : Z) (cov : gset Z) (ls : Z)
     (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
@@ -464,59 +464,59 @@ Lemma inode_local_of_ok (i : Z) (cov : gset Z) (ls : Z)
    \/ bv_unsigned (di_type dn) = T_DEVICE_z) ->
   bv_unsigned (di_nlink dn) <= 32767 ->
   (bv_unsigned (di_type dn) = T_DIR_z -> (16 | bv_unsigned (di_size dn))) ->
-  dir_uniq dn (fn_data (bnode dn bm data)) ->
-  dir_dots_ix i dn (fn_data (bnode dn bm data)) ->
-  inode_local i (bnode dn bm data).
+  dir_uniq dn (fn_data (era_node dn bm data)) ->
+  dir_dots_ix i dn (fn_data (era_node dn bm data)) ->
+  inode_local i (era_node dn bm data).
 Proof.
   intros (Hwf & Hcov & Haddr & Hty0 & Hsz & Hholes & Hsized)
          Hty Hnl Hdsz Huniq Hdots.
   destruct Hwf as (Hdlen & Helen & Hindz & _ & _).
   assert (Hnaddr : forall k, (k < MAXFILE)%nat ->
-                     fn_naddr (bnode dn bm data) k
+                     fn_naddr (era_node dn bm data) k
                      = bv_unsigned (blkmap_get bm k))
-    by (intros k Hk; exact (bnode_naddr dn bm data k Haddr Hdlen Hk)).
-  assert (Hind : fn_indb (bnode dn bm data) = bv_unsigned (bm_ind bm))
-    by exact (bnode_indb dn bm data Haddr Hdlen).
+    by (intros k Hk; exact (era_node_naddr dn bm data k Haddr Hdlen Hk)).
+  assert (Hind : fn_indb (era_node dn bm data) = bv_unsigned (bm_ind bm))
+    by exact (era_node_indb dn bm data Haddr Hdlen).
   (* the record's own well-formedness comes off [di_addrs = bm_cells] *)
   assert (Hrwf : dinode_wf dn).
   { rewrite /dinode_wf Haddr /bm_cells length_app Hdlen /NDIRECT /=. lia. }
   (* the two readings [fn_is_dir] / [fn_nrec] resolve to the record's *)
-  assert (Hdirb : fn_is_dir (bnode dn bm data) = true
+  assert (Hdirb : fn_is_dir (era_node dn bm data) = true
                   <-> bv_unsigned (di_type dn) = T_DIR_z).
   { rewrite /fn_is_dir. apply bool_decide_eq_true. }
-  assert (Hnrec : fn_nrec (bnode dn bm data)
+  assert (Hnrec : fn_nrec (era_node dn bm data)
                   = dir_nrec (bv_unsigned (di_size dn))) by reflexivity.
   (* [nlink <> 0] as the record states it, which is the dots guard's form *)
-  assert (Hnlz : fn_nlink (bnode dn bm data) <> 0%nat ->
+  assert (Hnlz : fn_nlink (era_node dn bm data) <> 0%nat ->
                  bv_unsigned (di_nlink dn) <> 0).
   { intros Hnz Hc. apply Hnz.
-    rewrite /fn_nlink bnode_rec Hc //. }
+    rewrite /fn_nlink era_node_rec Hc //. }
   constructor.
   - exact Hrwf.
   - rewrite -NINDIRECT_FS. exact Helen.
   - rewrite Hind -NINDIRECT_FS. exact Hindz.
   - intros k Hk. rewrite -MAXFILE_FS in Hk.
-    rewrite bnode_blk node_blk_lookup (Hnaddr k Hk).
+    rewrite era_node_blk node_blk_lookup (Hnaddr k Hk).
     destruct (decide ((k < MAXFILE)%nat /\ bv_unsigned (blkmap_get bm k) <> 0))
       as [[_ Hnz] | Hc].
     + split; [intros _; exact Hnz | intros _; by eexists].
     + split; [intros [x Hx]; discriminate |].
       intros Hnz. exfalso. apply Hc. split; [exact Hk | exact Hnz].
   - intros k Hk. rewrite -MAXFILE_FS in Hk.
-    rewrite bnode_blk node_blk_lookup.
+    rewrite era_node_blk node_blk_lookup.
     destruct (decide ((k < MAXFILE)%nat /\ bv_unsigned (blkmap_get bm k) <> 0))
       as [[Hc _] | _]; [lia | done].
-  - intros k bs Hk. rewrite bnode_blk node_blk_lookup in Hk.
+  - intros k bs Hk. rewrite era_node_blk node_blk_lookup in Hk.
     destruct (decide ((k < MAXFILE)%nat /\ bv_unsigned (blkmap_get bm k) <> 0))
       as [[Hlt _] | _]; [| discriminate].
     injection Hk as <-. exact (Hsized k Hlt).
   - exact Hty.
-  - rewrite /fn_size bnode_rec. split.
+  - rewrite /fn_size era_node_rec. split.
     + pose proof (bv_unsigned_in_range _ (di_size dn)) as [Hge _]. exact Hge.
     + rewrite -BSIZE_BSIZEz -MAXFILE_FS. exact Hsz.
   - intros k Hk Hlt. rewrite -MAXFILE_FS in Hk.
     rewrite (Hnaddr k Hk). apply (Hcov k Hk).
-    rewrite /fn_size bnode_rec -BSIZE_BSIZEz in Hlt. exact Hlt.
+    rewrite /fn_size era_node_rec -BSIZE_BSIZEz in Hlt. exact Hlt.
   - intros Hz. exfalso. exact (Hty0 Hz).
   - exact Hnl.
   - intros Hd. exact (Hdsz (proj1 Hdirb Hd)).
@@ -526,10 +526,10 @@ Proof.
     destruct (Hdots (proj1 Hdirb Hd) (Hnlz Hnz))
       as (H2 & Hlive0 & Hinum0 & Hname0 & _ & _).
     assert (Hlt0 : (0 < dir_nrec (bv_unsigned (di_size dn)))%nat) by lia.
-    assert (Hbn : dir_bname (fn_data (bnode dn bm data)) 0%nat = DOT).
+    assert (Hbn : dir_bname (fn_data (era_node dn bm data)) 0%nat = DOT).
     { rewrite /dir_bname Hname0 DOT_dot //. }
     rewrite /dir_entries Hd Hnrec -Hbn.
-    rewrite (dir_view_live (fn_data (bnode dn bm data))
+    rewrite (dir_view_live (fn_data (era_node dn bm data))
                (dir_nrec (bv_unsigned (di_size dn))) 0%nat
                (Huniq (proj1 Hdirb Hd)) Hlt0 Hlive0).
     by rewrite Hinum0.
@@ -538,10 +538,10 @@ Proof.
     destruct (Hdots (proj1 Hdirb Hd) (Hnlz Hnz))
       as (H2 & _ & _ & _ & Hlive1 & Hname1).
     assert (Hlt1 : (1 < dir_nrec (bv_unsigned (di_size dn)))%nat) by lia.
-    assert (Hbn : dir_bname (fn_data (bnode dn bm data)) 1%nat = DOTDOT).
+    assert (Hbn : dir_bname (fn_data (era_node dn bm data)) 1%nat = DOTDOT).
     { rewrite /dir_bname Hname1 DOTDOT_dotdot //. }
     rewrite /dir_entries Hd Hnrec -Hbn.
-    rewrite (dir_view_live (fn_data (bnode dn bm data))
+    rewrite (dir_view_live (fn_data (era_node dn bm data))
                (dir_nrec (bv_unsigned (di_size dn))) 1%nat
                (Huniq (proj1 Hdirb Hd)) Hlt1 Hlive1).
     by eexists.
@@ -551,7 +551,7 @@ Qed.
 (*  2b. THE DIRENT READINGS ARE EXTENSIONAL BELOW THE RECORD COUNT       *)
 (* ===================================================================== *)
 
-(* [bnode]'s [fn_data] agrees with [data] BELOW MAXFILE and cannot agree
+(* [era_node]'s [fn_data] agrees with [data] BELOW MAXFILE and cannot agree
    above it -- the map is partial by design.  So a directory fact stated
    over the payload's own TOTAL [data] -- which is the shape
    [DirView.dir_dots_ix] and [FsTree.dir_uniq] come in, at the image and at
@@ -684,7 +684,7 @@ Proof.
   - rewrite -(Hb 1%nat ltac:(lia)). exact Hn1.
 Qed.
 
-(* ---- and the two facts that instantiate it at [bnode] ---------------- *)
+(* ---- and the two facts that instantiate it at [era_node] ---------------- *)
 
 Lemma dir_nrec_bound (sz : Z) :
   0 <= sz -> sz <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
@@ -698,14 +698,14 @@ Proof.
   - apply Z.div_pos; lia.
 Qed.
 
-Lemma bnode_fb_agree dn bm data :
+Lemma era_node_fb_agree dn bm data :
   blk_holes_zero bm data ->
-  fb_agree (fn_data (bnode dn bm data)) data (MAXFILE * BSIZE).
+  fb_agree (fn_data (era_node dn bm data)) data (MAXFILE * BSIZE).
 Proof.
   intros Hh i Hi. rewrite /file_byte.
   assert (Hd : (i `div` BSIZE < MAXFILE)%nat).
   { apply Nat.Div0.div_lt_upper_bound. rewrite Nat.mul_comm. exact Hi. }
-  rewrite (bnode_data dn bm data (i `div` BSIZE)%nat Hh Hd) //.
+  rewrite (era_node_data dn bm data (i `div` BSIZE)%nat Hh Hd) //.
 Qed.
 
 (* THE FORM A PAYLOAD ACTUALLY HAS: the two directory facts stated over the
@@ -723,17 +723,17 @@ Lemma inode_local_of_ok_data (i : Z) (cov : gset Z) (ls : Z)
   (bv_unsigned (di_type dn) = T_DIR_z -> (16 | bv_unsigned (di_size dn))) ->
   dir_uniq dn data ->
   dir_dots_ix i dn data ->
-  inode_local i (bnode dn bm data).
+  inode_local i (era_node dn bm data).
 Proof.
   intros Hok Hty Hnl Hdsz Huniq Hdots.
   pose proof Hok as (_ & _ & _ & _ & Hsz & Hholes & _).
   assert (Hb : (16 * dir_nrec (bv_unsigned (di_size dn)) <= MAXFILE * BSIZE)%nat).
   { apply dir_nrec_bound; [| exact Hsz].
     pose proof (bv_unsigned_in_range _ (di_size dn)) as [Hge _]. exact Hge. }
-  assert (Hag : fb_agree data (fn_data (bnode dn bm data))
+  assert (Hag : fb_agree data (fn_data (era_node dn bm data))
                   (16 * dir_nrec (bv_unsigned (di_size dn)))).
   { apply (fb_agree_mono _ _ (MAXFILE * BSIZE) _ Hb).
-    apply fb_agree_sym. exact (bnode_fb_agree dn bm data Hholes). }
+    apply fb_agree_sym. exact (era_node_fb_agree dn bm data Hholes). }
   apply (inode_local_of_ok i cov ls dn bm data Hok Hty Hnl Hdsz).
   - exact (dir_uniq_data_ext dn data _ Hag Huniq).
   - exact (dir_dots_ix_data_ext i dn data _ Hag Hdots).
@@ -744,14 +744,14 @@ Qed.
 (* ===================================================================== *)
 
 (* A PAYLOAD NAMES ITS RECORD, ITS BLOCK MAP AND ITS DATA SEPARATELY, AND
-   THE NODE IS [bnode] OF THE THREE.  Reading the node's own [bm_of] /
+   THE NODE IS [era_node] OF THE THREE.  Reading the node's own [bm_of] /
    [fn_data] back at the payload's [bm] / [data] needs exactly these five
    representational equations -- every one of them a conjunct of
    [InodeLock.inode_ok], so a producer that had [inode_ok] has them and
    nothing new is owed.  They are what the EXPENSIVE half of [inode_ok]
    (the coverage sweep and the injectivity) is derived THROUGH: the
    payload keeps the cheap shape, the [*] and the byte view's auth supply
-   the rest ([inode_owned_era_bnode_ok] below). *)
+   the rest ([inode_owned_era_era_node_ok] below). *)
 Definition node_shape_ok (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) : Prop :=
   di_addrs dn = bm_cells bm
@@ -776,11 +776,11 @@ Proof. intros (_ & _ & _ & _ & H). exact H. Qed.
 
 (* the round trip the payload uses: [bm_of] of the node IS the payload's
    own block map *)
-Lemma bm_of_bnode (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
-  node_shape_ok dn bm data -> bm_of (bnode dn bm data) = bm.
+Lemma bm_of_era_node (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  node_shape_ok dn bm data -> bm_of (era_node dn bm data) = bm.
 Proof.
   intros (Haddr & Hd & _ & _ & _).
-  rewrite /bm_of /bnode /=. rewrite Haddr /bm_cells.
+  rewrite /bm_of /era_node /=. rewrite Haddr /bm_cells.
   destruct bm as [dir ind ent]; simpl in *.
   assert (Htk : take NDIRECT (dir ++ [ind]) = dir).
   { rewrite -Hd. apply take_app_length. }
@@ -789,13 +789,13 @@ Proof.
   rewrite Hd Nat.sub_diag //.
 Qed.
 
-Lemma fn_data_bnode (dn : dinode) (bm : blkmap)
+Lemma fn_data_era_node (dn : dinode) (bm : blkmap)
     (data : nat -> list (bv 8)) (k : nat) :
   node_shape_ok dn bm data -> (k < MAXFILE)%nat ->
-  fn_data (bnode dn bm data) k = data k.
+  fn_data (era_node dn bm data) k = data k.
 Proof.
   intros Hs Hk.
-  exact (bnode_data dn bm data k (node_shape_ok_holes _ _ _ Hs) Hk).
+  exact (era_node_data dn bm data k (node_shape_ok_holes _ _ _ Hs) Hk).
 Qed.
 
 (* [inode_ok]'s two [data]-facing conjuncts stop at MAXFILE, so a [data]
@@ -838,7 +838,7 @@ Lemma inode_local_of_ok_rec (i : Z) (cov : gset Z) (ls : Z)
   inode_rec_local dn ->
   dir_uniq dn data ->
   dir_dots_ix i dn data ->
-  inode_local i (bnode dn bm data).
+  inode_local i (era_node dn bm data).
 Proof.
   intros Hok (Hty & Hnl & Hgr) Hu Hd.
   exact (inode_local_of_ok_data i cov ls dn bm data Hok Hty Hnl Hgr Hu Hd).
@@ -1333,7 +1333,7 @@ Section EraRes.
   (* ---- THE PAYLOAD'S SPELLING OF THE BUNDLE -------------------------- *)
 
   (* [IcacheEscrow]'s payloads name a record, a block map and a total
-     [data] and the node is [bnode] of the three; these three lemmas are
+     [data] and the node is [era_node] of the three; these three lemmas are
      that spelling of [_to] / [_of] / [_ok], and they are what every
      consumer of a payload actually applies.  Each takes only
      [node_shape_ok], which every producer reads off its own
@@ -1351,68 +1351,68 @@ Section EraRes.
     rewrite (Hext k Hk) //.
   Qed.
 
-  Lemma inode_owned_era_bnode_to (γfs : fs_names) (γi : gname) (inum : bv 32)
+  Lemma inode_owned_era_era_node_to (γfs : fs_names) (γi : gname) (inum : bv 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     node_shape_ok dn bm data ->
-    inode_owned_era γfs γi inum (bnode dn bm data) -∗
+    inode_owned_era γfs γi inum (era_node dn bm data) -∗
       dinode_at γi inum dn
       ∗ ind_res γfs bm
       ∗ inode_blocks γfs bm data
-      ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data).
+      ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data).
   Proof.
     intros Hs. iIntros "Hn".
     iDestruct (inode_owned_era_to with "Hn") as "(Hd & Hi & Hb & Ht)".
-    rewrite (bm_of_bnode dn bm data Hs).
-    rewrite (inode_blocks_data_ext γfs bm (fn_data (bnode dn bm data)) data
-               (fun k Hk => fn_data_bnode dn bm data k Hs Hk)).
+    rewrite (bm_of_era_node dn bm data Hs).
+    rewrite (inode_blocks_data_ext γfs bm (fn_data (era_node dn bm data)) data
+               (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
     iFrame.
   Qed.
 
-  Lemma inode_owned_era_bnode_of (γfs : fs_names) (γi : gname) (inum : bv 32)
+  Lemma inode_owned_era_era_node_of (γfs : fs_names) (γi : gname) (inum : bv 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     node_shape_ok dn bm data ->
-    inode_local (bv_unsigned inum) (bnode dn bm data) ->
+    inode_local (bv_unsigned inum) (era_node dn bm data) ->
     dinode_at γi inum dn -∗
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
-    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) -∗
-    inode_owned_era γfs γi inum (bnode dn bm data).
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
+    inode_owned_era γfs γi inum (era_node dn bm data).
   Proof.
     intros Hs Hl. iIntros "Hd Hi Hb Ht".
-    iApply (inode_owned_era_of γfs γi inum (bnode dn bm data) Hl
+    iApply (inode_owned_era_of γfs γi inum (era_node dn bm data) Hl
               with "[Hd] [Hi] [Hb] Ht").
     - iExact "Hd".
-    - rewrite (bm_of_bnode dn bm data Hs). iExact "Hi".
-    - rewrite (bm_of_bnode dn bm data Hs).
-      rewrite (inode_blocks_data_ext γfs bm (fn_data (bnode dn bm data)) data
-                 (fun k Hk => fn_data_bnode dn bm data k Hs Hk)).
+    - rewrite (bm_of_era_node dn bm data Hs). iExact "Hi".
+    - rewrite (bm_of_era_node dn bm data Hs).
+      rewrite (inode_blocks_data_ext γfs bm (fn_data (era_node dn bm data)) data
+                 (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
       iExact "Hb".
   Qed.
 
   (* the whole of [InodeLock.inode_ok], at the payload's own spelling --
      one fupd at [logN], which is what keeps a payload from having to
      MAINTAIN the coverage sweep and the injectivity *)
-  Lemma inode_owned_era_bnode_ok (E : coPset) (γfs : fs_names) (γi : gname)
+  Lemma inode_owned_era_era_node_ok (E : coPset) (γfs : fs_names) (γi : gname)
       (inum : bv 32) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z) (ls : Z) :
     ↑logN ⊆ E ->
     node_shape_ok dn bm data ->
     bv_unsigned (di_type dn) <> 0 ->
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
-    inode_owned_era γfs γi inum (bnode dn bm data) ={E}=∗
+    inode_owned_era γfs γi inum (era_node dn bm data) ={E}=∗
       ⌜inode_ok cov ls dn bm data⌝
-      ∗ inode_owned_era γfs γi inum (bnode dn bm data).
+      ∗ inode_owned_era γfs γi inum (era_node dn bm data).
   Proof.
     iIntros (HE Hs Hty) "#Hinv Hn".
-    assert (Hty' : bv_unsigned (di_type (fn_rec (bnode dn bm data))) <> 0)
+    assert (Hty' : bv_unsigned (di_type (fn_rec (era_node dn bm data))) <> 0)
       by exact Hty.
-    iMod (inode_owned_era_ok E γfs γi inum (bnode dn bm data) cov ls HE Hty'
+    iMod (inode_owned_era_ok E γfs γi inum (era_node dn bm data) cov ls HE Hty'
             with "Hinv Hn") as "[%Hok Hn]".
     iModIntro. iFrame "Hn". iPureIntro.
-    rewrite (bm_of_bnode dn bm data Hs) in Hok.
-    apply (inode_ok_data_ext cov ls dn bm (fn_data (bnode dn bm data)) data);
+    rewrite (bm_of_era_node dn bm data Hs) in Hok.
+    apply (inode_ok_data_ext cov ls dn bm (fn_data (era_node dn bm data)) data);
       [| exact Hok].
-    intros k Hk. exact (fn_data_bnode dn bm data k Hs Hk).
+    intros k Hk. exact (fn_data_era_node dn bm data k Hs Hk).
   Qed.
 
 End EraRes.

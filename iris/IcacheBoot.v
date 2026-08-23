@@ -106,7 +106,7 @@ Require Import InodeLock.
 Require Import InodeRegion.
 (* durable-disk 2b-inode-3: the pool's allocated arm is the era bundle.
    [FsState] for [top_frag], [FsBytesGamma] for [fs_gamma_L], [FsStateEra]
-   for [bnode] / [inode_rec_local] / [inode_owned_era_bnode_of]. *)
+   for [era_node] / [inode_rec_local] / [inode_owned_era_era_node_of]. *)
 Require Import FsState.
 Require Import FsBytesGamma.
 Require Import FsStateEra.
@@ -612,6 +612,14 @@ Section IcacheBootRegion.
     forall z : Z, z ∈ region_inums nib ->
       bv_unsigned (di_nlink (image_dinode dss z)) <= 32767.
 
+  (* ...AND (L5) IS AN IMAGE OBLIGATION FOR THE SAME REASON (durable-disk
+     2b-inode-3).  [ireg_slot] now also says of every record that its TYPE
+     is one of the four, which is [FsStateInode.inode_local]'s [inl_type]
+     and has no other producer; at boot it is [FsImg.fio_type] at a live
+     inode and type 0 everywhere else. *)
+  Definition image_ty_ok (dss : list (list dinode)) (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib -> ireg_ty_ok (image_dinode dss z).
+
   (* ...AND SO IS THE ROOT CLAUSE ([InodeRegion.ireg_root_ok], design
      fs-icache.md §20.4's "image-wf IOU" -- that section calls it (L4) too,
      which is NOT the 32767 clause above), for the third time and for
@@ -905,7 +913,7 @@ Section IcacheBootRegion.
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
        image_root_alive W dss nib /\ image_link_le W dss nib
-       /\ image_dir_wl0 W dss nib) ->
+       /\ image_dir_wl0 W dss nib /\ image_ty_ok dss nib) ->
     (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier;
        V4+V5's fused widening): the image's authorities are ALL-PLAIN,
        [wdu = wdt = 0] and [p = None] at every inum, so (T1), (T1') and
@@ -974,7 +982,7 @@ Section IcacheBootRegion.
   Proof.
     intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0).
+    destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0 & Hl5).
     iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv #Hftopi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
@@ -1067,7 +1075,8 @@ Section IcacheBootRegion.
       iIntros "[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir]".
       assert (Hok : ireg_link_ok (image_dinode dss z) (W z + 0 + 0)).
       { pose proof (Hl1 z Hz).
-        split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
+        split_and!;
+          [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz) | exact (Hl5 z Hz)]. }
       (* the root clause at the WIDENED ledger, i.e. §20.4's own words with
          [W root] in place of the [0] stage A could hard-code *)
       assert (Hrt : ireg_root_ok z (image_dinode dss z) (W z + 0 + 0)).
@@ -1278,7 +1287,7 @@ Section IcacheBootPool.
        (durable-disk 2b-inode-3).  The four resources above are what
        [FsStateEra.inode_owned_era] is assembled OUT of, and this is its
        fourth piece. *)
-    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (bnode dn bm data) -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
     (* ...and the CONTENTS HOLD, TIED to the image's own record and bytes
        (namei-pinned-lookup.md §9 W2/W3): the boot client sets the value with
        a free [dv_set] before it gets here, so nothing in this file has to
@@ -1306,7 +1315,7 @@ Section IcacheBootPool.
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |].
     iSplitR "Hdv Hfv".
-    { iApply (inode_owned_era_bnode_of γfs γi inum dn bm data Hsh Hloc
+    { iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
                 with "Hdn Hind Hblk Htop"). }
     iFrame "Hdv Hfv".
   Qed.
@@ -1352,7 +1361,7 @@ Section IcacheBootPool.
             for the contents holds' reason verbatim (durable-disk
             2b-inode-3) *)
          top_frag (fs_gamma_L γfs) (bv_unsigned (mword_of_int z : mword 32))
-                  (bnode dn bm data) ∗
+                  (era_node dn bm data) ∗
          (* the CONTENTS HOLD rides INSIDE the allocated bundle, because the
             value it is tied to is this bundle's own [dn]/[data] and nothing
             outside the existential can name them (§9 W2). *)
