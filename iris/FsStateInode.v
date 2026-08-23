@@ -167,6 +167,55 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------ *)
+(*  2b. The PURE bridge from the tree's dirent vocabulary              *)
+(*                                                                     *)
+(*  [FsTree] states an unlink as [dir_zeroed_at] and a dirlink as      *)
+(*  [dir_insert_at], and proves BOTH view deltas outright              *)
+(*  ([dir_view_zero], [dir_view_insert]).  These read them at          *)
+(*  [fs_node]; section 8's token moves take the record delta as their  *)
+(*  premise and go through them, so nothing below assumes an           *)
+(*  entry-map delta.                                                   *)
+(* ------------------------------------------------------------------ *)
+
+Lemma dir_entries_zero (n n' : fs_node) (k0 : nat) :
+  fn_is_dir n = true -> fn_is_dir n' = true ->
+  fn_size n' = fn_size n ->
+  dir_names_unique (fn_data n) (fn_nrec n) ->
+  (k0 < fn_nrec n)%nat ->
+  dir_live (fn_data n) k0 ->
+  dir_zeroed_at (fn_data n) (fn_data n') k0 ->
+  dir_entries n' = delete (dir_bname (fn_data n) k0) (dir_entries n).
+Proof.
+  intros Hd Hd' Hsz Hu Hk Hlive Hz.
+  rewrite /dir_entries Hd Hd' /fn_nrec Hsz.
+  by apply (dir_view_zero (fn_data n) (fn_data n') (dir_nrec (fn_size n)) k0).
+Qed.
+
+(* the dirlink twin.  [dir_insert_at] carries the record-count arithmetic
+   (both arms of the free-slot scan) and the free-slot and grown-range
+   liveness side conditions; the ONE guard left over is dirlink's own,
+   [s] not already a live name. *)
+Lemma dir_entries_write (n n' : fs_node) (k0 : nat) (s : fname) (z : bv 16) :
+  fn_is_dir n = true -> fn_is_dir n' = true ->
+  dir_first (fn_data n) (fn_nrec n) s = None ->
+  dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
+  dir_entries n' = <[s := bv_unsigned z]> (dir_entries n).
+Proof.
+  intros Hd Hd' Hnone Hins. rewrite /dir_entries Hd Hd'.
+  exact (dir_view_insert (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n')
+           k0 s z Hnone Hins).
+Qed.
+
+(* ...and the freshness the [big_sepM_insert] needs, off the same guard *)
+Lemma dir_entries_fresh (n : fs_node) (s : fname) :
+  dir_first (fn_data n) (fn_nrec n) s = None -> dir_entries n !! s = None.
+Proof.
+  intros Hnone. rewrite /dir_entries. destruct (fn_is_dir n).
+  - by apply dir_view_lookup_None.
+  - apply lookup_empty.
+Qed.
+
+(* ------------------------------------------------------------------ *)
 (*  3.  The node's byte ownership                                      *)
 (* ------------------------------------------------------------------ *)
 
@@ -502,9 +551,11 @@ Section InodeOwned.
   (*  8.  ENCODE LEMMAS -- the dirent moves, at the token layer         *)
   (*                                                                   *)
   (*  The BYTES of a dirent write move by (b) above; what is left is    *)
-  (*  the token that rides with the entry.  Stated at the ENTRY-MAP     *)
-  (*  delta so that the pure bridge (section 9) and the resource move   *)
-  (*  stay separable.                                                   *)
+  (*  the token that rides with the entry.  The DELETE is stated at the *)
+  (*  entry-map delta (the caller holds [dir_entries_zero]'s conclusion  *)
+  (*  in that shape anyway); the INSERT is stated at the RECORD delta    *)
+  (*  [dir_insert_at] and goes through section 2b's                      *)
+  (*  [dir_entries_write], so it assumes no view equation.               *)
   (* ---------------------------------------------------------------- *)
 
   Lemma ent_toks_delete Γ n n' s t :
@@ -518,14 +569,21 @@ Section InodeOwned.
     iIntros "[$ H]". rewrite Hdel Horph //.
   Qed.
 
-  Lemma ent_toks_insert Γ n n' s t :
+  (* THE INSERT TAKES THE RECORD DELTA, NOT THE ENTRY-MAP DELTA.  Its
+     entry-map delta is [FsTree.dir_view_insert], read at [fs_node] by
+     [dir_entries_write] above -- so a caller supplies what a dirlink
+     postcondition actually says (which slot moved, and dirlink's guard)
+     rather than an equation about the view. *)
+  Lemma ent_toks_insert Γ n n' k0 s z :
     fn_orphan n' = fn_orphan n ->
-    dir_entries n !! s = None ->
-    dir_entries n' = <[s := t]> (dir_entries n) ->
-    ent_toks Γ n -∗ ent_tok Γ (fn_orphan n) s t -∗ ent_toks Γ n'.
+    fn_is_dir n = true -> fn_is_dir n' = true ->
+    dir_first (fn_data n) (fn_nrec n) s = None ->
+    dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
+    ent_toks Γ n -∗ ent_tok Γ (fn_orphan n) s (bv_unsigned z) -∗ ent_toks Γ n'.
   Proof.
-    intros Horph Hs Hins.
-    rewrite /ent_toks Hins Horph big_sepM_insert //.
+    intros Horph Hd Hd' Hnone Hins.
+    rewrite /ent_toks (dir_entries_write n n' k0 s z Hd Hd' Hnone Hins) Horph.
+    rewrite big_sepM_insert; [| exact (dir_entries_fresh n s Hnone)].
     iIntros "H Ht". iFrame.
   Qed.
 
@@ -613,9 +671,10 @@ Section InodeOwned.
   (*                                                                   *)
   (*  Each hands the writer the Φ-part (whose bytes the log moves, by  *)
   (*  [inode_phi_blk_move]) and does the token move beside it.  The    *)
-  (*  entry-map delta is a PREMISE: it is a pure fact about ONE        *)
-  (*  directory's own bytes, proved by the caller from [FsTree]        *)
-  (*  ([dir_entries_zero] below is the removal case, outright).        *)
+  (*  premise is a pure fact about ONE directory's own bytes: the      *)
+  (*  removal's entry-map delta, which [dir_entries_zero] proves       *)
+  (*  outright, and the link's RECORD delta, which                     *)
+  (*  [dir_entries_write] turns into the view's.                       *)
   (* ---------------------------------------------------------------- *)
 
   (* the direction safety uses: at [nlink = 0] no entry points here *)
@@ -645,21 +704,23 @@ Section InodeOwned.
     rewrite /dir_owned /inode_owned /inode_ghost Hnl. by iFrame.
   Qed.
 
-  Lemma dir_owned_link Γ sb d n n' s t :
+  Lemma dir_owned_link Γ sb d n n' k0 s z :
     fn_orphan n' = fn_orphan n ->
     fn_nlink n' = fn_nlink n ->
-    dir_entries n !! s = None ->
-    dir_entries n' = <[s := t]> (dir_entries n) ->
+    fn_is_dir n = true ->
+    dir_first (fn_data n) (fn_nrec n) s = None ->
+    dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
     inode_local d n' -> fn_is_dir n' = true ->
     dir_owned Γ sb d n ⊢
       inode_phi Γ sb d n
-      ∗ (inode_phi Γ sb d n' -∗ ent_tok Γ (fn_orphan n) s t
+      ∗ (inode_phi Γ sb d n' -∗ ent_tok Γ (fn_orphan n) s (bv_unsigned z)
          -∗ dir_owned Γ sb d n').
   Proof.
-    intros Horph Hnl Hs Hins Hloc Hdir.
+    intros Horph Hnl Hd Hnone Hins Hloc Hdir.
     iIntros "[[$ (Ha & Ht & _)] _]".
     iIntros "Hphi Htok".
-    iDestruct (ent_toks_insert Γ n n' s t Horph Hs Hins with "Ht Htok") as "Ht".
+    iDestruct (ent_toks_insert Γ n n' k0 s z Horph Hd Hdir Hnone Hins
+                 with "Ht Htok") as "Ht".
     rewrite /dir_owned /inode_owned /inode_ghost Hnl. by iFrame.
   Qed.
 
@@ -685,29 +746,3 @@ Section InodeOwned.
   Qed.
 
 End InodeOwned.
-
-(* ------------------------------------------------------------------ *)
-(*  11. The PURE bridge from the tree's dirent vocabulary              *)
-(*                                                                     *)
-(*  [FsTree] states an unlink as [dir_zeroed_at] and proves the view    *)
-(*  delta outright; the token move above then applies.  (The mirror     *)
-(*  equation for an INSERT is not in the tree -- [FsTree] proves the    *)
-(*  uniqueness preservation, [dir_names_unique_write], but no           *)
-(*  [dir_view data' nrec' = <[s:=t]> (dir_view data nrec)].  Until it   *)
-(*  is, [ent_toks_insert] takes that delta as a hypothesis, which is    *)
-(*  the shape a caller has anyway.)                                     *)
-(* ------------------------------------------------------------------ *)
-
-Lemma dir_entries_zero (n n' : fs_node) (k0 : nat) :
-  fn_is_dir n = true -> fn_is_dir n' = true ->
-  fn_size n' = fn_size n ->
-  dir_names_unique (fn_data n) (fn_nrec n) ->
-  (k0 < fn_nrec n)%nat ->
-  dir_live (fn_data n) k0 ->
-  dir_zeroed_at (fn_data n) (fn_data n') k0 ->
-  dir_entries n' = delete (dir_bname (fn_data n) k0) (dir_entries n).
-Proof.
-  intros Hd Hd' Hsz Hu Hk Hlive Hz.
-  rewrite /dir_entries Hd Hd' /fn_nrec Hsz.
-  by apply (dir_view_zero (fn_data n) (fn_data n') (dir_nrec (fn_size n)) k0).
-Qed.

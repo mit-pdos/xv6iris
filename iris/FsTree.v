@@ -957,6 +957,163 @@ Proof.
     exact Heq.
 Qed.
 
+(* ---- THE INSERT'S VIEW EQUATION, THE TWIN OF [dir_view_zero] --------- *)
+
+(* The scan that finds nothing new above [n] answers at [n].  ([dfirst_ext]
+   compares two predicates at ONE count; this compares one predicate at two
+   counts, which is what the APPEND arm's grown record count needs.) *)
+Lemma dfirst_trunc (p : nat -> bool) (n m : nat) :
+  (n <= m)%nat -> (forall j : nat, (n <= j < m)%nat -> p j = false) ->
+  dfirst p m = dfirst p n.
+Proof.
+  intros Hle Hab. destruct (dfirst p n) as [k |] eqn:Hf.
+  - exact (dfirst_mono p n m k Hle Hf).
+  - apply dfirst_None_2. intros j Hj.
+    destruct (decide (j < n)%nat) as [Hlt | Hge].
+    + exact (dfirst_None_1 p n Hf j Hlt).
+    + apply Hab. lia.
+Qed.
+
+(* the [dfirst_ext] comparison off the written slot, [dir_zeroed_matchb]'s
+   twin *)
+Lemma dir_written_matchb (data data' : nat -> list (bv 8))
+    (k0 : nat) (s : fname) (z : bv 16) (x : fname) (q : nat) :
+  dir_written_at data data' k0 s z -> q <> k0 ->
+  dir_matchb data' q x = dir_matchb data q x.
+Proof.
+  intros Hw Hq. unfold dir_matchb, dir_liveb, dir_freeb.
+  rewrite (dir_written_inum data data' k0 s z q Hw Hq).
+  replace (bname 14 (dir_name data' q)) with (dir_bname data' q) by reflexivity.
+  replace (bname 14 (dir_name data q)) with (dir_bname data q) by reflexivity.
+  rewrite (dir_written_bname data data' k0 s z q Hw Hq). reflexivity.
+Qed.
+
+(* **WHAT dirlink DOES TO A DIRECTORY, AT THE RECORD VIEW.**
+   [dir_written_at] says only that slot [k0] now reads [(s, z)] and that no
+   other record's sixteen bytes moved; that alone is not an INSERT, for two
+   reasons this clause adds:
+
+     - the slot must not have been LIVE below the old count, or the write
+       would have DESTROYED a name rather than added one.  Both of dirlink's
+       arms give it: the REUSE arm's slot is the free record the scan
+       settled on, and the APPEND arm's [k0 = nrec] makes it vacuous;
+     - the records the count GREW over, other than [k0], must be dead --
+       there are none at all when the count grows onto [k0] by exactly one,
+       which is what [dir_insert_append] discharges.
+
+   [z <> bv_0 16] is what makes the new record live at all.  The two
+   constructors below are the two arms; everything else here quantifies over
+   [nrec]/[nrec'] separately rather than being written twice. *)
+Definition dir_insert_at (data data' : nat -> list (bv 8))
+    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) : Prop :=
+  (nrec <= nrec')%nat
+  /\ (k0 < nrec')%nat
+  /\ ((k0 < nrec)%nat -> ~ dir_live data k0)
+  /\ (forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 -> ~ dir_live data' r)
+  /\ z <> bv_0 16
+  /\ dir_written_at data data' k0 s z.
+
+(* ARM 1 -- REUSE: a free record below the count, and the count is unmoved *)
+Lemma dir_insert_reuse (data data' : nat -> list (bv 8))
+    (nrec k0 : nat) (s : fname) (z : bv 16) :
+  (k0 < nrec)%nat -> ~ dir_live data k0 -> z <> bv_0 16 ->
+  dir_written_at data data' k0 s z ->
+  dir_insert_at data data' nrec nrec k0 s z.
+Proof.
+  intros Hk0 Hfree Hnz Hw.
+  split; [lia | split; [lia | split; [intros _; exact Hfree | split]]].
+  - intros r Hr. exfalso. lia.
+  - split; [exact Hnz | exact Hw].
+Qed.
+
+(* ARM 2 -- APPEND: the record past the end, and the count grows by one *)
+Lemma dir_insert_append (data data' : nat -> list (bv 8))
+    (nrec : nat) (s : fname) (z : bv 16) :
+  z <> bv_0 16 -> dir_written_at data data' nrec s z ->
+  dir_insert_at data data' nrec (S nrec) nrec s z.
+Proof.
+  intros Hnz Hw.
+  split; [lia | split; [lia | split; [intros H; exfalso; lia | split]]].
+  - intros r Hr Hrk. exfalso. lia.
+  - split; [exact Hnz | exact Hw].
+Qed.
+
+(* **THE TREE DELTA OF A dirlink, AND IT NEEDS NO UNIQUENESS.**  Unlike
+   [dir_view_zero] -- where a hidden duplicate BEHIND the zeroed record is
+   unmasked -- an insert only has to reach the front of the first-match
+   scan, so [dir_names_unique] is not a premise here.  The one guard is
+   dirlink's own, and it is the WEAKEST that makes the equation true: [s]
+   must not already be a live name ([dir_first data nrec s = None],
+   equivalently [dir_view data nrec !! s = None] by
+   [dir_view_lookup_None]).  Without it the name is already mapped, to the
+   OLD record's inum, and the first-match answer never reaches [k0]. *)
+Lemma dir_view_insert (data data' : nat -> list (bv 8))
+    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) :
+  dir_first data nrec s = None ->
+  dir_insert_at data data' nrec nrec' k0 s z ->
+  dir_view data' nrec' = <[s := bv_unsigned z]> (dir_view data nrec).
+Proof.
+  intros Hnone (Hle & Hk0 & Hfree & Hdead & Hnz & Hw).
+  pose proof Hw as (Hinum0 & Hbname0 & _).
+  assert (Hl0 : dir_live data' k0)
+    by exact (dir_written_live0 data data' k0 s z Hw Hnz).
+  apply map_eq. intros x.
+  destruct (decide (x = s)) as [-> | Hne].
+  - (* the written name: the scan stops AT [k0] *)
+    rewrite lookup_insert. rewrite dir_view_lookup.
+    assert (Hf : dir_first data' nrec' s = Some k0).
+    { unfold dir_first. apply dfirst_Some_2; [exact Hk0 | |].
+      - apply dir_matchb_true. split; [exact Hl0 | exact Hbname0].
+      - intros j Hj.
+        assert (Hjk : j <> k0) by lia.
+        destruct (decide (j < nrec)%nat) as [Hjn | Hjn].
+        + rewrite (dir_written_matchb data data' k0 s z s j Hw Hjk).
+          apply dir_matchb_false.
+          exact (proj1 (dir_first_None data nrec s) Hnone j Hjn).
+        + apply dir_matchb_false. intros [Hlv _].
+          exact (Hdead j ltac:(lia) Hjk Hlv). }
+    rewrite Hf. cbn. rewrite Hinum0. reflexivity.
+  - (* every other name: the first-match search is unmoved *)
+    rewrite lookup_insert_ne by congruence.
+    rewrite !dir_view_lookup.
+    assert (Hab : forall r : nat, (nrec <= r < nrec')%nat ->
+                    dir_matchb data' r x = false).
+    { intros r Hr. apply dir_matchb_false. intros [Hlv Hnm].
+      destruct (decide (r = k0)) as [-> | Hrk].
+      - apply Hne. rewrite <- Hnm. exact Hbname0.
+      - exact (Hdead r Hr Hrk Hlv). }
+    assert (Hf : dir_first data' nrec' x = dir_first data nrec x).
+    { unfold dir_first.
+      rewrite (dfirst_trunc (fun k => dir_matchb data' k x) nrec nrec' Hle Hab).
+      apply dfirst_ext. intros j Hj.
+      destruct (decide (j = k0)) as [-> | Hjk].
+      - assert (H1 : dir_matchb data' k0 x = false).
+        { apply dir_matchb_false. intros [_ Hnm].
+          apply Hne. rewrite <- Hnm. exact Hbname0. }
+        assert (H2 : dir_matchb data k0 x = false).
+        { apply dir_matchb_false. intros [Hlv _]. exact (Hfree Hj Hlv). }
+        rewrite H1, H2. reflexivity.
+      - exact (dir_written_matchb data data' k0 s z x j Hw Hjk). }
+    rewrite Hf.
+    destruct (dir_first data nrec x) as [k |] eqn:Hfd; [| reflexivity].
+    apply dir_first_Some in Hfd. destruct Hfd as (Hkn & [Hlv Hnm] & _).
+    assert (Hkk0 : k <> k0) by (intros ->; exact (Hfree Hkn Hlv)).
+    cbn. rewrite (dir_written_inum data data' k0 s z k Hw Hkk0). reflexivity.
+Qed.
+
+(* ...and the value half, straight off [dir_names_unique_write] *)
+Lemma dir_names_unique_insert (data data' : nat -> list (bv 8))
+    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) :
+  dir_names_unique data nrec ->
+  dir_first data nrec s = None ->
+  dir_insert_at data data' nrec nrec' k0 s z ->
+  dir_names_unique data' nrec'.
+Proof.
+  intros Hu Hnone (Hle & Hk0 & _ & Hdead & _ & Hw).
+  exact (dir_names_unique_write data data' nrec nrec' k0 s z
+           Hu Hle Hk0 Hdead Hnone Hw).
+Qed.
+
 (* ====================================================================== *)
 (*  9.  THE PAYLOAD CLAUSE [dir_uniq] (fs-fragments §7.5.8, item S2-0),     *)
 (*      AND dirlink's PRESERVATION MOVER, MOVED DOWN FROM [FsLookup.v].     *)

@@ -336,15 +336,26 @@ Where the built shape differs from §2, and why:
   clause is stated at `Z` (a `nat` literal that large elaborates to an
   opaque `Nat.of_num_uint` — durable-notes).
 
+- **BOTH dirent view deltas come out of `FsTree`, at the RECORD view, and
+  neither is assumed here.**  An unlink is `dir_zeroed_at`, a dirlink is
+  `dir_insert_at` — `dir_written_at` plus the two side conditions that make
+  it an insert rather than an overwrite (the slot is not live below the old
+  count; the records the count grew over are dead), with
+  `dir_insert_reuse` / `dir_insert_append` as the two arms of dirlink's
+  free-slot scan.  `dir_view_zero` and `dir_view_insert` are the equations;
+  §2b's `dir_entries_zero` / `dir_entries_write` read them at `fs_node`, and
+  `dir_entries_fresh` supplies the `big_sepM_insert` side condition.
+  `ent_toks_insert` and `dir_owned_link` therefore take the record delta and
+  dirlink's own guard (`dir_first data nrec s = None`, the WEAKEST
+  precondition — equivalently `dir_view data nrec !! s = None`), never an
+  entry-map equation.  `dir_view_insert` needs no `dir_names_unique`: an
+  insert only has to reach the FRONT of the first-match scan, unlike the
+  removal, which unmasks whatever was hiding behind it.  Uniqueness after
+  the write is `dir_names_unique_insert`, a one-liner off
+  `dir_names_unique_write`.
+
 Left out, with the reason:
 
-- **The dirent-INSERT view equation.**  `FsTree` proves the removal delta
-  outright (`dir_view_zero`, lifted here as `dir_entries_zero`) but has no
-  `dir_view data' nrec' = <[s := t]> (dir_view data nrec)` — only the
-  uniqueness preservation `dir_names_unique_write`.  So `ent_toks_insert`
-  and `dir_owned_link` take the entry-map delta as a PREMISE, which is the
-  shape a caller has anyway.  Proving that equation in `FsTree` is a small
-  self-contained job and belongs there, not here.
 - **`inode_local` preservation lemmas** beyond the two readings
   (`inode_local_data_owned`, `inode_local_beyond_size`).  Each mover's pure
   side condition is `inode_local i n'` as a premise; which of them a given
