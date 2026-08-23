@@ -93,9 +93,13 @@ baseline", read the current three. Landed, in order:
 review its report against the spec in this file, cherry-pick its
 worktree-branch commits onto main linearly, run one combined VM build +
 audit, push):**
-- branch `worktree-agent-a771acd0806be1fdd`: the FsEff
-  build-performance pass (next-steps item 1; statements frozen,
-  proof-internal only, before/after measurements required).
+- branch `worktree-agent-a3c9c688bcd01522c`: effect 8
+  (`eff_alloc_ind_block`, spec = the F2 entry's deferral note; on the
+  optimized FsEff base, with the worktree build-safety procedure).
+
+The FsEff performance pass is MERGED (946 s -> 133 s cold for the band,
+statements byte-identical; the lia-vs-context rules are in
+optimization.md).
 
 G1-impl is MERGED (no longer in flight): `log_state` + `op_pending`
 landed; row (b) rides the GATED `log_mirror_tie` (interim `True`;
@@ -106,14 +110,8 @@ for the G1-flip/G2 arms; `fs_links_eq` is conjunct (13) end to end.
 See the G1-impl entry for the site table.
 
 **Next steps, in order (all specs live in this file):**
-1. **FsEff build-performance pass FIRST** (owner's ruling): the F2
-   files are slow to build and every later stage iterates on them.
-   Proof-internal optimization only (statements identical), per
-   optimization.md's rules; measure before/after per file. Only THEN:
-2. **Effect 8** (`eff_alloc_ind_block`, spec = the F2 entry's deferral
-   note) on the optimized base.
-3. Merge the G1-impl branch (above) when it reports.
-4. **G2**: the per-op preservation lemmas, STANDALONE (pure statements
+1. Merge the in-flight effect-8 branch (above) when it reports.
+2. **G2**: the per-op preservation lemmas, STANDALONE (pure statements
    composing the F2 effects per op; no log_state dependency; fully
    parallelizable — one Opus agent per op batch). The 12 ops and their
    26 exit arms are enumerated in the 2026-08-22 survey (§Stage G);
@@ -121,19 +119,19 @@ See the G1-impl entry for the site table.
    eff_create_dir_entry; filewrite = eff_alloc_file_block* +
    eff_write_file_data* (+ eff_alloc_ind_block at the boundary);
    sys_unlink = eff_unlink_entry (+ trunc/free on the nlink=0 path)).
-5. **The row-(a) flip + G3** (one coordinated sweep): add row (a) to
+3. **The row-(a) flip + G3** (one coordinated sweep): add row (a) to
    `log_state`, wire the G2 lemmas into the 26 arms, re-point
    `ProofEndOp` at the value-chained primitives (threading the chained
    `M` through write_log/commit/installs/clear — this discharges any
    G1-impl premise-debt), `SpecEndOp` gains the client fupd.
-6. **H1–H3**: the boot re-founding (mint at `D` off `fs_boot_pure`,
+4. **H1–H3**: the boot re-founding (mint at `D` off `fs_boot_pure`,
    dirty-at-boot blocks, ghost-no-op recovery arms replacing D1/D2's
    L-moving ones, orphan routing to ireclaim, D3's clean-header
    deletion). H0's channel is already there.
-7. **The switch-on**: `fs_durable_wf := fs_durable_wf_body`, delete
+5. **The switch-on**: `fs_durable_wf := fs_durable_wf_body`, delete
    `fs_durable_wf_placeholder`; its use sites (grep) are exactly the
    rework list; E4's image discharge closes via `FsWfImg`.
-8. **Stage I**: delete `Himg`/`fs_boot_image_eras`/
+6. **Stage I**: delete `Himg`/`fs_boot_image_eras`/
    `fsimg_at_every_era`; adequacy assumes only era 0's `fs.img`;
    audit unchanged.
 
