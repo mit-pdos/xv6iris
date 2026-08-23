@@ -438,7 +438,7 @@ Three fixes, in the order they paid:
    *definition* with *"Hypothesis Hibd3 was not found in the current
    environment"* — which reads like a broken proof and is a scoping error.
    And keep a `| _ => lia` last arm: the fallback makes the rewrite a
-   drop-in, so the conversion is one `sed` over the call sites (48 `Hdec`
+   drop-in, so the conversion is one `sed` over the call sites (106 `Hdec`
    sites in seven files, one pass, zero fixups).
 3. **Close a CONCRETE goal with `discriminate`, not `lia`.** 46 sites of
    `rewrite Hty; unfold T_DIR_z; lia` prove `1 <> 0` and still paid the
