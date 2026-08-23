@@ -390,7 +390,12 @@ the same way. E2's mirror did NOT change shape: the receipt chains through
     lock per record slot, balloc's bit, the inode lock per slot). No
     deposits, no last-holder case, no ordering constraint.
   - wf(A) preservation per finalize = the G2 lemma verbatim; the
-    agreement bookkeeping is separate and mechanical.
+    agreement bookkeeping is separate and mechanical — EXCEPT one
+    known-open transport: cross-record preconditions (create's
+    name-uniqueness in the target dir) are not object-local, so the
+    wiring discharges them from the DIR-VIEW ghosts (dv tracks the
+    dir's live entries across the group's serialization), not from
+    the agreement relation. Budget a dv-to-decode bridge lemma there.
 - [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
       literal image (a `FsImgCheck`-style computation, cheap — the
       sweeps already run there).
