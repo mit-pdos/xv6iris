@@ -21,18 +21,18 @@
    the byte index; [m] as [1 << (b & 7)]; the clear as [xori -1] + [and].
 
    THE CONTRACT (claude-notes/design/fs-bitmap.md).  bfree consumes the
-   freed block's logical content half AND its exclusive [blk_own] token and
-   returns both to [BitmapInv]'s FREE POOL, clearing bit [b] of the bitmap
-   block.  The pool and the bitmap block live in the persistent
-   [BitmapInv.bitmap_inv]; the block goes back in at log_write's own ghost
-   step ([BitmapInv.bitmap_free_au]), so the contract names no bitmap set.
+   freed block's EXCLUSIVE byte run and returns it to the FREE POOL,
+   clearing bit [b] of the bitmap block.  The pool and the bitmap block live
+   in the persistent [BitmapInv.bitmap_inv]; the block goes back in at
+   log_write's own ghost step ([BitmapInv.bitmap_free_au]), so the contract
+   names no bitmap set.
 
    THE PANIC IS DEAD, and the bitmap invariant is what kills it.  The
-   caller arrives holding [blk_own γfs b] -- a FULL-fraction ghost_map
-   element, hence exclusive -- while [free_pool] holds one such token for
-   every block below [size] whose bit is CLEAR.  So if bit [b] were clear
-   there would be two tokens at one key, which is absurd
-   ([BitmapInv.free_pool_own_used]).  The bit is therefore set,
+   caller arrives holding block [b]'s byte run, which is EXCLUSIVE, while
+   the free pool holds the run of every block below [size] whose bit is
+   CLEAR.  So if bit [b] were clear there would be two owners of one
+   block's bytes, which is absurd ([FsStateBitmap.free_pool_used]).  The bit
+   is therefore set,
    [bp->data[bi/8] & m] is nonzero ([BitmapEnc.bm_bit_test]), and the
    branch at +0x3a is not taken.  Refuting this panic is the main thing the
    invariant has to buy; the contract still takes the panic credentials
@@ -166,11 +166,9 @@ Definition wp_bfree_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent; the pool is inside *)
   bitmap_inv γfs bmapstart cov logstart size -∗
-  (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
-     half of the handshake -- its EXCLUSIVE ownership token.  Holding the
-     token is what makes the panic dead. *)
+  (* THE BLOCK BEING FREED: its EXCLUSIVE byte run.  Holding it is what
+     makes the panic dead. *)
   fsblock (fs_bytes γfs) (bv_unsigned bno) bs -∗
-  blk_own γfs (bv_unsigned bno) -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -293,11 +291,9 @@ Definition wp_bfree_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent; the pool is inside *)
   bitmap_inv γfs bmapstart cov logstart size -∗
-  (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
-     half of the handshake -- its EXCLUSIVE ownership token.  Holding the
-     token is what makes the panic dead. *)
+  (* THE BLOCK BEING FREED: its EXCLUSIVE byte run.  Holding it is what
+     makes the panic dead. *)
   fsblock (fs_bytes γfs) (bv_unsigned bno) bs -∗
-  blk_own γfs (bv_unsigned bno) -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)

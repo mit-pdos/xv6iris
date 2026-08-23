@@ -211,8 +211,7 @@ map at home blocks); 1d lands last.
         three block-layer ghosts AND the byte view, and splits its
         per-block output along the home/log-region line -- `fsblock` for a
         home block, `fs_chalf` for a log-region one, with the machinery
-        halves, the log-side dirty halves and the `blk_own` tokens handed
-        out undivided.  `FsBoot.fs_boot_ghosts`/`fs_boot_bundle` take
+        halves and the log-side dirty halves handed out undivided.  `FsBoot.fs_boot_ghosts`/`fs_boot_bundle` take
         `home` (the caller passes `fs_home_set cov logstart`) and
         re-export the split plus the persistent row; `FsCfgBoot`'s kit and
         `FirstTok.first_fsinit` carry `fsblock` for block 1 and for the
@@ -501,16 +500,52 @@ map at home blocks); 1d lands last.
         ones stage 3's arms actually need is stage 3's evidence, and
         writing the cross-product now is the near-duplicate family the
         guiding principle warns about.
-- [ ] **2b. Re-state the in-memory owners over `Γ_L`**: `InodeRegion`'s
-      `ireg_blk`/`ireg_slot` coupling (`InodeRegion.v:2252-2258`,
-      `:1448-1452`) becomes `rec_owned Γ_L`; `ic_loaded`'s payload
-      (`IcacheEscrow.v:811-832`: `dinode_at`, `inode_blocks`, `ind_res`,
-      `dir_links`, `dv_ride`) becomes `inode_owned Γ_L i n` + the top
-      fragment; `BitmapInv.bitmap_res` (`BitmapInv.v:235-239`) becomes
-      `free_bitmap Γ_L`; `dir_links`'s `dlc_bound`/`dlc_lower` and the
-      link ledger's L1 become the link RA.  The `ipool` (uncached inodes)
-      holds `inode_owned Γ_L` pieces under the itable spin lock — fine,
-      since only the holder of a locked inode ever updates one.
+- [~] **2b. Re-state the in-memory owners over `Γ_L`.**  THE BITMAP PIECE
+      IS LANDED; the region/icache/link pieces are not.
+      - [x] **2b-bitmap.**  `BitmapInv.bitmap_res γfs bms size used` IS
+        `FsStateBitmap.free_bitmap_at (fs_gamma_L γfs) bms size used` —
+        `Γ_L.fsΦ a v := a ↪[fs_bytes γfs] v`.  `bitmap_inv`'s ARITY AND NAME
+        ARE UNCHANGED (it is an `fs_ready` conjunct carried by 30-odd fs
+        contracts), so nothing above balloc/bfree moved; `bitmap_res` lost
+        `cov`/`logstart`, which only ever fed the deleted pure clause.
+        `FsStateBitmap` gained the geometry-free `free_bitmap_at` (the two
+        superblock numbers as plain `Z`s, since `bitmap_inv` has no `fs_sb`),
+        the three pool moves `free_pool_take`/`_give`/`_used`, and boot's
+        constructor `free_pool_intro` over `free_set`.  `FsBytesGamma.v` (NEW,
+        84 lines) is the ONE bridge: `fs_gamma_L`, `phi_excl`, `GTimeless`,
+        and `gamma_byte_range`/`gamma_blk_owned` — `reflexivity`, since
+        `FsImg.BSIZE_z` and `FsBlocks.BSZ` both delta-reduce to 1024 and a
+        `rewrite` between the two spellings does not fire.
+      - [x] **`bitmap_ok` is DERIVED, not maintained.**  It is no longer a
+        conjunct of `bitmap_res`; `bitmap_pool_home` reads the whole of it
+        off the pool's OWNERSHIP against `bytes_dom` (`FsBlocks.fsblock_home`),
+        once per `bitmap_read`.  `bitmap_ok_add`/`_del` are deleted — nothing
+        preserves it — and boot owes no pure obligation at all.
+      - [x] **`FsBlocks.blk_own` IS GONE**, with the `fs_own` field of
+        `fs_names`, `blk_own_excl`/`_ne` and every holder: `InodeInv.ind_tok`
+        (deleted; `ind_res = ind_blk`), `blk_res`/`inode_blocks`/
+        `inode_blocks_acc`/`_insert`/`inode_fresh`/`inode_fresh_at`,
+        `IcacheEscrow`'s `ind_tok_timeless`, `FsImgBridge.img_inode_blocks_res`,
+        and the boot distribution (`FsBlocks.fs_alloc`, `FsBoot.fs_boot_ghosts`/
+        `fs_boot_bundle`, `FsCfgBoot`'s stocking + `bitmap_res_of_image` +
+        `fs_kit_fsinit_ghost`, `FirstTok.first_fsinit`).  Every use was
+        disjointness, and `FsBlocks.fsblock_ne` (NEW, the one-line
+        `↦`-distinctness idiom off `fsblock_excl`) gives it directly.
+        23 statement sites across 20 files.
+      - [ ] `InodeRegion`'s `ireg_blk`/`ireg_slot` coupling
+        (`InodeRegion.v:2252-2258`, `:1448-1452`) becomes `rec_owned Γ_L`.
+      - [ ] `ic_loaded`'s payload (`IcacheEscrow.v:811-832`: `dinode_at`,
+        `inode_blocks`, `ind_res`, `dir_links`, `dv_ride`) becomes
+        `inode_owned Γ_L i n` + the top fragment.
+      - [ ] `dir_links`'s `dlc_bound`/`dlc_lower` and the link ledger's L1
+        become the link RA.  The `ipool` (uncached inodes) holds
+        `inode_owned Γ_L` pieces under the itable spin lock — fine, since
+        only the holder of a locked inode ever updates one.
+      - OPEN, for the orchestrator: `SpecBfree`'s two premises
+        `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
+        UNUSED (they only fed `bitmap_ok_del`).  Left in place rather than
+        moved through three `ProofItrunc` call sites; delete them with the
+        next change that touches itrunc.
 - [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
       the commit AU's discharge from the debt; `FsAdequacyImg` builds
       `fs_view Γ_D` from `fs.img` once (the only place the image is

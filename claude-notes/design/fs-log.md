@@ -140,22 +140,6 @@ and "what the file system owns".
   - `fs_bytes_alloc` is the mint: the home blocks' parked cache halves go
     in, the byte map is allocated at their explosion and the invariant with
     it, and one `fsblock` per home block comes out.
-
-- **`γown : ghost_map Z unit`** — the EXCLUSIVE per-block ownership token,
-  `blk_own γ b := b ↪[fs_own γ] tt` (`FsBlocks.v`). A FULL-fraction element
-  is incompatible with itself, which gives `blk_own_excl` and hence
-  **`blk_own_ne : blk_own γ b1 -∗ blk_own γ b2 -∗ ⌜b1 ≠ b2⌝`** — the fact
-  the inode layer's block-map injectivity (`blkmap_wf`, `fs-inode.md`)
-  rests on. **No auth exists, and none is needed**: exclusivity of the
-  elements is an auth-free property. The authority over this map belongs
-  to the bitmap/free-block invariant, which is where "block `b`'s token is
-  in the free pool" is stated; `fs_alloc` therefore drops the auth it
-  allocates and mints one token per covered block into the per-block
-  bundle, and `fs_boot_bundle` hands the whole
-  `[∗ set] b ∈ cov, blk_own γfs b` to the boot client. Consequence of
-  having no auth: a dropped token is dropped forever. (`blk_own` is
-  retired when `free_bitmap Γ` replaces the pool; `fs-state.md` §2.)
-
 - **`γdirty : ghost_map Z bool`** — per covered block, is it in the current
   pinned write set (logged-uncommitted-or-uninstalled)? Auth + one ½ in
   `log_state` (the ½ recording W-membership); the other ½ rides with the

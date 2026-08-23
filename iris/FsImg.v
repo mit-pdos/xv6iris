@@ -1245,7 +1245,7 @@ Definition fs_used_blocks (P : Z -> list (bv 8)) (sb : fs_sb) : list Z :=
 
 (* WHY (W4): two inodes naming one disk block would make
    [InodeInv.blkmap_wf]'s injectivity clause unprovable across the region
-   and the [fs_chalf]/[blk_own] halves of two inodes claim one key.  The
+   and two inodes would own one block's bytes.  The
    check is [O(n log n)] -- one gset -- and its answer is the used set W5
    then reads. *)
 Definition fs_used_set (P : Z -> list (bv 8)) (sb : fs_sb) : option (gset Z) :=
@@ -1526,7 +1526,7 @@ Qed.
 (* ---- W4 READ THE OTHER WAY: THE INODES' BLOCK SETS ARE DISJOINT ------ *)
 
 (* **WHY THIS READING TOO.**  The stocking of the inode pool hands each
-   live inode the [fs_chalf]/[blk_own] pair of every block it names, carved
+   live inode the byte run of every block it names, carved
    out of the ONE big-op the era fupd holds over [cov]
    ([FsBoot.big_sepS_carve]).  A carve needs its pieces PAIRWISE DISJOINT
    -- two inodes naming one block would have the carve claim one key twice

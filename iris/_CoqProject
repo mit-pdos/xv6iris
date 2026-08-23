@@ -785,6 +785,7 @@ FsStateLink.v
 FsStateInode.v
 FsStateBitmap.v
 FsState.v
+FsBytesGamma.v
 BitmapInv.v
 SpecVmfault.v
 CodeVmfault.v

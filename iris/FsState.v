@@ -147,7 +147,7 @@ Section FsState.
   Lemma fs_state_split Γ S : fs_state Γ S ⊣⊢ fs_footprint Γ S ∗ fs_ghost Γ S.
   Proof.
     rewrite /fs_state /fs_footprint /fs_ghost /sb_owned /fs_inodes
-            /free_bitmap /inode_owned.
+            /free_bitmap /free_bitmap_at /inode_owned.
     rewrite big_sepM_sep.
     iSplit.
     - iIntros "((Hsb & %Hp) & [Hphi Hg] & Hbm & Hpool)". by iFrame.

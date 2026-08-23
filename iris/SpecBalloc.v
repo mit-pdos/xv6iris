@@ -45,7 +45,7 @@
 
    *** THE OUT-OF-BLOCKS ARM IS LIVE, AND IT CALLS printk. ***  Nothing in
    [BitmapInv.bitmap_res] prevents every bit below [sb.size] being set --
-   [free_pool] is then the empty big-op and [bitmap_ok] is vacuous -- so the
+   the free pool is then all-[emp] -- so the
    scan CAN fall out of the loop and reach
    [auipc a0,0x4 / addi a0,a0,1350 / jal printk] on "balloc: out of blocks".
    That is the GENERAL printk path ([SpecPrintk.v]), not the panic path,
@@ -74,9 +74,9 @@
    SpecInitlog.v takes [sb + 20].  The bitmap block and its FREE POOL live
    in [BitmapInv.bitmap_inv], a persistent Iris invariant at an
    EXISTENTIAL set: the contract says nothing about which bits are set,
-   and the postcondition's [fs_chalf] + [blk_own] come out of the pool at
-   log_write's own ghost step ([BitmapInv.bitmap_alloc_au], the supplier
-   for [SpecLogWrite.wp_log_write_au]).  This is [InodeRegion]'s shape,
+   and the postcondition's byte run comes out of the pool at log_write's
+   own ghost step ([BitmapInv.bitmap_alloc_au], the supplier for
+   [SpecLogWrite.wp_log_write_au]).  This is [InodeRegion]'s shape,
    one layer over; claude-notes/design/fs-bitmap.md has the argument.
 
    ONE BITMAP BLOCK, AND A THIRD DEAD ARM.  [FSSIZE = 2000 < BPB = 8192],
@@ -252,17 +252,13 @@ Definition wp_balloc_sconf_body
           ⌜bv_unsigned blk <> 0⌝ ∗
           ⌜bv_unsigned blk ∈ cov⌝ ∗
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
-          fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
-          (* THE FRESHNESS CLAIM, and the reason it has to be a resource
-             rather than a pure fact: [fs_chalf] is a HALF ghost_map element,
-             so two of them at one key compose to a valid full element and
-             say nothing about disjointness.  [blk_own] is the FULL element,
-             so a caller that also holds one per block its own structures
-             name learns, by [FsBlocks.blk_own_ne], that this block is none
-             of them -- which is exactly what re-establishes
+          (* THE FRESHNESS CLAIM IS THE RUN ITSELF.  The byte view is
+             EXCLUSIVE, so a caller that also holds one run per block its own
+             structures name learns, by [FsBlocks.fsblock_ne], that this
+             block is none of them -- which is exactly what re-establishes
              [InodeInv.blkmap_wf]'s injectivity at an insertion (see
              [InodeInv.inode_fresh]).  Without it bmap is unprovable. *)
-          blk_own γfs (bv_unsigned blk) ∗
+          fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
           log_op γ u)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -384,7 +380,6 @@ Definition wp_balloc_gen_body
           ⌜bv_unsigned blk ∈ cov⌝ ∗
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
           fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
-          blk_own γfs (bv_unsigned blk) ∗
           log_opS γ (if cr then S u else u)
                     (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
       WP (Loop : expr riscv_lang)) -∗

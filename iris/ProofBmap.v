@@ -60,7 +60,7 @@
 
    FRESHNESS.  Each of the three installs has to re-establish
    [blkmap_wf]'s injectivity, and the ONLY thing that can is balloc's
-   exclusive [blk_own] token against the tokens inside [inode_map] /
+   exclusive byte run against the runs inside [inode_map] /
    [inode_blocks] ([InodeInv.inode_fresh]); [fs_chalf] is a half element and
    two at one key are consistent.  That is also why bmap takes
    [inode_blocks]: the fresh DATA block's half is deposited there. *)
@@ -1250,7 +1250,6 @@ Section BmapTail.
     i_dev ip ↦₄{dqd} dev -∗
     inode_addrs ip (bm_cells bmI) -∗
     ind_blk γfs bmI -∗
-    ind_tok γfs bmI -∗
     inode_blocks γfs bmI data -∗
     bslots 1 -∗
     bm_kit ak bn γfs cov logstart dev nI SbI -∗
@@ -1285,7 +1284,7 @@ Section BmapTail.
       by (unfold MAXFILE, NDIRECT, NINDIRECT in *; lia).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hprk #Hbio #Hrow #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev
-              Haddrs Hindblk Hindtok Hblocks Hsl1 Hkit Hcont".
+              Haddrs Hindblk Hblocks Hsl1 Hkit Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
     (* ===== +0x62 c.mv a1,s1 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.bmap + 0x62)) Ra1 Rs1
@@ -1789,10 +1788,9 @@ Section BmapTail.
                        (4 * q)%nat) with "Hcell") as "Hbuf".
         iEval (rewrite (bm_buf_restore (ind_bytes (bm_ent bmI)) q Hlen0)) in "Hbuf".
         iDestruct ("Hheldback" $! (ind_bytes (bm_ent bmI)) with "Hbuf") as "Hheld".
-        iAssert (inode_map γfs ip bmI) with "[Haddrs Hindblk Hindtok]" as "Hmap".
+        iAssert (inode_map γfs ip bmI) with "[Haddrs Hindblk]" as "Hmap".
         { rewrite /inode_map /ind_res /ind_blk.
           iSplitL "Haddrs"; [iExact "Haddrs"|].
-          iSplitL "Hindblk"; [| iExact "Hindtok"].
           destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
             [exfalso; exact (Hindnz Hz1)|].
           iEval (rewrite -Huind). iExact "Hindblk". }
@@ -1827,15 +1825,18 @@ Section BmapTail.
                   with "Hcont").
       + (* ---------- balloc SUCCEEDED: install and log ---------- *)
         iDestruct "Hsucc" as (blk)
-          "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Htok & Hop)".
+          "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Hop)".
         (* THE SET AFTER balloc: the bitmap block (paid or absorbed) and the
            block balloc just bzero'd.  Naming it keeps the [log_write] call
            and the two ledger discharges reading the same term. *)
         remember (SbI ∪ {[bms]} ∪ {[bv_unsigned blk]}) as S1 eqn:HS1.
         iEval (rewrite Hbal_w) in "Hop".
-        (* the freshness that re-establishes injectivity *)
+        (* the freshness that re-establishes injectivity: the fresh block's
+           own EXCLUSIVE run against the runs the inode already holds *)
+        iEval (rewrite (ind_blk_run γfs bmI _ Hindnz Huind)) in "Hindblk".
         iDestruct (inode_fresh γfs bmI data (bv_unsigned blk)
-                     with "Htok Hindtok Hblocks") as %Hfresh.
+                     with "Hfsb Hindblk Hblocks") as %Hfresh.
+        iEval (rewrite -(ind_blk_run γfs bmI _ Hindnz Huind)) in "Hindblk".
         (* +0xa2 c.mv s1,a0 *)
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.bmap + 0xa2)) Rs1 Ra0
                   mA (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
@@ -2023,18 +2024,17 @@ Section BmapTail.
         { rewrite -(bm_slot_lt bmJ fbn Hfbnlt) (Hslotd fbn ltac:(lia)).
           destruct (decide (fbn = (NDIRECT + q)%nat)) as [_|Hc];
             [reflexivity | exfalso; apply Hc; exact Hfbn]. }
-        iAssert (inode_map γfs ip bmJ) with "[Haddrs Hindblk Hindtok]" as "Hmap".
-        { rewrite /inode_map /ind_res /ind_blk /ind_tok /bmJ.
+        iAssert (inode_map γfs ip bmJ) with "[Haddrs Hindblk]" as "Hmap".
+        { rewrite /inode_map /ind_res /ind_blk /bmJ.
           cbn [bm_ind bm_ent bm_dir].
           iSplitL "Haddrs"; [iExact "Haddrs"|].
-          iSplitL "Hindblk"; [| iExact "Hindtok"].
           destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
             [exfalso; exact (Hindnz Hz1)|].
           iEval (rewrite -Huind). iExact "Hindblk". }
         iDestruct (inode_blocks_insert γfs bmI bmJ data fbn blk
                      (replicate BSIZE (bv_0 8)) Hfbnlt
                      ltac:(rewrite Hgetq; exact Hentz) HgetJf HgetJ
-                     with "Hblocks Hfsb Htok") as "Hblocks".
+                     with "Hblocks Hfsb") as "Hblocks".
         iDestruct (bm_slots_join 1 1 with "Hslr Hsl1") as "Hsl".
         iDestruct (cpu_own_transport CID21 CID22 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2121,10 +2121,9 @@ Section BmapTail.
                      (4 * q)%nat) with "Hcell") as "Hbuf".
       iEval (rewrite (bm_buf_restore (ind_bytes (bm_ent bmI)) q Hlen0)) in "Hbuf".
       iDestruct ("Hheldback" $! (ind_bytes (bm_ent bmI)) with "Hbuf") as "Hheld".
-      iAssert (inode_map γfs ip bmI) with "[Haddrs Hindblk Hindtok]" as "Hmap".
+      iAssert (inode_map γfs ip bmI) with "[Haddrs Hindblk]" as "Hmap".
       { rewrite /inode_map /ind_res /ind_blk.
         iSplitL "Haddrs"; [iExact "Haddrs"|].
-        iSplitL "Hindblk"; [| iExact "Hindtok"].
         destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
           [exfalso; exact (Hindnz Hz1)|].
         iEval (rewrite -Huind). iExact "Hindblk". }
@@ -2194,7 +2193,7 @@ Section ProofBmapMain.
                pidv dq dqd j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /bm_cont; iExact "Hcont"|].
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
-    iDestruct "Hmap" as "[Haddrs [Hindblk Hindtok]]".
+    iDestruct "Hmap" as "[Haddrs Hindblk]".
     (* the argument, as a plain literal *)
     assert (Hbn : m !!! Regidx Ra1 = (mword_of_int (Z.of_nat fbn) : mword 64)).
     { rewrite Ha1. exact (bm_sext32 (Z.of_nat fbn) ltac:(lia) ltac:(lia)). }
@@ -2664,10 +2663,9 @@ Section ProofBmapMain.
           iDestruct ("Hback" $! (blkmap_get bm fbn) with "Hcell") as "Haddrs".
           iEval (rewrite (list_insert_id (bm_cells bm) fbn (blkmap_get bm fbn)
                             (bm_cells_dir bm fbn Hdirlen Hdir))) in "Haddrs".
-          iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk Hindtok]" as "Hmap".
+          iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk]" as "Hmap".
           { rewrite /inode_map /ind_res.
-            iSplitL "Haddrs"; [iExact "Haddrs"|].
-            iSplitL "Hindblk"; [iExact "Hindblk" | iExact "Hindtok"]. }
+            iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
           iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
           { rewrite /bm_frame.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -2699,9 +2697,9 @@ Section ProofBmapMain.
                     with "Hcont").
         * (* ------ balloc SUCCEEDED: install into addrs[bn] ------ *)
           iDestruct "Hsucc" as (blk)
-            "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Htok & Hop)".
+            "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Hop)".
           iDestruct (inode_fresh γfs bm data (bv_unsigned blk)
-                       with "Htok Hindtok Hblocks") as %Hfresh.
+                       with "Hfsb Hindblk Hblocks") as %Hfresh.
           iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.bmap + 0x2e)) Rs1 Ra0
                     mD (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
           { iApply (bmi_2e with "Htext"). }
@@ -2792,14 +2790,13 @@ Section ProofBmapMain.
             destruct (decide (fbn = fbn)); [reflexivity | congruence]. }
           iDestruct ("Hback" $! blk with "Hcell") as "Haddrs".
           iEval (rewrite (bm_cells_insert_dir bm fbn blk Hdirlen Hdir)) in "Haddrs".
-          iAssert (inode_map γfs ip bmD) with "[Haddrs Hindblk Hindtok]" as "Hmap".
-          { rewrite /inode_map /ind_res /ind_blk /ind_tok /bmD.
+          iAssert (inode_map γfs ip bmD) with "[Haddrs Hindblk]" as "Hmap".
+          { rewrite /inode_map /ind_res /ind_blk /bmD.
             cbn [bm_ind bm_ent bm_dir].
-            iSplitL "Haddrs"; [iExact "Haddrs"|].
-            iSplitL "Hindblk"; [iExact "Hindblk" | iExact "Hindtok"]. }
+            iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
           iDestruct (inode_blocks_insert γfs bm bmD data fbn blk
                        (replicate BSIZE (bv_0 8)) Hfbn Hdz HgetDf HgetD
-                       with "Hblocks Hfsb Htok") as "Hblocks".
+                       with "Hblocks Hfsb") as "Hblocks".
           iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
           { rewrite /bm_frame.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -2876,10 +2873,9 @@ Section ProofBmapMain.
         iDestruct ("Hback" $! (blkmap_get bm fbn) with "Hcell") as "Haddrs".
         iEval (rewrite (list_insert_id (bm_cells bm) fbn (blkmap_get bm fbn)
                           (bm_cells_dir bm fbn Hdirlen Hdir))) in "Haddrs".
-        iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk Hindtok]" as "Hmap".
+        iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk]" as "Hmap".
         { rewrite /inode_map /ind_res.
-          iSplitL "Haddrs"; [iExact "Haddrs"|].
-          iSplitL "Hindblk"; [iExact "Hindblk" | iExact "Hindtok"]. }
+          iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
         iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
         { rewrite /bm_frame.
           iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -3246,10 +3242,9 @@ Section ProofBmapMain.
           iDestruct ("Hback" $! (bm_ind bm) with "Hcell") as "Haddrs".
           iEval (rewrite (list_insert_id (bm_cells bm) NDIRECT (bm_ind bm)
                             (bm_cells_ind bm Hdirlen))) in "Haddrs".
-          iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk Hindtok]" as "Hmap".
+          iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk]" as "Hmap".
           { rewrite /inode_map /ind_res.
-            iSplitL "Haddrs"; [iExact "Haddrs"|].
-            iSplitL "Hindblk"; [iExact "Hindblk" | iExact "Hindtok"]. }
+            iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
           iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
           { rewrite /bm_frame.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -3285,9 +3280,9 @@ Section ProofBmapMain.
                     with "Hcont").
         * (* ------ balloc SUCCEEDED: install the indirect block ------ *)
           iDestruct "Hsucc" as (blk)
-            "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Htok & Hop)".
+            "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Hop)".
           iDestruct (inode_fresh γfs bm data (bv_unsigned blk)
-                       with "Htok Hindtok Hblocks") as %Hfresh.
+                       with "Hfsb Hindblk Hblocks") as %Hfresh.
           assert (HP2s1 : P2 !!! Regidx Rs1 = (sign_extend' 64 blk : mword 64)).
           { rewrite /P2 upd_eq. rgne. rewrite Ha0v. apply add_vec_zero_l. }
           assert (HP2a0v : P2 !!! Regidx Ra0 = (sign_extend' 64 blk : mword 64))
@@ -3383,9 +3378,6 @@ Section ProofBmapMain.
           { rewrite /ind_blk /bmI. cbn [bm_ind bm_ent].
             case_decide as Hz; [exfalso; exact (Hblknz Hz)|].
             rewrite Hindz. iExact "Hfsb". }
-          iAssert (ind_tok γfs bmI) with "[Htok]" as "Hindtok2".
-          { rewrite /ind_tok /bmI. cbn [bm_ind].
-            case_decide as Hz; [exfalso; exact (Hblknz Hz)|]. iExact "Htok". }
           iDestruct (inode_blocks_frame γfs bm bmI data data
                        ltac:(intros i Hi; split; [exact (HgetI i Hi) | reflexivity])
                        with "Hblocks") as "Hblocks".
@@ -3456,7 +3448,7 @@ Section ProofBmapMain.
                     Hbc Hlog
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hprk Hbio Hrow Hprocs
                           Hdevi Hdgeom Hdlock Hframe Hppid Hidev
-                          Haddrs Hindblk2 Hindtok2 Hblocks Hsl Hkit [Hcont]").
+                          Haddrs Hindblk2 Hblocks Hsl Hkit [Hcont]").
           iApply (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID25) ltac:(wp_next_chain)
                     with "Hcont").
       + (* ------ the indirect block EXISTS ------ *)
@@ -3532,7 +3524,7 @@ Section ProofBmapMain.
                   Hbc Hlog
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hprk Hbio Hrow Hprocs
                         Hdevi Hdgeom Hdlock Hframe Hppid Hidev
-                        Haddrs Hindblk Hindtok Hblocks Hsl Hkit [Hcont]").
+                        Haddrs Hindblk Hblocks Hsl Hkit [Hcont]").
         iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID18) ltac:(wp_next_chain)
                   with "Hcont").
   Qed.

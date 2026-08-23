@@ -47,7 +47,7 @@ Local Open Scope Z_scope.
 (* 1.  THE IMAGE'S COVERAGE SET (ruling R4).                               *)
 (*                                                                        *)
 (* [cov] is the set of block numbers the proof maintains logical content    *)
-(* for -- the domain of [FsBoot.fs_C0] / [blk_own], and exactly the set     *)
+(* for -- the domain of [FsBoot.fs_C0], and exactly the set               *)
 (* [bread] accepts.  The generic theorems keep it a PARAMETER, because      *)
 (* nothing about the image constrains it and the conclusion never mentions  *)
 (* it; here it is instantiated at the image's own range.  Block 0 is        *)

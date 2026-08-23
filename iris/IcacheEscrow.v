@@ -236,8 +236,6 @@ Section IcacheEscrow.
   Global Instance ind_blk_timeless γfs bm : Timeless (ind_blk γfs bm).
   Proof. rewrite /ind_blk. case_decide; apply _. Qed.
 
-  Global Instance ind_tok_timeless γfs bm : Timeless (ind_tok γfs bm).
-  Proof. rewrite /ind_tok. case_decide; apply _. Qed.
 
   Global Instance ind_res_timeless γfs bm : Timeless (ind_res γfs bm).
   Proof. rewrite /ind_res. apply _. Qed.

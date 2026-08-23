@@ -2606,7 +2606,7 @@ Section WriteiLoop.
             exact HB3s8).
       (* THE COUPLING: the buffer's bytes ARE the block's logical content *)
       iDestruct (inode_blocks_acc γfs bm2 data2 fbn Hfbnlt Hbnzz with "Hblocks")
-        as "[[Hfsb1 Htok1] Hblback]".
+        as "[Hfsb1 Hblback]".
       iEval (rewrite -Hubno) in "Hfsb1".
       iEval (rewrite /bio_locked) in "Hheld".
       iDestruct (wi_held_k with "Hheld") as %Hkklt.
@@ -2743,7 +2743,7 @@ Section WriteiLoop.
           pc_is (mword_of_int (WI + 0x4c) : mword 64) -∗
           WP (Loop : expr riscv_lang))%I
         with "[Hcnt Hextc Hextm Hcont Hframe Hidev Hinum Hmeta Hmap Hsb
-               Hba Hdn Hsrc Hsl2 Hop Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
+               Hba Hdn Hsrc Hsl2 Hop Hbuf Hheldback Hfsb1 Hblback]" as "BODY".
       { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs1 %Hbs4 %Hbs7
                               %Hbs5 %Hbs2 %Hbs6 %Hbs3 %Hbs9 %Hbs8 Hcg Hpc".
         assert (Hmm1 : (1 <= mm)%nat) by (rewrite Hmmd; rewrite Hbsz in Holt |- *; lia).
@@ -3267,7 +3267,7 @@ Section WriteiLoop.
           iDestruct (wi_slots_join 2 1 with "Hsl2 Hsl1") as "Hsl".
           iEval (rewrite Hubno) in "Hfsb1".
           iDestruct ("Hblback" $! (wi_splice (data2 fbn) o mm g)
-                       with "Hfsb1 Htok1") as "Hblocks".
+                       with "Hfsb1") as "Hblocks".
           (* ---- the accumulated effect of this chunk ---- *)
           pose proof HcsR as HcsRc.
           assert (HRsp : wi_sp m mR).
@@ -3776,7 +3776,7 @@ Section WriteiLoop.
           iDestruct (wi_slots_join 2 1 with "Hsl2 Hsl1") as "Hsl".
           iEval (rewrite Hubno) in "Hfsb1".
           iDestruct ("Hblback" $! (wi_splice (data2 fbn) o mm g)
-                       with "Hfsb1 Htok1") as "Hblocks".
+                       with "Hfsb1") as "Hblocks".
           pose proof HcsR as HcsRc.
           assert (HRsp : wi_sp m mR).
           { rewrite /wi_sp

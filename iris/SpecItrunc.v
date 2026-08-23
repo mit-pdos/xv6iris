@@ -370,10 +370,10 @@ Definition wp_itrunc_sconf_body
      [IcacheInv.cov_below_of_image] discharges it from the boot image).
 
      Note there is deliberately NO [bm_blocks bm ⊆ used] premise: itrunc
-     holds [blk_own] for every block it frees (via [inode_blocks] and
-     [ind_res]), and bfree derives the bit-is-set fact from that token
-     itself ([BitmapInv.free_pool_own_used]).  Demanding it here would have
-     made the contract uncallable by iput, which has no source for it. *)
+     holds the byte run of every block it frees (via [inode_blocks] and
+     [ind_res]), and bfree derives the bit-is-set fact from that run itself
+     ([FsStateBitmap.free_pool_used]).  Demanding it here would have made
+     the contract uncallable by iput, which has no source for it. *)
   cov_below cov size ->
   (* EVERY DATA BLOCK IS A BLOCK'S WORTH OF BYTES.  bfree demands it of the
      block it frees, and [inode_blocks] does not carry it: the bundle names

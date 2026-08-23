@@ -430,7 +430,7 @@ Section ImageRes.
 
   (* [InodeInv.inode_blocks_of_blocks] AT AN IMAGE RECORD.  Still generic
      in the block count, in [P] and in the inode; the [∗ set] on the left
-     is exactly the pair [FsBoot.fs_boot_ghosts] hands over for the blocks
+     is exactly the run [FsBoot.fs_boot_ghosts] hands over for the blocks
      of ONE inode (which [FsBoot.big_sepS_carve] cuts out of [cov] using
      [FsImg.fs_inode_blocks_disjoint]).
 
@@ -442,7 +442,7 @@ Section ImageRes.
     dinode_wf dn -> fs_blocks_full P ->
     fs_inode_ok P sb dn -> fs_slot_inj P dn ->
     ([∗ set] b ∈ (list_to_set (fs_inode_blocks P dn) : gset Z),
-       fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b) -∗
+       fsblock (fs_bytes γfs) b (P b)) -∗
     inode_blocks γfs (img_blkmap P dn) (fs_data_of P dn)
       ∗ ind_res γfs (img_blkmap P dn).
   Proof.

@@ -363,7 +363,7 @@ Section FirstTok.
            first process's, R3 *)
         ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
                                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb),
-           fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b) ∗ blk_own fsc_fs b).
+           fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b)).
   Proof.
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb vlock v_start v_dev v_nc v_n vname vcpu sb_old)

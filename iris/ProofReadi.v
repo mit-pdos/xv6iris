@@ -1450,7 +1450,7 @@ Section ReadiLoop.
           exact HB3s8).
     (* THE COUPLING: the buffer's bytes ARE the block's logical content *)
     iDestruct (inode_blocks_acc γfs bm data fbn Hfbnlt Hbnzz with "Hblocks")
-      as "[[Hfsb1 Htok1] Hblback]".
+      as "[Hfsb1 Hblback]".
     iEval (rewrite -Hubno) in "Hfsb1".
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (rd_held_k with "Hheld") as %Hkklt.
@@ -1575,7 +1575,7 @@ Section ReadiLoop.
     iAssert (∀ (CIDb : CpuId) (Mb : regfile) (mm : nat),
         rd_chunk_body j b K m nc tot o kkb usv ip off CIDa14 CIDb Mb mm)%I
       with "[Hcnt Hextc Hextm Hcont Hframe Hidev Hmeta Hmap Hdst
-             Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
+             Hbuf Hheldback Hfsb1 Hblback]" as "BODY".
     { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs2 %Hbs4 %Hbs7
                             %Hbs6 %Hbs1 %Hbs5 %Hbs3 %Hbs9 %Hbs8 Hcg Hpc".
       assert (Hmm1 : (1 <= mm)%nat) by (rewrite Hmmd; rewrite Hbsz in Holt |- *; lia).
@@ -1943,7 +1943,7 @@ Section ReadiLoop.
                         = mword_of_int (RI + 0x6e)) by (rewrite HF2ra; pcw).
         iEval (rewrite Hpc6e) in "Hpc".
         iEval (rewrite Hubno) in "Hfsb1".
-        iDestruct ("Hblback" $! (data fbn) with "Hfsb1 Htok1") as "Hblocks".
+        iDestruct ("Hblback" $! (data fbn) with "Hfsb1") as "Hblocks".
         iDestruct (rd_blocks_restore γfs bm data fbn with "Hblocks") as "Hblocks".
         pose proof HcsR as HcsRc.
         assert (HRsp : rd_sp m mR).
@@ -2230,7 +2230,7 @@ Section ReadiLoop.
                         = mword_of_int (RI + 0xb0)) by (rewrite HJ2ra; pcw).
         iEval (rewrite Hpcb0) in "Hpc".
         iEval (rewrite Hubno) in "Hfsb1".
-        iDestruct ("Hblback" $! (data fbn) with "Hfsb1 Htok1") as "Hblocks".
+        iDestruct ("Hblback" $! (data fbn) with "Hfsb1") as "Hblocks".
         iDestruct (rd_blocks_restore γfs bm data fbn with "Hblocks") as "Hblocks".
         pose proof HcsR as HcsRc.
         assert (HRsp : rd_sp m mR).

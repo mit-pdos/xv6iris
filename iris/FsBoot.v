@@ -398,8 +398,7 @@ Section FsBoot.
       fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
       ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (fs_blocks dk b)) ∗
-      ([∗ set] b ∈ cov ∖ home, fs_chalf γfs b (fs_blocks dk b)) ∗
-      ([∗ set] b ∈ cov, blk_own γfs b).
+      ([∗ set] b ∈ cov ∖ home, fs_chalf γfs b (fs_blocks dk b)).
   Proof.
     iIntros (Hcov Hsub) "Hm".
     iDestruct (fs_boot_carve γv dk ndisk cov Hcov with "Hm") as "Hblk".
@@ -414,16 +413,14 @@ Section FsBoot.
        [envs_entails] -- hypotheses AND the (existentially quantified)
        conclusion -- and does not come back. *)
     iEval (rewrite big_sepS_sep) in "Hpm".
-    iDestruct "Hpm" as "[Hmc Hpm]".
-    iEval (rewrite big_sepS_sep) in "Hpm".
-    iDestruct "Hpm" as "[Hdty Hown]".
+    iDestruct "Hpm" as "[Hmc Hdty]".
     iModIntro. iExists γfs.
     iSplitL "Hblk Hmc".
     { iDestruct (big_sepS_sep_2 with "Hblk Hmc") as "H".
       iApply (big_sepS_mono with "H"). intros b Hb.
       iIntros "[Hd Hc]". rewrite /pool_blk /fs_view. cbn [bv_gd bv_clean].
       iExists (fs_blocks dk b). iFrame "Hd Hc". }
-    rewrite /fs_D0. iFrame "HaL HaD Hinv Hdty Hfb Hcl Hown".
+    rewrite /fs_D0. iFrame "HaL HaD Hinv Hdty Hfb Hcl".
   Qed.
 
 (* ====================================================================== *)
@@ -558,12 +555,7 @@ Section FsBoot.
          file system's byte view, which is exactly why [home] is
          [fs_home_set] and not [cov]. *)
       ([∗ set] b ∈ fs_home_set cov logstart,
-         fsblock (fs_bytes γfs) b (fs_blocks dk b)) ∗
-      (* the exclusive per-block tokens, whole and undivided: the log
-         region's own blocks are owned by the log layer, everything else by
-         whoever the (future) bitmap invariant hands them to.  Purely
-         additive -- a consumer that ignores it is unaffected. *)
-      ([∗ set] b ∈ cov, blk_own γfs b).
+         fsblock (fs_bytes γfs) b (fs_blocks dk b)).
   Proof.
     iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
@@ -573,7 +565,7 @@ Section FsBoot.
                        intros x Hx; apply elem_of_difference in Hx as [Hc _];
                        exact Hc)
             with "Hm")
-      as (γfs) "(Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog & Hown)".
+      as (γfs) "(Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog)".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
             with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
     iModIntro. iExists bn, γfs.
@@ -593,7 +585,7 @@ Section FsBoot.
         intros Hd. apply elem_of_difference in Hd as [_ Hn]. exact (Hn Hx). }
     rewrite Hcancel.
     iDestruct (fs_log_region_split with "Hlog") as "[Hhdr Hslots]".
-    iFrame "Hctx Hsl HaL HaD Hdty Hinv Hhdr Hslots Hrest Hown".
+    iFrame "Hctx Hsl HaL HaD Hdty Hinv Hhdr Hslots Hrest".
   Qed.
 
 End FsBoot.

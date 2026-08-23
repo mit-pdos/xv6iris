@@ -969,8 +969,8 @@ Section ItruncDLoop.
                          destruct (decide (t < S k)%nat),
                                   (decide (t < k)%nat);
                            try reflexivity; lia)
-                   with "Hblks") as "[[Hfsb Htok] Hblks]".
-      iEval (rewrite Hgk) in "Hfsb". iEval (rewrite Hgk) in "Htok".
+                   with "Hblks") as "[Hfsb Hblks]".
+      iEval (rewrite Hgk) in "Hfsb".
       (* ===== +0x22 c.beqz a1 : NOT taken, the slot names a block ===== *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (IT + 0x22))
                 (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 3)) Ra1
@@ -1069,7 +1069,7 @@ Section ItruncDLoop.
                 (Hblen k ltac:(unfold MAXFILE, NDIRECT in *; lia))
                 Hj Hgl HL3a0 HL3a1
                 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hfsb Htok
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hfsb
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
       all: try lkbelow.
       iIntros (CID4 Hq4 mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb
@@ -1528,7 +1528,7 @@ Section ItruncELoop.
         as Hqlt.
       rewrite Hslotq in Hqcov, Hqlog, Hqlt.
       iDestruct (blk_res_nz γfs (bm_ent bm !!! q) (data (NDIRECT + q)%nat)
-                   Hnzero with "Hblk") as "[Hfsb Htok]".
+                   Hnzero with "Hblk") as "Hfsb".
       (* ===== +0x6e c.beqz a1 : NOT taken ===== *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (IT + 0x6e))
                 (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 3)) Ra1
@@ -1628,7 +1628,7 @@ Section ItruncELoop.
                                           lia))
                 Hj Hgl HE3a0 HE3a1
                 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hfsb Htok
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hfsb
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
       all: try lkbelow.
       iIntros (CIDf Hqf mfE) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb
@@ -1876,7 +1876,7 @@ Section ItruncIArm.
     pose proof (blkmap_wf_ent_len _ _ _ Hwf) as Hentlen.
     assert (Hzlen : length (bm_dir (bm_dir_zeroed bm NDIRECT)) = NDIRECT)
       by (rewrite bm_dir_zeroed_len; [exact Hdirlen | lia]).
-    (* the indirect block's own content half and token, out of the map *)
+    (* the indirect block's own byte run, out of the map *)
     iDestruct (inode_map_ind_acc γfs ip (bm_dir_zeroed bm NDIRECT) Hzlen
                  with "Hmap") as "(Hindcell & Hindres & Hmapback)".
     assert (Hindz : bm_ind (bm_dir_zeroed bm NDIRECT) = bm_ind bm)
@@ -1885,9 +1885,8 @@ Section ItruncIArm.
       by (rewrite /bm_dir_zeroed; reflexivity).
     iDestruct (ind_res_nz γfs (bm_dir_zeroed bm NDIRECT)
                  ltac:(rewrite Hindz; exact Hindnz) with "Hindres")
-      as "[Hindblk Hindtok]".
+      as "Hindblk".
     iEval (rewrite Hindz Hentz) in "Hindblk".
-    iEval (rewrite Hindz) in "Hindtok".
     iEval (rewrite Hindz) in "Hindcell".
     (* ===== +0x50 sd s4,0(sp) : the ONLY write to the sixth slot ===== *)
     iDestruct "Hslot6" as (v6) "Hslot6".
@@ -2374,7 +2373,7 @@ Section ItruncIArm.
               Hj Hgl HC2a0 HC2a1
               Hlkbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hindblk
-                    Hindtok Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
+                    Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
     all: try lkbelow.
     iIntros (CID16 Hq16 mZ) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hsl Hop".
     assert (Hpc8c : ret_pc (C2 !!! Regidx Rra : mword 64)
@@ -2416,9 +2415,9 @@ Section ItruncIArm.
        because the block it lived in is gone *)
     iDestruct ("Hmapback" $! (bv_0 32) (replicate NINDIRECT (bv_0 32))
                  with "Hindcell []") as "Hmap".
-    { rewrite /ind_res /ind_blk /ind_tok. cbn [bm_ind].
+    { rewrite /ind_res /ind_blk. cbn [bm_ind].
       destruct (decide (bv_unsigned (bv_0 32) = 0)) as [_|Hc];
-        [iSplitR; done | exfalso; apply Hc; reflexivity]. }
+        [done | exfalso; apply Hc; reflexivity]. }
     assert (Hmempty : MkBlkmap (bm_dir (bm_dir_zeroed bm NDIRECT)) (bv_0 32)
                         (replicate NINDIRECT (bv_0 32)) = bm_empty).
     { rewrite (bm_dir_zeroed_full bm Hdirlen). reflexivity. }

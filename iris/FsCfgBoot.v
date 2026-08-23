@@ -69,6 +69,8 @@ Require Import FsBoot.
 Require Import BioDefs.
 Require Import BitmapEnc.
 Require Import BitmapInv.
+Require Import FsStateBitmap.
+Require Import FsBytesGamma.
 Require Import FsImg.
 Require Import FsImgBridge.
 Require Import FsCfg.          (* the record this file finally gives a value *)
@@ -132,18 +134,16 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 (*  DEBT (D): THE BITMAP BLOCK AND THE FREE POOL                           *)
 (*                                                                        *)
-(*  [BitmapInv.bitmap_res] is three things, and boot has all three in the   *)
-(*  coverage remainder: the pure [bitmap_ok] (W5 plus R4's data-region      *)
-(*  corner), the bitmap block AT [bitmap_bytes used], and one               *)
-(*  [fs_chalf]/[blk_own] pair per CLEAR bit below [size].                    *)
+(*  [BitmapInv.bitmap_res] is two things, and boot has both in the          *)
+(*  coverage remainder: the bitmap block AT [bitmap_bytes used], and the    *)
+(*  byte run of every block whose bit reads CLEAR below [size].             *)
 (*                                                                        *)
 (*  [used] IS THE BLOCK'S OWN BIT SET ([FsImg.fs_bmap_set]) rather than     *)
 (*  "the used set ∪ the metadata blocks": at the block's own bits the       *)
 (*  byte-level equation is a theorem ([FsImg.bm_bytes_fs_bmap_set]) and no  *)
 (*  new image sweep exists, where the reconstructed set would additionally  *)
 (*  need the 6192 bits above [size] swept clear.  Nothing distinguishes     *)
-(*  the two: [bitmap_ok] quantifies over [x < size] and [free_set]          *)
-(*  intersects [seqZ 0 size].                                              *)
+(*  the two: [free_set] intersects [seqZ 0 size].                          *)
 (* ---------------------------------------------------------------------- *)
 (*  The blocks the producer takes OUT of the remainder: the bitmap block
     itself and the whole free pool.  One set, so [fs_kit_spent] can name it.
@@ -333,16 +333,15 @@ Section FsCfgBootPool.
        ireg_out γi (mword_of_int z : mword 32) (fs_dinode P sb z)) -∗
     ([∗ set] z ∈ A, dir_links z (fs_dinode P sb z)
                       (fs_data_of P (fs_dinode P sb z))) -∗
-    (* [fs_boot_ghosts]' two block big-ops, UNPAIRED as it hands them over,
-       and cut down to [C] by the era fupd's own peels *)
+    (* [fs_boot_ghosts]' block big-op, cut down to [C] by the era fupd's
+       own peels *)
     ([∗ set] b ∈ C, fsblock (fs_bytes γfs) b (P b)) -∗
-    ([∗ set] b ∈ C, blk_own γfs b) -∗
     ipool γfs γi cov (sb_logstart sb) (region_inums icfg_nib)
       ∗ ([∗ set] b ∈ C ∖ fs_live_blocks P sb A,
-           fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b).
+           fsblock (fs_bytes γfs) b (P b)).
   Proof.
-    iIntros (Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC)
-            "Hcnt Hmir Hoff Hdv Hfv Hout Hdlk Hfsb Hown".
+    intros Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC.
+    iIntros "Hcnt Hmir Hoff Hdv Hfv Hout Hdlk Hblk".
     (* ---- the pure preliminaries, all from the sweeps' lookup specs --- *)
     pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
     destruct (fsimg_wf_used P sb Hwf) as (u & _ & Hnd & _).
@@ -396,17 +395,16 @@ Section FsCfgBootPool.
                  with "Hmir") as "Hmir".
     iDestruct (region_key_shift icfg_nib (fun z => ifreeze_off z) Hnib
                  with "Hoff") as "Hoff".
-    (* ---- the blocks: PAIRED ONCE, then carved ------------------------ *)
-    iDestruct (big_sepS_sep_2 with "Hfsb Hown") as "Hblk".
+    (* ---- the blocks, carved ------------------------------------------ *)
     rewrite /fs_live_blocks.
     iDestruct (big_sepS_carve
-                 (fun b => fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b)%I
+                 (fun b => fsblock (fs_bytes γfs) b (P b))%I
                  C (elements A) (fs_inode_blocks_set P sb)
                  (NoDup_elements A) Hsub Hdisj with "Hblk") as "[Hpc Hrem]".
     iSplitR "Hrem"; [| iExact "Hrem"].
     iDestruct (big_sepS_of_elements
                  (fun i => [∗ set] b ∈ fs_inode_blocks_set P sb i,
-                             (fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b))%I A
+                             fsblock (fs_bytes γfs) b (P b))%I A
                  with "Hpc") as "Hpc".
     (* ---- the region's payout, split along the same subset ------------ *)
     iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
@@ -867,33 +865,20 @@ Definition fs_kit_spent (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
 Section FsCfgBootBitmap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
-  (*  DEBT (D) PAID.  The whole of [BitmapInv.bitmap_res], out of the paired
+  (*  DEBT (D) PAID.  The whole of [BitmapInv.bitmap_res], out of the
       remainder the stocking carve leaves and nothing else: no new image
-      sweep, and the era fupd still computes nothing.  The bitmap block's
-      own [blk_own] is dropped -- [bitmap_res] does not hold one for it, and
-      nothing may: the block is the invariant's own storage, not a client
-      block. *)
+      sweep, and the era fupd still computes nothing. *)
   Lemma bitmap_res_of_image (γfs : fs_names) (P : Z -> list (bv 8))
-      (sb : fs_sb) (cov : gset Z) :
+      (sb : fs_sb) :
     fsimg_wf P sb = true ->
     fs_blocks_full P ->
-    (forall b : Z, fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov) ->
-    ([∗ set] b ∈ fs_bitmap_spent P sb,
-       fsblock (fs_bytes γfs) b (P b) ∗ blk_own γfs b) -∗
-    bitmap_res γfs (FsImg.sb_bmapstart sb) cov (FsImg.sb_logstart sb)
-      (FsImg.sb_size sb) (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))).
+    ([∗ set] b ∈ fs_bitmap_spent P sb, fsblock (fs_bytes γfs) b (P b)) -∗
+    bitmap_res γfs (FsImg.sb_bmapstart sb) (FsImg.sb_size sb)
+      (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))).
   Proof.
-    intros Hwf Hfull Hcovd. iIntros "H".
+    intros Hwf Hfull. iIntros "H".
     pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
     destruct (fsimg_wf_used P sb Hwf) as (u & _ & _ & Hbw).
-    pose proof (fs_sb_ok_meta sb Hsb) as (Hm1 & Hm2 & Hm3).
-    (* the log region sits strictly below the inode region, hence strictly
-       below every block the pool or the bitmap block occupies *)
-    assert (HlogI : forall z : Z, z ∈ log_region_set (FsImg.sb_logstart sb) ->
-              1 < z < FsImg.sb_inodestart sb).
-    { intros z Hz. pose proof (log_region_bound (FsImg.sb_logstart sb) z Hz).
-      pose proof (sbo_logstart sb Hsb). pose proof (sbo_nlog sb Hsb).
-      pose proof (sbo_inodestart sb Hsb). unfold LOGBLOCKS in *. lia. }
     (* the bitmap block is below the data region, so it is not in the pool *)
     assert (Hdj : {[ FsImg.sb_bmapstart sb ]}
                   ## free_set (FsImg.sb_size sb)
@@ -909,23 +894,13 @@ Section FsCfgBootBitmap.
                      = P (FsImg.sb_bmapstart sb)).
     { rewrite /bitmap_bytes.
       apply bm_bytes_fs_bmap_set. apply Hfull. }
-    (* ...and the pure half *)
-    assert (Hok : bitmap_ok cov (FsImg.sb_logstart sb) (FsImg.sb_size sb)
-                            (FsImg.fs_bmap_set BSIZE
-                               (P (FsImg.sb_bmapstart sb)))).
-    { intros x Hx Hnu.
-      destruct (fs_bmap_set_free P sb u x Hsb Hbw Hx Hnu) as [Hge _].
-      split; [apply Hcovd; lia |].
-      intros Hlog. pose proof (HlogI x Hlog). lia. }
     rewrite /fs_bitmap_spent (big_sepS_union _ _ _ Hdj) big_sepS_singleton.
-    iDestruct "H" as "[[Hbm _] Hpool]".
-    rewrite /bitmap_res Hbytes.
-    iSplitR; [iPureIntro; exact Hok |].
+    iDestruct "H" as "[Hbm Hpool]".
+    rewrite bitmap_res_open Hbytes.
     iSplitL "Hbm"; [iExact "Hbm" |].
-    rewrite /free_pool.
+    iApply free_pool_intro.
     iApply (big_sepS_mono with "Hpool"). intros b Hb.
-    iIntros "[Hf Ho]".
-    iApply (free_blk_intro γfs b (P b) (Hfull b) with "Hf Ho").
+    iIntros "Hf". iExists (P b). rewrite -gamma_blk_owned. iExact "Hf".
   Qed.
 
 End FsCfgBootBitmap.
@@ -1139,7 +1114,7 @@ Section FsCfgBootEra.
         did not spend.  At an image whose [cov] is exactly its own block
         range this is empty; it is kept because [cov] is a parameter. *)
      ([∗ set] b ∈ fsc_cov ∖ Rspent,
-        fsblock (fs_bytes fsc_fs) b (P b) ∗ blk_own fsc_fs b))%I.
+        fsblock (fs_bytes fsc_fs) b (P b)))%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
       (P : Z -> list (bv 8)) (Rspent : gset Z) :
@@ -1158,7 +1133,7 @@ Section FsCfgBootEra.
          ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno fsc_logst i) bs) ∗
       bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
       ([∗ set] b ∈ fsc_cov ∖ Rspent,
-         fsblock (fs_bytes fsc_fs) b (P b) ∗ blk_own fsc_fs b).
+         fsblock (fs_bytes fsc_fs) b (P b)).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -1546,7 +1521,7 @@ Section FsCfgBootEra.
     (* ---- 4. the block layer's ghosts -------------------------------- *)
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
             ROOTDEV E Hcovin Hhomesub with "Hdisk")
-      as (γfs) "(Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl & Hown)".
+      as (γfs) "(Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl)".
     (* ---- 5. THE PEELS ------------------------------------------------
        THE MINT ALREADY SPLIT THE LOG REGION OFF (durable-disk 1c-flip):
        [Hchl] is the log's own storage, at the parked cache halves
@@ -1556,24 +1531,16 @@ Section FsCfgBootEra.
     rewrite Hcancel.
     iDestruct (fs_log_region_split γfs dk (sb_logstart sb) with "Hchl")
       as "[Hhdr Hslots]".
-    iDestruct (big_sepS_split_sub _ cov (fs_home_set cov (sb_logstart sb))
-                 Hhomesub with "Hown") as "[HownH _]".
-    iDestruct (big_sepS_sep_2 with "Hfsb HownH") as "Hblk".
     iDestruct (big_sepS_split_sub _ _ ({[ (1:Z) ]} : gset Z) H1home
-                 with "Hblk") as "[Hb1 Hblk]".
+                 with "Hfsb") as "[Hb1 Hblk]".
     iEval (rewrite Hsetcomm) in "Hblk".
     iDestruct (big_sepS_split_sub _ _
                  (ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
-                 Hiregcov with "Hblk") as "[Hbireg Hblk]".
+                 Hiregcov with "Hblk") as "[Hbireg HfsbC]".
     iEval (rewrite big_sepS_singleton) in "Hb1".
-    iDestruct "Hb1" as "[Hb1 _]".
-    iEval (rewrite big_sepS_sep) in "Hbireg".
-    iDestruct "Hbireg" as "[Hbireg _]".
     iDestruct (ireg_blk_of_set (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b))
                  (FsImg.sb_inodestart sb) icfg_nib with "Hbireg")
       as "Hbireg".
-    iEval (rewrite big_sepS_sep) in "Hblk".
-    iDestruct "Hblk" as "[HfsbC HownC]".
     (* ---- 6. THE INODE REGION ---------------------------------------- *)
     iAssert (ireg_boot) with "[Hboot]" as "Hboot".
     { rewrite /ireg_boot /ity_pending. iExact "Hboot". }
@@ -1687,7 +1654,7 @@ Section FsCfgBootEra.
                  (fs_live_set (fs_blocks dk) sb)
                  Hwf (fs_region_wf_free _ _ _ Hrw) Hfull Hnin Hnib32
                  (fs_live_set_elem_of (fs_blocks dk) sb) Hcovdata HcovC
-                 with "HcntP HmirP Hoff Hdv Hfv Hout Hdlk HfsbC HownC")
+                 with "HcntP HmirP Hoff Hdv Hfv Hout Hdlk HfsbC")
       as "[Hipool Hrem]".
     (* ---- 7b. DEBT (D): the bitmap block and the free pool ------------ *)
     (* every member of [fs_bitmap_spent] survives all four peels: it is
@@ -1737,11 +1704,11 @@ Section FsCfgBootEra.
         + intros Hc. pose proof (HiregI _ Hc). lia.
         + intros Hc. exact (Hnu (Hlive Hc)). }
     iDestruct (big_sepS_split_sub
-                 (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b) ∗ blk_own γfs b)%I
+                 (fun b => fsblock (fs_bytes γfs) b (fs_blocks dk b))%I
                  _ (fs_bitmap_spent (fs_blocks dk) sb) Hbmsub with "Hrem")
       as "[Hbmspent Hrem]".
-    iDestruct (bitmap_res_of_image γfs (fs_blocks dk) sb cov Hwf Hfull
-                 Hcovdata with "Hbmspent") as "Hbmres".
+    iDestruct (bitmap_res_of_image γfs (fs_blocks dk) sb Hwf Hfull
+                 with "Hbmspent") as "Hbmres".
     iMod (bitmap_inv_alloc E with "Hbinv Hbmres") as "#Hbmres".
     (* ---- 8. the gname-only mints, and the record -------------------- *)
     iMod (bio_names_ghost_alloc with "Hsa Hsf") as (bn) "Hbio".

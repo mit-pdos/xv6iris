@@ -520,8 +520,7 @@ Section ItruncDefs.
     (forall t : nat, (t < MAXFILE)%nat -> t <> i ->
        blkmap_get bm' t = blkmap_get bm t) ->
     inode_blocks γfs bm data -∗
-      (fsblock (fs_bytes γfs) (bv_unsigned (blkmap_get bm i)) (data i) ∗
-       blk_own γfs (bv_unsigned (blkmap_get bm i))) ∗
+      fsblock (fs_bytes γfs) (bv_unsigned (blkmap_get bm i)) (data i) ∗
       inode_blocks γfs bm' data.
   Proof.
     intros Hi Hnz Hz Hag.
@@ -538,8 +537,7 @@ Section ItruncDefs.
     rewrite {1}/blk_res.
     destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hc|_];
       [exfalso; exact (Hnz Hc)|].
-    iDestruct "Hb" as "[Hfs Htok]".
-    iSplitL "Hfs Htok"; [iFrame "Hfs Htok"|].
+    iSplitL "Hb"; [iExact "Hb"|].
     iSplitR.
     { rewrite /blk_res.
       destruct (decide (bv_unsigned (blkmap_get bm' i) = 0)) as [_|Hc];
@@ -565,12 +563,11 @@ Section ItruncDefs.
       [done | exfalso; apply Hc; reflexivity].
   Qed.
 
-  (* a nonzero slot's [blk_res] is the pair; the [if decide] lives inside an
+  (* a nonzero slot's [blk_res] is the run; the [if decide] lives inside an
      Iris hypothesis, where a Coq [destruct] cannot reach it *)
   Lemma blk_res_nz (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) :
     bv_unsigned w <> 0 ->
-    blk_res γfs w bs -∗
-      fsblock (fs_bytes γfs) (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w).
+    blk_res γfs w bs -∗ fsblock (fs_bytes γfs) (bv_unsigned w) bs.
   Proof.
     intros Hnz. rewrite /blk_res.
     destruct (decide (bv_unsigned w = 0)) as [Hc|_];
@@ -591,14 +588,13 @@ Section ItruncDefs.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hr".
   Qed.
 
-  (* the indirect block's content half and token, when it exists *)
+  (* the indirect block's run, when it exists *)
   Lemma ind_res_nz (γfs : fs_names) (bmx : blkmap) :
     bv_unsigned (bm_ind bmx) <> 0 ->
     ind_res γfs bmx -∗
-      fsblock (fs_bytes γfs) (bv_unsigned (bm_ind bmx)) (ind_bytes (bm_ent bmx)) ∗
-      blk_own γfs (bv_unsigned (bm_ind bmx)).
+      fsblock (fs_bytes γfs) (bv_unsigned (bm_ind bmx)) (ind_bytes (bm_ent bmx)).
   Proof.
-    intros Hnz. rewrite /ind_res /ind_blk /ind_tok.
+    intros Hnz. rewrite /ind_res /ind_blk.
     destruct (decide (bv_unsigned (bm_ind bmx) = 0)) as [Hc|_];
       [exfalso; exact (Hnz Hc) |]. iIntros "$".
   Qed.

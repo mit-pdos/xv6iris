@@ -48,10 +48,10 @@
    caller's [inode_blocks] bundle and gives it back with the freshly
    allocated block in it, so nothing here is asymmetric between the two
    arms (design doc, "Why the fresh block is deposited, not returned").
-   The bundles are ALSO what carry the per-block exclusive [blk_own]
-   tokens, and those are the only thing that can re-establish
-   [blkmap_wf]'s injectivity when balloc's block is installed --
-   [fs_chalf] is a half element, so two at one key are consistent.
+   The bundles are ALSO what carry each block's EXCLUSIVE byte run, and
+   those are what re-establishes [blkmap_wf]'s injectivity when balloc's
+   block is installed ([FsBlocks.fsblock_ne]: two owners of one block's
+   bytes is [False]).
 
    THE BUDGET IS SPEND-AT-MOST, not spend-exactly: [log_op γ n] in with
    (5 <= n), and [log_op γ n'] out with (n - 5 <= n' <= n).  bmap cannot
@@ -331,11 +331,11 @@ Definition wp_bmap_sconf_body
      a FRACTION, so the caller keeps its own copy *)
   i_dev ip ↦₄{dqd} dev -∗
   (* THE BLOCK MAP, and THE FILE'S DATA BLOCKS.  Both, because balloc hands
-     the freshly allocated DATA block's [fs_chalf] half (and its exclusive
-     [blk_own] token) to bmap and there is nowhere else to put them: the
-     design doc's "the fresh half is deposited into the bundle" is exactly
-     this, and a bmap that returned only [inode_map] would strand the block
-     it just allocated.  The tokens inside the two bundles are also what
+     the freshly allocated DATA block's byte run to bmap and there is
+     nowhere else to put it: the design doc's "the fresh half is deposited
+     into the bundle" is exactly this, and a bmap that returned only
+     [inode_map] would strand the block it just allocated.  The runs inside
+     the two bundles are also what
      re-establish [blkmap_wf]'s injectivity at an insertion
      ([InodeInv.inode_fresh]). *)
   inode_map γfs ip bm -∗

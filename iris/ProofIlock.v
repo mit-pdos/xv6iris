@@ -663,9 +663,9 @@ Section IlockLoad.
 
   Local Lemma il_ind_res_empty (gfs : fs_names) : ⊢ ind_res gfs bm_empty.
   Proof.
-    rewrite /ind_res /ind_blk /ind_tok.
+    rewrite /ind_res /ind_blk.
     destruct (decide (bv_unsigned (bm_ind bm_empty) = 0)) as [_|Hc];
-      [iSplitL; done | exfalso; apply Hc; reflexivity].
+      [done | exfalso; apply Hc; reflexivity].
   Qed.
 
   Local Lemma il_blocks_empty (gfs : fs_names) (data : nat -> list (bv 8)) :

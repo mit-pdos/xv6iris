@@ -58,8 +58,8 @@
    TWO SLOT UNITS, in and back out.  bread's reference is held across
    log_write, which wants one of its own; brelse returns it.
 
-   NO [blk_own].  iupdate establishes no injectivity -- it installs no block
-   number anywhere -- so it needs no exclusive token.  Who owns an inode
+   NO BLOCK RUN BEYOND THE INODE BLOCK'S.  iupdate establishes no
+   injectivity -- it installs no block number anywhere.  Who owns an inode
    block is no longer deferred: the region does (see above).
 
    THE SUPERBLOCK FIELD rides as a plain fractional cell, the way

@@ -226,7 +226,6 @@ Section BallocDefs.
       ⌜bv_unsigned rv ∈ cov⌝ ∗
       ⌜~ (bv_unsigned rv ∈ log_region_set logstart)⌝ ∗
       fsblock (fs_bytes γfs) (bv_unsigned rv) (replicate BSIZE (bv_0 8)) ∗
-      blk_own γfs (bv_unsigned rv) ∗
       log_opS γ (if cr then S u else u)
                 (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]})))%I.
 
@@ -259,7 +258,6 @@ Section BallocDefs.
             ⌜bv_unsigned blk ∈ cov⌝ ∗
             ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
             fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
-            blk_own γfs (bv_unsigned blk) ∗
             log_opS γ (if cr then S u else u)
                       (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
         WP (Loop : expr riscv_lang))%I.
@@ -585,7 +583,7 @@ Section BallocEpilogue.
     rewrite /ba_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
     rewrite /ba_arms.
-    iDestruct "Harms" as "[(%Hz & Hop) | (%Hnz & %Hcv & %Hlg & Hfsb & Hown & Hop)]".
+    iDestruct "Harms" as "[(%Hz & Hop) | (%Hnz & %Hcv & %Hlg & Hfsb & Hop)]".
     - iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm
                        Hsl [Hop]").
       { unfold callee_saved. split_and!; assumption. }
@@ -593,15 +591,14 @@ Section BallocEpilogue.
         { iPureIntro. rewrite HP4a0. exact (ba_sext_zero rv Hz). }
         iExact "Hop". }
     - iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm
-                       Hsl [Hfsb Hown Hop]").
+                       Hsl [Hfsb Hop]").
       { unfold callee_saved. split_and!; assumption. }
       { iRight. iExists rv.
         iSplitR; [iPureIntro; exact HP4a0|].
         iSplitR; [iPureIntro; exact Hnz|].
         iSplitR; [iPureIntro; exact Hcv|].
         iSplitR; [iPureIntro; exact Hlg|].
-        iSplitL "Hfsb"; [iExact "Hfsb"|].
-        iSplitL "Hown"; [iExact "Hown"|]. iExact "Hop". }
+        iSplitL "Hfsb"; [iExact "Hfsb"|]. iExact "Hop". }
   Qed.
 
 End BallocEpilogue.
@@ -1243,7 +1240,6 @@ Section BallocRestore.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots 2 -∗
     fsblock (fs_bytes γfs) (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
-    blk_own γfs (bv_unsigned rv) -∗
     log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]}) -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
@@ -1252,7 +1248,7 @@ Section BallocRestore.
     intros HK Hsp Hthr Hs1 Hnz Hcv Hlg.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-              Hfsb Hown Hop Hcont".
+              Hfsb Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     rewrite /ba_frame.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9 & Hf10)".
@@ -1460,13 +1456,12 @@ Section BallocRestore.
     iApply (ba_epilogue (CID0 := CID7)  j γfs bn γ cov logstart bmapstart size
               u cr Sb rv pidv dq dqb dqs m R7 K eb b lks Vpr HK HR7sp HR7thr HR7s1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-                    [Hfsb Hown Hop] [Hcont]").
+                    [Hfsb Hop] [Hcont]").
     { rewrite /ba_arms. iRight.
       iSplitR; [iPureIntro; exact Hnz|].
       iSplitR; [iPureIntro; exact Hcv|].
       iSplitR; [iPureIntro; exact Hlg|].
-      iSplitL "Hfsb"; [iExact "Hfsb"|].
-      iSplitL "Hown"; [iExact "Hown"|]. iExact "Hop". }
+      iSplitL "Hfsb"; [iExact "Hfsb"|]. iExact "Hop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID7) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -1526,7 +1521,6 @@ Section BallocBzero.
     bslots 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
     fsblock (fs_bytes γfs) bi bsD -∗
-    blk_own γfs bi -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
@@ -1553,7 +1547,7 @@ Section BallocBzero.
     assert (Hlvl : (Z.of_nat 0 + 2 < 2 ^ 31)%Z)
       by (change (2^31)%Z with 2147483648%Z; lia).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
-              HfsbD Hown Hcont".
+              HfsbD Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     (* ===== +0x4c c.mv a1,s1 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.balloc + 0x4c)) Ra1 Rs1
@@ -2030,9 +2024,8 @@ Section BallocBzero.
               ltac:(rewrite -bb_uint32 HbnoD; exact Hbicov)
               ltac:(rewrite -bb_uint32 HbnoD; exact Hbilog)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-                    [HfsbD] [Hown] Hop [Hcont]").
+                    [HfsbD] Hop [Hcont]").
     { iEval (rewrite -bb_uint32 HbnoD). iExact "HfsbD". }
-    { iEval (rewrite -bb_uint32 HbnoD). iExact "Hown". }
     { iApply (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID16) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -2327,12 +2320,13 @@ Section BallocAlloc.
        straight back.  The block's CLIENT half is not in our hands and
        never was -- it is parked in [BitmapInv.bitmap_inv], and the one
        moment it comes out is log_write's own ghost step.
-       [bitmap_alloc_au] IS that fupd: it surrenders the half at whatever
-       the invariant parks, and the closing wand -- handed the half back at
-       the image of [used ∪ {bi}] -- pays out the allocated block (content
-       half and token) together with the two facts bread and log_write
-       demand of its number.  [lw_au_lb0] parks the writer's epoch anchor
-       at zero, where nobody owes a receipt. *)
+       [bitmap_alloc_au] IS that fupd: it surrenders the run at whatever
+       the invariant parks, and the closing wand -- handed the run back at
+       the image of [used ∪ {bi}] -- pays out the allocated block's own
+       EXCLUSIVE byte run, and nothing else.  The two facts bread and
+       log_write demand of its number came out of the scan's own
+       [bitmap_read], off the pool's ownership.  [lw_au_lb0] parks the
+       writer's epoch anchor at zero, where nobody owes a receipt. *)
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ cr Sb e0 (uint bnoB)
                   ltac:(rewrite HbnoB; exact Hcred)) as "#Hcredit".
@@ -2347,14 +2341,12 @@ Section BallocAlloc.
     iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
                  (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used)
-                 (free_blk γfs bi ∗
-                  ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I e0 Psi
+                 (free_blk γfs bi) e0 Psi
                  with "Hau0") as "Hau".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used) bsdX dX
               (1 + u)%nat cr Sb e0 0%nat Psi (⊤ ∖ ↑bitmapN)
-              (free_blk γfs bi ∗
-               ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I
+              (free_blk γfs bi)%I
               A3 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw HbnoBlt Hkk HA3a0
               ltac:(rewrite HbnoB; exact Hbmcov)
@@ -2371,8 +2363,8 @@ Section BallocAlloc.
     iDestruct (log_opSwe_opSw with "Hop") as "Hop".
     iDestruct (log_opSw_witness with "Hop") as "[Hop _]".
     (* the receipt: the allocated block, out of the pool at last *)
-    iDestruct "Hblk" as "[Hblk _]".
-    iDestruct "Hblk" as (bsD) "(%HbsDlen & HfsbD & Hown)".
+    iDestruct "Hblk" as (bsD) "HfsbD".
+    iDestruct (fsblock_length with "HfsbD") as %HbsDlen.
     assert (HbudgeB : (if cr then S (1 + u) else (1 + u))%nat
                       = S (if cr then S u else u))
       by (destruct cr; reflexivity).
@@ -2495,7 +2487,7 @@ Section BallocAlloc.
               Vpr HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl
               HmRsp HmRthr HmRs1 HmRs7 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
-                    HfsbD Hown [Hcont]").
+                    HfsbD [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID9) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -3452,7 +3444,6 @@ Section BallocMain.
               ⌜bv_unsigned blk ∈ cov⌝ ∗
               ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
               fsblock (fs_bytes γfs) (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
-              blk_own γfs (bv_unsigned blk) ∗
               log_opS γ (if cr then S u else u)
                         (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -4449,13 +4440,13 @@ Section BallocMain.
     iDestruct "Harms" as "[(%Hz & Hop) | Hr]".
     - iLeft. iSplitR; [iPureIntro; exact Hz|].
       iApply (log_opS_op with "Hop").
-    - iDestruct "Hr" as (blk) "(%Ha & %Hnz & %Hcv & %Hlg & Hfsb & Hown & Hop)".
+    - iDestruct "Hr" as (blk) "(%Ha & %Hnz & %Hcv & %Hlg & Hfsb & Hop)".
       iRight. iExists blk.
       iSplitR; [iPureIntro; exact Ha|].
       iSplitR; [iPureIntro; exact Hnz|].
       iSplitR; [iPureIntro; exact Hcv|].
       iSplitR; [iPureIntro; exact Hlg|].
-      iFrame "Hfsb Hown".
+      iFrame "Hfsb".
       iApply (log_opS_op with "Hop").
   Qed.
 

@@ -21,58 +21,53 @@
 
    ---- THE RESOURCE --------------------------------------------------
 
-   [bitmap_res γfs bmapstart cov logstart size used] is three things:
+   [bitmap_res gfs bmapstart size used] IS [FsStateBitmap.free_bitmap_at],
+   the design's free-space predicate (fs-state.md section 2), instantiated
+   at the LOGGED view: [Gamma_L.fsPhi a v := a ↪[fs_bytes gfs] v], which is
+   [FsBytesGamma.fs_gamma_L].  It is two things and no more:
 
-     - the pure well-formedness [bitmap_ok]: every CLEAR bit below
-       [size] names a covered home block (in [cov], outside the log's own
-       storage).  It is what turns "balloc found a zero bit" into the two
-       facts bread and log_write demand of a block number;
-     - the bitmap block itself, as an [fs_chalf] at [bitmap_bytes used] --
-       the block content is kept in the IMAGE of [BitmapEnc.bm_bytes]
-       over the pure set [used], so setting a bit is [used ∪ {[bi]}] and
-       the byte level is only ever read back;
-     - the FREE POOL: for every block below [size] whose bit is CLEAR,
-       that block's [fs_chalf] half AND its exclusive [blk_own] token.
+     - the bitmap block itself, at [BitmapEnc.bm_bytes] of the pure set
+       [used] -- the block content is always in the IMAGE of an encoding
+       over a pure index set, so setting a bit is [used ∪ {[bi]}] and the
+       byte level is only ever read back;
+     - THE FREE POOL: for every block below [size] whose bit is CLEAR,
+       THE BLOCK ITSELF, at content nobody has committed to.
 
-   The pool is the answer to the question fs-inode.md left open -- where a
-   free block's [fs_chalf] half lives while it is free.  [FsBlocks.fs_alloc]
-   already mints one half plus one [blk_own] per covered block at boot, so
-   the material exists; this is where it parks.
+   THERE IS NO PURE CLAUSE.  [bitmap_ok] ("every clear bit below [size]
+   names a covered home block, outside the log's own storage") used to be a
+   conjunct of the resource -- a MAINTAINED statement about the whole used
+   set, which is exactly what fs-state.md section 0 forbids.  It is still
+   stated, and every reader still gets it, but it is now DERIVED at each
+   read rather than carried: HOLDING A BLOCK'S BYTE RUN IS BEING A HOME
+   BLOCK ([FsBlocks.fsblock_home]), and the pool holds the run of every
+   clear bit, so [bitmap_pool_home] reads the whole of [bitmap_ok] off the
+   pool's OWNERSHIP against [bytes_dom].  Nothing establishes it, nothing
+   preserves it, and no boot client owes it -- fs-state.md section 0's "a
+   consequence of the [∗]", not a clause.  [x <> 0] still comes free from
+   [cov_ok] at the caller.
 
-   ---- WHY [blk_own] IS WHAT MAKES THE HANDSHAKE SOUND ----------------
+   ---- WHY THE HANDSHAKE IS SOUND -------------------------------------
 
-   REDUNDANT SINCE THE CONSUMER FLIP, AND KEPT ONLY BECAUSE STAGE 2
-   RETIRES IT WITH THE POOL (durable-disk 1c-flip step 5).  The argument
-   below was written when the content resource was [fs_chalf], a HALF
-   ghost_map element: two owners each holding a half of one key are
-   perfectly consistent, so no amount of [fs_chalf] reasoning says a block
-   is unowned.  The pool and every home-block owner hold the EXCLUSIVE byte
-   run [fsblock] now, and [FsBlocks.fsblock_excl] does both jobs below on
-   its own -- [free_pool_own_used]'s panic refutation especially, since two
-   owners of one block's bytes is already [False].  [blk_own] is the FULL
-   element and
-   is therefore EXCLUSIVE, and the pool holds one per clear bit.  That
-   single fact does both jobs:
+   Exclusivity of the byte run, and nothing else.  There is no per-block
+   ownership token any more (durable-disk 2b; [FsBlocks.blk_own] is gone):
 
-     - balloc hands out the token with the block, so a caller that keeps
-       one per block its own structures name can conclude the new block is
-       none of them ([FsBlocks.blk_own_ne]) -- the fact that re-establishes
-       [InodeInv.blkmap_wf]'s injectivity, and the same fact that stopped
-       the inode block map from aliasing;
+     - balloc hands out the block's EXCLUSIVE run, so a caller that keeps
+       one per block its own structures name concludes the new block is
+       none of them ([FsBlocks.fsblock_excl]) -- the fact that
+       re-establishes [InodeInv.blkmap_wf]'s injectivity;
      - bfree's [panic("freeing free block")] is DEAD, and
-       [free_pool_own_used] is the proof: the caller arrives holding the
-       block's token, so if the bit were CLEAR the pool would hold a
-       SECOND token at that key, which is absurd.  So the bit is set and
-       the panic arm is unreachable.  Refuting that panic is the main
-       thing this invariant has to buy.
+       [FsStateBitmap.free_pool_used] is the proof: the caller arrives
+       holding the block's run, so if the bit were CLEAR the pool would
+       hold a SECOND run at the same block, and two owners of one block's
+       bytes is [False].  Refuting that panic is the main thing this
+       invariant has to buy.
 
    ---- WHO OWNS [bitmap_res] BETWEEN CALLS ----------------------------
 
-   DEFERRED, deliberately, exactly as [InodeInv.inode_map] was for bmap:
-   PASS IT IN AND RETURN IT UPDATED.  In xv6 the discipline is the buffer
-   sleeplock on the bitmap block -- bread gives exclusive access for the
-   critical section -- so a later free-space layer can seat it there.
-   Designing that layer here would block balloc behind it.               *)
+   Nobody outside this file: it is exclusive and there is one per file
+   system, so threading it through contracts would serialize every
+   allocator and freer in the kernel.  It lives in the Iris invariant
+   [bitmap_inv], at an EXISTENTIAL set no contract names.                *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers functions bitvector.definitions.
@@ -87,6 +82,8 @@ Require Import FsBlocks.
 Require Import LogInv.
 Require Import BioDefs.     (* [BSIZE] *)
 Require Import BitmapEnc.
+Require Import FsBytesGamma.   (* the byte view AS a [Gamma]; the bridge *)
+Require Import FsStateBitmap.  (* [free_bitmap_at], the design predicate *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -141,28 +138,17 @@ Definition sb_bmapstart : mword 64 :=
   pa_add (mword_of_int KernelSyms.sb : mword 64) 28.
 
 (* ===================================================================== *)
-(*  The pure well-formedness of a bitmap                                  *)
+(*  The pure READING of a bitmap -- derived, never maintained              *)
 (* ===================================================================== *)
 
-(* Every CLEAR bit below [size] names a usable client block.  This is the
-   only thing that converts balloc's scan result into the two facts bread
-   and log_write demand; [x <> 0] comes free from [cov_ok]. *)
+(* Every CLEAR bit below [size] names a usable client block.  This is what
+   converts balloc's scan result into the two facts bread and log_write
+   demand of a block number; [x <> 0] comes free from [cov_ok].  It is NOT a
+   conjunct of [bitmap_res] and nothing preserves it: [bitmap_pool_home]
+   below derives it, at each read, from the pool's ownership. *)
 Definition bitmap_ok (cov : gset Z) (logstart size : Z) (used : gset Z) : Prop :=
   forall x : Z, 0 <= x < size -> x ∉ used ->
     x ∈ cov /\ ~ (x ∈ log_region_set logstart).
-
-Lemma bitmap_ok_add (cov : gset Z) (ls size : Z) (used : gset Z) (bi : Z) :
-  bitmap_ok cov ls size used -> bitmap_ok cov ls size (used ∪ {[bi]}).
-Proof. intros H x Hx Hnu. apply H; [exact Hx|set_solver]. Qed.
-
-Lemma bitmap_ok_del (cov : gset Z) (ls size : Z) (used : gset Z) (b : Z) :
-  b ∈ cov -> ~ (b ∈ log_region_set ls) ->
-  bitmap_ok cov ls size used -> bitmap_ok cov ls size (used ∖ {[b]}).
-Proof.
-  intros Hcov Hlog H x Hx Hnu.
-  destruct (decide (x = b)) as [->|Hne]; [split; assumption|].
-  apply H; [exact Hx|set_solver].
-Qed.
 
 (* the covered-ness fact a client of [bitmap_ok] actually applies *)
 Lemma bitmap_ok_free (cov : gset Z) (ls size : Z) (used : gset Z) (x : Z) :
@@ -213,128 +199,49 @@ Section BitmapRes.
     intros Hbi. apply bm_bytes_clear; [lia|]. apply bit_byte_lt. exact Hbi.
   Qed.
 
-  (* ---- the free pool ------------------------------------------------ *)
+  (* ---- a free block ------------------------------------------------- *)
 
-  (* one free block: its logical content (at SOME block-sized byte list --
-     the pool makes no promise about a free block's bytes, and bzero is
-     what makes the allocated one all-zero) and its EXCLUSIVE token *)
+  (* what the pool holds for a clear bit, and what balloc hands out: the
+     block's EXCLUSIVE byte run, at content nobody has committed to (the
+     pool promises nothing about a free block's bytes; bzero is what makes
+     the allocated one all-zero).  It is [FsStateBitmap.pool_elt]'s clear
+     arm, read through the bridge. *)
   Definition free_blk (γfs : fs_names) (b : Z) : iProp Σ :=
-    (∃ bs : list (bv 8), ⌜length bs = BSIZE⌝ ∗
-       fsblock (fs_bytes γfs) b bs ∗ blk_own γfs b)%I.
+    (∃ bs : list (bv 8), fsblock (fs_bytes γfs) b bs)%I.
 
-  Definition free_set (size : Z) (used : gset Z) : gset Z :=
-    (list_to_set (seqZ 0 size) : gset Z) ∖ used.
+  Lemma free_blk_intro (γfs : fs_names) (b : Z) (bs : list (bv 8)) :
+    fsblock (fs_bytes γfs) b bs -∗ free_blk γfs b.
+  Proof. iIntros "H". rewrite /free_blk. by iExists bs. Qed.
 
-  Lemma elem_of_free_set (size : Z) (used : gset Z) (x : Z) :
-    x ∈ free_set size used <-> (0 <= x < size /\ x ∉ used).
+  Lemma free_blk_of_owned (γfs : fs_names) (b : Z) :
+    (∃ bs, blk_owned (fs_gamma_L γfs) b bs) ⊣⊢ free_blk γfs b.
   Proof.
-    unfold free_set.
-    rewrite elem_of_difference elem_of_list_to_set elem_of_seqZ.
-    split.
-    - intros [H1 H2]. split; [lia | exact H2].
-    - intros [H1 H2]. split; [lia | exact H2].
+    rewrite /free_blk. iSplit.
+    - iIntros "H". iDestruct "H" as (bs) "H". iExists bs.
+      rewrite -gamma_blk_owned. iExact "H".
+    - iIntros "H". iDestruct "H" as (bs) "H". iExists bs.
+      rewrite gamma_blk_owned. iExact "H".
   Qed.
 
-  Definition free_pool (γfs : fs_names) (size : Z) (used : gset Z) : iProp Σ :=
-    ([∗ set] b ∈ free_set size used, free_blk γfs b)%I.
+  (* ---- the resource -------------------------------------------------- *)
 
-  (* ---- the resource ------------------------------------------------- *)
+  (* THE DESIGN PREDICATE, at the logged view.  [cov]/[logstart] are gone
+     from it: they only ever fed the deleted pure clause. *)
+  Definition bitmap_res (γfs : fs_names) (bmapstart size : Z)
+      (used : gset Z) : iProp Σ :=
+    free_bitmap_at (fs_gamma_L γfs) bmapstart size used.
 
-  Definition bitmap_res (γfs : fs_names) (bmapstart : Z)
-      (cov : gset Z) (logstart size : Z) (used : gset Z) : iProp Σ :=
-    (⌜bitmap_ok cov logstart size used⌝ ∗
-     fsblock (fs_bytes γfs) bmapstart (bitmap_bytes used) ∗
-     free_pool γfs size used)%I.
-
-  Lemma bitmap_res_open (γfs : fs_names) (bms : Z) (cov : gset Z)
-      (ls size : Z) (used : gset Z) :
-    bitmap_res γfs bms cov ls size used -∗
-      ⌜bitmap_ok cov ls size used⌝ ∗
-      fsblock (fs_bytes γfs) bms (bitmap_bytes used) ∗
-      free_pool γfs size used.
-  Proof. iIntros "H". iExact "H". Qed.
-
-  Lemma bitmap_res_close (γfs : fs_names) (bms : Z) (cov : gset Z)
-      (ls size : Z) (used : gset Z) :
-    bitmap_ok cov ls size used ->
-    fsblock (fs_bytes γfs) bms (bitmap_bytes used) -∗
-    free_pool γfs size used -∗
-    bitmap_res γfs bms cov ls size used.
+  Lemma bitmap_res_open (γfs : fs_names) (bms size : Z) (used : gset Z) :
+    bitmap_res γfs bms size used ⊣⊢
+      fsblock (fs_bytes γfs) bms (bitmap_bytes used)
+      ∗ free_pool (fs_gamma_L γfs) size used.
   Proof.
-    iIntros (Hok) "Hb Hp". rewrite /bitmap_res.
-    iSplitR; [iPureIntro; exact Hok|]. iFrame.
+    rewrite /bitmap_res /free_bitmap_at /bitmap_bytes gamma_blk_owned //.
   Qed.
 
-  (* ================================================================== *)
-  (*  The handshake                                                      *)
-  (* ================================================================== *)
-
-  Lemma free_set_take (size : Z) (used : gset Z) (bi : Z) :
-    free_set size used ∖ {[bi]} = free_set size (used ∪ {[bi]}).
-  Proof. unfold free_set. set_solver. Qed.
-
-  Lemma free_set_give (size : Z) (used : gset Z) (b : Z) :
-    0 <= b < size ->
-    free_set size (used ∖ {[b]}) = free_set size used ∪ {[b]}.
-  Proof.
-    intros Hb. apply set_eq. intros x.
-    rewrite elem_of_union elem_of_singleton !elem_of_free_set.
-    split.
-    - intros [Hx Hnu]. destruct (decide (x = b)) as [->|Hne]; [by right|].
-      left. split; [exact Hx|]. intros Hu. apply Hnu.
-      apply elem_of_difference. split; [exact Hu|].
-      rewrite elem_of_singleton. exact Hne.
-    - intros [[Hx Hnu]|Hxb].
-      + split; [exact Hx|]. intros Hd.
-        apply elem_of_difference in Hd as [Hu _]. exact (Hnu Hu).
-      + subst x. split; [lia|]. intros Hd.
-        apply elem_of_difference in Hd as [_ Hns].
-        apply Hns, elem_of_singleton. reflexivity.
-  Qed.
-
-  (* ALLOCATE: a clear bit yields the block's half and its token, and the
-     pool shrinks by exactly that block. *)
-  Lemma free_pool_take (γfs : fs_names) (size : Z) (used : gset Z) (bi : Z) :
-    0 <= bi < size -> bi ∉ used ->
-    free_pool γfs size used -∗
-      free_blk γfs bi ∗ free_pool γfs size (used ∪ {[bi]}).
-  Proof.
-    intros Hbi Hnu. rewrite /free_pool.
-    rewrite (big_sepS_delete _ (free_set size used) bi
-               ltac:(apply elem_of_free_set; split; [exact Hbi|exact Hnu])).
-    rewrite free_set_take. iIntros "[$ $]".
-  Qed.
-
-  (* THE PANIC REFUTATION.  The caller holds the block's token; if the bit
-     were clear the pool would hold a SECOND one at the same key, and
-     [blk_own] is a FULL-fraction ghost_map element. *)
-  Lemma free_pool_own_used (γfs : fs_names) (size : Z) (used : gset Z) (b : Z) :
-    0 <= b < size ->
-    blk_own γfs b -∗ free_pool γfs size used -∗ ⌜b ∈ used⌝.
-  Proof.
-    intros Hb. iIntros "Hown Hpool".
-    destruct (decide (b ∈ used)) as [Hin|Hnu]; [done|].
-    rewrite /free_pool.
-    rewrite (big_sepS_delete _ (free_set size used) b
-               ltac:(apply elem_of_free_set; split; [exact Hb|exact Hnu])).
-    iDestruct "Hpool" as "[Hb _]".
-    iDestruct "Hb" as (bs) "(_ & _ & Hown2)".
-    iExFalso. iApply (blk_own_excl with "Hown Hown2").
-  Qed.
-
-  (* FREE: the block's half and token go back into the pool, and the bit
-     is cleared. *)
-  Lemma free_pool_give (γfs : fs_names) (size : Z) (used : gset Z) (b : Z) :
-    0 <= b < size -> b ∈ used ->
-    free_blk γfs b -∗ free_pool γfs size used -∗
-    free_pool γfs size (used ∖ {[b]}).
-  Proof.
-    intros Hb Hin. iIntros "Hblk Hpool". rewrite /free_pool free_set_give //.
-    rewrite big_sepS_union.
-    2:{ apply disjoint_singleton_r. rewrite elem_of_free_set.
-        intros [_ Hnu]. exact (Hnu Hin). }
-    rewrite big_sepS_singleton. iFrame.
-  Qed.
+  Global Instance bitmap_res_timeless γfs bms size used :
+    Timeless (bitmap_res γfs bms size used).
+  Proof. rewrite /bitmap_res. apply _. Qed.
 
   (* ================================================================== *)
   (*  What a CALLER of balloc has to hold                                *)
@@ -352,17 +259,6 @@ Section BitmapRes.
     /\ bmapstart ∈ cov
     /\ ~ (bmapstart ∈ log_region_set logstart).
 
-  (* the shape bfree's caller hands over: a block-sized content half plus
-     the token *)
-  Lemma free_blk_intro (γfs : fs_names) (b : Z) (bs : list (bv 8)) :
-    length bs = BSIZE ->
-    fsblock (fs_bytes γfs) b bs -∗ blk_own γfs b -∗ free_blk γfs b.
-  Proof.
-    iIntros (Hlen) "Hb Ho". rewrite /free_blk. iExists bs.
-    iSplitR; [iPureIntro; exact Hlen|]. iFrame.
-  Qed.
-
-
   (* ================================================================== *)
   (*  THE INVARIANT: who owns [bitmap_res] between calls                *)
   (* ================================================================== *)
@@ -376,53 +272,46 @@ Section BitmapRes.
      anything about it.
 
      The shape is [InodeRegion]'s, verbatim, one layer over: the block's
-     client half never leaves the invariant except at log_write's own ghost
+     byte run never leaves the invariant except at log_write's own ghost
      step.  A caller between bread and brelse holds the block's MACHINERY
-     half in its handle, and that half against the parked client half is
-     what tells it the bytes it read are [bitmap_bytes used] for SOME
-     [used] -- [bitmap_read] below.  The one moment the client half is
-     withdrawn is [SpecLogWrite.wp_log_write_au]'s fupd, and the two
-     suppliers of that fupd are [bitmap_alloc_au] (set a bit, take the
-     block out of the pool) and [bitmap_free_au] (clear a bit, put the block
-     back).  Both re-park the block at the written bytes in the same
-     opening, so the invariant is never open across an instruction.
+     half in its handle, and that half against the parked run is what tells
+     it the bytes it read are [bitmap_bytes used] for SOME [used] --
+     [bitmap_read] below.  The one moment the run is withdrawn is
+     [SpecLogWrite.wp_log_write_au]'s fupd, and the two suppliers of that
+     fupd are [bitmap_alloc_au] (set a bit, take the block out of the pool)
+     and [bitmap_free_au] (clear a bit, put the block back).  Both re-park
+     the block at the written bytes in the same opening, so the invariant is
+     never open across an instruction.
 
      WHY THE SUPPLIERS ARE STATED AT THE CALLER'S SET.  The caller learned
      [bsl = bitmap_bytes u0] at its bread; by the time its log_write fires,
      the invariant parks SOME [u1] with [bitmap_bytes u1 = bsl] -- the
-     machinery half in the handle froze the bytes, not the set.  The two
+     machinery half in the handle froze the BYTES, not the set.  The two
      need not be equal as sets (only below [BPB] do the bytes see them),
      and nothing downstream cares: [bitmap_bytes_eq_bit] transfers the one
      bit the caller tested, and [bitmap_bytes_ext] transfers the written
      image.  So each supplier takes the caller's [u0] and the caller's bit,
      and the [u1]-side bookkeeping stays inside this file. *)
 
-  Global Instance bitmap_res_timeless γfs bms cov ls size used :
-    Timeless (bitmap_res γfs bms cov ls size used).
-  Proof. rewrite /bitmap_res /free_pool /free_blk /blk_own. apply _. Qed.
-
   Definition bitmapN : namespace := nroot .@ "bitmap".
 
-  Definition bitmap_body (γfs : fs_names) (bms : Z) (cov : gset Z)
-      (ls size : Z) : iProp Σ :=
-    (∃ used : gset Z, bitmap_res γfs bms cov ls size used)%I.
+  Definition bitmap_body (γfs : fs_names) (bms size : Z) : iProp Σ :=
+    (∃ used : gset Z, bitmap_res γfs bms size used)%I.
 
-  Global Instance bitmap_body_timeless γfs bms cov ls size :
-    Timeless (bitmap_body γfs bms cov ls size).
+  Global Instance bitmap_body_timeless γfs bms size :
+    Timeless (bitmap_body γfs bms size).
   Proof. rewrite /bitmap_body. apply _. Qed.
 
   (* THE BYTE VIEW'S ROW RIDES HERE (durable-disk 1c-flip step 3).  The
-     bitmap block and every free block are HOME blocks and are now owned as
-     EXCLUSIVE byte runs, so a reader can no longer pin its bread bytes by
-     an auth-free half/half agreement -- it opens [fs_bytes_inv].  Unlike
-     [InodeRegion.ireg_inv] this invariant already carries [cov] and [ls],
-     so the home set is NAMED here rather than bound, and the bitmap
-     block's own membership rides beside it (nothing else states it: it is
-     [bitmap_geom_ok]'s, and [bitmap_ok] speaks only about the blocks the
-     pool holds). *)
+     bitmap block and every free block are HOME blocks and are owned as
+     EXCLUSIVE byte runs, so a reader pins its bread bytes by opening
+     [fs_bytes_inv].  Unlike [InodeRegion.ireg_inv] this invariant already
+     carries [cov] and [ls], so the home set is NAMED here rather than
+     bound, and the bitmap block's own membership rides beside it
+     ([bitmap_geom_ok]'s). *)
   Definition bitmap_inv (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) : iProp Σ :=
-    (inv bitmapN (bitmap_body γfs bms cov ls size) ∗
+    (inv bitmapN (bitmap_body γfs bms size) ∗
      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls))%I.
 
   Global Instance bitmap_inv_persistent γfs bms cov ls size :
@@ -434,11 +323,11 @@ Section BitmapRes.
   Lemma bitmap_inv_alloc (E : coPset) (γfs : fs_names) (bms : Z)
       (cov : gset Z) (ls size : Z) (used : gset Z) :
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
-    bitmap_res γfs bms cov ls size used ={E}=∗
+    bitmap_res γfs bms size used ={E}=∗
     bitmap_inv γfs bms cov ls size.
   Proof.
     iIntros "#Hbinv H".
-    iMod (inv_alloc bitmapN E (bitmap_body γfs bms cov ls size)
+    iMod (inv_alloc bitmapN E (bitmap_body γfs bms size)
             with "[H]") as "#Hi".
     { iNext. rewrite /bitmap_body. iExists used. iExact "H". }
     iModIntro. rewrite /bitmap_inv. iFrame "Hi Hbinv".
@@ -463,6 +352,62 @@ Section BitmapRes.
   (* [logN] and [bitmapN] are distinct namespaces *)
   Lemma logN_bitmapN_disj : (↑logN : coPset) ## ↑bitmapN.
   Proof. solve_ndisj. Qed.
+
+  (* ---- [bitmap_ok], READ OFF THE POOL ------------------------------- *)
+
+  (* one block at a time, with the byte map's auth in hand: a clear bit
+     means the pool owns that block's run, and holding a run IS being a home
+     block ([FsBlocks.fsblock_home]).  The [∀] is a Coq quantifier over a
+     PURE conclusion, so the pool is used once per instantiation and nothing
+     is consumed -- the same shape as [InodeInv.inode_fresh]. *)
+  Local Lemma pool_home_pure (γfs : fs_names) (L : gmap Z (bv 8))
+      (home : gset Z) (size : Z) (u : gset Z) :
+    bytes_dom L home ->
+    ghost_map_auth (fs_bytes γfs) 1 L -∗
+    free_pool (fs_gamma_L γfs) size u -∗
+    ⌜forall x : Z, 0 <= x < size -> x ∉ u -> x ∈ home⌝.
+  Proof.
+    intros Hdm. iIntros "Ha Hpool".
+    rewrite bi.pure_forall. iIntros (x).
+    destruct (decide (0 <= x < size)) as [Hx|Hx];
+      [| iPureIntro; intros Hc; exfalso; exact (Hx Hc)].
+    destruct (decide (x ∈ u)) as [Hu|Hu];
+      [ iPureIntro; intros _ Hc; exfalso; exact (Hc Hu) |].
+    assert (Hx' : Z.of_nat (Z.to_nat x) = x) by lia.
+    rewrite (free_pool_split (fs_gamma_L γfs) size u (Z.to_nat x)); [| lia].
+    rewrite Hx' {1}/pool_elt (bool_decide_eq_false_2 _ Hu).
+    iDestruct "Hpool" as "[Hb _]".
+    iDestruct "Hb" as (bsx) "Hb".
+    rewrite gamma_blk_owned.
+    iDestruct (fsblock_home (fs_bytes γfs) L home x bsx Hdm with "Ha Hb") as %Hin.
+    iPureIntro. intros _ _. exact Hin.
+  Qed.
+
+  (* ...and the whole of [bitmap_ok], in one opening of the byte view *)
+  Lemma bitmap_pool_home (E : coPset) (γfs : fs_names) (home : gset Z)
+      (size : Z) (u : gset Z) :
+    ↑logN ⊆ E ->
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    free_pool (fs_gamma_L γfs) size u ={E}=∗
+      ⌜forall x : Z, 0 <= x < size -> x ∉ u -> x ∈ home⌝
+      ∗ free_pool (fs_gamma_L γfs) size u.
+  Proof.
+    iIntros (HE) "#Hinv Hpool".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct (pool_home_pure γfs L home size u Hdm with "Ha Hpool") as %Hres.
+    iMod ("Hclose" with "[Ha HC]") as "_".
+    { iNext. iExists L, C. by iFrame. }
+    iModIntro. by iFrame.
+  Qed.
+
+  Lemma bitmap_ok_of_home (cov : gset Z) (ls size : Z) (u : gset Z) :
+    (forall x : Z, 0 <= x < size -> x ∉ u -> x ∈ fs_home_set cov ls) ->
+    bitmap_ok cov ls size u.
+  Proof.
+    intros H x Hx Hnu. specialize (H x Hx Hnu).
+    rewrite /fs_home_set elem_of_difference in H. exact H.
+  Qed.
 
   (* ---- the two pure bridges between the caller's set and the parked one *)
 
@@ -523,15 +468,11 @@ Section BitmapRes.
   (* ---- the READ: one mask-preserving opening between bread and brelse *)
 
   (* The caller's handle carries the bitmap block's machinery half at the
-     bytes bread returned; against the parked client half that pins the
-     bytes to the image of SOME set, and [bitmap_ok] at that set is what the
-     scan needs of a clear bit.  Everything goes back; only facts come out. *)
+     bytes bread returned; against the parked run that pins the bytes to the
+     image of SOME set.  Everything goes back; only facts come out. *)
   Lemma bitmap_read (E : coPset) (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (bsl : list (bv 8)) :
     ↑bitmapN ⊆ E ->
-    (* THE FLIP'S ONE ADDITION (durable-disk 1c-flip step 3): the parked
-       resource is the block's EXCLUSIVE byte run, so pinning the caller's
-       bread bytes is an OPEN of the byte view's invariant. *)
     ↑logN ⊆ E ->
     bitmap_inv γfs bms cov ls size -∗
     (bms ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
@@ -544,31 +485,34 @@ Section BitmapRes.
     assert (HlogB : (↑logN : coPset) ⊆ E ∖ ↑bitmapN)
       by (apply subseteq_difference_r; [apply logN_bitmapN_disj | exact HEl]).
     iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (used) "(>%Hok & >Hfsb & >Hpool)".
+    iDestruct "Hbody" as (used) ">Hres".
+    rewrite bitmap_res_open. iDestruct "Hres" as "[Hfsb Hpool]".
     iMod (fs_bytes_agree (E ∖ ↑bitmapN) (fs_bytes γfs) (fs_cache γfs)
             (fs_home_set cov ls) bms (bitmap_bytes used) bsl HlogB
             with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
+    iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) size used
+            HlogB with "Hbinv Hpool") as "(%Hhome & Hpool)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. rewrite /bitmap_res.
-      iFrame. done. }
-    iModIntro. iFrame "Hhalf". iPureIntro. exists used. auto.
+    { iNext. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
+      iFrame. }
+    iModIntro. iFrame "Hhalf". iPureIntro. exists used.
+    split; [exact Hbytes | exact (bitmap_ok_of_home cov ls size used Hhome)].
   Qed.
 
-  (* ...and bfree's read: the caller holds the block's token, so the bit is
-     SET -- [free_pool_own_used] is the panic refutation, now stated where
-     the pool lives. *)
+  (* ...and bfree's read: the caller holds the block's own byte run, so the
+     bit is SET -- [FsStateBitmap.free_pool_used] is the panic refutation,
+     and it is exclusivity, not a clause. *)
   Lemma bitmap_read_own (E : coPset) (γfs : fs_names) (bms : Z) (cov : gset Z)
-      (ls size : Z) (b : Z) (bsl : list (bv 8)) :
+      (ls size : Z) (b : Z) (bs bsl : list (bv 8)) :
     ↑bitmapN ⊆ E ->
-    (* see [bitmap_read] (durable-disk 1c-flip step 3) *)
     ↑logN ⊆ E ->
     0 <= b < size ->
     bitmap_inv γfs bms cov ls size -∗
-    blk_own γfs b -∗
+    fsblock (fs_bytes γfs) b bs -∗
     (bms ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
     ⌜exists used : gset Z,
        bsl = bitmap_bytes used /\ bitmap_ok cov ls size used /\ b ∈ used⌝ ∗
-    blk_own γfs b ∗
+    fsblock (fs_bytes γfs) b bs ∗
     (bms ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl Hb) "#Hinv Hown Hhalf".
@@ -576,26 +520,36 @@ Section BitmapRes.
     assert (HlogB : (↑logN : coPset) ⊆ E ∖ ↑bitmapN)
       by (apply subseteq_difference_r; [apply logN_bitmapN_disj | exact HEl]).
     iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (used) "(>%Hok & >Hfsb & >Hpool)".
+    iDestruct "Hbody" as (used) ">Hres".
+    rewrite bitmap_res_open. iDestruct "Hres" as "[Hfsb Hpool]".
     iMod (fs_bytes_agree (E ∖ ↑bitmapN) (fs_bytes γfs) (fs_cache γfs)
             (fs_home_set cov ls) bms (bitmap_bytes used) bsl HlogB
             with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
-    iDestruct (free_pool_own_used γfs size used b Hb with "Hown Hpool") as %Hin.
+    iEval (rewrite -gamma_blk_owned) in "Hown".
+    iDestruct (free_pool_used (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
+                 size used b bs Hb with "Hpool Hown") as %Hin.
+    iEval (rewrite gamma_blk_owned) in "Hown".
+    iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) size used
+            HlogB with "Hbinv Hpool") as "(%Hhome & Hpool)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. rewrite /bitmap_res.
-      iFrame. done. }
-    iModIntro. iFrame "Hown Hhalf". iPureIntro. exists used. auto.
+    { iNext. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
+      iFrame. }
+    iModIntro. iFrame "Hown Hhalf". iPureIntro. exists used.
+    split; [exact Hbytes |].
+    split; [exact (bitmap_ok_of_home cov ls size used Hhome) | exact Hin].
   Qed.
 
   (* ---- the two ATOMIC-UPDATE suppliers for [wp_log_write_au] ---- *)
 
   (* balloc's: the caller found bit [bi] clear in the bytes it read
      ([bi ∉ u0]), set it in the buffer, and log_writes.  The fupd surrenders
-     the client half at whatever the invariant parks; log_write's own
+     the bitmap block's run at whatever the invariant parks; log_write's own
      agreement delivers [bsl' = bitmap_bytes u0]; the closing wand takes the
-     half back at the image of [u0 ∪ {[bi]}] and pays out the block --
-     content half, token, and the two facts bread and log_write will demand
-     of it.  [lw_au_lb0] is the adapter to the anchored shape. *)
+     run back at the image of [u0 ∪ {[bi]}] and pays out THE BLOCK -- its
+     byte run, AND NOTHING ELSE.  The two facts bread and log_write demand
+     of the block number are not here: the caller learned them at its
+     [bitmap_read], where they are read off the pool's ownership rather than
+     off any clause.  [lw_au_lb0] is the adapter to the anchored shape. *)
   Lemma bitmap_alloc_au (E : coPset) (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (u0 : gset Z) (bi : Z) :
     ↑bitmapN ⊆ E ->
@@ -607,36 +561,38 @@ Section BitmapRes.
       fsblock (fs_bytes γfs) bms bsl' ∗
       (⌜bsl' = bitmap_bytes u0⌝ -∗
        fsblock (fs_bytes γfs) bms (bitmap_bytes (u0 ∪ {[bi]})) ={E ∖ ↑bitmapN, E}=∗
-       free_blk γfs bi ∗ ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set ls)⌝).
+       free_blk γfs bi).
   Proof.
     iIntros (HE Hsz Hbi Hnu) "#Hinv".
-    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
-    iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (u1) "(>%Hok & >Hfsb & >Hpool)".
+    iDestruct "Hinv" as "(#Hbmi & #Hbinv)".
+    iMod (inv_acc E bitmapN with "Hbmi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (u1) ">Hres".
+    rewrite bitmap_res_open. iDestruct "Hres" as "[Hfsb Hpool]".
     iModIntro. iExists (bitmap_bytes u1). iFrame "Hfsb".
     iIntros (Hbytes) "Hfsb'".
     assert (Hnu1 : bi ∉ u1).
     { intros Hin. apply Hnu.
       apply (bitmap_bytes_eq_bit u1 u0 bi ltac:(lia) Hbytes). exact Hin. }
-    iDestruct (free_pool_take γfs size u1 bi Hbi Hnu1 with "Hpool") as "[Hblk Hpool]".
+    rewrite (free_pool_take (fs_gamma_L γfs) size u1 bi Hbi Hnu1).
+    iDestruct "Hpool" as "[Hblk Hpool]".
     iMod ("Hclose" with "[Hfsb' Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists (u1 ∪ {[bi]}). rewrite /bitmap_res.
-      rewrite (bitmap_bytes_eq_union u0 u1 bi (eq_sym Hbytes)).
-      iFrame. iPureIntro. apply bitmap_ok_add. exact Hok. }
-    iModIntro. iFrame "Hblk". iPureIntro.
-    exact (bitmap_ok_free cov ls size u1 bi Hok Hbi Hnu1).
+    { iNext. rewrite /bitmap_body. iExists (u1 ∪ {[bi]}).
+      rewrite bitmap_res_open.
+      rewrite (bitmap_bytes_eq_union u0 u1 bi (eq_sym Hbytes)). iFrame. }
+    iModIntro. rewrite -free_blk_of_owned. iExact "Hblk".
   Qed.
 
-  (* bfree's: the caller arrives with the block (content half and token),
-     clears its bit in the buffer, and log_writes.  The block goes back into
-     the pool in the same opening that re-parks the bitmap at the image of
-     [u0 ∖ {[b]}].  Nothing comes out: the receipt is [emp]. *)
+  (* bfree's: the caller arrives with the block's byte run, clears its bit
+     in the buffer, and log_writes.  The block goes back into the pool in
+     the same opening that re-parks the bitmap at the image of [u0 ∖ {[b]}].
+     Nothing comes out: the receipt is [emp].  The caller supplies no
+     covered-ness premise -- the pool takes the block back wherever it came
+     from, and the bit's being SET is [free_pool_used]'s exclusivity
+     argument inside. *)
   Lemma bitmap_free_au (E : coPset) (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) (u0 : gset Z) (b : Z) :
     ↑bitmapN ⊆ E ->
     0 <= b < size ->
-    b ∈ cov ->
-    ~ (b ∈ log_region_set ls) ->
     bitmap_inv γfs bms cov ls size -∗
     free_blk γfs b -∗
     |={E, E ∖ ↑bitmapN}=> ∃ bsl' : list (bv 8),
@@ -644,20 +600,21 @@ Section BitmapRes.
       (⌜bsl' = bitmap_bytes u0⌝ -∗
        fsblock (fs_bytes γfs) bms (bitmap_bytes (u0 ∖ {[b]})) ={E ∖ ↑bitmapN, E}=∗ emp).
   Proof.
-    iIntros (HE Hb Hcov Hlog) "#Hinv Hblk".
-    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
-    iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (u1) "(>%Hok & >Hfsb & >Hpool)".
+    iIntros (HE Hb) "#Hinv Hblk".
+    iDestruct "Hinv" as "(#Hbmi & #Hbinv)".
+    iMod (inv_acc E bitmapN with "Hbmi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (u1) ">Hres".
+    rewrite bitmap_res_open. iDestruct "Hres" as "[Hfsb Hpool]".
     iModIntro. iExists (bitmap_bytes u1). iFrame "Hfsb".
     iIntros (Hbytes) "Hfsb'".
-    iDestruct "Hblk" as (bs) "(%Hlen & Hb & Hown)".
-    iDestruct (free_pool_own_used γfs size u1 b Hb with "Hown Hpool") as %Hin.
-    iDestruct (free_pool_give γfs size u1 b Hb Hin with "[Hb Hown] Hpool") as "Hpool".
-    { iApply (free_blk_intro with "Hb Hown"). exact Hlen. }
+    iDestruct "Hblk" as (bsx) "Hblk".
+    iEval (rewrite -gamma_blk_owned) in "Hblk".
+    iDestruct (free_pool_give (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
+                 size u1 b bsx Hb with "Hblk Hpool") as "Hpool".
     iMod ("Hclose" with "[Hfsb' Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists (u1 ∖ {[b]}). rewrite /bitmap_res.
-      rewrite (bitmap_bytes_eq_diff u0 u1 b (eq_sym Hbytes)).
-      iFrame. iPureIntro. apply bitmap_ok_del; assumption. }
+    { iNext. rewrite /bitmap_body. iExists (u1 ∖ {[b]}).
+      rewrite bitmap_res_open.
+      rewrite (bitmap_bytes_eq_diff u0 u1 b (eq_sym Hbytes)). iFrame. }
     done.
   Qed.
 

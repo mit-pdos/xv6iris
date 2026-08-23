@@ -611,7 +611,7 @@ Neither is an icache *invariant*. That is the substantive correction to
 Falling out of (C1) in §3: when an entry is recycled, the previous inode's
 `ind_res` and `inode_blocks` have to go **somewhere**, and when a
 never-cached inode is `ilock`ed for the first time its blocks have to come
-**from** somewhere. The `fsblock`/`blk_own` for every covered block are
+**from** somewhere. The `fsblock` of every covered block is
 minted at boot (`FsBoot.fs_alloc`) and today are partitioned between the
 bitmap's free pool (`BitmapInv.free_pool`), the log's own storage, and
 whatever the in-flight proofs hold. **The used data blocks of inodes that
@@ -1020,7 +1020,7 @@ no hook in bio's interface to ride on. bio's own escrow escapes only
 because `bown` is a resource its mid-window calls never need; the region
 has no such spare. Variants tried and killed by the same argument: an
 enter/exit pair bracketing the whole bread..brelse window (its mid state
-is unrefutable at enter for exactly the same reason); `blk_own` as the
+is unrefutable at enter for exactly the same reason); a per-block token as the
 credential (no way to acquire it before the first opening); fractional
 splits of `disk_block` or the halves (mass conservation).
 

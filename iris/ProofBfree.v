@@ -24,7 +24,7 @@
    names no set.  The proof touches the invariant exactly twice:
 
      - after bread, [BitmapInv.bitmap_read_own] against the handle's
-       MACHINERY half ([BioFs.bio_held_fs_L]) -- the client half never leaves --
+       MACHINERY half ([BioFs.bio_held_fs_L]) -- the parked run never leaves --
        learns [bs0 = bitmap_bytes used] for some [used], [bitmap_ok] at it,
        and [bi ∈ used];
      - at log_write, [SpecLogWrite.wp_log_write_au] fired with
@@ -33,10 +33,10 @@
        [used ∖ {[bi]}].  The receipt is [emp].
 
    HOW THE PANIC DIES (the point of the whole exercise).  The caller arrives
-   holding [blk_own γfs b] -- a FULL-fraction ghost_map element -- while
-   [BitmapInv.free_pool] holds one such token for every block below [size]
-   whose bit is CLEAR.  The read above therefore gives [b ∈ used] outright
-   ([BitmapInv.free_pool_own_used], now inside [bitmap_read_own]), and
+   holding block [b]'s EXCLUSIVE byte run, while the free pool holds the run
+   of every block below [size] whose bit is CLEAR.  The read above therefore
+   gives [b ∈ used] outright ([FsStateBitmap.free_pool_used], inside
+   [bitmap_read_own]), and
    [BitmapEnc.bm_bit_test] turns that into
    [bp->data[bi/8] & m = 2^(b mod 8) <> 0]: the [c.beqz] at +0x3a falls
    THROUGH, and the arm at +0x60 is never entered.  Nothing about the panic
@@ -567,8 +567,6 @@ Section BfreeTail.
     ~ (bmapstart ∈ log_region_set logstart) ->
     (* the freed block, for [BitmapInv.bitmap_free_au] *)
     0 <= bi < size ->
-    bi ∈ cov ->
-    ~ (bi ∈ log_region_set logstart) ->
     sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 b (proc_addr j) b lks -∗
     trap_csrs_ext KT1 b -∗
@@ -593,7 +591,7 @@ Section BfreeTail.
             pidv dq dqb j m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hbirange Hbicov Hbilog.
+    intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hbirange.
     pose proof HK as HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop #Hbminv Hblk Hheld Hcont".
     (* the degenerate writer's anchor: nobody here owes a receipt *)
@@ -641,7 +639,7 @@ Section BfreeTail.
        point of the invariant.  [lw_au_lb0] parks the writer's epoch anchor
        at zero, where nobody owes a receipt. *)
     iDestruct (bitmap_free_au ⊤ γfs bmapstart cov logstart size used bi
-                 ltac:(solve_ndisj) Hbirange Hbicov Hbilog with "Hbminv Hblk")
+                 ltac:(solve_ndisj) Hbirange with "Hbminv Hblk")
       as "Hau".
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
        atomic-update contract is stated over the Psi-NAMED context, because
@@ -1039,7 +1037,7 @@ Section ProofBfreeMain.
     { rewrite HbnoB. exact (proj2 Hbm31). }
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb #Hbminv Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb #Hbminv Hfsb Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl #Hcredit Hop Hcont".
     (* bfree enters at level 0, so the live index IS the saved base -- one
        variable [b] carries both from here on (the porting guide's "derive
@@ -1369,7 +1367,7 @@ Section ProofBfreeMain.
        bitmap block's client half is parked in [BitmapInv.bitmap_inv]; the
        handle's MACHINERY half against it pins the bytes bread returned to
        [bitmap_bytes used] for SOME [used], and -- because we arrive holding
-       the freed block's exclusive [blk_own] -- that same opening yields
+       the freed block's own EXCLUSIVE byte run -- that same opening yields
        [bi ∈ used], which is the whole of the panic refutation.  Everything
        goes back; only facts come out.  ([bitmap_read_own].) *)
     iEval (rewrite /bio_locked) in "Hheld".
@@ -1377,17 +1375,17 @@ Section ProofBfreeMain.
     iDestruct (bio_held_fs_L with "Hheld") as "[HL Hbackl]".
     iEval (rewrite HbnoB) in "HL".
     iApply fupd_wp.
-    iMod (bitmap_read_own ⊤ γfs bmapstart cov logstart size bi bs0
-            ltac:(solve_ndisj) logN_top Hbirange with "Hbminv Hown HL")
-      as "(%Hex & Hown & HL)".
+    iMod (bitmap_read_own ⊤ γfs bmapstart cov logstart size bi bs bs0
+            ltac:(solve_ndisj) logN_top Hbirange with "Hbminv Hfsb HL")
+      as "(%Hex & Hfsb & HL)".
     iEval (rewrite -HbnoB) in "HL".
     iDestruct ("Hbackl" with "HL") as "Hheld".
     iModIntro.
     destruct Hex as (used & Hbs0 & Hok & Hin).
     subst bs0.
-    (* the pool step the postcondition needs: the caller's two halves become
-       the pool entry [bitmap_free_au] will deposit at log_write *)
-    iDestruct (free_blk_intro γfs bi bs Hbslen with "Hfsb Hown") as "Hblk".
+    (* the pool step the postcondition needs: the caller's run becomes the
+       pool entry [bitmap_free_au] will deposit at log_write *)
+    iDestruct (free_blk_intro γfs bi bs with "Hfsb") as "Hblk".
     iDestruct (iu_held_swap with "Hheld") as "[Hbuf Hheldback]".
     (* the byte the code reads and writes *)
     assert (Hlkused : bitmap_bytes used !!! d = bm_byte used q).
@@ -1628,7 +1626,7 @@ Section ProofBfreeMain.
                     = mword_of_int (KernelSyms.bfree + 0x3a)) by pcw.
     iEval (rewrite Hpp3a) in "Hpc".
     (* ===== +0x3a c.beqz a3 : THE DEAD PANIC.  The bit is SET (the caller's
-       [blk_own] token forced [bi ∈ used]), so the branch is not taken. ===== *)
+       byte run forced [bi ∈ used]), so the branch is not taken. ===== *)
     assert (Hnz : eq_vec (rget B7 Ra3) zero_reg = false).
     { destruct (bf_pow_bound r Hrmod) as [Hp0 Hp1].
       rgne. rewrite HB7a3. apply eq_vec_false_iff.
@@ -1809,7 +1807,7 @@ Section ProofBfreeMain.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
               dev used bi u cr Sb e0 kk bnoB bsd0 d0 pidv dq dqb m B11 K b lks
               Vpr Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog
-              Hbirange Hbicov Hbilog
+              Hbirange
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hcredit Hop Hbminv Hblk Hheld [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
@@ -1838,7 +1836,7 @@ Section ProofBfreeMain.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     (* the counted form opens its own birth epoch and presents the EMPTY
@@ -1852,7 +1850,7 @@ Section ProofBfreeMain.
               pidv dq dqb m K eb b lks
               Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].

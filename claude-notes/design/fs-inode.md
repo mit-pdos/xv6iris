@@ -79,41 +79,21 @@ quantified clause each.
   list was all-zero too. Vacuous on the resulting `bm'` (its `bm_ind` is
   nonzero) and preserved everywhere else.
 
-### Injectivity is NOT derivable from the CACHE half — the ownership token
-
-(Superseded once the byte view's consumers flip: `FsBlocks.fsblock` is now
-a run of FULL byte elements and `fsblock_excl` gives injectivity directly,
-which is what retires `blk_own`. `fs-state.md` §2, `durable-disk.md` 1c.
-The reading below is why the token exists while clients still hold
-`fs_chalf`.)
+### Injectivity comes from EXCLUSIVITY of the byte run
 
 The first draft of this document asserted that "`balloc`'s freshness
-re-establishes injectivity at every insertion". **That was wrong, and it
-blocked bmap's proof.** `fs_chalf γ b bs` is `b ↪[fs_cache γ]{#(1/2)} bs` — a
-HALF. Two owners each holding a half of one key is perfectly consistent:
-they `iCombine` into a valid full element (machine-checked). The third half
-that *would* contradict is the machinery half, and it lives inside
-`bio_ctx`'s escrow — unreachable at a straight-line instruction step.
-Adding `inode_blocks` does not rescue it either: aliasing then merely yields
-`data i = replicate BSIZE 0`, which is not absurd.
+re-establishes injectivity at every insertion", and at the time that was
+wrong: the client resource was `fs_chalf γ b bs = b ↪[fs_cache γ]{#(1/2)} bs`,
+a HALF, and two owners each holding a half of one key are perfectly
+consistent. That is why a separate exclusive per-block token existed.
 
-So the layer needs an **exclusive** per-block ownership token, and it lives
-in the block layer beside `fs_cache` and `fs_dirty` (not bolted onto the inode
-layer — "which owner holds block `b`" is FS-block-layer state, and it is
-what the bitmap invariant will need when `balloc` is finally proved):
-
-```coq
-  fs_names gains  fs_own : gname          (* ghost_map Z unit *)
-  blk_own γ b := b ↪[fs_own γ] tt          (* FULL fraction => exclusive *)
-  blk_own_excl : blk_own γ b -∗ blk_own γ b -∗ False
-  blk_own_ne   : blk_own γ b1 -∗ blk_own γ b2 -∗ ⌜b1 <> b2⌝
-```
-
-`blk_own_ne` is what every install site uses; injectivity then falls out in
-two lines. The token's AUTH is not needed yet — only element exclusivity —
-so it can be introduced before the bitmap invariant exists. `fs_alloc` mints
-one per covered block and `FsBoot`'s bundle carries them until there is a
-free pool to park them in.
+**It does not exist any more** (durable-disk 2b). `FsBlocks.fsblock` is a run
+of FULL byte elements, so two owners of one block's bytes is `False`
+(`fsblock_excl`), and **`FsBlocks.fsblock_ne` gives the distinctness every
+install site wants in one line** — the `↦`-distinctness idiom, never a
+maintained clause (`fs-state.md` §0). `InodeInv.inode_fresh` is that fact
+lifted to a whole block map, and it takes the fresh block's run and the
+inode's own runs; nothing else.
 
 ## The two resources
 
@@ -125,18 +105,16 @@ whole-file operation needs both.
 - the 13 `addrs` cells, exclusive: `[∗ list] j ↦ a ∈ bm_dir ++ [bm_ind],
   i_addr ip j ↦₄ u32 a`;
 - when `bm_ind ≠ 0`, the indirect block's own logical content, as an
-  `fsblock` at the *encoding* of `bm_ent`, **plus its `blk_own` token**:
-  `fsblock γfs (bm_ind bm) (ind_bytes (bm_ent bm)) ∗ blk_own γfs (bm_ind bm)`.
-  Those two are SEPARATELY NAMED (`ind_res := ind_blk ∗ ind_tok`), and that
-  split is load-bearing: bmap hands the content half to `log_write` and gets
-  it back re-indexed, so between the two it still has to present the token to
-  `inode_fresh`. A single fused conjunct would force the freshness step
-  before the store, where the new entry list does not exist yet.
+  `fsblock` at the *encoding* of `bm_ent`:
+  `ind_res γfs bm := ind_blk γfs bm := fsblock γfs (bm_ind bm) (ind_bytes (bm_ent bm))`.
+  There is no second conjunct: `ind_tok` is gone with the ownership token.
+  bmap hands the run to `log_write` and gets it back re-indexed, and
+  `InodeInv.ind_blk_run` is the fold/unfold equation it uses at whichever
+  spelling of the block number it happens to hold.
 
 **`inode_blocks γfs bm data`** — the file's data, `data : nat → list (bv 8)`:
 
-- `[∗ list] i ∈ allocated indices,
-   fsblock γfs (blkmap_get bm i) (data i) ∗ blk_own γfs (blkmap_get bm i)`.
+- `[∗ list] i ∈ allocated indices, fsblock γfs (blkmap_get bm i) (data i)`.
 
 **`bmap` takes BOTH.** An earlier draft said it "never looks at
 `inode_blocks`" while also saying the fresh half is deposited there — those
@@ -144,8 +122,8 @@ contradict, and the second is right. Without `inode_blocks` in the
 contract, `balloc`'s `fsblock` for a freshly allocated *data* block is
 silently discarded (affine, so the proof still goes through) and `writei`
 could never touch the block bmap just allocated — the contract would be
-useless to its only intended caller. It is also where the `blk_own` tokens
-for data blocks have to live, which the injectivity argument needs.
+useless to its only intended caller. It is also where the data blocks' runs
+have to live, which the injectivity argument needs.
 
 `writei` uses a one-block accessor out of `inode_blocks`, the same shape as
 `proc_pt_page_acc` in
@@ -198,10 +176,10 @@ and stays usable from the `Pt4kWalk`-style vanilla-rewrite files
 Its two arms:
 
 - **success** — returns `b ≠ 0` with `⌜b ∈ cov⌝`, `⌜b ∉ log_region⌝`,
-  `fsblock γfs b (replicate BSIZE 0)` and **`blk_own γfs b`**: `bzero` has
+  `fsblock γfs b (replicate BSIZE 0)`: `bzero` has
   already logged the block as all-zero, so the caller receives a zeroed
   block, not an arbitrary one. Spends **two** budget units (the bitmap
-  `log_write` plus `bzero`'s). The `blk_own` token IS the freshness claim —
+  `log_write` plus `bzero`'s). The RUN ITSELF is the freshness claim —
   without it the caller cannot show the block differs from one it already
   owns, and no amount of `fsblock` reasoning substitutes (see "Injectivity
   is NOT derivable" above).
@@ -212,7 +190,7 @@ is already a two-arm disjunction on the return value.
 
 Where a free block's `fsblock` half lives while free is the FREE POOL, in
 [`fs-bitmap.md`](fs-bitmap.md): bit `b` of the bitmap being clear is tied to
-block `b`'s half sitting in the pool alongside its exclusive `blk_own` token,
+block `b`'s run sitting in the pool,
 and that token's exclusivity is what makes this handshake sound.
 
 ## `bmap`'s contract
@@ -383,7 +361,7 @@ the map — that is the case the phantom would actually hurt.
 An inode block holds **16 different inodes'** dinodes, and the sharing is
 `InodeRegion.v`'s: the coarse whole-block `fsblock` premise is refined into a
 per-inum `dinode_at γi inum dn`, an exclusive `ghost_map` fragment, with the
-region invariant coupling the fragments to the block's bytes. No `blk_own` is
+region invariant coupling the fragments to the block's bytes. No token is
 needed anywhere here — iupdate establishes no injectivity.
 
 ## `writei` — the loop, and what a PARTIAL write may claim
@@ -773,7 +751,7 @@ So the map the disk names and the map the lock parked have to be the SAME
 it was tried and fails:
 
 - putting the `ind_res` in the CALLER's hands instead is contradictory on
-  the cached arm (two `blk_own` tokens for one indirect block);
+  the cached arm (two owners of one indirect block's bytes);
 - a `∀ bm, … -∗ ind_res γfs bm` "opener" in the lock is a resource nothing
   can produce;
 - parameterising `inode_parked` by `dn`/`bm` makes `iunlock` re-parkable
@@ -899,10 +877,10 @@ That is the whole reason the credit was worth building as a *positive,
 client-held claim* rather than a conditional refund: the caller never has
 to predict absorption, because it is the one that logged the block.
 
-**No `bm_blocks bm ⊆ used` premise.** `itrunc` holds `blk_own` for every
+**No `bm_blocks bm ⊆ used` premise.** `itrunc` holds the byte run of every
 block it frees (through `inode_blocks` and `ind_res`), and `bfree` derives
-"the bit is set" from that token itself
-(`BitmapInv.free_pool_own_used`). Demanding the set inclusion would have
+"the bit is set" from that run itself
+(`FsStateBitmap.free_pool_used`). Demanding the set inclusion would have
 made the contract uncallable by `iput`, which has no source for it. This is
 the fourth time in this effort a contract was nearly written with a premise
 its only caller could not supply; the check is always the same — *name the

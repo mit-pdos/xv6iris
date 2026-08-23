@@ -761,20 +761,23 @@ Section InodeRes.
     (if decide (bv_unsigned (bm_ind bm) = 0) then True
      else fsblock (fs_bytes γfs) (bv_unsigned (bm_ind bm)) (ind_bytes (bm_ent bm)))%I.
 
-  (* ...and the EXCLUSIVE ownership token for that same block.  Split off
-     from the content half deliberately: [fs_chalf] is a HALF ghost_map
-     element, so two of them at one key are consistent and carry no
-     disjointness at all; [blk_own] is the full element and is the only
-     thing that can re-establish [blkmap_wf]'s injectivity when a freshly
-     allocated block is installed ([inode_fresh] below).  Keeping it a
-     separate conjunct means a proof that has already spent the content
-     half (bmap, across its interior [log_write]) still holds the token. *)
-  Definition ind_tok (γfs : fs_names) (bm : blkmap) : iProp Σ :=
-    (if decide (bv_unsigned (bm_ind bm) = 0) then True
-     else blk_own γfs (bv_unsigned (bm_ind bm)))%I.
-
+  (* THE INDIRECT BLOCK'S RESOURCE IS ITS RUN, AND NOTHING BESIDE IT.
+     There used to be a second conjunct, an exclusive per-block token, for
+     disjointness -- necessary while the content resource was the block-keyed
+     HALF [fs_chalf], since two halves at one key are consistent and carry no
+     disjointness at all.  The run above is EXCLUSIVE, so [FsBlocks.fsblock_ne]
+     re-establishes [blkmap_wf]'s injectivity on its own ([inode_fresh]
+     below) and the token is gone (durable-disk 2b). *)
   Definition ind_res (γfs : fs_names) (bm : blkmap) : iProp Σ :=
-    (ind_blk γfs bm ∗ ind_tok γfs bm)%I.
+    ind_blk γfs bm.
+
+  (* the fold/unfold equation, at whatever spelling of the block number the
+     caller has (bmap holds the indirect block's run out of the map, at
+     [uint (bm_ind bm : mword 32)], across its own interior [log_write]) *)
+  Lemma ind_blk_run (γfs : fs_names) (bm : blkmap) (bi : Z) :
+    bv_unsigned (bm_ind bm) <> 0 -> bi = bv_unsigned (bm_ind bm) ->
+    fsblock (fs_bytes γfs) bi (ind_bytes (bm_ent bm)) ⊣⊢ ind_blk γfs bm.
+  Proof. intros Hnz ->. rewrite /ind_blk (decide_False _ _ Hnz) //. Qed.
 
   Definition inode_map (γfs : fs_names) (ip : mword 64) (bm : blkmap) : iProp Σ :=
     (inode_addrs ip (bm_cells bm) ∗ ind_res γfs bm)%I.
@@ -783,7 +786,7 @@ Section InodeRes.
 
   Definition blk_res (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) : iProp Σ :=
     (if decide (bv_unsigned w = 0) then True
-     else fsblock (fs_bytes γfs) (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w))%I.
+     else fsblock (fs_bytes γfs) (bv_unsigned w) bs)%I.
 
   Definition inode_blocks (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) : iProp Σ :=
@@ -792,8 +795,8 @@ Section InodeRes.
   (* ------------------------------------------------------------------ *)
   (*  BUILDING [inode_blocks] FROM BLOCK-GRANULAR RESOURCES              *)
   (*                                                                     *)
-  (*  A boot client (and, in general, anyone holding one [fs_chalf]/       *)
-  (*  [blk_own] pair per DISK BLOCK NUMBER) has its resources keyed by    *)
+  (*  A boot client (and, in general, anyone holding one byte run per     *)
+  (*  DISK BLOCK NUMBER) has its resources keyed by                       *)
   (*  block number; [inode_blocks] is keyed by FILE INDEX.  This is that  *)
   (*  change of granularity, and it is stated so that the 268-element     *)
   (*  big-op is NEVER unfolded at a caller's altitude: the framing hazard *)
@@ -886,12 +889,12 @@ Section InodeRes.
     (forall i : nat, (i < MAXFILE)%nat ->
        bv_unsigned (blkmap_get bm i) <> 0 ->
        data i = ct (bv_unsigned (blkmap_get bm i))) ->
-    ([∗ set] b ∈ V, fsblock (fs_bytes γfs) b (ct b) ∗ blk_own γfs b) -∗
+    ([∗ set] b ∈ V, fsblock (fs_bytes γfs) b (ct b)) -∗
     inode_blocks γfs bm data.
   Proof.
     intros Hinj Hmem Hdata. rewrite /inode_blocks.
     apply (big_sepS_reindex
-             (fun b => fsblock (fs_bytes γfs) b (ct b) ∗ blk_own γfs b)%I
+             (fun b => fsblock (fs_bytes γfs) b (ct b))%I
              (fun i => blk_res γfs (blkmap_get bm i) (data i))
              (fun i => bv_unsigned (blkmap_get bm i))
              (seq 0 MAXFILE) V).
@@ -933,7 +936,7 @@ Section InodeRes.
        data i = ct (bv_unsigned (blkmap_get bm i))) ->
     (bv_unsigned (bm_ind bm) <> 0 ->
        ind_bytes (bm_ent bm) = ct (bv_unsigned (bm_ind bm))) ->
-    ([∗ set] b ∈ U, fsblock (fs_bytes γfs) b (ct b) ∗ blk_own γfs b) -∗
+    ([∗ set] b ∈ U, fsblock (fs_bytes γfs) b (ct b)) -∗
     inode_blocks γfs bm data ∗ ind_res γfs bm.
   Proof.
     intros Hinj Hmem Hdata Hib.
@@ -956,8 +959,7 @@ Section InodeRes.
       iIntros "H". iSplitL "H".
       { iApply (inode_blocks_of_slots γfs bm U ct data Hinj2 Hmem2 Hdata).
         iExact "H". }
-      rewrite /ind_res /ind_blk /ind_tok !(decide_True _ _ Hz).
-      iSplitR; [done | done].
+      rewrite /ind_res /ind_blk (decide_True _ _ Hz). done.
     - (* THE INDIRECT BLOCK: out of [U] first, by ONE delete *)
       assert (Hind : bv_unsigned (bm_ind bm) ∈ U).
       { rewrite -bm_slot_top. apply Hmem; [lia |].
@@ -974,13 +976,12 @@ Section InodeRes.
           - rewrite (bm_slot_lt bm i Hi) bm_slot_top. apply bv_eq, Heq. }
         lia. }
       rewrite (big_sepS_delete
-                 (fun b => fsblock (fs_bytes γfs) b (ct b) ∗ blk_own γfs b)%I U
+                 (fun b => fsblock (fs_bytes γfs) b (ct b))%I U
                  (bv_unsigned (bm_ind bm)) Hind).
       iIntros "[Hi Hrest]". iSplitR "Hi".
       { iApply (inode_blocks_of_slots γfs bm (U ∖ {[bv_unsigned (bm_ind bm)]})
                   ct data Hinj2 Hmem3 Hdata). iExact "Hrest". }
-      rewrite /ind_res /ind_blk /ind_tok !(decide_False _ _ Hnz) (Hib Hnz).
-      iDestruct "Hi" as "[Ha Hb]". iFrame.
+      rewrite /ind_res /ind_blk (decide_False _ _ Hnz) (Hib Hnz). iExact "Hi".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1084,11 +1085,9 @@ Section InodeRes.
       (data : nat -> list (bv 8)) (i : nat) :
     (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
     inode_blocks γfs bm data -∗
-      (fsblock (fs_bytes γfs) (bv_unsigned (blkmap_get bm i)) (data i) ∗
-       blk_own γfs (bv_unsigned (blkmap_get bm i))) ∗
+      fsblock (fs_bytes γfs) (bv_unsigned (blkmap_get bm i)) (data i) ∗
       (∀ bs : list (bv 8),
          fsblock (fs_bytes γfs) (bv_unsigned (blkmap_get bm i)) bs -∗
-         blk_own γfs (bv_unsigned (blkmap_get bm i)) -∗
          inode_blocks γfs bm (<[i := bs]> data)).
   Proof.
     intros Hi Hnz.
@@ -1101,16 +1100,16 @@ Section InodeRes.
     rewrite /blk_res.
     destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
       [exfalso; exact (Hnz Hz)|].
-    iSplitL "Hb"; [iExact "Hb"|]. iIntros (bs) "Hbs Htok".
+    iSplitL "Hb"; [iExact "Hb"|]. iIntros (bs) "Hbs".
     rewrite (big_sepL_delete
                (fun (_ : nat) (k : nat) =>
                   blk_res γfs (blkmap_get bm k) ((<[i := bs]> data) k))
                (seq 0 MAXFILE) i i Hlk).
-    iSplitL "Hbs Htok".
+    iSplitL "Hbs".
     { rewrite /blk_res fn_lookup_insert.
       destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
         [exfalso; exact (Hnz Hz)|].
-      iSplitL "Hbs"; [iExact "Hbs"|iExact "Htok"]. }
+      iExact "Hbs". }
     iApply (big_sepL_mono with "Hrest").
     intros k y Hky.
     apply lookup_seq in Hky as [Hy Hk].
@@ -1130,7 +1129,6 @@ Section InodeRes.
     (forall i : nat, (i < MAXFILE)%nat -> i <> bn -> blkmap_get bm' i = blkmap_get bm i) ->
     inode_blocks γfs bm data -∗
     fsblock (fs_bytes γfs) (bv_unsigned b) bs -∗
-    blk_own γfs (bv_unsigned b) -∗
     inode_blocks γfs bm' (<[bn := bs]> data).
   Proof.
     intros Hbn Hz Hb Hag.
@@ -1143,11 +1141,11 @@ Section InodeRes.
                (fun (_ : nat) (k : nat) =>
                   blk_res γfs (blkmap_get bm' k) ((<[bn := bs]> data) k))
                (seq 0 MAXFILE) bn bn Hlk).
-    iIntros "[_ Hrest] Hfs Htok".
-    iSplitL "Hfs Htok".
+    iIntros "[_ Hrest] Hfs".
+    iSplitL "Hfs".
     { rewrite /blk_res Hb fn_lookup_insert.
       destruct (decide (bv_unsigned b = 0)); [done|].
-      iSplitL "Hfs"; [iExact "Hfs"|iExact "Htok"]. }
+      iExact "Hfs". }
     iApply (big_sepL_mono with "Hrest").
     intros k y Hky.
     apply lookup_seq in Hky as [Hy Hk].
@@ -1161,37 +1159,33 @@ Section InodeRes.
   (*  FRESHNESS: what re-establishes [blkmap_wf]'s injectivity            *)
   (* ------------------------------------------------------------------ *)
 
-  (* THE lemma the three install sites want.  Holding the exclusive token
-     for a block [b] -- which is exactly what balloc's success arm hands
+  (* THE lemma the three install sites want.  Holding the EXCLUSIVE byte
+     run of a block [b] -- which is exactly what balloc's success arm hands
      over -- rules [b] out of every nonzero slot the inode already names,
-     because the bundles hold a token for each of those.
-     [ind_tok] rather than [ind_res] is the premise so a caller that has
-     spent the indirect block's content run (bmap, across its interior
-     log_write) can still apply it.
+     because the bundles hold that block's run for each of those, and two
+     owners of one block's bytes is [False] ([FsBlocks.fsblock_ne]).  It is
+     one line of the [↦]-distinctness idiom, never a maintained clause
+     (fs-state.md section 0).
 
-     THIS IS NO LONGER THE ONLY ROUTE (durable-disk 1c-flip step 5).  It was
-     while the content resource was [fs_chalf] -- a HALF ghost_map element,
-     so two of them at one key compose to a valid full element and carry no
-     disjointness whatever.  [ind_blk]/[blk_res] hold the EXCLUSIVE byte run
-     now, and [FsBlocks.fsblock_excl] refutes two owners of one block
-     directly, so a caller that still holds the fresh block's run could get
-     this without [blk_own] at all.  The token is kept because stage 2
-     retires it together with the free pool ([free_bitmap Γ],
-     fs-state.md §2), and the [ind_tok]-only premise above is exactly the
-     case where the run has been spent. *)
+     The indirect slot's premise is [ind_blk] rather than [ind_res] because
+     the two are the same predicate now; there is no separate token that
+     survives spending the run, so a caller that has to apply this across
+     its own interior [log_write] of the indirect block (bmap) holds the run
+     it got back from that write. *)
   Lemma inode_fresh_at (γfs : fs_names) (bm : blkmap)
-      (data : nat -> list (bv 8)) (b : Z) (i : nat) :
+      (data : nat -> list (bv 8)) (b : Z) (bsb : list (bv 8)) (i : nat) :
     (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
-    blk_own γfs b -∗ ind_tok γfs bm -∗ inode_blocks γfs bm data -∗
+    fsblock (fs_bytes γfs) b bsb -∗ ind_blk γfs bm -∗
+    inode_blocks γfs bm data -∗
     ⌜bv_unsigned (bm_slot bm i) <> b⌝.
   Proof.
     intros Hi Hnz. iIntros "Ho Ht Hd".
     destruct (decide (i = MAXFILE)) as [->|Hne].
     - rewrite bm_slot_top. rewrite bm_slot_top in Hnz.
-      rewrite /ind_tok.
+      rewrite /ind_blk.
       destruct (decide (bv_unsigned (bm_ind bm) = 0)) as [Hz|_];
         [exfalso; exact (Hnz Hz)|].
-      iApply (blk_own_ne with "Ht Ho").
+      iApply (fsblock_ne with "Ht Ho").
     - assert (Hlt : (i < MAXFILE)%nat) by lia.
       rewrite (bm_slot_lt bm i Hlt).
       rewrite (bm_slot_lt bm i Hlt) in Hnz.
@@ -1202,14 +1196,14 @@ Section InodeRes.
       rewrite /blk_res.
       destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
         [exfalso; exact (Hnz Hz)|].
-      iDestruct "Hb" as "[_ Hb]".
-      iApply (blk_own_ne with "Hb Ho").
+      iApply (fsblock_ne with "Hb Ho").
   Qed.
 
   (* the quantified form the [blkmap_wf_slot_upd] premise is stated at *)
   Lemma inode_fresh (γfs : fs_names) (bm : blkmap)
-      (data : nat -> list (bv 8)) (b : Z) :
-    blk_own γfs b -∗ ind_tok γfs bm -∗ inode_blocks γfs bm data -∗
+      (data : nat -> list (bv 8)) (b : Z) (bsb : list (bv 8)) :
+    fsblock (fs_bytes γfs) b bsb -∗ ind_blk γfs bm -∗
+    inode_blocks γfs bm data -∗
     ⌜forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
         bv_unsigned (bm_slot bm i) <> b⌝.
   Proof.
@@ -1218,7 +1212,7 @@ Section InodeRes.
       [| iPureIntro; intros Hc; exfalso; exact (Hi Hc)].
     destruct (decide (bv_unsigned (bm_slot bm i) = 0)) as [Hz|Hnz];
       [ iPureIntro; intros _ Hc; exfalso; exact (Hc Hz) |].
-    iDestruct (inode_fresh_at γfs bm data b i Hi Hnz with "Ho Ht Hd") as %Hne.
+    iDestruct (inode_fresh_at γfs bm data b bsb i Hi Hnz with "Ho Ht Hd") as %Hne.
     iPureIntro. intros _ _. exact Hne.
   Qed.
 

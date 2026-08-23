@@ -34,7 +34,7 @@
    THE POOL IS DIFFERENT.  [IcacheEscrow.ipool_shape]'s ALLOCATED arm carries
    [InodeLock.inode_ok] -- a well-formed block map inside [cov], the size cap
    (§13.5), [blk_holes_zero] and [inode_sized] -- together with the file's
-   own [fs_chalf]s and its indirect block's [blk_own].  Nothing anywhere in
+   own byte runs, its indirect block's included.  Nothing anywhere in
    this tree yet says that the mkfs image's allocated inodes have those
    properties, and no amount of decoding will produce them: they are a claim
    about which BLOCKS the image's inodes own and that those runs are
