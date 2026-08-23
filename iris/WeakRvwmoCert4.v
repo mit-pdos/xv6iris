@@ -469,82 +469,155 @@ Proof.
   apply elem_of_cons in Ho' as [->|Ho']; [by exists S, S'|by apply IH].
 Qed.
 
-(** ** 4.3 THE INTERFACE IS INHABITED BY [cert_segment']
+(** ** 4.3 THE INTERFACE IS INHABITED BY [cert_segment'']
 
     Nothing in §4.2 is specific to the certification: [seg_step] is exactly
-    what [WeakRvwmoCert3.cert_segment'] delivers, with the carried context
-    [Ctx] (intended: [cpol_ctx G W x], §3.1) coming along. *)
+    what [WeakRvwmoCert3.cert_segment''] delivers, with the carried context
+    [Ctx] (intended: [cpol_ctx G W x], §3.1) coming along.
+
+    MIGRATED to [cert_segment''] (§5b of [WeakRvwmoCert3]).  Three things
+    change at this interface, and all three are what retires
+    [WeakRvwmoWalk.wwit_vindep]:
+
+      - THE NODE IS EXPOSED.  The reachability parameter [Nd : nat → M unit
+        → Prop] is handed to the policy at every block ([Nd k m]), so a site
+        datum about the monad NODE is dischargeable rather than assumed.
+        Its two closure laws are [WeakRvwmoCert3.ndreach]'s own constructors,
+        and the segment's EXIT node comes back reachable at the row position
+        the segment ends at — which is what lets a walk carry [Nd] from one
+        segment of a hart to the next.
+      - THE INVARIANT IS [csync], NOT "the same node".  The acting hart's
+        two runs may have parted company at a witness; they are back in
+        LOCKSTEP at the end of any segment whose row ENDS IN A WRITE
+        ([seg_locked]), which is exactly the walk's segment shape.
+      - THE EMISSION MUST BE DEVICE-QUIET ([LDev ∉ es.*1]), which
+        [WeakRvwmoSupply.em_devfree] supplies. *)
 Theorem seg_step_of_segment (x : agent) (cpu : CPU) (d0 : dev_state)
     (T : list wreg) (Q : nat → lbl → Prop)
     (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
+    (Nd : nat → M unit → Prop)
     (Hpres : ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
         Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx_w lb lb' →
         mstep_ok (cand_last_st c0) x lb' → Cls c0 lb' →
         Ctx (S k) (cand_snoc c0 (EStep x lb')))
-    (Hpol' : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+    (* the dependency-freedom of the segment's blocks: no block whose node
+       the reachability admits reads a carrier the taint set holds.  At
+       [T = []] it is free. *)
+    (Hrds : ∀ (k : nat) (lb : lbl) (ws : wstate) (l : wlabel)
+        (rds : list wreg) (wrs : list register)
+        (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+        (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
+        Q k lb → Nd k m →
+        cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+        rds_ok (λ n, n ∉ T) rds)
+    (Hrdsp : ∀ (k : nat) (lb : lbl) (ws : wstate) (l1 l2 : wlabel)
+        (rds : list wreg) (wrs : list register)
+        (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+        (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
+        Q k lb → Nd k m →
+        cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+        rds_ok (λ n, n ∉ T) rds)
+    (* (N-D) the reachability parameter's two closure laws *)
+    (HNdadm : ∀ (k : nat) (m m' : M unit) (rs rs' : regstate)
+        (fn fn' : ofence) (ib ib' : oib32) (ls : list wlabel)
+        (rds : list wreg) (wrs : list register) (ann : bool),
+        Nd k m → (∀ l0, l0 ∈ ls → lb_admin true l0) →
+        phrun cpu ls rds wrs ann m rs fn ib d0 m' rs' fn' ib' d0 → Nd k m')
+    (HNdblk : ∀ (k : nat) (m m' : M unit) (ws : wstate) (lb : lbl)
+        (l : wlabel) (rds : list wreg) (wrs : list register)
+        (rs rs' : regstate) (fn fn' : ofence) (ib ib' : oib32),
+        Nd k m → Q k lb →
+        cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' → Nd (S k) m')
+    (HNdblkp : ∀ (k : nat) (m m' : M unit) (ws : wstate) (lb : lbl)
+        (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
+        (rs rs' : regstate) (fn fn' : ofence) (ib ib' : oib32),
+        Nd k m → Q k lb →
+        cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+        Nd (S k) m')
+    (* THE READ/REGISTER POLICY, at a block whose NODE is pinned by [Nd] *)
+    (Hpol'' : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
         (rds : list wreg) (wrs : list register)
         (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
         (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
         srvwmo_consistent c0 → Ctx k c0 → Q k lb →
         w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
         dreg_agree (λ n, n ∉ T) rs1 rs2 →
+        rds_ok (λ n, n ∉ T) rds →
+        Nd k m →
         cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
-        ∃ lb' l' rds' wrs' rs2',
-          cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+        ∃ lb' l' rds' wrs' rs2' (m2' : M unit) (fn2' : ofence)
+          (ib2' : oib32),
+          cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
           mstep_ok (cand_last_st c0) x lb' ∧
           lbl_reidx_w lb lb' ∧
           Cls c0 lb' ∧
-          dreg_agree (λ n, n ∉ T) rs1' rs2')
-    (* (O-F) the pair policy — [WeakRvwmoCert3.cpolp]; an RMW-free [Q] gets
-       it from [WeakRvwmoCert3.cpolp_of_rmwfree] *)
-    (Hpolp : cpolp x cpu d0 T Ctx Cls Q)
+          csync T m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
+          (lb_is_w lb = true →
+             clockstep T m' rs1' fn' ib' m2' rs2' fn2' ib2'))
+    (* (O-F) the pair policy — [WeakRvwmoCert3.cpolpr] *)
+    (Hpolp : cpolpr x cpu d0 T Nd Ctx Cls Q)
     (k0 : nat) (ws0 : wstate) (rowseg : list lbl) (es : list eitem)
     (pfin : pexv6) (m0 : M unit) (rs10 : regstate) (fn0 : ofence)
-    (ib0 : oib32) (S : cyc_state) (rs20 : regstate) :
+    (ib0 : oib32) (St : cyc_state) (m20 : M unit) (rs20 : regstate)
+    (fn20 : ofence) (ib20 : oib32) :
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
+  LDev ∉ es.*1 →
   (∀ i lb, rowseg !! i = Some lb → Q (k0 + i)%nat lb) →
-  cst_ok d0 S →
-  Ctx k0 (cst_c S) →
-  cst_pst S (cd_end (cst_c S)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
-  dreg_agree (λ n, n ∉ T) rs10 rs20 →
-  w_relp (ms_ws (cand_last_st (cst_c S)) x) = w_relp ws0 →
-  ∃ (S' : cyc_state) (tradd : list estep),
-    seg_step d0 (SegOut x rowseg (cd_end (cst_c S)) tradd) S S' ∧
-    Ctx (k0 + length rowseg)%nat (cst_c S') ∧
-    (** (O-E), carried through from [cert_segment']'s own conclusion. *)
-    cd_img (cst_c S') = cd_img (cst_c S) ∧
-    cst_pst S' 0%nat = cst_pst S 0%nat ∧
-    cst_dv S' 0%nat = cst_dv S 0%nat ∧
-    (** THE CHAINING DATA, also [cert_segment']'s own: where the acting
+  cst_ok d0 St →
+  Ctx k0 (cst_c St) →
+  cst_pst St (cd_end (cst_c St)) !! x
+    = Some (PHart cpu m20 rs20 fn20 ib20) →
+  Nd k0 m0 →
+  csync T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 →
+  w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 →
+  ∃ (St' : cyc_state) (tradd : list estep),
+    seg_step d0 (SegOut x rowseg (cd_end (cst_c St)) tradd) St St' ∧
+    Ctx (k0 + length rowseg)%nat (cst_c St') ∧
+    (** (O-E), carried through from [cert_segment'']'s own conclusion. *)
+    cd_img (cst_c St') = cd_img (cst_c St) ∧
+    cst_pst St' 0%nat = cst_pst St 0%nat ∧
+    cst_dv St' 0%nat = cst_dv St 0%nat ∧
+    (** THE CHAINING DATA, also [cert_segment'']'s own: where the acting
         hart's process ENDS (the emission's own final state, up to the
-        taint), what its release-pending bit becomes, and the FRAME for
-        every other hart.  A walk whose invariant speaks of all harts at
-        every state needs precisely these four. *)
-    (∃ (m1 : M unit) (rs11 rs21 : regstate) (fn1 : ofence) (ib1 : oib32),
+        taint AND up to a witness's divergence), what its release-pending
+        bit becomes, and the FRAME for every other hart.  A walk whose
+        invariant speaks of all harts at every state needs precisely
+        these — and, since the walk's rows end in a write, [seg_locked]
+        hands it back the LOCKSTEP it started with. *)
+    (∃ (m1 : M unit) (rs11 : regstate) (fn1 : ofence) (ib1 : oib32)
+       (m21 : M unit) (rs21 : regstate) (fn21 : ofence) (ib21 : oib32),
        pfin = PHart cpu m1 rs11 fn1 ib1 ∧
-       cst_pst S' (cd_end (cst_c S')) !! x = Some (PHart cpu m1 rs21 fn1 ib1) ∧
-       dreg_agree (λ n, n ∉ T) rs11 rs21) ∧
-    w_relp (ms_ws (cand_last_st (cst_c S')) x)
+       cst_pst St' (cd_end (cst_c St')) !! x
+         = Some (PHart cpu m21 rs21 fn21 ib21) ∧
+       csync T m1 rs11 fn1 ib1 m21 rs21 fn21 ib21 ∧
+       (seg_locked rowseg
+          (clockstep T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20) →
+          clockstep T m1 rs11 fn1 ib1 m21 rs21 fn21 ib21) ∧
+       Nd (k0 + length rowseg)%nat m1) ∧
+    w_relp (ms_ws (cand_last_st (cst_c St')) x)
       = w_relp (row_ws_aux k0 ws0 rowseg) ∧
     (∀ y, y ≠ x →
-       cst_pst S' (cd_end (cst_c S')) !! y = cst_pst S (cd_end (cst_c S)) !! y) ∧
-    (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st (cst_c S')) y)
-                = w_relp (ms_ws (cand_last_st (cst_c S)) y)).
+       cst_pst St' (cd_end (cst_c St')) !! y
+       = cst_pst St (cd_end (cst_c St)) !! y) ∧
+    (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st (cst_c St')) y)
+                = w_relp (ms_ws (cand_last_st (cst_c St)) y)).
 Proof.
-  intros Hem HQ HS HCtx Hp Hag Hrelp.
+  intros Hem Hdev HQ HS HCtx Hp Hnd Hsync Hrelp.
   destruct HS as (Hc & Hpo & Hdv).
-  destruct (cert_segment' x cpu d0 T Q Ctx Cls Hpres Hpol' Hpolp
-              k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin Hem HQ
-              m0 rs10 fn0 ib0 eq_refl
-              (cst_c S) (cst_pst S) (cst_dv S) rs20
-              Hc HCtx Hpo Hp Hdv Hag Hrelp)
-    as (c' & pst' & dv' & tradd & m1 & rs11 & rs21 & fn1 & ib1 &
-        Htr & Hagf & Hf2 & Hc' & HCtx' & Hpo' & Hp' & Hdv' & Hfin & Hagr
-        & Hrelpf & Himg & Hpst0 & Hdv0 & Hfr & Hfrp).
+  destruct (cert_segment'' x cpu d0 T Q Ctx Cls Hpres Nd Hrds Hrdsp
+              HNdadm HNdblk HNdblkp Hpol'' Hpolp
+              k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin Hem Hdev HQ
+              m0 rs10 fn0 ib0 eq_refl Hnd
+              (cst_c St) (cst_pst St) (cst_dv St) m20 rs20 fn20 ib20
+              Hc HCtx Hpo Hp Hdv Hsync Hrelp)
+    as (c' & pst' & dv' & tradd & m1 & rs11 & fn1 & ib1 &
+        m21 & rs21 & fn21 & ib21 &
+        Htr & Hagf & Hf2 & Hc' & HCtx' & Hpo' & Hp' & Hdv' & Hfin & Hsyncf
+        & Hlockf & Hrelpf & Himg & Hpst0 & Hdv0 & Hfr & Hfrp & Hndf).
   exists (CSt c' pst' dv'), tradd.
   split; [|split_and!; [exact HCtx'|exact Himg|exact Hpst0|exact Hdv0
-          |(exists m1, rs11, rs21, fn1, ib1; split_and!;
-              [exact Hfin|exact Hp'|exact Hagr])
+          |(exists m1, rs11, fn1, ib1, m21, rs21, fn21, ib21; split_and!;
+              [exact Hfin|exact Hp'|exact Hsyncf|exact Hlockf|exact Hndf])
           |exact Hrelpf|exact Hfr|exact Hfrp]].
   split_and!; [split_and!; [exact Hc|exact Hpo|exact Hdv]| |done| | |];
     [split_and!; [exact Hc'|exact Hpo'|exact Hdv']
@@ -750,23 +823,65 @@ Section nonvacuity4.
       = Some (EStep 0%nat (WeakAxiomatic.LStore false (pa_z ev_flag)
                              (wbytes 4 WeakLock.lock_one) WCplain)).
   Proof.
+    have Hrds0 : ∀ rds : list wreg, rds_ok (λ n, n ∉ []) rds.
+    { intros rds n _. apply not_elem_of_nil. }
+    have Hpol : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+        (rds : list wreg) (wrs : list register)
+        (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib0 : oib32)
+        (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+        srvwmo_consistent c0 → True → lb_store_ne lb →
+        w_relp (ms_ws (cand_last_st c0) 0%nat) = w_relp ws →
+        dreg_agree (λ n, n ∉ []) rs1 rs2 →
+        rds_ok (λ n, n ∉ []) rds →
+        True →
+        cblk cpu d0 ws lb l rds wrs m rs1 fn ib0 m' rs1' fn' ib' →
+        ∃ lb' l' rds' wrs' rs2' (m2' : M unit) (fn2' : ofence)
+          (ib2' : oib32),
+          cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib0 m2' rs2' fn2' ib2' ∧
+          mstep_ok (cand_last_st c0) 0%nat lb' ∧
+          lbl_reidx_w lb lb' ∧
+          True ∧
+          csync [] m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
+          (lb_is_w lb = true →
+             clockstep [] m' rs1' fn' ib' m2' rs2' fn2' ib2').
+    { intros k c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
+        Hc _ Hlb Hrelp Hag _ _ Hblk.
+      destruct (pol_store' 0%nat cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0
+                  m' rs1' fn' ib' Hc Hlb Hrelp Hag Hblk)
+        as (lb' & l' & rds' & wrs' & rs2' & H1 & H2 & H3 & _ & H5).
+      exists lb', l', rds', wrs', rs2', m', fn', ib'.
+      split_and!; [exact H1|exact H2|exact H3|exact I| |intros _];
+        [left|]; by split_and!. }
     destruct (seg_step_of_segment 0%nat cpu d0 [] (λ _ : nat, lb_store_ne)
                 (λ (_ : nat) (_ : cand), True) (λ _ _, True)
+                (λ (_ : nat) (_ : M unit), True)
                 (λ k c0 lb lb' _ _ _ _ _ _, I)
-                (λ k c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
-                   Hc _ Hlb H1 H2 H3,
-                   pol_store' 0%nat cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0
-                     m' rs1' fn' ib' Hc Hlb H1 H2 H3)
-                (cpolp_of_rmwfree 0%nat cpu d0 []
+                (λ k lb ws l rds wrs m rs1 fn ib0 m' rs1' fn' ib' _ _ _,
+                   Hrds0 rds)
+                (λ k lb ws l1 l2 rds wrs m rs1 fn ib0 m' rs1' fn' ib' _ _ _,
+                   Hrds0 rds)
+                (λ k m m' rs1 rs1' fn fn' ib0 ib' ls rds wrs ann _ _ _, I)
+                (λ k m m' ws lb l rds wrs rs1 rs1' fn fn' ib0 ib' _ _ _, I)
+                (λ k m m' ws lb l1 l2 rds wrs rs1 rs1' fn fn' ib0 ib' _ _ _, I)
+                Hpol
+                (cpolpr_of_cpolp 0%nat cpu d0 []
+                   (λ (_ : nat) (_ : M unit), True)
                    (λ (_ : nat) (_ : cand), True) (λ _ _, True)
                    (λ _ : nat, lb_store_ne)
-                   (λ _ lb Hlb, lb_store_ne_rmwfree lb Hlb))
+                   (cpolp_of_rmwfree 0%nat cpu d0 []
+                      (λ (_ : nat) (_ : cand), True) (λ _ _, True)
+                      (λ _ : nat, lb_store_ne)
+                      (λ _ lb Hlb, lb_store_ne_rmwfree lb Hlb)))
                 0%nat ws_init ev_row _ _
-                ev_x2.2 rs None ib nv4_S0 rs
+                ev_x2.2 rs None ib nv4_S0 ev_x2.2 rs None ib
                 (nv_hemit cpu rs ib d0)
+                (ev_em_devfree cpu rs ib)
                 (λ i lb Hi, Forall_lookup_1 lb_store_ne ev_row i lb
                               nv_row_class Hi)
-                nv4_S0_ok I eq_refl (dreg_agree_refl _ _)
+                nv4_S0_ok I eq_refl I
+                ltac:(left; split_and!;
+                        [reflexivity|reflexivity|reflexivity
+                        |apply dreg_agree_refl])
                 ltac:(by rewrite (sm_ws img0)))
       as (Sf & tradd & Hstep & _).
     exists Sf, tradd. split.

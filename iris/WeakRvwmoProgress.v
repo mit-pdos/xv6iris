@@ -440,18 +440,25 @@ Qed.
     serves a witness position by the latest-read route
     ([WeakRvwmoWalk.wblk_pol_at]). *)
 Theorem wlk_seg_of_cert' (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (k0 kz : nat) (ws0 : wstate) (rowseg : list lbl)
+    (d0 : dev_state) (T : list wreg) (Nd : nat → CPU → M unit → Prop)
+    (k0 kz : nat) (ws0 : wstate) (rowseg : list lbl)
     (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 : regstate)
-    (fn0 : ofence) (ib0 : oib32) (St : cyc_state) (rs20 : regstate) :
+    (fn0 : ofence) (ib0 : oib32) (St : cyc_state) (m20 : M unit)
+    (rs20 : regstate) (fn20 : ofence) (ib20 : oib32) :
   rvwmo_minus_consistent G →
   W_poloc_closed G (wwit G n) →
   wrow_in_log' G x n →
+  wrds_free d0 T →
+  wnd_ok cpu d0 (wQ G d0 T Nd n x k0 kz) Nd →
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
-  (∀ i lb, rowseg !! i = Some lb → wQ G n x k0 kz (k0 + i)%nat lb) →
+  LDev ∉ es.*1 →
+  (∀ i lb, rowseg !! i = Some lb → wQ G d0 T Nd n x k0 kz (k0 + i)%nat lb) →
   cst_ok d0 St →
   wctx G n x kz k0 (cst_c St) →
-  cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
-  dreg_agree (λ nn, nn ∉ []) rs10 rs20 →
+  cst_pst St (cd_end (cst_c St)) !! x
+    = Some (PHart cpu m20 rs20 fn20 ib20) →
+  Nd k0 cpu m0 →
+  csync T m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 →
   w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 →
   ∃ (St' : cyc_state) (tradd : list estep),
     seg_step d0 (SegOut x rowseg (cd_end (cst_c St)) tradd) St St' ∧
@@ -460,11 +467,12 @@ Theorem wlk_seg_of_cert' (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     cst_pst St' 0%nat = cst_pst St 0%nat ∧
     cst_dv St' 0%nat = cst_dv St 0%nat.
 Proof.
-  intros Hcons Hpc Hrow Hem HQ Hok Hctx Hp Hag Hrelp.
-  eapply (wlk_seg_of_cert G n x cpu d0 k0 kz ws0 rowseg es pfin m0 rs10
-            fn0 ib0 St rs20);
-    [exact Hcons|exact Hpc|by apply wub_of_row
-    |exact Hem|exact HQ|exact Hok|exact Hctx|exact Hp|exact Hag|exact Hrelp].
+  intros Hcons Hpc Hrow Hrdsf Hndok Hem Hdev HQ Hok Hctx Hp Hnd Hsync Hrelp.
+  eapply (wlk_seg_of_cert G n x cpu d0 T Nd k0 kz ws0 rowseg es pfin m0 rs10
+            fn0 ib0 St m20 rs20 fn20 ib20);
+    [exact Hcons|exact Hpc|by apply wub_of_row|exact Hrdsf|exact Hndok
+    |exact Hem|exact Hdev|exact HQ|exact Hok|exact Hctx|exact Hp|exact Hnd
+    |exact Hsync|exact Hrelp].
 Qed.
 
 (** ** 5.2 THE PER-STATE RESIDUE, REPAIRED
@@ -480,31 +488,41 @@ Qed.
       - the SITE DATA [wQ] — [G]'s label at each position of the stretch,
         its sources already in the log, and the exit write being the log's
         next entry — together with the walk state's own alignment [wctx]
-        and the witness-set side condition [wub].  ([wnw_seg] is GONE with
-        the tenth pass's split: the carried context no longer asserts that
-        the next position is not a witness.) *)
+        and the witness-set side condition [wub].
+
+    WHAT THE [csync] MIGRATION ADDED, all of it chosen by the datum itself:
+    a taint set [T] and a node-reachability [Nd] for the acting hart, the
+    device-quiet emission, and the two side conditions [wrds_free] /
+    [wnd_ok].  At [T = []] the first is free ([wrds_free_nil]) and at
+    [Nd := wnd] the second is [wnd_wnd_ok]. *)
 Definition walk_seg_data' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (G : gexec) : Prop :=
   ∀ St n, wlk_inv boot d0 N G St n → (n < length (gwrites G))%nat →
   ∃ (x : agent) (cpu : CPU) (k0 : nat) (ws0 : wstate) (pre : list lbl)
     (rl : bool) (base : Z) (vs : list (bv 8)) (kc : wm_class)
     (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 rs20 : regstate)
-    (fn0 : ofence) (ib0 : oib32) (w : geid),
+    (fn0 : ofence) (ib0 : oib32) (w : geid) (T : list wreg)
+    (Nd : nat → CPU → M unit → Prop),
     (* the graph side: the segment's exit IS [G]'s [(n+1)]-st write *)
     gwrite_at G (S n) = Some w ∧
     gmsg G w = Some (WMsg base vs (Some x) kc) ∧
     Forall (λ lb, lb_is_w lb = false) pre ∧
-    (* THE EMISSION — the progress-carrying input *)
+    (* THE EMISSION — the progress-carrying input — and its fabric quiet *)
     hemit (λ _, d0) k0 ws0 (pre ++ [WeakAxiomatic.LStore rl base vs kc])
       (PHart cpu m0 rs10 fn0 ib0) es pfin ∧
+    LDev ∉ es.*1 ∧
     (* THE SITE DATA, INDEXED BY ROW POSITION *)
     (∀ i lb, (pre ++ [WeakAxiomatic.LStore rl base vs kc]) !! i = Some lb →
-       wQ G n x k0 (k0 + length pre)%nat (k0 + i)%nat lb) ∧
+       wQ G d0 T Nd n x k0 (k0 + length pre)%nat (k0 + i)%nat lb) ∧
     (* the walk's state, ALIGNED to the segment's first position *)
     wctx G n x (k0 + length pre)%nat k0 (cst_c St) ∧
     cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) ∧
-    dreg_agree (λ nn, nn ∉ []) rs10 rs20 ∧
+    dreg_agree (λ nn, nn ∉ T) rs10 rs20 ∧
     w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 ∧
+    (* the two side conditions the [csync] iteration names *)
+    wrds_free d0 T ∧
+    wnd_ok cpu d0 (wQ G d0 T Nd n x k0 (k0 + length pre)%nat) Nd ∧
+    Nd k0 cpu m0 ∧
     (* the witness set's side conditions *)
     W_poloc_closed G (wwit G n) ∧
     wub G (wwit G n) x.
@@ -517,12 +535,16 @@ Proof.
   intros Hcons Hdata St n Hinv Hn.
   destruct (Hdata St n Hinv Hn)
     as (x & cpu & k0 & ws0 & pre & rl & base & vs & kc & es & pfin &
-        m0 & rs10 & rs20 & fn0 & ib0 & w &
-        Hw & Hm & Hpre & Hem & HQ & Hctx & Hp & Hag & Hrelp & Hpc & Hub).
+        m0 & rs10 & rs20 & fn0 & ib0 & w & T & Nd &
+        Hw & Hm & Hpre & Hem & Hdev & HQ & Hctx & Hp & Hag & Hrelp &
+        Hrdsf & Hndok & Hnd & Hpc & Hub).
   have Hok : cst_ok d0 St by destruct Hinv as (? & _).
-  destruct (wlk_seg_of_cert G n x cpu d0 k0 (k0 + length pre)%nat ws0
+  destruct (wlk_seg_of_cert G n x cpu d0 T Nd k0 (k0 + length pre)%nat ws0
               (pre ++ [WeakAxiomatic.LStore rl base vs kc]) es pfin m0 rs10
-              fn0 ib0 St rs20 Hcons Hpc Hub Hem HQ Hok Hctx Hp Hag Hrelp)
+              fn0 ib0 St m0 rs20 fn0 ib0 Hcons Hpc Hub Hrdsf Hndok Hem Hdev
+              HQ Hok Hctx Hp Hnd
+              (or_introl (conj eq_refl (conj eq_refl (conj eq_refl Hag))))
+              Hrelp)
     as (St' & tradd & Hstep & _ & Himg & Hpst & Hdv).
   exists x, rl, base, vs, kc, pre, tradd, St', w.
   split_and!; [exact Hw|exact Hm|exact Hpre|exact Hstep|exact Himg|exact Hpst

@@ -860,18 +860,20 @@ Qed.
           [WeakRvwmoWalk.wcpolp_at] consumes it through [cert_rmw_ok],
           whose latest-source content is [WeakRvwmoCert.cert_rmw_latest]'s
           [gatomicity] + log-dictionary derivation. *)
-Definition wsupply_res (boot : agent → pexv6) (G : gexec) (N : nat) : Prop :=
+Definition wsupply_res (boot : agent → pexv6) (d0 : dev_state) (G : gexec)
+    (N : nat) : Prop :=
   (∀ x k lb, gx_lbl G (x, k) = Some lb → lb_is_w lb = true →
      ∃ cpu m rs fn ib, boot x = PHart cpu m rs fn ib) ∧
-  (∃ W : geid → Prop,
-     W_poloc_closed G W ∧ wubA G W ∧ wsite_supply G W).
+  (∃ (W : geid → Prop) (T : list wreg),
+     W_poloc_closed G W ∧ wubA G W ∧ wrds_free d0 T ∧
+     wsite_supply boot d0 G W T).
 
 (** THE DISK SCOPE, MADE EXPLICIT.  An agent that is not a [PHart] at boot
     — the disk, whose DMA writes are real [LStore]s in the graph — writes
     NOTHING in any graph the residue admits. *)
-Lemma wsupply_res_no_disk_writes (boot : agent → pexv6) (G : gexec) (N : nat)
-    (x : agent) :
-  wsupply_res boot G N →
+Lemma wsupply_res_no_disk_writes (boot : agent → pexv6) (d0 : dev_state)
+    (G : gexec) (N : nat) (x : agent) :
+  wsupply_res boot d0 G N →
   (∀ cpu m rs fn ib, boot x ≠ PHart cpu m rs fn ib) →
   ∀ k lb, gx_lbl G (x, k) = Some lb → lb_is_w lb = false.
 Proof.
@@ -881,12 +883,14 @@ Proof.
   exact (Hnp cpu m rs fn ib Hp).
 Qed.
 
-Lemma wsupply_of_gwrow (boot : agent → pexv6) (G : gexec) (N : nat) :
+Lemma wsupply_of_gwrow (boot : agent → pexv6) (d0 : dev_state) (G : gexec)
+    (N : nat) :
   gwrow_gmo G →
   (∀ x k, is_Some (gx_lbl G (x, k)) → (x < N)%nat) →
-  wsupply_res boot G N → ∃ W, wsupply boot G W N.
+  wsupply_res boot d0 G N → ∃ W T, wsupply boot d0 G W T N.
 Proof.
-  intros H14 H1 (H2 & (W & H3 & H4 & H5)). exists W. by split_and!.
+  intros H14 H1 (H2 & (W & T & H3 & H4 & H5 & H6)). exists W, T.
+  by split_and!.
 Qed.
 
 (** THE ONE STEP THE ORBIT COSTS, NAMED.  [normalize_ww] delivers
@@ -898,28 +902,30 @@ Qed.
     where the remaining architectural work sits: the consumer
     ([cut_supply]/[cert_supply]/[cycle_kill]) has to be restated at the
     normalized member, or the walk's output transported. *)
-Definition wsupply_orbit_pull (boot : agent → pexv6) (N : nat) : Prop :=
+Definition wsupply_orbit_pull (boot : agent → pexv6) (d0 : dev_state)
+    (N : nat) : Prop :=
   ∀ GD GD', gd_equiv GD GD' →
-    (∃ W, wsupply boot (gd_g GD') W N) → ∃ W, wsupply boot (gd_g GD) W N.
+    (∃ W T, wsupply boot d0 (gd_g GD') W T N) →
+    ∃ W T, wsupply boot d0 (gd_g GD) W T N.
 
 Theorem wsupply_of_prenorm (boot : agent → pexv6) (d0 : dev_state)
     (im : image) (nh N : nat) (GD : gdexec) :
   (nh ≤ N)%nat →
   rvwmo_minus_deps_consistent GD →
   gdexec_qconf boot d0 im nh GD →
-  wsupply_orbit_pull boot N →
+  wsupply_orbit_pull boot d0 N →
   (∀ GD' : gdexec,
      rvwmo_minus_deps_consistent GD' → gdexec_qconf boot d0 im nh GD' →
-     wsupply_res boot (gd_g GD') N) →
+     wsupply_res boot d0 (gd_g GD') N) →
   kill_ww_K2 GD → kill_ww_K3 GD → kill_ww_K4 GD →
-  ∃ W, wsupply boot (gd_g GD) W N.
+  ∃ W T, wsupply boot d0 (gd_g GD) W T N.
 Proof.
   intros HnN Hcons Hq Hpull Hres HK2 HK3 HK4.
   destruct (normalize_ww GD Hcons HK2 HK3 HK4) as (GD' & Heq & Hrow).
   pose proof Heq as (π & Hrows & Hwp & Hdeps & Hcons').
   have Hq' : gdexec_qconf boot d0 im nh GD' by eapply gdexec_qconf_ren.
   apply (Hpull GD GD' Heq).
-  apply (wsupply_of_gwrow boot (gd_g GD') N Hrow).
+  apply (wsupply_of_gwrow boot d0 (gd_g GD') N Hrow).
   - intros x k Hs. have Hx := qconf_hart_bound boot d0 im nh GD' Hq' x k Hs. lia.
   - by apply (Hres GD' Hcons').
 Qed.
@@ -949,7 +955,7 @@ Theorem xv6_rvwmo_safe_modulo_l2'' (Σ : gFunctors)
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
      gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
-     wsupply_res (xboot σ0) (gd_g GD) (xN σ0)) →
+     wsupply_res (xboot σ0) (wgdev σ0) (gd_g GD) (xN σ0)) →
   (* (R-2b) the write-order gate *)
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
@@ -977,7 +983,7 @@ Proof.
   intros Hfr Hwp Hwpp Hl2 Hres Hrow.
   apply (xv6_rvwmo_safe_modulo_l2' Σ gen σ0 D Nm P Hfr Hwp Hwpp Hl2).
   intros GD Hcons Hq.
-  apply (wsupply_of_gwrow (xboot σ0) (gd_g GD) (xN σ0));
+  apply (wsupply_of_gwrow (xboot σ0) (wgdev σ0) (gd_g GD) (xN σ0));
     [by apply Hrow
     |exact (qconf_hart_bound (xboot σ0) (wgdev σ0) (img_z (wgimg σ0))
               (xN σ0) GD Hq)
@@ -998,8 +1004,8 @@ Theorem xv6_rvwmo_safe_modulo_l2''_prenorm (Σ : gFunctors)
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
      gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
-     wsupply_res (xboot σ0) (gd_g GD) (xN σ0)) →
-  wsupply_orbit_pull (xboot σ0) (xN σ0) →
+     wsupply_res (xboot σ0) (wgdev σ0) (gd_g GD) (xN σ0)) →
+  wsupply_orbit_pull (xboot σ0) (wgdev σ0) (xN σ0) →
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
      gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →

@@ -269,7 +269,8 @@ Proof.
     rewrite Hl0 in Hl. injection Hl as Hl'. rewrite -Hl' in Hrmw.
     exact (Hrmw I). }
   exact (wcpolp_at G (wwit G n) n x cpu d0 c0 ws lb l1 l2 rds wrs m rs1 rs2
-           fn ib m' rs1' fn' ib' Hcons Himg Hpfx Hc Hctx HnW Hsite Hag Hblk).
+           fn ib m' rs1' fn' ib' [] Hcons Himg Hpfx Hc Hctx HnW Hsite Hag
+           (λ nn _, not_elem_of_nil nn) Hblk).
 Qed.
 
 (* ====================================================================== *)
@@ -559,15 +560,15 @@ Qed.
 
 (** The walk state's process for [x] IS the emission's own starting
     process, and its release-pending bit is the row fold's. *)
-Definition wseg_align (d0 : dev_state) (G : gexec) (St : cyc_state)
-    (x : agent) (k0 : nat) (stretch : list lbl) : Prop :=
+Definition wseg_align (d0 : dev_state) (G : gexec) (T : list wreg)
+    (St : cyc_state) (x : agent) (k0 : nat) (stretch : list lbl) : Prop :=
   ∀ (p1 : pexv6) (es : list eitem) (p2 : pexv6),
     hemit (λ _, d0) k0 (row_ws (qrow G x) k0) stretch p1 es p2 →
     ∃ (cpu : CPU) (m0 : M unit) (rs10 rs20 : regstate) (fn0 : ofence)
       (ib0 : oib32),
       p1 = PHart cpu m0 rs10 fn0 ib0 ∧
       cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) ∧
-      dreg_agree (λ nn, nn ∉ []) rs10 rs20 ∧
+      dreg_agree (λ nn, nn ∉ T) rs10 rs20 ∧
       w_relp (ms_ws (cand_last_st (cst_c St)) x)
         = w_relp (row_ws (qrow G x) k0).
 
@@ -575,7 +576,8 @@ Definition wseg_supply (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (GD : gdexec) : Prop :=
   ∀ St n, wlk_inv boot d0 N (gd_g GD) St n →
     (n < length (gwrites (gd_g GD)))%nat →
-  ∃ (x : agent) (k0 kz : nat),
+  ∃ (x : agent) (k0 kz : nat) (T : list wreg)
+    (Nd : nat → CPU → M unit → Prop),
     (* WHICH WRITE: [G]'s [(n+1)]-st, and where the hart stands now *)
     gwrite_at (gd_g GD) (S n) = Some (x, kz) ∧
     (k0 ≤ kz)%nat ∧
@@ -589,13 +591,26 @@ Definition wseg_supply (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (∀ k lb, (k0 ≤ k)%nat → (k ≤ kz)%nat →
        gx_lbl (gd_g GD) (x, k) = Some lb → lb_rmwfree lb) ∧
     (∀ k, (k0 ≤ k)%nat → (k ≤ kz)%nat →
-       wwit (gd_g GD) n (x, k) → wwit_site (gd_g GD) n x k) ∧
+       wwit (gd_g GD) n (x, k) →
+       wwit_site (gd_g GD) d0 T Nd n x k) ∧
+    (* the two side conditions the [csync] iteration names, and the
+       device-quiet emission *)
+    wrds_free d0 T ∧
+    (∀ cpu : CPU, wnd_ok cpu d0 (wQ (gd_g GD) d0 T Nd n x k0 kz) Nd) ∧
+    (∀ (cpu : CPU) (m0 : M unit) (rs10 : regstate) (fn0 : ofence)
+       (ib0 : oib32) (es : list eitem) (pfin : pexv6),
+       hemit (λ _, d0) k0 (row_ws (qrow (gd_g GD) x) k0)
+         (take (kz - k0) (drop k0 (qrow (gd_g GD) x)) ++
+          [default (WeakAxiomatic.LFence false false false false)
+             (gx_lbl (gd_g GD) (x, kz))])
+         (PHart cpu m0 rs10 fn0 ib0) es pfin →
+       LDev ∉ es.*1 ∧ Nd k0 cpu m0) ∧
     (* THE WITNESS SET's side conditions *)
     cpol_ctx (gd_g GD) (wwit (gd_g GD) n) x (cst_c St) ∧
     W_poloc_closed (gd_g GD) (wwit (gd_g GD) n) ∧
     wub (gd_g GD) (wwit (gd_g GD) n) x ∧
     (* THE STATE IDENTIFICATION *)
-    wseg_align d0 (gd_g GD) St x k0
+    wseg_align d0 (gd_g GD) T St x k0
       (take (kz - k0) (drop k0 (qrow (gd_g GD) x)) ++
        [default (WeakAxiomatic.LFence false false false false)
           (gx_lbl (gd_g GD) (x, kz))]).
@@ -613,8 +628,8 @@ Proof.
   have Hwf : gwf G by destruct Hcons as ((H & _ & _) & _ & _).
   have Hnd : NoDup (gx_gmo G) by destruct Hwf as (H & _ & _).
   destruct (Hsup St n Hinv Hn)
-    as (x & k0 & kz & Hat & Hle & Hgc & Hnwr & Hrmw & Hwitd & Hctx & Hpc &
-        Hub & Hal).
+    as (x & k0 & kz & T & Nd & Hat & Hle & Hgc & Hnwr & Hrmw & Hwitd &
+        Hrdsf & Hndok & Hemd & Hctx & Hpc & Hub & Hal).
   destruct (gwrite_at_inv G (S n) (x, kz) Hnd Hat) as (Hmem & Hwix).
   (* the exit write's label *)
   have Hisw : gis_w G (x, kz) = true by apply gwrites_elem_of in Hmem as [_ H].
@@ -639,8 +654,10 @@ Proof.
   { rewrite /pre length_take length_drop.
     pose proof (lookup_lt_Some _ _ _ Hkzr). lia. }
   have Hkz : (k0 + length pre)%nat = kz by lia.
+  destruct (Hemd cpu m0 rs10 fn0 ib0 es p2 ltac:(rewrite Hlb /=; exact Hemp))
+    as (Hdev & Hnd0).
   exists x, cpu, k0, (row_ws (qrow G x) k0), pre, rl, base, vs, kc, es, p2,
-         m0, rs10, rs20, fn0, ib0, (x, kz).
+         m0, rs10, rs20, fn0, ib0, (x, kz), T, Nd.
   split_and!.
   - exact Hat.
   - by rewrite /gmsg Hlb.
@@ -650,6 +667,7 @@ Proof.
     apply (Hnwr (k0 + i)%nat lb0 ltac:(lia) ltac:(lia)).
     by rewrite qrow_lbl.
   - exact Hemp.
+  - exact Hdev.
   - intros i lb0 Hi.
     destruct (decide (i < length pre)%nat) as [Hlt|Hlt].
     + rewrite lookup_app_l // in Hi.
@@ -676,6 +694,9 @@ Proof.
   - exact Hp.
   - exact Hag.
   - exact Hrelp.
+  - exact Hrdsf.
+  - rewrite Hkz. apply Hndok.
+  - exact Hnd0.
   - exact Hpc.
   - exact Hub.
 Qed.
@@ -766,7 +787,8 @@ Theorem xv6_rvwmo_safe_modulo_l2' (Σ : gFunctors)
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
      gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
-     ∃ W : geid → Prop, wsupply (xboot σ0) (gd_g GD) W (xN σ0)) →
+     ∃ (W : geid → Prop) (T : list wreg),
+       wsupply (xboot σ0) (wgdev σ0) (gd_g GD) W T (xN σ0)) →
   ∀ GD : gdexec,
     rvwmo_minus_deps_consistent GD →
     gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
@@ -820,9 +842,10 @@ Qed.
     GENERIC engine with no hand-built block ([cyg_step0_generic]). *)
 
 (** ** 6.1 The repaired site data, at [cyg]'s second segment *)
-Lemma cyg_wQ_seg1 (i : nat) (lb : lbl) :
+Lemma cyg_wQ_seg1 (d0 : dev_state) (T : list wreg)
+    (Nd : nat → CPU → M unit → Prop) (i : nat) (lb : lbl) :
   cy_row cy_B cy_A cy_ts1 !! i = Some lb →
-  wQ cyg 1%nat 1%nat 0%nat 1%nat (0 + i)%nat lb.
+  wQ cyg d0 T Nd 1%nat 1%nat 0%nat 1%nat (0 + i)%nat lb.
 Proof.
   destruct i as [|[|i]]; [| |by rewrite /cy_row /=]; intros [= <-].
   - (* the TRUE read: its source is write 1, which the log holds *)
@@ -934,34 +957,60 @@ Proof.
   destruct j as [|[|[|[|j]]]]; try lia; vm_compute; by eexists.
 Qed.
 
-(** … AND THE MACHINE HALF, WHICH IS A PREMISE AND SAYS SO.
+(** … AND THE MACHINE HALF, NOW A THEOREM.
 
-    [wwit_vindep] is what the value-equality clause was standing in for:
-    the substituted read returns the CANDIDATE's bytes, so the hart must
-    still land at the emission's own successor node
-    ([WeakRvwmoCert2.cblk_vfree]) or [cert_segment'] cannot continue.  At
-    [cyg]'s witness the FACT is true and machine-checked —
-    [WeakRvwmoCycWit.cy_node_vindep]: the [MemRead] node's continuation
-    ignores the value, so any four bytes step to the same successor.
+    [WeakRvwmoWalk.wwit_vindep] is RETIRED, and this is where it is paid
+    for.  It used to be a named premise for a precise reason: it quantified
+    over EVERY [cblk] carrying the site's label, because that is all
+    [wblk_pol_at] was handed, while the concrete node was known only to
+    [wlk_inv']'s [wemit]/[pex_dag] clauses, which the policy interface did
+    not see.
 
-    IT IS NOT PLUMBED THROUGH, and that is the honest residue this fix
-    exposes.  [wwit_vindep] quantifies over EVERY [cblk] carrying the
-    site's label, because that is all [wblk_pol_at] is handed; the concrete
-    node is known only to [wlk_inv']'s [wemit]/[pex_dag] clauses, which the
-    policy interface does not see.  Closing it means carrying the emission
-    node down to the policy (a reachability clause in [wlk_inv'] plus a
-    [pex_dag]-keyed [wwit_vindep]) — priced, not done.  Until then every
-    statement below that needs a witness position takes it as a NAMED
-    premise rather than pretending. *)
-Lemma cyg_wwit_site00 (Hvnd : wwit_vindep cyg 0%nat 0%nat) :
-  wwit_site cyg 0%nat 0%nat 0%nat.
-Proof. split; [exact cyg_wwit_site00_graph|exact Hvnd]. Qed.
+    [WeakRvwmoCert3] §5b.4's reachability parameter closes exactly that
+    gap: [wwit_nd]'s premise [wnd d0 cyg boot 0 cpu m] says the hart can be
+    at [m] with NO row event behind it, which at row position 0 means an
+    administrative stretch out of the booted node
+    ([WeakRvwmoWalk.wnd_fix]) — and [cy_m] has no administrative step that
+    moves it ([WeakRvwmoCycWit.cy_m_adm_fix]).  So [m] IS [cy_m], and
+    [WeakRvwmoCycWit.cy_blk_subst] re-answers the block with the
+    candidate's own bytes at the SAME successor node: [csync]'s LOCKSTEP
+    arm, with the empty taint set. *)
+Lemma cyg_wwit_nd (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
+  wwit_nd d0 [] (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat) 0%nat.
+Proof.
+  intros cpu ws aq base ts vs l rds wrs m rs fn ib m' rs' fn' ib' tvs2
+    Hnd Hblk Hlen.
+  have Hm : m = cy_m cy_A cy_B.
+  { eapply (wnd_fix d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat
+              (λ mm, mm = cy_m cy_A cy_B) cpu m); [| |exact Hnd].
+    - intros m0 rs00 fn00 ib00 Hb. rewrite /cy_boot /cy_p0 /= in Hb.
+      by injection Hb as <- <- <- <-.
+    - intros m1 m2 rs1' rs2' fn1 fn2 ib1 ib2 ls rds' wrs' ann Hm1 Hadm Hrun.
+      eapply (cy_m_adm_fix cy_A cy_B cpu ls rds' wrs' ann m1 rs1' fn1 ib1 d0
+                m2 rs2' fn2 ib2 d0 cy_A_ram Hrun Hadm Hm1). }
+  subst m.
+  destruct (cy_blk_subst cy_A cy_B cpu d0 ws aq base ts vs l rds wrs rs fn ib
+              m' rs' fn' ib' tvs2 cy_A_ram Hlen Hblk)
+    as (l2 & rds2 & wrs2 & Hblk2).
+  exists l2, rds2, wrs2, m'. split; [exact Hblk2|].
+  left. split_and!; [reflexivity|reflexivity|reflexivity|apply dreg_agree_refl].
+Qed.
+
+Lemma cyg_wwit_site00 (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
+    (d0 : dev_state) :
+  wwit_site cyg d0 [] (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat)
+    0%nat 0%nat 0%nat.
+Proof.
+  split; [exact cyg_wwit_site00_graph|apply cyg_wwit_nd].
+Qed.
 
 (** THE SITE DATA at [cyg]'s FIRST segment — the one the old shape could
     not state: row position 0 is a WITNESS. *)
-Lemma cyg_wQ_seg0 (Hvnd : wwit_vindep cyg 0%nat 0%nat) (i : nat) (lb : lbl) :
+Lemma cyg_wQ_seg0 (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state)
+    (i : nat) (lb : lbl) :
   cy_row cy_A cy_B cy_ts2 !! i = Some lb →
-  wQ cyg 0%nat 0%nat 0%nat 1%nat (0 + i)%nat lb.
+  wQ cyg d0 [] (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat)
+    0%nat 0%nat 0%nat 1%nat (0 + i)%nat lb.
 Proof.
   destruct i as [|[|i]]; [| |by rewrite /cy_row /=]; intros [= <-].
   - (* THE WITNESS READ, at row position 0 *)
@@ -970,7 +1019,7 @@ Proof.
     + reflexivity.
     + by intros H.
     + exact I.
-    + intros _. exact (cyg_wwit_site00 Hvnd).
+    + intros _. apply cyg_wwit_site00.
   - (* the exit store, at row position 1 *)
     split_and!; [lia|lia| |split; [done|done]].
     split_and!.
@@ -989,24 +1038,37 @@ Qed.
     ([WeakRvwmoCycWit.cy_hart_conf]) and the site data above.  Nothing here
     builds a block or chooses a label by hand: the substituted read is the
     POLICY's choice. *)
-Theorem cyg_step0_generic (Hvnd : wwit_vindep cyg 0%nat 0%nat)
+Theorem cyg_step0_generic
     (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
   wlk_step cyg d0 (cw_S0 cpu0 cpu1 rs0 rs1 d0) 0%nat.
 Proof.
-  destruct (wlk_seg_of_cert cyg 0%nat 0%nat cpu0 d0 0%nat 1%nat ws_init
-              (cy_row cy_A cy_B cy_ts2)
+  destruct (wlk_seg_of_cert cyg 0%nat 0%nat cpu0 d0 []
+              (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat) 0%nat 1%nat
+              ws_init (cy_row cy_A cy_B cy_ts2)
               (em_items (cy_em cy_A cy_B cy_ts2 cpu0 rs0))
               (em_fin (cy_em cy_A cy_B cy_ts2 cpu0 rs0))
               (cy_m cy_A cy_B) rs0 None ib_none
-              (cw_S0 cpu0 cpu1 rs0 rs1 d0) rs0
+              (cw_S0 cpu0 cpu1 rs0 rs1 d0) (cy_m cy_A cy_B) rs0 None ib_none
               cyg_consistent (cyg_W_poloc 0%nat) (cyg_wub 0%nat 0%nat)
+              (wrds_free_nil d0)
+              (wnd_wnd_ok cpu0 d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat
+                 (wQ cyg d0 [] (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat)
+                    0%nat 0%nat 0%nat 1%nat)
+                 (λ k lb H, wQ_lbl cyg d0 []
+                    (wnd d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat)
+                    0%nat 0%nat 0%nat 1%nat k lb H))
               (cy_hart_conf 0%nat cy_A cy_B cy_ts2 cpu0 rs0 d0
                  cy_A_ram cy_B_ram eq_refl)
-              (cyg_wQ_seg0 Hvnd) (cw_S0_ok cpu0 cpu1 rs0 rs1 d0))
+              (cy_em_devfree cy_A cy_B cy_ts2 cpu0 rs0)
+              (cyg_wQ_seg0 cpu0 cpu1 rs0 rs1 d0)
+              (cw_S0_ok cpu0 cpu1 rs0 rs1 d0))
     as (St' & tradd & Hstep & _ & Himg & Hpst & Hdv).
   - split_and!; [exact cyg_ctx0|reflexivity|apply wlog_pfx_nil].
   - reflexivity.
-  - apply dreg_agree_refl.
+  - by apply (wnd_start d0 cyg (cy_boot cpu0 cpu1 rs0 rs1) 0%nat cpu0
+                (cy_m cy_A cy_B) rs0 None ib_none).
+  - left. split_and!;
+      [reflexivity|reflexivity|reflexivity|apply dreg_agree_refl].
   - reflexivity.
   - eapply (wlk_step_of_seg cyg d0 _ St' 0%nat _
               [WeakAxiomatic.LLoad false zA cy_ts2 cy_bytes]
@@ -1084,8 +1146,9 @@ Proof.
   rewrite Hl2 in Hl. injection Hl as <-. by simpl in Hw.
 Qed.
 
-Lemma cyg_wsite_supply (Hvnd : wwit_vindep cyg 0%nat 0%nat) :
-  wsite_supply cyg cyW.
+Lemma cyg_wsite_supply (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
+    (d0 : dev_state) :
+  wsite_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 cyg cyW [].
 Proof.
   intros n x kz p lb Hat Hp _ Hl.
   destruct n as [|[|n]].
@@ -1095,7 +1158,7 @@ Proof.
     + destruct (cyg_lbl _ _ Hl) as [[_ ->]|[[He _]|[[He _]|[He _]]]];
         [|by simplify_eq|by simplify_eq|by simplify_eq].
       split; [by intros Hn; destruct (Hn I)|]. right.
-      split_and!; [reflexivity|exact cyg_wit00|exact (cyg_wwit_site00 Hvnd)].
+      split_and!; [reflexivity|exact cyg_wit00|apply cyg_wwit_site00].
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[_ ->]|[[He _]|[He _]]]];
         [by simplify_eq| |by simplify_eq|by simplify_eq].
       split; [by intros Hn; destruct (Hn I)|]. left. split;
@@ -1117,9 +1180,9 @@ Proof.
   - exfalso. rewrite /gwrite_at cyg_gwrites /= in Hat. done.
 Qed.
 
-Theorem cyg_wsupply (Hvnd : wwit_vindep cyg 0%nat 0%nat)
-    (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) :
-  wsupply (cy_boot cpu0 cpu1 rs0 rs1) cyg cyW 2%nat.
+Theorem cyg_wsupply (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
+    (d0 : dev_state) :
+  wsupply (cy_boot cpu0 cpu1 rs0 rs1) d0 cyg cyW [] 2%nat.
 Proof.
   split_and!.
   - exact cyg_gwrow.
@@ -1129,13 +1192,13 @@ Proof.
     destruct x as [|[|x]]; [| |lia]; by eexists _, _, _, _, _.
   - exact cyg_W_poloc'.
   - exact cyg_wubA.
-  - exact (cyg_wsite_supply Hvnd).
+  - apply wrds_free_nil.
+  - apply cyg_wsite_supply.
 Qed.
 
 (** THE ACCEPTANCE TEST: [WeakRvwmoCycWit.cyg_walk]'s conclusion, from the
     generic engine — the invariant, the start, and the per-graph datum. *)
-Theorem cyg_walk' (Hvnd : wwit_vindep cyg 0%nat 0%nat)
-    (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
+Theorem cyg_walk' (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
   ∃ (l : list segout) (S0 Sf : cyc_state),
     segs_run d0 l S0 Sf ∧
     cd_img (cst_c Sf) = gx_img cyg ∧
@@ -1149,15 +1212,15 @@ Proof.
   { intros x _.
     exact (wemit_of_qconf (cy_boot cpu0 cpu1 rs0 rs1) d0 cy_img 2%nat cygd x
              (cyg_qconf cpu0 cpu1 rs0 rs1 d0)). }
-  destruct (wlk_run' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
+  destruct (wlk_run' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW []
               (λ St n Hinv Hn,
                  wlk_step'_of_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat
-                   cyg cyW St n cyg_consistent
-                   (cyg_wsupply Hvnd cpu0 cpu1 rs0 rs1)
+                   cyg cyW [] St n cyg_consistent
+                   (cyg_wsupply cpu0 cpu1 rs0 rs1 d0)
                    Hinv Hn)
               2%nat 0%nat
               (wlk_start (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg)
-              (wlk_start_inv' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
+              (wlk_start_inv' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW []
                  Hwf Hem0)
               ltac:(by rewrite cyg_gwrites))
     as (l & Sf & Hrun & Hok & Himg & Hpst & Hdv & Hpfx).
@@ -1187,6 +1250,7 @@ Print Assumptions cyg_wQ_seg1.
 Print Assumptions cyg_wnw_seg1.
 Print Assumptions cyg_ctx0.
 Print Assumptions cyg_wwit_site00_graph.
+Print Assumptions cyg_wwit_nd.
 Print Assumptions cyg_wwit_site00.
 Print Assumptions cyg_wQ_seg0.
 Print Assumptions cyg_step0_generic.

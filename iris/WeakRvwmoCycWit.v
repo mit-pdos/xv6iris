@@ -88,6 +88,7 @@ Require Import WeakAxRealize.
 Require Import WeakEvInst.
 Require Import WeakEvLift.
 Require Import WeakEvStarted.
+Require Import WeakEvProv.
 Require Import WeakSrvwmoLitmus.
 Require Import WeakRvwmoConf.
 Require Import WeakRvwmoSupply.
@@ -361,6 +362,200 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(* ---------------------------------------------------------------------- *)
+(** ** 1.6 THE NODE IS PINNED, AND THE SUBSTITUTION RE-CONVERGES
+
+    What [WeakRvwmoWalk.wwit_vindep] used to ASSUME, PROVEN here at the
+    node the walk actually visits.  The premise could not be discharged
+    before because the policy interface was node-blind; with
+    [WeakRvwmoCert3]'s reachability parameter [Nd] the site datum is handed
+    the node, and at [cy_m] the following three facts close it:
+
+      (1) [cy_m]'s continuation is a CONSTANT ([λ _, cy_ma aS]), so EVERY
+          step out of it — at every answer — lands at [cy_ma aS], and the
+          read is PLAIN, so the exclusive arm is unreachable
+          ([cy_m_step_inv]).
+      (2) [cy_m] has no ADMINISTRATIVE step that moves it: the parked-fence
+          arm emits [LFence], the RAM read emits [LLoad]/[LExLoad] (none of
+          them [lb_admin]), and the PLIC arm does not move the monad.  So
+          an administrative stretch out of [cy_m] ENDS at [cy_m]
+          ([cy_m_adm_fix]) — this is what turns "the hart is reachable at
+          this row position" into "the hart is AT this node".
+      (3) hence a block out of [cy_m] carrying a load label can be
+          re-answered with ANY four bytes and lands at the SAME successor
+          ([cy_blk_subst]): [WeakRvwmoCert2.cblk_vfree] at this site, as a
+          THEOREM. *)
+
+(** The projection of a load's wlabel does not consult the process, so the
+    realization holds at any node, register file and channel. *)
+Lemma cy_realizes_ld_any (p : pexv6) (ws : wstate) (aL : Arch.pa)
+    (tvs : list (nat * bv 8)) :
+  hlbl_realizes p ws
+    (WeakAxiomatic.LLoad false (pa_z aL) tvs.*1 tvs.*2) (cy_wl_ld' aL tvs).
+Proof.
+  rewrite /hlbl_realizes /cy_wl_ld'. split_and!; [done|done|done|reflexivity].
+Qed.
+
+(** … so the successor node, register file, parked fence and channel are
+    the node's own, whatever the answer. *)
+Lemma cy_m_step_inv (aL aS : Arch.pa) (rs : regstate) (ib : oib32)
+    (d : dev_state) (l : wlabel) (m' : M unit) (ors : option regstate)
+    (fn' : ofence) (d' : dev_state) (oib : option oib32) :
+  dev_addr aL = false →
+  pnode_step (cy_m aL aS) rs ib d l m' ors fn' d' oib →
+  ∃ tvs : list (nat * bv 8),
+    length tvs = 4%nat ∧ l = cy_wl_ld' aL tvs ∧
+    m' = cy_ma aS ∧ ors = None ∧ fn' = None ∧ d' = d ∧ oib = None.
+Proof.
+  intros Hram Hst.
+  rewrite /cy_m /pnode_step /= Hram in Hst.
+  destruct Hst as (_ & [(Hlat & w & tvs & Hlen & Hb & Hl & Hm & Ho & Hf & Hd
+                         & Hoib)
+                       |(Hlat & _)]).
+  - exists tvs. split_and!;
+      [exact Hlen|by rewrite Hl|exact Hm|exact Ho|exact Hf|exact Hd|exact Hoib].
+  - discriminate Hlat.
+Qed.
+
+(** (2) NO ADMINISTRATIVE STEP MOVES [cy_m]. *)
+Lemma cy_m_adm_step (aL aS : Arch.pa) (cpu : CPU) (rs : regstate)
+    (fn : ofence) (ib : oib32) (d : dev_state) (l : wlabel)
+    (rds : list wreg) (wrs : list register) (ann : bool) (m1 : M unit)
+    (ors : option regstate) (fn1 : ofence) (d1 : dev_state)
+    (oib : option oib32) :
+  dev_addr aL = false →
+  lb_admin true l →
+  pstep_hw cpu (cy_m aL aS) rs fn ib d l rds wrs ann m1 ors fn1 d1 oib →
+  m1 = cy_m aL aS.
+Proof.
+  intros Hram Hadm
+    [(-> & Hn & _)|[(pr & pw & sr & sw & -> & Hn & _)|(Hp & _)]].
+  - exfalso.
+    destruct (cy_m_step_inv aL aS rs ib d l m1 ors fn1 d1 oib Hram Hn)
+      as (tvs & _ & -> & _). by simpl in Hadm.
+  - exfalso. rewrite /pstep_node in Hn.
+    destruct Hn as (-> & _). by simpl in Hadm.
+  - by destruct Hp as (_ & -> & _).
+Qed.
+
+Lemma cy_m_adm_fix (aL aS : Arch.pa) (cpu : CPU) (ls : list wlabel)
+    (rds : list wreg) (wrs : list register) (ann : bool) (m : M unit)
+    (rs : regstate) (fn : ofence) (ib : oib32) (d : dev_state)
+    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32)
+    (d' : dev_state) :
+  dev_addr aL = false →
+  phrun cpu ls rds wrs ann m rs fn ib d m' rs' fn' ib' d' →
+  (∀ l0, l0 ∈ ls → lb_admin true l0) →
+  m = cy_m aL aS → m' = cy_m aL aS.
+Proof.
+  intros Hram Hrun. induction Hrun as
+    [m0 rs0 fn0 ib0 d0
+    |l ls rdsA rdsB wrsA wrsB annA annB m0 rs0 fn0 ib0 d0
+     m1 ors fn1 oib d1 m2 rs2 fn2 ib2 d2 Hstep Hrun IH];
+    intros Hadm Hm; [exact Hm|].
+  subst m0.
+  have Hl : lb_admin true l by (apply Hadm, elem_of_list_here).
+  have Hm1 : m1 = cy_m aL aS
+    := cy_m_adm_step aL aS cpu rs0 fn0 ib0 d0 l rdsA wrsA annA m1 ors fn1 d1
+         oib Hram Hl Hstep.
+  apply IH; [|exact Hm1].
+  intros l0 Hl0. by apply Hadm, elem_of_list_further.
+Qed.
+
+(** The load step at an ARBITRARY register file and channel — [cy_pstep_ld']
+    is the instance at the boot state. *)
+Lemma cy_pstep_ld_any (aL aS : Arch.pa) (cpu : CPU) (rs : regstate)
+    (ib : oib32) (d : dev_state) (tvs : list (nat * bv 8)) :
+  dev_addr aL = false → length tvs = 4%nat →
+  pstep_ev (PHart cpu (cy_m aL aS) rs None ib) d (cy_wl_ld' aL tvs)
+    (PHart cpu (cy_ma aS) rs None ib) d.
+Proof.
+  intros Hram Hlen.
+  have Hl2 : length tvs.*2 = N.to_nat 4 by rewrite length_fmap Hlen.
+  destruct (bv_of_bytes 4 tvs.*2 Hl2) as (w2 & Hw2).
+  rewrite /pstep_ev. split; [reflexivity|].
+  exists None, None. split_and!; [reflexivity|reflexivity|].
+  left. rewrite /pstep_node /cy_m /pnode_step /=.
+  rewrite Hram. split; [reflexivity|]. left. split; [reflexivity|].
+  exists w2, tvs. split_and!;
+    [by rewrite Hlen| |reflexivity|reflexivity|reflexivity|reflexivity
+    |reflexivity|reflexivity].
+  intros j Hj. by apply Hw2.
+Qed.
+
+(** (3) THE SUBSTITUTION RE-CONVERGES AT ONCE: a block out of [cy_m]
+    carrying a load label can be re-answered with any list of the read's
+    own width, and lands at the SAME successor node, register file, parked
+    fence and channel.  This is [WeakRvwmoCert2.cblk_vfree] at this site —
+    a theorem, not a premise. *)
+Theorem cy_blk_subst (aL aS : Arch.pa) (cpu : CPU) (d0 : dev_state)
+    (ws : wstate) (aq : bool) (base : Z) (ts : list nat)
+    (vs : list (bv 8)) (l : wlabel) (rds : list wreg)
+    (wrs : list register) (rs : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32)
+    (tvs2 : list (nat * bv 8)) :
+  dev_addr aL = false →
+  length tvs2 = length ts →
+  cblk cpu d0 ws (WeakAxiomatic.LLoad aq base ts vs) l rds wrs
+    (cy_m aL aS) rs fn ib m' rs' fn' ib' →
+  ∃ (l2 : wlabel) (rds2 : list wreg) (wrs2 : list register),
+    cblk cpu d0 ws (WeakAxiomatic.LLoad aq base tvs2.*1 tvs2.*2) l2 rds2 wrs2
+      (cy_m aL aS) rs fn ib m' rs' fn' ib'.
+Proof.
+  intros Hram Hlen2
+    (ls & ma & rsa & fna & iba & da & rdsA & wrsA & annA & rdsB & wrsB & annB
+     & Hadm & HA & Hre & HB & -> & ->).
+  have Hma : ma = cy_m aL aS
+    := cy_m_adm_fix aL aS cpu ls rdsA wrsA annA _ rs fn ib d0 ma rsa fna iba
+         da Hram HA Hadm eq_refl.
+  subst ma.
+  have Hst : pstep_ev (PHart cpu (cy_m aL aS) rsa fna iba) da l
+               (PHart cpu m' rs' fn' ib') d0.
+  { apply pevrun_single_inv. by eapply phrun_pevrun. }
+  destruct Hst as (_ & ors & oib & Hrs & Hib & Hhart).
+  destruct (hlbl_realizes_load_shape (PHart cpu (cy_m aL aS) rsa fna iba) ws
+              aq base ts vs l Hre) as (tvs & Hf & Hs & Hshape).
+  (* the label is a LOAD, so neither the parked fence nor the PLIC wire *)
+  have Hnotf : ∀ pr pw sr sw, l ≠ LFence pr pw sr sw.
+  { intros pr pw sr sw ->.
+    by destruct Hshape as [Hl|(asrc & Hl)]; discriminate Hl. }
+  have Hnotd : l ≠ LDev.
+  { intros ->. by destruct Hshape as [Hl|(asrc & Hl)]; discriminate Hl. }
+  have Hfna : fna = None.
+  { destruct fna as [[[[pr pw] sr] sw]|]; [exfalso|reflexivity].
+    destruct Hhart as [Hnode|Hplic].
+    - rewrite /pstep_node in Hnode. destruct Hnode as (Hl & _).
+      by apply (Hnotf pr pw sr sw).
+    - destruct Hplic as (Hl & _). by apply Hnotd. }
+  subst fna.
+  have Hn : pnode_step (cy_m aL aS) rsa iba da l m' ors fn' d0 oib.
+  { destruct Hhart as [Hnode|Hplic]; [exact Hnode|exfalso].
+    destruct Hplic as (Hl & _). by apply Hnotd. }
+  destruct (cy_m_step_inv aL aS rsa iba da l m' ors fn' d0 oib Hram Hn)
+    as (tvs0 & Hlen0 & Hl0 & Hm' & Hors & Hfn' & Hda & Hoib).
+  subst ors oib m' fn' da.
+  simpl in Hrs, Hib. subst rs' ib'.
+  (* … and its data are the NODE's: the address, the plainness, the width *)
+  destruct Hshape as [Hl|(asrc & Hl)]; rewrite Hl /cy_wl_ld' in Hl0;
+    [|discriminate Hl0].
+  simplify_eq.
+  have Hlen2' : length tvs2 = 4%nat.
+  { rewrite Hlen2 ?length_fmap. done. }
+  have Hst2 : pstep_ev (PHart cpu (cy_m aL aS) rsa None iba) d0
+                (cy_wl_ld' aL tvs2) (PHart cpu (cy_ma aS) rsa None iba) d0
+    := cy_pstep_ld_any aL aS cpu rsa iba d0 tvs2 Hram Hlen2'.
+  destruct (pevrun_phrun [cy_wl_ld' aL tvs2] _ d0 _ d0
+              (pevrun_more _ [] _ d0 _ d0 _ d0 Hst2 (pevrun_nil _ _))
+              cpu (cy_m aL aS) rsa None iba (cy_ma aS) rsa None iba
+              eq_refl eq_refl)
+    as (rdsB2 & wrsB2 & annB2 & HB2).
+  exists (cy_wl_ld' aL tvs2), (rdsA ++ rdsB2), (wrsA ++ wrsB2).
+  exists ls, (cy_m aL aS), rsa, None, iba, d0, rdsA, wrsA, annA,
+    rdsB2, wrsB2, annB2.
+  split_and!; [exact Hadm|exact HA|apply cy_realizes_ld_any|exact HB2
+              |reflexivity|reflexivity].
+Qed.
+
 (** * 2. THE TWO-EVENT ROW, EMITTED
 
     [HEone] twice and [HEnil]: the load block with an EMPTY administrative

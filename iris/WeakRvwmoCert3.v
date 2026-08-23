@@ -1854,6 +1854,31 @@ Proof.
     rewrite Hz. by intros H _.
 Qed.
 
+(** A segment whose ROW ENDS IN A WRITE is locked outright — the walk's
+    own shape ("non-writes, then the exit store"), so its exit is always in
+    LOCKSTEP even when a witness inside it diverged. *)
+Lemma lastlb_app_single (l : list lbl) (a : lbl) : lastlb (l ++ [a]) = Some a.
+Proof.
+  induction l as [|b l IH]; [reflexivity|].
+  destruct l as [|c l']; [reflexivity|]. exact IH.
+Qed.
+
+Lemma seg_locked_snoc (row : list lbl) (a : lbl) (Pin : Prop) :
+  lb_is_w a = true → seg_locked (row ++ [a]) Pin.
+Proof. intros H. rewrite /seg_locked lastlb_app_single. exact H. Qed.
+
+(** [csync] does not constrain the two register files beyond their
+    agreement off [T], so it transports along any other agreeing pair. *)
+Lemma csync_regs (T : list wreg) (m1 m2 : M unit) (rs rs1 rs2 : regstate)
+    (fn : ofence) (ib : oib32) :
+  csync T m1 rs fn ib m2 rs fn ib →
+  dreg_agree (λ n, n ∉ T) rs1 rs2 →
+  csync T m1 rs1 fn ib m2 rs2 fn ib.
+Proof.
+  intros [(-> & _ & _ & _)|(-> & H2 & Hts1 & Hts2 & _)] Hag;
+    [left|right]; by split_and!.
+Qed.
+
 Lemma hlbl_realizes_pair_notadm p pm ws lb l1 l2 instr :
   hlbl_realizes_pair p pm ws lb l1 l2 → ¬ lb_admin instr l1.
 Proof.
@@ -1873,26 +1898,28 @@ Section segment''.
       Cls c0 lb' →
       Ctx (S k) (cand_snoc c0 (EStep x lb'))).
 
-  Context (Hrds : ∀ (k : nat) (lb : lbl) (ws : wstate) (l : wlabel)
-      (rds : list wreg) (wrs : list register)
-      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
-      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
-      Q k lb → cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
-      rds_ok (λ n, n ∉ T) rds).
-
-  Context (Hrdsp : ∀ (k : nat) (lb : lbl) (ws : wstate) (l1 l2 : wlabel)
-      (rds : list wreg) (wrs : list register)
-      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
-      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
-      Q k lb → cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
-      rds_ok (λ n, n ∉ T) rds).
-
   (** (N-D) THE REACHABILITY PARAMETER (§5b.4): what pins the block's own
       monad NODE, so that a site datum about the node — [tail_silent], the
       read-set clause, the same-node demand an RMW-free load site may prefer
       — is DISCHARGEABLE rather than assumed.  Its two closure laws are
       [ndreach]'s own constructors. *)
   Context (Nd : nat → M unit → Prop).
+
+  Context (Hrds : ∀ (k : nat) (lb : lbl) (ws : wstate) (l : wlabel)
+      (rds : list wreg) (wrs : list register)
+      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
+      Q k lb → Nd k m →
+      cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+      rds_ok (λ n, n ∉ T) rds).
+
+  Context (Hrdsp : ∀ (k : nat) (lb : lbl) (ws : wstate) (l1 l2 : wlabel)
+      (rds : list wreg) (wrs : list register)
+      (m : M unit) (rs : regstate) (fn : ofence) (ib : oib32)
+      (m' : M unit) (rs' : regstate) (fn' : ofence) (ib' : oib32),
+      Q k lb → Nd k m →
+      cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib' →
+      rds_ok (λ n, n ∉ T) rds).
 
   Context (HNdadm : ∀ (k : nat) (m m' : M unit) (rs rs' : regstate)
       (fn fn' : ofence) (ib ib' : oib32) (ls : list wlabel)
@@ -1974,7 +2001,11 @@ Section segment''.
         dv' 0%nat = dv 0%nat ∧
         (∀ y, y ≠ x → pst' (cd_end c') !! y = pst (cd_end c) !! y) ∧
         (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st c') y)
-                    = w_relp (ms_ws (cand_last_st c) y)).
+                    = w_relp (ms_ws (cand_last_st c) y)) ∧
+        (** THE EXIT NODE IS REACHABLE at the row position the segment ends
+            at: what lets a CALLER re-establish [Nd] for the next segment of
+            the same hart (the walk's own invariant). *)
+        Nd (k0 + length rowseg)%nat m1.
   Proof.
     induction 1 as [k ws p
                    |k ws lb row p ls pa da l p' es pfin Har Hre Hst Hem IH
@@ -1989,7 +2020,8 @@ Section segment''.
                   |exact Hpo|exact Hp|exact Hdvc|reflexivity|exact Hsync
                   | |exact Hrelp
                   |reflexivity|reflexivity|reflexivity
-                  |(intros y _; reflexivity)|(intros y _; reflexivity)].
+                  |(intros y _; reflexivity)|(intros y _; reflexivity)
+                  |(rewrite /= Nat.add_0_r; exact Hnd)].
       + intros s Hs. by apply elem_of_nil in Hs.
       + rewrite /seg_locked /=. by intros H.
     - (* ONE BLOCK, then the rest *)
@@ -2016,11 +2048,12 @@ Section segment''.
       destruct (cblk_intro cpu d0 ws lb l lsc (PHart cpu ma rsa fna iba) da
                   mc rs1c fnc ibc m1 rs11 fn1 ib1 Hadmc Hre Hst)
         as (rds & wrs & Hblk).
-      have Hrdsok : rds_ok (fun n => n ∉ T) rds
-        := Hrds k lb ws l rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb Hblk.
       have Hndc : Nd k mc
         := HNdadm k m0 mc rs10 rs1c fn0 fnc ib0 ibc lsq rdsq wrsq annq
              Hnd Hadmq Hrunq.
+      have Hrdsok : rds_ok (fun n => n ∉ T) rds
+        := Hrds k lb ws l rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb Hndc
+             Hblk.
       have Hnd1 : Nd (S k) m1
         := HNdblk k mc m1 ws lb l rds wrs rs1c rs11 fnc fn1 ibc ib1
              Hndc Hlb Hblk.
@@ -2055,13 +2088,14 @@ Section segment''.
         as (c' & pst' & dv' & tradd & m2 & rs12 & fn2 & ib2 &
             m22 & rs22 & fn22 & ib22 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hsyncf
-            & Hlockf & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
+            & Hlockf & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2 & Hndf).
       exists c', pst', dv', (EStep x lb' :: tradd), m2, rs12, fn2, ib2,
         m22, rs22, fn22, ib22.
       split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'
                    |(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hsyncf
-                   | |exact Hrelpf| | | | | ].
+                   | |exact Hrelpf| | | | |
+                   |(rewrite /= Nat.add_succ_r; exact Hndf)].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
       + intros Hlk. apply Hlockf.
@@ -2111,11 +2145,12 @@ Section segment''.
                   ls2 (PHart cpu mc2 rsc2 fnc2 ibc2) dm2
                   mc rs1c fnc ibc m1 rs11 fn1 ib1 Hadmc Hre Hst1 Har2 Hst2)
         as (rds & wrs & Hblk).
-      have Hrdsok : rds_ok (fun n => n ∉ T) rds
-        := Hrdsp k lb ws l1 l2 rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb Hblk.
       have Hndc : Nd k mc
         := HNdadm k m0 mc rs10 rs1c fn0 fnc ib0 ibc lsq rdsq wrsq annq
              Hnd Hadmq Hrunq.
+      have Hrdsok : rds_ok (fun n => n ∉ T) rds
+        := Hrdsp k lb ws l1 l2 rds wrs mc rs1c fnc ibc m1 rs11 fn1 ib1 Hlb
+             Hndc Hblk.
       have Hnd1 : Nd (S k) m1
         := HNdblkp k mc m1 ws lb l1 l2 rds wrs rs1c rs11 fnc fn1 ibc ib1
              Hndc Hlb Hblk.
@@ -2152,13 +2187,14 @@ Section segment''.
         as (c' & pst' & dv' & tradd & m2 & rs12 & fn2 & ib2 &
             m22 & rs22 & fn22 & ib22 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hsyncf
-            & Hlockf & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
+            & Hlockf & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2 & Hndf).
       exists c', pst', dv', (EStep x lb :: tradd), m2, rs12, fn2, ib2,
         m22, rs22, fn22, ib22.
       split_and!; [| |constructor; [apply lbl_reidx_w_refl|exact Hf2]
                    |exact Hc'|(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hsyncf
-                   | |exact Hrelpf| | | | | ].
+                   | |exact Hrelpf| | | | |
+                   |(rewrite /= Nat.add_succ_r; exact Hndf)].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
       + intros Hlk. apply Hlockf.

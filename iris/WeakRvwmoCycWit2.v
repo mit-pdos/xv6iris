@@ -36,10 +36,19 @@
     modelled here is therefore the real one's FIRST node — the destination
     write — followed directly by the boundary.
 
-    Nothing below is [Admitted] or [Axiom]-ed.  A LEAF: nothing imports it.
+    WHAT §3b AND §3c ADD (the [wwit_vindep] retirement's acceptance test).
+    §3b proves at THIS node the three facts the MIGRATED policy interface
+    asks of a witness site — [w2_m] has no administrative step that moves
+    it, it reads no register, and every step out of it lands in the silent
+    tail at a node the ANSWER determines ([w2_blk_subst]).  §3c then runs
+    [WeakRvwmoCert4.seg_step_of_segment] — the generic segment engine the
+    walk itself uses — on a one-event row at this load, with a NON-EMPTY
+    taint set and the reachability parameter at [ndreach], and its exit
+    invariant is [csync]'s DIVERGED arm.  What that does NOT reach is
+    recorded in §4(d).
 
-    NOT IN [_CoqProject] (the task forbade touching it).  The line to add,
-    after [WeakRvwmoWalk2.v]:  [WeakRvwmoCycWit2.v] *)
+    Nothing below is [Admitted] or [Axiom]-ed.  A LEAF: nothing imports it.
+    It is in [_CoqProject], after [WeakRvwmoWalk2.v]. *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list relations.
 From stdpp Require Import bitvector.definitions.
@@ -77,6 +86,9 @@ Require Import WeakRvwmoCert.
 Require Import WeakRvwmoFloor.
 Require Import WeakRvwmoCert2.
 Require Import WeakRvwmoCert3.
+Require Import WeakRvwmoCert4.
+Require Import WeakRvwmoWalk.
+Require Import WeakRvwmoCycWit.
 
 Local Open Scope Z_scope.
 
@@ -242,6 +254,442 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** * 3b. THE NODE IS PINNED, AND THE BLOCK RE-ANSWERED
+
+    The same three facts [WeakRvwmoCycWit] §1.6 proves at the
+    value-INDEPENDENT node, here at the value-CARRYING one: [w2_m] has no
+    administrative step that moves it (its RAM read emits [LLoad], its
+    parked-fence arm [LFence], and the PLIC wire does not move the monad),
+    it reads NO register, and every step out of it lands in the
+    instruction's silent tail — at a node the ANSWER determines.  That is
+    what makes the site datum of the migrated interface discharegable here
+    by [csync]'s DIVERGED arm rather than its lockstep one. *)
+
+Lemma w2_m_step_inv (rs : regstate) (ib : oib32) (d : dev_state)
+    (l : wlabel) (m' : M unit) (ors : option regstate) (fn' : ofence)
+    (d' : dev_state) (oib : option oib32) :
+  pnode_step w2_m rs ib d l m' ors fn' d' oib →
+  ∃ tvs : list (nat * bv 8),
+    length tvs = 4%nat ∧
+    l = WeakPromise.LLoad false false (pa_z ev_flag) tvs [] ∧
+    (∃ v : type_of_register w2_rd, m' = w2_k1 v) ∧
+    ors = None ∧ fn' = None ∧ d' = d ∧ oib = None.
+Proof.
+  rewrite /w2_m /pnode_step /=. intros Hst.
+  destruct Hst as (_ & [(_ & w & tvs & Hlen & _ & Hl & Hm & Ho & Hf & Hd
+                         & Hoib)
+                       |(Hlat & _)]).
+  - exists tvs. split_and!;
+      [exact Hlen|by rewrite Hl|by exists (w2_val (inl (w, None)))
+      |exact Ho|exact Hf|exact Hd|exact Hoib].
+  - discriminate Hlat.
+Qed.
+
+(** ONE labelled step, as a [pstep_hw] — the annotated run's own inversion. *)
+Lemma phrun_one (cpu : CPU) (l : wlabel) (rds : list wreg)
+    (wrs : list register) (ann : bool) (m : M unit) (rs : regstate)
+    (fn : ofence) (ib : oib32) (d : dev_state) (m' : M unit)
+    (rs' : regstate) (fn' : ofence) (ib' : oib32) (d' : dev_state) :
+  phrun cpu [l] rds wrs ann m rs fn ib d m' rs' fn' ib' d' →
+  ∃ (ors : option regstate) (oib : option oib32) (wrs0 : list register)
+    (ann0 : bool),
+    pstep_hw cpu m rs fn ib d l rds wrs0 ann0 m' ors fn' d' oib.
+Proof.
+  intros H. inversion H; subst.
+  match goal with
+  | Hr : phrun _ [] _ _ _ _ _ _ _ _ _ _ _ _ _ |- _ => inversion Hr; subst
+  end.
+  rewrite app_nil_r. by eexists _, _, _, _.
+Qed.
+
+(** [w2_m] READS NO REGISTER: it is a memory node, so its own read set is
+    empty, and so is every other arm's. *)
+Lemma w2_m_step_rds (cpu : CPU) (rs : regstate) (fn : ofence) (ib : oib32)
+    (d : dev_state) (l : wlabel) (rds : list wreg) (wrs : list register)
+    (ann : bool) (m1 : M unit) (ors : option regstate) (fn1 : ofence)
+    (d1 : dev_state) (oib : option oib32) :
+  pstep_hw cpu w2_m rs fn ib d l rds wrs ann m1 ors fn1 d1 oib → rds = [].
+Proof.
+  by intros [(_ & _ & -> & _)|[(? & ? & ? & ? & _ & _ & -> & _)|(_ & -> & _)]].
+Qed.
+
+Lemma w2_m_adm_step (cpu : CPU) (rs : regstate) (fn : ofence) (ib : oib32)
+    (d : dev_state) (l : wlabel) (rds : list wreg) (wrs : list register)
+    (ann : bool) (m1 : M unit) (ors : option regstate) (fn1 : ofence)
+    (d1 : dev_state) (oib : option oib32) :
+  lb_admin true l →
+  pstep_hw cpu w2_m rs fn ib d l rds wrs ann m1 ors fn1 d1 oib →
+  m1 = w2_m ∧ rds = [].
+Proof.
+  intros Hadm Hst. have Hr : rds = []
+    := w2_m_step_rds cpu rs fn ib d l rds wrs ann m1 ors fn1 d1 oib Hst.
+  split; [|exact Hr].
+  destruct Hst as [(-> & Hn & _)|[(pr & pw & sr & sw & -> & Hn & _)
+                                 |(Hp & _)]].
+  - exfalso. destruct (w2_m_step_inv rs ib d l m1 ors fn1 d1 oib Hn)
+      as (tvs & _ & -> & _). by simpl in Hadm.
+  - exfalso. rewrite /pstep_node in Hn. destruct Hn as (-> & _).
+    by simpl in Hadm.
+  - by destruct Hp as (_ & -> & _).
+Qed.
+
+Lemma w2_m_adm_fix (cpu : CPU) (ls : list wlabel) (rds : list wreg)
+    (wrs : list register) (ann : bool) (m : M unit) (rs : regstate)
+    (fn : ofence) (ib : oib32) (d : dev_state) (m' : M unit)
+    (rs' : regstate) (fn' : ofence) (ib' : oib32) (d' : dev_state) :
+  phrun cpu ls rds wrs ann m rs fn ib d m' rs' fn' ib' d' →
+  (∀ l0, l0 ∈ ls → lb_admin true l0) →
+  m = w2_m → m' = w2_m ∧ rds = [].
+Proof.
+  intros Hrun. induction Hrun as
+    [m0 rs0 fn0 ib0 d0
+    |l ls rdsA rdsB wrsA wrsB annA annB m0 rs0 fn0 ib0 d0
+     m1 ors fn1 oib d1 m2 rs2 fn2 ib2 d2 Hstep Hrun IH];
+    intros Hadm Hm; [by split|].
+  subst m0.
+  have Hl : lb_admin true l by (apply Hadm, elem_of_list_here).
+  destruct (w2_m_adm_step cpu rs0 fn0 ib0 d0 l rdsA wrsA annA m1 ors fn1 d1
+              oib Hl Hstep) as (Hm1 & ->).
+  destruct (IH ltac:(intros l0 Hl0; by apply Hadm, elem_of_list_further) Hm1)
+    as (Hm2 & ->).
+  by split.
+Qed.
+
+(** THE STEP AT ANY ANSWER LIST of the read's own width. *)
+Lemma w2_pstep_any (cpu : CPU) (rs : regstate) (ib : oib32) (d : dev_state)
+    (tvs : list (nat * bv 8)) :
+  length tvs = 4%nat →
+  ∃ v : type_of_register w2_rd,
+    pstep_ev (PHart cpu w2_m rs None ib) d
+      (WeakPromise.LLoad false false (pa_z ev_flag) tvs [])
+      (PHart cpu (w2_k1 v) rs None ib) d.
+Proof.
+  intros Hlen.
+  have Hl2 : length tvs.*2 = N.to_nat 4 by rewrite length_fmap Hlen.
+  destruct (bv_of_bytes 4 tvs.*2 Hl2) as (w2 & Hw2).
+  exists (w2_val (inl (w2, None))).
+  rewrite /pstep_ev /w2_m. split; [reflexivity|].
+  exists None, None. split_and!; [reflexivity|reflexivity|]. left.
+  rewrite /pstep_node /pnode_step /=.
+  split; [done|]. left. split; [done|].
+  exists w2, tvs. split_and!; try reflexivity; [by rewrite Hlen|].
+  intros j Hj. by apply Hw2.
+Qed.
+
+(** THE BLOCK, RE-ANSWERED.  Everything the migrated site datum asks at
+    this node: the block reads no register, its parked fence is clear at
+    the exit, BOTH the emission's successor and every re-answered one lie
+    in the instruction's silent tail — and the re-answered block exists. *)
+Theorem w2_blk_subst (cpu : CPU) (d0 : dev_state) (ws : wstate) (aq : bool)
+    (base : Z) (ts : list nat) (vs : list (bv 8)) (l : wlabel)
+    (rds : list wreg) (wrs : list register) (rs : regstate) (fn : ofence)
+    (ib : oib32) (m' : M unit) (rs' : regstate) (fn' : ofence)
+    (ib' : oib32) (tvs2 : list (nat * bv 8)) :
+  length tvs2 = 4%nat →
+  cblk cpu d0 ws (WeakAxiomatic.LLoad aq base ts vs) l rds wrs
+    w2_m rs fn ib m' rs' fn' ib' →
+  rds = [] ∧ fn' = None ∧ (∃ v1 : type_of_register w2_rd, m' = w2_k1 v1) ∧
+  ∃ (l2 : wlabel) (rds2 : list wreg) (wrs2 : list register)
+    (v2 : type_of_register w2_rd),
+    cblk cpu d0 ws
+      (WeakAxiomatic.LLoad false (pa_z ev_flag) tvs2.*1 tvs2.*2)
+      l2 rds2 wrs2 w2_m rs fn ib (w2_k1 v2) rs' fn' ib'.
+Proof.
+  intros Hlen2
+    (ls & ma & rsa & fna & iba & da & rdsA & wrsA & annA & rdsB & wrsB & annB
+     & Hadm & HA & Hre & HB & -> & ->).
+  destruct (w2_m_adm_fix cpu ls rdsA wrsA annA _ rs fn ib d0 ma rsa fna iba
+              da HA Hadm eq_refl) as (Hma & ->).
+  subst ma.
+  have Hst : pstep_ev (PHart cpu w2_m rsa fna iba) da l
+               (PHart cpu m' rs' fn' ib') d0.
+  { apply pevrun_single_inv. by eapply phrun_pevrun. }
+  destruct Hst as (_ & ors & oib & Hrs & Hib & Hhart).
+  destruct (hlbl_realizes_load_shape (PHart cpu w2_m rsa fna iba) ws
+              aq base ts vs l Hre) as (tvs & Hf & Hs & Hshape).
+  have Hnotf : ∀ pr pw sr sw, l ≠ LFence pr pw sr sw.
+  { intros pr pw sr sw ->.
+    by destruct Hshape as [Hl|(asrc & Hl)]; discriminate Hl. }
+  have Hnotd : l ≠ LDev.
+  { intros ->. by destruct Hshape as [Hl|(asrc & Hl)]; discriminate Hl. }
+  have Hfna : fna = None.
+  { destruct fna as [[[[pr pw] sr] sw]|]; [exfalso|reflexivity].
+    destruct Hhart as [Hnode|Hplic].
+    - rewrite /pstep_node in Hnode. destruct Hnode as (Hl & _).
+      by apply (Hnotf pr pw sr sw).
+    - destruct Hplic as (Hl & _). by apply Hnotd. }
+  subst fna.
+  have Hn : pnode_step w2_m rsa iba da l m' ors fn' d0 oib.
+  { destruct Hhart as [Hnode|Hplic]; [exact Hnode|exfalso].
+    destruct Hplic as (Hl & _). by apply Hnotd. }
+  destruct (w2_m_step_inv rsa iba da l m' ors fn' d0 oib Hn)
+    as (tvs0 & Hlen0 & Hl0 & Hv1 & Hors & Hfn' & Hda & Hoib).
+  destruct (phrun_one cpu l rdsB wrsB annB w2_m rsa None iba da m' rs' fn'
+              ib' d0 HB) as (ors2 & oib2 & wrs02 & ann02 & Hhw).
+  have HrdsB : rdsB = []
+    := w2_m_step_rds cpu rsa None iba da l rdsB wrs02 ann02 m' ors2 fn' d0
+         oib2 Hhw.
+  subst rdsB ors oib fn' da.
+  simpl in Hrs, Hib. subst rs' ib'.
+  split_and!; [reflexivity|reflexivity|exact Hv1|].
+  destruct (w2_pstep_any cpu rsa iba d0 tvs2 Hlen2) as (v2 & Hst2).
+  destruct (pevrun_phrun [WeakPromise.LLoad false false (pa_z ev_flag) tvs2 []]
+              _ d0 _ d0
+              (pevrun_more _ [] _ d0 _ d0 _ d0 Hst2 (pevrun_nil _ _))
+              cpu w2_m rsa None iba (w2_k1 v2) rsa None iba eq_refl eq_refl)
+    as (rdsB2 & wrsB2 & annB2 & HB2).
+  exists (WeakPromise.LLoad false false (pa_z ev_flag) tvs2 []),
+    ([] ++ rdsB2), (wrsA ++ wrsB2), v2.
+  exists ls, w2_m, rsa, None, iba, d0, [], wrsA, annA, rdsB2, wrsB2, annB2.
+  split_and!; [exact Hadm|exact HA| |exact HB2|reflexivity|reflexivity].
+  rewrite /hlbl_realizes. by split_and!.
+Qed.
+
+(* ====================================================================== *)
+(** * 3c. THE DIVERGED ARM, FIRED BY THE GENERIC SEGMENT ENGINE
+
+    §3b's facts are what the MIGRATED policy interface asks at a site.
+    This section runs [WeakRvwmoCert4.seg_step_of_segment] — the generic
+    engine the walk itself uses, over [WeakRvwmoCert3.cert_segment''] — on
+    a ONE-EVENT row whose event is the REAL spin load, with
+
+      - a NON-EMPTY taint set ([w2_T = [x15]], the loaded value's carrier),
+      - the reachability parameter instantiated at [ndreach] from the load
+        node, which is what lets the policy pin the node and answer at all,
+      - and a policy whose answer is [csync]'s DIVERGED arm: the two runs
+        end at DIFFERENT monad nodes ([w2_nodes_differ] when the values
+        differ), both inside the instruction's silent tail.
+
+    Nothing is hand-built below the engine: the block, the certified label
+    and the appended step are the POLICY's, and the candidate bookkeeping
+    is [cert_segment'']'s. *)
+
+Section w2seg.
+  Context (cpu : CPU) (d0 : dev_state) (t : nat) (w : bv 32) (ib : oib32).
+  Context (rs rs2 : regstate).
+
+  Definition w2_lb : WeakAxiomatic.lbl :=
+    WeakAxiomatic.LLoad false (pa_z ev_flag) (ld_ts t) (ld_vs w).
+  Definition w2_Q : nat → WeakAxiomatic.lbl → Prop :=
+    λ k lb, k = 0%nat ∧ lb = w2_lb.
+  Definition w2_Ctx : nat → cand → Prop :=
+    λ _ c, latest_bytes_ok c (pa_z ev_flag) 4.
+  Definition w2_Nd : nat → M unit → Prop := ndreach cpu d0 w2_Q 0%nat w2_m.
+  Definition w2_pst : nat → list pexv6 := λ _, [PHart cpu w2_m rs2 None ib].
+  Definition w2_St : cyc_state := CSt cw_c0 w2_pst (λ _, d0).
+
+  (** THE NODE IS PINNED at row position 0: no block has run, so the
+      reachability is an administrative stretch out of the load node, and
+      §3b says such a stretch does not move it. *)
+  Lemma w2_nd_pin (k : nat) (m : M unit) :
+    w2_Nd k m → k = 0%nat → m = w2_m.
+  Proof.
+    intros Hnd Hk.
+    eapply (ndreach_fix cpu d0 w2_Q (λ mm, mm = w2_m) w2_m);
+      [reflexivity| |exact Hnd|exact Hk].
+    intros m1 m2 rs1' rs2' fn1 fn2 ib1 ib2 ls rds wrs ann Hm1 Hadm Hrun.
+    by destruct (w2_m_adm_fix cpu ls rds wrs ann m1 rs1' fn1 ib1 d0 m2 rs2'
+                   fn2 ib2 d0 Hrun Hadm Hm1) as (H & _).
+  Qed.
+
+  (** THE EMISSION: one block, no administrative stretch, at the REAL load
+      request — and it is fabric-quiet. *)
+  Lemma w2_hemit :
+    hemit (λ _, d0) 0%nat (ms_ws (cand_last_st cw_c0) 0%nat) [w2_lb]
+      (w2_p0 cpu rs ib)
+      [(WeakPromise.LLoad false false (pa_z ev_flag) (ld_tvs t w) [],
+        Some 0%nat)]
+      (w2_p1 w cpu rs ib).
+  Proof.
+    apply (HEone (λ _, d0) 0%nat (ms_ws (cand_last_st cw_c0) 0%nat) w2_lb []
+             (w2_p0 cpu rs ib) [] (w2_p0 cpu rs ib) d0
+             (WeakPromise.LLoad false false (pa_z ev_flag) (ld_tvs t w) [])
+             (w2_p1 w cpu rs ib) [] (w2_p1 w cpu rs ib)).
+    - apply ARnil.
+    - apply w2_realizes.
+    - apply w2_pstep.
+    - apply HEnil.
+  Qed.
+
+  Lemma w2_devfree :
+    LDev ∉ ([(WeakPromise.LLoad false false (pa_z ev_flag) (ld_tvs t w) [],
+              Some 0%nat)] : list eitem).*1.
+  Proof.
+    intros [H|H]%elem_of_cons; [discriminate|by apply elem_of_nil in H].
+  Qed.
+
+  Lemma w2_cst_ok : cst_ok d0 w2_St.
+  Proof.
+    split_and!; [apply cw_c0_cons| |reflexivity].
+    intros k s Hs. rewrite cand_ex_tr in Hs. by destruct k.
+  Qed.
+
+  Lemma w2_HQ (i : nat) (lb : WeakAxiomatic.lbl) :
+    [w2_lb] !! i = Some lb → w2_Q (0 + i)%nat lb.
+  Proof.
+    destruct i as [|i]; [|by rewrite /= lookup_nil].
+    intros [= <-]. by split.
+  Qed.
+
+  Lemma w2_Q_rmwfree (k : nat) (lb : WeakAxiomatic.lbl) :
+    w2_Q k lb → lb_rmwfree lb.
+  Proof. by intros (_ & ->). Qed.
+
+  Lemma w2_Hpres (k : nat) (c0 : cand) (lb lb' : WeakAxiomatic.lbl) :
+    w2_Ctx k c0 → srvwmo_consistent c0 → w2_Q k lb →
+    lbl_reidx_w lb lb' → mstep_ok (cand_last_st c0) 0%nat lb' → True →
+    w2_Ctx (S k) (cand_snoc c0 (EStep 0%nat lb')).
+  Proof.
+    intros Hctx Hc (_ & ->) Hri Hok _.
+    have Hw' : lb_is_w lb' = false
+      by apply (lbl_reidx_w_notw w2_lb lb' Hri eq_refl).
+    rewrite /w2_Ctx /latest_bytes_ok cand_snoc_img cd_log_end_snoc
+            (es_msg_notw (EStep 0%nat lb') Hw') app_nil_r.
+    exact Hctx.
+  Qed.
+
+  Lemma w2_Hrds (k : nat) (lb : WeakAxiomatic.lbl) (ws : wstate)
+      (l : wlabel) (rds : list wreg) (wrs : list register) (m : M unit)
+      (rs1 : regstate) (fn : ofence) (ib1 : oib32) (m' : M unit)
+      (rs1' : regstate) (fn' : ofence) (ib1' : oib32) :
+    w2_Q k lb → w2_Nd k m →
+    cblk cpu d0 ws lb l rds wrs m rs1 fn ib1 m' rs1' fn' ib1' →
+    rds_ok (λ n, n ∉ w2_T) rds.
+  Proof.
+    intros (Hk & ->) Hnd Hblk.
+    rewrite (w2_nd_pin k m Hnd Hk) in Hblk.
+    destruct (w2_blk_subst cpu d0 ws false (pa_z ev_flag) (ld_ts t) (ld_vs w)
+                l rds wrs rs1 fn ib1 m' rs1' fn' ib1'
+                (ld_tvs 0%nat (Z_to_bv 32 0)) eq_refl Hblk) as (-> & _).
+    intros n Hn. by apply elem_of_nil in Hn.
+  Qed.
+
+  Lemma w2_Hrdsp (k : nat) (lb : WeakAxiomatic.lbl) (ws : wstate)
+      (l1 l2 : wlabel) (rds : list wreg) (wrs : list register) (m : M unit)
+      (rs1 : regstate) (fn : ofence) (ib1 : oib32) (m' : M unit)
+      (rs1' : regstate) (fn' : ofence) (ib1' : oib32) :
+    w2_Q k lb → w2_Nd k m →
+    cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib1 m' rs1' fn' ib1' →
+    rds_ok (λ n, n ∉ w2_T) rds.
+  Proof.
+    intros (Hk & ->) Hnd Hblk. exfalso.
+    exact (cblkp_rmw cpu d0 ws w2_lb l1 l2 rds wrs m rs1 fn ib1 m' rs1' fn'
+             ib1' Hblk I).
+  Qed.
+
+  (** THE POLICY.  The certified run reads the CANDIDATE's latest bytes;
+      the emission read [w].  The two runs therefore leave the memory node
+      at DIFFERENT successors — and [csync]'s DIVERGED arm is exactly what
+      says that is admissible: both are inside the instruction's silent
+      tail, with the register files agreeing off [w2_T]. *)
+  Lemma w2_Hpol (k : nat) (c0 : cand) (ws : wstate)
+      (lb : WeakAxiomatic.lbl) (l : wlabel) (rds : list wreg)
+      (wrs : list register) (m : M unit) (rs1 rs1b : regstate)
+      (fn : ofence) (ib1 : oib32) (m' : M unit) (rs1' : regstate)
+      (fn' : ofence) (ib1' : oib32) :
+    srvwmo_consistent c0 → w2_Ctx k c0 → w2_Q k lb →
+    w_relp (ms_ws (cand_last_st c0) 0%nat) = w_relp ws →
+    dreg_agree (λ n, n ∉ w2_T) rs1 rs1b →
+    rds_ok (λ n, n ∉ w2_T) rds →
+    w2_Nd k m →
+    cblk cpu d0 ws lb l rds wrs m rs1 fn ib1 m' rs1' fn' ib1' →
+    ∃ lb' l' rds' wrs' rs2' (m2' : M unit) (fn2' : ofence) (ib2' : oib32),
+      cblk cpu d0 ws lb' l' rds' wrs' m rs1b fn ib1 m2' rs2' fn2' ib2' ∧
+      mstep_ok (cand_last_st c0) 0%nat lb' ∧
+      lbl_reidx_w lb lb' ∧
+      True ∧
+      csync w2_T m' rs1' fn' ib1' m2' rs2' fn2' ib2' ∧
+      (lb_is_w lb = true →
+         clockstep w2_T m' rs1' fn' ib1' m2' rs2' fn2' ib2').
+  Proof.
+    intros Hc Hctx (Hk & ->) Hrelp Hag Hrds Hnd Hblk.
+    rewrite (w2_nd_pin k m Hnd Hk) in Hblk.
+    destruct (w2_blk_subst cpu d0 ws false (pa_z ev_flag) (ld_ts t) (ld_vs w)
+                l rds wrs rs1 fn ib1 m' rs1' fn' ib1'
+                (ld_tvs 0%nat (Z_to_bv 32 0)) eq_refl Hblk)
+      as (Hrn & Hfn' & (v1 & Hm') & _).
+    destruct (cert_block_mirror (λ n, n ∉ w2_T) cpu d0 ws w2_lb l rds wrs
+                w2_m rs1 fn ib1 m' rs1' fn' ib1' rs1b Hblk Hrds Hag)
+      as (rs2b & Hblk2 & Hag2).
+    destruct (w2_blk_subst cpu d0 ws false (pa_z ev_flag) (ld_ts t) (ld_vs w)
+                l rds wrs rs1b fn ib1 m' rs2b fn' ib1'
+                (wit_tvs c0 (pa_z ev_flag) 4)
+                (wit_tvs_length c0 (pa_z ev_flag) 4) Hblk2)
+      as (_ & _ & _ & (l2 & rds2 & wrs2 & v2 & Hblk3)).
+    rewrite (wit_tvs_lbl c0 false (pa_z ev_flag) 4) in Hblk3.
+    exists (latest_read_lbl c0 false (pa_z ev_flag) 4), l2, rds2, wrs2, rs2b,
+      (w2_k1 v2), fn', ib1'.
+    split_and!.
+    - rewrite (w2_nd_pin k m Hnd Hk). exact Hblk3.
+    - by apply cert_read_witness.
+    - right. rewrite /latest_read_lbl /=. split_and!;
+        [reflexivity|reflexivity|reflexivity| |].
+      + reflexivity.
+      + reflexivity.
+    - exact I.
+    - right. split_and!;
+        [exact Hfn'|exact Hfn'|rewrite Hm'; apply w2_tail_silent
+        |apply w2_tail_silent|exact Hag2].
+    - intros H. by simpl in H.
+  Qed.
+
+  (** THE INSTANCE.  One [WeakRvwmoCert4.seg_step] of the generic engine,
+      at the real load, with the diverged arm at its exit. *)
+  Theorem w2_seg_step_diverged :
+    dreg_agree (λ n, n ∉ w2_T) rs rs2 →
+    ∃ (St' : cyc_state) (tradd : list estep) (m21 : M unit)
+      (rs21 : regstate) (fn21 : ofence) (ib21 : oib32),
+      seg_step d0 (SegOut 0%nat [w2_lb] 0%nat tradd) w2_St St' ∧
+      cst_pst St' (cd_end (cst_c St')) !! 0%nat
+        = Some (PHart cpu m21 rs21 fn21 ib21) ∧
+      (** the two runs are [csync] at the exit … *)
+      csync w2_T (w2_k1 (w2_val (inl (w, None)))) rs None ib
+        m21 rs21 fn21 ib21 ∧
+      (** … and BOTH are inside the instruction's silent tail, which is
+          [csync]'s DIVERGED arm — the emission's own node carries the
+          value it read, so no lockstep answer exists here unless the two
+          values coincide ([w2_nodes_differ]). *)
+      tail_silent w2_T (w2_k1 (w2_val (inl (w, None)))) ∧
+      tail_silent w2_T m21.
+  Proof.
+    intros Hag.
+    destruct (seg_step_of_segment 0%nat cpu d0 w2_T w2_Q w2_Ctx
+                (λ _ _, True) w2_Nd w2_Hpres w2_Hrds w2_Hrdsp
+                (λ k m m' rs' rs'' fn fn' ib' ib'' ls rds wrs ann Hnd Ha Hr,
+                   nd_adm cpu d0 w2_Q 0%nat w2_m k m m' rs' rs'' fn fn'
+                     ib' ib'' ls rds wrs ann Hnd Ha Hr)
+                (λ k m m' ws lb l rds wrs rs' rs'' fn fn' ib' ib'' Hnd Hq Hb,
+                   nd_blk cpu d0 w2_Q 0%nat w2_m k m m' ws lb l rds wrs
+                     rs' rs'' fn fn' ib' ib'' Hnd Hq Hb)
+                (λ k m m' ws lb l1 l2 rds wrs rs' rs'' fn fn' ib' ib''
+                   Hnd Hq Hb,
+                   nd_blkp cpu d0 w2_Q 0%nat w2_m k m m' ws lb l1 l2 rds wrs
+                     rs' rs'' fn fn' ib' ib'' Hnd Hq Hb)
+                w2_Hpol
+                (cpolpr_of_cpolp 0%nat cpu d0 w2_T w2_Nd w2_Ctx
+                   (λ _ _, True) w2_Q
+                   (cpolp_of_rmwfree 0%nat cpu d0 w2_T w2_Ctx (λ _ _, True)
+                      w2_Q w2_Q_rmwfree))
+                0%nat (ms_ws (cand_last_st cw_c0) 0%nat) [w2_lb] _ _
+                w2_m rs None ib w2_St w2_m rs2 None ib
+                w2_hemit w2_devfree w2_HQ w2_cst_ok cw_bytes0 eq_refl
+                (nd_start cpu d0 w2_Q 0%nat w2_m)
+                (or_introl (conj eq_refl (conj eq_refl (conj eq_refl Hag))))
+                eq_refl)
+      as (St' & tradd & Hstep & _ & _ & _ & _ &
+          (m1 & rs11 & fn1 & ib1 & m21 & rs21 & fn21 & ib21 &
+           Hpfin & Hpx & Hsync & _ & _) & _).
+    rewrite /w2_p1 in Hpfin. injection Hpfin as <- <- <- <-.
+    exists St', tradd, m21, rs21, fn21, ib21.
+    have Hts1 : tail_silent w2_T (w2_k1 (w2_val (inl (w, None))))
+      := w2_tail_silent _.
+    split_and!; [exact Hstep|exact Hpx|exact Hsync|exact Hts1|].
+    destruct Hsync as [(-> & _)|(_ & _ & _ & Hts2 & _)];
+      [exact Hts1|exact Hts2].
+  Qed.
+End w2seg.
+
+(* ====================================================================== *)
 (** * 4. WHAT THIS WITNESS LEAVES OPEN
 
     (a) THE REAL NINE-NODE TAIL.  Admitting [lw a5,0(a4)]'s own tail (the
@@ -263,16 +711,30 @@ Qed.
         [WeakRvwmoAdm]'s 117-node [la_ls] — which is exactly the tail (a)
         rules out for now.
 
-    (c) THE POLICY INTERFACE IS NODE-BLIND.  [WeakRvwmoWalk.wblk_pol_at] is
-        handed a [cblk] and the site's LABEL, never the monad node, so
-        neither [tail_silent] nor the read-set clause [rds_ok] can be
-        discharged at a site: both are properties of the NODE.  That is the
-        same obstruction [WeakRvwmoWalk2] §6.2 priced for [wwit_vindep],
-        and it is what stands between §5b and the removal of that premise:
-        [cert_segment''] must carry a reachability parameter [Nd : nat → M
-        unit → Prop] (its two closure laws are one admin run and one block)
-        and hand [Nd k m] to the policy. *)
+    (c) THE POLICY INTERFACE IS NODE-BLIND — DONE, and §3b/§3c are the
+        payoff.  [WeakRvwmoCert3.cert_segment''] now carries the
+        reachability parameter [Nd] and hands [Nd k m] to the policy (and
+        to the read-set side condition), [WeakRvwmoWalk.wwit_vindep] is
+        RETIRED in favour of [WeakRvwmoWalk.wwit_nd], and §3c fires the
+        DIVERGED arm inside [WeakRvwmoCert4.seg_step_of_segment] — the
+        generic engine — at THIS node, with the taint set [w2_T] non-empty
+        and the node pinned by [ndreach].
+
+    (d) WHAT §3c DOES NOT REACH, and why.  The engine here PRODUCES the
+        diverged arm at a segment's exit; it does not CONSUME it, because
+        consuming it ([WeakRvwmoCert3.csync_advance]'s second branch, via
+        [witness_instr_tail_silent]) needs a SECOND block of the same
+        segment after the witness — and by (b) the node after the boundary
+        is the real machine's [RiscvLang.riscv_step], whose next memory
+        node is the FETCH reached across [WeakRvwmoAdm]'s 117-node stretch,
+        with the real nine-node load tail that (a) rules out.  So a
+        [WeakRvwmoWalk.wlk_step'] carrying the diverged arm — the walk's
+        segments must END in a write, hence must cross the boundary — waits
+        on the paired taint law of (a); everything else is in place. *)
 
 Print Assumptions w2_pstep.
+Print Assumptions w2_m_adm_fix.
+Print Assumptions w2_blk_subst.
+Print Assumptions w2_seg_step_diverged.
 Print Assumptions w2_reaches_boundary.
 Print Assumptions w2_reconverge.

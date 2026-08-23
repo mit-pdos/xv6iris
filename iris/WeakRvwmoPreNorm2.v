@@ -871,12 +871,15 @@ Qed.
     pull-back asserts that a graph whose normalization is well-supplied is
     ITSELF write-order-normal — i.e. it asserts away the very inversion the
     normalization exists to remove.  Machine-checked: *)
-Lemma wsupply_orbit_pull_forces_gwrow (boot : agent → pexv6) (N : nat)
-    (GD GD' : gdexec) :
-  wsupply_orbit_pull boot N →
-  gd_equiv GD GD' → (∃ W, wsupply boot (gd_g GD') W N) →
+Lemma wsupply_orbit_pull_forces_gwrow (boot : agent → pexv6)
+    (d0 : dev_state) (N : nat) (GD GD' : gdexec) :
+  wsupply_orbit_pull boot d0 N →
+  gd_equiv GD GD' → (∃ W T, wsupply boot d0 (gd_g GD') W T N) →
   gwrow_gmo (gd_g GD).
-Proof. intros Hpull Heq Hw. by destruct (Hpull GD GD' Heq Hw) as (W & H & _). Qed.
+Proof.
+  intros Hpull Heq Hw.
+  by destruct (Hpull GD GD' Heq Hw) as (W & T & H & _).
+Qed.
 
 (** THE ROUTE THAT IS LEFT, stated as a theorem: run the walk AT THE
     NORMALIZED MEMBER (which is conformant and consistent, by
