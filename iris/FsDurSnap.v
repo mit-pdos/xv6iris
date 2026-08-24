@@ -399,6 +399,76 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(*  1e. THE ONE-BLOCK FRAME, AND THE FACT IT NEEDS                        *)
+(*                                                                        *)
+(*  A batch's writes have to carry the tie from the previous commit's      *)
+(*  state to the next one's, and the part of that which is FRAME -- the    *)
+(*  objects the batch did not touch -- is this lemma.  Its hypothesis is   *)
+(*  the honest one and it is NOT per-object: no clause of [snap_ok S] may  *)
+(*  read block [b], which quantifies over every inode of [S].              *)
+(*                                                                        *)
+(*  THAT IS THE RESIDUAL OBSTACLE OF THE WHOLE FLIP, and it is worth       *)
+(*  stating where it is: at the ERA the fact is free, because distinct     *)
+(*  objects' [blk_owned]s are separated by the [∗] ([blk_owned_ne]); as    *)
+(*  an accumulated PURE fact it is a claim about every inode at once and   *)
+(*  no per-object splice fact supplies it.  The SNAPSHOT ruling removes    *)
+(*  every RESOURCE wall the project met -- there is nothing to update --   *)
+(*  but it does not by itself supply this, so a batch's accumulation is    *)
+(*  still a LEDGER (durable-disk 3c/3d's, minus its resources and its      *)
+(*  hands).  See claude-notes/projects/durable-disk.md item 4.             *)
+(* ===================================================================== *)
+
+Definition snap_untouched (S : fs_state_rec) (b : Z) : Prop :=
+  b <> SB_BNO
+  /\ b <> sb_bmapstart (fss_sb S)
+  /\ (forall i n, fss_inodes S !! i = Some n ->
+        b <> sb_inodestart (fss_sb S) + i `div` 16
+        /\ (forall k bs, fn_blk n !! k = Some bs -> b <> fn_naddr n k)
+        /\ (fn_indb n <> 0 -> b <> fn_indb n)).
+
+Lemma snap_ok_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) (bs : list (bv 8)) :
+  snap_ok S D -> snap_untouched S b -> length bs = BSIZE ->
+  snap_ok S (<[b := bs]> D).
+Proof.
+  intros Hok (Hsb & Hbm & Hin) Hlen.
+  (* one lookup transport, used at every clause that names a block *)
+  assert (Hne : forall c cs, c <> b -> D !! c = Some cs ->
+                  <[b := bs]> D !! c = Some cs).
+  { intros c cs Hc Hcs. rewrite lookup_insert_ne; [exact Hcs |].
+    exact (not_eq_sym Hc). }
+  split.
+  - intros c cs Hcs.
+    destruct (decide (c = b)) as [-> | Hc].
+    + rewrite lookup_insert in Hcs. injection Hcs as <-. exact Hlen.
+    + rewrite lookup_insert_ne in Hcs; [| exact (not_eq_sym Hc)].
+      exact (sk_bsz Hok c cs Hcs).
+  - exact (Hne _ _ (not_eq_sym Hsb) (sk_sb Hok)).
+  - exact (sk_parse Hok).
+  - exact (Hne _ _ (not_eq_sym Hbm) (sk_bmap Hok)).
+  - intros c Hc Hcu.
+    destruct (decide (c = b)) as [-> | Hcb].
+    + rewrite lookup_insert. by eexists.
+    + destruct (sk_pool Hok c Hc Hcu) as [cs Hcs].
+      exists cs. exact (Hne _ _ Hcb Hcs).
+  - exact (sk_inum Hok).
+  - exact (sk_local Hok).
+  - intros i n Hi.
+    destruct (Hin i n Hi) as (Hrec & _ & _).
+    destruct (sk_rec Hok i n Hi) as (cs & Hcs & Hrin).
+    exists cs. split; [| exact Hrin].
+    exact (Hne _ _ (not_eq_sym Hrec) Hcs).
+  - intros i n k cs Hi Hk.
+    destruct (Hin i n Hi) as (_ & Hblk & _).
+    exact (Hne _ _ (not_eq_sym (Hblk k cs Hk)) (sk_blk Hok i n k cs Hi Hk)).
+  - intros i n Hi Hnz.
+    destruct (Hin i n Hi) as (_ & _ & Hind).
+    exact (Hne _ _ (not_eq_sym (Hind Hnz)) (sk_ind Hok i n Hi Hnz)).
+  - exact (sk_dom Hok).
+  - exact (sk_links Hok).
+Qed.
+
+(* ===================================================================== *)
 (*  2.  THE SNAPSHOT'S VIEW RECORD                                        *)
 (* ===================================================================== *)
 
