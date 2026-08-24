@@ -177,7 +177,6 @@ does not exist).
 | # | what | model | QEMU | kind | found by |
 |---|------|-------|------|------|----------|
 | 2 | offered / negotiated features | `FLUSH\|CONFIG_WCE`, negotiates 0 | `0x30006e54`, negotiates `0x6454` | incompleteness | `disk_rw` |
-| 5 | **completion ORDER of two in-flight requests** | publication order ONLY | either order | **unsoundness** | `disk_order` |
 | 17 | a descriptor chain that is not exactly THREE descriptors | the device STALLS (`virtio_stalled`); only `DevStepDiskWild` covers it | served normally -- 512 bytes written, status 0 | incompleteness in practice | `disk_chain` |
 | 18 | **`a1` at entry** -- the device-tree pointer | `0x1000`, a HARDCODED constant in `rv64d.v`'s `init_boot_requirements` | the real DTB address (`0x87e00000`), which moves with `-m` and the image | **defect** (boot contract) | `core_regs_gpr` |
 | 19 | `misa` bit 7 (H), and `mideleg` as its consequence | H absent; `mideleg` 0 | H present; `mideleg` `0x1444` (VSSIP/VSTIP/VSEIP/SGEIP, hardwired when H is implemented) | incompleteness | `core_regs_mcsr` |
@@ -215,6 +214,7 @@ them are one modelling shortcut seen from different sides.
 | 14 | virtio `QueueReset` (0x0c0) and the SHM registers (0x0ac..) | not decoded -- STUCK | `QueueReset` reads 0 (this device does not offer `RING_RESET`); every SHM region reads all-ones, which is how the transport says a region does not exist | incompleteness | `disk_ident_qreset`, `disk_ident_shmsel` |
 | 15 | sub-word access anywhere in the virtio window | not decoded -- STUCK | the transport is 32-bit: a 1- or 2-byte read reaches no register and answers 0, and a narrow write is dropped | incompleteness | `disk_ident_rd1/rd2/wr1` |
 | 16 | a per-queue write with `QueueSel` /= 0, and `QueueNotify` /= 0 | REFUSED -- STUCK | both accepted and ignored.  What kept the queue geometry legal was never the refusal but `virtio_live`'s own conditions | incompleteness | `disk_ident_qsel`, `disk_ident_notify` |
+| 5 | **the completion ORDER of two in-flight requests** | publication order ONLY -- `virtio_req_step` read the chain at `v_seen` and handed back `v_seen + 1`, so no schedule could reorder | EITHER order, and the model now has both: the step takes the ring POSITION as a parameter, the state carries a watermark plus the set served out of turn, and `DiskOrder.v` exhibits the two executions against the two captures | **UNSOUNDNESS** | `disk_order` |
 
 **Finding 10 was the serious one of the PLIC three**, and the only PLIC
 finding that was not mere incompleteness: the threshold appeared in `plic_eip`
@@ -300,7 +300,7 @@ field.  The fix needs the request TYPE at that point, so it is local; what
 makes it a decision rather than a drive-by edit is that VirtioModel.v's
 reverse-dependency closure is 1286 files.
 
-**Finding 5 is the serious one.**  `disk_order` publishes two write requests in
+**Finding 5 was the serious one.**  `disk_order` publishes two write requests in
 one batch -- eight sectors at 100 and one sector at 5 -- and records which
 descriptor id lands in which used-ring slot.  QEMU produces BOTH orders:
 
@@ -414,6 +414,17 @@ THE memory, so no store can wait anywhere -- `ConcSb.v` states this off the
 model (`model_hart_sees_the_one_memory`, `model_store_is_immediately_global`)
 and enumerates all six interleavings of the two two-instruction sequences,
 none of which gives (0,0).  Per-node interleaving would not help either.
+
+**IT IS FIXED IN THE DEVICE MODEL, AND THE DRIVER PORT IS IN PROGRESS.**  A
+step now takes the available-ring position it answers as a parameter; the
+device state carries a watermark plus the set of positions served out of turn,
+and `v_taken` names the position whose payload is latched rather than being a
+flag.  `DiskOrder.v` proves both of QEMU's captures are model executions --
+same program, same start state, two schedules that differ only in which
+outstanding request the device picks up.  The Iris driver proof is being
+ported to the new protocol; `claude-notes/projects/device-conformance.md`
+records exactly what is green, what is in progress, and the two design pieces
+that remain.
 
 **This is live in xv6.**  `acquire`/`release` carry `__sync_synchronize()`
 precisely because the hardware reorders a store past a later load -- and under

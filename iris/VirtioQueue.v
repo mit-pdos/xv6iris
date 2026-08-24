@@ -696,7 +696,8 @@ Definition vslot_post (v : virtio_state) (sl : vslot) (i : bv 16)
   : virtio_state :=
   VirtioState (v_cfg v) (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
     (vserve (v_seen v) (v_ahead v) i).1 (vserve (v_seen v) (v_ahead v) i).2
-    (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v) (v_cache v) None
+    (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v) (v_cache v)
+    (if bool_decide (v_taken v = Some i) then None else v_taken v)
     (v_cap v).
 
 (* THE SLOT'S WRITE IDENTITY (claude-notes/design/fs-log.md stage 4 phase
@@ -723,7 +724,8 @@ Lemma vslot_post_cache (v : virtio_state) (sl : vslot) (i : bv 16) :
 Proof. reflexivity. Qed.
 
 Lemma vslot_post_taken (v : virtio_state) (sl : vslot) (i : bv 16) :
-  v_taken (vslot_post v sl i) = None.
+  v_taken (vslot_post v sl i)
+  = (if bool_decide (v_taken v = Some i) then None else v_taken v).
 Proof. reflexivity. Qed.
 
 Definition vslot_writes (c : virtio_cfg) (ui : bv 16) (dk : Z -> bv 8)
@@ -810,13 +812,20 @@ Proof.
     cbn [Z.eqb orb Pos.eqb]; reflexivity.
 Qed.
 
-(* WRITETHROUGH COLLAPSES THE OVERLAY: with nothing cached, the bytes a READ
-   reports are the DURABLE image's, exactly as before the cache existed. *)
+(* WRITETHROUGH COLLAPSES THE OVERLAY: a read whose own sectors are not in
+   the cache reports the DURABLE image's bytes, which is what the completion
+   gate buys ([VirtioModel.virtio_complete_ok]).  The device may still be
+   holding SOME OTHER request's payload -- the served order is free -- and
+   that is why this is stated per request rather than over the whole cache. *)
 Lemma vslot_writes_cache_view (c : virtio_cfg) (ui : bv 16) (v : virtio_state)
     (sl : vslot) :
-  v_cache v = ∅ ->
+  vreq_touch (vs_req sl) ∩ dom (v_cache v) = ∅ ->
   vslot_writes c ui (cache_view v) sl = vslot_writes c ui (v_disk v) sl.
-Proof. intro H. by rewrite (cache_view_empty v H). Qed.
+Proof.
+  intro H. unfold vslot_writes. cbv zeta.
+  destruct (vs_is_out sl); [reflexivity|].
+  unfold vs_sector_off, vs_len. by rewrite (cache_view_read v (vs_req sl) H).
+Qed.
 
 (* ...and hence the step at a pinned slot, when it fires, is that function.
    [virtio_req_step]'s gate ([VirtioModel.virtio_complete_ok]) is simply
@@ -2026,7 +2035,7 @@ Proof. set_solver. Qed.
 
 (* THE WATERMARK AFTER A SERVE.  Named rather than written inline so that
    [cbn] cannot unfold the walk's fuel into a term of a thousand matches. *)
-Definition vp_lo_next (lo : nat) (srv : gset nat) : nat := vp_adv 1024 lo srv.
+Definition vp_lo_next (lo : nat) (srv : gset nat) : nat := vp_adv 8 lo srv.
 
 Lemma vp_adv_np (f lo np : nat) (srv : gset nat) :
   (forall q, q ∈ srv -> (q < np)%nat) -> (lo <= np)%nat ->
@@ -2118,7 +2127,10 @@ Qed.
 Definition vproto_step_state (pr : vproto) (p : nat) (sl : vslot) : vproto :=
   VProto (S (vp_nc pr)) (vp_np pr)
          (vp_lo_next (vp_lo pr) ({[ p ]} ∪ vp_srv pr))
-         None
+         (* THE LATCH IS RELEASED ONLY BY ITS OWN REQUEST
+            ([VirtioModel.virtio_complete]): completing some other position
+            leaves another request's captured payload where it was. *)
+         (if bool_decide (vp_tk pr = Some p) then None else vp_tk pr)
          ({[ p ]} ∪ vp_srv pr)
          (delete p (vp_pend pr))
          (<[ p := sl ]> (vp_done pr))
@@ -2156,7 +2168,7 @@ Proof.
   set (lo' := vp_lo_next (vp_lo pr) srv').
   assert (Hlo'ge : (vp_lo pr <= lo')%nat) by apply vp_adv_ge.
   assert (Hlo'le : (lo' <= vp_np pr)%nat)
-    by exact (vp_adv_np 1024 (vp_lo pr) (vp_np pr) srv' Hsrv' Hlonp).
+    by exact (vp_adv_np 8 (vp_lo pr) (vp_np pr) srv' Hsrv' Hlonp).
   constructor.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
@@ -2164,21 +2176,21 @@ Proof.
   - unfold vproto_step_state. cbn [vp_np vp_pend vp_srv].
     rewrite dom_delete_L, (vpo_pend_dom _ _ _ Hok). apply pend_dom_step.
   - unfold vproto_step_state. cbn [vp_lo vp_np]. unfold vp_lo_next.
-    exact (vp_adv_np 1024 (vp_lo pr) (vp_np pr) ({[ p ]} ∪ vp_srv pr)
+    exact (vp_adv_np 8 (vp_lo pr) (vp_np pr) ({[ p ]} ∪ vp_srv pr)
              Hsrv' Hlonp).
   - unfold vproto_step_state. cbn [vp_lo vp_srv]. unfold vp_lo_next.
     intros q Hq.
     destruct (decide (q < vp_lo pr)%nat) as [Hlt|Hge].
     + apply elem_of_union_r, (vpo_lo_srv _ _ _ Hok). exact Hlt.
-    + apply (vp_adv_below 1024 (vp_lo pr) q ({[ p ]} ∪ vp_srv pr));
+    + apply (vp_adv_below 8 (vp_lo pr) q ({[ p ]} ∪ vp_srv pr));
         [lia|exact Hq].
   - unfold vproto_step_state. cbn [vp_lo vp_np vp_srv]. intro Hlt.
     unfold vp_lo_next in Hlt |- *.
-    destruct (vp_adv_stop 1024 (vp_lo pr) ({[ p ]} ∪ vp_srv pr)) as [He|Hn];
+    destruct (vp_adv_stop 8 (vp_lo pr) ({[ p ]} ∪ vp_srv pr)) as [He|Hn];
       [| exact Hn ].
     exfalso. rewrite He in Hlt. lia.
   - unfold vproto_step_state. cbn [vp_lo vp_np]. unfold vp_lo_next.
-    pose proof (vp_adv_ge 1024 (vp_lo pr) ({[ p ]} ∪ vp_srv pr)). lia.
+    pose proof (vp_adv_ge 8 (vp_lo pr) ({[ p ]} ∪ vp_srv pr)). lia.
   - (* the completion count is the served set's size, and [p] is new to it *)
     unfold vproto_step_state. cbn [vp_nc vp_srv].
     rewrite (vpo_nc _ _ _ Hok), size_union by set_solver.
@@ -2214,7 +2226,12 @@ Proof.
       assert (Hpd2 : p ∈ dom (vp_uix pr)).
       { apply elem_of_dom. exists u. by rewrite Hpq. }
       rewrite (vpo_uix_dom _ _ _ Hok) in Hpd2. contradiction.
-  - unfold vproto_step_state. cbn [vp_tk]. discriminate.
+  - unfold vproto_step_state. cbn [vp_tk vp_pend]. intros q Hq.
+    destruct (bool_decide (vp_tk pr = Some p)) eqn:Hb; [discriminate|].
+    apply bool_decide_eq_false in Hb.
+    assert (Hne : q <> p) by (intro Hc; subst q; exact (Hb Hq)).
+    rewrite dom_delete_L. apply elem_of_difference.
+    split; [ exact (vpo_tk _ _ _ Hok q Hq) | set_solver ].
   - unfold vproto_step_state. cbn [vp_done vp_srv]. intros q Hq.
     rewrite dom_insert_L in Hq. apply elem_of_union in Hq as [Hq|Hq].
     + apply elem_of_singleton in Hq. subst q. set_solver.
@@ -2272,7 +2289,7 @@ Proof.
   unfold vproto_step_state. cbn [vp_lo vp_srv].
   unfold vp_ah. cbn [vp_lo vp_srv].
   unfold vp_lo_next.
-  apply (vseen_adv_vp 1024 (vp_lo pr) (vp_np pr) srv');
+  apply (vseen_adv_vp 8 (vp_lo pr) (vp_np pr) srv');
     [ lia | lia | exact Hsrv' ].
 Qed.
 
@@ -2300,6 +2317,48 @@ Proof.
     [ exact Hsub | exact (vproto_wr_off_ctl c pr D _ sl pin Hok Hs Hpin) ].
 Qed.
 
+(* THE CAPTURE: the latch takes a position, and nothing else moves. *)
+Definition vproto_capture_state (pr : vproto) (p : nat) : vproto :=
+  VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (Some p) (vp_srv pr)
+         (vp_pend pr) (vp_done pr) (vp_uix pr) (vp_pin pr).
+
+Lemma vproto_ok_capture (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (p : nat) (sl : vslot) :
+  vproto_ok c pr D -> vp_pend pr !! p = Some sl ->
+  vproto_ok c (vproto_capture_state pr p) D.
+Proof.
+  intros Hok Hsl. constructor.
+  - exact (vpo_qnum _ _ _ Hok).
+  - exact (vpo_live _ _ _ Hok).
+  - exact (vpo_srv_np _ _ _ Hok).
+  - exact (vpo_pend_dom _ _ _ Hok).
+  - exact (vpo_lo_np _ _ _ Hok).
+  - exact (vpo_lo_srv _ _ _ Hok).
+  - exact (vpo_lo_min _ _ _ Hok).
+  - exact (vpo_win _ _ _ Hok).
+  - exact (vpo_nc _ _ _ Hok).
+  - exact (vpo_uix_dom _ _ _ Hok).
+  - exact (vpo_uix_lt _ _ _ Hok).
+  - exact (vpo_uix_inj _ _ _ Hok).
+  - exact (vpo_uix_surj _ _ _ Hok).
+  - unfold vproto_capture_state. cbn [vp_tk vp_pend]. intros q Hq.
+    injection Hq as <-. apply elem_of_dom. by exists sl.
+  - exact (vpo_done_lt _ _ _ Hok).
+  - exact (vpo_pin_dom _ _ _ Hok).
+  - exact (vpo_slot _ _ _ Hok).
+  - exact (vpo_fp_disj _ _ _ Hok).
+  - exact (vpo_wr_pin _ _ _ Hok).
+  - exact (vpo_standing _ _ _ Hok).
+  - exact (vpo_idx_used _ _ _ Hok).
+  - exact (vpo_fp_D _ _ _ Hok).
+  - exact (vpo_used_D _ _ _ Hok).
+  - exact (vpo_idx_D _ _ _ Hok).
+Qed.
+
+Lemma vproto_capture_ctl (c : virtio_cfg) (pr : vproto) (p : nat) :
+  vproto_ctl c (vproto_capture_state pr p) = vproto_ctl c pr.
+Proof. reflexivity. Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 5. Publish: appending slot [np].                                       *)
 (* ---------------------------------------------------------------------- *)
@@ -2311,6 +2370,39 @@ Definition vproto_publish_state (pr : vproto) (sl : vslot)
          (vp_done pr)
          (vp_uix pr)
          (<[ vp_np pr := pin ]> (vp_pin pr)).
+
+(* Projections of the publish state as REWRITE RULES.  [cbn] must not be
+   pointed at these goals: the published count appears as [S (vp_np pr)] and
+   [cbn] would unfold [set_seq 0 (S _)] one step and then normalise the
+   resulting gset union into its map representation, which is a term the size
+   of the window and takes minutes to build. *)
+Lemma vppq_nc (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_nc (vproto_publish_state pr sl pin) = vp_nc pr.
+Proof. reflexivity. Qed.
+Lemma vppq_np (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_np (vproto_publish_state pr sl pin) = S (vp_np pr).
+Proof. reflexivity. Qed.
+Lemma vppq_lo (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_lo (vproto_publish_state pr sl pin) = vp_lo pr.
+Proof. reflexivity. Qed.
+Lemma vppq_tk (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_tk (vproto_publish_state pr sl pin) = vp_tk pr.
+Proof. reflexivity. Qed.
+Lemma vppq_srv (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_srv (vproto_publish_state pr sl pin) = vp_srv pr.
+Proof. reflexivity. Qed.
+Lemma vppq_pend (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_pend (vproto_publish_state pr sl pin) = <[ vp_np pr := sl ]> (vp_pend pr).
+Proof. reflexivity. Qed.
+Lemma vppq_done (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_done (vproto_publish_state pr sl pin) = vp_done pr.
+Proof. reflexivity. Qed.
+Lemma vppq_uix (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_uix (vproto_publish_state pr sl pin) = vp_uix pr.
+Proof. reflexivity. Qed.
+Lemma vppq_pin (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_pin (vproto_publish_state pr sl pin) = <[ vp_np pr := pin ]> (vp_pin pr).
+Proof. reflexivity. Qed.
 
 (* All the NEW disjointness hypotheses come from OWNERSHIP at the Iris layer
    (the publisher physically holds the new pin and writable bytes, so they
@@ -2397,37 +2489,31 @@ Proof.
   constructor.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_srv vp_np]. intros q Hq.
+  - rewrite vppq_srv, vppq_np. intros q Hq.
     pose proof (vpo_srv_np _ _ _ Hok q Hq). lia.
-  - unfold vproto_publish_state. cbn [vp_np vp_pend vp_srv].
+  - rewrite vppq_pend, vppq_np, vppq_srv.
     rewrite dom_insert_L, (vpo_pend_dom _ _ _ Hok).
     apply pend_dom_publish. exact Hnpsrv.
-  - unfold vproto_publish_state. cbn [vp_lo vp_np].
-    pose proof (vpo_lo_np _ _ _ Hok). lia.
-  - unfold vproto_publish_state. cbn [vp_lo vp_srv].
-    exact (vpo_lo_srv _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_lo vp_np vp_srv]. intro Hlt.
+  - rewrite vppq_lo, vppq_np. pose proof (vpo_lo_np _ _ _ Hok). lia.
+  - rewrite vppq_lo, vppq_srv. exact (vpo_lo_srv _ _ _ Hok).
+  - rewrite vppq_lo, vppq_np, vppq_srv. intro Hlt.
     destruct (decide (vp_lo pr < vp_np pr)%nat) as [Hlo|Hlo].
     + exact (vpo_lo_min _ _ _ Hok Hlo).
-    + assert (vp_lo pr = vp_np pr)%nat
+    + intro Hc. apply Hnpsrv.
+      assert (He : vp_lo pr = vp_np pr)
         by (pose proof (vpo_lo_np _ _ _ Hok); lia).
-      congruence.
-  - unfold vproto_publish_state. cbn [vp_lo vp_np]. lia.
-  - unfold vproto_publish_state. cbn [vp_nc vp_srv]. exact (vpo_nc _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_uix vp_srv].
-    exact (vpo_uix_dom _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_uix vp_nc].
-    exact (vpo_uix_lt _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_uix].
-    exact (vpo_uix_inj _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_uix vp_nc].
-    exact (vpo_uix_surj _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_tk vp_pend]. intros q Hq.
+      by rewrite <- He.
+  - rewrite vppq_lo, vppq_np. lia.
+  - rewrite vppq_nc, vppq_srv. exact (vpo_nc _ _ _ Hok).
+  - rewrite vppq_uix, vppq_srv. exact (vpo_uix_dom _ _ _ Hok).
+  - rewrite vppq_uix, vppq_nc. exact (vpo_uix_lt _ _ _ Hok).
+  - rewrite vppq_uix. exact (vpo_uix_inj _ _ _ Hok).
+  - rewrite vppq_uix, vppq_nc. exact (vpo_uix_surj _ _ _ Hok).
+  - rewrite vppq_tk, vppq_pend. intros q Hq.
     rewrite dom_insert_L. apply elem_of_union_r.
     exact (vpo_tk _ _ _ Hok q Hq).
-  - unfold vproto_publish_state. cbn [vp_done vp_srv].
-    exact (vpo_done_lt _ _ _ Hok).
-  - unfold vproto_publish_state. cbn [vp_pend vp_done vp_pin].
+  - rewrite vppq_done, vppq_srv. exact (vpo_done_lt _ _ _ Hok).
+  - rewrite vppq_pend, vppq_done, vppq_pin.
     rewrite !dom_insert_L, (vpo_pin_dom _ _ _ Hok). apply gset_union_assoc.
   - intros q slq pinq H1 H2.
     destruct (Hlook q slq pinq H1 H2) as [(-> & -> & ->)|[Ha Hb]].

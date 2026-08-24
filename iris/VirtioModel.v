@@ -1677,11 +1677,11 @@ Qed.
    THE FUEL IS SEMANTICALLY INERT.  Advancing the watermark does not change
    which positions are free ([vseen_adv_free]) -- it only keeps [v_ahead]
    from carrying positions the window has left behind -- so a walk that
-   stopped early would still be a correct device state.  The bound is the
-   largest queue the transport admits, which no live window can exceed. *)
+   stopped early would still be a correct device state.  Eight is the
+   available ring's own size, which is what bounds a live window. *)
 Definition vserve (lo : bv 16) (ah : gset (bv 16)) (p : bv 16)
   : bv 16 * gset (bv 16) :=
-  vseen_adv 1024 lo ({[ p ]} ∪ ah).
+  vseen_adv 8 lo ({[ p ]} ∪ ah).
 
 Lemma vserve_sub (lo p : bv 16) (ah : gset (bv 16)) :
   (vserve lo ah p).2 ⊆ {[ p ]} ∪ ah.
@@ -1956,6 +1956,70 @@ Proof.
   - intros (i & Hi & ->). exists i. split; [done|]. apply elem_of_seq. lia.
 Qed.
 
+(* THE SECTORS A REQUEST TOUCHES, in EITHER direction -- [vreq_sectors] is
+   the write's payload and is empty for a read, and the completion gate needs
+   the read's range too (see [virtio_complete_ok]). *)
+Definition vreq_span (r : vio_req) : nat :=
+  sector_count (Z.to_nat (bv_unsigned (vr_len r))).
+
+Definition vreq_touch (r : vio_req) : gset Z :=
+  list_to_set (vreq_key r <$> seq 0 (vreq_span r)).
+
+Lemma vreq_touch_spec (r : vio_req) (s : Z) :
+  s ∈ vreq_touch r <-> exists i, (i < vreq_span r)%nat /\ s = vreq_key r i.
+Proof.
+  unfold vreq_touch. rewrite elem_of_list_to_set, elem_of_list_fmap.
+  split.
+  - intros (i & -> & Hi). apply elem_of_seq in Hi. exists i. split; [lia|done].
+  - intros (i & Hi & ->). exists i. split; [done|]. apply elem_of_seq. lia.
+Qed.
+
+(* for a WRITE the two agree: its payload IS its span *)
+Lemma vreq_touch_out (r : vio_req) :
+  bv_unsigned (vr_type r) = virtio_blk_t_out -> vreq_touch r = vreq_sectors r.
+Proof.
+  intro H. unfold vreq_touch, vreq_sectors, vreq_span, vreq_nsectors.
+  by rewrite H, Z.eqb_refl.
+Qed.
+
+(* THE COLLAPSE: a request none of whose sectors is cached reads the DURABLE
+   image, so the overlay the device serves reads from is invisible to it.
+   Every byte of the request's range lies in one of the sectors its span
+   names, so an uncached span is an uncached range. *)
+Lemma cache_view_read (v : virtio_state) (r : vio_req) :
+  vreq_touch r ∩ dom (v_cache v) = ∅ ->
+  disk_read (cache_view v)
+    (bv_unsigned (vr_sector r) * virtio_sector_size)
+    (Z.to_nat (bv_unsigned (vr_len r)))
+  = disk_read (v_disk v)
+      (bv_unsigned (vr_sector r) * virtio_sector_size)
+      (Z.to_nat (bv_unsigned (vr_len r))).
+Proof.
+  intro Hdisj. unfold disk_read. apply list_fmap_ext. intros k x Hk.
+  apply lookup_seq in Hk as [-> Hk].
+  replace (0 + k)%nat with k by lia. set (j := k).
+  assert (Hj : (j < Z.to_nat (bv_unsigned (vr_len r)))%nat) by exact Hk.
+  apply cache_view_miss.
+  (* the byte's sector is the [j / 512]th of the request's span *)
+  assert (Hsec : (bv_unsigned (vr_sector r) * virtio_sector_size + Z.of_nat j)
+                 `div` virtio_sector_size
+                 = vreq_key r (j `div` 512)%nat).
+  { unfold vreq_key, virtio_sector_size.
+    rewrite Z.div_add_l by lia.
+    rewrite Nat2Z.inj_div. change (Z.of_nat 512) with 512. reflexivity. }
+  rewrite Hsec.
+  apply not_elem_of_dom. intro Hc.
+  assert (Hin : vreq_key r (j `div` 512)%nat ∈ vreq_touch r).
+  { apply vreq_touch_spec. exists (j `div` 512)%nat. split; [| reflexivity ].
+    unfold vreq_span, virtio_sector_bytes.
+    apply Nat.div_lt_upper_bound; [lia|].
+    pose proof (sector_count_cover (Z.to_nat (bv_unsigned (vr_len r)))) as Hcov.
+    unfold virtio_sector_bytes in Hcov. lia. }
+  assert (Hne : vreq_key r (j `div` 512)%nat ∈ vreq_touch r ∩ dom (v_cache v))
+    by (apply elem_of_intersection; split; [exact Hin | exact Hc]).
+  rewrite Hdisj in Hne. by apply elem_of_empty in Hne.
+Qed.
+
 (* a request that is not a disk WRITE touches no sector at all *)
 Lemma vreq_sectors_in (r : vio_req) :
   bv_unsigned (vr_type r) <> virtio_blk_t_out -> vreq_sectors r = ∅.
@@ -2015,11 +2079,14 @@ Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
   let ws := <[ vr_status r := Z_to_bv 8 st ]>
               (virtio_used_writes (v_cfg v) (v_used_idx v) r) in
   let sv := vserve (v_seen v) (v_ahead v) i in
+  (* THE LATCH IS RELEASED ONLY BY THE REQUEST THAT HOLDS IT: completing some
+     OTHER position leaves another request's payload exactly where it was. *)
+  let tk := if bool_decide (v_taken v = Some i) then None else v_taken v in
   let vd := VirtioState (v_cfg v)
               (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
               sv.1 sv.2
               (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v)
-              (v_cache v) None (v_cap v) in
+              (v_cache v) tk (v_cap v) in
   if bv_unsigned (vr_type r) =? virtio_blk_t_in then
     (* read the disk: the device WRITES the driver's buffer, READ-YOUR-WRITES *)
     (vd, write_byte_list ws (vr_buf r) (disk_read (cache_view v) doff n))
@@ -2051,8 +2118,10 @@ Proof.
 Qed.
 
 (* it does clear the capture flag, so the NEXT request starts untaken *)
-Lemma virtio_complete_taken (v : virtio_state) (mv : vmem) (r : vio_req) (i : bv 16) :
-  v_taken (virtio_complete v mv r i).1 = None.
+Lemma virtio_complete_taken (v : virtio_state) (mv : vmem) (r : vio_req)
+    (i : bv 16) :
+  v_taken (virtio_complete v mv r i).1
+  = (if bool_decide (v_taken v = Some i) then None else v_taken v).
 Proof.
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in); reflexivity.
@@ -2126,19 +2195,46 @@ Definition virtio_complete_ok (v : virtio_state) (r : vio_req) (i : bv 16)
   if bv_unsigned (vr_type r) =? virtio_blk_t_out then
     bool_decide (v_taken v = Some i)
     && (virtio_wce (v_cfg v)
-        || bool_decide (vreq_sectors r ∩ dom (v_cache v) = ∅))
+        || bool_decide (vreq_touch r ∩ dom (v_cache v) = ∅))
   else if bv_unsigned (vr_type r) =? virtio_blk_t_flush then
     bool_decide (v_cache v = ∅)
-  else true.
+  else
+    (* A READ IS SERVED FROM THE DEVICE'S LATEST BYTES ([cache_view]), so it
+       is not gated on the cache DRAINING -- but in writethrough it does wait
+       for its OWN sectors to leave the cache.  What that costs is a driver
+       that reads a sector it is concurrently writing: such a driver cannot
+       exist in this development (the disk points-to for a sector is
+       exclusive, so two in-flight requests never share one), and admitting
+       the read-your-writes execution for it would mean carrying the
+       overlap-freedom of every pair of in-flight requests through the queue
+       protocol.  Recorded in claude-notes/design/virtio-driver.md. *)
+    virtio_wce (v_cfg v)
+    || bool_decide (vreq_touch r ∩ dom (v_cache v) = ∅).
 
 (* a READ and an unrecognised type are completable at once *)
 Lemma virtio_complete_ok_in (v : virtio_state) (r : vio_req) (i : bv 16) :
   bv_unsigned (vr_type r) <> virtio_blk_t_out ->
   bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
+  vreq_touch r ∩ dom (v_cache v) = ∅ ->
   virtio_complete_ok v r i = true.
 Proof.
-  intros H1 H2. unfold virtio_complete_ok.
-  by rewrite (proj2 (Z.eqb_neq _ _) H1), (proj2 (Z.eqb_neq _ _) H2).
+  intros H1 H2 H3. unfold virtio_complete_ok.
+  rewrite (proj2 (Z.eqb_neq _ _) H1), (proj2 (Z.eqb_neq _ _) H2).
+  rewrite (bool_decide_eq_true_2 _ H3). apply orb_true_r.
+Qed.
+
+(* ...and the gate read back: a read that completed had its own sectors off
+   the cache, so the bytes it reported are the DURABLE ones *)
+Lemma virtio_complete_ok_read (v : virtio_state) (r : vio_req) (i : bv 16) :
+  bv_unsigned (vr_type r) <> virtio_blk_t_out ->
+  bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
+  virtio_complete_ok v r i = true ->
+  virtio_wce (v_cfg v) = true \/ vreq_touch r ∩ dom (v_cache v) = ∅.
+Proof.
+  intros H1 H2 Hok. unfold virtio_complete_ok in Hok.
+  rewrite (proj2 (Z.eqb_neq _ _) H1), (proj2 (Z.eqb_neq _ _) H2) in Hok.
+  apply orb_prop in Hok as [Hw|Hd]; [by left|].
+  right. by apply bool_decide_eq_true in Hd.
 Qed.
 
 (* the OUT gate, read back *)
@@ -2146,7 +2242,7 @@ Lemma virtio_complete_ok_out (v : virtio_state) (r : vio_req) (i : bv 16) :
   bv_unsigned (vr_type r) = virtio_blk_t_out ->
   virtio_complete_ok v r i = true ->
   v_taken v = Some i
-  /\ (virtio_wce (v_cfg v) = true \/ vreq_sectors r ∩ dom (v_cache v) = ∅).
+  /\ (virtio_wce (v_cfg v) = true \/ vreq_touch r ∩ dom (v_cache v) = ∅).
 Proof.
   intros Hout Hok. unfold virtio_complete_ok in Hok.
   rewrite Hout, Z.eqb_refl in Hok.
@@ -2593,16 +2689,22 @@ Proof.
     - rewrite (bool_decide_eq_true_2 (v_taken v = Some j) Htk) in Hgj.
       cbn [andb] in Hgj. apply orb_false_elim in Hgj as [_ Hd].
       apply bool_decide_eq_false in Hd.
-      destruct (set_choose_or_empty (vreq_sectors rj ∩ dom (v_cache v)))
+      destruct (set_choose_or_empty (vreq_touch rj ∩ dom (v_cache v)))
         as [[x Hx]|Hemp]; [| exfalso; apply Hd; set_solver ].
       apply elem_of_intersection in Hx as [_ Hx].
       apply elem_of_dom in Hx as [bs Hbs].
       exists x. unfold virtio_drain_step. rewrite Hbs. by eexists.
-    - destruct (bv_unsigned (vr_type rj) =? virtio_blk_t_flush);
-        [| discriminate Hgj ].
-      apply bool_decide_eq_false in Hgj.
-      destruct (map_choose (v_cache v) Hgj) as (x & bs & Hbs).
-      exists x. unfold virtio_drain_step. rewrite Hbs. by eexists. }
+    - destruct (bv_unsigned (vr_type rj) =? virtio_blk_t_flush) eqn:Hfl.
+      + apply bool_decide_eq_false in Hgj.
+        destruct (map_choose (v_cache v) Hgj) as (x & bs & Hbs).
+        exists x. unfold virtio_drain_step. rewrite Hbs. by eexists.
+      + apply orb_false_elim in Hgj as [_ Hd].
+        apply bool_decide_eq_false in Hd.
+        destruct (set_choose_or_empty (vreq_touch rj ∩ dom (v_cache v)))
+          as [[x Hx]|Hemp]; [| exfalso; apply Hd; set_solver ].
+        apply elem_of_intersection in Hx as [_ Hx].
+        apply elem_of_dom in Hx as [bs Hbs].
+        exists x. unfold virtio_drain_step. rewrite Hbs. by eexists. }
   (* nothing latched: the position the device picked is answerable now *)
   destruct (req_at_chain _ _ _ (Hchain i Hi)) as [r Hr].
   destruct (virtio_complete_ok v r i) eqn:Hgate.
@@ -2615,14 +2717,20 @@ Proof.
     left. exists i. unfold virtio_capture_step. rewrite Hi. cbn [negb].
     rewrite Hr, Hout. cbn [negb].
     rewrite (bool_decide_eq_true_2 (v_taken v = None) Htk). by eexists. }
-  (* not an OUT: only a FLUSH can have a shut gate, and then the cache is
-     non-empty, so a drain is on *)
+  (* not an OUT: a FLUSH waits for an empty cache and a READ for its own
+     sectors, and either way something IS cached, so a drain is on *)
   right; left.
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_flush);
-    [| discriminate Hgate ].
-  apply bool_decide_eq_false in Hgate.
-  destruct (map_choose (v_cache v) Hgate) as (x & bs & Hbs).
-  exists x. unfold virtio_drain_step. rewrite Hbs. by eexists.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_flush) eqn:Hfl.
+  - apply bool_decide_eq_false in Hgate.
+    destruct (map_choose (v_cache v) Hgate) as (x & bs & Hbs).
+    exists x. unfold virtio_drain_step. rewrite Hbs. by eexists.
+  - apply orb_false_elim in Hgate as [_ Hd].
+    apply bool_decide_eq_false in Hd.
+    destruct (set_choose_or_empty (vreq_touch r ∩ dom (v_cache v)))
+      as [[x Hx]|Hemp]; [| exfalso; apply Hd; set_solver ].
+    apply elem_of_intersection in Hx as [_ Hx].
+    apply elem_of_dom in Hx as [bs Hbs].
+    exists x. unfold virtio_drain_step. rewrite Hbs. by eexists.
 Qed.
 
 (* -- what a step does and does not touch -- *)
@@ -2723,7 +2831,8 @@ Qed.
 (* it does clear the capture flag for the next request *)
 Lemma virtio_req_step_taken (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) (i : bv 16) :
-  virtio_req_step v mv i = Some (v', w) -> v_taken v' = None.
+  virtio_req_step v mv i = Some (v', w) ->
+  v_taken v' = (if bool_decide (v_taken v = Some i) then None else v_taken v).
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
@@ -2871,7 +2980,7 @@ Proof.
     as [Hout|Hnout].
   - destruct (virtio_complete_ok_out v r i Hout Hgate) as (_ & [Hw|Hdisj]).
     + rewrite Hwce in Hw. discriminate.
-    + set_solver.
+    + rewrite (vreq_touch_out r Hout) in Hdisj. set_solver.
   - rewrite (vreq_sectors_in r Hnout) in Hdom. set_solver.
 Qed.
 

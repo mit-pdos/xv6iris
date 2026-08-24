@@ -149,38 +149,62 @@ drivers can be verified, cannot make a proof wrong) or worse.
 | 2 | the device offers only `FLUSH\|CONFIG_WCE`, so negotiation lands on 0 where QEMU lands on `0x6454` | incompleteness |
 | 3 | `DeviceFeaturesSel` (0x14) / `DriverFeaturesSel` (0x24) are not decoded — the store is STUCK, so `VIRTIO_F_VERSION_1` can neither be read nor acked | incompleteness |
 | 4 | `used.ring[i].len` is the DATA descriptor's length in both directions; the spec and QEMU say 1 for a write, 513 for a read | **defect** |
-| 5 | **completion ORDER: the model serves the available ring strictly at `v_seen`, so the used ring can only come out in publication order; QEMU produces either order** | **UNSOUNDNESS** |
+| 5 | completion ORDER: the model served the available ring strictly at `v_seen`, so the used ring could only come out in publication order; QEMU produces either order | ~~UNSOUNDNESS~~ **fixed in the model; the Iris port is in progress** |
 
-### Finding 5 is the one that matters
+### Finding 5: what the model does now, and what is left
 
 `disk_order` publishes two write requests in one batch — eight sectors at 100
 and one at 5 — and records which descriptor id lands in which used slot.  QEMU
 gives both orders, and how often depends only on the backend (6/25 reordered
 with the default `cache=writeback`, 25/25 with `cache=none,aio=native`).
 
-The model has no execution for the reordered one, and that is a fact about
-the device, not about the test's schedule: `DiskOrder.model_serves_head_only`
-proves `virtio_req_step` reads the chain at `v_seen` and returns a state whose
-`v_seen` is one greater, so the served order IS the publication order and no
-`sitem` list can change it.
+**The model now produces both**, and `DiskOrder.v` proves it: the same program
+and the same start state under two schedules that differ only in which
+outstanding request the device picks up
+(`disk_order_admits_inorder` / `disk_order_admits_reordered`, and
+`disk_order_model_has_both` against the two captures).
+`model_serves_any_free_position` states the general fact off the model rather
+than off the test: a step answers the position it is handed, the only
+condition on that position is that the driver published it and the device has
+not served it, and afterwards exactly that position is gone from the free set.
 
-**It is live in xv6, not hypothetical.** `virtio_disk_rw` sleeps with its
-request outstanding, so up to `NUM` = 8 can be in flight; and
-`virtio_disk_intr` walks the used ring reading each element's ID and waking
-`disk.info[id]` — written that way precisely because completions need not come
-back in order.  Under this model that code is only ever exercised on the
-in-order case, so the reason it reads the id at all is never tested by the
-proof.
+**The device-side redesign** (design/virtio-driver.md has the rules):
+`virtio_req_step`/`virtio_capture_step` take the available-ring position as a
+parameter; the state carries a watermark `v_seen` plus the served-out-of-turn
+set `v_ahead`, with modular-distance window arithmetic (`vdist`, `vpos_pub`,
+`vfree`, section 5b of VirtioModel.v); `v_taken` names the position whose
+payload is latched rather than being a flag, and a completion releases the
+latch only if it held it.  `VirtioQueue`'s keyed protocol follows: `vp_srv`,
+`vp_lo`, `vp_tk`, `vp_uix`, with `vpo_win` (the eight-wide window) derived at
+the publish from the available-ring entry the watermark's own position pins.
 
-**The fix is not local**, which is why it is recorded rather than made.  The
-device would have to serve any published-but-unserved position rather than
-`v_seen` alone: `v_seen : bv 16` becomes a set of outstanding positions,
-`virtio_pending` and the completion gate move with it, and `VirtioQueue`'s
-slot protocol and the DMA lease's reachable-window argument
-(`virtio_queue_ok`'s `S`, closed under advancing by one until it reaches
-`ai`) are stated against exactly the assumption this breaks.  See
-[`completed/virtio-disk.md`](../completed/virtio-disk.md) and
-[`design/virtio-driver.md`](../design/virtio-driver.md).
+**THE IRIS DRIVER PORT IS NOT FINISHED.**  Green as of this note:
+`VirtioModel`, `RiscvLang`, `WpVirtio`, `VirtioQueue`, and the whole
+`vtest-rocq` suite.  In progress: `VirtioProto` (the invariant's coupling and
+the three device-thread rules are ported; the accessors are not).  Untouched:
+`DiskInv`, `ProofVirtioDiskIntr`, the six `ProofVirtioDiskRw*`, the specs and
+`WpUart`'s disk loop.  The two pieces of DESIGN still to do, both recorded
+here so the port is resumable:
+
+1. **The interrupt handler's identification.**  `virtio_disk_intr` walks USED
+   INDICES and the protocol is keyed by POSITION, and the two are different
+   numbers now.  The plan: `dn_ord`, a ghost_map from position to used index
+   whose elements are minted PERSISTENT at each completion (already added to
+   `disk_names`/`Xv6Cameras`/the invariant), plus `vpo_uix_surj` (every used
+   index below the count belongs to some position, already in `vproto_ok`).
+   The handler at used index `nr` gets `∃ p, disk_ord γ p nr`, and
+   `disk_ord_agree` is what tells it `p` is not one it has already processed.
+   `DiskInv.disk_res` then keys its flight map by position with
+   `dom fl = [0,np) ∖ processed` rather than by the interval `[nr, np)`.
+
+2. **The used ring must not overwrite an unconsumed element.**  The old proof
+   got this free (position = used index, and pins made positions distinct mod
+   8).  It now needs the fact that the unreclaimed done records' used indices
+   are exactly `[nr, nc)` — a `vp_nr` field plus `k ∈ dom vp_done ↔ nr ≤ vp_uix k`,
+   maintained by the step (adds `nc`) and by the reclaim (removes `nr`, which
+   is what the handler consumes).  With that, |done| = nc − nr, each done
+   position is still pinned, so nc − nr ≤ 8 and the new element never lands on
+   a live one.
 
 Finding 4's fix IS local — `virtio_used_writes` needs the request type to
 choose between `1` and `vr_len r + 1` — but it still moves a definition in

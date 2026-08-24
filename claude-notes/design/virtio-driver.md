@@ -34,14 +34,54 @@ Three counters order every event, and they only ever grow:
     nc  — completed: the device's progress (v_seen = v_used_idx = wrap16 nc)
     np  — published: the driver's progress (avail idx bytes hold wrap16 np)
 
-with `nr ≤ nc ≤ np`. The protocol state splits the window into
-`pend` (dom = `[nc, np)`, contiguous — the device serves strictly in order) and
-`done` (dom ⊆ `[nr, nc)`, *not* necessarily contiguous). Wrap-around never
-needs 16-bit window reasoning: every pending/done slot pins its own avail-ring
-entry (2 bytes at `avail+4+2*(p mod 8)`), the pins are disjoint sub-maps of the
-lease, so positions in the window are distinct mod 8, hence `np − nr ≤ 8 < 2^16`
-and `wrap16` is injective on the window. That one separation fact replaces all
+with `nr ≤ nc ≤ np`. Wrap-around never needs 16-bit window reasoning: every
+pending/done slot pins its own avail-ring entry (2 bytes at
+`avail+4+2*(p mod 8)`), the pins are disjoint sub-maps of the lease, so
+positions in the window are distinct mod 8, hence the window is at most eight
+wide and `wrap16` is injective on it. That one separation fact replaces all
 ring-index arithmetic.
+
+## THE SERVED ORDER IS FREE (finding 5)
+
+The device answers whichever published request it finishes first, so `nc` is
+**the completion count and the used index, not the position of anything**.
+What the protocol keys off instead:
+
+    vp_srv  — the SET of positions served (an arbitrary subset of [0,np))
+    vp_pend — dom = [0,np) ∖ vp_srv: the published-but-unserved slots
+    vp_lo   — the WATERMARK: the least unserved position
+    vp_tk   — the position whose payload the device has LATCHED
+    vp_uix  — position ↦ the used index its completion was reported at
+
+and `vpo_win : np − vp_lo ≤ 8`, which is what keeps `wrap16` injective. That
+bound is not assumed: `vproto_ok_publish` DERIVES it, because publishing at
+`lo + 8` would claim the available-ring entry position `lo` still pins, and
+the publisher's fresh pin is disjoint from the lease that holds it.
+
+The device side (`VirtioModel` section 5b) carries the same window as
+`v_seen` (the watermark) plus `v_ahead` (the positions served out of turn),
+with modular-distance arithmetic (`vdist`, `vpos_pub`, `vfree`) rather than a
+walk. `vseen_adv_vp` is the single lemma that says the two walks agree, and
+`vproto_serve_slot` is what turns the `bv 16` position a device step names
+back into the keyed state's `nat` one.
+
+**The latch is per position.** `v_taken : option (bv 16)` rather than a flag:
+a write's payload is captured under the position that owns it, the completion
+gate demands `v_taken = Some i` for that request's own `i`, and a completion
+releases the latch only if it held it. One latch, so a second write waits for
+the first — a restriction on the DEVICE's internal concurrency, not on any
+driver, and every completion order is still reachable through it
+(`vtest-rocq/DiskOrder.v` exhibits both of QEMU's).
+
+**What a read costs.** A read is served from `cache_view` (the cache overlaid
+on the image), so with another request's write latched the bytes it reports
+are not the durable ones. In writethrough the gate therefore makes a read
+wait for its OWN sectors to leave the cache
+(`VirtioModel.virtio_complete_ok`'s last arm). The execution that costs is a
+driver reading a sector it is concurrently writing — impossible here, since
+the disk points-to for a sector is exclusive and two in-flight requests never
+share one. The alternative (carry pairwise overlap-freedom of in-flight
+requests through the queue protocol) buys nothing this development can use.
 
 ## The slot: what one in-flight request pins and owns
 

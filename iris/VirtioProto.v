@@ -663,7 +663,8 @@ Lemma vps_np (pr : vproto) (p : nat) (sl : vslot) :
   vp_np (vproto_step_state pr p sl) = vp_np pr.
 Proof. reflexivity. Qed.
 Lemma vps_tk (pr : vproto) (p : nat) (sl : vslot) :
-  vp_tk (vproto_step_state pr p sl) = None.
+  vp_tk (vproto_step_state pr p sl)
+  = (if bool_decide (vp_tk pr = Some p) then None else vp_tk pr).
 Proof. reflexivity. Qed.
 Lemma vps_pend (pr : vproto) (p : nat) (sl : vslot) :
   vp_pend (vproto_step_state pr p sl) = delete p (vp_pend pr).
@@ -1557,17 +1558,19 @@ Section VirtioProto.
     (* the cache mode the pre-flip DRIVER_FEATURES write decided *)
     virtio_wce c = false ->
     (* the empty, untaken cache the not-live arm was recording all along *)
-    v_cache v1 = ∅ -> v_taken v1 = false ->
+    v_cache v1 = ∅ -> v_taken v1 = None ->
+    v_ahead v1 = ∅ ->
     disk_cfg γ c -∗
     ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) -∗
+    ghost_map_auth (dn_ord γ) 1 (∅ : gmap nat nat) -∗
     mono_nat_auth_own (dn_nc γ) 1 0%nat -∗
     ghost_var (dn_np γ) (1/2) 0%nat -∗
     phys_word2 (avail_idx_pa c) (wrap16 0) -∗
     phys_list (vc_used c) (replicate 4096 byte_zero) -∗
     virtio_proto γ v1.
   Proof.
-    intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui Hwce Hca Htk.
-    iIntros "#Hcfgp Hslot Hnc Hnp Hidx Hpage".
+    intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui Hwce Hca Htk Hah.
+    iIntros "#Hcfgp Hslot Hord Hnc Hnp Hidx Hpage".
     assert (H4k : Z.of_nat 4096 < 18446744073709551616) by (rewrite z4096; lia).
     rewrite phys_word2_map (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
     iAssert (dma_own (vinit_dma c)) with "[Hidx Hpage]" as "Hdma".
@@ -1579,17 +1582,20 @@ Section VirtioProto.
     rewrite Hcfg Hlive.
     iExists vproto0, (vinit_dma c).
     rewrite vp_spins_init.
-    iFrame "Hcfgp Hdma Hslot Hnc Hnp".
+    iFrame "Hcfgp Hdma Hslot Hord Hnc Hnp".
     iSplitR; [iPureIntro; apply vinit_dma_ctl|].
     iSplitR.
     { iPureIntro. rewrite vinit_dma_dom.
       apply vproto_ok_init; [exact Hqnum | exact Hlive | exact Hdisj]. }
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; by rewrite Hah|].
+    iSplitR; [iPureIntro; by rewrite Htk|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact (vinit_dma_uidx c Hdisj)|].
     iSplitR; [iPureIntro; exact Hwce|].
-    iSplitR; [iPureIntro; exact (vp_wt_idle vproto0 (v_cache v1) (v_taken v1) Hca Htk)|].
+    iSplitR;
+      [iPureIntro; exact (vp_wt_idle vproto0 (v_cache v1) Hca eq_refl)|].
     assert (Hpe : vp_pend vproto0 = (∅ : gmap nat vslot)) by reflexivity.
     assert (Hde : vp_done vproto0 = (∅ : gmap nat vslot)) by reflexivity.
     rewrite Hpe Hde !big_sepM_empty. iSplit; done.
@@ -1758,13 +1764,13 @@ Section VirtioProto.
      Both stores the live driver makes do
      ([VirtioModel.virtio_write_cache]/[_taken] at [vio_cfg_stable]). *)
   Lemma virtio_proto_stable (γ : disk_names) (v v' : virtio_state) :
-    v_cfg v' = v_cfg v -> v_seen v' = v_seen v ->
+    v_cfg v' = v_cfg v -> v_seen v' = v_seen v -> v_ahead v' = v_ahead v ->
     v_used_idx v' = v_used_idx v ->
     v_cache v' = v_cache v -> v_taken v' = v_taken v ->
     virtio_proto γ v -∗ virtio_proto γ v'.
   Proof.
-    intros Hc Hs Hu Hca Htk.
-    rewrite /virtio_proto Hc Hs Hu Hca Htk. iIntros "$".
+    intros Hc Hs Hah Hu Hca Htk.
+    rewrite /virtio_proto Hc Hs Hah Hu Hca Htk. iIntros "$".
   Qed.
 
   (* ==================================================================== *)
@@ -1804,14 +1810,15 @@ Section VirtioProto.
     destruct (virtio_live (v_cfg v)) eqn:Hlive.
     2:{ iPureIntro. exact (virtio_not_live_not_stalled v mv Hlive). }
     iDestruct "Hp" as (pr dma)
-      "(Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & Hrest)".
+      "(Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui &
+        %Hridx & Hrest)".
     iDestruct (dma_agree with "Hm Hdma") as %Hsub.
     iPureIntro.
     assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
       by (etransitivity; [exact Hctl | exact Hsub]).
     apply (virtio_queue_not_stalled v (vproto_ctl (v_cfg v) pr) (dom dma)
              (set_map wrap16 (dom (vp_pend pr))) (wrap16 (vp_np pr)) mv).
-    - rewrite Hseen. exact (vproto_flat (v_cfg v) pr (dom dma) Hok).
+    - rewrite Hseen, Hah. exact (vproto_flat (v_cfg v) pr (dom dma) Hok).
     - exact (mem_view_subseteq _ m mv Hctlm Hview).
   Qed.
 
@@ -1870,22 +1877,30 @@ Section VirtioProto.
       as (p & sl & pin & Hplo & Hphi & Hip & Hsl & Hpin & Hslotok & Hvpin &
           Hsdone & Hv1 & Hw1).
     subst i v' w. rewrite Hui.
-    (* THE WRITETHROUGH PAYOFF (async-disk.md §2).  xv6 declined the cache,
-       so the completion gate demands that no sector of this request is still
-       cached -- and the protocol's own [vp_wt] says nothing ELSE is -- hence
-       the device is holding NOTHING at the instant it reports the request
-       done.  Every byte it acknowledged is on the durable medium. *)
+    (* THE WRITETHROUGH PAYOFF (async-disk.md §2), now stated per REQUEST
+       rather than over the whole cache: xv6 declined the cache, so the gate
+       demands that none of THIS request's sectors is still held, in either
+       direction ([virtio_complete_ok]).  What the device may still be
+       holding is some OTHER request's captured payload, and that is exactly
+       what the served order being free makes possible. *)
     pose proof (spo_req _ _ _ _ Hslotok mv Hvpin) as Hreq.
-    rewrite <- Hseen in Hreq.
-    assert (Hwtinv : virtio_wt_inv v (vreq_sectors (vs_req sl)))
-      by exact (vp_wt_virtio_wt_inv (v_cfg v) (vp_nc pr) pr v sl pin
-                  Hslotok Hsl Hwt).
-    assert (Hcae : v_cache v = ∅)
-      by exact (virtio_req_step_wt_cache v mv (vs_req sl) _ _
-                  Hwce Hreq Hwtinv Hstep).
+    assert (Htouch : vreq_touch (vs_req sl) ∩ dom (v_cache v) = ∅).
+    { destruct (decide (bv_unsigned (vr_type (vs_req sl)) = virtio_blk_t_out))
+        as [Hout|Hnout].
+      - destruct (virtio_complete_ok_out v (vs_req sl) (wrap16 p) Hout Hsdone)
+          as [_ [Hw|Hd]]; [ by rewrite Hwce in Hw | exact Hd ].
+      - destruct (decide (bv_unsigned (vr_type (vs_req sl))
+                          = virtio_blk_t_flush)) as [Hfl|Hnfl].
+        + (* a FLUSH: the gate emptied the whole cache *)
+          rewrite (virtio_complete_ok_flush v (vs_req sl) (wrap16 p)
+                     Hnout Hfl Hsdone), dom_empty_L. set_solver.
+        + destruct (virtio_complete_ok_read v (vs_req sl) (wrap16 p)
+                      Hnout Hnfl Hsdone) as [Hw|Hd];
+            [ by rewrite Hwce in Hw | exact Hd ]. }
     (* ...so a READ's data collapses from the cache-overlaid image back to
-       the DURABLE one, exactly as before the cache existed. *)
-    rewrite (vslot_writes_cache_view (v_cfg v) (wrap16 (vp_nc pr)) v sl Hcae).
+       the DURABLE one, on the range it reports. *)
+    rewrite (vslot_writes_cache_view (v_cfg v) (wrap16 (vp_nc pr)) v sl
+               Htouch).
     (* the pure protocol facts about the slot the device is completing *)
     pose proof (vproto_pend_slot pr _ _ Hsl) as Hs.
     pose proof (vpo_standing _ _ _ Hok _ sl pin Hs Hpin) as Hstand.
@@ -1908,28 +1923,50 @@ Section VirtioProto.
        block does is read off what they already say: the block holds the
        payload, because [virtio_sectors_done] says every sector landed and
        [vs_torn] says a landed sector holds the payload. *)
-    iDestruct (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl with "Hpend")
+    iDestruct (big_sepM_delete _ (vp_pend pr) p sl Hsl with "Hpend")
       as "[Hslres Hpend]".
     (* ...so the request's channel entry has nothing left to land: its cell
        is at the LEAF, the completion's own identity permit.  For an OUT
-       request because the gate demanded [v_taken] and the cache is empty; for
-       a READ because it owes nothing per-sector to begin with. *)
-    assert (Htd : pend_todo pr (v_cache v) (v_taken v) (vp_nc pr) sl = ∅).
-    { rewrite pend_todo_head Hcae dom_empty_L.
-      destruct (v_taken v) eqn:Htk; [ apply vs_todo_empty |].
-      apply vs_all_read.
-      destruct (vs_is_out sl) eqn:Hout; [| reflexivity ]. exfalso.
+       request because the gate demanded that none of ITS sectors is still
+       held; for a READ because it owes nothing per-sector to begin with. *)
+    assert (Htd : pend_todo pr (v_cache v) p sl = ∅).
+    { destruct (vs_is_out sl) eqn:Hout; last first.
+      { (* a READ owes nothing whatever the latch says *)
+        unfold pend_todo. destruct (bool_decide (vp_tk pr = Some p));
+          [ apply vs_todo_read; exact Hout | apply vs_all_read; exact Hout ]. }
+      (* an OUT: the gate says [p] itself is latched, and that none of its
+         sectors is cached, so its todo set is empty *)
       assert (Hout2 : bv_unsigned (vr_type (vs_req sl)) = virtio_blk_t_out)
         by (unfold vs_is_out in Hout; by apply Z.eqb_eq).
-      destruct (virtio_complete_ok_out v (vs_req sl) Hout2 Hsdone) as [Ht _].
-      rewrite Htk in Ht. discriminate. }
+      destruct (virtio_complete_ok_out v (vs_req sl) (wrap16 p) Hout2 Hsdone)
+        as [Ht _].
+      (* the device's latch is the protocol's, and [wrap16] is injective on
+         the live window, so the latched POSITION is [p] *)
+      assert (Htkp : vp_tk pr = Some p).
+      { destruct (vp_tk pr) as [q|] eqn:Htq; last first.
+        { exfalso. rewrite Htkc, Htq in Ht. discriminate. }
+        rewrite Htkc, Htq in Ht. injection Ht as Ht.
+        f_equal. apply (vproto_wrap_inj (v_cfg v) pr (dom dma) q p Hok).
+        - destruct (vproto_pend_win (v_cfg v) pr (dom dma) q Hok
+                      (vpo_tk _ _ _ Hok q Htq)). lia.
+        - lia.
+        - exact Ht. }
+      rewrite (pend_todo_head _ _ p Htkp).
+      apply vs_todo_done. intros k Hk Hin.
+      assert (Hks : vs_key sl k ∈ vreq_touch (vs_req sl)).
+      { rewrite (vreq_touch_out (vs_req sl) Hout2).
+        apply (vs_sectors_spec (v_cfg v) p sl pin _ Hslotok).
+        by exists k. }
+      assert (Hboth : vs_key sl k ∈ vreq_touch (vs_req sl) ∩ dom (v_cache v))
+        by (apply elem_of_intersection; split; [exact Hks | exact Hin]).
+      rewrite Htouch in Hboth. by apply elem_of_empty in Hboth. }
     rewrite Htd.
     iDestruct "Hslres" as (bs)
       "(%Hbslen & %Hbspin & %Hbstorn & Hbs & Hpend0)".
     rewrite vs_kept_nil in Hbstorn.
     assert (Hout' : bs = vs_data sl).
     { destruct (vs_is_out sl) eqn:Hout; [| exact (Hbspin eq_refl) ].
-      pose proof (vslot_data_len (v_cfg v) (vp_nc pr) sl pin Hslotok Hout) as Hdl.
+      pose proof (vslot_data_len (v_cfg v) q sl pin Hslotok Hout) as Hdl.
       apply (vs_torn_full sl (vs_all sl) bs Hbslen Hdl); [| exact Hbstorn ].
       intros i Hi. apply vs_all_elem.
       rewrite <- (vslot_nsectors_pin (v_cfg v) (vp_nc pr) sl pin Hslotok).
@@ -1995,28 +2032,73 @@ Section VirtioProto.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
        out, and the caller owes the spent one back at the same key. *)
+    (* the completion RECORD: position [p] answered at used index [nc], minted
+       persistent so the interrupt handler can name the position it is
+       looking at when it walks the used ring *)
+    assert (Hunone : vp_uix pr !! p = None).
+    { apply not_elem_of_dom. rewrite (vpo_uix_dom _ _ _ Hok).
+      intro Hc. pose proof (vpo_pend_dom _ _ _ Hok) as Hpd.
+      assert (Hin : p ∈ dom (vp_pend pr)) by (apply elem_of_dom; by exists sl).
+      rewrite Hpd in Hin. apply elem_of_difference in Hin as [_ Hns].
+      exact (Hns Hc). }
+    iMod (ghost_map_insert_persist p (vp_nc pr) Hunone with "Hord")
+      as "[Hord #Hordp]".
     iModIntro. iExists (vs_perm sl), (vs_wr sl).
     iSplitR; [iPureIntro; apply vslot_post_wr|].
     iFrame "Hpend0". iIntros "Hdone0".
     iFrame "Hm".
     iSplitL "Hauth".
     { iExists dmap. iFrame "Hauth". iPureIntro. exact Hdv'. }
-    rewrite /virtio_proto vslot_post_cfg vslot_post_cache vslot_post_taken
-            Hlive.
-    iExists (vproto_step_state pr sl),
+    rewrite /virtio_proto vslot_post_cfg vslot_post_cache Hlive.
+    iExists (vproto_step_state pr p sl),
       (vslot_writes (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl ∪ dma).
-    rewrite (vp_spins_step pr sl Hsl) vps_nc vps_np vps_pend vps_done.
-    iFrame "Hcfg Hdma Hslot Hnc Hnp".
+    rewrite (vp_spins_step pr p sl Hsl) vps_nc vps_np vps_pend vps_done vps_uix.
+    iFrame "Hcfg Hdma Hslot Hord Hnc Hnp".
     (* the pure conjuncts *)
     iSplitR.
-    { iPureIntro. rewrite (vproto_step_ctl (v_cfg v) pr sl).
+    { iPureIntro. rewrite (vproto_step_ctl (v_cfg v) pr p sl).
       exact (virtio_ctl_union _ _ _ Hwctl Hctl). }
     iSplitR.
     { iPureIntro. rewrite (dom_union_sub _ dma HwDdma).
-      exact (vproto_ok_step (v_cfg v) pr (dom dma) sl Hok Hsl). }
+      exact (vproto_ok_step (v_cfg v) pr (dom dma) p sl Hok Hsl). }
     iSplitR; [iPureIntro; exact Hal|].
+    (* THE WINDOW MOVED EXACTLY AS THE KEYED STATE SAYS ([vproto_step_vserve]):
+       the watermark absorbed whatever prefix the serve completed, and the
+       served-out-of-turn set is the protocol's own. *)
     iSplitR.
-    { iPureIntro. rewrite vslot_post_seen Hseen. symmetry. apply wrap16_S. }
+    { iPureIntro. rewrite vslot_post_seen Hseen, Hah.
+      by rewrite (vproto_step_vserve (v_cfg v) pr (dom dma) p sl Hok Hsl). }
+    iSplitR.
+    { iPureIntro. rewrite vslot_post_ahead Hseen, Hah.
+      by rewrite (vproto_step_vserve (v_cfg v) pr (dom dma) p sl Hok Hsl). }
+    (* THE LATCH: released exactly when the request that held it completed,
+       and the two sides agree because [wrap16] is injective on the window. *)
+    assert (Htkeq : (if bool_decide (v_taken v = Some (wrap16 p))
+                     then None else v_taken v)
+                    = wrap16 <$> (if bool_decide (vp_tk pr = Some p)
+                                  then None else vp_tk pr)).
+    { destruct (vp_tk pr) as [q|] eqn:Htq; last first.
+      { rewrite Htkc, Htq. cbn [fmap option_fmap].
+        by rewrite (bool_decide_eq_false_2 (@None (bv 16) = Some (wrap16 p)))
+          by discriminate. }
+      destruct (decide (q = p)) as [->|Hne].
+      - rewrite (bool_decide_eq_true_2 (vp_tk pr = Some p) Htq).
+        rewrite Htkc, Htq. cbn [fmap option_fmap].
+        by rewrite (bool_decide_eq_true_2 (Some (wrap16 p) = Some (wrap16 p))
+                      eq_refl).
+      - rewrite (bool_decide_eq_false_2 (vp_tk pr = Some p))
+          by (rewrite Htq; intro Hc; injection Hc as <-; exact (Hne eq_refl)).
+        rewrite Htkc, Htq. cbn [fmap option_fmap].
+        rewrite (bool_decide_eq_false_2 (Some (wrap16 q) = Some (wrap16 p)));
+          [reflexivity|].
+        intro Hc. injection Hc as Hc. apply Hne.
+        apply (vproto_wrap_inj (v_cfg v) pr (dom dma) q p Hok).
+        + destruct (vproto_pend_win (v_cfg v) pr (dom dma) q Hok
+                      (vpo_tk _ _ _ Hok q Htq)). lia.
+        + lia.
+        + exact Hc. }
+    iSplitR.
+    { iPureIntro. rewrite vslot_post_taken, vps_tk. exact Htkeq. }
     iSplitR.
     { iPureIntro. rewrite vslot_post_uidx Hui. symmetry. apply wrap16_S. }
     iSplitR.
@@ -2028,30 +2110,68 @@ Section VirtioProto.
                  Hqnum Hj2 Hwrpage).
       rewrite <- wrap16_S. reflexivity. }
     iSplitR; [iPureIntro; exact Hwce|].
-    iSplitR;
-      [ iPureIntro;
-        exact (vp_wt_idle (vproto_step_state pr sl) (v_cache v) false
-                 Hcae eq_refl) |].
-    (* the pending map lost [nc] -- and the cache is empty and untaken again,
-       so every slot still pending owes its whole write *)
-    assert (Hpmono : forall k x, delete (vp_nc pr) (vp_pend pr) !! k = Some x ->
-              slot_pend_res γ (pend_todo pr (v_cache v) (v_taken v) k x) x
+    (* THE WRITETHROUGH ROW SURVIVES: if the completing request was the
+       latched one, the gate left nothing of it in the cache and the latch is
+       free; if some OTHER request holds the latch, it is still pending and
+       still owns exactly what the cache holds. *)
+    iSplitR.
+    { iPureIntro. rewrite /vp_wt vps_tk.
+      destruct (bool_decide (vp_tk pr = Some p)) eqn:Hb.
+      - apply bool_decide_eq_true in Hb.
+        destruct (vp_wt_head pr (v_cache v) p Hb Hwt) as (sl' & Hsl' & Hsub).
+        rewrite Hsl in Hsl'. injection Hsl' as <-.
+        (* the gate: none of this request's sectors is still cached, and the
+           cache holds nothing else *)
+        apply map_empty. intro s.
+        destruct (v_cache v !! s) as [bs2|] eqn:Hs; [| reflexivity ].
+        exfalso.
+        assert (Hin : s ∈ dom (vslot_cache sl))
+          by (apply elem_of_dom; exists bs2;
+              exact (lookup_weaken _ _ _ _ Hs Hsub)).
+        rewrite (vslot_cache_dom_sectors (v_cfg v) p sl pin Hslotok) in Hin.
+        assert (Hboth : s ∈ vreq_touch (vs_req sl) ∩ dom (v_cache v)).
+        { apply elem_of_intersection. split.
+          - unfold vs_sectors in Hin.
+            destruct (decide (bv_unsigned (vr_type (vs_req sl))
+                              = virtio_blk_t_out)) as [Ho|Hno].
+            + by rewrite (vreq_touch_out (vs_req sl) Ho).
+            + exfalso. rewrite (vreq_sectors_in _ Hno) in Hin.
+              by apply elem_of_empty in Hin.
+          - apply elem_of_dom. by exists bs2. }
+        rewrite Htouch in Hboth. by apply elem_of_empty in Hboth.
+      - apply bool_decide_eq_false in Hb.
+        destruct (vp_tk pr) as [q|] eqn:Htq; [| exact (vp_wt_none pr _ Htq Hwt) ].
+        destruct (vp_wt_head pr (v_cache v) q Htq Hwt) as (slq & Hslq & Hsub).
+        exists slq. split; [| exact Hsub ]. cbn [vp_pend].
+        rewrite lookup_delete_ne; [exact Hslq|].
+        intro Hc. apply Hb. by rewrite Htq, Hc. }
+    (* the pending map lost [p]; every slot still pending owes what it owed *)
+    assert (Hpmono : forall k x, delete p (vp_pend pr) !! k = Some x ->
+              slot_pend_res γ (pend_todo pr (v_cache v) k x) x
               ⊢ slot_pend_res γ
-                  (pend_todo (vproto_step_state pr sl) (v_cache v) false k x) x).
+                  (pend_todo (vproto_step_state pr p sl) (v_cache v) k x) x).
     { intros k x Hk. apply bi.wand_entails.
       apply lookup_delete_Some in Hk as [Hne _].
-      rewrite (pend_todo_other pr (v_cache v) (v_taken v) k x
-                 (fun e => Hne (eq_sym e)))
-              (pend_todo_untaken (vproto_step_state pr sl) (v_cache v) k x).
-      iIntros "$". }
+      unfold pend_todo. rewrite vps_tk.
+      destruct (bool_decide (vp_tk pr = Some p)) eqn:Hb.
+      - rewrite (bool_decide_eq_false_2 (@None nat = Some k)) by discriminate.
+        apply bool_decide_eq_true in Hb.
+        rewrite (bool_decide_eq_false_2 (vp_tk pr = Some k));
+          [ iIntros "$" | rewrite Hb; intro Hc; injection Hc as <-;
+                          exact (Hne eq_refl) ].
+      - iIntros "$". }
     iSplitL "Hpend".
     { iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend". }
-    assert (Hdnone : vp_done pr !! vp_nc pr = None).
+    assert (Hdnone : vp_done pr !! p = None).
     { apply not_elem_of_dom. intro Hc.
-      pose proof (vpo_done_lt _ _ _ Hok _ Hc). lia. }
-    rewrite (big_sepM_insert _ (vp_done pr) (vp_nc pr) sl Hdnone).
+      pose proof (vpo_done_lt _ _ _ Hok _ Hc) as Hsrv.
+      assert (Hin : p ∈ dom (vp_pend pr)) by (apply elem_of_dom; by exists sl).
+      rewrite (vpo_pend_dom _ _ _ Hok) in Hin.
+      apply elem_of_difference in Hin as [_ Hns]. exact (Hns Hsrv). }
+    rewrite (big_sepM_insert _ (vp_done pr) p sl Hdnone).
     iSplitL "Hbs Hdone0".
-    { iExists bs. rewrite /slot_perms_done. iFrame "Hbs Hdone0".
+    { iExists (vp_nc pr). iSplitR; [iPureIntro; apply lookup_insert|].
+      iExists bs. rewrite /slot_perms_done. iFrame "Hbs Hdone0".
       iPureIntro. split_and!.
       - exact Hbslen.
       - exact Hout'.
@@ -2085,16 +2205,16 @@ Section VirtioProto.
      Same set, so the per-slot resources ride through untouched -- which is
      why this accessor is a plain wand and not an update. *)
   Lemma virtio_proto_capture_step (γ : disk_names) (v : virtio_state)
-      (m : gmap Arch.pa (bv 8)) (mv : vmem) (v' : virtio_state) :
+      (m : gmap Arch.pa (bv 8)) (mv : vmem) (i : bv 16) (v' : virtio_state) :
     mem_view m mv ->
-    virtio_capture_step v mv = Some v' ->
+    virtio_capture_step v mv i = Some v' ->
     gen_heap_interp m -∗ virtio_proto γ v -∗
       gen_heap_interp m ∗ virtio_proto γ v'.
   Proof.
     iIntros (Hview Hstep) "Hm Hp".
     rewrite {1}/virtio_proto.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { exfalso. rewrite (virtio_capture_step_not_live v mv Hlive) in Hstep.
+    { exfalso. rewrite (virtio_capture_step_not_live v mv i Hlive) in Hstep.
       discriminate. }
     iDestruct "Hp" as (pr dma)
       "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
@@ -2104,43 +2224,57 @@ Section VirtioProto.
       by (etransitivity; [exact Hctl | exact Hsub]).
     assert (Hvctl : mem_view (vproto_ctl (v_cfg v) pr) mv)
       by exact (mem_view_subseteq _ m mv Hctlm Hview).
-    destruct (vproto_capture_det (v_cfg v) pr (dom dma) v mv v'
-                Hok eq_refl Hseen Hvctl Hstep)
-      as (sl & pin & Hsl & Hpin & Hlt & Hslotok & Hout & Htk & Hv1).
-    (* the cache was EMPTY: the head request had not been taken *)
-    destruct (vp_wt_head pr (v_cache v) (v_taken v) sl Hsl Hwt) as [Hnil _].
-    pose proof (Hnil Htk) as Hcae.
+    destruct (vproto_capture_det (v_cfg v) pr (dom dma) v mv i v'
+                Hok eq_refl Hseen Hah Hvctl Hstep)
+      as (p & sl & pin & Hplo & Hphi & Hip & Hsl & Hpin & Hslotok & Hout &
+          Htk & Hv1).
+    (* NOTHING WAS LATCHED, so the cache was empty: the protocol's latch is
+       the device's, and [vp_wt] says an unlatched device holds nothing. *)
+    assert (Htkp : vp_tk pr = None).
+    { destruct (vp_tk pr) as [q|] eqn:Ht; [| reflexivity ].
+      exfalso. rewrite Htkc, Ht in Htk. discriminate. }
+    pose proof (vp_wt_none pr (v_cache v) Htkp Hwt) as Hcae.
     assert (Hce : vslot_cache sl ∪ v_cache v = vslot_cache sl)
       by (rewrite Hcae; apply map_union_empty).
-    (* the owed sets are the same before and after *)
+    (* the owed sets are the same before and after: nothing was latched, so
+       every pending slot owed its whole write, and the newly latched one
+       owes exactly the write its capture just deposited *)
     assert (Hpmono : forall k x, vp_pend pr !! k = Some x ->
-              slot_pend_res γ (pend_todo pr (v_cache v) (v_taken v) k x) x
-              ⊢ slot_pend_res γ (pend_todo pr (vslot_cache sl) true k x) x).
+              slot_pend_res γ (pend_todo pr (v_cache v) k x) x
+              ⊢ slot_pend_res γ
+                  (pend_todo (vproto_capture_state pr p) (vslot_cache sl) k x)
+                  x).
     { intros k x Hk. apply bi.wand_entails.
-      assert (Hsrc : pend_todo pr (v_cache v) (v_taken v) k x = vs_all x)
-        by (rewrite Htk; apply pend_todo_untaken).
-      assert (Htgt : pend_todo pr (vslot_cache sl) true k x = vs_all x).
-      { destruct (decide (k = vp_nc pr)) as [Hkk|Hne].
-        - rewrite Hkk in Hk. rewrite Hk in Hsl. injection Hsl as Hxs.
-          rewrite Hkk. rewrite <- Hxs. rewrite pend_todo_head.
+      assert (Hsrc : pend_todo pr (v_cache v) k x = vs_all x)
+        by (apply pend_todo_untaken; exact Htkp).
+      assert (Htgt : pend_todo (vproto_capture_state pr p) (vslot_cache sl) k x
+                     = vs_all x).
+      { destruct (decide (k = p)) as [->|Hne].
+        - rewrite Hk in Hsl. injection Hsl as Hxs. rewrite <- Hxs.
+          rewrite (pend_todo_head _ _ p); [| reflexivity ].
           apply vs_todo_full.
-        - apply (pend_todo_other pr (vslot_cache sl) true k x Hne). }
+        - apply (pend_todo_other (vproto_capture_state pr p) (vslot_cache sl)
+                   k x). cbn [vp_tk]. intro Hc. injection Hc as <-.
+          exact (Hne eq_refl). }
       rewrite Hsrc Htgt. iIntros "$". }
     iFrame "Hm".
     rewrite /virtio_proto Hv1.
-    cbn [v_cfg v_isr v_seen v_used_idx v_disk v_cache v_taken].
+    cbn [v_cfg v_isr v_seen v_ahead v_used_idx v_disk v_cache v_taken].
     rewrite Hlive Hce.
-    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hdone".
+    iExists (vproto_capture_state pr p), dma.
+    iFrame "Hcfg Hdma Hslot Hord Hnc Hnp Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
-    iSplitR; [iPureIntro; exact Hok|].
+    iSplitR; [iPureIntro; exact (vproto_ok_capture _ _ _ p sl Hok Hsl)|].
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; cbn [vp_tk]; by rewrite Hip|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR.
-    { iPureIntro. rewrite /vp_wt Hsl.
-      split; [discriminate | reflexivity]. }
+    { iPureIntro. rewrite /vp_wt. cbn [vp_tk vp_pend]. exists sl.
+      split; [exact Hsl | reflexivity]. }
     iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend".
   Qed.
 
@@ -2187,42 +2321,38 @@ Section VirtioProto.
     iDestruct "Hp" as (pr dma)
       "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
         %Hwce & %Hwt & Hslot & Hord & Hnc & Hnp & Hpend & Hdone)".
-    (* something is cached, so there IS a head request *)
+    (* SOMETHING IS CACHED, SO SOMETHING IS LATCHED, and the drained bytes
+       are that request's: [vp_wt] is what says the cache holds nothing else.
+       Which POSITION it is no longer follows from the counters -- the latch
+       names it, which is the whole point of carrying it. *)
     pose proof (virtio_drain_step_enabled v s v' Hstep) as Hsin.
-    assert (Hhead : exists sl, vp_pend pr !! vp_nc pr = Some sl).
-    { destruct (vp_pend pr !! vp_nc pr) as [sl|] eqn:Hp; [by exists sl|].
-      exfalso. destruct (vp_wt_none pr (v_cache v) (v_taken v) Hp Hwt)
-        as [Hca _].
-      rewrite Hca dom_empty_L in Hsin. by apply elem_of_empty in Hsin. }
-    destruct Hhead as [sl Hsl].
-    assert (Hlt : (vp_nc pr < vp_np pr)%nat).
-    { assert (Hin : vp_nc pr ∈ dom (vp_pend pr))
-        by (apply elem_of_dom; by exists sl).
-      rewrite (vpo_pend_dom _ _ _ Hok) in Hin.
-      apply elem_of_set_seq in Hin. lia. }
-    destruct (vproto_head_slot (v_cfg v) pr (dom dma) Hok Hlt)
-      as (sl0 & pin & Hsl0 & Hpin & Hslotok).
-    rewrite Hsl in Hsl0. injection Hsl0 as Hsl0.
-    rewrite <- Hsl0 in Hslotok. clear Hsl0.
-    (* the writethrough row identifies the drained key with a sector index *)
-    destruct (vp_wt_head pr (v_cache v) (v_taken v) sl Hsl Hwt) as [Hnil Hcsub].
+    assert (Hlatch : exists q, vp_tk pr = Some q).
+    { destruct (vp_tk pr) as [q|] eqn:Ht; [by exists q|].
+      exfalso. rewrite (vp_wt_none pr (v_cache v) Ht Hwt) dom_empty_L in Hsin.
+      by apply elem_of_empty in Hsin. }
+    destruct Hlatch as [q Htkq].
+    destruct (vp_wt_head pr (v_cache v) q Htkq Hwt) as (sl & Hsl & Hcsub).
+    assert (Hqd : q ∈ dom (vp_pend pr))
+      by (apply elem_of_dom; by exists sl).
+    assert (Hpd : q ∈ dom (vp_pin pr)).
+    { rewrite (vpo_pin_dom _ _ _ Hok). by apply elem_of_union_l. }
+    apply elem_of_dom in Hpd as [pin Hpin].
+    pose proof (vpo_slot _ _ _ Hok q sl pin (vproto_pend_slot pr _ _ Hsl) Hpin)
+      as Hslotok.
     assert (Hdom : dom (v_cache v) ⊆ vs_sectors sl).
-    { rewrite <- (vslot_cache_dom_sectors (v_cfg v) (vp_nc pr) sl pin Hslotok).
+    { rewrite <- (vslot_cache_dom_sectors (v_cfg v) q sl pin Hslotok).
       by apply subseteq_dom. }
-    destruct (vproto_drain_det (v_cfg v) (vp_nc pr) sl pin v s v'
+    destruct (vproto_drain_det (v_cfg v) q sl pin v s v'
                 Hslotok Hdom Hcsub Hstep)
       as (i & Hi & Hskey & Hlk & Hv1).
-    (* ...and the head has been TAKEN: something is cached *)
-    assert (Htk : v_taken v = true).
-    { destruct (v_taken v) eqn:Ht; [reflexivity|]. exfalso.
-      rewrite (Hnil eq_refl) lookup_empty in Hlk. discriminate. }
-    iDestruct (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl with "Hpend")
+    assert (Htk : v_taken v = Some (wrap16 q)) by (by rewrite Htkc, Htkq).
+    iDestruct (big_sepM_delete _ (vp_pend pr) q sl Hsl with "Hpend")
       as "[Hslres Hpend]".
-    (* the head slot's owed set, spelled out -- LOCALLY, so that the other
-       slots' resources keep naming [v_taken v] and ride through by frame *)
-    assert (Hhtd0 : pend_todo pr (v_cache v) (v_taken v) (vp_nc pr) sl
+    (* the LATCHED slot's owed set, spelled out -- LOCALLY, so that the other
+       slots' resources ride through by frame *)
+    assert (Hhtd0 : pend_todo pr (v_cache v) q sl
                     = vs_todo sl (dom (v_cache v)))
-      by (rewrite pend_todo_head Htk; reflexivity).
+      by (rewrite (pend_todo_head _ _ q Htkq); reflexivity).
     rewrite Hhtd0.
     iDestruct "Hslres" as (bs)
       "(%Hbslen & %Hbspin & %Hbstorn & Hbs & Hpend0)".
@@ -2233,7 +2363,7 @@ Section VirtioProto.
     { destruct (vs_is_out sl) eqn:Ho; [reflexivity|]. exfalso.
       rewrite (vs_todo_read sl (dom (v_cache v)) Ho) in Hitd.
       by apply elem_of_empty in Hitd. }
-    pose proof (vslot_data_len (v_cfg v) (vp_nc pr) sl pin Hslotok Hout) as Hdl.
+    pose proof (vslot_data_len (v_cfg v) q sl pin Hslotok Hout) as Hdl.
     iDestruct (disk_bytes_read γ dmap (v_disk v) (vs_sector_off sl) bs Hdv
                  with "Hauth Hbs") as %Hrd.
     rewrite Hbslen in Hrd.
@@ -2256,16 +2386,17 @@ Section VirtioProto.
                (vs_kept sl (vs_todo sl (dom (v_cache v)))) i Hout Hdl).
       rewrite Hrd. exact Hbstorn. }
     (* the other pending slots owe their whole write either way *)
-    assert (Hpmono : forall k x, delete (vp_nc pr) (vp_pend pr) !! k = Some x ->
-              slot_pend_res γ (pend_todo pr (v_cache v) (v_taken v) k x) x
+    assert (Hpmono : forall k x, delete q (vp_pend pr) !! k = Some x ->
+              slot_pend_res γ (pend_todo pr (v_cache v) k x) x
               ⊢ slot_pend_res γ
-                  (pend_todo pr (delete s (v_cache v)) (v_taken v) k x) x).
+                  (pend_todo pr (delete s (v_cache v)) k x) x).
     { intros k x Hk. apply bi.wand_entails.
       apply lookup_delete_Some in Hk as [Hne _].
-      rewrite (pend_todo_other pr (v_cache v) (v_taken v) k x
-                 (fun e => Hne (eq_sym e)))
-              (pend_todo_other pr (delete s (v_cache v)) (v_taken v) k x
-                 (fun e => Hne (eq_sym e))). iIntros "$". }
+      assert (Hno : vp_tk pr <> Some k)
+        by (rewrite Htkq; intro Hc; injection Hc as <-; exact (Hne eq_refl)).
+      rewrite (pend_todo_other pr (v_cache v) k x Hno)
+              (pend_todo_other pr (delete s (v_cache v)) k x Hno).
+      iIntros "$". }
     iModIntro.
     iExists (vs_perm sl), (vs_wr sl), i, (vs_todo sl (dom (v_cache v))).
     iSplitR; [iPureIntro; exact Hitd|].
@@ -2274,24 +2405,26 @@ Section VirtioProto.
     iSplitL "Hauth".
     { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
     rewrite /virtio_proto Hv1.
-    cbn [v_cfg v_isr v_seen v_used_idx v_disk v_cache v_taken].
+    cbn [v_cfg v_isr v_seen v_ahead v_used_idx v_disk v_cache v_taken].
     rewrite Hlive.
-    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hdone".
+    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hord Hnc Hnp Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR.
-    { iPureIntro. rewrite /vp_wt Hsl. split.
-      - rewrite Htk. discriminate.
-      - exact (vslot_cache_sub_delete (v_cache v) sl s Hcsub). }
-    iApply (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl).
-    assert (Hhtd : pend_todo pr (delete s (v_cache v)) (v_taken v) (vp_nc pr) sl
+    { iPureIntro. rewrite /vp_wt Htkq. exists sl. split; [exact Hsl|].
+      exact (vslot_cache_sub_delete (v_cache v) sl s Hcsub). }
+    iApply (big_sepM_delete _ (vp_pend pr) q sl Hsl).
+    assert (Hhtd : pend_todo pr (delete s (v_cache v)) q sl
                    = vs_todo sl (dom (v_cache v)) ∖ {[ i ]}).
-    { rewrite pend_todo_head Htk dom_delete_L Hskey. apply vs_todo_step. }
+    { rewrite (pend_todo_head _ _ q Htkq) dom_delete_L Hskey.
+      apply vs_todo_step. }
     rewrite Hhtd.
     iSplitR "Hpend".
     { iExists bs'. iFrame "Hbs Hpend0". iPureIntro. split_and!.
@@ -2339,7 +2472,7 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Hal|].
     iFrame "Hmm". iIntros "Hmm".
     iDestruct ("Hback" with "Hmm") as "Hdma".
-    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend Hdone".
+    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hslot Hord Hnc Hnp Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -2478,7 +2611,7 @@ Section VirtioProto.
       (pin ∪ (wrb ∪ (range_map (avail_idx_pa (v_cfg v)) 2
          (nth_byte (wrap16 (S np))) ∪ dma))).
     rewrite (vp_spins_publish pr sl pin) vpp_nc vpp_np vpp_pend vpp_done Hnpeq.
-    iFrame "Hcfg Hdma Hslot Hnc Hnp".
+    iFrame "Hcfg Hdma Hslot Hord Hnc Hnp".
     iSplitR.
     { iPureIntro. rewrite Hctl'. apply map_union_least.
       - rewrite (avail_idx_bytes_range (v_cfg v) (S np)).
@@ -2518,6 +2651,8 @@ Section VirtioProto.
       rewrite Hdd. exact Hok'. }
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR.
     { iPureIntro. apply (read_bytes_transfer dma); [| exact Hridx].
@@ -2532,13 +2667,13 @@ Section VirtioProto.
        the cache is empty and untaken -- so the fresh slot inherits an empty
        cache, which is what puts its permit at the ROOT.  If the queue was
        busy the head is unchanged and so is the row. *)
-    assert (Hwt' : vp_wt (vproto_publish_state pr sl pin) (v_cache v) (v_taken v)).
+    assert (Hwt' : vp_wt (vproto_publish_state pr sl pin) (v_cache v)).
     { rewrite /vp_wt vpp_nc vpp_pend.
       destruct (decide (vp_nc pr = vp_np pr)) as [Heq|Hne].
       - rewrite Heq lookup_insert.
         assert (Hpn : vp_pend pr !! vp_nc pr = None)
           by (rewrite Heq; exact Hpendnone).
-        destruct (vp_wt_none pr (v_cache v) (v_taken v) Hpn Hwt) as [Hca Htk].
+        destruct (vp_wt_none pr (v_cache v) Hpn Hwt) as [Hca Htk].
         split; [by intros _ | rewrite Hca; apply map_empty_subseteq].
       - rewrite lookup_insert_ne;
           [ rewrite /vp_wt in Hwt; exact Hwt
@@ -2548,20 +2683,19 @@ Section VirtioProto.
     rewrite Hnpeq in Hpendnone.
     rewrite (big_sepM_insert _ (vp_pend pr) np sl Hpendnone).
     assert (Hnptd :
-      pend_todo (vproto_publish_state pr sl pin) (v_cache v) (v_taken v) np sl
+      pend_todo (vproto_publish_state pr sl pin) (v_cache v) np sl
       = vs_all sl).
     { rewrite /pend_todo vpp_nc.
       destruct (bool_decide (np = vp_nc pr)) eqn:Hb; [|reflexivity].
       apply bool_decide_eq_true in Hb.
       assert (Hpn : vp_pend pr !! vp_nc pr = None)
         by (rewrite <- Hb; exact Hpendnone).
-      destruct (vp_wt_none pr (v_cache v) (v_taken v) Hpn Hwt) as [_ Htk].
+      destruct (vp_wt_none pr (v_cache v) Hpn Hwt) as [_ Htk].
       by rewrite Htk. }
     assert (Hpmono : forall k x, vp_pend pr !! k = Some x ->
-              slot_pend_res γ (pend_todo pr (v_cache v) (v_taken v) k x) x
+              slot_pend_res γ (pend_todo pr (v_cache v) k x) x
               ⊢ slot_pend_res γ
-                  (pend_todo (vproto_publish_state pr sl pin)
-                     (v_cache v) (v_taken v) k x) x).
+                  (pend_todo (vproto_publish_state pr sl pin) (v_cache v) k x) x).
     { intros k x _. apply bi.wand_entails. rewrite /pend_todo vpp_nc.
       iIntros "$". }
     iSplitL "Hpres Hpend".
@@ -2646,7 +2780,7 @@ Section VirtioProto.
     iSplitR; [iExact "Hcfg"|]. iSplitR; [iPureIntro; exact Hal|].
     iFrame "Hlb Hmm". iIntros "Hmm".
     iDestruct ("Hback" with "Hmm") as "Hdma".
-    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend Hdone".
+    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hslot Hord Hnc Hnp Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -2728,10 +2862,11 @@ Section VirtioProto.
     iFrame "Hem". iIntros "Hem".
     iDestruct ("Hback" with "Hem") as "Hdma".
     iFrame "Hpub Hrecpt Hlb".
-    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend".
+    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hord Hnc Hnp Hpend".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-    iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|].
     iApply (big_sepM_delete _ (vp_done pr) p sl Hdone).
     iSplitR "Hdone"; [| iExact "Hdone"].
     iExists bs. iFrame "Hbs Hdone0".
@@ -2921,7 +3056,7 @@ Section VirtioProto.
                    (fun j : nat => bs !!! j))))).
     rewrite (vp_spins_reclaim (v_cfg v) pr (dom dma) p sl Hok Hdone)
             vpr_nc vpr_np vpr_pend vpr_done.
-    iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend".
+    iFrame "Hcfg Hdma Hslot Hord Hnc Hnp Hpend".
     iSplitR.
     { iPureIntro. rewrite Hctlr. apply map_sub_difference; [exact HAsub|].
       rewrite HdomMM. exact HAdisj. }
@@ -2930,6 +3065,8 @@ Section VirtioProto.
       exact (vproto_ok_reclaim (v_cfg v) pr (dom dma) p sl pin Hok Hdone Hpin). }
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR.
     { iPureIntro. apply (read_bytes_transfer dma); [| exact Hridx].
