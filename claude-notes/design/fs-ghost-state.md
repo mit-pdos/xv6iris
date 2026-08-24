@@ -222,7 +222,30 @@ redeems (escrow→`imark`, pool arm→normal, `reg_join`→`reg_full`).
 | `live_slot M k := live_norm ∨ live_frzn` (`IcacheInv.v:434`, RULING R-e) | the invariant-side live-mass account, per slot, inside `itable_inv`'s `live_pool`: NORM holds the table's complement slice at `frzsel ½ false`; **FRZN holds the WHOLE live unit** (`live_frac k 1`) at `frzsel ½ true` — so ANY reader with a positive `live_frac` share kills the frozen alternative (`frz_slot_kill`) with no lock, no licence, no region open.  This is the index-independent decider ProofIlock and ProofIdup use. |
 | `frzsel k q b` (`IcacheRef.v:2466`) | the per-slot freeze SELECTOR — a `dfrac_agree bool` filed at the RESERVED key `NINODE + k` **inside the existing liveness ghost** (`icfg_live`; no new `inG`, no boot premise). |
 | `isl_pool M` / `iref_slots_auth` / `iref_slot` | as before: the slots' share authorities (lock-held) and the fungible reference-slot budget a caller brings to iget. |
-| `ipool …` | the free pool: one **bundle** per uncached inum = `icnt_half z 0 ∗ ifreeze_off z ∗` shape, shape = `ipool_shape_np` (alloc-arm with `dinode_at`, or `imark`-arm) ∨ `pool_pending` ∨ `pool_await`. |
+| `ipool …` | the free pool: one **bundle** per uncached inum = `icnt_half z 0 ∗ frzm_h z false ∗` shape, shape = (`ipool_shape_np ∗ ifreeze_off z`) ∨ (`pool_pending ∗ ∃ n, top_frag`) ∨ (`pool_await ∗ ∃ n, top_frag`); `ipool_shape_np` = the ALLOC arm (`ipool_alloc`, whose ownership is `FsStateEra.inode_owned_era` at `era_node dn bm data` — the record proxy, every data block, the indirect block AND the era's abstract value `top_frag`) ∨ the MARKER arm (`imark` and the three untied holds `∃ e, dv_ride`, `∃ b, fv_ride`, `∃ n, top_frag`).  **Every region inum owns exactly one `top_frag`, always**: tied on the allocated arm, untied on the other three, and inside `ic_loaded` while the entry is cached.  Its AUTHORITY is `InodeRegion.ftop_inv` (§5c′). |
+
+### 5a′. The era's top map — `InodeRegion.ftop_inv` (`ftopN`)
+
+`fs-state.md` §4's `γtop`: inum ↦ the era's abstract inode
+(`FsState.top_frag Γ i n`, a FULL `ghost_map` element, so exclusive).  Its
+AUTHORITY is a one-conjunct invariant of its own,
+`ftop_inv γfs := inv ftopN (∃ I, ghost_map_auth (fs_top γfs) 1 I)`, whose
+handle rides in `ireg_inv` — the ambient FS credential every contract in the
+cone already carries.
+
+WHY IT EXISTS AT ALL: a checked-out payload holds the fragment, a
+`ghost_map` element cannot be retagged without its authority, and every
+write in this kernel moves the node.  Without a reachable authority the
+payload would be immutable and no walk could re-park at its new value.
+
+WHY IT IS ITS OWN INVARIANT rather than a conjunct of `ireg_body`: a mover
+with `iregN` already open — every region write is one — must still be able
+to retag.  `ireg_top_retag` therefore opens `ftopN` ALONE, which is why the
+payload's flip disturbs no walk's mask.
+
+The body is UNTIED and says so: nothing here relates `I` to the bytes.
+Stage 2c moves the whole `fs_view Γ_L` body into the log's parked payload,
+where the tie is the design's, and retires this invariant with it.
 
 ### 5b. Per-entry escrows — `ic_escrows` (persistent family, `icEscN`)
 

@@ -336,9 +336,13 @@ inum (rather than one gname per inum) is what lets `fs_state_mint` allocate
 every auth AND every token of the new instance in a single `own_alloc`.  No
 existing class serves (the tree's unique `ghost_mapG Σ Z (bv 8)` is the byte
 view's and must not be duplicated), so there are two new CAPACITY-ONLY
-classes, `fsLinkG` and `fsTopG` (`ghost_mapG Σ Z fs_node`).  Neither is a
-member of `Xv6G.xv6G`, so a file may bind both without a second instance
-path; folding them into the bundle is 2b/2c's call.
+classes, `fsLinkG` and `fsTopG` (`ghost_mapG Σ Z fs_node`).  `fsLinkG` is
+NOT an `Xv6G.xv6G` member; **`fsTopG` IS one** since 2b-inode-3, because a
+checked-out payload carries `top_frag` and the class therefore reaches
+`ProcInv.proc_priv`.  The record `fs_node` moved to the bottom file
+`FsNode.v` so `Xv6Cameras.v` can name the camera's value type, and the
+standing rule applies: a file at or above `Xv6G.v` binds the bundle and NOT
+this member.
 
 Where the built shape differs from §2, and why:
 
@@ -453,14 +457,16 @@ Left out, with the reason:
 - **`γlink`/`γtop` have a home: `FsBlocks.fs_names`' `fs_link`/`fs_top`,**
   which `FsBytesGamma.fs_gamma_L` reads.  They are PARAMETERS of `fs_alloc`
   and `fs_boot_ghosts` (the block layer must not name `fs_node`) and are
-  allocated in `FsCfgBoot.fs_cfg_alloc` by `FsState.fs_boot_alloc`, whose
-  `✓ link_elem I` premise IS the tokens-≤-nlink law the boot owes.  The
-  initial map is the ZERO map over the region's inums, not the image's:
-  `linkUR` has no authority over which KEYS exist, so a family allocated at
-  `ε` can never be extended, while `● 0` per inum rises to the record's real
-  `nlink` with the auth in hand.  The classes `fsLinkG`/`fsTopG` are bound
-  explicitly at each boot file rather than folded into `Xv6G.xv6G`, so that
-  editing this stack does not rebuild the 767 files that bind the bundle.
+  allocated in `FsCfgBoot.fs_cfg_alloc` by `FsState.fs_boot_alloc_at`, which
+  takes the two maps SEPARATELY.  The LINK family is at the ZERO map over
+  the region's inums, and its `✓ link_elem I` premise IS the tokens-≤-nlink
+  law the boot owes -- free there, and the zero map is also the only shape
+  the family can grow from (`linkUR` has no authority over which KEYS exist,
+  so a family allocated at `ε` can never be extended, while `● 0` per inum
+  rises to the record's real `nlink` with the auth in hand).  The TOP map is
+  at `FsCfgBoot.img_nodes`, the IMAGE's nodes: a plain `ghost_map` owes no
+  validity at all, which is what makes the image value affordable without
+  the W9 + `fs_links_eq` sweep.
 
 ### 2b-inode-2's additions: the IN-ERA bundle (`FsStateEra.v`)
 
@@ -519,12 +525,15 @@ without touching `DirLinks.v`.
   design), so a directory fact stated over a payload's total `data` has to
   be transported; `inode_local_of_ok_data` is `inode_local_of_ok` called
   through it, and is the form a producer actually has.  These belong in
-  `DirView.v`/`FsTree.v` beside `dfirst_ext`/`bname_ext`/`bview_ext` and
-  sit in `FsStateEra.v` only while it is their one consumer.
+  `DirView.v`/`FsTree.v` beside `dfirst_ext`/`bname_ext`/`bview_ext`;
+  2b-inode-3 priced the move and declined it, because
+  `inode_local_of_ok_data` is still their one consumer and the move costs
+  those files' cones a rebuild.
 - **What `inode_ok` does NOT imply, and where each fact comes from
-  instead**: the type ENUMERATION (`FsImg.fio_type` at boot,
-  `InodeRegion.ireg_wd_ty` at a marker fill, transferred at every
-  eviction), `16 ∣ size` (`FsImg.fdo_gran`), the two dots
+  instead**: the type ENUMERATION (`FsImg.fio_type` at boot; at a marker
+  fill it is the inode region's own (L5) clause `InodeRegion.ireg_ty_ok`,
+  which `ireg_withdraw` exports -- 2b-inode-2 recorded `ireg_wd_ty` here
+  and that was wrong, see 2b-inode-3), `16 ∣ size` (`FsImg.fdo_gran`), the two dots
   (`fdo_dot`/`fdo_dotdot`, i.e. W8) and `nlink ≤ 32767`
   (`FsImg.fs_region_nlink_short`, maintained by `ireg_link_ok`).
   `inode_local_of_ok` takes exactly those four and derives the other

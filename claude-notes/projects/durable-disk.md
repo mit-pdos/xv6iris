@@ -687,35 +687,30 @@ map at home blocks); 1d lands last.
           so no tokens).  The whole bundle — the top auth, one `top_frag`
           per inum, and `fs_links` — comes out as `fs_cfg_alloc`'s LEADING
           conjunct, beside the two pins.
-        - **LEFT: the bundle has no home, so `BootShared` drops it**
-          (`iClear`, beside the two pins).  The only per-inum structure that
-          outlives fsinit is the inode REGION, and re-stating it over `Γ_L`
-          is 2b-inode's.  Routing is a one-line change at that `iClear`.
-        - **AND THE INITIAL MAP IS THE ZERO MAP, NOT THE IMAGE'S.**  Nothing
-          ties `γtop` to bytes yet (no `inode_owned` at `Γ_L` exists), so it
-          claims nothing false, and it is the only shape the family can GROW
-          from: `linkUR = gmapUR Z (authR natUR)` has NO authority over which
-          KEYS exist, so a family allocated at `ε` can never be extended
-          (nothing mints `{[i := ● n]}` out of nothing) — while `● 0` at
-          every inum rises to the record's real `nlink` with the auth in
-          hand (`nat_local_update`).  So **2b-inode CANNOT mint per-inum
-          fragments at the first `ilock` unless the region holds what boot
-          allocated**; the fragments must travel, not be re-created.  Stage 4
-          replaces the allocation with `fs_state_mint` off `P_wf` anyway,
-          which is why no image decoder was built (fs-state.md §1: "there is
-          no image decoding at boot").  Discharging `✓ link_elem I` at the
-          image's own map, when someone wants it, is `fsimg_wf`'s W9
-          (`fs_links_wf`: every live directory has `nlink = 1` and zero
-          incoming tickets) plus conjunct (13) `FsImg.fs_links_eq` (the
-          file-nlink equality) — no new sweep.
-        - `fsLinkG`/`fsTopG` are bound explicitly in `FsCfgBoot`,
-          `BootShared` and `SystemAdequacy` and are NOT `Xv6G.xv6G` members:
-          the `FsState*` stack is under active development, and folding it
-          into the bundle would put its cone in front of the 767 files that
-          bind `xv6G`.  `xv6Σ` gained `fsLinkΣ; fsTopΣ`.
-      - [~] **2b-inode-1 (the REGION flip).**  LANDED IN PART, and its
-        second half is BLOCKED on a ruling — read the finding below before
-        sequencing 2b-inode-2.
+        - **THE LINK FAMILY IS STILL THE ZERO MAP, AND STILL DROPPED AT
+          `BootShared`** — the bundle excludes the link ghosts, so nothing
+          in the tree can hold them yet.  The zero map is also the only
+          shape the family can GROW from: `linkUR = gmapUR Z (authR natUR)`
+          has NO authority over which KEYS exist, so a family allocated at
+          `ε` can never be extended (nothing mints `{[i := ● n]}` out of
+          nothing) — while `● 0` at every inum rises to the record's real
+          `nlink` with the auth in hand (`nat_local_update`).  Discharging
+          `✓ link_elem I` at the image's own map, when the links step wants
+          it, is `fsimg_wf`'s W9 (`fs_links_wf`: every live directory has
+          `nlink = 1` and zero incoming tickets) plus conjunct (13)
+          `FsImg.fs_links_eq` (the file-nlink equality) — no new sweep.
+        - **THE TOP MAP IS THE IMAGE'S SINCE 2b-inode-3**, and it never
+          leaves `fs_cfg_alloc`: a plain `ghost_map` owes no validity, so
+          `FsState.fs_boot_alloc_at` allocates it at `FsCfgBoot.img_nodes`
+          while the link family stays at the zero map.  See the 2b-inode-3
+          bullet.
+        - `fsLinkG` is bound explicitly in `FsCfgBoot`, `BootShared` and
+          `SystemAdequacy` and is NOT an `Xv6G.xv6G` member.  `fsTopG` IS
+          one since 2b-inode-3 (the payload carries `top_frag`, so the class
+          reaches `ProcInv.proc_priv`); the record `fs_node` moved to the
+          bottom file `FsNode.v` for it and `xv6GΣ` gained `fsTopΣ`.
+      - [x] **2b-inode-1 (the REGION flip).**  LANDED, at option (i) of the
+        ruling below.
         - [x] **The region's byte unit is the RECORD.**  `InodeRegion.ireg_blk`
           parked one whole inode block's exclusive `fsblock`; it now parks
           the sixteen 64-byte runs that block is made of, each spelled
@@ -800,11 +795,14 @@ map at home blocks); 1d lands last.
             (iv) re-found ialloc's free-slot choice on something other than
             the buffer scan — no such argument exists from what ialloc
             holds (its only serialiser is the buffer).
-        - [ ] **DEFERRED to 2b-inode-2, and why.**  `ic_loaded`'s new
-          `rec_owned_at` conjunct (step 2) and the `γtop` fragment threading
-          (step 5) both presuppose the checkout carrying the bytes, so both
-          wait on the ruling above.  Nothing else in 2b-inode-2 (the
-          payload and the links) is blocked by it.
+        - [x] **RESOLVED BY THE RULING BELOW.**  `ic_loaded` never gained a
+          `rec_owned_at` conjunct: option (i) keeps the marked slot's run
+          region-side and the checkout carries `dinode_at` alone.  The
+          `γtop` fragment threading landed in 2b-inode-3, into the POOL
+          rather than the region — the free inums' fragments ride the
+          marker / pending / await arms beside the two untied contents
+          holds, which is where a free inum's other untied ghosts already
+          lived.
       - **RULED (owner-confirmed, 2026-08-23): option (i).**  The marked
         slot's run stays REGION-SIDE; `dinode_at` is the holder's
         exclusive record proxy (agreement pins the value, exclusivity
@@ -819,127 +817,146 @@ map at home blocks); 1d lands last.
         check out freely (era-mortal, lost-at-crash is the semantics);
         record runs park in `iregN` only because of the shared-block
         scanners.
-      - [~] **2b-inode-2 (the PAYLOAD flip).**  THE BUNDLE AND ITS WHOLE
-        DICTIONARY ARE LANDED (`iris/FsStateEra.v`, NEW, 1228 lines, one
-        `_CoqProject` row after `InodeRegion.v`); NO CONSUMER HAS MOVED.
-        Read the finding at the end of this bullet before sequencing the
-        rest — the remaining work is ONE atomic change, not a sequence.
+      - [x] **2b-inode-2 (the PAYLOAD flip).**  THE BUNDLE AND ITS WHOLE
+        DICTIONARY ARE LANDED (`iris/FsStateEra.v`, one `_CoqProject` row
+        after `InodeRegion.v`); 2b-inode-3 below is the swap itself.
         - **The bundle** (`inode_owned_era Γ γi inum n`), under ruling (i):
           `dinode_at γi inum (fn_rec n)` ∗ `[∗ map] k ↦ bs ∈ fn_blk n,
           blk_owned Γ (fn_naddr n k) bs` ∗ `ind_owned Γ n` ∗
           `top_frag Γ (bv_unsigned inum) n` ∗ `⌜inode_local (bv_unsigned
           inum) n⌝`.  The record's 64 bytes are NOT in it (they park
           region-side); `fn_rec n = dinode_at`'s value and `n = top_frag`'s
-          value are maintained BY CONSTRUCTION — the bundle names each
-          once — so neither is a clause.  The LINK ghosts are deliberately
-          out: they are step 3's, and leaving them out is what let this
-          land without touching `DirLinks.v`.
-        - **The dictionary, both ways.**  `bnode dn bm data` /
-          `bm_of n`, with `bnode (fn_rec n) (bm_of n) (fn_data n) = n`
-          under `inode_local`.  `fn_blk` is built by `blk_of_seq`, its own
-          SEALED recursion over the index range, so its lookup law is one
-          induction and the 268-way case split never reaches a use site.
-          The direction a flip uses is `bm_of`: `ic_loaded`'s `data` is
-          EXISTENTIAL, so the payload picks the node first and reads the
-          old model off it, and NO RESOURCE ever has to be moved between
-          two `data` functions.  The payload's PURE directory facts do
-          have to move, and that is the `fb_agree` transport below.
+          value are maintained BY CONSTRUCTION.  The LINK ghosts are
+          deliberately out: they are the links step's.
+        - **The dictionary, both ways.**  `era_node dn bm data` / `bm_of n`,
+          with `era_node (fn_rec n) (bm_of n) (fn_data n) = n` under
+          `inode_local`.  `fn_blk` is built by `blk_of_seq`, its own SEALED
+          recursion over the index range, so its lookup law is one induction
+          and the 268-way case split never reaches a use site.
         - **`inode_ok` COMES BACK, IN ONE fupd.**
-          `inode_owned_era_home_all` reads `blkmap_wf`'s coverage conjunct
-          at EVERY slot from a single `inv_acc` of `FsBlocks.fs_bytes_inv`
-          (the auth is what knows the byte view's domain);
+          `inode_owned_era_home_all` reads `blkmap_wf`'s coverage conjunct at
+          EVERY slot from a single `inv_acc` of `FsBlocks.fs_bytes_inv`;
           `inode_owned_era_slot_inj` reads the injectivity conjunct off the
-          `∗` through `blk_owned_ne`; `inode_owned_era_ok` composes them at
-          `home := fs_home_set cov ls` into the WHOLE of
-          `InodeLock.inode_ok`, with `di_type ≠ 0` (the payload's own fact,
-          not a property of the node) as its one premise.  **That is what
-          keeps readi/writei/bmap/itrunc's contracts unmoved when the
-          payload flips** — a walk pays one fupd at `logN` and its callees'
-          `inode_ok` premises are unchanged.  `InodeInv`'s pure blkmap
-          model therefore STAYS, exactly as the KEEP verdict says.
-        - **ONE mover, not a family.**  `inode_owned_era_retag` — "hand
-          back the new node's footprint and retag the two ghosts", both
-          authorities LENT (the region's from `iregN`, the top's from the
-          log's parked payload).  Readings: `_split`, `_rec_upd` (at
-          `fn_addrs_kept`), `_blk_acc` (one data block out and back, the
-          two ghosts untouched, returner quantified over the NEW contents),
-          `_trunc` (`SpecItrunc`'s post as the `fn_blk = ∅` node; "frees
-          every owned block" is DEFINITIONAL — F3 — so what comes back for
-          `bitmap_free` is exactly `fn_blk n`'s blocks, the ones beyond the
-          size included, plus the old indirect block).
-        - **THE FLIP IS ATOMIC ACROSS {boot, `ipool_alloc`, `ic_loaded`,
-          the region's parking, every consumer} — it CANNOT be sliced.**
-          The reason is resource-exclusive, not stylistic: the era bundle
-          CONTAINS the data blocks, so it cannot coexist with
-          `inode_blocks` (two owners of one run) — every payload must swap
-          in one step.  And the two payloads convert into each other at
-          every eviction and every fill, so flipping `ipool_alloc` alone
-          needs `top_frag` for pooled inums, which is the boot routing;
-          flipping `ic_loaded` alone needs it at the fill.  Budget the flip
-          as one lane over ~40 files (`ic_loaded` 240 mentions / 52 files,
-          44 of them `rewrite /ic_loaded`; `inode_ok` ~110 sites;
-          `inode_blocks` ~110), not as three.
-        - **EVERY `inl_*` CLAUSE HAS A PRODUCER — checked, so `inode_local`
-          is not the blocker it looks like.**  The one that is NOT an
-          `inode_ok` conjunct and looks unsourceable is `inl_type` (the
-          type is one of 0 / T_DIR / T_FILE / T_DEVICE, where `inode_ok`
-          says only "nonzero"): it comes from `FsImg.fio_type` at boot
-          (through `FsImgBridge.img_inode_ok`'s own premise), from
-          `ireg_wd_ty` on the marker fill, and rides every eviction.
+          `∗` through `blk_owned_ne`; `inode_owned_era_ok` composes them into
+          the WHOLE of `InodeLock.inode_ok`, with `di_type ≠ 0` as its one
+          premise.  It is LANDED and UNUSED: 2b-inode-3 kept `inode_ok` a
+          payload conjunct instead (see there for why), and this is what an
+          arm that would rather not maintain the sweep uses.
+        - **ONE mover, not a family.**  `inode_owned_era_retag`, with
+          `_split`, `_rec_upd`, `_blk_acc`, `_trunc` as its readings, and
+          `_era_node_of` / `_era_node_to` / `_era_node_ok` as the payload's
+          own spelling of them.
+        - **EVERY `inl_*` CLAUSE HAS A PRODUCER — with ONE correction.**
           `inl_dir_size` is `FsImg.fdo_gran`, `inl_dir_uniq` is
-          `fdo_unique` (= `FsImgBridge.img_dir_uniq`), the two dots are
-          `fdo_dot`/`fdo_dotdot` (= `fs_dots_wf_ok`, W8), and `inl_nlink`
-          is `FsImg.fs_region_nlink_short` (L4), maintained by
-          `InodeRegion.ireg_link_ok`.  `inode_local_of_ok` takes exactly
-          those four as premises and derives the other eleven.
-        - **THE DIRENT READINGS ARE EXTENSIONAL BELOW THE RECORD COUNT,
-          and that transport is landed too.**  `fb_agree data data' N` (the
-          flat byte view agrees below `N`) carries `dir_inum`, `dir_name`,
+          `fdo_unique`, the two dots are `fdo_dot`/`fdo_dotdot`, and
+          `inl_nlink` is `FsImg.fs_region_nlink_short` (L4).  `inl_type`
+          was recorded as coming from `InodeRegion.ireg_wd_ty` on the
+          marker fill; that is FALSE, and 2b-inode-3 sources it from the
+          region's new (L5) instead — see there.
+        - **THE DIRENT READINGS ARE EXTENSIONAL BELOW THE RECORD COUNT.**
+          `fb_agree data data' N` carries `dir_inum`, `dir_name`,
           `dir_liveb`, `dir_matchb`, `dir_first`, `dir_view`,
-          `dir_names_unique`, `dir_uniq` and `dir_dots_ix` — every dirent
-          reading of record `k` touches file bytes `16k .. 16k+15` and
-          nothing else, so the only bound any of them needs is `16·nrec`.
-          It is what moves a directory fact stated over a payload's TOTAL
-          `data` (the shape `dir_dots_ix`/`dir_uniq` come in, at the image
-          and at every re-park) onto `fn_data (bnode ..)`, which agrees
-          below MAXFILE and cannot agree above it.
-          `inode_local_of_ok_data` is `inode_local_of_ok` called through
-          it, and is the form a producer actually has.
-          **HOME: these belong in `DirView.v`/`FsTree.v` beside
-          `dfirst_ext`/`bname_ext`/`bview_ext`, which are their pieces.**
-          They sit in `FsStateEra.v` while it is their only consumer, so
-          that landing them costs no rebuild of those files' cones; move
-          them when the payload flips.
-        - **A DECISION THE FLIP MUST TAKE, recorded so it is not taken by
-          accident: `dv_ride`'s value.**  `fv_of dn (fn_data n)` IS
-          `fn_file_bytes n`, so `fv_ride` re-indexes for free.  `dv_of dn
-          (fn_data n)` is NOT `dir_entries n`: they agree on a DIRECTORY
-          and differ on a file (determined garbage vs `∅`).  Keeping
-          `dv_of (fn_rec n) (fn_data n)` — still a function of `n` — is the
-          zero-churn option; re-indexing at `dir_entries n` is the design's
-          shape and moves `DirViewLend`/`namex`'s custody chain with it.
-        - **WHAT IS LEFT, in the order a lane would do it.**  (1) The
-          BOOT VALUE: `FsCfgBoot.fs_cfg_alloc` still allocates `γtop` at
-          the ZERO map (`fs_boot_inodes nib`), and it must become the
-          IMAGE's node map — `bnode (image record) (img_blkmap P dn)
-          (fs_data_of P dn)` per allocated inum, whose `inode_local` is
-          `inode_local_of_ok_data` off `FsImgBridge.img_inode_ok` +
-          `fio_type` + `fdo_gran` + `img_dir_uniq` + `fs_dots_wf_ok`.
-          Its `✓ link_elem I` premise is then NOT the token-free one:
-          the image's directories have entries, so the tokens are real and
-          the validity is `fsimg_wf`'s W9 + conjunct (13)
-          `FsImg.fs_links_eq` — no new image sweep, but not free either.
-          (2) The ROUTING: `BootShared`'s `iClear` of the bundle becomes a
-          hand-off, region IN/PENDING arms for free records and
-          `ipool_alloc` for allocated ones.  (3) The PAYLOAD SWAP itself,
-          atomically, per the bullet above.  (4) The consumers.
-          (1)–(4) are ONE lane; (1) alone is inert, because a top fragment
-          with no owner claims nothing and is `iClear`ed either way.
-      - OPEN, for the orchestrator: `SpecBfree`'s two premises
-        `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are now
-        UNUSED (they only fed `bitmap_ok_del`).  Left in place rather than
-        moved through three `ProofItrunc` call sites; delete them with the
-        next change that touches itrunc.
+          `dir_names_unique`, `dir_uniq` and `dir_dots_ix`;
+          `inode_local_of_ok_data` is `inode_local_of_ok` called through it,
+          and is the form a producer actually has.  HOME: these belong in
+          `DirView.v`/`FsTree.v` beside `dfirst_ext`/`bname_ext`/`bview_ext`;
+          2b-inode-3 priced the move and declined it (it costs those files'
+          cones a rebuild and buys the flip nothing).
+      - [x] **2b-inode-3 (THE ATOMIC PAYLOAD SWAP).**  LANDED.
+        `IcacheEscrow.ic_loaded` and `ipool_alloc` hold
+        `FsStateEra.inode_owned_era` at `era_node dn bm data` in place of
+        their three resource conjuncts (`dinode_at`, `ind_res`,
+        `inode_blocks`); arity, pure conjuncts and conjunct ORDER are
+        unchanged, so every contract that passes a payload through is
+        byte-identical.  `dv_ride` kept `dv_of dn data` (the ruling's
+        zero-churn option).
+        - **THE SEAM.**  `ic_loaded_flat_body` is the payload's OLD list
+          plus `⌜inode_rec_local dn⌝` SECOND and `top_frag` LAST; both
+          positions are load-bearing (a producer with `inode_ok` proves the
+          record-only facts beside it; a consumer's existing eight-name
+          spatial pattern binds its last name to `fv_ride ∗ top_frag`, so
+          no `with "[…]"` selection moves).  `ic_loaded_open` is an
+          ORDINARY entailment and `ic_loaded_flat` / `ic_mk_loaded` are its
+          inverse.
+        - **`inode_ok` STAYS a payload conjunct — a deviation from
+          2b-inode-2's plan**, which had it derived on demand by the fupd
+          `inode_owned_era_era_node_ok`.  It costs nothing (every producer
+          proved it before the flip and still does) and it is what keeps
+          `ic_loaded_open` out of a modality, so no walk needs a
+          `logN`-open window at its unpack and no arm that unpacks inside
+          an `iInv` becomes unprovable.  The derivation is landed and is
+          what an arm that would rather not maintain the coverage sweep or
+          the injectivity uses.
+        - **THE TOP MAP'S AUTHORITY IS `InodeRegion.ftop_inv`**, its own
+          invariant at `ftopN`, whose handle rides in `ireg_inv`.  A
+          `ghost_map` element cannot be retagged without its authority and
+          every write moves the node, so a payload with no reachable
+          authority would be immutable.  It is its OWN invariant rather
+          than a conjunct of `ireg_body` so that a mover with `iregN`
+          already open can still retag, and `ireg_top_retag` opens `ftopN`
+          ALONE — which is why the flip disturbs no walk's mask.  Stage 2c
+          moves the body into the log's parked payload and retires it.
+        - **BOOT.**  `FsState.fs_boot_alloc_at` separates the two maps:
+          the top map is allocated at `FsCfgBoot.img_nodes` — the IMAGE's
+          nodes, `era_node (fs_dinode P sb z) (img_blkmap …) (fs_data_of …)`
+          per region inum — while the LINK family stays at the zero map.
+          **A plain `ghost_map` owes NO validity**, which is what makes the
+          image value affordable: `✓ link_elem` is never asked at the image
+          map, and W9 + conjunct (13) `fs_links_eq` are NOT spent.  The
+          authority becomes `ftop_inv` and the per-inum fragments go into
+          the free pool — tied inside `ipool_alloc` at a live inum, untied
+          on the marker / pending / await arms.  `BootShared`'s `iClear` of
+          the top map is gone; the LINK family is still dropped there (the
+          bundle excludes the link ghosts).
+        - **`fsTopG` IS AN `Xv6G.xv6G` MEMBER.**  The payload carries
+          `top_frag`, so the class reaches `ProcInv.proc_priv` through
+          `FirstTok.first_boot_persist`; membership is what keeps that from
+          being an explicit binder in ~400 files.  The record `fs_node`
+          moved to the new bottom file `FsNode.v` so `Xv6Cameras.v` can name
+          the camera's value type; the whole `FsState*` theory stayed where
+          it is.  The standing rule applies: a file at or above `Xv6G.v`
+          binds the bundle and NOT this member.
+        - **(L5), AND A CORRECTION.**  2b-inode-2 recorded `inl_type` (the
+          type enumeration) as coming from `InodeRegion.ireg_wd_ty` "on the
+          marker fill".  That is FALSE as landed: `ireg_wd_ty (ClaimK ty) d`
+          is `di_type d = ty` with `ty` unconstrained, and at `PlainK` it is
+          `True`.  It is now `ireg_link_ok`'s fourth clause
+          (`ireg_ty_ok`) — a fourth clause of THAT predicate rather than a
+          new `ireg_slot` conjunct, so no destructuring and no `iSplitR`
+          moves.  Three of the four writers get it free off the
+          `di_type_stable` premise they already take
+          (`ireg_ty_ok_stable`); the free deposit writes type 0; the CLAIM
+          takes it as its own premise, which threads up through
+          `SpecIalloc` / `ProofIalloc` / `create_fresh_ty` / `ProofCreate`
+          as `ireg_ty_ok (ialloc_fresh ty)` beside the `ty <> 0` those
+          contracts already took.  At boot it is `image_ty_ok`, discharged
+          from `FsImg.fio_type` below `ninodes` and `fs_region_free` above
+          it — no new image sweep.  `ireg_withdraw` exports it, which is
+          what lets the claim box's fill pay `inode_local`.
+        - **A WRITE RETAGS.**  Where a walk moves the record (`sl_setnl`,
+          `di_trunc`, `wi_dinode`, dirlink's append, `cr_setf`) the era's
+          abstract value moves with it: `ireg_top_retag`, three lines
+          before the re-park, plus `FsStateEra.inode_rec_local_same_type`
+          — every write in this kernel keeps the TYPE, so only the count
+          bound and a directory's granularity are re-proved at the site.
+        - **`FsStateEra.bnode` is renamed `era_node`**: the bio layer's
+          `BcacheInv.bnode` is in every fs walk's scope and the two
+          collided at the first consumer.
+        - **`fb_agree` and its nine carriers STAYED in `FsStateEra.v`.**
+          The move to `DirView.v`/`FsTree.v` was priced and declined for
+          this lane: it costs those files' cones a rebuild and buys nothing
+          the flip needs — `inode_local_of_ok_data` is their only consumer
+          and it lives beside them.
+      - OPEN, for the orchestrator, in the order they cost:
+        - `SpecBfree`'s two dead premises (`bv_unsigned bno ∈ cov`,
+          `bno ∉ log_region_set logstart`) and their three `ProofItrunc`
+          call-site dischargers are STILL THERE: itrunc's own walk needed
+          no edit in this lane (its contracts did not move), so the change
+          that was to carry them never happened.
+        - The link family is still dropped at `BootShared` and the bundle
+          still excludes the link ghosts.  Routing them is the links step's
+          one-line change at that `iClear`, and its price is the
+          `✓ link_elem` at the image map that this lane did NOT have to pay.
 - [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
       - RULE for 2c (from 2c-pre, 2026-08-23): the fixed layer now carries
         two client-only gnames (`riscv_swap_name`, `riscv_dview_name`)

@@ -16,16 +16,16 @@ Read [`fs-inode.md`](fs-inode.md)'s "`ilock` / `iunlock` — the LOAD, and
 the icache seam" first: the sleeplock-side of an entry is settled there and
 is not restated here.
 
-## BANNER — `ic_loaded`'s PAYLOAD under the durable-disk design
+## BANNER — `ic_loaded`'s PAYLOAD
 
-**`ic_loaded` is UNCHANGED in the tree; the predicate that will replace its
-disk half exists and is proven beside it.**  Everything below in this file
-describes the payload as it is; this banner says what it becomes and what
-the change costs, so that a reader does not have to reconcile the two.
+**`ic_loaded`'s OWNERSHIP is the in-era bundle.**  Everything below in this
+file describes the payload's arity, its pure conjuncts and its lifecycle,
+all of which are unchanged; this banner says what the resource half IS, so
+that a reader does not have to reconcile the two.
 
 `iris/FsStateEra.v`'s `inode_owned_era Γ γi inum n` is the IN-ERA bundle of
-[`fs-state.md`](fs-state.md) §2, at ruling (i) of the inode
-region (a checked-out inode does NOT carry its record's bytes — those park
+[`fs-state.md`](fs-state.md) §2, at ruling (i) of the inode region (a
+checked-out inode does NOT carry its record's bytes — those park
 region-side, because `ialloc`'s and `ireclaim`'s free-slot scans read OTHER
 slots out of a shared inode block):
 
@@ -35,37 +35,60 @@ slots out of a shared inode block):
   ∗ top_frag Γ (bv_unsigned inum) n       -- the era's abstract value
   ∗ ⌜inode_local (bv_unsigned inum) n⌝
 
-It replaces, in `ic_loaded` and in `ipool_shape`'s allocated arm, exactly
-`ind_res ∗ inode_blocks ∗ ⌜inode_ok …⌝` (the `dinode_at` is already there).
-Three things follow, and they are what a reader of this file needs:
+`ic_loaded` and `ipool_alloc` hold it at `era_node dn bm data`, in place of
+the three resource conjuncts `dinode_at ∗ ind_res ∗ inode_blocks`.  Arity,
+pure conjuncts and conjunct ORDER are unchanged, so a contract that only
+passes a payload through is byte-identical.
 
-- **`inode_ok` DOES NOT DISAPPEAR from the contracts above.**
-  `FsStateEra.inode_owned_era_ok` produces the WHOLE of
-  `InodeLock.inode_ok` from the bundle in ONE fupd at `logN`: the coverage
-  conjunct off `FsBlocks.fs_bytes_inv`'s auth (one open for all 269 slots,
-  `inode_owned_era_home_all`), the injectivity conjunct off the `∗`
-  (`blk_owned_ne`), everything else off `inode_local`.  Its one premise is
-  `di_type ≠ 0` — "this inode is allocated", the payload's own conjunct and
-  not a property of the node.  So readi/writei/bmap/itrunc keep their
-  premises and `InodeInv`'s pure blkmap model stays.
-- **`data` STOPS BEING A TOTAL FUNCTION.**  `fn_blk` is a `gmap` over the
-  ALLOCATED slots, which is what kills the 268-element framing hazard this
-  file records at `IcacheEscrow.v`. `FsStateEra.bnode` / `bm_of` are the
-  dictionary both ways; the direction a payload uses is `bm_of`, because
-  `ic_loaded`'s `data` is existential and re-existentialises at `fn_data n`.
-- **THE SWAP IS ATOMIC.**  The bundle CONTAINS the data blocks, so it
-  cannot coexist with `inode_blocks` — two owners of one run — and the pool
-  and the loaded arm convert into each other at every fill and every
-  eviction.  `ipool_alloc`, `ic_loaded`, the region's parking, boot's
-  stocking and every consumer move together or not at all.
+**THE SEAM IS TWO LEMMAS AND A FLAT SHAPE.**  `IcacheEscrow`'s
+`ic_loaded_flat_body` is the payload's OLD list — `⌜inode_ok⌝` first,
+`dir_links ∗ dinode_at ∗ inode_meta ∗ inode_addrs ∗ ind_res ∗
+inode_blocks ∗ dv_ride ∗ fv_ride` — with exactly two additions, and both
+positions are load-bearing:
 
-The `dv_ride`/`fv_ride` holds re-index with the node: `fv_of dn (fn_data n)`
-IS `fn_file_bytes n`, while `dv_of dn (fn_data n)` and `dir_entries n` agree
-on a DIRECTORY and differ on a file (determined garbage vs `∅`) — which of
-the two the payload carries is a decision the flip takes, recorded in
-[`../projects/durable-disk.md`](../projects/durable-disk.md)'s 2b-inode-2
-bullet along with the rest of the remaining work.
+- `⌜FsStateEra.inode_rec_local dn⌝` SECOND, beside `inode_ok`, because a
+  producer that has `inode_ok` proves the two together and because
+  `inode_local` needs it (the type enumeration, the nlink short, a
+  directory's 16-divisible size);
+- `top_frag … (era_node dn bm data)` LAST, because a consumer's existing
+  eight-name spatial pattern then binds its last name to
+  `fv_ride ∗ top_frag` — so the flip costs each of the ~forty payload sites
+  one lemma name and one pure conjunct, and no `with "[…]"` selection moves.
 
+`ic_loaded_open` (an ORDINARY entailment) and `ic_loaded_flat` /
+`ic_mk_loaded` are the two directions.
+
+Three consequences a reader of this file needs:
+
+- **`inode_ok` STAYS a pure conjunct of the payload**, and that is a
+  deliberate deviation from the flip's plan, which had it derived on demand
+  by `FsStateEra.inode_owned_era_era_node_ok` (a fupd at `logN`, off
+  `FsBlocks.fs_bytes_inv`'s auth for the coverage and off the `∗` for the
+  injectivity).  Keeping it costs nothing — every producer proved it before
+  the flip and still does — and it is what keeps `ic_loaded_open` from
+  being a fupd, so no walk has to find a `logN`-open window where it
+  unpacks its payload and no arm that unpacks inside an `iInv` becomes
+  unprovable.  The derivation is landed and is what an arm that would
+  rather NOT maintain the sweep uses.
+- **`data` is still a total function in the payload**; `fn_blk` is a `gmap`
+  over the ALLOCATED slots and `FsStateEra.era_node` / `bm_of` are the
+  dictionary both ways.  The direction a payload uses is `era_node`, which
+  is why nothing has to relate two `data` functions.
+- **A WRITE RETAGS.**  `top_frag` is a `ghost_map` element, so a walk that
+  MOVES the record (`sl_setnl`, `di_trunc`, writei's `wi_dinode`, dirlink's
+  append, `cr_setf`) retags it with `InodeRegion.ireg_top_retag` before the
+  re-park.  That accessor opens `ftopN` ALONE — the top map's authority is
+  its own invariant, whose handle rides in `ireg_inv` — which is why the
+  flip disturbs no walk's mask.  `FsStateEra.inode_rec_local_same_type` is
+  the pure companion: every write in this kernel keeps the record's TYPE,
+  so the enumeration rides and only the count bound and a directory's
+  granularity are re-proved at the site.
+
+The `dv_ride`/`fv_ride` holds keep their landed values (`dv_of dn data` /
+`fv_of dn data`) — the zero-churn option of the 2b-inode-2 ruling; they are
+equal to the node's own readings below the record count
+(`FsStateEra.dir_view_data_ext`), so nothing is lost by not re-indexing and
+the `dir_entries` re-index stays the pinned-lookup project's.
 ---
 
 ## 1. The `itable`'s geometry

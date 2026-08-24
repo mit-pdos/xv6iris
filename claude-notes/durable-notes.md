@@ -916,7 +916,7 @@ a textually clean three-way merge that re-introduced two member binders).
 python3 - <<'EOF'
 import re,glob
 MEM=['sieG','lockG','kallocG','bioG','diskGhostG','uartGhostG','fsLogG',
-     'logG','fsCrashG','iregG','icacheG','pipeG','cinvG','uioG']
+     'logG','fsCrashG','iregG','fsTopG','icacheG','pipeG','cinvG','uioG']
 mem=re.compile(r'!(?:[A-Za-z_]\w*\.)*(?:'+'|'.join(MEM)+r')\s+Σ')
 for f in sorted(glob.glob('iris/*.v')):
     t=open(f).read()
@@ -1040,6 +1040,55 @@ carried capacity belonging to the one bundle:
 Selecting files by NAME (`Spec*`/`Proof*`/`Link*`) is also wrong: select by
 dependency position (not in the bundle's own cone), or the `Wp*`/`User*`
 files above the boundary keep their own binders and fail.
+
+## WHEN A NEW CONJUNCT GOES INTO A PREDICATE FORTY PROOFS DESTRUCTURE,
+## PUT IT LAST — AND THE PURE ONE SECOND
+
+Adding a resource to a bundled `iProp` that ~40 sites open and re-pack looks
+like ~80 edits: every `iDestruct "H" as (x) "(…)"` pattern gains a name and
+every `with "[…]"` selection has to carry it. It is ONE edit per site if
+the conjunct goes at the END. An Iris intro pattern binds its LAST name to
+everything that is left, so an existing eight-name spatial pattern
+automatically binds its last name to `old_last ∗ new`, and a close that ends
+in `iFrame` or in `iExact "Hlast"` rebuilds the pair with no change at all.
+Only the handful of sites that USE that last hypothesis for something else
+need `iDestruct "Hlast" as "[Hlast Hnew]"`, and the build names them.
+
+The mirror rule for a PURE conjunct: put it SECOND, right after whichever
+fact every producer already has (here `inode_ok`), so a producer proves the
+two together and a consumer's `%`-names stay in one run. Do not put it in
+the middle of the spatial block — that is the one position that costs every
+site a rename.
+
+(durable-disk 2b-inode-3: `IcacheEscrow.ic_loaded` gained
+`FsState.top_frag` and `FsStateEra.inode_rec_local` across ~40 payload
+sites in 21 files. Measured: with the two at those positions, the
+mechanical part of the sweep was a `rewrite /ic_loaded` → lemma-name
+substitution plus one `iSplitR` per close.)
+
+## A GHOST-MAP ELEMENT IN A CHECKED-OUT PAYLOAD NEEDS ITS AUTHORITY TO HAVE
+## A HOME A WALK CAN REACH — AND THAT HOME IS ITS OWN INVARIANT
+
+A `ghost_map` element cannot be updated without the authority. So the
+moment a payload a thread checks out carries one, "where does the auth
+live?" stops being a design detail and becomes a correctness gate: with the
+auth dropped (or parked somewhere lock-protected the walk does not hold),
+the payload is IMMUTABLE and every re-park at a changed value is
+unprovable — which shows up as ~40 broken proofs, not as one error.
+
+Two placement rules came out of it:
+
+- **Give it its OWN invariant, not a conjunct of the nearest one.** The
+  obvious home is the invariant whose body already holds the sibling
+  authority (here `InodeRegion.ireg_body`, which holds the record map's).
+  That is wrong: every mover of that structure has the invariant OPEN when
+  it writes, so it could not retag. A separate namespace (`ftopN`, one
+  conjunct) is openable from inside the other one, and the accessor then
+  disturbs no mask any walk holds.
+- **Hang the HANDLE off the credential the cone already threads** — here
+  `ireg_inv`, which every fs contract carries. A new premise on the
+  contracts would have been ~40 statement changes; a conjunct on the
+  ambient bundle is one, plus its projection.
 
 ## A `Typeclasses Opaque` SEAL DOES NOT TRAVEL — IMPORT THE PREDICATE'S HOME FILE
 
