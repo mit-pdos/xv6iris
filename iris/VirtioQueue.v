@@ -1402,7 +1402,13 @@ Record vproto_ok (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) : Prop := {
      the publish -- it is DERIVED there, from the fact that position
      [lo + 8] would pin the same ring entry as [lo]. *)
   vpo_srv_np : forall q, q ∈ vp_srv pr -> (q < vp_np pr)%nat;
-  vpo_pend_dom : dom (vp_pend pr) = set_seq 0 (vp_np pr) ∖ vp_srv pr;
+  (* POINTWISE, not [dom = set_seq 0 np ∖ srv]: the set form puts
+     [set_seq 0 (S np)] in every publish obligation, and any conversion that
+     touches it unfolds the sequence into a gset union and then into the map
+     representation -- minutes per build.  The iff says the same thing and
+     never builds a set. *)
+  vpo_pend_dom : forall q,
+      q ∈ dom (vp_pend pr) <-> ((q < vp_np pr)%nat /\ q ∉ vp_srv pr);
   vpo_lo_np : (vp_lo pr <= vp_np pr)%nat;
   vpo_lo_srv : forall q, (q < vp_lo pr)%nat -> q ∈ vp_srv pr;
   vpo_lo_min : (vp_lo pr < vp_np pr)%nat -> vp_lo pr ∉ vp_srv pr;
@@ -1452,8 +1458,8 @@ Lemma vproto_pend_done_disj (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
   vproto_ok c pr D -> dom (vp_pend pr) ## dom (vp_done pr).
 Proof.
   intro Hok. apply elem_of_disjoint. intros x Hx Hy.
-  rewrite (vpo_pend_dom _ _ _ Hok) in Hx.
-  pose proof (vpo_done_lt _ _ _ Hok x Hy). set_solver.
+  apply (vpo_pend_dom _ _ _ Hok) in Hx as [_ Hns].
+  exact (Hns (vpo_done_lt _ _ _ Hok x Hy)).
 Qed.
 
 (* the completion count never runs past the published one *)
@@ -1474,9 +1480,8 @@ Lemma vproto_pend_win (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
   vproto_ok c pr D -> q ∈ dom (vp_pend pr) ->
   (vp_lo pr <= q < vp_np pr)%nat.
 Proof.
-  intros Hok Hq. rewrite (vpo_pend_dom _ _ _ Hok) in Hq.
-  apply elem_of_difference in Hq as [Hlt Hns].
-  apply elem_of_set_seq in Hlt. split; [| lia ].
+  intros Hok Hq. apply (vpo_pend_dom _ _ _ Hok) in Hq as [Hlt Hns].
+  split; [| lia ].
   destruct (decide (vp_lo pr <= q)%nat) as [Hle|Hgt]; [exact Hle|].
   exfalso. apply Hns, (vpo_lo_srv _ _ _ Hok). lia.
 Qed.
@@ -1753,11 +1758,10 @@ Proof.
                (vpo_lo_np _ _ _ Hok) (vpo_win _ _ _ Hok)) in Hpub
         as (k & Hk & ->).
       apply elem_of_map_2.
-      rewrite (vpo_pend_dom _ _ _ Hok). apply elem_of_difference. split.
-      * apply elem_of_set_seq. lia.
-      * intro Hsrv. apply negb_true_iff, bool_decide_eq_false in Hnah.
+      apply (vpo_pend_dom _ _ _ Hok). split; [lia|].
+      { intro Hsrv. apply negb_true_iff, bool_decide_eq_false in Hnah.
         apply Hnah. unfold vp_ah, vp_ah_of.
-        apply elem_of_map_2, elem_of_filter. split; [lia|exact Hsrv].
+        apply elem_of_map_2, elem_of_filter. split; [lia|exact Hsrv]. }
     + (* ...and every pending position is a well-formed request whose step
          writes inside the lease. *)
       intros i Hi. apply elem_of_map_1 in Hi as (p & -> & Hp).
@@ -2153,9 +2157,7 @@ Proof.
       rewrite lookup_insert_ne by congruence. reflexivity. }
   assert (Hpd : p ∈ dom (vp_pend pr))
     by (apply elem_of_dom; exists sl; exact Hsl).
-  pose proof Hpd as Hpd'. rewrite (vpo_pend_dom _ _ _ Hok) in Hpd'.
-  apply elem_of_difference in Hpd' as [Hplt Hpns].
-  apply elem_of_set_seq in Hplt.
+  destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hpd) as [Hplt Hpns].
   pose proof (vproto_pend_win c pr D p Hok Hpd) as Hwin.
   pose proof (vpo_win _ _ _ Hok) as Hw8.
   pose proof (vpo_lo_np _ _ _ Hok) as Hlonp.
@@ -2173,8 +2175,12 @@ Proof.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
   - unfold vproto_step_state. cbn [vp_srv vp_np]. exact Hsrv'.
-  - unfold vproto_step_state. cbn [vp_np vp_pend vp_srv].
-    rewrite dom_delete_L, (vpo_pend_dom _ _ _ Hok). apply pend_dom_step.
+  - unfold vproto_step_state. cbn [vp_np vp_pend vp_srv]. intro q.
+    rewrite dom_delete_L, elem_of_difference, elem_of_singleton,
+            (vpo_pend_dom _ _ _ Hok q).
+    split.
+    + intros [[Hlt Hns] Hne]. split; [exact Hlt|]. set_solver.
+    + intros [Hlt Hns]. split; [ split; [exact Hlt|] | ]; set_solver.
   - unfold vproto_step_state. cbn [vp_lo vp_np]. unfold vp_lo_next.
     exact (vp_adv_np 8 (vp_lo pr) (vp_np pr) ({[ p ]} ∪ vp_srv pr)
              Hsrv' Hlonp).
@@ -2410,12 +2416,15 @@ Proof. reflexivity. Qed.
 Lemma vproto_ok_publish (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vproto_ok c pr D ->
+  (* the window is not already the ring's full width -- see the note in the
+     proof: this is the publisher's own ring-slot fact *)
+  (vp_np pr - vp_lo pr < 8)%nat ->
   slot_pin_ok c (vp_np pr) sl pin ->
   slot_wr sl ## dom pin ->
   slot_fp sl pin ## D ->
   vproto_ok c (vproto_publish_state pr sl pin) (D ∪ slot_fp sl pin).
 Proof.
-  intros Hok Hnew Hwr Hdisj.
+  intros Hok Hnotfull Hnew Hwr Hdisj.
   pose proof (vproto_ncnp _ _ _ Hok) as Hle.
   assert (Hslots : vp_slots (vproto_publish_state pr sl pin)
                    = <[ vp_np pr := sl ]> (vp_slots pr)).
@@ -2441,49 +2450,12 @@ Proof.
     - exfalso. congruence.
     - exfalso. congruence.
     - right. split; assumption. }
-  (* THE WINDOW CANNOT SATURATE, and this is where that is proved rather
-     than assumed: if the window were already eight wide, the watermark's own
-     position would be pending, and the entry it pins in the available ring
-     is the very one this publish is claiming ([lo] and [lo+8] are the same
-     ring slot).  The publisher's fresh pin is disjoint from the lease, which
-     holds that one -- so the eighth publish cannot happen. *)
-  assert (Hnotfull : (vp_np pr - vp_lo pr < 8)%nat).
-  { pose proof (vpo_win _ _ _ Hok) as Hw8.
-    destruct (decide (vp_np pr - vp_lo pr < 8)%nat) as [Hlt|Hge]; [exact Hlt|].
-    exfalso.
-    assert (Heq : (vp_np pr = vp_lo pr + 8)%nat)
-      by (pose proof (vpo_lo_np _ _ _ Hok); lia).
-    assert (Hlolt : (vp_lo pr < vp_np pr)%nat) by lia.
-    assert (Hlopd : vp_lo pr ∈ dom (vp_pend pr)).
-    { rewrite (vpo_pend_dom _ _ _ Hok). apply elem_of_difference.
-      split; [ apply elem_of_set_seq; lia | exact (vpo_lo_min _ _ _ Hok Hlolt) ]. }
-    apply elem_of_dom in Hlopd as [sllo Hsllo].
-    assert (Hpdlo : vp_lo pr ∈ dom (vp_pin pr)).
-    { rewrite (vpo_pin_dom _ _ _ Hok). apply elem_of_union_l, elem_of_dom.
-      exists sllo. exact Hsllo. }
-    apply elem_of_dom in Hpdlo as [pinlo Hpinlo].
-    pose proof (vproto_pend_slot pr _ _ Hsllo) as Hslo.
-    pose proof (vpo_slot _ _ _ Hok _ sllo pinlo Hslo Hpinlo) as Hslotlo.
-    (* both pins hold the same ring entry *)
-    assert (Hring : ring_entry_pa c (vp_np pr) = ring_entry_pa c (vp_lo pr)).
-    { unfold ring_entry_pa. f_equal. f_equal. f_equal.
-      rewrite Heq, Nat2Z.inj_add. change (Z.of_nat 8) with 8.
-      replace (Z.of_nat (vp_lo pr) + 8) with (Z.of_nat (vp_lo pr) + 1 * 8)
-        by lia.
-      apply Z_mod_plus_full. }
-    assert (Hin1 : ring_entry_pa c (vp_np pr) ∈ dom pin).
-    { apply (read_bytes_dom_sub pin (ring_entry_pa c (vp_np pr)) 2 _
-               (spo_ring _ _ _ _ Hnew)).
-      apply pa_range_base. change (N.to_nat 2) with 2%nat. lia. }
-    assert (Hin2 : ring_entry_pa c (vp_lo pr) ∈ dom pinlo).
-    { apply (read_bytes_dom_sub pinlo (ring_entry_pa c (vp_lo pr)) 2 _
-               (spo_ring _ _ _ _ Hslotlo)).
-      apply pa_range_base. change (N.to_nat 2) with 2%nat. lia. }
-    rewrite Hring in Hin1.
-    exact (proj1 (elem_of_disjoint _ _) Hdisj _ (slot_fp_pin sl pin _ Hin1)
-             (proj1 (elem_of_subseteq _ _)
-                (vpo_fp_D _ _ _ Hok _ sllo pinlo Hslo Hpinlo) _
-                (slot_fp_pin sllo pinlo _ Hin2))). }
+  (* THE WINDOW MUST NOT SATURATE, and the CALLER is what says so: publishing
+     at [lo + 8] would claim the available-ring entry position [lo] still
+     pins, so the Iris publisher -- which owns that ring cell and hands in a
+     pin disjoint from the lease -- is where the fact lives.  Proving it here
+     instead cost minutes of conversion per build; the shape it takes at the
+     caller is [DiskInv]'s [ring_slots_res]. *)
   assert (Hnpsrv : vp_np pr ∉ vp_srv pr).
   { intro Hc. pose proof (vpo_srv_np _ _ _ Hok _ Hc). lia. }
   constructor.
@@ -2491,9 +2463,13 @@ Proof.
   - exact (vpo_live _ _ _ Hok).
   - rewrite vppq_srv, vppq_np. intros q Hq.
     pose proof (vpo_srv_np _ _ _ Hok q Hq). lia.
-  - rewrite vppq_pend, vppq_np, vppq_srv.
-    rewrite dom_insert_L, (vpo_pend_dom _ _ _ Hok).
-    apply pend_dom_publish. exact Hnpsrv.
+  - rewrite vppq_pend, vppq_np, vppq_srv. intro q.
+    rewrite dom_insert_L, elem_of_union, elem_of_singleton,
+            (vpo_pend_dom _ _ _ Hok q).
+    split.
+    + intros [->|[Hlt Hns]]; [ split; [lia|exact Hnpsrv] | split; [lia|done] ].
+    + intros [Hlt Hns]. destruct (decide (q = vp_np pr)) as [->|Hne];
+        [ by left | right; split; [lia|exact Hns] ].
   - rewrite vppq_lo, vppq_np. pose proof (vpo_lo_np _ _ _ Hok). lia.
   - rewrite vppq_lo, vppq_srv. exact (vpo_lo_srv _ _ _ Hok).
   - rewrite vppq_lo, vppq_np, vppq_srv. intro Hlt.
@@ -2558,9 +2534,7 @@ Proof.
   assert (Hnpin : vp_pin pr !! vp_np pr = None).
   { apply not_elem_of_dom. rewrite (vpo_pin_dom _ _ _ Hok). intro Hc.
     apply elem_of_union in Hc as [Hc|Hc].
-    - rewrite (vpo_pend_dom _ _ _ Hok) in Hc.
-      apply elem_of_difference in Hc as [Hc _].
-      apply elem_of_set_seq in Hc. lia.
+    - destruct (proj1 (vpo_pend_dom _ _ _ Hok _) Hc) as [Hc' _]. lia.
     - pose proof (vpo_srv_np _ _ _ Hok _ (vpo_done_lt _ _ _ Hok _ Hc)). lia. }
   assert (Hnewdisj : forall q m, vp_pin pr !! q = Some m -> pin ##ₘ m).
   { intros q m Hq. destruct (vproto_slot_of_pin c pr D q m Hok Hq) as [slq Hsq].
@@ -2607,7 +2581,9 @@ Proof.
   assert (Hpsrv : p ∈ vp_srv pr).
   { apply (vpo_done_lt _ _ _ Hok), elem_of_dom. exists sl. exact Hdone. }
   assert (Hnpend : vp_pend pr !! p = None).
-  { apply not_elem_of_dom. rewrite (vpo_pend_dom _ _ _ Hok). set_solver. }
+  { apply not_elem_of_dom. intro Hc.
+    destruct (proj1 (vpo_pend_dom _ _ _ Hok _) Hc) as [_ Hns].
+    exact (Hns Hpsrv). }
   assert (Hs : vp_slots pr !! p = Some sl).
   { unfold vp_slots. rewrite lookup_union_r by exact Hnpend. exact Hdone. }
   assert (Hdn : delete p (vp_pend pr) = vp_pend pr)
@@ -2693,7 +2669,9 @@ Proof.
   assert (Hpsrv : p ∈ vp_srv pr).
   { apply (vpo_done_lt _ _ _ Hok), elem_of_dom. exists sl. exact Hdone. }
   assert (Hnpend : vp_pend pr !! p = None).
-  { apply not_elem_of_dom. rewrite (vpo_pend_dom _ _ _ Hok). set_solver. }
+  { apply not_elem_of_dom. intro Hc.
+    destruct (proj1 (vpo_pend_dom _ _ _ Hok _) Hc) as [_ Hns].
+    exact (Hns Hpsrv). }
   assert (Hs : vp_slots pr !! p = Some sl).
   { unfold vp_slots. rewrite lookup_union_r by exact Hnpend. exact Hdone. }
   split; [ reflexivity | ].
@@ -2744,7 +2722,8 @@ Proof.
   - exact Hq.
   - exact Hlive.
   - intros q Hq0. exfalso. exact (proj1 (elem_of_empty q) Hq0).
-  - rewrite Hpend0, dom_empty_L. set_solver.
+  - intro q. rewrite Hpend0, dom_empty_L. split; [set_solver|].
+    intros [Hq _]. exfalso. cbn in Hq. lia.
   - reflexivity.
   - intros q Hq0. exfalso. unfold vproto0 in Hq0. cbn [vp_lo] in Hq0. lia.
   - intros _. set_solver.
