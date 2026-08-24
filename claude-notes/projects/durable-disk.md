@@ -1665,6 +1665,16 @@ BYTES (the owner's spike-first ruling): the commit's receipt `D' = L` at
 home maps + mknod's carried facts about `L` at its objects — the tie's
 strengthening stays the later lane; (3) the era's "my superblock's
 geometry is `riscv_fsdur`'s" equation rides the FS config bundle.
+RULED (owner delegated, orchestrator decided, 2026-08-25): FOLD NOW.
+The flip proceeds on the landed `FsDurLedger` fold; the commit's
+client-facing law is STATED in the one-fupd-per-batch shape
+(`dled_dstep` is its constructor); the `P_log`/`P_fs` ordinary-invariant
+split + the completion mask window are a SEPARABLE later refactor (the
+fold takes the body as a hypothesis — placement-independent), natural to
+do with the strengthening/sys_sync lane.  The three boot-fixed geometry
+equations (`dgeo_ok`) are ACCEPTED (one number each at boot; not the
+rejected kinds tie); the owner is "not thrilled" — keep them to exactly
+three and delete on sight anything that grows them.
 ## Stage 3 — the vertical spike: `sys_mknod`
 
 **ORDERING RULING (2c, 2026-08-24): THE `P_wf` FLIP AND THE SUPPLIERS' STEPS
