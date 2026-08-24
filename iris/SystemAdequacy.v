@@ -521,7 +521,9 @@ Proof.
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ _ gen g' sb nib cov Hbf
+  (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
+     member now, so the section generalises one class less. *)
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
@@ -673,7 +675,9 @@ Proof.
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ _ gen g' sb nib cov Hbf
+  (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
+     member now, so the section generalises one class less. *)
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.

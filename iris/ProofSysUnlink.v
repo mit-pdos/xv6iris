@@ -440,6 +440,11 @@ Lemma su_decr_pay (x y : Z) (bb : bool) :
   y = x + 1 -> x + (if bb then 1 else 0) <= y.
 Proof. intro H. destruct bb; lia. Qed.
 
+(* the decrement stays short, over plain [Z] (durable-disk 2b-inode-3):
+   [lia]'s zify hook does not come back with [bv_unsigned] in the goal. *)
+Lemma su_dec_short (a c : Z) : c = a + 1 -> c <= 32767 -> a <= 32767.
+Proof. lia. Qed.
+
 Lemma su_decr_pos (x y z : Z) : y = x + 1 -> y = z -> 2 <= z -> x <> 0.
 Proof. intros. lia. Qed.
 
@@ -1690,6 +1695,8 @@ Section ProofSysUnlinkBody.
        ⌜bv_unsigned dinum < 16 * Z.of_nat nib⌝ -∗
        ⌜di_type dnd = SpecDirlookup.T_DIR⌝ -∗
        ⌜inode_ok cov logstart dnd bmd datd⌝ -∗
+       (* durable-disk 2b-inode-3: the payload's record-only facts *)
+       ⌜inode_rec_local dnd⌝ -∗
        ⌜dir_ok icfg_nib dnd datd⌝ -∗
        ⌜dir_dots_ix (bv_unsigned dinum) dnd datd⌝ -∗
        ⌜dir_orphan_clean dnd datd⌝ -∗
@@ -1730,6 +1737,9 @@ Section ProofSysUnlinkBody.
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
        dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
        fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+       top_frag (fs_gamma_L gfs) (bv_unsigned dinum)
+                (era_node dnd bmd datd) -∗
        ity_shot gyd (di_type dnd) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
@@ -2328,7 +2338,7 @@ Section ProofSysUnlinkBody.
         { rewrite HR12a2 su_offcell_sp. unfold pa_add.
           apply stack_off_nonzero; [exact Hspb | lia]. }
         (* the locked directory, opened for readi's bundle *)
-        iDestruct (ic_loaded_open with "Hload") as (datd)"(%Hiok & %Hrl_datd & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
+        iDestruct (ic_loaded_open with "Hload") as (datd)"(%Hiok & %Hrl_datd & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview & Htop)".
         pose proof Hiok as Hiok0.
         destruct Hiok as (Hbmwf & Hbmcv & Hbmc & Htynz & Hszcap & Hiokrest).
         assert (Hinums : dir_inums_ok datd
@@ -2437,10 +2447,10 @@ Section ProofSysUnlinkBody.
           iApply ("Hseamk" $! CID22 R13 kd kslot kk gild gisld gyd (qd/2)%Qp
                     (qd/2)%Qp qs dinum dnd bmd datd (word_lo w27)
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                    [%]
+                    [%] [%]
                     Hcg Hown Hpc Hseam Hgen [Hbs1 Hbs2] Hsbb Hsbi Hsbs
                     Hpriv Hslkd0 Hslkdd Hdep Hidev Hiinum Hivalid
-                    Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview Hshotl Hfrz Hkeepd Hrud
+                    Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview Htop Hshotl Hfrz Hkeepd Hrud
                     Hchild Hruc HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP
                     H27lo H27hi HbE H30 [Hcont]").
           { exact HR13regs. }
@@ -2449,6 +2459,7 @@ Section ProofSysUnlinkBody.
           { exact Hdinb. }
           { exact Htydir. }
           { exact Hiok0. }
+          { exact Hrl_datd. }
           { exact Hdok. }
           { exact Hddix. }
           { exact Hdoc. }
@@ -2509,10 +2520,11 @@ Section ProofSysUnlinkBody.
           iDestruct (su_off_join sp0 (word_lo w27) (word_hi w27) Hal27
                        with "H27lo H27hi") as "H27".
           iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-            with "[Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview]" as "Hload".
+            with "[Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview Htop]"
+            as "Hload".
           { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
             iExists datd. iFrame "Hdlnk Hdiat Hmeta
-              Haddrs Hind Hblocks Hdview Hfview". iPureIntro. split_and!;
+              Haddrs Hind Hblocks Hdview Hfview Htop". iPureIntro. split_and!;
               [ exact Hiok0 | exact Hrl_datd | exact Hdok | exact Hddix
               | exact Hdoc | exact Hduq ]. }
           iDestruct (cpu_own_transport CID20 CID22 0 eb (proc_addr jx) b
@@ -2663,6 +2675,8 @@ Section ProofSysUnlinkBody.
     su_al sp0 ->
     ipv = ientry ki ->
     inode_ok cov logstart dni bmi dati ->
+    (* durable-disk 2b-inode-3: the child's record-only facts *)
+    inode_rec_local dni ->
     bv_unsigned (di_type dni) = T_DIR_z ->
     bv_unsigned (di_nlink dni) <> 0 ->
     dir_dots_ix (bv_unsigned inumi) dni dati ->
@@ -2701,7 +2715,8 @@ Section ProofSysUnlinkBody.
     X -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal Hipv Hiok Htyz Hnlz Hddix.
+    intros Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal Hipv Hiok Hrl_dati Htyz
+           Hnlz Hddix.
     pose proof Hiok as Hiok0.
     destruct Hiok as (Hbmwf & Hbmcv & Hbmc & Htynz & Hszcap & Hiokrest).
     assert (Hmb : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)
@@ -3218,6 +3233,8 @@ Section ProofSysUnlinkBody.
     su_al sp0 ->
     ipv = ientry ki ->
     inode_ok cov logstart dni bmi dati ->
+    (* durable-disk 2b-inode-3: the child's record-only facts *)
+    inode_rec_local dni ->
     bv_unsigned (di_type dni) = T_DIR_z ->
     bv_unsigned (di_nlink dni) <> 0 ->
     dir_dots_ix (bv_unsigned inumi) dni dati ->
@@ -3250,8 +3267,8 @@ Section ProofSysUnlinkBody.
     X -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal Hipv Hiok Htyz Hnlz Hddix
-           Hregs.
+    intros Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal Hipv Hiok Hrl_dati Htyz
+           Hnlz Hddix Hregs.
     pose proof Hiok as Hiok0.
     destruct Hiok as (Hbmwf & Hbmcv & Hbmc & Htynz & Hszcap & Hiokrest).
     assert (Hmb : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)
@@ -3376,7 +3393,7 @@ Section ProofSysUnlinkBody.
       iApply (su_w4_loop (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn gfs
                 ga gf cov logstart dev ki inumi dni bmi dati pidv dq dpv ipv
                 m sp0 K eb b lks X Vpr Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal
-                Hipv Hiok0 Htyz Hnlz Hddix
+                Hipv Hiok0 Hrl_dati Htyz Hnlz Hddix
                 (Z.to_nat (bv_unsigned (di_size dni))) 2%nat M3 be
                 ltac:(lia) ltac:(lia) ltac:(lia)
                 ltac:(intros k Hk2 Hklt; exfalso; lia)
@@ -3463,6 +3480,8 @@ Section ProofSysUnlinkBody.
     bv_unsigned dinum < 16 * Z.of_nat nib ->
     di_type dnd = SpecDirlookup.T_DIR ->
     inode_ok cov logstart dnd bmd datd ->
+    (* durable-disk 2b-inode-3: the payload's record-only facts *)
+    inode_rec_local dnd ->
     dir_ok icfg_nib dnd datd ->
     dir_dots_ix (bv_unsigned dinum) dnd datd ->
     dir_orphan_clean dnd datd ->
@@ -3517,6 +3536,8 @@ Section ProofSysUnlinkBody.
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
     dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
     fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+    (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+    top_frag (fs_gamma_L gfs) (bv_unsigned dinum) (era_node dnd bmd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -3560,6 +3581,8 @@ Section ProofSysUnlinkBody.
        ⌜su_regs m sp0 (ientry kd) (ientry ks) s3x M3⌝ -∗
        ⌜bv_unsigned (di_nlink dni) <> 0⌝ -∗
        ⌜inode_ok cov logstart dni bmi dati⌝ -∗
+       (* durable-disk 2b-inode-3: the child's record-only facts *)
+       ⌜inode_rec_local dni⌝ -∗
        ⌜dir_ok icfg_nib dni dati⌝ -∗
        ⌜dir_dots_ix (bv_unsigned (zero_extend' 32
             (dir_inum datd kk : mword 16) : mword 32)) dni dati⌝ -∗
@@ -3599,6 +3622,9 @@ Section ProofSysUnlinkBody.
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
        dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
        fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+       top_frag (fs_gamma_L gfs) (bv_unsigned dinum)
+                (era_node dnd bmd datd) -∗
        ity_shot gyd (di_type dnd) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
@@ -3628,6 +3654,10 @@ Section ProofSysUnlinkBody.
            (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
        fv_ride (bv_unsigned (zero_extend' 32
            (dir_inum datd kk : mword 16) : mword 32)) (fv_of dni dati) -∗
+       (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+       top_frag (fs_gamma_L gfs) (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32))
+                (era_node dni bmi dati) -∗
        ity_shot gyi (di_type dni) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned
@@ -3696,14 +3726,15 @@ Section ProofSysUnlinkBody.
   Proof.
     intros HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hcovb Hiregb Hj Hgl Heb Hsp0 Hal Hn1 Hupt1 Hregs Hkd Hks Hdinb
-           Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd Hfst Hma0 Hal27.
+           Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq Hnotdot Hnotdd Hfst
+           Hma0 Hal27.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
     iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hbio #Hlog Hseam Hgen #Hdev #Hgeo
              #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs
              #Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq Hdepd Hidevd
              Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
-             Hdviewd Hfviewd #Hshotd Hfrz Hkeepd Hrud Hchild Hrui HopS
+             Hdviewd Hfviewd Htop #Hshotd Hfrz Hkeepd Hrud Hchild Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hseamk Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -3820,7 +3851,7 @@ Section ProofSysUnlinkBody.
       by exact (su_regs_cs m sp0 _ _ _ R0 mil Hcsil HR0regs).
     (* [ip]'s loaded bundle, opened: the +0x8a seam wants it in pieces and
        the [lh]s below read two of its meta cells *)
-    iDestruct (ic_loaded_open with "Hloadi") as (dati)"(%Hioki & %Hrl_dati & %Hdoki & %Hddixi & %Hdoci & %Hduqi & Hdlnki & Hdiati & Hmetai & Haddrsi & Hindi & Hblocksi & Hdviewi & Hfviewi)".
+    iDestruct (ic_loaded_open with "Hloadi") as (dati)"(%Hioki & %Hrl_dati & %Hdoki & %Hddixi & %Hdoci & %Hduqi & Hdlnki & Hdiati & Hmetai & Haddrsi & Hindi & Hblocksi & Hdviewi & Hfviewi & Htopi)".
     (* ===== +0x78 lh a5,74(s2) -- ip->nlink ===== *)
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
@@ -3951,9 +3982,9 @@ Section ProofSysUnlinkBody.
          continuations, combined so [su_w4]'s exits can hand them back *)
       iCombine "Hseam Hgen Hbs2 Hsbb Hsbi Hsbs Hpre Hslkdq
                 Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd
-                Hindd Hblocksd Hdviewd Hfviewd Hfrz Hkeepd Hrud Hslkiq Hdepi Hiinumi
+                Hindd Hblocksd Hdviewd Hfviewd Htop Hfrz Hkeepd Hrud Hslkiq Hdepi Hiinumi
                 Hivalidi
-                Hdlnki Hdiati Hdviewi Hfviewi Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
+                Hdlnki Hdiati Hdviewi Hfviewi Htopi Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
                 Hnm2 HbP H27lo H27hi H30 Hseamk Hcont" as "HX".
       (* the byte view's row (durable-disk 1c-flip step 3) *)
       iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
@@ -3963,7 +3994,8 @@ Section ProofSysUnlinkBody.
                 dni bmi dati pid (DfracOwn (1/4)) be
                 (ientry kd) (ientry ks) (m !!! Regidx Rs3 : mword 64)
                 m M5 sp0 K eb b lks _
-                (upd_upt V P1) Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal eq_refl Hioki Htyzi
+                (upd_upt V P1) Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal eq_refl
+                Hioki Hrl_dati Htyzi
                 Hnlzi Hddixi HM5regs
                 with "Hcg Hown Htext Hkd Hpe Hpc Hbio Hrow Hkenv Hprocs Hdev Hgeo
                       Hdlk Hidevi Hmetai [Haddrsi Hindi] Hblocksi HbE Hpidq
@@ -3975,27 +4007,31 @@ Section ProofSysUnlinkBody.
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs
                             & Hpre & Hslkdq & Hdepd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
-                            Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd & Hfrz & Hkeepd & Hrud &
+                            Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd & Htop & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
                              Hdepi & Hiinumi & Hivalidi & Hdlnki &
-                            Hdiati & Hdviewi & Hfviewi & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hdiati & Hdviewi & Hfviewi & Htopi & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
         iDestruct "Hmapi" as "[Haddrsi Hindi]".
         (* both bundles repacked: neither release below opens them *)
         iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-          with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd]" as "Hloadd".
+          with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd
+                 Htop]" as "Hloadd".
         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
           iExists datd.
-          iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd".
+          iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd
+                  Htop".
           iPureIntro. split_and!;[exact Hiok | exact Hrl_datd | exact Hdok | exact Hddix | exact Hdoc | exact Hduq]. }
         iAssert (ic_loaded gfs gi cov logstart ks
                    (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                    dni bmi)
-          with "[Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi]" as "Hloadi".
+          with "[Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi
+                 Htopi]" as "Hloadi".
         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
           iExists dati.
-          iFrame "Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi".
+          iFrame "Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi
+                  Htopi".
           iPureIntro. split_and!;[exact Hioki | exact Hrl_dati | exact Hdoki | exact Hddixi | exact Hdoci
             | exact Hduqi]. }
         (* the buffers and slot 27, put back for the tail *)
@@ -4062,10 +4098,10 @@ Section ProofSysUnlinkBody.
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs
                             & Hpre & Hslkdq & Hdepd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
-                            Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd & Hfrz & Hkeepd & Hrud &
+                            Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd & Htop & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
                              Hdepi & Hiinumi & Hivalidi & Hdlnki &
-                            Hdiati & Hdviewi & Hfviewi & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hdiati & Hdviewi & Hfviewi & Htopi & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
         iDestruct "Hmapi" as "[Haddrsi Hindi]".
@@ -4077,17 +4113,18 @@ Section ProofSysUnlinkBody.
                      with "Hcont") as "Hcont".
         iApply ("Hseamk" $! CIDx Mx s3x bex true gili gisli gyi (qs/2)%Qp
                   (qs/2)%Qp dni bmi dati
-                  with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
+                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                         [Hbslot Hbs2] Hsbb Hsbi Hsbs Hpriv Hslkd
                         Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd Hfrz Hkeepd Hrud
+                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd Hfrz Hkeepd Hrud
                         Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi
-                        Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Hshoti
+                        Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Htopi Hshoti
                         Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
                         HbP H27lo H27hi Hbuf H30 [Hcont]").
         { exact Hxregs. }
         { exact Hnlzi. }
         { exact Hioki. }
+        { exact Hrl_dati. }
         { exact Hdoki. }
         { exact Hddixi. }
         { exact Hdoci. }
@@ -4117,17 +4154,18 @@ Section ProofSysUnlinkBody.
                    with "Hcont") as "Hcont".
       iApply ("Hseamk" $! CID8 M5 (m !!! Regidx Rs3 : mword 64) be false
                 gili gisli gyi (qs/2)%Qp (qs/2)%Qp dni bmi dati
-                with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                       [Hbs1 Hbs2] Hsbb Hsbi Hsbs Hpriv Hslkd Hslkdq
                       Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd
-                      Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd Hfrz Hkeepd Hrud Hslki
+                      Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd Hfrz Hkeepd Hrud Hslki
                       Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Hshoti Hfrzi Hkeepi Hrui HopS
+                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Htopi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 [Hcont]").
       { exact HM5regs. }
       { exact Hnlzi. }
       { exact Hioki. }
+      { exact Hrl_dati. }
       { exact Hdoki. }
       { exact Hddixi. }
       { exact Hdoci. }
@@ -4201,6 +4239,8 @@ Section ProofSysUnlinkBody.
     bv_unsigned dinum < 16 * Z.of_nat nib ->
     di_type dnd = SpecDirlookup.T_DIR ->
     inode_ok cov logstart dnd bmd datd ->
+    (* durable-disk 2b-inode-3: the payload's record-only facts *)
+    inode_rec_local dnd ->
     dir_ok icfg_nib dnd datd ->
     dir_dots_ix (bv_unsigned dinum) dnd datd ->
     dir_orphan_clean dnd datd ->
@@ -4214,6 +4254,8 @@ Section ProofSysUnlinkBody.
     su_regs m sp0 (ientry kd) (ientry ks) s3x M3 ->
     bv_unsigned (di_nlink dni) <> 0 ->
     inode_ok cov logstart dni bmi dati ->
+    (* durable-disk 2b-inode-3: the child's record-only facts *)
+    inode_rec_local dni ->
     dir_ok icfg_nib dni dati ->
     dir_dots_ix (bv_unsigned (zero_extend' 32
         (dir_inum datd kk : mword 16) : mword 32)) dni dati ->
@@ -4263,6 +4305,8 @@ Section ProofSysUnlinkBody.
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
     dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
     fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+    (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+    top_frag (fs_gamma_L gfs) (bv_unsigned dinum) (era_node dnd bmd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -4292,6 +4336,9 @@ Section ProofSysUnlinkBody.
         (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
     fv_ride (bv_unsigned (zero_extend' 32
         (dir_inum datd kk : mword 16) : mword 32)) (fv_of dni dati) -∗
+    (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+    top_frag (fs_gamma_L gfs) (bv_unsigned (zero_extend' 32
+        (dir_inum datd kk : mword 16) : mword 32)) (era_node dni bmi dati) -∗
     ity_shot gyi (di_type dni) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned
@@ -4341,17 +4388,18 @@ Section ProofSysUnlinkBody.
   Proof.
     intros HK Hglog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov
            Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb Hsp0 Hal Hn1 Hupt1 Hkd Hks
-           Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd Hfst Hal27
-           Hregs Hnlzi Hioki Hdoki Hddixi Hdoci Hduqi Htynzi.
+           Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq Hnotdot Hnotdd
+           Hfst Hal27
+           Hregs Hnlzi Hioki Hrl_dati Hdoki Hddixi Hdoci Hduqi Htynzi.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
     iIntros "Hcg Hown #Htext #Hdata #Hprenv Hpc #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
              #Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd #Hshotd Hfrz Hkeepd Hrud
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop #Hshotd Hfrz Hkeepd Hrud
              #Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi #Hshoti Hfrzi Hkeepi Hrui HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Htopi #Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
@@ -4916,6 +4964,14 @@ Section ProofSysUnlinkBody.
       - rewrite (Hnm' 0%nat Hkk0'). exact Hname0.
       - unfold dir_live. rewrite (Hagree 1%nat Hkk1'). exact Hlv1.
       - rewrite (Hnm' 1%nat Hkk1'). exact Hname1. }
+    (* the RECORD-ONLY facts at the zeroed record (durable-disk
+       2b-inode-3): [wi_dinode] moved neither the type, the count nor the
+       size, so all three ride. *)
+    assert (Hrl_data' : inode_rec_local dnW).
+    { apply (inode_rec_local_same_type dnd dnW Hrl_datd Hty'v).
+      - rewrite Hnl'v. exact (proj1 (proj2 Hrl_datd)).
+      - intros Hd. rewrite Hsz'v. apply (proj2 (proj2 Hrl_datd)).
+        rewrite -Hty'v. exact Hd. }
     assert (Hnlz' : bv_unsigned (di_nlink dnW) <> 0)
       by (rewrite Hnl'v; exact Hdplive).
     assert (Hdoc' : dir_orphan_clean dnW data')
@@ -4965,13 +5021,21 @@ Section ProofSysUnlinkBody.
             (fv_of dnd datd) (fv_of dnW data')
             ltac:(solve_ndisj)
            with "Hireg Hdviewd Hfviewd") as "[Hdviewd Hfviewd]".
+    (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
+       [ireg_top_retag] opens [ftopN] alone. *)
+    iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
+            (era_node dnd bmd datd) (era_node dnW bm' data')
+            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum dnW bm')
-      with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd]" as "Hloadd".
+      with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop]"
+      as "Hloadd".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body.
           iExists data'.
       rewrite Hdn0W.
-      iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd".
+      iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd
+              Htop".
       iPureIntro. split_and!;[exact Hiok' | exact Hrl_data' | exact Hdok' | exact Hddix' | exact Hdoc'
         | exact Hduq']. }
     iAssert (ity_shot gyd (di_type dnW)) as "#Hshotd2".
@@ -5309,6 +5373,21 @@ Section ProofSysUnlinkBody.
                       : mword 64)) 31 0)))) dati)
       as "Hdlnki2".
     { iApply dir_links_not_dir. rewrite su_setnl_type. exact Htynzi. }
+    (* ...and the ERA's abstract value follows the count (2b-inode-3). *)
+    iApply fupd_wp.
+    iMod (ireg_top_retag ⊤ gfs
+            (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
+                          : mword 32))
+            (era_node dni bmi dati)
+            (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
+                            : mword 64)
+                     (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 63 : mword 6))
+                      : mword 64)) 31 0)))) bmi dati)
+            ltac:(solve_ndisj) with "[] Htopi") as "Htopi";
+      [iApply (ireg_inv_ftop with "Hireg") |].
+    iModIntro.
     iAssert (ic_loaded gfs gi cov logstart ks
                (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
@@ -5317,9 +5396,18 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi)
-      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi]" as "Hloadi".
-    { rewrite /ic_loaded. iExists dati.
+      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi
+             Htopi]" as "Hloadi".
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dati.
       iSplit; [iPureIntro; exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki) |].
+      (* [su_setnl] moves the COUNT alone, so the type and the size ride;
+         the new count is one BELOW one the region already bounded, and the
+         directory clause is vacuous here (durable-disk 2b-inode-3). *)
+      iSplit; [iPureIntro;
+               apply (inode_rec_local_same_type dni _ Hrl_dati
+                        (su_setnl_type dni _));
+               [ exact (su_dec_short _ _ Hdecr (proj1 (proj2 Hrl_dati)))
+               | exact (proj2 (proj2 Hrl_dati)) ] |].
       iSplit; [iPureIntro; exact (su_setnl_dir_ok icfg_nib dni dati _ Hdoki) |].
       iSplit; [iPureIntro; apply dir_dots_ix_not_dir;
                rewrite su_setnl_type; exact Htynzi |].
@@ -5337,9 +5425,11 @@ Section ProofSysUnlinkBody.
          contents value is unmoved (§9 W3). *)
       iSplitL "Hdviewi";
         [iApply (dv_ride_size _ dni _ dati (eq_sym (su_setnl_size dni _))
-                  with "Hdviewi")
-        | iApply (fv_ride_size _ dni _ dati (eq_sym (su_setnl_size dni _))
-                  with "Hfviewi")]. }
+                  with "Hdviewi") |].
+      iSplitL "Hfviewi";
+        [iApply (fv_ride_size _ dni _ dati (eq_sym (su_setnl_size dni _))
+                  with "Hfviewi")
+        | iExact "Htopi"]. }
     iAssert (ity_shot gyi (di_type (su_setnl dni (trunc16 (sign_extend' 64
                (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
@@ -5656,6 +5746,8 @@ Section ProofSysUnlinkBody.
     bv_unsigned dinum < 16 * Z.of_nat nib ->
     di_type dnd = SpecDirlookup.T_DIR ->
     inode_ok cov logstart dnd bmd datd ->
+    (* durable-disk 2b-inode-3: the payload's record-only facts *)
+    inode_rec_local dnd ->
     dir_ok icfg_nib dnd datd ->
     dir_dots_ix (bv_unsigned dinum) dnd datd ->
     dir_orphan_clean dnd datd ->
@@ -5669,6 +5761,8 @@ Section ProofSysUnlinkBody.
     su_regs m sp0 (ientry kd) (ientry ks) s3x M3 ->
     bv_unsigned (di_nlink dni) <> 0 ->
     inode_ok cov logstart dni bmi dati ->
+    (* durable-disk 2b-inode-3: the child's record-only facts *)
+    inode_rec_local dni ->
     dir_ok icfg_nib dni dati ->
     dir_dots_ix (bv_unsigned (zero_extend' 32
         (dir_inum datd kk : mword 16) : mword 32)) dni dati ->
@@ -5742,6 +5836,8 @@ Section ProofSysUnlinkBody.
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
     dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
     fv_ride (bv_unsigned dinum) (fv_of dnd datd) -∗
+    (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+    top_frag (fs_gamma_L gfs) (bv_unsigned dinum) (era_node dnd bmd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -5771,6 +5867,9 @@ Section ProofSysUnlinkBody.
         (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
     fv_ride (bv_unsigned (zero_extend' 32
         (dir_inum datd kk : mword 16) : mword 32)) (fv_of dni dati) -∗
+    (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
+    top_frag (fs_gamma_L gfs) (bv_unsigned (zero_extend' 32
+        (dir_inum datd kk : mword 16) : mword 32)) (era_node dni bmi dati) -∗
     ity_shot gyi (di_type dni) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned
@@ -5820,17 +5919,19 @@ Section ProofSysUnlinkBody.
   Proof.
     intros HK Hglog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov
            Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb Hsp0 Hal Hn1 Hupt1 Hkd Hks
-           Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd Hfst Hal27
-           Hregs Hnlzi Hioki Hdoki Hddixi Hdoci Hduqi Htyzi Hdots Hdead.
+           Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq Hnotdot Hnotdd
+           Hfst Hal27
+           Hregs Hnlzi Hioki Hrl_dati Hdoki Hddixi Hdoci Hduqi Htyzi Hdots
+           Hdead.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
     iIntros "Hcg Hown #Htext #Hdata #Hprenv Hpc #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
              #Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd #Hshotd Hfrz Hkeepd Hrud
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop #Hshotd Hfrz Hkeepd Hrud
              #Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi #Hshoti Hfrzi Hkeepi Hrui HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Htopi #Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
@@ -6396,6 +6497,14 @@ Section ProofSysUnlinkBody.
       - rewrite (Hnm' 0%nat Hkk0'). exact Hname0.
       - unfold dir_live. rewrite (Hagree 1%nat Hkk1'). exact Hlv1.
       - rewrite (Hnm' 1%nat Hkk1'). exact Hname1. }
+    (* the RECORD-ONLY facts at the zeroed record (durable-disk
+       2b-inode-3): [wi_dinode] moved neither the type, the count nor the
+       size, so all three ride. *)
+    assert (Hrl_data' : inode_rec_local dnW).
+    { apply (inode_rec_local_same_type dnd dnW Hrl_datd Hty'v).
+      - rewrite Hnl'v. exact (proj1 (proj2 Hrl_datd)).
+      - intros Hd. rewrite Hsz'v. apply (proj2 (proj2 Hrl_datd)).
+        rewrite -Hty'v. exact Hd. }
     assert (Hnlz' : bv_unsigned (di_nlink dnW) <> 0)
       by (rewrite Hnl'v; exact Hdplive).
     assert (Hdoc' : dir_orphan_clean dnW data')
@@ -6847,6 +6956,17 @@ Section ProofSysUnlinkBody.
             (fv_of dnd datd) (fv_of dnW data')
             ltac:(solve_ndisj)
            with "Hireg Hdviewd Hfviewd") as "[Hdviewd Hfviewd]".
+    (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
+       [ireg_top_retag] opens [ftopN] alone. *)
+    iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
+            (era_node dnd bmd datd) (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
+                            : mword 64)
+                     (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 63 : mword 6))
+                      : mword 64)) 31 0)))) bm' data')
+            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -6854,9 +6974,16 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bm')
-      with "[Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd]" as "Hloadd".
-    { rewrite /ic_loaded. iExists data'.
+      with "[Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd
+             Htop]" as "Hloadd".
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists data'.
       iSplitR; [iPureIntro; exact HiokF2 |].
+      (* [su_setnl] moves the COUNT alone (durable-disk 2b-inode-3) *)
+      iSplitR; [iPureIntro;
+                exact (inode_rec_local_same_type dnW _ Hrl_data'
+                         (su_setnl_type dnW _)
+                         (su_dec_short _ _ HdecrW (proj1 (proj2 Hrl_data')))
+                         (proj2 (proj2 Hrl_data'))) |].
       iSplitR; [iPureIntro; exact HdokF2 |].
       iSplitR; [iPureIntro; exact HddixF2 |].
       iSplitR; [iPureIntro; exact HdocF2 |].
@@ -6866,9 +6993,11 @@ Section ProofSysUnlinkBody.
          contents value is unmoved (§9 W3). *)
       iSplitL "Hdviewd";
         [iApply (dv_ride_size _ dnW _ data' (eq_sym (su_setnl_size dnW _))
-                  with "Hdviewd")
-        | iApply (fv_ride_size _ dnW _ data' (eq_sym (su_setnl_size dnW _))
-                  with "Hfviewd")]. }
+                  with "Hdviewd") |].
+      iSplitL "Hfviewd";
+        [iApply (fv_ride_size _ dnW _ data' (eq_sym (su_setnl_size dnW _))
+                  with "Hfviewd")
+        | iExact "Htop"]. }
     iAssert (ity_shot gyd (di_type (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
@@ -7239,6 +7368,21 @@ Section ProofSysUnlinkBody.
       with "[Hgrey]" as "Hdlnki2".
     { iApply (su_dir_links_orphan _ _ dati Hnl2z Hself0i Hdead2).
       iExact "Hgrey". }
+    (* ...and the ERA's abstract value follows the count (2b-inode-3). *)
+    iApply fupd_wp.
+    iMod (ireg_top_retag ⊤ gfs
+            (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
+                          : mword 32))
+            (era_node dni bmi dati)
+            (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
+                            : mword 64)
+                     (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 63 : mword 6))
+                      : mword 64)) 31 0)))) bmi dati)
+            ltac:(solve_ndisj) with "[] Htopi") as "Htopi";
+      [iApply (ireg_inv_ftop with "Hireg") |].
+    iModIntro.
     iAssert (ic_loaded gfs gi cov logstart ks
                (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
@@ -7247,11 +7391,16 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi)
-      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi]" as "Hloadi".
-    { rewrite /ic_loaded. iExists dati.
-      iFrame "Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi".
+      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi
+             Htopi]" as "Hloadi".
+    { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dati.
+      iFrame "Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi
+              Htopi".
       iPureIntro. split_and!.
       - exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki).
+      - apply (inode_rec_local_same_type dni _ Hrl_dati (su_setnl_type dni _));
+          [ exact (su_dec_short _ _ Hdecr (proj1 (proj2 Hrl_dati)))
+          | exact (proj2 (proj2 Hrl_dati)) ].
       - exact (su_setnl_dir_ok icfg_nib dni dati _ Hdoki).
       - exact HddixZ.
       - exact HdocZ.
@@ -7583,11 +7732,12 @@ Section ProofSysUnlinkBody.
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30
                     [] Hcont").
     iIntros (CIDb M2 kd ks kk gild gisld gyd qdi sd qs dinum dnd bmd datd lo).
-    iIntros "%Hregs2 %Hkd %Hks %Hdinb %Htydir %Hiok %Hdok %Hddix %Hdoc %Hduq
+    iIntros "%Hregs2 %Hkd %Hks %Hdinb %Htydir %Hiok %Hrl_datd %Hdok %Hddix
+             %Hdoc %Hduq
              %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
              Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
@@ -7600,22 +7750,24 @@ Section ProofSysUnlinkBody.
               m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks
               HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1 Hupt1 Hregs2
-              Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd
+              Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
+              Hnotdot Hnotdd
               Hfst Hma02 Hal27
               with "Hcg Hown Htext Hdata Hpetop Hpc Hbio Hlog Hseam Hgen Hdev Hgeo
                     Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen Hsbb Hsbi
                     Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq
                     Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
-                    Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
+                    Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                     HbE H30 [] Hcont").
     iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi dni bmi dati).
-    iIntros "%Hregs3 %Hnlzi %Hioki %Hdoki %Hddixi %Hdoci %Hduqi %Hisd
+    iIntros "%Hregs3 %Hnlzi %Hioki %Hrl_dati %Hdoki %Hddixi %Hdoci %Hduqi
+             %Hisd
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
              Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd Hfrz Hkeepd Hrud
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd Hfrz Hkeepd Hrud
              Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Hshoti Hfrzi Hkeepi Hrui HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hfviewi Htopi Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     (* ---- W5, +0x8a..: the zeroing and the two tails, split on the seam's
@@ -7632,17 +7784,18 @@ Section ProofSysUnlinkBody.
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks
                 HK Hclog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0
                 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
-                Hupt1 Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq
-                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hdoki Hddixi
+                Hupt1 Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
+                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hrl_dati Hdoki
+                Hddixi
                 Hdoci Hduqi Htyzi Hdots Hdead
                 with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
                       Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd
+                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd
                       Hfrz Hkeepd Hrud Hslki Hslkiq Hdepi Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Hdviewi Hfviewi Hshoti Hfrzi Hkeepi Hrui HopS
+                      Hdviewi Hfviewi Htopi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
     - iApply (su_w5_file gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -7653,17 +7806,18 @@ Section ProofSysUnlinkBody.
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks
                 HK Hclog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0
                 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
-                Hupt1 Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq
-                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hdoki Hddixi
+                Hupt1 Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
+                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hrl_dati Hdoki
+                Hddixi
                 Hdoci Hduqi Hisd
                 with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
                       Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Hshotd
+                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hfviewd Htop Hshotd
                       Hfrz Hkeepd Hrud Hslki Hslkiq Hdepi Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Hdviewi Hfviewi Hshoti Hfrzi Hkeepi Hrui HopS
+                      Hdviewi Hfviewi Htopi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
   Qed.

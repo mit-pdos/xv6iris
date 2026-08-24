@@ -311,6 +311,42 @@ Proof. reflexivity. Qed.
 Definition sl_incnl (dn : dinode) : dinode :=
   sl_setnl dn (add_vec (di_nlink dn : mword 16) (mword_of_int 1)).
 
+(* the [++]'s arithmetic, over plain [Z]: [lia]'s zify hook does not come
+   back with [bv_unsigned] in the goal (durable-notes' trap), so the two
+   [bv_unsigned] readings are abstracted before it runs. *)
+Lemma sl_max_div16 (a b : Z) : (16 | a) -> (16 | b) -> (16 | Z.max a b).
+Proof.
+  intros Ha Hb. destruct (Z.max_spec a b) as [[_ ->] | [_ ->]];
+    [exact Hb | exact Ha].
+Qed.
+
+Lemma sl_bump_short (a c : Z) :
+  a <= c + 1 -> c <= 32767 -> c <> 32767 -> a <= 32767.
+Proof. lia. Qed.
+
+(* THE [++]'s RECORD-ONLY FACTS (durable-disk 2b-inode-3).  [sl_incnl]
+   moves the COUNT and nothing else, so the type and the size ride; the
+   new count is short because the +0x58 guard fired the OTHER way, and the
+   directory clause is vacuous at a non-directory.  NAMED, not spliced:
+   the bound needs three facts and [lia] over [bv_unsigned]. *)
+Lemma sl_incnl_rec_local (dn : dinode) :
+  inode_rec_local dn ->
+  di_nlink dn <> (mword_of_int 32767 : mword 16) ->
+  bv_unsigned (di_type dn) <> T_DIR_z ->
+  inode_rec_local (sl_incnl dn).
+Proof.
+  intros Hrl Hne Hnd.
+  assert (Hne' : bv_unsigned (di_nlink dn) <> 32767).
+  { intro Hc. apply Hne. apply bv_eq. rewrite Hc. vm_compute. reflexivity. }
+  apply (inode_rec_local_same_type dn (sl_incnl dn) Hrl
+           (sl_setnl_type dn _)).
+  - rewrite /sl_incnl sl_setnl_nlink.
+    exact (sl_bump_short _ _ (dlc_bv_add1_le (di_nlink dn))
+             (proj1 (proj2 Hrl)) Hne').
+  - intros Hd. exfalso. apply Hnd.
+    rewrite /sl_incnl sl_setnl_type in Hd. exact Hd.
+Qed.
+
 (* +0x96's [lw a2,4(s1)] SIGN-extends the 32-bit inum cell and
    [SpecDirlink] takes a ZERO-extended halfword; mkfs's [ushort] geometry
    is what closes the gap.  ProofCreate's cluster, restated (a
@@ -1856,12 +1892,25 @@ Section ProofSysLinkBody.
                                   (eq_sym (sl_setnl_size dn _)))) in "Hdview".
                 iEval (rewrite (fv_of_size dn (sl_incnl dn) dat
                                   (eq_sym (sl_setnl_size dn _)))) in "Hfview".
+                (* ...and the ERA's abstract value follows the count, which
+                   is the one column [sl_incnl] moves: [ireg_top_retag]
+                   opens [ftopN] alone (durable-disk 2b-inode-3). *)
+                iDestruct "Hfview" as "[Hfview Htop]".
+                iApply fupd_wp.
+                iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
+                        (era_node dn bm dat) (era_node (sl_incnl dn) bm dat)
+                        ltac:(solve_ndisj) with "[] Htop") as "Htop";
+                  [iApply (ireg_inv_ftop with "Hireg") |].
+                iModIntro.
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
-                  with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Hdview Hfview]" as "Hload".
+                  with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]"
+                  as "Hload".
                 { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
-                  iSplitR; [iPureIntro; exact Hrl_dat |].
+                  iSplitR; [iPureIntro;
+                            exact (sl_incnl_rec_local dn Hrl_dat Hnl
+                                     (sl_tdir_zne _ Hty)) |].
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
                   iSplitR;
@@ -1879,7 +1928,7 @@ Section ProofSysLinkBody.
                   iSplitL "Hdlnk2"; [iExact "Hdlnk2" |].
                   iFrame "Hdiat Hmeta". rewrite /inode_map.
                   iDestruct "Hmap" as "[Ha Hi]".
-                  iFrame "Ha Hi Hblocks Hdview Hfview". }
+                  iFrame "Ha Hi Hblocks Hdview Hfview Htop". }
                 iClear "Hdlnk".
                 (* ===== +0x6a c.mv a0,s1 ===== *)
                 iApply (wp_cmv_s_sconf (CID := CID41) (mword_of_int (SL + 0x6a))
@@ -2186,7 +2235,7 @@ Section ProofSysLinkBody.
                    iDestruct (ity_shot_agree with "Hshotd Hshotd2") as %Htyd0.
                    assert (Htyd : di_type dnd = SpecDirlookup.T_DIR)
                      by (symmetry; exact Htyd0).
-                   iDestruct (ic_loaded_open with "Hloadd") as (datd)"(%Hdiok & %Hrl_datd & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd & Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd)".
+                   iDestruct (ic_loaded_open with "Hloadd") as (datd)"(%Hdiok & %Hrl_datd & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd & Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd & Htopd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
                    (*                                                              *)
@@ -2259,9 +2308,9 @@ Section ProofSysLinkBody.
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)
                      iDestruct (ic_mk_loaded gfs gi cov logstart kd dinum dnd bmd
-                                  datd Hdiok Hddok Hddixd Hdocd Hduqd
+                                  datd Hdiok Hrl_datd Hddok Hddixd Hdocd Hduqd
                                   with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
-                                        Hdviewd Hfviewd")
+                                        Hdviewd Hfviewd Htopd")
                        as "Hloadd".
                      iDestruct (sl_bs3 with "[Hbs1d Hbs2d]") as "Hbsl";
                        [iSplitL "Hbs1d"; [iExact "Hbs1d" | iExact "Hbs2d"] |].
@@ -2631,7 +2680,8 @@ Section ProofSysLinkBody.
                        iEval (rewrite Htgee_a0) in "Hpc".
                        subst bmd' datd' dnd' dnd0'.
                        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-                         with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd Hfviewd]"
+                         with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd
+                                Hfviewd Htopd]"
                            as "Hloadd".
                        { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datd.
                          iSplitR; [iPureIntro; exact Hdiok |].
@@ -2643,7 +2693,7 @@ Section ProofSysLinkBody.
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
                          iDestruct "Hmapd" as "[Ha Hi]".
-                         iFrame "Ha Hi Hblocksd Hdviewd Hfviewd". }
+                         iFrame "Ha Hi Hblocksd Hdviewd Hfviewd Htopd". }
                        (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
                           (SpecIunlock's amended post), so the tail re-[ilock]s under the
                           very generation the [ity_shot] above names. *)
@@ -2741,6 +2791,28 @@ Section ProofSysLinkBody.
                                  (bv_unsigned (di_size dnd)
                                   <= bv_unsigned (di_size dnd'))%Z)
                          by (clear -Hszmax; rewrite Hszmax; lia).
+                       (* THE RECORD-ONLY FACTS AT THE APPENDED PARENT
+                          (durable-disk 2b-inode-3): dirlink keeps the type
+                          and the count, and the size is a MAX of two
+                          multiples of sixteen -- the old one (a
+                          directory's) and one whole record past a slot,
+                          whichever the append reached. *)
+                       assert (Hrl_datd' : inode_rec_local dnd').
+                       { apply (inode_rec_local_same_type dnd dnd' Hrl_datd
+                                  Htyeq).
+                         - rewrite Hnleq. exact (proj1 (proj2 Hrl_datd)).
+                         - intros _. rewrite Hszmax. apply sl_max_div16.
+                           + apply (proj2 (proj2 Hrl_datd)).
+                             rewrite Htyd. vm_compute. reflexivity.
+                           + destruct Hatom as [Hz | H16].
+                             * exists (Z.of_nat (dir_slot datd
+                                        (dir_nrec (bv_unsigned
+                                           (di_size dnd)))))%Z.
+                               rewrite Hz Nat.add_0_r Nat2Z.inj_mul. lia.
+                             * exists (Z.of_nat (dir_slot datd
+                                        (dir_nrec (bv_unsigned
+                                           (di_size dnd)))) + 1)%Z.
+                               rewrite H16 Nat2Z.inj_add Nat2Z.inj_mul. lia. }
                        assert (Hddok' : dir_ok icfg_nib dnd' datd').
                        { apply (dir_ok_dirlink icfg_nib dnd dnd' datd datd'
                                  (sl_low16 inum) (bname 14 nf)
@@ -2874,10 +2946,19 @@ Section ProofSysLinkBody.
                                     ltac:(solve_ndisj)
                                    with "Hireg Hdviewd Hfviewd")
                               as "[Hdviewd Hfviewd]".
+                            (* ...and the ERA's abstract value with them
+                               (durable-disk 2b-inode-3): [ireg_top_retag]
+                               opens [ftopN] alone. *)
+                            iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
+                                    (era_node dnd bmd datd)
+                                    (era_node dnd' bmd' datd')
+                                    ltac:(solve_ndisj) with "[] Htopd")
+                              as "Htopd";
+                              [iApply (ireg_inv_ftop with "Hireg") |].
                             iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd
-                                     Hfviewd]"
+                                     Hfviewd Htopd]"
                               as "Hloadd".
                             { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
@@ -2890,7 +2971,7 @@ Section ProofSysLinkBody.
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
                               iDestruct "Hmapd" as "[Ha Hi]".
-                              iFrame "Ha Hi Hblocksd Hdviewd Hfviewd". }
+                              iFrame "Ha Hi Hblocksd Hdviewd Hfviewd Htopd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
                             destruct (Hmemtrio Htotpos)
@@ -3289,10 +3370,19 @@ Section ProofSysLinkBody.
                                     ltac:(solve_ndisj)
                                    with "Hireg Hdviewd Hfviewd")
                               as "[Hdviewd Hfviewd]".
+                            (* ...and the ERA's abstract value with them
+                               (durable-disk 2b-inode-3): [ireg_top_retag]
+                               opens [ftopN] alone. *)
+                            iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
+                                    (era_node dnd bmd datd)
+                                    (era_node dnd' bmd' datd')
+                                    ltac:(solve_ndisj) with "[] Htopd")
+                              as "Htopd";
+                              [iApply (ireg_inv_ftop with "Hireg") |].
                             iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd
-                                     Hfviewd]"
+                                     Hfviewd Htopd]"
                               as "Hloadd".
                             { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
@@ -3305,7 +3395,7 @@ Section ProofSysLinkBody.
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
                               iDestruct "Hmapd" as "[Ha Hi]".
-                              iFrame "Ha Hi Hblocksd Hdviewd Hfviewd". }
+                              iFrame "Ha Hi Hblocksd Hdviewd Hfviewd Htopd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
                             assert (Hiu3 : (iput_units <= n3)%nat)
