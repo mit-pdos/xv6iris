@@ -267,6 +267,20 @@ Proof. exact (fsimg_wf_root_link fsimg_P fsimg_sb fsimg_wf_ok). Qed.
 Lemma fsimg_links_eq : fs_links_eq fsimg_P fsimg_sb = true.
 Proof. vm_eq. Qed.
 
+(* ---- CONJUNCT (15): NO LIVE NON-DOT ROOT RECORD NAMES THE ROOT ------- *)
+
+(*  The one place the image's ticket discipline and the link RA's token
+    discipline disagree: [FsImg.fs_rec_ticket] exempts a record naming its
+    OWN home under ANY name, [FsStateInode.ent_tokenless] only ["."] and an
+    orphaned-or-self [".."].  A root record called "foo" pointing at the
+    root would owe a token and pay no ticket, and W1-W9 do not rule it out
+    -- so [FsDurImg.img_link_valid] (hence [FsState.fs_boot_alloc_at]'s
+    [✓ link_elem] premise) takes this sweep.  ONE [O(nrec)] pass over the
+    root's 64 records, the same records W6/W8 already read; it is the only
+    sweep in this file that touches exactly one directory. *)
+Lemma fsimg_root_no_self : fs_root_no_self fsimg_P fsimg_sb = true.
+Proof. vm_eq. Qed.
+
 (* ---- W4 reindexed, cited: no inode names one block twice ------------- *)
 
 (* [InodeInv.blkmap_wf]'s injectivity clause at every live inum, out of
@@ -305,6 +319,19 @@ Qed.
    would be circular) and L4 is about arbitrary bytes.  Same thirteen
    inode blocks as [fsimg_region_free]; measured together below. *)
 Lemma fsimg_region_nlink : fs_region_nlink fsimg_P fsimg_sb 13 = true.
+Proof. vm_eq. Qed.
+
+(* ---- CONJUNCT (14): EVERY FREE RECORD IS BARE ------------------------ *)
+
+(*  [FsState.fs_inodes] iterates [FsStateInode.inode_owned] over the WHOLE
+    inode map and that carries [inode_local], whose [inl_size]/[inl_covers]
+    would be FALSE of a garbage type-0 record: W3 skips such a record
+    entirely and [fs_region_nlink] speaks only of [nlink].
+    [FsImg.fs_region_bare] is the sweep ([FsDurImg]'s header (2)); with L3
+    beside it, [FsDurImg.img_node_bare] gives [FsStateInode.fn_bare] and
+    hence [inode_local] at every free inum of the region.  Same thirteen
+    inode blocks as the two sweeps above, and it forces no file contents. *)
+Lemma fsimg_region_bare : fs_region_bare fsimg_P fsimg_sb 13 = true.
 Proof. vm_eq. Qed.
 
 (* THE ONE REGION-WIDE HYPOTHESIS [FsCfgBoot.fs_cfg_alloc] takes beside

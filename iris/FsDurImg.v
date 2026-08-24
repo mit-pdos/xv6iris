@@ -36,37 +36,37 @@
 (*     move.  The two cache-side fields are never read and are filled with *)
 (*     the byte gname rather than fresh ones, so nothing is allocated.     *)
 (*                                                                        *)
-(* (2) THE FREE RECORDS NEED THEIR OWN SWEEP, and the 2026-08-24 survey    *)
-(*     did not price it.  [FsState.fs_inodes] iterates [inode_owned] over  *)
-(*     the WHOLE inode map, and [inode_owned] carries                      *)
-(*     [FsStateInode.inode_local].  At a LIVE inum that is                 *)
-(*     [FsStateEra.inode_local_of_ok_rec] off W3/W6/W8 as [FsCfgBoot]      *)
-(*     already does it; at a FREE one (type 0) NOTHING in [fsimg_wf] or    *)
-(*     [fs_region_wf] constrains the record's [size] or [addrs], so        *)
-(*     [inl_size] and [inl_covers] are not derivable.  Both would be false *)
-(*     of a garbage type-0 record.  [fs_region_bare] below is the missing  *)
-(*     sweep, in [FsImg.fs_region_free]'s own idiom and reading the same   *)
-(*     thirteen inode blocks; it is a PREMISE here and its literal-image   *)
-(*     discharge is one [vm_compute] row in [FsImgCheck.v] (owed).         *)
+(* (2) THE FREE RECORDS NEED THEIR OWN SWEEP: CONJUNCT (14).              *)
+(*     [FsState.fs_inodes] iterates [inode_owned] over the WHOLE inode     *)
+(*     map, and [inode_owned] carries [FsStateInode.inode_local].  At a    *)
+(*     LIVE inum that is [FsStateEra.inode_local_of_ok_rec] off W3/W6/W8   *)
+(*     as [FsCfgBoot] already does it; at a FREE one (type 0) NOTHING in   *)
+(*     [fsimg_wf] or [fs_region_wf] constrains the record's [size] or      *)
+(*     [addrs], so [inl_size] and [inl_covers] are not derivable -- both   *)
+(*     would be false of a garbage type-0 record.  [FsImg.fs_region_bare]  *)
+(*     is the sweep, in [FsImg.fs_region_free]'s own idiom and reading the *)
+(*     same thirteen inode blocks; [FsImgCheck.fsimg_region_bare]          *)
+(*     discharges it at the literal image.                                 *)
 (*                                                                        *)
-(* (3) THE LINK FAMILY'S VALIDITY IS A PREMISE, and that is the lane's     *)
-(*     main finding.  [FsState.fs_boot_alloc_at] needs                     *)
+(* (3) THE LINK FAMILY'S VALIDITY IS A THEOREM, and it costs ONE MORE      *)
+(*     IMAGE SWEEP: CONJUNCT (15).  [FsState.fs_boot_alloc_at] needs       *)
 (*     [✓ FsState.link_elem I]; [FsState.v]'s header says a map read off   *)
 (*     the image discharges it from W9 ([FsImg.fs_links_wf]) plus conjunct *)
-(*     (13) ([FsImg.fs_links_eq]).  Those are the right raw material and   *)
-(*     they do NOT close it as they stand.  Section 10 takes the           *)
-(*     reduction as far as they do go -- W9 forces the image to have       *)
-(*     EXACTLY ONE directory (the root), so the whole family is one        *)
-(*     authority per inum, composed with the root's outgoing tokens, and   *)
-(*     [img_link_valid] leaves ONE inclusion in [fsLinkUR], the survey's   *)
-(*     (iv)(c) ticket bridge -- and its header names the two places the    *)
-(*     image's ticket discipline and [FsStateInode.ent_tokenless]          *)
-(*     disagree.  Until that lands, [✓ link_elem …] is a premise here.     *)
+(*     (13) ([FsImg.fs_links_eq]).  Those two are NOT enough, because the  *)
+(*     image's ticket discipline ([FsImg.fs_rec_ticket], which exempts a   *)
+(*     record naming its OWN home under ANY name) and the RA's             *)
+(*     ([FsStateInode.ent_tokenless], which exempts only the two dot       *)
+(*     NAMES) disagree on exactly one shape: a root record called "foo"    *)
+(*     pointing at the root.  [FsImg.fs_root_no_self] rules that shape     *)
+(*     out, and section 9 then PROVES [img_link_valid] -- W9 forces the    *)
+(*     image to have exactly ONE directory, so the family is one authority *)
+(*     per inum composed with the root's outgoing tokens, and the tokens   *)
+(*     are covered record by record.                                       *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac excl.
+From iris.algebra Require Import auth gmap frac excl numbers.
 From iris.base_logic.lib Require Import iprop own ghost_map.
 Require Import SailStdpp.Operators_mwords.
 Require Import RiscvPtsto.
@@ -101,63 +101,14 @@ Require Import FsDurBytes.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
-(*  1.  THE MISSING IMAGE SWEEP: A FREE RECORD IS BARE                    *)
+(*  1.  WHERE THE TWO EXTRA IMAGE SWEEPS LIVE                             *)
 (* ===================================================================== *)
 
-(* one type-0 record's shape: zero size and thirteen zero addresses.  With
-   [FsImg.fs_region_nlink]'s L3 ([nlink = 0] at a type-0 record) beside it
-   this is exactly [FsStateInode.fn_bare] of the node the image decodes. *)
-Definition fs_rec_bare (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : bool :=
-  let dn := fs_dinode P sb z in
-  (bv_unsigned (di_size dn) =? 0)
-  && List.forallb (fun a : bv 32 => bv_unsigned a =? 0) (di_addrs dn).
-
-(* ...over the whole region, in [FsImg.fs_region_free]'s idiom *)
-Definition fs_region_bare (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-  : bool :=
-  List.forallb
-    (fun i => let z := Z.of_nat i in
-              if bv_unsigned (di_type (fs_dinode P sb z)) =? 0
-              then fs_rec_bare P sb z else true)
-    (seq 0 (16 * nib)%nat).
-
-Lemma fs_region_bare_size (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (z : Z) :
-  fs_region_bare P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
-  bv_unsigned (di_type (fs_dinode P sb z)) = 0 ->
-  bv_unsigned (di_size (fs_dinode P sb z)) = 0.
-Proof.
-  intros H Hz Hty.
-  assert (Hzid : Z.of_nat (Z.to_nat z) = z) by lia.
-  pose proof (forallb_seq _ (16 * nib)%nat (Z.to_nat z) H ltac:(lia)) as Hk.
-  cbv beta zeta in Hk. rewrite Hzid in Hk.
-  rewrite (proj2 (Z.eqb_eq _ _) Hty) in Hk.
-  rewrite /fs_rec_bare in Hk. cbv zeta in Hk.
-  apply andb_true_iff in Hk as [Hs _]. apply Z.eqb_eq. exact Hs.
-Qed.
-
-Lemma fs_region_bare_addr (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (z : Z) (k : nat) :
-  fs_region_bare P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
-  bv_unsigned (di_type (fs_dinode P sb z)) = 0 -> (k < 13)%nat ->
-  bv_unsigned (di_addrs (fs_dinode P sb z) !!! k) = 0.
-Proof.
-  intros H Hz Hty Hk.
-  assert (Hzid : Z.of_nat (Z.to_nat z) = z) by lia.
-  pose proof (forallb_seq _ (16 * nib)%nat (Z.to_nat z) H ltac:(lia)) as Hq.
-  cbv beta zeta in Hq. rewrite Hzid in Hq.
-  rewrite (proj2 (Z.eqb_eq _ _) Hty) in Hq.
-  rewrite /fs_rec_bare in Hq. cbv zeta in Hq.
-  apply andb_true_iff in Hq as [_ Ha].
-  rewrite List.forallb_forall in Ha.
-  assert (Hlen : length (di_addrs (fs_dinode P sb z)) = 13%nat)
-    by exact (fs_dinode_wf P sb z).
-  destruct (lookup_lt_is_Some_2 (di_addrs (fs_dinode P sb z)) k
-              ltac:(lia)) as [a Ha'].
-  rewrite (list_lookup_total_correct _ _ _ Ha').
-  apply Z.eqb_eq. apply Ha.
-  apply elem_of_list_In, elem_of_list_lookup_2 with k. exact Ha'.
-Qed.
+(*  [FsImg.fs_region_bare] (conjunct (14)) and [FsImg.fs_root_no_self]
+    (conjunct (15)) are stated in [FsImg.v], beside [fs_region_free] and
+    [fs_links_eq] whose idiom they follow, and discharged at the literal
+    image by [FsImgCheck.fsimg_region_bare] / [fsimg_root_no_self].  This
+    file only CONSUMES them: (14) in section 2a, (15) in section 10.       *)
 
 (* ===================================================================== *)
 (*  2.  THE IMAGE'S NODE, READ                                            *)
@@ -709,7 +660,577 @@ Definition img_owned (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
   ∪ fs_live_blocks P sb (fs_live_set P sb).
 
 (* ===================================================================== *)
-(*  9.  THE DURABLE INSTANCE, FROM THE IMAGE                              *)
+(*  9.  THE LINK FAMILY'S VALIDITY, PROVED FROM THE IMAGE CONJUNCTS      *)
+(*                                                                        *)
+(*  [FsState.fs_boot_alloc_at]'s premise [✓ link_elem I] is the           *)
+(*  tokens-<=-nlink law of the initial map -- the fact                    *)
+(*  [FsState.fs_links_valid] READS OFF a durable instance and which the   *)
+(*  boot, having none, owes.  It is [img_link_valid] below, and it takes  *)
+(*  FOUR image facts: W9 ([FsImg.fs_links_wf]), W6/W7, conjunct (13)      *)
+(*  ([FsImg.fs_links_eq]) and conjunct (15)                               *)
+(*  ([FsImg.fs_root_no_self]).  The first three are what [FsState.v]'s    *)
+(*  header expected; (15) is what this lane found missing, and its        *)
+(*  definition's header says why.                                        *)
+(*                                                                        *)
+(*  THE SHAPE OF THE PROOF, in three moves.                              *)
+(*                                                                        *)
+(*  (i)  W9 gives the STRUCTURAL half outright, and it is stronger than   *)
+(*       expected: at every live inum which is a DIRECTORY W9 forces      *)
+(*       [z = ROOTINO], so the image has EXACTLY ONE directory and every  *)
+(*       other node's entry map is empty ([img_dir_entries_empty]).  The  *)
+(*       family therefore splits into one authority per inum, times the   *)
+(*       root's outgoing tokens ([link_elem_split] + [ent_ops_one]), and  *)
+(*       since the all-at-home family [FsState.link_full_map] is valid    *)
+(*       unconditionally, validity follows from ONE inclusion in          *)
+(*       [fsLinkUR] ([link_elem_valid_of_root]).                          *)
+(*                                                                        *)
+(*  (ii) THE TOKEN-TO-TICKET BRIDGE ([img_link_incl]).  The root's        *)
+(*       outgoing tokens are covered by the inodes' own [nlink]s.  The    *)
+(*       two counting disciplines exempt different records --             *)
+(*       [FsImg.fs_rec_ticket] exempts a record naming its OWN home under *)
+(*       ANY name, [FsStateInode.ent_tokenless] only ["."] and an         *)
+(*       orphaned-or-self [".."] -- and conjunct (15) is exactly the      *)
+(*       difference: with it, every NON-tokenless entry of the root names *)
+(*       something other than the root, hence is live-and-not-self, hence *)
+(*       bears a ticket.                                                  *)
+(*       The counting is done ONCE, by induction on the record count      *)
+(*       ([view_ops_incl]): [DirView.dir_view]'s one-step recursion adds  *)
+(*       at most one entry, at a name the prefix does not carry, so       *)
+(*       [big_opM_insert] applies and the step is a single record's       *)
+(*       comparison.  NO multiset argument and NO                         *)
+(*       [FsTree.dir_names_unique] is needed -- a name is served by ONE   *)
+(*       record because [DirView.dir_first] returns one, and W6's         *)
+(*       uniqueness is what the CONVERSE (tickets <= tokens) would want.  *)
+(*                                                                        *)
+(*  (iii) THE ARITHMETIC ([toks_of_list_incl]).  A ticket list's element  *)
+(*       in [fsLinkUR] has, at each key [z], the fragment                 *)
+(*       [◯ (fs_tick_count L z)]; [link_toks_of I] is [◯ ∘ fn_nlink]      *)
+(*       fmapped over [I].  So the inclusion is per-key [<=], which is    *)
+(*       conjunct (13) at a live file inum and W9's directory arm at the  *)
+(*       root -- with the root's own tickets bounded by the whole image's *)
+(*       supply because [fs_all_tickets] JOINS the per-directory lists.   *)
+(* ===================================================================== *)
+
+(* ---- 9a.   THE FAMILY, SPLIT INTO AUTHORITIES AND TOKENS ------------ *)
+
+(* one inode's outgoing tokens, as ONE resource-algebra element: the
+   second half of [FsStateInode.link_elem_node] *)
+Definition ent_ops (i : Z) (n : fs_node) : fsLinkUR :=
+  [^op map] s ↦ t ∈ dir_entries n, ent_elem i (fn_orphan n) s t.
+
+(* ...and the two halves of [FsState.link_full_map] *)
+Definition link_auths (I : gmap Z fs_node) : fsLinkUR :=
+  [^op map] i ↦ n ∈ I, link_auth_elem i (fn_nlink n).
+Definition link_toks_of (I : gmap Z fs_node) : fsLinkUR :=
+  [^op map] i ↦ n ∈ I, link_tok_elem i (fn_nlink n).
+
+Lemma link_full_map_split (I : gmap Z fs_node) :
+  link_full_map I ≡ link_auths I ⋅ link_toks_of I.
+Proof.
+  rewrite /link_full_map /link_auths /link_toks_of -big_opM_op //.
+Qed.
+
+Lemma link_elem_split (I : gmap Z fs_node) :
+  link_elem I ≡ link_auths I ⋅ ([^op map] i ↦ n ∈ I, ent_ops i n).
+Proof.
+  rewrite /link_elem /link_auths /link_elem_node -big_opM_op //.
+Qed.
+
+Lemma ent_ops_empty (i : Z) (n : fs_node) :
+  dir_entries n = ∅ -> ent_ops i n = ε.
+Proof. rewrite /ent_ops. intros ->. rewrite big_opM_empty //. Qed.
+
+(* AT MOST ONE NODE HAS ENTRIES, so the whole family's token half is that
+   one node's *)
+Lemma ent_ops_one (I : gmap Z fs_node) (d : Z) (nd : fs_node) :
+  I !! d = Some nd ->
+  (forall i n, I !! i = Some n -> i <> d -> dir_entries n = ∅) ->
+  ([^op map] i ↦ n ∈ I, ent_ops i n) ≡ ent_ops d nd.
+Proof.
+  intros Hd Hrest.
+  rewrite (big_opM_delete (fun i n => ent_ops i n) I d nd Hd).
+  rewrite (big_opM_proper (fun i n => ent_ops i n)
+             (fun (_ : Z) (_ : fs_node) => ε) (delete d I)); last first.
+  { intros i n Hi. apply lookup_delete_Some in Hi as [Hne Hi].
+    rewrite (ent_ops_empty i n (Hrest i n Hi ltac:(congruence))) //. }
+  rewrite big_opM_unit right_id //.
+Qed.
+
+(* THE REDUCTION.  [FsState.link_full_map_valid] is unconditional, and
+   validity is downward closed, so the whole obligation is one inclusion. *)
+Lemma link_elem_valid_of_root (I : gmap Z fs_node) (d : Z) (nd : fs_node) :
+  I !! d = Some nd ->
+  (forall i n, I !! i = Some n -> i <> d -> dir_entries n = ∅) ->
+  ent_ops d nd ≼ link_toks_of I ->
+  ✓ link_elem I.
+Proof.
+  intros Hd Hrest [x Hx].
+  apply (cmra_valid_included (link_elem I) (link_full_map I)
+           (link_full_map_valid I)).
+  rewrite link_full_map_split link_elem_split (ent_ops_one I d nd Hd Hrest).
+  rewrite Hx. exists x. rewrite assoc //.
+Qed.
+
+(* ---- 9b.   A LIST OF TOKENS AS ONE RA ELEMENT ----------------------- *)
+
+Definition toks_of_list (L : list Z) : fsLinkUR :=
+  [^op list] t ∈ L, link_tok_elem t 1%nat.
+
+Lemma toks_of_list_cons (t : Z) (L : list Z) :
+  toks_of_list (t :: L) ≡ link_tok_elem t 1%nat ⋅ toks_of_list L.
+Proof. rewrite /toks_of_list big_opL_cons //. Qed.
+
+Lemma toks_of_list_app (L1 L2 : list Z) :
+  toks_of_list (L1 ++ L2) ≡ toks_of_list L1 ⋅ toks_of_list L2.
+Proof. rewrite /toks_of_list big_opL_app //. Qed.
+
+Lemma toks_of_list_singleton (t : Z) :
+  toks_of_list [t] ≡ link_tok_elem t 1%nat.
+Proof. rewrite /toks_of_list big_opL_singleton //. Qed.
+
+Lemma fs_tick_count_cons (t : Z) (L : list Z) (z : Z) :
+  fs_tick_count (t :: L) z
+  = (if bool_decide (t = z) then S (fs_tick_count L z)
+     else fs_tick_count L z).
+Proof. rewrite /fs_tick_count /=. by destruct (bool_decide (t = z)). Qed.
+
+(* THE LOOKUP, in the two directions the inclusion needs: a key carries
+   one fragment per naming, and nothing at all when nothing names it --
+   [FsImg.fs_tick_count]'s reading in the RA. *)
+Lemma toks_of_list_lookup_zero (L : list Z) (z : Z) :
+  fs_tick_count L z = 0%nat -> toks_of_list L !! z = None.
+Proof.
+  induction L as [| t L IH]; intros H0.
+  - reflexivity.
+  - rewrite fs_tick_count_cons in H0.
+    assert (Hne : t <> z).
+    { intros ->. rewrite (bool_decide_eq_true_2 (z = z) eq_refl) in H0.
+      discriminate. }
+    rewrite (bool_decide_eq_false_2 (t = z) Hne) in H0.
+    rewrite /toks_of_list big_opL_cons -/(toks_of_list L) lookup_op.
+    rewrite /link_tok_elem lookup_singleton_ne; [| exact Hne].
+    rewrite (IH H0). reflexivity.
+Qed.
+
+Lemma toks_of_list_lookup_pos (L : list Z) (z : Z) :
+  (0 < fs_tick_count L z)%nat ->
+  toks_of_list L !! z ≡ Some (◯ (fs_tick_count L z) : authR natUR).
+Proof.
+  induction L as [| t L IH]; intros Hp.
+  - rewrite /fs_tick_count /= in Hp. lia.
+  - rewrite /toks_of_list big_opL_cons -/(toks_of_list L) lookup_op.
+    rewrite fs_tick_count_cons in Hp |- *.
+    destruct (decide (t = z)) as [-> | Hne].
+    + rewrite (bool_decide_eq_true_2 (z = z) eq_refl) in Hp |- *.
+      rewrite /link_tok_elem lookup_singleton.
+      destruct (decide (fs_tick_count L z = 0%nat)) as [H0 | H0].
+      * rewrite (toks_of_list_lookup_zero L z H0) H0 right_id. reflexivity.
+      * assert (Heq : (1%nat ⋅ fs_tick_count L z) = S (fs_tick_count L z))
+          by (rewrite nat_op; lia).
+        rewrite (IH ltac:(lia)) -Some_op -auth_frag_op Heq. reflexivity.
+    + rewrite (bool_decide_eq_false_2 (t = z) Hne) in Hp |- *.
+      rewrite /link_tok_elem lookup_singleton_ne; [| exact Hne].
+      rewrite left_id. exact (IH Hp).
+Qed.
+
+(* ...and the boot family's token half, as an fmap ([link_full_map_fmap]'s
+   twin at the fragment column) *)
+Lemma link_toks_of_fmap (I : gmap Z fs_node) :
+  link_toks_of I ≡ (fun n => (◯ (fn_nlink n) : authR natUR)) <$> I.
+Proof.
+  induction I as [| i n I Hi IH] using map_ind.
+  - rewrite /link_toks_of big_opM_empty fmap_empty //.
+  - rewrite /link_toks_of big_opM_insert //.
+    rewrite -/(link_toks_of I) IH fmap_insert /link_tok_elem.
+    rewrite insert_singleton_op; [done |]. rewrite lookup_fmap Hi //.
+Qed.
+
+(* THE INCLUSION, per key *)
+Lemma toks_of_list_incl (L : list Z) (I : gmap Z fs_node) :
+  (forall z : Z, (0 < fs_tick_count L z)%nat ->
+     exists n : fs_node,
+       I !! z = Some n /\ (fs_tick_count L z <= fn_nlink n)%nat) ->
+  toks_of_list L ≼ link_toks_of I.
+Proof.
+  intros H. apply lookup_included. intros z.
+  destruct (decide (fs_tick_count L z = 0%nat)) as [H0 | H0].
+  - rewrite (toks_of_list_lookup_zero L z H0). apply option_included. by left.
+  - destruct (H z ltac:(lia)) as (n & Hn & Hle).
+    rewrite (toks_of_list_lookup_pos L z ltac:(lia)).
+    rewrite (link_toks_of_fmap I) lookup_fmap Hn /=.
+    apply Some_included_2. right. apply auth_frag_mono, nat_included. lia.
+Qed.
+
+(* ---- 9c.   THE COUNT OVER A JOINED TICKET SUPPLY --------------------- *)
+
+Lemma fs_tick_count_app (L1 L2 : list Z) (z : Z) :
+  fs_tick_count (L1 ++ L2) z
+  = (fs_tick_count L1 z + fs_tick_count L2 z)%nat.
+Proof. rewrite /fs_tick_count List.filter_app length_app //. Qed.
+
+Lemma fs_tick_count_join (ls : list (list Z)) (l : list Z) (z : Z) :
+  l ∈ ls -> (fs_tick_count l z <= fs_tick_count (mjoin ls) z)%nat.
+Proof.
+  induction ls as [| a ls IH]; intros Hl.
+  - by apply elem_of_nil in Hl.
+  - change (mjoin (a :: ls)) with (a ++ mjoin ls).
+    rewrite fs_tick_count_app.
+    apply elem_of_cons in Hl as [-> | Hl]; [lia |].
+    pose proof (IH Hl). lia.
+Qed.
+
+Lemma fs_tick_count_elem (L : list Z) (z : Z) :
+  (0 < fs_tick_count L z)%nat -> z ∈ L.
+Proof.
+  rewrite /fs_tick_count. intros H.
+  destruct (List.filter (fun t => bool_decide (t = z)) L) as [| a l] eqn:E;
+    [cbn in H; lia |].
+  assert (Hin : List.In a (List.filter (fun t => bool_decide (t = z)) L))
+    by (rewrite E; left; reflexivity).
+  apply List.filter_In in Hin as [Hin Ha].
+  apply bool_decide_eq_true in Ha. subst a.
+  by apply elem_of_list_In.
+Qed.
+
+(* ---- 9d.   A DIRECTORY'S VIEW READ AT AGREEING BYTES ----------------- *)
+
+(*  [FsStateInode.dir_entries] reads [FsStateInode.fn_data] of the node --
+    the node's own block map, with a zero block at every hole -- while the
+    image's sweeps read [FsImg.fs_data_of].  The two agree on every block a
+    directory's records can reach ([img_node_file_byte]), and these three
+    are the transport.  [DirView]'s [dir_win_agree] family does the
+    per-record half; only the two SCANS need saying.                       *)
+
+(* [DirView.dir_bname_agree] is stated at the UNFOLDED [bname 14 …]; the
+   two scans below meet it folded as [FsTree.dir_bname]. *)
+Lemma dir_bname_win_agree (data data' : nat -> list (bv 8)) (k : nat) :
+  dir_win_agree data data' k -> dir_bname data' k = dir_bname data k.
+Proof. intros H. unfold dir_bname. exact (dir_bname_agree data data' k H). Qed.
+
+Lemma dir_first_agree (data data' : nat -> list (bv 8)) (n : nat)
+    (s : fname) :
+  (forall k : nat, (k < n)%nat -> dir_win_agree data data' k) ->
+  dir_first data' n s = dir_first data n s.
+Proof.
+  intros H. unfold dir_first. apply dfirst_ext. intros j Hj.
+  unfold dir_matchb.
+  rewrite (dir_liveb_agree data data' j (H j Hj)).
+  rewrite (dir_bname_agree data data' j (H j Hj)). reflexivity.
+Qed.
+
+Lemma dir_wins_agree (data data' : nat -> list (bv 8)) (n : nat) :
+  (forall k : nat, (k <= n)%nat -> dir_win_agree data data' k) ->
+  dir_wins data' n = dir_wins data n.
+Proof.
+  intros H. unfold dir_wins.
+  rewrite (dir_liveb_agree data data' n ltac:(apply H; lia)).
+  rewrite (dir_bname_win_agree data data' n ltac:(apply H; lia)).
+  rewrite (dir_first_agree data data' n (dir_bname data n)
+             ltac:(intros k Hk; apply H; lia)).
+  reflexivity.
+Qed.
+
+Lemma dir_view_agree (data data' : nat -> list (bv 8)) (n : nat) :
+  (forall k : nat, (k < n)%nat -> dir_win_agree data data' k) ->
+  dir_view data' n = dir_view data n.
+Proof.
+  induction n as [| n IH]; intros H; [reflexivity |].
+  rewrite !dir_view_S.
+  rewrite (IH ltac:(intros k Hk; apply H; lia)).
+  rewrite (dir_wins_agree data data' n ltac:(intros k Hk; apply H; lia)).
+  destruct (dir_wins data n); [| reflexivity].
+  rewrite (dir_bname_win_agree data data' n ltac:(apply H; lia)).
+  rewrite (dir_inum_agree data data' n ltac:(apply H; lia)).
+  reflexivity.
+Qed.
+
+(* ...and the agreement itself, at the image's node *)
+Lemma img_blkmap_holes (P : Z -> list (bv 8)) (dn : dinode) :
+  dinode_wf dn -> blk_holes_zero (img_blkmap P dn) (fs_data_of P dn).
+Proof.
+  intros Hwf i Hi H0. apply fs_data_of_holes.
+  rewrite <- (img_blkmap_get P dn i Hwf Hi). exact H0.
+Qed.
+
+Lemma img_node_data (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) (k : nat) :
+  (k < MAXFILE)%nat ->
+  fn_data (img_node P sb z) k = fs_data_of P (fs_dinode P sb z) k.
+Proof.
+  intros Hk.
+  exact (era_node_data (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+           (fs_data_of P (fs_dinode P sb z)) k
+           (img_blkmap_holes P (fs_dinode P sb z) (fs_dinode_wf P sb z)) Hk).
+Qed.
+
+Lemma img_node_file_byte (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
+    (x : nat) :
+  (x < MAXFILE * BSIZE)%nat ->
+  file_byte (fn_data (img_node P sb z)) x
+  = file_byte (fs_data_of P (fs_dinode P sb z)) x.
+Proof.
+  intros Hx. unfold file_byte. rewrite img_node_data; [reflexivity |].
+  apply Nat.div_lt_upper_bound; [unfold BSIZE; lia | lia].
+Qed.
+
+(* THE ROOT'S ENTRY MAP, at the image's own byte reading *)
+Lemma img_root_entries (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fsimg_wf P sb = true ->
+  dir_entries (img_node P sb FsImg.ROOTINO)
+  = dir_view (fs_data_of P (fs_dinode P sb FsImg.ROOTINO))
+      (dir_nrec (bv_unsigned (di_size (fs_dinode P sb FsImg.ROOTINO)))).
+Proof.
+  intros Hwf.
+  assert (Hty : bv_unsigned (di_type (fs_dinode P sb FsImg.ROOTINO))
+                = T_DIR_z)
+    by exact (fs_root_wf_type P sb (fsimg_wf_root P sb Hwf)).
+  assert (Hnin : 0 <= FsImg.ROOTINO < FsImg.sb_ninodes sb).
+  { pose proof (sbo_ninodes sb (fsimg_wf_sb P sb Hwf)).
+    unfold FsImg.ROOTINO in *. lia. }
+  assert (Hok : fs_inode_ok P sb (fs_dinode P sb FsImg.ROOTINO)).
+  { apply (fsimg_wf_inode P sb FsImg.ROOTINO Hwf Hnin).
+    rewrite Hty. unfold T_DIR_z. lia. }
+  pose proof (fio_size P sb (fs_dinode P sb FsImg.ROOTINO) Hok) as Hsz.
+  pose proof (proj1 (bv_unsigned_in_range _
+                       (di_size (fs_dinode P sb FsImg.ROOTINO)))) as Hsz0.
+  rewrite /dir_entries.
+  assert (Hdir : fn_is_dir (img_node P sb FsImg.ROOTINO) = true)
+    by (apply bool_decide_eq_true; exact Hty).
+  rewrite Hdir.
+  change (fn_nrec (img_node P sb FsImg.ROOTINO))
+    with (dir_nrec (bv_unsigned (di_size (fs_dinode P sb FsImg.ROOTINO)))).
+  apply dir_view_agree. intros k Hk j Hj.
+  apply img_node_file_byte.
+  (* the records live below [MAXFILE] blocks, by W3's size cap *)
+  assert (H16 : 16 * (bv_unsigned (di_size (fs_dinode P sb FsImg.ROOTINO))
+                      / 16)
+                <= bv_unsigned (di_size (fs_dinode P sb FsImg.ROOTINO)))
+    by (apply Z.mul_div_le; lia).
+  unfold dir_nrec in Hk.
+  unfold MAXFILE, BSIZE. unfold FS_MAXFILE, BSIZE_z in Hsz. lia.
+Qed.
+
+(* ---- 9e.   THE INDUCTION: EVERY NON-TOKENLESS ENTRY BEARS A TICKET ---- *)
+
+(*  Generic in the ticket function, so nothing here knows about an image:
+    the RA's [FsStateInode.ent_elem] and a ticket are compared record by
+    record.  The premise is the WHOLE content of the bridge -- a record
+    that WINS its name and owes a token has a ticket naming the same inum
+    -- and the induction is [DirView.dir_view]'s own one-step recursion,
+    which adds at most one entry at a name the prefix does not carry, so
+    [big_opM_insert] applies and no multiset argument is needed.           *)
+Lemma view_ops_incl (data : nat -> list (bv 8)) (self : Z) (orph : bool)
+    (tick : nat -> option Z) (n : nat) :
+  (forall k : nat, (k < n)%nat -> dir_wins data k = true ->
+     ent_tokenless self orph (dir_bname data k)
+       (bv_unsigned (dir_inum data k)) = false ->
+     tick k = Some (bv_unsigned (dir_inum data k))) ->
+  ([^op map] s ↦ t ∈ dir_view data n, ent_elem self orph s t)
+    ≼ toks_of_list (omap tick (seq 0 n)).
+Proof.
+  induction n as [| n IH].
+  - intros _. rewrite dir_view_nil big_opM_empty. apply ucmra_unit_least.
+  - intros Hself.
+    assert (IHn : ([^op map] s ↦ t ∈ dir_view data n, ent_elem self orph s t)
+                    ≼ toks_of_list (omap tick (seq 0 n)))
+      by (apply IH; intros k Hk; apply Hself; lia).
+    rewrite seq_S. replace (0 + n)%nat with n by lia.
+    rewrite omap_app toks_of_list_app dir_view_S.
+    destruct (dir_wins data n) eqn:Hw; last first.
+    { rewrite right_id_L.
+      apply (cmra_included_trans _ (toks_of_list (omap tick (seq 0 n))));
+        [exact IHn |].
+      exists (toks_of_list (omap tick [n])). reflexivity. }
+    (* the record enters the view, at a name the prefix does not carry *)
+    assert (Hfresh : dir_view data n !! dir_bname data n = None).
+    { apply dir_view_lookup_None.
+      exact (proj2 (proj1 (dir_wins_true data n) Hw)). }
+    rewrite insert_empty -insert_union_singleton_r; [| exact Hfresh].
+    rewrite (big_opM_insert (fun s t => ent_elem self orph s t)
+               (dir_view data n) (dir_bname data n)
+               (bv_unsigned (dir_inum data n)) Hfresh).
+    rewrite (cmra_comm (ent_elem self orph (dir_bname data n)
+                          (bv_unsigned (dir_inum data n)))).
+    apply cmra_mono; [exact IHn |].
+    (* the one record's comparison *)
+    destruct (ent_tokenless self orph (dir_bname data n)
+                (bv_unsigned (dir_inum data n))) eqn:Htl.
+    { rewrite /ent_elem Htl. apply ucmra_unit_least. }
+    pose proof (Hself n ltac:(lia) Hw Htl) as Ht.
+    assert (Homap : omap tick [n] = [bv_unsigned (dir_inum data n)])
+      by (cbn; rewrite Ht; reflexivity).
+    rewrite Homap toks_of_list_singleton /ent_elem Htl.
+    exists ε. by rewrite right_id.
+Qed.
+
+(*  ...at the image's ticket function.  THIS IS WHERE CONJUNCT (15) IS
+    SPENT: without it a root record called "foo" naming the root would owe
+    a token ([ent_tokenless] exempts only the two dot NAMES) and pay no
+    ticket ([fs_rec_ticket] exempts any SELF record).                      *)
+Lemma view_ops_incl_tickets (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
+    (orph : bool) :
+  (forall k : nat,
+     (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+     dir_live (fs_data_of P dn) k ->
+     bv_unsigned (dir_inum (fs_data_of P dn) k) = self ->
+     dir_bname (fs_data_of P dn) k = DOT
+     \/ dir_bname (fs_data_of P dn) k = DOTDOT) ->
+  ([^op map] s ↦ t ∈ dir_view (fs_data_of P dn)
+                       (dir_nrec (bv_unsigned (di_size dn))),
+     ent_elem self orph s t)
+    ≼ toks_of_list (fs_dir_tickets P self dn).
+Proof.
+  intros Hself. rewrite /fs_dir_tickets.
+  apply view_ops_incl. intros k Hk Hw Htl.
+  assert (Hlv : dir_live (fs_data_of P dn) k)
+    by exact (dir_wins_live (fs_data_of P dn) k Hw).
+  assert (Hne : bv_unsigned (dir_inum (fs_data_of P dn) k) <> self).
+  { intros Hc.
+    destruct (Hself k Hk Hlv Hc) as [Hd | Hd];
+      rewrite /ent_tokenless Hd Hc in Htl.
+    - rewrite (bool_decide_eq_true_2 (DOT = DOT) eq_refl) in Htl.
+      cbn [orb] in Htl. discriminate.
+    - rewrite (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl) in Htl.
+      rewrite (bool_decide_eq_true_2 (self = self) eq_refl) in Htl.
+      rewrite orb_true_r andb_true_r orb_true_r in Htl. discriminate. }
+  rewrite /fs_rec_ticket. cbv zeta.
+  rewrite (proj2 (dir_liveb_true (fs_data_of P dn) k) Hlv).
+  rewrite (bool_decide_eq_false_2 _ Hne). reflexivity.
+Qed.
+
+(* ---- 9f.   THE IMAGE'S OWN INSTANCE ---------------------------------- *)
+
+Lemma img_nodes_lookup_inv (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) (n : fs_node) :
+  img_nodes P sb nib !! z = Some n ->
+  z ∈ region_inums nib /\ n = img_node P sb z.
+Proof.
+  intros Hz. rewrite /img_nodes in Hz.
+  apply elem_of_list_to_map_2 in Hz.
+  apply elem_of_list_fmap in Hz as (y & Heq & Hy).
+  injection Heq as -> ->. split; [| reflexivity].
+  by apply elem_of_elements.
+Qed.
+
+(* W9's STRUCTURAL HALF: the image has exactly one directory, the root. *)
+Lemma img_dir_entries_empty (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+  z ∈ region_inums nib -> z <> FsImg.ROOTINO ->
+  dir_entries (img_node P sb z) = ∅.
+Proof.
+  intros Hwf Hrw Hz Hne. apply region_inums_spec in Hz.
+  rewrite /dir_entries.
+  destruct (fn_is_dir (img_node P sb z)) eqn:Hd; [| reflexivity].
+  exfalso.
+  assert (Hty : bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z)
+    by exact (proj1 (bool_decide_eq_true _) Hd).
+  assert (Hran : 0 <= z < FsImg.sb_ninodes sb).
+  { split; [lia |].
+    destruct (Z_lt_ge_dec z (FsImg.sb_ninodes sb)) as [Hlt | Hge];
+      [exact Hlt |].
+    exfalso.
+    rewrite (fs_region_free_spec P sb nib z (fs_region_wf_free _ _ _ Hrw)
+               ltac:(lia) ltac:(lia) ltac:(lia)) in Hty.
+    rewrite /T_DIR_z in Hty. discriminate. }
+  destruct (proj2 (fs_links_wf_at P sb z (fsimg_wf_links P sb Hwf) Hran) Hty)
+    as (_ & _ & Hroot).
+  exact (Hne Hroot).
+Qed.
+
+(* ---- 9g.   THE BRIDGE ------------------------------------------------ *)
+
+Lemma img_link_incl (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+  fsimg_wf P sb = true -> fs_links_eq P sb = true ->
+  fs_root_no_self P sb = true ->
+  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+  ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO)
+    ≼ link_toks_of (img_nodes P sb nib).
+Proof.
+  intros Hwf Heq Hns Hnib.
+  assert (Hty : bv_unsigned (di_type (fs_dinode P sb FsImg.ROOTINO))
+                = T_DIR_z)
+    by exact (fs_root_wf_type P sb (fsimg_wf_root P sb Hwf)).
+  assert (Hnin : 0 <= FsImg.ROOTINO < FsImg.sb_ninodes sb).
+  { pose proof (sbo_ninodes sb (fsimg_wf_sb P sb Hwf)).
+    unfold FsImg.ROOTINO in *. lia. }
+  pose proof (fsimg_wf_dir P sb FsImg.ROOTINO Hwf Hnin Hty) as Hdok.
+  apply (cmra_included_trans _
+           (toks_of_list (fs_dir_tickets P FsImg.ROOTINO
+                            (fs_dinode P sb FsImg.ROOTINO)))).
+  (* STEP ONE: the root's tokens are covered by the root's tickets *)
+  { rewrite /ent_ops (img_root_entries P sb Hwf).
+    apply view_ops_incl_tickets. intros k Hk Hlv Hc.
+    exact (fs_root_no_self_at P sb k Hns Hk Hlv Hc). }
+  (* STEP TWO: the root's tickets are covered by the inodes' nlinks *)
+  apply toks_of_list_incl. intros z Hz.
+  pose proof (fs_tick_count_elem _ z Hz) as Hin.
+  rewrite /fs_dir_tickets in Hin.
+  apply elem_of_list_omap in Hin as (k & Hk & Hkt).
+  apply elem_of_seq in Hk as [_ Hk].
+  rewrite /fs_rec_ticket in Hkt. cbv zeta in Hkt.
+  destruct (dir_liveb (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k
+            && negb (bool_decide
+                       (bv_unsigned
+                          (dir_inum
+                             (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k)
+                        = FsImg.ROOTINO))) eqn:Hg; [| discriminate].
+  injection Hkt as <-.
+  apply andb_true_iff in Hg as [Hlv Hself].
+  apply negb_true_iff, bool_decide_eq_false in Hself.
+  destruct (fdo_ent P sb FsImg.ROOTINO (fs_dinode P sb FsImg.ROOTINO) Hdok
+              k Hk (proj1 (dir_liveb_true _ k) Hlv)) as [Hran Hlive].
+  set (t := bv_unsigned
+              (dir_inum (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k))
+    in *.
+  assert (Htran : 0 <= t < FsImg.sb_ninodes sb) by lia.
+  exists (img_node P sb t). split.
+  { apply img_nodes_lookup. apply region_inums_spec. lia. }
+  (* not a directory (W9's arm), so conjunct (13) gives its exact count *)
+  assert (Hnd : bv_unsigned (di_type (fs_dinode P sb t)) <> T_DIR_z).
+  { intros Hc.
+    destruct (proj2 (fs_links_wf_at P sb t (fsimg_wf_links P sb Hwf) Htran)
+                Hc) as (_ & _ & Hr).
+    exact (Hself Hr). }
+  pose proof (fs_links_eq_at P sb t Heq Htran Hlive Hnd) as Hnl.
+  (* the root's own tickets are part of the image's whole supply *)
+  assert (Hjoin :
+    (fs_tick_count (fs_dir_tickets P FsImg.ROOTINO
+                      (fs_dinode P sb FsImg.ROOTINO)) t
+     <= fs_link_count P sb t)%nat).
+  { rewrite /fs_link_count /fs_all_tickets.
+    apply fs_tick_count_join. apply elem_of_list_fmap.
+    exists (Z.to_nat FsImg.ROOTINO). split.
+    - rewrite Z2Nat.id; [| unfold FsImg.ROOTINO; lia].
+      rewrite /fs_dir_tickets_at. cbv zeta.
+      rewrite (proj2 (Z.eqb_eq _ _) Hty) //.
+    - apply elem_of_seq. unfold FsImg.ROOTINO in *. lia. }
+  rewrite /fn_nlink img_node_rec Hnl Nat2Z.id. exact Hjoin.
+Qed.
+
+(* ---- 9h.   THE FAMILY'S VALIDITY, AS A THEOREM ----------------------- *)
+
+Lemma img_link_valid (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+  fs_links_eq P sb = true -> fs_root_no_self P sb = true ->
+  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+  ✓ link_elem (img_nodes P sb nib).
+Proof.
+  intros Hwf Hrw Heq Hns Hnin.
+  pose proof (sbo_ninodes sb (fsimg_wf_sb P sb Hwf)) as Hni.
+  unfold FsImg.ROOTINO in Hni.
+  assert (Hrootin : FsImg.ROOTINO ∈ region_inums nib)
+    by (apply region_inums_spec; rewrite /FsImg.ROOTINO; lia).
+  apply (link_elem_valid_of_root _ FsImg.ROOTINO
+           (img_node P sb FsImg.ROOTINO)
+           (img_nodes_lookup P sb nib FsImg.ROOTINO Hrootin));
+    [| exact (img_link_incl P sb nib Hwf Heq Hns Hnin)].
+  intros i n Hi Hne.
+  destruct (img_nodes_lookup_inv P sb nib i n Hi) as [Hin ->].
+  exact (img_dir_entries_empty P sb nib i Hwf Hrw Hin Hne).
+Qed.
+
+(* ===================================================================== *)
+(* 10.  THE DURABLE INSTANCE, FROM THE IMAGE                              *)
 (* ===================================================================== *)
 
 Section DurImgMain.
@@ -718,10 +1239,9 @@ Section DurImgMain.
   Lemma fs_dur_of_image (g : gname) (dk : Z -> bv 8) (ndisk : nat)
       (sb : fs_sb) (nib : nat) (cov : gset Z) :
     fs_boot_image_wf dk ndisk sb nib cov ->
-    (* the missing image sweep -- header (2) *)
+    (* the two image sweeps this file's header (2)/(3) name *)
     fs_region_bare (fs_blocks dk) sb nib = true ->
-    (* the link family's own law at the image's map -- header (3) *)
-    ✓ link_elem (img_nodes (fs_blocks dk) sb nib) ->
+    fs_root_no_self (fs_blocks dk) sb = true ->
     fs_dbelems g (fs_dbytes (fs_restrict (fs_blocks dk)
                               (fs_home_set cov (FsImg.sb_logstart sb))))
     ⊢ |==> ∃ Gd : fs_dur_names,
@@ -732,7 +1252,10 @@ Section DurImgMain.
              blk_owned (fs_gamma_D g Gd) b (fs_blocks dk b)).
   Proof.
     intros (Hwf & Hrw & Hnin & Hnib32 & Hnibpos & Hnibq & Hcovin & Hcovmeta
-            & Hcovdata & Hparse & Hnib16 & Hndisk & Hlinkeq) Hbare Hlink.
+            & Hcovdata & Hparse & Hnib16 & Hndisk & Hlinkeq) Hbare Hns.
+    (* the link family's own law, PROVED (section 9h) *)
+    pose proof (img_link_valid (fs_blocks dk) sb nib Hwf Hrw Hlinkeq Hns Hnin)
+      as Hlink.
     (* ---- the pure geometry, off [fs_sb_ok] alone -------------------- *)
     pose proof (fsimg_wf_sb _ _ Hwf) as Hsb.
     pose proof (sbo_logstart sb Hsb) as Hls.
@@ -952,7 +1475,7 @@ Section DurImgMain.
       (sb : fs_sb) (nib : nat) (cov : gset Z) :
     fs_boot_image_wf dk ndisk sb nib cov ->
     fs_region_bare (fs_blocks dk) sb nib = true ->
-    ✓ link_elem (img_nodes (fs_blocks dk) sb nib) ->
+    fs_root_no_self (fs_blocks dk) sb = true ->
     fs_dbelems g (fs_dbytes (fs_restrict (fs_blocks dk)
                               (fs_home_set cov (FsImg.sb_logstart sb))))
     ⊢ |==> ∃ Gd : fs_dur_names,
@@ -961,9 +1484,9 @@ Section DurImgMain.
                        ∖ img_owned (fs_blocks dk) sb nib,
              blk_owned (fs_gamma_D g Gd) b (fs_blocks dk b)).
   Proof.
-    intros Himg Hbare Hlink.
+    intros Himg Hbare Hns.
     iIntros "Hd".
-    iMod (fs_dur_of_image g dk ndisk sb nib cov Himg Hbare Hlink with "Hd")
+    iMod (fs_dur_of_image g dk ndisk sb nib cov Himg Hbare Hns with "Hd")
       as (Gd) "(Htopa & Hst & Hrem)".
     iModIntro. iExists Gd. iFrame "Hrem".
     rewrite /FsState.fs_view. iExists (img_state (fs_blocks dk) sb nib).
@@ -971,166 +1494,3 @@ Section DurImgMain.
   Qed.
 
 End DurImgMain.
-
-(* ===================================================================== *)
-(* 10.  THE LINK FAMILY'S VALIDITY, REDUCED TO THE ROOT'S OWN ENTRIES     *)
-(*                                                                        *)
-(*  [FsState.fs_boot_alloc_at]'s premise [✓ link_elem I] is the           *)
-(*  tokens-<=-nlink law of the initial map -- the fact                    *)
-(*  [FsState.fs_links_valid] READS OFF a durable instance and which the   *)
-(*  boot, having none, owes.  [FsState.v]'s header says W9                *)
-(*  ([FsImg.fs_links_wf]) plus conjunct (13) ([FsImg.fs_links_eq])        *)
-(*  discharge it at the image.  THAT IS OPTIMISTIC AS IT STANDS, and this *)
-(*  section says exactly how far those two get.                          *)
-(*                                                                        *)
-(*  W9 DOES give the structural half outright, and it is a strong fact:   *)
-(*  at every live inum which is a DIRECTORY, W9 forces [z = ROOTINO], so  *)
-(*  the mkfs image has EXACTLY ONE directory and every other node's entry *)
-(*  map is empty ([img_dir_entries_empty]).  The family therefore splits  *)
-(*  as "one authority per inum" times "the root's outgoing tokens"        *)
-(*  ([link_elem_split] + [ent_ops_one]), and since the all-at-home        *)
-(*  family [FsState.link_full_map] is valid unconditionally, validity     *)
-(*  follows from ONE inclusion in [fsLinkUR]                              *)
-(*  ([link_elem_valid_of_root]).                                          *)
-(*                                                                        *)
-(*  WHAT IS LEFT is that inclusion -- the root's outgoing tokens are      *)
-(*  covered by the inodes' own [nlink]s -- i.e. the survey's (iv)(c)      *)
-(*  bridge                                                                *)
-(*  from the image's TICKET counting to [FsStateInode.ent_toks].  It is   *)
-(*  not a corollary of W9 + (13), for two reasons, and both are about the *)
-(*  two counting disciplines disagreeing rather than about arithmetic:    *)
-(*                                                                        *)
-(*   - [FsImg.fs_rec_ticket] exempts a record naming ITS OWN HOME under   *)
-(*     ANY name; [FsStateInode.ent_tokenless] exempts only ["."] and a    *)
-(*     [".."] that is orphaned or self-naming.  A root record named       *)
-(*     "foo" pointing at the root would owe a token here and pay no       *)
-(*     ticket there, and nothing in [fsimg_wf] rules it out.              *)
-(*   - the ticket count is per RECORD INDEX while [dir_entries] is a      *)
-(*     first-match scan by NAME, so the two agree only through W6's       *)
-(*     [FsTree.dir_names_unique], which has to be carried through the     *)
-(*     count.                                                             *)
-(*                                                                        *)
-(*  So the inclusion is a PREMISE of [img_link_valid], stated in the RA's *)
-(*  own language, and it is what a later stage has to prove (or what one  *)
-(*  more image sweep -- no live non-dot record of the root names the      *)
-(*  root -- would make derivable from (13)).                              *)
-(* ===================================================================== *)
-
-(* one inode's outgoing tokens, as ONE resource-algebra element: the
-   second half of [FsStateInode.link_elem_node] *)
-Definition ent_ops (i : Z) (n : fs_node) : fsLinkUR :=
-  [^op map] s ↦ t ∈ dir_entries n, ent_elem i (fn_orphan n) s t.
-
-(* ...and the two halves of [FsState.link_full_map] *)
-Definition link_auths (I : gmap Z fs_node) : fsLinkUR :=
-  [^op map] i ↦ n ∈ I, link_auth_elem i (fn_nlink n).
-Definition link_toks_of (I : gmap Z fs_node) : fsLinkUR :=
-  [^op map] i ↦ n ∈ I, link_tok_elem i (fn_nlink n).
-
-Lemma link_full_map_split (I : gmap Z fs_node) :
-  link_full_map I ≡ link_auths I ⋅ link_toks_of I.
-Proof.
-  rewrite /link_full_map /link_auths /link_toks_of -big_opM_op //.
-Qed.
-
-Lemma link_elem_split (I : gmap Z fs_node) :
-  link_elem I ≡ link_auths I ⋅ ([^op map] i ↦ n ∈ I, ent_ops i n).
-Proof.
-  rewrite /link_elem /link_auths /link_elem_node -big_opM_op //.
-Qed.
-
-Lemma ent_ops_empty (i : Z) (n : fs_node) :
-  dir_entries n = ∅ -> ent_ops i n = ε.
-Proof. rewrite /ent_ops. intros ->. rewrite big_opM_empty //. Qed.
-
-(* AT MOST ONE NODE HAS ENTRIES, so the whole family's token half is that
-   one node's *)
-Lemma ent_ops_one (I : gmap Z fs_node) (d : Z) (nd : fs_node) :
-  I !! d = Some nd ->
-  (forall i n, I !! i = Some n -> i <> d -> dir_entries n = ∅) ->
-  ([^op map] i ↦ n ∈ I, ent_ops i n) ≡ ent_ops d nd.
-Proof.
-  intros Hd Hrest.
-  rewrite (big_opM_delete (fun i n => ent_ops i n) I d nd Hd).
-  rewrite (big_opM_proper (fun i n => ent_ops i n)
-             (fun (_ : Z) (_ : fs_node) => ε) (delete d I)); last first.
-  { intros i n Hi. apply lookup_delete_Some in Hi as [Hne Hi].
-    rewrite (ent_ops_empty i n (Hrest i n Hi ltac:(congruence))) //. }
-  rewrite big_opM_unit right_id //.
-Qed.
-
-(* THE REDUCTION.  [FsState.link_full_map_valid] is unconditional, and
-   validity is downward closed, so the whole obligation is one inclusion. *)
-Lemma link_elem_valid_of_root (I : gmap Z fs_node) (d : Z) (nd : fs_node) :
-  I !! d = Some nd ->
-  (forall i n, I !! i = Some n -> i <> d -> dir_entries n = ∅) ->
-  ent_ops d nd ≼ link_toks_of I ->
-  ✓ link_elem I.
-Proof.
-  intros Hd Hrest [x Hx].
-  apply (cmra_valid_included (link_elem I) (link_full_map I)
-           (link_full_map_valid I)).
-  rewrite link_full_map_split link_elem_split (ent_ops_one I d nd Hd Hrest).
-  rewrite Hx. exists x. rewrite assoc //.
-Qed.
-
-(* ---- the image's own instance --------------------------------------- *)
-
-Lemma img_nodes_lookup_inv (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (z : Z) (n : fs_node) :
-  img_nodes P sb nib !! z = Some n ->
-  z ∈ region_inums nib /\ n = img_node P sb z.
-Proof.
-  intros Hz. rewrite /img_nodes in Hz.
-  apply elem_of_list_to_map_2 in Hz.
-  apply elem_of_list_fmap in Hz as (y & Heq & Hy).
-  injection Heq as -> ->. split; [| reflexivity].
-  by apply elem_of_elements.
-Qed.
-
-(* W9's STRUCTURAL HALF: the image has exactly one directory, the root. *)
-Lemma img_dir_entries_empty (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (z : Z) :
-  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
-  z ∈ region_inums nib -> z <> FsImg.ROOTINO ->
-  dir_entries (img_node P sb z) = ∅.
-Proof.
-  intros Hwf Hrw Hz Hne. apply region_inums_spec in Hz.
-  rewrite /dir_entries.
-  destruct (fn_is_dir (img_node P sb z)) eqn:Hd; [| reflexivity].
-  exfalso.
-  assert (Hty : bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z)
-    by exact (proj1 (bool_decide_eq_true _) Hd).
-  assert (Hran : 0 <= z < FsImg.sb_ninodes sb).
-  { split; [lia |].
-    destruct (Z_lt_ge_dec z (FsImg.sb_ninodes sb)) as [Hlt | Hge];
-      [exact Hlt |].
-    exfalso.
-    rewrite (fs_region_free_spec P sb nib z (fs_region_wf_free _ _ _ Hrw)
-               ltac:(lia) ltac:(lia) ltac:(lia)) in Hty.
-    rewrite /T_DIR_z in Hty. discriminate. }
-  destruct (proj2 (fs_links_wf_at P sb z (fsimg_wf_links P sb Hwf) Hran) Hty)
-    as (_ & _ & Hroot).
-  exact (Hne Hroot).
-Qed.
-
-Lemma img_link_valid (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
-  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
-  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
-  (* THE ONE OBLIGATION LEFT -- see this section's header *)
-  ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO)
-    ≼ link_toks_of (img_nodes P sb nib) ->
-  ✓ link_elem (img_nodes P sb nib).
-Proof.
-  intros Hwf Hrw Hnin Hincl.
-  pose proof (sbo_ninodes sb (fsimg_wf_sb P sb Hwf)) as Hni.
-  unfold FsImg.ROOTINO in Hni.
-  assert (Hrootin : FsImg.ROOTINO ∈ region_inums nib)
-    by (apply region_inums_spec; rewrite /FsImg.ROOTINO; lia).
-  apply (link_elem_valid_of_root _ FsImg.ROOTINO
-           (img_node P sb FsImg.ROOTINO)
-           (img_nodes_lookup P sb nib FsImg.ROOTINO Hrootin)); [| exact Hincl].
-  intros i n Hi Hne.
-  destruct (img_nodes_lookup_inv P sb nib i n Hi) as [Hin ->].
-  exact (img_dir_entries_empty P sb nib i Hwf Hrw Hin Hne).
-Qed.

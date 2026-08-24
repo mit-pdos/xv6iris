@@ -1187,14 +1187,12 @@ map at home blocks); 1d lands last.
         `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
         and `fs_dstep_rebase` still holds.  2c-img (below) discharged
       - RULED (2026-08-24): the two gaps 2c-img found are facts about the
-        mkfs IMAGE, not invariants — add both to `fs_boot_image_wf` as
-        `vm_compute` rows in `FsImgCheck`: (14) `fs_region_bare` (every
-        type-0 record has zero size and thirteen zero addresses); (15) no
-        live non-dot record of the root names the root (so
-        `FsImg.fs_rec_ticket`'s self-exemption and `ent_tokenless` agree,
-        and `✓ link_elem (img_nodes …)` follows from W9 + (13)).  Stage 3's
-        image discharge consumes them; `FsDurImg.fs_region_bare` moves to
-        `FsImg.v`.
+        mkfs IMAGE, not invariants — (14) `FsImg.fs_region_bare` and (15)
+        `FsImg.fs_root_no_self`, both LANDED (see the closed bullet below)
+        with their `FsImgCheck` rows; what is still OWED is WIRING them
+        into `FsCfgBoot.fs_boot_image_wf` as conjuncts (14)/(15), which
+        retires the two extra premises `FsDurImg.fs_dur_of_image` carries
+        today.  Stage 3's image discharge consumes them.
         findings (ii) and (iv); (iii) and (v) stand.
         - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN
           `S`, because `free_pool`'s blocks have EXISTENTIAL contents** — so
@@ -1289,47 +1287,47 @@ map at home blocks); 1d lands last.
           as `n` runs of `m`) → beside `FsStateInode.big_sepL_seq0`;
           `big_sepM_fs_restrict` + `fs_restrict_keys` → `LogDefs.v`, beside
           `fs_restrict`.
-      - [ ] **2c-img's TWO GAPS.  Both are PREMISES of `fs_dur_of_image`
-        today; neither was a survey finding.**
-        - **A FREE RECORD'S `inode_local` IS NOT DERIVABLE FROM
-          `fs_boot_image_wf`.**  `FsState.fs_inodes` iterates `inode_owned`
-          over the WHOLE inode map and `inode_owned` carries
-          `inode_local`; at a type-0 record nothing in `fsimg_wf` or
-          `fs_region_wf` constrains `di_size` or `di_addrs`, so `inl_size`
-          and `inl_covers` are false of a garbage one.
-          `FsDurImg.fs_region_bare` is the missing sweep — zero size and
-          thirteen zero addresses at every type-0 region record, in
-          `FsImg.fs_region_free`'s idiom and reading the same thirteen
-          inode blocks — and with L3 (`fs_region_nlink_free`) beside it
-          `img_node_bare` gives `FsStateInode.fn_bare`, hence
-          `inode_local_bare`.  OWED: move the definition into `FsImg.v`
-          beside `fs_region_free`, add its `vm_compute` row to
-          `FsImgCheck.v` (the sibling sweep measures 0.44 s at the literal
-          image) and its conjunct to `fs_boot_image_wf`.
-        - **`✓ link_elem (img_nodes …)` IS NOT W9 + (13).**  What W9 DOES
-          give is stronger than expected and is PROVED
-          (`FsDurImg.img_dir_entries_empty`): at a live DIRECTORY inum W9
-          forces `z = ROOTINO`, so the image has EXACTLY ONE directory and
-          every other node's `dir_entries` is `∅`.  The family therefore
-          splits as `link_auths I ⋅ ent_ops ROOTINO n_root`, and since
-          `FsState.link_full_map` is valid unconditionally and validity is
-          downward closed, `FsDurImg.img_link_valid` reduces the WHOLE
-          obligation to one inclusion in `fsLinkUR`:
+      - [x] **2c-img's TWO GAPS.  CLOSED as two new image sweeps plus one
+        bridge theorem; both are still PREMISES of `fs_dur_of_image`, and
+        folding them into `fs_boot_image_wf` is the only thing left.**
+        - **(14) A FREE RECORD'S `inode_local`.**  `FsState.fs_inodes`
+          iterates `inode_owned` over the WHOLE inode map and
+          `inode_owned` carries `inode_local`; at a type-0 record nothing
+          in `fsimg_wf` or `fs_region_wf` constrains `di_size` or
+          `di_addrs`, so `inl_size`/`inl_covers` are false of a garbage
+          one.  `FsImg.fs_region_bare` is the sweep (zero size, thirteen
+          zero addresses, over the whole `16*nib` region, in
+          `fs_region_free`'s idiom); with L3 (`fs_region_nlink_free`)
+          beside it `FsDurImg.img_node_bare` gives `FsStateInode.fn_bare`,
+          hence `inode_local_bare`.  `FsImgCheck.fsimg_region_bare`: 4.5 s.
+        - **(15) `✓ link_elem (img_nodes …)` IS NOT W9 + (13), and the ONE
+          missing fact is `FsImg.fs_root_no_self`** — of the root's live
+          records only the two dot NAMES may name the root.  W9 gives the
+          structural half outright (`FsDurImg.img_dir_entries_empty`: a
+          live directory IS the root, so every other node's `dir_entries`
+          is `∅`), so `FsState.link_full_map`'s unconditional validity
+          plus downward closure reduce the obligation to ONE inclusion,
           `ent_ops ROOTINO (img_node …) ≼ link_toks_of (img_nodes …)`.
-          That is the survey's (iv)(c) bridge, and it is NOT a corollary of
-          W9 + (13), for two reasons that are both about the two counting
-          disciplines rather than about arithmetic.  (a)
+          That inclusion is `FsDurImg.img_link_incl`, and (15) is exactly
+          the shape the two counting disciplines disagreed on:
           `FsImg.fs_rec_ticket` exempts a record naming its OWN home under
-          ANY name, while `FsStateInode.ent_tokenless` exempts only `"."`
-          and a `".."` that is orphaned or self-naming — a root record
-          named `foo` pointing at the root owes a token here and pays no
-          ticket there, and nothing in `fsimg_wf` rules it out.  (b) the
-          ticket count is per RECORD INDEX while `dir_entries` is a
-          first-match scan by NAME, so the two agree only through W6's
-          `dir_names_unique`, which has to be carried through the count.
-          One more image sweep — no live non-dot record of the root names
-          the root — makes (a) derivable from (13); (b) is a pure
-          `DirView`/`FsTree` counting lemma.
+          ANY name, `FsStateInode.ent_tokenless` only `"."` and an
+          orphaned-or-self `".."`.  `FsImgCheck.fsimg_root_no_self`: 3.4 s.
+        - **THE (b) HALF OF THE SURVEY'S BRIDGE DID NOT NEED W6.**  The
+          worry was that ticket counting is per RECORD INDEX while
+          `dir_entries` is a first-match scan by NAME, so the two agree
+          only through `dir_names_unique`.  In the direction actually
+          needed (tokens ≤ tickets) they agree for free: `dir_view`'s
+          one-step recursion adds at most one entry, at a name the prefix
+          does not carry, so `big_opM_insert` applies and the induction
+          (`FsDurImg.view_ops_incl`, generic in the ticket function)
+          compares ONE record per step.  `dir_names_unique` is what the
+          CONVERSE would want, and nothing asks for it.
+        - **THE COST RULE THIS TURNED UP** is in design/fs-img.md: `orb`
+          is a function, so `vm_compute` evaluates BOTH arms — the `||`
+          spelling of (15) cost 44.8 s against the nested-`if` spelling's
+          3.4 s, because the name arms re-read fourteen bytes per record
+          and every `file_byte` rebuilds a 1024-byte block.
       - [ ] **THE PAYLOAD, AND THE ONE THING THAT IS ALREADY DECIDED.**
         `ftop_inv` (2b-inode-3's standalone `ftopN` invariant holding
         `γtop_L`'s authority) **MUST STAY**; it is NOT folded into the

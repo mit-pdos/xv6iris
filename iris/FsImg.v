@@ -1173,6 +1173,77 @@ Proof.
   apply Z.leb_le. exact H2.
 Qed.
 
+(* **CONJUNCT (14): A FREE RECORD IS BARE.**  [FsState.fs_inodes] iterates
+   [FsStateInode.inode_owned] over the WHOLE inode map and that predicate
+   carries [FsStateInode.inode_local], whose [inl_size] and [inl_covers]
+   clauses are claims about a record's SIZE and ADDRESSES.  At a live inum
+   W3 supplies them; at a type-0 one NOTHING above does -- W3 skips a
+   type-0 record entirely and [fs_region_nlink] speaks only of [nlink] --
+   so a garbage free record would refute both.  This is the missing sweep:
+   zero size and thirteen zero addresses at every type-0 record of the
+   REGION.  With L3 ([fs_region_nlink_free]) beside it it is exactly
+   [FsStateInode.fn_bare] of the node the image decodes
+   ([FsDurImg.img_node_bare]), hence [inode_local_bare].
+   Region-wide and in [fs_region_free]'s own idiom, reading the same
+   thirteen inode blocks, for that definition's reason: the tail
+   [[ninodes, 16*nib)] is inside the icache's region and outside every W
+   sweep.  It is NOT a conjunct of [fs_region_wf] -- that bundle's
+   consumers destructure it -- but a separate premise, as [fs_links_eq] is
+   beside [fsimg_wf]. *)
+
+(* one type-0 record's shape: zero size and thirteen zero addresses.
+   IT TAKES THE DECODED RECORD, not an inum: a record decode is ~21 ms at
+   the literal image, and a [P]/[z] form would make the sweep below decode
+   every free record TWICE (measured 8.5 s against 4.5 s). *)
+Definition fs_rec_bare (dn : dinode) : bool :=
+  (bv_unsigned (di_size dn) =? 0)
+  && List.forallb (fun a : bv 32 => bv_unsigned a =? 0) (di_addrs dn).
+
+Definition fs_region_bare (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+  : bool :=
+  List.forallb
+    (fun i => let dn := fs_dinode P sb (Z.of_nat i) in
+              if bv_unsigned (di_type dn) =? 0 then fs_rec_bare dn else true)
+    (seq 0 (16 * nib)%nat).
+
+Lemma fs_region_bare_size (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  fs_region_bare P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = 0 ->
+  bv_unsigned (di_size (fs_dinode P sb z)) = 0.
+Proof.
+  intros H Hz Hty.
+  assert (Hzid : Z.of_nat (Z.to_nat z) = z) by lia.
+  pose proof (forallb_seq _ (16 * nib)%nat (Z.to_nat z) H ltac:(lia)) as Hk.
+  cbv beta zeta in Hk. rewrite Hzid in Hk.
+  rewrite (proj2 (Z.eqb_eq _ _) Hty) in Hk.
+  unfold fs_rec_bare in Hk.
+  apply andb_true_iff in Hk as [Hs _]. apply Z.eqb_eq. exact Hs.
+Qed.
+
+Lemma fs_region_bare_addr (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) (k : nat) :
+  fs_region_bare P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = 0 -> (k < 13)%nat ->
+  bv_unsigned (di_addrs (fs_dinode P sb z) !!! k) = 0.
+Proof.
+  intros H Hz Hty Hk.
+  assert (Hzid : Z.of_nat (Z.to_nat z) = z) by lia.
+  pose proof (forallb_seq _ (16 * nib)%nat (Z.to_nat z) H ltac:(lia)) as Hq.
+  cbv beta zeta in Hq. rewrite Hzid in Hq.
+  rewrite (proj2 (Z.eqb_eq _ _) Hty) in Hq.
+  unfold fs_rec_bare in Hq.
+  apply andb_true_iff in Hq as [_ Ha].
+  rewrite List.forallb_forall in Ha.
+  assert (Hlen : length (di_addrs (fs_dinode P sb z)) = 13%nat)
+    by exact (fs_dinode_wf P sb z).
+  destruct (lookup_lt_is_Some_2 (di_addrs (fs_dinode P sb z)) k
+              ltac:(lia)) as [a Ha'].
+  rewrite (list_lookup_total_correct _ _ _ Ha').
+  apply Z.eqb_eq. apply Ha.
+  apply elem_of_list_In, elem_of_list_lookup_2 with k. exact Ha'.
+Qed.
+
 (* **THE ONE REGION-WIDE HYPOTHESIS.**  [fsimg_wf] cannot see [nib], so the
    region's three claims (the tail's type, and L3/L4 everywhere) cannot be
    conjuncts of it; they are collected here instead so that
@@ -3291,6 +3362,82 @@ Proof.
   cbv beta zeta in Hk. rewrite Z2Nat.id in Hk by lia.
   rewrite (proj2 (Z.eqb_neq _ _) Hty), (proj2 (Z.eqb_neq _ _) Hnd) in Hk.
   cbn [orb] in Hk. apply Z.eqb_eq. exact Hk.
+Qed.
+
+(* ====================================================================== *)
+(*  11d.  CONJUNCT (15) -- NO LIVE NON-DOT RECORD OF THE ROOT NAMES THE    *)
+(*        ROOT                                                             *)
+(* ====================================================================== *)
+
+(*  WHY THIS CONJUNCT EXISTS.  Two counting disciplines meet at the boot
+    composition and they exempt DIFFERENT records.  [fs_rec_ticket] above
+    is [DirLinks.dir_link_at]'s guard: a record bears a ticket exactly when
+    it is LIVE and does NOT name its own home -- a SELF exemption under ANY
+    name.  [FsStateInode.ent_tokenless] exempts only ["."] (under any
+    target) and [".."] (when the directory is orphaned or the entry names
+    the home).  A root record called "foo" pointing at the root therefore
+    owes a link token and pays no ticket, and nothing in [fsimg_wf] rules
+    it out -- so [FsState.link_elem]'s validity, which the durable boot
+    needs, does not follow from W9 + (13) as they stand.
+
+    THE WEAKEST SWEEP THAT CLOSES IT is the one below: of the root's live
+    records, only the two dot NAMES may name the root.  Under it every
+    non-tokenless entry of the root has a target other than the root, hence
+    is live-and-not-self, hence bears a ticket -- and the entry-to-ticket
+    map is injective because [DirView.dir_first] returns ONE record per
+    name.  ([FsTree.dir_names_unique], W6, is NOT needed for that
+    direction: it is what would be needed for the CONVERSE, tickets <=
+    tokens, which nothing asks for.)  [FsDurImg.img_link_incl] is the
+    bridge and [FsDurImg.img_link_valid] the theorem.
+
+    It is stated at the ROOT ALONE and that is not a shortcut: W9's
+    directory arm already forces every live directory of the image to BE
+    the root ([fs_links_wf_at]'s [z = ROOTINO]), so every other node's
+    entry map is empty ([FsDurImg.img_dir_entries_empty]) and has nothing
+    to pay for.  COST: one [O(nrec)] pass over the root's records -- the
+    same records W6/W8 already read, and the only sweep in this file that
+    touches exactly one directory.                                        *)
+
+(*  NESTED [if], NOT [||], AND THAT IS THE WHOLE COST.  [orb] is a
+    FUNCTION, so [vm_compute] evaluates BOTH arguments: an
+    [... || bool_decide (name = DOT) || bool_decide (name = DOTDOT)]
+    spelling reads (twice) the fourteen name bytes of every record, and
+    each [DirView.file_byte] rebuilds the record's whole 1024-byte block
+    -- 44.8 s at the literal image.  A nested [if] is a MATCH, so the name
+    is read once and only for a record that actually names the root (two
+    of them): 3.4 s.  The [let i] shares the inum halfword between the
+    liveness test and the self test for the same reason.                  *)
+Definition fs_root_no_self (P : Z -> list (bv 8)) (sb : fs_sb) : bool :=
+  let dn := fs_dinode P sb ROOTINO in
+  let data := fs_data_of P dn in
+  List.forallb
+    (fun k => let i := dir_inum data k in
+              if bool_decide (i = bv_0 16) then true
+              else if bv_unsigned i =? ROOTINO
+                   then (let s := dir_bname data k in
+                         if bool_decide (s = DOT) then true
+                         else bool_decide (s = DOTDOT))
+                   else true)
+    (seq 0 (dir_nrec (bv_unsigned (di_size dn)))).
+
+Lemma fs_root_no_self_at (P : Z -> list (bv 8)) (sb : fs_sb) (k : nat) :
+  fs_root_no_self P sb = true ->
+  (k < dir_nrec (bv_unsigned (di_size (fs_dinode P sb ROOTINO))))%nat ->
+  dir_live (fs_data_of P (fs_dinode P sb ROOTINO)) k ->
+  bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb ROOTINO)) k) = ROOTINO ->
+  dir_bname (fs_data_of P (fs_dinode P sb ROOTINO)) k = DOT
+  \/ dir_bname (fs_data_of P (fs_dinode P sb ROOTINO)) k = DOTDOT.
+Proof.
+  intros H Hk Hlv Hin.
+  unfold fs_root_no_self in H. cbv zeta in H.
+  pose proof (forallb_seq _ _ k H Hk) as Hq. cbv beta zeta in Hq.
+  rewrite (bool_decide_eq_false_2 _ Hlv) in Hq.
+  rewrite (proj2 (Z.eqb_eq _ _) Hin) in Hq.
+  destruct (decide (dir_bname (fs_data_of P (fs_dinode P sb ROOTINO)) k = DOT))
+    as [Hd | Hd]; [by left |].
+  right.
+  rewrite (bool_decide_eq_false_2 _ Hd) in Hq.
+  exact (proj1 (bool_decide_eq_true _) Hq).
 Qed.
 
 (* ====================================================================== *)
