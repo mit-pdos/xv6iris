@@ -1755,6 +1755,66 @@ this stage or 2c's body.**
       - Nothing else moved.  `fs_dstep_rebase`, `log_psi_write_rebase` and
         `fs_dstep`'s shape are as 3a-log left them; the audit is at the
         three-entry baseline.
+- [x] **3a-def. DEFERRED JUSTIFICATION (§4¾) tried end to end: the row that
+      works, and a THIRD wall — TWO OPEN TRANSACTIONS SHARING ONE BLOCK.**
+      The lane's product is `iris/FsDurDefer.v` (one `_CoqProject` row, no
+      existing statement moved); the design account is `fs-state.md` §4¾a
+      and `crash.md`.  `P_wf`'s body is still `LogDefs.fs_dview`, none of the
+      eleven suppliers moved, and `op_entry`/`log_state`/`SpecLogWrite`/
+      `SpecEndOp` are untouched — items 1–5 of the 3a-def task are all
+      downstream of the wall.  §4¾ does lift 3a′'s wall (B): the row pins
+      `Dj` at the writer's own block, so the `∀ Dc` obligation is gone.
+      - **THE OVERLAY IS POINTWISE, AND THE LEDGER RECORDS NO ORDER.**  Two
+        open ops each writing one home block once leave the SAME ledger
+        under both write orders (`dfr_ledger_order_blind`; the rest of the
+        entry matches too when the block is already in `lh.block[]`, since
+        both writes then ABSORB), while `lm_logged L` differs — so no
+        order-free overlay function is the row (`defer_overlay_order_blind`,
+        at an arbitrary resolver), and the DOMAIN-only weakening dies one
+        step later at `end_op` (`defer_domain_row_end_blind`).  Not escapes:
+        a per-op ORDERED write list (the missing order is CROSS-op),
+        deferring the FUNCTION update (needs commutativity — a whole-ledger
+        fact, and false for `bfree` against `balloc` at one bit), a global
+        per-(op,block) SEQUENCE NUMBER (defeats the refutation, then reduces
+        to eviction and meets the same wall).
+        The row that works is `FsDurDefer.dfr_row`: (a) every open op's
+        deferred value at a block IS the logged value there; (b) off the
+        deferred domain `Dj` agrees with the logged view.  No union, no
+        order, no disjointness hypothesis.  All five ledger transitions are
+        proved (`dfr_row_begin`/`_justify`/`_defer`/`_end`/`_quiesce`, plus
+        `dfr_row_id` for the boot); `dfr_row_quiesce` IS the commit's
+        conclusion at `out = 0`.
+      - **CLAUSE (a) FORCES EVICTION, AND EVICTION IS THE WALL.**  Two open
+        ops holding one block hold it at one value
+        (`dfr_row_forces_agreement`), so a `log_write` must remove its block
+        from every other open op's entry.  Then `dfr_row_end_target` — the
+        one `end_op` fupd carries the durable predicate to the FULL logged
+        content of every block in the op's map — makes the LAST writer of a
+        shared block owe the earlier op's effect: the bitmap bit another
+        op's `balloc` set, the claim marker another op's `ialloc` wrote.  It
+        owns neither the resources nor the knowledge.  Machine-checked at
+        the bitmap: `free_pool_used_no_block` (the pool gives nothing at a
+        set bit) and `fs_state_orphan_step_False` (the later step in which
+        that op's record adopts the block provably CONSUMES the block's
+        ownership) — nothing in `fs_state Γ_D` holds it in between.
+      - **SO §4¾'s CONSEQUENCE 4 IS WRONG**: the in-transit bin and 3a′'s
+        §C explicit pool are needed.  (C) is cheaper than 3a′ priced it —
+        `FsStateBitmap.free_pool_used` (xv6's freeing-a-free-block panic) is
+        consumed on the ERA side, so the durable instance may take the
+        relaxed pool at no cost to that argument and only the per-BATCH
+        endpoint condition is owed.
+      - **WHERE DEFERRAL BELONGS, for the next ruling.**  Any version that
+        puts the deferred set in the LOG's ledger makes every link hand back
+        a whole `P_wf` (3a′'s wall (A), arriving through the ledger).  In the
+        CLIENT's payload it need not: the client keeps its own per-op
+        deferral ledger at its own gname, `Ψ D₀ Dc` carries the relaxed pool
+        and the bin, and the log adds only a QUIESCENCE TOKEN so
+        `log_psi_commit` is demanded at `out = 0` only.  No `op_entry`
+        field, no `log_state` row, no two-arm AU, and §5 unchanged.
+      - **THE FOUR SHAPES ARE IN TREE AS TERMS** (`FsDurDefer.v` §4):
+        `P_wf_strict`, `dstep_strict` (+ `_id`/`_trans`), `lw_arm_justify`,
+        `eo_arm` (+ `eo_arm_empty`), `commit_conclusion`.  Audit at the
+        three-entry baseline.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

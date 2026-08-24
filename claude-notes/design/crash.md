@@ -441,6 +441,37 @@ lemma names is fs-state.md §4½a; the two headlines:
   pinning `Dc` is the only handle, and it makes each supplier's obligation
   a fact about the whole durable map.
 
+**AND DEFERRED JUSTIFICATION (fs-state.md §4¾) LIFTS WALL (B) AND MEETS A
+THIRD — TWO OPEN TRANSACTIONS SHARING ONE BLOCK (3a-def,
+`iris/FsDurDefer.v`).** Deferring to `end_op` does pin `Dj`: the row's
+off-the-deferred-domain clause hands the writer `⌜Dj !! b = lm_logged L !! b⌝`
+at its own block, so the `∀ Dc` obligation is gone. What it does not survive
+is concurrency, which the ruling does not mention and `LogInv.log_res`
+permits (`out ≤ 3`). The full account with the lemma names is fs-state.md
+§4¾a; the three headlines:
+
+- **The ledger records no ORDER and `lm_logged L` depends on it**, so no
+  order-free overlay of per-op deferred maps can be `log_state`'s row
+  (`defer_overlay_order_blind`, at an arbitrary resolver). The row that
+  works is POINTWISE — each open op's deferred value IS the logged value,
+  and off the deferred domain `Dj` agrees with the logged view — and it is
+  maintained by all five ledger transitions.
+- **It FORCES a `log_write` to evict its block from every other open op's
+  entry**, and eviction hands the last writer of a shared block the earlier
+  op's obligation: the bitmap bit another op's `balloc` set, the claim
+  marker another op's `ialloc` wrote. The bitmap instance is machine-checked
+  (`free_pool_used_no_block` + `fs_state_orphan_step_False`): the orphaned
+  block is owned by no conjunct of `fs_state Γ_D` between the evicting
+  write and the owning op's own record write.
+- **So §4¾'s consequence 4 is wrong**: the in-transit bin and §4½a (C)'s
+  explicit pool are needed after all. (C) is cheaper than §4½a priced it —
+  `FsStateBitmap.free_pool_used`, the freeing-a-free-block panic argument,
+  is consumed on the ERA side, so only the per-BATCH endpoint condition is
+  owed. And the wall's shape says where deferral belongs: in the CLIENT's
+  payload, where an intermediate object need never be a `P_wf`, with the log
+  adding only a quiescence token so `log_psi_commit` is demanded at
+  `out = 0` only.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of

@@ -420,6 +420,108 @@ bfree, ialloc's claim, the linked nlink/entry pairs); a deferring op's
 end_op fupd is its composed movers — the op-level content in its rightful
 place.
 
+### 4¾a. AS BUILT (3a-def): the row that works, and the wall TWO OPEN
+### TRANSACTIONS put in front of transaction-granular justification
+
+`iris/FsDurDefer.v` carries every claim below as a COMPILED LEMMA, in
+`FsDurRefute`'s shape (statements about what a resource can say, not proof
+difficulties).  §4¾ never mentions concurrency; `LogInv.log_res` permits
+`out ≤ 3`, and xv6's open transactions share blocks constantly — the bitmap
+block (two `balloc`s), an inode block (two `ialloc`s, or an `ialloc` beside
+another op's `iupdate`), a directory's data block.  Everything below is
+about that.
+
+**THE OVERLAY: it is POINTWISE, and there is no union.**  §4¾ item 2 asks
+for "`D_justified` overlaid with the open ops' deferred maps".  No
+order-free overlay FUNCTION can serve, because the ledger is a `gmap nat _`
+and records no order while `lm_logged L` depends on the write order:
+two ops each writing one home block once leave the SAME ledger under both
+orders (`FsDurDefer.dfr_ledger_order_blind` — and the rest of the entry
+matches too, if the block is already in `lh.block[]`, since both writes then
+take `log_write`'s ABSORB path and neither spends a budget unit), so the row
+would have to equal two different logged views.  That is
+`defer_overlay_order_blind`, stated at an ARBITRARY resolver.  The
+DOMAIN-only weakening survives the writes and dies at `end_op`
+(`defer_domain_row_end_blind`): the ending op can only write back what IT
+wrote, and a stale value is exactly what a domain row cannot see.  Three
+apparent escapes are not: a per-op ORDERED list of writes (the refutation
+uses one write per op — the missing order is CROSS-op), deferring the
+FUNCTION update (composition is order-free only where the updates commute,
+which is a whole-ledger fact and is FALSE for one op's `bfree` clearing a
+bit against another's `balloc` setting it), and a global per-(op,block)
+SEQUENCE NUMBER (which does defeat the refutation and then reduces to
+eviction, below, meeting the same wall).
+
+The row that works states the overlay pointwise and needs no union, no order
+and no disjointness hypothesis (`FsDurDefer.dfr_row`):
+
+```
+(a) ∀ i d b v, om !! i = Some d → d !! b = Some v → lm_logged L cov ls !! b = Some v
+(b) ∀ b, (∀ i d, om !! i = Some d → d !! b = None) → Dj !! b = lm_logged L cov ls !! b
+```
+
+Clause (a) FORCES any two open ops holding one block to hold it at the same
+value (`dfr_row_forces_agreement`), so **a `log_write` must EVICT its block
+from every other open op's entry** — from all of them on the justify-now
+arm, from all but the writer's on the defer arm.  With that discipline the
+row is maintained by all five ledger transitions and collapses at
+quiescence: `dfr_row_begin`, `dfr_row_justify`, `dfr_row_defer`,
+`dfr_row_end`, `dfr_row_quiesce` (`out = 0 ⇒ Dj = lm_logged L`, which is the
+commit's conclusion) and `dfr_row_id` (the boot's).  So the INTERFACE is
+real.
+
+**THE WALL: eviction moves the obligation across the transaction boundary.**
+Clause (a) read as the op's obligation (`dfr_row_end_target`) says the one
+fupd `end_op` consumes must carry the durable predicate to the FULL logged
+content of every block in the op's deferred map.  For a block two open ops
+wrote, the last writer's entry is the only one left — so the last writer
+owes the OTHER op's effect, and owns neither the resources nor the
+knowledge.  The bitmap instance is machine-checked: after the evicting
+writer's step the other op's block is marked USED, so `free_pool` gives
+nothing at it (`free_pool_used_no_block`, off `pool_elt` being `emp` at a set
+bit) and no inode names it yet, while the later step in which that op's own
+record adopts the block provably CONSUMES the block's ownership
+(`fs_state_orphan_step_False`, `step_forces_the_element` at one block).
+Nothing in `fs_state Γ_D` holds it in between.  The same thing happens
+without a bitmap: an `ialloc`'s claim marker evicted by another op's write
+to the same inode block leaves the second op owing a record move it cannot
+name.
+
+**CONSEQUENCE 4 OF §4¾ DOES NOT HOLD.**  The in-transit bin and §4½a (C)'s
+explicit pool are NOT unnecessary — the orphaned block has to be parked
+somewhere that outlives ONE op's fupd.  Note the price §4½a attached to (C)
+is smaller than it looks: `FsStateBitmap.free_pool_used`, which kills xv6's
+`panic("freeing free block")`, is consumed on the ERA side, so the durable
+instance may take the relaxed pool at no cost to that argument — what is
+left is the per-BATCH endpoint condition at the commit.
+
+**AND THE SHAPE OF THE WALL SAYS WHERE DEFERRAL BELONGS.**  Any version that
+puts the deferred set in the LOG's ledger makes each link of the chain hand
+back a whole `P_wf`, because the log's row is an equation between `Dj` and
+the logged view and `Ψ`'s index is what `P_wf` is stated at — which is
+§4½a's wall (A) again, arriving through the ledger.  Put the deferral INSIDE
+the client's payload instead: the client keeps its own per-op deferral
+ledger at its own gname, `Ψ D₀ Dc` carries whatever intermediate object it
+likes (`FsDurRefute` §C's relaxed pool and its bin are both available there,
+and neither is ever a `P_wf`), and the only thing the LOG adds is a
+QUIESCENCE TOKEN so that `log_psi_commit` is demanded at `out = 0` only,
+where the client must collapse its intermediate object to a real
+`fs_state`.  Then no `op_entry` field, no `log_state` row and no two-arm AU
+exist at all, and the log's interface is §5 unchanged.
+
+**THE FOUR SHAPES, as type-checked terms** (`FsDurDefer.v` §4, so the next
+lane starts from terms rather than a paraphrase): `P_wf_strict` (§4½ (2)'s
+standalone body — `∃ S`, the top auth, the top FRAGMENTS, `fs_state Γ_D S`;
+the fragments are in it because `FsState.inode_owned` carries none and an
+authority with no elements cannot be retagged), `dstep_strict` with
+`dstep_strict_id`/`_trans` (the debt's two laws survive the flip verbatim;
+`fs_dstep_rebase` does not), `lw_arm_justify` (the justify-now arm, whose
+`⌜Dj !! b = Lg !! b⌝` tie is read off clause (b) and is what retires §4½a's
+wall (B): with `Dj` pinned AT THE BLOCK there is no `∀ Dc` obligation left),
+`eo_arm` with `eo_arm_empty` (the one end-of-op fupd, `emp`-trivial at an
+empty deferred map), and `commit_conclusion` (`dstep_strict … D₀
+(lm_logged L cov ls)` — home maps, no `fs_restrict` arithmetic).
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
