@@ -2171,6 +2171,144 @@ this stage or 2c's body.**
         region (off `IcacheBoot.diblk_bytes_surj`, which
         `FsDurImg.img_recs_of_block` already uses) and `KData` elsewhere.
         (6) the nine suppliers and the mknod arm.
+- [x] **3b'. THE INDEX LANDS, `dwire_geom` IS REPAIRED, AND THE IMAGE'S
+      SEED IS BUILT — the flip's two ENDS, not its middle.**  The lane's
+      product is `RiscvPtsto.fs_dur_names`' three new pure fields, a
+      repair inside `iris/FsDurWire.v`, and `iris/FsDurImg.v` §11–§12; the
+      design account is `fs-state.md` §4⅞d and `crash.md`'s 3b' paragraph.
+      **`P_wf`'s body is still `LogDefs.fs_dview`, none of the nine
+      suppliers moved, and `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash`/
+      `ProofInitlog` are untouched** — the flip still has no green
+      checkpoint (the ordering ruling), and what was available was its two
+      ends.  Whole tree green; audit at the three-entry baseline.
+      - **THE INDEX (step 1), LANDED.**  `fs_dur_names` gains `fdn_bmap`,
+        `fdn_ist` and `fdn_nin` as plain `Z`s — NOT an `FsDurObj.dgeom`,
+        which lives above `FsState` and would put the whole file-system
+        cone underneath the machine layer; `FsDurWire.fdn_geom` is the
+        one-line reading.  `P_wf_dec` and `dstep_dec` now READ the geometry
+        off the bundle they already take, so `FsCrash.P_fs`'s arity does
+        not move, and `psi_commit_law` / `psi_write_law` follow
+        (`psi_write_law` takes `Γd`; `Psi_dec` stays at a bare `(G, nin)`).
+        The four `MkFsDurNames` sites fill the fields: `SystemAdequacy`'s
+        two off `sb`/`nib` (`fdn_nin = 16 * nib`, the inums the REGION
+        holds — `ko_inodeblk` must cover every region block and mkfs rounds
+        `ninodes` up to a whole block), `FsDurImg`'s off the image's own
+        superblock, `RiscvAdequacy`'s device-only corollary at zeroes.
+      - **THE REPAIR, and it is a REAL DEFECT the spike found.** 3b's
+        `dwire_geom G := ∀ j, 0 <= j -> dg_ist G + j <> dg_bmap G` is
+        REFUTED at `j := dg_bmap G - dg_ist G` whenever the bitmap block is
+        above the inode region — which is xv6's layout exactly
+        (`FsImg.sbo_bmapstart` puts the bitmap one block past the region).
+        So the premise was UNSATISFIABLE at the only geometry the tree ever
+        builds, and every mover taking it (`bm_write_obligation`,
+        `di_write_obligation`, the witnesses) was vacuously applicable and
+        unusable.  `durable-notes.md`'s "a GAP premise can be
+        unsatisfiable", reached through the LAYOUT rather than through a
+        quantifier; no build sees it, and 3b's own `dwire_geom_wit` hid it
+        by exhibiting an INVERTED layout (`MkDGeom 0 1`, bitmap BELOW the
+        region).  `dwire_geom_refuted_unbounded` is the four-line witness,
+        kept in file.  The repaired form bounds `j` by the region
+        (`16 * j < nin`, which `ko_inodeblk` and `ko_slot`'s range
+        conclusion both already carry) and states the STRICT
+        `dg_ist G + j < dg_bmap G`.  **Strict, not `<>`, and that is
+        load-bearing**: a DATA block is above the bitmap block
+        (`fs_data_start = bmapstart + 1`), so ONE comparison rules out the
+        bitmap block and every region block at once (`data_write_above`) —
+        with a disequality the data writer would owe the region separately,
+        from a fact it does not carry.  `dwire_geom_of_sb` derives it from
+        `fs_sb_ok`; `dwire_geom_wit` is now at a real xv6-shaped layout.
+      - **THE THREE OBLIGATIONS AT THE BUNDLE'S GEOMETRY** (`bm_write_at` /
+        `data_write_at` / `di_write_at`), each stated so its premises are
+        facts a supplier can actually hold: "my block IS `fdn_bmap`", "my
+        block is ABOVE `fdn_bmap`", "my inum is in range and the region
+        starts at `fdn_ist`".
+      - **THE IMAGE'S SEED (step 4's boot half), LANDED.**  `FsDurImg`
+        §11's `img_kinds` is the three-arm assignment — bitmap block ↦ the
+        image's own bit set, region block ↦ its sixteen records, else ↦ its
+        bytes — with `img_kinds_enc` (every block's bytes ARE its kind's
+        encoding), `img_kinds_bridge`, `img_kinds_blocksized` and
+        `img_kinds_of_state` at the image's own geometry.  §12's
+        `img_dur_seed` packages it with `FsState.fs_boot_alloc_at`'s top-map
+        authority and fragments into `FsDurWire.dur_seed`, which is the ONE
+        resource the flipped `P_fs_alloc` needs: `P_wf_dec` minus the flat
+        blob, which the allocation mints itself (`P_wf_dec_of_seed`).  The
+        region arm reads slot `k mod 16` so the record function is TOTAL —
+        `ko_recwf` quantifies over every slot index and a record read past
+        a block's sixteen is not a record of that block at all.
+      - **WHERE THE ERA-SIDE EQUATION CAN ACTUALLY RIDE, checked against
+        the tree — the ratification's "the FS config bundle every supplier
+        already carries" does NOT hold as written.**  Not one of the nine
+        supplier proof files (or their specs) names `fscfg` or `icfg`:
+        they take `bmapstart` / `inodestart` / `nib` as EXPLICIT parameters
+        and carry the invariants those parameters index.  So the equation
+        splits three ways, and each part rides something all of its
+        consumers already hold:
+        * `⌜dwire_geom (fdn_geom riscv_fsdur) (fdn_nin riscv_fsdur)⌝`
+          mentions only the ambient record, so it rides `LogInv.log_ctx_at`
+          — which all nine hold, since all nine call `log_write`;
+        * `⌜bmapstart = fdn_bmap riscv_fsdur⌝` rides
+          `BitmapInv.bitmap_inv` (parameterized by `bmapstart`; held by
+          balloc ×2, bfree, bmap, writei, iput);
+        * `⌜inodestart = fdn_ist riscv_fsdur ∧ 16 * nib = fdn_nin
+          riscv_fsdur⌝` rides `InodeRegion.ireg_inv` (held by ialloc,
+          iupdate, iput, writei).
+        A data writer needs only the first two: `b >= fs_data_start =
+        bmapstart + 1` plus `data_write_at`.  Both conjuncts are minted at
+        `FsCfgBoot.fs_cfg_alloc`, which already reports `fsc_bmapstart =
+        sb_bmapstart sb` and `icfg_ist = sb_inodestart sb`; what it gains
+        is one premise, threaded from `SystemAdequacy` exactly as `Hcp`
+        (`riscv_crash_pred = P_fs_any …`) already is.
+      - **THE SHAPES THE REST OF THE FLIP NEEDS, worked out and NOT
+        landed** (each was written, type-checked against the surrounding
+        text and then backed out, because the flip is one checkpoint):
+        * `SpecLogWrite`'s AU premise becomes
+          `(∀ D0 Dc, ⌜Dc !! uint bno = Some bsl⌝ -∗ Psi D0 Dc ==∗
+          Psi D0 (<[uint bno := bs]> Dc))` — the log supplies the tie and
+          the client the pure `kind_write_ok`.  `ProofLogWrite` discharges
+          it at the `byte_range_log_update` step (~line 2270), where
+          `Hllk : L !! uint bno = Some bsl` and `Hhomebno` are both already
+          in hand; the bridge is one new `LogDefs` line,
+          `lm_logged L cov ls !! b = Some bs` from `L !! b = Some bs` at a
+          home `b`.
+        * The nine suppliers' `log_psi_write_rebase` becomes
+          `LogInv.log_psi_write_ok` (same shape plus the tie hypothesis and
+          three pure premises).
+        * `LogInv`: `log_psi_commit`/`log_psi_step` become
+          `FsDurWire.psi_commit_law`/`psi_write_law` at `(cov, logstart)`,
+          `log_psi_spend` returns `dstep_dec`, `log_psi_write_rebase` and
+          `LogDefs.fs_dstep_rebase` die.  `Require Import FsDurWire` goes
+          EARLY, before `FsBlocks`, and there is no cycle (`FsState`'s cone
+          does not reach `LogInv`, checked).
+        * `FsCrash`: `Require Import FsDurWire` (not Export — its cone
+          exports `fs_view`/`byte_range`/`blk_owned`), the `fs_crash`
+          section gains a `!fsTopG Σ` MEMBER binder beside its existing
+          `fsCrashG`/`lockG`, `P_fs`'s durable conjunct becomes
+          `P_wf_dec γv Γd cov logstart (fr_D r)`, both commit permits take
+          `dstep_dec riscv_dview_name riscv_fsdur cov ls`, and
+          `P_fs_alloc`/`_clean` take `dur_seed` as a third input.
+      - **A DATA WRITER DOES NOT HOLD ITS OWN PROVENANCE TODAY, checked.**
+        `data_write_at` wants `fdn_bmap riscv_fsdur < b`.  No fs contract
+        says it: `InodeInv.blkmap_wf` bounds an inode's blocks only to
+        "covered and not the log's storage", and `cov` CONTAINS the bitmap
+        block (`bitmap_geom_ok`: `bmapstart ∈ cov`) and the whole inode
+        region; `SpecBalloc`'s success arm reports `blk ≠ 0`, `blk ∈ cov`,
+        `blk ∉ log_region_set` and no range.  Both facts are true — the
+        free pool lives in `[fs_data_start, size)` — so the repair is two
+        conjuncts (one on `blkmap_wf`, one on balloc's post), discharged
+        from the bitmap invariant's own pool range where balloc hands the
+        block over.  **Price this before the supplier sweep**: it is the
+        one place the durable obligation asks for something the era side
+        does not already prove.
+      - **THE ONE OPEN QUESTION, and it is the next lane's first.**
+        `ProofInitlog`'s witness.  The boot parks
+        `Psi_dec … (lm_committed M cov ls) (lm_logged L cov ls)` and must
+        prove the PURE bridge AT THAT VIEW; `initlog` runs in the era and
+        has no image, so the bridge has to be read out of `P_fs`'s own
+        `P_wf_dec` (which carries it) at a point where `crashN` is
+        openable, or threaded from boot as a persistent pure fact.
+        `Psi_dec` is pure and PERSISTENT, so ONE opening suffices and
+        nothing has to be spent — but it is real work in a 2748-line file
+        and it is what the next lane should size first.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

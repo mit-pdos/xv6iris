@@ -526,6 +526,33 @@ and never moves, nothing in xv6 writes the superblock — so that neither
 `P_fs` (whose `cov`/`ls` are threaded by name through 90 files inside
 `fs_crash_seam`) nor `LogInv.log_ctx` (78) grows an argument.
 
+**AND THE INDEX IS ON THE BUNDLE, WHILE THE LAYOUT PREMISE THAT CAME WITH
+IT WAS UNSATISFIABLE (3b', `RiscvPtsto.v` / `FsDurWire.v` / `FsDurImg.v`).**
+`fs_dur_names` carries the geometry as three plain `Z`s — `fdn_bmap`,
+`fdn_ist`, `fdn_nin` (`16 · nib`, the inums the REGION holds) — spelled as
+integers rather than as an `FsDurObj.dgeom`, which lives above `FsState`
+and would put the file-system cone underneath the machine layer;
+`FsDurWire.fdn_geom` is the reading, and `P_wf_dec`/`dstep_dec` take the
+geometry off the bundle they already hold, so no arity moves.  **The 3b
+layout premise `dwire_geom` was FALSE at xv6's own layout**: stated
+unbounded (`∀ j ≥ 0, dg_ist G + j ≠ dg_bmap G`) it is refuted at
+`j := dg_bmap G − dg_ist G` whenever the bitmap block is above the inode
+region, which `FsImg.sbo_bmapstart` makes it, so every mover taking it was
+vacuously applicable and unusable — and 3b's own non-vacuity witness hid
+that by exhibiting an INVERTED layout.  The repaired form bounds `j` by
+the region (`16·j < nin`, which every use site already carries) and states
+the STRICT `dg_ist G + j < dg_bmap G`; strictness is what lets a DATA
+block's writer rule out the bitmap block and every region block with one
+comparison (`data_write_above`), which is the only geometry fact such a
+writer holds.  The flipped `P_fs_alloc` takes the durable tie as ONE
+resource, `FsDurWire.dur_seed` (`P_wf_dec` minus the flat blob), built at
+the image by `FsDurImg.img_dur_seed`.  What the ERA still owes — and what
+`fs-state.md` §4⅞d records placements for, the "FS config bundle every
+supplier already carries" NOT existing — is the equation tying its own
+`bmapstart`/`inodestart`/`nib` to the bundle's: it rides `log_ctx_at`
+(the layout half, which names only the ambient record), `bitmap_inv` and
+`ireg_inv`, one conjunct each, all three minted at `fs_cfg_alloc`.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of
