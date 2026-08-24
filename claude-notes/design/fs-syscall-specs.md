@@ -295,25 +295,42 @@ first instance), not a consumer-visible statement.
    `flushed (my batch)` AT RETURN — the one synchronous durability xv6
    has; otherwise it arrives at a later quiescence.
 
-   *A future `sys_sync`.*  Its whole spec is "returns `flushed b` for
-   `b` ≥ the batch current at invocation" — one token, no new durable
-   state even here.  DOES IT MAKE THE IN-MEMORY STATE DURABLE?  Yes, in
-   the sense a consumer can use: every carrier held across the call has
-   bound ≤ b, so principle 3 makes each held node durable at its
-   observed value, and SNAPSHOT's boundary moves past the sync point.
-   The honest refinement: the committed snapshot is a DESCENDANT of the
-   invocation-instant state, not necessarily equal to it — closing the
-   current batch also sweeps in deltas other processes linearized
+   *`sys_sync` — IT EXISTS in this fork* (`SYS_sync = 22`,
+   `xv6-riscv/kernel/log.c:247`; stock xv6-riscv has none) and it
+   BLOCKS until the log has been flushed.  Its whole spec is "returns
+   `flushed b` for `b` ≥ the batch current at invocation" — one token,
+   no new durable state even here.  DOES IT MAKE THE IN-MEMORY STATE
+   DURABLE?  Yes, in the sense a consumer can use: every carrier held
+   across the call has bound ≤ b, so principle 3 makes each held node
+   durable at its observed value, and SNAPSHOT's boundary moves past
+   the sync point.  The honest refinement: the committed snapshot is a
+   DESCENDANT of the invocation-instant state, not necessarily equal to
+   it — the commit also sweeps in deltas other processes linearized
    between invocation and commit.  Monotone, so nothing a consumer
-   concludes breaks; and it is what real sync means.  SEMANTICS (owner,
-   2026-08-24): `sys_sync` BLOCKS until the log has been flushed — it
-   returns only after a commit covering the invocation-time batch has
-   installed.  That blocking is precisely what discharges the spec; the
-   proof's shape is "wait for the quiescence/commit event, then read
-   the `flushed b` receipt it minted".  (Recorded because the naive
-   `begin_op(); end_op()` pair does NOT have this behavior — with other
-   ops open, `end_op` is not last and commits nothing — so the blocking
-   wait is a real, load-bearing piece of the implementation.)
+   concludes breaks; and it is what real sync means.
+
+   THE CODE, and why its one-commit wait meets the spec.  `sys_sync`
+   takes `log.lock`; if `!committing && outstanding == 0` it returns at
+   once (the log is empty — the last `end_op` committed and cleared
+   it); otherwise it waits until `log.ncommit` (a commit counter bumped
+   after each `commit()`, log.c:180) advances by ONE.  One commit
+   suffices by a case split at the lock: `committing` implies
+   `outstanding == 0` (`begin_op` blocks while committing, so no op is
+   open), hence the in-progress commit's batch already contains every
+   delta linearized before the call; and with the group merely open,
+   all older batches are committed and every remaining pre-sync delta
+   sits in (or will join) the current group's log, which the next
+   commit writes in full — the log only grows between commits.  So
+   `ncommit + 1` IS "the commit covering the invocation-time batch".
+   Note `sys_sync` never runs `begin_op` — it is not a transaction, it
+   only watches the counter — which both sidesteps the naive
+   `begin_op(); end_op()` shape (that pair commits NOTHING while other
+   ops are open) and means sync does not delay the group it waits on.
+   Caveat, safety vs liveness: with ops outstanding, quiescence needs
+   `out = 0`, and `begin_op` admits new ops into the open group, so a
+   continuous op stream defers the commit unboundedly.  The spec above
+   is safety-only; termination of `sys_sync` would need a fairness
+   assumption and is out of scope here.
 3. **PER-NODE PERSISTENCE (the only rule most consumers use).**
 
    ```
