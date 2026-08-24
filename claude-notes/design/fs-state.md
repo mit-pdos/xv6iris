@@ -296,8 +296,9 @@ The log exposes, and knows, only this:
   the block written; both are `∀`-bound because they are the log's own
   parked indices, which no caller can name.
   **`Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs']> Dc)` is not provable at an arbitrary
-  `Ψ`**, so it is a PREMISE of the three AU adapters
-  (`SpecLogWrite.lw_au_lb0` / `lw_au_whole` / `lw_au_rec`) and of the three
+  `Ψ`**, so it is a PREMISE of the two AU adapters whose input has no
+  payload move (`SpecLogWrite.lw_au_lb0` / `lw_au_rec`; `lw_au_whole`
+  relays one and needs none) and of the three
   forms that used to be Ψ-free (`wp_log_write_gen` / `_gene` / `_sconf`,
   which now take `log_ctx_at Ψ …`).  A supplier discharges it by handing
   the log its own durable step through the log's SECOND law:
