@@ -1160,15 +1160,45 @@ map at home blocks); 1d lands last.
           DROP the explicit `fsLinkG` binders in `FsCfgBoot`, `BootShared`
           and `SystemAdequacy` (they would otherwise be a second instance
           path).  Do that FIRST; it is self-contained and green on its own.
+          `FsCrash`, `LogInv`, `LogDefs`, `SysUnlinkBudget`, `RiscvPtsto`
+          (and the first five of those are BELOW `Xv6G.v`, so they bind
+          members explicitly anyway).
+        - The camera moved to `Xv6Cameras.v` as **`fslinkUR`** — NOT
+          `linkUR`: section 11 of that file declares the inode CACHE's
+          `linkUR`, a different camera of the same name, and the
+          `FsState*` stack reaches `Xv6Cameras` through `BioDefs`'
+          re-export.  `FsStateLink.v` gained a direct
+          `Require Import Xv6Cameras` (an `Import` does not propagate
+          through a `Require Export`, and a capacity class that is merely
+          REQUIRED has inert field instances).
+        - The explicit `!fsLinkG Σ` binders are GONE from `FsCfgBoot`,
+          `BootShared`, `SystemAdequacy` (both theorems) and
+          `FsStateEra` — the last found by durable-notes' one-bundle scan,
+          which now runs clean with `fsLinkG` in its member list.
+        - **THE TRAP IT SPRANG is the positional-`@` one**, and it is
+          worth copying: `SystemAdequacy`'s two
+          `refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ gen …)`
+          lost one `_` each, and the error was
+          *"The term `gen` has type `nat` while it is expected to have
+          type `gstate`"* — it names the first argument that mis-lands,
+          never the binder.
+      - [ ] **THE BODY, AND WHAT IT COSTS (surveyed 2026-08-24; this is
+        the ruling the orchestrator owes).**  `P_wf`'s body is still
+        `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
+        and `fs_dstep_rebase` still holds.  Four findings left:
         - **(ii) `fs_dbytes` HAS NO THEORY AT ALL** — four use sites, zero
           lemmas.  Everything below needs one lemma first:
           `fs_dbelems g (fs_dbytes D) ⊣⊢ [∗ map] b ↦ bs ∈ D, blk_owned Γ_D b bs`
-          under `∀ b bs, D !! b = Some bs → length bs ≤ BSIZE`.  Route:
-          `fs_dbytes_lookup` by `map_fold_ind`, then
-          `map_seqZ (b₁·BSIZE) bs₁ ##ₘ map_seqZ (b₂·BSIZE) bs₂` for
-          `b₁ ≠ b₂`, then `map_fold_insert_L` (whose commutation premise is
-          restricted to keys of the map, so the length side condition
-          discharges it), then `map_ind` + `big_sepM_union`.  ~200 lines.
+          under `∀ b bs, D !! b = Some bs → length bs ≤ BSIZE`.  Route,
+          all four tools CHECKED to exist at this switch: `map_fold_insert_L`
+          (its commutation premise is restricted to keys of the map, so the
+          length premise discharges it through `map_union_comm`) gives
+          `fs_dbytes (<[b:=bs]> D) = map_seqZ (b·BSIZE) bs ∪ fs_dbytes D`;
+          `lookup_map_seqZ_is_Some` gives
+          `map_seqZ (b₁·BSIZE) bs₁ ##ₘ map_seqZ (b₂·BSIZE) bs₂` at `b₁ ≠ b₂`;
+          then `map_ind` + `big_sepM_union` + iris'
+          `big_sepM_map_seqZ`.  (stdpp's `map_fold_ind` is `Local` — use
+          `map_ind` and the insert equation.)  ~200 lines.
         - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN `S`,
           because `free_pool`'s blocks have EXISTENTIAL contents.**  So
           `fs_footprint Γ_D S ⊣⊢ fs_dbelems γD (some map of S)` cannot be
@@ -1265,6 +1295,20 @@ map at home blocks); 1d lands last.
             tree passes ambiently — `riscv_disk_name`'s precedent.
 
 ## Stage 3 — the vertical spike: `sys_mknod`
+
+**ORDERING RULING (2c, 2026-08-24): STAGE 3 IS NOT AFTER 2c'S BODY, IT IS
+PART OF THE SAME GREEN CHECKPOINT.**  `LogInv.log_psi_commit` is quantified
+over ALL `M`/`L`, so at a real `fs_dstep` the boot's `Ψ := fun _ => emp` can
+no longer discharge it (producing a state change from nothing), and the only
+payload that can is one holding the era's own byte ELEMENTS — which is what
+pins the law's `∀ L` to the payload's own state through the LENT byte auth.
+That payload then has to be re-established by every `log_write` AU, i.e. by
+each of the eleven suppliers, appending its own `Γ_D` step.  A supplier that
+appends the IDENTITY is honest only for a write that touches no home block,
+and there is no such write.  So: `P_wf`'s flip, the payload's real content
+and the suppliers' per-object steps land TOGETHER or not at all.  The one
+thing that IS separable, and is landed, is the plumbing (2c-names,
+2c-fslink).
 
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
