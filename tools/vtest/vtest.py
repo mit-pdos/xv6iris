@@ -46,13 +46,13 @@ def config(name):
     the model must admit EVERY execution the hardware has, so such a test is
     captured as a SET of observations rather than one."""
     src = os.path.join(TESTDIR, name + ".S")
-    cfg = {"repeat": 1, "drives": "cache=writeback"}
+    cfg = {"repeat": 1, "drives": "cache=writeback", "smp": 1, "serial_in": ""}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
         if m:
             for kv in m.group(1).split():
                 k, _, v = kv.partition("=")
-                cfg[k] = int(v) if k == "repeat" else v
+                cfg[k] = int(v) if k in ("repeat", "smp") else v
     return cfg
 
 def build(name):
@@ -99,16 +99,39 @@ class Qmp:
                 out += int(w, 16).to_bytes(4, "little")
         return out[:nbytes]
 
-def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback"):
+def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback",
+        smp=None, serial_in=None):
+    # smp and serial_in default to the test's own `vtest:` directive, so a
+    # direct vtest.run("conc_foo") behaves the same as the command line.
+    cfg = config(name)
+    if smp is None: smp = cfg["smp"]
+    if serial_in is None:
+        serial_in = bytes(int(x, 0) for x in cfg["serial_in"].split(",")) \
+                    if cfg["serial_in"] else b""
     elf, text = build(name)
     d = tempfile.mkdtemp(prefix="vtest-")
     qmp  = os.path.join(d, "qmp")
     disk = os.path.join(d, "disk.img")
+    ser  = os.path.join(d, "serial.out")
+    sock = os.path.join(d, "serial.sock")
     with open(disk, "wb") as fh: fh.write(b"\0" * (512 * disk_sectors))
     pre = open(disk, "rb").read()
     q = subprocess.Popen([QEMU, "-machine", "virt", "-bios", "none",
-        "-kernel", elf, "-display", "none", "-serial", "none",
-        "-smp", "1", "-m", "128M",
+        "-kernel", elf, "-display", "none",
+        # THE SERIAL CHANNEL IS CAPTURED, not discarded: it is how a `uart`
+        # test observes what the 16550 actually transmitted.  It is NOT the
+        # channel other tests report through -- printing a result costs ~10
+        # instructions per character and the model executes every one.
+        #
+        # A test that needs the UART to RECEIVE declares `serial_in=` and gets
+        # a socket instead of an output file, so the runner can push bytes in.
+        # Receiving is the only externally-driven event in the whole suite:
+        # on the model side those same bytes are a SCHEDULE choice, the
+        # [SUartRx] arm of VSched, delivered where the test says.
+        *(["-chardev", f"socket,id=s0,path={sock},server=on,wait=off",
+           "-serial", "chardev:s0"] if serial_in else
+          ["-serial", f"file:{ser}"]),
+        "-smp", str(smp), "-m", "128M",
         # without this QEMU is a LEGACY virtio-mmio device (Version = 1)
         "-global", "virtio-mmio.force-legacy=false",
         "-drive", f"file={disk},if=none,format=raw,id=x0,{drive_opts}",
@@ -116,13 +139,31 @@ def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback"):
         "-qmp", f"unix:{qmp},server,nowait"],
         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     deadline = time.time() + timeout
+    sc, sout = None, b""
     try:
         m = Qmp(qmp, deadline)
+        if serial_in:
+            while time.time() < deadline:
+                try:
+                    sc = socket.socket(socket.AF_UNIX); sc.connect(sock); break
+                except OSError: time.sleep(0.01)
+            else: raise RuntimeError("QEMU never opened its serial socket")
+            sc.setblocking(False)
+            sc.sendall(serial_in)
         t0, done = time.time(), False
         while time.time() < deadline:
+            if sc is not None:
+                try: sout += sc.recv(4096)
+                except BlockingIOError: pass
+                except OSError: pass
             if int.from_bytes(m.read(ABI["RESULT_BASE"], 4), "little") == ABI["DONE_MAGIC"]:
                 done = True; break
             time.sleep(0.005)
+        if sc is not None:
+            for _ in range(20):
+                try: sout += sc.recv(4096)
+                except BlockingIOError: time.sleep(0.005)
+                except OSError: break
         result = m.read(ABI["RESULT_BASE"], ABI["RESULT_SIZE"])
         ms = (time.time() - t0) * 1000
     finally:
@@ -133,12 +174,15 @@ def run(name, disk_sectors=128, timeout=15.0, drive_opts="cache=writeback"):
         try: q.wait(timeout=5)
         except subprocess.TimeoutExpired: q.kill(); q.wait()
     post = open(disk, "rb").read()
+    serial = sout if serial_in else (open(ser, "rb").read()
+                                     if os.path.exists(ser) else b"")
     changed = [(i, post[i*512:(i+1)*512]) for i in range(len(pre)//512)
                if pre[i*512:(i+1)*512] != post[i*512:(i+1)*512]]
     if not done:
         sys.exit(f"{name}: guest never set the DONE flag within {timeout}s "
                  f"(status word = 0x{int.from_bytes(result[4:8],'little'):08x})")
-    return dict(name=name, text=text, result=result, disk=changed, ms=ms)
+    return dict(name=name, text=text, result=result, disk=changed, ms=ms,
+                serial=serial)
 
 # ------------------------------------------------------------------- gen ----
 
@@ -158,6 +202,7 @@ def gen(r, alts=None):
     path = os.path.join(ROCQDIR, mod + "Gen.v")
     disk = ";\n   ".join("(%d, [%s])" % (i, lit(b)) for i, b in r["disk"]) or ""
     alts = alts or [bytes(r["result"])]
+    ser = lit(r["serial"])
     results = ";\n   ".join("[%s]" % lit(a) for a in alts)
     open(path, "w").write(f"""(* {mod}Gen.v -- GENERATED by tools/vtest/vtest.py from
    tools/vtest/tests/{r['name']}.S and one QEMU run.  Do not edit: run
@@ -182,6 +227,10 @@ Definition {low}_qemu_result : list Z :=
 Definition {low}_qemu_disk : list (Z * list Z) :=
   [{disk}].
 
+(* what the 16550 actually transmitted, as the host saw it *)
+Definition {low}_qemu_serial : list Z :=
+  [{ser}].
+
 (* Every DISTINCT result region observed over {len(alts)} distinct
    observation(s) of this test.  More than one means QEMU itself has more
    than one legal execution here, and the model must admit each of them. *)
@@ -192,7 +241,7 @@ Definition {low}_qemu_results : list (list Z) :=
 
 # ------------------------------------------------------------------ main ----
 
-def repeat(name, n, drive_opts):
+def repeat(name, n, drive_opts, smp=1):
     """Run a test n times and report the DISTINCT observations.
 
     The model must admit every execution the hardware has, so a test whose
@@ -202,8 +251,9 @@ def repeat(name, n, drive_opts):
     publication order and a real device does not have to."""
     seen = {}
     for _ in range(n):
-        r = run(name, drive_opts=drive_opts)
-        key = (bytes(r["result"]), tuple((i, bytes(b)) for i, b in r["disk"]))
+        r = run(name, drive_opts=drive_opts, smp=smp)
+        key = (bytes(r["result"]), tuple((i, bytes(b)) for i, b in r["disk"]),
+               bytes(r["serial"]))
         seen.setdefault(key, 0)
         seen[key] += 1
     return seen
@@ -242,7 +292,7 @@ def main():
             seen = {}
             for opts in drives:
                 for _ in range(reps):
-                    rr = run(n, drive_opts=opts)
+                    rr = run(n, drive_opts=opts, smp=cfg["smp"])
                     seen.setdefault(bytes(rr["result"]), rr)
             disks = {tuple((i, bytes(b)) for i, b in rr["disk"]) for rr in seen.values()}
             if len(disks) != 1:
@@ -255,7 +305,7 @@ def main():
                   f"sectors changed: {[i for i,_ in r['disk']] or 'none'}")
             print("  ->", os.path.relpath(gen(r, alts), ROOT))
         elif a.repeat:
-            seen = repeat(n, a.repeat, a.drive_opts)
+            seen = repeat(n, a.repeat, a.drive_opts, config(n)["smp"])
             print(f"{n}: {a.repeat} runs [{a.drive_opts}] -> "
                   f"{len(seen)} distinct observation(s)")
             for k, (key, cnt) in enumerate(sorted(seen.items(), key=lambda kv: -kv[1])):
@@ -265,8 +315,8 @@ def main():
                 print(f"  [{k}] x{cnt}  sectors={[i for i,_ in key[1]]}")
                 print(f"        +4..+64: {words}")
         else:
-            r = run(n, drive_opts=a.drive_opts)
-            print(f"{n}: DONE in {r['ms']:.0f} ms, status="
+            r = run(n, drive_opts=a.drive_opts, smp=config(n)["smp"])
+            print(f"{n}: DONE in {r['ms']:.0f} ms, serial={len(r['serial'])}B, status="
                   f"0x{int.from_bytes(r['result'][4:8],'little'):08x}, "
                   f"sectors changed: {[i for i,_ in r['disk']] or 'none'}")
 

@@ -25,5 +25,5 @@ Proof. reflexivity. Qed.
 (* A test that ran out of budget and one that got stuck both report [None];
    this is what tells them apart, and it is the number to raise if a future
    edit to the program makes the test go red with an empty result. *)
-Lemma core_smoke_budget : budget_left 200 (start core_smoke_text) = 171%nat.
-Proof. vm_cast_no_check (eq_refl 171%nat). Qed.
+Lemma core_smoke_budget : budget_left 200 (start core_smoke_text) = 167%nat.
+Proof. vm_cast_no_check (eq_refl 167%nat). Qed.

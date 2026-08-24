@@ -141,6 +141,32 @@ been wrong and is not.
   the delay were longer and would FAIL if the model had made the pin
   synchronous.
 
+## 4b. OPEN DECISIONS -- questions the suite raised and cannot answer
+
+**Which machine is the model claiming to be?**  `core_regs_mcsr` found the
+extension set differing in BOTH directions: QEMU's default rv64 virt CPU has
+the hypervisor extension and the model does not (finding 19, and `mideleg`
+follows from it), while the model implements `mseccfg`, `mstateen0`,
+`sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg` and `ssp`, which that CPU
+answers with an illegal-instruction trap (finding 22).
+
+Finding 22 is the only row in the whole table where the model is WIDER than
+the hardware, and under this suite's premise -- QEMU-virt is the reference --
+the hardware's trap then has no model execution, which is the unsound
+direction.  But it may be no bug at all: `sail-config-rv64d.json` decides
+which extensions exist, so this may simply mean the two are configured for
+different machines.
+
+Two ways to settle it, and the choice is the owner's:
+- the model is meant to be QEMU's virt board -> 19 and 22 are real gaps and
+  the Sail config should be reconciled with `-cpu rv64`;
+- the model is meant to be a machine with a different extension set -> pin the
+  QEMU command line to match (e.g. `-cpu rv64,h=false,smstateen=on`) and both
+  rows become configuration notes rather than findings.
+
+Recorded 2026-08-24, deferred by the owner.  Until it is settled both rows
+stay in the findings table UNCLASSIFIED, and no test depends on the answer.
+
 ## 5. WHAT IS LEFT, in the order it is worth doing
 
 1. **`disk_ident` — the stuck matrix.** The cheapest remaining findings, and

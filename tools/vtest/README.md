@@ -32,6 +32,7 @@ whose definitions are `disk_rw_text`, `disk_rw_qemu_result`, ...  Areas:
 | `disk` | the virtio-mmio block device (`VirtioModel.v`) |
 | `uart` | the 16550 (`DevModel.v`'s UART half) |
 | `plic` | the interrupt controller ITSELF -- arbitration, priorities, thresholds, several sources |
+| `conc` | shared memory between harts.  Uses `vtest-rocq/VConc.v` and `smp=` rather than the single-hart harness. |
 
 **The area is what the test is ABOUT, not everything it touches.**
 `disk_intr` drives the PLIC and reads `mip`, but it exists to check the
@@ -70,15 +71,64 @@ observations through memory are ~40 instructions / 2 s.
 They come from the ABI and from what the model is:
 
 - Only the regions in `abi.h` are mapped.  Anything else is a STUCK model.
-- No dependence on `a0`/`a1`.  QEMU's `-kernel` passes hartid and a device-tree
-  pointer; the model's reset register file does not.
+- No dependence on `a1`/`a2`.  a0 (hartid) agrees, but the model writes a1 to
+  a hardcoded `0x1000` that is not the DTB address (finding 18) and never
+  writes a2 at all.
 - No LR/SC: `exec` treats the reservation outcomes as stuck.
 - `-smp 1`.  The model has 8 harts, but a schedule that only ever steps hart 0
   is a legal execution, so this costs nothing.
+- **A bad FETCH is a TRAP LOOP, not `VStuck`.**  `mtvec` is 0 at power-on, so
+  an illegal instruction sends the pc to 0, where the fetch at an undeclared
+  address raises an access fault that traps back to 0 -- forever.  The status
+  is `VBudget`, and the way to tell it from a small budget is to pin the pc at
+  two different step counts (`CoreRegsFpr.v` does).  `VStuck` is for DATA
+  accesses the model refuses.
+- **The clock never ticks.**  The harness always steps `riscv_step false`, so
+  `mcycle`/`cycle`/`time` are frozen while `minstret` DOES advance -- which is
+  the control showing the freeze is about the clock and not about counters in
+  general.  Consequence: no vtest image can observe elapsed time, so this
+  suite cannot reach the timer-interrupt path at all, and `mip.MTIP` can only
+  ever appear as power-on garbage.
+- **QEMU's `-kernel` boot contract** passes a0 = hartid, a1 = the DTB pointer,
+  AND a2 = `0x1028` (virt's reset ROM leaves a pointer to the `fw_dynamic`
+  info struct there).  The model's chain writes a0 and a1 and nothing else;
+  a2 is admitted as a witness.  See finding 18 for a1.
+- **Do not write FCR bit 0 in a test that receives.**  Flipping FIFO-enable
+  flushes the receive path, and the host's first byte is already in QEMU's
+  holding register before the guest's first instruction runs -- an FCR
+  FIFO-enable at the top of the program silently eats byte 1 (measured: reads
+  `0x42` first, 8 runs of 8).  Relatedly, with the FIFOs off QEMU delivers one
+  character at a time and re-offers the next only after RHR is read, so any
+  "LSR bit 0 immediately after a read" field is a race against the host rather
+  than a fact about the device; order plus a spin before each read
+  establishes the same property deterministically.
+- **Use `lla`, never `la`, to materialise an address.**  `la` assembles to a
+  GOT load; the GOT is outside `.text` and the image is built with
+  `objcopy -j .text`, so it is not in the image at all.  The model then reads
+  an undeclared address and goes STUCK -- which looks exactly like a genuine
+  "the model does not decode this" finding.  Whenever a test reports `VStuck`,
+  check `stuck_pc` against
+  `riscv64-linux-gnu-objdump -d tools/vtest/build/<name>.elf` and confirm the
+  instruction it names is the access you meant to test.
 - The QEMU command line is fixed by `vtest.py`, and
   `-global virtio-mmio.force-legacy=false` is part of it: without that flag
   QEMU presents a LEGACY virtio-mmio device (Version reads 1, not 2) and every
   register test disagrees for the wrong reason.
+
+## QEMU quirks that look like findings
+
+- **The virt PLIC is built with `num-priorities = 7` and silently ignores any
+  priority or threshold write above 7.** A probe using threshold 9 looks
+  exactly like "the threshold does not mask".  Keep every value <= 7.
+- **QEMU's `sifive_plic_write` does not recompute the context notification on
+  an ENABLE write**, so it lags by one register access.  `plic_mask.S`
+  re-writes the threshold with its existing value right after the enable write
+  to force the recompute; that write is a no-op on the model side.
+- QEMU defaults to LEGACY virtio-mmio (Version reads 1);
+  `-global virtio-mmio.force-legacy=false` is in the fixed command line.
+- A QEMU process that outlives its test holds the disk image's write lock, and
+  the next run dies with "Failed to get write lock"; the runner quits it in a
+  `finally`.
 
 ## Recording a divergence
 
@@ -106,11 +156,29 @@ does not exist).
 
 | # | what | model | QEMU | kind | found by |
 |---|------|-------|------|------|----------|
-| 1 | `QueueNumMax`, and `QueueNum` writes | 8, only {1,2,4,8} accepted | 1024 | incompleteness | `disk_rw` |
+| 1 | `QueueNumMax`, and `QueueNum` writes | 8, only {1,2,4,8} accepted | 1024 | incompleteness | `disk_rw`, `disk_ident_qnum` |
 | 2 | offered / negotiated features | `FLUSH\|CONFIG_WCE`, negotiates 0 | `0x30006e54`, negotiates `0x6454` | incompleteness | `disk_rw` |
-| 3 | `DeviceFeaturesSel` (0x14), `DriverFeaturesSel` (0x24) | not decoded -- the store is STUCK | writable | incompleteness | not yet covered |
+| 3 | `DeviceFeaturesSel` (0x14), `DriverFeaturesSel` (0x24) | not decoded -- the store is STUCK | writable; the high feature word is `0x101`, and a full 1.x negotiation acking `VERSION_1` reaches Status 11 | incompleteness | `disk_ident_featsel`, `disk_ident_drvfsel` |
 | 4 | **`used.ring[i].len`** | `vr_len` (the data descriptor's length) in both directions | 1 for a write, 513 for a read | **defect** | `disk_rw`, `disk_order` |
 | 5 | **completion ORDER of two in-flight requests** | publication order ONLY | either order | **unsoundness** | `disk_order` |
+| 6 | UART MCR (4), MSR (6), SCRATCH (7): read as 0, writes discarded | `0` / `0` / `0` | `3` / `0xb0` / `0x5a` | incompleteness | `uart_regs` |
+| 7 | UART ISR bits 7:6 (FIFOs-enabled) hardcoded set | `0xc1` at reset | `0x01` until FCR enables the FIFOs | incompleteness | `uart_regs` |
+| 8 | UART THRE interrupt modelled as a LEVEL, not latched | second ISR read still `0xc2` | second read `0xc1` -- the read cleared it | incompleteness | `uart_regs` |
+| 9 | the UART window decodes width 1 only | a 4-byte read is STUCK | returns `0x00000008` (the bus narrows to register 4) | incompleteness | `uart_width` |
+| 10 | **PLIC claim ignores the context THRESHOLD** | returns the masked source and clears its pending bit | returns `0`, the source stays pending | **unsoundness** (and a defect) | `plic_thresh` |
+| 11 | PLIC M-context registers (enable 0x2000, threshold 0x200000, claim 0x200004) not decoded | STUCK at the first M access | services all three | incompleteness | `plic_mctx` |
+| 13 | virtio CONFIG SPACE: capacity (0x100) and ConfigGeneration (0x0fc) | not decoded -- STUCK | capacity **128 sectors**, exactly the backing file | incompleteness | `disk_ident_cap`, `disk_ident_confgen` |
+| 14 | virtio `QueueReset` (0x0c0) and the SHM registers (0x0ac..) | not decoded -- STUCK | `QueueReset` 0; `SHMLen` all-ones | incompleteness | `disk_ident_qreset`, `disk_ident_shmsel` |
+| 15 | sub-word access anywhere in the virtio window (1- and 2-byte, read and write) | not decoded -- STUCK | reads give 0; a 1-byte Status write is a NO-OP | incompleteness | `disk_ident_rd1/rd2/wr1` |
+| 16 | a per-queue write with `QueueSel` /= 0, and `QueueNotify` /= 0 | REFUSED -- STUCK | both ignored | incompleteness | `disk_ident_qsel`, `disk_ident_notify` |
+| 17 | a descriptor chain that is not exactly THREE descriptors | the device STALLS (`virtio_stalled`); only `DevStepDiskWild` covers it | served normally -- 512 bytes written, status 0 | incompleteness in practice | `disk_chain` |
+| 18 | **`a1` at entry** -- the device-tree pointer | `0x1000`, a HARDCODED constant in `rv64d.v`'s `init_boot_requirements` | the real DTB address (`0x87e00000`), which moves with `-m` and the image | **defect** (boot contract) | `core_regs_gpr` |
+| 19 | `misa` bit 7 (H), and `mideleg` as its consequence | H absent; `mideleg` 0 | H present; `mideleg` `0x1444` (VSSIP/VSTIP/VSEIP/SGEIP, hardwired when H is implemented) | incompleteness | `core_regs_mcsr` |
+| 20 | `menvcfg` bit 61 (ADUE) at POWER-ON | `0` -- `ArchReset.board_regs` pins the whole value | `0x2000000000000000` | incompleteness, and a FALSE board assumption | `core_regs_mcsr` |
+| 21 | `misa` advertises F and D but the model has NO F/D instructions | `fsd` takes an illegal-instruction trap (`mcause` 2, `mtval` = the encoding) | executes | incompleteness + internal inconsistency | `core_regs_fpr` |
+| 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
+| 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received -- the holding register is not cleared by a read nor by an FCR clear, only the DR FLAG is | incompleteness | `uart_rx` |
+| 12 | PLIC source 0's priority register not decoded (`plic_read`/`plic_write` gate on `0 <? off`), and `plic_nsrc` is 32 where the board has 96 | STUCK | offset 0 is read-only zero; source 32 is a real register | incompleteness | `plic_prio0` |
 
 Finding 4 is the one worth acting on.  The spec defines the used element's
 `len` as the number of bytes written into the DEVICE-WRITABLE part of the
@@ -157,6 +225,97 @@ reachable-window argument (`virtio_queue_ok`'s `S`, closed under advancing by
 one until it reaches `ai`) are stated against exactly the assumption this
 breaks.
 
+### Finding 10 is the second one with no model execution
+
+`plic_cand` is `pending && enabled && (0 < priority)` and never mentions the
+threshold; the threshold appears in `plic_eip` alone.  So **the model's
+notification and its own claim disagree with each other**: a source masked by
+the threshold raises no notification, yet `plic_claim` hands it back and
+clears its pending bit.  QEMU returns 0 and leaves the source pending, so
+lowering the threshold later re-exposes it.
+
+Like finding 5, this is not merely a wrong value: `plic_read`'s claim arm is a
+pure function of `plic_state`, so no schedule can produce QEMU's answer.
+
+It is not live in xv6 -- `plicinithart` writes threshold 0 -- **but
+`PlicPlan.v` deliberately leaves the per-hart threshold completely free**, so
+the device invariant admits exactly the states where the two disagree.
+
+The fix is three tokens and makes the two halves agree by construction: move
+the threshold conjunct from `plic_eip` into `plic_cand` (where it subsumes
+`0 < priority`), leaving `plic_eip := existsb (plic_cand p h) plic_srcs`.
+
+### One divergence where the MODEL is right
+
+`plic_level` shows the model re-forwarding a still-asserted level source after
+`plic_complete`, where QEMU does not: QEMU's PLIC takes pending off the RISING
+edge only.  A level gateway that re-forwards is the spec-faithful behaviour --
+it is why a driver acknowledges the DEVICE before completing at the PLIC -- so
+no model change is wanted.  The model does have a matching execution (`SLatch`
+is never forced), but `VSched.settle` is eager and takes every enabled arm, so
+this test cannot exhibit it.  Exhibiting it needs a `run_until` variant
+parameterised by the device policy; until then it is recorded, not reproduced.
+
+### Finding 17, and why the wild arm earns its keep
+
+`chain_at` requires exactly three descriptors, so a 4-descriptor
+scatter-gather chain leaves the device `virtio_stalled` and it never
+completes -- `run_status` reads `VBudget`, and `disk_chain` confirms
+`virtio_stalled = true` after 700 instructions, so it is a real stall and not
+a small budget.
+
+But this is **incompleteness in practice, not unsoundness**, and the
+difference is the whole point of the "model UB as anything, never as nothing"
+rule: `DevStepDiskWild` is enabled *exactly when* `virtio_stalled` holds, so
+the model's transition relation genuinely does contain QEMU's behaviour --
+the device may write anything anywhere, which includes writing what QEMU
+wrote.  What the model does not contain is anything a driver PROOF could use.
+`DiskChain.v` states both halves off the model (`model_refuses_longer_chains`,
+`model_stalled_leaves_only_wild`) rather than off the test.
+
+Exhibiting it would need a hand-written schedule interleaving ~550 `SCpu`
+steps around one `SDiskWild` carrying ~530 (address, byte) pairs built
+mechanically from the capture; `DiskChain.v` section 5 records what that takes.
+
+### A correction to finding 4
+
+`disk_err` runs the UNSUPP and FLUSH paths, where the model reports `used.len`
+= 512 and QEMU reports 513 -- but the **spec** says 1 on both, since neither
+path writes the data buffer.  So on these paths QEMU is not spec-conforming
+either, and finding 4's fix must be stated against the SPEC (bytes actually
+written into the device-writable part of the chain), not against QEMU's value.
+
+### OPEN DECISION (finding 22): which machine is the model claiming to be?
+
+Every other row is the model being NARROWER than the hardware.  Finding 22 is
+the reverse: the model implements CSRs that QEMU's default rv64 virt CPU
+answers with an illegal-instruction trap.  Under this suite's premise --
+QEMU-virt is the reference hardware -- the hardware's TRAP then has no model
+execution, which is the unsound direction.
+
+But it may not be a bug at all: it may just mean the model is configured for a
+different machine than `-cpu rv64` gives us (`sail-config-rv64d.json` decides
+which extensions exist).  The same axis produces finding 19 in the opposite
+direction -- QEMU has H and the model does not.
+
+**This needs a decision that is not the suite's to make: WHICH machine is the
+model claiming to be?**  If it is QEMU's virt board, findings 19 and 22 are
+both real gaps and the config should be reconciled.  If it is a machine with a
+different extension set, the QEMU command line should be pinned to match
+(e.g. `-cpu rv64,h=false,smstateen=on`) and both rows become configuration
+notes rather than findings.  Until that is settled they are recorded, not
+classified.
+
+### Finding 21, and what it costs
+
+`model-xv6iris/sail-modules.txt` includes `FD_core` -- the registers, `fcsr`,
+and the CSR plumbing -- but no F/D INSTRUCTION modules, so the decoder has no
+floating-point instructions at all while `misa` bits 3 and 5 promise them.
+`fsd ft0,8(s11)` takes an illegal-instruction trap with `mstatus.FS` correctly
+set to Initial first, so FS is not the cause.  The fix is a one-liner either
+way: add the modules, or set F/D `supported: false` in the config so `misa`
+stops promising them.
+
 ### Capturing a nondeterministic test
 
 Because QEMU has more than one legal execution here, `disk_order` is captured as
@@ -185,6 +344,93 @@ have been wrong and is not.
   backing file by the time its process exits, so the raw-file diff is a sound
   channel -- and the model's `v_disk` agrees with it byte for byte, including
   on a multi-sector (8-sector) request.
+- **The UART transmit path end to end** (`uart_tx`, `uart_dlab`, `uart_regs`):
+  `uart_write` at offset 0 -> `uart_tx_pop` -> `uart_acc` is exactly the byte
+  sequence the host received, in order, nothing lost or duplicated; `uart_lsr`
+  is `0x60` with the FIFO empty at every point either machine can be asked,
+  including one instruction after a THR store, and LSR reads are pure.
+- **The DLAB divisor-latch aliasing** (`uart_dlab`), which is what the whole
+  `un_dlab` ghost in `design/device.md` exists for: LCR bit 7's polarity,
+  offset 0 aliasing to DLL and offset 1 to DLM, IER unaffected by a DLM
+  store, the aliasing not sticky, and a byte written to offset 0 with DLAB
+  set NOT reaching the wire.
+- **PLIC arbitration, both clauses** (`plic_arb` + `plic_tie`): with the disk
+  at priority 3 and the UART at 7 the claim returns the HIGHER id 10 over the
+  pending, enabled id 1 -- ids are scanned in order, so only the priority
+  comparison explains it -- and the same program with equal priorities
+  reverses the order to 1-then-10.  The pair pins both clauses of
+  `plic_better`; either alone is passed by a half-wrong implementation, and
+  QEMU breaks ties the same way.
+- **The rest of the controller** (`plic_thresh`, `plic_mask`, `plic_level`):
+  the threshold gates the NOTIFICATION strictly and in both directions (equal
+  is masked, and the pin follows down and back up); the enable bit is not the
+  gateway (a disabled source still latches, is not claimable, and becomes
+  claimable when the bit is set later with no new device edge); a claim clears
+  that source's pending bit and no other and marks it claimed, and neither
+  source re-latches while claimed; `plic_complete` touches `p_claimed` only;
+  claiming with nothing pending returns 0 and disturbs nothing; the pending
+  word carries two bits (`0x402`), which `plic_pending_word`'s fold had never
+  been exercised past one; and pending is sticky across the source going quiet.
+- **The two-device interrupt fabric**: the UART raises PLIC source 10 with no
+  serial input at all (IER bit 1, empty FIFO), and `dev_irq_level`'s
+  two-source dispatch agrees with the machine.
+- **The UART raises BOTH interrupts, all the way into `mip`** (`uart_irq_tx`,
+  `uart_irq_rx`): IER bit clear -> nothing pending; bit set -> the line goes
+  high -> the gateway latches source **10** -> the wire sets `mip` bit 9; the
+  ISR names the cause (2 = THRE, 4 = rx available); the S-context claim hands
+  back 10; the condition removed and completed -> pending and SEIP clear.
+  Identical on both machines at every step of both chains.  This is the first
+  test to raise source 10 at all, so it is the first evidence that the UART is
+  wired to the controller AND to the right source.  It also BOUNDS finding 8:
+  after QEMU's ISR read drops the line, QEMU still reports source 10 pending
+  and SEIP set, because the gateway holds a forwarded request until it is
+  claimed -- and `plic_latch` does the same -- so the model's level treatment
+  of THRE costs no extra PLIC-visible interrupt on this path.  Only the
+  TRANSMIT condition has the wrong edge; the receive interrupt is a level on
+  real hardware too.
+- **The virtio RESET command** (`disk_ident`), never exercised before: Status
+  -> 0, `QueueReady` -> 0 without the driver clearing it, ISR -> 0, and the
+  offered features untouched.  `virtio_reset` keeping only `v_disk` is what
+  the hardware does.
+- **The error paths** (`disk_err`): an unrecognised request type is an ANSWER,
+  not a silence -- status 2 (UNSUPP) and a used-ring slot, with zero data
+  movement on both channels and the disk unchanged; and a `FLUSH` from a
+  driver that DECLINED `VIRTIO_BLK_F_FLUSH` still completes OK on QEMU, so the
+  model's unconditional recognition of type 4 is faithful.  The ISR is a bit
+  and not a count: still 1 after three completions.
+- **Per-queue READS at a queue that does not exist** (`disk_ident`): both
+  answer 0.  A driver may LOOK at queue 1; it may not TOUCH it.
+- **The whole S-mode CSR file, the whole PMP file, and the whole HPM file**
+  (`core_regs_scsr`, `core_regs_pmp`, `core_regs_hpm`) agree byte for byte
+  over the entire result region.  None is vacuous: `sstatus` is derived
+  through the model's `lower_mstatus` window onto the board-written `mstatus`;
+  `satp = 0` is what makes "translation is off until `start()` turns it on"
+  true OF THE MACHINE; and `ArchReset.v` says pmpcfg is explicitly NOT a board
+  obligation -- the spec's own `reset_pmp` establishes `pmp_all_off` over
+  arbitrary garbage -- so those sixteen zero entries are produced by the
+  model's reset CODE, and this is the check that the code's answer is the
+  machine's answer.  The HPM test also exercises a permission path: an M-mode
+  read of the UNPRIVILEGED alias with `mcounteren = 0` must succeed, because
+  `mcounteren` gates S and U and not M, and the model does not wrongly refuse.
+- **`mstatus = 0xA00000000`** (`core_regs_mcsr`): `ArchReset.board_regs`'
+  power-on obligation for mstatus -- SXL = UXL = 2 and everything else clear,
+  the part `reset_sys` does NOT establish -- is a true statement about this
+  board.
+- **`mip` and `tselect` are WITNESSED, not findings** (`core_regs_mcsr`): the
+  model admits QEMU's values from a legal power-on file.  `tselect` is the
+  instructive one -- `read_CSR 0x7A0` returns `not_vec tselect`, the
+  architecture's "no trigger selectable" stub, so the default's all-ones
+  readback is just `init_regstate`'s zero complemented; preset the register to
+  all-ones and the read gives QEMU's 0.  This is exactly the case a raw diff
+  would have mis-reported as a divergence.
+- **The UART receive datapath** (`uart_rx`), ten of eleven observations
+  exact: bytes come out IN ORDER (`u_rx` really is a FIFO -- a LIFO or a
+  one-deep register gives a different answer here); RHR pops EXACTLY one byte
+  per read, established without a race by reading three of a four-byte queue
+  and finding the fourth still there; LSR bit 0 tracks the FIFO across the
+  whole sequence and is not sticky in either direction; and FCR bit 1 clears
+  the receive FIFO -- a live `uart_write` arm no test had touched on the rx
+  side, and what `uartinit` writes at boot.
 - **The whole interrupt path** (`disk_intr`): the device raising its line, the PLIC
   gateway latching source 1, the wire driving hart 0's `sig_seip` (visible in
   `mip`), the S-context claim returning the source and clearing pending, the

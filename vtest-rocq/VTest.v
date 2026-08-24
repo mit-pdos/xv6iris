@@ -145,6 +145,48 @@ Fixpoint budget_left (n : nat) (s : mstate) : nat :=
   end.
 
 (* ---------------------------------------------------------------------- *)
+(* 3b. WHY a run did not finish.                                           *)
+(*                                                                         *)
+(*     [run_until] answers [None] for two very different reasons, and the   *)
+(*     difference is usually the point of the test.  A STUCK machine means  *)
+(*     the model has no transition -- an MMIO offset or access width it     *)
+(*     does not decode, a register write it refuses, an access outside the  *)
+(*     regions the test declared.  That is a FINDING when the hardware      *)
+(*     completes the same program, and a test states it positively:         *)
+(*                                                                         *)
+(*       Lemma foo_model_stuck : run_status N (start_dma foo_text) = VStuck.*)
+(*       Lemma foo_stuck_at : stuck_pc N (start_dma foo_text) = 0x800000ab. *)
+(*                                                                         *)
+(*     A budget that merely ran out is a broken test, not a finding, and    *)
+(*     reads [VBudget] instead.  [stuck_pc] names the instruction, so the   *)
+(*     test says WHICH access the model refuses rather than only that one   *)
+(*     of them did.                                                        *)
+(* ---------------------------------------------------------------------- *)
+
+Inductive vstatus := VDone | VStuck | VBudget.
+
+Fixpoint run_status (n : nat) (s : mstate) : vstatus :=
+  if flag_set s then VDone else
+  match n with
+  | 0%nat => VBudget
+  | S n' => match exec (riscv_step false) s with
+            | Some (_, s') => run_status n' (settle dev_fuel s')
+            | None => VStuck
+            end
+  end.
+
+(* the pc the machine was stuck AT, or -1 if it did not get stuck *)
+Fixpoint stuck_pc (n : nat) (s : mstate) : Z :=
+  if flag_set s then -1 else
+  match n with
+  | 0%nat => -1
+  | S n' => match exec (riscv_step false) s with
+            | Some (_, s') => stuck_pc n' (settle dev_fuel s')
+            | None => bv_unsigned (register_lookup (R_bitvector_64 PC) (sregs s))
+            end
+  end.
+
+(* ---------------------------------------------------------------------- *)
 (* 4. The observations, in the same currency vtest.py captures them.       *)
 (*    A byte the map does not hold reads as -1, which no real byte can be,  *)
 (*    so "the model never wrote here" is visible rather than silently zero. *)
@@ -160,6 +202,18 @@ Definition result_of (o : option mstate) : list Z :=
   match o with
   | None => []
   | Some s => peek_mem (mem s) result_base result_size
+  end.
+
+(* WHAT THE UART TRANSMITTED, in the same currency vtest.py captures from
+   QEMU's serial file.  [uart_acc] is every byte the device has ACCEPTED --
+   [u_out ++ u_tx], the transmitted prefix plus whatever is still in the
+   FIFO -- which is the right notion here: a byte the driver pushed is
+   observable on the host whether or not the model has drained it yet, and
+   [VSched.settle] drains eagerly anyway. *)
+Definition serial_of (o : option mstate) : list Z :=
+  match o with
+  | None => []
+  | Some s => bv_unsigned <$> uart_acc (duart (mdev s))
   end.
 
 (* the disk, per 512-byte sector, in the shape [<name>_qemu_disk] carries *)
