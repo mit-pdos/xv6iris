@@ -2339,3 +2339,29 @@ this stage or 2c's body.**
 - [ ] Delete what `fs-state.md` §6 says is superseded once its last
       consumer is gone; update `fs-ghost-state.md`, `fs-log.md`,
       `fs-bitmap.md`, `fs-inode.md` to the `Γ` vocabulary.
+
+- **3b'' (STOPPED by owner ruling — the kinds/geometry tie is REJECTED;
+  see the pending structured-shape ruling).**  Nothing committed; the
+  backed-out work (22 files, era equations complete, finding-2 range
+  conjuncts defined) is preserved at
+  `scratchpad/lane-3bpp-backed-out.patch` in the session dir.  Three
+  findings to keep:
+  1. `riscv_power_adequacy` must gain a client-chosen
+     `Pdur : fs_dur_names → Prop` (established in `HPc`, delivered in
+     `Hboot`) — `HPc` returns the bundle existentially, so NO property
+     of it is provable at the `xv6_boot_era` sites without this.  Any
+     design needing a boot-time fact about the durable bundle pays it.
+  2. Finding 2's real cost is era-side: `bitmap_inv` needs a maintained
+     pool-range clause (`bitmap_meta_used`), whose `bfree` preservation
+     needs a new `SpecBfree` premise supplied by `itrunc` off
+     `blkmap_wf` (all three `ProofItrunc` sites hold `bitmap_inv`).
+     The image side is free (`FsImgBridge.img_slot_range` already
+     proves and discards it).
+  3. Arity: reading geometry off the AMBIENT `riscv_fsdur` in a
+     `riscvGS` section costs zero call-site edits (compiled clean
+     through `InodeInv`/`InodeLock`/`IcacheInv`/`FsImgBridge`/
+     `FsStateEra`); a `bmapstart` parameter on `blkmap_wf` reaches ~110
+     sites + six contracts with nothing to pass.  Do NOT push the
+     ambient trick below `FsState` (`riscvGS` under `FsState` fails at
+     `inode_owned`) — deliver such facts to `inode_local` consumers as
+     hypotheses.
