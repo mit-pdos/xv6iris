@@ -1206,6 +1206,21 @@ Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
    commit: `γtop_L`'s auth (inodes), the bitmap invariant's used set, and
    the config's superblock.
 
+8. **Where the per-op residue lives (orchestrator, 2026-08-25, over lane
+   4b's wall).**  `Ψ D₀ Dc` cannot distinguish an ended op from an open
+   one, so the local half rides a PURE ROW of `LogInv.log_state`: each
+   op's ledger entry carries an INUM SET (threaded through `log_opS`
+   exactly like `Sb`; the log treats it as an opaque `gset Z`), and a
+   client-chosen predicate `Φ : gset Z → Prop` (anti-monotone in the
+   union of open ops' sets) is carried as the row "every inode in no
+   open op's set is `inode_local`".  Growth at `log_write` is free
+   (anti-monotonicity); `end_op` removes its own set and pays
+   `SpecEndOp`'s pure, op-local residue for the inums that newly qualify
+   — which are exactly its own, because an inode serially taken by a
+   second still-open op stays in that op's set.  At `out = 0` the union
+   is `∅` and the row IS `snap_local`.  Block-keyed `pend` is UNSOUND for
+   this (an inode block is shared by 16 inums) — hence inums.
+
 Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
 (`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
 and at every commit.
