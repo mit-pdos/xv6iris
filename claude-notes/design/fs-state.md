@@ -384,6 +384,42 @@ when the durable structure lags the era's by the batch's own earlier writes.
 Items 4 and 5 of the accessor plan (the eleven suppliers' steps, the commit's
 close) are downstream of both and were not attempted.
 
+## 4¾. RULING (owner, 2026-08-24): DEFERRED JUSTIFICATION — the transaction, not the write, is the unit of durable justification
+
+Issued after 3a′'s machine-checked refutation (`FsDurRefute.v`): the strict
+predicate cannot be the per-`log_write` intermediate (xv6 frees the bitmap
+bit one logged write before the record stops naming the block), and a
+∀-quantified per-write obligation re-imports completeness through the
+quantifier.  The fix is the transaction discipline itself:
+
+1. **Each open op's ledger entry carries its DEFERRED WRITES** — a map
+   `block → written bytes` of logged writes not yet justified against the
+   durable predicate.  `log_write`'s AU offers TWO ARMS: justify-now
+   (supply the strict-to-strict step; the parked chain advances) or defer
+   (the bytes join your ledger entry; the chain does not move).
+2. **The parked payload is indexed `(D₀, D_justified)`** with one pure row
+   in `log_state`: `D_justified` overlaid with the open ops' deferred maps
+   `= lm_logged L`.  At quiescence the ledger is empty, `D_justified = L`,
+   and the commit runs the chain — concluding `D' = L` at the home level.
+3. **`end_op` requires ONE fupd over the op's remaining deferred set** —
+   the op's own writes, `emp`-shaped when the set is empty.  This is where
+   entangled writes (bfree's bit + itrunc's record; balloc's bit + bzero +
+   the adopting record write; a link's nlink write + entry write) are
+   justified TOGETHER, at the moment the ownership transfer is coherent.
+4. **Consequences:** the strict `fs_state` is the ONLY durable object —
+   the in-transit bin and the explicit-pool relaxation (§4½'s residuals,
+   `FsDurRefute` §C) are unnecessary and not built; the per-write
+   obligation is pinned (the AU hands the writer `D_justified`'s tie to
+   the logged view; its era byte elements pin it at its object) — no ∀
+   over durable maps; `P_wf` stays standalone-structured (§4½ (2)) with
+   the boot-minted per-inum existence witnesses.
+
+The eleven suppliers classify as justify-now (writei's data writes, plain
+record flushes with no ownership motion) or defer-to-end (balloc ×2,
+bfree, ialloc's claim, the linked nlink/entry pairs); a deferring op's
+end_op fupd is its composed movers — the op-level content in its rightful
+place.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
