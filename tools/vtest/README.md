@@ -186,7 +186,7 @@ does not exist).
 | 21 | `misa` advertises F and D but the model has NO F/D instructions | `fsd` takes an illegal-instruction trap (`mcause` 2, `mtval` = the encoding) | executes | incompleteness + internal inconsistency | `core_regs_fpr` |
 | 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
 | 24 | **THE MEMORY MODEL: the model is sequentially consistent** | one shared `gmem`, a store is global the instant it retires -- (0,0) unreachable | store-buffering gives **(0,0) in a few percent of runs**, which RVWMO permits | **UNSOUNDNESS** | `conc_sb` |
-| 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | incompleteness (harness-blocking) | `conc_amo` |
+| 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | **out of scope: LR/SC is not supported** | `conc_amo` |
 
 <a id="findings-fixed"></a>
 ## Findings fixed
