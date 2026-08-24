@@ -1816,6 +1816,11 @@ this stage or 2c's body.**
         `eo_arm` (+ `eo_arm_empty`), `commit_conclusion`.  Audit at the
         three-entry baseline.
 - [x] **3a-val. OBJECT-GRANULAR (§4⅞) VALIDATED: all three load-bearing
+      - RATIFIED (orchestrator, 2026-08-24): 3a-val's repair — the
+        `dres_flat` reading (bit objects resource-free; every block its own
+        `DBlk`; the durable pool at the full block set, `free_pool_at_full`;
+        no durable `free_pool_used`, the panic argument being era-side).
+        The implementation lane builds on the validated core verbatim.
       claims hold, with ONE refutation inside claim 1 and a one-line
       repair.**  The lane's product is `iris/FsDurObj.v` (1487 lines, one
       `_CoqProject` row, no existing statement moved, every lemma `Qed`,
