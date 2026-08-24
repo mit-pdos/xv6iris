@@ -19,6 +19,11 @@
 #define RESULT_SIZE  0x1000
 #define DMA_BASE     0x80200000   /* zero-filled; virtqueue + data buffers */
 #define DMA_SIZE     0x2000
+/* zero-filled, 4 KB-aligned, four pages: room for an Sv39 root plus a full
+   three-level walk.  Declared only by tests that enable paging -- every
+   declared byte is a gmap insert on the model side, so this is not free. */
+#define PT_BASE      0x80300000
+#define PT_SIZE      0x4000
 
 /* RESULT layout: +0 done flag, +4 test-defined status, +8.. payload. */
 #define RES_DONE     0

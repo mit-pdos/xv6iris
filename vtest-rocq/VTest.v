@@ -43,6 +43,7 @@ Definition text_base   : Z := 0x80000000.
 Definition stack_base  : Z := 0x80090000.  Definition stack_size  : nat := 4096.
 Definition result_base : Z := 0x80100000.  Definition result_size : nat := 4096.
 Definition dma_base    : Z := 0x80200000.  Definition dma_size    : nat := 8192.
+Definition pt_base     : Z := 0x80300000.  Definition pt_size     : nat := 16384.
 Definition done_magic  : Z := 0x444f4e45.
 
 (* ---------------------------------------------------------------------- *)
@@ -85,6 +86,13 @@ Definition std_regions : list region :=
 Definition dma_regions : list region :=
   std_regions ++ [(dma_base, dma_size)].
 
+(* ...and what a test that turns PAGING on needs: four 4 KB-aligned pages for
+   an Sv39 root and a full three-level walk.  The walk reads these through
+   the PHYSICAL map, so they have to be declared like any other memory --
+   an undeclared PTE address makes the walk itself stuck. *)
+Definition pt_regions : list region :=
+  std_regions ++ [(pt_base, pt_size)].
+
 (* The device fabric a test starts from is [DevModel.dev0_state] -- power-on:
    FIFOs empty, PLIC masked, virtio reset, disk blank -- or, for a test that
    reads a sector it did not write, [VSched.dev_of img] with a seeded image.
@@ -100,6 +108,7 @@ Definition start_disk (text : list Z) (rs : list region)
 
 Definition start     (text : list Z) : mstate := start_with text std_regions.
 Definition start_dma (text : list Z) : mstate := start_with text dma_regions.
+Definition start_pt  (text : list Z) : mstate := start_with text pt_regions.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. Stepping.                                                            *)

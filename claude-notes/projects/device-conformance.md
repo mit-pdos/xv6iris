@@ -2,13 +2,25 @@
 
 ## STATUS (2026-08-24)
 
-LANDED and green: `make vtest`, **46 test programs** across six areas (`core`,
-`disk`, `uart`, `plic`, `conc`), and **25 recorded divergences from real
-hardware, THREE of them unsoundnesses**, beside a long list of confirmations.
+LANDED and green: `make vtest`, **55 test programs** across six areas (`core`,
+`disk`, `uart`, `plic`, `conc`, `pt`), and **26 recorded divergences from real
+hardware, THREE of them unsoundnesses** plus one that is unsound in direction
+only (finding 26, the direct-mapped TLB), beside a long list of
+confirmations.
 Nothing here changes the model: this effort's output is a register of findings
 plus the machinery that keeps producing them.
 
 **The three unsoundnesses, in the order they matter:**
+
+0. **Page-table translation is now covered** (`pt_*`, nine tests): the walk,
+   the fault matrix with `stval` byte offsets, three-level and megapage
+   descents, the reserved and misaligned-superpage checks, and -- for the
+   first time against hardware -- **the Svadu A/D write-back arm, which is
+   faithful in both the A and the D case**, and the Svade faulting arm.  The
+   write-back is also EXECUTABLE under `exec`, so finding 25's `sc.w` problem
+   does not reach it; but the conditional write always succeeds there, which
+   makes `update_and_write_pte`'s `Ok false -> internal_error` arm unreachable
+   by this harness.
 
 1. **The memory model is sequentially consistent and the architecture is not**
    (finding 24, `conc_sb`).  Store buffering gives (0,0) on QEMU in a few

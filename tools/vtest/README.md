@@ -32,6 +32,7 @@ whose definitions are `disk_rw_text`, `disk_rw_qemu_result`, ...  Areas:
 | `disk` | the virtio-mmio block device (`VirtioModel.v`) |
 | `uart` | the 16550 (`DevModel.v`'s UART half) |
 | `plic` | the interrupt controller ITSELF -- arbitration, priorities, thresholds, several sources |
+| `pt` | Sv39 translation: the walk, the TLB, page faults, and the A/D write-back.  S-mode, `start_pt`. |
 | `conc` | shared memory between harts.  Uses `vtest-rocq/VConc.v` and `smp=` rather than the single-hart harness. |
 
 **The area is what the test is ABOUT, not everything it touches.**
@@ -102,6 +103,15 @@ They come from the ABI and from what the model is:
   "LSR bit 0 immediately after a read" field is a race against the host rather
   than a fact about the device; order plus a spin before each read
   establishes the same property deterministically.
+- **A `pt_` program must pin `menvcfg.ADUE` explicitly, before `satp`.**
+  Power-on ADUE DIFFERS (finding 20): clear in the model, set on the machine.
+  So a page table written the natural way (`V|R|W|X`, no A/D) needs an A/D
+  update on its first access, which FAULTS in the model and SUCCEEDS on QEMU
+  -- and that makes an unrelated translation test diverge in a way that looks
+  like a walk bug.  Set or clear bit 61 deliberately in every `pt_` program;
+  Svadu is the natural default, being what `start()` gives xv6.  QEMU does
+  accept the CLEAR (verified -- ADUE is WARL, so this was not a given), so the
+  Svade arm is testable on hardware too.
 - **Use `lla`, never `la`, to materialise an address.**  `la` assembles to a
   GOT load; the GOT is outside `.text` and the image is built with
   `objcopy -j .text`, so it is not in the image at all.  The model then reads
@@ -174,7 +184,8 @@ does not exist).
 | 17 | a descriptor chain that is not exactly THREE descriptors | the device STALLS (`virtio_stalled`); only `DevStepDiskWild` covers it | served normally -- 512 bytes written, status 0 | incompleteness in practice | `disk_chain` |
 | 18 | **`a1` at entry** -- the device-tree pointer | `0x1000`, a HARDCODED constant in `rv64d.v`'s `init_boot_requirements` | the real DTB address (`0x87e00000`), which moves with `-m` and the image | **defect** (boot contract) | `core_regs_gpr` |
 | 19 | `misa` bit 7 (H), and `mideleg` as its consequence | H absent; `mideleg` 0 | H present; `mideleg` `0x1444` (VSSIP/VSTIP/VSEIP/SGEIP, hardwired when H is implemented) | incompleteness | `core_regs_mcsr` |
-| 20 | `menvcfg` bit 61 (ADUE) at POWER-ON | `0` -- `ArchReset.board_regs` pins the whole value | `0x2000000000000000` | incompleteness, and a FALSE board assumption | `core_regs_mcsr` |
+| 20 | `menvcfg` bit 61 (ADUE) at POWER-ON | `0` (Svade), so an access needing A/D FAULTS | `0x2000...` (Svadu), so hardware writes the bit back | incompleteness, and a FALSE board assumption | `core_regs_mcsr`, `pt_ad` |
+| 26 | **the model's TLB is DIRECT-MAPPED (64 entries, `tlb_hash` = the low 6 bits of the VPN)** | at a colliding VPN the entry is evicted by the very next fetch, so a PTE rewritten WITHOUT `sfence.vma` is re-walked and the NEW mapping is used | keeps the stale entry | unsound direction, but see below | `pt_tlb` |
 | 21 | `misa` advertises F and D but the model has NO F/D instructions | `fsd` takes an illegal-instruction trap (`mcause` 2, `mtval` = the encoding) | executes | incompleteness + internal inconsistency | `core_regs_fpr` |
 | 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
 | 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received -- the holding register is not cleared by a read nor by an FCR clear, only the DR FLAG is | incompleteness | `uart_rx` |
@@ -314,6 +325,47 @@ tell a correct one from a missing one.
 
 The model reproduces the three SC outcomes, whole result region each, lined up
 with the capture order (`conc_sb_model_admits_every_sc_outcome`).
+
+### Finding 26 is a different shape from the other three
+
+`pt_tlb` rewrites a level-0 leaf without `sfence.vma` and reads again, at two
+VAs chosen to land in different TLB sets.  At **set 7 both machines keep the
+stale entry** -- that is the control.  At **set 0 QEMU keeps it and the model
+has already re-walked**, 20 runs of 20.
+
+The cause is exact: `tlb` is a `vec (option TLB_Entry) 64` and `tlb_hash` is
+literally the low `num_tlb_entries_exp = 6` bits of the VPN, so the TLB is
+DIRECT-MAPPED -- and every fetch in a vtest image is at VPN `0x80000` with
+every result store at `0x80100`, both `= 0 (mod 64)`, so a set-0 entry is
+evicted by the next instruction.
+
+Unlike findings 5, 10 and 24 the model is not missing a FREEDOM -- set 7 shows
+it can keep a stale entry.  It has a smaller, less associative TLB, and both
+are legal implementations.  The risk is directional rather than structural: a
+theorem over this model can conclude "the access after a PTE write uses the
+new mapping" where the real machine uses the old one.  Only software that
+omits `sfence.vma` is exposed, and nothing in xv6 is -- but the model hands
+such a program the favourable answer instead of refusing it.
+
+A fix is not more capacity: any deterministic finite TLB collides somewhere.
+It would have to make eviction NONDETERMINISTIC -- the `DevStepDiskWild`
+over-approximation shape applied to `translate`.  Recorded, not proposed.
+
+### The A/D write-back IS executable, and why `sc.w` is not
+
+`pt_adu` runs two write-backs under `vm_compute` at ordinary cost -- no hang,
+no `VStuck`, no `internal_error`.  The `sc.w` non-termination of finding 25
+does not reach this path, and the reason is structural: `execute_STORECON`
+goes through the opaque platform axioms `match_reservation`/
+`cancel_reservation`, which `exec` cannot step, whereas
+`write_pte_conditional` is `mem_write_value_priv ... con = true` -- an
+ordinary `Interface.MemWrite` outcome.  `exec` answers it `inl None` and
+`write_ram` maps that to `true`.
+
+**Consequence worth knowing: the conditional write ALWAYS succeeds under
+`exec`, so the `Ok false -> internal_error` arm of `update_and_write_pte` is
+unreachable by this interpreter.**  Not a defect -- the limit of what a test
+in this suite can probe.
 
 ### OPEN DECISION (finding 22): which machine is the model claiming to be?
 
@@ -494,6 +546,32 @@ have been wrong and is not.
   machines answer 8.  The atomicity claim is deliberately weak and the file
   says so: `CCpu` is instruction-granular, so no schedule here could split an
   AMO in the first place.
+- **S-mode with paging on, end to end** (`pt_ident`): the PMP TOR grant that
+  S-mode cannot run without, the `satp` write and `sfence.vma`, `mret` to
+  Supervisor, a level-2 leaf taking 30 offset bits, and FETCH through
+  translation as well as load and store.
+- **The A/D write-back arm against real hardware** (`pt_adu`), for the first
+  time -- both the A case and the D case, checked by reading the PTE word back
+  out of the page-table page: `0x07 -> 0x47` and `0x47 -> 0xC7`, upper 54 bits
+  identical, i.e. the write-back rewrote exactly the flag bits to the same
+  word the hardware wrote.  And **the Svade arm** (`pt_ade`): the model
+  refuses exactly where the hardware refuses, and writes nothing.
+- **The fault matrix** (`pt_fault`): five refusals and one grant, with
+  `scause`, `sepc` AND `stval` identical in all five.  `stval` carries the
+  faulting VIRTUAL address including the sub-page byte offset -- a model
+  reporting the page-aligned VA, the PA, or the PTE address would fail here --
+  and the instruction-fetch case attributes `sepc` to the unmapped VA itself,
+  not to the `jalr`.  `sstatus.SUM` gates the identical U-page load in both
+  directions on both machines.
+- **The walk really descends** (`pt_levels`): a three-level walk to a 4 KB
+  leaf, and a level-1 megapage whose 21-bit offset is checked by a store 1 MB
+  in landing where it should.
+- **Two checks a translation model could quietly have omitted and did not**:
+  the reserved leaf encoding R=0/W=1 (`pt_resv`) and the misaligned superpage
+  (`pt_super`).  Each has a control mapping built from the same PPN that
+  works, so the fault is attributable to the CHECK and not to the table.
+- **`medeleg` bits 12/13/15**: the M-mode backstop never fired in any of the
+  nine images, and `sfence.vma` flushes totally on both machines.
 - **The whole interrupt path** (`disk_intr`): the device raising its line, the PLIC
   gateway latching source 1, the wire driving hart 0's `sig_seip` (visible in
   `mip`), the S-context claim returning the source and clearing pending, the
