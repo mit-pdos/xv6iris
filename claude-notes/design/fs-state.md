@@ -1137,6 +1137,41 @@ entry map is NOT empty, where `fn_orphan` flips and the dot entries'
 exemption moves with it (`ent_tok_orph_up` is the lemma; `mkdir`'s child
 is the case).  The landed pair covers `mknod`'s non-growing arm.
 
+## 4⁹ RULING (owner, 2026-08-25): SNAPSHOT COMMITS — the durable instance is re-allocated per commit, never updated
+
+Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
+`fdn_*` geometry fields, `FsDurLedger`'s fold as the commit path, and
+`FsDurWire`'s law family).  The design:
+
+1. **No durable ghost is ever updated.**  At each group commit the
+   committer ALLOCATES a fresh gname family `Γ_{k+1}` (byte map, top map,
+   link family) at the quiescent state's values, proves
+   `P_fs[Γ_{k+1}]` at birth, advances a small EPOCH POINTER carried by
+   the crash predicate, and DISCARDS `Γ_k` (affine).  Allocation is
+   unconditionally frame-preserving — every update-wall of the project
+   (auth-in-frame, completeness, geometry, ordering) is thereby vacated.
+2. **The transport does not consume the era's instance**:
+   `P_fs[Γ_L] ==∗ P_fs[Γ_L] ∗ P_fs[Γ_fresh]` — the commit reads the
+   VALUE `S_L` off the `γtop_L` AUTHORITY (parked in the openable
+   payload invariant; the ipool mask wall is never touched — values,
+   not pieces), the bytes tie accumulates per-write from each writer's
+   own splice fact, the local clauses at quiescence ride as per-op pure
+   residue completed at `end_op`, and the WAL's row (b) gives
+   `bytes(S_L) = fr_D'` as a pure equality AT BIRTH.  Mid-op windows
+   never reach a snapshot (snapshots are quiescence-only).
+3. **Snapshots are frozen, hence may be PERSISTENT**: each commit yields
+   an immutable certificate; sync-style receipts are copies; the boot
+   mint (stage 4) reads the current snapshot without borrowing; the
+   spike theorem reads the child's entry off the snapshot directly.
+4. **The historical caveat, answered**: this is re-minting, but with the
+   crash predicate carrying the epoch pointer and `P_log`'s committed-view
+   tie CONTINUOUSLY, the cross-era loop invariant survives; the
+   snapshot's strength is still tested by its consumer (the boot mint).
+
+Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
+(`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
+and at every commit.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
