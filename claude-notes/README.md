@@ -69,8 +69,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   SNAPSHOT COMMITS: the durable instance is re-ALLOCATED at every group
   commit and never updated, so the transport lemma IS the allocator; its
   as-built (§4⁹a) has the persistent byte points-to that makes the
-  construction take a VALUE and PURE FACTS only, the encoder's
-  injectivity, and the one residual (a batch's pure FRAME).
+  construction take a VALUE and PURE FACTS only and the encoder's
+  injectivity; §4⁹b splits the tie into a byte half that a batch
+  accumulates and a per-inode LOCAL half no write can disturb, derives the
+  batch's FRAME from the used-set COUPLING, shows the byte half PINS every
+  node, and states the one open ruling (how the local half accumulates
+  across an op's end).
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
   split, the crash-spanning disk invariant.
@@ -152,9 +156,11 @@ first five were audited against the tree 2026-08-22):
   placeholder lemmas tree-wide), the `Γ`-predicates (2a), and the in-era
   flip (2b: bitmap, region records, the era payload, link tokens as a
   counting RA), and the SNAPSHOT TRANSPORT the durable flip turns on (4,
-  `iris/FsDurSnap.v`).  IN FLIGHT: the flip itself — `P_wf` is still the
-  flat blob, and the batch's PURE accumulation is what is left — then the
-  `sys_mknod` spike, then boot re-founding + delete `Himg` (stage 4).  The byte-view attempt is archived in
+  `iris/FsDurSnap.v`) with its tie SPLIT and the batch's FRAME off the
+  used-set coupling (4b).  IN FLIGHT: the flip itself — `P_wf` is still
+  the flat blob, and the payload's LOCAL half is the one open ruling
+  (§4⁹b) — then the `sys_mknod` spike, then boot re-founding + delete
+  `Himg` (stage 4).  The byte-view attempt is archived in
   `completed/durable-disk-byteview.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`

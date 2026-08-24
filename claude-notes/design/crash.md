@@ -599,14 +599,25 @@ already priced at zero.  The link family's `● nlink` has no core, so the
 BUNDLE is not persistent; nothing borrows it, because every consumer reads
 the pure `snap_ok`, which is.
 
-WHAT THE SNAPSHOT RULING DOES **NOT** REMOVE, and it is the flip's residual:
-a batch's writes still have to carry the tie from one commit's state to the
-next, and the FRAME half of that (`FsDurSnap.snap_ok_frame`) needs "no
-clause of `snap_ok S` reads block `b`" — a claim about every inode at once.
-At the era it is free (the `∗`, via `blk_owned_ne`); as an accumulated PURE
-fact it is not, and no writer's splice fact supplies it.  So the batch's
-accumulation is still a LEDGER — 3c/3d's, minus its resources and its
-hands.
+**THE BATCH'S FRAME IS THE USED-SET COUPLING, AND THE BYTE HALF PINS THE
+OBJECTS (4b).**  The tie SPLITS: `snap_ok S D = snap_bytes S D ∧
+snap_local S`.  `snap_bytes` — the byte tie plus the representation
+clauses plus the coupling (metadata blocks are marked in use; a node's own
+blocks are marked in use and are no metadata block; no two nodes share
+one) — is true even MID-OP and is what a batch accumulates; `snap_local`
+is the per-inode `inode_local` and does not mention `D`, so no write can
+disturb it.  The frame's hypothesis then comes off ONE object at ONE
+writer: a block whose bit reads CLEAR is untouched
+(`snap_untouched_of_free`, the ADOPT case, off the writer's own bitmap
+AU), and a block that is my node's is untouched by every clause but mine
+(`snap_untouched_of_own`).  The coupling is exactly the image's W3+W4+W5,
+so boot owes nothing new.  And with the representation clauses on the byte
+side the three byte ties DETERMINE each node (`snap_bytes_node_inj`),
+which is what lets a writer read the payload's existentially-bound state
+as its own — the reason the accumulation can be state-free at all.  What
+is still open is the LOCAL half's accumulation across concurrent ops in
+one batch; `fs-state.md` §4⁹b has the finding and the proposed row over
+the log's `pend`.
 
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 

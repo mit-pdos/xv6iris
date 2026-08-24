@@ -2502,6 +2502,71 @@ this stage or 2c's body.**
         current snapshot's inode map and its parent's entry map); what is
         missing is the flip that puts `P_dur` into `P_fs` and the batch
         accumulation above.
+- [ ] **4b. THE FLIP: the tie SPLITS and the FRAME lands; the payload's
+      LOCAL half needs a ruling.**  The lane's product is `iris/FsDurSnap.v`
+      §§1a–1f (no new file, no `_CoqProject` row, no existing statement
+      outside that file moved, every lemma `Qed`, all ten stated theorems
+      `Closed under the global context`); the design account is
+      `fs-state.md` §4⁹b and `crash.md`'s snapshot paragraph.  **`P_fs`'s
+      durable conjunct is still `LogDefs.fs_dview`, none of the nine
+      suppliers moved, and `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash`/
+      `ProofInitlog` are untouched** — the flip is one green checkpoint
+      (the ordering ruling) and its accumulation half is not closed.
+      Whole tree green; audit at the three-entry baseline.
+      - **ADDENDUM 7's ITEM 1, LANDED.**  `snap_ok S D = snap_bytes S D ∧
+        snap_local S`; the coupling (`sk_meta_used` / `sk_own_used` /
+        `sk_disj`, over `snap_meta` and `fn_owns`) rides the byte half;
+        `snap_untouched_of_free` and `snap_untouched_of_own` derive the
+        frame's hypothesis from ONE fact about ONE object, so NO WRITER
+        MEETS THE QUANTIFIER.  `snap_bytes_frame` / `snap_ok_frame` /
+        `snap_meta_sb`/`_bmap`/`_reg` are the readings.
+      - **THE COUPLING IS THE IMAGE'S W3+W4+W5** (`fs_inode_blocks_disjoint`
+        and `fs_bitmap_wf`, whose bit is set below `fs_data_start` and at
+        every used block), so `P_fs_alloc`'s boot side owes nothing new.
+      - **THE ONE THING ADDENDUM 7 DID NOT NAME, and the accumulation
+        cannot do without: the byte half must PIN THE OBJECTS.**  A pure
+        payload binds its state EXISTENTIALLY, so a writer owes a fact
+        about a state it did not choose while its resources are about the
+        ERA's.  The five REPRESENTATION clauses of `inode_local` —
+        `dinode_wf`, `inl_ent_len`, `inl_ind_zero`, `inl_blk_dom`,
+        `inl_blk_top`, gathered as `inode_repr` — are therefore in
+        `snap_bytes`, not in `snap_local`, and then `snap_bytes_node_inj`
+        (with `snap_bytes_sb_inj` and `snap_bytes_used_agree`) says two
+        states admitted by one committed map agree on every node.  Leave
+        them on the local side and `S` is underdetermined at exactly
+        `fn_ent` (whose only pin needs the array's LENGTH) and `fn_blk`'s
+        DOMAIN.  They are true mid-op — they say the node IS the reading
+        of its bytes and nothing about the file system.
+      - **THE OPEN RULING: the LOCAL half's accumulation.**  Addendum 7
+        puts the per-op residue "into the payload's local half at
+        `end_op`", and `Ψ` cannot carry it: `Ψ` is a function of `D₀` and
+        `Dc`, neither of which distinguishes an ENDED op from an open one.
+        A `∀ S`-shaped clause does not frame across a write (given
+        `snap_bytes S (<[b:=bs]> D)` there need be no `S₀` at `D` with the
+        same node); an `∃ S`-shaped one does frame, but must name the
+        inums it does not claim, and the only set that SHRINKS at `end_op`
+        is the log's PENDING set.  Proposed: `Ψ D₀ Dc := ⌜∃ S, snap_bytes
+        S Dc⌝` per write, plus a new pure row of `LogInv.log_state` over
+        its own `pend` ("every inode whose region block and whose own
+        blocks avoid `pend` is `inode_local`").  `log_state_pend_mono`
+        weakens it for free; `log_state_fin` strengthens it and is where
+        `SpecEndOp`'s residue is spent; at `out = 0`, `pend = ∅` and the
+        row IS `snap_local`.  `LogInv.v`'s header already names this the
+        one place such a row would land.  **The remaining six items of the
+        flip (payload, `P_fs`'s slot and the two permits, the nine
+        suppliers, `ProofInitlog`, the mknod arm and the spike theorem,
+        the deletions) are unstarted and wait on this ruling** — a
+        half-flip is a red tree or a gate, both forbidden.
+      - **THE SPIKE THEOREM, the standing ratification, QUOTED verbatim as
+        the target it remains:**
+        > `ProofSysMknod` keeps the `made` clause; prove `mknod_durable` —
+        > over the commit event: the receipt's `D'` satisfies `D' = L` at
+        > home maps and `D'`'s inode block decodes at `islot inum` to
+        > `create_made ty major minor` and the parent-dir block contains
+        > `(name, inum)`; `Closed under the global context`.
+        Its DURABLE half is landed (`P_dur_node_of_slot` plus
+        `snap_dir_entry_of_first`); what is missing is the flip that puts
+        `P_dur` into `P_fs` and the batch accumulation above.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

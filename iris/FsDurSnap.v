@@ -111,6 +111,54 @@ Definition snap_meta (S : fs_state_rec) (b : Z) : Prop :=
              /\ b = sb_inodestart (fss_sb S) + i `div` 16).
 
 (* ===================================================================== *)
+(*  1a'. THE REPRESENTATION CLAUSES                                       *)
+(*                                                                        *)
+(*  The half of [inode_local] that says a node IS the reading of its own   *)
+(*  bytes: the record is well formed, the entry array has the indirect     *)
+(*  block's length (and is zeroes when there is no indirect block), and a  *)
+(*  slot is held exactly when its address is nonzero.  Nothing here is a   *)
+(*  claim about the file system -- there is no type, no size, no link      *)
+(*  count and no directory clause -- which is why all five survive every   *)
+(*  window a semantic clause does not: a writer that has just spliced a    *)
+(*  record has not made the node stop being that record's reading.         *)
+(*                                                                        *)
+(*  THEY BELONG ON THE ACCUMULATED SIDE, AND THAT IS NOT A CONVENIENCE.    *)
+(*  With them in [snap_bytes], the three byte ties PIN THE NODE            *)
+(*  ([snap_bytes_node_inj] in 1f), so a writer can identify the state the  *)
+(*  PAYLOAD existentially names with the era state its own resources are   *)
+(*  about.  Without them the payload's [S] is underdetermined at exactly   *)
+(*  the two fields a writer must re-prove its own clauses at -- [fn_ent]   *)
+(*  (whose only pin, [ind_bytes_inj], needs the entry array's LENGTH) and  *)
+(*  [fn_blk]'s DOMAIN -- and no era-side fact reaches an existential.      *)
+(*  See claude-notes/projects/durable-disk.md item 4b.                     *)
+(* ===================================================================== *)
+Record inode_repr (n : fs_node) : Prop := MkInodeRepr {
+  inr_rec_wf   : dinode_wf (fn_rec n);
+  inr_ent_len  : length (fn_ent n) = FS_NINDIRECT;
+  inr_ind_zero : fn_indb n = 0 -> fn_ent n = replicate FS_NINDIRECT (bv_0 32);
+  inr_blk_dom  : forall k, (k < FS_MAXFILE)%nat ->
+                   (is_Some (fn_blk n !! k) <-> fn_naddr n k <> 0);
+  inr_blk_top  : forall k, (FS_MAXFILE <= k)%nat -> fn_blk n !! k = None;
+}.
+
+Global Arguments inr_rec_wf {_} _.
+Global Arguments inr_ent_len {_} _.
+Global Arguments inr_ind_zero {_} _.
+Global Arguments inr_blk_dom {_} _.
+Global Arguments inr_blk_top {_} _.
+
+Lemma inode_repr_of_local (i : Z) (n : fs_node) :
+  inode_local i n -> inode_repr n.
+Proof.
+  intros Hl. split.
+  - exact (inl_rec_wf Hl).
+  - exact (inl_ent_len Hl).
+  - exact (inl_ind_zero Hl).
+  - exact (inl_blk_dom Hl).
+  - exact (inl_blk_top Hl).
+Qed.
+
+(* ===================================================================== *)
 (*  1b. THE BYTE HALF: the tie, and the USED-SET COUPLING                 *)
 (*                                                                        *)
 (*  THE ACCUMULATED PURE CONTENT (fs-state.md 4^9, addendum 7): an         *)
@@ -158,8 +206,9 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
   (* every block below the size whose bit reads FREE is a block of [D] *)
   sk_pool   : forall b, 0 <= b < sb_size (fss_sb S) -> b ∉ fss_used S ->
                 is_Some (D !! b);
-  (* the inodes: range, and the three byte ties *)
+  (* the inodes: range, representation, and the three byte ties *)
   sk_inum   : forall i n, fss_inodes S !! i = Some n -> 0 <= i < 2 ^ 32;
+  sk_repr   : forall i n, fss_inodes S !! i = Some n -> inode_repr n;
   sk_rec    : forall i n, fss_inodes S !! i = Some n ->
                 exists bs,
                   D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs
@@ -193,6 +242,7 @@ Global Arguments sk_parse {_ _} _.
 Global Arguments sk_bmap {_ _} _.
 Global Arguments sk_pool {_ _} _.
 Global Arguments sk_inum {_ _} _.
+Global Arguments sk_repr {_ _} _.
 Global Arguments sk_rec {_ _} _.
 Global Arguments sk_blk {_ _} _.
 Global Arguments sk_ind {_ _} _.
@@ -593,6 +643,7 @@ Proof.
     + destruct (sk_pool Hok c Hc Hcu) as [cs Hcs].
       exists cs. exact (Hne _ _ Hcb Hcs).
   - exact (sk_inum Hok).
+  - exact (sk_repr Hok).
   - intros i n Hi.
     destruct (sk_rec Hok i n Hi) as (cs & Hcs & Hrin).
     exists cs. split; [| exact Hrin].
@@ -621,6 +672,131 @@ Lemma snap_ok_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
 Proof.
   intros [Hok Hloc] Hu Hlen.
   exact (conj (snap_bytes_frame S D b bs Hok Hu Hlen) Hloc).
+Qed.
+
+(* ===================================================================== *)
+(*  1f. THE BYTE HALF PINS THE OBJECTS                                    *)
+(*                                                                        *)
+(*  A payload accumulated as a PURE fact binds its state EXISTENTIALLY, so *)
+(*  a writer that must move it owes a fact about a state it did not        *)
+(*  choose -- while every resource it holds is about the ERA's state.      *)
+(*  These are the bridge, and they are what makes the accumulation         *)
+(*  state-free: at one committed map, any two states the byte half admits  *)
+(*  agree on the SUPERBLOCK, on EVERY NODE, and on the BITMAP's bits.  So  *)
+(*  a writer reads the payload's state as its own and re-proves its own    *)
+(*  clauses from its own splice fact; the objects it did not touch ride    *)
+(*  1e's frame.                                                            *)
+(*                                                                        *)
+(*  The used set is pinned only WITHIN THE BITMAP BLOCK, which is right    *)
+(*  and not a weakness: nothing reads a bit above the block               *)
+(*  ([BitmapInv.bitmap_ok] and [free_set] both cut at [sb_size]), so two   *)
+(*  states differing only up there are indistinguishable to every consumer *)
+(*  -- the same argument [FsImg.fs_bmap_set]'s header makes.               *)
+(* ===================================================================== *)
+
+Lemma snap_bytes_sb_inj (S S' : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_bytes S D -> snap_bytes S' D ->
+  fss_sbb S = fss_sbb S' /\ fss_sb S = fss_sb S'.
+Proof.
+  intros H H'.
+  assert (Hb : fss_sbb S = fss_sbb S').
+  { pose proof (sk_sb H) as Hs. rewrite (sk_sb H') in Hs.
+    by injection Hs as <-. }
+  split; [exact Hb |].
+  pose proof (sk_parse H) as Hp. rewrite Hb in Hp.
+  rewrite (sk_parse H') in Hp. by injection Hp as <-.
+Qed.
+
+(* the reading of a node is a function of its record and its entry array,
+   so the two field equalities carry every derived address *)
+Lemma fn_naddr_of_fields (n n' : fs_node) (k : nat) :
+  fn_rec n = fn_rec n' -> fn_ent n = fn_ent n' ->
+  fn_naddr n k = fn_naddr n' k.
+Proof. intros Hr He. rewrite /fn_naddr Hr He //. Qed.
+
+Lemma fn_indb_of_rec (n n' : fs_node) :
+  fn_rec n = fn_rec n' -> fn_indb n = fn_indb n'.
+Proof. intros Hr. rewrite /fn_indb Hr //. Qed.
+
+Theorem snap_bytes_node_inj (S S' : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (n n' : fs_node) :
+  snap_bytes S D -> snap_bytes S' D ->
+  fss_inodes S !! i = Some n -> fss_inodes S' !! i = Some n' -> n = n'.
+Proof.
+  intros H H' Hi Hi'.
+  destruct (snap_bytes_sb_inj S S' D H H') as [_ Hsb].
+  pose proof (sk_repr H i n Hi) as Hrp.
+  pose proof (sk_repr H' i n' Hi') as Hrp'.
+  (* ---- the record ---- *)
+  assert (Hr : fn_rec n = fn_rec n').
+  { destruct (sk_rec H i n Hi) as (bs & Hbs & Hin).
+    destruct (sk_rec H' i n' Hi') as (bs' & Hbs' & Hin').
+    rewrite -Hsb in Hbs'. rewrite Hbs in Hbs'. injection Hbs' as <-.
+    exact (rec_in_blk_inj bs _ (fn_rec n) (fn_rec n')
+             (inr_rec_wf Hrp) (inr_rec_wf Hrp') Hin Hin'). }
+  pose proof (fn_indb_of_rec n n' Hr) as Hib.
+  (* ---- the entry array ---- *)
+  assert (He : fn_ent n = fn_ent n').
+  { destruct (decide (fn_indb n = 0)) as [Hz | Hnz].
+    - rewrite (inr_ind_zero Hrp Hz) (inr_ind_zero Hrp' ltac:(rewrite -Hib; exact Hz)) //.
+    - pose proof (sk_ind H i n Hi Hnz) as Hd.
+      pose proof (sk_ind H' i n' Hi' ltac:(rewrite -Hib; exact Hnz)) as Hd'.
+      rewrite -Hib in Hd'. rewrite Hd in Hd'. injection Hd' as Hib2.
+      apply (ind_bytes_inj (fn_ent n) (fn_ent n'));
+        [rewrite (inr_ent_len Hrp) (inr_ent_len Hrp') // | exact Hib2]. }
+  (* ---- the slot contents ---- *)
+  assert (Hbk : fn_blk n = fn_blk n').
+  { apply map_eq. intros k.
+    destruct (decide (k < FS_MAXFILE)%nat) as [Hk | Hk]; last first.
+    { rewrite (inr_blk_top Hrp k ltac:(lia)) (inr_blk_top Hrp' k ltac:(lia)) //. }
+    pose proof (fn_naddr_of_fields n n' k Hr He) as Hna.
+    destruct (fn_blk n !! k) as [bs|] eqn:Eb;
+      destruct (fn_blk n' !! k) as [bs'|] eqn:Eb'.
+    - pose proof (sk_blk H i n k bs Hi Eb) as Hd.
+      pose proof (sk_blk H' i n' k bs' Hi' Eb') as Hd'.
+      rewrite -Hna in Hd'. rewrite Hd in Hd'. by injection Hd' as <-.
+    - exfalso.
+      assert (Hne : fn_naddr n' k <> 0).
+      { rewrite -Hna. apply (proj1 (inr_blk_dom Hrp k Hk)). by exists bs. }
+      destruct (proj2 (inr_blk_dom Hrp' k Hk) Hne) as [x Hx]. congruence.
+    - exfalso.
+      assert (Hne : fn_naddr n k <> 0).
+      { rewrite Hna. apply (proj1 (inr_blk_dom Hrp' k Hk)). by exists bs'. }
+      destruct (proj2 (inr_blk_dom Hrp k Hk) Hne) as [x Hx]. congruence.
+    - reflexivity. }
+  destruct n as [r e m]; destruct n' as [r' e' m'].
+  cbn in Hr, He, Hbk. by subst.
+Qed.
+
+(* ...and the bitmap's bits, inside the block *)
+Lemma snap_bytes_used_agree (S S' : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) :
+  snap_bytes S D -> snap_bytes S' D -> 0 <= b < 8 * Z.of_nat BSIZE ->
+  (b ∈ fss_used S <-> b ∈ fss_used S').
+Proof.
+  intros H H' Hb.
+  destruct (snap_bytes_sb_inj S S' D H H') as [_ Hsb].
+  (* NOT [injection]: both sides are [bm_bytes BSIZE _], a 1024-element
+     list, and [injection]'s decomposition normalises it -- the sentence
+     does not come back (durable-notes.md, a big-op over a literal-sized
+     list is a reduct, not a value).  [inj Some] is unification only. *)
+  assert (Hm : bm_bytes BSIZE (fss_used S) = bm_bytes BSIZE (fss_used S')).
+  { apply (inj Some). rewrite -(sk_bmap H) -(sk_bmap H') Hsb //. }
+  pose proof (fs_bit_bm_bytes BSIZE (fss_used S) b Hb) as E.
+  pose proof (fs_bit_bm_bytes BSIZE (fss_used S') b Hb) as E'.
+  assert (Heq : bool_decide (b ∈ fss_used S) = bool_decide (b ∈ fss_used S')).
+  { rewrite -E -E' Hm //. }
+  (* the two [Decision]s are spelled out: [apply bool_decide_eq_true_1] on a
+     goal that is not itself a [bool_decide] leaves the instance an evar *)
+  split; intros Hin.
+  - destruct (decide (b ∈ fss_used S')) as [Hy | Hn]; [exact Hy | exfalso].
+    rewrite (@bool_decide_eq_true_2 (b ∈ fss_used S) _ Hin)
+            (@bool_decide_eq_false_2 (b ∈ fss_used S') _ Hn) in Heq.
+    discriminate.
+  - destruct (decide (b ∈ fss_used S)) as [Hy | Hn]; [exact Hy | exfalso].
+    rewrite (@bool_decide_eq_false_2 (b ∈ fss_used S) _ Hn)
+            (@bool_decide_eq_true_2 (b ∈ fss_used S') _ Hin) in Heq.
+    discriminate.
 Qed.
 
 (* ===================================================================== *)

@@ -1270,18 +1270,91 @@ the node's own reading) and `dir_entries_of_first`, packaged as
 `P_dur_node_of_slot` as the Iris reading.  Those are the SPIKE THEOREM's
 durable half.
 
-**THE RESIDUAL, and it is not a resource wall.**  A batch's writes must
-carry the tie from one commit's state to the next.  The frame half is
-`snap_ok_frame`, and its hypothesis `snap_untouched S b` — no clause of
-`snap_ok S` reads block `b` — quantifies over every inode of `S`.  At the
-era that fact is free (the `∗`, `blk_owned_ne`); as an accumulated PURE
-fact it is not, and no writer's own splice fact supplies it.  So the
-batch's accumulation is still a LEDGER — 3c/3d's, minus its resources and
-its hands, which is exactly what the snapshot ruling did remove.  The
-per-write payload therefore cannot be state-free: `Ψ D₀ Dc` has to name
-the era's abstract state, which means an observer half beside `γtop_L`'s
-authority in `ftop_inv` (and the used set beside `bitmap_inv`'s), updated
-at each write by the writer that already opens those invariants.
+### 4⁹b. AS BUILT (4b): the tie SPLITS, the frame comes off the COUPLING,
+### and the byte half PINS the objects
+
+`iris/FsDurSnap.v` §§1a–1f.  Addendum 7's item 1, plus the one thing it
+does not name and the accumulation cannot do without.
+
+- **`snap_ok S D = snap_bytes S D ∧ snap_local S`.**  `snap_bytes` is the
+  byte tie (the superblock's block, the bitmap block at `bm_bytes`, the
+  free blocks present, each inode's record at its own slot, its data
+  blocks, its indirect block) plus `sk_dom` / `sk_links` / `sk_bsz`, the
+  REPRESENTATION clauses and THE COUPLING.  It is true EVEN MID-OP and is
+  what a batch accumulates.  `snap_local` is the per-inode `inode_local`
+  and does not mention `D` at all, so no write can disturb it.
+  `fs_state_of_ledger` / `fs_snap_alloc` / `P_dur` and every spike reading
+  take the conjunction and did not move.
+- **The coupling is three clauses**, each per-object except for naming the
+  used set: the metadata roles (`snap_meta` — block 0, the bitmap block, a
+  region block of a named inum) are MARKED IN USE; a node's own blocks
+  (`fn_owns` — its data blocks and its indirect block) are marked in use
+  and are no metadata block; and no two nodes share one.  This is §4⁹ (7)'s
+  sanctioned whole-state pure clause, and the only one.
+- **THE FRAME NO LONGER HAS A QUANTIFIER AT ANY WRITER.**
+  `snap_untouched_of_free`: a block whose bit reads CLEAR is untouched —
+  the ADOPT case, and the fact is what the adopting writer reads off its
+  own bitmap AU.  `snap_untouched_of_own`: a block that is MY node's is
+  untouched by every clause but mine (`snap_untouched_but`) — what a data
+  or indirect-block writer holds from its own splice fact.
+  `snap_bytes_frame` is the one-block frame; `snap_ok_frame` its reading
+  at both halves; `snap_meta_sb`/`_bmap`/`_reg` read the three metadata
+  arms out one at a time.
+- **THE COUPLING IS EXACTLY THE IMAGE'S W3+W4+W5**, so boot owes nothing
+  new: W3 puts every named block in the data region, W4 is
+  `FsImg.fs_inode_blocks_disjoint`, and W5 (`FsImg.fs_bitmap_wf`) sets the
+  bit of everything below `fs_data_start` and of every used block.
+- **AND THE BYTE HALF PINS THE OBJECTS** — `snap_bytes_sb_inj`,
+  `snap_bytes_node_inj`, `snap_bytes_used_agree`.  **THIS IS NOT AN
+  EXTRA.**  A payload accumulated as a PURE fact binds its state
+  EXISTENTIALLY, so a writer owes a fact about a state it did not choose
+  while every resource it holds is about the ERA's.  With the five
+  REPRESENTATION clauses of `inode_local` (`inode_repr`: `dinode_wf`, the
+  entry array's length, the zero-indirect case, and the slot domain's two
+  clauses) in the BYTE half, the three byte ties determine each node
+  outright, so a writer reads the payload's state as its own.  Leave them
+  in `snap_local` and the payload's `S` is underdetermined at exactly the
+  two fields a writer must re-prove at — `fn_ent`, whose only pin
+  (`ind_bytes_inj`) needs the array's LENGTH, and `fn_blk`'s DOMAIN — and
+  no era-side fact reaches an existential.  The five are true mid-op: they
+  say the node IS the reading of its own bytes and nothing about the file
+  system.  The used set is pinned only WITHIN the bitmap block, which is
+  right: nothing reads a bit above it (`BitmapInv.bitmap_ok` and
+  `free_set` both cut at `sb_size`).
+
+**WHAT IS STILL OPEN IS THE LOCAL HALF'S ACCUMULATION, NOT THE BYTE
+HALF'S.**  Addendum 7 puts the per-op residue "into the payload's local
+half at `end_op`".  `Ψ` is a function of `D₀` and `Dc` and of nothing
+else, and neither distinguishes an op that has ENDED from one still open,
+so the local half cannot live in `Ψ`:
+
+- a `∀ S`-shaped clause (`∀ S, snap_bytes S Dc → …`) does not frame across
+  a write.  Given `snap_bytes S (<[b:=bs]> D)` there need be no `S₀` with
+  `snap_bytes S₀ D` and the same node at an untouched inum — the OTHER
+  clauses of `S` fail at `D`;
+- an `∃ S`-shaped clause DOES frame (the writer transforms its own witness,
+  and by `snap_bytes_node_inj` every untouched node is unchanged) — but it
+  has to name the inums it does not claim, and the only set that SHRINKS at
+  `end_op` is the log's own PENDING set.
+
+THE PROPOSED SHAPE, for the owner.  `Ψ D₀ Dc := ⌜∃ S, snap_bytes S Dc⌝`
+per write, and a NEW pure row of `LogInv.log_state` over its own `pend`:
+
+    ⌜∀ S, snap_bytes S (lm_logged L cov ls) →
+       ∀ i n, fss_inodes S !! i = Some n →
+         sb_inodestart (fss_sb S) + i `div` 16 ∉ pend →
+         (∀ b, fn_owns n b → b ∉ pend) →
+         inode_local i n⌝
+
+`log_state_pend_mono` (growth, at every `log_write`) WEAKENS it and is
+free; `log_state_fin` (`pend ∖ F`, at `end_op`) STRENGTHENS it and is
+exactly where `SpecEndOp`'s pure residue is spent, at the ending op's own
+objects — which are its own by `snap_bytes_node_inj` plus the coupling's
+disjointness.  At the commit `out = 0` forces `om = ∅` hence `pend = ∅`,
+and the row IS `snap_local`.  `pend` is `log_state`'s existing parameter,
+which the bundle does not read today and whose two moves are both the
+identity; `LogInv.v`'s own header already predicts this place — "a future
+row over the pending set … would land here and nowhere else."
 
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
