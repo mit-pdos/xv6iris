@@ -79,6 +79,14 @@ Class xv6G (Σ : gFunctors) := Xv6G {
      proof file; membership is what keeps that from being an explicit
      binder in ~400 of them.  See the note at [Xv6Cameras.fsTopG]. *)
   xv6_fstop      :: fsTopG Σ;
+  (* ---- the LINK-COUNTING FAMILY, a member since durable-disk 2b-inode-4
+     A checked-out payload carries its directory's link TOKENS
+     ([IcacheEscrow.ic_loaded] holds [FsStateInode.ent_toks]) and the inode
+     region parks the per-inum authority ([InodeRegion.ireg_slot]), so
+     without membership the class would be an explicit binder on
+     [ireg_inv] -- hence on the thirty-odd fs contracts that thread it --
+     and on every payload site.  See the note at [Xv6Cameras.fsLinkG]. *)
+  xv6_fslink     :: fsLinkG Σ;
   (* ---- the three that came OUT of [FileInvDefs.fileG] ---------------
      [fileG] carried these as superclasses so that the ~100 files merely
      mentioning [proc_priv] need not name the pipe and cache layers.  The
@@ -101,7 +109,7 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; fsTopΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ ].
+     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ ].
 
 Global Instance subG_xv6GΣ {Σ} : subG xv6GΣ Σ -> xv6G Σ.
 Proof. solve_inG. Qed.

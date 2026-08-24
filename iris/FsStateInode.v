@@ -517,29 +517,48 @@ Section InodeOwned.
   (*  4.  The link tokens an inode's directory entries carry           *)
   (* ---------------------------------------------------------------- *)
 
-  (* "." never carries a token (it would count the directory's link to
-     itself twice); ".." carries one unless the directory is an orphan. *)
-  Definition ent_tokenless (orph : bool) (s : fname) : bool :=
-    bool_decide (s = DOT) || (orph && bool_decide (s = DOTDOT)).
+  (* THREE EXEMPTIONS, and each of them is the kernel's own arithmetic.
 
-  Definition ent_tok Γ (orph : bool) (s : fname) (t : Z) : iProp Σ :=
-    (if ent_tokenless orph s then emp else link_tok Γ t)%I.
+     - ".": xv6 deliberately does not bump [nlink] for it ("No ip->nlink++
+       for '.': avoid cyclic ref count"), so there is nothing to pay for it.
+     - ".." of an ORPHAN: the parent took that token back when it removed
+       the directory's name, and the record it left behind is exactly this
+       kernel's grey ".." (fs-icache.md section 20).
+     - ".." OF A SELF-PARENT, i.e. the ROOT, whose [".."] names the root.
+       That record is a SELF record and pays for nothing, exactly as "."
+       does -- it is the image's own counting rule
+       ([FsImg.fs_rec_ticket]'s [negb (dir_inum = self)] guard, and W9's
+       "a live directory has zero incoming tickets").  What the exemption
+       buys is the ROOT KEEP-ALIVE TOKEN: with root's [".."] tokenless the
+       image's [nlink = 1] is unaccounted for, so the inode region can park
+       one [link_tok] at [ireg_root] that nothing ever spends, and
+       "the root is allocated" becomes a reading of the RA's own law rather
+       than a maintained clause. *)
+  Definition ent_tokenless (self : Z) (orph : bool) (s : fname) (t : Z)
+    : bool :=
+    bool_decide (s = DOT)
+    || (bool_decide (s = DOTDOT) && (orph || bool_decide (t = self))).
 
-  Definition ent_toks Γ (n : fs_node) : iProp Σ :=
-    ([∗ map] s ↦ t ∈ dir_entries n, ent_tok Γ (fn_orphan n) s t)%I.
+  Definition ent_tok Γ (self : Z) (orph : bool) (s : fname) (t : Z)
+    : iProp Σ :=
+    (if ent_tokenless self orph s t then emp else link_tok Γ t)%I.
+
+  Definition ent_toks Γ (i : Z) (n : fs_node) : iProp Σ :=
+    ([∗ map] s ↦ t ∈ dir_entries n, ent_tok Γ i (fn_orphan n) s t)%I.
 
   (* the same thing as ONE resource-algebra element -- what the mint
      allocates (fs-state.md section 1, "Functoriality") *)
-  Definition ent_elem (orph : bool) (s : fname) (t : Z) : linkUR :=
-    if ent_tokenless orph s then ε else link_tok_elem t 1.
+  Definition ent_elem (self : Z) (orph : bool) (s : fname) (t : Z)
+    : fsLinkUR :=
+    if ent_tokenless self orph s t then ε else link_tok_elem t 1.
 
-  Definition link_elem_node (i : Z) (n : fs_node) : linkUR :=
+  Definition link_elem_node (i : Z) (n : fs_node) : fsLinkUR :=
     link_auth_elem i (fn_nlink n)
-    ⋅ ([^op map] s ↦ t ∈ dir_entries n, ent_elem (fn_orphan n) s t).
+    ⋅ ([^op map] s ↦ t ∈ dir_entries n, ent_elem i (fn_orphan n) s t).
 
   (* the Φ-FREE part of an inode: the link ghosts and the local clauses *)
   Definition inode_ghost Γ (i : Z) (n : fs_node) : iProp Σ :=
-    (link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n ∗ ⌜inode_local i n⌝)%I.
+    (link_auth Γ i (fn_nlink n) ∗ ent_toks Γ i n ∗ ⌜inode_local i n⌝)%I.
 
   Definition inode_owned Γ (sb : fs_sb) (i : Z) (n : fs_node) : iProp Σ :=
     (inode_phi Γ sb i n ∗ inode_ghost Γ i n)%I.
@@ -576,10 +595,11 @@ Section InodeOwned.
     Timeless (inode_phi Γ sb i n).
   Proof. rewrite /inode_phi. apply _. Qed.
 
-  Global Instance ent_tok_timeless Γ orph s t : Timeless (ent_tok Γ orph s t).
-  Proof. rewrite /ent_tok. destruct (ent_tokenless orph s); apply _. Qed.
+  Global Instance ent_tok_timeless Γ self orph s t :
+    Timeless (ent_tok Γ self orph s t).
+  Proof. rewrite /ent_tok. destruct (ent_tokenless self orph s t); apply _. Qed.
 
-  Global Instance ent_toks_timeless Γ n : Timeless (ent_toks Γ n).
+  Global Instance ent_toks_timeless Γ i n : Timeless (ent_toks Γ i n).
   Proof. rewrite /ent_toks. apply _. Qed.
 
   Global Instance inode_ghost_timeless Γ i n : Timeless (inode_ghost Γ i n).
@@ -601,15 +621,15 @@ Section InodeOwned.
   (*  own [own]; scattering hands the freshly allocated one back out.   *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma inode_link_gather Γ i n (x : linkUR) :
-    own (γlink Γ) x -∗ link_auth Γ i (fn_nlink n) -∗ ent_toks Γ n -∗
+  Lemma inode_link_gather Γ i n (x : fsLinkUR) :
+    own (γlink Γ) x -∗ link_auth Γ i (fn_nlink n) -∗ ent_toks Γ i n -∗
     own (γlink Γ) (x ⋅ link_elem_node i n).
   Proof.
     iIntros "Hx Ha Ht".
     iDestruct (own_op with "[$Hx $Ha]") as "Hxa".
     iDestruct (own_gather_map_opt (γlink Γ)
                  (fun (_ : fname) (t : Z) => link_tok_elem t 1)
-                 (fun (s : fname) (_ : Z) => ent_tokenless (fn_orphan n) s)
+                 (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
                  (dir_entries n) (x ⋅ link_auth_elem i (fn_nlink n))
                 with "Hxa [Ht]") as "H".
     { iApply (big_sepM_mono with "Ht"). intros s t _; simpl.
@@ -619,13 +639,13 @@ Section InodeOwned.
 
   (* the same, with no accumulator: the auth IS the accumulator *)
   Lemma inode_link_pack Γ i n :
-    link_auth Γ i (fn_nlink n) -∗ ent_toks Γ n -∗
+    link_auth Γ i (fn_nlink n) -∗ ent_toks Γ i n -∗
     own (γlink Γ) (link_elem_node i n).
   Proof.
     iIntros "Ha Ht".
     iDestruct (own_gather_map_opt (γlink Γ)
                  (fun (_ : fname) (t : Z) => link_tok_elem t 1)
-                 (fun (s : fname) (_ : Z) => ent_tokenless (fn_orphan n) s)
+                 (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
                  (dir_entries n) (link_auth_elem i (fn_nlink n))
                 with "Ha [Ht]") as "H".
     { iApply (big_sepM_mono with "Ht"). intros s t _; simpl.
@@ -635,12 +655,12 @@ Section InodeOwned.
 
   Lemma inode_link_scatter Γ i n :
     own (γlink Γ) (link_elem_node i n) ⊢
-    link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n.
+    link_auth Γ i (fn_nlink n) ∗ ent_toks Γ i n.
   Proof.
     rewrite /link_elem_node own_op. iIntros "[$ Ht]".
     iDestruct (own_scatter_map_opt (γlink Γ)
                  (fun (_ : fname) (t : Z) => link_tok_elem t 1)
-                 (fun (s : fname) (_ : Z) => ent_tokenless (fn_orphan n) s)
+                 (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
                  (dir_entries n) with "[Ht]") as "H".
     { rewrite /ent_elem //. }
     iApply (big_sepM_mono with "H"). intros s t _; simpl.
@@ -648,7 +668,7 @@ Section InodeOwned.
   Qed.
 
   Lemma inode_link_iff Γ i n :
-    link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n
+    link_auth Γ i (fn_nlink n) ∗ ent_toks Γ i n
     ⊣⊢ own (γlink Γ) (link_elem_node i n).
   Proof.
     iSplit.
@@ -869,11 +889,11 @@ Section InodeOwned.
   (*  [dir_entries_write], so it assumes no view equation.               *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma ent_toks_delete Γ n n' s t :
+  Lemma ent_toks_delete Γ i n n' s t :
     fn_orphan n' = fn_orphan n ->
     dir_entries n !! s = Some t ->
     dir_entries n' = delete s (dir_entries n) ->
-    ent_toks Γ n -∗ ent_tok Γ (fn_orphan n) s t ∗ ent_toks Γ n'.
+    ent_toks Γ i n -∗ ent_tok Γ i (fn_orphan n) s t ∗ ent_toks Γ i n'.
   Proof.
     intros Horph Hs Hdel.
     rewrite /ent_toks (big_sepM_delete _ (dir_entries n) s t) //.
@@ -885,12 +905,13 @@ Section InodeOwned.
      [dir_entries_write] above -- so a caller supplies what a dirlink
      postcondition actually says (which slot moved, and dirlink's guard)
      rather than an equation about the view. *)
-  Lemma ent_toks_insert Γ n n' k0 s z :
+  Lemma ent_toks_insert Γ i n n' k0 s z :
     fn_orphan n' = fn_orphan n ->
     fn_is_dir n = true -> fn_is_dir n' = true ->
     dir_first (fn_data n) (fn_nrec n) s = None ->
     dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
-    ent_toks Γ n -∗ ent_tok Γ (fn_orphan n) s (bv_unsigned z) -∗ ent_toks Γ n'.
+    ent_toks Γ i n -∗ ent_tok Γ i (fn_orphan n) s (bv_unsigned z) -∗
+    ent_toks Γ i n'.
   Proof.
     intros Horph Hd Hd' Hnone Hins.
     rewrite /ent_toks (dir_entries_write n n' k0 s z Hd Hd' Hnone Hins) Horph.
@@ -904,42 +925,51 @@ Section InodeOwned.
   Lemma dot_ne_dotdot : DOT <> DOTDOT.
   Proof. rewrite /DOT /DOTDOT. intros H. inversion H. Qed.
 
-  Lemma ent_tokenless_orphan_ne orph orph' s :
-    s <> DOTDOT -> ent_tokenless orph' s = ent_tokenless orph s.
+  Lemma ent_tokenless_orphan_ne self orph orph' s t :
+    s <> DOTDOT -> ent_tokenless self orph' s t = ent_tokenless self orph s t.
   Proof.
     intros Hne. rewrite /ent_tokenless (bool_decide_eq_false_2 _ Hne).
-    by rewrite !andb_false_r.
+    by rewrite !andb_false_l.
   Qed.
 
-  Lemma ent_tokenless_dotdot orph : ent_tokenless orph DOTDOT = orph.
+  Lemma ent_tokenless_dotdot self orph t :
+    ent_tokenless self orph DOTDOT t = (orph || bool_decide (t = self)).
   Proof.
     rewrite /ent_tokenless.
     rewrite (bool_decide_eq_false_2 (DOTDOT = DOT));
       [| intros H; by apply dot_ne_dotdot].
-    by rewrite bool_decide_eq_true_2 // andb_true_r orb_false_l.
+    by rewrite bool_decide_eq_true_2 // andb_true_l orb_false_l.
   Qed.
 
-  Lemma ent_tok_dotdot Γ orph t :
-    ent_tok Γ orph DOTDOT t ⊣⊢ (if orph then emp else link_tok Γ t).
+  Lemma ent_tok_dotdot Γ self orph t :
+    ent_tok Γ self orph DOTDOT t
+    ⊣⊢ (if orph || bool_decide (t = self) then emp else link_tok Γ t).
   Proof. rewrite /ent_tok ent_tokenless_dotdot //. Qed.
 
-  Lemma ent_toks_orphan Γ n n' t :
+  (* [t <> i] is the SELF-PARENT exclusion: a directory whose [".."] names
+     ITSELF is the root, whose record already carries no token (see
+     [ent_tokenless]) -- there is nothing to hand back, and no kernel path
+     orphans the root anyway. *)
+  Lemma ent_toks_orphan Γ i n n' t :
     dir_entries n' = dir_entries n ->
     fn_orphan n = false ->
     fn_orphan n' = true ->
     dir_entries n !! DOTDOT = Some t ->
-    ent_toks Γ n -∗ link_tok Γ t ∗ ent_toks Γ n'.
+    t <> i ->
+    ent_toks Γ i n -∗ link_tok Γ t ∗ ent_toks Γ i n'.
   Proof.
-    intros Hents Ho Ho' Hdd.
+    intros Hents Ho Ho' Hdd Hne.
     rewrite /ent_toks Hents Ho Ho'.
-    rewrite (big_sepM_delete (fun s t => ent_tok Γ false s t)
+    rewrite (big_sepM_delete (fun s t => ent_tok Γ i false s t)
                (dir_entries n) DOTDOT t) //.
-    rewrite (big_sepM_delete (fun s t => ent_tok Γ true s t)
+    rewrite (big_sepM_delete (fun s t => ent_tok Γ i true s t)
                (dir_entries n) DOTDOT t) //.
     rewrite !ent_tok_dotdot.
+    rewrite (bool_decide_eq_false_2 (t = i) Hne).
+    cbn [orb].
     iIntros "[Hd H]". iFrame "Hd". iSplitR; [done |].
     iApply (big_sepM_mono with "H"). intros s v Hs; simpl.
-    rewrite /ent_tok (ent_tokenless_orphan_ne false true s) //.
+    rewrite /ent_tok (ent_tokenless_orphan_ne i false true s v) //.
     intros ->. rewrite lookup_delete in Hs. done.
   Qed.
 
@@ -1005,12 +1035,12 @@ Section InodeOwned.
     inode_local d n' -> fn_is_dir n' = true ->
     dir_owned Γ sb d n ⊢
       inode_phi Γ sb d n
-      ∗ ent_tok Γ (fn_orphan n) s t
+      ∗ ent_tok Γ d (fn_orphan n) s t
       ∗ (inode_phi Γ sb d n' -∗ dir_owned Γ sb d n').
   Proof.
     intros Horph Hnl Hs Hdel Hloc Hdir.
     iIntros "[[$ (Ha & Ht & _)] _]".
-    iDestruct (ent_toks_delete Γ n n' s t Horph Hs Hdel with "Ht") as "[$ Ht]".
+    iDestruct (ent_toks_delete Γ d n n' s t Horph Hs Hdel with "Ht") as "[$ Ht]".
     iIntros "Hphi".
     rewrite /dir_owned /inode_owned /inode_ghost Hnl. by iFrame.
   Qed.
@@ -1024,13 +1054,13 @@ Section InodeOwned.
     inode_local d n' -> fn_is_dir n' = true ->
     dir_owned Γ sb d n ⊢
       inode_phi Γ sb d n
-      ∗ (inode_phi Γ sb d n' -∗ ent_tok Γ (fn_orphan n) s (bv_unsigned z)
+      ∗ (inode_phi Γ sb d n' -∗ ent_tok Γ d (fn_orphan n) s (bv_unsigned z)
          -∗ dir_owned Γ sb d n').
   Proof.
     intros Horph Hnl Hd Hnone Hins Hloc Hdir.
     iIntros "[[$ (Ha & Ht & _)] _]".
     iIntros "Hphi Htok".
-    iDestruct (ent_toks_insert Γ n n' k0 s z Horph Hd Hdir Hnone Hins
+    iDestruct (ent_toks_insert Γ d n n' k0 s z Horph Hd Hdir Hnone Hins
                  with "Ht Htok") as "Ht".
     rewrite /dir_owned /inode_owned /inode_ghost Hnl. by iFrame.
   Qed.
@@ -1043,15 +1073,17 @@ Section InodeOwned.
     dir_entries n' = dir_entries n ->
     fn_orphan n = false -> fn_orphan n' = true ->
     dir_entries n !! DOTDOT = Some t ->
+    t <> d ->
     inode_local d n' -> fn_is_dir n' = true ->
     dir_owned Γ sb d n ⊢
       inode_phi Γ sb d n ∗ link_auth Γ d (fn_nlink n) ∗ link_tok Γ t
       ∗ (inode_phi Γ sb d n' -∗ link_auth Γ d (fn_nlink n')
          -∗ dir_owned Γ sb d n').
   Proof.
-    intros Hents Ho Ho' Hdd Hloc Hdir.
+    intros Hents Ho Ho' Hdd Hne Hloc Hdir.
     iIntros "[[$ (Ha & Ht & _)] _]". iFrame "Ha".
-    iDestruct (ent_toks_orphan Γ n n' t Hents Ho Ho' Hdd with "Ht") as "[$ Ht]".
+    iDestruct (ent_toks_orphan Γ d n n' t Hents Ho Ho' Hdd Hne with "Ht")
+      as "[$ Ht]".
     iIntros "Hphi Ha".
     rewrite /dir_owned /inode_owned /inode_ghost. by iFrame.
   Qed.

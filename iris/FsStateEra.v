@@ -23,10 +23,11 @@
        * |{ inode_local (bv_unsigned inum) n }|
 
    -- i.e. [FsStateInode.inode_owned] with [rec_owned] replaced by the
-   proxy and with the LINK ghosts left out.  The links are step 3's
-   ([ent_toks] / [link_auth]); they are deliberately absent here so that
-   this file lands without touching [DirLinks.v] or the ledger's link
-   columns.
+   proxy and with the LINK ghosts left out.  The links are NOT part of this
+   bundle and are not going to be: since durable-disk 2b-inode-4 a
+   directory's TOKENS ride beside it in the escrow payload
+   ([FsStateInode.ent_toks], see the section at the end of this file) and
+   the per-inum AUTHORITY lives with the record in the inode region.
 
    [fn_rec n] IS the value of [dinode_at] and [n] IS the value of the top
    fragment: the bundle names each once, so both ties are maintained BY
@@ -866,7 +867,7 @@ Qed.
 (* ===================================================================== *)
 
 Section EraRes.
-  Context `{!riscvGS Σ, !xv6G Σ, !fsLinkG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Local Lemma era_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.
@@ -1430,6 +1431,62 @@ Section EraRes.
     apply (inode_ok_data_ext cov ls dn bm (fn_data (era_node dn bm data)) data);
       [| exact Hok].
     intros k Hk. exact (fn_data_era_node dn bm data k Hs Hk).
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE LINK TOKENS OF A CHECKED-OUT DIRECTORY (durable-disk 2b-inode-4) *)
+  (* ==================================================================== *)
+
+  (*  A holder owns the TOKENS its own directory records file against other
+      inums -- [FsStateInode.ent_toks] at the payload's own node -- and it
+      does NOT own the per-inum AUTHORITY.  That stays with the RECORD, i.e.
+      in the inode region ([InodeRegion.ireg_slot], tied to [di_nlink] of
+      the slot's own record), which is 2b-inode-1's ruling (i) applied to
+      the ghost that mirrors a record FIELD.  Two things force it and
+      neither is a placement preference:
+
+      - [IgetLic]'s licence (a) is "a directory record names this inum and
+        PAYS for it".  Reading allocatedness off it is the RA's law
+        ([FsStateLink.link_auth_toks_le]) at the TARGET's authority, and the
+        target is an inode the presenter does not hold.  With the authority
+        in the target's own payload nothing in the tree can reach it, and
+        the licence -- hence [SpecIget]'s premise -- has no discharge.
+        Region-side, the reading is one [inv_acc] of [iregN], which is
+        exactly where the pure clause (L1) it replaces was read.
+      - Every move of a count is a FLUSH ([iupdate]), which already opens
+        the region to write the record; [link_mint]/[link_return] are basic
+        updates, so they compose into that AU at no mask cost.
+
+      The tokens are [ent_toks] verbatim; this section only carries the two
+      congruences a payload needs, since a payload binds its [data]
+      existentially and re-parks at a different one. *)
+
+  Lemma ent_toks_cong (Γ : fs_view_names Σ) (i : Z) (n n' : fs_node) :
+    fn_rec n' = fn_rec n ->
+    dir_entries n' = dir_entries n ->
+    ent_toks Γ i n ⊣⊢ ent_toks Γ i n'.
+  Proof.
+    intros Hrec Hent. rewrite /ent_toks /fn_orphan /fn_nlink Hrec Hent //.
+  Qed.
+
+  (* ...and at the payload's own spelling: two [era_node]s over data that
+     agree BELOW THE RECORD COUNT carry the same tokens.  [fb_agree] is
+     this file's own extensionality (see above); the record is the same, so
+     the orphan flag and the record count are too. *)
+  Lemma ent_toks_era_node_data_ext (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm bm' : blkmap) (data data' : nat -> list (bv 8)) :
+    fb_agree (fn_data (era_node dn bm data)) (fn_data (era_node dn bm' data'))
+      (16 * dir_nrec (bv_unsigned (di_size dn))) ->
+    ent_toks Γ i (era_node dn bm data)
+    ⊣⊢ ent_toks Γ i (era_node dn bm' data').
+  Proof.
+    intros Hag.
+    apply (ent_toks_cong Γ i (era_node dn bm data) (era_node dn bm' data'));
+      [reflexivity |].
+    rewrite /dir_entries /fn_is_dir /fn_type /fn_nrec /fn_size !era_node_rec.
+    destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
+      [| reflexivity].
+    symmetry. exact (dir_view_data_ext _ _ _ Hag).
   Qed.
 
 End EraRes.

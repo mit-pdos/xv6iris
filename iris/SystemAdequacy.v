@@ -244,8 +244,8 @@ Qed.
 Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
-  (* B3: not [xv6G] members -- see the note at [FsCfgBoot]'s era section *)
-  Context `{!fsLinkG Σ}.
+  (* B3's two classes are [xv6G] MEMBERS now (2b-inode-3 / 2b-inode-4), so
+     nothing extra is bound here -- see [FsCfgBoot]'s era section. *)
   Context `{GEN : GenId}.
 
   (* NO [fileG] AND NO [icacheG] BINDER ANY MORE (fs-cfg-boot.md stage
@@ -388,7 +388,7 @@ End SystemBoot.
 
 Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
        [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
@@ -523,7 +523,7 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
@@ -564,7 +564,7 @@ Qed.
 
 Theorem xv6_fs_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !bioslotGpreS Σ, !fsLinkG Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
     (g : gstate) (cov : gset Z)
     (D0 : gmap Z (list (bv 8)))
     (sb : fs_sb) (nib : nat)
@@ -677,7 +677,7 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
@@ -709,7 +709,7 @@ Qed.
    chain application in §2 above. *)
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ; fsLinkΣ; fsTopΣ ].
+  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].
 
 (* THE ASSUMPTION AUDIT'S TARGET, and it stays in THIS file deliberately.
 

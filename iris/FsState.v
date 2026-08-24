@@ -36,10 +36,11 @@ Require Import DinodeEnc.
 Require Import FsImg.
 (* [fsTopG] -- an [Xv6G.xv6G] MEMBER since durable-disk 2b-inode-3 (see the
    note at [Xv6Cameras.fsTopG]).  IMPORTED, not exported, and imported
-   BEFORE the [FsState*] exports below: [Xv6Cameras] declares the icache
-   ledger's [linkUR], which is a different camera from [FsStateLink]'s of
-   the same name, and the LAST import wins (durable-notes, "AND WHERE THAT
-   IMPORT COLLIDES, PUT IT EARLY").  Nothing above this file needs the class
+   BEFORE the [FsState*] exports below: [Xv6Cameras] declares names that
+   collide with live ones here, and the LAST import wins (durable-notes,
+   "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY").  The link family's own
+   camera and class live there too, as [fsLinkUR] / [fsLinkG] -- the icache
+   ledger already owned the name [linkUR].  Nothing above this file needs the class
    from here -- every one of them binds the bundle instead. *)
 Require Import Xv6Cameras.
 Require Export FsStateInode.
@@ -157,7 +158,7 @@ Section FsState.
   (*  5.  The link family, gathered                                    *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_elem (I : gmap Z fs_node) : linkUR :=
+  Definition link_elem (I : gmap Z fs_node) : fsLinkUR :=
     ([^op map] i ↦ n ∈ I, link_elem_node i n).
 
   Definition fs_links (g : gname) (I : gmap Z fs_node) : iProp Σ :=
@@ -181,7 +182,7 @@ Section FsState.
   Proof.
     rewrite /fs_ghost /fs_pure /fs_links /inode_ghost.
     rewrite (big_sepM_proper
-               (fun i n => link_auth Γ i (fn_nlink n) ∗ ent_toks Γ n
+               (fun i n => link_auth Γ i (fn_nlink n) ∗ ent_toks Γ i n
                            ∗ ⌜inode_local i n⌝)%I
                (fun i n => own (γlink Γ) (link_elem_node i n)
                            ∗ ⌜inode_local i n⌝)%I);
@@ -203,7 +204,7 @@ Section FsState.
     - apply map_choose in Hne as (i & n & Hin).
       rewrite /fs_links (big_sepM_delete _ I i n) //.
       iIntros "[Hi Hrest]".
-      iDestruct (own_gather_map (A := linkUR) g link_elem_node (delete i I)
+      iDestruct (own_gather_map (A := fsLinkUR) g link_elem_node (delete i I)
                    (link_elem_node i n) with "Hi Hrest") as "H".
       iDestruct (own_valid with "H") as %Hv.
       iPureIntro. rewrite /link_elem (big_opM_delete _ I i n) //.
@@ -282,6 +283,72 @@ Section FsState.
   Proof.
     intros Hv.
     iMod (fs_links_alloc IL Hv) as (gl) "Hl".
+    iMod (ghost_map_alloc IT) as (gt) "[Ha Hf]".
+    iModIntro. iExists gl, gt. iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  5c. THE REGION'S BOOT SHAPE (durable-disk 2b-inode-4)             *)
+  (*                                                                    *)
+  (*  The inode REGION parks one [link_auth] per inum at the record's    *)
+  (*  own [nlink] -- 2b-inode-1's ruling (i) applied to the ghost that   *)
+  (*  mirrors a record FIELD -- because that is where the RA's law is    *)
+  (*  READ: [IgetLic]'s licence (a) turns a directory record's token     *)
+  (*  into "the target is allocated", and the target's authority has to  *)
+  (*  be reachable from a presenter that does not hold the target.       *)
+  (*                                                                    *)
+  (*  At boot every token is still AT HOME, so the family's validity is  *)
+  (*  free ([link_full_elem_valid]) and NO image sweep is spent.  Once   *)
+  (*  a directory's tokens ride in its checked-out payload the boot owes *)
+  (*  [FsImg]'s W9 + [fs_links_eq] instead; that is the links step.      *)
+  (* ---------------------------------------------------------------- *)
+
+  Definition link_full_map (I : gmap Z fs_node) : fsLinkUR :=
+    ([^op map] i ↦ n ∈ I, link_full_elem i (fn_nlink n)).
+
+  Definition fs_links_full (g : gname) (I : gmap Z fs_node) : iProp Σ :=
+    ([∗ map] i ↦ n ∈ I, own g (link_full_elem i (fn_nlink n)))%I.
+
+  Global Instance fs_links_full_timeless g I : Timeless (fs_links_full g I).
+  Proof. rewrite /fs_links_full. apply _. Qed.
+
+  Lemma link_full_map_fmap (I : gmap Z fs_node) :
+    link_full_map I
+    ≡ (fun n => (● (fn_nlink n) ⋅ ◯ (fn_nlink n) : authR natUR)) <$> I.
+  Proof.
+    induction I as [| i n I Hi IH] using map_ind.
+    - rewrite /link_full_map big_opM_empty fmap_empty //.
+    - rewrite /link_full_map big_opM_insert // link_full_elem_singleton.
+      rewrite -/(link_full_map I) IH fmap_insert.
+      rewrite insert_singleton_op; [done |]. rewrite lookup_fmap Hi //.
+  Qed.
+
+  Lemma link_full_map_valid (I : gmap Z fs_node) : ✓ link_full_map I.
+  Proof.
+    rewrite link_full_map_fmap. intros j. rewrite lookup_fmap.
+    destruct (I !! j) as [n |] eqn:E; [| done].
+    rewrite /= Some_valid. apply auth_both_valid_discrete.
+    split; [apply nat_included; lia | done].
+  Qed.
+
+  Lemma fs_links_full_alloc (I : gmap Z fs_node) :
+    ⊢ |==> ∃ g : gname, fs_links_full g I.
+  Proof.
+    iMod (own_alloc (link_full_map I)) as (g) "H";
+      [apply link_full_map_valid |].
+    iExists g. iModIntro.
+    rewrite /fs_links_full /link_full_map. by iApply big_opM_own_1.
+  Qed.
+
+  (* ...and the two ghosts allocated together, the region's way: no
+     validity premise at all, because nothing is outstanding. *)
+  Lemma fs_boot_alloc_full (IL IT : gmap Z fs_node) :
+    ⊢ |==> ∃ gl gt : gname,
+        ghost_map_auth gt 1 IT
+        ∗ ([∗ map] i ↦ n ∈ IT, i ↪[gt] n)
+        ∗ fs_links_full gl IL.
+  Proof.
+    iMod (fs_links_full_alloc IL) as (gl) "Hl".
     iMod (ghost_map_alloc IT) as (gt) "[Ha Hf]".
     iModIntro. iExists gl, gt. iFrame.
   Qed.

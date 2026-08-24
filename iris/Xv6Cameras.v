@@ -411,6 +411,40 @@ Definition fsTopΣ : gFunctors := #[ghost_mapΣ Z fs_node].
 Global Instance subG_fsTopΣ {Σ} : subG fsTopΣ Σ -> fsTopG Σ.
 Proof. solve_inG. Qed.
 
+(* ---- the LINK-COUNTING FAMILY (theory: FsStateLink.v) ---------------- *)
+
+(* [fs_state.md] section 2's counting RA: ONE auth-of-nat per inum, all
+   inums in a single element at [γlink].  [natUR]'s [op] is [+] and its
+   [≼] is [≤], so the law "#tokens ≤ nlink" IS [auth_both_valid_discrete]
+   plus [nat_included]; [k] separate tokens compose because
+   [◯ 1 ⋅ ◯ 1 = ◯ 2].  One camera keyed by inum (rather than one gname per
+   inum) is what lets a whole instance be allocated by a single
+   [own_alloc].
+
+   IT IS A MEMBER for [fsTopG]'s reason, one step further on: since
+   durable-disk 2b-inode-4 a checked-out payload carries its directory's
+   link TOKENS ([IcacheEscrow.ic_loaded] holds [FsStateInode.ent_toks])
+   and the inode REGION parks the per-inum authority
+   ([InodeRegion.ireg_slot]), so the class would otherwise be an explicit
+   binder on [ireg_inv] -- hence on the thirty-odd fs contracts that thread
+   it -- and on every payload site.  Nothing had to move for it: the
+   camera is plain iris algebra.
+
+   THE STANDING RULE APPLIES: a file at or above [Xv6G.v] binds [xv6G] and
+   NOT this class.  The [FsState*] stack, which sits below the bundle,
+   binds it alone.
+
+   NAMED [fsLinkUR], not [linkUR]: the inode cache's own ledger camera
+   (section 11 below) already owns that name in this file. *)
+Definition fsLinkUR : ucmra := gmapUR Z (authR natUR).
+
+Class fsLinkG (Σ : gFunctors) := FsLinkG {
+  fs_link_inG :: inG Σ fsLinkUR;
+}.
+Definition fsLinkΣ : gFunctors := #[ GFunctor fsLinkUR ].
+Global Instance subG_fsLinkΣ {Σ} : subG fsLinkΣ Σ -> fsLinkG Σ.
+Proof. solve_inG. Qed.
+
 (* ===================================================================== *)
 (*  11.  THE INODE CACHE  (theory: IcacheRef.v)                           *)
 (* ===================================================================== *)

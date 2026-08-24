@@ -1031,11 +1031,10 @@ Proof. solve_ndisj. Qed.
 
 Section FsCfgBootEra.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
-  (* B3: the two file-system-state cameras.  They are CAPACITY-ONLY classes
-     and are deliberately NOT members of [Xv6G.xv6G]: the whole [FsState*]
-     stack is under active development, and folding it into the bundle would
-     put its cone in front of the 767 files that bind [xv6G]. *)
-  Context `{!fsLinkG Σ}.
+  (* B3's two file-system-state cameras are both [Xv6G.xv6G] MEMBERS now
+     ([fsTopG] since durable-disk 2b-inode-3, [fsLinkG] since 2b-inode-4),
+     so this file -- which is ABOVE the bundle -- binds [xv6G] and NEITHER
+     member (durable-notes, "ONE BUNDLE PER GHOST CLASS"). *)
   Context `{GEN : GenId}.
 
   (* ---- two list/set conversions the era fupd needs -------------------- *)
@@ -1417,7 +1416,7 @@ Section FsCfgBootEra.
      the image's inode map, and it does not claim to be -- nothing ties
      [γtop] to any bytes yet, because no [inode_owned] at [Γ_L] exists in
      the tree.  What it IS is the only shape from which the family can ever
-     GROW: [linkUR = gmapUR Z (authR natUR)] has no authority over which
+     GROW: [fsLinkUR = gmapUR Z (authR natUR)] has no authority over which
      KEYS exist, so a family allocated at [ε] can never be extended (nothing
      mints [{[i := ● n]}] out of nothing), while [● 0] at every inum can be
      raised to the record's real [nlink] with the auth in hand

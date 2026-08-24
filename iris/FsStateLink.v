@@ -16,7 +16,7 @@
 
    THE RA, AND WHY.  One [own] at the family gname [γlink Γ], over
 
-       linkUR := gmapUR Z (authR natUR)
+       fsLinkUR := gmapUR Z (authR natUR)
 
    i.e. ONE auth-of-nat PER INUM, keyed by the inum, in a single ghost map
    element.  Two reasons for this shape over the alternatives:
@@ -32,11 +32,14 @@
      every token in one step).  A [ghost_map] of counters cannot serve: its
      elements are exclusive, so it cannot express "k tokens".
 
-   No existing class serves: the tree's unique [ghost_mapG Σ Z (bv 8)] is the
-   byte view's (durable-disk 1c's TYPING note) and must not be duplicated, and
-   nothing in [Xv6Cameras] is a [gmapUR Z (authR natUR)].  Hence the new
-   capacity-only class [fsStateG] below; it is NOT a member of [Xv6G.xv6G], so
-   a file may bind both without creating a second instance path. *)
+   THE CAMERA AND ITS CAPACITY CLASS LIVE IN [Xv6Cameras.v] (the camera is
+   [fsLinkUR] there, since this file's [linkUR] name is already the inode
+   cache's ledger camera), and since durable-disk 2b-inode-4 [fsLinkG] is an
+   [Xv6G.xv6G] MEMBER: a checked-out payload carries its directory's tokens
+   and the inode region parks the per-inum authority, so the class reaches
+   [InodeRegion.ireg_inv] and every payload site.  The standing rule applies
+   -- this file sits BELOW the bundle, so it binds the member and not
+   [xv6G]. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -44,23 +47,13 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap numbers.
 From iris.base_logic.lib Require Import iprop own.
 Require Export FsStateDefs.
+Require Import Xv6Cameras.  (* [fsLinkUR] / [fsLinkG] -- capacity class, must be IMPORTed *)
 
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
 (*  1.  The camera and its capacity class                              *)
 (* ------------------------------------------------------------------ *)
-
-Definition linkUR : ucmra := gmapUR Z (authR natUR).
-
-Class fsLinkG (Σ : gFunctors) := FsLinkG {
-  fs_link_inG :: inG Σ linkUR;
-}.
-
-Definition fsLinkΣ : gFunctors := #[ GFunctor linkUR ].
-
-Global Instance subG_fsLinkΣ Σ : subG fsLinkΣ Σ -> fsLinkG Σ.
-Proof. solve_inG. Qed.
 
 Section Link.
   Context `{!fsLinkG Σ}.
@@ -70,8 +63,8 @@ Section Link.
   (*  2.  The two shapes                                               *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_auth_elem (i : Z) (n : nat) : linkUR := {[ i := ● n ]}.
-  Definition link_tok_elem (i : Z) (k : nat) : linkUR := {[ i := ◯ k ]}.
+  Definition link_auth_elem (i : Z) (n : nat) : fsLinkUR := {[ i := ● n ]}.
+  Definition link_tok_elem (i : Z) (k : nat) : fsLinkUR := {[ i := ◯ k ]}.
 
   (* "inum [i]'s on-disk record says [n] links".  Held by [inode_owned]. *)
   Definition link_auth Γ (i : Z) (n : nat) : iProp Σ :=
@@ -167,9 +160,38 @@ Section Link.
   (*  the durable instance's own [own] (section 7), never proved.       *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma link_family_alloc (M : linkUR) :
+  Lemma link_family_alloc (M : fsLinkUR) :
     ✓ M -> ⊢ |==> ∃ g : gname, own g M.
   Proof. intros HM. iMod (own_alloc M) as (g) "H"; [done |]. by iExists g. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  5b. THE FULL ELEMENT: an authority with all its tokens AT HOME    *)
+  (*                                                                    *)
+  (*  The shape the INODE REGION parks (durable-disk 2b-inode-4): one    *)
+  (*  auth per inum, standing at the record's own [nlink], together with *)
+  (*  exactly that many tokens.  Nothing is outstanding, so its          *)
+  (*  VALIDITY is free -- no image sweep is spent at boot.  A directory  *)
+  (*  entry's token is drawn out of this pile by [link_mint] at the      *)
+  (*  [iupdate] that raises the count and put back by [link_return] at   *)
+  (*  the one that lowers it.                                           *)
+  (* ---------------------------------------------------------------- *)
+
+  Definition link_full_elem (i : Z) (n : nat) : fsLinkUR :=
+    link_auth_elem i n ⋅ link_tok_elem i n.
+
+  Lemma link_full_elem_singleton i n :
+    link_full_elem i n = {[ i := (● n ⋅ ◯ n : authR natUR) ]}.
+  Proof. rewrite /link_full_elem /link_auth_elem /link_tok_elem singleton_op //. Qed.
+
+  Lemma link_full_elem_valid i n : ✓ link_full_elem i n.
+  Proof.
+    rewrite link_full_elem_singleton. apply singleton_valid.
+    apply auth_both_valid_discrete. split; [apply nat_included; lia | done].
+  Qed.
+
+  Lemma link_full_split Γ i n :
+    own (γlink Γ) (link_full_elem i n) ⊣⊢ link_auth Γ i n ∗ link_toks Γ i n.
+  Proof. rewrite /link_full_elem own_op //. Qed.
 
   Lemma link_auth_of_elem Γ i n :
     own (γlink Γ) (link_auth_elem i n) ⊣⊢ link_auth Γ i n.
@@ -311,7 +333,7 @@ Section LinkLaw.
     destruct l as [| u l].
     - iIntros "_ _". iPureIntro. simpl. lia.
     - iIntros "Ha Hl".
-      iDestruct (own_gather_list (A := linkUR) (γlink Γ)
+      iDestruct (own_gather_list (A := fsLinkUR) (γlink Γ)
                    (fun _ : unit => link_tok_elem i 1) (u :: l)
                    (link_auth_elem i n) with "Ha Hl") as "H".
       iDestruct (own_valid with "H") as %Hv.

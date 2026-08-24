@@ -1057,10 +1057,9 @@ Section BootAlloc.
   Context `{FGP : fileGpreS Σ}.
   Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
   (* durable-disk 2b-A / B3: [FsCfgBoot.fs_cfg_alloc] allocates the era's
-     link family and top map, so its two capacity classes travel with it.
-     They are NOT [xv6G] members (see the note at [FsCfgBoot]'s era
-     section), so they are bound here beside the other non-members. *)
-  Context `{!fsLinkG Σ}.
+     link family and top map.  Both capacity classes are [Xv6G.xv6G]
+     MEMBERS since 2b-inode-3 / 2b-inode-4, so this file -- above the
+     bundle -- binds neither. *)
   Context `{GEN : GenId}.
 
   (* The two PER-HART GHOST BUNDLES, NAMED -- and the naming is load-bearing:
