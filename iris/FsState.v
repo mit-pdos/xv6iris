@@ -32,7 +32,6 @@ From iris.algebra Require Import auth gmap numbers.
 From iris.base_logic.lib Require Import iprop own ghost_map.
 Require Import BioDefs.
 Require Import BitmapEnc.
-Require Import DinodeEnc.
 Require Import FsImg.
 (* [fsTopG] -- an [Xv6G.xv6G] MEMBER since durable-disk 2b-inode-3 (see the
    note at [Xv6Cameras.fsTopG]).  IMPORTED, not exported, and imported

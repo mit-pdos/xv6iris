@@ -37,9 +37,7 @@ From iris.base_logic.lib Require Import ghost_map.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvPtsto.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsImg.
+Require Import Xv6Cameras.
 Require Import FsBlocks.
 Require Export FsStateDefs.
 

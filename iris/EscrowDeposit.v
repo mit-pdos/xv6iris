@@ -41,7 +41,7 @@ Require Import RiscvPtsto.
 Require Import LogInv.
 Require Import FsBlocks.
 Require Import DinodeEnc.
-Require Import FsStateInode.
+Require Import FsStateDefs.
 Require Import FsBytesGamma.
 Require Import InodeRegion.
 Require Import EscrowDefs.

@@ -25,7 +25,6 @@ Require Import RiscvLang RiscvPtsto.
    fields are ACTIVE here.  Required EARLY on purpose: [FsState] exports four
    names that collide with live ones ([fs_view], [link_auth], [byte_range],
    [blk_owned]), and the later imports are what shadow them again. *)
-Require Import FsState.
 Require Import HartTp.
 Require Import KMap KptPt KptGhost.
 Require Import StackOwn.

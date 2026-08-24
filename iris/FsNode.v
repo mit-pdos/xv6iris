@@ -23,8 +23,6 @@
 
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
-Require Import RiscvModelBytes.
-Require Import BlockWords.
 Require Import DinodeEnc.
 
 Local Open Scope Z_scope.
