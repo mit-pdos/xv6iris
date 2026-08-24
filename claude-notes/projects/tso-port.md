@@ -223,34 +223,44 @@ One new file pair on main, semantics untouched:
 - The compat shim: `↦ₘ`(old) ⊣⊢ `wptsto cur_ctx`(new), in ONE file, used
   only at sweep boundaries, deleted at cutover.
 
-## 2b. The mixed tree — one converted proof among unconverted ones (PROTOTYPED)
+## 2b. The mixed tree — one function converted IN PLACE among unconverted ones
 
-`iris/TsoCtxShim.v` + `iris/TsoMemsetCtx.v` are the worked answer, on the
-real `memset`. The mechanics:
+RULING (owner): conversions are IN-PLACE edits of the existing spec and
+proof files — never wrapper files, never a second copy of a spec. The
+worked instance is `memset`, the tree's first converted function:
 
-- A CONVERTED spec differs from its original by exactly three deltas: the
-  ambient `` `{XI : CurCtx}`` binder; `own_context cur_ctx` threaded
+- **The spec** (`SpecMemset.v`, edited in place): exactly three deltas —
+  the ambient `` `{XI : CurCtx}`` binder; `own_context cur_ctx` threaded
   beside `sie_cap_gpr` (a stopgap conjunct — M2 folds it into the bundle
-  and it disappears from spec text again); the memory footprint stated
-  with `ctx_pointsto … cur_ctx`. Registers, premises, ktier axis,
-  `wp_next` — character-identical. At the spec's `wp_next`, `CID` rebinds
-  and `cur_ctx` does not: the migration-survival property is now VISIBLE
-  in the statement.
-- The converted spec is PROVED FROM the sealed original (`MS : MEMSET`)
-  through the shim: ~10 lines of wand plumbing, memset's own proof
-  untouched. Symmetrically the ORIGINAL spec is re-derived from the
-  converted one — an unconverted caller mints a context on the spot
-  (`own_context_alloc`, free at SC) and loses nothing. And the round
-  trip closes as a MODULE (`MemsetRoundTrip <: MEMSET`), so every
-  existing linker instantiation can take a converted function unchanged:
-  the sweep converts one function at a time, in any order.
+  and it disappears from spec text again); the byte window at `↦c[ktb]`
+  — the `↦c` notation family (`TsoCtx.v`) mirrors `↦ₘ`'s spellings with
+  the context ambient, so converted spec text reads as before; at the
+  M1 notation flip `↦c` becomes `↦ₘ` and is retired. Registers,
+  premises, ktier axis, `wp_next` — character-identical. At the
+  `wp_next`, `CID` rebinds and `cur_ctx` does not: migration survival
+  is visible in the statement.
+- **The proof** (`WpMemsetArray.v`, edited in place): one `"Hctx"` per
+  arm's intro pattern, `"Hctx"` at the two continuation hand-backs, and
+  two shim conversions at the INTERIOR seam — the whole-function proof
+  composes per-instruction parts (`SpecMemsetParts`) that are not yet
+  converted, so the file is itself mixed: converted export, unconverted
+  internals, shim at the boundary between them.
+- **Unconverted callers** (nine files, patched at ~14 call sites; the
+  reference diff is `ProofBalloc.v`): six lines per site — mint a
+  context (`iMod own_context_alloc`), shim the buffer in
+  (`ctx_buf_of_mem`), add `(XI := ξms)` and `"Hctx"` to the existing
+  `iApply`, discard the returned token in the continuation intro, shim
+  the buffer back (`ctx_buf_to_mem`). Callers' own specs, and every
+  Link file, are untouched — the sweep converts one function at a time,
+  in any order, with the tree green throughout.
 - `TsoCtxShim.v` is the ONLY file allowed to state
-  `ctx_pointsto ξ ⊣⊢ mem_pointsto` (both wand directions + the
-  `[∗ list]` window forms). Its import list IS the tree's live seam
-  inventory (`grep -l TsoCtxShim`), and at cutover the file is deleted:
-  every leftover unconverted boundary and every SC-only context mint
-  becomes a compile error — the remaining worklist, not a soundness
-  hole.
+  `ctx_pointsto ξ ⊣⊢ mem_pointsto` (wand directions + the `[∗ list]`
+  window forms). Its import list IS the live seam inventory
+  (`grep -l TsoCtxShim`): each import marks a file with an unconverted
+  neighbour, and each finished conversion deletes imports. At cutover
+  the file is deleted; every leftover boundary and every SC-only
+  context mint becomes a compile error — the remaining worklist, not a
+  soundness hole.
 
 ## 3. Leg M — the main sweeps (each independently landable, main green after each)
 

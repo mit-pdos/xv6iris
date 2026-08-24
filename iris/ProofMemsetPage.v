@@ -18,6 +18,8 @@ Require Import RegFile WpNext.
 Require Import WpMemsetPage.
 Require Import KallocInv.
 Require Import SpecMemset.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -49,11 +51,17 @@ Section ProofMemsetPage.
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* --- apply the general memset spec at len = 4096 --- *)
-    iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms) "Hctx".
+    iDestruct (ctx_buf_of_mem KT0 ξms with "Hbuf") as "Hbuf".
+    iApply (MemsetArray.wp_memset_sconf (XI := ξms) kt KT0 m0 n 4096 cval olds b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
-              with "Hcg Htext Hpc [Hbuf]").
+              with "Hctx Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
-    iIntros (CID1 Hs1 mfin) "Hcg Hpc Hbuf %Hcs".
+    iIntros (CID1 Hs1 mfin) "_ Hcg Hpc Hbuf %Hcs".
+    iDestruct (ctx_buf_to_mem with "Hbuf") as "Hbuf".
     iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
     (* the bytes come back NAMED -- that is the whole of this form *)
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").

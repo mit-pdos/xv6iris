@@ -113,6 +113,8 @@ Require Import SpecNamecmp.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import SpecMemset.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNamex.
@@ -4590,13 +4592,19 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms1) "Hctx".
+    iDestruct (ctx_buf_of_mem KT1 ξms1 with "HbD") as "HbD".
+    iApply (Memset.wp_memset_sconf (XI := ξms1) KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
               ltac:(rewrite HA5a2; pcw)
-              with "Hcg Htext Hpc [HbD]").
+              with "Hctx Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
-    iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
+    iIntros (D6 Hd6 mms) "_ Hcg Hpc HbD %Hcsms".
+    iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x98)) by (rewrite HA5ra; pcw).
@@ -6137,13 +6145,19 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms2) "Hctx".
+    iDestruct (ctx_buf_of_mem KT1 ξms2 with "HbD") as "HbD".
+    iApply (Memset.wp_memset_sconf (XI := ξms2) KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
               ltac:(rewrite HA5a2; pcw)
-              with "Hcg Htext Hpc [HbD]").
+              with "Hctx Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
-    iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
+    iIntros (D6 Hd6 mms) "_ Hcg Hpc HbD %Hcsms".
+    iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x98)) by (rewrite HA5ra; pcw).

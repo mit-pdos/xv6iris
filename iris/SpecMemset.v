@@ -23,6 +23,7 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* CurCtx / own_context / ctx_pointsto *)
 Import Defs.
 
 
@@ -34,7 +35,17 @@ Import Defs.
    exactly as the hardware's pointer increment does.  memset saves ra/s0 in a
    2-slot frame, so it needs 2 of the [n] available stack slots and returns
    them (avail [n] preserved). *)
-Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+(* CONVERTED TO THE CONTEXT STYLE (tso-port leg M; the tree's first).
+   Three deltas from the pre-conversion statement, nothing else:
+   the ambient [`{XI : CurCtx}] binder; [own_context cur_ctx] threaded
+   beside [sie_cap_gpr] (STOPGAP until the M2 sweep folds it into the
+   bundle in IntrDefs.v, at which point the conjunct leaves the spec text
+   again); the byte window at [↦c[ktb]] -- the context-indexed points-to
+   at the ambient [cur_ctx] (TsoCtx.v's notation).  At the
+   [wp_next], [CID] rebinds -- memset can be preempted and resume on any
+   hart -- and [cur_ctx] does NOT: the window in the continuation names
+   the same ξ.  At SC that is cosmetic; at cutover it is the theorem. *)
+Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -48,20 +59,22 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
   (Z.of_nat len < 2 ^ 32)%Z ->
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
+  own_context cur_ctx -∗
   sie_cap_gpr kt m0 n b pcur -∗
   kernel_text -∗ pc_is pcE -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦ₘ[ktb] olds j) -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦c[ktb] olds j) -∗
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mfin,
+    own_context cur_ctx -∗
     sie_cap_gpr kt mfin n b pcur -∗
     pc_is ret_tgt -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦ₘ[ktb] cbyte) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦c[ktb] cbyte) -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type MEMSET.
   Parameter wp_memset_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
 End MEMSET.

@@ -115,6 +115,8 @@ Require Import SpecFetchstr.
 Require Import SpecKalloc.
 Require Import SpecKfree.
 Require Import SpecMemset.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecKexec.
 Require Import CodeSysExec.
 Require Import SpecSysExec.
@@ -1760,10 +1762,16 @@ Section SysExecSetup.
       by (rewrite /N5 upd_ne; [exact HN4s0 | nz]).
     iDestruct (sx_bytes_name (pa_stk sp0 58) 256 with "Hab") as (af) "Haz".
     iEval (rewrite -HN5a0) in "Haz".
-    iApply (Memset.wp_memset_sconf KT1 KT1 N5 (K - 60)%nat 256%nat
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms) "Hctx".
+    iDestruct (ctx_buf_of_mem KT1 ξms with "Haz") as "Haz".
+    iApply (Memset.wp_memset_sconf (XI := ξms) KT1 KT1 N5 (K - 60)%nat 256%nat
               (mword_of_int 0 : mword 64) af b pj
-              K2 ltac:(lia) HN5a1 HN5a2 with "Hcg Htext Hpc Haz").
-    iIntros (CIDa6 Hqa6 N6) "Hcg Hpc Haz %Hcsa6".
+              K2 ltac:(lia) HN5a1 HN5a2 with "Hctx Hcg Htext Hpc Haz").
+    iIntros (CIDa6 Hqa6 N6) "_ Hcg Hpc Haz %Hcsa6".
+    iDestruct (ctx_buf_to_mem with "Haz") as "Haz".
     iEval (rewrite HN5a0) in "Haz".
     assert (HN6sp : sx_sp sp0 N6).
     { rewrite /sx_sp (callee_saved_lookup Hcsa6 csp_rs1

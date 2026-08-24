@@ -113,6 +113,8 @@ Require Import CodeIalloc.
 Require Import SpecPrintk.
 Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecIalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -1313,13 +1315,19 @@ Section IallocClaim.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /W3 upd_ne; [| regne]. exact (HW2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iEval (rewrite -HW3a0) in "Hby".
-    iApply (MS.wp_memset_sconf KT1 KT0 W3 (K - 8)%nat 64%nat
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms) "Hctx".
+    iDestruct (ctx_buf_of_mem KT0 ξms with "Hby") as "Hby".
+    iApply (MS.wp_memset_sconf (XI := ξms) KT1 KT0 W3 (K - 8)%nat 64%nat
               (mword_of_int 0 : mword 64)
               (fun jj => dinode_bytes (ds !!! DinodeEnc.islot inum) !!! jj)
               b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HW3a1 HW3a2
-              with "Hcg Htext Hpc Hby").
-    iIntros (CID5 Hq5 mM) "Hcg Hpc Hby %Hcsm".
+              with "Hctx Hcg Htext Hpc Hby").
+    iIntros (CID5 Hq5 mM) "_ Hcg Hpc Hby %Hcsm".
+    iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HW3a0) in "Hby".
     assert (Hpc94 : ret_pc (W3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x94)) by (rewrite HW3ra; pcw).

@@ -128,6 +128,8 @@ Require Import DiskBoot.
 Require Import WpMemsetPage.
 Require Import CodeVirtioDiskInit.
 Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -1915,12 +1917,18 @@ Section ProofVirtioDiskInit.
                      (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = byte_zero) by bvc.
     iEval (rewrite /page_own /byte_any) in "Hpdpg".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pd j) ↦ₘ b)%I) with "Hpdpg") as (opd) "Hbufd".
-    iApply (MS.wp_memset_sconf KT1 KT0 E7 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opd false pp
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms1) "Hctx".
+    iApply (MS.wp_memset_sconf (XI := ξms1) KT1 KT0 E7 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opd false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
-              with "Hcg Htext Hpc [Hbufd]").
-    { iApply (big_sepL_impl with "Hbufd"). iIntros "!>" (k j _) "H". rewrite HE7a0. iExact "H". }
+              with "Hctx Hcg Htext Hpc [Hbufd]").
+    { iApply (ctx_buf_of_mem KT0 ξms1).
+      iApply (big_sepL_impl with "Hbufd"). iIntros "!>" (k j _) "H". rewrite HE7a0. iExact "H". }
     iApply wp_next_off_intro.
-    iIntros (ms1) "Hcg Hpc Hbpd %Hms1cs".
+    iIntros (ms1) "_ Hcg Hpc Hbpd %Hms1cs".
+    iDestruct (ctx_buf_to_mem with "Hbpd") as "Hbpd".
     iEval (rewrite Hcb HE7a0) in "Hbpd".
     assert (Hr0f4 : ret_pc (E7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x0f4)).
     { rewrite /E7 upd_eq. unfold ret_pc. bvc. }
@@ -1995,12 +2003,18 @@ Section ProofVirtioDiskInit.
     assert (HF6s2 : F6 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms1s2).
     iEval (rewrite /page_own /byte_any) in "Hpavpg".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pav j) ↦ₘ b)%I) with "Hpavpg") as (opav) "Hbufa".
-    iApply (MS.wp_memset_sconf KT1 KT0 F6 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opav false pp
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms2) "Hctx".
+    iApply (MS.wp_memset_sconf (XI := ξms2) KT1 KT0 F6 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opav false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
-              with "Hcg Htext Hpc [Hbufa]").
-    { iApply (big_sepL_impl with "Hbufa"). iIntros "!>" (k j _) "H". rewrite HF6a0. iExact "H". }
+              with "Hctx Hcg Htext Hpc [Hbufa]").
+    { iApply (ctx_buf_of_mem KT0 ξms2).
+      iApply (big_sepL_impl with "Hbufa"). iIntros "!>" (k j _) "H". rewrite HF6a0. iExact "H". }
     iApply wp_next_off_intro.
-    iIntros (ms2) "Hcg Hpc Hbpav %Hms2cs".
+    iIntros (ms2) "_ Hcg Hpc Hbpav %Hms2cs".
+    iDestruct (ctx_buf_to_mem with "Hbpav") as "Hbpav".
     iEval (rewrite Hcb HF6a0) in "Hbpav".
     assert (Hr106 : ret_pc (F6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x106)).
     { rewrite /F6 upd_eq. unfold ret_pc. bvc. }
@@ -2058,12 +2072,18 @@ Section ProofVirtioDiskInit.
     assert (HG4s2 : G4 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms2s2).
     iEval (rewrite /page_own /byte_any) in "Hpupg".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pu j) ↦ₘ b)%I) with "Hpupg") as (opu) "Hbufu".
-    iApply (MS.wp_memset_sconf KT1 KT0 G4 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opu false pp
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms3) "Hctx".
+    iApply (MS.wp_memset_sconf (XI := ξms3) KT1 KT0 G4 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opu false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
-              with "Hcg Htext Hpc [Hbufu]").
-    { iApply (big_sepL_impl with "Hbufu"). iIntros "!>" (k j _) "H". rewrite HG4a0. iExact "H". }
+              with "Hctx Hcg Htext Hpc [Hbufu]").
+    { iApply (ctx_buf_of_mem KT0 ξms3).
+      iApply (big_sepL_impl with "Hbufu"). iIntros "!>" (k j _) "H". rewrite HG4a0. iExact "H". }
     iApply wp_next_off_intro.
-    iIntros (ms3) "Hcg Hpc Hbpu %Hms3cs".
+    iIntros (ms3) "_ Hcg Hpc Hbpu %Hms3cs".
+    iDestruct (ctx_buf_to_mem with "Hbpu") as "Hbpu".
     iEval (rewrite Hcb HG4a0) in "Hbpu".
     assert (Hr110 : ret_pc (G4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x110)).
     { rewrite /G4 upd_eq. unfold ret_pc. bvc. }

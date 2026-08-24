@@ -82,6 +82,8 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import SpecAcquire SpecRelease SpecAllocpid SpecKalloc SpecProcPagetable SpecMemset.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecFreeproc.
 Require Import SpecProcinit.
 Require Import SpecAllocproc.
@@ -1857,11 +1859,17 @@ Section ProofAllocproc.
           assert (N1 : r <> mword_of_int 1) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
           rewrite /G4 upd_ne; [| congruence].
           exact (HG3rest r Hr Ncsp N8 N9 N18). }
-        iApply (MS.wp_memset_sconf KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
+        (* memset's contract is context-indexed; this caller is not yet
+           converted, so it mints a context for the call (SC-only move,
+           becomes a compile error at cutover -- the leftover-work marker). *)
+        iMod (own_context_alloc) as (ξms) "Hctx".
+        iApply (MS.wp_memset_sconf (XI := ξms) KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
                   ltac:(pose proof (ap_K2 K HK); lia) ltac:(vm_compute; reflexivity) HG4a1 HG4a2
-                  with "Hcg Htext Hpc [Hbw]").
-        { iEval (rewrite HG4a0). iExact "Hbw". }
-        iApply wp_next_off_intro. iIntros (mms) "Hcg Hpc Hbw %Hcsms".
+                  with "Hctx Hcg Htext Hpc [Hbw]").
+        { iEval (rewrite HG4a0).
+          iApply (ctx_buf_of_mem KT0 ξms with "Hbw"). }
+        iApply wp_next_off_intro. iIntros (mms) "_ Hcg Hpc Hbw %Hcsms".
+        iDestruct (ctx_buf_to_mem with "Hbw") as "Hbw".
         iEval (rewrite HG4a0) in "Hbw".
         assert (Hp66 : ret_pc (G4 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x66))
           by (rewrite HG4ra; apply bv_eq; vm_compute; reflexivity).

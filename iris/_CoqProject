@@ -337,7 +337,6 @@ SpecMemsetParts.v
 ProofMemset.v
 LinkMemset.v
 SpecMemset.v
-TsoMemsetCtx.v
 WpMemsetArray.v
 LinkMemsetArray.v
 SpecMemsetPage.v

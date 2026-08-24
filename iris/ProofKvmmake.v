@@ -31,6 +31,8 @@ Require Import ByteBuf.   (* bb_choose: a window of existentials is an existenti
 Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.
 Require Import CodeKvmmake.
 Require Import SpecKalloc SpecMemset SpecKvmmap SpecProcMapstacks SpecKvmmake.
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -929,8 +931,11 @@ Section KvmmakeBody.
       (fl : mword 64) (m : regfile) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_kalloc_sconf_body KT0 γl γk fl m on n eb p K b lks.
+  (* memset's spec is CONVERTED (tso-port leg M): context-indexed, so this
+     hypothesis is [XI]-generic exactly as it is [CID]-generic -- the call
+     site below mints its own context, this file not being converted yet. *)
   Hypothesis wp_memset :
-    forall `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat)
+    forall `{CID : CpuId} `{XI : CurCtx} (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
   Hypothesis wp_kvmmap :
@@ -1150,11 +1155,17 @@ Section KvmmakeBody.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bb_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
-    iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    (* memset's contract is context-indexed; this caller is not yet
+       converted, so it mints a context for the call (SC-only move,
+       becomes a compile error at cutover -- the leftover-work marker). *)
+    iMod (own_context_alloc) as (ξms) "Hctx".
+    iDestruct (ctx_buf_of_mem KT0 ξms with "Hbuf") as "Hbuf".
+    iApply (wp_memset (XI := ξms) M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
-              with "Hcg Htext Hpc [Hbuf]").
+              with "Hctx Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID12 Hs12 mfin) "_ Hcg Hpc Hbytes %Hmcs".
+    iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -2282,7 +2293,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf KT0 (CID := CID'))
-      (fun (CID' : CpuId) => MS.wp_memset_sconf KT0 KT0 (CID := CID'))
+      (fun (CID' : CpuId) (XI' : CurCtx) => MS.wp_memset_sconf KT0 KT0 (CID := CID') (XI := XI'))
       (fun (CID' : CpuId) => KM.wp_kvmmap_sconf (CID := CID'))
       (fun (CID' : CpuId) => PM.wp_proc_mapstacks_sconf (CID := CID'))
       γa γk mm lvl K eb p on b lks.

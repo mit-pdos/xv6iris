@@ -33,6 +33,8 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
+Require Import TsoCtx TsoCtxShim.   (* converted spec; shim = the interior
+   seam to the UNCONVERTED parts (SpecMemsetParts) this proof composes *)
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
@@ -41,7 +43,7 @@ Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
 
 Section WpMemsetArray.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Context {ktb : ktier}.
@@ -70,7 +72,7 @@ Section WpMemsetArray.
     assert (Hsp' : sp' = pa_stk sp0 2).
     { unfold sp', imm_entry, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
-    iIntros "Hcg #Htext Hpc Hbuf Hcont".
+    iIntros "Hctx Hcg #Htext Hpc Hbuf Hcont".
     (* --- HEAD: 0x00..0x06 --- *)
     iApply (Memset.wp_memset_head_sconf kt m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
               with "Hcg Hpc [] [] [] [] [-]").
@@ -109,7 +111,7 @@ Section WpMemsetArray.
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
     iSpecialize ("Hcont" $! CID3 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
+    iApply ("Hcont" $! mfin with "Hctx Hcg Hpc [Hbuf] [%]").
     - (* the buffer is empty at len = 0 *) iExact "Hbuf".
     - (* callee_saved m0 mfin: only sp/s0 moved, and both are restored *)
       rewrite Hmeq.
@@ -156,11 +158,12 @@ Section WpMemsetArray.
     assert (Hlenu : bv_unsigned (mword_of_int (Z.of_nat len) : mword 64) = Z.of_nat len).
     { rewrite moi64_unsigned. apply bv_wrap_small.
       unfold bv_modulus; simpl. split; [ lia | apply (Z.lt_trans _ (2 ^ 32)); [ lia | vm_compute; reflexivity ] ]. }
-    iIntros "Hcg #Htext Hpc Hbuf0 Hcont".
+    iIntros "Hctx Hcg #Htext Hpc Hbuf0 Hcont".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)
     iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ[ktb] olds j)%I
       with "[Hbuf0]" as "Hbuf".
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
+      iDestruct (ctx_pointsto_to_mem with "H") as "H".
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- prefix/loop/suffix instr resources --- *)
     (* the value-coupling premises for the setup and the loop *)
@@ -270,9 +273,10 @@ Section WpMemsetArray.
     iEval (rewrite Hnk) in "Hcg".
     (* hand the all-cbyte buffer back directly (KEEP the written bytes) *)
     iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
+    iApply ("Hcont" $! mfin with "Hctx Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
-      iEval (rewrite ms_pa_ms_addr) in "H". iExact "H".
+      iEval (rewrite ms_pa_ms_addr) in "H".
+      iApply (ctx_pointsto_of_mem with "H").
     - (* callee_saved m0 mfin: only sp/s0 moved *)
       assert (Hcatch : forall r : regidx,
                 r <> Regidx (mword_of_int 1 : mword 5) -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->

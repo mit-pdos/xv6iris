@@ -227,6 +227,26 @@ Section ctx.
 
 End ctx.
 
+(* The notation family, mirroring [mem_pointsto]'s ([RiscvPtsto.v]) with
+   [↦c] in place of [↦ₘ]: the context index is AMBIENT ([cur_ctx], like
+   the tier), so converted spec text reads as before --
+   [a ↦c[ktb] v], [a ↦c v], [a ↦c{dq} v], [a ↦c□ v].  A statement that
+   needs an EXPLICIT context (lock internals, the shim) spells
+   [ctx_pointsto] directly.  At the M1 notation flip these become the
+   [↦ₘ] spellings and [↦c] is retired.  The tier-bracket form goes
+   through Iris's custom [dfrac] entry for the same lexer reason as
+   [↦ₘ[kt]]'s (see the note there: a fused "]{" token would break
+   ghost_map's [↪[γ]] tree-wide). *)
+Notation "a ↦c{ dq } v" := (ctx_pointsto cur_ctx a dq v)
+  (at level 20, format "a  ↦c{ dq }  v") : bi_scope.
+Notation "a ↦c□ v" := (ctx_pointsto cur_ctx a DfracDiscarded v)
+  (at level 20, format "a  ↦c□  v") : bi_scope.
+Notation "a ↦c v" := (ctx_pointsto cur_ctx a (DfracOwn 1) v)
+  (at level 20, format "a  ↦c  v") : bi_scope.
+Notation "a ↦c[ kt ] dq v" := (ctx_pointsto (KTR := kt) cur_ctx a dq v)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦c[ kt ] dq  v") : bi_scope.
+
 (* The seal.  [ctx_dom] stays opaque too: nothing above this file may
    learn it is [True] at SC. *)
 Global Typeclasses Opaque own_context ctx_pointsto ctx_dom.
