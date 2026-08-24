@@ -1247,6 +1247,17 @@ Section DurImgMain.
                               (fs_home_set cov (FsImg.sb_logstart sb))))
     ⊢ |==> ∃ Gd : fs_dur_names,
         ghost_map_auth (fdn_top Gd) 1 (img_nodes (fs_blocks dk) sb nib)
+        (* THE AUTHORITY'S OWN ELEMENTS, AND THEY ARE NOT OPTIONAL
+           (durable-disk 2c-body's finding (G)).  A [ghost_map] value
+           cannot be retagged without its element, so an authority handed
+           out alone makes the durable abstract state IMMUTABLE and every
+           commit that moves an inode unprovable.  [FsState]'s own
+           [inode_owned] does not carry [top_frag] -- only the ERA bundle
+           [FsStateEra.inode_owned_era] does -- so the durable instance
+           carries the fragments here, one per inode, exactly as
+           [fs-state.md] section 4 says a holder of [inode_owned] does. *)
+        ∗ ([∗ map] i ↦ n ∈ img_nodes (fs_blocks dk) sb nib,
+             top_frag (fs_gamma_D g Gd) i n)
         ∗ fs_state (fs_gamma_D g Gd) (img_state (fs_blocks dk) sb nib)
         ∗ ([∗ set] b ∈ fs_home_set cov (FsImg.sb_logstart sb)
                        ∖ img_owned (fs_blocks dk) sb nib,
@@ -1382,9 +1393,10 @@ Section DurImgMain.
     (* the two durable gnames -- the CLIENT allocates them (2c-names) *)
     iMod (fs_boot_alloc_at (img_nodes (fs_blocks dk) sb nib)
             (img_nodes (fs_blocks dk) sb nib) Hlink)
-      as (gl gt) "(Htopa & _ & Hlnk)".
+      as (gl gt) "(Htopa & Htfr & Hlnk)".
     iModIntro. iExists (MkFsDurNames gl gt).
     iSplitL "Htopa"; [iExact "Htopa" |].
+    iSplitL "Htfr"; [iExact "Htfr" |].
     (* the flat elements, as one exclusive run per home block *)
     assert (Hlen : forall b bs,
               fs_restrict (fs_blocks dk)
@@ -1481,6 +1493,8 @@ Section DurImgMain.
                               (fs_home_set cov (FsImg.sb_logstart sb))))
     ⊢ |==> ∃ Gd : fs_dur_names,
         FsState.fs_view (fs_gamma_D g Gd)
+        ∗ ([∗ map] i ↦ n ∈ img_nodes (fs_blocks dk) sb nib,
+             top_frag (fs_gamma_D g Gd) i n)
         ∗ ([∗ set] b ∈ fs_home_set cov (FsImg.sb_logstart sb)
                        ∖ img_owned (fs_blocks dk) sb nib,
              blk_owned (fs_gamma_D g Gd) b (fs_blocks dk b)).
@@ -1488,8 +1502,8 @@ Section DurImgMain.
     intros Himg Hbare Hns.
     iIntros "Hd".
     iMod (fs_dur_of_image g dk ndisk sb nib cov Himg Hbare Hns with "Hd")
-      as (Gd) "(Htopa & Hst & Hrem)".
-    iModIntro. iExists Gd. iFrame "Hrem".
+      as (Gd) "(Htopa & Htfr & Hst & Hrem)".
+    iModIntro. iExists Gd. iFrame "Htfr Hrem".
     rewrite /FsState.fs_view. iExists (img_state (fs_blocks dk) sb nib).
     iFrame "Hst". iExact "Htopa".
   Qed.

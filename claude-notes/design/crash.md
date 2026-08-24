@@ -376,6 +376,33 @@ rather than a pure sweep:
   AMBIENTLY at `riscv_dview_name` — the one kind of gname this tree does
   not thread explicitly, and the reason `log_ctx_at`'s arity did not move.
 
+**WHAT "`P_wf` AS REAL" COSTS, AND WHY IT IS STILL A BLOB (2c-body,
+2026-08-24).** The intended body is `fs_view Γ_D` plus an explicit residual
+(`FsDurImg.fs_dur_view_of_image` already builds exactly that from the mkfs
+image, generically in `fs_boot_image_wf`). Three things stand between it and
+the flip, all of them statements rather than proofs, and the full account is
+`projects/durable-disk.md` item 2c:
+
+- `P_wf` must NOT be indexed by the block map: the domain clause that would
+  need is a maintained whole-state fact, and the theorem under it does not
+  state (a record is 64 bytes, so whole inode blocks need an extent
+  `fs_state_rec` does not carry). Index-free — `∃ S Br, top auth ∗ the top
+  fragments ∗ fs_state Γ_D S ∗ a clause-free byte bin` — the tie to
+  `fr_D r` is `P_disk`'s authority alone, by `ghost_map` agreement.
+- The durable top map has NO elements: `FsState.inode_owned` carries no
+  `top_frag`, so the durable abstract state cannot be retagged.
+  `FsDurImg.fs_dur_of_image` now returns the per-inode fragments (it used
+  to drop them); the definition of `P_wf` has to hold them.
+- The commit law's LENT byte auth cannot pin the logged view `L`: the
+  payload holds none of the `Γ_L` elements (they are behind `iregN`,
+  `ftopN`, `bitmapN`, and — decisively — handed out of the icache escrow to
+  whoever holds an inode's sleeplock, which `readi` takes with no operation
+  open). The payload's index has to MOVE with the logged view instead, and
+  the Ψ-free forms of `log_write`'s AU die with that.
+- The identity step survives the flip and nothing else of `fs_dstep_rebase`
+  does: `LogDefs.fs_dstep_id` and `fs_dstep_trans` are the debt's whole
+  algebra and are already landed, body-free.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of

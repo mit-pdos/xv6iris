@@ -1213,12 +1213,11 @@ map at home blocks); 1d lands last.
              their last consumers — so those two clauses can come out of
              `ireg_slot`/`ireg_slot_intro` FIRST, as a small separable
              increment, before the `DirLinks` demolition.
-- [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
-      - OPEN, for the orchestrator, in the order they cost:
-        - The link family is still dropped at `BootShared` and the bundle
-          still excludes the link ghosts.  Routing them is the links step's
-          one-line change at that `iClear`, and its price is the
-          `✓ link_elem` at the image map that this lane did NOT have to pay.
+        - STILL OPEN beside the deletions: the link family is dropped at
+          `BootShared` and the bundle excludes the link ghosts.  Routing
+          them is the links step's one-line change at that `iClear`, and
+          its price is the `✓ link_elem` at the image map that 2b-inode-3
+          did NOT have to pay.
 - [~] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload,
       the commit AU's discharge from the debt; `FsAdequacyImg` builds
       `fs_view Γ_D` from `fs.img` once (the only place the image is
@@ -1259,10 +1258,8 @@ map at home blocks); 1d lands last.
           gnames are real, the resources are dropped, and nothing reads
           them until the body flips.  Audit unchanged at the three-entry
           baseline.
-      - [ ] **THE BODY, AND WHAT IT COSTS (surveyed 2026-08-24; this is
-        the ruling the orchestrator owes).**  `P_wf`'s body is still
-        `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
-        and `fs_dstep_rebase` still holds.  Four findings:
+      - [x] **2c-fslink. THE CLASSES THE BODY DRAGS IN.**  LANDED, and it
+        is the plumbing half of the body flip (survey finding (i)).
         - **(i) THE CLASSES REACH `log_ctx` AND `fs_crash_seam`.**
           `fs_view Γ_D` needs `fsLinkG` and `fsTopG`, so the moment
           `fs_dview`'s body names it, both become implicit arguments of
@@ -1301,10 +1298,12 @@ map at home blocks); 1d lands last.
           *"The term `gen` has type `nat` while it is expected to have
           type `gstate`"* — it names the first argument that mis-lands,
           never the binder.
-      - [ ] **THE BODY, AND WHAT IT COSTS (surveyed 2026-08-24; this is
-        the ruling the orchestrator owes).**  `P_wf`'s body is still
+      - [ ] **THE BODY.**  `P_wf`'s body is still
         `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
-        and `fs_dstep_rebase` still holds.  2c-img (below) discharged
+        and `fs_dstep_rebase` still holds.  2c-img discharged survey
+        findings (ii) and (iv); (iii) and (v) stand, and **2c-body found
+        two more that block the flip outright — see "2c-body's finding"
+        below, which is the ruling the orchestrator owes.**
       - RULED (2026-08-24): the two gaps 2c-img found are facts about the
         mkfs IMAGE, not invariants — (14) `FsImg.fs_region_bare` and (15)
         `FsImg.fs_root_no_self`, both LANDED (see the closed bullet below)
@@ -1312,7 +1311,6 @@ map at home blocks); 1d lands last.
         into `FsCfgBoot.fs_boot_image_wf` as conjuncts (14)/(15), which
         retires the two extra premises `FsDurImg.fs_dur_of_image` carries
         today.  Stage 3's image discharge consumes them.
-        findings (ii) and (iv); (iii) and (v) stand.
         - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN
           `S`, because `free_pool`'s blocks have EXISTENTIAL contents** — so
           `fs_footprint Γ_D S ⊣⊢ fs_dbelems γD (some map of S)` cannot be
@@ -1455,18 +1453,140 @@ map at home blocks); 1d lands last.
         `wi_dinode`/dirlink's append/`cr_setf`) while holding `iregN` and
         NOT `log.lock`, so an authority parked behind the log lock would be
         unreachable at exactly the sites that move it.  The payload
-        therefore holds the DEBT plus whatever the commit needs, and
-        `Ψ D₀`'s shape is
-        `∃ L, ⌜…⌝ ∗ (the Γ_L content the commit reads) ∗ fs_dstep γD Γ_D D₀ (lm_logged L cov ls)`
-        — the `∃ L` is pinned at the commit by `log_psi_commit`'s LENT byte
-        auth (`bytes_home_at Lb L`), which is why the law lends it.
-        **The identity debt (`D₀ = D'`) is discharged for `D = D'` and
-        NOWHERE ELSE**, and it is honest only for a batch that wrote no
-        home block — so it cannot be what `ProofInitlog` parks once
-        `fs_dstep` is real, and the suppliers' per-object steps (stage 3)
-        are on the critical path for a green tree, not after it.  That is
-        the ordering finding: **`P_wf`'s flip and stage 3's supplier steps
+        therefore holds the DEBT plus whatever the commit needs.
+        **The identity debt is honest at `D = D'` and NOWHERE ELSE**
+        (`LogDefs.fs_dstep_id`), so it is not what a batch that wrote a
+        home block can park; the suppliers' per-object steps are on the
+        critical path for a green tree, not after it, which is the
+        ordering finding: **`P_wf`'s flip and stage 3's supplier steps
         cannot be separated by a green checkpoint.**
+      - [ ] **2c-body's FINDING (2026-08-24): THE `D₀`-ONLY INDEX CANNOT
+        CARRY THE DEBT, AND NO PROOF EFFORT FIXES IT — THE INDEX HAS TO
+        MOVE.  THIS IS THE RULING THE ORCHESTRATOR OWES BEFORE ANY OF
+        2c-body/STAGE 3 IS ATTEMPTED AGAIN.**  Nothing of it is a proof
+        difficulty; each step below is a statement about what a resource
+        can possibly say.
+        - **(A) WHAT THE COMMIT MUST PRODUCE.**  `log_psi_commit`'s law
+          must return `fs_dstep γD (lm_committed M cov ls) (lm_logged L
+          cov ls)` — a step whose TARGET is the logged view **on every
+          home block**, including every block no operation in the batch
+          touched.  A debt composed from the suppliers' steps ends at
+          `D₀` overwritten at the blocks that were WRITTEN; the two agree
+          only if the client can prove `L = D₀` at every home block it did
+          not write.  That equation is true (a `log_write` is the only
+          thing that moves `L`) and it is the whole of what has to be
+          PROVED.
+        - **(B) THE LENT AUTH CANNOT PIN IT, BECAUSE THE `Γ_L` ELEMENTS
+          ARE NOT IN THE PAYLOAD AND CANNOT BE PUT THERE.**  Lending
+          `ghost_map_auth (fs_bytes γfs) 1 Lb` lets the client learn `Lb`
+          only at addresses whose ELEMENT it holds.  Under the landed
+          distribution the payload holds none of them, and each home block
+          is out of reach for its own forced reason:
+          the inode region's record runs are behind `iregN`
+          (2b-inode-1 ruling (i), forced by ialloc/ireclaim's buffer
+          scan); `γtop_L`'s authority is behind `ftopN` (the bullet
+          above); the bitmap block and the free pool are behind
+          `bitmapN`; and — the decisive one — **a cached inode's data
+          blocks are handed OUT of the escrow to whoever holds its
+          sleeplock** (`SpecIlock` gives `IcacheEscrow.ic_loaded` to the
+          locker, `SpecIunlock` takes it back), and `readi` locks an inode
+          WITHOUT an open operation.  So even at group quiescence
+          (`out = 0`, every invariant openable at ⊤) a concurrent reader
+          can hold an inode's blocks, and no mask and no fupd reaches
+          them.  Widening `log_psi_commit` from `==∗` to a fupd at an FS
+          mask therefore does NOT close the gap; it only recovers the
+          three invariant-parked pieces.
+        - **(C) THE FIX: INDEX `Ψ` BY THE CURRENT LOGGED VIEW AS WELL.**
+          `Ψ : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ`,
+          parked in `log_state` as `Ψ (lm_committed M cov ls)
+          (lm_logged L cov ls)`.  Both indices are functions of binders
+          `log_state` already has.  The commit law loses the lent auth,
+          `bytes_home_at` and both `∀ L`/`∀ Lb` and becomes
+          `□ (∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ Dc Dc ∗ fs_dstep γD D₀ Dc)` — the
+          payload hands out the debt it has accumulated and re-parks
+          `fs_dstep_id`.  `log_write`'s ghost step re-indexes with
+          `LogDefs.lm_logged_insert_home` (landed by this lane) off
+          `FsBlocks.fsblock_home`'s "holding the run IS being a home
+          block", so the log never needs a membership premise.
+          `FsBlocks.bytes_home_at` / `fs_bytes_home_of` and
+          `LogInv.log_psi_spend`'s `inv_acc` of `logN` all die with it.
+        - **(D) WHAT (C) COSTS, AND WHY IT IS NOT SEPARABLE EITHER.**  A
+          moving index kills `SpecLogWrite.lw_au_lb0`'s
+          `iFrame "Hpsi"`: `Ψ D₀ Dc ={E}=∗ Ψ D₀ (<[b := bs']> Dc)` is not
+          provable at an arbitrary `Ψ`.  So the three adapters
+          (`lw_au_lb0`, `lw_au_whole`, `lw_au_rec`) gain the move as a
+          PREMISE, and the three Ψ-FREE forms that take a plain `log_ctx`
+          — `wp_log_write_gen_body`, `_gene_body`, `_sconf_body` — cannot
+          survive at all: every one of the eleven suppliers has to name
+          `Ψ` and discharge the move with its own composed step.  That is
+          the same wall the ordering ruling names, reached from the log's
+          side, and it confirms it: `fs-state.md` §5's rejection of an
+          `L`-index ("no client can re-index the payload for an arbitrary
+          `Ψ`") is CORRECT as stated and is not a reason to keep the
+          `D₀`-only index — it is the statement that the suppliers must
+          be converted, which stage 3 requires anyway.
+        - **(E) SECOND FINDING: SURVEY (iii)'s BLOCK-INDEXED `P_wf` IS THE
+          WRONG SHAPE, AND DROPPING THE INDEX RETIRES (iii) ENTIRELY.**
+          `⌜fs_state_blocks S = dom Ds⌝` is a MAINTAINED WHOLE-STATE
+          domain clause — exactly the pure well-formedness projection
+          ruling 3 deleted (fs-state.md §0) — and it needs both a function
+          `fs_state_blocks S : gset Z` and, at proof time, the theorem
+          *"`fs_state Γ S` owns exactly those WHOLE blocks"*.  That
+          theorem does not even STATE: a record is 64 bytes, so the
+          region's blocks are whole only if `dom (fss_inodes S)` covers
+          every slot of every inode block, and the region's extent `nib`
+          is not in `fs_state_rec` (`sb_ninodes (fss_sb S) <= 16 * nib`,
+          not equal — the durable map is the REGION's inums, as
+          `FsCfgBoot.img_nodes` is).
+          **The shape that works is INDEX-FREE:**
+          `P_wf γv Γd := ∃ S Br, ghost_map_auth (fdn_top Γd) 1
+          (fss_inodes S) ∗ (one top_frag per inode, see (G)) ∗
+          fs_state (fs_gamma_D γv Γd) S ∗ FsDurBytes.fs_dbelems γv Br`,
+          with **no `D` in it at all**.  The tie to `fr_D r` is then
+          `P_disk`'s authority alone — `ghost_map` agreement says the
+          state's bytes ARE `D`'s bytes wherever the state owns a byte,
+          which is the LOCAL statement §0 asks for, and totality ("no
+          durable byte is owned elsewhere") is a metatheorem, since `γD`
+          is a fixed-layer name no mortal can name.  `Br` is a
+          clause-free byte BIN, not a residual with a domain: it absorbs
+          whatever a step inserts at an address no object owns.  Every
+          preserving permit gets easier too (nothing to re-index), and a
+          supplier's step stays local: it changes `fs_dbytes` on one
+          block's range (`FsDurBytes.fs_dbytes_insert` under
+          `dbytes_ok`), never on the whole map.
+        - **(G) THIRD FINDING, AND IT IS A ONE-LINE CODE FACT:
+          `fs_view Γ_D`'s TOP MAP IS IMMUTABLE AS LANDED.**
+          `FsState.fs_view Γ` holds `ghost_map_auth (γtop Γ) 1
+          (fss_inodes S)` and `fs_state Γ S`, and `FsState.inode_owned`
+          does NOT carry `top_frag` (only `FsStateEra.inode_owned_era`
+          does).  A `ghost_map` value cannot be retagged without its
+          ELEMENT, so the durable abstract state can never move — and
+          `fs_dur_of_image` used to discard the fragments
+          `FsState.fs_boot_alloc_at` hands it, so the image's durable
+          instance was born immutable.  It is durable-notes' parked-
+          authority rule seen from the other side: here the AUTHORITY had
+          no elements.  **The code half is FIXED (2c-body):**
+          `FsDurImg.fs_dur_of_image` and `fs_dur_view_of_image` now RETURN
+          `[∗ map] i ↦ n ∈ img_nodes …, top_frag (fs_gamma_D g Gd) i n`
+          beside the authority.  What is left is the DEFINITION: `P_wf`
+          must hold those fragments (the `[∗ map]` conjunct in (E)), or a
+          durable reading of `inode_owned` must carry one, which is what
+          fs-state.md §4 says a holder does.  Decide it with (E): they are
+          the same definition.
+        - **(F) WHAT 2c-body LANDED, AND IT SURVIVES EITHER RULING.**  The
+          debt's whole algebra is two laws, both in `LogDefs.v` and both
+          independent of `fs_dview`'s body, so neither moves at the flip:
+          `fs_dstep_id` (the identity, which is the one instance of
+          `fs_dstep_rebase` that survives) and `fs_dstep_trans` (the
+          composition every supplier appends through).  `fs_dstep_rebase`
+          itself dies at the flip, as its header already says.  Beside
+          them, `LogDefs.lm_logged_insert_home` — the logged view's ONE
+          move, a home-block write, which is (C)'s re-index — and
+          `FsDurImg`'s returned top fragments (G).  Nothing else of the
+          four pieces is landed and nothing of them CAN be until (C), (E)
+          and (G) are ruled: the flip has no green checkpoint (see the
+          ordering ruling in stage 3), so a half-flip would be a red tree
+          or a gate, and both are forbidden by the working rules.
       - [x] **2c-pre. `γD` hoisted into the FIXED layer.**  LANDED.
             `RiscvPtsto.riscvFixedGS` gains `riscv_dview_name`, riding
             `riscvF_diskGS` (the tree's unique `ghost_mapG Σ Z (bv 8)`),
@@ -1498,18 +1618,26 @@ map at home blocks); 1d lands last.
 ## Stage 3 — the vertical spike: `sys_mknod`
 
 **ORDERING RULING (2c, 2026-08-24): STAGE 3 IS NOT AFTER 2c'S BODY, IT IS
-PART OF THE SAME GREEN CHECKPOINT.**  `LogInv.log_psi_commit` is quantified
-over ALL `M`/`L`, so at a real `fs_dstep` the boot's `Ψ := fun _ => emp` can
-no longer discharge it (producing a state change from nothing), and the only
-payload that can is one holding the era's own byte ELEMENTS — which is what
-pins the law's `∀ L` to the payload's own state through the LENT byte auth.
-That payload then has to be re-established by every `log_write` AU, i.e. by
-each of the eleven suppliers, appending its own `Γ_D` step.  A supplier that
-appends the IDENTITY is honest only for a write that touches no home block,
-and there is no such write.  So: `P_wf`'s flip, the payload's real content
-and the suppliers' per-object steps land TOGETHER or not at all.  The one
-thing that IS separable, and is landed, is the plumbing (2c-names,
-2c-fslink).
+PART OF THE SAME GREEN CHECKPOINT.**  At a real `fs_dstep` the boot's
+`Ψ := fun _ => emp` can no longer discharge `log_psi_commit` (it would be
+producing a state change from nothing), and whatever payload does has to be
+re-established by every `log_write` AU, i.e. by each of the eleven
+suppliers, appending its own `Γ_D` step.  A supplier that appends the
+IDENTITY is honest only for a write that touches no home block, and there is
+no such write.  So: `P_wf`'s flip, the payload's real content and the
+suppliers' per-object steps land TOGETHER or not at all.  The one thing that
+IS separable, and is landed, is the plumbing (2c-names, 2c-fslink) and the
+debt's two algebra laws (`LogDefs.fs_dstep_id`/`_trans`).
+
+**AND THE PAYLOAD CANNOT BE "the one holding the era's own byte ELEMENTS"**
+— that was the reading of the ruling until 2c-body refuted it: those
+elements are distributed across `iregN`/`ftopN`/`bitmapN` and, decisively,
+are handed OUT of the icache escrow to whoever holds an inode's sleeplock,
+which `readi` takes outside any operation.  The lent-auth device therefore
+cannot pin `L`, and the payload's index has to MOVE with the logged view.
+The full statement, with the cost of the fix and the two things it forces,
+is item 2c's "2c-body's FINDING" above; **read it before starting either
+this stage or 2c's body.**
 
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append

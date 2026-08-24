@@ -201,8 +201,19 @@ debt's input (never owned by the writer).  Its intermediate resources are
 `fs_state`-minus-in-flight ∗ in-flight, never required to be anything; at
 `out = 0` the chain ends at the whole `fs_view Γ_D` at `S_L`.  If the era
 dies, the chain dies in the payload and `P_wf` still holds the last
-commit: uncommitted work vanishes, as it should.  The commit AU (§5) is
-the debt plus the byte-level fact the log supplies.
+commit: uncommitted work vanishes, as it should.
+
+**The debt's whole algebra is two laws, and both are landed and body-free**
+(`LogDefs.fs_dstep_id`, `fs_dstep_trans`): a fresh payload parks the
+identity and each supplier appends its step on the right.  `fs_dstep_rebase`
+— today's trivial witness — is NOT one of them: it runs `fs_dview_rebase`
+on the flat blob and dies the moment `P_wf`'s body carries content.
+
+**THE DEBT'S TARGET IS THE WHOLE HOME SET, WHICH IS WHY THE PAYLOAD'S
+INDEX HAS TO MOVE.**  A debt composed from the suppliers ends at `D₀`
+overwritten at the blocks that were WRITTEN; the commit needs it at the
+logged view on EVERY home block.  Nothing the payload can hold pins the
+rest — see §5's commit law, where the correction and its price are stated.
 
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
@@ -229,13 +240,15 @@ The log exposes, and knows, only this:
   (the last-ending operation cannot know it is last), and `log.lock`
   already serializes every `log_write`.
 
-  **The index is the committed view and NOT the logged one.**  The logged
-  view needs no index: the payload's `Γ_L` content is pinned to `L` by the
-  byte ELEMENTS it holds against the log's auth, and `fs_view Γ_L` binds
-  its state existentially (§4).  An `L` index is not merely redundant, it
-  is FATAL: it would make every `log_write`'s AU RE-INDEX the payload,
-  which no client can do for an arbitrary `Ψ`, so no supplier could frame
-  it and the interface could not be proven Ψ-parametrically at all.
+  **The index is the committed view, and it is not enough.**  It was
+  ruled to be the only index on the grounds that the payload's `Γ_L`
+  content pins `L` by the byte ELEMENTS it holds against the log's auth,
+  and that an `L` index would make every `log_write`'s AU RE-INDEX the
+  payload — which no client can do for an arbitrary `Ψ`, so no supplier
+  could frame it.  The first half is FALSE (the payload holds no such
+  elements; see the commit law below) and the second half is TRUE and is
+  the price: the payload's second index is the current logged view, and
+  the Ψ-free AU forms die with it.
 
   `Ψ` is packaged EXISTENTIALLY in the log's context — `log_ctx_at Ψ …` is
   the Ψ-named form and `log_ctx … := ∃ Ψ, log_ctx_at Ψ …` — so the 78 files
@@ -243,11 +256,14 @@ The log exposes, and knows, only this:
   names a file-system payload; a client that must name `Ψ` opens the
   existential in its own proof, and the BOOT picks the witness.
 - **`log_write(b)`'s AU**:
-  `fs_L-elements for the bytes that change ∗ (∀ D₀, Ψ D₀ ={E}=∗ Ψ D₀ ∗ Q)`.
-  The payload goes in and comes back at the SAME index — a `log_write`
-  writes no disk block, so the committed view does not move — and `D₀` is
-  `∀`-bound because it is the log's own parked index, which no caller can
-  name.  The client opens whatever it likes inside (its own invariants, the
+  `fs_L-elements for the bytes that change ∗ (∀ D₀ Dc, Ψ D₀ Dc ={E}=∗
+  Ψ D₀ (<[b := bs']> Dc) ∗ Q)`.  The COMMITTED index does not move — a
+  `log_write` writes no disk block — and the LOGGED one does, at exactly
+  the block written; both are `∀`-bound because they are the log's own
+  parked indices, which no caller can name.  (The landed statement carries
+  only `D₀` and frames the payload; that is the shape the commit law's
+  correction above replaces.)
+  The client opens whatever it likes inside (its own invariants, the
   parked `fs_view Γ_L` body) to move its pieces, its top fragment and the
   debt.  Since the log learns the checked-out buffer's bytes equal `L(b)`
   on every byte (via `γcache`), and the writer's stores touched only its
@@ -267,16 +283,51 @@ The log exposes, and knows, only this:
           ∗ fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))
   ```
 
-  where `fs_dstep D D' := ∀ g, γD_auth (bytes D) ∗ P_wf(g, bytes D) ==∗
-  γD_auth (bytes D') ∗ P_wf(g, bytes D')`.
+  where `fs_dstep γD D D' := γD_auth (bytes D) -∗ P_wf(bytes D) ==∗
+  γD_auth (bytes D') ∗ P_wf(bytes D')` (the gname is a PARAMETER since
+  2c-pre; the log spells it ambiently at `riscv_dview_name`).  Its two
+  laws — `LogDefs.fs_dstep_id` and `fs_dstep_trans` — are the whole of
+  the debt's algebra and are body-free, so they survive the flip.
 
-  **The law takes the log's byte-view AUTH as an input and gives it back**,
-  and that is load-bearing.  A law of the naive shape
-  `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))` is NOT provable for a
-  real payload: quantified over an arbitrary `L` with nothing else in hand,
-  the client cannot know that `L` is the view its own elements describe, and
-  the debt it owes is specific to the ACTUAL logged view.  With the auth
-  lent, the client agrees its elements against it and learns the real `L`.
+  **The law takes the log's byte-view AUTH as an input and gives it back.**
+  A law of the naive shape `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged
+  L))` is NOT provable for a real payload: quantified over an arbitrary `L`
+  with nothing else in hand, the client cannot know that `L` is the view its
+  own elements describe, and the debt it owes is specific to the ACTUAL
+  logged view.  Lending the auth was meant to fix that — the client agrees
+  its elements against it and learns the real `L`.
+
+  **THAT DEVICE DOES NOT WORK, AND IT IS NOT A PROOF PROBLEM.**  A lent
+  auth teaches the client `L` only at addresses whose ELEMENT it holds, and
+  the payload holds none: the inode region's record runs live behind
+  `iregN` (§7's ruling (i)), `γtop_L`'s authority behind `ftopN`, the
+  bitmap and the free pool behind `bitmapN`, and a cached inode's data
+  blocks are handed OUT of the icache escrow to whoever holds its
+  sleeplock — which `readi` takes with no operation open, so even at group
+  quiescence they are unreachable at any mask.  Widening the law to a fupd
+  recovers the three invariant-parked pieces and not the fourth.
+
+  **THE CORRECTION: `Ψ` IS INDEXED BY THE COMMITTED VIEW *AND* THE CURRENT
+  LOGGED VIEW**, `Ψ D₀ Dc`, parked as `Ψ (lm_committed M cov ls)
+  (lm_logged L cov ls)` — both functions of binders `log_state` already
+  has.  The law then needs neither the auth nor `bytes_home_at`:
+
+  ```
+  log_psi_commit Ψ := □ (∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ Dc Dc ∗ fs_dstep γD D₀ Dc)
+  ```
+
+  — hand out the accumulated debt, re-park the identity.  `log_write`'s
+  ghost step re-indexes with `LogDefs.lm_logged_insert_home`, whose home
+  membership comes from `FsBlocks.fsblock_home` (holding the run IS being a
+  home block), so the log needs no new premise.  **What it costs is the
+  Ψ-FREE forms of `log_write`'s AU**: `Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs']> Dc)`
+  is not provable at an arbitrary `Ψ`, so `SpecLogWrite.lw_au_lb0` can no
+  longer frame the payload and every one of the eleven suppliers must name
+  `Ψ` and discharge the move with its own composed step.  The rejection of
+  an `L`-index recorded here before — "no client can re-index the payload
+  for an arbitrary `Ψ`" — is TRUE and is exactly that cost; it is not a
+  reason to keep the `D₀`-only index, because stage 3 converts those
+  suppliers anyway.
 
   The permit LENDS `γD`'s auth AND `P_wf` to the returned step for the
   instant — the same move the machine layer makes when it lends `γdisk` to
@@ -287,7 +338,10 @@ The log exposes, and knows, only this:
   Today's `P_wf` is a bare byte map, so the trivial witness
   (`fs_dstep_rebase`) discharges the step and the boot's `Ψ := fun _ => emp`
   discharges the law; both are PARAMETERS of stage 1 and stop holding once
-  `P_wf` becomes `fs_view Γ_D`.
+  `P_wf` carries content.  With the corrected law the boot's payload is
+  not `emp` but `fs_dstep_id` at the era's own committed view, which is
+  honest: a clean boot's logged view IS its committed view
+  (`LogDefs.lm_committed_clean`).
 - **`end_op`**: no FS-specific premise at all.
 
 `FsCrash.end_op_pres`, `fs_commit_pres`, `LogInv.end_op_fin`, the
@@ -299,14 +353,15 @@ only as placeholders).  **They are all DELETED in the tree** — the last of
 them by durable-disk 1d, which also deleted their 30 + 6 gate call sites;
 `end_op` now takes no FS-facing premise at all.
 
-The whole of §5 above is LANDED (durable-disk 1d/1d'/2c-pre), the durable
-gname included: `γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS`
-field, so `fs_dstep γD D D'` is the client's debt AT THE REAL DURABLE
-NAME.  `LogDefs.v` takes the gname as an argument (it sits below
-`RiscvPtsto` and may not import it); `log_psi_commit`, `log_psi_spend` and
-`FsCrash.fs_commit_L_sector0_rec` spell it AMBIENTLY as
-`riscv_dview_name`, the way every file already spells `riscv_disk_name`,
-so `log_ctx_at` and `fs_crash_seam` keep their arities.
+§5 is LANDED (durable-disk 1d/1d'/2c-pre) **apart from the payload's
+second index and the commit law's correction above**, which are 2c-body's
+finding and are still a ruling, not code.  The durable gname is landed:
+`γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS` field, so
+`fs_dstep γD D D'` is the client's debt AT THE REAL DURABLE NAME.
+`LogDefs.v` takes the gname as an argument; `log_psi_commit`,
+`log_psi_spend` and `FsCrash.fs_commit_L_sector0_rec` spell it AMBIENTLY
+as `riscv_dview_name`, the way every file already spells
+`riscv_disk_name`, so `log_ctx_at` and `fs_crash_seam` keep their arities.
 
 ## 6. What this supersedes in the tree
 
@@ -630,6 +685,19 @@ differs is only which byte map's full element `fsΦ` is.
   of `fs_gamma_L` (fill `fs_bytes`/`fs_link`/`fs_top` with the durable
   gnames; the two cache-side fields are never read) and
   `fs_gamma_L (fs_dur_bundle g Γd) = fs_gamma_D g Γd` by `reflexivity`.
+
+  **PRICE THE PROPER FIX BEFORE STARTING IT (2c-body).**  The three
+  lemmas' `Γ` reaches them only through `InodeInv`'s
+  `inode_blocks`/`ind_res`/`blk_res`/`ind_blk`, which are stated over
+  `fsblock (fs_bytes γfs)`, so a Γ-generic restatement needs Γ-generic
+  TWINS of those four — and they must sit below BOTH `FsStateEra` and
+  `FsImgBridge`, which are siblings (neither is in the other's cone).
+  That means `InodeInv.v` itself (358 dependents), with the four
+  definitions re-based on `blk_owned Γ` and the landed names derived at
+  `fs_gamma_L γfs`; a new leaf file cannot serve both siblings and would
+  duplicate `inode_blocks_of_slots`/`_of_blocks`, which is the
+  near-duplicate family the guiding principle forbids.  Do it when a
+  supplier's `Γ_D` step actually needs the instance, not before.
 - **TWO IMAGE FACTS THE `Γ`-PREDICATES NEED AND `fs_boot_image_wf` DOES
   NOT CARRY**, both premises today and both recorded in
   `projects/durable-disk.md` item 2c: a FREE record's `inode_local`
@@ -641,3 +709,44 @@ differs is only which byte map's full element `fsΦ` is.
   `fsLinkUR` — `FsDurImg.img_link_valid`.  What is left is the ticket
   bridge, and the reason it is not free is that `FsImg.fs_rec_ticket` and
   `FsStateInode.ent_tokenless` exempt different records.
+
+### 2c-body: `P_wf`'s body is INDEX-FREE, and the top map needs its elements
+
+`P_wf` is still the flat blob `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`.
+Two things have to be settled before the intended body can be WRITTEN, and
+neither is a proof difficulty.
+
+- **DO NOT INDEX `P_wf` BY THE BLOCK MAP.**  A `⌜fs_state_blocks S = dom
+  Ds⌝` clause is a MAINTAINED WHOLE-STATE domain fact — §0's forbidden
+  shape — and the theorem under it ("`fs_state Γ S` owns exactly those
+  WHOLE blocks") does not even state: a record is 64 bytes, so the inode
+  region's blocks are whole only when `dom (fss_inodes S)` covers every
+  slot of every inode block, and that extent is `nib`, which
+  `fs_state_rec` does not carry (`sb_ninodes (fss_sb S) <= 16 * nib`, not
+  equal — the durable map is the REGION's inums, as `FsCfgBoot.img_nodes`
+  is).  The shape that works carries no `D`:
+
+  ```
+  P_wf γv Γd := ∃ S Br, ghost_map_auth (fdn_top Γd) 1 (fss_inodes S)
+                      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ_D i n)
+                      ∗ fs_state Γ_D S ∗ FsDurBytes.fs_dbelems γv Br
+  ```
+
+  The tie to `fr_D r` is `P_disk`'s AUTHORITY alone: `ghost_map` agreement
+  says the state's bytes are `D`'s bytes wherever the state owns a byte,
+  which is the local statement §0 asks for, and "no durable byte is owned
+  anywhere else" is a metatheorem (`γD` is a fixed-layer name no mortal
+  can name).  `Br` is a clause-free byte BIN, not a residual with a
+  domain.  A supplier's step then changes `fs_dbytes` on ONE block's range
+  (`FsDurBytes.fs_dbytes_insert` under `dbytes_ok`) and never touches the
+  whole map.
+- **THE TOP MAP IS IMMUTABLE WITHOUT ITS ELEMENTS.**  `fs_view Γ` holds
+  `γtop`'s authority and `FsState.inode_owned` carries no `top_frag` (only
+  `FsStateEra.inode_owned_era` does), so the durable abstract state cannot
+  be retagged.  `FsDurImg.fs_dur_of_image` / `fs_dur_view_of_image` now
+  RETURN the per-inode fragments `FsState.fs_boot_alloc_at` mints (they
+  used to drop them); what is left is the DEFINITION — `P_wf` holds the
+  `[∗ map]` above, or a durable reading of `inode_owned` carries one each,
+  which is what §4 says a holder does.  It is the parked-authority rule of
+  durable-notes seen from the other side: here the AUTHORITY has no
+  elements.

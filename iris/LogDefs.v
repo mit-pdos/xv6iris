@@ -383,7 +383,56 @@ Section FsDurableView.
     rewrite /fs_dstep. iIntros "Ha Hd".
     iApply (fs_dview_rebase g (fs_dbytes D) (fs_dbytes D') with "Ha Hd").
   Qed.
+
+  (* THE DEBT'S ALGEBRA (durable-disk 2c-body).  Composition and the
+     identity are the ONLY two laws the client's debt is ever built with:
+     the payload parks the identity at a fresh index and each supplier's
+     [log_write] AU composes its own per-object step onto the right of the
+     chain.  Neither lemma mentions [fs_dview]'s BODY, so both survive the
+     stage-2 flip of that body VERBATIM -- which is exactly what separates
+     them from [fs_dstep_rebase] above, whose proof runs
+     [fs_dview_rebase] and therefore dies with the flip.
+
+     [fs_dstep_id] is the ONE instance of [fs_dstep_rebase] that survives
+     it, and it is honest at any body: a step that changes no byte is the
+     identity update.  It is what a batch that has written nothing parks,
+     and (with [lm_committed_clean]) what a clean boot parks. *)
+  Lemma fs_dstep_id (g : gname) (D : gmap Z (list (bv 8))) :
+    ⊢ fs_dstep g D D.
+  Proof. rewrite /fs_dstep. iIntros "Ha Hd". iModIntro. iFrame. Qed.
+
+  Lemma fs_dstep_trans (g : gname) (D D' D'' : gmap Z (list (bv 8))) :
+    fs_dstep g D D' -∗ fs_dstep g D' D'' -∗ fs_dstep g D D''.
+  Proof.
+    rewrite /fs_dstep. iIntros "H1 H2 Ha Hd".
+    iMod ("H1" with "Ha Hd") as "[Ha Hd]".
+    iApply ("H2" with "Ha Hd").
+  Qed.
 End FsDurableView.
+
+(* THE LOGGED VIEW'S ONE MOVE: a [log_write] AT A HOME BLOCK.  Its two
+   siblings above say what does NOT move the reading -- a write to a log
+   SLOT ([lm_logged_insert_ne]) and the committed view's blindness to the
+   same ([lm_committed_upd_ne]).  This is the case that DOES move it, and
+   it is stated because the payload's index has to follow it: a client
+   whose parked debt ends at the current logged view owes a step to
+   [<[b := bs]> (lm_logged L cov ls)] at every home-block write, and
+   [FsBlocks.fsblock_home] is what supplies the membership premise at the
+   ghost step (holding the run IS being a home block). *)
+Lemma lm_logged_insert_home (L : gmap Z (list (bv 8))) (cov : gset Z)
+    (ls b : Z) (bs : list (bv 8)) :
+  b ∈ fs_home_set cov ls ->
+  lm_logged (<[b := bs]> L) cov ls = <[b := bs]> (lm_logged L cov ls).
+Proof.
+  intros Hb. apply map_eq. intros c. rewrite /lm_logged.
+  destruct (decide (c = b)) as [-> | Hne].
+  - rewrite lookup_insert fs_restrict_lookup (decide_True _ _ Hb)
+            lookup_insert //.
+  - rewrite lookup_insert_ne; [| exact (not_eq_sym Hne)].
+    rewrite !fs_restrict_lookup.
+    destruct (decide (c ∈ fs_home_set cov ls)) as [_ | _]; [| reflexivity].
+    rewrite lookup_insert_ne; [reflexivity | exact (not_eq_sym Hne)].
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* THE INSTALL PASS'S PICTURE, AS A TERM (durable-disk 1a).                 *)
