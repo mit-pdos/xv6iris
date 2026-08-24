@@ -265,7 +265,7 @@ Section ProofKexecParts.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr KT1 Mt (K - 68)%nat b p -∗
     kernel_text -∗
-    pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
+    pc_is (mword_of_int (KX + 0x072) : mword 64) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
@@ -305,7 +305,7 @@ Section ProofKexecParts.
     { rewrite (rget_ne Mt csp_rs1 ltac:(vm_compute; discriminate)) Hmtsp.
       apply kxc_frm1. }
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x72)) Rra csp_rs1
+    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x072)) Rra csp_rs1
               (mword_of_int 536 : mword 12) Mt (K - 68)%nat ra0 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -315,8 +315,8 @@ Section ProofKexecParts.
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /T1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
-    assert (Hpp076 : add_vec_int (mword_of_int (KX + 0x72) : mword 64) 4
-                     = mword_of_int (KX + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp076 : add_vec_int (mword_of_int (KX + 0x072) : mword 64) 4
+                     = mword_of_int (KX + 0x076)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp076) in "Hpc".
     (* ---- +0x76: ld s0,528(sp) ---- *)
     assert (Hpa2 : add_vec (rget T1 csp_rs1)
@@ -325,7 +325,7 @@ Section ProofKexecParts.
     { rewrite (rget_ne T1 csp_rs1 ltac:(vm_compute; discriminate)) HT1sp.
       apply kxc_frm2. }
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x76)) Rs0 csp_rs1
+    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x076)) Rs0 csp_rs1
               (mword_of_int 528 : mword 12) T1 (K - 68)%nat s00 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -335,8 +335,8 @@ Section ProofKexecParts.
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /T2 upd_ne; [exact HT1sp | vm_compute; discriminate]).
-    assert (Hpp07a : add_vec_int (mword_of_int (KX + 0x76) : mword 64) 4
-                     = mword_of_int (KX + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp07a : add_vec_int (mword_of_int (KX + 0x076) : mword 64) 4
+                     = mword_of_int (KX + 0x07a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp07a) in "Hpc".
     (* ---- +0x7a: ld s1,520(sp) ---- *)
     assert (Hpa3 : add_vec (rget T2 csp_rs1)
@@ -345,7 +345,7 @@ Section ProofKexecParts.
     { rewrite (rget_ne T2 csp_rs1 ltac:(vm_compute; discriminate)) HT2sp.
       apply kxc_frm3. }
     iEval (rewrite -Hpa3) in "Hb3".
-    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x7a)) Rs1 csp_rs1
+    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x07a)) Rs1 csp_rs1
               (mword_of_int 520 : mword 12) T2 (K - 68)%nat s10 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -355,8 +355,8 @@ Section ProofKexecParts.
     set (T3 := <[Regidx Rs1 := regval_into_reg s10]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /T3 upd_ne; [exact HT2sp | vm_compute; discriminate]).
-    assert (Hpp07e : add_vec_int (mword_of_int (KX + 0x7a) : mword 64) 4
-                     = mword_of_int (KX + 0x7e)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp07e : add_vec_int (mword_of_int (KX + 0x07a) : mword 64) 4
+                     = mword_of_int (KX + 0x07e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp07e) in "Hpc".
     (* ---- +0x7e: ld s2,512(sp) ---- *)
     assert (Hpa4 : add_vec (rget T3 csp_rs1)
@@ -365,7 +365,7 @@ Section ProofKexecParts.
     { rewrite (rget_ne T3 csp_rs1 ltac:(vm_compute; discriminate)) HT3sp.
       apply kxc_frm4. }
     iEval (rewrite -Hpa4) in "Hb4".
-    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x7e)) Rs2 csp_rs1
+    iApply (wp_ld_s_sconf (mword_of_int (KX + 0x07e)) Rs2 csp_rs1
               (mword_of_int 512 : mword 12) T3 (K - 68)%nat s20 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -375,8 +375,8 @@ Section ProofKexecParts.
     set (T4 := <[Regidx Rs2 := regval_into_reg s20]> T3).
     assert (HT4sp : T4 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /T4 upd_ne; [exact HT3sp | vm_compute; discriminate]).
-    assert (Hpp082 : add_vec_int (mword_of_int (KX + 0x7e) : mword 64) 4
-                     = mword_of_int (KX + 0x82)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp082 : add_vec_int (mword_of_int (KX + 0x07e) : mword 64) 4
+                     = mword_of_int (KX + 0x082)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp082) in "Hpc".
     (* ---- +0x82: addi sp,sp,544 -- the whole 68-slot frame goes back ---- *)
     assert (Hwv : add_vec (T4 !!! Regidx csp_rs1)
@@ -407,7 +407,7 @@ Section ProofKexecParts.
       iSplitL "Hb13"; [iExists _; iExact "Hb13"|].
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_addi_sp_pop4_s_sconf (mword_of_int (KX + 0x82))
+    iApply (wp_addi_sp_pop4_s_sconf (mword_of_int (KX + 0x082))
               (mword_of_int 544 : mword 12) T4 (K - 68)%nat 68 b Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (kxc_082 with "Htext"). }
@@ -420,8 +420,8 @@ Section ProofKexecParts.
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (T4 !!! Regidx csp_rs1)
            (sign_extend' 64 (mword_of_int 544 : mword 12)))]> T4) with T5.
-    assert (Hpp086 : add_vec_int (mword_of_int (KX + 0x82) : mword 64) 4
-                     = mword_of_int (KX + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp086 : add_vec_int (mword_of_int (KX + 0x082) : mword 64) 4
+                     = mword_of_int (KX + 0x086)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp086) in "Hpc".
     (* ---- +0x86: c.jr ra ---- *)
     assert (HT5ra : T5 !!! Regidx Rra = ra0).
@@ -430,7 +430,7 @@ Section ProofKexecParts.
       rewrite /T3 upd_ne; [| vm_compute; discriminate].
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
-    iApply (wp_cret_s_sconf (mword_of_int (KX + 0x86)) Rra T5 K b
+    iApply (wp_cret_s_sconf (mword_of_int (KX + 0x086)) Rra T5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kxc_086 with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc".
@@ -558,7 +558,7 @@ Section ProofKexecParts.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr KT1 Mt (K - 68)%nat b p -∗
     kernel_text -∗
-    pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
+    pc_is (mword_of_int (KX + 0x072) : mword 64) -∗
     kxc_frame sp0 ra0 s00 s10 s20 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,

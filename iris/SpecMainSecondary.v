@@ -86,8 +86,11 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    this is set by the SCHEDULER's trap reserve rather than by the arm's own
    cone (38 slots below a 2-slot frame): the secondary hart also ends in
    [jal scheduler], whose loop-head enable must fund [kv_frame_slots] out of
-   what it is given, i.e. [2 + kv_frame_slots + 20 = 100]. *)
-Notation K_main_secondary := (112%nat) (only parsing).
+   what it is given, i.e. [2 + kv_frame_slots + 22 = 114].  (The [22] was a
+   [20] until XV6_REV 7d258aa: scheduler's frame went 80 -> 96 when gcc
+   spilled one more callee-saved for the c->intena reset, so its own prologue
+   costs two slots more.) *)
+Notation K_main_secondary := (114%nat) (only parsing).
 Section SpecMainSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

@@ -484,7 +484,7 @@ Section ProofSysWrite.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ---- +0x0e: jal ra,argaddr ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_write + 0x0e))
-              Rra (mword_of_int 2087556 : mword 21) M4 (av - 6)%nat b
+              Rra (mword_of_int 2087562 : mword 21) M4 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (swri_0e with "Htext"). }
@@ -494,7 +494,7 @@ Section ProofSysWrite.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_write + 0x0e) : mword 64) 4)]> M4) with M5.
     assert (Hjaa : add_vec (mword_of_int (KernelSyms.sys_write + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087556 : mword 21)) = mword_of_int KernelSyms.argaddr)
+                     (sign_extend' 64 (mword_of_int 2087562 : mword 21)) = mword_of_int KernelSyms.argaddr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjaa) in "Hpc".
     assert (HM5a0 : M5 !!! Regidx Ra0 = mword_of_int (Z.of_nat 1)).
@@ -567,7 +567,7 @@ Section ProofSysWrite.
     iEval (rewrite Hpp18) in "Hpc".
     (* ---- +0x18: jal ra,argint ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_write + 0x18))
-              Rra (mword_of_int 2087518 : mword 21) B2 (av - 6)%nat b
+              Rra (mword_of_int 2087524 : mword 21) B2 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (swri_18 with "Htext"). }
@@ -577,7 +577,7 @@ Section ProofSysWrite.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_write + 0x18) : mword 64) 4)]> B2) with B3.
     assert (Hjai : add_vec (mword_of_int (KernelSyms.sys_write + 0x18) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087518 : mword 21)) = mword_of_int KernelSyms.argint)
+                     (sign_extend' 64 (mword_of_int 2087524 : mword 21)) = mword_of_int KernelSyms.argint)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjai) in "Hpc".
     assert (HB3a0 : B3 !!! Regidx Ra0 = mword_of_int (Z.of_nat 2)).
@@ -914,7 +914,7 @@ Section ProofSysWrite.
         by (rewrite /S3 upd_ne; [exact HS2sp | reg_neq]).
       (* ---- +0x3c: jal ra,filewrite ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_write + 0x3c))
-                Rra (mword_of_int 2094382 : mword 21) S3 (av - 6)%nat b
+                Rra (mword_of_int 2094388 : mword 21) S3 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (swri_3c with "Htext"). }
@@ -924,7 +924,7 @@ Section ProofSysWrite.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.sys_write + 0x3c) : mword 64) 4)]> S3) with S4.
       assert (Hjfr : add_vec (mword_of_int (KernelSyms.sys_write + 0x3c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094382 : mword 21)) = mword_of_int KernelSyms.filewrite)
+                       (sign_extend' 64 (mword_of_int 2094388 : mword 21)) = mword_of_int KernelSyms.filewrite)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjfr) in "Hpc".
       assert (HS4ra : S4 !!! Regidx Rra

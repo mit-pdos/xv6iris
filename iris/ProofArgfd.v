@@ -636,7 +636,7 @@ Section ProofArgfd.
     { rewrite /M5 upd_eq HM4s0. apply af_addr_fd. }
     (* ---- +0x14: jal ra,argint ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argfd + 0x14))
-              (mword_of_int 1 : mword 5) (mword_of_int 2088180 : mword 21) M5 (av - 6)%nat b
+              (mword_of_int 1 : mword 5) (mword_of_int 2088186 : mword 21) M5 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (afi_14 with "Htext"). }
@@ -646,7 +646,7 @@ Section ProofArgfd.
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.argfd + 0x14) : mword 64) 4)]> M5) with M6.
     assert (Hjai : add_vec (mword_of_int (KernelSyms.argfd + 0x14) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2088180 : mword 21)) = mword_of_int KernelSyms.argint)
+                     (sign_extend' 64 (mword_of_int 2088186 : mword 21)) = mword_of_int KernelSyms.argint)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjai) in "Hpc".
     assert (HM6ra : M6 !!! Regidx (mword_of_int 1 : mword 5)
@@ -814,7 +814,7 @@ Section ProofArgfd.
       { exfalso. apply lookup_ge_None_1 in Hlk. rewrite Hoflen in Hlk. lia. }
       (* ---- +0x22: jal ra,myproc ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argfd + 0x22))
-                (mword_of_int 1 : mword 5) (mword_of_int 2084260 : mword 21) A2 (av - 6)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2084250 : mword 21) A2 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (afi_22 with "Htext"). }
@@ -824,7 +824,7 @@ Section ProofArgfd.
       change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) 4)]> A2) with B.
       assert (Hjmp : add_vec (mword_of_int (KernelSyms.argfd + 0x22) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2084260 : mword 21)) = mword_of_int KernelSyms.myproc)
+                       (sign_extend' 64 (mword_of_int 2084250 : mword 21)) = mword_of_int KernelSyms.myproc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmp) in "Hpc".
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)

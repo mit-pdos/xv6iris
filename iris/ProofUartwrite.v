@@ -818,9 +818,9 @@ Section UwBodies.
     assert (Jrel1 : add_vec (mword_of_int (KernelSyms.uartwrite + 0x3e) : mword 64)
                       (sign_extend' 64 (mword_of_int 828 : mword 21)) = mword_of_int KernelSyms.release) by pcw.
     assert (Jslp : add_vec (mword_of_int (KernelSyms.uartwrite + 0x42) : mword 64)
-                     (sign_extend' 64 (mword_of_int 5654 : mword 21)) = mword_of_int KernelSyms.sleep) by pcw.
+                     (sign_extend' 64 (mword_of_int 5670 : mword 21)) = mword_of_int KernelSyms.sleep) by pcw.
     assert (Jprep : add_vec (mword_of_int (KernelSyms.uartwrite + 0x4c) : mword 64)
-                      (sign_extend' 64 (mword_of_int 5584 : mword 21)) = mword_of_int KernelSyms.sleep_prepare) by pcw.
+                      (sign_extend' 64 (mword_of_int 5600 : mword 21)) = mword_of_int KernelSyms.sleep_prepare) by pcw.
     assert (Jacq : add_vec (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64)
                      (sign_extend' 64 (mword_of_int 672 : mword 21)) = mword_of_int KernelSyms.acquire) by pcw.
     assert (Jrel2 : add_vec (mword_of_int (KernelSyms.uartwrite + 0x6e) : mword 64)
@@ -857,7 +857,7 @@ Section UwBodies.
         by (rewrite /Q1; apply callee_saved_insert_r;
             [vm_compute; reflexivity | apply callee_saved_refl]).
       (* --- +0x4c  jal ra,sleep_prepare --- *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x4c)) Rra (mword_of_int 5584 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x4c)) Rra (mword_of_int 5600 : mword 21)
                 Q1 (av - 10)%nat true ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uwi_4c with "Ht"). }
@@ -1027,7 +1027,7 @@ Section UwBodies.
         { apply (uw_loop_regs_cs m0 K2 MR); [exact HcsR|].
           apply (uw_loop_regs_cs m0 D2 K2); [exact HcsK2 | exact HD2regs]. }
         (* --- +0x42  jal ra,sleep --- *)
-        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x42)) Rra (mword_of_int 5654 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x42)) Rra (mword_of_int 5670 : mword 21)
                   MR (av - 10)%nat true ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (uwi_42 with "Ht"). }

@@ -28,6 +28,7 @@ Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode14.
+Require Import KernelDecode15.
 Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode18.
@@ -82,9 +83,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x10) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma suli_012 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x12) : mword 64) false (JAL (mword_of_int 2087090 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x12) (mword_of_int 0x8b3fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x12) : mword 64) (JAL (mword_of_int 2087090 : mword 21, Regidx (mword_of_int 1))) kd_8b3fd0ef. Qed.
+  Lemma suli_012 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x12) : mword 64) false (JAL (mword_of_int 2087096 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x12) (mword_of_int 0x8b9fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x12) : mword 64) (JAL (mword_of_int 2087096 : mword 21, Regidx (mword_of_int 1))) kd_8b9fd0ef. Qed.
 
   Lemma suli_016 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x16) : mword 64) false (BTYPE (mword_of_int 346 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x16) (mword_of_int 0x14054d63 : mword 32)
@@ -94,9 +95,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x1a) (mword_of_int 0xeda6 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x1a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 27 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) kd_eda6 exec_execute_C_SDSP. Qed.
 
-  Lemma suli_01c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x1c) : mword 64) false (JAL (mword_of_int 2092212 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x1c) (mword_of_int 0xcb5fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x1c) : mword 64) (JAL (mword_of_int 2092212 : mword 21, Regidx (mword_of_int 1))) kd_cb5fe0ef. Qed.
+  Lemma suli_01c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x1c) : mword 64) false (JAL (mword_of_int 2092218 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x1c) (mword_of_int 0xcbbfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x1c) : mword 64) (JAL (mword_of_int 2092218 : mword 21, Regidx (mword_of_int 1))) kd_cbbfe0ef. Qed.
 
   Lemma suli_020 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x20) : mword 64) false (ITYPE (mword_of_int 4016 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x20) (mword_of_int 0xfb040593 : mword 32)
@@ -106,9 +107,9 @@ Section CodeSysUnlink.
   Proof. mk_base (KernelSyms.sys_unlink + 0x24) (mword_of_int 0xf3040513 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x24) : mword 64) (ITYPE (mword_of_int 3888 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)) kd_f3040513. Qed.
 
-  Lemma suli_028 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x28) : mword 64) false (JAL (mword_of_int 2091748 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x28) (mword_of_int 0xae5fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x28) : mword 64) (JAL (mword_of_int 2091748 : mword 21, Regidx (mword_of_int 1))) kd_ae5fe0ef. Qed.
+  Lemma suli_028 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x28) : mword 64) false (JAL (mword_of_int 2091754 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x28) (mword_of_int 0xaebfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x28) : mword 64) (JAL (mword_of_int 2091754 : mword 21, Regidx (mword_of_int 1))) kd_aebfe0ef. Qed.
 
   Lemma suli_02c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x2c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x2c) (mword_of_int 0x84aa : mword 16)
@@ -118,25 +119,25 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x2e) (mword_of_int 0xc955 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x2e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 90 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_c955 exec_execute_C_BEQZ. Qed.
 
-  Lemma suli_030 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x30) : mword 64) false (JAL (mword_of_int 2089526 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x30) (mword_of_int 0xa36fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x30) : mword 64) (JAL (mword_of_int 2089526 : mword 21, Regidx (mword_of_int 1))) kd_a36fe0ef. Qed.
+  Lemma suli_030 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x30) : mword 64) false (JAL (mword_of_int 2089532 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x30) (mword_of_int 0xa3cfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x30) : mword 64) (JAL (mword_of_int 2089532 : mword 21, Regidx (mword_of_int 1))) kd_a3cfe0ef. Qed.
 
   Lemma suli_034 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x34) : mword 64) false (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x34) (mword_of_int 0x00002597 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x34) : mword 64) (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00002597. Qed.
 
-  Lemma suli_038 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x38) : mword 64) false (ITYPE (mword_of_int 1564 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x38) (mword_of_int 0x61c58593 : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x38) : mword 64) (ITYPE (mword_of_int 1564 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_61c58593. Qed.
+  Lemma suli_038 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x38) : mword 64) false (ITYPE (mword_of_int 1554 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x38) (mword_of_int 0x61258593 : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x38) : mword 64) (ITYPE (mword_of_int 1554 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_61258593. Qed.
 
   Lemma suli_03c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x3c) : mword 64) false (ITYPE (mword_of_int 4016 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x3c) (mword_of_int 0xfb040513 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x3c) : mword 64) (ITYPE (mword_of_int 4016 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)) kd_fb040513. Qed.
 
-  Lemma suli_040 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x40) : mword 64) false (JAL (mword_of_int 2091000 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x40) (mword_of_int 0xff8fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x40) : mword 64) (JAL (mword_of_int 2091000 : mword 21, Regidx (mword_of_int 1))) kd_ff8fe0ef. Qed.
+  Lemma suli_040 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x40) : mword 64) false (JAL (mword_of_int 2091006 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x40) (mword_of_int 0xffefe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x40) : mword 64) (JAL (mword_of_int 2091006 : mword 21, Regidx (mword_of_int 1))) kd_ffefe0ef. Qed.
 
   Lemma suli_044 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x44) : mword 64) false (BTYPE (mword_of_int 278 : mword 13, zreg, Regidx (mword_of_int 10), BEQ)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x44) (mword_of_int 0x10050b63 : mword 32)
@@ -146,17 +147,17 @@ Section CodeSysUnlink.
   Proof. mk_base (KernelSyms.sys_unlink + 0x48) (mword_of_int 0x00002597 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x48) : mword 64) (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00002597. Qed.
 
-  Lemma suli_04c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x4c) : mword 64) false (ITYPE (mword_of_int 1552 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x4c) (mword_of_int 0x61058593 : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x4c) : mword 64) (ITYPE (mword_of_int 1552 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_61058593. Qed.
+  Lemma suli_04c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x4c) : mword 64) false (ITYPE (mword_of_int 1542 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x4c) (mword_of_int 0x60658593 : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x4c) : mword 64) (ITYPE (mword_of_int 1542 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_60658593. Qed.
 
   Lemma suli_050 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x50) : mword 64) false (ITYPE (mword_of_int 4016 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x50) (mword_of_int 0xfb040513 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x50) : mword 64) (ITYPE (mword_of_int 4016 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)) kd_fb040513. Qed.
 
-  Lemma suli_054 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x54) : mword 64) false (JAL (mword_of_int 2090980 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x54) (mword_of_int 0xfe4fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x54) : mword 64) (JAL (mword_of_int 2090980 : mword 21, Regidx (mword_of_int 1))) kd_fe4fe0ef. Qed.
+  Lemma suli_054 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x54) : mword 64) false (JAL (mword_of_int 2090986 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x54) (mword_of_int 0xfeafe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x54) : mword 64) (JAL (mword_of_int 2090986 : mword 21, Regidx (mword_of_int 1))) kd_feafe0ef. Qed.
 
   Lemma suli_058 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x58) : mword 64) false (BTYPE (mword_of_int 258 : mword 13, zreg, Regidx (mword_of_int 10), BEQ)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x58) (mword_of_int 0x10050163 : mword 32)
@@ -178,9 +179,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x66) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x66) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma suli_068 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x68) : mword 64) false (JAL (mword_of_int 2090982 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x68) (mword_of_int 0xfe6fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x68) : mword 64) (JAL (mword_of_int 2090982 : mword 21, Regidx (mword_of_int 1))) kd_fe6fe0ef. Qed.
+  Lemma suli_068 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x68) : mword 64) false (JAL (mword_of_int 2090988 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x68) (mword_of_int 0xfecfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x68) : mword 64) (JAL (mword_of_int 2090988 : mword 21, Regidx (mword_of_int 1))) kd_fecfe0ef. Qed.
 
   Lemma suli_06c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x6c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x6c) (mword_of_int 0x892a : mword 16)
@@ -194,9 +195,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x72) (mword_of_int 0xe5ce : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x72) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 25 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) kd_e5ce exec_execute_C_SDSP. Qed.
 
-  Lemma suli_074 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x74) : mword 64) false (JAL (mword_of_int 2089458 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x74) (mword_of_int 0x9f2fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x74) : mword 64) (JAL (mword_of_int 2089458 : mword 21, Regidx (mword_of_int 1))) kd_9f2fe0ef. Qed.
+  Lemma suli_074 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x74) : mword 64) false (JAL (mword_of_int 2089464 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x74) (mword_of_int 0x9f8fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x74) : mword 64) (JAL (mword_of_int 2089464 : mword 21, Regidx (mword_of_int 1))) kd_9f8fe0ef. Qed.
 
   Lemma suli_078 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x78) : mword 64) false (LOAD (mword_of_int 74 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15), false, 2)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x78) (mword_of_int 0x04a91783 : mword 32)
@@ -234,9 +235,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x92) (mword_of_int 0x854e : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x92) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) kd_854e exec_execute_C_MV. Qed.
 
-  Lemma suli_094 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x94) : mword 64) false (JAL (mword_of_int 2079830 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x94) (mword_of_int 0xc57fb0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x94) : mword 64) (JAL (mword_of_int 2079830 : mword 21, Regidx (mword_of_int 1))) kd_c57fb0ef. Qed.
+  Lemma suli_094 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x94) : mword 64) false (JAL (mword_of_int 2079820 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x94) (mword_of_int 0xc4dfb0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x94) : mword 64) (JAL (mword_of_int 2079820 : mword 21, Regidx (mword_of_int 1))) kd_c4dfb0ef. Qed.
 
   Lemma suli_098 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x98) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x98) (mword_of_int 0x4741 : mword 16)
@@ -258,9 +259,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xa2) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0xa2) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma suli_0a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xa4) : mword 64) false (JAL (mword_of_int 2090638 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xa4) (mword_of_int 0xe8efe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xa4) : mword 64) (JAL (mword_of_int 2090638 : mword 21, Regidx (mword_of_int 1))) kd_e8efe0ef. Qed.
+  Lemma suli_0a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xa4) : mword 64) false (JAL (mword_of_int 2090644 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xa4) (mword_of_int 0xe94fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xa4) : mword 64) (JAL (mword_of_int 2090644 : mword 21, Regidx (mword_of_int 1))) kd_e94fe0ef. Qed.
 
   Lemma suli_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xa8) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xa8) (mword_of_int 0x47c1 : mword 16)
@@ -286,9 +287,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xb8) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0xb8) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma suli_0ba : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xba) : mword 64) false (JAL (mword_of_int 2089984 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xba) (mword_of_int 0xc00fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xba) : mword 64) (JAL (mword_of_int 2089984 : mword 21, Regidx (mword_of_int 1))) kd_c00fe0ef. Qed.
+  Lemma suli_0ba : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xba) : mword 64) false (JAL (mword_of_int 2089990 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xba) (mword_of_int 0xc06fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xba) : mword 64) (JAL (mword_of_int 2089990 : mword 21, Regidx (mword_of_int 1))) kd_c06fe0ef. Qed.
 
   Lemma suli_0be : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xbe) : mword 64) false (LOAD (mword_of_int 74 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15), true, 2)).
   Proof. mk_base (KernelSyms.sys_unlink + 0xbe) (mword_of_int 0x04a95783 : mword 32)
@@ -306,21 +307,21 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xc8) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0xc8) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma suli_0ca : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xca) : mword 64) false (JAL (mword_of_int 2089192 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xca) (mword_of_int 0x8e8fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xca) : mword 64) (JAL (mword_of_int 2089192 : mword 21, Regidx (mword_of_int 1))) kd_8e8fe0ef. Qed.
+  Lemma suli_0ca : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xca) : mword 64) false (JAL (mword_of_int 2089198 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xca) (mword_of_int 0x8eefe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xca) : mword 64) (JAL (mword_of_int 2089198 : mword 21, Regidx (mword_of_int 1))) kd_8eefe0ef. Qed.
 
   Lemma suli_0ce : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xce) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xce) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0xce) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma suli_0d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xd0) : mword 64) false (JAL (mword_of_int 2089962 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xd0) (mword_of_int 0xbeafe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xd0) : mword 64) (JAL (mword_of_int 2089962 : mword 21, Regidx (mword_of_int 1))) kd_beafe0ef. Qed.
+  Lemma suli_0d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xd0) : mword 64) false (JAL (mword_of_int 2089968 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xd0) (mword_of_int 0xbf0fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xd0) : mword 64) (JAL (mword_of_int 2089968 : mword 21, Regidx (mword_of_int 1))) kd_bf0fe0ef. Qed.
 
-  Lemma suli_0d4 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xd4) : mword 64) false (JAL (mword_of_int 2092168 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xd4) (mword_of_int 0xc89fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xd4) : mword 64) (JAL (mword_of_int 2092168 : mword 21, Regidx (mword_of_int 1))) kd_c89fe0ef. Qed.
+  Lemma suli_0d4 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xd4) : mword 64) false (JAL (mword_of_int 2092174 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xd4) (mword_of_int 0xc8ffe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xd4) : mword 64) (JAL (mword_of_int 2092174 : mword 21, Regidx (mword_of_int 1))) kd_c8ffe0ef. Qed.
 
   Lemma suli_0d8 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xd8) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xd8) (mword_of_int 0x4501 : mword 16)
@@ -342,9 +343,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xe0) (mword_of_int 0xa061 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0xe0) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 68 : mword 11) ('b"0")), zreg)) kd_a061 exec_execute_C_J. Qed.
 
-  Lemma suli_0e2 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xe2) : mword 64) false (JAL (mword_of_int 2092154 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xe2) (mword_of_int 0xc7bfe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xe2) : mword 64) (JAL (mword_of_int 2092154 : mword 21, Regidx (mword_of_int 1))) kd_c7bfe0ef. Qed.
+  Lemma suli_0e2 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xe2) : mword 64) false (JAL (mword_of_int 2092160 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xe2) (mword_of_int 0xc81fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xe2) : mword 64) (JAL (mword_of_int 2092160 : mword 21, Regidx (mword_of_int 1))) kd_c81fe0ef. Qed.
 
   Lemma suli_0e6 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xe6) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0xe6) (mword_of_int 0x557d : mword 16)
@@ -362,13 +363,13 @@ Section CodeSysUnlink.
   Proof. mk_base (KernelSyms.sys_unlink + 0xec) (mword_of_int 0x00002517 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0xec) : mword 64) (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00002517. Qed.
 
-  Lemma suli_0f0 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xf0) : mword 64) false (ITYPE (mword_of_int 1396 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xf0) (mword_of_int 0x57450513 : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xf0) : mword 64) (ITYPE (mword_of_int 1396 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_57450513. Qed.
+  Lemma suli_0f0 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xf0) : mword 64) false (ITYPE (mword_of_int 1386 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xf0) (mword_of_int 0x56a50513 : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xf0) : mword 64) (ITYPE (mword_of_int 1386 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_56a50513. Qed.
 
-  Lemma suli_0f4 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xf4) : mword 64) false (JAL (mword_of_int 2078608 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0xf4) (mword_of_int 0xf90fb0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0xf4) : mword 64) (JAL (mword_of_int 2078608 : mword 21, Regidx (mword_of_int 1))) kd_f90fb0ef. Qed.
+  Lemma suli_0f4 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xf4) : mword 64) false (JAL (mword_of_int 2078598 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0xf4) (mword_of_int 0xf86fb0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0xf4) : mword 64) (JAL (mword_of_int 2078598 : mword 21, Regidx (mword_of_int 1))) kd_f86fb0ef. Qed.
 
   Lemma suli_0f8 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0xf8) : mword 64) false (LOAD (mword_of_int 76 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_base (KernelSyms.sys_unlink + 0xf8) (mword_of_int 0x04c92703 : mword 32)
@@ -406,9 +407,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x110) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x110) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma suli_112 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x112) : mword 64) false (JAL (mword_of_int 2090286 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x112) (mword_of_int 0xd2efe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x112) : mword 64) (JAL (mword_of_int 2090286 : mword 21, Regidx (mword_of_int 1))) kd_d2efe0ef. Qed.
+  Lemma suli_112 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x112) : mword 64) false (JAL (mword_of_int 2090292 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x112) (mword_of_int 0xd34fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x112) : mword 64) (JAL (mword_of_int 2090292 : mword 21, Regidx (mword_of_int 1))) kd_d34fe0ef. Qed.
 
   Lemma suli_116 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x116) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x116) (mword_of_int 0x47c1 : mword 16)
@@ -446,25 +447,25 @@ Section CodeSysUnlink.
   Proof. mk_base (KernelSyms.sys_unlink + 0x12e) (mword_of_int 0x00002517 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x12e) : mword 64) (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00002517. Qed.
 
-  Lemma suli_132 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x132) : mword 64) false (ITYPE (mword_of_int 1354 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x132) (mword_of_int 0x54a50513 : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x132) : mword 64) (ITYPE (mword_of_int 1354 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_54a50513. Qed.
+  Lemma suli_132 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x132) : mword 64) false (ITYPE (mword_of_int 1344 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x132) (mword_of_int 0x54050513 : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x132) : mword 64) (ITYPE (mword_of_int 1344 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_54050513. Qed.
 
-  Lemma suli_136 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x136) : mword 64) false (JAL (mword_of_int 2078542 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x136) (mword_of_int 0xf4efb0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x136) : mword 64) (JAL (mword_of_int 2078542 : mword 21, Regidx (mword_of_int 1))) kd_f4efb0ef. Qed.
+  Lemma suli_136 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x136) : mword 64) false (JAL (mword_of_int 2078532 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x136) (mword_of_int 0xf44fb0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x136) : mword 64) (JAL (mword_of_int 2078532 : mword 21, Regidx (mword_of_int 1))) kd_f44fb0ef. Qed.
 
   Lemma suli_13a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x13a) : mword 64) false (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x13a) (mword_of_int 0x00002517 : mword 32)
     (mword_of_int (KernelSyms.sys_unlink + 0x13a) : mword 64) (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00002517. Qed.
 
-  Lemma suli_13e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x13e) : mword 64) false (ITYPE (mword_of_int 1366 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x13e) (mword_of_int 0x55650513 : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x13e) : mword 64) (ITYPE (mword_of_int 1366 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_55650513. Qed.
+  Lemma suli_13e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x13e) : mword 64) false (ITYPE (mword_of_int 1356 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x13e) (mword_of_int 0x54c50513 : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x13e) : mword 64) (ITYPE (mword_of_int 1356 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_54c50513. Qed.
 
-  Lemma suli_142 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x142) : mword 64) false (JAL (mword_of_int 2078530 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x142) (mword_of_int 0xf42fb0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x142) : mword 64) (JAL (mword_of_int 2078530 : mword 21, Regidx (mword_of_int 1))) kd_f42fb0ef. Qed.
+  Lemma suli_142 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x142) : mword 64) false (JAL (mword_of_int 2078520 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x142) (mword_of_int 0xf38fb0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x142) : mword 64) (JAL (mword_of_int 2078520 : mword 21, Regidx (mword_of_int 1))) kd_f38fb0ef. Qed.
 
   Lemma suli_146 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x146) : mword 64) false (LOAD (mword_of_int 74 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), true, 2)).
   Proof. mk_base (KernelSyms.sys_unlink + 0x146) (mword_of_int 0x04a4d783 : mword 32)
@@ -482,9 +483,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x150) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x150) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma suli_152 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x152) : mword 64) false (JAL (mword_of_int 2089056 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x152) (mword_of_int 0x860fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x152) : mword 64) (JAL (mword_of_int 2089056 : mword 21, Regidx (mword_of_int 1))) kd_860fe0ef. Qed.
+  Lemma suli_152 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x152) : mword 64) false (JAL (mword_of_int 2089062 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x152) (mword_of_int 0x866fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x152) : mword 64) (JAL (mword_of_int 2089062 : mword 21, Regidx (mword_of_int 1))) kd_866fe0ef. Qed.
 
   Lemma suli_156 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x156) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 1969 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x156) (mword_of_int 0xb78d : mword 16)
@@ -498,13 +499,13 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x15a) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x15a) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma suli_15c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x15c) : mword 64) false (JAL (mword_of_int 2089822 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x15c) (mword_of_int 0xb5efe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x15c) : mword 64) (JAL (mword_of_int 2089822 : mword 21, Regidx (mword_of_int 1))) kd_b5efe0ef. Qed.
+  Lemma suli_15c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x15c) : mword 64) false (JAL (mword_of_int 2089828 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x15c) (mword_of_int 0xb64fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x15c) : mword 64) (JAL (mword_of_int 2089828 : mword 21, Regidx (mword_of_int 1))) kd_b64fe0ef. Qed.
 
-  Lemma suli_160 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x160) : mword 64) false (JAL (mword_of_int 2092028 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x160) (mword_of_int 0xbfdfe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x160) : mword 64) (JAL (mword_of_int 2092028 : mword 21, Regidx (mword_of_int 1))) kd_bfdfe0ef. Qed.
+  Lemma suli_160 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x160) : mword 64) false (JAL (mword_of_int 2092034 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x160) (mword_of_int 0xc03fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x160) : mword 64) (JAL (mword_of_int 2092034 : mword 21, Regidx (mword_of_int 1))) kd_c03fe0ef. Qed.
 
   Lemma suli_164 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x164) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x164) (mword_of_int 0x557d : mword 16)
@@ -542,9 +543,9 @@ Section CodeSysUnlink.
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x174) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.sys_unlink + 0x174) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma suli_176 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x176) : mword 64) false (JAL (mword_of_int 2089796 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_unlink + 0x176) (mword_of_int 0xb44fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_unlink + 0x176) : mword 64) (JAL (mword_of_int 2089796 : mword 21, Regidx (mword_of_int 1))) kd_b44fe0ef. Qed.
+  Lemma suli_176 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x176) : mword 64) false (JAL (mword_of_int 2089802 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_unlink + 0x176) (mword_of_int 0xb4afe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_unlink + 0x176) : mword 64) (JAL (mword_of_int 2089802 : mword 21, Regidx (mword_of_int 1))) kd_b4afe0ef. Qed.
 
   Lemma suli_17a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_unlink + 0x17a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 26 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
   Proof. mk_rvc (KernelSyms.sys_unlink + 0x17a) (mword_of_int 0x694e : mword 16)

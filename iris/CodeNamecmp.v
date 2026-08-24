@@ -22,6 +22,7 @@ Require Import KernelDecode07.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
+Require Import KernelDecode19.
 Require Import KernelDecode24.
 Require Import KernelDecode28.
 Require Import KernelDecode31.
@@ -55,9 +56,9 @@ Section CodeNamecmp.
   Proof. mk_rvc (KernelSyms.namecmp + 0x8) (mword_of_int 0x4639 : mword 16)
     (mword_of_int (KernelSyms.namecmp + 0x8) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 14 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) kd_4639 exec_execute_C_LI. Qed.
 
-  Lemma nci_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.namecmp + 0xa) : mword 64) false (JAL (mword_of_int 2086268 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namecmp + 0xa) (mword_of_int 0xd7cfd0ef : mword 32)
-    (mword_of_int (KernelSyms.namecmp + 0xa) : mword 64) (JAL (mword_of_int 2086268 : mword 21, Regidx (mword_of_int 1))) kd_d7cfd0ef. Qed.
+  Lemma nci_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.namecmp + 0xa) : mword 64) false (JAL (mword_of_int 2086252 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namecmp + 0xa) (mword_of_int 0xd6cfd0ef : mword 32)
+    (mword_of_int (KernelSyms.namecmp + 0xa) : mword 64) (JAL (mword_of_int 2086252 : mword 21, Regidx (mword_of_int 1))) kd_d6cfd0ef. Qed.
 
   Lemma nci_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.namecmp + 0xe) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.namecmp + 0xe) (mword_of_int 0x60a2 : mword 16)

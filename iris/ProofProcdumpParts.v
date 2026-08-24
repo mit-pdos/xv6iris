@@ -291,14 +291,14 @@ Section ProofProcdumpParts.
     iEval (rewrite Hp1a) in "Hpc".
     (* ---- +0x1a addi a0,a0,-672 : a0 := "\n" ---- *)
     assert (Hrg1a : rget (CID := CID12) P2 Ra0 = P2 !!! Regidx Ra0) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x1a)) Ra0 Ra0 (mword_of_int 3418 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x1a)) Ra0 Ra0 (mword_of_int 3402 : mword 12)
               P2 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_1a with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc".
     iEval (rewrite Hrg1a) in "Hcg".
     set (P3 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (P2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 3418 : mword 12)))]> P2).
+                  (add_vec (P2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 3402 : mword 12)))]> P2).
     assert (Hp1e : add_vec_int (mword_of_int (PD + 0x1a) : mword 64) 4 = mword_of_int (PD + 0x1e)) by pcstep.
     iEval (rewrite Hp1e) in "Hpc".
     (* ---- hand over ---- *)
@@ -358,13 +358,13 @@ Section ProofProcdumpParts.
     assert (Hp26 : add_vec_int (mword_of_int (PD + 0x22) : mword 64) 4 = mword_of_int (PD + 0x26)) by pcstep.
     iEval (rewrite Hp26) in "Hpc".
     assert (Hrg26 : rget (CID := CID1) Q1 Rs1 = Q1 !!! Regidx Rs1) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x26)) Rs1 Rs1 (mword_of_int 1558 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x26)) Rs1 Rs1 (mword_of_int 1542 : mword 12)
               Q1 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_26 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc". iEval (rewrite Hrg26) in "Hcg".
     set (Q2 := <[Regidx Rs1 := regval_into_reg
-                  (add_vec (Q1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1558 : mword 12)))]> Q1).
+                  (add_vec (Q1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1542 : mword 12)))]> Q1).
     assert (HQ2s1 : Q2 !!! Regidx Rs1 = pd_cur 0).
     { rewrite /Q2 upd_eq /Q1 upd_eq.
       unfold pd_cur, acur, pd_base, pd_name_off, proc_size.
@@ -383,13 +383,13 @@ Section ProofProcdumpParts.
     assert (Hp2e : add_vec_int (mword_of_int (PD + 0x2a) : mword 64) 4 = mword_of_int (PD + 0x2e)) by pcstep.
     iEval (rewrite Hp2e) in "Hpc".
     assert (Hrg2e : rget (CID := CID3) Q3 Rs2 = Q3 !!! Regidx Rs2) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x2e)) Rs2 Rs2 (mword_of_int 14 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x2e)) Rs2 Rs2 (mword_of_int 4094 : mword 12)
               Q3 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_2e with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc". iEval (rewrite Hrg2e) in "Hcg".
     set (Q4 := <[Regidx Rs2 := regval_into_reg
-                  (add_vec (Q3 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 14 : mword 12)))]> Q3).
+                  (add_vec (Q3 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 4094 : mword 12)))]> Q3).
     assert (HQ4s2 : Q4 !!! Regidx Rs2 = pd_cur NPROC).
     { rewrite /Q4 upd_eq /Q3 upd_eq.
       unfold pd_cur, acur, pd_base, pd_name_off, proc_size, NPROC.
@@ -419,13 +419,13 @@ Section ProofProcdumpParts.
     assert (Hp38 : add_vec_int (mword_of_int (PD + 0x34) : mword 64) 4 = mword_of_int (PD + 0x38)) by pcstep.
     iEval (rewrite Hp38) in "Hpc".
     assert (Hrg38 : rget (CID := CID6) Q6 Rs3 = Q6 !!! Regidx Rs3) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x38)) Rs3 Rs3 (mword_of_int 3812 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x38)) Rs3 Rs3 (mword_of_int 3796 : mword 12)
               Q6 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_38 with "Htext"). }
     iIntros (CID7 Hs7) "Hcg Hpc". iEval (rewrite Hrg38) in "Hcg".
     set (Q7 := <[Regidx Rs3 := regval_into_reg
-                  (add_vec (Q6 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 3812 : mword 12)))]> Q6).
+                  (add_vec (Q6 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 3796 : mword 12)))]> Q6).
     assert (HQ7s3 : Q7 !!! Regidx Rs3 = (mword_of_int pd_qqq_a : mword 64)).
     { rewrite /Q7 upd_eq /Q6 upd_eq. unfold pd_qqq_a. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp3c : add_vec_int (mword_of_int (PD + 0x38) : mword 64) 4 = mword_of_int (PD + 0x3c)) by pcstep.
@@ -442,13 +442,13 @@ Section ProofProcdumpParts.
     assert (Hp40 : add_vec_int (mword_of_int (PD + 0x3c) : mword 64) 4 = mword_of_int (PD + 0x40)) by pcstep.
     iEval (rewrite Hp40) in "Hpc".
     assert (Hrg40 : rget (CID := CID8) Q8 Rs5 = Q8 !!! Regidx Rs5) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x40)) Rs5 Rs5 (mword_of_int 3812 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x40)) Rs5 Rs5 (mword_of_int 3796 : mword 12)
               Q8 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_40 with "Htext"). }
     iIntros (CID9 Hs9) "Hcg Hpc". iEval (rewrite Hrg40) in "Hcg".
     set (Q9 := <[Regidx Rs5 := regval_into_reg
-                  (add_vec (Q8 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 3812 : mword 12)))]> Q8).
+                  (add_vec (Q8 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 3796 : mword 12)))]> Q8).
     assert (HQ9s5 : Q9 !!! Regidx Rs5 = (mword_of_int pd_fmt_a : mword 64)).
     { rewrite /Q9 upd_eq /Q8 upd_eq. unfold pd_fmt_a. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp44 : add_vec_int (mword_of_int (PD + 0x40) : mword 64) 4 = mword_of_int (PD + 0x44)) by pcstep.
@@ -465,13 +465,13 @@ Section ProofProcdumpParts.
     assert (Hp48 : add_vec_int (mword_of_int (PD + 0x44) : mword 64) 4 = mword_of_int (PD + 0x48)) by pcstep.
     iEval (rewrite Hp48) in "Hpc".
     assert (Hrg48 : rget (CID := CID10) Q10 Rs4 = Q10 !!! Regidx Rs4) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x48)) Rs4 Rs4 (mword_of_int 3372 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x48)) Rs4 Rs4 (mword_of_int 3356 : mword 12)
               Q10 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_48 with "Htext"). }
     iIntros (CID11 Hs11) "Hcg Hpc". iEval (rewrite Hrg48) in "Hcg".
     set (Q11 := <[Regidx Rs4 := regval_into_reg
-                   (add_vec (Q10 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 3372 : mword 12)))]> Q10).
+                   (add_vec (Q10 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 3356 : mword 12)))]> Q10).
     assert (HQ11s4 : Q11 !!! Regidx Rs4 = (mword_of_int pd_nl_a : mword 64)).
     { rewrite /Q11 upd_eq /Q10 upd_eq. unfold pd_nl_a. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp4c : add_vec_int (mword_of_int (PD + 0x48) : mword 64) 4 = mword_of_int (PD + 0x4c)) by pcstep.
@@ -488,13 +488,13 @@ Section ProofProcdumpParts.
     assert (Hp50 : add_vec_int (mword_of_int (PD + 0x4c) : mword 64) 4 = mword_of_int (PD + 0x50)) by pcstep.
     iEval (rewrite Hp50) in "Hpc".
     assert (Hrg50 : rget (CID := CID12) Q12 Rs7 = Q12 !!! Regidx Rs7) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x50)) Rs7 Rs7 (mword_of_int 1012 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x50)) Rs7 Rs7 (mword_of_int 996 : mword 12)
               Q12 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_50 with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc". iEval (rewrite Hrg50) in "Hcg".
     set (Q13 := <[Regidx Rs7 := regval_into_reg
-                   (add_vec (Q12 !!! Regidx Rs7) (sign_extend' 64 (mword_of_int 1012 : mword 12)))]> Q12).
+                   (add_vec (Q12 !!! Regidx Rs7) (sign_extend' 64 (mword_of_int 996 : mword 12)))]> Q12).
     assert (HQ13s7 : Q13 !!! Regidx Rs7 = (mword_of_int pd_states_a : mword 64)).
     { rewrite /Q13 upd_eq /Q12 upd_eq. unfold pd_states_a, KernelSyms.states_0.
       apply bv_eq; vm_compute; reflexivity. }

@@ -462,7 +462,7 @@ Section UtEntry.
     (*  +0x22 .. +0x26: p = myproc(); s1 = p.                            *)
     (* =============================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x22)) Rra
-              (mword_of_int 2093858 : mword 21) M6 (av - 4)%nat false
+              (mword_of_int 2093842 : mword 21) M6 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_022 with "Htext"). }
@@ -472,7 +472,7 @@ Section UtEntry.
     change (<[Regidx Rra := regval_into_reg
                (add_vec_int (mword_of_int (UT + 0x22) : mword 64) 4)]> M6) with M7.
     assert (Hmyp : add_vec (mword_of_int (UT + 0x22) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093858 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093842 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hmyp) in "Hpc".
     assert (HM7sp : M7 !!! Regidx csp_rs1 = pa_stk ksp 4)

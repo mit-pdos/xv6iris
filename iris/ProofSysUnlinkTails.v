@@ -353,24 +353,24 @@ Section ProofSysUnlinkTails.
                   = mword_of_int (SU + 0xf0)) by pcw.
     iEval (rewrite Hp0) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID1) (mword_of_int (SU + 0xf0)) Ra0 Ra0
-              (mword_of_int 1396 : mword 12) P1 K b
+              (mword_of_int 1386 : mword 12) P1 K b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (suli_0f0 with "Htext"). }
     iIntros (CID2 Hq2) "Hcg Hpc".
     pose (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 1396 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 1386 : mword 12)))]> P1).
     assert (Hp1 : add_vec_int (mword_of_int (SU + 0xf0) : mword 64) 4
                   = mword_of_int (SU + 0xf4)) by pcw.
     iEval (rewrite Hp1) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (SU + 0xf4)) Rra
-              (mword_of_int 2078608 : mword 21) P2 K b
+              (mword_of_int 2078598 : mword 21) P2 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_0f4 with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     assert (Htgt : add_vec (mword_of_int (SU + 0xf4) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2078608 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2078598 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
@@ -417,24 +417,24 @@ Section ProofSysUnlinkTails.
                   = mword_of_int (SU + 0x132)) by pcw.
     iEval (rewrite Hp0) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID1) (mword_of_int (SU + 0x132)) Ra0 Ra0
-              (mword_of_int 1354 : mword 12) P1 K b
+              (mword_of_int 1344 : mword 12) P1 K b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (suli_132 with "Htext"). }
     iIntros (CID2 Hq2) "Hcg Hpc".
     pose (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 1354 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 1344 : mword 12)))]> P1).
     assert (Hp1 : add_vec_int (mword_of_int (SU + 0x132) : mword 64) 4
                   = mword_of_int (SU + 0x136)) by pcw.
     iEval (rewrite Hp1) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (SU + 0x136)) Rra
-              (mword_of_int 2078542 : mword 21) P2 K b
+              (mword_of_int 2078532 : mword 21) P2 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_136 with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     assert (Htgt : add_vec (mword_of_int (SU + 0x136) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2078542 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2078532 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
@@ -481,24 +481,24 @@ Section ProofSysUnlinkTails.
                   = mword_of_int (SU + 0x13e)) by pcw.
     iEval (rewrite Hp0) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID1) (mword_of_int (SU + 0x13e)) Ra0 Ra0
-              (mword_of_int 1366 : mword 12) P1 K b
+              (mword_of_int 1356 : mword 12) P1 K b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (suli_13e with "Htext"). }
     iIntros (CID2 Hq2) "Hcg Hpc".
     pose (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 1366 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 1356 : mword 12)))]> P1).
     assert (Hp1 : add_vec_int (mword_of_int (SU + 0x13e) : mword 64) 4
                   = mword_of_int (SU + 0x142)) by pcw.
     iEval (rewrite Hp1) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (SU + 0x142)) Rra
-              (mword_of_int 2078530 : mword 21) P2 K b
+              (mword_of_int 2078520 : mword 21) P2 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_142 with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     assert (Htgt : add_vec (mword_of_int (SU + 0x142) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2078530 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2078520 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
@@ -596,7 +596,7 @@ Section ProofSysUnlinkTails.
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     (* ===== +0x0e2 jal ra,end_op ===== *)
     iApply (wp_jal_s_sconf (CID := CID0) (mword_of_int (SU + 0xe2)) Rra
-              (mword_of_int 2092154 : mword 21) M (K - 30)%nat b
+              (mword_of_int 2092160 : mword 21) M (K - 30)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_0e2 with "Htext"). }
@@ -604,7 +604,7 @@ Section ProofSysUnlinkTails.
     set (M1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0xe2) : mword 64) 4)]> M).
     assert (Hjeo : add_vec (mword_of_int (SU + 0xe2) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092154 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092160 : mword 21))
                    = mword_of_int KernelSyms.end_op) by pcw.
     iEval (rewrite Hjeo) in "Hpc".
     assert (HM1ra : (M1 !!! Regidx Rra : mword 64)
@@ -896,7 +896,7 @@ Section ProofSysUnlinkTails.
     iEval (rewrite Hpp15c) in "Hpc".
     (* ===== +0x15c jal ra,iunlockput ===== *)
     iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SU + 0x15c)) Rra
-              (mword_of_int 2089822 : mword 21) M1 (K - 30)%nat b
+              (mword_of_int 2089828 : mword 21) M1 (K - 30)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_15c with "Htext"). }
@@ -904,7 +904,7 @@ Section ProofSysUnlinkTails.
     set (M2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0x15c) : mword 64) 4)]> M1).
     assert (Hjup : add_vec (mword_of_int (SU + 0x15c) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2089822 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2089828 : mword 21))
                    = mword_of_int KernelSyms.iunlockput) by pcw.
     iEval (rewrite Hjup) in "Hpc".
     assert (HM2ra : (M2 !!! Regidx Rra : mword 64)
@@ -958,7 +958,7 @@ Section ProofSysUnlinkTails.
       exact (HM2thr c Hc N2 N8 N9 N18 N19). }
     (* ===== +0x160 jal ra,end_op ===== *)
     iApply (wp_jal_s_sconf (CID := CID3) (mword_of_int (SU + 0x160)) Rra
-              (mword_of_int 2092028 : mword 21) mup (K - 30)%nat b
+              (mword_of_int 2092034 : mword 21) mup (K - 30)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_160 with "Htext"). }
@@ -966,7 +966,7 @@ Section ProofSysUnlinkTails.
     set (Q1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0x160) : mword 64) 4)]> mup).
     assert (Hjeo : add_vec (mword_of_int (SU + 0x160) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092028 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092034 : mword 21))
                    = mword_of_int KernelSyms.end_op) by pcw.
     iEval (rewrite Hjeo) in "Hpc".
     assert (HQ1ra : (Q1 !!! Regidx Rra : mword 64)
@@ -1436,7 +1436,7 @@ Section ProofSysUnlinkTails.
     iEval (rewrite Hpp176) in "Hpc".
     (* ===== +0x176 jal ra,iunlockput ===== *)
     iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SU + 0x176)) Rra
-              (mword_of_int 2089796 : mword 21) M1 (K - 30)%nat b
+              (mword_of_int 2089802 : mword 21) M1 (K - 30)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_176 with "Htext"). }
@@ -1444,7 +1444,7 @@ Section ProofSysUnlinkTails.
     set (M2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0x176) : mword 64) 4)]> M1).
     assert (Hjup : add_vec (mword_of_int (SU + 0x176) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2089796 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2089802 : mword 21))
                    = mword_of_int KernelSyms.iunlockput) by pcw.
     iEval (rewrite Hjup) in "Hpc".
     assert (HM2ra : (M2 !!! Regidx Rra : mword 64)

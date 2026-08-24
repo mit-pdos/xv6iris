@@ -67,9 +67,9 @@ Section CodeFdalloc.
   Proof. mk_rvc (KernelSyms.fdalloc + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.fdalloc + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma fdi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) false (JAL (mword_of_int 2084192 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fdalloc + 0xc) (mword_of_int 0xd61fc0ef : mword 32)
-    (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) (JAL (mword_of_int 2084192 : mword 21, Regidx (mword_of_int 1))) kd_d61fc0ef. Qed.
+  Lemma fdi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) false (JAL (mword_of_int 2084182 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fdalloc + 0xc) (mword_of_int 0xd57fc0ef : mword 32)
+    (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) (JAL (mword_of_int 2084182 : mword 21, Regidx (mword_of_int 1))) kd_d57fc0ef. Qed.
 
   Lemma fdi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.fdalloc + 0x10) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (KernelSyms.fdalloc + 0x10) (mword_of_int 0x862a : mword 16)

@@ -379,7 +379,7 @@ Section ProofWakeup.
       iEval (rewrite Hpp3a) in "Hpc".
       (* ---- 0x3a jal ra,acquire ---- *)
       iApply (wp_jal_s_sconf (CID := CIDd) (mword_of_int (KernelSyms.wakeup + 0x3a))
-                (mword_of_int 1 : mword 5) (mword_of_int 2092080 : mword 21) M38 av b
+                (mword_of_int 1 : mword 5) (mword_of_int 2092064 : mword 21) M38 av b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
@@ -388,7 +388,7 @@ Section ProofWakeup.
       set (M3a := <[Regidx (mword_of_int 1 : mword 5) :=
                     regval_into_reg (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x3a) : mword 64) 4)]> M38).
       assert (Hjtgt_aq : add_vec (mword_of_int (KernelSyms.wakeup + 0x3a) : mword 64)
-                          (sign_extend' 64 (mword_of_int 2092080 : mword 21)) = mword_of_int KernelSyms.acquire)
+                          (sign_extend' 64 (mword_of_int 2092064 : mword 21)) = mword_of_int KernelSyms.acquire)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjtgt_aq) in "Hpc".
       assert (HM3a_ra : M3a !!! Regidx (mword_of_int 1 : mword 5)
@@ -482,7 +482,7 @@ Section ProofWakeup.
         iEval (rewrite Hpp2c) in "Hpc".
         (* 0x2c jal ra,release *)
         iApply (wp_jal_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2c))
-                  (mword_of_int 1 : mword 5) (mword_of_int 2092230 : mword 21) Mr2a (trap_res b + av)%nat false
+                  (mword_of_int 1 : mword 5) (mword_of_int 2092214 : mword 21) Mr2a (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -492,7 +492,7 @@ Section ProofWakeup.
         set (Mr2c := <[Regidx (mword_of_int 1 : mword 5) :=
                        regval_into_reg (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x2c) : mword 64) 4)]> Mr2a).
         assert (Hjtgt_rl : add_vec (mword_of_int (KernelSyms.wakeup + 0x2c) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2092230 : mword 21)) = mword_of_int KernelSyms.release)
+                            (sign_extend' 64 (mword_of_int 2092214 : mword 21)) = mword_of_int KernelSyms.release)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjtgt_rl) in "Hpc".
         assert (HMr2c_ra : Mr2c !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.wakeup + 0x2c) : mword 64) 4)

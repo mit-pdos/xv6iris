@@ -18,7 +18,7 @@
      +0x0e            c.mv s1,a0                 s1 = p
      +0x10 .. +0x14   auipc a5,0x8; sd a0,1796(a5)     initproc = p
      +0x18 .. +0x1c   auipc a0,0x5; addi a0,a0,1484    a0 = "/" (0x80007190)
-     +0x20            jal ra,namei               (0x80003a82)
+     +0x20            jal ra,namei               (0x80003a92)
      +0x24            sd a0,336(s1)              p->cwd = ip
      +0x28            c.li a5,3                  RUNNABLE
      +0x2a            c.sw a5,24(s1)             p->state = RUNNABLE
@@ -507,7 +507,7 @@ Section ProofUserinit.
     (* +0x20 jal ra,namei                                                    *)
     (* ===================================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (UI + 0x20)) Rra
-              (mword_of_int 7862 : mword 21) R7 (trap_res b + (K - 4))%nat false
+              (mword_of_int 7878 : mword 21) R7 (trap_res b + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uin_20 with "Htext"). }
@@ -515,7 +515,7 @@ Section ProofUserinit.
     set (R8 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (UI + 0x20) : mword 64) 4)]> R7).
     assert (Htgtnm : add_vec (mword_of_int (UI + 0x20) : mword 64)
-                       (sign_extend' 64 (mword_of_int 7862 : mword 21))
+                       (sign_extend' 64 (mword_of_int 7878 : mword 21))
                      = mword_of_int KernelSyms.namei) by pcw.
     iEval (rewrite Htgtnm) in "Hpc".
     assert (HR8ra : (R8 !!! Regidx Rra : mword 64)

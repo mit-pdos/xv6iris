@@ -606,7 +606,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below (mword_of_int 0 : mword 64) P.(ud_um) /\
        um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
-     pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
+     pc_is (mword_of_int (KXB + 0x1f2) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
@@ -743,12 +743,17 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szv : mword 64) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (szv sv11 : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs2 = szv /\
        M !!! Regidx Rs4 = ientry kf /\
-       M !!! Regidx Rs6 = page_base P.(ud_root) ⌝ ∗
+       M !!! Regidx Rs6 = page_base P.(ud_root) /\
+       (* s11 is BACK at its entry value here since XV6_REV 7d258aa: the loop
+          path passed the reload gcc moved to +0x1a2, and the phnum = 0 path
+          never spilled or clobbered it.  Phase C/D's epilogues no longer
+          reload it, so this is what pays for them. *)
+       M !!! Regidx Rs11 = sv11 ⌝ ∗
      ⌜ (kf < NINODE)%nat /\
        bv_unsigned inumf < 16 * Z.of_nat nib /\
        (iput_units <= n2)%nat /\
@@ -800,11 +805,14 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szv : mword 64) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (szv sv11 : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs2 = szv /\
-       M !!! Regidx Rs6 = page_base P.(ud_root) ⌝ ∗
+       M !!! Regidx Rs6 = page_base P.(ud_root) /\
+       (* carried on from [kxc_at_1a4]: phase C/D's epilogues no longer
+          reload s11 (XV6_REV 7d258aa), so they need it here. *)
+       M !!! Regidx Rs11 = sv11 ⌝ ∗
      ⌜ (forall j, (j < 8)%nat ->
           is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
@@ -913,24 +921,24 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
        M !!! Regidx Ra0 = avf c /\
-       M !!! Regidx Rs2 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
-       M !!! Regidx Rs4 = sz1 /\
-       M !!! Regidx Rs5 = proc_addr jp /\
+       M !!! Regidx Rs8 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
+       M !!! Regidx Rs2 = sz1 /\
+       M !!! Regidx Rs3 = proc_addr jp /\
        M !!! Regidx Rs6 = page_base P.(ud_root) /\
-       M !!! Regidx Rs7 = (mword_of_int (uint sz1 - 4096) : mword 64) /\
-       M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
-       M !!! Regidx Rs9 = pa_stk sp0 46 /\
-       M !!! Regidx Rs10 = oldsz ⌝ ∗
+       M !!! Regidx Rs4 = (mword_of_int (uint sz1 - 4096) : mword 64) /\
+       M !!! Regidx Rs7 = pa_stk sp0 46 /\
+       M !!! Regidx Rs11 = sv11 /\
+       M !!! Regidx Rs5 = oldsz ⌝ ∗
      ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c <> (mword_of_int 0 : mword 64) /\
        (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
-     pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
+     pc_is (mword_of_int (KXB + 0x218) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
@@ -970,23 +978,39 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
-       M !!! Regidx Rs2 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
-       M !!! Regidx Rs4 = sz1 /\
-       M !!! Regidx Rs5 = proc_addr jp /\
+       M !!! Regidx Rs8 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
+       M !!! Regidx Rs2 = sz1 /\
+       M !!! Regidx Rs3 = proc_addr jp /\
        M !!! Regidx Rs6 = page_base P.(ud_root) /\
-       M !!! Regidx Rs7 = (mword_of_int (uint sz1 - 4096) : mword 64) /\
-       M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
-       M !!! Regidx Rs9 = pa_stk sp0 46 /\
-       M !!! Regidx Rs10 = oldsz ⌝ ∗
+       M !!! Regidx Rs4 = (mword_of_int (uint sz1 - 4096) : mword 64) /\
+       M !!! Regidx Rs11 = sv11 /\
+       M !!! Regidx Rs5 = oldsz ⌝ ∗
+     (* TWO CONJUNCTS ARE GONE AT XV6_REV 7d258aa, and this is the one seam in
+        the bump that gets WEAKER rather than just renamed:
+        * [Rs8 = 32] was MAXARG, and the register does not exist any more --
+          upstream deleted the [argc >= MAXARG] test;
+        * the ustack base ([Rs7 = pa_stk sp0 46]) is no longer established on
+          the argc = 0 arm.  With the test hoisted above the loop's setup, that
+          arm runs only the cold trampoline at +0x2b6 ([s8 := sz1; s1 := 0]),
+          which does not set s7.  Dropping it is sound because nothing between
+          +0x268 and +0x27c reads s7 -- +0x27c's [sub s7,s8,a4] writes it
+          first.  [kxc_at_21a], INSIDE the loop, keeps its copy: there s7 is
+          live and read at +0x252.
+        [c < 32] survives and is NOT a loss: it comes from [c <= na] and
+        SpecKexec's [na < MAXARG] premise, which the spec already had to take
+        because the deleted test was the "incomplete" one -- it could not see
+        a vector whose first null sits exactly at MAXARG (SpecKexec.v's own
+        header says so).  So the check upstream removed was buying the proof
+        nothing it did not already have. *)
      ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
        (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
-     pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
+     pc_is (mword_of_int (KXB + 0x268) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
@@ -1051,22 +1075,23 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
-       M !!! Regidx Rs2
+       M !!! Regidx Rs7
          = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64) /\
-       M !!! Regidx Rs4 = sz1 /\
-       M !!! Regidx Rs5 = proc_addr jp /\
+       M !!! Regidx Rs2 = sz1 /\
+       M !!! Regidx Rs3 = proc_addr jp /\
        M !!! Regidx Rs6 = page_base P.(ud_root) /\
-       M !!! Regidx Rs10 = oldsz ⌝ ∗
+       M !!! Regidx Rs11 = sv11 /\
+       M !!! Regidx Rs5 = oldsz ⌝ ∗
      ⌜ (c <= na)%nat /\ (c < MAXARG)%nat /\
        avf c = (mword_of_int 0 : mword 64) /\
        kxc_stack_ok (uint sz1) (uint sz1 - 4096) alen c ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
-     pc_is (mword_of_int (KXB + 0x2a6) : mword 64) ∗
+     pc_is (mword_of_int (KXB + 0x29c) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗

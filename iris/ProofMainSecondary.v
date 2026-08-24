@@ -100,7 +100,7 @@ Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compu
    sized by: the loop-head enable funds [kv_frame_slots] out of what the arm
    hands it. *)
 Lemma ms_bounds (K : nat) : (K_main_secondary <= K)%nat ->
-  (2 <= K)%nat /\ (48 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
+  (2 <= K)%nat /\ (48 <= K - 2)%nat /\ (kv_frame_slots + 22 <= K - 2)%nat.
 Proof. lia. Qed.
 
 (* ===================================================================== *)
@@ -585,7 +585,7 @@ Section ProofMainSecondary.
       (root : mword 44) (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
-    (kv_frame_slots + 20 <= n)%nat ->
+    (kv_frame_slots + 22 <= n)%nat ->
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
     (* NOT hart 0, which is what makes [tick_keeper]'s cheap arm available:
        [tick_hart] is [cpuid() == 0] and a secondary never keeps time. *)
@@ -645,7 +645,7 @@ Section ProofMainSecondary.
     iEval (rewrite Hretkh) in "Hpc".
     (* ---- +0x36 jal trapinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x36)) (mword_of_int 1 : mword 5)
-              (mword_of_int 5588 : mword 21) mkh n false
+              (mword_of_int 5604 : mword 21) mkh n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (mni_36 with "Htext"). }
@@ -654,7 +654,7 @@ Section ProofMainSecondary.
     pose (Q2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x36) : mword 64) 4)]> mkh).
     assert (Htgtth : add_vec (mword_of_int (KernelSyms.main + 0x36) : mword 64)
-              (sign_extend' 64 (mword_of_int 5588 : mword 21))
+              (sign_extend' 64 (mword_of_int 5604 : mword 21))
               = (mword_of_int KernelSyms.trapinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtth) in "Hpc".
@@ -692,7 +692,7 @@ Section ProofMainSecondary.
     { iApply bi.later_intro. iExact "Hkvs". }
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 18318 : mword 21) mth n false
+              (mword_of_int 18334 : mword 21) mth n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (mni_3a with "Htext"). }
@@ -701,7 +701,7 @@ Section ProofMainSecondary.
     pose (Q3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x3a) : mword 64) 4)]> mth).
     assert (Htgtph : add_vec (mword_of_int (KernelSyms.main + 0x3a) : mword 64)
-              (sign_extend' 64 (mword_of_int 18318 : mword 21))
+              (sign_extend' 64 (mword_of_int 18334 : mword 21))
               = (mword_of_int KernelSyms.plicinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtph) in "Hpc".

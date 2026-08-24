@@ -366,7 +366,7 @@ Section ProofFilestat.
        +0x10 jal ra,myproc
        ================================================================= *)
     iApply (wp_jal_s_sconf (mword_of_int (FST + 0x10)) Rra
-              (mword_of_int 2086638 : mword 21) R4 (K - 10)%nat b
+              (mword_of_int 2086622 : mword 21) R4 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (fsti_10 with "Htext"). }
@@ -376,7 +376,7 @@ Section ProofFilestat.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (FST + 0x10) : mword 64) 4)]> R4) with R5.
     assert (Htgtmp : add_vec (mword_of_int (FST + 0x10) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2086638 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2086622 : mword 21))
                      = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtmp) in "Hpc".
@@ -1096,7 +1096,7 @@ Section ProofFilestat.
       iEval (rewrite Hpp4a) in "Hpc".
       (* +0x4a jal ra,copyout *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x4a)) Rra
-                (mword_of_int 2085614 : mword 21) U5 (K - 10)%nat b
+                (mword_of_int 2085598 : mword 21) U5 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (fsti_4a with "Htext"). }
@@ -1104,7 +1104,7 @@ Section ProofFilestat.
       set (U6 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x4a) : mword 64) 4)]> U5).
       assert (Htgtco : add_vec (mword_of_int (FST + 0x4a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2085614 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2085598 : mword 21))
                        = mword_of_int KernelSyms.copyout)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtco) in "Hpc".

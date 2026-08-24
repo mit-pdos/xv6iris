@@ -208,7 +208,7 @@ Section ProofPlicComplete.
        own now-[b = false] contract, so the call's continuation is entered
        directly. ---- *)
     iApply (Cpuid.wp_call_cpuid_sconf_cs KT1 (mword_of_int (KernelSyms.plic_complete + 0x0c))
-              (mword_of_int 2081358 : mword 21) R3 (n - 4)%nat p
+              (mword_of_int 2081342 : mword 21) R3 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)

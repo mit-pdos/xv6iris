@@ -635,7 +635,7 @@ Definition kxc_bad324_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
-  pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
+  pc_is (mword_of_int (KXB + 0x31e) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
@@ -758,7 +758,7 @@ Definition kxc_ls_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
-  pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
+  pc_is (mword_of_int (KXB + 0x0f6) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗

@@ -129,8 +129,15 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Six remain open; each file's top banner says precisely what is left (the
+Seven remain open; each file's top banner says precisely what is left (the
 first five were audited against the tree 2026-08-22):
+
+- **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
+  31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
+  hand-derived scheduler and kexec offset maps (the tools get both wrong on
+  this one), three `relayout` defects and the audits that catch their classes,
+  the REGISTER-value vs SLOT-value distinction that a narrowed spill range
+  forces, and how to tell a wrong proof from a slow one.
 
 - **[`durable-disk.md`](projects/durable-disk.md)** — xv6 correctness
   across crashes INCLUDING FS consistency, under RULING 3 (2026-08-23):

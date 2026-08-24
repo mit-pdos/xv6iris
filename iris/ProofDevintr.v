@@ -855,7 +855,7 @@ Section ProofDevintr.
                        = mword_of_int (KernelSyms.devintr + 0x48)) by pcw.
         iEval (rewrite Hj48) in "Hpc".
         (* +0x48: jal ra,uartintr *)
-        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x48)) ra_idx (mword_of_int 2090040 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.devintr + 0x48)) ra_idx (mword_of_int 2090024 : mword 21)
                   B3 (av - 4)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -866,7 +866,7 @@ Section ProofDevintr.
         change (<[Regidx ra_idx := regval_into_reg
             (add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)]> B3) with U0.
         assert (Hjui : add_vec (mword_of_int (KernelSyms.devintr + 0x48) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2090040 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2090024 : mword 21))
                        = mword_of_int KernelSyms.uartintr) by pcw.
         iEval (rewrite Hjui) in "Hpc".
         assert (HU0ra : U0 !!! Regidx ra_idx

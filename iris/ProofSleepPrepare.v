@@ -186,7 +186,7 @@ Section ProofSleepPrepare.
     assert (HA2s1 : A2 !!! Regidx spr_s1 = chan)
       by (rewrite /A2 upd_eq add_vec_zero_l; exact HA1a0).
     (* ===================== p = myproc() ===================== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x0e)) spr_ra (mword_of_int 2095592 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x0e)) spr_ra (mword_of_int 2095576 : mword 21)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -194,7 +194,7 @@ Section ProofSleepPrepare.
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (A3 := <[Regidx spr_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x0e) : mword 64) 4)]> A2).
     change (<[Regidx spr_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x0e) : mword 64) 4)]> A2) with A3.
-    assert (Hjmp : add_vec (mword_of_int (KernelSyms.sleep_prepare + 0x0e) : mword 64) (sign_extend' 64 (mword_of_int 2095592 : mword 21)) = mword_of_int KernelSyms.myproc)
+    assert (Hjmp : add_vec (mword_of_int (KernelSyms.sleep_prepare + 0x0e) : mword 64) (sign_extend' 64 (mword_of_int 2095576 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HA3ra : A3 !!! Regidx spr_ra = add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x0e) : mword 64) 4)
@@ -231,7 +231,7 @@ Section ProofSleepPrepare.
     assert (HB1a0 : B1 !!! Regidx spr_a0 = proc_addr j)
       by (rewrite /B1 upd_ne; [exact Ha0_mp | vm_compute; discriminate]).
     (* +0x14: jal ra,acquire *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x14)) spr_ra (mword_of_int 2092226 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x14)) spr_ra (mword_of_int 2092210 : mword 21)
               B1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -239,7 +239,7 @@ Section ProofSleepPrepare.
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (B2 := <[Regidx spr_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x14) : mword 64) 4)]> B1).
     change (<[Regidx spr_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x14) : mword 64) 4)]> B1) with B2.
-    assert (Hjacq : add_vec (mword_of_int (KernelSyms.sleep_prepare + 0x14) : mword 64) (sign_extend' 64 (mword_of_int 2092226 : mword 21)) = mword_of_int KernelSyms.acquire)
+    assert (Hjacq : add_vec (mword_of_int (KernelSyms.sleep_prepare + 0x14) : mword 64) (sign_extend' 64 (mword_of_int 2092210 : mword 21)) = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjacq) in "Hpc".
     assert (HB2ra : B2 !!! Regidx spr_ra = add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x14) : mword 64) 4) by (rewrite /B2 upd_eq; reflexivity).
@@ -311,7 +311,7 @@ Section ProofSleepPrepare.
     assert (HC1a0 : C1 !!! Regidx spr_a0 = proc_addr j)
       by (rewrite /C1 upd_eq add_vec_zero_l; exact Hmacq_s2).
     (* +0x20: jal ra,release *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x20)) spr_ra (mword_of_int 2092350 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x20)) spr_ra (mword_of_int 2092334 : mword 21)
               C1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -320,7 +320,7 @@ Section ProofSleepPrepare.
     iIntros "Hcg Hpc".
     set (C2 := <[Regidx spr_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x20) : mword 64) 4)]> C1).
     change (<[Regidx spr_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x20) : mword 64) 4)]> C1) with C2.
-    assert (Hjrel : add_vec (mword_of_int (KernelSyms.sleep_prepare + 0x20) : mword 64) (sign_extend' 64 (mword_of_int 2092350 : mword 21)) = mword_of_int KernelSyms.release)
+    assert (Hjrel : add_vec (mword_of_int (KernelSyms.sleep_prepare + 0x20) : mword 64) (sign_extend' 64 (mword_of_int 2092334 : mword 21)) = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjrel) in "Hpc".
     assert (HC2ra : C2 !!! Regidx spr_ra = add_vec_int (mword_of_int (KernelSyms.sleep_prepare + 0x20) : mword 64) 4) by (rewrite /C2 upd_eq; reflexivity).

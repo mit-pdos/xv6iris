@@ -160,9 +160,9 @@ Section CodeConsoleread.
   Proof. mk_base (KernelSyms.consoleread + 0x48) (mword_of_int 0x71a010ef : mword 32)
     (mword_of_int (KernelSyms.consoleread + 0x48) : mword 64) (JAL (mword_of_int 5914 : mword 21, Regidx (mword_of_int 1))) kd_71a010ef. Qed.
 
-  Lemma cnri_04c : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x4c) : mword 64) false (JAL (mword_of_int 8056 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleread + 0x4c) (mword_of_int 0x779010ef : mword 32)
-    (mword_of_int (KernelSyms.consoleread + 0x4c) : mword 64) (JAL (mword_of_int 8056 : mword 21, Regidx (mword_of_int 1))) kd_779010ef. Qed.
+  Lemma cnri_04c : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x4c) : mword 64) false (JAL (mword_of_int 8072 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleread + 0x4c) (mword_of_int 0x789010ef : mword 32)
+    (mword_of_int (KernelSyms.consoleread + 0x4c) : mword 64) (JAL (mword_of_int 8072 : mword 21, Regidx (mword_of_int 1))) kd_789010ef. Qed.
 
   Lemma cnri_050 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x50) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 56 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc (KernelSyms.consoleread + 0x50) (mword_of_int 0xe925 : mword 16)
@@ -172,9 +172,9 @@ Section CodeConsoleread.
   Proof. mk_rvc (KernelSyms.consoleread + 0x52) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.consoleread + 0x52) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma cnri_054 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x54) : mword 64) false (JAL (mword_of_int 7448 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleread + 0x54) (mword_of_int 0x519010ef : mword 32)
-    (mword_of_int (KernelSyms.consoleread + 0x54) : mword 64) (JAL (mword_of_int 7448 : mword 21, Regidx (mword_of_int 1))) kd_519010ef. Qed.
+  Lemma cnri_054 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x54) : mword 64) false (JAL (mword_of_int 7464 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleread + 0x54) (mword_of_int 0x529010ef : mword 32)
+    (mword_of_int (KernelSyms.consoleread + 0x54) : mword 64) (JAL (mword_of_int 7464 : mword 21, Regidx (mword_of_int 1))) kd_529010ef. Qed.
 
   Lemma cnri_058 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x58) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.consoleread + 0x58) (mword_of_int 0x8526 : mword 16)
@@ -184,9 +184,9 @@ Section CodeConsoleread.
   Proof. mk_base (KernelSyms.consoleread + 0x5a) (mword_of_int 0x271000ef : mword 32)
     (mword_of_int (KernelSyms.consoleread + 0x5a) : mword 64) (JAL (mword_of_int 2672 : mword 21, Regidx (mword_of_int 1))) kd_271000ef. Qed.
 
-  Lemma cnri_05e : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x5e) : mword 64) false (JAL (mword_of_int 7498 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleread + 0x5e) (mword_of_int 0x54b010ef : mword 32)
-    (mword_of_int (KernelSyms.consoleread + 0x5e) : mword 64) (JAL (mword_of_int 7498 : mword 21, Regidx (mword_of_int 1))) kd_54b010ef. Qed.
+  Lemma cnri_05e : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x5e) : mword 64) false (JAL (mword_of_int 7514 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleread + 0x5e) (mword_of_int 0x55b010ef : mword 32)
+    (mword_of_int (KernelSyms.consoleread + 0x5e) : mword 64) (JAL (mword_of_int 7514 : mword 21, Regidx (mword_of_int 1))) kd_55b010ef. Qed.
 
   Lemma cnri_062 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0x62) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.consoleread + 0x62) (mword_of_int 0x8526 : mword 16)
@@ -272,9 +272,9 @@ Section CodeConsoleread.
   Proof. mk_rvc (KernelSyms.consoleread + 0xa6) (mword_of_int 0x855a : mword 16)
     (mword_of_int (KernelSyms.consoleread + 0xa6) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) kd_855a exec_execute_C_MV. Qed.
 
-  Lemma cnri_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0xa8) : mword 64) false (JAL (mword_of_int 8272 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleread + 0xa8) (mword_of_int 0x050020ef : mword 32)
-    (mword_of_int (KernelSyms.consoleread + 0xa8) : mword 64) (JAL (mword_of_int 8272 : mword 21, Regidx (mword_of_int 1))) kd_050020ef. Qed.
+  Lemma cnri_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0xa8) : mword 64) false (JAL (mword_of_int 8288 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleread + 0xa8) (mword_of_int 0x060020ef : mword 32)
+    (mword_of_int (KernelSyms.consoleread + 0xa8) : mword 64) (JAL (mword_of_int 8288 : mword 21, Regidx (mword_of_int 1))) kd_060020ef. Qed.
 
   Lemma cnri_0ac : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleread + 0xac) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.consoleread + 0xac) (mword_of_int 0x57fd : mword 16)

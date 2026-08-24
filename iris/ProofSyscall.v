@@ -4667,15 +4667,15 @@ Section SyscallArms.
                    = mword_of_int (KernelSyms.syscall + 0x4a)) by pcw.
     iEval (rewrite Hp4a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.syscall + 0x4a)) Ra0 Ra0
-              (mword_of_int 2766 : mword 12) F2 (av - 4)%nat true
+              (mword_of_int 2750 : mword 12) F2 (av - 4)%nat true
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (syci_4a with "Htext"). }
     iIntros (CIDd Hsd) "Hcg Hpc".
     set (F3 := <[Regidx Ra0 := regval_into_reg
-        (add_vec (rget F2 Ra0) (sign_extend' 64 (mword_of_int 2766 : mword 12)))]> F2).
+        (add_vec (rget F2 Ra0) (sign_extend' 64 (mword_of_int 2750 : mword 12)))]> F2).
     change (<[Regidx Ra0 := regval_into_reg
-        (add_vec (rget F2 Ra0) (sign_extend' 64 (mword_of_int 2766 : mword 12)))]> F2) with F3.
+        (add_vec (rget F2 Ra0) (sign_extend' 64 (mword_of_int 2750 : mword 12)))]> F2) with F3.
     assert (Hp4e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x4a) : mword 64) 4
                    = mword_of_int (KernelSyms.syscall + 0x4e)) by pcw.
     iEval (rewrite Hp4e) in "Hpc".
@@ -4684,7 +4684,7 @@ Section SyscallArms.
       unfold sysc_fmt_a. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0x4e: jal ra,printk ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.syscall + 0x4e)) Rra
-              (mword_of_int 2087992 : mword 21) F3 (av - 4)%nat true
+              (mword_of_int 2087976 : mword 21) F3 (av - 4)%nat true
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (syci_4e with "Htext"). }
@@ -4694,7 +4694,7 @@ Section SyscallArms.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.syscall + 0x4e) : mword 64) 4)]> F3) with F4.
     assert (Hjpk : add_vec (mword_of_int (KernelSyms.syscall + 0x4e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087992 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2087976 : mword 21))
                    = mword_of_int KernelSyms.printk) by pcw.
     iEval (rewrite Hjpk) in "Hpc".
     assert (HF4a0 : F4 !!! Regidx Ra0 = (mword_of_int sysc_fmt_a : mword 64))
@@ -4978,7 +4978,7 @@ Section SyscallMain.
     assert (HA1sp : A1 !!! Regidx csp_rs1 = spd)
       by (rewrite /A1 upd_ne; [exact HcspA0 | vm_compute; discriminate]).
     (* +0x0c: jal ra,myproc *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.syscall + 0x0c)) Rra (mword_of_int 2093138 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.syscall + 0x0c)) Rra (mword_of_int 2093122 : mword 21)
               A1 (av - 4)%nat true
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -4986,7 +4986,7 @@ Section SyscallMain.
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (A2 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.syscall + 0x0c) : mword 64) 4)]> A1).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.syscall + 0x0c) : mword 64) 4)]> A1) with A2.
-    assert (Hjmp : add_vec (mword_of_int (KernelSyms.syscall + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2093138 : mword 21)) = mword_of_int KernelSyms.myproc)
+    assert (Hjmp : add_vec (mword_of_int (KernelSyms.syscall + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2093122 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HA2ra : A2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.syscall + 0x0c) : mword 64) 4)
@@ -5199,7 +5199,7 @@ Section SyscallMain.
           (add_vec (mword_of_int (KernelSyms.syscall + 0x2a) : mword 64) (auipc_off (mword_of_int 5 : mword 20)))]> C0) with C1.
       assert (Hp2e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.syscall + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp2e) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.syscall + 0x2e)) Ra5 Ra5 (mword_of_int 3818 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.syscall + 0x2e)) Ra5 Ra5 (mword_of_int 3802 : mword 12)
                 C1 (av - 4)%nat true
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
@@ -5210,9 +5210,9 @@ Section SyscallMain.
          NOTHING and the [change] behind it silently no-ops -- see the note at
          [C3] below for what that costs. *)
       set (C2 := <[Regidx Ra5 := regval_into_reg
-          (add_vec (rget C1 Ra5) (sign_extend' 64 (mword_of_int 3818 : mword 12)))]> C1).
+          (add_vec (rget C1 Ra5) (sign_extend' 64 (mword_of_int 3802 : mword 12)))]> C1).
       change (<[Regidx Ra5 := regval_into_reg
-          (add_vec (rget C1 Ra5) (sign_extend' 64 (mword_of_int 3818 : mword 12)))]> C1) with C2.
+          (add_vec (rget C1 Ra5) (sign_extend' 64 (mword_of_int 3802 : mword 12)))]> C1) with C2.
       assert (Hp32 : add_vec_int (mword_of_int (KernelSyms.syscall + 0x2e) : mword 64) 4 = mword_of_int (KernelSyms.syscall + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp32) in "Hpc".
       assert (HC2a5 : C2 !!! Regidx Ra5 = mword_of_int KernelSyms.syscalls).

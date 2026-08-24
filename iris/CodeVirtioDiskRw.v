@@ -134,13 +134,13 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x2a) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x2a) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma rwi_02e : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x2e) : mword 64) false (ITYPE (mword_of_int 3286 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x2e) (mword_of_int 0xcd650513 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x2e) : mword 64) (ITYPE (mword_of_int 3286 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cd650513. Qed.
+  Lemma rwi_02e : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x2e) : mword 64) false (ITYPE (mword_of_int 3270 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x2e) (mword_of_int 0xcc650513 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x2e) : mword 64) (ITYPE (mword_of_int 3270 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cc650513. Qed.
 
-  Lemma rwi_032 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x32) : mword 64) false (JAL (mword_of_int 2077400 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x32) (mword_of_int 0xad8fb0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x32) : mword 64) (JAL (mword_of_int 2077400 : mword 21, Regidx (mword_of_int 1))) kd_ad8fb0ef. Qed.
+  Lemma rwi_032 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x32) : mword 64) false (JAL (mword_of_int 2077384 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x32) (mword_of_int 0xac8fb0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x32) : mword 64) (JAL (mword_of_int 2077384 : mword 21, Regidx (mword_of_int 1))) kd_ac8fb0ef. Qed.
 
   Lemma rwi_036 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x36) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x36) (mword_of_int 0x44a1 : mword 16)
@@ -150,9 +150,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x38) (mword_of_int 0x0001ea97 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x38) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 21), AUIPC)) kd_0001ea97. Qed.
 
-  Lemma rwi_03c : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x3c) : mword 64) false (ITYPE (mword_of_int 2976 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x3c) (mword_of_int 0xba0a8a93 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x3c) : mword 64) (ITYPE (mword_of_int 2976 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)) kd_ba0a8a93. Qed.
+  Lemma rwi_03c : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x3c) : mword 64) false (ITYPE (mword_of_int 2960 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x3c) (mword_of_int 0xb90a8a93 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x3c) : mword 64) (ITYPE (mword_of_int 2960 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)) kd_b90a8a93. Qed.
 
   Lemma rwi_040 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x40) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 3 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x40) (mword_of_int 0x4a0d : mword 16)
@@ -202,9 +202,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x5e) (mword_of_int 0x0001e717 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x5e) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001e717. Qed.
 
-  Lemma rwi_062 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x62) : mword 64) false (ITYPE (mword_of_int 2938 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x62) (mword_of_int 0xb7a70713 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x62) : mword 64) (ITYPE (mword_of_int 2938 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_b7a70713. Qed.
+  Lemma rwi_062 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x62) : mword 64) false (ITYPE (mword_of_int 2922 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x62) (mword_of_int 0xb6a70713 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x62) : mword 64) (ITYPE (mword_of_int 2922 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_b6a70713. Qed.
 
   Lemma rwi_066 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x66) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x66) (mword_of_int 0x4781 : mword 16)
@@ -266,9 +266,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x94) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x94) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma rwi_098 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x98) : mword 64) false (ITYPE (mword_of_int 2908 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x98) (mword_of_int 0xb5c50513 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x98) : mword 64) (ITYPE (mword_of_int 2908 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_b5c50513. Qed.
+  Lemma rwi_098 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x98) : mword 64) false (ITYPE (mword_of_int 2892 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x98) (mword_of_int 0xb4c50513 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x98) : mword 64) (ITYPE (mword_of_int 2892 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_b4c50513. Qed.
 
   Lemma rwi_09c : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x9c) : mword 64) false (JAL (mword_of_int 2082200 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x9c) (mword_of_int 0xd98fc0ef : mword 32)
@@ -278,13 +278,13 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0xa0) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0xa0) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma rwi_0a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xa4) : mword 64) false (ITYPE (mword_of_int 3168 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xa4) (mword_of_int 0xc6050513 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0xa4) : mword 64) (ITYPE (mword_of_int 3168 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c6050513. Qed.
+  Lemma rwi_0a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xa4) : mword 64) false (ITYPE (mword_of_int 3152 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xa4) (mword_of_int 0xc5050513 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0xa4) : mword 64) (ITYPE (mword_of_int 3152 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c5050513. Qed.
 
-  Lemma rwi_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xa8) : mword 64) false (JAL (mword_of_int 2077418 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xa8) (mword_of_int 0xaeafb0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0xa8) : mword 64) (JAL (mword_of_int 2077418 : mword 21, Regidx (mword_of_int 1))) kd_aeafb0ef. Qed.
+  Lemma rwi_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xa8) : mword 64) false (JAL (mword_of_int 2077402 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xa8) (mword_of_int 0xadafb0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0xa8) : mword 64) (JAL (mword_of_int 2077402 : mword 21, Regidx (mword_of_int 1))) kd_adafb0ef. Qed.
 
   Lemma rwi_0ac : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xac) : mword 64) false (JAL (mword_of_int 2082244 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0xac) (mword_of_int 0xdc4fc0ef : mword 32)
@@ -294,13 +294,13 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0xb0) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0xb0) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma rwi_0b4 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xb4) : mword 64) false (ITYPE (mword_of_int 3152 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xb4) (mword_of_int 0xc5050513 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0xb4) : mword 64) (ITYPE (mword_of_int 3152 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c5050513. Qed.
+  Lemma rwi_0b4 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xb4) : mword 64) false (ITYPE (mword_of_int 3136 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xb4) (mword_of_int 0xc4050513 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0xb4) : mword 64) (ITYPE (mword_of_int 3136 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c4050513. Qed.
 
-  Lemma rwi_0b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xb8) : mword 64) false (JAL (mword_of_int 2077266 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xb8) (mword_of_int 0xa52fb0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0xb8) : mword 64) (JAL (mword_of_int 2077266 : mword 21, Regidx (mword_of_int 1))) kd_a52fb0ef. Qed.
+  Lemma rwi_0b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xb8) : mword 64) false (JAL (mword_of_int 2077250 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xb8) (mword_of_int 0xa42fb0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0xb8) : mword 64) (JAL (mword_of_int 2077250 : mword 21, Regidx (mword_of_int 1))) kd_a42fb0ef. Qed.
 
   Lemma rwi_0bc : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xbc) : mword 64) false (ITYPE (mword_of_int 4000 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI)).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0xbc) (mword_of_int 0xfa040613 : mword 32)
@@ -326,9 +326,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0xcc) (mword_of_int 0x0001e797 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0xcc) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0001e797. Qed.
 
-  Lemma rwi_0d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xd0) : mword 64) false (ITYPE (mword_of_int 2828 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xd0) (mword_of_int 0xb0c78793 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0xd0) : mword 64) (ITYPE (mword_of_int 2828 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_b0c78793. Qed.
+  Lemma rwi_0d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xd0) : mword 64) false (ITYPE (mword_of_int 2812 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0xd0) (mword_of_int 0xafc78793 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0xd0) : mword 64) (ITYPE (mword_of_int 2812 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_afc78793. Qed.
 
   Lemma rwi_0d4 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0xd4) : mword 64) false (SHIFTIOP (mword_of_int 4 : mword 6, Regidx (mword_of_int 10), Regidx (mword_of_int 14), SLLI)).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0xd4) (mword_of_int 0x00451713 : mword 32)
@@ -602,9 +602,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1a6) (mword_of_int 0x0001e497 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a6) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_0001e497. Qed.
 
-  Lemma rwi_1aa : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1aa) : mword 64) false (ITYPE (mword_of_int 2906 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1aa) (mword_of_int 0xb5a48493 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1aa) : mword 64) (ITYPE (mword_of_int 2906 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_b5a48493. Qed.
+  Lemma rwi_1aa : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1aa) : mword 64) false (ITYPE (mword_of_int 2890 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1aa) (mword_of_int 0xb4a48493 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1aa) : mword 64) (ITYPE (mword_of_int 2890 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_b4a48493. Qed.
 
   Lemma rwi_1ae : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ae) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x1ae) (mword_of_int 0x892e : mword 16)
@@ -626,9 +626,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x1ba) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ba) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma rwi_1bc : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1bc) : mword 64) false (JAL (mword_of_int 2077142 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1bc) (mword_of_int 0x9d6fb0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1bc) : mword 64) (JAL (mword_of_int 2077142 : mword 21, Regidx (mword_of_int 1))) kd_9d6fb0ef. Qed.
+  Lemma rwi_1bc : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1bc) : mword 64) false (JAL (mword_of_int 2077126 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1bc) (mword_of_int 0x9c6fb0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1bc) : mword 64) (JAL (mword_of_int 2077126 : mword 21, Regidx (mword_of_int 1))) kd_9c6fb0ef. Qed.
 
   Lemma rwi_1c0 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c0) : mword 64) false (JAL (mword_of_int 2081968 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1c0) (mword_of_int 0xcb0fc0ef : mword 32)
@@ -638,9 +638,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x1c4) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c4) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma rwi_1c6 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c6) : mword 64) false (JAL (mword_of_int 2076996 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1c6) (mword_of_int 0x944fb0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c6) : mword 64) (JAL (mword_of_int 2076996 : mword 21, Regidx (mword_of_int 1))) kd_944fb0ef. Qed.
+  Lemma rwi_1c6 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c6) : mword 64) false (JAL (mword_of_int 2076980 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1c6) (mword_of_int 0x934fb0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c6) : mword 64) (JAL (mword_of_int 2076980 : mword 21, Regidx (mword_of_int 1))) kd_934fb0ef. Qed.
 
   Lemma rwi_1ca : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca) : mword 64) false (LOAD (mword_of_int 4 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1ca) (mword_of_int 0x0049a783 : mword 32)
@@ -666,9 +666,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1de) (mword_of_int 0x0001e797 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x1de) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0001e797. Qed.
 
-  Lemma rwi_1e2 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e2) : mword 64) false (ITYPE (mword_of_int 2554 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1e2) (mword_of_int 0x9fa78793 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e2) : mword 64) (ITYPE (mword_of_int 2554 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_9fa78793. Qed.
+  Lemma rwi_1e2 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e2) : mword 64) false (ITYPE (mword_of_int 2538 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1e2) (mword_of_int 0x9ea78793 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e2) : mword 64) (ITYPE (mword_of_int 2538 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_9ea78793. Qed.
 
   Lemma rwi_1e6 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e6) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x1e6) (mword_of_int 0x97ba : mword 16)
@@ -682,9 +682,9 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1ec) (mword_of_int 0x0001e997 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ec) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 19), AUIPC)) kd_0001e997. Qed.
 
-  Lemma rwi_1f0 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f0) : mword 64) false (ITYPE (mword_of_int 2540 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1f0) (mword_of_int 0x9ec98993 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f0) : mword 64) (ITYPE (mword_of_int 2540 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_9ec98993. Qed.
+  Lemma rwi_1f0 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f0) : mword 64) false (ITYPE (mword_of_int 2524 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1f0) (mword_of_int 0x9dc98993 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f0) : mword 64) (ITYPE (mword_of_int 2524 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_9dc98993. Qed.
 
   Lemma rwi_1f4 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) false (SHIFTIOP (mword_of_int 4 : mword 6, Regidx (mword_of_int 18), Regidx (mword_of_int 14), SLLI)).
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x1f4) (mword_of_int 0x00491713 : mword 32)
@@ -726,13 +726,13 @@ Section CodeVirtioDiskRw.
   Proof. mk_base (KernelSyms.virtio_disk_rw + 0x210) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma rwi_214 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x214) : mword 64) false (ITYPE (mword_of_int 2800 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x214) (mword_of_int 0xaf050513 : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x214) : mword 64) (ITYPE (mword_of_int 2800 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_af050513. Qed.
+  Lemma rwi_214 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x214) : mword 64) false (ITYPE (mword_of_int 2784 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x214) (mword_of_int 0xae050513 : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x214) : mword 64) (ITYPE (mword_of_int 2784 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ae050513. Qed.
 
-  Lemma rwi_218 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) false (JAL (mword_of_int 2077050 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x218) (mword_of_int 0x97afb0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) (JAL (mword_of_int 2077050 : mword 21, Regidx (mword_of_int 1))) kd_97afb0ef. Qed.
+  Lemma rwi_218 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) false (JAL (mword_of_int 2077034 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_rw + 0x218) (mword_of_int 0x96afb0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) (JAL (mword_of_int 2077034 : mword 21, Regidx (mword_of_int 1))) kd_96afb0ef. Qed.
 
   Lemma rwi_21c : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_rw + 0x21c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.virtio_disk_rw + 0x21c) (mword_of_int 0x60e6 : mword 16)

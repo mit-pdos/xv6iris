@@ -33,7 +33,7 @@ Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
-Require Import KernelDecode22.
+Require Import KernelDecode21.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
@@ -84,9 +84,9 @@ Section CodeFilestat.
   Proof. mk_rvc (KernelSyms.filestat + 0xe) (mword_of_int 0x8a2e : mword 16)
     (mword_of_int (KernelSyms.filestat + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 20), ADD)) kd_8a2e exec_execute_C_MV. Qed.
 
-  Lemma fsti_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.filestat + 0x10) : mword 64) false (JAL (mword_of_int 2086638 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.filestat + 0x10) (mword_of_int 0xeeefd0ef : mword 32)
-    (mword_of_int (KernelSyms.filestat + 0x10) : mword 64) (JAL (mword_of_int 2086638 : mword 21, Regidx (mword_of_int 1))) kd_eeefd0ef. Qed.
+  Lemma fsti_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.filestat + 0x10) : mword 64) false (JAL (mword_of_int 2086622 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.filestat + 0x10) (mword_of_int 0xedefd0ef : mword 32)
+    (mword_of_int (KernelSyms.filestat + 0x10) : mword 64) (JAL (mword_of_int 2086622 : mword 21, Regidx (mword_of_int 1))) kd_edefd0ef. Qed.
 
   Lemma fsti_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.filestat + 0x14) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.filestat + 0x14) (mword_of_int 0x409c : mword 16)
@@ -168,9 +168,9 @@ Section CodeFilestat.
   Proof. mk_base (KernelSyms.filestat + 0x46) (mword_of_int 0x05093503 : mword 32)
     (mword_of_int (KernelSyms.filestat + 0x46) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), false, 8)) kd_05093503. Qed.
 
-  Lemma fsti_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.filestat + 0x4a) : mword 64) false (JAL (mword_of_int 2085614 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.filestat + 0x4a) (mword_of_int 0xaeefd0ef : mword 32)
-    (mword_of_int (KernelSyms.filestat + 0x4a) : mword 64) (JAL (mword_of_int 2085614 : mword 21, Regidx (mword_of_int 1))) kd_aeefd0ef. Qed.
+  Lemma fsti_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.filestat + 0x4a) : mword 64) false (JAL (mword_of_int 2085598 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.filestat + 0x4a) (mword_of_int 0xadefd0ef : mword 32)
+    (mword_of_int (KernelSyms.filestat + 0x4a) : mword 64) (JAL (mword_of_int 2085598 : mword 21, Regidx (mword_of_int 1))) kd_adefd0ef. Qed.
 
   Lemma fsti_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.filestat + 0x4e) : mword 64) false (SHIFTIWOP (mword_of_int 31 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SRAIW)).
   Proof. mk_base (KernelSyms.filestat + 0x4e) (mword_of_int 0x41f5551b : mword 32)

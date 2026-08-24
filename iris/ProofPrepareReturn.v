@@ -221,7 +221,7 @@ Section ProofPrepareReturn.
     (*  +0x08: jal ra,myproc -- a0 = p.                                 *)
     (* =============================================================== *)
     iApply (wp_jal_s_sconf (mword_of_int (PRR + 0x08)) ra_idx
-              (mword_of_int 2094204 : mword 21) M2 (av - 2)%nat b
+              (mword_of_int 2094188 : mword 21) M2 (av - 2)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (prr_08 with "Htext"). }
@@ -235,7 +235,7 @@ Section ProofPrepareReturn.
     assert (HM3ra : M3 !!! Regidx ra_idx = mword_of_int (PRR + 0x0c))
       by (rewrite /M3 upd_eq; pcw).
     assert (Hentry : add_vec (mword_of_int (PRR + 0x08) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094204 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094188 : mword 21))
                      = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hentry) in "Hpc".
     iDestruct (cpu_own_transport CID CID5 0%nat b p b
@@ -348,7 +348,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ---- +0x1c: addi a5,a5,-1128 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x1c)) a5_idx a5_idx
-              (mword_of_int 2962 : mword 12) T4 (trap_res b + (av - 2))%nat false
+              (mword_of_int 2946 : mword 12) T4 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (prr_1c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -377,7 +377,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp24) in "Hpc".
     (* ---- +0x24: addi a3,a3,-1136 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x24)) a3_idx a3_idx
-              (mword_of_int 2954 : mword 12) T6 (trap_res b + (av - 2))%nat false
+              (mword_of_int 2938 : mword 12) T6 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (prr_24 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".

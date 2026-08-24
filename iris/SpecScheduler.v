@@ -55,7 +55,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
      turns into "the scheduler thread cannot migrate".  So the index is the
      literal zero, not a binder. *)
   p0 = zero_reg ->
-  (* [kv_frame_slots + 20], NOT [20] -- ONE reserve, paid ONCE.
+  (* [kv_frame_slots + 22], NOT [22] -- ONE reserve, paid ONCE.
      scheduler() is entered from main() with interrupts OFF, and the [intr_on]
      inlined at its loop head ([csrsi sstatus,2] at +0x86) is therefore a
      genuine 0 -> 1 enable at a point where NOBODY holds the trap reserve: it
@@ -71,7 +71,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
      aside [kv_frame_slots] in a state where they are ALREADY set aside, i.e.
      [2 * kv_frame_slots + 20], which is the pathology the arm-dependent carve
      exists to remove. *)
-  (kv_frame_slots + 20 <= av)%nat ->
+  (kv_frame_slots + 22 <= av)%nat ->
   sie_cap_gpr KT1 m av false p0 -∗
   cpu_ctx_free -∗
   cpu_own 0 false p0 false ∅ -∗

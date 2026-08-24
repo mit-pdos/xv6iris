@@ -487,13 +487,13 @@ Section ProofBinit.
     set (R3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.binit + 0x10) : mword 64) (auipc_off (mword_of_int 5 : mword 20)))]> R2).
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.binit + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x14)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 2248 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x14)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 2232 : mword 12)
               R3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bii_14 with "Htext"). }
     iIntros (CID10 Hs10) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 2248 : mword 12)))]> R3).
+    set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 2232 : mword 12)))]> R3).
     assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = name_bcache).
     { rewrite /R4 upd_eq. rewrite /R3 upd_eq. unfold name_bcache, bcache_name_str.
       apply bv_eq; vm_compute; reflexivity. }
@@ -507,13 +507,13 @@ Section ProofBinit.
     set (R5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.binit + 0x18) : mword 64) (auipc_off (mword_of_int 21 : mword 20)))]> R4).
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.binit + 0x18) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 1808 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 1792 : mword 12)
               R5 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bii_1c with "Htext"). }
     iIntros (CID12 Hs12) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1808 : mword 12)))]> R5).
+    set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1792 : mword 12)))]> R5).
     assert (HR6a0 : R6 !!! Regidx (mword_of_int 10 : mword 5) = lk).
     { rewrite /R6 upd_eq. rewrite /R5 upd_eq. unfold lk, bcache_addr, KernelSyms.bcache.
       apply bv_eq; vm_compute; reflexivity. }
@@ -529,14 +529,14 @@ Section ProofBinit.
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.binit + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
     (* ===== jal initlock ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.binit + 0x20)) (mword_of_int 1 : mword 5) (mword_of_int 2089026 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.binit + 0x20)) (mword_of_int 1 : mword 5) (mword_of_int 2089010 : mword 21)
               R6 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (bii_20 with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc".
     set (R7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.binit + 0x20) : mword 64) 4)]> R6).
-    assert (Htgtil : add_vec (mword_of_int (KernelSyms.binit + 0x20) : mword 64) (sign_extend' 64 (mword_of_int 2089026 : mword 21)) = mword_of_int KernelSyms.initlock)
+    assert (Htgtil : add_vec (mword_of_int (KernelSyms.binit + 0x20) : mword 64) (sign_extend' 64 (mword_of_int 2089010 : mword 21)) = mword_of_int KernelSyms.initlock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtil) in "Hpc".
     assert (HR7a0 : R7 !!! Regidx (mword_of_int 10 : mword 5) = lk)
@@ -591,13 +591,13 @@ Section ProofBinit.
     set (T1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.binit + 0x24) : mword 64) (auipc_off (mword_of_int 29 : mword 20)))]> mil).
     assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.binit + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp28) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x28)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1796 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x28)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1780 : mword 12)
               T1 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bii_28 with "Htext"). }
     iIntros (CID16 Hs16) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (T2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (T1 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 1796 : mword 12)))]> T1).
+    set (T2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (T1 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 1780 : mword 12)))]> T1).
     assert (HT2a5 : T2 !!! Regidx (mword_of_int 15 : mword 5) = hbase).
     { rewrite /T2 upd_eq. rewrite /T1 upd_eq. unfold hbase, KernelSyms.bcache.
       apply bv_eq; vm_compute; reflexivity. }
@@ -611,13 +611,13 @@ Section ProofBinit.
     set (T3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.binit + 0x2c) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))]> T2).
     assert (Hpp30 : add_vec_int (mword_of_int (KernelSyms.binit + 0x2c) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp30) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2404 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2388 : mword 12)
               T3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bii_30 with "Htext"). }
     iIntros (CID18 Hs18) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (T4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (T3 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 2404 : mword 12)))]> T3).
+    set (T4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (T3 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 2388 : mword 12)))]> T3).
     assert (HT4a4 : T4 !!! Regidx (mword_of_int 14 : mword 5) = bhead).
     { rewrite /T4 upd_eq. rewrite /T3 upd_eq.
       unfold bhead, bnode, acur, buf_base, buf_stride, NBUF, KernelSyms.bcache.
@@ -657,13 +657,13 @@ Section ProofBinit.
     set (T5 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.binit + 0x3c) : mword 64) (auipc_off (mword_of_int 21 : mword 20)))]> T4).
     assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.binit + 0x3c) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp40) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x40)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 1796 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x40)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 1780 : mword 12)
               T5 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bii_40 with "Htext"). }
     iIntros (CID22 Hs22) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (T6 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (T5 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 1796 : mword 12)))]> T5).
+    set (T6 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (T5 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 1780 : mword 12)))]> T5).
     assert (HT6s1 : T6 !!! Regidx (mword_of_int 9 : mword 5) = bnode 0).
     { rewrite /T6 upd_eq. rewrite /T5 upd_eq.
       unfold bnode, acur, buf_base, buf_stride, KernelSyms.bcache.
@@ -711,13 +711,13 @@ Section ProofBinit.
     set (T9 := <[Regidx s4i := regval_into_reg (add_vec (mword_of_int (KernelSyms.binit + 0x48) : mword 64) (auipc_off (mword_of_int 5 : mword 20)))]> T8).
     assert (Hpp4c : add_vec_int (mword_of_int (KernelSyms.binit + 0x48) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4c) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x4c)) s4i s4i (mword_of_int 2200 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.binit + 0x4c)) s4i s4i (mword_of_int 2184 : mword 12)
               T9 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bii_4c with "Htext"). }
     iIntros (CID26 Hs26) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (TA := <[Regidx s4i := regval_into_reg (add_vec (T9 !!! Regidx s4i) (sign_extend' 64 (mword_of_int 2200 : mword 12)))]> T9).
+    set (TA := <[Regidx s4i := regval_into_reg (add_vec (T9 !!! Regidx s4i) (sign_extend' 64 (mword_of_int 2184 : mword 12)))]> T9).
     assert (HTAs4 : TA !!! Regidx s4i = name_buffer).
     { rewrite /TA upd_eq. rewrite /T9 upd_eq. unfold name_buffer, buffer_name_str.
       apply bv_eq; vm_compute; reflexivity. }

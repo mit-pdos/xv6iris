@@ -219,7 +219,7 @@ Section ProofKerneltrap.
       iEval (rewrite Hpc86) in "Hpc".
       (* ---- +0x86: jal myproc ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x86)) ra_idx
-                (mword_of_int 2093494 : mword 21) D1 (av - 6)%nat false
+                (mword_of_int 2093478 : mword 21) D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kti_86 with "Htext"). }
@@ -229,7 +229,7 @@ Section ProofKerneltrap.
       change (<[Regidx ra_idx := regval_into_reg
           (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) 4)]> D1) with D2.
       assert (Hpcmp : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2093494 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2093478 : mword 21))
                       = mword_of_int KernelSyms.myproc) by pcw.
       iEval (rewrite Hpcmp) in "Hpc".
       assert (HD2ra : D2 !!! Regidx ra_idx

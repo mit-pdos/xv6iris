@@ -129,7 +129,10 @@ Section KexecDName.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
   Notation Rs6 := (mword_of_int 22 : mword 5).
+  Notation Rs3 := (mword_of_int 19 : mword 5).
+  Notation Rs7 := (mword_of_int 23 : mword 5).
   Notation Rs10 := (mword_of_int 26 : mword 5).
+  Notation Rs11 := (mword_of_int 27 : mword 5).
   Notation Ra3 := (mword_of_int 13 : mword 5).
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
@@ -214,21 +217,22 @@ Section KexecDName.
   Definition kxd_scan_out `{CID0 : CpuId}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
-      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 : mword 64)
+      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
       (i : nat) : iProp Σ :=
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (M' : regfile) (q' : nat),
         ⌜(q' <= plen)%nat /\
           M' !!! Regidx csp_rs1 = vsp /\ M' !!! Regidx Rs0 = sp0 /\
-          M' !!! Regidx Rs1 = v1 /\ M' !!! Regidx Rs2 = v2 /\
-          M' !!! Regidx Rs4 = v4 /\ M' !!! Regidx Rs5 = v5 /\
-          M' !!! Regidx Rs6 = v6 /\ M' !!! Regidx Rs10 = v10⌝ -∗
+          M' !!! Regidx Rs1 = v1 /\ M' !!! Regidx Rs7 = v2 /\
+          M' !!! Regidx Rs2 = v4 /\ M' !!! Regidx Rs3 = v5 /\
+          M' !!! Regidx Rs6 = v6 /\ M' !!! Regidx Rs5 = v10 /\
+          M' !!! Regidx Rs11 = v11⌝ -∗
         ( ⌜(S i < plen)%nat /\
            M' !!! Regidx Ra3 = (mword_of_int 47 : mword 64) /\
            M' !!! Regidx Ra4 = (zero_extend' 64 (pfun (S i) : mword 8) : mword 64) /\
            M' !!! Regidx Ra5 = pa_add pv (S (S i))⌝
-          ∗ pc_is (mword_of_int (KXD + 0x2c8) : mword 64)
-        ∨ pc_is (mword_of_int (KXD + 0x2d2) : mword 64) ) -∗
+          ∗ pc_is (mword_of_int (KXD + 0x2c4) : mword 64)
+        ∨ pc_is (mword_of_int (KXD + 0x2ce) : mword 64) ) -∗
         sie_cap_gpr KT1 M' n b pj -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
@@ -242,30 +246,31 @@ Section KexecDName.
   Lemma kxd_scan_tail `{CID0 : CpuId}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
-      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 : mword 64)
+      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
       (M : regfile) (i q : nat) :
     bb_cstr pfun plen ->
     (i < plen)%nat -> (q <= plen)%nat ->
     M !!! Regidx csp_rs1 = vsp -> M !!! Regidx Rs0 = sp0 ->
-    M !!! Regidx Rs1 = v1 -> M !!! Regidx Rs2 = v2 -> M !!! Regidx Rs4 = v4 ->
-    M !!! Regidx Rs5 = v5 -> M !!! Regidx Rs6 = v6 -> M !!! Regidx Rs10 = v10 ->
+    M !!! Regidx Rs1 = v1 -> M !!! Regidx Rs7 = v2 -> M !!! Regidx Rs2 = v4 ->
+    M !!! Regidx Rs3 = v5 -> M !!! Regidx Rs6 = v6 -> M !!! Regidx Rs5 = v10 ->
+    M !!! Regidx Rs11 = v11 ->
     M !!! Regidx Ra3 = (mword_of_int 47 : mword 64) ->
     M !!! Regidx Ra5 = pa_add pv (S i) ->
     kernel_text -∗
-    pc_is (mword_of_int (KXD + 0x2c0) : mword 64) -∗
+    pc_is (mword_of_int (KXD + 0x2bc) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
-    kxd_scan_out pj b n plen pfun dqpv sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
+    kxd_scan_out pj b n plen pfun dqpv sp0 pv vsp v1 v2 v4 v5 v6 v10 v11 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros [Hnonul Hnul] Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Ha3 Ha5.
+    intros [Hnonul Hnul] Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha5.
     iIntros "#Htext Hpc Hcg Hpath Hlast Hout".
     (* ---- +0x2c0: c.addi a5,a5,1 ---- *)
-    iApply (wp_caddi_s_sconf (mword_of_int (KXD + 0x2c0)) Ra5
+    iApply (wp_caddi_s_sconf (mword_of_int (KXD + 0x2bc)) Ra5
               (mword_of_int 1 : mword 6) M n b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
-    { iApply (kxc_2c0 with "Htext"). }
+    { iApply (kxc_2bc with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc".
     pose (N1 := <[Regidx Ra5 := regval_into_reg
                    (add_vec (rget M Ra5)
@@ -280,21 +285,23 @@ Section KexecDName.
       by (rewrite /N1 upd_ne; [exact Hs0 | nz]).
     assert (HN1s1 : N1 !!! Regidx Rs1 = v1)
       by (rewrite /N1 upd_ne; [exact Hv1 | nz]).
-    assert (HN1s2 : N1 !!! Regidx Rs2 = v2)
+    assert (HN1s2 : N1 !!! Regidx Rs7 = v2)
       by (rewrite /N1 upd_ne; [exact Hv2 | nz]).
-    assert (HN1s4 : N1 !!! Regidx Rs4 = v4)
+    assert (HN1s4 : N1 !!! Regidx Rs2 = v4)
       by (rewrite /N1 upd_ne; [exact Hv4 | nz]).
-    assert (HN1s5 : N1 !!! Regidx Rs5 = v5)
+    assert (HN1s5 : N1 !!! Regidx Rs3 = v5)
       by (rewrite /N1 upd_ne; [exact Hv5 | nz]).
     assert (HN1s6 : N1 !!! Regidx Rs6 = v6)
       by (rewrite /N1 upd_ne; [exact Hv6 | nz]).
-    assert (HN1s10 : N1 !!! Regidx Rs10 = v10)
+    assert (HN1s10 : N1 !!! Regidx Rs5 = v10)
       by (rewrite /N1 upd_ne; [exact Hv10 | nz]).
+    assert (HN1s11 : N1 !!! Regidx Rs11 = v11)
+      by (rewrite /N1 upd_ne; [exact Hv11 | nz]).
     assert (HN1a3 : N1 !!! Regidx Ra3 = (mword_of_int 47 : mword 64))
       by (rewrite /N1 upd_ne; [exact Ha3 | nz]).
-    assert (Hpp2c2 : add_vec_int (mword_of_int (KXD + 0x2c0) : mword 64) 2
-                     = mword_of_int (KXD + 0x2c2)) by pcw.
-    iEval (rewrite Hpp2c2) in "Hpc".
+    assert (Hpp2be : add_vec_int (mword_of_int (KXD + 0x2bc) : mword 64) 2
+                     = mword_of_int (KXD + 0x2be)) by pcw.
+    iEval (rewrite Hpp2be) in "Hpc".
     (* ---- +0x2c2: lbu a4,-1(a5) -- the byte at index [S i] ---- *)
     assert (Hlk : seq 0 (S plen) !! (S i) = Some (S i))
       by (rewrite (lookup_seq_lt 0 (S plen) (S i) ltac:(lia)); f_equal; lia).
@@ -305,10 +312,10 @@ Section KexecDName.
                         = pa_add pv (S i))
       by (rewrite HN1a5; apply pa_add_pred).
     iEval (rewrite -Hloadaddr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2be)) Ra4 Ra5
               (mword_of_int 4095 : mword 12) N1 n (pfun (S i)) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hbyte").
-    { iApply (kxc_2c2 with "Htext"). }
+    { iApply (kxc_2be with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hbyte".
     iEval (rewrite Hloadaddr) in "Hbyte".
     iDestruct ("Hpathback" with "Hbyte") as "Hpath".
@@ -326,51 +333,53 @@ Section KexecDName.
       by (rewrite /N2 upd_ne; [exact HN1s0 | nz]).
     assert (HN2s1 : N2 !!! Regidx Rs1 = v1)
       by (rewrite /N2 upd_ne; [exact HN1s1 | nz]).
-    assert (HN2s2 : N2 !!! Regidx Rs2 = v2)
+    assert (HN2s2 : N2 !!! Regidx Rs7 = v2)
       by (rewrite /N2 upd_ne; [exact HN1s2 | nz]).
-    assert (HN2s4 : N2 !!! Regidx Rs4 = v4)
+    assert (HN2s4 : N2 !!! Regidx Rs2 = v4)
       by (rewrite /N2 upd_ne; [exact HN1s4 | nz]).
-    assert (HN2s5 : N2 !!! Regidx Rs5 = v5)
+    assert (HN2s5 : N2 !!! Regidx Rs3 = v5)
       by (rewrite /N2 upd_ne; [exact HN1s5 | nz]).
     assert (HN2s6 : N2 !!! Regidx Rs6 = v6)
       by (rewrite /N2 upd_ne; [exact HN1s6 | nz]).
-    assert (HN2s10 : N2 !!! Regidx Rs10 = v10)
+    assert (HN2s10 : N2 !!! Regidx Rs5 = v10)
       by (rewrite /N2 upd_ne; [exact HN1s10 | nz]).
-    assert (Hpp2c6 : add_vec_int (mword_of_int (KXD + 0x2c2) : mword 64) 4
-                     = mword_of_int (KXD + 0x2c6)) by pcw.
-    iEval (rewrite Hpp2c6) in "Hpc".
+    assert (HN2s11 : N2 !!! Regidx Rs11 = v11)
+      by (rewrite /N2 upd_ne; [exact HN1s11 | nz]).
+    assert (Hpp2c2 : add_vec_int (mword_of_int (KXD + 0x2be) : mword 64) 4
+                     = mword_of_int (KXD + 0x2c2)) by pcw.
+    iEval (rewrite Hpp2c2) in "Hpc".
     (* ---- +0x2c6: c.beqz a4,+0x2d2 -- the string's own end ---- *)
     assert (Hcreg : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx Ra4)
       by (vm_compute; reflexivity).
-    assert (Htgt2d2 : add_vec (mword_of_int (KXD + 0x2c6) : mword 64)
+    assert (Htgt2ce : add_vec (mword_of_int (KXD + 0x2c2) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
                            (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
-                      = mword_of_int (KXD + 0x2d2)) by pcw.
+                      = mword_of_int (KXD + 0x2ce)) by pcw.
     destruct (decide (pfun (S i) = (mword_of_int 0 : mword 8))) as [Hz | Hnz].
     - (* ==== NUL: the scan is over ==== *)
-      iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KXD + 0x2c6))
+      iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KXD + 0x2c2))
                 (mword_of_int 6 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                 N2 n b Hcreg ltac:(nz)
                 ltac:(rewrite (rget_ne N2 Ra4 ltac:(nz)) HN2a4 Hz;
                       vm_compute; reflexivity)
-                ltac:(rewrite Htgt2d2; vm_compute; reflexivity)
+                ltac:(rewrite Htgt2ce; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2c6 with "Htext"). }
+      { iApply (kxc_2c2 with "Htext"). }
       iIntros (CID3 Hs3). iApply bi.later_intro. iIntros "Hcg Hpc".
-      iEval (rewrite Htgt2d2) in "Hpc".
+      iEval (rewrite Htgt2ce) in "Hpc".
       iEval (rewrite /kxd_scan_out) in "Hout".
       iSpecialize ("Hout" $! CID3 with "[%]"); [wp_next_chain |].
       iApply ("Hout" $! N2 q with "[%] [Hpc] Hcg Hpath Hlast").
       { split_and!; [exact Hq | exact HN2sp | exact HN2s0 | exact HN2s1
                     | exact HN2s2 | exact HN2s4 | exact HN2s5 | exact HN2s6
-                    | exact HN2s10]. }
+                    | exact HN2s10 | exact HN2s11]. }
       { iRight. iExact "Hpc". }
     - (* ==== not a NUL: on to the '/' test at +0x2c8 ==== *)
       assert (HSiplen : (S i < plen)%nat).
       { destruct (Nat.lt_ge_cases (S i) plen) as [Hlt | Hge]; [exact Hlt |].
         exfalso. apply Hnz.
         assert (HSieq : S i = plen) by lia. rewrite HSieq. exact Hnul. }
-      iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KXD + 0x2c6))
+      iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KXD + 0x2c2))
                 (mword_of_int 6 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                 N2 n b Hcreg ltac:(nz)
                 ltac:(rewrite (rget_ne N2 Ra4 ltac:(nz)) HN2a4;
@@ -379,17 +388,17 @@ Section KexecDName.
                       apply (proj1 (kxd_zext8_zero (pfun (S i))));
                       rewrite Heq; apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2c6 with "Htext"). }
+      { iApply (kxc_2c2 with "Htext"). }
       iIntros (CID3 Hs3) "Hcg Hpc".
-      assert (Hpp2c8 : add_vec_int (mword_of_int (KXD + 0x2c6) : mword 64) 2
-                       = mword_of_int (KXD + 0x2c8)) by pcw.
-      iEval (rewrite Hpp2c8) in "Hpc".
+      assert (Hpp2c4 : add_vec_int (mword_of_int (KXD + 0x2c2) : mword 64) 2
+                       = mword_of_int (KXD + 0x2c4)) by pcw.
+      iEval (rewrite Hpp2c4) in "Hpc".
       iEval (rewrite /kxd_scan_out) in "Hout".
       iSpecialize ("Hout" $! CID3 with "[%]"); [wp_next_chain |].
       iApply ("Hout" $! N2 q with "[%] [Hpc] Hcg Hpath Hlast").
       { split_and!; [exact Hq | exact HN2sp | exact HN2s0 | exact HN2s1
                     | exact HN2s2 | exact HN2s4 | exact HN2s5 | exact HN2s6
-                    | exact HN2s10]. }
+                    | exact HN2s10 | exact HN2s11]. }
       { iLeft. iSplitR; [| iExact "Hpc"].
         iPureIntro. split_and!;
           [exact HSiplen | exact HN2a3 | exact HN2a4 | exact HN2a5]. }
@@ -403,54 +412,55 @@ Section KexecDName.
   Lemma kxd_name_step `{CID0 : CpuId}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
-      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 : mword 64)
+      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
       (M : regfile) (i q : nat) :
     bb_cstr pfun plen ->
     (i < plen)%nat -> (q <= plen)%nat ->
     M !!! Regidx csp_rs1 = vsp -> M !!! Regidx Rs0 = sp0 ->
-    M !!! Regidx Rs1 = v1 -> M !!! Regidx Rs2 = v2 -> M !!! Regidx Rs4 = v4 ->
-    M !!! Regidx Rs5 = v5 -> M !!! Regidx Rs6 = v6 -> M !!! Regidx Rs10 = v10 ->
+    M !!! Regidx Rs1 = v1 -> M !!! Regidx Rs7 = v2 -> M !!! Regidx Rs2 = v4 ->
+    M !!! Regidx Rs3 = v5 -> M !!! Regidx Rs6 = v6 -> M !!! Regidx Rs5 = v10 ->
+    M !!! Regidx Rs11 = v11 ->
     M !!! Regidx Ra3 = (mword_of_int 47 : mword 64) ->
     M !!! Regidx Ra4 = (zero_extend' 64 (pfun i : mword 8) : mword 64) ->
     M !!! Regidx Ra5 = pa_add pv (S i) ->
     kernel_text -∗
-    pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
+    pc_is (mword_of_int (KXD + 0x2c4) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
-    kxd_scan_out pj b n plen pfun dqpv sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
+    kxd_scan_out pj b n plen pfun dqpv sp0 pv vsp v1 v2 v4 v5 v6 v10 v11 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Ha3 Ha4 Ha5.
+    intros Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha4 Ha5.
     iIntros "#Htext Hpc Hcg Hpath Hlast Hout".
-    assert (Htgt2c0 : add_vec (mword_of_int (KXD + 0x2c8) : mword 64)
+    assert (Htgt2bc : add_vec (mword_of_int (KXD + 0x2c4) : mword 64)
                         (sign_extend' 64 (mword_of_int 8184 : mword 13))
-                      = mword_of_int (KXD + 0x2c0)) by pcw.
+                      = mword_of_int (KXD + 0x2bc)) by pcw.
     destruct (decide ((zero_extend' 64 (pfun i : mword 8) : mword 64) = mword_of_int 47))
       as [Hslash | Hnoslash].
     - (* ==== a '/': record [last = s + 1], then the fetch block ==== *)
-      iApply (wp_bne_fall_s_sconf (mword_of_int (KXD + 0x2c8))
+      iApply (wp_bne_fall_s_sconf (mword_of_int (KXD + 0x2c4))
                 (mword_of_int 8184 : mword 13) Ra3 Ra4 M n b
                 ltac:(nz) ltac:(nz)
                 ltac:(rewrite (rget_ne M Ra4 ltac:(nz)) (rget_ne M Ra3 ltac:(nz))
                               Ha4 Ha3 Hslash;
                       vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2c8 with "Htext"). }
+      { iApply (kxc_2c4 with "Htext"). }
       iIntros (CID1 Hs1) "Hcg Hpc".
-      assert (Hpp2cc : add_vec_int (mword_of_int (KXD + 0x2c8) : mword 64) 4
-                       = mword_of_int (KXD + 0x2cc)) by pcw.
-      iEval (rewrite Hpp2cc) in "Hpc".
+      assert (Hpp2c8 : add_vec_int (mword_of_int (KXD + 0x2c4) : mword 64) 4
+                       = mword_of_int (KXD + 0x2c8)) by pcw.
+      iEval (rewrite Hpp2c8) in "Hpc".
       (* ---- +0x2cc: sd a5,-528(s0) ---- *)
       assert (Hslotaddr : add_vec (M !!! Regidx Rs0)
                             (sign_extend' 64 (mword_of_int 3568 : mword 12))
                           = pa_stk sp0 66)
         by (rewrite Hs0; apply kxd_last_slot).
       iEval (rewrite -Hslotaddr) in "Hlast".
-      iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2cc)) Ra5 Rs0
+      iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2c8)) Ra5 Rs0
                 (mword_of_int 3568 : mword 12) M n (pa_add pv q) b
                 with "Hcg Hpc [] Hlast").
-      { iApply (kxc_2cc with "Htext"). }
+      { iApply (kxc_2c8 with "Htext"). }
       iIntros (CID2 Hs2) "Hcg Hpc Hlast".
       iEval (rewrite Hslotaddr) in "Hlast".
       (* the store's [storeval] is [rget m rs2] at the ENTRY hart -- the one
@@ -458,43 +468,43 @@ Section KexecDName.
          just above), not the continuation's [CID2].  kexec.md's fourth
          hart-mismatch class. *)
       iEval (rewrite (rget_ne (CID := CID1) M Ra5 ltac:(nz)) Ha5) in "Hlast".
-      assert (Hpp2d0 : add_vec_int (mword_of_int (KXD + 0x2cc) : mword 64) 4
-                       = mword_of_int (KXD + 0x2d0)) by pcw.
-      iEval (rewrite Hpp2d0) in "Hpc".
+      assert (Hpp2cc : add_vec_int (mword_of_int (KXD + 0x2c8) : mword 64) 4
+                       = mword_of_int (KXD + 0x2cc)) by pcw.
+      iEval (rewrite Hpp2cc) in "Hpc".
       (* ---- +0x2d0: c.j +0x2c0 ---- *)
-      assert (Htgt2d0 : add_vec (mword_of_int (KXD + 0x2d0) : mword 64)
+      assert (Htgt2cc : add_vec (mword_of_int (KXD + 0x2cc) : mword 64)
                           (sign_extend' 64 (sign_extend' 21
                              (concat_vec (mword_of_int 2040 : mword 11) ('b"0"))))
-                        = mword_of_int (KXD + 0x2c0)) by pcw.
-      iApply (wp_cj_s_sconf (mword_of_int (KXD + 0x2d0))
+                        = mword_of_int (KXD + 0x2bc)) by pcw.
+      iApply (wp_cj_s_sconf (mword_of_int (KXD + 0x2cc))
                 (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")))
-                M n b ltac:(rewrite Htgt2d0; vm_compute; reflexivity)
+                M n b ltac:(rewrite Htgt2cc; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2d0 with "Htext"). }
+      { iApply (kxc_2cc with "Htext"). }
       iIntros (CID3 Hs3). iApply bi.later_intro. iIntros "Hcg Hpc".
-      iEval (rewrite Htgt2d0) in "Hpc".
+      iEval (rewrite Htgt2cc) in "Hpc".
       iApply (kxd_scan_tail (CID0 := CID3) pj b n plen pfun dqpv sp0 pv
-                vsp v1 v2 v4 v5 v6 v10 M i (S i)
-                Hcstr Hiplen ltac:(lia) Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Ha3 Ha5
+                vsp v1 v2 v4 v5 v6 v10 v11 M i (S i)
+                Hcstr Hiplen ltac:(lia) Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha5
                 with "Htext Hpc Hcg Hpath Hlast [Hout]").
       rewrite /kxd_scan_out.
       assert (Hcr3 : b = false \/ pj = zero_reg -> (CID3 : CPU) = (CID0 : CPU))
         by wp_next_chain.
       iApply (wp_next_retarget CID0 CID3 b pj _ Hcr3 with "Hout").
     - (* ==== not a '/': straight to the fetch block, [last] unmoved ==== *)
-      iApply (wp_bne_taken_s_sconf (mword_of_int (KXD + 0x2c8))
+      iApply (wp_bne_taken_s_sconf (mword_of_int (KXD + 0x2c4))
                 (mword_of_int 8184 : mword 13) Ra3 Ra4 M n b
                 ltac:(nz) ltac:(nz)
                 ltac:(rewrite (rget_ne M Ra4 ltac:(nz)) (rget_ne M Ra3 ltac:(nz))
                               Ha4 Ha3; apply kxd_neq_vec64; exact Hnoslash)
-                ltac:(rewrite Htgt2c0; vm_compute; reflexivity)
+                ltac:(rewrite Htgt2bc; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2c8 with "Htext"). }
+      { iApply (kxc_2c4 with "Htext"). }
       iIntros (CID1 Hs1). iApply bi.later_intro. iIntros "Hcg Hpc".
-      iEval (rewrite Htgt2c0) in "Hpc".
+      iEval (rewrite Htgt2bc) in "Hpc".
       iApply (kxd_scan_tail (CID0 := CID1) pj b n plen pfun dqpv sp0 pv
-                vsp v1 v2 v4 v5 v6 v10 M i q
-                Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Ha3 Ha5
+                vsp v1 v2 v4 v5 v6 v10 v11 M i q
+                Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha5
                 with "Htext Hpc Hcg Hpath Hlast [Hout]").
       rewrite /kxd_scan_out.
       assert (Hcr1 : b = false \/ pj = zero_reg -> (CID1 : CPU) = (CID0 : CPU))
@@ -510,19 +520,20 @@ Section KexecDName.
   Lemma kxd_name_loop `{CID0 : CpuId}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
-      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 : mword 64) :
+      (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64) :
     bb_cstr pfun plen ->
     forall (W : nat) (M : regfile) (i q : nat),
     (plen - i <= W)%nat ->
     (i < plen)%nat -> (q <= plen)%nat ->
     M !!! Regidx csp_rs1 = vsp -> M !!! Regidx Rs0 = sp0 ->
-    M !!! Regidx Rs1 = v1 -> M !!! Regidx Rs2 = v2 -> M !!! Regidx Rs4 = v4 ->
-    M !!! Regidx Rs5 = v5 -> M !!! Regidx Rs6 = v6 -> M !!! Regidx Rs10 = v10 ->
+    M !!! Regidx Rs1 = v1 -> M !!! Regidx Rs7 = v2 -> M !!! Regidx Rs2 = v4 ->
+    M !!! Regidx Rs3 = v5 -> M !!! Regidx Rs6 = v6 -> M !!! Regidx Rs5 = v10 ->
+    M !!! Regidx Rs11 = v11 ->
     M !!! Regidx Ra3 = (mword_of_int 47 : mword 64) ->
     M !!! Regidx Ra4 = (zero_extend' 64 (pfun i : mword 8) : mword 64) ->
     M !!! Regidx Ra5 = pa_add pv (S i) ->
     kernel_text -∗
-    pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
+    pc_is (mword_of_int (KXD + 0x2c4) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
@@ -530,10 +541,11 @@ Section KexecDName.
       ∀ (M' : regfile) (q' : nat),
         ⌜(q' <= plen)%nat /\
           M' !!! Regidx csp_rs1 = vsp /\ M' !!! Regidx Rs0 = sp0 /\
-          M' !!! Regidx Rs1 = v1 /\ M' !!! Regidx Rs2 = v2 /\
-          M' !!! Regidx Rs4 = v4 /\ M' !!! Regidx Rs5 = v5 /\
-          M' !!! Regidx Rs6 = v6 /\ M' !!! Regidx Rs10 = v10⌝ -∗
-        pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
+          M' !!! Regidx Rs1 = v1 /\ M' !!! Regidx Rs7 = v2 /\
+          M' !!! Regidx Rs2 = v4 /\ M' !!! Regidx Rs3 = v5 /\
+          M' !!! Regidx Rs6 = v6 /\ M' !!! Regidx Rs5 = v10 /\
+          M' !!! Regidx Rs11 = v11⌝ -∗
+        pc_is (mword_of_int (KXD + 0x2ce) : mword 64) -∗
         sie_cap_gpr KT1 M' n b pj -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
@@ -542,23 +554,23 @@ Section KexecDName.
   Proof.
     intros Hcstr W. revert CID0.
     induction W as [| W IH]; intros CID0 M i q Hfuel Hiplen Hq
-      Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Ha3 Ha4 Ha5.
+      Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha4 Ha5.
     { exfalso. lia. }
     iIntros "#Htext Hpc Hcg Hpath Hlast Hout".
     iApply (kxd_name_step (CID0 := CID0) pj b n plen pfun dqpv sp0 pv
-              vsp v1 v2 v4 v5 v6 v10 M i q
-              Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Ha3 Ha4 Ha5
+              vsp v1 v2 v4 v5 v6 v10 v11 M i q
+              Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha4 Ha5
               with "Htext Hpc Hcg Hpath Hlast [Hout]").
     rewrite /kxd_scan_out.
     iIntros (CIDn Hsn M' q') "%Hpres [[%Hnext Hpc] | Hpc] Hcg Hpath Hlast".
     - (* the back edge, at [S i] *)
       destruct Hnext as (HSi & Ha3' & Ha4' & Ha5').
-      destruct Hpres as (Hq' & Hsp' & Hs0' & Hv1' & Hv2' & Hv4' & Hv5' & Hv6' & Hv10').
+      destruct Hpres as (Hq' & Hsp' & Hs0' & Hv1' & Hv2' & Hv4' & Hv5' & Hv6' & Hv10' & Hv11').
       assert (Hcr : b = false \/ pj = zero_reg -> (CIDn : CPU) = (CID0 : CPU))
         by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDn b pj _ Hcr with "Hout") as "Hout".
       iApply (IH CIDn M' (S i) q' ltac:(lia) HSi Hq'
-                Hsp' Hs0' Hv1' Hv2' Hv4' Hv5' Hv6' Hv10' Ha3' Ha4' Ha5'
+                Hsp' Hs0' Hv1' Hv2' Hv4' Hv5' Hv6' Hv10' Hv11' Ha3' Ha4' Ha5'
                 with "Htext Hpc Hcg Hpath Hlast Hout").
     - (* the scan is over *)
       iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
@@ -894,18 +906,20 @@ Section KexecDCommit.
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
-    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
+    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 68 ->
     M !!! Regidx Rs0 = sp0 ->
     M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) ->
-    M !!! Regidx Rs2
+    M !!! Regidx Rs7
       = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64) ->
-    M !!! Regidx Rs4 = sz1 ->
-    M !!! Regidx Rs5 = proc_addr jp ->
+    M !!! Regidx Rs2 = sz1 ->
+    M !!! Regidx Rs3 = proc_addr jp ->
     M !!! Regidx Rs6 = page_base P.(ud_root) ->
-    M !!! Regidx Rs10 = pv_sz V ->
+    (* the epilogue no longer reloads s11 (XV6_REV 7d258aa) *)
+    M !!! Regidx Rs11 = m !!! Regidx Rs11 ->
+    M !!! Regidx Rs5 = pv_sz V ->
     kernel_text -∗
-    pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
+    pc_is (mword_of_int (KXD + 0x2ce) : mword 64) -∗
     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) eb ∅ -∗
     trap_csrs_ext KT1 eb -∗
@@ -943,8 +957,8 @@ Section KexecDCommit.
   Proof.
     intros HQe HK Hcstr Hq Hnamax Hsz1ge Hceq Hstk HPtfp Hbelow Hcov Hal
            Hmsp Hmra Hms0 Hms1 Hms2
-           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
-           HMsp HMs0 HMs1 HMs2 HMs4 HMs5 HMs6 HMs10.
+           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
+           HMsp HMs0 HMs1 HMs2 HMs4 HMs5 HMs6 HMs11 HMs10.
     (* the loop's final counter IS the argument count; say so once, so the
        exit's [alen na] and the state's [alen c] are the same term.  [subst
        na], not [subst c]: the block's own text is written in [c]. *)
@@ -960,11 +974,11 @@ Section KexecDCommit.
                             Hf64 & Hf65e & Hf66 & Hf67 & Hf68e)".
     iDestruct "Hf65e" as (w65) "Hf65". iDestruct "Hf68e" as (w68) "Hf68".
     (* ---- +0x2d2: c.li a2,16 (PNAMELEN) ---- *)
-    iApply (wp_cli_s_sconf (mword_of_int (KXD + 0x2d2)) Ra2
+    iApply (wp_cli_s_sconf (mword_of_int (KXD + 0x2ce)) Ra2
               (mword_of_int 16 : mword 6) (mword_of_int 16 : mword 64)
               M (K - 68)%nat eb ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc []").
-    { iApply (kxc_2d2 with "Htext"). }
+    { iApply (kxc_2ce with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc".
     pose (E1 := <[Regidx Ra2 := regval_into_reg (mword_of_int 16 : mword 64)]> M).
     assert (HE1a2 : E1 !!! Regidx Ra2 = (mword_of_int 16 : mword 64))
@@ -975,30 +989,32 @@ Section KexecDCommit.
       by (rewrite /E1 upd_ne; [exact HMs0 | nz]).
     assert (HE1s1 : E1 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /E1 upd_ne; [exact HMs1 | nz]).
-    assert (HE1s2 : E1 !!! Regidx Rs2
+    assert (HE1s2 : E1 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /E1 upd_ne; [exact HMs2 | nz]).
-    assert (HE1s4 : E1 !!! Regidx Rs4 = sz1)
+    assert (HE1s4 : E1 !!! Regidx Rs2 = sz1)
       by (rewrite /E1 upd_ne; [exact HMs4 | nz]).
-    assert (HE1s5 : E1 !!! Regidx Rs5 = proc_addr jp)
+    assert (HE1s5 : E1 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /E1 upd_ne; [exact HMs5 | nz]).
     assert (HE1s6 : E1 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /E1 upd_ne; [exact HMs6 | nz]).
-    assert (HE1s10 : E1 !!! Regidx Rs10 = pv_sz V)
+    assert (HE1s11 : E1 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /E1 upd_ne; [exact HMs11 | nz]).
+    assert (HE1s10 : E1 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /E1 upd_ne; [exact HMs10 | nz]).
-    assert (Hpp2d4 : add_vec_int (mword_of_int (KXD + 0x2d2) : mword 64) 2
-                     = mword_of_int (KXD + 0x2d4)) by pcw.
-    iEval (rewrite Hpp2d4) in "Hpc".
+    assert (Hpp2d0 : add_vec_int (mword_of_int (KXD + 0x2ce) : mword 64) 2
+                     = mword_of_int (KXD + 0x2d0)) by pcw.
+    iEval (rewrite Hpp2d0) in "Hpc".
     (* ---- +0x2d4: ld a1,-528(s0) -- a1 = last ---- *)
     assert (Hslot66 : add_vec (E1 !!! Regidx Rs0)
                         (sign_extend' 64 (mword_of_int 3568 : mword 12))
                       = pa_stk sp0 66)
       by (rewrite HE1s0; apply kxd_last_slot).
     iEval (rewrite -Hslot66) in "Hf66".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2d4)) Ra1 Rs0
+    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2d0)) Ra1 Rs0
               (mword_of_int 3568 : mword 12) E1 (K - 68)%nat (pa_add pv q) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf66").
-    { iApply (kxc_2d4 with "Htext"). }
+    { iApply (kxc_2d0 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hf66". iEval (rewrite Hslot66) in "Hf66".
     pose (E2 := <[Regidx Ra1 := regval_into_reg (pa_add pv q)]> E1).
     assert (HE2a1 : E2 !!! Regidx Ra1 = pa_add pv q)
@@ -1011,31 +1027,33 @@ Section KexecDCommit.
       by (rewrite /E2 upd_ne; [exact HE1s0 | nz]).
     assert (HE2s1 : E2 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /E2 upd_ne; [exact HE1s1 | nz]).
-    assert (HE2s2 : E2 !!! Regidx Rs2
+    assert (HE2s2 : E2 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /E2 upd_ne; [exact HE1s2 | nz]).
-    assert (HE2s4 : E2 !!! Regidx Rs4 = sz1)
+    assert (HE2s4 : E2 !!! Regidx Rs2 = sz1)
       by (rewrite /E2 upd_ne; [exact HE1s4 | nz]).
-    assert (HE2s5 : E2 !!! Regidx Rs5 = proc_addr jp)
+    assert (HE2s5 : E2 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /E2 upd_ne; [exact HE1s5 | nz]).
     assert (HE2s6 : E2 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /E2 upd_ne; [exact HE1s6 | nz]).
-    assert (HE2s10 : E2 !!! Regidx Rs10 = pv_sz V)
+    assert (HE2s11 : E2 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /E2 upd_ne; [exact HE1s11 | nz]).
+    assert (HE2s10 : E2 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /E2 upd_ne; [exact HE1s10 | nz]).
-    assert (Hpp2d8 : add_vec_int (mword_of_int (KXD + 0x2d4) : mword 64) 4
-                     = mword_of_int (KXD + 0x2d8)) by pcw.
-    iEval (rewrite Hpp2d8) in "Hpc".
+    assert (Hpp2d4 : add_vec_int (mword_of_int (KXD + 0x2d0) : mword 64) 4
+                     = mword_of_int (KXD + 0x2d4)) by pcw.
+    iEval (rewrite Hpp2d4) in "Hpc".
     (* ---- +0x2d8: addi a0,s5,344 -- a0 = &p->name ---- *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KXD + 0x2d8)) Ra0 Rs5
+    iApply (wp_addi4_s_sconf (mword_of_int (KXD + 0x2d4)) Ra0 Rs3
               (mword_of_int 344 : mword 12) E2 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
-    { iApply (kxc_2d8 with "Htext"). }
+    { iApply (kxc_2d4 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc".
     pose (E3 := <[Regidx Ra0 := regval_into_reg
-                   (add_vec (rget E2 Rs5)
+                   (add_vec (rget E2 Rs3)
                       (sign_extend' 64 (mword_of_int 344 : mword 12)))]> E2).
     assert (HE3a0 : E3 !!! Regidx Ra0 = kfk_name_base (proc_addr jp)).
-    { rewrite /E3 upd_eq (rget_ne E2 Rs5 ltac:(nz)) HE2s5 /kfk_name_base.
+    { rewrite /E3 upd_eq (rget_ne E2 Rs3 ltac:(nz)) HE2s5 /kfk_name_base.
       f_equal. }
     assert (HE3a1 : E3 !!! Regidx Ra1 = pa_add pv q)
       by (rewrite /E3 upd_ne; [exact HE2a1 | nz]).
@@ -1047,35 +1065,37 @@ Section KexecDCommit.
       by (rewrite /E3 upd_ne; [exact HE2s0 | nz]).
     assert (HE3s1 : E3 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /E3 upd_ne; [exact HE2s1 | nz]).
-    assert (HE3s2 : E3 !!! Regidx Rs2
+    assert (HE3s2 : E3 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /E3 upd_ne; [exact HE2s2 | nz]).
-    assert (HE3s4 : E3 !!! Regidx Rs4 = sz1)
+    assert (HE3s4 : E3 !!! Regidx Rs2 = sz1)
       by (rewrite /E3 upd_ne; [exact HE2s4 | nz]).
-    assert (HE3s5 : E3 !!! Regidx Rs5 = proc_addr jp)
+    assert (HE3s5 : E3 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /E3 upd_ne; [exact HE2s5 | nz]).
     assert (HE3s6 : E3 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /E3 upd_ne; [exact HE2s6 | nz]).
-    assert (HE3s10 : E3 !!! Regidx Rs10 = pv_sz V)
+    assert (HE3s11 : E3 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /E3 upd_ne; [exact HE2s11 | nz]).
+    assert (HE3s10 : E3 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /E3 upd_ne; [exact HE2s10 | nz]).
-    assert (Hpp2dc : add_vec_int (mword_of_int (KXD + 0x2d8) : mword 64) 4
-                     = mword_of_int (KXD + 0x2dc)) by pcw.
-    iEval (rewrite Hpp2dc) in "Hpc".
+    assert (Hpp2d8 : add_vec_int (mword_of_int (KXD + 0x2d4) : mword 64) 4
+                     = mword_of_int (KXD + 0x2d8)) by pcw.
+    iEval (rewrite Hpp2d8) in "Hpc".
     (* ---- +0x2dc: jal ra,safestrcpy ---- *)
-    assert (Htss : add_vec (mword_of_int (KXD + 0x2dc) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2081598 : mword 21))
+    assert (Htss : add_vec (mword_of_int (KXD + 0x2d8) : mword 64)
+                     (sign_extend' 64 (mword_of_int 2081586 : mword 21))
                    = mword_of_int KernelSyms.safestrcpy) by pcw.
-    iApply (wp_jal_s_sconf (mword_of_int (KXD + 0x2dc)) Rra
-              (mword_of_int 2081598 : mword 21) E3 (K - 68)%nat eb
+    iApply (wp_jal_s_sconf (mword_of_int (KXD + 0x2d8)) Rra
+              (mword_of_int 2081586 : mword 21) E3 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htss; vm_compute; reflexivity)
               with "Hcg Hpc []").
-    { iApply (kxc_2dc with "Htext"). }
+    { iApply (kxc_2d8 with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc". iEval (rewrite Htss) in "Hpc".
     pose (E4 := <[Regidx Rra := regval_into_reg
-                   (add_vec_int (mword_of_int (KXD + 0x2dc) : mword 64) 4)]> E3).
+                   (add_vec_int (mword_of_int (KXD + 0x2d8) : mword 64) 4)]> E3).
     assert (HE4ra : E4 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (KXD + 0x2dc) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KXD + 0x2d8) : mword 64) 4)
       by (rewrite /E4; apply upd_eq).
     assert (HE4a0 : E4 !!! Regidx Ra0 = kfk_name_base (proc_addr jp))
       by (rewrite /E4 upd_ne; [exact HE3a0 | nz]).
@@ -1089,16 +1109,18 @@ Section KexecDCommit.
       by (rewrite /E4 upd_ne; [exact HE3s0 | nz]).
     assert (HE4s1 : E4 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /E4 upd_ne; [exact HE3s1 | nz]).
-    assert (HE4s2 : E4 !!! Regidx Rs2
+    assert (HE4s2 : E4 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /E4 upd_ne; [exact HE3s2 | nz]).
-    assert (HE4s4 : E4 !!! Regidx Rs4 = sz1)
+    assert (HE4s4 : E4 !!! Regidx Rs2 = sz1)
       by (rewrite /E4 upd_ne; [exact HE3s4 | nz]).
-    assert (HE4s5 : E4 !!! Regidx Rs5 = proc_addr jp)
+    assert (HE4s5 : E4 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /E4 upd_ne; [exact HE3s5 | nz]).
     assert (HE4s6 : E4 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /E4 upd_ne; [exact HE3s6 | nz]).
-    assert (HE4s10 : E4 !!! Regidx Rs10 = pv_sz V)
+    assert (HE4s11 : E4 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /E4 upd_ne; [exact HE3s11 | nz]).
+    assert (HE4s10 : E4 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /E4 upd_ne; [exact HE3s10 | nz]).
     (* ---- the two buffers safestrcpy wants: [p->name]'s sixteen cells out
        of the process block, and the path RE-BASED at [last]. ---- *)
@@ -1136,9 +1158,9 @@ Section KexecDCommit.
               Hsrcok
               with "Hcg Htext Hpc Hsrc Hnmseq").
     iIntros (CID5 Hs5 mr h) "Hcg Hpc Hsrc Hnmseq %Hcsn %Hnra0 %Hnpost".
-    assert (Hpc2e0 : ret_pc (E4 !!! Regidx Rra) = mword_of_int (KXD + 0x2e0))
+    assert (Hpc2dc : ret_pc (E4 !!! Regidx Rra) = mword_of_int (KXD + 0x2dc))
       by (rewrite HE4ra; pcw).
-    iEval (rewrite Hpc2e0) in "Hpc".
+    iEval (rewrite Hpc2dc) in "Hpc".
     (* ---- put both buffers back ---- *)
     iEval (rewrite HE4a1) in "Hsrc".
     iAssert ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k)%I
@@ -1168,21 +1190,24 @@ Section KexecDCommit.
     assert (HF0s1 : mr !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64)).
     { rewrite (callee_saved_lookup Hcsn Rs1 ltac:(vm_compute; reflexivity)).
       exact HE4s1. }
-    assert (HF0s2 : mr !!! Regidx Rs2
+    assert (HF0s2 : mr !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)).
-    { rewrite (callee_saved_lookup Hcsn Rs2 ltac:(vm_compute; reflexivity)).
+    { rewrite (callee_saved_lookup Hcsn Rs7 ltac:(vm_compute; reflexivity)).
       exact HE4s2. }
-    assert (HF0s4 : mr !!! Regidx Rs4 = sz1).
-    { rewrite (callee_saved_lookup Hcsn Rs4 ltac:(vm_compute; reflexivity)).
+    assert (HF0s4 : mr !!! Regidx Rs2 = sz1).
+    { rewrite (callee_saved_lookup Hcsn Rs2 ltac:(vm_compute; reflexivity)).
       exact HE4s4. }
-    assert (HF0s5 : mr !!! Regidx Rs5 = proc_addr jp).
-    { rewrite (callee_saved_lookup Hcsn Rs5 ltac:(vm_compute; reflexivity)).
+    assert (HF0s5 : mr !!! Regidx Rs3 = proc_addr jp).
+    { rewrite (callee_saved_lookup Hcsn Rs3 ltac:(vm_compute; reflexivity)).
       exact HE4s5. }
     assert (HF0s6 : mr !!! Regidx Rs6 = page_base P.(ud_root)).
     { rewrite (callee_saved_lookup Hcsn Rs6 ltac:(vm_compute; reflexivity)).
       exact HE4s6. }
-    assert (HF0s10 : mr !!! Regidx Rs10 = pv_sz V).
-    { rewrite (callee_saved_lookup Hcsn Rs10 ltac:(vm_compute; reflexivity)).
+    assert (HF0s11 : mr !!! Regidx Rs11 = m !!! Regidx Rs11).
+    { rewrite (callee_saved_lookup Hcsn Rs11 ltac:(vm_compute; reflexivity)).
+      exact HE4s11. }
+    assert (HF0s10 : mr !!! Regidx Rs5 = pv_sz V).
+    { rewrite (callee_saved_lookup Hcsn Rs5 ltac:(vm_compute; reflexivity)).
       exact HE4s10. }
     (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently) and
        [page_valid] (the trapframe page's own well-formedness) -- what the
@@ -1202,16 +1227,16 @@ Section KexecDCommit.
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
     iDestruct (kxd_tf_len with "Htfp") as "[%Htflen Htfp]".
     (* ---- +0x2e0: ld a0,80(s5) -- the OLD table, for proc_freepagetable ---- *)
-    assert (Hppaddr : add_vec (mr !!! Regidx Rs5)
+    assert (Hppaddr : add_vec (mr !!! Regidx Rs3)
                         (sign_extend' 64 (mword_of_int 80 : mword 12))
                       = p_pagetable (proc_addr jp))
       by (rewrite HF0s5; reflexivity).
     iEval (rewrite -Hppaddr) in "Hppt".
-    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e0)) Ra0 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2dc)) Ra0 Rs3
               (mword_of_int 80 : mword 12) mr (K - 68)%nat
               (page_base (ud_root (pv_upt V))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hppt").
-    { iApply (kxc_2e0 with "Htext"). }
+    { iApply (kxc_2dc with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc Hppt". iEval (rewrite Hppaddr) in "Hppt".
     pose (F1 := <[Regidx Ra0 := regval_into_reg
                    (page_base (ud_root (pv_upt V)))]> mr).
@@ -1223,62 +1248,64 @@ Section KexecDCommit.
       by (rewrite /F1 upd_ne; [exact HF0s0 | nz]).
     assert (HF1s1 : F1 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F1 upd_ne; [exact HF0s1 | nz]).
-    assert (HF1s2 : F1 !!! Regidx Rs2
+    assert (HF1s2 : F1 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /F1 upd_ne; [exact HF0s2 | nz]).
-    assert (HF1s4 : F1 !!! Regidx Rs4 = sz1)
+    assert (HF1s4 : F1 !!! Regidx Rs2 = sz1)
       by (rewrite /F1 upd_ne; [exact HF0s4 | nz]).
-    assert (HF1s5 : F1 !!! Regidx Rs5 = proc_addr jp)
+    assert (HF1s5 : F1 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /F1 upd_ne; [exact HF0s5 | nz]).
     assert (HF1s6 : F1 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /F1 upd_ne; [exact HF0s6 | nz]).
-    assert (HF1s10 : F1 !!! Regidx Rs10 = pv_sz V)
+    assert (HF1s11 : F1 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /F1 upd_ne; [exact HF0s11 | nz]).
+    assert (HF1s10 : F1 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /F1 upd_ne; [exact HF0s10 | nz]).
-    assert (Hpp2e4 : add_vec_int (mword_of_int (KXD + 0x2e0) : mword 64) 4
-                     = mword_of_int (KXD + 0x2e4)) by pcw.
-    iEval (rewrite Hpp2e4) in "Hpc".
+    assert (Hpp2e0 : add_vec_int (mword_of_int (KXD + 0x2dc) : mword 64) 4
+                     = mword_of_int (KXD + 0x2e0)) by pcw.
+    iEval (rewrite Hpp2e0) in "Hpc".
     (* ---- +0x2e4: sd s6,80(s5) -- p->pagetable = the NEW table ---- *)
-    assert (Hppaddr1 : add_vec (F1 !!! Regidx Rs5)
+    assert (Hppaddr1 : add_vec (F1 !!! Regidx Rs3)
                          (sign_extend' 64 (mword_of_int 80 : mword 12))
                        = p_pagetable (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hppaddr1) in "Hppt".
-    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e4)) Rs6 Rs5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e0)) Rs6 Rs3
               (mword_of_int 80 : mword 12) F1 (K - 68)%nat
               (page_base (ud_root (pv_upt V))) eb
               with "Hcg Hpc [] Hppt").
-    { iApply (kxc_2e4 with "Htext"). }
+    { iApply (kxc_2e0 with "Htext"). }
     iIntros (CID7 Hs7) "Hcg Hpc Hppt". iEval (rewrite Hppaddr1) in "Hppt".
     iEval (rewrite (rget_ne (CID := CID6) F1 Rs6 ltac:(nz)) HF1s6) in "Hppt".
-    assert (Hpp2e8 : add_vec_int (mword_of_int (KXD + 0x2e4) : mword 64) 4
-                     = mword_of_int (KXD + 0x2e8)) by pcw.
-    iEval (rewrite Hpp2e8) in "Hpc".
+    assert (Hpp2e4 : add_vec_int (mword_of_int (KXD + 0x2e0) : mword 64) 4
+                     = mword_of_int (KXD + 0x2e4)) by pcw.
+    iEval (rewrite Hpp2e4) in "Hpc".
     (* ---- +0x2e8: sd s4,72(s5) -- p->sz = sz1 ---- *)
-    assert (Hszaddr : add_vec (F1 !!! Regidx Rs5)
+    assert (Hszaddr : add_vec (F1 !!! Regidx Rs3)
                         (sign_extend' 64 (mword_of_int 72 : mword 12))
                       = p_sz (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hszaddr) in "Hpsz".
-    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e8)) Rs4 Rs5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e4)) Rs2 Rs3
               (mword_of_int 72 : mword 12) F1 (K - 68)%nat (pv_sz V) eb
               with "Hcg Hpc [] Hpsz").
-    { iApply (kxc_2e8 with "Htext"). }
+    { iApply (kxc_2e4 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc Hpsz". iEval (rewrite Hszaddr) in "Hpsz".
-    iEval (rewrite (rget_ne (CID := CID7) F1 Rs4 ltac:(nz)) HF1s4) in "Hpsz".
-    assert (Hpp2ec : add_vec_int (mword_of_int (KXD + 0x2e8) : mword 64) 4
-                     = mword_of_int (KXD + 0x2ec)) by pcw.
-    iEval (rewrite Hpp2ec) in "Hpc".
+    iEval (rewrite (rget_ne (CID := CID7) F1 Rs2 ltac:(nz)) HF1s4) in "Hpsz".
+    assert (Hpp2e8 : add_vec_int (mword_of_int (KXD + 0x2e4) : mword 64) 4
+                     = mword_of_int (KXD + 0x2e8)) by pcw.
+    iEval (rewrite Hpp2e8) in "Hpc".
     (* ---- +0x2ec: ld a5,88(s5) -- the trapframe page ---- *)
-    assert (Htfaddr : add_vec (F1 !!! Regidx Rs5)
+    assert (Htfaddr : add_vec (F1 !!! Regidx Rs3)
                         (sign_extend' 64 (mword_of_int 88 : mword 12))
                       = p_trapframe (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Htfaddr) in "Hptf".
-    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2ec)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e8)) Ra5 Rs3
               (mword_of_int 88 : mword 12) F1 (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hptf").
-    { iApply (kxc_2ec with "Htext"). }
+    { iApply (kxc_2e8 with "Htext"). }
     iIntros (CID9 Hs9) "Hcg Hpc Hptf". iEval (rewrite Htfaddr) in "Hptf".
     pose (F2 := <[Regidx Ra5 := regval_into_reg
                    (page_base (ud_tfp (pv_upt V)))]> F1).
@@ -1292,20 +1319,22 @@ Section KexecDCommit.
       by (rewrite /F2 upd_ne; [exact HF1s0 | nz]).
     assert (HF2s1 : F2 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F2 upd_ne; [exact HF1s1 | nz]).
-    assert (HF2s2 : F2 !!! Regidx Rs2
+    assert (HF2s2 : F2 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /F2 upd_ne; [exact HF1s2 | nz]).
-    assert (HF2s4 : F2 !!! Regidx Rs4 = sz1)
+    assert (HF2s4 : F2 !!! Regidx Rs2 = sz1)
       by (rewrite /F2 upd_ne; [exact HF1s4 | nz]).
-    assert (HF2s5 : F2 !!! Regidx Rs5 = proc_addr jp)
+    assert (HF2s5 : F2 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /F2 upd_ne; [exact HF1s5 | nz]).
     assert (HF2s6 : F2 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /F2 upd_ne; [exact HF1s6 | nz]).
-    assert (HF2s10 : F2 !!! Regidx Rs10 = pv_sz V)
+    assert (HF2s11 : F2 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /F2 upd_ne; [exact HF1s11 | nz]).
+    assert (HF2s10 : F2 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /F2 upd_ne; [exact HF1s10 | nz]).
-    assert (Hpp2f0 : add_vec_int (mword_of_int (KXD + 0x2ec) : mword 64) 4
-                     = mword_of_int (KXD + 0x2f0)) by pcw.
-    iEval (rewrite Hpp2f0) in "Hpc".
+    assert (Hpp2ec : add_vec_int (mword_of_int (KXD + 0x2e8) : mword 64) 4
+                     = mword_of_int (KXD + 0x2ec)) by pcw.
+    iEval (rewrite Hpp2ec) in "Hpc".
     (* ---- +0x2f0: ld a4,-408(s0) -- elf.entry, byte 24 of the header ---- *)
     assert (Helfaddr : add_vec (F2 !!! Regidx Rs0)
                          (sign_extend' 64 (mword_of_int 3688 : mword 12))
@@ -1320,11 +1349,11 @@ Section KexecDCommit.
     iDestruct (kxd_win8 (pa_stk sp0 54) ef 24 32 64 ltac:(lia) Halelf
                  with "Helf") as "[Hentry Helfback]".
     iEval (rewrite -Helfaddr) in "Hentry".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2f0)) Ra4 Rs0
+    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2ec)) Ra4 Rs0
               (mword_of_int 3688 : mword 12) F2 (K - 68)%nat
               (Z_to_bv 64 (le_at ef 24 8) : mword 64) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hentry").
-    { iApply (kxc_2f0 with "Htext"). }
+    { iApply (kxc_2ec with "Htext"). }
     iIntros (CID10 Hs10) "Hcg Hpc Hentry". iEval (rewrite Helfaddr) in "Hentry".
     iDestruct ("Helfback" with "Hentry") as "Helf".
     pose (F3 := <[Regidx Ra4 := regval_into_reg
@@ -1341,20 +1370,22 @@ Section KexecDCommit.
       by (rewrite /F3 upd_ne; [exact HF2s0 | nz]).
     assert (HF3s1 : F3 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F3 upd_ne; [exact HF2s1 | nz]).
-    assert (HF3s2 : F3 !!! Regidx Rs2
+    assert (HF3s2 : F3 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /F3 upd_ne; [exact HF2s2 | nz]).
-    assert (HF3s4 : F3 !!! Regidx Rs4 = sz1)
+    assert (HF3s4 : F3 !!! Regidx Rs2 = sz1)
       by (rewrite /F3 upd_ne; [exact HF2s4 | nz]).
-    assert (HF3s5 : F3 !!! Regidx Rs5 = proc_addr jp)
+    assert (HF3s5 : F3 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /F3 upd_ne; [exact HF2s5 | nz]).
     assert (HF3s6 : F3 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /F3 upd_ne; [exact HF2s6 | nz]).
-    assert (HF3s10 : F3 !!! Regidx Rs10 = pv_sz V)
+    assert (HF3s11 : F3 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /F3 upd_ne; [exact HF2s11 | nz]).
+    assert (HF3s10 : F3 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /F3 upd_ne; [exact HF2s10 | nz]).
-    assert (Hpp2f4 : add_vec_int (mword_of_int (KXD + 0x2f0) : mword 64) 4
-                     = mword_of_int (KXD + 0x2f4)) by pcw.
-    iEval (rewrite Hpp2f4) in "Hpc".
+    assert (Hpp2f0 : add_vec_int (mword_of_int (KXD + 0x2ec) : mword 64) 4
+                     = mword_of_int (KXD + 0x2f0)) by pcw.
+    iEval (rewrite Hpp2f0) in "Hpc".
     (* ---- +0x2f4: c.sd a4,24(a5) -- trapframe->epc = elf.entry ---- *)
     assert (Hw3 : exists u3,
               (<[tf_arg_idx 1
@@ -1373,27 +1404,27 @@ Section KexecDCommit.
       { unfold tf_epc_idx. lia. }
       unfold tf_epc_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr24) in "Hword3".
-    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
+    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f0)) Ra4 Ra5
               (mword_of_int 24 : mword 12) F3 (K - 68)%nat u3 eb
               with "Hcg Hpc [] Hword3").
-    { iApply (kxc_2f4 with "Htext"). }
+    { iApply (kxc_2f0 with "Htext"). }
     iIntros (CID11 Hs11) "Hcg Hpc Hword3". iEval (rewrite Haddr24) in "Hword3".
     iEval (rewrite (rget_ne (CID := CID10) F3 Ra4 ltac:(nz)) HF3a4) in "Hword3".
     iDestruct ("Htfback3" with "Hword3") as "Htfp".
-    assert (Hpp2f6 : add_vec_int (mword_of_int (KXD + 0x2f4) : mword 64) 2
-                     = mword_of_int (KXD + 0x2f6)) by pcw.
-    iEval (rewrite Hpp2f6) in "Hpc".
+    assert (Hpp2f2 : add_vec_int (mword_of_int (KXD + 0x2f0) : mword 64) 2
+                     = mword_of_int (KXD + 0x2f2)) by pcw.
+    iEval (rewrite Hpp2f2) in "Hpc".
     (* ---- +0x2f6: ld a5,88(s5) -- the trapframe page, again ---- *)
-    assert (Htfaddr2 : add_vec (F3 !!! Regidx Rs5)
+    assert (Htfaddr2 : add_vec (F3 !!! Regidx Rs3)
                          (sign_extend' 64 (mword_of_int 88 : mword 12))
                        = p_trapframe (proc_addr jp))
       by (rewrite HF3s5; reflexivity).
     iEval (rewrite -Htfaddr2) in "Hptf".
-    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f6)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f2)) Ra5 Rs3
               (mword_of_int 88 : mword 12) F3 (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hptf").
-    { iApply (kxc_2f6 with "Htext"). }
+    { iApply (kxc_2f2 with "Htext"). }
     iIntros (CID12 Hs12) "Hcg Hpc Hptf". iEval (rewrite Htfaddr2) in "Hptf".
     pose (F4 := <[Regidx Ra5 := regval_into_reg
                    (page_base (ud_tfp (pv_upt V)))]> F3).
@@ -1407,20 +1438,22 @@ Section KexecDCommit.
       by (rewrite /F4 upd_ne; [exact HF3s0 | nz]).
     assert (HF4s1 : F4 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F4 upd_ne; [exact HF3s1 | nz]).
-    assert (HF4s2 : F4 !!! Regidx Rs2
+    assert (HF4s2 : F4 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /F4 upd_ne; [exact HF3s2 | nz]).
-    assert (HF4s4 : F4 !!! Regidx Rs4 = sz1)
+    assert (HF4s4 : F4 !!! Regidx Rs2 = sz1)
       by (rewrite /F4 upd_ne; [exact HF3s4 | nz]).
-    assert (HF4s5 : F4 !!! Regidx Rs5 = proc_addr jp)
+    assert (HF4s5 : F4 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /F4 upd_ne; [exact HF3s5 | nz]).
     assert (HF4s6 : F4 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /F4 upd_ne; [exact HF3s6 | nz]).
-    assert (HF4s10 : F4 !!! Regidx Rs10 = pv_sz V)
+    assert (HF4s11 : F4 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /F4 upd_ne; [exact HF3s11 | nz]).
+    assert (HF4s10 : F4 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /F4 upd_ne; [exact HF3s10 | nz]).
-    assert (Hpp2fa : add_vec_int (mword_of_int (KXD + 0x2f6) : mword 64) 4
-                     = mword_of_int (KXD + 0x2fa)) by pcw.
-    iEval (rewrite Hpp2fa) in "Hpc".
+    assert (Hpp2f6 : add_vec_int (mword_of_int (KXD + 0x2f2) : mword 64) 4
+                     = mword_of_int (KXD + 0x2f6)) by pcw.
+    iEval (rewrite Hpp2f6) in "Hpc".
     (* ---- +0x2fa: sd s2,48(a5) -- trapframe->sp = the new user sp ---- *)
     assert (Hw6 : exists u6,
               (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
@@ -1440,12 +1473,12 @@ Section KexecDCommit.
       { unfold kxc_tf_sp_idx. lia. }
       unfold kxc_tf_sp_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr48) in "Hword6".
-    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f6)) Rs7 Ra5
               (mword_of_int 48 : mword 12) F4 (K - 68)%nat u6 eb
               with "Hcg Hpc [] Hword6").
-    { iApply (kxc_2fa with "Htext"). }
+    { iApply (kxc_2f6 with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc Hword6". iEval (rewrite Haddr48) in "Hword6".
-    iEval (rewrite (rget_ne (CID := CID12) F4 Rs2 ltac:(nz)) HF4s2) in "Hword6".
+    iEval (rewrite (rget_ne (CID := CID12) F4 Rs7 ltac:(nz)) HF4s2) in "Hword6".
     iDestruct ("Htfback6" with "Hword6") as "Htfp".
     (* ---- the process block CLOSES here, at the new table and size: this is
        the commit.  [upd_exec_compose] is what turns the three successive
@@ -1469,16 +1502,16 @@ Section KexecDCommit.
     iEval (rewrite -HPtfp) in "Hptf".
     iEval (rewrite -HPtfp) in "Htfp".
     iDestruct ("Hprivback" with "Hpsz Hppt Hptf Hpt Htfp") as "Hpriv".
-    assert (Hpp2fe : add_vec_int (mword_of_int (KXD + 0x2fa) : mword 64) 4
-                     = mword_of_int (KXD + 0x2fe)) by pcw.
-    iEval (rewrite Hpp2fe) in "Hpc".
+    assert (Hpp2fa : add_vec_int (mword_of_int (KXD + 0x2f6) : mword 64) 4
+                     = mword_of_int (KXD + 0x2fa)) by pcw.
+    iEval (rewrite Hpp2fa) in "Hpc".
     (* ---- +0x2fe: c.mv a1,s10 -- oldsz, for proc_freepagetable ---- *)
-    iApply (wp_cmv_s_sconf (mword_of_int (KXD + 0x2fe)) Ra1 Rs10
+    iApply (wp_cmv_s_sconf (mword_of_int (KXD + 0x2fa)) Ra1 Rs5
               F4 (K - 68)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
-    { iApply (kxc_2fe with "Htext"). }
+    { iApply (kxc_2fa with "Htext"). }
     iIntros (CID14 Hs14) "Hcg Hpc". iEval (rgne) in "Hcg".
     pose (F5 := <[Regidx Ra1 := regval_into_reg
-                   (add_vec zero_reg (F4 !!! Regidx Rs10))]> F4).
+                   (add_vec zero_reg (F4 !!! Regidx Rs5))]> F4).
     assert (HF5a1 : F5 !!! Regidx Ra1 = pv_sz V).
     { rewrite /F5 upd_eq HF4s10. apply add_vec_zero_l. }
     assert (HF5a0 : F5 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
@@ -1489,24 +1522,26 @@ Section KexecDCommit.
       by (rewrite /F5 upd_ne; [exact HF4s0 | nz]).
     assert (HF5s1 : F5 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F5 upd_ne; [exact HF4s1 | nz]).
-    assert (Hpp300 : add_vec_int (mword_of_int (KXD + 0x2fe) : mword 64) 2
-                     = mword_of_int (KXD + 0x300)) by pcw.
-    iEval (rewrite Hpp300) in "Hpc".
+    assert (HF5s11 : F5 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /F5 upd_ne; [exact HF4s11 | nz]).
+    assert (Hpp2fc : add_vec_int (mword_of_int (KXD + 0x2fa) : mword 64) 2
+                     = mword_of_int (KXD + 0x2fc)) by pcw.
+    iEval (rewrite Hpp2fc) in "Hpc".
     (* ---- +0x300: jal ra,proc_freepagetable(old table, oldsz) ---- *)
-    assert (Htpfp : add_vec (mword_of_int (KXD + 0x300) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2084800 : mword 21))
+    assert (Htpfp : add_vec (mword_of_int (KXD + 0x2fc) : mword 64)
+                      (sign_extend' 64 (mword_of_int 2084788 : mword 21))
                     = mword_of_int KernelSyms.proc_freepagetable) by pcw.
-    iApply (wp_jal_s_sconf (mword_of_int (KXD + 0x300)) Rra
-              (mword_of_int 2084800 : mword 21) F5 (K - 68)%nat eb
+    iApply (wp_jal_s_sconf (mword_of_int (KXD + 0x2fc)) Rra
+              (mword_of_int 2084788 : mword 21) F5 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpfp; vm_compute; reflexivity)
               with "Hcg Hpc []").
-    { iApply (kxc_300 with "Htext"). }
+    { iApply (kxc_2fc with "Htext"). }
     iIntros (CID15 Hs15) "Hcg Hpc". iEval (rewrite Htpfp) in "Hpc".
     pose (F6 := <[Regidx Rra := regval_into_reg
-                   (add_vec_int (mword_of_int (KXD + 0x300) : mword 64) 4)]> F5).
+                   (add_vec_int (mword_of_int (KXD + 0x2fc) : mword 64) 4)]> F5).
     assert (HF6ra : F6 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (KXD + 0x300) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KXD + 0x2fc) : mword 64) 4)
       by (rewrite /F6; apply upd_eq).
     assert (HF6a0 : F6 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
       by (rewrite /F6 upd_ne; [exact HF5a0 | nz]).
@@ -1518,6 +1553,8 @@ Section KexecDCommit.
       by (rewrite /F6 upd_ne; [exact HF5s0 | nz]).
     assert (HF6s1 : F6 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F6 upd_ne; [exact HF5s1 | nz]).
+    assert (HF6s11 : F6 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /F6 upd_ne; [exact HF5s11 | nz]).
     (* [cpu_own] and the complement are hart-indexed now that [b] is free:
        carry them from the entry hart across the fifteen steps (and
        safestrcpy's own [wp_next eb] crossing) to the call's hart. *)
@@ -1534,9 +1571,9 @@ Section KexecDCommit.
               ltac:(rewrite HF6a1; exact Hbelold) (locks_below_empty _)
               with "Hcg Hcnt Htext Hpc Hptold Hka").
     iIntros (CID16 Hs16 mr2) "Hcg Hcnt Hpc %Hcsf".
-    assert (Hpc304 : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KXD + 0x304))
+    assert (Hpc300 : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KXD + 0x300))
       by (rewrite HF6ra; pcw).
-    iEval (rewrite Hpc304) in "Hpc".
+    iEval (rewrite Hpc300) in "Hpc".
     assert (HG0sp : mr2 !!! Regidx csp_rs1 = pa_stk sp0 68).
     { rewrite (callee_saved_lookup Hcsf csp_rs1 ltac:(vm_compute; reflexivity)).
       exact HF6sp. }
@@ -1544,10 +1581,10 @@ Section KexecDCommit.
     { rewrite (callee_saved_lookup Hcsf Rs1 ltac:(vm_compute; reflexivity)).
       exact HF6s1. }
     (* ---- +0x304: addiw a0,s1,0 -- the return value is argc ---- *)
-    iApply (wp_addiw_s_sconf (mword_of_int (KXD + 0x304)) Ra0 Rs1
+    iApply (wp_addiw_s_sconf (mword_of_int (KXD + 0x300)) Ra0 Rs1
               (mword_of_int 0 : mword 12) mr2 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
-    { iApply (kxc_304 with "Htext"). }
+    { iApply (kxc_300 with "Htext"). }
     iIntros (CID17 Hs17) "Hcg Hpc".
     pose (G1 := <[Regidx Ra0 := regval_into_reg
                    (sign_extend' 64 (subrange_vec_dec
@@ -1558,162 +1595,153 @@ Section KexecDCommit.
       unfold MAXARG in Hnamax. lia. }
     assert (HG1sp : G1 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G1 upd_ne; [exact HG0sp | nz]).
-    assert (Hpp308 : add_vec_int (mword_of_int (KXD + 0x304) : mword 64) 4
-                     = mword_of_int (KXD + 0x308)) by pcw.
-    iEval (rewrite Hpp308) in "Hpc".
+    assert (Hpp304 : add_vec_int (mword_of_int (KXD + 0x300) : mword 64) 4
+                     = mword_of_int (KXD + 0x304)) by pcw.
+    iEval (rewrite Hpp304) in "Hpc".
     (* ---- +0x308 .. +0x318: reload s3..s11 from their spill slots ---- *)
     assert (Hpa5 : add_vec (G1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 63 : mword 6) ('b"000")))
                    = pa_stk sp0 5) by (rewrite HG1sp; apply kxc_slot5_sp).
     iEval (rewrite -Hpa5) in "Hf5". iEval (rewrite -Hmw5) in "Hf5".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x308)) (mword_of_int 63 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x304)) (mword_of_int 63 : mword 6)
               Rs3 G1 (K - 68)%nat (m !!! Regidx Rs3) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf5").
-    { iApply (kxc_308 with "Htext"). }
+    { iApply (kxc_304 with "Htext"). }
     iIntros (CID18 Hs18) "Hcg Hpc Hf5". iEval (rewrite Hpa5) in "Hf5".
     pose (G2 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> G1).
     assert (HG2sp : G2 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G2 upd_ne; [exact HG1sp | nz]).
-    assert (Hpp30a : add_vec_int (mword_of_int (KXD + 0x308) : mword 64) 2
-                     = mword_of_int (KXD + 0x30a)) by pcw.
-    iEval (rewrite Hpp30a) in "Hpc".
+    assert (Hpp306 : add_vec_int (mword_of_int (KXD + 0x304) : mword 64) 2
+                     = mword_of_int (KXD + 0x306)) by pcw.
+    iEval (rewrite Hpp306) in "Hpc".
     assert (Hpa6 : add_vec (G2 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 62 : mword 6) ('b"000")))
                    = pa_stk sp0 6) by (rewrite HG2sp; apply kxc_slot6_sp).
     iEval (rewrite -Hpa6) in "Hf6". iEval (rewrite -Hmw6) in "Hf6".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x30a)) (mword_of_int 62 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x306)) (mword_of_int 62 : mword 6)
               Rs4 G2 (K - 68)%nat (m !!! Regidx Rs4) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf6").
-    { iApply (kxc_30a with "Htext"). }
+    { iApply (kxc_306 with "Htext"). }
     iIntros (CID19 Hs19) "Hcg Hpc Hf6". iEval (rewrite Hpa6) in "Hf6".
     pose (G3 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> G2).
     assert (HG3sp : G3 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G3 upd_ne; [exact HG2sp | nz]).
-    assert (Hpp30c : add_vec_int (mword_of_int (KXD + 0x30a) : mword 64) 2
-                     = mword_of_int (KXD + 0x30c)) by pcw.
-    iEval (rewrite Hpp30c) in "Hpc".
+    assert (Hpp308 : add_vec_int (mword_of_int (KXD + 0x306) : mword 64) 2
+                     = mword_of_int (KXD + 0x308)) by pcw.
+    iEval (rewrite Hpp308) in "Hpc".
     assert (Hpa7 : add_vec (G3 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 61 : mword 6) ('b"000")))
                    = pa_stk sp0 7) by (rewrite HG3sp; apply kxc_slot7_sp).
     iEval (rewrite -Hpa7) in "Hf7". iEval (rewrite -Hmw7) in "Hf7".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x30c)) (mword_of_int 61 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x308)) (mword_of_int 61 : mword 6)
               Rs5 G3 (K - 68)%nat (m !!! Regidx Rs5) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf7").
-    { iApply (kxc_30c with "Htext"). }
+    { iApply (kxc_308 with "Htext"). }
     iIntros (CID20 Hs20) "Hcg Hpc Hf7". iEval (rewrite Hpa7) in "Hf7".
     pose (G4 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5)]> G3).
     assert (HG4sp : G4 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G4 upd_ne; [exact HG3sp | nz]).
-    assert (Hpp30e : add_vec_int (mword_of_int (KXD + 0x30c) : mword 64) 2
-                     = mword_of_int (KXD + 0x30e)) by pcw.
-    iEval (rewrite Hpp30e) in "Hpc".
+    assert (Hpp30a : add_vec_int (mword_of_int (KXD + 0x308) : mword 64) 2
+                     = mword_of_int (KXD + 0x30a)) by pcw.
+    iEval (rewrite Hpp30a) in "Hpc".
     assert (Hpa8 : add_vec (G4 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 60 : mword 6) ('b"000")))
                    = pa_stk sp0 8) by (rewrite HG4sp; apply kxc_slot8_sp).
     iEval (rewrite -Hpa8) in "Hf8". iEval (rewrite -Hmw8) in "Hf8".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x30e)) (mword_of_int 60 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x30a)) (mword_of_int 60 : mword 6)
               Rs6 G4 (K - 68)%nat (m !!! Regidx Rs6) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf8").
-    { iApply (kxc_30e with "Htext"). }
+    { iApply (kxc_30a with "Htext"). }
     iIntros (CID21 Hs21) "Hcg Hpc Hf8". iEval (rewrite Hpa8) in "Hf8".
     pose (G5 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6)]> G4).
     assert (HG5sp : G5 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G5 upd_ne; [exact HG4sp | nz]).
-    assert (Hpp310 : add_vec_int (mword_of_int (KXD + 0x30e) : mword 64) 2
-                     = mword_of_int (KXD + 0x310)) by pcw.
-    iEval (rewrite Hpp310) in "Hpc".
+    assert (Hpp30c : add_vec_int (mword_of_int (KXD + 0x30a) : mword 64) 2
+                     = mword_of_int (KXD + 0x30c)) by pcw.
+    iEval (rewrite Hpp30c) in "Hpc".
     assert (Hpa9 : add_vec (G5 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 59 : mword 6) ('b"000")))
                    = pa_stk sp0 9) by (rewrite HG5sp; apply kxc_slot9_sp).
     iEval (rewrite -Hpa9) in "Hf9". iEval (rewrite -Hmw9) in "Hf9".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x310)) (mword_of_int 59 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x30c)) (mword_of_int 59 : mword 6)
               Rs7 G5 (K - 68)%nat (m !!! Regidx Rs7) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf9").
-    { iApply (kxc_310 with "Htext"). }
+    { iApply (kxc_30c with "Htext"). }
     iIntros (CID22 Hs22) "Hcg Hpc Hf9". iEval (rewrite Hpa9) in "Hf9".
     pose (G6 := <[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7)]> G5).
     assert (HG6sp : G6 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G6 upd_ne; [exact HG5sp | nz]).
-    assert (Hpp312 : add_vec_int (mword_of_int (KXD + 0x310) : mword 64) 2
-                     = mword_of_int (KXD + 0x312)) by pcw.
-    iEval (rewrite Hpp312) in "Hpc".
+    assert (Hpp30e : add_vec_int (mword_of_int (KXD + 0x30c) : mword 64) 2
+                     = mword_of_int (KXD + 0x30e)) by pcw.
+    iEval (rewrite Hpp30e) in "Hpc".
     assert (Hpa10 : add_vec (G6 !!! Regidx csp_rs1)
                       (zero_extend' 64 (concat_vec (mword_of_int 58 : mword 6) ('b"000")))
                     = pa_stk sp0 10) by (rewrite HG6sp; apply kxc_slot10_sp).
     iEval (rewrite -Hpa10) in "Hf10". iEval (rewrite -Hmw10) in "Hf10".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x312)) (mword_of_int 58 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x30e)) (mword_of_int 58 : mword 6)
               Rs8 G6 (K - 68)%nat (m !!! Regidx Rs8) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf10").
-    { iApply (kxc_312 with "Htext"). }
+    { iApply (kxc_30e with "Htext"). }
     iIntros (CID23 Hs23) "Hcg Hpc Hf10". iEval (rewrite Hpa10) in "Hf10".
     pose (G7 := <[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8)]> G6).
     assert (HG7sp : G7 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G7 upd_ne; [exact HG6sp | nz]).
-    assert (Hpp314 : add_vec_int (mword_of_int (KXD + 0x312) : mword 64) 2
-                     = mword_of_int (KXD + 0x314)) by pcw.
-    iEval (rewrite Hpp314) in "Hpc".
+    assert (Hpp310 : add_vec_int (mword_of_int (KXD + 0x30e) : mword 64) 2
+                     = mword_of_int (KXD + 0x310)) by pcw.
+    iEval (rewrite Hpp310) in "Hpc".
     assert (Hpa11 : add_vec (G7 !!! Regidx csp_rs1)
                       (zero_extend' 64 (concat_vec (mword_of_int 57 : mword 6) ('b"000")))
                     = pa_stk sp0 11) by (rewrite HG7sp; apply kxc_slot11_sp).
     iEval (rewrite -Hpa11) in "Hf11". iEval (rewrite -Hmw11) in "Hf11".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x314)) (mword_of_int 57 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x310)) (mword_of_int 57 : mword 6)
               Rs9 G7 (K - 68)%nat (m !!! Regidx Rs9) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf11").
-    { iApply (kxc_314 with "Htext"). }
+    { iApply (kxc_310 with "Htext"). }
     iIntros (CID24 Hs24) "Hcg Hpc Hf11". iEval (rewrite Hpa11) in "Hf11".
     pose (G8 := <[Regidx Rs9 := regval_into_reg (m !!! Regidx Rs9)]> G7).
     assert (HG8sp : G8 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G8 upd_ne; [exact HG7sp | nz]).
-    assert (Hpp316 : add_vec_int (mword_of_int (KXD + 0x314) : mword 64) 2
-                     = mword_of_int (KXD + 0x316)) by pcw.
-    iEval (rewrite Hpp316) in "Hpc".
+    assert (Hpp312 : add_vec_int (mword_of_int (KXD + 0x310) : mword 64) 2
+                     = mword_of_int (KXD + 0x312)) by pcw.
+    iEval (rewrite Hpp312) in "Hpc".
     assert (Hpa12 : add_vec (G8 !!! Regidx csp_rs1)
                       (zero_extend' 64 (concat_vec (mword_of_int 56 : mword 6) ('b"000")))
                     = pa_stk sp0 12) by (rewrite HG8sp; apply kxc_slot12_sp).
     iEval (rewrite -Hpa12) in "Hf12". iEval (rewrite -Hmw12) in "Hf12".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x316)) (mword_of_int 56 : mword 6)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x312)) (mword_of_int 56 : mword 6)
               Rs10 G8 (K - 68)%nat (m !!! Regidx Rs10) eb (dqm := DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf12").
-    { iApply (kxc_316 with "Htext"). }
+    { iApply (kxc_312 with "Htext"). }
     iIntros (CID25 Hs25) "Hcg Hpc Hf12". iEval (rewrite Hpa12) in "Hf12".
     pose (G9 := <[Regidx Rs10 := regval_into_reg (m !!! Regidx Rs10)]> G8).
     assert (HG9sp : G9 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /G9 upd_ne; [exact HG8sp | nz]).
-    assert (Hpp318 : add_vec_int (mword_of_int (KXD + 0x316) : mword 64) 2
-                     = mword_of_int (KXD + 0x318)) by pcw.
-    iEval (rewrite Hpp318) in "Hpc".
-    assert (Hpa13 : add_vec (G9 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 55 : mword 6) ('b"000")))
-                    = pa_stk sp0 13) by (rewrite HG9sp; apply kxc_slot13_sp).
-    iEval (rewrite -Hpa13) in "Hf13". iEval (rewrite -Hmw13) in "Hf13".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KXD + 0x318)) (mword_of_int 55 : mword 6)
-              Rs11 G9 (K - 68)%nat (m !!! Regidx Rs11) eb (dqm := DfracOwn 1)
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf13").
-    { iApply (kxc_318 with "Htext"). }
-    iIntros (CID26 Hs26) "Hcg Hpc Hf13". iEval (rewrite Hpa13) in "Hf13".
-    pose (G10 := <[Regidx Rs11 := regval_into_reg (m !!! Regidx Rs11)]> G9).
-    assert (HG10sp : G10 !!! Regidx csp_rs1 = pa_stk sp0 68)
-      by (rewrite /G10 upd_ne; [exact HG9sp | nz]).
+    (* THE s11 RELOAD IS GONE FROM THIS EPILOGUE at XV6_REV 7d258aa -- gcc
+       narrowed s11's live range to the phdr loop and put its one reload on
+       the loop's exit edge at +0x1a2, which every path here has passed.  So
+       [G10] is just [G9] and the slot keeps whatever it holds. *)
+    assert (Hpp314 : add_vec_int (mword_of_int (KXD + 0x312) : mword 64) 2
+                     = mword_of_int (KXD + 0x314)) by pcw.
+    iEval (rewrite Hpp314) in "Hpc".
+    pose (G10 := G9).
+    assert (HG10sp : G10 !!! Regidx csp_rs1 = pa_stk sp0 68) by exact HG9sp.
     assert (HG10a0 : G10 !!! Regidx Ra0 = (mword_of_int (Z.of_nat c) : mword 64)).
-    { rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz].
+    { rewrite /G10. rewrite /G9 upd_ne; [| nz].
       rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz].
       rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz].
       rewrite /G4 upd_ne; [| nz]. rewrite /G3 upd_ne; [| nz].
       rewrite /G2 upd_ne; [| nz]. exact HG1a0. }
-    assert (Hpp31a : add_vec_int (mword_of_int (KXD + 0x318) : mword 64) 2
-                     = mword_of_int (KXD + 0x31a)) by pcw.
-    iEval (rewrite Hpp31a) in "Hpc".
-    (* ---- +0x31a: c.j +0x72 -- into the shared epilogue ---- *)
-    assert (Htgt72 : add_vec (mword_of_int (KXD + 0x31a) : mword 64)
+    (* ---- +0x314: c.j +0x72 -- into the shared epilogue ---- *)
+    assert (Htgt72 : add_vec (mword_of_int (KXD + 0x314) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
-                          (concat_vec (mword_of_int 1708 : mword 11) ('b"0"))))
-                     = mword_of_int (KXD + 0x72)) by pcw.
-    iApply (wp_cj_s_sconf (mword_of_int (KXD + 0x31a))
-              (sign_extend' 21 (concat_vec (mword_of_int 1708 : mword 11) ('b"0")))
+                          (concat_vec (mword_of_int 1711 : mword 11) ('b"0"))))
+                     = mword_of_int (KXD + 0x072)) by pcw.
+    iApply (wp_cj_s_sconf (mword_of_int (KXD + 0x314))
+              (sign_extend' 21 (concat_vec (mword_of_int 1711 : mword 11) ('b"0")))
               G10 (K - 68)%nat eb
               ltac:(rewrite Htgt72; vm_compute; reflexivity)
               with "Hcg Hpc []").
-    { iApply (kxc_31a with "Htext"). }
+    { iApply (kxc_314 with "Htext"). }
     iIntros (CID27 Hs27). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt72) in "Hpc".
     (* ---- the threading clause: all NINE came back from THIS block's own
@@ -1726,15 +1754,24 @@ Section KexecDCommit.
         as [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> | [-> |
            [-> | [-> | ->]]]]]]]]]]]];
         try (exfalso; congruence).
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz]. rewrite /G4 upd_ne; [| nz]. rewrite /G3 upd_ne; [| nz]. rewrite /G2; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz]. rewrite /G4 upd_ne; [| nz]. rewrite /G3; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz]. rewrite /G4; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9 upd_ne; [| nz]. rewrite /G8; apply upd_eq.
-      - rewrite /G10 upd_ne; [| nz]. rewrite /G9; apply upd_eq.
-      - rewrite /G10; apply upd_eq. }
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz]. rewrite /G4 upd_ne; [| nz]. rewrite /G3 upd_ne; [| nz]. rewrite /G2; apply upd_eq.
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz]. rewrite /G4 upd_ne; [| nz]. rewrite /G3; apply upd_eq.
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5 upd_ne; [| nz]. rewrite /G4; apply upd_eq.
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz]. rewrite /G5; apply upd_eq.
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7 upd_ne; [| nz]. rewrite /G6; apply upd_eq.
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz]. rewrite /G7; apply upd_eq.
+      - rewrite /G10. rewrite /G9 upd_ne; [| nz]. rewrite /G8; apply upd_eq.
+      - rewrite /G10. rewrite /G9; apply upd_eq.
+      - (* s11: NOT reloaded here since XV6_REV 7d258aa -- it is untouched
+           all the way down, and the caller's [Hmw13] pins the slot. *)
+        rewrite /G10.
+        rewrite /G9 upd_ne; [| nz]. rewrite /G8 upd_ne; [| nz].
+        rewrite /G7 upd_ne; [| nz]. rewrite /G6 upd_ne; [| nz].
+        rewrite /G5 upd_ne; [| nz]. rewrite /G4 upd_ne; [| nz].
+        rewrite /G3 upd_ne; [| nz]. rewrite /G2 upd_ne; [| nz].
+        rewrite /G1 upd_ne; [| nz].
+        rewrite (callee_saved_lookup Hcsf Rs11 ltac:(vm_compute; reflexivity)).
+        exact HF6s11. }
     (* ---- the frame, back to [kxc_frame]'s shape ---- *)
     iDestruct (kxc_stack_of_top5 sp0 (pa_add av (8 * c)) w65 (pa_add pv q) w67 w68
                  with "Hf64 Hf65 Hf66 Hf67 Hf68") as "Htop5".
@@ -1754,7 +1791,9 @@ Section KexecDCommit.
       iSplitL "Hf10"; [by iExists (m !!! Regidx Rs8) |].
       iSplitL "Hf11"; [by iExists (m !!! Regidx Rs9) |].
       iSplitL "Hf12"; [by iExists (m !!! Regidx Rs10) |].
-      iSplitL "Hf13"; [by iExists (m !!! Regidx Rs11) |].
+      (* slot 13 still holds [w13]: the reload that used to convert it to
+         [m !!! Regidx Rs11] here moved to +0x1a2 at XV6_REV 7d258aa. *)
+      iSplitL "Hf13"; [by iExists w13 |].
       change 55%nat with (50 + 5)%nat.
       rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Amid50"; [iExact "Amid50" | iExact "Htop5"]. }
@@ -1899,12 +1938,12 @@ Section KexecDMain.
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
-    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
+    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     kernel_text -∗
     kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
@@ -1929,12 +1968,12 @@ Section KexecDMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
-           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
+           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     
     iIntros "#Htext Hst Hcont".
     rewrite /kxc_at_2a6.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
-                          %HMs10) &
+                          %HMs11 & %HMs10) &
                          (%Hcna & %Hcmax & %Havfc & %Hstackok) &
                          (%HPtfp & %Hbelow & %Hcov) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
@@ -1964,16 +2003,16 @@ Section KexecDMain.
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
     iDestruct (kxd_tf_len with "Htfp") as "[%Htflen Htfp]".
     (* ---- +0x2a6: ld a5,88(s5) -- a5 = p->trapframe ---- *)
-    assert (Htfaddr : add_vec (M !!! Regidx Rs5)
+    assert (Htfaddr : add_vec (M !!! Regidx Rs3)
                         (sign_extend' 64 (mword_of_int 88 : mword 12))
                       = p_trapframe (proc_addr jp))
       by (rewrite HMs5; reflexivity).
     iEval (rewrite -Htfaddr) in "Hptf".
-    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2a6)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x29c)) Ra5 Rs3
               (mword_of_int 88 : mword 12) M (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hptf").
-    { iApply (kxc_2a6 with "Htext"). }
+    { iApply (kxc_29c with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc Hptf". iEval (rewrite Htfaddr) in "Hptf".
     pose (D1 := <[Regidx Ra5 := regval_into_reg
                    (page_base (ud_tfp (pv_upt V)))]> M).
@@ -1985,20 +2024,22 @@ Section KexecDMain.
       by (rewrite /D1 upd_ne; [exact HMs0 | nz]).
     assert (HD1s1 : D1 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /D1 upd_ne; [exact HMs1 | nz]).
-    assert (HD1s2 : D1 !!! Regidx Rs2
+    assert (HD1s2 : D1 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /D1 upd_ne; [exact HMs2 | nz]).
-    assert (HD1s4 : D1 !!! Regidx Rs4 = sz1)
+    assert (HD1s4 : D1 !!! Regidx Rs2 = sz1)
       by (rewrite /D1 upd_ne; [exact HMs4 | nz]).
-    assert (HD1s5 : D1 !!! Regidx Rs5 = proc_addr jp)
+    assert (HD1s5 : D1 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /D1 upd_ne; [exact HMs5 | nz]).
     assert (HD1s6 : D1 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /D1 upd_ne; [exact HMs6 | nz]).
-    assert (HD1s10 : D1 !!! Regidx Rs10 = pv_sz V)
+    assert (HD1s11 : D1 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /D1 upd_ne; [exact HMs11 | nz]).
+    assert (HD1s10 : D1 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /D1 upd_ne; [exact HMs10 | nz]).
-    assert (Hpp2aa : add_vec_int (mword_of_int (KXD + 0x2a6) : mword 64) 4
-                     = mword_of_int (KXD + 0x2aa)) by pcw.
-    iEval (rewrite Hpp2aa) in "Hpc".
+    assert (Hpp2a0 : add_vec_int (mword_of_int (KXD + 0x29c) : mword 64) 4
+                     = mword_of_int (KXD + 0x2a0)) by pcw.
+    iEval (rewrite Hpp2a0) in "Hpc".
     (* ---- +0x2aa: sd s2,120(a5) -- trapframe->a1 = sp ---- *)
     assert (Hw15 : exists u15, pv_tf V !! tf_arg_idx 1 = Some u15).
     { apply lookup_lt_is_Some_2. rewrite Htflen. unfold TFWORDS, tf_arg_idx. lia. }
@@ -2013,13 +2054,13 @@ Section KexecDMain.
       { unfold tf_arg_idx. lia. }
       unfold tf_arg_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr120) in "Hword".
-    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2aa)) Rs2 Ra5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2a0)) Rs7 Ra5
               (mword_of_int 120 : mword 12) D1 (K - 68)%nat u15 eb
               with "Hcg Hpc [] Hword").
-    { iApply (kxc_2aa with "Htext"). }
+    { iApply (kxc_2a0 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hword".
     iEval (rewrite Haddr120) in "Hword".
-    iEval (rewrite (rget_ne (CID := CID1) D1 Rs2 ltac:(nz)) HD1s2) in "Hword".
+    iEval (rewrite (rget_ne (CID := CID1) D1 Rs7 ltac:(nz)) HD1s2) in "Hword".
     iDestruct ("Htfback" with "Hword") as "Htfp".
     (* close at the SAME table and size: only the trapframe words moved *)
     (* the accessor's three side conditions are IRIS wands over pure props,
@@ -2033,19 +2074,19 @@ Section KexecDMain.
     iSpecialize ("Hprivback" with "[%]"); [exact Hbelold |].
     iDestruct ("Hprivback" with "Hpsz Hppt Hptf Hptold Htfp") as "Hpriv".
     iDestruct (kxd_priv_close_tf with "Hpriv") as "Hpriv".
-    assert (Hpp2ae : add_vec_int (mword_of_int (KXD + 0x2aa) : mword 64) 4
-                     = mword_of_int (KXD + 0x2ae)) by pcw.
-    iEval (rewrite Hpp2ae) in "Hpc".
+    assert (Hpp2a4 : add_vec_int (mword_of_int (KXD + 0x2a0) : mword 64) 4
+                     = mword_of_int (KXD + 0x2a4)) by pcw.
+    iEval (rewrite Hpp2a4) in "Hpc".
     (* ---- +0x2ae: ld a5,-528(s0) -- a5 = last (= path, still) ---- *)
     assert (Hslot66 : add_vec (D1 !!! Regidx Rs0)
                         (sign_extend' 64 (mword_of_int 3568 : mword 12))
                       = pa_stk sp0 66)
       by (rewrite HD1s0; apply kxd_last_slot).
     iEval (rewrite -Hslot66) in "Hf66".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2ae)) Ra5 Rs0
+    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2a4)) Ra5 Rs0
               (mword_of_int 3568 : mword 12) D1 (K - 68)%nat pv eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hf66").
-    { iApply (kxc_2ae with "Htext"). }
+    { iApply (kxc_2a4 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc Hf66". iEval (rewrite Hslot66) in "Hf66".
     pose (D2 := <[Regidx Ra5 := regval_into_reg pv]> D1).
     assert (HD2a5 : D2 !!! Regidx Ra5 = pv) by (rewrite /D2; apply upd_eq).
@@ -2055,20 +2096,22 @@ Section KexecDMain.
       by (rewrite /D2 upd_ne; [exact HD1s0 | nz]).
     assert (HD2s1 : D2 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /D2 upd_ne; [exact HD1s1 | nz]).
-    assert (HD2s2 : D2 !!! Regidx Rs2
+    assert (HD2s2 : D2 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /D2 upd_ne; [exact HD1s2 | nz]).
-    assert (HD2s4 : D2 !!! Regidx Rs4 = sz1)
+    assert (HD2s4 : D2 !!! Regidx Rs2 = sz1)
       by (rewrite /D2 upd_ne; [exact HD1s4 | nz]).
-    assert (HD2s5 : D2 !!! Regidx Rs5 = proc_addr jp)
+    assert (HD2s5 : D2 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /D2 upd_ne; [exact HD1s5 | nz]).
     assert (HD2s6 : D2 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /D2 upd_ne; [exact HD1s6 | nz]).
-    assert (HD2s10 : D2 !!! Regidx Rs10 = pv_sz V)
+    assert (HD2s11 : D2 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /D2 upd_ne; [exact HD1s11 | nz]).
+    assert (HD2s10 : D2 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /D2 upd_ne; [exact HD1s10 | nz]).
-    assert (Hpp2b2 : add_vec_int (mword_of_int (KXD + 0x2ae) : mword 64) 4
-                     = mword_of_int (KXD + 0x2b2)) by pcw.
-    iEval (rewrite Hpp2b2) in "Hpc".
+    assert (Hpp2a8 : add_vec_int (mword_of_int (KXD + 0x2a4) : mword 64) 4
+                     = mword_of_int (KXD + 0x2a8)) by pcw.
+    iEval (rewrite Hpp2a8) in "Hpc".
     (* ---- +0x2b2: lbu a4,0(a5) -- path[0] ---- *)
     assert (Hlk0 : seq 0 (S plen) !! 0%nat = Some 0%nat)
       by (rewrite (lookup_seq_lt 0 (S plen) 0 ltac:(lia)); reflexivity).
@@ -2079,10 +2122,10 @@ Section KexecDMain.
                      = pa_add pv 0)
       by (rewrite HD2a5; apply kxd_add_zero).
     iEval (rewrite -Haddr0) in "Hbyte0".
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2b2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2a8)) Ra4 Ra5
               (mword_of_int 0 : mword 12) D2 (K - 68)%nat (pfun 0%nat) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hbyte0").
-    { iApply (kxc_2b2 with "Htext"). }
+    { iApply (kxc_2a8 with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc Hbyte0". iEval (rewrite Haddr0) in "Hbyte0".
     iDestruct ("Hpathback" with "Hbyte0") as "Hpath".
     pose (D3 := <[Regidx Ra4 := regval_into_reg
@@ -2097,16 +2140,18 @@ Section KexecDMain.
       by (rewrite /D3 upd_ne; [exact HD2s0 | nz]).
     assert (HD3s1 : D3 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /D3 upd_ne; [exact HD2s1 | nz]).
-    assert (HD3s2 : D3 !!! Regidx Rs2
+    assert (HD3s2 : D3 !!! Regidx Rs7
                     = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
       by (rewrite /D3 upd_ne; [exact HD2s2 | nz]).
-    assert (HD3s4 : D3 !!! Regidx Rs4 = sz1)
+    assert (HD3s4 : D3 !!! Regidx Rs2 = sz1)
       by (rewrite /D3 upd_ne; [exact HD2s4 | nz]).
-    assert (HD3s5 : D3 !!! Regidx Rs5 = proc_addr jp)
+    assert (HD3s5 : D3 !!! Regidx Rs3 = proc_addr jp)
       by (rewrite /D3 upd_ne; [exact HD2s5 | nz]).
     assert (HD3s6 : D3 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /D3 upd_ne; [exact HD2s6 | nz]).
-    assert (HD3s10 : D3 !!! Regidx Rs10 = pv_sz V)
+    assert (HD3s11 : D3 !!! Regidx Rs11 = m !!! Regidx Rs11)
+      by (rewrite /D3 upd_ne; [exact HD2s11 | nz]).
+    assert (HD3s10 : D3 !!! Regidx Rs5 = pv_sz V)
       by (rewrite /D3 upd_ne; [exact HD2s10 | nz]).
     (* the resource bundle the commit takes, assembled once and used by both
        arms of the [beqz] below *)
@@ -2144,20 +2189,20 @@ Section KexecDMain.
       iExists w68. iExact "Hf68". }
     assert (Hcreg2b6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx Ra4)
       by (vm_compute; reflexivity).
-    assert (Htgt2d2a : add_vec (mword_of_int (KXD + 0x2b6) : mword 64)
+    assert (Htgt2d2a : add_vec (mword_of_int (KXD + 0x2ac) : mword 64)
                          (sign_extend' 64 (sign_extend' 13
-                            (concat_vec (mword_of_int 14 : mword 8) ('b"0"))))
-                       = mword_of_int (KXD + 0x2d2)) by pcw.
+                            (concat_vec (mword_of_int 17 : mword 8) ('b"0"))))
+                       = mword_of_int (KXD + 0x2ce)) by pcw.
     destruct (decide (pfun 0%nat = (mword_of_int 0 : mword 8))) as [Hz0 | Hnz0].
     - (* ==== the path is EMPTY: [last] stays at [path] ==== *)
-      iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KXD + 0x2b6))
-                (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 6)) Ra4
+      iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KXD + 0x2ac))
+                (mword_of_int 17 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                 D3 (K - 68)%nat eb Hcreg2b6 ltac:(nz)
                 ltac:(rewrite (rget_ne D3 Ra4 ltac:(nz)) HD3a4 Hz0;
                       vm_compute; reflexivity)
                 ltac:(rewrite Htgt2d2a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2b6 with "Htext"). }
+      { iApply (kxc_2ac with "Htext"). }
       iIntros (CID5 Hs5). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt2d2a) in "Hpc".
       iDestruct (kxd_last_at0 with "Hf66") as "Hf66".
@@ -2179,16 +2224,16 @@ Section KexecDMain.
                 HQe ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
-                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
-                HD3sp HD3s0 HD3s1 HD3s2 HD3s4 HD3s5 HD3s6 HD3s10
+                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
+                HD3sp HD3s0 HD3s1 HD3s2 HD3s4 HD3s5 HD3s6 HD3s11 HD3s10
                 with "Htext Hpc Hcg Hcnt Hextc Hclmc Hka Hres Hcont").
     - (* ==== the path is non-empty: run the scan from index 0 ==== *)
       assert (H0plen : (0 < plen)%nat).
       { destruct Hcstr as [_ Hnul].
         destruct (Nat.eq_dec plen 0) as [Hp0 | Hp0]; [| lia].
         exfalso. apply Hnz0. rewrite Hp0 in Hnul. exact Hnul. }
-      iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KXD + 0x2b6))
-                (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 6)) Ra4
+      iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KXD + 0x2ac))
+                (mword_of_int 17 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                 D3 (K - 68)%nat eb Hcreg2b6 ltac:(nz)
                 ltac:(rewrite (rget_ne D3 Ra4 ltac:(nz)) HD3a4;
                       apply kxd_eq_vec64_false;
@@ -2196,16 +2241,16 @@ Section KexecDMain.
                       apply (proj1 (kxd_zext8_zero (pfun 0%nat)));
                       rewrite Heq; apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2b6 with "Htext"). }
+      { iApply (kxc_2ac with "Htext"). }
       iIntros (CID5 Hs5) "Hcg Hpc".
-      assert (Hpp2b8 : add_vec_int (mword_of_int (KXD + 0x2b6) : mword 64) 2
-                       = mword_of_int (KXD + 0x2b8)) by pcw.
-      iEval (rewrite Hpp2b8) in "Hpc".
+      assert (Hpp2ae : add_vec_int (mword_of_int (KXD + 0x2ac) : mword 64) 2
+                       = mword_of_int (KXD + 0x2ae)) by pcw.
+      iEval (rewrite Hpp2ae) in "Hpc".
       (* ---- +0x2b8: c.addi a5,a5,1 ---- *)
-      iApply (wp_caddi_s_sconf (mword_of_int (KXD + 0x2b8)) Ra5
+      iApply (wp_caddi_s_sconf (mword_of_int (KXD + 0x2ae)) Ra5
                 (mword_of_int 1 : mword 6) D3 (K - 68)%nat eb
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
-      { iApply (kxc_2b8 with "Htext"). }
+      { iApply (kxc_2ae with "Htext"). }
       iIntros (CID6 Hs6) "Hcg Hpc".
       pose (D4 := <[Regidx Ra5 := regval_into_reg
                      (add_vec (rget D3 Ra5)
@@ -2226,27 +2271,29 @@ Section KexecDMain.
         by (rewrite /D4 upd_ne; [exact HD3s0 | nz]).
       assert (HD4s1 : D4 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
         by (rewrite /D4 upd_ne; [exact HD3s1 | nz]).
-      assert (HD4s2 : D4 !!! Regidx Rs2
+      assert (HD4s2 : D4 !!! Regidx Rs7
                       = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
         by (rewrite /D4 upd_ne; [exact HD3s2 | nz]).
-      assert (HD4s4 : D4 !!! Regidx Rs4 = sz1)
+      assert (HD4s4 : D4 !!! Regidx Rs2 = sz1)
         by (rewrite /D4 upd_ne; [exact HD3s4 | nz]).
-      assert (HD4s5 : D4 !!! Regidx Rs5 = proc_addr jp)
+      assert (HD4s5 : D4 !!! Regidx Rs3 = proc_addr jp)
         by (rewrite /D4 upd_ne; [exact HD3s5 | nz]).
       assert (HD4s6 : D4 !!! Regidx Rs6 = page_base P.(ud_root))
         by (rewrite /D4 upd_ne; [exact HD3s6 | nz]).
-      assert (HD4s10 : D4 !!! Regidx Rs10 = pv_sz V)
+      assert (HD4s11 : D4 !!! Regidx Rs11 = m !!! Regidx Rs11)
+        by (rewrite /D4 upd_ne; [exact HD3s11 | nz]).
+      assert (HD4s10 : D4 !!! Regidx Rs5 = pv_sz V)
         by (rewrite /D4 upd_ne; [exact HD3s10 | nz]).
-      assert (Hpp2ba : add_vec_int (mword_of_int (KXD + 0x2b8) : mword 64) 2
-                       = mword_of_int (KXD + 0x2ba)) by pcw.
-      iEval (rewrite Hpp2ba) in "Hpc".
+      assert (Hpp2b0 : add_vec_int (mword_of_int (KXD + 0x2ae) : mword 64) 2
+                       = mword_of_int (KXD + 0x2b0)) by pcw.
+      iEval (rewrite Hpp2b0) in "Hpc".
       (* ---- +0x2ba: addi a3,zero,47 -- the '/' the scan compares against ---- *)
-      iApply (wp_li4_s_sconf (mword_of_int (KXD + 0x2ba)) Ra3
+      iApply (wp_li4_s_sconf (mword_of_int (KXD + 0x2b0)) Ra3
                 (mword_of_int 47 : mword 12) (mword_of_int 47 : mword 64)
                 D4 (K - 68)%nat eb ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2ba with "Htext"). }
+      { iApply (kxc_2b0 with "Htext"). }
       iIntros (CID7 Hs7) "Hcg Hpc".
       pose (D5 := <[Regidx Ra3 := regval_into_reg
                      (mword_of_int 47 : mword 64)]> D4).
@@ -2263,44 +2310,47 @@ Section KexecDMain.
         by (rewrite /D5 upd_ne; [exact HD4s0 | nz]).
       assert (HD5s1 : D5 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
         by (rewrite /D5 upd_ne; [exact HD4s1 | nz]).
-      assert (HD5s2 : D5 !!! Regidx Rs2
+      assert (HD5s2 : D5 !!! Regidx Rs7
                       = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
         by (rewrite /D5 upd_ne; [exact HD4s2 | nz]).
-      assert (HD5s4 : D5 !!! Regidx Rs4 = sz1)
+      assert (HD5s4 : D5 !!! Regidx Rs2 = sz1)
         by (rewrite /D5 upd_ne; [exact HD4s4 | nz]).
-      assert (HD5s5 : D5 !!! Regidx Rs5 = proc_addr jp)
+      assert (HD5s5 : D5 !!! Regidx Rs3 = proc_addr jp)
         by (rewrite /D5 upd_ne; [exact HD4s5 | nz]).
       assert (HD5s6 : D5 !!! Regidx Rs6 = page_base P.(ud_root))
         by (rewrite /D5 upd_ne; [exact HD4s6 | nz]).
-      assert (HD5s10 : D5 !!! Regidx Rs10 = pv_sz V)
+      assert (HD5s11 : D5 !!! Regidx Rs11 = m !!! Regidx Rs11)
+        by (rewrite /D5 upd_ne; [exact HD4s11 | nz]).
+      assert (HD5s10 : D5 !!! Regidx Rs5 = pv_sz V)
         by (rewrite /D5 upd_ne; [exact HD4s10 | nz]).
-      assert (Hpp2be : add_vec_int (mword_of_int (KXD + 0x2ba) : mword 64) 4
-                       = mword_of_int (KXD + 0x2be)) by pcw.
-      iEval (rewrite Hpp2be) in "Hpc".
+      assert (Hpp2b4 : add_vec_int (mword_of_int (KXD + 0x2b0) : mword 64) 4
+                       = mword_of_int (KXD + 0x2b4)) by pcw.
+      iEval (rewrite Hpp2b4) in "Hpc".
       (* ---- +0x2be: c.j +0x2c8 -- into the scan's head ---- *)
-      assert (Htgt2c8 : add_vec (mword_of_int (KXD + 0x2be) : mword 64)
+      assert (Htgt2c4 : add_vec (mword_of_int (KXD + 0x2b4) : mword 64)
                           (sign_extend' 64 (sign_extend' 21
-                             (concat_vec (mword_of_int 5 : mword 11) ('b"0"))))
-                        = mword_of_int (KXD + 0x2c8)) by pcw.
-      iApply (wp_cj_s_sconf (mword_of_int (KXD + 0x2be))
-                (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0")))
+                             (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
+                        = mword_of_int (KXD + 0x2c4)) by pcw.
+      iApply (wp_cj_s_sconf (mword_of_int (KXD + 0x2b4))
+                (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")))
                 D5 (K - 68)%nat eb
-                ltac:(rewrite Htgt2c8; vm_compute; reflexivity)
+                ltac:(rewrite Htgt2c4; vm_compute; reflexivity)
                 with "Hcg Hpc []").
-      { iApply (kxc_2be with "Htext"). }
+      { iApply (kxc_2b4 with "Htext"). }
       iIntros (CID8 Hs8). iApply bi.later_intro. iIntros "Hcg Hpc".
-      iEval (rewrite Htgt2c8) in "Hpc".
+      iEval (rewrite Htgt2c4) in "Hpc".
       iDestruct (kxd_last_at0 with "Hf66") as "Hf66".
       iApply (kxd_name_loop (CID0 := CID8) (proc_addr jp) eb (K - 68)%nat
                 plen pfun dqpv sp0 pv (pa_stk sp0 68)
                 (mword_of_int (Z.of_nat c) : mword 64)
                 (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)
-                sz1 (proc_addr jp) (page_base P.(ud_root)) (pv_sz V)
+                sz1 (proc_addr jp) (page_base P.(ud_root)) (pv_sz V) (m !!! Regidx Rs11)
                 Hcstr plen D5 0%nat 0%nat ltac:(lia) H0plen ltac:(lia)
-                HD5sp HD5s0 HD5s1 HD5s2 HD5s4 HD5s5 HD5s6 HD5s10 HD5a3 HD5a4 HD5a5
+                HD5sp HD5s0 HD5s1 HD5s2 HD5s4 HD5s5 HD5s6 HD5s10 HD5s11
+                HD5a3 HD5a4 HD5a5
                 with "Htext Hpc Hcg Hpath Hf66").
       iIntros (CID9 Hs9 Mf q') "%Hpres Hpc Hcg Hpath Hf66".
-      destruct Hpres as (Hq' & Hfsp & Hfs0 & Hfs1 & Hfs2 & Hfs4 & Hfs5 & Hfs6 & Hfs10).
+      destruct Hpres as (Hq' & Hfsp & Hfs0 & Hfs1 & Hfs2 & Hfs4 & Hfs5 & Hfs6 & Hfs10 & Hfs11).
       iDestruct ("Hmk" $! (pa_add pv q') with "Hf66 Hpath") as "Hres".
       iDestruct (cpu_own_transport CID0 CID9 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2319,8 +2369,8 @@ Section KexecDMain.
                 HQe ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
-                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
-                Hfsp Hfs0 Hfs1 Hfs2 Hfs4 Hfs5 Hfs6 Hfs10
+                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
+                Hfsp Hfs0 Hfs1 Hfs2 Hfs4 Hfs5 Hfs6 Hfs11 Hfs10
                 with "Htext Hpc Hcg Hcnt Hextc Hclmc Hka Hres Hcont").
   Qed.
 

@@ -31,6 +31,7 @@ Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
 Require Import KernelDecode26.
+Require Import KernelDecode27.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -134,9 +135,9 @@ Section CodeUartintr.
   Proof. mk_base (KernelSyms.uartintr + 0x42) (mword_of_int 0x8c250513 : mword 32)
     (mword_of_int (KernelSyms.uartintr + 0x42) : mword 64) (ITYPE (mword_of_int 2242 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_8c250513. Qed.
 
-  Lemma uii2_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) false (JAL (mword_of_int 5482 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartintr + 0x46) (mword_of_int 0x56a010ef : mword 32)
-    (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) (JAL (mword_of_int 5482 : mword 21, Regidx (mword_of_int 1))) kd_56a010ef. Qed.
+  Lemma uii2_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) false (JAL (mword_of_int 5498 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartintr + 0x46) (mword_of_int 0x57a010ef : mword 32)
+    (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) (JAL (mword_of_int 5498 : mword 21, Regidx (mword_of_int 1))) kd_57a010ef. Qed.
 
   Lemma uii2_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartintr + 0x4a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.uartintr + 0x4a) (mword_of_int 0xbfe1 : mword 16)

@@ -167,7 +167,7 @@ Definition kxc_b2_body
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                 w67 ef P' szv' -∗
+                 w67 ef P' szv' (m !!! Regidx Rs11) -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
         ∀ (mf : regfile) (V' : pprivate)
           (entry spv szv2 : mword 64),
@@ -211,7 +211,7 @@ Definition kxc_b2z_body
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
-    (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
+    (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
@@ -234,7 +234,7 @@ Definition kxc_b2z_body
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
-             (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+             (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
              w67 ef P -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile),
@@ -243,8 +243,8 @@ Definition kxc_b2z_body
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
-                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                 w67 ef P (mword_of_int 0 : mword 64) -∗
+                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
+                 w67 ef P (mword_of_int 0 : mword 64) (m !!! Regidx Rs11) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -288,10 +288,10 @@ Module Type KEXECB3.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
-      (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
+      (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
+      pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
 End KEXECB3.

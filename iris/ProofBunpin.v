@@ -271,14 +271,14 @@ Section ProofBunpin.
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.bunpin + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.bunpin + 0x10))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.bunpin + 0x10)) Ra0 Ra0 (mword_of_int 0x4d6 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.bunpin + 0x10)) Ra0 Ra0 (mword_of_int 0x4c6 : mword 12)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bui_10 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1238 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1222 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = bcache_addr).
     { rewrite /R5 upd_eq /R4 upd_eq. rewrite /bcache_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -286,7 +286,7 @@ Section ProofBunpin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bunpin + 0x14)) Rra (mword_of_int 0x1fde88 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bunpin + 0x14)) Rra (mword_of_int 0x1fde78 : mword 21)
               R5 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (bui_14 with "Htext"). }
@@ -294,7 +294,7 @@ Section ProofBunpin.
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bunpin + 0x14) : mword 64) 4)]> R5).
     assert (Htgtacq : add_vec (mword_of_int (KernelSyms.bunpin + 0x14) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1fde88 : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1fde78 : mword 21))
                       = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtacq) in "Hpc".
@@ -502,21 +502,21 @@ Section ProofBunpin.
     assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.bunpin + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.bunpin + 0x22))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.bunpin + 0x22)) Ra0 Ra0 (mword_of_int 0x4c4 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.bunpin + 0x22)) Ra0 Ra0 (mword_of_int 0x4b4 : mword 12)
               D3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (bui_22 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D4 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (D3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1220 : mword 12)))]> D3).
+                  (add_vec (D3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1204 : mword 12)))]> D3).
     assert (HD4a0 : D4 !!! Regidx Ra0 = bcache_addr).
     { rewrite /D4 upd_eq /D3 upd_eq. rewrite /bcache_addr.
       apply bv_eq; vm_compute; reflexivity. }
     assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.bunpin + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.bunpin + 0x26))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bunpin + 0x26)) Rra (mword_of_int 0x1fdefe : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bunpin + 0x26)) Rra (mword_of_int 0x1fdeee : mword 21)
               D4 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (bui_26 with "Htext"). }
@@ -524,7 +524,7 @@ Section ProofBunpin.
     set (D5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bunpin + 0x26) : mword 64) 4)]> D4).
     assert (Htgtrel : add_vec (mword_of_int (KernelSyms.bunpin + 0x26) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1fdefe : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1fdeee : mword 21))
                       = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtrel) in "Hpc".

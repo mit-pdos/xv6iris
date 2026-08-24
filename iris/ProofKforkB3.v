@@ -568,7 +568,7 @@ Section KforkB3Proof.
                      (zero_reg : mword 64) Hvc with "Hpv2") as "[Hslot2 Hback2]".
         iDestruct (ofile_slot_null with "Hslot2") as "[Hcell2 Hfds]".
         (* ---- +0x9a: jal ra,filedup ---- *)
-        iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 9200 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 9216 : mword 21)
                   L1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -579,7 +579,7 @@ Section KforkB3Proof.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KF + 0x9a) : mword 64) 4)]> L1) with L2.
         assert (Hjmp : add_vec (mword_of_int (KF + 0x9a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 9200 : mword 21))
+                         (sign_extend' 64 (mword_of_int 9216 : mword 21))
                        = mword_of_int KernelSyms.filedup) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjmp) in "Hpc".
         assert (HL2ra : L2 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x9a) : mword 64) 4)

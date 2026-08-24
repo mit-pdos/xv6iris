@@ -899,12 +899,12 @@ Section IlockLoad.
     iEval (rewrite Hpp42) in "Hpc".
     (* ===== +0x42 lw a1,1698(a1) : a1 := sb.inodestart ===== *)
     assert (Hsbadr : add_vec (rget L3 Ra1)
-                       (sign_extend' 64 (mword_of_int 1700 : mword 12))
+                       (sign_extend' 64 (mword_of_int 1684 : mword 12))
                      = sb_inodestart).
     { rgne. rewrite HL3a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x42)) Ra1 Ra1
-              (mword_of_int 1700 : mword 12) L3 (K - 4)%nat
+              (mword_of_int 1684 : mword 12) L3 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hsb").
     { iApply (ili_42 with "Htext"). }
@@ -1755,7 +1755,7 @@ Section IlockLoad.
     iEval (rewrite Hpp8a) in "Hpc".
     (* ---- +0x8a jal ra,memmove ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ilock + 0x8a)) Rra
-              (mword_of_int 2087514 : mword 21) G2 (K - 4)%nat b
+              (mword_of_int 2087498 : mword 21) G2 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ili_8a with "Htext"). }
@@ -1763,7 +1763,7 @@ Section IlockLoad.
     set (G3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ilock + 0x8a) : mword 64) 4)]> G2).
     assert (Htgtmm : add_vec (mword_of_int (KernelSyms.ilock + 0x8a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2087514 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2087498 : mword 21))
                      = mword_of_int KernelSyms.memmove) by pcw.
     iEval (rewrite Htgtmm) in "Hpc".
     assert (HG3a0 : G3 !!! Regidx Ra0 = i_addr ip 0)
@@ -2010,26 +2010,26 @@ Section IlockLoad.
       iEval (rewrite Hppa6) in "Hpc".
       (* +0xa6 addi a0,a0,438 : ...and its low part *)
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ilock + 0xa6)) Ra0 Ra0
-                (mword_of_int 472 : mword 12) PA1 (K - 4)%nat b
+                (mword_of_int 456 : mword 12) PA1 (K - 4)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
       { iApply (ili_a6 with "Htext"). }
       iIntros (CIDp3 Hqp3) "Hcg Hpc".
       set (PA2 := <[Regidx Ra0 := regval_into_reg
                      (add_vec (rget PA1 Ra0)
-                        (sign_extend' 64 (mword_of_int 472 : mword 12)))]> PA1).
+                        (sign_extend' 64 (mword_of_int 456 : mword 12)))]> PA1).
       assert (Hppaa : add_vec_int
                         (mword_of_int (KernelSyms.ilock + 0xa6) : mword 64) 4
                       = mword_of_int (KernelSyms.ilock + 0xaa)) by pcw.
       iEval (rewrite Hppaa) in "Hpc".
       (* +0xaa jal ra,panic -- and panic() never returns *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ilock + 0xaa)) Rra
-                (mword_of_int 2086260 : mword 21) PA2 (K - 4)%nat b
+                (mword_of_int 2086244 : mword 21) PA2 (K - 4)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ili_aa with "Htext"). }
       iIntros (CIDp4 Hqp4) "Hcg Hpc".
       assert (Htgtpn : add_vec (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2086260 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2086244 : mword 21))
                        = mword_of_int KernelSyms.panic) by pcw.
       iEval (rewrite Htgtpn) in "Hpc".
       (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----

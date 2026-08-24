@@ -93,7 +93,7 @@ SAIL_RISCV_REV ?= 23dcf8fd923eb8a1958795393d2975632aa940b2
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= 31f115a604f04c85e7468f4edc15f06605b03507
+XV6_REV ?= 7d258aab2c94eb33313f57139edd75c1dca25b0a
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
               $(KDUMP)/KernelElfRaw.v $(KDUMP)/FsImgRaw.v

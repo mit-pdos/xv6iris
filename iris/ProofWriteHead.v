@@ -1491,14 +1491,14 @@ Section ProofWriteHead.
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 addi s2,s2,-1826 *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x10)) Rs2 Rs2
-              (mword_of_int 2248 : mword 12) R3 (K - 4)%nat b
+              (mword_of_int 2232 : mword 12) R3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (whi_10 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (R4 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (rget R3 Rs2)
-                     (sign_extend' 64 (mword_of_int 2248 : mword 12)))]> R3).
+                     (sign_extend' 64 (mword_of_int 2232 : mword 12)))]> R3).
     assert (HR4s2 : R4 !!! Regidx Rs2 = log_addr).
     { rewrite /R4 upd_eq. rgne. rewrite /R3 upd_eq /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1809,14 +1809,14 @@ Section ProofWriteHead.
       iEval (rewrite Hpp30) in "Hpc".
       (* +0x30 addi a4,a4,-1810 : a4 := &log.lh.block[0] *)
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x30)) Ra4 Ra4
-                (mword_of_int 2264 : mword 12) B3 (K - 4)%nat b
+                (mword_of_int 2248 : mword 12) B3 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (whi_30 with "Htext"). }
       iIntros (CID18 Hs18) "Hcg Hpc".
       set (B4 := <[Regidx Ra4 := regval_into_reg
                     (add_vec (rget B3 Ra4)
-                       (sign_extend' 64 (mword_of_int 2264 : mword 12)))]> B3).
+                       (sign_extend' 64 (mword_of_int 2248 : mword 12)))]> B3).
       assert (HB4a4 : B4 !!! Regidx Ra4 = lh_block 0%nat).
       { rewrite /B4 upd_eq. rgne. rewrite /B3 upd_eq.
         rewrite /lh_block /log_pa /log_addr /pa_add /add_vec_int.

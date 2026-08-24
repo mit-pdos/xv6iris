@@ -23,7 +23,7 @@ Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode24.
-Require Import KernelDecode29.
+Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -51,9 +51,9 @@ Section CodeSysFork.
   Proof. mk_rvc (KernelSyms.sys_fork + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.sys_fork + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma sf_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fork + 0x8) : mword 64) false (JAL (mword_of_int 2093864 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_fork + 0x8) (mword_of_int 0xb28ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_fork + 0x8) : mword 64) (JAL (mword_of_int 2093864 : mword 21, Regidx (mword_of_int 1))) kd_b28ff0ef. Qed.
+  Lemma sf_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fork + 0x8) : mword 64) false (JAL (mword_of_int 2093848 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_fork + 0x8) (mword_of_int 0xb18ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_fork + 0x8) : mword 64) (JAL (mword_of_int 2093848 : mword 21, Regidx (mword_of_int 1))) kd_b18ff0ef. Qed.
 
   Lemma sf_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fork + 0xc) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.sys_fork + 0xc) (mword_of_int 0x60a2 : mword 16)

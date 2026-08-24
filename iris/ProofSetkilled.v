@@ -169,7 +169,7 @@ Section ProofSetkilled.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /M1 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     (* +0x0c: jal ra,acquire *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.setkilled + 0x0c)) sk_ra (mword_of_int 2091670 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.setkilled + 0x0c)) sk_ra (mword_of_int 2091654 : mword 21)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -177,7 +177,7 @@ Section ProofSetkilled.
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (B1 := <[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) 4)]> A2).
     change (<[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) 4)]> A2) with B1.
-    assert (Hjacq : add_vec (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2091670 : mword 21)) = mword_of_int KernelSyms.acquire)
+    assert (Hjacq : add_vec (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2091654 : mword 21)) = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjacq) in "Hpc".
     assert (HB1ra : B1 !!! Regidx sk_ra = add_vec_int (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) 4) by (rewrite /B1 upd_eq; reflexivity).
@@ -245,7 +245,7 @@ Section ProofSetkilled.
     assert (HC2a0 : C2 !!! Regidx sk_a0 = proc_addr j)
       by (rewrite /C2 upd_eq add_vec_zero_l; exact HC1s1).
     (* +0x16: jal ra,release *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.setkilled + 0x16)) sk_ra (mword_of_int 2091796 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.setkilled + 0x16)) sk_ra (mword_of_int 2091780 : mword 21)
               C2 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -254,7 +254,7 @@ Section ProofSetkilled.
     iIntros "Hcg Hpc".
     set (C3 := <[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) 4)]> C2).
     change (<[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) 4)]> C2) with C3.
-    assert (Hjrel : add_vec (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2091796 : mword 21)) = mword_of_int KernelSyms.release)
+    assert (Hjrel : add_vec (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2091780 : mword 21)) = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjrel) in "Hpc".
     assert (HC3ra : C3 !!! Regidx sk_ra = add_vec_int (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) 4) by (rewrite /C3 upd_eq; reflexivity).

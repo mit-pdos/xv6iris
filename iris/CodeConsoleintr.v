@@ -506,9 +506,9 @@ Section CodeConsoleintr.
   Proof. mk_base (KernelSyms.consoleintr + 0x162) (mword_of_int 0xf3e50513 : mword 32)
     (mword_of_int (KernelSyms.consoleintr + 0x162) : mword 64) (ITYPE (mword_of_int 3902 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_f3e50513. Qed.
 
-  Lemma cnti_166 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleintr + 0x166) : mword 64) false (JAL (mword_of_int 6958 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleintr + 0x166) (mword_of_int 0x32f010ef : mword 32)
-    (mword_of_int (KernelSyms.consoleintr + 0x166) : mword 64) (JAL (mword_of_int 6958 : mword 21, Regidx (mword_of_int 1))) kd_32f010ef. Qed.
+  Lemma cnti_166 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleintr + 0x166) : mword 64) false (JAL (mword_of_int 6974 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleintr + 0x166) (mword_of_int 0x33f010ef : mword 32)
+    (mword_of_int (KernelSyms.consoleintr + 0x166) : mword 64) (JAL (mword_of_int 6974 : mword 21, Regidx (mword_of_int 1))) kd_33f010ef. Qed.
 
   Lemma cnti_16a : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleintr + 0x16a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 1997 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.consoleintr + 0x16a) (mword_of_int 0xbf69 : mword 16)

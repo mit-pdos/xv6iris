@@ -211,12 +211,12 @@ Section KexecTail.
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
-    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
+    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     kernel_text -∗
     kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
@@ -241,14 +241,14 @@ Section KexecTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
-           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
+           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     iIntros "#Htext Hst Hcont".
     iApply (PC.kxc_c_close (CID0 := CID0) Q jp bn gfs ga gf cov logstart
               bmapstart inodestart size plen pfun na avf alen aslen afun
               pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c
               HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
-              Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+              Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
     iIntros (CIDd) "%Hsd". iIntros (Md Pd) "Hst2a6 Hcont".
     iApply (PD.kxd_phaseD (CID0 := CIDd) Q jp bn gfs ga gf cov logstart
@@ -256,7 +256,7 @@ Section KexecTail.
               pidv V eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pd sz1 c
               HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
-              Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+              Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst2a6 Hcont").
   Qed.
 
@@ -294,12 +294,12 @@ Section KexecTail.
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
-    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
+    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     kernel_text -∗
     kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
@@ -325,7 +325,7 @@ Section KexecTail.
   Proof.
     intros HQe HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
            Hmsp Hmra Hms0 Hms1 Hms2
-           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
+           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     iIntros "#Htext Hst Hcont".
     (* the two pure facts the blocks past [kxc_c_setup] take as PREMISES --
        the bitmap-set inclusion and the ustack's eight-alignment -- are
@@ -337,7 +337,7 @@ Section KexecTail.
     iAssert (kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv)
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv (m !!! Regidx Rs11))
       with "[Hrest]" as "Hst".
     { rewrite /kxc_at_1ae.
       iSplitR; [iPureIntro; exact Hregs |].
@@ -349,7 +349,7 @@ Section KexecTail.
               afun pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv
               HK Hmsp Hmra Hms0 Hms1 Hms2
-              Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+              Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
     iIntros (CID1) "%Hs1". iIntros (M1 P1 sz1) "%Hsz1ge Hdisj Hcont".
@@ -366,7 +366,7 @@ Section KexecTail.
       iAssert (kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart
                  size plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                  M1 K sp0 ra0 s00 s10 s20 pv av
-                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 (pv_sz V) sz1 0)
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 (pv_sz V) sz1 (m !!! Regidx Rs11) 0)
         with "[Hrest2]" as "Hloop".
       { rewrite /kxc_at_21a.
         iSplitR; [iPureIntro; exact Hq1 |].
@@ -379,7 +379,7 @@ Section KexecTail.
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef (pv_sz V) sz1
                 HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
-                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 na M1 P1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
       iIntros (CID2) "%Hs2". iIntros (M2 P2 c2) "Hst272 Hcont".
@@ -388,7 +388,7 @@ Section KexecTail.
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 sz1 c2
                 HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
-                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
     - (* argv[0] = NULL: the loop is skipped, and c = 0 *)
       iApply (kxc_d_tail (CID0 := CID1) Q jp bn gfs ga gf cov logstart bmapstart
@@ -396,7 +396,7 @@ Section KexecTail.
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 sz1 0
                 HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
-                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+                Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hskip Hcont").
   Qed.
 
@@ -539,14 +539,14 @@ Section KexecMain.
               with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
-      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w67z) "Hst1a2 Hcont".
+      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w13z w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w67z ef Pz
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w13z w67z ef Pz
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 with "Htext Hfab Hst1a2 [Hcont]").
       iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
@@ -560,11 +560,11 @@ Section KexecMain.
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
-                (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+                (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
                 w67z ef Pz (mword_of_int 0 : mword 64)
                 I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
-                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
@@ -593,7 +593,7 @@ Section KexecMain.
                 (mword_of_int 4095 : mword 64) ef Py szvy
                 I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
-                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
   Qed.
 

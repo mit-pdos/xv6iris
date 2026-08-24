@@ -228,7 +228,7 @@ Section YieldPostSched.
     assert (Hpc1e : add_vec_int (mword_of_int (KernelSyms.yield + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.yield + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
     (* +0x1e: jal release *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092396 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092380 : mword 21)
               D0 (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -237,7 +237,7 @@ Section YieldPostSched.
     iIntros "Hcg Hpc".
     set (D1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) 4)]> D0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) 4)]> D0) with D1.
-    assert (Hpcrl : add_vec (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 2092396 : mword 21))
+    assert (Hpcrl : add_vec (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 2092380 : mword 21))
                     = mword_of_int KernelSyms.release) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcrl) in "Hpc".
     (* ------------------------------------------------------------------ *)
@@ -560,7 +560,7 @@ Section ProofYield.
     (* ------------------------------------------------------------------ *)
     (* +0x0a: jal myproc -> a0 = proc_addr j; noff/intena/cur_proc round.  *)
     (* ------------------------------------------------------------------ *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095640 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095624 : mword 21)
               A1 (av - 4)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -568,7 +568,7 @@ Section ProofYield.
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (A2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)]> A1).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)]> A1) with A2.
-    assert (Hpcmp : add_vec (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095640 : mword 21))
+    assert (Hpcmp : add_vec (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095624 : mword 21))
                     = mword_of_int KernelSyms.myproc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcmp) in "Hpc".
     assert (HA2ra : A2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)
@@ -598,7 +598,7 @@ Section ProofYield.
     assert (Hpc10 : add_vec_int (mword_of_int (KernelSyms.yield + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.yield + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc10) in "Hpc".
     (* +0x10: jal acquire *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x10)) (mword_of_int 1 : mword 5) (mword_of_int 2092274 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x10)) (mword_of_int 1 : mword 5) (mword_of_int 2092258 : mword 21)
               B0 (av - 4)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
@@ -606,7 +606,7 @@ Section ProofYield.
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (B1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x10) : mword 64) 4)]> B0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x10) : mword 64) 4)]> B0) with B1.
-    assert (Hpcaq : add_vec (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 2092274 : mword 21))
+    assert (Hpcaq : add_vec (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 2092258 : mword 21))
                     = mword_of_int KernelSyms.acquire) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcaq) in "Hpc".
     (* ------------------------------------------------------------------ *)

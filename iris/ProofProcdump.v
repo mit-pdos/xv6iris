@@ -87,7 +87,7 @@ Section ProofProcdumpMain.
     (* ================================================================== *)
     iApply (wp_jal_s_sconf (CID := CID1)
               (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) Rra
-              (mword_of_int 2089436 : mword 21) M (K - 10)%nat b
+              (mword_of_int 2089420 : mword 21) M (K - 10)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pdi_1e with "Htext"). }
@@ -96,7 +96,7 @@ Section ProofProcdumpMain.
                   (add_vec_int
                      (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) 4)]> M).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2089436 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2089420 : mword 21))
                    = mword_of_int KernelSyms.printk) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     assert (HM1ra : M1 !!! Regidx Rra

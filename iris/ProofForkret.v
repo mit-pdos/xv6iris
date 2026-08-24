@@ -230,7 +230,7 @@ Proof.
   (*  +0x64: jal ra, prepare_return.                                     *)
   (* ================================================================== *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x64)) Rra
-            (mword_of_int 2790 : mword 21) mt av2 eb
+            (mword_of_int 2806 : mword 21) mt av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_64 with "Htext"). }
@@ -242,7 +242,7 @@ Proof.
   assert (HT5sp : T5 !!! Regidx csp_rs1 = pa_stk ksp 6)
     by (rewrite /T5 upd_ne; [exact Hmtsp | reg_neq]).
   assert (Hprep : add_vec (mword_of_int (FR + 0x64) : mword 64)
-                    (sign_extend' 64 (mword_of_int 2790 : mword 21))
+                    (sign_extend' 64 (mword_of_int 2806 : mword 21))
                   = mword_of_int KernelSyms.prepare_return) by pcw.
   iEval (rewrite Hprep) in "Hpc".
   (* the three hart-indexed carriers, moved to the current binder in one
@@ -944,7 +944,7 @@ Proof.
   iEval (rewrite Hbp28) in "Hpc".
   (* ---- +0x28: jal ra, fsinit ---- *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x28)) Rra
-            (mword_of_int 7166 : mword 21) B5 av2 eb
+            (mword_of_int 7182 : mword 21) B5 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_28 with "Htext"). }
@@ -1242,7 +1242,7 @@ Proof.
   iEval (rewrite Hdp52) in "Hpc".
   (* ---- +0x52: jal ra, kexec ---- *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x52)) Rra
-            (mword_of_int 11862 : mword 21) D4 av2 eb
+            (mword_of_int 11878 : mword 21) D4 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (fkr_52 with "Htext"). }

@@ -18,7 +18,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode02.
-Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode08.
@@ -167,9 +166,9 @@ Section CodeDevintr.
   Proof. mk_rvc (KernelSyms.devintr + 0x46) (mword_of_int 0xbff1 : mword 16)
     (mword_of_int (KernelSyms.devintr + 0x46) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2030 : mword 11) ('b"0")), zreg)) kd_bff1 exec_execute_C_J. Qed.
 
-  Lemma dii_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) false (JAL (mword_of_int 2090040 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.devintr + 0x48) (mword_of_int 0xc38fe0ef : mword 32)
-    (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) (JAL (mword_of_int 2090040 : mword 21, Regidx (mword_of_int 1))) kd_c38fe0ef. Qed.
+  Lemma dii_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) false (JAL (mword_of_int 2090024 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.devintr + 0x48) (mword_of_int 0xc28fe0ef : mword 32)
+    (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) (JAL (mword_of_int 2090024 : mword 21, Regidx (mword_of_int 1))) kd_c28fe0ef. Qed.
 
   Lemma dii_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x4c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 11 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.devintr + 0x4c) (mword_of_int 0xa819 : mword 16)
@@ -191,13 +190,13 @@ Section CodeDevintr.
   Proof. mk_base (KernelSyms.devintr + 0x56) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.devintr + 0x56) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma dii_5a : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x5a) : mword 64) false (ITYPE (mword_of_int 3322 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.devintr + 0x5a) (mword_of_int 0xcfa50513 : mword 32)
-    (mword_of_int (KernelSyms.devintr + 0x5a) : mword 64) (ITYPE (mword_of_int 3322 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cfa50513. Qed.
+  Lemma dii_5a : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x5a) : mword 64) false (ITYPE (mword_of_int 3306 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.devintr + 0x5a) (mword_of_int 0xcea50513 : mword 32)
+    (mword_of_int (KernelSyms.devintr + 0x5a) : mword 64) (ITYPE (mword_of_int 3306 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cea50513. Qed.
 
-  Lemma dii_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x5e) : mword 64) false (JAL (mword_of_int 2088836 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.devintr + 0x5e) (mword_of_int 0xf85fd0ef : mword 32)
-    (mword_of_int (KernelSyms.devintr + 0x5e) : mword 64) (JAL (mword_of_int 2088836 : mword 21, Regidx (mword_of_int 1))) kd_f85fd0ef. Qed.
+  Lemma dii_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x5e) : mword 64) false (JAL (mword_of_int 2088820 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.devintr + 0x5e) (mword_of_int 0xf75fd0ef : mword 32)
+    (mword_of_int (KernelSyms.devintr + 0x5e) : mword 64) (JAL (mword_of_int 2088820 : mword 21, Regidx (mword_of_int 1))) kd_f75fd0ef. Qed.
 
   Lemma dii_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.devintr + 0x62) (mword_of_int 0x8526 : mword 16)

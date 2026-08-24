@@ -1123,7 +1123,7 @@ Section ProofPipealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2c) in "Hpc".
     (* +0x2c jal ra,kalloc *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x2c)) Rra (mword_of_int 0x1fc666 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x2c)) Rra (mword_of_int 0x1fc656 : mword 21)
               mD (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (pai_2c with "Htext"). }
@@ -1131,7 +1131,7 @@ Section ProofPipealloc.
     set (mE := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) 4)]> mD).
     assert (Htgtka : add_vec (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 0x1fc666 : mword 21))
+                       (sign_extend' 64 (mword_of_int 0x1fc656 : mword 21))
                      = mword_of_int KernelSyms.kalloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtka) in "Hpc".
@@ -1462,13 +1462,13 @@ Section ProofPipealloc.
     assert (Hpp4c : add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x48) : mword 64) 4 = mword_of_int (KernelSyms.pipealloc + 0x4c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4c) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x4c)) Ra1 Ra1 (mword_of_int 0x122 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x4c)) Ra1 Ra1 (mword_of_int 0x112 : mword 12)
               G3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pai_4c with "Htext"). }
     iIntros (CID31 Hs31) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (G4 := <[Regidx Ra1 := regval_into_reg
-                  (add_vec (G3 !!! Regidx Ra1) (sign_extend' 64 (mword_of_int 290 : mword 12)))]> G3).
+                  (add_vec (G3 !!! Regidx Ra1) (sign_extend' 64 (mword_of_int 274 : mword 12)))]> G3).
     assert (HG4a1 : G4 !!! Regidx Ra1 = (mword_of_int pipe_name_str : mword 64)).
     { rewrite /G4 upd_eq /G3 upd_eq. unfold pipe_name_str.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1499,7 +1499,7 @@ Section ProofPipealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp50) in "Hpc".
     (* +0x50 jal ra,initlock *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x50)) Rra (mword_of_int 0x1fc69c : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x50)) Rra (mword_of_int 0x1fc68c : mword 21)
               G4 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (pai_50 with "Htext"). }
@@ -1507,7 +1507,7 @@ Section ProofPipealloc.
     set (G5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) 4)]> G4).
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64)
-                       (sign_extend' 64 (mword_of_int 0x1fc69c : mword 21))
+                       (sign_extend' 64 (mword_of_int 0x1fc68c : mword 21))
                      = mword_of_int KernelSyms.initlock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtil) in "Hpc".

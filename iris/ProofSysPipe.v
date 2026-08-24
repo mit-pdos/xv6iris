@@ -1210,7 +1210,7 @@ Section ProofSysPipe.
     (*  +0x0a  jal ra,myproc                                             *)
     (* ================================================================= *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0xa)) Rra
-              (mword_of_int 2081846 : mword 21) R2 (av - 8)%nat b
+              (mword_of_int 2081836 : mword 21) R2 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_0a with "Htext"). }
@@ -1220,7 +1220,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64) 4)]> R2) with R3.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2081846 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2081836 : mword 21))
                    = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
@@ -1297,7 +1297,7 @@ Section ProofSysPipe.
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 jal ra,argaddr *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x16)) Rra
-              (mword_of_int 2085768 : mword 21) P3 (av - 8)%nat b
+              (mword_of_int 2085774 : mword 21) P3 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_16 with "Htext"). }
@@ -1307,7 +1307,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x16) : mword 64) 4)]> P3) with P4.
     assert (Hjaa : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085768 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085774 : mword 21))
                    = mword_of_int KernelSyms.argaddr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjaa) in "Hpc".
@@ -1403,7 +1403,7 @@ Section ProofSysPipe.
       by (rewrite /Q2 upd_ne; [exact HQ1a1 | vm_compute; discriminate]).
     (* +0x22 jal ra,pipealloc *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x22)) Rra
-              (mword_of_int 2092946 : mword 21) Q2 (av - 8)%nat b
+              (mword_of_int 2092952 : mword 21) Q2 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_22 with "Htext"). }
@@ -1413,7 +1413,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x22) : mword 64) 4)]> Q2) with Q3.
     assert (Hjpa : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x22) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092946 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092952 : mword 21))
                    = mword_of_int KernelSyms.pipealloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjpa) in "Hpc".
@@ -1588,11 +1588,11 @@ Section ProofSysPipe.
     assert (Hcc4e : add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0xd8) : mword 64) 2
                     = mword_of_int (KernelSyms.sys_pipe + 0xda)) by (apply bv_eq; vm_compute; reflexivity).
     assert (Hcc4f : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xcc) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2091956 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2091962 : mword 21))
                     = mword_of_int KernelSyms.fileclose)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hcc4g : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xd4) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2091948 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2091954 : mword 21))
                     = mword_of_int KernelSyms.fileclose)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ...and the +0xbc descriptor-null block's *)
@@ -1735,7 +1735,7 @@ Section ProofSysPipe.
                    with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
       iApply (sp_close2 (CID0 := CID43)  γfl γf fn on Y0 (av - 8)%nat eb p sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2091956 : mword 21) (mword_of_int 2091948 : mword 21) b lks pid _
+                (mword_of_int 2091962 : mword 21) (mword_of_int 2091954 : mword 21) b lks pid _
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe [] [] [] [] [] Hb6 Hb7 Href0 Href1 Hpenv Hfefull Hpbare Hiru").
       { iApply (spi_c8 with "Htext"). }
@@ -1970,7 +1970,7 @@ Section ProofSysPipe.
                    with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
       iApply (sp_close2 (CID0 := CID53)  γfl γf fn on F2 (av - 8)%nat eb p sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2091956 : mword 21) (mword_of_int 2091948 : mword 21) b lks pid _
+                (mword_of_int 2091962 : mword 21) (mword_of_int 2091954 : mword 21) b lks pid _
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe [] [] [] [] [] Hb6 Hb7 Href0 Href1 Hpenv Hfefull Hpbare Hiru").
       { iApply (spi_c8 with "Htext"). }
@@ -2073,11 +2073,11 @@ Section ProofSysPipe.
     assert (Hc9ce : add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0xb0) : mword 64) 2
                     = mword_of_int (KernelSyms.sys_pipe + 0xb2)) by (apply bv_eq; vm_compute; reflexivity).
     assert (Hc9cf : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xa4) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2091996 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2092002 : mword 21))
                     = mword_of_int KernelSyms.fileclose)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hc9cg : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xac) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2091988 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2091994 : mword 21))
                     = mword_of_int KernelSyms.fileclose)
       by (apply bv_eq; vm_compute; reflexivity).
     (* two [kalloc_env] bundles, one per copyout, built from the persistent
@@ -2197,7 +2197,7 @@ Section ProofSysPipe.
     iEval (rewrite Hpp5e) in "Hpc".
     (* +0x5e jal ra,copyout *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x5e)) Rra
-              (mword_of_int 2080796 : mword 21) A5 (av - 8)%nat b
+              (mword_of_int 2080786 : mword 21) A5 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_5e with "Htext"). }
@@ -2207,7 +2207,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x5e) : mword 64) 4)]> A5) with A6.
     assert (Hjco1 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x5e) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2080796 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2080786 : mword 21))
                     = mword_of_int KernelSyms.copyout)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjco1) in "Hpc".
@@ -2463,7 +2463,7 @@ Section ProofSysPipe.
                    with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
       iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 E4 (av - 8)%nat eb p sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
-                (mword_of_int 2091996 : mword 21) (mword_of_int 2091988 : mword 21) b lks pid _
+                (mword_of_int 2092002 : mword 21) (mword_of_int 2091994 : mword 21) b lks pid _
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe [] [] [] [] [] Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfefull Hpbare Hiru").
       { iApply (spi_a0 with "Htext"). }
@@ -2662,7 +2662,7 @@ Section ProofSysPipe.
     iEval (rewrite Hpp76) in "Hpc".
     (* +0x76 jal ra,copyout *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x76)) Rra
-              (mword_of_int 2080772 : mword 21) C6 (av - 8)%nat b
+              (mword_of_int 2080762 : mword 21) C6 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_76 with "Htext"). }
@@ -2672,7 +2672,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x76) : mword 64) 4)]> C6) with C7.
     assert (Hjco2 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x76) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2080772 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2080762 : mword 21))
                     = mword_of_int KernelSyms.copyout)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjco2) in "Hpc".

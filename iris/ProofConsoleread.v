@@ -1370,7 +1370,7 @@ Section ProofConsoleread.
                    = mword_of_int (CR + 0xa8)) by pcw.
     iEval (rewrite Hpa8) in "Hpc".
     (* ---- +0xa8 jal either_copyout ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (CR + 0xa8)) Rra (mword_of_int 8272 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (CR + 0xa8)) Rra (mword_of_int 8288 : mword 21)
               G4 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnri_0a8 with "Ht"). }
@@ -1378,7 +1378,7 @@ Section ProofConsoleread.
     set (G5 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0xa8) : mword 64) 4)]> G4).
     assert (Hjeco : add_vec (mword_of_int (CR + 0xa8) : mword 64)
-                      (sign_extend' 64 (mword_of_int 8272 : mword 21))
+                      (sign_extend' 64 (mword_of_int 8288 : mword 21))
                     = mword_of_int KernelSyms.either_copyout) by pcw.
     iEval (rewrite Hjeco) in "Hpc".
     assert (HG5a0 : G5 !!! Regidx Ra0 = (mword_of_int 1 : mword 64)).
@@ -1809,7 +1809,7 @@ Section ProofConsoleread.
                    = (mword_of_int (CR + 0x4c) : mword 64)) by pcw.
     iEval (rewrite Hp4c) in "Hpc".
     (* ---- +0x4c jal ra,killed ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (CR + 0x4c)) Rra (mword_of_int 8056 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (CR + 0x4c)) Rra (mword_of_int 8072 : mword 21)
               mmp (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnri_04c with "Ht"). }
@@ -1817,7 +1817,7 @@ Section ProofConsoleread.
     set (W2 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x4c) : mword 64) 4)]> mmp).
     assert (Hjkl : add_vec (mword_of_int (CR + 0x4c) : mword 64)
-                     (sign_extend' 64 (mword_of_int 8056 : mword 21))
+                     (sign_extend' 64 (mword_of_int 8072 : mword 21))
                    = mword_of_int KernelSyms.killed) by pcw.
     iEval (rewrite Hjkl) in "Hpc".
     assert (HW2a0 : W2 !!! Regidx Ra0 = proc_addr jp)
@@ -1976,7 +1976,7 @@ Section ProofConsoleread.
     assert (Hp54 : add_vec_int (mword_of_int (CR + 0x52) : mword 64) 2
                    = mword_of_int (CR + 0x54)) by pcw.
     iEval (rewrite Hp54) in "Hpc".
-    iApply (wp_jal_s_sconf (mword_of_int (CR + 0x54)) Rra (mword_of_int 7448 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (CR + 0x54)) Rra (mword_of_int 7464 : mword 21)
               S1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnri_054 with "Ht"). }
@@ -1984,7 +1984,7 @@ Section ProofConsoleread.
     set (S2 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x54) : mword 64) 4)]> S1).
     assert (Hjsp : add_vec (mword_of_int (CR + 0x54) : mword 64)
-                     (sign_extend' 64 (mword_of_int 7448 : mword 21))
+                     (sign_extend' 64 (mword_of_int 7464 : mword 21))
                    = mword_of_int KernelSyms.sleep_prepare) by pcw.
     iEval (rewrite Hjsp) in "Hpc".
     assert (HS2a0 : S2 !!! Regidx Ra0 = a_cons_r).
@@ -2064,7 +2064,7 @@ Section ProofConsoleread.
     { apply (callee_saved_trans M msp mrl0 HcsMsp).
       apply (callee_saved_trans msp S4 mrl0 HcsS4 Hcsrl0). }
     (* ---- +0x5e jal sleep : the park.  Interrupts are back ON here. ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (CR + 0x5e)) Rra (mword_of_int 7498 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (CR + 0x5e)) Rra (mword_of_int 7514 : mword 21)
               mrl0 (av - 12)%nat true ltac:(nz) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnri_05e with "Ht"). }
@@ -2072,7 +2072,7 @@ Section ProofConsoleread.
     set (S5 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x5e) : mword 64) 4)]> mrl0).
     assert (Hjsl : add_vec (mword_of_int (CR + 0x5e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 7498 : mword 21))
+                     (sign_extend' 64 (mword_of_int 7514 : mword 21))
                    = mword_of_int KernelSyms.sleep) by pcw.
     iEval (rewrite Hjsl) in "Hpc".
     assert (HS5ra : S5 !!! Regidx Rra

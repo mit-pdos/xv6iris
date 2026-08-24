@@ -458,7 +458,7 @@ Section ProofSysFstat.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ---- +0x0e: jal ra,argaddr ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_fstat + 0x0e))
-              Rra (mword_of_int 2087416 : mword 21) M4 (av - 4)%nat b
+              Rra (mword_of_int 2087422 : mword 21) M4 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sfsi_0e with "Htext"). }
@@ -468,7 +468,7 @@ Section ProofSysFstat.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_fstat + 0x0e) : mword 64) 4)]> M4) with M5.
     assert (Hjaa : add_vec (mword_of_int (KernelSyms.sys_fstat + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087416 : mword 21)) = mword_of_int KernelSyms.argaddr)
+                     (sign_extend' 64 (mword_of_int 2087422 : mword 21)) = mword_of_int KernelSyms.argaddr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjaa) in "Hpc".
     assert (HM5a0 : M5 !!! Regidx Ra0 = mword_of_int (Z.of_nat 1)).
@@ -772,7 +772,7 @@ Section ProofSysFstat.
         by (rewrite /S2 upd_ne; [exact HS1sp | reg_neq]).
       (* ---- +0x2e: jal ra,filestat ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_fstat + 0x2e))
-                Rra (mword_of_int 2093948 : mword 21) S2 (av - 4)%nat b
+                Rra (mword_of_int 2093954 : mword 21) S2 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sfsi_2e with "Htext"). }
@@ -782,7 +782,7 @@ Section ProofSysFstat.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.sys_fstat + 0x2e) : mword 64) 4)]> S2) with S3.
       assert (Hjfs : add_vec (mword_of_int (KernelSyms.sys_fstat + 0x2e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093948 : mword 21)) = mword_of_int KernelSyms.filestat)
+                       (sign_extend' 64 (mword_of_int 2093954 : mword 21)) = mword_of_int KernelSyms.filestat)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjfs) in "Hpc".
       assert (HS3ra : S3 !!! Regidx Rra
