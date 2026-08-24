@@ -78,6 +78,7 @@ Require Import BioDefs.
 Require Import BitmapEnc.
 Require Import DinodeEnc.
 Require Import DirView.
+Require Import FsTree.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import Xv6Cameras.
