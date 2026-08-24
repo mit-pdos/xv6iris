@@ -92,3 +92,11 @@ CoreRegsFprGen.v
 CoreRegsFpr.v
 UartRxGen.v
 UartRx.v
+ConcLostGen.v
+ConcLost.v
+ConcSbGen.v
+ConcSb.v
+ConcByteGen.v
+ConcByte.v
+ConcAmoGen.v
+ConcAmo.v

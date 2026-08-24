@@ -1,12 +1,30 @@
 # Project: device conformance — the semantics, differentially tested against QEMU
 
-## STATUS (2026-08-23)
+## STATUS (2026-08-24)
 
-The plumbing is LANDED and green (`make vtest`, ~33 s, four tests).  What it
-has produced so far is **five divergences from real hardware, one of them an
-unsoundness**, and three positive confirmations.  Nothing here changes the
-model: this effort's output is a register of findings plus the machinery that
-keeps producing them.
+LANDED and green: `make vtest`, **46 test programs** across six areas (`core`,
+`disk`, `uart`, `plic`, `conc`), and **25 recorded divergences from real
+hardware, THREE of them unsoundnesses**, beside a long list of confirmations.
+Nothing here changes the model: this effort's output is a register of findings
+plus the machinery that keeps producing them.
+
+**The three unsoundnesses, in the order they matter:**
+
+1. **The memory model is sequentially consistent and the architecture is not**
+   (finding 24, `conc_sb`).  Store buffering gives (0,0) on QEMU in a few
+   percent of runs, which RVWMO permits and no SC machine can.  Live in xv6:
+   `acquire`/`release` carry `__sync_synchronize()` for exactly this reason,
+   and under this model those fences are unobservable.
+2. **The virtqueue is served strictly in publication order** (finding 5,
+   `disk_order`), where a real device completes in any order -- which is why
+   `virtio_disk_intr` reads the used element's id at all.
+3. **`plic_claim` ignores the context threshold** (finding 10, `plic_thresh`),
+   contradicting the model's own `plic_eip`.  Not reachable through xv6's own
+   code, but `PlicPlan.v` leaves the threshold free, so the invariant admits
+   exactly the disagreeing states.
+
+The FINDINGS TABLE in [`tools/vtest/README.md`](../../tools/vtest/README.md)
+is the authority and is maintained; this file summarises and links.
 
 - `tools/vtest/` — the ABI, the test programs, the QEMU runner/generator.
   **Read [`tools/vtest/README.md`](../../tools/vtest/README.md) first**; it
@@ -169,7 +187,26 @@ stay in the findings table UNCLASSIFIED, and no test depends on the answer.
 
 ## 5. WHAT IS LEFT, in the order it is worth doing
 
-1. **`disk_ident` — the stuck matrix.** The cheapest remaining findings, and
+0. **THE MEMORY MODEL (finding 24) is now the largest open question in the
+   effort**, and it is not a device question at all.  `VConc` has one `gmem`
+   and a store is global the instant it retires; RVWMO permits store->load
+   reordering.  Nothing short of giving the language a real memory model
+   closes it, which is a research-scale change to `RiscvLang.prim_step`, not
+   a fix.  What is cheap and worth doing first is to WRITE DOWN the exposure:
+   which proofs would change if fences became observable, and whether the
+   whole-system theorem should state its SC assumption explicitly rather than
+   inheriting it silently from the language.
+
+**DONE since this list was written** (2026-08-24): items 1-3 (`disk_ident`
+and its twelve stuck programs, `disk_err`, `disk_chain`), item 4 (`uart_*`,
+seven tests including both interrupt paths and the receive datapath), item 5
+(`plic_*`, seven tests), and item 6's register half (`core_regs_*`, eight
+programs).  What is left of item 6 is the CPU/memory side proper -- the RAM
+path at each width, misaligned accesses, and the reservation arms of
+`mnode_step`, which `conc_amo` shows are partly reachable after all (`lr.w`
+and `amoadd.w` execute; `sc.w` does not evaluate, finding 25).
+
+1. ~~**`disk_ident` — the stuck matrix.**~~ DONE. The cheapest remaining findings, and
    the one place the register set is systematically wrong rather than
    incidentally.  Config space at offset `0x100` is not decoded, so **a
    driver that asks the disk its capacity gets a STUCK machine**; likewise

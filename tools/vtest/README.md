@@ -178,6 +178,8 @@ does not exist).
 | 21 | `misa` advertises F and D but the model has NO F/D instructions | `fsd` takes an illegal-instruction trap (`mcause` 2, `mtval` = the encoding) | executes | incompleteness + internal inconsistency | `core_regs_fpr` |
 | 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
 | 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received -- the holding register is not cleared by a read nor by an FCR clear, only the DR FLAG is | incompleteness | `uart_rx` |
+| 24 | **THE MEMORY MODEL: the model is sequentially consistent** | one shared `gmem`, a store is global the instant it retires -- (0,0) unreachable | store-buffering gives **(0,0) in a few percent of runs**, which RVWMO permits | **UNSOUNDNESS** | `conc_sb` |
+| 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | incompleteness (harness-blocking) | `conc_amo` |
 | 12 | PLIC source 0's priority register not decoded (`plic_read`/`plic_write` gate on `0 <? off`), and `plic_nsrc` is 32 where the board has 96 | STUCK | offset 0 is read-only zero; source 32 is a real register | incompleteness | `plic_prio0` |
 
 Finding 4 is the one worth acting on.  The spec defines the used element's
@@ -285,6 +287,34 @@ path writes the data buffer.  So on these paths QEMU is not spec-conforming
 either, and finding 4's fix must be stated against the SPEC (bytes actually
 written into the device-writable part of the chain), not against QEMU's value.
 
+### Finding 24 is the largest one the suite has found
+
+`conc_sb` is the store-buffering litmus test -- `hart 0: X=1; a=Y` alongside
+`hart 1: Y=1; b=X` -- and QEMU produces **(a,b) = (0,0)**, which no
+sequentially consistent machine can.  Measured 55 times in 1200 runs (4.6%)
+by the agent, and independently re-confirmed at 4 in 200.  It is not a
+truncated run: in the (0,0) captures **X and Y are both 1**, so both stores
+landed and both loads still returned 0 (`conc_sb_both_stores_happened`).
+
+QEMU is RIGHT.  RVWMO permits a store to be reordered past a later load, the
+litmus program has no fence between them, and QEMU on an x86 host exposes the
+host's TSO.  It is the MODEL that is wrong.
+
+And it is not a granularity gap that a finer schedule would close.  `VConc`
+has one `gmem`; `ghart` hands it to a hart and `gput` makes that hart's memory
+THE memory, so no store can wait anywhere -- `ConcSb.v` states this off the
+model (`model_hart_sees_the_one_memory`, `model_store_is_immediately_global`)
+and enumerates all six interleavings of the two two-instruction sequences,
+none of which gives (0,0).  Per-node interleaving would not help either.
+
+**This is live in xv6.**  `acquire`/`release` carry `__sync_synchronize()`
+precisely because the hardware reorders a store past a later load -- and under
+this model those fences are unobservable, so nothing in the development can
+tell a correct one from a missing one.
+
+The model reproduces the three SC outcomes, whole result region each, lined up
+with the capture order (`conc_sb_model_admits_every_sc_outcome`).
+
 ### OPEN DECISION (finding 22): which machine is the model claiming to be?
 
 Every other row is the model being NARROWER than the hardware.  Finding 22 is
@@ -315,6 +345,26 @@ floating-point instructions at all while `misa` bits 3 and 5 promise them.
 set to Initial first, so FS is not the cause.  The fix is a one-liner either
 way: add the modules, or set F/D `supported: false` in the config so `misa`
 stops promising them.
+
+### Making a race actually race (the TB warm-up trap)
+
+QEMU's FIRST execution of a basic block costs thousands of guest instructions'
+worth of wall time in `tb_gen_code`, so a plain rendezvous does not make two
+harts overlap -- whichever is still in the translator loses before it starts.
+Measured: a 16-round lost-update loop came out at 32 in **60 runs of 60**, and
+2048 rounds each was still 0 lost in 25 runs.
+
+The fix, used by all three racing tests: a **two-pass structure**.  Both harts
+run the whole hot path once on PRIVATE words, leaving every block in QEMU's
+shared TB cache, then rendezvous, then race.  With that, two rounds each is
+enough.  `conc_sb` additionally gives the harts delay loops of different
+lengths to trim hart 0's systematic head start, which raised (0,0) from 1.3%
+to 4.6% of runs.
+
+Only store->load reordering appears on an x86-64 host, which is what TSO under
+MTTCG can expose.  Message-passing and load-buffering tests would be
+guaranteed single-outcome here and are worth adding only if this suite is ever
+run on an aarch64 host.
 
 ### Capturing a nondeterministic test
 
@@ -431,6 +481,19 @@ have been wrong and is not.
   whole sequence and is not sticky in either direction; and FCR bit 1 clears
   the receive FIFO -- a live `uart_write` arm no test had touched on the rx
   side, and what `uartinit` writes at boot.
+- **Instruction-granularity interleaving** (`conc_lost`): a lost-update race
+  produces exactly three outcomes (4, 2 and 3 over two rounds) and the model
+  has a schedule for each, floor included.  It also pins that the UNSCHEDULED
+  round-robin run is the maximally-colliding one, which is the concrete reason
+  a race test must NAME its interleaving rather than let the harness pick.
+- **Sub-word store granularity under concurrent access** (`conc_byte`): two
+  harts holding a loaded byte while the other stores an adjacent byte of the
+  same word, three rounds, nothing lost -- the same shape that DOES lose an
+  update in `conc_lost` when the byte is shared.
+- **`amoadd.w`** (`conc_amo`) computes the right read-modify-write and both
+  machines answer 8.  The atomicity claim is deliberately weak and the file
+  says so: `CCpu` is instruction-granular, so no schedule here could split an
+  AMO in the first place.
 - **The whole interrupt path** (`disk_intr`): the device raising its line, the PLIC
   gateway latching source 1, the wire driving hart 0's `sig_seip` (visible in
   `mip`), the S-context claim returning the source and clearing pending, the
