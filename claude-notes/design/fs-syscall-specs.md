@@ -331,6 +331,32 @@ first instance), not a consumer-visible statement.
    continuous op stream defers the commit unboundedly.  The spec above
    is safety-only; termination of `sys_sync` would need a fairness
    assumption and is out of scope here.
+
+   DERIVATION STATUS (owner + Fable, 2026-08-24): NOT derivable from the
+   landed contracts, BY THE TREE'S OWN ADMISSION — `SpecSysSync.v`'s
+   header says "THE CONTRACT IS EMPTY, AND THAT IS THE HONEST STATE OF
+   THE INTERFACE" and names what is missing (a faithful commit counter
+   with the committer's receipt deposited beside it; fs-log.md item 5).
+   It becomes derivable when the durable-disk flip lands, and the chain
+   is short once the commit concludes something real:
+   (i) the flip's one green checkpoint — `P_wf`'s body + the suppliers'
+   steps + the commit's close (`dur_stands_at_logged` under whatever
+   body the pending structured-shape ruling picks; the kinds/geometry
+   tie of 3a-obj/3b was REJECTED at 3b'', so the body's shape is
+   currently between rulings) — without which a commit has nothing true
+   to deposit and `flushed b` would be a token about nothing;
+   (ii) a ghost mirror of `log.ncommit` in `LogInv` plus the mono-nat
+   `flushed` lower bound, minted where the committer bumps the counter;
+   (iii) the re-spec of `wp_sys_sync` as a NEW parallel form (R10:
+   the landed empty contract does not move — its header already
+   promises "the postcondition only grows").
+   ONE SHAPE CONSTRAINT the landed header teaches, and v2 already
+   satisfies: sys_sync's FAST PATH (`!committing ∧ out = 0`) returns
+   with NO commit occurring during the call, so an EVENT-shaped receipt
+   ("a commit happened") is unavailable on that arm.  The receipt must
+   be STATE-shaped — "batches ≤ b are durable" — which `flushed b` is:
+   on the fast path the invariant hands it out directly (the log is
+   empty, so durable = logged at the current epoch), no commit needed.
 3. **PER-NODE PERSISTENCE (the only rule most consumers use).**
 
    ```
