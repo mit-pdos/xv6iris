@@ -334,13 +334,6 @@ map at home blocks); 1d lands last.
 
       **LANDED — the parked payload, the AUs, and the commit's prepared
       step (spec items 2, 3, 4; lane 1d').**
-      - **Ψ's arity: `Ψ : gmap Z (list (bv 8)) → iProp Σ`, indexed by the
-        committed view ALONE.**  The logged view needs no index (the
-        payload's byte content is pinned to `L` by the ELEMENTS it holds
-        against the log's auth), and an `L` index would make every
-        `log_write`'s AU re-index the payload, which no client can do for
-        an arbitrary `Ψ`.  With the `D₀` index the payload goes in and comes
-        back UNCHANGED at a `log_write` and moves at the commit alone.
       - **Ψ's packaging: an EXISTENTIAL in `log_ctx`.**  `log_ctx_at Ψ γ bn
         γfs cov ls dev` is the Ψ-named form (the lock at `log_res Ψ …`, plus
         the payload's commit law) and `log_ctx γ … := ∃ Ψ, log_ctx_at Ψ γ …`
@@ -348,33 +341,13 @@ map at home blocks); 1d lands last.
         that must name `Ψ` open the existential in their own proof
         (`ProofBeginOp`, `ProofEndOp`, `ProofSysSync`, and each of the five
         `wp_log_write_au` sites); `log_ctx_of_at` gives the plain form back.
-        `ProofInitlog` picks the witness, `Ψ := fun _ => emp`, with NO
-        boot-chain threading at all.
-      - **THE ORCHESTRATOR'S CORRECTION, LANDED.**  The persistent law
-        `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))` was REJECTED: at
-        an arbitrary `L` with nothing else in hand it is not provable for a
-        real stage-2 payload.  The landed law takes the log's byte-view AUTH
-        as an input and gives it back, so the client can agree its own
-        elements against it and learn the real `L`, and it RETURNS the
-        prepared durable step:
-
-            LogInv.log_psi_commit Ψ γfs cov ls :=
-              □ (∀ M L Lb,
-                   (ghost_map_auth (fs_bytes γfs) 1 Lb
-                    ∗ ⌜FsBlocks.bytes_home_at Lb L (fs_home_set cov ls)⌝
-                    ∗ Ψ (lm_committed M cov ls))
-                   ==∗
-                   (ghost_map_auth (fs_bytes γfs) 1 Lb
-                    ∗ Ψ (lm_logged L cov ls)
-                    ∗ LogDefs.fs_dstep (lm_committed M cov ls)
-                                       (lm_logged L cov ls)))
-
-        `bytes_home_at` is `bytes_dom` plus "every home block's entry of `L`
-        is a whole block whose bytes are `Lb`'s" — exactly what pins `Lb` to
-        `L`'s byte flattening on the home set — and the committer derives it
-        with `FsBlocks.fs_bytes_home_of` off the invariant's parked halves
-        and the cache auth it holds.  `LogInv.log_psi_spend` is the crossing
-        (open `logN`, lend, spend, close).
+        `ProofInitlog` picks the witness, with NO boot-chain threading at
+        all (stage 3a: the witness is `LogDefs.fs_dstep` itself).
+      - **THE COMMIT LAW is stage 3a's, not this stage's**: the
+        auth-lending shape landed here was refuted by 2c-body (the payload
+        holds none of the elements a lent auth could teach it about) and is
+        gone with `FsBlocks.bytes_home_at` / `fs_bytes_home_of`.  See stage
+        3a-log.
       - **The prepared step, and where `P_wf` is lent.**
         `LogDefs.fs_dstep D D' := ∀ g, ghost_map_auth g 1 (fs_dbytes D) -∗
         fs_dview g (fs_dbytes D) ==∗ ghost_map_auth g 1 (fs_dbytes D') ∗
@@ -420,7 +393,6 @@ map at home blocks); 1d lands last.
       - NEW in `LogDefs.v`: `lm_committed_of_clean`, `lm_committed_upd_ne`,
         `lm_logged_insert_ne`, `fs_dbytes`, `fs_dview`(+timeless, opaque,
         `fs_dview_rebase`), `fs_dstep`, `fs_dstep_rebase`.  NEW in
-        `FsBlocks.v`: `bytes_home_at`, `fs_bytes_home_of`.  NEW in
         `LogInv.v`: `log_psi_commit`, `log_ctx_at` and its five accessors,
         `log_ctx_of_at`, `log_psi_spend`.
 
@@ -1625,12 +1597,14 @@ map at home blocks); 1d lands last.
 
 ## Stage 3 — the vertical spike: `sys_mknod`
 
-**ORDERING RULING (2c, 2026-08-24): STAGE 3 IS NOT AFTER 2c'S BODY, IT IS
-PART OF THE SAME GREEN CHECKPOINT.**  At a real `fs_dstep` the boot's
-`Ψ := fun _ => emp` can no longer discharge `log_psi_commit` (it would be
-producing a state change from nothing), and whatever payload does has to be
-re-established by every `log_write` AU, i.e. by each of the eleven
-suppliers, appending its own `Γ_D` step.  A supplier that appends the
+**ORDERING RULING (2c, 2026-08-24): THE `P_wf` FLIP AND THE SUPPLIERS' STEPS
+ARE ONE GREEN CHECKPOINT.**  At a real `fs_dstep` no trivial payload can
+discharge `log_psi_commit` (it would be producing a state change from
+nothing), and whatever the payload is has to be re-established by every
+`log_write` AU, i.e. by each of the eleven suppliers, appending its own
+`Γ_D` step.  Stage 3a-log has since landed the LOG's half of that
+(the payload is the debt, and the suppliers' premise is real); what is
+left inside the one checkpoint is `P_wf`'s body and the eleven steps.  A supplier that appends the
 IDENTITY is honest only for a write that touches no home block, and there is
 no such write.  So: `P_wf`'s flip, the payload's real content and the
 suppliers' per-object steps land TOGETHER or not at all.  The one thing that
