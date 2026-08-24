@@ -522,6 +522,48 @@ wall (B): with `Dj` pinned AT THE BLOCK there is no `∀ Dc` obligation left),
 empty deferred map), and `commit_conclusion` (`dstep_strict … D₀
 (lm_logged L cov ls)` — home maps, no `fs_restrict` arithmetic).
 
+## 4⅞. RULING (owner, 2026-08-24): OBJECT-GRANULAR pending, batch-scope durability, modularity by ∗
+
+Issued over 3a-def's concurrency wall (`FsDurDefer.v`).  Four decisions:
+
+1. **A transaction's durable promise is about its OBJECTS, never its
+   blocks.**  Objects inside a shared block (bitmap bits, inode slots,
+   dir records) are disjoint — that disjointness is why xv6 can
+   interleave transactions at all — so the block's final logged bytes are
+   a function of the SET of per-object final values: order-free where
+   3a-def's block-level ledger was order-blind against an
+   order-dependent target.  Same-object reuse across a batch (free then
+   re-claim) inherits its order from the era-side serialization that
+   already proves it (the region invariant, the buffer lock).
+2. **The durable justification unit is the BATCH; the deposit unit is the
+   transaction; the promise unit is the object.**  At `end_op` an op
+   deposits, into the payload, one self-contained fupd per touched
+   object ("this object's durable view moves v → v′" — resources and
+   knowledge era-exclusively its own); a later writer of the same object
+   COMPOSES onto the existing entry at deposit time.  The WAL's one
+   addition is the QUIESCENCE signal: `log_psi_commit` is demanded at
+   `out = 0` only.  The log stays FS-agnostic; no ledger field, no
+   two-arm AU, no `log_state` row.
+3. **Modularity (the owner's tractability requirement): the pending state
+   is a `[∗ object]`.**  A syscall proof mentions only its own objects
+   and never names another transaction or the batch; the batch-scope
+   reasoning happens ONCE, generically, as frame-composition of the ∗ at
+   quiescence.  "Not durable yet" appears in no client proof; a deposit
+   MAY hand back a persistent "durable once this batch commits" receipt
+   for clients that want one.
+4. **The bridge to bytes is one maintained invariant**: each home block's
+   logged bytes encode its objects' current logged values — maintained
+   per-write by the writer's own read-modify-write fact (the 2b-0
+   byte-range machinery is exactly this) and consumed once at the close
+   to conclude `D' = L` at home maps.  `P_wf` is strict at batch
+   boundaries; the relaxed shapes live only inside the pending pool's
+   intermediates.
+
+VALIDATION FIRST (the FsDurRefute/FsDurDefer style): the per-object
+pending-pool algebra incl. same-object recomposition; the encode-bridge's
+per-write maintenance at the shared bitmap under two interleaved ops; the
+quiescence composition.  Then the implementation lane.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
