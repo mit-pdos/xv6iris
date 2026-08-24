@@ -729,10 +729,12 @@ Section Payload.
 
   (* [SpecLogWrite]'s BYTE-SHAPED PREMISE, at this payload.  The writer
      supplies the new kind of its OWN block and the new abstract state; the
-     [forall S K] is plumbing rather than non-locality, since [S] and [K]
-     are existential inside [Psi_dec] so a client cannot name them, and
-     section 6 discharges the premise by reading off exactly the one clause
-     of [kinds_of_state] its own block's kind owns. *)
+     [forall S K] is not a choice -- [S] and [K] are existential inside
+     [Psi_dec], so a client cannot name them and has to answer for whichever
+     pair the payload happens to hold.  At the BITMAP block that is free
+     (section 6's [bm_write_obligation] never reads [K] at the written
+     block); at an INODE block it is not, and [Psi_dec_write_tied] below is
+     the form that is, with the tie the log must supply. *)
   Theorem Psi_dec_write (cov : gset Z) (ls : Z)
       (D0 Dc : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
     b ∈ fs_home_set cov ls -> length bs = BSIZE ->
