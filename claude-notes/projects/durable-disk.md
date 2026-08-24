@@ -1683,6 +1683,78 @@ this stage or 2c's body.**
       taken out), not in `P_wf`.
       Items 4 and 5 of the 3a task (the eleven suppliers' `Γ_D` steps, the
       commit's close) are downstream of (a) and (b) and were not attempted.
+      **THE HOME-VIEW ACCESSOR RULING THAT ANSWERED THIS IS ITSELF REFUTED
+      ON TWO COUNTS — read 3a' below before proposing a third body.**
+- [x] **3a'. The home-view accessor ruling, tried end to end: TWO WALLS,
+      MACHINE-CHECKED, and the decoupling that removes the first.**  The
+      lane's product is `iris/FsDurRefute.v` (one `_CoqProject` row, no
+      existing statement moved); the design account is `fs-state.md` §4½a.
+      `P_wf`'s body is still `LogDefs.fs_dview`, the flat blob, and none of
+      the eleven suppliers moved — the ruling's items 3–5 are downstream of
+      wall (B), which the ruling does not answer.
+      - **(A) THE CHAIN HAS NO INTERMEDIATE OBJECT AT A `bfree`.**  One
+        accessor per `log_write`, each handing back a whole `P_wf`, forces
+        every intermediate durable byte map to be some `fs_state Γ_D S`.
+        `FsStateBitmap.free_pool` owns every block whose bitmap bit reads
+        FREE; `FsStateInode.inl_blk_dom` is an IFF, so an inode owns every
+        block its RECORD names; xv6 clears the bit one `log_write` BEFORE
+        the record stops naming the block (`itrunc` bfrees each address and
+        only then `iupdate`s).  Two owners, no `S`.
+        `FsDurRefute.fs_state_stale_free_False`, off
+        `fs_state_inode_block_used`.
+        The in-transit bin CANNOT repair it — the conflict is between two
+        conjuncts of `fs_state` that both CLAIM the block, and a bin adds an
+        owner.  The ALLOCATING direction is fine and the bin is exactly
+        right for it; the asymmetry is the finding.  Neither escape is open:
+        the pool's ownership is a function of the used set (pinned by the
+        bitmap block's own bytes), and dropping the inode from
+        `fss_inodes S` is what the ruling's fixed per-inum EXISTENCE
+        WITNESSES forbid.
+        **COMMITTED states are unaffected**: `itrunc` and its `iupdate` are
+        one operation and an operation that would not fit the log panics, so
+        `fs_state` is a correct invariant of the committed view and fails
+        only as the per-write intermediate.
+      - **(B) THE AU QUANTIFIES OVER THE INDEX, so the ownership obligation
+        comes back through the quantifier.**
+        `FsDurRefute.dstep_block_forces_ownership` is §4's
+        `step_forces_the_element` at one BLOCK: any `Q` supporting the byte
+        auth's move at a byte of block `b` is refuted by an outside holder
+        of that byte, so `Q` must own block `b`.  `SpecLogWrite`'s premise is
+        `∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs]> Dc)`, so a supplier owes
+        that UNIFORMLY in the durable byte map — which is the completeness
+        demand the ruling set out to avoid.  The ruled `P_wf` owns a home
+        block through whichever conjunct happens to hold it, and which one
+        that is depends on the index.
+        The only handle is a client-chosen `Ψ` carrying a tie that pins
+        `Dc`; that makes each supplier's obligation a fact about the whole
+        durable byte map (§0's forbidden shape, from the other side).
+      - **(C) THE DECOUPLING THAT REMOVES (A), validated.**
+        `FsDurRefute.free_pool_at Γ nb p` is `free_pool` with the owned set
+        given EXPLICITLY instead of read off the used set;
+        `fs_state_mid Γ S p Bin` is `fs_state` over it with the bin beside
+        it.  `fs_state_mid_of_state`: at the endpoint (pool = complement of
+        the used set, bin empty) the relaxed predicate IS `fs_state`, so the
+        chain's ends and the commit's conclusion do not move.
+        `fs_state_mid_bitmap`: a bitmap-block write carries the relaxed
+        predicate at ANY new used set with pool and bin untouched — exactly
+        the step (A) refutes for `fs_state`.
+        **THE PRICE, AND IT IS THE OWNER'S TO RULE:**
+        `FsStateBitmap.free_pool_used` (own the block ⇒ its bit reads
+        allocated — what kills xv6's `panic("freeing free block")`) is a
+        theorem about the COUPLED pool.  Either the era view keeps the
+        coupled pool and the durable view takes the relaxed one, with the
+        endpoint condition re-proved at each commit (a per-BATCH finalize
+        obligation — one condition on the chain's last state at quiescence,
+        NOT the per-OP finalize ruling 3 deleted), or the coupling comes
+        back as an endpoint-only clause.
+      - **WHAT A NEXT LANE NEEDS RULED**, and it is unchanged in kind from
+        3a-body's (a)/(b): what pins `Dc` for a supplier, and how a supplier
+        names its object durably when the durable structure lags the era's
+        by the batch's own earlier writes.  (C) settles the chain's
+        intermediate OBJECT; it settles neither of those.
+      - Nothing else moved.  `fs_dstep_rebase`, `log_psi_write_rebase` and
+        `fs_dstep`'s shape are as 3a-log left them; the audit is at the
+        three-entry baseline.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

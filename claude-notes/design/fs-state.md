@@ -291,6 +291,99 @@ slots, install) use the low-level physical facts; FS clients use the home
 view — the split 1c already made in-era (`fs_bytes` covers exactly the
 home byte range) is the architecture, not an accident.
 
+### 4½a. AS BUILT (3a'): the ruling's TWO WALLS, and the one decoupling
+### that removes the first
+
+`iris/FsDurRefute.v` carries every claim below as a COMPILED LEMMA; read it
+before re-opening this design.  Nothing here is a proof difficulty — each
+is a statement about what a resource can possibly say.
+
+**(A) THE CHAIN HAS NO INTERMEDIATE OBJECT AT A `bfree`.**  §4½ (3) composes
+the accessors IN WRITE ORDER, one link per `log_write`, and each link hands
+back a whole `P_wf` — so every intermediate durable byte map has to be
+described by some `fs_state Γ_D S`.  It is not.  `FsStateBitmap.free_pool`
+owns every block whose bitmap bit reads FREE (`pool_elt` is `emp` at a set
+bit and `∃ bs, blk_owned` at a clear one), and `FsStateInode.inl_blk_dom` is
+an IFF, so an inode owns every block its RECORD names.  xv6 clears the bit
+one `log_write` BEFORE it writes the record that stops naming the block —
+`itrunc` calls `bfree` on each address and only then `iupdate`s — so between
+those two writes the block has two owners and no `S` exists.
+`FsDurRefute.fs_state_stale_free_False` is that, off
+`fs_state_inode_block_used` ("an inode's own block is marked used", itself a
+consequence of the `∗` and not a clause).
+
+  - **The IN-TRANSIT BIN CANNOT REPAIR IT.**  The conflict is between two
+    conjuncts of `fs_state` that BOTH claim the block; a bin adds an owner,
+    which is the wrong direction.  The bin is exactly right for the
+    ALLOCATING direction, and that asymmetry is the whole finding: `balloc`
+    sets the bit first, the block leaves the pool with nothing yet claiming
+    it, and the bin absorbs it until the `iupdate` that installs the address.
+  - **NEITHER ESCAPE IS OPEN.**  Keeping the block in the inode and out of
+    the pool is impossible — the pool's ownership is a FUNCTION of the used
+    set and the used set is pinned by the bitmap block's own bytes.  Dropping
+    the inode from `fss_inodes S` and parking its record and blocks in the
+    bin is what §4½ (2)'s fixed per-inum EXISTENCE WITNESSES forbid (the
+    durable inode table's domain is the fixed geometry), and it would break
+    the commit's conclusion as well.
+  - **COMMITTED states are fine.**  xv6 never commits such a state (`itrunc`
+    and its `iupdate` are one operation, and an operation that would not fit
+    the log panics).  `fs_state` is a correct invariant of the COMMITTED
+    view; what it cannot be is the chain's PER-`log_write` intermediate.
+
+**(B) THE ACCESSOR STILL FORCES OWNERSHIP, AND THE AU QUANTIFIES OVER THE
+INDEX.**  §4's `step_forces_the_element`, read at one BLOCK, is
+`FsDurRefute.dstep_block_forces_ownership`: any `Q` supporting the byte
+auth's move at a byte of block `b` is refuted by an OUTSIDE holder of that
+byte, so `Q` must own block `b`.  Moving the ownership from the writer's hand
+into `P_wf` does not remove the obligation, it relocates it — and
+`SpecLogWrite`'s premise is `∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs]> Dc)`, so
+a supplier owes it UNIFORMLY in the durable byte map.  The ruled `P_wf` owns
+a home block through whichever conjunct happens to hold it, and which
+conjunct that is depends on the index; no clause of it discharges the
+obligation uniformly.  That is the completeness demand the ruling set out to
+avoid, arriving through the quantifier instead of through the body.
+
+  - **THE SUPPLIER'S ONLY HANDLE ON `Dc` IS `Ψ` ITSELF.**  `Ψ` is the
+    client's, so it may carry a tie (a `ghost_var` half at the current
+    logged view, say) that pins `Dc` where the supplier can read it.  That
+    is a real degree of freedom and it is what any repair has to spend: with
+    `Dc` pinned, the durable structure is pinned too (the bitmap's used set
+    and every record are functions of the bytes), and an accessor can place
+    its block.  The price is that each supplier's obligation is then about
+    the whole durable byte map — §0's forbidden shape, reached from the
+    other side.
+
+**(C) THE ONE DECOUPLING THAT REMOVES (A).**  `FsDurRefute`'s
+`free_pool_at Γ nb p` is `free_pool` with the owned set given EXPLICITLY
+rather than read off the used set; `fs_state_mid Γ S p Bin` is `fs_state`
+over it with the bin beside it.  Two lemmas are the argument:
+
+  - `fs_state_mid_of_state` — at the ENDPOINT (pool exactly the complement of
+    the used set, bin empty) the relaxed predicate IS `fs_state`, so the
+    chain's two ends and the commit's conclusion do not move;
+  - `fs_state_mid_bitmap` — a write of the BITMAP BLOCK carries the relaxed
+    predicate at ANY new used set with the pool and the bin untouched, which
+    is precisely the step (A) shows `fs_state` cannot take.
+
+  **WHAT IT COSTS, AND IT IS THE OWNER'S TO RULE.**
+  `FsStateBitmap.free_pool_used` — "you own this block, therefore its bit
+  reads allocated", which is what kills xv6's `panic("freeing free block")`
+  — is a theorem about the COUPLED pool and is not available at
+  `free_pool_at`.  So either the two instances differ (the era view keeps the
+  coupled pool; the durable view takes the relaxed one and the endpoint
+  condition is re-proved at each commit, which is a per-BATCH finalize
+  obligation — small, and at quiescence, but real) or the coupling returns as
+  an endpoint-only clause.  Note that a per-batch finalize is NOT the per-OP
+  finalize §3 deleted: it is one condition on the chain's last state, not a
+  premise on `end_op`'s arms.
+
+**WHAT IS STILL OPEN after (C).**  (B) is untouched by the decoupling.  The
+two questions the next ruling has to answer are unchanged in kind from §4's:
+what pins `Dc` for a supplier, and how a supplier names its object durably
+when the durable structure lags the era's by the batch's own earlier writes.
+Items 4 and 5 of the accessor plan (the eleven suppliers' steps, the commit's
+close) are downstream of both and were not attempted.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
@@ -846,3 +939,9 @@ the shape as proposed by 2c-body, kept for the record.
   which is what §4 says a holder does.  It is the parked-authority rule of
   durable-notes seen from the other side: here the AUTHORITY has no
   elements.
+
+**AND THE ACCESSOR RULING THAT REPLACED IT HAS ITS OWN TWO WALLS** —
+§4½a, machine-checked in `iris/FsDurRefute.v`.  Read both before proposing a
+third body: the first wall is about the CHAIN's intermediate object and the
+second is the ownership obligation arriving through the AU's `∀ Dc` instead
+of through the body.

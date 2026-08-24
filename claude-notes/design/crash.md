@@ -411,6 +411,36 @@ The full account is `fs-state.md` §4 and §7:
   algebra and are already landed, body-free. `fs_dstep_rebase` itself is
   still the SUPPLIERS' discharge, through `LogInv.log_psi_write_rebase`.
 
+
+**AND THE HOME-VIEW ACCESSOR RULING (fs-state.md §4½) DOES NOT LIFT IT
+EITHER — TWO WALLS, BOTH MACHINE-CHECKED (3a', `iris/FsDurRefute.v`).**
+Making durable write permission the client's per-block accessor moves the
+ownership obligation, it does not remove it. The full account with the
+lemma names is fs-state.md §4½a; the two headlines:
+
+- **The chain has no intermediate object at a `bfree`.** One accessor per
+  `log_write`, each handing back a whole `P_wf`, means every intermediate
+  durable byte map has to be some `fs_state Γ_D S`. It is not:
+  `free_pool` owns every block whose bitmap bit reads FREE while
+  `inl_blk_dom` makes an inode own every block its RECORD names, and xv6
+  clears the bit one `log_write` before it writes the record — so between
+  `itrunc`'s `bfree` and its `iupdate` the block has two owners. The
+  in-transit bin cannot help (the conflict is between two conjuncts that
+  both CLAIM the block). COMMITTED states are unaffected: xv6 never commits
+  one, so `fs_state` remains a correct invariant of the committed view and
+  fails only as the per-write intermediate. The decoupling that removes
+  this wall — the free pool's owned set stated EXPLICITLY rather than read
+  off the bitmap's bytes — is `FsDurRefute`'s `free_pool_at` /
+  `fs_state_mid`, and it costs `FsStateBitmap.free_pool_used`, i.e. the
+  argument that kills xv6's freeing-a-free-block panic.
+- **The AU quantifies over the index.** `SpecLogWrite`'s premise is
+  `∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs]> Dc)`, so a supplier owes "`P_wf`
+  owns block `b`" uniformly in the durable byte map — the completeness
+  demand the ruling set out to avoid, arriving through the quantifier
+  rather than through the body. A client-chosen `Ψ` that carries a tie
+  pinning `Dc` is the only handle, and it makes each supplier's obligation
+  a fact about the whole durable map.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of
