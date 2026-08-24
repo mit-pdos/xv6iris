@@ -440,17 +440,34 @@ Proof.
   intros [Hdom Henc] HL. exact (dobj_close K D' L cov ls Hdom Henc HL).
 Qed.
 
-(* THE ABSTRACT STATE'S TIE TO THE KIND ASSIGNMENT.  Two clauses, and each
-   is the ONE thing its block kind knows about the state: the bitmap block's
-   kind IS the state's used set, and every inode's record sits at its own
-   slot of its own inode block ([FsDurObj.dobj_home_slot]'s numbering, read
-   at the region's start). *)
-Definition kinds_of_state (S : fs_state_rec) (K : Z -> blk_kind) : Prop :=
-  K (sb_bmapstart (fss_sb S)) = KBitmap (fss_used S)
-  /\ (forall (i : Z) (n : fs_node), 0 <= i -> fss_inodes S !! i = Some n ->
-        exists nd : nat -> fs_node,
-          K (sb_inodestart (fss_sb S) + i `div` 16) = KInode nd
-          /\ nd (Z.to_nat (i `mod` 16)) = n).
+(* THE ABSTRACT STATE'S TIE TO THE KIND ASSIGNMENT.  Four clauses, and each
+   is the ONE thing its block kind knows about the state.
+
+   [ko_bitmap] and [ko_slot] are the content: the bitmap block's kind IS the
+   state's used set, and every inode's record sits at its own slot of its
+   own inode block ([FsDurObj.dobj_home_slot]'s numbering, read at the
+   region's start).  [ko_inodeblk] and [ko_recwf] are ROLE clauses -- every
+   block of the inode region has an inode KIND, and any kind that is an
+   inode kind carries well-formed records -- and they are here because a
+   SUPPLIER needs them.  Without [ko_inodeblk] the writer of an inode slot
+   cannot name the block's current slot values (they are inside [K], which
+   is existential in the payload) and so cannot say what its own spliced
+   bytes encode; without [ko_recwf] it cannot apply
+   [FsDurObj.di_vals_enc].  Both are facts about the geometry and about
+   every record on the disk, not about any one transaction. *)
+Record kinds_of_state (S : fs_state_rec) (K : Z -> blk_kind) : Prop :=
+  MkKindsOfState {
+  ko_bitmap : K (sb_bmapstart (fss_sb S)) = KBitmap (fss_used S);
+  ko_inodeblk : forall j : Z, 0 <= j -> 16 * j < sb_ninodes (fss_sb S) ->
+      exists nd : nat -> fs_node, K (sb_inodestart (fss_sb S) + j) = KInode nd;
+  ko_slot : forall (i : Z) (n : fs_node), 0 <= i ->
+      fss_inodes S !! i = Some n ->
+      exists nd : nat -> fs_node,
+        K (sb_inodestart (fss_sb S) + i `div` 16) = KInode nd
+        /\ nd (Z.to_nat (i `mod` 16)) = n;
+  ko_recwf : forall (b : Z) (nd : nat -> fs_node), K b = KInode nd ->
+      forall j : nat, dinode_wf (fn_rec (nd j));
+}.
 
 (* the kind assignment updated at ONE block -- the only shape a writer ever
    produces, since a [log_write] writes one block *)
@@ -721,6 +738,35 @@ Section Payload.
     iPureIntro; exact Hst'.
   Qed.
 
+  (* THE FORM A SUPPLIER CAN ACTUALLY DISCHARGE, and the interface finding
+     it carries.  [Psi_dec_write]'s premise is quantified over the payload's
+     index, and at the BITMAP block that costs nothing ([bm_write_obligation]
+     never reads [K] at the written block).  At an INODE block it is not
+     dischargeable: the writer's spliced bytes encode the block's sixteen
+     slot values, fifteen of which it does not know, and the only handle on
+     them is [K] at its own block -- reachable only if [Dc] agrees with the
+     bytes the writer read.  So [SpecLogWrite]'s AU must carry the
+     BLOCK-LOCAL tie [Dc !! b = Some oldbs], which is exactly
+     [FsDurDefer.lw_arm_justify]'s [Dj !! b = Lg !! b]: landed there, and
+     needed here.  It is not [FsDurRefute]'s wall (B) -- the tie is at ONE
+     block and the log reads it off row (b) -- but it is not free either. *)
+  Theorem Psi_dec_write_tied (cov : gset Z) (ls : Z)
+      (D0 Dc : gmap Z (list (bv 8))) (b : Z) (oldbs bs : list (bv 8)) :
+    b ∈ fs_home_set cov ls -> Dc !! b = Some oldbs -> length bs = BSIZE ->
+    (forall (S : fs_state_rec) (K : Z -> blk_kind),
+       kinds_blocksized K cov ls -> kinds_of_state S K ->
+       kind_enc (K b) = oldbs ->
+       exists (S' : fs_state_rec) (k' : blk_kind),
+         kind_enc k' = bs /\ kinds_of_state S' (kind_upd K b k')) ->
+    Psi_dec cov ls D0 Dc ==∗ Psi_dec cov ls D0 (<[b := bs]> Dc).
+  Proof.
+    intros Hb Htie Hlen Hstep.
+    iApply (Psi_dec_write cov ls D0 Dc b bs Hb Hlen).
+    intros S K Hbr Hks Hst. apply (Hstep S K Hks Hst).
+    destruct Hbr as [_ Henc]. rewrite (Henc b Hb) in Htie.
+    by injection Htie.
+  Qed.
+
 End Payload.
 
 (* ===================================================================== *)
@@ -742,50 +788,66 @@ End Payload.
 Definition state_bm_upd (S : fs_state_rec) (u' : gset Z) : fs_state_rec :=
   MkFsS (fss_sb S) (fss_sbb S) (fss_inodes S) u'.
 
-Lemma kinds_of_state_bm (S : fs_state_rec) (K : Z -> blk_kind)
-    (bi : Z) (v : bool) :
-  kinds_of_state S K ->
-  (forall i : Z, 0 <= i ->
-     sb_inodestart (fss_sb S) + i `div` 16 <> sb_bmapstart (fss_sb S)) ->
-  kinds_of_state (state_bm_upd S (bm_wr (fss_used S) bi v))
-    (kind_upd K (sb_bmapstart (fss_sb S))
-       (KBitmap (bm_wr (fss_used S) bi v))).
+(* THE GEOMETRY PREMISE both movers take, and it is a fact about the
+   superblock: no block of the inode region is the bitmap block.  It follows
+   from [FsImg.fs_sb_ok]'s [sbo_bmapstart] and is stated as a hypothesis
+   here because this file has no superblock in hand. *)
+Definition dwire_geom (S : fs_state_rec) : Prop :=
+  forall j : Z, 0 <= j ->
+    sb_inodestart (fss_sb S) + j <> sb_bmapstart (fss_sb S).
+
+Lemma kinds_of_state_bm (S : fs_state_rec) (K : Z -> blk_kind) (u' : gset Z) :
+  kinds_of_state S K -> dwire_geom S ->
+  kinds_of_state (state_bm_upd S u')
+    (kind_upd K (sb_bmapstart (fss_sb S)) (KBitmap u')).
 Proof.
-  intros [Hbm Hin] Hgeo. split.
-  - cbn [state_bm_upd fss_sb fss_used]. by rewrite kind_upd_at.
-  - cbn [state_bm_upd fss_sb fss_inodes fss_used].
-    intros i n Hi Hn.
-    rewrite (kind_upd_ne K (sb_bmapstart (fss_sb S))
-               (KBitmap (bm_wr (fss_used S) bi v))
-               (sb_inodestart (fss_sb S) + i `div` 16) (Hgeo i Hi)).
-    exact (Hin i n Hi Hn).
+  intros [Hbm Hib Hslot Hwf] Hgeo.
+  split; cbn [state_bm_upd fss_sb fss_inodes fss_used].
+  - by rewrite kind_upd_at.
+  - intros j Hj Hn. destruct (Hib j Hj Hn) as [nd HK]. exists nd.
+    rewrite (kind_upd_ne K (sb_bmapstart (fss_sb S)) (KBitmap u')
+               (sb_inodestart (fss_sb S) + j) (Hgeo j Hj)).
+    exact HK.
+  - intros i n Hi Hn. destruct (Hslot i n Hi Hn) as (nd & HK & Hnd).
+    exists nd. split; [| exact Hnd].
+    assert (Hdiv : 0 <= i `div` 16) by (apply Z.div_pos; lia).
+    rewrite (kind_upd_ne K (sb_bmapstart (fss_sb S)) (KBitmap u')
+               (sb_inodestart (fss_sb S) + i `div` 16) (Hgeo _ Hdiv)).
+    exact HK.
+  - intros b nd HKb j.
+    destruct (decide (b = sb_bmapstart (fss_sb S))) as [-> | Hne].
+    + rewrite kind_upd_at in HKb. discriminate.
+    + rewrite (kind_upd_ne K (sb_bmapstart (fss_sb S)) (KBitmap u') b Hne)
+        in HKb.
+      exact (Hwf b nd HKb j).
 Qed.
 
-(* THE SUPPLIER'S DISCHARGE, at the bitmap block.  The writer's bytes are
-   its read-modify-write of the block it read ([FsDurObj.bm_blk_write], one
-   byte spliced -- and [FsDurObj.bm_new_byte_code] says that byte is the one
-   [bp->data[bi/8] |= m] / [&= ~m] stores); the bridge hands it the OLD
-   bytes as [bm_bytes] of a used set, so [FsDurObj.bm_blk_write_enc] closes
-   it with no injectivity of the encoder anywhere. *)
+(* THE SUPPLIER'S DISCHARGE, at the bitmap block -- AND IT IS UNIFORM IN THE
+   PAYLOAD'S INDEX.  The writer needs only a KIND whose encoding is the
+   bytes it is about to log, and its own bytes are a bitmap encoding by its
+   own era-side knowledge ([bm_write_bytes_are_a_kind], off
+   [FsDurObj.bm_blk_write_enc]; [FsDurObj.bm_new_byte_code] is what says the
+   byte spliced is the one [bp->data[bi/8] |= m] / [&= ~m] stores).  So this
+   obligation is discharged without ever reading [K] at the written block --
+   which is why the bitmap suppliers need no tie to [Dc] at all. *)
 Theorem bm_write_obligation (S : fs_state_rec) (K : Z -> blk_kind)
-    (bi : Z) (v : bool) :
-  kinds_of_state S K ->
-  0 <= bi < 8 * Z.of_nat BSIZE ->
-  (forall i : Z, 0 <= i ->
-     sb_inodestart (fss_sb S) + i `div` 16 <> sb_bmapstart (fss_sb S)) ->
+    (u' : gset Z) :
+  kinds_of_state S K -> dwire_geom S ->
   exists (S' : fs_state_rec) (k' : blk_kind),
-    kind_enc k' = bm_blk_write (kind_enc (K (sb_bmapstart (fss_sb S))))
-                    (bm_wr (fss_used S) bi v) bi
+    kind_enc k' = bm_bytes BSIZE u'
     /\ kinds_of_state S' (kind_upd K (sb_bmapstart (fss_sb S)) k').
 Proof.
-  intros Hst Hbi Hgeo.
-  exists (state_bm_upd S (bm_wr (fss_used S) bi v)),
-         (KBitmap (bm_wr (fss_used S) bi v)).
-  split.
-  - destruct Hst as [Hbm _]. rewrite Hbm. cbn [kind_enc].
-    symmetry. exact (bm_blk_write_enc (fss_used S) bi v Hbi).
-  - exact (kinds_of_state_bm S K bi v Hst Hgeo).
+  intros Hst Hgeo.
+  exists (state_bm_upd S u'), (KBitmap u'). split; [reflexivity |].
+  exact (kinds_of_state_bm S K u' Hst Hgeo).
 Qed.
+
+(* ...and the writer's spliced block really is such an encoding *)
+Corollary bm_write_bytes_are_a_kind (u : gset Z) (bi : Z) (v : bool) :
+  0 <= bi < 8 * Z.of_nat BSIZE ->
+  bm_blk_write (bm_bytes BSIZE u) (bm_wr u bi v) bi
+  = kind_enc (KBitmap (bm_wr u bi v)).
+Proof. intros H. cbn [kind_enc]. exact (bm_blk_write_enc u bi v H). Qed.
 
 (* ...and the encoding really is a block, which is [Psi_dec_write]'s other
    premise *)
@@ -821,21 +883,30 @@ Qed.
 
 Lemma kinds_of_state_slot (S : fs_state_rec) (K : Z -> blk_kind)
     (bi : Z) (k : nat) (nd : nat -> fs_node) (n : fs_node) :
-  kinds_of_state S K -> (k < 16)%nat ->
+  kinds_of_state S K -> (k < 16)%nat -> dwire_geom S -> 0 <= bi ->
   K (sb_inodestart (fss_sb S) + bi) = KInode nd ->
-  sb_inodestart (fss_sb S) + bi <> sb_bmapstart (fss_sb S) ->
+  dinode_wf (fn_rec n) ->
   kinds_of_state
     (state_slot_upd S (16 * bi + Z.of_nat k) n)
     (kind_upd K (sb_inodestart (fss_sb S) + bi) (KInode (nd_upd nd k n))).
 Proof.
-  intros [Hbm Hin] Hk HK Hne. split.
-  - cbn [state_slot_upd fss_sb fss_used].
-    rewrite (kind_upd_ne K (sb_inodestart (fss_sb S) + bi)
+  intros [Hbm Hib Hslot Hwf] Hk Hgeo Hbi HK Hn.
+  split; cbn [state_slot_upd fss_sb fss_inodes fss_used].
+  - rewrite (kind_upd_ne K (sb_inodestart (fss_sb S) + bi)
                (KInode (nd_upd nd k n)) (sb_bmapstart (fss_sb S))
-               (not_eq_sym Hne)).
+               (not_eq_sym (Hgeo bi Hbi))).
     exact Hbm.
-  - cbn [state_slot_upd fss_sb fss_inodes fss_used].
-    intros i m Hi Hm.
+  - intros j Hj Hnj.
+    destruct (decide (j = bi)) as [-> | Hnej].
+    + exists (nd_upd nd k n). rewrite kind_upd_at //.
+    + destruct (Hib j Hj Hnj) as [nd1 HK1]. exists nd1.
+      assert (Hne2 : sb_inodestart (fss_sb S) + j
+                     <> sb_inodestart (fss_sb S) + bi) by lia.
+      rewrite (kind_upd_ne K (sb_inodestart (fss_sb S) + bi)
+                 (KInode (nd_upd nd k n))
+                 (sb_inodestart (fss_sb S) + j) Hne2).
+      exact HK1.
+  - intros i m Hi Hm.
     destruct (decide (i = 16 * bi + Z.of_nat k)) as [-> | Hnei].
     + rewrite lookup_insert in Hm. injection Hm as <-.
       exists (nd_upd nd k n). split.
@@ -844,7 +915,7 @@ Proof.
         destruct (Nat.eq_dec k k) as [_ | Hbad];
           [reflexivity | exfalso; exact (Hbad eq_refl)].
     + rewrite lookup_insert_ne in Hm; [| exact (not_eq_sym Hnei)].
-      destruct (Hin i m Hi Hm) as (nd0 & HK0 & Hnd0).
+      destruct (Hslot i m Hi Hm) as (nd0 & HK0 & Hnd0).
       assert (Hmb : 0 <= i `mod` 16 < 16) by (apply Z.mod_pos_bound; lia).
       destruct (decide (i `div` 16 = bi)) as [Hdiv | Hdiv].
       * rewrite Hdiv in HK0. rewrite HK0 in HK. injection HK as ->.
@@ -865,30 +936,45 @@ Proof.
                    (KInode (nd_upd nd k n))
                    (sb_inodestart (fss_sb S) + i `div` 16) Hne2).
         exact HK0.
+  - intros b nd2 HKb j.
+    destruct (decide (b = sb_inodestart (fss_sb S) + bi)) as [-> | Hne3].
+    + rewrite kind_upd_at in HKb. injection HKb as <-.
+      rewrite /nd_upd. destruct (Nat.eq_dec j k) as [-> | _];
+        [exact Hn | exact (Hwf _ nd HK j)].
+    + rewrite (kind_upd_ne K (sb_inodestart (fss_sb S) + bi)
+                 (KInode (nd_upd nd k n)) b Hne3) in HKb.
+      exact (Hwf b nd2 HKb j).
 Qed.
 
-(* THE SUPPLIER'S DISCHARGE, at an inode block.  The writer's bytes are its
-   read-modify-write of the block it read ([FsDurObj.di_blk_write], the
-   record's 64 bytes spliced at offset [64k]); the bridge hands it the OLD
-   bytes as [diblk_bytes] of the block's sixteen slot values, so
-   [FsDurObj.di_vals_enc] closes it. *)
+(* THE SUPPLIER'S DISCHARGE, at an inode block -- AND HERE THE TIE TO [Dc]
+   IS LOAD-BEARING, which is the interface finding of section 5.  The
+   writer's bytes are its read-modify-write of the block it read
+   ([FsDurObj.di_blk_write], the record's 64 bytes spliced at offset
+   [64k]), and to say what they ENCODE it has to name the block's other
+   fifteen slot values.  Those live in [K], which is existential in the
+   payload, so the writer reaches them only through
+   [kind_enc (K b) = <its own old bytes>] -- i.e. through
+   [FsDurDefer.lw_arm_justify]'s [Dc !! b = Lg !! b].  [ko_inodeblk] is what
+   turns that byte equation into a KIND, and [ko_recwf] is what lets
+   [FsDurObj.di_vals_enc] apply. *)
 Theorem di_write_obligation (S : fs_state_rec) (K : Z -> blk_kind)
-    (bi : Z) (k : nat) (nd : nat -> fs_node) (n : fs_node) :
-  kinds_of_state S K -> (k < 16)%nat ->
-  K (sb_inodestart (fss_sb S) + bi) = KInode nd ->
-  sb_inodestart (fss_sb S) + bi <> sb_bmapstart (fss_sb S) ->
-  (forall j, dinode_wf (fn_rec (nd j))) -> dinode_wf (fn_rec n) ->
+    (bi : Z) (k : nat) (n : fs_node) (oldbs : list (bv 8)) :
+  kinds_of_state S K -> (k < 16)%nat -> dwire_geom S ->
+  0 <= bi -> 16 * bi < sb_ninodes (fss_sb S) ->
+  kind_enc (K (sb_inodestart (fss_sb S) + bi)) = oldbs ->
+  dinode_wf (fn_rec n) ->
   exists (S' : fs_state_rec) (k' : blk_kind),
-    kind_enc k' = di_blk_write (kind_enc (K (sb_inodestart (fss_sb S) + bi)))
-                    k (fn_rec n)
+    kind_enc k' = di_blk_write oldbs k (fn_rec n)
     /\ kinds_of_state S' (kind_upd K (sb_inodestart (fss_sb S) + bi) k').
 Proof.
-  intros Hst Hk HK Hne Hall Hn.
+  intros Hst Hk Hgeo Hbi Hnib Hold Hn.
+  destruct (ko_inodeblk S K Hst bi Hbi Hnib) as [nd HK].
   exists (state_slot_upd S (16 * bi + Z.of_nat k) n),
          (KInode (nd_upd nd k n)).
   split.
-  - rewrite HK. cbn [kind_enc]. symmetry. exact (di_vals_enc nd k n Hall Hn Hk).
-  - exact (kinds_of_state_slot S K bi k nd n Hst Hk HK Hne).
+  - rewrite -Hold HK. cbn [kind_enc]. symmetry.
+    exact (di_vals_enc nd k n (ko_recwf S K Hst _ nd HK) Hn Hk).
+  - exact (kinds_of_state_slot S K bi k nd n Hst Hk Hgeo Hbi HK Hn).
 Qed.
 
 (* ...and its encoding is a block *)
@@ -915,24 +1001,43 @@ Qed.
    NOTHING IN THE BUILD SEES THEM".  The bridge, the kind tie and the
    payload all have a model, exhibited at a witness. *)
 
-(* the state whose inode map is empty: its kind tie is the bitmap clause
-   alone, and the second clause holds vacuously *)
+(* the witness node: the smallest well-formed record, no indirect entries,
+   no blocks ([FsDurObj.dobj_wit_dinode] is the record) *)
+Definition dwire_wit_node : fs_node :=
+  MkNode dobj_wit_dinode [] ∅.
+
+Lemma dwire_wit_node_wf : dinode_wf (fn_rec dwire_wit_node).
+Proof. exact dobj_wit_dinode_wf. Qed.
+
+(* the state whose inode map is empty: [ko_slot] holds vacuously and the two
+   ROLE clauses hold because every block but the bitmap block is given an
+   inode kind, at the witness node *)
 Definition dwire_wit_state (sb : fs_sb) (sbb : list (bv 8)) (u : gset Z)
     : fs_state_rec := MkFsS sb sbb ∅ u.
 
 Definition dwire_wit_kinds (sb : fs_sb) (u : gset Z) : Z -> blk_kind :=
-  kind_upd (fun _ => KData (replicate BSIZE (bv_0 8)))
+  kind_upd (fun _ => KInode (fun _ => dwire_wit_node))
     (sb_bmapstart sb) (KBitmap u).
 
 Lemma dwire_wit_kinds_of_state (sb : fs_sb) (sbb : list (bv 8))
     (u : gset Z) :
+  dwire_geom (dwire_wit_state sb sbb u) ->
   kinds_of_state (dwire_wit_state sb sbb u) (dwire_wit_kinds sb u).
 Proof.
-  split.
-  - cbn [dwire_wit_state fss_sb fss_used].
-    rewrite /dwire_wit_kinds kind_upd_at //.
-  - cbn [dwire_wit_state fss_inodes]. intros i n _ Hi.
-    rewrite lookup_empty in Hi. discriminate.
+  intros Hgeo. split; cbn [dwire_wit_state fss_sb fss_inodes fss_used].
+  - rewrite /dwire_wit_kinds kind_upd_at //.
+  - intros j Hj _. exists (fun _ => dwire_wit_node).
+    rewrite /dwire_wit_kinds.
+    rewrite (kind_upd_ne (fun _ => KInode (fun _ => dwire_wit_node))
+               (sb_bmapstart sb) (KBitmap u)
+               (sb_inodestart sb + j) (Hgeo j Hj)) //.
+  - intros i n _ Hi. rewrite lookup_empty in Hi. discriminate.
+  - intros b nd HKb j. rewrite /dwire_wit_kinds in HKb.
+    destruct (decide (b = sb_bmapstart sb)) as [-> | Hne].
+    + rewrite kind_upd_at in HKb. discriminate.
+    + rewrite (kind_upd_ne (fun _ => KInode (fun _ => dwire_wit_node))
+                 (sb_bmapstart sb) (KBitmap u) b Hne) in HKb.
+      injection HKb as <-. exact dwire_wit_node_wf.
 Qed.
 
 Lemma dwire_wit_blocksized (sb : fs_sb) (u : gset Z) (cov : gset Z) (ls : Z) :
@@ -941,9 +1046,9 @@ Proof.
   intros b _. rewrite /dwire_wit_kinds.
   destruct (decide (b = sb_bmapstart sb)) as [-> | Hne].
   - rewrite kind_upd_at. apply bm_kind_blocksize.
-  - rewrite (kind_upd_ne (fun _ => KData (replicate BSIZE (bv_0 8)))
+  - rewrite (kind_upd_ne (fun _ => KInode (fun _ => dwire_wit_node))
                (sb_bmapstart sb) (KBitmap u) b Hne).
-    cbn [kind_enc]. apply length_replicate.
+    apply di_kind_blocksize. intros j. exact dwire_wit_node_wf.
 Qed.
 
 (* the block map that IS the kinds encoded on the home set satisfies the
@@ -964,15 +1069,27 @@ Section Witness.
      state and the witness kinds, over the block map they encode. *)
   Theorem Psi_dec_wit (cov : gset Z) (ls : Z) (sb : fs_sb)
       (sbb : list (bv 8)) (u : gset Z) :
+    dwire_geom (dwire_wit_state sb sbb u) ->
     ⊢ Psi_dec (Σ := Σ) cov ls ∅
         (fs_restrict (fun b => kind_enc (dwire_wit_kinds sb u b))
            (fs_home_set cov ls)).
   Proof.
+    intros Hgeo.
     iExists (dwire_wit_state sb sbb u), (dwire_wit_kinds sb u).
     iSplitR; [iPureIntro; apply dwire_bridge_wit |].
     iSplitR; [iPureIntro; apply (dwire_wit_blocksized sb u cov ls) |].
-    iPureIntro. apply (dwire_wit_kinds_of_state sb sbb u).
+    iPureIntro. exact (dwire_wit_kinds_of_state sb sbb u Hgeo).
   Qed.
+
+  (* ...AND THE GEOMETRY PREMISE IS SATISFIABLE, so the witness is not
+     vacuous: any superblock whose inode region starts ABOVE the bitmap
+     block has it, and so does xv6's own layout read the other way
+     ([FsImg.fs_sb_ok]'s [sbo_bmapstart] puts the bitmap block above the
+     region).  Exhibited at a superblock rather than assumed. *)
+  Lemma dwire_geom_wit (sbb : list (bv 8)) (u : gset Z) :
+    dwire_geom (dwire_wit_state
+                  (MkFsSb 0 0 0 0 0 0 1 0) sbb u).
+  Proof. intros j Hj. cbn [dwire_wit_state fss_sb]. cbn. lia. Qed.
 
 End Witness.
 
