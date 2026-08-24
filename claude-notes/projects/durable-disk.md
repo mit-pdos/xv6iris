@@ -1987,9 +1987,10 @@ this stage or 2c's body.**
         log's interface is §5 unchanged and `SpecEndOp` grows no row.  The
         payload's SECOND INDEX is carried and never read (`Psi_dec` ignores
         `D0`; the conjunct that would mention it is absent, not trivial).
-        And `LogInv.log_psi_step` is NOT provable at a pure payload (a step
-        is a magic wand and carries no pure information about its target) —
-        replacement `Psi_dec_step_of_bridge` — while **`SpecLogWrite`'s AU
+        And `LogInv.log_psi_step` cannot be DISCHARGED at a pure payload
+        (reading the target's bridge out of the step would mean applying it,
+        which needs the durable authority and the body) — replacement
+        `Psi_dec_step_of_bridge` — while **`SpecLogWrite`'s AU
         needs `FsDurDefer.lw_arm_justify`'s BLOCK-LOCAL TIE after all**: the
         `∀ Dc` premise costs nothing at the bitmap block
         (`bm_write_obligation` never reads `K` at the written block) and is

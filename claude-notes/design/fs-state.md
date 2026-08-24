@@ -777,8 +777,11 @@ side condition to the whole content.
    ignores `D0`, because the commit's step comes from the target's bridge
    alone. The `D0` index is not wrong, it is unused — the conjunct that
    would mention it is absent rather than trivial.
-3. **`LogInv.log_psi_step` is not provable at a pure payload**, a step being
-   a magic wand that carries no pure information about its target; its
+3. **`LogInv.log_psi_step` cannot be DISCHARGED at a pure payload**: reading
+   the target's bridge out of `dstep_dec Dc Dc'` would mean APPLYING the
+   step, and applying it needs the durable byte authority and the body,
+   neither of which the payload's holder has. (A statement about the
+   obligation, not a refutation — nothing says the law is false.) Its
    replacement is `Psi_dec_step_of_bridge`, the same law with the target's
    bridge supplied. And **`SpecLogWrite`'s AU needs the BLOCK-LOCAL TIE
    after all**: `Psi_dec_write`'s premise is quantified over the payload's

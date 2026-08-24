@@ -99,10 +99,13 @@
    payload's SECOND INDEX is not read: [Psi_dec] ignores [D0], because the
    commit's step is derivable from the target's bridge alone.  And
    [LogInv.log_psi_step] -- "hand the payload a durable step and it
-   re-indexes" -- is not provable at a pure payload, a step being a magic
-   wand that carries no pure information about its target; its replacement
-   is [Psi_dec_step_of_bridge], the same law with the target's bridge
-   supplied, which is what a supplier proves anyway.
+   re-indexes" -- CANNOT BE DISCHARGED at a pure payload: to read the
+   target's bridge out of [dstep_dec Dc Dc'] one would have to APPLY it, and
+   applying it needs the durable byte authority and the body, neither of
+   which the payload's holder has.  (Note this is a statement about the
+   obligation, not a refutation: nothing here says the law is false.)  Its
+   replacement is [Psi_dec_step_of_bridge], the same law with the target's
+   bridge supplied, which is what a supplier proves anyway.
 
    WHAT THE LANDED BODY DOES NOT SAY, and it is the next lane's first
    question.  [FsDurDefer.P_wf_strict] contains [FsState.fs_state Gamma_D S]
@@ -692,10 +695,12 @@ Section Payload.
   Qed.
 
   (* THE REPLACEMENT FOR [LogInv.log_psi_step].  The log's WRITE law says
-     "absorb a durable step and re-index"; at a pure payload the step
-     carries nothing, so what is absorbed is the target's BRIDGE.  A
-     supplier has it -- section 6 is how it gets it -- and the log needs no
-     law at all beyond it. *)
+     "absorb a durable step and re-index"; at a pure payload it cannot be
+     discharged, because reading the target's bridge out of the step would
+     mean APPLYING the step, and applying it needs the durable byte
+     authority and the body -- neither of which the payload's holder has.
+     What IS absorbed is the target's BRIDGE.  A supplier has it -- section
+     6 is how it gets it -- and the log needs no law at all beyond it. *)
   Theorem Psi_dec_step_of_bridge (cov : gset Z) (ls : Z) :
     ⊢ □ (∀ (D0 Dc' : gmap Z (list (bv 8))) (S' : fs_state_rec)
            (K' : Z -> blk_kind),
