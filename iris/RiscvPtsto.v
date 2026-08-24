@@ -365,10 +365,32 @@ Record riscvEraGS := RiscvEraGS {
    system: two gnames and nothing else.  What they are gnames OF is stated
    entirely above, where [FsState]'s cameras live -- exactly as
    [riscv_crash_pred] is an arbitrary client [iProp] here and [P_fs]
-   there. *)
+   there.
+
+   THE RECORD ALSO CARRIES THE IMAGE'S BLOCK GEOMETRY, as three PLAIN
+   INTEGERS (durable-disk 3b'; fs-state.md section 4.875c).  The durable
+   tie [FsDurWire.kinds_of_state] is INDEXED by the geometry rather than
+   reading it off the abstract state -- [FsDurWire.kinds_geom_underdetermined]
+   and [kind_write_geom_free_degenerate] are why -- and the index has to
+   reach [FsCrash.P_fs] and the log's two payload laws without an arity
+   change anywhere ([fs_crash_seam] is threaded by name through 90 files
+   and [LogInv.log_ctx] through 78).  The geometry is fixed at boot and
+   never moves -- nothing in xv6 writes the superblock -- so it belongs
+   beside the durable instance's other fixed data, and every file with a
+   [riscvFixedGS] spells it ambiently as [riscv_fsdur], exactly as it
+   spells [riscv_dview_name].
+
+   THEY ARE [Z]s AND NOT AN [FsDurObj.dgeom], deliberately: that record
+   lives above [FsState], i.e. far above this file, and importing it here
+   would put the whole file-system cone underneath the machine layer.
+   [FsDurWire.fdn_geom] is the one-line reading. *)
 Record fs_dur_names := MkFsDurNames {
   fdn_link : gname;   (* FsStateLink's link-counting family, at Gamma_D *)
   fdn_top  : gname;   (* FsState's top-level abstract map, at Gamma_D   *)
+  fdn_bmap : Z;       (* the bitmap block                               *)
+  fdn_ist  : Z;       (* the inode region's first block                 *)
+  fdn_nin  : Z;       (* 16 * (the region's block count): the inums it  *)
+                      (* can hold, which is what indexes the slot tie   *)
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {

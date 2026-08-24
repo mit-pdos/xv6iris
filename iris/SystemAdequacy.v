@@ -483,11 +483,11 @@ Proof.
                 (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst γdv; iIntros "(Hfr & Hsw & Hdv)";
                  iMod fs_boot_alloc_empty as (gl gt) "_";
-                 iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt)
+                 iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib))
                          _ D0 cov
                          (FsImg.sb_logstart sb) Hrec Hhwf
                          with "[$Hsw $Hdv]") as (γs) "(%Hseq & HP & _)";
-                 iModIntro; iExists (MkFsDurNames gl gt);
+                 iModIntro; iExists (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib));
                  rewrite /P_fs_named;
                  iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
                  iSplitR; [iPureIntro; exact Hext |];
@@ -645,11 +645,11 @@ Proof.
                 (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst γdv; iIntros "(Hfr & Hsw & Hdv)";
                  iMod fs_boot_alloc_empty as (gl gt) "_";
-                 iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt)
+                 iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib))
                          _ D0 cov
                          (FsImg.sb_logstart sb) Hrec Hhwf
                          with "[$Hsw $Hdv]") as (γs) "(%Hseq & HP & _)";
-                 iModIntro; iExists (MkFsDurNames gl gt);
+                 iModIntro; iExists (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib));
                  rewrite /P_fs_named;
                  iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
                  iSplitR; [iPureIntro; exact Hext |];

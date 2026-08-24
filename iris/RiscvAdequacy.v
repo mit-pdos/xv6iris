@@ -797,7 +797,7 @@ Proof.
            (fun (_ _ _ _ _ : gname) (_ : fs_dur_names) => True%I) 0%nat Hram
            Hpow Hgen0 Hgid Hresv0).
   { iIntros (γdisk γsw γreg γst γdv) "_". iModIntro.
-    iExists (MkFsDurNames γdisk γdisk). done. }
+    iExists (MkFsDurNames γdisk γdisk 0 0 0). done. }
   intros HR.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
             #Hcinv & #Hcert)".

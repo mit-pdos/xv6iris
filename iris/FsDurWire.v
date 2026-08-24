@@ -528,11 +528,87 @@ Qed.
 (* --------------------------------------------------------------------- *)
 
 (* THE GEOMETRY PREMISE every mover takes, and it is a fact about the
-   LAYOUT: no block of the inode region is the bitmap block.  It follows
-   from [FsImg.fs_sb_ok]'s [sbo_bmapstart] and is a hypothesis here because
-   this file has no superblock in hand. *)
-Definition dwire_geom (G : dgeom) : Prop :=
-  forall j : Z, 0 <= j -> dg_ist G + j <> dg_bmap G.
+   LAYOUT: the inode region lies strictly BELOW the bitmap block, so no
+   block of the region is the bitmap block.  It follows from
+   [FsImg.fs_sb_ok]'s [sbo_bmapstart] ([dwire_geom_of_sb] below is the
+   derivation) and is a definition here because this file has no
+   superblock in hand.
+
+   IT IS BOUNDED BY [nin], AND THAT BOUND IS LOAD-BEARING (durable-disk
+   3b').  The 3b form quantified [j] over every non-negative integer:
+
+       forall j, 0 <= j -> dg_ist G + j <> dg_bmap G
+
+   which is REFUTED by any layout with the bitmap above the region --
+   instantiate at [j := dg_bmap G - dg_ist G].  That is xv6's layout
+   exactly ([sbo_bmapstart] puts the bitmap one past the region), so the
+   premise was unsatisfiable at the only geometry the tree ever builds and
+   every mover taking it was vacuously applicable and unusable.  It is
+   durable-notes.md's "a GAP premise can be unsatisfiable" at the
+   layout: [dwire_geom_refuted_unbounded] below is the four-line
+   refutation, kept because the shape is easy to write again.
+
+   The bound is exactly what the region IS -- [j] indexes a block of the
+   inode region, so [16 * j < nin] -- and it is available at every use
+   site: [ko_inodeblk] carries it, and [ko_slot]'s [0 <= i < nin]
+   conclusion gives it for [j := i / 16].
+
+   AND IT IS STATED AS [<], NOT [<>].  The strict form is what a DATA
+   block's writer needs: a data block is above the bitmap block, so one
+   comparison rules out the bitmap block AND every block of the region at
+   once ([data_write_above] below).  A disequality would leave the region
+   to be excluded separately, from a fact the data writer does not
+   carry. *)
+Definition dwire_geom (G : dgeom) (nin : Z) : Prop :=
+  forall j : Z, 0 <= j -> 16 * j < nin -> dg_ist G + j < dg_bmap G.
+
+(* WHERE THE INDEX LIVES (durable-disk 3b'): the geometry rides
+   [RiscvPtsto.fs_dur_names] as three plain [Z]s, and this is the one-line
+   reading that turns them back into [FsDurObj]'s record.  Every file with
+   a [riscvFixedGS] therefore spells the whole index as
+   [fdn_geom riscv_fsdur] / [fdn_nin riscv_fsdur], and no arity moves --
+   [FsCrash.P_fs] and [LogInv.log_ctx_at] already take the bundle. *)
+Definition fdn_geom (Γd : fs_dur_names) : dgeom :=
+  MkDGeom (fdn_bmap Γd) (fdn_ist Γd).
+
+Lemma fdn_geom_bmap (Γd : fs_dur_names) : dg_bmap (fdn_geom Γd) = fdn_bmap Γd.
+Proof. reflexivity. Qed.
+
+Lemma fdn_geom_ist (Γd : fs_dur_names) : dg_ist (fdn_geom Γd) = fdn_ist Γd.
+Proof. reflexivity. Qed.
+
+(* THE MINIMAL WITNESS for the paragraph above: the unbounded form forces
+   the bitmap block BELOW the inode region, which no xv6 image has. *)
+Theorem dwire_geom_refuted_unbounded (G : dgeom) :
+  (forall j : Z, 0 <= j -> dg_ist G + j <> dg_bmap G) ->
+  dg_bmap G < dg_ist G.
+Proof.
+  intros H. destruct (Z.le_gt_cases (dg_ist G) (dg_bmap G)) as [Hle | Hgt].
+  - exfalso. apply (H (dg_bmap G - dg_ist G)); lia.
+  - lia.
+Qed.
+
+(* ...AND THE DERIVATION AT A REAL SUPERBLOCK, which is what the boot
+   supplies.  [sbo_bmapstart] says the bitmap sits one block past the
+   region, and [nib] blocks hold [16 * nib] inums. *)
+Lemma dwire_geom_of_sb (sb : fs_sb) (nib : nat) :
+  fs_sb_ok sb -> Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1 ->
+  dwire_geom (MkDGeom (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb))
+    (16 * Z.of_nat nib).
+Proof.
+  intros Hok Hnib j Hj Hlt. cbn [dg_bmap dg_ist].
+  rewrite (sbo_bmapstart sb Hok). lia.
+Qed.
+
+(* THE DATA WRITER'S ONE COMPARISON: a block strictly above the bitmap
+   block is neither the bitmap block nor a block of the inode region. *)
+Lemma data_write_above (G : dgeom) (nin : Z) (b : Z) :
+  dwire_geom G nin -> dg_bmap G < b ->
+  b <> dg_bmap G /\ (forall j : Z, 0 <= j -> 16 * j < nin -> b <> dg_ist G + j).
+Proof.
+  intros Hgeo Hb. split; [lia |].
+  intros j Hj Hlt. pose proof (Hgeo j Hj Hlt). lia.
+Qed.
 
 (* THE ABSTRACT STATE'S TIE TO THE KIND ASSIGNMENT, AT THE GEOMETRY.  Four
    clauses, and each is the ONE thing its block kind knows about the state.
@@ -634,12 +710,17 @@ Section Body.
      mentions them, and their values are read off the bitmap block's kind
      ([FsDurObj.bm_vals] is the same reading).  That is 3a-val's [dres_flat]
      repair, arriving as the body's SHAPE rather than as a second
-     predicate. *)
-  Definition P_wf_dec (g : gname) (Γd : fs_dur_names) (G : dgeom) (nin : Z)
+     predicate.
+
+     THE GEOMETRY IS READ OFF [Γd] (durable-disk 3b'), not taken as two
+     more arguments: the bundle is already here, it is where the index was
+     ratified to live, and reading it here is what keeps [FsCrash.P_fs]'s
+     arity fixed. *)
+  Definition P_wf_dec (g : gname) (Γd : fs_dur_names)
       (cov : gset Z) (ls : Z) (D : gmap Z (list (bv 8))) : iProp Σ :=
     (∃ (S : fs_state_rec) (K : Z -> blk_kind),
        ⌜dwire_bridge K D cov ls⌝ ∗ ⌜kinds_blocksized K cov ls⌝
-       ∗ ⌜kinds_of_state G nin S K⌝
+       ∗ ⌜kinds_of_state (fdn_geom Γd) (fdn_nin Γd) S K⌝
        ∗ fs_dview g (fs_dbytes D)
        ∗ ghost_map_auth (fdn_top Γd) 1 (fss_inodes S)
        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (fs_gamma_D g Γd) i n))%I.
@@ -647,8 +728,8 @@ Section Body.
   (* TIMELESS, which [FsCrash.P_fs_named_timeless] needs at the flip: every
      conjunct is (the two authorities and the fragments are [ghost_map], the
      flat blob is [LogDefs.fs_dview_timeless], the rest is pure). *)
-  Global Instance P_wf_dec_timeless g Γd G nin cov ls D :
-    Timeless (P_wf_dec g Γd G nin cov ls D).
+  Global Instance P_wf_dec_timeless g Γd cov ls D :
+    Timeless (P_wf_dec g Γd cov ls D).
   Proof. rewrite /P_wf_dec /top_frag. apply _. Qed.
 
   (* ...AND IT REALLY IS "ALL HOME BLOCKS [DBlk]-OWNED".  The flat conjunct
@@ -674,18 +755,18 @@ Section Body.
   (* [FsDurDefer.dstep_strict] at this body: the durable byte authority and
      the body are LENT for the instant, exactly as today, and the step lands
      both at the new index. *)
-  Definition dstep_dec (g : gname) (Γd : fs_dur_names) (G : dgeom) (nin : Z)
+  Definition dstep_dec (g : gname) (Γd : fs_dur_names)
       (cov : gset Z) (ls : Z) (D D' : gmap Z (list (bv 8))) : iProp Σ :=
-    (ghost_map_auth g 1 (fs_dbytes D) -∗ P_wf_dec g Γd G nin cov ls D ==∗
-     ghost_map_auth g 1 (fs_dbytes D') ∗ P_wf_dec g Γd G nin cov ls D')%I.
+    (ghost_map_auth g 1 (fs_dbytes D) -∗ P_wf_dec g Γd cov ls D ==∗
+     ghost_map_auth g 1 (fs_dbytes D') ∗ P_wf_dec g Γd cov ls D')%I.
 
-  Lemma dstep_dec_id g Γd G nin cov ls D :
-    ⊢ dstep_dec g Γd G nin cov ls D D.
+  Lemma dstep_dec_id g Γd cov ls D :
+    ⊢ dstep_dec g Γd cov ls D D.
   Proof. rewrite /dstep_dec. iIntros "Ha Hw". iModIntro. iFrame. Qed.
 
-  Lemma dstep_dec_trans g Γd G nin cov ls D D' D'' :
-    dstep_dec g Γd G nin cov ls D D' -∗ dstep_dec g Γd G nin cov ls D' D'' -∗
-    dstep_dec g Γd G nin cov ls D D''.
+  Lemma dstep_dec_trans g Γd cov ls D D' D'' :
+    dstep_dec g Γd cov ls D D' -∗ dstep_dec g Γd cov ls D' D'' -∗
+    dstep_dec g Γd cov ls D D''.
   Proof.
     rewrite /dstep_dec. iIntros "H1 H2 Ha Hw".
     iMod ("H1" with "Ha Hw") as "[Ha Hw]".
@@ -704,12 +785,12 @@ Section Body.
   (*  commit actually needs from the client is a PURE fact.              *)
   (* ================================================================ *)
   Theorem dstep_dec_of_bridge (g : gname) (Γd : fs_dur_names)
-      (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z)
+      (cov : gset Z) (ls : Z)
       (D D' : gmap Z (list (bv 8)))
       (S' : fs_state_rec) (K' : Z -> blk_kind) :
     dwire_bridge K' D' cov ls -> kinds_blocksized K' cov ls ->
-    kinds_of_state G nin S' K' ->
-    ⊢ dstep_dec g Γd G nin cov ls D D'.
+    kinds_of_state (fdn_geom Γd) (fdn_nin Γd) S' K' ->
+    ⊢ dstep_dec g Γd cov ls D D'.
   Proof.
     intros Hbr Hlen Hst. rewrite /dstep_dec /P_wf_dec.
     iIntros "Ha Hw".
@@ -731,17 +812,18 @@ Section Body.
      logged view on every home block ([dwire_bridge_close] is the byte-level
      half).  This is the commit's closing statement. *)
   Theorem dur_stands_at_logged (g : gname) (Γd : fs_dur_names)
-      (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z)
+      (cov : gset Z) (ls : Z)
       (D0 : gmap Z (list (bv 8)))
       (L : gmap Z (list (bv 8))) (S' : fs_state_rec) (K' : Z -> blk_kind) :
     dwire_bridge K' (lm_logged L cov ls) cov ls ->
-    kinds_blocksized K' cov ls -> kinds_of_state G nin S' K' ->
-    ghost_map_auth g 1 (fs_dbytes D0) -∗ P_wf_dec g Γd G nin cov ls D0 ==∗
+    kinds_blocksized K' cov ls ->
+    kinds_of_state (fdn_geom Γd) (fdn_nin Γd) S' K' ->
+    ghost_map_auth g 1 (fs_dbytes D0) -∗ P_wf_dec g Γd cov ls D0 ==∗
       ghost_map_auth g 1 (fs_dbytes (lm_logged L cov ls))
-      ∗ P_wf_dec g Γd G nin cov ls (lm_logged L cov ls).
+      ∗ P_wf_dec g Γd cov ls (lm_logged L cov ls).
   Proof.
     intros Hbr Hlen Hst. iIntros "Ha Hw".
-    iApply (dstep_dec_of_bridge g Γd G nin cov ls D0 (lm_logged L cov ls)
+    iApply (dstep_dec_of_bridge g Γd cov ls D0 (lm_logged L cov ls)
               S' K' Hbr Hlen Hst with "Ha Hw").
   Qed.
 
@@ -800,14 +882,18 @@ Section Payload.
      step the commit permit runs. *)
   Definition psi_commit_law
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (g : gname) (Γd : fs_dur_names) (G : dgeom) (nin : Z)
+      (g : gname) (Γd : fs_dur_names)
       (cov : gset Z) (ls : Z) : iProp Σ :=
     (□ ∀ D0 Dc : gmap Z (list (bv 8)),
-        Psi D0 Dc ==∗ Psi Dc Dc ∗ dstep_dec g Γd G nin cov ls D0 Dc)%I.
+        Psi D0 Dc ==∗ Psi Dc Dc ∗ dstep_dec g Γd cov ls D0 Dc)%I.
 
-  Theorem Psi_dec_commit (g : gname) (Γd : fs_dur_names) (G : dgeom)
-      (nin : Z) (cov : gset Z) (ls : Z) :
-    ⊢ psi_commit_law (Psi_dec G nin cov ls) g Γd G nin cov ls.
+  Global Instance psi_commit_law_persistent Psi g Γd cov ls :
+    Persistent (psi_commit_law Psi g Γd cov ls).
+  Proof. rewrite /psi_commit_law. apply _. Qed.
+
+  Theorem Psi_dec_commit (g : gname) (Γd : fs_dur_names)
+      (cov : gset Z) (ls : Z) :
+    ⊢ psi_commit_law (Psi_dec (fdn_geom Γd) (fdn_nin Γd) cov ls) g Γd cov ls.
   Proof.
     rewrite /psi_commit_law.
     iModIntro. iIntros (D0 Dc) "#Hpsi".
@@ -817,7 +903,7 @@ Section Payload.
       iSplitR; [iPureIntro; exact Hbr |].
       iSplitR; [iPureIntro; exact Hlen |].
       iPureIntro; exact Hst.
-    - iApply (dstep_dec_of_bridge g Γd G nin cov ls D0 Dc S K Hbr Hlen Hst).
+    - iApply (dstep_dec_of_bridge g Γd cov ls D0 Dc S K Hbr Hlen Hst).
   Qed.
 
   (* THE WRITE LAW, i.e. [LogInv.log_psi_step]'s replacement.  The log
@@ -827,11 +913,16 @@ Section Payload.
      it is what [LogInv.log_ctx_at] carries and what a supplier spends. *)
   Definition psi_write_law
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z) : iProp Σ :=
+      (Γd : fs_dur_names) (cov : gset Z) (ls : Z) : iProp Σ :=
     (□ ∀ (D0 Dc : gmap Z (list (bv 8))) (b : Z) (oldbs bs : list (bv 8)),
         ⌜b ∈ fs_home_set cov ls⌝ -∗ ⌜Dc !! b = Some oldbs⌝ -∗
-        ⌜length bs = BSIZE⌝ -∗ ⌜kind_write_ok G nin cov ls b oldbs bs⌝ -∗
+        ⌜length bs = BSIZE⌝ -∗
+        ⌜kind_write_ok (fdn_geom Γd) (fdn_nin Γd) cov ls b oldbs bs⌝ -∗
         Psi D0 Dc ==∗ Psi D0 (<[b := bs]> Dc))%I.
+
+  Global Instance psi_write_law_persistent Psi Γd cov ls :
+    Persistent (psi_write_law Psi Γd cov ls).
+  Proof. rewrite /psi_write_law. apply _. Qed.
 
   Theorem Psi_dec_write_tied (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z)
       (D0 Dc : gmap Z (list (bv 8))) (b : Z) (oldbs bs : list (bv 8)) :
@@ -855,13 +946,13 @@ Section Payload.
     iPureIntro; exact Hst'.
   Qed.
 
-  Theorem Psi_dec_write_law (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z) :
-    ⊢ psi_write_law (Psi_dec G nin cov ls) G nin cov ls.
+  Theorem Psi_dec_write_law (Γd : fs_dur_names) (cov : gset Z) (ls : Z) :
+    ⊢ psi_write_law (Psi_dec (fdn_geom Γd) (fdn_nin Γd) cov ls) Γd cov ls.
   Proof.
     rewrite /psi_write_law. iModIntro.
     iIntros (D0 Dc b oldbs bs) "%Hb %Htie %Hlen %Hstep Hpsi".
-    iApply (Psi_dec_write_tied G nin cov ls D0 Dc b oldbs bs
-              Hb Htie Hlen Hstep with "Hpsi").
+    iApply (Psi_dec_write_tied (fdn_geom Γd) (fdn_nin Γd) cov ls
+              D0 Dc b oldbs bs Hb Htie Hlen Hstep with "Hpsi").
   Qed.
 
 End Payload.
@@ -886,7 +977,7 @@ Definition state_bm_upd (S : fs_state_rec) (u' : gset Z) : fs_state_rec :=
 
 Lemma kinds_of_state_bm (G : dgeom) (nin : Z) (S : fs_state_rec)
     (K : Z -> blk_kind) (u' : gset Z) :
-  kinds_of_state G nin S K -> dwire_geom G ->
+  kinds_of_state G nin S K -> dwire_geom G nin ->
   kinds_of_state G nin (state_bm_upd S u')
     (kind_upd K (dg_bmap G) (KBitmap u')).
 Proof.
@@ -894,14 +985,19 @@ Proof.
   split; cbn [state_bm_upd fss_sb fss_inodes fss_used].
   - by rewrite kind_upd_at.
   - intros j Hj Hn. destruct (Hib j Hj Hn) as [nd HK]. exists nd.
-    rewrite (kind_upd_ne K (dg_bmap G) (KBitmap u')
-               (dg_ist G + j) (Hgeo j Hj)).
+    assert (Hne : dg_ist G + j <> dg_bmap G)
+      by (pose proof (Hgeo j Hj Hn); lia).
+    rewrite (kind_upd_ne K (dg_bmap G) (KBitmap u') (dg_ist G + j) Hne).
     exact HK.
   - intros i n Hn. destruct (Hslot i n Hn) as (Hrng & nd & HK & Hnd).
     split; [exact Hrng |]. exists nd. split; [| exact Hnd].
     assert (Hdiv : 0 <= i `div` 16) by (apply Z.div_pos; lia).
+    assert (Hjlt : 16 * (i `div` 16) < nin).
+    { pose proof (Z.mul_div_le i 16 ltac:(lia)) as Hle. lia. }
+    assert (Hne : dg_ist G + i `div` 16 <> dg_bmap G)
+      by (pose proof (Hgeo _ Hdiv Hjlt); lia).
     rewrite (kind_upd_ne K (dg_bmap G) (KBitmap u')
-               (dg_ist G + i `div` 16) (Hgeo _ Hdiv)).
+               (dg_ist G + i `div` 16) Hne).
     exact HK.
   - intros b nd HKb j.
     destruct (decide (b = dg_bmap G)) as [-> | Hne].
@@ -918,7 +1014,7 @@ Qed.
    [bp->data[bi/8] |= m] / [&= ~m] stores). *)
 Theorem bm_write_obligation (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z)
     (u' : gset Z) (oldbs : list (bv 8)) :
-  dwire_geom G ->
+  dwire_geom G nin ->
   kind_write_ok G nin cov ls (dg_bmap G) oldbs (bm_bytes BSIZE u').
 Proof.
   intros Hgeo S K _ Hst _.
@@ -1026,7 +1122,7 @@ Qed.
 
 Lemma kinds_of_state_slot (G : dgeom) (nin : Z) (S : fs_state_rec)
     (K : Z -> blk_kind) (i : Z) (nd : nat -> fs_node) (n : fs_node) :
-  kinds_of_state G nin S K -> dwire_geom G -> 0 <= i < nin ->
+  kinds_of_state G nin S K -> dwire_geom G nin -> 0 <= i < nin ->
   K (dg_ist G + i `div` 16) = KInode nd ->
   dinode_wf (fn_rec n) ->
   kinds_of_state G nin (state_slot_upd S i n)
@@ -1036,10 +1132,14 @@ Proof.
   intros Hks Hgeo Hi HK Hn.
   destruct Hks as [Hbm Hib Hslot Hwf].
   assert (Hdiv0 : 0 <= i `div` 16) by (apply Z.div_pos; lia).
+  assert (Hdivlt : 16 * (i `div` 16) < nin).
+  { pose proof (Z.mul_div_le i 16 ltac:(lia)) as Hle. lia. }
   split; cbn [state_slot_upd fss_sb fss_inodes fss_used].
-  - rewrite (kind_upd_ne K (dg_ist G + i `div` 16)
+  - assert (Hne0 : dg_bmap G <> dg_ist G + i `div` 16)
+      by (pose proof (Hgeo (i `div` 16) Hdiv0 Hdivlt); lia).
+    rewrite (kind_upd_ne K (dg_ist G + i `div` 16)
                (KInode (nd_upd nd (Z.to_nat (i `mod` 16)) n)) (dg_bmap G)
-               (not_eq_sym (Hgeo (i `div` 16) Hdiv0))).
+               Hne0).
     exact Hbm.
   - intros j Hj Hnj.
     destruct (decide (j = i `div` 16)) as [-> | Hnej].
@@ -1102,7 +1202,7 @@ Qed.
    [FsDurObj.di_vals_enc] apply. *)
 Theorem di_write_obligation (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z)
     (i : Z) (n : fs_node) (oldbs : list (bv 8)) :
-  dwire_geom G -> 0 <= i < nin -> dinode_wf (fn_rec n) ->
+  dwire_geom G nin -> 0 <= i < nin -> dinode_wf (fn_rec n) ->
   kind_write_ok G nin cov ls (dg_ist G + i `div` 16) oldbs
     (di_blk_write oldbs (Z.to_nat (i `mod` 16)) (fn_rec n)).
 Proof.
@@ -1234,15 +1334,17 @@ Definition dwire_wit_kinds (G : dgeom) (u : gset Z) : Z -> blk_kind :=
 
 Lemma dwire_wit_kinds_of_state (G : dgeom) (nin : Z) (sb : fs_sb)
     (sbb : list (bv 8)) (u : gset Z) :
-  dwire_geom G ->
+  dwire_geom G nin ->
   kinds_of_state G nin (dwire_wit_state sb sbb u) (dwire_wit_kinds G u).
 Proof.
   intros Hgeo. split; cbn [dwire_wit_state fss_sb fss_inodes fss_used].
   - rewrite /dwire_wit_kinds kind_upd_at //.
-  - intros j Hj _. exists (fun _ => dwire_wit_node).
+  - intros j Hj Hn. exists (fun _ => dwire_wit_node).
+    assert (Hne : dg_ist G + j <> dg_bmap G)
+      by (pose proof (Hgeo j Hj Hn); lia).
     rewrite /dwire_wit_kinds.
     rewrite (kind_upd_ne (fun _ => KInode (fun _ => dwire_wit_node))
-               (dg_bmap G) (KBitmap u) (dg_ist G + j) (Hgeo j Hj)) //.
+               (dg_bmap G) (KBitmap u) (dg_ist G + j) Hne) //.
   - intros i n Hi. rewrite lookup_empty in Hi. discriminate.
   - intros b nd HKb j. rewrite /dwire_wit_kinds in HKb.
     destruct (decide (b = dg_bmap G)) as [-> | Hne].
@@ -1273,13 +1375,13 @@ Proof.
   intros b Hb. by apply fs_restrict_lookup_Some.
 Qed.
 
-(* ...AND THE GEOMETRY PREMISE IS SATISFIABLE, so the witness is not
-   vacuous: any geometry whose inode region starts ABOVE the bitmap block
-   has it, and so does xv6's own layout read the other way
-   ([FsImg.fs_sb_ok]'s [sbo_bmapstart] puts the bitmap block above the
-   region).  Exhibited at a geometry rather than assumed. *)
-Lemma dwire_geom_wit : dwire_geom (MkDGeom 0 1).
-Proof. intros j Hj. cbn. lia. Qed.
+(* ...AND THE GEOMETRY PREMISE IS SATISFIABLE AT XV6'S OWN LAYOUT, which
+   is what [dwire_geom_of_sb] proves off [fs_sb_ok]; this is the same
+   thing at a bare geometry, so the witnesses below need no superblock.
+   A 32-inum region starting at block 33 puts the bitmap at 35, exactly
+   as [sbo_bmapstart] does. *)
+Lemma dwire_geom_wit : dwire_geom (MkDGeom 35 33) 32.
+Proof. intros j Hj Hn. cbn. lia. Qed.
 
 Section Witness.
   Context {Σ : gFunctors}.
@@ -1289,7 +1391,7 @@ Section Witness.
      state and the witness kinds, over the block map they encode. *)
   Theorem Psi_dec_wit (G : dgeom) (nin : Z) (cov : gset Z) (ls : Z)
       (sb : fs_sb) (sbb : list (bv 8)) (u : gset Z) :
-    dwire_geom G ->
+    dwire_geom G nin ->
     ⊢ Psi_dec (Σ := Σ) G nin cov ls ∅
         (fs_restrict (fun b => kind_enc (dwire_wit_kinds G u b))
            (fs_home_set cov ls)).
