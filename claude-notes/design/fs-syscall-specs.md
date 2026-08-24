@@ -305,11 +305,15 @@ first instance), not a consumer-visible statement.
    invocation-instant state, not necessarily equal to it — closing the
    current batch also sweeps in deltas other processes linearized
    between invocation and commit.  Monotone, so nothing a consumer
-   concludes breaks; and it is what real sync means.  Implementation
-   honesty: a naive `begin_op(); end_op()` does NOT meet this spec —
-   with other ops open, `end_op` is not last and commits nothing — so a
-   real `sys_sync` must wait for quiescence (or force a commit); the
-   one-line spec is a real code obligation.
+   concludes breaks; and it is what real sync means.  SEMANTICS (owner,
+   2026-08-24): `sys_sync` BLOCKS until the log has been flushed — it
+   returns only after a commit covering the invocation-time batch has
+   installed.  That blocking is precisely what discharges the spec; the
+   proof's shape is "wait for the quiescence/commit event, then read
+   the `flushed b` receipt it minted".  (Recorded because the naive
+   `begin_op(); end_op()` pair does NOT have this behavior — with other
+   ops open, `end_op` is not last and commits nothing — so the blocking
+   wait is a real, load-bearing piece of the implementation.)
 3. **PER-NODE PERSISTENCE (the only rule most consumers use).**
 
    ```
