@@ -1178,6 +1178,18 @@ Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
    `fs_links_full_alloc`'s validity is free at the full family — the
    quiescent snapshot's exact situation.
 
+6. **One allocator, two call sites** (owner, same day): the SAME
+   transport/allocator core serves the BOOT — cloning the durable
+   snapshot onto the fresh per-era L family (stage 4/H1).  The core is
+   Γ-GENERIC and SOURCE-AGNOSTIC: inputs = the abstract state VALUE plus
+   the pure facts; output = ∃ fresh family, the instance at that value.
+   Commit instantiates it at the era's value (off `γtop_L`'s auth);
+   boot at the snapshot's value (trivially readable if `P_snap` is
+   persistent), followed by the era-only extras (cache/dirty/obs mints,
+   distribution into the era invariants).  Stage 4's boot re-founding —
+   and with it the `Himg` deletion — is thereby mostly this one lemma's
+   second call site.
+
 Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
 (`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
 and at every commit.
