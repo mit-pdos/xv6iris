@@ -107,6 +107,19 @@
    replacement is [Psi_dec_step_of_bridge], the same law with the target's
    bridge supplied, which is what a supplier proves anyway.
 
+   AND THE DEBT STOPS BEING LINEAR, which is the disclosure the owner has to
+   rule on.  fs-state.md section 5 makes the payload the place where "the
+   LINEARITY the debt needs lives", each commit consuming its [Psi D0 Dc].
+   Here [Psi_dec] is persistent and [dstep_dec_of_bridge] derives the step
+   from [True], so both are freely duplicable.  That is not a hole: the step
+   the commit runs has its TARGET fixed by the log ([Dc] is the log's own
+   [lm_logged L cov ls]), so what a client can "spend twice" is a step to
+   the one map the log is committing anyway.  What it does mean is that ALL
+   of the content has moved into the bridge -- the per-write maintained
+   invariant -- and none of it is left in the resource.  A ruling that wants
+   linearity back has to put it somewhere the bridge cannot: a token the
+   commit consumes, or the [fs_state] clauses of the paragraph below.
+
    WHAT THE LANDED BODY DOES NOT SAY, and it is the next lane's first
    question.  [FsDurDefer.P_wf_strict] contains [FsState.fs_state Gamma_D S]
    -- the durable disk IS a well-formed file system, with the ownership

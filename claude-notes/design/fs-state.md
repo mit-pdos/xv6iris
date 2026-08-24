@@ -796,6 +796,18 @@ side condition to the whole content.
    needed here. `Psi_dec_write_tied` is that form. It is NOT §4½a's wall (B):
    the tie is at ONE block and the log reads it off row (b).
 
+**AND THE DEBT STOPS BEING LINEAR** — the disclosure the owner has to rule
+on. §5 makes the payload the place where "the LINEARITY the debt needs
+lives", each commit consuming its `Ψ D₀ Dc`. `Psi_dec` is persistent and
+`dstep_dec_of_bridge` derives the step from `True`, so both are freely
+duplicable. That is not a hole: the step's TARGET is fixed by the log (`Dc`
+is the log's own `lm_logged L cov ls`), so what a client could "spend twice"
+is a step to the one map the log is committing anyway. What it does mean is
+that ALL of the content has moved into the bridge — the per-write maintained
+invariant — and none is left in the resource. A ruling that wants linearity
+back has to put it where the bridge cannot: a token the commit consumes, or
+the `fs_state` clauses below.
+
 **WHAT THE LANDED BODY DOES NOT SAY, and it is the next ruling's first
 question.** `P_wf_strict` contains `fs_state Γ_D S` — the durable disk IS a
 well-formed file system, with the ownership decomposition — and `P_wf_dec`
