@@ -29,11 +29,24 @@
        repair that keeps the deferred content per-op and order-free -- in
        particular the byte-valued map the ruling's item 1 proposes, and the
        DOMAIN-only variant, whose end_op is refuted separately by
-       [defer_domain_row_end_blind].  Deferring the FUNCTION update instead
-       of the bytes does not lift it either: function composition is not
-       commutative for the pair that actually occurs (one op's [bfree]
-       clearing a bit and another's [balloc] setting the same bit), so it
-       needs the very order the ledger does not have.
+       [defer_domain_row_end_blind].  Three variants that look like escapes
+       and are not:
+       - a per-op ORDERED LIST of writes: the refutation uses one write per
+         op, so the two lists are singletons and the ledgers still coincide.
+         Per-op order is not the order that is missing; CROSS-op order is.
+       - deferring the FUNCTION update rather than the bytes: composition is
+         order-free only where the functions COMMUTE, which is a fact about
+         the WHOLE ledger (section 0's forbidden shape) and is FALSE for the
+         pair that actually occurs -- one op's [bfree] clearing a bit and
+         another op's [balloc] setting the same bit do not commute.
+       - a GLOBAL SEQUENCE NUMBER per (op, block): this really does defeat
+         the refutation, because the two orders then leave different
+         ledgers.  It buys nothing, though: with sequence numbers the row
+         constrains a block only at its LAST deferrer, so an op's end-of-op
+         fupd is vacuous at every block some later deferrer holds and is the
+         full logged content at the rest -- which is the eviction discipline
+         of section 2 written differently, and it meets section 3's wall in
+         exactly the same place.
 
    (2) THE ROW THAT DOES WORK IS POINTWISE, AND IT FORCES EVICTION.
        [dfr_row Dj Lg om] below is the ruling's row spelled without any
@@ -78,7 +91,24 @@
    parked somewhere that outlives ONE op's fupd, i.e. in the payload's own
    existential (a batch-scope bin, a third index on [Psi]) or in
    [FsDurRefute]'s section C decoupling.  With one op open at a time the
-   whole of (3) is vacuous and (2) is the whole interface. *)
+   whole of (3) is vacuous and (2) is the whole interface.
+
+   WHAT THE SHAPE OF (3) SAYS ABOUT WHERE DEFERRAL BELONGS.  Every version
+   of the ruling that puts the deferred set in the LOG's ledger makes each
+   link of the chain hand back a whole [P_wf], because the log's row is an
+   equation between [Dj] and the logged view and [Psi]'s index is what
+   [P_wf] is stated at.  That is the same demand [FsDurRefute]'s wall (A)
+   made of the accessor chain, and it is what forces an orphaned block to
+   have a durable home at a moment when nothing can hold one.  Move the
+   deferral INSIDE the client's payload -- the client keeps its own per-op
+   deferral ledger at its own gname, [Psi D0 Dc] carries whatever
+   intermediate object it likes (the relaxed pool and the bin of
+   [FsDurRefute] section C are both available there, and neither is ever a
+   [P_wf]), and the only thing the LOG has to add is a QUIESCENCE TOKEN so
+   that [log_psi_commit] is demanded only at [out = 0], where the client
+   must collapse its intermediate object to a real [fs_state].  Then no
+   [op_entry] field, no [log_state] row and no two-arm AU exist at all, and
+   the log's interface is what fs-state.md section 5 already says it is. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
