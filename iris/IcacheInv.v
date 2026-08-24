@@ -2262,7 +2262,7 @@ Section IcacheRefInvReg.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
@@ -2286,7 +2286,7 @@ Section IcacheRefInvReg.
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl' pl fz m
-                Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz'
+                Hlok Hdir Hwl0 Hpar Hclm Hfrz'
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iExact "Hhalf".
   Qed.
@@ -2367,7 +2367,7 @@ Section IcacheRefInvReg.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
     iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
@@ -2431,7 +2431,7 @@ Section IcacheRefInvReg.
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl' pl (Some (Excl ph')) m
-                Hlok Hrt Hdir Hwl0 Hpar Hclm' Hfrz'
+                Hlok Hdir Hwl0 Hpar Hclm' Hfrz'
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj' [Hfrcp Hmr] Harm").
       iApply (ireg_frzc_intro _ _ (frz_bit ph') Hmok' with "Hfrcp Hmr"). }
     iModIntro. iFrame "Hfz Hhalf Hmir".
@@ -2500,7 +2500,7 @@ Section IcacheRefInvReg.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
     (* the coupling names the region's record at this inum, which is what
        ties the licence's fragment-level facts to the slot's clauses *)
@@ -2551,7 +2551,7 @@ Section IcacheRefInvReg.
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl' pl fz (S n)
-                Hlok Hrt Hdir Hwl0 Hpar Hclm
+                Hlok Hdir Hwl0 Hpar Hclm
                 (ireg_frz_ok_of_off fz (S n) (ds !!! islot inum) Hfz0)
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hhalf Hu".
@@ -2653,7 +2653,7 @@ Section IcacheRefInvReg.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
     iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) mrg
@@ -2685,7 +2685,7 @@ Section IcacheRefInvReg.
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl fz cn
-                Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                Hlok Hdir Hwl0 Hpar Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj [Hrc Hmr] Harm").
       iApply (ireg_frzc_intro _ _ false Hmok with "Hrc Hmr"). }
     iModIntro. iFrame "Hl Hout Hsel".
@@ -2749,7 +2749,7 @@ Section IcacheRefInvReg.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
     iDestruct "Hfrcp" as "[Hrc Hmr]".
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
@@ -2782,7 +2782,7 @@ Section IcacheRefInvReg.
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl' pl fz (S n)
-                Hlok Hrt Hdir Hwl0 Hpar Hclm
+                Hlok Hdir Hwl0 Hpar Hclm
                 (ireg_frz_ok_of_off fz (S n) (ds !!! islot inum) Hfz0)
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj [Hrc Hmr] Harm").
       iApply (ireg_frzc_intro _ _ false Hmok with "Hrc Hmr"). }

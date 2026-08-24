@@ -289,8 +289,8 @@ Qed.
 
           (L1) is the SUM, [wl + wd <= nlink], which is why widening the
           component costs the region's six movers an arithmetic rewrite and
-          nothing else: [InodeRegion.ireg_link_ok] and [ireg_root_ok] are
-          UNCHANGED, applied at [wl + wd].  Nothing else in the tree may
+          nothing else: [InodeRegion.ireg_link_ok] is UNCHANGED, applied at
+          [wl + wd].  Nothing else in the tree may
           read [wd] -- it is a flavour on the SAME unit of payment, not a
           second currency, and a [ilinkd] pays for exactly the record an
           [ilink] does;

@@ -512,12 +512,12 @@ Section ProofNamexRoot.
        namex's very first [iget] is the one xv6 does not look up at all --
        it hands [ROOTINO] to [iget] on the strength of the path starting
        with '/', and nothing on the walk has read a directory yet.  What
-       founds it is the landed ROOT CLAUSE: [InodeRegion.ireg_root_ok] is
-       (L1) MADE STRICT at [ireg_root], so the root's count is at least one
-       and (L3) then gives it a nonzero type ([IgetLic.iname_root_alloc]).
-       The licence itself is PURE -- the evidence lives in the region's
-       invariant, not in the caller's hands -- which is exactly why it costs
-       this walk nothing.  This is the root clause's first consumer. *)
+       founds it is the region's KEEP-ALIVE TOKEN: nothing can spend
+       [InodeRegion.ireg_keep], so [ireg_lnk_root_alive] puts the root's
+       count at least one and (L3) then gives it a nonzero type
+       ([IgetLic.iname_root_alloc]).  The licence itself is PURE -- the
+       evidence lives in the region's invariant, not in the caller's hands
+       -- which is exactly why it costs this walk nothing. *)
     iAssert (iname gi gfs inodestart ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
     iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO

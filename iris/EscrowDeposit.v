@@ -148,14 +148,14 @@ Section EscrowDeposit.
        in-transition pins and the f column's boot-shelter clause all ride in
        the ∃ beside the seven original columns.  The region's own slot pattern
        verbatim -- every consumer of the slot destructures it identically. *)
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     rewrite /dinode_at.
     pose proof Hdeq0 as Hdeq.
-    rewrite Hdeq in Hlok. rewrite Hdeq in Hrt.
+    rewrite Hdeq in Hlok.
     assert (Hnl0' : bv_unsigned (di_nlink dn') = 0) by exact (proj2 Hnl Hz).
     assert (Hnl0 : bv_unsigned (di_nlink dn) = 0).
     { rewrite -(proj1 Hnl). exact Hnl0'. }
@@ -173,10 +173,6 @@ Section EscrowDeposit.
       by (rewrite Hzz2 Hzz3; exact (ireg_dir_ok_zero dn')).
     assert (Hwl0' : ireg_dir_wl0 dn' wl)
       by (rewrite Hzz1; exact (ireg_dir_wl0_zero dn')).
-    assert (Hnr : bv_unsigned inum <> ireg_root)
-      by exact (ireg_root_ok_ne _ dn _ Hrt Hnl0).
-    assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
-      by exact (ireg_root_ok_nonroot _ dn' _ Hnr).
     (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's own
        [dinode_at] put this open on the MARKED arm, whose clause says
        [cl = None].  The deposit is a byte-writing mover, so §2.4's "writes
@@ -293,7 +289,7 @@ Section EscrowDeposit.
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 (Some (Excl FrzOff)) cn
-                Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz'
+                Hlok' Hdir' Hwl0' Hpar Hclm' Hfrz'
                 with "Hla Hep Hlnk Hdisj Hcnt [] [Hrcpt Hmr]").
       { iApply ireg_fsh_off. }
       { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))

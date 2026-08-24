@@ -80,7 +80,7 @@ R7. **Staging** (§5.3 adopted with one amendment): F1a, F1b, F1.5b are
     QUEUED BEHIND the sysfile cone; they are the fragment queue's first
     three items, in that order.  **F1.5c does not start until F1.5d's
     gate has a door**: `isdirempty`'s invariant (S7, unwritten), the
-    root clause (LANDED, see R9), and SpecIget's licence enumeration (C′)
+    root's liveness (see R9), and SpecIget's licence enumeration (C′)
     — or fs-icache §20.17.7's kernel fix (ialloc's brelse-after-iget;
     NOTE the name collision: that is fs-icache's "F2", unrelated to the
     staging table's F2 row).
@@ -100,18 +100,16 @@ R9. **Owed items registered**, each with its home:
       can land ahead of it.  Today insert has a full resource story and
       delete has only the refcount half (`ireg_write_unlink` consumes
       an `ilink` and has NO CALLER).
-    - ~~the ROOT clause~~ — **LANDED and RATIFIED** (coordinator,
-      2026-08-15: the form and home moves are both forced — the
-      chartered body-form is unpreservable at `ireg_write_unlink`, and
-      strictness names `w`, which lives only at the slot; the
-      claim/free REFUTATIONS falling out as theorems exceed the
-      charter).  `ireg_slot` (not `ireg_body`) carries
-      `ireg_root_ok z d w := z = ireg_root -> w < di_nlink d`, (L1) MADE
-      STRICT at the root, with §20.4's `di_nlink ≥ 1` as its projection
-      `ireg_root_ok_alive`.  The chartered form is unpreservable at
-      `ireg_write_unlink` and strictness is what the root's structural
-      slack of one (its `"."`/`".."` are self-records no `dir_links` unit
-      is filed against) buys; see the campaign ledger for the mover table.
+    - **the ROOT's liveness is a TOKEN, not a clause.**  There is no pure
+      root clause on `ireg_slot`: the region parks one unspendable
+      keep-alive token at `ireg_root` (`InodeRegion.ireg_keep`), which the
+      root's own self-records leave unaccounted for, and
+      `ireg_lnk_root_alive` / `ireg_lnk_root_min2` read `1 ≤ nlink` and
+      `2 ≤ nlink` (the latter against any one token a caller presents) off
+      `FsStateLink.link_auth_toks_le`.  A maintained clause could not
+      survive `ireg_write_unlink` in its chartered form and the strict form
+      that did survive had to name `w`; the token form needs neither, and
+      it dies with no mover premise at all.
     - `isdirempty`'s invariant goes into S7's brief as a PREREQUISITE
       of create_fresh_ty's retirement, not a local convenience.
     - the `".."`-location fact (`ents ip !! ".." = Some dp`) is F1b's
@@ -583,7 +581,7 @@ box with licence (d) **now founded** by §3.4:
 | (c) HELD `dinode_at` | **refuted** | a claim box's fragment is IN the region (`ireg_in`, :652, left arm; re-parked at :1536); `dinode_at_excl` (:567) |
 | (d) CLAIMED | **refuted** | `iclaim_excl` (IcacheRef.v:699) — create holds the unique token.  **Founded only under (L5).** |
 | (e) BUFFERED | **refuted** | §20.7 row 2 — demands a type-nonzero read through the block ialloc's `log_write` just committed |
-| (f) ROOT | **refuted**, and the clause is LANDED | `ireg_slot` carries `⌜ireg_root_ok z d w⌝` = (L1) strict at the root; a claim box has `di_nlink = 0` (`fresh_shape`), and `ireg_root_ok_ne` / `InodeRegion.ireg_root_ne` turn that into `z ≠ ROOTINO`.  The mover-level dividend is stronger than the row asks: `ireg_claim_au` and `ireg_free_au` REFUTE the root outright, so no claim box is ever at ROOTINO in the first place. |
+| (f) ROOT | **refuted** | the region's keep-alive token puts `1 ≤ di_nlink` at `ireg_root` (`InodeRegion.ireg_lnk_root_alive`, off `FsStateLink.link_auth_toks_le`); a claim box has `di_nlink = 0` (`fresh_shape`), so it is not the root. |
 | **(b) ORPHAN `igrey i`** | **THE RESIDUE** | `igrey` concludes nothing by construction: `link_mint_grey` is mint-from-nothing (IcacheRef.v:812), and §20.18 ruling 2 (fs-icache.md:5638-5643) accepts permanently that `g` can never again carry information |
 
 Case (b) is closed only by §20.17.5's boxed enumeration
@@ -1067,7 +1065,7 @@ ruling, and it is the single largest price saving in the increment.
 |---|---|---|
 | `LinkedL` ⇒ allocated | `IregLinkNz.ireg_link_nz` / `InodeRegion.ireg_link_alloc` — landed | 0 |
 | `HeldL` ⇒ allocated | definitional | 0 |
-| `RootL` ⇒ allocated | `ireg_root_ok_alive` (the landed root clause) + (L3)'s contrapositive; first consumer of the root clause | ~10 lines |
+| `RootL` ⇒ allocated | `InodeRegion.ireg_lnk_root_alive` (the region's keep-alive token) + (L3)'s contrapositive | ~10 lines |
 | `BufL` ⇒ allocated | `ireg_read_blk`'s pattern + `diblk_bytes_inj` | ~40 lines, owed to F1.5d |
 | `ClaimL` ⇒ allocated | needs (L5); not available at C′ | F1.5c |
 | `GreyL` | concludes nothing, by construction (§20.18 ruling 2) | — |
@@ -2550,8 +2548,8 @@ The probes read `c105ad60` / `3e8d4c3e`.  Verified at HEAD `e50a6508`:
   record-backed probe's G2 blocker (`ProofSysLinkTails`' `ip->nlink--`)
   CLEARED.**  R13(vi)'s S7-plank is therefore no longer owed as a
   design step; it is landed machinery.
-- **The root clause is landed and ratified** (R9): `ireg_root_ok` on
-  `ireg_slot`, with `ireg_root_ok_alive` as the chartered projection.
+- **The root's liveness is the region's keep-alive TOKEN** (R9), read by
+  `InodeRegion.ireg_lnk_root_alive`; `ireg_slot` carries no root clause.
 - **`SpecSysUnlink.v` and `ProofSysUnlinkParts.v` now exist** (S7 is in
   flight; the T_DIR re-park has one missing premise, recorded at HEAD).
   `ProofSysUnlinkParts` is a new `igrey` consumer — **the grey

@@ -1234,9 +1234,9 @@ Two consequences worth stating once:
   `negb (dir_inum = self)` guard) and only the ROOT's `".."` ever hits it.
   What it buys is the **root keep-alive token**: root's `nlink = 1` is then
   unaccounted for, the region parks one `link_tok ireg_root` that nothing
-  spends, and "the root is allocated" is a reading of the RA's law rather
-  than a maintained clause (`InodeRegion.ireg_root_ok`'s strict `w < nlink`
-  dies with the ledger's columns).
+  spends, and "the root is allocated" is a reading of the RA's law
+  (`InodeRegion.ireg_lnk_root_alive`) rather than a maintained clause —
+  there is no pure root clause on `ireg_slot` at all.
 - **At the stage where every token is still at home** the family's validity
   is free (`link_full_map_valid`) and boot spends no image sweep;
   `✓ link_elem` at the image map — `fsimg_wf`'s W9 plus conjunct (13)

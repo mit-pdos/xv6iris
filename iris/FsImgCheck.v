@@ -216,10 +216,9 @@ Qed.
 (*  [IcacheBoot.ireg_alloc]'s stage-B ledger premise stands at [W z =
     FsImg.fs_link_count P sb z] -- the number of ticket-bearing records of
     the image that name [z] -- and the region invariant then owes (L1)
-    ([InodeRegion.ireg_link_ok]), [ireg_dir_wl0] and the strict root clause
-    [ireg_root_ok] at that value.  All three are W9 of [fsimg_wf_ok], so NO
-    new computation lands here; W9's own sweep is what added ~+20 s to this
-    file's [vm_compute]. *)
+    ([InodeRegion.ireg_link_ok]) and [ireg_dir_wl0] at that value.  Both are
+    W9 of [fsimg_wf_ok], so NO new computation lands here; W9's own sweep is
+    what added ~+20 s to this file's [vm_compute]. *)
 
 (* (L1): no inum has more tickets than links *)
 Lemma fsimg_link_le (z : Z) :
@@ -249,7 +248,8 @@ Lemma fsimg_dir_root (z : Z) :
   z = ROOTINO.
 Proof. exact (fsimg_wf_dir_root fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
 
-(* ...and [ireg_root_ok]'s strict clause at the root, where the two meet *)
+(* ...and the ROOT's own pair, which is what the boot's keep-alive token
+   ([InodeRegion.ireg_keep]) is minted against *)
 Lemma fsimg_root_link :
   fs_link_count fsimg_P fsimg_sb ROOTINO = 0%nat
   /\ bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb ROOTINO)) = 1.

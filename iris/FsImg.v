@@ -2302,8 +2302,7 @@ Qed.
                the d-flavoured column, and boot mints no d-fragment);
              * [nlink = 1], because [DirView.dlc_bound] at the all-false
                flavour map reads [nlink <= 1] ([dlc_bound_le1]), and the
-               strict root clause [InodeRegion.ireg_root_ok] then needs
-               [0 < nlink];
+               region's keep-alive token then needs [0 < nlink];
              * [z = ROOTINO], because [dir_links_of_plain]'s third premise
                is exactly the root exclusion of [DirLinks.dir_par_tie] --
                mkfs lays down one directory and it is the root, which is
@@ -3587,8 +3586,8 @@ Proof.
 Qed.
 
 (* [DirView.dlc_bound] at the all-false flavour map ([dlc_bound_le1]) AND
-   [InodeRegion.ireg_root_ok]'s strict clause at the root: a live image
-   directory has EXACTLY one link. *)
+   the root's keep-alive token: a live image directory has EXACTLY one
+   link. *)
 Lemma fsimg_wf_dir_nlink (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
   fsimg_wf P sb = true -> 0 <= z < sb_ninodes sb ->
   bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
@@ -3611,10 +3610,10 @@ Proof.
                                 (fsimg_wf_links P sb H) Hz) Hty))).
 Qed.
 
-(* ...and the ROOT's own pair, which is what [InodeRegion.ireg_root_ok]
-   needs at [ireg_root]: the count is zero and the link count is one, so
-   the STRICT clause [w < nlink] holds.  W7 supplies the type and W1 the
-   range, so this costs no new image fact. *)
+(* ...and the ROOT's own pair, which is what the region's keep-alive token
+   ([InodeRegion.ireg_keep]) is minted against at [ireg_root]: the count is
+   zero and the link count is one, so the one parked token is covered.  W7
+   supplies the type and W1 the range, so this costs no new image fact. *)
 Lemma fsimg_wf_root_link (P : Z -> list (bv 8)) (sb : fs_sb) :
   fsimg_wf P sb = true ->
   fs_link_count P sb ROOTINO = 0%nat

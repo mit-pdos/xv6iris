@@ -823,8 +823,7 @@ Section FsCfgBootPool.
        P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
     16 * Z.of_nat nib <= 2 ^ 32 ->
     image_link_le (fs_link_count P sb) dss nib
-    /\ image_dir_wl0 (fs_link_count P sb) dss nib
-    /\ image_root_alive (fs_link_count P sb) dss nib.
+    /\ image_dir_wl0 (fs_link_count P sb) dss nib.
   Proof.
     intros Hwf Hl Hdwf He Hnib.
     assert (Hbr : forall z : Z, z ∈ region_inums nib ->
@@ -836,15 +835,10 @@ Section FsCfgBootPool.
       pose proof (fsimg_wf_link_le P sb z Hwf).
       pose proof (proj1 (bv_unsigned_in_range _
                            (di_nlink (fs_dinode P sb z)))). lia. }
-    split.
     { intros z Hz Hty. rewrite (Hbr z Hz) in Hty.
       apply (fsimg_wf_link_dir P sb z Hwf).
       (* [InodeRegion.ireg_dir_ty] and [DirView.T_DIR_z] are the same 1 *)
       rewrite Hty. reflexivity. }
-    { intros z Hz Hroot.
-      destruct (fsimg_wf_root_link P sb Hwf) as [Hc Hnl].
-      assert (Hz1 : z = ROOTINO) by (rewrite Hroot; reflexivity).
-      rewrite (Hbr z Hz) Hz1 Hnl Hc. lia. }
   Qed.
 
   (* **THE FORM [fs_cfg_alloc] USES**: straight off
@@ -1155,7 +1149,6 @@ Section FsCfgBootPool.
        P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
     16 * Z.of_nat nib <= 2 ^ 32 ->
     image_free_nlink dss nib /\ image_nlink_short dss nib /\
-    image_root_alive (fs_link_count P sb) dss nib /\
     image_link_le (fs_link_count P sb) dss nib
     /\ image_dir_wl0 (fs_link_count P sb) dss nib
     /\ image_ty_ok dss nib
@@ -1175,11 +1168,9 @@ Section FsCfgBootPool.
     { intros z Hz. rewrite (Hbr z Hz). apply region_inums_spec in Hz.
       exact (fs_region_nlink_short P sb nib z (fs_region_wf_nlink _ _ _ Hrw)
                Hz). }
-    (* [image_link_premises] lists them in ITS order; [ireg_alloc]'s slot
-       wants root-alive first. *)
     destruct (image_link_premises P sb dss nib Hwf Hl Hdwf He Hnib)
-      as (Hle & Hw0 & Hrt).
-    split; [exact Hrt |]. split; [exact Hle |]. split; [exact Hw0 |].
+      as (Hle & Hw0).
+    split; [exact Hle |]. split; [exact Hw0 |].
     (* THE LINK RA's TIE (durable-disk 2b-inode-4) is [Hbr] and nothing
        else: [img_node]'s record IS [fs_dinode P sb z] ([era_node_rec]). *)
     split; [| intros z Hz;

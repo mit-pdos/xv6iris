@@ -94,7 +94,7 @@ Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IregDirBit.
 Require Import IregLinkNz.   (* V5' increment W: the root refutation at a
-                                TAGGED unit ([ireg_link_root_min2_dp]) and the
+                                released TOKEN ([ireg_tok_root_min2]) and the
                                 [dl_root]/[ireg_root] bridge, which is what
                                 opens [dir_links_dotdot_out]'s tie leg *)
 Require Import KvmSpec.
@@ -5805,7 +5805,7 @@ Section ProofSysUnlinkBody.
               [DirLinks.dir_links_dotdot_out]'s tie, and
               [IcacheRef.iparent_agree] collapses the two values -- no
               region open, no tree fragment.  The root exclusion the tie's
-              guard wants comes from [IregLinkNz.ireg_link_root_min2_dp]
+              guard wants comes from [IregLinkNz.ireg_tok_root_min2]
               against FINDING 3's [nlink ip = 1].
          (D2) [2 <= bv_unsigned (di_nlink dnd)] -- a directory holding a
               live subdirectory entry has at least two links.  Derived
@@ -6674,9 +6674,10 @@ Section ProofSysUnlinkBody.
             [DirLinks.dir_par_tie] -- [∃ pv, iparent ip pv ∗
             ⌜dir_inum dati 1 = pv⌝] -- under a guard whose two live
             conjuncts the seam already supplies and whose third is the root
-            exclusion, and THAT is [IregLinkNz.ireg_link_root_min2_dp]
-            against FINDING 3's [nlink ip = 1]: the strict root clause plus
-            any outstanding unit put root's count at two.
+            exclusion, and THAT is [IregLinkNz.ireg_tok_root_min2] against
+            FINDING 3's [nlink ip = 1]: the region's unspendable keep-alive
+            token plus the one the zeroing just released put root's count at
+            two.
          3. THE AGREEMENT.  Half plus half is at most the whole register,
             so [IcacheRef.iparent_agree] collapses [dp] and [pv] --
             fragment against fragment, no region open at all.  With
@@ -6689,10 +6690,10 @@ Section ProofSysUnlinkBody.
        =================================================================== *)
     iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
     iApply fupd_wp.
-    iMod (ireg_link_root_min2_dp ⊤ gi gfs inodestart nib
+    iMod (ireg_tok_root_min2 ⊤ gi gfs inodestart nib
             (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
-            (bv_unsigned dinum) ltac:(solve_ndisj) Hinb
-            with "Hireg Hdiati Hticket") as "(%Hrmin & Hdiati & Hticket)".
+            ltac:(solve_ndisj) Hinb
+            with "Hireg Hdiati Htoken") as "(%Hrmin & Hdiati & Htoken)".
     iModIntro.
     assert (Hipnroot : bv_unsigned (zero_extend' 32
                          (dir_inum datd kk : mword 16) : mword 32)

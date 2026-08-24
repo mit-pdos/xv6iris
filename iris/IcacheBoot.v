@@ -621,34 +621,6 @@ Section IcacheBootRegion.
   Definition image_ty_ok (dss : list (list dinode)) (nib : nat) : Prop :=
     forall z : Z, z ∈ region_inums nib -> ireg_ty_ok (image_dinode dss z).
 
-  (* ...AND SO IS THE ROOT CLAUSE ([InodeRegion.ireg_root_ok], design
-     fs-icache.md §20.4's "image-wf IOU" -- that section calls it (L4) too,
-     which is NOT the 32767 clause above), for the third time and for
-     exactly the same reason.
-     [ireg_slot] now says of the ROOT's record that its link count strictly
-     exceeds the ledger's -- and at boot the ledger is EMPTY, so the strict
-     clause is §20.4's chartered one verbatim: [1 <= di_nlink] at [ROOTINO].
-     True of every mkfs image (mkfs's [ialloc] writes [nlink = 1] into the
-     root and the ["."]/[".."] it appends are self-records that no
-     [dir_links] unit is ever filed against), false of nothing this kernel
-     can produce (the region itself now refutes the claim and the free at the
-     root, and the only lowering write pays with a fragment), and unprovable
-     here because the bytes are the boot client's.
-
-     It rides in the SAME ∀-over-decodings premise slot as (L3) and (L4), so
-     [ireg_alloc]'s arity does not move; and it is guarded by
-     [z ∈ region_inums nib] like its two neighbours, which makes it VACUOUS
-     at [nib = 0] -- an empty region has no root slot to constrain. *)
-  (* WIDENED BY STAGE B: at [w = 0] the strict clause read [1 <= nlink],
-     §20.4's own words; at [w = W z] it reads [W z < nlink].  The image
-     supplies it the same way -- at the mkfs image the root IS a directory,
-     so [image_dir_wl0] pins [W root = 0] and the clause collapses back to
-     [1 <= nlink] ([FsImg.fsimg_wf_root_link]). *)
-  Definition image_root_alive (W : Z -> nat) (dss : list (list dinode))
-      (nib : nat) : Prop :=
-    forall z : Z, z ∈ region_inums nib -> z = ireg_root ->
-      (W z < Z.to_nat (bv_unsigned (di_nlink (image_dinode dss z))))%nat.
-
   (* ...AND (L1) BECOMES ONE TOO, for the first time.  At [w = 0] it was
      [0 <= nlink] and needed nothing; at [w = W z] it is the real ledger
      clause -- "no more tickets than links" -- and it is a fact about the
@@ -924,7 +896,7 @@ Section IcacheBootRegion.
        length dss = nib -> Forall diblk_wf dss ->
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
-       image_root_alive W dss nib /\ image_link_le W dss nib
+       image_link_le W dss nib
        /\ image_dir_wl0 W dss nib /\ image_ty_ok dss nib
        /\ image_nlink_at N dss nib) ->
     (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier;
@@ -934,9 +906,10 @@ Section IcacheBootRegion.
        owes NOTHING new -- (T1') in particular is not even an image fact
        ([wl = 0] closes it before the type is asked).  A d-flavoured
        fragment is only ever minted by a running kernel at create's mkdir
-       arm; mkfs's records are handed to the region unflavoured, and the
-       root's own [nlink = 1] is still [image_root_alive]'s business and
-       nobody else's. *)
+       arm; mkfs's records are handed to the region unflavoured.  The
+       ROOT's own [nlink = 1] is nobody's business here any more: the
+       region's keep-alive token ([InodeRegion.ireg_keep]) carries it, and
+       the boot hands that token over with the rest of the pile. *)
     ([∗ set] z ∈ region_inums nib,
        link_auth z (W z) 0 0 0 None 0 None (Some (Excl FrzOff)) 0) -∗
     (* THE LINK RA's PER-INUM AUTHORITY AND ITS PILE OF TOKENS
@@ -1003,7 +976,7 @@ Section IcacheBootRegion.
     intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He)
-      as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0 & Hl5 & Hlnkat).
+      as (Hl3 & Hl4 & Hl1 & Hdw0 & Hl5 & Hlnkat).
     iIntros "Hlk Hlnks Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv #Hftopi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
@@ -1102,10 +1075,6 @@ Section IcacheBootRegion.
       { pose proof (Hl1 z Hz).
         split_and!;
           [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz) | exact (Hl5 z Hz)]. }
-      (* the root clause at the WIDENED ledger, i.e. §20.4's own words with
-         [W root] in place of the [0] stage A could hard-code *)
-      assert (Hrt : ireg_root_ok z (image_dinode dss z) (W z + 0 + 0)).
-      { intros Heq. pose proof (Hrt0 z Hz Heq). lia. }
       (* ...and the DIRECTORY clause, which stage A got for free at [wl = 0] *)
       assert (Hwl0 : ireg_dir_wl0 (image_dinode dss z) (W z))
         by exact (Hdw0 z Hz).
@@ -1118,7 +1087,7 @@ Section IcacheBootRegion.
                      with "Hla") as "Hla".
         iApply (ireg_slot_intro γfs γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
-                  Hok Hrt (ireg_dir_ok_zero _) Hwl0
+                  Hok (ireg_dir_ok_zero _) Hwl0
                   ireg_par_ok_none (ireg_claim_ok_none _ _) I
                   with "Hla Hep Hlnk [] Hcnt [] [Hrcpt Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
@@ -1139,7 +1108,7 @@ Section IcacheBootRegion.
                      with "Hla") as "Hla".
         iApply (ireg_slot_intro γfs γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
-                  Hok Hrt (ireg_dir_ok_zero _) Hwl0
+                  Hok (ireg_dir_ok_zero _) Hwl0
                   ireg_par_ok_none (ireg_claim_ok_none _ _) I
                   with "Hla Hep Hlnk [] Hcnt [] [Hrcpt Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT

@@ -4233,9 +4233,11 @@ keep-alive token; the borrow is `FsStateEra.ent_toks_borrow`, one
 `big_sepM_lookup_acc` at the name `dir_first` won on
 (`FsTree.dir_view_lookup`).  `dirlookup` and `dirlink` therefore take
 `IcacheEscrow.dlinks` rather than `dir_links`, plus one new pure premise
-`blk_holes_zero bm data` (an `inode_ok` conjunct).  **Nothing reads (L1)
-or `ireg_root_ok` any more.**  What is NOT yet done is the deletions
-(`claude-notes/projects/durable-disk.md`, item 2b-inode-5 step 6).
+`blk_holes_zero bm data` (an `inode_ok` conjunct).  **The root clause is
+GONE from `ireg_slot`** (2b-inode-6, step 6a); (L1) is not, and its three
+surviving readers are listed in fs-ghost-state §3b.  The rest of the
+deletions are `claude-notes/projects/durable-disk.md`, item 2b-inode-5
+step 6.
 
 §19 ended by naming Part 2 "the soundness obligation, and the only route
 to an unblocked create" and leaving it unpriced.  This section prices it,
@@ -4481,39 +4483,37 @@ the formal content of the user's premise (1):
 | dirlookup `+0x8e` | `ProofDirlookup.v:1895` | (a)/(b) for an ordinary record, (c) for `"."` | the fragment is pulled out of the caller's `dir_links` by `big_sepL_lookup_acc` at the matched index `i` — the SAME index `Hinums` is applied at (`:1892`) — and put back before the return |
 | ialloc `+0xaa` | `ProofIalloc.v:1622` | (d) | §20.5 — the buffer is already gone (`brelse` at `:1528`, two instructions earlier) |
 | ireclaim `+0x44` | `ProofIreclaim.v:1252` | (e) | it **still holds the dinode buffer** at its iget (the comment at `ProofIreclaim.v:1213` says so), which is §16.2's serialiser: while that buffer is locked, no free of any inum in the block can commit |
-| namex `+0x4c` | `ProofNamex.v:4996` | (f) | `ROOTINO` is a literal; the root's liveness is a region clause (L4), established by the image-wf IOU and never lowered |
+| namex `+0x4c` | `ProofNamex.v:4996` | (f) | `ROOTINO` is a literal; the root's liveness is the region's keep-alive TOKEN, read off the counting RA |
 
-**(L4), the root clause — LANDED, and NOT in this form.**  (This (L4) is
+**(L4), the root's liveness — A TOKEN, NOT A CLAUSE.**  (This (L4) is
 §20.4's numbering and is NOT `ireg_link_ok`'s third conjunct, which the
-file also calls (L4); the code names this one `ireg_root_ok`, commented as
-"(L4-ROOT)".)  `⌜1 <=
-di_nlink (m !!! ROOTINO)⌝` in `ireg_body` is what a consumer needs and
-what nothing can preserve: `ireg_write_unlink` would have to turn
-`1 <= di_nlink dn` into `1 <= di_nlink dn'` across `di_nlink dn =
-di_nlink dn' + 1`, and no premise on that mover supplies the missing
-one honestly (the mover cannot see `sys_unlink`'s `"."`/`".."` refusal,
-which is three contracts away).
+file also calls (L4).)  `⌜1 <= di_nlink (m !!! ROOTINO)⌝` in `ireg_body`
+is what a consumer needs and what NO pure clause can preserve:
+`ireg_write_unlink` would have to turn `1 <= di_nlink dn` into
+`1 <= di_nlink dn'` across `di_nlink dn = di_nlink dn' + 1`, and no
+premise on that mover supplies the missing one honestly (the mover cannot
+see `sys_unlink`'s `"."`/`".."` refusal, which is three contracts away).
 
-What is landed is **(L1) MADE STRICT AT THE ROOT**, at `ireg_slot`
-(strictness names `w`, which lives at the slot and not at the body):
+What stands instead is the COUNTING RA (fs-ghost-state §3b).  The region
+parks one unspendable token at `ireg_root` (`InodeRegion.ireg_keep`) —
+the unit of slack the root's own self-records leave unaccounted for — and
+`ireg_lnk_root_alive` reads `1 <= di_nlink` off
+`FsStateLink.link_auth_toks_le`; `ireg_lnk_root_min2` reads `2 <=` when
+the caller presents a token of its own.  The lowering mover simply cannot
+reach the parked token, so nothing has to be preserved by hand.
 
-    ireg_root_ok z d w := z = ireg_root -> (w < Z.to_nat (di_nlink d))%nat
-
-with `⌜1 <= di_nlink⌝` recovered as the projection
-`ireg_root_ok_alive`.  The root's slack of exactly one is structural:
-`dir_links` files one unit per live NON-SELF record, so the root's own
-`"."` and `".."` are filed by nobody while every subdirectory's `".."`
-is paid for by create's `dp->nlink++` — the root's count is
-permanently one above the number of records that can ever name it, and
-that one is the entry it does not have in a parent.  So every mover is
-free (`stable`/`bump`/`drop`) or REFUTES the root outright
-(`ireg_claim_au` and `ireg_free_au`, each from (L3) at its own
-type-0/`nlink`-0 record): **ialloc can never claim the root and iput can
-never free it**, with no new premise on any mover and no obligation on
-any walk.  Preservation was owed to S7 and is owed to nobody.
-Licence (f)'s refutation is `ireg_root_ok_ne` / `InodeRegion.ireg_root_ne`;
-the boot side is `IcacheBoot.image_root_alive`, one computational image
-obligation in `ireg_alloc`'s existing ∀-over-decodings slot.
+The root's slack of exactly one is structural: a SELF record is
+tokenless (`FsStateInode.ent_tokenless`, the image's own
+`FsImg.fs_rec_ticket` guard), so the root's own `"."` and `".."` are paid
+for by nobody while every subdirectory's `".."` is paid for by create's
+`dp->nlink++` — the root's count is permanently one above the number of
+records that can ever name it, and that one is the entry it does not have
+in a parent.  That unit is the PARKED TOKEN, and because nothing in the
+tree can reach it no mover has anything to preserve: **ialloc can never
+claim the root and iput can never free it**, with no premise on any mover
+and no obligation on any walk.  The boot side is
+`FsCfgBoot.ireg_lnks_of_image`'s split, whose arithmetic premise is
+`fs_link_count z + keep z <= nlink z` (W9 plus `fsimg_wf_root_link`).
 
 **`SpecDirlookup` gains `dinode_at γi dinum dn`, in and out.**  It takes
 the locked-inode payload today (`SpecDirlookup.v:216-222`) but not the
@@ -5027,8 +5027,8 @@ Everything else in §20 stands: the RA (unchanged — `r` and `iref_lic` were
 landed in S5f and neither move), the parking, the grey colour, the ten
 death certificates, D2, and stages B/C/D as scoped.  (L2) and the
 `c = None` half of (L3) remain unstated, both for the reason already in
-the text: nothing mints an `iclaim` yet.  §20.4's (L4), the root clause,
-IS landed — as (L1) made strict at the root, see §20.4.
+the text: nothing mints an `iclaim` yet.  §20.4's (L4), the root's
+liveness, is the region's keep-alive token — see §20.4.
 
 ### 20.16 THE M2 DERIVATION (fs-sysfile S5h, 2026-08-12): **STOP-AND-REPORT.
 ### (M2) IS REFUTED, AND SO IS EVERY OTHER CARRIER, BECAUSE THE OBLIGATION IS

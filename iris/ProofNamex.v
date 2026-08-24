@@ -5492,9 +5492,9 @@ Section ProofNamexMain.
       (* THE LICENCE (increment C'-lite, fs-fragments.md §7.1), licence (f).
          namex's FIRST iget is the one nothing looked up: an absolute path
          starts at the root and the walk has read no directory yet.  What
-         founds it is the landed ROOT CLAUSE -- [InodeRegion.ireg_root_ok]
-         is (L1) MADE STRICT at [ireg_root], so the root's count is at
-         least one and (L3) gives it a nonzero type
+         founds it is the region's KEEP-ALIVE TOKEN -- nothing can spend
+         [InodeRegion.ireg_keep], so [ireg_lnk_root_alive] puts the root's
+         count at least one and (L3) gives it a nonzero type
          ([IgetLic.iname_root_alloc]).  The licence is PURE: the evidence
          lives in the region's invariant, not in this walk's hands, which
          is why it costs the walk nothing. *)

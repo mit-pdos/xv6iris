@@ -547,7 +547,8 @@ map at home blocks); 1d lands last.
           vanish (`fn_blk` is partial).  `dir_links` + ledger columns
           `wl/wdu/wdt/g/p` → `ent_toks` + `link_auth Γ` (the RA law IS
           L1); `dlc_lower`, `dir_orphan_clean`, `dir_dots_ix`'s index
-          half, `ireg_dir_ok`/`ireg_par_ok`/`ireg_root_ok`/`ireg_dir_wl0`
+          half, `ireg_dir_ok`/`ireg_par_ok`/`ireg_dir_wl0` (the root
+          clause is already gone — 2b-inode-6 step 6a)
           and `igrey` all DIE (`igrey` = the tokenless ".." of the orphan
           form).  KEPT, kernel bookkeeping with no counterpart:
           `inode_meta`/`inode_addrs` (the in-memory `struct inode`),
@@ -1157,34 +1158,78 @@ map at home blocks); 1d lands last.
             open it AFTER, where the deposit needs it; `FsLookup`'s tree
             layer (which nothing consumes — see `FsTree.v`'s demonstration
             note) takes the units as their own premise beside `fedges`.
-        - [ ] **WHAT REMAINS — step 6, THE DELETIONS.**  One step:
-          1. DELETE `DirLinks.v` (2009 lines) from `_CoqProject`,
-             `DirView`'s `dlc_*` (`dlc_bound`/`_lower`/`_ctb`/`_count`/
-             `_dotb`), `IcacheRef`'s `ilink`/`ilinkd`/`ilinkdp`/`igrey`/
-             `iparent`/`ilink_fl`/`lreg`/`lreg_half` and the
-             `wl`/`wdu`/`wdt`/`g`/`p` columns of `lelem*`/`linkElemUR0`,
-             `InodeRegion`'s `ireg_dir_ok`/`ireg_par_ok`/`ireg_dir_wl0`
-             and (L1), and `IregLinkNz.v` if nothing is left of it.
-             `IcacheEscrow.dlinks` then loses its FIRST conjunct and the
-             payloads keep their arity a second time.
-             `dir_dots_ix`/`dir_orphan_clean` are a SEPARABLE cleanup and
-             were deliberately kept: `dir_dots_ix` is what every payload
-             producer feeds `FsStateEra.inode_local_of_ok_rec`, so
-             removing it is a seam redesign across ~40 sites that buys the
-             flip nothing.
-             WHAT STILL READS THE OLD LEDGER, i.e. the exact work list:
-             `SpecIupdate`/`ProofIupdate`'s `ilink_fl fl` (payout and
-             spend) with the `fl` index threaded through every walk's
-             `wp_iupdate_link`/`_unlink` call and the `_d`/`_p` wrappers;
-             `DirLinks.dir_links` inside `IcacheEscrow.dlinks` and hence
-             the ~40 payload sites, `FsRep.fedges`/`fedges_acc`,
-             `ProofDirlink`'s `dir_links_dirlink*` movers,
-             `ProofSysUnlink`'s `dir_links_*`, `IregLinkNz`; and
-             `InodeRegion.ireg_write_link_fl`/`_unlink_fl`'s ledger half.
-             Nothing reads (L1) or `ireg_root_ok` any more — step 3 took
-             their last consumers — so those two clauses can come out of
-             `ireg_slot`/`ireg_slot_intro` FIRST, as a small separable
-             increment, before the `DirLinks` demolition.
+        - [~] **WHAT REMAINS — step 6, THE DELETIONS.**
+          - [x] **6a. THE ROOT CLAUSE IS GONE** (2b-inode-6).
+            `ireg_root_ok`, its seven readings (`_alive`/`_ne`/`_nonroot`/
+            `_zero`/`_stable`/`_bump`/`_drop`) and the five `ireg_wlt_*`
+            arithmetic steps under them, the accessor
+            `InodeRegion.ireg_root_ne` (no consumers), the now-dead
+            `IregLinkNz.ireg_link_root_min2`, and the image obligation
+            `IcacheBoot.image_root_alive` (hence its two `FsCfgBoot`
+            producers) are deleted; `ireg_slot` / `ireg_slot_intro` lost
+            the clause and the premise.  **CORRECTION to the note this
+            bullet used to carry: `ireg_root_ok` DID still have a reader**
+            — `IregLinkNz.ireg_link_root_min2`/`_dp`, whose consumer is
+            `ProofSysUnlink`'s rmdir arm, (D1) step 2.  It was MIGRATED,
+            not blocked: `InodeRegion.ireg_lnk_root_min2` reads
+            `2 <= nlink` off the keep-alive token plus ONE the caller
+            holds, and `IregLinkNz.ireg_tok_root_min2` is its accessor,
+            fed at the rmdir arm by the token `ent_toks_unlink` releases
+            two lines earlier.  So the rule is:
+            **A PURE CLAUSE'S LAST CONSUMER IS USUALLY NOT DEAD, IT IS
+            MIS-SPELT — look for the RA reading that says the same thing
+            before recording the clause as unread.**
+          - [ ] **6b. (L1) CANNOT COME OUT YET, and this is a correction.**
+            Three live readers: `InodeRegion.ireg_link_ok_alloc` (used at
+            `ireg_link_alloc`) and `_free` (used at the claim mover), and
+            `IregLinkNz.ireg_link_nz` / `_fl`, whose callers are
+            `ProofSysLinkTails` and `ProofCreate`.  All three read (L1)
+            against the icache ledger's `wl/wdu/wdt`, so (L1) goes when
+            those columns go (6d) and not before.
+          - [ ] **6c. `dlinks` collapses to `ent_toks`; `DirLinks.v`
+            (2009 lines) leaves `_CoqProject`**; `DirView`'s `dlc_*`
+            (`dlc_bound`/`_lower`/`_ctb`/`_count`/`_dotb`) and
+            `InodeRegion`'s `ireg_dir_ok`/`ireg_par_ok`/`ireg_dir_wl0` go
+            with it.  Keep `dlinks` as the NAME (a one-conjunct wrapper),
+            so the ~40 pass-through payload sites do not move a second
+            time; `dlinks_open`/`_intro` become single-resource.
+            `dir_dots_ix`/`dir_orphan_clean` are a SEPARABLE cleanup and
+            were deliberately kept: `dir_dots_ix` is what every payload
+            producer feeds `FsStateEra.inode_local_of_ok_rec`, so
+            removing it is a seam redesign across ~40 sites that buys the
+            flip nothing.
+            **THE TWO FACTS THAT BLOCK 6c, AND NEITHER IS MECHANICAL.**
+            `ProofSysUnlink`'s rmdir arm reads them off `dir_links`:
+            (D2) `2 <= nlink dp` (`IregDirBit.dir_links_subdir_nlink2`,
+            via `DirView.dlc_lower`), needed so `dp->nlink--` leaves a
+            LIVE directory; and (D1)'s step 1/3, the parent register
+            (`DirLinks.dir_par_tie` + `IcacheRef.iparent_agree`), which is
+            what names `dir_inum dati 1 = dp`.  The counting RA does NOT
+            supply (D2): the walk can borrow exactly ONE token at `dp`
+            (out of the child's `".."`, `ent_toks_borrow`), and `dp`'s
+            second inbound token lives in `dp`'s OWN parent's `ent_toks`,
+            which sys_unlink never holds.  So 6c needs a design answer for
+            (D1)/(D2) first — either a second token source at `dp`, or the
+            two facts restated over `FsTree.dir_view`/`ent_toks`.  Price
+            that BEFORE opening the file.
+          - [ ] **6d. `IcacheRef`'s five link columns** —
+            `ilink`/`ilinkd`/`ilinkdp`/`igrey`/`iparent`/`ilink_fl`/
+            `lreg`/`lreg_half` and the `wl`/`wdu`/`wdt`/`g`/`p` columns of
+            `lelem*`/`linkElemUR0`, KEEPING `c`/`r`/`rc`/`f`.  MEASURED:
+            narrowing `linkElemUR0` is NOT a Σ-level binder change —
+            `icacheΣ`/`icacheG` name `linkUR`, which is defined FROM it —
+            so the camera can narrow, but every `link_*` law in
+            `IcacheRef` (70 `link_auth` sites) and every destructuring of
+            `ireg_rcol` re-shapes with it.  `IregLinkNz.v` survives
+            regardless: `ireg_root_ROOTINO` and `ireg_boot_no_claim` have
+            consumers that outlive the ledger.
+          - [ ] **6e. the `fl` index** out of `SpecIupdate`/`ProofIupdate`
+            and every walk's `wp_iupdate_link`/`_unlink` call and `_d`/`_p`
+            wrappers, plus
+            `InodeRegion.ireg_write_link_fl`/`_unlink_fl`'s ledger half.
+          - [ ] **6f. `FsRep.fedges`/`fedges_acc`** and the `fedges`
+            premise of `FsLookup.wp_dirlookup_tree_body` (the tree layer
+            nothing consumes).
         - STILL OPEN beside the deletions: the link family is dropped at
           `BootShared` and the bundle excludes the link ghosts.  Routing
           them is the links step's one-line change at that `iClear`, and

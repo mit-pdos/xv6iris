@@ -161,8 +161,9 @@ ORPHAN ONLY, either dot name.  The root's `".."` names the root, so it carries n
 token and the image's `nlink = 1` at the root is unaccounted for by any
 directory; that one unit of slack IS the keep-alive.
 `InodeRegion.ireg_lnk_root_alive` reads `1 ≤ di_nlink` off it by the RA's
-own law, which is what replaces the maintained strict clause
-`ireg_root_ok`.
+own law, and `ireg_lnk_root_min2` reads `2 ≤ di_nlink` off the keep-alive
+together with any ONE token a caller presents.  There is no pure clause
+about the root anywhere in `ireg_slot`.
 
 **Why REGION-side and not in the checked-out payload**, which is where
 `fs-state.md` §2 draws it.  Two reasons, and the first is a hard one:
@@ -187,15 +188,28 @@ goes **OUT**, to the `dirlink` that files it in a directory's `ent_toks` —
 `ireg_write_link_fl`) and `ireg_lnk_drop` (`link_return`, paid for by a
 token the caller brings **IN** out of the entry it is removing —
 `ireg_write_unlink_fl`).  The readers are `ireg_lnk_root_alive` and
-`ireg_lnk_toks_le` / `ireg_lnk_tok_nz` (the RA's law at this slot).
+`ireg_lnk_toks_le` / `ireg_lnk_tok_nz` / `ireg_lnk_root_min2` (the RA's law
+at this slot).
 
-Since 2b-inode-5 step 3 those readers are `IgetLic`'s: licence (a) IS
+Those readers are `IgetLic`'s: licence (a) IS
 `link_tok (fs_gamma_L γfs) (bv_unsigned inum)` and `iname_linked_alloc`
 reads `ireg_lnk_tok_nz` then (L3); licence (f) is the root's keep-alive
 token through `ireg_lnk_root_alive`.  `iname_not_frozen` / `iname_mint_ok`
-take `ireg_lnk` as an argument and no longer take `ireg_root_ok` — so
-NOTHING in the tree reads (L1) or `ireg_root_ok` any more, and both can
-leave `ireg_slot` in a small separable increment.
+take `ireg_lnk` as an argument.
+
+**S7-unlink's dir arm reads the keep-alive too.**  `(D1)` step 2 needs "a
+directory whose count is ONE is not the root"; that is
+`IregLinkNz.ireg_tok_root_min2`, the accessor form of `ireg_lnk_root_min2`,
+fed with the very token the zeroed entry just released
+(`FsStateEra.ent_toks_unlink`) and handing it straight back.
+
+**(L1) IS STILL READ, and that is what keeps it in `ireg_slot`.**  Its
+three consumers are `InodeRegion.ireg_link_ok_alloc` / `_free` (the
+ledger's own "an outstanding fragment means an ALLOCATED record" chain, at
+`ireg_link_alloc` and at the claim mover) and `IregLinkNz.ireg_link_nz`,
+whose callers are `ProofSysLinkTails` and `ProofCreate`.  All three read it
+against the icache ledger's `wl/wdu/wdt` columns, so (L1) can only go when
+those columns do.
 
 **BOOT SPENDS NO IMAGE SWEEP, AND W9 IS THE WHOLE ARITHMETIC.**
 `FsState.fs_boot_alloc_full` allocates the family at `FsCfgBoot.img_nodes`
@@ -218,8 +232,9 @@ What is left region-side is the authority and the root's keep-alive.
 
 ### 3c. The pure/shelter clauses on `ireg_slot` (`InodeRegion.v:2135`)
 
-- `ireg_link_ok` / `ireg_root_ok` / `ireg_dir_ok` / `ireg_dir_wl0` /
-  `ireg_par_ok` — the dirent-payment clauses (unchanged; L4 bound included).
+- `ireg_link_ok` / `ireg_dir_ok` / `ireg_dir_wl0` / `ireg_par_ok` — the
+  dirent-payment clauses (L4 bound included).  There is NO root clause: the
+  root's liveness is `ireg_keep`'s token (3b).
 - `(⌜c = None⌝ ∨ ireg_open)` — the §7.12 **boot shelter**: a claimed slot
   exhibits the sealed regime; the exclusive `ireg_boot` holder (ireclaim)
   refutes it, proving every slot boot reaches is unclaimed.
