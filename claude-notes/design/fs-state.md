@@ -210,10 +210,44 @@ identity and each supplier appends its step on the right.  `fs_dstep_rebase`
 on the flat blob and dies the moment `P_wf`'s body carries content.
 
 **THE DEBT'S TARGET IS THE WHOLE HOME SET, WHICH IS WHY THE PAYLOAD'S
-INDEX HAS TO MOVE.**  A debt composed from the suppliers ends at `D₀`
+INDEX MOVES.**  A debt composed from the suppliers ends at `D₀`
 overwritten at the blocks that were WRITTEN; the commit needs it at the
 logged view on EVERY home block.  Nothing the payload can hold pins the
-rest — see §5's commit law, where the correction and its price are stated.
+rest, so the payload is indexed by the current logged view as well and
+every `log_write` re-indexes it — §5's two laws, landed.
+
+**`P_wf` MUST STATE THAT ITS BODY EXHAUSTS THE DURABLE BYTE MAP, AND AN
+INDEX-FREE BODY CANNOT (durable-disk 3a).**  `fs_dstep γ D D'` moves
+`ghost_map_auth γ 1 (fs_dbytes D)` to `fs_dbytes D'`.  A `ghost_map`
+authority is `● B` in `auth (gmap K (dfrac * agree V))`, and `● B ⤳ ● B'`
+alone is NOT frame-preserving — a frame `◯ {[a := (1, v)]}` at a changed
+address refutes it — so the mover must hold the ELEMENTS at every address
+where `D` and `D'` differ.  Today's flat body `fs_dview γ (fs_dbytes D)`
+IS exactly that completeness statement, which is why `fs_dstep_rebase`
+holds.  A body of the form `∃ S Br, … fs_state Γ_D S ∗ fs_dbelems γ Br`
+with no index puts NO lower bound on which elements it holds relative to
+the auth's map (`S` and `Br` are existential, and a small `S` with
+`Br = ∅` is perfectly consistent with a large auth), so no `fs_dstep γ D D'`
+with `D ≠ D'` is derivable from it — by the commit OR by a supplier.
+Whatever `P_wf`'s body becomes, it has to carry its own byte map and the
+partition equation that says the body owns it.  Corollary: the free pool's
+CONTENTS have to be part of the bound data (`fs_footprint`'s addresses are
+a function of `S`, its bytes are not), or the equation cannot be stated.
+
+**AND A SUPPLIER STILL HAS TO FIND ITS OBJECT.**  Completeness alone gives
+a flatten (`fs_state Γ S ⊢` its byte elements); the way BACK needs the new
+abstract state, i.e. a decode of the whole durable disk per write.  The
+per-object route (`FsState.fs_state_acc` at the writer's inum, then
+`inode_phi_rec_move` and friends) is the only affordable one, and it needs
+`fss_inodes S !! i = Some n` for an existentially-bound `S` — a whole-state
+fact (§0).  The durable node's VALUE is not the problem: holding the auth
+and the object's elements in the same step pins it by `ghost_map` agreement
+(the encodings are injective).  Only its EXISTENCE is.  The two things a
+supplier would need are (i) the durable inode map's domain — immutable, so
+a persistent per-inum token minted once at boot and carried by the era's
+region bundle would serve — and (ii) which blocks are in the byte bin, which
+moves per write and therefore belongs in the DEBT's own existential (the
+payload knows what the batch has taken out) rather than in `P_wf`.
 
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
@@ -231,24 +265,24 @@ The log exposes, and knows, only this:
   `log_write` opens under its lock and a `bread` client opens to turn
   `bytes = C(b)` into `bytes = L(b)`.  One-time re-plumb of `FsBlocks` and
   the bio `Ψ` instantiation; the price of exclusive ownership.
-- **A parked client payload `Ψ D₀`** in `log_state`, Ψ-parametric exactly
-  as `bio_view` is for bio: the log stores it, never reads it, and indexes
-  it by the **committed view alone** — `D₀ = lm_committed M cov ls`, which
-  the log knows by value once the era's mirror is born true (H2a).  It is
-  parked in the log, not in a separate FS invariant, because whatever the
-  committer needs at the commit instant must already be in the log's hands
-  (the last-ending operation cannot know it is last), and `log.lock`
-  already serializes every `log_write`.
+- **A parked client payload `Ψ D₀ Dc`** in `log_state`, Ψ-parametric
+  exactly as `bio_view` is for bio: the log stores it, never reads it, and
+  indexes it by BOTH views it knows by value — the committed one
+  `D₀ = lm_committed M cov ls` (which the era's born-true mirror gives it,
+  H2a) and the CURRENT LOGGED one `Dc = lm_logged L cov ls`.  Both are
+  functions of binders `log_state` already has.  It is parked in the log,
+  not in a separate FS invariant, because whatever the committer needs at
+  the commit instant must already be in the log's hands (the last-ending
+  operation cannot know it is last), and `log.lock` already serializes
+  every `log_write`.
 
-  **The index is the committed view, and it is not enough.**  It was
-  ruled to be the only index on the grounds that the payload's `Γ_L`
+  **The second index is forced, and the Ψ-free AU forms die with it.**  A
+  `D₀`-only index was ruled on the grounds that the payload's `Γ_L`
   content pins `L` by the byte ELEMENTS it holds against the log's auth,
   and that an `L` index would make every `log_write`'s AU RE-INDEX the
-  payload — which no client can do for an arbitrary `Ψ`, so no supplier
-  could frame it.  The first half is FALSE (the payload holds no such
-  elements; see the commit law below) and the second half is TRUE and is
-  the price: the payload's second index is the current logged view, and
-  the Ψ-free AU forms die with it.
+  payload — which no client can do for an arbitrary `Ψ`.  The first half
+  is FALSE (the payload holds no such elements; see the commit law below);
+  the second is TRUE and is the price paid.
 
   `Ψ` is packaged EXISTENTIALLY in the log's context — `log_ctx_at Ψ …` is
   the Ψ-named form and `log_ctx … := ∃ Ψ, log_ctx_at Ψ …` — so the 78 files
@@ -260,9 +294,20 @@ The log exposes, and knows, only this:
   Ψ D₀ (<[b := bs']> Dc) ∗ Q)`.  The COMMITTED index does not move — a
   `log_write` writes no disk block — and the LOGGED one does, at exactly
   the block written; both are `∀`-bound because they are the log's own
-  parked indices, which no caller can name.  (The landed statement carries
-  only `D₀` and frames the payload; that is the shape the commit law's
-  correction above replaces.)
+  parked indices, which no caller can name.
+  **`Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs']> Dc)` is not provable at an arbitrary
+  `Ψ`**, so it is a PREMISE of the three AU adapters
+  (`SpecLogWrite.lw_au_lb0` / `lw_au_whole` / `lw_au_rec`) and of the three
+  forms that used to be Ψ-free (`wp_log_write_gen` / `_gene` / `_sconf`,
+  which now take `log_ctx_at Ψ …`).  A supplier discharges it by handing
+  the log its own durable step through the log's SECOND law:
+
+  ```
+  log_psi_step Ψ := □ (∀ D₀ Dc Dc', Ψ D₀ Dc -∗ fs_dstep γD Dc Dc' ==∗ Ψ D₀ Dc')
+  ```
+
+  — which is `LogDefs.fs_dstep_trans` read on the payload, and is the whole
+  of what the log assumes about its client at a write.
   The client opens whatever it likes inside (its own invariants, the
   parked `fs_view Γ_L` body) to move its pieces, its top fragment and the
   debt.  Since the log learns the checked-out buffer's bytes equal `L(b)`
@@ -271,17 +316,18 @@ The log exposes, and knows, only this:
   byte-range ownership works above a block-granular device.
 - **The commit law, and the prepared step it RETURNS.**  The commit's own
   update is consumed by the log's permit at mask `∅`, so it must be a basic
-  update the client prepared in advance (the debt).  What prepares it is the
-  client's ONE persistent law, carried by `log_ctx_at`:
+  update the client prepared in advance (the debt).  What prepares it is
+  one of the two persistent laws `log_ctx_at` carries:
 
   ```
-  log_psi_commit Ψ γfs cov ls :=
-    □ (∀ M L Lb,
-         (γL_auth Lb ∗ ⌜Lb is L's bytes on home⌝ ∗ Ψ (lm_committed M cov ls))
-         ==∗
-         (γL_auth Lb ∗ Ψ (lm_logged L cov ls)
-          ∗ fs_dstep (lm_committed M cov ls) (lm_logged L cov ls)))
+  log_psi_commit Ψ := □ (∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ Dc Dc ∗ fs_dstep γD D₀ Dc)
   ```
+
+  — hand out the accumulated debt, re-park the identity.  It needs neither
+  a lent byte auth nor a home-set tie nor a `logN` crossing; all three died
+  with the `D₀`-only index, and `FsBlocks.bytes_home_at` /
+  `fs_bytes_home_of` are DELETED.  `LogInv.log_psi_spend` is now a
+  three-line corollary rather than an invariant crossing.
 
   where `fs_dstep γD D D' := γD_auth (bytes D) -∗ P_wf(bytes D) ==∗
   γD_auth (bytes D') ∗ P_wf(bytes D')` (the gname is a PARAMETER since
@@ -289,45 +335,24 @@ The log exposes, and knows, only this:
   laws — `LogDefs.fs_dstep_id` and `fs_dstep_trans` — are the whole of
   the debt's algebra and are body-free, so they survive the flip.
 
-  **The law takes the log's byte-view AUTH as an input and gives it back.**
-  A law of the naive shape `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged
-  L))` is NOT provable for a real payload: quantified over an arbitrary `L`
-  with nothing else in hand, the client cannot know that `L` is the view its
-  own elements describe, and the debt it owes is specific to the ACTUAL
-  logged view.  Lending the auth was meant to fix that — the client agrees
-  its elements against it and learns the real `L`.
-
-  **THAT DEVICE DOES NOT WORK, AND IT IS NOT A PROOF PROBLEM.**  A lent
-  auth teaches the client `L` only at addresses whose ELEMENT it holds, and
-  the payload holds none: the inode region's record runs live behind
-  `iregN` (§7's ruling (i)), `γtop_L`'s authority behind `ftopN`, the
-  bitmap and the free pool behind `bitmapN`, and a cached inode's data
-  blocks are handed OUT of the icache escrow to whoever holds its
-  sleeplock — which `readi` takes with no operation open, so even at group
-  quiescence they are unreachable at any mask.  Widening the law to a fupd
-  recovers the three invariant-parked pieces and not the fourth.
-
-  **THE CORRECTION: `Ψ` IS INDEXED BY THE COMMITTED VIEW *AND* THE CURRENT
-  LOGGED VIEW**, `Ψ D₀ Dc`, parked as `Ψ (lm_committed M cov ls)
-  (lm_logged L cov ls)` — both functions of binders `log_state` already
-  has.  The law then needs neither the auth nor `bytes_home_at`:
-
-  ```
-  log_psi_commit Ψ := □ (∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ Dc Dc ∗ fs_dstep γD D₀ Dc)
-  ```
-
-  — hand out the accumulated debt, re-park the identity.  `log_write`'s
-  ghost step re-indexes with `LogDefs.lm_logged_insert_home`, whose home
-  membership comes from `FsBlocks.fsblock_home` (holding the run IS being a
-  home block), so the log needs no new premise.  **What it costs is the
-  Ψ-FREE forms of `log_write`'s AU**: `Ψ D₀ Dc ==∗ Ψ D₀ (<[b := bs']> Dc)`
-  is not provable at an arbitrary `Ψ`, so `SpecLogWrite.lw_au_lb0` can no
-  longer frame the payload and every one of the eleven suppliers must name
-  `Ψ` and discharge the move with its own composed step.  The rejection of
-  an `L`-index recorded here before — "no client can re-index the payload
-  for an arbitrary `Ψ`" — is TRUE and is exactly that cost; it is not a
-  reason to keep the `D₀`-only index, because stage 3 converts those
-  suppliers anyway.
+  **WHY THE LAW CANNOT LEND THE LOG'S BYTE-VIEW AUTH INSTEAD.**  A law of
+  the naive shape `□ (∀ M L, Ψ (lm_committed M) ==∗ Ψ (lm_logged L))` is
+  NOT provable for a real payload: quantified over an arbitrary `L` with
+  nothing else in hand, the client cannot know that `L` is the view its own
+  elements describe.  Lending the byte AUTH was meant to fix that — and it
+  cannot: a lent auth teaches the client `L` only at addresses whose
+  ELEMENT it holds, and the payload holds none.  The inode region's record
+  runs live behind `iregN` (§7's ruling (i)), `γtop_L`'s authority behind
+  `ftopN`, the bitmap and the free pool behind `bitmapN`, and a cached
+  inode's data blocks are handed OUT of the icache escrow to whoever holds
+  its sleeplock — which `readi` takes with no operation open, so even at
+  group quiescence they are unreachable at any mask.  Widening the law to a
+  fupd recovers the three invariant-parked pieces and not the fourth.  That
+  is what forces the payload's SECOND index: the equation the client cannot
+  prove becomes definitional, because every `log_write` re-indexes.
+  `log_write`'s ghost step does it with `LogDefs.lm_logged_insert_home`,
+  whose home-membership premise is the contract's own two (covered, and not
+  the log's own storage), so the log needs no new premise.
 
   The permit LENDS `γD`'s auth AND `P_wf` to the returned step for the
   instant — the same move the machine layer makes when it lends `γdisk` to
@@ -335,13 +360,18 @@ The log exposes, and knows, only this:
   `ghost_map_auth γD 1 B` needs the ELEMENTS of `B`, and those may not be
   owned by anything mortal (crash.md principle 1), so they are `P_wf`'s.
   The log proves `D' = L|home` internally (row (b), `log_mirror_tie_body`).
-  Today's `P_wf` is a bare byte map, so the trivial witness
-  (`fs_dstep_rebase`) discharges the step and the boot's `Ψ := fun _ => emp`
-  discharges the law; both are PARAMETERS of stage 1 and stop holding once
-  `P_wf` carries content.  With the corrected law the boot's payload is
-  not `emp` but `fs_dstep_id` at the era's own committed view, which is
-  honest: a clean boot's logged view IS its committed view
-  (`LogDefs.lm_committed_clean`).
+
+  **THE BOOT'S PAYLOAD IS THE DEBT ITSELF**: `ProofInitlog` picks
+  `Ψ D₀ Dc := LogDefs.fs_dstep riscv_dview_name D₀ Dc`, parks it at the
+  identity (`fs_dstep_id`, off `lm_committed_clean` at the clean header and
+  row (b) at the empty batch) and proves the two laws by `fs_dstep_id` and
+  `fs_dstep_trans`.  Nothing in the boot chain threads a `Ψ`.
+  While `P_wf` is a bare byte map the SUPPLIERS' half is still stage 1's
+  declared parameter: they discharge the write premise with
+  `LogInv.log_psi_write_rebase`, i.e. `log_psi_step` fed
+  `LogDefs.fs_dstep_rebase`.  That corollary is honest on exactly
+  `fs_dstep_rebase`'s terms and dies with it; each supplier replaces its
+  use by its own composed `Γ_D` step when `P_wf` carries content.
 - **`end_op`**: no FS-specific premise at all.
 
 `FsCrash.end_op_pres`, `fs_commit_pres`, `LogInv.end_op_fin`, the
@@ -353,9 +383,9 @@ only as placeholders).  **They are all DELETED in the tree** — the last of
 them by durable-disk 1d, which also deleted their 30 + 6 gate call sites;
 `end_op` now takes no FS-facing premise at all.
 
-§5 is LANDED (durable-disk 1d/1d'/2c-pre) **apart from the payload's
-second index and the commit law's correction above**, which are 2c-body's
-finding and are still a ruling, not code.  The durable gname is landed:
+§5 is LANDED IN FULL (durable-disk 1d/1d'/2c-pre/3a): the payload's second
+index, the two laws, the retirement of the Ψ-free `log_write` forms and the
+commit's spend are all code.  The durable gname is landed:
 `γD` is `RiscvPtsto.riscv_dview_name`, a `riscvFixedGS` field, so
 `fs_dstep γD D D'` is the client's debt AT THE REAL DURABLE NAME.
 `LogDefs.v` takes the gname as an argument; `log_psi_commit`,
@@ -710,11 +740,34 @@ differs is only which byte map's full element `fsΦ` is.
   bridge, and the reason it is not free is that `FsImg.fs_rec_ticket` and
   `FsStateInode.ent_tokenless` exempt different records.
 
-### 2c-body: `P_wf`'s body is INDEX-FREE, and the top map needs its elements
+### 3a: `P_wf`'s body -- what an INDEX-FREE one cannot do, and what it needs
 
-`P_wf` is still the flat blob `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`.
-Two things have to be settled before the intended body can be WRITTEN, and
-neither is a proof difficulty.
+`P_wf` is still the flat blob `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`,
+and the index-free shape below CANNOT replace it.  The two walls are
+stated in §4 ("`P_wf` must state that its body exhausts the durable byte
+map" and "and a supplier still has to find its object"); this section keeps
+the shape that was proposed, the reasons it was proposed, and the two
+corrections it needs, because the next attempt starts from all four.
+
+**The formal core of the first wall**, in two lines of Iris and nothing
+else -- any body `Q` that supports a step at a byte where the two maps
+differ must OWN that byte's element, because an outside holder refutes it:
+
+```coq
+Lemma step_forces_the_element g B B' Q a v v' :
+  B' !! a = Some v' -> v <> v' ->
+  (ghost_map_auth g 1 B -∗ Q ==∗ ghost_map_auth g 1 B' ∗ Q) -∗
+  ghost_map_auth g 1 B -∗ a ↪[g] v -∗ Q ==∗ False.
+Proof.
+  iIntros (Hb' Hne) "Hstep Ha Hel HQ".
+  iMod ("Hstep" with "Ha HQ") as "[Ha _]".
+  iDestruct (ghost_map_lookup with "Ha Hel") as %Hlk.
+  rewrite Hb' in Hlk. iPureIntro. congruence.
+Qed.
+```
+
+`∃ S Br, …` owns no particular element, so it cannot.  Everything below is
+the shape as proposed by 2c-body, kept for the record.
 
 - **DO NOT INDEX `P_wf` BY THE BLOCK MAP.**  A `⌜fs_state_blocks S = dom
   Ds⌝` clause is a MAINTAINED WHOLE-STATE domain fact — §0's forbidden

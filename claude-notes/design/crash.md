@@ -376,32 +376,40 @@ rather than a pure sweep:
   AMBIENTLY at `riscv_dview_name` — the one kind of gname this tree does
   not thread explicitly, and the reason `log_ctx_at`'s arity did not move.
 
-**WHAT "`P_wf` AS REAL" COSTS, AND WHY IT IS STILL A BLOB (2c-body,
+**WHAT "`P_wf` AS REAL" COSTS, AND WHY IT IS STILL A BLOB (3a,
 2026-08-24).** The intended body is `fs_view Γ_D` plus an explicit residual
 (`FsDurImg.fs_dur_view_of_image` already builds exactly that from the mkfs
-image, generically in `fs_boot_image_wf`). Three things stand between it and
-the flip, all of them statements rather than proofs, and the full account is
-`projects/durable-disk.md` item 2c:
+image, generically in `fs_boot_image_wf`). The log's side of the interface
+is DONE — the payload's second index, the two laws, the retirement of the
+Ψ-free `log_write` forms — and the wall is now entirely on `P_wf`'s side.
+The full account is `fs-state.md` §4 and §7:
 
-- `P_wf` must NOT be indexed by the block map: the domain clause that would
-  need is a maintained whole-state fact, and the theorem under it does not
-  state (a record is 64 bytes, so whole inode blocks need an extent
-  `fs_state_rec` does not carry). Index-free — `∃ S Br, top auth ∗ the top
-  fragments ∗ fs_state Γ_D S ∗ a clause-free byte bin` — the tie to
-  `fr_D r` is `P_disk`'s authority alone, by `ghost_map` agreement.
+- **`P_wf`'s body MUST carry its own byte map and say that it owns it.**
+  `fs_dstep` moves `ghost_map_auth γD 1 (fs_dbytes D)`, and a `ghost_map`
+  authority moves only where its ELEMENTS are in hand. An index-free body
+  (`∃ S Br, top auth ∗ the top fragments ∗ fs_state Γ_D S ∗ a clause-free
+  byte bin`) puts no lower bound on which elements it owns relative to the
+  auth's map, so no `fs_dstep γ D D'` with `D ≠ D'` is derivable from it —
+  not by a supplier and not by the commit. Today's flat body IS the
+  completeness statement, which is exactly why `fs_dstep_rebase` holds.
+  Survey (iii)'s block-indexed shape is not the answer either (its domain
+  clause needs a `fs_state_blocks` theorem that does not state); the
+  equation has to be at the BYTE level, which in turn wants the free pool's
+  CONTENTS inside the bound data.
+- **And a supplier still has to FIND its object**: `FsState.fs_state_acc`
+  wants `fss_inodes S !! i = Some n` at an existentially bound `S`. The
+  node's VALUE is free (auth agreement pins it), only its EXISTENCE is not.
+  The durable inode map's domain never changes, so a persistent per-inum
+  token minted at boot would serve; a byte bin's membership does move, so
+  it belongs in the DEBT's own existential rather than in `P_wf`.
 - The durable top map has NO elements: `FsState.inode_owned` carries no
   `top_frag`, so the durable abstract state cannot be retagged.
   `FsDurImg.fs_dur_of_image` now returns the per-inode fragments (it used
   to drop them); the definition of `P_wf` has to hold them.
-- The commit law's LENT byte auth cannot pin the logged view `L`: the
-  payload holds none of the `Γ_L` elements (they are behind `iregN`,
-  `ftopN`, `bitmapN`, and — decisively — handed out of the icache escrow to
-  whoever holds an inode's sleeplock, which `readi` takes with no operation
-  open). The payload's index has to MOVE with the logged view instead, and
-  the Ψ-free forms of `log_write`'s AU die with that.
 - The identity step survives the flip and nothing else of `fs_dstep_rebase`
   does: `LogDefs.fs_dstep_id` and `fs_dstep_trans` are the debt's whole
-  algebra and are already landed, body-free.
+  algebra and are already landed, body-free. `fs_dstep_rebase` itself is
+  still the SUPPLIERS' discharge, through `LogInv.log_psi_write_rebase`.
 
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
