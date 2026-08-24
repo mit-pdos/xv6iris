@@ -752,6 +752,51 @@ Section Body.
     rewrite dres_blk //.
   Qed.
 
+  (* THE BOOT'S HANDLE ON THE BODY, so that [FsCrash.P_fs_alloc] -- which
+     may not name [FsState]'s vocabulary, its own importers relying on the
+     block layer's colliding twins -- can be handed one resource instead of
+     a state, a kind assignment and three pure facts (durable-disk 3b').
+     [dur_seed] is exactly [P_wf_dec] MINUS the flat blob, which is what the
+     allocation itself mints. *)
+  Definition dur_top (g : gname) (Γd : fs_dur_names) (S : fs_state_rec)
+      : iProp Σ :=
+    (ghost_map_auth (fdn_top Γd) 1 (fss_inodes S)
+     ∗ [∗ map] i ↦ n ∈ fss_inodes S, top_frag (fs_gamma_D g Γd) i n)%I.
+
+  Definition dur_seed (g : gname) (Γd : fs_dur_names) (cov : gset Z) (ls : Z)
+      (D : gmap Z (list (bv 8))) : iProp Σ :=
+    (∃ (S : fs_state_rec) (K : Z -> blk_kind),
+       ⌜dwire_bridge K D cov ls⌝ ∗ ⌜kinds_blocksized K cov ls⌝
+       ∗ ⌜kinds_of_state (fdn_geom Γd) (fdn_nin Γd) S K⌝
+       ∗ dur_top g Γd S)%I.
+
+  Lemma dur_seed_intro (g : gname) (Γd : fs_dur_names) (cov : gset Z)
+      (ls : Z) (D : gmap Z (list (bv 8)))
+      (S : fs_state_rec) (K : Z -> blk_kind) :
+    dwire_bridge K D cov ls -> kinds_blocksized K cov ls ->
+    kinds_of_state (fdn_geom Γd) (fdn_nin Γd) S K ->
+    dur_top g Γd S -∗ dur_seed g Γd cov ls D.
+  Proof.
+    intros Hbr Hlen Hst. iIntros "Htop". iExists S, K.
+    iSplitR; [iPureIntro; exact Hbr |].
+    iSplitR; [iPureIntro; exact Hlen |].
+    iSplitR; [iPureIntro; exact Hst |]. iExact "Htop".
+  Qed.
+
+  Lemma P_wf_dec_of_seed (g : gname) (Γd : fs_dur_names) (cov : gset Z)
+      (ls : Z) (D : gmap Z (list (bv 8))) :
+    fs_dview g (fs_dbytes D) -∗ dur_seed g Γd cov ls D -∗
+    P_wf_dec g Γd cov ls D.
+  Proof.
+    iIntros "Hd Hseed".
+    iDestruct "Hseed" as (S K) "(%Hbr & %Hlen & %Hst & [Htopa Hfr])".
+    rewrite /P_wf_dec. iExists S, K.
+    iSplitR; [iPureIntro; exact Hbr |].
+    iSplitR; [iPureIntro; exact Hlen |].
+    iSplitR; [iPureIntro; exact Hst |].
+    iFrame "Hd Htopa Hfr".
+  Qed.
+
   (* [FsDurDefer.dstep_strict] at this body: the durable byte authority and
      the body are LENT for the instant, exactly as today, and the step lands
      both at the new index. *)
@@ -1234,6 +1279,64 @@ Proof.
       exact (Hall j).
     + rewrite lookup_ge_None_2 in Hx;
         [discriminate | rewrite di_recs_length; lia].
+Qed.
+
+(* ---- THE THREE, AT THE BUNDLE'S OWN GEOMETRY --------------------------
+
+   The three theorems above are stated at a bare [G]/[nin] because that is
+   what makes them readable.  A SUPPLIER, though, does not have a [dgeom]:
+   it has the ambient [riscv_fsdur] and its own block number, and what it
+   owes the log is [kind_write_ok (fdn_geom Gd) (fdn_nin Gd) ...].  These
+   three corollaries are that reading, and each is stated so that its
+   premises are facts a supplier can actually hold (durable-disk 3b'):
+
+   - the bitmap writer knows its block IS the bitmap block ([bitmap_inv] is
+     parameterized by [bmapstart], so the tie is one equation on that
+     invariant);
+   - a DATA writer knows only that its block is above the bitmap block --
+     which every data block is, [fs_data_start] being [bmapstart + 1] --
+     and [data_write_above] turns that ONE comparison into both of
+     [data_write_obligation]'s premises.  That is why [dwire_geom] is
+     stated with [<] rather than [<>];
+   - an inode-slot writer knows its inum and that the region starts where
+     the region invariant says it does.
+
+   [Hgeo] is the layout fact [dwire_geom_of_sb] derives from [fs_sb_ok];
+   it mentions only [riscv_fsdur], so it rides the ambient log context
+   rather than any one supplier's invariant. *)
+
+Theorem bm_write_at (Gd : fs_dur_names) (cov : gset Z) (ls : Z)
+    (b : Z) (u' : gset Z) (oldbs : list (bv 8)) :
+  dwire_geom (fdn_geom Gd) (fdn_nin Gd) -> b = fdn_bmap Gd ->
+  kind_write_ok (fdn_geom Gd) (fdn_nin Gd) cov ls b oldbs
+    (bm_bytes BSIZE u').
+Proof.
+  intros Hgeo ->.
+  exact (bm_write_obligation (fdn_geom Gd) (fdn_nin Gd) cov ls u' oldbs Hgeo).
+Qed.
+
+Theorem data_write_at (Gd : fs_dur_names) (cov : gset Z) (ls : Z)
+    (b : Z) (oldbs bs : list (bv 8)) :
+  dwire_geom (fdn_geom Gd) (fdn_nin Gd) -> fdn_bmap Gd < b ->
+  kind_write_ok (fdn_geom Gd) (fdn_nin Gd) cov ls b oldbs bs.
+Proof.
+  intros Hgeo Hb.
+  destruct (data_write_above (fdn_geom Gd) (fdn_nin Gd) b Hgeo Hb)
+    as [Hbm Hreg].
+  exact (data_write_obligation (fdn_geom Gd) (fdn_nin Gd) cov ls b oldbs bs
+           Hbm Hreg).
+Qed.
+
+Theorem di_write_at (Gd : fs_dur_names) (cov : gset Z) (ls : Z)
+    (b i : Z) (n : fs_node) (oldbs : list (bv 8)) :
+  dwire_geom (fdn_geom Gd) (fdn_nin Gd) -> 0 <= i < fdn_nin Gd ->
+  dinode_wf (fn_rec n) -> b = fdn_ist Gd + i `div` 16 ->
+  kind_write_ok (fdn_geom Gd) (fdn_nin Gd) cov ls b oldbs
+    (di_blk_write oldbs (Z.to_nat (i `mod` 16)) (fn_rec n)).
+Proof.
+  intros Hgeo Hi Hn ->.
+  exact (di_write_obligation (fdn_geom Gd) (fdn_nin Gd) cov ls i n oldbs
+           Hgeo Hi Hn).
 Qed.
 
 (* ===================================================================== *)

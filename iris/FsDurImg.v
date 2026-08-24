@@ -1768,3 +1768,51 @@ Proof.
     exact (img_region_rec_wf P sb nib (b - FsImg.sb_inodestart sb)
              (j mod 16)%nat Hfull Hnib Hj0 Hjn Hmod).
 Qed.
+
+(* ---- THE BOOT'S SEED, PACKAGED (durable-disk 3b') --------------------
+   [FsCrash.P_fs_alloc]'s durable conjunct at the flip is
+   [FsDurWire.P_wf_dec], and what it cannot build for itself is the
+   durable top map with all its fragments plus the pure bridge.  This is
+   that, at the image: the two gnames come from [FsState.fs_boot_alloc_at]
+   (the CLIENT allocates them -- the link family's camera has no authority
+   over which keys exist, so a family allocated at the unit cannot be
+   grown), and the geometry fields come from the image's own superblock.
+
+   THE GEOMETRY IN THE BUNDLE IS THE IMAGE'S, and that is the whole content
+   of the era-side equation the suppliers owe: [fdn_bmap] IS
+   [sb_bmapstart sb], which [FsCfgBoot.fs_cfg_alloc] already reports as
+   [fsc_bmapstart], and [fdn_ist] IS [sb_inodestart sb], which it already
+   reports as [icfg_ist]. *)
+Section DurImgSeed.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Lemma img_dur_seed (g : gname) (dk : Z -> bv 8) (sb : fs_sb) (nib : nat)
+      (cov : gset Z) (ls : Z) (gl gt : gname) :
+    16 * Z.of_nat nib <= 2 ^ 32 ->
+    FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
+    ghost_map_auth gt 1 (img_nodes (fs_blocks dk) sb nib) -∗
+    ([∗ map] i ↦ n ∈ img_nodes (fs_blocks dk) sb nib, i ↪[gt] n) -∗
+    dur_seed g
+      (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb)
+         (16 * Z.of_nat nib))
+      cov ls (fs_restrict (fs_blocks dk) (fs_home_set cov ls)).
+  Proof.
+    intros Hnib Hgeo.
+    assert (Hfull : fs_blocks_full (fs_blocks dk))
+      by (intros c; apply fs_blocks_length).
+    iIntros "Hauth Hfr".
+    iApply (dur_seed_intro g
+              (MkFsDurNames gl gt (FsImg.sb_bmapstart sb)
+                 (FsImg.sb_inodestart sb) (16 * Z.of_nat nib))
+              cov ls (fs_restrict (fs_blocks dk) (fs_home_set cov ls))
+              (img_state (fs_blocks dk) sb nib)
+              (img_kinds (fs_blocks dk) sb nib)
+              (img_kinds_bridge (fs_blocks dk) sb nib cov ls Hfull Hnib Hgeo)
+              (img_kinds_blocksized (fs_blocks dk) sb nib cov ls Hfull Hnib
+                 Hgeo)
+              (img_kinds_of_state (fs_blocks dk) sb nib Hfull Hnib Hgeo)).
+    rewrite /dur_top /img_state. cbn [fss_inodes].
+    iFrame "Hauth". rewrite /top_frag /=. iExact "Hfr".
+  Qed.
+
+End DurImgSeed.
