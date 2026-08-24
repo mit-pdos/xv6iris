@@ -209,6 +209,20 @@ truncate syscall):
 δ_free   i             :  delete i from aview     (iput at nlink 0, last ref)
 ```
 
+**ALIGNMENT WITH `FsDurLedger` (3c), recorded 2026-08-25.**  The durable
+campaign's ruled flip now carries a machine-checked delta ledger of its
+own: `dent` entries (`DeRec i n' gh` — a record move with its ghost/link
+hand, `DeBlk i k bs'` — one data block; bitmap/attach/trunc constructors
+pending), folded by `dled_run`/`dled_fold_body` from one state to
+another inside one basic update.  That IS this section's "one delta log"
+at the next granularity down: each §4 syscall delta will DECOMPOSE into
+a `dent` sequence (δ_create ≈ DeRec(GMint) + DeRec/DeBlk for the entry
+write via GIns; δ_write ≈ DeBlk*; …).  When the campaign reaches this
+layer, the δ vocabulary must be DEFINED as the composite reading of
+`dent` runs — not stated as a parallel family (the near-duplicate trap
+the guiding principle forbids) — and the SNAPSHOT principle's proof is
+then the fold theorem read at batch boundaries.
+
 Sketches of the AU forms (⟨·⟩ the atomic pre/post; failure arms elided
 here, enumerated in §7).  **Note what is NOT here: no durable clause of
 any kind.**  The only durability-adjacent artifact is the version bound
@@ -340,11 +354,14 @@ first instance), not a consumer-visible statement.
    It becomes derivable when the durable-disk flip lands, and the chain
    is short once the commit concludes something real:
    (i) the flip's one green checkpoint — `P_wf`'s body + the suppliers'
-   steps + the commit's close (`dur_stands_at_logged` under whatever
-   body the pending structured-shape ruling picks; the kinds/geometry
-   tie of 3a-obj/3b was REJECTED at 3b'', so the body's shape is
-   currently between rulings) — without which a commit has nothing true
-   to deposit and `flushed b` would be a token about nothing;
+   steps + the commit's close — without which a commit has nothing true
+   to deposit and `flushed b` would be a token about nothing.  The
+   body's shape is now RULED (fold-now, 2026-08-25): the flip proceeds
+   on `FsDurLedger`'s pure delta ledger and fold theorem
+   (`dled_fold_body`/`dled_dstep`, 3c), and the ruling EXPLICITLY parks
+   the `P_log`/`P_fs` invariant-split refactor "with the
+   strengthening/sys_sync lane" — i.e. this derivation is already named
+   as a lane in the durable campaign's own plan;
    (ii) a ghost mirror of `log.ncommit` in `LogInv` plus the mono-nat
    `flushed` lower bound, minted where the committer bumps the counter;
    (iii) the re-spec of `wp_sys_sync` as a NEW parallel form (R10:
