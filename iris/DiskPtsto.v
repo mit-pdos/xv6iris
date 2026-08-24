@@ -62,6 +62,13 @@ Record disk_names := DiskNames {
      minted PERSISTENT at the completion: they are pure identification, never
      ownership, and two of them at one position agree. *)
   dn_ord   : gname;
+  (* THE HANDLER'S READ WATERMARK ([disk.used_idx] in virtio_disk_intr).  A
+     [ghost_var nat]: the invariant holds one half at [vp_nr], the disk lock's
+     resource the other.  It is the credential that says the record being
+     reclaimed is the one at the watermark -- which is what keeps the unread
+     used records a contiguous run, and hence what says a completion can
+     never overwrite one the driver still owes a look (finding 5). *)
+  dn_nr    : gname;
   (* the CRASH-PERMIT channel's ghost-map name (PermInv.v): the auth lives in
      [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)
