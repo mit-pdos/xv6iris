@@ -1595,6 +1595,22 @@ map at home blocks); 1d lands last.
         an index-free `P_wf` cannot support `fs_dstep` at all, so it is not
         a body the flip can use.  (G) stands and is unaffected.
 
+RULED (owner, 2026-08-24): SPIKE FIRST — close sys_mknod end to end on
+the CURRENT decode-coherence tie (`P_wf_dec`/`Psi_dec`, 3a-obj) and prove
+the kernel-safety continuity; STRENGTHEN the pure tie later (the per-op
+pure pending ledger toward full FS well-formedness; the never-deleted
+`FsWf`/`FsEff*`/`FsOp*` layer is the raw material).  The spike (3b) =
+flip the payload to `Psi_dec` for real (ProofInitlog's witness;
+`log_psi_step` → `Psi_dec_step_of_bridge`; the block-local tie
+`⌜Dc !! b = Some oldbs⌝` into the AU from the log's row), convert the
+nine `log_psi_write_rebase` sites to their obligations
+(`bm_write_obligation` / `di_write_obligation` / KData), flip `P_fs`'s
+durable conjunct to `P_wf_dec` with boot via `FsDurImg` at the bridge,
+restate the commit to lend the new body and conclude `D' = L` at home
+maps via `dur_stands_at_logged`, then thread mknod's `made` clause and
+state the end theorem: after mknod's batch commits, the durable view
+contains the device inode.
+
 ## Stage 3 — the vertical spike: `sys_mknod`
 
 **ORDERING RULING (2c, 2026-08-24): THE `P_wf` FLIP AND THE SUPPLIERS' STEPS
