@@ -1168,6 +1168,16 @@ Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
    tie CONTINUOUSLY, the cross-era loop invariant survives; the
    snapshot's strength is still tested by its consumer (the boot mint).
 
+5. **The transport lemma IS the allocator** (owner, same day): it
+   performs the allocation itself and returns the fresh family
+   EXISTENTIALLY — `P_fs-view[Γ_L] ==∗ P_fs-view[Γ_L] ∗ ∃ Γ′, P_fs[Γ′]`
+   — covering all three gnames (byte map, top map, link-count family) in
+   one update.  Forced by the logic (`own_alloc` cannot target a name)
+   and already the landed shape: `fs_boot_alloc_at` allocates top map +
+   link family jointly with existential gnames, and
+   `fs_links_full_alloc`'s validity is free at the full family — the
+   quiescent snapshot's exact situation.
+
 Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
 (`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
 and at every commit.
