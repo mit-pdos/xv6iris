@@ -2508,8 +2508,8 @@ Section IcacheRefInvReg.
     rewrite -ireg_key_split in Hmd.
     (* §2.6's TABLE, at whichever licence the caller presented *)
     iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) mrg
-                 wl wdu wdt gl rl cl pl fz n Hlok Hrt Hclm Hfrz Hmd
-                 with "Ha Hla Hfdisj Hl") as %Hfz0.
+                 wl wdu wdt gl rl cl pl fz n Hlok Hclm Hfrz Hmd
+                 with "Ha Hla Hlnk Hfdisj Hl") as %Hfz0.
     (* THE MINT's TABLE (§5', RULING R): the same five rows, read for the
        two side conditions [InodeRegion.ireg_ref_ok_mint] owes -- the box is
        ALLOCATED, and at any non-[ClaimL] licence it is UNCLAIMED.  The
@@ -2526,8 +2526,8 @@ Section IcacheRefInvReg.
                   [apply logN_iregN_disj | exact HEl]) Hwf
             with "Hbinv Hfsb Hl") as "(%Hbuf & Hfsb & Hl)".
     iDestruct (iname_mint_ok γi γfs inodestart inum l ds mrg
-                 wl wdu wdt gl rl cl pl fz n Hwf Hlok Hrt Hclm Hmd Hbuf
-                 with "Ha Hla Hdisj Hl") as %[Hty0 Hcl0].
+                 wl wdu wdt gl rl cl pl fz n Hwf Hlok Hclm Hmd Hbuf
+                 with "Ha Hla Hlnk Hdisj Hl") as %[Hty0 Hcl0].
     iEval (rewrite (ireg_bi_iblock inum inodestart)) in "Hfsb".
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
@@ -2657,8 +2657,8 @@ Section IcacheRefInvReg.
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
     iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) mrg
-                 wl wdu wdt gl rl cl pl fz cn Hlok Hrt Hclm Hfrz Hmd
-                 with "Ha Hla Hfdisj Hl") as %Hfz0.
+                 wl wdu wdt gl rl cl pl fz cn Hlok Hclm Hfrz Hmd
+                 with "Ha Hla Hlnk Hfdisj Hl") as %Hfz0.
     iDestruct "Hfrcp" as "[Hrc Hmr]".
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
     assert (Hb0 : b0 = false).

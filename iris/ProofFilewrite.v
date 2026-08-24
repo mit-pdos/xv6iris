@@ -2264,7 +2264,8 @@ Section ProofFilewrite.
       iSplitR; [iPureIntro;
                 exact (dir_orphan_clean_not_dir dn' data' Hnodir') |].
       iSplitR; [iPureIntro; exact (dir_uniq_not_dir dn' data' Hnodir') |].
-      iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
+      iSplitR; [iApply (dlinks_not_dir (fwn_fs fn) (bv_unsigned inum) dn' bm' data'
+                          Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
       rewrite Hdn0q.
       iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview Htop". }

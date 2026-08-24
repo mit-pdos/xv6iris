@@ -1087,7 +1087,7 @@ Section ProofDirlinkMain.
        iref_slot -∗
        log_opS g ncount Sb -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
-       dir_links (bv_unsigned dinum) dn data -∗
+       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
          ∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
@@ -1110,7 +1110,7 @@ Section ProofDirlinkMain.
              proc_priv_bare (proc_addr j) pidv Vpr -∗
              bslots 3 -∗
              iref_slot -∗
-             dir_links (bv_unsigned dinum) dn data -∗
+             IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
              ⌜((ncount - dirlink_units)%nat <= n')%nat
               /\ (n' <= ncount)%nat⌝ -∗
              ⌜Sb ⊆ Sb'⌝ -∗
@@ -1199,7 +1199,7 @@ Section ProofDirlinkMain.
        iref_slot -∗
        log_opS g ncount Sb -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
-       dir_links (bv_unsigned dinum) dn data -∗
+       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
          ∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
@@ -1222,7 +1222,7 @@ Section ProofDirlinkMain.
              proc_priv_bare (proc_addr j) pidv Vpr -∗
              bslots 3 -∗
              iref_slot -∗
-             dir_links (bv_unsigned dinum) dn data -∗
+             IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
              ⌜((ncount - dirlink_units)%nat <= n')%nat
               /\ (n' <= ncount)%nat⌝ -∗
              ⌜Sb ⊆ Sb'⌝ -∗
@@ -1763,7 +1763,7 @@ Section ProofDirlinkMain.
               ga gf cov logstart inodestart nib dev ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
               pidv dq dqd dqn R7 (K - 10)%nat eb b _ Vpr
-              ltac:(exact HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hinums
+              ltac:(exact HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hholes Hinums
               Hdisj Horph Hdn0nz
               (* premise (6'), iclaim-ledger.md §3.3.  This is the ONE caller
                  whose region index is genuinely stale, and the equation is

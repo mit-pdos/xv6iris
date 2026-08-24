@@ -595,7 +595,7 @@ Definition wp_dirlink_sconf_body
   ic_sleeplocks cn -∗
   iref_slot -∗
   (* the borrowed ticket list, over the PRE-state *)
-  dir_links (bv_unsigned dinum) dn data -∗
+  IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_op γ ncount -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -632,7 +632,7 @@ Definition wp_dirlink_sconf_body
       (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
          which is what R13(ii) admits and what the caller's own re-park
          movers ([DirLinks.dir_link_at_dirlink] and its siblings) take. *)
-      dir_links (bv_unsigned dinum) dn data -∗
+      IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       log_op γ n' -∗
@@ -872,7 +872,7 @@ Definition wp_dirlink_gen_body
   ic_sleeplocks cn -∗
   iref_slot -∗
   (* the borrowed ticket list, over the PRE-state *)
-  dir_links (bv_unsigned dinum) dn data -∗
+  IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_opS γ ncount Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -909,7 +909,7 @@ Definition wp_dirlink_gen_body
       (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
          which is what R13(ii) admits and what the caller's own re-park
          movers ([DirLinks.dir_link_at_dirlink] and its siblings) take. *)
-      dir_links (bv_unsigned dinum) dn data -∗
+      IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       (* THE SET ONLY GROWS.  No ceiling -- SpecWritei's header's reason

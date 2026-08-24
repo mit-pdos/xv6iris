@@ -709,6 +709,58 @@ Proof.
   rewrite (era_node_data dn bm data (i `div` BSIZE)%nat Hh Hd) //.
 Qed.
 
+(* THE PAYLOAD's ENTRY MAP, AT ITS OWN TOTAL [data].  [dir_entries] reads
+   the node's [fn_data], which is partial above the allocated slots; below
+   the record count the two agree ([era_node_fb_agree]), so a producer that
+   knows the directory's bytes as a total function -- which is what the
+   IMAGE hands boot, and what every payload carries -- can state the entry
+   map without ever mentioning [fn_data]. *)
+Lemma dir_entries_era_node dn bm data :
+  blk_holes_zero bm data ->
+  bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  dir_entries (era_node dn bm data)
+  = if bool_decide (bv_unsigned (di_type dn) = T_DIR_z)
+    then dir_view data (dir_nrec (bv_unsigned (di_size dn)))
+    else ∅.
+Proof.
+  intros Hh Hsz.
+  assert (Hb : (16 * dir_nrec (bv_unsigned (di_size dn)) <= MAXFILE * BSIZE)%nat).
+  { apply dir_nrec_bound; [| exact Hsz].
+    pose proof (bv_unsigned_in_range _ (di_size dn)) as [Hge _]. exact Hge. }
+  assert (Hag : fb_agree (fn_data (era_node dn bm data)) data
+                  (16 * dir_nrec (bv_unsigned (di_size dn)))).
+  { apply (fb_agree_mono _ _ (MAXFILE * BSIZE) _ Hb).
+    exact (era_node_fb_agree dn bm data Hh). }
+  rewrite /dir_entries /fn_is_dir /fn_type /fn_nrec /fn_size !era_node_rec.
+  destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z)); [| reflexivity].
+  exact (dir_view_data_ext _ _ _ Hag).
+Qed.
+
+Lemma fn_orphan_era_node dn bm data :
+  fn_orphan (era_node dn bm data)
+  = bool_decide (Z.to_nat (bv_unsigned (di_nlink dn)) = 0%nat).
+Proof. rewrite /fn_orphan /fn_nlink era_node_rec //. Qed.
+
+(* [FsTree]'s ["."] and [DirView]'s are the same list; the walks are stated
+   in [DirView]'s spelling and the token layer in [FsTree]'s *)
+Lemma DOT_dot_name : DOT = dot_name.
+Proof. reflexivity. Qed.
+
+(* a LIVE record is not an orphan -- the form every walk holds *)
+Lemma fn_orphan_era_nz dn bm data :
+  bv_unsigned (di_nlink dn) <> 0 -> fn_orphan (era_node dn bm data) = false.
+Proof.
+  intros H. rewrite fn_orphan_era_node. apply bool_decide_eq_false_2.
+  pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+Qed.
+
+Lemma fn_orphan_era_z dn bm data :
+  bv_unsigned (di_nlink dn) = 0 -> fn_orphan (era_node dn bm data) = true.
+Proof.
+  intros H. rewrite fn_orphan_era_node. apply bool_decide_eq_true_2.
+  rewrite H //.
+Qed.
+
 (* THE FORM A PAYLOAD ACTUALLY HAS: the two directory facts stated over the
    payload's own total [data], transported onto the node's reading.  This
    is what [inode_local_of_ok] is called through at every producer -- the
@@ -1461,6 +1513,499 @@ Section EraRes.
       congruences a payload needs, since a payload binds its [data]
       existentially and re-parks at a different one. *)
 
+  (* the two shapes a payload producer of a NON-directory (or of a record
+     with no entries at all) discharges the conjunct with *)
+  Lemma ent_toks_era_not_dir (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    bv_unsigned (di_type dn) <> T_DIR_z ->
+    ⊢ ent_toks Γ i (era_node dn bm data).
+  Proof.
+    intros Hne. apply ent_toks_not_dir.
+    rewrite /fn_is_dir /fn_type era_node_rec.
+    apply bool_decide_eq_false_2. exact Hne.
+  Qed.
+
+  Lemma ent_toks_era_nrec0 (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    dir_nrec (bv_unsigned (di_size dn)) = 0%nat ->
+    ⊢ ent_toks Γ i (era_node dn bm data).
+  Proof.
+    intros H. apply ent_toks_nrec0.
+    rewrite /fn_nrec /fn_size era_node_rec H //.
+  Qed.
+
+  Lemma ent_toks_era_size0 (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    bv_unsigned (di_size dn) = 0 ->
+    ⊢ ent_toks Γ i (era_node dn bm data).
+  Proof.
+    intros Hsz. apply ent_toks_nrec0.
+    rewrite /fn_nrec /fn_size era_node_rec Hsz /dir_nrec //.
+  Qed.
+
+  (* ---- THE DIRLINK MOVE, AT THE PAYLOAD'S OWN [data] ---------------- *)
+
+  (*  A directory's tokens are keyed by NAME, so a [dirlink] moves exactly
+      ONE of them: the entry map gains [s |-> inum] and nothing else.  The
+      two lemmas below are the two arms [SpecDirlink]'s [tot = 0 \/ tot =
+      16] offers, stated over the premises the walk actually holds (the
+      record delta, the size max and the range clause), so that a call site
+      is one [iDestruct] and no view equation is ever restated there.
+
+      The record-count arithmetic is [DirView.dir_uniq_dirlink]'s verbatim:
+      at [k0 < nrec] the write reuses a free record and the count is
+      unmoved; at [k0 = nrec] it appends and the count grows by exactly
+      one, which is what makes the "records the count grew over are dead"
+      clause of [FsTree.dir_insert_at] vacuous. *)
+
+  Lemma dir_view_dirlink (dn dn' : dinode) (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : fname) (nrec k0 : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (length s <= 14)%nat -> nonul s ->
+    inum <> bv_0 16 ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + 16)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + 16)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_first data nrec s = None ->
+    dir_view data' (dir_nrec (bv_unsigned (di_size dn')))
+    = <[s := bv_unsigned inum]> (dir_view data nrec).
+  Proof.
+    intros Hnrec Hk0 Hlen Hs Hnz Hsz Hrng Hnone.
+    assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+    assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+    destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+    destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn')
+      as [Hnr1' Hnr2'].
+    rewrite <- Hnrec in Hnr1, Hnr2.
+    assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+    set (nrec' := dir_nrec (bv_unsigned (di_size dn'))).
+    assert (Hcle : (nrec <= nrec')%nat) by (unfold nrec'; lia).
+    assert (Hk0lt : (k0 < nrec')%nat) by (unfold nrec'; lia).
+    assert (Hwin : forall j : nat, (j < 16)%nat ->
+              file_byte data' (16 * k0 + j)%nat
+              = dirent_bytes (de_of_name inum s) !!! j).
+    { intros j Hj. rewrite (Hrng (16 * k0 + j)%nat).
+      rewrite decide_True; [| lia].
+      replace (16 * k0 + j - 16 * k0)%nat with j by lia. reflexivity. }
+    destruct (dir_record_of_name data' k0 inum s Hlen Hs Hwin) as [Hrin Hrnm].
+    assert (Hwrit : dir_written_at data data' k0 s inum).
+    { split; [exact Hrin | split].
+      - unfold dir_bname. exact Hrnm.
+      - intros q Hq j Hj. rewrite (Hrng (16 * q + j)%nat).
+        rewrite decide_False; [reflexivity |].
+        intros [Hlo Hhi]. apply Hq. lia. }
+    assert (Hfree : (k0 < nrec)%nat -> ~ dir_live data k0).
+    { intros Hlt Hlv. apply Hlv.
+      rewrite Hk0. apply dir_slot_free. rewrite <- Hk0. exact Hlt. }
+    assert (Hdead : forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 ->
+                      ~ dir_live data' r).
+    { intros r Hr Hrk. exfalso. unfold nrec' in Hr. lia. }
+    apply (dir_view_insert data data' nrec nrec' k0 s inum Hnone).
+    split; [exact Hcle | split; [exact Hk0lt | split; [exact Hfree |
+      split; [exact Hdead | split; [exact Hnz | exact Hwrit]]]]].
+  Qed.
+
+  (* ...AND THE CORNER WHERE THE WRITTEN INUM IS ZERO.  [SpecDirlink]'s
+     post does not say the linked inum is nonzero, and no walk in this
+     tree carries that fact -- so the move has to be true anyway.  It is:
+     a record whose two inum bytes are zero is DEAD, so the entry map does
+     not gain the name and the token is simply dropped, exactly as
+     [DirLinks.dir_link_at_dirlink] drops its ticket at the same corner. *)
+  Lemma dir_view_dead_write (data data' : nat -> list (bv 8))
+      (nrec nrec' k0 : nat) :
+    (nrec <= nrec')%nat ->
+    (forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 -> ~ dir_live data' r) ->
+    ~ dir_live data' k0 ->
+    (forall q : nat, q <> k0 -> dir_win_agree data data' q) ->
+    ((k0 < nrec)%nat -> ~ dir_live data k0) ->
+    dir_view data' nrec' = dir_view data nrec.
+  Proof.
+    intros Hle Hdead Hk0dead Hagr Hfree.
+    assert (Hf : forall x : fname,
+              dir_first data' nrec' x = dir_first data nrec x).
+    { intros x. unfold dir_first.
+      rewrite (dfirst_trunc (fun k => dir_matchb data' k x) nrec nrec' Hle).
+      2:{ intros r Hr. apply dir_matchb_false. intros [Hlv _].
+          destruct (decide (r = k0)) as [-> | Hrk];
+            [exact (Hk0dead Hlv) | exact (Hdead r Hr Hrk Hlv)]. }
+      apply dfirst_ext. intros j Hj.
+      destruct (decide (j = k0)) as [-> | Hjk].
+      - rewrite (proj2 (dir_matchb_false data' k0 x)
+                   ltac:(intros [Hlv _]; exact (Hk0dead Hlv))).
+        symmetry. apply dir_matchb_false. intros [Hlv _]. exact (Hfree Hj Hlv).
+      - exact (dir_matchb_agree data data' j x (Hagr j Hjk)). }
+    apply map_eq. intros x. rewrite !dir_view_lookup Hf.
+    destruct (dir_first data nrec x) as [k |] eqn:E;
+      cbn [fmap option_fmap option_map]; [| reflexivity].
+    apply dir_first_Some in E as (Hk & [Hlv _] & _).
+    assert (Hkk : k <> k0) by (intros ->; exact (Hfree Hk Hlv)).
+    rewrite (dir_inum_agree data data' k (Hagr k Hkk)) //.
+  Qed.
+
+  (* ...and the node-level move: one token IN, at the name the record now
+     carries. *)
+  Lemma ent_toks_dirlink (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : fname) (nrec k0 : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (length s <= 14)%nat -> nonul s ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + 16)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + 16)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_first data nrec s = None ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    ent_toks Γ i (era_node dn bm data) -∗
+    ent_tok Γ i (fn_orphan (era_node dn bm data)) s (bv_unsigned inum) -∗
+    ent_toks Γ i (era_node dn' bm' data').
+  Proof.
+    intros Hnrec Hk0 Hlen Hs Hty Hty' Hnl Hsz Hrng Hnone Hh Hh' Hb Hb'.
+    assert (Hents : dir_entries (era_node dn bm data) = dir_view data nrec).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Hty) Hnrec //. }
+    assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
+      by (rewrite Hty'; exact Hty).
+    assert (Horph : fn_orphan (era_node dn' bm' data')
+                    = fn_orphan (era_node dn bm data))
+      by (rewrite /fn_orphan /fn_nlink !era_node_rec Hnl //).
+    destruct (decide (inum = bv_0 16)) as [Hz | Hnz].
+    - (* the written record is DEAD: nothing is inserted and the unit is
+         dropped *)
+      assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+        by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+      assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+        by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+      destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+      destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn')
+        as [Hnr1' Hnr2'].
+      rewrite <- Hnrec in Hnr1, Hnr2.
+      assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+      assert (Hwin : forall j : nat, (j < 16)%nat ->
+                file_byte data' (16 * k0 + j)%nat
+                = dirent_bytes (de_of_name inum s) !!! j).
+      { intros j Hj. rewrite (Hrng (16 * k0 + j)%nat).
+        rewrite decide_True; [| lia].
+        replace (16 * k0 + j - 16 * k0)%nat with j by lia. reflexivity. }
+      destruct (dir_record_of_name data' k0 inum s Hlen Hs Hwin) as [Hrin _].
+      assert (Hk0dead : ~ dir_live data' k0)
+        by (rewrite /dir_live Hrin Hz; intros Hc; exact (Hc eq_refl)).
+      assert (Hagr : forall q : nat, q <> k0 -> dir_win_agree data data' q).
+      { intros q Hq j Hj. rewrite (Hrng (16 * q + j)%nat).
+        rewrite decide_False; [reflexivity |]. intros [Hlo Hhi]. apply Hq. lia. }
+      assert (Hfree : (k0 < nrec)%nat -> ~ dir_live data k0).
+      { intros Hlt Hlv. apply Hlv.
+        rewrite Hk0. apply dir_slot_free. rewrite <- Hk0. exact Hlt. }
+      assert (Hdead : forall r : nat,
+                (nrec <= r < dir_nrec (bv_unsigned (di_size dn')))%nat ->
+                r <> k0 -> ~ dir_live data' r)
+        by (intros r Hr Hrk; exfalso; lia).
+      assert (Hcle : (nrec <= dir_nrec (bv_unsigned (di_size dn')))%nat) by lia.
+      assert (Hents' : dir_entries (era_node dn' bm' data')
+                       = dir_view data nrec).
+      { rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+          (bool_decide_eq_true_2 _ Hty2).
+        exact (dir_view_dead_write data data' nrec
+                 (dir_nrec (bv_unsigned (di_size dn'))) k0
+                 Hcle Hdead Hk0dead Hagr Hfree). }
+      rewrite /ent_toks Hents Hents' Horph. iIntros "H _"; iExact "H".
+    - assert (Hents' : dir_entries (era_node dn' bm' data')
+                       = <[s := bv_unsigned inum]> (dir_view data nrec)).
+      { rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+          (bool_decide_eq_true_2 _ Hty2).
+        exact (dir_view_dirlink dn dn' data data' inum s nrec k0
+                 Hnrec Hk0 Hlen Hs Hnz Hsz Hrng Hnone). }
+      assert (Hfresh : dir_view data nrec !! s = None)
+        by (apply dir_view_lookup_None; exact Hnone).
+      rewrite /ent_toks Hents Hents' Horph.
+      rewrite big_sepM_insert; [| exact Hfresh].
+      iIntros "H Ht". iFrame.
+  Qed.
+
+  (* THE NO-WRITE ARM ([tot = 0]): the bytes did not move and neither did
+     the record count, so the entry map -- hence the token map -- is the
+     same one.  The [then] branch of the range clause is a PARAMETER, so a
+     caller passes its own without restating it. *)
+  Lemma ent_toks_dirlink_nop (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8)) (f : nat -> bv 8)
+      (nrec k0 tot : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    (k0 <= nrec)%nat -> tot = 0%nat ->
+    di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then f (x - 16 * k0)%nat
+         else file_byte data x) ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    ent_toks Γ i (era_node dn bm data) -∗
+    ent_toks Γ i (era_node dn' bm' data').
+  Proof.
+    intros Hnrec Hk0le Htot Hty Hnl Hsz Hrng Hh Hh' Hb Hb'. subst tot.
+    assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+    destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+    rewrite <- Hnrec in Hnr1, Hnr2.
+    assert (Hszeq : bv_unsigned (di_size dn') = bv_unsigned (di_size dn))
+      by (rewrite Hsz; lia).
+    assert (Hbytes : forall x : nat, file_byte data' x = file_byte data x).
+    { intros x. rewrite (Hrng x). rewrite decide_False; [reflexivity | lia]. }
+    assert (Hents : dir_entries (era_node dn' bm' data')
+                    = dir_entries (era_node dn bm data)).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (dir_entries_era_node dn' bm' data' Hh' Hb') Hty Hszeq.
+      destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
+        [| reflexivity].
+      apply dir_view_data_ext. intros y _. exact (Hbytes y). }
+    assert (Horph : fn_orphan (era_node dn' bm' data')
+                    = fn_orphan (era_node dn bm data))
+      by (rewrite /fn_orphan /fn_nlink !era_node_rec Hnl //).
+    rewrite (ent_toks_cong_ent Γ i (era_node dn bm data)
+               (era_node dn' bm' data') Horph Hents).
+    iIntros "H"; iExact "H".
+  Qed.
+
+  (* ---- THE ORPHAN's OWN TOKENS ARE NONE (durable-disk 2b-inode-5) --- *)
+
+  (*  An ORPHANED directory -- one whose count has reached zero -- owns no
+      tokens at all, which is what lets create's [fail:] arm park the grey
+      child it has just zeroed.  Two clauses pay for it and the walk holds
+      both: [DirView.dir_orphan_clean]'s [dir_dots_only] (an orphan's live
+      records are named ["."] or [".."]) and the ["."]-names-self fact the
+      write that put it there established.  ["."] is exempt as a SELF
+      record and [".."] as an orphan's; nothing else is live. *)
+  Lemma ent_toks_era_dots_only (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    bv_unsigned (di_nlink dn) = 0 ->
+    blk_holes_zero bm data ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_dots_only dn data ->
+    ⊢ ent_toks Γ i (era_node dn bm data).
+  Proof.
+    intros Hz Hh Hb Hdots.
+    rewrite /ent_toks (fn_orphan_era_z dn bm data Hz).
+    rewrite (dir_entries_era_node dn bm data Hh Hb).
+    destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
+      [| rewrite big_sepM_empty; done].
+    iApply big_sepM_intro. iModIntro. iIntros (s t Hst).
+    destruct (dv_lookup_some_inv _ data (dir_nrec (bv_unsigned (di_size dn)))
+                s t eq_refl Hst) as (k & _ & Hk & Hlv & Hnm & Hin).
+    rewrite /ent_tok /ent_tokenless.
+    destruct (Hdots k Hk Hlv) as [Hd | Hdd].
+    - (* ["."] -- the orphan's own *)
+      assert (Hs : s = DOT) by (rewrite -Hnm; exact Hd).
+      rewrite (bool_decide_eq_true_2 (s = DOT) Hs) orb_true_l andb_true_l
+        orb_true_r //.
+    - (* [".."] -- likewise *)
+      assert (Hs : s = DOTDOT) by (rewrite -Hnm; exact Hdd).
+      rewrite (bool_decide_eq_true_2 (s = DOTDOT) Hs) orb_true_r andb_true_l
+        orb_true_r //.
+  Qed.
+
+  (* ---- THE COUNT-ONLY MOVE (durable-disk 2b-inode-5) ---------------- *)
+
+  (*  A flush that moves ONLY [di_nlink] leaves the entry map alone, so the
+      token map rides -- provided the record does not cross the ORPHAN
+      boundary in either direction, which is what the two nonzero premises
+      say.  This is what create's mkdir arm needs between the [dirlink] that
+      appends the parent's record and the [dp->nlink++] fused with it. *)
+  Lemma ent_toks_era_nlink (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    di_type dn' = di_type dn -> di_size dn' = di_size dn ->
+    bv_unsigned (di_nlink dn) <> 0 -> bv_unsigned (di_nlink dn') <> 0 ->
+    ent_toks Γ i (era_node dn bm data) -∗
+    ent_toks Γ i (era_node dn' bm data).
+  Proof.
+    intros Hty Hsz Hnz Hnz'.
+    assert (Hents : dir_entries (era_node dn' bm data)
+                    = dir_entries (era_node dn bm data))
+      by (rewrite /dir_entries /fn_is_dir /fn_type /fn_nrec /fn_size /fn_data
+            !era_node_rec Hty Hsz //).
+    assert (Horph : fn_orphan (era_node dn' bm data)
+                    = fn_orphan (era_node dn bm data))
+      by (rewrite (fn_orphan_era_nz dn bm data Hnz)
+                  (fn_orphan_era_nz dn' bm data Hnz') //).
+    rewrite (ent_toks_cong_ent Γ i (era_node dn bm data)
+               (era_node dn' bm data) Horph Hents).
+    iIntros "H"; iExact "H".
+  Qed.
+
+  (* ---- THE ORPHAN MOVE, rmdir's (durable-disk 2b-inode-5) ----------- *)
+
+  (*  When sys_unlink drops a DIRECTORY's name, the directory's own count
+      reaches zero and its [".."] becomes TOKENLESS -- the parent takes that
+      token back, which is exactly what pays for the parent's own
+      [dp->nlink--].  What is left behind is this kernel's grey [".."]
+      (fs-icache.md section 20), and in this design it is not a second
+      colour but the ABSENCE of a token.
+
+      [t <> i] is the SELF-PARENT exclusion: a directory whose [".."] names
+      ITSELF is the root, which carries no token to hand back and which no
+      kernel path orphans anyway.  sys_unlink has it as [dp <> ip]. *)
+  Lemma ent_toks_era_orphan (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (t : Z) :
+    di_type dn' = di_type dn -> di_size dn' = di_size dn ->
+    bv_unsigned (di_nlink dn) <> 0 -> bv_unsigned (di_nlink dn') = 0 ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    blk_holes_zero bm data ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))) ->
+    (1 < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_live data 1%nat ->
+    dir_bname data 1%nat = DOTDOT ->
+    bv_unsigned (dir_inum data 1%nat) = t ->
+    t <> i ->
+    ent_toks Γ i (era_node dn bm data) -∗
+    link_tok Γ t ∗ ent_toks Γ i (era_node dn' bm data).
+  Proof.
+    intros Hty Hsz Hnz Hz Htyd Hh Hb Hu Hnr Hlv Hnm Hin Hne.
+    assert (Hents : dir_entries (era_node dn' bm data)
+                    = dir_entries (era_node dn bm data))
+      by (rewrite /dir_entries /fn_is_dir /fn_type /fn_nrec /fn_size /fn_data
+            !era_node_rec Hty Hsz //).
+    assert (Hlk : dir_entries (era_node dn bm data) !! DOTDOT = Some t).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Htyd).
+      rewrite -Hnm -Hin. exact (dir_view_live data _ 1%nat Hu Hnr Hlv). }
+    exact (ent_toks_orphan Γ i (era_node dn bm data) (era_node dn' bm data) t
+             Hents (fn_orphan_era_nz dn bm data Hnz)
+             (fn_orphan_era_z dn' bm data Hz) Hlk Hne).
+  Qed.
+
+  (* ---- THE UNLINK MOVE (durable-disk 2b-inode-5) -------------------- *)
+
+  (*  sys_unlink's [memset(&de,0,sizeof(de)); writei(...)] kills ONE record,
+      so the entry map loses ONE name and the token that entry carried comes
+      OUT -- to the [ip->nlink--] flush that pays for it
+      ([InodeRegion.ireg_write_unlink_fl]).  The premise list is the one the
+      walk already holds for [DirLinks.dir_links_unlink] and
+      [DirView.dir_uniq_zero]: the zeroing delta, uniqueness, the record's
+      index and liveness, and the record delta.
+
+      [t <> i] is the SELF-record exclusion, and it is the walk's own: at a
+      self record the entry is TOKENLESS ([FsStateInode.ent_tokenless]) and
+      there would be nothing to hand back.  sys_unlink's two [namecmp]
+      refusals leave it. *)
+  Lemma ent_toks_unlink (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8)) (k0 : nat) :
+    (k0 < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_live data k0 ->
+    bv_unsigned (dir_inum data k0) <> i ->
+    dir_bname data k0 <> DOT ->
+    dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))) ->
+    dir_zeroed_at data data' k0 ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    bv_unsigned (di_nlink dn) <> 0 ->
+    bv_unsigned (di_nlink dn') <> 0 ->
+    di_type dn' = di_type dn ->
+    di_size dn' = di_size dn ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    ent_toks Γ i (era_node dn bm data) -∗
+    link_tok Γ (bv_unsigned (dir_inum data k0))
+    ∗ ent_toks Γ i (era_node dn' bm' data').
+  Proof.
+    intros Hk0 Hlive Hne Hnd Hu Hzer Hty Hnz Hnz' Hty' Hsz Hh Hh' Hb.
+    assert (Hb' : bv_unsigned (di_size dn')
+                  <= Z.of_nat MAXFILE * Z.of_nat BSIZE) by (rewrite Hsz; exact Hb).
+    assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
+      by (rewrite Hty'; exact Hty).
+    assert (Hents : dir_entries (era_node dn bm data)
+                    = dir_view data (dir_nrec (bv_unsigned (di_size dn)))).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Hty) //. }
+    assert (Hents' : dir_entries (era_node dn' bm' data')
+                     = delete (dir_bname data k0)
+                         (dir_view data (dir_nrec (bv_unsigned (di_size dn))))).
+    { rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+        (bool_decide_eq_true_2 _ Hty2) Hsz.
+      exact (dir_view_zero data data' _ k0 Hu Hk0 Hlive Hzer). }
+    assert (Horph : fn_orphan (era_node dn' bm' data')
+                    = fn_orphan (era_node dn bm data))
+      by (rewrite (fn_orphan_era_nz dn bm data Hnz)
+                  (fn_orphan_era_nz dn' bm' data' Hnz') //).
+    assert (Hlk : dir_view data (dir_nrec (bv_unsigned (di_size dn)))
+                    !! dir_bname data k0
+                  = Some (bv_unsigned (dir_inum data k0)))
+      by exact (dir_view_live data _ k0 Hu Hk0 Hlive).
+    iIntros "H".
+    iDestruct (ent_toks_delete Γ i (era_node dn bm data) (era_node dn' bm' data')
+                 (dir_bname data k0) (bv_unsigned (dir_inum data k0))
+                 Horph ltac:(rewrite Hents; exact Hlk)
+                 ltac:(rewrite Hents Hents'; reflexivity) with "H") as "[Ht $]".
+    rewrite (ent_tok_ne Γ i (fn_orphan (era_node dn bm data))
+               (dir_bname data k0) (bv_unsigned (dir_inum data k0)) Hne
+               (fn_orphan_era_nz dn bm data Hnz)).
+    iExact "Ht".
+  Qed.
+
+  (* **THE FORM A WALK APPLIES**, and its premise list is
+     [DirView.dir_uniq_dirlink]'s verbatim: the two arms
+     [SpecDirlink]'s relay of writei's single-block atomicity offers, the
+     record delta, the size max and the range clause -- all at the walk's
+     own [tot], so a call site restates nothing.  The token goes in at
+     [tot = 16] and is dropped at [tot = 0], where nothing was written. *)
+  Lemma ent_toks_dirlink_arm (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : fname) (nrec k0 tot : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (tot = 0%nat \/ tot = 16%nat) ->
+    (length s <= 14)%nat -> nonul s ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_first data nrec s = None ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    ent_toks Γ i (era_node dn bm data) -∗
+    ent_tok Γ i (fn_orphan (era_node dn bm data)) s (bv_unsigned inum) -∗
+    ent_toks Γ i (era_node dn' bm' data').
+  Proof.
+    intros Hnrec Hk0 Hatom Hlen Hs Hty Hty' Hnl Hsz Hrng Hnone Hh Hh' Hb Hb'.
+    destruct Hatom as [-> | ->].
+    - assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+      iIntros "H _".
+      iApply (ent_toks_dirlink_nop Γ i dn dn' bm bm' data data'
+                (fun j => dirent_bytes (de_of_name inum s) !!! j)
+                nrec k0 0%nat Hnrec Hk0le eq_refl Hty' Hnl Hsz Hrng
+                Hh Hh' Hb Hb' with "H").
+    - iApply (ent_toks_dirlink Γ i dn dn' bm bm' data data' inum s nrec k0
+                Hnrec Hk0 Hlen Hs Hty Hty' Hnl Hsz Hrng Hnone Hh Hh' Hb Hb').
+  Qed.
+
   Lemma ent_toks_cong (Γ : fs_view_names Σ) (i : Z) (n n' : fs_node) :
     fn_rec n' = fn_rec n ->
     dir_entries n' = dir_entries n ->
@@ -1487,6 +2032,59 @@ Section EraRes.
     destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
       [| reflexivity].
     symmetry. exact (dir_view_data_ext _ _ _ Hag).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE BORROW AT A MATCHED RECORD -- where licence (a) comes from      *)
+  (* ------------------------------------------------------------------ *)
+
+  (*  [ProofDirlookup]'s found arm holds the home directory's tokens and
+      needs the ONE unit at the record the scan stopped on.  Peel it with
+      a [big_sepM_lookup_acc] at the name the scan matched --
+      [FsTree.dir_view_lookup] says the map's value at a WINNING record's
+      name is that record's inum -- and hand back the wand that re-seals.
+      Nothing is spent: [iget] returns the licence at the same [l].
+
+      The [dir_inum <> self] premise is the SELF exemption: at a self
+      record there IS no unit ([ent_tokenless]), and the caller uses
+      licence (c) instead.  That case split is not an accident of the
+      proof -- it is the (a)-vs-(c) boundary, drawn where xv6 draws it.
+      NOTHING IS OWED ABOUT THE NAME.  [ent_tokenless] exempts a dot name
+      only at an ORPHAN, and this borrow already runs under a LIVE home
+      ([di_nlink <> 0], which the found arm holds out of
+      [SpecDirlookup.dl_lic_live]) -- which is exactly why that guard is
+      on the definition. *)
+  Lemma ent_toks_borrow (Γ : fs_view_names Σ) (self : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (k : nat) :
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    bv_unsigned (di_nlink dn) <> 0 ->
+    dir_first data (dir_nrec (bv_unsigned (di_size dn)))
+      (dir_bname data k) = Some k ->
+    bv_unsigned (dir_inum data k) <> self ->
+    blk_holes_zero bm data ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    ent_toks Γ self (era_node dn bm data) -∗
+      FsStateLink.link_tok Γ (bv_unsigned (dir_inum data k))
+      ∗ (FsStateLink.link_tok Γ (bv_unsigned (dir_inum data k))
+         -∗ ent_toks Γ self (era_node dn bm data)).
+  Proof.
+    intros Hty Hnl Hfirst Hself Hh Hsz.
+    assert (Hlk : dir_view data (dir_nrec (bv_unsigned (di_size dn)))
+                    !! dir_bname data k
+                  = Some (bv_unsigned (dir_inum data k))).
+    { rewrite dir_view_lookup Hfirst //. }
+    rewrite /ent_toks (dir_entries_era_node dn bm data Hh Hsz)
+      (bool_decide_eq_true_2 (bv_unsigned (di_type dn) = T_DIR_z) Hty)
+      (fn_orphan_era_nz dn bm data Hnl).
+    iIntros "H".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hlk with "H") as "[Ht Hback]".
+    iEval (rewrite (ent_tok_ne Γ self false (dir_bname data k)
+                      (bv_unsigned (dir_inum data k)) Hself eq_refl)) in "Ht".
+    iFrame "Ht". iIntros "Ht".
+    iApply "Hback".
+    iEval (rewrite (ent_tok_ne Γ self false (dir_bname data k)
+                      (bv_unsigned (dir_inum data k)) Hself eq_refl)).
+    iExact "Ht".
   Qed.
 
 End EraRes.

@@ -1066,6 +1066,91 @@ sites in 21 files. Measured: with the two at those positions, the
 mechanical part of the sweep was a `rewrite /ic_loaded` → lemma-name
 substitution plus one `iSplitR` per close.)
 
+## REPLACING ONE CONJUNCT OF A BIG PAYLOAD BY ANOTHER: BUNDLE THE PAIR IN
+## THE OLD ONE'S POSITION, AND THE PASS-THROUGH SITES NEVER MOVE
+
+The section above is about ADDING a conjunct.  Replacing one — resource
+`X` gives way to resource `Y`, with a long red stretch while both must be
+maintained — looks like it must cost every site twice, once to add `Y` and
+once to delete `X`.  It does not, and the trick is one definition:
+
+```coq
+Definition XY args := (X args ∗ Y args)%I.
+```
+
+put in **`X`'s own conjunct position** in the payload.  The payload's
+ARITY does not change, so every site that only passes the conjunct
+through — the ~forty `iDestruct "H" as (…) "(… & Hx & …)"` patterns and
+their `with "[… Hx …]"` selections — is untouched in BOTH directions.
+Only the handful of sites that actually SPEND or MINT an `X` open the pair
+(`XY_open` / `XY_intro`, two one-line entailments), and when `X` finally
+dies the definition loses its first conjunct and the arity still does not
+move.  Measured on durable-disk 2b-inode-5 (`IcacheEscrow.dlinks` =
+`DirLinks.dir_links ∗ FsStateInode.ent_toks`): ~40 payload sites across 19
+files cost ZERO edits; the sites that moved were exactly the ones with
+real work to do.
+
+Two rules that come with it:
+
+- **State the opener with `-∗`, not `⊢`.**  `iDestruct (op with "H") as
+  "[A B]"` does not reliably CONSUME `H` when `op` is stated as an
+  entailment: two of six call sites failed with `iAndDestruct: "H" or "B"
+  not fresh` while the other four were fine, and the message names the
+  PATTERN rather than the input.  One character at the definition
+  (`dlinks γ … -∗ X ∗ Y`) fixes every site.
+- **Open where the resource is SPENT, and let the callee take the pair.**
+  Where a callee borrows `X` alone and hands it back verbatim, the
+  `XY_open` goes immediately before the call and the `XY_intro` at each
+  arm's re-park; getting THAT backwards produces `iSpecialize: cannot
+  instantiate` at the CALL, naming the callee's whole premise chain.  But
+  the moment the callee needs `Y` TOO — `SpecDirlookup`'s found arm turned
+  out to need an entry unit for its licence — do not split the pair at the
+  caller and pass two conjuncts: widen the CALLEE's premise to `XY` and
+  move each caller's `XY_open` to AFTER the call, where its own spend is.
+  That keeps every intermediate contract at one conjunct (`SpecDirlink`
+  relays `XY` through to its interior `dirlookup` with no edit beyond the
+  type) and it is a smaller diff than the split, because the opens were
+  already written — they only move down.
+- **A resource that is spent on one arm and carried on another must be
+  spent by a lemma that TAKES it, and ridden by one that does not.**  The
+  same `dirlink` post has a `tot = 16` arm that deposits the unit and a
+  `tot = 0` arm that must keep it for the failure tail; one combined
+  lemma taking the unit unconditionally makes the second arm's tail fail
+  with `iSpecialize: "Htoken" not found`, several hundred lines away.
+  Keep the two arms as two lemmas (`ent_toks_dirlink_arm` /
+  `ent_toks_dirlink_nop`) even though one is an instance of the other.
+
+## AN EXEMPTION IN A DEFINITION IS A PREMISE ON EVERY CONSUMER — PRICE IT
+## AT THE WORST CALL SITE BEFORE YOU WIDEN IT
+
+Widening the exempt case of a boolean side condition (`ent_tokenless`:
+"which directory entries carry no token") looks free — it makes the
+resource WEAKER, so producers get easier.  It is not free: every CONSUMER
+that wants to extract at a non-exempt position now owes "this position is
+not exempt", and that disequality has to come from somewhere.
+
+The trap is that the obligation lands far from the definition and looks
+dischargeable from a clause the payload already carries.  On durable-disk
+2b-inode-5 an unconditional `"."` exemption pushed `dir_bname data k ≠
+DOT` onto `dirlookup`'s licence borrow; the natural discharge is
+`DirView.dir_dots_ix` (record 0 is a live `"."` naming the home), which
+~forty payload sites carry — and it took the whole propagation through
+`SpecDirlookup` → `SpecDirlink` → five walks before the ONE site that
+cannot pay showed up: create's `mkdir` writes `"."` into a child with
+`nrec = 0` and `".."` into one with `nrec = 1`, while `dir_dots_ix`
+demands two records.  The fix was to GUARD the exemption
+(`(s = DOT || s = DOTDOT) && orph`) so the obligation becomes `orph =
+false`, which every consumer already holds — but the cost of finding that
+out was a full propagation and its revert.
+
+**So: before widening, enumerate the consumers that must EXCLUDE the newly
+exempt case, write down the fact each of them would owe, and check the
+WORST one — typically a half-built object mid-`create`, not the steady
+state.**  Prefer the guarded form whenever the guard is a flag the
+consumers already carry: a guarded exemption costs the producers nothing
+extra when the guard is set the easy way, and it costs the consumers
+nothing at all.
+
 ## A GHOST-MAP ELEMENT IN A CHECKED-OUT PAYLOAD NEEDS ITS AUTHORITY TO HAVE
 ## A HOME A WALK CAN REACH — AND THAT HOME IS ITS OWN INVARIANT
 

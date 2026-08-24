@@ -145,12 +145,24 @@ counting RA (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (authR
 natUR)`, one auth-of-nat per inum in a single element at `fs_link γfs`).
 `ireg_slot` carries
 
-    ireg_lnk γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d)
-                      ∗ link_toks (fs_gamma_L γfs) z (ireg_nl d)
+    ireg_keep γfs z  := if z = ireg_root then link_tok (fs_gamma_L γfs) z else emp
+    ireg_lnk γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d) ∗ ireg_keep γfs z
 
 where `ireg_nl d = Z.to_nat (bv_unsigned (di_nlink d))`.  The value is tied
 to the slot's record BY CONSTRUCTION — the definition names `d` once — so
 "the authority stands at this record's `nlink`" is never a clause.
+
+**THE TOKENS ARE NOT HERE.**  A directory's tokens ride in its CHECKED-OUT
+PAYLOAD (`FsStateInode.ent_toks`, inside `IcacheEscrow.ic_loaded` /
+`ipool_alloc`); what the region keeps is the per-inum AUTHORITY, plus
+`ireg_keep` — the ROOT's one keep-alive token, which nothing can spend.
+`ent_tokenless` exempts a SELF record (target = home inum) and, AT AN
+ORPHAN ONLY, either dot name.  The root's `".."` names the root, so it carries no
+token and the image's `nlink = 1` at the root is unaccounted for by any
+directory; that one unit of slack IS the keep-alive.
+`InodeRegion.ireg_lnk_root_alive` reads `1 ≤ di_nlink` off it by the RA's
+own law, which is what replaces the maintained strict clause
+`ireg_root_ok`.
 
 **Why REGION-side and not in the checked-out payload**, which is where
 `fs-state.md` §2 draws it.  Two reasons, and the first is a hard one:
@@ -170,24 +182,39 @@ to the slot's record BY CONSTRUCTION — the definition names `d` once — so
 
 The three movers are `ireg_lnk_stable` (`bv_unsigned (di_nlink d') =
 bv_unsigned (di_nlink d)` — every ordinary flush, the claim, the free
-deposit), `ireg_lnk_bump` (`= +1`: one `link_mint`, the minted token joins
-the pile — `ireg_write_link_fl`) and `ireg_lnk_drop` (`link_return` —
-`ireg_write_unlink_fl`).
+deposit), `ireg_lnk_bump` (`= +1`: one `link_mint`, and the minted token
+goes **OUT**, to the `dirlink` that files it in a directory's `ent_toks` —
+`ireg_write_link_fl`) and `ireg_lnk_drop` (`link_return`, paid for by a
+token the caller brings **IN** out of the entry it is removing —
+`ireg_write_unlink_fl`).  The readers are `ireg_lnk_root_alive` and
+`ireg_lnk_toks_le` / `ireg_lnk_tok_nz` (the RA's law at this slot).
 
-**Every token is still AT HOME.**  The pile is `nlink` wide, so the
-family's validity is free (`FsState.link_full_map_valid`) and boot spends
-no image sweep on it: `FsState.fs_boot_alloc_full` allocates it at
-`FsCfgBoot.img_nodes` — the IMAGE's records — and `FsCfgBoot`'s
-`ireg_lnks_of_image` routes it into `IcacheBoot.ireg_alloc`, whose only new
-image obligation is `image_nlink_at` (`N z = ireg_nl (image_dinode dss z)`,
-discharged by `image_dinode_fs_dinode` and nothing else).  Neither era
-ghost leaves `fs_cfg_alloc` any more.
+Since 2b-inode-5 step 3 those readers are `IgetLic`'s: licence (a) IS
+`link_tok (fs_gamma_L γfs) (bv_unsigned inum)` and `iname_linked_alloc`
+reads `ireg_lnk_tok_nz` then (L3); licence (f) is the root's keep-alive
+token through `ireg_lnk_root_alive`.  `iname_not_frozen` / `iname_mint_ok`
+take `ireg_lnk` as an argument and no longer take `ireg_root_ok` — so
+NOTHING in the tree reads (L1) or `ireg_root_ok` any more, and both can
+leave `ireg_slot` in a small separable increment.
 
-The links step is what hands a directory's tokens to its CHECKED-OUT
-payload (`FsStateInode.ent_toks` inside `IcacheEscrow.ic_loaded`), leaving
-the region holding only the ROOT's keep-alive token; that is where W9 +
-conjunct (13) `FsImg.fs_links_eq` come due, and where the `w`-columns of
-3b and `DirLinks.v` die.
+**BOOT SPENDS NO IMAGE SWEEP, AND W9 IS THE WHOLE ARITHMETIC.**
+`FsState.fs_boot_alloc_full` allocates the family at `FsCfgBoot.img_nodes`
+— the IMAGE's records, one auth plus `nlink` tokens per inum, so its
+validity is free (`FsState.link_full_map_valid`).  `ireg_lnks_of_image`
+then splits each pile into the region's keep (one token at the root, none
+elsewhere) and `fs_link_count P sb z` tokens for the directories, and drops
+the rest; the ONE arithmetic premise is
+`fs_link_count z + keep z ≤ nlink z`, which is `FsImg.fsimg_wf_link_le`
+(W9's first clause, extended off the sweep's range by `fs_link_count_out`)
+plus `fsimg_wf_root_link` at the root.  `FsCfgBoot.ent_toks_of_region`
+routes the piles onto the image's flat ticket list
+(`big_sepS_tick_route`, unchanged) and then onto each directory's
+NAME-keyed `ent_toks` — `ent_toks_of_tickets`, whose whole content is that
+`FsTree.dir_view` is an `omap` over the SAME `seq 0 nrec` the ticket list
+is (`big_sepL_omap_pair`), and whose per-index obligation is exactly the
+SELF exemption.  `FsImg.fs_links_eq` is NOT needed.
+
+What is left region-side is the authority and the root's keep-alive.
 
 ### 3c. The pure/shelter clauses on `ireg_slot` (`InodeRegion.v:2135`)
 

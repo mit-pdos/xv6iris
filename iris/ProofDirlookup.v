@@ -88,6 +88,11 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
+Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
+Require Import FsStateInode.
+Require Import FsTree.         (* [dir_bname], [DOT] *)
+Require Import FsStateEra.     (* [ent_toks_borrow], [dir_first_hit_not_dot] *)
+Require Import FsBytesGamma.   (* [fs_gamma_L] *)
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import SpecPanic.
@@ -345,7 +350,7 @@ Section ProofDirlookupMain.
        proc_priv_bare pj pidv Vpr -∗
        bslot -∗
        (* the borrow, back verbatim on both arms (fs-fragments.md §7.1) *)
-       dir_links (bv_unsigned dinum) dn data -∗
+       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
        dinode_at gi dinum dr -∗
        (if found
         then ⌜dir_first data nrec s = Some kk
@@ -403,7 +408,7 @@ Section ProofDirlookupMain.
        proc_priv_bare pj pidv Vpr -∗
        bslot -∗
        iref_slot -∗
-       dir_links (bv_unsigned dinum) dn data -∗
+       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
        dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
@@ -445,7 +450,7 @@ Section ProofDirlookupMain.
        proc_priv_bare pj pidv Vpr -∗
        bslot -∗
        iref_slot -∗
-       dir_links (bv_unsigned dinum) dn data -∗
+       IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm data -∗
        dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
@@ -475,7 +480,7 @@ Section ProofDirlookupMain.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
-           Hinums Hdisj Horph Hdrnz Hdrnl Hj Hgs Ha0 Hposs Hbelow.
+           Hholes Hinums Hdisj Horph Hdrnz Hdrnl Hj Hgs Ha0 Hposs Hbelow.
     (* the reading of the type premise the LICENCE work needs, taken
        once here (increment C'-lite, fs-fragments.md §7.1) *)
     assert (Htyz : bv_unsigned (di_type dn) = T_DIR_z)
@@ -2139,7 +2144,8 @@ Section ProofDirlookupMain.
                        ∗ (iname gi gfs inodestart
                             (zero_extend' 32 (dir_inum data i : mword 16)
                              : mword 32) lic
-                          -∗ dir_links (bv_unsigned dinum) dn data
+                          -∗ IcacheEscrow.dlinks gfs (bv_unsigned dinum) dn bm
+                                data
                              ∗ dinode_at gi dinum dr))%I
               with "[Hlinks Hdi]" as (lic) "(%Hlicfl & Hlic & Hlicback)".
             { destruct (decide (bv_unsigned (dir_inum data i)
@@ -2161,15 +2167,29 @@ Section ProofDirlookupMain.
                 iIntros "Hl".
                 iDestruct (iname_held_alloc with "Hl") as "(_ & _ & Hdi)".
                 iFrame "Hlinks Hdi".
-              - (* any other record: licence (a), the payload's own ticket *)
-                iDestruct (dir_links_borrow (bv_unsigned dinum) dn data i
-                             Htyz Hnl0 Hilt Hlive Hnself with "Hlinks")
-                  as (fl) "[Hp Hback]".
-                iExists (LinkedL fl).
+              - (* any other record: licence (a), one of the home's entry
+                   units.  [dir_first]'s hit is at the record's OWN name, so
+                   the peel is at the name the map is keyed by; nothing is
+                   owed about the NAME, because [ent_tokenless] exempts a
+                   dot name only at an ORPHAN and this home is LIVE. *)
+                assert (Hbi : dir_bname data i = s)
+                  by exact (dir_first_name data nrec i s Hsome).
+                assert (Hfirsti : dir_first data
+                          (dir_nrec (bv_unsigned (di_size dn)))
+                          (dir_bname data i) = Some i)
+                  by (rewrite Hbi; exact Hsome).
+                iDestruct (IcacheEscrow.dlinks_open with "Hlinks")
+                  as "[Hlnk0 Hetk]".
+                iDestruct (ent_toks_borrow (fs_gamma_L gfs) (bv_unsigned dinum)
+                             dn bm data i Htyz Hnl0 Hfirsti Hnself
+                             Hholes Hszb with "Hetk") as "[Hp Hback]".
+                iExists LinkedL.
                 iSplitR; [iPureIntro; reflexivity |].
                 rewrite /iname Hzu.
                 iSplitL "Hp"; [iExact "Hp" |].
-                iIntros "Hp". iFrame "Hdi". iApply ("Hback" with "Hp"). }
+                iIntros "Hp". iFrame "Hdi".
+                iDestruct ("Hback" with "Hp") as "Hetk".
+                iApply (IcacheEscrow.dlinks_intro with "Hlnk0 Hetk"). }
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic

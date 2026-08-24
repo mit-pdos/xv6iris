@@ -3193,6 +3193,13 @@ Section ProofNamexTrMain.
                                       ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                          iDestruct (cpu_claim_ext_transport CIDz CIDG4 eb (proc_addr j)
                                       ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         (* dirlookup borrows the LEDGER half alone
+                            (durable-disk 2b-inode-5); the counting RA's
+                            tokens stay with this walk and go back into the
+                            payload untouched -- namex changes no record. *)
+                         assert (Hholesl : blk_holes_zero bml datl)
+                           by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
+                               exact Hq).
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
                                    pd pav pu bn gfs gi cn gtl ga gf cov
                                    logstart inodestart nib dev (ientry ik) iinum
@@ -3200,7 +3207,7 @@ Section ProofNamexTrMain.
                                    nf' false (mword_of_int 0 : mword 32)
                                    pidv dq (DfracOwn (1/2)) (DfracOwn 1)
                                    GA4 (K - 12)%nat eb b lks Vpr
-                                   Kdl Htyd Hlg Hbwf Hbcov Hszb Hdio
+                                   Kdl Htyd Hlg Hbwf Hbcov Hszb Hholesl Hdio
                                    (* ---- THE LICENCE PREMISE, AND THIS IS
                                       THE SITE WHERE THE USER'S INVARIANT IS
                                       EARNED (fs-fragments.md §7.5.6, TRACE

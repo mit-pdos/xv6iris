@@ -808,7 +808,7 @@ Section ProofSysOpenPublish.
     ∃ data : nat -> list (bv 8),
       ⌜inode_ok cov logstart dn bm data⌝ ∗ ⌜inode_rec_local dn⌝ ∗
       ⌜dir_ok icfg_nib dn data⌝ ∗
-      dir_links (bv_unsigned inum) dn data ∗
+      dlinks gfs (bv_unsigned inum) dn bm data ∗
       dinode_at gi inum dn ∗
       inode_meta (ientry k) dn ∗
       inode_map gfs (ientry k) bm ∗
@@ -889,7 +889,7 @@ Section ProofSysOpenPublish.
               (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
               with "[] Hat Hmeta Haddr Hind Hblk Hdv Hfv Htop").
-    iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).
+    iApply (dlinks_not_dir gfs (bv_unsigned inum) (di_trunc dn) _ _).
     rewrite Hty. exact Hnd.
   Qed.
 

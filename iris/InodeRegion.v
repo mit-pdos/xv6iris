@@ -2316,11 +2316,31 @@ Section InodeRegion.
       the ROOT's keep-alive token. *)
   Definition ireg_nl (d : dinode) : nat := Z.to_nat (bv_unsigned (di_nlink d)).
 
+  (* THE ROOT KEEP-ALIVE TOKEN.  [ent_tokenless] exempts a SELF record, so
+     the root's [".."] -- which names the root -- carries no token and the
+     image's [nlink = 1] at the root is unaccounted for by any directory.
+     The region parks that one token here, where nothing can ever spend it,
+     and "the root is allocated" becomes a reading of the RA's own law
+     ([FsStateLink.link_auth_toks_le]) instead of the maintained strict
+     clause [ireg_root_ok] it replaces. *)
+  Definition ireg_keep (γfs : fs_names) (z : Z) : iProp Σ :=
+    (if bool_decide (z = ireg_root)
+     then FsStateLink.link_tok (fs_gamma_L γfs) z else emp)%I.
+
+  Global Instance ireg_keep_timeless γfs z : Timeless (ireg_keep γfs z).
+  Proof. rewrite /ireg_keep. case_bool_decide; apply _. Qed.
+
   (* the count-indexed form, which is what BOOT hands over: the region's
-     shape at a slot is a function of the record's [nlink] alone. *)
+     shape at a slot is a function of the record's [nlink] alone.
+
+     THE TOKENS ARE NOT HERE.  A directory's tokens ride in its CHECKED-OUT
+     PAYLOAD ([IcacheEscrow.ic_loaded]'s [FsStateInode.ent_toks]); what the
+     region keeps is the per-inum AUTHORITY, plus the root's one keep-alive
+     token.  The authority is region-side because [IgetLic]'s licence (a)
+     reads the RA's law at the TARGET's authority and the presenter of the
+     licence does not hold the target -- see the banner above. *)
   Definition ireg_lnk_at (γfs : fs_names) (z : Z) (n : nat) : iProp Σ :=
-    (FsStateLink.link_auth (fs_gamma_L γfs) z n
-     ∗ FsStateLink.link_toks (fs_gamma_L γfs) z n)%I.
+    (FsStateLink.link_auth (fs_gamma_L γfs) z n ∗ ireg_keep γfs z)%I.
 
   Definition ireg_lnk (γfs : fs_names) (z : Z) (d : dinode) : iProp Σ :=
     ireg_lnk_at γfs z (ireg_nl d).
@@ -2345,35 +2365,69 @@ Section InodeRegion.
   Qed.
 
   (* the RAISING flush ([ip->nlink++; iupdate]): one [link_mint], and the
-     minted token joins the pile *)
+     minted token goes OUT -- to the [dirlink] that files it in a
+     directory's [FsStateInode.ent_toks]. *)
   Lemma ireg_lnk_bump γfs z d d' :
     bv_unsigned (di_nlink d') = bv_unsigned (di_nlink d) + 1 ->
-    ireg_lnk γfs z d ==∗ ireg_lnk γfs z d'.
+    ireg_lnk γfs z d ==∗
+    ireg_lnk γfs z d' ∗ FsStateLink.link_tok (fs_gamma_L γfs) z.
   Proof.
     intros Heq. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl.
     pose proof (di_nlink_nonneg d) as Hnn.
     assert (Hs : Z.to_nat (bv_unsigned (di_nlink d'))
                  = S (Z.to_nat (bv_unsigned (di_nlink d)))) by lia.
-    rewrite Hs. iIntros "[Ha Ht]".
-    iMod (FsStateLink.link_mint with "Ha") as "[Ha Htk]".
-    iModIntro. iFrame "Ha".
-    rewrite -Nat.add_1_r FsStateLink.link_toks_split. iFrame.
+    rewrite Hs. iIntros "[Ha $]".
+    iMod (FsStateLink.link_mint with "Ha") as "[$ $]".
+    done.
   Qed.
 
-  (* ...and the LOWERING one ([ip->nlink--; iupdate]): one [link_return] *)
+  (* ...and the LOWERING one ([ip->nlink--; iupdate]): one [link_return],
+     paid for by the token the removed directory entry gave up. *)
   Lemma ireg_lnk_drop γfs z d d' :
     bv_unsigned (di_nlink d) = bv_unsigned (di_nlink d') + 1 ->
-    ireg_lnk γfs z d ==∗ ireg_lnk γfs z d'.
+    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z ==∗
+    ireg_lnk γfs z d'.
   Proof.
     intros Heq. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl.
     pose proof (di_nlink_nonneg d') as Hnn.
     assert (Hs : Z.to_nat (bv_unsigned (di_nlink d))
                  = S (Z.to_nat (bv_unsigned (di_nlink d')))) by lia.
-    rewrite Hs -Nat.add_1_r FsStateLink.link_toks_split.
-    iIntros "[Ha [Ht Htk]]".
-    rewrite Nat.add_1_r.
-    iMod (FsStateLink.link_return with "Ha Htk") as "Ha".
-    iModIntro. iFrame.
+    rewrite Hs. iIntros "[Ha $] Htk".
+    iMod (FsStateLink.link_return with "Ha Htk") as "$". done.
+  Qed.
+
+  (* THE ROOT'S READING, which is what replaces [ireg_root_ok]'s strict
+     [w < nlink]: the parked keep-alive token cannot be spent, so the RA's
+     own law says the root's count is at least one. *)
+  Lemma ireg_lnk_root_alive γfs d :
+    ireg_lnk γfs ireg_root d -∗ ⌜1 <= bv_unsigned (di_nlink d)⌝.
+  Proof.
+    rewrite /ireg_lnk /ireg_lnk_at /ireg_keep bool_decide_eq_true_2 //.
+    iIntros "[Ha Htk]".
+    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htk") as %Hle.
+    iPureIntro. rewrite /ireg_nl in Hle.
+    pose proof (di_nlink_nonneg d). lia.
+  Qed.
+
+  (* ...and the general one, which is what licence (a) reads: any token
+     standing at this inum bounds the record's own count from below. *)
+  Lemma ireg_lnk_toks_le γfs z d k :
+    ireg_lnk γfs z d -∗ FsStateLink.link_toks (fs_gamma_L γfs) z k -∗
+    ⌜Z.of_nat k <= bv_unsigned (di_nlink d)⌝.
+  Proof.
+    rewrite /ireg_lnk /ireg_lnk_at. iIntros "[Ha _] Htk".
+    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htk") as %Hle.
+    iPureIntro. rewrite /ireg_nl in Hle.
+    pose proof (di_nlink_nonneg d). lia.
+  Qed.
+
+  Lemma ireg_lnk_tok_nz γfs z d :
+    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z -∗
+    ⌜bv_unsigned (di_nlink d) <> 0⌝.
+  Proof.
+    iIntros "Hl Ht".
+    iDestruct (ireg_lnk_toks_le γfs z d 1 with "Hl Ht") as %Hle.
+    iPureIntro. lia.
   Qed.
 
   Definition ireg_slot (γfs : fs_names) (γi : gname) (z : Z) (d : dinode)
@@ -4514,7 +4568,13 @@ Section InodeRegion.
        FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗
-       dinode_at γi inum dn' ∗ ilink_fl fl (bv_unsigned inum) ∗
+       dinode_at γi inum dn' ∗ ilink_fl fl (bv_unsigned inum)
+       (* THE COUNTING RA's OWN UNIT (durable-disk 2b-inode-5): the raised
+          count mints one [FsStateLink.link_tok] at this inum, and it goes
+          OUT -- to the [dirlink] that files it in a directory's
+          [FsStateInode.ent_toks] inside that directory's checked-out
+          payload.  The region keeps only the AUTHORITY. *)
+       ∗ FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum) ∗
        ireg_link_pin pin (bv_unsigned inum) dn).
   Proof.
     iIntros (HE Hin Hdn' Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp)
@@ -4676,7 +4736,7 @@ Section InodeRegion.
        token joins the slot's pile.  A basic update, so it composes into
        this AU at no mask cost. *)
     iMod (ireg_lnk_bump γfs (bv_unsigned inum) dn dn' Hnl with "Hlnk")
-      as "Hlnk".
+      as "[Hlnk Htok]".
     iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
@@ -4719,7 +4779,7 @@ Section InodeRegion.
       iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | exact (proj2 Ht2)] | iExact "Hmk"] | iExact "Hrf"]. }
     (* ...and the pin premise goes back out, unspent (§3.9's
        borrowed-and-returned). *)
-    iModIntro. iFrame "Hdn Hfrag Hpin".
+    iModIntro. iFrame "Hdn Hfrag Htok Hpin".
   Qed.
 
   (* THE PLAIN INSTANCE -- the landed mover, statement for statement.  Kept
@@ -4750,7 +4810,8 @@ Section InodeRegion.
        FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗
-       dinode_at γi inum dn' ∗ ilink (bv_unsigned inum)).
+       dinode_at γi inum dn' ∗ ilink (bv_unsigned inum)
+       ∗ FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum)).
   Proof.
     iIntros (HE Hin Hdn' Hnz Hstab Hbump Hgrd Hnd Hnl0) "#Hinv Hdn".
     (* the relay pays RULING A-prime's PURE arm and drops the returned
@@ -4765,8 +4826,8 @@ Section InodeRegion.
     iModIntro. iExists rec_old.
     iSplitR; [iPureIntro; exact Hlr |]. iFrame "Hrun".
     iIntros (Hbytes) "Hrun'".
-    iMod ("Hwand" with "[//] Hrun'") as "(Hdn & Hfr & _)".
-    iModIntro. iSplitL "Hdn"; [iExact "Hdn" | iExact "Hfr"].
+    iMod ("Hwand" with "[//] Hrun'") as "(Hdn & Hfr & Htok & _)".
+    iModIntro. iFrame "Hdn Hfr Htok".
   Qed.
 
   (* ...and the d-FLAVOURED TWIN, whose mint premise is (T1) at the record
@@ -4796,7 +4857,8 @@ Section InodeRegion.
        FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗
-       dinode_at γi inum dn' ∗ ilinkd (bv_unsigned inum)).
+       dinode_at γi inum dn' ∗ ilinkd (bv_unsigned inum)
+       ∗ FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum)).
   Proof.
     iIntros (HE Hin Hdn' Hnz Hstab Hbump Hgrd Hty Hnl0) "#Hinv Hdn".
     iMod (ireg_write_link_fl E γi γfs inodestart nib inum dn dn' bsl
@@ -4809,8 +4871,8 @@ Section InodeRegion.
     iModIntro. iExists rec_old.
     iSplitR; [iPureIntro; exact Hlr |]. iFrame "Hrun".
     iIntros (Hbytes) "Hrun'".
-    iMod ("Hwand" with "[//] Hrun'") as "(Hdn & Hfr & _)".
-    iModIntro. iSplitL "Hdn"; [iExact "Hdn" | iExact "Hfr"].
+    iMod ("Hwand" with "[//] Hrun'") as "(Hdn & Hfr & Htok & _)".
+    iModIntro. iFrame "Hdn Hfr Htok".
   Qed.
 
   (* ...AND THE TAGGED INSTANCE (V5') -- create's +0xc4 child mint on the
@@ -4853,6 +4915,7 @@ Section InodeRegion.
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn'
        ∗ ilinkdp (bv_unsigned inum) pv ∗ iparent (bv_unsigned inum) pv
+       ∗ FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum)
        (* the token back, unspent *)
        ∗ ifreeze_off (bv_unsigned inum)).
   Proof.
@@ -4869,14 +4932,15 @@ Section InodeRegion.
     iIntros (Hbytes) "Hrun'".
     iAssert (⌜rec_old = take 64%nat (drop (64 * islot inum)%nat bsl)⌝)%I
       as "Hb"; [iPureIntro; exact Hbytes |].
-    iMod ("Hwand" with "Hb Hrun'") as "(Hdn & Hfr & Hpin)".
+    iMod ("Hwand" with "Hb Hrun'") as "(Hdn & Hfr & Htok & Hpin)".
     cbn. iDestruct "Hfr" as "[Hdp Hip]".
     (* at [pin = true] the premise that comes back IS the token *)
     iEval (rewrite /ireg_link_pin) in "Hpin". iRename "Hpin" into "Hoff".
     iModIntro.
     iSplitL "Hdn"; [iExact "Hdn" |].
     iSplitL "Hdp"; [iExact "Hdp" |].
-    iSplitL "Hip"; [iExact "Hip" | iExact "Hoff"].
+    iSplitL "Hip"; [iExact "Hip" |].
+    iSplitL "Htok"; [iExact "Htok" | iExact "Hoff"].
   Qed.
 
   (* [ip->nlink--; iupdate(ip)] -- sys_unlink's decrement, and THE ONLY
@@ -4908,6 +4972,13 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     ilink_fl fl (bv_unsigned inum) -∗
+    (* THE COUNTING RA's OWN UNIT, COMING BACK (durable-disk 2b-inode-5).
+       This is the one flush in the kernel that LOWERS a count, so it is
+       the one that returns a [FsStateLink.link_tok] to the region's
+       authority -- the token the directory entry whose removal this
+       decrement pays for gave up out of its own
+       [FsStateInode.ent_toks]. *)
+    FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum) -∗
     (* the RECORD-GRANULAR form (durable-disk 2b-inode-1), with the
        observation counter [v] riding beside the run exactly as it did
        beside the block. *)
@@ -4932,7 +5003,7 @@ Section InodeRegion.
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
-    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag".
+    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag Htok".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -5091,10 +5162,10 @@ Section InodeRegion.
       by (rewrite (proj2 Ht2); exact I).
     assert (Hfrz' : ireg_frz_ok fz cn dn')
       by exact (ireg_frz_ok_of_off fz cn dn' Hfz0).
-    (* THE RA's OWN STEP (durable-disk 2b-inode-4), the dual of the link
-       mover's: the lowered count is one [link_return], paid for by a
-       token out of the slot's own pile. *)
-    iMod (ireg_lnk_drop γfs (bv_unsigned inum) dn dn' Hnl with "Hlnk")
+    (* THE RA's OWN STEP (durable-disk 2b-inode-5), the dual of the link
+       mover's: the lowered count is one [link_return], paid for by the
+       token the caller brought back out of its directory's [ent_toks]. *)
+    iMod (ireg_lnk_drop γfs (bv_unsigned inum) dn dn' Hnl with "Hlnk Htok")
       as "Hlnk".
 
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
@@ -5152,6 +5223,7 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     ilink (bv_unsigned inum) -∗
+    FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (rec_old : list (bv 8)) (v : nat),
       ⌜length rec_old = 64%nat⌝ ∗
       FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
@@ -5163,9 +5235,9 @@ Section InodeRegion.
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
-    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag".
+    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag Htok".
     iApply (ireg_write_unlink_fl E γi γfs inodestart nib inum dn dn' bsl None
-              HE Hin Hdn' Hnz Hstab Hnl with "Hinv Hdn Hfrag").
+              HE Hin Hdn' Hnz Hstab Hnl with "Hinv Hdn Hfrag Htok").
   Qed.
 
   (* ...and the d-FLAVOURED TWIN.  No caller in V1: it is what V3's walk
@@ -5182,6 +5254,7 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     ilinkd (bv_unsigned inum) -∗
+    FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (rec_old : list (bv 8)) (v : nat),
       ⌜length rec_old = 64%nat⌝ ∗
       FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
@@ -5193,10 +5266,10 @@ Section InodeRegion.
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
-    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag".
+    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag Htok".
     iApply (ireg_write_unlink_fl E γi γfs inodestart nib inum dn dn' bsl
               (Some None) HE Hin Hdn' Hnz Hstab Hnl
-              with "Hinv Hdn Hfrag").
+              with "Hinv Hdn Hfrag Htok").
   Qed.
 
   (* ...AND THE TAGGED INSTANCE (V5') -- the spend of a parent-record
@@ -5218,6 +5291,7 @@ Section InodeRegion.
     dinode_at γi inum dn -∗
     ilinkdp (bv_unsigned inum) pv -∗
     iparent (bv_unsigned inum) pv -∗
+    FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ (rec_old : list (bv 8)) (v : nat),
       ⌜length rec_old = 64%nat⌝ ∗
       FsStateDefs.byte_range (fs_gamma_L γfs) (IBLOCK inum inodestart)
@@ -5229,10 +5303,10 @@ Section InodeRegion.
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
-    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hdp Hip".
+    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hdp Hip Htok".
     iApply (ireg_write_unlink_fl E γi γfs inodestart nib inum dn dn' bsl
               (Some (Some pv)) HE Hin Hdn' Hnz Hstab Hnl
-              with "Hinv Hdn [Hdp Hip]").
+              with "Hinv Hdn [Hdp Hip] Htok").
     cbn. iFrame "Hdp Hip".
   Qed.
 

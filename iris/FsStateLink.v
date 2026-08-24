@@ -94,6 +94,35 @@ Section Link.
   Lemma link_toks_one Γ i : link_toks Γ i 1 ⊣⊢ link_tok Γ i.
   Proof. done. Qed.
 
+  (* take a PREFIX of a pile and drop the rest (the ambient logic is
+     affine, so a surplus token is thrown away rather than carried) *)
+  Lemma link_toks_le_split Γ i n k :
+    (k <= n)%nat -> link_toks Γ i n ⊢ link_toks Γ i k ∗ link_toks Γ i (n - k).
+  Proof.
+    intros Hle.
+    assert (Hn : n = (k + (n - k))%nat) by lia.
+    rewrite {1}Hn link_toks_split. done.
+  Qed.
+
+  (* ...and the LIST form, which is the shape the boot's ticket routing
+     takes ([FsCfgBoot.big_sepS_tick_route] walks a pile as a [big_sepL]).
+     One direction only: at [k = 0] the pile is [own _ {[i := ◯ 0]}], which
+     an [emp] cannot rebuild, and no consumer wants that direction. *)
+  Lemma link_toks_list_at Γ i k j :
+    link_toks Γ i k ⊢ [∗ list] _ ∈ seq j k, link_tok Γ i.
+  Proof.
+    revert j. induction k as [| k IH]; intros j; [iIntros "_"; done |].
+    replace (seq j (S k)) with (j :: seq (S j) k) by reflexivity.
+    rewrite big_sepL_cons.
+    replace (S k) with (1 + k)%nat by lia.
+    rewrite link_toks_split. iIntros "[$ Ht]".
+    iApply (IH (S j) with "Ht").
+  Qed.
+
+  Lemma link_toks_list Γ i k :
+    link_toks Γ i k ⊢ [∗ list] _ ∈ seq 0 k, link_tok Γ i.
+  Proof. exact (link_toks_list_at Γ i k 0). Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  3.  THE LAW                                                      *)
   (* ---------------------------------------------------------------- *)

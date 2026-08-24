@@ -1093,7 +1093,7 @@ Section IlockLoad.
                     ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
                     ⌜dir_orphan_clean dn data⌝ ∗
                     ⌜dir_uniq dn data⌝ ∗
-                    dir_links (bv_unsigned inum) dn data ∗
+                    dlinks gfs (bv_unsigned inum) dn bm data ∗
                     ind_res gfs bm ∗ inode_blocks gfs bm data ∗
                     (* the CONTENTS HOLD, TIED to the record the fill just
                        decoded (namei-pinned-lookup.md §9 W3).  The pool arm
@@ -1262,7 +1262,7 @@ Section IlockLoad.
           (* ...and V2's count clause is the SAME conjunct of [fresh_shape]
              the ".." discharge above reads: a claim box is an orphan, and
              [0 <= 1]. *)
-          iSplitR; [iApply (dir_links_size_zero (bv_unsigned inum) dn _ Hfsz
+          iSplitR; [iApply (dlinks_size_zero gfs (bv_unsigned inum) dn _ _ Hfsz
                               ltac:(rewrite (fresh_shape_nlink dn Hfr0); lia)) |].
           iSplitR "Hdv Hfv Htop"; [iApply il_ind_res_empty |].
           iSplitR "Hdv Hfv Htop"; [iApply il_blocks_empty |].

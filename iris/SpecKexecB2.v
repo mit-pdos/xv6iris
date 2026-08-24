@@ -338,7 +338,7 @@ Section KexecB2Res.
       ⌜dir_dots_ix (bv_unsigned inumf) dnf datl⌝ ∗
       ⌜dir_orphan_clean dnf datl⌝ ∗
       ⌜dir_uniq dnf datl⌝ ∗
-      dir_links (bv_unsigned inumf) dnf datl ∗
+      dlinks gfs (bv_unsigned inumf) dnf bmf datl ∗
       dinode_at gi inumf dnf ∗
       inode_meta (ientry kf) dnf ∗
       inode_map gfs (ientry kf) bmf ∗
@@ -387,7 +387,7 @@ Section KexecB2Res.
     dir_dots_ix (bv_unsigned inumf) dnf datl ->
     dir_orphan_clean dnf datl ->
     dir_uniq dnf datl ->
-    dir_links (bv_unsigned inumf) dnf datl -∗
+    dlinks gfs (bv_unsigned inumf) dnf bmf datl -∗
     dinode_at gi inumf dnf -∗
     inode_meta (ientry kf) dnf -∗
     inode_map gfs (ientry kf) bmf -∗

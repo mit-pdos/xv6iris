@@ -1306,7 +1306,7 @@ Section IcacheBootPool.
     icnt_half (bv_unsigned inum) 0%nat -∗
     frzm_h (bv_unsigned inum) false -∗
     ifreeze_off (bv_unsigned inum) -∗
-    dir_links (bv_unsigned inum) dn data -∗
+    dlinks γfs (bv_unsigned inum) dn bm data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
     (* ...AND THE ERA'S ABSTRACT VALUE, TIED to this arm's own node
        (durable-disk 2b-inode-3).  The four resources above are what
@@ -1379,7 +1379,7 @@ Section IcacheBootPool.
          ⌜dir_dots_ix (bv_unsigned (mword_of_int z : mword 32)) dn data⌝ ∗
          ⌜dir_orphan_clean dn data⌝ ∗
          ⌜dir_uniq dn data⌝ ∗
-         dir_links (bv_unsigned (mword_of_int z : mword 32)) dn data ∗
+         dlinks γfs (bv_unsigned (mword_of_int z : mword 32)) dn bm data ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data ∗
          (* ...and the era's abstract value, TIED to this bundle's own node

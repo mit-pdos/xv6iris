@@ -518,25 +518,44 @@ Section InodeOwned.
 
   (* THREE EXEMPTIONS, and each of them is the kernel's own arithmetic.
 
-     - ".": xv6 deliberately does not bump [nlink] for it ("No ip->nlink++
-       for '.': avoid cyclic ref count"), so there is nothing to pay for it.
-     - ".." of an ORPHAN: the parent took that token back when it removed
-       the directory's name, and the record it left behind is exactly this
-       kernel's grey ".." (fs-icache.md section 20).
-     - ".." OF A SELF-PARENT, i.e. the ROOT, whose [".."] names the root.
-       That record is a SELF record and pays for nothing, exactly as "."
-       does -- it is the image's own counting rule
-       ([FsImg.fs_rec_ticket]'s [negb (dir_inum = self)] guard, and W9's
-       "a live directory has zero incoming tickets").  What the exemption
-       buys is the ROOT KEEP-ALIVE TOKEN: with root's [".."] tokenless the
-       image's [nlink = 1] is unaccounted for, so the inode region can park
-       one [link_tok] at [ireg_root] that nothing ever spends, and
-       "the root is allocated" becomes a reading of the RA's own law rather
-       than a maintained clause. *)
+     - A SELF RECORD -- an entry whose TARGET is the home inum.  That is
+       the image's own counting rule verbatim ([FsImg.fs_rec_ticket]'s
+       [negb (dir_inum = self)] guard), and it covers both of the cases
+       the kernel cares about: ["."], which xv6 deliberately does not
+       count ("No ip->nlink++ for '.': avoid cyclic ref count"), and the
+       ROOT's [".."], which names the root.
+       What the SELF exemption buys beyond ["."] is the ROOT KEEP-ALIVE
+       TOKEN: with root's [".."] tokenless the image's [nlink = 1] is
+       unaccounted for, so the inode region can park one [link_tok] at
+       [ireg_root] that nothing ever spends, and "the root is allocated"
+       becomes a reading of the RA's own law rather than a maintained
+       clause.  Stating it at the TARGET rather than at the NAME is also
+       what makes the boot's token supply come out of W9: the image's
+       ticket list exempts exactly the self records, so a name-keyed
+       token demand never exceeds the record-keyed ticket count.
+     - EITHER DOT NAME AT AN ORPHAN.  [".."] is the parent's: it took that
+       token back when it removed the directory's name, and the record it
+       left behind is exactly this kernel's grey ".." (fs-icache.md
+       section 20).  ["."] is the home's OWN, and at a LIVE directory the
+       self rule above already covers it -- [inl_dir_dot] says a live
+       directory's ["."] names its home.  At an ORPHAN that clause is
+       withdrawn ([inl_dir_dot] is guarded by [fn_nlink <> 0]) and there is
+       no longer anything to tie the record to its home, so the exemption
+       has to be stated at the NAME as well; create's [fail:] arm parks
+       exactly such a record.
+       IT IS GUARDED BY [orph] AND THAT IS LOAD-BEARING (durable-disk
+       2b-inode-5, step 3).  An unconditional ["."] exemption would make
+       licence (a)'s borrow ([FsStateEra.ent_toks_borrow]) owe "the matched
+       record is not a dot record" at every [dirlookup] -- a fact whose
+       only source is [DirView.dir_dots_ix], which create's own [mkdir]
+       arms provably cannot supply (a fresh child has [nrec = 0], and after
+       the ["."] write [nrec = 1], while [dir_dots_ix] demands two).  Under
+       the guard the borrow owes only [orph = false], which the found arm
+       already holds out of [SpecDirlookup.dl_lic_live]. *)
   Definition ent_tokenless (self : Z) (orph : bool) (s : fname) (t : Z)
     : bool :=
-    bool_decide (s = DOT)
-    || (bool_decide (s = DOTDOT) && (orph || bool_decide (t = self))).
+    bool_decide (t = self)
+    || ((bool_decide (s = DOT) || bool_decide (s = DOTDOT)) && orph).
 
   Definition ent_tok Γ (self : Z) (orph : bool) (s : fname) (t : Z)
     : iProp Σ :=
@@ -597,6 +616,28 @@ Section InodeOwned.
   Global Instance ent_tok_timeless Γ self orph s t :
     Timeless (ent_tok Γ self orph s t).
   Proof. rewrite /ent_tok. destruct (ent_tokenless self orph s t); apply _. Qed.
+
+  (* the congruence at the READINGS: two nodes whose entry maps and orphan
+     flags agree carry the same tokens, whatever their records are *)
+  Lemma ent_toks_cong_ent Γ i n n' :
+    fn_orphan n' = fn_orphan n -> dir_entries n' = dir_entries n ->
+    ent_toks Γ i n ⊣⊢ ent_toks Γ i n'.
+  Proof. intros Ho He. rewrite /ent_toks He Ho //. Qed.
+
+  (* a NON-directory owns no entries and therefore no tokens *)
+  Lemma ent_toks_not_dir Γ i n : fn_is_dir n = false -> ⊢ ent_toks Γ i n.
+  Proof.
+    intros H. rewrite /ent_toks /dir_entries H big_sepM_empty. done.
+  Qed.
+
+  (* ...and neither does a directory whose record count is zero (a claim
+     box, a truncated corpse) *)
+  Lemma ent_toks_nrec0 Γ i n : fn_nrec n = 0%nat -> ⊢ ent_toks Γ i n.
+  Proof.
+    intros H. rewrite /ent_toks /dir_entries.
+    destruct (fn_is_dir n); [| rewrite big_sepM_empty; done].
+    rewrite H dir_view_nil big_sepM_empty. done.
+  Qed.
 
   Global Instance ent_toks_timeless Γ i n : Timeless (ent_toks Γ i n).
   Proof. rewrite /ent_toks. apply _. Qed.
@@ -925,19 +966,111 @@ Section InodeOwned.
   Proof. rewrite /DOT /DOTDOT. intros H. inversion H. Qed.
 
   Lemma ent_tokenless_orphan_ne self orph orph' s t :
-    s <> DOTDOT -> ent_tokenless self orph' s t = ent_tokenless self orph s t.
+    s <> DOT -> s <> DOTDOT ->
+    ent_tokenless self orph' s t = ent_tokenless self orph s t.
   Proof.
-    intros Hne. rewrite /ent_tokenless (bool_decide_eq_false_2 _ Hne).
-    by rewrite !andb_false_l.
+    intros Hnd Hne. rewrite /ent_tokenless
+      (bool_decide_eq_false_2 (s = DOT) Hnd)
+      (bool_decide_eq_false_2 (s = DOTDOT) Hne).
+    by rewrite !orb_false_l !andb_false_l.
+  Qed.
+
+  (* ...and the ORPHANING step is MONOTONE at every other entry: going
+     orphan only ever REMOVES a token demand, so an entry's unit is simply
+     dropped rather than transported.  This is what replaces the equality
+     above at [s = DOT], where the flag now matters. *)
+  Lemma ent_tokenless_orph_up self s t :
+    ent_tokenless self false s t = true -> ent_tokenless self true s t = true.
+  Proof.
+    rewrite /ent_tokenless andb_false_r orb_false_r. intros H.
+    by rewrite H orb_true_l.
   Qed.
 
   Lemma ent_tokenless_dotdot self orph t :
     ent_tokenless self orph DOTDOT t = (orph || bool_decide (t = self)).
   Proof.
     rewrite /ent_tokenless.
-    rewrite (bool_decide_eq_false_2 (DOTDOT = DOT));
-      [| intros H; by apply dot_ne_dotdot].
-    by rewrite bool_decide_eq_true_2 // andb_true_l orb_false_l.
+    rewrite (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl) orb_true_r
+      andb_true_l.
+    apply orb_comm.
+  Qed.
+
+  (* the ["."] twin, and it is the same statement -- both dot names are
+     exempt exactly at an orphan *)
+  Lemma ent_tokenless_dot self orph t :
+    ent_tokenless self orph DOT t = (orph || bool_decide (t = self)).
+  Proof.
+    rewrite /ent_tokenless.
+    rewrite (bool_decide_eq_true_2 (DOT = DOT) eq_refl) orb_true_l
+      andb_true_l.
+    apply orb_comm.
+  Qed.
+
+
+  (* the SELF exemption, at the point of use: an entry naming its own home
+     carries no token whatever its name is *)
+  Lemma ent_tokenless_self self orph s : ent_tokenless self orph s self = true.
+  Proof.
+    rewrite /ent_tokenless (bool_decide_eq_true_2 (self = self) eq_refl)
+      orb_true_l //.
+  Qed.
+
+  Lemma ent_tok_self Γ self orph s : ent_tok Γ self orph s self ⊣⊢ emp.
+  Proof. rewrite /ent_tok ent_tokenless_self //. Qed.
+
+  Lemma ent_tok_self_of Γ self orph s t :
+    t = self -> ⊢ ent_tok Γ self orph s t.
+  Proof. intros ->. rewrite ent_tok_self. done. Qed.
+
+  (* ...and the two readings a producer of a token needs: a non-self entry
+     of a LIVE directory carries one. *)
+  Lemma ent_tokenless_ne self orph s t :
+    t <> self -> orph = false -> ent_tokenless self orph s t = false.
+  Proof.
+    intros Hne ->. rewrite /ent_tokenless.
+    rewrite (bool_decide_eq_false_2 (t = self) Hne) orb_false_l.
+    by rewrite andb_false_r.
+  Qed.
+
+  (* THE FORM A WALK HANDS IN.  A [dirlink] holds the counting RA's unit
+     for the inum it is about to name; whether the entry it creates PAYS
+     for it is the exemption's business, and at a self record the unit is
+     simply dropped (the logic is affine, and that is the same drop
+     [DirLinks.dir_link_at_dirlink] makes of a ticket).  So no
+     disequality is owed at the call site -- only that a [".."] is not
+     being written into an ORPHAN, which is free at a live directory. *)
+  Lemma ent_tok_of_link Γ self orph s t :
+    ((s = DOT \/ s = DOTDOT) -> orph = false) ->
+    link_tok Γ t -∗ ent_tok Γ self orph s t.
+  Proof.
+    intros Hdd. rewrite /ent_tok /ent_tokenless.
+    destruct (bool_decide (t = self)); [iIntros "_"; done |].
+    rewrite orb_false_l.
+    destruct (bool_decide (s = DOT)) eqn:Hd.
+    - rewrite (Hdd (or_introl (proj1 (bool_decide_eq_true (s = DOT)) Hd)))
+        andb_false_r. iIntros "$".
+    - rewrite orb_false_l.
+      destruct (bool_decide (s = DOTDOT)) eqn:Hs;
+        [| rewrite andb_false_l; iIntros "$"].
+      rewrite (Hdd (or_intror (proj1 (bool_decide_eq_true (s = DOTDOT)) Hs)))
+        andb_false_r. iIntros "$".
+  Qed.
+
+  (* the ORPHANING WEAKENING, at the resource: see [ent_tokenless_orph_up] *)
+  Lemma ent_tok_orph_up Γ self s t :
+    ent_tok Γ self false s t -∗ ent_tok Γ self true s t.
+  Proof.
+    rewrite /ent_tok. destruct (ent_tokenless self false s t) eqn:H0.
+    - rewrite (ent_tokenless_orph_up self s t H0). iIntros "$".
+    - destruct (ent_tokenless self true s t); iIntros "H"; done.
+  Qed.
+
+  Lemma ent_tok_ne Γ self orph s t :
+    t <> self -> orph = false ->
+    ent_tok Γ self orph s t ⊣⊢ link_tok Γ t.
+  Proof.
+    intros Hne Ho.
+    rewrite /ent_tok (ent_tokenless_ne self orph s t Hne Ho) //.
   Qed.
 
   Lemma ent_tok_dotdot Γ self orph t :
@@ -968,8 +1101,7 @@ Section InodeOwned.
     cbn [orb].
     iIntros "[Hd H]". iFrame "Hd". iSplitR; [done |].
     iApply (big_sepM_mono with "H"). intros s v Hs; simpl.
-    rewrite /ent_tok (ent_tokenless_orphan_ne i false true s v) //.
-    intros ->. rewrite lookup_delete in Hs. done.
+    iApply ent_tok_orph_up.
   Qed.
 
   (* ---------------------------------------------------------------- *)

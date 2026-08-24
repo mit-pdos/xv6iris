@@ -107,7 +107,8 @@
 
    THREE THINGS COME IN AND GO BACK OUT VERBATIM, ON BOTH ARMS (R13(ii)):
 
-   [dir_links (bv_unsigned dinum) dn data] -- the payload's per-record ticket
+   [IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data] -- the payload's
+   per-record ticket list PAIRED WITH the home's name-keyed entry units
    big-op, over the PRE-state (there is no post-state: dirlookup writes
    nothing).  At the matched index it is the payment unit that founds licence
    (a).  Nothing is spent: the ticket is lent to [iget] and handed straight
@@ -283,6 +284,12 @@ Definition wp_dirlookup_sconf_body
   blkmap_wf cov logstart bm ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (* (2') ...and the payload's hole clause, which licence (a)'s borrow needs
+     to read the home's entry map off [data] rather than off the blkmap's
+     own spelling ([FsStateEra.dir_entries_era_node]).  An [inode_ok]
+     conjunct, so every caller has it in the same [Hiok] the three premises
+     above come out of. *)
+  blk_holes_zero bm data ->
   (* (3) iget's argument bound, over the records -- see the header *)
   dir_inums_ok data nrec nib ->
   (* (4) THE LICENCE PREMISE, §7.5.6 verbatim.  See the header for why it
@@ -382,8 +389,9 @@ Definition wp_dirlookup_sconf_body
   ireg_inv γi γfs inodestart nib -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
-  (* ---- THE BORROWED TICKET LIST AND THE HOME'S OWN RECORD ---- *)
-  dir_links (bv_unsigned dinum) dn data -∗
+  (* ---- THE BORROWED TICKET LIST, THE HOME'S ENTRY UNITS AND ITS OWN
+     RECORD ---- *)
+  IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
   dinode_at γi dinum dr -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (through namex / dirlookup, down to ilock and sleep), so a park moves
@@ -407,7 +415,7 @@ Definition wp_dirlookup_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       bslot -∗
       (* ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS *)
-      dir_links (bv_unsigned dinum) dn data -∗
+      IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
       dinode_at γi dinum dr -∗
       (* THE TWO ARMS *)
       (if found

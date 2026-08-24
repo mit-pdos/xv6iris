@@ -120,6 +120,10 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
+Require Import FsStateInode.
+Require Import FsStateEra.
+Require Import FsBytesGamma.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import FsTree.
@@ -565,6 +569,9 @@ Definition wp_dirlookup_tree_body
   blkmap_wf cov logstart bm ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (* (2') the payload's hole clause, owed to licence (a)'s borrow
+     (durable-disk 2b-inode-5, step 3) *)
+  blk_holes_zero bm data ->
   (* (3) iget's argument bound, over the records *)
   dir_inums_ok data nrec nib ->
   (* (4) THE LICENCE PREMISES -- see the FINDING in the header *)
@@ -611,8 +618,15 @@ Definition wp_dirlookup_tree_body
   ireg_inv γi γfs inodestart nib -∗
   iref_slot -∗
   (* the directory's OUT-EDGES, borrowed for the licence and returned
-     verbatim on both arms (§1.3 makes them a client-held fragment) *)
+     verbatim on both arms (§1.3 makes them a client-held fragment) --
+     and beside them the ENTRY UNITS the licence is now spelt with
+     (durable-disk 2b-inode-5, step 3).  The tree layer has no fnode
+     conjunct for them, so they ride as their own premise; nothing in the
+     tree builds an [fdir] anyway (FsTree.v's §"the demonstration
+     layer"). *)
   fedges dpi dn data -∗
+  FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
+    (FsStateEra.era_node dn bm data) -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
@@ -631,6 +645,8 @@ Definition wp_dirlookup_tree_body
       proc_priv_bare pj pidv Vpr -∗
       bslot -∗
       fedges dpi dn data -∗
+      FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
+        (FsStateEra.era_node dn bm data) -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
          survives because a caller needs it: sys_unlink names the offset
          [16k] with it, and iget's reference is at that record's inum. *)
@@ -688,10 +704,11 @@ Module FsLookupTree (DL : DIRLOOKUP).
                              m K eb b lks Vpr.
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
-    intros HK Hlg Hbwf Hbcov Hszb Hdio Hdisj Horph Hdpi Hj Hgs Ha0 Ha2 Heb Hlkb.
+    intros HK Hlg Hbwf Hbcov Hszb Hholes Hdio Hdisj Horph Hdpi Hj Hgs Ha0 Ha2
+           Heb Hlkb.
     iIntros "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap Hfdir
              Hname Hpoff Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
-             Hitb2 Hitbl Hesc Hireg Hisl Hedges Hcont".
+             Hitb2 Hitbl Hesc Hireg Hisl Hedges Hetk Hcont".
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
     (* licence (c)'s only demand on the record: an allocated one.  The
        tree layer has it by construction -- a directory node's type is
@@ -702,11 +719,17 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iAssert (dir_links (bv_unsigned (inum_of dpi)) dn data)
       with "[Hedges]" as "Hedges".
     { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
+    pose proof (inum_of_unsigned dpi Hdpi) as Hkeq.
+    iAssert (FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs)
+               (bv_unsigned (inum_of dpi)) (FsStateEra.era_node dn bm data))
+      with "[Hetk]" as "Hetk".
+    { rewrite Hkeq. iExact "Hetk". }
+    iDestruct (dlinks_intro with "Hedges Hetk") as "Hedges".
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
               γa γf cov logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
-              HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
+              HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb Hholes
               Hdio Hdisj Horph Htynz eq_refl Hj Hgs Ha0 Ha2 Hlkb
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv
                     Hidev Hmeta Hmap Hblocks Hname Hpoff
@@ -719,13 +742,15 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iIntros (CIDd Hgd mf found k kslot q)
       "%Hcs Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
        Hedges Hdiat Harm".
+    iDestruct (dlinks_open with "Hedges") as "[Hedges Hetk]".
+    iEval (rewrite Hkeq) in "Hetk".
     iAssert (fedges dpi dn data) with "[Hedges]" as "Hedges".
     { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDd Hgd
                  with "Hcont") as "Hcont".
     iApply ("Hcont" $! mf found k kslot q
               with "[] Hcg Hcnt Hpc Hidev Hmeta Hmap
-                    [Hdiat Hblocks] Hname Hppid Hbslot Hedges [Harm]").
+                    [Hdiat Hblocks] Hname Hppid Hbslot Hedges Hetk [Harm]").
     - iPureIntro. exact Hcs.
     - iApply (fdir_intro γi γfs dpi ents dn bm data Hrep with "Hdiat Hblocks").
     - destruct found.

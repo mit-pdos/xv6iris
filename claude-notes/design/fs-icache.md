@@ -4176,13 +4176,13 @@ section needs is the dictionary:
 
 | §20's apparatus | the RA |
 |---|---|
-| `ilink z` / `ilinkd z` / `ilinkdp z pv` (three flavours, no weakening between them) | ONE `FsStateLink.link_tok Γ z`; the flavour index, `dlc_fl`, `ipaid_fl` and `IcacheRef.ilink_fl` all die with it |
+| `ilink z` / `ilinkd z` / `ilinkdp z pv` (three flavours, no weakening between them) | ONE `FsStateLink.link_tok Γ z`; the flavour index, `dlc_fl`, `ipaid_fl` and `IcacheRef.ilink_fl` all die with it.  LANDED at the LICENCE (2b-inode-5 step 3): `IgetLic.ipaid`/`ipaid_fl` are gone, `LinkedL` carries no argument, and licence (a) IS the counting unit |
 | the per-inum authority's `wl + wdu + wdt` | `FsStateLink.link_auth Γ z n`, parked in `ireg_slot` as `InodeRegion.ireg_lnk` at `n = ireg_nl d` |
 | (L1) `w ≤ nlink` | the RA's own law `link_auth_toks_le` — read, never maintained |
 | `dir_links self dn data` (the payload's ticket list, keyed by record INDEX) | `FsStateInode.ent_toks Γ self n` (a `big_sepM` over `dir_entries n`, keyed by NAME) |
 | `igrey z` — the orphaned `".."` nothing pays for | **nothing at all**: `ent_tokenless` makes an orphan's `".."` TOKENLESS, so the grey record is not a second colour but the ABSENCE of a token, and §20.8's defect keeps exactly its old force with no ledger machinery |
 | `dlc_bound` / `dlc_lower` / `dir_dots_ix`'s index half / `dir_orphan_clean`, `ireg_dir_ok`, `ireg_dir_wl0`, `ireg_par_ok`, `dir_par_tie` | all die: a token is name-keyed, so nothing has to say WHICH record is the parent's |
-| `ireg_root_ok`'s strict `w < nlink` | the region's ROOT KEEP-ALIVE TOKEN — root's `".."` is a SELF record and is tokenless (`ent_tokenless`, and the image's own `FsImg.fs_rec_ticket` guard), so root's `nlink = 1` is unaccounted for and the region can park one `link_tok ireg_root` that nothing spends |
+| `ireg_root_ok`'s strict `w < nlink` | the region's ROOT KEEP-ALIVE TOKEN — `InodeRegion.ireg_keep`, read by `ireg_lnk_root_alive`.  Root's `".."` is a SELF record and is tokenless (`FsStateInode.ent_tokenless`, and the image's own `FsImg.fs_rec_ticket` guard), so root's `nlink = 1` is unaccounted for and the region parks one `link_tok ireg_root` that nothing spends |
 
 **The one cross-inode fact in the whole design is the RA's law**, and it
 is READ off ownership rather than maintained: `nlink = 0 ⟹ no entry points
@@ -4190,13 +4190,52 @@ here` is what the free path uses, and `1 ≤ #tokens ⟹ 1 ≤ nlink ⟹ type �
 (with (L3)) is licence (a).  The `≥` direction — `nlink ≤ #entries` — is
 NOT stated anywhere and rules out only a leak.
 
-Landed so far (durable-disk 2b-inode-4): the RA's authority and its whole
-token pile live in `ireg_slot` (`fs-ghost-state.md` §3b′), boot allocates
-them at the image's records with no new sweep, and `ent_tokenless` carries
-the self-record exemption.  What is NOT yet done is the hand-over — the
-tokens moving from the region's pile into the checked-out payload, in
-`dir_links`' place — and the deletions that follow it
-(`claude-notes/projects/durable-disk.md`, item 2b-inode-4).
+**`ent_tokenless` EXEMPTS A SELF RECORD, not only `"."`** — the target is
+the home inum — and that is the image's own counting rule verbatim.  It is
+what makes the boot's NAME-keyed token demand provable from W9 alone: the
+image's ticket list is keyed by record INDEX and exempts exactly the self
+records, `FsTree.dir_view` is an `omap` over the SAME `seq 0 nrec` the
+ticket list is, and `FsCfgBoot.ent_toks_of_tickets` is that one induction.
+`FsImg.fs_links_eq` is not needed and no new image sweep is spent.
+As LANDED it also exempts EITHER DOT NAME **at an orphan**: an orphan's
+`"."` is tied to its home by no clause a walk still holds (`inl_dir_dot` is
+guarded by `fn_nlink ≠ 0`), so a `"."` unit could not be produced at the
+free path, and `".."` is the grey record.  The `orph` guard on the `"."`
+half is load-bearing and step 3 is what forced it: an UNCONDITIONAL `"."`
+exemption makes licence (a)'s borrow owe "the matched record is not a dot
+record" at every `dirlookup`, whose only source is `dir_dots_ix` — and
+create's own `mkdir` arms provably cannot supply that (a fresh child has
+`nrec = 0`, and after the `"."` write `nrec = 1`, while `dir_dots_ix`
+demands two).  Guarded, the borrow owes only `orph = false`, which the
+found arm already holds out of `SpecDirlookup.dl_lic_live`, and
+`ent_tok_ne` / `ent_toks_unlink` need no name-side premise at all.
+
+Landed (durable-disk 2b-inode-4/-5): the RA's per-inum AUTHORITY lives in
+`ireg_slot` as `InodeRegion.ireg_lnk` beside the root's keep-alive token
+(`fs-ghost-state.md` §3b′); `ireg_write_link_fl` pays a `link_tok` OUT and
+`ireg_write_unlink_fl` takes one IN; boot routes the image's piles into the
+checked-out payloads.  A directory's tokens ride in
+`IcacheEscrow.ic_loaded` / `ipool_alloc`, which carry
+`dlinks γfs self dn bm data := DirLinks.dir_links ∗ FsStateInode.ent_toks`
+in `dir_links`' own conjunct position — ONE conjunct, so the ~forty payload
+sites that only pass it through do not move — until the ledger dies, when
+`dlinks` loses its first half.  The per-move lemmas are
+`FsStateEra.ent_toks_dirlink_arm` (dirlink, at `SpecDirlink`'s own premise
+list), `ent_toks_unlink` (the entry zeroing), `ent_toks_era_orphan` (rmdir's
+grey `".."`), `ent_toks_era_nlink` (a count-only flush) and
+`FsStateInode.ent_tok_of_link` (a walk's `link_tok`, as the entry's).
+Every walk moves its tokens: create's four `dirlink`s and its `fail:`
+arms, sys_link's mint and deposit, sys_unlink's entry zeroing and rmdir's
+grey `".."`.  The LICENCE flip landed with them (step 3): licence (a) is
+`link_tok`, read by `InodeRegion.ireg_lnk_tok_nz` at the TARGET's own
+authority inside one `inv_acc` of `iregN`; licence (f) is the root's
+keep-alive token; the borrow is `FsStateEra.ent_toks_borrow`, one
+`big_sepM_lookup_acc` at the name `dir_first` won on
+(`FsTree.dir_view_lookup`).  `dirlookup` and `dirlink` therefore take
+`IcacheEscrow.dlinks` rather than `dir_links`, plus one new pure premise
+`blk_holes_zero bm data` (an `inode_ok` conjunct).  **Nothing reads (L1)
+or `ireg_root_ok` any more.**  What is NOT yet done is the deletions
+(`claude-notes/projects/durable-disk.md`, item 2b-inode-5 step 6).
 
 §19 ended by naming Part 2 "the soundness obligation, and the only route
 to an unblocked create" and leaving it unpriced.  This section prices it,

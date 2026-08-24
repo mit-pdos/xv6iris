@@ -499,6 +499,61 @@ Section IcacheEscrow.
      and no arm that unpacks inside an [iInv] becomes unprovable.  The
      derivation is landed and is what an arm that would rather NOT maintain
      the coverage sweep or the injectivity uses. *)
+  (* ---- THE LINKS CONJUNCT, DURING THE FLIP (durable-disk 2b-inode-5) --
+
+     The payload's links half is the counting RA's TOKENS
+     ([FsStateInode.ent_toks] at this payload's own node): one per entry of
+     this directory that names another inum, drawn out of that inum's
+     region-side authority at the [iupdate] that raised its count.
+
+     WHILE THE LEDGER IS STILL ALIVE the two supplies ride TOGETHER in one
+     conjunct.  That is what keeps the flip off the ~forty payload sites
+     that only pass the conjunct through: their [iDestruct] patterns and
+     their [with "[...]"] selections do not move at all, and only the
+     handful of walks that actually SPEND or MINT a unit open the pair.
+     When [DirLinks.v] goes, this definition loses its first conjunct and
+     the payloads keep their arity again. *)
+  Definition dlinks (γfs : fs_names) (self : Z) (dn : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) : iProp Σ :=
+    (dir_links self dn data
+     ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self
+         (era_node dn bm data))%I.
+
+  Global Instance dlinks_timeless γfs self dn bm data :
+    Timeless (dlinks γfs self dn bm data).
+  Proof. rewrite /dlinks. apply _. Qed.
+
+  Lemma dlinks_open γfs self dn bm data :
+    dlinks γfs self dn bm data -∗
+      dir_links self dn data
+      ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self (era_node dn bm data).
+  Proof. iIntros "H"; iExact "H". Qed.
+
+  Lemma dlinks_intro γfs self dn bm data :
+    dir_links self dn data -∗
+    FsStateInode.ent_toks (fs_gamma_L γfs) self (era_node dn bm data) -∗
+    dlinks γfs self dn bm data.
+  Proof. iIntros "H1 H2". iFrame. Qed.
+
+  (* the two free discharges: a NON-directory owns no links at all, and
+     neither does a record whose size is zero (a claim box, a corpse) *)
+  Lemma dlinks_not_dir γfs self dn bm data :
+    bv_unsigned (di_type dn) <> T_DIR_z -> ⊢ dlinks γfs self dn bm data.
+  Proof.
+    intros Hne. rewrite /dlinks. iSplitR.
+    - iApply (dir_links_not_dir self dn data Hne).
+    - iApply (FsStateEra.ent_toks_era_not_dir _ self dn bm data Hne).
+  Qed.
+
+  Lemma dlinks_size_zero γfs self dn bm data :
+    bv_unsigned (di_size dn) = 0 ->
+    bv_unsigned (di_nlink dn) <= 1 -> ⊢ dlinks γfs self dn bm data.
+  Proof.
+    intros Hsz Hnl. rewrite /dlinks. iSplitR.
+    - iApply (dir_links_size_zero self dn data Hsz Hnl).
+    - iApply (FsStateEra.ent_toks_era_size0 _ self dn bm data Hsz).
+  Qed.
+
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
@@ -507,7 +562,7 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn0 data0⌝ ∗
        ⌜dir_orphan_clean dn0 data0⌝ ∗
        ⌜dir_uniq dn0 data0⌝ ∗
-       dir_links (bv_unsigned inum) dn0 data0 ∗
+       dlinks γfs (bv_unsigned inum) dn0 bm0 data0 ∗
        inode_owned_era γfs γi inum (era_node dn0 bm0 data0) ∗
        (* ...AND THE CONTENTS HOLD, TIED (namei-pinned-lookup.md §9 W2).  The
           tie is DEFINITIONAL (Revision 1): the abstract entry map is a
@@ -862,7 +917,7 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
-       dir_links (bv_unsigned inum) dn data ∗
+       dlinks γfs (bv_unsigned inum) dn bm data ∗
        (* THE OWNERSHIP IS THE ERA BUNDLE (durable-disk 2b-inode-3), at this
           payload's own node.  It CONTAINS what three conjuncts used to say
           separately -- [dinode_at], [ind_res] and [inode_blocks] -- and
@@ -1694,7 +1749,7 @@ Section IcacheEscrow.
     dir_dots_ix (bv_unsigned inum) dn data ->
     dir_orphan_clean dn data ->
     dir_uniq dn data ->
-    dir_links (bv_unsigned inum) dn data -∗
+    dlinks γfs (bv_unsigned inum) dn bm data -∗
     dinode_at γi inum dn -∗
     inode_meta (ientry k) dn -∗
     inode_addrs (ientry k) (bm_cells bm) -∗
@@ -1752,7 +1807,7 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
-       dir_links (bv_unsigned inum) dn data ∗
+       dlinks γfs (bv_unsigned inum) dn bm data ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗

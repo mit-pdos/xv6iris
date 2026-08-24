@@ -1007,6 +1007,11 @@ Definition wp_iupdate_link_body
          continuation moves a character. *)
       dinode_at γi inum dn -∗
       ilink_fl fl (bv_unsigned inum) -∗
+      (* ...AND THE COUNTING RA's OWN UNIT (durable-disk 2b-inode-5), which
+         is what the [dirlink] that follows files in the directory's
+         [FsStateInode.ent_toks] inside its checked-out payload.  The
+         region keeps only the per-inum AUTHORITY. *)
+      FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) -∗
       (* ...and the freeze-pin premise back, unspent (§3.9's
          borrowed-and-returned).  A caller that came in on the pure arm gets
          the pure arm back and ignores it; a caller that paid the token gets
@@ -1147,6 +1152,12 @@ Definition wp_iupdate_unlink_body
   (* THE FRAGMENT THE DROP SPENDS (edit (ii)): consumed, not returned.  AT
      THE CALLER'S OWN FLAVOUR since V1 -- [None] is [ilink] by iota. *)
   ilink_fl fl (bv_unsigned inum) -∗
+  (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5),
+     also consumed: this is the one flush in the kernel that LOWERS a
+     count, so it is the one that returns a token to the region's
+     authority -- the token the removed directory entry gave up out of its
+     own [FsStateInode.ent_toks]. *)
+  FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) -∗
   (* THE RECEIPT PREMISE (edit (iv); see the banner).  Persistent in both
      arms, so it costs a caller nothing to keep, and pure in both, so the
      choice is made with one [iLeft]/[iRight]. *)

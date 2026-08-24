@@ -980,9 +980,9 @@ map at home blocks); 1d lands last.
           same for its `dirlink` arms.  A lane that adds another payload
           conjunct should price these two files at the flat lists, not at
           the `ic_loaded` sites.
-      - [~] **2b-inode-4 (THE LINK FLIP).**  THE RA IS LANDED IN THE
-        REGION AND AT BOOT; the hand-over to the payload, and the deletions
-        that follow it, are NOT.
+      - [~] **2b-inode-4/-5 (THE LINK FLIP).**  THE TOKENS ARE IN THE
+        PAYLOAD AND EVERY WALK MOVES THEM; what is left is the LICENCE
+        flip ([IgetLic]: [ipaid] -> [link_tok]) and the deletions.
         - **RULING, and it is a correction to the task's step 1: the
           per-inum AUTHORITY is REGION-side, not payload-side.**  `fs-state.md`
           §2 draws `link_auth Γ i (nlink n)` inside `inode_owned`, i.e. in
@@ -1038,62 +1038,181 @@ map at home blocks); 1d lands last.
           `IregDirBit`, `IgetLic`, `IregLinkNz`, `IcacheInv`, `IcacheBoot`).
           Three movers carry every writer: `ireg_lnk_stable` (the count does
           not move — every ordinary flush, `ireg_claim_au`, the free
-          deposit), `ireg_lnk_bump` (one `link_mint`, `ireg_write_link_fl`)
-          and `ireg_lnk_drop` (one `link_return`, `ireg_write_unlink_fl`).
-        - [x] **EVERY TOKEN IS STILL AT HOME**, so the family's validity is
-          free (`FsState.link_full_map_valid`) and **NO IMAGE SWEEP IS
+          deposit), `ireg_lnk_bump` (one `link_mint`, and the token goes
+          OUT -- `ireg_write_link_fl`) and `ireg_lnk_drop` (one
+          `link_return`, paid for by a token the caller brings IN --
+          `ireg_write_unlink_fl`).
+        - [x] **THE FAMILY IS ALLOCATED AT THE FULL MAP, so its validity is
+          free** (`FsState.link_full_map_valid`) and **NO IMAGE SWEEP IS
           SPENT**: `FsState.fs_boot_alloc_full` allocates both era maps at
-          `FsCfgBoot.img_nodes`, `FsCfgBoot.ireg_lnks_of_image` routes the
-          link family into `IcacheBoot.ireg_alloc`, and the one new image
-          obligation is `image_nlink_at` (`N z = ireg_nl (image_dinode dss
-          z)`), discharged by `image_dinode_fs_dinode` and nothing else.
+          `FsCfgBoot.img_nodes`, `FsCfgBoot.ireg_lnks_of_image` splits each
+          pile into the region's authority-plus-keep (routed into
+          `IcacheBoot.ireg_alloc`) and the directories' demand, and the one
+          image obligation on the region's side is `image_nlink_at`
+          (`N z = ireg_nl (image_dinode dss z)`), discharged by
+          `image_dinode_fs_dinode` and nothing else.
           **`BootShared`'s `iClear` of the link family is gone** and neither
           era ghost leaves `fs_cfg_alloc` any more.
-        - [ ] **WHAT REMAINS — the hand-over, then the deletions.**  The
-          region's pile becomes the ROOT's one token plus whatever no
-          directory has claimed; a directory's tokens ride in its
-          checked-out payload.  In dependency order:
-          1. `IcacheEscrow.ic_loaded` / `ic_loaded_flat_body` /
-             `ipool_alloc`: `DirLinks.dir_links (bv_unsigned inum) dn data`
-             → `FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum)
-             (era_node dn bm data)`, in the SAME conjunct position.
-             `FsStateEra.ent_toks_cong` / `_era_node_data_ext` are the two
-             congruences a payload needs (landed).
-          2. `InodeRegion.ireg_write_link_fl` / `_unlink_fl` hand the token
-             OUT / take it IN instead of keeping it in the pile — the
-             `link_mint`/`link_return` calls are already at the right
-             places; `_d`/`_p` collapse into the plain instance and the
-             `fl : option (option Z)` index dies from `SpecIupdate`,
-             `IcacheRef.ilink_fl`, `DirLinks.dlc_fl` and `IgetLic.ipaid_fl`.
-          3. `IgetLic`: `ipaid fl z` → `link_tok (fs_gamma_L γfs) z`,
-             `LinkedL` loses its argument, `iname_linked_alloc` reads
-             `link_auth_toks_le` at `ireg_lnk` in place of (L1)+(L3).
-             `RootL`/`iname_root_alloc` read the root keep-alive token.
-          4. The walks: `ProofCreate` (mint at :4964), `ProofDirlink`
-             (spend at :2343), `ProofSysLink`, `ProofSysUnlink` (both arms;
-             the rmdir orphan is `dir_owned_orphan` + `link_return` at the
-             parent + `dir_owned_unlink` at the child), `ProofSysMkdir`,
-             `ProofIput`/`ProofIreclaim`, `ProofDirlookup`,
-             `ProofSysOpenParts`, `ProofFilewrite`.  **Price
-             `ProofSysUnlink` and `ProofSysLink` at their FLAT payload
-             lists, not at their `ic_loaded` sites** (2b-inode-3's finding).
-          5. Boot: the tokens leave `ireg_alloc`'s pile for
-             `ipool_alloc`/`ic_loaded` (`FsCfgBoot.dir_links_of_region`'s
-             successor), and THEN `✓ link_elem` at the image map comes due
-             — `fsimg_wf`'s W9 (`fs_links_wf`) plus conjunct (13)
-             `FsImg.fs_links_eq`, with no new sweep.
-          6. DELETE `DirLinks.v` (2009 lines) from `_CoqProject`,
+        - [x] **THE HAND-OVER'S MACHINERY (2b-inode-5).**  LANDED.
+          - `FsStateInode.ent_tokenless` is the design-of-record rule: a
+            SELF record (target = home inum) is tokenless, not only `"."`.
+            That is `FsImg.fs_rec_ticket`'s guard verbatim, and it is what
+            makes the boot's NAME-keyed demand provable from W9 alone.
+            Readings: `ent_tok_self`/`_self_of`/`_ne`/`_of_link`,
+            `ent_toks_not_dir`/`_nrec0`/`_cong_ent`.
+          - `InodeRegion.ireg_lnk` is the AUTHORITY plus `ireg_keep` (the
+            ROOT's one keep-alive token); the pile is gone.
+            `ireg_lnk_bump` pays the minted token OUT, `ireg_lnk_drop`
+            takes one IN, and `ireg_lnk_root_alive` / `_toks_le` /
+            `_tok_nz` are the readings that replace `ireg_root_ok`'s
+            strict clause.  `ireg_write_link_fl` and its `_d`/`_p`
+            wrappers pay out a `link_tok`; `ireg_write_unlink_fl` and its
+            wrappers take one; `SpecIupdate`/`ProofIupdate` thread both.
+          - **THE PAYLOAD CARRIES ONE CONJUNCT, NOT TWO.**
+            `IcacheEscrow.dlinks γfs self dn bm data :=
+            DirLinks.dir_links self dn data ∗ FsStateInode.ent_toks
+            (fs_gamma_L γfs) self (era_node dn bm data)`, in
+            `dir_links`' own position in `ic_loaded` / `ipool_alloc` /
+            `ic_loaded_flat_body` / `ic_mk_loaded`.  So the ~forty payload
+            sites that only PASS the conjunct through do not move at all —
+            no `iDestruct` pattern and no `with "[…]"` selection changes —
+            and only the walks that SPEND or MINT open the pair
+            (`dlinks_open`/`_intro`/`_not_dir`/`_size_zero`).
+            When `DirLinks.v` goes, `dlinks` loses its first half and the
+            payloads keep their arity again.
+          - The per-move lemmas, all in `FsStateEra`, all stated at the
+            premises the walk already holds:
+            `ent_toks_dirlink_arm` (`SpecDirlink`'s own premise list,
+            both `tot = 0 \/ tot = 16` arms; the `inum = 0` corner is
+            handled inside by `dir_view_dead_write`, which is why no walk
+            owes "the linked inum is nonzero" — a fact none of them
+            carries), `ent_toks_unlink` (the entry zeroing, releasing the
+            token that pays for `ip->nlink--`), `ent_toks_era_orphan`
+            (rmdir's grey `".."`, `t <> self` from `dp <> ip`),
+            `ent_toks_era_nlink` (a count-only flush).
+          - **BOOT SPENDS NO NEW SWEEP AND `fs_links_eq` IS NOT NEEDED.**
+            `FsState.fs_boot_alloc_full` still allocates the family at
+            `FsCfgBoot.img_nodes` (validity free); `ireg_lnks_of_image`
+            splits each pile into the region's keep and
+            `fs_link_count P sb z` tokens, and the ONE arithmetic premise
+            is `fs_link_count z + keep z <= nlink z` —
+            `FsImg.fsimg_wf_link_le` (W9) plus `fsimg_wf_root_link` at the
+            root.  `FsCfgBoot.ent_toks_of_region` routes them through the
+            LANDED `big_sepS_tick_route` and then onto each directory's
+            name-keyed `ent_toks`; the one new induction is
+            `big_sepL_omap_pair`, because `FsTree.dir_view` is an `omap`
+            over the SAME `seq 0 nrec` the ticket list is, and its
+            per-index obligation is exactly the SELF exemption.
+        - [x] **THE WALKS' TOKEN MOVES.**  LANDED, all of them, and each is
+          one application of the lemma above at the premises the walk
+          already holds:
+          - **create** mints the child's unit at `ip->nlink = 1`
+            (`SpecIupdate.wp_iupdate_link_body`'s new payout) and files it
+            in `dp`'s `ent_toks` at the `dirlink` that names the child; on
+            the mkdir arm the append and `dp->nlink++` are FUSED, so the
+            move is `ent_toks_dirlink_arm` at `dp3` (where the count is
+            unmoved) followed by `ent_toks_era_nlink` across the `++`.
+            The child's `"."` is a SELF record and costs no unit; the
+            child's `".."` takes the unit the `dp->nlink++` minted.  Every
+            `fail:` arm carries the unspent unit to its `ip->nlink = 0`,
+            which is why `cr_mkdir_body` / `cr_fail_body` /
+            `cr_fail_mkdir_body` grew a `link_tok` premise; the grey child
+            it parks owns NO tokens (`ent_toks_era_dots_only`).
+          - **sys_link** is the same mint and the same deposit, with the
+            short-write and `bad:` tails carrying the unit to
+            `ip->nlink--`; `sl_tail_bad` / `_f` / `_e2` grew the premise.
+          - **sys_unlink** (file arm) takes the token OUT of the entry it
+            zeroes (`ent_toks_unlink`) and spends it at `ip->nlink--`.
+          - **rmdir** (dir arm) does that AND takes the child's `".."`
+            token out by `ent_toks_era_orphan` (`t <> self` is (D1)'s own
+            `Hz1ne`), which is what pays for `dp->nlink--`.  The grey
+            `".."` it leaves behind is the ABSENCE of a token.
+          - **iput / ireclaim** move nothing: they free at `nlink = 0`, and
+            what a token would refute there is the RA's own
+            `link_auth_zero_no_tok`, which no arm needed.
+          - **dirlookup / namex / sys_open / filewrite / kexec** only pass
+            the conjunct through, which is what `dlinks` is for.
+        - [x] **THE LICENCE FLIP (step 3).**  LANDED.  `IgetLic.ipaid`,
+          `ipaid_fl`, `ipaid_tick`/`_of_tick`/`tick_of_ipaid`,
+          `link_paid_ge`, `ireg_rcol_paid_ge` and `dir_links_borrow` are
+          GONE; `LinkedL` carries no argument and licence (a) IS
+          `FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum)`.
+          - `iname_linked_alloc` reads `InodeRegion.ireg_lnk_tok_nz` at the
+            slot's own `ireg_lnk` (the SAME `inv_acc` of `iregN` that used
+            to read (L1)) and then (L3); `iname_root_alloc` reads
+            `ireg_lnk_root_alive`.  `iname_not_frozen` and `iname_mint_ok`
+            gained an `ireg_lnk γfs (bv_unsigned inum) d` argument and LOST
+            their `ireg_root_ok` premise — their three consumers
+            (`IgetLic.iname_freeze_off`, `IcacheInv`'s two up-count movers)
+            already destructure the slot, and the conclusion is PURE so
+            `iDestruct … as %H` leaves the resource in hand.
+          - The borrow is `FsStateEra.ent_toks_borrow`: `dir_first`'s hit is
+            at the record's OWN name, so `FsTree.dir_view_lookup` says the
+            entry map's value there IS that record's inum and one
+            `big_sepM_lookup_acc` peels it.  Its premises are the found
+            arm's own: `T_DIR`, `di_nlink <> 0` (out of `dl_lic_live`),
+            `dir_first … (dir_bname data k) = Some k`, `dir_inum <> self`,
+            and the payload's `blk_holes_zero`.
+          - **THE ONE DESIGN CHANGE, AND IT WAS FORCED.**  `ent_tokenless`
+            used to exempt `"."` UNCONDITIONALLY, which made the borrow owe
+            "the matched record is not a dot record" — a fact whose only
+            source is `DirView.dir_dots_ix`, and **create's own `mkdir`
+            arms provably cannot supply it**: the fresh child has
+            `nrec = 0` and after the `"."` write `nrec = 1`, while
+            `dir_dots_ix` demands two records.  So the exemption is now
+            GUARDED BY `orph`, uniformly for both dot names:
+            `ent_tokenless self orph s t := bool_decide (t = self) ||
+            ((bool_decide (s = DOT) || bool_decide (s = DOTDOT)) && orph)`.
+            At a LIVE directory `inl_dir_dot` already ties `"."` to its
+            home, so the self rule covers it and nothing is lost; at an
+            ORPHAN that clause is withdrawn and the name-side exemption is
+            what create's `fail:` arm needs.  The borrow then owes only
+            `orph = false`, which the found arm holds, and `ent_tok_ne` /
+            `ent_toks_unlink` LOSE their `s <> DOT` side conditions.
+            New beside it: `ent_tokenless_orph_up` / `ent_tok_orph_up` (the
+            orphaning step is a token DROP at every entry, which is what
+            replaces `ent_tokenless_orphan_ne` at `s = DOT`), and
+            `ent_tokenless_dot`.
+          - **THE PAYLOAD PAIR NOW REACHES `dirlookup`.**
+            `SpecDirlookup.wp_dirlookup_sconf` takes
+            `IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data` in
+            place of `dir_links`, plus ONE new pure premise
+            `blk_holes_zero bm data` (an `inode_ok` conjunct, so every
+            caller pays it out of the `Hiok` it already destructures).
+            `SpecDirlink`/`ProofDirlink` relay both, since dirlink's
+            interior lookup is what presents the licence.  The five kernel
+            callers therefore STOP opening the pair before the call and
+            open it AFTER, where the deposit needs it; `FsLookup`'s tree
+            layer (which nothing consumes — see `FsTree.v`'s demonstration
+            note) takes the units as their own premise beside `fedges`.
+        - [ ] **WHAT REMAINS — step 6, THE DELETIONS.**  One step:
+          1. DELETE `DirLinks.v` (2009 lines) from `_CoqProject`,
              `DirView`'s `dlc_*` (`dlc_bound`/`_lower`/`_ctb`/`_count`/
              `_dotb`), `IcacheRef`'s `ilink`/`ilinkd`/`ilinkdp`/`igrey`/
              `iparent`/`ilink_fl`/`lreg`/`lreg_half` and the
              `wl`/`wdu`/`wdt`/`g`/`p` columns of `lelem*`/`linkElemUR0`,
-             `InodeRegion`'s `ireg_dir_ok`/`ireg_par_ok`/`ireg_dir_wl0` and
-             (L1), and `IregLinkNz.v` if nothing is left of it.
+             `InodeRegion`'s `ireg_dir_ok`/`ireg_par_ok`/`ireg_dir_wl0`
+             and (L1), and `IregLinkNz.v` if nothing is left of it.
+             `IcacheEscrow.dlinks` then loses its FIRST conjunct and the
+             payloads keep their arity a second time.
              `dir_dots_ix`/`dir_orphan_clean` are a SEPARABLE cleanup and
              were deliberately kept: `dir_dots_ix` is what every payload
-             producer feeds `FsStateEra.inode_local_of_ok_rec`, so removing
-             it is a seam redesign across ~40 sites that buys the flip
-             nothing.
+             producer feeds `FsStateEra.inode_local_of_ok_rec`, so
+             removing it is a seam redesign across ~40 sites that buys the
+             flip nothing.
+             WHAT STILL READS THE OLD LEDGER, i.e. the exact work list:
+             `SpecIupdate`/`ProofIupdate`'s `ilink_fl fl` (payout and
+             spend) with the `fl` index threaded through every walk's
+             `wp_iupdate_link`/`_unlink` call and the `_d`/`_p` wrappers;
+             `DirLinks.dir_links` inside `IcacheEscrow.dlinks` and hence
+             the ~40 payload sites, `FsRep.fedges`/`fedges_acc`,
+             `ProofDirlink`'s `dir_links_dirlink*` movers,
+             `ProofSysUnlink`'s `dir_links_*`, `IregLinkNz`; and
+             `InodeRegion.ireg_write_link_fl`/`_unlink_fl`'s ledger half.
+             Nothing reads (L1) or `ireg_root_ok` any more — step 3 took
+             their last consumers — so those two clauses can come out of
+             `ireg_slot`/`ireg_slot_intro` FIRST, as a small separable
+             increment, before the `DirLinks` demolition.
 - [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
       - OPEN, for the orchestrator, in the order they cost:
         - The link family is still dropped at `BootShared` and the bundle
