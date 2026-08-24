@@ -1815,6 +1815,113 @@ this stage or 2c's body.**
         `P_wf_strict`, `dstep_strict` (+ `_id`/`_trans`), `lw_arm_justify`,
         `eo_arm` (+ `eo_arm_empty`), `commit_conclusion`.  Audit at the
         three-entry baseline.
+- [x] **3a-val. OBJECT-GRANULAR (§4⅞) VALIDATED: all three load-bearing
+      claims hold, with ONE refutation inside claim 1 and a one-line
+      repair.**  The lane's product is `iris/FsDurObj.v` (1487 lines, one
+      `_CoqProject` row, no existing statement moved, every lemma `Qed`,
+      every stated theorem `Closed under the global context`); the design
+      account is `fs-state.md` §4⅞ "AS VALIDATED".  Read it after
+      `FsDurRefute.v` and `FsDurDefer.v` — it is in their style and it
+      reuses `FsDurRefute.free_pool_at` and `FsDurDefer.dstep_strict` /
+      `commit_conclusion` / `dfr_ledger_order_blind` by name.
+      - **(1) THE POOL AND ITS ALGEBRA — PROVED, and stated over an
+        ARBITRARY per-object reading `R`, which is what makes the repair
+        below free.**  Object names `dobj` (four constructors, the shape of
+        the deleted `FsObjType.fsobj`, redefined because under this ruling
+        the LOG has no object field at all); values `oval`; a pending entry
+        `dpend R o (x,x') := R o x ==∗ R o x'` — it mentions the object and
+        two values and NOTHING else, which is what retires 3a′'s wall (B)
+        (no `∀ Dc`) and 3a-def's wall (no cross-op obligation).
+        (a) `dpool_deposit` (the `∗`-extension) and `dobj_modular_deposit`
+        (a whole op's entries at once; map disjointness is the ENTIRE
+        interface).  (b) `dpool_recompose` — the second writer's fupd
+        composes sequentially onto the entry, at deposit time.
+        (c) `dpool_commute`/`_res`, and `dobj_3adef_scenario_handled` is
+        the whole 3a-def scenario in one statement: **conjunct (1) IS
+        `FsDurDefer.dfr_ledger_order_blind` applied unchanged** (same
+        ledger), (2) same pool, (3) same final values, (4) **same final
+        block BYTES** — the conjunct the block-level ledger could not have,
+        because there the target was `lm_logged L`, which moves with the
+        write order, and here it is the encoder applied to the objects'
+        values, which does not.  (d) `dpool_run` / `dpool_run_frame` (the
+        ONE quiescence composition), instantiated concretely at the shared
+        bitmap block by `dpool_run_bitmap_alloc` / `_free` off
+        `FsStateBitmap`'s own two movers, so the schema is not vacuous.
+      - **(1′) THE ONE REFUTATION: the ruling's object NAMES are right and
+        the natural RESOURCE READING of the bit object is not.**
+        `FsStateBitmap.pool_elt` makes a clear bit own the block, so a
+        `balloc` MOVES the block from `DBit b` to `DBlk b` — and the pool
+        composes its entries by `∗`, which cannot thread a resource out of
+        one entry's conclusion into another's premise.  Machine-checked:
+        `dres_bit_blk_excl` (the two objects cannot both hold it),
+        `dres_map_alloc_incoherent` (the allocating op's own value
+        assignment is contradictory), `dres_blk_forces_source`
+        (`step_forces_the_element` at one block: the missing resource
+        cannot be conjured by the entry that needs it).
+        **THE REPAIR IS ONE LINE OF THE READING** — `dres_flat` makes the
+        bit object RESOURCE-FREE and gives every block its own `DBlk`
+        object, free or allocated (`dpend_flat_bit` is then trivially
+        satisfiable at both values; `dres_flat_orphan_home` is the block's
+        home).  **PRICE:** the durable free pool becomes 3a′ §C's
+        explicit-set pool at the FULL block set (`free_pool_at_full`), so
+        `FsStateBitmap.free_pool_used` (xv6's `panic("freeing free
+        block")`) is not a durable theorem — which 3a-def already priced at
+        ZERO, that argument being consumed on the ERA side; what is left is
+        the per-BATCH endpoint condition at the commit.  **PAYOFF:**
+        3a-def's ORPHANED BLOCK has a durable home at every instant, which
+        is the wall the ruling was written to clear.
+      - **(2) THE ENCODE BRIDGE — PROVED, at both shared block kinds.**
+        The writer's read-modify-write fact is `FsBlocks.blk_splice`.
+        Bitmap: `bm_blk_write` (one byte spliced), `bm_blk_write_enc` (the
+        spliced block IS `bm_bytes` of the new used set, off
+        `BitmapEnc.bm_bytes_set`/`_clear`), `bm_new_byte_code` (the byte
+        spliced is the one `bp->data[bi/8] |= m` / `&= ~m` actually
+        stores — without it the maintenance would be about a byte nobody
+        writes), `bm_vals_write` (only the writer's bit's value moves).
+        **THE KILLER SCENARIO, BOTH ORDERS**: `bm_two_ops_order_free` (A
+        sets bit `i`, B clears bit `j`, `i ≠ j`) — after each write the
+        invariant holds, and the two targets are the same SET hence the
+        same BYTES.  Inode block: `di_blk_write`, `di_blk_write_enc`,
+        `di_vals_write`, `di_two_slots_order_free` (A writes slot `k`, B
+        slot `k′`).  Non-vacuity is checked at witnesses:
+        `dobj_wit_bm_same_byte` runs the scenario at bits **0 and 1 — the
+        SAME BYTE** of the bitmap block, the hardest instance, and it is
+        still order-free.
+      - **(3) THE CLOSE — PROVED.**  `dobj_close`: `D' = lm_logged L cov ls`
+        at HOME MAPS from "every home block's bytes are its objects' final
+        values encoded" on both sides; `dobj_close_dstep` reads it into
+        `FsDurDefer.commit_conclusion`.  MODULARITY: `dobj_modular_deposit`
+        plus the file's §2d audit note — **no lemma in `FsDurObj.v`
+        quantifies over the ledger, over another op, or over a durable byte
+        map, except the one quiescence composition `dpool_run`/`_frame`
+        (and `dobj_close`, a pure equation between two block maps).**
+      - **(4) THE ERA-SIDE WITNESS, as the implementation lane's interface
+        requirement** (§5 of the file).  Recomposition needs the second
+        writer to KNOW the first's pending target `x′`; what the era side
+        must hand it is **a HALF of a per-object `ghost_var` at the
+        object's current pending value** (`obs γ x := ghost_var γ (1/2) x`;
+        `γobs : dobj → gname`, a PARAMETER, not a config class).  Three
+        obligations: mint the pair at the object's committed value on first
+        touch; hand every era-side write a half at the value it INSTALLED,
+        travelling with whatever already serializes writes to that object
+        (buffer lock / inode-region invariant / bitmap invariant — no new
+        serialization); present it at `end_op`.  `dpool_recompose_era` is
+        that as a term — `⌜y = x′⌝` is a CONCLUSION read off agreement, not
+        a hypothesis — and `dpool_recompose_era_blind` is the DEPOSITOR's
+        form, in which the entry's start value and the earlier writer's
+        target are both EXISTENTIAL: the client knows only that the object
+        is in the pool, which it knows because it holds the receipt.
+      - **FOR RELOCATION** (both are pure facts, both marked in-file):
+        `blk_splice_one` (a one-byte splice IS a list insert) → `FsBlocks.v`
+        beside `blk_splice_whole`; `diblk_bytes_splice_pure` →
+        `DinodeEnc.v`, with `InodeRegion.diblk_bytes_splice` (the same
+        statement) deleted in the same move — it lives there only because
+        that is where `FsBlocks` and `DinodeEnc` first met, and a validation
+        leaf has no business on `IcacheRef`/`EscrowDefs`' cone.
+      - Nothing else moved.  `P_wf`'s body is still `LogDefs.fs_dview`, none
+        of the eleven suppliers moved, and `op_entry`/`log_state`/
+        `SpecLogWrite`/`SpecEndOp` are untouched.  Audit at the three-entry
+        baseline.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

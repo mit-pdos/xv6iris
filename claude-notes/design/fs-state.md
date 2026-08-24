@@ -564,6 +564,127 @@ pending-pool algebra incl. same-object recomposition; the encode-bridge's
 per-write maintenance at the shared bitmap under two interleaved ops; the
 quiescence composition.  Then the implementation lane.
 
+### 4⅞a. AS VALIDATED (3a-val): the ruling STANDS, with one repair to the
+### bit object's RESOURCE reading and one interface obligation on the era
+
+`iris/FsDurObj.v` carries every claim below as a COMPILED LEMMA, in
+`FsDurRefute`/`FsDurDefer`'s shape (statements about what a resource can
+say, not proof difficulties).  Every stated theorem prints `Closed under
+the global context`.  Nothing in the tree moved; `P_wf`'s body is still
+`LogDefs.fs_dview` and the eleven suppliers are untouched.
+
+**THE VOCABULARY.**  `dobj` = `DRec b k` | `DBit b` | `DSlot i` | `DBlk b`
+— the shape of the deleted `FsObjType.fsobj`, redefined in the FS band
+because under this ruling the LOG has no object field at all.  A geometry
+record `dgeom` (bitmap block, inode start) is read by ONE kind:
+`dres_geom_irrel` says `DRec`/`DBit`/`DBlk` name their home block in the
+object itself, and only `DSlot` reads `dg_ist` — the asymmetry
+`FsStateInode.rec_owned_at` was factored for.  `dobj_home_slot` ties slot
+`k` of inode block `bi` to inum `16·bi+k`, so the encode bridge is a
+per-HOME-BLOCK invariant.
+
+**THE ALGEBRA IS BLIND TO THE RESOURCE READING, and that is load-bearing.**
+`dpend R o (x,x')` is `R o x ==∗ R o x'` and every law is stated over an
+arbitrary `R`.  Deposit `dpool_deposit`; batch deposit
+`dobj_modular_deposit` (disjointness of the two maps is the ENTIRE
+interface — decision 3's tractability requirement, discharged);
+recomposition `dpool_recompose`; commutation `dpool_commute`/`_res`;
+quiescence `dpool_run`/`dpool_run_frame`, with a CONCRETE instance at the
+shared bitmap (`dpool_run_bitmap_alloc`/`_free`, off `FsStateBitmap`'s own
+`bitmap_alloc`/`bitmap_free`).  **`dobj_3adef_scenario_handled` is §4¾a's
+wall scenario in one statement**, and its FIRST conjunct is
+`FsDurDefer.dfr_ledger_order_blind` applied unchanged: same ledger, same
+pool, same final values, **and the same final block BYTES** — the conjunct
+the block-level ledger could not have, because its target `lm_logged L`
+moves with the write order and the encoder of the objects' values does
+not.  That is decision 1, validated.
+
+**THE ONE REFUTATION, AND IT IS INSIDE DECISION 1.**  The object NAMES are
+right; `FsStateBitmap.pool_elt`'s reading of the BIT object is not.  A
+clear bit owns the block, so a `balloc` MOVES the block from `DBit b` to
+`DBlk b`, and the pool composes its entries by `∗`, which cannot thread a
+resource out of one entry's conclusion into another's premise.  Three
+lemmas: `dres_bit_blk_excl` (the two objects cannot both hold it),
+`dres_map_alloc_incoherent` (the allocating op's own value assignment is
+CONTRADICTORY under this reading), `dres_blk_forces_source`
+(`step_forces_the_element` at one block — the missing resource cannot be
+conjured by the entry that needs it).
+
+**THE REPAIR IS ONE LINE OF THE READING.**  `dres_flat` makes the bit
+object RESOURCE-FREE and gives every block its own `DBlk` object, free or
+allocated.  The bit then promises only a VALUE — which is all the encoder
+ever reads off it — and no ownership crosses an object boundary at a
+`balloc` or a `bfree` (`dpend_flat_bit` is trivially satisfiable at both
+values; `dres_flat_orphan_home` is the block's home).  The repair costs the
+algebra nothing, because the algebra never unfolds `R`.
+- **PRICE:** the durable free pool becomes §4½a (C)'s explicit-set pool at
+  the FULL block set (`free_pool_at_full`), so `FsStateBitmap.free_pool_used`
+  — "you own this block, therefore its bit reads allocated", which kills
+  xv6's `panic("freeing free block")` — is not a durable theorem.  §4¾a
+  already priced that at ZERO: the argument is consumed on the ERA side,
+  which keeps the coupled pool.  What is left durably is the per-BATCH
+  endpoint condition at the commit.
+- **PAYOFF:** §4¾a's ORPHANED BLOCK has a durable home at every instant.
+  That wall — "after the evicting writer's bitmap step the block is marked
+  USED, so the pool gives nothing at it and no inode names it yet" — is
+  exactly what the flat reading removes.  **So the repair is not a
+  concession; it is the thing that clears the wall the ruling was written
+  for**, and it also settles §4¾a's "consequence 4 is wrong": the
+  explicit-pool relaxation IS needed, and it arrives as the durable
+  instance's resource reading rather than as a second predicate.
+
+**THE ENCODE BRIDGE (decision 4) — validated at both shared block kinds.**
+The writer's read-modify-write fact is `FsBlocks.blk_splice`.  Bitmap:
+`bm_blk_write` splices ONE byte; `bm_blk_write_enc` says the spliced block
+IS `bm_bytes` of the new used set (off `BitmapEnc.bm_bytes_set`/`_clear`);
+`bm_new_byte_code` says the byte spliced is the one `bp->data[bi/8] |= m` /
+`&= ~m` actually stores — without it the maintenance would be about a byte
+nobody writes; `bm_vals_write` says only the writer's bit's value moves.
+`bm_two_ops_order_free` is A-sets-`i` / B-clears-`j`, `i ≠ j`, BOTH orders:
+the invariant holds after each write and the two targets are the same SET
+hence the same BYTES.  Inode block: `di_blk_write_enc`, `di_vals_write`,
+`di_two_slots_order_free`.  Non-vacuity is checked at witnesses, and
+`dobj_wit_bm_same_byte` runs the scenario at bits **0 and 1 — the SAME BYTE
+of the bitmap block**, which is the hardest instance and is still
+order-free.
+
+**THE CLOSE.**  `dobj_close`: `D' = lm_logged L cov ls` at HOME MAPS, from
+"every home block's bytes are its objects' final values encoded" on both
+sides; `dobj_close_dstep` reads it into `FsDurDefer.commit_conclusion`.  No
+`fs_restrict` arithmetic outside `lm_logged`'s own definition.
+
+**THE MODULARITY THEOREM, and the audit that backs it.**  A client deposits
+with `dobj_modular_deposit`; the file's §2d audit note records that **no
+lemma in `FsDurObj.v` quantifies over the ledger, over another op, or over
+a durable byte map, except the ONE quiescence composition
+`dpool_run`/`dpool_run_frame`** (and `dobj_close`, a pure equation between
+two block maps).
+
+**WHAT THE ERA SIDE MUST HAND OVER (the implementation lane's interface
+requirement, and it is not hand-waved).**  Recomposition needs the second
+writer to KNOW the first's pending target `x′`.  The witness is **a HALF of
+a per-object `ghost_var` at the object's current pending value** —
+`obs γ x := ghost_var γ (1/2) x`, with `γobs : dobj → gname` a PARAMETER
+(not a new config class; the standing rule for a ghost var in this tree).
+Three obligations: (i) mint the pair at the object's committed value on the
+batch's first touch of it; (ii) every era-side write of the object hands
+the writer a half at the value it INSTALLED — so the half travels with
+whatever already serializes writes to that object (the buffer lock for a
+block, the region invariant for a slot, the bitmap invariant for a bit) and
+NO new serialization is introduced; (iii) at `end_op` the depositor
+presents its half and its move.  `dpool_recompose_era` is (iii) as a term —
+`⌜y = x′⌝` is a CONCLUSION, read off agreement, not a hypothesis — and
+`dpool_recompose_era_blind` is the DEPOSITOR's form of it, in which the
+entry's start value and the earlier writer's target are both EXISTENTIAL:
+the client knows only that the object is in the pool, which it knows
+because it is holding the receipt.  `dpool_tied` is the pool carrying the
+ledger-side halves.
+
+**FOR RELOCATION** (both pure, both marked in-file): `blk_splice_one` (a
+one-byte splice IS a list insert) → `FsBlocks.v` beside `blk_splice_whole`;
+`diblk_bytes_splice_pure` → `DinodeEnc.v`, deleting
+`InodeRegion.diblk_bytes_splice` (the same statement) in the same move.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
