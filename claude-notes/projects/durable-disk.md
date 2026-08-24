@@ -2309,6 +2309,92 @@ this stage or 2c's body.**
         `Psi_dec` is pure and PERSISTENT, so ONE opening suffices and
         nothing has to be spent — but it is real work in a 2748-line file
         and it is what the next lane should size first.
+- [ ] **3c. THE FLIP under the STRUCTURED-BODY ruling: the FOLD THEOREM
+      LANDS, the ruling closes, and the geometry does NOT die.**  The
+      lane's product is `iris/FsDurLedger.v` (one `_CoqProject` row, no
+      existing statement moved, every lemma `Qed`, five stated theorems all
+      `Closed under the global context`); the design account is
+      `fs-state.md` §5′ and `crash.md`'s 3c paragraph.  **`P_wf`'s body is
+      still `LogDefs.fs_dview`, none of the nine suppliers moved, and
+      `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash`/`ProofInitlog` are
+      untouched** — the flip is one green checkpoint (the ordering ruling)
+      and the lane was STOPPED at its first green by the orchestrator,
+      pending the owner's revision of the COMMIT-SIDE design (a
+      two-invariant split that may make a genuinely fupd-based commit spec
+      sound and supersede the pure-ledger payload).  Whole tree green;
+      audit at the three-entry baseline.
+      - **NO STRUCTURAL WALL: the ruling closes.**  The fold theorem
+        `dled_fold_body` is
+        `dgeo_ok Γd S → dbytes_tot D0 →
+         dled_run Γd le (MkDCfg S ∅ ∅ D0) (MkDCfg S' ∅ ∅ Dc) →
+         ghost_map_auth g 1 (fs_dbytes D0) -∗ dbody g Γd S ==∗
+         ghost_map_auth g 1 (fs_dbytes Dc) ∗ dbody g Γd S'`,
+        one induction over the ledger inside ONE basic update, and
+        `dled_dstep` is the same at the existentially-stated body.
+      - **THE BYTE WORKHORSE IS WHY §4's FIRST WALL IS GONE.**
+        `dbytes_range_update` moves the durable byte authority at ONE byte
+        RANGE of ONE home block against the ownership of exactly that
+        range (`ghost_map_update_big` + the pure `map_seqZ_splice` /
+        `fs_dbytes_splice`).  The authority is never moved wholesale, so
+        `P_wf` needs NO completeness clause and NO byte bin, and a home
+        byte the body does not own (xv6's boot block) is simply outside
+        every entry.
+      - **THE INTERMEDIATES ARE HYPOTHESES, NOT PREDICATES.**  `dcfg`
+        carries two HANDS — blocks and link tokens in transit — that are
+        empty at both ends of the ledger and that no definition outside the
+        file mentions.  3a-def's orphaned block and 3a-val's bit/blk
+        exclusion were walls only because each intermediate had to be
+        something a client could hold.
+      - **THE ONE THING THE RULING DID NOT PRICE: three GEOMETRY EQUATIONS,
+        so `fdn_bmap`/`fdn_ist`/`fdn_nin` are NOT dead.**
+        `FsDurLedger.dgeo_ok` is `sb_bmapstart (fss_sb S) = fdn_bmap Γd`,
+        `sb_inodestart (fss_sb S) = fdn_ist Γd`, and
+        `∀ i, 0 ≤ i < fdn_nin Γd → is_Some (fss_inodes S !! i)`.  The first
+        two turn a writer's block number into the existentially-bound
+        state's own geometry; the third is §4½ (2)'s per-inum EXISTENCE
+        witness and is underivable in BOTH directions — the durable inode
+        map's DOMAIN is not a function of the byte map (a state with fewer
+        inodes owns fewer bytes and no `ghost_map` agreement refutes it)
+        and not a function of the superblock (`FsCfgBoot.img_nodes` is at
+        `region_inums nib` while `sb_ninodes ≤ 16·nib`).  This is NOT the
+        rejected kinds tie — no per-block role, no quantifier over
+        admissible states, no supplier obligation at a kind — and 3b''s
+        three era-side carriers stand unchanged.
+      - **THE LEDGER AS LANDED.**  `dent` = `DeRec i n' gh` (the record
+        move: `fs_state_inode_acc` + `inode_phi_rec_move` + the ghost half;
+        a 64-byte splice at the inum's own slot) and `DeBlk i k bs'` (one
+        data block: `inode_phi_blk_move`).  `gh` is where xv6's
+        entanglement lives: `GSame` (which is ALSO the bare move — both
+        bare records have `nlink = 0` and no entries, so there is no fourth
+        constructor), `GMint` (`nlink + 1`, the token to the hand:
+        `create`'s `ip->nlink = 1; iupdate(ip)`) and
+        `GIns k0 s z tokened` (the size grows over a record the data write
+        already placed, so one entry becomes visible and takes a token:
+        `dirlink`'s `writei` tail, through `ent_toks_insert`).
+      - **WHAT IS NOT LANDED** — each is one constructor plus one case of
+        `dent_step_res`, not a design question: the bitmap moves
+        (`bitmap_alloc`/`bitmap_free` at the hand of blocks), attach/detach
+        (`inode_phi_blk_add`, `inode_phi_trunc`), the indirect block,
+        `GBurn`/`GDel`, and the one shape needing care — a `GMint`/`GBurn`
+        at a node whose entry map is NOT empty, where `fn_orphan` flips and
+        the dot entries' exemption moves with it (`ent_tok_orph_up`;
+        `mkdir`'s child is the case).
+      - **NOT STARTED** (the lane stopped before the payload): the payload
+        `Ψ D₀ Dc := ⌜∃ ledger, coherent D₀ Dc ledger⌝`, the two log laws,
+        `ProofLogWrite`'s block-local tie, the nine suppliers' ledger
+        extensions, `P_fs`'s flip, `P_fs_alloc`, `ProofInitlog`, the mknod
+        arm and the spike theorem.  The deletions the ruling orders
+        (`kinds_of_state`, `dwire_geom`, `P_wf_dec`, `Psi_dec` and their
+        families in `FsDurWire.v`; `log_psi_step`, `log_psi_write`,
+        `log_psi_write_rebase`, `fs_dstep_rebase`) were NOT made: they are
+        live and their consumers compile.
+      - **THE SPIKE THEOREM, the standing ratification, QUOTED verbatim as
+        the target it remains:**
+        > `ProofSysMknod` keeps the `made` clause; prove `mknod_durable` —
+        > over the commit event: the receipt's `D'` satisfies `D' = L` at
+        > home maps and `D'`'s inode block decodes at `islot inum` to
+        > `create_made ty major minor` and the parent-dir block contains
+        > `(name, inum)`; `Closed under the global context`.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

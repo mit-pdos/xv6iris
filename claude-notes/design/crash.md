@@ -553,6 +553,27 @@ supplier already carries" NOT existing — is the equation tying its own
 (the layout half, which names only the ambient record), `bitmap_inv` and
 `ireg_inv`, one conjunct each, all three minted at `fs_cfg_alloc`.
 
+**THE KINDS DESIGN IS REJECTED, AND THE STRUCTURED BODY NEEDS THE SAME
+THREE NUMBERS ANYWAY (3c, `iris/FsDurLedger.v`).**  Under the owner's
+STRUCTURED-BODY ruling (`fs-state.md` §5') `kinds_of_state`, `dwire_geom`
+and the whole role-proving family go, and `P_wf` is `fs_state Gamma_D S`
+with the durable top map's authority and every one of its fragments.  The
+byte authority is then moved only where the body demonstrably owns the
+bytes -- `FsDurLedger.dbytes_range_update`, one `ghost_map_update_big` at
+ONE byte range of ONE home block -- so `P_wf` needs no completeness clause
+and no byte bin, and a home byte nobody owns (xv6's boot block: marked
+used, named by no inode) is simply outside every entry.  What survives of
+the geometry is `fdn_bmap` / `fdn_ist` / `fdn_nin` as THREE EQUATIONS ON
+THE BODY (`FsDurLedger.dgeo_ok`): the first two turn a writer's block
+number into the existentially-bound state's own geometry, and the third is
+per-inum EXISTENCE, which is underivable in both directions -- the durable
+inode map's DOMAIN is not a function of the byte map (a smaller state owns
+fewer bytes and no agreement refutes it) and not a function of the
+superblock either (the domain is `region_inums nib`, while
+`sb_ninodes <= 16*nib`).  So `fs_dur_names`' three fields stay, the three
+era-side carriers above stay, and only the third equation reaches a record
+writer.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of

@@ -1013,6 +1013,130 @@ carries it — at a point where `crashN` is openable, or threaded from boot
 as a persistent pure fact.  `Psi_dec` is pure and PERSISTENT, so one
 opening suffices and nothing is spent; it is work, not a wall.
 
+## 5′. RULING (owner, 2026-08-24): the STRUCTURED body, and a PURE per-object DELTA LEDGER folded by the COMMITTER
+
+Issued over 3b's finding that the kinds/geometry tie is degenerate
+(§4⅞c) and 3b''s stop.  The kinds design is REJECTED.  The ruling, verbatim:
+
+> **the durable body stays the STRUCTURED `fs_state Γ_D S`
+> (`FsDurDefer.P_wf_strict` + top auth/fragments): roles are structural,
+> disjointness is ownership, nothing lifted to pure — `kinds_of_state`,
+> `dwire_geom`, the kind map and every role-proving obligation are
+> DELETED.  The payload `Ψ D₀ Dc` is a PURE per-object DELTA LEDGER: for
+> each object the batch touched, (old value, new value, the mover's
+> precondition facts, the byte-splice fact tying that block's byte change
+> to the value change), extended locally by each writer at its AU.  The
+> COMMITTER — holding the whole body with the crash invariant open —
+> constructs the commit step from the ledger by folding the library movers
+> at `Γ_D` inside ONE basic update (intermediates unobservable: no bin, no
+> relaxed pool, no two-owner problem; disjoint-object deltas commute per
+> `FsDurObj`, same-object deltas compose in ledger order, justified by the
+> era serialization that recorded them).**
+
+### 5′a. AS BUILT (3c): the fold theorem stands, and it needs THREE geometry equations
+
+`iris/FsDurLedger.v` carries every claim below as a COMPILED LEMMA, in
+`FsDurRefute`/`FsDurDefer`/`FsDurObj`'s style; the five stated theorems
+print `Closed under the global context`.  Nothing else in the tree moved:
+`P_wf`'s body is still `LogDefs.fs_dview`, the nine suppliers are
+untouched, and `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash`/`ProofInitlog`
+are untouched.
+
+**NO STRUCTURAL WALL.  The ruling closes**, and it closes because the
+committer never moves the byte authority wholesale.
+
+- **THE BYTE WORKHORSE IS THE WHOLE ANSWER TO §4's FIRST WALL.**
+  `dbytes_range_update` moves `ghost_map_auth g 1 (fs_dbytes D)` at ONE
+  byte RANGE of ONE home block, against the ownership of exactly that
+  range, and lands at `fs_dbytes (<[b := blk_splice off nbs bs]> D)`.  It
+  is `ghost_map_update_big` plus one pure map equation
+  (`map_seqZ_splice`: a list splice IS a map union at the spliced range,
+  `fs_dbytes_splice` its reading through the flattening).  Because the
+  authority is only ever touched where the body demonstrably owns the
+  bytes, **`P_wf` needs no completeness clause and no byte bin** —
+  §4's "`P_wf` must state that its body exhausts the durable byte map" was
+  a consequence of `fs_dview_rebase`'s wholesale move, not of the auth.
+  A leaked block (bit set, no inode: xv6's boot block is one) is simply a
+  home byte the body does not own and no entry names.
+- **THE INTERMEDIATES LIVE IN THE FOLD'S OWN CONTEXT.**  `dcfg` carries the
+  state, the durable byte map, and two HANDS — blocks and link tokens in
+  transit.  `balloc`'s block between the bitmap write that takes it out of
+  the pool and the record write that adopts it is a hypothesis of the
+  fold's induction, and so is the `link_tok` `create` mints at
+  `ip->nlink = 1` and spends at `dirlink`.  Both hands are EMPTY at both
+  ends of the ledger and neither predicate escapes the file.  That is
+  3a-def's orphan wall and 3a-val's bit/blk exclusion dissolved: they were
+  walls because each intermediate had to be a predicate someone could
+  hold.
+- **THE FOLD THEOREM**, `dled_fold_body`: `dgeo_ok Γd S` and
+  `dbytes_tot D0` and `dled_run Γd le (MkDCfg S ∅ ∅ D0) (MkDCfg S' ∅ ∅ Dc)`
+  give `ghost_map_auth g 1 (fs_dbytes D0) -∗ dbody g Γd S ==∗
+  ghost_map_auth g 1 (fs_dbytes Dc) ∗ dbody g Γd S'`, and `dled_dstep` is
+  the same at the existentially-stated body.  One induction over the
+  ledger, one basic update, one lemma per entry kind.
+
+**THE ONE THING THE RULING DID NOT PRICE, AND IT IS REAL: the body needs
+THREE GEOMETRY EQUATIONS, so `fs_dur_names`' `fdn_bmap`/`fdn_ist`/`fdn_nin`
+are NOT dead.**
+
+```
+dgeo_ok Γd S := sb_bmapstart (fss_sb S) = fdn_bmap Γd
+             /\ sb_inodestart (fss_sb S) = fdn_ist Γd
+             /\ (∀ i, 0 ≤ i < fdn_nin Γd → is_Some (fss_inodes S !! i))
+```
+
+A ledger entry names its object — an inum, a block — and the committer has
+to FIND that object inside `fs_state Γ_D S` where `S` is existentially
+bound.  Two of the three equations turn the writer's block number into the
+state's own geometry (nothing else relates them: `fss_sb S` is under the
+existential).  The third is §4½ (2)'s per-inum EXISTENCE witness, and it
+cannot be avoided or derived: **the durable inode map's DOMAIN is not a
+function of the byte map** — a state with fewer inodes owns fewer bytes,
+which no `ghost_map` agreement refutes — and it is not a function of the
+superblock either, because the domain is the REGION's inums
+(`FsCfgBoot.img_nodes` at `region_inums nib`, i.e. `[0, 16·nib)`) while
+`sb_ninodes ≤ 16·nib`.  It is immutable, so stating it once is exactly
+right, and `fdn_nin = 16·nib` (3b') is already the number.
+
+This is NOT the rejected kinds/geometry tie: there is no per-block ROLE
+assignment, no `kinds_of_state`, no quantifier over admissible states, and
+no supplier obligation phrased at a kind.  Each equation is ONE number,
+fixed at boot.  3b''s three era-side carriers stand unchanged
+(`log_ctx_at` for the geometry, `BitmapInv.bitmap_inv` for `bmapstart`,
+`InodeRegion.ireg_inv` for `inodestart`/`nib`), and only the third
+(`16·nib = fdn_nin`) is needed by a record writer.
+
+**THE LEDGER AS LANDED.**  `dent` has two constructors, and each is a
+LIBRARY MOVER read at `Γ_D`:
+
+| entry | mover | byte change |
+|---|---|---|
+| `DeRec i n' gh` | `fs_state_inode_acc` + `inode_phi_rec_move` + the ghost half | the 64-byte splice at inum `i`'s own slot |
+| `DeBlk i k bs'` | `fs_state_inode_acc` + `inode_phi_blk_move` | the whole data block at `fn_naddr n k` |
+
+`gh` is the record write's GHOST half, which is where the entanglement
+xv6 creates actually lives: `GSame` (neither `nlink` nor the entry map
+moves — this is also the BARE move, since `ialloc`'s claim box and
+`iput`'s corpse both have `nlink = 0` and no entries, so there is
+deliberately no fourth constructor for them), `GMint` (`nlink + 1`, the
+token to the hand — `create`'s `ip->nlink = 1; iupdate(ip)`), and
+`GIns k0 s z tokened` (the record's SIZE grows over a directory record the
+data write already put in place, so one entry becomes visible and takes a
+token — `dirlink`'s `writei` tail, through `FsStateInode.ent_toks_insert`;
+`tokened` says whether `ent_tokenless` charges for it, so a self record or
+an orphan's dot entry spends nothing).
+
+**WHAT IS NOT LANDED**, and each is one more constructor plus one more
+case of `dent_step_res`, not a design question: the bitmap moves
+(`bitmap_alloc`/`bitmap_free` at the hand of blocks), block attach/detach
+(`inode_phi_blk_add`, `inode_phi_trunc`), the indirect block
+(`inode_phi_ind_move`/`_ind_create`), `GBurn`/`GDel` (the `link_return`
+and `ent_toks_delete` twins of `GMint`/`GIns`), and — the one shape that
+needs care rather than transcription — a `GMint`/`GBurn` at a node whose
+entry map is NOT empty, where `fn_orphan` flips and the dot entries'
+exemption moves with it (`ent_tok_orph_up` is the lemma; `mkdir`'s child
+is the case).  The landed pair covers `mknod`'s non-growing arm.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:

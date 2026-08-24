@@ -65,7 +65,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the durable and logged sides, `inode_owned`/`dir_owned`/`free_bitmap`/
   `fs_state` as nested predicates with link TOKENS and no whole-state pure
   clauses, "in flight, not inconsistent", the debt, the log's FS-agnostic
-  interface, and what it supersedes.
+  interface, and what it supersedes.  §5' is the STRUCTURED-BODY ruling
+  and its as-built: the byte authority is moved only where the body owns
+  the bytes, so `P_wf` needs no completeness clause and no bin, the
+  commit's intermediates are hypotheses of one fold rather than
+  predicates, and the three geometry equations the body does need.
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
   split, the crash-spanning disk invariant.
@@ -146,10 +150,11 @@ first five were audited against the tree 2026-08-22):
   byte-keyed exclusive logged view, the parked payload + two AUs, zero
   placeholder lemmas tree-wide), the `Γ`-predicates (2a), and the in-era
   flip (2b: bitmap, region records, the era payload, link tokens as a
-  counting RA).  IN FLIGHT: 2c-body — `P_wf := fs_view Γ_D`, the real
-  debt, the suppliers' durable steps — then the `sys_mknod` spike, then
-  boot re-founding + delete `Himg` (stage 4).  The byte-view attempt is
-  archived in `completed/durable-disk-byteview.md`.
+  counting RA), and the FOLD THEOREM the durable flip turns on (3c,
+  `iris/FsDurLedger.v`).  IN FLIGHT: the flip itself — `P_wf` is still the
+  flat blob — then the `sys_mknod` spike, then boot re-founding + delete
+  `Himg` (stage 4).  The byte-view attempt is archived in
+  `completed/durable-disk-byteview.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
   (today both carry a clean-image premise), `sys_sync`'s empty
