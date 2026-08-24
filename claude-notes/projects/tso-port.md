@@ -223,6 +223,35 @@ One new file pair on main, semantics untouched:
 - The compat shim: `↦ₘ`(old) ⊣⊢ `wptsto cur_ctx`(new), in ONE file, used
   only at sweep boundaries, deleted at cutover.
 
+## 2b. The mixed tree — one converted proof among unconverted ones (PROTOTYPED)
+
+`iris/TsoCtxShim.v` + `iris/TsoMemsetCtx.v` are the worked answer, on the
+real `memset`. The mechanics:
+
+- A CONVERTED spec differs from its original by exactly three deltas: the
+  ambient `` `{XI : CurCtx}`` binder; `own_context cur_ctx` threaded
+  beside `sie_cap_gpr` (a stopgap conjunct — M2 folds it into the bundle
+  and it disappears from spec text again); the memory footprint stated
+  with `ctx_pointsto … cur_ctx`. Registers, premises, ktier axis,
+  `wp_next` — character-identical. At the spec's `wp_next`, `CID` rebinds
+  and `cur_ctx` does not: the migration-survival property is now VISIBLE
+  in the statement.
+- The converted spec is PROVED FROM the sealed original (`MS : MEMSET`)
+  through the shim: ~10 lines of wand plumbing, memset's own proof
+  untouched. Symmetrically the ORIGINAL spec is re-derived from the
+  converted one — an unconverted caller mints a context on the spot
+  (`own_context_alloc`, free at SC) and loses nothing. And the round
+  trip closes as a MODULE (`MemsetRoundTrip <: MEMSET`), so every
+  existing linker instantiation can take a converted function unchanged:
+  the sweep converts one function at a time, in any order.
+- `TsoCtxShim.v` is the ONLY file allowed to state
+  `ctx_pointsto ξ ⊣⊢ mem_pointsto` (both wand directions + the
+  `[∗ list]` window forms). Its import list IS the tree's live seam
+  inventory (`grep -l TsoCtxShim`), and at cutover the file is deleted:
+  every leftover unconverted boundary and every SC-only context mint
+  becomes a compile error — the remaining worklist, not a soundness
+  hole.
+
 ## 3. Leg M — the main sweeps (each independently landable, main green after each)
 
 Precedents that say this scale of sweep is routine for this tree:

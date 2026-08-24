@@ -55,6 +55,7 @@ PtreeType.v
 Ktier.v
 RiscvPtsto.v
 TsoCtx.v
+TsoCtxShim.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
@@ -336,6 +337,7 @@ SpecMemsetParts.v
 ProofMemset.v
 LinkMemset.v
 SpecMemset.v
+TsoMemsetCtx.v
 WpMemsetArray.v
 LinkMemsetArray.v
 SpecMemsetPage.v
