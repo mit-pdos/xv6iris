@@ -1111,6 +1111,21 @@ Section Witness.
                   (MkFsSb 0 0 0 0 0 0 1 0) sbb u).
   Proof. intros j Hj. cbn [dwire_wit_state fss_sb]. cbn. lia. Qed.
 
+  (* AND THE PAYLOAD IS NOT [True] -- the other half of the hedge check
+     (durable-notes.md, "A HEDGED CONJUNCT IS A FALSE STATEMENT THAT
+     COMPILES").  A block map that is not the home set REFUTES it, so
+     [Psi_dec] really does constrain its index; the same conjunct is
+     [P_wf_dec]'s, so the body is not [True] either. *)
+  Theorem Psi_dec_nontrivial (cov : gset Z) (ls : Z)
+      (D0 : gmap Z (list (bv 8))) :
+    fs_home_set cov ls <> ∅ ->
+    Psi_dec (Σ := Σ) cov ls D0 ∅ ⊢ False.
+  Proof.
+    intros Hne. iIntros "Hpsi".
+    iDestruct "Hpsi" as (S K) "([%Hdom _] & _ & _)".
+    iPureIntro. apply Hne. rewrite -Hdom dom_empty_L //.
+  Qed.
+
 End Witness.
 
 (* the bodies are nests of block-sized big-ops; seal them the day they are
