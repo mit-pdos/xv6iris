@@ -176,6 +176,12 @@ first five were audited against the tree 2026-08-22):
   and real hardware does not, which is exactly what `virtio_disk_intr` reads
   the used element's id for.  §5 is the worklist, and §7 of it is the
   `prim_step` soundness bridge that `HartBlock.v`'s header already defers to.
+- **[`tso-port.md`](projects/tso-port.md)** — PROPOSED plan of record for
+  moving main from SC to operational Ztso semantics: interface-first via a
+  context-indexed ownership surface Σ (inherited from the `weak-memory`
+  branch's `WeakCtx`/`WeakCtxPt`/`WeakCtxLock`), SC-degenerate instances
+  swept onto main while semantics stays SC, the `tso` branch as the standing
+  TSO-satisfiability certificate, cutover swaps only the below-Σ kit.
 - **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
   ghost-state spec for WHICH inode `namei` returns: N-1 through N-5.2B
   (kexec loads `/init` at its entry) are landed; M2 (`dvrt`, the pin through

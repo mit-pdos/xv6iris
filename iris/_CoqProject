@@ -18,6 +18,9 @@ RiscvModelBytes.v
 VirtioModel.v
 DiskImg.v
 DevModel.v
+TsoMem.v
+TsoLitmus.v
+TsoCtxTwin.v
 RiscvLang.v
 HartBlock.v
 HartSwp.v
@@ -51,6 +54,7 @@ WpNext.v
 PtreeType.v
 Ktier.v
 RiscvPtsto.v
+TsoCtx.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
