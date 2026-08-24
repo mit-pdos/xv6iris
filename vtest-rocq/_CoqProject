@@ -1,0 +1,16 @@
+-R . VTest
+-R ../iris xv6iris
+-R ../model-xv6iris Riscv
+-R ../kernel-rocq Kernel
+-arg -w
+-arg -notation-overridden
+VSched.v
+VTest.v
+CoreSmokeGen.v
+CoreSmoke.v
+DiskRwGen.v
+DiskRw.v
+DiskOrderGen.v
+DiskOrder.v
+DiskIntrGen.v
+DiskIntr.v

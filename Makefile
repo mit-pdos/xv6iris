@@ -3,6 +3,10 @@
 #
 #   make            build everything needed for the proofs (== make proofs)
 #   make proofs     compile the Iris proofs (iris/) + their dependencies
+#   make vtest      regenerate the QEMU captures, then check the model
+#                   against them (needs qemu-system-riscv64 + the toolchain)
+#   make vtest-check  check the model against the CHECKED-IN captures only
+#   make vtest-deps build just the ~14 iris/ files vtest needs (not all of iris)
 #   make audit      build, then Print Assumptions on the system theorem
 #   make audit-only the same audit, against an already-built tree
 #   make model      compile the Sail-generated Coq model (model-xv6iris/)
@@ -101,7 +105,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
-        audit audit-only \
+        audit audit-only vtest vtest-check vtest-gen vtest-deps \
         clean clean-proofs distclean model-gen
 
 all: proofs
@@ -269,12 +273,65 @@ audit: proofs
 audit-only:
 	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob SystemAssumptions.v
 
+# ---- 5. vtest: the device semantics, differentially tested against QEMU ----
+#
+# These are NOT proofs.  The question they answer is one-directional -- is
+# what the real hardware did an execution our model ALLOWS? -- so a test only
+# has to EXHIBIT one model execution matching what QEMU produced, which is a
+# computation (a [vm_cast_no_check]d equation), not a WP.  See
+# tools/vtest/README.md and vtest-rocq/VTest.v.
+#
+# TWO TARGETS, and the split matters.  `vtest-gen` RE-RUNS QEMU and rewrites
+# the captured vtest-rocq/*Gen.v; it needs qemu-system-riscv64 and the riscv64
+# toolchain.  `vtest-check` only checks the model against the captures already
+# checked in, so CI (and anyone without QEMU) can run it.  Neither is part of
+# `make proofs`: a red device test is a finding about the model, and it must
+# not break the proof build.
+VTEST := vtest-rocq
+
+# THE CONE vtest ACTUALLY NEEDS -- [RiscvExec] + [DevModel] + [ColdBoot] and
+# their dependencies, fourteen files, NOT all of iris/.  There is no CSL in
+# vtest-rocq: a test exhibits one execution by computation, so it needs the
+# model and the interpreter and nothing above them.  `vtest-deps` builds
+# exactly that (~2 min from cold), which is what keeps a device test from
+# ever being blocked by in-progress proof work elsewhere in the tree.
+#
+# It drives the sub-CoqMakefiles DIRECTLY rather than going through the
+# `kernel-rocq` target, whose prerequisites reach the kernel ELF: the dumped
+# .v are checked in, and vtest has no business rebuilding an image.
+VTEST_CONE := SetShrink FastSetSolver ArchReset RiscvModelBytes VirtioModel \
+              DiskImg DevModel RiscvLang HartBlock PtreeType Ktier \
+              RiscvPtsto RiscvExec ColdBoot
+
+vtest-deps: model $(KDUMP)/CoqMakefile $(IRIS)/CoqMakefile
+	$(RUN) $(MAKE) -C $(KDUMP) -f CoqMakefile -j$(JOBS) \
+	  KernelSyms.vo KernelInstrs.vo KernelData.vo
+	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile -j$(JOBS) \
+	  $(addsuffix .vo,$(VTEST_CONE))
+
+vtest-gen:
+	$(PYTHON) tools/vtest/vtest.py gen --all
+
+$(VTEST)/CoqMakefile: $(VTEST)/_CoqProject
+	cd $(VTEST) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
+
+# The cone this needs is RiscvExec + DevModel + ColdBoot and their
+# dependencies (~20 files), not all of iris/ -- but the iris/ .vo have to
+# exist, so build them the normal way first if the tree is cold.
+vtest-check: $(VTEST)/CoqMakefile
+	$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile -j$(JOBS)
+
+vtest: vtest-gen vtest-check
+
 # ---- cleaning ----
 clean-proofs:
 	-$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile clean 2>/dev/null || true
 	rm -f $(IRIS)/CoqMakefile* $(IRIS)/*.vo $(IRIS)/*.vos $(IRIS)/*.vok $(IRIS)/*.glob $(IRIS)/.*.aux
 
 clean: clean-proofs
+	-$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile clean 2>/dev/null || true
+	rm -f $(VTEST)/CoqMakefile*
+	rm -rf tools/vtest/build
 	-$(RUN) $(MAKE) -C $(MODEL) -f CoqMakefile clean 2>/dev/null || true
 	-$(RUN) $(MAKE) -C $(KDUMP) -f CoqMakefile clean 2>/dev/null || true
 	-$(RUN) $(MAKE) -C $(UDUMP) -f CoqMakefile clean 2>/dev/null || true

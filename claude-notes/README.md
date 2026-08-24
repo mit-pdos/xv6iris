@@ -129,8 +129,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Three remain open (audited against the tree 2026-08-22; each file's top
-banner says precisely what is left):
+Six remain open; each file's top banner says precisely what is left (the
+first five were audited against the tree 2026-08-22):
 
 - **[`durable-disk.md`](projects/durable-disk.md)** — xv6 correctness
   across crashes INCLUDING FS consistency, under RULING 3 (2026-08-23):
@@ -157,6 +157,15 @@ banner says precisely what is left):
   −46 % wall / −61 % `Qed` / −69 % proof term on the reference conversion. The
   file is the mechanical recipe, the traps, and the scoreboard for the
   remaining 214 files.
+- **[`device-conformance.md`](projects/device-conformance.md)** — the
+  device semantics differentially tested against QEMU: one bare-metal image
+  run on both machines, the model side EXHIBITING one execution by
+  `vm_compute` (no WP, no Iris, ~8 ms/instruction).  Landed and green
+  (`make vtest`); it has already found FIVE divergences, one of them an
+  UNSOUNDNESS — the model serves the virtqueue strictly in publication order
+  and real hardware does not, which is exactly what `virtio_disk_intr` reads
+  the used element's id for.  §5 is the worklist, and §7 of it is the
+  `prim_step` soundness bridge that `HartBlock.v`'s header already defers to.
 - **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
   ghost-state spec for WHICH inode `namei` returns: N-1 through N-5.2B
   (kexec loads `/init` at its entry) are landed; M2 (`dvrt`, the pin through

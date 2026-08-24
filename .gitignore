@@ -16,3 +16,12 @@ __pycache__
 /sail-riscv
 /aws/
 *.pem
+
+# vtest build artifacts
+tools/vtest/build/
+vtest-rocq/CoqMakefile*
+vtest-rocq/*.vo
+vtest-rocq/*.vok
+vtest-rocq/*.vos
+vtest-rocq/*.glob
+vtest-rocq/.*.aux
