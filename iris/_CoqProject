@@ -1348,6 +1348,7 @@ ProofForkretPark.v
 LinkForkretParkPaid.v
 CodeSyscall.v
 FsDurBytes.v
+FsDurSnap.v
 FsDurImg.v
 FsDurRefute.v
 FsDurDefer.v
