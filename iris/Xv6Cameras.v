@@ -251,6 +251,10 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
      still live in disk_res (in flight or parked); the fragment is how a
      sleeping rw re-finds its own request (DiskInv.v).  See [dclaim]. *)
   disk_claim_inG :: ghost_mapG Σ nat dclaim;
+  (* THE COMPLETION ORDER: a request's POSITION in the available ring against
+     the USED INDEX its completion was reported at.  Its elements are
+     persistent identification, not ownership (DiskPtsto's [dn_ord]). *)
+  disk_ord_inG :: ghost_mapG Σ nat nat;
   (* the LIVE configuration, frozen: the invariant publishes it as a
      persistent fact so a driver can tie [v_cfg v] to the pages it
      programmed at init (see [disk_cfg]) *)
@@ -265,6 +269,7 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
 Definition diskGhostΣ : gFunctors :=
   #[ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
     mono_natΣ; ghost_varΣ nat; ghost_mapΣ nat dclaim;
+    ghost_mapΣ nat nat;
     GFunctor (dfrac_agreeR (leibnizO virtio_cfg));
     permΣ].
 

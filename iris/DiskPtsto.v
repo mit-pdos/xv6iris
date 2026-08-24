@@ -53,6 +53,15 @@ Record disk_names := DiskNames {
   dn_np    : gname;
   dn_claim : gname;
   dn_cfg   : gname;
+  (* THE COMPLETION ORDER (tools/vtest/README.md finding 5).  A ghost_map
+     from a request's POSITION in the available ring to the USED INDEX its
+     completion was reported at.  The two are different numbers now that the
+     device answers requests in whatever order it finishes them, and the
+     interrupt handler -- which walks used indices -- needs the inverse
+     direction to name the position it is looking at.  Its elements are
+     minted PERSISTENT at the completion: they are pure identification, never
+     ownership, and two of them at one position agree. *)
+  dn_ord   : gname;
   (* the CRASH-PERMIT channel's ghost-map name (PermInv.v): the auth lives in
      [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)

@@ -141,7 +141,7 @@ Section WpVirtio.
   Definition virtio_lease (v : virtio_state) : iProp Σ :=
     (∃ (ctl dma : gmap Arch.pa (bv 8)) (S : gset (bv 16)) (ai : bv 16),
        dma_own dma ∗ ⌜ctl ⊆ dma⌝ ∗
-       ⌜virtio_queue_ok (v_cfg v) ctl (dom dma) S ai (v_seen v)⌝)%I.
+       ⌜virtio_queue_ok (v_cfg v) ctl (dom dma) S ai (v_seen v) (v_ahead v)⌝)%I.
 
   Global Instance virtio_lease_timeless v : Timeless (virtio_lease v).
   Proof. rewrite /virtio_lease. apply _. Qed.
@@ -149,11 +149,11 @@ Section WpVirtio.
   (* The lease depends on the queue CONFIGURATION and on how far the device has
      got, and on nothing else: it rides through any other change to the device
      state.  A driver's INTERRUPT_ACK and QUEUE_NOTIFY writes qualify
-     ([virtio_write_cfg_stable] + [virtio_write_seen]). *)
+     ([virtio_write_cfg_stable] + [virtio_write_seen]/[virtio_write_ahead]). *)
   Lemma virtio_lease_stable (v v' : virtio_state) :
-    v_cfg v' = v_cfg v -> v_seen v' = v_seen v ->
+    v_cfg v' = v_cfg v -> v_seen v' = v_seen v -> v_ahead v' = v_ahead v ->
     virtio_lease v -∗ virtio_lease v'.
-  Proof. intros Hc Hs. rewrite /virtio_lease Hc Hs. iIntros "$". Qed.
+  Proof. intros Hc Hs Ha. rewrite /virtio_lease Hc Hs Ha. iIntros "$". Qed.
 
   (* Before the driver has made the queue live, the device cannot look at the
      ring at all, so the EMPTY lease is already good.  This is what the
@@ -193,9 +193,9 @@ Section WpVirtio.
      for the next request).  Nothing about the queue's contents is re-proved
      here -- that was discharged once, by the driver, when it took the lease. *)
   Lemma virtio_lease_step (v : virtio_state) (m : gmap Arch.pa (bv 8))
-      (mv : vmem) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+      (mv : vmem) (i : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
     mem_view m mv ->
-    virtio_req_step v mv = Some (v', w) ->
+    virtio_req_step v mv i = Some (v', w) ->
     gen_heap_interp m -∗ virtio_lease v ==∗
       gen_heap_interp (w ∪ m) ∗ virtio_lease v'.
   Proof.
@@ -205,7 +205,7 @@ Section WpVirtio.
     assert (Hctlm : ctl ⊆ m) by (etransitivity; [exact Hctl|exact Hsub]).
     assert (Hvctl : mem_view ctl mv)
       by (apply (mem_view_subseteq ctl m mv Hctlm Hview)).
-    destruct (virtio_queue_ok_step v ctl (dom dma) S ai mv v' w Hok Hvctl Hstep)
+    destruct (virtio_queue_ok_step v ctl (dom dma) S ai mv i v' w Hok Hvctl Hstep)
       as (Hdw & Hdisj & Hok').
     iMod (dma_update w m dma Hdw with "Hm Hd") as "[Hm Hd]".
     iModIntro. iFrame "Hm".

@@ -665,6 +665,19 @@ Proof.
   - intro He; injection He as <-; reflexivity.
 Qed.
 
+Lemma virtio_write_ahead (v : virtio_state) (off : Z) (w : bv 32)
+    (v' : virtio_state) :
+  vio_cfg_stable off = true ->
+  virtio_write v off w = Some v' -> v_ahead v' = v_ahead v.
+Proof.
+  unfold vio_cfg_stable. intro H.
+  apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
+    unfold virtio_write; cbv zeta.
+  - (* QUEUE_NOTIFY is accepted at every value now, so there is no guard *)
+    intro He; injection He as <-; reflexivity.
+  - intro He; injection He as <-; reflexivity.
+Qed.
+
 Lemma virtio_write_cfg_stable (v : virtio_state) (off : Z) (w : bv 32)
     (v' : virtio_state) :
   vio_cfg_stable off = true ->
@@ -1498,6 +1511,21 @@ Proof.
   destruct H as [k Hk]. lia.
 Qed.
 
+(* a position is determined by its distance from any other *)
+Lemma vdist_inj (a b c : bv 16) : vdist a b = vdist a c -> b = c.
+Proof.
+  unfold vdist. intro H. apply bv_eq.
+  pose proof (bv_unsigned_in_range _ b) as Hb.
+  pose proof (bv_unsigned_in_range _ c) as Hc.
+  unfold bv_modulus in Hb, Hc. cbn in Hb, Hc.
+  assert (Hd : (bv_unsigned b - bv_unsigned c) `mod` 65536 = 0).
+  { replace (bv_unsigned b - bv_unsigned c)
+      with ((bv_unsigned b - bv_unsigned a) - (bv_unsigned c - bv_unsigned a))
+      by lia.
+    rewrite Zminus_mod, H, Z.sub_diag. reflexivity. }
+  apply Z.mod_divide in Hd; [| lia ]. destruct Hd as [z Hz]. lia.
+Qed.
+
 Lemma bv_unsigned_one16 : bv_unsigned one16 = 1.
 Proof. reflexivity. Qed.
 
@@ -1615,12 +1643,45 @@ Proof.
   rewrite IH by set_solver. by apply vseen_adv_one.
 Qed.
 
+(* ...and with fuel to spare the walk lands in the same place whatever the
+   fuel was: each step consumes one of the served positions, so any bound at
+   or above the set's size is enough. *)
+Lemma vseen_adv_sat (f g : nat) (lo : bv 16) (ah : gset (bv 16)) :
+  (size ah <= f)%nat -> (size ah <= g)%nat ->
+  vseen_adv f lo ah = vseen_adv g lo ah.
+Proof.
+  revert g lo ah. induction f as [|f IH]; intros g lo ah Hf Hg.
+  - assert (Hout : lo ∉ ah).
+    { intro Hin. pose proof (subseteq_size {[lo]} ah ltac:(set_solver)) as Hs.
+      rewrite size_singleton in Hs. lia. }
+    cbn [vseen_adv]. destruct g as [|g]; cbn [vseen_adv]; [reflexivity|].
+    by rewrite (bool_decide_eq_false_2 (lo ∈ ah) Hout).
+  - cbn [vseen_adv]. destruct (decide (lo ∈ ah)) as [Hin|Hout].
+    + rewrite (bool_decide_eq_true_2 (lo ∈ ah) Hin).
+      assert (Hsz : size (ah ∖ {[lo]}) = (size ah - 1)%nat).
+      { rewrite size_difference by set_solver. by rewrite size_singleton. }
+      assert (Hpos : (0 < size ah)%nat).
+      { pose proof (subseteq_size {[lo]} ah ltac:(set_solver)) as Hs.
+        rewrite size_singleton in Hs. lia. }
+      destruct g as [|g]; [lia|].
+      cbn [vseen_adv]. rewrite (bool_decide_eq_true_2 (lo ∈ ah) Hin).
+      apply IH; lia.
+    + rewrite (bool_decide_eq_false_2 (lo ∈ ah) Hout).
+      destruct g as [|g]; cbn [vseen_adv]; [reflexivity|].
+      by rewrite (bool_decide_eq_false_2 (lo ∈ ah) Hout).
+Qed.
+
 (* MARKING position [p] SERVED: add it to the out-of-turn set, then let the
-   watermark absorb whatever prefix of the window that completes.  The fuel
-   is the served set's size, which is what the walk consumes. *)
+   watermark absorb whatever prefix of the window that completes.
+
+   THE FUEL IS SEMANTICALLY INERT.  Advancing the watermark does not change
+   which positions are free ([vseen_adv_free]) -- it only keeps [v_ahead]
+   from carrying positions the window has left behind -- so a walk that
+   stopped early would still be a correct device state.  The bound is the
+   largest queue the transport admits, which no live window can exceed. *)
 Definition vserve (lo : bv 16) (ah : gset (bv 16)) (p : bv 16)
   : bv 16 * gset (bv 16) :=
-  vseen_adv (S (size ah)) lo ({[ p ]} ∪ ah).
+  vseen_adv 1024 lo ({[ p ]} ∪ ah).
 
 Lemma vserve_sub (lo p : bv 16) (ah : gset (bv 16)) :
   (vserve lo ah p).2 ⊆ {[ p ]} ∪ ah.

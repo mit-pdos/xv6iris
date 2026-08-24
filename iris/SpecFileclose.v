@@ -190,7 +190,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
   populate (MkFCloseNames
     [] 0%nat 1%positive 1%positive (1%positive, 1%positive)
     (UartNames 1%positive 1%positive 1%positive 1%positive)
-    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
+    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
                1%positive 1%positive)
     1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)

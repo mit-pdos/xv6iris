@@ -291,7 +291,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
   populate (MkFWriteNames
     [] 0%nat 1%positive
     (UartNames 1%positive 1%positive 1%positive 1%positive)
-    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
+    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
                1%positive 1%positive)
     1%positive 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
