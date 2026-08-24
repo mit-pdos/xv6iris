@@ -2603,7 +2603,8 @@ Section ProofSysOpenBody.
               ltac:(assert (E31 : (2 ^ 31 = 2147483648)%Z)
                       by (vm_compute; reflexivity); lia)
               Hni1 Hni2 Hni3 Hush
-              ltac:(rewrite SpecCreate.T_FILE_value; lia) Hprkc
+              ltac:(rewrite SpecCreate.T_FILE_value; lia)
+              SpecCreate.T_FILE_ty_ok Hprkc
               ltac:(unfold create_units; lia) Hnsb Hj Hgl
               HN5a1 HN5a2 HN5a3 Heb
               with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv Hitab

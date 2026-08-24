@@ -400,6 +400,19 @@ Proof. reflexivity. Qed.
 Lemma T_DEVICE_value : bv_unsigned T_DEVICE = 3.
 Proof. reflexivity. Qed.
 
+(* (L5) at the three literal types the three entries pass.  NAMED rather
+   than spliced at each call site: [ireg_ty_ok_w] is a four-way
+   disjunction and an inline [ltac:] would pick its arm before the
+   argument is unified (durable-disk 2b-inode-3). *)
+Lemma T_FILE_ty_ok : InodeRegion.ireg_ty_ok_w T_FILE.
+Proof. right. right. left. reflexivity. Qed.
+
+Lemma T_DEVICE_ty_ok : InodeRegion.ireg_ty_ok_w T_DEVICE.
+Proof. right. right. right. reflexivity. Qed.
+
+Lemma T_DIR_ty_ok : InodeRegion.ireg_ty_ok_w SpecDirlookup.T_DIR.
+Proof. right. left. reflexivity. Qed.
+
 (* THE RECORD THE NON-DIRECTORY ALLOCATE ARM LEAVES BEHIND: ialloc's
    claimed record with the three halfword stores at +0x90 / +0x94 / +0x9a
    applied, and nothing else -- create never touches size or addrs, and
@@ -574,6 +587,11 @@ Definition wp_create_sconf_body
      is where it has to stand. *)
   16 * Z.of_nat nib <= 2 ^ 16 ->
   bv_unsigned ty <> 0 ->
+  (* durable-disk 2b-inode-3: ialloc's claim box owes the region (L5) --
+     the type it writes is one of the four the enumeration admits.  Stated
+     on the type WORD so this file needs no [SpecIalloc] import; all three
+     entries pass a literal. *)
+  InodeRegion.ireg_ty_ok_w ty ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- THE TWO LEDGERS (see the header) ---- *)

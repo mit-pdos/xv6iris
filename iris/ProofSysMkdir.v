@@ -1195,7 +1195,7 @@ Section ProofSysMkdirBody.
                 N4 (K - 18)%nat eb b lks
                 ltac:(lia) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr
-                (md_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush md_tdir_nz Hpkc
+                (md_plen_lt pk Hpk) Hni1 Hni2 Hni3 Hush md_tdir_nz SpecCreate.T_DIR_ty_ok Hpkc
                 ltac:(unfold create_units; lia) Hnsb Hj Hgl
                 HN4a1 HN4a2 HN4a3 Heb
                 with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv

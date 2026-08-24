@@ -1231,6 +1231,16 @@ Definition ireg_ty_ok (d : dinode) : Prop :=
   \/ bv_unsigned (di_type d) = ireg_file_ty
   \/ bv_unsigned (di_type d) = ireg_dev_ty.
 
+(* ...and (L5) read off the TYPE WORD alone, which is what a contract
+   above [SpecIalloc] can state without naming [ialloc_fresh]
+   (durable-disk 2b-inode-3). *)
+Definition ireg_ty_ok_w (t : mword 16) : Prop :=
+  bv_unsigned t = 0 \/ bv_unsigned t = ireg_dir_ty
+  \/ bv_unsigned t = ireg_file_ty \/ bv_unsigned t = ireg_dev_ty.
+
+Lemma ireg_ty_ok_of_w (d : dinode) : ireg_ty_ok_w (di_type d) -> ireg_ty_ok d.
+Proof. exact (fun H => H). Qed.
+
 Definition ireg_dir_ok (d : dinode) (wd : nat) : Prop :=
   (0 < wd)%nat -> bv_unsigned (di_type d) = ireg_dir_ty.
 
