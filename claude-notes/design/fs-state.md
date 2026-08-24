@@ -249,6 +249,48 @@ region bundle would serve — and (ii) which blocks are in the byte bin, which
 moves per write and therefore belongs in the DEBT's own existential (the
 payload knows what the batch has taken out) rather than in `P_wf`.
 
+## 4½. RULING (owner, 2026-08-24): the WAL exports a HOME VIEW; durable write permission IS the client's fupd
+
+Issued after lane 3a refuted the index-free `P_wf` and the orchestrator's
+indexed-blob alternative.  Three decisions, superseding §4's debt-component
+type and the "completeness" reasoning around it:
+
+1. **Two byte layers, durably as well as in-era.**  The PHYSICAL durable
+   resources (whole disk, log region included: `disk_img_bytes`, `fr_D`'s
+   definition by recovery) are owned by the WAL inside `P_disk`, wholly —
+   auth and fragments; the WAL may move them freely at a commit.  The WAL
+   re-exports a HOME VIEW: the ghost map `γD` (home bytes only — its
+   domain IS the home area) whose AUTH the WAL keeps in `P_disk` beside a
+   WAL-private tie to the physical committed view.  `P_fs`'s statement of
+   recovery and the commit's conclusion are phrased at home maps: the
+   commit concludes `D' = L` with no restriction arithmetic — `fs_restrict
+   …/|home` lives only inside the WAL.
+2. **`P_wf` is the STANDALONE structured predicate over home-view
+   fragments** (`∃ S, fs_state (Γ_D …) S ∗ top auth/fragments ∗ the
+   in-transit bin`), NOT a function of the committed map and NOT a blob.
+   The refutation of wholesale auth movement does not apply because nobody
+   moves the home-view auth wholesale:
+3. **Durable write permission is a client-supplied fupd per written
+   block**, demanded by `log_write`'s AU and composed into the parked
+   debt: "given this block's home-view fragment at its old value,
+   re-establish `P_wf` at the new one" — an ACCESSOR into `P_wf` that the
+   client can write because the block is its own (its inode's record or
+   data block, its bitmap bit, its free-pool member).  The WAL at the
+   commit runs the collected accessors in write order (chain order gives
+   accessor k the `P_wf` transformed by 1..k−1); a block whose fragment
+   the file system dropped is simply UNWRITABLE (no accessor can be
+   supplied), matching the in-era story — no completeness demand exists
+   anywhere.  The payload/debt machinery (the two laws, the second index,
+   the suppliers' threading) SURVIVES with only the component type
+   changed.  Residuals, now local to the accessors: the in-transit bin
+   for mid-chain states; a persistent boot-minted per-inum existence
+   witness so an accessor can name its slot.
+
+Bio/buf reasoning is two-level BY DESIGN: the WAL's internals (header,
+slots, install) use the low-level physical facts; FS clients use the home
+view — the split 1c already made in-era (`fs_bytes` covers exactly the
+home byte range) is the architecture, not an accident.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
