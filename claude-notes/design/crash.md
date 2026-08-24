@@ -574,6 +574,40 @@ superblock either (the domain is `region_inums nib`, while
 era-side carriers above stay, and only the third equation reaches a record
 writer.
 
+**SNAPSHOT COMMITS: THE TRANSPORT IS AN ALLOCATION, AND EVERY RESOURCE
+WALL GOES WITH IT (4, `iris/FsDurSnap.v`).**  Under the owner's SNAPSHOT
+ruling (`fs-state.md` §4⁹) no durable ghost is ever moved: the committer
+ALLOCATES a fresh gname family at the quiescent state's values, proves the
+whole predicate at birth, and discards the previous instance.  So the
+durable step is `P_dur D ==∗ P_dur D'` with the input simply DROPPED, and
+it is derivable from a PURE fact about `D'` alone — no lent authority, no
+`fs_dstep`-shaped byte move, no completeness, no in-transit bin.
+`FsDurSnap.fs_snap_alloc` is the transport: byte map, top map and link
+family in ONE update, gnames existential, inputs the abstract state VALUE
+plus `snap_ok S D`.
+
+The one thing that makes the construction go through is that the
+snapshot's byte points-to is **persistent** (`a ↪□ v`).  With `blk_owned`
+persistent the footprint's pieces are COPIES of the block ledger, so
+`fs_state` is BUILDABLE from a flat byte map; at an exclusive points-to the
+same construction demands "distinct inodes name distinct blocks", a
+cross-inode pure fact that `fs-state.md` §0 forbids and that no per-object
+accumulation supplies.  What the durable instance gives up — `phi_excl` and
+hence `free_pool_used` (xv6's freeing-a-free-block panic) and
+`blk_owned_ne` — is consumed ERA-side only, which 3a-def and 3a-val had
+already priced at zero.  The link family's `● nlink` has no core, so the
+BUNDLE is not persistent; nothing borrows it, because every consumer reads
+the pure `snap_ok`, which is.
+
+WHAT THE SNAPSHOT RULING DOES **NOT** REMOVE, and it is the flip's residual:
+a batch's writes still have to carry the tie from one commit's state to the
+next, and the FRAME half of that (`FsDurSnap.snap_ok_frame`) needs "no
+clause of `snap_ok S` reads block `b`" — a claim about every inode at once.
+At the era it is free (the `∗`, via `blk_owned_ne`); as an accumulated PURE
+fact it is not, and no writer's splice fact supplies it.  So the batch's
+accumulation is still a LEDGER — 3c/3d's, minus its resources and its
+hands.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of

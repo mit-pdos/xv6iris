@@ -2423,6 +2423,85 @@ this stage or 2c's body.**
         > home maps and `D'`'s inode block decodes at `islot inum` to
         > `create_made ty major minor` and the parent-dir block contains
         > `(name, inum)`; `Closed under the global context`.
+- [ ] **4. SNAPSHOT COMMITS: the transport LANDS, and the residual is the
+      batch's PURE FRAME.**  The lane's product is `iris/FsDurSnap.v` (one
+      `_CoqProject` row plus a Γ-generic restatement inside
+      `iris/FsDurBytes.v`; no existing statement moved, every lemma `Qed`,
+      every stated theorem `Closed under the global context`); the design
+      account is `fs-state.md` §4⁹a and `crash.md`'s snapshot paragraph.
+      **`P_fs`'s durable conjunct is still `LogDefs.fs_dview`, none of the
+      nine suppliers moved, and `LogInv`/`SpecLogWrite`/`SpecEndOp`/
+      `FsCrash`/`ProofInitlog` are untouched** — the flip is one green
+      checkpoint (the ordering ruling) and its accumulation half is not
+      closed.  Whole tree green; audit at the three-entry baseline.
+      - **THE TRANSPORT IS AN ALLOCATION, exactly as addendum 5 rules.**
+        `fs_snap_alloc S D : snap_ok S D → ⊢ |==> ∃ g gl gt, <byte auth> ∗
+        <top auth> ∗ <every top fragment> ∗ fs_state (snap_gamma g gl gt)
+        S` — all three families in ONE update, gnames existential, inputs
+        the abstract state VALUE and PURE FACTS and nothing else (no era
+        resource, no previous instance, no authority loan).  Its Γ-generic
+        source-agnostic core is `fs_state_of_ledger`, which stage 4/H1
+        reuses to clone a snapshot onto a fresh era family.  `P_dur D` is
+        the epoch registry and `dsnap_step D D' := P_dur D ==∗ P_dur D'`
+        the commit's step, derivable from `snap_ok S' D'` alone because
+        the old instance is DROPPED (affine).
+      - **THE ENABLING DECISION: the snapshot's byte points-to is
+        PERSISTENT** (ruling (3) allows it).  With `blk_owned` persistent
+        the footprint's pieces are COPIES of the block ledger, so
+        `fs_state` is CONSTRUCTIBLE from a flat byte map; at an exclusive
+        points-to it demands "distinct inodes name distinct blocks", §0's
+        forbidden shape.  The exclusivity given up (`phi_excl`, hence
+        `free_pool_used` and `blk_owned_ne`) is consumed ERA-side only —
+        3a-def and 3a-val priced exactly that at zero.  The BUNDLE stays
+        non-persistent (`● nlink` has no core) and nothing needs it to be:
+        every consumer reads the PURE `snap_ok`, which is persistent.
+      - **THE ENCODER IS NOW INJECTIVE**, which is what turns a durable
+        BYTE fact into a durable INODE fact and is the whole point of the
+        registry over the flat blob: `dinode_bytes_inj` / `rec_in_blk_inj`
+        over `half_bytes_inj` / `word_bytes_inj` / `ind_bytes_inj` and two
+        `bv` byte lemmas off `RiscvModelBytes.bv_eq_of_bytes`.  The
+        readings `snap_ok_rec_of_bytes` / `snap_ok_data` /
+        `dir_entries_of_first`, packaged as `snap_node_is` /
+        `snap_dir_entry` / `snap_slot_holds` with `P_dur_node_of_slot`,
+        ARE the spike theorem's durable half.
+      - **THE RESIDUAL, and it is NOT a resource wall.**  The snapshot
+        ruling vacates every update wall the project met — there is
+        nothing to update — but a batch still has to carry the tie from
+        one commit's state to the next, and the FRAME half
+        (`snap_ok_frame`) needs `snap_untouched S b`: no clause of
+        `snap_ok S` reads block `b`.  That quantifies over every inode of
+        `S`.  At the era it is free (the `∗`, `blk_owned_ne`); as an
+        accumulated PURE fact it is not, and no writer's splice fact
+        supplies it.  **So the accumulation is still a LEDGER (3c/3d's,
+        minus its resources and its hands), and the payload cannot be
+        state-free.**  The shape the next lane should price first:
+        `Ψ D₀ Dc` names the era's abstract state through an OBSERVER half
+        parked beside `γtop_L`'s authority in `ftop_inv` (and the used set
+        beside `bitmap_inv`'s), updated at each write by the writer that
+        already opens those invariants — 3a-val item (4)'s `obs` device,
+        at the state rather than at one object.  The commit then reads the
+        value and the tie there, builds `snap_ok S_L (lm_logged L cov ls)`
+        and hands `dsnap_step` to the permit; NOTE that `S_L` is not a
+        function of `γtop_L` alone — `fss_used` comes from the bitmap
+        invariant and `fss_sb`/`fss_sbb` from the config.
+      - **FOR RELOCATION** (each marked in file): `bv16_eq_of_bytes` /
+        `bv32_eq_of_bytes` → `RiscvModelBytes.v`; `word_bytes_inj` /
+        `ind_bytes_inj` → `BlockWords.v`; `half_bytes_inj` /
+        `dinode_bytes_inj` → `DinodeEnc.v`; `dir_entries_of_first` →
+        `FsStateInode.v`.  They are in the leaf so the lane does not
+        rebuild those files' cones per iteration.
+      - **THE SPIKE THEOREM, the standing ratification, QUOTED verbatim as
+        the target it remains:**
+        > `ProofSysMknod` keeps the `made` clause; prove `mknod_durable` —
+        > over the commit event: the receipt's `D'` satisfies `D' = L` at
+        > home maps and `D'`'s inode block decodes at `islot inum` to
+        > `create_made ty major minor` and the parent-dir block contains
+        > `(name, inum)`; `Closed under the global context`.
+        Its DURABLE half is landed (`P_dur_node_of_slot` plus
+        `snap_dir_entry_of_first`, i.e. the step from `D'`'s bytes to the
+        current snapshot's inode map and its parent's entry map); what is
+        missing is the flip that puts `P_dur` into `P_fs` and the batch
+        accumulation above.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

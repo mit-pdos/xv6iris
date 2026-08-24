@@ -1194,6 +1194,79 @@ Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
 (`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
 and at every commit.
 
+### 4⁹a. AS BUILT (4): the transport is an allocation, the byte points-to
+### is PERSISTENT, and the residual is the batch's PURE FRAME
+
+`iris/FsDurSnap.v` is the ruling's core, Γ-generic and source-agnostic.
+
+- **`snap_ok S D`, the pure tie.**  A state and a committed block map agree
+  at the state's FOOTPRINT: the superblock's block and its parse, the
+  bitmap block at `bm_bytes` of the used set, every free block below the
+  size present, and per inode its range, its `inode_local`, its record's
+  bytes at its own slot (`rec_in_blk`, a SPLIT — the shape a writer's
+  splice fact already has), its data blocks and its indirect block.  Every
+  clause names ONE object.  Three do not, and each is named at its
+  definition: `sk_dom` (the inode map's domain over the region — §4½ (2)'s
+  per-inum existence witness and 3c's third `dgeo_ok` equation, which is
+  BY CONSTRUCTION here since the value is read off the era's own top-map
+  authority), `sk_links` (`✓ link_elem`, §7's "one whole-state fact in the
+  design", carried and never maintained, needed because `own_alloc` needs
+  a valid element), and `sk_bsz` (the log's own row (b) property).
+- **`fs_state_of_ledger Γ S D`** builds the whole nested predicate from
+  `□ blk_ledger Γ D` and `fs_links (γlink Γ) (fss_inodes S)` at ANY Γ.
+- **`fs_snap_alloc S D : snap_ok S D → ⊢ |==> ∃ g gl gt, …`** is the
+  transport, and addendum 5 is landed literally: the byte map, the top map
+  (auth AND every fragment) and the link family in one update, gnames
+  existential, inputs the VALUE and the pure facts and nothing else.
+- **`P_dur D`** is the epoch registry — the CURRENT snapshot at the
+  committed map, family and state existential, so it is a function of `D`
+  alone and drops into `FsCrash.P_fs` with no arity change.  `dsnap_step
+  D D' := P_dur D ==∗ P_dur D'` is the commit's step; `dsnap_step_of`
+  derives it from `snap_ok S' D'` ALONE (the old instance is dropped —
+  affine), and `_id`/`_trans` are its algebra.
+
+**THE ENABLING DECISION, and it is the whole of why the construction
+type-checks: the snapshot's byte points-to is PERSISTENT** (`a ↪[g]□ v`;
+ruling (3) allows it).  With `blk_owned` persistent the footprint's pieces
+are COPIES of the ledger's blocks, so `fs_state` is CONSTRUCTIBLE from a
+flat byte map and no disjointness premise is needed.  At an exclusive
+points-to the same construction demands "distinct inodes name distinct
+blocks", which is §0's forbidden shape and which no per-object accumulation
+can supply.  What the durable instance gives up — `phi_excl`, hence
+`FsStateBitmap.free_pool_used` (xv6's `panic("freeing free block")`) and
+`blk_owned_ne` — is consumed ERA-side only; 3a-def and 3a-val had already
+priced exactly that at zero.  The BUNDLE is nevertheless NOT persistent
+(the link family's `● nlink` has no core) and nothing needs it to be: it
+lives inside `crashN`, nothing borrows it, and every consumer reads the
+PURE `snap_ok`, which is persistent, so a receipt is a copy.
+
+**FROM A DURABLE BYTE FACT TO A DURABLE INODE FACT.**  What the registry
+adds over the flat blob is that the durable side carries an abstract state,
+and crossing to it is injectivity of the encoder — which the tree did not
+have.  `dinode_bytes_inj` (on `dinode_wf` records; the hypothesis is for
+the address array alone) and `rec_in_blk_inj` are landed, over
+`half_bytes_inj` / `word_bytes_inj` / `ind_bytes_inj` and two `bv`-level
+byte lemmas off `RiscvModelBytes.bv_eq_of_bytes`.  On top of them:
+`snap_ok_rec_of_bytes` (the committed map's slot bytes ARE the snapshot
+node's record), `snap_ok_data` (a slot below the size is a block of `D` at
+the node's own reading) and `dir_entries_of_first`, packaged as
+`snap_node_is` / `snap_dir_entry` / `snap_slot_holds` with
+`P_dur_node_of_slot` as the Iris reading.  Those are the SPIKE THEOREM's
+durable half.
+
+**THE RESIDUAL, and it is not a resource wall.**  A batch's writes must
+carry the tie from one commit's state to the next.  The frame half is
+`snap_ok_frame`, and its hypothesis `snap_untouched S b` — no clause of
+`snap_ok S` reads block `b` — quantifies over every inode of `S`.  At the
+era that fact is free (the `∗`, `blk_owned_ne`); as an accumulated PURE
+fact it is not, and no writer's own splice fact supplies it.  So the
+batch's accumulation is still a LEDGER — 3c/3d's, minus its resources and
+its hands, which is exactly what the snapshot ruling did remove.  The
+per-write payload therefore cannot be state-free: `Ψ D₀ Dc` has to name
+the era's abstract state, which means an observer half beside `γtop_L`'s
+authority in `ftop_inv` (and the used set beside `bitmap_inv`'s), updated
+at each write by the writer that already opens those invariants.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
