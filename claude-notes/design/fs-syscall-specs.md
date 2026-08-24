@@ -293,9 +293,23 @@ first instance), not a consumer-visible statement.
    persistent, monotone — batches ≤ b are on disk, so SNAPSHOT's
    boundary is ≥ b.  Sources: `end_op`-was-last-in-group yields
    `flushed (my batch)` AT RETURN — the one synchronous durability xv6
-   has; otherwise it arrives at a later quiescence.  (A future
-   `sys_sync`'s whole spec is "returns `flushed (current batch)`"; one
-   new arm, no redesign.)
+   has; otherwise it arrives at a later quiescence.
+
+   *A future `sys_sync`.*  Its whole spec is "returns `flushed b` for
+   `b` ≥ the batch current at invocation" — one token, no new durable
+   state even here.  DOES IT MAKE THE IN-MEMORY STATE DURABLE?  Yes, in
+   the sense a consumer can use: every carrier held across the call has
+   bound ≤ b, so principle 3 makes each held node durable at its
+   observed value, and SNAPSHOT's boundary moves past the sync point.
+   The honest refinement: the committed snapshot is a DESCENDANT of the
+   invocation-instant state, not necessarily equal to it — closing the
+   current batch also sweeps in deltas other processes linearized
+   between invocation and commit.  Monotone, so nothing a consumer
+   concludes breaks; and it is what real sync means.  Implementation
+   honesty: a naive `begin_op(); end_op()` does NOT meet this spec —
+   with other ops open, `end_op` is not last and commits nothing — so a
+   real `sys_sync` must wait for quiescence (or force a commit); the
+   one-line spec is a real code obligation.
 3. **PER-NODE PERSISTENCE (the only rule most consumers use).**
 
    ```
