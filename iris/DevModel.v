@@ -67,42 +67,103 @@ Lemma dev_addr_false (a : Arch.pa) : dev_bound <= uint a -> dev_addr a = false.
 Proof. intros H. unfold dev_addr. apply Z.ltb_ge. exact H. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. The UART: the 16550 subset xv6 uses.                                 *)
+(* 1. The UART: a 16550, as the board this development runs on has one.    *)
 (*                                                                        *)
 (*    Offsets: 0 RHR(r)/THR(w)/DLL(dlab), 1 IER/DLM(dlab), 2 ISR(r)/FCR(w),*)
-(*    3 LCR, 5 LSR(r).  The FIFOs are modelled as byte lists; [u_out] is   *)
-(*    the observable trace of bytes that have LEFT the UART on the wire    *)
-(*    (what a spec about console output talks about).                      *)
+(*    3 LCR, 4 MCR, 5 LSR(r), 6 MSR(r), 7 SCR.  The FIFOs are byte lists;  *)
+(*    [u_wire] is the trace of bytes that have actually left the chip on   *)
+(*    SOUT -- what a spec about console output talks about -- and [u_out]  *)
+(*    the trace that has left the TRANSMITTER, which is the same thing     *)
+(*    except in loopback mode (see [uart_tx_pop]).                         *)
+(*                                                                        *)
+(*    ALL EIGHT REGISTERS ARE REAL, and five FINDINGS of the conformance    *)
+(*    suite (tools/vtest) are why -- it put the model beside the machine:   *)
+(*    MCR, MSR and SCR used to read as zero and swallow their writes       *)
+(*    (finding 6), the ISR claimed the FIFOs were enabled before anyone    *)
+(*    had enabled them (finding 7) and reported the transmit interrupt as  *)
+(*    a LEVEL that a read could not acknowledge (finding 8), and RHR       *)
+(*    answered 0 on an empty receive FIFO where the receive holding        *)
+(*    register still holds the last byte (finding 23).  Each of those is a *)
+(*    driver the development could not describe: the standard 16550        *)
+(*    PRESENCE TEST is a write to the scratch register and a read-back,    *)
+(*    the standard SELF TEST is MCR's loopback bit, and a driver that      *)
+(*    acknowledges its transmit interrupt by reading the ISR -- rather     *)
+(*    than by feeding the transmitter -- livelocked against the level.     *)
 (* ---------------------------------------------------------------------- *)
 
 Record uart_state := UartState {
-  u_rx  : list (bv 8);   (* receive FIFO; head = next byte RHR returns *)
-  u_tx  : list (bv 8);   (* transmit FIFO; head = next byte to go on the wire *)
-  u_out : list (bv 8);   (* bytes already transmitted (observable output trace) *)
-  u_ier : bv 8;          (* interrupt enable: bit0 rx-avail, bit1 thr-empty *)
-  u_lcr : bv 8;          (* line control; bit7 = DLAB (divisor-latch access) *)
-  u_fcr : bv 8;          (* FIFO control (stored; bits 1/2 clear the FIFOs) *)
-  u_dll : bv 8;          (* divisor latch low *)
-  u_dlm : bv 8;          (* divisor latch high *)
+  u_rx   : list (bv 8);  (* receive FIFO; head = next byte RHR returns *)
+  u_tx   : list (bv 8);  (* transmit FIFO; head = next byte to go out *)
+  u_out  : list (bv 8);  (* bytes the TRANSMITTER has finished with *)
+  u_wire : list (bv 8);  (* ...of those, the ones that left on SOUT *)
+  u_ier  : bv 8;         (* interrupt enable: bit0 rx-avail, bit1 thr-empty *)
+  u_lcr  : bv 8;         (* line control; bit7 = DLAB (divisor-latch access) *)
+  u_fcr  : bv 8;         (* FIFO control; bit0 enables, bits 1/2 clear *)
+  u_dll  : bv 8;         (* divisor latch low *)
+  u_dlm  : bv 8;         (* divisor latch high *)
+  u_mcr  : bv 8;         (* modem control (bits 4:0); bit4 = LOOP *)
+  u_scr  : bv 8;         (* scratch: a byte of storage with no semantics *)
+  u_rbr  : bv 8;         (* receive holding register: the last byte in *)
+  u_thri : bool;         (* the transmit interrupt LATCH *)
 }.
 
+(* The FIFOs are 16 deep, which is what FCR bit 0 switches ON; with the FIFOs
+   disabled a real 16550 has a one-byte holding register at each end.  The
+   model keeps the 16-deep lists in both modes and lets FCR bit 0 decide only
+   what the ISR reports (bits 7:6), what an FCR write flushes, and what a read
+   of an empty RHR answers.  The difference is invisible to a driver that
+   polls, xv6 enables the FIFOs in [uartinit] before anything is transmitted,
+   and the direction is the safe one: the model ACCEPTS more host input than
+   the hardware does, never less. *)
 Definition uart_fifo_depth : nat := 16%nat.
 
 Definition byte0 : bv 8 := Z_to_bv 8 0.
 
-(* register fields *)
+(* -- register fields -- *)
+
 Definition uart_dlab (u : uart_state) : bool := Z.testbit (bv_unsigned (u_lcr u)) 7.
+
+(* FCR bit 0: the FIFOs are enabled.  Read by the ISR's bits 7:6, by the
+   flush-on-toggle rule in [uart_write], and by RHR on an empty FIFO. *)
+Definition uart_fifo_en (u : uart_state) : bool :=
+  Z.testbit (bv_unsigned (u_fcr u)) 0.
+
+(* MCR bit 4: LOCAL LOOPBACK.  The transmitter's output is disconnected from
+   SOUT and wired to this UART's own receiver instead, and the four modem
+   OUTPUTS are wired to the four modem INPUTS ([uart_msr]).  This is the
+   standard way to self-test a 16550, and the only way to exercise the
+   receive path on a port nobody is typing at. *)
+Definition uart_loopback (u : uart_state) : bool :=
+  Z.testbit (bv_unsigned (u_mcr u)) 4.
+
 Definition uart_rx_ready (u : uart_state) : bool :=
   match u_rx u with [] => false | _ => true end.
 (* transmit holding register / FIFO empty (LSR bit 5, and TEMT bit 6) *)
 Definition uart_thre (u : uart_state) : bool :=
   match u_tx u with [] => true | _ => false end.
 
-(* the two interrupt conditions, and the UART's (level) interrupt output *)
+(* The two interrupt conditions, and the UART's (level) interrupt output.
+
+   RECEIVE is a LEVEL: data ready, and IER bit 0.  (A real 16550 with the
+   FIFOs on compares the queue length against FCR's trigger level and adds a
+   character-TIMEOUT interrupt for a queue that never reaches it.  The model
+   triggers at one byte, which IS the trigger level xv6 and every conformance
+   test select -- FCR bits 7:6 clear -- and which everywhere else errs toward
+   more interrupts, never fewer.)
+
+   TRANSMIT is a LATCH, [u_thri].  It is SET when the transmitter falls idle
+   -- the last queued byte leaves, or an FCR write clears the FIFO -- and
+   when IER bit 1 is written while it is already idle, since there is no
+   later edge to arm it then.  It is CLEARED by a THR write (the transmitter
+   is busy again) and by the ISR read that REPORTS it, which is the 16550's
+   acknowledgement.  It used to be the level [uart_thre] here, and that is
+   finding 8: two ISR reads in a row both answered "THRE pending" where the
+   machine's second read says the interrupt is gone, so a driver that
+   acknowledges by reading the ISR could not be verified against the model. *)
 Definition uart_rx_int (u : uart_state) : bool :=
   Z.testbit (bv_unsigned (u_ier u)) 0 && uart_rx_ready u.
 Definition uart_tx_int (u : uart_state) : bool :=
-  Z.testbit (bv_unsigned (u_ier u)) 1 && uart_thre u.
+  Z.testbit (bv_unsigned (u_ier u)) 1 && u_thri u.
 Definition uart_irq (u : uart_state) : bool := uart_rx_int u || uart_tx_int u.
 
 (* LSR: bit0 = data ready, bit5 = THR empty, bit6 = transmitter idle.
@@ -111,63 +172,145 @@ Definition uart_lsr (u : uart_state) : bv 8 :=
   Z_to_bv 8 ((if uart_rx_ready u then 1 else 0)
              + (if uart_thre u then 0x60 else 0)).
 
-(* ISR: bit0 = NO interrupt pending (inverted); bits 3:1 = id (rx-avail 0b010
-   at bits 2:1 -> 0x04; THRE -> 0x02); bits 7:6 = FIFOs enabled.  NOTE: we
-   model the THRE interrupt as a LEVEL (pending while the FIFO is empty and
-   IER bit1 is set); the real 16550 latches it and clears it on an ISR read.
-   The level model is simpler and only produces MORE interrupts, which a
-   correct driver (xv6's uartintr) already tolerates. *)
+(* ISR: bit0 = NO interrupt pending (inverted); bits 3:1 = the id of the
+   highest-priority pending interrupt (receive 0b010 at bits 2:1 -> 0x04,
+   THRE -> 0x02); bits 7:6 = the FIFOs are enabled, which is FCR bit 0 --
+   and not, as it used to be here, a constant (finding 7). *)
 Definition uart_isr (u : uart_state) : bv 8 :=
-  Z_to_bv 8 (0xc0 + (if uart_rx_int u then 0x04
-                     else if uart_tx_int u then 0x02
-                     else 0x01)).
+  Z_to_bv 8 ((if uart_fifo_en u then 0xc0 else 0)
+             + (if uart_rx_int u then 0x04
+                else if uart_tx_int u then 0x02
+                else 0x01)).
+
+(* ...and THIS is the read that acknowledges the transmit interrupt: the one
+   whose reported id is THRE, i.e. nothing of higher priority is pending. *)
+Definition uart_isr_thri (u : uart_state) : bool :=
+  negb (uart_rx_int u) && uart_tx_int u.
+
+(* MSR: the four modem inputs (bits 7:4 = DCD, RI, DSR, CTS) over the four
+   DELTA bits (3:0) that a read clears.  This board's port has no modem
+   cable: its inputs sit at the idle-asserted level the machine reports
+   (DCD|DSR|CTS) and never move, so no delta bit can ever be set and the
+   read has nothing to clear -- which is why MSR is a pure function of the
+   state here rather than a field of it.  Under LOOP the inputs come from
+   MCR's own outputs instead: DTR->DSR, RTS->CTS, OUT1->RI, OUT2->DCD. *)
+Definition uart_msr_idle : Z := 0xb0.
+
+Definition uart_msr (u : uart_state) : bv 8 :=
+  if uart_loopback u then
+    let m := bv_unsigned (u_mcr u) in
+    Z_to_bv 8 (Z.lor (Z.shiftl (Z.land m 0x0c) 4)
+                     (Z.lor (Z.shiftl (Z.land m 0x02) 3)
+                            (Z.shiftl (Z.land m 0x01) 5)))
+  else Z_to_bv 8 uart_msr_idle.
+
+(* Every arm below spells [UartState]'s fields positionally, in the record's
+   own order:
+     rx  tx  out  wire  ier  lcr  fcr  dll  dlm  mcr  scr  rbr  thri
+   Coq has no record-update syntax and a setter per arm would only move the
+   same list somewhere else; adding a register means extending each arm here,
+   and the type checker finds every one of them. *)
 
 (* one MMIO read of byte register [off] (0..7): value + successor state *)
 Definition uart_read (u : uart_state) (off : Z) : option (bv 8 * uart_state) :=
   if off =? 0 then
     if uart_dlab u then Some (u_dll u, u)
-    else (* RHR: pop the receive FIFO (reads as 0 when empty) *)
+    else (* RHR: pop the receive FIFO *)
       match u_rx u with
-      | [] => Some (byte0, u)
+      | [] =>
+          (* DR is CLEAR.  The datasheet leaves this read undefined and the
+             hardware answers out of the receive HOLDING register, which
+             neither a read nor an FCR clear ever erases -- only the DR flag
+             goes away.  (Finding 23: the model used to answer 0 where the
+             machine hands back the last byte it received.)  With the FIFOs
+             enabled the holding register is the FIFO's own output stage and
+             the machine answers 0. *)
+          Some ((if uart_fifo_en u then byte0 else u_rbr u), u)
       | b :: rx' =>
-          Some (b, UartState rx' (u_tx u) (u_out u) (u_ier u) (u_lcr u)
-                             (u_fcr u) (u_dll u) (u_dlm u))
+          Some (b, UartState rx' (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                             (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                             (u_mcr u) (u_scr u) (u_rbr u) (u_thri u))
       end
   else if off =? 1 then
     if uart_dlab u then Some (u_dlm u, u) else Some (u_ier u, u)
-  else if off =? 2 then Some (uart_isr u, u)
+  else if off =? 2 then
+    Some (uart_isr u,
+          if uart_isr_thri u then
+            UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                      (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                      (u_mcr u) (u_scr u) (u_rbr u) false
+          else u)
   else if off =? 3 then Some (u_lcr u, u)
+  else if off =? 4 then Some (u_mcr u, u)
   else if off =? 5 then Some (uart_lsr u, u)
-  else if (off =? 4) || (off =? 6) || (off =? 7) then Some (byte0, u)
+  else if off =? 6 then Some (uart_msr u, u)
+  else if off =? 7 then Some (u_scr u, u)
   else None.
 
 (* one MMIO write of byte register [off] *)
 Definition uart_write (u : uart_state) (off : Z) (b : bv 8) : option uart_state :=
   if off =? 0 then
     if uart_dlab u then
-      Some (UartState (u_rx u) (u_tx u) (u_out u) (u_ier u) (u_lcr u)
-                      (u_fcr u) b (u_dlm u))
-    else (* THR: push onto the transmit FIFO (dropped if full, as in hw) *)
+      Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                      (u_lcr u) (u_fcr u) b (u_dlm u)
+                      (u_mcr u) (u_scr u) (u_rbr u) (u_thri u))
+    else (* THR: push onto the transmit FIFO (dropped if full, as in hw).
+            The transmitter is no longer idle, so the latch drops -- and it
+            drops on the DROPPED write too: the byte is lost, but the write
+            happened, and the hardware disarms the interrupt either way. *)
       if (length (u_tx u) <? uart_fifo_depth)%nat then
-        Some (UartState (u_rx u) (u_tx u ++ [b]) (u_out u) (u_ier u) (u_lcr u)
-                        (u_fcr u) (u_dll u) (u_dlm u))
-      else Some u
+        Some (UartState (u_rx u) (u_tx u ++ [b]) (u_out u) (u_wire u) (u_ier u)
+                        (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                        (u_mcr u) (u_scr u) (u_rbr u) false)
+      else
+        Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                        (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                        (u_mcr u) (u_scr u) (u_rbr u) false)
   else if off =? 1 then
     if uart_dlab u then
-      Some (UartState (u_rx u) (u_tx u) (u_out u) (u_ier u) (u_lcr u)
-                      (u_fcr u) (u_dll u) b)
+      Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                      (u_lcr u) (u_fcr u) (u_dll u) b
+                      (u_mcr u) (u_scr u) (u_rbr u) (u_thri u))
     else
-      Some (UartState (u_rx u) (u_tx u) (u_out u) b (u_lcr u)
-                      (u_fcr u) (u_dll u) (u_dlm u))
+      (* IER holds four bits.  Enabling the transmit interrupt on an ALREADY
+         idle transmitter arms the latch, because no later edge would. *)
+      let ier := Z_to_bv 8 (Z.land (bv_unsigned b) 0x0f) in
+      Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) ier
+                      (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                      (u_mcr u) (u_scr u) (u_rbr u)
+                      (u_thri u || (Z.testbit (bv_unsigned ier) 1 && uart_thre u)))
   else if off =? 2 then
-    (* FCR: bit1 clears the rx FIFO, bit2 clears the tx FIFO *)
-    Some (UartState (if Z.testbit (bv_unsigned b) 1 then [] else u_rx u)
-                    (if Z.testbit (bv_unsigned b) 2 then [] else u_tx u)
-                    (u_out u) (u_ier u) (u_lcr u) b (u_dll u) (u_dlm u))
+    (* FCR: bit 0 enables the FIFOs, bit 1 clears the receive FIFO and bit 2
+       the transmit FIFO.  Bits 1 and 2 are self-clearing, so what the
+       register HOLDS is 0xc9's worth.  CHANGING bit 0 flushes BOTH FIFOs,
+       which is why a driver that enables them loses whatever had already
+       arrived -- measured on the machine, and the reason the conformance
+       suite's receive test leaves them off.  A cleared transmit FIFO is an
+       idle transmitter, so the latch arms. *)
+    let flush  := xorb (Z.testbit (bv_unsigned b) 0) (uart_fifo_en u) in
+    let clr_rx := flush || Z.testbit (bv_unsigned b) 1 in
+    let clr_tx := flush || Z.testbit (bv_unsigned b) 2 in
+    Some (UartState (if clr_rx then [] else u_rx u)
+                    (if clr_tx then [] else u_tx u)
+                    (u_out u) (u_wire u) (u_ier u) (u_lcr u)
+                    (Z_to_bv 8 (Z.land (bv_unsigned b) 0xc9))
+                    (u_dll u) (u_dlm u) (u_mcr u) (u_scr u) (u_rbr u)
+                    (u_thri u || clr_tx))
   else if off =? 3 then
-    Some (UartState (u_rx u) (u_tx u) (u_out u) (u_ier u) b
-                    (u_fcr u) (u_dll u) (u_dlm u))
-  else if (off =? 4) || (off =? 5) || (off =? 6) || (off =? 7) then Some u
+    Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                    b (u_fcr u) (u_dll u) (u_dlm u)
+                    (u_mcr u) (u_scr u) (u_rbr u) (u_thri u))
+  else if off =? 4 then
+    (* MCR holds five bits; 7:5 read back as zero. *)
+    Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                    (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                    (Z_to_bv 8 (Z.land (bv_unsigned b) 0x1f))
+                    (u_scr u) (u_rbr u) (u_thri u))
+  else if off =? 7 then
+    Some (UartState (u_rx u) (u_tx u) (u_out u) (u_wire u) (u_ier u)
+                    (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                    (u_mcr u) b (u_rbr u) (u_thri u))
+  else if (off =? 5) || (off =? 6) then Some u  (* LSR and MSR are read-only *)
   else None.
 
 (* Reading the LSR is a pure observation: it returns the status byte and does
@@ -175,14 +318,30 @@ Definition uart_write (u : uart_state) (off : Z) (b : bv 8) : option uart_state 
 Lemma uart_read_lsr (u : uart_state) : uart_read u 5 = Some (uart_lsr u, u).
 Proof. reflexivity. Qed.
 
-(* ...and so is reading the ISR, which in this model is a pure function of the
-   state (the THRE interrupt is a LEVEL here -- see [uart_isr] -- so the read
-   that xv6's uartintr performs to "acknowledge the interrupt" acknowledges
-   nothing.  That is deliberate: a level model only produces MORE interrupts
-   than the hardware, which a correct driver already tolerates). *)
-Lemma uart_read_isr (u : uart_state) : uart_read u 2 = Some (uart_isr u, u).
-Proof. reflexivity. Qed.
+(* Reading the ISR is NOT.  The value is always [uart_isr u], but a read that
+   REPORTS the transmit interrupt is the acknowledgement of it and clears the
+   latch -- so a driver that reads the ISR twice sees the interrupt go away,
+   which is what the hardware does and what the level model could not do. *)
+Lemma uart_read_isr_value (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_read u 2 = Some (b, u') -> b = uart_isr u.
+Proof.
+  unfold uart_read. cbn [Z.eqb].
+  destruct (uart_isr_thri u); intro H; by injection H as <- _.
+Qed.
 
+(* the read that reports something else -- or nothing -- leaves the device
+   alone, which is the form a poll of the ISR uses *)
+Lemma uart_read_isr_quiet (u : uart_state) :
+  uart_isr_thri u = false -> uart_read u 2 = Some (uart_isr u, u).
+Proof. intro H. unfold uart_read. cbn [Z.eqb]. by rewrite H. Qed.
+
+(* ...and the read that DOES report it disarms it *)
+Lemma uart_read_isr_acks (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_isr_thri u = true -> uart_read u 2 = Some (b, u') -> u_thri u' = false.
+Proof.
+  intros Hth H. unfold uart_read in H. cbn [Z.eqb] in H.
+  rewrite Hth in H. by injection H as _ <-.
+Qed.
 
 (* -- MMIO totality --
 
@@ -202,13 +361,12 @@ Proof.
   { destruct (uart_dlab u); by do 2 eexists. }
   destruct (off =? 2) eqn:E2. { by do 2 eexists. }
   destruct (off =? 3) eqn:E3. { by do 2 eexists. }
+  destruct (off =? 4) eqn:E4. { by do 2 eexists. }
   destruct (off =? 5) eqn:E5. { by do 2 eexists. }
-  destruct ((off =? 4) || (off =? 6) || (off =? 7)) eqn:E4.
-  { by do 2 eexists. }
+  destruct (off =? 6) eqn:E6. { by do 2 eexists. }
+  destruct (off =? 7) eqn:E7. { by do 2 eexists. }
   exfalso.
-  apply Z.eqb_neq in E0, E1, E2, E3, E5.
-  apply orb_false_elim in E4 as [E4 E7]. apply orb_false_elim in E4 as [E4 E6].
-  apply Z.eqb_neq in E4, E6, E7. lia.
+  apply Z.eqb_neq in E0, E1, E2, E3, E4, E5, E6, E7. lia.
 Qed.
 
 Lemma uart_write_total (u : uart_state) (off : Z) (b : bv 8) :
@@ -222,37 +380,67 @@ Proof.
   { destruct (uart_dlab u); by eexists. }
   destruct (off =? 2) eqn:E2. { by eexists. }
   destruct (off =? 3) eqn:E3. { by eexists. }
-  destruct ((off =? 4) || (off =? 5) || (off =? 6) || (off =? 7)) eqn:E4.
-  { by eexists. }
+  destruct (off =? 4) eqn:E4. { by eexists. }
+  destruct (off =? 7) eqn:E7. { by eexists. }
+  destruct ((off =? 5) || (off =? 6)) eqn:E56. { by eexists. }
   exfalso.
-  apply Z.eqb_neq in E0, E1, E2, E3.
-  apply orb_false_elim in E4 as [E4 E7]. apply orb_false_elim in E4 as [E4 E6].
-  apply orb_false_elim in E4 as [E4 E5].
-  apply Z.eqb_neq in E4, E5, E6, E7. lia.
+  apply Z.eqb_neq in E0, E1, E2, E3, E4, E7.
+  apply orb_false_elim in E56 as [E5 E6].
+  apply Z.eqb_neq in E5, E6. lia.
 Qed.
 
 (* -- the UART's autonomous transitions (the device "thread") -- *)
 
-(* transmit: move the head of the tx FIFO onto the wire *)
+(* The RECEIVER latching a byte, which is one event with two causes: a byte
+   arriving from outside ([uart_rx_push]) and, in loopback, a byte leaving
+   this UART's own transmitter ([uart_tx_pop]).  A full FIFO OVERRUNS -- the
+   byte is lost -- and the holding register keeps it either way. *)
+Definition uart_recv (u : uart_state) (b : bv 8) : uart_state :=
+  UartState (if (length (u_rx u) <? uart_fifo_depth)%nat then u_rx u ++ [b]
+             else u_rx u)
+            (u_tx u) (u_out u) (u_wire u) (u_ier u) (u_lcr u) (u_fcr u)
+            (u_dll u) (u_dlm u) (u_mcr u) (u_scr u) b (u_thri u).
+
+(* The receiver touches the receive side and nothing else, so none of the
+   three quantities the UART ghosts track (WpUart.v) can move under it.
+   These are the shape the drain lemmas below need, since the drain's
+   loopback arm ends in a [uart_recv]. *)
+Lemma uart_recv_out (u : uart_state) (b : bv 8) : u_out (uart_recv u b) = u_out u.
+Proof. reflexivity. Qed.
+Lemma uart_recv_tx (u : uart_state) (b : bv 8) : u_tx (uart_recv u b) = u_tx u.
+Proof. reflexivity. Qed.
+Lemma uart_recv_lcr (u : uart_state) (b : bv 8) : u_lcr (uart_recv u b) = u_lcr u.
+Proof. reflexivity. Qed.
+
+(* transmit: the head of the tx FIFO leaves the transmitter.  It goes onto
+   the wire, or -- under LOOP -- straight back into this UART's receiver,
+   with SOUT held marking so the host sees nothing.  Either way the
+   transmitter is one byte emptier, and an emptied transmitter arms the
+   THRE latch. *)
 Definition uart_tx_pop (u : uart_state) : option (bv 8 * uart_state) :=
   match u_tx u with
   | [] => None
   | b :: tx' =>
-      Some (b, UartState (u_rx u) tx' (u_out u ++ [b]) (u_ier u) (u_lcr u)
-                         (u_fcr u) (u_dll u) (u_dlm u))
+      let u' := UartState (u_rx u) tx' (u_out u ++ [b])
+                          (if uart_loopback u then u_wire u else u_wire u ++ [b])
+                          (u_ier u) (u_lcr u) (u_fcr u) (u_dll u) (u_dlm u)
+                          (u_mcr u) (u_scr u) (u_rbr u)
+                          (match tx' with [] => true | _ => u_thri u end) in
+      Some (b, if uart_loopback u then uart_recv u' b else u')
   end.
 
-(* receive: a byte arrives from the outside world (refused when full) *)
+(* receive: a byte arrives from the outside world.  REFUSED when the FIFO is
+   full, which is flow control and not an overrun: the host is told to wait,
+   exactly as the machine's front end does. *)
 Definition uart_rx_push (u : uart_state) (b : bv 8) : option uart_state :=
-  if (length (u_rx u) <? uart_fifo_depth)%nat then
-    Some (UartState (u_rx u ++ [b]) (u_tx u) (u_out u) (u_ier u) (u_lcr u)
-                    (u_fcr u) (u_dll u) (u_dlm u))
+  if (length (u_rx u) <? uart_fifo_depth)%nat then Some (uart_recv u b)
   else None.
 
 (* -- the accepted-byte trace -- *)
 
 (* [uart_acc u] is every byte the UART has ACCEPTED for transmission: those
-   already on the wire ([u_out]) followed by those still queued ([u_tx]).  It
+   the transmitter has finished with ([u_out]) followed by those still queued
+   ([u_tx]).  It
    is the right notion for a driver's postcondition, because a driver returns
    as soon as its byte is in the tx FIFO -- the move to [u_out] is the device
    thread's own later step, so [u_out] alone is not yet observable at a
@@ -272,15 +460,20 @@ Lemma uart_tx_pop_acc (u : uart_state) (b : bv 8) (u' : uart_state) :
 Proof.
   unfold uart_tx_pop, uart_acc. destruct (u_tx u) as [| b0 tx'] eqn:Htx.
   - discriminate.
-  - intro H. injection H as <- <-. cbn [u_out u_tx].
-    rewrite <- app_assoc. reflexivity.
+  - destruct (uart_loopback u); intro H; injection H as <- <-.
+    + (* the loopback arm hands the byte to [uart_recv], which touches
+         neither [u_out] nor [u_tx]: the accepted trace does not record where
+         the byte went, only that the transmitter is done with it *)
+      rewrite uart_recv_out, uart_recv_tx.
+      cbn [u_out u_tx]. rewrite <- app_assoc. reflexivity.
+    + cbn [u_out u_tx]. rewrite <- app_assoc. reflexivity.
 Qed.
 
 (* a byte arriving on the rx side touches neither [u_out] nor [u_tx] *)
 Lemma uart_rx_push_acc (u : uart_state) (b : bv 8) (u' : uart_state) :
   uart_rx_push u b = Some u' -> uart_acc u' = uart_acc u.
 Proof.
-  unfold uart_rx_push, uart_acc.
+  unfold uart_rx_push, uart_recv, uart_acc.
   destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
   intro H. injection H as <-. reflexivity.
 Qed.
@@ -303,11 +496,15 @@ Proof.
     - destruct (u_rx u) as [| c rx']; intro H; inversion H; subst u'; done. }
   destruct (off =? 1) eqn:E1.
   { destruct (uart_dlab u) eqn:Ed; intro H; inversion H; subst u'; done. }
-  destruct (off =? 2) eqn:E2. { intro H; inversion H; subst u'; done. }
+  destruct (off =? 2) eqn:E2.
+  { (* the ISR read may disarm the transmit latch, which is none of the
+       three tracked quantities either *)
+    destruct (uart_isr_thri u); intro H; inversion H; subst u'; done. }
   destruct (off =? 3) eqn:E3. { intro H; inversion H; subst u'; done. }
+  destruct (off =? 4) eqn:E4. { intro H; inversion H; subst u'; done. }
   destruct (off =? 5) eqn:E5. { intro H; inversion H; subst u'; done. }
-  destruct ((off =? 4) || (off =? 6) || (off =? 7)) eqn:E4.
-  { intro H; inversion H; subst u'; done. }
+  destruct (off =? 6) eqn:E6. { intro H; inversion H; subst u'; done. }
+  destruct (off =? 7) eqn:E7. { intro H; inversion H; subst u'; done. }
   discriminate.
 Qed.
 
@@ -431,13 +628,15 @@ Lemma uart_tx_pop_out (u : uart_state) (b : bv 8) (u' : uart_state) :
   uart_tx_pop u = Some (b, u') -> u_out u' = u_out u ++ [b].
 Proof.
   unfold uart_tx_pop. destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
-  intro H. injection H as <- <-. reflexivity.
+  destruct (uart_loopback u); intro H; injection H as <- <-.
+  - by rewrite uart_recv_out.
+  - reflexivity.
 Qed.
 
 Lemma uart_rx_push_out (u : uart_state) (b : bv 8) (u' : uart_state) :
   uart_rx_push u b = Some u' -> u_out u' = u_out u.
 Proof.
-  unfold uart_rx_push.
+  unfold uart_rx_push, uart_recv.
   destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
   intro H. injection H as <-. reflexivity.
 Qed.
@@ -457,7 +656,9 @@ Proof.
   { destruct (uart_dlab u); intro H; injection H as <-; reflexivity. }
   destruct (off =? 2). { intro H; injection H as <-; reflexivity. }
   destruct (off =? 3). { intro H; injection H as <-; reflexivity. }
-  destruct ((off =? 4) || (off =? 5) || (off =? 6) || (off =? 7)).
+  destruct (off =? 4). { intro H; injection H as <-; reflexivity. }
+  destruct (off =? 7). { intro H; injection H as <-; reflexivity. }
+  destruct ((off =? 5) || (off =? 6)).
   { intro H; injection H as <-; reflexivity. }
   discriminate.
 Qed.
@@ -470,14 +671,17 @@ Qed.
 Lemma uart_tx_pop_dlab (u : uart_state) (b : bv 8) (u' : uart_state) :
   uart_tx_pop u = Some (b, u') -> uart_dlab u' = uart_dlab u.
 Proof.
-  unfold uart_tx_pop. destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
-  intro H. injection H as <- <-. reflexivity.
+  unfold uart_tx_pop, uart_dlab.
+  destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
+  destruct (uart_loopback u); intro H; injection H as <- <-.
+  - by rewrite uart_recv_lcr.
+  - reflexivity.
 Qed.
 
 Lemma uart_rx_push_dlab (u : uart_state) (b : bv 8) (u' : uart_state) :
   uart_rx_push u b = Some u' -> uart_dlab u' = uart_dlab u.
 Proof.
-  unfold uart_rx_push.
+  unfold uart_rx_push, uart_recv.
   destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
   intro H. injection H as <-. reflexivity.
 Qed.
@@ -704,9 +908,35 @@ Definition dev_irq_level (d : dev_state) (i : N) : bool :=
   else if (i =? virtio_irq_id)%N then virtio_irq (dvirtio d)
   else false.
 
+(* THE BUS NARROWS a wide access to the UART.  Every one of the port's
+   registers is a BYTE, so a 2-, 4- or 8-byte access reads (or writes) the
+   ONE register its address names -- zero-extended on the way back, low byte
+   taken on the way in.  It does NOT gather consecutive registers into a
+   word, which is what the machine does and is worth stating, because the
+   guess a reader makes is the other one.
+
+   The model used to decode the window at width 1 and REFUSE everything else,
+   which is finding 9: all eight registers sit inside one aligned doubleword,
+   so `lw` of the status word is a thing real drivers do, and against the old
+   model it was a STUCK machine. *)
+Definition uart_dev_read (d : dev_state) (off : Z) (k : N)
+  : option (bv k * dev_state) :=
+  match uart_read (duart d) off with
+  | Some (b, u') => Some (Z_to_bv k (bv_unsigned b), set_duart d u')
+  | None => None
+  end.
+
+Definition uart_dev_write (d : dev_state) (off : Z) (b : bv 8)
+  : option dev_state :=
+  match uart_write (duart d) off b with
+  | Some u' => Some (set_duart d u')
+  | None => None
+  end.
+
 (* An MMIO READ transaction: [n]-byte read at physical address [pa].
-   Serviced directly by the device; the UART decodes 1-byte accesses, the
-   PLIC 4-byte accesses.  Any other width/offset is STUCK (None). *)
+   Serviced directly by the device; the UART decodes any width (one byte
+   register, narrowed as above), the PLIC 4-byte accesses.  Any other
+   width/offset is STUCK (None). *)
 Definition dev_read (d : dev_state) (pa : Arch.pa) (n : N)
   : option (bv (8 * n) * dev_state) :=
   let a := uint pa in
@@ -716,6 +946,9 @@ Definition dev_read (d : dev_state) (pa : Arch.pa) (n : N)
              | Some (b, u') => Some (b, set_duart d u')
              | None => None
              end
+    | 2%N => uart_dev_read d (a - uart_base) _
+    | 4%N => uart_dev_read d (a - uart_base) _
+    | 8%N => uart_dev_read d (a - uart_base) _
     | _ => None
     end
   else if in_plic a then
@@ -749,6 +982,9 @@ Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
                       | Some u' => Some (set_duart d u')
                       | None => None
                       end
+    | 2%N => fun v => uart_dev_write d (a - uart_base) (Z_to_bv 8 (bv_unsigned v))
+    | 4%N => fun v => uart_dev_write d (a - uart_base) (Z_to_bv 8 (bv_unsigned v))
+    | 8%N => fun v => uart_dev_write d (a - uart_base) (Z_to_bv 8 (bv_unsigned v))
     | _ => fun _ => None
     end v
   else if in_plic a then
@@ -782,7 +1018,7 @@ Lemma dev_read_v_disk (d : dev_state) (pa : Arch.pa) (n : N)
   dev_read d pa n = Some (w, d') ->
   v_disk (dvirtio d') = v_disk (dvirtio d).
 Proof.
-  unfold dev_read. intros H.
+  unfold dev_read, uart_dev_read. intros H.
   repeat (case_match; try discriminate); simplify_eq; cbn; reflexivity.
 Qed.
 
@@ -791,17 +1027,30 @@ Lemma dev_write_v_disk (d : dev_state) (pa : Arch.pa) (n : N)
   dev_write d pa n v = Some d' ->
   v_disk (dvirtio d') = v_disk (dvirtio d).
 Proof.
-  unfold dev_write. intros H.
+  unfold dev_write, uart_dev_write. intros H.
   repeat (case_match; try discriminate); simplify_eq; cbn;
     eauto using virtio_write_disk.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. Power-on state: FIFOs empty, everything masked/zero.                  *)
+(*                                                                         *)
+(*    The two registers that are NOT zero at power-on are the board's, not  *)
+(*    the chip's: this port comes up with MCR bit 3 (OUT2) asserted and the *)
+(*    divisor set for 9600 baud.  A bare 16550's master reset clears both,  *)
+(*    but they are what the machine this development is a model OF reports  *)
+(*    -- and OUT2 in particular is the pin that would gate the interrupt    *)
+(*    onto an ISA bus, which this board does not have, so nothing here      *)
+(*    reads it.                                                            *)
 (* ---------------------------------------------------------------------- *)
 
+Definition uart_mcr_reset : Z := 0x08.       (* OUT2 *)
+Definition uart_divisor_reset : Z := 0x0c.   (* 9600 baud in DLL, DLM = 0 *)
+
 Definition uart0_state : uart_state :=
-  UartState [] [] [] byte0 byte0 byte0 byte0 byte0.
+  UartState [] [] [] [] byte0 byte0 byte0
+            (Z_to_bv 8 uart_divisor_reset) byte0
+            (Z_to_bv 8 uart_mcr_reset) byte0 byte0 false.
 Definition plic0_state : plic_state :=
   PlicState (fun _ => Z_to_bv 32 0) (fun _ => false) (fun _ => false)
             (fun _ => Z_to_bv 32 0) (fun _ => Z_to_bv 32 0).

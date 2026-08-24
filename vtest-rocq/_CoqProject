@@ -27,6 +27,8 @@ UartRegsGen.v
 UartRegs.v
 UartWidthGen.v
 UartWidth.v
+UartLoopGen.v
+UartLoop.v
 PlicArbGen.v
 PlicArb.v
 PlicTieGen.v

@@ -2,13 +2,15 @@
 
 ## STATUS (2026-08-24)
 
-LANDED and green: `make vtest`, **55 test programs** across six areas (`core`,
-`disk`, `uart`, `plic`, `conc`, `pt`), and **26 recorded divergences from real
+LANDED and green: `make vtest`, **56 test programs** across six areas (`core`,
+`disk`, `uart`, `plic`, `conc`, `pt`), and **21 open divergences from real
 hardware, THREE of them unsoundnesses** plus one that is unsound in direction
-only (finding 26, the direct-mapped TLB), beside a long list of
-confirmations.
-Nothing here changes the model: this effort's output is a register of findings
-plus the machinery that keeps producing them.
+only (finding 26, the direct-mapped TLB), beside a long list of confirmations
+and **five findings FIXED** (6, 7, 8, 9, 23 -- the whole 16550 register file,
+its interrupt-status semantics and its bus decode; they keep their numbers and
+their values in the README's "Findings fixed" table).
+Beyond those five the effort still changes nothing in the model: its output is
+a register of findings plus the machinery that keeps producing them.
 
 **The three unsoundnesses, in the order they matter:**
 
@@ -37,6 +39,17 @@ plus the machinery that keeps producing them.
 
 The FINDINGS TABLE in [`tools/vtest/README.md`](../../tools/vtest/README.md)
 is the authority and is maintained; this file summarises and links.
+
+**The one place the effort has CHANGED the model so far is the UART**, and the
+shape of that change is the argument for the whole exercise: five of the
+findings were in the 16550, four of them were one shortcut seen from different
+sides, and the fifth (MCR reading as zero) could not be fixed by making the
+register readable -- MCR bit 4 is LOOPBACK, so a stored-but-inert bit would
+have put a driver's self-test bytes on the console, which is a defect where
+the missing register was only an incompleteness.  `uart_loop` is the new test
+that pins the mode against the machine, serial channel included.  See
+[`design/device.md`](../design/device.md) for the rules that came out of it
+and the README's "Findings fixed" table for the values.
 
 - `tools/vtest/` — the ABI, the test programs, the QEMU runner/generator.
   **Read [`tools/vtest/README.md`](../../tools/vtest/README.md) first**; it
@@ -211,7 +224,8 @@ stay in the findings table UNCLASSIFIED, and no test depends on the answer.
 
 **DONE since this list was written** (2026-08-24): items 1-3 (`disk_ident`
 and its twelve stuck programs, `disk_err`, `disk_chain`), item 4 (`uart_*`,
-seven tests including both interrupt paths and the receive datapath), item 5
+eight tests including both interrupt paths, the receive datapath and
+loopback), item 5
 (`plic_*`, seven tests), and item 6's register half (`core_regs_*`, eight
 programs).  What is left of item 6 is the CPU/memory side proper -- the RAM
 path at each width, misaligned accesses, and the reservation arms of
@@ -239,11 +253,13 @@ and `amoadd.w` execute; `sc.w` does not evaluate, finding 25).
    doing because it is the one test that demonstrates the "model UB as
    anything, never as nothing" design actually paying off.
 
-4. **`uart_*`** — the 16550 half of `DevModel.v`: the transmit FIFO and its
-   depth-16 drop-when-full behaviour, `LSR`/`THRE`, the `FCR` FIFO clear,
-   the `DLAB` divisor-latch aliasing of offset 0 (which the ghost design in
-   [`design/device.md`](../design/device.md) leans on), and the rx path.
-   `VSched` already has `SUartTx`/`SUartRx`.
+4. ~~**`uart_*`**~~ DONE, and the one area whose findings were FIXED rather
+   than recorded: eight tests now, the transmit FIFO and its depth-16
+   drop-when-full behaviour, `LSR`/`THRE`, the `FCR` FIFO clear and its
+   flush-on-enable, the `DLAB` divisor-latch aliasing of offset 0 (which the
+   ghost design in [`design/device.md`](../design/device.md) leans on), the
+   rx path, both interrupt paths, the register file at every width, and
+   loopback.
 
 5. **`plic_*`** — the controller as SUBJECT rather than as the disk's
    plumbing: two sources competing, priorities, a threshold that masks one,

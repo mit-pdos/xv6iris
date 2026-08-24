@@ -213,16 +213,18 @@ Definition result_of (o : option mstate) : list Z :=
   | Some s => peek_mem (mem s) result_base result_size
   end.
 
-(* WHAT THE UART TRANSMITTED, in the same currency vtest.py captures from
-   QEMU's serial file.  [uart_acc] is every byte the device has ACCEPTED --
-   [u_out ++ u_tx], the transmitted prefix plus whatever is still in the
-   FIFO -- which is the right notion here: a byte the driver pushed is
-   observable on the host whether or not the model has drained it yet, and
-   [VSched.settle] drains eagerly anyway. *)
+(* WHAT THE HOST RECEIVED, in the same currency vtest.py captures from QEMU's
+   serial file: [u_wire], the bytes that actually left the port on SOUT.
+   NOT [uart_acc] ([u_out ++ u_tx], every byte the device has ACCEPTED),
+   which is the transmitter's business and not the host's -- under LOOPBACK
+   an accepted byte goes to this UART's own receiver and the host never sees
+   it, which is exactly what UartLoop.v checks.  The two agree on every
+   other test: [VSched.settle] drains the FIFO after every instruction, so
+   nothing is left in flight when the guest publishes its result. *)
 Definition serial_of (o : option mstate) : list Z :=
   match o with
   | None => []
-  | Some s => bv_unsigned <$> uart_acc (duart (mdev s))
+  | Some s => bv_unsigned <$> u_wire (duart (mdev s))
   end.
 
 (* the disk, per 512-byte sector, in the shape [<name>_qemu_disk] carries *)

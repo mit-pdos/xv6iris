@@ -5,16 +5,19 @@
    THE THIRD OBSERVATION CHANNEL.  A `uart` test has one the disk tests do
    not: what the host actually saw on the serial line.  vtest.py captures
    QEMU's -serial file as [uart_tx_qemu_serial], and the model side is
-   [VTest.serial_of], i.e. [DevModel.uart_acc] -- [u_out ++ u_tx], every byte
-   the device ACCEPTED.  So [uart_tx_serial] below is a direct test of what
-   was transmitted, not merely of what the driver believed.
+   [VTest.serial_of], i.e. [DevModel.u_wire] -- the bytes that actually left
+   the port on SOUT, which under [settle] is every byte the device accepted
+   (nothing is left in the FIFO when the guest publishes its result) but is
+   NOT the same notion: see UartLoop.v, where the two part company.  So
+   [uart_tx_serial] below is a direct test of what was transmitted, not
+   merely of what the driver believed.
 
    WHAT THE PROGRAM DOES.  The xv6 uartputc_sync shape: poll LSR (offset 5)
    for THRE (bit 5), store the byte to THR (offset 0), repeat -- for a
    20-byte string; then one unpolled store followed immediately by an LSR
    read; then a 24-byte BURST with no polling at all.  Registers are read
-   and written a BYTE at a time throughout, which is the only width the
-   model's bus decodes for this window (see UartWidth.v).
+   and written a BYTE at a time throughout, which is what xv6's uart.c does;
+   the wider accesses have their own test (UartWidth.v).
 
    WHAT IT PINS DOWN, i.e. the ways the model could have been wrong and is
    not: [uart_write] at offset 0 with DLAB clear pushing onto the tx FIFO,

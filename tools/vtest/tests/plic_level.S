@@ -20,11 +20,10 @@
  *
  * The source is the 16550 at source 10, raised with NO serial input by
  * enabling the transmit-holding-register-empty interrupt in IER while the
- * FIFO is empty -- and note that the model's THRE interrupt is a LEVEL that
- * an ISR read does not clear (see the comment above [DevModel.uart_isr]),
- * which is exactly why it is a good probe for a gateway question: the level
- * stays up unless this program lowers IER itself.  Nothing here reads the
- * ISR, so nothing here depends on that.
+ * FIFO is empty.  That makes it a good probe for a gateway question: the two
+ * things that acknowledge the transmit interrupt are a THR write and an ISR
+ * read, and this program does neither -- it never touches offsets 0 or 2 --
+ * so the level stays up until the program itself lowers IER.
  */
 /* vtest: repeat=1 */
 #include "abi.h"

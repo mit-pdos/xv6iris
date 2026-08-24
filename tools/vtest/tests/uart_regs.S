@@ -1,23 +1,24 @@
-/* uart_regs -- the registers the model does NOT really implement, and the
- * one place its interrupt-status semantics are deliberately different from
- * the hardware's.
+/* uart_regs -- the eight registers, and the interrupt-status semantics.
  *
  * Three questions:
  *
- *  (a) offsets 4 (MCR), 6 (MSR) and 7 (SCRATCH).  [uart_read] returns ZERO
- *      for all three and [uart_write] accepts and discards.  A real 16550
- *      has a scratch register at 7 that reads back whatever was stored, and
- *      an MCR at 4 that also reads back.
+ *  (a) offsets 4 (MCR), 6 (MSR) and 7 (SCRATCH).  [uart_read] used to return
+ *      ZERO for all three and [uart_write] to accept and discard, which is
+ *      finding 6.  A real 16550 has a scratch register at 7 that reads back
+ *      whatever was stored -- the standard PRESENCE TEST -- and an MCR at 4
+ *      that reads back five bits, whose bit 4 has real semantics
+ *      (uart_loop.S).  MSR at 6 reports the port's modem inputs.
  *
- *  (b) the ISR (offset 2).  [uart_isr] is 0xc0 + (rx ? 4 : tx ? 2 : 1) --
- *      bits 7:6 ("FIFOs enabled") unconditionally, and the THRE interrupt as
- *      a LEVEL.  The comment above [uart_isr] in DevModel.v says a real
- *      16550 LATCHES the THRE interrupt and clears it on an ISR read, so
- *      this test reads the ISR TWICE in a row with IER bit 1 set.
+ *  (b) the ISR (offset 2).  [uart_isr] used to be 0xc0 + (rx ? 4 : tx ? 2 :
+ *      1): bits 7:6 ("FIFOs enabled") unconditionally, where the hardware
+ *      sets them from FCR bit 0 (finding 7), and the transmit interrupt as
+ *      a LEVEL, where the hardware LATCHES it and clears it on an ISR read
+ *      (finding 8).  So this test reads the ISR before and after the FCR
+ *      write, and TWICE in a row with IER bit 1 set.
  *
  *  (c) the FCR (offset 2, write).  Bit 1 clears the receive FIFO, bit 2 the
- *      transmit FIFO.  A FIFO-clearing write must not break the transmitter,
- *      so the test sends "OK" after one.
+ *      transmit FIFO.  A FIFO-clearing write must not break the
+ *      transmitter, so the test sends "OK" after one.
  *
  * RESULT layout (mirrored in vtest-rocq/UartRegs.v):
  *   +8   offset 7 read back after storing 0x5a   (SCRATCH)

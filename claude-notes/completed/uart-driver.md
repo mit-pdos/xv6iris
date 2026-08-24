@@ -231,8 +231,9 @@ not in a resource — which is why proving uartwrite needed nothing from here.
 
 - **The rx half needs no ghosts at all.**  `DevModel.uart_read_stable` — new,
   and the one model fact this work added — says NO uart read moves
-  `uart_acc` / `u_out` / `uart_dlab` (only the RHR read advances the device,
-  and it pops the RECEIVE FIFO).  So `WpSconfUartAccess.wp_uart_read_free_s_sconf`
+  `uart_acc` / `u_out` / `uart_dlab` (two reads DO advance the device — RHR
+  pops the receive FIFO, and an ISR read that reports the transmit interrupt
+  clears its latch — but neither touches the three tracked quantities).  So `WpSconfUartAccess.wp_uart_read_free_s_sconf`
   is a UART read at ANY of the eight offsets with `R := emp` and no ghost
   obligation, and that is why the drain can legitimately run AFTER the
   release, as the C does.  One leaf covers the ISR acknowledge, uartgetc's

@@ -149,8 +149,8 @@ _vtest_body:
     sw   t0, RES_STATUS(s11)
 
 /* ---- the SECOND ISR READ, on its own, so it does not contaminate the
- * chain above.  Our model treats the THRE interrupt as a LEVEL; a real
- * 16550 latches it and the ISR read is what clears it. ---- */
+ * chain above.  The transmit interrupt is a LATCH and the ISR read that
+ * reports it is what clears it, so these two reads must differ. ---- */
     li   t0, 0x02
     sb   t0, 1(s0)
 2:  lw   t0, 0(s1)

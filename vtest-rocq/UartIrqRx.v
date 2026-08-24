@@ -21,7 +21,9 @@
    that flips FIFO-enable also flushes the receive FIFO and would race with
    the host's byte.
 
-   Everything agrees except the two ISR fields this area already had. *)
+   EVERYTHING AGREES, the ISR fields included: they used to differ by
+   exactly 0xc0, which was finding 7 (bits 7:6 set whether or not FCR bit 0
+   had been written), and [DevModel.uart_isr] now reads that bit. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list.
@@ -36,7 +38,7 @@ Definition irq_rx_run : option mstate :=
   match irq_rx_start with Some s => run_until 50000 s | None => None end.
 
 (* result-region offsets, mirroring tools/vtest/tests/uart_irq_rx.S *)
-Definition irq_rx_agree_offs : list nat :=
+Definition irq_rx_offs : list nat :=
   [4;   (* progress marker: 3 = the whole program ran *)
    8;   (* LSR with the byte waiting             0x61 = DR|THRE|TEMT *)
    12; 16;   (* PLIC pending / mip&SEIP with IER = 0      0, 0 *)
@@ -46,22 +48,20 @@ Definition irq_rx_agree_offs : list nat :=
    44; 48;   (* PLIC pending / mip after the claim          0, 0 *)
    52; 56;   (* the byte out of RHR, and how many came      0x41, 1 *)
    60;  (* LSR after draining                          0x60: DR gone *)
-   68; 72]%nat. (* pending / mip after the PLIC complete      0, 0 *)
-
-Definition irq_rx_diverge_offs : list nat :=
-  [20;  (* ISR with IER = 0 *)
-   32;  (* ISR identifying rx-available *)
-   64]%nat. (* ISR after the FIFO was drained *)
+   68; 72;   (* pending / mip after the PLIC complete      0, 0 *)
+   20;  (* ISR with IER = 0                            0x01 *)
+   32;  (* ISR identifying rx-available                0x04 *)
+   64]%nat. (* ISR after the FIFO was drained          0x01 *)
 
 (* ---------------------------------------------------------------------- *)
 (* 1. THE CHAIN AGREES, step for step -- and so does the byte itself.      *)
 (* ---------------------------------------------------------------------- *)
 
 Definition irq_rx_expect :=
-  (fun o => cap_word uart_irq_rx_qemu_result o) <$> irq_rx_agree_offs.
+  (fun o => cap_word uart_irq_rx_qemu_result o) <$> irq_rx_offs.
 
 Lemma uart_irq_rx_agrees :
-  (fun o => res_word irq_rx_run o) <$> irq_rx_agree_offs = irq_rx_expect.
+  (fun o => res_word irq_rx_run o) <$> irq_rx_offs = irq_rx_expect.
 Proof. solve_vtest irq_rx_expect. Qed.
 
 (* Spelled out:
@@ -90,43 +90,21 @@ Proof. solve_vtest irq_rx_expect. Qed.
    [SUartRx] schedule arm do what the hardware does at all. *)
 
 (* ---------------------------------------------------------------------- *)
-(* 2. What diverges: the ISR, and only the ISR.                            *)
-(* ---------------------------------------------------------------------- *)
-
-Definition irq_rx_model_diverging : list Z := [0xc1; 0xc4; 0xc1].
-Definition irq_rx_qemu_diverging  : list Z := [0x01; 0x04; 0x01].
-
-Lemma uart_irq_rx_model_diverging :
-  (fun o => res_word irq_rx_run o) <$> irq_rx_diverge_offs
-  = irq_rx_model_diverging.
-Proof. solve_vtest irq_rx_model_diverging. Qed.
-
-Lemma uart_irq_rx_qemu_diverging :
-  (fun o => cap_word uart_irq_rx_qemu_result o) <$> irq_rx_diverge_offs
-  = irq_rx_qemu_diverging.
-Proof. solve_vtest irq_rx_qemu_diverging. Qed.
-
-Lemma uart_irq_rx_really_diverges :
-  irq_rx_model_diverging <> irq_rx_qemu_diverging.
-Proof. discriminate. Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 3. Classification: ONE cause, already recorded, and it is NOT the       *)
-(*    level-versus-latch one.                                             *)
+(* 2. The ISR fields, which used to be this file's three divergences.      *)
 (*                                                                        *)
-(*    All three fields differ by exactly 0xc0.  [uart_isr] sets bits 7:6   *)
-(*    (FIFOs enabled) unconditionally where the hardware sets them only    *)
-(*    once FCR bit 0 has been written, and this program never writes FCR   *)
-(*    (see the header: a FIFO-enable write flushes the receive FIFO and    *)
-(*    would race with the host's byte).  INCOMPLETENESS, and the same one  *)
-(*    UartRegs.v records as (d).  Field +36 is the same read masked to     *)
-(*    bits 3:0 and it AGREES, so the interrupt CAUSE encoding -- which is  *)
-(*    what a driver dispatches on -- is faithful for the receive case.     *)
+(*    All three differed by exactly 0xc0: [uart_isr] set bits 7:6 (FIFOs   *)
+(*    enabled) unconditionally where the hardware sets them only once FCR  *)
+(*    bit 0 has been written, and this program never writes FCR (see the   *)
+(*    header: a FIFO-enable write flushes the receive FIFO and would race  *)
+(*    with the host's byte).  With the bits taken from the register, the   *)
+(*    three read 0x01, 0x04 and 0x01 on both machines -- and +36, the same *)
+(*    read masked to bits 3:0, is now redundant rather than load-bearing.  *)
 (*                                                                        *)
-(*    The latch divergence (UartRegs.v (e)) does NOT arise on this path:   *)
-(*    the rx interrupt is a level on the real hardware too -- it goes away *)
-(*    when the FIFO is emptied, not when the ISR is read -- so the model   *)
-(*    and QEMU agree at +64 modulo the same 0xc0, and at +68/+72 exactly.  *)
-(*    That is worth stating positively: of the two interrupt conditions,   *)
-(*    only the transmit one is modelled with the wrong kind of edge.       *)
+(*    THE LATCH FIX DOES NOT REACH THIS PATH, which is worth stating       *)
+(*    positively: the receive interrupt is a LEVEL on the real hardware    *)
+(*    too -- it goes away when the FIFO is emptied, not when the ISR is    *)
+(*    read -- so +64 (the ISR after the drain) is 0x01 for the same reason  *)
+(*    on both sides, and the model's [uart_rx_int] needed no change.  Of   *)
+(*    the two interrupt conditions only the transmit one was modelled with *)
+(*    the wrong kind of edge, and UartIrqTx.v is where that shows.         *)
 (* ---------------------------------------------------------------------- *)

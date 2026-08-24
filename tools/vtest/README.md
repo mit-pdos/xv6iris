@@ -95,10 +95,12 @@ They come from the ABI and from what the model is:
   info struct there).  The model's chain writes a0 and a1 and nothing else;
   a2 is admitted as a witness.  See finding 18 for a1.
 - **Do not write FCR bit 0 in a test that receives.**  Flipping FIFO-enable
-  flushes the receive path, and the host's first byte is already in QEMU's
-  holding register before the guest's first instruction runs -- an FCR
-  FIFO-enable at the top of the program silently eats byte 1 (measured: reads
-  `0x42` first, 8 runs of 8).  Relatedly, with the FIFOs off QEMU delivers one
+  flushes the receive path -- on BOTH machines now, `uart_write` offset 2
+  implements it -- and the host's first byte is already in QEMU's holding
+  register before the guest's first instruction runs, so an FCR FIFO-enable
+  at the top of the program silently eats byte 1 (measured: reads `0x42`
+  first, 8 runs of 8).  The model cannot reproduce the RACE, only the flush,
+  which is why this is a rule for the test rather than a finding.  Relatedly, with the FIFOs off QEMU delivers one
   character at a time and re-offers the next only after RHR is read, so any
   "LSR bit 0 immediately after a read" field is a race against the host rather
   than a fact about the device; order plus a spin before each read
@@ -158,6 +160,12 @@ would not give.
 
 ## Findings so far
 
+Five of these have been FIXED rather than recorded -- the whole UART register
+file, its interrupt-status semantics and its bus decode.  They are in
+[Findings fixed](#findings-fixed) below, with what the fix was and which test
+now passes because of it; they are kept because the point of this table is the
+register of what differential testing FOUND, not only of what is still open.
+
 Classified as *incompleteness* (the model is stricter than the hardware, so
 some real driver has no model execution -- cannot make a proof wrong, but
 limits what can be verified) or *defect* (the model produces a value the
@@ -171,10 +179,6 @@ does not exist).
 | 3 | `DeviceFeaturesSel` (0x14), `DriverFeaturesSel` (0x24) | not decoded -- the store is STUCK | writable; the high feature word is `0x101`, and a full 1.x negotiation acking `VERSION_1` reaches Status 11 | incompleteness | `disk_ident_featsel`, `disk_ident_drvfsel` |
 | 4 | **`used.ring[i].len`** | `vr_len` (the data descriptor's length) in both directions | 1 for a write, 513 for a read | **defect** | `disk_rw`, `disk_order` |
 | 5 | **completion ORDER of two in-flight requests** | publication order ONLY | either order | **unsoundness** | `disk_order` |
-| 6 | UART MCR (4), MSR (6), SCRATCH (7): read as 0, writes discarded | `0` / `0` / `0` | `3` / `0xb0` / `0x5a` | incompleteness | `uart_regs` |
-| 7 | UART ISR bits 7:6 (FIFOs-enabled) hardcoded set | `0xc1` at reset | `0x01` until FCR enables the FIFOs | incompleteness | `uart_regs` |
-| 8 | UART THRE interrupt modelled as a LEVEL, not latched | second ISR read still `0xc2` | second read `0xc1` -- the read cleared it | incompleteness | `uart_regs` |
-| 9 | the UART window decodes width 1 only | a 4-byte read is STUCK | returns `0x00000008` (the bus narrows to register 4) | incompleteness | `uart_width` |
 | 10 | **PLIC claim ignores the context THRESHOLD** | returns the masked source and clears its pending bit | returns `0`, the source stays pending | **unsoundness** (and a defect) | `plic_thresh` |
 | 11 | PLIC M-context registers (enable 0x2000, threshold 0x200000, claim 0x200004) not decoded | STUCK at the first M access | services all three | incompleteness | `plic_mctx` |
 | 13 | virtio CONFIG SPACE: capacity (0x100) and ConfigGeneration (0x0fc) | not decoded -- STUCK | capacity **128 sectors**, exactly the backing file | incompleteness | `disk_ident_cap`, `disk_ident_confgen` |
@@ -188,10 +192,55 @@ does not exist).
 | 26 | **the model's TLB is DIRECT-MAPPED (64 entries, `tlb_hash` = the low 6 bits of the VPN)** | at a colliding VPN the entry is evicted by the very next fetch, so a PTE rewritten WITHOUT `sfence.vma` is re-walked and the NEW mapping is used | keeps the stale entry | unsound direction, but see below | `pt_tlb` |
 | 21 | `misa` advertises F and D but the model has NO F/D instructions | `fsd` takes an illegal-instruction trap (`mcause` 2, `mtval` = the encoding) | executes | incompleteness + internal inconsistency | `core_regs_fpr` |
 | 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
-| 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received -- the holding register is not cleared by a read nor by an FCR clear, only the DR FLAG is | incompleteness | `uart_rx` |
 | 24 | **THE MEMORY MODEL: the model is sequentially consistent** | one shared `gmem`, a store is global the instant it retires -- (0,0) unreachable | store-buffering gives **(0,0) in a few percent of runs**, which RVWMO permits | **UNSOUNDNESS** | `conc_sb` |
 | 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | incompleteness (harness-blocking) | `conc_amo` |
 | 12 | PLIC source 0's priority register not decoded (`plic_read`/`plic_write` gate on `0 <? off`), and `plic_nsrc` is 32 where the board has 96 | STUCK | offset 0 is read-only zero; source 32 is a real register | incompleteness | `plic_prio0` |
+
+<a id="findings-fixed"></a>
+## Findings fixed
+
+**These are findings, not deleted rows.**  Each was a real difference between
+the model and the machine and each is now a passing test rather than a pinned
+divergence, but the register of what differential testing FOUND is the point
+of this file, so they keep their numbers, their values and their original
+classification.  All five were in the 16550 and they went together: half of
+them are one modelling shortcut seen from different sides.
+
+| # | what | the model USED to say | the machine -- and the model now | kind it was | pinned by |
+|---|------|------------------------|-----------------------------------|-------------|-----------|
+| 6 | UART MCR (4), MSR (6), SCRATCH (7) | `0` / `0` / `0`, and writes discarded | `3` / `0xb0` / `0x5a`: five bits of MCR **including LOOPBACK**, the port's modem inputs (MCR's outputs under LOOP), and a byte of storage | incompleteness | `uart_regs`, `uart_loop` |
+| 7 | UART ISR bits 7:6 (FIFOs-enabled) | hardcoded set: `0xc1` at reset | `0x01` until FCR bit 0 enables the FIFOs, `0xc1` after | incompleteness | `uart_regs`, `uart_irq_tx`, `uart_irq_rx` |
+| 8 | UART THRE interrupt: LEVEL or LATCH | a level -- the second ISR read still `0xc2` | second read `0xc1`: the read cleared it.  The latch `u_thri` arms when the transmitter falls idle, when an FCR write clears the tx FIFO, or when IER bit 1 is written while it is already idle | incompleteness | `uart_regs`, `uart_irq_tx` |
+| 9 | UART access WIDTH | width 1 only -- a 4-byte read was STUCK | `0x00000008`: the bus NARROWS to the one byte register the address names (zero-extended out, low byte in), at 2, 4 and 8 bytes, and does NOT gather registers into a word | incompleteness | `uart_width` |
+| 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received: the holding register is cleared neither by a read nor by an FCR clear, only the DR FLAG is -- and with the FIFOs ENABLED the machine answers `0`, which is the FIFO's output stage | incompleteness | `uart_rx`, `uart_dlab` |
+
+**Finding 6 was the load-bearing one, and not because of the values.**  MCR
+bit 4 is LOOPBACK, so a readable MCR that ignored bit 4 would have been worse
+than the register that read as zero: a driver's self-test would have put its
+byte on the WIRE, which is a thing the hardware never does -- turning an
+incompleteness into a defect.  Making the register real meant making the mode
+real.  `uart_tx_pop` has two arms, and `uart_state` carries `u_wire` (what
+left on SOUT -- the console-observable trace, and what `VTest.serial_of`
+compares) beside `u_out` (what the TRANSMITTER finished with, loopback
+included), so that the transmitter-token argument in `WpUart.v`, stated on
+`u_out ++ u_tx`, is untouched by where the byte went.  `uart_loop` checks the
+whole of it against the machine, serial channel included: the loopbacked byte
+comes back on RHR and the host sees only the byte sent after LOOP was cleared.
+
+**What these fixes deliberately did NOT change**, each for the same reason --
+the safe direction is the model producing MORE interrupts and accepting MORE
+input than the machine, never fewer:
+
+- the RECEIVE interrupt is a level on the hardware too, so `uart_rx_int` is
+  what it always was (`uart_irq_rx` is the evidence);
+- the ISR's receive condition triggers at ONE byte rather than at FCR's
+  trigger level.  Modelling the trigger level without the character TIMEOUT
+  interrupt would err toward FEWER interrupts, and one byte is the level xv6
+  and every test here select anyway (FCR bits 7:6 clear);
+- the model's rx FIFO is 16 deep in both FIFO modes, where the hardware has a
+  one-byte holding register with the FIFOs off.  The model accepts more host
+  input than the machine offers, and `uart_rx_push` REFUSES when full, which
+  is the flow control QEMU's front end applies rather than an overrun.
 
 Finding 4 is the one worth acting on.  The spec defines the used element's
 `len` as the number of bytes written into the DEVICE-WRITABLE part of the
@@ -447,10 +496,20 @@ have been wrong and is not.
   channel -- and the model's `v_disk` agrees with it byte for byte, including
   on a multi-sector (8-sector) request.
 - **The UART transmit path end to end** (`uart_tx`, `uart_dlab`, `uart_regs`):
-  `uart_write` at offset 0 -> `uart_tx_pop` -> `uart_acc` is exactly the byte
+  `uart_write` at offset 0 -> `uart_tx_pop` -> `u_wire` is exactly the byte
   sequence the host received, in order, nothing lost or duplicated; `uart_lsr`
   is `0x60` with the FIFO empty at every point either machine can be asked,
   including one instruction after a THR store, and LSR reads are pure.
+- **The whole UART register file, read and written** (`uart_regs`,
+  `uart_width`, `uart_loop`): all eight offsets, at all four access widths,
+  in both directions -- see [Findings fixed](#findings-fixed), since every one
+  of those rows is now a confirmation.  The two worth naming on their own are
+  LOOPBACK (`uart_loop`: the transmitted byte comes back on RHR, the modem
+  outputs come back on the modem inputs pin for pin, and the host sees
+  nothing of it -- the serial channel is what proves the last part) and the
+  ISR's LATCH (`uart_regs`, `uart_irq_tx`: two reads in a row differ, and the
+  latch is armed by the IER write itself, so a transmitter that is already
+  idle when the interrupt is enabled still interrupts).
 - **The DLAB divisor-latch aliasing** (`uart_dlab`), which is what the whole
   `un_dlab` ghost in `design/device.md` exists for: LCR bit 7's polarity,
   offset 0 aliasing to DLL and offset 1 to DLM, IER unaffected by a DLM
@@ -483,13 +542,10 @@ have been wrong and is not.
   back 10; the condition removed and completed -> pending and SEIP clear.
   Identical on both machines at every step of both chains.  This is the first
   test to raise source 10 at all, so it is the first evidence that the UART is
-  wired to the controller AND to the right source.  It also BOUNDS finding 8:
-  after QEMU's ISR read drops the line, QEMU still reports source 10 pending
-  and SEIP set, because the gateway holds a forwarded request until it is
-  claimed -- and `plic_latch` does the same -- so the model's level treatment
-  of THRE costs no extra PLIC-visible interrupt on this path.  Only the
-  TRANSMIT condition has the wrong edge; the receive interrupt is a level on
-  real hardware too.
+  wired to the controller AND to the right source.  It also pins the GATEWAY against the ISR read: on
+  both machines the read drops the UART's line and source 10 stays pending
+  with SEIP still set, because the gateway holds a forwarded request until it
+  is claimed -- `plic_latch` does the same.
 - **The virtio RESET command** (`disk_ident`), never exercised before: Status
   -> 0, `QueueReady` -> 0 without the driver clearing it, ISR -> 0, and the
   offered features untouched.  `virtio_reset` keeping only `v_disk` is what
@@ -525,14 +581,14 @@ have been wrong and is not.
   readback is just `init_regstate`'s zero complemented; preset the register to
   all-ones and the read gives QEMU's 0.  This is exactly the case a raw diff
   would have mis-reported as a divergence.
-- **The UART receive datapath** (`uart_rx`), ten of eleven observations
-  exact: bytes come out IN ORDER (`u_rx` really is a FIFO -- a LIFO or a
+- **The UART receive datapath** (`uart_rx`), every observation exact: bytes come out IN ORDER (`u_rx` really is a FIFO -- a LIFO or a
   one-deep register gives a different answer here); RHR pops EXACTLY one byte
   per read, established without a race by reading three of a four-byte queue
   and finding the fourth still there; LSR bit 0 tracks the FIFO across the
   whole sequence and is not sticky in either direction; and FCR bit 1 clears
   the receive FIFO -- a live `uart_write` arm no test had touched on the rx
-  side, and what `uartinit` writes at boot.
+  side, and what `uartinit` writes at boot -- while leaving the receive
+  HOLDING register alone, which is what a read with DR clear hands back.
 - **Instruction-granularity interleaving** (`conc_lost`): a lost-update race
   produces exactly three outcomes (4, 2 and 3 over two rounds) and the model
   has a schedule for each, floor included.  It also pins that the UNSCHEDULED

@@ -1,5 +1,6 @@
-(* UartRx.v -- THE RECEIVE DATAPATH.  Nine observations agree; ONE diverges,
-   and it is a new finding.
+(* UartRx.v -- THE RECEIVE DATAPATH.  All eleven observations agree; the one
+   that used to diverge was finding 23, and it is the RHR read on an empty
+   FIFO (section 3).
 
    Source: tools/vtest/tests/uart_rx.S.  Capture: UartRxGen.v.
 
@@ -41,7 +42,7 @@ Definition rx_run : option mstate :=
   match rx_start with Some s => run_until 50000 s | None => None end.
 
 (* result-region offsets, mirroring tools/vtest/tests/uart_rx.S *)
-Definition rx_agree_offs : list nat :=
+Definition rx_offs : list nat :=
   [4;   (* progress marker: 3 = the whole program ran *)
    8;   (* LSR with bytes waiting                 0x61 = DR|THRE|TEMT *)
    12; 16; 20;   (* RHR #1, #2, #3            0x41, 0x42, 0x43 -- IN ORDER *)
@@ -49,20 +50,18 @@ Definition rx_agree_offs : list nat :=
    28;  (* LSR after the FCR write with bit 1 set          0x60: DR gone *)
    36;  (* LSR after reading the emptied FIFO              0x60 *)
    40;  (* how many bytes a drain loop still finds         0 *)
-   44]%nat. (* LSR at the end                             0x60 *)
-
-Definition rx_diverge_offs : list nat :=
-  [32]%nat.  (* RHR on the FIFO the clear just emptied *)
+   44;  (* LSR at the end                                  0x60 *)
+   32]%nat. (* RHR on the FIFO the clear just emptied      0x44 *)
 
 (* ---------------------------------------------------------------------- *)
 (* 1. What agrees -- which is the datapath.                                *)
 (* ---------------------------------------------------------------------- *)
 
 Definition rx_expect :=
-  (fun o => cap_word uart_rx_qemu_result o) <$> rx_agree_offs.
+  (fun o => cap_word uart_rx_qemu_result o) <$> rx_offs.
 
 Lemma uart_rx_agrees :
-  (fun o => res_word rx_run o) <$> rx_agree_offs = rx_expect.
+  (fun o => res_word rx_run o) <$> rx_offs = rx_expect.
 Proof. solve_vtest rx_expect. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -100,50 +99,48 @@ Proof. solve_vtest rx_expect. Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* ---------------------------------------------------------------------- *)
-(* 3. The one divergence: RHR on an EMPTY receive FIFO.                    *)
+(* 3. RHR ON AN EMPTY RECEIVE FIFO (+32), which used to be finding 23.     *)
+(*                                                                        *)
+(*    The answer is 0x44 -- the byte the FCR write had just discarded.     *)
+(*    The receive HOLDING register is not cleared by a read and not        *)
+(*    cleared by the FCR clear either: only the DATA-READY flag is, so a   *)
+(*    read with DR clear hands back the last byte the receiver latched.    *)
+(*    [uart_read]'s offset-0 arm used to answer [byte0] there, which is a  *)
+(*    value the machine does not produce, and no proof against the old     *)
+(*    model could conclude anything about what such a read returns on a    *)
+(*    real port -- a driver that (wrongly, but really) used a zero from    *)
+(*    RHR as an end-of-input signal would have been verified against a     *)
+(*    device that does not exist.  [DevModel.uart_state] carries [u_rbr]   *)
+(*    for this, and the FCR clear empties [u_rx] without touching it,      *)
+(*    which is exactly the separation the finding asked for.               *)
+(*                                                                        *)
+(*    The two machines still agree that the byte is GONE in the sense that *)
+(*    matters: +28 and +36 show DR clear and +40 shows the drain loop      *)
+(*    finding nothing.  A correct driver reads RHR only when DR is set,    *)
+(*    which is why the old answer cost xv6 nothing.                         *)
+(*                                                                        *)
+(*    WITH THE FIFOs ENABLED the machine answers 0 instead, because the    *)
+(*    holding register is then the FIFO's own output stage; the model      *)
+(*    reads FCR bit 0 and does the same.  This program leaves them off     *)
+(*    (see the header), so the case is stated off the model here -- and    *)
+(*    UartDlab.v's +32 is the third case, a port that has never received   *)
+(*    anything at all, where both machines read 0 because that is what the *)
+(*    holding register powers up holding.                                  *)
 (* ---------------------------------------------------------------------- *)
 
-Definition rx_model_diverging : list Z := [0].
-Definition rx_qemu_diverging  : list Z := [0x44].
+Definition rx_after_clear : uart_state :=
+  match rx_run with Some s => duart (mdev s) | None => uart0_state end.
 
-Lemma uart_rx_model_diverging :
-  (fun o => res_word rx_run o) <$> rx_diverge_offs = rx_model_diverging.
-Proof. solve_vtest rx_model_diverging. Qed.
+Definition rx_fifos_on : uart_state :=
+  match uart_write rx_after_clear 2 (Z_to_bv 8 0x01) with
+  | Some u => u | None => rx_after_clear end.
 
-Lemma uart_rx_qemu_diverging :
-  (fun o => cap_word uart_rx_qemu_result o) <$> rx_diverge_offs
-  = rx_qemu_diverging.
-Proof. solve_vtest rx_qemu_diverging. Qed.
-
-Lemma uart_rx_really_diverges : rx_model_diverging <> rx_qemu_diverging.
-Proof. discriminate. Qed.
-
-(* INCOMPLETENESS, and NEW -- nothing in the suite had read RHR on a FIFO
-   that had held something.
-
-   [uart_read]'s offset-0 arm returns [byte0] when [u_rx] is empty.  The
-   hardware's receive holding register is not cleared by a read and not
-   cleared by the FCR clear either: only the DATA-READY flag is, so a read
-   with DR clear returns the LAST BYTE RECEIVED -- here 0x44, the byte the
-   FCR write had just discarded.  Both machines agree the byte is GONE in
-   the sense that matters (+28 and +36 show DR clear, +40 shows the drain
-   loop finds nothing), and a correct driver reads RHR only when DR is set,
-   which is why this costs xv6 nothing.
-
-   The direction is the model producing a value the hardware does not, which
-   is the shape of a defect; it is classified as incompleteness because the
-   value is only produced on a read the hardware calls undefined -- RHR with
-   no data ready -- and 0 is as good an answer as any.  What it does mean is
-   that no proof against this model can conclude anything about what such a
-   read returns on a real port, and a driver that (wrongly, but really) uses
-   a zero from RHR as an end-of-input signal would be verified against a
-   device that does not exist.  UartDlab.v +32 is the other data point: on a
-   port that has never received anything, both machines do read 0.
-
-   The obvious fix -- keep the last byte in [uart_state] and return it -- is
-   local to [uart_read], but it is not obviously right either, since the FCR
-   clear and the DR flag would then have to be separated from [u_rx] being
-   empty.  Recorded rather than made. *)
+Lemma uart_rx_empty_read_fifos_on :
+  match uart_read rx_fifos_on 0 with
+  | Some (b, _) => bv_unsigned b
+  | None => -1
+  end = 0.
+Proof. solve_vtest (0 : Z). Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. The receive FIFO's DEPTH is not worth a test, and this says why.     *)
