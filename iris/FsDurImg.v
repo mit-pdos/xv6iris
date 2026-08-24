@@ -1065,7 +1065,7 @@ Qed.
 
 (*  ...at the image's ticket function.  THIS IS WHERE CONJUNCT (15) IS
     SPENT: without it a root record called "foo" naming the root would owe
-    a token ([ent_tokenless] exempts only the two dot NAMES) and pay no
+    a token ([ent_tokenless]'s self clause exempts it) and pay no
     ticket ([fs_rec_ticket] exempts any SELF record).                      *)
 Lemma view_ops_incl_tickets (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
     (orph : bool) :
@@ -1085,14 +1085,14 @@ Proof.
   assert (Hlv : dir_live (fs_data_of P dn) k)
     by exact (dir_wins_live (fs_data_of P dn) k Hw).
   assert (Hne : bv_unsigned (dir_inum (fs_data_of P dn) k) <> self).
-  { intros Hc.
-    destruct (Hself k Hk Hlv Hc) as [Hd | Hd];
-      rewrite /ent_tokenless Hd Hc in Htl.
-    - rewrite (bool_decide_eq_true_2 (DOT = DOT) eq_refl) in Htl.
-      cbn [orb] in Htl. discriminate.
-    - rewrite (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl) in Htl.
-      rewrite (bool_decide_eq_true_2 (self = self) eq_refl) in Htl.
-      rewrite orb_true_r andb_true_r orb_true_r in Htl. discriminate. }
+  { (* under 2b-inode-5's [ent_tokenless] the SELF clause refutes directly:
+       a live entry targeting its home owes no token, whatever its name.
+       [Hself] ((15), [fs_root_no_self]) is no longer needed here and stays
+       only to keep the statement (and its callers) unchanged. *)
+    clear Hself. intros Hc.
+    rewrite /ent_tokenless Hc in Htl.
+    rewrite (bool_decide_eq_true_2 (self = self) eq_refl) in Htl.
+    cbn [orb] in Htl. discriminate. }
   rewrite /fs_rec_ticket. cbv zeta.
   rewrite (proj2 (dir_liveb_true (fs_data_of P dn) k) Hlv).
   rewrite (bool_decide_eq_false_2 _ Hne). reflexivity.
