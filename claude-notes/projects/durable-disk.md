@@ -1675,6 +1675,24 @@ do with the strengthening/sys_sync lane.  The three boot-fixed geometry
 equations (`dgeo_ok`) are ACCEPTED (one number each at boot; not the
 rejected kinds tie); the owner is "not thrilled" — keep them to exactly
 three and delete on sight anything that grows them.
+3d STOPPED at one green commit (`6c577ec5`): the ledger's remaining
+entry kinds — all TRANSPORT-COMPATIBLE (mover statements at arbitrary Γ).
+Its triage, for the snapshot lane: (i) the `GMint`-at-nonempty shape is
+SOLVED by a kernel fact — this kernel never raises `nlink` from zero at
+a node with entries (`create`'s child is fresh, `sys_link` refuses dirs,
+`mkdir`'s `dp->nlink++` is at a live dir) — so `GMint` needs only
+"entries unchanged ∧ (orphan flag unchanged ∨ entry map empty)"; the
+DOWN direction is `GBurn (Some t)` = `ent_toks_orphan`. (ii) The
+cross-write HANDS (a balloc'd block between its bitmap write and its
+adopt; create's minted token before its dirlink) admit provably NO
+hands-empty ledger mid-window — under per-commit fresh instances the
+problem DISSOLVES (nothing spans writes durably). (iii) `dgeo_ok`'s
+three equations and the would-be fourth (`sb_size` for bitmap range)
+become true BY CONSTRUCTION when the durable state is minted from the
+era's. Fold-specific (do not carry): `dled_coh`/`dled_dstep`/the
+Ψ-law wiring/`P_wf_led`-with-hands. In-flight payload patch preserved at
+`scratchpad/lane-3d-inflight-payload.patch` (not compiled).
+
 ## Stage 3 — the vertical spike: `sys_mknod`
 
 **ORDERING RULING (2c, 2026-08-24): THE `P_wf` FLIP AND THE SUPPLIERS' STEPS
