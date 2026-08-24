@@ -2,8 +2,8 @@
    ALLOCATED AFRESH at every group commit and never updated.
 
    Design of record: claude-notes/design/fs-state.md section 4^9 (the
-   owner's SNAPSHOT ruling, with its addendum 5 "the transport lemma IS
-   the allocator"); worklist item 4 of
+   owner's SNAPSHOT ruling, with its addendum 5 -- the transport lemma IS
+   the allocator); worklist item 4 of
    claude-notes/projects/durable-disk.md.
 
    THE ONE IDEA.  No durable ghost is ever moved.  At a group commit the
@@ -57,15 +57,18 @@ Require Import DiskImg.       (* [diskImgG] -- the byte map's capacity class;
 Require Import BitmapEnc.
 Require Import BlockWords.
 Require Import DinodeEnc.
+Require Import DirView.
+Require Import FsTree.
 Require Import InodeDefs.
+Require Import RiscvModelBytes.  (* [nth_byte] / [bv_eq_of_bytes] *)
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)
 Require Import Xv6Cameras.
 Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically  *)
 (* LAST, so [FsState]'s [fs_view] / [byte_range] / [blk_owned] / [link_auth]
    win over the block layer's twins that arrive transitively through
-   [FsDurBytes] -> [RiscvPtsto] (durable-notes.md, "AND WHERE THAT IMPORT
-   COLLIDES, PUT IT EARLY"). *)
+   [FsDurBytes] -> [RiscvPtsto]; durable-notes.md, AND WHERE THAT IMPORT
+   COLLIDES, PUT IT EARLY. *)
 Require Export FsState.
 
 Local Open Scope Z_scope.
@@ -94,8 +97,8 @@ Definition rec_in_blk (bs : list (bv 8)) (off : Z) (dn : dinode) : Prop :=
      value [S] is read off the era's own top-map authority, whose domain
      IS the region's inums.
    - [sk_links], the link family's validity.  It is the tokens-<=-nlink
-     law, which fs-state.md section 7 already names as "the one whole-state
-     fact in the design"; it is never MAINTAINED here, only carried, and
+     law, which fs-state.md section 7 already names as the one whole-state
+     fact in the design; it is never MAINTAINED here, only carried, and
      the allocator needs it because [own_alloc] needs a valid element.
    - [sk_bsz], "every block of [D] is a whole block", which is the log's
      own row (b) property. *)
@@ -167,6 +170,232 @@ Proof.
   destruct (sk_dom Hok i Hi) as [n Hn].
   exists n. split; [exact Hn |]. split; [exact (sk_local Hok i n Hn) |].
   exact (sk_rec Hok i n Hn).
+Qed.
+
+(* ===================================================================== *)
+(*  1b. THE ENCODING IS INJECTIVE, AND WHAT THAT BUYS                     *)
+(*                                                                        *)
+(*  The whole point of the snapshot registry over the flat byte blob is    *)
+(*  that the durable side now carries an ABSTRACT STATE, so a client can   *)
+(*  learn a fact about an INODE and not merely about a byte.  Turning a    *)
+(*  byte fact into a node fact is exactly injectivity of the encoder, and  *)
+(*  the tree did not have it.                                             *)
+(*                                                                        *)
+(*  FOR RELOCATION: [bv16_eq_of_bytes] / [bv32_eq_of_bytes] belong in      *)
+(*  [RiscvModelBytes.v] beside [bv_eq_of_bytes]; [word_bytes_inj] /        *)
+(*  [ind_bytes_inj] in [BlockWords.v] and [half_bytes_inj] /               *)
+(*  [dinode_bytes_inj] in [DinodeEnc.v], each beside its encoder.  They    *)
+(*  are here because an additive change to a file that low rebuilds its    *)
+(*  whole cone on every iteration -- durable-notes.md, an ADDITIVE change *)
+(*  to a shared invariant file belongs in a NEW leaf file.                 *)
+(* ===================================================================== *)
+
+Lemma bv16_eq_of_bytes (w w' : bv 16) :
+  nth_byte w 0 = nth_byte w' 0 -> nth_byte w 1 = nth_byte w' 1 -> w = w'.
+Proof.
+  intros H0 H1. apply (bv_eq_of_bytes (n := 2%N)).
+  intros j Hj. destruct j as [| [| j]]; [exact H0 | exact H1 |].
+  exfalso. rewrite Nat2N.inj_succ Nat2N.inj_succ in Hj. lia.
+Qed.
+
+Lemma bv32_eq_of_bytes (w w' : bv 32) :
+  nth_byte w 0 = nth_byte w' 0 -> nth_byte w 1 = nth_byte w' 1 ->
+  nth_byte w 2 = nth_byte w' 2 -> nth_byte w 3 = nth_byte w' 3 -> w = w'.
+Proof.
+  intros H0 H1 H2 H3. apply (bv_eq_of_bytes (n := 4%N)).
+  intros j Hj. destruct j as [| [| [| [| j]]]];
+    [exact H0 | exact H1 | exact H2 | exact H3 |].
+  exfalso.
+  rewrite Nat2N.inj_succ Nat2N.inj_succ Nat2N.inj_succ Nat2N.inj_succ in Hj.
+  lia.
+Qed.
+
+(* [injection] on a list of BITVECTORS goes one constructor too far -- it
+   decomposes the [BV] record itself and hands back an equation between two
+   [bv_unsigned] projections, which the byte lemmas above cannot take.  So
+   the elements are read out positionally instead, where [!!!] on a literal
+   list is conversion. *)
+Lemma half_bytes_inj (w w' : bv 16) : half_bytes w = half_bytes w' -> w = w'.
+Proof.
+  intros H. apply bv16_eq_of_bytes.
+  - change (nth_byte w 0) with (half_bytes w !!! 0%nat).
+    change (nth_byte w' 0) with (half_bytes w' !!! 0%nat). by rewrite H.
+  - change (nth_byte w 1) with (half_bytes w !!! 1%nat).
+    change (nth_byte w' 1) with (half_bytes w' !!! 1%nat). by rewrite H.
+Qed.
+
+Lemma word_bytes_inj (w w' : bv 32) : word_bytes w = word_bytes w' -> w = w'.
+Proof.
+  intros H. apply bv32_eq_of_bytes.
+  - change (nth_byte w 0) with (word_bytes w !!! 0%nat).
+    change (nth_byte w' 0) with (word_bytes w' !!! 0%nat). by rewrite H.
+  - change (nth_byte w 1) with (word_bytes w !!! 1%nat).
+    change (nth_byte w' 1) with (word_bytes w' !!! 1%nat). by rewrite H.
+  - change (nth_byte w 2) with (word_bytes w !!! 2%nat).
+    change (nth_byte w' 2) with (word_bytes w' !!! 2%nat). by rewrite H.
+  - change (nth_byte w 3) with (word_bytes w !!! 3%nat).
+    change (nth_byte w' 3) with (word_bytes w' !!! 3%nat). by rewrite H.
+Qed.
+
+Lemma ind_bytes_inj (e e' : list (bv 32)) :
+  length e = length e' -> ind_bytes e = ind_bytes e' -> e = e'.
+Proof.
+  revert e'. induction e as [| w e IH]; intros [| w' e'] Hlen H;
+    [reflexivity | simpl in Hlen; lia | simpl in Hlen; lia |].
+  rewrite !ind_bytes_cons in H.
+  assert (Hl : length (word_bytes w) = length (word_bytes w'))
+    by (rewrite !word_bytes_length //).
+  destruct (app_inj_1 _ _ _ _ Hl H) as [Hw He].
+  f_equal; [exact (word_bytes_inj w w' Hw) |].
+  apply IH; [simpl in Hlen; lia | exact He].
+Qed.
+
+(* THE ENCODER IS INJECTIVE ON WELL-FORMED RECORDS.  [dinode_wf] is needed
+   for the address array alone: two records whose [di_addrs] have different
+   lengths encode to byte lists of different lengths, and the peel below is
+   what needs them equal. *)
+Lemma dinode_bytes_inj (d d' : dinode) :
+  dinode_wf d -> dinode_wf d' -> dinode_bytes d = dinode_bytes d' -> d = d'.
+Proof.
+  destruct d as [ty ma mi nl sz ad]; destruct d' as [ty' ma' mi' nl' sz' ad'].
+  rewrite /dinode_wf /dinode_bytes.
+  cbn [di_type di_major di_minor di_nlink di_size di_addrs].
+  intros Had Had' H.
+  (* the five lengths as NAMED facts: an inline [ltac:] in an argument
+     position whose expected type is still an evar is elaborated before the
+     conclusion is unified, and the [rewrite] then has nothing to hit
+     (durable-notes.md, "Inline [ltac:] in argument position") *)
+  assert (Hh : forall a b : bv 16,
+                 length (half_bytes a) = length (half_bytes b))
+    by (intros a b; rewrite !half_bytes_length //).
+  assert (Hw : forall a b : bv 32,
+                 length (word_bytes a) = length (word_bytes b))
+    by (intros a b; rewrite !word_bytes_length //).
+  destruct (app_inj_1 _ _ _ _ (Hh ty ty') H) as [Hty H1].
+  destruct (app_inj_1 _ _ _ _ (Hh ma ma') H1) as [Hma H2].
+  destruct (app_inj_1 _ _ _ _ (Hh mi mi') H2) as [Hmi H3].
+  destruct (app_inj_1 _ _ _ _ (Hh nl nl') H3) as [Hnl H4].
+  destruct (app_inj_1 _ _ _ _ (Hw sz sz') H4) as [Hsz Had2].
+  f_equal.
+  - exact (half_bytes_inj _ _ Hty).
+  - exact (half_bytes_inj _ _ Hma).
+  - exact (half_bytes_inj _ _ Hmi).
+  - exact (half_bytes_inj _ _ Hnl).
+  - exact (word_bytes_inj _ _ Hsz).
+  - apply ind_bytes_inj; [rewrite Had Had' // | exact Had2].
+Qed.
+
+(* ...hence a record IS determined by the bytes of the slot it sits in *)
+Lemma rec_in_blk_inj (bs : list (bv 8)) (off : Z) (dn dn' : dinode) :
+  dinode_wf dn -> dinode_wf dn' ->
+  rec_in_blk bs off dn -> rec_in_blk bs off dn' -> dn = dn'.
+Proof.
+  intros Hwf Hwf' (pre & post & Hbs & Hlen) (pre' & post' & Hbs' & Hlen').
+  assert (Hpre : length pre = length pre') by lia.
+  rewrite Hbs in Hbs'.
+  destruct (app_inj_1 _ _ _ _ Hpre Hbs') as [_ Hrest].
+  assert (Hl : length (dinode_bytes dn) = length (dinode_bytes dn'))
+    by (rewrite (dinode_bytes_length dn Hwf) (dinode_bytes_length dn' Hwf') //).
+  destruct (app_inj_1 _ _ _ _ Hl Hrest) as [Hd _].
+  exact (dinode_bytes_inj dn dn' Hwf Hwf' Hd).
+Qed.
+
+(* ===================================================================== *)
+(*  1c. WHAT A DURABLE BYTE FACT SAYS ABOUT THE SNAPSHOT'S STATE          *)
+(* ===================================================================== *)
+
+(* THE RECORD.  What the committed map holds at inum [i]'s slot IS the
+   snapshot node's record -- which is the step from a fact about the
+   durable disk's BYTES to a fact about the durable FILE SYSTEM,
+   i.e. the whole of what the snapshot registry adds over the flat blob. *)
+Lemma snap_ok_rec_of_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (bs : list (bv 8)) (dn : dinode) :
+  snap_ok S D -> snap_inum_ok S i ->
+  D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs ->
+  rec_in_blk bs (64 * (i `mod` 16)) dn -> dinode_wf dn ->
+  exists n, fss_inodes S !! i = Some n /\ fn_rec n = dn /\ inode_local i n.
+Proof.
+  intros Hok Hi Hbs Hin Hwf.
+  destruct (snap_ok_inode S D i Hok Hi) as (n & Hn & Hloc & bs' & Hbs' & Hin').
+  rewrite Hbs in Hbs'. injection Hbs' as <-.
+  exists n. split; [exact Hn |]. split; [| exact Hloc].
+  exact (rec_in_blk_inj bs _ (fn_rec n) dn (inl_rec_wf Hloc) Hwf Hin' Hin).
+Qed.
+
+(* THE DATA.  A slot below the node's size is a block of [D], at the node's
+   own reading -- so every dirent fact about a node's [fn_data] is a fact
+   about the committed map's blocks. *)
+Lemma snap_ok_data (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (n : fs_node) (k : nat) :
+  snap_ok S D -> fss_inodes S !! i = Some n ->
+  (k < FS_MAXFILE)%nat -> Z.of_nat k * BSIZE_z < fn_size n ->
+  D !! fn_naddr n k = Some (fn_data n k).
+Proof.
+  intros Hok Hn Hk Hlt.
+  destruct (inode_local_data_owned i n k (sk_local Hok i n Hn) Hk Hlt)
+    as (bs & Hbs & Hdat & _).
+  rewrite Hdat. exact (sk_blk Hok i n k bs Hn Hbs).
+Qed.
+
+(* THE DIRECTORY ENTRY.  A pure reading of [dir_entries], stated here
+   because the spike's parent half is its one consumer; FOR RELOCATION it
+   belongs in [FsStateInode.v] beside [dir_entries]. *)
+Lemma dir_entries_of_first (np : fs_node) (s : fname) (z : Z) (k : nat) :
+  fn_is_dir np = true ->
+  dir_first (fn_data np) (fn_nrec np) s = Some k ->
+  bv_unsigned (dir_inum (fn_data np) k) = z ->
+  dir_entries np !! s = Some z.
+Proof.
+  intros Hdir Hfirst Hinum.
+  rewrite /dir_entries Hdir.
+  apply dir_view_lookup_Some. exists k. split; [exact Hfirst | exact Hinum].
+Qed.
+
+(* ===================================================================== *)
+(*  1d. THE TWO SHAPES THE SPIKE THEOREM READS OFF A SNAPSHOT             *)
+(*                                                                        *)
+(*  Each side is a NAMED [Prop] rather than inline arithmetic, because     *)
+(*  both appear inside a [⌜ ⌝] where the ambient scope is [type_scope]     *)
+(*  and [a + b] would parse as [sum].                                     *)
+(* ===================================================================== *)
+
+(* "the committed map's inode block holds [dn] at inum [i]'s slot" *)
+Definition snap_slot_holds (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (dn : dinode) : Prop :=
+  exists bs, D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs
+          /\ rec_in_blk bs (64 * (i `mod` 16)) dn.
+
+(* "the durable file system's inode [i] IS the record [dn]" *)
+Definition snap_node_is (S : fs_state_rec) (i : Z) (dn : dinode) : Prop :=
+  exists n, fss_inodes S !! i = Some n /\ fn_rec n = dn /\ inode_local i n.
+
+(* "the durable file system's directory [p] maps [s] to [z]" *)
+Definition snap_dir_entry (S : fs_state_rec) (p : Z) (s : fname) (z : Z)
+    : Prop :=
+  exists np, fss_inodes S !! p = Some np /\ fn_is_dir np = true
+          /\ dir_entries np !! s = Some z.
+
+Lemma snap_ok_node_of_slot (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (dn : dinode) :
+  snap_ok S D -> snap_inum_ok S i -> dinode_wf dn ->
+  snap_slot_holds S D i dn -> snap_node_is S i dn.
+Proof.
+  intros Hok Hi Hwf (bs & Hbs & Hin).
+  destruct (snap_ok_rec_of_bytes S D i bs dn Hok Hi Hbs Hin Hwf)
+    as (n & Hn & Hrec & Hloc).
+  exists n. split_and!; [exact Hn | exact Hrec | exact Hloc].
+Qed.
+
+Lemma snap_dir_entry_of_first (S : fs_state_rec) (p : Z) (np : fs_node)
+    (s : fname) (z : Z) (k : nat) :
+  fss_inodes S !! p = Some np -> fn_is_dir np = true ->
+  dir_first (fn_data np) (fn_nrec np) s = Some k ->
+  bv_unsigned (dir_inum (fn_data np) k) = z ->
+  snap_dir_entry S p s z.
+Proof.
+  intros Hp Hdir Hfirst Hinum.
+  exists np. split_and!;
+    [exact Hp | exact Hdir | exact (dir_entries_of_first np s z k Hdir Hfirst Hinum)].
 Qed.
 
 (* ===================================================================== *)
@@ -436,6 +665,25 @@ Section Snap.
     iDestruct (P_dur_tie_keep with "H") as (S Hok) "HP".
     iExists S. iFrame "HP". iSplitR; [iPureIntro; exact Hok |].
     iPureIntro. intros Hi. exact (snap_ok_inode S D i Hok Hi).
+  Qed.
+
+  (* THE SPIKE'S DURABLE HALF, at the current snapshot: a byte fact about
+     the committed map's inode block becomes a fact about the durable FILE
+     SYSTEM's inode.  This is what the snapshot registry adds over the flat
+     byte blob, and it is the reading [mknod_durable] is stated at. *)
+  Lemma P_dur_node_of_slot D (i : Z) (dn : dinode) :
+    dinode_wf dn ->
+    P_dur D -∗
+      ∃ S, ⌜snap_ok S D⌝
+           ∗ ⌜snap_inum_ok S i -> snap_slot_holds S D i dn ->
+              snap_node_is S i dn⌝
+           ∗ P_dur D.
+  Proof.
+    iIntros (Hwf) "H".
+    iDestruct (P_dur_tie_keep with "H") as (S Hok) "HP".
+    iExists S. iFrame "HP". iSplitR; [iPureIntro; exact Hok |].
+    iPureIntro. intros Hi Hslot.
+    exact (snap_ok_node_of_slot S D i dn Hok Hi Hwf Hslot).
   Qed.
 
 End Snap.
