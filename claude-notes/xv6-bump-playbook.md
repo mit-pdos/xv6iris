@@ -856,6 +856,41 @@ satisfy:
 Module Chk : SpecUartinit.UARTINIT := Uartinit.
 ```
 
+### 4g. `fs.img` — a bump can move the DISK IMAGE without touching the kernel
+
+`XV6_REV` pins the whole xv6 tree, so a commit that only edits xv6's
+`Makefile` — adding or dropping a `UPROGS` entry, or changing any user
+program's source — rebuilds `fs.img` and therefore `kernel-rocq/FsImgRaw.v`,
+with `KernelInstrs.v`/`KernelSyms.v` completely unchanged. **None of the
+relayout tooling looks at the disk image**: `fix_proof_imms.py` is keyed on
+kernel pcs and will happily report `STALE: 0` while `FsImgCheck.v` is broken.
+The tell in `git status` is `FsImgRaw.v` modified with `KernelSyms.v` clean.
+
+What breaks is the small set of literals in `iris/FsImgCheck.v` that COUNT
+things in the image rather than read them:
+
+- `fsimg_live_set` — `list_to_set (Z.of_nat <$> seq 1 N)`, `N` = number of
+  allocated inodes (root + `README` + one per `UPROGS` entry), and the two
+  lemmas restating that bound, `fsimg_live_set_elem` and `fsimg_live_iff`.
+  It fails as an `eq_refl` type mismatch whose two sides are both
+  `list_to_set (… seq 1 N)`, which reads like a unification bug and is
+  simply the wrong `N`.
+
+Everything else in the file RE-COMPUTES off the image (`vm_eq`) and needs no
+attention — the superblock geometry (`MkFsSb`) is fixed by mkfs's parameters,
+not by content, and the per-file `inum`/size pins for `/init /sh /echo /sync`
+only move if an entry is added or removed BEFORE them in `UPROGS`. Get `N`
+and the pins from the image itself rather than by counting the Makefile:
+
+```python
+import struct
+img = open('xv6-riscv/fs.img','rb').read(); B = 1024
+_,_,_,_,_,_,inodestart,_ = struct.unpack('<8I', img[B:B+32])
+live = [i for i in range(13*16)
+        if struct.unpack('<h', img[inodestart*B+i*64:][:2])[0] != 0]
+print(len(live), live)          # N, and the inums, which must be 1..N
+```
+
 ---
 
 ## 5. Iterating to green

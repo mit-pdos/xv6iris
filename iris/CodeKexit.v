@@ -243,8 +243,8 @@ Section CodeKexit.
   Proof. mk_base (KernelSyms.kexit + 0x9e) (mword_of_int 0x15a50513 : mword 32)
     (mword_of_int (KernelSyms.kexit + 0x9e) : mword 64) (ITYPE (mword_of_int 346 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_15a50513. Qed.
 
-  Lemma kxi_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexit + 0xa2) : mword 64) false (JAL (mword_of_int 2090838 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kexit + 0xa2) (mword_of_int 0xf56fe0ef : mword 32)
-    (mword_of_int (KernelSyms.kexit + 0xa2) : mword 64) (JAL (mword_of_int 2090838 : mword 21, Regidx (mword_of_int 1))) kd_f56fe0ef. Qed.
+  Lemma kxi_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexit + 0xa2) : mword 64) false (JAL (mword_of_int 2090878 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kexit + 0xa2) (mword_of_int 0xf7efe0ef : mword 32)
+    (mword_of_int (KernelSyms.kexit + 0xa2) : mword 64) (JAL (mword_of_int 2090878 : mword 21, Regidx (mword_of_int 1))) kd_f7efe0ef. Qed.
 
 End CodeKexit.
