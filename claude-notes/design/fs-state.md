@@ -597,3 +597,47 @@ Two things 2b should know before it starts:
   by `FsBlocks.BSZ`; both delta-reduce to `1024`, so at `Φ_L a v := a ↪[gL] v`
   the two runs are convertible.  Nothing needs a bridge lemma, but do not
   expect a `rewrite` between them to fire.
+
+### 2c-img: the DURABLE instance, and where it comes from
+
+`Γ_D` is `FsDurBytes.fs_gamma_D g Γd` — `MkFsView (λ a v, a ↪[g] v)
+(fdn_link Γd) (fdn_top Γd)`, with `g` the fixed layer's
+`RiscvPtsto.riscv_dview_name` and `Γd` its `riscv_fsdur` bundle.  Same
+record, same `phi_excl`/`GTimeless`, as `FsBytesGamma.fs_gamma_L`; what
+differs is only which byte map's full element `fsΦ` is.
+
+- **THE FLAT BLOB AND THE NESTED STATE ARE ONE LEMMA.**  `P_fs_alloc`
+  fills `γD` with `LogDefs.fs_dbytes D` — block `b`'s `i`th byte at
+  `b·BSIZE + i` — and `FsDurBytes.fs_dbelems_dbytes` says those elements
+  ARE one `blk_owned Γ_D b bs` per entry of `D`, under
+  `∀ b bs, D !! b = Some bs → length bs = BSIZE`.  The premise is what
+  makes the flattening injective (a block starts at a multiple of the
+  stride and is no longer than it), and it is the premise of every lemma
+  about `fs_dbytes`: without it the fold silently overwrites.
+- **THE IMAGE IS DECODED IN EXACTLY ONE PLACE**, `FsDurImg.fs_dur_of_image`,
+  generic in `FsCfgBoot.fs_boot_image_wf` and naming no literal image.  It
+  returns `γtop`'s auth, `fs_state Γ_D (img_state …)` and an EXPLICIT
+  residual — the home blocks the footprint does not cover.  The residual is
+  not slack: the footprint is a function of `S` only up to the free pool's
+  existential CONTENTS, so no `⊣⊢` between the elements and the state can
+  be stated, and returning the leftover is what keeps the tie honest
+  without a domain sweep.
+- **THE Γ IS FUNCTORIAL, AND THE TREE DOES NOT YET SAY SO.**
+  `FsStateEra.inode_blocks_era`/`ind_res_era` and
+  `FsImgBridge.img_inode_blocks_res` are stated at `fs_gamma_L` but use
+  only `gamma_blk_owned`, so they hold at ANY `Γ`.  Until they are
+  restated Γ-generically, `FsDurImg.fs_dur_bundle` makes `Γ_D` an instance
+  of `fs_gamma_L` (fill `fs_bytes`/`fs_link`/`fs_top` with the durable
+  gnames; the two cache-side fields are never read) and
+  `fs_gamma_L (fs_dur_bundle g Γd) = fs_gamma_D g Γd` by `reflexivity`.
+- **TWO IMAGE FACTS THE `Γ`-PREDICATES NEED AND `fs_boot_image_wf` DOES
+  NOT CARRY**, both premises today and both recorded in
+  `projects/durable-disk.md` item 2c: a FREE record's `inode_local`
+  (nothing constrains a type-0 record's `size`/`addrs`, so `inl_size` and
+  `inl_covers` fail — `FsDurImg.fs_region_bare` is the sweep), and
+  `✓ link_elem` at the image map.  On the second, W9's structural half IS
+  proved (`img_dir_entries_empty`: the image has exactly ONE directory,
+  the root), which reduces the whole family to one inclusion in
+  `fsLinkUR` — `FsDurImg.img_link_valid`.  What is left is the ticket
+  bridge, and the reason it is not free is that `FsImg.fs_rec_ticket` and
+  `FsStateInode.ent_tokenless` exempt different records.

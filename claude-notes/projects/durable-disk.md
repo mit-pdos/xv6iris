@@ -1185,28 +1185,15 @@ map at home blocks); 1d lands last.
       - [ ] **THE BODY, AND WHAT IT COSTS (surveyed 2026-08-24; this is
         the ruling the orchestrator owes).**  `P_wf`'s body is still
         `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
-        and `fs_dstep_rebase` still holds.  Four findings left:
-        - **(ii) `fs_dbytes` HAS NO THEORY AT ALL** — four use sites, zero
-          lemmas.  Everything below needs one lemma first:
-          `fs_dbelems g (fs_dbytes D) ⊣⊢ [∗ map] b ↦ bs ∈ D, blk_owned Γ_D b bs`
-          under `∀ b bs, D !! b = Some bs → length bs ≤ BSIZE`.  Route,
-          all four tools CHECKED to exist at this switch: `map_fold_insert_L`
-          (its commutation premise is restricted to keys of the map, so the
-          length premise discharges it through `map_union_comm`) gives
-          `fs_dbytes (<[b:=bs]> D) = map_seqZ (b·BSIZE) bs ∪ fs_dbytes D`;
-          `lookup_map_seqZ_is_Some` gives
-          `map_seqZ (b₁·BSIZE) bs₁ ##ₘ map_seqZ (b₂·BSIZE) bs₂` at `b₁ ≠ b₂`;
-          then `map_ind` + `big_sepM_union` + iris'
-          `big_sepM_map_seqZ`.  (stdpp's `map_fold_ind` is `Local` — use
-          `map_ind` and the insert equation.)  ~200 lines.
-        - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN `S`,
-          because `free_pool`'s blocks have EXISTENTIAL contents.**  So
+        and `fs_dstep_rebase` still holds.  2c-img (below) discharged
+        findings (ii) and (iv); (iii) and (v) stand.
+        - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN
+          `S`, because `free_pool`'s blocks have EXISTENTIAL contents** — so
           `fs_footprint Γ_D S ⊣⊢ fs_dbelems γD (some map of S)` cannot be
-          stated as it stands.  Two ways out, and the second is cheaper:
-          give `FsStateBitmap` a `free_pool_at Γ nb u F` (contents given,
-          with `free_pool ⊣⊢ ∃ F, ⌜dom F = free_set nb u⌝ ∗ free_pool_at …`);
-          or index `P_wf` by the BLOCK map `D` rather than the byte map and
-          state the tie at BLOCK granularity —
+          stated as an iff.  2c-img sidesteps it in the ONE direction boot
+          needs (elements ⊢ state, with the leftover RETURNED); STAGE 3
+          still owes `P_wf`'s own shape, and the cheap option stands: index
+          it by the BLOCK map `D` and state
           `∃ S Ds Dr, ⌜D = Ds ∪ Dr⌝ ∗ ⌜Ds ##ₘ Dr⌝ ∗ ⌜fs_state_blocks S = dom Ds⌝
            ∗ top auth ∗ fs_state Γ_D S ∗ [∗ map] b↦bs ∈ Dr, blk_owned Γ_D b bs`,
           where `fs_state_blocks S : gset Z` IS a function of `S` (only the
@@ -1217,27 +1204,6 @@ map at home blocks); 1d lands last.
           both OUTSIDE `home`, so the accounting is exact) — but nothing
           makes exactness true of an arbitrary reachable state, and the
           residual is what keeps `P_wf` honest without a domain sweep.
-        - **(iv) THE IMAGE DISCHARGE IS THE BULK, AND `inode_owned` HAS NO
-          PRODUCER IN THE TREE.**  2b built `inode_owned_era` (the
-          checked-out bundle, no record bytes, no link ghosts); nothing
-          builds `inode_owned Γ sb i n`.  The material IS all there and NO
-          NEW IMAGE SWEEP IS NEEDED: W4 (`NoDup (fs_used_blocks)`) +
-          `FsImg.fs_inode_blocks_disjoint` + `FsBoot.big_sepS_carve` give
-          the per-inode block carve (this is exactly what
-          `FsImgBridge.img_inode_blocks_res` does on the Γ_L side), W5
-          (`fs_bitmap_wf`, via `bm_bytes_fs_bmap_set`) gives the bitmap
-          block and `free_pool_intro` the pool, conjunct (10) gives
-          `sb_owned`, `img_inode_ok` + `fio_type` + `fdo_gran` +
-          `fdo_dot`/`fdo_dotdot` + `fs_region_nlink_short` give
-          `inode_local` through `inode_local_of_ok`, and W9 + conjunct (13)
-          `fs_links_eq` give `✓ link_elem (img_nodes …)`.  What is NEW is
-          (a) a Γ-side twin of `InodeInv.inode_blocks_of_blocks` producing
-          `inode_phi`, (b) the 16-records-per-inode-block reshuffle from
-          `rec_owned_at_diblk`'s `[∗ list]` to `fs_inodes`' `[∗ map]` over
-          208 inums, and (c) a bridge from the image's ticket counting
-          (`fs_all_tickets`/`fs_tick_count`) to `FsState`'s
-          (`ent_toks`/`dir_entries`) for `✓ link_elem`.  Estimate:
-          800–1500 lines across `FsState*`/`FsImgBridge`/a new leaf.
         - **(v) IT IS NOT `FsAdequacyImg`'S JOB.**  Both generic theorems
           (`SystemAdequacy.xv6_power_adequacy` and `xv6_fs_adequacy`)
           discharge `HPc`, and both already carry
@@ -1246,6 +1212,115 @@ map at home blocks); 1d lands last.
           is GENERIC in `fs_boot_image_wf` and belongs beside
           `FsCfgBoot.img_nodes`; `FsAdequacyImg` keeps doing only what it
           does now (discharging `fs_boot_image_wf` at the literal image).
+          2c-img followed it: `FsDurImg.v` names no literal image and is
+          not on `FsAdequacyImg`'s cone.
+      - [x] **2c-img. `fs_dbytes`'s theory, and `fs_view Γ_D` FROM THE
+        IMAGE.**  LANDED, as two NEW files (1555 lines; no existing file's
+        statements moved, two `iris/_CoqProject` rows added).
+        - `iris/FsDurBytes.v` (427).  `fs_dbytes`'s whole theory, under ONE
+          guard `dbytes_ok D` (every block of `D` is at most `BSIZE` bytes)
+          — which is exactly what makes the flattening injective:
+          `dbytes_seq_disj` (two blocks' byte ranges are disjoint, off
+          `map_seqZ_disjoint`, because a block starts at a multiple of the
+          stride and is no longer than it), `fs_dbytes_insert`
+          (`map_fold_insert_L`, whose commutation premise IS
+          `map_union_comm` under that guard), `fs_dbytes_disj_seq`,
+          `fs_dbytes_lookup_Some` (an IFF, so the domain reading
+          `fs_dbytes_dom` and the split `fs_dbytes_union` fall out of it).
+          Plus `Γ_D` itself — `fs_gamma_D g Γd`,
+          `FsBytesGamma.fs_gamma_L`'s durable twin at
+          `RiscvPtsto.fs_dur_names`, with `phi_excl` and `GTimeless`.
+          THE ONE LEMMA EVERYTHING NEEDS is
+          `fs_dbelems_dbytes : fs_dbelems g (fs_dbytes D) ⊣⊢
+           [∗ map] b ↦ bs ∈ D, blk_owned (fs_gamma_D g Γd) b bs`
+          under `∀ b bs, D !! b = Some bs → length bs = BSIZE` — `=`, not
+          `≤`, because `blk_owned` carries the length conjunct;
+          `fs_dview_dbytes` is the same at `LogDefs.fs_dview`, which is
+          `P_wf`'s body.
+        - `iris/FsDurImg.v` (1128).  `fs_dur_of_image`: generic in
+          `FsCfgBoot.fs_boot_image_wf dk ndisk sb nib cov`, it takes the
+          flat elements at `fs_restrict (fs_blocks dk) (fs_home_set cov
+          logstart)` and returns `γtop`'s auth at `img_nodes`,
+          `FsState.fs_state Γ_D (img_state …)`, and an EXPLICIT residual
+          `[∗ set] b ∈ home ∖ img_owned …, blk_owned Γ_D b (fs_blocks dk b)`;
+          `fs_dur_view_of_image` is the `FsState.fs_view` reading.  Both
+          durable gnames are minted INSIDE (`FsState.fs_boot_alloc_at` at
+          `img_nodes`, `IL = IT`), so the record comes back existentially —
+          2c-names' client-allocates ruling, unchanged.
+        - **NO NEW IMAGE SWEEP WAS NEEDED FOR THE BLOCKS** (survey (iv) was
+          right).  The carve is `FsBoot.big_sepS_carve` over
+          `FsImg.fs_inode_blocks_disjoint` (W4); one live inode is
+          `FsImgBridge.img_inode_blocks_res`; the bitmap block and the pool
+          are `FsImg.bm_bytes_fs_bmap_set` +
+          `FsStateBitmap.free_pool_intro` off `FsCfgBoot.fs_bitmap_spent`;
+          `sb_owned` is conjunct (10) by `reflexivity` (`fs_parse_sb` reads
+          only block 1, so its `fun _ => bs` form needs no lemma); a live
+          inum's `inode_local` is `FsStateEra.inode_local_of_ok_rec` off
+          `img_inode_ok` / `fio_type` / `fs_region_nlink_short` /
+          `fdo_gran` / `img_dir_uniq` / `fsimg_wf_dots`.  The 16-records-
+          per-inode-block reshuffle is `rec_owned_at_diblk` +
+          `IcacheBoot.diblk_bytes_surj` + `FsImg.fs_dinode_of_diblk`, then
+          `region_of_seq`.
+        - **THE Γ_L-STATED LEMMAS ARE REUSED THROUGH A NAME BUNDLE, and it
+          is a workaround with a named fix.**  `FsBytesGamma.fs_gamma_L`
+          reads exactly `fs_bytes` / `fs_link` / `fs_top` off
+          `FsBlocks.fs_names`, so
+          `fs_dur_bundle g Γd := MkFsNames g g g (fdn_link Γd) (fdn_top Γd)`
+          makes `fs_gamma_L (fs_dur_bundle g Γd) = fs_gamma_D g Γd` hold by
+          `reflexivity`, and `FsStateEra.inode_blocks_era` / `ind_res_era`
+          and `FsImgBridge.img_inode_blocks_res` then apply AT THE DURABLE
+          VIEW verbatim — none of them opens an invariant or reads the
+          logged view; each is resource shuffling over `gamma_blk_owned`.
+          THE PROPER FIX is to make those three Γ-GENERIC, which an
+          additive lane could not do; the bundle dies with that move.
+        - **LEMMAS STATED HERE THAT BELONG ELSEWHERE** (listed for
+          relocation): `big_sepM_map_seqZ_gen` → `FsStateDefs.v` (it is
+          `FsBlocks.big_sepM_map_seqZ` restated over a bare `Σ`, and that
+          copy dies with the move); `big_sepL_seq_chunks` (a range of `m·n`
+          as `n` runs of `m`) → beside `FsStateInode.big_sepL_seq0`;
+          `big_sepM_fs_restrict` + `fs_restrict_keys` → `LogDefs.v`, beside
+          `fs_restrict`.
+      - [ ] **2c-img's TWO GAPS.  Both are PREMISES of `fs_dur_of_image`
+        today; neither was a survey finding.**
+        - **A FREE RECORD'S `inode_local` IS NOT DERIVABLE FROM
+          `fs_boot_image_wf`.**  `FsState.fs_inodes` iterates `inode_owned`
+          over the WHOLE inode map and `inode_owned` carries
+          `inode_local`; at a type-0 record nothing in `fsimg_wf` or
+          `fs_region_wf` constrains `di_size` or `di_addrs`, so `inl_size`
+          and `inl_covers` are false of a garbage one.
+          `FsDurImg.fs_region_bare` is the missing sweep — zero size and
+          thirteen zero addresses at every type-0 region record, in
+          `FsImg.fs_region_free`'s idiom and reading the same thirteen
+          inode blocks — and with L3 (`fs_region_nlink_free`) beside it
+          `img_node_bare` gives `FsStateInode.fn_bare`, hence
+          `inode_local_bare`.  OWED: move the definition into `FsImg.v`
+          beside `fs_region_free`, add its `vm_compute` row to
+          `FsImgCheck.v` (the sibling sweep measures 0.44 s at the literal
+          image) and its conjunct to `fs_boot_image_wf`.
+        - **`✓ link_elem (img_nodes …)` IS NOT W9 + (13).**  What W9 DOES
+          give is stronger than expected and is PROVED
+          (`FsDurImg.img_dir_entries_empty`): at a live DIRECTORY inum W9
+          forces `z = ROOTINO`, so the image has EXACTLY ONE directory and
+          every other node's `dir_entries` is `∅`.  The family therefore
+          splits as `link_auths I ⋅ ent_ops ROOTINO n_root`, and since
+          `FsState.link_full_map` is valid unconditionally and validity is
+          downward closed, `FsDurImg.img_link_valid` reduces the WHOLE
+          obligation to one inclusion in `fsLinkUR`:
+          `ent_ops ROOTINO (img_node …) ≼ link_toks_of (img_nodes …)`.
+          That is the survey's (iv)(c) bridge, and it is NOT a corollary of
+          W9 + (13), for two reasons that are both about the two counting
+          disciplines rather than about arithmetic.  (a)
+          `FsImg.fs_rec_ticket` exempts a record naming its OWN home under
+          ANY name, while `FsStateInode.ent_tokenless` exempts only `"."`
+          and a `".."` that is orphaned or self-naming — a root record
+          named `foo` pointing at the root owes a token here and pays no
+          ticket there, and nothing in `fsimg_wf` rules it out.  (b) the
+          ticket count is per RECORD INDEX while `dir_entries` is a
+          first-match scan by NAME, so the two agree only through W6's
+          `dir_names_unique`, which has to be carried through the count.
+          One more image sweep — no live non-dot record of the root names
+          the root — makes (a) derivable from (13); (b) is a pure
+          `DirView`/`FsTree` counting lemma.
       - [ ] **THE PAYLOAD, AND THE ONE THING THAT IS ALREADY DECIDED.**
         `ftop_inv` (2b-inode-3's standalone `ftopN` invariant holding
         `γtop_L`'s authority) **MUST STAY**; it is NOT folded into the
