@@ -76,7 +76,7 @@ Proof. intros a b Hb. unfold view_of. by rewrite Hb. Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition set_vdisk (v : virtio_state) (dk : Z -> bv 8) : virtio_state :=
-  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v) dk
+  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) dk
               (v_cache v) (v_taken v) (v_cap v).
 
 (* the disk image as the device sees it: a TOTAL function over a finite
@@ -103,14 +103,27 @@ Inductive sitem : Type :=
   | SUartTx                       (* drain one byte of the transmit FIFO *)
   | SUartRx (b : Z)               (* the host types a byte *)
   (* the disk ([disk_step]).  Three ordinary arms and the wild one. *)
-  | SDiskDma                      (* complete the head request *)
-  | SDiskCapture                  (* take a write request's data into the cache *)
+  (* THE POSITION IS THE DEVICE'S CHOICE (VirtioModel section 5b): the ring
+     is served in whatever order the device finishes, so a schedule has to
+     say WHICH published request it is answering.  The nullary arms take the
+     first one still outstanding, which is what every test that is not about
+     ordering wants; [SDiskDmaAt]/[SDiskCaptureAt] name a position instead,
+     and that is how a test exhibits a REORDERED completion. *)
+  | SDiskDma                      (* complete the oldest outstanding request *)
+  | SDiskCapture                  (* take its data into the cache *)
+  | SDiskDmaAt (pos : Z)          (* ...complete THIS position instead *)
+  | SDiskCaptureAt (pos : Z)      (* ...capture THIS position instead *)
   | SDiskDrain (sec : Z)          (* one cached sector reaches the durable image *)
   | SDiskWild (w : list (Z * Z))  (* a malformed queue: write anything, anywhere *)
   (* the PLIC gateway, per SOURCE -- an arm of the DEVICE that drives it *)
   | SLatch (src : N)
   (* the wire ([plic_step]): propagate the PLIC's EIP onto a hart's pin *)
   | SWire (h : nat).
+
+(* THE OLDEST OUTSTANDING POSITION -- what the nullary disk arms serve. *)
+Definition first_free (d : dev_state) (mv : vmem) : option (bv 16) :=
+  let v := dvirtio d in
+  head (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v)).
 
 (* ---------------------------------------------------------------------- *)
 (* 3. Applying one item.                                                   *)
@@ -151,12 +164,30 @@ Definition sapply (i : sitem) (s : mstate) : option mstate :=
       | None => None
       end
   | SDiskDma =>
-      match virtio_req_step (dvirtio d) (view_of (mem s)) with
+      match first_free d (view_of (mem s)) with
+      | None => None
+      | Some i =>
+          match virtio_req_step (dvirtio d) (view_of (mem s)) i with
+          | Some (v', w) => Some (MState (sregs s) (w ∪ mem s) (set_dvirtio d v'))
+          | None => None
+          end
+      end
+  | SDiskCapture =>
+      match first_free d (view_of (mem s)) with
+      | None => None
+      | Some i =>
+          match virtio_capture_step (dvirtio d) (view_of (mem s)) i with
+          | Some v' => Some (with_dev s (set_dvirtio d v'))
+          | None => None
+          end
+      end
+  | SDiskDmaAt pos =>
+      match virtio_req_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 pos) with
       | Some (v', w) => Some (MState (sregs s) (w ∪ mem s) (set_dvirtio d v'))
       | None => None
       end
-  | SDiskCapture =>
-      match virtio_capture_step (dvirtio d) (view_of (mem s)) with
+  | SDiskCaptureAt pos =>
+      match virtio_capture_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 pos) with
       | Some v' => Some (with_dev s (set_dvirtio d v'))
       | None => None
       end
@@ -226,14 +257,33 @@ Definition wire_needed (s : mstate) (h : nat) : bool :=
 Definition settle_wire (s : mstate) : option mstate :=
   if wire_needed s 0 then sapply (SWire 0) s else None.
 
+(* WHICH OUTSTANDING REQUEST THE EAGER SCHEDULE PICKS UP.  The device may
+   serve any published position it has not served yet, so an eager schedule
+   has to choose -- and the choice is a real degree of freedom, not a detail:
+   [first_free] is the in-order run and [last_free] is the one where a later
+   request OVERTAKES an earlier one, which is what a device with two requests
+   in flight does (DiskOrder.v).  Everything else about the two schedules is
+   identical. *)
+Definition last_free (d : dev_state) (mv : vmem) : option (bv 16) :=
+  let v := dvirtio d in
+  last (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v)).
+
+Definition pick_at (pick : dev_state -> vmem -> option (bv 16))
+    (f : Z -> sitem) (s : mstate) : option mstate :=
+  match pick (mdev s) (view_of (mem s)) with
+  | Some i => sapply (f (bv_unsigned i)) s
+  | None => None
+  end.
+
 (* first enabled arm wins.  Nested rather than a list, so a later arm is not
    even evaluated once an earlier one fires -- [settle] runs after EVERY
    instruction, so this is the harness's hot path. *)
-Definition settle1 (s : mstate) : option mstate :=
+Definition settle1_at (pick : dev_state -> vmem -> option (bv 16))
+    (s : mstate) : option mstate :=
   match sapply SUartTx s with Some s' => Some s' | None =>
-  match sapply SDiskCapture s with Some s' => Some s' | None =>
+  match pick_at pick SDiskCaptureAt s with Some s' => Some s' | None =>
   match drain_one s with Some s' => Some s' | None =>
-  match sapply SDiskDma s with Some s' => Some s' | None =>
+  match pick_at pick SDiskDmaAt s with Some s' => Some s' | None =>
   (* the two interrupt gateways, then the wire.  [plic_latch] is itself
      guarded -- a level source is forwarded only when it is neither already
      pending nor claimed -- so these stop on their own. *)
@@ -242,8 +292,13 @@ Definition settle1 (s : mstate) : option mstate :=
   settle_wire s
   end end end end end end.
 
-Fixpoint settle (fuel : nat) (s : mstate) : mstate :=
+Definition settle1 (s : mstate) : option mstate := settle1_at first_free s.
+
+Fixpoint settle_at (pick : dev_state -> vmem -> option (bv 16)) (fuel : nat)
+    (s : mstate) : mstate :=
   match fuel with
   | 0%nat => s
-  | S f => match settle1 s with Some s' => settle f s' | None => s end
+  | S f => match settle1_at pick s with Some s' => settle_at pick f s' | None => s end
   end.
+
+Definition settle (fuel : nat) (s : mstate) : mstate := settle_at first_free fuel s.

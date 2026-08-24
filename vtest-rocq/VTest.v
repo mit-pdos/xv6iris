@@ -131,15 +131,26 @@ Definition flag_set (s : mstate) : bool :=
    is a FAILED test either way -- a stuck machine and an exhausted budget are
    both "the model did not do what QEMU did" -- and [budget_left] tells them
    apart. *)
-Fixpoint run_until (n : nat) (s : mstate) : option mstate :=
+Fixpoint run_until_at (pick : dev_state -> vmem -> option (bv 16)) (n : nat)
+    (s : mstate) : option mstate :=
   if flag_set s then Some s else
   match n with
   | 0%nat => None
   | S n' => match exec (riscv_step false) s with
-            | Some (_, s') => run_until n' (settle dev_fuel s')
+            | Some (_, s') => run_until_at pick n' (settle_at pick dev_fuel s')
             | None => None
             end
   end.
+
+Definition run_until (n : nat) (s : mstate) : option mstate :=
+  run_until_at first_free n s.
+
+(* ...and the run in which a LATER request overtakes an earlier one: the same
+   machine, the same program, a device that finishes the small request first.
+   Only [DiskOrder.v] uses it, and what it demonstrates is that the model has
+   BOTH of the executions the hardware has. *)
+Definition run_until_rev (n : nat) (s : mstate) : option mstate :=
+  run_until_at last_free n s.
 
 (* how much of the budget was left -- the diagnostic that tells "the budget
    was too small" apart from "the machine got stuck" *)

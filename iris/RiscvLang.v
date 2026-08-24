@@ -410,21 +410,24 @@ Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
      nobody has accounted for returns an arbitrary byte, which is what a real
      bus does, and what forces a driver proof to account for every address it
      hands the device. *)
-  | DiskStepDma (mv : vmem) v' w :
+  | DiskStepDma (mv : vmem) (i : bv 16) v' w :
       mem_view m mv ->
-      virtio_req_step d.(dvirtio) mv = Some (v', w) ->
+      virtio_req_step d.(dvirtio) mv i = Some (v', w) ->
       disk_step d m (set_dvirtio d v') (w ∪ m)
   (* THE DISK HAS A VOLATILE WRITE-BACK CACHE
      (claude-notes/projects/async-disk.md), so an outstanding WRITE request
      reaches the durable image in two separate autonomous actions.  FIRST the
      CAPTURE: the device reads the driver's data buffer off the bus (hence
      the same existentially-quantified view as [DiskStepDma]) and deposits
-     every sector of it in its own cache.  It writes NO byte memory, produces
+     every sector of it in its own cache.  WHICH request it picks up is
+     existentially quantified too ([i]): the device serves the available ring
+     in whatever order it finishes, which is what a device with more than one
+     request in flight does (tools/vtest/README.md finding 5).  It writes NO byte memory, produces
      no used-ring entry, raises no interrupt, and -- the point -- moves no
      DURABLE disk byte: a crash here loses the whole request. *)
-  | DiskStepCapture (mv : vmem) v' :
+  | DiskStepCapture (mv : vmem) (i : bv 16) v' :
       mem_view m mv ->
-      virtio_capture_step d.(dvirtio) mv = Some v' ->
+      virtio_capture_step d.(dvirtio) mv i = Some v' ->
       disk_step d m (set_dvirtio d v') m
   (* ...and THEN the DRAINS: one cached 512-byte sector reaches the durable
      image per step, in ANY order, at times of the device's own choosing --

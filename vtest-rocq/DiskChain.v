@@ -124,18 +124,19 @@ Proof.
 Qed.
 
 (* ...and once the device is stalled, NEITHER ordinary arm is enabled: the
-   completion and the capture are both None while the request stays
-   published.  So there is no schedule of ordinary steps -- no [sitem] list
+   completion and the capture are both None at the position it stalled at,
+   while the request stays published.  So there is no schedule of ordinary steps -- no [sitem] list
    built from [SDiskDma], [SDiskCapture] and [SDiskDrain] -- that gets the
    used ring moving.  Only [SDiskWild] is left. *)
 Lemma model_stalled_leaves_only_wild (v : virtio_state) (mv : vmem) :
   virtio_stalled v mv = true ->
   virtio_pending v mv = true
-  /\ virtio_req_step v mv = None
-  /\ virtio_capture_step v mv = None.
+  /\ exists i, virtio_req_step v mv i = None
+               /\ virtio_capture_step v mv i = None.
 Proof.
-  intro H. destruct (virtio_stalled_step v mv H) as [Hp Hr].
-  split_and!; [exact Hp | exact Hr | exact (virtio_stalled_capture_step v mv H)].
+  intro H. split; [ exact (virtio_stalled_pending v mv H) | ].
+  destruct (virtio_stalled_pos v mv H) as (i & _ & Hbad).
+  exists i. exact (virtio_chain_bad_no_step v mv i Hbad).
 Qed.
 
 (* ---------------------------------------------------------------------- *)

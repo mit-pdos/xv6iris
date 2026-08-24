@@ -1,5 +1,6 @@
 (* DiskOrder.v -- TWO requests in one batch, and the order they complete in.
-   THIS FILE RECORDS THE SUITE'S FIRST UNSOUNDNESS.
+   BOTH OF QEMU's EXECUTIONS ARE THE MODEL'S; this file used to record the
+   suite's only unsoundness (finding 5).
 
    Source: tools/vtest/tests/disk_order.S.  Capture: DiskOrderGen.v.
    215 instructions on the model side.
@@ -16,9 +17,26 @@
    25.  Nothing about it is exotic -- it is what a device with more than one
    request in flight does.
 
-   THE MODEL HAS ONLY ONE, and cannot be scheduled into the other.  That is
-   [model_serves_head_only] in section 3: it is not a statement about this
-   test's schedule but about [virtio_req_step] itself. *)
+   THE MODEL USED TO HAVE ONLY ONE.  [virtio_req_step] read the chain at
+   [v_seen] and handed back a state whose [v_seen] was one greater, so the
+   sequence of positions the device served was 0,1,2,... with no freedom at
+   all and the used ring could only ever come out in PUBLICATION ORDER.  No
+   choice of [sitem] list changed that: the arms a schedule could pick
+   between (capture, drain, complete) did not include "serve a different
+   one".  That was UNSOUNDNESS -- a hardware behaviour with no model
+   execution -- and the reason it mattered is that xv6 depends on the
+   freedom: [virtio_disk_intr] walks the used ring reading each element's ID
+   and waking [disk.info[id]], written that way precisely because
+   completions need not come back in order.
+
+   THE FIX (claude-notes/design/virtio-driver.md).  A position is servable
+   when the driver has published it and the device has not served it yet, and
+   every step that answers a request takes the position as a PARAMETER: the
+   device state carries a watermark [v_seen] plus the set [v_ahead] of
+   positions served out of turn, and [vfree] is the window arithmetic that
+   decides which are left.  Both executions below run the SAME program on the
+   same machine; they differ only in which outstanding request the device
+   picks up ([VTest.run_until] versus [VTest.run_until_rev]). *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list gmap bitvector.definitions.
@@ -26,6 +44,11 @@ Require Import VTest DiskOrderGen.
 Local Open Scope Z_scope.
 
 Definition ord_run : option mstate := run_until 30000 (start_dma disk_order_text).
+
+(* the same program, served by a device that finishes the SECOND request
+   first -- the execution the model used to be missing *)
+Definition ord_run_rev : option mstate :=
+  run_until_rev 30000 (start_dma disk_order_text).
 
 (* result-region offsets, mirroring tools/vtest/tests/disk_order.S *)
 Definition ord_agree_offs : list nat :=
@@ -38,9 +61,9 @@ Definition ord_agree_offs : list nat :=
 Definition ord_len_offs : list nat := [12; 20]%nat.  (* the two used.len *)
 
 (* ---------------------------------------------------------------------- *)
-(* 1. The model reproduces ONE of QEMU's two executions: the in-order one.  *)
-(*    Both ids, both status bytes, the used index, the interrupt status,    *)
-(*    and all nine sectors of the disk.                                     *)
+(* 1. The model reproduces QEMU's IN-ORDER execution, whole.  Both ids,     *)
+(*    both status bytes, the used index, the interrupt status, and all      *)
+(*    nine sectors of the disk.                                            *)
 (* ---------------------------------------------------------------------- *)
 
 Definition ord_expect :=
@@ -68,57 +91,72 @@ Lemma disk_order_orders_differ : [0; 3] <> [3; 0].
 Proof. discriminate. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 3. THE FINDING: the model cannot produce the second one, under ANY       *)
-(*    schedule.  Not a fact about this test -- a fact about the device.     *)
-(*                                                                         *)
-(*    [virtio_req_step] reads the chain at position [v_seen] and hands back *)
-(*    a state whose [v_seen] is one greater.  So the sequence of positions  *)
-(*    the device serves is 0,1,2,... with no freedom at all, the used-ring  *)
-(*    entry for position i is written before the one for position i+1, and  *)
-(*    the used ring can only ever come out in PUBLICATION ORDER.  No choice *)
-(*    of [sitem] list changes that: the arms a schedule may pick between    *)
-(*    (capture, drain, complete) do not include "serve a different one".    *)
+(* 3. AND THE MODEL PRODUCES IT TOO.  Same program, same start state, a     *)
+(*    device that picks up the SECOND outstanding request first: B's id     *)
+(*    lands in used.ring[0] and A's in used.ring[1], which is QEMU's other  *)
+(*    capture.  Everything else -- both status bytes, the used index, the    *)
+(*    interrupt status and all nine sectors of the disk -- is unchanged,     *)
+(*    which is the point: the two executions differ in the ORDER and in     *)
+(*    nothing else.                                                        *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma model_serves_head_only (v : virtio_state) (mv : vmem)
-    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_req_step v mv = Some (v', w) ->
-  (exists r, req_at (v_cfg v) mv (v_seen v) = Some r)
-  /\ v_seen v' = bv_add (v_seen v) (Z_to_bv 16 1).
+Definition ord_ids_of (r : option mstate) : list Z :=
+  [res_word r 8; res_word r 16].
+
+Lemma disk_order_admits_reordered :
+  (ord_ids_of ord_run_rev,
+   (fun o => res_word ord_run_rev o) <$> [24; 28; 32; 36]%nat,
+   disk_like ord_run_rev disk_order_qemu_disk)
+  = ([3; 0],
+     (fun o => cap_word disk_order_qemu_result o) <$> [24; 28; 32; 36]%nat,
+     disk_order_qemu_disk).
 Proof.
-  intro H. split.
-  - destruct (virtio_req_step_shape _ _ _ _ H) as (r & Hr & _). by exists r.
-  - exact (virtio_req_step_seen _ _ _ _ H).
+  solve_vtest ([3; 0],
+               (fun o => cap_word disk_order_qemu_result o) <$> [24; 28; 32; 36]%nat,
+               disk_order_qemu_disk).
 Qed.
 
+(* ...and the two model runs really are the two QEMU captures, not one run
+   read twice: the ids differ, and between them they are exactly the set of
+   orders the hardware produced. *)
+Lemma disk_order_model_has_both :
+  [ord_ids_of ord_run; ord_ids_of ord_run_rev] = ord_qemu_orders.
+Proof. solve_vtest ord_qemu_orders. Qed.
+
 (* ---------------------------------------------------------------------- *)
-(* 4. What this costs the development.                                     *)
-(*                                                                         *)
-(*    UNSOUNDNESS, not incompleteness.  The other divergences the suite has *)
-(*    found so far are the model being STRICTER than the hardware, which    *)
-(*    limits which drivers can be verified but cannot make a proof wrong.   *)
-(*    This one is the other direction: the hardware has a behaviour the     *)
-(*    model has no transition for, so a theorem proved against the model    *)
-(*    does not cover the machine it claims to.                              *)
-(*                                                                         *)
-(*    And it is live in xv6, not hypothetical.  [virtio_disk_rw] sleeps     *)
-(*    with its request outstanding, so up to NUM = 8 can be in flight at    *)
-(*    once; and [virtio_disk_intr] walks the used ring reading each         *)
-(*    element's ID and waking [disk.info[id]] -- it is written that way     *)
-(*    precisely because completions need not come back in order.  Under     *)
-(*    this model that code is only ever exercised on the in-order case, so  *)
-(*    the reason it reads the id at all is never tested by the proof.       *)
-(*                                                                         *)
-(*    The fix is not local, which is why this file only records it.  The    *)
-(*    device would need to serve any PUBLISHED-but-unserved position rather *)
-(*    than [v_seen] alone -- so [v_seen : bv 16] becomes a set of           *)
-(*    outstanding positions, [virtio_pending] and the completion gate move  *)
-(*    with it, and [VirtioQueue]'s slot protocol and the DMA lease's        *)
-(*    reachable-window argument ([virtio_queue_ok]'s [S], closed under      *)
-(*    advancing by one until it reaches [ai]) are stated against exactly    *)
-(*    the assumption this breaks.  See                                      *)
-(*    claude-notes/completed/virtio-disk.md and design/virtio-driver.md.    *)
+(* 4. Stated off the MODEL rather than off this program: the served order   *)
+(*    is FREE.  A step answers the position it is given, and the only       *)
+(*    condition on that position is that the driver published it and the    *)
+(*    device has not served it yet -- there is nothing in the model that     *)
+(*    prefers one outstanding position to another.  This is the property    *)
+(*    whose absence was the finding.                                       *)
 (* ---------------------------------------------------------------------- *)
+
+Lemma model_serves_any_free_position (v : virtio_state) (mv : vmem)
+    (i : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  (* the standing window fact, and the only thing the served set owes: a
+     position the device has served was one the driver had PUBLISHED, so the
+     published index is never in it ([VirtioModel.virtio_queue_ok] carries
+     exactly this conjunct) *)
+  avail_idx_at (v_cfg v) mv ∉ v_ahead v ->
+  virtio_req_step v mv i = Some (v', w) ->
+  (* it answered the position it was handed... *)
+  (exists r, req_at (v_cfg v) mv i = Some r)
+  (* ...which was published and unserved, and nothing more was asked of it *)
+  /\ virtio_serve_ok v mv i = true
+  (* ...and afterwards exactly that position is gone from the free set *)
+  /\ (forall q, vfree (v_seen v') (avail_idx_at (v_cfg v) mv) (v_ahead v') q
+                = vfree (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v) q
+                  && negb (bool_decide (q = i))).
+Proof.
+  intros Hai H.
+  destruct (virtio_req_step_shape _ _ _ _ _ H) as (r & Hr & Hserve & _ & _).
+  split; [by exists r|]. split; [exact Hserve|].
+  intro q.
+  rewrite (virtio_req_step_seen _ _ _ _ _ H), (virtio_req_step_ahead _ _ _ _ _ H).
+  apply vserve_free; [ exact Hai | ].
+  exact (vfree_ne_ai _ _ _ _ (virtio_serve_free _ _ _ Hserve)).
+Qed.
 
 Definition ord_lens : list Z := [1; 1].
 

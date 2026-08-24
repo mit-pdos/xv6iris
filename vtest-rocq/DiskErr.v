@@ -115,11 +115,12 @@ Proof. solve_vtest err_lens. Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* an unrecognised type is answered, and answered with UNSUPP *)
-Lemma model_unknown_type_is_unsupp (v : virtio_state) (mv : vmem) (r : vio_req) :
+Lemma model_unknown_type_is_unsupp (v : virtio_state) (mv : vmem) (r : vio_req)
+    (i : bv 16) :
   bv_unsigned (vr_type r) <> virtio_blk_t_in ->
   bv_unsigned (vr_type r) <> virtio_blk_t_out ->
   bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
-  (virtio_complete v mv r).2 !! vr_status r
+  (virtio_complete v mv r i).2 !! vr_status r
   = Some (Z_to_bv 8 virtio_blk_s_unsupp).
 Proof.
   intros Hi Ho Hf. unfold virtio_complete. cbv zeta.
@@ -130,11 +131,12 @@ Qed.
 
 (* ...and it is never GATED: unlike a write it does not wait for anything,
    which is why the eager schedule serves it in one step *)
-Lemma model_unknown_type_not_gated (v : virtio_state) (r : vio_req) :
+Lemma model_unknown_type_not_gated (v : virtio_state) (r : vio_req)
+    (i : bv 16) :
   bv_unsigned (vr_type r) <> virtio_blk_t_out ->
   bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
-  virtio_complete_ok v r = true.
-Proof. exact (virtio_complete_ok_in v r). Qed.
+  virtio_complete_ok v r i = true.
+Proof. exact (virtio_complete_ok_in v r i). Qed.
 
 (* THE FLUSH IS A BARRIER, and this is the whole of what that means in the
    model: the completion is enabled only once the volatile write cache has
@@ -142,11 +144,12 @@ Proof. exact (virtio_complete_ok_in v r). Qed.
    so the cache was already empty and the flush completed at once -- the
    test therefore confirms the OK status but not the barrier.  The barrier
    is the statement below. *)
-Lemma model_flush_needs_empty_cache (v : virtio_state) (r : vio_req) :
+Lemma model_flush_needs_empty_cache (v : virtio_state) (r : vio_req)
+    (i : bv 16) :
   bv_unsigned (vr_type r) = virtio_blk_t_flush ->
-  virtio_complete_ok v r = true -> v_cache v = ∅.
+  virtio_complete_ok v r i = true -> v_cache v = ∅.
 Proof.
-  intros Hf Hok. apply (virtio_complete_ok_flush v r); [| exact Hf | exact Hok].
+  intros Hf Hok. apply (virtio_complete_ok_flush v r i); [| exact Hf | exact Hok].
   rewrite Hf. unfold virtio_blk_t_flush, virtio_blk_t_out. lia.
 Qed.
 
