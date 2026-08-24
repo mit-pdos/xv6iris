@@ -1190,6 +1190,22 @@ Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
    and with it the `Himg` deletion — is thereby mostly this one lemma's
    second call site.
 
+7. **The batch's frame, resolved (orchestrator, 2026-08-25, over lane 4's
+   residual).**  The accumulated pure tie (`snap_ok`) gains the USED-SET
+   COUPLING — every inode's footprint ⊆ the bitmap's used set, footprints
+   pairwise disjoint — so a write to block `b` frames every other inode's
+   clause purely; the clause is MAINTAINED LOCALLY: the only write that
+   could break it (adopting `b`) holds "b's bit was clear" from its own
+   bitmap AU, hence `b` was in no footprint.  And the accumulation is
+   SPLIT: per-write the payload carries only the byte tie + coupling
+   (true even mid-op); the local clauses (`inode_local`) arrive as each
+   op's own pure residue at `end_op` (create's nlink-before-dots window
+   never reaches a snapshot).  This is one whole-state PURE clause on the
+   DURABLE tie — §0's letter is bent there and nowhere else; §0's spirit
+   (local maintenance) holds.  `S_L` is read from three sources at
+   commit: `γtop_L`'s auth (inodes), the bitmap invariant's used set, and
+   the config's superblock.
+
 Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
 (`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
 and at every commit.
