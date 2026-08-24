@@ -967,6 +967,19 @@ map at home blocks); 1d lands last.
           literal and discharge it by name (`T_FILE_ty_ok`,
           `T_DEVICE_ty_ok`, `T_DIR_ty_ok` in `SpecCreate`), so `sys_open`,
           `sys_mkdir` and `sys_mknod` each grew exactly one argument.
+        - **THE ADEQUACY SEAM.**  `SystemAdequacy`'s `SystemBoot` section
+          dropped its `!fsTopG Σ` binder (the class is an `xv6G` member
+          now), so the two `@xv6_boot_era` applications inside it take one
+          `_` fewer.  Nothing else in the boot cone moved.
+        - **`ProofSysUnlink` WAS THE EXPENSIVE CONSUMER**, and not because
+          of the payload: its three seams and its five walk lemmas
+          (`su_w2` .. `su_w5_dir`) carry the payload FLAT — as twenty-odd
+          separate wands rather than one `ic_loaded` — so the two new
+          conjuncts had to be threaded through every premise list, every
+          `iIntros` and every hand-off by hand.  `ProofSysLink` is the
+          same for its `dirlink` arms.  A lane that adds another payload
+          conjunct should price these two files at the flat lists, not at
+          the `ic_loaded` sites.
       - OPEN, for the orchestrator, in the order they cost:
         - The link family is still dropped at `BootShared` and the bundle
           still excludes the link ghosts.  Routing them is the links step's
