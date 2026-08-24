@@ -2416,15 +2416,12 @@ Proof. reflexivity. Qed.
 Lemma vproto_ok_publish (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vproto_ok c pr D ->
-  (* the window is not already the ring's full width -- see the note in the
-     proof: this is the publisher's own ring-slot fact *)
-  (vp_np pr - vp_lo pr < 8)%nat ->
   slot_pin_ok c (vp_np pr) sl pin ->
   slot_wr sl ## dom pin ->
   slot_fp sl pin ## D ->
   vproto_ok c (vproto_publish_state pr sl pin) (D ∪ slot_fp sl pin).
 Proof.
-  intros Hok Hnotfull Hnew Hwr Hdisj.
+  intros Hok Hnew Hwr Hdisj.
   pose proof (vproto_ncnp _ _ _ Hok) as Hle.
   assert (Hslots : vp_slots (vproto_publish_state pr sl pin)
                    = <[ vp_np pr := sl ]> (vp_slots pr)).
@@ -2450,12 +2447,49 @@ Proof.
     - exfalso. congruence.
     - exfalso. congruence.
     - right. split; assumption. }
-  (* THE WINDOW MUST NOT SATURATE, and the CALLER is what says so: publishing
-     at [lo + 8] would claim the available-ring entry position [lo] still
-     pins, so the Iris publisher -- which owns that ring cell and hands in a
-     pin disjoint from the lease -- is where the fact lives.  Proving it here
-     instead cost minutes of conversion per build; the shape it takes at the
-     caller is [DiskInv]'s [ring_slots_res]. *)
+  (* THE WINDOW CANNOT SATURATE, and this is where that is proved rather
+     than assumed: if the window were already eight wide, the watermark's own
+     position would be pending, and the entry it pins in the available ring
+     is the very one this publish is claiming ([lo] and [lo+8] are the same
+     ring slot).  The publisher's fresh pin is disjoint from the lease, which
+     holds that one -- so the eighth publish cannot happen. *)
+  assert (Hnotfull : (vp_np pr - vp_lo pr < 8)%nat).
+  { pose proof (vpo_win _ _ _ Hok) as Hw8.
+    destruct (decide (vp_np pr - vp_lo pr < 8)%nat) as [Hlt|Hge]; [exact Hlt|].
+    exfalso.
+    assert (Heq : (vp_np pr = vp_lo pr + 8)%nat)
+      by (pose proof (vpo_lo_np _ _ _ Hok); lia).
+    assert (Hlolt : (vp_lo pr < vp_np pr)%nat) by lia.
+    assert (Hlopd : vp_lo pr ∈ dom (vp_pend pr)).
+    { apply (vpo_pend_dom _ _ _ Hok).
+      split; [ lia | exact (vpo_lo_min _ _ _ Hok Hlolt) ]. }
+    apply elem_of_dom in Hlopd as [sllo Hsllo].
+    assert (Hpdlo : vp_lo pr ∈ dom (vp_pin pr)).
+    { rewrite (vpo_pin_dom _ _ _ Hok). apply elem_of_union_l, elem_of_dom.
+      exists sllo. exact Hsllo. }
+    apply elem_of_dom in Hpdlo as [pinlo Hpinlo].
+    pose proof (vproto_pend_slot pr _ _ Hsllo) as Hslo.
+    pose proof (vpo_slot _ _ _ Hok _ sllo pinlo Hslo Hpinlo) as Hslotlo.
+    (* both pins hold the same ring entry *)
+    assert (Hring : ring_entry_pa c (vp_np pr) = ring_entry_pa c (vp_lo pr)).
+    { unfold ring_entry_pa. f_equal. f_equal. f_equal.
+      rewrite Heq, Nat2Z.inj_add. change (Z.of_nat 8) with 8.
+      replace (Z.of_nat (vp_lo pr) + 8) with (Z.of_nat (vp_lo pr) + 1 * 8)
+        by lia.
+      apply Z_mod_plus_full. }
+    assert (Hin1 : ring_entry_pa c (vp_np pr) ∈ dom pin).
+    { apply (read_bytes_dom_sub pin (ring_entry_pa c (vp_np pr)) 2 _
+               (spo_ring _ _ _ _ Hnew)).
+      apply pa_range_base. change (N.to_nat 2) with 2%nat. lia. }
+    assert (Hin2 : ring_entry_pa c (vp_lo pr) ∈ dom pinlo).
+    { apply (read_bytes_dom_sub pinlo (ring_entry_pa c (vp_lo pr)) 2 _
+               (spo_ring _ _ _ _ Hslotlo)).
+      apply pa_range_base. change (N.to_nat 2) with 2%nat. lia. }
+    rewrite Hring in Hin1.
+    exact (proj1 (elem_of_disjoint _ _) Hdisj _ (slot_fp_pin sl pin _ Hin1)
+             (proj1 (elem_of_subseteq _ _)
+                (vpo_fp_D _ _ _ Hok _ sllo pinlo Hslo Hpinlo) _
+                (slot_fp_pin sllo pinlo _ Hin2))). }
   assert (Hnpsrv : vp_np pr ∉ vp_srv pr).
   { intro Hc. pose proof (vpo_srv_np _ _ _ Hok _ Hc). lia. }
   constructor.
@@ -2711,8 +2745,19 @@ Lemma vproto_ok_init (c : virtio_cfg) :
   vproto_ok c vproto0 (avail_idx_dom c ∪ used_page_pas c).
 Proof.
   intros Hq Hlive Hiu.
+  (* EVERY projection of [vproto0] is named here, and the proof below uses
+     ONLY these.  Pointing [cbn] (or [set_solver], which unfolds on its own)
+     at a projection of this constructor is what made this file take an hour:
+     the fields are the empty gset/gmap, and normalising them drags the map
+     representation into a goal that never needed it. *)
+  assert (Hnc0 : vp_nc vproto0 = 0%nat) by reflexivity.
+  assert (Hnp0 : vp_np vproto0 = 0%nat) by reflexivity.
+  assert (Hlo0 : vp_lo vproto0 = 0%nat) by reflexivity.
+  assert (Htk0 : vp_tk vproto0 = None) by reflexivity.
+  assert (Hsrv0 : vp_srv vproto0 = (∅ : gset nat)) by reflexivity.
   assert (Hpend0 : vp_pend vproto0 = (∅ : gmap nat vslot)) by reflexivity.
   assert (Hdone0 : vp_done vproto0 = (∅ : gmap nat vslot)) by reflexivity.
+  assert (Huix0 : vp_uix vproto0 = (∅ : gmap nat nat)) by reflexivity.
   assert (Hpin0 : vp_pin vproto0 = (∅ : gmap nat (gmap Arch.pa (bv 8))))
     by reflexivity.
   assert (Hemp : vp_slots vproto0 = (∅ : gmap nat vslot)).
@@ -2721,20 +2766,22 @@ Proof.
   constructor.
   - exact Hq.
   - exact Hlive.
-  - intros q Hq0. exfalso. exact (proj1 (elem_of_empty q) Hq0).
-  - intro q. rewrite Hpend0, dom_empty_L. split; [set_solver|].
-    intros [Hq _]. exfalso. cbn in Hq. lia.
-  - reflexivity.
-  - intros q Hq0. exfalso. unfold vproto0 in Hq0. cbn [vp_lo] in Hq0. lia.
-  - intros _. set_solver.
-  - reflexivity.
-  - by rewrite size_empty.
-  - by rewrite dom_empty_L.
-  - intros q u Hu. rewrite lookup_empty in Hu. discriminate.
-  - intros q1 q2 u Hu _. rewrite lookup_empty in Hu. discriminate.
-  - intros u Hu. exfalso. cbn in Hu. lia.
-  - discriminate.
-  - intros q Hqd. rewrite Hdone0, dom_empty_L in Hqd.
+  - rewrite Hsrv0. intros q Hq0. exfalso. exact (proj1 (elem_of_empty q) Hq0).
+  - intro q. rewrite Hpend0, Hnp0, Hsrv0, dom_empty_L. split.
+    + intro Hc. exfalso. exact (proj1 (elem_of_empty q) Hc).
+    + intros [Hlt _]. exfalso. lia.
+  - rewrite Hlo0, Hnp0. reflexivity.
+  - rewrite Hlo0. intros q Hq0. exfalso. lia.
+  - rewrite Hlo0, Hnp0, Hsrv0. intros _. apply not_elem_of_empty.
+  - rewrite Hlo0, Hnp0. lia.
+  - rewrite Hnc0, Hsrv0. by rewrite size_empty.
+  - rewrite Huix0, Hsrv0. by rewrite dom_empty_L.
+  - rewrite Huix0. intros q u Hu. rewrite lookup_empty in Hu. discriminate.
+  - rewrite Huix0. intros q1 q2 u Hu _. rewrite lookup_empty in Hu.
+    discriminate.
+  - rewrite Hnc0. intros u Hu. exfalso. lia.
+  - rewrite Htk0. discriminate.
+  - rewrite Hdone0, Hsrv0. intros q Hqd. rewrite dom_empty_L in Hqd.
     exfalso. exact (proj1 (elem_of_empty q) Hqd).
   - rewrite Hpend0, Hdone0, Hpin0, !dom_empty_L.
     apply gset_eq_of_elem. intro x. rewrite elem_of_union. tauto.
