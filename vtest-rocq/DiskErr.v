@@ -129,14 +129,33 @@ Proof.
   cbn [orb snd]. by rewrite lookup_insert.
 Qed.
 
-(* ...and it is never GATED: unlike a write it does not wait for anything,
-   which is why the eager schedule serves it in one step *)
+(* ...and it does not wait for the CACHE TO DRAIN the way a write does, only
+   for its own sectors to be off the cache -- which in this test, and in every
+   execution where nothing overlapping is in flight, is immediate.  (With the
+   served order free the device may be holding SOME OTHER request's captured
+   payload when this one completes, and a request is served from
+   [VirtioModel.cache_view]; the gate is what makes the bytes it reports the
+   durable ones.  See VirtioModel's [virtio_complete_ok].) *)
 Lemma model_unknown_type_not_gated (v : virtio_state) (r : vio_req)
     (i : bv 16) :
   bv_unsigned (vr_type r) <> virtio_blk_t_out ->
   bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
+  vreq_touch r ∩ dom (v_cache v) = ∅ ->
   virtio_complete_ok v r i = true.
 Proof. exact (virtio_complete_ok_in v r i). Qed.
+
+(* ...and with an EMPTY cache -- the state this test's device is in -- it is
+   not gated at all, which is why the eager schedule serves it in one step *)
+Lemma model_unknown_type_empty_cache (v : virtio_state) (r : vio_req)
+    (i : bv 16) :
+  bv_unsigned (vr_type r) <> virtio_blk_t_out ->
+  bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
+  v_cache v = ∅ ->
+  virtio_complete_ok v r i = true.
+Proof.
+  intros H1 H2 Hc. apply (virtio_complete_ok_in v r i H1 H2).
+  rewrite Hc, dom_empty_L. set_solver.
+Qed.
 
 (* THE FLUSH IS A BARRIER, and this is the whole of what that means in the
    model: the completion is enabled only once the volatile write cache has
