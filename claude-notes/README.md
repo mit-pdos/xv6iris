@@ -140,13 +140,16 @@ first five were audited against the tree 2026-08-22):
   forces, and how to tell a wrong proof from a slow one.
 
 - **[`durable-disk.md`](projects/durable-disk.md)** — xv6 correctness
-  across crashes INCLUDING FS consistency, under RULING 3 (2026-08-23):
-  the file system as nested SL predicates at two views (`design/fs-state.md`),
-  the log's contract first (custody at birth, row (b), byte-keyed `fs_L`,
-  the parked payload and two AUs), then the predicates, then a `sys_mknod`
-  spike.  Stages A/B/D/H0 stand; everything FS-side is still a
-  placeholder.  The byte-view attempt is archived in
-  `completed/durable-disk-byteview.md`.
+  across crashes INCLUDING FS consistency, under ruling 3
+  (`design/fs-state.md`): nested SL predicates at two views.  LANDED:
+  the log's whole contract (stage 1: custody at birth, row (b), the
+  byte-keyed exclusive logged view, the parked payload + two AUs, zero
+  placeholder lemmas tree-wide), the `Γ`-predicates (2a), and the in-era
+  flip (2b: bitmap, region records, the era payload, link tokens as a
+  counting RA).  IN FLIGHT: 2c-body — `P_wf := fs_view Γ_D`, the real
+  debt, the suppliers' durable steps — then the `sys_mknod` spike, then
+  boot re-founding + delete `Himg` (stage 4).  The byte-view attempt is
+  archived in `completed/durable-disk-byteview.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
   (today both carry a clean-image premise), `sys_sync`'s empty
