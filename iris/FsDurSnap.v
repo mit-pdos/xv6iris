@@ -85,25 +85,69 @@ Definition rec_in_blk (bs : list (bv 8)) (off : Z) (dn : dinode) : Prop :=
   exists pre post,
     bs = (pre ++ dinode_bytes dn ++ post)%list /\ Z.of_nat (length pre) = off.
 
-(* THE ACCUMULATED PURE CONTENT: an abstract state [S] and the committed
-   block map [D] agree at [S]'s FOOTPRINT.  Every clause names ONE object
-   and its own bytes -- there is no clause about two inodes, no domain
-   sweep, no disjointness, and no "used set" completeness (fs-state.md
-   section 0).  The three that are not per-object are:
+(* ===================================================================== *)
+(*  1a. WHICH BLOCK EACH CLAUSE READS                                     *)
+(*                                                                        *)
+(*  The two vocabularies the USED-SET COUPLING and the FRAME are stated    *)
+(*  in.  Both are per-object readings: [fn_owns] names ONE node's blocks   *)
+(*  and [snap_meta] the three roles that are not a node's at all.          *)
+(* ===================================================================== *)
 
-   - [sk_dom], the inode map's DOMAIN over the region.  It is
-     fs-state.md 4.5 (2)'s per-inum EXISTENCE witness and 3c's third
-     [dgeo_ok] equation, and under snapshots it is by construction: the
-     value [S] is read off the era's own top-map authority, whose domain
-     IS the region's inums.
-   - [sk_links], the link family's validity.  It is the tokens-<=-nlink
-     law, which fs-state.md section 7 already names as the one whole-state
-     fact in the design; it is never MAINTAINED here, only carried, and
-     the allocator needs it because [own_alloc] needs a valid element.
-   - [sk_bsz], "every block of [D] is a whole block", which is the log's
-     own row (b) property. *)
-Record snap_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
-  MkSnapOk {
+(* block [b] is one of node [n]'s OWN blocks: a data block it holds, or its
+   indirect block.  These are exactly the blocks [snap_blk] and [snap_ind]
+   read at [n]. *)
+Definition fn_owns (n : fs_node) (b : Z) : Prop :=
+  (exists k, is_Some (fn_blk n !! k) /\ fn_naddr n k = b)
+  \/ (fn_indb n <> 0 /\ fn_indb n = b).
+
+(* ...and the blocks the NON-inode clauses read: the superblock's block, the
+   bitmap's block, and the inode region's blocks (one per sixteen inums).
+   The region arm quantifies over the inums the STATE names rather than over
+   the region's geometry, which is the only form derivable from [S] alone. *)
+Definition snap_meta (S : fs_state_rec) (b : Z) : Prop :=
+  b = SB_BNO
+  \/ b = sb_bmapstart (fss_sb S)
+  \/ (exists i, is_Some (fss_inodes S !! i)
+             /\ b = sb_inodestart (fss_sb S) + i `div` 16).
+
+(* ===================================================================== *)
+(*  1b. THE BYTE HALF: the tie, and the USED-SET COUPLING                 *)
+(*                                                                        *)
+(*  THE ACCUMULATED PURE CONTENT (fs-state.md 4^9, addendum 7): an         *)
+(*  abstract state [S] and the committed block map [D] agree at [S]'s      *)
+(*  FOOTPRINT, and the state's own blocks are laid out DISJOINTLY inside   *)
+(*  the bitmap's used set.  This half is true EVEN MID-OPERATION, which is *)
+(*  why it -- and not [snap_ok] -- is what a batch accumulates per write.  *)
+(*                                                                        *)
+(*  Every byte clause names ONE object and its own bytes.  Three do not,   *)
+(*  and each is named at its definition:                                   *)
+(*                                                                        *)
+(*  - [snap_dom], the inode map's DOMAIN over the region.  It is           *)
+(*    fs-state.md 4.5 (2)'s per-inum EXISTENCE witness and 3c's third      *)
+(*    [dgeo_ok] equation, and under snapshots it is by construction: the   *)
+(*    value [S] is read off the era's own top-map authority, whose domain  *)
+(*    IS the region's inums.                                              *)
+(*  - [snap_links], the link family's validity.  It is the tokens-<=-nlink *)
+(*    law, which fs-state.md section 7 already names as the one            *)
+(*    whole-state fact in the design; it is never MAINTAINED here, only    *)
+(*    carried, and the allocator needs it because [own_alloc] needs a      *)
+(*    valid element.                                                       *)
+(*  - [snap_bsz], "every block of [D] is a whole block", which is the      *)
+(*    log's own row (b) property.                                          *)
+(*                                                                        *)
+(*  THE COUPLING -- [snap_meta_used], [snap_own_used], [snap_disj] -- IS   *)
+(*  THE ONE SANCTIONED WHOLE-STATE PURE CLAUSE (fs-state.md 4^9 (7)):      *)
+(*  section 0's LETTER is bent here and nowhere else, and its SPIRIT       *)
+(*  (local maintenance) holds.  What it BUYS is exactly                    *)
+(*  [snap_untouched_of_own] and [snap_untouched_of_free] in 1e below: the  *)
+(*  frame's hypothesis quantifies over every inode of [S], and the         *)
+(*  coupling turns it into a fact ONE writer holds about ONE object: that  *)
+(*  the block is its own node's, or that the block's bit read CLEAR -- the *)
+(*  latter straight off the adopting writer's own bitmap atomic update.    *)
+(*  No writer ever meets the quantifier.                                   *)
+(* ===================================================================== *)
+Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
+  MkSnapBytes {
   sk_bsz    : forall b bs, D !! b = Some bs -> length bs = BSIZE;
   (* the superblock block, and the one clause [sb_owned] states *)
   sk_sb     : D !! SB_BNO = Some (fss_sbb S);
@@ -114,9 +158,8 @@ Record snap_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
   (* every block below the size whose bit reads FREE is a block of [D] *)
   sk_pool   : forall b, 0 <= b < sb_size (fss_sb S) -> b ∉ fss_used S ->
                 is_Some (D !! b);
-  (* the inodes: range, local clauses, and the three byte ties *)
+  (* the inodes: range, and the three byte ties *)
   sk_inum   : forall i n, fss_inodes S !! i = Some n -> 0 <= i < 2 ^ 32;
-  sk_local  : forall i n, fss_inodes S !! i = Some n -> inode_local i n;
   sk_rec    : forall i n, fss_inodes S !! i = Some n ->
                 exists bs,
                   D !! (sb_inodestart (fss_sb S) + i `div` 16) = Some bs
@@ -130,6 +173,18 @@ Record snap_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
                 is_Some (fss_inodes S !! i);
   (* the link family's own validity *)
   sk_links  : ✓ link_elem (fss_inodes S);
+  (* ---- THE USED-SET COUPLING ---- *)
+  (* the metadata roles are MARKED IN USE, so a block whose bit reads clear
+     is none of them *)
+  sk_meta_used : forall b, snap_meta S b -> b ∈ fss_used S;
+  (* every node's own blocks are marked in use, and none of them is a
+     metadata block *)
+  sk_own_used  : forall i n b, fss_inodes S !! i = Some n -> fn_owns n b ->
+                   b ∈ fss_used S /\ ~ snap_meta S b;
+  (* ...and no two nodes share one *)
+  sk_disj      : forall i n j m b,
+                   fss_inodes S !! i = Some n -> fss_inodes S !! j = Some m ->
+                   fn_owns n b -> fn_owns m b -> i = j;
 }.
 
 Global Arguments sk_bsz {_ _} _.
@@ -138,12 +193,43 @@ Global Arguments sk_parse {_ _} _.
 Global Arguments sk_bmap {_ _} _.
 Global Arguments sk_pool {_ _} _.
 Global Arguments sk_inum {_ _} _.
-Global Arguments sk_local {_ _} _.
 Global Arguments sk_rec {_ _} _.
 Global Arguments sk_blk {_ _} _.
 Global Arguments sk_ind {_ _} _.
 Global Arguments sk_dom {_ _} _.
 Global Arguments sk_links {_ _} _.
+Global Arguments sk_meta_used {_ _} _.
+Global Arguments sk_own_used {_ _} _.
+Global Arguments sk_disj {_ _} _.
+
+(* ===================================================================== *)
+(*  1c. THE LOCAL HALF, AND THE TIE THE ALLOCATOR TAKES                   *)
+(*                                                                        *)
+(*  [snap_local] is the per-inode clauses and NOTHING ELSE -- it does not  *)
+(*  mention [D] at all, which is why no write can disturb it and why it    *)
+(*  does not have to be carried through one.  It is FALSE mid-operation    *)
+(*  (create's window between [ip->nlink = 1] and its two [dirlink]s is the *)
+(*  worked case), so it is not accumulated per write: each operation       *)
+(*  re-establishes it at its own objects as [SpecEndOp]'s pure residue,    *)
+(*  and the objects it did not touch ride the frame.  A snapshot is        *)
+(*  quiescence-only, so it is demanded exactly where it is true.           *)
+(* ===================================================================== *)
+Definition snap_local (S : fs_state_rec) : Prop :=
+  forall i n, fss_inodes S !! i = Some n -> inode_local i n.
+
+(* THE TIE THE ALLOCATOR TAKES: both halves.  The split above is about what
+   a BATCH accumulates; a COMMIT proves this. *)
+Definition snap_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
+  snap_bytes S D /\ snap_local S.
+
+(* the two projections, so that a consumer that wants one clause of the
+   byte half names it exactly as it did at the unsplit record *)
+Definition sk_bytes {S D} (H : snap_ok S D) : snap_bytes S D := proj1 H.
+Definition sk_local {S D} (H : snap_ok S D) : snap_local S := proj2 H.
+
+Lemma snap_ok_intro (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_bytes S D -> snap_local S -> snap_ok S D.
+Proof. intros Hb Hl. exact (conj Hb Hl). Qed.
 
 (* THE PURE READING THE SPIKE USES: the state names every region inum, and
    for the named node the record's bytes are where they are.  Everything a
@@ -166,9 +252,9 @@ Definition snap_inode_at (S : fs_state_rec) (D : gmap Z (list (bv 8)))
 Lemma snap_ok_inode (S : fs_state_rec) (D : gmap Z (list (bv 8))) (i : Z) :
   snap_ok S D -> snap_inum_ok S i -> snap_inode_at S D i.
 Proof.
-  intros Hok Hi.
+  intros [Hok Hloc] Hi.
   destruct (sk_dom Hok i Hi) as [n Hn].
-  exists n. split; [exact Hn |]. split; [exact (sk_local Hok i n Hn) |].
+  exists n. split; [exact Hn |]. split; [exact (Hloc i n Hn) |].
   exact (sk_rec Hok i n Hn).
 Qed.
 
@@ -331,8 +417,8 @@ Lemma snap_ok_data (S : fs_state_rec) (D : gmap Z (list (bv 8)))
   (k < FS_MAXFILE)%nat -> Z.of_nat k * BSIZE_z < fn_size n ->
   D !! fn_naddr n k = Some (fn_data n k).
 Proof.
-  intros Hok Hn Hk Hlt.
-  destruct (inode_local_data_owned i n k (sk_local Hok i n Hn) Hk Hlt)
+  intros [Hok Hloc] Hn Hk Hlt.
+  destruct (inode_local_data_owned i n k (Hloc i n Hn) Hk Hlt)
     as (bs & Hbs & Hdat & _).
   rewrite Hdat. exact (sk_blk Hok i n k bs Hn Hbs).
 Qed.
@@ -399,39 +485,94 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(*  1e. THE ONE-BLOCK FRAME, AND THE FACT IT NEEDS                        *)
+(*  1e. THE ONE-BLOCK FRAME, AND THE COUPLING THAT SUPPLIES ITS FACT      *)
 (*                                                                        *)
 (*  A batch's writes have to carry the tie from the previous commit's      *)
 (*  state to the next one's, and the part of that which is FRAME -- the    *)
-(*  objects the batch did not touch -- is this lemma.  Its hypothesis is   *)
-(*  the honest one and it is NOT per-object: no clause of [snap_ok S] may  *)
-(*  read block [b], which quantifies over every inode of [S].              *)
+(*  objects the batch did not touch -- is [snap_bytes_frame].  Its         *)
+(*  hypothesis [snap_untouched S b] is honest and is NOT per-object: no    *)
+(*  clause of [snap_bytes S] may read block [b], which quantifies over     *)
+(*  every inode of [S].                                                    *)
 (*                                                                        *)
-(*  THAT IS THE RESIDUAL OBSTACLE OF THE WHOLE FLIP, and it is worth       *)
-(*  stating where it is: at the ERA the fact is free, because distinct     *)
-(*  objects' [blk_owned]s are separated by the [∗] ([blk_owned_ne]); as    *)
-(*  an accumulated PURE fact it is a claim about every inode at once and   *)
-(*  no per-object splice fact supplies it.  The SNAPSHOT ruling removes    *)
-(*  every RESOURCE wall the project met -- there is nothing to update --   *)
-(*  but it does not by itself supply this, so a batch's accumulation is    *)
-(*  still a LEDGER (durable-disk 3c/3d's, minus its resources and its      *)
-(*  hands).  See claude-notes/projects/durable-disk.md item 4.             *)
+(*  THAT WAS THE RESIDUAL OBSTACLE OF THE FLIP, and the USED-SET COUPLING  *)
+(*  (1b) is what retires it: neither of the two derivations below          *)
+(*  quantifies over the state, so NO WRITER EVER MEETS THE QUANTIFIER.     *)
+(*                                                                        *)
+(*  - [snap_untouched_of_free]: "b's bit reads CLEAR".  A block outside    *)
+(*    the used set is no metadata block ([sk_meta_used]) and in no node's  *)
+(*    footprint ([sk_own_used]).  This is the ADOPT case, and the fact is  *)
+(*    exactly what the adopting writer reads off its OWN bitmap atomic     *)
+(*    update -- balloc's scan found the bit zero before it set it.         *)
+(*  - [snap_untouched_of_own]: "b is MY node's block".  Then it is no      *)
+(*    metadata block ([sk_own_used] again) and no OTHER node's             *)
+(*    ([sk_disj]), so every clause but my own frames.  This is what a data *)
+(*    or indirect-block writer holds from its own splice fact.             *)
+(*                                                                        *)
+(*  The second one is stated as the residue [snap_untouched_but], since a  *)
+(*  writer at its own block DOES move its own clauses; the composite       *)
+(*  "frame everything else and re-prove mine" is the supplier lane's, and  *)
+(*  is one [snap_bytes] constructor over these two plus the writer's own   *)
+(*  splice fact.                                                           *)
 (* ===================================================================== *)
 
 Definition snap_untouched (S : fs_state_rec) (b : Z) : Prop :=
-  b <> SB_BNO
-  /\ b <> sb_bmapstart (fss_sb S)
-  /\ (forall i n, fss_inodes S !! i = Some n ->
-        b <> sb_inodestart (fss_sb S) + i `div` 16
-        /\ (forall k bs, fn_blk n !! k = Some bs -> b <> fn_naddr n k)
-        /\ (fn_indb n <> 0 -> b <> fn_indb n)).
+  ~ snap_meta S b
+  /\ (forall i n, fss_inodes S !! i = Some n -> ~ fn_owns n b).
 
-Lemma snap_ok_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-    (b : Z) (bs : list (bv 8)) :
-  snap_ok S D -> snap_untouched S b -> length bs = BSIZE ->
-  snap_ok S (<[b := bs]> D).
+(* ...and the same with ONE inode exempted: the shape a writer at its own
+   block has, since its own clauses are the ones it re-proves. *)
+Definition snap_untouched_but (S : fs_state_rec) (i : Z) (b : Z) : Prop :=
+  ~ snap_meta S b
+  /\ (forall j m, fss_inodes S !! j = Some m -> j <> i -> ~ fn_owns m b).
+
+(* THE ADOPT CASE, off the writer's own bitmap atomic update. *)
+Lemma snap_untouched_of_free (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) :
+  snap_bytes S D -> b ∉ fss_used S -> snap_untouched S b.
 Proof.
-  intros Hok (Hsb & Hbm & Hin) Hlen.
+  intros Hok Hfree. split.
+  - intros Hm. exact (Hfree (sk_meta_used Hok b Hm)).
+  - intros i n Hi Hown. exact (Hfree (proj1 (sk_own_used Hok i n b Hi Hown))).
+Qed.
+
+(* THE OWN CASE, off the writer's own splice fact. *)
+Lemma snap_untouched_of_own (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (n : fs_node) (b : Z) :
+  snap_bytes S D -> fss_inodes S !! i = Some n -> fn_owns n b ->
+  snap_untouched_but S i b.
+Proof.
+  intros Hok Hi Hown. split.
+  - exact (proj2 (sk_own_used Hok i n b Hi Hown)).
+  - intros j m Hj Hne Hownj. exact (Hne (sk_disj Hok j m i n b Hj Hi Hownj Hown)).
+Qed.
+
+(* the [snap_meta] arms, read out one at a time: this is how a caller that
+   holds [~ snap_meta S b] discharges the three clause-level disequalities *)
+Lemma snap_meta_sb (S : fs_state_rec) (b : Z) :
+  ~ snap_meta S b -> b <> SB_BNO.
+Proof. intros Hm ->. apply Hm. by left. Qed.
+
+Lemma snap_meta_bmap (S : fs_state_rec) (b : Z) :
+  ~ snap_meta S b -> b <> sb_bmapstart (fss_sb S).
+Proof. intros Hm ->. apply Hm. right. by left. Qed.
+
+Lemma snap_meta_reg (S : fs_state_rec) (b i : Z) (n : fs_node) :
+  ~ snap_meta S b -> fss_inodes S !! i = Some n ->
+  b <> sb_inodestart (fss_sb S) + i `div` 16.
+Proof.
+  intros Hm Hi Heq. apply Hm. right. right. exists i.
+  split; [by exists n | exact Heq].
+Qed.
+
+(* THE FRAME.  Only the byte half moves -- [snap_local] does not mention
+   [D] at all, so a write cannot disturb it, which is the whole point of
+   the split. *)
+Lemma snap_bytes_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) (bs : list (bv 8)) :
+  snap_bytes S D -> snap_untouched S b -> length bs = BSIZE ->
+  snap_bytes S (<[b := bs]> D).
+Proof.
+  intros Hok (Hm & Hin) Hlen.
   (* one lookup transport, used at every clause that names a block *)
   assert (Hne : forall c cs, c <> b -> D !! c = Some cs ->
                   <[b := bs]> D !! c = Some cs).
@@ -443,29 +584,43 @@ Proof.
     + rewrite lookup_insert in Hcs. injection Hcs as <-. exact Hlen.
     + rewrite lookup_insert_ne in Hcs; [| exact (not_eq_sym Hc)].
       exact (sk_bsz Hok c cs Hcs).
-  - exact (Hne _ _ (not_eq_sym Hsb) (sk_sb Hok)).
+  - exact (Hne _ _ (not_eq_sym (snap_meta_sb S b Hm)) (sk_sb Hok)).
   - exact (sk_parse Hok).
-  - exact (Hne _ _ (not_eq_sym Hbm) (sk_bmap Hok)).
+  - exact (Hne _ _ (not_eq_sym (snap_meta_bmap S b Hm)) (sk_bmap Hok)).
   - intros c Hc Hcu.
     destruct (decide (c = b)) as [-> | Hcb].
     + rewrite lookup_insert. by eexists.
     + destruct (sk_pool Hok c Hc Hcu) as [cs Hcs].
       exists cs. exact (Hne _ _ Hcb Hcs).
   - exact (sk_inum Hok).
-  - exact (sk_local Hok).
   - intros i n Hi.
-    destruct (Hin i n Hi) as (Hrec & _ & _).
     destruct (sk_rec Hok i n Hi) as (cs & Hcs & Hrin).
     exists cs. split; [| exact Hrin].
-    exact (Hne _ _ (not_eq_sym Hrec) Hcs).
+    exact (Hne _ _ (not_eq_sym (snap_meta_reg S b i n Hm Hi)) Hcs).
   - intros i n k cs Hi Hk.
-    destruct (Hin i n Hi) as (_ & Hblk & _).
-    exact (Hne _ _ (not_eq_sym (Hblk k cs Hk)) (sk_blk Hok i n k cs Hi Hk)).
+    assert (Hb : fn_naddr n k <> b).
+    { intro Heq. apply (Hin i n Hi). left. exists k. split; [by exists cs | exact Heq]. }
+    exact (Hne _ _ Hb (sk_blk Hok i n k cs Hi Hk)).
   - intros i n Hi Hnz.
-    destruct (Hin i n Hi) as (_ & _ & Hind).
-    exact (Hne _ _ (not_eq_sym (Hind Hnz)) (sk_ind Hok i n Hi Hnz)).
+    assert (Hb : fn_indb n <> b).
+    { intro Heq. apply (Hin i n Hi). right. split; [exact Hnz | exact Heq]. }
+    exact (Hne _ _ Hb (sk_ind Hok i n Hi Hnz)).
   - exact (sk_dom Hok).
   - exact (sk_links Hok).
+  - exact (sk_meta_used Hok).
+  - exact (sk_own_used Hok).
+  - exact (sk_disj Hok).
+Qed.
+
+(* ...and the reading at the whole tie, for a consumer that holds both
+   halves and wants both back. *)
+Lemma snap_ok_frame (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) (bs : list (bv 8)) :
+  snap_ok S D -> snap_untouched S b -> length bs = BSIZE ->
+  snap_ok S (<[b := bs]> D).
+Proof.
+  intros [Hok Hloc] Hu Hlen.
+  exact (conj (snap_bytes_frame S D b bs Hok Hu Hlen) Hloc).
 Qed.
 
 (* ===================================================================== *)
@@ -540,7 +695,7 @@ Section Snap.
     snap_ok S D ->
     □ blk_ledger Γ D -∗ fs_links (γlink Γ) (fss_inodes S) -∗ fs_state Γ S.
   Proof.
-    intros Hok. iIntros "#Hled Hlinks".
+    intros [Hok Hloc]. iIntros "#Hled Hlinks".
     rewrite /fs_state. iSplitR "Hlinks"; last iSplitL "Hlinks".
     - (* ---- the superblock ---- *)
       rewrite /sb_owned. iSplitL; [| iPureIntro; exact (sk_parse Hok)].
@@ -571,7 +726,7 @@ Section Snap.
       + (* the ghosts *)
         rewrite /inode_ghost.
         iDestruct (inode_link_scatter with "Hown") as "[$ $]".
-        iPureIntro. exact (sk_local Hok i n Hi).
+        iPureIntro. exact (Hloc i n Hi).
     - (* ---- the bitmap and the free pool ---- *)
       rewrite /free_bitmap /free_bitmap_at. iSplitL.
       + iApply (blk_ledger_lookup Γ D (sb_bmapstart (fss_sb S))
@@ -630,10 +785,11 @@ Section Snap.
   Proof.
     intros Hok.
     iMod (snap_bytes_alloc (fs_dbytes D)) as (g) "[Hba Hbe]".
-    iMod (fs_links_alloc (fss_inodes S) (sk_links Hok)) as (gl) "Hlinks".
+    iMod (fs_links_alloc (fss_inodes S) (sk_links (sk_bytes Hok)))
+      as (gl) "Hlinks".
     iMod (ghost_map_alloc (fss_inodes S)) as (gt) "[Hta Htf]".
     iModIntro. iExists g, gl, gt.
-    iDestruct (snap_ledger_of_elems g gl gt D (sk_bsz Hok) with "Hbe")
+    iDestruct (snap_ledger_of_elems g gl gt D (sk_bsz (sk_bytes Hok)) with "Hbe")
       as "#Hled".
     iFrame "Hba Hta Htf".
     iApply (fs_state_of_ledger (snap_gamma g gl gt) S D Hok with "Hled").
