@@ -4163,6 +4163,41 @@ assumption the SHAPE is a soundness question and not a style one.
 ## S5e, 2026-08-12): a per-inum LINK LEDGER filed in the region, six
 ## licences on `SpecIget`, and the claim token that spans ialloc's window
 
+### BANNER — THE LEDGER'S `w` COLUMNS ARE A COUNTING RA, AND A GREY RECORD IS THE TOKENLESS ORPHAN FORM
+
+Everything below describes the design as first built: five `w`-flavoured
+columns (`wl`/`wdu`/`wdt`/`g`) with a parent register `p`, their fragments
+`ilink`/`ilinkd`/`ilinkdp`/`igrey`/`iparent`, the pure clauses
+`ireg_link_ok` (L1) / `ireg_dir_ok` / `ireg_dir_wl0` / `ireg_par_ok`, and
+`DirLinks.dir_links` as the payload's resource twin of `DirView.dir_ok`.
+**That whole apparatus is being replaced by ONE counting resource algebra**
+(`fs-state.md` §2, `iris/FsStateLink.v`), and the reading a reader of this
+section needs is the dictionary:
+
+| §20's apparatus | the RA |
+|---|---|
+| `ilink z` / `ilinkd z` / `ilinkdp z pv` (three flavours, no weakening between them) | ONE `FsStateLink.link_tok Γ z`; the flavour index, `dlc_fl`, `ipaid_fl` and `IcacheRef.ilink_fl` all die with it |
+| the per-inum authority's `wl + wdu + wdt` | `FsStateLink.link_auth Γ z n`, parked in `ireg_slot` as `InodeRegion.ireg_lnk` at `n = ireg_nl d` |
+| (L1) `w ≤ nlink` | the RA's own law `link_auth_toks_le` — read, never maintained |
+| `dir_links self dn data` (the payload's ticket list, keyed by record INDEX) | `FsStateInode.ent_toks Γ self n` (a `big_sepM` over `dir_entries n`, keyed by NAME) |
+| `igrey z` — the orphaned `".."` nothing pays for | **nothing at all**: `ent_tokenless` makes an orphan's `".."` TOKENLESS, so the grey record is not a second colour but the ABSENCE of a token, and §20.8's defect keeps exactly its old force with no ledger machinery |
+| `dlc_bound` / `dlc_lower` / `dir_dots_ix`'s index half / `dir_orphan_clean`, `ireg_dir_ok`, `ireg_dir_wl0`, `ireg_par_ok`, `dir_par_tie` | all die: a token is name-keyed, so nothing has to say WHICH record is the parent's |
+| `ireg_root_ok`'s strict `w < nlink` | the region's ROOT KEEP-ALIVE TOKEN — root's `".."` is a SELF record and is tokenless (`ent_tokenless`, and the image's own `FsImg.fs_rec_ticket` guard), so root's `nlink = 1` is unaccounted for and the region can park one `link_tok ireg_root` that nothing spends |
+
+**The one cross-inode fact in the whole design is the RA's law**, and it
+is READ off ownership rather than maintained: `nlink = 0 ⟹ no entry points
+here` is what the free path uses, and `1 ≤ #tokens ⟹ 1 ≤ nlink ⟹ type ≠ 0`
+(with (L3)) is licence (a).  The `≥` direction — `nlink ≤ #entries` — is
+NOT stated anywhere and rules out only a leak.
+
+Landed so far (durable-disk 2b-inode-4): the RA's authority and its whole
+token pile live in `ireg_slot` (`fs-ghost-state.md` §3b′), boot allocates
+them at the image's records with no new sweep, and `ent_tokenless` carries
+the self-record exemption.  What is NOT yet done is the hand-over — the
+tokens moving from the region's pile into the checked-out payload, in
+`dir_links`' place — and the deletions that follow it
+(`claude-notes/projects/durable-disk.md`, item 2b-inode-4).
+
 §19 ended by naming Part 2 "the soundness obligation, and the only route
 to an unblocked create" and leaving it unpriced.  This section prices it,
 designs it against the code, and reports three things §19 did not know:

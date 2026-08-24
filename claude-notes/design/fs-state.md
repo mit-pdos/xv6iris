@@ -539,6 +539,42 @@ without touching `DirLinks.v`.
   `inode_local_of_ok` takes exactly those four and derives the other
   eleven clauses.
 
+### 2b-inode-4's ruling: the AUTHORITY is region-side, the TOKENS are not
+
+§2 draws `link_auth Γ i (nlink n)` inside `inode_owned`, i.e. in whatever
+holder has the inode checked out.  **In the ERA instance the authority
+lives in the inode REGION** (`InodeRegion.ireg_lnk`, beside the record's own
+bytes) and only the TOKENS ride in the checked-out payload
+(`FsStateInode.ent_toks` inside `IcacheEscrow.ic_loaded`).  It is the same
+distribution ruling (i) already made for `rec_owned`, and it is forced:
+
+- The one CONSUMER of the RA's law that is not about the holder's own inode
+  is `IgetLic`'s licence (a) — "a directory record names this inum and pays
+  for it, therefore the target is allocated".  That reading applies
+  `link_auth_toks_le` at the **target's** authority, and the presenter is
+  about to `iget` the target, so it holds neither its payload nor anything
+  that could reach it.  Payload-side, `SpecIget`'s premise has no discharge
+  at all.
+- Every move of a count is a FLUSH, which already opens the region to write
+  the record, and `link_mint`/`link_return` are basic updates — so nothing
+  is lost by keeping the authority behind `iregN`.
+
+Two consequences worth stating once:
+
+- **`ent_tokenless` exempts a SELF record** (target = home inum), not only
+  `"."`.  That is the image's own counting rule (`FsImg.fs_rec_ticket`'s
+  `negb (dir_inum = self)` guard) and only the ROOT's `".."` ever hits it.
+  What it buys is the **root keep-alive token**: root's `nlink = 1` is then
+  unaccounted for, the region parks one `link_tok ireg_root` that nothing
+  spends, and "the root is allocated" is a reading of the RA's law rather
+  than a maintained clause (`InodeRegion.ireg_root_ok`'s strict `w < nlink`
+  dies with the ledger's columns).
+- **At the stage where every token is still at home** the family's validity
+  is free (`link_full_map_valid`) and boot spends no image sweep;
+  `✓ link_elem` at the image map — `fsimg_wf`'s W9 plus conjunct (13)
+  `FsImg.fs_links_eq` — comes due only when a directory's tokens move into
+  its payload.
+
 Two things 2b should know before it starts:
 
 - **Four names collide with live ones**, all at different types (so a

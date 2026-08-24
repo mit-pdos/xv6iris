@@ -1493,7 +1493,7 @@ Section BootAlloc.
             Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
             fs_cfg_iregN_top
             with "Hdimg Hbsauth Hbslots") as (ICFG FSC)
-        "[Hlnk [Hpinr [Hfpinr Hfs]]]".
+        "[Hpinr [Hfpinr Hfs]]".
     (* N-5.1 (W5a) / N-5.2A: ROOT'S PIN AND /INIT'S CONTENTS PIN ARE BOTH
        DROPPED HERE, deliberately.  They are affine, and nothing on this side
        of the boot chain consumes them: transporting either would mean
@@ -1504,14 +1504,12 @@ Section BootAlloc.
        fview pin, N-5.2B's kexec re-walk; both are stated against
        [fs_cfg_alloc]'s conjuncts directly. *)
     iClear "Hpinr". iClear "Hfpinr".
-    (* durable-disk 2b-inode-3: THE TOP MAP NO LONGER ARRIVES HERE -- its
-       authority is [InodeRegion.ftop_inv] (carried by [ireg_inv]) and its
-       per-inum fragments are the free pool's, both routed inside
-       [fs_cfg_alloc].  What is still dropped is the LINK FAMILY: the era
-       bundle deliberately excludes the link ghosts, so nothing in the tree
-       can hold them yet and routing them is the links step's one-line
-       change here. *)
-    iClear "Hlnk".
+    (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
+       ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried
+       by [ireg_inv]) and its per-inum fragments are the free pool's; the
+       LINK family's per-inum authorities and their token piles are the
+       inode REGION's ([InodeRegion.ireg_lnk]).  Both are routed inside
+       [fs_cfg_alloc], so nothing is dropped here. *)
     (* [fileG_of]'s two projections ARE the two minted records, by iota.
        Named, so the postcondition's row needs no conversion step inside the
        proofmode. *)

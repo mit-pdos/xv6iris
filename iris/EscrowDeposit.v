@@ -141,14 +141,14 @@ Section EscrowDeposit.
     iSplitR; [iPureIntro; exact (dinode_bytes_length dn Hdnwf) |].
     iFrame "Hrun".
     iIntros (_) "Hrun".
-    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     (* THE LEDGER's FULL ARITY since §2.2/§2.3: the [icnt] half, the two
        in-transition pins and the f column's boot-shelter clause all ride in
        the ∃ beside the seven original columns.  The region's own slot pattern
        verbatim -- every consumer of the slot destructures it identically. *)
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
@@ -235,6 +235,14 @@ Section EscrowDeposit.
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
                   bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
     { intros _. rewrite Hdeq. exact Hnl0. }
+    (* the link authority does not move (durable-disk 2b-inode-4): the free
+       deposit writes a type-0 record and BOTH counts are zero -- the old
+       one by the freeze pin's own [nlink = 0], the new one by [Hnl]. *)
+    assert (Hlnkeq : bv_unsigned (di_nlink dn')
+                     = bv_unsigned (di_nlink (ds !!! islot inum)))
+      by (rewrite Hdeq Hnl0 Hnl0'; reflexivity).
+    iDestruct (ireg_lnk_stable γfs (bv_unsigned inum) (ds !!! islot inum) dn'
+                 Hlnkeq with "Hlnk") as "Hlnk".
     iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
@@ -258,9 +266,9 @@ Section EscrowDeposit.
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
-    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
+      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -281,12 +289,12 @@ Section EscrowDeposit.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hrecb"; [iExact "Hrecb" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
+      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 (Some (Excl FrzOff)) cn
                 Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz'
-                with "Hla Hep Hdisj Hcnt [] [Hrcpt Hmr]").
+                with "Hla Hep Hlnk Hdisj Hcnt [] [Hrcpt Hmr]").
       { iApply ireg_fsh_off. }
       { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
                   ltac:(reflexivity) with "Hrcpt Hmr"). }

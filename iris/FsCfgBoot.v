@@ -889,7 +889,8 @@ Section FsCfgBootPool.
     image_root_alive (fs_link_count P sb) dss nib /\
     image_link_le (fs_link_count P sb) dss nib
     /\ image_dir_wl0 (fs_link_count P sb) dss nib
-    /\ image_ty_ok dss nib.
+    /\ image_ty_ok dss nib
+    /\ image_nlink_at (fun z => fn_nlink (img_node P sb z)) dss nib.
   Proof.
     intros Hwf Hrw Hl Hdwf He Hnib.
     assert (Hbr : forall z : Z, z ∈ region_inums nib ->
@@ -910,6 +911,11 @@ Section FsCfgBootPool.
     destruct (image_link_premises P sb dss nib Hwf Hl Hdwf He Hnib)
       as (Hle & Hw0 & Hrt).
     split; [exact Hrt |]. split; [exact Hle |]. split; [exact Hw0 |].
+    (* THE LINK RA's TIE (durable-disk 2b-inode-4) is [Hbr] and nothing
+       else: [img_node]'s record IS [fs_dinode P sb z] ([era_node_rec]). *)
+    split; [| intros z Hz;
+               rewrite /ireg_nl /fn_nlink /img_node era_node_rec (Hbr z Hz);
+               reflexivity ].
     (* (L5), the TYPE ENUMERATION (durable-disk 2b-inode-3).  Two arms and
        no new sweep: below [ninodes] a record is either free (type 0) or
        live, and [FsImg.fio_type] is exactly the enumeration at a live one;
@@ -1458,6 +1464,29 @@ Section FsCfgBootEra.
     rewrite big_sepS_elements //.
   Qed.
 
+  (* ...and the LINK family in the shape [IcacheBoot.ireg_alloc] takes
+     (durable-disk 2b-inode-4): one authority per region inum, standing at
+     the image record's own [nlink], with every token still at home.
+     [FsState.fs_boot_alloc_full] allocates it at [img_nodes] and owes NO
+     validity -- nothing is outstanding -- so no image sweep is spent here;
+     the links step, which hands a directory's tokens to its checked-out
+     payload, is what makes W9 + conjunct (13) [FsImg.fs_links_eq] come
+     due. *)
+  Lemma ireg_lnks_of_image (γfs : fs_names)
+      (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+    fs_links_full (fs_link γfs) (img_nodes P sb nib) -∗
+    [∗ set] z ∈ region_inums nib,
+      ireg_lnk_at γfs z (fn_nlink (img_node P sb z)).
+  Proof.
+    rewrite /fs_links_full.
+    rewrite (big_sepM_img_nodes
+               (fun i n => own (fs_link γfs) (link_full_elem i (fn_nlink n)))
+               P sb nib).
+    iIntros "H". iApply (big_sepS_mono with "H"). intros z _.
+    rewrite /ireg_lnk_at -(link_full_split (fs_gamma_L γfs)).
+    iIntros "H"; iExact "H".
+  Qed.
+
   Lemma fs_cfg_alloc (γd : uart_names) (γv : disk_names)
       (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (cov : gset Z)
       (nib : nat) (E : coPset) :
@@ -1499,13 +1528,11 @@ Section FsCfgBootEra.
          inum, untied on the marker arm at a free one.  Nothing about the
          top map leaves this lemma any more.
 
-         THE LINK FAMILY STILL DOES, and is still at the ZERO map: the
-         bundle deliberately excludes the link ghosts (they are the links
-         step's), and [✓ link_elem] is free there while at the image it is
-         W9 + conjunct (13) [FsImg.fs_links_eq].  Like the two pins below it
-         is a LEADING conjunct so that a caller with no consumer drops it in
-         one step. *)
-      fs_links (fs_link fsc_fs) (fs_boot_inodes nib) ∗
+         AND SO IS THE LINK FAMILY, since durable-disk 2b-inode-4: it is
+         allocated at the IMAGE's records in its FULL shape (each inum's
+         authority at that record's [nlink], with all its tokens still at
+         home) and routed into the inode region, where the RA's law is
+         readable.  Neither ghost leaves this lemma. *)
       (* ---- N-5.1 (W5a): ROOT'S PIN, THE ONE NEW CONJUNCT ----
          The stocking spends [ROOTINO]'s mint licence while it still holds
          the root directory's contents element WHOLE, so the pin leaves boot
@@ -1708,14 +1735,16 @@ Section FsCfgBootEra.
     (* ---- 4. the block layer's ghosts -------------------------------- *)
     (* B3: the two file-system-state ghosts first, so [fs_boot_ghosts] can
        put their names in [γfs] (the block layer allocates neither). *)
-    (* durable-disk 2b-inode-3: the LINK family at the zero map (its
-       [✓ link_elem] is free there and the links step is still ahead), the
-       TOP map at the IMAGE's node map -- a plain [ghost_map] owes no
-       validity at all, which is what makes the image value affordable
-       here. *)
-    iMod (fs_boot_alloc_at (fs_boot_inodes icfg_nib)
-            (img_nodes (fs_blocks dk) sb icfg_nib)
-            (fs_boot_inodes_valid icfg_nib))
+    (* durable-disk 2b-inode-4: BOTH maps at the IMAGE's node map now.  The
+       TOP map is a plain [ghost_map] and owes no validity; the LINK family
+       is allocated in its FULL shape -- every inum's authority at the
+       record's own [nlink] with all its tokens still at home -- which owes
+       no validity either, because nothing is outstanding.  It is routed
+       into [IcacheBoot.ireg_alloc] below and no longer leaves this lemma;
+       W9 + conjunct (13) [FsImg.fs_links_eq] come due only when the links
+       step hands a directory's tokens to its checked-out payload. *)
+    iMod (fs_boot_alloc_full (img_nodes (fs_blocks dk) sb icfg_nib)
+            (img_nodes (fs_blocks dk) sb icfg_nib))
       as (γlk γtp) "(Htopa & Htopf & Hlnk)".
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
             ROOTDEV γlk γtp E Hcovin Hhomesub with "Hdisk")
@@ -1734,6 +1763,15 @@ Section FsCfgBootEra.
     iEval (rewrite (big_sepM_img_nodes
                       (fun i n => top_frag (fs_gamma_L γfs) i n)
                       (fs_blocks dk) sb icfg_nib)) in "Htopf".
+    (* ---- durable-disk 2b-inode-4: THE LINK FAMILY IS ROUTED HERE TOO,
+       into the inode region, which is where the RA's law has to be
+       READABLE ([IgetLic]'s licence (a) turns a directory record's token
+       into "the target is allocated" at the TARGET's authority, and the
+       presenter does not hold the target).  Nothing about it leaves this
+       lemma any more. *)
+    iEval (rewrite -Hlk) in "Hlnk".
+    iDestruct (ireg_lnks_of_image γfs (fs_blocks dk) sb icfg_nib
+                 with "Hlnk") as "Hlnks".
     (* ---- 5. THE PEELS ------------------------------------------------
        THE MINT ALREADY SPLIT THE LOG REGION OFF (durable-disk 1c-flip):
        [Hchl] is the log's own storage, at the parked cache halves
@@ -1760,12 +1798,14 @@ Section FsCfgBootEra.
             (fs_home_set cov (sb_logstart sb))
             (fun bi : nat =>
                fs_blocks dk (FsImg.sb_inodestart sb + Z.of_nat bi))
-            (fs_link_count (fs_blocks dk) sb) Hnib32 eq_refl
+            (fs_link_count (fs_blocks dk) sb)
+            (fun z => fn_nlink (img_node (fs_blocks dk) sb z))
+            Hnib32 eq_refl
             ltac:(intros bi _; rewrite fs_blocks_length; reflexivity)
             ltac:(intros dss Hdl Hdwf Hde;
                   exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
                            Hwf Hrw Hdl Hdwf Hde Hnib32))
-            with "Hla HcntR Hrcpt HmirR Hep Hbireg Hbinv Hftopi Hboot Hrauth")
+            with "Hla Hlnks HcntR Hrcpt HmirR Hep Hbireg Hbinv Hftopi Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
@@ -1969,9 +2009,9 @@ Section FsCfgBootEra.
          FULL failing pass". *)
       rewrite 6!elem_of_difference 4!elem_of_union. tauto. }
     rewrite Hset.
-    (* ---- B3: the era's two fs-state ghosts, the post's first rows ---- *)
-    rewrite Hlk.
-    iSplitL "Hlnk"; [iExact "Hlnk" |].
+    (* ---- B3: NEITHER era ghost is in the post any more (durable-disk
+       2b-inode-3 / 2b-inode-4): the top map is routed into [ftop_inv] and
+       the free pool, the link family into the inode region. ---- *)
     (* ---- N-5.1 (W5a): root's pin, the post's first conjunct ---- *)
     iSplitL "Hpinr"; [iExact "Hpinr" |].
     iSplitL "Hfpinr"; [iExact "Hfpinr" |].

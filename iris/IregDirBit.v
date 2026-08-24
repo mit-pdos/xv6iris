@@ -100,10 +100,10 @@ Section IregDirBit.
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (ireg_rcol_wd_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -118,17 +118,17 @@ Section IregDirBit.
                ltac:(lia)). }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj Hfrcp]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj Hfrcp]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hdisj Hcnt Hfdisj Hfrcp Harm"). }
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 
@@ -162,10 +162,10 @@ Section IregDirBit.
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (ireg_rcol_wdt_ge with "Hla Hfrag") as %[Hw1 _].
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -180,17 +180,17 @@ Section IregDirBit.
                ltac:(lia)). }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj Hfrcp]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj Hfrcp]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hdisj Hcnt Hfdisj Hfrcp Harm"). }
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 
@@ -227,10 +227,10 @@ Section IregDirBit.
                 with "Hblks") as "[Hblk Hback]".
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (ireg_rcol_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -246,17 +246,17 @@ Section IregDirBit.
       pose proof (Hwl0 Hc'). lia. }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj Hfrcp]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj Hfrcp]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hdisj Hcnt Hfdisj Hfrcp Harm"). }
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 

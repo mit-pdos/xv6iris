@@ -530,17 +530,18 @@ Section IcacheBootRegion.
     iIntros "H". rewrite /imark. iExists dinode_mark. iExact "H".
   Qed.
 
-  Lemma ireg_slots_of_set (γi : gname) (dss : list (list dinode)) (nib : nat) :
-    ([∗ set] z ∈ region_inums nib, ireg_slot γi z (image_dinode dss z))
+  Lemma ireg_slots_of_set (γfs : fs_names) (γi : gname)
+      (dss : list (list dinode)) (nib : nat) :
+    ([∗ set] z ∈ region_inums nib, ireg_slot γfs γi z (image_dinode dss z))
     ⊢ [∗ list] bi ∈ seq 0 nib,
         [∗ list] i ∈ seq 0 16,
-          ireg_slot γi (16 * Z.of_nat bi + Z.of_nat i)%Z ((dss !!! bi) !!! i).
+          ireg_slot γfs γi (16 * Z.of_nat bi + Z.of_nat i)%Z ((dss !!! bi) !!! i).
   Proof.
     rewrite /region_inums (big_sepS_list_to_set _ _ (region_list_nodup nib)).
     rewrite big_sepL_fmap.
     iIntros "H".
     iPoseProof (seq16_flatten nib
-                  (fun j => ireg_slot γi (Z.of_nat j)
+                  (fun j => ireg_slot γfs γi (Z.of_nat j)
                               (image_dinode dss (Z.of_nat j))) with "H") as "H".
     iApply (big_sepL_mono with "H"). intros idx bi Hbi.
     iIntros "H". iApply (big_sepL_mono with "H"). intros idx2 i Hi.
@@ -657,6 +658,17 @@ Section IcacheBootRegion.
       (nib : nat) : Prop :=
     forall z : Z, z ∈ region_inums nib ->
       (W z <= Z.to_nat (bv_unsigned (di_nlink (image_dinode dss z))))%nat.
+
+  (* ...AND THE LINK RA's OWN TIE (durable-disk 2b-inode-4).  The region
+     parks one [FsStateLink.link_auth] per inum standing at the record's
+     [nlink], with all its tokens still at home; the caller hands the
+     family over indexed by a FUNCTION (the resource cannot mention [dss],
+     which this lemma decodes internally), and this is the equation that
+     lands it on the decoded record.  At the caller it is
+     [FsCfgBoot]'s own [image_dinode_fs_dinode] and nothing more. *)
+  Definition image_nlink_at (N : Z -> nat) (dss : list (list dinode))
+      (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib -> N z = ireg_nl (image_dinode dss z).
 
   (* ...AND SO DOES [InodeRegion.ireg_dir_wl0]: a record naming a DIRECTORY
      pays in the d-flavoured column ([ilinkd]/[ilinkdp]), never the plain
@@ -895,7 +907,7 @@ Section IcacheBootRegion.
   Qed.
 
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
-      (home : gset Z) (bss : nat -> list (bv 8)) (W : Z -> nat) :
+      (home : gset Z) (bss : nat -> list (bv 8)) (W N : Z -> nat) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (* THE REGION'S BLOCKS ARE HOME BLOCKS (durable-disk 1c-flip step 3):
        [ireg_blk] holds each one's EXCLUSIVE byte run now, so the region's
@@ -913,7 +925,8 @@ Section IcacheBootRegion.
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
        image_root_alive W dss nib /\ image_link_le W dss nib
-       /\ image_dir_wl0 W dss nib /\ image_ty_ok dss nib) ->
+       /\ image_dir_wl0 W dss nib /\ image_ty_ok dss nib
+       /\ image_nlink_at N dss nib) ->
     (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier;
        V4+V5's fused widening): the image's authorities are ALL-PLAIN,
        [wdu = wdt = 0] and [p = None] at every inum, so (T1), (T1') and
@@ -926,6 +939,13 @@ Section IcacheBootRegion.
        nobody else's. *)
     ([∗ set] z ∈ region_inums nib,
        link_auth z (W z) 0 0 0 None 0 None (Some (Excl FrzOff)) 0) -∗
+    (* THE LINK RA's PER-INUM AUTHORITY AND ITS PILE OF TOKENS
+       (durable-disk 2b-inode-4), one per inum at the record's own [nlink].
+       A PREMISE for the ledger's reason: the family is
+       [FsState.fs_boot_alloc_full]'s and only its [own_alloc] can hand it
+       over.  Nothing is outstanding at boot, so the family's validity is
+       free and no image sweep is spent on it. *)
+    ([∗ set] z ∈ region_inums nib, ireg_lnk_at γfs z (N z)) -∗
     (* THE COUNT COUPLING's REGION HALVES (iclaim-ledger.md §2.2), one per
        inum and all at ZERO -- boot caches no inode.  A PREMISE for the
        ledger's own reason: the gname is the ambient class's, so only the
@@ -982,8 +1002,9 @@ Section IcacheBootRegion.
   Proof.
     intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0 & Hl5).
-    iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv #Hftopi Hboot Hrauth".
+    destruct (Himg dss Hl Hwf He)
+      as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0 & Hl5 & Hlnkat).
+    iIntros "Hlk Hlnks Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv #Hftopi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -1064,15 +1085,19 @@ Section IcacheBootRegion.
     (* ...and the freeze receipts (§3.14 as built) *)
     iDestruct (big_sepS_sep_2 with "Hall Hrcpts") as "Hall".
     iDestruct (big_sepS_sep_2 with "Hall Hmirs") as "Hall".
+    (* ...and the link RA's per-inum pile (durable-disk 2b-inode-4) *)
+    iDestruct (big_sepS_sep_2 with "Hall Hlnks") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
        the other one is the payout; the ledger authority stays with the
        slot on BOTH arms (design §20.2) *)
     iAssert ([∗ set] z ∈ region_inums nib,
-               (ireg_slot γi z (image_dinode dss z) ∗
+               (ireg_slot γfs γi z (image_dinode dss z) ∗
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir]".
+      iIntros "[[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir] Hlnk]".
+      iDestruct (ireg_lnk_of_at γfs z (N z) (image_dinode dss z)
+                   (Hlnkat z Hz) with "Hlnk") as "Hlnk".
       assert (Hok : ireg_link_ok (image_dinode dss z) (W z + 0 + 0)).
       { pose proof (Hl1 z Hz).
         split_and!;
@@ -1091,11 +1116,11 @@ Section IcacheBootRegion.
                      0%nat 0%nat (image_dinode dss z)
                      (ireg_ref_ok_zero 0%nat None (image_dinode dss z))
                      with "Hla") as "Hla".
-        iApply (ireg_slot_intro γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
+        iApply (ireg_slot_intro γfs γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) Hwl0
                   ireg_par_ok_none (ireg_claim_ok_none _ _) I
-                  with "Hla Hep [] Hcnt [] [Hrcpt Hmir]").
+                  with "Hla Hep Hlnk [] Hcnt [] [Hrcpt Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
@@ -1112,11 +1137,11 @@ Section IcacheBootRegion.
                      0%nat 0%nat (image_dinode dss z)
                      (ireg_ref_ok_zero 0%nat None (image_dinode dss z))
                      with "Hla") as "Hla".
-        iApply (ireg_slot_intro γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
+        iApply (ireg_slot_intro γfs γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) Hwl0
                   ireg_par_ok_none (ireg_claim_ok_none _ _) I
-                  with "Hla Hep [] Hcnt [] [Hrcpt Hmir]").
+                  with "Hla Hep Hlnk [] Hcnt [] [Hrcpt Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
@@ -1130,7 +1155,7 @@ Section IcacheBootRegion.
         iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hty | reflexivity] | iExact "Hmk"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
-    iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
+    iDestruct (ireg_slots_of_set γfs γi dss nib with "Hslots") as "Hslots".
     iAssert (ireg_body γi γfs inodestart nib)%I
       with "[Ha Hblks Hslots Hreg]" as "Hbody".
     { iExists (ireg_M0 dss nib ∪ ireg_MK nib). iFrame "Ha Hreg".

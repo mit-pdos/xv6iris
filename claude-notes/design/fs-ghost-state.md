@@ -138,6 +138,57 @@ The count coupling `icnt_half z n` and the pin `ireg_ref_ok r rc n c d`
 `ireg_rcol` beside the authority, with `rc` existentially bound so no
 destructure site ever names it.
 
+### 3b′. The link-counting RA's per-inum AUTHORITY — `ireg_lnk`
+
+Beside the ledger above, and a different ghost entirely: `fs-state.md` §2's
+counting RA (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (authR
+natUR)`, one auth-of-nat per inum in a single element at `fs_link γfs`).
+`ireg_slot` carries
+
+    ireg_lnk γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d)
+                      ∗ link_toks (fs_gamma_L γfs) z (ireg_nl d)
+
+where `ireg_nl d = Z.to_nat (bv_unsigned (di_nlink d))`.  The value is tied
+to the slot's record BY CONSTRUCTION — the definition names `d` once — so
+"the authority stands at this record's `nlink`" is never a clause.
+
+**Why REGION-side and not in the checked-out payload**, which is where
+`fs-state.md` §2 draws it.  Two reasons, and the first is a hard one:
+
+- `IgetLic`'s licence (a) reads "a directory record names this inum and
+  PAYS for it" into "the target is ALLOCATED", and that reading is the RA's
+  own law (`FsStateLink.link_auth_toks_le`) applied at the **target's**
+  authority.  The presenter does not hold the target, so with the authority
+  in the target's payload nothing in the tree can reach it and `SpecIget`'s
+  premise has no discharge at all.  Region-side it is one `inv_acc` of
+  `iregN` — exactly where the pure clause (L1) it replaces was read.
+- The authority mirrors a record FIELD, so 2b-inode-1's ruling (i) — the
+  record's own bytes stay region-side — puts it in the same place; and
+  every move of a count is a FLUSH, which already opens the region.
+  `link_mint`/`link_return` are basic updates, so they compose into that
+  AU at no mask cost.
+
+The three movers are `ireg_lnk_stable` (`bv_unsigned (di_nlink d') =
+bv_unsigned (di_nlink d)` — every ordinary flush, the claim, the free
+deposit), `ireg_lnk_bump` (`= +1`: one `link_mint`, the minted token joins
+the pile — `ireg_write_link_fl`) and `ireg_lnk_drop` (`link_return` —
+`ireg_write_unlink_fl`).
+
+**Every token is still AT HOME.**  The pile is `nlink` wide, so the
+family's validity is free (`FsState.link_full_map_valid`) and boot spends
+no image sweep on it: `FsState.fs_boot_alloc_full` allocates it at
+`FsCfgBoot.img_nodes` — the IMAGE's records — and `FsCfgBoot`'s
+`ireg_lnks_of_image` routes it into `IcacheBoot.ireg_alloc`, whose only new
+image obligation is `image_nlink_at` (`N z = ireg_nl (image_dinode dss z)`,
+discharged by `image_dinode_fs_dinode` and nothing else).  Neither era
+ghost leaves `fs_cfg_alloc` any more.
+
+The links step is what hands a directory's tokens to its CHECKED-OUT
+payload (`FsStateInode.ent_toks` inside `IcacheEscrow.ic_loaded`), leaving
+the region holding only the ROOT's keep-alive token; that is where W9 +
+conjunct (13) `FsImg.fs_links_eq` come due, and where the `w`-columns of
+3b and `DirLinks.v` die.
+
 ### 3c. The pure/shelter clauses on `ireg_slot` (`InodeRegion.v:2135`)
 
 - `ireg_link_ok` / `ireg_root_ok` / `ireg_dir_ok` / `ireg_dir_wl0` /

@@ -980,11 +980,120 @@ map at home blocks); 1d lands last.
           same for its `dirlink` arms.  A lane that adds another payload
           conjunct should price these two files at the flat lists, not at
           the `ic_loaded` sites.
-      - OPEN, for the orchestrator, in the order they cost:
-        - The link family is still dropped at `BootShared` and the bundle
-          still excludes the link ghosts.  Routing them is the links step's
-          one-line change at that `iClear`, and its price is the
-          `✓ link_elem` at the image map that this lane did NOT have to pay.
+      - [~] **2b-inode-4 (THE LINK FLIP).**  THE RA IS LANDED IN THE
+        REGION AND AT BOOT; the hand-over to the payload, and the deletions
+        that follow it, are NOT.
+        - **RULING, and it is a correction to the task's step 1: the
+          per-inum AUTHORITY is REGION-side, not payload-side.**  `fs-state.md`
+          §2 draws `link_auth Γ i (nlink n)` inside `inode_owned`, i.e. in
+          the checked-out payload.  That is unimplementable here, and the
+          refutation is one line: `IgetLic`'s licence (a) turns a directory
+          record's token into "the TARGET is allocated" by the RA's law
+          (`link_auth_toks_le`) **at the target's authority**, and the
+          presenter of the licence does not hold the target — it is about
+          to `iget` it.  With the authority in the target's own payload
+          nothing in the tree can reach it (a cached-but-unlocked inode's
+          payload is inside the escrow; an uncached one's is `ipool_alloc`
+          under the itable lock, whose marker arm a token cannot refute),
+          so `SpecIget`'s premise would have no discharge at all and
+          `iname_linked_alloc` would be unprovable.  Region-side, the
+          reading is one `inv_acc` of `iregN` — exactly where the pure
+          clause (L1) it replaces was read — and it is the SAME placement
+          2b-inode-1's ruling (i) already made for the record's bytes,
+          for the same reason (the ghost mirrors a record FIELD).
+          `link_mint`/`link_return` are basic updates, so they compose into
+          the flush's own AU at no mask cost, which is what the task's "a
+          basic update, no mask" buys.
+        - **THE ROOT KEEP-ALIVE TOKEN, and the SELF-record exemption that
+          pays for it.**  `ireg_root_ok`'s strict `w < nlink` has no RA
+          reading unless something holds a token at the root that nothing
+          can spend.  `FsStateInode.ent_tokenless` therefore exempts an
+          entry whose TARGET is the home inum — which is the IMAGE's own
+          counting rule (`FsImg.fs_rec_ticket`'s `negb (dir_inum = self)`
+          guard, and W9's "a live directory has zero incoming tickets") and
+          the kernel's ("No ip->nlink++ for '.'"), and which only the ROOT's
+          `".."` ever hits.  Root's `nlink = 1` is then unaccounted for and
+          the region parks one `link_tok ireg_root`; `1 ≤ nlink root` (hence
+          licence (f), hence `iput` cannot free the root) becomes a reading
+          of `link_auth_toks_le` instead of a maintained clause.  Cost:
+          `ent_toks`/`ent_tok`/`ent_elem` take the home inum, and
+          `ent_toks_orphan`/`dir_owned_orphan` gain `t <> self` (a
+          self-parent has no token to hand back).
+        - [x] **`fsLinkG` IS AN `Xv6G.xv6G` MEMBER** (camera and class moved
+          to `Xv6Cameras.v` as `fsLinkUR`/`fsLinkG`; the icache ledger owns
+          the name `linkUR` there).  Forced twice over: `ic_loaded` will hold
+          `ent_toks`, and `ireg_slot` holds the authority, so the class
+          reaches `ireg_inv` — hence the thirty-odd fs contracts — and every
+          payload site.  `FsCfgBoot`/`BootShared`/`SystemAdequacy` drop their
+          binders (they are above the bundle); `InodeRegion`, which binds
+          MEMBERS and not the bundle, gains `!fsLinkG Σ` beside `!fsTopG Σ`;
+          `xv6Σ` drops `fsLinkΣ`/`fsTopΣ` (`xv6GΣ` has both) and the two
+          `@xv6_boot_era` applications lose one `_`.
+        - [x] **THE AUTHORITY IS IN `ireg_slot`** as `InodeRegion.ireg_lnk
+          γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d) ∗ link_toks …
+          z (ireg_nl d)` — value tied to the slot's record BY CONSTRUCTION,
+          never a clause.  `ireg_slot`/`ireg_slots_acc_upd`/`ireg_slot_intro`
+          take `γfs`; the conjunct is LAST so a destructuring pattern's final
+          name absorbs it (~22 sites across `InodeRegion`, `EscrowDeposit`,
+          `IregDirBit`, `IgetLic`, `IregLinkNz`, `IcacheInv`, `IcacheBoot`).
+          Three movers carry every writer: `ireg_lnk_stable` (the count does
+          not move — every ordinary flush, `ireg_claim_au`, the free
+          deposit), `ireg_lnk_bump` (one `link_mint`, `ireg_write_link_fl`)
+          and `ireg_lnk_drop` (one `link_return`, `ireg_write_unlink_fl`).
+        - [x] **EVERY TOKEN IS STILL AT HOME**, so the family's validity is
+          free (`FsState.link_full_map_valid`) and **NO IMAGE SWEEP IS
+          SPENT**: `FsState.fs_boot_alloc_full` allocates both era maps at
+          `FsCfgBoot.img_nodes`, `FsCfgBoot.ireg_lnks_of_image` routes the
+          link family into `IcacheBoot.ireg_alloc`, and the one new image
+          obligation is `image_nlink_at` (`N z = ireg_nl (image_dinode dss
+          z)`), discharged by `image_dinode_fs_dinode` and nothing else.
+          **`BootShared`'s `iClear` of the link family is gone** and neither
+          era ghost leaves `fs_cfg_alloc` any more.
+        - [ ] **WHAT REMAINS — the hand-over, then the deletions.**  The
+          region's pile becomes the ROOT's one token plus whatever no
+          directory has claimed; a directory's tokens ride in its
+          checked-out payload.  In dependency order:
+          1. `IcacheEscrow.ic_loaded` / `ic_loaded_flat_body` /
+             `ipool_alloc`: `DirLinks.dir_links (bv_unsigned inum) dn data`
+             → `FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum)
+             (era_node dn bm data)`, in the SAME conjunct position.
+             `FsStateEra.ent_toks_cong` / `_era_node_data_ext` are the two
+             congruences a payload needs (landed).
+          2. `InodeRegion.ireg_write_link_fl` / `_unlink_fl` hand the token
+             OUT / take it IN instead of keeping it in the pile — the
+             `link_mint`/`link_return` calls are already at the right
+             places; `_d`/`_p` collapse into the plain instance and the
+             `fl : option (option Z)` index dies from `SpecIupdate`,
+             `IcacheRef.ilink_fl`, `DirLinks.dlc_fl` and `IgetLic.ipaid_fl`.
+          3. `IgetLic`: `ipaid fl z` → `link_tok (fs_gamma_L γfs) z`,
+             `LinkedL` loses its argument, `iname_linked_alloc` reads
+             `link_auth_toks_le` at `ireg_lnk` in place of (L1)+(L3).
+             `RootL`/`iname_root_alloc` read the root keep-alive token.
+          4. The walks: `ProofCreate` (mint at :4964), `ProofDirlink`
+             (spend at :2343), `ProofSysLink`, `ProofSysUnlink` (both arms;
+             the rmdir orphan is `dir_owned_orphan` + `link_return` at the
+             parent + `dir_owned_unlink` at the child), `ProofSysMkdir`,
+             `ProofIput`/`ProofIreclaim`, `ProofDirlookup`,
+             `ProofSysOpenParts`, `ProofFilewrite`.  **Price
+             `ProofSysUnlink` and `ProofSysLink` at their FLAT payload
+             lists, not at their `ic_loaded` sites** (2b-inode-3's finding).
+          5. Boot: the tokens leave `ireg_alloc`'s pile for
+             `ipool_alloc`/`ic_loaded` (`FsCfgBoot.dir_links_of_region`'s
+             successor), and THEN `✓ link_elem` at the image map comes due
+             — `fsimg_wf`'s W9 (`fs_links_wf`) plus conjunct (13)
+             `FsImg.fs_links_eq`, with no new sweep.
+          6. DELETE `DirLinks.v` (2009 lines) from `_CoqProject`,
+             `DirView`'s `dlc_*` (`dlc_bound`/`_lower`/`_ctb`/`_count`/
+             `_dotb`), `IcacheRef`'s `ilink`/`ilinkd`/`ilinkdp`/`igrey`/
+             `iparent`/`ilink_fl`/`lreg`/`lreg_half` and the
+             `wl`/`wdu`/`wdt`/`g`/`p` columns of `lelem*`/`linkElemUR0`,
+             `InodeRegion`'s `ireg_dir_ok`/`ireg_par_ok`/`ireg_dir_wl0` and
+             (L1), and `IregLinkNz.v` if nothing is left of it.
+             `dir_dots_ix`/`dir_orphan_clean` are a SEPARABLE cleanup and
+             were deliberately kept: `dir_dots_ix` is what every payload
+             producer feeds `FsStateEra.inode_local_of_ok_rec`, so removing
+             it is a seam redesign across ~40 sites that buys the flip
+             nothing.
 - [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
       - RULE for 2c (from 2c-pre, 2026-08-23): the fixed layer now carries
         two client-only gnames (`riscv_swap_name`, `riscv_dview_name`)
