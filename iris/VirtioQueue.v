@@ -1366,6 +1366,7 @@ Record vproto := VProto {
   vp_nc   : nat;                                (* completions = used index *)
   vp_np   : nat;                                (* published count *)
   vp_lo   : nat;                                (* the watermark *)
+  vp_nr   : nat;                                (* used indices READ so far *)
   vp_tk   : option nat;                         (* the latched position *)
   vp_srv  : gset nat;                           (* the positions SERVED *)
   vp_pend : gmap nat vslot;                     (* dom = [0,np) minus srv *)
@@ -1416,6 +1417,16 @@ Record vproto_ok (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) : Prop := {
   (* the used index counts completions, and each served position has its own *)
   vpo_nc : vp_nc pr = size (vp_srv pr);
   vpo_uix_dom : dom (vp_uix pr) = vp_srv pr;
+  (* THE USED RING NEVER OVERWRITES AN UNREAD ELEMENT.  [vp_nr] is how far the
+     driver's interrupt handler has walked; the records it has NOT read are
+     exactly the used indices from there to the completion count, and they
+     are exactly the unreclaimed [vp_done] entries.  With that,
+     [vproto_unread_lt8] bounds the gap by the ring's eight elements -- no
+     completion can land on one the driver still owes a look. *)
+  vpo_nr_nc : (vp_nr pr <= vp_nc pr)%nat;
+  vpo_done_uix : forall k,
+      k ∈ dom (vp_done pr)
+      <-> (exists u, vp_uix pr !! k = Some u /\ (vp_nr pr <= u)%nat);
   vpo_uix_lt : forall q u, vp_uix pr !! q = Some u -> (u < vp_nc pr)%nat;
   vpo_uix_inj : forall q1 q2 u,
       vp_uix pr !! q1 = Some u -> vp_uix pr !! q2 = Some u -> q1 = q2;
@@ -1675,6 +1686,164 @@ Proof.
     [ by rewrite size_set_seq | ].
   apply subseteq_size. intros q Hq.
   apply elem_of_set_seq in Hq. apply (vpo_lo_srv _ _ _ Hok). lia.
+Qed.
+
+(* TWO LIVE POSITIONS NEVER SHARE AN AVAILABLE-RING ENTRY: each pins its
+   own two bytes there, and the pins are disjoint. *)
+Lemma vproto_pos_mod8_ne (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (p q : nat) (slp slq : vslot) (pinp pinq : gmap Arch.pa (bv 8)) :
+  vproto_ok c pr D -> p ≠ q ->
+  vp_slots pr !! p = Some slp -> vp_pin pr !! p = Some pinp ->
+  vp_slots pr !! q = Some slq -> vp_pin pr !! q = Some pinq ->
+  Z.of_nat p `mod` 8 ≠ Z.of_nat q `mod` 8.
+Proof.
+  intros Hok Hne H1 H2 H3 H4 Hmod.
+  assert (Hring : ring_entry_pa c q = ring_entry_pa c p).
+  { unfold ring_entry_pa. rewrite Hmod. reflexivity. }
+  assert (Hdp : ring_entry_pa c p ∈ dom pinp).
+  { pose proof (spo_ring _ _ _ _ (vpo_slot _ _ _ Hok p slp pinp H1 H2)) as Hr.
+    apply (read_bytes_dom_sub pinp (ring_entry_pa c p) 2 _ Hr).
+    apply pa_range_base. change (N.to_nat 2) with 2%nat. lia. }
+  assert (Hdq : ring_entry_pa c p ∈ dom pinq).
+  { pose proof (spo_ring _ _ _ _ (vpo_slot _ _ _ Hok q slq pinq H3 H4)) as Hr.
+    rewrite Hring in Hr.
+    apply (read_bytes_dom_sub pinq (ring_entry_pa c p) 2 _ Hr).
+    apply pa_range_base. change (N.to_nat 2) with 2%nat. lia. }
+  pose proof (vpo_fp_disj _ _ _ Hok p q slp slq pinp pinq Hne H1 H2 H3 H4) as Hd.
+  exact (proj1 (elem_of_disjoint _ _) Hd _
+           (slot_fp_pin slp pinp _ Hdp) (slot_fp_pin slq pinq _ Hdq)).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE USED INDEX'S POSITION, AS A FUNCTION.                              *)
+(*                                                                        *)
+(*   [vpo_uix_surj] says every used index below the count belongs to some  *)
+(*   position; this computes WHICH, which is what a counting argument      *)
+(*   needs (and what the interrupt handler wants when it walks the ring).  *)
+(*   The map is injective on values, so the filtered domain has at most    *)
+(*   one element and the choice is not a choice at all.                    *)
+(* ---------------------------------------------------------------------- *)
+Definition uix_inv (m : gmap nat nat) (u : nat) : nat :=
+  from_option id 0%nat
+    (head (List.filter (fun k => bool_decide (m !! k = Some u))
+                       (elements (dom m)))).
+
+Lemma uix_inv_spec (m : gmap nat nat) (k u : nat) :
+  (forall q1 q2, m !! q1 = Some u -> m !! q2 = Some u -> q1 = q2) ->
+  m !! k = Some u -> uix_inv m u = k.
+Proof.
+  intros Hinj Hk. unfold uix_inv.
+  assert (Hin : k ∈ List.filter (fun q => bool_decide (m !! q = Some u))
+                                (elements (dom m))).
+  { apply elem_of_list_In, filter_In. split.
+    - apply elem_of_list_In, elem_of_elements, elem_of_dom. by exists u.
+    - by apply bool_decide_eq_true. }
+  destruct (head (List.filter (fun q => bool_decide (m !! q = Some u))
+                              (elements (dom m)))) as [x|] eqn:Hh; cbn.
+  - assert (Hx : x ∈ List.filter (fun q => bool_decide (m !! q = Some u))
+                                 (elements (dom m))).
+    { destruct (List.filter (fun q => bool_decide (m !! q = Some u))
+                            (elements (dom m))) as [|y l]; [discriminate|].
+      cbn in Hh. injection Hh as <-. apply elem_of_list_here. }
+    apply elem_of_list_In, filter_In in Hx as [_ Hxb].
+    apply bool_decide_eq_true in Hxb. exact (Hinj x k Hxb Hk).
+  - exfalso. destruct (List.filter (fun q => bool_decide (m !! q = Some u))
+                                   (elements (dom m))) as [|y l];
+      [ by apply elem_of_nil in Hin | discriminate ].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* AT MOST EIGHT COMPLETIONS ARE UNREAD.                                  *)
+(*                                                                        *)
+(*   Each used index the driver has not read names a DONE position, those  *)
+(*   positions are distinct, each still pins its own available-ring entry, *)
+(*   and there are eight entries -- so a ninth would collide.  With one    *)
+(*   more live position in hand (the one a completion is about to answer)  *)
+(*   the gap is strictly under eight, which is what says the completion's  *)
+(*   used element cannot land on one the driver still owes a look.          *)
+(* ---------------------------------------------------------------------- *)
+Lemma vproto_unread_lt8 (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (p : nat) :
+  vproto_ok c pr D -> p ∈ dom (vp_pend pr) ->
+  (vp_nc pr - vp_nr pr < 8)%nat.
+Proof.
+  intros Hok Hp.
+  destruct (decide (vp_nc pr - vp_nr pr < 8)%nat) as [Hlt|Hge]; [exact Hlt|].
+  exfalso.
+  (* the eight unread indices, plus the position about to be answered *)
+  pose (g := fun j : nat =>
+               if bool_decide (j = 8%nat) then p
+               else uix_inv (vp_uix pr) (vp_nr pr + j)%nat).
+  assert (Hgdone : forall j, (j < 8)%nat -> g j ∈ dom (vp_done pr)
+                             /\ vp_uix pr !! (g j) = Some (vp_nr pr + j)%nat).
+  { intros j Hj. unfold g. rewrite bool_decide_eq_false_2 by lia.
+    destruct (vpo_uix_surj _ _ _ Hok (vp_nr pr + j)%nat ltac:(lia)) as [k Hk].
+    rewrite (uix_inv_spec (vp_uix pr) k (vp_nr pr + j)%nat
+               (fun q1 q2 H1 H2 => vpo_uix_inj _ _ _ Hok q1 q2 _ H1 H2) Hk).
+    split; [| exact Hk ].
+    apply (vpo_done_uix _ _ _ Hok). exists (vp_nr pr + j)%nat.
+    split; [exact Hk | lia]. }
+  (* they are pairwise distinct: distinct used indices, and [p] is pending *)
+  assert (Hgne : forall j1 j2, (j1 < 9)%nat -> (j2 < 9)%nat -> j1 <> j2 ->
+                   g j1 <> g j2).
+  { intros j1 j2 H1 H2 Hne Heq.
+    assert (Hgp : g 8%nat = p)
+      by (unfold g; by rewrite bool_decide_eq_true_2).
+    assert (Hpnd : p ∉ dom (vp_done pr)).
+    { destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hp) as [_ Hns].
+      intro Hc. exact (Hns (vpo_done_lt _ _ _ Hok p Hc)). }
+    destruct (decide (j1 = 8%nat)) as [->|Hn1];
+      destruct (decide (j2 = 8%nat)) as [->|Hn2]; [ lia | | | ].
+    - destruct (Hgdone j2 ltac:(lia)) as [Hd2 _].
+      rewrite Hgp in Heq. rewrite <- Heq in Hd2. exact (Hpnd Hd2).
+    - destruct (Hgdone j1 ltac:(lia)) as [Hd1 _].
+      rewrite Hgp in Heq. rewrite Heq in Hd1. exact (Hpnd Hd1).
+    - destruct (Hgdone j1 ltac:(lia)) as [_ Hu1].
+      destruct (Hgdone j2 ltac:(lia)) as [_ Hu2].
+      rewrite Heq in Hu1. rewrite Hu1 in Hu2. injection Hu2 as Hu2. lia. }
+  (* each has a pin, so residues mod 8 are distinct -- and nine of them
+     cannot be *)
+  assert (Hgpin : forall j, (j < 9)%nat -> exists sl pin,
+            vp_slots pr !! (g j) = Some sl /\ vp_pin pr !! (g j) = Some pin).
+  { intros j Hj.
+    assert (Hdomj : g j ∈ dom (vp_pend pr) ∪ dom (vp_done pr)).
+    { destruct (decide (j = 8%nat)) as [->|Hn].
+      - unfold g. rewrite bool_decide_eq_true_2 by reflexivity.
+        by apply elem_of_union_l.
+      - apply elem_of_union_r. exact (proj1 (Hgdone j ltac:(lia))). }
+    assert (Hpd : g j ∈ dom (vp_pin pr))
+      by (rewrite (vpo_pin_dom _ _ _ Hok); exact Hdomj).
+    assert (Hsd : g j ∈ dom (vp_slots pr))
+      by (rewrite <- (vproto_slot_dom _ _ _ Hok); exact Hpd).
+    apply elem_of_dom in Hpd as [pin Hpin].
+    apply elem_of_dom in Hsd as [sl Hsl].
+    by exists sl, pin. }
+  (* NINE LIVE POSITIONS, EIGHT RING ENTRIES.  The residues are distinct
+     (two live positions never share an entry), so the nine of them embed in
+     the eight residues -- which a length count refutes. *)
+  pose (res := fun k : nat => Z.to_nat (Z.of_nat k `mod` 8)).
+  assert (Hresinj : forall j1 j2, (j1 < 9)%nat -> (j2 < 9)%nat ->
+                      res (g j1) = res (g j2) -> j1 = j2).
+  { intros j1 j2 H1 H2 Hr.
+    destruct (decide (j1 = j2)) as [->|Hne]; [reflexivity|]. exfalso.
+    destruct (Hgpin j1 H1) as (sl1 & pin1 & Hs1 & Hp1).
+    destruct (Hgpin j2 H2) as (sl2 & pin2 & Hs2 & Hp2).
+    apply (vproto_pos_mod8_ne c pr D (g j1) (g j2) sl1 sl2 pin1 pin2 Hok
+             (Hgne j1 j2 H1 H2 Hne) Hs1 Hp1 Hs2 Hp2).
+    unfold res in Hr.
+    pose proof (Z.mod_pos_bound (Z.of_nat (g j1)) 8 ltac:(lia)).
+    pose proof (Z.mod_pos_bound (Z.of_nat (g j2)) 8 ltac:(lia)). lia. }
+  assert (Hnd : NoDup ((fun j => res (g j)) <$> seq 0 9)).
+  { apply (NoDup_fmap_2_strong (fun j => res (g j))); [| apply NoDup_seq ].
+    intros x y Hx Hy Hxy. apply elem_of_seq in Hx. apply elem_of_seq in Hy.
+    exact (Hresinj x y ltac:(lia) ltac:(lia) Hxy). }
+  assert (Hsub : forall x, x ∈ ((fun j => res (g j)) <$> seq 0 9) ->
+                   x ∈ seq 0 8).
+  { intros x Hx. apply elem_of_list_fmap in Hx as (j & -> & _).
+    apply elem_of_seq. unfold res.
+    pose proof (Z.mod_pos_bound (Z.of_nat (g j)) 8 ltac:(lia)). lia. }
+  pose proof (submseteq_length _ _ (NoDup_submseteq _ _ Hnd Hsub)) as Hlen.
+  rewrite length_fmap, length_seq, length_seq in Hlen. lia.
 Qed.
 
 (* AT MOST EIGHT REQUESTS ARE EVER OUTSTANDING, which is the ring's own
@@ -2130,7 +2299,7 @@ Qed.
 (* the keyed obligation survives its own step: [nc] moves from pend to done *)
 Definition vproto_step_state (pr : vproto) (p : nat) (sl : vslot) : vproto :=
   VProto (S (vp_nc pr)) (vp_np pr)
-         (vp_lo_next (vp_lo pr) ({[ p ]} ∪ vp_srv pr))
+         (vp_lo_next (vp_lo pr) ({[ p ]} ∪ vp_srv pr)) (vp_nr pr)
          (* THE LATCH IS RELEASED ONLY BY ITS OWN REQUEST
             ([VirtioModel.virtio_complete]): completing some other position
             leaves another request's captured payload where it was. *)
@@ -2203,6 +2372,21 @@ Proof.
     rewrite size_singleton. lia.
   - unfold vproto_step_state. cbn [vp_uix vp_srv].
     rewrite dom_insert_L, (vpo_uix_dom _ _ _ Hok). reflexivity.
+  - unfold vproto_step_state. cbn [vp_nr vp_nc].
+    pose proof (vpo_nr_nc _ _ _ Hok). lia.
+  - (* the new record is the one this completion just wrote, and the driver
+       has not read it: its used index is the count the step consumed *)
+    unfold vproto_step_state. cbn [vp_done vp_uix vp_nr vp_nc]. intro k.
+    rewrite dom_insert_L, elem_of_union, elem_of_singleton.
+    destruct (decide (k = p)) as [->|Hne].
+    + split.
+      * intros _. exists (vp_nc pr). rewrite lookup_insert.
+        split; [reflexivity|]. pose proof (vpo_nr_nc _ _ _ Hok). lia.
+      * intros _. by left.
+    + rewrite lookup_insert_ne by congruence.
+      rewrite <- (vpo_done_uix _ _ _ Hok k).
+      split; [ intros [Hc|Hc]; [ exfalso; exact (Hne Hc) | exact Hc ]
+             | intro Hc; by right ].
   - unfold vproto_step_state. cbn [vp_uix vp_nc]. intros q u Hq.
     destruct (decide (q = p)) as [->|Hne].
     + rewrite lookup_insert in Hq. injection Hq as <-. lia.
@@ -2307,16 +2491,17 @@ Proof. reflexivity. Qed.
 (* the step's writes: inside the lease, off the control region -- restated
    over the keyed state for the Iris layer's convenience *)
 Lemma vslot_writes_dom (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
-    (sl : vslot) (pin : gmap Arch.pa (bv 8)) (ui : bv 16) (dk : Z -> bv 8) :
+    (p : nat) (sl : vslot) (pin : gmap Arch.pa (bv 8)) (ui : bv 16)
+    (dk : Z -> bv 8) :
   vproto_ok c pr D ->
-  vp_pend pr !! vp_nc pr = Some sl -> vp_pin pr !! vp_nc pr = Some pin ->
+  vp_pend pr !! p = Some sl -> vp_pin pr !! p = Some pin ->
   dom (vslot_writes c ui dk sl) ⊆ slot_wr sl ∪ used_page_pas c
   /\ dom (vslot_writes c ui dk sl) ## dom (vproto_ctl c pr).
 Proof.
   intros Hok Hsl Hpin.
   pose proof (vproto_pend_slot pr _ _ Hsl) as Hs.
   pose proof (vpo_slot _ _ _ Hok _ sl pin Hs Hpin) as Hslot.
-  pose proof (vslot_writes_dom_sub c (vp_nc pr) sl pin ui dk
+  pose proof (vslot_writes_dom_sub c p sl pin ui dk
                 (vpo_qnum _ _ _ Hok) Hslot) as Hsub.
   split; [exact Hsub|].
   apply (gset_disj_sub_l _ (slot_wr sl ∪ used_page_pas c));
@@ -2325,7 +2510,7 @@ Qed.
 
 (* THE CAPTURE: the latch takes a position, and nothing else moves. *)
 Definition vproto_capture_state (pr : vproto) (p : nat) : vproto :=
-  VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (Some p) (vp_srv pr)
+  VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (vp_nr pr) (Some p) (vp_srv pr)
          (vp_pend pr) (vp_done pr) (vp_uix pr) (vp_pin pr).
 
 Lemma vproto_ok_capture (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
@@ -2344,6 +2529,8 @@ Proof.
   - exact (vpo_win _ _ _ Hok).
   - exact (vpo_nc _ _ _ Hok).
   - exact (vpo_uix_dom _ _ _ Hok).
+  - exact (vpo_nr_nc _ _ _ Hok).
+  - exact (vpo_done_uix _ _ _ Hok).
   - exact (vpo_uix_lt _ _ _ Hok).
   - exact (vpo_uix_inj _ _ _ Hok).
   - exact (vpo_uix_surj _ _ _ Hok).
@@ -2371,7 +2558,8 @@ Proof. reflexivity. Qed.
 
 Definition vproto_publish_state (pr : vproto) (sl : vslot)
     (pin : gmap Arch.pa (bv 8)) : vproto :=
-  VProto (vp_nc pr) (S (vp_np pr)) (vp_lo pr) (vp_tk pr) (vp_srv pr)
+  VProto (vp_nc pr) (S (vp_np pr)) (vp_lo pr) (vp_nr pr) (vp_tk pr)
+         (vp_srv pr)
          (<[ vp_np pr := sl ]> (vp_pend pr))
          (vp_done pr)
          (vp_uix pr)
@@ -2402,6 +2590,9 @@ Lemma vppq_pend (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
 Proof. reflexivity. Qed.
 Lemma vppq_done (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_done (vproto_publish_state pr sl pin) = vp_done pr.
+Proof. reflexivity. Qed.
+Lemma vppq_nr (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_nr (vproto_publish_state pr sl pin) = vp_nr pr.
 Proof. reflexivity. Qed.
 Lemma vppq_uix (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_uix (vproto_publish_state pr sl pin) = vp_uix pr.
@@ -2516,6 +2707,8 @@ Proof.
   - rewrite vppq_lo, vppq_np. lia.
   - rewrite vppq_nc, vppq_srv. exact (vpo_nc _ _ _ Hok).
   - rewrite vppq_uix, vppq_srv. exact (vpo_uix_dom _ _ _ Hok).
+  - rewrite vppq_nr, vppq_nc. exact (vpo_nr_nc _ _ _ Hok).
+  - rewrite vppq_done, vppq_uix, vppq_nr. exact (vpo_done_uix _ _ _ Hok).
   - rewrite vppq_uix, vppq_nc. exact (vpo_uix_lt _ _ _ Hok).
   - rewrite vppq_uix. exact (vpo_uix_inj _ _ _ Hok).
   - rewrite vppq_uix, vppq_nc. exact (vpo_uix_surj _ _ _ Hok).
@@ -2601,17 +2794,22 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition vproto_reclaim_state (pr : vproto) (p : nat) : vproto :=
-  VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (vp_tk pr) (vp_srv pr)
+  VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (S (vp_nr pr)) (vp_tk pr)
+         (vp_srv pr)
          (vp_pend pr) (delete p (vp_done pr)) (vp_uix pr)
          (delete p (vp_pin pr)).
 
 Lemma vproto_ok_reclaim (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (p : nat) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vproto_ok c pr D ->
+  (* THE HANDLER READS THE USED RING IN ORDER, so the record it reclaims is
+     the one at the read watermark.  That is what lets [vp_nr] advance by one
+     and keeps the unread records a contiguous run. *)
+  vp_uix pr !! p = Some (vp_nr pr) ->
   vp_done pr !! p = Some sl -> vp_pin pr !! p = Some pin ->
   vproto_ok c (vproto_reclaim_state pr p) (D ∖ slot_fp sl pin).
 Proof.
-  intros Hok Hdone Hpin.
+  intros Hok Huixp Hdone Hpin.
   assert (Hpsrv : p ∈ vp_srv pr).
   { apply (vpo_done_lt _ _ _ Hok), elem_of_dom. exists sl. exact Hdone. }
   assert (Hnpend : vp_pend pr !! p = None).
@@ -2648,6 +2846,21 @@ Proof.
   - exact (vpo_win _ _ _ Hok).
   - exact (vpo_nc _ _ _ Hok).
   - exact (vpo_uix_dom _ _ _ Hok).
+  - (* the read watermark advances past the record just reclaimed *)
+    unfold vproto_reclaim_state. cbn [vp_nr vp_nc].
+    pose proof (vpo_uix_lt _ _ _ Hok p _ Huixp). lia.
+  - (* ...and the unread records are the ones strictly above it *)
+    unfold vproto_reclaim_state. cbn [vp_done vp_uix vp_nr]. intro k.
+    rewrite dom_delete_L, elem_of_difference, elem_of_singleton.
+    split.
+    + intros [Hk Hne]. destruct (proj1 (vpo_done_uix _ _ _ Hok k) Hk)
+        as (u & Hu & Hge).
+      exists u. split; [exact Hu|].
+      destruct (decide (u = vp_nr pr)) as [->|Hu2]; [| lia ].
+      exfalso. exact (Hne (vpo_uix_inj _ _ _ Hok k p _ Hu Huixp)).
+    + intros (u & Hu & Hge). split.
+      * apply (vpo_done_uix _ _ _ Hok). exists u. split; [exact Hu|lia].
+      * intros ->. rewrite Huixp in Hu. injection Hu as <-. lia.
   - exact (vpo_uix_lt _ _ _ Hok).
   - exact (vpo_uix_inj _ _ _ Hok).
   - exact (vpo_uix_surj _ _ _ Hok).
@@ -2736,7 +2949,7 @@ Qed.
 (* 7. The empty (fresh-after-init) instance.                              *)
 (* ---------------------------------------------------------------------- *)
 
-Definition vproto0 : vproto := VProto 0 0 0 None ∅ ∅ ∅ ∅ ∅.
+Definition vproto0 : vproto := VProto 0 0 0 0 None ∅ ∅ ∅ ∅ ∅.
 
 Lemma vproto_ok_init (c : virtio_cfg) :
   vc_qnum c = Z_to_bv 32 8 ->
@@ -2751,6 +2964,7 @@ Proof.
      the fields are the empty gset/gmap, and normalising them drags the map
      representation into a goal that never needed it. *)
   assert (Hnc0 : vp_nc vproto0 = 0%nat) by reflexivity.
+  assert (Hnr0 : vp_nr vproto0 = 0%nat) by reflexivity.
   assert (Hnp0 : vp_np vproto0 = 0%nat) by reflexivity.
   assert (Hlo0 : vp_lo vproto0 = 0%nat) by reflexivity.
   assert (Htk0 : vp_tk vproto0 = None) by reflexivity.
@@ -2776,6 +2990,10 @@ Proof.
   - rewrite Hlo0, Hnp0. lia.
   - rewrite Hnc0, Hsrv0. by rewrite size_empty.
   - rewrite Huix0, Hsrv0. by rewrite dom_empty_L.
+  - rewrite Hnr0, Hnc0. reflexivity.
+  - rewrite Hdone0, Huix0. intro k. rewrite dom_empty_L. split.
+    + intro Hc. exfalso. exact (proj1 (elem_of_empty k) Hc).
+    + intros (u & Hu & _). rewrite lookup_empty in Hu. discriminate.
   - rewrite Huix0. intros q u Hu. rewrite lookup_empty in Hu. discriminate.
   - rewrite Huix0. intros q1 q2 u Hu _. rewrite lookup_empty in Hu.
     discriminate.
