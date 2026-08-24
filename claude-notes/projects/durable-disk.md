@@ -1186,6 +1186,15 @@ map at home blocks); 1d lands last.
         the ruling the orchestrator owes).**  `P_wf`'s body is still
         `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
         and `fs_dstep_rebase` still holds.  2c-img (below) discharged
+      - RULED (2026-08-24): the two gaps 2c-img found are facts about the
+        mkfs IMAGE, not invariants — add both to `fs_boot_image_wf` as
+        `vm_compute` rows in `FsImgCheck`: (14) `fs_region_bare` (every
+        type-0 record has zero size and thirteen zero addresses); (15) no
+        live non-dot record of the root names the root (so
+        `FsImg.fs_rec_ticket`'s self-exemption and `ent_tokenless` agree,
+        and `✓ link_elem (img_nodes …)` follows from W9 + (13)).  Stage 3's
+        image discharge consumes them; `FsDurImg.fs_region_bare` moves to
+        `FsImg.v`.
         findings (ii) and (iv); (iii) and (v) stand.
         - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN
           `S`, because `free_pool`'s blocks have EXISTENTIAL contents** — so
