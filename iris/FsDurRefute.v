@@ -55,6 +55,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import iprop ghost_map.
 Require Import BioDefs.
+Require Import BitmapEnc.    (* [bm_bytes] -- the bitmap block's encoding *)
 Require Import FsImg.        (* [sb_size] -- the pool's block count       *)
 Require Import RiscvPtsto.     (* [fs_dur_names] -- Gamma_D's two gnames   *)
 Require Import LogDefs.        (* [fs_dbytes]                              *)
@@ -189,3 +190,117 @@ Section AccessorOwnership.
   Qed.
 
 End AccessorOwnership.
+
+(* ===================================================================== *)
+(*  (C)  WHAT THE CHAIN'S INTERMEDIATE OBJECT HAS TO BE INSTEAD           *)
+(* ===================================================================== *)
+
+(* (A) says the chain cannot pass [fs_state] from link to link.  This
+   section says what CAN be passed, and it is one decoupling: the free
+   pool's ownership must stop being a FUNCTION of the bitmap block's bytes.
+
+   [free_pool_at Γ nb p] is [FsStateBitmap.free_pool] with the owned set
+   given EXPLICITLY rather than read off the used set, and [fs_state_mid]
+   is [FsState.fs_state] over it, with the in-transit bin beside it.  Two
+   facts are the whole of the argument:
+
+   - [fs_state_mid_of_state]: at the ENDPOINT -- pool exactly the
+     complement of the used set, bin empty -- the relaxed predicate IS
+     [fs_state].  So the chain's two ends are unchanged and the commit's
+     conclusion still says the durable [fs_state] stands at the batch's
+     logged values.
+   - [fs_state_mid_bitmap]: a write of the BITMAP BLOCK carries the relaxed
+     predicate at ANY new used set, with the pool and the bin untouched.
+     That is exactly the step (A) shows [fs_state] cannot take: [bfree]'s
+     bit clears, the block stays where it is, and the record that still
+     names it stays consistent with it.  The matching [iupdate] later moves
+     the block out of the inode and into the pool, where the endpoint
+     condition puts it back into agreement with the bits.
+
+   The price is the era instance's, and it is where the owner has to rule:
+   [FsStateBitmap.free_pool_used] -- you own this block, therefore its bit
+   reads allocated, which is what kills xv6's panic on freeing a free
+   block -- is a theorem about the COUPLED pool and is not available at
+   [free_pool_at].  So either the two instances differ (the era view keeps
+   the coupled pool, the durable view takes the relaxed one and the
+   endpoint condition is proved at each commit), or the coupling comes back
+   as an endpoint-only clause.  Nothing in this file chooses. *)
+
+Section RelaxedChainState.
+  Context {Σ : gFunctors}.
+  Context `{!fsLinkG Σ, !fsTopG Σ}.
+  Implicit Types Γ : fs_view_names Σ.
+  Implicit Types S : fs_state_rec.
+
+  (* the pool over an EXPLICIT owned set *)
+  Definition free_pool_at Γ (nb : Z) (p : gset Z) : iProp Σ :=
+    ([∗ list] b ∈ seqZ 0 nb,
+       if bool_decide (b ∈ p) then (∃ bs, blk_owned Γ b bs)%I else emp)%I.
+
+  (* the endpoint's owned set: every block below the count whose bit is
+     clear *)
+  Definition pool_free_set (nb : Z) (u : gset Z) : gset Z :=
+    list_to_set (seqZ 0 nb) ∖ u.
+
+  Lemma free_pool_at_of_pool Γ nb u :
+    free_pool Γ nb u ⊣⊢ free_pool_at Γ nb (pool_free_set nb u).
+  Proof.
+    rewrite /free_pool /free_pool_at /pool_elt.
+    apply big_sepL_proper. intros k b Hb.
+    assert (Hin : b ∈ seqZ 0 nb) by exact (elem_of_list_lookup_2 _ _ _ Hb).
+    destruct (decide (b ∈ u)) as [Hu | Hu].
+    - rewrite (bool_decide_eq_true_2 _ Hu).
+      rewrite (bool_decide_eq_false_2 (b ∈ pool_free_set nb u)); [done |].
+      rewrite /pool_free_set elem_of_difference.
+      intros [_ Hnu]. exact (Hnu Hu).
+    - rewrite (bool_decide_eq_false_2 _ Hu).
+      rewrite (bool_decide_eq_true_2 (b ∈ pool_free_set nb u)); [done |].
+      rewrite /pool_free_set elem_of_difference.
+      split; [by apply elem_of_list_to_set | exact Hu].
+  Qed.
+
+  (* the in-transit bin: home-view byte runs for blocks between roles *)
+  Definition dbin Γ (Bin : gmap Z (list (bv 8))) : iProp Σ :=
+    ([∗ map] b ↦ bs ∈ Bin, blk_owned Γ b bs)%I.
+
+  Definition fs_state_mid Γ S (p : gset Z)
+      (Bin : gmap Z (list (bv 8))) : iProp Σ :=
+    (sb_owned Γ (fss_sb S) (fss_sbb S)
+     ∗ fs_inodes Γ (fss_sb S) (fss_inodes S)
+     ∗ blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S))
+     ∗ free_pool_at Γ (sb_size (fss_sb S)) p
+     ∗ dbin Γ Bin)%I.
+
+  (* THE ENDPOINTS ARE UNCHANGED *)
+  Lemma fs_state_mid_of_state Γ S :
+    fs_state Γ S ⊣⊢
+      fs_state_mid Γ S (pool_free_set (sb_size (fss_sb S)) (fss_used S)) ∅.
+  Proof.
+    rewrite /fs_state /fs_state_mid /free_bitmap /free_bitmap_at /dbin.
+    rewrite big_sepM_empty free_pool_at_of_pool.
+    iSplit.
+    - iIntros "(Hsb & Hin & Hbm & Hpool)". iFrame.
+    - iIntros "(Hsb & Hin & Hbm & Hpool & _)". iFrame.
+  Qed.
+
+  (* THE STEP [fs_state] CANNOT TAKE: the bitmap block's bytes move to the
+     encoding of ANY used set, and neither the pool nor the bin owes
+     anything.  This is [bfree]'s [log_write] at the durable view. *)
+  Lemma fs_state_mid_bitmap Γ S p Bin :
+    fs_state_mid Γ S p Bin ⊢
+      blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S))
+      ∗ (∀ u' : gset Z,
+           blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE u') -∗
+           fs_state_mid Γ (MkFsS (fss_sb S) (fss_sbb S)
+                                 (fss_inodes S) u') p Bin).
+  Proof.
+    rewrite /fs_state_mid. cbn [fss_sb fss_sbb fss_inodes fss_used].
+    iIntros "(Hsb & Hin & $ & Hpool & Hbin)".
+    iIntros (u') "Hbm". iFrame.
+  Qed.
+
+End RelaxedChainState.
+
+(* the pool and the bin are big-ops over block-sized index sets; seal them
+   the day they are written (durable-notes.md, the [iFrame] hang) *)
+Global Typeclasses Opaque free_pool_at dbin fs_state_mid.
