@@ -26,7 +26,7 @@
      - FEATURES_OK sticks because the write took ([virtio_status_readback]);
      - QUEUE_READY reads clear because the reset cleared it
        ([virtio_reset_not_ready]);
-     - QUEUE_NUM_MAX = 8, so neither the "no queue 0" nor the "max queue too
+     - QUEUE_NUM_MAX = 1024, so neither the "no queue 0" nor the "max queue too
        short" test fires;
      - kalloc cannot return null, because the caller supplies three pages.
 

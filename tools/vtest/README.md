@@ -160,9 +160,10 @@ would not give.
 
 ## Findings so far
 
-Eight of these have been FIXED rather than recorded -- the whole UART register
-file, its interrupt-status semantics and its bus decode, and then the PLIC's
-threshold, its M contexts and its source count.  They are in
+Fifteen of these have been FIXED rather than recorded -- the whole UART
+register file, its interrupt-status semantics and its bus decode; the PLIC's
+threshold, its M contexts and its source count; and the virtio disk's register
+decode, its queue sizes and its used-ring reporting.  They are in
 [Findings fixed](#findings-fixed) below, with what the fix was and which test
 now passes because of it; they are kept because the point of this table is the
 register of what differential testing FOUND, not only of what is still open.
@@ -175,15 +176,8 @@ does not exist).
 
 | # | what | model | QEMU | kind | found by |
 |---|------|-------|------|------|----------|
-| 1 | `QueueNumMax`, and `QueueNum` writes | 8, only {1,2,4,8} accepted | 1024 | incompleteness | `disk_rw`, `disk_ident_qnum` |
 | 2 | offered / negotiated features | `FLUSH\|CONFIG_WCE`, negotiates 0 | `0x30006e54`, negotiates `0x6454` | incompleteness | `disk_rw` |
-| 3 | `DeviceFeaturesSel` (0x14), `DriverFeaturesSel` (0x24) | not decoded -- the store is STUCK | writable; the high feature word is `0x101`, and a full 1.x negotiation acking `VERSION_1` reaches Status 11 | incompleteness | `disk_ident_featsel`, `disk_ident_drvfsel` |
-| 4 | **`used.ring[i].len`** | `vr_len` (the data descriptor's length) in both directions | 1 for a write, 513 for a read | **defect** | `disk_rw`, `disk_order` |
 | 5 | **completion ORDER of two in-flight requests** | publication order ONLY | either order | **unsoundness** | `disk_order` |
-| 13 | virtio CONFIG SPACE: capacity (0x100) and ConfigGeneration (0x0fc) | not decoded -- STUCK | capacity **128 sectors**, exactly the backing file | incompleteness | `disk_ident_cap`, `disk_ident_confgen` |
-| 14 | virtio `QueueReset` (0x0c0) and the SHM registers (0x0ac..) | not decoded -- STUCK | `QueueReset` 0; `SHMLen` all-ones | incompleteness | `disk_ident_qreset`, `disk_ident_shmsel` |
-| 15 | sub-word access anywhere in the virtio window (1- and 2-byte, read and write) | not decoded -- STUCK | reads give 0; a 1-byte Status write is a NO-OP | incompleteness | `disk_ident_rd1/rd2/wr1` |
-| 16 | a per-queue write with `QueueSel` /= 0, and `QueueNotify` /= 0 | REFUSED -- STUCK | both ignored | incompleteness | `disk_ident_qsel`, `disk_ident_notify` |
 | 17 | a descriptor chain that is not exactly THREE descriptors | the device STALLS (`virtio_stalled`); only `DevStepDiskWild` covers it | served normally -- 512 bytes written, status 0 | incompleteness in practice | `disk_chain` |
 | 18 | **`a1` at entry** -- the device-tree pointer | `0x1000`, a HARDCODED constant in `rv64d.v`'s `init_boot_requirements` | the real DTB address (`0x87e00000`), which moves with `-m` and the image | **defect** (boot contract) | `core_regs_gpr` |
 | 19 | `misa` bit 7 (H), and `mideleg` as its consequence | H absent; `mideleg` 0 | H present; `mideleg` `0x1444` (VSSIP/VSTIP/VSEIP/SGEIP, hardwired when H is implemented) | incompleteness | `core_regs_mcsr` |
@@ -214,6 +208,13 @@ them are one modelling shortcut seen from different sides.
 | 10 | **PLIC claim ignores the context THRESHOLD** | the masked source's id, and its pending bit cleared | `0`, and the source STAYS pending.  The threshold now lives in `plic_cand`, which `plic_eip` and `plic_best` both read | **unsoundness** (and a defect) | `plic_thresh` |
 | 11 | PLIC M-context registers (enable 0x2000, threshold 0x200000, claim 0x200004) | not decoded -- STUCK at the first M access | all three serviced: the PLIC is indexed by CONTEXT (`plic_nctx`, `plic_mctx`/`plic_sctx`), both halves of every hart's pair, and each context drives its own pin | incompleteness | `plic_mctx` |
 | 12 | PLIC source 0's priority register, and `plic_nsrc` = 32 against the board's 96 | STUCK at both bounds | offset 0 is read-only zero (source 0 does not exist); 96 sources, so the enable and pending bitmaps are three words each | incompleteness | `plic_prio0` |
+| 1 | `QueueNumMax`, and `QueueNum` writes | 8, and only {1,2,4,8} accepted | **1024**, and any power of two up to it.  An illegal size is still refused, which is deliberate | incompleteness | `disk_rw`, `disk_ident_qnum` |
+| 3 | `DeviceFeaturesSel` (0x14), `DriverFeaturesSel` (0x24) | not decoded -- STUCK, so no feature bit above 31 could be read OR acked | both are real registers; word 1 carries `VIRTIO_F_VERSION_1`, the ack lands in the word the selector names, and a full 1.x negotiation reaches Status 11 | incompleteness | `disk_ident_featsel`, `disk_ident_drvfsel` |
+| 4 | **`used.ring[i].len`** | `vr_len` -- the data descriptor's length -- in every direction | the device-WRITABLE part of the chain: 1 for a write, 513 for a read, and 513 for an unrecognised type on a read-shaped chain.  The discriminator is the descriptor's WRITE flag, not the request type | **defect** | `disk_rw`, `disk_order`, `disk_err` |
+| 13 | virtio CONFIG SPACE: capacity (0x100), ConfigGeneration (0x0fc) | not decoded -- STUCK | the capacity is a field of the device state (`v_cap`), set by whoever attaches the image and kept across a reset; generation 0 | incompleteness | `disk_ident_cap`, `disk_ident_confgen` |
+| 14 | virtio `QueueReset` (0x0c0) and the SHM registers (0x0ac..) | not decoded -- STUCK | `QueueReset` reads 0 (this device does not offer `RING_RESET`); every SHM region reads all-ones, which is how the transport says a region does not exist | incompleteness | `disk_ident_qreset`, `disk_ident_shmsel` |
+| 15 | sub-word access anywhere in the virtio window | not decoded -- STUCK | the transport is 32-bit: a 1- or 2-byte read reaches no register and answers 0, and a narrow write is dropped | incompleteness | `disk_ident_rd1/rd2/wr1` |
+| 16 | a per-queue write with `QueueSel` /= 0, and `QueueNotify` /= 0 | REFUSED -- STUCK | both accepted and ignored.  What kept the queue geometry legal was never the refusal but `virtio_live`'s own conditions | incompleteness | `disk_ident_qsel`, `disk_ident_notify` |
 
 **Finding 10 was the serious one of the PLIC three**, and the only PLIC
 finding that was not mere incompleteness: the threshold appeared in `plic_eip`
@@ -238,6 +239,28 @@ leaving the pin unmodelled would have been the same half-fix as a
 stored-but-inert control bit.  The source count went with it: 96 sources means
 three enable words per context and three pending words, which is what makes
 source 32's priority register (`plic_prio0` +20) a register at all.
+
+**Finding 4 is the one that had to be got right rather than merely made.**
+Two rules both explain "1 for a write, 513 for a read": key off the request
+TYPE, or key off the data descriptor's WRITE flag.  `disk_err` is what
+separates them -- an unrecognised type and a FLUSH, both published through a
+read-shaped chain, where the device writes no data at all.  The spec's wording
+("bytes WRITTEN into the device-writable part") says 1; the hardware says 513,
+because what a real device reports is the writable SEGMENT and not the
+transfer.  Keying off the type would have passed `disk_rw` and produced 1
+there -- a value the machine does not produce, which is finding 4 itself moved
+from the read path to the error paths.  So `vreq_used_len` reads `vr_wr`, the
+flag the parser takes off the descriptor.
+
+**Findings 3, 13, 14, 15 and 16 were all the same shape**: an access the
+hardware answers and the model had no transition for, so a driver that made it
+had no model execution.  Nothing about them was subtle once each register's
+meaning was pinned; what they cost was reach, and the two that had real
+drivers behind them are 15 (a narrow read of a status byte) and 16 (a driver
+that touches a queue this device does not have).  Finding 13 needed one piece
+of modelling rather than decode: `v_disk` is a total function, so the medium
+has no edge of its own and the CAPACITY had to become a field of the device
+state, set by the machine that attaches the image.
 
 **Finding 6 was the load-bearing one of the UART five, and not because of the values.**  MCR
 bit 4 is LOOPBACK, so a readable MCR that ignored bit 4 would have been worse

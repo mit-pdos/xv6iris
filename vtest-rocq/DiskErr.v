@@ -72,40 +72,40 @@ Lemma disk_err_agrees :
 Proof. solve_vtest err_expect. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 2. The one field that differs is finding 4 again, on two new paths.     *)
+(* 2. THE USED ELEMENT'S [len] on two paths that write no data at all --   *)
+(*    which is where finding 4's fix had to be got right rather than       *)
+(*    merely made.                                                         *)
 (*                                                                         *)
-(*    [virtio_used_writes] reports [vr_len r] -- the DATA descriptor's      *)
-(*    length -- as used.ring[i].len whatever the request was, so both the   *)
-(*    unsupported request and the flush report 512.  QEMU reports 513 for   *)
-(*    each: it counts the device-writable part of the chain, the 512-byte   *)
-(*    buffer plus the one status byte.                                     *)
+(*    Both requests here ride a READ-SHAPED chain: the data descriptor is   *)
+(*    marked WRITABLE by the driver, and the 0xaa prefill above proves the  *)
+(*    device never filled it (an unrecognised type transfers nothing, and   *)
+(*    neither does a flush).  So the two candidate rules disagree exactly   *)
+(*    here.  The spec's wording -- "the number of bytes WRITTEN into the    *)
+(*    device-writable part of the chain" -- says 1, the status byte alone.  *)
+(*    The hardware says 513, and every real device does: what is reported   *)
+(*    is the writable SEGMENT, not the transfer.                            *)
 (*                                                                         *)
-(*    Worth noting that on THESE two paths neither number is what the spec  *)
-(*    asks for.  The used element's [len] is defined as the number of bytes *)
-(*    WRITTEN into the device-writable part of the chain; neither request   *)
-(*    wrote the data buffer at all (the 0xaa prefill above proves it), so   *)
-(*    the spec's answer is 1, the status byte alone.  The model says 512    *)
-(*    and QEMU says 513.  That does not make QEMU wrong for the suite's     *)
-(*    purposes -- the question is only whether the model admits what the    *)
-(*    hardware did -- but it does mean finding 4's fix should be stated     *)
-(*    against the SPEC and not against QEMU's number.                       *)
-(*                                                                         *)
-(*    Pinned on both sides, so this goes red when the model changes here.   *)
+(*    The model follows the hardware, and the reason is the suite's own     *)
+(*    question.  A model that answered 1 here would produce a value the     *)
+(*    machine does not, and would have no execution matching what the       *)
+(*    machine did -- which is the shape of finding 4 itself, merely moved   *)
+(*    from the read path to the error paths.  So [vreq_used_len] keys off   *)
+(*    the descriptor's WRITE flag, not the request type, and these two      *)
+(*    fields are what force that distinction: keying off the type would     *)
+(*    pass DiskRw.v and fail here.                                         *)
 (* ---------------------------------------------------------------------- *)
 
-Definition err_model_lens : list Z := [512; 512].
-Definition err_qemu_lens  : list Z := [513; 513].
+Definition err_lens : list Z := [513; 513].
 
 Lemma disk_err_model_lens :
-  (fun o => res_word err_run o) <$> err_len_offs = err_model_lens.
-Proof. solve_vtest err_model_lens. Qed.
+  (fun o => res_word err_run o) <$> err_len_offs = err_lens.
+Proof. solve_vtest err_lens. Qed.
 
 Lemma disk_err_qemu_lens :
-  (fun o => cap_word disk_err_qemu_result o) <$> err_len_offs = err_qemu_lens.
-Proof. solve_vtest err_qemu_lens. Qed.
+  (fun o => cap_word disk_err_qemu_result o) <$> err_len_offs = err_lens.
+Proof. solve_vtest err_lens. Qed.
 
-Lemma disk_err_lens_differ : err_model_lens <> err_qemu_lens.
-Proof. discriminate. Qed.
+
 
 (* ---------------------------------------------------------------------- *)
 (* 3. The two branches, off the model rather than off this test.           *)

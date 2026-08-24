@@ -120,15 +120,18 @@ Qed.
 (*    claude-notes/completed/virtio-disk.md and design/virtio-driver.md.    *)
 (* ---------------------------------------------------------------------- *)
 
-Definition ord_model_lens : list Z := [4096; 512].
-Definition ord_qemu_lens  : list Z := [1; 1].
+Definition ord_lens : list Z := [1; 1].
 
-(* the used.len defect of DiskRw section 3 again, on a multi-sector request:
-   the model reports the data descriptor's length, QEMU the one status byte *)
+(* THE USED ELEMENT'S [len], which used to be finding 4 here too: both these
+   requests are WRITES, so the device-writable part of each chain is the
+   status byte alone and both report 1 -- on a multi-sector request as much
+   as on a single-sector one, since what is counted is the writable segment
+   and not the transfer.  The model used to report the data descriptor's
+   length, 4096 and 512. *)
 Lemma disk_order_model_lens :
-  (fun o => res_word ord_run o) <$> ord_len_offs = ord_model_lens.
-Proof. solve_vtest ord_model_lens. Qed.
+  (fun o => res_word ord_run o) <$> ord_len_offs = ord_lens.
+Proof. solve_vtest ord_lens. Qed.
 
 Lemma disk_order_qemu_lens :
-  (fun o => cap_word disk_order_qemu_result o) <$> ord_len_offs = ord_qemu_lens.
-Proof. solve_vtest ord_qemu_lens. Qed.
+  (fun o => cap_word disk_order_qemu_result o) <$> ord_len_offs = ord_lens.
+Proof. solve_vtest ord_lens. Qed.

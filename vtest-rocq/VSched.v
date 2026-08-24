@@ -77,7 +77,7 @@ Proof. intros a b Hb. unfold view_of. by rewrite Hb. Qed.
 
 Definition set_vdisk (v : virtio_state) (dk : Z -> bv 8) : virtio_state :=
   VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v) dk
-              (v_cache v) (v_taken v).
+              (v_cache v) (v_taken v) (v_cap v).
 
 (* the disk image as the device sees it: a TOTAL function over a finite
    description, zero off it -- the same shape [view_of] gives the bus. *)

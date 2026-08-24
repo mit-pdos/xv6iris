@@ -1,66 +1,63 @@
-(* DiskIdentDrvfsel.v -- DriverFeaturesSel (0x024).  FINDING 3, second half.
+(* DiskIdentDrvfsel.v -- THE DRIVER-FEATURES WORD SELECTOR, and a full 1.x
+   negotiation.  The mechanism agrees and the negotiation completes; the two
+   feature words differ, which is finding 2 (see DiskIdentFeatsel.v).
 
-   Source: tools/vtest/tests/disk_ident_drvfsel.S.  Capture:
-   DiskIdentDrvfselGen.v.
+   Source: tools/vtest/tests/disk_ident_drvfsel.S.  Capture: DiskIdentDrvfselGen.v.
 
-   DeviceFeaturesSel (DiskIdentFeatsel.v) is how a driver READS the high half
-   of the feature word; DriverFeaturesSel is how it ACKNOWLEDGES it.  Neither
-   is decoded, so the store is stuck and VIRTIO_F_VERSION_1 can be neither
-   read nor acked: a spec-conforming modern driver is outside the model
-   ENTIRELY, not merely restricted by it.
+   DriverFeaturesSel (0x024) was not decoded (finding 3), so a driver could
+   not ack a feature bit above 31 at all -- and VIRTIO_F_VERSION_1 lives up
+   there, which makes it the bit a modern driver MUST ack for the transport
+   to be legal.  Both selectors are now real registers: the ack lands in the
+   word DriverFeaturesSel names, and the device records both words.
 
-   After the stuck store the program does, on QEMU only, exactly the
-   negotiation such a driver performs -- ack the low half, select the high
-   half, ack VERSION_1, then FEATURES_OK -- and reads Status back.  QEMU
-   answers 11: FEATURES_OK stuck, the device accepted the set.  That whole
-   sequence has no model execution. *)
+   What this test therefore pins, and could not before, is the SHAPE of a
+   1.x negotiation: select word 0, read, ack; select word 1, read, ack
+   VERSION_1; set FEATURES_OK; re-read status and find it stuck.  The final
+   status is 11 on both machines. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list.
 Require Import VTest DiskIdentDrvfselGen.
 Local Open Scope Z_scope.
 
-Definition di_drvfsel_start : mstate := start disk_ident_drvfsel_text.
+Definition di_drvfsel_run : option mstate :=
+  run_until 50000 (start disk_ident_drvfsel_text).
 
-(* ---------------------------------------------------------------------- *)
-(* 1. The model: STUCK, at exactly the access named in the header.         *)
-(*                                                                         *)
-(*    The pc below is cross-checked against the disassembly                *)
-(*    riscv64-linux-gnu-objdump -d tools/vtest/build/disk_ident_drvfsel.elf, *)
-(*    and names that access.  Every MMIO offset the program touches before  *)
-(*    it is one the model DOES decode, so the model reaches the intended    *)
-(*    access rather than tripping on something earlier -- and every address *)
-(*    the program materialises comes from [li]/[lui], never [la], whose GOT *)
-(*    load would be outside the [-j .text] image and would look like a      *)
-(*    device finding while being nothing of the sort.                      *)
-(* ---------------------------------------------------------------------- *)
+(* result-region offsets, mirroring tools/vtest/tests/disk_ident_drvfsel.S *)
+Definition di_drvfsel_agree_offs : list nat :=
+  [4;    (* progress marker *)
+   16]%nat. (* the status after the whole negotiation: 11 = ACK|DRIVER|FEATURES_OK *)
 
-Lemma disk_ident_drvfsel_model_stuck : run_status 50000 di_drvfsel_start = VStuck.
-Proof. solve_vtest VStuck. Qed.
+Definition di_drvfsel_diverge_offs : list nat :=
+  [8; 12]%nat.   (* the two feature words -- finding 2 *)
 
-Lemma disk_ident_drvfsel_stuck_at : stuck_pc 50000 di_drvfsel_start = 0x8000009c.
-Proof. solve_vtest (0x8000009c : Z). Qed.
+Definition di_drvfsel_expect :=
+  (fun o => cap_word disk_ident_drvfsel_qemu_result o) <$> di_drvfsel_agree_offs.
 
-(* ---------------------------------------------------------------------- *)
-(* 2. ...and the hardware COMPLETED the same program.  Read off the        *)
-(*    capture, so it costs no model evaluation.                            *)
-(* ---------------------------------------------------------------------- *)
+Lemma disk_ident_drvfsel_agrees :
+  (fun o => res_word di_drvfsel_run o) <$> di_drvfsel_agree_offs
+  = di_drvfsel_expect.
+Proof. solve_vtest di_drvfsel_expect. Qed.
 
-Definition di_drvfsel_qemu : list Z :=
-  (fun o => cap_word disk_ident_drvfsel_qemu_result o) <$> [8; 12; 16]%nat.
+(* THE STATUS IS THE POINT: FEATURES_OK stays set, so the device ACCEPTED the
+   negotiation -- including the VERSION_1 ack, which had nowhere to land
+   before.  A device that dropped the second word would still report 11 here,
+   which is why the model states separately (VioCheck / the model's own
+   [vc_dfeat1]) that the acked word is recorded. *)
 
-Definition di_drvfsel_qemu_expect : list Z := [805334612; 257; 11].
+Definition di_drvfsel_model_diverging : list Z := [0xa00; 1].
+Definition di_drvfsel_qemu_diverging  : list Z := [805334612; 257].
 
-Lemma disk_ident_drvfsel_qemu_completes : di_drvfsel_qemu = di_drvfsel_qemu_expect.
-Proof. solve_vtest di_drvfsel_qemu_expect. Qed.
+Lemma disk_ident_drvfsel_model_diverging :
+  (fun o => res_word di_drvfsel_run o) <$> di_drvfsel_diverge_offs
+  = di_drvfsel_model_diverging.
+Proof. solve_vtest di_drvfsel_model_diverging. Qed.
 
-(* ---------------------------------------------------------------------- *)
-(* 3. CLASSIFICATION: INCOMPLETENESS.                                      *)
-(*                                                                         *)
-(*    A stuck machine is NOT unsoundness.  The system theorem proves xv6    *)
-(*    never gets stuck, so a state with no transition is never reached and  *)
-(*    no proof can be wrong because of one.  What it costs is COVERAGE: a   *)
-(*    driver that performs this access has no model execution at all, so it *)
-(*    cannot be verified in this development.  Each such access is one more *)
-(*    driver the semantics cannot describe.                                *)
-(* ---------------------------------------------------------------------- *)
+Lemma disk_ident_drvfsel_qemu_diverging :
+  (fun o => cap_word disk_ident_drvfsel_qemu_result o) <$> di_drvfsel_diverge_offs
+  = di_drvfsel_qemu_diverging.
+Proof. solve_vtest di_drvfsel_qemu_diverging. Qed.
+
+Lemma disk_ident_drvfsel_really_diverges :
+  di_drvfsel_model_diverging <> di_drvfsel_qemu_diverging.
+Proof. discriminate. Qed.

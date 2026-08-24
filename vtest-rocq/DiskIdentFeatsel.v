@@ -1,66 +1,73 @@
-(* DiskIdentFeatsel.v -- DeviceFeaturesSel (0x014).  FINDING 3, first half,
-   which had no landed test until this one.
+(* DiskIdentFeatsel.v -- THE DEVICE-FEATURES WORD SELECTOR.  The mechanism
+   agrees; the two words it selects do not, and that is finding 2 rather than
+   anything about the selector.
 
-   Source: tools/vtest/tests/disk_ident_featsel.S.  Capture:
-   DiskIdentFeatselGen.v.
+   Source: tools/vtest/tests/disk_ident_featsel.S.  Capture: DiskIdentFeatselGen.v.
 
-   The device's feature word is 64 bits and the DeviceFeatures register
-   (0x010) is 32; DeviceFeaturesSel picks which half it reports.  [virtio_
-   write] has no case for 0x014, so the store is None and the machine is
-   stuck -- the model's DeviceFeatures is a constant, and the high half of
-   the feature word simply cannot be READ.
+   DeviceFeaturesSel (0x014) was not decoded at all (finding 3), so a driver
+   that wanted any feature bit above 31 -- VIRTIO_F_VERSION_1 among them, the
+   bit a 1.x driver MUST ack -- was a STUCK machine at its first select.  The
+   register is now real: it selects which 32-bit word DeviceFeatures reports,
+   word 1 carries VERSION_1, and a selection with nothing behind it reads
+   zero.  The program runs to completion on both machines.
 
-   That is not a cosmetic gap.  Bit 32 is VIRTIO_F_VERSION_1, which virtio
-   1.x REQUIRES every driver to negotiate; QEMU's high half here is 0x101,
-   i.e. VERSION_1 (bit 32) and VIRTIO_F_RING_RESET (bit 40).  See
-   DiskIdentDrvfsel.v for the acknowledgement side. *)
+   WHAT STILL DIFFERS is what the device OFFERS, which is a statement about
+   the device's capabilities and not about this register: this model offers
+   FLUSH and CONFIG_WCE, the QEMU device offers those plus SEG_MAX, GEOMETRY,
+   BLK_SIZE, TOPOLOGY, DISCARD, WRITE_ZEROES, INDIRECT_DESC and EVENT_IDX,
+   and in the high word RING_RESET beside VERSION_1.  Offering a feature
+   obliges implementing it -- its config fields, and for DISCARD and
+   WRITE_ZEROES whole request types -- so widening the word is a device
+   change, not a decode fix, and it is recorded as finding 2. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list.
 Require Import VTest DiskIdentFeatselGen.
 Local Open Scope Z_scope.
 
-Definition di_featsel_start : mstate := start disk_ident_featsel_text.
+Definition di_featsel_run : option mstate :=
+  run_until 50000 (start disk_ident_featsel_text).
+
+(* result-region offsets, mirroring tools/vtest/tests/disk_ident_featsel.S *)
+Definition di_featsel_agree_offs : list nat :=
+  [4]%nat.   (* the progress marker: the program RAN, which is the finding-3 half *)
+
+Definition di_featsel_diverge_offs : list nat :=
+  [8;    (* DeviceFeatures with word 0 selected *)
+   12]%nat. (* ...and with word 1 selected *)
+
+Definition di_featsel_expect :=
+  (fun o => cap_word disk_ident_featsel_qemu_result o) <$> di_featsel_agree_offs.
+
+Lemma disk_ident_featsel_agrees :
+  (fun o => res_word di_featsel_run o) <$> di_featsel_agree_offs
+  = di_featsel_expect.
+Proof. solve_vtest di_featsel_expect. Qed.
+
+(* the two feature words, pinned on both sides *)
+Definition di_featsel_model_diverging : list Z := [0xa00; 1].
+Definition di_featsel_qemu_diverging  : list Z := [805334612; 257].
+
+Lemma disk_ident_featsel_model_diverging :
+  (fun o => res_word di_featsel_run o) <$> di_featsel_diverge_offs
+  = di_featsel_model_diverging.
+Proof. solve_vtest di_featsel_model_diverging. Qed.
+
+Lemma disk_ident_featsel_qemu_diverging :
+  (fun o => cap_word disk_ident_featsel_qemu_result o) <$> di_featsel_diverge_offs
+  = di_featsel_qemu_diverging.
+Proof. solve_vtest di_featsel_qemu_diverging. Qed.
+
+Lemma disk_ident_featsel_really_diverges :
+  di_featsel_model_diverging <> di_featsel_qemu_diverging.
+Proof. discriminate. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. The model: STUCK, at exactly the access named in the header.         *)
-(*                                                                         *)
-(*    The pc below is cross-checked against the disassembly                *)
-(*    riscv64-linux-gnu-objdump -d tools/vtest/build/disk_ident_featsel.elf, *)
-(*    and names that access.  Every MMIO offset the program touches before  *)
-(*    it is one the model DOES decode, so the model reaches the intended    *)
-(*    access rather than tripping on something earlier -- and every address *)
-(*    the program materialises comes from [li]/[lui], never [la], whose GOT *)
-(*    load would be outside the [-j .text] image and would look like a      *)
-(*    device finding while being nothing of the sort.                      *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma disk_ident_featsel_model_stuck : run_status 50000 di_featsel_start = VStuck.
-Proof. solve_vtest VStuck. Qed.
-
-Lemma disk_ident_featsel_stuck_at : stuck_pc 50000 di_featsel_start = 0x8000009c.
-Proof. solve_vtest (0x8000009c : Z). Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 2. ...and the hardware COMPLETED the same program.  Read off the        *)
-(*    capture, so it costs no model evaluation.                            *)
-(* ---------------------------------------------------------------------- *)
-
-Definition di_featsel_qemu : list Z :=
-  (fun o => cap_word disk_ident_featsel_qemu_result o) <$> [8; 12]%nat.
-
-Definition di_featsel_qemu_expect : list Z := [805334612; 257].
-
-Lemma disk_ident_featsel_qemu_completes : di_featsel_qemu = di_featsel_qemu_expect.
-Proof. solve_vtest di_featsel_qemu_expect. Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 3. CLASSIFICATION: INCOMPLETENESS.                                      *)
-(*                                                                         *)
-(*    A stuck machine is NOT unsoundness.  The system theorem proves xv6    *)
-(*    never gets stuck, so a state with no transition is never reached and  *)
-(*    no proof can be wrong because of one.  What it costs is COVERAGE: a   *)
-(*    driver that performs this access has no model execution at all, so it *)
-(*    cannot be verified in this development.  Each such access is one more *)
-(*    driver the semantics cannot describe.                                *)
+(* CLASSIFICATION: INCOMPLETENESS, and the safe direction of it.  The      *)
+(* model offers a SUBSET of what the machine offers, so every negotiation  *)
+(* it can describe is one the machine would also accept; what it cannot    *)
+(* describe is a driver that wants one of the bits this device does not     *)
+(* have.  The reverse -- advertising a feature and then not implementing   *)
+(* it -- is the direction that would make a proof wrong, and it is why     *)
+(* the word was not simply widened to match the capture.                   *)
 (* ---------------------------------------------------------------------- *)

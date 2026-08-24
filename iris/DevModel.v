@@ -1031,12 +1031,18 @@ Definition dev_read (d : dev_state) (pa : Arch.pa) (n : N)
     end
   else if in_virtio a then
     (* virtio-mmio registers are all 32 bits wide, and none of them is
-       read-sensitive: the device is left alone by a read. *)
+       read-sensitive: the device is left alone by a read.  A NARROWER access
+       is not an error but it is not a register read either -- the transport
+       is 32-bit and the machine answers zero (finding 15: the model used to
+       be STUCK, so a driver that read a status byte with [lb] had no model
+       execution). *)
     match n return option (bv (8 * n) * dev_state) with
     | 4%N => match virtio_read (dvirtio d) (a - virtio_base) with
              | Some w => Some (w, d)
              | None => None
              end
+    | 1%N => Some (Z_to_bv _ 0, d)
+    | 2%N => Some (Z_to_bv _ 0, d)
     | _ => None
     end
   else None.
@@ -1071,6 +1077,10 @@ Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
                       | Some vd' => Some (set_dvirtio d vd')
                       | None => None
                       end
+    (* ...and a narrow WRITE reaches no register: it is dropped, which is
+       what the machine does with it (finding 15). *)
+    | 1%N => fun _ => Some d
+    | 2%N => fun _ => Some d
     | _ => fun _ => None
     end v
   else None.

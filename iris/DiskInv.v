@@ -970,7 +970,19 @@ Qed.
 Definition rw_slot (hd : nat) (ty : bv 32) (sec : bv 64) (buf sts : Arch.pa)
     (bs : list (bv 8)) (kq : nat * positive)
   : vslot :=
-  VSlot (VioReq (Z_to_bv 16 (Z.of_nat hd)) ty sec buf (Z_to_bv 32 1024) sts)
+  VSlot (VioReq (Z_to_bv 16 (Z.of_nat hd)) ty sec buf (Z_to_bv 32 1024) sts
+                (* the data descriptor is WRITABLE exactly when the driver
+                   marked it so, and xv6 marks it for a read: the flag word
+                   it publishes is 3 (NEXT|WRITE) for a read and 1 (NEXT) for
+                   a write, so this is that word's WRITE bit and not a second
+                   opinion about the request type.  [vd_has] reads only the
+                   flags, so the descriptor's other fields are immaterial
+                   here. *)
+                (vd_has (VqDesc buf (Z_to_bv 32 1024)
+                           (Z_to_bv 16 (if bv_unsigned ty =? virtio_blk_t_out
+                                        then 1 else 3))
+                           (Z_to_bv 16 0))
+                        vring_desc_f_write))
         bs kq.
 
 (* THE PUBLISHED SLOT'S WRITE IDENTITY (phase C2a), by conversion: what the

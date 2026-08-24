@@ -3,13 +3,28 @@
 ## STATUS (2026-08-24)
 
 LANDED and green: `make vtest`, **56 test programs** across six areas (`core`,
-`disk`, `uart`, `plic`, `conc`, `pt`), and **18 open divergences from real
+`disk`, `uart`, `plic`, `conc`, `pt`), and **11 open divergences from real
 hardware, TWO of them unsoundnesses** plus one that is unsound in direction
 only (finding 26, the direct-mapped TLB), beside a long list of confirmations
-and **eight findings FIXED** (6, 7, 8, 9, 23 -- the whole 16550 register file,
-its interrupt-status semantics and its bus decode -- and 10, 11, 12, the
-PLIC's threshold, its M contexts and its source count; they keep their numbers
-and their values in the README's "Findings fixed" table).
+and **fifteen findings FIXED** -- 6, 7, 8, 9, 23 (the whole 16550 register
+file, its interrupt-status semantics and its bus decode), 10, 11, 12 (the
+PLIC's threshold, its M contexts and its source count) and 1, 3, 4, 13, 14,
+15, 16 (the virtio disk's register decode, its queue sizes and its used-ring
+reporting).  They keep their numbers and their values in the README's
+"Findings fixed" table.
+
+**WHAT IS LEFT OF THE DISK is finding 5 (completion order, the unsoundness),
+finding 2 (which features the device OFFERS) and finding 17 (chains that are
+not exactly three descriptors).**  All three are device REDESIGNS rather than
+decode fixes, and each is described where it is recorded: 5 needs `v_seen` to
+become a set of outstanding positions, which is what `VirtioQueue`'s slot
+protocol and the DMA lease's reachable-window argument are stated against; 2
+obliges implementing every feature it would advertise (config fields for
+SEG_MAX and friends, whole request types for DISCARD and WRITE_ZEROES), and
+advertising without implementing is the direction that makes proofs wrong; 17
+needs the request parser to walk a chain of arbitrary length, which turns
+`vio_req`'s single buffer into a list and reaches the capture, the drains and
+the lease.
 
 **The two remaining unsoundnesses, in the order they matter** (the third,
 finding 10, is fixed -- see below):

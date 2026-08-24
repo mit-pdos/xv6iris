@@ -321,10 +321,16 @@ Lemma vg_00c : vdi_geom (mword_of_int 0x1000100c). Proof. vgeom. Qed.
 (*     whole 23-access chain is a chain of [vdi_c]s.                      *)
 (* ===================================================================== *)
 
+(* The four word SELECTORS and the second acked feature word stay at their
+   reset zero throughout: xv6's init writes neither DeviceFeaturesSel nor
+   DriverFeaturesSel nor SHMSel, so it negotiates word 0 and only word 0.
+   That is also why the [driver_features] write below still lands where this
+   chain expects it -- the ack goes to the word the selector names, and the
+   selector is 0. *)
 Definition vdi_c (st dfeat qsel qnum : Z) (rdy : bool) (d a u : Arch.pa)
   : virtio_cfg :=
   VirtioCfg (Z_to_bv 32 st) (Z_to_bv 32 dfeat) (Z_to_bv 32 qsel)
-            (Z_to_bv 32 qnum) rdy d a u.
+            (Z_to_bv 32 qnum) rdy d a u zero32 zero32 zero32 zero32.
 
 (* Every pre-flip write is CONFIG-ONLY: at any state whose configuration is
    [c] it is accepted and its only effect is to replace the configuration.
@@ -1532,16 +1538,16 @@ Section ProofVirtioDiskInit.
     assert (HB35a5 : B35 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp0b0 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0ac) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_init + 0x0b0)) by pcs.
     iEval (rewrite Hp0b0) in "Hpc".
-    (* +0x0b0 lw a5,52(a5) : QUEUE_NUM_MAX = 8 *)
+    (* +0x0b0 lw a5,52(a5) : QUEUE_NUM_MAX = 1024 (the board's queue) *)
     iApply (wp_vdi_lw γv (mword_of_int (KernelSyms.virtio_disk_init + 0x0b0)) true (mword_of_int 15 : mword 5)
               (mword_of_int 15 : mword 5) (mword_of_int 52 : mword 12) B35 (K - 4)%nat Q5
-              (mword_of_int 0x10001034) 52 (Z_to_bv 32 8) pp ltac:(vm_compute; discriminate)
+              (mword_of_int 0x10001034) 52 (Z_to_bv 32 1024) pp ltac:(vm_compute; discriminate)
               ltac:(rewrite HB35a5; bvc) vg_034 ltac:(vm_compute; reflexivity)
               ltac:(nzd) ltac:(rdok) ltac:(vcr)
               with "Hcg Hpc [] Hdinv Hvc").
     { iApply (vdi_0b0 with "Htext"). }
     iIntros "Hcg Hpc Hvc".
-    pose (B36 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 8 : mword 32))]> B35).
+    pose (B36 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 1024 : mword 32))]> B35).
     assert (Hp0b2 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0b0) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x0b2)) by pcs.
     iEval (rewrite Hp0b2) in "Hpc".
     (* +0x0b2 sext.w a5,a5 *)
@@ -1554,10 +1560,10 @@ Section ProofVirtioDiskInit.
     pose (B37 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B36 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B36).
-    assert (HB37a5 : B37 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 8) by (peel; bvc).
+    assert (HB37a5 : B37 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 1024) by (peel; bvc).
     assert (Hp0b4 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0b2) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x0b4)) by pcs.
     iEval (rewrite Hp0b4) in "Hpc".
-    (* +0x0b4 beqz a5 -- NOT taken (max = 8) *)
+    (* +0x0b4 beqz a5 -- NOT taken (max = 1024) *)
     iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0b4)) (mword_of_int 240 : mword 13)
               (mword_of_int 15 : mword 5) B37 (K - 4)%nat false ltac:(nzd)
               ltac:(rgne; rewrite HB37a5; vm_compute; reflexivity) with "Hcg Hpc []").
@@ -1577,11 +1583,11 @@ Section ProofVirtioDiskInit.
     pose (B38 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 7 : mword 6))))]> B37).
     assert (HB38a4 : B38 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 7) by (peel; bvc).
-    assert (HB38a5 : B38 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 8)
+    assert (HB38a5 : B38 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 1024)
       by (rewrite /B38 upd_ne; [exact HB37a5 | reg_neq]).
     assert (Hp0ba : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0b8) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x0ba)) by pcs.
     iEval (rewrite Hp0ba) in "Hpc".
-    (* +0x0ba bgeu a4,a5 -- NOT taken (7 <u 8) *)
+    (* +0x0ba bgeu a4,a5 -- NOT taken (7 <u 1024) *)
     iApply (wp_bgeu_fall_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0ba)) (mword_of_int 246 : mword 13)
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) B38 (K - 4)%nat false
               ltac:(nzd) ltac:(nzd) ltac:(rgne; rgne; rewrite HB38a4 HB38a5; vm_compute; reflexivity)

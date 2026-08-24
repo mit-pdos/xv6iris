@@ -104,9 +104,18 @@ Lemma virtio_xv6_features :
   Z.land virtio_device_features (Z.lnot virtio_xv6_clear_mask) = 0.
 Proof. reflexivity. Qed.
 
-(* The largest queue this device supports.  The driver rejects 0 and anything
-   below its own NUM (= 8), and programs exactly 8. *)
-Definition virtio_queue_num_max : Z := 8.
+(* THE HIGH FEATURE WORD.  Feature bits above 31 are reached by selecting
+   word 1 with DeviceFeaturesSel, and bit 32 is VIRTIO_F_VERSION_1 -- the bit
+   a 1.x driver MUST ack for the transport to be legal.  Offering it is what
+   makes a modern negotiation (select 1, read, select 1, ack, FEATURES_OK)
+   describable at all; with the two SEL registers undecoded it was a stuck
+   machine at the first select (finding 3). *)
+Definition virtio_device_features_hi : Z := 1.   (* VIRTIO_F_VERSION_1 *)
+
+(* The largest queue this device supports: the board's, 1024.  A driver may
+   program any power of two up to it -- the old model advertised 8 and
+   accepted only {1,2,4,8}, which is finding 1. *)
+Definition virtio_queue_num_max : Z := 1024.
 
 (* register offsets within the window (all registers are 32 bits wide) *)
 Definition vio_off_magic_value : Z := 0x000.
@@ -129,6 +138,22 @@ Definition vio_off_driver_desc_low : Z := 0x090.
 Definition vio_off_driver_desc_high : Z := 0x094.
 Definition vio_off_device_desc_low : Z := 0x0a0.
 Definition vio_off_device_desc_high : Z := 0x0a4.
+(* ...and the ones the model used to answer [None] for (findings 3, 13, 14) *)
+Definition vio_off_device_features_sel : Z := 0x014.
+Definition vio_off_driver_features_sel : Z := 0x024.
+Definition vio_off_shm_sel : Z := 0x0ac.
+Definition vio_off_shm_len_low : Z := 0x0b0.
+Definition vio_off_shm_len_high : Z := 0x0b4.
+Definition vio_off_shm_base_low : Z := 0x0b8.
+Definition vio_off_shm_base_high : Z := 0x0bc.
+Definition vio_off_queue_reset : Z := 0x0c0.
+Definition vio_off_config_generation : Z := 0x0fc.
+(* the DEVICE-SPECIFIC configuration space, which for virtio-blk starts with
+   the 64-bit capacity in sectors *)
+Definition vio_off_config : Z := 0x100.
+Definition vio_off_config_capacity_low : Z := 0x100.
+Definition vio_off_config_capacity_high : Z := 0x104.
+Definition virtio_window_size : Z := 0x200.
 
 (* device-status bits (virtio_config.h) *)
 Definition vio_status_acknowledge : Z := 1.
@@ -170,8 +195,11 @@ Definition virtio_blk_s_unsupp : Z := 2.
    (see [virtio_write]) rather than silently accepted -- the ring geometry
    below divides by this number, and a device that let the driver pick an
    illegal one would be modelling hardware that does not exist. *)
+(* A LEGAL QUEUE SIZE: a power of two, at least one, no larger than the
+   device's maximum.  (The old model accepted {1,2,4,8} because that is what
+   its [virtio_queue_num_max] = 8 allowed; the board's queue is 1024.) *)
 Definition vq_size_ok (n : Z) : bool :=
-  (n =? 1) || (n =? 2) || (n =? 4) || (n =? 8).
+  (0 <? n) && (n <=? virtio_queue_num_max) && (Z.land n (n - 1) =? 0).
 
 (* ---------------------------------------------------------------------- *)
 (* 1. The device state.                                                    *)
@@ -182,13 +210,22 @@ Definition vq_size_ok (n : Z) : bool :=
    what makes [virtio_dma_ok] (§6) survive an autonomous step for free. *)
 Record virtio_cfg := VirtioCfg {
   vc_status : bv 32;      (* device status (ACKNOWLEDGE/DRIVER/FEATURES_OK/DRIVER_OK) *)
-  vc_dfeat  : bv 32;      (* the driver-features word, recorded and unused *)
+  vc_dfeat  : bv 32;      (* the driver-features word 0, recorded *)
   vc_qsel   : bv 32;      (* selected queue (only queue 0 exists) *)
   vc_qnum   : bv 32;      (* driver-programmed queue size *)
   vc_ready  : bool;       (* queue 0 ready *)
   vc_desc   : Arch.pa;    (* descriptor table base *)
   vc_avail  : Arch.pa;    (* available ring base (driver -> device) *)
   vc_used   : Arch.pa;    (* used ring base (device -> driver) *)
+  (* THE WORD SELECTORS.  Feature bits come in 32-bit words and the transport
+     reaches the upper ones through a selector written first, so each side of
+     the negotiation is TWO registers: the select and the data.  All three
+     selectors below are ordinary storage the driver writes and the device
+     reads back through whichever data register they gate. *)
+  vc_devfsel : bv 32;     (* DeviceFeaturesSel: which word a read reports *)
+  vc_dfsel   : bv 32;     (* DriverFeaturesSel: which word a write acks *)
+  vc_dfeat1  : bv 32;     (* the driver-features word 1 (VERSION_1 lives here) *)
+  vc_shmsel  : bv 32;     (* SHMSel: which shared-memory region -- none exist *)
 }.
 
 Record virtio_state := VirtioState {
@@ -213,12 +250,19 @@ Record virtio_state := VirtioState {
      the buffer belongs to the driver again the moment the request completes,
      so the device must own the bytes before it says so. *)
   v_taken    : bool;
+  (* THE BACKING DEVICE'S SIZE, in 512-byte sectors, reported through the
+     configuration space at offset 0x100.  [v_disk] is a TOTAL function, so
+     the model's image has no edge of its own: the capacity is a separate
+     fact about the medium the board attached, which is why it is a field
+     rather than something derived.  A reset keeps it -- the configuration
+     goes, the disk does not. *)
+  v_cap      : bv 64;
 }.
 
 (* replace the dynamic part, keeping the configuration *)
 Definition set_vcfg (v : virtio_state) (c : virtio_cfg) : virtio_state :=
   VirtioState c (v_isr v) (v_seen v) (v_used_idx v) (v_disk v) (v_cache v)
-              (v_taken v).
+              (v_taken v) (v_cap v).
 
 (* THE DISK IMAGE'S GHOST VIEW (claude-notes/design/crash.md).  The image is
    a TOTAL function, while its ghost mirror is a partial map -- a fragment
@@ -283,7 +327,13 @@ Definition virtio_read (v : virtio_state) (off : Z) : option (bv 32) :=
   else if off =? vio_off_version then Some (Z_to_bv 32 virtio_version)
   else if off =? vio_off_device_id then Some (Z_to_bv 32 virtio_blk_device_id)
   else if off =? vio_off_vendor_id then Some (Z_to_bv 32 virtio_vendor_id)
-  else if off =? vio_off_device_features then Some (Z_to_bv 32 virtio_device_features)
+  (* DEVICE FEATURES: the word DeviceFeaturesSel selects.  Word 0 is what
+     this device offers, word 1 carries VIRTIO_F_VERSION_1, and every other
+     selection reads zero -- there are no bits up there. *)
+  else if off =? vio_off_device_features then
+    Some (Z_to_bv 32 (if bv_unsigned (vc_devfsel c) =? 0 then virtio_device_features
+                      else if bv_unsigned (vc_devfsel c) =? 1 then virtio_device_features_hi
+                      else 0))
   (* the two per-queue registers report on the SELECTED queue, and queue 0 is
      the only one this device has: any other selection reads as absent. *)
   else if off =? vio_off_queue_num_max then
@@ -294,6 +344,31 @@ Definition virtio_read (v : virtio_state) (off : Z) : option (bv 32) :=
                       else 0))
   else if off =? vio_off_interrupt_status then Some (v_isr v)
   else if off =? vio_off_status then Some (vc_status c)
+  (* QUEUE RESET reads 0: this device does not offer VIRTIO_F_RING_RESET, so
+     no queue is ever in the reset state. *)
+  else if off =? vio_off_queue_reset then Some zero32
+  (* THE SHARED-MEMORY REGIONS, of which this device has NONE.  The transport
+     says a region that does not exist reports a length of all-ones, and the
+     selector is ordinary storage, so every selection reads the same. *)
+  else if (off =? vio_off_shm_len_low) || (off =? vio_off_shm_len_high)
+          || (off =? vio_off_shm_base_low) || (off =? vio_off_shm_base_high)
+  then Some (Z_to_bv 32 0xffffffff)
+  (* CONFIG GENERATION: the config space of this device never changes under
+     the driver's feet, so the generation is always 0 and a driver's
+     read-check-reread loop always agrees with itself. *)
+  else if off =? vio_off_config_generation then Some zero32
+  (* THE CONFIGURATION SPACE.  virtio-blk's first field is the 64-bit
+     CAPACITY in sectors, and it is not feature-gated -- every virtio-blk
+     device has one.  The fields after it belong to features this device does
+     not offer (size_max, seg_max, geometry, ...), so they read zero: a
+     driver may only look at a config field whose feature it negotiated. *)
+  else if off =? vio_off_config_capacity_low then
+    Some (bv_extract 0 32 (v_cap v))
+  else if off =? vio_off_config_capacity_high then
+    Some (bv_extract 32 32 (v_cap v))
+  else if (vio_off_config <=? off) && (off <? virtio_window_size)
+          && (off mod 4 =? 0)
+  then Some zero32
   else None.
 
 (* splice a 32-bit half into a 64-bit queue address *)
@@ -330,10 +405,11 @@ Qed.
 (* A device RESET (status <- 0) drops the whole configuration and all queue
    progress; the disk image, of course, survives. *)
 Definition virtio_cfg0 : virtio_cfg :=
-  VirtioCfg zero32 zero32 zero32 zero32 false zero64 zero64 zero64.
+  VirtioCfg zero32 zero32 zero32 zero32 false zero64 zero64 zero64
+              zero32 zero32 zero32 zero32.
 
 Definition virtio_reset (v : virtio_state) : virtio_state :=
-  VirtioState virtio_cfg0 zero32 zero16 zero16 (v_disk v) ∅ false.
+  VirtioState virtio_cfg0 zero32 zero16 zero16 (v_disk v) ∅ false (v_cap v).
 
 (* WHAT A RESET DEVICE SATISFIES.  These are the four facts a boot client owes
    [VirtioProto.disk_ghosts_alloc] and [WpUart.dev_inv_alloc] about the device
@@ -373,74 +449,108 @@ Proof. by vm_compute. Qed.
 Definition virtio_write (v : virtio_state) (off : Z) (w : bv 32)
   : option virtio_state :=
   let c := v_cfg v in
+  (* a per-queue write names the SELECTED queue, and queue 0 is the only one
+     this device has.  A write with any other selection is IGNORED -- which
+     is what the hardware does, and what the model used to REFUSE (finding
+     16).  Refusing made the geometry legal by construction, but at the price
+     of a driver that touches queue 1 having no model execution at all; the
+     geometry is kept by [virtio_live]'s own conditions instead. *)
+  let qsel0 := bv_unsigned (vc_qsel c) =? 0 in
   if off =? vio_off_status then
     (* writing 0 is the reset command *)
     if bv_unsigned w =? 0 then Some (virtio_reset v)
     else Some (set_vcfg v (VirtioCfg w (vc_dfeat c) (vc_qsel c) (vc_qnum c)
-                                     (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)))
+                                     (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                     (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
+  else if off =? vio_off_device_features_sel then
+    Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
+                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                w (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
+  else if off =? vio_off_driver_features_sel then
+    Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
+                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                (vc_devfsel c) w (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_driver_features then
-    Some (set_vcfg v (VirtioCfg (vc_status c) w (vc_qsel c) (vc_qnum c)
-                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)))
+    (* the ack lands in the word DriverFeaturesSel names; a selection with no
+       bits behind it is accepted and goes nowhere, as on the hardware *)
+    if bv_unsigned (vc_dfsel c) =? 0 then
+      Some (set_vcfg v (VirtioCfg (vc_status c) w (vc_qsel c) (vc_qnum c)
+                                  (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                  (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
+    else if bv_unsigned (vc_dfsel c) =? 1 then
+      Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
+                                  (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                  (vc_devfsel c) (vc_dfsel c) w (vc_shmsel c)))
+    else Some v
   else if off =? vio_off_queue_sel then
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) w (vc_qnum c)
-                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)))
-  (* -- the per-queue registers.  All of them address the SELECTED queue, and
-        queue 0 is the only one that exists, so a write with any other
-        selection is REFUSED: the machine is stuck, and a driver proof has to
-        show it selected queue 0 first.  Same for an illegal queue size and a
-        notification naming a queue that does not exist.  Refusing at the
-        write is what keeps the queue geometry legal by construction, instead
-        of leaving the device to cope with a configuration no real one
-        would accept. -- *)
+                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
+  else if off =? vio_off_shm_sel then
+    Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
+                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) w))
   else if off =? vio_off_queue_num then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    (* an ILLEGAL SIZE is still refused: a queue whose size is not a power of
+       two no larger than the maximum is a configuration no real device
+       accepts, and refusing at the write is what keeps the geometry legal by
+       construction rather than leaving the device to cope with it. *)
+    if negb qsel0 then Some v else
     if negb (vq_size_ok (bv_unsigned w)) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) w
-                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)))
+                                (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_queue_ready then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (negb (bv_unsigned w =? 0))
-                                (vc_desc c) (vc_avail c) (vc_used c)))
+                                (vc_desc c) (vc_avail c) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_queue_notify then
     (* a hint only: this device polls the available ring itself.  The value is
-       the queue number, so only 0 is meaningful. *)
-    if negb (bv_unsigned w =? 0) then None else Some v
+       the queue number, and a queue that does not exist is ignored. *)
+    Some v
   else if off =? vio_off_interrupt_ack then
     Some (VirtioState c (Z_to_bv 32 (Z.land (bv_unsigned (v_isr v))
                                             (Z.lnot (bv_unsigned w))))
                       (v_seen v) (v_used_idx v) (v_disk v) (v_cache v)
-                      (v_taken v))
+                      (v_taken v) (v_cap v))
   else if off =? vio_off_queue_desc_low then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (set_lo (vc_desc c) w)
-                                (vc_avail c) (vc_used c)))
+                                (vc_avail c) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_queue_desc_high then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (set_hi (vc_desc c) w)
-                                (vc_avail c) (vc_used c)))
+                                (vc_avail c) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_driver_desc_low then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c)
-                                (set_lo (vc_avail c) w) (vc_used c)))
+                                (set_lo (vc_avail c) w) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_driver_desc_high then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c)
-                                (set_hi (vc_avail c) w) (vc_used c)))
+                                (set_hi (vc_avail c) w) (vc_used c)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_device_desc_low then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c) (vc_avail c)
-                                (set_lo (vc_used c) w)))
+                                (set_lo (vc_used c) w)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else if off =? vio_off_device_desc_high then
-    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c) (vc_avail c)
-                                (set_hi (vc_used c) w)))
+                                (set_hi (vc_used c) w)
+                                (vc_devfsel c) (vc_dfsel c) (vc_dfeat1 c) (vc_shmsel c)))
   else None.
 
 (* -- MMIO totality, for the offsets the xv6 driver names --
@@ -464,19 +574,28 @@ Definition vio_readable (off : Z) : bool :=
    existing queue number.  Anything else is stuck -- deliberately, so that a
    driver proof has to establish these rather than have the device paper over
    them (see the header). *)
+(* WHICH WRITES THE DEVICE ANSWERS.  Only two things are refused now: an
+   illegal QUEUE SIZE (a power of two up to the maximum, or the geometry is
+   one no real device accepts) and an offset this device has no register at.
+   A per-queue write with a foreign selection is ACCEPTED and ignored, and so
+   is a notification naming a queue that does not exist -- finding 16, where
+   the model used to be stuck at both. *)
 Definition vio_write_ok (c : virtio_cfg) (off : Z) (w : bv 32) : bool :=
   (off =? vio_off_status) || (off =? vio_off_driver_features)
+  || (off =? vio_off_device_features_sel) || (off =? vio_off_driver_features_sel)
   || (off =? vio_off_queue_sel) || (off =? vio_off_interrupt_ack)
-  || ((off =? vio_off_queue_notify) && (bv_unsigned w =? 0))
+  || (off =? vio_off_shm_sel)
+  || (off =? vio_off_queue_notify)
+  (* QUEUE_NUM keeps the stronger side condition: this predicate is what a
+     driver proof uses to conjure a successor, and xv6 always selects queue 0
+     first, so nothing needs the foreign-selection arm here.  The DEVICE
+     accepts that write (and ignores it) either way. *)
   || ((off =? vio_off_queue_num) && (bv_unsigned (vc_qsel c) =? 0)
       && vq_size_ok (bv_unsigned w))
-  || ((off =? vio_off_queue_ready) && (bv_unsigned (vc_qsel c) =? 0))
-  || ((off =? vio_off_queue_desc_low) && (bv_unsigned (vc_qsel c) =? 0))
-  || ((off =? vio_off_queue_desc_high) && (bv_unsigned (vc_qsel c) =? 0))
-  || ((off =? vio_off_driver_desc_low) && (bv_unsigned (vc_qsel c) =? 0))
-  || ((off =? vio_off_driver_desc_high) && (bv_unsigned (vc_qsel c) =? 0))
-  || ((off =? vio_off_device_desc_low) && (bv_unsigned (vc_qsel c) =? 0))
-  || ((off =? vio_off_device_desc_high) && (bv_unsigned (vc_qsel c) =? 0)).
+  || (off =? vio_off_queue_ready)
+  || (off =? vio_off_queue_desc_low) || (off =? vio_off_queue_desc_high)
+  || (off =? vio_off_driver_desc_low) || (off =? vio_off_driver_desc_high)
+  || (off =? vio_off_device_desc_low) || (off =? vio_off_device_desc_high).
 
 Lemma virtio_read_total (v : virtio_state) (off : Z) :
   vio_readable off = true -> exists w, virtio_read v off = Some w.
@@ -497,9 +616,19 @@ Proof.
     unfold virtio_write; cbv zeta;
     repeat (match goal with
             | Hx : (_ =? _) = true |- _ => rewrite Hx; clear Hx
+            end);
+    repeat (match goal with
             | Hx : vq_size_ok _ = true |- _ => rewrite Hx; clear Hx
             end);
-    destruct (bv_unsigned w =? 0); eexists; reflexivity.
+    (* the branches the WRITE decides for itself: the reset test, which
+       feature word the ack lands in, and the queue selection.  Every arm of
+       each is defined, so one [eexists; reflexivity] closes them all --
+       conversion does the offset comparisons. *)
+    try destruct (bv_unsigned w =? 0);
+    try destruct (bv_unsigned (vc_dfsel (v_cfg v)) =? 0);
+    try destruct (bv_unsigned (vc_dfsel (v_cfg v)) =? 1);
+    try destruct (negb (bv_unsigned (vc_qsel (v_cfg v)) =? 0));
+    eexists; reflexivity.
 Qed.
 
 (* The two MMIO writes the driver performs while the queue is LIVE -- the
@@ -518,7 +647,7 @@ Proof.
   unfold vio_cfg_stable. intro H.
   apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
     unfold virtio_write; cbv zeta.
-  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
+  - (* QUEUE_NOTIFY is accepted at every value now, so there is no guard *)
     intro He; injection He as <-; reflexivity.
   - intro He; injection He as <-; reflexivity.
 Qed.
@@ -531,7 +660,7 @@ Proof.
   unfold vio_cfg_stable. intro H.
   apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
     unfold virtio_write; cbv zeta.
-  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
+  - (* QUEUE_NOTIFY is accepted at every value now, so there is no guard *)
     intro He; injection He as <-; reflexivity.
   - intro He; injection He as <-; reflexivity.
 Qed.
@@ -581,7 +710,7 @@ Qed.
    arrived whole (as the device thread's does). *)
 Lemma virtio_state_eta (v : virtio_state) :
   v = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v) (v_disk v)
-        (v_cache v) (v_taken v).
+        (v_cache v) (v_taken v) (v_cap v).
 Proof. by destruct v. Qed.
 
 (* No MMIO write touches the disk image -- not even the reset command. *)
@@ -589,12 +718,15 @@ Lemma virtio_write_disk (v : virtio_state) (off : Z) (w : bv 32) (v' : virtio_st
   virtio_write v off w = Some v' -> v_disk v' = v_disk v.
 Proof.
   unfold virtio_write. cbv zeta.
-  destruct (off =? vio_off_status).
-  { destruct (bv_unsigned w =? 0); intro H; injection H as <-; reflexivity. }
-  repeat (destruct (off =? _);
-          [ repeat (destruct (negb _); [discriminate|]);
-            intro H; injection H as <-; reflexivity |]).
-  discriminate.
+  (* Peel the decode one guard at a time -- each [destruct] leaves the arm
+     and the rest of the chain, so this is linear, not exponential.  Every
+     arm answers [Some] of a state built from [v]'s own disk (the ignored
+     per-queue writes give back [v] itself), and the only [None] left is the
+     offset this device has no register at. *)
+  repeat (match goal with
+          | |- (if ?b then _ else _) = Some _ -> _ => destruct b
+          end);
+    first [ discriminate | intro H; injection H as <-; reflexivity ].
 Qed.
 
 (* ... and the two writes the driver makes while the queue is LIVE leave the
@@ -608,7 +740,7 @@ Proof.
   unfold vio_cfg_stable. intro H.
   apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
     unfold virtio_write; cbv zeta.
-  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
+  - (* QUEUE_NOTIFY is accepted at every value now, so there is no guard *)
     intro He; injection He as <-; reflexivity.
   - intro He; injection He as <-; reflexivity.
 Qed.
@@ -621,7 +753,7 @@ Proof.
   unfold vio_cfg_stable. intro H.
   apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
     unfold virtio_write; cbv zeta.
-  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
+  - (* QUEUE_NOTIFY is accepted at every value now, so there is no guard *)
     intro He; injection He as <-; reflexivity.
   - intro He; injection He as <-; reflexivity.
 Qed.
@@ -639,10 +771,12 @@ Proof.
   destruct (off =? vio_off_status).
   { destruct (bv_unsigned w =? 0); intro H; injection H as <-;
       [ by left | right; by split ]. }
-  repeat (destruct (off =? _);
-          [ repeat (destruct (negb _); [discriminate|]);
-            intro H; injection H as <-; right; by split |]).
-  discriminate.
+  (* the same linear peel as [virtio_write_disk]: every arm below the status
+     register answers [Some] of a state with [v]'s own cache *)
+  repeat (match goal with
+          | |- (if ?b then _ else _) = Some _ -> _ => destruct b
+          end);
+    first [ discriminate | intro H; injection H as <-; right; by split ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1284,6 +1418,13 @@ Record vio_req := VioReq {
   vr_buf    : Arch.pa;  (* data buffer *)
   vr_len    : bv 32;    (* data length *)
   vr_status : Arch.pa;  (* the one-byte status the device must write *)
+  (* ...and whether the DATA descriptor is device-WRITABLE, which is what
+     decides how much of the chain the device may write and therefore what
+     goes in the used element's [len].  It is a property of the descriptor
+     flags, not of the request type: an unrecognised type published through a
+     read-shaped chain has a writable data buffer the device simply does not
+     fill. *)
+  vr_wr     : bool;
 }.
 
 Definition req_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : option vio_req :=
@@ -1293,7 +1434,8 @@ Definition req_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : option vio_req :=
       (* the header: type:4 reserved:4 sector:8 *)
       Some (VioReq h (view_word mv (vd_addr d0) 4)
                      (view_word mv (pa_off (vd_addr d0) 8) 8)
-                     (vd_addr d1) (vd_len d1) (vd_addr d2))
+                     (vd_addr d1) (vd_len d1) (vd_addr d2)
+                     (vd_has d1 vring_desc_f_write))
   end.
 
 Lemma req_at_chain (c : virtio_cfg) (mv : vmem) (i : bv 16) :
@@ -1312,13 +1454,33 @@ Qed.
    a disk READ), the status byte, the used-ring element, and the used index.
    Ordering the index bump last is what the driver's completion test relies
    on, and doing it all atomically gives exactly that. *)
+(* THE USED ELEMENT'S [len] IS THE DEVICE-WRITABLE PART OF THE CHAIN: the
+   status byte, plus the data buffer when the driver marked that descriptor
+   WRITABLE.  So a disk READ reports 513 and a disk WRITE reports 1, which is
+   what the hardware does; the model used to report the DATA descriptor's
+   length in both directions (finding 4) -- 512 where the hardware says 1.
+   Nothing in this tree noticed because xv6's driver ignores the field; a
+   driver that used it to learn how much of a partial read arrived would have
+   been verified against a device that does not exist.
+
+   THE DISCRIMINATOR IS THE DESCRIPTOR FLAG, NOT THE REQUEST TYPE, and that
+   is the whole subtlety: an unrecognised type or a FLUSH published through a
+   read-shaped chain has a writable data buffer that the device never fills,
+   and the hardware still counts it (DiskErr.v measures exactly that).  The
+   spec's "number of bytes WRITTEN" would say 1 there; every real device
+   reports the writable segment's length instead, and a model that reported 1
+   would produce a value the hardware does not -- which is the defect this
+   finding was about, merely relocated. *)
+Definition vreq_used_len (r : vio_req) : bv 32 :=
+  if vr_wr r then Z_to_bv 32 (bv_unsigned (vr_len r) + 1) else Z_to_bv 32 1.
+
 Definition virtio_used_writes (c : virtio_cfg) (ui : bv 16) (r : vio_req)
   : gmap Arch.pa (bv 8) :=
   let qnum := bv_unsigned (vc_qnum c) in
   let slot := bv_unsigned ui mod qnum in
   let elem := pa_off (vc_used c) (vq_used_ring_off + vq_used_elem_size * slot) in
   let m1 := write_bytes ∅ elem 4 (Z_to_bv 32 (bv_unsigned (vr_head r))) in
-  let m2 := write_bytes m1 (pa_off elem 4) 4 (vr_len r) in
+  let m2 := write_bytes m1 (pa_off elem 4) 4 (vreq_used_len r) in
   write_bytes m2 (pa_off (vc_used c) vq_idx_off) 2 (bv_add ui (Z_to_bv 16 1)).
 
 Definition byte_zero : bv 8 := Z_to_bv 8 0.
@@ -1495,7 +1657,7 @@ Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
               (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
               (bv_add (v_seen v) (Z_to_bv 16 1))
               (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v)
-              (v_cache v) false in
+              (v_cache v) false (v_cap v) in
   if bv_unsigned (vr_type r) =? virtio_blk_t_in then
     (* read the disk: the device WRITES the driver's buffer, READ-YOUR-WRITES *)
     (vd, write_byte_list ws (vr_buf r) (disk_read (cache_view v) doff n))
@@ -1657,7 +1819,7 @@ Definition virtio_capture_step (v : virtio_state) (mv : vmem)
            if negb (bv_unsigned (vr_type r) =? virtio_blk_t_out) then None
            else if v_taken v then None
            else Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
-                        (v_disk v) (vreq_cache mv r ∪ v_cache v) true)
+                        (v_disk v) (vreq_cache mv r ∪ v_cache v) true (v_cap v))
        end.
 
 (* THE inversion the field lemmas run on. *)
@@ -1666,7 +1828,7 @@ Lemma virtio_capture_step_shape (v : virtio_state) (mv : vmem)
   virtio_capture_step v mv = Some v' ->
   exists r, req_at (v_cfg v) mv (v_seen v) = Some r
     /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
-              (v_disk v) (vreq_cache mv r ∪ v_cache v) true.
+              (v_disk v) (vreq_cache mv r ∪ v_cache v) true (v_cap v).
 Proof.
   unfold virtio_capture_step.
   destruct (negb (virtio_pending v mv)); [discriminate|].
@@ -1804,7 +1966,7 @@ Definition virtio_drain_step (v : virtio_state) (s : Z) : option virtio_state :=
   | Some bs =>
       Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
               (disk_write (v_disk v) (virtio_sector_size * s) bs)
-              (delete s (v_cache v)) (v_taken v))
+              (delete s (v_cache v)) (v_taken v) (v_cap v))
   end.
 
 Lemma virtio_drain_step_shape (v : virtio_state) (s : Z) (v' : virtio_state) :
@@ -1812,7 +1974,7 @@ Lemma virtio_drain_step_shape (v : virtio_state) (s : Z) (v' : virtio_state) :
   exists bs, v_cache v !! s = Some bs
     /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
               (disk_write (v_disk v) (virtio_sector_size * s) bs)
-              (delete s (v_cache v)) (v_taken v).
+              (delete s (v_cache v)) (v_taken v) (v_cap v).
 Proof.
   unfold virtio_drain_step.
   destruct (v_cache v !! s) as [bs|] eqn:Hbs; [|discriminate].
@@ -2276,7 +2438,7 @@ Lemma virtio_drains_cache_of (v : virtio_state) (mv : vmem) (r : vio_req)
   v_cache v = vreq_cache_of mv r is ->
   virtio_drains v (vreq_key r <$> is)
   = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
-            (wr_foldl (vreq_wr mv r) is (v_disk v)) ∅ (v_taken v)).
+            (wr_foldl (vreq_wr mv r) is (v_disk v)) ∅ (v_taken v) (v_cap v)).
 Proof.
   intro Hout. revert v. induction is as [|i is IH]; intros v Hnd Hc.
   - rewrite fmap_nil. cbn [virtio_drains]. unfold wr_foldl. cbn [foldl].
@@ -2304,15 +2466,15 @@ Proof.
                            (disk_write (v_disk v)
                               (virtio_sector_size * vreq_key r i)
                               (wr_sector_bytes (vreq_wr mv r) i))
-                           (delete (vreq_key r i) (v_cache v)) (v_taken v))).
+                           (delete (vreq_key r i) (v_cache v)) (v_taken v) (v_cap v))).
     { unfold virtio_drain_step. by rewrite Hlk. }
     rewrite fmap_cons. cbn [virtio_drains]. rewrite Hd.
     rewrite (IH (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
                    (disk_write (v_disk v) (virtio_sector_size * vreq_key r i)
                       (wr_sector_bytes (vreq_wr mv r) i))
-                   (delete (vreq_key r i) (v_cache v)) (v_taken v))
+                   (delete (vreq_key r i) (v_cache v)) (v_taken v) (v_cap v))
                Hnd' Hrest).
-    cbn [v_cfg v_isr v_seen v_used_idx v_disk v_taken].
+    cbn [v_cfg v_isr v_seen v_used_idx v_disk v_taken v_cap].
     rewrite (vreq_sector_write mv r i (v_disk v) Hout).
     unfold wr_foldl. cbn [foldl]. reflexivity.
 Qed.
@@ -2327,7 +2489,7 @@ Lemma virtio_capture_drain_all (v : virtio_state) (mv : vmem) (r : vio_req)
   v_cache v = vreq_cache mv r ->
   virtio_drains v (vreq_key r <$> is)
   = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
-            (wr_apply (vreq_wr mv r) (v_disk v)) ∅ (v_taken v)).
+            (wr_apply (vreq_wr mv r) (v_disk v)) ∅ (v_taken v) (v_cap v)).
 Proof.
   intros Hout Hperm Hc.
   assert (Hnd : NoDup is) by (rewrite Hperm; apply NoDup_seq).
@@ -2390,9 +2552,9 @@ Definition virtio_slot_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
   forall mv : vmem, mem_view ctl mv ->
     virtio_chain_ok c mv i = true
     /\ forall (isr : bv 32) (ui : bv 16) (dk : Z -> bv 8)
-              (ca : gmap Z (list (bv 8))) (tk : bool)
+              (ca : gmap Z (list (bv 8))) (tk : bool) (cp : bv 64)
               (v' : virtio_state) (w : gmap Arch.pa (bv 8)),
-         virtio_req_step (VirtioState c isr i ui dk ca tk) mv = Some (v', w) ->
+         virtio_req_step (VirtioState c isr i ui dk ca tk cp) mv = Some (v', w) ->
          dom w ⊆ D /\ dom w ## dom ctl.
 
 Definition virtio_queue_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
@@ -2476,11 +2638,11 @@ Proof.
   assert (Hsplit : virtio_req_step
                      (VirtioState (v_cfg v) (v_isr v) (v_seen v)
                                   (v_used_idx v) (v_disk v) (v_cache v)
-                                  (v_taken v)) mv
+                                  (v_taken v) (v_cap v)) mv
                    = Some (v', w)).
   { rewrite <- virtio_state_eta. exact Hstep. }
   destruct (proj2 (Hslot mv Hv) (v_isr v) (v_used_idx v) (v_disk v)
-              (v_cache v) (v_taken v) v' w Hsplit)
+              (v_cache v) (v_taken v) (v_cap v) v' w Hsplit)
     as [Hdw Hdisj].
   split; [exact Hdw|]. split; [exact Hdisj|].
   rewrite (virtio_req_step_cfg _ _ _ _ Hstep),
@@ -2533,8 +2695,22 @@ Qed.
 (* 8. Power-on state: reset configuration, empty interrupt, blank disk.    *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE CAPACITY THE BOARD ATTACHES, in 512-byte sectors, and the one number
+   in this file that is a property of the MACHINE rather than of the device:
+   the model's [v_disk] is a total function, so the medium's size has to come
+   from outside it.  This is the size of the image the conformance harness's
+   `-drive` presents (tools/vtest/vtest.py, 64 KB); a machine that attaches a
+   different image sets the field, which is what [set_vcap] is for.  No proof
+   reads it -- xv6's driver never asks the device how big the disk is. *)
+Definition virtio_capacity0 : Z := 128.
+
 Definition virtio0_state : virtio_state :=
-  VirtioState virtio_cfg0 zero32 zero16 zero16 (fun _ => byte_zero) ∅ false.
+  VirtioState virtio_cfg0 zero32 zero16 zero16 (fun _ => byte_zero) ∅ false
+              (Z_to_bv 64 virtio_capacity0).
+
+Definition set_vcap (v : virtio_state) (cap : bv 64) : virtio_state :=
+  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v) (v_disk v)
+              (v_cache v) (v_taken v) cap.
 
 Lemma virtio0_not_live : virtio_live (v_cfg virtio0_state) = false.
 Proof. reflexivity. Qed.
@@ -2575,7 +2751,8 @@ Proof. repeat split; reflexivity. Qed.
    queue, and the driver has selected queue 0 by then. *)
 Lemma virtio_queue_num_max_read (v : virtio_state) :
   bv_unsigned (vc_qsel (v_cfg v)) = 0 ->
-  virtio_read v vio_off_queue_num_max = Some (Z_to_bv 32 8).
+  virtio_read v vio_off_queue_num_max
+  = Some (Z_to_bv 32 virtio_queue_num_max).
 Proof. intro H. unfold virtio_read. cbv zeta. rewrite H. reflexivity. Qed.
 
 (* "ensure queue 0 is not in use": after the reset command it is not *)
@@ -2625,8 +2802,9 @@ Definition virtio_init_post (v : virtio_state) (dl dh al ah ul uh : bv 32)
                          (Z_to_bv 32 8) true
                          (set_hi (set_lo zero64 dl) dh)
                          (set_hi (set_lo zero64 al) ah)
-                         (set_hi (set_lo zero64 ul) uh))
-              zero32 zero16 zero16 (v_disk v) ∅ false.
+                         (set_hi (set_lo zero64 ul) uh)
+                         zero32 zero32 zero32 zero32)
+              zero32 zero16 zero16 (v_disk v) ∅ false (v_cap v).
 
 (* The same configuration with the queue addresses named DIRECTLY.  The driver
    programs each as two 32-bit halves, and [set_lo_hi_id] reassembles them, so a
@@ -2634,12 +2812,12 @@ Definition virtio_init_post (v : virtio_state) (dl dh al ah ul uh : bv 32)
    the half-splitting into its postcondition. *)
 Definition virtio_init_cfg (pd pav pu : Arch.pa) : virtio_cfg :=
   VirtioCfg (Z_to_bv 32 15) (Z_to_bv 32 0) (Z_to_bv 32 0) (Z_to_bv 32 8) true
-            pd pav pu.
+            pd pav pu zero32 zero32 zero32 zero32.
 
 Lemma virtio_init_post_cfg (v : virtio_state) (pd pav pu : Arch.pa) :
   virtio_init_post v (lo32 pd) (hi32 pd) (lo32 pav) (hi32 pav) (lo32 pu) (hi32 pu)
   = VirtioState (virtio_init_cfg pd pav pu) zero32 zero16 zero16 (v_disk v)
-      ∅ false.
+      ∅ false (v_cap v).
 Proof.
   unfold virtio_init_post, virtio_init_cfg. by rewrite !set_lo_hi_id.
 Qed.

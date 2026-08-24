@@ -53,6 +53,7 @@ Definition ident_agree_offs : list nat :=
    20;  (* VendorID        0x554d4551 *)
    28;  (* Status after ACKNOWLEDGE|DRIVER   3 *)
    32;  (* Status after FEATURES_OK          11 -- the bit STUCK *)
+   36;  (* QueueNumMax at QueueSel = 0    1024 -- was finding 1 *)
    40;  (* QueueNumMax at QueueSel = 1       0  -- no such queue *)
    44;  (* QueueReady  at QueueSel = 1       0 *)
    48;  (* QueueReady  at QueueSel = 0, before  0 *)
@@ -65,7 +66,6 @@ Definition ident_agree_offs : list nat :=
 
 Definition ident_diverge_offs : list nat :=
   [24;  (* DeviceFeatures                     -- finding 2 *)
-   36;  (* QueueNumMax at QueueSel = 0        -- finding 1 *)
    72]%nat. (* DeviceFeatures again, after the reset -- finding 2 *)
 
 (* ---------------------------------------------------------------------- *)
@@ -100,8 +100,8 @@ Proof. solve_vtest ident_expect. Qed.
 (*    simplification is the right shape.                                    *)
 (* ---------------------------------------------------------------------- *)
 
-Definition ident_model_diverging : list Z := [0xa00; 8; 0xa00].
-Definition ident_qemu_diverging  : list Z := [0x30006e54; 1024; 0x30006e54].
+Definition ident_model_diverging : list Z := [0xa00; 0xa00].
+Definition ident_qemu_diverging  : list Z := [0x30006e54; 0x30006e54].
 
 Lemma disk_ident_model_diverging :
   (fun o => res_word ident_run o) <$> ident_diverge_offs = ident_model_diverging.

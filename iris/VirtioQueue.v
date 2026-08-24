@@ -649,7 +649,7 @@ Definition vslot_post (v : virtio_state) (sl : vslot) : virtio_state :=
               (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
               (bv_add (v_seen v) (Z_to_bv 16 1))
               (bv_add (v_used_idx v) (Z_to_bv 16 1))
-              (v_disk v) (v_cache v) false.
+              (v_disk v) (v_cache v) false (v_cap v).
 
 (* THE SLOT'S WRITE IDENTITY (claude-notes/design/fs-log.md stage 4 phase
    C2a): what this request does to the disk image, as the pure
@@ -1633,13 +1633,13 @@ Proof.
       * unfold virtio_chain_ok. unfold req_at in Hreq.
         destruct (chain_at c mv (wrap16 p)) as [[[[h d0] d1] d2]|];
           [reflexivity | discriminate].
-      * intros isr ui dk ca tk v' w Hstep.
+      * intros isr ui dk ca tk cp v' w Hstep.
         destruct (vslot_req_step c p sl pin mv
-                    (VirtioState c isr (wrap16 p) ui dk ca tk) v' w
+                    (VirtioState c isr (wrap16 p) ui dk ca tk cp) v' w
                     Hslot Hvpin eq_refl eq_refl Hstep) as [_ Hw].
         cbn [v_used_idx] in Hw. subst w.
         pose proof (vslot_writes_dom_sub c p sl pin ui
-                      (cache_view (VirtioState c isr (wrap16 p) ui dk ca tk))
+                      (cache_view (VirtioState c isr (wrap16 p) ui dk ca tk cp))
                       (vpo_qnum _ _ _ Hok) Hslot) as Hsub.
         split.
         -- etransitivity; [ exact Hsub | ]. apply union_least.
@@ -1780,7 +1780,7 @@ Lemma vproto_capture_det (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     slot_pin_ok c (vp_nc pr) sl pin /\
     vs_is_out sl = true /\ v_taken v = false /\
     v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
-           (v_disk v) (vslot_cache sl ∪ v_cache v) true.
+           (v_disk v) (vslot_cache sl ∪ v_cache v) true (v_cap v).
 Proof.
   intros Hok Hcfg Hseen Hview Hstep.
   destruct (virtio_capture_step_shape v mv v' Hstep) as (r & Hr & Hv').
@@ -1822,7 +1822,7 @@ Lemma vproto_drain_det (c : virtio_cfg) (p : nat) (sl : vslot)
     /\ v_cache v !! s = Some (wr_sector_bytes (vs_wr sl) i)
     /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
               (wr_apply (wr_sector (vs_wr sl) i) (v_disk v))
-              (delete s (v_cache v)) (v_taken v).
+              (delete s (v_cache v)) (v_taken v) (v_cap v).
 Proof.
   intros Hslot Hdom Hsub Hstep.
   destruct (virtio_drain_step_shape v s v' Hstep) as (bs & Hbs & Hv').

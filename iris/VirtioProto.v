@@ -395,7 +395,7 @@ Lemma virtio_used_writes_unfold (c : virtio_cfg) (ui : bv 16) (r : vio_req) :
       (write_bytes
          (write_bytes ∅ (used_elem_at c ui) 4
             (Z_to_bv 32 (bv_unsigned (vr_head r))))
-         (pa_off (used_elem_at c ui) 4) 4 (vr_len r))
+         (pa_off (used_elem_at c ui) 4) 4 (vreq_used_len r))
       (used_idx_pa c) 2 (bv_add ui (Z_to_bv 16 1)).
 Proof.
   intro Hq. unfold virtio_used_writes, used_elem_at, used_idx_pa. cbv zeta.
@@ -414,7 +414,7 @@ Proof.
   rewrite (write_bytes_lookup_out _ (used_idx_pa c) 2
              (bv_add ui (Z_to_bv 16 1)) x H2).
   rewrite (write_bytes_lookup_out _ (pa_off (used_elem_at c ui) 4) 4
-             (vr_len r) x).
+             (vreq_used_len r) x).
   2:{ intro Hc. apply pa_range_elim in Hc as (k & Hk & ->). apply H8.
       rewrite pa_off_add. apply pa_range_intro.
       change (N.to_nat 4) with 4%nat in Hk. change (Z.to_nat 4) with 4%nat. lia. }
@@ -441,7 +441,7 @@ Proof.
       exact (used_off_ne c (4 + 8 * (bv_unsigned ui `mod` 8)) 2 j k
                ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) Heq). }
   rewrite (write_bytes_lookup_out _ (pa_off (used_elem_at c ui) 4) 4
-             (vr_len r) (pa_add (used_elem_at c ui) j)).
+             (vreq_used_len r) (pa_add (used_elem_at c ui) j)).
   2:{ intro Hc. apply pa_range_elim in Hc as (k & Hk & Heq).
       change (N.to_nat 4) with 4%nat in Hk.
       exact (pa_add_off4_ne (used_elem_at c ui) j k Hj Hk Heq). }

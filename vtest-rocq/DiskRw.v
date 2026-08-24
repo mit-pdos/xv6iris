@@ -22,15 +22,15 @@ Definition rw_run : option mstate := run_until 20000 (start_dma disk_rw_text).
 (* result-region offsets, mirroring tools/vtest/tests/disk_rw.S *)
 Definition agree_offs : list nat :=
   [4;   (* progress marker: 3 = both requests completed *)
+   8;   (* QueueNumMax                     1024 -- was finding 1 *)
    12;  (* Status read back after FEATURES_OK *)
    20; 24; 28; 36;   (* write: status byte, used.idx, used.ring[0].id, ISR *)
-   40; 44; 48; 56]%nat.  (* read:  the same four *)
+   32;  (* write: used.ring[0].len            1 -- was finding 4 *)
+   40; 44; 48; 56;   (* read:  the same four *)
+   52]%nat. (* read:  used.ring[1].len       513 -- was finding 4 *)
 
 Definition diverge_offs : list nat :=
-  [8;   (* QueueNumMax *)
-   16;  (* the negotiated feature word *)
-   32;  (* write: used.ring[0].len *)
-   52]%nat. (* read:  used.ring[1].len *)
+  [16]%nat.  (* the negotiated feature word -- finding 2 *)
 
 (* ---------------------------------------------------------------------- *)
 (* 1. What agrees -- and it is everything the protocol turns on.           *)
@@ -61,8 +61,8 @@ Proof. solve_vtest rw_expect. Qed.
 (*    give.                                                                 *)
 (* ---------------------------------------------------------------------- *)
 
-Definition rw_model_diverging : list Z := [8; 0; 512; 512].
-Definition rw_qemu_diverging  : list Z := [1024; 25684; 1; 513].
+Definition rw_model_diverging : list Z := [0].
+Definition rw_qemu_diverging  : list Z := [25684].
 
 Lemma disk_rw_model_diverging :
   (fun o => res_word rw_run o) <$> diverge_offs = rw_model_diverging.
