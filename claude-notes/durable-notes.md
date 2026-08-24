@@ -186,6 +186,47 @@ literal-sized list should be `Typeclasses Opaque` from the day it is
 written**, for the same reason `FsImg.fs_bmap_set` is `Global Opaque`
 (the conversion-checker twin of this trap, elsewhere in this file).
 
+## AN INVARIANT THAT HAS TO BE RE-BASED MUST STATE THAT ITS BODY OWNS ITS
+## OWN MAP — AN EXISTENTIAL BODY CANNOT MOVE A `ghost_map` AUTHORITY
+
+A `ghost_map` authority moves ONLY where its elements are in hand:
+`● B ⤳ ● B'` is not frame-preserving (a frame `◯ {[a := (1, v)]}` at a
+changed address refutes it), so a resource `Q` that is supposed to support
+
+    ghost_map_auth g 1 B -∗ Q ==∗ ghost_map_auth g 1 B' ∗ Q
+
+must OWN the element at every address where `B` and `B'` differ. **That is
+a lower bound on `Q`, and an existentially-quantified body does not meet
+it**: `∃ S Br, <nested predicates over S> ∗ <elements of Br>` says nothing
+about which elements it owns *relative to the auth's map*, so no such step
+is derivable from it, however plausible the intended instance.
+
+The check is two lines, and it is worth writing before designing around a
+body: any `Q` that supports the step is refuted by an OUTSIDE holder of a
+changed address's element, so if `Q` is satisfiable alongside one, the step
+is not provable.
+
+```coq
+Lemma step_forces_the_element g B B' Q a v v' :
+  B' !! a = Some v' -> v <> v' ->
+  (ghost_map_auth g 1 B -∗ Q ==∗ ghost_map_auth g 1 B' ∗ Q) -∗
+  ghost_map_auth g 1 B -∗ a ↪[g] v -∗ Q ==∗ False.
+Proof.
+  iIntros (Hb' Hne) "Hstep Ha Hel HQ".
+  iMod ("Hstep" with "Ha HQ") as "[Ha _]".
+  iDestruct (ghost_map_lookup with "Ha Hel") as %Hlk.
+  rewrite Hb' in Hlk. iPureIntro. congruence.
+Qed.
+```
+
+The worked instance is the durable file system's `P_wf`
+(`design/fs-state.md` §4): a flat `[∗ map] a ↦ v ∈ B, a ↪[g] v` supports an
+unconditional re-base precisely BECAUSE it is the completeness statement,
+and every richer body proposed to replace it has to keep that property —
+which in turn forces every existential inside it (there: the free block
+pool's contents) to become bound data, since the body's byte map has to be
+a function of what the body names.
+
 ## A LEMMA'S `` `{...}`` BINDER LIST MUST MATCH THE DEFINITION IT IS ABOUT
 
 Stating a projection out of a big bundled `iProp` with a SHORTER
