@@ -472,6 +472,40 @@ permits (`out ≤ 3`). The full account with the lemma names is fs-state.md
   adding only a quiescence token so `log_psi_commit` is demanded at
   `out = 0` only.
 
+**AND THE OBJECT-GRANULAR POOL IS INERT AT THE DURABLE READING — SO WHAT
+THE COMMIT NEEDS FROM THE CLIENT IS A PURE FACT, NOT A BUNDLE OF FUPDS
+(3a-obj, `iris/FsDurWire.v`).** `FsDurObj`'s algebra is stated over an
+arbitrary reading `R` and its concrete lemmas over an arbitrary `Γ`, and
+nothing there instantiates `Γ` at the DURABLE view. Once you do, the pending
+entry `dpend R o (x,x') := R o x ==∗ R o x'` cannot be RUN: an object's
+durable resources are `ghost_map` elements (of the byte view, and of the top
+map for an inode slot), moving one needs the AUTHORITY, and completeness
+puts the authority and every element inside `P_wf` — which is exactly the
+configuration the commit is in, since the permit lends both to the step.
+`dpend_dur_blk_False` / `dpool_run_dur_False` / `dpend_dur_slot_False`. The
+entries a client CAN hold are the ones that promise nothing (`dpend_flat_bit`
+read the other way). The full account with the lemma names is fs-state.md
+§4⅞b; the two consequences for THIS layer:
+
+- **The complement makes the finding constructive.** A body holding an
+  authority AND all of its elements rebases unconditionally
+  (`LogDefs.fs_dview_rebase` for the bytes, `FsDurWire.top_rebase` for the
+  durable top map), so nothing is lost: `FsDurWire.dstep_dec_of_bridge`
+  derives the whole durable step from the TARGET'S PURE BRIDGE and no client
+  resource at all. `P_wf`'s landed shape is therefore the flat completeness
+  (which `FsDurBytes.fs_dview_dbytes` says IS "every home block owned as a
+  `DBlk`") plus the top map's authority and ALL its fragments plus a pure
+  bridge — `FsDurWire.P_wf_dec`. **Its crash guarantee is exactly as strong
+  as its pure tie is made**; `FsDurWire.kinds_of_state` carries the four
+  clauses the encode bridge and the suppliers need, and strengthening it
+  towards `fs_state`'s local clauses is PURE work that costs the resource
+  story nothing.
+- **`fs_state` with `free_pool_at_full` is contradictory** — `fs_state`
+  already owns the bitmap block through `free_bitmap_at`'s first conjunct
+  (`FsDurWire.fs_state_full_pool_False`), so "every home block `DBlk`-owned"
+  is the flat ownership INSTEAD OF the coupled decomposition, never beside
+  it.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of

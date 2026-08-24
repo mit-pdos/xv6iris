@@ -1927,6 +1927,95 @@ this stage or 2c's body.**
         of the eleven suppliers moved, and `op_entry`/`log_state`/
         `SpecLogWrite`/`SpecEndOp` are untouched.  Audit at the three-entry
         baseline.
+- [x] **3a-obj. THE WIRING LANE: the pool is INERT at the durable reading,
+      and the PURE BRIDGE is what replaces it.**  The lane's product is
+      `iris/FsDurWire.v` (1098 lines, one `_CoqProject` row, no existing
+      statement moved, every lemma `Qed`, 22 stated theorems all `Closed
+      under the global context`); the design account is `fs-state.md`
+      §4⅞b "AS WIRED" and `crash.md`'s 3a-obj paragraph.  Steps 1 and 2 of
+      the lane's task (the `P_wf` flip to `P_wf_strict`-with-`free_pool_at_full`;
+      the pool in the payload) do NOT type-check at the durable instance;
+      the finding is constructive and the replacements are in the file as
+      terms.
+      - **(1) THE POOL CANNOT BE RUN WHERE IT IS MEANT TO BE RUN.**
+        §4⅞a's algebra is blind to the reading `R` and its concrete lemmas
+        take an arbitrary `Γ`; nothing there instantiates `Γ` at the
+        DURABLE view.  An object's durable resources are `ghost_map`
+        elements (of the byte view; of the top map, for `DSlot`), moving one
+        needs the AUTHORITY, and §4's completeness — forced, since
+        `fs_dstep` moves `ghost_map_auth γ 1 (fs_dbytes D)` — puts the
+        authority AND every element inside `P_wf`.  That is exactly the
+        configuration the commit is in (the permit lends both to the step),
+        so: `dpend_dur_blk_False` (auth + the object's own resources + the
+        entry ⊢ `False`, assuming only that the two contents differ at ONE
+        byte), `dpool_run_dur_False` (hence `dpool_run` at
+        `dres_flat (fs_gamma_D …)`, which is where `dpool_run_frame`'s
+        `Body` IS `P_wf`), `dpend_dur_slot_False` (the same wall through the
+        TOP MAP, so it is not an artefact of the byte flattening).  What
+        survives is `dpend_flat_bit` read the other way: the entries a
+        client CAN hold are the resource-free ones.
+      - **(2) AND `fs_state` WITH `free_pool_at_full` IS CONTRADICTORY** —
+        `fs_state` already owns the bitmap block through
+        `free_bitmap_at`'s first conjunct (`free_bitmap_at_full_False`,
+        `fs_state_full_pool_False`).  "Every home block `DBlk`-owned" is the
+        flat ownership INSTEAD OF the coupled decomposition, not beside it.
+      - **(3) THE COMPLEMENT, which is why the finding is constructive.**  A
+        predicate holding an authority and ALL its elements rebases to any
+        target with no client resource at all (`LogDefs.fs_dview_rebase`;
+        `top_rebase` for the durable top map).  So **`dstep_dec_of_bridge`:
+        the durable step is derivable from the TARGET'S PURE BRIDGE and
+        nothing else.**
+      - **(4) THE LANDED SHAPES.**  `dwire_bridge` (+ `dwire_bridge_close`,
+        `dobj_close` applied unchanged); `kinds_of_state`, a four-field
+        record (`ko_bitmap`/`ko_slot` the content, `ko_inodeblk`/`ko_recwf`
+        the ROLE clauses a supplier needs); `P_wf_dec` (flat completeness =
+        one `DBlk` per home block by `P_wf_dec_blocks`; the top authority
+        and ALL its fragments; the pure bridge — bit objects resource-free
+        by construction, which is 3a-val's `dres_flat` repair as the body's
+        SHAPE); `dstep_dec` + `_id`/`_trans`/`_of_bridge`;
+        `dur_stands_at_logged` (the close, at HOME MAPS); `Psi_dec` (the
+        parked payload, PURE and PERSISTENT) with `Psi_dec_commit` (§5's
+        `log_psi_commit` law) and `Psi_dec_write`/`Psi_dec_write_tied`
+        (`SpecLogWrite`'s byte-shaped premise); `bm_write_obligation` +
+        `bm_write_bytes_are_a_kind` and `di_write_obligation`, the two
+        shared-block suppliers' discharges, both PURE and both naming only
+        the writer's block and object.  Non-vacuity at a witness with a real
+        inode region (`Psi_dec_wit`, `dwire_geom_wit`).
+      - **(5) THREE INTERFACE CONSEQUENCES.**  The QUIESCENCE TOKEN §4¾a
+        asks for has NOTHING TO GATE once the payload is pure and persistent
+        — there is no intermediate object to collapse at `out = 0` — so the
+        log's interface is §5 unchanged and `SpecEndOp` grows no row.  The
+        payload's SECOND INDEX is carried and never read (`Psi_dec` ignores
+        `D0`; the conjunct that would mention it is absent, not trivial).
+        And `LogInv.log_psi_step` is NOT provable at a pure payload (a step
+        is a magic wand and carries no pure information about its target) —
+        replacement `Psi_dec_step_of_bridge` — while **`SpecLogWrite`'s AU
+        needs `FsDurDefer.lw_arm_justify`'s BLOCK-LOCAL TIE after all**: the
+        `∀ Dc` premise costs nothing at the bitmap block
+        (`bm_write_obligation` never reads `K` at the written block) and is
+        not dischargeable at an INODE block (the writer's spliced bytes
+        encode fifteen slot values it does not know, and `K` at its own
+        block is the only handle).  Not §4½a's wall (B): the tie is at ONE
+        block and the log reads it off row (b).
+      - **WHAT THE NEXT RULING MUST DECIDE** (and it is the only thing
+        blocking the flip): `P_wf_strict` contains `fs_state Γ_D S` and
+        `P_wf_dec` replaces it by flat ownership plus a pure tie, so the
+        crash guarantee is exactly as strong as `kinds_of_state` is made.
+        Strengthening it towards `fs_state`'s local clauses (`inode_local`,
+        the link accounting, the pool/used coupling) is PURE work that costs
+        the resource story nothing; the one genuinely ghost part is
+        `inode_ghost`'s link family, in a plain `gmapUR Z (authR natUR)` held
+        by `own`, rebasable by the same argument once the body holds all of
+        it.  **Then** the flip is: move `fs_dstep`'s definition ABOVE
+        `FsState` (`LogDefs` may not import it, so `LogInv` requires the new
+        file), `P_fs`'s durable conjunct becomes `P_wf_dec`, `P_fs_alloc`
+        builds it from the image through `FsDurImg`, `log_psi_step` leaves
+        `log_ctx_at`, `SpecLogWrite`'s AU gains the block-local tie, and the
+        eleven suppliers discharge `Psi_dec_write_tied` instead of
+        `log_psi_write_rebase`.  Nothing else moved: `P_wf`'s body is still
+        `LogDefs.fs_dview`, none of the eleven suppliers moved, and
+        `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash` are untouched.  Audit
+        at the three-entry baseline.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

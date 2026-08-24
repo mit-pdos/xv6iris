@@ -685,6 +685,128 @@ one-byte splice IS a list insert) → `FsBlocks.v` beside `blk_splice_whole`;
 `diblk_bytes_splice_pure` → `DinodeEnc.v`, deleting
 `InodeRegion.diblk_bytes_splice` (the same statement) in the same move.
 
+### 4⅞b. AS WIRED (3a-obj): the pool is INERT at the durable reading, and
+### the PURE BRIDGE is the whole of what the commit needs
+
+`iris/FsDurWire.v` carries every claim below as a COMPILED LEMMA, in the
+predecessors' style (statements about what a resource can say, not proof
+difficulties); all 22 stated theorems print `Closed under the global
+context`. Nothing in the tree moved; `P_wf`'s body is still
+`LogDefs.fs_dview`, none of the eleven suppliers moved, and
+`LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash` are untouched.
+
+**THE FINDING.** §4⅞a's algebra is blind to the reading `R` and its
+concrete lemmas take an arbitrary `Γ` — both load-bearing, and neither ever
+instantiates `Γ` at the DURABLE view. Do that and a pending entry cannot be
+RUN. An object's durable resources are `ghost_map` elements (of the byte
+view; of the top map, for `DSlot`); moving one needs the AUTHORITY; and
+§4's completeness — forced, since `fs_dstep` moves
+`ghost_map_auth γ 1 (fs_dbytes D)` — puts the authority AND every element
+inside `P_wf`, which is precisely the configuration the commit is in (the
+permit lends both to the step, §5). So:
+
+- `dpend_dur_blk_False` — the byte authority, the object's own durable
+  resources, and the entry, together, give `False`. Nothing about the
+  pool's other entries, the ledger, or `D` is assumed: only that the two
+  contents differ at ONE byte position, which is what "the batch wrote this
+  block" means.
+- `dpool_run_dur_False` — hence `dpool_run` at `dres_flat (fs_gamma_D …)`,
+  which is where `dpool_run_frame`'s `Body` IS `P_wf`, gives `False`. **The
+  pool cannot be run in the only place it is meant to be run.**
+- `dpend_dur_slot_False` — the same wall through the TOP MAP, so it is not
+  an artefact of the byte flattening.
+- What survives is `dpend_flat_bit` read the other way round: the entries a
+  client CAN hold are the resource-free ones, i.e. the ones that promise
+  nothing.
+
+**AND `fs_state` WITH `free_pool_at_full` IS CONTRADICTORY.**
+`FsStateBitmap.free_bitmap_at` is the bitmap BLOCK beside the pool, and the
+full pool owns every block below the count — they collide at the bitmap
+block (`free_bitmap_at_full_False`, `fs_state_full_pool_False`). "Every home
+block `DBlk`-owned" is the flat ownership INSTEAD OF the coupled
+decomposition, never beside it.
+
+**THE COMPLEMENT, AND IT MAKES THE FINDING CONSTRUCTIVE.** A predicate
+holding an authority and ALL of its elements rebases to any target with no
+client resource whatever: `LogDefs.fs_dview_rebase` for the byte view,
+`top_rebase` for the durable top map. So nothing is lost. What the commit
+needs from the client is not a bundle of fupds but the PURE fact that the
+batch's logged bytes decode to a coherent state — decision 4 promoted from a
+side condition to the whole content.
+
+**THE LANDED SHAPES.**
+
+- `dwire_bridge K D cov ls` — `dom D = fs_home_set cov ls` and every home
+  block's bytes are `kind_enc (K b)`. `dwire_bridge_close` is
+  `dobj_close` applied unchanged: two block maps with the same kinds on the
+  home set are equal, one of them `lm_logged L cov ls`.
+- `kinds_of_state S K` — a four-field record. `ko_bitmap` (the bitmap
+  block's kind IS `fss_used S`) and `ko_slot` (every inode's record at its
+  own slot, `dobj_home_slot`'s numbering) are the content; `ko_inodeblk`
+  (every inode-region block has an inode kind) and `ko_recwf` (an inode kind
+  carries well-formed records) are ROLE clauses, there because a SUPPLIER
+  needs them — see the interface finding below.
+- `P_wf_dec g Γd cov ls D` — the flat completeness `fs_dview g (fs_dbytes D)`
+  (which `FsDurBytes.fs_dview_dbytes` turns into one `DBlk` per home block,
+  `P_wf_dec_blocks`), the durable top map's authority and ALL its fragments,
+  and the pure bridge. The bit objects are resource-free BY CONSTRUCTION:
+  no clause mentions them and their values are read off the bitmap block's
+  kind. That is 3a-val's `dres_flat` repair arriving as the body's SHAPE.
+- `dstep_dec` with `_id`/`_trans`, and **`dstep_dec_of_bridge`: the durable
+  step is derivable from the TARGET'S PURE BRIDGE and nothing else.**
+  `dur_stands_at_logged` is the closing statement — at the batch's logged
+  values the durable body stands, at HOME MAPS.
+- `Psi_dec cov ls D0 Dc` — the log's parked payload, PURE and PERSISTENT.
+  `Psi_dec_commit` proves §5's `log_psi_commit` law for it;
+  `Psi_dec_write` is `SpecLogWrite`'s byte-shaped premise;
+  `Psi_dec_wit` is the model.
+- The suppliers' discharge, at the two shared block kinds:
+  `bm_write_obligation` (+ `bm_write_bytes_are_a_kind`, off
+  `bm_blk_write_enc`) and `di_write_obligation` (off `di_vals_enc`). Both
+  are PURE and both name only the writer's block and the writer's object.
+
+**THREE INTERFACE CONSEQUENCES, and the third is the one to act on.**
+
+1. **The QUIESCENCE TOKEN has nothing to gate.** §4¾a asks the log to add
+   one so `log_psi_commit` is demanded at `out = 0` only, because the
+   client's intermediate object must collapse there. With the payload pure
+   and persistent there is no intermediate object; the law holds at every
+   commit. So the log's interface is §5 UNCHANGED and `SpecEndOp` does not
+   grow a row.
+2. **The payload's SECOND INDEX is carried and never read.** `Psi_dec`
+   ignores `D0`, because the commit's step comes from the target's bridge
+   alone. The `D0` index is not wrong, it is unused — the conjunct that
+   would mention it is absent rather than trivial.
+3. **`LogInv.log_psi_step` is not provable at a pure payload**, a step being
+   a magic wand that carries no pure information about its target; its
+   replacement is `Psi_dec_step_of_bridge`, the same law with the target's
+   bridge supplied. And **`SpecLogWrite`'s AU needs the BLOCK-LOCAL TIE
+   after all**: `Psi_dec_write`'s premise is quantified over the payload's
+   index, which costs nothing at the BITMAP block (`bm_write_obligation`
+   never reads `K` at the written block — the writer needs only a kind whose
+   encoding is the bytes it is about to log, and its own bytes are a bitmap
+   encoding by its own era-side knowledge) but is NOT dischargeable at an
+   INODE block: the writer's spliced bytes encode the block's sixteen slot
+   values, fifteen of which it does not know, and the only handle on them is
+   `K` at its own block. The repair is `⌜Dc !! b = Some oldbs⌝` — exactly
+   `FsDurDefer.lw_arm_justify`'s `Dj !! b = Lg !! b`, landed there and
+   needed here. `Psi_dec_write_tied` is that form. It is NOT §4½a's wall (B):
+   the tie is at ONE block and the log reads it off row (b).
+
+**WHAT THE LANDED BODY DOES NOT SAY, and it is the next ruling's first
+question.** `P_wf_strict` contains `fs_state Γ_D S` — the durable disk IS a
+well-formed file system, with the ownership decomposition — and `P_wf_dec`
+replaces that by flat ownership plus the pure tie. Its crash guarantee is
+therefore exactly as strong as `kinds_of_state` is made, and 3a-obj leaves
+it at the four clauses the bridge and the suppliers need. Strengthening it
+is PURE work and costs the resource story nothing: `fs_state`'s content
+splits into ownership, which the flat conjunct already supplies, and local
+clauses (`inode_local`, the link accounting, the pool/used coupling), which
+are propositions about `S`. The one genuinely ghost part is
+`FsState.inode_ghost`'s link family, and it lives in a plain
+`gmapUR Z (authR natUR)` held by `own`, so it is rebasable by the same
+argument as the two maps above once the body holds all of it.
+
 ## 5. The log's interface (FS-agnostic, logically atomic)
 
 The log exposes, and knows, only this:
