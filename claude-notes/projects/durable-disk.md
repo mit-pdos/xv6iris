@@ -1615,6 +1615,19 @@ map at home blocks); 1d lands last.
             file already has through `riscvFixedGS` is the one kind this
             tree passes ambiently — `riscv_disk_name`'s precedent.
 
+      - **RATIFIED (orchestrator, 2026-08-24): (C), (D), (E)+(G), as 2c-body
+        proposed.**  `Ψ : gmap → gmap → iProp` parked at
+        `(lm_committed M, lm_logged L)`; the commit law
+        `□ ∀ D₀ Dc, Ψ D₀ Dc ==∗ Ψ Dc Dc ∗ fs_dstep γD D₀ Dc` (no lent
+        byte auth, no `bytes_home_at`); each `log_write` AU extends the
+        second index by its own step; the three Ψ-free `log_write` forms
+        retire; `P_wf` is INDEX-FREE (`∃ S Br`, top auth + top fragments +
+        `fs_state Γ_D S` + the byte bin `Br`), tied to `fr_D` only through
+        `P_disk`'s ghost-map agreement — survey (iii)'s block-indexed
+        shape is retired.  Stage 3a = the ONE red stretch: the re-index,
+        the `P_wf` flip, the eleven suppliers, the commit close; the
+        `sys_mknod` arm is 3b on top.
+
 ## Stage 3 — the vertical spike: `sys_mknod`
 
 **ORDERING RULING (2c, 2026-08-24): STAGE 3 IS NOT AFTER 2c'S BODY, IT IS
