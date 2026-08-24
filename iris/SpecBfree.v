@@ -129,12 +129,12 @@ Definition wp_bfree_gen_body
   0 <= bmapstart ->
   bmapstart ∈ cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
-  (* the block being freed: in range for the bitmap, and a covered home
-     block -- the two facts [bitmap_ok] must be re-established with, and
-     exactly what the caller's [InodeInv.blkmap_wf] already gives it *)
+  (* the block being freed: in range for the bitmap.  That is ALL bfree
+     needs of it -- it never breads the block itself, only the bitmap word
+     that covers it, so the covered-home and not-in-the-log facts the
+     caller used to hand over were dead premises and are gone
+     (durable-disk 2b-inode-3). *)
   0 <= bv_unsigned bno < size ->
-  bv_unsigned bno ∈ cov ->
-  ~ (bv_unsigned bno ∈ log_region_set logstart) ->
   (* ...and it really is a block's worth of bytes *)
   length bs = BSIZE ->
   (j < NPROC)%nat ->
@@ -254,12 +254,12 @@ Definition wp_bfree_sconf_body
   0 <= bmapstart ->
   bmapstart ∈ cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
-  (* the block being freed: in range for the bitmap, and a covered home
-     block -- the two facts [bitmap_ok] must be re-established with, and
-     exactly what the caller's [InodeInv.blkmap_wf] already gives it *)
+  (* the block being freed: in range for the bitmap.  That is ALL bfree
+     needs of it -- it never breads the block itself, only the bitmap word
+     that covers it, so the covered-home and not-in-the-log facts the
+     caller used to hand over were dead premises and are gone
+     (durable-disk 2b-inode-3). *)
   0 <= bv_unsigned bno < size ->
-  bv_unsigned bno ∈ cov ->
-  ~ (bv_unsigned bno ∈ log_region_set logstart) ->
   (* ...and it really is a block's worth of bytes *)
   length bs = BSIZE ->
   (j < NPROC)%nat ->

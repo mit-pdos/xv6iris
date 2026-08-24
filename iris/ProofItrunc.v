@@ -1065,7 +1065,6 @@ Section ItruncDLoop.
                 _ Vpr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 ltac:(destruct (bv_unsigned_in_range 32 (bm_dir bm !!! k))
                         as [Hlo _]; split; [exact Hlo | exact Hklt])
-                Hkcov Hklog
                 (Hblen k ltac:(unfold MAXFILE, NDIRECT in *; lia))
                 Hj Hgl HL3a0 HL3a1
                 Hlkbelow
@@ -1623,7 +1622,7 @@ Section ItruncELoop.
                 _ Vpr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 ltac:(destruct (bv_unsigned_in_range 32 (bm_ent bm !!! q))
                         as [Hlo _]; split; [exact Hlo | exact Hqlt])
-                Hqcov Hqlog (Hblen (NDIRECT + q)%nat
+                (Hblen (NDIRECT + q)%nat
                                     ltac:(unfold MAXFILE, NDIRECT, NINDIRECT in *;
                                           lia))
                 Hj Hgl HE3a0 HE3a1
@@ -2368,7 +2367,6 @@ Section ItruncIArm.
               Hbmcov Hbmlog
               ltac:(destruct (bv_unsigned_in_range 32 (bm_ind bm))
                       as [Hlo _]; split; [exact Hlo | exact Hilt2])
-              Hicov Hilog
               ltac:(rewrite ind_bytes_length Hentlen; reflexivity)
               Hj Hgl HC2a0 HC2a1
               Hlkbelow

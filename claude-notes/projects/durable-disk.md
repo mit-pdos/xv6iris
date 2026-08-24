@@ -929,7 +929,9 @@ map at home blocks); 1d lands last.
           takes it as its own premise, which threads up through
           `SpecIalloc` / `ProofIalloc` / `create_fresh_ty` / `ProofCreate`
           as `ireg_ty_ok (ialloc_fresh ty)` beside the `ty <> 0` those
-          contracts already took.  At boot it is `image_ty_ok`, discharged
+          contracts already took, and out through `SpecCreate` to the three
+          syscalls as `ireg_ty_ok_w ty` (the same enumeration read off the
+          type word, so the contract need not name `ialloc_fresh`).  At boot it is `image_ty_ok`, discharged
           from `FsImg.fio_type` below `ninodes` and `fs_region_free` above
           it — no new image sweep.  `ireg_withdraw` exports it, which is
           what lets the claim box's fill pay `inode_local`.
@@ -947,12 +949,25 @@ map at home blocks); 1d lands last.
           this lane: it costs those files' cones a rebuild and buys nothing
           the flip needs — `inode_local_of_ok_data` is their only consumer
           and it lives beside them.
+        - **`SpecBfree`'S TWO DEAD PREMISES ARE GONE.**
+          `bv_unsigned bno ∈ cov` and `bno ∉ log_region_set logstart` are
+          deleted from BOTH `wp_bfree_gen_body` and `wp_bfree_sconf_body`;
+          bfree never breads the freed block, only the bitmap word that
+          covers it, so neither fact was ever used.  `ProofBfree`'s two
+          `intros` and its one forwarding application drop `Hbicov Hbilog`,
+          and the three `ProofItrunc` call sites drop `Hkcov Hklog` /
+          `Hqcov Hqlog` / `Hicov Hilog`.  The producers stay (they are the
+          `blkmap_wf` coverage reads the walks use for other things).
+        - **CREATE'S CONTRACT GAINED (L5).**  `SpecCreate`'s
+          `wp_create_sconf_body` takes `InodeRegion.ireg_ty_ok_w ty` beside
+          the `bv_unsigned ty <> 0` it already took — the enumeration on
+          the type WORD, a new one-line definition beside `ireg_ty_ok` with
+          `ireg_ty_ok_of_w` the (definitional) bridge, so `SpecCreate` needs
+          no `SpecIalloc` import to state it.  All three entries pass a
+          literal and discharge it by name (`T_FILE_ty_ok`,
+          `T_DEVICE_ty_ok`, `T_DIR_ty_ok` in `SpecCreate`), so `sys_open`,
+          `sys_mkdir` and `sys_mknod` each grew exactly one argument.
       - OPEN, for the orchestrator, in the order they cost:
-        - `SpecBfree`'s two dead premises (`bv_unsigned bno ∈ cov`,
-          `bno ∉ log_region_set logstart`) and their three `ProofItrunc`
-          call-site dischargers are STILL THERE: itrunc's own walk needed
-          no edit in this lane (its contracts did not move), so the change
-          that was to carry them never happened.
         - The link family is still dropped at `BootShared` and the bundle
           still excludes the link ghosts.  Routing them is the links step's
           one-line change at that `iClear`, and its price is the

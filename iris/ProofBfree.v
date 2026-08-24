@@ -1010,7 +1010,7 @@ Section ProofBfreeMain.
   Proof.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-           Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
+           Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow.
     pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hbmcov) as [Hbmpos Hbmlt].
@@ -1835,7 +1835,7 @@ Section ProofBfreeMain.
   Proof.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-           Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
+           Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
@@ -1849,7 +1849,7 @@ Section ProofBfreeMain.
               cov logstart bmapstart size dev bno bs u false Sb e0
               pidv dq dqb m K eb b lks
               Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow
+              Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
     all: try lkbelow.
