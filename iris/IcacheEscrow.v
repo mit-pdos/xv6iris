@@ -180,7 +180,7 @@ Require Import InodeRegion.
    [link_auth], [free_pool]) -- checked. *)
 Require Import FsState.
 Require Import FsBytesGamma.
-Require Import Xv6Cameras.       (* [fs_home_set] -- [ic_loaded_open]'s row *)
+Require Import LogDefs.       (* [fs_home_set] -- [ic_loaded_open]'s row *)
 Require Import FsStateEra.
 Require Import EscrowDefs.
 Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)

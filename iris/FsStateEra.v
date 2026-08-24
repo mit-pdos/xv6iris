@@ -93,7 +93,7 @@ From iris.base_logic.lib Require Import iprop own ghost_map invariants.
    [fs_view]); the LAST import wins, so it goes FIRST and the block layer's
    spellings below shadow it back.  Every [FsStateDefs] run in this file is
    therefore written QUALIFIED. *)
-Require Import FsStateDefs.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
+Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
 Require Import FsStateInode.   (* [fs_node], [inode_local], [ind_owned], ... *)
 Require Import FsState.        (* [fsTopG], [top_frag] -- ditto *)
 Require Import FsBytesGamma.   (* [fs_gamma_L], [gamma_blk_owned]           *)
