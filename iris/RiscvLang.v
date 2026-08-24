@@ -461,16 +461,26 @@ Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
      must still refute. *)
   | DiskStepIdle : disk_step d m d m.
 
-(* The wire: propagate the PLIC's per-hart EIP level onto that hart's
-   external S-interrupt pin.  Reads [dplic] (through [dev_seip], which is
-   [plic_eip (dplic d)]) and writes one hart's register file; it needs no
-   stutter, since the arm has no premise and any hart may be chosen. *)
+(* The wires: propagate a PLIC CONTEXT's notification level onto the pin the
+   board wires it to.  Every hart has two -- context 2h+1 drives its external
+   S-interrupt pin and context 2h its M one ([DevModel.dev_seip]/[dev_meip],
+   both [plic_eip] at the corresponding context) -- so there is one arm per
+   pin.  Each reads [dplic] and writes one hart's register file; neither needs
+   a stutter, since the arms have no premises and any hart may be chosen.
+
+   BOTH pins live in [WireInv] with existential contents, which is what makes
+   a second wire arm free on the Iris side: no proof may pin a wire's value,
+   so no proof can be invalidated by the PLIC writing one. *)
 Inductive plic_step (d : dev_state) (gr : CPU -> regstate)
     : (CPU -> regstate) -> Prop :=
   | PlicStepWire (c : CPU) :
       plic_step d gr
         (<[c := register_set sig_seip
-                  (bool_to_bit (dev_seip d (fin_to_nat c))) (gr c)]> gr).
+                  (bool_to_bit (dev_seip d (fin_to_nat c))) (gr c)]> gr)
+  | PlicStepWireM (c : CPU) :
+      plic_step d gr
+        (<[c := register_set sig_meip
+                  (bool_to_bit (dev_meip d (fin_to_nat c))) (gr c)]> gr).
 
 (* ---------------------------------------------------------------------- *)
 (* 4. The language.  The program [Loop] steps ONE hart forever; which hart   *)
@@ -1363,17 +1373,19 @@ Qed.
 (* THE BATCHING LICENCE (claude-notes/design/main-cycle-port.md §5): apart
    from hart [c]'s own steps and a PowerOn's whole-machine reset, the ONLY
    thing any step of any other thread can do to hart [c]'s register file is
-   [plic_step]'s [sig_seip] wire write.  This is the meta-level soundness of
-   every batched register rule: a stretch of nodes whose registers the
-   caller owns (and [sig_seip] is not ownable -- it lives in [WireInv])
-   cannot be invalidated by interference. *)
+   one of [plic_step]'s two wire writes -- [sig_seip] or [sig_meip].  This is
+   the meta-level soundness of every batched register rule: a stretch of nodes
+   whose registers the caller owns (and NEITHER pin is ownable -- both live in
+   [WireInv]) cannot be invalidated by interference. *)
 Lemma prim_step_hart_regs_frame e g κ e' g' efs (c : CPU) :
   prim_step e g κ e' g' efs ->
   (forall gen m, e <> HartE gen c m) ->
   e <> PowerLoopE ->
   g'.(gregs) c = g.(gregs) c \/
   g'.(gregs) c = register_set sig_seip
-      (bool_to_bit (dev_seip g.(gdev) (fin_to_nat c))) (g.(gregs) c).
+      (bool_to_bit (dev_seip g.(gdev) (fin_to_nat c))) (g.(gregs) c) \/
+  g'.(gregs) c = register_set sig_meip
+      (bool_to_bit (dev_meip g.(gdev) (fin_to_nat c))) (g.(gregs) c).
 Proof.
   intros Hstep Hnot Hnp.
   destruct Hstep as
@@ -1386,9 +1398,10 @@ Proof.
   - (* another hart's node: [c] is not [cpu], so the insert misses [c] *)
     left. cbn. rewrite /insert /greg_insert.
     case_decide as Hc; [exfalso; subst c; exact (Hnot gen m eq_refl)|done].
-  - (* the wire: [sig_seip] on whichever hart the PLIC chose *)
-    destruct Hp as [c0]. cbn. rewrite /insert /greg_insert.
-    case_decide as Hc; [subst c0; by right|by left].
+  - (* a wire: [sig_seip] or [sig_meip] on whichever hart the PLIC chose *)
+    destruct Hp as [c0|c0]; cbn; rewrite /insert /greg_insert;
+      case_decide as Hc; [subst c0; by right; left|by left
+                         |subst c0; by right; right|by left].
 Qed.
 
 (* THE CORPSE STEP is always available, at every expression that carries a

@@ -160,8 +160,9 @@ would not give.
 
 ## Findings so far
 
-Five of these have been FIXED rather than recorded -- the whole UART register
-file, its interrupt-status semantics and its bus decode.  They are in
+Eight of these have been FIXED rather than recorded -- the whole UART register
+file, its interrupt-status semantics and its bus decode, and then the PLIC's
+threshold, its M contexts and its source count.  They are in
 [Findings fixed](#findings-fixed) below, with what the fix was and which test
 now passes because of it; they are kept because the point of this table is the
 register of what differential testing FOUND, not only of what is still open.
@@ -179,8 +180,6 @@ does not exist).
 | 3 | `DeviceFeaturesSel` (0x14), `DriverFeaturesSel` (0x24) | not decoded -- the store is STUCK | writable; the high feature word is `0x101`, and a full 1.x negotiation acking `VERSION_1` reaches Status 11 | incompleteness | `disk_ident_featsel`, `disk_ident_drvfsel` |
 | 4 | **`used.ring[i].len`** | `vr_len` (the data descriptor's length) in both directions | 1 for a write, 513 for a read | **defect** | `disk_rw`, `disk_order` |
 | 5 | **completion ORDER of two in-flight requests** | publication order ONLY | either order | **unsoundness** | `disk_order` |
-| 10 | **PLIC claim ignores the context THRESHOLD** | returns the masked source and clears its pending bit | returns `0`, the source stays pending | **unsoundness** (and a defect) | `plic_thresh` |
-| 11 | PLIC M-context registers (enable 0x2000, threshold 0x200000, claim 0x200004) not decoded | STUCK at the first M access | services all three | incompleteness | `plic_mctx` |
 | 13 | virtio CONFIG SPACE: capacity (0x100) and ConfigGeneration (0x0fc) | not decoded -- STUCK | capacity **128 sectors**, exactly the backing file | incompleteness | `disk_ident_cap`, `disk_ident_confgen` |
 | 14 | virtio `QueueReset` (0x0c0) and the SHM registers (0x0ac..) | not decoded -- STUCK | `QueueReset` 0; `SHMLen` all-ones | incompleteness | `disk_ident_qreset`, `disk_ident_shmsel` |
 | 15 | sub-word access anywhere in the virtio window (1- and 2-byte, read and write) | not decoded -- STUCK | reads give 0; a 1-byte Status write is a NO-OP | incompleteness | `disk_ident_rd1/rd2/wr1` |
@@ -194,7 +193,6 @@ does not exist).
 | 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
 | 24 | **THE MEMORY MODEL: the model is sequentially consistent** | one shared `gmem`, a store is global the instant it retires -- (0,0) unreachable | store-buffering gives **(0,0) in a few percent of runs**, which RVWMO permits | **UNSOUNDNESS** | `conc_sb` |
 | 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | incompleteness (harness-blocking) | `conc_amo` |
-| 12 | PLIC source 0's priority register not decoded (`plic_read`/`plic_write` gate on `0 <? off`), and `plic_nsrc` is 32 where the board has 96 | STUCK | offset 0 is read-only zero; source 32 is a real register | incompleteness | `plic_prio0` |
 
 <a id="findings-fixed"></a>
 ## Findings fixed
@@ -213,8 +211,35 @@ them are one modelling shortcut seen from different sides.
 | 8 | UART THRE interrupt: LEVEL or LATCH | a level -- the second ISR read still `0xc2` | second read `0xc1`: the read cleared it.  The latch `u_thri` arms when the transmitter falls idle, when an FCR write clears the tx FIFO, or when IER bit 1 is written while it is already idle | incompleteness | `uart_regs`, `uart_irq_tx` |
 | 9 | UART access WIDTH | width 1 only -- a 4-byte read was STUCK | `0x00000008`: the bus NARROWS to the one byte register the address names (zero-extended out, low byte in), at 2, 4 and 8 bytes, and does NOT gather registers into a word | incompleteness | `uart_width` |
 | 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received: the holding register is cleared neither by a read nor by an FCR clear, only the DR FLAG is -- and with the FIFOs ENABLED the machine answers `0`, which is the FIFO's output stage | incompleteness | `uart_rx`, `uart_dlab` |
+| 10 | **PLIC claim ignores the context THRESHOLD** | the masked source's id, and its pending bit cleared | `0`, and the source STAYS pending.  The threshold now lives in `plic_cand`, which `plic_eip` and `plic_best` both read | **unsoundness** (and a defect) | `plic_thresh` |
+| 11 | PLIC M-context registers (enable 0x2000, threshold 0x200000, claim 0x200004) | not decoded -- STUCK at the first M access | all three serviced: the PLIC is indexed by CONTEXT (`plic_nctx`, `plic_mctx`/`plic_sctx`), both halves of every hart's pair, and each context drives its own pin | incompleteness | `plic_mctx` |
+| 12 | PLIC source 0's priority register, and `plic_nsrc` = 32 against the board's 96 | STUCK at both bounds | offset 0 is read-only zero (source 0 does not exist); 96 sources, so the enable and pending bitmaps are three words each | incompleteness | `plic_prio0` |
 
-**Finding 6 was the load-bearing one, and not because of the values.**  MCR
+**Finding 10 was the serious one of the PLIC three**, and the only PLIC
+finding that was not mere incompleteness: the threshold appeared in `plic_eip`
+alone, so the model's NOTIFICATION and its CLAIM disagreed -- a source could be
+invisible to a context and still be what that context's claim register handed
+back, with its pending bit cleared on the way out.  The fix is not a special
+case in the claim but a move: the threshold went into `plic_cand`, the one
+predicate that says what a context can see, and `plic_eip` became
+`existsb (plic_cand p c)` while `plic_best` folds the same thing.  The two
+cannot disagree now because they are the same question asked twice ("is there
+one?" versus "which one?"), which `PlicThresh.v` states off the model as well
+as off the program.  It also subsumed the old `0 <? p_prio` guard -- a
+priority-0 source cannot exceed a threshold of 0 -- so the model got smaller.
+
+**Findings 11 and 12 were one change**: the PLIC stopped being indexed by hart.
+It has CONTEXTS, the board wires two to each hart (M then S), and every
+per-context register family -- enable bitmap, threshold, claim/complete -- is
+now decoded for all of them, with `dev_meip` beside `dev_seip` and a second
+wire arm in `RiscvLang.plic_step` so that an M context's notification reaches
+its pin rather than being computed and dropped.  Decoding the registers while
+leaving the pin unmodelled would have been the same half-fix as a
+stored-but-inert control bit.  The source count went with it: 96 sources means
+three enable words per context and three pending words, which is what makes
+source 32's priority register (`plic_prio0` +20) a register at all.
+
+**Finding 6 was the load-bearing one of the UART five, and not because of the values.**  MCR
 bit 4 is LOOPBACK, so a readable MCR that ignored bit 4 would have been worse
 than the register that read as zero: a driver's self-test would have put its
 byte on the WIRE, which is a thing the hardware never does -- turning an

@@ -301,7 +301,7 @@ Section ProofPlicinithart.
               ltac:(rewrite HN5sw HN5a5; intros pq Hpq;
                     eexists; split;
                     [ exact (ph_senable_write _ pq _ Hhart)
-                    | apply plic_ok_hupd_enable;
+                    | apply plic_ok_wupd_enable;
                       [ exact Hpq | exact plic_senable_ok_mask ] ])
               with "Hcg Hpc [] Hdinv").
     { iApply (phi_1a with "Htext"). }

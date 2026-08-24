@@ -1,34 +1,27 @@
-/* plic_mctx -- the M-CONTEXT registers, which the model does not decode.
+/* plic_mctx -- the M-CONTEXT registers.
  *
  * The virt machine's PLIC gives every hart TWO contexts: context 2h is the
- * M-mode one and context 2h+1 the S-mode one.  [DevModel]'s decode
- * ([plic_senable_hart], [plic_sthresh_hart], [plic_sclaim_hart]) recognises
- * only the second of each pair -- enable at 0x2080 + h*0x100, threshold at
- * 0x201000 + h*0x2000, claim/complete at 0x201004 + h*0x2000 -- because
- * that is all xv6 uses.  Hart 0's M-context registers sit one stride BELOW
- * each of those, at 0x2000, 0x200000 and 0x200004, and [plic_read] /
- * [plic_write] answer [None] for all three, which is a STUCK machine.
+ * M-mode one and context 2h+1 the S-mode one.  The model's decode used to
+ * recognise only the second of each pair -- enable at 0x2080 + h*0x100,
+ * threshold at 0x201000 + h*0x2000, claim/complete at 0x201004 + h*0x2000 --
+ * because that is all xv6 uses, and hart 0's M-context registers sit one
+ * stride BELOW each of those, at 0x2000, 0x200000 and 0x200004.  All three
+ * fell through to [None], which is a STUCK machine (finding 11).
  *
- * So this program does its S-context work first, to show the window and the
- * program are otherwise fine, and then makes ONE M-context access.  A stuck
- * run is over, so the M-context threshold and claim below are for the QEMU
- * capture's benefit -- the model never reaches them.
+ * [DevModel]'s PLIC is now indexed by CONTEXT rather than by hart, so the M
+ * registers are the S registers' equals and every field below agrees.  The
+ * program writes DIFFERENT thresholds to the two contexts of hart 0 (3 and
+ * 2) precisely so that a model which aliased the pair would be caught.
  *
- * WHAT KIND OF FINDING THIS IS: incompleteness, not unsoundness.  Nothing
- * proved about xv6 is weakened by it -- the system theorem proves xv6 never
- * gets stuck, so these states are simply never reached.  What it costs is
- * reach: an M-mode interrupt handler, or a machine-mode bootloader that
- * parks the M context by writing its threshold, cannot be described in this
- * model at all.
  */
 /* vtest: repeat=1 */
 #include "abi.h"
 
 #define PLIC        0x0c000000
-#define P_SENABLE   0x2080          /* hart 0, S context -- decoded */
+#define P_SENABLE   0x2080          /* hart 0, S context = context 1 */
 #define P_STHRESH   0x201000
 #define P_SCLAIM    0x201004
-#define P_MENABLE   0x2000          /* hart 0, M context -- NOT decoded */
+#define P_MENABLE   0x2000          /* hart 0, M context = context 0 */
 #define P_MTHRESH   0x200000
 #define P_MCLAIM    0x200004
 
@@ -44,7 +37,7 @@ _vtest_body:
     mv   s10, ra
     li   s2, PLIC
 
-/* ---- the S context, which the model DOES decode ---- */
+/* ---- the S context ---- */
     li   t1, P_SENABLE
     add  t1, s2, t1
     li   t0, 0x402
@@ -64,7 +57,7 @@ _vtest_body:
     li   t1, P_MENABLE
     add  t1, s2, t1
     li   t0, 0x402
-    sw   t0, 0(t1)                   /* <-- THE MODEL IS STUCK HERE */
+    sw   t0, 0(t1)
     lw   t0, 0(t1)
     sw   t0, R_MENAB(s11)
     li   t1, P_MTHRESH

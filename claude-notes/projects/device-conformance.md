@@ -3,16 +3,16 @@
 ## STATUS (2026-08-24)
 
 LANDED and green: `make vtest`, **56 test programs** across six areas (`core`,
-`disk`, `uart`, `plic`, `conc`, `pt`), and **21 open divergences from real
-hardware, THREE of them unsoundnesses** plus one that is unsound in direction
+`disk`, `uart`, `plic`, `conc`, `pt`), and **18 open divergences from real
+hardware, TWO of them unsoundnesses** plus one that is unsound in direction
 only (finding 26, the direct-mapped TLB), beside a long list of confirmations
-and **five findings FIXED** (6, 7, 8, 9, 23 -- the whole 16550 register file,
-its interrupt-status semantics and its bus decode; they keep their numbers and
-their values in the README's "Findings fixed" table).
-Beyond those five the effort still changes nothing in the model: its output is
-a register of findings plus the machinery that keeps producing them.
+and **eight findings FIXED** (6, 7, 8, 9, 23 -- the whole 16550 register file,
+its interrupt-status semantics and its bus decode -- and 10, 11, 12, the
+PLIC's threshold, its M contexts and its source count; they keep their numbers
+and their values in the README's "Findings fixed" table).
 
-**The three unsoundnesses, in the order they matter:**
+**The two remaining unsoundnesses, in the order they matter** (the third,
+finding 10, is fixed -- see below):
 
 0. **Page-table translation is now covered** (`pt_*`, nine tests): the walk,
    the fault matrix with `stval` byte offsets, three-level and megapage
@@ -32,24 +32,33 @@ a register of findings plus the machinery that keeps producing them.
 2. **The virtqueue is served strictly in publication order** (finding 5,
    `disk_order`), where a real device completes in any order -- which is why
    `virtio_disk_intr` reads the used element's id at all.
-3. **`plic_claim` ignores the context threshold** (finding 10, `plic_thresh`),
-   contradicting the model's own `plic_eip`.  Not reachable through xv6's own
-   code, but `PlicPlan.v` leaves the threshold free, so the invariant admits
-   exactly the disagreeing states.
 
 The FINDINGS TABLE in [`tools/vtest/README.md`](../../tools/vtest/README.md)
 is the authority and is maintained; this file summarises and links.
 
-**The one place the effort has CHANGED the model so far is the UART**, and the
-shape of that change is the argument for the whole exercise: five of the
-findings were in the 16550, four of them were one shortcut seen from different
-sides, and the fifth (MCR reading as zero) could not be fixed by making the
-register readable -- MCR bit 4 is LOOPBACK, so a stored-but-inert bit would
-have put a driver's self-test bytes on the console, which is a defect where
-the missing register was only an incompleteness.  `uart_loop` is the new test
-that pins the mode against the machine, serial channel included.  See
-[`design/device.md`](../design/device.md) for the rules that came out of it
-and the README's "Findings fixed" table for the values.
+**THE EFFORT HAS NOW CHANGED THE MODEL TWICE, and both times the shape of the
+change was the argument for the whole exercise.**
+
+*The UART* (findings 6, 7, 8, 9, 23): four of them were one shortcut seen from
+different sides, and the fifth (MCR reading as zero) could not be fixed by
+making the register readable -- MCR bit 4 is LOOPBACK, so a stored-but-inert
+bit would have put a driver's self-test bytes on the console, which is a
+defect where the missing register was only an incompleteness.  `uart_loop` is
+the test that pins the mode against the machine, serial channel included.
+
+*The PLIC* (findings 10, 11, 12).  Finding 10 was the one non-incompleteness:
+the threshold lived in `plic_eip` alone, so the model's notification and its
+claim disagreed, and the fix was to move it into the single predicate both of
+them read (`plic_cand`) rather than to special-case the claim.  11 and 12 were
+one change: the controller stopped being indexed by hart.  It has CONTEXTS,
+the board wires two to each hart, and decoding the M context's registers
+without also driving its pin would have been the same half-fix as an inert
+control bit -- so `dev_meip` joins `dev_seip` and `plic_step` gained a second
+wire arm.  The source count went with it (96, hence three-word bitmaps), which
+is what makes source 32's priority register exist.
+
+See [`design/device.md`](../design/device.md) for the rules that came out of
+both and the README's "Findings fixed" table for the values.
 
 - `tools/vtest/` — the ABI, the test programs, the QEMU runner/generator.
   **Read [`tools/vtest/README.md`](../../tools/vtest/README.md) first**; it

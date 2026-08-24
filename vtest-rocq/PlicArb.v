@@ -63,7 +63,7 @@ Proof. solve_vtest plic_arb_qemu_disk. Qed.
    wrong and is not:
 
    - the pending WORD.  [plic_pending_word] folds bit i in from
-     [p_pending (N.of_nat i)] over [seq 0 plic_nsrc]; until now only one bit
+     [p_pending] over word 0's thirty-two ids; until now only one bit
      was ever set in it, so an off-by-one in the shift or the fold could not
      show.  Here 0x402 pins bits 1 and 10 simultaneously, and the two
      intermediate reads (0x400 with only the UART up, 0x002 with only the
@@ -71,7 +71,7 @@ Proof. solve_vtest plic_arb_qemu_disk. Qed.
 
    - ARBITRATION BY PRIORITY.  [plic_best]'s fold and [plic_better]'s first
      clause: the claim returns 10 while 1 is also pending, enabled and
-     non-zero-priority.  Ids are scanned 1..31 in order, so returning the
+     non-zero-priority.  Ids are scanned in order, so returning the
      LATER id is exactly the evidence that priority, not position, decided.
 
    - the claim's SIDE EFFECTS, twice over.  Each claim clears that source's

@@ -216,7 +216,8 @@ Section ProofPlicinit.
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; unfold kpt_dev_vpn; zrange_vm)
-              ltac:(rewrite Ha4' Hsw; intros pq Hpq; apply plic_write_prio_ok;
+              ltac:(rewrite Ha4' Hsw; intros pq Hpq;
+                    apply (plic_write_prio_ok pq _ 10%N);
                     [ vm_compute; reflexivity | exact Hpq ])
               with "Hcg Hpc [] Hpinv").
     { iApply (pi_0e with "Htext"). }
@@ -229,7 +230,8 @@ Section ProofPlicinit.
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; vm_compute; reflexivity)
               ltac:(rewrite Ha4'; unfold kpt_dev_vpn; zrange_vm)
-              ltac:(rewrite Ha4' Hsw; intros pq Hpq; apply plic_write_prio_ok;
+              ltac:(rewrite Ha4' Hsw; intros pq Hpq;
+                    apply (plic_write_prio_ok pq _ 1%N);
                     [ vm_compute; reflexivity | exact Hpq ])
               with "Hcg Hpc [] Hpinv").
     { iApply (pi_10 with "Htext"). }

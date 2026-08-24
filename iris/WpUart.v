@@ -1109,7 +1109,9 @@ Section DevLoops.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  THE WIRE THREAD.  [dev_seip d h] is [plic_eip (dplic d) h], read    *)
+  (*  THE WIRE THREAD.  [dev_seip d h] is [plic_eip (dplic d) (plic_sctx  *)
+  (*  h)] and [dev_meip d h] the same at [plic_mctx h] -- one PLIC context *)
+  (*  per pin, and one [plic_step] arm per pin.  Both are read              *)
   (*  off the PHYSICAL device state the lifting rule hands over, so this   *)
   (*  proof needs NO agreement against [plic_frag] and therefore never     *)
   (*  opens [plicN] at all -- the old proof opened the device invariant     *)
@@ -1128,29 +1130,54 @@ Section DevLoops.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (gr' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [c].
-    (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
-    iInv "Hwinv" as ">Hwbody" "Hwclose".
-    iDestruct "Hwbody" as (seip meip) "Hwires".
-    iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
-    iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
-      [ apply elem_of_fin_to_set |].
-    iMod (reg_update_at c (gr c) sig_seip (seip c)
-            (bool_to_bit (dev_seip d (fin_to_nat c))) with "Hrc Hwc")
-      as "[Hrc' Hwc']".
-    iDestruct ("Hback" with "Hrc'") as "Hgr'".
-    set (seip' := fun c' : CPU =>
-           if decide (c' = c) then bool_to_bit (dev_seip d (fin_to_nat c))
-           else seip c').
-    iMod ("Hwclose" with "[Hwc' Hmc Hwrest]") as "_".
-    { iNext. iExists seip', meip.
-      iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
-      iSplitL "Hwc' Hmc".
-      { rewrite /seip' decide_True //. iFrame. }
-      iApply (big_sepS_mono with "Hwrest").
-      intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
-      rewrite /seip' decide_False; [ done | ].
-      intros ->. apply Hne, elem_of_singleton. reflexivity. }
-    iModIntro. iFrame "Hgr' Hmem Hdev". iApply "IH".
+    (* ONE ARM PER PIN: the PLIC drives hart [c]'s S pin from context 2c+1 and
+       its M pin from context 2c, and both cells are borrowed from
+       [wire_inv] -- whose contents are existential, which is exactly why the
+       second arm costs nothing here. *)
+    destruct Hstep as [c|c].
+    - iInv "Hwinv" as ">Hwbody" "Hwclose".
+      iDestruct "Hwbody" as (seip meip) "Hwires".
+      iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
+      iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
+        [ apply elem_of_fin_to_set |].
+      iMod (reg_update_at c (gr c) sig_seip (seip c)
+              (bool_to_bit (dev_seip d (fin_to_nat c))) with "Hrc Hwc")
+        as "[Hrc' Hwc']".
+      iDestruct ("Hback" with "Hrc'") as "Hgr'".
+      set (seip' := fun c' : CPU =>
+             if decide (c' = c) then bool_to_bit (dev_seip d (fin_to_nat c))
+             else seip c').
+      iMod ("Hwclose" with "[Hwc' Hmc Hwrest]") as "_".
+      { iNext. iExists seip', meip.
+        iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
+        iSplitL "Hwc' Hmc".
+        { rewrite /seip' decide_True //. iFrame. }
+        iApply (big_sepS_mono with "Hwrest").
+        intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
+        rewrite /seip' decide_False; [ done | ].
+        intros ->. apply Hne, elem_of_singleton. reflexivity. }
+      iModIntro. iFrame "Hgr' Hmem Hdev". iApply "IH".
+    - iInv "Hwinv" as ">Hwbody" "Hwclose".
+      iDestruct "Hwbody" as (seip meip) "Hwires".
+      iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
+      iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
+        [ apply elem_of_fin_to_set |].
+      iMod (reg_update_at c (gr c) sig_meip (meip c)
+              (bool_to_bit (dev_meip d (fin_to_nat c))) with "Hrc Hmc")
+        as "[Hrc' Hmc']".
+      iDestruct ("Hback" with "Hrc'") as "Hgr'".
+      set (meip' := fun c' : CPU =>
+             if decide (c' = c) then bool_to_bit (dev_meip d (fin_to_nat c))
+             else meip c').
+      iMod ("Hwclose" with "[Hwc Hmc' Hwrest]") as "_".
+      { iNext. iExists seip, meip'.
+        iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
+        iSplitL "Hwc Hmc'".
+        { rewrite /meip' decide_True //. iFrame. }
+        iApply (big_sepS_mono with "Hwrest").
+        intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
+        rewrite /meip' decide_False; [ done | ].
+        intros ->. apply Hne, elem_of_singleton. reflexivity. }
+      iModIntro. iFrame "Hgr' Hmem Hdev". iApply "IH".
   Qed.
 End DevLoops.

@@ -252,12 +252,12 @@ Section ProofPlicClaim.
               ltac:(rewrite HN4a5; exact (ph_geom_vpn   _ (ph_sclaim_geom _ Hhart)))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite HN4a5; intros pq Hpq;
-                    destruct (plic_claim pq (Z.to_nat (bv_unsigned cid_word))) as [cv cp] eqn:Hc;
+                    destruct (plic_claim pq (plic_sctx (Z.to_nat (bv_unsigned cid_word)))) as [cv cp] eqn:Hc;
                     exists cv, cp; split; [ | split ];
                     [ rewrite (ph_sclaim_read _ pq Hhart); rewrite Hc; reflexivity
-                    | pose proof (plic_ok_claim pq (Z.to_nat (bv_unsigned cid_word)) Hpq) as Hk;
+                    | pose proof (plic_ok_claim pq (plic_sctx (Z.to_nat (bv_unsigned cid_word))) Hpq) as Hk;
                       rewrite Hc in Hk; exact Hk
-                    | pose proof (plic_claim_ret pq (Z.to_nat (bv_unsigned cid_word)) Hpq) as Hk;
+                    | pose proof (plic_claim_ret pq (plic_sctx (Z.to_nat (bv_unsigned cid_word))) Hpq) as Hk;
                       rewrite Hc in Hk; exact Hk ])
               with "Hcg Hpc [] Hdinv").
     { iApply (pqi_16 with "Htext"). }

@@ -1,27 +1,19 @@
-/* plic_thresh -- the CONTEXT THRESHOLD, and what it is supposed to gate.
+/* plic_thresh -- the CONTEXT THRESHOLD: it gates the NOTIFICATION and the
+ * CLAIM, and both strictly.
  *
- * One source is enough for this one, so it uses the cheap one: the 16550 at
- * source 10, raised with NO serial input by enabling the transmit-holding-
- * register-empty interrupt in IER while the FIFO is empty.  No virtqueue,
- * so the model side declares only the stack and the result region.
+ * This program walks one source (the 16550 on source 10, raised with no
+ * serial input by enabling the THRE interrupt while the FIFO is empty) at
+ * priority 3 past thresholds 3, 2, 3, and then claims while masked.
  *
- * Two separate questions, and the model answers only the first of them the
- * way the hardware does:
+ * IT USED TO BE THIS AREA'S ONE NON-INCOMPLETENESS (finding 10).
+ * [plic_claim] went through [plic_best]/[plic_cand], which never looked at
+ * [p_thresh] at all, so the model handed back the id of a source the context
+ * could not see and cleared its pending bit on the way out -- a value the
+ * hardware never produces, and the hardware's answer (0, source still
+ * pending) had no model execution.  The threshold now lives in [plic_cand],
+ * which the notification and the claim both read, so the two agree by
+ * construction and every field below agrees with the machine.
  *
- *   (a) does the threshold gate the NOTIFICATION (the wire onto mip.SEIP)?
- *       -- and it must gate it STRICTLY: priority == threshold is masked,
- *       priority > threshold is not.  Both machines agree, both ways round.
- *
- *   (b) does the threshold gate the CLAIM?  On the hardware it does: a claim
- *       whose only pending source is at or below the threshold returns 0 and
- *       leaves that source PENDING.  [DevModel.plic_claim] goes through
- *       [plic_best]/[plic_cand], which never look at [p_thresh] at all, so
- *       the model hands the masked source back and clears its pending bit.
- *       See vtest-rocq/PlicThresh.v section 3.
- *
- * NOTE ON PRIORITY VALUES: QEMU's virt machine builds its PLIC with
- * num-priorities = 7 and SILENTLY IGNORES a priority or threshold write
- * above that, so every value here is <= 7.
  */
 /* vtest: repeat=1 */
 #include "abi.h"

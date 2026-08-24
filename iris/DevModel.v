@@ -734,19 +734,33 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 2. The PLIC: S-mode contexts only (context 2h+1 of hart h, as xv6 uses). *)
-(*    Sources 1..31 (one 32-bit enable word); the UART is source 10.       *)
+(* 2. The PLIC: BOTH contexts of every hart, and all 96 of the board's     *)
+(*    sources.                                                            *)
+(*                                                                        *)
+(*    CONTEXTS, not harts.  The interrupt controller does not know about   *)
+(*    harts; it has [plic_nctx] independent CONTEXTS, each with its own    *)
+(*    enable bitmap, threshold and claim register, and the board wires two *)
+(*    of them to each hart: context 2h is hart h's M-mode context and      *)
+(*    2h+1 its S-mode one ([plic_mctx]/[plic_sctx]).  Modelling only the   *)
+(*    S half -- which is all xv6 uses -- made every M-context register a   *)
+(*    STUCK access (finding 11), so an M-mode handler or a bootloader that *)
+(*    parks its own context could not be described at all.                *)
+(*                                                                        *)
+(*    THE THRESHOLD GATES THE CLAIM, and that is finding 10: it used to    *)
+(*    appear in [plic_eip] alone, so the model could hand a context the id *)
+(*    of a source that context cannot see -- a value the hardware never    *)
+(*    produces -- and clear a pending bit the hardware leaves standing.    *)
+(*    It now lives in [plic_cand], which [plic_eip] and [plic_claim] BOTH  *)
+(*    read, so the notification and the claim agree by construction.      *)
 (* ---------------------------------------------------------------------- *)
 
 Record plic_state := PlicState {
-  p_prio    : N -> bv 32;    (* per-source priority (0 = never interrupts) *)
-  p_pending : N -> bool;     (* gateway has forwarded a request *)
-  p_claimed : N -> bool;     (* claimed (in service), completion pending *)
-  p_enable  : nat -> bv 32;  (* per-hart S-context enable bits, sources 0..31 *)
-  p_thresh  : nat -> bv 32;  (* per-hart S-context priority threshold *)
+  p_prio    : N -> bv 32;         (* per-source priority (0 = never interrupts) *)
+  p_pending : N -> bool;          (* gateway has forwarded a request *)
+  p_claimed : N -> bool;          (* claimed (in service), completion pending *)
+  p_enable  : nat -> nat -> bv 32;(* per-CONTEXT enable bitmap, 32 sources/word *)
+  p_thresh  : nat -> bv 32;       (* per-CONTEXT priority threshold *)
 }.
-
-Definition plic_nsrc : nat := 32%nat.
 
 (* the second interrupt source this machine has (the virtio disk); the UART is
    [uart_irq_id] = 10.  Which device sits on which PLIC source is a property of
@@ -754,18 +768,45 @@ Definition plic_nsrc : nat := 32%nat.
    lives in the software layer (PlicPlan.v). *)
 Definition virtio_irq_id : N := 1%N.   (* VIRTIO0_IRQ *)
 
+(* The board's source count: 96, so the enable and pending bitmaps are three
+   32-bit words each.  Source 0 does not exist -- its priority register is
+   hardwired to zero and its pending/enable bits are never set. *)
+Definition plic_nsrc : nat := 96%nat.
+Definition plic_nwords : nat := 3%nat.
+
+(* Two contexts per hart, M then S. *)
+Definition plic_nctx : nat := (2 * dev_ncpu)%nat.
+Definition plic_mctx (h : nat) : nat := (2 * h)%nat.
+Definition plic_sctx (h : nat) : nat := (2 * h + 1)%nat.
+
+(* which enable/pending word a source lives in, and which bit of it *)
+Definition plic_src_word (i : N) : nat := (N.to_nat i / 32)%nat.
+Definition plic_src_bit (i : N) : Z := Z.of_N i mod 32.
+
 (* pointwise function updates *)
 Definition nupd {A} (f : N -> A) (i : N) (x : A) : N -> A :=
   fun j => if N.eqb j i then x else f j.
 Definition hupd {A} (f : nat -> A) (h : nat) (x : A) : nat -> A :=
   fun k => if Nat.eqb k h then x else f k.
+(* ...and the two-level one the per-context enable bitmap needs *)
+Definition wupd (f : nat -> nat -> bv 32) (c w : nat) (x : bv 32)
+  : nat -> nat -> bv 32 :=
+  fun c' w' => if Nat.eqb c' c && Nat.eqb w' w then x else f c' w'.
 
-Definition plic_enabled (p : plic_state) (h : nat) (i : N) : bool :=
-  Z.testbit (bv_unsigned (p_enable p h)) (Z.of_N i).
+Definition plic_enabled (p : plic_state) (c : nat) (i : N) : bool :=
+  Z.testbit (bv_unsigned (p_enable p c (plic_src_word i))) (plic_src_bit i).
 
-(* is source [i] eligible to be claimed by hart [h]'s S context? *)
-Definition plic_cand (p : plic_state) (h : nat) (i : N) : bool :=
-  p_pending p i && plic_enabled p h i && (0 <? bv_unsigned (p_prio p i)).
+(* IS SOURCE [i] VISIBLE TO CONTEXT [c]?  Pending at the gateway, enabled in
+   this context's bitmap, and of a priority STRICTLY above this context's
+   threshold.  A priority-0 source can never clear a threshold of 0, so this
+   subsumes the old explicit "priority 0 never interrupts" guard.
+
+   This one predicate is the whole of the context's view: [plic_eip] asks
+   whether ANY source is visible and [plic_best] which visible one wins, so
+   the pin and the claim register cannot disagree (finding 10). *)
+Definition plic_cand (p : plic_state) (c : nat) (i : N) : bool :=
+  p_pending p i && plic_enabled p c i
+  && (bv_unsigned (p_thresh p c) <? bv_unsigned (p_prio p i)).
 
 (* strictly better: higher priority, ties broken toward the lower id *)
 Definition plic_better (p : plic_state) (i j : N) : bool :=
@@ -774,9 +815,9 @@ Definition plic_better (p : plic_state) (i j : N) : bool :=
 
 Definition plic_srcs : list N := map N.of_nat (seq 1 (plic_nsrc - 1)).
 
-Definition plic_best (p : plic_state) (h : nat) : option N :=
+Definition plic_best (p : plic_state) (c : nat) : option N :=
   fold_left (fun best i =>
-               if plic_cand p h i then
+               if plic_cand p c i then
                  match best with
                  | None => Some i
                  | Some j => if plic_better p i j then Some i else Some j
@@ -784,9 +825,12 @@ Definition plic_best (p : plic_state) (h : nat) : option N :=
                else best)
             plic_srcs None.
 
-(* claim: return (and clear pending on, mark claimed) the best source; 0 if none *)
-Definition plic_claim (p : plic_state) (h : nat) : bv 32 * plic_state :=
-  match plic_best p h with
+(* claim: return (and clear pending on, mark claimed) the best VISIBLE source;
+   0 if the context can see none -- including the case where the only pending
+   sources are masked by the threshold, where the hardware likewise answers 0
+   and leaves them pending. *)
+Definition plic_claim (p : plic_state) (c : nat) : bv 32 * plic_state :=
+  match plic_best p c with
   | None => (Z_to_bv 32 0, p)
   | Some i =>
       (Z_to_bv 32 (Z.of_N i),
@@ -801,71 +845,97 @@ Definition plic_complete (p : plic_state) (i : N) : plic_state :=
               (p_enable p) (p_thresh p)
   else p.
 
-(* the external-interrupt-pending level the PLIC drives into hart [h]'s
-   S context: some pending, enabled source exceeds the context threshold *)
-Definition plic_eip (p : plic_state) (h : nat) : bool :=
-  existsb (fun i => plic_cand p h i
-                    && (bv_unsigned (p_thresh p h) <? bv_unsigned (p_prio p i)))
-          plic_srcs.
+(* the external-interrupt-pending level the PLIC drives into context [c]:
+   some source is visible to it *)
+Definition plic_eip (p : plic_state) (c : nat) : bool :=
+  existsb (plic_cand p c) plic_srcs.
 
-(* the pending bitmap word 0 (sources 0..31), for reads of offset 0x1000 *)
-Definition plic_pending_word (p : plic_state) : bv 32 :=
-  Z_to_bv 32 (fold_right (fun i acc =>
-                            if p_pending p (N.of_nat i)
-                            then Z.lor (Z.shiftl 1 (Z.of_nat i)) acc else acc)
-                         0 (seq 0 plic_nsrc)).
+(* the pending bitmap's word [w] (sources 32w .. 32w+31), for a read of
+   offset 0x1000 + 4w *)
+Definition plic_pending_word (p : plic_state) (w : nat) : bv 32 :=
+  Z_to_bv 32 (fold_right (fun j acc =>
+                            if p_pending p (N.of_nat (32 * w + j))
+                            then Z.lor (Z.shiftl 1 (Z.of_nat j)) acc else acc)
+                         0 (seq 0 32)).
 
 (* -- PLIC MMIO decode: 32-bit registers at [off] within the PLIC window -- *)
 
-(* context sub-decodes; [None] = not that register family *)
-Definition plic_senable_hart (off : Z) : option nat :=
-  if (0x2080 <=? off) && ((off - 0x2080) mod 0x100 =? 0)
-     && ((off - 0x2080) / 0x100 <? Z.of_nat dev_ncpu)
-  then Some (Z.to_nat ((off - 0x2080) / 0x100)) else None.
-Definition plic_sthresh_hart (off : Z) : option nat :=
-  if (0x201000 <=? off) && ((off - 0x201000) mod 0x2000 =? 0)
-     && ((off - 0x201000) / 0x2000 <? Z.of_nat dev_ncpu)
-  then Some (Z.to_nat ((off - 0x201000) / 0x2000)) else None.
-Definition plic_sclaim_hart (off : Z) : option nat :=
-  if (0x201004 <=? off) && ((off - 0x201004) mod 0x2000 =? 0)
-     && ((off - 0x201004) / 0x2000 <? Z.of_nat dev_ncpu)
-  then Some (Z.to_nat ((off - 0x201004) / 0x2000)) else None.
+(* SOURCE PRIORITY, one word per source at [4i].  Source 0's register exists
+   (finding 12: it used to be the one hole a plain "mask every source" init
+   loop fell into) but source 0 does not, so it reads zero and swallows its
+   writes. *)
+Definition plic_prio_src (off : Z) : option N :=
+  if (0 <=? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0)
+  then Some (Z.to_N (off / 4)) else None.
+
+(* the PENDING bitmap, read-only: three words at 0x1000. *)
+Definition plic_pending_widx (off : Z) : option nat :=
+  if (0x1000 <=? off) && (off <? 0x1000 + 4 * Z.of_nat plic_nwords)
+     && (off mod 4 =? 0)
+  then Some (Z.to_nat ((off - 0x1000) / 4)) else None.
+
+(* PER-CONTEXT ENABLE: a 0x80-byte block per context at 0x2000, of which the
+   first [plic_nwords] words are real; the rest of the block is reserved. *)
+Definition plic_enable_ctx (off : Z) : option (nat * nat) :=
+  if (0x2000 <=? off) && (off <? 0x2000 + 0x80 * Z.of_nat plic_nctx)
+     && (off mod 4 =? 0)
+     && (((off - 0x2000) mod 0x80) / 4 <? Z.of_nat plic_nwords)
+  then Some (Z.to_nat ((off - 0x2000) / 0x80),
+             Z.to_nat (((off - 0x2000) mod 0x80) / 4))
+  else None.
+
+(* PER-CONTEXT THRESHOLD and CLAIM/COMPLETE: one 0x1000-byte page per context
+   at 0x200000, threshold at +0 and claim/complete at +4. *)
+Definition plic_thresh_ctx (off : Z) : option nat :=
+  if (0x200000 <=? off) && ((off - 0x200000) mod 0x1000 =? 0)
+     && ((off - 0x200000) / 0x1000 <? Z.of_nat plic_nctx)
+  then Some (Z.to_nat ((off - 0x200000) / 0x1000)) else None.
+Definition plic_claim_ctx (off : Z) : option nat :=
+  if (0x200004 <=? off) && ((off - 0x200004) mod 0x1000 =? 0)
+     && ((off - 0x200004) / 0x1000 <? Z.of_nat plic_nctx)
+  then Some (Z.to_nat ((off - 0x200004) / 0x1000)) else None.
 
 Definition plic_read (p : plic_state) (off : Z) : option (bv 32 * plic_state) :=
-  if (0 <? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0) then
-    Some (p_prio p (Z.to_N (off / 4)), p)          (* source priorities *)
-  else if off =? 0x1000 then Some (plic_pending_word p, p)
-  else match plic_senable_hart off with
-  | Some h => Some (p_enable p h, p)
+  match plic_prio_src off with
+  | Some i => Some (if (i =? 0)%N then Z_to_bv 32 0 else p_prio p i, p)
   | None =>
-    match plic_sthresh_hart off with
-    | Some h => Some (p_thresh p h, p)
-    | None =>
-      match plic_sclaim_hart off with
-      | Some h => Some (plic_claim p h)             (* claim: side effect *)
-      | None => None
-      end
-    end
-  end.
+  match plic_pending_widx off with
+  | Some w => Some (plic_pending_word p w, p)
+  | None =>
+  match plic_enable_ctx off with
+  | Some (c, w) => Some (p_enable p c w, p)
+  | None =>
+  match plic_thresh_ctx off with
+  | Some c => Some (p_thresh p c, p)
+  | None =>
+  match plic_claim_ctx off with
+  | Some c => Some (plic_claim p c)              (* claim: side effect *)
+  | None => None
+  end end end end end.
 
 Definition plic_write (p : plic_state) (off : Z) (v : bv 32) : option plic_state :=
-  if (0 <? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0) then
-    Some (PlicState (nupd (p_prio p) (Z.to_N (off / 4)) v) (p_pending p)
-                    (p_claimed p) (p_enable p) (p_thresh p))
-  else match plic_senable_hart off with
-  | Some h => Some (PlicState (p_prio p) (p_pending p) (p_claimed p)
-                              (hupd (p_enable p) h v) (p_thresh p))
+  match plic_prio_src off with
+  | Some i =>
+      (* source 0's register is hardwired zero: the write is dropped *)
+      Some (if (i =? 0)%N then p
+            else PlicState (nupd (p_prio p) i v) (p_pending p)
+                           (p_claimed p) (p_enable p) (p_thresh p))
   | None =>
-    match plic_sthresh_hart off with
-    | Some h => Some (PlicState (p_prio p) (p_pending p) (p_claimed p)
-                                (p_enable p) (hupd (p_thresh p) h v))
-    | None =>
-      match plic_sclaim_hart off with
-      | Some _ => Some (plic_complete p (Z.to_N (bv_unsigned v)))
-      | None => None
-      end
-    end
-  end.
+  match plic_pending_widx off with
+  | Some _ => Some p          (* the pending bitmap is read-only *)
+  | None =>
+  match plic_enable_ctx off with
+  | Some (c, w) => Some (PlicState (p_prio p) (p_pending p) (p_claimed p)
+                                   (wupd (p_enable p) c w v) (p_thresh p))
+  | None =>
+  match plic_thresh_ctx off with
+  | Some c => Some (PlicState (p_prio p) (p_pending p) (p_claimed p)
+                              (p_enable p) (hupd (p_thresh p) c v))
+  | None =>
+  match plic_claim_ctx off with
+  | Some _ => Some (plic_complete p (Z.to_N (bv_unsigned v)))
+  | None => None
+  end end end end end.
 
 (* gateway: latch source [i]'s level output into its pending bit.  A level
    source is forwarded only when it is neither already pending nor claimed.
@@ -1005,8 +1075,15 @@ Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
     end v
   else None.
 
-(* the level the PLIC drives on hart [h]'s S-mode external interrupt pin *)
-Definition dev_seip (d : dev_state) (h : nat) : bool := plic_eip (dplic d) h.
+(* The levels the PLIC drives on hart [h]'s two external-interrupt pins.  Each
+   is its own CONTEXT's notification, which is why the model has both: the
+   controller does not know which pin is which, it drives every context it
+   has, and the board wires context 2h to hart h's M pin and 2h+1 to its S
+   pin.  [RiscvLang.plic_step] has one wire arm per pin. *)
+Definition dev_seip (d : dev_state) (h : nat) : bool :=
+  plic_eip (dplic d) (plic_sctx h).
+Definition dev_meip (d : dev_state) (h : nat) : bool :=
+  plic_eip (dplic d) (plic_mctx h).
 
 (* No CPU-side MMIO transaction moves the disk IMAGE (crash.md): reads
    advance at most the UART's rx FIFO, and the virtio window's writes go
@@ -1053,6 +1130,6 @@ Definition uart0_state : uart_state :=
             (Z_to_bv 8 uart_mcr_reset) byte0 byte0 false.
 Definition plic0_state : plic_state :=
   PlicState (fun _ => Z_to_bv 32 0) (fun _ => false) (fun _ => false)
-            (fun _ => Z_to_bv 32 0) (fun _ => Z_to_bv 32 0).
+            (fun _ _ => Z_to_bv 32 0) (fun _ => Z_to_bv 32 0).
 Definition dev0_state : dev_state :=
   DevState uart0_state plic0_state virtio0_state.

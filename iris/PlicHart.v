@@ -171,11 +171,14 @@ Qed.
 (*  What an access at each address does to the PLIC state.                *)
 (* ===================================================================== *)
 
+(* PLIC_SENABLE(hart) is word 0 of the hart's S CONTEXT's enable bitmap: the
+   +128 is the half-stride that picks context 2h+1 out of the pair. *)
 Lemma ph_senable_write (tp : mword 64) (p : plic_state) (v : bv 32) :
   bv_unsigned tp < Z.of_nat dev_ncpu ->
   plic_write p (uint (ph_a8 (ph_senb tp) (mword_of_int 128 : mword 12)) - plic_base) v
   = Some (PlicState (p_prio p) (p_pending p) (p_claimed p)
-            (hupd (p_enable p) (Z.to_nat (bv_unsigned tp)) v) (p_thresh p)).
+            (wupd (p_enable p) (plic_sctx (Z.to_nat (bv_unsigned tp))) 0 v)
+            (p_thresh p)).
 Proof.
   intro Hh.
   destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
@@ -186,7 +189,7 @@ Lemma ph_sthresh_write (tp : mword 64) (p : plic_state) (v : bv 32) :
   bv_unsigned tp < Z.of_nat dev_ncpu ->
   plic_write p (uint (ph_a8 (ph_sthb tp) (mword_of_int 0 : mword 12)) - plic_base) v
   = Some (PlicState (p_prio p) (p_pending p) (p_claimed p) (p_enable p)
-            (hupd (p_thresh p) (Z.to_nat (bv_unsigned tp)) v)).
+            (hupd (p_thresh p) (plic_sctx (Z.to_nat (bv_unsigned tp))) v)).
 Proof.
   intro Hh.
   destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
@@ -199,38 +202,39 @@ Qed.
    a 31-element fold ([plic_best]) over a SYMBOLIC state, and normalising that
    does not terminate in any useful time.  Reducing only the numeric guards
    leaves [plic_claim]/[plic_complete] untouched on both sides. *)
-Lemma plic_read_sclaim (p : plic_state) (off : Z) (h : nat) :
-  ((0 <? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0))%Z = false ->
-  (off =? 0x1000)%Z = false ->
-  plic_senable_hart off = None ->
-  plic_sthresh_hart off = None ->
-  plic_sclaim_hart off = Some h ->
-  plic_read p off = Some (plic_claim p h).
+Lemma plic_read_sclaim (p : plic_state) (off : Z) (c : nat) :
+  plic_prio_src off = None ->
+  plic_pending_widx off = None ->
+  plic_enable_ctx off = None ->
+  plic_thresh_ctx off = None ->
+  plic_claim_ctx off = Some c ->
+  plic_read p off = Some (plic_claim p c).
 Proof.
   (* plain Stdlib [rewrite] here (no ssreflect in this iris-free file): commas. *)
   intros H1 H2 H3 H4 H5. unfold plic_read. rewrite H1, H2, H3, H4, H5. reflexivity.
 Qed.
 
-Lemma plic_write_sclaim (p : plic_state) (off : Z) (h : nat) (v : bv 32) :
-  ((0 <? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0))%Z = false ->
-  plic_senable_hart off = None ->
-  plic_sthresh_hart off = None ->
-  plic_sclaim_hart off = Some h ->
+Lemma plic_write_sclaim (p : plic_state) (off : Z) (c : nat) (v : bv 32) :
+  plic_prio_src off = None ->
+  plic_pending_widx off = None ->
+  plic_enable_ctx off = None ->
+  plic_thresh_ctx off = None ->
+  plic_claim_ctx off = Some c ->
   plic_write p off v = Some (plic_complete p (Z.to_N (bv_unsigned v))).
 Proof.
-  intros H1 H3 H4 H5. unfold plic_write. rewrite H1, H3, H4, H5. reflexivity.
+  intros H1 H2 H3 H4 H5. unfold plic_write. rewrite H1, H2, H3, H4, H5. reflexivity.
 Qed.
 
-(* the claim/complete address decodes to THIS hart's context, and to none of
+(* the claim/complete address decodes to THIS hart's S CONTEXT, and to none of
    the other register families *)
 Lemma ph_sclaim_decode (tp : mword 64) :
   bv_unsigned tp < Z.of_nat dev_ncpu ->
   let off := (uint (ph_a8 (ph_sthb tp) (mword_of_int 4 : mword 12)) - plic_base)%Z in
-  ((0 <? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0))%Z = false
-  /\ (off =? 0x1000)%Z = false
-  /\ plic_senable_hart off = None
-  /\ plic_sthresh_hart off = None
-  /\ plic_sclaim_hart off = Some (Z.to_nat (bv_unsigned tp)).
+  plic_prio_src off = None
+  /\ plic_pending_widx off = None
+  /\ plic_enable_ctx off = None
+  /\ plic_thresh_ctx off = None
+  /\ plic_claim_ctx off = Some (plic_sctx (Z.to_nat (bv_unsigned tp))).
 Proof.
   intro Hh. cbv zeta.
   destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
@@ -245,8 +249,8 @@ Lemma ph_sclaim_write (tp : mword 64) (p : plic_state) (v : bv 32) :
   plic_write p (uint (ph_a8 (ph_sthb tp) (mword_of_int 4 : mword 12)) - plic_base) v
   = Some (plic_complete p (Z.to_N (bv_unsigned v))).
 Proof.
-  intro Hh. destruct (ph_sclaim_decode tp Hh) as (H1 & _ & H3 & H4 & H5).
-  exact (plic_write_sclaim p _ _ v H1 H3 H4 H5).
+  intro Hh. destruct (ph_sclaim_decode tp Hh) as (H1 & H2 & H3 & H4 & H5).
+  exact (plic_write_sclaim p _ _ v H1 H2 H3 H4 H5).
 Qed.
 
 (* a READ of the claim/complete register is a CLAIM: it returns the id of the
@@ -254,7 +258,7 @@ Qed.
 Lemma ph_sclaim_read (tp : mword 64) (p : plic_state) :
   bv_unsigned tp < Z.of_nat dev_ncpu ->
   plic_read p (uint (ph_a8 (ph_sthb tp) (mword_of_int 4 : mword 12)) - plic_base)
-  = Some (plic_claim p (Z.to_nat (bv_unsigned tp))).
+  = Some (plic_claim p (plic_sctx (Z.to_nat (bv_unsigned tp)))).
 Proof.
   intro Hh. destruct (ph_sclaim_decode tp Hh) as (H1 & H2 & H3 & H4 & H5).
   exact (plic_read_sclaim p _ _ H1 H2 H3 H4 H5).
