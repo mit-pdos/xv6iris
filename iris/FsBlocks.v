@@ -503,22 +503,6 @@ Section FsBytes.
     forall b bs, C !! b = Some bs ->
                  (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ⊆ L.
 
-  (* WHAT A CLIENT OF THE BYTE VIEW LEARNS WHEN THE AUTH IS LENT TO IT
-     (durable-disk 1d', item 4).  The commit's payload law takes the byte
-     AUTHORITY as an input so that the client can agree the ELEMENTS it owns
-     against it and read off the real logged view; this is the tie that
-     makes that reading total on the home set -- [Lb] resides exactly the
-     home blocks' byte range, and every home block's cache entry is a
-     whole block whose bytes are [Lb]'s.  Together the two pin [Lb] to the
-     byte flattening of [L] on [home], which is what the client needs to
-     identify [LogDefs.lm_logged L] with what its own elements say. *)
-  Definition bytes_home_at (Lb : gmap Z (bv 8)) (L : gmap Z (list (bv 8)))
-      (home : gset Z) : Prop :=
-    bytes_dom Lb home /\
-    forall b : Z, b ∈ home -> exists bs : list (bv 8),
-      L !! b = Some bs /\ length bs = BSIZE /\
-      (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ⊆ Lb.
-
   (* THE BODY.  [gL] is the byte view's name, [gc] the cache's.  The
      invariant holds the byte AUTH and, per home block, the cache
      element's OTHER half -- the half the FS client used to hold.  That
@@ -548,37 +532,6 @@ Section FsBytes.
   Global Instance fs_bytes_inv_persistent gL gc home :
     Persistent (fs_bytes_inv gL gc home).
   Proof. apply _. Qed.
-
-  (* ...AND HOW THE HOLDER OF THE CACHE AUTH READS IT OFF THE INVARIANT'S
-     BODY.  The parked halves are the invariant's; the auth is the log
-     lock's; agreement between them is what turns the body's own [bytes_tie]
-     (stated over the PARKED map [C]) into the tie the client wants, stated
-     over the map the log actually holds.  Pure conclusion, so nothing is
-     consumed. *)
-  Lemma fs_bytes_home_of (gc : gname) (L C : gmap Z (list (bv 8)))
-      (Lb : gmap Z (bv 8)) (home : gset Z) :
-    dom C = home ->
-    (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
-    bytes_tie Lb C -> bytes_dom Lb home ->
-    ghost_map_auth gc 1 L -∗
-    ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#(1/2)} bs) -∗
-    ⌜bytes_home_at Lb L home⌝.
-  Proof.
-    iIntros (Hdom Hlens Htie Hdm) "Hca HC".
-    iAssert (⌜forall (b : Z) (bs : list (bv 8)), C !! b = Some bs ->
-               L !! b = Some bs⌝)%I as %Hagr.
-    { iIntros (b bs Hb).
-      iDestruct (big_sepM_lookup _ _ b bs Hb with "HC") as "Hi".
-      iApply (ghost_map_lookup with "Hca Hi"). }
-    iPureIntro. split; [exact Hdm|].
-    intros b Hb.
-    assert (Hin : is_Some (C !! b)) by (apply elem_of_dom; rewrite Hdom; exact Hb).
-    destruct Hin as [bs Hbs].
-    exists bs. split_and!.
-    - exact (Hagr b bs Hbs).
-    - exact (Hlens b bs Hbs).
-    - exact (Htie b bs Hbs).
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  5.  What a bread client gets: C(b) IS L's bytes at b               *)

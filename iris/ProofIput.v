@@ -1781,9 +1781,18 @@ Section IputFreePath.
     (* the RECORD-granular adapter (durable-disk 2b-inode-1): the deposit
        writes one 64-byte slot, so [lw_au_rec] is what carries it into
        [log_write]'s sub-range atomic update. *)
+    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)): the block's
+       new LOGGED content is the whole retagged inode block, which the
+       record writer knows even though it owns only its own slot. *)
+    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
+                  (uint bno) (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds))
+                  with "Hlctxa") as "Hpstep".
     iDestruct (lw_au_rec γ γfs (uint bno) (⊤ ∖ ↑iregN)
-                 (DinodeEnc.islot inum) (diblk_bytes ds) (dinode_bytes dn')
-                 (committedA ge ∗ ireg_regime rg)%I e0 Psi with "Hau0") as "Hau".
+                 (DinodeEnc.islot inum)
+                 (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds))
+                 (diblk_bytes ds) (dinode_bytes dn')
+                 (committedA ge ∗ ireg_regime rg)%I e0 Psi
+                 with "Hpstep Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

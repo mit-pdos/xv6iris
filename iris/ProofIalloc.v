@@ -1467,6 +1467,11 @@ Section IallocClaim.
        The plain form is recovered immediately, so nothing else moves. *)
     iDestruct "Hlctx" as (Psi) "#Hlctxa".
     iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
+    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
+    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
+                  (uint bno)
+                  (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
+                  with "Hlctxa") as "Hpstep".
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     iPoseProof (log_credit_own γ false Sb e0 (uint bno) ltac:(discriminate))
@@ -1512,13 +1517,16 @@ Section IallocClaim.
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcrd HopS [] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcrd HopS [Hpstep] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
       (* log_write's own two closing inputs (the epoch witness and its
          bound) are still dropped -- one adapter line, fs-log.md §G.17 --
-         but the ANCHOR is now [iclaim]; see the instantiation above. *)
-      iApply lw_au_rec.
+         but the ANCHOR is now [iclaim]; see the instantiation above.  The
+         payload-step premise (durable-disk 3a, ratified (D)) rides in
+         beside it. *)
+      iApply (lw_au_rec with "[Hpstep]").
+      { iEval (rewrite -Hbno). iExact "Hpstep". }
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
                 ltac:(solve_ndisj) Hnib Hdswf Ht0
                 (ialloc_fresh_shape ty Hty) Htyk with "Hireg Hiopen"). }

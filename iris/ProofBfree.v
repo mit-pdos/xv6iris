@@ -647,9 +647,13 @@ Section BfreeTail.
        The plain form is recovered immediately, so nothing else moves. *)
     iDestruct "Hlctx" as (Psi) "#Hlctxa".
     iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
+    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
+    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
+                  bmapstart (bitmap_bytes (used ∖ {[ bi ]})) with "Hlctxa")
+      as "Hpstep".
     iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
                  (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) emp e0 Psi
-                 with "Hau") as "Hau".
+                 with "Hpstep Hau") as "Hau".
     (* log_write does not thread the trap-CSR complement at all: [Hextc]/
        [Hextm] are stranded at bf_tail's entry hart and are not touched
        here -- transported across the whole span, right before [bf_cont]. *)

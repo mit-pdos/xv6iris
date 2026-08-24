@@ -152,7 +152,7 @@ Section IupdateDefs.
      tie compares against. *)
   Definition iu_region_au (γ : log_names) (γfs : fs_names) (inodestart : Z)
       (inum : mword 32) (dn : dinode) (ds : list dinode) (e0 : nat)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ) (Pout : iProp Σ) : iProp Σ :=
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (Pout : iProp Σ) : iProp Σ :=
     (|={⊤, ⊤ ∖ ↑iregN}=> ∃ (sub_old : list (bv 8)) (v : nat),
        ⌜length sub_old = 64%nat⌝ ∗
        FsBlocks.byte_range (fs_bytes γfs) (IBLOCK inum inodestart)
@@ -164,8 +164,10 @@ Section IupdateDefs.
         logged_at γ e0 (IBLOCK inum inodestart) -∗ ⌜(v <= e0)%nat⌝ -∗
         FsBlocks.byte_range (fs_bytes γfs) (IBLOCK inum inodestart)
           (Z.of_nat (64 * islot inum)) (dinode_bytes dn) -∗
-        ∀ D0 : gmap Z (list (bv 8)),
-          Psi D0 ={⊤ ∖ ↑iregN, ⊤}=∗ Psi D0 ∗ Pout))%I.
+        ∀ D0 Dc : gmap Z (list (bv 8)),
+          Psi D0 Dc ={⊤ ∖ ↑iregN, ⊤}=∗
+          Psi D0 (<[IBLOCK inum inodestart
+                    := diblk_bytes (<[islot inum := dn]> ds)]> Dc) ∗ Pout))%I.
 
   (* ...and the form a SEAL supplies, which cannot name [ds]: the list is
      proof-internal (the walk learns it at [InodeRegion.ireg_read], out of
@@ -174,8 +176,17 @@ Section IupdateDefs.
   Definition iu_region_step (γ : log_names) (γfs : fs_names) (γi : gname)
       (inodestart : Z) (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
       (Pout : iProp Σ) : iProp Σ :=
-    (∀ (Psi : gmap Z (list (bv 8)) -> iProp Σ) (ds : list dinode),
+    (∀ (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (ds : list dinode),
        ⌜diblk_wf ds⌝ -∗ dinode_at γi inum dn0 -∗
+       (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)).  The
+          payload's second index is the CURRENT LOGGED VIEW, so a
+          [log_write] moves it and the move has to be justified.  A region
+          step cannot justify it (it never sees the log's context), so it
+          travels in from the caller, which holds [log_ctx_at]. *)
+       (∀ D0 Dc : gmap Z (list (bv 8)),
+          Psi D0 Dc ==∗
+          Psi D0 (<[IBLOCK inum inodestart
+                    := diblk_bytes (<[islot inum := dn]> ds)]> Dc)) -∗
        iu_region_au γ γfs inodestart inum dn ds e0 Psi Pout)%I.
 
   (* the record being flushed is a legal dinode -- one line, needed by both
@@ -209,11 +220,12 @@ Section IupdateDefs.
     ireg_inv γi γfs inodestart nib -∗
     iu_region_step γ γfs γi inodestart inum dn dn0 e0 (ireg_out γi inum dn).
   Proof.
-    intros Hnib Hdnwf Hstab Hnlk Hnzty. iIntros "#Hireg" (Psi ds) "%Hdswf Hdn".
+    intros Hnib Hdnwf Hstab Hnlk Hnzty.
+    iIntros "#Hireg" (Psi ds) "%Hdswf Hdn Hpstep".
     (* the ordinary flush owes no receipt ([InodeRegion.ireg_ep_mono]
        carries it for free), so its anchor is the unit: one adapter line
        and both region lemmas below are unchanged. *)
-    rewrite /iu_region_au. iApply lw_au_rec.
+    rewrite /iu_region_au. iApply (lw_au_rec with "Hpstep").
     rewrite /ireg_out. case_decide as Hty.
     - exfalso. exact (Hnzty Hty).
     - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn
@@ -263,11 +275,11 @@ Section IupdateDefs.
        ireg_link_pin pin (bv_unsigned inum) dn0).
   Proof.
     intros Hnib Hdnwf Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp.
-    iIntros "#Hireg Hpin" (Psi ds) "%Hdswf Hdn".
+    iIntros "#Hireg Hpin" (Psi ds) "%Hdswf Hdn Hpstep".
     (* nlink RISES here, so the receipt is vacuous at the written record
        and the anchor is the unit -- the same one adapter line the ordinary
        step takes. *)
-    rewrite /iu_region_au. iApply lw_au_rec.
+    rewrite /iu_region_au. iApply (lw_au_rec with "Hpstep").
     iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn
               (diblk_bytes ds) fl pin
               ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hbump Hgrd
@@ -315,7 +327,7 @@ Section IupdateDefs.
       (dinode_at γi inum dn).
   Proof.
     intros Hnib Hdnwf Hnz Hstab Hnl.
-    iIntros "#Hireg Hfrag Htok Hrc" (Psi ds) "%Hdswf Hdn".
+    iIntros "#Hireg Hfrag Htok Hrc" (Psi ds) "%Hdswf Hdn Hpstep".
     rewrite /iu_region_au.
     iMod (ireg_write_unlink_fl ⊤ γi γfs inodestart nib inum dn0 dn
             (diblk_bytes ds) fl
@@ -328,22 +340,24 @@ Section IupdateDefs.
       subst γ inodestart.
       iModIntro. iExists rec_old, v.
       iSplitR; [iPureIntro; exact Hlr |]. iFrame "Hrun Hvlb".
-      iIntros "(%Hlbsl & %Hlrec & %Hslice) #Hwit %Hle Hrun". iIntros (D0) "Hpsi".
+      iIntros "(%Hlbsl & %Hlrec & %Hslice) #Hwit %Hle Hrun". iIntros (D0 Dc) "Hpsi".
       iEval (rewrite -FsBytesGamma.gamma_byte_range) in "Hrun".
       iMod ("Hcl" with "[] [] Hrun") as "Hout".
       { iPureIntro. exact Hslice. }
       { rewrite /izrcpt iblk_of_IBLOCK. iIntros (_).
         iRight. iExists e0. iFrame "Hwit". iPureIntro. exact Hle. }
+      iMod ("Hpstep" with "Hpsi") as "Hpsi".
       iModIntro. iFrame "Hpsi Hout".
     - (* THE VACUOUS ROUTE *)
       iMod (log_epoch_lb_0 γ) as "#Hlb0".
       iModIntro. iExists rec_old, 0%nat.
       iSplitR; [iPureIntro; exact Hlr |]. iFrame "Hrun Hlb0".
-      iIntros "(%Hlbsl & %Hlrec & %Hslice) _ _ Hrun". iIntros (D0) "Hpsi".
+      iIntros "(%Hlbsl & %Hlrec & %Hslice) _ _ Hrun". iIntros (D0 Dc) "Hpsi".
       iEval (rewrite -FsBytesGamma.gamma_byte_range) in "Hrun".
       iMod ("Hcl" with "[] [] Hrun") as "Hout".
       { iPureIntro. exact Hslice. }
       { rewrite /izrcpt. iIntros (H0). exfalso. exact (Hnzd H0). }
+      iMod ("Hpstep" with "Hpsi") as "Hpsi".
       iModIntro. iFrame "Hpsi Hout".
   Qed.
 
@@ -424,7 +438,7 @@ Section IupdateTail.
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ) (Pout : iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (Pout : iProp Σ)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_iupdate <= K)%nat ->
@@ -1978,7 +1992,16 @@ Section ProofIupdateMain.
        ghost step is quantified over [Psi] precisely so that opening the
        existential here costs no seal above a line. *)
     iDestruct "Hlctx" as (Psi) "#Hlctxa".
-    iDestruct ("Hstep" $! Psi ds with "[%] Hdn") as "Hau"; [exact Hdswf |].
+    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)): the caller
+       is the one that holds the log's context, so it is the one that can
+       justify the payload's logged-index move.  It hands it to the region
+       step, which cannot build it. *)
+    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
+                  (IBLOCK inum inodestart)
+                  (diblk_bytes (<[islot inum := dn]> ds)) with "Hlctxa")
+      as "Hpstep".
+    iDestruct ("Hstep" $! Psi ds with "[%] Hdn Hpstep") as "Hau";
+      [exact Hdswf |].
     iApply (iu_tail (CID0 := CID36) γs j γfs γd bn γ cov logstart inodestart
               dev
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Psi Pout

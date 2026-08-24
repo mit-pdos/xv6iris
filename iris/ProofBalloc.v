@@ -1546,8 +1546,14 @@ Section BallocBzero.
       by (rewrite HbsDlen; unfold BSIZE; reflexivity).
     assert (Hlvl : (Z.of_nat 0 + 2 < 2 ^ 31)%Z)
       by (change (2^31)%Z with 2147483648%Z; lia).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx0 #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
               HfsbD Hcont".
+    (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 3a).  [log_write]'s
+       three [Psi]-free forms retired with the payload's second index, so
+       this caller opens [LogInv.log_ctx]'s existential once and hands the
+       plain form back to everything else it calls. *)
+    iDestruct "Hlctx0" as (Psi) "#Hlctxa".
+    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     (* ===== +0x4c c.mv a1,s1 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.balloc + 0x4c)) Ra1 Rs1
@@ -1900,16 +1906,20 @@ Section BallocBzero.
        not one the caller can claim this op already logged.  What matters is
        the OUTPUT -- [bnoD] joins the op's set, which is what lets writei
        absorb its own later log_write of the very same block. *)
+    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
+    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
+                  (uint bnoD) (replicate BSIZE (bv_0 8)) with "Hlctxa")
+      as "Hpstep".
     iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kk2 pidv bnoD
               (replicate BSIZE (bv_0 8)) bsD bsd0 d0 (if cr then S u else u)
-              false (Sb ∪ {[bmapstart]})
+              false (Sb ∪ {[bmapstart]}) Psi
               Z9 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw2 Hlvl Hkk2 HZ9a0
               ltac:(rewrite HbnoD; exact Hbicov)
               ltac:(rewrite HbnoD; exact Hbilog)
               ltac:(discriminate)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hop HfsbD Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hpstep Hsl Hop HfsbD Hheld").
     all: try lkbelow.
     iIntros (CID13 Hq13 mL2) "Hcg Hcnt Hpc %Hcs3 Hop HfsbD Hlk Hsl".
     assert (HsetD : (Sb ∪ {[bmapstart]} ∪ {[uint bnoD]} : gset Z)
@@ -2339,10 +2349,14 @@ Section BallocAlloc.
        The plain form is recovered immediately, so nothing else moves. *)
     iDestruct "Hlctx" as (Psi) "#Hlctxa".
     iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
+    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
+    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
+                  bmapstart (bitmap_bytes (used ∪ {[ bi ]})) with "Hlctxa")
+      as "Hpstep".
     iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
                  (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used)
                  (free_blk γfs bi) e0 Psi
-                 with "Hau0") as "Hau".
+                 with "Hpstep Hau0") as "Hau".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used) bsdX dX
               (1 + u)%nat cr Sb e0 0%nat Psi (⊤ ∖ ↑bitmapN)

@@ -789,7 +789,7 @@ Section EndOpDefs.
         ∃ bs, fs_chalf γfs (log_slot_bno logstart i) bs) ∗
      bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
-  Lemma eo_open_of_batch (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+  Lemma eo_open_of_batch (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) :
     log_state Psi bn γfs cov logstart n LB pend -∗
@@ -817,7 +817,7 @@ Section EndOpDefs.
          It travels OUTSIDE [eo_open], beside the mirror's value and row (b),
          because the commit is where it moves and the commit is where those
          two are spent. *)
-      Psi (lm_committed M0 cov logstart) ∗
+      Psi (lm_committed M0 cov logstart) (lm_logged L cov logstart) ∗
       eo_open bn γfs cov logstart n W L D (fun _ => []) 0.
   Proof.
     rewrite /log_state /eo_open.
@@ -853,15 +853,16 @@ Section EndOpDefs.
      chained: the arithmetic belongs at the site that HOLDS the chain, not
      inside the packing lemma.  At the [n = 0] fast deposit it is the
      checkout's own row, unchanged. *)
-  Lemma eo_open_to_batch (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+  Lemma eo_open_to_batch (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (pend : gset Z) (M : log_mirror) :
     lm_hdr M logstart = (0%nat, []) ->
     log_mirror_tie_body M L cov logstart ∅ ->
     log_mirror_half M -∗
-    (* the client's payload, re-parked at the view the commit produced *)
-    Psi (lm_committed M cov logstart) -∗
+    (* the client's payload, re-parked at the view the commit produced --
+       at BOTH indices, which after a commit are the same map *)
+    Psi (lm_committed M cov logstart) (lm_logged L cov logstart) -∗
     eo_open bn γfs cov logstart 0 [] L D Lw 0 -∗
     log_state Psi bn γfs cov logstart 0 ∅ pend.
   Proof.
@@ -1293,7 +1294,7 @@ Section EndOpBlocks.
   (*  batch re-formed at n = 0.                                          *)
   (* ================================================================== *)
   Local Lemma eo_tail `{GEN : GenId} `{CID0 : CpuId} 
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -1845,7 +1846,8 @@ Section EndOpBlocks.
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ) (D0 : gmap Z (list (bv 8)))
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+      (D0 Dc : gmap Z (list (bv 8)))
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) (Mc : log_mirror)
       (pidv : mword 32) (dq : dfrac)
@@ -1877,6 +1879,11 @@ Section EndOpBlocks.
        ([LogDefs.lm_committed_upd_ne]: a fill writes a log SLOT, which is
        neither the header nor a home block). *)
     D0 = lm_committed Mc cov logstart ->
+    (* THE PAYLOAD'S SECOND INDEX (durable-disk 3a).  Same device: a
+       parameter with a pure tie, maintained across the fills by
+       [LogDefs.lm_logged_insert_ne] (a fill writes a log SLOT, and the
+       logged view reads [L] only at a HOME block). *)
+    Dc = lm_logged L cov logstart ->
     eo_regs m M ->
     (* threaded through unchanged to [eo_tail]'s own re-acquire of "log" --
        [eo_commit] itself never touches the lock. *)
@@ -1902,12 +1909,12 @@ Section EndOpBlocks.
     eo_frame4 m -∗
     eo_frameS m -∗
     log_mirror_half Mc -∗
-    Psi D0 -∗
+    Psi D0 Dc -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hrow HD0 Hregs Hbelow.
+    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hrow HD0 HDc Hregs Hbelow.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc Hpsi
@@ -1922,18 +1929,17 @@ Section EndOpBlocks.
     rewrite /eo_open.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
-    (* ---- THE CLIENT'S LAW, SPENT ONCE (durable-disk 1d', items 3 and 4).
-       The committer holds [log.lock]'s batch, so [L] is FROZEN, and it opens
-       the byte view's invariant at [logN] to LEND the byte authority to the
-       law.  What comes back is the payload re-indexed at the view this batch
-       is about to commit, and the PREPARED DURABLE STEP the commit permit
-       will run at mask [empty] with [gamma_D]'s auth and [P_wf] lent to it.
-       The mask is TOP here: the lock is not held (the committing flag is
-       what serialises this stretch), and [logN] is openable. ---- *)
-    iEval (rewrite HD0) in "Hpsi".
+    (* ---- THE CLIENT'S LAW, SPENT ONCE (durable-disk 3a).  The payload is
+       ALREADY at this batch's logged view -- every [log_write] re-indexed
+       it -- so the spend needs nothing but the law: no lent byte auth, no
+       home-set tie, no [logN] crossing.  What comes back is the payload
+       re-parked at the identity ([Psi Dc Dc]) and the PREPARED DURABLE STEP
+       the commit permit will run at mask [empty] with [gamma_D]'s auth and
+       [P_wf] lent to it. ---- *)
     iApply fupd_wp.
-    iMod (log_psi_spend Psi γfs cov logstart ⊤ Mc L (logN_top)
-            with "Hbinvh Hlaw HauthL Hpsi") as "(HauthL & Hpsi & Hstep)".
+    iMod (log_psi_spend Psi D0 Dc with "Hlaw Hpsi") as "[Hpsi Hstep]".
+    iEval (rewrite HD0 HDc) in "Hstep".
+    iEval (rewrite HDc) in "Hpsi".
     iModIntro.
     (* the step, at the two spellings the commit permit is stated in *)
     iEval (rewrite (lm_committed_of_clean Mc cov logstart HMchdr)) in "Hstep".
@@ -2517,7 +2523,15 @@ Section EndOpBlocks.
                  Hhdrout).
       exact (lm_logged_insert_ne L cov logstart (log_hdr_bno logstart) bs1
                Hhdrout). }
-    iEval (rewrite -Hdepidx) in "Hpsi".
+    assert (HdepL : lm_logged (<[log_hdr_bno logstart := bs2]>
+                       (<[log_hdr_bno logstart := bs1]> L)) cov logstart
+                    = lm_logged L cov logstart).
+    { rewrite (lm_logged_insert_ne _ cov logstart (log_hdr_bno logstart) bs2
+                 Hhdrout).
+      exact (lm_logged_insert_ne L cov logstart (log_hdr_bno logstart) bs1
+               Hhdrout). }
+    iEval (rewrite -HdepL) in "Hpsi".
+    iEval (rewrite {1} HdepL -Hdepidx) in "Hpsi".
     iAssert (log_state Psi bn γfs cov logstart 0 ∅ ∅)
       with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool Hmirc Hpsi]" as "Hbatch".
     { iApply (eo_open_to_batch Psi bn γfs cov logstart
@@ -2589,7 +2603,8 @@ Section EndOpBlocks.
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ) (D0 : gmap Z (list (bv 8)))
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
+      (D0 Dc : gmap Z (list (bv 8)))
       (n : nat) (W : list (mword 32)) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat) :
@@ -2628,6 +2643,10 @@ Section EndOpBlocks.
        ([LogDefs.lm_committed_upd_ne]) and the tie is re-established in one
        line at the back edge. *)
     D0 = lm_committed Mc cov logstart ->
+    (* AND THE SECOND INDEX (durable-disk 3a), by the same device: a fill
+       writes a log SLOT, so [LogDefs.lm_logged_insert_ne] re-establishes
+       the tie at the back edge in one line. *)
+    Dc = lm_logged L cov logstart ->
     eo_regs m M ->
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat t) : mword 64) ->
     M !!! Regidx Rs4 = log_addr ->
@@ -2653,7 +2672,7 @@ Section EndOpBlocks.
     eo_frame4 m -∗
     eo_frameS m -∗
     log_mirror_half Mc -∗
-    Psi D0 -∗
+    Psi D0 Dc -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
@@ -2662,7 +2681,7 @@ Section EndOpBlocks.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
-      intros CID0 t M L Lw Mc Ht Hfuel HLw HMchdr HMcslot Hrow HD0 Hregs HMs2 HMs4 HMs5;
+      intros CID0 t M L Lw Mc Ht Hfuel HLw HMchdr HMcslot Hrow HD0 HDc Hregs HMs2 HMs4 HMs5;
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc Hpsi
@@ -3793,6 +3812,13 @@ Section EndOpBlocks.
                       (log_slot_bno logstart t) bs2 HMchdr
                       (log_slot_ne_hdr logstart t) Hslotout).
       exact HD0. }
+    (* AND THE LOGGED INDEX AT THE BACK EDGE (durable-disk 3a): the fill
+       moved [L] at a log SLOT, which the logged view never reads. *)
+    assert (HDc' : Dc = lm_logged (<[uint bnol := bs2]> L) cov logstart).
+    { rewrite Hubnol
+        (lm_logged_insert_ne L cov logstart (log_slot_bno logstart t) bs2
+           Hslotout).
+      exact HDc. }
     assert (Hseq : seq 0 (S t) = seq 0 t ++ [t]) by (rewrite seq_S; reflexivity).
     iAssert ([∗ list] i ∈ seq 0 (S t),
                fs_chalf γfs (log_slot_bno logstart i) (Lw' i))%I
@@ -3852,7 +3878,7 @@ Section EndOpBlocks.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Mc' Hlt
                 (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot Hrow' HD0'
-                HJ3regs HJ3s2 HJ3s4 HJ3s5
+                HDc' HJ3regs HJ3s2 HJ3s4 HJ3s5
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hpsi
                       Hopen Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
@@ -3886,12 +3912,12 @@ Section EndOpBlocks.
       rewrite Htn in HLw'. rewrite Htn in HMc'slot.
       iEval (rewrite Htn) in "Hopen".
       iApply (eo_commit (CID0 := CIDa25)  γs j γl γu γd γk pd pav pu bn γ γfs
-                cov logstart dev Psi D0
+                cov logstart dev Psi D0 Dc
                 n W Lw' (<[uint bnol := bs2]> L) D Mc' pidv dq m J3 K eb lks
                 Vpr HK (conj Hcovok Hlogsub) Hj Hgl (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
-                HMc'hdr HMc'slot Hrow' HD0'
+                HMc'hdr HMc'slot Hrow' HD0' HDc'
                 HJ3regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hpsi
                       Hopen Hcont").
@@ -3903,7 +3929,7 @@ Section EndOpBlocks.
   (*  held, then release, falling straight into the epilogue at +0x92.    *)
   (* ================================================================== *)
   Local Lemma eo_fast `{GEN : GenId} `{CID0 : CpuId} 
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -5104,12 +5130,12 @@ Section ProofEndOp.
         iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs9)  j pidv dq m K eb eb lks Vpr
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply (eo_loop γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev
-                  Psi (lm_committed M0 cov logstart)
+                  Psi (lm_committed M0 cov logstart) (lm_logged L cov logstart)
                   nl W D pidv dq m K eb lks Vpr nl
                   HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) M0 ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HM0hdr ltac:(intros i Hi; lia)
-                  HM0row eq_refl HY4regs HY4s2 HY4s4 HY4s5
+                  HM0row eq_refl eq_refl HY4regs HY4s2 HY4s4 HY4s5
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hpsi
                         Hopen Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)

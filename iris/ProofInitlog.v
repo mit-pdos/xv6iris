@@ -2574,13 +2574,17 @@ Section ProofInitlog.
                               (log_hdr_bno logstart) bs') logstart
                     = (0%nat, [])).
     { rewrite /lm_hdr lm_upd_view_eq Hhdec //. }
-    (* THE BOOT PICKS THE PAYLOAD, AND IT PICKS THE TRIVIAL ONE
-       (durable-disk 1d').  [LogInv.log_ctx]'s existential is what lets it:
-       nothing in the boot chain threads a [Psi], and no caller above ever
-       names one.  [Psi := fun _ => emp] is a PARAMETER of this stage, not a
-       theorem -- stage 2c replaces it by [fs_view Gamma_L]'s body and the
-       law below stops being free. *)
-    iAssert (log_state (fun _ => emp)%I bn γfs cov logstart 0%nat ∅ ∅)
+    (* THE BOOT PICKS THE PAYLOAD, AND IT IS THE DEBT ITSELF (durable-disk
+       3a).  [LogInv.log_ctx]'s existential is what lets it: nothing in the
+       boot chain threads a [Psi], and no caller above ever names one.  The
+       witness is [LogDefs.fs_dstep] at the durable name -- "the durable
+       state owes a move from the committed view to the current logged
+       view" -- and its two laws are exactly the debt's algebra:
+       [fs_dstep_id] re-parks at a commit and [fs_dstep_trans] absorbs a
+       supplier's own step at a write.  At GENESIS the two indices coincide
+       ([LogDefs.lm_committed_clean] off the clean header and row (b) at the
+       empty batch), so the parked debt is the identity. *)
+    iAssert (log_state (fs_dstep riscv_dview_name) bn γfs cov logstart 0%nat ∅ ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_state.
       iExists ([] : list (mword 32)),
@@ -2615,8 +2619,9 @@ Section ProofInitlog.
          [L] from the era's disk, the mirror was born at that disk, and the
          recovering install moved the two at exactly the same blocks to
          exactly the same bytes.  So the row is arithmetic on the chain. *)
-      iSplitR; [| done ].
-      iPureIntro.
+      lazymatch goal with
+      | |- environments.envs_entails _ (⌜?P⌝ ∗ _)%I => assert (Hrow0 : P)
+      end.
       { intros bb Hbb _.
         rewrite /fs_home_set in Hbb.
         apply elem_of_difference in Hbb as [Hbcov Hbout].
@@ -2653,8 +2658,17 @@ Section ProofInitlog.
           rewrite (lm_install_miss M ((hdr_dec bs_hdr).2)
                      (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) bb
                      HnnW Hmiss2).
-          exact (HLmir bb Hbcov). } }
-    iAssert (log_res (fun _ => emp)%I γ bn γfs cov logstart)
+          exact (HLmir bb Hbcov). }
+      iSplitR; [iPureIntro; exact Hrow0|].
+      (* THE PARKED DEBT AT GENESIS IS THE IDENTITY.  The clean header plus
+         row (b) at the empty batch say the committed view IS the logged
+         view, and a step that changes no byte is [LogDefs.fs_dstep_id] --
+         honest at ANY body of [P_wf], which is what separates it from the
+         [fs_dstep_rebase] this site used to lean on. *)
+      rewrite (lm_committed_clean _ _ cov logstart Hmhdr
+                 (fun bb Hbb => Hrow0 bb Hbb (not_elem_of_empty bb))).
+      iApply fs_dstep_id. }
+    iAssert (log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
@@ -2691,24 +2705,28 @@ Section ProofInitlog.
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
-            (log_res (fun _ => emp)%I γ bn γfs cov logstart)
+            (log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
             with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
-    { rewrite /log_ctx. iExists (fun _ => emp)%I. rewrite /log_ctx_at.
+    { rewrite /log_ctx. iExists (fs_dstep riscv_dview_name). rewrite /log_ctx_at.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp"|].
       iSplitR; [iExact "Hswlb"|].
       iSplitR; [iExact "Hbrow"|].
-      (* THE CLIENT'S COMMIT LAW, AT THE TRIVIAL PAYLOAD.  The payload is
-         [emp], so the only content of the law is the PREPARED DURABLE STEP,
-         and while [P_wf] is a bare byte map that step is
-         [LogDefs.fs_dstep_rebase] -- the unconditional re-base the commit
-         permit used to perform itself.  Both halves are this stage's
-         parameters and are called out as such. *)
-      rewrite /log_psi_commit. iModIntro.
-      iIntros (M0 L0 Lb0) "(Ha & _ & _)". iModIntro.
-      iFrame "Ha". iSplitR; [done|]. iApply fs_dstep_rebase. }
+      (* THE PAYLOAD'S TWO LAWS, AND BOTH ARE THE DEBT'S OWN ALGEBRA
+         (durable-disk 3a).  The commit law hands the accumulated debt out
+         and re-parks the identity ([fs_dstep_id]); the write law absorbs a
+         supplier's own durable step onto the right of the chain
+         ([fs_dstep_trans]).  Neither mentions [fs_dview]'s BODY, so both
+         survive the flip of that body verbatim. *)
+      iSplitR.
+      - rewrite /log_psi_commit. iModIntro.
+        iIntros (D0 Dc) "Hdebt". iModIntro. iFrame "Hdebt".
+        iApply fs_dstep_id.
+      - rewrite /log_psi_step. iModIntro.
+        iIntros (D0 Dc Dc') "Hdebt Hstep". iModIntro.
+        iApply (fs_dstep_trans with "Hdebt Hstep"). }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".

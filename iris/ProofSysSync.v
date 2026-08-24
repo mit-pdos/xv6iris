@@ -276,7 +276,7 @@ Section SsProps.
   (* The log lock's resource, opened for exactly the three cells sys_sync
      reads.  Nothing else in [log_res] is touched, and the closing wand puts
      the same three back -- there is no ghost step anywhere in this proof. *)
-  Lemma ss_cells (Psi : gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Lemma ss_cells (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) :
     log_res Psi γ bn γfs cov logstart -∗
     ∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32),
@@ -316,7 +316,7 @@ Section SsProps.
      inside the loop means either can be entered at a hart nobody knew about
      when it was established. *)
   Definition ss_exit `{GEN : GenId} (CID0 : CPU)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -339,7 +339,7 @@ Section SsProps.
       WP (Loop : expr riscv_lang)))%I.
 
   Definition ss_loop `{GEN : GenId} (CID0 : CPU)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -378,7 +378,7 @@ Section SsBodies.
 
   (* ---- THE SHARED TAIL: +0x5e (a0 := &log) .. +0x72 (c.ret) ---- *)
   Lemma ss_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -637,7 +637,7 @@ Section SsBodies.
      at +0x5e.  The Löb hypothesis arrives WITH its [▷]; the taken [bge] at
      +0x56 is what strips it. ---- *)
   Lemma ss_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -992,7 +992,7 @@ Section SsBodies.
      entry to the wait loop.  Both guard arms -- "committing" (taken) and
      "outstanding > 0" (fallen) -- converge here. ---- *)
   Lemma ss_entry_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)

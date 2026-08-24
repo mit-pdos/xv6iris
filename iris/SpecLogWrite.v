@@ -97,6 +97,7 @@ Definition wp_log_write_gen_body
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z)
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -135,7 +136,17 @@ Definition wp_log_write_gen_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  log_ctx_at Psi γ bn γfs cov logstart dev -∗
+  (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)).  The parked
+     payload is indexed by the CURRENT LOGGED VIEW as well as the committed
+     one, so a [log_write] MOVES that index and the client has to justify
+     the move.  That is why these three forms can no longer take the
+     Psi-FREE [LogInv.log_ctx]: [Psi D0 Dc ==∗ Psi D0 (<[b := bs]> Dc)] is
+     not provable at an arbitrary payload, and every supplier discharges it
+     by composing its own [Gamma_D] step into the debt
+     ([LogInv.log_psi_write]). *)
+  (∀ D0 Dc : gmap Z (list (bv 8)),
+     Psi D0 Dc ==∗ Psi D0 (<[uint bno := bs]> Dc)) -∗
   (* the slot unit backing the (possible) bpin *)
   bslot -∗
   (* THE RESERVATION.  A unit must be IN HAND either way -- that is what
@@ -207,7 +218,7 @@ Definition wp_log_write_au_body
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
-    (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
     (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -304,8 +315,8 @@ Definition wp_log_write_au_body
      fsblock (fs_bytes γfs) (uint bno) bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 (uint bno) -∗ ⌜(v <= e0)%nat⌝ -∗
       fsblock (fs_bytes γfs) (uint bno) bs -∗
-      ∀ D0 : gmap Z (list (bv 8)),
-        Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)) -∗
+      ∀ D0 Dc : gmap Z (list (bv 8)),
+        Psi D0 Dc ={Efs, ⊤}=∗ Psi D0 (<[uint bno := bs]> Dc) ∗ Φfsb)) -∗
   (* the checked-out buffer, payload still indexed at the old content *)
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -376,7 +387,7 @@ Definition wp_log_write_au_range_body
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (off len : nat) (sub_new : list (bv 8))
     (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
-    (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
     (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -424,8 +435,8 @@ Definition wp_log_write_au_range_body
        sub_old = take len (drop off bsl)⌝ -∗
       logged_at γ e0 (uint bno) -∗ ⌜(v <= e0)%nat⌝ -∗
       FsBlocks.byte_range (fs_bytes γfs) (uint bno) (Z.of_nat off) sub_new -∗
-      ∀ D0 : gmap Z (list (bv 8)),
-        Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)) -∗
+      ∀ D0 Dc : gmap Z (list (bv 8)),
+        Psi D0 Dc ={Efs, ⊤}=∗ Psi D0 (<[uint bno := bs]> Dc) ∗ Φfsb)) -∗
   (* the checked-out buffer, payload still indexed at the old content *)
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -452,12 +463,12 @@ Definition wp_log_write_au_range_body
 Lemma lw_au_whole `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
     (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
-    (Psi : gmap Z (list (bv 8)) -> iProp Σ) :
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) :
   (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
      fsblock (fs_bytes γfs) bno bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
       fsblock (fs_bytes γfs) bno bs -∗
-      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb))
+      ∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ={Efs, ⊤}=∗ Psi D0 (<[bno := bs]> Dc) ∗ Φfsb))
   -∗
   (|={⊤, Efs}=> ∃ (sub_old : list (bv 8)) (v : nat),
      ⌜length sub_old = BSIZE⌝ ∗
@@ -467,7 +478,7 @@ Lemma lw_au_whole `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
        sub_old = take BSIZE (drop 0 bsl)⌝ -∗
       logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
       FsBlocks.byte_range (fs_bytes γfs) bno (Z.of_nat 0) bs -∗
-      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)).
+      ∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ={Efs, ⊤}=∗ Psi D0 (<[bno := bs]> Dc) ∗ Φfsb)).
 Proof.
   iIntros "Hau". iMod "Hau" as (bsl' v) "(Hfb & Hlb & Hcl)".
   rewrite /fsblock. iDestruct "Hfb" as "[%Hl Hr]".
@@ -492,8 +503,18 @@ Qed.
    from [rec_owned_acc]. *)
 Lemma lw_au_rec `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
-    (kslot : nat) (bsl rec_new : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
-    (Psi : gmap Z (list (bv 8)) -> iProp Σ) :
+    (kslot : nat) (bs bsl rec_new : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) :
+  (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)).  With the
+     payload indexed by the CURRENT LOGGED VIEW as well, a [log_write]
+     MOVES that index, and [Psi D0 Dc ==∗ Psi D0 (<[bno := bs]> Dc)] is
+     not provable at an arbitrary [Psi].  So it is a premise, and every
+     supplier discharges it by composing its own [Gamma_D] step into the
+     parked debt ([LogInv.log_psi_write] off the log's own
+     [log_psi_step]).  [bs] is the whole block's new logged content --
+     the buffer log_write is handed -- which a record writer knows even
+     though it owns only its own 64-byte run. *)
+  (∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ==∗ Psi D0 (<[bno := bs]> Dc)) -∗
   (|={⊤, Efs}=> ∃ rec_old : list (bv 8),
      ⌜length rec_old = 64%nat⌝ ∗
      FsStateDefs.byte_range (fs_gamma_L γfs) bno
@@ -510,16 +531,17 @@ Lemma lw_au_rec `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
        sub_old = take 64%nat (drop (64 * kslot)%nat bsl)⌝ -∗
       logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
       FsBlocks.byte_range (fs_bytes γfs) bno (Z.of_nat (64 * kslot)) rec_new -∗
-      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)).
+      ∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ={Efs, ⊤}=∗ Psi D0 (<[bno := bs]> Dc) ∗ Φfsb)).
 Proof.
-  iIntros "Hau".
+  iIntros "Hstep Hau".
   iMod (log_epoch_lb_0 γ) as "#Hlb0".
   iMod "Hau" as (rec_old) "(%Hl & Hr & Hcl)".
   iModIntro. iExists rec_old, 0%nat.
   rewrite -!gamma_byte_range.
   iSplitR; [iPureIntro; exact Hl |]. iFrame "Hr Hlb0".
-  iIntros "(%Hlbsl & %Hlrec & %Hslice) _ _ Hr %D0 Hpsi".
+  iIntros "(%Hlbsl & %Hlrec & %Hslice) _ _ Hr %D0 %Dc Hpsi".
   iMod ("Hcl" with "[//] Hr") as "HPhi".
+  iMod ("Hstep" with "Hpsi") as "Hpsi".
   iModIntro. iFrame "Hpsi HPhi".
 Qed.
 
@@ -540,7 +562,9 @@ Proof. unfold BSIZE. lia. Qed.
 Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
     (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat)
-    (Psi : gmap Z (list (bv 8)) -> iProp Σ) :
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) :
+  (* THE PAYLOAD-STEP PREMISE -- see [lw_au_rec] above. *)
+  (∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ==∗ Psi D0 (<[bno := bs]> Dc)) -∗
   (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
      fsblock (fs_bytes γfs) bno bsl' ∗
      (⌜bsl' = bsl⌝ -∗ fsblock (fs_bytes γfs) bno bs ={Efs, ⊤}=∗ Φfsb))
@@ -549,14 +573,15 @@ Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
      fsblock (fs_bytes γfs) bno bsl' ∗ log_epoch_lb γ v ∗
      (⌜bsl' = bsl⌝ -∗ logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
       fsblock (fs_bytes γfs) bno bs -∗
-      ∀ D0 : gmap Z (list (bv 8)), Psi D0 ={Efs, ⊤}=∗ Psi D0 ∗ Φfsb)).
+      ∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ={Efs, ⊤}=∗ Psi D0 (<[bno := bs]> Dc) ∗ Φfsb)).
 Proof.
-  iIntros "Hau".
+  iIntros "Hstep Hau".
   iMod (log_epoch_lb_0 γ) as "#Hlb0".
   iMod "Hau" as (bsl') "[Hfsb Hcl]".
   iModIntro. iExists bsl', 0%nat. iFrame "Hfsb Hlb0".
-  iIntros "%Hbs _ _ Hfsb %D0 Hpsi".
+  iIntros "%Hbs _ _ Hfsb %D0 %Dc Hpsi".
   iMod ("Hcl" with "[//] Hfsb") as "HPhi".
+  iMod ("Hstep" with "Hpsi") as "Hpsi".
   iModIntro. iFrame "Hpsi HPhi".
 Qed.
 
@@ -591,6 +616,7 @@ Definition wp_log_write_gene_body
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z) (e0 : nat)
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -609,7 +635,17 @@ Definition wp_log_write_gene_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  log_ctx_at Psi γ bn γfs cov logstart dev -∗
+  (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)).  The parked
+     payload is indexed by the CURRENT LOGGED VIEW as well as the committed
+     one, so a [log_write] MOVES that index and the client has to justify
+     the move.  That is why these three forms can no longer take the
+     Psi-FREE [LogInv.log_ctx]: [Psi D0 Dc ==∗ Psi D0 (<[b := bs]> Dc)] is
+     not provable at an arbitrary payload, and every supplier discharges it
+     by composing its own [Gamma_D] step into the debt
+     ([LogInv.log_psi_write]). *)
+  (∀ D0 Dc : gmap Z (list (bv 8)),
+     Psi D0 Dc ==∗ Psi D0 (<[uint bno := bs]> Dc)) -∗
   (* the slot unit backing the (possible) bpin *)
   bslot -∗
   (* THE CREDIT, AS A RESOURCE (fs-log.md §G.19): either this op logged the
@@ -650,6 +686,7 @@ Definition wp_log_write_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+    (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
@@ -676,7 +713,17 @@ Definition wp_log_write_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
+  log_ctx_at Psi γ bn γfs cov logstart dev -∗
+  (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)).  The parked
+     payload is indexed by the CURRENT LOGGED VIEW as well as the committed
+     one, so a [log_write] MOVES that index and the client has to justify
+     the move.  That is why these three forms can no longer take the
+     Psi-FREE [LogInv.log_ctx]: [Psi D0 Dc ==∗ Psi D0 (<[b := bs]> Dc)] is
+     not provable at an arbitrary payload, and every supplier discharges it
+     by composing its own [Gamma_D] step into the debt
+     ([LogInv.log_psi_write]). *)
+  (∀ D0 Dc : gmap Z (list (bv 8)),
+     Psi D0 Dc ==∗ Psi D0 (<[uint bno := bs]> Dc)) -∗
   (* the slot unit backing the (possible) bpin *)
   bslot -∗
   (* one unit of this operation's reservation, spent unconditionally *)
@@ -721,7 +768,7 @@ Module Type LOG_WRITE.
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (off len : nat) (sub_new : list (bv 8))
       (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
@@ -741,7 +788,7 @@ Module Type LOG_WRITE.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
-      (Psi : gmap Z (list (bv 8)) -> iProp Σ)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
@@ -758,10 +805,11 @@ Module Type LOG_WRITE.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z) (e0 : nat)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
-                             bs bsl bsd d u cr Sb e0 m n eb p K b lks.
+                             bs bsl bsd d u cr Sb e0 Psi m n eb p K b lks.
 
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
      set-forgetting instance of this at [cr = false]; it is kept as its own
@@ -774,10 +822,11 @@ Module Type LOG_WRITE.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gen_body bn γ γfs γd cov logstart dev k pidv bno
-                            bs bsl bsd d u cr Sb m n eb p K b lks.
+                            bs bsl bsd d u cr Sb Psi m n eb p K b lks.
 
   Parameter wp_log_write_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
@@ -785,8 +834,9 @@ Module Type LOG_WRITE.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_sconf_body bn γ γfs γd cov logstart dev k pidv bno
-                              bs bsl bsd d u m n eb p K b lks.
+                              bs bsl bsd d u Psi m n eb p K b lks.
 End LOG_WRITE.
