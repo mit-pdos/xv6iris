@@ -350,6 +350,27 @@ Record riscvEraGS := RiscvEraGS {
   era_resv_name : gname;
 }.
 
+(* THE DURABLE FILE SYSTEM'S REMAINING GHOST NAMES (durable-disk 2c;
+   claude-notes/design/fs-state.md section 1).  The committed view
+   [Gamma_D] is a record of THREE things: the byte points-to
+   [Phi_D a v := a -> v at riscv_dview_name], which the field below
+   already supplies, and two plain gnames -- the link-counting family and
+   the top-level abstract map.  They ride the fixed layer as ONE BUNDLE
+   FIELD rather than as two more positional names (the bundle rule, ruled
+   for 2c): a gname a CLIENT must be able to name has to be fixed-layer,
+   and a record keeps [Pc]/[HPc]/[Hproj]/[Hswap]/[boot_fixedGS] at one
+   extra argument however many of them there turn out to be.
+
+   THE RECORD IS DECLARED HERE, in the machine layer, and it names NO file
+   system: two gnames and nothing else.  What they are gnames OF is stated
+   entirely above, where [FsState]'s cameras live -- exactly as
+   [riscv_crash_pred] is an arbitrary client [iProp] here and [P_fs]
+   there. *)
+Record fs_dur_names := MkFsDurNames {
+  fdn_link : gname;   (* FsStateLink's link-counting family, at Gamma_D *)
+  fdn_top  : gname;   (* FsState's top-level abstract map, at Gamma_D   *)
+}.
+
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_invGS :: invGS Σ;
   riscvF_regGS :: ghost_mapG Σ register (sigT type_of_register);
@@ -463,6 +484,23 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      image's committed view ([FsCrash.P_fs_alloc]) -- the machine layer
      cannot compute that view and must not name it. *)
   riscv_dview_name : gname;
+  (* [Gamma_D]'s REMAINING TWO GNAMES, as ONE BUNDLE (durable-disk 2c).
+     See [fs_dur_names] above for the record and for why it is one field.
+     Like [riscv_dview_name] these are FIXED-layer because the durable
+     file system is what survives a crash and because a client -- the
+     log's parked payload, the commit debt -- has to NAME the instance
+     it owes a step at.
+
+     THE CLIENT ALLOCATES THEM, not adequacy, and that is a deviation
+     from 2c's task text with a reason: the link family's camera
+     ([FsStateLink.linkUR = gmapUR Z (authR natUR)]) has NO authority
+     over which keys exist, so a family allocated at the unit CANNOT be
+     grown -- [eps ~~> link_elem I] is refuted by the frame
+     [{[0 := auth 5]}].  So [RiscvAdequacy]'s [HPc] hands the record back
+     EXISTENTIALLY: the client mints both gnames at the values it needs
+     inside its own update and the machine layer, which must not name a
+     file-system camera at all, learns only that they exist. *)
+  riscv_fsdur : fs_dur_names;
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
      durability invariant over the durable disk, sealed into [crash_inv]
      below.  A bare [iProp Σ] again (it was [dk]-indexed while the tie was a

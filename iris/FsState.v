@@ -353,6 +353,23 @@ Section FsState.
     iModIntro. iExists gl, gt. iFrame.
   Qed.
 
+  (* THE DEGENERATE INSTANCE, and it is what durable-disk 2c's fixed-layer
+     plumbing mints: two fresh gnames with an EMPTY top map and an empty
+     link family.  It exists because [RiscvPtsto.fs_dur_names] -- the
+     bundle [Gamma_D]'s two gnames ride the fixed layer in -- has to be
+     produced inside adequacy's own update, and the machine layer must not
+     name a file-system camera.  The IMAGE's instance is
+     [fs_boot_alloc_at]; this is the same lemma at [I = empty]. *)
+  Lemma fs_boot_alloc_empty :
+    ⊢ |==> ∃ gl gt : gname,
+        ghost_map_auth gt 1 (∅ : gmap Z fs_node) ∗ fs_links gl ∅.
+  Proof.
+    iMod (fs_boot_alloc_at ∅ ∅) as (gl gt) "(Ha & _ & Hl)".
+    { apply link_elem_valid_no_ents.
+      intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
+    iModIntro. iExists gl, gt. iFrame.
+  Qed.
+
   Lemma fs_boot_alloc (I : gmap Z fs_node) :
     ✓ link_elem I ->
     ⊢ |==> ∃ gl gt : gname,

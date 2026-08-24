@@ -187,19 +187,20 @@ Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
    on or off).  Nothing new is proved and nothing new is assumed. *)
 Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (cov : gset Z) (ls : Z)
-    (Hinv : invGS Σ) (γgen γstart γreg γd γdv γsw : gname) (g' : gstate) :
+    (Hinv : invGS Σ) (γgen γstart γreg γd γdv γsw : gname)
+    (Γd : fs_dur_names) (g' : gstate) :
   ⊢ @power_interp Σ
-       (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
-          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls)) g' -∗
-    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls -∗
+       (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv Γd γsw
+          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov ls)) g' -∗
+    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov ls -∗
     ◇ ⌜fs_boot_pure cov ls (v_disk (g'.(gdev).(dvirtio)))⌝.
 Proof.
   exact (disk_proj_trace XV6_DISK_BYTES
-           (fun a b c d e => P_fs_named a XV6_DISK_BYTES b c d e cov ls)
+           (fun a b c d e Gd => P_fs_named a XV6_DISK_BYTES b c d e Gd cov ls)
            (fs_boot_pure cov ls)
-           (fun a b c d e dk =>
-              P_fs_project a XV6_DISK_BYTES b c d e cov ls dk)
-           Hinv γgen γstart γreg γd γdv γsw g').
+           (fun a b c d e Gd dk =>
+              P_fs_project a XV6_DISK_BYTES b c d e Gd cov ls dk)
+           Hinv γgen γstart γreg γd γdv γsw Γd g').
 Qed.
 
 (* ...AND A [phi] THAT IS NOT ABOUT THE DISK AT ALL, beside it.
@@ -225,18 +226,19 @@ Definition xv6_trace_pure (cov : gset Z) (ls : Z) (g : gstate) : Prop :=
 
 Lemma xv6_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (cov : gset Z) (ls : Z)
-    (Hinv : invGS Σ) (γgen γstart γreg γd γdv γsw : gname) (g' : gstate) :
+    (Hinv : invGS Σ) (γgen γstart γreg γd γdv γsw : gname)
+    (Γd : fs_dur_names) (g' : gstate) :
   ⊢ @power_interp Σ
-       (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
-          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls)) g' -∗
-    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov ls -∗
+       (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv Γd γsw
+          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov ls)) g' -∗
+    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov ls -∗
     ◇ ⌜xv6_trace_pure cov ls g'⌝.
 Proof.
   iIntros "Hsi HP".
   (* the era-side fact first: its conclusion is PURE, so [state_interp] is
      not spent and the disk projection still has it *)
   iDestruct (power_interp_resv_ok with "Hsi") as %Hresv.
-  iDestruct (fs_trace_hook Σ cov ls Hinv γgen γstart γreg γd γdv γsw g'
+  iDestruct (fs_trace_hook Σ cov ls Hinv γgen γstart γreg γd γdv γsw Γd g'
                with "Hsi HP") as ">%Hdisk".
   iModIntro. iPureIntro. split; [exact Hdisk | exact Hresv].
 Qed.
@@ -405,12 +407,13 @@ Theorem xv6_power_adequacy Σ
        never has to see a [riscvFixedGS] it did not build. *)
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γd γdv γsw : gname) (g' : gstate),
+                   (γgen γstart γreg γd γdv γsw : gname) (Γd : fs_dur_names)
+                   (g' : gstate),
        ⊢ @power_interp Σ
-            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
-               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv Γd γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov
                   (FsImg.sb_logstart sb))) g' -∗
-         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov (FsImg.sb_logstart sb) -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov (FsImg.sb_logstart sb) -∗
          ◇ ⌜phi g'⌝)
     (* the hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
@@ -475,14 +478,17 @@ Proof.
      predicate from here on (design/crash.md, "The durable disk").  This is
      the only place the initial image is ever named. *)
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun (γd γsw γreg γst γdv : gname) =>
-              P_fs_named γd XV6_DISK_BYTES γsw γreg γst γdv cov
+           (fun (γd γsw γreg γst γdv : gname) (Γd : fs_dur_names) =>
+              P_fs_named γd XV6_DISK_BYTES γsw γreg γst γdv Γd cov
                 (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst γdv; iIntros "(Hfr & Hsw & Hdv)";
-                 iMod (P_fs_alloc γsw γreg γst γdv _ D0 cov
+                 iMod fs_boot_alloc_empty as (gl gt) "_";
+                 iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt)
+                         _ D0 cov
                          (FsImg.sb_logstart sb) Hrec Hhwf
                          with "[$Hsw $Hdv]") as (γs) "(%Hseq & HP & _)";
-                 iModIntro; rewrite /P_fs_named;
+                 iModIntro; iExists (MkFsDurNames gl gt);
+                 rewrite /P_fs_named;
                  iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
                  iSplitR; [iPureIntro; exact Hext |];
                  rewrite /P_fs_rec_named; iExists γs;
@@ -493,8 +499,8 @@ Proof.
               agreement that identifies [P_fs]'s image with the machine's,
               and nothing is spent. *)
            (fs_boot_pure cov (FsImg.sb_logstart sb))
-           ltac:(intros γd γsw γreg γst γdv dk;
-                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst γdv cov
+           ltac:(intros γd γsw γreg γst γdv Gd dk;
+                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst γdv Gd cov
                           (FsImg.sb_logstart sb) dk))
            (* CUSTODY AT BIRTH (durable-disk 1a): the era's mirror is the
               picture of the era's own disk, and [P_fs_swap] IS the hook's
@@ -502,8 +508,8 @@ Proof.
               variable in the same fupd, so the era boots already holding a
               true picture and the swap receipt. *)
            (fun dk => mirror_of (fs_blocks dk))
-           ltac:(intros γd γsw γreg γst γdv Er gen dk;
-                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst γdv cov
+           ltac:(intros γd γsw γreg γst γdv Gd Er gen dk;
+                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst γdv Gd cov
                           (FsImg.sb_logstart sb) dk Er gen))
            (* THE TRACE HOOK, threaded straight through: this layer fixes the
               crash predicate but says nothing about what the client reads off
@@ -520,7 +526,7 @@ Proof.
      to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
-  destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
+  destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & Gd & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
@@ -583,12 +589,13 @@ Theorem xv6_fs_adequacy Σ
        never has to see a [riscvFixedGS] it did not build. *)
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γd γdv γsw : gname) (g' : gstate),
+                   (γgen γstart γreg γd γdv γsw : gname) (Γd : fs_dur_names)
+                   (g' : gstate),
        ⊢ @power_interp Σ
-            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
-               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv Γd γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov
                   (FsImg.sb_logstart sb))) g' -∗
-         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov (FsImg.sb_logstart sb) -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov (FsImg.sb_logstart sb) -∗
          ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* mkfs's obligation, at the image the machine powers on with.
@@ -633,14 +640,17 @@ Proof.
      predicate from here on (design/crash.md, "The durable disk").  This is
      the only place the initial image is ever named. *)
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun (γd γsw γreg γst γdv : gname) =>
-              P_fs_named γd XV6_DISK_BYTES γsw γreg γst γdv cov
+           (fun (γd γsw γreg γst γdv : gname) (Γd : fs_dur_names) =>
+              P_fs_named γd XV6_DISK_BYTES γsw γreg γst γdv Γd cov
                 (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst γdv; iIntros "(Hfr & Hsw & Hdv)";
-                 iMod (P_fs_alloc γsw γreg γst γdv _ D0 cov
+                 iMod fs_boot_alloc_empty as (gl gt) "_";
+                 iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt)
+                         _ D0 cov
                          (FsImg.sb_logstart sb) Hrec Hhwf
                          with "[$Hsw $Hdv]") as (γs) "(%Hseq & HP & _)";
-                 iModIntro; rewrite /P_fs_named;
+                 iModIntro; iExists (MkFsDurNames gl gt);
+                 rewrite /P_fs_named;
                  iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
                  iSplitR; [iPureIntro; exact Hext |];
                  rewrite /P_fs_rec_named; iExists γs;
@@ -651,8 +661,8 @@ Proof.
               agreement that identifies [P_fs]'s image with the machine's,
               and nothing is spent. *)
            (fs_boot_pure cov (FsImg.sb_logstart sb))
-           ltac:(intros γd γsw γreg γst γdv dk;
-                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst γdv cov
+           ltac:(intros γd γsw γreg γst γdv Gd dk;
+                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst γdv Gd cov
                           (FsImg.sb_logstart sb) dk))
            (* CUSTODY AT BIRTH (durable-disk 1a): the era's mirror is the
               picture of the era's own disk, and [P_fs_swap] IS the hook's
@@ -660,8 +670,8 @@ Proof.
               variable in the same fupd, so the era boots already holding a
               true picture and the swap receipt. *)
            (fun dk => mirror_of (fs_blocks dk))
-           ltac:(intros γd γsw γreg γst γdv Er gen dk;
-                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst γdv cov
+           ltac:(intros γd γsw γreg γst γdv Gd Er gen dk;
+                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst γdv Gd cov
                           (FsImg.sb_logstart sb) dk Er gen))
            (* THE TRACE HOOK, threaded straight through: this layer fixes the
               crash predicate but says nothing about what the client reads off
@@ -674,7 +684,7 @@ Proof.
      to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
-  destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & ->).
+  destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & Gd & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
@@ -729,12 +739,13 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS xv6Σ)
-                   (γgen γstart γreg γd γdv γsw : gname) (g' : gstate),
+                   (γgen γstart γreg γd γdv γsw : gname) (Γd : fs_dur_names)
+                   (g' : gstate),
        ⊢ @power_interp xv6Σ
-            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv γsw
-               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γdv Γd γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov
                   (FsImg.sb_logstart sb))) g' -∗
-         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv cov
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart γdv Γd cov
              (FsImg.sb_logstart sb) -∗
          ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)

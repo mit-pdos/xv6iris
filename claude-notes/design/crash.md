@@ -187,18 +187,34 @@ Three principles, in order of force:
 2. **One fixed-layer gname `γdisk` for the durable bytes.** The machine layer
    (`state_interp`) holds `● v_disk` at it; PowerOn preserves `v_disk`, so
    the auth is simply still right in the new era — nothing is re-minted and
-   nothing is re-associated. **The FIXED-layer gname roster is six wide**
+   nothing is re-associated. **The FIXED-layer gname roster is six gnames
+   plus ONE BUNDLE**
    (`RiscvPtsto.riscvFixedGS`; every one of them is a `Pc`/`HPc`/`Hproj`/
    `Hswap`/`boot_fixedGS` argument in `RiscvAdequacy` and rides the
    `boot_fixedGS` seam equation into the boot cone): `riscv_gen_name`,
    `riscv_start_name`, `riscv_registry_name`, `riscv_disk_name` (+ its
-   `riscv_disk_size`), `riscv_swap_name`, and `riscv_dview_name` — the
+   `riscv_disk_size`), `riscv_swap_name`, `riscv_dview_name` — the
    COMMITTED BYTE VIEW `γD` (`fs-state.md` §1's `Φ_D`), which rides
    `riscv_disk_name`'s own `DiskImg.diskImgG`, the tree's unique
-   `ghost_mapG Σ Z (bv 8)`, so it costs no new functor. Adequacy mints
-   `γD`'s map EMPTY — the machine layer cannot compute the image's
-   committed view and must not name it — and `FsCrash.P_fs_alloc` fills it
-   at `fs_dbytes D₀` in the same update. The crash predicate `P_fs` owns the `◯`
+   `ghost_mapG Σ Z (bv 8)`, so it costs no new functor — and
+   `riscv_fsdur : fs_dur_names`, `Γ_D`'s two remaining gnames
+   (`fdn_link`, `fdn_top`) as ONE record field. **The BUNDLE RULE (ruled
+   for 2c): a positional name per ghost does not scale past two; a record
+   keeps the five hooks at one extra argument however many durable ghosts
+   `Γ_D` turns out to need.** `fs_dur_names` is declared in `RiscvPtsto.v`
+   itself and names no file system — two gnames and nothing else, exactly
+   as `riscv_crash_pred` is an arbitrary client `iProp` there.
+
+   **Adequacy does NOT allocate the bundle; the CLIENT does, and `HPc`
+   hands the record back existentially** (`|==> ∃ Γd, Pc … Γd`). Forced:
+   the link family's camera `FsStateLink.linkUR = gmapUR Z (authR natUR)`
+   has no authority over which keys exist, so `own g ε ⤳ own g (link_elem I)`
+   is refuted by the frame `{[0 := ● 5]}` — a family adequacy minted at the
+   unit could never be filled. The machine layer therefore never names a
+   file-system camera at all. (`riscv_dview_name`'s own map IS minted here,
+   EMPTY — the machine layer cannot compute the image's committed view and
+   must not name it — and `FsCrash.P_fs_alloc` fills it
+   at `fs_dbytes D₀` in the same update.) The crash predicate `P_fs` owns the `◯`
    fragments (all of them, forever). Auth/frag agreement IS the tie:
    `disk_tie`, `fs_tie_interp` and the `dk`-indexing of `riscv_crash_pred`
    go away; whoever opens `crashN` with the auth in scope learns

@@ -430,7 +430,14 @@ Theorem riscv_system_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId}
        and the FS's durable instance [Gamma_D] is stated over it, so the
        client can only mention it as a parameter.  Its seam equation is the
        same shape as the swap counter's. *)
-    (Pc : gname -> gname -> gname -> gname -> gname -> iProp Σ)
+    (* ...AND BY [Gamma_D]'s REMAINING GNAMES, as ONE [fs_dur_names] BUNDLE
+       (durable-disk 2c).  Unlike the five gnames before it this one is NOT
+       allocated here: the client mints it inside [HPc]'s own update and
+       hands the record back existentially (see [HPc]), because the link
+       family's camera cannot be grown from its unit.  The machine layer
+       therefore never names a file-system camera; it only carries the
+       record into [riscvFixedGS] so that a client can spell [Gamma_D]. *)
+    (Pc : gname -> gname -> gname -> gname -> gname -> fs_dur_names -> iProp Σ)
     (* the durable disk's extent, for the one-time mint of its fragments
        into the client's crash predicate *)
     (ndisk : nat)
@@ -457,7 +464,7 @@ Theorem riscv_system_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId}
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
        mono_nat_auth_own γsw 1 0%nat ∗
        ghost_map_auth γdv 1 (∅ : gmap Z (bv 8)) ⊢
-         |==> Pc γdisk γsw γreg γst γdv) :
+         |==> ∃ Γd : fs_dur_names, Pc γdisk γsw γreg γst γdv Γd) :
   (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
@@ -614,9 +621,13 @@ Proof.
   (* the crash-spanning invariant, over the client's [Pc] AND the tie's other
      half.  Allocated at the FIXED layer, so it outlives every era; both
      power arms leave it closed. *)
+  (* [Gamma_D]'S TWO GNAMES COME BACK EXISTENTIALLY (durable-disk 2c): the
+     CLIENT mints them, because the link family's camera has no authority
+     over its keys and so cannot be grown from a unit this proof would
+     allocate.  They are consumed here only as data for the record. *)
   iMod (HPc γfdisk γswap γreg γstart γdview
-          with "[$Hfdfrags $Hswap $Hdva]") as "HPc0".
-  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart γdview) with "HPc0")
+          with "[$Hfdfrags $Hswap $Hdva]") as (Γd) "HPc0".
+  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart γdview Γd) with "HPc0")
     as "#Hcinv".
   assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
     by apply lookup_empty.
@@ -624,8 +635,8 @@ Proof.
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ _ γfdisk ndisk γdview
-                  (Pc γfdisk γswap γreg γstart γdview) γswap)
+                  _ _ γfdisk ndisk γdview Γd
+                  (Pc γfdisk γswap γreg γstart γdview Γd) γswap)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
      layer's boot client has the same raw inputs at a fresh era and reuses
@@ -783,9 +794,10 @@ Proof.
      anything but the completion arm, which finds the index move free. *)
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
-           (fun (_ _ _ _ _ : gname) => True%I) 0%nat Hram
+           (fun (_ _ _ _ _ : gname) (_ : fs_dur_names) => True%I) 0%nat Hram
            Hpow Hgen0 Hgid Hresv0).
-  { iIntros (γdisk γsw γreg γst γdv) "_". iModIntro. done. }
+  { iIntros (γdisk γsw γreg γst γdv) "_". iModIntro.
+    iExists (MkFsDurNames γdisk γdisk). done. }
   intros HR.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
             #Hcinv & #Hcert)".
@@ -1267,9 +1279,10 @@ End power.
    from [riscvGpreS]/[xv6G], exactly as the [set] did. *)
 Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
     (Hinv : invGS Σ) (γgen γstart γreg γdisk : gname) (ndisk : nat)
-    (γdview γswap : gname) (Pcp : iProp Σ) : riscvFixedGS Σ :=
+    (γdview : gname) (Γd : fs_dur_names) (γswap : gname) (Pcp : iProp Σ)
+  : riscvFixedGS Σ :=
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ γdisk ndisk γdview Pcp γswap.
+    _ _ γdisk ndisk γdview Γd Pcp γswap.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1323,25 +1336,27 @@ Proof. iIntros "(_ & _ & Htie & _)". iExact "Htie". Qed.
    obligation.  The auth is borrowed and returned inside [Hproj]; here it is
    simply dropped, because at the end of the trace nothing is owed. *)
 Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
-    (ndisk : nat) (Pc : gname -> gname -> gname -> gname -> gname -> iProp Σ)
+    (ndisk : nat)
+    (Pc : gname -> gname -> gname -> gname -> gname -> fs_dur_names -> iProp Σ)
     (Ppure : (Z -> bv 8) -> Prop)
-    (Hproj : forall (γdisk γsw γreg γst γdv : gname) (dk : Z -> bv 8),
+    (Hproj : forall (γdisk γsw γreg γst γdv : gname) (Γd : fs_dur_names)
+                    (dk : Z -> bv 8),
        ⊢ disk_img_auth_sized γdisk ndisk dk -∗
-         ▷ Pc γdisk γsw γreg γst γdv -∗
+         ▷ Pc γdisk γsw γreg γst γdv Γd -∗
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
-            ▷ Pc γdisk γsw γreg γst γdv ∗ ⌜Ppure dk⌝))
+            ▷ Pc γdisk γsw γreg γst γdv Γd ∗ ⌜Ppure dk⌝))
     (Hinv : invGS Σ) (γgen γstart γreg γdisk γdview γswap : gname)
-    (g' : gstate) :
+    (Γd : fs_dur_names) (g' : gstate) :
   ⊢ @power_interp Σ
-       (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview γswap
-          (Pc γdisk γswap γreg γstart γdview)) g' -∗
-    ▷ Pc γdisk γswap γreg γstart γdview -∗
+       (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview Γd γswap
+          (Pc γdisk γswap γreg γstart γdview Γd)) g' -∗
+    ▷ Pc γdisk γswap γreg γstart γdview Γd -∗
     ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
 Proof.
   iIntros "Hsi HP".
   iDestruct (power_interp_disk_auth with "Hsi") as "Htie".
   rewrite /disk_fixed_auth /=.
-  iDestruct (Hproj γdisk γswap γreg γstart γdview
+  iDestruct (Hproj γdisk γswap γreg γstart γdview Γd
                (v_disk (dvirtio (gdev g'))) with "Htie HP")
     as ">(_ & _ & %Hp)".
   iModIntro. iPureIntro. exact Hp.
@@ -1403,19 +1418,31 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        which is what makes a durability property span power cycles.  Taken
        before [Hboot] so the [crash_inv] inside [power_boot_res] is this
        one.  The fifth gname is the committed byte view's
-       ([RiscvPtsto.riscv_dview_name], durable-disk 2c-pre). *)
-    (Pc : gname -> gname -> gname -> gname -> gname -> iProp Σ)
+       ([RiscvPtsto.riscv_dview_name], durable-disk 2c-pre).  The sixth
+       argument is [Gamma_D]'s remaining gnames as ONE [fs_dur_names]
+       bundle (durable-disk 2c), and it is the one the CLIENT allocates --
+       see [HPc]. *)
+    (Pc : gname -> gname -> gname -> gname -> gname -> fs_dur_names -> iProp Σ)
     (* ...ESTABLISHED ONCE, at the initial disk, from the durable disk's full
        fragments and the swap counter: the ONLY place the initial image is
        ever named.  From here on [Pc] is the loop invariant across eras --
        every PowerOn boots into a disk the predicate describes, and it
        describes it through the fragments it owns (design/crash.md, "The
        durable disk"). *)
+    (* ...AND IT IS ALSO WHERE [Gamma_D]'S TWO GNAMES ARE MINTED.  They come
+       back EXISTENTIALLY (durable-disk 2c) rather than being allocated
+       here beside [γdv]: the link family's camera
+       ([FsStateLink.linkUR = gmapUR Z (authR natUR)]) has NO authority over
+       which keys exist, so [own g eps ~~> own g (link_elem I)] is refuted
+       by the frame [{[0 := auth 5]}] and a family minted at the unit could
+       never be filled.  The client mints both at the values its image
+       needs, inside this same update; the machine layer never names a
+       file-system camera. *)
     (HPc : forall γdisk γsw γreg γst γdv : gname,
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
        mono_nat_auth_own γsw 1 0%nat ∗
        ghost_map_auth γdv 1 (∅ : gmap Z (bv 8)) ⊢
-         |==> Pc γdisk γsw γreg γst γdv)
+         |==> ∃ Γd : fs_dur_names, Pc γdisk γsw γreg γst γdv Γd)
     (* THE PURE PROJECTION HOOK (stage H0, claude-notes/projects/
        durable-disk.md).  [Ppure] is a client-chosen pure consequence of [Pc]
        AT THE MACHINE'S OWN DISK IMAGE, and [Hproj] is its proof -- stated,
@@ -1429,11 +1456,12 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        result to [Hboot] below: a boot LEARNS this about the disk it boots
        on, rather than assuming it. *)
     (Ppure : (Z -> bv 8) -> Prop)
-    (Hproj : forall (γdisk γsw γreg γst γdv : gname) (dk : Z -> bv 8),
+    (Hproj : forall (γdisk γsw γreg γst γdv : gname) (Γd : fs_dur_names)
+                    (dk : Z -> bv 8),
        ⊢ disk_img_auth_sized γdisk ndisk dk -∗
-         ▷ Pc γdisk γsw γreg γst γdv -∗
+         ▷ Pc γdisk γsw γreg γst γdv Γd -∗
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
-            ▷ Pc γdisk γsw γreg γst γdv ∗ ⌜Ppure dk⌝))
+            ▷ Pc γdisk γsw γreg γst γdv Γd ∗ ⌜Ppure dk⌝))
     (* THE CUSTODY HOOK (durable-disk 1a), stated at the same raw gnames as
        [Hproj] and for the same reason.  [Mof] is the client's picture of a
        disk image; the era's mirror variable is allocated at [Mof] of the
@@ -1444,17 +1472,18 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        started auth, the durable auth and the predicate all come straight
        back. *)
     (Mof : (Z -> bv 8) -> log_mirror)
-    (Hswap : forall (γdisk γsw γreg γst γdv : gname) (E : riscvEraGS)
+    (Hswap : forall (γdisk γsw γreg γst γdv : gname) (Γd : fs_dur_names)
+                    (E : riscvEraGS)
                     (gen : nat) (dk : Z -> bv 8),
        ⊢ gen ↪[γreg]□ E -∗
          mono_nat_lb_own γst (S gen) -∗
          mono_nat_auth_own γst 1 (gen + 1)%nat -∗
          disk_img_auth_sized γdisk ndisk dk -∗
          ghost_var (era_mirror_name E) 1 (Mof dk) -∗
-         ▷ Pc γdisk γsw γreg γst γdv ==∗
+         ▷ Pc γdisk γsw γreg γst γdv Γd ==∗
            ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
               disk_img_auth_sized γdisk ndisk dk ∗
-              ▷ Pc γdisk γsw γreg γst γdv ∗
+              ▷ Pc γdisk γsw γreg γst γdv Γd ∗
               ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
               mono_nat_lb_own γsw (S gen)))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
@@ -1495,11 +1524,12 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
                    (γgen γstart γreg γdisk γdview γswap : gname)
+                   (Γd : fs_dur_names)
                    (g' : gstate),
        ⊢ @power_interp Σ
-            (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview γswap
-               (Pc γdisk γswap γreg γstart γdview)) g' -∗
-         ▷ Pc γdisk γswap γreg γstart γdview -∗
+            (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview Γd γswap
+               (Pc γdisk γswap γreg γstart γdview Γd)) g' -∗
+         ▷ Pc γdisk γswap γreg γstart γdview Γd -∗
          ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
@@ -1531,9 +1561,10 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
 
           It costs the client nothing ([eq_refl] here) and it does not
           weaken the obligation: [boot_fixedGS] IS what this proof builds. *)
-       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γdview γswap : gname),
-          F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview γswap
-                (Pc γdisk γswap γreg γstart γdview)) ->
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γdview γswap : gname)
+               (Γd : fs_dur_names),
+          F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γdview Γd γswap
+                (Pc γdisk γswap γreg γstart γdview Γd)) ->
        ⊢ power_boot_res HE gen D nproc ndisk Mof g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1582,19 +1613,21 @@ Proof.
      allocation in [riscv_system_adequacy] for why the machine layer cannot
      mint it at the image's committed view. *)
   iMod (ghost_map_alloc (∅ : gmap Z (bv 8))) as (γdview) "[Hdva _]".
+  (* [Gamma_D]'S TWO GNAMES COME BACK EXISTENTIALLY (durable-disk 2c): see
+     [HPc]'s header for why the client, not this proof, mints them. *)
   iMod (HPc γfdisk γswap γreg γstart γdview
-          with "[$Hfdfrags $Hswap $Hdva]") as "HPc0".
-  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart γdview) with "HPc0")
+          with "[$Hfdfrags $Hswap $Hdva]") as (Γd) "HPc0".
+  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart γdview Γd) with "HPc0")
     as "#Hcinv".
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
-  set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γdview γswap
-              (Pc γfdisk γswap γreg γstart γdview)).
+  set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γdview Γd γswap
+              (Pc γfdisk γswap γreg γstart γdview Γd)).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
      faces are convertible. *)
-  pose proof (Hphi Hinv γgen γstart γreg γfdisk γdview γswap) as Hph.
+  pose proof (Hphi Hinv γgen γstart γreg γfdisk γdview γswap Γd) as Hph.
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -1616,13 +1649,15 @@ Proof.
     rewrite Hpow. done. }
   iSplitL.
   { cbn. iSplitL; [|done].
-    assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γd γdv γsw : gname),
-              F = boot_fixedGS Hi γg γs γr γd ndisk γdv γsw
-                    (Pc γd γsw γr γs γdv))
-      by (exists Hinv, γgen, γstart, γreg, γfdisk, γdview, γswap; reflexivity).
+    assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γd γdv γsw : gname)
+                            (Gd : fs_dur_names),
+              F = boot_fixedGS Hi γg γs γr γd ndisk γdv Gd γsw
+                    (Pc γd γsw γr γs γdv Gd))
+      by (exists Hinv, γgen, γstart, γreg, γfdisk, γdview, γswap, Γd;
+          reflexivity).
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
-              (Hproj γfdisk γswap γreg γstart γdview)
-              Mof (Hswap γfdisk γswap γreg γstart γdview)
+              (Hproj γfdisk γswap γreg γstart γdview Γd)
+              Mof (Hswap γfdisk γswap γreg γstart γdview Γd)
               (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
               with "Hcinv"). }
   (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.

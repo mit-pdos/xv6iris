@@ -1737,7 +1737,8 @@ Section fs_crash.
      [gamma_v] every definition in THIS section threads.  This file
      re-exports [LogDefs], so every reading of [fs_dview] is unchanged. *)
 
-  Definition P_fs (γs : fs_crash_names) (γv : gname) (cov : gset Z)
+  Definition P_fs (γs : fs_crash_names) (γv : gname)
+      (Γd : fs_dur_names) (cov : gset Z)
       (logstart : Z) (dk : Z -> bv 8) : iProp Σ :=
     (∃ r : fs_rec,
        fs_hist_auth (fcn_hist γs) (fr_hist r) ∗
@@ -1765,11 +1766,12 @@ Section fs_crash.
      exactly what [fs_arm_acc] reads).  Stated HERE, in the section that must
      stay [riscvFixedGS]-free, because this IS the value the fixed record's
      [riscv_crash_pred] field is built from. *)
-  Definition P_fs_rec_named (γsw γreg γst γv : gname) (cov : gset Z) (ls : Z)
+  Definition P_fs_rec_named (γsw γreg γst γv : gname) (Γd : fs_dur_names)
+      (cov : gset Z) (ls : Z)
       (dk : Z -> bv 8) : iProp Σ :=
     (∃ γs : fs_crash_names,
        ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
-       P_fs γs γv cov ls dk)%I.
+       P_fs γs γv Γd cov ls dk)%I.
 
   (* THE EXTENT: every block the record reads -- the covered blocks and the
      log region -- lies inside the durable disk's [N] bytes.  A pure fact
@@ -1787,11 +1789,12 @@ Section fs_crash.
      instant, and [fs_permit_of_rec] below is how the record's own view
      shift runs under that loan. *)
   Definition P_fs_named (γd : gname) (N : nat) (γsw γreg γst γv : gname)
+      (Γd : fs_dur_names)
       (cov : gset Z) (ls : Z) : iProp Σ :=
     (∃ dk : Z -> bv 8,
        disk_img_bytes γd 0 (disk_read dk 0 N) ∗
        ⌜fs_extent cov ls N⌝ ∗
-       P_fs_rec_named γsw γreg γst γv cov ls dk)%I.
+       P_fs_rec_named γsw γreg γst γv Γd cov ls dk)%I.
 
   (* the record reads the image only on the extent: two images that agree
      on the durable bytes carry the same record *)
@@ -1821,11 +1824,12 @@ Section fs_crash.
     exact (fs_blocks_agree dk dk' N b Heq Hb0 HbN).
   Qed.
 
-  Lemma P_fs_rec_agree (γsw γreg γst γv : gname) (cov : gset Z) (ls : Z)
+  Lemma P_fs_rec_agree (γsw γreg γst γv : gname) (Γd : fs_dur_names)
+      (cov : gset Z) (ls : Z)
       (N : nat) (dk dk' : Z -> bv 8) :
     disk_read dk 0 N = disk_read dk' 0 N ->
     fs_extent cov ls N ->
-    P_fs_rec_named γsw γreg γst γv cov ls dk -∗ P_fs_rec_named γsw γreg γst γv cov ls dk'.
+    P_fs_rec_named γsw γreg γst γv Γd cov ls dk -∗ P_fs_rec_named γsw γreg γst γv Γd cov ls dk'.
   Proof.
     intros Heq Hext.
     assert (Hblk : forall b, b ∈ cov ∪ log_region_set ls ->
@@ -1880,8 +1884,8 @@ Section fs_crash.
   (* THE HEADLINE.  At the disk image the machine layer's tie pins, the crash
      predicate says the REAL disk recovers to the last committed state.  This
      is the fact a crash-time client (recovery, sys_sync) consumes. *)
-  Lemma P_fs_recovers γs γv cov logstart dk :
-    P_fs γs γv cov logstart dk -∗
+  Lemma P_fs_recovers γs γv Γd cov logstart dk :
+    P_fs γs γv Γd cov logstart dk -∗
       ⌜exists (D : gmap Z (list (bv 8)))
               (h : list (gmap Z (list (bv 8)))),
          fs_recovery (fs_blocks dk) D cov logstart /\
@@ -1896,8 +1900,8 @@ Section fs_crash.
   Qed.
 
   (* a receipt is honest: what it names really was committed *)
-  Lemma P_fs_receipt_committed γs γv cov logstart dk D :
-    P_fs γs γv cov logstart dk -∗ fs_receipt γs D -∗
+  Lemma P_fs_receipt_committed γs γv Γd cov logstart dk D :
+    P_fs γs γv Γd cov logstart dk -∗ fs_receipt γs D -∗
       ⌜exists r : fs_rec,
          fs_rec_wf r (fs_blocks dk) cov logstart /\ D ∈ fr_hist r⌝.
   Proof.
@@ -1927,8 +1931,8 @@ Section fs_crash.
   (* the predicate is timeless, exactly as [P_fs_any] is (that one IS this
      one, at the fixed layer's names): every conjunct is a [ghost_map] /
      [mono_nat] / [own] over a discrete cmra *)
-  Global Instance P_fs_named_timeless γd N γsw γreg γst γv cov ls :
-    Timeless (P_fs_named γd N γsw γreg γst γv cov ls).
+  Global Instance P_fs_named_timeless γd N γsw γreg γst γv Γd cov ls :
+    Timeless (P_fs_named γd N γsw γreg γst γv Γd cov ls).
   Proof.
     rewrite /P_fs_named /P_fs_rec_named /P_fs /fs_arm /fs_custody /fs_hist_auth.
     apply _.
@@ -1936,9 +1940,10 @@ Section fs_crash.
 
   (* the record's own [fs_rec_wf] conjuncts, read off at its committed view
      [fr_D].  PURE, hence non-destructive: the record is handed back. *)
-  Lemma P_fs_rec_named_wf (γsw γreg γst γv : gname) (cov : gset Z) (ls : Z)
+  Lemma P_fs_rec_named_wf (γsw γreg γst γv : gname) (Γd : fs_dur_names)
+      (cov : gset Z) (ls : Z)
       (dk : Z -> bv 8) :
-    P_fs_rec_named γsw γreg γst γv cov ls dk -∗
+    P_fs_rec_named γsw γreg γst γv Γd cov ls dk -∗
       ⌜exists D : gmap Z (list (bv 8)),
          fs_recovery (fs_blocks dk) D cov ls /\
          hdr_wf (fs_blocks dk) cov ls⌝.
@@ -1956,11 +1961,12 @@ Section fs_crash.
      it and the predicate are handed straight back.  The [▷] strips under the
      [◇] because the predicate is timeless. *)
   Lemma P_fs_project (γd : gname) (N : nat) (γsw γreg γst γv : gname)
+      (Γd : fs_dur_names)
       (cov : gset Z) (ls : Z) (dk : Z -> bv 8) :
     disk_img_auth_sized γd N dk -∗
-    ▷ P_fs_named γd N γsw γreg γst γv cov ls -∗
+    ▷ P_fs_named γd N γsw γreg γst γv Γd cov ls -∗
     ◇ (disk_img_auth_sized γd N dk ∗
-       ▷ P_fs_named γd N γsw γreg γst γv cov ls ∗
+       ▷ P_fs_named γd N γsw γreg γst γv Γd cov ls ∗
        ⌜fs_extent cov ls N /\
         exists D : gmap Z (list (bv 8)),
           fs_recovery (fs_blocks dk) D cov ls /\
@@ -1975,10 +1981,10 @@ Section fs_crash.
     (* re-index the record at [dk], read the pure fact off it there, and
        re-index back -- the agreement runs in both directions, and nothing
        else moves *)
-    iDestruct (P_fs_rec_agree γsw γreg γst γv cov ls N dk0 dk
+    iDestruct (P_fs_rec_agree γsw γreg γst γv Γd cov ls N dk0 dk
                  (eq_sym Hrd) Hext with "HPr") as "HPr".
     iDestruct (P_fs_rec_named_wf with "HPr") as %Hwf.
-    iDestruct (P_fs_rec_agree γsw γreg γst γv cov ls N dk dk0
+    iDestruct (P_fs_rec_agree γsw γreg γst γv Γd cov ls N dk dk0
                  Hrd Hext with "HPr") as "HPr".
     iModIntro. iSplitL "Ha"; [iExact "Ha"|].
     iSplitL "Hfr HPr".
@@ -2010,6 +2016,7 @@ Section fs_crash.
   (*   [install_trans]'s recovering arms move no exposed ghost state.        *)
   (* -------------------------------------------------------------------- *)
   Lemma P_fs_swap (γd : gname) (N : nat) (γsw γreg γst γv : gname)
+      (Γd : fs_dur_names)
       (cov : gset Z) (ls : Z) (dk : Z -> bv 8)
       (E : riscvEraGS) (gen : nat) :
     gen ↪[γreg]□ E -∗
@@ -2017,10 +2024,10 @@ Section fs_crash.
     mono_nat_auth_own γst 1 (gen + 1)%nat -∗
     disk_img_auth_sized γd N dk -∗
     ghost_var (era_mirror_name E) 1 (mirror_of (fs_blocks dk)) -∗
-    ▷ P_fs_named γd N γsw γreg γst γv cov ls ==∗
+    ▷ P_fs_named γd N γsw γreg γst γv Γd cov ls ==∗
       ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
          disk_img_auth_sized γd N dk ∗
-         ▷ P_fs_named γd N γsw γreg γst γv cov ls ∗
+         ▷ P_fs_named γd N γsw γreg γst γv Γd cov ls ∗
          ghost_var (era_mirror_name E) (1/2) (mirror_of (fs_blocks dk)) ∗
          mono_nat_lb_own γsw (S gen)).
   Proof.
@@ -2030,7 +2037,7 @@ Section fs_crash.
        disk, which is the only thing the auth is borrowed for *)
     iDestruct (disk_img_sized_read with "Ha Hfr") as %Hrd.
     rewrite disk_read_length in Hrd.
-    iDestruct (P_fs_rec_agree γsw γreg γst γv cov ls N dk0 dk
+    iDestruct (P_fs_rec_agree γsw γreg γst γv Γd cov ls N dk0 dk
                  (eq_sym Hrd) Hext with "HPr") as "HPr".
     rewrite /P_fs_rec_named. iDestruct "HPr" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
@@ -2049,13 +2056,13 @@ Section fs_crash.
     iEval (rewrite Hstn) in "Hsa".
     iEval (rewrite Hsw) in "Hswlb".
     (* repack at [dk], then re-index back to the record's own image *)
-    iAssert (P_fs_rec_named γsw γreg γst γv cov ls dk)
+    iAssert (P_fs_rec_named γsw γreg γst γv Γd cov ls dk)
       with "[Hh Harm Hva Hvw]" as "HPr".
     { rewrite /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists r. iFrame "Hh". iSplitR; [iPureIntro; exact Hwf|].
       iFrame "Hva Hvw". iExact "Harm". }
-    iDestruct (P_fs_rec_agree γsw γreg γst γv cov ls N dk dk0
+    iDestruct (P_fs_rec_agree γsw γreg γst γv Γd cov ls N dk dk0
                  Hrd Hext with "HPr") as "HPr".
     iModIntro. iModIntro. iFrame "Hsa Ha HMe Hswlb".
     iNext. iExists dk0. iFrame "Hfr HPr". iPureIntro. exact Hext.
@@ -2092,14 +2099,14 @@ Section fs_crash.
      image's committed home map, and the elements it hands back ARE the FS
      layer's conjunct.  This is where the durable file system is born, and
      it is where stage 2c's image decode lands. *)
-  Lemma P_fs_alloc (γsw γreg γst γv : gname) (dk0 : Z -> bv 8)
+  Lemma P_fs_alloc (γsw γreg γst γv : gname) (Γd : fs_dur_names) (dk0 : Z -> bv 8)
       (D0 : gmap Z (list (bv 8))) (cov : gset Z) (logstart : Z) :
     fs_recovery (fs_blocks dk0) D0 cov logstart ->
     hdr_wf (fs_blocks dk0) cov logstart ->
     mono_nat_auth_own γsw 1 0%nat ∗
     ghost_map_auth γv 1 (∅ : gmap Z (bv 8)) ⊢ |==> ∃ γs : fs_crash_names,
       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
-      P_fs γs γv cov logstart dk0 ∗ fs_receipt γs D0.
+      P_fs γs γv Γd cov logstart dk0 ∗ fs_receipt γs D0.
   Proof.
     intros Hrec Hhwf. iIntros "[Hsw Hva]".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
@@ -2128,13 +2135,13 @@ Section fs_crash.
   (* The mkfs corollary: a freshly formatted disk has an EMPTY on-disk log,
      so its committed state is just its home blocks and no recovery
      hypothesis has to be assumed at all. *)
-  Lemma P_fs_alloc_clean (γsw γreg γst γv : gname) (dk0 : Z -> bv 8)
+  Lemma P_fs_alloc_clean (γsw γreg γst γv : gname) (Γd : fs_dur_names) (dk0 : Z -> bv 8)
       (cov : gset Z) (logstart : Z) :
     hdr_n (fs_blocks dk0 (log_hdr_bno logstart)) = 0 ->
     mono_nat_auth_own γsw 1 0%nat ∗
     ghost_map_auth γv 1 (∅ : gmap Z (bv 8)) ⊢ |==> ∃ γs : fs_crash_names,
       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
-      P_fs γs γv cov logstart dk0 ∗
+      P_fs γs γv Γd cov logstart dk0 ∗
       fs_receipt γs (fs_restrict (fs_blocks dk0)
                        (fs_home_set cov logstart)).
   Proof.
@@ -2167,7 +2174,7 @@ Section fs_crash_seam.
   (* the record at an image, at the fixed layer's names *)
   Definition P_fs_rec (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : iProp Σ :=
     P_fs_rec_named riscv_swap_name riscv_registry_name riscv_start_name
-      riscv_dview_name cov ls dk.
+      riscv_dview_name riscv_fsdur cov ls dk.
 
   Global Instance P_fs_rec_timeless cov ls dk : Timeless (P_fs_rec cov ls dk).
   Proof.
@@ -2180,7 +2187,7 @@ Section fs_crash_seam.
   Definition P_fs_any (cov : gset Z) (ls : Z) : iProp Σ :=
     P_fs_named riscv_disk_name riscv_disk_size
       riscv_swap_name riscv_registry_name riscv_start_name riscv_dview_name
-      cov ls.
+      riscv_fsdur cov ls.
 
   Global Instance P_fs_any_timeless cov ls : Timeless (P_fs_any cov ls).
   Proof.
@@ -2225,7 +2232,7 @@ Section fs_crash_seam.
     rewrite /disk_fixed_auth.
     iDestruct (disk_img_sized_read with "Ha Hfr") as %Hrd.
     rewrite disk_read_length in Hrd.
-    iDestruct (P_fs_rec_agree _ _ _ _ cov ls riscv_disk_size dk0 dk
+    iDestruct (P_fs_rec_agree _ _ _ _ _ cov ls riscv_disk_size dk0 dk
                  (eq_sym Hrd) Hext with "HPr") as "HPr".
     iMod ("Hrec" $! dk n with "Hsa [//] [HPr]") as "(HPr & Hsa & HQ)";
       [iNext; iExact "HPr"|].

@@ -50,7 +50,16 @@ instantiated TWICE with the same definitions:
 - **`Γ_D`, the committed (durable) view.**  `Φ_D a v := a ↪[γD] v`, the
   FULL element of a fixed-layer byte-keyed `ghost_map Z (bv 8)` whose auth
   is the committed byte view `D` inside `P_disk` (`crash.md`).  `γlink_D`,
-  `γtop_D` are fixed-layer gnames.  The whole instance lives inside
+  `γtop_D` are fixed-layer gnames — since durable-disk 2c-names they are
+  ONE `riscvFixedGS` field, `riscv_fsdur : RiscvPtsto.fs_dur_names`
+  (`fdn_link`/`fdn_top`), so `Γ_D` is
+  `MkFsView (λ a v, a ↪[riscv_dview_name] v) (fdn_link riscv_fsdur)
+  (fdn_top riscv_fsdur)` and any file with a `riscvFixedGS` can spell it.
+  **The CLIENT allocates that bundle**, inside adequacy's `HPc` update,
+  which hands the record back existentially: the link family's camera has
+  no authority over its keys, so a family adequacy minted at `ε` could
+  never be filled (`crash.md`, "The durable disk").
+  The whole instance lives inside
   `crashN` (`P_wf`, §4); no mortal ever holds a piece of it (ruling 1).
 - **`Γ_L`, the logged (in-era) view.**  `Φ_L a v := a ↪[fs_L] v`, the FULL
   element of the era's byte-keyed logged view whose auth the log owns

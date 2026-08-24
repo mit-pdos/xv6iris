@@ -1095,18 +1095,147 @@ map at home blocks); 1d lands last.
              it is a seam redesign across ~40 sites that buys the flip
              nothing.
 - [ ] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload, and
+      - OPEN, for the orchestrator, in the order they cost:
+        - The link family is still dropped at `BootShared` and the bundle
+          still excludes the link ghosts.  Routing them is the links step's
+          one-line change at that `iClear`, and its price is the
+          `✓ link_elem` at the image map that this lane did NOT have to pay.
+- [~] **2c. `P_wf := fs_view Γ_D`**, the debt's shape in the payload,
+      the commit AU's discharge from the debt; `FsAdequacyImg` builds
+      `fs_view Γ_D` from `fs.img` once (the only place the image is
+      decoded).  **THE NAMES ARE LANDED (2c-names); the BODY IS NOT.**
       - RULE for 2c (from 2c-pre, 2026-08-23): the fixed layer now carries
         two client-only gnames (`riscv_swap_name`, `riscv_dview_name`)
         threaded positionally through `Pc`/`HPc`/`Hproj`/`Hswap`/
         `boot_fixedGS`.  `Γ_D`'s remaining ghosts (`γlink_D`, `γtop_D`)
         go in ONE bundle field (a record of the durable FS gnames), not
-        as a third and fourth positional name.  `P_fs_alloc`'s
-        `ghost_map_auth γv 1 ∅` premise is the sole allocator's claim —
-        to pre-populate `γD` in adequacy, change `HPc`'s premise, do not
-        add a conjunct beside it.
-      the commit AU's discharge from the debt; `FsAdequacyImg` builds
-      `fs_view Γ_D` from `fs.img` once (the only place the image is
-      decoded).
+        as a third and fourth positional name.
+      - [x] **2c-names. `Γ_D`'s gnames ride the fixed layer, as ONE
+        bundle.**  LANDED.
+        - `RiscvPtsto.fs_dur_names = { fdn_link ; fdn_top }` (declared in
+          `RiscvPtsto.v` itself — two gnames, naming no file system, the
+          way `riscv_crash_pred` is an arbitrary client `iProp` there) is
+          the new `riscvFixedGS` field `riscv_fsdur`, beside
+          `riscv_dview_name`.  `Pc`/`HPc`/`Hproj`/`Hswap`/`Hphi`/`Hboot`'s
+          shape equation/`boot_fixedGS`/`disk_proj_trace` take it as ONE
+          argument.
+        - `FsCrash.P_fs` / `P_fs_rec_named` / `P_fs_named` (and
+          `P_fs_alloc`/`_clean`, `P_fs_project`, `P_fs_swap`,
+          `P_fs_rec_agree`, `P_fs_rec_named_wf`, `P_fs_recovers`,
+          `P_fs_receipt_committed`) take it as a fifth explicit fixed
+          name; `P_fs_rec`/`P_fs_any` — hence `fs_crash_seam`, unchanged
+          in arity across its 90 files — read `riscv_fsdur` ambiently.
+        - **DEVIATION, forced, and the task text's version is NOT
+          implementable: the CLIENT allocates the bundle, not adequacy.**
+          `linkUR = gmapUR Z (authR natUR)` has no authority over which
+          keys exist, so `own g ε ⤳ own g (link_elem I)` is refuted by the
+          frame `{[0 := ● 5]}`: a family adequacy minted at `ε` could
+          never be filled by `P_fs_alloc`.  So `HPc` hands the record back
+          EXISTENTIALLY (`… ⊢ |==> ∃ Γd : fs_dur_names, Pc … Γd`) and the
+          machine layer never names a file-system camera.  `P_fs_alloc`
+          keeps its `ghost_map_auth γv 1 ∅` premise (the sole allocator's
+          claim) untouched.
+        - The mint at the `HPc` sites is `FsState.fs_boot_alloc_empty`
+          (`fs_boot_alloc_at` at `I = ∅`), and it is PLUMBING: the two
+          gnames are real, the resources are dropped, and nothing reads
+          them until the body flips.  Audit unchanged at the three-entry
+          baseline.
+      - [ ] **THE BODY, AND WHAT IT COSTS (surveyed 2026-08-24; this is
+        the ruling the orchestrator owes).**  `P_wf`'s body is still
+        `LogDefs.fs_dview γv (fs_dbytes (fr_D r))`, the flat element blob,
+        and `fs_dstep_rebase` still holds.  Four findings:
+        - **(i) THE CLASSES REACH `log_ctx` AND `fs_crash_seam`.**
+          `fs_view Γ_D` needs `fsLinkG` and `fsTopG`, so the moment
+          `fs_dview`'s body names it, both become implicit arguments of
+          `LogDefs.fs_dstep` → `LogInv.log_psi_commit` → `log_ctx_at` →
+          `log_ctx` (78 threading files) and of `P_fs` → `P_fs_any` →
+          `fs_crash_seam` (90 files).  MEASURED: of the 87 files naming
+          any of `log_ctx`/`fs_crash_seam`/`P_fs_any`/`fs_dstep`, **81
+          already bind `xv6G`**; the six that do not are `FsBlocks`,
+          `FsCrash`, `LogInv`, `LogDefs`, `SysUnlinkBudget`, `RiscvPtsto`.
+          `fsTopG` is already an `xv6G` member; **so the move is to make
+          `fsLinkG` one too** (its camera to `Xv6Cameras.v` under a
+          non-colliding name — `Xv6Cameras` has the icache ledger's own
+          `linkUR`) and to bind both explicitly in those six files, then
+          DROP the explicit `fsLinkG` binders in `FsCfgBoot`, `BootShared`
+          and `SystemAdequacy` (they would otherwise be a second instance
+          path).  Do that FIRST; it is self-contained and green on its own.
+        - **(ii) `fs_dbytes` HAS NO THEORY AT ALL** — four use sites, zero
+          lemmas.  Everything below needs one lemma first:
+          `fs_dbelems g (fs_dbytes D) ⊣⊢ [∗ map] b ↦ bs ∈ D, blk_owned Γ_D b bs`
+          under `∀ b bs, D !! b = Some bs → length bs ≤ BSIZE`.  Route:
+          `fs_dbytes_lookup` by `map_fold_ind`, then
+          `map_seqZ (b₁·BSIZE) bs₁ ##ₘ map_seqZ (b₂·BSIZE) bs₂` for
+          `b₁ ≠ b₂`, then `map_fold_insert_L` (whose commutation premise is
+          restricted to keys of the map, so the length side condition
+          discharges it), then `map_ind` + `big_sepM_union`.  ~200 lines.
+        - **(iii) THE TIE `fr_D` ↔ the footprint IS NOT FUNCTIONAL IN `S`,
+          because `free_pool`'s blocks have EXISTENTIAL contents.**  So
+          `fs_footprint Γ_D S ⊣⊢ fs_dbelems γD (some map of S)` cannot be
+          stated as it stands.  Two ways out, and the second is cheaper:
+          give `FsStateBitmap` a `free_pool_at Γ nb u F` (contents given,
+          with `free_pool ⊣⊢ ∃ F, ⌜dom F = free_set nb u⌝ ∗ free_pool_at …`);
+          or index `P_wf` by the BLOCK map `D` rather than the byte map and
+          state the tie at BLOCK granularity —
+          `∃ S Ds Dr, ⌜D = Ds ∪ Dr⌝ ∗ ⌜Ds ##ₘ Dr⌝ ∗ ⌜fs_state_blocks S = dom Ds⌝
+           ∗ top auth ∗ fs_state Γ_D S ∗ [∗ map] b↦bs ∈ Dr, blk_owned Γ_D b bs`,
+          where `fs_state_blocks S : gset Z` IS a function of `S` (only the
+          free blocks' CONTENTS are existential; their ADDRESSES are not).
+          The `Dr` residual is not optional: at the mkfs image the durable
+          home set is `{1} ∪ [33,2000)` and the footprint covers exactly
+          that (block 0 and the log region are used-but-unowned and are
+          both OUTSIDE `home`, so the accounting is exact) — but nothing
+          makes exactness true of an arbitrary reachable state, and the
+          residual is what keeps `P_wf` honest without a domain sweep.
+        - **(iv) THE IMAGE DISCHARGE IS THE BULK, AND `inode_owned` HAS NO
+          PRODUCER IN THE TREE.**  2b built `inode_owned_era` (the
+          checked-out bundle, no record bytes, no link ghosts); nothing
+          builds `inode_owned Γ sb i n`.  The material IS all there and NO
+          NEW IMAGE SWEEP IS NEEDED: W4 (`NoDup (fs_used_blocks)`) +
+          `FsImg.fs_inode_blocks_disjoint` + `FsBoot.big_sepS_carve` give
+          the per-inode block carve (this is exactly what
+          `FsImgBridge.img_inode_blocks_res` does on the Γ_L side), W5
+          (`fs_bitmap_wf`, via `bm_bytes_fs_bmap_set`) gives the bitmap
+          block and `free_pool_intro` the pool, conjunct (10) gives
+          `sb_owned`, `img_inode_ok` + `fio_type` + `fdo_gran` +
+          `fdo_dot`/`fdo_dotdot` + `fs_region_nlink_short` give
+          `inode_local` through `inode_local_of_ok`, and W9 + conjunct (13)
+          `fs_links_eq` give `✓ link_elem (img_nodes …)`.  What is NEW is
+          (a) a Γ-side twin of `InodeInv.inode_blocks_of_blocks` producing
+          `inode_phi`, (b) the 16-records-per-inode-block reshuffle from
+          `rec_owned_at_diblk`'s `[∗ list]` to `fs_inodes`' `[∗ map]` over
+          208 inums, and (c) a bridge from the image's ticket counting
+          (`fs_all_tickets`/`fs_tick_count`) to `FsState`'s
+          (`ent_toks`/`dir_entries`) for `✓ link_elem`.  Estimate:
+          800–1500 lines across `FsState*`/`FsImgBridge`/a new leaf.
+        - **(v) IT IS NOT `FsAdequacyImg`'S JOB.**  Both generic theorems
+          (`SystemAdequacy.xv6_power_adequacy` and `xv6_fs_adequacy`)
+          discharge `HPc`, and both already carry
+          `Himg : fs_boot_image_eras sb nib cov` — which yields
+          `fs_boot_image_wf` at the boot state's own disk.  So the builder
+          is GENERIC in `fs_boot_image_wf` and belongs beside
+          `FsCfgBoot.img_nodes`; `FsAdequacyImg` keeps doing only what it
+          does now (discharging `fs_boot_image_wf` at the literal image).
+      - [ ] **THE PAYLOAD, AND THE ONE THING THAT IS ALREADY DECIDED.**
+        `ftop_inv` (2b-inode-3's standalone `ftopN` invariant holding
+        `γtop_L`'s authority) **MUST STAY**; it is NOT folded into the
+        log's parked payload.  A region mover retags the era's abstract
+        value (`InodeRegion.ireg_top_retag`, at `sl_setnl`/`di_trunc`/
+        `wi_dinode`/dirlink's append/`cr_setf`) while holding `iregN` and
+        NOT `log.lock`, so an authority parked behind the log lock would be
+        unreachable at exactly the sites that move it.  The payload
+        therefore holds the DEBT plus whatever the commit needs, and
+        `Ψ D₀`'s shape is
+        `∃ L, ⌜…⌝ ∗ (the Γ_L content the commit reads) ∗ fs_dstep γD Γ_D D₀ (lm_logged L cov ls)`
+        — the `∃ L` is pinned at the commit by `log_psi_commit`'s LENT byte
+        auth (`bytes_home_at Lb L`), which is why the law lends it.
+        **The identity debt (`D₀ = D'`) is discharged for `D = D'` and
+        NOWHERE ELSE**, and it is honest only for a batch that wrote no
+        home block — so it cannot be what `ProofInitlog` parks once
+        `fs_dstep` is real, and the suppliers' per-object steps (stage 3)
+        are on the critical path for a green tree, not after it.  That is
+        the ordering finding: **`P_wf`'s flip and stage 3's supplier steps
+        cannot be separated by a green checkpoint.**
       - [x] **2c-pre. `γD` hoisted into the FIXED layer.**  LANDED.
             `RiscvPtsto.riscvFixedGS` gains `riscv_dview_name`, riding
             `riscvF_diskGS` (the tree's unique `ghost_mapG Σ Z (bv 8)`),
