@@ -1656,6 +1656,15 @@ maps via `dur_stands_at_logged`, then thread mknod's `made` clause and
 state the end theorem: after mknod's batch commits, the durable view
 contains the device inode.
 
+RATIFIED (orchestrator, 2026-08-24, within standing rulings): (1) the
+geometry index `(G, nin)` lands as PURE FIELDS of
+`RiscvPtsto.fs_dur_names` (the 2c-pre bundle rule; arity-free through
+`fs_crash_seam`'s 90 and `log_ctx`'s 78 files), allocated in adequacy's
+`HPc` where `sb`/`nib` are in scope; (2) the SPIKE THEOREM is stated AT
+BYTES (the owner's spike-first ruling): the commit's receipt `D' = L` at
+home maps + mknod's carried facts about `L` at its objects — the tie's
+strengthening stays the later lane; (3) the era's "my superblock's
+geometry is `riscv_fsdur`'s" equation rides the FS config bundle.
 ## Stage 3 — the vertical spike: `sys_mknod`
 
 **ORDERING RULING (2c, 2026-08-24): THE `P_wf` FLIP AND THE SUPPLIERS' STEPS
