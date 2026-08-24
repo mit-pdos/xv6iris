@@ -2078,6 +2078,90 @@ this stage or 2c's body.**
         `LogDefs.fs_dview`, none of the eleven suppliers moved, and
         `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash` are untouched.  Audit
         at the three-entry baseline.
+- [x] **3b. THE SPIKE, ATTEMPTED: the flip's SUPPLIER SITES do not
+      type-check at 3a-obj's shapes, and the reason is the tie's
+      GEOMETRY.**  The lane's product is a rewrite of `iris/FsDurWire.v`
+      sections 4 and 4a–7 (no new file, no new `_CoqProject` row, no
+      existing statement outside that file moved, every lemma `Qed`, the
+      twelve stated theorems all `Closed under the global context`); the
+      design account is `fs-state.md` §4⅞c and `crash.md`'s 3b paragraph.
+      **`P_wf`'s body is still `LogDefs.fs_dview`, none of the eleven
+      suppliers moved, and `LogInv`/`SpecLogWrite`/`SpecEndOp`/`FsCrash`/
+      `ProofInitlog` are untouched** — the flip has no green checkpoint
+      (the ordering ruling above), and a repair to the interface it flips
+      TO is the increment that was available.
+      - **THE FINDING, in two pure theorems.**  `Psi_dec` carries `S` and
+        `K` EXISTENTIALLY, so a supplier's write obligation is quantified
+        over every admissible pair; 3a-obj read the geometry off
+        `fss_sb S`, and a writer's block is fixed by the CODE.
+        `kinds_geom_underdetermined`: ONE kind assignment satisfies the tie
+        at two geometries whose bitmap blocks differ — so
+        `bm_write_obligation`, whose conclusion is at
+        `sb_bmapstart (fss_sb S)`, is not applicable, and neither is
+        `di_write_obligation` nor any `KData` write (which must exclude the
+        bitmap block AND every region block).
+        **`kind_write_geom_free_degenerate` is the dangerous half**: the
+        obligation is NOT unprovable — it is dischargeable by a state with
+        no inodes and no inode region, so the flip would have COMPILED with
+        a durable tie saying nothing about any inode from the first
+        `balloc` onwards.  `durable-notes.md`'s hedged-conjunct rule reached
+        through a quantifier, and no build sees it.
+      - **THE REPAIR, machine-checked.**  `kinds_of_state G nin S K` takes
+        the geometry explicitly (`G : dgeom`, `nin` the region's inum
+        count); `ko_slot` CONCLUDES the inum's range instead of assuming it
+        (which is what lets a data-block writer exclude every inode block
+        the state can still be naming); `P_wf_dec`/`dstep_dec`/`Psi_dec`
+        carry `(G, nin)`; `dstep_dec_of_bridge`, `dur_stands_at_logged`,
+        `Psi_dec_commit`, `P_wf_dec_blocks`, `dwire_bridge_close` are
+        unchanged in content.  THREE supplier obligations, each PRESERVING
+        the payload's own state and each naming only the writer's block and
+        object: `bm_write_obligation` (`state_bm_upd`),
+        `di_write_obligation` (`state_slot_upd`, stated at the INUM, off
+        `ko_inodeblk` + `ko_recwf` + `di_vals_enc`) and
+        `data_write_obligation` — the `KData` case 3a-obj did not state.
+        `psi_write_law` replaces `LogInv.log_psi_step`: stated over an
+        ARBITRARY `Ψ` and proved for `Psi_dec`, with the log supplying the
+        block-local tie `⌜Dc !! b = Some oldbs⌝` and the client the pure
+        `kind_write_ok`; `psi_commit_law` likewise for `log_psi_commit`.
+        `P_wf_dec_timeless` is added (`FsCrash.P_fs_named_timeless` needs it
+        at the flip).
+      - **THE ONE INTERFACE CHANGE THE FLIP NOW FORCES, beyond 3a-obj's
+        three, and it is RULED-SHAPED, not written:** the geometry index
+        must reach `P_fs` and the log's laws without an arity change, so it
+        belongs as PURE FIELDS of `RiscvPtsto.fs_dur_names` (which `P_fs`
+        already takes and which any `riscvFixedGS` file spells ambiently as
+        `riscv_fsdur`, exactly as `riscv_dview_name` is spelled).  Not an
+        argument of `P_fs` (90 files through `fs_crash_seam`) and not of
+        `log_ctx` (78).  The client allocates the bundle inside adequacy's
+        `HPc`, and `SystemAdequacy`'s two `MkFsDurNames` sites have `sb` and
+        `nib` in scope; the era side owes the pure equation "my
+        superblock's geometry is `riscv_fsdur`'s", which belongs in the FS
+        config bundle every supplier already carries.  It was NOT written
+        here because unconstrained new fields are dead weight until the flip
+        consumes them.
+      - **THE SIX-STEP PATH IS OTHERWISE UNCHANGED** and its pieces are all
+        terms now: (1) `fs_dstep`'s definition dies in `LogDefs` and
+        `FsDurWire.dstep_dec` is the durable step (`LogDefs.fs_dview` /
+        `fs_dview_rebase` stay — `FsDurWire` uses them); `LogInv` requires
+        `FsDurWire` (no cycle: `FsState`'s cone does not reach `LogInv`) and
+        puts it EARLY, before `Require Import FsBlocks`, so `FsBlocks`'
+        colliding `fs_view`/`byte_range`/`blk_owned` still win.  (2)
+        `log_psi_commit`/`log_psi_step` become `psi_commit_law`/
+        `psi_write_law`; `log_ctx_at` keeps its arity (`cov`/`logstart` are
+        already there, the geometry rides `riscv_fsdur`);
+        `log_psi_write_rebase` and `LogDefs.fs_dstep_rebase` die.  (3)
+        `SpecLogWrite`'s AU gains the tie, which the log reads off row (b)
+        against `log_state`'s `fs_cache` auth.  (4) `P_fs`'s durable
+        conjunct becomes `P_wf_dec γv Γd cov logstart (fr_D r)` — ARITY-FREE,
+        since `P_fs` already takes `Γd`, `cov` and `logstart` — and
+        `fs_commit_L_sector0_rec` lends it and concludes by
+        `dur_stands_at_logged`.  (5) `P_fs_alloc` builds the bridge at the
+        image: at a clean log `D0` IS the image on the home set
+        (`fs_recovery_clean`), and the kind assignment is `KBitmap` at
+        `bmapstart` (off `FsImg.bm_bytes_fs_bmap_set`), `KInode` on the
+        region (off `IcacheBoot.diblk_bytes_surj`, which
+        `FsDurImg.img_recs_of_block` already uses) and `KData` elsewhere.
+        (6) the nine suppliers and the mknod arm.
 - [ ] One arm end to end with NO placeholder: `ialloc` (slot write),
       `iupdate` (slot), `dirlink`→`writei` (a dir record; the growing-append
       sub-arm allocates), the link token minted from `ip` into `dp`'s

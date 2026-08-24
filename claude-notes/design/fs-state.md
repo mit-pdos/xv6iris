@@ -740,13 +740,16 @@ side condition to the whole content.
   block's bytes are `kind_enc (K b)`. `dwire_bridge_close` is
   `dobj_close` applied unchanged: two block maps with the same kinds on the
   home set are equal, one of them `lm_logged L cov ls`.
-- `kinds_of_state S K` — a four-field record. `ko_bitmap` (the bitmap
-  block's kind IS `fss_used S`) and `ko_slot` (every inode's record at its
-  own slot, `dobj_home_slot`'s numbering) are the content; `ko_inodeblk`
-  (every inode-region block has an inode kind) and `ko_recwf` (an inode kind
-  carries well-formed records) are ROLE clauses, there because a SUPPLIER
-  needs them — see the interface finding below.
-- `P_wf_dec g Γd cov ls D` — the flat completeness `fs_dview g (fs_dbytes D)`
+- `kinds_of_state G nin S K` — a four-field record, at an explicit GEOMETRY
+  (`G : dgeom`, the bitmap block and the inode region's start; `nin`, the
+  region's inum count).  §4⅞c is why the geometry is an index and not
+  `fss_sb S`.  `ko_bitmap` (the bitmap block's kind IS `fss_used S`) and
+  `ko_slot` (every inode's record at its own slot, `dobj_home_slot`'s
+  numbering, at an inum CONCLUDED to be inside the region) are the content;
+  `ko_inodeblk` (every region block has an inode kind) and `ko_recwf` (an
+  inode kind carries well-formed records) are ROLE clauses, there because a
+  SUPPLIER needs them — see the interface finding below.
+- `P_wf_dec g Γd G nin cov ls D` — the flat completeness `fs_dview g (fs_dbytes D)`
   (which `FsDurBytes.fs_dview_dbytes` turns into one `DBlk` per home block,
   `P_wf_dec_blocks`), the durable top map's authority and ALL its fragments,
   and the pure bridge. The bit objects are resource-free BY CONSTRUCTION:
@@ -756,14 +759,19 @@ side condition to the whole content.
   step is derivable from the TARGET'S PURE BRIDGE and nothing else.**
   `dur_stands_at_logged` is the closing statement — at the batch's logged
   values the durable body stands, at HOME MAPS.
-- `Psi_dec cov ls D0 Dc` — the log's parked payload, PURE and PERSISTENT.
-  `Psi_dec_commit` proves §5's `log_psi_commit` law for it;
-  `Psi_dec_write` is `SpecLogWrite`'s byte-shaped premise;
-  `Psi_dec_wit` is the model.
-- The suppliers' discharge, at the two shared block kinds:
-  `bm_write_obligation` (+ `bm_write_bytes_are_a_kind`, off
-  `bm_blk_write_enc`) and `di_write_obligation` (off `di_vals_enc`). Both
-  are PURE and both name only the writer's block and the writer's object.
+- `Psi_dec G nin cov ls D0 Dc` — the log's parked payload, PURE and
+  PERSISTENT.  `psi_commit_law` is §5's `log_psi_commit` at `dstep_dec` and
+  `Psi_dec_commit` proves it; `psi_write_law` is `SpecLogWrite`'s
+  byte-shaped premise, stated over an ARBITRARY `Ψ` and proved for this one
+  by `Psi_dec_write_law` off `Psi_dec_write_tied`; `Psi_dec_wit` is the
+  model.
+- The suppliers' discharge, at the THREE block kinds, each PRESERVING the
+  payload's own state: `bm_write_obligation` (+ `bm_write_bytes_are_a_kind`,
+  off `bm_blk_write_enc`), `data_write_obligation` (the `KData` case, whose
+  whole content is that its block is neither the bitmap block nor a region
+  block) and `di_write_obligation` (at the INUM, off `ko_inodeblk` +
+  `ko_recwf` + `di_vals_enc`).  All three are PURE and each names only the
+  writer's block and the writer's object.
 
 **THREE INTERFACE CONSEQUENCES, and the third is the one to act on.**
 
@@ -782,8 +790,9 @@ side condition to the whole content.
    step, and applying it needs the durable byte authority and the body,
    neither of which the payload's holder has. (A statement about the
    obligation, not a refutation — nothing says the law is false.) Its
-   replacement is `Psi_dec_step_of_bridge`, the same law with the target's
-   bridge supplied. And **`SpecLogWrite`'s AU needs the BLOCK-LOCAL TIE
+   replacement is `psi_write_law`: the log supplies the block-local tie and
+   the client supplies the pure `kind_write_ok`, and nothing resource-shaped
+   crosses in either direction. And **`SpecLogWrite`'s AU needs the BLOCK-LOCAL TIE
    after all**: `Psi_dec_write`'s premise is quantified over the payload's
    index, which costs nothing at the BITMAP block (`bm_write_obligation`
    never reads `K` at the written block — the writer needs only a kind whose
@@ -821,6 +830,61 @@ are propositions about `S`. The one genuinely ghost part is
 `FsState.inode_ghost`'s link family, and it lives in a plain
 `gmapUR Z (authR natUR)` held by `own`, so it is rebasable by the same
 argument as the two maps above once the body holds all of it.
+
+### 4⅞c. AS RE-WIRED (3b): the tie's GEOMETRY is an index, and the
+### geometry-free form is not unprovable — it is empty
+
+The spike lane's first step is the flip's supplier sites, and they do not
+type-check against §4⅞b's shapes.  Two pure theorems in `iris/FsDurWire.v`
+§6a say why, and the repair is in the same file (§4a and the restated
+§§4–7); nothing else in the tree moved.
+
+**THE PAYLOAD'S STATE IS EXISTENTIAL, SO A SUPPLIER'S OBLIGATION IS
+QUANTIFIED OVER IT.**  `Psi_dec` carries `S` and `K` existentially, so
+`Psi_dec_write_tied`'s premise is `∀ S K, … → ∃ S′ k′, …`.  3a-obj read the
+geometry off `fss_sb S` — the bitmap block was `sb_bmapstart (fss_sb S)`,
+the region `sb_inodestart (fss_sb S)`, its extent `sb_ninodes (fss_sb S)` —
+and `bm_write_obligation` concluded AT the state's bitmap block.  A writer's
+block is fixed by the CODE, and nothing relates the two:
+`kinds_geom_underdetermined` exhibits one kind assignment `K` and two
+geometries with different bitmap blocks, each with a state satisfying the
+tie.  So `bm_write_obligation` is not applicable, and the same holds of
+`di_write_obligation` and of any `KData` write (which must rule out the
+bitmap block AND every region block).
+
+**AND THE OBLIGATION IS NOT UNPROVABLE — IT IS EMPTY, WHICH IS WORSE.**
+`kind_write_geom_free_degenerate`: if the geometry may move with the answer,
+any block at all can be answered for as the bitmap block, by a state with no
+inodes and no inode region.  So a flip that quantified the obligation over
+the state's own geometry would have COMPILED, and the durable tie would have
+stopped saying anything about any inode from the first `balloc` onwards.
+That is durable-notes.md's hedged-conjunct rule reached through a quantifier
+rather than through a disjunction, and no build sees it.
+
+**THE REPAIR.**  `kinds_of_state G nin S K` takes the geometry explicitly
+(`G : dgeom` is `FsDurObj`'s own two-number record; `nin` is the region's
+inum count), `ko_slot` CONCLUDES the inum's range instead of assuming it,
+and `P_wf_dec` / `dstep_dec` / `Psi_dec` carry `(G, nin)`.  The three
+supplier obligations are then stated at the index and each PRESERVES the
+payload's own state — the used set moves (`state_bm_upd`), or one entry of
+the inode map moves (`state_slot_upd`), or nothing moves (`KData`).  The
+write law becomes `psi_write_law`, over an arbitrary `Ψ`: the log supplies
+the block-local tie `⌜Dc !! b = Some oldbs⌝` and the client supplies the
+pure `kind_write_ok`.
+
+**WHERE THE INDEX HAS TO LIVE, and it is the ONE interface change the flip
+forces beyond §4⅞b's three.**  Not an argument of `FsCrash.P_fs` — its
+`cov`/`ls` are threaded BY NAME through 90 files inside `fs_crash_seam` —
+and not of `LogInv.log_ctx` (78 files).  The geometry is fixed at boot and
+never moves (nothing in xv6 writes the superblock), so it belongs as PURE
+FIELDS of `RiscvPtsto.fs_dur_names`, which `P_fs` already takes and which
+any file with a `riscvFixedGS` spells ambiently as `riscv_fsdur` — exactly
+as `riscv_dview_name` is spelled.  The client allocates that bundle inside
+adequacy's `HPc`, so it can fill the fields from the image's own superblock
+(`SystemAdequacy`'s two `MkFsDurNames` sites have `sb` and `nib` in scope);
+the era side owes the pure equation "my superblock's geometry is
+`riscv_fsdur`'s", which belongs in the FS config bundle every supplier
+already carries.
 
 ## 5. The log's interface (FS-agnostic, logically atomic)
 

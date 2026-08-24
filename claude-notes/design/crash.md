@@ -506,6 +506,26 @@ read the other way). The full account with the lemma names is fs-state.md
   is the flat ownership INSTEAD OF the coupled decomposition, never beside
   it.
 
+**AND THE DURABLE TIE'S GEOMETRY IS AN INDEX, NOT A PROJECTION OF THE
+PAYLOAD'S STATE (3b, `iris/FsDurWire.v` §4a/§6a).** The pure tie's `S` is
+existential in the payload, so a supplier's write obligation is quantified
+over every admissible `(S, K)`; a tie whose bitmap block is
+`sb_bmapstart (fss_sb S)` therefore leaves a writer's own block — fixed by
+the CODE — unrelated to the state's. `kinds_geom_underdetermined` is one
+kind assignment satisfying the tie at two different geometries. **And the
+obligation is not thereby unprovable, which is the dangerous half:**
+`kind_write_geom_free_degenerate` discharges it with a state that has no
+inodes and no inode region, so the flip would have compiled with a durable
+tie that says nothing about any inode from the first `balloc` onwards. The
+geometry is an explicit `dgeom` + `nin` index of `kinds_of_state`,
+`P_wf_dec`, `dstep_dec` and `Psi_dec`, and the three supplier obligations
+(`bm_write_obligation`, `data_write_obligation`, `di_write_obligation`) are
+stated at it and PRESERVE the payload's own state. For the flip, the index
+belongs in **`RiscvPtsto.fs_dur_names` as pure fields** — it is fixed at boot
+and never moves, nothing in xv6 writes the superblock — so that neither
+`P_fs` (whose `cov`/`ls` are threaded by name through 90 files inside
+`fs_crash_seam`) nor `LogInv.log_ctx` (78) grows an argument.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of
