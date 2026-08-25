@@ -226,7 +226,7 @@ Global Instance fstat_names_inhabited : Inhabited fstat_names :=
   populate (MkFStatNames
     (UartNames 1%positive 1%positive 1%positive 1%positive)
     (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
-               1%positive 1%positive 1%positive 1%positive)
+               1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
     (MkBioNames 1%positive 1%positive

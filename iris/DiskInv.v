@@ -587,16 +587,20 @@ Section DiskInv.
      eight-element conjunct.  [fr i = true] hands over the whole bundle and
      leaves the cell behind; the caller clears the cell with a plain store
      and re-closes at [fr' := <i := false> fr]. *)
-  Definition free_bundles (pd : Arch.pa) (fr : nat -> bool) : iProp Σ :=
+  (* A FREE DESCRIPTOR CARRIES ITS RECEIPT (finding 5).  That is what makes
+     "allocating a descriptor hands the caller the receipt" fall out of the
+     allocator with nothing extra threaded: the token comes with the bytes. *)
+  Definition free_bundles (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool)
+    : iProp Σ :=
     ([∗ list] i ∈ seq 0 8,
        d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-       (if fr i then free_slot_res pd i else emp))%I.
+       (if fr i then free_slot_res pd i ∗ i ↪[dn_head γ] HInactive else emp))%I.
 
-  Lemma free_bundles_unfold (pd : Arch.pa) (fr : nat -> bool) :
-    free_bundles pd fr ⊣⊢
+  Lemma free_bundles_unfold (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool) :
+    free_bundles γ pd fr ⊣⊢
     ([∗ list] i ∈ seq 0 8,
        d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-       (if fr i then free_slot_res pd i else emp)).
+       (if fr i then free_slot_res pd i ∗ i ↪[dn_head γ] HInactive else emp)).
   Proof. reflexivity. Qed.
 
   Definition fr_upd (fr : nat -> bool) (i : nat) (b : bool) : nat -> bool :=
@@ -610,28 +614,33 @@ Section DiskInv.
   Proof. intro Hne. unfold fr_upd. destruct (Nat.eq_dec k i); [congruence|reflexivity]. Qed.
 
   (* the residual bundle, with slot [i] cut out *)
-  Definition free_bundles_but (pd : Arch.pa) (fr : nat -> bool) (i : nat) : iProp Σ :=
+  Definition free_bundles_but (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool)
+      (i : nat) : iProp Σ :=
     ([∗ list] k ∈ seq 0 8,
        if bool_decide (k = i) then emp
        else (d_free_cell k ↦ₘ (if fr k then Z_to_bv 8 1 else byte_zero) ∗
-             (if fr k then free_slot_res pd k else emp)))%I.
+             (if fr k then free_slot_res pd k ∗ k ↪[dn_head γ] HInactive
+              else emp)))%I.
 
-  Lemma free_bundles_split (pd : Arch.pa) (fr : nat -> bool) (i : nat) :
+  Lemma free_bundles_split (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool)
+      (i : nat) :
     (i < 8)%nat ->
-    free_bundles pd fr ⊣⊢
+    free_bundles γ pd fr ⊣⊢
     (d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-     (if fr i then free_slot_res pd i else emp)) ∗
-    free_bundles_but pd fr i.
+     (if fr i then free_slot_res pd i ∗ i ↪[dn_head γ] HInactive else emp)) ∗
+    free_bundles_but γ pd fr i.
   Proof.
     intro Hi. rewrite /free_bundles /free_bundles_but.
     apply (seq8_delete
              (fun k => d_free_cell k ↦ₘ (if fr k then Z_to_bv 8 1 else byte_zero) ∗
-                       (if fr k then free_slot_res pd k else emp))%I i Hi).
+                       (if fr k then free_slot_res pd k ∗ k ↪[dn_head γ] HInactive
+                        else emp))%I i Hi).
   Qed.
 
   (* the residual does not see slot [i], so it survives any update there *)
-  Lemma free_bundles_but_upd (pd : Arch.pa) (fr : nat -> bool) (i : nat) (b : bool) :
-    free_bundles_but pd fr i ⊣⊢ free_bundles_but pd (fr_upd fr i b) i.
+  Lemma free_bundles_but_upd (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool)
+      (i : nat) (b : bool) :
+    free_bundles_but γ pd fr i ⊣⊢ free_bundles_but γ pd (fr_upd fr i b) i.
   Proof.
     rewrite /free_bundles_but. apply big_sepL_proper. intros k y Hk.
     apply lookup_seq in Hk as [-> _].

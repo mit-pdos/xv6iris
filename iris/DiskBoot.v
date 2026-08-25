@@ -255,7 +255,7 @@ Section DiskBoot.
     pa_add SpecVirtioDiskInit.disk_free j = d_free_cell j.
   Proof.
     rewrite /d_free_cell.
-    assert (Hb : SpecVirtioDiskInit.disk_free = pa_add DiskInv.disk_base 24)
+    assert (Hb : SpecVirtioDiskInit.disk_free = pa_add DiskAddrs.disk_base 24)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Hb pa_add_add. reflexivity.
   Qed.
@@ -273,19 +273,25 @@ Section DiskBoot.
     iIntros "H". rewrite free_slot_res_split. iExact "H".
   Qed.
 
-  Lemma free_bundles_boot (pd : Arch.pa) :
+  Lemma free_bundles_boot (γ : disk_names) (pd : Arch.pa) :
     ([∗ list] j ∈ seq 0 8, pa_add SpecVirtioDiskInit.disk_free j ↦ₘ (Z_to_bv 8 1)) -∗
     ([∗ list] i ∈ seq 0 8, desc_entry_own pd i) -∗
     ([∗ list] i ∈ seq 0 8, disk_slot_raw i) -∗
-    free_bundles pd (fun _ => true).
+    ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
+       i ↪[dn_head γ] st) -∗
+    free_bundles γ pd (fun _ => true).
   Proof.
-    iIntros "Hc Hd Hr".
+    iIntros "Hc Hd Hr Hfrags".
     iDestruct (free_slots_boot pd with "Hd Hr") as "Hs".
     rewrite /free_bundles. cbn [andb].
     rewrite big_sepL_sep. iSplitL "Hc".
     - iApply (big_sepL_mono with "Hc"). intros k y Hy.
       rewrite disk_free_cell_eq. iIntros "$".
-    - iExact "Hs".
+    - rewrite big_sepL_sep. iSplitL "Hs"; [iExact "Hs"|].
+      rewrite big_sepM_gset_to_gmap -list_to_set_seq
+              big_sepS_list_to_set; [| apply NoDup_seq ].
+      iApply (big_sepL_mono with "Hfrags"). iIntros (k i Hk) "H".
+      apply lookup_seq in Hk as [-> _]. iExact "H".
   Qed.
 
   (* ==================================================================== *)
@@ -308,33 +314,26 @@ Section DiskBoot.
     (* --- the boot tokens: [struct disk]'s untouched .bss cells... --- *)
     d_used_idx ↦₂ wrap16 0%nat -∗
     ([∗ list] i ∈ seq 0 8, disk_slot_raw i) -∗
-    (* --- ...and the two ghosts [disk_ghosts_alloc] minted at power-on --- *)
+    (* --- ...and the ghosts [disk_ghosts_alloc] minted at power-on: the
+       completed-count lower bound, and the eight per-descriptor RECEIPTS at
+       [HInactive], one to ride each free descriptor (finding 5) --- *)
     disk_done_lb γ 0%nat -∗
-    ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) -∗
+    ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
+       i ↪[dn_head γ] st) -∗
     disk_res γ pd pav pu.
   Proof.
     intro Hal. destruct (init_cfg_pages_aligned pd pav pu Hal) as [Hpd Hpav].
-    iIntros "Hpub Hrd Hstg Hdesc Hfree Huidx Hraw Hlb Hclaim".
+    iIntros "Hpub Hrd Hstg Hdesc Hfree Huidx Hraw Hlb Hfrags".
     iDestruct (desc_page_entries pd Hpd with "Hdesc") as "Hde".
-    iDestruct (free_bundles_boot pd with "Hfree Hde Hraw") as "Hfb".
-    assert (Hu : (∅ : gmap nat dclaim) ∪ ∅ = ∅)
-      by (apply map_eq; intro k; rewrite lookup_union !lookup_empty; reflexivity).
+    iDestruct (free_bundles_boot γ pd with "Hfree Hde Hraw Hfrags") as "Hfb".
     rewrite /disk_res.
-    iExists 0%nat, 0%nat, ∅, ∅, ∅, (fun _ => true).
-    rewrite Hu !dom_empty_L !big_sepM_empty.
-    (* nothing published, nothing in flight, nothing parked *)
+    (* nothing published, nothing live, every descriptor free *)
+    iExists 0%nat, 0%nat, ∅, (fun _ => true).
     iSplitR.
-    { iPureIntro. intros p Hp. exfalso. exact (not_elem_of_empty p Hp). }
+    { iPureIntro. intros p Hp. rewrite dom_empty_L in Hp.
+      exfalso. exact (not_elem_of_empty p Hp). }
     iSplitR.
     { iPureIntro. reflexivity. }
-    iSplitR.
-    { iPureIntro. intros p Hp. exfalso. exact (not_elem_of_empty p Hp). }
-    iSplitR.
-    { iPureIntro. set_solver. }
-    iSplitR.
-    { iPureIntro. set_solver. }
-    iSplitR.
-    { iPureIntro. intros p v Hp. rewrite lookup_empty in Hp. discriminate. }
     iSplitR.
     { iPureIntro. intros p T Hp. rewrite lookup_empty in Hp. discriminate. }
     iSplitR.
@@ -342,8 +341,8 @@ Section DiskBoot.
       discriminate. }
     iSplitR.
     { iPureIntro. intros p T i Hp _. rewrite lookup_empty in Hp. discriminate. }
-    iFrame "Hpub Hlb Hrd Hstg Hclaim Huidx".
-    iFrame "Hfb".
+    iFrame "Hpub Hlb Hrd Hstg Huidx".
+    iExact "Hfb".
   Qed.
 
 End DiskBoot.
