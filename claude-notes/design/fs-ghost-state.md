@@ -551,17 +551,20 @@ unit and DERIVES `c = None` by the `ireg_ref_ok` collision
 | piece | type / home | meaning |
 |---|---|---|
 | `escA_inv ge gr gd γi z rg` | tiny invariant per in-flight free (`EscrowInode.v`), **rg-indexed** (G′/C-6: `rg : frzidx` is the regime arm and the freezing transaction's `(t, q)`) | the bridge carrying "the disk free COMMITTED" from the off-lock tail to the next allocator/recycler.  Three gnames now: `ge` (state), `gr` (redeem ticket), `gd` (the **deposit ticket**, item 7c — lets the deposit rule out the FILLED/REDEEMED arms). |
-| its arms | `EMPTY ∗ ifreeze_post rg z` → `FILLED ∗ imark ∗ ifreeze_off ∗ ticket gd` → `REDEEMED ∗ ticket gr ∗ ticket gd` | the standing `ifreeze_post` lives HERE between iput+0x8a and the deposit; its agreement with the region's f-column is what tells the deposit which regime arm to hand back. |
+| its arms | `EMPTY ∗ ifreeze_post rg z ∗ ∃n, top_frag` → `FILLED ∗ crp_elem z CrpDep ∗ ifreeze_off ∗ ticket gd` → `REDEEMED ∗ ticket gr ∗ ticket gd` | the standing `ifreeze_post` lives HERE between iput+0x8a and the deposit; its agreement with the region's f-column is what tells the deposit which regime arm to hand back.  FILLED holds the CORPSE LEDGER's ELEMENT and NOT `imark` (§5a): the marker has to be somewhere a commit can reach, and this is an `inv` behind the itable lock.  The swap is also the TIE between the two one-shots — a recycler that peels this arm reads the ledger's state off the element it gets back. |
 | `committedA ge` | persistent `mono_nat_lb` at `ST_FILLED` | "the type-0 write is in the log" — minted by `ireg_free_deposit_au`, read by the redeem. |
 | `redeem_ticketA gr` | `Excl ()` | the one-shot right to redeem the escrow back into a normal free-pool entry; parked pool-side (`pool_await`). |
 | `region_pending z` / `pool_pending γi z` | the two halves' packagings | region-side and pool-side views of one in-flight free, correlated by the `reg_half` pair. |
 
 Lifecycle: the freezer mints the escrow at +0x86 and parks `pool_await =
 ∃ ge gr gd rg, escA_inv ∗ ticket gr` at the eviction (keeping `dinode_at`
-in hand — B2's fix) → `ireg_free_deposit_au` writes type 0, fills the
-escrow, retires the freeze `FrzPost rg → FrzOff`, and **returns
+in hand — B2's fix), together with a CORPSE LEDGER row at `CrpPre` (§5a) →
+`ireg_free_deposit_au` writes type 0, moves the ledger row to `CrpDep` (the
+marker in, the freeing transaction's share back out), fills the escrow with
+that row's element, retires the freeze `FrzPost rg → FrzOff`, and **returns
 `ireg_regime rg`** (the G round-trip) → the next iget/ilock of that inum
-redeems (escrow→`imark`, pool arm→normal, `reg_join`→`reg_full`).
+redeems (escrow → the element → the ledger row's `imark`, pool arm→normal,
+`reg_join`→`reg_full`), all inside `ipool_take_lend`.
 
 ## 5. The icache (lock-held state + per-entry escrows)
 
@@ -578,7 +581,8 @@ redeems (escrow→`imark`, pool arm→normal, `reg_join`→`reg_full`).
 | `isl_pool M` / `iref_slots_auth` / `iref_slot` | as before: the slots' share authorities (lock-held) and the fungible reference-slot budget a caller brings to iget. |
 | `ipool_ord γfs γi cov ls z` | the ORDINARY pool row for uncached inum `z`, and the only alternative that carries an `inode_owned_era` at all: `icnt_half z 0 ∗ frzm_h z false ∗ ipool_shape_np ∗ ifreeze_off z`, TIMELESS.  `ipool_shape_np` is the ALLOC arm (`ipool_alloc`, whose ownership is `FsStateEra.inode_owned_era` at `era_node dn bm data` — the record proxy, every data block, the indirect block AND the era's abstract value `top_frag`) ∨ the MARKER arm (`imark` and the three untied holds `∃ e, dv_ride`, `∃ b, fv_ride`, `∃ n, top_frag`). |
 | `ipool_ext γfs γi cov ls z` | the pending / await row (`pool_pending` / `pool_await` beside `∃ n, top_frag`).  NOT Timeless — both alternatives hold `EscrowInode.escA_inv`, an `inv` — which is why it cannot live in an invariant and stays under the itable lock. |
-| `ipool_inv cn γfs γi cov ls nib` | `inv ipoolN (ipool_body …)`, `ipoolN = nroot .@ "ipool"`.  The body is `∃ O X T ids, ⌜length ids = NINODE⌝ ∗ ⌜region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids⌝ ∗ ipool_key O ∗ ipool_xkey X ∗ ipool_tkey T ∗ ipool_transit T ∗ ic_ids cn ids ∗ ipool_rows … O` — TIMELESS, so `iInv .. as ">"` keeps working at both consumers, and the commit opens it ONCE and holds every ordinary bundle beside all fifty slot escrows. |
+| `ipool_inv cn γfs γi cov ls nib` | `inv ipoolN (ipool_body …)`, `ipoolN = nroot .@ "ipool"`.  The body is `∃ O X T ids K, ⌜length ids = NINODE⌝ ∗ ⌜region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids⌝ ∗ ⌜dom K = X⌝ ∗ ipool_key O ∗ ipool_xkey X ∗ ipool_tkey T ∗ ipool_transit T ∗ ic_ids cn ids ∗ ipool_rows … O ∗ ipool_ckey K ∗ ipool_corpse γi K` — TIMELESS, so `iInv .. as ">"` keeps working at both consumers, and the commit opens it ONCE and holds every ordinary bundle beside all fifty slot escrows. |
+| `ipool_ckey K` / `ipool_corpse γi K` (C-7) | the CORPSE LEDGER, `K : gmap Z icorpse` with `⌜dom K = X⌝`: `ghost_map_auth icfg_pcrp 1 K` (WHOLE, here) beside one row per in-transition inum — `CrpPre t q` parks `t ↪[ln_tx icfg_log]{#q} tt` (refuted at a commit, `ipool_corpse_no_ops`) and `CrpDep` parks `InodeRegion.imark`, which is what `FsCollect.col_free_slot_acc` turns into that inum's free bundle.  A `ghost_map` and not `ipool_tkey`'s paired `ghost_var` because the off-lock deposit holds neither half of `icfg_pext`: its ELEMENT (`EscrowDefs.crp_elem`, carried from `ipool_put_corpse` to `ireg_free_deposit_au`) is what locates the row. |
 | `ipool_tkey T` / `ipool_transit T` (C-4) | the TRANSIT LEDGER, `T : gmap Z (nat * Qp)`: `ghost_var icfg_ptrn (1/2) T` (one half here, one in `ipool`) beside `[∗ map] z ↦ (t, q) ∈ T, t ↪[ln_tx icfg_log]{#q} tt`.  `(t, q)` are FIELDS for `ic_dep`'s reason verbatim — `ipool_put` has to hand the walk back exactly the element it parked, and an existentially-keyed share cannot be re-identified (`IcacheTxRefute.tx_two_halves_no_whole`). |
 | `ipool γfs γi cov ls P T` | what the itable LOCK keeps, in the old `ipool`'s own position and at `itable_res2`'s unchanged arity: `∃ O, ⌜O ⊆ P⌝ ∗ ipool_key O ∗ ipool_xkey (P ∖ O) ∗ ipool_tkey T ∗ [∗ set] z ∈ P ∖ O, ipool_ext … z`.  `T` is the TRANSIT LEDGER — the one inum a walk is carrying between an eviction's identity flip and its deposit, with the share it parked — and it is `∅` in `itable_res2`, because that walk holds the lock throughout. |
 
@@ -636,40 +640,33 @@ the transit set under its own key) before it can state anything:
   inside the very window the accessor holds `ipoolN` open for.  The
   commit's door is `ipool_quiesce_acc`, which is `ipool_inv_acc` plus that
   refutation and hands out B″-join's own three-part row.
-* THE PENDING/AWAIT HALF IS A RESIDUE AFTER ALL, and that is C-4's second
-  finding.  "Its region slot is on `ireg_slot`'s PENDING arm" is true only
-  AFTER iput's off-lock deposit (`EscrowDeposit.ireg_free_deposit_au`); the
-  pool's pending row is parked at +0x94 and the await row at the free
-  path's eviction, both BEFORE it, and until the deposit fires the region
-  slot is still on the MARKED sub-arm — which holds `imark` and NO record
-  fragment (`ireg_marked_ok` forces a nonzero type there), the fragment
-  being in the walk's own hand.  So such an inum has no bundle anywhere and
-  `FsCollect.col_free_slot_acc` does not reach it.
+* THE PENDING/AWAIT HALF NEEDED A LEDGER OF ITS OWN, and that is C-4's
+  second finding, closed by C-7.  "Its region slot is on `ireg_slot`'s
+  PENDING arm" is true only AFTER iput's off-lock deposit
+  (`EscrowDeposit.ireg_free_deposit_au`); the pool's pending row is parked at
+  +0x94 and the await row at the free path's eviction, both BEFORE it, and
+  until the deposit fires the region slot is still on the MARKED sub-arm —
+  which holds `imark` and NO record fragment (`ireg_marked_ok` forces a
+  nonzero type there), the fragment being in the walk's own hand.
   THE CORPSE WINDOW ITSELF IS CLOSED (C-6): it is inside one transaction, and
-  the freeze column now carries that transaction — `frzidx` (§3b) — with
+  the freeze column carries that transaction — `frzidx` (§3b) — with
   `ireg_fsh` parking its share for the window's length, so
   `InodeRegion.ireg_fsh_no_ops` reads `f = FrzOff` off an empty `ln_tx`
   authority at every slot and `FsCollect.col_corpse_no_ops` refutes a slot
   whose freeze token is in some thread's hand.
-  WHAT REMAINS IS THE POOL-SIDE WITNESS FOR `X`, and it is this file's
-  business, not the region's: a MARKED slot at `FrzOff` is every cached or
-  pooled inode, so the refutation above yields only "an `X` inum's slot is
-  MARKED implies its column is `FrzOff`".  The obvious witness — a
-  `reg_half` per pending/await inum inside `ipool_body`, colliding with the
-  MARKED arm's `reg_full` — CANNOT BE MINTED: the registry element at one
-  inum is entirely region-side on every arm (IN and MARKED hold `reg_full`;
-  PENDING holds `reg_half` beside `region_pending`'s, which is the other
-  half), and its one producer, the deposit's `reg_split`, runs OFF-LOCK,
-  twenty instructions after iput gave the itable lock up at +0x94 — so it
-  can reach neither `ipool`'s rows nor `ipool_body`'s `X` index (knowing
-  `z ∈ X` needs both halves of `icfg_pext`, one of which is the lock's).
-  `FsCollect.reg_full_no_pool_half` is that wall, machine-checked; section
-  5d there records the shape that would close it (a per-inum ghost map like
-  `ipool_tkey`, its authority in `ipool_body` and its element carried by the
-  walk from `ipool_put` to the deposit, whose value parks a share of the
-  freezing transaction before the deposit and `imark` after it — which
-  moves the `imark` out of `escA_body`'s FILLED arm and makes
-  `ipool_take_lend` produce it, so the re-plumbing reaches `ProofIget`).
+  THE POOL-SIDE WITNESS IS THE CORPSE LEDGER (C-7).  A `reg_half` per
+  pending/await inum inside `ipool_body` — the obvious shape — CANNOT BE
+  MINTED: the registry element at one inum is entirely region-side on every
+  arm (`FsCollect.reg_full_no_pool_half`), and moving a half out is not
+  available either, because `ireg_claim_au`'s PENDING branch recombines the
+  two region-side halves at ialloc.  What the row carries instead is the
+  MARKER, which the deposit already has in hand: `ipool_ckey`/`ipool_corpse`
+  above, keyed so the OFF-LOCK deposit's element alone locates the row.  The
+  marker therefore leaves `escA_body`'s FILLED arm, which keeps the ledger's
+  element in its place — the tie that lets a recycler conclude the ledger's
+  state from the escrow's peel, and the reason `ipool_take_lend` absorbs the
+  peel (`ipool_shape_to_np` is gone).  At a commit `ipool_quiesce_acc` hands
+  out one `imark` per `X` inum and the collection owes nothing anywhere.
 
 **THE MOVERS ARE ACCESSORS, NOT PLAIN FUPDS**, because the pool's quarter
 of `ic_id` has to be in the caller's hand at the same ghost step as the

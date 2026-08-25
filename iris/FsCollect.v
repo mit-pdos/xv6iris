@@ -1382,6 +1382,85 @@ Section Collect.
     iSplitR; [iPureIntro; exact Ht0 |]. iFrame "Hmk Hown Hback".
   Qed.
 
+  (* ==================================================================== *)
+  (*  THE DOOR THE ASSEMBLY CALLS AT EVERY REGION INUM                     *)
+  (*  (durable-disk C-7, and it is what (G) makes statable)                *)
+  (*                                                                      *)
+  (*  At a quiescent transaction ledger the commit holds, for ONE region   *)
+  (*  inum, exactly one of two things -- and since C-7 there is no third   *)
+  (*  case and no inum without one:                                       *)
+  (*                                                                      *)
+  (*   - [InodeRegion.imark], if the inum is UNCACHED and FREE.  It comes  *)
+  (*     off the pool's ordinary marker row ([IcacheEscrow.ipool_ord]) for *)
+  (*     an inum in [O], and off the CORPSE LEDGER's [CrpDep] row          *)
+  (*     ([IcacheEscrow.ipool_quiesce_acc]) for one in [X] -- the second   *)
+  (*     is residue (G), and it is the whole of what C-7 added.            *)
+  (*   - a WHOLE BUNDLE at a share whose double is invalid, if the inum is *)
+  (*     cached or allocated.  It comes off the slot escrow's cover        *)
+  (*     ([IcacheEscrow.ic_escrow_body_cover_all]: parked at 1, read arm   *)
+  (*     at 3/4) or off the pool row's own ALLOC arm at 1.                 *)
+  (*                                                                      *)
+  (*  [col_side] is those two, and this accessor turns either into the     *)
+  (*  bundle [col_hand]'s big-op wants.  The MARKER case is where the      *)
+  (*  region does the work: the marker refutes the slot's own MARKED arm   *)
+  (*  ([col_free_slot_acc]), so the record is IN or PENDING and the bundle *)
+  (*  is the region's ([FsStateEra.inode_owned_era] at [free_node d], the  *)
+  (*  type read off the arm rather than assumed -- residue (E)).  The      *)
+  (*  bundle case is a pass-through: the slot is not touched at all.       *)
+  (*                                                                      *)
+  (*  THE SHARE IS NAMED AND NOT RE-HIDDEN, which is what lets the closing *)
+  (*  wand give back exactly what it lent -- [col_bundle] existentialises  *)
+  (*  it, so a bundle handed out in that shape could not be returned.      *)
+  (*  [col_bundle_of_side] is the one-line packer the collection's big-op  *)
+  (*  wants once the reading is done. *)
+  Definition col_side γfs (γi : gname) (inum : bv 32) : iProp Σ :=
+    (imark γi (bv_unsigned inum)
+     ∨ ∃ (n : fs_node) (dq : dfrac),
+         ⌜~ ✓ (dq ⋅ dq)⌝ ∗ inode_owned_era_q γfs dq γi inum n)%I.
+
+  Lemma col_bundle_of_side γfs (γi : gname) (inum : bv 32) (n : fs_node)
+      (dq : dfrac) :
+    ~ ✓ (dq ⋅ dq) ->
+    inode_owned_era_q γfs dq γi inum n -∗
+    col_bundle γfs γi (bv_unsigned inum) n.
+  Proof.
+    intros Hdq. iIntros "H". iExists dq, inum.
+    iSplitR; [done |]. iSplitR; [iPureIntro; exact Hdq |]. iExact "H".
+  Qed.
+
+  Lemma col_region_quiesce_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    col_side γfs γi inum -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ∃ (n : fs_node) (dq : dfrac),
+          ⌜~ ✓ (dq ⋅ dq)⌝
+          ∗ inode_owned_era_q γfs dq γi inum n
+          ∗ (inode_owned_era_q γfs dq γi inum n -∗
+               col_side γfs γi inum
+               ∗ ireg_slot γfs γi (bv_unsigned inum) d).
+  Proof.
+    iIntros "Hauth Hside Hslot".
+    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & Hown)]".
+    - (* THE MARKER: the region holds this inum's record, and the bundle is
+         the free one it parks beside it. *)
+      iDestruct (col_free_slot_acc γfs γi inum d with "Hauth Hmk Hslot")
+        as "(Hauth & %Ht0 & Hmk & Hown & Hback)".
+      iFrame "Hauth". iExists (free_node d), (DfracOwn 1).
+      iSplitR; [iPureIntro; exact dfrac_full_nvalid |].
+      rewrite -inode_owned_era_1.
+      iSplitL "Hown"; [iExact "Hown" |].
+      iIntros "Hown". iSplitL "Hmk"; [iLeft; iExact "Hmk" |].
+      iApply ("Hback" with "Hown").
+    - (* A CACHED OR ALLOCATED INUM: the bundle is already in hand and the
+         region slot is not touched. *)
+      iFrame "Hauth". iExists n, dq.
+      iSplitR; [iPureIntro; exact Hdq |].
+      iSplitL "Hown"; [iExact "Hown" |].
+      iIntros "Hown". iSplitR "Hslot"; [| iExact "Hslot"].
+      iRight. iExists n, dq. iSplitR; [iPureIntro; exact Hdq |]. iExact "Hown".
+  Qed.
+
   End FreeSlot.
 
   (* ...and the collection's own view of what came out.  [col_hand]'s big-op

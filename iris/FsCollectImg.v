@@ -311,6 +311,52 @@ Section CollectImgFree.
     iApply (col_bundle_of_owned with "Hown").
   Qed.
 
+
+  (* ...AND THE ASSEMBLY'S OWN DOOR, AT THE SAME STATE (durable-disk C-7).
+     [FsCollect.col_region_quiesce_acc] takes whichever of the two things the
+     pool and the escrows hand the commit at one inum ([FsCollect.col_side])
+     and returns the bundle; THIS is its payload at the mkfs image, with the
+     node NAMED.  The side here is the MARKER -- the pool's ordinary row
+     carries it at boot ([IcacheBoot.ipool_alloc_all_free]), and the CORPSE
+     LEDGER carries it at every inum a later iput has freed and no iget has
+     recycled ([IcacheEscrow.ipool_quiesce_acc]) -- and what comes out is
+     [FsCfgBoot.img_node], the very value [InodeRegion.ftop_inv]'s map holds
+     at boot.  The closing wand gives the marker and the slot back, so a
+     commit that reads every inum this way leaves the region invariant
+     exactly as it found it. *)
+  Lemma img_col_quiesce_marker (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
+      (nib : nat) (cov : gset Z) (γfs : fs_names) (γi : gname)
+      (inum : bv 32) :
+    fs_boot_image_wf dk ndisk sb nib cov ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    imark γi (bv_unsigned inum) -∗
+    ireg_slot γfs γi (bv_unsigned inum)
+      (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ inode_owned_era_q γfs (DfracOwn 1) γi inum
+          (img_node (fs_blocks dk) sb (bv_unsigned inum))
+      ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum
+           (img_node (fs_blocks dk) sb (bv_unsigned inum)) -∗
+         col_side γfs γi inum
+         ∗ ireg_slot γfs γi (bv_unsigned inum)
+             (fs_dinode (fs_blocks dk) sb (bv_unsigned inum))).
+  Proof.
+    intros Hwf Hlt.
+    pose proof (bv_unsigned_in_range _ inum) as [Hlo _].
+    assert (Hz : 0 <= bv_unsigned inum < 16 * Z.of_nat nib) by lia.
+    iIntros "Hauth Hmk Hslot".
+    iDestruct (col_free_slot_acc γfs γi inum
+                 (fs_dinode (fs_blocks dk) sb (bv_unsigned inum))
+                 with "Hauth Hmk Hslot")
+      as "(Hauth & %Hty & Hmk & Hown & Hback)".
+    rewrite (img_free_node dk ndisk sb nib cov (bv_unsigned inum) Hwf Hz Hty).
+    rewrite -inode_owned_era_1.
+    iFrame "Hauth". iSplitL "Hown"; [iExact "Hown" |].
+    iIntros "Hown". iSplitL "Hmk"; [iLeft; iExact "Hmk" |].
+    iApply ("Hback" with "Hown").
+  Qed.
+
   End CollectImgSlot.
 
 End CollectImgFree.

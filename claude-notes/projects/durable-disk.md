@@ -1833,13 +1833,8 @@ as their remaining consumers.
   MARKED arm's `reg_full` — which is `IcacheEscrow.v` and lane B′/C-3b's
   business, not the region's.
 
-  NOT LANDED, and blocked on (F) and on that pool-side witness:
-  `fs_collect_snap_ok` (the assembly), the law parked in `log_ctx`,
-  `eo_commit`'s call at `outstanding = 0`, the two commit permits at
-  `dsnap_step_of`, `fs_commit_receipt`, `P_fs`'s conjunct → `P_dur (fr_D r)`,
-  and the `fs_dview`-as-slot / `fdn_*` / `riscv_dview_name` deletions.
-  Nothing of the shape changed: `col_snap_ok_ex` is still what the law
-  concludes and `col_hand` still what it must assemble.
+  NOT LANDED: the assembly itself — see C-7's closing paragraph for the
+  current list.
 
   **AS LANDED — C-6: THE CORPSE WINDOW PARKS ITS TRANSACTION, AND THE
   POOL-SIDE WITNESS IS A WALL.**
@@ -1904,38 +1899,134 @@ as their remaining consumers.
   standing in `escA_body`'s EMPTY arm.  `col_region_slot_acc` and
   `col_free_slot_acc` did not have to move.
 
-  **(G), THE POOL-SIDE WITNESS FOR `X`, IS A WALL — `FsCollect` section 5d,
-  machine-checked.**  The measured fix ("a `EscrowDefs.reg_half` per
-  pending/await inum inside `ipool_body`, colliding with the MARKED arm's
-  `reg_full`") CANNOT BE MINTED, and the obstruction is accounting, not
-  proof.  The registry element at one inum is entirely REGION-side on every
-  arm: IN and MARKED hold `reg_full`, and the PENDING arm holds `reg_half`
-  beside `EscrowDefs.region_pending`'s — which is the other half, also in
+  **(G), THE POOL-SIDE WITNESS FOR `X`, IS WHAT C-6 LEFT — closed by C-7.**
+  The measured fix ("a `EscrowDefs.reg_half` per pending/await inum inside
+  `ipool_body`, colliding with the MARKED arm's `reg_full`") CANNOT BE
+  MINTED, and the obstruction is accounting, not proof.  The registry
+  element at one inum is entirely REGION-side on every arm: IN and MARKED
+  hold `reg_full`, and the PENDING arm holds `reg_half` beside
+  `EscrowDefs.region_pending`'s — which is the other half, also in
   `ireg_slot`.  `FsCollect.reg_full_no_pool_half` states exactly that (a
   `reg_half` at an inum is refuted by that inum's slot on EVERY arm, not
-  just the two the witness is meant to rule out), so the half would have to
-  be MOVED out of the region first — and its one producer, the deposit's
-  `reg_split`, runs OFF-LOCK: iput gives the itable lock up at +0x94,
-  twenty instructions before `ireg_free_deposit_au`, so the deposit can
-  open `ipoolN` but cannot find the row for its own inum (`z ∈ X` needs
+  just the two the witness is meant to rule out), and its one producer, the
+  deposit's `reg_split`, runs OFF-LOCK: iput gives the itable lock up at
+  +0x94, twenty instructions before `ireg_free_deposit_au`, so the deposit
+  can open `ipoolN` but cannot find the row for its own inum (`z ∈ X` needs
   both halves of `icfg_pext`, one of which is the lock's).  The same wall
   kills every cheaper variant: `ipool_ext`'s rows are lock-side, so the
   commit sees NOTHING at an `X` inum, and `escA_inv` is an `inv` and
-  therefore cannot move into the Timeless `ipool_body`.
+  therefore cannot move into the Timeless `ipool_body`.  C-7's answer is a
+  per-inum ghost map whose ELEMENT the walk carries — see its own paragraph
+  below.
 
-  THE SHAPE THAT WOULD CLOSE IT, for the successor lane.  A per-inum ghost
-  map keyed like `IcacheEscrow.ipool_tkey`: its AUTHORITY in `ipool_body`,
-  its element carried by the walk from `ipool_put` to the deposit, and the
-  body's big-op stated over the VALUE — `Corpse (t, q)` parks a share of
-  the freezing transaction (refuted at a commit exactly as `ipool_transit`
-  is) and `Deposited` parks `imark`, which `col_free_slot_acc` reads as the
-  free bundle.  The `imark` is the one the deposit hands to
-  `EscrowInode.escA_deposit`'s FILLED state today, so the escrow loses it
-  and `ipool_take_lend` — the redeem — produces it instead; that
-  re-plumbing reaches `ProofIget`'s recycle as well as `ProofIput`'s two
-  sites, plus a new camera/gname and its boot premises
-  (`IcacheBoot`/`FsCfgBoot`).  It is a lane of its own, B″-tx5-sized twice
-  over, and C-6 leaves it stated rather than half-built.
+
+  **AS LANDED — C-7: THE CORPSE LEDGER, AND THE MARKER MOVES OUT OF THE
+  ESCROW.**
+
+  RESIDUE (G) IS CLOSED, and with it the whole of `col_hand`'s supplier
+  list: nothing in `FsCollect.v`'s header is outstanding.  The pool's
+  in-transition part `X` now has one CORPSE LEDGER row per inum inside
+  `IcacheEscrow.ipool_body` — `Xv6Cameras.icorpse` (`CrpPre t q` /
+  `CrpDep`), a `ghost_map Z icorpse` at the new ambient gname
+  `IcacheRef.icfg_pcrp`, with `ipool_ckey` the authority (whole, in the
+  body), `crp_row` the per-row payload, `ipool_corpse` the big-op and
+  `EscrowDefs.crp_elem` the element.  `⌜dom K = X⌝` is the body's new pure
+  row.  `CrpPre t q` parks the freeing transaction's share, so
+  `ipool_corpse_no_ops` reads "every corpse has been deposited" off an empty
+  `ln_tx` authority exactly as `ipool_transit_no_ops` does; `CrpDep` parks
+  `InodeRegion.imark`, so `ipool_quiesce_acc` hands the commit
+  `[∗ set] z ∈ X, imark γi z` and `FsCollect.col_free_slot_acc` turns each
+  into that inum's free bundle.
+
+  A `ghost_map` AND NOT `ipool_tkey`'s PAIRED `ghost_var`, and that is what
+  C-6's wall forced: the deposit runs twenty instructions after iput gave the
+  itable lock up, so it holds neither half of `icfg_pext` and cannot tell
+  that its inum is in `X`.  The ELEMENT locates the row — created at
+  `ipool_put_corpse` (the +0x94 park), carried off-lock, spent at
+  `ipool_deposit_corpse` inside `EscrowDeposit.ireg_free_deposit_au`.
+
+  THE MARKER IS THE WITNESS, NOT A `reg_half`, and C-6's measured shape is
+  refuted rather than built: `FsCollect.reg_full_no_pool_half` survives as
+  the reason (the registry element at one inum is entirely region-side on
+  every arm), and moving one half out is not available either —
+  `InodeRegion.ireg_claim_au`'s PENDING branch RECOMBINES the two
+  region-side halves at ialloc, long before any recycle could hand a
+  pool-side half over.
+
+  THE TIE BETWEEN THE TWO ONE-SHOTS IS WHAT MADE THE RE-PLUMBING NECESSARY.
+  `escA_body`'s FILLED arm loses `imark` and keeps the ledger's ELEMENT at
+  `CrpDep` in its place.  Without that swap the escrow's state machine and
+  the ledger's are untied, and a recycler that peels the escrow cannot
+  conclude that its row is `CrpDep` — so it cannot produce the marker at
+  all.  With it, `ghost_map_lookup` against the open body decides it in one
+  line.  Consequence: `ipool_take_lend` ABSORBS `ipool_shape_to_np` (which
+  is deleted).  The merge is forced, not tidy — the row's deletion needs the
+  element, the element comes from the peel, and `dom K = X` means the peel
+  and the index move must be the same ghost step.  What take_lend returns is
+  an ORDINARY row's four pieces on BOTH branches, plus the borrowed licence;
+  ProofIget's recycle drops one call and gains none.
+
+  THE FRACTION PLAN: NO NEW SHARE.  The corpse row parks the share
+  `ipool_evict_lend` already took — the half iput split off at the +0x3a
+  window (C-6's plan) — instead of `ipool_put` handing it straight back, and
+  the deposit returns it beside `ireg_fpin`.  So `ip_free_locked`'s post
+  carries the ELEMENT where it used to carry that share,
+  `ip_free_offlock`'s post carries the share, and `wp_iput_gen`'s join at
+  Exit B is unchanged.  `SpecIput`, ireclaim and the sixteen iput call sites
+  are untouched.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `Xv6Cameras.icacheG` (+`icache_pcrpG`)
+  and `icacheΣ`; `IcacheRef.icfg` (+`icfg_pcrp`) and `icfg_alloc` (+the
+  ledger's auth, LAST).  `EscrowInode.escA_body`/`escA_inv`/`escA_alloc`/
+  `escA_deposit_acc`/`escA_redeem`/`escA_await_peel` and `pool_pending`/
+  `IcacheEscrow.pool_await` all DROP `γi` (the marker was its only use), and
+  the three peels yield `crp_elem z CrpDep` where they yielded `imark`.
+  `IcacheEscrow.ipool_body` (+`K`, +`⌜dom K = X⌝`, +the ledger),
+  `ipool_alloc_inv` (+the empty auth), `ipool_inv_acc` (+`K` and the rows),
+  `ipool_quiesce_acc` (+the `X` markers), `ipool_take_lend` (the peel's
+  premises and the licence in, an ordinary row out; `ipool_shape_to_np` is
+  gone), `ipool_put` SPLIT into `ipool_put_ord` (`ipool_ord` in, the share
+  out) and `ipool_put_corpse` (`ipool_ext` in, the element out);
+  `ic_close_to_empty`/`_late` now yield `ipool_ord` and
+  `ipool_shape_await`/`ic_close_to_empty_await` `ipool_ext` (the
+  `ipool_ord`/`ipool_ext` definitions moved above them; `ipool_shape` and its
+  three equations stay, and `ipool_no_timeless_check` with them).
+  `EscrowDeposit.ireg_free_deposit_au` (+`icn`/`cov`/`logstart`/`(t, q)`,
+  +`ipool_inv`, +the element, +`↑ipoolN`, and its second fupd yields the
+  share LAST).  `ProofIput.ip_free_offlock` (+`cn`, +`(t, q)`, +`ipool_inv`,
+  +the element; its continuation gains the share).  NEW:
+  `IcacheEscrow.ipool_ckey`/`crp_row`/`ipool_corpse`/`ipool_corpse_no_ops`/
+  `ipool_corpse_marks`/`ipool_deposit_corpse`/`ipl_moi_inum`,
+  `EscrowDefs.crp_elem`/`crp_elem_excl`.  BOOT: `IcacheBoot.icache_boot_at`/
+  `icache_boot` and `FsCfgBoot.fs_kit_icache`/`_rest`/their two `_open`s gain
+  the empty ledger authority, LAST; `ProofMain` moves one destructuring
+  pattern and one `with`-list.  UNTOUCHED: `log_ctx`, `log_op`, `wp_end_op`,
+  `fs_crash_seam`, `P_fs`, `is_itable2`/`itable_res2`'s arity,
+  `ic_escrow_body`'s five arms and `ic_escrow_body_cover`,
+  `ireg_slot`/`ireg_slot_intro`, `SpecIget`/`SpecIlock`/`SpecIput`'s posts,
+  `LogInv`.
+
+  THE ASSEMBLY'S DOOR is `FsCollect.col_region_quiesce_acc`, and it is
+  statable now only because (G) is closed: `col_side` is the two things the
+  pool and the escrows hand the commit at one region inum — the MARKER (the
+  pool's ordinary row for an `O` inum, the corpse ledger for an `X` one) or
+  a whole bundle at a share whose double is invalid (a slot escrow's cover,
+  or the pool row's ALLOC arm) — and the accessor turns either into
+  `inode_owned_era_q` at a NAMED share, which `col_bundle_of_side` packs
+  into `col_hand`'s own currency.  The share is named and not
+  existentialised so that the closing wand can give back exactly what it
+  lent.  NON-VACUITY (plan §7): `FsCollectImg.img_col_quiesce_marker` runs
+  the marker side at the mkfs image and gets the payload out at
+  `FsCfgBoot.img_node`, the value `ftop_inv`'s map holds at boot, with the
+  marker and the slot handed back.
+
+  WHAT REMAINS FOR THE ASSEMBLY (items 2–5), now with no residue under it:
+  `fs_collect_snap_ok`, the law parked in `log_ctx`, `eo_commit`'s call at
+  `outstanding = 0`, the two commit permits at `dsnap_step_of`,
+  `fs_commit_receipt`, `P_fs`'s conjunct → `P_dur (fr_D r)`, and the
+  `fs_dview`-as-slot / `fdn_*` / `riscv_dview_name` deletions.
+  `col_snap_ok_ex` is still what the law concludes and `col_hand` still what
+  it must assemble.
 
 - [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
   The GENERAL statement is the commit's receipt itself: after a commit, the
