@@ -688,13 +688,9 @@ as their remaining consumers.
   transaction's element and is refuted outright (`ic_dep_own_tx_no_ops`).
   `ic_out_no_write_arm` gained `ic_out`'s four new arguments.
 
-  ALTERNATIVE (d) IS EXACTLY WHAT THE CALLER SWEEP STILL OWES, and nothing
-  else: a checked-out bundle at an `ic_dep_bundleless` descriptor (`DepShr`
-  — every transactional `ilock` not yet converted to `DepTx`; `DepRef` and
-  `DepFrz` — iput's two windows), iput's mid-free park
-  (`ic_payload_arm`'s frozen alternative) and iput's authority-side window
-  `ic_held`.  Lane C can take the collection as far as the sweep has got and
-  no further; the lemma names the gap rather than hiding it in a premise.
+  (Alternative (d) — what the caller sweep still owed at this point — is
+  gone: B″-tx4 retired the bundleless lock descriptor and B″-tx5 gave iput's
+  three windows their share.  `ic_slot_cover` is three alternatives.)
 
   TWO PERFORMANCE FACTS, both instances of durable-notes rules and both
   worth the scale they set.  (i) `inode_owned_era_q` / `inode_bytes_era` /
@@ -718,8 +714,7 @@ as their remaining consumers.
   `log_tx γ` those stages carry across the locked window becomes the residue
   half `t ↪[ln_tx icfg_log]{#(1/2)} tt` (5 files name `log_tx`).
   `sys_chdir` is the worked instance and costs three ghost steps wherever
-  `ilock` and `iunlock` sit in one proof block; `create` is next.  Until it
-  is done, alternative (d) is inhabited and `snap_ok` cannot be collected.
+  `ilock` and `iunlock` sit in one proof block; `create` is next.
   (2) THE PARTITION TIE (`region_inums nib = O ∪ {inum_k | slot k live}`, a
   quarter of `ic_id` in `ipool_body`, `ipool_inv`/`ipool_body`/`ipool`
   gaining `cn`) — untouched here; it reaches into `ProofIget`'s recycle and
@@ -918,7 +913,7 @@ as their remaining consumers.
   the contract's post.  That is one more increment in `ProofIlock` +
   `SpecIlock` and it is what "retire `DepShr`" now means.
 
-  IPUT'S SHARE IS NOT DONE, AND THE MEASUREMENT IS THE DELIVERABLE.  Every
+  IPUT'S SHARE, MEASURED HERE AND BUILT BY B″-tx5.  Every
   `iput` in this kernel runs inside a transaction (its `nlink = 0` path calls
   `itrunc` + `iupdate`), so no window of it is exempt and nothing here needed
   a premise nobody can discharge.  What blocks it is the CONTRACT: the
@@ -935,9 +930,8 @@ as their remaining consumers.
   the walks above put one in their hands — so the sweep is threading, not
   design.
 
-  REMAINS: iput's share (above), the checkout-side arm that retires `DepShr`
-  (above), and B″-join's partition tie.  Until the first two land,
-  `ic_slot_cover` keeps arm (d) and `snap_ok` cannot be collected.
+  REMAINS at that point: iput's share and the checkout-side arm that retires
+  `DepShr` (B″-tx4 and B″-tx5 close both).
 
   **AS LANDED — B″-tx3: THE ARM MOVES INTO THE CHECKOUT, AND THE READ ARM
   WITH IT.**
@@ -1018,35 +1012,19 @@ as their remaining consumers.
   any more, and `ic_arm_tx` / `ic_arm_tx_log` / `ic_arm_tx2` have no walk-side
   caller left.
 
-  WHAT `ic_slot_cover` STILL HAS is alternative (d), inhabited by IPUT'S
-  THREE WINDOWS — `DepFrz` (+0x5e), the mid-free park (`ic_payload_arm`'s
-  frozen alternative, +0x70) and the authority-side window `ic_held` (+0x3c).
-
-  IT IS A WALL, AND IT IS A SPEC-SHAPE FACT.  Every `iput` in this kernel
-  does run inside a transaction, and `DepFrz` and the mid-free park could take
-  a share the way `DepTx` does — the descriptor is a `ghost_var` the holder
-  pins, and the park's `frzown`/`frzsel` pair could carry `(t, q)` as fields.
-  `ic_held` CANNOT.  Its window spans iput's `acquiresleep` (+0x3c..+0x5e):
-  before that call the slot's descriptor variable is inside the ENTRY'S
-  SLEEPLOCK (`ic_tok cn k`), not in iput's hand and not in the escrow, and
-  `ic_held` holds only cells, `ic_mid` and half of `ic_id` — none of which can
-  carry a transaction id.  So a share parked in `ic_held` comes back from
-  `ic_open_held` at an EXISTENTIAL `(t, q)`, which iput cannot rejoin with the
-  residue its caller has to get back.  Two escapes were checked and both fail:
-  parking a WHOLE `LogInv.log_tx` element (then the existential closure IS the
-  currency and no re-identification is needed) requires iput to hold the whole
-  token, which `sys_unlink`'s `su_tail_e` — the arm that calls `iunlockput`
-  with a second inode still write-locked at a quarter — cannot supply; and
-  parking the arm in `InodeRegion`'s registry instead moves the share out of
-  the slot, where the per-slot cover lemma cannot see it.  **Giving `ic_held` a
-  share needs a pin the slot does not have today** (a per-slot
-  `ghost_var Σ (option (nat * Qp))`, i.e. one new `icfg` field and its boot
-  allocation), and that is a ruling, not a proof step.  Nothing here invented a
-  premise for it.
-
-  ALSO NOT DONE: item 3's pool-side twin for C-3b's transit set `X`.  It reads
-  "an inum in `X` is carried by a walk inside iput's window, which now holds a
-  share" — and iput does not hold one, so the twin has no premise to run off.
+  WHY `ic_held` NEEDED A PIN AND THE OTHER TWO DID NOT (B″-tx5 built it):
+  its window spans iput's `acquiresleep` (+0x3c..+0x5e), where the slot's
+  descriptor variable is inside the ENTRY'S SLEEPLOCK (`ic_tok cn k`), not in
+  iput's hand and not in the escrow, and `ic_held` holds only cells, `ic_mid`
+  and half of `ic_id` — none of which can carry a transaction id, so a share
+  parked there would come back from `ic_open_held` at an EXISTENTIAL `(t, q)`
+  that iput could not rejoin with the residue its caller must get back.  Two
+  escapes were checked and both fail: parking a WHOLE `LogInv.log_tx` element
+  requires iput to hold the whole token, which `sys_unlink`'s `su_tail_e` —
+  the arm that calls `iunlockput` with a second inode still write-locked at a
+  quarter — cannot supply; and parking the arm in `InodeRegion`'s registry
+  instead moves the share out of the slot, where the per-slot cover lemma
+  cannot see it.
 
 
   **AS LANDED — B″-tx4: THE RETIREMENT SIDE, AND `DepShr` GOES.**
@@ -1097,13 +1075,10 @@ as their remaining consumers.
   `IUNLOCKPUT`).  `ic_shrink_tx` / `ic_grow_tx` and `ic_tx_dep_at` stay: they
   are what a two-lock walk moves between.
 
-  `ic_slot_cover` IS STILL FOUR ALTERNATIVES, and alternative (d) is now
-  inhabited by IPUT'S THREE WINDOWS AND NOTHING ELSE — `DepFrz` (+0x5e), the
-  mid-free park (`ic_payload_arm`'s frozen alternative, +0x70) and `ic_held`
-  (+0x3c).  Item 1 (iput's share) and therefore item 3 (the three-alternative
-  cover and the pool-side twin) are NOT DONE; what follows is the design, at
-  the level of detail that makes it executable, plus two corrections to the
-  ruling that the code forced.
+  WHAT B″-tx4 LEFT FOR B″-tx5, and the design it wrote out for it: iput's
+  share, the three-alternative cover and the pool-side twin.  The two
+  corrections to the ruling that the code forced are below, and both landed
+  as written.
 
   CORRECTION 1: THE PIN GHOST MUST BE AN `icfg` FIELD, NOT A FIELD OF
   `ic_names`, AND THE REASON IS ONE PREDICATE.  The mid-free park is
@@ -1181,9 +1156,110 @@ as their remaining consumers.
   the two parts (or carry `T` as its own key) before it can state anything at
   all; taking `X = ∅` as a premise would be a premise nobody can discharge.
 
-  REMAINS: iput's share (above, with its two corrections), then
-  `ic_escrow_body_cover` / `ic_slot_cover` / `_all` at THREE alternatives, then
-  the pool-side twin at the shape the finding forces.
+  REMAINS: the pool-side twin at the shape the finding forces (see B''-tx5).
+
+
+  **AS LANDED — B''-tx5: THE PIN, IPUT'S SHARE, AND THE COVER AT THREE.**
+
+  THE LOCK-WINDOW PIN IS AN `icfg` FIELD AND IT SITS INSIDE THE ARMS, exactly
+  as B''-tx4's two corrections said.  `Xv6Cameras.hpnUR := gmapUR nat
+  (dfrac_agreeR (leibnizO (option (nat * Qp))))` (one `inG`,
+  `IcacheRef.icfg_hpn`, vocabulary `hpn_at`/`hpn_h`/`hpn_full` with
+  `hpn_agree`/`_update`/`_split`/`_join`/`_full_update` cloned off `frzm`'s);
+  `hpn_boot_map` is minted BY `icfg_alloc` rather than passed to it -- one
+  whole element per SLOT at `None` is a fact that file knows in full -- and
+  `hpn_boot_split` fans it out for `IcacheBoot`'s escrow loop, which puts one
+  into each `ic_empty_arm` it builds.  `icache_boot_at`/`icache_boot` and
+  `FsCfgBoot.fs_kit_icache`/`_rest` (with their two `_open`s) gained the
+  premise LAST, so no destructuring pattern above it moved.
+
+  PER ARM, LAST CONJUNCT EACH: `IcacheEscrow.ic_pin_rest k` (`hpn_full k
+  None`) in `ic_out`, `ic_mid_arm`, `ic_empty_arm` and `ic_payload_arm`'s LEFT
+  alternative; `ic_pin_tx k` (`∃ t q, hpn_h k (Some (t, q)) ∗ t ↪[ln_tx
+  icfg_log]{#q} tt`) in `ic_held` and in `ic_payload_arm`'s FROZEN
+  alternative.  `ic_pin_tx_no_ops` is the refutation the commit reads;
+  `ic_pin_enter`/`ic_pin_exit` are the two movers and `ic_close_held_tx` is
+  the +0x3c entry.  `DepFrz` gained `(t, qt)` as FIELDS and parks its share in
+  `ic_out_frz` (`ic_out_frz_no_ops`).  The ~40 sites this moved are all inside
+  `IcacheEscrow.v` bar four: `ProofIget`'s recycle (three destructuring
+  patterns), `ProofMain`'s boot call, and `ProofIput`.
+
+  `ic_slot_cover` HAS THREE ALTERNATIVES -- not live, pool row, bundle inside
+  at a share whose double is invalid -- and `ic_escrow_body_cover` /
+  `ic_escrow_body_cover_all` are the per-slot and fifty-slot readings.  **That
+  is the lemma lane C calls**, and there is nothing per-slot left in it: the
+  old alternative (d) was iput's three windows and all three are now refuted
+  at an empty `ln_tx` authority.
+
+  IPUT'S SHARE, AND WHO PAYS FOR IT.  `SpecIput.wp_iput_gen_body` takes
+  `LogInv.log_opSet g u Sb e t q` (the new bundle: `log_opSe` beside `t
+  ↪[ln_tx g]{#q} tt`, in `log_opSe`'s own position) and hands `log_opS` plus
+  the share back on every arm, under the pure premise `g = icfg_log`;
+  `wp_iput_sconf` gains ONLY that equation, because its `log_op` carries the
+  whole element and the derivation halves it.  `ProofIput` threads the pin
+  half and `(t, q)` through `ip_free_entry` (premise, and both exits: the
+  share on Exit A, the pin half on Exit B) and `ip_free_locked` (the pin half
+  in, the share out), and the share alone through `ip_tail`/`ip_tail_exit`;
+  `ip_free_offlock` and `ip_epilogue` did not move -- the share is framed
+  across them in the continuation's closure.
+
+  **NO CALLER OF ANY `iunlockput` FORM FINDS A SHARE, AND THAT IS THE FINDING
+  THAT SHRANK THE SWEEP FROM SIXTEEN RESOURCE SITES TO SIXTEEN `eq_refl`s.**
+  iunlockput is `iunlock` then `iput`, and the share the WRITE ARM parked
+  comes home at the FIRST of the two -- so `SpecIunlockput`'s two generic
+  bodies relay `IcacheEscrow.ic_dep_side d` straight on, under the pure
+  premise `SpecIunlockput.ic_dep_side_tx d = Some (t, q)` ("the park is a
+  write arm's", which every iunlockput in this kernel is; `ic_dep_side_of_tx`
+  is the reading) plus `g = icfg_log`.  The two `_tx_` readings are
+  BYTE-STABLE.  The sixteen direct `wp_iunlockput_dep_gen` sites (`ProofCreate`
+  x11, `ProofSysUnlink` x4, `ProofSysUnlinkTails`) each gained two positional
+  arguments and nothing else.
+
+  THE FIVE `wp_dirlink_gen` SITES DO LEND ONE, because dirlink holds no token
+  of its own -- a write-locked walk's is part-parked in the escrow -- and its
+  "already exists" arm iputs what `dirlookup` found.  `SpecDirlink`'s gen form
+  takes the share in and out (`ProofDirlink` threads it through `dl_after_body`
+  and `dl_scan_body`); the counted form gains only `γ = icfg_log` and halves
+  its `log_op`.  create's FILE arm lends its free residue; its two dot links
+  and its parent link shrink an escrow arm by an EIGHTH across the call and
+  grow it back (`ic_shrink_tx`/`ic_grow_tx`); sys_link splits a quarter out of
+  its write-arm bundle's residue.  The other direct iput callers pay less:
+  `ProofIreclaim` and `ProofNamex` halve a token they are holding,
+  `ProofFileclose`/`ProofKexit`/`ProofSysChdir`/`ProofSysLink` add one
+  `eq_refl`-or-`Hclog` for the equation (`ProofKexit.kx_rest` gained it as a
+  premise).
+
+  CONTRACTS WHOSE STATEMENT CHANGED: `SpecIput.wp_iput_gen_body` (+`g =
+  icfg_log`, `log_opSet`, the share in the post) and `wp_iput_sconf_body`
+  (+the equation); `SpecIunlockput.wp_iunlockput_dep_sconf_body`/`_dep_gen_body`
+  (+the equation and `ic_dep_side_tx`); `SpecDirlink.wp_dirlink_gen_body`
+  (+the equation and the share) and `wp_dirlink_sconf_body` (+the equation);
+  `IcacheBoot.icache_boot_at`/`icache_boot` and `FsCfgBoot.fs_kit_icache` /
+  `_rest` / their `_open`s (+the pin row); `IcacheRef.icfg`/`icfg_alloc`;
+  `Xv6Cameras.ic_dep`'s `DepFrz`; and inside `IcacheEscrow` the arm-touching
+  movers (`ic_payload_to_arm`, `ic_payload_arm_frz`, `ic_payload_arm_decide_frz`,
+  `ic_mk_parked`, `ic_mk_mid_arm`, `ic_swap_park_frz`, `ic_open_empty_free`,
+  `ic_close_to_empty`+`_core`/`_late`/`_frz`/`_await`, `ic_close_frozen`,
+  `ic_open_frozen`, `ic_close_mid_to_parked`, `ic_close_out`, `ic_close_out_frz`,
+  `ic_open_held`).  New beside them: `ic_close_held_tx`, `ic_pin_*`,
+  `ic_out_frz_no_ops`, `LogInv.log_opSet`+`_split`/`_intro`.
+
+  REMAINS -- THE POOL-SIDE TWIN, AND THE SHAPE IS NOW FORCED.  B''-tx4's
+  finding stands: `ipool_body`'s `X` is the pending/await rows TOGETHER WITH
+  the transit set, and `X = ∅` at an empty `ln_tx` authority is false as
+  stated.  What tx5 adds is that the TRANSIT half is now payable: the set is
+  grown only by `ipool_evict_lend`, which iput calls holding a share of its
+  caller's transaction, so a transit row can park one and the commit refutes
+  it exactly as it refutes iput's three windows.  The share must sit in
+  `ipool_body` and not under the itable lock for the commit to see it, which
+  is what "carry the transit set under its own key" means: a new ambient
+  gname beside `icfg_pext`, the invariant holding `⌜region_inums nib = O ∪ X
+  ∪ T ∪ ic_live_inums ids⌝` with `[∗ set] z ∈ T, ∃ t q, t ↪[ln_tx
+  icfg_log]{#q} tt` beside it, and `ipool_evict_lend`/`ipool_put` moving the
+  share in and out.  The PENDING/AWAIT half is not a residue at all: its
+  region slot is on `ireg_slot`'s PENDING arm carrying C-3c's
+  `ireg_top_park`, so the collection reads the bundle region-side through
+  `FsCollect.col_free_slot_acc`.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
@@ -1343,8 +1419,10 @@ as their remaining consumers.
   update, beside the identity flip; `ipoolN` is outside that update's mask
   already.
 
-  (B) ALTERNATIVE (d) of `ic_escrow_body_cover` — the ABI sweep.  This is
-  the ONE premise the plan sanctions taking as a hypothesis (P1).
+  (B) ALTERNATIVE (d) of `ic_escrow_body_cover` — CLOSED by B″-tx5.
+  `ic_slot_cover` has THREE alternatives and there is nothing per-slot the
+  collection cannot close; what remains of supplier (A) is the pool-side
+  twin's transit half (B″-tx5's REMAINS).
 
   (C) NOBODY OWNED BLOCK 1 — closed by C-3a below.  `col_hand` wants
   `FsState.sb_owned`: the superblock's block at FULL fraction plus its
@@ -1460,11 +1538,9 @@ as their remaining consumers.
   half is a conjunct of `ipool` at `(P ∖ O) ∪ T`, so only a lock holder can
   grow `X` and the row cannot go vacuous by taking `X` to be the region.  At
   boot `X = ∅` and the partition IS the two-way one (`ipool_alloc_inv`).  What
-  it leaves the collection is ONE residue, the pool-side twin of
-  `ic_escrow_body_cover`'s alternative (d): an inum in `X` has no bundle
-  anywhere.  It is refutable at a commit for (d)'s reason — a walk inside
-  iput's free window holds an open transaction's token and the commit runs at
-  `outstanding = 0` — so closing it is (d)'s ABI sweep and belongs with it.
+  it leaves the collection is ONE residue, the pool-side twin: an inum in `X`
+  has no bundle anywhere.  B″-tx4's finding split it in two and B″-tx5's
+  REMAINS states the shape that closes each half.
 
   THE MOVERS ARE ACCESSORS, NOT PLAIN FUPDS, and that is what forced C-3b's
   first commit: the pool's quarter has to be in the caller's hand at the same
@@ -1576,8 +1652,8 @@ as their remaining consumers.
   `ireg_inv`'s arity, `ic_escrow_body`'s five arms.
 
   WHAT (D) LEAVES.  Nothing of its own.  `col_hand`'s remaining supplier is
-  (B) alone — alternative (d) of `ic_escrow_body_cover` plus (A)'s `X` row,
-  one ABI sweep.
+  (A)'s `X` row alone — see B″-tx5's REMAINS; alternative (d) of
+  `ic_escrow_body_cover` is gone.
 
 - [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
   The GENERAL statement is the commit's receipt itself: after a commit, the
