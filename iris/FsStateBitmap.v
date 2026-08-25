@@ -23,6 +23,7 @@
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
+From iris.algebra Require Import dfrac.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import iprop.
 Require Import BioDefs.
@@ -157,9 +158,12 @@ Section Bitmap.
   (* THE PANIC REFUTATION: a holder of block [b]'s bytes proves [b]'s bit
      reads ALLOCATED, because a clear bit would put a SECOND owner of those
      bytes in the pool.  Exclusivity, not a clause. *)
-  Lemma free_pool_used Γ (Hex : phi_excl Γ) nb u (b : Z) bs :
+  (* THE POOL'S ELEMENT IS FULL, so ANY share of the block refutes it: a
+     read-locker holding a quarter proves the bit reads allocated exactly
+     as a writer holding all of it does (durable-fs-plan.md section 4). *)
+  Lemma free_pool_used_q Γ (Hex : phi_excl Γ) dq nb u (b : Z) bs :
     0 <= b < nb ->
-    free_pool Γ nb u -∗ blk_owned Γ b bs -∗ ⌜b ∈ u⌝.
+    free_pool Γ nb u -∗ blk_owned_q Γ dq b bs -∗ ⌜b ∈ u⌝.
   Proof.
     intros [Hb0 Hbn].
     assert (Hb : Z.of_nat (Z.to_nat b) = b) by lia.
@@ -169,7 +173,17 @@ Section Bitmap.
     rewrite Hb {1}/pool_elt (bool_decide_eq_false_2 _ Hnot).
     iIntros "[Helt _] Hin".
     iDestruct "Helt" as (bs') "Helt".
-    iDestruct (blk_owned_excl Γ Hex with "Helt Hin") as "[]".
+    rewrite blk_owned_1.
+    iDestruct (blk_owned_q_excl Γ Hex _ dq _ bs' bs (dfrac_full_nvalid dq)
+                 with "Helt Hin") as "[]".
+  Qed.
+
+  Lemma free_pool_used Γ (Hex : phi_excl Γ) nb u (b : Z) bs :
+    0 <= b < nb ->
+    free_pool Γ nb u -∗ blk_owned Γ b bs -∗ ⌜b ∈ u⌝.
+  Proof.
+    intros Hrng. rewrite blk_owned_1.
+    iApply (free_pool_used_q Γ Hex (DfracOwn 1) nb u b bs Hrng).
   Qed.
 
   (* FREE: the block goes back into the pool and its bit is cleared. *)

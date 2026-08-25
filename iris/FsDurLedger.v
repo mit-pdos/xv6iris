@@ -151,7 +151,7 @@ Section Workhorse.
     ⊣⊢ fs_dbelems g (map_seqZ (b * Z.of_nat BSIZE + off) bs).
   Proof.
     rewrite /fs_dbelems big_sepM_map_seqZ_gen.
-    rewrite /byte_range /fs_gamma_D. cbn [fsΦ].
+    rewrite /byte_range /byte_range_q /fs_gamma_D. cbn [fsΦ].
     apply big_sepL_proper. intros k v _.
     assert (Hz : b * BSIZE_z + off + Z.of_nat k
                  = b * Z.of_nat BSIZE + off + Z.of_nat k)

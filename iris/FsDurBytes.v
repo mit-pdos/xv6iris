@@ -299,16 +299,17 @@ Section DbytesGen.
     length bs = BSIZE ->
     blk_owned Γ b bs
     ⊣⊢ ([∗ map] a ↦ v ∈ (map_seqZ (b * Z.of_nat BSIZE) bs : gmap Z (bv 8)),
-          fsΦ Γ a v).
+          fsΦ Γ (DfracOwn 1) a v).
   Proof.
     intros Hlen.
     rewrite big_sepM_map_seqZ_gen.
-    rewrite /blk_owned /byte_range.
+    rewrite /blk_owned /byte_range /byte_range_q.
     rewrite (big_sepL_proper
                (fun (k : nat) (v : bv 8) =>
-                  (fsΦ Γ (b * BSIZE_z + 0 + Z.of_nat k) v)%I)
+                  (fsΦ Γ (DfracOwn 1) (b * BSIZE_z + 0 + Z.of_nat k) v)%I)
                (fun (k : nat) (v : bv 8) =>
-                  (fsΦ Γ (b * Z.of_nat BSIZE + Z.of_nat k) v)%I) bs);
+                  (fsΦ Γ (DfracOwn 1) (b * Z.of_nat BSIZE + Z.of_nat k) v)%I)
+               bs);
       last first.
     { intros k v _.
       assert (Hz : b * BSIZE_z + 0 + Z.of_nat k
@@ -325,7 +326,7 @@ Section DbytesGen.
      that ever looks inside [fs_dbytes]. *)
   Theorem fs_dbytes_blocks Γ (D : gmap Z (list (bv 8))) :
     (forall b bs, D !! b = Some bs -> length bs = BSIZE) ->
-    ([∗ map] a ↦ v ∈ fs_dbytes D, fsΦ Γ a v)
+    ([∗ map] a ↦ v ∈ fs_dbytes D, fsΦ Γ (DfracOwn 1) a v)
     ⊣⊢ ([∗ map] b ↦ bs ∈ D, blk_owned Γ b bs).
   Proof.
     induction D as [| b bs D Hb IH] using map_ind; intros Hlen.
@@ -388,11 +389,11 @@ Section DurBytes.
   (* [FsBytesGamma.fs_gamma_L]'s durable twin: the same record, at the
      durable byte map's full element and the fixed layer's two gnames. *)
   Definition fs_gamma_D (g : gname) (Γd : fs_dur_names) : fs_view_names Σ :=
-    MkFsView (fun (a : Z) (v : bv 8) => (a ↪[g] v)%I)
+    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I)
              (fdn_link Γd) (fdn_top Γd).
 
   Lemma fs_gamma_D_phi (g : gname) (Γd : fs_dur_names) (a : Z) (v : bv 8) :
-    fsΦ (fs_gamma_D g Γd) a v = (a ↪[g] v)%I.
+    fsΦ (fs_gamma_D g Γd) (DfracOwn 1) a v = (a ↪[g] v)%I.
   Proof. reflexivity. Qed.
 
   Lemma fs_gamma_D_link (g : gname) (Γd : fs_dur_names) :
@@ -408,15 +409,15 @@ Section DurBytes.
   Lemma fs_gamma_D_excl (g : gname) (Γd : fs_dur_names) :
     phi_excl (fs_gamma_D g Γd).
   Proof.
-    intros a v w. rewrite /fs_gamma_D /phi_excl /=.
+    intros a v w dq1 dq2. rewrite /fs_gamma_D /=.
     iIntros "[H1 H2]".
     iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
+    done.
   Qed.
 
   Global Instance fs_gamma_D_timeless (g : gname) (Γd : fs_dur_names) :
     GTimeless (fs_gamma_D g Γd).
-  Proof. intros a v. rewrite /fs_gamma_D /=. apply _. Qed.
+  Proof. intros dq a v. rewrite /fs_gamma_D /=. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  2b.  ONE BLOCK                                                     *)

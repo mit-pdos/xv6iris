@@ -29,7 +29,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap numbers.
+From iris.algebra Require Import auth gmap numbers dfrac.
 From iris.base_logic.lib Require Import iprop own.
 Require Import BioDefs.
 Require Import RiscvModelBytes.
@@ -503,9 +503,40 @@ Section InodeOwned.
   Context `{!fsLinkG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
+  (* THE INDIRECT BLOCK, at a share (durable-fs-plan.md sections 4 and 6).
+     [ind_owned] is the [DfracOwn 1] reading and its text has not moved, so
+     every existing [rewrite /ind_owned] still sees the [decide]. *)
+  Definition ind_owned_q Γ (dq : dfrac) (n : fs_node) : iProp Σ :=
+    (if decide (fn_indb n = 0) then emp
+     else blk_owned_q Γ dq (fn_indb n) (ind_bytes (fn_ent n)))%I.
+
   Definition ind_owned Γ (n : fs_node) : iProp Σ :=
     (if decide (fn_indb n = 0) then emp
      else blk_owned Γ (fn_indb n) (ind_bytes (fn_ent n)))%I.
+
+  Lemma ind_owned_1 Γ n : ind_owned Γ n = ind_owned_q Γ (DfracOwn 1) n.
+  Proof. reflexivity. Qed.
+
+  Global Instance ind_owned_q_timeless `{!GTimeless Γ} dq n :
+    Timeless (ind_owned_q Γ dq n).
+  Proof. rewrite /ind_owned_q. case_decide; apply _. Qed.
+
+  Lemma ind_owned_q_split Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) n :
+    ind_owned_q Γ (DfracOwn (q1 + q2)) n
+    ⊣⊢ ind_owned_q Γ (DfracOwn q1) n ∗ ind_owned_q Γ (DfracOwn q2) n.
+  Proof.
+    rewrite /ind_owned_q. case_decide.
+    - iSplit; [iIntros "_"; iSplitR; done | iIntros "_"; done].
+    - apply (blk_owned_q_split Γ Hfr).
+  Qed.
+
+  Lemma ind_owned_split_34 Γ (Hfr : phi_frac Γ) n :
+    ind_owned Γ n
+    ⊣⊢ ind_owned_q Γ (DfracOwn (3/4)) n ∗ ind_owned_q Γ (DfracOwn (1/4)) n.
+  Proof.
+    rewrite ind_owned_1 -(ind_owned_q_split Γ Hfr (3/4) (1/4)).
+    rewrite Qp.three_quarter_quarter //.
+  Qed.
 
   (* the Φ-only part of an inode: exactly its footprint *)
   Definition inode_phi Γ (sb : fs_sb) (i : Z) (n : fs_node) : iProp Σ :=

@@ -87,7 +87,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap numbers.
+From iris.algebra Require Import auth gmap numbers dfrac.
 From iris.base_logic.lib Require Import iprop own ghost_map invariants.
 (* The [FsState*] stack exports names with live twins ([byte_range],
    [fs_view]); the LAST import wins, so it goes FIRST and the block layer's
@@ -1018,6 +1018,29 @@ Section EraRes.
 
   (* ---- THE BUNDLE ---------------------------------------------------- *)
 
+  (* THE BYTE LEGS ALONE, AT A SHARE (durable-fs-plan.md sections 4, 6;
+     lane B').  A read-locking [ilock] withdraws exactly this at a QUARTER
+     and the escrow's "out for reading" arm keeps the bundle at three
+     quarters -- which is what makes cross-inode block disjointness at the
+     commit's collection pure separation logic (3/4 + 3/4 > 1,
+     [FsStateDefs.blk_owned_ne_34]).  The record is NOT here: records park
+     region-side at fraction 1 always (plan section 2, ruling (i)). *)
+  Definition inode_bytes_era (γfs : fs_names) (dq : dfrac) (n : fs_node)
+    : iProp Σ :=
+    (([∗ map] k ↦ bs ∈ fn_blk n,
+        FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs)
+     ∗ ind_owned_q (fs_gamma_L γfs) dq n)%I.
+
+  Definition inode_owned_era_q (γfs : fs_names) (dq : dfrac) (γi : gname)
+      (inum : bv 32) (n : fs_node) : iProp Σ :=
+    (dinode_at γi inum (fn_rec n)
+     ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+          FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs)
+     ∗ ind_owned_q (fs_gamma_L γfs) dq n
+     ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n
+     ∗ ⌜inode_local (bv_unsigned inum) n⌝)%I.
+
+  (* the [DfracOwn 1] reading: today's bundle, text unmoved *)
   Definition inode_owned_era (γfs : fs_names) (γi : gname) (inum : bv 32)
       (n : fs_node) : iProp Σ :=
     (dinode_at γi inum (fn_rec n)
@@ -1027,11 +1050,85 @@ Section EraRes.
      ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n
      ∗ ⌜inode_local (bv_unsigned inum) n⌝)%I.
 
+  Lemma inode_owned_era_1 γfs γi inum n :
+    inode_owned_era γfs γi inum n
+    = inode_owned_era_q γfs (DfracOwn 1) γi inum n.
+  Proof. reflexivity. Qed.
+
+  Global Instance inode_bytes_era_timeless γfs dq n :
+    Timeless (inode_bytes_era γfs dq n).
+  Proof.
+    rewrite /inode_bytes_era /ind_owned_q.
+    destruct (decide (fn_indb n = 0)); apply _.
+  Qed.
+
+  Global Instance inode_owned_era_q_timeless γfs dq γi inum n :
+    Timeless (inode_owned_era_q γfs dq γi inum n).
+  Proof.
+    rewrite /inode_owned_era_q /ind_owned_q /top_frag.
+    destruct (decide (fn_indb n = 0)); apply _.
+  Qed.
+
   Global Instance inode_owned_era_timeless γfs γi inum n :
     Timeless (inode_owned_era γfs γi inum n).
   Proof.
     rewrite /inode_owned_era /ind_owned /top_frag.
     destruct (decide (fn_indb n = 0)); apply _.
+  Qed.
+
+  (* ---- THE READER'S QUARTER, BOTH WAYS ------------------------------- *)
+
+  Local Lemma blk_big_sepM_split γfs (q1 q2 : Qp) n :
+    ([∗ map] k ↦ bs ∈ fn_blk n,
+       FsStateDefs.blk_owned_q (fs_gamma_L γfs) (DfracOwn (q1 + q2))
+         (fn_naddr n k) bs)
+    ⊣⊢ ([∗ map] k ↦ bs ∈ fn_blk n,
+          FsStateDefs.blk_owned_q (fs_gamma_L γfs) (DfracOwn q1)
+            (fn_naddr n k) bs)
+        ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+             FsStateDefs.blk_owned_q (fs_gamma_L γfs) (DfracOwn q2)
+               (fn_naddr n k) bs).
+  Proof.
+    rewrite -big_sepM_sep.
+    apply big_sepM_proper. intros k bs _.
+    apply (blk_owned_q_split _ (fs_gamma_L_frac γfs)).
+  Qed.
+
+  Lemma inode_bytes_era_split γfs (q1 q2 : Qp) n :
+    inode_bytes_era γfs (DfracOwn (q1 + q2)) n
+    ⊣⊢ inode_bytes_era γfs (DfracOwn q1) n ∗ inode_bytes_era γfs (DfracOwn q2) n.
+  Proof.
+    rewrite /inode_bytes_era blk_big_sepM_split.
+    rewrite (ind_owned_q_split _ (fs_gamma_L_frac γfs)).
+    iSplit.
+    - iIntros "[[Hb1 Hb2] [Hi1 Hi2]]". iFrame.
+    - iIntros "[[Hb1 Hi1] [Hb2 Hi2]]". iFrame.
+  Qed.
+
+  (* THE ESCROW'S DEPOSIT/WITHDRAW ARITHMETIC: the bundle at [dq1 ⋅ dq2] is
+     the bundle at [dq1] beside the byte legs at [dq2].  [ilock] without a
+     transaction runs it left to right at [3/4 ⋅ 1/4], [iunlock] right to
+     left. *)
+  Lemma inode_owned_era_q_split γfs (q1 q2 : Qp) γi inum n :
+    inode_owned_era_q γfs (DfracOwn (q1 + q2)) γi inum n
+    ⊣⊢ inode_owned_era_q γfs (DfracOwn q1) γi inum n
+        ∗ inode_bytes_era γfs (DfracOwn q2) n.
+  Proof.
+    rewrite /inode_owned_era_q /inode_bytes_era blk_big_sepM_split.
+    rewrite (ind_owned_q_split _ (fs_gamma_L_frac γfs)).
+    iSplit.
+    - iIntros "(Hd & [Hb1 Hb2] & [Hi1 Hi2] & Ht & %Hl)". iFrame. done.
+    - iIntros "[(Hd & Hb1 & Hi1 & Ht & %Hl) [Hb2 Hi2]]". iFrame. done.
+  Qed.
+
+  Lemma inode_owned_era_shed γfs γi inum n :
+    inode_owned_era γfs γi inum n
+    ⊣⊢ inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+        ∗ inode_bytes_era γfs (DfracOwn (1/4)) n.
+  Proof.
+    rewrite inode_owned_era_1.
+    rewrite -(inode_owned_era_q_split γfs (3/4) (1/4)).
+    rewrite Qp.three_quarter_quarter //.
   Qed.
 
   Lemma inode_owned_era_local γfs γi inum n :

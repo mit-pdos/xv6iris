@@ -1588,12 +1588,16 @@ Section Ledger.
   (* ------------------------------------------------------------------ *)
 
   Lemma byte_range_run Γ b off bs :
-    byte_range Γ b off bs ⊣⊢ ([∗ map] a ↦ v ∈ fp_run b off bs, fsΦ Γ a v).
-  Proof. rewrite /fp_run big_sepM_map_seqZ_gen /byte_range //. Qed.
+    byte_range Γ b off bs
+    ⊣⊢ ([∗ map] a ↦ v ∈ fp_run b off bs, fsΦ Γ (DfracOwn 1) a v).
+  Proof.
+    rewrite /fp_run big_sepM_map_seqZ_gen /byte_range /byte_range_q //.
+  Qed.
 
   Lemma blk_owned_run Γ b bs :
     length bs = BSIZE ->
-    blk_owned Γ b bs ⊣⊢ ([∗ map] a ↦ v ∈ fp_run b 0 bs, fsΦ Γ a v).
+    blk_owned Γ b bs
+    ⊣⊢ ([∗ map] a ↦ v ∈ fp_run b 0 bs, fsΦ Γ (DfracOwn 1) a v).
   Proof.
     intros Hl. rewrite /blk_owned byte_range_run.
     iSplit.
@@ -1650,7 +1654,8 @@ Section Ledger.
   Proof.
     intros Hb.
     rewrite /blk_ledger -(fs_dbytes_blocks Γ D (sk_bsz Hb)).
-    rewrite (ledger_carve (fsΦ Γ) (fs_dbytes D) (fp_list S) (fp_map S D)
+    rewrite (ledger_carve (fsΦ Γ (DfracOwn 1)) (fs_dbytes D) (fp_list S)
+               (fp_map S D)
                (fp_list_nodup S)
                (fun x Hx => proj1 (fp_ok S D x Hb (fp_list_valid S x Hx)))
                (fun x y Hx Hy Hne =>
@@ -1777,11 +1782,11 @@ Section Snap.
 
   (* the FULL element, exactly as the era's [FsBytesGamma.fs_gamma_L] is *)
   Definition snap_gamma (g gl gt : gname) : fs_view_names Σ :=
-    MkFsView (fun (a : Z) (v : bv 8) => (a ↪[g] v)%I) gl gt.
+    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I) gl gt.
 
   Global Instance snap_gamma_gtimeless g gl gt :
     GTimeless (snap_gamma g gl gt).
-  Proof. intros a v. rewrite /snap_gamma /=. apply _. Qed.
+  Proof. intros dq a v. rewrite /snap_gamma /=. apply _. Qed.
 
   (* two owners of one byte is [False].  [FsStateDefs.phi_excl]'s consumers
      -- [FsStateBitmap.free_pool_used], hence xv6's "freeing free block"
@@ -1789,10 +1794,10 @@ Section Snap.
      durable side exactly as they do at the era's view. *)
   Lemma snap_gamma_excl g gl gt : phi_excl (snap_gamma g gl gt).
   Proof.
-    intros a v w. rewrite /snap_gamma /phi_excl /=.
+    intros a v w dq1 dq2. rewrite /snap_gamma /=.
     iIntros "[H1 H2]".
     iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
+    done.
   Qed.
 
   (* ------------------------------------------------------------------ *)
