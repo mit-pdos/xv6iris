@@ -5060,9 +5060,15 @@ Section ProofSysUnlinkBody.
            with "Hireg Hdviewd Hfviewd") as "[Hdviewd Hfviewd]".
     (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
        [ireg_top_retag] opens [ftopN] alone. *)
+    (* THE RETAG OWES THE ROW (durable-disk lane A): the four facts are the
+       re-pack's own, already named -- a zeroed entry leaves the directory
+       well-formed (its dots are untouched and its names stay unique). *)
     iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
             (era_node dnd bmd datd) (era_node dnW bm' data')
-            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+            ltac:(solve_ndisj)
+            (inode_local_of_ok_rec (bv_unsigned dinum) cov logstart dnW bm'
+               data' Hiok' Hrl_data' Hduq' Hddix')
+            with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum dnW bm')
@@ -5412,6 +5418,27 @@ Section ProofSysUnlinkBody.
       as "Hdlnki2".
     { iApply dlinks_not_dir. rewrite su_setnl_type. exact Htynzi. }
     (* ...and the ERA's abstract value follows the count (2b-inode-3). *)
+    (* THE RETAG OWES THE ROW (durable-disk lane A): a lowered link count
+       leaves the inode well-formed, and these are the re-pack's own four
+       facts.  A directory that reaches nlink = 0 is an ORPHAN, whose dot
+       clauses [FsStateInode.inode_local] guards away. *)
+    assert (Hlocdec : inode_local
+              (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
+                            : mword 32))
+              (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+                    (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
+                              : mword 64)
+                       (sign_extend' 64
+                          (sign_extend' 12 (mword_of_int 63 : mword 6))
+                        : mword 64)) 31 0)))) bmi dati)).
+    { apply (inode_local_of_ok_rec _ cov logstart _ bmi dati).
+      - exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki).
+      - apply (inode_rec_local_same_type dni _ Hrl_dati
+                 (su_setnl_type dni _));
+          [ exact (su_dec_short _ _ Hdecr (proj1 (proj2 Hrl_dati)))
+          | exact (proj2 (proj2 Hrl_dati)) ].
+      - apply dir_uniq_not_dir. rewrite su_setnl_type. exact Htynzi.
+      - apply dir_dots_ix_not_dir. rewrite su_setnl_type. exact Htynzi. }
     iApply fupd_wp.
     iMod (ireg_top_retag ⊤ gfs
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
@@ -5423,7 +5450,7 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati)
-            ltac:(solve_ndisj) with "[] Htopi") as "Htopi";
+            ltac:(solve_ndisj) Hlocdec with "[] Htopi") as "Htopi";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart ks
@@ -7064,6 +7091,25 @@ Section ProofSysUnlinkBody.
            with "Hireg Hdviewd Hfviewd") as "[Hdviewd Hfviewd]".
     (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
        [ireg_top_retag] opens [ftopN] alone. *)
+    (* THE RETAG OWES THE ROW (durable-disk lane A): rmdir lowers the
+       parent's own count, and the re-pack below proves the same four facts
+       -- the entry's removal left the directory well-formed and the count
+       move touches nothing else. *)
+    assert (HlocW : inode_local (bv_unsigned dinum)
+              (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+                    (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
+                              : mword 64)
+                       (sign_extend' 64
+                          (sign_extend' 12 (mword_of_int 63 : mword 6))
+                        : mword 64)) 31 0)))) bm' data')).
+    { apply (inode_local_of_ok_rec (bv_unsigned dinum) cov logstart _ bm' data').
+      - exact HiokF2.
+      - exact (inode_rec_local_same_type dnW _ Hrl_data'
+                 (su_setnl_type dnW _)
+                 (su_dec_short _ _ HdecrW (proj1 (proj2 Hrl_data')))
+                 (proj2 (proj2 Hrl_data'))).
+      - exact HduqF2.
+      - exact HddixF2. }
     iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
             (era_node dnd bmd datd) (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -7071,7 +7117,7 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bm' data')
-            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+            ltac:(solve_ndisj) HlocW with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
@@ -7476,6 +7522,27 @@ Section ProofSysUnlinkBody.
       iExact "Hgrey". }
     iDestruct (dlinks_intro with "Hdlnki2 Hetki") as "Hdlnki2".
     (* ...and the ERA's abstract value follows the count (2b-inode-3). *)
+    (* THE RETAG OWES THE ROW (durable-disk lane A): a lowered link count
+       leaves the inode well-formed, and these are the re-pack's own four
+       facts.  This is the RMDIR arm, so the child IS a directory and the
+       two dot clauses ride [HddixZ]/[HduqZ], proved just above. *)
+    assert (Hlocdec : inode_local
+              (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
+                            : mword 32))
+              (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+                    (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
+                              : mword 64)
+                       (sign_extend' 64
+                          (sign_extend' 12 (mword_of_int 63 : mword 6))
+                        : mword 64)) 31 0)))) bmi dati)).
+    { apply (inode_local_of_ok_rec _ cov logstart _ bmi dati).
+      - exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki).
+      - apply (inode_rec_local_same_type dni _ Hrl_dati
+                 (su_setnl_type dni _));
+          [ exact (su_dec_short _ _ Hdecr (proj1 (proj2 Hrl_dati)))
+          | exact (proj2 (proj2 Hrl_dati)) ].
+      - exact HduqZ.
+      - exact HddixZ. }
     iApply fupd_wp.
     iMod (ireg_top_retag ⊤ gfs
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
@@ -7487,7 +7554,7 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati)
-            ltac:(solve_ndisj) with "[] Htopi") as "Htopi";
+            ltac:(solve_ndisj) Hlocdec with "[] Htopi") as "Htopi";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart ks

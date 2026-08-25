@@ -66,6 +66,7 @@ Require Import SleepLock.      (* [sl_free_tok] / [slh_auth]: [icfg_isl]'s pair 
 Require Import BioInitAt.
 Require Import KallocInv.
 Require Import InodeInv.
+Require Import InodeLock.   (* [inode_ok] -- the image node's readings, moved down here *)
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
@@ -111,6 +112,169 @@ Definition img_nodes (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
   list_to_map ((fun z => (z, img_node P sb z))
                  <$> elements (region_inums nib)).
 
+(* the three [fn_*] readings of [FsCfgBoot.img_node] that this file uses,
+   each one delta-step off [FsStateEra.era_node_*] *)
+Lemma img_node_rec (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fn_rec (img_node P sb z) = fs_dinode P sb z.
+Proof. reflexivity. Qed.
+
+Lemma img_node_ent (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fn_ent (img_node P sb z) = bm_ent (img_blkmap P (fs_dinode P sb z)).
+Proof. reflexivity. Qed.
+
+Lemma img_node_blk (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fn_blk (img_node P sb z)
+  = node_blk (img_blkmap P (fs_dinode P sb z))
+             (fs_data_of P (fs_dinode P sb z)).
+Proof. reflexivity. Qed.
+
+(* ---- 2a. A FREE INUM'S NODE IS BARE --------------------------------- *)
+
+Lemma img_node_bare (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) (z : Z) :
+  fs_region_bare P sb nib = true -> fs_region_nlink P sb nib = true ->
+  0 <= z < 16 * Z.of_nat nib ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = 0 ->
+  fn_bare (img_node P sb z).
+Proof.
+  intros Hbare Hnl Hz Hty.
+  set (dn := fs_dinode P sb z).
+  assert (Hwf : length (di_addrs dn) = 13%nat) by exact (fs_dinode_wf P sb z).
+  assert (Ha : forall k : nat, (k < 13)%nat ->
+                 bv_unsigned (di_addrs dn !!! k) = 0)
+    by (intros k Hk; exact (fs_region_bare_addr P sb nib z k Hbare Hz Hty Hk)).
+  assert (Hsz : bv_unsigned (di_size dn) = 0)
+    by exact (fs_region_bare_size P sb nib z Hbare Hz Hty).
+  (* the addresses, as a list *)
+  assert (Haddrs : di_addrs dn = replicate 13 (bv_0 32)).
+  { apply list_eq. intros k.
+    destruct (Nat.lt_ge_cases k 13) as [Hk | Hk].
+    - rewrite (lookup_replicate_2 _ _ _ Hk).
+      destruct (lookup_lt_is_Some_2 (di_addrs dn) k ltac:(lia)) as [a Hk'].
+      rewrite Hk'. f_equal. apply bv_eq.
+      rewrite -(list_lookup_total_correct _ _ _ Hk') (Ha k Hk).
+      by change (bv_unsigned (bv_0 32)) with 0.
+    - assert (H1 : di_addrs dn !! k = None)
+        by (apply lookup_ge_None; lia).
+      assert (H2 : (replicate 13 (bv_0 32) : list (bv 32)) !! k = None)
+        by (apply lookup_ge_None; rewrite length_replicate; lia).
+      rewrite H1 H2 //. }
+  assert (Hind : bv_unsigned (bm_ind (img_blkmap P dn)) = 0).
+  { rewrite img_blkmap_ind. apply Ha. lia. }
+  (* the indirect entries, as a list *)
+  assert (Hent : bm_ent (img_blkmap P dn) = replicate FS_NINDIRECT (bv_0 32)).
+  { rewrite (img_blkmap_noind P dn Hind). rewrite /NINDIRECT /FS_NINDIRECT //. }
+  (* every slot reads zero, so the node owns no block *)
+  assert (Hget : forall k : nat, (k < MAXFILE)%nat ->
+                   bv_unsigned (blkmap_get (img_blkmap P dn) k) = 0).
+  { intros k Hk. rewrite (img_blkmap_get P dn k Hwf Hk) /fs_blk_addr.
+    destruct (Nat.ltb_spec k FS_NDIRECT) as [Hd | Hd].
+    - apply Ha. unfold FS_NDIRECT in Hd. lia.
+    - rewrite /fs_ind_ents. cbv zeta.
+      rewrite (proj2 (Z.eqb_eq _ _) (Ha 12%nat ltac:(lia))).
+      rewrite lookup_total_replicate_2; [reflexivity |].
+      unfold MAXFILE, NDIRECT, NINDIRECT, FS_MAXFILE, FS_NDIRECT,
+             FS_NINDIRECT in *. lia. }
+  rewrite /fn_bare img_node_rec img_node_ent img_node_blk.
+  split; [exact Haddrs |].
+  split; [exact Hent |].
+  split.
+  { apply map_eq. intros k. rewrite node_blk_lookup lookup_empty.
+    case_decide as Hc; [| reflexivity].
+    exfalso. destruct Hc as [Hk Hnz]. apply Hnz. exact (Hget k Hk). }
+  split.
+  { rewrite /fn_size img_node_rec. exact Hsz. }
+  rewrite /fn_nlink img_node_rec.
+  rewrite (fs_region_nlink_free P sb nib z Hnl Hz Hty). reflexivity.
+Qed.
+
+Lemma img_inode_local_free (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  fs_region_bare P sb nib = true -> fs_region_nlink P sb nib = true ->
+  0 <= z < 16 * Z.of_nat nib ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = 0 ->
+  inode_local z (img_node P sb z).
+Proof.
+  intros Hbare Hnl Hz Hty.
+  apply (inode_local_bare z (img_node P sb z)
+           (img_node_bare P sb nib z Hbare Hnl Hz Hty)).
+  left. rewrite /fn_type img_node_rec. exact Hty.
+Qed.
+
+(* ---- 2b. A LIVE INUM'S NODE, exactly as [FsCfgBoot] reads it --------- *)
+
+Lemma img_inode_ok_at (P : Z -> list (bv 8)) (sb : fs_sb) (cov : gset Z)
+    (z : Z) :
+  fsimg_wf P sb = true -> fs_blocks_full P ->
+  (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
+  0 <= z < FsImg.sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb z)) <> 0 ->
+  inode_ok cov (sb_logstart sb) (fs_dinode P sb z)
+    (img_blkmap P (fs_dinode P sb z)) (fs_data_of P (fs_dinode P sb z)).
+Proof.
+  intros Hwf Hfull Hcov Hran Hty.
+  exact (img_inode_ok P sb cov (sb_logstart sb) (fs_dinode P sb z)
+           (fs_dinode_wf P sb z) (fsimg_wf_sb P sb Hwf) eq_refl Hfull Hcov
+           (fsimg_wf_inode P sb z Hwf Hran Hty) Hty
+           (fsimg_wf_slot_inj P sb z Hwf Hran Hty)).
+Qed.
+
+Lemma img_inode_local_live (P : Z -> list (bv 8)) (sb : fs_sb) (cov : gset Z)
+    (nib : nat) (z : Z) :
+  fsimg_wf P sb = true -> fs_region_nlink P sb nib = true ->
+  fs_blocks_full P ->
+  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+  (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
+  0 <= z < FsImg.sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb z)) <> 0 ->
+  inode_local z (img_node P sb z).
+Proof.
+  intros Hwf Hrnl Hfull Hnin Hcov Hran Hty.
+  set (dn := fs_dinode P sb z).
+  assert (Hok : fs_inode_ok P sb dn)
+    by exact (fsimg_wf_inode P sb z Hwf Hran Hty).
+  assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z -> fs_dir_ok P sb z dn)
+    by (intros Hd; exact (fsimg_wf_dir P sb z Hwf Hran Hd)).
+  (* the three record-only facts, each off the sweep that proves it *)
+  assert (Hrl : inode_rec_local dn).
+  { split_and!.
+    - right. exact (fio_type P sb dn Hok).
+    - apply (fs_region_nlink_short P sb nib z Hrnl). lia.
+    - intros Hd. exact (fdo_gran P sb z dn (Hdir Hd)). }
+  apply (inode_local_of_ok_rec z cov (sb_logstart sb) dn
+           (img_blkmap P dn) (fs_data_of P dn)
+           (img_inode_ok_at P sb cov z Hwf Hfull Hcov Hran Hty) Hrl).
+  - exact (img_dir_uniq P sb z dn Hdir).
+  - intros Hd Hnl0. exact (fsimg_wf_dots P sb z Hwf Hran Hd Hd Hnl0).
+Qed.
+
+(* ...and the two arms as ONE fact over the whole region *)
+Lemma img_inode_local (P : Z -> list (bv 8)) (sb : fs_sb) (cov : gset Z)
+    (nib : nat) (z : Z) :
+  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+  fs_region_bare P sb nib = true ->
+  fs_blocks_full P ->
+  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+  (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
+  z ∈ region_inums nib ->
+  inode_local z (img_node P sb z).
+Proof.
+  intros Hwf Hrw Hbare Hfull Hnin Hcov Hz.
+  apply region_inums_spec in Hz.
+  destruct (decide (bv_unsigned (di_type (fs_dinode P sb z)) = 0))
+    as [H0 | Hnz].
+  - exact (img_inode_local_free P sb nib z Hbare
+             (fs_region_wf_nlink _ _ _ Hrw) Hz H0).
+  - assert (Hran : 0 <= z < FsImg.sb_ninodes sb).
+    { split; [lia |].
+      destruct (Z_lt_ge_dec z (FsImg.sb_ninodes sb)) as [Hlt | Hge];
+        [exact Hlt |].
+      exfalso. apply Hnz.
+      exact (fs_region_free_spec P sb nib z (fs_region_wf_free _ _ _ Hrw)
+               ltac:(lia) ltac:(lia) ltac:(lia)). }
+    exact (img_inode_local_live P sb cov nib z Hwf
+             (fs_region_wf_nlink _ _ _ Hrw) Hfull Hnin Hcov Hran Hnz).
+Qed.
+
 Lemma img_nodes_keys (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
   ((fun z => (z, img_node P sb z)) <$> elements (region_inums nib)).*1
   = elements (region_inums nib).
@@ -123,6 +287,39 @@ Lemma img_nodes_nodup (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
   base.NoDup (((fun z => (z, img_node P sb z))
                  <$> elements (region_inums nib)).*1).
 Proof. rewrite img_nodes_keys. apply NoDup_elements. Qed.
+
+(* the converse reading: a key the node map answers at is a region inum, and
+   the answer is the image's own node *)
+Lemma img_nodes_lookup_inv (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) (n : fs_node) :
+  img_nodes P sb nib !! z = Some n ->
+  z ∈ region_inums nib /\ n = img_node P sb z.
+Proof.
+  intros Hz. rewrite /img_nodes in Hz.
+  apply elem_of_list_to_map_2 in Hz.
+  apply elem_of_list_fmap in Hz as (y & Heq & Hy).
+  injection Heq as -> <-. split; [by apply elem_of_elements | reflexivity].
+Qed.
+
+(* THE BOOT ROW (durable-disk lane A, plan section 4b): every inode the
+   era's abstract map names is well-formed.  It is what
+   [InodeRegion.ftop_alloc] takes, and it is the image's own two arms read
+   over the map -- conjunct (14) [fs_region_bare] is what makes the FREE
+   arm true (a garbage type-0 record would break [inl_size]/[inl_covers]). *)
+Lemma img_nodes_local (P : Z -> list (bv 8)) (sb : fs_sb) (cov : gset Z)
+    (nib : nat) :
+  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+  fs_region_bare P sb nib = true ->
+  fs_blocks_full P ->
+  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+  (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
+  forall (i : Z) (n : fs_node),
+    img_nodes P sb nib !! i = Some n -> inode_local i n.
+Proof.
+  intros Hwf Hrw Hbare Hfull Hnin Hcov i n Hi.
+  destruct (img_nodes_lookup_inv P sb nib i n Hi) as [Hin ->].
+  exact (img_inode_local P sb cov nib i Hwf Hrw Hbare Hfull Hnin Hcov Hin).
+Qed.
 
 Lemma img_nodes_lookup (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
     (z : Z) :
@@ -1795,6 +1992,12 @@ Section FsCfgBootEra.
     (* ---- the image, all as hypotheses (R3) ---- *)
     fsimg_wf (fs_blocks dk) sb = true ->
     fs_region_wf (fs_blocks dk) sb nib = true ->
+    (* CONJUNCT (14) (durable-disk lane A): a free slot's record is BARE.
+       It is what makes the locked registry's boot row true at a FREE inum
+       -- [inode_local]'s size and coverage clauses would be false of a
+       garbage type-0 record -- and it is cited at the literal image by
+       [FsImgCheck.fsimg_region_bare], so the adequacy cone pays nothing. *)
+    fs_region_bare (fs_blocks dk) sb nib = true ->
     FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (0 < nib)%nat ->
@@ -1870,7 +2073,7 @@ Section FsCfgBootEra.
       fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk)
         (fs_kit_spent (fs_blocks dk) sb nib (fs_live_set (fs_blocks dk) sb)).
   Proof.
-    intros Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata HiregE.
+    intros Hwf Hrw Hbare Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata HiregE.
     iIntros "Hdisk Hsa Hsf".
     (* ---- 1. the log's four gnames, at their genesis values ---------- *)
     iMod log_ghost_alloc as (γlog) "Hlogtok".
@@ -1888,7 +2091,7 @@ Section FsCfgBootEra.
             (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
-                     Hisl & Hrauth)".
+                     Hisl & Hrauth & Hlkauth)".
     (* every ambient form below is stated at [icfg_nib]; make the caller's
        [nib] BE it, so no lemma has to be re-instantiated *)
     symmetry in Hnibq. subst nib.
@@ -2061,7 +2264,9 @@ Section FsCfgBootEra.
     iEval (rewrite -Htp) in "Htopa".
     iEval (rewrite -Htp) in "Htopf".
     iMod (ftop_alloc E γfs (img_nodes (fs_blocks dk) sb icfg_nib)
-            with "Htopa") as "#Hftopi".
+            (img_nodes_local (fs_blocks dk) sb cov icfg_nib Hwf Hrw Hbare
+               Hfull Hnin Hcovdata)
+            with "Htopa Hlkauth") as "#Hftopi".
     iEval (rewrite (big_sepM_img_nodes
                       (fun i n => top_frag (fs_gamma_L γfs) i n)
                       (fs_blocks dk) sb icfg_nib)) in "Htopf".

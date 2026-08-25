@@ -2246,9 +2246,19 @@ Section ProofFilewrite.
             (fv_of dnl datal) (fv_of dn' data')
             ltac:(solve_ndisj) with "Hireg Hdview Hfview")
       as "[Hdview Hfview]".
+    (* THE RETAG OWES THE ROW (durable-disk lane A).  A write leaves the
+       inode well-formed -- writei grows the size only after the block it
+       needs is in the map -- and these are the four facts the re-pack
+       below proves anyway; the fd is provably not a directory here, so the
+       two dot clauses are vacuous. *)
+    assert (Hlocw : inode_local (bv_unsigned inum) (era_node dn' bm' data')).
+    { apply (inode_local_of_ok_rec (bv_unsigned inum) (fwn_cov fn)
+               (fwn_logstart fn) dn' bm' data' Hiok2 Hrl2).
+      - exact (dir_uniq_not_dir dn' data' Hnodir').
+      - exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir'). }
     iMod (ireg_top_retag ⊤ (fwn_fs fn) (bv_unsigned inum)
             (era_node dnl bml datal) (era_node dn' bm' data')
-            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+            ltac:(solve_ndisj) Hlocw with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I

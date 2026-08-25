@@ -1198,11 +1198,37 @@ Section IlockLoad.
           iDestruct "Hdv" as (e0) "Hdv".
           iDestruct "Hfv" as (b0) "Hfv".
           iDestruct "Htop" as (n0) "Htop".
+          (* THE CLAIM BOX IS WELL-FORMED (durable-disk lane A): the retag
+             owes the registry's row, and this arm proves the four facts it
+             is assembled from a few lines below anyway -- a claim box has
+             type from the region, no blocks, size 0 and count 0. *)
+          assert (Hlocbox : inode_local (bv_unsigned inum)
+                    (era_node dn bm_empty
+                       (fun _ => replicate BSIZE (bv_0 8)))).
+          { apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn
+                     bm_empty (fun _ => replicate BSIZE (bv_0 8))).
+            - rewrite /inode_ok. split_and!.
+              + exact (bm_empty_wf cov logstart).
+              + apply bm_covers_nonpos. rewrite Hfsz. lia.
+              + rewrite Hfad il_bmcells_empty. reflexivity.
+              + exact Hfty.
+              + rewrite Hfsz.
+                pose proof (Nat2Z.is_nonneg MAXFILE).
+                pose proof (Nat2Z.is_nonneg BSIZE). nia.
+              + apply bm_empty_holes. intros i. reflexivity.
+              + exact inode_sized_zero.
+            - split_and!.
+              + exact Htyok.
+              + rewrite (fresh_shape_nlink dn Hfr0). lia.
+              + intros _. rewrite Hfsz. by exists 0.
+            - exact (dir_uniq_size_zero dn _ Hfsz).
+            - exact (dir_dots_ix_orphan (bv_unsigned inum) dn _
+                       (fresh_shape_nlink dn Hfr0)). }
           (* the marker arm's fragment is untied; retag it at the claim
              box's own node, exactly as the two contents holds are set *)
           iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))
-                  ltac:(solve_ndisj)
+                  ltac:(solve_ndisj) Hlocbox
                   with "[Hireg] Htop") as "Htop".
           { iApply (ireg_inv_ftop with "Hireg"). }
           iMod (dvw_set_rt ⊤ gi gfs inodestart nib (bv_unsigned inum) e0

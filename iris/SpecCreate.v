@@ -659,6 +659,18 @@ Definition wp_create_sconf_body
   iref_slots ns -∗
   (* ---- THE OP-WIDE RESERVATION, IN SET FORM (section 18 clause 1) ---- *)
   log_opS γ u Sb -∗
+  (* ---- THE TRANSACTION TOKEN (durable-disk lane A, plan section 4b) ----
+     create is the one function whose child is MID-BUILT across a call: a
+     mkdir's child carries [nlink = 1] from +0xc4 and gets its two dot
+     entries only at the interior [dirlink]s, and in between it is a
+     directory with a link count and no dots -- exactly what
+     [FsStateInode.inode_local] rules out.  So create SUSPENDS that inode's
+     row for the window ([InodeRegion.ireg_arm]), which parks this token,
+     and hands it back at the disarm.  Every other walk in the tree leaves
+     its inode well-formed at each write and needs none of this.
+     THE TOKEN COMES BACK ON EVERY ARM: create's caller ends the operation,
+     and end_op takes the whole [LogInv.log_op]. *)
+  log_tx γ -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: create parks (ilock,
      bread, the whole fs cone), and a park moves the hart with interrupts
      off, so the crossing has nothing to do with SIE. *)
@@ -702,6 +714,9 @@ Definition wp_create_sconf_body
          that guard is forced, not a convenience: see the header. *)
       ⌜Sb ⊆ Sb' /\ (u' <= u)%nat /\ (ok = true -> (iput_units <= u')%nat)⌝ -∗
       log_opS γ u' Sb' -∗
+      (* ...and the transaction token, off the disarm: no arm of create
+         leaves an inode's row suspended (durable-disk lane A) *)
+      log_tx γ -∗
       (if ok
        then (* BOTH SUCCESS ARMS RETURN A LOCKED INODE *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry k

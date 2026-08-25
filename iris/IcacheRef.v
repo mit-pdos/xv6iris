@@ -817,6 +817,11 @@ Class icfg := MkIcfg {
      name would enter every fs contract.  Registers every inum: the full
      element refutes the pending arm at [ireg_claim_au] by fraction overflow. *)
   icfg_reg : gname;
+  (* THE LOCKED REGISTRY's gname (durable-disk lane A, plan section 4b),
+     ambient for [icfg_reg]'s reason verbatim: the registry is a conjunct of
+     [InodeRegion.ftop_body], which rides [ireg_inv], so a threaded name
+     would enter thirty-odd fs contracts. *)
+  icfg_lk : gname;
   (* THE COUNT COUPLING's gname (iclaim-ledger.md §2.2), ambient for
      [icfg_link]'s reason verbatim: one half is parked in
      [InodeRegion.ireg_slot] (hence inside [ireg_inv], whose arity is fixed
@@ -1010,7 +1015,11 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          escrow gnames; the reordered-iput walk re-mints real ones at deposit)
          and parks the whole thing inside [ireg_body], where [reg_full]
          refutes [ireg_claim_au]'s pending arm with no premise. *)
-      ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname)).
+      ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname)) ∗
+      (* THE LOCKED REGISTRY's auth, handed out EMPTY: at boot no
+         transaction exists, so no inum's row is suspended (durable-disk
+         lane A).  [InodeRegion.ftop_alloc] takes it. *)
+      ghost_map_auth icfg_lk 1 (∅ : gmap nat (gset Z)).
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1035,11 +1044,13 @@ Proof.
      boot fupd re-mints it registered over every inum and parks it in
      [ireg_body] (where [reg_full] refutes the pending arm). *)
   iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
+  (* the locked registry, empty (durable-disk lane A) *)
+  iMod (ghost_map_alloc (∅ : gmap nat (gset Z))) as (γlkr) "[Hlkr _]".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γcnt γfrzo γfrzm γdv γfv), g0.
-  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_icnt icfg_frzo icfg_frzm
-       icfg_dview icfg_fview].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg".
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γcnt γfrzo γfrzm γdv γfv), g0.
+  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_icnt icfg_frzo
+       icfg_frzm icfg_dview icfg_fview].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr".
 Qed.
 
 (* ===================================================================== *)

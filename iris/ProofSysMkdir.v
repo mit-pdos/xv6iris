@@ -1201,11 +1201,11 @@ Section ProofSysMkdirBody.
                 with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
                       Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                       Hsbb
-                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS").
+                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
       iIntros (CID18 Hq18 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
         "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
-         %Hns1 Hir %Hun1 HopS Hok".
+         %Hns1 Hir %Hun1 HopS Htx Hok".
       iEval (rewrite HN4a0) in "Hbufk".
       assert (Hpc2c : ret_pc (N4 !!! Regidx Rra : mword 64)
                       = mword_of_int (MD + 0x2c)) by (rewrite HN4ra; pcw).

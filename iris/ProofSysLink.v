@@ -1896,10 +1896,24 @@ Section ProofSysLinkBody.
                    is the one column [sl_incnl] moves: [ireg_top_retag]
                    opens [ftopN] alone (durable-disk 2b-inode-3). *)
                 iDestruct "Hfview" as "[Hfview Htop]".
+                (* THE RETAG OWES THE ROW (durable-disk lane A): a raised
+                   link count leaves the inode well-formed, and these are
+                   the re-pack's own four facts. *)
+                assert (Hlocnl : inode_local (bv_unsigned inum)
+                          (era_node (sl_incnl dn) bm dat)).
+                { apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart
+                           (sl_incnl dn) bm dat
+                           (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok)
+                           (sl_incnl_rec_local dn Hrl_dat Hnl
+                              (sl_tdir_zne _ Hty))).
+                  - apply dir_uniq_not_dir.
+                    rewrite /sl_incnl sl_setnl_type. exact (sl_tdir_zne _ Hty).
+                  - apply (dir_dots_ix_not_dir (bv_unsigned inum)).
+                    rewrite /sl_incnl sl_setnl_type. exact (sl_tdir_zne _ Hty). }
                 iApply fupd_wp.
                 iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
                         (era_node dn bm dat) (era_node (sl_incnl dn) bm dat)
-                        ltac:(solve_ndisj) with "[] Htop") as "Htop";
+                        ltac:(solve_ndisj) Hlocnl with "[] Htop") as "Htop";
                   [iApply (ireg_inv_ftop with "Hireg") |].
                 iModIntro.
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
@@ -2999,10 +3013,17 @@ Section ProofSysLinkBody.
                             (* ...and the ERA's abstract value with them
                                (durable-disk 2b-inode-3): [ireg_top_retag]
                                opens [ftopN] alone. *)
+                            (* THE RETAG OWES THE ROW (durable-disk lane A):
+                               the four facts are the re-pack's own, already
+                               named. *)
                             iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj) with "[] Htopd")
+                                    ltac:(solve_ndisj)
+                                    (inode_local_of_ok_rec (bv_unsigned dinum)
+                                       cov logstart dnd' bmd' datd'
+                                       Hdiok' Hrl_datd' Hduq' Hddix')
+                                    with "[] Htopd")
                               as "Htopd";
                               [iApply (ireg_inv_ftop with "Hireg") |].
                             iModIntro.
@@ -3449,10 +3470,17 @@ Section ProofSysLinkBody.
                             (* ...and the ERA's abstract value with them
                                (durable-disk 2b-inode-3): [ireg_top_retag]
                                opens [ftopN] alone. *)
+                            (* THE RETAG OWES THE ROW (durable-disk lane A):
+                               the four facts are the re-pack's own, already
+                               named. *)
                             iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj) with "[] Htopd")
+                                    ltac:(solve_ndisj)
+                                    (inode_local_of_ok_rec (bv_unsigned dinum)
+                                       cov logstart dnd' bmd' datd'
+                                       Hdiok' Hrl_datd' Hduq' Hddix')
+                                    with "[] Htopd")
                               as "Htopd";
                               [iApply (ireg_inv_ftop with "Hireg") |].
                             iModIntro.

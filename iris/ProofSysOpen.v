@@ -1037,11 +1037,26 @@ Section ProofSysOpenBody.
     (* itrunc MOVED the record and every block, so the era's abstract value
        is retagged at the truncated node before the seal (durable-disk
        2b-inode-3).  [ftopN] alone is opened. *)
+    (* THE RETAG OWES THE ROW (durable-disk lane A): a truncated FILE is
+       well-formed -- size 0, no blocks, the type and the count ride -- and
+       these are [so_trunc_loaded]'s own four facts, taken a few lines
+       early. *)
+    assert (Hloctr : FsStateInode.inode_local (bv_unsigned inum)
+              (era_node (di_trunc dn) bm_empty
+                        (fun _ => replicate BSIZE (bv_0 8)))).
+    { assert (Htyt : di_type (di_trunc dn) = di_type dn) by reflexivity.
+      apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart
+               (di_trunc dn) bm_empty (fun _ => replicate BSIZE (bv_0 8))).
+      - exact (so_trunc_ok cov logstart dn Htynz).
+      - exact (so_trunc_rec_local dn Hrl).
+      - apply (FsTree.dir_uniq_not_dir (di_trunc dn) _). rewrite Htyt. exact Htynd.
+      - apply (dir_dots_ix_not_dir (bv_unsigned inum) (di_trunc dn) _).
+        rewrite Htyt. exact Htynd. }
     iApply fupd_wp.
     iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
             (era_node dn bm data)
             (era_node (di_trunc dn) bm_empty (fun _ => replicate BSIZE (bv_0 8)))
-            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+            ltac:(solve_ndisj) Hloctr with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iDestruct (so_trunc_loaded gfs gi cov logstart kk inum dn Htynz Htynd Hrl
@@ -2611,11 +2626,11 @@ Section ProofSysOpenBody.
               with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv Hitab
                     Hitinv Hescrows Hslks Hireg Hropen Hsbn Hsbi Hsbs Hsbb
                     Hbmres
-                    Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS").
+                    Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS Htx").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
     iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
       "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
-       %Hns1 Hisl %Hu1 HopS Hok".
+       %Hns1 Hisl %Hu1 HopS Htx Hok".
     iEval (rewrite HN5a0) in "Hbufk".
     assert (Hpccr : ret_pc (N5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x46)) by (rewrite HN5ra; pcw).

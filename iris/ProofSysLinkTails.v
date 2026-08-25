@@ -1414,10 +1414,23 @@ Section ProofSysLinkTails.
        the record, and [InodeRegion.ireg_top_retag] is the one-line move.
        It opens [ftopN] alone, so no mask this walk holds is disturbed. *)
     iDestruct "Hfview" as "[Hfview Htop]".
+    (* THE RETAG OWES THE ROW (durable-disk lane A): the raised record is
+       well-formed, and these are the four facts the re-pack below proves
+       anyway -- a link count is the one column [sl_setnl] moves. *)
+    assert (Hloc' : inode_local (bv_unsigned inum) (era_node dn' bm dat)).
+    { apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn' bm dat).
+      - exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok).
+      - apply (inode_rec_local_same_type dn dn' Hrl_dat
+                 (sl_setnl_type dn _));
+          [ pose proof (proj1 (proj2 Hrl_dat)); lia
+          | intros Hd; exfalso; apply Hnotdir;
+            rewrite /dn' sl_setnl_type in Hd; exact Hd ].
+      - apply dir_uniq_not_dir. rewrite /dn' sl_setnl_type. exact Hnotdir.
+      - exact (sl_setnl_ddix _ dn dat _ Hnz Hddix). }
     iApply fupd_wp.
     iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
             (era_node dn bm dat) (era_node dn' bm dat)
-            ltac:(solve_ndisj) with "[] Htop") as "Htop";
+            ltac:(solve_ndisj) Hloc' with "[] Htop") as "Htop";
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kk inum dn' bm)

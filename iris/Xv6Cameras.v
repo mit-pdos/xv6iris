@@ -590,6 +590,12 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   (* OPTION A escrow: the redemption ticket and the per-inum name registry. *)
   icache_tickG :: inG Σ (exclR unitO);
   icache_regG :: ghost_mapG Σ Z (gname * gname)%type;
+  (* THE LOCKED REGISTRY (durable-disk lane A): which transaction has
+     suspended which inums' well-formedness row.  Keyed by TRANSACTION id,
+     not by inum, so that a walk holding an open transaction's token can
+     prove its own row is not registered yet -- the entry parks that very
+     token, and two whole elements of one key cannot coexist. *)
+  icache_lkG :: ghost_mapG Σ nat (gset Z);
   icache_cntG :: inG Σ icntUR;
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
@@ -600,6 +606,7 @@ Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * SailStdpp.Values.mword 32 * SailStdpp.Values.mword 32);
     GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
+    ghost_mapΣ nat (gset Z);
     GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR;
     GFunctor fviewUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
