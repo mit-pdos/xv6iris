@@ -24,7 +24,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list sets coPset namespaces bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import invariants.
+From iris.base_logic.lib Require Import invariants ghost_map.
 
 Require Import SailStdpp.Values.  (* [mword] *)
 Require Import RiscvLang.        (* [GenId] -- [log_ctx]'s swap receipt *)
@@ -265,5 +265,52 @@ Section CollectImgFree.
               (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) Hb Hnl Hty
               with "Hdn Hpk").
   Qed.
+
+  (* ==================================================================== *)
+  (*  ...AND THE ACCESSOR ITSELF, EXERCISED AT THE BOOT STATE               *)
+  (*  (durable-disk C-5; plan section 7's vacuity discipline)               *)
+  (*                                                                      *)
+  (*  [FsCollect.col_free_slot_acc] lost its [di_type d = 0] premise at    *)
+  (*  C-5: at an empty transaction ledger the type is READ off the         *)
+  (*  region's own arm.  This runs it at the mkfs image -- the shape       *)
+  (*  [IcacheBoot.ireg_alloc] mints, which is the IN arm at [c = None] and *)
+  (*  a bare record (conjunct (14) [FsImg.fs_region_bare]) for every free  *)
+  (*  inum of the region -- and gets the bundle out at                     *)
+  (*  [FsCfgBoot.img_node], the very value [InodeRegion.ftop_inv]'s map    *)
+  (*  holds at boot.  THE IMAGE HAS NO CLAIM BOXES: boot mints every       *)
+  (*  ledger column at [None] ([InodeRegion.ireg_claim_ok_none] at both of *)
+  (*  [ireg_alloc]'s arms), so the nonzero-typed side of the IN arm is     *)
+  (*  uninhabited there and the first commit meets this reading at nearly  *)
+  (*  every inum.                                                          *)
+  (* ==================================================================== *)
+  Section CollectImgSlot.
+  Context `{ICFG : icfg}.
+
+  Lemma img_col_region_slot (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
+      (nib : nat) (cov : gset Z) (γfs : fs_names) (γi : gname)
+      (inum : bv 32) :
+    fs_boot_image_wf dk ndisk sb nib cov ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    imark γi (bv_unsigned inum) -∗
+    ireg_slot γfs γi (bv_unsigned inum)
+      (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ col_bundle γfs γi (bv_unsigned inum)
+          (img_node (fs_blocks dk) sb (bv_unsigned inum)).
+  Proof.
+    intros Hwf Hlt.
+    pose proof (bv_unsigned_in_range _ inum) as [Hlo _].
+    assert (Hz : 0 <= bv_unsigned inum < 16 * Z.of_nat nib) by lia.
+    iIntros "Hauth Hmk Hslot".
+    iDestruct (col_free_slot_acc γfs γi inum
+                 (fs_dinode (fs_blocks dk) sb (bv_unsigned inum))
+                 with "Hauth Hmk Hslot") as "(Hauth & %Hty & _ & Hown & _)".
+    iFrame "Hauth".
+    rewrite (img_free_node dk ndisk sb nib cov (bv_unsigned inum) Hwf Hz Hty).
+    iApply (col_bundle_of_owned with "Hown").
+  Qed.
+
+  End CollectImgSlot.
 
 End CollectImgFree.

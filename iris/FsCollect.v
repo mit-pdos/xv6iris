@@ -1345,27 +1345,28 @@ Section Collect.
   Qed.
 
   (* ==================================================================== *)
-  (*  5b.  WHY THE TYPE-0 PREMISE OF [col_free_slot_acc] IS NOT FREE       *)
-  (*       -- THE CLAIM BOX (durable-disk lane C-4, residue (E))           *)
+  (*  5b.  THE CLAIM BOX -- WHY THE TYPE IS A CONCLUSION AND NOT A PREMISE *)
+  (*       (durable-disk C-4's residue (E), CLOSED by C-5)                 *)
   (*                                                                      *)
-  (*  [col_free_slot_acc] closes (D) at a MARKER-arm pool row whose record *)
-  (*  is TYPE 0.  The premise is load-bearing and cannot be dropped: at a  *)
-  (*  claim box ([InodeRegion.fresh_shape], which ialloc's                 *)
-  (*  [ireg_claim_au] writes over a free record and which is a nonzero     *)
-  (*  type by definition) the pool row is STILL on its marker arm and the  *)
-  (*  region slot is still on [ireg_slot]'s IN arm -- but the park is on   *)
-  (*  its VACUOUS side there, so the fragment it carries is at an          *)
-  (*  ARBITRARY node.  This is that statement, and it is the whole of the  *)
-  (*  residue: no [FsDurSnap.sk_rec] and no [sk_links] can be read at such *)
-  (*  an inum, because nothing ties the abstract value to the record.      *)
+  (*  [col_region_slot_acc] reads a bundle off the region's IN arm at a    *)
+  (*  TYPE-0 record.  The IN arm admits one other shape: a CLAIM BOX --    *)
+  (*  the [InodeRegion.fresh_shape] record ialloc's [ireg_claim_au] writes *)
+  (*  over a free one, which is a NONZERO type by definition.  There the   *)
+  (*  park's tie is on its VACUOUS side, so the fragment it carries is at  *)
+  (*  an ARBITRARY node and neither [FsDurSnap.sk_rec] nor [sk_links] can  *)
+  (*  be read at the inum.  [col_claim_box_untied] is that statement,      *)
+  (*  machine-checked, and it is why the window had to be refuted rather   *)
+  (*  than reasoned around.                                                *)
   (*                                                                      *)
-  (*  It is unreachable at a commit for (B)'s reason exactly -- ialloc     *)
-  (*  runs inside a transaction -- but nothing PROVES that today: no arm   *)
-  (*  of the claim window parks a share of its transaction's [ln_tx]       *)
-  (*  element the way [IcacheEscrow.ic_pin_tx] and                         *)
-  (*  [IcacheEscrow.ipool_transit] do.  Closing it is the same ABI         *)
-  (*  increment as B''-tx5's, at [InodeRegion.ireg_slot]'s CLAIM column    *)
-  (*  ([ireg_claim_ok]'s [Some] arm), and it is not this file's.           *)
+  (*  IT IS REFUTED AT A COMMIT, and that is C-5's increment.  The claim   *)
+  (*  parks a POSITIVE share of its own transaction's [ln_tx] element in   *)
+  (*  the slot ([InodeRegion.ireg_cpin], keyed by the c column so the      *)
+  (*  claimant's [IcacheRef.iclaim] re-identifies it at the fill), exactly *)
+  (*  as [IcacheEscrow.ic_pin_tx] and [ipool_transit] do at the escrow and *)
+  (*  the pool.  At an empty authority the column is [None]                *)
+  (*  ([InodeRegion.ireg_cpin_no_ops]) and the arm's own clause collapses  *)
+  (*  to [di_type d = 0] ([ireg_in_quiesce]).                              *)
+  (*  [col_claim_box_no_ops] is the residue closed, end to end.            *)
   (* ==================================================================== *)
 
   Section ClaimBox.
@@ -1377,6 +1378,24 @@ Section Collect.
   Proof.
     intros (Hnz & _ & _ & _). iIntros "Hf".
     iApply (ireg_top_park_nz γfs z d n Hnz with "Hf").
+  Qed.
+
+  (* ...AND THE WINDOW ITSELF, REFUTED.  A slot the pool's marker arm
+     reaches -- which is every ordinary free row, claim boxes included --
+     cannot have a nonzero-typed record while no transaction is open.  This
+     is the whole of residue (E): the type premise [col_free_slot_acc] used
+     to carry is now its CONCLUSION, so the assembly does not have to know
+     in advance which of the region's inums are free. *)
+  Lemma col_claim_box_no_ops γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    bv_unsigned (di_type d) <> 0 ->
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    imark γi (bv_unsigned inum) -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗ False.
+  Proof.
+    intros Hnz. iIntros "Hauth Hmk Hslot".
+    iDestruct (col_free_slot_acc γfs γi inum d with "Hauth Hmk Hslot")
+      as "(_ & %Ht0 & _)".
+    iPureIntro. exact (Hnz Ht0).
   Qed.
 
   End ClaimBox.
