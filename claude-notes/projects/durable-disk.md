@@ -148,6 +148,92 @@ reusable is on `main`.
   5. The commit-side consequence as a lemma: `γtx` empty ⊢ `dom LOCKED`
      has no `Some` entries ⊢ `snap_local` of the current state.
   6. Green; note the fractional-token footprint as landed.
+
+  **AS LANDED.**  Item 1 is `LogInv.log_tx γ = ∃ t, t ↪[ln_tx γ] ()` inside
+  `log_op γ u = log_opb γ u ∗ log_tx γ`; `begin_op` mints, `end_op` consumes
+  the whole element, and the tie to the ledger is CARDINALITY (`log_res`
+  carries `size T = size om`; `log_tx_empty_of_ops` reads it at zero) — a
+  retiring transaction never names its id, and nothing needs it to.  The bill
+  was the ~85 `log_op`↔`log_opS` conversions (59 `log_opS_op`, 24
+  `log_op_openS`) and the eleven walk-stage lemmas spanning
+  `begin_op..end_op`; `SpecLogWrite`/`SpecBfree`/`SpecItrunc`/`SpecWritei` and
+  the loop shapes are byte-stable on `log_opb`.  THE TOKEN IS NEVER
+  FRACTIONAL — item 2's shape removed the need.
+
+  THE REGISTRY IS KEYED BY TRANSACTION, not by inum: `icfg_lk : gmap nat
+  (gset Z)` as the LAST conjuncts of `InodeRegion.ftop_body`, beside the
+  parked `ln_tx` elements of the armed transactions and the pure row
+  `ftop_clean I A` ("every inum the map names and no armed transaction names
+  is `inode_local`").  The `inum → option txid` shape does not close: an arm
+  keyed by inum must prove its key free, which is the inode LOCK's property
+  and invisible at `ftopN`, and one transaction holding two inodes needs two
+  halves of one token that then cannot come back whole.  Keyed by transaction
+  both vanish — the entry parks the arming transaction's WHOLE token, so a
+  walk still holding it is provably unregistered (`ghost_map_elem_ne` on two
+  whole elements), and the receipt `ireg_armed t S` names a SET
+  (`ireg_arm`, `ireg_arm_more`, `ireg_disarm`, `ireg_release`).
+
+  ITEM 3'S ONE `ilock` SPEC DID NOT LAND AND IS NOT WANTED: registration is
+  not at the lock.  The row's whole cost is one premise on
+  `ireg_top_retag` — the ONE mover of the abstract map, 17 sites in 10
+  files — namely `inode_local i n'`, free at sixteen of them
+  (`FsStateEra.inode_local_of_ok_rec` off the four facts the site's
+  `ic_loaded`/`inode_owned_era` re-pack already names).  The seventeenth is
+  create's mkdir child, the ONE mid-transaction ill-formed state this kernel
+  produces (a directory with a link count and no dots): create ARMS at the
+  `ip->nlink = 1` flush, rides the window on `cr_dirty` / `cr_dirty_retag`
+  (`ireg_top_retag_armed`), and CLEARS at each of its four exits
+  (`cr_dirty_clear` = retag + `ireg_disarm` + `ireg_release`) — the FILE arm
+  at once, the mkdir success at the dots, the two mkdir failures at the
+  `nlink = 0` flush that orphans the child.  `SpecCreate.wp_create_sconf_body`
+  gains `log_tx γ` in and out; its three callers (`sys_open`, `sys_mkdir`,
+  `sys_mknod`) cost one line each.  `log_ctx`, `fs_crash_seam` and
+  `wp_end_op` are untouched.
+
+  ITEM 4 IS REFUTED AS STATED AND IS NOT NEEDED.  A `Some t` receipt on
+  `ireg_write_*` (8 files), `ireg_claim_au` (18) or `ireg_free_deposit_au` (9)
+  would demand of every writer a resource only an ARMING walk holds, and
+  arming means "my inode is briefly ill-formed", not "I hold the write lock".
+  What it was for is already enforced: `ireg_write_au` takes `dinode_at`, the
+  EXCLUSIVE per-inum record proxy `ilock` withdraws and `iunlock` deposits, so
+  a read-locker cannot move a record; and a data block needs its byte elements
+  at full fraction, which lane B′ makes literal by handing a read-locker ¼.
+
+  Item 5 is `IregClean.ireg_snap_local_acc` (and `_of_ops`, the same off the
+  ledger through `log_tx_empty_of_ops`) in its OWN file, because `snap_local`
+  is `FsDurSnap`'s and the registry is `InodeRegion`'s and neither is on the
+  other's cone.  It borrows the `ln_tx` authority and hands the map's
+  authority straight back, so it moves NO resource — which is what lets the
+  commit take it at its own ghost step.  Checked with coqdep at the real
+  import: `ProofEndOp` and `IregClean` are on neither's cone, so lane C's
+  `Require Import IregClean` is acyclic (+13 files to `ProofEndOp`'s cone).
+
+  BOOT: `ftop_alloc` takes the row and the empty registry authority;
+  `FsCfgBoot.img_nodes_local` proves it off conjunct (14) `fs_region_bare`
+  (a garbage type-0 record would break `inl_size`/`inl_covers`), so
+  `fs_cfg_alloc` gained that ONE premise and `BootShared` passes the name it
+  already destructures.  `FsDurImg`'s section 2 (`img_node_rec`/`_ent`/`_blk`,
+  `img_node_bare`, `img_inode_local_free`/`_ok_at`/`_local_live`/`_local`)
+  MOVED to `FsCfgBoot`, which sits below it and is where the row is
+  established; `FsDurImg` consumes them through its import as before.
+
+  FOR LANE B′ (measured here): the fraction cannot stop at
+  `FsStateEra.inode_owned_era`.  Its byte legs are `FsStateDefs.blk_owned` and
+  `FsStateInode.ind_owned` over `FsStateDefs.byte_range`/`fsΦ` — the SAME
+  definitions the DURABLE side uses at dfrac 1 — so `fsΦ` takes a dfrac and
+  `byte_range`/`blk_owned`/`ind_owned`/`inode_owned_era` become
+  fraction-indexed with 1 as today's reading.  The real cost is
+  `FsStateDefs.phi_excl`, the class lane 4c's `blk_owned_excl`/`blk_owned_ne`/
+  `free_pool_used` and the commit's cross-inode disjointness all read: it
+  becomes a fraction-aware law, and that is what forces the reader's share to
+  ¼ (¾ + ¾ > 1).  Era-side consumers to sweep: `FsStateEra` 11,
+  `IcacheEscrow` 11, `FsStateInode` 10, `FsStateDefs` 7, `FsState` 4,
+  `ProofIlock` 4, `IcacheBoot` 3, `InodeRegion` 3; the durable side
+  (`FsDurBytes`/`FsDurImg`/`FsDurObj`/`FsDurSnap`/`FsDurLedger`/
+  `FsStateBitmap`, ~75 uses) stays at 1 and does not move if the index
+  defaults.  `ilock` today still withdraws the whole bundle and registers
+  nothing; B′ is where `ic_out` splits into "out for reading at ¼" and "out
+  for writing".
 - [x] **Lane B — CLOSED BY REFUTATION** (`iris/FsDurTrunc.v`): the
   per-write accumulation of `snap_bytes` as the WAL's payload has no
   witness at `bfree`'s `log_write` (`itrunc`'s window) and `sk_disj` dies

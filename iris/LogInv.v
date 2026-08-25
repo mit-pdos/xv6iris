@@ -1536,8 +1536,10 @@ Section LogInv.
      No open ledger entry means no open transaction, so no share of any
      transaction id can exist anywhere -- which is what the locked registry
      turns into "every inode is well-formed"
-     ([InodeRegion.ireg_locked_clean_of_tx]).  It is the cardinality tie
-     read at zero, and nothing else in the ledger is consulted. *)
+     ([InodeRegion.ireg_clean_acc], read as [snap_local] by
+     [IregClean.ireg_snap_local_of_ops], which is this lemma's one
+     consumer).  It is the cardinality tie read at zero, and nothing else
+     in the ledger is consulted. *)
   Lemma log_tx_empty_of_ops (om : gmap nat op_entry) (T : gmap nat unit) :
     size T = size om ->
     om = ∅ ->
