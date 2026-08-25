@@ -37,6 +37,13 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import BioDefs.
 Require Import FsBlocks.
+(* BLOCK 1'S PARK (durable-disk lane C-3a).  A one-predicate file, not the
+   pure wf layer the next comment is about: it carries the superblock
+   block's byte run and the single local fact that run can state.  It is a
+   conjunct of [log_ctx] because [log_ctx] is the ONLY persistent bundle
+   [SpecEndOp.wp_end_op] holds, and the commit's collection has to reach
+   block 1 (durable-fs-plan.md section 4, gap (C) in FsCollect.v). *)
+Require Import SbPark.
 (* NOTHING IN THE CRASH/LOG LAYER IMPORTS THE PURE WF LAYER any more
    (durable-disk 1d).  [FsImg]/[FsWf]/[FsObj*] were here for row (a) --
    "the logged view is the committed view except at the pending objects" --
@@ -473,8 +480,43 @@ Section LogInv.
      contract.  Only the two arms that CLAIM the absorption credit --
      log_write's and bfree's -- mention [log_opS], and only itrunc, which
      needs the credit to survive 269 frees, threads it. *)
-  Definition log_op (γ : log_names) (u : nat) : iProp Σ :=
+  Definition log_opb (γ : log_names) (u : nat) : iProp Σ :=
     (∃ Sb : gset Z, log_opS γ u Sb)%I.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE OPEN TRANSACTION (durable-disk lane A, plan section 3)       *)
+  (* ---------------------------------------------------------------- *)
+
+  (* One element of [ln_tx] per transaction that is open right now, at the
+     unit value -- the element says only that its id EXISTS.  It is minted
+     by begin_op and consumed WHOLE by end_op, and while an inode's
+     well-formedness row is suspended the element is parked in the locked
+     registry ([InodeRegion.ireg_locked]), which is what makes "no
+     transaction is open" imply "no row is suspended" at a commit.
+
+     THE ID IS EXISTENTIAL, and no client ever names it: the ending
+     transaction does not have to say which id it retires, because
+     [log_res] ties the ledger to the transactions by CARDINALITY
+     ([size T = size om]) rather than by identity -- a tie that survives
+     any retire, and all a commit needs ([om = empty] forces [T = empty]).
+
+     WHY IT IS NOT INSIDE [log_opS]: a suspended row's owner must keep
+     WRITING (create's mkdir writes the two dot entries while its child is
+     still dotless), so the token it retains across the suspension has to
+     be one [log_write] accepts.  That token is the BUDGET half above --
+     which is exactly the pre-lane-A [log_op] -- so no callee below
+     [log_op] moves at all. *)
+  Definition log_tx (γ : log_names) : iProp Σ :=
+    (∃ t : nat, t ↪[ln_tx γ] ())%I.
+
+  Definition log_op (γ : log_names) (u : nat) : iProp Σ :=
+    (log_opb γ u ∗ log_tx γ)%I.
+
+  Global Instance log_tx_timeless γ : Timeless (log_tx γ).
+  Proof. rewrite /log_tx. apply _. Qed.
+
+  Global Instance log_opb_timeless γ u : Timeless (log_opb γ u).
+  Proof. rewrite /log_opb. apply _. Qed.
 
   Global Instance log_opSe_timeless γ u Sb e0 : Timeless (log_opSe γ u Sb e0).
   Proof. apply _. Qed.
@@ -739,9 +781,95 @@ Section LogInv.
   Proof. apply _. Qed.
 
   (* the forgetful direction, used wherever a credited op is handed to a
-     callee that does not care *)
-  Lemma log_opS_op γ u Sb : log_opS γ u Sb -∗ log_op γ u.
-  Proof. iIntros "H". rewrite /log_op. iExists Sb. iFrame. Qed.
+     callee that does not care.  It takes the transaction token back
+     BESIDE the budget, because the two travel together everywhere except
+     inside a suspended row's window. *)
+  Lemma log_opS_op γ u Sb : log_opS γ u Sb -∗ log_tx γ -∗ log_op γ u.
+  Proof.
+    iIntros "H Ht". rewrite /log_op /log_opb. iFrame "Ht". iExists Sb. iFrame.
+  Qed.
+
+  (* ...and its budget-only half, for a walk that is between the arm and
+     the disarm of a row and therefore holds no transaction token *)
+  Lemma log_opS_opb γ u Sb : log_opS γ u Sb -∗ log_opb γ u.
+  Proof. iIntros "H". rewrite /log_opb. iExists Sb. iFrame. Qed.
+
+  (* THE OPENING EVERY THREADER USES: the budget at a named set beside the
+     transaction token.  Written as one lemma so a caller that used to
+     destructure [log_op]'s existential keeps one line. *)
+  Lemma log_op_openS γ u : log_op γ u -∗ ∃ Sb, log_opS γ u Sb ∗ log_tx γ.
+  Proof.
+    iIntros "[Hb Ht]". rewrite /log_opb. iDestruct "Hb" as (Sb) "Hb".
+    iExists Sb. iFrame.
+  Qed.
+
+  (* ---- THE TOKEN, HALVED ACROSS A HELD WRITE LOCK -------------------
+     (durable-fs-plan.md section 3, [ilock]; durable-disk B''-arm)
+
+     A transactional [ilock] parks a SHARE of the transaction's element in
+     the escrow's write arm ([IcacheEscrow.ic_arm_tx]), so that [end_op] --
+     which consumes the WHOLE element -- cannot commit while the inode is
+     write-locked.  The id has to come OUT of [log_tx]'s existential for the
+     arm to name it, which is exactly [IcacheTxRefute]'s finding: an
+     existentially-keyed share can never be rejoined.  It goes back in at
+     the join, so nothing above these two lines ever sees an id. *)
+  Lemma log_tx_halve (γ : log_names) :
+    log_tx γ -∗ ∃ t : nat,
+      t ↪[ln_tx γ]{#(1/2)} () ∗ t ↪[ln_tx γ]{#(1/2)} ().
+  Proof.
+    iIntros "H". rewrite /log_tx. iDestruct "H" as (t) "Ht".
+    iExists t. iDestruct "Ht" as "[$ $]".
+  Qed.
+
+  Lemma log_tx_join (γ : log_names) (t : nat) :
+    t ↪[ln_tx γ]{#(1/2)} () -∗ t ↪[ln_tx γ]{#(1/2)} () -∗ log_tx γ.
+  Proof.
+    iIntros "H1 H2". rewrite /log_tx. iExists t.
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own Qp.half_half. iExact "H".
+  Qed.
+
+  Lemma log_op_split γ u : log_op γ u -∗ log_opb γ u ∗ log_tx γ.
+  Proof. iIntros "[$ $]". Qed.
+
+  (* ---- THE SET FORM BESIDE THE TOKEN, AS ONE CONJUNCT ----------------
+     (durable-fs-plan.md section 3, [ilock]; durable-disk B''-tx)
+
+     A WALK THAT WRITE-LOCKS carries both: the SET half is what [log_write]
+     accepts and what a [log_opS]-shaped callee wants, the TOKEN half is
+     what a transactional [ilock] parks in the escrow.  They ride together
+     because of durable-notes' bundling rule -- written as two conjuncts
+     they would move every pass-through site of the walk-stage statements
+     that already thread [log_opS]; written as ONE, in [log_opS]'s own
+     position, no stage lemma's arity changes at all.  It is split exactly
+     once per locked window, at the [ilock], and rejoined at the release. *)
+  Definition log_opSt (γ : log_names) (u : nat) (Sb : gset Z) : iProp Σ :=
+    (log_opS γ u Sb ∗ log_tx γ)%I.
+
+  Global Instance log_opSt_timeless γ u Sb : Timeless (log_opSt γ u Sb).
+  Proof. rewrite /log_opSt. apply _. Qed.
+
+  Lemma log_opSt_split γ u Sb :
+    log_opSt γ u Sb -∗ log_opS γ u Sb ∗ log_tx γ.
+  Proof. iIntros "[$ $]". Qed.
+
+  Lemma log_opSt_intro γ u Sb :
+    log_opS γ u Sb -∗ log_tx γ -∗ log_opSt γ u Sb.
+  Proof. iIntros "H Ht". rewrite /log_opSt. iFrame. Qed.
+
+  Lemma log_op_openSt γ u : log_op γ u -∗ ∃ Sb, log_opSt γ u Sb.
+  Proof.
+    iIntros "H". iDestruct (log_op_openS with "H") as (Sb) "[H Ht]".
+    iExists Sb. iApply (log_opSt_intro with "H Ht").
+  Qed.
+
+  Lemma log_opSt_op γ u Sb : log_opSt γ u Sb -∗ log_op γ u.
+  Proof.
+    iIntros "[H Ht]". iApply (log_opS_op with "H Ht").
+  Qed.
+
+  Lemma log_opb_op γ u : log_opb γ u -∗ log_tx γ -∗ log_op γ u.
+  Proof. iIntros "H Ht". iFrame. Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The ERA's half of the log-region MIRROR (phase C2b/D1 stage 2)    *)
@@ -873,80 +1001,7 @@ Section LogInv.
      so that row (b) -- which relates the era's picture of the durable
      disk to the logged view -- can be stated at all.  The header reading
      is unchanged, so nothing above this file grew a binder. *)
-  (* ---------------------------------------------------------------- *)
-  (*  THE CLIENT'S PARKED PAYLOAD, AND ITS TWO LAWS (durable-disk 3a)   *)
-  (*  claude-notes/design/fs-state.md section 5.                         *)
-  (*                                                                     *)
-  (*  The log stores an OPAQUE client payload and never reads it.  It is  *)
-  (*  indexed by BOTH views the log knows by value: the COMMITTED one     *)
-  (*  [lm_committed M cov ls] (durable-disk 1a's born-true mirror) and    *)
-  (*  the CURRENT LOGGED one [lm_logged L cov ls].  Both are functions of *)
-  (*  binders [log_state] already has.                                    *)
-  (*                                                                      *)
-  (*  WHY THE SECOND INDEX IS FORCED (durable-disk 2c-body's finding      *)
-  (*  (A)/(B), ratified 2026-08-24).  The commit's law must return a step *)
-  (*  whose TARGET is the logged view on EVERY home block, including the  *)
-  (*  ones this batch never wrote.  A debt composed from the suppliers'   *)
-  (*  own steps ends at the committed view overwritten at the blocks that *)
-  (*  WERE written, so the two agree only if the client can prove         *)
-  (*  [L = D0] at every home block it did not touch.  The device that was *)
-  (*  meant to give it that -- lending the log's byte-view AUTH, so the   *)
-  (*  client agrees its own elements against it -- CANNOT work: the       *)
-  (*  payload holds none of those elements (the inode region's runs are   *)
-  (*  behind [iregN], the top map behind [ftopN], the bitmap behind       *)
-  (*  [bitmapN], and a cached inode's data blocks are handed OUT of the   *)
-  (*  icache escrow to whoever holds its sleeplock, which [readi] takes   *)
-  (*  with no operation open).  Indexing by the logged view instead makes *)
-  (*  the equation definitional: the payload is ALWAYS at the current [L] *)
-  (*  because every [log_write] re-indexes it by its own write.           *)
-  (*                                                                      *)
-  (*  THE TWO LAWS.                                                       *)
-  (*                                                                      *)
-  (*  [log_psi_commit] is the COMMIT's: hand out the accumulated debt and *)
-  (*  re-park the identity.  It needs neither the byte auth nor a         *)
-  (*  home-set tie -- both died with the [D0]-only index.                 *)
-  (*                                                                      *)
-  (*  [log_psi_step] is the WRITE's, and it is what lets a supplier       *)
-  (*  re-index an OPAQUE payload: the client hands in a durable step at   *)
-  (*  the current logged view and the payload absorbs it.  For the real   *)
-  (*  payload ([Psi D0 Dc := fs_dstep gamma_D D0 Dc]) it is exactly       *)
-  (*  [LogDefs.fs_dstep_trans], which is why the debt's algebra is the    *)
-  (*  whole of what the log has to assume about its client.               *)
-  (*                                                                      *)
-  (*  THE STEP IS AT THE REAL DURABLE NAME: [gamma_D] is                   *)
-  (*  [RiscvPtsto.riscv_dview_name], a FIXED-layer FIELD, so it is spelled *)
-  (*  AMBIENTLY here -- exactly as [riscv_disk_name] is -- and neither law *)
-  (*  nor [log_ctx_at] grows an argument for it.                           *)
-  (*                                                                      *)
-  (*  PERSISTENT is not a weakening: the LINEARITY the debt needs lives    *)
-  (*  inside [Psi D0 Dc], which each update consumes; what is uniform is   *)
-  (*  only the RIGHT to spend the law, which the log must have in every    *)
-  (*  batch and at every write.                                           *)
-  (* ---------------------------------------------------------------- *)
-  Definition log_psi_commit (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      : iProp Σ :=
-    (□ ∀ (D0 Dc : gmap Z (list (bv 8))),
-        Psi D0 Dc ==∗ Psi Dc Dc ∗ fs_dstep riscv_dview_name D0 Dc)%I.
-
-  Global Instance log_psi_commit_persistent Psi :
-    Persistent (log_psi_commit Psi).
-  Proof. apply _. Qed.
-
-  (* THE WRITE's LAW.  [Dc'] is left general -- the [log_write] instance is
-     [Dc' := <[b := bs]> Dc], by [LogDefs.lm_logged_insert_home] -- because
-     nothing in the law depends on the shape of the move, only on the
-     client's ability to justify it with a durable step. *)
-  Definition log_psi_step (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      : iProp Σ :=
-    (□ ∀ (D0 Dc Dc' : gmap Z (list (bv 8))),
-        Psi D0 Dc -∗ fs_dstep riscv_dview_name Dc Dc' ==∗ Psi D0 Dc')%I.
-
-  Global Instance log_psi_step_persistent Psi :
-    Persistent (log_psi_step Psi).
-  Proof. apply _. Qed.
-
-  Definition log_state (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Definition log_state (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) : iProp Σ :=
     (∃ (W : list (SailStdpp.Values.mword 32))
        (L : gmap Z (list (bv 8))) (D : gmap Z bool) (M : log_mirror),
@@ -994,17 +1049,7 @@ Section LogInv.
           is this bundle's own binder now. *)
        log_mirror_half M ∗ ⌜lm_hdr M logstart = (0%nat, [])⌝ ∗
        (* ROW (b) -- see [log_mirror_tie_body] above *)
-       ⌜log_mirror_tie_body M L cov logstart LB⌝ ∗
-       (* THE CLIENT'S PARKED PAYLOAD (durable-disk 3a), AT BOTH VIEWS THE
-          LOG KNOWS BY VALUE: the committed one this era's mirror computes
-          and the CURRENT LOGGED one.  It is parked HERE, in the log's own
-          lock resource, and not in a separate FS invariant, because
-          whatever the committer needs at the commit instant must already be
-          in the log's hands (the last-ending operation cannot know it is
-          last) and [log.lock] already serializes every [log_write].  The
-          second index is what makes the commit's law statable at all --
-          see [log_psi_commit] above. *)
-       Psi (lm_committed M cov logstart) (lm_logged L cov logstart))%I.
+       ⌜log_mirror_tie_body M L cov logstart LB⌝)%I.
 
   (* THE PENDING SET MOVES, in the two shapes the transitions need, and
      BOTH ARE THE IDENTITY (durable-disk 1d): the bundle does not read
@@ -1014,12 +1059,11 @@ Section LogInv.
      ruling 3 ever grows one -- would land here and nowhere else.
 
      GROWTH: [begin_op]'s mint and [log_write]'s two ledger steps. *)
-  Lemma log_state_pend_mono (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Lemma log_state_pend_mono (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB pend pend' : gset Z) :
     pend ⊆ pend' ->
-    log_state Psi bn γfs cov logstart n LB pend -∗
-    log_state Psi bn γfs cov logstart n LB pend'.
+    log_state bn γfs cov logstart n LB pend -∗
+    log_state bn γfs cov logstart n LB pend'.
   Proof. intros _. rewrite /log_state. iIntros "H". iExact "H". Qed.
 
   (* SHRINKAGE -- [end_op]'s retire, where the ending op's already-logged
@@ -1027,22 +1071,21 @@ Section LogInv.
      argument is GONE with row (a): the retiring op owes the log nothing
      ([SpecEndOp] has no FS-facing premise at all now), and the fast path
      closes with [op_pending_delete] alone. *)
-  Lemma log_state_fin (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Lemma log_state_fin (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB F pend : gset Z) :
-    log_state Psi bn γfs cov logstart n LB pend -∗
-    log_state Psi bn γfs cov logstart n LB (pend ∖ F).
+    log_state bn γfs cov logstart n LB pend -∗
+    log_state bn γfs cov logstart n LB (pend ∖ F).
   Proof. rewrite /log_state. iIntros "H". iExact "H". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)
   (* ---------------------------------------------------------------- *)
 
-  Definition log_res (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition log_res (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) : iProp Σ :=
     (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32)
-       (om : gmap nat op_entry) (E : nat) (X : gset (nat * Z)),
+       (om : gmap nat op_entry) (E : nat) (X : gset (nat * Z))
+       (T : gmap nat unit),
        l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
        l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
        l_ncommit ↦₄ nc ∗
@@ -1075,6 +1118,23 @@ Section LogInv.
           minted at the epoch current when it was minted, and the epoch only
           grows.  This is the half that turns [e0 <= e] into [e = E]. *)
        ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
+       (* THE OPEN TRANSACTIONS (durable-disk lane A, plan section 3).
+          OUTSIDE the committing arm -- a commit is exactly the instant this
+          authority has to be READABLE, and [log_state] is checked out then.
+          It sits here rather than in [log_state] for that reason and for one
+          more: it is the ledger's own twin, and the ledger's authority is
+          here.  It is the LAST conjunct that is not the committing arm,
+          which is the cheapest position: the arm is what every opener
+          destructures further, so a conjunct after it would cost each of
+          them a restructuring rather than one name in a pattern.
+
+          THE TIE IS CARDINALITY, not identity ([log_tx_retire]'s note): a
+          retiring transaction hands back an element whose id it never
+          named, so nothing can relate that id to the ledger entry the same
+          end_op retires -- but both retires drop exactly one row, which is
+          all the commit reads ([log_tx_empty_of_ops]). *)
+       ghost_map_auth (ln_tx γ) 1 T ∗
+       ⌜size T = size om⌝ ∗
        (if cmt then emp
         else ∃ (n : nat) (LB : gset Z),
           ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
@@ -1091,24 +1151,22 @@ Section LogInv.
              unconstrained, which is exactly the self-invalidation -- they
              can never be used, because using one needs [e = E]. *)
           ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
-          log_state Psi bn γfs cov logstart n LB (op_pending om)))%I.
+          log_state bn γfs cov logstart n LB (op_pending om)))%I.
 
   (* the persistent bundle every log function shares: the sealed lock and
-     the two cells initlog wrote once and froze *)
-  (* THE Psi-NAMED FORM.  [log_ctx] below is its existential closure, so the
-     78 files that thread the log's context keep their arity and none of them
-     ever names a file-system payload; a client that MUST name [Psi] --
-     [log_write]'s AU callers, [end_op]'s committer -- opens the existential
-     IN ITS OWN PROOF, which is sound because only one log lock is ever
-     allocated.  A CLASS was refuted the same way [P_wf]'s parameter form
-     was: the instance would have to be in scope in every file that mentions
-     any statement in the cone. *)
-  Definition log_ctx_at (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (γ : log_names) (bn : bio_names) (γfs : fs_names)
+     the two cells initlog wrote once and froze.
+
+     IT NAMES NO FILE-SYSTEM PAYLOAD.  The existential closure over a
+     parked [Psi] is gone with the payload itself (plan sections 3 and 8):
+     a [log_write] proves nothing about the file system, so the log's lock
+     resource carries no client proposition and this bundle carries no
+     client law.  The arity is the one the 75 files that thread it already
+     have. *)
+  Definition log_ctx (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=
     (is_lock (ln_lk γ) log_addr "log"%string
-       (log_res Psi γ bn γfs cov logstart) ∗
+       (log_res γ bn γfs cov logstart) ∗
      l_dev ↦₄□ dev ∗
      l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
      (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
@@ -1127,59 +1185,21 @@ Section LogInv.
         already carries [cov] and [logstart], so not one call site moves. *)
      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs)
                   (fs_home_set cov logstart) ∗
-     (* THE PAYLOAD'S TWO LAWS (durable-disk 3a).  Persistent, so they ride
-        the context every log function already threads; together they are
-        the WHOLE of the client's obligation. *)
-     log_psi_commit Psi ∗ log_psi_step Psi)%I.
-
-  Global Instance log_ctx_at_persistent Psi γ bn γfs cov logstart dev :
-    Persistent (log_ctx_at Psi γ bn γfs cov logstart dev).
-  Proof. apply _. Qed.
-
-  Definition log_ctx (γ : log_names) (bn : bio_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z)
-      (dev : SailStdpp.Values.mword 32) : iProp Σ :=
-    (∃ Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ,
-       log_ctx_at Psi γ bn γfs cov logstart dev)%I.
+     (* BLOCK 1, OWNED (durable-disk lane C-3a).  The superblock's byte run
+        at FULL fraction, parked in [SbPark.sbN] with its parse; initlog
+        allocates it out of the run fsinit hands down and this is where the
+        commit reaches it.  LAST, so no pattern that opens this bundle
+        moves. *)
+     sb_parked γfs)%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
   Proof. apply _. Qed.
 
-  Lemma log_ctx_of_at Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    log_ctx γ bn γfs cov logstart dev.
-  Proof. iIntros "H". iExists Psi. iExact "H". Qed.
-
-  Lemma log_ctx_at_lock Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    is_lock (ln_lk γ) log_addr "log"%string (log_res Psi γ bn γfs cov logstart).
-  Proof. rewrite /log_ctx_at. iIntros "($ & _)". Qed.
-
-  Lemma log_ctx_at_psi Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    log_psi_commit Psi.
-  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & _ & _ & $ & _)". Qed.
-
-  Lemma log_ctx_at_psi_step Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    log_psi_step Psi.
-  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & _ & _ & _ & $)". Qed.
-
-  (* THE WRITE LAW AT A HOME BLOCK, which is the only instance
-     [wp_log_write_au]'s client ever needs: the logged view's own move
-     ([LogDefs.lm_logged_insert_home]) read on the payload's index.  The
-     durable step is the CLIENT's -- it is what a supplier composes out of
-     its own [Gamma_D] mover -- and this is where it is absorbed. *)
-  Lemma log_psi_write Psi (D0 Dc : gmap Z (list (bv 8)))
-      (b : Z) (bs : list (bv 8)) :
-    log_psi_step Psi -∗
-    Psi D0 Dc -∗
-    fs_dstep riscv_dview_name Dc (<[b := bs]> Dc) ==∗
-    Psi D0 (<[b := bs]> Dc).
-  Proof.
-    iIntros "#Hlaw Hpsi Hstep". iApply ("Hlaw" with "Hpsi Hstep").
-  Qed.
+  Lemma log_ctx_lock γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗
+    is_lock (ln_lk γ) log_addr "log"%string (log_res γ bn γfs cov logstart).
+  Proof. rewrite /log_ctx. iIntros "($ & _)". Qed.
 
   (* THE FROZEN CELLS ALONE -- log_ctx minus the lock.  The COMMITTER-ONLY
      helpers (write_head, install_trans) run with NO lock held (that is what
@@ -1197,37 +1217,15 @@ Section LogInv.
     Persistent (log_frozen logstart dev).
   Proof. apply _. Qed.
 
-  Lemma log_ctx_at_frozen Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
-  Proof. rewrite /log_ctx_at /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
-
   Lemma log_ctx_frozen γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
-  Proof.
-    rewrite /log_ctx. iIntros "H". iDestruct "H" as (Psi) "H".
-    iApply (log_ctx_at_frozen with "H").
-  Qed.
+  Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
 
   (* the byte view's row, off the context every log function threads *)
-  Lemma log_ctx_at_bytes Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
-  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
-
   Lemma log_ctx_bytes γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
-  Proof.
-    rewrite /log_ctx. iIntros "H". iDestruct "H" as (Psi) "H".
-    iApply (log_ctx_at_bytes with "H").
-  Qed.
-
-  Lemma log_ctx_at_bytes_any Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗ fs_bytes_any γfs.
-  Proof.
-    iIntros "H". iPoseProof (log_ctx_at_bytes with "H") as "Hb".
-    rewrite /fs_bytes_any. iExists (fs_home_set cov logstart). iExact "Hb".
-  Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
   (* ...and the home-set-free form every bread client above takes *)
   Lemma log_ctx_bytes_any γ bn γfs cov logstart dev :
@@ -1237,53 +1235,17 @@ Section LogInv.
     rewrite /fs_bytes_any. iExists (fs_home_set cov logstart). iExact "Hb".
   Qed.
 
-  Lemma log_ctx_at_swap Psi γ bn γfs cov logstart dev :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
-  Proof. rewrite /log_ctx_at. iIntros "(_ & _ & _ & $ & _)". Qed.
-
   Lemma log_ctx_swap γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
-  Proof.
-    rewrite /log_ctx. iIntros "H". iDestruct "H" as (Psi) "H".
-    iApply (log_ctx_at_swap with "H").
-  Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $ & _ & _)". Qed.
 
-  (* THE WRITE PREMISE, DISCHARGED FROM THE LOG'S OWN LAW AND THIS STAGE'S
-     TRIVIAL DURABLE STEP.  [LogDefs.fs_dstep_rebase] is honest exactly
-     while [P_wf] is a bare byte map -- it is stage 1's declared parameter,
-     not a theorem about the file system -- so this corollary is honest on
-     the same terms and DIES with it.  Each of the eleven [log_write]
-     suppliers replaces its use by its OWN composed [Gamma_D] step, which
-     is what the [log_psi_step] law is there to absorb; nothing else about
-     the interface moves when they do. *)
-  Lemma log_psi_write_rebase (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (γ : log_names) (bn : bio_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : SailStdpp.Values.mword 32)
-      (b : Z) (bs : list (bv 8)) :
-    log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    (∀ D0 Dc : gmap Z (list (bv 8)), Psi D0 Dc ==∗ Psi D0 (<[b := bs]> Dc)).
-  Proof.
-    iIntros "#Hctx" (D0 Dc) "Hpsi".
-    iPoseProof (log_ctx_at_psi_step with "Hctx") as "#Hlaw".
-    iApply ("Hlaw" with "Hpsi"). iApply fs_dstep_rebase.
-  Qed.
-
-  (* ---------------------------------------------------------------- *)
-  (*  SPENDING THE COMMIT LAW (durable-disk 3a).  The committer holds the *)
-  (*  log lock's batch, hence the payload, and the payload is ALREADY at   *)
-  (*  the batch's own logged view -- every [log_write] re-indexed it.  So  *)
-  (*  the spend needs nothing but the law: no lent byte auth, no home-set  *)
-  (*  tie, and no [logN] crossing (all three died with the [D0]-only       *)
-  (*  index, durable-disk 2c-body (B)/(C)).  What comes back is the        *)
-  (*  payload re-parked at the identity and the prepared durable step the  *)
-  (*  commit permit runs.  Spent ONCE per batch.                           *)
-  (* ---------------------------------------------------------------- *)
-  Lemma log_psi_spend (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
-      (D0 Dc : gmap Z (list (bv 8))) :
-    log_psi_commit Psi -∗
-    Psi D0 Dc ==∗
-      Psi Dc Dc ∗ fs_dstep riscv_dview_name D0 Dc.
-  Proof. iIntros "#Hlaw Hpsi". iApply ("Hlaw" with "Hpsi"). Qed.
+  (* BLOCK 1'S PARK, off the context end_op already threads (durable-disk
+     lane C-3a).  This is the whole of what the commit's collection needs of
+     the superblock: [SbPark.sb_park_acc] then opens it for the one ghost
+     step the collection runs in. *)
+  Lemma log_ctx_sb γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ sb_parked γfs.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)
@@ -1408,15 +1370,68 @@ Section LogInv.
   (* ...AND THE ALREADY-LOGGED BLOCK SET COMES BACK WITH IT, which is what
      end_op's re-deposit shrinks [op_pending] by ([op_pending_delete]). *)
   Lemma log_end_step γ (om : gmap nat op_entry) (u : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u ==∗
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opb γ u ==∗
     ∃ i Sb e0, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
       ghost_map_auth (ln_ops γ) 1 (delete i om).
   Proof.
-    iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
+    iIntros "Ha He". rewrite /log_opb /log_opS /log_opSe.
     iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_delete with "Ha He") as "Ha".
     iModIntro. iExists i, Sb, e0. by iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE TRANSACTION AUTHORITY'S TWO STEPS (durable-disk lane A)      *)
+  (* ---------------------------------------------------------------- *)
+
+  (* begin_op's mint, beside the ledger's.  Free: allocation at a fresh id,
+     and the id never leaves this proof. *)
+  Lemma log_tx_mint (γ : log_names) (T : gmap nat unit) :
+    ghost_map_auth (ln_tx γ) 1 T ==∗
+    ∃ t, ⌜T !! t = None⌝ ∗
+      ghost_map_auth (ln_tx γ) 1 (<[t := tt]> T) ∗ log_tx γ.
+  Proof.
+    iIntros "Ha".
+    set (t := fresh (dom T)).
+    assert (Ht : T !! t = None).
+    { apply not_elem_of_dom. apply is_fresh. }
+    iMod (ghost_map_insert t tt Ht with "Ha") as "[Ha He]".
+    iModIntro. iExists t. iSplitR; [done|]. iFrame "Ha".
+    rewrite /log_tx. iExists t. iExact "He".
+  Qed.
+
+  (* end_op's retire, and the reason the tie is cardinality: the token is
+     the FULL element, so the id it carries really is a live row -- but the
+     token never named it, so no lemma can relate it to the ledger entry
+     this same end_op retires.  Both retires drop exactly one row, which is
+     what [log_res]'s [size T = size om] is stated to survive. *)
+  Lemma log_tx_retire (γ : log_names) (T : gmap nat unit) :
+    ghost_map_auth (ln_tx γ) 1 T -∗ log_tx γ ==∗
+    ∃ t, ⌜T !! t = Some tt⌝ ∗ ghost_map_auth (ln_tx γ) 1 (delete t T).
+  Proof.
+    iIntros "Ha He". rewrite /log_tx. iDestruct "He" as (t) "He".
+    iDestruct (ghost_map_lookup with "Ha He") as %Ht.
+    iMod (ghost_map_delete with "Ha He") as "Ha".
+    iModIntro. iExists t. iSplitR; [by destruct (T !! t) as [[]|]; simplify_eq|].
+    iExact "Ha".
+  Qed.
+
+  (* THE COMMIT'S READING (durable-disk lane A item 5, plan section 4b).
+     No open ledger entry means no open transaction, so no share of any
+     transaction id can exist anywhere -- which is what the locked registry
+     turns into "every inode is well-formed"
+     ([InodeRegion.ireg_clean_acc], read as [snap_local] by
+     [IregClean.ireg_snap_local_of_ops], which is this lemma's one
+     consumer).  It is the cardinality tie read at zero, and nothing else
+     in the ledger is consulted. *)
+  Lemma log_tx_empty_of_ops (om : gmap nat op_entry) (T : gmap nat unit) :
+    size T = size om ->
+    om = ∅ ->
+    T = ∅.
+  Proof.
+    intros Hsz ->. rewrite map_size_empty in Hsz.
+    by apply map_size_empty_iff.
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's
@@ -1453,15 +1468,20 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u -∗
     ⌜(1 <= size om)%nat⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
-    iDestruct (ghost_map_lookup with "Ha He") as %Hi.
-    iPureIntro.
-    assert (Hne : om ≠ ∅).
-    { intros ->. rewrite lookup_empty in Hi. done. }
-    assert (Hs : size om ≠ 0%nat).
-    { intros Hz. apply Hne. by apply map_size_empty_iff. }
-    lia.
+    iIntros "Ha [He _]". rewrite /log_opb /log_opS.
+    iDestruct "He" as (Sb e0) "He".
+    iApply (log_opSe_positive with "Ha He").
+  Qed.
+
+  (* ...and the same fact off the BUDGET half alone, which is what a walk
+     between the arm and the disarm of a row holds *)
+  Lemma log_opb_positive γ (om : gmap nat op_entry) (u : nat) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opb γ u -∗
+    ⌜(1 <= size om)%nat⌝.
+  Proof.
+    iIntros "Ha He". rewrite /log_opb /log_opS.
+    iDestruct "He" as (Sb e0) "He".
+    iApply (log_opSe_positive with "Ha He").
   Qed.
 
   (* ---------------------------------------------------------------- *)

@@ -151,7 +151,7 @@ Section Workhorse.
     ⊣⊢ fs_dbelems g (map_seqZ (b * Z.of_nat BSIZE + off) bs).
   Proof.
     rewrite /fs_dbelems big_sepM_map_seqZ_gen.
-    rewrite /byte_range /fs_gamma_D. cbn [fsΦ].
+    rewrite /byte_range /byte_range_q /fs_gamma_D. cbn [fsΦ].
     apply big_sepL_proper. intros k v _.
     assert (Hz : b * BSIZE_z + off + Z.of_nat k
                  = b * Z.of_nat BSIZE + off + Z.of_nat k)
@@ -249,10 +249,19 @@ End Workhorse.
    predicate anyone can hold. *)
 Record dcfg := MkDCfg {
   dc_S    : fs_state_rec;
-  dc_bin  : gmap Z (list (bv 8));
+  dc_bin  : gset Z;
   dc_toks : gmap Z nat;
   dc_D    : gmap Z (list (bv 8));
 }.
+
+(* THE HAND OF BLOCKS IS A SET, NOT A MAP, and that is forced by [balloc]:
+   a block leaves [free_bitmap]'s pool at an EXISTENTIAL content
+   ([FsStateBitmap.pool_elt] is [exists bs, blk_owned]), so no ledger entry
+   could name its bytes.  It does not have to: the fold holds the durable
+   byte AUTHORITY at [fs_dbytes (dc_D c)] and the block's own elements, so
+   the content is READ OFF [dc_D] by agreement ([dblk_content] below).  That
+   is the same device that lets an entry name the durable record it is
+   about without the writer having to know it. *)
 
 (* every block of the durable home map is a whole block *)
 Definition dbytes_tot (D : gmap Z (list (bv 8))) : Prop :=
@@ -273,6 +282,13 @@ Proof.
   rewrite /dsplice in Hc.
   apply lookup_insert_Some in Hc as [[_ <-] | [_ Hc]]; [| exact (HD c cs Hc)].
   rewrite Hb /=. rewrite (blk_splice_length off nbs bs); [exact Hbs | lia].
+Qed.
+
+Lemma dsplice_whole (D : gmap Z (list (bv 8))) (b : Z) (bs nbs : list (bv 8)) :
+  D !! b = Some bs -> length nbs = length bs ->
+  dsplice D b 0%nat nbs = <[b := nbs]> D.
+Proof.
+  intros Hb Hl. rewrite /dsplice Hb /=. rewrite (blk_splice_whole nbs bs Hl) //.
 Qed.
 
 (* the fold's hands, as multisets with a home *)
@@ -354,8 +370,8 @@ Section Ledger.
   (* ------------------------------------------------------------------ *)
 
   Definition dhand (g : gname) (Γd : fs_dur_names)
-      (Bin : gmap Z (list (bv 8))) (Tk : gmap Z nat) : iProp Σ :=
-    (([∗ map] b ↦ bs ∈ Bin, blk_owned (fs_gamma_D g Γd) b bs)
+      (Bin : gset Z) (Tk : gmap Z nat) : iProp Σ :=
+    (([∗ set] b ∈ Bin, ∃ bs, blk_owned (fs_gamma_D g Γd) b bs)
      ∗ ([∗ map] i ↦ k ∈ Tk, link_toks (fs_gamma_D g Γd) i k))%I.
 
   Definition dcfg_res (g : gname) (Γd : fs_dur_names) (c : dcfg) : iProp Σ :=
@@ -363,7 +379,27 @@ Section Ledger.
      ∗ ghost_map_auth g 1 (fs_dbytes (dc_D c)))%I.
 
   Lemma dhand_empty g Γd : ⊢ dhand g Γd ∅ ∅.
-  Proof. rewrite /dhand !big_sepM_empty. auto. Qed.
+  Proof. rewrite /dhand big_sepS_empty big_sepM_empty. auto. Qed.
+
+  (* one block INTO the hand, at an unknown content *)
+  Lemma dhand_blk_add g Γd Bin Tk (b : Z) (bs : list (bv 8)) :
+    b ∉ Bin ->
+    dhand g Γd Bin Tk -∗ blk_owned (fs_gamma_D g Γd) b bs -∗
+    dhand g Γd ({[b]} ∪ Bin) Tk.
+  Proof.
+    intros Hb. iIntros "[Hs $] Hblk".
+    rewrite big_sepS_insert; [| exact Hb]. iFrame "Hs". by iExists bs.
+  Qed.
+
+  (* ...and one block OUT of it *)
+  Lemma dhand_blk_sub g Γd Bin Tk (b : Z) :
+    b ∈ Bin ->
+    dhand g Γd Bin Tk -∗
+    (∃ bs, blk_owned (fs_gamma_D g Γd) b bs) ∗ dhand g Γd (Bin ∖ {[b]}) Tk.
+  Proof.
+    intros Hb. iIntros "[Hs $]".
+    rewrite (big_sepS_delete _ Bin b Hb). iDestruct "Hs" as "[$ $]".
+  Qed.
 
   (* the two token moves, at the hand *)
   Lemma dhand_tok_add g Γd Bin Tk (i : Z) :
@@ -397,6 +433,51 @@ Section Ledger.
     - iFrame "H1". rewrite big_sepM_insert_delete. iFrame.
   Qed.
 
+  (* one block of the hand, out and back, at any content *)
+  Lemma dhand_blk_acc g Γd Bin Tk (b : Z) :
+    b ∈ Bin ->
+    dhand g Γd Bin Tk -∗
+    (∃ bs, blk_owned (fs_gamma_D g Γd) b bs)
+    ∗ (∀ bs', blk_owned (fs_gamma_D g Γd) b bs' -∗ dhand g Γd Bin Tk).
+  Proof.
+    intros Hb. iIntros "[Hs Ht]".
+    iEval (rewrite (big_sepS_delete _ Bin b Hb)) in "Hs".
+    iDestruct "Hs" as "[Hbb Hs]". iFrame "Hbb".
+    iIntros (bs') "Hblk". rewrite /dhand.
+    iEval (rewrite (big_sepS_delete _ Bin b Hb)).
+    iFrame "Ht Hs". by iExists bs'.
+  Qed.
+
+  (* THE ENTRY TOKEN, out of the hand and into it.  Both are stated at the
+     [ent_tok] the entry-map movers consume and produce, so a [GIns]/[BIns]
+     and a [BDel] never have to case on [ent_tokenless] again. *)
+  Lemma dhand_ent_take g Γd Bin Tk (i : Z) (orph : bool) (s : fname)
+      (t : Z) (tokened : bool) :
+    ent_tokenless i orph s t = negb tokened ->
+    (tokened = true -> exists k, Tk !! t = Some (S k)) ->
+    dhand g Γd Bin Tk -∗
+    ent_tok (fs_gamma_D g Γd) i orph s t
+    ∗ dhand g Γd Bin (if tokened then tk_sub Tk t else Tk).
+  Proof.
+    intros Htl Hex. iIntros "Hh". destruct tokened.
+    - destruct (Hex eq_refl) as [k Hk].
+      iDestruct (dhand_tok_sub g Γd Bin Tk t k Hk with "Hh") as "[Htok $]".
+      rewrite /ent_tok Htl /=. iExact "Htok".
+    - rewrite /ent_tok Htl /=. iSplitR; [done | iExact "Hh"].
+  Qed.
+
+  Lemma dhand_ent_give g Γd Bin Tk (i : Z) (orph : bool) (s : fname)
+      (t : Z) (tokened : bool) :
+    ent_tokenless i orph s t = negb tokened ->
+    ent_tok (fs_gamma_D g Γd) i orph s t -∗ dhand g Γd Bin Tk -∗
+    dhand g Γd Bin (if tokened then tk_add Tk t else Tk).
+  Proof.
+    intros Htl. iIntros "Htok Hh". destruct tokened.
+    - rewrite /ent_tok Htl /= in |- *.
+      iApply (dhand_tok_add g Γd Bin Tk t with "Hh Htok").
+    - iExact "Hh".
+  Qed.
+
 End Ledger.
 
 (* ===================================================================== *)
@@ -415,7 +496,18 @@ End Ledger.
                   is deliberately no fourth constructor for them.
    - [GMint]   -- [nlink] goes up by one and the token goes to the fold's
                   hand, to be spent by the directory write that names the
-                  inode.  [create]'s [ip->nlink = 1; iupdate(ip)].
+                  inode.  [create]'s [ip->nlink = 1; iupdate(ip)] and
+                  [mkdir]'s [dp->nlink++; iupdate(dp)].
+   - [GBurn]   -- [nlink] goes DOWN by one and a token from the hand is
+                  returned to the authority.  [unlink]'s [ip->nlink--],
+                  [create]'s [fail:] arm, [iput]'s corpse.  Its argument is
+                  the ORPHANING arm: [None] where the orphan flag does not
+                  move, [Some t] where [nlink] reaches ZERO at a directory,
+                  so [fn_orphan] flips and [".."]'s token -- which the
+                  exemption stops charging for -- comes back to the hand at
+                  its target [t].  See the note on [drec_ghost_ok] below for
+                  why the MIRROR arm (a [GMint] that flips [fn_orphan] at a
+                  node with non-empty entries) has no constructor.
    - [GIns]    -- the record's SIZE grows over a directory record that the
                   data write has already put in place, so one entry becomes
                   visible and takes a token.  [dirlink]'s [writei] tail.
@@ -426,14 +518,38 @@ End Ledger.
 Inductive dghost :=
 | GSame
 | GMint
+| GBurn (odd : option Z)
 | GIns (k0 : nat) (s : fname) (z : bv 16) (tokened : bool).
+
+(* THE GHOST HALF OF A DATA-BLOCK WRITE.  A data write moves no [nlink], so
+   the link AUTHORITY never moves here; what CAN move is the entry map of a
+   DIRECTORY whose record the write makes live or dead, and with it one
+   token.  Three shapes, and they are the three things a [writei] of sixteen
+   bytes into a directory can do:
+
+   - [BSame] -- the entry map does not move.  Every write to a file, and
+                dirlink's APPEND sub-arm, whose record is written ABOVE the
+                current count and only becomes visible when the SIZE grows
+                (that growth is the record write's [GIns]).
+   - [BIns]  -- dirlink's REUSE sub-arm: the record written is BELOW the
+                count and was dead, so the entry becomes visible at this
+                write and takes a token from the hand.
+   - [BDel]  -- unlink's zeroing: the record's inum halfword goes to zero,
+                the entry disappears, and its token goes to the hand. *)
+Inductive dgblk :=
+| BSame
+| BIns (k0 : nat) (s : fname) (z : bv 16) (tokened : bool)
+| BDel (s : fname) (t : Z) (tokened : bool).
 
 (* ONE LEDGER ENTRY.  It names the OBJECT and its NEW value and nothing
    else: no other entry, no transaction, no durable byte map.  A writer
    extends the ledger by consing its own entry at its own AU. *)
 Inductive dent :=
-| DeRec (i : Z) (n' : fs_node) (gh : dghost)
-| DeBlk (i : Z) (k : nat) (bs' : list (bv 8)).
+| DeRec    (i : Z) (n' : fs_node) (gh : dghost)
+| DeBlk    (i : Z) (k : nat) (bs' : list (bv 8)) (gb : dgblk)
+| DeHand   (b : Z) (bs' : list (bv 8))
+| DeBmap   (b : Z) (alloc : bool)
+| DeAdopt  (i : Z) (n' : fs_node) (k : nat) (gh : dghost).
 
 Definition dledger : Type := list dent.
 
@@ -442,6 +558,47 @@ Definition dledger : Type := list dent.
 Definition drec_blk (Γd : fs_dur_names) (i : Z) : Z := fdn_ist Γd + i `div` 16.
 Definition drec_off (i : Z) : nat := Z.to_nat (64 * (i `mod` 16)).
 
+(* the durable content of one home block, read off the fold's byte map.  The
+   hand of blocks is a SET, so this is how a block that left the pool at an
+   existential content is named again once the fold has pinned it against
+   the byte authority ([dblk_content]). *)
+Definition dblk_at (D : gmap Z (list (bv 8))) (b : Z) : list (bv 8) :=
+  default [] (D !! b).
+
+(* the used set after a bitmap move *)
+Definition dbm_used (S : fs_state_rec) (b : Z) (alloc : bool) : gset Z :=
+  if alloc then fss_used S ∪ {[b]} else fss_used S ∖ {[b]}.
+
+(* a node is its three fields *)
+Lemma fs_node_eq (n1 n2 : fs_node) :
+  fn_rec n1 = fn_rec n2 -> fn_ent n1 = fn_ent n2 -> fn_blk n1 = fn_blk n2 ->
+  n1 = n2.
+Proof. destruct n1, n2; simpl; intros -> -> ->; reflexivity. Qed.
+
+(* THE ENTRY-MAP SIDE OF A COUNT MOVE, and the ONE shape that needed a
+   decision rather than a transcription (worklist item 3c, design issue 2).
+
+   [ent_toks] is indexed by [fn_orphan], so a count move that CROSSES zero
+   re-prices every dot entry the node holds.  The two directions are not
+   symmetric:
+
+   - DOWN ([GBurn] at [nlink = 1 -> 0]): the exemption WIDENS, so every
+     entry's token is still enough ([FsStateInode.ent_tok_orph_up]) and the
+     [".."] token, no longer charged for, comes free to the hand.  That is
+     [ent_toks_orphan], and [GBurn (Some t)] is exactly it.
+   - UP ([GMint] at [nlink = 0 -> 1]): the exemption NARROWS, so the dot
+     entries would have to be paid for out of nothing.  There is no lemma
+     and there is no constructor -- and none is owed, because THIS KERNEL
+     NEVER DOES IT: [dir_entries] is empty at anything that is not a
+     directory, [create] raises [nlink] on a freshly [ialloc]ed child whose
+     entry map is empty, [sys_link] refuses a directory outright, and every
+     other [nlink++] ([mkdir]'s [dp->nlink++]) is at a directory that is
+     already live.  So [GMint] asks for "the entries do not move AND either
+     the orphan flag does not move or the entry map is empty", which is
+     satisfied by every mint in the tree and by nothing that would need the
+     missing lemma.  A future arm that re-links an orphan DIRECTORY would
+     have to hand in one token per newly charged dot entry, and that is a
+     ruling, not a gap in this file. *)
 Definition drec_ghost_ok (i : Z) (n n' : fs_node) (gh : dghost)
     (Tk : gmap Z nat) : Prop :=
   match gh with
@@ -449,7 +606,17 @@ Definition drec_ghost_ok (i : Z) (n n' : fs_node) (gh : dghost)
              /\ dir_entries n' = dir_entries n
              /\ fn_orphan n' = fn_orphan n
   | GMint => fn_nlink n' = S (fn_nlink n)
-             /\ dir_entries n = ∅ /\ dir_entries n' = ∅
+             /\ dir_entries n' = dir_entries n
+             /\ (fn_orphan n' = fn_orphan n \/ dir_entries n = ∅)
+  | GBurn odd =>
+      fn_nlink n = S (fn_nlink n')
+      /\ dir_entries n' = dir_entries n
+      /\ (exists k, Tk !! i = Some (S k))
+      /\ match odd with
+         | None => fn_orphan n' = fn_orphan n \/ dir_entries n = ∅
+         | Some t => fn_orphan n = false /\ fn_orphan n' = true
+                     /\ dir_entries n !! DOTDOT = Some t /\ t <> i
+         end
   | GIns k0 s z tokened =>
       fn_nlink n' = fn_nlink n
       /\ fn_orphan n' = fn_orphan n
@@ -467,7 +634,39 @@ Definition drec_ghost_next (i : Z) (gh : dghost) (Tk : gmap Z nat)
   match gh with
   | GSame => Tk
   | GMint => tk_add Tk i
+  | GBurn odd => match odd with
+                 | None => tk_sub Tk i
+                 | Some t => tk_add (tk_sub Tk i) t
+                 end
   | GIns _ _ z tokened => if tokened then tk_sub Tk (bv_unsigned z) else Tk
+  end.
+
+(* THE DATA WRITE'S GHOST HALF.  [fn_set_blk] keeps [fn_nlink] and therefore
+   [fn_orphan] ([FsStateInode.fn_nlink_set_blk] / [fn_orphan_set_blk]), so
+   the link AUTHORITY never moves here and only the entry map can. *)
+Definition dblk_ghost_ok (i : Z) (n n' : fs_node) (gb : dgblk)
+    (Tk : gmap Z nat) : Prop :=
+  match gb with
+  | BSame => dir_entries n' = dir_entries n
+  | BIns k0 s z tokened =>
+      fn_is_dir n = true /\ fn_is_dir n' = true
+      /\ dir_first (fn_data n) (fn_nrec n) s = None
+      /\ dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n')
+                       k0 s z
+      /\ ent_tokenless i (fn_orphan n) s (bv_unsigned z) = negb tokened
+      /\ (tokened = true ->
+            exists k, Tk !! bv_unsigned z = Some (S k))
+  | BDel s t tokened =>
+      dir_entries n !! s = Some t
+      /\ dir_entries n' = delete s (dir_entries n)
+      /\ ent_tokenless i (fn_orphan n) s t = negb tokened
+  end.
+
+Definition dblk_ghost_next (gb : dgblk) (Tk : gmap Z nat) : gmap Z nat :=
+  match gb with
+  | BSame => Tk
+  | BIns _ _ z tokened => if tokened then tk_sub Tk (bv_unsigned z) else Tk
+  | BDel _ t tokened => if tokened then tk_add Tk t else Tk
   end.
 
 (* THE ENTRY'S PRECONDITIONS -- the LIBRARY MOVER's own, and nothing more.
@@ -489,18 +688,47 @@ Definition dent_ok (Γd : fs_dur_names) (e : dent) (c : dcfg) : Prop :=
             /\ fn_addrs_kept n n'
             /\ inode_local i n'
             /\ drec_ghost_ok i n n' gh (dc_toks c))
-  | DeBlk i k bs' =>
+  | DeBlk i k bs' gb =>
       0 <= i < fdn_nin Γd
       /\ length bs' = BSIZE
       /\ (forall n, fss_inodes (dc_S c) !! i = Some n ->
             is_Some (fn_blk n !! k)
             /\ is_Some (dc_D c !! fn_naddr n k)
             /\ inode_local i (fn_set_blk n k bs')
-            /\ dir_entries (fn_set_blk n k bs') = dir_entries n)
+            /\ dblk_ghost_ok i n (fn_set_blk n k bs') gb (dc_toks c))
+  | DeHand b bs' =>
+      b ∈ dc_bin c
+      /\ length bs' = BSIZE
+      /\ is_Some (dc_D c !! b)
+  | DeBmap b alloc =>
+      is_Some (dc_D c !! fdn_bmap Γd)
+      /\ 0 <= b < sb_size (fss_sb (dc_S c))
+      /\ (if alloc
+          then b ∉ fss_used (dc_S c) /\ b ∉ dc_bin c
+          else b ∈ dc_bin c)
+  | DeAdopt i n' k gh =>
+      0 <= i < fdn_nin Γd
+      /\ 0 <= i < 2 ^ 32
+      /\ dinode_wf (fn_rec n')
+      /\ is_Some (dc_D c !! drec_blk Γd i)
+      /\ fn_naddr n' k ∈ dc_bin c
+      /\ is_Some (dc_D c !! fn_naddr n' k)
+      /\ (forall n, fss_inodes (dc_S c) !! i = Some n ->
+            dinode_wf (fn_rec n)
+            /\ fn_blk n !! k = None
+            /\ fn_ent n' = fn_ent n
+            /\ fn_indb n' = fn_indb n
+            /\ fn_addrs_kept n n'
+            /\ fn_blk n' = <[k := dblk_at (dc_D c) (fn_naddr n' k)]> (fn_blk n)
+            /\ inode_local i n'
+            /\ drec_ghost_ok i n n' gh (dc_toks c))
   end.
 
 Definition dS_upd (S : fs_state_rec) (i : Z) (n : fs_node) : fs_state_rec :=
   MkFsS (fss_sb S) (fss_sbb S) (<[i := n]> (fss_inodes S)) (fss_used S).
+
+Definition dS_used (S : fs_state_rec) (u : gset Z) : fs_state_rec :=
+  MkFsS (fss_sb S) (fss_sbb S) (fss_inodes S) u.
 
 Definition dent_next (Γd : fs_dur_names) (e : dent) (c : dcfg) : dcfg :=
   match e with
@@ -510,14 +738,29 @@ Definition dent_next (Γd : fs_dur_names) (e : dent) (c : dcfg) : dcfg :=
              (drec_ghost_next i gh (dc_toks c))
              (dsplice (dc_D c) (drec_blk Γd i) (drec_off i)
                       (dinode_bytes (fn_rec n')))
-  | DeBlk i k bs' =>
+  | DeBlk i k bs' gb =>
       match fss_inodes (dc_S c) !! i with
       | Some n =>
           MkDCfg (dS_upd (dc_S c) i (fn_set_blk n k bs'))
-                 (dc_bin c) (dc_toks c)
+                 (dc_bin c) (dblk_ghost_next gb (dc_toks c))
                  (dsplice (dc_D c) (fn_naddr n k) 0%nat bs')
       | None => c
       end
+  | DeHand b bs' =>
+      MkDCfg (dc_S c) (dc_bin c) (dc_toks c)
+             (dsplice (dc_D c) b 0%nat bs')
+  | DeBmap b alloc =>
+      MkDCfg (dS_used (dc_S c) (dbm_used (dc_S c) b alloc))
+             (if alloc then {[b]} ∪ dc_bin c else dc_bin c ∖ {[b]})
+             (dc_toks c)
+             (dsplice (dc_D c) (fdn_bmap Γd) 0%nat
+                      (bm_bytes BSIZE (dbm_used (dc_S c) b alloc)))
+  | DeAdopt i n' k gh =>
+      MkDCfg (dS_upd (dc_S c) i n')
+             (dc_bin c ∖ {[fn_naddr n' k]})
+             (drec_ghost_next i gh (dc_toks c))
+             (dsplice (dc_D c) (drec_blk Γd i) (drec_off i)
+                      (dinode_bytes (fn_rec n')))
   end.
 
 (* THE GEOMETRY IS INVARIANT.  Neither entry kind touches the superblock or
@@ -526,17 +769,20 @@ Definition dent_next (Γd : fs_dur_names) (e : dent) (c : dcfg) : dcfg :=
 Lemma dgeo_ok_step (Γd : fs_dur_names) (e : dent) (c : dcfg) :
   dgeo_ok Γd (dc_S c) -> dgeo_ok Γd (dc_S (dent_next Γd e c)).
 Proof.
-  intros (H1 & H2 & H3).
+  intros Hgeo. pose proof Hgeo as (H1 & H2 & H3).
   assert (Hupd : forall i n, dgeo_ok Γd (dS_upd (dc_S c) i n)).
   { intros i n. rewrite /dgeo_ok /dS_upd /=.
     split; [exact H1 |]. split; [exact H2 |].
     intros j Hj. destruct (decide (j = i)) as [-> | Hne].
     - rewrite lookup_insert. by eexists.
     - rewrite lookup_insert_ne; [exact (H3 j Hj) | congruence]. }
-  destruct e as [i n' gh | i k bs']; simpl.
+  destruct e as [i n' gh | i k bs' gb | b bs' | b alloc | i n' k gh]; simpl.
   - exact (Hupd i n').
   - destruct (fss_inodes (dc_S c) !! i) as [n |];
-      [exact (Hupd i _) | by repeat split].
+      [exact (Hupd i _) | exact Hgeo].
+  - exact Hgeo.
+  - exact Hgeo.
+  - exact (Hupd i n').
 Qed.
 
 Section LedgerStep.
@@ -563,11 +809,94 @@ Section LedgerStep.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  3a'. A WHOLE BLOCK, and the CONTENT the fold reads off the map      *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the byte workhorse at a WHOLE home block -- the shape every entry that
+     rewrites a block outright (a data write, a [bzero] of a block in the
+     hand, the bitmap block) uses *)
+  Lemma dbytes_blk_update (g : gname) (Γd : fs_dur_names)
+      (D : gmap Z (list (bv 8))) (b : Z) (bs obs nbs : list (bv 8)) :
+    dbytes_tot D -> D !! b = Some bs -> length nbs = BSIZE ->
+    ghost_map_auth g 1 (fs_dbytes D) -∗
+    blk_owned (fs_gamma_D g Γd) b obs ==∗
+    ghost_map_auth g 1 (fs_dbytes (<[b := nbs]> D))
+    ∗ blk_owned (fs_gamma_D g Γd) b nbs.
+  Proof.
+    intros HD Hb Hn. iIntros "Ha Hblk".
+    iDestruct (blk_owned_length with "Hblk") as %Hol.
+    iEval (rewrite /blk_owned) in "Hblk". iDestruct "Hblk" as "[_ Hr]".
+    assert (Hz : Z.of_nat 0%nat = 0) by lia.
+    assert (Hll : length obs = length nbs) by (rewrite Hol Hn //).
+    assert (Hoff : (0 + length nbs <= BSIZE)%nat) by (rewrite Hn; lia).
+    iMod (dbytes_range_update g Γd D b bs 0%nat obs nbs HD Hb Hll Hoff
+            with "Ha [Hr]") as "[Ha Hr]"; [rewrite Hz; iExact "Hr" |].
+    rewrite (blk_splice_whole nbs bs
+               ltac:(rewrite Hn (HD _ _ Hb); reflexivity)).
+    iModIntro. iFrame "Ha". rewrite /blk_owned. iSplitR; [done |].
+    rewrite Hz. iExact "Hr".
+  Qed.
+
+  (* THE HAND'S BLOCKS HAVE NO VALUE OF THEIR OWN, AND DO NOT NEED ONE.
+     A block that left [free_bitmap]'s pool arrived at an existential
+     content, so the ledger cannot name it -- but the fold holds the byte
+     AUTHORITY at [fs_dbytes D] and the block's own elements, and the two
+     together say the content IS [D]'s.  Same device as the record
+     coherence: what a writer cannot name, agreement pins. *)
+  Lemma dblk_content (g : gname) (Γd : fs_dur_names)
+      (D : gmap Z (list (bv 8))) (b : Z) (bs cs : list (bv 8)) :
+    dbytes_tot D -> D !! b = Some cs ->
+    ghost_map_auth g 1 (fs_dbytes D) -∗
+    blk_owned (fs_gamma_D g Γd) b bs -∗ ⌜bs = cs⌝.
+  Proof.
+    intros HD Hb. iIntros "Ha Hblk".
+    iDestruct (blk_owned_length with "Hblk") as %Hlb.
+    assert (Hlc : length cs = BSIZE) by exact (HD b cs Hb).
+    assert (Hok : dbytes_ok D) by exact (dbytes_ok_full D HD).
+    iEval (rewrite /blk_owned) in "Hblk". iDestruct "Hblk" as "[_ Hr]".
+    assert (Hz : (0 : Z) = Z.of_nat 0%nat) by lia.
+    rewrite Hz (byte_range_dbelems g Γd b (Z.of_nat 0%nat) bs) /fs_dbelems.
+    iDestruct (ghost_map_lookup_big with "Ha Hr") as %Hsub.
+    iPureIntro. apply list_eq. intros j.
+    destruct (decide (j < BSIZE)%nat) as [Hj | Hj]; last first.
+    { rewrite (lookup_ge_None_2 bs j ltac:(lia))
+              (lookup_ge_None_2 cs j ltac:(lia)) //. }
+    destruct (lookup_lt_is_Some_2 bs j ltac:(lia)) as [v Hv].
+    destruct (lookup_lt_is_Some_2 cs j ltac:(lia)) as [w Hw].
+    rewrite Hv Hw. f_equal.
+    assert (Hm : (map_seqZ (b * Z.of_nat BSIZE + Z.of_nat 0%nat) bs
+                  : gmap Z (bv 8))
+                 !! (b * Z.of_nat BSIZE + Z.of_nat j) = Some v).
+    { rewrite lookup_map_seqZ.
+      rewrite (option_guard_True
+                 (b * Z.of_nat BSIZE + Z.of_nat 0%nat
+                  <= b * Z.of_nat BSIZE + Z.of_nat j)); [| lia].
+      assert (Hjj : Z.to_nat (b * Z.of_nat BSIZE + Z.of_nat j
+                              - (b * Z.of_nat BSIZE + Z.of_nat 0%nat)) = j)
+        by lia.
+      rewrite Hjj Hv //. }
+    assert (Hv' : fs_dbytes D !! (b * Z.of_nat BSIZE + Z.of_nat j) = Some v)
+      by exact (lookup_weaken _ _ _ _ Hm Hsub).
+    assert (Hw' : fs_dbytes D !! (b * Z.of_nat BSIZE + Z.of_nat j) = Some w)
+      by exact (fs_dbytes_lookup D b cs j w Hok Hb Hw).
+    rewrite Hv' in Hw'. by injection Hw'.
+  Qed.
+
+  (* the bitmap piece of the state, out and back *)
+  Lemma fs_state_bm_acc (Γ : fs_view_names Σ) (S : fs_state_rec) :
+    fs_state Γ S ⊢ free_bitmap Γ (fss_sb S) (fss_used S)
+      ∗ (∀ u', free_bitmap Γ (fss_sb S) u' -∗ fs_state Γ (dS_used S u')).
+  Proof.
+    rewrite /fs_state /dS_used. iIntros "(Hsb & Hin & $)".
+    iIntros (u') "Hbm". cbn [fss_sb fss_sbb fss_inodes fss_used]. iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  3b.  THE GHOST HALF OF A RECORD MOVE                                *)
   (* ------------------------------------------------------------------ *)
 
   Lemma dghost_move (g : gname) (Γd : fs_dur_names) (i : Z) (n n' : fs_node)
-      (gh : dghost) (Bin : gmap Z (list (bv 8))) (Tk : gmap Z nat) :
+      (gh : dghost) (Bin : gset Z) (Tk : gmap Z nat) :
     drec_ghost_ok i n n' gh Tk ->
     inode_local i n' ->
     inode_ghost (fs_gamma_D g Γd) i n -∗ dhand g Γd Bin Tk ==∗
@@ -576,31 +905,73 @@ Section LedgerStep.
   Proof.
     intros Hgh Hloc. iIntros "(Ha & Ht & _) Hh".
     rewrite /inode_ghost.
-    destruct gh as [| | k0 s z tokened]; simpl.
+    destruct gh as [| | odd | k0 s z tokened]; simpl.
     - destruct Hgh as (Hnl & Hde & Ho).
       rewrite Hnl -(ent_toks_cong_ent (fs_gamma_D g Γd) i n n' Ho Hde).
       iModIntro. iFrame "Ha Ht Hh". by iPureIntro.
-    - destruct Hgh as (Hnl & Hde & Hde').
+    - destruct Hgh as (Hnl & Hde & Horph).
       iMod (link_mint (fs_gamma_D g Γd) i (fn_nlink n) with "Ha")
         as "[Ha Htok]".
       iDestruct (dhand_tok_add g Γd Bin Tk i with "Hh Htok") as "Hh".
       rewrite Hnl. iModIntro. iFrame "Ha Hh".
-      iSplitL; [| by iPureIntro].
-      rewrite /ent_toks Hde' big_sepM_empty. done.
+      iSplitL "Ht"; [| by iPureIntro].
+      destruct Horph as [Ho | Hemp].
+      + rewrite -(ent_toks_cong_ent (fs_gamma_D g Γd) i n n' Ho Hde).
+        iExact "Ht".
+      + rewrite /ent_toks Hde Hemp big_sepM_empty. done.
+    - destruct Hgh as (Hnl & Hde & [k Hk] & Harm).
+      iDestruct (dhand_tok_sub g Γd Bin Tk i k Hk with "Hh") as "[Htok Hh]".
+      iEval (rewrite Hnl) in "Ha".
+      iMod (link_return (fs_gamma_D g Γd) i (fn_nlink n') with "Ha Htok")
+        as "Ha".
+      destruct odd as [t |].
+      + destruct Harm as (Ho & Ho' & Hdd & Hne).
+        iDestruct (ent_toks_orphan (fs_gamma_D g Γd) i n n' t Hde Ho Ho' Hdd
+                     Hne with "Ht") as "[Htk Ht]".
+        iDestruct (dhand_tok_add g Γd Bin (tk_sub Tk i) t with "Hh Htk")
+          as "Hh".
+        iModIntro. iFrame "Ha Ht Hh". by iPureIntro.
+      + iModIntro. iFrame "Ha Hh". iSplitL "Ht"; [| by iPureIntro].
+        destruct Harm as [Ho | Hemp].
+        * rewrite -(ent_toks_cong_ent (fs_gamma_D g Γd) i n n' Ho Hde).
+          iExact "Ht".
+        * rewrite /ent_toks Hde Hemp big_sepM_empty. done.
     - destruct Hgh as (Hnl & Ho & Hd & Hd' & Hfirst & Hins & Htl & Htk).
       rewrite Hnl.
-      iAssert (ent_tok (fs_gamma_D g Γd) i (fn_orphan n) s (bv_unsigned z)
-               ∗ dhand g Γd Bin
-                   (if tokened then tk_sub Tk (bv_unsigned z) else Tk))%I
-        with "[Hh]" as "[Htok Hh]".
-      { destruct tokened.
-        - destruct (Htk eq_refl) as [k Hk].
-          iDestruct (dhand_tok_sub g Γd Bin Tk (bv_unsigned z) k Hk with "Hh")
-            as "[Htok $]".
-          rewrite /ent_tok Htl /=. iExact "Htok".
-        - rewrite /ent_tok Htl /=. iSplitR; [done | iExact "Hh"]. }
+      iDestruct (dhand_ent_take g Γd Bin Tk i (fn_orphan n) s
+                   (bv_unsigned z) tokened Htl Htk with "Hh") as "[Htok Hh]".
       iDestruct (ent_toks_insert (fs_gamma_D g Γd) i n n' k0 s z
                    Ho Hd Hd' Hfirst Hins with "Ht Htok") as "Ht".
+      iModIntro. iFrame "Ha Ht Hh". by iPureIntro.
+  Qed.
+
+  (* ...and of a DATA-BLOCK write.  The authority never moves ([fn_set_blk]
+     keeps [fn_nlink]); only a directory's entry map can. *)
+  Lemma dblk_ghost_move (g : gname) (Γd : fs_dur_names) (i : Z)
+      (n n' : fs_node) (gb : dgblk) (Bin : gset Z) (Tk : gmap Z nat) :
+    dblk_ghost_ok i n n' gb Tk ->
+    fn_nlink n' = fn_nlink n -> fn_orphan n' = fn_orphan n ->
+    inode_local i n' ->
+    inode_ghost (fs_gamma_D g Γd) i n -∗ dhand g Γd Bin Tk ==∗
+    inode_ghost (fs_gamma_D g Γd) i n'
+    ∗ dhand g Γd Bin (dblk_ghost_next gb Tk).
+  Proof.
+    intros Hgb Hnl Ho Hloc. iIntros "(Ha & Ht & _) Hh".
+    rewrite /inode_ghost Hnl.
+    destruct gb as [| k0 s z tokened | s t tokened]; simpl.
+    - rewrite -(ent_toks_cong_ent (fs_gamma_D g Γd) i n n' Ho Hgb).
+      iModIntro. iFrame "Ha Ht Hh". by iPureIntro.
+    - destruct Hgb as (Hd & Hd' & Hfirst & Hins & Htl & Htk).
+      iDestruct (dhand_ent_take g Γd Bin Tk i (fn_orphan n) s
+                   (bv_unsigned z) tokened Htl Htk with "Hh") as "[Htok Hh]".
+      iDestruct (ent_toks_insert (fs_gamma_D g Γd) i n n' k0 s z
+                   Ho Hd Hd' Hfirst Hins with "Ht Htok") as "Ht".
+      iModIntro. iFrame "Ha Ht Hh". by iPureIntro.
+    - destruct Hgb as (Hs & Hdel & Htl).
+      iDestruct (ent_toks_delete (fs_gamma_D g Γd) i n n' s t Ho Hs Hdel
+                   with "Ht") as "[Htok Ht]".
+      iDestruct (dhand_ent_give g Γd Bin Tk i (fn_orphan n) s t tokened Htl
+                   with "Htok Hh") as "Hh".
       iModIntro. iFrame "Ha Ht Hh". by iPureIntro.
   Qed.
 
@@ -616,7 +987,7 @@ Section LedgerStep.
     intros HD Hgeo Hok.
     iIntros "(Hb & Hh & Hauth)".
     iDestruct "Hb" as "(Htop & Hfr & Hst)".
-    destruct e as [i n' gh | i k bs'].
+    destruct e as [i n' gh | i k bs' gb | b bs' | b alloc | i n' k gh].
     - (* ---- the RECORD move ---- *)
       destruct Hok as (Hrng & H32 & Hwf' & [bs Hbs] & Hn).
       destruct Hgeo as (Hbm & Hist & Hex) eqn:Hgeoeq.
@@ -667,47 +1038,199 @@ Section LedgerStep.
       destruct Hok as (Hrng & Hlen' & Hn).
       destruct Hgeo as (Hbm & Hist & Hex) eqn:Hgeoeq.
       destruct (Hex i Hrng) as [n Hni].
-      destruct (Hn n Hni) as (Hk & [bs Hbs] & Hloc' & Hde).
+      destruct (Hn n Hni) as (Hk & [bs Hbs] & Hloc' & Hgb).
       destruct Hk as [obs Hobs].
       iDestruct (fs_state_inode_acc (fs_gamma_D g Γd) (dc_S c) i n Hni
                    with "Hst") as "[Hin Hstback]".
       iDestruct "Hin" as "[Hphi Hgho]".
       iDestruct (inode_phi_blk_move (fs_gamma_D g Γd) (fss_sb (dc_S c)) i n k
                    obs bs' Hobs with "Hphi") as "[Hblk Hphiback]".
-      iDestruct (blk_owned_length with "Hblk") as %Hobsl.
-      iEval (rewrite /blk_owned) in "Hblk".
-      iDestruct "Hblk" as "[%Hbl Hblk]".
-      assert (Hz : Z.of_nat 0%nat = 0) by lia.
-      assert (Hl : length obs = length bs') by (rewrite Hobsl Hlen' //).
-      assert (Hoffb : (0 + length bs' <= BSIZE)%nat) by (rewrite Hlen'; lia).
-      iMod (dbytes_range_update g Γd (dc_D c) (fn_naddr n k) bs
-              0%nat obs bs' HD Hbs Hl Hoffb with "Hauth [Hblk]")
-        as "[Hauth Hblk]"; [rewrite Hz; iExact "Hblk" |].
-      rewrite Hz.
-      rewrite (blk_splice_whole bs' bs
-                 ltac:(rewrite Hlen' (HD _ _ Hbs); reflexivity)).
-      iDestruct ("Hphiback" with "[Hblk]") as "Hphi".
-      { rewrite /blk_owned. iSplitR; [by iPureIntro | iExact "Hblk"]. }
-      (* the ghost half: the entry map does not move *)
-      iDestruct "Hgho" as "(Ha & Ht & _)".
-      iEval (rewrite (ent_toks_cong_ent (fs_gamma_D g Γd) i n
-                        (fn_set_blk n k bs')
-                        (fn_orphan_set_blk n k bs') Hde)) in "Ht".
-      iDestruct ("Hstback" $! (fn_set_blk n k bs') with "[Hphi Ha Ht]")
-        as "Hst".
-      { rewrite /inode_owned /inode_ghost (fn_nlink_set_blk n k bs').
-        iFrame "Hphi Ha Ht". by iPureIntro. }
+      iMod (dbytes_blk_update g Γd (dc_D c) (fn_naddr n k) bs obs bs'
+              HD Hbs Hlen' with "Hauth Hblk") as "[Hauth Hblk]".
+      iDestruct ("Hphiback" with "Hblk") as "Hphi".
+      (* the ghost half *)
+      iMod (dblk_ghost_move g Γd i n (fn_set_blk n k bs') gb (dc_bin c)
+              (dc_toks c) Hgb (fn_nlink_set_blk n k bs')
+              (fn_orphan_set_blk n k bs') Hloc' with "Hgho Hh")
+        as "[Hgho Hh]".
+      iDestruct ("Hstback" $! (fn_set_blk n k bs') with "[Hphi Hgho]")
+        as "Hst"; [by iFrame |].
       iDestruct (big_sepM_insert_acc _ _ i n Hni with "Hfr") as "[Hf Hfrback]".
       iMod (ghost_map_update (fn_set_blk n k bs') with "Htop Hf")
         as "[Htop Hf]".
       iDestruct ("Hfrback" $! (fn_set_blk n k bs') with "Hf") as "Hfr".
-      assert (Hwh : blk_splice 0%nat bs' bs = bs').
-      { apply blk_splice_whole. rewrite Hlen' (HD _ _ Hbs). reflexivity. }
-      assert (Hnext : dent_next Γd (DeBlk i k bs') c
+      assert (Hnext : dent_next Γd (DeBlk i k bs' gb) c
                       = MkDCfg (dS_upd (dc_S c) i (fn_set_blk n k bs'))
-                          (dc_bin c) (dc_toks c)
+                          (dc_bin c) (dblk_ghost_next gb (dc_toks c))
                           (<[fn_naddr n k := bs']> (dc_D c))).
-      { cbn [dent_next]. rewrite Hni /dsplice Hbs /= Hwh //. }
+      { cbn [dent_next]. rewrite Hni.
+        rewrite (dsplice_whole (dc_D c) (fn_naddr n k) bs bs' Hbs
+                   ltac:(rewrite Hlen' (HD _ _ Hbs); reflexivity)) //. }
+      iModIntro. rewrite Hnext /dcfg_res /dbody /dS_upd.
+      cbn [dc_S dc_bin dc_toks dc_D fss_sb fss_sbb fss_inodes fss_used].
+      iFrame.
+    - (* ---- a block held in the HAND ---- *)
+      destruct Hok as (Hbin & Hlen' & [cs Hcs]).
+      iDestruct (dhand_blk_acc g Γd (dc_bin c) (dc_toks c) b Hbin with "Hh")
+        as "[Hblk Hhback]".
+      iDestruct "Hblk" as (obs) "Hblk".
+      iMod (dbytes_blk_update g Γd (dc_D c) b cs obs bs' HD Hcs Hlen'
+              with "Hauth Hblk") as "[Hauth Hblk]".
+      iDestruct ("Hhback" $! bs' with "Hblk") as "Hh".
+      assert (Hnext : dent_next Γd (DeHand b bs') c
+                      = MkDCfg (dc_S c) (dc_bin c) (dc_toks c)
+                          (<[b := bs']> (dc_D c))).
+      { cbn [dent_next].
+        rewrite (dsplice_whole (dc_D c) b cs bs' Hcs
+                   ltac:(rewrite Hlen' (HD _ _ Hcs); reflexivity)) //. }
+      iModIntro. rewrite Hnext /dcfg_res /dbody.
+      cbn [dc_S dc_bin dc_toks dc_D]. iFrame.
+    - (* ---- the BITMAP block, and one block between pool and hand ---- *)
+      destruct Hok as ([bs Hbs] & Hrng & Harm).
+      pose proof Hgeo as (Hbm & Hist & Hex).
+      iDestruct (fs_state_bm_acc (fs_gamma_D g Γd) (dc_S c) with "Hst")
+        as "[Hbmp Hstback]".
+      assert (Hbs' : dc_D c !! sb_bmapstart (fss_sb (dc_S c)) = Some bs)
+        by (rewrite Hbm; exact Hbs).
+      assert (Hlbs : length bs = BSIZE) by exact (HD _ _ Hbs).
+      rewrite /free_bitmap.
+      destruct alloc.
+      + (* ALLOCATE: the bit is set and the block leaves the pool *)
+        destruct Harm as (Hnu & Hnbin).
+        iDestruct (bitmap_alloc (fs_gamma_D g Γd)
+                     (sb_bmapstart (fss_sb (dc_S c)))
+                     (sb_size (fss_sb (dc_S c))) (fss_used (dc_S c)) b
+                     Hrng Hnu with "Hbmp") as "(Hnew & Hbmblk & Hbmback)".
+        iDestruct "Hnew" as (obs) "Hnew".
+        iMod (dbytes_blk_update g Γd (dc_D c)
+                (sb_bmapstart (fss_sb (dc_S c))) bs
+                (bm_bytes BSIZE (fss_used (dc_S c)))
+                (bm_bytes BSIZE (fss_used (dc_S c) ∪ {[b]}))
+                HD Hbs' (bm_bytes_length _ _) with "Hauth Hbmblk")
+          as "[Hauth Hbmblk]".
+        iDestruct ("Hbmback" with "Hbmblk") as "Hbmp".
+        iDestruct ("Hstback" $! (fss_used (dc_S c) ∪ {[b]}) with "Hbmp")
+          as "Hst".
+        iDestruct (dhand_blk_add g Γd (dc_bin c) (dc_toks c) b obs Hnbin
+                     with "Hh Hnew") as "Hh".
+        assert (Hnext : dent_next Γd (DeBmap b true) c
+                = MkDCfg (dS_used (dc_S c) (fss_used (dc_S c) ∪ {[b]}))
+                    ({[b]} ∪ dc_bin c) (dc_toks c)
+                    (<[sb_bmapstart (fss_sb (dc_S c))
+                       := bm_bytes BSIZE (fss_used (dc_S c) ∪ {[b]})]>
+                       (dc_D c))).
+        { assert (Hln : length (bm_bytes BSIZE (fss_used (dc_S c) ∪ {[b]}))
+                        = length bs)
+            by (rewrite bm_bytes_length Hlbs; reflexivity).
+          cbn [dent_next]. rewrite /dbm_used /=. rewrite -Hbm.
+          rewrite (dsplice_whole (dc_D c) (sb_bmapstart (fss_sb (dc_S c))) bs
+                     (bm_bytes BSIZE (fss_used (dc_S c) ∪ {[b]})) Hbs' Hln) //. }
+        iModIntro. rewrite Hnext /dcfg_res /dbody /dS_used.
+        cbn [dc_S dc_bin dc_toks dc_D fss_sb fss_sbb fss_inodes fss_used].
+        iFrame.
+      + (* FREE: the block goes back into the pool and the bit is cleared *)
+        iDestruct (dhand_blk_sub g Γd (dc_bin c) (dc_toks c) b Harm with "Hh")
+          as "[Hold Hh]".
+        iDestruct "Hold" as (obs) "Hold".
+        iDestruct (bitmap_free (fs_gamma_D g Γd) (fs_gamma_D_excl g Γd)
+                     (sb_bmapstart (fss_sb (dc_S c)))
+                     (sb_size (fss_sb (dc_S c))) (fss_used (dc_S c)) b obs
+                     Hrng with "Hbmp Hold") as "(_ & Hbmblk & Hbmback)".
+        iMod (dbytes_blk_update g Γd (dc_D c)
+                (sb_bmapstart (fss_sb (dc_S c))) bs
+                (bm_bytes BSIZE (fss_used (dc_S c)))
+                (bm_bytes BSIZE (fss_used (dc_S c) ∖ {[b]}))
+                HD Hbs' (bm_bytes_length _ _) with "Hauth Hbmblk")
+          as "[Hauth Hbmblk]".
+        iDestruct ("Hbmback" with "Hbmblk") as "Hbmp".
+        iDestruct ("Hstback" $! (fss_used (dc_S c) ∖ {[b]}) with "Hbmp")
+          as "Hst".
+        assert (Hnext : dent_next Γd (DeBmap b false) c
+                = MkDCfg (dS_used (dc_S c) (fss_used (dc_S c) ∖ {[b]}))
+                    (dc_bin c ∖ {[b]}) (dc_toks c)
+                    (<[sb_bmapstart (fss_sb (dc_S c))
+                       := bm_bytes BSIZE (fss_used (dc_S c) ∖ {[b]})]>
+                       (dc_D c))).
+        { assert (Hln : length (bm_bytes BSIZE (fss_used (dc_S c) ∖ {[b]}))
+                        = length bs)
+            by (rewrite bm_bytes_length Hlbs; reflexivity).
+          cbn [dent_next]. rewrite /dbm_used /=. rewrite -Hbm.
+          rewrite (dsplice_whole (dc_D c) (sb_bmapstart (fss_sb (dc_S c))) bs
+                     (bm_bytes BSIZE (fss_used (dc_S c) ∖ {[b]})) Hbs' Hln) //. }
+        iModIntro. rewrite Hnext /dcfg_res /dbody /dS_used.
+        cbn [dc_S dc_bin dc_toks dc_D fss_sb fss_sbb fss_inodes fss_used].
+        iFrame.
+    - (* ---- a block from the HAND joins the inode at the record write ---- *)
+      destruct Hok as (Hrng & H32 & Hwf' & [bs Hbs] & Hbin & [cs Hcs] & Hn).
+      destruct Hgeo as (Hbm & Hist & Hex) eqn:Hgeoeq.
+      destruct (Hex i Hrng) as [n Hni].
+      destruct (Hn n Hni)
+        as (Hwf & Hkn & Hent & Hindb & Hkept & Hblk' & Hloc' & Hgh).
+      (* the block, out of the hand, and its content read off the map *)
+      iDestruct (dhand_blk_sub g Γd (dc_bin c) (dc_toks c) (fn_naddr n' k)
+                   Hbin with "Hh") as "[Hnew Hh]".
+      iDestruct "Hnew" as (obs) "Hnew".
+      iDestruct (dblk_content g Γd (dc_D c) (fn_naddr n' k) obs cs HD Hcs
+                   with "Hauth Hnew") as %->.
+      assert (Hcsat : dblk_at (dc_D c) (fn_naddr n' k) = cs)
+        by (rewrite /dblk_at Hcs //).
+      (* the intermediate node: the new RECORD, the old blocks *)
+      pose (n1 := MkNode (fn_rec n') (fn_ent n) (fn_blk n)).
+      assert (Hnn : forall j, fn_naddr n1 j = fn_naddr n' j).
+      { intros j. rewrite /fn_naddr /n1 /=. rewrite Hent //. }
+      assert (Hb1 : fn_blk n1 = fn_blk n) by reflexivity.
+      assert (He1 : fn_ent n1 = fn_ent n) by reflexivity.
+      assert (Hi1 : fn_indb n1 = fn_indb n).
+      { rewrite /fn_indb /n1 /=. exact Hindb. }
+      assert (Hk1 : fn_addrs_kept n n1).
+      { intros j Hj. rewrite Hnn. exact (Hkept j Hj). }
+      iDestruct (fs_state_inode_acc (fs_gamma_D g Γd) (dc_S c) i n Hni
+                   with "Hst") as "[Hin Hstback]".
+      iDestruct "Hin" as "[Hphi Hgho]".
+      iDestruct (inode_phi_rec_move (fs_gamma_D g Γd) (fss_sb (dc_S c)) i n n1
+                   Hb1 He1 Hi1 Hk1 with "Hphi") as "[Hrec Hphiback]".
+      (* the record's bytes *)
+      rewrite (drec_owned_at g Γd (dc_S c) i (fn_rec n) Hgeo H32).
+      assert (Hl : length (dinode_bytes (fn_rec n))
+                   = length (dinode_bytes (fn_rec n'))).
+      { rewrite (dinode_bytes_length _ Hwf) (dinode_bytes_length _ Hwf') //. }
+      pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
+      assert (Hoffb : (drec_off i + length (dinode_bytes (fn_rec n'))
+                       <= BSIZE)%nat).
+      { rewrite (dinode_bytes_length _ Hwf') /drec_off BSIZE_1024. lia. }
+      iMod (dbytes_range_update g Γd (dc_D c) (drec_blk Γd i) bs
+              (drec_off i) (dinode_bytes (fn_rec n))
+              (dinode_bytes (fn_rec n')) HD Hbs Hl Hoffb
+              with "Hauth Hrec") as "[Hauth Hrec]".
+      rewrite -(drec_owned_at g Γd (dc_S c) i (fn_rec n') Hgeo H32).
+      iDestruct ("Hphiback" with "[Hrec]") as "Hphi"; [iExact "Hrec" |].
+      (* the block joins *)
+      assert (Hkn1 : fn_blk n1 !! k = None) by exact Hkn.
+      iDestruct (inode_phi_blk_add (fs_gamma_D g Γd) (fss_sb (dc_S c)) i n1 k
+                   cs Hkn1 with "[Hphi Hnew]") as "Hphi".
+      { rewrite Hnn. iFrame. }
+      assert (Hn1n' : fn_set_blk n1 k cs = n').
+      { apply fs_node_eq; simpl.
+        - reflexivity.
+        - rewrite Hent //.
+        - rewrite Hblk' Hcsat //. }
+      rewrite Hn1n'.
+      (* the ghost half *)
+      iMod (dghost_move g Γd i n n' gh (dc_bin c ∖ {[fn_naddr n' k]})
+              (dc_toks c) Hgh Hloc' with "Hgho Hh") as "[Hgho Hh]".
+      iDestruct ("Hstback" $! n' with "[Hphi Hgho]") as "Hst";
+        [by iFrame |].
+      iDestruct (big_sepM_insert_acc _ _ i n Hni with "Hfr") as "[Hf Hfrback]".
+      iMod (ghost_map_update n' with "Htop Hf") as "[Htop Hf]".
+      iDestruct ("Hfrback" $! n' with "Hf") as "Hfr".
+      assert (Hnext : dent_next Γd (DeAdopt i n' k gh) c
+                      = MkDCfg (dS_upd (dc_S c) i n')
+                          (dc_bin c ∖ {[fn_naddr n' k]})
+                          (drec_ghost_next i gh (dc_toks c))
+                          (<[drec_blk Γd i
+                             := blk_splice (drec_off i)
+                                  (dinode_bytes (fn_rec n')) bs]> (dc_D c))).
+      { cbn [dent_next]. rewrite /dsplice Hbs //. }
       iModIntro. rewrite Hnext /dcfg_res /dbody /dS_upd.
       cbn [dc_S dc_bin dc_toks dc_D fss_sb fss_sbb fss_inodes fss_used].
       iFrame.
@@ -718,7 +1241,8 @@ Section LedgerStep.
     dbytes_tot (dc_D c) -> dgeo_ok Γd (dc_S c) -> dent_ok Γd e c ->
     dbytes_tot (dc_D (dent_next Γd e c)).
   Proof.
-    intros HD Hgeo Hok. destruct e as [i n' gh | i k bs']; simpl.
+    intros HD Hgeo Hok.
+    destruct e as [i n' gh | i k bs' gb | b bs' | b alloc | i n' k gh]; simpl.
     - destruct Hok as (Hrng & H32 & Hwf' & Hbs & Hn).
       pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
       apply (dbytes_tot_splice _ _ _ _ HD Hbs).
@@ -728,6 +1252,15 @@ Section LedgerStep.
       destruct (Hex i Hrng) as [n Hni]. rewrite Hni.
       destruct (Hn n Hni) as (_ & Hbs & _ & _).
       apply (dbytes_tot_splice _ _ _ _ HD Hbs). rewrite Hlen'. lia.
+    - destruct Hok as (_ & Hlen' & Hbs).
+      apply (dbytes_tot_splice _ _ _ _ HD Hbs). rewrite Hlen'. lia.
+    - destruct Hok as (Hbs & _ & _).
+      apply (dbytes_tot_splice _ _ _ _ HD Hbs).
+      rewrite bm_bytes_length. lia.
+    - destruct Hok as (Hrng & H32 & Hwf' & Hbs & _ & _ & Hn).
+      pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1].
+      apply (dbytes_tot_splice _ _ _ _ HD Hbs).
+      rewrite (dinode_bytes_length _ Hwf') /drec_off BSIZE_1024. lia.
   Qed.
 
 End LedgerStep.

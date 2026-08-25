@@ -649,7 +649,7 @@ Section ProofNameiMain.
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hlog" as (Sb0) "Hlog".
+    iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
     iApply (wp_namei_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib
               size dev plen pfun n Sb0
@@ -668,7 +668,7 @@ Section ProofNameiMain.
     { exact Hcs. }
     { split; [exact (walk_spend_counted L n n' w ok Hbud (proj1 Hbnd))
              | exact (proj2 Hbnd)]. }
-    { iApply (log_opS_op with "Hlog"). }
+    { iApply (log_opSt_op with "Hlog"). }
   Qed.
 
 End ProofNameiMain.

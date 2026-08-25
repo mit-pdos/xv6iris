@@ -60,16 +60,29 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   proof interface that keeps step granularity out of proof granularity, and the
   phasing (the tree is red across the port — read §6 before starting).
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy, and the TRACE INVARIANT hook `Hphi`: how a pure consequence of any Iris invariant is exported to every state of the CSL-free execution, which conjunct of `state_interp` each kind of fact comes from, and what `wp_strong_adequacy` still leaves on the table.
+- **[`durable-fs-plan.md`](design/durable-fs-plan.md)** — THE DESIGN OF
+  RECORD for the durable file system, in one place: the three disk
+  views, the file-system predicate at two instances, the WAL's
+  client-facing contracts (`begin_op`/`end_op` with a transaction id,
+  ONE `ilock` spec with a locked-inode registry, `log_write`, the commit
+  that allocates a fresh snapshot), the two pure facts the commit needs,
+  boot as the allocator's second call site, and why every earlier
+  mechanism died.
 - **[`fs-state.md`](design/fs-state.md)** — DESIGN OF RECORD for the
   durable-disk project: the view record `Γ`, byte-level ownership on both
   the durable and logged sides, `inode_owned`/`dir_owned`/`free_bitmap`/
   `fs_state` as nested predicates with link TOKENS and no whole-state pure
   clauses, "in flight, not inconsistent", the debt, the log's FS-agnostic
-  interface, and what it supersedes.  §5' is the STRUCTURED-BODY ruling
-  and its as-built: the byte authority is moved only where the body owns
-  the bytes, so `P_wf` needs no completeness clause and no bin, the
-  commit's intermediates are hypotheses of one fold rather than
-  predicates, and the three geometry equations the body does need.
+  interface, and what it supersedes.  §4⁹ is the RULING IN FORCE —
+  SNAPSHOT COMMITS: the durable instance is re-ALLOCATED at every group
+  commit and never updated, so the transport lemma IS the allocator; its
+  as-built (§4⁹a) has the persistent byte points-to that makes the
+  construction take a VALUE and PURE FACTS only and the encoder's
+  injectivity; §4⁹b splits the tie into a byte half that a batch
+  accumulates and a per-inode LOCAL half no write can disturb, derives the
+  batch's FRAME from the used-set COUPLING, shows the byte half PINS every
+  node, and states the one open ruling (how the local half accumulates
+  across an op's end).
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
   split, the crash-spanning disk invariant.
@@ -143,18 +156,14 @@ first five were audited against the tree 2026-08-22):
   the REGISTER-value vs SLOT-value distinction that a narrowed spill range
   forces, and how to tell a wrong proof from a slow one.
 
-- **[`durable-disk.md`](projects/durable-disk.md)** — xv6 correctness
-  across crashes INCLUDING FS consistency, under ruling 3
-  (`design/fs-state.md`): nested SL predicates at two views.  LANDED:
-  the log's whole contract (stage 1: custody at birth, row (b), the
-  byte-keyed exclusive logged view, the parked payload + two AUs, zero
-  placeholder lemmas tree-wide), the `Γ`-predicates (2a), and the in-era
-  flip (2b: bitmap, region records, the era payload, link tokens as a
-  counting RA), and the FOLD THEOREM the durable flip turns on (3c,
-  `iris/FsDurLedger.v`).  IN FLIGHT: the flip itself — `P_wf` is still the
-  flat blob — then the `sys_mknod` spike, then boot re-founding + delete
-  `Himg` (stage 4).  The byte-view attempt is archived in
-  `completed/durable-disk-byteview.md`.
+- **[`durable-disk.md`](projects/durable-disk.md)** — HANDOFF WORKLIST
+  (2026-08-25) for xv6 correctness across crashes incl. FS consistency.
+  Design of record: `design/durable-fs-plan.md` (snapshot commits: the
+  durable FS predicate is re-allocated per commit, never updated; a
+  locked-inode registry keyed on transaction ids gives "all inodes clean
+  at commit").  Landed: the log's contract, the nested predicate, the
+  whole era instance, the durable allocator.  Lanes A–G in the file.
+  History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
   (today both carry a clean-image premise), `sys_sync`'s empty
@@ -189,9 +198,11 @@ first five were audited against the tree 2026-08-22):
 
 ## `completed/` — finished projects, archived for reference
 
-`durable-disk-byteview.md` (2026-08-23) is NOT a finished project: it is
-the superseded byte-view worklist of the live durable-disk effort, kept
-for its two surveys' findings; `projects/durable-disk.md` is current.
+`durable-disk-byteview.md` (the byte-view attempt) and
+`durable-disk-2026-08-23-to-25.md` (the rulings/refutations/lane reports
+of the SL redesign) are NOT finished projects: they are the archived
+history of the live durable-disk effort; `projects/durable-disk.md` is
+current and `design/durable-fs-plan.md` is the design.
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
 **Nobody reads these for current guidance**, so they are the one place a

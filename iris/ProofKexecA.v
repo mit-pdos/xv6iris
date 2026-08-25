@@ -448,7 +448,7 @@ Section KexecABody.
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
-                          #Hdlock)".
+                          #Hdlock & %Hclogf)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
     (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
        cells now, so namei borrows it for its own load and nothing here has
@@ -597,7 +597,7 @@ Section KexecABody.
        [∃ Sb, log_opS], so entering the set form is one [iDestruct] and
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
-    iDestruct "Hlog" as (Sb0) "Hlog".
+    iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
     iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
@@ -609,11 +609,11 @@ Section KexecABody.
               Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
-                    Hcref Hpath Hbs Hirs Hlog").
+                    Hcref Hpath Hbs Hirs [$Hlog $Htx]").
     (* namei is eb-generic now; kexec is still at [eb = true]. *)
     iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
-             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
-    iDestruct (log_opS_op with "Hlog") as "Hlog".
+             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 [Hlog Htx] Harm".
+    iDestruct (log_opS_op with "Hlog Htx") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
        The walk spent at most two of the ten. *)
     assert (Hiu1 : (iput_units <= n1)%nat).
@@ -994,7 +994,7 @@ Section KexecABody.
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+        ic_tx_dep cn kf sf dev inumf gyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1007,7 +1007,7 @@ Section KexecABody.
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
         runit_any (bv_unsigned inumf) -∗
-        log_op g n2 -∗
+        log_opb g n2 -∗
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1047,7 +1047,7 @@ Section KexecABody.
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
-                          #Hdlock)".
+                          #Hdlock & %Hclogf)".
     (* ---- the inode: slot, share, and the region facts ---- *)
     iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & %Hz & Href & Hru)".
     iEval (rewrite -Hdev) in "Href".
@@ -1148,13 +1148,20 @@ Section KexecABody.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
+    (* ---- THE WRITE ARM (durable-fs-plan.md section 3, [ilock];
+       durable-disk B''-tx).  kexec holds this inode's lock from here to
+       phase B's [iunlockput], and half its transaction's element sits in
+       the escrow's checked-out arm for that whole window; what crosses the
+       seam is the BUDGET half. *)
+    iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
+    iEval (rewrite Htlog) in "Htx".
+    iApply (Ilock.wp_ilock_tx_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy PlainK
               dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
               V ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
-                    Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
+                    Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 Htx").
     all: try lkbelow.
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hins Hbs1
              Hslkd Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
@@ -1355,9 +1362,11 @@ Section KexecABody.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     (* the byte view's row (durable-disk 1c-flip step 3) *)
     iPoseProof (log_ctx_bytes_any with "Hlogc") as "#Hrow".
+    iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iApply (Readi.wp_readi_sconf KT1 gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry k) bml datl dnl false 0%nat 64%nat fb V
-              pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat eb eb lks
+              pidv (DfracOwn 1) (DfracOwn (1/2)) Q8 (K - 68)%nat eb eb lks
               ltac:(lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity) Hjp Hgs HQ8a0
@@ -1368,6 +1377,8 @@ Section KexecABody.
     { iSplitL "Helfb"; [iExact "Helfb" | iExact "Hppid"]. }
     iIntros (CIDrd Hsrd M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
              Hidev Hmeta Hmap Hblocks [Helfb Hppid] Hbs1".
+    iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     assert (Hpc4c : ret_pc (Q8 !!! Regidx Rra) = mword_of_int (KXA + 0x04c))
       by (rewrite HQ8ra; pcw).
     iEval (rewrite Hpc4c) in "Hpc".
@@ -1686,8 +1697,8 @@ Section KexecABody.
                   with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-        { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                       Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
+        { iApply (T.fs_fabric_mk with "[%] Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
+                                       Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). exact Hclogf. }
         rewrite /kxc_frameA6.
         iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
         iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1768,8 +1779,8 @@ Section KexecABody.
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-      { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
+      { iApply (T.fs_fabric_mk with "[%] Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
+                                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). exact Hclogf. }
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1970,7 +1981,7 @@ Section KexecAMain.
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+        ic_tx_dep cn kf sf dev inumf gyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1983,7 +1994,7 @@ Section KexecAMain.
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
         runit_any (bv_unsigned inumf) -∗
-        log_op g n2 -∗
+        log_opb g n2 -∗
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

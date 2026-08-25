@@ -1326,7 +1326,8 @@ Section BootAlloc.
   Proof.
     intros Hbf Himg.
     destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
-                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq).
+                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq &
+                      Hbare & Hnoself).
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.
@@ -1489,7 +1490,7 @@ Section BootAlloc.
        this file cannot spell [iregN] anyway (durable-notes inline-[ltac:]
        trap).  [FsCfgBoot.fs_cfg_iregN_top] is that fact. *)
     iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
-            Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
+            Hwf Hrw Hbare Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
             fs_cfg_iregN_top
             with "Hdimg Hbsauth Hbslots") as (ICFG FSC)
         "[Hpinr [Hfpinr Hfs]]".

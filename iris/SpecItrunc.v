@@ -171,9 +171,9 @@ Section ItruncSpec.
 
   (* entering the loops: two units and no credit yet *)
   Lemma bm_paid_intro γ bmapstart u :
-    log_op γ (S (S u)) -∗ bm_paid γ bmapstart u.
+    log_opb γ (S (S u)) -∗ bm_paid γ bmapstart u.
   Proof.
-    iIntros "H". rewrite /log_op. iDestruct "H" as (Sb) "H".
+    iIntros "H". rewrite /log_opb. iDestruct "H" as (Sb) "H".
     iRight. iExists Sb. iFrame.
   Qed.
 
@@ -290,13 +290,13 @@ Section ItruncSpec.
 
   (* leaving them: at least the [S u] units iupdate still needs *)
   Lemma bm_paid_elim γ bmapstart u :
-    bm_paid γ bmapstart u -∗ ∃ n : nat, ⌜(S u <= n <= S (S u))%nat⌝ ∗ log_op γ n.
+    bm_paid γ bmapstart u -∗ ∃ n : nat, ⌜(S u <= n <= S (S u))%nat⌝ ∗ log_opb γ n.
   Proof.
     iIntros "[H|H]".
     - iDestruct "H" as (Sb) "(_ & H)". iExists (S u).
-      iSplitR; [iPureIntro; lia|]. iApply (log_opS_op with "H").
+      iSplitR; [iPureIntro; lia|]. iApply (log_opS_opb with "H").
     - iDestruct "H" as (Sb) "H". iExists (S (S u)).
-      iSplitR; [iPureIntro; lia|]. iApply (log_opS_op with "H").
+      iSplitR; [iPureIntro; lia|]. iApply (log_opS_opb with "H").
   Qed.
 
 End ItruncSpec.

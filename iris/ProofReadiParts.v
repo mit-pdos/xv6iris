@@ -504,15 +504,18 @@ Section ReadiRes.
     bio_held bn V k pidv dev bno bs bsl bsd d -∗ ⌜(k < NBUF)%nat⌝.
   Proof. rewrite /bio_held. iIntros "(%A & _)". done. Qed.
 
+  (* AT A SHARE (lane B''-blk).  readi's buffer/bytes tie is an AGREEMENT,
+     so a read-locker holding a QUARTER of its own data block runs it
+     exactly as a full owner does (durable-fs-plan.md section 4). *)
   Lemma rd_held_content (E : coPset) (bn : bio_names) (γfs : fs_names)
-      (γd : disk_names)
+      (γd : disk_names) (dq : dfrac)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
     ↑logN ⊆ E ->
     fs_bytes_any γfs -∗
-    fsblock (fs_bytes γfs) (uint bno) bs0 -∗
+    fsblock_q (fs_bytes γfs) dq (uint bno) bs0 -∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d ={E}=∗
-    ⌜bsl = bs0⌝ ∗ fsblock (fs_bytes γfs) (uint bno) bs0 ∗
+    ⌜bsl = bs0⌝ ∗ fsblock_q (fs_bytes γfs) dq (uint bno) bs0 ∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d.
   Proof.
     iIntros (HE) "#Hrow Hc Hheld".
@@ -521,7 +524,7 @@ Section ReadiRes.
     destruct d.
     - iEval (rewrite /fs_mdirty) in "Hpay".
       iDestruct "Hpay" as "[[HL HD] Hq]".
-      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+      iMod (fs_bytes_agree_any_q E γfs dq (uint bno) bs0 bsl HE
               with "Hrow Hc HL") as "(%Heq & Hc & HL)".
       iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
       rewrite /bio_held /bio_pay /fs_view /=.
@@ -529,7 +532,7 @@ Section ReadiRes.
       iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
     - iEval (rewrite /fs_mclean) in "Hpay".
       iDestruct "Hpay" as "[[HL HD] %He]".
-      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+      iMod (fs_bytes_agree_any_q E γfs dq (uint bno) bs0 bsl HE
               with "Hrow Hc HL") as "(%Heq & Hc & HL)".
       iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
       rewrite /bio_held /bio_pay /fs_view /=.
@@ -540,11 +543,12 @@ Section ReadiRes.
   (* readi PUTS THE BLOCK BACK UNCHANGED: [inode_blocks_acc]'s back-wand
      re-indexes [data] at the value it already had, which is [data] itself
      -- pointwise, hence through [inode_blocks_frame] rather than funext. *)
-  Lemma rd_blocks_restore (γfs : fs_names) (bm : blkmap)
+  Lemma rd_blocks_restore (γfs : fs_names) (dq : dfrac) (bm : blkmap)
       (data : nat -> list (bv 8)) (i : nat) :
-    inode_blocks γfs bm (<[i := data i]> data) -∗ inode_blocks γfs bm data.
+    inode_blocks_q γfs dq bm (<[i := data i]> data) -∗
+    inode_blocks_q γfs dq bm data.
   Proof.
-    iApply inode_blocks_frame. intros k Hk. split; [reflexivity|].
+    iApply inode_blocks_q_frame. intros k Hk. split; [reflexivity|].
     destruct (decide (k = i)) as [->|Hne].
     - rewrite fn_lookup_insert. reflexivity.
     - rewrite fn_lookup_insert_ne; [reflexivity | congruence].

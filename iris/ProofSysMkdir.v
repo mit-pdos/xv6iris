@@ -1184,7 +1184,7 @@ Section ProofSysMkdirBody.
         exact (HN3thr c Hc N2' N8). }
       iDestruct (md_buf_split (pa_stk sp0 18) bf pk Hpk with "Hbuf")
         as "[Hbufk Hbufrest]".
-      iDestruct "Hop" as (Sb0) "HopS".
+      iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
       iDestruct (cpu_own_transport CID11 CID17 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Create.wp_create_sconf (CID := CID17) gs j gl gu gd gk pd pav pu
@@ -1201,11 +1201,11 @@ Section ProofSysMkdirBody.
                 with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
                       Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
                       Hsbb
-                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS").
+                      Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
       iIntros (CID18 Hq18 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
         "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
-         %Hns1 Hir %Hun1 HopS Hok".
+         %Hns1 Hir %Hun1 HopS Htx Hok".
       iEval (rewrite HN4a0) in "Hbufk".
       assert (Hpc2c : ret_pc (N4 !!! Regidx Rra : mword 64)
                       = mword_of_int (MD + 0x2c)) by (rewrite HN4ra; pcw).
@@ -1284,14 +1284,14 @@ Section ProofSysMkdirBody.
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                         Hesc Hireg [] Hslk Hslkd Hdep Hidev Hiinum Hivalid
                         Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs Hdev
-                        Hgeo Hdlk Hbsl [HopS]").
+                        Hgeo Hdlk Hbsl [HopS Htx]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         (* RULING G: a runtime caller lends iunlockput the SEALED arm of the
            borrowed regime and discards what comes back -- its own copy is
            persistent. *)
         { iExact "Hiopen". }
-        { iApply (log_opS_op with "HopS"). }
+        { iApply (log_opS_op with "HopS Htx"). }
         iIntros (CID21 Hq21 miu n2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
            Hop Hislot".
@@ -1416,11 +1416,11 @@ Section ProofSysMkdirBody.
                   (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) Hcrsp Hcrthr Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hbuf
+                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hbuf
                         [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { iApply (log_opS_op with "HopS"). }
+        { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
         iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct ("Hpback" with "Hpbare") as "Hpriv".

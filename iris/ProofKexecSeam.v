@@ -547,7 +547,7 @@ Section KexecBSeam.
       (gilf gislf : gname) : iProp Σ :=
     (is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) ∗
      sleeplocked_q gislf sf (i_lock (ientry kf)) pidv ∗
-     ic_deposit cn kf (DepShr sf dev inumf gyf) ∗
+     ic_tx_dep cn kf sf dev inumf gyf ∗
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
@@ -613,7 +613,7 @@ Section KexecBSeam.
      cpu_claim_ext eb (proc_addr jp) ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
-     log_op g n2 ∗
+     log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -698,7 +698,7 @@ Section KexecBSeam.
      cpu_claim_ext eb (proc_addr jp) ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
-     log_op g n2 ∗
+     log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -769,7 +769,7 @@ Section KexecBSeam.
      cpu_claim_ext eb (proc_addr jp) ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
-     log_op g n2 ∗
+     log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗

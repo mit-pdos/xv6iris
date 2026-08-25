@@ -361,7 +361,7 @@ Section ProofIdup.
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
-    { iEval (rewrite HmAa0). iExact "Hlock". }
+    { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hlock"). }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.idup + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
@@ -668,7 +668,7 @@ Section ProofIdup.
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
-    { iExact "Hlock". }
+    { iApply (is_itable2_lock with "Hlock"). }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     (* release handed back the FULL entry set minus the rank it just gave up;

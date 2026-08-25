@@ -143,6 +143,10 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
+(* [fs_sb]/[fs_parse_sb]/[fs_sb_ok] -- block 1's park (durable-disk lane
+   C-3a).  EARLY, because this file's later imports own the names it
+   shadows. *)
+Require Import FsImg.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
@@ -265,7 +269,9 @@ Definition wp_fsinit_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (* ---- the record block 1's bytes decode to (durable-disk lane C-3a) ---- *)
+    (sbrec : fs_sb) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fsinit in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -285,6 +291,15 @@ Definition wp_fsinit_sconf_body
          fields, in fs.h's order *)
   take 32 bs_sb = sb_image v_magic v_size v_nblocks v_ninodes
                            v_nlog v_logstart v_inodestart v_bmapstart ->
+  (* (a') ...AND THE RECORD THEY DECODE TO (durable-disk lane C-3a).  Block
+         1's run stops being dropped at fsinit's return: it goes down into
+         [initlog], which parks it in [SbPark.sbN] and seals the handle into
+         [LogInv.log_ctx], so the commit's collection can finally say what
+         block 1 holds.  These two premises are what the park is stated at,
+         and both are read off the boot image (W1 of
+         [FsCfgBoot.fs_boot_image_wf]) rather than recomputed. *)
+  fs_parse_sb (fun _ => bs_sb) = Some sbrec ->
+  fs_sb_ok sbrec ->
   (* (b) the magic, which is what refutes the LIVE panic arm at +0x40 *)
   bv_unsigned v_magic = FSMAGIC ->
   (* (c) the three field values every fs contract downstream reads *)
@@ -448,8 +463,10 @@ Definition wp_fsinit_sconf_body
       sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
       InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
       BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-      (* block 1's client half, untouched -- bread/brelse do not write it *)
-      fsblock (fs_bytes γfs) 1 bs_sb -∗
+      (* NOTHING COMES BACK FOR BLOCK 1 (durable-disk lane C-3a).  The run
+         used to be returned here and DROPPED by forkret; it is now spent
+         inside, into [initlog]'s [SbPark] park, and rides out as a conjunct
+         of the [log_ctx] below. *)
       (* THE LOG LAYER, BUILT by initlog at +0x4e and already USED by
          ireclaim at +0x54.  It does not cross the boundary as an input.
          AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log
@@ -491,12 +508,13 @@ Module Type FSINIT.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (sbrec : fs_sb),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr M L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb b lks Vpr.
+                           pidv dq m K eb b lks Vpr sbrec.
 End FSINIT.

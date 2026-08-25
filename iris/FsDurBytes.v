@@ -256,6 +256,102 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(*  1b. THE FLATTENING AS A BIG-OP, Gamma-GENERICALLY                     *)
+(*                                                                        *)
+(*  The relation "the byte elements of [fs_dbytes D] ARE one [blk_owned]   *)
+(*  per block of [D]" is about [map_seqZ] and the stride, and about        *)
+(*  nothing else -- in particular it is not about WHICH points-to [fsΦ]    *)
+(*  is.  So it is stated over an arbitrary view record, and section 2's    *)
+(*  landed durable readings are its instances (by [reflexivity] on the     *)
+(*  [fsΦ] field).  This is what lets durable-disk 4's SNAPSHOT allocator   *)
+(*  build [FsState.fs_state] over a PERSISTENT byte points-to             *)
+(*  ([a -> v at dq = DfracDiscarded]) from the very same theorem the       *)
+(*  exclusive durable instance uses.                                       *)
+(* ===================================================================== *)
+
+Section DbytesGen.
+  Context {Σ : gFunctors}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* A RANGE-INDEXED BIG-OP OVER A [map_seqZ] IS THE MAP'S.  This is
+     [FsBlocks.big_sepM_map_seqZ] restated over a bare [Σ]: the block
+     layer's copy is inside a section binding [riscvGS]/[diskGhostG]/
+     [fsLogG], which a leaf about the DURABLE view has no business
+     binding.  IT BELONGS IN [FsStateDefs.v] and should be relocated
+     there, with [FsBlocks]' copy deleted in the same move. *)
+  Lemma big_sepM_map_seqZ_gen (Phi : Z -> bv 8 -> iProp Σ) (start : Z)
+      (xs : list (bv 8)) :
+    ([∗ map] a ↦ v ∈ (map_seqZ start xs : gmap Z (bv 8)), Phi a v)
+    ⊣⊢ ([∗ list] k ↦ v ∈ xs, Phi (start + Z.of_nat k) v).
+  Proof.
+    revert start. induction xs as [| x xs IH]; intros start.
+    - simpl. rewrite big_sepM_empty //.
+    - rewrite map_seqZ_cons big_sepM_insert; [| apply map_seqZ_cons_disjoint].
+      rewrite IH big_sepL_cons.
+      assert (Hz : start + Z.of_nat 0 = start) by lia. rewrite Hz.
+      f_equiv. apply big_sepL_proper. intros k y _.
+      assert (Hs : Z.succ start + Z.of_nat k = start + Z.of_nat (S k)) by lia.
+      rewrite Hs //.
+  Qed.
+
+  (* ONE BLOCK'S ELEMENTS ARE ITS [blk_owned], at any view *)
+  Lemma blk_owned_seqZ Γ (b : Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    blk_owned Γ b bs
+    ⊣⊢ ([∗ map] a ↦ v ∈ (map_seqZ (b * Z.of_nat BSIZE) bs : gmap Z (bv 8)),
+          fsΦ Γ (DfracOwn 1) a v).
+  Proof.
+    intros Hlen.
+    rewrite big_sepM_map_seqZ_gen.
+    rewrite /blk_owned /byte_range /byte_range_q.
+    rewrite (big_sepL_proper
+               (fun (k : nat) (v : bv 8) =>
+                  (fsΦ Γ (DfracOwn 1) (b * BSIZE_z + 0 + Z.of_nat k) v)%I)
+               (fun (k : nat) (v : bv 8) =>
+                  (fsΦ Γ (DfracOwn 1) (b * Z.of_nat BSIZE + Z.of_nat k) v)%I)
+               bs);
+      last first.
+    { intros k v _.
+      assert (Hz : b * BSIZE_z + 0 + Z.of_nat k
+                   = b * Z.of_nat BSIZE + Z.of_nat k).
+      { rewrite dbytes_stride. change BSIZE_z with 1024. lia. }
+      rewrite Hz //. }
+    iSplit.
+    - iIntros "[_ H]". iExact "H".
+    - iIntros "H". iSplitR; [iPureIntro; exact Hlen | iExact "H"].
+  Qed.
+
+  (* THE TIE, Gamma-generically: the view's byte points-to at [fs_dbytes D]
+     ARE one [blk_owned] per block of [D].  It is the only thing in the tree
+     that ever looks inside [fs_dbytes]. *)
+  Theorem fs_dbytes_blocks Γ (D : gmap Z (list (bv 8))) :
+    (forall b bs, D !! b = Some bs -> length bs = BSIZE) ->
+    ([∗ map] a ↦ v ∈ fs_dbytes D, fsΦ Γ (DfracOwn 1) a v)
+    ⊣⊢ ([∗ map] b ↦ bs ∈ D, blk_owned Γ b bs).
+  Proof.
+    induction D as [| b bs D Hb IH] using map_ind; intros Hlen.
+    - rewrite fs_dbytes_empty big_sepM_empty big_sepM_empty //.
+    - assert (Hok : dbytes_ok (<[b := bs]> D))
+        by exact (dbytes_ok_full _ Hlen).
+      assert (HokD : dbytes_ok D) by exact (dbytes_ok_insert D b bs Hb Hok).
+      assert (Hlb : length bs = BSIZE)
+        by exact (Hlen b bs (lookup_insert _ _ _)).
+      assert (HlenD : forall c cs, D !! c = Some cs -> length cs = BSIZE).
+      { intros c cs Hc. apply (Hlen c cs).
+        rewrite lookup_insert_ne; [exact Hc |].
+        intros ->. rewrite Hb in Hc. discriminate. }
+      rewrite (fs_dbytes_insert D b bs Hok Hb).
+      rewrite big_sepM_union;
+        [| exact (fs_dbytes_disj_seq D b bs HokD
+                    ltac:(rewrite Hlb; reflexivity) Hb)].
+      rewrite -(blk_owned_seqZ Γ b bs Hlb).
+      rewrite (IH HlenD).
+      rewrite big_sepM_insert; [reflexivity | exact Hb].
+  Qed.
+
+End DbytesGen.
+
+(* ===================================================================== *)
 (*  2.  THE DURABLE VIEW RECORD, AND THE BYTE ELEMENTS                    *)
 (* ===================================================================== *)
 
@@ -293,11 +389,11 @@ Section DurBytes.
   (* [FsBytesGamma.fs_gamma_L]'s durable twin: the same record, at the
      durable byte map's full element and the fixed layer's two gnames. *)
   Definition fs_gamma_D (g : gname) (Γd : fs_dur_names) : fs_view_names Σ :=
-    MkFsView (fun (a : Z) (v : bv 8) => (a ↪[g] v)%I)
+    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I)
              (fdn_link Γd) (fdn_top Γd).
 
   Lemma fs_gamma_D_phi (g : gname) (Γd : fs_dur_names) (a : Z) (v : bv 8) :
-    fsΦ (fs_gamma_D g Γd) a v = (a ↪[g] v)%I.
+    fsΦ (fs_gamma_D g Γd) (DfracOwn 1) a v = (a ↪[g] v)%I.
   Proof. reflexivity. Qed.
 
   Lemma fs_gamma_D_link (g : gname) (Γd : fs_dur_names) :
@@ -313,40 +409,19 @@ Section DurBytes.
   Lemma fs_gamma_D_excl (g : gname) (Γd : fs_dur_names) :
     phi_excl (fs_gamma_D g Γd).
   Proof.
-    intros a v w. rewrite /fs_gamma_D /phi_excl /=.
+    intros a v w dq1 dq2. rewrite /fs_gamma_D /=.
     iIntros "[H1 H2]".
     iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
+    done.
   Qed.
 
   Global Instance fs_gamma_D_timeless (g : gname) (Γd : fs_dur_names) :
     GTimeless (fs_gamma_D g Γd).
-  Proof. intros a v. rewrite /fs_gamma_D /=. apply _. Qed.
+  Proof. intros dq a v. rewrite /fs_gamma_D /=. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  2b.  ONE BLOCK                                                     *)
   (* ------------------------------------------------------------------ *)
-
-  (* A RANGE-INDEXED BIG-OP OVER A [map_seqZ] IS THE MAP'S.  This is
-     [FsBlocks.big_sepM_map_seqZ] restated over a bare [Σ]: the block
-     layer's copy is inside a section binding [riscvGS]/[diskGhostG]/
-     [fsLogG], which a leaf about the DURABLE view has no business
-     binding.  IT BELONGS IN [FsStateDefs.v] and should be relocated
-     there, with [FsBlocks]' copy deleted in the same move. *)
-  Lemma big_sepM_map_seqZ_gen (Phi : Z -> bv 8 -> iProp Σ) (start : Z)
-      (xs : list (bv 8)) :
-    ([∗ map] a ↦ v ∈ (map_seqZ start xs : gmap Z (bv 8)), Phi a v)
-    ⊣⊢ ([∗ list] k ↦ v ∈ xs, Phi (start + Z.of_nat k) v).
-  Proof.
-    revert start. induction xs as [| x xs IH]; intros start.
-    - simpl. rewrite big_sepM_empty //.
-    - rewrite map_seqZ_cons big_sepM_insert; [| apply map_seqZ_cons_disjoint].
-      rewrite IH big_sepL_cons.
-      assert (Hz : start + Z.of_nat 0 = start) by lia. rewrite Hz.
-      f_equiv. apply big_sepL_proper. intros k y _.
-      assert (Hs : Z.succ start + Z.of_nat k = start + Z.of_nat (S k)) by lia.
-      rewrite Hs //.
-  Qed.
 
   (* ONE BLOCK'S ELEMENTS ARE ITS [blk_owned] *)
   Lemma blk_owned_dbelems (g : gname) (Γd : fs_dur_names) (b : Z)
@@ -354,26 +429,7 @@ Section DurBytes.
     length bs = BSIZE ->
     blk_owned (fs_gamma_D g Γd) b bs
     ⊣⊢ fs_dbelems g (map_seqZ (b * Z.of_nat BSIZE) bs).
-  Proof.
-    intros Hlen.
-    rewrite /fs_dbelems big_sepM_map_seqZ_gen.
-    rewrite /blk_owned /byte_range /fs_gamma_D.
-    cbn [fsΦ].
-    rewrite (big_sepL_proper
-               (fun (k : nat) (v : bv 8) =>
-                  ((b * BSIZE_z + 0 + Z.of_nat k) ↪[g] v)%I)
-               (fun (k : nat) (v : bv 8) =>
-                  ((b * Z.of_nat BSIZE + Z.of_nat k) ↪[g] v)%I) bs);
-      last first.
-    { intros k v _.
-      assert (Hz : b * BSIZE_z + 0 + Z.of_nat k
-                   = b * Z.of_nat BSIZE + Z.of_nat k).
-      { rewrite dbytes_stride. change BSIZE_z with 1024. lia. }
-      rewrite Hz //. }
-    iSplit.
-    - iIntros "[_ H]". iExact "H".
-    - iIntros "H". iSplitR; [iPureIntro; exact Hlen | iExact "H"].
-  Qed.
+  Proof. exact (blk_owned_seqZ (fs_gamma_D g Γd) b bs). Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  2c.  THE ONE LEMMA EVERYTHING NEEDS                                *)
@@ -388,26 +444,7 @@ Section DurBytes.
     (forall b bs, D !! b = Some bs -> length bs = BSIZE) ->
     fs_dbelems g (fs_dbytes D)
     ⊣⊢ ([∗ map] b ↦ bs ∈ D, blk_owned (fs_gamma_D g Γd) b bs).
-  Proof.
-    induction D as [| b bs D Hb IH] using map_ind; intros Hlen.
-    - rewrite fs_dbytes_empty fs_dbelems_empty big_sepM_empty //.
-    - assert (Hok : dbytes_ok (<[b := bs]> D))
-        by exact (dbytes_ok_full _ Hlen).
-      assert (HokD : dbytes_ok D) by exact (dbytes_ok_insert D b bs Hb Hok).
-      assert (Hlb : length bs = BSIZE)
-        by exact (Hlen b bs (lookup_insert _ _ _)).
-      assert (HlenD : forall c cs, D !! c = Some cs -> length cs = BSIZE).
-      { intros c cs Hc. apply (Hlen c cs).
-        rewrite lookup_insert_ne; [exact Hc |].
-        intros ->. rewrite Hb in Hc. discriminate. }
-      rewrite (fs_dbytes_insert D b bs Hok Hb).
-      rewrite (fs_dbelems_union g _ _
-                 (fs_dbytes_disj_seq D b bs HokD
-                    ltac:(rewrite Hlb; reflexivity) Hb)).
-      rewrite -(blk_owned_dbelems g Γd b bs Hlb).
-      rewrite (IH HlenD).
-      rewrite big_sepM_insert; [reflexivity | exact Hb].
-  Qed.
+  Proof. exact (fs_dbytes_blocks (fs_gamma_D g Γd) D). Qed.
 
   (* ...and the reading at [LogDefs.fs_dview], which is the shape [P_wf]'s
      body and [LogDefs.fs_dstep] are stated in *)

@@ -2756,8 +2756,81 @@ Section InodeRegion.
      UPDATE right the fragments need, which is sound at any [I]. *)
   Definition ftopN : namespace := nroot .@ "ftop".
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE LOCKED REGISTRY (durable-disk lane A, plan section 4b)         *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE INVARIANT'S POINT, in one sentence: every inode the abstract map
+     names is WELL-FORMED, except the ones some open transaction has said
+     it is in the middle of writing.
+
+     A transaction says so by ARMING: it hands its own transaction token
+     over (it is parked here, [ftop_body]'s big-op) and takes back a
+     receipt naming the inums whose row it has suspended.  It gets the
+     token back by DISARMING, which is where it re-proves the row -- and
+     that is free at the natural place, because a walk that re-packs its
+     payload has [FsStateEra.inode_owned_era]'s [inode_local] in hand
+     anyway.  So at a COMMIT, where no transaction is open at all, no
+     token can be parked, no inum can be armed, and the row is
+     [FsDurSnap.snap_local] of the whole map ([ireg_clean_acc]).
+
+     WHY THE REGISTRY IS KEYED BY AN ARM ID.  An arm has to prove its key is
+     not already taken, or the ghost map cannot grow.  Keyed by INUM that is
+     exactly the fact nobody can produce -- "no other walk holds this inode"
+     is the inode LOCK's property, and the lock is invisible here.  Keyed by
+     TRANSACTION it costs the arming walk its WHOLE token, and a walk that
+     has parked a SHARE of the same token elsewhere -- which is exactly what
+     a transactional [ilock] does -- can then never arm at all
+     ([IcacheTxArm.arm_needs_whole] is that refutation).  Keyed by an ARM ID
+     it is free: the ghost step SEES the registry's own map, so
+     [fresh (dom A)] is a key nobody holds, and the arm may then park ANY
+     share.
+
+     WHAT THE PARKED SHARE STILL BUYS is the one thing the commit reads off
+     the registry: every entry holds a POSITIVE share of its transaction's
+     [ln_tx] element, so an EMPTY [ln_tx] authority refutes every entry
+     ([ireg_clean_acc]), which is all [IregClean.ireg_snap_local_acc] wants.
+     And because the entry RECORDS the share, [ireg_release] hands back
+     exactly what [ireg_arm] took, so a walk can recombine its token for
+     [end_op].  The price is that a receipt carries a SET of inums rather
+     than one, which costs the arming walk one more ghost step
+     ([ireg_arm_more]) and nothing else. *)
+
+  (* what an arm parks: its transaction's element, at the arm's own share *)
+  Definition ireg_parked (e : ireg_arm_ent) : iProp Σ :=
+    (e.1.1 ↪[ln_tx icfg_log]{#(e.1.2)} tt)%I.
+
+  Global Instance ireg_parked_timeless e : Timeless (ireg_parked e).
+  Proof. rewrite /ireg_parked. apply _. Qed.
+
+  (* "arm [k] belongs to transaction [t], parked [q] of [t]'s token, and has
+     suspended the row of every inum in [S]" -- the receipt.  It is the
+     WHOLE registry element, hence exclusive, and it names its own set AND
+     its own share, so no lemma below has to guess either. *)
+  Definition ireg_armed (k t : nat) (q : Qp) (S : gset Z) : iProp Σ :=
+    k ↪[icfg_lk] (t, q, S).
+
+  Global Instance ireg_armed_timeless k t q S : Timeless (ireg_armed k t q S).
+  Proof. rewrite /ireg_armed. apply _. Qed.
+
+  (* THE ROW, as a pure statement about the two maps: an inum no armed
+     transaction names is well-formed at the map's own value for it. *)
+  Definition ftop_clean (I : gmap Z fs_node) (A : gmap nat ireg_arm_ent) : Prop :=
+    forall (i : Z) (n : fs_node),
+      I !! i = Some n ->
+      (forall (k t : nat) (q : Qp) (S : gset Z),
+         A !! k = Some (t, q, S) -> i ∉ S) ->
+      inode_local i n.
+
   Definition ftop_body (γfs : fs_names) : iProp Σ :=
-    (∃ I : gmap Z fs_node, ghost_map_auth (fs_top γfs) 1 I)%I.
+    (∃ (I : gmap Z fs_node) (A : gmap nat ireg_arm_ent),
+       ghost_map_auth (fs_top γfs) 1 I ∗
+       ghost_map_auth icfg_lk 1 A ∗
+       (* the arming transactions' tokens, parked at each arm's own share:
+          this is what makes "no transaction is open" imply "nothing is
+          armed" *)
+       ([∗ map] e ∈ A, ireg_parked e) ∗
+       ⌜ftop_clean I A⌝)%I.
 
   Definition ftop_inv (γfs : fs_names) : iProp Σ :=
     inv ftopN (ftop_body γfs).
@@ -2768,13 +2841,222 @@ Section InodeRegion.
   Global Instance ftop_body_timeless γfs : Timeless (ftop_body γfs).
   Proof. rewrite /ftop_body. apply _. Qed.
 
+  (* the empty registry's row is just "every inode is well-formed", which is
+     what the boot image gives *)
+  Lemma ftop_clean_empty (I : gmap Z fs_node) :
+    (forall i n, I !! i = Some n -> inode_local i n) ->
+    ftop_clean I ∅.
+  Proof. intros Hl i n Hi _. exact (Hl i n Hi). Qed.
+
   Lemma ftop_alloc (E : coPset) (γfs : fs_names) (I : gmap Z fs_node) :
-    ghost_map_auth (fs_top γfs) 1 I ={E}=∗ ftop_inv γfs.
+    (forall i n, I !! i = Some n -> inode_local i n) ->
+    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ={E}=∗ ftop_inv γfs.
   Proof.
-    iIntros "Ha".
-    iMod (inv_alloc ftopN E (ftop_body γfs) with "[Ha]") as "#Hi".
-    { iNext. rewrite /ftop_body. iExists I. iExact "Ha". }
+    iIntros (Hloc) "Ha Hlk".
+    iMod (inv_alloc ftopN E (ftop_body γfs) with "[Ha Hlk]") as "#Hi".
+    { iNext. rewrite /ftop_body. iExists I, ∅. iFrame "Ha Hlk".
+      rewrite big_sepM_empty. iSplitR; [done|].
+      iPureIntro. exact (ftop_clean_empty I Hloc). }
     iModIntro. iExact "Hi".
+  Qed.
+
+  (* ---- THE ARM: a transaction suspends its first inum's row ---------- *)
+
+  (* ANY SHARE of the transaction's element goes in and the receipt comes
+     out.  The key needs no freshness ARGUMENT: the ghost step sees the
+     registry's map, so [fresh (dom A)] is free (see the header above). *)
+  Lemma ireg_arm (E : coPset) (γfs : fs_names) (i : Z) (t : nat) (q : Qp) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗ t ↪[ln_tx icfg_log]{#q} tt ={E}=∗
+      ∃ k : nat, ireg_armed k t q {[i]}.
+  Proof.
+    iIntros (HE) "#Hi Ht".
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    set (k := fresh (dom A)).
+    assert (Hfree : A !! k = None).
+    { apply not_elem_of_dom. exact (is_fresh (dom A)). }
+    iMod (ghost_map_insert k (t, q, {[i]}) Hfree with "Hla") as "[Hla Hrec]".
+    iMod ("Hclose" with "[Hta Hla Hpark Ht]") as "_".
+    { iNext. rewrite /ftop_body. iExists I, (<[k := (t, q, {[i]})]> A).
+      iFrame "Hta Hla".
+      iSplitL "Hpark Ht".
+      { rewrite big_sepM_insert; [| exact Hfree].
+        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht Hpark". }
+      iPureIntro. intros j m Hj Hun. apply (Hcl j m Hj).
+      intros k' t' q' S' Hk'. apply (Hun k' t' q' S').
+      rewrite lookup_insert_ne; [exact Hk' |].
+      intros ->. rewrite Hfree in Hk'. discriminate. }
+    iModIntro. iExists k. iExact "Hrec".
+  Qed.
+
+  (* ...and the WHOLE-token reading, for a walk that has parked nothing
+     elsewhere: it is [ireg_arm] at [q = 1], and [ireg_release_tx] undoes
+     it.  [create] is the one walk in this kernel that arms, and this is the
+     form it takes until a transactional [ilock] starts parking shares. *)
+  Lemma ireg_arm_tx (E : coPset) (γfs : fs_names) (i : Z) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗ log_tx icfg_log ={E}=∗
+      ∃ k t : nat, ireg_armed k t 1%Qp {[i]}.
+  Proof.
+    iIntros (HE) "#Hi Htx". rewrite /log_tx. iDestruct "Htx" as (t) "Ht".
+    iMod (ireg_arm E γfs i t 1%Qp HE with "Hi Ht") as (k) "Hrec".
+    iModIntro. iExists k, t. iExact "Hrec".
+  Qed.
+
+  (* ---- ...AND ONE MORE INUM UNDER THE SAME TRANSACTION --------------- *)
+
+  Lemma ireg_arm_more (E : coPset) (γfs : fs_names) (k t : nat) (q : Qp)
+      (S : gset Z) (i : Z) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗ ireg_armed k t q S ={E}=∗ ireg_armed k t q ({[i]} ∪ S).
+  Proof.
+    iIntros (HE) "#Hi Hrec". rewrite /ireg_armed.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
+    iMod (ghost_map_update (t, q, {[i]} ∪ S) with "Hla Hrec") as "[Hla Hrec]".
+    iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists I, (<[k := (t, q, {[i]} ∪ S)]> A).
+      iFrame "Hta Hla".
+      iSplitL "Hpark".
+      { rewrite (big_sepM_delete _ (<[k := (t, q, {[i]} ∪ S)]> A) k
+                   (t, q, {[i]} ∪ S)); [| by rewrite lookup_insert].
+        rewrite (big_sepM_delete _ A k (t, q, S)); [| exact HAt].
+        iDestruct "Hpark" as "[Ht Hrest]".
+        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht".
+        rewrite delete_insert_delete. iExact "Hrest". }
+      iPureIntro. intros j m Hj Hun. apply (Hcl j m Hj).
+      intros k' t' q' S' Hk'. destruct (decide (k' = k)) as [->|Hne].
+      - rewrite HAt in Hk'. injection Hk' as <- <- <-.
+        (* the inline [ltac:] is the recorded trap: the expected type is an
+           evar at elaboration time, so the rewrite has nothing to match *)
+        assert (Hlk : <[k := (t, q, {[i]} ∪ S)]> A !! k
+                      = Some (t, q, {[i]} ∪ S)) by apply lookup_insert.
+        specialize (Hun k t q ({[i]} ∪ S) Hlk).
+        set_unfold in Hun. intros Hin. apply Hun. right. exact Hin.
+      - apply (Hun k' t' q' S').
+        rewrite lookup_insert_ne; [exact Hk' | exact (not_eq_sym Hne)]. }
+    iModIntro. iExact "Hrec".
+  Qed.
+
+  (* ---- THE DISARM: the row comes back, one inum at a time ------------ *)
+
+  (* The walk presents its fragment at the node it is releasing and the
+     WELL-FORMEDNESS of that node -- which is free where a payload is
+     re-packed ([FsStateEra.inode_owned_era] carries it). *)
+  Lemma ireg_disarm (E : coPset) (γfs : fs_names) (k t : nat) (q : Qp)
+      (S : gset Z) (i : Z) (n : fs_node) :
+    ↑ftopN ⊆ E ->
+    inode_local i n ->
+    ftop_inv γfs -∗ ireg_armed k t q S -∗ top_frag (fs_gamma_L γfs) i n ={E}=∗
+      ireg_armed k t q (S ∖ {[i]}) ∗ top_frag (fs_gamma_L γfs) i n.
+  Proof.
+    iIntros (HE Hloc) "#Hi Hrec Hfr". rewrite /ireg_armed.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
+    rewrite /top_frag /fs_gamma_L /=.
+    iDestruct (ghost_map_lookup with "Hta Hfr") as %HIi.
+    iMod (ghost_map_update (t, q, S ∖ {[i]}) with "Hla Hrec") as "[Hla Hrec]".
+    iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists I, (<[k := (t, q, S ∖ {[i]})]> A).
+      iFrame "Hta Hla".
+      iSplitL "Hpark".
+      { rewrite (big_sepM_delete _ (<[k := (t, q, S ∖ {[i]})]> A) k
+                   (t, q, S ∖ {[i]})); [| by rewrite lookup_insert].
+        rewrite (big_sepM_delete _ A k (t, q, S)); [| exact HAt].
+        iDestruct "Hpark" as "[Ht Hrest]".
+        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht".
+        rewrite delete_insert_delete. iExact "Hrest". }
+      iPureIntro. intros j m Hj Hun.
+      destruct (decide (j = i)) as [->|Hne].
+      { rewrite HIi in Hj. injection Hj as <-. exact Hloc. }
+      apply (Hcl j m Hj). intros k' t' q' S' Hk'.
+      destruct (decide (k' = k)) as [->|Hnt].
+      - rewrite HAt in Hk'. injection Hk' as <- <- <-.
+        assert (Hlk : <[k := (t, q, S ∖ {[i]})]> A !! k
+                      = Some (t, q, S ∖ {[i]})) by apply lookup_insert.
+        specialize (Hun k t q (S ∖ {[i]}) Hlk).
+        intros Hin. apply Hun. set_unfold. split; [exact Hin | exact Hne].
+      - apply (Hun k' t' q' S').
+        rewrite lookup_insert_ne; [exact Hk' | exact (not_eq_sym Hnt)]. }
+    iModIntro. iFrame "Hrec Hfr".
+  Qed.
+
+  (* ...and when nothing is left armed, the transaction's token comes home *)
+  Lemma ireg_release (E : coPset) (γfs : fs_names) (k t : nat) (q : Qp) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗ ireg_armed k t q ∅ ={E}=∗ t ↪[ln_tx icfg_log]{#q} tt.
+  Proof.
+    iIntros (HE) "#Hi Hrec". rewrite /ireg_armed.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
+    rewrite (big_sepM_delete _ A k (t, q, ∅)); [| exact HAt].
+    iDestruct "Hpark" as "[Ht Hpark]".
+    rewrite /ireg_parked. cbn [fst snd].
+    iMod (ghost_map_delete with "Hla Hrec") as "Hla".
+    iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists I, (delete k A).
+      iFrame "Hta Hla Hpark".
+      iPureIntro. intros j m Hj Hun. apply (Hcl j m Hj).
+      intros k' t' q' S' Hk'. destruct (decide (k' = k)) as [->|Hne].
+      - rewrite HAt in Hk'. injection Hk' as <- <- <-. apply not_elem_of_empty.
+      - apply (Hun k' t' q' S').
+        rewrite lookup_delete_ne; [exact Hk' | exact (not_eq_sym Hne)]. }
+    iModIntro. iExact "Ht".
+  Qed.
+
+  (* ...and the WHOLE-token reading, [ireg_arm_tx]'s undo *)
+  Lemma ireg_release_tx (E : coPset) (γfs : fs_names) (k t : nat) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗ ireg_armed k t 1%Qp ∅ ={E}=∗ log_tx icfg_log.
+  Proof.
+    iIntros (HE) "#Hi Hrec".
+    iMod (ireg_release E γfs k t 1%Qp HE with "Hi Hrec") as "Ht".
+    iModIntro. rewrite /log_tx. iExists t. iExact "Ht".
+  Qed.
+
+  (* ---- THE COMMIT'S READING (lane A item 5) -------------------------- *)
+
+  (* No open transaction means no armed inum means the whole abstract map is
+     well-formed -- [FsDurSnap.snap_local] of any state whose inodes are
+     [I].  The committer holds the log's own transaction AUTHORITY (it is a
+     conjunct of [LogInv.log_res], and [LogInv.log_tx_empty_of_ops] is what
+     turns "the ledger is empty" into "the authority is empty"), so the
+     reading costs it nothing but this accessor. *)
+  Lemma ireg_clean_acc (E : coPset) (γfs : fs_names) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
+      ∃ I : gmap Z fs_node,
+        ghost_map_auth (fs_top γfs) 1 I ∗
+        ⌜forall i n, I !! i = Some n -> inode_local i n⌝ ∗
+        ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
+        (ghost_map_auth (fs_top γfs) 1 I ={E ∖ ↑ftopN, E}=∗ True).
+  Proof.
+    iIntros (HE) "#Hi Htxa".
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    (* nothing is armed: an entry would park a token the empty authority
+       cannot account for *)
+    iAssert (⌜A = ∅⌝)%I as %HA.
+    { destruct (decide (A = ∅)) as [->|Hne]; [done |].
+      apply map_choose in Hne as (k & e & HAk).
+      iDestruct (big_sepM_lookup _ _ k e HAk with "Hpark") as "Ht".
+      rewrite /ireg_parked.
+      iDestruct (ghost_map_lookup with "Htxa Ht") as %Hbad.
+      rewrite lookup_empty in Hbad. discriminate. }
+    subst A.
+    iModIntro. iExists I. iFrame "Hta Htxa".
+    iSplitR.
+    { iPureIntro. intros i n Hi. apply (Hcl i n Hi).
+      intros k' t' q' S' Hk'. rewrite lookup_empty in Hk'. discriminate. }
+    iIntros "Hta". iApply "Hclose". iNext. rewrite /ftop_body.
+    iExists I, ∅. iFrame "Hta Hla". rewrite big_sepM_empty.
+    iSplitR; [done |]. iPureIntro. exact Hcl.
   Qed.
 
   Definition ireg_inv (γi : gname) (γfs : fs_names)
@@ -2796,21 +3078,65 @@ Section InodeRegion.
 
   (* THE RETAG, ALONE.  A walk that has already moved the region's record
      proxy (iupdate did it, at the region's own AU) and only owes the
-     abstract value takes this one; it opens nothing but [ftopN]. *)
+     abstract value takes this one; it opens nothing but [ftopN].
+
+     IT NOW CARRIES THE ROW (durable-disk lane A, plan section 4b): the new
+     node has to be well-formed, because the map the walk is moving is the
+     one a commit reads.  A walk whose write leaves the inode HALF-BUILT --
+     create's mkdir child between its [nlink = 1] and its two dot entries,
+     itrunc between the cleared pointers and the zeroed size -- takes
+     [ireg_top_retag_armed] instead, having suspended the row first
+     ([ireg_arm]).  The obligation is free at every other site: they
+     re-establish exactly these facts to re-pack their payload anyway, and
+     [FsStateEra.inode_local_of_ok_rec] is the one line that assembles
+     them. *)
   Lemma ireg_top_retag (E : coPset) (γfs : fs_names) (i : Z)
       (n n' : fs_node) :
     ↑ftopN ⊆ E ->
+    inode_local i n' ->
     ftop_inv γfs -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
-    iIntros (HE) "#Hi Hf".
+    iIntros (HE Hloc) "#Hi Hf".
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as ">HI". iDestruct "HI" as (I) "Ha".
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Ha & Hla & Hpark & %Hcl)".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (ghost_map_update n' with "Ha Hf") as "[Ha Hf]".
-    iMod ("Hclose" with "[Ha]") as "_".
-    { iNext. rewrite /ftop_body. iExists (<[i := n']> I). iExact "Ha". }
+    iMod ("Hclose" with "[Ha Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
+      iFrame "Ha Hla Hpark". iPureIntro.
+      intros j m Hj Hun. destruct (decide (j = i)) as [->|Hne].
+      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        exact (Hcl j m Hj Hun). }
     iModIntro. iExact "Hf".
+  Qed.
+
+  (* ...and the SUSPENDED form: the walk holds a receipt naming this inum,
+     so the row says nothing about it and the new node may be anything. *)
+  Lemma ireg_top_retag_armed (E : coPset) (γfs : fs_names) (k t : nat)
+      (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
+    ↑ftopN ⊆ E ->
+    i ∈ S ->
+    ftop_inv γfs -∗ ireg_armed k t q S -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Hin) "#Hi Hrec Hf". rewrite /ireg_armed.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Ha & Hla & Hpark & %Hcl)".
+    iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
+    rewrite /top_frag /fs_gamma_L /=.
+    iMod (ghost_map_update n' with "Ha Hf") as "[Ha Hf]".
+    iMod ("Hclose" with "[Ha Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
+      iFrame "Ha Hla Hpark". iPureIntro.
+      intros j m Hj Hun. destruct (decide (j = i)) as [->|Hne].
+      - (* this inum IS armed, so the row's own hypothesis is refuted *)
+        exfalso. exact (Hun k t q S HAt Hin).
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        exact (Hcl j m Hj Hun). }
+    iModIntro. iFrame "Hrec Hf".
   Qed.
 
   (* [logN], [iregN] and [ftopN] are pairwise distinct namespaces, so a

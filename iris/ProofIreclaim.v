@@ -977,6 +977,12 @@ Section IreclaimOrphan.
        begin_op/end_op ("log", 3), ilock ("bcache", 4), iunlock
        ("sleep lock", 6) -- "itable" is the lowest. *)
     locks_below lks "log" ->
+    (* THE AMBIENT LOG, named (durable-disk B''-tx): this walk write-locks
+       an inode inside its own transaction, and the escrow's write arm parks
+       a share of [icfg_log]'s element -- the escrow has no [log_names]
+       parameter.  [ProofFsinit] instantiates this contract AT [icfg_log], so
+       the discharge is [eq_refl]. *)
+    γ = icfg_log ->
     sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1015,7 +1021,7 @@ Section IreclaimOrphan.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
            Hj Hgl Hfuel Hinum Hkk Hbseq Hdswf Htnz Hbnoeq
-           Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
+           Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow Hclog.
     pose proof HK as HK'. 
     pose proof irc_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
@@ -1578,6 +1584,14 @@ Section IreclaimOrphan.
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlctx Hppid Hprocs").
     all: try lkbelow.
     iIntros (CID15 Hq15 mB) "%Hcsbo Hcg Hcnt Hextc Hclmc Hpc Hppid Hop".
+    (* ---- THE WRITE ARM (durable-fs-plan.md section 3, [ilock];
+       durable-disk B''-tx).  The transaction's token is handed to [ilock],
+       which parks HALF of it in the escrow's checked-out arm for the whole
+       locked window; what this walk keeps across the window is the BUDGET
+       half, which is all [log_write] ever wanted.  Nothing between the lock
+       and the unlock writes here, so the budget just travels. *)
+    iDestruct (log_op_split with "Hop") as "[Hopb Htx]".
+    iEval (rewrite Hclog) in "Htx".
     assert (Hpc58 : ret_pc (OA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x58))
       by (rewrite HOAra; pcw).
@@ -1683,7 +1697,7 @@ Section IreclaimOrphan.
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh) "Hshr".
-    iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
+    iApply (IL.wp_ilock_tx_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
               pidv dq dqs OC (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
@@ -1692,7 +1706,7 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
-                    Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+                    Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1 Htx").
     all: try lkbelow.
     iIntros (CID18 Hq18 mL dnl bml fl_)
       "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
@@ -1796,7 +1810,7 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
+    iApply (IU.wp_iunlock_tx_sconf γs γfs γi cn gil gisl cov logstart kslot
               (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Vpr
               ltac:(lia) Hkslot HOEa0
@@ -1806,7 +1820,11 @@ Section IreclaimOrphan.
               with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd
                     Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot Hfrz").
     all: try lkbelow.
-    iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
+    iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr Htx".
+    (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
+       descriptor named the share, so the token is whole again. *)
+    iEval (rewrite -Hclog) in "Htx".
+    iDestruct (log_opb_op with "Hopb Htx") as "Hop".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x64))
@@ -1913,7 +1931,7 @@ Section IreclaimOrphan.
        difference at this site -- its witness and birth epoch are the
        [log_op] existential's own, exactly as [ProofIput]'s own counted seal
        derives them. *)
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (log_opS_named with "Hop") as (e00) "Hop".
     iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev
@@ -1937,7 +1955,7 @@ Section IreclaimOrphan.
     iIntros (CID24 Hq24 mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
                                       Hsl %Hssub %Hwbm %Hwc %Hbnd
                                       Hop Hiref Hboot".
-    iDestruct (log_opS_op with "Hop") as "Hop".
+    iDestruct (log_opS_op with "Hop Htx") as "Hop".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))
       by (rewrite HOGra; pcw).
@@ -2282,6 +2300,11 @@ Section IreclaimScan.
     (* irc_scan reaches irc_step (no lock), irc_orphan ("itable", 2) and
        irc_release ("bcache", 4) every turn; "itable" is the lowest. *)
     locks_below lks "log" ->
+    (* THE AMBIENT LOG, named (durable-disk B''-tx): [irc_orphan]
+       write-locks an inode inside its own transaction and the escrow's
+       write arm parks a share of [icfg_log]'s element.  [ProofFsinit]
+       instantiates this walk AT [icfg_log]. *)
+    γ = icfg_log ->
     kernel_text -∗ kernel_data -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -2302,7 +2325,7 @@ Section IreclaimScan.
                pidv dq dqb dqs dqn j m K eb b lks Vpr fuel.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31
-           Hpk Hj Hgl Hbelow.
+           Hpk Hj Hgl Hbelow Hclog.
     pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "#Htext #Hkdata #Hpenv #Hbio #Hlctx #Hseam #Hgen #Hireg
@@ -3000,7 +3023,7 @@ Section IreclaimScan.
                        [c.beqz] at +0xa2 has just refuted a zero type for. *)
                     eq_refl Hdswf Ht0 Hbno HWDsp HWDthr
                     HWDs1 HWDs2 HWDs3 HWDs4 HWDs5 HWDs6
-                    Hbelow
+                    Hbelow Hclog
                     with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hlctx
                           Hseam Hgen Hireg Hitb2 Hitbl Hesc Hslks Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
@@ -3076,7 +3099,7 @@ Section IreclaimMain.
   Proof.
     cbv beta delta [wp_ireclaim_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb
-           Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Hbelow.
+           Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Hbelow Hclog.
     pose proof HK as HK'. 
     assert (Hnsext : (sign_extend' 64 (mword_of_int ninodes : mword 32) : mword 64)
                      = mword_of_int ninodes)
@@ -3569,7 +3592,7 @@ Section IreclaimMain.
                   cov logstart bmapstart inodestart ninodes size nib dev
                   pidv dq dqb dqs dqn m K eb b lks
                   Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib
-                  Hn31 Hpk Hj Hgl Hbelow
+                  Hn31 Hpk Hj Hgl Hbelow Hclog
                   with "Htext Hkdata Hpenv Hbio Hlctx Hseam Hgen Hireg
                         Hitb2 Hitbl Hesc Hslks Hprocs Hdevi Hdgeom Hdlock")
       as "Hscan".

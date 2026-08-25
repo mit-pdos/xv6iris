@@ -393,6 +393,14 @@ Three smaller ones from the same effort:
   reported ~60 characters later with an unrelated `[ltac_use_default]`
   message. Quoting C in a comment needs the `*` broken up.
 
+## `NoDup_fmap_2_strong` WITH A SECTION-VARIABLE `f` LEAVES THE LIST AN EVAR
+
+stdpp's `NoDup_fmap_2_strong` applied when `f` is a section variable
+leaves the list argument as an evar; the follow-up `apply NoDup_elements`
+then fails with an `ElemOf Z <your record type>` instance error that
+names the wrong cause entirely. Take `f` explicitly (see
+`FsDurSnap.NoDup_fmap_inj`) or hand `NoDup_elements` its set.
+
 ## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
 
 **"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal
@@ -418,6 +426,13 @@ Two smaller ones from the same proof:
   an earlier `_` is still an evar at splice time.** Spell out the argument the
   side condition mentions. (Same root cause as the `Qp.div_2` and
   `co_license` traps: a hole whose expected type is still an evar.)
+
+The MIRROR failure: **a keyed `rewrite length_app` / `rewrite app_assoc` that
+SUCCEEDS in the wrong place.** Keyed matching may unfold a definition to find
+its key — `dinode_bytes d` unfolds to an `app`, so the rewrite fires INSIDE
+the record's own encoding and the goal no longer mentions `dinode_bytes d`
+at all (seen in `FsDurImg.diblk_bytes_split`). Apply such lemmas at
+spelled-out arguments (`rewrite (length_app l1 l2)`), never bare.
 
 ## INCONSISTENT PREMISES ARE THE WORST DEFECT, AND NOTHING IN THE BUILD SEES THEM
 

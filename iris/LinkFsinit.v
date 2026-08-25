@@ -46,7 +46,9 @@
    [struct log] bundle and FsBlocks material, the icache's four persistent
    things out of [IcacheBoot.icache_boot], and the image premises SpecFsinit.v
    names.  It gets back the eight typed superblock cells, the log context and
-   [bslots 3]. *)
+   [bslots 3] -- block 1's half does NOT come back (durable-disk lane C-3a):
+   it is spent into initlog's [SbPark] park and rides out inside the
+   [LogInv.log_ctx]. *)
 Require Import LinkBread LinkMemmove LinkBrelse LinkInitlog LinkIreclaim
                 ProofFsinit.
 

@@ -44,7 +44,7 @@
                           thing that can name the value at +0x72.
          +0x72  sw inum   [ic_open_empty_free] + [ic_close_mid]: the table's
                           inum half joins in, the pool's bundle for the
-                          requested inum comes out ([ipool_acc]) and goes
+                          requested inum comes out ([ipool_take]) and goes
                           into the MID arm, and the identification ghost
                           flips false -> true at the entry's NEW identity.
                           The recycler keeps a dev half and the table's
@@ -56,7 +56,7 @@
          +0x7c  sw 0      [ic_open_mid] + [ic_close_mid_to_parked]: the
                           window closes at a normal parked arm, unloaded.
 
-       NO eviction and NO [ipool_insert]: under §13.9 a recycled slot is
+       NO eviction and NO [ipool_put]: under §13.9 a recycled slot is
        not live, so its arm is EMPTY and there is nothing to evict -- that
        is iput's job, where the flush semantics hold.
 
@@ -67,7 +67,7 @@
    "no live slot carries (dev, inum)".  The pool is keyed on the inum
    ALONE.  [is_itable2] therefore carries the table's device and iget
    instantiates it at its own [dev]: with [ic_ci_wf]'s fourth clause the
-   two readings coincide and the sentinel's invariant IS [ipool_acc]'s
+   two readings coincide and the sentinel's invariant IS [ipool_take]'s
    membership premise.
 
    ---- THE PANIC AT +0x9e IS LIVE ---------------------------------------
@@ -244,7 +244,7 @@ Proof.
   intros He. unfold neq_vec. by rewrite (ig_entry_nonzero e He).
 Qed.
 
-(* the pool's key round-trips: [ipool_acc] hands the bundle out at
+(* the pool's key round-trips: [ipool_take] hands the bundle out at
    [mword_of_int z] and the escrow wants it at the inum itself. *)
 Lemma ig_trunc32_zero : trunc32 (zero_reg : mword 64) = (mword_of_int 0 : mword 32).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
@@ -480,7 +480,11 @@ Section ProofIget.
        RETURNING arms, and simply dropped on the diverging
        panic("iget: no inodes") arm at +0x6a -- which is what a partial
        correctness post owes there and nothing more. *)
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hrinv #Hpenv Hislot Hlic Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock0 #Hinv #Hescs #Hrinv #Hpenv Hislot Hlic Hcont".
+    (* durable-disk B''-esc: the itable credential bundles the free pool's
+       own invariant beside the spinlock, so project both once here. *)
+    iDestruct (is_itable2_lock with "Hlock0") as "#Hlock".
+    iDestruct (is_itable2_pool with "Hlock0") as "#Hpinv".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -677,7 +681,7 @@ Section ProofIget.
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
-    { iEval (rewrite HmAa0). iExact "Hlock". }
+    { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hlock0"). }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x20)).
     { rewrite HmAra. pcw. }
@@ -1205,7 +1209,7 @@ Section ProofIget.
               rewrite HMe in Hin. by destruct Hin. }
             (* THE POOL MEMBERSHIP.  The scan proves no live slot carries the
                PAIR; the table's single-device clause (§13.11) turns that into
-               "no live slot carries this INUM", which is [ipool_acc]'s
+               "no live slot carries this INUM", which is [ipool_take]'s
                premise -- the pool being inum-keyed. *)
             assert (Hzin : bv_unsigned inum ∈ region_inums nib ∖ ci_inums ci).
             { apply elem_of_difference. split.
@@ -1273,7 +1277,7 @@ Section ProofIget.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (ic_id cn e (1/2) false dev inumT)
-                      (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
+                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hgid]").
             { iApply (igi_6e with "Htext"). }
             { rewrite Hpa6e. iExact "Hclaim1". }
@@ -1295,9 +1299,17 @@ Section ProofIget.
                identity.  The recycler keeps a dev half and the table's ghost
                half -- the latter is what pins the arm's FULL inum cell at
                +0x7c. ---- *)
-            iDestruct (ipool_acc γfs γi cov logstart
-                         (region_inums nib ∖ ci_inums ci) (bv_unsigned inum) Hzin
-                         with "Hpool") as "[Hbundle Hpool]".
+            (* THE WITHDRAW (durable-disk B''-esc): the ordinary rows live in
+               the pool's own invariant now, so the take is a fupd -- run
+               here, before the store's atomic update, exactly where the pure
+               [ipool_take] used to sit.  What comes out is the FULL
+               [ipool_shape], so the peel below is unchanged. *)
+            iApply fupd_wp.
+            iMod (ipool_take ⊤ γfs γi cov logstart
+                    (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
+                    ltac:(solve_ndisj) Hzin with "Hpinv Hpool")
+              as "[Hbundle Hpool]".
+            iModIntro.
             iEval (rewrite ig_moi_inum) in "Hbundle".
             assert (Hpa72 : add_vec (rget N1 Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                             = i_inum (ientry e)).
@@ -1323,7 +1335,7 @@ Section ProofIget.
                        frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
                        iname γi γfs inodestart inum l)%I
-                      (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
+                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hgid HinT Hbundle Hlic]").
             { iApply (igi_72 with "Htext"). }
             { rewrite Hpa72. iExact "Hclaim2". }
@@ -1346,7 +1358,7 @@ Section ProofIget.
                  back the licence together with the bundle's two ghost columns
                  ([icnt_half] at 0 and the [ifreeze_off] token).  Both go on to
                  +0x78; the payload is not touched. *)
-              iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑icEscN) γfs γi inodestart nib
+              iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) γfs γi inodestart nib
                       cov logstart inum l
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
                       with "Hrinv Hlic Hbundle")
@@ -1495,7 +1507,7 @@ Section ProofIget.
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
                        ic_id cn e (1/2) true dev inum)%I
-                      (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
+                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hmt Hgid2 Hd2 Hlvh Hpend Hfoff]").
             { iApply (igi_7c with "Htext"). }
             { rewrite Hpa7c. iExact "Hclaim4". }
@@ -1649,7 +1661,7 @@ Section ProofIget.
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
-            { iExact "Hlock". }
+            { iApply (is_itable2_lock with "Hlock0"). }
             iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
             pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
@@ -2148,7 +2160,7 @@ Section ProofIget.
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
-        { iExact "Hlock". }
+        { iApply (is_itable2_lock with "Hlock0"). }
         iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
         pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.

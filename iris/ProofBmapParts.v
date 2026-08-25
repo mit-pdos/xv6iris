@@ -424,15 +424,20 @@ Section BmapRes.
      against the handle's machinery half pins the buffer's logical content.
      With [bio_locked] (bs = bsl) that is the BYTES, which is what makes the
      word the code reads out of [bp->data] be the entry list's entry. *)
+  (* AT A SHARE (lane B''-blk).  It is an AGREEMENT -- the byte run is
+     looked up against the byte authority and handed straight back -- so
+     the caller's fraction is irrelevant to every step, which is what lets
+     the no-alloc bmap read the indirect block off a read-locker's quarter
+     (durable-fs-plan.md section 4). *)
   Lemma bm_held_content (E : coPset) (bn : bio_names) (γfs : fs_names)
-      (γd : disk_names)
+      (γd : disk_names) (dq : dfrac)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd bs0 : list (bv 8)) (d : bool) :
     ↑logN ⊆ E ->
     fs_bytes_any γfs -∗
-    fsblock (fs_bytes γfs) (uint bno) bs0 -∗
+    fsblock_q (fs_bytes γfs) dq (uint bno) bs0 -∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d ={E}=∗
-    ⌜bsl = bs0⌝ ∗ fsblock (fs_bytes γfs) (uint bno) bs0 ∗
+    ⌜bsl = bs0⌝ ∗ fsblock_q (fs_bytes γfs) dq (uint bno) bs0 ∗
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d.
   Proof.
     iIntros (HE) "#Hrow Hc Hheld".
@@ -441,7 +446,7 @@ Section BmapRes.
     destruct d.
     - iEval (rewrite /fs_mdirty) in "Hpay".
       iDestruct "Hpay" as "[[HL HD] Hq]".
-      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+      iMod (fs_bytes_agree_any_q E γfs dq (uint bno) bs0 bsl HE
               with "Hrow Hc HL") as "(%Heq & Hc & HL)".
       iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
       rewrite /bio_held /bio_pay /fs_view /=.
@@ -449,7 +454,7 @@ Section BmapRes.
       iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
     - iEval (rewrite /fs_mclean) in "Hpay".
       iDestruct "Hpay" as "[[HL HD] %He]".
-      iMod (fs_bytes_agree_any E γfs (uint bno) bs0 bsl HE
+      iMod (fs_bytes_agree_any_q E γfs dq (uint bno) bs0 bsl HE
               with "Hrow Hc HL") as "(%Heq & Hc & HL)".
       iModIntro. iSplitR; [iPureIntro; exact Heq |]. iFrame "Hc".
       rewrite /bio_held /bio_pay /fs_view /=.

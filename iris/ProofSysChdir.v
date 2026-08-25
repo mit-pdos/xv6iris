@@ -1412,7 +1412,7 @@ Section ProofSysChdirBody.
       iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
       iDestruct (sc_buf_split (pa_stk sp0 20) bf pk Hpk with "Hbuf")
         as "[Hbufk Hbufrest]".
-      iDestruct "Hop" as (Sb0) "HopS".
+      iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
       iDestruct (cpu_own_transport CID15 CID19 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Namei.wp_namei_gen (CID := CID19) gs j gl gu gd gk pd pav pu bn
@@ -1425,14 +1425,14 @@ Section ProofSysChdirBody.
                 (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                      Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir HopS").
+                      Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir [$HopS $Htx]").
       (* namei is eb-generic now; sys_chdir is still at [eb = true]. *)
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (rewrite HN1a0). iExact "Hbufk". }
       iIntros (CID20 Hq20 mna n1 Sb1 ok ipv w1)
         "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpbare Hcwdref
-         Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
+         Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
       iEval (rewrite HN1a0) in "Hbufk".
       assert (Hpc30 : ret_pc (N1 !!! Regidx Rra : mword 64)
                       = mword_of_int (SC + 0x30)) by (rewrite HN1ra; pcw).
@@ -1541,7 +1541,18 @@ Section ProofSysChdirBody.
           exact (HN2thr c Hc N2' N8 N9 N18). }
         iDestruct (cpu_own_transport CID20 CID23 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Ilock.wp_ilock_sconf (CID := CID23) gs j gl gu gd gk pd pav pu
+        (* ---- THE WRITE ARM IS INSIDE THE CONTRACT (durable-fs-plan.md
+           section 3, [ilock]; durable-disk B''-tx).  chdir holds this
+           inode's write lock from here to its [iunlock] / [iunlockput], and
+           for that whole window HALF of its transaction's token sits in the
+           escrow's checked-out arm: [end_op] consumes the WHOLE element, so
+           no commit -- this thread's or another's -- can happen inside the
+           window, which is what lets the collection at quiescence refute a
+           checked-out bundle ([IcacheEscrow.ic_out_no_write_arm]).  The
+           residue rides home inside [IcacheEscrow.ic_tx_dep], so nothing but
+           the descriptor conjunct crosses the window. *)
+        iEval (rewrite Hclog) in "Htx".
+        iApply (Ilock.wp_ilock_tx_sconf (CID := CID23) gs j gl gu gd gk pd pav pu
                   bn gfs gi cn gil gisl cov logstart inodestart nib
                   kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                   P0 (K - 20)%nat eb b lks
@@ -1549,7 +1560,7 @@ Section ProofSysChdirBody.
                   (Hlb "bcache"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                         Hireg Hslkk Hshr Hruip Hsbi Hpbare Hprocs Hdev Hgeo Hdlk
-                        Hbs1").
+                        Hbs1 Htx").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
@@ -1717,16 +1728,20 @@ Section ProofSysChdirBody.
             iSplitL "Hity Himaj Himin Hinl Hisz".
             - rewrite /inode_meta /i_type. iFrame.
             - iFrame. }
+          (* ...AND THE WRITE ARM COMES HOME INSIDE [iunlock] (B''-tx): the
+             descriptor named the share, so what comes back is exactly the
+             half the [ilock] parked. *)
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iApply (Iunlock.wp_iunlock_sconf (CID := CID29) gs gfs gi cn gil gisl
+          iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID29) gs gfs gi cn gil gisl
                     cov logstart kk (qq/2)%Qp gsh dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     (upd_upt V P') ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
                     with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
                           Hpbare Hprocs Hdep Hidev Hiinum Hivalid Hload
                           Hshot Hfrz").
-          iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpbare Hshr".
+          iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpbare Hshr Htx".
+          iEval (rewrite -Hclog) in "Htx".
           iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
           assert (Hpc48 : ret_pc (P4 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x48)) by (rewrite HP4ra; pcw).
@@ -1831,10 +1846,10 @@ Section ProofSysChdirBody.
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hescc Hireg Hropen Hslkc [$Hrefc $Hruc] Hsbb Hsbi Hbmres Hpbare Hprocs
-                          Hdev Hgeo Hdlk Hbsl [HopS]").
+                          Hdev Hgeo Hdlk Hbsl [HopS Htx]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /log_op. iExists Sb1. iExact "HopS". }
+          { iApply (log_opS_op with "HopS Htx"). }
           iIntros (CID33 Hq33 mip n2)
             "%Hcsip Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
              Hop Hislot".
@@ -2089,22 +2104,26 @@ Section ProofSysChdirBody.
             - iFrame. }
           iDestruct (sc_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
+          (* ...AND THE WRITE ARM COMES HOME on the failing arm too
+             (B''-tx): [iunlockput] releases the same lock, and its
+             transactional form runs the same disarm. *)
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iApply (Iunlockput.wp_iunlockput_sconf (CID := CID29) gs j gl gu gd gk
+          iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID29) gs j gl gu gd gk
                     pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                     inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                     Q1 (K - 20)%nat eb b lks
                     (upd_upt V P') ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
+                    Hclog
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpbare
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /log_op. iExists Sb1. iExact "HopS". }
+          { iApply (log_opS_opb with "HopS"). }
           iIntros (CID30 Hq30 mup n2)
             "%Hcsup Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
              Hop Hislot".
@@ -2301,11 +2320,11 @@ Section ProofSysChdirBody.
                   (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4 Hbuf
+                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4 Hbuf
                         [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hftok Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { rewrite /log_op. iExists Sb1. iExact "HopS". }
+        { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
         iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".

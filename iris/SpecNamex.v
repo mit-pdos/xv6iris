@@ -406,7 +406,14 @@ Definition namex_postS
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
-      log_opS g n' Sb' -∗
+      (* THE SET FORM BESIDE THE TOKEN (durable-fs-plan.md section 3,
+         [ilock]; durable-disk B''-tx).  namex write-locks each directory it
+         walks, and a transactional [ilock] parks half the transaction's
+         element in the escrow -- so the walk has to be HOLDING the token to
+         hand it over.  It rides in [log_opS]'s own position, as one
+         conjunct, so no stage lemma of any caller moved
+         ([LogInv.log_opSt]). *)
+      log_opSt g n' Sb' -∗
       (* THE TWO ARMS.  The success arm's reference is BUNDLED when the
          walk was a nameiparent one: that return is [L_par], reached only
          through the +0xc4 type test, so the walk KNOWS the record is a
@@ -729,8 +736,11 @@ Definition wp_namex_gen_body
   bslots 3 -∗
   (* ---- the ledger: see (5) in the header ---- *)
   iref_slots 2 -∗
-  (* ---- this operation's reservation, SET FORM ---- *)
-  log_opS g n Sb -∗
+  (* ---- this operation's reservation, SET FORM, BESIDE THE TRANSACTION'S
+     TOKEN (durable-disk B''-tx): the walk's [ilock] takes the write arm, so
+     it needs the token, and [LogInv.log_opSt] carries the pair in the set
+     form's own position ---- *)
+  log_opSt g n Sb -∗
   (* the continuation is SEALED as [namex_post]; see its header *)
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with

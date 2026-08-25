@@ -2966,10 +2966,12 @@ Section ProofDirlinkMain.
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           (* the byte view's row (durable-disk 1c-flip step 3) *)
           iPoseProof (ireg_inv_bytes with "Hiregi") as "#Hrow".
+          iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+          iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
           iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol Vpr
-                    pidv dq dqd L6 (K - 10)%nat eb b lks
+                    pidv (DfracOwn 1) dqd L6 (K - 10)%nat eb b lks
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
                     ltac:(lia)
                     ltac:(intros _; change (Z.of_nat 16%nat) with 16; lia)
@@ -2988,6 +2990,8 @@ Section ProofDirlinkMain.
           iIntros (CIDrd Hsrd mrd tot P')
             "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
              Hdst2 Hbs1".
+          iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+          iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii
                         ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)
@@ -3514,7 +3518,7 @@ Section ProofDirlinkMain.
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb #Hbmr
               #Hiregi #Hropen Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hlinks Hop Hcont".
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     (* THE COUNTED SEAL'S ONE NEW STEP (D0 pre-stage 1): the gen form asks
        for the honest [dl_need], the counted form was given the constant,
        and [dl_need_le] is the whole bridge -- six is the worst case and
@@ -3531,7 +3535,7 @@ Section ProofDirlinkMain.
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
                     Hiregi Hropen Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
-                    Hitb2 Hitbl Hesc Hslks Hislot Hlinks Hop [Hcont]").
+                    Hitb2 Hitbl Hesc Hslks Hislot Hlinks Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -3541,11 +3545,11 @@ Section ProofDirlinkMain.
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf found bm' data' dn' dn0' n' tot
               with "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                    Hsbs Hsbb Hdat Hppid Hbsl Hislot Hlinks [%] [Hop] [%]
+                    Hsbs Hsbb Hdat Hppid Hbsl Hislot Hlinks [%] [Hop Htx] [%]
                     [%] [%]").
     { exact E1. }
     { exact E2. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
     { exact E3. }
     { exact E4. }
     { exact E5. }

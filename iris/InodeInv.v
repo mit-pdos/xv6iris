@@ -771,6 +771,49 @@ Section InodeRes.
   Definition ind_res (γfs : fs_names) (bm : blkmap) : iProp Σ :=
     ind_blk γfs bm.
 
+  (* THE SAME SHAPE AT A SHARE (durable-fs-plan.md sections 4, 6; lane
+     B''-blk).  The unsuffixed names above are the [DfracOwn 1] READINGS and
+     their text has not moved, so the ~35 files that spell [inode_blocks] /
+     [inode_map] are untouched by the index; each [_1] equation below is
+     [reflexivity] ([FsBlocks.fsblock] IS [fsblock_q .. (DfracOwn 1)]). *)
+  Definition ind_blk_q (γfs : fs_names) (dq : dfrac) (bm : blkmap) : iProp Σ :=
+    (if decide (bv_unsigned (bm_ind bm) = 0) then True
+     else fsblock_q (fs_bytes γfs) dq (bv_unsigned (bm_ind bm))
+            (ind_bytes (bm_ent bm)))%I.
+
+  Definition ind_res_q (γfs : fs_names) (dq : dfrac) (bm : blkmap) : iProp Σ :=
+    ind_blk_q γfs dq bm.
+
+  Lemma ind_blk_1 (γfs : fs_names) (bm : blkmap) :
+    ind_blk γfs bm = ind_blk_q γfs (DfracOwn 1) bm.
+  Proof. reflexivity. Qed.
+
+  Lemma ind_res_1 (γfs : fs_names) (bm : blkmap) :
+    ind_res γfs bm = ind_res_q γfs (DfracOwn 1) bm.
+  Proof. reflexivity. Qed.
+
+  Lemma ind_blk_q_1_of (γfs : fs_names) (dq : dfrac) (bm : blkmap) :
+    dq = DfracOwn 1 -> ind_blk_q γfs dq bm -∗ ind_blk γfs bm.
+  Proof. intros ->. rewrite ind_blk_1. iIntros "H". iExact "H". Qed.
+
+  Lemma ind_blk_q_1_to (γfs : fs_names) (dq : dfrac) (bm : blkmap) :
+    dq = DfracOwn 1 -> ind_blk γfs bm -∗ ind_blk_q γfs dq bm.
+  Proof. intros ->. rewrite ind_blk_1. iIntros "H". iExact "H". Qed.
+
+  Lemma ind_blk_q_run (γfs : fs_names) (dq : dfrac) (bm : blkmap) (bi : Z) :
+    bv_unsigned (bm_ind bm) <> 0 -> bi = bv_unsigned (bm_ind bm) ->
+    fsblock_q (fs_bytes γfs) dq bi (ind_bytes (bm_ent bm)) ⊣⊢ ind_blk_q γfs dq bm.
+  Proof. intros Hnz ->. rewrite /ind_blk_q (decide_False _ _ Hnz) //. Qed.
+
+  Lemma ind_blk_q_split (γfs : fs_names) (q1 q2 : Qp) (bm : blkmap) :
+    ind_blk_q γfs (DfracOwn (q1 + q2)) bm
+    ⊣⊢ ind_blk_q γfs (DfracOwn q1) bm ∗ ind_blk_q γfs (DfracOwn q2) bm.
+  Proof.
+    rewrite /ind_blk_q. case_decide.
+    - rewrite bi.True_emp left_id //.
+    - apply fsblock_q_split.
+  Qed.
+
   (* the fold/unfold equation, at whatever spelling of the block number the
      caller has (bmap holds the indirect block's run out of the map, at
      [uint (bm_ind bm : mword 32)], across its own interior [log_write]) *)
@@ -782,6 +825,27 @@ Section InodeRes.
   Definition inode_map (γfs : fs_names) (ip : mword 64) (bm : blkmap) : iProp Σ :=
     (inode_addrs ip (bm_cells bm) ∗ ind_res γfs bm)%I.
 
+  (* THE ADDRS CELLS DO NOT TAKE A SHARE -- they are the inode's in-memory
+     record, region-side at fraction 1 always (plan section 2, ruling (i)).
+     Only the indirect BLOCK's byte run is fraction-indexed. *)
+  Definition inode_map_q (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) : iProp Σ :=
+    (inode_addrs ip (bm_cells bm) ∗ ind_res_q γfs dq bm)%I.
+
+  Lemma inode_map_1 (γfs : fs_names) (ip : mword 64) (bm : blkmap) :
+    inode_map γfs ip bm = inode_map_q γfs (DfracOwn 1) ip bm.
+  Proof. reflexivity. Qed.
+
+  Lemma inode_map_q_1_of (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) :
+    dq = DfracOwn 1 -> inode_map_q γfs dq ip bm -∗ inode_map γfs ip bm.
+  Proof. intros ->. rewrite inode_map_1. iIntros "H". iExact "H". Qed.
+
+  Lemma inode_map_q_1_to (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) :
+    dq = DfracOwn 1 -> inode_map γfs ip bm -∗ inode_map_q γfs dq ip bm.
+  Proof. intros ->. rewrite inode_map_1. iIntros "H". iExact "H". Qed.
+
   (* --- inode_blocks: one fs_chalf per allocated file index ------------- *)
 
   Definition blk_res (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) : iProp Σ :=
@@ -791,6 +855,60 @@ Section InodeRes.
   Definition inode_blocks (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) : iProp Σ :=
     ([∗ list] i ∈ seq 0 MAXFILE, blk_res γfs (blkmap_get bm i) (data i))%I.
+
+  Definition blk_res_q (γfs : fs_names) (dq : dfrac) (w : bv 32)
+      (bs : list (bv 8)) : iProp Σ :=
+    (if decide (bv_unsigned w = 0) then True
+     else fsblock_q (fs_bytes γfs) dq (bv_unsigned w) bs)%I.
+
+  Definition inode_blocks_q (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) : iProp Σ :=
+    ([∗ list] i ∈ seq 0 MAXFILE, blk_res_q γfs dq (blkmap_get bm i) (data i))%I.
+
+  Lemma blk_res_1 (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) :
+    blk_res γfs w bs = blk_res_q γfs (DfracOwn 1) w bs.
+  Proof. reflexivity. Qed.
+
+  Lemma inode_blocks_1 (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    inode_blocks γfs bm data = inode_blocks_q γfs (DfracOwn 1) bm data.
+  Proof. reflexivity. Qed.
+
+  (* THE CROSSINGS AS WANDS (see [FsBlocks.fsblock_q_1_of] for why the
+     equations alone are not enough): what an ALLOCATING bmap arm, which
+     has just learned its share is 1, uses to reach the fraction-1
+     deposit lemmas. *)
+  Lemma inode_blocks_q_1_of (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    dq = DfracOwn 1 ->
+    inode_blocks_q γfs dq bm data -∗ inode_blocks γfs bm data.
+  Proof. intros ->. rewrite inode_blocks_1. iIntros "H". iExact "H". Qed.
+
+  Lemma inode_blocks_q_1_to (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    dq = DfracOwn 1 ->
+    inode_blocks γfs bm data -∗ inode_blocks_q γfs dq bm data.
+  Proof. intros ->. rewrite inode_blocks_1. iIntros "H". iExact "H". Qed.
+
+  Lemma blk_res_q_split (γfs : fs_names) (q1 q2 : Qp) (w : bv 32)
+      (bs : list (bv 8)) :
+    blk_res_q γfs (DfracOwn (q1 + q2)) w bs
+    ⊣⊢ blk_res_q γfs (DfracOwn q1) w bs ∗ blk_res_q γfs (DfracOwn q2) w bs.
+  Proof.
+    rewrite /blk_res_q. case_decide.
+    - rewrite bi.True_emp left_id //.
+    - apply fsblock_q_split.
+  Qed.
+
+  Lemma inode_blocks_q_split (γfs : fs_names) (q1 q2 : Qp) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    inode_blocks_q γfs (DfracOwn (q1 + q2)) bm data
+    ⊣⊢ inode_blocks_q γfs (DfracOwn q1) bm data
+        ∗ inode_blocks_q γfs (DfracOwn q2) bm data.
+  Proof.
+    rewrite /inode_blocks_q -big_sepL_sep.
+    apply big_sepL_proper. intros k i _. apply blk_res_q_split.
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  BUILDING [inode_blocks] FROM BLOCK-GRANULAR RESOURCES              *)
@@ -1057,6 +1175,49 @@ Section InodeRes.
     iFrame.
   Qed.
 
+  (* ---- the same two, at a share (lane B''-blk) ----------------------- *)
+
+  Lemma inode_map_q_dir_acc (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) (j : nat) :
+    length (bm_dir bm) = NDIRECT -> (j < NDIRECT)%nat ->
+    inode_map_q γfs dq ip bm -∗
+      (i_addr ip j ↦₄ blkmap_get bm j) ∗
+      (∀ w : bv 32, i_addr ip j ↦₄ w -∗
+         inode_map_q γfs dq ip
+           (MkBlkmap (<[j := w]> (bm_dir bm)) (bm_ind bm) (bm_ent bm))).
+  Proof.
+    intros Hlen Hj.
+    iIntros "[Ha Hi]".
+    iDestruct (inode_addrs_acc ip (bm_cells bm) j (blkmap_get bm j)
+                 (bm_cells_dir bm j Hlen Hj) with "Ha") as "[Hcell Hback]".
+    iFrame "Hcell". iIntros (w) "Hw".
+    iDestruct ("Hback" with "Hw") as "Ha".
+    rewrite /inode_map_q /bm_cells /=.
+    rewrite insert_app_l; [|lia].
+    iFrame "Ha". rewrite /ind_res_q /=. iExact "Hi".
+  Qed.
+
+  Lemma inode_map_q_ind_acc (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) :
+    length (bm_dir bm) = NDIRECT ->
+    inode_map_q γfs dq ip bm -∗
+      (i_addr ip NDIRECT ↦₄ bm_ind bm) ∗ ind_res_q γfs dq bm ∗
+      (∀ (w : bv 32) (e : list (bv 32)),
+         i_addr ip NDIRECT ↦₄ w -∗
+         ind_res_q γfs dq (MkBlkmap (bm_dir bm) w e) -∗
+         inode_map_q γfs dq ip (MkBlkmap (bm_dir bm) w e)).
+  Proof.
+    intros Hlen.
+    iIntros "[Ha Hi]".
+    iDestruct (inode_addrs_acc ip (bm_cells bm) NDIRECT (bm_ind bm)
+                 (bm_cells_ind bm Hlen) with "Ha") as "[Hcell Hback]".
+    iFrame "Hcell Hi". iIntros (w e) "Hw Hnew".
+    iDestruct ("Hback" with "Hw") as "Ha".
+    rewrite /inode_map_q /bm_cells /=.
+    rewrite insert_app_r_alt; [|lia]. rewrite Hlen Nat.sub_diag /=.
+    iFrame.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  inode_blocks: one-block access, and the deposit of a fresh block    *)
   (* ------------------------------------------------------------------ *)
@@ -1155,6 +1316,98 @@ Section InodeRes.
     iIntros "$".
   Qed.
 
+  (* ---- the same three, at a share (lane B''-blk).  [_acc] is what a
+         read-locker's readi runs at a QUARTER: the block goes out, its
+         bytes are agreed against the buffer, and it comes back. -------- *)
+
+  Lemma inode_blocks_q_frame (γfs : fs_names) (dq : dfrac) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8)) :
+    (forall i : nat, (i < MAXFILE)%nat ->
+       blkmap_get bm' i = blkmap_get bm i /\ data' i = data i) ->
+    inode_blocks_q γfs dq bm data -∗ inode_blocks_q γfs dq bm' data'.
+  Proof.
+    intros Hag. rewrite /inode_blocks_q.
+    iIntros "H". iApply (big_sepL_mono with "H").
+    intros k y Hky.
+    apply lookup_seq in Hky as [Hy Hk].
+    assert (Hyk : y = k) by lia. subst y.
+    destruct (Hag k Hk) as [Hf Hd]. rewrite Hf Hd. iIntros "$".
+  Qed.
+
+  Lemma inode_blocks_q_acc (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) (i : nat) :
+    (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
+    inode_blocks_q γfs dq bm data -∗
+      fsblock_q (fs_bytes γfs) dq (bv_unsigned (blkmap_get bm i)) (data i) ∗
+      (∀ bs : list (bv 8),
+         fsblock_q (fs_bytes γfs) dq (bv_unsigned (blkmap_get bm i)) bs -∗
+         inode_blocks_q γfs dq bm (<[i := bs]> data)).
+  Proof.
+    intros Hi Hnz.
+    pose proof (seq_maxfile_lookup i Hi) as Hlk.
+    rewrite /inode_blocks_q.
+    rewrite (big_sepL_delete
+               (fun (_ : nat) (k : nat) =>
+                  blk_res_q γfs dq (blkmap_get bm k) (data k))
+               (seq 0 MAXFILE) i i Hlk).
+    iIntros "[Hb Hrest]".
+    rewrite /blk_res_q.
+    destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
+      [exfalso; exact (Hnz Hz)|].
+    iSplitL "Hb"; [iExact "Hb"|]. iIntros (bs) "Hbs".
+    rewrite (big_sepL_delete
+               (fun (_ : nat) (k : nat) =>
+                  blk_res_q γfs dq (blkmap_get bm k) ((<[i := bs]> data) k))
+               (seq 0 MAXFILE) i i Hlk).
+    iSplitL "Hbs".
+    { rewrite /blk_res_q fn_lookup_insert.
+      destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
+        [exfalso; exact (Hnz Hz)|].
+      iExact "Hbs". }
+    iApply (big_sepL_mono with "Hrest").
+    intros k y Hky.
+    apply lookup_seq in Hky as [Hy Hk].
+    assert (Hyk : y = k) by lia. subst y.
+    destruct (decide (k = i)) as [->|Hne]; [iIntros "$"|].
+    rewrite fn_lookup_insert_ne; [|congruence]. iIntros "$".
+  Qed.
+
+  Lemma inode_blocks_q_insert (γfs : fs_names) (dq : dfrac) (bm bm' : blkmap)
+      (data : nat -> list (bv 8)) (bn : nat) (b : bv 32) (bs : list (bv 8)) :
+    (bn < MAXFILE)%nat ->
+    bv_unsigned (blkmap_get bm bn) = 0 ->
+    blkmap_get bm' bn = b ->
+    (forall i : nat, (i < MAXFILE)%nat -> i <> bn ->
+       blkmap_get bm' i = blkmap_get bm i) ->
+    inode_blocks_q γfs dq bm data -∗
+    fsblock_q (fs_bytes γfs) dq (bv_unsigned b) bs -∗
+    inode_blocks_q γfs dq bm' (<[bn := bs]> data).
+  Proof.
+    intros Hbn Hz Hb Hag.
+    pose proof (seq_maxfile_lookup bn Hbn) as Hlk.
+    rewrite /inode_blocks_q.
+    rewrite (big_sepL_delete
+               (fun (_ : nat) (k : nat) =>
+                  blk_res_q γfs dq (blkmap_get bm k) (data k))
+               (seq 0 MAXFILE) bn bn Hlk).
+    rewrite (big_sepL_delete
+               (fun (_ : nat) (k : nat) =>
+                  blk_res_q γfs dq (blkmap_get bm' k) ((<[bn := bs]> data) k))
+               (seq 0 MAXFILE) bn bn Hlk).
+    iIntros "[_ Hrest] Hfs".
+    iSplitL "Hfs".
+    { rewrite /blk_res_q Hb fn_lookup_insert.
+      destruct (decide (bv_unsigned b = 0)); [done|].
+      iExact "Hfs". }
+    iApply (big_sepL_mono with "Hrest").
+    intros k y Hky.
+    apply lookup_seq in Hky as [Hy Hk].
+    assert (Hyk : y = k) by lia. subst y.
+    destruct (decide (k = bn)) as [->|Hne]; [iIntros "$"|].
+    rewrite (Hag k Hk Hne) fn_lookup_insert_ne; [|congruence].
+    iIntros "$".
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  FRESHNESS: what re-establishes [blkmap_wf]'s injectivity            *)
   (* ------------------------------------------------------------------ *)
@@ -1197,6 +1450,57 @@ Section InodeRes.
       destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
         [exfalso; exact (Hnz Hz)|].
       iApply (fsblock_ne with "Hb Ho").
+  Qed.
+
+  (* AT A SHARE (lane B''-blk).  The FRESH block's run is the FULL one
+     balloc hands over, and a full owner excludes any other share
+     ([FsBlocks.fsblock_ne_full]), so this reading does not care what
+     fraction of its own bundle the caller holds. *)
+  Lemma inode_fresh_q_at (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) (b : Z) (bsb : list (bv 8)) (i : nat) :
+    (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
+    fsblock (fs_bytes γfs) b bsb -∗ ind_blk_q γfs dq bm -∗
+    inode_blocks_q γfs dq bm data -∗
+    ⌜bv_unsigned (bm_slot bm i) <> b⌝.
+  Proof.
+    intros Hi Hnz. iIntros "Ho Ht Hd".
+    destruct (decide (i = MAXFILE)) as [->|Hne].
+    - rewrite bm_slot_top. rewrite bm_slot_top in Hnz.
+      rewrite /ind_blk_q.
+      destruct (decide (bv_unsigned (bm_ind bm) = 0)) as [Hz|_];
+        [exfalso; exact (Hnz Hz)|].
+      iDestruct (fsblock_ne_full with "Ho Ht") as %Hne'.
+      iPureIntro. congruence.
+    - assert (Hlt : (i < MAXFILE)%nat) by lia.
+      rewrite (bm_slot_lt bm i Hlt).
+      rewrite (bm_slot_lt bm i Hlt) in Hnz.
+      rewrite /inode_blocks_q.
+      iDestruct (big_sepL_lookup
+                   (fun (_ : nat) (k : nat) =>
+                      blk_res_q γfs dq (blkmap_get bm k) (data k))
+                   (seq 0 MAXFILE) i i (seq_maxfile_lookup i Hlt) with "Hd") as "Hb".
+      rewrite /blk_res_q.
+      destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
+        [exfalso; exact (Hnz Hz)|].
+      iDestruct (fsblock_ne_full with "Ho Hb") as %Hne'.
+      iPureIntro. congruence.
+  Qed.
+
+  Lemma inode_fresh_q (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) (b : Z) (bsb : list (bv 8)) :
+    fsblock (fs_bytes γfs) b bsb -∗ ind_blk_q γfs dq bm -∗
+    inode_blocks_q γfs dq bm data -∗
+    ⌜forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
+        bv_unsigned (bm_slot bm i) <> b⌝.
+  Proof.
+    iIntros "Ho Ht Hd". rewrite bi.pure_forall. iIntros (i).
+    destruct (decide ((i <= MAXFILE)%nat)) as [Hi|Hi];
+      [| iPureIntro; intros Hc; exfalso; exact (Hi Hc)].
+    destruct (decide (bv_unsigned (bm_slot bm i) = 0)) as [Hz|Hnz];
+      [ iPureIntro; intros _ Hc; exfalso; exact (Hc Hz) |].
+    iDestruct (inode_fresh_q_at γfs dq bm data b bsb i Hi Hnz
+                 with "Ho Ht Hd") as %Hne.
+    iPureIntro. intros _ _. exact Hne.
   Qed.
 
   (* the quantified form the [blkmap_wf_slot_upd] premise is stated at *)
@@ -1363,4 +1667,4 @@ End InodeRes.
     [rewrite /inode_blocks] and [unfold] are unaffected -- the ten sites
     that do take the big-op apart still do, and [IcacheEscrow]'s
     [inode_blocks_timeless] proves through the same [rewrite]. *)
-Global Typeclasses Opaque inode_blocks.
+Global Typeclasses Opaque inode_blocks inode_blocks_q.

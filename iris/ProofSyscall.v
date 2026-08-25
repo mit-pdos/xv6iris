@@ -1185,7 +1185,10 @@ Section SyscallVocab.
     iSplitR; [iExact "Hprocs"  |].
     iSplitR; [iExact "Hdevi"   |].
     iSplitR; [iExact "Hgeom"   |].
-    iExact "Hdlock".
+    iSplitR; [iExact "Hdlock"  |].
+    (* the fabric's last conjunct (durable-disk B''-tx): the ambient log,
+       named.  [sysc_fs_env_all] has said so all along ([Hlogn]). *)
+    iPureIntro; exact Hlogn.
   Qed.
 
   (* THE THREE RESOURCES [SpecFileclose.fileclose_bm] USED TO CARRY, and all
@@ -3496,6 +3499,10 @@ Section SyscallArms.
     iPoseProof (ConsoleInv.console_ready_devsw with "Hcr") as "#Htbl".
     iDestruct "Hpe" as "(_ & _ & _ & Hxl & _)".
     iDestruct "Hxl" as (γtxl) "#Htx".
+    (* the ambient log, named: filewrite's FD_INODE arm write-locks inside
+       its own transaction and the escrow parks at [icfg_log] (durable-disk
+       B''-tx).  [sysc_ties] has said so all along. *)
+    iDestruct (sysc_fs_env_ties with "Hfsenv") as %Twr.
     iAssert (SpecFilewrite.filewrite_dev_caps
                (sysc_fwrite_names fsc_printk γtxl γs j γl bn fn)) as "#Hcaps".
     { rewrite /SpecFilewrite.filewrite_dev_caps /sysc_fwrite_names; cbn.
@@ -3505,7 +3512,7 @@ Section SyscallArms.
     iApply (SysWrite.wp_sys_write_sconf γa γf γs j γl
               (sysc_fwrite_names fsc_printk γtxl γs j γl bn fn)
               pid V v0 v2 M (av - 4)%nat true true ∅
-              ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0
+              ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl (sct_log _ _ _ Twr) Hv0
               (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs
                     Hfse Hcaps Htbl").

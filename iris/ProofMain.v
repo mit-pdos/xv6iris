@@ -1428,7 +1428,7 @@ Section ProofMain.
        return (the FIRST of the two ghost interludes below) and the rest at
        +0x92's, so one open serves both. *)
     iDestruct (fs_kit_icache_rest_open with "Hkit1") as
-      "(Hiref & Hlivef & Hislg & Hipool & Hitfree & Hictok & Hicmid & Hicid &
+      "(Hiref & Hlivef & Hislg & Hipool & Hpkey & Hitfree & Hictok & Hicmid & Hicid &
         Hbiotok & Hblkpool & Hdllk)".
     (* the two allocator-budget facts, in the closed form the callees ask for *)
     assert (Hnb3 : exists nb, avail_sub (Some (length ps)) K_kvmmake = Some nb
@@ -1546,7 +1546,7 @@ Section ProofMain.
     iMod (icache_boot_at ⊤ fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
             fsc_logst icfg_nib icfg_dev
             with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
-                  Hipool Hitfree Hictok Hicmid Hicid")
+                  Hipool Hpkey Hitfree Hictok Hicmid Hicid")
       as "(#Hitl & #Hitinv & #Hesc & Hicsl)".
     iModIntro.
     (* ---- +0x96 jal fileinit ---- *)
@@ -2024,7 +2024,8 @@ Section ProofMain.
        other nine are what [FirstTok.fs_geom_ok_of_image] and
        [FirstTok.first_fsinit_pures_of_image] consume at +0x9e. *)
     destruct Himg as (Hiwf & Hirw & Hinin & Hinib32 & Hnib0 & Hinibeq &
-                      Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq).
+                      Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq &
+                      Hibare & Hinoself).
     assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".

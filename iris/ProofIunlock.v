@@ -437,7 +437,7 @@ Section ProofIunlockMain.
                  eq_refl with "Hbodyp Hvalid Hdep")
       as "(Hvalid & Hdep & Hborp)".
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
-    iMod (iref_live_load_au (⊤ ∖ ↑icEscN) k sbp
+    iMod (iref_live_load_au (⊤ ∖ ↑(icEscN .@ k)) k sbp
             ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
     iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
@@ -450,7 +450,7 @@ Section ProofIunlockMain.
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
                          i_valid (ientry k) ↦₄ valid_word true ∗
                          ic_deposit cn k (DepShr s dev inum g))%I)
-              (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
+              (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k) ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc [] [] [Hvalid Hdep]").
     { iApply (iui2_1c with "Htext"). }
@@ -465,7 +465,7 @@ Section ProofIunlockMain.
                    eq_refl with "Hbody Hvalid Hdep")
         as "(Hvalid & Hdep & Hbor)".
       iDestruct "Hbor" as (sb) "[Hlv Hbback]".
-      iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k sb
+      iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) k sb
               ltac:(solve_ndisj) Hk with "Hitbl Hlv") as (v) "[Hcell Hcl]".
       iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
       iMod ("Hcl" with "Hcell") as "[%Hb Hlv]".
@@ -793,6 +793,27 @@ Section ProofIunlockMain.
     iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Href").
     { unfold callee_saved. split_and!; assumption. }
+  Qed.
+
+  (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the disarm is a ghost
+     step BEFORE the call, so this is a derivation and nothing of iunlock's
+     own proof is re-run. *)
+  Lemma wp_iunlock_tx_sconf
+      (gs : list gname)
+      (gfs : fs_names) (gi : gname)
+      (cn : ic_names)
+      (gil gisl : gname)
+      (cov : gset Z) (logstart : Z)
+      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (pidv : mword 32) (dq : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_iunlock_tx_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev
+                               inum dn' bm' pidv dq m K eb p b lks Vpr.
+  Proof.
+    apply wp_iunlock_tx_of_sconf.
+    apply wp_iunlock_sconf.
   Qed.
 
 End ProofIunlockMain.

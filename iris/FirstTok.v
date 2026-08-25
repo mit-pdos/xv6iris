@@ -274,7 +274,14 @@ Section FirstTok.
         /\ bv_unsigned v_magic = FsImg.FSMAGIC)
     /\ hdr_n (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) = 0
     /\ (1 : Z) ∈ fsc_cov
-    /\ ~ ((1 : Z) ∈ log_region_set fsc_logst).
+    /\ ~ ((1 : Z) ∈ log_region_set fsc_logst)
+    (* ...AND THE RECORD BLOCK 1 DECODES TO (durable-disk lane C-3a).  Two
+       readings of W1, both already in hand where this block is produced:
+       fsinit hands block 1's run down to initlog, which parks it at this
+       record ([SbPark.sb_park]).  LAST, so no destructuring pattern that
+       already opens this block moves. *)
+    /\ FsImg.fs_parse_sb (fun _ => FsCrash.fs_blocks dk 1) = Some sb
+    /\ FsImg.fs_sb_ok sb.
 
   (* ================================================================== *)
   (*  3.  THE EXCLUSIVE HALF -- [SpecFsinit]'s premise pile               *)
@@ -677,11 +684,13 @@ Section FirstTok.
       by apply fs_blocks_length.
     (* THE EIGHT FIELDS ARE THE EIGHT WORDS, which is all [fs_parse_sb]
        answering [Some sb] says -- and it is exactly premise (a). *)
+    pose proof Hparse as Hparse0.
     rewrite /FsImg.fs_parse_sb in Hparse.
     destruct ((32 <=? length (FsCrash.fs_blocks dk FsImg.SB_BNO))%nat) eqn:Hb;
       [| discriminate].
     injection Hparse as Hsbeq.
-    rewrite /first_fsinit_pures. split; [| split; [| split]].
+    rewrite /first_fsinit_pures.
+    split; [| split; [| split; [| split; [| split]]]].
     - exists (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 0 4)),
              (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 8 4)),
              (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 16 4)).
@@ -696,6 +705,9 @@ Section FirstTok.
     - rewrite Hcovq. apply Hcovmeta. lia.
     - rewrite Hlogq. intro Hc.
       pose proof (log_region_bound _ _ Hc) as Hbb. lia.
+    - rewrite /FsImg.fs_parse_sb. rewrite /FsImg.fs_parse_sb in Hparse0.
+      exact Hparse0.
+    - exact Hsb.
   Qed.
 
 End FirstTok.

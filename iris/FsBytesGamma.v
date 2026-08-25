@@ -8,7 +8,12 @@
    LOGGED instance's [fsΦ], namely the FULL element of the era's byte view
    [FsBlocks.fs_bytes] --
 
-     fsΦ (fs_gamma_L γfs) a v  :=  a ↪[fs_bytes γfs] v
+     fsΦ (fs_gamma_L γfs) dq a v  :=  a ↪[fs_bytes γfs]{dq} v
+
+   THE SHARE IS THE ERA'S OWN (durable-fs-plan.md sections 4 and 6, lane
+   B'): the logged view is the ONE instance a read-locker takes a fraction
+   of, so this is where [FsStateDefs.phi_frac] gets its witness.  The
+   durable instances stay at [DfracOwn 1] and never split.
 
    -- together with the two properties of it that consumers need and cannot
    prove of an abstract predicate ([phi_excl], [GTimeless]), and the two
@@ -47,23 +52,35 @@ Section Bridge.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
 
   Definition fs_gamma_L (γfs : fs_names) : fs_view_names Σ :=
-    MkFsView (fun (a : Z) (v : bv 8) => (a ↪[fs_bytes γfs] v)%I)
+    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) =>
+                (a ↪[fs_bytes γfs]{dq} v)%I)
              (fs_link γfs) (fs_top γfs).
+
+  Lemma fs_gamma_L_phi (γfs : fs_names) (dq : dfrac) (a : Z) (v : bv 8) :
+    fsΦ (fs_gamma_L γfs) dq a v = (a ↪[fs_bytes γfs]{dq} v)%I.
+  Proof. reflexivity. Qed.
 
   (* two owners of one byte is [False] -- the concrete instance of
      [FsStateDefs.phi_excl], and the only exclusivity law the design ever
      invokes (fs-state.md section 0). *)
   Lemma fs_gamma_L_excl (γfs : fs_names) : phi_excl (fs_gamma_L γfs).
   Proof.
-    intros a v w. rewrite /fs_gamma_L /phi_excl /=.
+    intros a v w dq1 dq2. rewrite /fs_gamma_L /=.
     iIntros "[H1 H2]".
     iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
+    done.
+  Qed.
+
+  (* ...and it SPLITS, which is what hands a read-locker its quarter *)
+  Lemma fs_gamma_L_frac (γfs : fs_names) : phi_frac (fs_gamma_L γfs).
+  Proof.
+    intros a v q1 q2. rewrite /fs_gamma_L /=.
+    apply (ghost_map_elem_fractional a (fs_bytes γfs) v q1 q2).
   Qed.
 
   Global Instance fs_gamma_L_timeless (γfs : fs_names) :
     GTimeless (fs_gamma_L γfs).
-  Proof. intros a v. rewrite /fs_gamma_L /=. apply _. Qed.
+  Proof. intros dq a v. rewrite /fs_gamma_L /=. apply _. Qed.
 
   (* ---- the two equations ------------------------------------------- *)
 
@@ -79,6 +96,32 @@ Section Bridge.
     blk_owned (fs_gamma_L γfs) b bs ⊣⊢ fsblock (fs_bytes γfs) b bs.
   Proof.
     rewrite /blk_owned /fsblock gamma_byte_range. reflexivity.
+  Qed.
+
+  (* ---- THE BRIDGE AT A SHARE (lane B''-blk) --------------------------- *)
+
+  (* THIS is what the fraction sweep was for.  The two equations above tie
+     the abstract runs to the concrete ones at fraction 1 ONLY, and
+     [FsStateEra.inode_owned_era_of]/[_to] -- through which [ic_loaded] and
+     [ipool_alloc] are stated -- go through them, so nothing at 3/4 or 1/4
+     could cross into the [InodeInv] vocabulary before these existed.  They
+     hold by CONVERSION exactly as their fraction-1 readings do
+     ([FsStateDefs.byte_range_q] multiplies by [FsImg.BSIZE_z],
+     [FsBlocks.byte_range_q] by [FsBlocks.BSZ]; both delta-reduce to 1024). *)
+  Lemma gamma_byte_range_q (γfs : fs_names) (dq : dfrac) (b off : Z)
+      (bs : list (bv 8)) :
+    FsStateDefs.byte_range_q (fs_gamma_L γfs) dq b off bs
+    ⊣⊢ FsBlocks.byte_range_q (fs_bytes γfs) dq b off bs.
+  Proof.
+    rewrite /FsStateDefs.byte_range_q /FsBlocks.byte_range_q /fs_gamma_L /=.
+    reflexivity.
+  Qed.
+
+  Lemma gamma_blk_owned_q (γfs : fs_names) (dq : dfrac) (b : Z)
+      (bs : list (bv 8)) :
+    blk_owned_q (fs_gamma_L γfs) dq b bs ⊣⊢ fsblock_q (fs_bytes γfs) dq b bs.
+  Proof.
+    rewrite /blk_owned_q /fsblock_q gamma_byte_range_q. reflexivity.
   Qed.
 
 End Bridge.

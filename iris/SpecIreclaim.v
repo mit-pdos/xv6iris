@@ -238,6 +238,13 @@ Definition wp_ireclaim_sconf_body
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
   locks_below lks "log" ->
+  (* THE AMBIENT LOG, named (durable-fs-plan.md section 3, [ilock];
+     durable-disk B''-tx).  ireclaim's orphan arm write-locks an inode
+     inside its own transaction, and the escrow's write arm parks a share of
+     [icfg_log]'s element -- the escrow carries no [log_names] parameter.
+     [ProofFsinit] calls this contract AT [icfg_log], so the discharge is
+     [eq_refl] and no premise reaches any further caller. *)
+  γ = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, in and out.  ireclaim holds no lock across its

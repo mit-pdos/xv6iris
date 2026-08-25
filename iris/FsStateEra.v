@@ -87,7 +87,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap numbers.
+From iris.algebra Require Import auth gmap numbers dfrac.
 From iris.base_logic.lib Require Import iprop own ghost_map invariants.
 (* The [FsState*] stack exports names with live twins ([byte_range],
    [fs_view]); the LAST import wins, so it goes FIRST and the block layer's
@@ -443,6 +443,42 @@ Proof.
     rewrite BSIZE_BSIZEz MAXFILE_FS. exact Hs. }
   split; [exact (blk_holes_zero_of_local i n Hl) |].
   exact (inode_sized_of_local i n Hl).
+Qed.
+
+(* THE ESCROW'S READ ARM NEEDS ONE PURE FACT, AND THIS IS IT (durable-disk
+   B''-join).  [IcacheEscrow.ic_loaded]'s index is the pair [(dn, bm)] while
+   the era bundle's is the NODE, so a read-lock withdrawal that leaves the
+   residue in the escrow under an existential [(dn', bm', data')] and hands
+   the holder a quarter at [era_node dn bm data] can only re-form the payload
+   if the two pairs agree.  They do, and [data] plays no part: a node pins the
+   record outright, [inode_ok] turns the record's [di_addrs] into the blkmap's
+   cells on BOTH sides, and the node's own [fn_ent] pins the indirect entries.
+
+   [data] is NOT determined -- two data functions differing above [MAXFILE],
+   or at an unallocated slot, give the same node -- which is exactly why the
+   join re-forms the payload at the ARM's [data] (existentially bound there)
+   and never has to compare the two. *)
+Lemma era_node_pair_inj (cov : gset Z) (ls : Z)
+    (dn dn' : dinode) (bm bm' : blkmap) (data data' : nat -> list (bv 8)) :
+  inode_ok cov ls dn bm data ->
+  inode_ok cov ls dn' bm' data' ->
+  era_node dn bm data = era_node dn' bm' data' ->
+  dn = dn' /\ bm = bm'.
+Proof.
+  intros (Hw & _ & Hc & _) (Hw' & _ & Hc' & _) Heq.
+  rewrite /era_node in Heq.
+  injection Heq as Hrec Hent _.
+  split; [exact Hrec |].
+  assert (Hcells : bm_cells bm = bm_cells bm').
+  { rewrite -Hc -Hc' Hrec //. }
+  rewrite /bm_cells in Hcells.
+  destruct Hw as (Hdl & _), Hw' as (Hdl' & _).
+  assert (Hdir : bm_dir bm = bm_dir bm' /\ [bm_ind bm] = [bm_ind bm']).
+  { apply app_inj_1; [rewrite Hdl Hdl' // | exact Hcells]. }
+  destruct Hdir as [Hdir Hind].
+  injection Hind as Hind.
+  destruct bm as [d1 i1 e1], bm' as [d2 i2 e2]; simpl in *.
+  rewrite Hdir Hind Hent //.
 Qed.
 
 (* ---- ...AND THE OTHER WAY: [inode_local] of [era_node] ---------------- *)
@@ -1016,8 +1052,93 @@ Section EraRes.
     - rewrite gamma_blk_owned //.
   Qed.
 
+  (* ---- THE SAME TWO BRIDGES AT A SHARE (lane B''-blk) ---------------- *)
+
+  (* THIS IS THE STRUCTURAL UNBLOCK lane B' measured and could not do: the
+     bridges above are stated through [FsBytesGamma.gamma_blk_owned], which
+     ties the two vocabularies at fraction 1 ONLY, so nothing at 3/4 or 1/4
+     could cross into the [InodeInv] vocabulary.  These are the same two
+     proofs over [gamma_blk_owned_q] / [InodeInv.inode_blocks_q] /
+     [ind_res_q], and their [DfracOwn 1] readings are the lemmas above. *)
+  Lemma inode_blocks_era_q (γfs : fs_names) (dq : dfrac) (i : Z) (n : fs_node) :
+    inode_local i n ->
+    inode_blocks_q γfs dq (bm_of n) (fn_data n)
+    ⊣⊢ ([∗ map] k ↦ bs ∈ fn_blk n,
+          FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs).
+  Proof.
+    intros Hl.
+    rewrite /inode_blocks_q.
+    rewrite -(big_sepL_seq_map
+                (fun k bs => FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq
+                               (fn_naddr n k) bs)
+                (fn_blk n) MAXFILE 0%nat); last first.
+    { intros k [bs Hbs].
+      destruct (inode_local_beyond_size i n k bs Hl Hbs) as (Hk & _ & _).
+      rewrite -MAXFILE_FS in Hk. lia. }
+    apply big_sepL_proper. intros j k Hj.
+    apply lookup_seq in Hj as [Heq Hlt].
+    assert (Hk : (k < MAXFILE)%nat) by lia.
+    rewrite /blk_res_q (bm_of_get n k (inl_rec_wf Hl) Hk).
+    destruct (fn_blk n !! k) as [bs |] eqn:Hbs; cbn [from_option].
+    - assert (Hnz : fn_naddr n k <> 0).
+      { apply (inl_blk_dom Hl k ltac:(rewrite -MAXFILE_FS; exact Hk)).
+        by exists bs. }
+      rewrite (decide_False _ _ Hnz).
+      rewrite /fn_data Hbs gamma_blk_owned_q //.
+    - assert (Hz : fn_naddr n k = 0).
+      { destruct (decide (fn_naddr n k = 0)) as [Hz | Hnz]; [exact Hz |].
+        exfalso.
+        destruct (proj2 (inl_blk_dom Hl k
+                           ltac:(rewrite -MAXFILE_FS; exact Hk)) Hnz)
+          as [bs Hbs']. rewrite Hbs' in Hbs. discriminate. }
+      rewrite (decide_True _ _ Hz) bi.True_emp //.
+  Qed.
+
+  Lemma ind_res_era_q (γfs : fs_names) (dq : dfrac) (n : fs_node) :
+    ind_res_q γfs dq (bm_of n) ⊣⊢ ind_owned_q (fs_gamma_L γfs) dq n.
+  Proof.
+    rewrite /ind_res_q /ind_blk_q /ind_owned_q bm_of_ind bm_of_ent.
+    repeat case_decide; try (exfalso; congruence).
+    - rewrite bi.True_emp //.
+    - rewrite gamma_blk_owned_q //.
+  Qed.
+
   (* ---- THE BUNDLE ---------------------------------------------------- *)
 
+  (* THE BYTE LEGS ALONE, AT A SHARE (durable-fs-plan.md sections 4, 6;
+     lane B').  A read-locking [ilock] withdraws exactly this at a QUARTER
+     and the escrow's "out for reading" arm keeps the bundle at three
+     quarters -- which is what makes cross-inode block disjointness at the
+     commit's collection pure separation logic (3/4 + 3/4 > 1,
+     [FsStateDefs.blk_owned_ne_34]).  The record is NOT here: records park
+     region-side at fraction 1 always (plan section 2, ruling (i)). *)
+  Definition inode_bytes_era (γfs : fs_names) (dq : dfrac) (n : fs_node)
+    : iProp Σ :=
+    (([∗ map] k ↦ bs ∈ fn_blk n,
+        FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs)
+     ∗ ind_owned_q (fs_gamma_L γfs) dq n)%I.
+
+  (* THE ABSTRACT FRAGMENT TAKES THE SHARE TOO (durable-disk B''-join), and
+     it is the read arm's whole re-identification mechanism: the escrow's
+     residue keeps three quarters of it, the read-locker carries a quarter,
+     and [FsState.top_frag_q_agree] pins the arm's existentially-bound node
+     to the holder's at [iunlock].  It also says the honest thing about a
+     read-locker: a retag ([InodeRegion.ireg_top_retag]) needs the WHOLE
+     element, so a quarter cannot move the abstract map.
+
+     The RECORD PROXY does not take it: records park region-side at fraction
+     1 always (plan section 2, ruling (i)) and [dinode_at] is what keeps a
+     read-locker from moving one. *)
+  Definition inode_owned_era_q (γfs : fs_names) (dq : dfrac) (γi : gname)
+      (inum : bv 32) (n : fs_node) : iProp Σ :=
+    (dinode_at γi inum (fn_rec n)
+     ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+          FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs)
+     ∗ ind_owned_q (fs_gamma_L γfs) dq n
+     ∗ top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum) n
+     ∗ ⌜inode_local (bv_unsigned inum) n⌝)%I.
+
+  (* the [DfracOwn 1] reading: today's bundle, text unmoved *)
   Definition inode_owned_era (γfs : fs_names) (γi : gname) (inum : bv 32)
       (n : fs_node) : iProp Σ :=
     (dinode_at γi inum (fn_rec n)
@@ -1027,11 +1148,157 @@ Section EraRes.
      ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n
      ∗ ⌜inode_local (bv_unsigned inum) n⌝)%I.
 
+  Lemma inode_owned_era_1 γfs γi inum n :
+    inode_owned_era γfs γi inum n
+    = inode_owned_era_q γfs (DfracOwn 1) γi inum n.
+  Proof. reflexivity. Qed.
+
+  Global Instance inode_bytes_era_timeless γfs dq n :
+    Timeless (inode_bytes_era γfs dq n).
+  Proof.
+    rewrite /inode_bytes_era /ind_owned_q.
+    destruct (decide (fn_indb n = 0)); apply _.
+  Qed.
+
+  Global Instance inode_owned_era_q_timeless γfs dq γi inum n :
+    Timeless (inode_owned_era_q γfs dq γi inum n).
+  Proof.
+    rewrite /inode_owned_era_q /ind_owned_q /top_frag_q.
+    destruct (decide (fn_indb n = 0)); apply _.
+  Qed.
+
   Global Instance inode_owned_era_timeless γfs γi inum n :
     Timeless (inode_owned_era γfs γi inum n).
   Proof.
     rewrite /inode_owned_era /ind_owned /top_frag.
     destruct (decide (fn_indb n = 0)); apply _.
+  Qed.
+
+  (* ---- THE READER'S QUARTER, BOTH WAYS ------------------------------- *)
+
+  Local Lemma blk_big_sepM_split γfs (q1 q2 : Qp) n :
+    ([∗ map] k ↦ bs ∈ fn_blk n,
+       FsStateDefs.blk_owned_q (fs_gamma_L γfs) (DfracOwn (q1 + q2))
+         (fn_naddr n k) bs)
+    ⊣⊢ ([∗ map] k ↦ bs ∈ fn_blk n,
+          FsStateDefs.blk_owned_q (fs_gamma_L γfs) (DfracOwn q1)
+            (fn_naddr n k) bs)
+        ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+             FsStateDefs.blk_owned_q (fs_gamma_L γfs) (DfracOwn q2)
+               (fn_naddr n k) bs).
+  Proof.
+    rewrite -big_sepM_sep.
+    apply big_sepM_proper. intros k bs _.
+    apply (blk_owned_q_split _ (fs_gamma_L_frac γfs)).
+  Qed.
+
+  Lemma inode_bytes_era_split γfs (q1 q2 : Qp) n :
+    inode_bytes_era γfs (DfracOwn (q1 + q2)) n
+    ⊣⊢ inode_bytes_era γfs (DfracOwn q1) n ∗ inode_bytes_era γfs (DfracOwn q2) n.
+  Proof.
+    rewrite /inode_bytes_era blk_big_sepM_split.
+    rewrite (ind_owned_q_split _ (fs_gamma_L_frac γfs)).
+    iSplit.
+    - iIntros "[[Hb1 Hb2] [Hi1 Hi2]]". iFrame.
+    - iIntros "[[Hb1 Hi1] [Hb2 Hi2]]". iFrame.
+  Qed.
+
+  (* WHAT A READ-LOCKING [ilock] WITHDRAWS (durable-fs-plan.md section 3;
+     durable-disk B''-join): the byte legs at a quarter BESIDE a quarter of
+     the abstract fragment.  The fragment's quarter is not decoration -- it
+     is the pin that lets [IcacheEscrow.ic_unshed_rd] re-form the payload
+     against the arm's existentially-bound node ([top_frag_q_agree]), and it
+     is the resource reading of "a read-locker cannot retag".
+
+     The RECORD is not here (it never leaves the escrow's residue), which is
+     the resource reading of "a read-locker cannot move a record". *)
+  Definition inode_rd_era (γfs : fs_names) (dq : dfrac) (inum : bv 32)
+      (n : fs_node) : iProp Σ :=
+    (inode_bytes_era γfs dq n
+     ∗ top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum) n)%I.
+
+  Global Instance inode_rd_era_timeless γfs dq inum n :
+    Timeless (inode_rd_era γfs dq inum n).
+  Proof. rewrite /inode_rd_era. apply _. Qed.
+
+  Lemma inode_rd_era_bytes γfs dq inum n :
+    inode_rd_era γfs dq inum n -∗ inode_bytes_era γfs dq n.
+  Proof. iIntros "[$ _]". Qed.
+
+  (* THE PIN, as the escrow's park meets it. *)
+  Lemma inode_rd_era_agree γfs dq1 dq2 γi inum n1 n2 :
+    inode_owned_era_q γfs dq1 γi inum n1 -∗
+    inode_rd_era γfs dq2 inum n2 -∗ ⌜n1 = n2⌝.
+  Proof.
+    iIntros "(_ & _ & _ & Ht1 & _) [_ Ht2]".
+    by iDestruct (top_frag_q_agree with "Ht1 Ht2") as %->.
+  Qed.
+
+  (* THE ESCROW'S DEPOSIT/WITHDRAW ARITHMETIC: the bundle at [dq1 ⋅ dq2] is
+     the bundle at [dq1] beside the READER'S share at [dq2].  [ilock] without
+     a transaction runs it left to right at [3/4 ⋅ 1/4], [iunlock] right to
+     left. *)
+  Lemma inode_owned_era_q_split γfs (q1 q2 : Qp) γi inum n :
+    inode_owned_era_q γfs (DfracOwn (q1 + q2)) γi inum n
+    ⊣⊢ inode_owned_era_q γfs (DfracOwn q1) γi inum n
+        ∗ inode_rd_era γfs (DfracOwn q2) inum n.
+  Proof.
+    rewrite /inode_owned_era_q /inode_rd_era /inode_bytes_era
+            blk_big_sepM_split.
+    rewrite (ind_owned_q_split _ (fs_gamma_L_frac γfs)).
+    rewrite top_frag_q_split.
+    iSplit.
+    - iIntros "(Hd & [Hb1 Hb2] & [Hi1 Hi2] & [Ht1 Ht2] & %Hl)". iFrame. done.
+    - iIntros "[(Hd & Hb1 & Hi1 & Ht1 & %Hl) [[Hb2 Hi2] Ht2]]". iFrame. done.
+  Qed.
+
+  (* ...and the BYTE-LEGS-ONLY reading of the same arithmetic, which is what
+     a consumer that already holds the fragment wants. *)
+  Lemma inode_bytes_era_q_split γfs (q1 q2 : Qp) γi inum n :
+    inode_owned_era_q γfs (DfracOwn (q1 + q2)) γi inum n
+    ⊣⊢ (dinode_at γi inum (fn_rec n)
+        ∗ inode_bytes_era γfs (DfracOwn q1) n
+        ∗ top_frag_q (fs_gamma_L γfs) (DfracOwn (q1 + q2)) (bv_unsigned inum) n
+        ∗ ⌜inode_local (bv_unsigned inum) n⌝)
+       ∗ inode_bytes_era γfs (DfracOwn q2) n.
+  Proof.
+    rewrite /inode_owned_era_q /inode_bytes_era blk_big_sepM_split.
+    rewrite (ind_owned_q_split _ (fs_gamma_L_frac γfs)).
+    iSplit.
+    - iIntros "(Hd & [Hb1 Hb2] & [Hi1 Hi2] & Ht & %Hl)". iFrame. done.
+    - iIntros "[(Hd & [Hb1 Hi1] & Ht & %Hl) [Hb2 Hi2]]". iFrame. done.
+  Qed.
+
+  Lemma inode_owned_era_shed γfs γi inum n :
+    inode_owned_era γfs γi inum n
+    ⊣⊢ inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+        ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n.
+  Proof.
+    rewrite inode_owned_era_1.
+    rewrite -(inode_owned_era_q_split γfs (3/4) (1/4)).
+    rewrite Qp.three_quarter_quarter //.
+  Qed.
+
+  (* THE SHED'S TWO DIRECTIONS AS WANDS, and they are not decoration.
+     [inode_owned_era_shed] is an [⊣⊢], so using it with [rewrite] inside a
+     proof that carries the escrow's payload rewrites the WHOLE proofmode
+     goal -- environments included -- and that walk is minutes.  Applied as
+     wands the same fact costs nothing, and every consumer wants exactly one
+     of the two directions.  (durable-disk B''-join; the same rule as
+     "discharge set side conditions by named lemma inside a proof that holds
+     a tower".) *)
+  Lemma inode_owned_era_shed_to γfs γi inum n :
+    inode_owned_era γfs γi inum n -∗
+    inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+    ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n.
+  Proof. iIntros "H". by iApply inode_owned_era_shed. Qed.
+
+  Lemma inode_owned_era_shed_of γfs γi inum n :
+    inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
+    inode_rd_era γfs (DfracOwn (1/4)) inum n -∗
+    inode_owned_era γfs γi inum n.
+  Proof.
+    iIntros "H1 H2". iApply inode_owned_era_shed. iFrame.
   Qed.
 
   Lemma inode_owned_era_local γfs γi inum n :
@@ -1082,16 +1349,84 @@ Section EraRes.
     iFrame.
   Qed.
 
+  (* ---- THE OLD PAYLOAD SHAPE AT A SHARE, AND THE READER'S QUARTER ---- *)
+
+  (* [inode_owned_era_of]/[_to] at an arbitrary share.  What crosses is the
+     [InodeInv] vocabulary at [dq]: the record proxy and the abstract
+     fragment do NOT take a share (records park region-side at fraction 1
+     always, plan section 2), so they are the same conjuncts as at 1. *)
+  Lemma inode_owned_era_of_q (γfs : fs_names) (dq : dfrac) (γi : gname)
+      (inum : bv 32) (n : fs_node) :
+    inode_local (bv_unsigned inum) n ->
+    dinode_at γi inum (fn_rec n) -∗
+    ind_res_q γfs dq (bm_of n) -∗
+    inode_blocks_q γfs dq (bm_of n) (fn_data n) -∗
+    top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum) n -∗
+    inode_owned_era_q γfs dq γi inum n.
+  Proof.
+    intros Hl. iIntros "Hd Hi Hb Ht".
+    rewrite /inode_owned_era_q.
+    rewrite (inode_blocks_era_q γfs dq (bv_unsigned inum) n Hl) ind_res_era_q.
+    iFrame. done.
+  Qed.
+
+  Lemma inode_owned_era_to_q (γfs : fs_names) (dq : dfrac) (γi : gname)
+      (inum : bv 32) (n : fs_node) :
+    inode_owned_era_q γfs dq γi inum n -∗
+      dinode_at γi inum (fn_rec n)
+      ∗ ind_res_q γfs dq (bm_of n)
+      ∗ inode_blocks_q γfs dq (bm_of n) (fn_data n)
+      ∗ top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum) n.
+  Proof.
+    iIntros "(Hd & Hb & Hi & Ht & %Hl)".
+    rewrite (inode_blocks_era_q γfs dq (bv_unsigned inum) n Hl) ind_res_era_q.
+    iFrame.
+  Qed.
+
+  (* THE READER'S QUARTER, IN THE [InodeInv] VOCABULARY.  [ilock] without a
+     transaction withdraws exactly [inode_bytes_era _ (DfracOwn (1/4)) n]
+     (lane B''-esc's read arm), and this is what turns that into the
+     [inode_map_q] / [inode_blocks_q] pair [readi] is stated over.  The
+     [inode_local] premise is what makes the block big-op and the
+     268-element bundle the same resource; a read-locker has it off the
+     escrow's residue ([inode_owned_era_q_local]). *)
+  Lemma inode_bytes_era_to (γfs : fs_names) (dq : dfrac) (i : Z) (n : fs_node) :
+    inode_local i n ->
+    inode_bytes_era γfs dq n -∗
+      ind_res_q γfs dq (bm_of n) ∗ inode_blocks_q γfs dq (bm_of n) (fn_data n).
+  Proof.
+    intros Hl. iIntros "[Hb Hi]".
+    rewrite (inode_blocks_era_q γfs dq i n Hl) ind_res_era_q. iFrame.
+  Qed.
+
+  Lemma inode_bytes_era_of (γfs : fs_names) (dq : dfrac) (i : Z) (n : fs_node) :
+    inode_local i n ->
+    ind_res_q γfs dq (bm_of n) -∗
+    inode_blocks_q γfs dq (bm_of n) (fn_data n) -∗
+    inode_bytes_era γfs dq n.
+  Proof.
+    intros Hl. iIntros "Hi Hb".
+    rewrite /inode_bytes_era.
+    rewrite (inode_blocks_era_q γfs dq i n Hl) ind_res_era_q. iFrame.
+  Qed.
+
   (* ---- INJECTIVITY IS THE [*] ---------------------------------------- *)
 
   (* two DIFFERENT owned slots name two DIFFERENT blocks -- [blkmap_wf]'s
-     fifth conjunct, read off the ownership and not maintained anywhere *)
-  Lemma inode_owned_era_slot_inj γfs γi inum n :
-    inode_owned_era γfs γi inum n -∗
+     fifth conjunct, read off the ownership and not maintained anywhere.
+
+     AT A SHARE (lane B'): the reading holds of ANY [dq] whose double is
+     invalid, so it is available off the escrow's THREE-QUARTER residue of a
+     read-locked inode as well as off a full bundle -- which is what the
+     commit's collection needs (plan section 4, [blk_owned_ne_34]). *)
+  Lemma inode_owned_era_q_slot_inj γfs dq γi inum n :
+    ~ ✓ (dq ⋅ dq) ->
+    inode_owned_era_q γfs dq γi inum n -∗
     ⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
         bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
         bm_slot (bm_of n) k = bm_slot (bm_of n) j -> k = j⌝.
   Proof.
+    intros Hnv.
     iIntros "(_ & Hb & Hi & _ & %Hl)".
     iAssert (⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
                k <> j ->
@@ -1105,19 +1440,19 @@ Section EraRes.
       destruct (decide (k = MAXFILE)) as [Hkm | Hkm];
         destruct (decide (j = MAXFILE)) as [Hjm | Hjm]; [lia | | |].
       - (* k is the indirect block, j a data slot *)
-        rewrite /ind_owned (decide_False _ _ Hnk).
+        rewrite /ind_owned_q (decide_False _ _ Hnk).
         destruct (proj2 (inl_blk_dom Hl j
                     ltac:(rewrite -MAXFILE_FS; lia)) Hnj) as [bs Hbs].
         iDestruct (big_sepM_lookup _ _ j bs Hbs with "Hb") as "Hbj".
-        iApply (FsStateDefs.blk_owned_ne _ (fs_gamma_L_excl γfs)
-                  with "Hi Hbj").
+        iApply (FsStateDefs.blk_owned_q_ne _ (fs_gamma_L_excl γfs) dq dq
+                  _ _ _ _ Hnv with "Hi Hbj").
       - (* j is the indirect block, k a data slot *)
-        rewrite /ind_owned (decide_False _ _ Hnj).
+        rewrite /ind_owned_q (decide_False _ _ Hnj).
         destruct (proj2 (inl_blk_dom Hl k
                     ltac:(rewrite -MAXFILE_FS; lia)) Hnk) as [bs Hbs].
         iDestruct (big_sepM_lookup _ _ k bs Hbs with "Hb") as "Hbk".
-        iApply (FsStateDefs.blk_owned_ne _ (fs_gamma_L_excl γfs)
-                  with "Hbk Hi").
+        iApply (FsStateDefs.blk_owned_q_ne _ (fs_gamma_L_excl γfs) dq dq
+                  _ _ _ _ Hnv with "Hbk Hi").
       - (* two data slots *)
         destruct (proj2 (inl_blk_dom Hl k
                     ltac:(rewrite -MAXFILE_FS; lia)) Hnk) as [bsk Hbsk].
@@ -1127,12 +1462,75 @@ Section EraRes.
         assert (Hbsj' : delete k (fn_blk n) !! j = Some bsj)
           by (rewrite lookup_delete_ne; [exact Hbsj | done]).
         iDestruct (big_sepM_lookup _ _ j bsj Hbsj' with "Hrest") as "Hbj".
-        iApply (FsStateDefs.blk_owned_ne _ (fs_gamma_L_excl γfs)
-                  with "Hbk Hbj"). }
+        iApply (FsStateDefs.blk_owned_q_ne _ (fs_gamma_L_excl γfs) dq dq
+                  _ _ _ _ Hnv with "Hbk Hbj"). }
     iPureIntro. intros k j Hk Hj Hnk Heq.
     destruct (decide (k = j)) as [-> | Hkj]; [done |].
     exfalso. apply (Hne k j Hk Hj Hkj Hnk); rewrite -Heq; [exact Hnk |].
     by rewrite Heq.
+  Qed.
+
+  Lemma inode_owned_era_slot_inj γfs γi inum n :
+    inode_owned_era γfs γi inum n -∗
+    ⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
+        bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
+        bm_slot (bm_of n) k = bm_slot (bm_of n) j -> k = j⌝.
+  Proof.
+    rewrite inode_owned_era_1.
+    iApply (inode_owned_era_q_slot_inj γfs (DfracOwn 1) γi inum n
+              (dfrac_full_nvalid _)).
+  Qed.
+
+  (* the residue a READ-LOCKED inode leaves in its escrow is at three
+     quarters, and that is exactly the share at which the reading above
+     holds (3/4 + 3/4 > 1) *)
+  Lemma inode_owned_era_34_slot_inj γfs γi inum n :
+    inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
+    ⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
+        bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
+        bm_slot (bm_of n) k = bm_slot (bm_of n) j -> k = j⌝.
+  Proof.
+    iApply (inode_owned_era_q_slot_inj γfs (DfracOwn (3/4)) γi inum n
+              dfrac_34_nvalid).
+  Qed.
+
+  Lemma inode_owned_era_q_local γfs dq γi inum n :
+    inode_owned_era_q γfs dq γi inum n -∗ ⌜inode_local (bv_unsigned inum) n⌝.
+  Proof. iIntros "(_ & _ & _ & _ & $)". Qed.
+
+  (* ---- THE DATA-BLOCK ACCESSOR AT A SHARE (plan section 3, lane B') ----
+
+     A READ of one slot's bytes takes the caller's fraction and hands it
+     straight back; a WRITE cannot use this at all, because
+     [SpecLogWrite.wp_log_write_au_range] needs fraction 1 and the borrow
+     comes out at whatever [dq] the bundle is at.  That is the resource
+     reading of "a read-locker cannot write a data block". *)
+  Lemma inode_owned_era_q_blk_read γfs dq γi inum n (k : nat) bs :
+    fn_blk n !! k = Some bs ->
+    inode_owned_era_q γfs dq γi inum n -∗
+      FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs
+      ∗ (FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs -∗
+           inode_owned_era_q γfs dq γi inum n).
+  Proof.
+    intros Hbs. iIntros "(Hd & Hb & Hi & Ht & %Hl)".
+    iDestruct (big_sepM_delete _ _ k bs Hbs with "Hb") as "[Hbk Hrest]".
+    iFrame "Hbk". iIntros "Hbk".
+    iDestruct (big_sepM_delete _ _ k bs Hbs) as "[_ Hback]".
+    iFrame. iSplitL; [| done]. iApply "Hback". iFrame.
+  Qed.
+
+  Lemma inode_bytes_era_blk_read γfs dq n (k : nat) bs :
+    fn_blk n !! k = Some bs ->
+    inode_bytes_era γfs dq n -∗
+      FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs
+      ∗ (FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs -∗
+           inode_bytes_era γfs dq n).
+  Proof.
+    intros Hbs. iIntros "[Hb Hi]".
+    iDestruct (big_sepM_delete _ _ k bs Hbs with "Hb") as "[Hbk Hrest]".
+    iFrame "Hbk". iIntros "Hbk".
+    iDestruct (big_sepM_delete _ _ k bs Hbs) as "[_ Hback]".
+    iFrame. iApply "Hback". iFrame.
   Qed.
 
   (* ---- COVERAGE IS A CONSEQUENCE OF OWNING THE RUN -------------------- *)
@@ -1436,6 +1834,69 @@ Section EraRes.
     rewrite (inode_blocks_data_ext γfs bm (fn_data (era_node dn bm data)) data
                (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
     iFrame.
+  Qed.
+
+  (* [inode_blocks_data_ext] AT A SHARE, which is all the reader's quarter
+     needs of it. *)
+  Lemma inode_blocks_q_data_ext (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data data' : nat -> list (bv 8)) :
+    (forall k : nat, (k < MAXFILE)%nat -> data k = data' k) ->
+    inode_blocks_q γfs dq bm data ⊣⊢ inode_blocks_q γfs dq bm data'.
+  Proof.
+    intros Hext. rewrite /inode_blocks_q.
+    apply big_sepL_proper. intros j k Hj.
+    apply lookup_seq in Hj as [Heq Hlt].
+    assert (Hk : (k < MAXFILE)%nat) by lia.
+    rewrite (Hext k Hk) //.
+  Qed.
+
+  (* THE READER'S QUARTER AT THE PAYLOAD'S SPELLING (durable-disk B''-join).
+     [IcacheEscrow.ic_rd_held] hands a read-locker
+     [inode_rd_era _ (DfracOwn (1/4)) inum (era_node dn bm data)]; this is
+     what turns it into the two conjuncts [readi] is stated over --
+     [InodeInv.ind_res_q] (which with the holder's [inode_addrs] cells IS
+     [inode_map_q]) and [InodeInv.inode_blocks_q] -- at the payload's own
+     [(bm, data)] rather than the node's.  The [top_frag] quarter comes out
+     beside them because the park needs it back. *)
+  Lemma inode_rd_era_era_node_to (γfs : fs_names) (dq : dfrac) (inum : bv 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    node_shape_ok dn bm data ->
+    inode_local (bv_unsigned inum) (era_node dn bm data) ->
+    inode_rd_era γfs dq inum (era_node dn bm data) -∗
+      ind_res_q γfs dq bm
+      ∗ inode_blocks_q γfs dq bm data
+      ∗ top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum)
+          (era_node dn bm data).
+  Proof.
+    intros Hs Hl. iIntros "[Hb Ht]".
+    iDestruct (inode_bytes_era_to γfs dq (bv_unsigned inum)
+                 (era_node dn bm data) Hl with "Hb") as "[Hi Hb]".
+    rewrite (bm_of_era_node dn bm data Hs).
+    rewrite (inode_blocks_q_data_ext γfs dq bm
+               (fn_data (era_node dn bm data)) data
+               (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
+    iFrame.
+  Qed.
+
+  Lemma inode_rd_era_era_node_of (γfs : fs_names) (dq : dfrac) (inum : bv 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    node_shape_ok dn bm data ->
+    inode_local (bv_unsigned inum) (era_node dn bm data) ->
+    ind_res_q γfs dq bm -∗
+    inode_blocks_q γfs dq bm data -∗
+    top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum) (era_node dn bm data) -∗
+    inode_rd_era γfs dq inum (era_node dn bm data).
+  Proof.
+    intros Hs Hl. iIntros "Hi Hb Ht".
+    rewrite /inode_rd_era. iFrame "Ht".
+    iApply (inode_bytes_era_of γfs dq (bv_unsigned inum)
+              (era_node dn bm data) Hl with "[Hi] [Hb]").
+    - rewrite (bm_of_era_node dn bm data Hs). iExact "Hi".
+    - rewrite (bm_of_era_node dn bm data Hs).
+      rewrite (inode_blocks_q_data_ext γfs dq bm
+                 (fn_data (era_node dn bm data)) data
+                 (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
+      iExact "Hb".
   Qed.
 
   Lemma inode_owned_era_era_node_of (γfs : fs_names) (γi : gname) (inum : bv 32)
@@ -2088,3 +2549,16 @@ Section EraRes.
   Qed.
 
 End EraRes.
+
+(* SEALED FOR THE [iFrame]-UP-TO-DELTA RULE (durable-notes).  All three are
+   separating conjunctions over a [big_sepM] of block runs and an
+   [ind_owned_q] whose body is a [decide] on a term no resolution can reduce,
+   so an unsealed one turns every [Timeless] / [Frame] search that meets it
+   into a backtracking walk of the whole payload -- measured at over
+   NINETEEN MINUTES on one [apply _] for [IcacheEscrow.ic_rd_arm], the read
+   arm's residue, with no error and no output.  The declared instances and
+   [rewrite /inode_owned_era_q] still work.
+
+   The UNSUFFIXED [inode_owned_era] is deliberately not in this list: it is
+   the [DfracOwn 1] reading forty payload sites already frame through. *)
+Global Typeclasses Opaque inode_owned_era_q inode_bytes_era inode_rd_era.

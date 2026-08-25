@@ -1255,7 +1255,7 @@ Section ProofSysLinkBody.
         assert (HQ2regs : sl_regs m sp0 (m !!! Regidx Rs1 : mword 64)
                             (m !!! Regidx Rs2 : mword 64) Q2)
           by (rewrite /Q2; apply sl_regs_caller; [exact Hcsra | exact HQ1regs]).
-        iDestruct "Hop" as (Sb0) "HopS".
+        iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
         iDestruct (sl_buf_split (pa_stk sp0 38) bo1 pk1 Hpk1 with "HbO")
           as "[Hbufk Hbufrest]".
         sl_own_transport CID21 CID23 eb pj b.
@@ -1269,14 +1269,14 @@ Section ProofSysLinkBody.
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                         Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                        Hbmres Hpidq Hcwdref [Hbufk] Hbsl Hir2 HopS").
+                        Hbmres Hpidq Hcwdref [Hbufk] Hbsl Hir2 [$HopS $Htx]").
         (* namei is eb-generic now; sys_link is still at [eb = true]. *)
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
         iIntros (CID24 Hq24 mna n1 Sb1 ok ipv w1)
           "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
-           Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
+           Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
         iEval (rewrite HQ2a0) in "Hbufk".
         assert (Hpc3e : ret_pc (Q2 !!! Regidx Rra : mword 64)
                         = mword_of_int (SL + 0x3e)) by (rewrite HQ2ra; pcw).
@@ -1371,7 +1371,12 @@ Section ProofSysLinkBody.
                               (m !!! Regidx Rs2 : mword 64) R0)
             by (rewrite /R0; apply sl_regs_caller; [exact Hcsra | exact HQ3regs]).
           sl_own_transport CID24 CID27 eb pj b.
-          iApply (Ilock.wp_ilock_sconf (CID := CID27) gs j gl gu gd gk pd pav pu
+          (* ---- THE WRITE ARM (durable-fs-plan.md section 3, [ilock];
+             durable-disk B''-tx): half the transaction's element sits in
+             the escrow's checked-out arm for the whole locked window,
+             and the residue rides the descriptor conjunct home. *)
+          iEval (rewrite Hclog) in "Htx".
+          iApply (Ilock.wp_ilock_tx_sconf (CID := CID27) gs j gl gu gd gk pd pav pu
                     bn gfs gi cn gil gisl cov logstart inodestart nib
                     kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                     R0 (K - 38)%nat eb b lks
@@ -1379,7 +1384,7 @@ Section ProofSysLinkBody.
                     (Hlb "bcache"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                           Hireg Hslkk Hshr Hru Hsbi Hpidq Hprocs Hdev Hgeo Hdlk
-                          Hbs1").
+                          Hbs1 Htx").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CID28 Hq28 mil dn bm fl)
@@ -1487,7 +1492,7 @@ Section ProofSysLinkBody.
                        m R2 sp0 K eb b lks u4 bn0 bw1 bo2
                        (upd_upt V P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                        Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
-                       Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
+                       Hiu1 Hj Hgl Hclog Hlkempty ltac:(reflexivity)
                        (sl_regs_sp _ _ _ _ _ HR2regs)
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
                        with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -1499,7 +1504,7 @@ Section ProofSysLinkBody.
                              [Hsbs Hir1 Hir1b Hcwdref Hofiles Hftok Hcont]").
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
-             { rewrite /log_op. iExists Sb1. iExact "HopS". }
+             { iApply (log_opS_opb with "HopS"). }
              iEval (rewrite /wp_next).
              iIntros (CIDy) "%Hqy". iIntros (mf)
                "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
@@ -1646,7 +1651,7 @@ Section ProofSysLinkBody.
                           m R5 sp0 K eb b lks u4 bn0 bw1 bo2
                           (upd_upt V P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
-                          Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
+                          Hiu1 Hj Hgl Hclog Hlkempty ltac:(reflexivity)
                           (sl_regs_sp _ _ _ _ _ HR5regs)
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam
@@ -1658,7 +1663,7 @@ Section ProofSysLinkBody.
                                 [Hsbs Hir1 Hir1b Hcwdref Hofiles Hftok Hcont]").
                 { rewrite Heb /trap_csrs_ext. done. }
                 { rewrite Heb /cpu_claim_ext. done. }
-                { rewrite /log_op. iExists Sb1. iExact "HopS". }
+                { iApply (log_opS_opb with "HopS"). }
                 iEval (rewrite /wp_next).
                 iIntros (CIDy) "%Hqy". iIntros (mf)
                   "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
@@ -1896,10 +1901,24 @@ Section ProofSysLinkBody.
                    is the one column [sl_incnl] moves: [ireg_top_retag]
                    opens [ftopN] alone (durable-disk 2b-inode-3). *)
                 iDestruct "Hfview" as "[Hfview Htop]".
+                (* THE RETAG OWES THE ROW (durable-disk lane A): a raised
+                   link count leaves the inode well-formed, and these are
+                   the re-pack's own four facts. *)
+                assert (Hlocnl : inode_local (bv_unsigned inum)
+                          (era_node (sl_incnl dn) bm dat)).
+                { apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart
+                           (sl_incnl dn) bm dat
+                           (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok)
+                           (sl_incnl_rec_local dn Hrl_dat Hnl
+                              (sl_tdir_zne _ Hty))).
+                  - apply dir_uniq_not_dir.
+                    rewrite /sl_incnl sl_setnl_type. exact (sl_tdir_zne _ Hty).
+                  - apply (dir_dots_ix_not_dir (bv_unsigned inum)).
+                    rewrite /sl_incnl sl_setnl_type. exact (sl_tdir_zne _ Hty). }
                 iApply fupd_wp.
                 iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum)
                         (era_node dn bm dat) (era_node (sl_incnl dn) bm dat)
-                        ltac:(solve_ndisj) with "[] Htop") as "Htop";
+                        ltac:(solve_ndisj) Hlocnl with "[] Htop") as "Htop";
                   [iApply (ireg_inv_ftop with "Hireg") |].
                 iModIntro.
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
@@ -1971,7 +1990,7 @@ Section ProofSysLinkBody.
                   by (rewrite /S4; apply sl_regs_caller;
                       [exact Hcsra | exact HS3regs]).
                 sl_own_transport CID41 CID43 eb pj b.
-                iApply (Iunlock.wp_iunlock_sconf (CID := CID43) gs gfs gi cn gil
+                iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID43) gs gfs gi cn gil
                           gisl cov logstart kk (qq/2)%Qp gsh dev inum
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
                           S4 (K - 38)%nat eb pj b lks
@@ -1979,7 +1998,8 @@ Section ProofSysLinkBody.
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hpidq Hprocs Hdep Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
-                iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr".
+                iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
+                iEval (rewrite -Hclog) in "Htx".
                 (* THE GENERATION SURVIVES THE WINDOW, and sys_link is the
                    caller that needs it: the share it still holds denies the
                    recycler [live_gen_bump]'s whole unit, so the [ity_shot]
@@ -2078,7 +2098,7 @@ Section ProofSysLinkBody.
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab
                                 Hitinv Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk
                                 Hsbb Hsbi Hbmres Hpidq Hcwdref [Hbufw]
-                                [Hnm14] Hbsl Hir2 HopS").
+                                [Hnm14] Hbsl Hir2 [$HopS $Htx]").
                 (* nameiparent is eb-generic now; sys_link is at [eb = true]. *)
                 { rewrite Heb /trap_csrs_ext. done. }
                 { rewrite Heb /cpu_claim_ext. done. }
@@ -2086,7 +2106,7 @@ Section ProofSysLinkBody.
                 { iEval (rewrite HT2a1). iExact "Hnm14". }
                 iIntros (CID48 Hq48 mnp n2 Sb2 ok2 nf dpv w2)
                   "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq
-                   Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 HopS Hres2".
+                   Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 [HopS Htx] Hres2".
                 iEval (rewrite HT2a0) in "Hbufw".
                 iEval (rewrite HT2a1) in "Hnm14".
                 assert (Hpc7c : ret_pc (T2 !!! Regidx Rra : mword 64)
@@ -2201,7 +2221,11 @@ Section ProofSysLinkBody.
                      by (rewrite /U0; apply sl_regs_caller;
                          [exact Hcsra | exact HT3regs]).
                    sl_own_transport CID48 CID51 eb pj b.
-                   iApply (Ilock.wp_ilock_sconf (CID := CID51) gs j gl gu gd gk pd
+                   (* ---- THE WRITE ARM for the directory's lock
+                      (durable-fs-plan.md section 3, [ilock];
+                      durable-disk B''-tx) *)
+                   iEval (rewrite Hclog) in "Htx".
+                   iApply (Ilock.wp_ilock_tx_sconf (CID := CID51) gs j gl gu gd gk pd
                              pav pu bn gfs gi cn gild gisld cov logstart inodestart
                              nib kd (qd/2)%Qp gyd PlainK dev dinum pid
                              (DfracOwn (1/4)) dqs
@@ -2210,7 +2234,7 @@ Section ProofSysLinkBody.
                              HU0a0 (Hlb "bcache"%string)
                              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv
                                    Hescd Hireg Hslkd0 Hshrd Hrud Hsbi Hpidq Hprocs
-                                   Hdev Hgeo Hdlk Hbs1d").
+                                   Hdev Hgeo Hdlk Hbs1d Htx").
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CID52 Hq52 mild dnd bmd fld)
@@ -2999,10 +3023,17 @@ Section ProofSysLinkBody.
                             (* ...and the ERA's abstract value with them
                                (durable-disk 2b-inode-3): [ireg_top_retag]
                                opens [ftopN] alone. *)
+                            (* THE RETAG OWES THE ROW (durable-disk lane A):
+                               the four facts are the re-pack's own, already
+                               named. *)
                             iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj) with "[] Htopd")
+                                    ltac:(solve_ndisj)
+                                    (inode_local_of_ok_rec (bv_unsigned dinum)
+                                       cov logstart dnd' bmd' datd'
+                                       Hdiok' Hrl_datd' Hduq' Hddix')
+                                    with "[] Htopd")
                               as "Htopd";
                               [iApply (ireg_inv_ftop with "Hireg") |].
                             iModIntro.
@@ -3077,7 +3108,7 @@ Section ProofSysLinkBody.
                                           (sl_sub_le _ _))).
                             iDestruct (log_opS_named with "HopS") as (e0) "HopE".
                             sl_own_transport CID60 CID63 eb pj b.
-                            iApply (Iunlockput.wp_iunlockput_gen (CID := CID63) gs j
+                            iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID63) gs j
                                       gl gu gd gk pd pav pu bn g gfs gi cn gtl gild
                                       gisld cov logstart bmapstart inodestart nib
                                       size dev kd (qd/2)%Qp (qd/2)%Qp gyd
@@ -3090,7 +3121,7 @@ Section ProofSysLinkBody.
                                       ltac:(intros _; exact Hmiblk)
                                       Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk
                                       Hdiblog Hdinb Hcovb Hiu3 Hj Hgl HW1a0
-                                      ltac:(rewrite Hlkempty; apply locks_below_empty)
+                                      ltac:(rewrite Hlkempty; apply locks_below_empty) Hclog
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd
                                             Hdepd Hidevd Hiinumd Hivalidd
@@ -3102,7 +3133,7 @@ Section ProofSysLinkBody.
                             { done. }
                             iIntros (CID64 Hq64 mupd n4 Sb4 wd)
                               "%Hcsupd Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
-                               Hbsl %HSb4 %Hwd %Hcrbwd %Hn4 HopS Hislotd".
+                               Hbsl %HSb4 %Hwd %Hcrbwd %Hn4 HopS Htx Hislotd".
                             assert (Hpcaa : ret_pc (W1 !!! Regidx Rra : mword 64)
                                       = mword_of_int (SL + 0xaa))
                               by (rewrite HW1ra; pcw).
@@ -3181,10 +3212,10 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hesck Hireg Hropen Hslkk [$Hrefip $Hru]
                                             Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
-                                            Hdlk Hbsl [HopS]").
+                                            Hdlk Hbsl [HopS Htx]").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
-                            { rewrite /log_op. iExists Sb4. iExact "HopS". }
+                            { iApply (log_opS_op with "HopS Htx"). }
                             iIntros (CID67 Hq67 mip n5)
                               "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                Hbsl %Hn5 Hop Hisloti".
@@ -3449,10 +3480,17 @@ Section ProofSysLinkBody.
                             (* ...and the ERA's abstract value with them
                                (durable-disk 2b-inode-3): [ireg_top_retag]
                                opens [ftopN] alone. *)
+                            (* THE RETAG OWES THE ROW (durable-disk lane A):
+                               the four facts are the re-pack's own, already
+                               named. *)
                             iMod (ireg_top_retag ⊤ gfs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj) with "[] Htopd")
+                                    ltac:(solve_ndisj)
+                                    (inode_local_of_ok_rec (bv_unsigned dinum)
+                                       cov logstart dnd' bmd' datd'
+                                       Hdiok' Hrl_datd' Hduq' Hddix')
+                                    with "[] Htopd")
                               as "Htopd";
                               [iApply (ireg_inv_ftop with "Hireg") |].
                             iModIntro.
@@ -3611,7 +3649,7 @@ Section ProofSysLinkBody.
                                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hkeep Hru Hshr
                                    Hshot2 Hilink Htoken Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
-                                   Hdlk Hbsl HopS Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
+                                   Hdlk Hbsl HopS Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwdref Hofiles Hftok Hcont]").
                    iEval (rewrite /wp_next).
                    iIntros (CIDy) "%Hqy". iIntros (mf)
@@ -3657,13 +3695,13 @@ Section ProofSysLinkBody.
                     (sl_regs_sp _ _ _ _ _ HQ3regs) (sl_regs_thr _ _ _ _ _ HQ3regs)
                     HQ3s2 Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                          Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
+                          Hpidq Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4
                           HbN HbW HbO
                           [Hbsl Hsbb Hsbi Hsbs Hir1 Hir2b Hcwdref
                            Hofiles Hftok Hcont]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /log_op. iExists Sb1. iExact "HopS". }
+          { iApply (log_opS_op with "HopS Htx"). }
           iEval (rewrite /wp_next).
           iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                                Hpc Hpidq".

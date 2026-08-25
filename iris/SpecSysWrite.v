@@ -177,6 +177,10 @@ Definition wp_sys_write_sconf_body
      they used to be promised by the opener and are ordinary premises now *)
   fwn_j fn = j ->
   fwn_procs fn = γs ->
+  (* ...and the log, likewise an equation rather than a derivation: the
+     escrow's write arm parks at the ambient [icfg_log] (durable-disk
+     B''-tx).  [ProofSyscall]'s [sysc_ties] proves it ([sct_log]). *)
+  fwn_log fn = icfg_log ->
   (* the three syscall arguments; argument 1 (the user source) is fetched
      but never inspected here *)
   pv_tf V !! tf_arg_idx 0 = Some v ->

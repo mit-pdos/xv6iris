@@ -93,6 +93,9 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
+(* [fs_sb], [fs_parse_sb], [fs_sb_ok], [SB_BNO] -- block 1's park.  EARLY,
+   because this file's later imports own the names it shadows. *)
+Require Import FsImg.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
@@ -178,7 +181,9 @@ Definition wp_initlog_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (* ---- block 1, on its way into [log_ctx] (durable-disk lane C-3a) ---- *)
+    (bs_sb : list (bv 8)) (sbrec : fs_sb) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initlog in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -227,6 +232,13 @@ Definition wp_initlog_sconf_body
      bwrite/bunpin, write_head's bread/bwrite/brelse) never dips below
      "bcache" (4); [initlock] itself carries no order premise. *)
   locks_below lks "bcache" ->
+  (* BLOCK 1'S TWO PURE FACTS (durable-disk lane C-3a).  Both come off the
+     boot image and neither is recomputed here: [fs_sb_ok] is
+     [FsCfgBoot.fs_boot_image_wf]'s W1 through [FsImg.fsimg_wf_sb], and the
+     parse is W1's own [FsImg.fs_parse_sb] reading, which
+     [FsImgCheck.fsimg_parse_sb] already discharges at the literal image. *)
+  fs_sb_ok sbrec ->
+  fs_parse_sb (fun _ => bs_sb) = Some sbrec ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- claude-notes/completed/
@@ -322,6 +334,15 @@ Definition wp_initlog_sconf_body
      dead n = 0 path).  The pair comes back; the 32 stay sealed in the
      lock. *)
   bslots ((LOGBLOCKS + 2) + 2)%nat -∗
+  (* BLOCK 1'S BYTE RUN, AT FULL FRACTION (durable-disk lane C-3a).  fsinit
+     is done with it by +0x4e -- its [readsb] ran at +0x26 -- and this is
+     where it stops being a resource nobody owns: initlog parks it in
+     [SbPark.sbN] and seals the handle into the [log_ctx] it returns, which
+     is the only persistent bundle the commit's [end_op] holds.  It has to
+     be fraction 1: [FsDurSnap.sk_meta_used] is read off the separating
+     conjunction, and a discarded share does not refute a read-locked
+     inode's 3/4. *)
+  fsblock (fs_bytes γfs) SB_BNO bs_sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -376,9 +397,10 @@ Module Type INITLOG.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (bs_sb : list (bv 8)) (sbrec : fs_sb),
       wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
                             cov logstart dev sb bs_hdr Bh M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb b lks Vpr.
+                            pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
 End INITLOG.

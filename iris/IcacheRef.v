@@ -720,7 +720,20 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
   | DepRef _ _ _ g => Some g
   | DepShr _ _ _ g => Some g
   | DepFrz _ _ _ => None
+  (* the write arm is a [DepShr] carrying a parked transaction share, so it
+     names the same generation (durable-disk B''-arm) *)
+  | DepTx _ _ _ g _ _ => Some g
+  | DepRd _ _ _ g => Some g
   end.
+
+(* IS THIS DESCRIPTOR THE READ ARM (durable-disk B''-join)?  The escrow's OUT
+   arm at [DepRd] keeps three quarters of the inode's bundle
+   ([IcacheEscrow.ic_rd_arm]); at every other descriptor it keeps nothing, and
+   this boolean is the pure side condition the two arm-generic constructors
+   ([ic_swap_checkout], [ic_close_out]) carry so that they may keep taking an
+   ABSTRACT descriptor.  Both callers pass a [DepShr] and pay [reflexivity]. *)
+Definition ic_dep_rd (d : ic_dep) : bool :=
+  match d with DepRd _ _ _ _ => true | _ => false end.
 
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
    ([icn_id], design §13.8 as widened by §13.10): an agreement between the
@@ -817,6 +830,17 @@ Class icfg := MkIcfg {
      name would enter every fs contract.  Registers every inum: the full
      element refutes the pending arm at [ireg_claim_au] by fraction overflow. *)
   icfg_reg : gname;
+  (* THE LOCKED REGISTRY's gname (durable-disk lane A, plan section 4b),
+     ambient for [icfg_reg]'s reason verbatim: the registry is a conjunct of
+     [InodeRegion.ftop_body], which rides [ireg_inv], so a threaded name
+     would enter thirty-odd fs contracts. *)
+  icfg_lk : gname;
+  (* THE FREE POOL'S RESIDENCY KEY (durable-disk lane B''-esc, plan section 4),
+     ambient for [icfg_lk]'s reason verbatim: one half of it sits inside the
+     pool's own Iris invariant and the other inside [IcacheEscrow.ipool], a
+     conjunct of the itable spinlock's resource, so a threaded name would
+     enter [ic_escrow]'s arity -- i.e. every fs contract in the tree. *)
+  icfg_pool : gname;
   (* THE COUNT COUPLING's gname (iclaim-ledger.md §2.2), ambient for
      [icfg_link]'s reason verbatim: one half is parked in
      [InodeRegion.ireg_slot] (hence inside [ireg_inv], whose arity is fixed
@@ -1010,7 +1034,16 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          escrow gnames; the reordered-iput walk re-mints real ones at deposit)
          and parks the whole thing inside [ireg_body], where [reg_full]
          refutes [ireg_claim_au]'s pending arm with no premise. *)
-      ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname)).
+      ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname)) ∗
+      (* THE LOCKED REGISTRY's auth, handed out EMPTY: at boot no
+         transaction exists, so no inum's row is suspended (durable-disk
+         lane A).  [InodeRegion.ftop_alloc] takes it. *)
+      ghost_map_auth icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ∗
+      (* THE FREE POOL'S RESIDENCY KEY, WHOLE and at the empty set: at this
+         altitude no pool exists yet.  [IcacheBoot.icache_boot_at] is what
+         updates it to the region's inums, splits it, and puts one half
+         inside the pool invariant it allocates. *)
+      ghost_var icfg_pool 1 (∅ : gset Z).
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1035,11 +1068,15 @@ Proof.
      boot fupd re-mints it registered over every inum and parks it in
      [ireg_body] (where [reg_full] refutes the pending arm). *)
   iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
+  (* the locked registry, empty (durable-disk lane A) *)
+  iMod (ghost_map_alloc (∅ : gmap nat ireg_arm_ent)) as (γlkr) "[Hlkr _]".
+  (* the free pool's residency key, whole and empty (durable-disk B''-esc) *)
+  iMod (ghost_var_alloc (∅ : gset Z)) as (γpool) "Hpool".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γcnt γfrzo γfrzm γdv γfv), g0.
-  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_icnt icfg_frzo icfg_frzm
-       icfg_dview icfg_fview].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg".
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γcnt γfrzo γfrzm γdv γfv), g0.
+  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_icnt icfg_frzo
+       icfg_frzm icfg_dview icfg_fview].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool".
 Qed.
 
 (* ===================================================================== *)

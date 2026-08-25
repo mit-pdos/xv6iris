@@ -339,9 +339,21 @@ Definition wp_readi_sconf_body
      bundle rather than the one cell, because that is what a caller holding
      a locked inode has; it comes back untouched. *)
   inode_meta ip dn -∗
-  (* THE FILE'S BLOCK MAP AND ITS DATA BLOCKS, both returned UNCHANGED *)
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  (* THE FILE'S BLOCK MAP AND ITS DATA BLOCKS, both returned UNCHANGED,
+     AT A SHARE [dq] (durable-fs-plan.md sections 4, 6; lane B''-blk).
+     [dq] was a vestigial parameter of this contract and is now the
+     fraction of the data and indirect blocks' byte runs -- the arity did
+     not move, and every caller that holds a whole inode passes
+     [DfracOwn 1].  readi MODIFIES NOTHING: its only use of a data block is
+     the AGREEMENT that identifies bread's buffer with the block's logged
+     bytes ([ProofReadiParts.rd_held_content]), and bmap-with-no-allocation
+     reads the indirect block the same way.  So a READ-LOCKER, which
+     [ilock] outside a transaction hands a QUARTER of the byte legs (plan
+     section 4), can call readi -- which is the whole point of the
+     fraction.  The ADDRS cells inside [inode_map_q] are not shared:
+     records park region-side at fraction 1 always. *)
+  inode_map_q γfs dq ip bm -∗
+  inode_blocks_q γfs dq bm data -∗
   (* THE DESTINATION, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
      virtual address into the running process's own space; on the kernel arm
      the caller's own [n]-byte buffer, whose current contents are [dst_olds].
@@ -405,8 +417,8 @@ Definition wp_readi_sconf_body
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_meta ip dn -∗
-      inode_map γfs ip bm -∗
-      inode_blocks γfs bm data -∗
+      inode_map_q γfs dq ip bm -∗
+      inode_blocks_q γfs dq bm data -∗
       (* THE BYTES DELIVERED ARE THE FILE'S BYTES.  Exact on both ends: the
          untouched tail still holds what the caller put there.  The pid
          fraction goes back the way it came -- with the kernel arm's buffer,

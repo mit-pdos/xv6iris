@@ -249,6 +249,11 @@ region bundle would serve — and (ii) which blocks are in the byte bin, which
 moves per write and therefore belongs in the DEBT's own existential (the
 payload knows what the batch has taken out) rather than in `P_wf`.
 
+> **SECTIONS 4½–4⁹ BELOW ARE SUPERSEDED (2026-08-25).**  They are the
+> accreted rulings of the three-day redesign, kept for traceability.  The
+> design of record is now [`durable-fs-plan.md`](durable-fs-plan.md); §0–§2
+> above and §7 (as-built) remain the reference for the predicate.
+
 ## 4½. RULING (owner, 2026-08-24): the WAL exports a HOME VIEW; durable write permission IS the client's fupd
 
 Issued after lane 3a refuted the index-free `P_wf` and the orchestrator's
@@ -1136,6 +1141,240 @@ needs care rather than transcription — a `GMint`/`GBurn` at a node whose
 entry map is NOT empty, where `fn_orphan` flips and the dot entries'
 exemption moves with it (`ent_tok_orph_up` is the lemma; `mkdir`'s child
 is the case).  The landed pair covers `mknod`'s non-growing arm.
+
+## 4⁹ RULING (owner, 2026-08-25): SNAPSHOT COMMITS — the durable instance is re-allocated per commit, never updated
+
+Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
+`fdn_*` geometry fields, `FsDurLedger`'s fold as the commit path, and
+`FsDurWire`'s law family).  The design:
+
+1. **No durable ghost is ever updated.**  At each group commit the
+   committer ALLOCATES a fresh gname family `Γ_{k+1}` (byte map, top map,
+   link family) at the quiescent state's values, proves
+   `P_fs[Γ_{k+1}]` at birth, advances a small EPOCH POINTER carried by
+   the crash predicate, and DISCARDS `Γ_k` (affine).  Allocation is
+   unconditionally frame-preserving — every update-wall of the project
+   (auth-in-frame, completeness, geometry, ordering) is thereby vacated.
+2. **The transport does not consume the era's instance**:
+   `P_fs[Γ_L] ==∗ P_fs[Γ_L] ∗ P_fs[Γ_fresh]` — the commit reads the
+   VALUE `S_L` off the `γtop_L` AUTHORITY (parked in the openable
+   payload invariant; the ipool mask wall is never touched — values,
+   not pieces), the bytes tie accumulates per-write from each writer's
+   own splice fact, the local clauses at quiescence ride as per-op pure
+   residue completed at `end_op`, and the WAL's row (b) gives
+   `bytes(S_L) = fr_D'` as a pure equality AT BIRTH.  Mid-op windows
+   never reach a snapshot (snapshots are quiescence-only).
+3. **Snapshots are frozen, hence may be PERSISTENT**: each commit yields
+   an immutable certificate; sync-style receipts are copies; the boot
+   mint (stage 4) reads the current snapshot without borrowing; the
+   spike theorem reads the child's entry off the snapshot directly.
+4. **The historical caveat, answered**: this is re-minting, but with the
+   crash predicate carrying the epoch pointer and `P_log`'s committed-view
+   tie CONTINUOUSLY, the cross-era loop invariant survives; the
+   snapshot's strength is still tested by its consumer (the boot mint).
+
+5. **The transport lemma IS the allocator** (owner, same day): it
+   performs the allocation itself and returns the fresh family
+   EXISTENTIALLY — `P_fs-view[Γ_L] ==∗ P_fs-view[Γ_L] ∗ ∃ Γ′, P_fs[Γ′]`
+   — covering all three gnames (byte map, top map, link-count family) in
+   one update.  Forced by the logic (`own_alloc` cannot target a name)
+   and already the landed shape: `fs_boot_alloc_at` allocates top map +
+   link family jointly with existential gnames, and
+   `fs_links_full_alloc`'s validity is free at the full family — the
+   quiescent snapshot's exact situation.
+
+6. **One allocator, two call sites** (owner, same day): the SAME
+   transport/allocator core serves the BOOT — cloning the durable
+   snapshot onto the fresh per-era L family (stage 4/H1).  The core is
+   Γ-GENERIC and SOURCE-AGNOSTIC: inputs = the abstract state VALUE plus
+   the pure facts; output = ∃ fresh family, the instance at that value.
+   Commit instantiates it at the era's value (off `γtop_L`'s auth);
+   boot at the snapshot's value (trivially readable if `P_snap` is
+   persistent), followed by the era-only extras (cache/dirty/obs mints,
+   distribution into the era invariants).  Stage 4's boot re-founding —
+   and with it the `Himg` deletion — is thereby mostly this one lemma's
+   second call site.
+
+7. **The batch's frame, resolved (orchestrator, 2026-08-25, over lane 4's
+   residual).**  The accumulated pure tie (`snap_ok`) gains the USED-SET
+   COUPLING — every inode's footprint ⊆ the bitmap's used set, footprints
+   pairwise disjoint — so a write to block `b` frames every other inode's
+   clause purely; the clause is MAINTAINED LOCALLY: the only write that
+   could break it (adopting `b`) holds "b's bit was clear" from its own
+   bitmap AU, hence `b` was in no footprint.  And the accumulation is
+   SPLIT: per-write the payload carries only the byte tie + coupling
+   (true even mid-op); the local clauses (`inode_local`) arrive as each
+   op's own pure residue at `end_op` (create's nlink-before-dots window
+   never reaches a snapshot).  This is one whole-state PURE clause on the
+   DURABLE tie — §0's letter is bent there and nowhere else; §0's spirit
+   (local maintenance) holds.  `S_L` is read from three sources at
+   commit: `γtop_L`'s auth (inodes), the bitmap invariant's used set, and
+   the config's superblock.
+
+8. **Where the per-op residue lives (orchestrator, 2026-08-25, over lane
+   4b's wall).**  `Ψ D₀ Dc` cannot distinguish an ended op from an open
+   one, so the local half rides a PURE ROW of `LogInv.log_state`: each
+   op's ledger entry carries an INUM SET (threaded through `log_opS`
+   exactly like `Sb`; the log treats it as an opaque `gset Z`), and a
+   client-chosen predicate `Φ : gset Z → Prop` (anti-monotone in the
+   union of open ops' sets) is carried as the row "every inode in no
+   open op's set is `inode_local`".  Growth at `log_write` is free
+   (anti-monotonicity); `end_op` removes its own set and pays
+   `SpecEndOp`'s pure, op-local residue for the inums that newly qualify
+   — which are exactly its own, because an inode serially taken by a
+   second still-open op stays in that op's set.  At `out = 0` the union
+   is `∅` and the row IS `snap_local`.  Block-keyed `pend` is UNSOUND for
+   this (an inode block is shared by 16 inums) — hence inums.
+
+Era side (stage 2b) untouched; `fs_state` + the allocation/mint lemmas
+(`fs_boot_alloc_at`'s family) are the central artifacts, used at boot
+and at every commit.
+
+### 4⁹a. AS BUILT (4): the transport is an allocation, the byte points-to
+### is PERSISTENT, and the residual is the batch's PURE FRAME
+
+`iris/FsDurSnap.v` is the ruling's core, Γ-generic and source-agnostic.
+
+- **`snap_ok S D`, the pure tie.**  A state and a committed block map agree
+  at the state's FOOTPRINT: the superblock's block and its parse, the
+  bitmap block at `bm_bytes` of the used set, every free block below the
+  size present, and per inode its range, its `inode_local`, its record's
+  bytes at its own slot (`rec_in_blk`, a SPLIT — the shape a writer's
+  splice fact already has), its data blocks and its indirect block.  Every
+  clause names ONE object.  Three do not, and each is named at its
+  definition: `sk_dom` (the inode map's domain over the region — §4½ (2)'s
+  per-inum existence witness and 3c's third `dgeo_ok` equation, which is
+  BY CONSTRUCTION here since the value is read off the era's own top-map
+  authority), `sk_links` (`✓ link_elem`, §7's "one whole-state fact in the
+  design", carried and never maintained, needed because `own_alloc` needs
+  a valid element), and `sk_bsz` (the log's own row (b) property).
+- **`fs_state_of_ledger Γ S D`** builds the whole nested predicate from
+  `□ blk_ledger Γ D` and `fs_links (γlink Γ) (fss_inodes S)` at ANY Γ.
+- **`fs_snap_alloc S D : snap_ok S D → ⊢ |==> ∃ g gl gt, …`** is the
+  transport, and addendum 5 is landed literally: the byte map, the top map
+  (auth AND every fragment) and the link family in one update, gnames
+  existential, inputs the VALUE and the pure facts and nothing else.
+- **`P_dur D`** is the epoch registry — the CURRENT snapshot at the
+  committed map, family and state existential, so it is a function of `D`
+  alone and drops into `FsCrash.P_fs` with no arity change.  `dsnap_step
+  D D' := P_dur D ==∗ P_dur D'` is the commit's step; `dsnap_step_of`
+  derives it from `snap_ok S' D'` ALONE (the old instance is dropped —
+  affine), and `_id`/`_trans` are its algebra.
+
+**THE ENABLING DECISION, and it is the whole of why the construction
+type-checks: the snapshot's byte points-to is PERSISTENT** (`a ↪[g]□ v`;
+ruling (3) allows it).  With `blk_owned` persistent the footprint's pieces
+are COPIES of the ledger's blocks, so `fs_state` is CONSTRUCTIBLE from a
+flat byte map and no disjointness premise is needed.  At an exclusive
+points-to the same construction demands "distinct inodes name distinct
+blocks", which is §0's forbidden shape and which no per-object accumulation
+can supply.  What the durable instance gives up — `phi_excl`, hence
+`FsStateBitmap.free_pool_used` (xv6's `panic("freeing free block")`) and
+`blk_owned_ne` — is consumed ERA-side only; 3a-def and 3a-val had already
+priced exactly that at zero.  The BUNDLE is nevertheless NOT persistent
+(the link family's `● nlink` has no core) and nothing needs it to be: it
+lives inside `crashN`, nothing borrows it, and every consumer reads the
+PURE `snap_ok`, which is persistent, so a receipt is a copy.
+
+**FROM A DURABLE BYTE FACT TO A DURABLE INODE FACT.**  What the registry
+adds over the flat blob is that the durable side carries an abstract state,
+and crossing to it is injectivity of the encoder — which the tree did not
+have.  `dinode_bytes_inj` (on `dinode_wf` records; the hypothesis is for
+the address array alone) and `rec_in_blk_inj` are landed, over
+`half_bytes_inj` / `word_bytes_inj` / `ind_bytes_inj` and two `bv`-level
+byte lemmas off `RiscvModelBytes.bv_eq_of_bytes`.  On top of them:
+`snap_ok_rec_of_bytes` (the committed map's slot bytes ARE the snapshot
+node's record), `snap_ok_data` (a slot below the size is a block of `D` at
+the node's own reading) and `dir_entries_of_first`, packaged as
+`snap_node_is` / `snap_dir_entry` / `snap_slot_holds` with
+`P_dur_node_of_slot` as the Iris reading.  Those are the SPIKE THEOREM's
+durable half.
+
+### 4⁹b. AS BUILT (4b): the tie SPLITS, the frame comes off the COUPLING,
+### and the byte half PINS the objects
+
+`iris/FsDurSnap.v` §§1a–1f.  Addendum 7's item 1, plus the one thing it
+does not name and the accumulation cannot do without.
+
+- **`snap_ok S D = snap_bytes S D ∧ snap_local S`.**  `snap_bytes` is the
+  byte tie (the superblock's block, the bitmap block at `bm_bytes`, the
+  free blocks present, each inode's record at its own slot, its data
+  blocks, its indirect block) plus `sk_dom` / `sk_links` / `sk_bsz`, the
+  REPRESENTATION clauses and THE COUPLING.  It is true EVEN MID-OP and is
+  what a batch accumulates.  `snap_local` is the per-inode `inode_local`
+  and does not mention `D` at all, so no write can disturb it.
+  `fs_state_of_ledger` / `fs_snap_alloc` / `P_dur` and every spike reading
+  take the conjunction and did not move.
+- **The coupling is three clauses**, each per-object except for naming the
+  used set: the metadata roles (`snap_meta` — block 0, the bitmap block, a
+  region block of a named inum) are MARKED IN USE; a node's own blocks
+  (`fn_owns` — its data blocks and its indirect block) are marked in use
+  and are no metadata block; and no two nodes share one.  This is §4⁹ (7)'s
+  sanctioned whole-state pure clause, and the only one.
+- **THE FRAME NO LONGER HAS A QUANTIFIER AT ANY WRITER.**
+  `snap_untouched_of_free`: a block whose bit reads CLEAR is untouched —
+  the ADOPT case, and the fact is what the adopting writer reads off its
+  own bitmap AU.  `snap_untouched_of_own`: a block that is MY node's is
+  untouched by every clause but mine (`snap_untouched_but`) — what a data
+  or indirect-block writer holds from its own splice fact.
+  `snap_bytes_frame` is the one-block frame; `snap_ok_frame` its reading
+  at both halves; `snap_meta_sb`/`_bmap`/`_reg` read the three metadata
+  arms out one at a time.
+- **THE COUPLING IS EXACTLY THE IMAGE'S W3+W4+W5**, so boot owes nothing
+  new: W3 puts every named block in the data region, W4 is
+  `FsImg.fs_inode_blocks_disjoint`, and W5 (`FsImg.fs_bitmap_wf`) sets the
+  bit of everything below `fs_data_start` and of every used block.
+- **AND THE BYTE HALF PINS THE OBJECTS** — `snap_bytes_sb_inj`,
+  `snap_bytes_node_inj`, `snap_bytes_used_agree`.  **THIS IS NOT AN
+  EXTRA.**  A payload accumulated as a PURE fact binds its state
+  EXISTENTIALLY, so a writer owes a fact about a state it did not choose
+  while every resource it holds is about the ERA's.  With the five
+  REPRESENTATION clauses of `inode_local` (`inode_repr`: `dinode_wf`, the
+  entry array's length, the zero-indirect case, and the slot domain's two
+  clauses) in the BYTE half, the three byte ties determine each node
+  outright, so a writer reads the payload's state as its own.  Leave them
+  in `snap_local` and the payload's `S` is underdetermined at exactly the
+  two fields a writer must re-prove at — `fn_ent`, whose only pin
+  (`ind_bytes_inj`) needs the array's LENGTH, and `fn_blk`'s DOMAIN — and
+  no era-side fact reaches an existential.  The five are true mid-op: they
+  say the node IS the reading of its own bytes and nothing about the file
+  system.  The used set is pinned only WITHIN the bitmap block, which is
+  right: nothing reads a bit above it (`BitmapInv.bitmap_ok` and
+  `free_set` both cut at `sb_size`).
+
+**WHAT IS STILL OPEN IS THE LOCAL HALF'S ACCUMULATION, NOT THE BYTE
+HALF'S.**  Addendum 7 puts the per-op residue "into the payload's local
+half at `end_op`".  `Ψ` is a function of `D₀` and `Dc` and of nothing
+else, and neither distinguishes an op that has ENDED from one still open,
+so the local half cannot live in `Ψ`:
+
+- a `∀ S`-shaped clause (`∀ S, snap_bytes S Dc → …`) does not frame across
+  a write.  Given `snap_bytes S (<[b:=bs]> D)` there need be no `S₀` with
+  `snap_bytes S₀ D` and the same node at an untouched inum — the OTHER
+  clauses of `S` fail at `D`;
+- an `∃ S`-shaped clause DOES frame (the writer transforms its own witness,
+  and by `snap_bytes_node_inj` every untouched node is unchanged) — but it
+  has to name the inums it does not claim, and the only set that SHRINKS at
+  `end_op` is the log's own PENDING set.
+
+THE PROPOSED SHAPE, for the owner.  `Ψ D₀ Dc := ⌜∃ S, snap_bytes S Dc⌝`
+per write, and a NEW pure row of `LogInv.log_state` over its own `pend`:
+
+    ⌜∀ S, snap_bytes S (lm_logged L cov ls) →
+       ∀ i n, fss_inodes S !! i = Some n →
+         sb_inodestart (fss_sb S) + i `div` 16 ∉ pend →
+         (∀ b, fn_owns n b → b ∉ pend) →
+         inode_local i n⌝
+
+`log_state_pend_mono` (growth, at every `log_write`) WEAKENS it and is
+free; `log_state_fin` (`pend ∖ F`, at `end_op`) STRENGTHENS it and is
+exactly where `SpecEndOp`'s pure residue is spent, at the ending op's own
+objects — which are its own by `snap_bytes_node_inj` plus the coupling's
+disjointness.  At the commit `out = 0` forces `om = ∅` hence `pend = ∅`,
+and the row IS `snap_local`.  `pend` is `log_state`'s existing parameter,
+which the bundle does not read today and whose two moves are both the
+identity; `LogInv.v`'s own header already predicts this place — "a future
+row over the pending set … would land here and nowhere else."
 
 ## 5. The log's interface (FS-agnostic, logically atomic)
 

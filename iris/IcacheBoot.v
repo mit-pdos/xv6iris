@@ -1224,13 +1224,16 @@ Section IcacheBootPool.
        Boot's value is the image's own node -- see
        [FsCfgBoot.img_nodes]. *)
     (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
-    imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
+    (* durable-disk B''-esc: boot stocks the pool with ORDINARY rows only --
+       no inum is in transition before userspace exists -- so this builds
+       [ipool_ord], which is what the pool INVARIANT holds. *)
+    imark γi (bv_unsigned inum) -∗ ipool_ord γfs γi cov logstart inum.
   Proof.
     iIntros "Hcnt Hmir Hoff Hdv Hfv Htop Hmk".
-    rewrite /ipool_shape /ipool_shape_np.
+    rewrite /ipool_ord /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iLeft. iSplitR "Hoff"; [| iExact "Hoff"].
+    iSplitR "Hoff"; [| iExact "Hoff"].
     iRight. iSplitL "Hmk"; [iExact "Hmk" |].
     iSplitL "Hdv"; [iExact "Hdv" |].
     iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"].
@@ -1289,17 +1292,17 @@ Section IcacheBootPool.
     dv_ride (bv_unsigned inum) (dv_of dn data) -∗
     (* ...and its PER-FILE twin (N-5.2A), beside it and for the same reason *)
     fv_ride (bv_unsigned inum) (fv_of dn data) -∗
-    ipool_shape γfs γi cov logstart inum.
+    ipool_ord γfs γi cov logstart inum.
   Proof.
     iIntros (Hok Hrl Hdok Hddix Hdoc Hduq)
             "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop Hdv Hfv".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     pose proof (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn bm
                   data Hok Hrl Hduq Hddix) as Hloc.
-    rewrite /ipool_shape /ipool_shape_np.
+    rewrite /ipool_ord /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iLeft. iSplitR "Hoff"; [| iExact "Hoff"]. iLeft.
+    iSplitR "Hoff"; [| iExact "Hoff"]. iLeft.
     rewrite /ipool_alloc.
     iExists dn, bm, data.
     iSplitR; [iPureIntro; exact Hok |].
@@ -1314,14 +1317,15 @@ Section IcacheBootPool.
     iFrame "Hdv Hfv".
   Qed.
 
-  (* the pool is a [∗ set], so it splits and rejoins along any subset *)
-  Lemma ipool_split (γfs : fs_names) (γi : gname) (cov : gset Z)
+  (* the stocked rows are a [∗ set], so they split and rejoin along any
+     subset *)
+  Lemma ipool_rows_split (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (R A : gset Z) :
     A ⊆ R ->
-    ipool γfs γi cov logstart A ∗ ipool γfs γi cov logstart (R ∖ A)
-      ⊢ ipool γfs γi cov logstart R.
+    ipool_rows γfs γi cov logstart A ∗ ipool_rows γfs γi cov logstart (R ∖ A)
+      ⊢ ipool_rows γfs γi cov logstart R.
   Proof.
-    intros Hsub. rewrite /ipool -big_sepS_union; [| set_solver].
+    intros Hsub. rewrite /ipool_rows -big_sepS_union; [| set_solver].
     rewrite -(union_difference_L A R Hsub) //.
   Qed.
 
@@ -1373,7 +1377,7 @@ Section IcacheBootPool.
        ∃ n : fs_node,
          top_frag (fs_gamma_L γfs)
                   (bv_unsigned (mword_of_int z : mword 32)) n) -∗
-    ipool γfs γi cov logstart R.
+    ipool_rows γfs γi cov logstart R.
   Proof.
     iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hdvf Hfvf Htopf".
     (* the ledger pair splits along the same subset the pool does *)
@@ -1381,9 +1385,9 @@ Section IcacheBootPool.
     iDestruct "Hcnts" as "[HcA HcF]". iDestruct "Hoffs" as "[HoA HoF]".
     iDestruct "Hmirs" as "[HmA HmF]".
     rewrite -(union_difference_L A R Hsub).
-    iApply (ipool_split γfs γi cov logstart R A Hsub).
+    iApply (ipool_rows_split γfs γi cov logstart R A Hsub).
     iSplitL "Ha HcA HmA HoA".
-    - rewrite /ipool.
+    - rewrite /ipool_rows.
       iDestruct (big_sepS_sep_2 with "HcA HmA") as "Hlg0".
       iDestruct (big_sepS_sep_2 with "Hlg0 HoA") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Ha") as "Ha".
@@ -1392,7 +1396,7 @@ Section IcacheBootPool.
                 & Hdlk & Hdn & Hind & Hblk & Htop & Hdv & Hfv)]".
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hrl Hdok Hddix Hdoc Hduq
                 with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop Hdv Hfv").
-    - rewrite /ipool.
+    - rewrite /ipool_rows.
       iDestruct (big_sepS_sep_2 with "HcF HmF") as "Hlg0".
       iDestruct (big_sepS_sep_2 with "Hlg0 HoF") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hdvf") as "Hlg".
@@ -1431,9 +1435,9 @@ Section IcacheBootPool.
        ∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
-    ipool γfs γi cov logstart (region_inums nib).
+    ipool_rows γfs γi cov logstart (region_inums nib).
   Proof.
-    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs Htops H". rewrite /ipool.
+    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs Htops H". rewrite /ipool_rows.
     iDestruct (region_key_shift nib (fun z => icnt_half z 0%nat) Hnib
                 with "Hcnts") as "Hcnts".
     iDestruct (region_key_shift nib (fun z => frzm_h z false) Hnib
@@ -1694,7 +1698,13 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
-    ipool γfs γi cov logstart (region_inums nib) -∗
+    (* THE STOCKED POOL, as ORDINARY ROWS (durable-disk B''-esc), beside the
+       residency key WHOLE.  This lemma is what allocates the pool's own
+       invariant out of the two: the rows and one half of the key go in, the
+       other half stays under the itable lock inside [itable_res2]'s
+       [ipool] conjunct, and [is_itable2] carries the invariant on. *)
+    ipool_rows γfs γi cov logstart (region_inums nib) -∗
+    ghost_var icfg_pool 1 (∅ : gset Z) -∗
     (* THE ITABLE LOCK'S GHOST, unbuilt: the two [excl_auth] halves at
        [None], as [WpLockAt.lock_ghost_alloc] mints them.  A PREMISE for the
        reason every other ghost here is one -- the gname is the caller's
@@ -1717,8 +1727,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
     iIntros "Hfree Htok Hmid Hgid".
+    (* the pool's own invariant, out of the stocked rows and the whole key *)
+    iMod (ipool_alloc_inv E γfs γi cov logstart (region_inums nib)
+            with "Hkey Hrows") as "[#Hpinv Hpool]".
     (* only the ZEROS are used: they are what [itable_body] parks for a free
        slot.  The [sl_free_tok]s beside them belong to whoever wants to build
        a lock AT [icfg_isl k], and this cache does not -- its locks carry
@@ -1763,7 +1776,7 @@ Section IcacheBootTable.
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
-      iMod (inv_alloc icEscN E (ic_escrow_body cn γfs γi cov logstart k)
+      iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
         rewrite /ic_empty_arm. iExists (dvs k).1, (dvs k).2, w. iFrame. }
@@ -1813,7 +1826,7 @@ Section IcacheBootTable.
        named [iFrame] searches that once per name -- 98 s in this one
        sentence (optimization.md's BioInv rule). *)
     rewrite /is_itable2.
-    iSplitR; [iExact "Hlock" |].
+    iSplitR; [iSplitR; [iExact "Hlock" | iExact "Hpinv"] |].
     iSplitR; [iExact "Hitinv" |].
     iSplitR; [iExact "Hescrows" |].
     iExact "Hsl".
@@ -1838,7 +1851,8 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
-    ipool γfs γi cov logstart (region_inums nib)
+    ipool_rows γfs γi cov logstart (region_inums nib) -∗
+    ghost_var icfg_pool 1 (∅ : gset Z)
     ={E}=∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1848,11 +1862,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hpool Hfree Htok Hmid Hgid") as "H".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hfree Htok Hmid Hgid") as "H".
     iModIntro. iExists γl, cn. iExact "H".
   Qed.
 

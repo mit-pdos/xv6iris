@@ -366,9 +366,9 @@ Section LogAmort.
      all can reserve F.  This is the worst case -- every block of F still
      to be paid for. *)
   Lemma log_amort_intro γ F u v :
-    (u + size F <= v)%nat -> log_op γ v -∗ log_amort γ F u.
+    (u + size F <= v)%nat -> log_opb γ v -∗ log_amort γ F u.
   Proof.
-    iIntros (Hv) "H". rewrite /log_op /log_amort.
+    iIntros (Hv) "H". rewrite /log_opb /log_amort.
     iDestruct "H" as (Sb) "H". iExists Sb, v. iFrame.
     iPureIntro.
     assert (Hsub : F ∖ Sb ⊆ F) by set_solver.
@@ -378,10 +378,10 @@ Section LogAmort.
   (* LEAVING: at least the [u] free units are really there.  A callee that
      wants the counted form (iupdate, end_op) takes this. *)
   Lemma log_amort_elim γ F u :
-    log_amort γ F u -∗ ∃ v : nat, ⌜(u <= v)%nat⌝ ∗ log_op γ v.
+    log_amort γ F u -∗ ∃ v : nat, ⌜(u <= v)%nat⌝ ∗ log_opb γ v.
   Proof.
     iIntros "H". rewrite /log_amort. iDestruct "H" as (Sb v) "(%Hv & H)".
-    iExists v. iSplitR; [iPureIntro; lia|]. iApply (log_opS_op with "H").
+    iExists v. iSplitR; [iPureIntro; lia|]. iApply (log_opS_opb with "H").
   Qed.
 
   (* the two monotonicities: fewer free units is weaker, and RESERVING
@@ -493,7 +493,7 @@ Section LogAmort.
     log_amort γ ({[bmapstart]} ∪ {[ind]}) u.
 
   Lemma wi_amort_intro γ bmapstart ind u v :
-    (u + 2 <= v)%nat -> log_op γ v -∗ wi_amort γ bmapstart ind u.
+    (u + 2 <= v)%nat -> log_opb γ v -∗ wi_amort γ bmapstart ind u.
   Proof.
     iIntros (Hv) "H". rewrite /wi_amort.
     iApply (log_amort_intro with "H").
@@ -503,7 +503,7 @@ Section LogAmort.
   Qed.
 
   Lemma wi_amort_elim γ bmapstart ind u :
-    wi_amort γ bmapstart ind u -∗ ∃ v : nat, ⌜(u <= v)%nat⌝ ∗ log_op γ v.
+    wi_amort γ bmapstart ind u -∗ ∃ v : nat, ⌜(u <= v)%nat⌝ ∗ log_opb γ v.
   Proof. rewrite /wi_amort. iApply log_amort_elim. Qed.
 
   (* RESERVING A BLOCK WHOSE IDENTITY IS NOT YET KNOWN.  [log_amort_adopt]

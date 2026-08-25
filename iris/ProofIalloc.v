@@ -1462,16 +1462,10 @@ Section IallocClaim.
        ([cr := false]), so log_write's relaxed credited premise (§G.19) costs
        it exactly one [log_credit_own] at the vacuous implication. *)
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
-       atomic-update contract is stated over the Psi-NAMED context, because
+       atomic-update contract is stated over the log's own context, because
        the AU hands the log's parked payload to the client's own update.
        The plain form is recovered immediately, so nothing else moves. *)
-    iDestruct "Hlctx" as (Psi) "#Hlctxa".
-    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                  (uint bno)
-                  (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
-                  with "Hlctxa") as "Hpstep".
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     iPoseProof (log_credit_own γ false Sb e0 (uint bno) ltac:(discriminate))
@@ -1504,7 +1498,7 @@ Section IallocClaim.
               (* THE ANCHOR IS NO LONGER THE UNIT (iclaim-ledger.md §2.4 /
                  IIIb step 4): [ireg_claim_au]'s closing wand delivers the
                  [c]-column receipt, so log_write carries it out for us. *)
-              false Sb e0 0%nat Psi (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
+              false Sb e0 0%nat (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
               W5 0%nat true (proc_addr j) (K - 8)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1517,16 +1511,13 @@ Section IallocClaim.
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcrd HopS [Hpstep] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
       (* log_write's own two closing inputs (the epoch witness and its
          bound) are still dropped -- one adapter line, fs-log.md §G.17 --
-         but the ANCHOR is now [iclaim]; see the instantiation above.  The
-         payload-step premise (durable-disk 3a, ratified (D)) rides in
-         beside it. *)
-      iApply (lw_au_rec with "[Hpstep]").
-      { iEval (rewrite -Hbno). iExact "Hpstep". }
+         but the ANCHOR is now [iclaim]; see the instantiation above. *)
+      iApply lw_au_rec.
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
                 ltac:(solve_ndisj) Hnib Hdswf Ht0
                 (ialloc_fresh_shape ty Hty) Htyk with "Hireg Hiopen"). }
@@ -3356,31 +3347,31 @@ Section IallocMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
+    iDestruct (log_op_openS with "Hop") as (Sb) "[HopS Htx]".
     iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ γfs γi
               cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m K eb b lks
               Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx
                     Hsbn Hsbi Hireg Hiopen Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
-                    Hitb2 Hitbl Hesc Hiref HopS [Hcont]").
+                    Hitb2 Hitbl Hesc Hiref HopS [Hcont Htx]").
     all: try lkbelow.
     iIntros (CID') "%Hq".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hq |].
     iIntros (mf alloc kslot q inum dn') "%Hcs Hcg Hcnt Hpc Hsbn Hsbi Hppid
               Hsl Harm".
     iApply ("Hcont" $! mf alloc kslot q inum dn'
-              with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Harm]");
+              with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Harm Htx]");
       [exact Hcs |].
     destruct alloc.
     - iDestruct "Harm" as "(%Hp & Hpkg & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Hpkg"; [iExact "Hpkg" |].
-      iApply (log_opS_op with "HopS").
+      iApply (log_opS_op with "HopS Htx").
     - iDestruct "Harm" as "(%Hp & Hiref & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Hiref"; [iExact "Hiref" |].
-      iApply (log_opS_op with "HopS").
+      iApply (log_opS_op with "HopS Htx").
   Qed.
 
 End IallocMain.

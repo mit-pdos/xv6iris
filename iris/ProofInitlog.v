@@ -67,6 +67,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
+(* block 1's park (durable-disk lane C-3a).  EARLY, because this file's
+   later imports own the names [FsImg] shadows. *)
+Require Import FsImg.
+Require Import SbPark.
 Require Import KernelDataInv.
 Require Import InstrBytes.   (* [pc_is], for the stage-D block lemmas *)
 Require Import KernelText.   (* [kernel_text], same *)
@@ -1149,21 +1153,22 @@ Section ProofInitlog.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
+      (bs_sb : list (bv 8)) (sbrec : fs_sb)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
                             cov logstart dev sb bs_hdr Bh M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb b lks Vpr.
+                            pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hbnd Hndup Hin Hpk
-           Hma0 Hma1 HDf HLmir Hbelow.
+           Hma0 Hma1 HDf HLmir Hbelow Hsbok Hsbparse.
     destruct Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam
               #Hpenvpk Hhomes #Hcert Hmirf
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow HLauth HDauth Hcovf Hfsb
-              Hslotsfs Hslots Hcont".
+              Hslotsfs Hslots Hb1 Hcont".
     (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
        half at a NAMED picture and the swap receipt PowerOn's custody hook
        already earned.  There is no boot swap here any more; every write
@@ -1601,7 +1606,7 @@ Section ProofInitlog.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iModIntro.
     iEval (rewrite /log_free_tok) in "Hlfree".
-    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa)".
+    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa)".
     (* ===== +0x28 lw a1,20(s3) : a1 := sb->logstart ===== *)
     assert (Hsbad : add_vec (rget mil Rs3)
                       (sign_extend' 64 (mword_of_int 20 : mword 12))
@@ -2574,17 +2579,7 @@ Section ProofInitlog.
                               (log_hdr_bno logstart) bs') logstart
                     = (0%nat, [])).
     { rewrite /lm_hdr lm_upd_view_eq Hhdec //. }
-    (* THE BOOT PICKS THE PAYLOAD, AND IT IS THE DEBT ITSELF (durable-disk
-       3a).  [LogInv.log_ctx]'s existential is what lets it: nothing in the
-       boot chain threads a [Psi], and no caller above ever names one.  The
-       witness is [LogDefs.fs_dstep] at the durable name -- "the durable
-       state owes a move from the committed view to the current logged
-       view" -- and its two laws are exactly the debt's algebra:
-       [fs_dstep_id] re-parks at a commit and [fs_dstep_trans] absorbs a
-       supplier's own step at a write.  At GENESIS the two indices coincide
-       ([LogDefs.lm_committed_clean] off the clean header and row (b) at the
-       empty batch), so the parked debt is the identity. *)
-    iAssert (log_state (fs_dstep riscv_dview_name) bn γfs cov logstart 0%nat ∅ ∅)
+    iAssert (log_state bn γfs cov logstart 0%nat ∅ ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_state.
       iExists ([] : list (mword 32)),
@@ -2620,7 +2615,7 @@ Section ProofInitlog.
          recovering install moved the two at exactly the same blocks to
          exactly the same bytes.  So the row is arithmetic on the chain. *)
       lazymatch goal with
-      | |- environments.envs_entails _ (⌜?P⌝ ∗ _)%I => assert (Hrow0 : P)
+      | |- environments.envs_entails _ (⌜?P⌝)%I => assert (Hrow0 : P)
       end.
       { intros bb Hbb _.
         rewrite /fs_home_set in Hbb.
@@ -2659,23 +2654,15 @@ Section ProofInitlog.
                      (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) bb
                      HnnW Hmiss2).
           exact (HLmir bb Hbcov). }
-      iSplitR; [iPureIntro; exact Hrow0|].
-      (* THE PARKED DEBT AT GENESIS IS THE IDENTITY.  The clean header plus
-         row (b) at the empty batch say the committed view IS the logged
-         view, and a step that changes no byte is [LogDefs.fs_dstep_id] --
-         honest at ANY body of [P_wf], which is what separates it from the
-         [fs_dstep_rebase] this site used to lean on. *)
-      rewrite (lm_committed_clean _ _ cov logstart Hmhdr
-                 (fun bb Hbb => Hrow0 bb Hbb (not_elem_of_empty bb))).
-      iApply fs_dstep_id. }
-    iAssert (log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
-      with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
+      iPureIntro. exact Hrow0. }
+    iAssert (log_res γ bn γfs cov logstart)
+      with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
          "never observed" counter value is zero, and the two must not
          collide.  Both epoch clauses stay vacuous. *)
       iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry), 1%nat,
-              (∅ : gset (nat * Z)).
+              (∅ : gset (nat * Z)), (∅ : gmap nat unit).
       iSplitL "Hout"; [iExact "Hout"|].
       iSplitL "Hcmt"; [iExact "Hcmt"|].
       iSplitL "Hnc"; [iExact "Hnc"|].
@@ -2694,7 +2681,11 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; intros e' b' Hi;
                 exfalso; exact (not_elem_of_empty _ Hi)|].
-      iExists 0%nat, ∅.
+      (* NO TRANSACTION IS OPEN AT GENESIS (durable-disk lane A): both maps
+         are empty, which is the cardinality tie read at zero. *)
+      iSplitL "Htxa"; [iExact "Htxa"|].
+      iSplitR; [iPureIntro; rewrite !map_size_empty; reflexivity|].
+      iExists 0%nat, (∅ : gset Z).
       iSplitR; [iPureIntro; rewrite op_sum_empty; unfold LOGBLOCKS; lia|].
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; intros b' Hi;
@@ -2705,28 +2696,23 @@ Section ProofInitlog.
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
-            (log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
+            (log_res γ bn γfs cov logstart)
             with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
+    (* BLOCK 1'S PARK, ALLOCATED (durable-disk lane C-3a).  It is minted
+       in the same ghost step as the lock's seal, which is the one place in
+       this walk where the run is free and the bundle it belongs to is
+       being built. *)
+    iMod (sb_park_alloc ⊤ γfs sbrec bs_sb Hsbparse with "Hb1") as "#Hsbp".
+    iPoseProof (sb_parked_of_park γfs sbrec Hsbok with "Hsbp")
+      as "#Hsbparked".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
-    { rewrite /log_ctx. iExists (fs_dstep riscv_dview_name). rewrite /log_ctx_at.
+    { rewrite /log_ctx.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp"|].
       iSplitR; [iExact "Hswlb"|].
       iSplitR; [iExact "Hbrow"|].
-      (* THE PAYLOAD'S TWO LAWS, AND BOTH ARE THE DEBT'S OWN ALGEBRA
-         (durable-disk 3a).  The commit law hands the accumulated debt out
-         and re-parks the identity ([fs_dstep_id]); the write law absorbs a
-         supplier's own durable step onto the right of the chain
-         ([fs_dstep_trans]).  Neither mentions [fs_dview]'s BODY, so both
-         survive the flip of that body verbatim. *)
-      iSplitR.
-      - rewrite /log_psi_commit. iModIntro.
-        iIntros (D0 Dc) "Hdebt". iModIntro. iFrame "Hdebt".
-        iApply fs_dstep_id.
-      - rewrite /log_psi_step. iModIntro.
-        iIntros (D0 Dc Dc') "Hdebt Hstep". iModIntro.
-        iApply (fs_dstep_trans with "Hdebt Hstep"). }
+      iExact "Hsbparked". }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".

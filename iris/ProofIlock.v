@@ -1198,11 +1198,37 @@ Section IlockLoad.
           iDestruct "Hdv" as (e0) "Hdv".
           iDestruct "Hfv" as (b0) "Hfv".
           iDestruct "Htop" as (n0) "Htop".
+          (* THE CLAIM BOX IS WELL-FORMED (durable-disk lane A): the retag
+             owes the registry's row, and this arm proves the four facts it
+             is assembled from a few lines below anyway -- a claim box has
+             type from the region, no blocks, size 0 and count 0. *)
+          assert (Hlocbox : inode_local (bv_unsigned inum)
+                    (era_node dn bm_empty
+                       (fun _ => replicate BSIZE (bv_0 8)))).
+          { apply (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn
+                     bm_empty (fun _ => replicate BSIZE (bv_0 8))).
+            - rewrite /inode_ok. split_and!.
+              + exact (bm_empty_wf cov logstart).
+              + apply bm_covers_nonpos. rewrite Hfsz. lia.
+              + rewrite Hfad il_bmcells_empty. reflexivity.
+              + exact Hfty.
+              + rewrite Hfsz.
+                pose proof (Nat2Z.is_nonneg MAXFILE).
+                pose proof (Nat2Z.is_nonneg BSIZE). nia.
+              + apply bm_empty_holes. intros i. reflexivity.
+              + exact inode_sized_zero.
+            - split_and!.
+              + exact Htyok.
+              + rewrite (fresh_shape_nlink dn Hfr0). lia.
+              + intros _. rewrite Hfsz. by exists 0.
+            - exact (dir_uniq_size_zero dn _ Hfsz).
+            - exact (dir_dots_ix_orphan (bv_unsigned inum) dn _
+                       (fresh_shape_nlink dn Hfr0)). }
           (* the marker arm's fragment is untied; retag it at the claim
              box's own node, exactly as the two contents holds are set *)
           iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))
-                  ltac:(solve_ndisj)
+                  ltac:(solve_ndisj) Hlocbox
                   with "[Hireg] Htop") as "Htop".
           { iApply (ireg_inv_ftop with "Hireg"). }
           iMod (dvw_set_rt ⊤ gi gfs inodestart nib (bv_unsigned inum) e0
@@ -2473,7 +2499,7 @@ Section ProofIlockMain.
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
     iMod (ic_swap_checkout cn gfs gi cov logstart k (DepShr s dev inum g) g
-            dev inum eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
+            dev inum eq_refl eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
     { rewrite /ic_dep_own. iSplitR; [iPureIntro; done |]. iExact "Href". }
     2:{ (* ============ DEVIATION 1's OWED OBLIGATION, PAID BY RULING R-e
            (iclaim-ledger.md §5⁗⁗).  The checkout may find the free path's
@@ -2491,7 +2517,7 @@ Section ProofIlockMain.
            which is why the same line serves ClaimK, PlainK and ShotK. ==== *)
         iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
         iDestruct (ic_dep_own_live with "Hown") as (s0 g0) "(%Hg0 & Hlv & _)".
-        iMod (frz_slot_kill (⊤ ∖ ↑icEscN) k ((1/2)/2)%Qp s0
+        iMod (frz_slot_kill (⊤ ∖ ↑(icEscN .@ k)) k ((1/2)/2)%Qp s0
                 ltac:(solve_ndisj) Hk with "Hitbl Hsel [Hlv]") as "[]".
         iExists g0. iExact "Hlv". }
     iDestruct "Hok" as "(Hbody & Hdep & Hout)".
@@ -2654,6 +2680,30 @@ Section ProofIlockMain.
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
                       Hsl Hstok Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
+  Qed.
+
+  (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the same code, the same
+     proof, plus one ghost step on the deposit the plain post already hands
+     out.  [SpecIlock.wp_ilock_tx_of_sconf] is the whole derivation. *)
+  Lemma wp_ilock_tx_sconf
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (gfs : fs_names) (gi : gname)
+      (cn : ic_names)
+      (gil gisl : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+      (pidv : mword 32) (dq dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+                             cov logstart inodestart nib k s g o dev inum
+                             pidv dq dqs m K eb b lks Vpr.
+  Proof.
+    apply wp_ilock_tx_of_sconf.
+    apply wp_ilock_sconf.
   Qed.
 
 End ProofIlockMain.

@@ -2265,8 +2265,6 @@ Section WriteiLoop.
        three Psi-free forms retired with the payload's second index, so this
        proof opens [LogInv.log_ctx]'s existential once and hands the plain
        form back to everything else it calls. *)
-    iDestruct "Hlctx" as (Psi) "#Hlctxa".
-    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     iApply (BM.wp_bmap_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart (ba_bms A) (ba_size A) dev (ba_pr A)
               ip bmI dataI fbn nI (bool_decide (ba_bms A ∈ SI)) SI
@@ -3119,17 +3117,13 @@ Section WriteiLoop.
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
                     (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
-                    Psi
+                   
                     F2 0%nat eb (proc_addr j) (K - 14)%nat b lks
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HF2a0 Hbcovlw Hbloglw
                     ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
                     Hbelow
-                    with "Hcg Hcnt Htext Hpc Hbio Hlctxa [] Hsla Hop Hfsb1 Hheld").
-          { (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-            iApply (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                      (uint (blkmap_get bm2 fbn : mword 32))
-                      (wi_splice (data2 fbn) o mm g) with "Hlctxa"). }
+                    with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsla Hop Hfsb1 Hheld").
           all: try lkbelow.
           iIntros (CIDc4 Hqc4 mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
           (* the count log_write left, as a variable: [S uX] when it absorbed,
@@ -3653,17 +3647,13 @@ Section WriteiLoop.
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
                     (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
-                    Psi
+                   
                     J2 0%nat eb (proc_addr j) (K - 14)%nat b lks
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HJ2a0 Hbcovlw Hbloglw
                     ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
                     Hbelow
-                    with "Hcg Hcnt Htext Hpc Hbio Hlctxa [] Hsla Hop Hfsb1 Hheld").
-          { (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-            iApply (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                      (uint (blkmap_get bm2 fbn : mword 32))
-                      (wi_splice (data2 fbn) o mm g) with "Hlctxa"). }
+                    with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsla Hop Hfsb1 Hheld").
           all: try lkbelow.
           iIntros (CIDd4 Hqd4 mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
           (* the count log_write left, as a variable: [S uX] when it absorbed,
@@ -5064,7 +5054,7 @@ Section WriteiMain.
               Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hszc Hbmsc #Hbminv #Hireg Hdn Hsrc
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iApply (wp_writei_gen γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
               cov logstart inodestart nib bmapstart size dev γpr
               ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
@@ -5074,7 +5064,7 @@ Section WriteiMain.
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbminv Hireg Hdn Hsrc
-                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -5088,12 +5078,12 @@ Section WriteiMain.
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     [%]
                     Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
-                    Hszc Hbmsc Hdn Hsrc Hsl [Hop]").
+                    Hszc Hbmsc Hdn Hsrc Hsl [Hop Htx]").
     { exact D1. } { exact D3. } { exact D4. } { exact D5. }
     { exact D6. } { exact D7. } { exact Dcap. } { exact Dsz. } { exact D8. }
     { exact D9. } { exact D9k. } { exact D10. } { exact D11. } { exact D12. }
     { exact D13. } { exact D14. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
   Qed.
 
 End WriteiMain.

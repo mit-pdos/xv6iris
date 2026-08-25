@@ -170,7 +170,7 @@ Section AccessorOwnership.
     (* the element of block [b] at offset [k], out of the block's run *)
     iAssert ((b * Z.of_nat BSIZE + Z.of_nat k) ↪[g] v)%I with "[Hblk]"
       as "Hel".
-    { rewrite /blk_owned /byte_range /fs_gamma_D. cbn [fsΦ].
+    { rewrite /blk_owned /byte_range /byte_range_q /fs_gamma_D. cbn [fsΦ].
       iDestruct "Hblk" as "[_ Hrun]".
       iDestruct (big_sepL_lookup _ _ k v Hk with "Hrun") as "Hel".
       assert (Hz : b * BSIZE_z + 0 + Z.of_nat k

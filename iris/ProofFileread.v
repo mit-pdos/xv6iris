@@ -2059,8 +2059,36 @@ Section ProofFileread.
                     and it IS [FileOff.off_mark], the borrow marker.  The
                     cells arrive addressed by SLOT; the file layer speaks the
                     [ip] its own [f->ip] cell holds. ---- *)
-             rewrite /ic_loaded.
-             iDestruct (ic_loaded_open with "Hlk") as (data)"(%Hiok & %Hrl_data & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Hdview & Hfview)".
+             (* ---- THE READ ARM (durable-fs-plan.md section 3, [ilock]
+                without a transaction; durable-disk B''-join).  fileread is
+                the other true read-locker: no [log_op], so no transaction
+                share to park, so its withdrawal is a SHARE.  It sheds three
+                quarters of the bundle straight back into the escrow's read
+                arm and keeps the metadata and addrs CELLS plus a QUARTER of
+                the byte legs -- which is exactly what [readi] runs on, since
+                readi modifies nothing and its only use of a data block is an
+                AGREEMENT (lane B''-blk).  The escrow keeps [dinode_at] (so
+                this call cannot move a record), the byte legs at 3/4, the
+                link ledger and the two contents holds, i.e. what plan
+                section 4's collection finds inside.
+
+                The quarter's own [top_frag] quarter is what pins the arm's
+                node at the park; the record and block map come back proven
+                equal to the ones the cells hold
+                ([FsStateEra.era_node_pair_inj]). ---- *)
+             iApply fupd_wp.
+             iMod (ic_shed_rd ⊤ (frn_ic fn) (frn_fs fn) (frn_ireg fn)
+                     (frn_cov fn) (frn_logstart fn) ikk (ssh/2)%Qp icfg_dev
+                     inm gsh true dnl bml ltac:(solve_ndisj)
+                     with "Hesc Hvalid Hdep Hlk")
+               as "(Hvalid & Hdep & Hrdh)".
+             iModIntro.
+             iDestruct "Hrdh" as (data) "(%Hiok & %Hloc & Hmeta & Haddrs & Hquarter)".
+             pose proof (FsStateEra.node_shape_ok_of_inode_ok (frn_cov fn) (frn_logstart fn)
+                           dnl bml data Hiok) as Hsh.
+             iDestruct (FsStateEra.inode_rd_era_era_node_to (frn_fs fn) (DfracOwn (1/4))
+                          inm dnl bml data Hsh Hloc with "Hquarter")
+               as "(Hindres & Hblocks & Htop)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
@@ -2068,9 +2096,9 @@ Section ProofFileread.
              iEval (rewrite -Hipk) in "Hidev".
              iAssert (i_valid (fc_ip Cf) ↦₄ (mword_of_int 1 : mword 32))%I
                with "[Hvalid]" as "Hvalid"; [rewrite Hipk; iExact "Hvalid" |].
-             iAssert (inode_map (frn_fs fn) (fc_ip Cf) bml)
+             iAssert (inode_map_q (frn_fs fn) (DfracOwn (1/4)) (fc_ip Cf) bml)
                with "[Haddrs Hindres]" as "Hmap".
-             { rewrite /inode_map. iFrame. }
+             { rewrite /inode_map_q. iFrame. }
              (* ---- CHECK OUT the offset cell ---- *)
              iApply fupd_wp.
              iMod (off_checkout γf γox k q (DfracOwn (q/2)) (fc_ip Cf) ⊤
@@ -2266,7 +2294,7 @@ Section ProofFileread.
                        bml data dnl
                        true (Z.to_nat (bv_unsigned v)) (Z.to_nat n)
                        (fun _ => (mword_of_int 0 : mword 8)) V
-                       pidv (DfracOwn 1) (DfracOwn (1/2))
+                       pidv (DfracOwn (1/4)) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb b
                        _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
@@ -2359,27 +2387,31 @@ Section ProofFileread.
                         ltac:(solve_ndisj) Hwf with "Hoh Hcip Hoff")
                   as "(Hoh & Hcip & Hvalid & Hrlv)".
                 iModIntro.
-                (* re-assemble the checked-out bundle, back at the SLOT *)
-                iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
-                           (frn_logstart fn) ikk inm dnl bml)
-                  with "[Hdnat Hmeta Hmap Hblocks Hdlk Hdview Hfview]" as "Hlk".
-                { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map -Hipk. iExists data.
-                  iSplitR; [iPureIntro; split_and!;
-                    [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
-                    | exact Hszb | exact Hholes | exact Hsized]|].
-                  (* §15(a): readi changed no byte, so the directory-wf
-                     conjunct goes back exactly as it came out *)
-                  iSplitR; [iPureIntro; exact Hrl_data |].
-                  iSplitR; [iPureIntro; exact Hdok |].
-                  iSplitR; [iPureIntro; exact Hddix |].
-                  iSplitR; [iPureIntro; exact Hdoc |].
-                  iSplitR; [iPureIntro; exact Hduq |].
-                  iSplitL "Hdlk"; [iExact "Hdlk" |].
-                  iDestruct "Hmap" as "[Haddrs Hindres]".
-                  iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview". }
+                (* ---- THE READ ARM COMES HOME (B''-join).  readi changed
+                   no byte, so the quarter goes back exactly as it came out
+                   and the escrow re-forms the payload against its own
+                   residue; the pure clauses never left the arm. ---- *)
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
+                iDestruct "Hmap" as "[Haddrs Hindres]".
+                iEval (rewrite Hipk) in "Haddrs".
+                iEval (rewrite Hipk) in "Hmeta".
+                iDestruct (FsStateEra.inode_rd_era_era_node_of (frn_fs fn) (DfracOwn (1/4))
+                             inm dnl bml data Hsh Hloc
+                             with "Hindres Hblocks Htop") as "Hquarter".
+                iApply fupd_wp.
+                iMod (ic_unshed_rd ⊤ (frn_ic fn) (frn_fs fn) (frn_ireg fn)
+                        (frn_cov fn) (frn_logstart fn) ikk (ssh/2)%Qp icfg_dev
+                        inm gsh true dnl bml ltac:(solve_ndisj)
+                        with "Hesc Hvalid Hdep [Hmeta Haddrs Hquarter]")
+                  as "(Hvalid & Hdep & Hlk)".
+                { iExists data. iFrame "Hmeta Haddrs Hquarter".
+                  iSplitR; [iPureIntro; split_and!;
+                    [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
+                    | exact Hszb | exact Hholes | exact Hsized] |].
+                  iPureIntro; exact Hloc. }
+                iModIntro.
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M1 Rs1)
                                   (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -2642,27 +2674,31 @@ Section ProofFileread.
                         ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hoff")
                   as "(Hoh & Hcip & Hvalid & Hrlv)".
                 iModIntro.
-                (* re-assemble the checked-out bundle, back at the SLOT *)
-                iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
-                           (frn_logstart fn) ikk inm dnl bml)
-                  with "[Hdnat Hmeta Hmap Hblocks Hdlk Hdview Hfview]" as "Hlk".
-                { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map -Hipk. iExists data.
-                  iSplitR; [iPureIntro; split_and!;
-                    [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
-                    | exact Hszb | exact Hholes | exact Hsized]|].
-                  (* §15(a): readi changed no byte, so the directory-wf
-                     conjunct goes back exactly as it came out *)
-                  iSplitR; [iPureIntro; exact Hrl_data |].
-                  iSplitR; [iPureIntro; exact Hdok |].
-                  iSplitR; [iPureIntro; exact Hddix |].
-                  iSplitR; [iPureIntro; exact Hdoc |].
-                  iSplitR; [iPureIntro; exact Hduq |].
-                  iSplitL "Hdlk"; [iExact "Hdlk" |].
-                  iDestruct "Hmap" as "[Haddrs Hindres]".
-                  iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview". }
+                (* ---- THE READ ARM COMES HOME (B''-join).  readi changed
+                   no byte, so the quarter goes back exactly as it came out
+                   and the escrow re-forms the payload against its own
+                   residue; the pure clauses never left the arm. ---- *)
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
+                iDestruct "Hmap" as "[Haddrs Hindres]".
+                iEval (rewrite Hipk) in "Haddrs".
+                iEval (rewrite Hipk) in "Hmeta".
+                iDestruct (FsStateEra.inode_rd_era_era_node_of (frn_fs fn) (DfracOwn (1/4))
+                             inm dnl bml data Hsh Hloc
+                             with "Hindres Hblocks Htop") as "Hquarter".
+                iApply fupd_wp.
+                iMod (ic_unshed_rd ⊤ (frn_ic fn) (frn_fs fn) (frn_ireg fn)
+                        (frn_cov fn) (frn_logstart fn) ikk (ssh/2)%Qp icfg_dev
+                        inm gsh true dnl bml ltac:(solve_ndisj)
+                        with "Hesc Hvalid Hdep [Hmeta Haddrs Hquarter]")
+                  as "(Hvalid & Hdep & Hlk)".
+                { iExists data. iFrame "Hmeta Haddrs Hquarter".
+                  iSplitR; [iPureIntro; split_and!;
+                    [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
+                    | exact Hszb | exact Hholes | exact Hsized] |].
+                  iPureIntro; exact Hloc. }
+                iModIntro.
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M4 Rs1)
                                   (sign_extend' 64 (mword_of_int 24 : mword 12))

@@ -371,7 +371,16 @@ Definition fs_fabric
    procs_inv gs ∗
    dev_inv gu gd ∗
    disk_geom gd pd pav pu ∗
-   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
+   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) ∗
+   (* ...AND THE AMBIENT LOG, NAMED (durable-fs-plan.md section 3, [ilock];
+      durable-disk B''-tx).  kexec write-locks the inode it is reading, so
+      half its transaction's element is parked in the escrow's write arm --
+      and the escrow parks at [icfg_log], having no [log_names] parameter of
+      its own.  A PURE conjunct in the fabric rather than a premise on the
+      cone's dozen internal lemmas: it is exactly the trade the fabric
+      exists to make, and it reaches every one of them for free.  LAST, so
+      no destructuring pattern above it moves. *)
+   ⌜g = icfg_log⌝)%I.
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,

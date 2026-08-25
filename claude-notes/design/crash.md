@@ -574,7 +574,56 @@ superblock either (the domain is `region_inums nib`, while
 era-side carriers above stay, and only the third equation reaches a record
 writer.
 
+**SNAPSHOT COMMITS: THE TRANSPORT IS AN ALLOCATION, AND EVERY RESOURCE
+WALL GOES WITH IT (4, `iris/FsDurSnap.v`).**  Under the owner's SNAPSHOT
+ruling (`fs-state.md` §4⁹) no durable ghost is ever moved: the committer
+ALLOCATES a fresh gname family at the quiescent state's values, proves the
+whole predicate at birth, and discards the previous instance.  So the
+durable step is `P_dur D ==∗ P_dur D'` with the input simply DROPPED, and
+it is derivable from a PURE fact about `D'` alone — no lent authority, no
+`fs_dstep`-shaped byte move, no completeness, no in-transit bin.
+`FsDurSnap.fs_snap_alloc` is the transport: byte map, top map and link
+family in ONE update, gnames existential, inputs the abstract state VALUE
+plus `snap_ok S D`.
+
+The one thing that makes the construction go through is that the
+snapshot's byte points-to is **persistent** (`a ↪□ v`).  With `blk_owned`
+persistent the footprint's pieces are COPIES of the block ledger, so
+`fs_state` is BUILDABLE from a flat byte map; at an exclusive points-to the
+same construction demands "distinct inodes name distinct blocks", a
+cross-inode pure fact that `fs-state.md` §0 forbids and that no per-object
+accumulation supplies.  What the durable instance gives up — `phi_excl` and
+hence `free_pool_used` (xv6's freeing-a-free-block panic) and
+`blk_owned_ne` — is consumed ERA-side only, which 3a-def and 3a-val had
+already priced at zero.  The link family's `● nlink` has no core, so the
+BUNDLE is not persistent; nothing borrows it, because every consumer reads
+the pure `snap_ok`, which is.
+
+**THE BATCH'S FRAME IS THE USED-SET COUPLING, AND THE BYTE HALF PINS THE
+OBJECTS (4b).**  The tie SPLITS: `snap_ok S D = snap_bytes S D ∧
+snap_local S`.  `snap_bytes` — the byte tie plus the representation
+clauses plus the coupling (metadata blocks are marked in use; a node's own
+blocks are marked in use and are no metadata block; no two nodes share
+one) — is true even MID-OP and is what a batch accumulates; `snap_local`
+is the per-inode `inode_local` and does not mention `D`, so no write can
+disturb it.  The frame's hypothesis then comes off ONE object at ONE
+writer: a block whose bit reads CLEAR is untouched
+(`snap_untouched_of_free`, the ADOPT case, off the writer's own bitmap
+AU), and a block that is my node's is untouched by every clause but mine
+(`snap_untouched_of_own`).  The coupling is exactly the image's W3+W4+W5,
+so boot owes nothing new.  And with the representation clauses on the byte
+side the three byte ties DETERMINE each node (`snap_bytes_node_inj`),
+which is what lets a writer read the payload's existentially-bound state
+as its own — the reason the accumulation can be state-free at all.  What
+is still open is the LOCAL half's accumulation across concurrent ops in
+one batch; `fs-state.md` §4⁹b has the finding and the proposed row over
+the log's `pend`.
+
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
+
+> Superseded in its commit mechanism (2026-08-25): the durable snapshot is
+> RE-ALLOCATED per commit, never updated — see [`durable-fs-plan.md`](durable-fs-plan.md),
+> the design of record.  The log's contract and the era instance stand.
 
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of
 `P_disk`, the lent auth, row (b), H2a stand).  The design of record is

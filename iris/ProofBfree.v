@@ -641,25 +641,16 @@ Section BfreeTail.
     iDestruct (bitmap_free_au ⊤ γfs bmapstart cov logstart size used bi
                  ltac:(solve_ndisj) Hbirange with "Hbminv Hblk")
       as "Hau".
-    (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
-       atomic-update contract is stated over the Psi-NAMED context, because
-       the AU hands the log's parked payload to the client's own update.
-       The plain form is recovered immediately, so nothing else moves. *)
-    iDestruct "Hlctx" as (Psi) "#Hlctxa".
-    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                  bmapstart (bitmap_bytes (used ∖ {[ bi ]})) with "Hlctxa")
-      as "Hpstep".
     iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
-                 (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) emp e0 Psi
-                 with "Hpstep Hau") as "Hau".
+                 (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) emp e0
+                 with "Hau") as "Hau".
     (* log_write does not thread the trap-CSR complement at all: [Hextc]/
        [Hextm] are stranded at bf_tail's entry hart and are not touched
        here -- transported across the whole span, right before [bf_cont]. *)
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 u cr Sb e0
-              0%nat Psi (⊤ ∖ ↑bitmapN) emp%I
+              0%nat (⊤ ∖ ↑bitmapN) emp%I
               T0 0%nat b (proc_addr j) (K - 4)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT0a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -667,7 +658,7 @@ Section BfreeTail.
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcredit Hop [Hau] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno). iExact "Hau". }
     (* the registry row log_write hands back is dropped here: bfree's caller
@@ -1842,7 +1833,7 @@ Section ProofBfreeMain.
            Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb) "[Hop Htx]".
     (* the counted form opens its own birth epoch and presents the EMPTY
        credit ([cr = false], where [log_credit] is [emp]); closing it again
        on the way out is what keeps every counted caller byte-stable *)
@@ -1855,12 +1846,12 @@ Section ProofBfreeMain.
               Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont Htx]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hsl HopS".
     iDestruct (log_opSe_opS with "HopS") as "HopS".
-    iDestruct (log_opS_op with "HopS") as "Hop".
+    iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hsl Hop").
     exact Hcs.
   Qed.

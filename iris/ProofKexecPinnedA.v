@@ -512,7 +512,7 @@ Section KexecPinnedABody.
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
-                          #Hdlock)".
+                          #Hdlock & %Hclogf)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
     (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
        cells now, so namei borrows it for its own load and nothing here has
@@ -661,7 +661,7 @@ Section KexecPinnedABody.
        [∃ Sb, log_opS], so entering the set form is one [iDestruct] and
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
-    iDestruct "Hlog" as (Sb0) "Hlog".
+    iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
     (* ---- THE PINNED WALK, NOT THE OPAQUE ONE.  Same environment, same
        ledger, same fractions -- [NameiInitPinned.wp_namei_init_pinned]'s
        premise list IS [wp_namei_gen]'s plus the two "/init" facts, and its
@@ -678,11 +678,11 @@ Section KexecPinnedABody.
               Hjp Hgs Hpelem
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
-                    Hcref Hpath Hbs Hirs Hlog Hpin").
+                    Hcref Hpath Hbs Hirs [$Hlog $Htx] Hpin").
     (* namei is eb-generic now; kexec is still at [eb = true]. *)
     iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
-             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
-    iDestruct (log_opS_op with "Hlog") as "Hlog".
+             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 [Hlog Htx] Harm".
+    iDestruct (log_opS_op with "Hlog Htx") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
        The walk spent at most two of the ten. *)
     assert (Hiu1 : (iput_units <= n1)%nat).
@@ -1113,7 +1113,7 @@ Section KexecPinnedAMain.
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+        ic_tx_dep cn kf sf dev inumf gyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1126,7 +1126,7 @@ Section KexecPinnedAMain.
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
         runit_any (bv_unsigned inumf) -∗
-        log_op g n2 -∗
+        log_opb g n2 -∗
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

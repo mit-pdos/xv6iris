@@ -635,6 +635,7 @@ CodeBeginOp.v
 CodeEndOp.v
 CodeLogWrite.v
 CodeSysSync.v
+SbPark.v
 LogInv.v
 FsWf.v
 FsEffBase.v
@@ -1348,9 +1349,16 @@ ProofForkretPark.v
 LinkForkretParkPaid.v
 CodeSyscall.v
 FsDurBytes.v
+FsDurSnap.v
 FsDurImg.v
 FsDurRefute.v
 FsDurDefer.v
+FsDurTrunc.v
+FsDurQuiesce.v
+IcacheTxRefute.v
+IcacheTxArm.v
 FsDurObj.v
-FsDurWire.v
 FsDurLedger.v
+IregClean.v
+FsCollect.v
+FsCollectImg.v

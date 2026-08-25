@@ -1552,8 +1552,7 @@ Section BallocBzero.
        three [Psi]-free forms retired with the payload's second index, so
        this caller opens [LogInv.log_ctx]'s existential once and hands the
        plain form back to everything else it calls. *)
-    iDestruct "Hlctx0" as (Psi) "#Hlctxa".
-    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
+    iPoseProof "Hlctx0" as "#Hlctx".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     (* ===== +0x4c c.mv a1,s1 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.balloc + 0x4c)) Ra1 Rs1
@@ -1907,19 +1906,16 @@ Section BallocBzero.
        the OUTPUT -- [bnoD] joins the op's set, which is what lets writei
        absorb its own later log_write of the very same block. *)
     (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                  (uint bnoD) (replicate BSIZE (bv_0 8)) with "Hlctxa")
-      as "Hpstep".
     iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kk2 pidv bnoD
               (replicate BSIZE (bv_0 8)) bsD bsd0 d0 (if cr then S u else u)
-              false (Sb ∪ {[bmapstart]}) Psi
+              false (Sb ∪ {[bmapstart]})
               Z9 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw2 Hlvl Hkk2 HZ9a0
               ltac:(rewrite HbnoD; exact Hbicov)
               ltac:(rewrite HbnoD; exact Hbilog)
               ltac:(discriminate)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hpstep Hsl Hop HfsbD Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hop HfsbD Hheld").
     all: try lkbelow.
     iIntros (CID13 Hq13 mL2) "Hcg Hcnt Hpc %Hcs3 Hop HfsbD Hlk Hsl".
     assert (HsetD : (Sb ∪ {[bmapstart]} ∪ {[uint bnoD]} : gset Z)
@@ -2347,19 +2343,14 @@ Section BallocAlloc.
        atomic-update contract is stated over the Psi-NAMED context, because
        the AU hands the log's parked payload to the client's own update.
        The plain form is recovered immediately, so nothing else moves. *)
-    iDestruct "Hlctx" as (Psi) "#Hlctxa".
-    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                  bmapstart (bitmap_bytes (used ∪ {[ bi ]})) with "Hlctxa")
-      as "Hpstep".
     iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
                  (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used)
-                 (free_blk γfs bi) e0 Psi
-                 with "Hpstep Hau0") as "Hau".
+                 (free_blk γfs bi) e0
+                 with "Hau0") as "Hau".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used) bsdX dX
-              (1 + u)%nat cr Sb e0 0%nat Psi (⊤ ∖ ↑bitmapN)
+              (1 + u)%nat cr Sb e0 0%nat (⊤ ∖ ↑bitmapN)
               (free_blk γfs bi)%I
               A3 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw HbnoBlt Hkk HA3a0
@@ -2368,7 +2359,7 @@ Section BallocAlloc.
               (* the byte view's mask (durable-disk 1c-flip step 4) *)
               ltac:(apply subseteq_difference_r; [solve_ndisj | apply logN_top])
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hlb0 Hcredit Hop [Hau] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
     { iEval (rewrite HbnoB). iExact "Hau". }
     iIntros (CID6 Hq6 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hblk Hlk Hsl".
@@ -4435,7 +4426,7 @@ Section BallocMain.
     intros pcE pj ret_tgt HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx Hppid
               Hsbsz Hsbbm #Hbminv #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb) "[Hop Htx]".
     (* [ba_main] is the eb-generic core both top-level lemmas share -- see
        its header comment -- so [wp_balloc_sconf], which genuinely needs
        [eb = false], applies it directly instead of routing through
@@ -4446,14 +4437,14 @@ Section BallocMain.
               Vpr HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog ltac:(discriminate)
               Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hpenv Hbio Hlctx Hppid
-                    Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl Harms".
-    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms]");
+    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms Htx]");
       [exact Hcs|].
     iDestruct "Harms" as "[(%Hz & Hop) | Hr]".
     - iLeft. iSplitR; [iPureIntro; exact Hz|].
-      iApply (log_opS_op with "Hop").
+      iApply (log_opS_op with "Hop Htx").
     - iDestruct "Hr" as (blk) "(%Ha & %Hnz & %Hcv & %Hlg & Hfsb & Hop)".
       iRight. iExists blk.
       iSplitR; [iPureIntro; exact Ha|].
@@ -4461,7 +4452,7 @@ Section BallocMain.
       iSplitR; [iPureIntro; exact Hcv|].
       iSplitR; [iPureIntro; exact Hlg|].
       iFrame "Hfsb".
-      iApply (log_opS_op with "Hop").
+      iApply (log_opS_op with "Hop Htx").
   Qed.
 
 End BallocMain.
