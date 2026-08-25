@@ -98,4 +98,30 @@ Section Bridge.
     rewrite /blk_owned /fsblock gamma_byte_range. reflexivity.
   Qed.
 
+  (* ---- THE BRIDGE AT A SHARE (lane B''-blk) --------------------------- *)
+
+  (* THIS is what the fraction sweep was for.  The two equations above tie
+     the abstract runs to the concrete ones at fraction 1 ONLY, and
+     [FsStateEra.inode_owned_era_of]/[_to] -- through which [ic_loaded] and
+     [ipool_alloc] are stated -- go through them, so nothing at 3/4 or 1/4
+     could cross into the [InodeInv] vocabulary before these existed.  They
+     hold by CONVERSION exactly as their fraction-1 readings do
+     ([FsStateDefs.byte_range_q] multiplies by [FsImg.BSIZE_z],
+     [FsBlocks.byte_range_q] by [FsBlocks.BSZ]; both delta-reduce to 1024). *)
+  Lemma gamma_byte_range_q (γfs : fs_names) (dq : dfrac) (b off : Z)
+      (bs : list (bv 8)) :
+    FsStateDefs.byte_range_q (fs_gamma_L γfs) dq b off bs
+    ⊣⊢ FsBlocks.byte_range_q (fs_bytes γfs) dq b off bs.
+  Proof.
+    rewrite /FsStateDefs.byte_range_q /FsBlocks.byte_range_q /fs_gamma_L /=.
+    reflexivity.
+  Qed.
+
+  Lemma gamma_blk_owned_q (γfs : fs_names) (dq : dfrac) (b : Z)
+      (bs : list (bv 8)) :
+    blk_owned_q (fs_gamma_L γfs) dq b bs ⊣⊢ fsblock_q (fs_bytes γfs) dq b bs.
+  Proof.
+    rewrite /blk_owned_q /fsblock_q gamma_byte_range_q. reflexivity.
+  Qed.
+
 End Bridge.

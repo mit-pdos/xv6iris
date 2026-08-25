@@ -54,7 +54,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac.
+From iris.algebra Require Import auth gmap frac dfrac.
 From iris.base_logic.lib Require Import ghost_map.
 From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.Operators_mwords.
@@ -307,13 +307,47 @@ Section FsBytes.
   Definition fsblock (gL : gname) (b : Z) (bs : list (bv 8)) : iProp Σ :=
     (⌜length bs = BSIZE⌝ ∗ byte_range gL b 0 bs)%I.
 
+  (* ---- THE SAME TWO SHAPES AT A SHARE (durable-fs-plan.md sections 4, 6;
+         lane B''-blk) ------------------------------------------------------
+
+     [FsStateDefs] fraction-indexed the ABSTRACT byte points-to; this is the
+     CONCRETE twin, and it is what lets a share cross the bridge
+     [FsBytesGamma.gamma_blk_owned_q] into the [InodeInv] vocabulary.  The
+     unsuffixed names above are the [DfracOwn 1] READINGS and their text has
+     not moved -- [k ↪[γ] v] IS [k ↪[γ]{DfracOwn 1} v], so each [_1]
+     equation below is [reflexivity] and the ~34 files spelling [fsblock]
+     are untouched by the index. *)
+  Definition byte_range_q (gL : gname) (dq : dfrac) (b off : Z)
+      (bs : list (bv 8)) : iProp Σ :=
+    ([∗ list] k ↦ v ∈ bs, (b * BSZ + off + Z.of_nat k) ↪[gL]{dq} v)%I.
+
+  Definition fsblock_q (gL : gname) (dq : dfrac) (b : Z) (bs : list (bv 8))
+    : iProp Σ :=
+    (⌜length bs = BSIZE⌝ ∗ byte_range_q gL dq b 0 bs)%I.
+
+  Lemma byte_range_1 gL b off bs :
+    byte_range gL b off bs = byte_range_q gL (DfracOwn 1) b off bs.
+  Proof. reflexivity. Qed.
+
+  Lemma fsblock_1 gL b bs : fsblock gL b bs = fsblock_q gL (DfracOwn 1) b bs.
+  Proof. reflexivity. Qed.
+
   Global Instance byte_range_timeless gL b off bs :
     Timeless (byte_range gL b off bs).
   Proof. apply _. Qed.
   Global Instance fsblock_timeless gL b bs : Timeless (fsblock gL b bs).
   Proof. apply _. Qed.
+  Global Instance byte_range_q_timeless gL dq b off bs :
+    Timeless (byte_range_q gL dq b off bs).
+  Proof. apply _. Qed.
+  Global Instance fsblock_q_timeless gL dq b bs : Timeless (fsblock_q gL dq b bs).
+  Proof. apply _. Qed.
 
   Lemma fsblock_length gL b bs : fsblock gL b bs -∗ ⌜length bs = BSIZE⌝.
+  Proof. iIntros "[% _]". done. Qed.
+
+  Lemma fsblock_q_length gL dq b bs :
+    fsblock_q gL dq b bs -∗ ⌜length bs = BSIZE⌝.
   Proof. iIntros "[% _]". done. Qed.
 
   Lemma BSIZE_pos : (0 < BSIZE)%nat.
@@ -340,6 +374,109 @@ Section FsBytes.
     iDestruct (big_sepL_lookup _ _ 0%nat v' Hv' with "Hr'") as "H2".
     iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hval _].
     exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hval).
+  Qed.
+
+  (* ---- the fraction-aware readings of the same law -------------------- *)
+
+  (* the general form: two runs at one address bound their shares.  The
+     concrete twin of [FsStateDefs.byte_range_q_valid]. *)
+  Lemma byte_range_q_valid gL dq1 dq2 b off bs bs' :
+    (0 < length bs)%nat -> (0 < length bs')%nat ->
+    byte_range_q gL dq1 b off bs -∗ byte_range_q gL dq2 b off bs' -∗
+    ⌜✓ (dq1 ⋅ dq2)⌝.
+  Proof.
+    intros Hl Hl'. iIntros "H H'".
+    destruct (lookup_lt_is_Some_2 bs 0%nat Hl) as [v Hv].
+    destruct (lookup_lt_is_Some_2 bs' 0%nat Hl') as [v' Hv'].
+    rewrite /byte_range_q.
+    iDestruct (big_sepL_lookup _ _ 0%nat v Hv with "H") as "H1".
+    iDestruct (big_sepL_lookup _ _ 0%nat v' Hv' with "H'") as "H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hval _].
+    done.
+  Qed.
+
+  Lemma fsblock_q_excl gL dq1 dq2 b bs bs' :
+    ~ ✓ (dq1 ⋅ dq2) ->
+    fsblock_q gL dq1 b bs -∗ fsblock_q gL dq2 b bs' -∗ False.
+  Proof.
+    intros Hnv. iIntros "[%Hl H] [%Hl' H']".
+    iDestruct (byte_range_q_valid gL dq1 dq2 b 0 bs bs'
+                 ltac:(rewrite Hl; exact BSIZE_pos)
+                 ltac:(rewrite Hl'; exact BSIZE_pos) with "H H'") as %Hv.
+    done.
+  Qed.
+
+  Lemma fsblock_q_ne gL dq1 dq2 b1 b2 bs1 bs2 :
+    ~ ✓ (dq1 ⋅ dq2) ->
+    fsblock_q gL dq1 b1 bs1 -∗ fsblock_q gL dq2 b2 bs2 -∗ ⌜b1 <> b2⌝.
+  Proof.
+    intros Hnv. iIntros "H1 H2".
+    destruct (decide (b1 = b2)) as [->|Hne]; [| done].
+    iExFalso. iApply (fsblock_q_excl gL dq1 dq2 _ _ _ Hnv with "H1 H2").
+  Qed.
+
+  (* THE TWO SPECIALISATIONS THE DESIGN NAMES (plan section 4), concretely.
+     [_full]: a full owner excludes ANY other share -- the resource reading
+     of "a read-locker cannot write", since [SpecLogWrite]'s byte-range AU
+     needs fraction 1.  [_34]: two three-quarter owners cannot alias, which
+     is why a reader's share is a QUARTER. *)
+  (* the two arithmetic facts, restated here because the BLOCK layer sits
+     BELOW [FsStateDefs] and must not import it (its twins there are
+     [FsStateDefs.dfrac_full_nvalid] / [dfrac_34_nvalid]). *)
+  Lemma blk_dfrac_full_nvalid (dq : dfrac) : ~ ✓ (DfracOwn 1 ⋅ dq).
+  Proof. intros Hv. exact (exclusive_l (DfracOwn 1) dq Hv). Qed.
+
+  Lemma blk_dfrac_34_nvalid : ~ ✓ (DfracOwn (3/4) ⋅ DfracOwn (3/4)).
+  Proof.
+    rewrite dfrac_op_own. intros Hv%dfrac_valid_own.
+    apply (Qp.lt_nge 1 (3/4 + 3/4)%Qp); [| exact Hv].
+    apply Qp.lt_sum. exists (1/2)%Qp. compute_done.
+  Qed.
+
+  Lemma fsblock_ne_full gL dq b1 b2 bs1 bs2 :
+    fsblock gL b1 bs1 -∗ fsblock_q gL dq b2 bs2 -∗ ⌜b1 <> b2⌝.
+  Proof.
+    rewrite fsblock_1.
+    iApply (fsblock_q_ne gL (DfracOwn 1) dq b1 b2 bs1 bs2
+              (blk_dfrac_full_nvalid _)).
+  Qed.
+
+  Lemma fsblock_ne_34 gL b1 b2 bs1 bs2 :
+    fsblock_q gL (DfracOwn (3/4)) b1 bs1 -∗
+    fsblock_q gL (DfracOwn (3/4)) b2 bs2 -∗ ⌜b1 <> b2⌝.
+  Proof.
+    iApply (fsblock_q_ne gL (DfracOwn (3/4)) (DfracOwn (3/4)) b1 b2 bs1 bs2
+              blk_dfrac_34_nvalid).
+  Qed.
+
+  (* ---- SPLITTING: how the quarter is handed out and taken back -------- *)
+
+  Lemma byte_range_q_split gL (q1 q2 : Qp) b off bs :
+    byte_range_q gL (DfracOwn (q1 + q2)) b off bs
+    ⊣⊢ byte_range_q gL (DfracOwn q1) b off bs
+        ∗ byte_range_q gL (DfracOwn q2) b off bs.
+  Proof.
+    rewrite /byte_range_q -big_sepL_sep.
+    apply big_sepL_proper. intros k v _.
+    apply (ghost_map_elem_fractional _ gL v q1 q2).
+  Qed.
+
+  Lemma fsblock_q_split gL (q1 q2 : Qp) b bs :
+    fsblock_q gL (DfracOwn (q1 + q2)) b bs
+    ⊣⊢ fsblock_q gL (DfracOwn q1) b bs ∗ fsblock_q gL (DfracOwn q2) b bs.
+  Proof.
+    rewrite /fsblock_q byte_range_q_split.
+    iSplit.
+    - iIntros "[%Hl [H1 H2]]". iSplitL "H1"; by iFrame.
+    - iIntros "[[%Hl H1] [_ H2]]". by iFrame.
+  Qed.
+
+  Lemma fsblock_split_34 gL b bs :
+    fsblock gL b bs
+    ⊣⊢ fsblock_q gL (DfracOwn (3/4)) b bs ∗ fsblock_q gL (DfracOwn (1/4)) b bs.
+  Proof.
+    rewrite fsblock_1 -(fsblock_q_split gL (3/4) (1/4)).
+    rewrite Qp.three_quarter_quarter //.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -423,6 +560,13 @@ Section FsBytes.
       rewrite length_take length_drop. lia.
   Qed.
 
+  Lemma byte_range_q_map (gL : gname) (dq : dfrac) (b off : Z)
+      (bs : list (bv 8)) :
+    byte_range_q gL dq b off bs ⊣⊢
+      ([∗ map] a ↦ v ∈ (map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)),
+         a ↪[gL]{dq} v).
+  Proof. rewrite /byte_range_q big_sepM_map_seqZ //. Qed.
+
   (* what the auth says about an owned run *)
   Lemma byte_range_lookup gL (L : gmap Z (bv 8)) b off bs :
     ghost_map_auth gL 1 L -∗ byte_range gL b off bs -∗
@@ -430,6 +574,23 @@ Section FsBytes.
   Proof.
     iIntros "Ha Hr". rewrite byte_range_map.
     iApply (ghost_map_lookup_big with "Ha Hr").
+  Qed.
+
+  (* AGREEMENT NEEDS NO SHARE (plan section 4: "the bytes at every record
+     slot and data block by AGREEMENT -- any fraction suffices").  This is
+     the one law a read-locker at a QUARTER runs, and every reading below
+     that a share must survive goes through it. *)
+  (* [ghost_map_lookup_big] is stated at fraction 1 only in iris 4.4.0, so
+     this is its own three-line proof at a share ([ghost_map_lookup] itself
+     takes a [dfrac] -- the big-op version simply was not generalised). *)
+  Lemma byte_range_q_lookup gL dq (L : gmap Z (bv 8)) b off bs :
+    ghost_map_auth gL 1 L -∗ byte_range_q gL dq b off bs -∗
+    ⌜(map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)) ⊆ L⌝.
+  Proof.
+    iIntros "Ha Hr". rewrite byte_range_q_map.
+    rewrite map_subseteq_spec. iIntros (k v Hk).
+    iDestruct (ghost_map_lookup with "Ha [Hr]") as %->; [| done].
+    rewrite big_sepM_lookup; done.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -638,6 +799,94 @@ Section FsBytes.
     { iNext. iExists L, C. iFrame "Ha". iSplitL; [by iApply "Hback" |].
       iPureIntro. auto. }
     iModIntro. iFrame "Hm". rewrite /fsblock. iFrame "Hr".
+    iSplit; [iPureIntro; congruence | done].
+  Qed.
+
+  (* ---- THE SAME TWO CROSSINGS AT A SHARE (lane B''-blk) -------------- *)
+
+  (* Holding ANY nonempty run inside block [b]'s width is being a home
+     block, and that reading is an AGREEMENT against the byte auth, so it
+     survives any share.  This is what makes a read-locker's quarter enough
+     to bread its own data block. *)
+  Lemma byte_range_q_home (gL : gname) (dq : dfrac) (L : gmap Z (bv 8))
+      (home : gset Z) (b : Z) (off : nat) (bs : list (bv 8)) :
+    bytes_dom L home ->
+    (off < BSIZE)%nat -> (0 < length bs)%nat ->
+    ghost_map_auth gL 1 L -∗ byte_range_q gL dq b (Z.of_nat off) bs -∗
+    ⌜b ∈ home⌝.
+  Proof.
+    iIntros (Hdm Hoff Hpos) "Ha Hr".
+    iDestruct (byte_range_q_lookup with "Ha Hr") as %Hsub.
+    assert (Hfst : is_Some ((map_seqZ (b * BSZ + Z.of_nat off) bs
+                               : gmap Z (bv 8)) !! (b * BSZ + Z.of_nat off))).
+    { apply lookup_map_seqZ_is_Some. lia. }
+    destruct Hfst as [v Hv].
+    assert (HL : L !! (b * BSZ + Z.of_nat off) = Some v)
+      by exact (lookup_weaken _ _ _ _ Hv Hsub).
+    destruct (proj1 (Hdm (b * BSZ + Z.of_nat off)) (mk_is_Some _ _ HL))
+      as (b' & Hb' & Hr').
+    iPureIntro.
+    assert (Hoz : Z.of_nat off < BSZ).
+    { rewrite -BSZ_BSIZE. apply Nat2Z.inj_lt. exact Hoff. }
+    rewrite (blk_range_disj b b' (b * BSZ + Z.of_nat off)
+               ltac:(lia) Hr'). exact Hb'.
+  Qed.
+
+  Lemma fsblock_q_home (gL : gname) (dq : dfrac) (L : gmap Z (bv 8))
+      (home : gset Z) (b : Z) (bs : list (bv 8)) :
+    bytes_dom L home ->
+    ghost_map_auth gL 1 L -∗ fsblock_q gL dq b bs -∗ ⌜b ∈ home⌝.
+  Proof.
+    iIntros (Hdm) "Ha [%Hlb Hr]".
+    iApply (byte_range_q_home gL dq L home b 0%nat bs Hdm
+              BSIZE_pos ltac:(rewrite Hlb; exact BSIZE_pos) with "Ha Hr").
+  Qed.
+
+  Lemma fsblock_q_home_open (E : coPset) gL dq gc home b bs :
+    ↑logN ⊆ E ->
+    fs_bytes_inv gL gc home -∗
+    fsblock_q gL dq b bs ={E}=∗ ⌜b ∈ home⌝ ∗ fsblock_q gL dq b bs.
+  Proof.
+    iIntros (HE) "#Hinv Hfb".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
+    iMod ("Hclose" with "[Ha HC]") as "_".
+    { iNext. iExists L, C. by iFrame. }
+    iModIntro. by iFrame.
+  Qed.
+
+  (* THE BREAD CLIENT'S CROSSING AT A SHARE.  [fs_bytes_agree] verbatim with
+     [fsblock_q] in place of [fsblock]: every step of it is a lookup against
+     the byte auth or the cache half, and neither is a share of the byte
+     run, so the quarter goes through unchanged. *)
+  Lemma fs_bytes_agree_q (E : coPset) gL dq gc home b bs bsm :
+    ↑logN ⊆ E ->
+    fs_bytes_inv gL gc home -∗
+    fsblock_q gL dq b bs -∗
+    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs⌝ ∗ fsblock_q gL dq b bs ∗ (b ↪[gc]{#(1/2)} bsm).
+  Proof.
+    iIntros (HE) "#Hinv Hfb Hm".
+    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
+    assert (Hin : is_Some (C !! b)).
+    { apply elem_of_dom. rewrite Hdom. exact Hb. }
+    destruct Hin as [bsi Hbsi].
+    iDestruct (big_sepM_lookup_acc _ _ b bsi Hbsi with "HC") as "[Hi Hback]".
+    iDestruct (ghost_map_elem_agree with "Hm Hi") as %->.
+    iDestruct "Hfb" as "[%Hlb Hr]".
+    iDestruct (byte_range_q_lookup with "Ha Hr") as %Hsub.
+    rewrite Z.add_0_r in Hsub.
+    assert (Hbe : bs = bsi).
+    { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
+      - rewrite Hlb (Hlens b bsi Hbsi) //.
+      - exact (Htie b bsi Hbsi). }
+    iMod ("Hclose" with "[Ha Hback Hi]") as "_".
+    { iNext. iExists L, C. iFrame "Ha". iSplitL; [by iApply "Hback" |].
+      iPureIntro. auto. }
+    iModIntro. iFrame "Hm". rewrite /fsblock_q. iFrame "Hr".
     iSplit; [iPureIntro; congruence | done].
   Qed.
 
@@ -951,7 +1200,7 @@ End FsBytes.
    the two heads leaves [rewrite /fsblock] and the declared [Timeless]
    instances working and makes [iFrame] treat a block run as one atom,
    which is what every consumer above the log wants of it. *)
-Global Typeclasses Opaque byte_range fsblock.
+Global Typeclasses Opaque byte_range fsblock byte_range_q fsblock_q.
 
 (* ===================================================================== *)
 (*  THE ERA'S MINT  (durable-disk 1c-flip, step 1)                        *)
@@ -1005,6 +1254,24 @@ Section FsMint.
   Proof.
     iIntros (HE) "Hrow Hfb Hm". iDestruct "Hrow" as (home) "#Hinv".
     iApply (fs_bytes_agree E (fs_bytes γ) (fs_cache γ) home b bs bsm HE
+              with "Hinv Hfb Hm").
+  Qed.
+
+  (* THE SAME CROSSING AT A SHARE (lane B''-blk).  This is [readi]'s tie
+     between the buffer bread handed it and the bytes its own [inode_blocks]
+     names, and it is an AGREEMENT, so a read-locker holding a QUARTER of
+     the run runs it exactly as a full owner does (plan section 4). *)
+  Lemma fs_bytes_agree_any_q (E : coPset) (γ : fs_names) (dq : dfrac) (b : Z)
+      (bs bsm : list (bv 8)) :
+    ↑logN ⊆ E ->
+    fs_bytes_any γ -∗
+    fsblock_q (fs_bytes γ) dq b bs -∗
+    (b ↪[fs_cache γ]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs⌝ ∗ fsblock_q (fs_bytes γ) dq b bs ∗
+      (b ↪[fs_cache γ]{#(1/2)} bsm).
+  Proof.
+    iIntros (HE) "Hrow Hfb Hm". iDestruct "Hrow" as (home) "#Hinv".
+    iApply (fs_bytes_agree_q E (fs_bytes γ) dq (fs_cache γ) home b bs bsm HE
               with "Hinv Hfb Hm").
   Qed.
 
