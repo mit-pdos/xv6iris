@@ -1356,3 +1356,4 @@ FsDurTrunc.v
 FsDurObj.v
 FsDurWire.v
 FsDurLedger.v
+IregClean.v
