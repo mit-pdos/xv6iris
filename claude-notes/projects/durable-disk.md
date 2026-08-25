@@ -1333,11 +1333,18 @@ as their remaining consumers.
   (B) alone — alternative (d) of `ic_escrow_body_cover` plus (A)'s `X` row,
   one ABI sweep.
 
-- [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
-  `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
-  prove `mknod_durable` off the snapshot; quote it here.  Then the
-  other arms are the same pattern (unlink/rmdir/link/write) — schedule
-  by value.
+- [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
+  The GENERAL statement is the commit's receipt itself: after a commit, the
+  current snapshot's abstract state IS the era's abstract state (the
+  `ftop_inv` map the transactions produced) — state it once as a theorem
+  over `P_dur_tie`/`P_dur_node_of_slot`, since every syscall spec already
+  states its effect on that map (`top_frag`/`ireg_top_retag`).  Then ONE
+  worked instance, `mknod_durable`: `ProofSysMknod` keeps `create`'s
+  `made` clause (today discarded at its `iDestruct`, ~`:1690`) and the
+  snapshot's inode at `inum` is `create_made ty major minor` with the
+  parent's entries containing `(name ↦ inum)`.  This lane is the vacuity
+  check of plan §7, not a step in lane E; other syscalls' durable
+  corollaries are the same two lines and are written only on request.
 - [ ] **Lane E — boot and the theorem (plan §5).**  Stage 4: the era's
   instance minted from the current snapshot by `fs_state_of_ledger` +
   the era-only extras, distributed into region/bitmap/escrow/pool
