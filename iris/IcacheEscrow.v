@@ -583,6 +583,12 @@ Section IcacheEscrow.
      carries, so the escrow (and the whole loaded/unloaded/evict/fill/recycle
      lifecycle) is untouched.  [reg_full] does NOT ride here: it lives in the
      [regN] invariant, borrowed by [ireg_claim_au]'s callers. *)
+  (* THE ERA'S ABSTRACT VALUE IS NOT ON THE MARKER ARM ANY MORE (durable-disk
+     C-3c).  It used to ride here UNTIED, which is exactly what left the
+     commit's collection unable to prove [FsDurSnap.sk_rec] or [sk_links] at a
+     free inum (FsCollect's supplier (D)).  It now parks WITH the record, in
+     [InodeRegion.ireg_top_park] -- tied at a type-0 record, untied at a claim
+     box -- and reaches the fill through [InodeRegion.ireg_withdraw]. *)
   Definition ipool_shape_np (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (ipool_alloc γfs γi cov logstart inum
@@ -592,17 +598,7 @@ Section IcacheEscrow.
            value, and the fill that re-ties it [dv_set]s to the fresh
            record's own [dv_of]. *)
         (∃ e, dv_ride (bv_unsigned inum) e) ∗
-        (∃ b, fv_ride (bv_unsigned inum) b) ∗
-        (* ...AND THE ERA'S ABSTRACT VALUE, UNTIED FOR THE SAME REASON
-           (durable-disk 2b-inode-3).  Every inum in the region owns exactly
-           one [top_frag]; on the ALLOCATED arm it rides tied inside
-           [inode_owned_era], and a free inum's has to be somewhere or
-           ialloc could never mint the bundle for the inode it claims.  It
-           is the POOL's marker arm and not the region's slot because this
-           is where a free inum's other untied holds already live, and
-           because the region's [ireg_slot] is destructured at twenty
-           accessors that have no business seeing it. *)
-        (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
+        (∃ b, fv_ride (bv_unsigned inum) b)))%I.
 
   (* THE AWAIT ARM (iclaim-ledger.md §1.2/§1.3): the entry a FREER has parked
      on its way to the off-lock deposit.  It is the whole point of B2's
@@ -649,9 +645,9 @@ Section IcacheEscrow.
   (* ...AND THE CONTENTS HOLD, UNTIED, for [pool_pending]'s reason verbatim:
      this arm is byte-less, and the peel that turns it into an [imark] must
      find the inum's [dv_ride] somewhere. *)
-  Definition pool_await (γi : gname) (z : Z) : iProp Σ :=
+  Definition pool_await (γfs : fs_names) (γi : gname) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : bool),
-       escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr ∗
+       escA_inv γfs ge gr gd γi z rg ∗ redeem_ticketA gr ∗
        (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
 
   (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
@@ -705,15 +701,15 @@ Section IcacheEscrow.
          choice -- and the placement is what lets the AWAIT arm below carry
          the STANDING freeze in the same escrow, which is the refuter §1.3
          always wanted. *)
-      (* THE ERA'S ABSTRACT VALUE RIDES BESIDE THE TWO IN-TRANSITION ARMS
-         (durable-disk 2b-inode-3), untied, exactly as it does on the
-         marker arm inside [ipool_shape_np].  It sits OUTSIDE
-         [pool_pending] / [pool_await] so that neither of those keeps its
-         [γfs]-free arity. *)
-      ∨ (pool_pending γi (bv_unsigned inum)
-         ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))
-      ∨ (pool_await γi (bv_unsigned inum)
-         ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))))%I.
+      (* THE ERA'S ABSTRACT VALUE IS NOT HERE EITHER (durable-disk C-3c).
+         A freed inum's fragment travels from iput's payload to the region
+         through the ESCROW's own EMPTY arm ([EscrowInode.escA_body]), which
+         is the one place both the +0x94 park and the +0xba deposit reach --
+         so neither in-transition arm carries it and the deposit parks it
+         region-side ([InodeRegion.ireg_top_park]) at the corpse's bare
+         record. *)
+      ∨ pool_pending γfs γi (bv_unsigned inum)
+      ∨ pool_await γfs γi (bv_unsigned inum)))%I.
 
   (* OPTION A (b)(ii): turn a pending-CAPABLE pool shape into the Timeless
      [ipool_shape_np] the escrow's unloaded arm needs, REDEEMING a genuine
@@ -809,10 +805,10 @@ Section IcacheEscrow.
     ifreeze_off (bv_unsigned inum).
   Proof.
     iIntros (HE HER HERE Hin) "#Hrinv Hl H". rewrite /ipool_shape.
-    iDestruct "H" as "[Hcnt [Hmir [[Hnp Hoff] | [[Hpp Htop] | [Haw Htop]]]]]".
+    iDestruct "H" as "[Hcnt [Hmir [[Hnp Hoff] | [Hpp | Haw]]]]".
     - iModIntro. iFrame "Hl Hnp Hcnt Hmir Hoff".
     - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk & Hdv & Hfv)".
-      iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
+      iMod (escA_redeem E γfs ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
         as "[Hmk Hoff]".
       (* DISPATCH THE [ipool_shape_np] CONJUNCT BEFORE FRAMING ANYTHING
          (optimization.md, "A NAMED iFrame still pays a GOAL-side search").
@@ -827,8 +823,7 @@ Section IcacheEscrow.
       iSplitR "Hcnt Hmir Hoff".
       { rewrite /ipool_shape_np. iRight.
         iSplitL "Hmk"; [iExact "Hmk" |].
-        iSplitL "Hdv"; [iExact "Hdv" |].
-        iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]. }
+        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
       iFrame "Hcnt Hmir Hoff".
     - (* THE AWAIT ARM (§1.3, as A⁗ rebuilt it).  There is no [committedA]
          until the off-lock deposit runs, so the peel cannot redeem -- and
@@ -837,7 +832,7 @@ Section IcacheEscrow.
          deposit the escrow hands back the marker AND the re-armed
          [ifreeze_off], which is exactly the ordinary arm's token. *)
       iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk & Hdv & Hfv)".
-      iMod (escA_await_peel E ge gr gd γi (bv_unsigned inum) rg
+      iMod (escA_await_peel E γfs ge gr gd γi (bv_unsigned inum) rg
               (iname γi γfs inodestart inum l) HE with "Hesc Htk Hl []")
         as "(Hl & Hmk & Hoff)".
       { iIntros "Hl Hpost". rewrite /ifreeze_post.
@@ -850,8 +845,7 @@ Section IcacheEscrow.
       iSplitR "Hcnt Hmir Hoff".
       { rewrite /ipool_shape_np. iRight.
         iSplitL "Hmk"; [iExact "Hmk" |].
-        iSplitL "Hdv"; [iExact "Hdv" |].
-        iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]. }
+        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
       iFrame "Hcnt Hmir Hoff".
   Qed.
 
@@ -3021,21 +3015,21 @@ Section IcacheEscrow.
       (ge gr gd : gname) (rg : bool) :
     icnt_half (bv_unsigned inum) 0%nat -∗
     frzm_h (bv_unsigned inum) false -∗
-    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
     (* the freer's own contents hold, which came out of the payload it
        evicted and which the AWAIT arm parks untied (§9 W2) *)
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
     (∃ b, fv_ride (bv_unsigned inum) b) -∗
-    (* ...and the era's abstract value, untied, which the freer's payload
-       carried in ([FsStateEra.inode_owned_era]'s [top_frag]) *)
-    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+    (* THE ERA'S ABSTRACT VALUE DOES NOT COME HERE (durable-disk C-3c): the
+       freer hands it to [EscrowInode.escA_alloc] at the mint instead, and
+       the off-lock deposit parks it region-side. *)
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv Htop". rewrite /ipool_shape.
+    iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv". rewrite /ipool_shape.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight. iRight. iSplitR "Htop"; [| iExact "Htop"].
+    iRight. iRight.
     rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" |].
     iSplitL "Htk"; [iExact "Htk" |].
@@ -3056,27 +3050,26 @@ Section IcacheEscrow.
     ic_mid cn k -∗
     icnt_half (bv_unsigned inum) 0%nat -∗
     frzm_h (bv_unsigned inum) false -∗
-    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
     (∃ b, fv_ride (bv_unsigned inum) b) -∗
-    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
          ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv Hfv Htop".
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv Hfv".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
     iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
-    iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv Htop";
+    iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv";
       [| iSplitL "Hgf2"; [iExact "Hgf2" |]].
     { iApply ic_close_empty. rewrite /ic_empty_arm.
       iExists dev, inum, (valid_word v). iFrame. }
     rewrite /ipool_shape. iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight. iRight. iSplitR "Htop"; [| iExact "Htop"].
+    iRight. iRight.
     rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" |].
     iSplitL "Htk"; [iExact "Htk" |].
@@ -4903,10 +4896,8 @@ Section IcacheEscrow.
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (icnt_half (bv_unsigned inum) 0%nat ∗
      frzm_h (bv_unsigned inum) false ∗
-     ((pool_pending γi (bv_unsigned inum)
-       ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))
-      ∨ (pool_await γi (bv_unsigned inum)
-         ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))))%I.
+     (pool_pending γfs γi (bv_unsigned inum)
+      ∨ pool_await γfs γi (bv_unsigned inum)))%I.
 
   Global Instance ipool_ord_timeless γfs γi cov logstart inum :
     Timeless (ipool_ord γfs γi cov logstart inum).

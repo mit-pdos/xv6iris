@@ -1062,4 +1062,72 @@ Section Collect.
     iPureIntro. exists (col_state sb sbb I used). exact Hok.
   Qed.
 
+  (* ==================================================================== *)
+  (*  5.  A FREE INUM'S BUNDLE -- SUPPLIER (D) (durable-disk lane C-3c)    *)
+  (* ==================================================================== *)
+
+  (* THE READING THAT CLOSES (D).  A FREE inum owns no block and no indirect
+     block, so [FsStateEra.inode_owned_era]'s two byte legs are [emp]; what
+     is left is the record fragment -- which the REGION holds at a free
+     record ([InodeRegion.ireg_slot]'s IN arm) -- and the era's abstract
+     value, which the region now parks BESIDE it and TIED
+     ([InodeRegion.ireg_top_park]).  The tie is the whole content of the
+     supplier: without it the fragment is at an unknown node and neither
+     [FsDurSnap.sk_rec] nor [sk_links] can be read at a free inum.
+
+     THE SHARE IS 1, which is what [col_bundle]'s [~ ✓ (dq ⋅ dq)] wants: a
+     free inum is never locked, so nothing splits its bundle. *)
+  Lemma dfrac_full_nvalid : ~ ✓ (DfracOwn 1 ⋅ DfracOwn 1).
+  Proof.
+    intros Hv. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
+  Qed.
+
+  Lemma inode_owned_era_free γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ireg_bare d ->
+    bv_unsigned (di_nlink d) = 0 ->
+    bv_unsigned (di_type d) = 0 ->
+    dinode_at γi inum d -∗
+    top_frag (fs_gamma_L γfs) (bv_unsigned inum) (free_node d) -∗
+    inode_owned_era γfs γi inum (free_node d).
+  Proof.
+    intros Hb Hnl Ht0. iIntros "Hdn Htop".
+    rewrite /inode_owned_era /free_node /=.
+    iSplitL "Hdn"; [iExact "Hdn" |].
+    rewrite big_sepM_empty.
+    iSplitR; [done |].
+    rewrite /ind_owned decide_True; last first.
+    { rewrite /fn_indb /= (proj2 Hb) lookup_total_replicate_2;
+        [by change (bv_unsigned (bv_0 32)) with 0 | rewrite /FS_NDIRECT; lia]. }
+    iSplitR; [done |].
+    iSplitL "Htop"; [iExact "Htop" |].
+    iPureIntro. exact (inode_local_free_node (bv_unsigned inum) d Hb Hnl Ht0).
+  Qed.
+
+  (* ...AND THE COLLECTION'S OWN SHAPE, which is what [col_hand]'s big-op
+     wants at every inum of the abstract map. *)
+  Lemma col_bundle_free γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ireg_bare d ->
+    bv_unsigned (di_nlink d) = 0 ->
+    bv_unsigned (di_type d) = 0 ->
+    dinode_at γi inum d -∗
+    ireg_top_park γfs (bv_unsigned inum) d -∗
+    col_bundle γfs γi (bv_unsigned inum) (free_node d).
+  Proof.
+    intros Hb Hnl Ht0. iIntros "Hdn Hpk".
+    iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
+      as "[_ Htop]".
+    iExists (DfracOwn 1), inum.
+    iSplitR; [done |]. iSplitR; [iPureIntro; exact dfrac_full_nvalid |].
+    rewrite -inode_owned_era_1.
+    iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0 with "Hdn Htop").
+  Qed.
+
+  (* THE FREE INUM'S OWN [sk_links] LEG, read off the same two pieces: the
+     region's link authority stands at [ireg_nl d], and a free record's count
+     is zero ([InodeRegion.ireg_link_ok]'s (L3)), which is exactly
+     [fn_nlink (free_node d)]. *)
+  Lemma free_node_nlink (d : dinode) :
+    bv_unsigned (di_nlink d) = 0 -> fn_nlink (free_node d) = 0%nat.
+  Proof. intros Hnl. rewrite /fn_nlink /free_node /= Hnl //. Qed.
+
 End Collect.

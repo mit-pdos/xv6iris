@@ -57,12 +57,24 @@ Section EscrowDeposit.
       (bsl : list (bv 8)) (ge gr gd : gname) (rg : bool) :
     ↑iregN ⊆ E ->
     ↑escAN (bv_unsigned inum) ⊆ E ∖ ↑iregN ->
+    (* ...AND [ftopN] (durable-disk C-3c).  The deposit is where the freed
+       payload's [FsState.top_frag] is RE-TIED at the corpse's own record and
+       parked region-side ([InodeRegion.ireg_top_park]), which is what gives
+       the commit's collection a whole bundle at a free inum.  The retag needs
+       the abstract map's authority, and [ireg_inv] already bundles it. *)
+    ↑ftopN ⊆ E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum) ->
     (bv_unsigned inum < 16 * Z.of_nat nib)%Z ->
     dinode_wf dn' ->
     bv_unsigned (di_type dn') = 0 ->
+    (* THE CORPSE IS BARE, and this is the one new obligation on iput: itrunc
+       has already freed every block and zeroed the size, so the record the
+       free flush writes names nothing.  Without it the parked node is not
+       determined by the record and [InodeRegion.ireg_top_park]'s tie -- hence
+       [FsCollect]'s [sk_rec]/[sk_links] at a free inum -- is unstatable. *)
+    ireg_bare dn' ->
     di_nlink_stable dn' dn ->
     ireg_inv γi γfs inodestart nib -∗
-    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
     dinode_at γi inum dn -∗
     (* THE FREEZE, RETIRED HERE (iclaim-ledger.md §1.4, and this mover's
        own row in RULING A's mover table).  The deposit is a type-0 write over
@@ -110,7 +122,7 @@ Section EscrowDeposit.
           -- which needs it on every iteration -- would not close. *)
        ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg).
   Proof.
-    iIntros (HE Hesc_mask Hin Hdn' Hz Hnl) "#Hinv #Hesc Hdn Hdep".
+    iIntros (HE Hesc_mask Hftop_mask Hin Hdn' Hz Hbare Hnl) "#Hinv #Hesc Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -150,7 +162,7 @@ Section EscrowDeposit.
        verbatim -- every consumer of the slot destructures it identically. *)
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
+    iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     rewrite /dinode_at.
@@ -187,8 +199,21 @@ Section EscrowDeposit.
     (* the escrow opens HERE, and its EMPTY state hands over the standing
        freeze; it closes again three lines below the region's re-park, with
        the marker and the retired token. *)
-    iMod (escA_deposit_acc (E ∖ ↑iregN) ge gr gd γi (bv_unsigned inum) rg
-            Hesc_mask with "Hesc Hdep") as "[Hfz Hescl]".
+    iMod (escA_deposit_acc (E ∖ ↑iregN) γfs ge gr gd γi (bv_unsigned inum) rg
+            Hesc_mask with "Hesc Hdep") as "(Hfz & Htop & Hescl)".
+    (* THE ERA'S ABSTRACT VALUE, RE-TIED AT THE CORPSE'S BARE RECORD
+       (durable-disk C-3c).  The escrow held the freed payload's fragment
+       from iput's mint at +0x8a; here it is retagged at the node the type-0
+       record determines and parked beside that record, so the PENDING arm
+       this deposit builds hands the commit's collection a whole
+       [FsStateEra.inode_owned_era] at this inum. *)
+    iDestruct "Htop" as (ntop) "Htop".
+    iMod (ireg_top_retag (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum)) γfs
+            (bv_unsigned inum) ntop (free_node dn') Hftop_mask
+            (inode_local_free_node (bv_unsigned inum) dn' Hbare Hnl0' Hz)
+            with "Hftopi Htop") as "Htop".
+    iDestruct (ireg_top_park_free γfs (bv_unsigned inum) dn' Hbare with "Htop")
+      as "Hpark".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
     (* RULING G's EXTRACTION.  With the column pinned at [FrzPost] the
        boot-shelter clause's left arm is a refutable equation, so what the
@@ -262,9 +287,9 @@ Section EscrowDeposit.
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
-    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
+      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -285,7 +310,7 @@ Section EscrowDeposit.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hrecb"; [iExact "Hrecb" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
+      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 (Some (Excl FrzOff)) cn
@@ -297,7 +322,7 @@ Section EscrowDeposit.
       iRight. iSplitR; [iPureIntro; exact Hz |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].
-      iExists ge, gr. iFrame "Hrh2 Hcom". }
+      iSplitR "Hpark"; [iExists ge, gr; iFrame "Hrh2 Hcom" | iExact "Hpark"]. }
     iModIntro. iSplitR; [iExact "Hcom" | iExact "Hgreg"].
   Qed.
 

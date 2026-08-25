@@ -1446,6 +1446,13 @@ Section IputFreePath.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     bv_unsigned (di_nlink dn) = 0 ->
+    (* THE CORPSE IS BARE (durable-disk C-3c).  itrunc freed every block and
+       zeroed the size before this tail runs -- [dn] is [SpecItrunc.di_trunc]
+       of the loaded record at the one call site -- so the type-0 record this
+       tail writes determines its abstract node outright, which is what lets
+       [EscrowDeposit.ireg_free_deposit_au] park the freed payload's
+       [FsState.top_frag] TIED beside it. *)
+    InodeRegion.ireg_bare dn ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     sp0 = m !!! Regidx csp_rs1 ->
@@ -1479,7 +1486,7 @@ Section IputFreePath.
 
        WHAT THE DEPOSITOR STILL CARRIES is the escrow itself (persistent) and
        its DEPOSIT ticket, below -- the two things the +0xba fill needs. *)
-    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
     (* THE DEPOSIT TICKET (A⁗, §3.16), in place of IVa's [ifreeze_post].  The
        standing freeze now lives in the ESCROW's EMPTY state -- it has to,
        because that is the only place from which a RECYCLER peeling the pool's
@@ -1541,7 +1548,9 @@ Section IputFreePath.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj bno dn' HKbr HKlw HKbl Hgeom Hst Hcov Hlog Hnib Hdnwf Hnl0
-           Hj Hgl Hsp0 Ha0 Ha1 Hs2v Hbelow.
+           Hbare Hj Hgl Hsp0 Ha0 Ha1 Hs2v Hbelow.
+    assert (Hdn'bare : InodeRegion.ireg_bare dn').
+    { rewrite /dn' /set_ditype0 /InodeRegion.ireg_bare /=. exact Hbare. }
     (* ---- pure prelude (mirrors iu_main_gen) ---- *)
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -1793,7 +1802,8 @@ Section IputFreePath.
     (* ---- the deposit's AU, adapted to log_write's anchor form ---- *)
     iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn'
                   (diblk_bytes ds) ge gr gd rg
-                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hdn'wf Hdn'ty Hnlst
+                  ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
+                  Hnib Hdn'wf Hdn'ty Hdn'bare Hnlst
                   with "Hireg Hesc Hdn Hdep") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
@@ -3209,6 +3219,12 @@ Section IputFreePath.
     set (dn2 := di_trunc dn).
     assert (Hdn2wf : dinode_wf dn2) by (unfold dn2; apply di_trunc_wf).
     assert (Hdn2nl : bv_unsigned (di_nlink dn2) = 0) by (unfold dn2; exact Hnl0).
+    (* itrunc's record names no block and has size zero -- the bridge from
+       [InodeInv.bm_cells bm_empty] to the bare [replicate 13] spelling is one
+       [vm_compute] (durable-disk C-3c) *)
+    assert (Hdn2bare : InodeRegion.ireg_bare dn2).
+    { rewrite /dn2 /di_trunc /InodeRegion.ireg_bare /=.
+      split; [by vm_compute | by vm_compute]. }
     iRename "Hdat" into "Hdn2".
     (* ---- ...AND THE POOL ENTRY, WHICH IS PARKED HERE AND NOT BY THE TAIL.
        This is the whole of what was left of B2, and the REORDER decides it:
@@ -3220,20 +3236,22 @@ Section IputFreePath.
        halves ride beside it on the AWAIT arm.  The DEPOSIT ticket does not go
        into the pool: it travels with the record to +0xa8. ---- *)
     iApply fupd_wp.
-    iMod (escA_alloc ⊤ γi (bv_unsigned inum) rg with "Hfzpost")
-      as (ge gr gd) "(#Hescr & Htkr & Htkd)".
+    (* ...AND THE FREED PAYLOAD'S ABSTRACT VALUE GOES IN WITH IT (C-3c).
+       It used to be parked in the pool's AWAIT arm just below; the off-lock
+       deposit cannot reach the pool (the itable lock goes at +0x94) but it
+       DOES open this escrow, so the fragment travels the road the standing
+       freeze already travels and the deposit ties it region-side. *)
+    iMod (escA_alloc ⊤ γfs γi (bv_unsigned inum) rg with "Hfzpost [Htop2]")
+      as (ge gr gd) "(#Hescr & Htkr & Htkd)";
+      [by iExists (era_node dn bm data2) |].
     iModIntro.
     (* THE CONTENTS HOLD GOES BACK UNTIED (namei-pinned-lookup.md §9 W2/W3).
        itrunc has zeroed this record's bytes, but the AWAIT arm is byte-less
        and forgets the value; the next fill of this inum re-ties it off the
        record it reads.  So the freer parks what it has and proves nothing. *)
     iDestruct (ipool_shape_await γfs γi cov logstart inum ge gr gd rg
-                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2] [Htop2]") as "Hgap";
-      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2)
-      (* ...and the era's abstract value goes back untied with them
-         (durable-disk 2b-inode-3): the await arm is byte-less and forgets
-         the node exactly as it forgets the two contents holds. *)
-      | by iExists (era_node dn bm data2) |].
+                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2]") as "Hgap";
+      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2) |].
     (* the AWAIT row stays on the LOCK's side of the split (durable-disk
        B''-esc) -- [ipool_put] reads that off the shape itself. *)
     iApply fupd_wp.
@@ -3515,7 +3533,7 @@ Section IputFreePath.
               uoff Sb' true e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks Vpr rg
               ltac:(lia) ltac:(lia) ltac:(lia)
-              Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hj Hgl
+              Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hdn2bare Hj Hgl
               ltac:(exact (eq_sym HP5sp)) HP5a0 HP5a1 HP5s2 Hlkbelow
               with "Hcg Hcnt Hextc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hireg
                     Hdn2 Hescr Htkd Hppid Hprocs Hdevi Hdgeom Hdlock Hins Hbs2

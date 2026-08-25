@@ -1178,7 +1178,7 @@ Section IlockLoad.
         iSplitR; [iPureIntro; exact Hdoc0 |].
         iSplitR; [iPureIntro; exact Hduq0 |].
         iSplitL "Hdlk0"; [iExact "Hdlk0" |]. iFrame.
-      - iDestruct "Hmk" as "[Hmk [Hdv [Hfv Htop]]]".
+      - iDestruct "Hmk" as "[Hmk [Hdv Hfv]]".
         destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
         + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
@@ -1186,7 +1186,7 @@ Section IlockLoad.
                   ltac:(solve_ndisj) logN_top Hfills Hinlt eq_refl Hdswf eq_refl
                   ltac:(rewrite Hagr; exact Htnz)
                   with "Hireg Hmk Hcl HL")
-            as "(%Hfresh & %Hty & %Htyok & Hwb & Hdn & HL)".
+            as "(%Hfresh & %Hty & %Htyok & Hwb & Hdn & HL & Htop)".
           rewrite Hagr in Hfresh. rewrite Hagr in Hty.
           rewrite Hagr in Htyok.
           iEval (rewrite Hagr) in "Hdn".
@@ -1197,6 +1197,10 @@ Section IlockLoad.
              contents are [∅] -- one free own-update (§9 Revision 2). *)
           iDestruct "Hdv" as (e0) "Hdv".
           iDestruct "Hfv" as (b0) "Hfv".
+          (* ...and the era's abstract value now comes out of the REGION,
+             where the claim parked it, rather than off the marker arm
+             (durable-disk C-3c).  It is untied either way -- the box is
+             [fresh_shape] -- so the retag below is unchanged. *)
           iDestruct "Htop" as (n0) "Htop".
           (* THE CLAIM BOX IS WELL-FORMED (durable-disk lane A): the retag
              owes the registry's row, and this arm proves the four facts it
@@ -1224,7 +1228,7 @@ Section IlockLoad.
             - exact (dir_uniq_size_zero dn _ Hfsz).
             - exact (dir_dots_ix_orphan (bv_unsigned inum) dn _
                        (fresh_shape_nlink dn Hfr0)). }
-          (* the marker arm's fragment is untied; retag it at the claim
+          (* the withdrawn fragment is untied; retag it at the claim
              box's own node, exactly as the two contents holds are set *)
           iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))

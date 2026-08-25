@@ -433,6 +433,71 @@ Lemma fresh_shape_nlink (d : dinode) :
   fresh_shape d -> bv_unsigned (di_nlink d) = 0.
 Proof. intros (_ & _ & _ & Hnl). exact Hnl. Qed.
 
+(* ---- THE BARE RECORD, AND THE NODE IT DETERMINES (durable-disk C-3c) ---
+
+   [fresh_shape] MINUS the type clause: a record that names no block and has
+   size 0.  Two of this kernel's record shapes are bare -- the claim box
+   ([fresh_shape]) and the FREE record iput's deposit writes (and the mkfs
+   image's, [FsCfgBoot.fs_region_bare]) -- and the second is the one the
+   commit's collection needs: a bare TYPE-0 record determines its abstract
+   node outright, so the region can park the era's [top_frag] TIED to the
+   record it holds beside it ([ireg_top_park] below).  Without the tie a free
+   inum's [top_frag] is untied and the collection can prove neither
+   [FsDurSnap.sk_rec] nor [sk_links] there (FsCollect.v's supplier (D)). *)
+Definition ireg_bare (d : dinode) : Prop :=
+  bv_unsigned (di_size d) = 0 /\ di_addrs d = replicate 13 (bv_0 32).
+
+Lemma fresh_shape_bare (d : dinode) : fresh_shape d -> ireg_bare d.
+Proof. intros (_ & Hsz & Ha & _). split; [exact Hsz | exact Ha]. Qed.
+
+Lemma ireg_bare_wf (d : dinode) : ireg_bare d -> dinode_wf d.
+Proof. intros (_ & Ha). rewrite /dinode_wf Ha length_replicate //. Qed.
+
+(* THE NODE A BARE RECORD DETERMINES.  [FsStateInode.fn_bare]'s three
+   non-record clauses are exactly "no entries, no blocks", so a bare record
+   leaves the node no freedom at all -- which is why the tie below needs no
+   existential and why the collection's [FsCollect.col_bundle] legs
+   ([FsStateEra.inode_bytes_era]'s two big-ops) are [emp] there. *)
+Definition free_node (d : dinode) : fs_node :=
+  MkNode d (replicate FsImg.FS_NINDIRECT (bv_0 32)) ∅.
+
+Lemma free_node_rec (d : dinode) : fn_rec (free_node d) = d.
+Proof. reflexivity. Qed.
+
+(* ...AND THE CONVERSE, which is what makes the tie STATABLE without an
+   existential: [fn_bare] pins the entry array and the block map outright,
+   so a bare node IS [free_node] of its own record. *)
+Lemma free_node_of_bare (n : fs_node) : fn_bare n -> n = free_node (fn_rec n).
+Proof.
+  destruct n as [r e b]. intros (_ & He & Hb & _).
+  rewrite /free_node /=. cbn in He, Hb. rewrite He Hb //.
+Qed.
+
+Lemma ireg_bare_of_fn_bare (n : fs_node) : fn_bare n -> ireg_bare (fn_rec n).
+Proof. intros (Ha & _ & _ & Hsz & _). split; [exact Hsz | exact Ha]. Qed.
+
+Lemma fn_bare_free_node (d : dinode) :
+  ireg_bare d -> bv_unsigned (di_nlink d) = 0 -> fn_bare (free_node d).
+Proof.
+  intros (Hsz & Ha) Hnl. rewrite /fn_bare /free_node /fn_size /fn_nlink /=.
+  split_and!; [exact Ha | reflexivity | reflexivity | exact Hsz |].
+  rewrite Hnl //.
+Qed.
+
+(* ...AND [inode_local] OF IT AT A FREE RECORD, which is what the commit's
+   collection reads off the park.  Only the TYPE-0 case is stated: the
+   enumeration clause [FsStateInode.inl_type] is then its own first
+   disjunct, so this file needs none of [FsImg]'s type names. *)
+Lemma inode_local_free_node (z : Z) (d : dinode) :
+  ireg_bare d -> bv_unsigned (di_nlink d) = 0 ->
+  bv_unsigned (di_type d) = 0 ->
+  inode_local z (free_node d).
+Proof.
+  intros Hb Hnl Ht0.
+  apply (inode_local_bare z (free_node d) (fn_bare_free_node d Hb Hnl)).
+  left. rewrite /fn_type /free_node /=. exact Ht0.
+Qed.
+
 (* ---- THE TWO IN-TRANSITION PINS (iclaim-ledger.md §2.3/§2.4) ---------
 
    THE CLAIM PIN (§2.4).  A claimed slot's record IS the claim box ialloc
@@ -2340,6 +2405,84 @@ Section InodeRegion.
     pose proof (di_nlink_nonneg d). lia.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE ERA's ABSTRACT VALUE, PARKED WITH THE RECORD (durable-disk C-3c) *)
+  (*                                                                      *)
+  (*  Every inum of the region owns exactly one [FsState.top_frag].  While  *)
+  (*  the record's fragment is region-side -- a FREE record, a claim box,   *)
+  (*  a PENDING slot -- the abstract value parks HERE, beside it, instead   *)
+  (*  of in the pool's marker arm where it used to ride UNTIED.  That is    *)
+  (*  the whole of supplier (D): the commit's collection needs a whole      *)
+  (*  [FsStateEra.inode_owned_era] at every inum of the abstract map, and   *)
+  (*  a free inum's is the region's [z |->[γi] d] together with THIS        *)
+  (*  fragment -- but only if the two describe the same node.               *)
+  (*                                                                        *)
+  (*  THE TIE IS GUARDED BY THE TYPE, and that is what keeps it free at      *)
+  (*  every mover.  At a TYPE-0 record the node is [free_node d] outright    *)
+  (*  (the record is bare, so nothing is left to choose); at a claim box     *)
+  (*  the fragment rides UNTIED exactly as it did in the pool, so            *)
+  (*  [ireg_claim_au] -- which retags the record 0 -> [fresh_shape] -- owes  *)
+  (*  nothing and moves no resource, and the fill's own                      *)
+  (*  [ireg_top_retag] (ProofIlock) is unchanged.                            *)
+  (*                                                                        *)
+  (*  WHERE IT ENTERS AND LEAVES.  In: boot ([IcacheBoot]) at every free     *)
+  (*  inum of the image, and [EscrowDeposit.ireg_free_deposit_au] -- iput's  *)
+  (*  type-0 write -- which takes the freed payload's fragment out of the    *)
+  (*  escrow the freer minted ([EscrowInode.escA_body]'s EMPTY arm) and      *)
+  (*  retags it at the corpse's bare record.  Out: [ireg_withdraw], the ONE  *)
+  (*  exit from the IN arm.                                                  *)
+  Definition ireg_top_park (γfs : fs_names) (z : Z) (d : dinode) : iProp Σ :=
+    (∃ n : fs_node,
+       ⌜bv_unsigned (di_type d) = 0 -> ireg_bare d /\ n = free_node d⌝ ∗
+       top_frag (fs_gamma_L γfs) z n)%I.
+
+  Global Instance ireg_top_park_timeless γfs z d :
+    Timeless (ireg_top_park γfs z d).
+  Proof. rewrite /ireg_top_park /top_frag. apply _. Qed.
+
+  (* the UNTIED park, which is all a nonzero-type record owes *)
+  Lemma ireg_top_park_nz γfs z d (n : fs_node) :
+    bv_unsigned (di_type d) <> 0 ->
+    top_frag (fs_gamma_L γfs) z n -∗ ireg_top_park γfs z d.
+  Proof.
+    intros Hnz. iIntros "Hf". iExists n. iFrame "Hf".
+    iPureIntro. intros H0. exfalso. exact (Hnz H0).
+  Qed.
+
+  (* ...and the TIED one, at the free record the deposit and boot write *)
+  Lemma ireg_top_park_free γfs z d :
+    ireg_bare d ->
+    top_frag (fs_gamma_L γfs) z (free_node d) -∗ ireg_top_park γfs z d.
+  Proof.
+    intros Hb. iIntros "Hf". iExists (free_node d). iFrame "Hf".
+    iPureIntro. intros _. split; [exact Hb | reflexivity].
+  Qed.
+
+  (* the park travels across a mover that writes a NONZERO type: the tie's
+     obligation is on its vacuous side at both records, so the fragment rides
+     through untouched.  That is every mover but the free deposit
+     ([ireg_write_au], the two link writes and [ireg_claim_au] all write a
+     record with a type). *)
+  Lemma ireg_top_park_retype γfs z d d' :
+    bv_unsigned (di_type d') <> 0 ->
+    ireg_top_park γfs z d -∗ ireg_top_park γfs z d'.
+  Proof.
+    intros Hnz. iIntros "(%n & _ & Hf)".
+    iApply (ireg_top_park_nz γfs z d' n Hnz with "Hf").
+  Qed.
+
+  (* WHAT THE COLLECTION READS OFF IT (FsCollect's supplier (D)): at a free
+     record the park IS the node, so the fragment can be handed out at
+     [free_node d] with no existential left. *)
+  Lemma ireg_top_park_open γfs z d :
+    bv_unsigned (di_type d) = 0 ->
+    ireg_top_park γfs z d -∗
+      ⌜ireg_bare d⌝ ∗ top_frag (fs_gamma_L γfs) z (free_node d).
+  Proof.
+    intros H0. iIntros "(%n & %Hn & Hf)".
+    destruct (Hn H0) as [Hb ->]. iFrame "Hf". iPureIntro. exact Hb.
+  Qed.
+
   Definition ireg_slot (γfs : fs_names) (γi : gname) (z : Z) (d : dinode)
     : iProp Σ :=
     ((∃ (wl wdu wdt g r : nat) (c : ctyUR)
@@ -2401,11 +2544,12 @@ Section InodeRegion.
         recombines the pending arm's two halves back to [reg_full] with no
         registry lookup.  The registry conjunct in [ireg_body] is now the bare
         [icfg_reg] auth. *)
-        ∗ ((((⌜ireg_in d⌝ ∗ z ↪[γi] d)
+        ∗ ((((⌜ireg_in d⌝ ∗ z ↪[γi] d ∗ ireg_top_park γfs z d)
              ∨ (⌜ireg_marked_ok c d⌝ ∗ imark γi z))
             ∗ (∃ ge gr, reg_full z ge gr))
            ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d
-              ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z)))
+              ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z
+              ∗ ireg_top_park γfs z d)))
      ∗ ireg_ep z d
      (* LAST, and that position is deliberate: an existing destructuring
         pattern's final name binds to [ireg_ep ∗ ireg_lnk], so only the
@@ -2435,11 +2579,12 @@ Section InodeRegion.
     icnt_half z n -∗
     ireg_fsh f -∗
     ireg_frzc z f -∗
-    ((((⌜ireg_in d⌝ ∗ z ↪[γi] d)
+    ((((⌜ireg_in d⌝ ∗ z ↪[γi] d ∗ ireg_top_park γfs z d)
        ∨ (⌜ireg_marked_ok c d⌝ ∗ imark γi z))
       ∗ (∃ ge gr, reg_full z ge gr))
      ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d
-        ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z)) -∗
+        ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z
+        ∗ ireg_top_park γfs z d)) -∗
     ireg_slot γfs γi z d.
   Proof.
     intros Hok Hdir Hwl0 Hpar Hclm Hfrz.
@@ -3600,7 +3745,7 @@ Section InodeRegion.
     (* THE ARM IS THE OUT ONE: the region cannot also hold this inum's
        fragment, because the caller does ([dinode_at_excl]). *)
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
+    iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     rewrite Hdeq in Hlok. rewrite Hdeq in Hdir.
@@ -3813,24 +3958,35 @@ Section InodeRegion.
        and refuted, exactly as before -- so the registry disjunct is what
        discriminates a genuine deposit from a spurious one, and
        [ireg_claim_au]'s interface (and postcondition) is unchanged. *)
+    (* ...AND THE ERA'S ABSTRACT VALUE COMES OUT WITH IT (durable-disk C-3c).
+       BOTH arms that hold the fragment hold the park beside it, so the claim
+       carries it across UNTOUCHED: the new record is [fresh_shape], hence
+       nonzero-typed, and the park's tie is guarded by [di_type = 0] -- so no
+       resource moves at the claim and no [ftopN] open is needed here.  It is
+       the fill ([ireg_withdraw] then ProofIlock's [ireg_top_retag]) that
+       re-ties the fragment at the node it parks. *)
     iAssert ((bv_unsigned inum ↪[γi] (ds !!! islot inum))
-             ∗ (∃ ge gr, reg_full (bv_unsigned inum) ge gr))%I
-      with "[Harm]" as "[Hfrg Hrf]".
+             ∗ (∃ ge gr, reg_full (bv_unsigned inum) ge gr)
+             ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))%I
+      with "[Harm]" as "(Hfrg & Hrf & Htp)".
     { iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
       - (* non-pending: fragment from the IN arm + the arm's own reg_full;
            a type-0 record refutes the marked sub-arm ([Ht2 Ht0]). *)
-        iDestruct "Harm" as "[[_ Hfrg] | [%Ht2 _]]".
-        + iFrame "Hfrg Hrf".
+        iDestruct "Harm" as "[[_ [Hfrg Hpk]] | [%Ht2 _]]".
+        + iDestruct "Hpk" as (n0) "[_ Hn0]".
+          iFrame "Hfrg Hrf". iExists n0. iExact "Hn0".
         + iExFalso. iPureIntro. exact (proj1 Ht2 Ht0).
       - (* PENDING: recombine the arm's structural [reg_half] with
            [region_pending]'s half back into [reg_full] -- the coordinate, now
            entirely from the slot's own arm (no registry lookup). *)
-        iDestruct "Hpend" as "(_ & Hfrg & Hrh1 & Hrp)".
+        iDestruct "Hpend" as "(_ & Hfrg & Hrh1 & Hrp & Hpk)".
         iDestruct "Hrh1" as (ge1 gr1) "Hrh1".
         iDestruct "Hrp" as (ge2 gr2) "[Hrh2 _]".
         iDestruct (reg_half_agree with "Hrh1 Hrh2") as %[-> ->].
         iDestruct (reg_join with "Hrh1 Hrh2") as "Hrf".
-        iFrame "Hfrg". iExists ge2, gr2. iExact "Hrf". }
+        iDestruct "Hpk" as (n0) "[_ Hn0]".
+        iFrame "Hfrg". iSplitL "Hrf"; [iExists ge2, gr2; iExact "Hrf" |].
+        iExists n0. iExact "Hn0". }
     (* (L3) AT THE CLAIMED SLOT: the record the caller's buffer showed
        type-0 has [nlink = 0], so (L1) collapses to [w = 0] -- i.e. no live
        directory record names the inum ialloc is about to claim -- and the
@@ -3928,10 +4084,10 @@ Section InodeRegion.
       in "Hrun".
     iEval (rewrite -Hkey) in "Hrun".
     iDestruct ("Hrecback" $! dn' with "Hrun") as "Hrecb".
-    iMod ("Hclose" with "[Ha Hreg Hrecb Hfrg Hla Hep Hlnk Hslback Hback Hrf Hcnt Hfdisj Hfrcp]") as "_"; last first.
+    iMod ("Hclose" with "[Ha Hreg Hrecb Hfrg Htp Hla Hep Hlnk Hslback Hback Hrf Hcnt Hfdisj Hfrcp]") as "_"; last first.
     { iModIntro. iExact "Hcl". }
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hrecb Hfrg Hla Hep Hlnk Hslback Hrf Hcnt Hfdisj Hfrcp]").
+      iApply ("Hback" $! m' with "[%] [Hrecb Hfrg Htp Hla Hep Hlnk Hslback Hrf Hcnt Hfdisj Hfrcp]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -3952,14 +4108,20 @@ Section InodeRegion.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hrecb"; [iExact "Hrecb" |].
-      iApply ("Hslback" $! dn' with "[Hfrg Hla Hep Hlnk Hrf Hcnt Hfdisj Hfrcp]").
+      iApply ("Hslback" $! dn' with "[Hfrg Htp Hla Hep Hlnk Hrf Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' wl wdu wdt gl
                 (Some (Excl (di_type dn'))) rl pl fz cn
                 Hlok' Hdir' Hwl0' Hpar Hclm' Hfrz'
                 with "Hla Hep Hlnk [] Hcnt Hfdisj Hfrcp").
       { iRight. iExact "Hopen". }
-      iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; right; exact Hfr | iExact "Hfrg"] | iExact "Hrf"]. }
+      iLeft. iSplitR "Hrf";
+        [iLeft; iSplitR; [iPureIntro; right; exact Hfr |];
+         iSplitL "Hfrg"; [iExact "Hfrg" |];
+         iDestruct "Htp" as (n0) "Hn0";
+         iApply (ireg_top_park_nz γfs (bv_unsigned inum) dn' n0
+                   (proj1 Hfr) with "Hn0")
+        | iExact "Hrf"]. }
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -4052,7 +4214,7 @@ Section InodeRegion.
     (* THE FRAGMENT PUTS THIS OPEN ON THE MARKED ARM, and that is where the
        claim clause is paid: [ireg_marked_ok] says [cl = None]. *)
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
+    iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     (* ...and it pins the region's record at this slot to the caller's, which
@@ -4459,7 +4621,13 @@ Section InodeRegion.
     ⌜ireg_ty_ok (ds !!! islot inum)⌝ ∗
     ireg_wd_back o gy (bv_unsigned inum) ∗
     dinode_at γi inum (ds !!! islot inum) ∗
-    (b ↪[fs_cache γfs]{#(1/2)} bsl).
+    (b ↪[fs_cache γfs]{#(1/2)} bsl) ∗
+    (* THE ERA's ABSTRACT VALUE LEAVES WITH THE RECORD (durable-disk C-3c),
+       and this is the ONE exit from the region's IN arm.  It comes out
+       UNTIED -- the box is [fresh_shape], so [ireg_top_park]'s tie is on its
+       vacuous side -- which is exactly the shape the fill used to take off
+       the pool's marker arm, so ProofIlock's [ireg_top_retag] is unchanged. *)
+    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n).
   Proof.
     iIntros (HE HEl Hfills Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
     pose proof (islot_lt inum) as Hsl.
@@ -4491,7 +4659,7 @@ Section InodeRegion.
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     (* the marker in the caller's hand refutes the OUT arm *)
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(%Ht0p & _ & _)"; exfalso; exact (Hnz Ht0p)].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk']]"; last first.
+    iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk']]"; last first.
     { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
     assert (Hfresh : fresh_shape (ds !!! islot inum))
       by (destruct Hin1 as [H0 | Hf]; [exfalso; exact (Hnz H0) | exact Hf]).
@@ -4576,7 +4744,9 @@ Section InodeRegion.
     iSplitR; [iPureIntro; exact Hty |].
     iSplitR;
       [iPureIntro; exact (ireg_link_ok_ty (ds !!! islot inum) _ Hlok) |].
-    iFrame "Hwback Hfr Hhalf".
+    (* the park leaves with the record, untied (the box is [fresh_shape]) *)
+    iDestruct "Hpk" as (n0) "[_ Hn0]".
+    iFrame "Hwback Hfr Hhalf". iExists n0. iExact "Hn0".
   Qed.
 
   (* ---- A CLAIM BOX HAS NO RECORD OUT (iclaim-ledger.md §5''''' step 2) --
@@ -4628,7 +4798,7 @@ Section InodeRegion.
     iDestruct "Hla" as (rcl) "[Hla %Href]".
     iDestruct (link_claim_agree with "Hla Hcl") as %Hcl.
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
-    - iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk']]".
+    - iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk']]".
       + iDestruct (dinode_at_excl with "Hdn Hfr") as %[].
       + (* the MARKED arm demands [c = None]; the fragment says otherwise *)
         exfalso. destruct Ht2 as [_ Hc0]. rewrite Hc0 in Hcl. discriminate.
@@ -4835,7 +5005,7 @@ Section InodeRegion.
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
+    iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     rewrite Hdeq in Hlok. rewrite Hdeq in Hdir.
@@ -5258,7 +5428,7 @@ Section InodeRegion.
     iEval (rewrite Hdeq) in "Hep".
     iDestruct (ireg_ep_open with "Hep") as (v) "[#Hvlb Hepback]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
-    iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
+    iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
     rewrite Hdeq in Hlok. rewrite Hdeq in Hdir.

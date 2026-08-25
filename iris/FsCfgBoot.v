@@ -586,12 +586,13 @@ Section FsCfgBootPool.
     ([∗ set] z ∈ region_inums icfg_nib,
        fv_ride z (fv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
     (* ...AND THE ERA'S ABSTRACT VALUE, AT THE IMAGE'S OWN NODE
-       (durable-disk 2b-inode-3).  One [FsState.top_frag] per region inum,
-       allocated by [FsState.fs_boot_alloc_at] at [img_nodes]; the value is
-       uniform over the whole region exactly as the two contents holds' is,
-       and at a LIVE inum it is the very node the allocated arm ties to. *)
-    ([∗ set] z ∈ region_inums icfg_nib,
-       top_frag (fs_gamma_L γfs) z (img_node P sb z)) -∗
+       (durable-disk 2b-inode-3).  One [FsState.top_frag] per LIVE inum,
+       allocated by [FsState.fs_boot_alloc_at] at [img_nodes]; it is the very
+       node the allocated arm ties to.  A FREE inum's does not come here any
+       more (durable-disk C-3c): it parks region-side with its record, in
+       [InodeRegion.ireg_top_park], and [IcacheBoot.ireg_alloc] is what takes
+       it. *)
+    ([∗ set] z ∈ A, top_frag (fs_gamma_L γfs) z (img_node P sb z)) -∗
     (* [ireg_alloc]'s payout, verbatim: the fragment at a live inum, the
        marker at a free one *)
     ([∗ set] z ∈ region_inums icfg_nib,
@@ -711,18 +712,8 @@ Section FsCfgBootPool.
       apply elem_of_difference in Hz as [Hz1 _].
       rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
       iIntros "H". iExists _. iExact "H". }
-    (* ...and the era's abstract value, split along the same subset *)
-    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
-                 with "Htop") as "[HtopA HtopF]".
-    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
-               ∃ n : fs_node,
-                 top_frag (fs_gamma_L γfs)
-                          (bv_unsigned (mword_of_int z : mword 32)) n)%I
-      with "[HtopF]" as "HtopF".
-    { iApply (big_sepS_mono with "HtopF"). intros z Hz.
-      apply elem_of_difference in Hz as [Hz1 _].
-      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
-      iIntros "H". iExists _. iExact "H". }
+    (* the era's abstract value needs no split: only the LIVE inums' arrive *)
+    iRename "Htop" into "HtopA".
     (* ---- the allocated arm, one named application per inum ----------- *)
     iDestruct (big_sepS_sep_2 with "HoutA Hdlk") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha Hpc") as "Ha".
@@ -731,7 +722,7 @@ Section FsCfgBootPool.
     iDestruct (big_sepS_sep_2 with "Ha HtopA") as "Ha".
     iApply (ipool_alloc γfs γi cov (sb_logstart sb)
               (region_inums icfg_nib) A HARs
-              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF HtopF").
+              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF").
     iApply (big_sepS_mono with "Ha"). intros z Hz.
     pose proof (Hrl z Hz) as Hrlz.
     rewrite (region_inum_faithful icfg_nib z Hnib (HAR z Hz)).
@@ -1341,6 +1332,10 @@ Section FsCfgBootPool.
   Lemma image_ireg_premises (P : Z -> list (bv 8)) (sb : fs_sb)
       (dss : list (list dinode)) (nib : nat) :
     fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+    (* CONJUNCT (14), spent here for the second time (durable-disk C-3c):
+       [IcacheBoot.image_bare] is what makes a free inum's parked node
+       [InodeRegion.free_node] of its record. *)
+    fs_region_bare P sb nib = true ->
     length dss = nib -> Forall diblk_wf dss ->
     (forall bi : nat, (bi < nib)%nat ->
        P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
@@ -1349,9 +1344,11 @@ Section FsCfgBootPool.
     image_link_le (fs_link_count P sb) dss nib
     /\ image_dir_wl0 (fs_link_count P sb) dss nib
     /\ image_ty_ok dss nib
-    /\ image_nlink_at (fun z => fn_nlink (img_node P sb z)) dss nib.
+    /\ image_nlink_at (fun z => fn_nlink (img_node P sb z)) dss nib
+    /\ image_bare dss nib
+    /\ image_rec_at (fun z => fs_dinode P sb z) dss nib.
   Proof.
-    intros Hwf Hrw Hl Hdwf He Hnib.
+    intros Hwf Hrw Hbare Hl Hdwf He Hnib.
     assert (Hbr : forall z : Z, z ∈ region_inums nib ->
               image_dinode dss z = fs_dinode P sb z).
     { intros z Hz. apply region_inums_spec in Hz.
@@ -1370,9 +1367,22 @@ Section FsCfgBootPool.
     split; [exact Hle |]. split; [exact Hw0 |].
     (* THE LINK RA's TIE (durable-disk 2b-inode-4) is [Hbr] and nothing
        else: [img_node]'s record IS [fs_dinode P sb z] ([era_node_rec]). *)
-    split; [| intros z Hz;
-               rewrite /ireg_nl /fn_nlink /img_node era_node_rec (Hbr z Hz);
-               reflexivity ].
+    split.
+    2:{ split.
+        { intros z Hz.
+          rewrite /ireg_nl /fn_nlink /img_node era_node_rec (Hbr z Hz).
+          reflexivity. }
+        split.
+        (* (14) AT THE DECODED RECORD (durable-disk C-3c): [img_node_bare] is
+           the sweep, and [InodeRegion.ireg_bare_of_fn_bare] reads the two
+           record clauses off it. *)
+        { intros z Hz Hty. rewrite (Hbr z Hz). rewrite (Hbr z Hz) in Hty.
+          apply region_inums_spec in Hz.
+          exact (ireg_bare_of_fn_bare (img_node P sb z)
+                   (img_node_bare P sb nib z Hbare
+                      (fs_region_wf_nlink _ _ _ Hrw) Hz Hty)). }
+        (* ...and the record function the park is indexed by IS the image's *)
+        { intros z Hz. rewrite (Hbr z Hz). reflexivity. } }
     (* (L5), the TYPE ENUMERATION (durable-disk 2b-inode-3).  Two arms and
        no new sweep: below [ninodes] a record is either free (type 0) or
        live, and [FsImg.fio_type] is exactly the enumeration at a live one;
@@ -2285,6 +2295,52 @@ Section FsCfgBootEra.
     iEval (rewrite (big_sepM_img_nodes
                       (fun i n => top_frag (fs_gamma_L γfs) i n)
                       (fs_blocks dk) sb icfg_nib)) in "Htopf".
+    (* ---- durable-disk C-3c: THE FREE INUMS' FRAGMENTS GO TO THE REGION ---
+       A free inum's [top_frag] now parks WITH its record ([InodeRegion.
+       ireg_top_park]), tied at the node the record determines, so that the
+       commit's collection can build a whole [FsStateEra.inode_owned_era]
+       there (FsCollect's supplier (D)).  Only the LIVE inums' fragments go
+       on to the pool, where they ride tied inside [ipool_shape_alloc]. *)
+    assert (HAsub : fs_live_set (fs_blocks dk) sb ⊆ region_inums icfg_nib).
+    { apply elem_of_subseteq. intros z Hz.
+      apply (fs_live_set_elem_of (fs_blocks dk) sb z) in Hz.
+      apply region_inums_spec. lia. }
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib)
+                 (fs_live_set (fs_blocks dk) sb) HAsub with "Htopf")
+      as "[Htopf Htopreg]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib,
+               ireg_top_boot γfs (fun z => fs_dinode (fs_blocks dk) sb z) z)%I
+      with "[Htopreg]" as "Htopreg".
+    { rewrite {2}(union_difference_L (fs_live_set (fs_blocks dk) sb)
+                    (region_inums icfg_nib) HAsub).
+      rewrite big_sepS_union; [| set_solver].
+      iSplitR "Htopreg".
+      { iApply big_sepS_intro. iModIntro. iIntros (z Hz).
+        iApply (ireg_top_boot_live γfs
+                  (fun z => fs_dinode (fs_blocks dk) sb z) z).
+        apply (fs_live_set_elem_of (fs_blocks dk) sb z) in Hz. tauto. }
+      iApply (big_sepS_mono with "Htopreg"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 Hz2].
+      pose proof (proj1 (region_inums_spec icfg_nib z) Hz1) as Hzr.
+      (* the region's TAIL is free too: below [ninodes] "not live" IS
+         "type 0", and at or above it [fs_region_free] says so outright *)
+      assert (Hty : bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb z)) = 0).
+      { destruct (decide
+            (bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb z)) = 0))
+          as [H0 | Hnz]; [exact H0 |]. exfalso.
+        destruct (Z_lt_ge_dec z (FsImg.sb_ninodes sb)) as [Hlt | Hge].
+        - apply Hz2. apply (fs_live_set_elem_of (fs_blocks dk) sb z).
+          split; [lia | exact Hnz].
+        - apply Hnz.
+          exact (fs_region_free_spec (fs_blocks dk) sb icfg_nib z
+                   (fs_region_wf_free _ _ _ Hrw)
+                   ltac:(lia) ltac:(lia) ltac:(lia)). }
+      iIntros "H". rewrite /ireg_top_boot decide_True; [| exact Hty].
+      rewrite -(free_node_of_bare (img_node (fs_blocks dk) sb z)
+                  (img_node_bare (fs_blocks dk) sb icfg_nib z Hbare
+                     (fs_region_wf_nlink _ _ _ Hrw)
+                     Hzr Hty)).
+      iExact "H". }
     (* ---- durable-disk 2b-inode-4: THE LINK FAMILY IS ROUTED HERE TOO,
        into the inode region, which is where the RA's law has to be
        READABLE ([IgetLic]'s licence (a) turns a directory record's token
@@ -2322,12 +2378,13 @@ Section FsCfgBootEra.
                fs_blocks dk (FsImg.sb_inodestart sb + Z.of_nat bi))
             (fs_link_count (fs_blocks dk) sb)
             (fun z => fn_nlink (img_node (fs_blocks dk) sb z))
+            (fun z => fs_dinode (fs_blocks dk) sb z)
             Hnib32 eq_refl
             ltac:(intros bi _; rewrite fs_blocks_length; reflexivity)
             ltac:(intros dss Hdl Hdwf Hde;
                   exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
-                           Hwf Hrw Hdl Hdwf Hde Hnib32))
-            with "Hla Hlnks HcntR Hrcpt HmirR Hep Hbireg Hbinv Hftopi Hboot Hrauth")
+                           Hwf Hrw Hbare Hdl Hdwf Hde Hnib32))
+            with "Hla Hlnks HcntR Hrcpt HmirR Hep Htopreg Hbireg Hbinv Hftopi Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
