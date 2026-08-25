@@ -1,4 +1,133 @@
-# TSO port — plan of record (PROPOSED, awaiting owner ratification)
+# TSO port — plan of record
+
+## 0. CHECKPOINT — READ THIS FIRST
+
+**Where the tree is.** Legs T and M are LANDED AND GREEN on branch `tso`
+(whole tree, `MAKEEXIT=0`, assumption audit unchanged at the standing
+baseline). `iris/TsoMem.v` is the minimal Ztso machine; `TsoLitmus.v` its
+8 verdicts; `TsoCtx.v` the SC-degenerate ownership surface Σ that ~600
+files now depend on; `TsoCtxTwin.v` the TSO-side gate; `TsoCtxRehearsal.v`
+the leg-C cutover rehearsal. `tools/ctx_convert.py` + the
+[`interface-sweep-playbook.md`](../interface-sweep-playbook.md) are how
+the sweep was done and how to repeat it.
+
+**Where the DESIGN is: Σ's shape is not yet right, and the rehearsal
+plus the review that followed it say exactly how.** The corrections
+below are NOT yet implemented — `TsoCtx.v` still carries the refuted
+statements, deliberately, because the tree is green against them and the
+repair should land as one coherent change. Nothing in the sweep is
+wasted by them: they are statements, and the sweep installed the AXIS.
+
+### 0.1 The ownership design, as it now stands
+
+1. **`own_context ξ` is the RUNNING token — "this hart is running as ξ" —
+   and is NEVER allocated from nothing.** `own_context_alloc : ⊢ |==> ∃ ξ,
+   own_context ξ` is REFUTED (`TsoCtxRehearsal.no_own_context_alloc`): the
+   token is keyed by the HART, so two mints collide however fresh the
+   identity is.
+2. **Fresh allocation yields a PARKED context**, which claims no hart, so
+   it can be pure. It must be stamped with a COUNTER: the child's bound =
+   the log top at creation (equivalently the parent's bound, and the top
+   is strictly more permissive). **That stamp is what makes the fork
+   deposit free** — the parent's facts sit below its bound, the child's
+   bound equals it, so domination holds by construction and handing facts
+   to the child has NOTHING TO PROVE. Verified: `twin_deposit_at_fork`.
+   Caveats: the stamp only covers facts held AT the stamp (a byte written
+   after the fork cannot be deposited — if `uvmcopy` runs after the child's
+   record is built, stamp at the END of fork), and the deposit itself needs
+   the ledger authority, so an interp-free mint buys nothing on its own.
+3. **The EXCHANGE is the primitive** (`own_context C1 ∗ parked C2 ==∗
+   own_context C2 ∗ parked C1`, recording C1's counter), not park-then-
+   resume: a hart always runs exactly one thread. Its premise is best
+   stated as **"this hart is at the log top"**, which the `p->lock`
+   acquire supplies and which means the parked record need not expose its
+   timestamp. `SpecSwtch` currently carries nothing that would discharge
+   it (vacuous at SC).
+4. **Boot is the only site of a hart's FIRST running token**, justified by
+   the interp being constructed there.
+
+### 0.2 The two refuted statements, and what is NOT the fix
+
+- **`CtxMorph` as stated is unsatisfiable** (`no_ctx_morph_pointsto`,
+  refuted inside a WELL-FORMED configuration).
+- **DO NOT "thread a world" through it.** That was tried and reverted.
+  Existentially closed, the caller cannot recover its specific interp
+  indices to hand back to `wp_lift_step`; named explicitly, the state
+  interpretation leaks into every lock client's spec. **Σ must be
+  statable without naming the machine's state interpretation, because Σ
+  is what 600 files depend on — that constrains the ghost construction,
+  not the other way round.**
+
+### 0.3 The ghost construction — the live design question
+
+The twin's `ctx_pointsto ξ a v := ∃ t, a ↪[γheap] (t,v) ∗ (ξ,a) ↪[γledger] t`
+has a **global** ledger whose authority sits in the interp; that is WHY
+transport needs the interp. Three rounds of review on it:
+
+- **Per-ADDRESS registration is heavier than TSO needs.** The ledger's
+  value duplicates the heap cell's timestamp; only its key (who owns
+  what) does work.
+- **Folding the owner INTO the cell is WRONG** — read-shared bytes are
+  many-to-many, and an owner field forces all holders to agree.
+- **Per-FACT state is irreducible, but it is a BIT, not a ledger entry:
+  clean (justified by my bound) vs dirty (justified by my own
+  unpublished write).** Forwarding is keyed on the HART, not the thread
+  (`visibleb h tv log t = t ≤ tv ∨ log[t] authored by h`), so a
+  context-indexed persistent "ξ wrote t" is UNSOUND across a migration,
+  and a hart-indexed one would put a hart in the fact and break the
+  survives-migration property. Park's bound-raise is what converts dirty
+  to clean, and it is mandatory: a thread that migrates without
+  publishing cannot read its own recent writes. **This is the
+  `weak-memory` branch's C/D/S three-state points-to, re-derived** — and
+  that branch hid the conversion INSIDE THE STORE LEAF via the migration
+  invariant, so client proofs never see the distinction. Preserve that.
+- Direction of travel: per-context state should be ONE MONOTONE NAT (its
+  bound, mirroring the machine's one nat per hart), the per-fact bit
+  rides in the points-to, and the authority a transport needs should
+  travel WITH THE CONTEXT'S TOKEN (the real `CtxId` already carries a
+  gname; the twin's `nat` throws it away). Get that right and
+  `CtxMorph`'s original bare-update shape becomes true as written, the
+  mint can read the parent's bound off the token, and the exchange's
+  premise becomes stable. **One correction, three problems.**
+
+### 0.4 Open, ranked by blast radius on the swept tree
+
+1. **`CtxMorph`'s shape** — 2 files TODAY (M3 has not run; `grep` for
+   `CtxMorph|ctx_morph|ctx_dom` outside `TsoCtx.v`/twin is empty), every
+   lock client if M3 runs first. **Fix before M3 and it is free.**
+2. **The exchange/acquire evidence token** — forces `SpecSwtch` to carry
+   a hart-view fact and `SpecAcquire` to produce one (cheapest hidden
+   inside `locked`/`cpu_own`, which swtch already holds at the proc
+   lock). Blocked on the item below.
+3. **A STABLE view lower bound is MISSING.** "Hart h is at the log top"
+   is false one step later; the honest resource is a persistent monotone
+   `view_lb h K` plus `⌜T ≤ K⌝`. The twin has no monotone-view resource
+   at all. **This is the largest unclosed gap** and it gates (2).
+4. **`own_context` is hart-indexed**, so re-hosting across `wp_next` is a
+   real ghost step needing view evidence (`twin_rehost`). Points-to facts
+   are NOT hart-indexed, so the ruling they survive migration unchanged
+   HOLDS; it is the token's transport that gains an obligation. The tree
+   already transports the bundle explicitly at migration, so this is
+   bounded in files and expensive in thought.
+5. **The parked-record shape** — `SwtchCtx.valid_context_pre` should hold
+   the PARKED token rather than `own_context`; `ProofSwtch` exchanges;
+   `ProofForkretPark` mints parked. Confirmed bounded: one definition +
+   three proofs, no consumer arity moves (the identity is existential).
+6. **Fractional/persistent sharing** — under the twin all facts about one
+   byte live in ONE context, so a discarded (immutable) byte is pinned
+   forever and `ctx_pointsto_persist` fights transport. Likely answer:
+   immutable bytes are CONTEXT-FREE, same as kernel text. Invisible today
+   (the `↦ₘ` notation flip has not landed); audit before M1's flip.
+
+### 0.5 What I would do next
+
+Rebuild the twin on the corrected construction (one nat per context, the
+clean/dirty bit in the fact, authority in the token, a monotone
+`view_lb`), re-run the rehearsal against it, and only then freeze Σ and
+repair `TsoCtx.v` in one change. Do NOT start M3 (lock payloads) before
+`CtxMorph`'s shape is settled.
+
+
 
 Goal: move main's memory semantics from SC to operational **Ztso**, keeping
 the proof tree. The port is **interface-first**: a context-indexed ownership
@@ -375,6 +504,44 @@ THE FOUR DESIGN SEAMS, and their rulings:
   the record it builds, the target's comes OUT of the record it resumes.
   That is what "the hart keeps running while the thread changes" means,
   and it is the one place in the kernel a token moves between records.
+- **`own_context` IS THE RUNNING TOKEN, AND IT IS NEVER ALLOCATED FROM
+  NOTHING** (owner ruling, from the leg-C rehearsal). `own_context ξ`
+  says "this hart is RUNNING as ξ", which cannot be conjured: the SC
+  instance's `own_context_alloc : ⊢ |==> ∃ ξ, own_context ξ` is a free
+  ghost var and hides the obligation. Three primitives instead:
+  1. **Fresh allocation yields a PARKED context**, not a running one — a
+     context that has never run makes no claim about any hart, so the
+     mint is pure. That is what fork needs: `ProofForkretPark` creates
+     the child, and the child does NOT get `own_context` yet.
+     **THE CHILD IS STAMPED AT THE PARENT'S COUNTER**, at the moment of
+     creation — not zero, not arbitrary: `ctx_fork : own_context ξp ==∗
+     own_context ξp ∗ ctx_parked ξc T` with `T` = ξp's current bound
+     (the mint BORROWS the parent's running token to read it, and hands
+     it back; no state interp). **This is what makes the deposit free.**
+     The parent hands the child points-to facts registered at ξp with
+     entries ≤ ξp's bound; since ξc's bound is EQUAL, `ctx_dom ξp ξc`
+     holds BY CONSTRUCTION and re-registering them at ξc has nothing to
+     prove. If depositing into the child's WP ever needs a side
+     condition, the stamp is wrong. It also closes the exchange's
+     premise: `T` is ≤ the log top at fork and therefore ever after, and
+     the resuming hart's `p->lock` acquire takes its view to the top.
+  2. **The EXCHANGE is the primitive**, not park-then-resume: a hart
+     always runs exactly one thread, so
+     `own_context C1 ∗ ctx_parked C2 T2 ∗ ⌜T2 ≤ this hart's freshness⌝
+     ==∗ own_context C2 ∗ ctx_parked C1 T1`, with T1 RECORDED so C1 can
+     be resumed later. The premise — the CPU is at least as fresh as the
+     resumed context requires — is what `p->lock`'s acquire supplies in
+     the kernel, and `SpecSwtch` currently carries nothing that would
+     give it (vacuous at SC).
+  3. **Boot is the only place a hart's FIRST running token appears**,
+     justified by the interp being CONSTRUCTED there.
+
+  Consequence for the swept tree, expected to be a bounded delta:
+  `SwtchCtx.valid_context_pre`'s record should hold the PARKED token
+  rather than `own_context`, `ProofSwtch`'s exchange consumes
+  parked(target) and produces parked(parker), and `ProofForkretPark`
+  mints parked.
+
 - **Boot TAKES, adequacy MINTS — one token PER HART.** `boot_bridge`
   (and `boot_entry_bridge`/`boot_hart_primary`/`_secondary`) take
   `own_context cur_ctx` as a premise; the mints sit in

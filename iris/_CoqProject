@@ -21,6 +21,7 @@ DevModel.v
 TsoMem.v
 TsoLitmus.v
 TsoCtxTwin.v
+TsoCtxRehearsal.v
 RiscvLang.v
 HartBlock.v
 HartSwp.v
