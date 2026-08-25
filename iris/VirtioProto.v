@@ -4001,6 +4001,212 @@ Section VirtioProto.
   Qed.
 
   (* ==================================================================== *)
+  (* THE HANDLER'S RECORD READ: [int id = disk.used->ring[...].id].       *)
+  (*                                                                      *)
+  (* Like [virtio_proto_used_peek], but keyed by the completion record and *)
+  (* the watermark instead of a receipt the handler does not hold.  Under  *)
+  (* out-of-order completion the handler has NOTHING before this read --   *)
+  (* the head it is about to learn is what names the chain -- so the       *)
+  (* accessor has to find the entry itself, from [disk_ord] and the fact   *)
+  (* that the watermark still owes this record a look.  What comes out is  *)
+  (* the element's bytes and, with them, WHICH claim they are about.       *)
+  (* ==================================================================== *)
+  Lemma virtio_proto_used_peek_at (γ : disk_names) (v : virtio_state)
+      (np p u : nat) :
+    virtio_proto γ v -∗ disk_pub γ np -∗
+    disk_ord γ p u -∗
+    disk_read_at γ u -∗
+    ⌜virtio_live (v_cfg v) = true⌝ ∗
+    disk_cfg γ (v_cfg v) ∗
+    (∃ dc : dclaim,
+       ⌜dc_pos dc = p⌝ ∗
+       ⌜slot_pin_ok (v_cfg v) p (dc_slot dc) (dc_pin dc)⌝ ∗
+       phys_word4 (used_elem_pa (v_cfg v) u)
+                  (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))) ∗
+       (phys_word4 (used_elem_pa (v_cfg v) u)
+                   (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))) -∗
+          virtio_proto γ v ∗ disk_pub γ np ∗ disk_read_at γ u)).
+  Proof.
+    iIntros "Hp Hpub #Hordp Hrd".
+    rewrite /virtio_proto /disk_pub.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
+      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
+      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
+        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
+    rewrite /disk_ord.
+    iDestruct (ghost_map_lookup with "Hord Hordp") as %Huix.
+    assert (Hsrv : p ∈ vp_srv pr).
+    { rewrite <- (vpo_uix_dom _ _ _ Hok). apply elem_of_dom. by exists u. }
+    assert (Hpendnone : vp_pend pr !! p = None).
+    { apply not_elem_of_dom. intro Hc'.
+      destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hc') as [_ Hns].
+      exact (Hns Hsrv). }
+    rewrite /disk_read_at.
+    iDestruct (ghost_var_agree with "Hnr Hrd") as %Hnreq.
+    assert (Hdonein : p ∈ dom (vp_done pr)).
+    { apply (vpo_done_uix _ _ _ Hok). exists u. split; [exact Huix | lia]. }
+    apply elem_of_dom in Hdonein as [sl Hdone].
+    assert (Hs : vp_slots pr !! p = Some sl).
+    { unfold vp_slots.
+      rewrite (lookup_union_r (vp_pend pr) (vp_done pr) p Hpendnone).
+      exact Hdone. }
+    assert (Hpinin : exists pin, vp_pin pr !! p = Some pin).
+    { apply elem_of_dom. rewrite (vproto_slot_dom (v_cfg v) pr (dom dma) Hok).
+      apply elem_of_dom. by exists sl. }
+    destruct Hpinin as [pin Hpin].
+    assert (Hspins : vp_spins pr !! p = Some (sl, pin))
+      by (unfold vp_spins; rewrite map_lookup_zip_with Hs Hpin; reflexivity).
+    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
+    destruct (Hhcoup p sl pin Hspins) as (dc & Hhlk & Hdcsl & Hdcpin & Hdcpos).
+    iDestruct (big_sepM_delete _ (vp_done pr) p sl Hdone with "Hdone")
+      as "[Hdres Hdone]".
+    iDestruct "Hdres" as (u') "[%Hu' Hdres]".
+    rewrite Huix in Hu'. injection Hu' as <-.
+    iDestruct "Hdres" as (bs) "(%Hbslen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hdone0)".
+    assert (HEMsub : range_map (used_elem_pa (v_cfg v) u) 4
+                       (nth_byte (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))))
+                     ⊆ dma).
+    { apply range_map_sub; [lia|]. intros j Hj.
+      apply (read_bytes_spec dma (used_elem_pa (v_cfg v) u) 4 _ Hre). lia. }
+    iDestruct (dma_own_acc_same _ dma HEMsub with "Hdma") as "[Hem Hback]".
+    iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
+    iExists dc.
+    iSplitR; [iPureIntro; exact Hdcpos|].
+    iSplitR.
+    { iPureIntro. rewrite Hdcsl Hdcpin.
+      exact (vpo_slot _ _ _ Hok p sl pin Hs Hpin). }
+    (* [dc_slot dc] is [sl]; only then is the word out from under the binder *)
+    rewrite Hdcsl !phys_word4_map.
+    iFrame "Hem". iIntros "Hem".
+    iDestruct ("Hback" with "Hem") as "Hdma".
+    iSplitR "Hpub Hrd"; [| by iFrame "Hpub Hrd"].
+    iExists pr, dma.
+    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend".
+    iSplitR; [iPureIntro; exact Hctl|].
+    iSplitR; [iPureIntro; exact Hok|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hridx|].
+    iSplitR; [iPureIntro; exact Hwce|].
+    iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hhauth Hhbig".
+    { rewrite /heads_res_at. iExists hs. iFrame "Hhauth".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iExact "Hhbig". }
+    iApply (big_sepM_delete _ (vp_done pr) p sl Hdone).
+    iSplitR "Hdone"; [| iExact "Hdone"].
+    iExists u. iSplitR; [done|].
+    iExists bs. iFrame "Hbs Hdone0".
+    all: try (iPureIntro; split_and!; assumption).
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE HANDLER'S STATUS CHECK: [if(disk.info[id].status != 0) panic].   *)
+  (*                                                                      *)
+  (* A PEEK out of the LEASE.  The status byte is one of the bytes the     *)
+  (* device wrote, so it is not owned apart from [dma]; what says it reads *)
+  (* zero is [slot_done_res]'s pure clause, and the completion record is   *)
+  (* what puts the slot in [done].  Keyed like the buf read and the        *)
+  (* deposit, so all three speak about the same claim, and it spends       *)
+  (* nothing.                                                             *)
+  (* ==================================================================== *)
+  Lemma virtio_proto_status_peek (γ : disk_names) (v : virtio_state)
+      (np p u : nat) :
+    virtio_proto γ v -∗ disk_pub γ np -∗
+    disk_ord γ p u -∗
+    disk_read_at γ u -∗
+    ⌜virtio_live (v_cfg v) = true⌝ ∗
+    disk_cfg γ (v_cfg v) ∗
+    (∃ dc : dclaim,
+       ⌜dc_pos dc = p⌝ ∗
+       ⌜slot_pin_ok (v_cfg v) p (dc_slot dc) (dc_pin dc)⌝ ∗
+       phys_pointsto (vr_status (vs_req (dc_slot dc))) (DfracOwn 1) byte_zero ∗
+       (phys_pointsto (vr_status (vs_req (dc_slot dc))) (DfracOwn 1) byte_zero -∗
+          virtio_proto γ v ∗ disk_pub γ np ∗ disk_read_at γ u)).
+  Proof.
+    iIntros "Hp Hpub #Hordp Hrd".
+    rewrite /virtio_proto /disk_pub.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
+      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
+      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
+        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
+    rewrite /disk_ord.
+    iDestruct (ghost_map_lookup with "Hord Hordp") as %Huix.
+    assert (Hsrv : p ∈ vp_srv pr).
+    { rewrite <- (vpo_uix_dom _ _ _ Hok). apply elem_of_dom. by exists u. }
+    assert (Hpendnone : vp_pend pr !! p = None).
+    { apply not_elem_of_dom. intro Hc'.
+      destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hc') as [_ Hns].
+      exact (Hns Hsrv). }
+    rewrite /disk_read_at.
+    iDestruct (ghost_var_agree with "Hnr Hrd") as %Hnreq.
+    assert (Hdonein : p ∈ dom (vp_done pr)).
+    { apply (vpo_done_uix _ _ _ Hok). exists u. split; [exact Huix | lia]. }
+    apply elem_of_dom in Hdonein as [sl Hdone].
+    assert (Hs : vp_slots pr !! p = Some sl).
+    { unfold vp_slots.
+      rewrite (lookup_union_r (vp_pend pr) (vp_done pr) p Hpendnone).
+      exact Hdone. }
+    assert (Hpinin : exists pin, vp_pin pr !! p = Some pin).
+    { apply elem_of_dom. rewrite (vproto_slot_dom (v_cfg v) pr (dom dma) Hok).
+      apply elem_of_dom. by exists sl. }
+    destruct Hpinin as [pin Hpin].
+    assert (Hspins : vp_spins pr !! p = Some (sl, pin))
+      by (unfold vp_spins; rewrite map_lookup_zip_with Hs Hpin; reflexivity).
+    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
+    destruct (Hhcoup p sl pin Hspins) as (dc & Hhlk & Hdcsl & Hdcpin & Hdcpos).
+    iDestruct (big_sepM_delete _ (vp_done pr) p sl Hdone with "Hdone")
+      as "[Hdres Hdone]".
+    iDestruct "Hdres" as (u') "[%Hu' Hdres]".
+    rewrite Huix in Hu'. injection Hu' as <-.
+    iDestruct "Hdres" as (bs) "(%Hbslen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hdone0)".
+    (* the byte is in the lease, and [slot_done_res] says it is zero *)
+    assert (HSTsub : {[ vr_status (vs_req sl) := byte_zero ]} ⊆ dma)
+      by (apply insert_subseteq_l; [ exact Hst | apply map_empty_subseteq ]).
+    iDestruct (dma_own_acc_same _ dma HSTsub with "Hdma") as "[Hst1 Hback]".
+    rewrite {1}/phys_map big_sepM_singleton.
+    iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
+    iExists dc.
+    iSplitR; [iPureIntro; exact Hdcpos|].
+    iSplitR.
+    { iPureIntro. rewrite Hdcsl Hdcpin.
+      exact (vpo_slot _ _ _ Hok p sl pin Hs Hpin). }
+    rewrite Hdcsl.
+    iFrame "Hst1". iIntros "Hst1".
+    iDestruct ("Hback" with "[Hst1]") as "Hdma";
+      [ rewrite /phys_map big_sepM_singleton; iExact "Hst1" |].
+    iSplitR "Hpub Hrd"; [| by iFrame "Hpub Hrd"].
+    iExists pr, dma.
+    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend".
+    iSplitR; [iPureIntro; exact Hctl|].
+    iSplitR; [iPureIntro; exact Hok|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hridx|].
+    iSplitR; [iPureIntro; exact Hwce|].
+    iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hhauth Hhbig".
+    { rewrite /heads_res_at. iExists hs. iFrame "Hhauth".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iExact "Hhbig". }
+    iApply (big_sepM_delete _ (vp_done pr) p sl Hdone).
+    iSplitR "Hdone"; [| iExact "Hdone"].
+    iExists u. iSplitR; [done|].
+    iExists bs. iFrame "Hbs Hdone0".
+    all: try (iPureIntro; split_and!; assumption).
+  Qed.
+
+  (* ==================================================================== *)
   (* THE HANDLER'S BUF READ: [struct buf *b = disk.info[id].b].           *)
   (*                                                                      *)
   (* A PEEK, keyed exactly like the deposit below -- the completion        *)
