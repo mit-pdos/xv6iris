@@ -2008,23 +2008,27 @@ Section ProofFileread.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
-             iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Ilock.wp_ilock_dep_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
                        gil gisl
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
-                       icfg_nib ikk (ssh/2)%Qp gsh (ShotK ty0)
+                       icfg_nib ikk (ssh/2)%Qp gsh
+                       (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK ty0)
                        icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
-                       _ V (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                       _ V (fr_av_ilock K HK) eq_refl
+                       ltac:(intros _; exists ty0; reflexivity)
+                       Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                             Hslk Href Hshot0 Hsb Hppid Hprocs
+                             Hslk Href [] Hshot0 Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
              all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
+             { rewrite /ic_dep_side. done. }
              (* v3: ilock also hands back the checkout descriptor's other
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
@@ -2076,14 +2080,11 @@ Section ProofFileread.
                 node at the park; the record and block map come back proven
                 equal to the ones the cells hold
                 ([FsStateEra.era_node_pair_inj]). ---- *)
-             iApply fupd_wp.
-             iMod (ic_shed_rd ⊤ (frn_ic fn) (frn_fs fn) (frn_ireg fn)
-                     (frn_cov fn) (frn_logstart fn) ikk (ssh/2)%Qp icfg_dev
-                     inm gsh true dnl bml ltac:(solve_ndisj)
-                     with "Hesc Hvalid Hdep Hlk")
-               as "(Hvalid & Hdep & Hrdh)".
-             iModIntro.
-             iDestruct "Hrdh" as (data) "(%Hiok & %Hloc & Hmeta & Haddrs & Hquarter)".
+             (* NO GHOST STEP (durable-disk B''-tx3): the shed is inside the
+                checkout ([IcacheEscrow.ic_swap_checkout_rd]), so the escrow
+                never holds a bundleless arm for this call. *)
+             iEval (rewrite /ic_dep_held /=) in "Hlk".
+             iDestruct "Hlk" as (data) "(%Hiok & %Hloc & Hmeta & Haddrs & Hquarter)".
              pose proof (FsStateEra.node_shape_ok_of_inode_ok (frn_cov fn) (frn_logstart fn)
                            dnl bml data Hiok) as Hsh.
              iDestruct (FsStateEra.inode_rd_era_era_node_to (frn_fs fn) (DfracOwn (1/4))
@@ -2400,18 +2401,19 @@ Section ProofFileread.
                 iDestruct (FsStateEra.inode_rd_era_era_node_of (frn_fs fn) (DfracOwn (1/4))
                              inm dnl bml data Hsh Hloc
                              with "Hindres Hblocks Htop") as "Hquarter".
-                iApply fupd_wp.
-                iMod (ic_unshed_rd ⊤ (frn_ic fn) (frn_fs fn) (frn_ireg fn)
-                        (frn_cov fn) (frn_logstart fn) ikk (ssh/2)%Qp icfg_dev
-                        inm gsh true dnl bml ltac:(solve_ndisj)
-                        with "Hesc Hvalid Hdep [Hmeta Haddrs Hquarter]")
-                  as "(Hvalid & Hdep & Hlk)".
-                { iExists data. iFrame "Hmeta Haddrs Hquarter".
+                (* the quarter goes home inside [ic_swap_park_dep]'s own
+                   ghost step (durable-disk B''-tx3); nothing is unshed
+                   first. *)
+                iAssert (ic_dep_held (frn_fs fn) (frn_ireg fn) (frn_cov fn)
+                           (frn_logstart fn) (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                           ikk inm dnl bml)%I
+                  with "[Hmeta Haddrs Hquarter]" as "Hlk".
+                { rewrite /ic_dep_held /=.
+                  iExists data. iFrame "Hmeta Haddrs Hquarter".
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
                     | exact Hszb | exact Hholes | exact Hsized] |].
                   iPureIntro; exact Hloc. }
-                iModIntro.
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M1 Rs1)
                                   (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -2466,20 +2468,21 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
+                iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
-                          ikk (ssh/2)%Qp gsh icfg_dev inm
+                          ikk (ssh/2)%Qp gsh
+                          (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
-                          lks (upd_upt V P') (fr_av_iunlock K HK) Hik
+                          lks (upd_upt V P') (fr_av_iunlock K HK) eq_refl Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
-                iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
+                iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
                 iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER: iunlock gives the half back WITHOUT its
@@ -2687,18 +2690,19 @@ Section ProofFileread.
                 iDestruct (FsStateEra.inode_rd_era_era_node_of (frn_fs fn) (DfracOwn (1/4))
                              inm dnl bml data Hsh Hloc
                              with "Hindres Hblocks Htop") as "Hquarter".
-                iApply fupd_wp.
-                iMod (ic_unshed_rd ⊤ (frn_ic fn) (frn_fs fn) (frn_ireg fn)
-                        (frn_cov fn) (frn_logstart fn) ikk (ssh/2)%Qp icfg_dev
-                        inm gsh true dnl bml ltac:(solve_ndisj)
-                        with "Hesc Hvalid Hdep [Hmeta Haddrs Hquarter]")
-                  as "(Hvalid & Hdep & Hlk)".
-                { iExists data. iFrame "Hmeta Haddrs Hquarter".
+                (* the quarter goes home inside [ic_swap_park_dep]'s own
+                   ghost step (durable-disk B''-tx3); nothing is unshed
+                   first. *)
+                iAssert (ic_dep_held (frn_fs fn) (frn_ireg fn) (frn_cov fn)
+                           (frn_logstart fn) (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                           ikk inm dnl bml)%I
+                  with "[Hmeta Haddrs Hquarter]" as "Hlk".
+                { rewrite /ic_dep_held /=.
+                  iExists data. iFrame "Hmeta Haddrs Hquarter".
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
                     | exact Hszb | exact Hholes | exact Hsized] |].
                   iPureIntro; exact Hloc. }
-                iModIntro.
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M4 Rs1)
                                   (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -2753,20 +2757,21 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
+                iApply (Iunlock.wp_iunlock_dep_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
-                          ikk (ssh/2)%Qp gsh icfg_dev inm
+                          ikk (ssh/2)%Qp gsh
+                          (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
-                          lks (upd_upt V P') (fr_av_iunlock K HK) Hik
+                          lks (upd_upt V P') (fr_av_iunlock K HK) eq_refl Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
-                iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
+                iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
                 iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER: iunlock gives the half back WITHOUT its
