@@ -723,7 +723,17 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
   (* the write arm is a [DepShr] carrying a parked transaction share, so it
      names the same generation (durable-disk B''-arm) *)
   | DepTx _ _ _ g _ _ => Some g
+  | DepRd _ _ _ g => Some g
   end.
+
+(* IS THIS DESCRIPTOR THE READ ARM (durable-disk B''-join)?  The escrow's OUT
+   arm at [DepRd] keeps three quarters of the inode's bundle
+   ([IcacheEscrow.ic_rd_arm]); at every other descriptor it keeps nothing, and
+   this boolean is the pure side condition the two arm-generic constructors
+   ([ic_swap_checkout], [ic_close_out]) carry so that they may keep taking an
+   ABSTRACT descriptor.  Both callers pass a [DepShr] and pay [reflexivity]. *)
+Definition ic_dep_rd (d : ic_dep) : bool :=
+  match d with DepRd _ _ _ _ => true | _ => false end.
 
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
    ([icn_id], design §13.8 as widened by §13.10): an agreement between the

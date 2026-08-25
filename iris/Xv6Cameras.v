@@ -591,7 +591,21 @@ Inductive ic_dep : Type :=
      LAST, so the ~66 [DepShr] sites in 23 files and every
      [destruct d as [| .. | .. | ..]] keep their shape. *)
   | DepTx (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
-          (t : nat) (q : Qp).
+          (t : nat) (q : Qp)
+  (* THE READ ARM (durable-fs-plan.md section 3, [ilock] without a
+     transaction; durable-disk B''-join).  [DepShr]'s content exactly -- the
+     credential does not change -- but the arm at this descriptor keeps THREE
+     QUARTERS of the inode's bundle ([IcacheEscrow.ic_rd_arm]) instead of
+     nothing, and the holder carries only the reader's quarter.  It is the
+     other of the two states plan section 4's collection can close: an
+     unlocked inode's bundle is inside at 1, a read-locked one's at 3/4, and
+     [blk_owned_ne_34] is what makes 3/4 enough for cross-inode disjointness.
+
+     A SEPARATE CONSTRUCTOR rather than a re-reading of [DepShr] so that the
+     conversion of the twenty [ilock] call sites can land one file at a time:
+     [DepShr] is what a withdrawal that has done NEITHER looks like, and it
+     retires when the last caller has moved.  LAST, for [DepTx]'s reason. *)
+  | DepRd (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname).
 
 (* THE LOCKED REGISTRY'S ENTRY (durable-disk lane A, re-keyed by B''-arm):
    one ARM.  [(t, q, S)] -- the transaction whose row is suspended, the

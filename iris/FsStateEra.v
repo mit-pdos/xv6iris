@@ -1279,6 +1279,28 @@ Section EraRes.
     rewrite Qp.three_quarter_quarter //.
   Qed.
 
+  (* THE SHED'S TWO DIRECTIONS AS WANDS, and they are not decoration.
+     [inode_owned_era_shed] is an [⊣⊢], so using it with [rewrite] inside a
+     proof that carries the escrow's payload rewrites the WHOLE proofmode
+     goal -- environments included -- and that walk is minutes.  Applied as
+     wands the same fact costs nothing, and every consumer wants exactly one
+     of the two directions.  (durable-disk B''-join; the same rule as
+     "discharge set side conditions by named lemma inside a proof that holds
+     a tower".) *)
+  Lemma inode_owned_era_shed_to γfs γi inum n :
+    inode_owned_era γfs γi inum n -∗
+    inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+    ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n.
+  Proof. iIntros "H". by iApply inode_owned_era_shed. Qed.
+
+  Lemma inode_owned_era_shed_of γfs γi inum n :
+    inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
+    inode_rd_era γfs (DfracOwn (1/4)) inum n -∗
+    inode_owned_era γfs γi inum n.
+  Proof.
+    iIntros "H1 H2". iApply inode_owned_era_shed. iFrame.
+  Qed.
+
   Lemma inode_owned_era_local γfs γi inum n :
     inode_owned_era γfs γi inum n -∗ ⌜inode_local (bv_unsigned inum) n⌝.
   Proof. iIntros "(_ & _ & _ & _ & $)". Qed.
@@ -1812,6 +1834,69 @@ Section EraRes.
     rewrite (inode_blocks_data_ext γfs bm (fn_data (era_node dn bm data)) data
                (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
     iFrame.
+  Qed.
+
+  (* [inode_blocks_data_ext] AT A SHARE, which is all the reader's quarter
+     needs of it. *)
+  Lemma inode_blocks_q_data_ext (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data data' : nat -> list (bv 8)) :
+    (forall k : nat, (k < MAXFILE)%nat -> data k = data' k) ->
+    inode_blocks_q γfs dq bm data ⊣⊢ inode_blocks_q γfs dq bm data'.
+  Proof.
+    intros Hext. rewrite /inode_blocks_q.
+    apply big_sepL_proper. intros j k Hj.
+    apply lookup_seq in Hj as [Heq Hlt].
+    assert (Hk : (k < MAXFILE)%nat) by lia.
+    rewrite (Hext k Hk) //.
+  Qed.
+
+  (* THE READER'S QUARTER AT THE PAYLOAD'S SPELLING (durable-disk B''-join).
+     [IcacheEscrow.ic_rd_held] hands a read-locker
+     [inode_rd_era _ (DfracOwn (1/4)) inum (era_node dn bm data)]; this is
+     what turns it into the two conjuncts [readi] is stated over --
+     [InodeInv.ind_res_q] (which with the holder's [inode_addrs] cells IS
+     [inode_map_q]) and [InodeInv.inode_blocks_q] -- at the payload's own
+     [(bm, data)] rather than the node's.  The [top_frag] quarter comes out
+     beside them because the park needs it back. *)
+  Lemma inode_rd_era_era_node_to (γfs : fs_names) (dq : dfrac) (inum : bv 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    node_shape_ok dn bm data ->
+    inode_local (bv_unsigned inum) (era_node dn bm data) ->
+    inode_rd_era γfs dq inum (era_node dn bm data) -∗
+      ind_res_q γfs dq bm
+      ∗ inode_blocks_q γfs dq bm data
+      ∗ top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum)
+          (era_node dn bm data).
+  Proof.
+    intros Hs Hl. iIntros "[Hb Ht]".
+    iDestruct (inode_bytes_era_to γfs dq (bv_unsigned inum)
+                 (era_node dn bm data) Hl with "Hb") as "[Hi Hb]".
+    rewrite (bm_of_era_node dn bm data Hs).
+    rewrite (inode_blocks_q_data_ext γfs dq bm
+               (fn_data (era_node dn bm data)) data
+               (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
+    iFrame.
+  Qed.
+
+  Lemma inode_rd_era_era_node_of (γfs : fs_names) (dq : dfrac) (inum : bv 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    node_shape_ok dn bm data ->
+    inode_local (bv_unsigned inum) (era_node dn bm data) ->
+    ind_res_q γfs dq bm -∗
+    inode_blocks_q γfs dq bm data -∗
+    top_frag_q (fs_gamma_L γfs) dq (bv_unsigned inum) (era_node dn bm data) -∗
+    inode_rd_era γfs dq inum (era_node dn bm data).
+  Proof.
+    intros Hs Hl. iIntros "Hi Hb Ht".
+    rewrite /inode_rd_era. iFrame "Ht".
+    iApply (inode_bytes_era_of γfs dq (bv_unsigned inum)
+              (era_node dn bm data) Hl with "[Hi] [Hb]").
+    - rewrite (bm_of_era_node dn bm data Hs). iExact "Hi".
+    - rewrite (bm_of_era_node dn bm data Hs).
+      rewrite (inode_blocks_q_data_ext γfs dq bm
+                 (fn_data (era_node dn bm data)) data
+                 (fun k Hk => fn_data_era_node dn bm data k Hs Hk)).
+      iExact "Hb".
   Qed.
 
   Lemma inode_owned_era_era_node_of (γfs : fs_names) (γi : gname) (inum : bv 32)
@@ -2464,3 +2549,16 @@ Section EraRes.
   Qed.
 
 End EraRes.
+
+(* SEALED FOR THE [iFrame]-UP-TO-DELTA RULE (durable-notes).  All three are
+   separating conjunctions over a [big_sepM] of block runs and an
+   [ind_owned_q] whose body is a [decide] on a term no resolution can reduce,
+   so an unsealed one turns every [Timeless] / [Frame] search that meets it
+   into a backtracking walk of the whole payload -- measured at over
+   NINETEEN MINUTES on one [apply _] for [IcacheEscrow.ic_rd_arm], the read
+   arm's residue, with no error and no output.  The declared instances and
+   [rewrite /inode_owned_era_q] still work.
+
+   The UNSUFFIXED [inode_owned_era] is deliberately not in this list: it is
+   the [DfracOwn 1] reading forty payload sites already frame through. *)
+Global Typeclasses Opaque inode_owned_era_q inode_bytes_era inode_rd_era.

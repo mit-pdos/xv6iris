@@ -2499,7 +2499,7 @@ Section ProofIlockMain.
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
     iMod (ic_swap_checkout cn gfs gi cov logstart k (DepShr s dev inum g) g
-            dev inum eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
+            dev inum eq_refl eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
     { rewrite /ic_dep_own. iSplitR; [iPureIntro; done |]. iExact "Href". }
     2:{ (* ============ DEVIATION 1's OWED OBLIGATION, PAID BY RULING R-e
            (iclaim-ledger.md §5⁗⁗).  The checkout may find the free path's
