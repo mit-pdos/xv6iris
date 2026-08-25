@@ -55,9 +55,8 @@ carries the file system across eras and `Himg` is deleted (lane E).
   logged view; byte-keyed exclusive `fs_L`
   (`FsBlocks.fsblock`/`byte_range`, `fs_bytes_inv` at `logN`,
   `byte_range_log_update`); `SpecLogWrite.wp_log_write_au_range` with the
-  block-local tie; the parked payload `Ψ D₀ Dc` in `log_state` and the
-  laws `log_psi_commit`/`log_psi_step`/`log_psi_write` (TO BE REPLACED,
-  lane B); `end_op` has NO FS-facing premise.
+  block-local tie; `end_op` has NO FS-facing premise, and neither
+  `log_state` nor `log_ctx` carries a file-system payload at all (lane C).
 - **The predicate (stage 2a):** `iris/FsState{Defs,Link,Inode,Bitmap,Era}.v`,
   `FsState.v`, `FsBytesGamma.v`, the movers, `fs_boot_alloc_at`/
   `fs_links_full_alloc`, the dirent-insert equation (`FsTree.dir_view_insert`).
@@ -92,7 +91,8 @@ carries the file system across eras and `Himg` is deleted (lane E).
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
   `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
   `snap_bytes`' used-set coupling — lane B's finding, plan §4, §8);
-  `FsDurWire.v` is the rejected kinds tie (delete in lane C).
+  `iris/FsDurQuiesce.v` (lane C's finding: where the era parks its bundles
+  is what blocks the collection at quiescence).
 - Image checks (14) `fs_region_bare` and (15) `fs_root_no_self` in
   `FsImg`/`FsImgCheck`, and (lane C-img) they are now the LAST two
   conjuncts of `FsCfgBoot.fs_boot_image_wf`, discharged in
@@ -106,18 +106,12 @@ carries the file system across eras and `Himg` is deleted (lane E).
 
 ## STILL PRESENT BUT SUPERSEDED (delete when their consumers move)
 
-`FsDurWire.v`'s `P_wf_dec`/`Psi_dec`/`kinds_of_state`/`dwire_geom`/`psi_*`;
-`LogInv.log_psi_commit`/`_step`/`_write`/`_write_rebase`/`_spend`;
-`LogDefs.fs_dstep`/`fs_dstep_rebase`/`fs_dview` as `P_fs`'s durable slot
-(`FsCrash.P_fs` still holds `ghost_map_auth γv 1 (fs_dbytes (fr_D r)) ∗
-fs_dview γv …`); `RiscvPtsto.fs_dur_names`' `fdn_bmap/ist/nin` and
-`riscv_dview_name`; the nine suppliers' `log_psi_write_rebase` lines
-(`ProofBfree:651`, `ProofBmap:1961`, `ProofBalloc:1910/:2353`,
-`ProofIupdate:1999`, `ProofIalloc:1471`, `ProofIput:1787`,
-`ProofWritei:3130/:3664` — line numbers at handoff);
-`ProofInitlog`'s `Ψ := fs_dstep …` witness (`:2587`, `:2711`).
-Preserved patches in the session scratchpad are NOT needed; everything
-reusable is on `main`.
+`LogDefs.fs_dview` as `P_fs`'s durable slot (`FsCrash.P_fs` still holds
+`ghost_map_auth γv 1 (fs_dbytes (fr_D r)) ∗ fs_dview γv …`, and the commit
+permits still re-base it themselves); `RiscvPtsto.fs_dur_names`'
+`fdn_bmap/ist/nin` and `riscv_dview_name`, with `RiscvAdequacy`/
+`SystemAdequacy`'s `Pc` arguments and `FsDurLedger`'s geometry equations
+as their remaining consumers.
 
 ## The lanes, in order (each is one green checkpoint; specs cite the plan)
 
@@ -270,8 +264,7 @@ reusable is on `main`.
      `FsDurImg.img_boot_P_fs_dur`); both commit permits: fr_D advance +
      `dsnap_step_of` at the collected `snap_ok`, allocator inside the
      permit (a bupd); receipt gains the snapshot's state; timelessness;
-     DELETE the superseded families incl. `fdn_*`/`riscv_dview_name`,
-     `FsDurWire.v`.
+     DELETE the superseded families incl. `fdn_*`/`riscv_dview_name`.
 
   **AS LANDED — THE IMAGE HALF ONLY (lane C-img).**  The image's tie is
   `FsDurImg.img_snap_ok`: `FsCfgBoot.fs_boot_image_wf dk ndisk sb nib cov`
@@ -301,12 +294,66 @@ reusable is on `main`.
   caller gains one.  `FsCrash.v` is UNTOUCHED.  Non-vacuity at the literal
   image: `FsAdequacyImg.fsimg_snap_ok`.  RETIRED (nothing consumed them):
   `FsDurImg`'s 3b' kind assignment `img_kinds*`/`img_region_*`/
-  `img_dur_seed` and its `FsDurObj`/`FsDurWire` imports — `FsDurWire.v` now
-  has NO importer at all.  STILL PRESENT AND SUPERSEDED: `fs_dur_of_image`/
+  `img_dur_seed` and its `FsDurObj`/`FsDurWire` imports.
+  STILL PRESENT AND SUPERSEDED: `fs_dur_of_image`/
   `fs_dur_view_of_image` (the resource-MOVING image conversion; lane E says
-  whether the boot mint still wants it).  REMAINS for lane C proper:
-  `P_fs`'s own conjunct, the two commit permits, the receipt, timelessness,
-  and the `fdn_*`/`riscv_dview_name`/`log_psi_*` deletions.
+  whether the boot mint still wants it).
+
+  **AS LANDED — THE WAL SIDE: THE PARKED PAYLOAD IS GONE.**  The log's lock
+  resource carries no client proposition and its context carries no client
+  law: `log_state`/`log_res` lose their `Psi` parameter and `log_state`'s
+  last conjunct, `log_ctx_at` and its `_at_` projections are DELETED (the
+  existential closure had nothing left to close, so `log_ctx` IS the bundle
+  and keeps its arity — the ~75 files that thread it are untouched), and
+  `log_psi_commit`/`_step`/`_write`/`_write_rebase`/`_spend`,
+  `LogDefs.fs_dstep`/`_rebase`/`_id`/`_trans` and `FsDurWire.v` go with
+  them.  `SpecLogWrite`'s three atomic-update forms lose the payload-step
+  premise and their closing wand ends at `|={Efs,⊤}=> Φfsb`; `lw_au_rec`
+  loses its `bs` binder with it.  `FsCrash.fs_commit_L_sector0_rec`/
+  `_seq_permit` lose the client's prepared step and run `fs_dview_rebase`
+  themselves, which is what they did before the payload existed.  The nine
+  suppliers' `log_psi_write_rebase` lines and the two `iDestruct "Hlctx" as
+  (Psi)` openings per file go; `ProofIupdate`'s `iu_region_au`/`iu_region_step`
+  lose the quantifier; `eo_commit`/`eo_loop` lose `D0`/`Dc` and their two
+  pure ties; `ProofInitlog` parks nothing.  `log_op`, `wp_end_op`,
+  `fs_crash_seam` and `P_fs` are byte-stable.
+
+  **THE REST OF LANE C IS BLOCKED, AND NOT AT THE PROOF LEVEL**
+  (`iris/FsDurQuiesce.v` is the finding, with its two machine-checked
+  namespace facts).  `P_fs`'s conjunct, the commit permits and the receipt
+  all hang off `dsnap_step_of`, which needs `snap_ok S L`, which only the
+  collection at quiescence produces — and the collection is unstatable
+  against the escrow AS IT IS, for two reasons that are both about WHERE the
+  era parks its bundles:
+
+  1. **The fifty cache escrows share ONE namespace.**
+     `IcacheEscrow.ic_escrow … k` is `inv icEscN (ic_escrow_body … k)` for
+     every slot, so at most one is open at a time
+     (`FsDurQuiesce.ns_not_reopenable`).  `snap_bytes`' `sk_disj` and
+     `sk_own_used` are read off the ∗ between TWO inodes, so the commit must
+     hold every bundle at once.  Fix: allocate at `icEscN .@ k`
+     (`esc_ns_disjoint`/`esc_ns_still_open` are the induction step that then
+     works).
+  2. **The uncached inodes' bundles are behind the itable SPINLOCK.**
+     Plan §4's "the pool (`live_pool` inside `inv icacheN`)" conflates two
+     objects: `IcacheInv.live_pool` is the reference-count fraction pool and
+     holds no bundle, while `IcacheEscrow.ipool` — which holds the uncached
+     inums' `inode_owned_era` — is a conjunct of `itable_res2`, the itable
+     spinlock's resource.  The commit's ghost step runs inside a disk-write
+     permit, where no code runs and no lock can be taken, and `end_op` never
+     takes `itable.lock` anyway.  Fix: move `ipool` into its own invariant
+     at per-inum namespaces; `itable_res2`'s own comment forbids the move
+     only for `isl_pool`, not for `ipool`.
+
+  Both fixes are in `IcacheEscrow.v` — lane B′'s file — so they belong with
+  B′ (or with a ruling that hands them to it).  REMAINS for lane C after
+  that: the collection lemma, `P_fs`'s conjunct → `P_dur (fr_D r)` (boot via
+  `FsDurImg.img_boot_P_fs_dur`, which already produces exactly that pair),
+  the two commit permits at `dsnap_step_of`, the receipt's snapshot state,
+  timelessness, and the `fdn_bmap/ist/nin`/`riscv_dview_name` deletions
+  (which are an adequacy sweep: `RiscvAdequacy`'s `Pc` takes the
+  `fs_dur_names` bundle and the dview gname as arguments, and `FsDurLedger`
+  still reads `fdn_bmap/ist/nin`).
 - [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
   `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
   prove `mknod_durable` off the snapshot; quote it here.  Then the
