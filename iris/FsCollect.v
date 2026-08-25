@@ -68,11 +68,12 @@
 (*                                                                        *)
 (*  ALL FOUR ARE NOW SUPPLIED -- (A) by C-3b and C-4, (B) by B''-tx5,      *)
 (*  (C) by C-3a, (D) by C-3c -- and their entries below record where.      *)
-(*  WHAT THE ASSEMBLY STILL LACKS IS TWO WINDOWS NOBODY HAD NAMED, (E)     *)
-(*  and (F) at the end of this list.  Both are inside ONE transaction and  *)
-(*  therefore unreachable at a commit; neither is PROVED so, because       *)
-(*  neither parks a share of its transaction's [ln_tx] element the way     *)
-(*  [IcacheEscrow.ic_pin_tx] and [IcacheEscrow.ipool_transit] do.          *)
+(*  C-4 then named TWO MORE WINDOWS, (E) and (F) at the end of this list.  *)
+(*  Both are inside ONE transaction and therefore unreachable at a commit; *)
+(*  neither was PROVED so, because neither parked a share of its           *)
+(*  transaction's [ln_tx] element the way [IcacheEscrow.ic_pin_tx] and     *)
+(*  [IcacheEscrow.ipool_transit] do.  (E) IS NOW CLOSED (C-5); (F) is not, *)
+(*  and section 5c below is its wall, machine-checked.                     *)
 (*                                                                        *)
 (*  (A) THE PARTITION -- SUPPLIED (durable-disk lane C-3b), AND IT HAS      *)
 (*      THREE PARTS.  [IcacheEscrow]'s section 5c: [ipool_body] gains [cn]  *)
@@ -190,7 +191,7 @@
 (*      [image_rec_at]), so the first commit meets it at nearly every inum *)
 (*      of the region.                                                     *)
 (*                                                                        *)
-(*  (E) THE CLAIM BOX -- NOT SUPPLIED (durable-disk C-4's first finding).  *)
+(*  (E) THE CLAIM BOX -- SUPPLIED (durable-disk C-5).                      *)
 (*      ialloc's [InodeRegion.ireg_claim_au] retags a FREE record to a     *)
 (*      [InodeRegion.fresh_shape] one, which is a NONZERO type, and the    *)
 (*      pool row for that inum stays on its MARKER arm until the iget      *)
@@ -202,6 +203,25 @@
 (*      [FsDurSnap.sk_rec] nor [sk_links] can be read at the inum.  This   *)
 (*      is (D)'s residue at a record type (D) does not reach, and it is    *)
 (*      NOT covered by (A): the inum is an ORDINARY pool row, in [O].      *)
+(*                                                                        *)
+(*      THE FIX IS (B)'s DEVICE AT THE c COLUMN.  The claim window is      *)
+(*      inside ONE transaction -- ialloc runs between its caller's         *)
+(*      [begin_op] and [end_op] -- so the claim PARKS a positive share of  *)
+(*      that transaction's element in the slot ([InodeRegion.ireg_cpin]),  *)
+(*      and [ireg_in] records that a nonzero-typed IN arm IS a standing    *)
+(*      claim.  At an empty authority the column is [None]                 *)
+(*      ([ireg_cpin_no_ops]) and the arm collapses to [di_type d = 0]      *)
+(*      ([ireg_in_quiesce]), so [col_region_slot_acc] CONCLUDES the type   *)
+(*      instead of assuming it and [col_free_slot_acc] LOSES its premise.  *)
+(*      The share is re-identified at the fill by the claimant's own       *)
+(*      [IcacheRef.iclaim], whose value now carries [(t, q)]               *)
+(*      ([Xv6Cameras.ctyval]) -- fields and not existentials, for          *)
+(*      [IcacheTxRefute.tx_two_halves_no_whole]'s reason -- and comes home *)
+(*      inside [InodeRegion.ireg_wd_back]'s claim arm, through ialloc's    *)
+(*      receipt and create's fresh-type span.                              *)
+(*      [col_claim_box_no_ops] is the residue closed, and                   *)
+(*      [FsCollectImg.img_col_region_slot] runs the premise-free accessor  *)
+(*      at the mkfs image (plan section 7).                                *)
 (*                                                                        *)
 (*  (F) THE CORPSE BEFORE ITS DEPOSIT -- NOT SUPPLIED (durable-disk C-4's  *)
 (*      second finding, and it CORRECTS B''-tx5's REMAINS).  "Every [X]    *)
@@ -216,8 +236,10 @@
 (*      bundle anywhere, exactly as C-3b's [X] residue said, and C-3c's    *)
 (*      accessor does not reach it.  The window is inside one transaction  *)
 (*      (iput's tail holds a share, durable-disk B''-tx5), so the fix is   *)
-(*      B''-tx5's ABI increment once more -- at the MARKED arm's freeze    *)
-(*      column, which is ON for exactly that window.                       *)
+(*      (E)'s increment once more -- at the MARKED arm's freeze column,    *)
+(*      which is ON for exactly that window.  SECTION 5c BELOW IS THE      *)
+(*      WALL, machine-checked, with the fix's measured shape and the       *)
+(*      reason it does not finish [X] on its own.                          *)
 (*                                                                        *)
 (*  NONE of these is visible from inside this file, which is the point of  *)
 (*  stating [col_hand] as a named predicate: the collection is CLOSED      *)
@@ -227,7 +249,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list sets bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import dfrac.
+From iris.algebra Require Import dfrac excl.
 From iris.base_logic.lib Require Import ghost_map.
 
 Require Import SailStdpp.Values.
@@ -1399,5 +1421,69 @@ Section Collect.
   Qed.
 
   End ClaimBox.
+
+  (* ==================================================================== *)
+  (*  5c.  THE CORPSE -- RESIDUE (F), AND THE WALL, MACHINE-CHECKED        *)
+  (*                                                                      *)
+  (*  iput's corpse is the window from the free path's eviction to         *)
+  (*  [EscrowDeposit.ireg_free_deposit_au].  Across it the walk holds the  *)
+  (*  record and the region slot is on the MARKED sub-arm, which carries   *)
+  (*  [InodeRegion.imark] and NO fragment -- so [col_region_slot_acc]      *)
+  (*  hands out its LEFT branch and the bundle has to come from wherever   *)
+  (*  the checkout parked it.  For an inum in the pool's pending/await set *)
+  (*  ([IcacheEscrow.ipool_ext], which is under the itable SPINLOCK and    *)
+  (*  therefore out of a commit's reach entirely) that is nowhere.          *)
+  (*                                                                      *)
+  (*  WHY IT IS NOT REFUTABLE AS THE SLOT STANDS, which is the wall: the   *)
+  (*  only thing [InodeRegion.ireg_slot] carries that distinguishes the    *)
+  (*  corpse from an ordinary checked-out inode is the FREEZE COLUMN, and  *)
+  (*  at either window phase its clause is [InodeRegion.ireg_fsh] -- the   *)
+  (*  REGIME alone, a PERSISTENT [IcacheRef.ireg_open] at the runtime      *)
+  (*  index.  An empty [ln_tx] authority cannot touch it.  Below is that   *)
+  (*  statement: the clause and the empty authority coexist, twice.        *)
+  (*                                                                      *)
+  (*  WHAT WOULD CLOSE IT is (E)'s device at the f column instead of the   *)
+  (*  c column: the freeze index [rg] carries the freezing transaction and *)
+  (*  its share, [ireg_fsh]'s two window arms park it beside the regime,   *)
+  (*  [InodeRegion.ireg_freeze_au] takes it and                            *)
+  (*  [EscrowDeposit.ireg_free_deposit_au] returns it.  The pair has to be *)
+  (*  in the INDEX and not existential for [IcacheTxRefute.                *)
+  (*  tx_two_halves_no_whole]'s reason -- iput's spec names [(tid, qtx)]   *)
+  (*  and must get that element back -- and the index is where the         *)
+  (*  freezer's own [IcacheRef.ifreeze_pre] / [ifreeze_post] fragment      *)
+  (*  already re-identifies it.  Measured: widening [Xv6Cameras.frz]'s     *)
+  (*  [rg] from [bool] to [bool * (nat * Qp)] leaves every [FrzPre rg] /   *)
+  (*  [FrzPost rg] site byte-stable (there is not one literal in the tree) *)
+  (*  and moves ~20 [rg : bool] binders in eight files plus the four       *)
+  (*  [ireg_regime_true]/[_false] readings; the WORK is iput's fraction    *)
+  (*  accounting, because the freeze window SPANS the eviction that hands  *)
+  (*  [IcacheEscrow.ipool_evict_lend] the whole share.                     *)
+  (*                                                                      *)
+  (*  AND IT DOES NOT FINISH [X] ON ITS OWN.  A MARKED slot at [FrzOff] is *)
+  (*  perfectly ordinary -- it is every cached or pooled inode, whose      *)
+  (*  record is checked out into its bundle -- so refuting the window      *)
+  (*  gives "an [X] inum's slot is MARKED implies its column is [FrzOff]"  *)
+  (*  and no more.  Ruling that combination out needs a pool-side witness  *)
+  (*  for [X]'s rows (a [EscrowDefs.reg_half] per pending/await inum in    *)
+  (*  [ipool_body], colliding with the MARKED arm's [reg_full]), which is  *)
+  (*  [IcacheEscrow]'s file and lane B'/C-3b's business, not this one's.   *)
+  (* ==================================================================== *)
+
+  Section Corpse.
+  Context `{ICFG : icfg}.
+
+  Lemma col_corpse_not_refuted :
+    ireg_open -∗
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+      ireg_fsh (Some (Excl (FrzPre true)))
+      ∗ ireg_fsh (Some (Excl (FrzPost true)))
+      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
+  Proof.
+    iIntros "#Ho Hauth". iFrame "Hauth".
+    iSplitL; [iApply (ireg_fsh_pre true with "Ho")
+             | iApply (ireg_fsh_post true with "Ho")].
+  Qed.
+
+  End Corpse.
 
 End Collect.

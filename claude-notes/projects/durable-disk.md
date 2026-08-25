@@ -1740,13 +1740,106 @@ as their remaining consumers.
   is exactly "the MARKED arm at a non-`FrzOff` column" and a share parked in
   `ireg_slot`'s freeze clause closes it.
 
-  NOT LANDED, and blocked on (E) and (F): `fs_collect_snap_ok` (the
-  assembly), the law parked in `log_ctx`, `eo_commit`'s call at
-  `outstanding = 0`, the two commit permits at `dsnap_step_of`,
-  `fs_commit_receipt`, `P_fs`'s conjunct → `P_dur (fr_D r)`, and the
-  `fs_dview`-as-slot / `fdn_*` / `riscv_dview_name` deletions.  Nothing of
-  the shape changed: `col_snap_ok_ex` is still what the law concludes and
-  `col_hand` still what it must assemble.
+  **AS LANDED — C-5: THE CLAIM BOX IS REFUTED, AND THE COLLECTION READS THE
+  TYPE OFF THE REGION.**
+
+  Residue (E) is CLOSED by (B)'s device at the c column, and the whole of it
+  is that the c column's VALUE now carries the claiming transaction:
+  `Xv6Cameras.ctyval = bv 16 * (nat * Qp)`, `IcacheRef.iclaim z ty t q`.
+  `InodeRegion.ireg_cpin c` parks `t ↪[ln_tx icfg_log]{#q} tt` for as long
+  as the claim stands and `ireg_in c d` (= `type = 0 ∨ (fresh_shape d ∧
+  c ≠ None)`) records that a nonzero-typed IN arm IS a standing claim — so
+  at a commit `ireg_cpin_no_ops` reads `c = None` off the empty `ln_tx`
+  authority and `ireg_in_quiesce` collapses the arm to `di_type d = 0`.
+  `FsCollect.col_region_slot_acc` is the door the assembly calls at EVERY
+  region inum whose record the region itself holds: it CONCLUDES the type
+  rather than assuming it, hands out `inode_owned_era` at `free_node d` on
+  the IN and PENDING arms and `imark` on the MARKED one, and lends
+  everything back (every conclusion is pure).  `col_free_slot_acc` is its
+  `imark`-fed corollary and has LOST its `di_type d = 0` premise.
+
+  TWO BUNDLINGS ARE WHAT KEEP THE SWEEP SMALL (durable-notes, "REPLACING ONE
+  CONJUNCT OF A BIG PAYLOAD BY ANOTHER").  `ireg_cpin` rides in `ireg_fsh`'s
+  position as `ireg_shp c f`, so the thirty-odd sites that thread the slot's
+  f-shelter through a re-park are byte-stable and only the claim, the
+  withdrawal, the freeze mint, the phase step and the free deposit split it;
+  and the returned share rides INSIDE `ireg_wd_back`'s ClaimK arm, so
+  `SpecIlock`'s fifteen `PlainK`/`ShotK` callers do not move at all — the
+  first cut, a separate `ireg_wd_side o` conjunct in the post, broke eleven
+  files with "iApply: cannot apply wp_next".
+
+  THE SHARE'S ROUND TRIP, and it is entirely inside create's own span.
+  `ProofCreate` splits a second QUARTER off the residue it already names
+  (`log_tx_split`, and the new general `LogInv.log_tx_join_q` puts it back)
+  and lends it to `ProofCreateFreshTy`'s `create_fresh_ty` at a new binder
+  `qc`; ialloc parks it at `ireg_claim_au`; the span's own `ilock` gets it
+  back at the fill and hands it out on BOTH arms.  It cannot be the quarter
+  the child's checkout parks — the fill parks that at the same instant the
+  claim returns this one — which is why it is a second share and not a
+  split of `qt`.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `IcacheRef.iclaim` /
+  `link_claim_agree` / `link_mint_claim` / `link_spend_claim` /
+  `iclaim_excl` / `inode_claimed` (+`t`, `qt`, LAST);
+  `IgetLic.ilic`'s `ClaimL` and `InodeRegion.ilkc`'s `ClaimK` (+`t`, `q`);
+  `InodeRegion.ireg_claim_ok` (its third conjunct is now `v.1 = di_type d`,
+  with `Some ExclBot` refuted), `ireg_in`, `ireg_slot`/`ireg_slot_intro`
+  (`ireg_shp c f` in `ireg_fsh f`'s position, `ireg_in c d` in the arm),
+  `ireg_claim_au` (+the share, +`t q`), `ireg_withdraw` (`ireg_wd_back`'s
+  claim arm is a pair), `ireg_claim_ok_ty`, `ireg_rcol_claim_agree`,
+  `ireg_claim_no_out`, `IregLinkNz.ireg_boot_no_claim`,
+  `IgetLic.iname_not_frozen` (takes `ireg_shp c f`);
+  `SpecIalloc.wp_ialloc_gen_body`/`wp_ialloc_sconf_body` (+`t`, `qt` LAST,
+  +the share premise, +the share on the no-inodes arm);
+  `ProofCreateFreshTy.create_fresh_ty_body` (+`qc`, +its premise, +the share
+  on both arms).  `LogInv` gains `log_tx_join_q` and nothing else.
+  UNTOUCHED: `log_ctx`, `log_op`, `wp_end_op`, `fs_crash_seam`, `P_fs`,
+  `ireg_inv`/`ireg_body`'s arity, `SpecIlock`'s posts, `ic_escrow_body`'s
+  five arms, `ipool`'s shape.
+
+  NON-VACUITY (plan §7).  `FsCollect.col_claim_box_no_ops` is the residue
+  closed end to end — a slot the pool's marker arm reaches cannot carry a
+  nonzero-typed record while no transaction is open — and
+  `FsCollectImg.img_col_region_slot` runs the premise-free accessor at the
+  mkfs image, getting the bundle out at `FsCfgBoot.img_node`.  THE IMAGE HAS
+  NO CLAIM BOXES: `IcacheBoot.ireg_alloc` mints every ledger column at
+  `None` (`ireg_claim_ok_none` at both of its arms) and every free record
+  bare (conjunct (14) `fs_region_bare`), so the IN arm's nonzero side is
+  uninhabited at boot and the first commit meets the free reading at nearly
+  every inum of the region.
+
+  **(F) IS NOT LANDED, AND `FsCollect.v` SECTION 5c IS THE WALL,
+  MACHINE-CHECKED.**  `col_corpse_not_refuted`: `ireg_fsh` at either window
+  phase is the REGIME alone — a persistent `ireg_open` at the runtime index
+  — so the clause and an empty `ln_tx` authority coexist.  The fix is (E)'s
+  device at the f column: the freeze index `rg` carries the freezing
+  transaction and its share, `ireg_fsh`'s two window arms park it beside the
+  regime, `ireg_freeze_au` takes it and `EscrowDeposit.ireg_free_deposit_au`
+  returns it; the pair must be in the INDEX (not existential) for
+  `IcacheTxRefute.tx_two_halves_no_whole`'s reason, and the index is exactly
+  where the freezer's own `ifreeze_pre`/`ifreeze_post` fragment already
+  re-identifies it.  MEASURED: widening `Xv6Cameras.frz`'s `rg` from `bool`
+  to `bool * (nat * Qp)` leaves every `FrzPre rg`/`FrzPost rg` site
+  byte-stable (there is not one literal in the tree) and moves ~20
+  `rg : bool` binders in eight files plus the four `ireg_regime_true`/
+  `_false` readings; the WORK is iput's fraction accounting, because the
+  freeze window SPANS the eviction that hands `ipool_evict_lend` the whole
+  share, and it lands in the two slowest files in the tree (`ProofIput`,
+  `IcacheEscrow`).  AND IT DOES NOT FINISH `X` ON ITS OWN: a MARKED slot at
+  `FrzOff` is every cached or pooled inode, so refuting the window yields
+  only "an `X` inum's slot is MARKED implies its column is `FrzOff`".
+  Ruling that combination out needs a POOL-SIDE witness for `X`'s rows — a
+  `reg_half` per pending/await inum inside `ipool_body`, colliding with the
+  MARKED arm's `reg_full` — which is `IcacheEscrow.v` and lane B′/C-3b's
+  business, not the region's.
+
+  NOT LANDED, and blocked on (F) and on that pool-side witness:
+  `fs_collect_snap_ok` (the assembly), the law parked in `log_ctx`,
+  `eo_commit`'s call at `outstanding = 0`, the two commit permits at
+  `dsnap_step_of`, `fs_commit_receipt`, `P_fs`'s conjunct → `P_dur (fr_D r)`,
+  and the `fs_dview`-as-slot / `fdn_*` / `riscv_dview_name` deletions.
+  Nothing of the shape changed: `col_snap_ok_ex` is still what the law
+  concludes and `col_hand` still what it must assemble.
 
 - [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
   The GENERAL statement is the commit's receipt itself: after a commit, the

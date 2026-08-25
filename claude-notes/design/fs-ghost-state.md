@@ -358,7 +358,7 @@ the rc-0/f-None defaulted aliases that keep old literals byte-stable).
 | `wdu` | paid `".."`-units | `ilinkd z` | mkdir's dot-dot deposit | the d-flavour of the same payment; buys `ireg_dir_ok` (`0 < wd → type = T_DIR`). |
 | `wdt` | THE parent-record unit (≤1, `ireg_par_ok`) | `ilinkdp z pv` + `iparent z pv` | mkdir / rmdir | tagged unit carrying half the **parent register** `p` — the `".."`-tie. |
 | `g` | grey records — orphaned `".."`s nothing pays for | `igrey z` | unlink's grave-dot-dot | carries NO allocatedness; that is the point (§20.8). |
-| `c` | the claim, **TYPED**: `option (excl (bv 16))` (`ctyUR`) | `iclaim z ty` | minted by `ireg_claim_au` at ialloc's type-write, at `ty = di_type dn'`; spent by `ireg_withdraw`'s ClaimK CONVERSION at the claimant's ilock-fill | **exclusive allocation carrying the claimed type** — the claim pin (3c) then pays `di_type d = ty` back at the fill, which is `create_fresh_ty`'s content. |
+| `c` | the claim, **TYPED AND TRANSACTION-KEYED**: `option (excl ctyval)`, `ctyval = bv 16 * (nat * Qp)` (`ctyUR`) | `iclaim z ty t q` | minted by `ireg_claim_au` at ialloc's type-write, at `ty = di_type dn'` and the claimant's `(t, q)`; spent by `ireg_withdraw`'s ClaimK CONVERSION at the claimant's ilock-fill | **exclusive allocation carrying the claimed type AND the claiming transaction** — the claim pin (3c) pays `di_type d = ty` back at the fill (`create_fresh_ty`'s content), and `(t, q)` is what re-identifies the share `ireg_cpin` parks for the claim box's duration (`FsCollect`'s residue (E)). |
 | `r` | outstanding PLAIN references — **ACTIVE** (item 7a) | `runit_plain z` (the renamed `iref_lic`; `runit_any := runit_plain`) | minted at iget by licence flavour, spent at iput's last close | the reference-provenance unit: every non-allocator reference carries one, and the pin `c ≠ None ⟹ r = 0` is how fifteen ilock sites DERIVE `c = None` at their fill. |
 | `rc` | outstanding CLAIM-flavoured references | `runit_claim z` | ialloc's own ClaimL iget mints it; the withdraw's conversion spends it (`rc→rc−1`, `r→r+1`) | keeps the allocator's reference counted without breaking the `r = 0` pin; `runit (b:bool) z` is the flavour-indexed form (`is_claim l`). |
 | `p` | parent register (`option (dfrac_agree Z)`) | rides `ilinkdp`/`iparent` | mkdir / rmdir | fractional agreement on who the parent is. |
@@ -470,13 +470,27 @@ What is left region-side is the authority and the root's keep-alive.
   exhibits the sealed regime; the exclusive `ireg_boot` holder (ireclaim)
   refutes it, proving every slot boot reaches is unclaimed.
 - `icnt_half z n` — the region's count half (3d).
-- `ireg_claim_ok c f d` — the **claim pin**, typed: `c = Some x ⟹
-  fresh_shape d ∧ f = FrzOff ∧ x = Excl (di_type d)`.  Cashed at the
-  ClaimK fill: the type you read IS the type you claimed.
+- `ireg_claim_ok c f d` — the **claim pin**, typed: `c = Some (Excl v) ⟹
+  fresh_shape d ∧ f = FrzOff ∧ v.1 = di_type d` (`Some ExclBot` is
+  refuted).  Cashed at the ClaimK fill: the type you read IS the type you
+  claimed.  It says nothing about `v`'s transaction pair — what constrains
+  that is `ireg_cpin`.
+- `ireg_cpin c` — the **claim box's parked transaction share**, the c-column
+  twin of `IcacheEscrow.ic_pin_tx`: `v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt`
+  at `c = Some (Excl v)`, `emp` at `None`.  A claim box stands from
+  ialloc's type-write to the claimant's own `ilock` fill, and that whole
+  window is inside ONE transaction, so at a commit `ireg_cpin_no_ops` reads
+  `c = None` off an empty `ln_tx` authority.  It rides in `ireg_fsh`'s
+  position, bundled as `ireg_shp c f`, so the thirty-odd sites that merely
+  thread the slot's f-shelter through a re-park are byte-stable and only
+  the claim and the withdrawal split it.  `ireg_withdraw` returns the share
+  inside `ireg_wd_back`'s ClaimK arm — again a bundle, so `SpecIlock`'s
+  fifteen `PlainK`/`ShotK` call sites do not move.
 - `ireg_frz_ok f n d` — the **freeze pin**, rg-blind: `FrzPre _ ⟹
   nlink = 0 ∧ type ≠ 0 ∧ n = 1`; `FrzPost _ ⟹ same ∧ n = 0`.  B1's
   `cnt2 = 1` payout.
-- `ireg_fsh f` — the **regime shelter** (G′): `True` at `FrzOff`,
+- `ireg_fsh f` — the **regime shelter** (G′), the f half of `ireg_shp`:
+  `True` at `FrzOff`,
   `ireg_regime rg` (= `if rg then ireg_open else ireg_boot`) parked at both
   window phases — the mint parks the lent arm, the deposit extracts and
   RETURNS it (agreement with the freer's own phase fragment selects it).
@@ -505,14 +519,21 @@ selector reclaim), and `iref_alloc_store_au` (the recycle's 0→1).
 
 ### 3e. The arm structure (option A) and the registry
 
-`ireg_slot`'s arm: **((IN `z ↪[γi] d` ∨ MARKED `⌜ireg_marked_ok c d⌝ ∗
-imark`) ∗ reg_full) ∨ PENDING** (`type = 0 ∗ z ↪[γi] d ∗ reg_half ∗
-region_pending z`).  `reg_full/reg_half z ge gr` are fractions of the
+`ireg_slot`'s arm: **((IN `⌜ireg_in c d⌝ ∗ z ↪[γi] d` ∨ MARKED
+`⌜ireg_marked_ok c d⌝ ∗ imark`) ∗ reg_full) ∨ PENDING** (`type = 0 ∗
+z ↪[γi] d ∗ reg_half ∗ region_pending z`).  **`ireg_in c d` is
+`type = 0 ∨ (fresh_shape d ∧ c ≠ None)`**: the IN arm holds a FREE record or
+a CLAIM BOX, and the box is exactly the state in which the c column is
+`Some` — which is what lets a commit read `di_type d = 0` off the arm
+(`ireg_in_quiesce` against `ireg_cpin_no_ops`) rather than assume it.
+The claim is the only writer of this arm at a nonzero type, so the
+strengthening costs no other mover anything.  `reg_full/reg_half z ge gr` are fractions of the
 per-inum **escrow registry** `icfg_reg`; `ireg_claim_au` refutes PENDING by
 fraction overflow, and the off-lock deposit splits `reg_full` into the
 pending pair.  `ireg_withdraw` is the IN→MARKED mover, indexed by `ilkc`
-(6): its ClaimK arm is the CONVERSION (`iclaim z ty ∗ runit_claim z` in,
-`runit_plain z` + `⌜di_type = ty⌝` out), its PlainK arm borrows a plain
+(6): its ClaimK arm is the CONVERSION (`iclaim z ty t q ∗ runit_claim z`
+in, `runit_plain z` + the parked share `t ↪[ln_tx icfg_log]{#q} tt` +
+`⌜di_type = ty⌝` out), its PlainK arm borrows a plain
 unit and DERIVES `c = None` by the `ireg_ref_ok` collision
 (`ireg_wd_lic/back/ty`, `InodeRegion.v`).
 
@@ -615,9 +636,18 @@ the transit set under its own key) before it can state anything:
   fragment (`ireg_marked_ok` forces a nonzero type there), the fragment
   being in the walk's own hand.  So such an inum has no bundle anywhere and
   `FsCollect.col_free_slot_acc` does not reach it.  The window is inside
-  one transaction, so the fix is B″-tx5's ABI increment once more, at the
-  MARKED arm's freeze column — which is ON for exactly that window.  See
-  `FsCollect.v`'s header, residue (F).
+  one transaction, so the fix is the c column's own increment once more
+  (§3c's `ireg_cpin`), at the MARKED arm's FREEZE column — which is ON for
+  exactly that window, and whose index `rg` is where the freezing
+  transaction and its share would have to ride so the deposit can hand
+  iput back the element its spec names.  It DOES NOT FINISH `X` on its own:
+  a MARKED slot at `FrzOff` is every cached or pooled inode, so refuting
+  the window yields only "an `X` inum's slot is MARKED implies its column
+  is `FrzOff`"; ruling that combination out needs a pool-side witness for
+  `X`'s rows (a `reg_half` per pending/await inum in `ipool_body`,
+  colliding with the MARKED arm's `reg_full`), which is this file's
+  business and not the region's.  See `FsCollect.v` section 5c, the wall
+  machine-checked.
 
 **THE MOVERS ARE ACCESSORS, NOT PLAIN FUPDS**, because the pool's quarter
 of `ic_id` has to be in the caller's hand at the same ghost step as the
