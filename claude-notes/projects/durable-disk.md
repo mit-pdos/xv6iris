@@ -365,6 +365,97 @@ as their remaining consumers.
   and `ProofFilestat`; every other `ilock` caller (`namex`, `create`,
   `sys_open`/`link`/`unlink`/`chdir`, `kexec`, `filewrite`) already holds
   a transaction and keeps the full bundle.
+
+  **AS LANDED — B″-esc: THE POOL SPLIT.  THE WRITE ARM IS A SECOND WALL.**
+
+  THE POOL SPLIT IS DONE, and it is the second of the two escrow-side
+  obstructions lane C named.  `IcacheEscrow.ipool_shape` splits BY ARM into
+  `ipool_ord` (the count half, the mirror half, the Timeless two-arm
+  `ipool_shape_np` and `ifreeze_off` — the only alternative carrying an
+  `inode_owned_era`, hence the only one the collection wants) and
+  `ipool_ext` (pending / await, not Timeless), tied back to the full shape
+  by `ipool_ord_shape` / `ipool_ext_shape` / `ipool_shape_arms`.  The
+  ordinary rows live in ONE invariant — `ipool_inv γfs γi cov logstart =
+  inv ipoolN (ipool_body …)` at `ipoolN = nroot .@ "ipool"`, body
+  `∃ O, ipool_key O ∗ ipool_rows … O`, TIMELESS — so the commit opens it
+  once and holds every ordinary bundle beside all fifty slot escrows.  The
+  itable lock keeps, in `ipool`'s OWN position and at its own arity, the
+  residency key `ipool_key O = ghost_var icfg_pool (1/2) O` plus `⌜O ⊆ P⌝`
+  and the in-transition rows over `P ∖ O`; `icfg_pool` is a new ambient
+  gname (`IcacheRef.icfg_pool`, `Xv6Cameras.icache_poolG`), allocated WHOLE
+  at `∅` by `icfg_alloc`.  So `itable_res2`'s arity, iget's scan-loop
+  hypothesis list, and `is_itable2`'s ~55 threading files did not move.
+
+  THE MOVERS HAND OUT AND TAKE BACK THE FULL `ipool_shape`
+  (`ipool_take` / `ipool_put`, fupds at any `E ⊇ ↑ipoolN`), which is what
+  kept the split invisible below them: `ProofIget`'s recycle still runs
+  `ipool_shape_to_np` on what comes out, `ProofIput`'s eviction still
+  deposits the ordinary row and its free path still parks the await arm
+  (`ipool_put` reads the side off the shape itself).  Each of the three
+  sites cost one `iApply fupd_wp` / `iMod` / `iModIntro` wrapper and nothing
+  else.  GONE: `ipool_acc`, `ipool_insert`, `ipool_acc_back`.  RENAMED:
+  `IcacheBoot.ipool_split` → `ipool_rows_split`.  RE-TYPED (same arity,
+  conclusion `ipool_rows`): `IcacheBoot.ipool_shape_free`/`_alloc`/
+  `ipool_alloc`/`ipool_alloc_all_free`, `FsCfgBoot.ipool_alloc_of_image` —
+  boot stocks ORDINARY rows only.  `IcacheBoot.icache_boot_at` gained the
+  whole key beside the rows and is what ALLOCATES the invariant
+  (`IcacheEscrow.ipool_alloc_inv`); `FsCfgBoot.fs_kit_icache` /
+  `fs_kit_icache_rest` carry the pair.
+
+  THE INVARIANT REACHES ITS CONSUMERS THROUGH `is_itable2`, which now
+  BUNDLES `ipool_inv` beside the lock (`is_itable2_lock`, `is_itable2_pool`)
+  — arity fixed, threading files untouched; the four files that use it AS a
+  lock project.  In `ProofIput` the four internal lemmas' `is_lock gtl
+  itable_lock …` premise became `is_itable2 gtl cn …` in the same position,
+  so their callers are byte-stable.
+
+  THE COMMIT'S DOOR IS `IcacheEscrow.ipool_inv_acc`: `ipool_inv … ={E,
+  E∖↑ipoolN}=∗ ∃ O, ipool_rows … O ∗ (rows ={…}=∗ True)` — read-only, no
+  lock, one ghost step.  WHAT LANE C STILL OWES ITSELF: `O` is the
+  invariant's own index, and "`O` ∪ the cached inums = the region's inums"
+  is `ic_ci_wf` plus `ipool`'s domain, both LOCK-HELD — so the collection
+  can now reach every ordinary pooled bundle but cannot yet PROVE it has
+  them all.  The cheapest shape for that accounting is a per-inum "checked
+  out of the pool" token riding the escrow payload (one conjunct at the END
+  of `ic_loaded`/`ic_unloaded`, ~40 payload sites at one edit each by
+  durable-notes' last-conjunct rule); `IcacheRef.icnt` nearly does it
+  already — the region's half is inside `iregN`, which the commit opens —
+  but the uncached halves live on the very rows whose presence is the
+  question.
+
+  **THE WRITE ARM IS A SECOND WALL** (`iris/IcacheTxArm.v`, compiled:
+  `arm_needs_whole`, `arm_state_reachable`).  B′'s recommended `DepTx` fix
+  DOES close the re-identification — the descriptor pins `(t, q)` between
+  arm and holder, so `iunlock` recovers exactly what `ilock` parked — but a
+  transaction that has PARKED a share of `LogInv.log_tx` can never supply a
+  WHOLE element again, and lane A's `InodeRegion.ireg_arm` demands exactly
+  that (`A !! t = None` has no other proof than "a parked entry would hold
+  this very element").  `create` is xv6's one arming walk and it arms at the
+  `ip->nlink = 1` flush with BOTH its parent and its fresh child
+  write-locked, so the escrow's write arm and lane A's armed registry are
+  mutually exclusive as they stand.  Closing it needs ONE of: (a) lane A's
+  registry re-keyed so the arm needs no freshness — a parked SHARE still
+  refutes a non-empty registry at an empty `ln_tx` authority, which is all
+  `IregClean.ireg_snap_local_acc` reads off it (`InodeRegion` +
+  `ProofCreate`); or (b) a second per-transaction ghost minted by `begin_op`
+  and consumed by `end_op` (`LogInv` + `ProofBeginOp`/`ProofEndOp`).  Neither
+  is this lane's file.  `Xv6Cameras.DepTx` was therefore NOT added: an arm
+  nobody can park in is a weakening every escrow opener would have to refute
+  for nothing.
+
+  MEASURED WHILE LOOKING, so the next attempt does not re-measure: the
+  held-lock ABI the write arm costs is much SMALLER than plan §6 feared.
+  The interior contracts already take the tx-free forms — `SpecWritei`,
+  `SpecIupdate`, `SpecItrunc`, `SpecDirlink`, `SpecBmap`, `SpecBalloc`,
+  `SpecBfree`, `SpecIunlockput` all have `log_opS`/`log_opSe` GEN contracts,
+  and `ProofCreate` calls the GEN forms throughout, framing `log_tx` itself
+  — so what moves is (i) the `_sconf` corollaries' callers that hold a lock
+  and (ii) the five files that name `log_tx` (`SpecCreate`, `ProofCreate`,
+  `ProofSysOpen`, `ProofSysUnlink`, `ProofSysLinkTails`).
+
+  ONE `ilock` SPEC: unchanged.  Its read arm is still blocked on the block
+  layer's fraction indexing (B′'s structural note) and its write arm on the
+  wall above, so `ilock` still withdraws the whole bundle and parks nothing.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
