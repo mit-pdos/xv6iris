@@ -921,7 +921,11 @@ as their remaining consumers.
   arm forgets it.  Cheapest fix: a HALF of `FsState.top_frag_q` parked
   region-side in `ireg_slot`'s free arm under
   `⌜fn_rec n = d⌝ ∗ ⌜inode_local z n⌝`, the marker arm keeping the other
-  half; it reaches `ProofIalloc`'s claim and `ProofIput`'s free deposit.
+  half; it reaches `ProofIalloc`'s claim and `ProofIput`'s free deposit.  It
+  is NOT a corner case: boot stocks EVERY free inum as a marker arm
+  (`IcacheBoot.ipool_shape_free`, whose own comment says the value is the
+  image's node but UNTIED), so at the mkfs image the first commit meets it
+  at nearly every inum of the region.
 
   NOT LANDED, and blocked on those four: the law parked in `log_ctx`,
   `end_op`'s call at `outstanding = 0`, the two commit permits at
