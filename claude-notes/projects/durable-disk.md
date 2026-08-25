@@ -456,6 +456,90 @@ as their remaining consumers.
   ONE `ilock` SPEC: unchanged.  Its read arm is still blocked on the block
   layer's fraction indexing (B′'s structural note) and its write arm on the
   wall above, so `ilock` still withdraws the whole bundle and parks nothing.
+  **AS LANDED — THE BLOCK HALF (lane B″-blk).**  The block layer now
+  carries a share, in the same shape lane B′ used one level up: `_q` twins
+  beside unsuffixed names that DID NOT MOVE and are their `DfracOwn 1`
+  readings (`k ↪[γ] v` IS `k ↪[γ]{DfracOwn 1} v`, so every `X_1` equation
+  is `reflexivity` and the ~30 files spelling `fsblock` / ~34 spelling
+  `inode_blocks` are textually untouched).  `FsBlocks`:
+  `byte_range_q`/`fsblock_q`, the fraction-aware exclusivity readings
+  (`byte_range_q_valid`, `fsblock_q_excl`/`_q_ne`, plus the two the plan
+  names, `fsblock_ne_full` and `fsblock_ne_34`), the splitting laws
+  (`byte_range_q_split`, `fsblock_q_split`, `fsblock_split_34`) and the
+  SHARE-SIDE AGREEMENTS, which are what a read-locker actually runs:
+  `byte_range_q_lookup` (its own three-line proof — iris 4.4.0's
+  `ghost_map_lookup_big` is stated at fraction 1 only, though
+  `ghost_map_lookup` takes a dfrac), `byte_range_q_home`, `fsblock_q_home`,
+  `fsblock_q_home_open`, `fs_bytes_agree_q`, `fs_bytes_agree_any_q`.
+  `InodeInv`: `ind_blk_q`/`ind_res_q`/`inode_map_q`/`blk_res_q`/
+  `inode_blocks_q` with their `_1` equations, splitting laws, accessors
+  (`inode_map_q_dir_acc`/`_ind_acc`, `inode_blocks_q_frame`/`_acc`/
+  `_insert`, `ind_blk_q_run`) and `inode_fresh_q(_at)` — which needs NO
+  fraction premise, because balloc's fresh run is FULL and a full owner
+  excludes any other share.
+
+  THE STRUCTURAL UNBLOCK IS `FsBytesGamma.gamma_blk_owned_q` (and
+  `gamma_byte_range_q`): the fraction-1-only bridge was what kept anything
+  at ¾ or ¼ out of the `InodeInv` vocabulary.  Over it, `FsStateEra` gains
+  `inode_blocks_era_q`, `ind_res_era_q`, `inode_owned_era_of_q`/`_to_q`,
+  and — the join point for the escrow lane — `inode_bytes_era_to`/`_of`,
+  which turn the reader's `inode_bytes_era γfs (DfracOwn (1/4)) n` into
+  exactly `ind_res_q … ¼ (bm_of n) ∗ inode_blocks_q … ¼ (bm_of n)
+  (fn_data n)` under `inode_local`.
+
+  A `Typeclasses Opaque` SEAL IS NOT CROSSED BY A `reflexivity` EQUATION,
+  and that is the whole cost of the shape.  `inode_blocks`/`fsblock` are
+  sealed (they must be — a 1024/268-element `big_sepL` behind a
+  `Definition` is an `iFrame` hang), so neither `iFrame` nor `IntoWand`
+  will unify `X` with `X_q … (DfracOwn 1)` even though they are
+  convertible, and `iEval (rewrite …) in "H"` does not reliably fold them
+  either.  The crossing that DOES work is a wand taking the fraction as a
+  premise — `FsBlocks.fsblock_q_1_of`/`_to`,
+  `InodeInv.inode_blocks_q_1_of`/`_to`, `ind_blk_q_1_of`/`_to`,
+  `inode_map_q_1_of`/`_to` — one `iDestruct` per crossing.
+
+  `readi` IS PROVEN AT A SHARE, AND `stati` NEEDED NOTHING.
+  `SpecReadi.wp_readi_sconf_body` and `SpecBmap.wp_bmap_noalloc_sconf_body`
+  take `inode_map_q γfs dq` / `inode_blocks_q γfs dq`, and NO ARITY MOVED:
+  `dq` was already a vestigial binder in both (and in `bm_gen_stmt`), so it
+  is now the block fraction.  readi modifies nothing — its only use of a
+  data block is the agreement `ProofReadiParts.rd_held_content` (now
+  fraction-generic, over `fs_bytes_agree_any_q`), and bmap-with-no-alloc
+  reads the indirect block through the same agreement
+  (`ProofBmapParts.bm_held_content`, likewise generic; its other consumer,
+  `ProofItrunc`, crosses at 1 in two lines).  `stati`/`filestat` touch NO
+  byte-layer resource at all (`inode_meta` is in-memory cells, which the
+  design keeps at fraction 1), so they are already callable by a
+  read-locker with nothing to prove.
+
+  ONLY THE ALLOCATING ARMS ARE FRACTION-1 ARMS.  `ProofBmap`'s shared core
+  gained one premise, `ak <> None -> dq = DfracOwn 1`, discharged
+  vacuously by the no-alloc seal and by `reflexivity` at the two
+  allocating seals (which now pass `DfracOwn 1` and cross with the wands
+  above).  Inside, exactly three steps need it: the two
+  `inode_blocks_insert` deposits of balloc's fresh block and the
+  `log_write` of the indirect block; everything else — the indirect-block
+  agreement, `inode_fresh`, the map/blocks framing — is share-blind.
+  readi's seven callers pass `DfracOwn 1` and cross with two `iDestruct`s
+  on each side of the call (`ProofFileread`, `ProofDirlookup`,
+  `ProofDirlink`, `ProofKexecA`/`B2`/`B3`, `ProofSysUnlink`; three of them
+  were passing `DfracOwn (1/4)` into the vestigial slot and now pass 1).
+
+  WHAT THE JOIN WITH THE ESCROW LANE NEEDS.  `ProofFileread` and
+  `ProofFilestat` still call `wp_ilock` at the FULL bundle and are
+  unchanged in that respect.  When B″-esc's read arm lands, `ilock`
+  without a transaction hands the holder `inode_meta`, `inode_addrs`, the
+  pure facts and `inode_bytes_era γfs (DfracOwn (1/4)) n` (the escrow
+  keeping `inode_owned_era_q γfs (DfracOwn (3/4))`, i.e. `dinode_at` — so
+  a read-locker still cannot move a record — plus the ¾ residue).
+  `fileread` then applies `FsStateEra.inode_bytes_era_to`, pairs the
+  result with `inode_addrs` to make `inode_map_q γfs ¼ ip bm`, and calls
+  `readi` at `dq := DfracOwn (1/4)`: one argument change and the two
+  crossing `iDestruct`s deleted.  `filestat` needs no change at all.
+  LEFTOVER: the ALLOCATING bmap contracts (`wp_bmap_sconf_body`,
+  `wp_bmap_gen_body`) still carry `dq` as a vestigial binder while the
+  no-alloc one uses it as the fraction; `ProofReadi.rd_q` now feeds only
+  bread/brelse's own vestigial slots.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
