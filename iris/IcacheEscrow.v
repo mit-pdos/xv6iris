@@ -718,7 +718,7 @@ Section IcacheEscrow.
   (* OPTION A (b)(ii): turn a pending-CAPABLE pool shape into the Timeless
      [ipool_shape_np] the escrow's unloaded arm needs, REDEEMING a genuine
      pending entry to its [imark] pool-locally.  This is what lets the iget
-     recycle and the ilock fill convert [ipool_acc]'s full shape without the
+     recycle and the ilock fill convert [ipool_take]'s full shape without the
      region invariant.  Walk-stable: it discharges real deposits, not just the
      flip-gate's empty pool.
 
@@ -2579,7 +2579,7 @@ Section IcacheEscrow.
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
        an existential over [ic_payload]/[inode_raw] -- for each of the two
-       names (88 s measured; see [ipool_insert] below and optimization.md). *)
+       names (88 s measured; see [ipool_put] below and optimization.md). *)
     iModIntro.
     iSplitR "Hgf2 Hpool"; [| iSplitL "Hgf2"; [iExact "Hgf2" | iExact "Hpool"]].
     iApply ic_close_empty. rewrite /ic_empty_arm.
@@ -3389,89 +3389,284 @@ Section IcacheEscrow.
     apply moi32_small. lia.
   Qed.
 
-  Definition ipool (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (logstart : Z) (P : gset Z) : iProp Σ :=
-    ([∗ set] z ∈ P, ipool_shape γfs γi cov logstart (mword_of_int z))%I.
-
-  Lemma ipool_acc γfs γi cov logstart (P : gset Z) (z : Z) :
-    z ∈ P ->
-    ipool γfs γi cov logstart P -∗
-      ipool_shape γfs γi cov logstart (mword_of_int z) ∗
-      ipool γfs γi cov logstart (P ∖ {[z]}).
-  Proof.
-    intros Hz. rewrite /ipool (big_sepS_delete _ P z Hz). iIntros "[$ $]".
-  Qed.
-
-  Lemma ipool_insert γfs γi cov logstart (P : gset Z) (z : Z) :
-    z ∉ P ->
-    ipool_shape γfs γi cov logstart (mword_of_int z) -∗
-    ipool γfs γi cov logstart P -∗
-    ipool γfs γi cov logstart ({[z]} ∪ P).
-  Proof.
-    intros Hz. rewrite /ipool (big_sepS_insert _ P z Hz).
-    (* structurally, NOT [iFrame]: the goal's left conjunct is an
-       [ipool_shape], whose body is a disjunction of existentials over
-       [inode_blocks]' 268-element big-op, and a bare [iFrame] searches all
-       of it per hypothesis (106 s measured -- optimization.md's BioInv
-       rule: naming fixes the CONTEXT-side scan, a big GOAL still costs a
-       goal-side one, so split and [iExact]). *)
-    iIntros "H1 H2". iSplitL "H1"; [iExact "H1" | iExact "H2"].
-  Qed.
-
-  (* the round trip, so a read-only user needs no set algebra of its own *)
-  Lemma ipool_acc_back γfs γi cov logstart (P : gset Z) (z : Z) :
-    z ∈ P ->
-    ipool γfs γi cov logstart P -∗
-      ipool_shape γfs γi cov logstart (mword_of_int z) ∗
-      (ipool_shape γfs γi cov logstart (mword_of_int z) -∗
-       ipool γfs γi cov logstart P).
-  Proof.
-    intros Hz. rewrite /ipool (big_sepS_delete _ P z Hz). iIntros "[$ Hr]".
-    iIntros "H". iFrame.
-  Qed.
-
-  (* [ipool] is NO LONGER Timeless (its pending arm holds an [esc_inv]); the
-     instance was unused (verified) and is removed.  The itable free pool is
-     lock-held, never [iInv .. as ">"], so Timelessness is not needed there. *)
+  (* ==================================================================== *)
+  (*  5b.  THE POOL, SPLIT BY ARM (durable-disk lane B''-esc;              *)
+  (*       durable-fs-plan.md section 4, the commit's collection)          *)
+  (* ==================================================================== *)
 
   (* ---- WHY THE POOL CANNOT SIMPLY MOVE INTO AN INVARIANT --------------
      (durable-fs-plan.md section 4: the commit has to collect the UNCACHED
      inodes' bundles too, and it cannot take the itable spinlock.)
 
-     [inv N P] hands its opener [▷ P].  Both of this pool's consumers --
-     iget's miss (ProofIget.v, the [ipool_acc] at the +0x72 store) and
-     iput's eviction (ProofIput.v, the two [ipool_insert]s) -- spend the
-     bundle inside a store's ATOMIC UPDATE, where there is no step left to
-     absorb a later (this file's own note at the head of section 0), and
-     this tree has no later credits ([RiscvPtsto.num_laters_per_step _ :=
-     0]).  So an invariant-resident pool would have to be TIMELESS, and
+     [inv N P] hands its opener [|> P].  Both of this pool's consumers --
+     iget's miss (ProofIget, the withdraw at the +0x72 store) and iput's
+     evictions (ProofIput's two deposits) -- spend the bundle inside a
+     store's ATOMIC UPDATE, where there is no step left to absorb a later
+     (this file's own note at the head of section 0), and this tree has no
+     later credits ([RiscvPtsto.num_laters_per_step _ := 0]).  So an
+     invariant-resident pool would have to be TIMELESS, and the full
      [ipool_shape] is not: its pending and await alternatives hold
      [EscrowInode.escA_inv], an [inv].  [ipool_no_timeless_check] below is
      that obstruction, checked.
 
-     THE SPLIT THAT DOES WORK, and the numbers for it.  The ORDINARY
-     alternative -- [ipool_shape_np] beside the count half, the freeze
-     mirror half and [ifreeze_off] -- IS timeless
-     ([ipool_shape_ord_timeless] below), and it is the only alternative
-     that carries an [FsStateEra.inode_owned_era] at all, i.e. the only one
-     the commit's collection wants.  So the pool splits by ARM: the
-     ordinary inums go into an Iris invariant (timeless body, so
-     [iInv .. as ">"] keeps working at both consumers), the pending/await
-     inums stay under the itable lock, and the lock keeps the residency
-     key for the invariant's index set.  A consumer that lands on a
-     pending/await inum refutes it exactly where it does today, with the
-     licence ([ipool_shape_to_np]'s [ifreeze_off] premise and
-     [IcacheRef.ifreeze_excl]) -- but now in the MAIN FLOW, off the
-     lock-held side, with no invariant open and no later in the way. *)
+     SO THE POOL SPLITS BY ARM.  [ipool_ord] -- the ORDINARY alternative,
+     which is the only one carrying an [FsStateEra.inode_owned_era] at all,
+     i.e. the only one the commit's collection wants -- IS timeless, and it
+     goes into an Iris invariant at [ipoolN] ([iInv .. as ">"] keeps working
+     at both consumers).  [ipool_ext] -- pending and await, the two
+     in-transition arms a FREER parks -- stays under the itable lock, and
+     the lock keeps the invariant's index set as the RESIDENCY KEY, one
+     conjunct in [ipool]'s own position.  So neither [itable_res2]'s arity
+     nor iget's scan-loop hypothesis list moves, and no consumer outside
+     this file's two movers ([ipool_take], [ipool_put]) changes shape.
 
+     A consumer that lands on a pending/await inum refutes or redeems it
+     exactly where it does today -- [ipool_shape_to_np], the caller's
+     licence and [IcacheRef.ifreeze_excl] -- because both movers hand out
+     and take back the FULL [ipool_shape]. *)
+
+  (* the ORDINARY row: the count half, the mirror half, the two-arm
+     (allocated / marker) Timeless shape and the unfrozen token. *)
+  Definition ipool_ord (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (inum : mword 32) : iProp Σ :=
+    (icnt_half (bv_unsigned inum) 0%nat ∗
+     frzm_h (bv_unsigned inum) false ∗
+     ipool_shape_np γfs γi cov logstart inum ∗
+     ifreeze_off (bv_unsigned inum))%I.
+
+  (* ...and the IN-TRANSITION row: the same two ledger halves beside the
+     pending or the await arm.  NOT Timeless ([escA_inv] is an [inv]),
+     which is the whole reason for the split. *)
+  Definition ipool_ext (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (inum : mword 32) : iProp Σ :=
+    (icnt_half (bv_unsigned inum) 0%nat ∗
+     frzm_h (bv_unsigned inum) false ∗
+     ((pool_pending γi (bv_unsigned inum)
+       ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))
+      ∨ (pool_await γi (bv_unsigned inum)
+         ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n))))%I.
+
+  Global Instance ipool_ord_timeless γfs γi cov logstart inum :
+    Timeless (ipool_ord γfs γi cov logstart inum).
+  Proof. rewrite /ipool_ord. apply _. Qed.
+
+  (* the three readings that tie the split to [ipool_shape], so that every
+     existing producer and consumer keeps speaking the full shape *)
+  Lemma ipool_ord_shape γfs γi cov logstart inum :
+    ipool_ord γfs γi cov logstart inum -∗
+    ipool_shape γfs γi cov logstart inum.
+  Proof.
+    rewrite /ipool_ord /ipool_shape. iIntros "(Hc & Hm & Hnp & Hoff)".
+    iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
+    iLeft. iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
+  Qed.
+
+  Lemma ipool_ext_shape γfs γi cov logstart inum :
+    ipool_ext γfs γi cov logstart inum -∗
+    ipool_shape γfs γi cov logstart inum.
+  Proof.
+    rewrite /ipool_ext /ipool_shape. iIntros "(Hc & Hm & Hx)".
+    iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
+    iRight. iExact "Hx".
+  Qed.
+
+  Lemma ipool_shape_arms γfs γi cov logstart inum :
+    ipool_shape γfs γi cov logstart inum -∗
+    (ipool_ord γfs γi cov logstart inum ∨ ipool_ext γfs γi cov logstart inum).
+  Proof.
+    rewrite /ipool_shape /ipool_ord /ipool_ext.
+    iIntros "(Hc & Hm & [[Hnp Hoff] | Hx])".
+    - iLeft. iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
+      iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
+    - iRight. iSplitL "Hc"; [iExact "Hc" |]. iSplitL "Hm"; [iExact "Hm" |].
+      iExact "Hx".
+  Qed.
+
+  (* THE ORDINARY ROWS, as one big-op -- what boot stocks and what the
+     invariant is allocated from. *)
+  Definition ipool_rows (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (P : gset Z) : iProp Σ :=
+    ([∗ set] z ∈ P, ipool_ord γfs γi cov logstart (mword_of_int z))%I.
+
+  Global Instance ipool_rows_timeless γfs γi cov logstart P :
+    Timeless (ipool_rows γfs γi cov logstart P).
+  Proof. rewrite /ipool_rows. apply _. Qed.
+
+  (* THE RESIDENCY KEY.  Two halves at [icfg_pool] (ambient, see
+     [IcacheRef]): one inside the invariant, one under the itable lock, so
+     that only a lock holder moves the index and the commit -- which never
+     takes the lock -- can still read every row. *)
+  Definition ipool_key (P : gset Z) : iProp Σ :=
+    ghost_var icfg_pool (1/2) P.
+
+  Definition ipool_body (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) : iProp Σ :=
+    (∃ O : gset Z, ipool_key O ∗ ipool_rows γfs γi cov logstart O)%I.
+
+  Global Instance ipool_body_timeless γfs γi cov logstart :
+    Timeless (ipool_body γfs γi cov logstart).
+  Proof. rewrite /ipool_body /ipool_key. apply _. Qed.
+
+  (* distinct from every namespace an opener may already hold: the escrow
+     family [icEscN], the ref words [IcacheInv.icacheN], the region
+     [InodeRegion.iregN] and [ftopN], the per-inum [EscrowDefs.escAN] and
+     the log's [logN]. *)
+  Definition ipoolN : namespace := nroot .@ "ipool".
+
+  Definition ipool_inv (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) : iProp Σ :=
+    inv ipoolN (ipool_body γfs γi cov logstart).
+
+  Global Instance ipool_inv_persistent γfs γi cov logstart :
+    Persistent (ipool_inv γfs γi cov logstart).
+  Proof. apply _. Qed.
+
+  (* WHAT THE LOCK KEEPS, in [ipool]'s own position and at its own arity:
+     the residency key for the invariant's index set, and the
+     in-transition rows the invariant may not hold. *)
+  Definition ipool (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (P : gset Z) : iProp Σ :=
+    (∃ O : gset Z,
+       ⌜O ⊆ P⌝ ∗ ipool_key O ∗
+       [∗ set] z ∈ P ∖ O, ipool_ext γfs γi cov logstart (mword_of_int z))%I.
+
+  (* the pool at its BOOT state: every row ordinary, so the lock's side is
+     the key alone.  This is what [IcacheBoot.icache_boot_at] builds. *)
+  Lemma ipool_alloc_inv (E : coPset) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (P : gset Z) :
+    ghost_var icfg_pool 1 (∅ : gset Z) -∗
+    ipool_rows γfs γi cov logstart P ={E}=∗
+      ipool_inv γfs γi cov logstart ∗ ipool γfs γi cov logstart P.
+  Proof.
+    iIntros "Hkey Hrows".
+    iMod (ghost_var_update P with "Hkey") as "Hkey".
+    iAssert (ipool_key P ∗ ipool_key P)%I with "[Hkey]" as "[Hk1 Hk2]".
+    { rewrite /ipool_key. iApply (ghost_var_split icfg_pool P (1/2) (1/2)).
+      rewrite Qp.half_half. iExact "Hkey". }
+    iMod (inv_alloc ipoolN E (ipool_body γfs γi cov logstart)
+            with "[Hk1 Hrows]") as "#Hinv".
+    { iNext. rewrite /ipool_body. iExists P.
+      iSplitL "Hk1"; [iExact "Hk1" | iExact "Hrows"]. }
+    iModIntro. iFrame "Hinv". rewrite /ipool.
+    iExists P. iSplitR; [iPureIntro; set_solver |].
+    iSplitL "Hk2"; [iExact "Hk2" |].
+    rewrite difference_diag_L big_sepS_empty. done.
+  Qed.
+
+  (* ---- THE TWO MOVERS ------------------------------------------------
+     Both hand out and take back the FULL [ipool_shape], so no consumer
+     below them sees the split: [ProofIget]'s recycle still runs
+     [ipool_shape_to_np] on what comes out, and [ProofIput]'s two evictions
+     still hand back what they always did. *)
+
+  Lemma ipool_take (E : coPset) (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (P : gset Z) (z : Z) :
+    ↑ipoolN ⊆ E ->
+    z ∈ P ->
+    ipool_inv γfs γi cov logstart -∗
+    ipool γfs γi cov logstart P ={E}=∗
+      ipool_shape γfs γi cov logstart (mword_of_int z) ∗
+      ipool γfs γi cov logstart (P ∖ {[z]}).
+  Proof.
+    iIntros (HE Hz) "#Hinv H". rewrite {1}/ipool.
+    iDestruct "H" as (O) "(%Hsub & Hkey & Hext)".
+    destruct (decide (z ∈ O)) as [Hzo | Hzo].
+    - (* the row is in the INVARIANT *)
+      iInv "Hinv" as ">Hb" "Hclose".
+      iDestruct "Hb" as (O') "[Hk1 Hrows]".
+      iDestruct (ghost_var_agree with "Hk1 Hkey") as %->.
+      rewrite /ipool_rows (big_sepS_delete _ O z Hzo).
+      iDestruct "Hrows" as "[Hrow Hrows]".
+      iMod (ghost_var_update_halves (O ∖ {[z]}) with "Hk1 Hkey") as "[Hk1 Hkey]".
+      iMod ("Hclose" with "[Hk1 Hrows]") as "_".
+      { iNext. rewrite /ipool_body. iExists (O ∖ {[z]}).
+        iSplitL "Hk1"; [iExact "Hk1" |]. rewrite /ipool_rows. iExact "Hrows". }
+      iModIntro. iSplitL "Hrow".
+      { iApply (ipool_ord_shape with "Hrow"). }
+      rewrite /ipool. iExists (O ∖ {[z]}).
+      iSplitR; [iPureIntro; set_solver |].
+      iSplitL "Hkey"; [iExact "Hkey" |].
+      assert (Hset : (P ∖ {[z]}) ∖ (O ∖ {[z]}) = P ∖ O) by set_solver.
+      rewrite Hset. iExact "Hext".
+    - (* the row is under the LOCK, on an in-transition arm *)
+      assert (Hzd : z ∈ P ∖ O) by set_solver.
+      rewrite (big_sepS_delete _ (P ∖ O) z Hzd).
+      iDestruct "Hext" as "[Hrow Hext]".
+      iModIntro. iSplitL "Hrow".
+      { iApply (ipool_ext_shape with "Hrow"). }
+      rewrite /ipool. iExists O.
+      iSplitR; [iPureIntro; set_solver |].
+      iSplitL "Hkey"; [iExact "Hkey" |].
+      assert (Hset : (P ∖ {[z]}) ∖ O = (P ∖ O) ∖ {[z]}) by set_solver.
+      rewrite Hset. iExact "Hext".
+  Qed.
+
+  Lemma ipool_put (E : coPset) (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (P : gset Z) (z : Z) :
+    ↑ipoolN ⊆ E ->
+    z ∉ P ->
+    ipool_inv γfs γi cov logstart -∗
+    ipool_shape γfs γi cov logstart (mword_of_int z) -∗
+    ipool γfs γi cov logstart P ={E}=∗
+      ipool γfs γi cov logstart ({[z]} ∪ P).
+  Proof.
+    iIntros (HE Hz) "#Hinv Hrow H". rewrite {1}/ipool.
+    iDestruct "H" as (O) "(%Hsub & Hkey & Hext)".
+    assert (Hzo : z ∉ O) by set_solver.
+    iDestruct (ipool_shape_arms with "Hrow") as "[Hord | Hext1]".
+    - (* an ordinary row goes back into the INVARIANT *)
+      iInv "Hinv" as ">Hb" "Hclose".
+      iDestruct "Hb" as (O') "[Hk1 Hrows]".
+      iDestruct (ghost_var_agree with "Hk1 Hkey") as %->.
+      iMod (ghost_var_update_halves ({[z]} ∪ O) with "Hk1 Hkey") as "[Hk1 Hkey]".
+      iMod ("Hclose" with "[Hk1 Hrows Hord]") as "_".
+      { iNext. rewrite /ipool_body. iExists ({[z]} ∪ O).
+        iSplitL "Hk1"; [iExact "Hk1" |].
+        rewrite /ipool_rows big_sepS_union; [| set_solver].
+        iSplitL "Hord"; [| iExact "Hrows"].
+        rewrite big_sepS_singleton. iExact "Hord". }
+      iModIntro. rewrite /ipool. iExists ({[z]} ∪ O).
+      iSplitR; [iPureIntro; set_solver |].
+      iSplitL "Hkey"; [iExact "Hkey" |].
+      assert (Hset : ({[z]} ∪ P) ∖ ({[z]} ∪ O) = P ∖ O) by set_solver.
+      rewrite Hset. iExact "Hext".
+    - (* an in-transition row stays with the LOCK *)
+      iModIntro. rewrite /ipool. iExists O.
+      iSplitR; [iPureIntro; set_solver |].
+      iSplitL "Hkey"; [iExact "Hkey" |].
+      assert (Hset : ({[z]} ∪ P) ∖ O = {[z]} ∪ (P ∖ O)) by set_solver.
+      rewrite Hset big_sepS_union; [| set_solver].
+      iSplitL "Hext1"; [| iExact "Hext"].
+      rewrite big_sepS_singleton. iExact "Hext1".
+  Qed.
+
+  (* THE COMMIT'S DOOR (durable-fs-plan.md section 4): every ordinary
+     uncached inum's bundle, at ONE ghost step and with no lock taken.
+     Read-only -- the rows go straight back -- so it disturbs nothing a
+     concurrent lock holder owns. *)
+  Lemma ipool_inv_acc (E : coPset) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) :
+    ↑ipoolN ⊆ E ->
+    ipool_inv γfs γi cov logstart ={E, E ∖ ↑ipoolN}=∗
+      ∃ O : gset Z,
+        ipool_rows γfs γi cov logstart O ∗
+        (ipool_rows γfs γi cov logstart O ={E ∖ ↑ipoolN, E}=∗ True).
+  Proof.
+    iIntros (HE) "#Hinv".
+    iMod (inv_acc E ipoolN with "Hinv") as "[Hb Hclose]"; [exact HE |].
+    iDestruct "Hb" as ">Hb". iDestruct "Hb" as (O) "[Hk Hrows]".
+    iModIntro. iExists O. iFrame "Hrows".
+    iIntros "Hrows". iApply "Hclose". iNext.
+    rewrite /ipool_body. iExists O. iSplitL "Hk"; [iExact "Hk" | iExact "Hrows"].
+  Qed.
+
+  (* the obstruction the split is FOR, checked: the full pool shape is not
+     Timeless, so it could never have moved into an invariant whole. *)
   Lemma ipool_no_timeless_check (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : True.
   Proof.
     (* the ordinary alternative is timeless ... *)
-    assert (Timeless (icnt_half (bv_unsigned inum) 0%nat ∗
-                      frzm_h (bv_unsigned inum) false ∗
-                      ipool_shape_np γfs γi cov logstart inum ∗
-                      ifreeze_off (bv_unsigned inum))%I) by apply _.
+    assert (Timeless (ipool_ord γfs γi cov logstart inum)) by apply _.
     (* ... the whole shape is NOT, and neither is the [inv] that makes it
        so -- which is what forbids [iInv .. as ">"] on a pool invariant. *)
     Fail (assert (Timeless (ipool_shape γfs γi cov logstart inum)) by apply _).
@@ -3479,16 +3674,6 @@ Section IcacheEscrow.
            by (intros; apply _)).
     done.
   Qed.
-
-  (* the timeless half the split above puts in the invariant.  A plain
-     Lemma, not an [Instance]: structural search already finds it, and a
-     shape this specific has no business in the tree's instance table. *)
-  Lemma ipool_shape_ord_timeless γfs γi cov logstart inum :
-    Timeless (icnt_half (bv_unsigned inum) 0%nat ∗
-              frzm_h (bv_unsigned inum) false ∗
-              ipool_shape_np γfs γi cov logstart inum ∗
-              ifreeze_off (bv_unsigned inum))%I.
-  Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  6.  THE itable LOCK'S RESOURCE, v2                                 *)
@@ -3579,15 +3764,35 @@ Section IcacheEscrow.
        ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci))%I.
 
+  (* THE POOL INVARIANT RIDES HERE (durable-disk lane B''-esc): it has to
+     reach the same four files the itable lock does ([ProofIget]'s recycle,
+     [ProofIput]'s two evictions, [ProofIdup]'s pass-through, boot), and
+     [is_itable2] already carries exactly the four arguments [ipool_inv]
+     needs.  BUNDLING RATHER THAN ADDING A PREMISE keeps this predicate's
+     arity fixed and its fifty-odd threading files untouched; the two
+     projections below are what a consumer uses instead of naming the
+     conjunct.  Both halves are persistent, so the bundle still is. *)
   Definition is_itable2 (γl : gname) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string
-      (itable_res2 cn γfs γi cov logstart nib dv).
+    (is_lock γl itable_lock "itable"%string
+       (itable_res2 cn γfs γi cov logstart nib dv) ∗
+     ipool_inv γfs γi cov logstart)%I.
 
   Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib dv :
     Persistent (is_itable2 γl cn γfs γi cov logstart nib dv).
   Proof. apply _. Qed.
+
+  Lemma is_itable2_lock γl cn γfs γi cov logstart nib dv :
+    is_itable2 γl cn γfs γi cov logstart nib dv -∗
+    is_lock γl itable_lock "itable"%string
+      (itable_res2 cn γfs γi cov logstart nib dv).
+  Proof. iIntros "[$ _]". Qed.
+
+  Lemma is_itable2_pool γl cn γfs γi cov logstart nib dv :
+    is_itable2 γl cn γfs γi cov logstart nib dv -∗
+    ipool_inv γfs γi cov logstart.
+  Proof. iIntros "[_ $]". Qed.
 
   (* the slot accessor a WRITER needs: BOTH pure maps may come back changed,
      provided they changed only at [k].  [IcacheInv.islots_acc_upd]'s shape

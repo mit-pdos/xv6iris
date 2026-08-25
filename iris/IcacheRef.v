@@ -822,6 +822,12 @@ Class icfg := MkIcfg {
      [InodeRegion.ftop_body], which rides [ireg_inv], so a threaded name
      would enter thirty-odd fs contracts. *)
   icfg_lk : gname;
+  (* THE FREE POOL'S RESIDENCY KEY (durable-disk lane B''-esc, plan section 4),
+     ambient for [icfg_lk]'s reason verbatim: one half of it sits inside the
+     pool's own Iris invariant and the other inside [IcacheEscrow.ipool], a
+     conjunct of the itable spinlock's resource, so a threaded name would
+     enter [ic_escrow]'s arity -- i.e. every fs contract in the tree. *)
+  icfg_pool : gname;
   (* THE COUNT COUPLING's gname (iclaim-ledger.md §2.2), ambient for
      [icfg_link]'s reason verbatim: one half is parked in
      [InodeRegion.ireg_slot] (hence inside [ireg_inv], whose arity is fixed
@@ -1019,7 +1025,12 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       (* THE LOCKED REGISTRY's auth, handed out EMPTY: at boot no
          transaction exists, so no inum's row is suspended (durable-disk
          lane A).  [InodeRegion.ftop_alloc] takes it. *)
-      ghost_map_auth icfg_lk 1 (∅ : gmap nat (gset Z)).
+      ghost_map_auth icfg_lk 1 (∅ : gmap nat (gset Z)) ∗
+      (* THE FREE POOL'S RESIDENCY KEY, WHOLE and at the empty set: at this
+         altitude no pool exists yet.  [IcacheBoot.icache_boot_at] is what
+         updates it to the region's inums, splits it, and puts one half
+         inside the pool invariant it allocates. *)
+      ghost_var icfg_pool 1 (∅ : gset Z).
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1046,11 +1057,13 @@ Proof.
   iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
   (* the locked registry, empty (durable-disk lane A) *)
   iMod (ghost_map_alloc (∅ : gmap nat (gset Z))) as (γlkr) "[Hlkr _]".
+  (* the free pool's residency key, whole and empty (durable-disk B''-esc) *)
+  iMod (ghost_var_alloc (∅ : gset Z)) as (γpool) "Hpool".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γcnt γfrzo γfrzm γdv γfv), g0.
-  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_icnt icfg_frzo
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γcnt γfrzo γfrzm γdv γfv), g0.
+  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_icnt icfg_frzo
        icfg_frzm icfg_dview icfg_fview].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr".
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool".
 Qed.
 
 (* ===================================================================== *)

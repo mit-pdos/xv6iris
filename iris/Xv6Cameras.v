@@ -596,6 +596,13 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      prove its own row is not registered yet -- the entry parks that very
      token, and two whole elements of one key cannot coexist. *)
   icache_lkG :: ghost_mapG Σ nat (gset Z);
+  (* THE FREE POOL'S RESIDENCY KEY (durable-disk lane B''-esc, plan section 4).
+     The uncached inums whose row sits in the pool INVARIANT, as one set: the
+     invariant holds one half and the itable lock's resource the other, so a
+     lock holder is the only mover of the index and the commit -- which never
+     takes that lock -- can still open the invariant and read every ordinary
+     bundle at one ghost step. *)
+  icache_poolG :: ghost_varG Σ (gset Z);
   icache_cntG :: inG Σ icntUR;
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
@@ -607,6 +614,7 @@ Definition icacheΣ : gFunctors :=
     GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
     ghost_mapΣ nat (gset Z);
+    ghost_varΣ (gset Z);
     GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR;
     GFunctor fviewUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
