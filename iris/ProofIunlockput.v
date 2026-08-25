@@ -89,7 +89,7 @@ Section ProofIunlockputMain.
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  iunlockput is a wrapper,
      so this is one call site's worth of threading; the counted seal is
      after the proof. *)
-  Lemma wp_iunlockput_gen
+  Lemma wp_iunlockput_dep_gen
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -98,19 +98,19 @@ Section ProofIunlockputMain.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
-                             gil gisl cov logstart bmapstart inodestart nib
-                             size dev k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb b lks Vpr.
+    : wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                                 gil gisl cov logstart bmapstart inodestart nib
+                                 size dev k qi s gy d inum dn' bm' n Sb crb cru
+                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
-    cbv beta delta [wp_iunlockput_gen_body].
-    intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
+    cbv beta delta [wp_iunlockput_dep_gen_body].
+    intros pcE ip pj ret_tgt HK Hdsh Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
@@ -267,14 +267,14 @@ Section ProofIunlockputMain.
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
-    iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
+    iApply (IU.wp_iunlock_dep_sconf gs gfs gi cn gil gisl cov logstart k s gy d dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Vpr
-              ltac:(lia) Hk ltac:(rewrite HR4a0; exact Hipe)
+              ltac:(lia) Hdsh Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hppid
                     Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
-    iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
+    iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr Hside".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc10 : ret_pc (R4 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x10))
@@ -563,7 +563,7 @@ Section ProofIunlockputMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P4 n' Sb' wp with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                                             Hbslots [%] [%] [%] [%] Hlogop Hslot").
+                                             Hbslots [%] [%] [%] [%] Hlogop Hslot Hside").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hssub. }
     { exact Hwbm. }
@@ -576,7 +576,7 @@ Section ProofIunlockputMain.
   (*  [ip_spend_w w false false <= 2 <= iput_units], so the gen bound is    *)
   (*  weaker and the seal's arithmetic goes the easy way.                   *)
   (* ===================================================================== *)
-  Lemma wp_iunlockput_sconf
+  Lemma wp_iunlockput_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -585,56 +585,57 @@ Section ProofIunlockputMain.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
-                               gil gisl cov logstart bmapstart inodestart nib
-                               size dev k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb b lks Vpr.
+    : wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
+                                   gtl gil gisl cov logstart bmapstart
+                                   inodestart nib size dev k qi s gy d inum
+                                   dn' bm' n pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
-    cbv beta delta [wp_iunlockput_sconf_body].
-    intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
+    cbv beta delta [wp_iunlockput_dep_sconf_body].
+    intros pcE ip pj ret_tgt HK Hdsh Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               Hropen #Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
-    iDestruct (log_op_openS with "Hlogop") as (Sb0) "[Hlogop Htx]".
+    rewrite {1}/log_opb. iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
-    iApply (wp_iunlockput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+    iApply (wp_iunlockput_dep_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev
-              k qi s gy inum dn' bm' n Sb0 false false false e00
+              k qi s gy d inum dn' bm' n Sb0 false false false e00
               pidv dq dqb dqs m K eb b lks Vpr
-              HK Hk ltac:(discriminate) ltac:(discriminate)
+              HK Hdsh Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hropen Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
                     Hparp
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
-                    Hlogop [Hcont Htx]").
+                    Hlogop [Hcont]").
     all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' Sb' wf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                               Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot".
+                               Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot Hside".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                     Hbslots [%] [Hlogop Htx] Hslot").
+                     Hbslots [%] [Hlogop] Hslot Hside").
     { exact Hcs. }
     { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.
       destruct wf; simpl in Hbnd; lia. }
-    { iApply (log_opS_op with "Hlogop Htx"). }
+    { iApply (log_opS_opb with "Hlogop"). }
   Qed.
 
-  (* THE TWO TRANSACTIONAL FORMS (durable-disk B''-tx): the disarm is a
-     ghost step BEFORE the call, so both are derivations and nothing of
-     iunlockput's own proof is re-run. *)
+  (* ---- THE TWO PUBLISHED READINGS, instances of the two generic forms
+     above at [DepTx] (durable-disk B''-tx4): the share the arm parked comes
+     back in the post and rejoins the caller's residue, so no disarm fupd
+     stands before an iunlockput any more. *)
   Lemma wp_iunlockput_tx_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -655,8 +656,8 @@ Section ProofIunlockputMain.
                                   nib size dev k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
-    apply wp_iunlockput_tx_of_sconf.
-    apply wp_iunlockput_sconf.
+    apply wp_iunlockput_tx_of_dep_sconf. intros d.
+    apply wp_iunlockput_dep_sconf.
   Qed.
 
   Lemma wp_iunlockput_tx_gen
@@ -679,8 +680,8 @@ Section ProofIunlockputMain.
                                 size dev k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
-    apply wp_iunlockput_tx_of_gen.
-    apply wp_iunlockput_gen.
+    apply wp_iunlockput_tx_of_dep_gen. intros d.
+    apply wp_iunlockput_dep_gen.
   Qed.
 
 End ProofIunlockputMain.

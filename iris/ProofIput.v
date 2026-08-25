@@ -953,7 +953,7 @@ Section IputTail.
     iref_slots_auth -∗
     isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
-    ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+    ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     IcacheRef.inode_ref k q dev inum -∗
     (* THE CLOSING REFERENCE's PROVENANCE UNIT (RULING R, item 7a-wire): both
        close AUs surrender it in the ghost step that moves the count, which is
@@ -1106,8 +1106,23 @@ Section IputTail.
         [ rewrite /iref_tok; iFrame |].
       (* the eviction runs BEFORE the store: [ic_open_auth_ref] wants the
          authority still showing the slot, and the store deletes it. *)
+      assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
+      { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
+        destruct Hciwf as (_ & _ & Hrange & _).
+        exact (Hrange k (dev, inum) Hcik). }
+      (* THE POOL'S QUARTER, AND THE IN-TRANSITION INDEX (durable-disk C-3b).
+         The identity goes DEAD here while the bundle is deposited only after
+         the refcount store (its three ledger columns do not exist until
+         then), so the evicted inum is in neither part of the partition in
+         between: [ipool_evict_lend] puts it in the third one, and the lock
+         carries it as [ipool]'s transit set until [ipool_put]. *)
+      iMod (ipool_evict_lend ⊤ cn gfs gi cov logstart nib
+              (region_inums nib ∖ ci_inums ci) k (bv_unsigned inum) dev inum
+              ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
+        as "(Hpool & Hgid & Hidback)".
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_auth_ref cn gfs gi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+      iMod (ic_open_auth_ref cn gfs gi cov logstart k
+              (⊤ ∖ ↑ipoolN ∖ ↑(icEscN .@ k))
               Mt qt qt dev inum ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
@@ -1130,11 +1145,8 @@ Section IputTail.
               with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hpayl Hmt")
         as "(Hbody & Hgidf & Hbundle)".
       iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
+      iMod ("Hidback" $! dev inum with "Hgidf") as "Hgidf".
       iModIntro.
-      assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
-      { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
-        destruct Hciwf as (_ & _ & Hrange & _).
-        exact (Hrange k (dev, inum) Hcik). }
       (* the slot's share authority, out of the LOCK's resource *)
       iDestruct (isl_pool_acc_upd Mt k Hk with "Hipool") as "[Hisl Hislback]".
       assert (Hincid : bv_unsigned inum ∈ ci_inums ci).
@@ -1186,7 +1198,7 @@ Section IputTail.
          [ipool_shape] and decides the side itself, so nothing above this
          line changes. *)
       iApply fupd_wp.
-      iMod (ipool_put ⊤ gfs gi cov logstart
+      iMod (ipool_put ⊤ cn gfs gi cov logstart nib
               (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
               ltac:(solve_ndisj) ltac:(apply ip_notin_diff; exact Hincid)
               with "Hpinv [Hbundle] Hpool") as "Hpool".
@@ -1434,6 +1446,13 @@ Section IputFreePath.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     bv_unsigned (di_nlink dn) = 0 ->
+    (* THE CORPSE IS BARE (durable-disk C-3c).  itrunc freed every block and
+       zeroed the size before this tail runs -- [dn] is [SpecItrunc.di_trunc]
+       of the loaded record at the one call site -- so the type-0 record this
+       tail writes determines its abstract node outright, which is what lets
+       [EscrowDeposit.ireg_free_deposit_au] park the freed payload's
+       [FsState.top_frag] TIED beside it. *)
+    InodeRegion.ireg_bare dn ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     sp0 = m !!! Regidx csp_rs1 ->
@@ -1467,7 +1486,7 @@ Section IputFreePath.
 
        WHAT THE DEPOSITOR STILL CARRIES is the escrow itself (persistent) and
        its DEPOSIT ticket, below -- the two things the +0xba fill needs. *)
-    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
     (* THE DEPOSIT TICKET (A⁗, §3.16), in place of IVa's [ifreeze_post].  The
        standing freeze now lives in the ESCROW's EMPTY state -- it has to,
        because that is the only place from which a RECYCLER peeling the pool's
@@ -1529,7 +1548,9 @@ Section IputFreePath.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj bno dn' HKbr HKlw HKbl Hgeom Hst Hcov Hlog Hnib Hdnwf Hnl0
-           Hj Hgl Hsp0 Ha0 Ha1 Hs2v Hbelow.
+           Hbare Hj Hgl Hsp0 Ha0 Ha1 Hs2v Hbelow.
+    assert (Hdn'bare : InodeRegion.ireg_bare dn').
+    { rewrite /dn' /set_ditype0 /InodeRegion.ireg_bare /=. exact Hbare. }
     (* ---- pure prelude (mirrors iu_main_gen) ---- *)
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -1781,7 +1802,8 @@ Section IputFreePath.
     (* ---- the deposit's AU, adapted to log_write's anchor form ---- *)
     iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn'
                   (diblk_bytes ds) ge gr gd rg
-                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hdn'wf Hdn'ty Hnlst
+                  ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
+                  Hnib Hdn'wf Hdn'ty Hdn'bare Hnlst
                   with "Hireg Hesc Hdn Hdep") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
@@ -2191,7 +2213,7 @@ Section IputFreePath.
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
-    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     (* ================================================================
        THE WINDOW'S i_inum SPLIT -- the entry can NOT ask for the islot2
        big-op and [inode_ref] here, and the reason is forced, not a
@@ -2216,9 +2238,9 @@ Section IputFreePath.
        ================================================================ *)
     ⌜ci !! k = Some (dev, inum)⌝ -∗
     iref_tok k q -∗
-    ic_id cn k (1/2) true dev inum -∗
+    ic_id cn k (1/4) true dev inum -∗
     (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-     ic_id cn k (1/2) true dev inum -∗
+     ic_id cn k (1/4) true dev inum -∗
      (* ...AND THE LIVE ARM's FIFTH CONJUNCT (iclaim-ledger.md §3.16, A⁗):
         the FROZEN PARK, which this body builds at the +0x62 re-park out of
         the mirror half the mint handed it and the two live slices it is
@@ -2469,7 +2491,7 @@ Section IputFreePath.
     iInv "Hesc" as ">Hbody" "Hclose".
     iAssert (live_frac k q) with "[Hlvq]" as "Hlvqf"; [ iExists ga'; iExact "Hlvq" |].
     iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
-            Mt q ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
+            Mt q (1/4) ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hfrg & Hlvq2 & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
     (* ---- THE 586 SITE.  [ic_open_held] hands [i_inum] back WHOLE; itrunc
@@ -3061,8 +3083,22 @@ Section IputFreePath.
     assert (Hqhalf2 : (q ≤ 1/2)%Qp) by (rewrite Hsum2; apply Qp.le_add_l).
     (* ---- the eviction runs BEFORE the store ---- *)
     iApply fupd_wp.
+    assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
+    { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
+      destruct Hciwf2 as (_ & _ & Hrange & _).
+      exact (Hrange k (dev, inum) Hcik2). }
+    (* THE IN-TRANSITION INDEX (durable-disk C-3b), exactly as at the
+       ordinary eviction -- and here the inum STAYS in it: what this path
+       deposits is an AWAIT row, which cannot live in the pool's invariant
+       at all ([EscrowInode.escA_inv] is an [inv]).  That is the residue
+       section 5c of [IcacheEscrow] records. *)
+    iMod (ipool_evict_lend ⊤ cn γfs γi cov logstart nib
+            (region_inums nib ∖ ci_inums ci2) k (bv_unsigned inum) dev inum
+            ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
+      as "(Hpool & Hgid & Hidback)".
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_open_auth_frz cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+    iMod (ic_open_auth_frz cn γfs γi cov logstart k
+            (⊤ ∖ ↑ipoolN ∖ ↑(icEscN .@ k))
             Mt2 q q dev inum ltac:(solve_ndisj) Hk HMk2
             with "Hitinv Hbody Hhalf Hfrg Hselp Hrident")
       as "(Hhalf & Hfrg & Hselp & Hrident & Harm & _)".
@@ -3096,11 +3132,8 @@ Section IputFreePath.
             with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hrcpt")
       as "(Hbody & Hgidf & Hrcpt)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
+    iMod ("Hidback" $! dev inum with "Hgidf") as "Hgidf".
     iModIntro.
-    assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
-    { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
-      destruct Hciwf2 as (_ & _ & Hrange & _).
-      exact (Hrange k (dev, inum) Hcik2). }
     assert (Hincid : bv_unsigned inum ∈ ci_inums ci2).
     { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik2 | reflexivity]. }
     iDestruct (isl_pool_acc_upd Mt2 k Hk with "Hipool") as "[Hisl Hislback]".
@@ -3186,6 +3219,12 @@ Section IputFreePath.
     set (dn2 := di_trunc dn).
     assert (Hdn2wf : dinode_wf dn2) by (unfold dn2; apply di_trunc_wf).
     assert (Hdn2nl : bv_unsigned (di_nlink dn2) = 0) by (unfold dn2; exact Hnl0).
+    (* itrunc's record names no block and has size zero -- the bridge from
+       [InodeInv.bm_cells bm_empty] to the bare [replicate 13] spelling is one
+       [vm_compute] (durable-disk C-3c) *)
+    assert (Hdn2bare : InodeRegion.ireg_bare dn2).
+    { rewrite /dn2 /di_trunc /InodeRegion.ireg_bare /=.
+      split; [by vm_compute | by vm_compute]. }
     iRename "Hdat" into "Hdn2".
     (* ---- ...AND THE POOL ENTRY, WHICH IS PARKED HERE AND NOT BY THE TAIL.
        This is the whole of what was left of B2, and the REORDER decides it:
@@ -3197,24 +3236,26 @@ Section IputFreePath.
        halves ride beside it on the AWAIT arm.  The DEPOSIT ticket does not go
        into the pool: it travels with the record to +0xa8. ---- *)
     iApply fupd_wp.
-    iMod (escA_alloc ⊤ γi (bv_unsigned inum) rg with "Hfzpost")
-      as (ge gr gd) "(#Hescr & Htkr & Htkd)".
+    (* ...AND THE FREED PAYLOAD'S ABSTRACT VALUE GOES IN WITH IT (C-3c).
+       It used to be parked in the pool's AWAIT arm just below; the off-lock
+       deposit cannot reach the pool (the itable lock goes at +0x94) but it
+       DOES open this escrow, so the fragment travels the road the standing
+       freeze already travels and the deposit ties it region-side. *)
+    iMod (escA_alloc ⊤ γfs γi (bv_unsigned inum) rg with "Hfzpost [Htop2]")
+      as (ge gr gd) "(#Hescr & Htkr & Htkd)";
+      [by iExists (era_node dn bm data2) |].
     iModIntro.
     (* THE CONTENTS HOLD GOES BACK UNTIED (namei-pinned-lookup.md §9 W2/W3).
        itrunc has zeroed this record's bytes, but the AWAIT arm is byte-less
        and forgets the value; the next fill of this inum re-ties it off the
        record it reads.  So the freer parks what it has and proves nothing. *)
     iDestruct (ipool_shape_await γfs γi cov logstart inum ge gr gd rg
-                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2] [Htop2]") as "Hgap";
-      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2)
-      (* ...and the era's abstract value goes back untied with them
-         (durable-disk 2b-inode-3): the await arm is byte-less and forgets
-         the node exactly as it forgets the two contents holds. *)
-      | by iExists (era_node dn bm data2) |].
+                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2]") as "Hgap";
+      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2) |].
     (* the AWAIT row stays on the LOCK's side of the split (durable-disk
        B''-esc) -- [ipool_put] reads that off the shape itself. *)
     iApply fupd_wp.
-    iMod (ipool_put ⊤ γfs γi cov logstart
+    iMod (ipool_put ⊤ cn γfs γi cov logstart nib
             (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum)
             ltac:(solve_ndisj) ltac:(apply fl_notin_diff; exact Hincid)
             with "Hpinv [Hgap] Hpool") as "Hpool".
@@ -3492,7 +3533,7 @@ Section IputFreePath.
               uoff Sb' true e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks Vpr rg
               ltac:(lia) ltac:(lia) ltac:(lia)
-              Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hj Hgl
+              Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hdn2bare Hj Hgl
               ltac:(exact (eq_sym HP5sp)) HP5a0 HP5a1 HP5s2 Hlkbelow
               with "Hcg Hcnt Hextc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hireg
                     Hdn2 Hescr Htkd Hppid Hprocs Hdevi Hdgeom Hdlock Hins Hbs2
@@ -3654,7 +3695,7 @@ Section IputFreePath.
     iref_slots_auth -∗
     isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
-    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     IcacheRef.inode_ref k q dev inum -∗
     is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                      (slh_tok (icfg_isl k)) -∗
@@ -3722,7 +3763,7 @@ Section IputFreePath.
        iref_slots_auth -∗
        isl_pool Mt -∗
        ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
-       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
        IcacheRef.inode_ref k q dev inum -∗
        (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
           regime the caller lent has not been spent and comes straight back. *)
@@ -3779,7 +3820,7 @@ Section IputFreePath.
        itable_half Mt -∗
        iref_slots_auth -∗
        isl_pool Mt -∗
-       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
        (* ================================================================
           THE WINDOW'S i_inum SPLIT -- the ONE place this Exit B is NOT
           byte-identical to [ip_free_locked]'s entry, and it is FORCED, not
@@ -3810,9 +3851,9 @@ Section IputFreePath.
           ================================================================ *)
        ⌜ci !! k = Some (dev, inum)⌝ -∗
        iref_tok k q -∗
-       ic_id cn k (1/2) true dev inum -∗
+       ic_id cn k (1/4) true dev inum -∗
        (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-        ic_id cn k (1/2) true dev inum -∗
+        ic_id cn k (1/4) true dev inum -∗
         (* ...AND THE ARM's FIFTH CONJUNCT (A⁗, §3.16): the caller supplies
            the FROZEN PARK it builds out of the mint's mirror half and the two
            live slices it is about to stop needing.  It cannot be built here:
@@ -4215,7 +4256,7 @@ Section IputFreePath.
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
     iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
-            Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+            Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbodyp Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidvp & Hnfullp
            & Hvldxp & Hmtp & Hgidap)".
@@ -4229,7 +4270,7 @@ Section IputFreePath.
     iApply (wp_lw_au_s_sconf false (mword_of_int (KernelSyms.iput + 0x46)) Rs2 Rs1
               (mword_of_int 4 : mword 12) F2 (trap_res eb + (K - 6))%nat
               (fun w => (⌜w = inum⌝ ∗ itable_half Mt ∗ iref_frag k q ∗ live_frac k q ∗
-                         live_gen k (1/2) ga ∗ ic_id cn k (1/2) true dev inum ∗
+                         live_gen k (1/2) ga ∗ ic_id cn k (1/4) true dev inum ∗
                          i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
                          ic_payload_at γfs γi cov logstart k inum ga dn bm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) false
@@ -4240,7 +4281,7 @@ Section IputFreePath.
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
-              Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+              Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iDestruct "Hvldx" as (w0) "Hva".
@@ -4360,7 +4401,7 @@ Section IputFreePath.
                         Hblks Hdv Hfv Htop").
         rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
-              Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+              Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
@@ -4593,7 +4634,7 @@ Section IputFreePath.
     iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
     { rewrite /iref_tok. iFrame. }
     iAssert (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-             ic_id cn k (1/2) true dev inum -∗
+             ic_id cn k (1/4) true dev inum -∗
              frz_park k (bv_unsigned inum) -∗
                ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
                IcacheRef.inode_ident k (DfracOwn q) dev inum)%I

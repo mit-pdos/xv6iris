@@ -63,26 +63,25 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`durable-fs-plan.md`](design/durable-fs-plan.md)** — THE DESIGN OF
   RECORD for the durable file system, in one place: the three disk
   views, the file-system predicate at two instances, the WAL's
-  client-facing contracts (`begin_op`/`end_op` with a transaction id,
-  ONE `ilock` spec with a locked-inode registry, `log_write`, the commit
-  that allocates a fresh snapshot), the two pure facts the commit needs,
-  boot as the allocator's second call site, and why every earlier
-  mechanism died.
-- **[`fs-state.md`](design/fs-state.md)** — DESIGN OF RECORD for the
-  durable-disk project: the view record `Γ`, byte-level ownership on both
-  the durable and logged sides, `inode_owned`/`dir_owned`/`free_bitmap`/
-  `fs_state` as nested predicates with link TOKENS and no whole-state pure
-  clauses, "in flight, not inconsistent", the debt, the log's FS-agnostic
-  interface, and what it supersedes.  §4⁹ is the RULING IN FORCE —
-  SNAPSHOT COMMITS: the durable instance is re-ALLOCATED at every group
-  commit and never updated, so the transport lemma IS the allocator; its
-  as-built (§4⁹a) has the persistent byte points-to that makes the
-  construction take a VALUE and PURE FACTS only and the encoder's
-  injectivity; §4⁹b splits the tie into a byte half that a batch
-  accumulates and a per-inode LOCAL half no write can disturb, derives the
-  batch's FRAME from the used-set COUPLING, shows the byte half PINS every
-  node, and states the one open ruling (how the local half accumulates
-  across an op's end).
+  client-facing contracts (`begin_op`/`end_op` with a transaction token,
+  ONE `ilock` with a write arm parking a share of it and a read arm
+  keeping ¾ of the bytes, `log_write` owing nothing but its bytes), the
+  commit that COLLECTS the predicate over `L` from the FS invariants at
+  quiescence and allocates a fresh snapshot from it, boot as the same
+  allocator's second call site, and why every earlier mechanism died —
+  including the per-write payload.
+- **[`fs-state.md`](design/fs-state.md)** — the PREDICATE itself: the view
+  record `Γ`, byte-level ownership on both the durable and logged sides,
+  `inode_owned`/`dir_owned`/`free_bitmap`/`fs_state` as nested predicates
+  with link TOKENS and no whole-state pure clauses, "in flight, not
+  inconsistent", the log's FS-agnostic interface (§0–§2, §7).  Its §4½–§4⁹
+  rulings are SUPERSEDED by `durable-fs-plan.md`.
+- **[`fs-ghost-state.md`](design/fs-ghost-state.md)** — the reference
+  INVENTORY of every file-system ghost: per piece its RA, its HOME, what a
+  fragment means, who mints/spends it — the log's transaction token and
+  block-1 park, the region's armed registry, the pool split and its
+  partition, the per-slot escrows' write/read arms, the durable snapshot
+  and what the commit collects.
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
   split, the crash-spanning disk invariant.
@@ -143,12 +142,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the tree layer, the DESIGN OF RECORD for F1/F1.5: rulings R1–R12 (including
   the standing constraint that (L6) must NEVER be stated) over a verification
   report against the landed tree.
-
-## `projects/` — ongoing worklists & plans (one per effort)
-
-Seven remain open; each file's top banner says precisely what is left (the
-first five were audited against the tree 2026-08-22):
-
 - **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
   31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
   hand-derived scheduler and kexec offset maps (the tools get both wrong on

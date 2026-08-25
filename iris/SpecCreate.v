@@ -469,7 +469,14 @@ Section CreateSpec.
     (∃ γil γisl : gname,
        is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
        sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
-       ic_deposit cn k (DepShr s dev inum g) ∗
+       (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): create returns with
+          the child still write-locked, so what it hands over is the
+          TRANSACTIONAL descriptor -- the escrow's arm at a half beside the
+          holder's own half of the same element.  It stands exactly where a
+          bare [ic_deposit cn k d] stands, at the same arguments, and it is
+          why this contract's post no longer hands the
+          caller a separate [LogInv.log_tx] on the success arm. *)
+       ic_tx_dep cn k s dev inum g ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
@@ -501,7 +508,7 @@ Section CreateSpec.
       γil γisl :
     is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
+    ic_tx_dep cn k s dev inum g -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -714,9 +721,13 @@ Definition wp_create_sconf_body
          that guard is forced, not a convenience: see the header. *)
       ⌜Sb ⊆ Sb' /\ (u' <= u)%nat /\ (ok = true -> (iput_units <= u')%nat)⌝ -∗
       log_opS γ u' Sb' -∗
-      (* ...and the transaction token, off the disarm: no arm of create
-         leaves an inode's row suspended (durable-disk lane A) *)
-      log_tx γ -∗
+      (* THE TRANSACTION TOKEN GOES WITH THE ANSWER (durable-disk B''-tx2).
+         No arm of create leaves an inode's row suspended (lane A), but the
+         SUCCESS arms return a write-locked child, whose escrow holds half
+         of the transaction's element -- so on those arms the token is
+         inside [create_locked]'s [IcacheEscrow.ic_tx_dep] and there is
+         nothing to hand back beside it.  On the failure arms nothing is
+         locked and the whole token comes home. *)
       (if ok
        then (* BOTH SUCCESS ARMS RETURN A LOCKED INODE *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry k
@@ -741,7 +752,7 @@ Definition wp_create_sconf_body
        else (* ARMS N / F-BAD / A-FAIL / FAIL: a0 = 0 and create holds
                nothing -- every inode it touched has been iunlockput. *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
-          = (mword_of_int 0 : mword 64)⌝) -∗
+          = (mword_of_int 0 : mword 64)⌝ ∗ log_tx γ) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

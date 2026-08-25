@@ -22,7 +22,7 @@
                                     field copies, the memmove, brelse,
                                     ip->valid = 1, the dead type panic,
                                     restore s2, [c.j] back to +0x1e
-     [wp_ilock_sconf] +0x00 .. +0x1c prologue, the two dead panic tests,
+     ilock's +0x00 .. +0x1c prologue, the two dead panic tests,
                                     acquiresleep, and the ip->valid branch
 
    THE GUARD READ IS AN ATOMIC UPDATE.  [ip->ref] lives in [itable_inv],
@@ -345,12 +345,44 @@ Section IlockDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] w)%I.
 
+  (* WHAT THE CHECKOUT HANDS OUT, AT EITHER ARM (durable-disk B''-tx3).
+     [IcacheEscrow.ic_dep_held] is the loaded half -- the whole bundle at a
+     bundleless descriptor, the reader's quarter at [DepRd] -- and the
+     [rd = false] on the UNLOADED alternative is what says the read arm never
+     meets the fill: [ic_swap_checkout_rd] kills [valid = 0] inside its own
+     ghost step, off the [ShotK] licence's one-shot, so this proof's uncached
+     branch is reachable only at a bundleless descriptor. *)
+  Definition il_payload (d : ic_dep)
+      (gfs : fs_names) (gi : gname) (cov : gset Z) (logstart : Z)
+      (k : nat) (inum : mword 32) (g : gname) (v : bool) : iProp Σ :=
+    ((if v
+      then ∃ (dn : dinode) (bm : blkmap),
+             ic_dep_held gfs gi cov logstart d k inum dn bm ∗
+             ity_shot g (di_type dn)
+      else ⌜ic_dep_rd d = false⌝ ∗ ic_unloaded gfs gi cov logstart k inum ∗
+           ity_pending g)
+     ∗ ifreeze_off (bv_unsigned inum))%I.
+
+  Lemma il_payload_of_payload d gfs gi cov logstart k (inum : mword 32)
+      g (v : bool) :
+    ic_dep_rd d = false ->
+    ic_payload gfs gi cov logstart k inum g v -∗
+    il_payload d gfs gi cov logstart k inum g v.
+  Proof.
+    intros Hrd.
+    rewrite /ic_payload /il_payload /ic_payload_np /ic_dep_held Hrd.
+    destruct v; iIntros "[H Hoff]".
+    - iSplitL "H"; [iExact "H" | iExact "Hoff"].
+    - iSplitR "Hoff"; [| iExact "Hoff"].
+      iSplitR; [iPureIntro; reflexivity | iExact "H"].
+  Qed.
+
   (* [cn] and [s] are here for ONE resource: the other half of the entry
      sleeplock's checkout descriptor (§14.8).  SpecIlock v3 hands it to the
      caller, so both arms of the function have to carry it to the join. *)
   Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
       (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
-      (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
+      (cn : ic_names) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
@@ -371,11 +403,11 @@ Section IlockDefs.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bslot -∗
         sleeplocked_q gisl s (i_lock ip) pidv -∗
-        ic_deposit cn k (DepShr s dev inum g) -∗
+        ic_deposit cn k d -∗
         i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
         i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
         i_valid ip ↦₄ valid_word true -∗
-        ic_loaded gfs gi cov logstart k inum dn bm -∗
+        ic_dep_held gfs gi cov logstart d k inum dn bm -∗
         ity_shot g (di_type dn) -∗
         (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.9, RULING
            A-prime).  It rides the PAYLOAD ([IcacheEscrow.ic_payload]'s
@@ -404,7 +436,7 @@ Section IlockEpilogue.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
-      (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
+      (cn : ic_names) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (dn : dinode) (bm : blkmap) (filled : bool)
@@ -426,15 +458,15 @@ Section IlockEpilogue.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
+    ic_deposit cn k d -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     i_valid ip ↦₄ valid_word true -∗
-    ic_loaded gfs gi cov logstart k inum dn bm -∗
+    ic_dep_held gfs gi cov logstart d k inum dn bm -∗
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
     ireg_wd_back o g (bv_unsigned inum) -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
+    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g d o cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -691,7 +723,7 @@ Section IlockLoad.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (gfs : fs_names) (gi : gname) (gisl : gname)
-      (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
+      (cn : ic_names) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (k : nat) (ip : mword 64) (inum : mword 32)
@@ -701,6 +733,10 @@ Section IlockLoad.
     (* [ShotK] never gets here: its one-shot refutes this whole arm at the
        caller, five hundred lines up (RULING C'). *)
     ilk_fills o ->
+    (* ...AND NEITHER DOES THE READ ARM (durable-disk B''-tx3): the fill hands
+       the holder the WHOLE bundle, so its descriptor is bundleless.  The
+       caller derives this from the same one-shot. *)
+    ic_dep_rd d = false ->
     il_sp m M ->
     il_thr5 m M ->
     M !!! Regidx Rs1 = ip ->
@@ -714,7 +750,7 @@ Section IlockLoad.
     gs !! j = Some gl ->
     (* il_load reaches bread/brelse, whose bound is "bcache" (4); it is the
        whole point of this helper (the fill arm), so it needs the premise
-       threaded on its own binder list just like [wp_ilock_sconf] itself. *)
+       threaded on its own binder list just like the contract itself. *)
     locks_below lks "bcache" ->
     sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
@@ -736,7 +772,7 @@ Section IlockLoad.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
+    ic_deposit cn k d -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
     inode_raw ip -∗
     (* THE [_np] FORM, not the full [ipool_shape] (iclaim-ledger.md §3.5
@@ -761,11 +797,11 @@ Section IlockLoad.
        CONVERTS, or [PlainK]'s borrowed unit, which refutes the box arm and
        comes back.  See [SpecIlock]'s header. *)
     ireg_wd_lic o g (bv_unsigned inum) -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
+    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g d o cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hfills Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
+    intros HK Hfills Hrdf Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
     pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -1178,7 +1214,7 @@ Section IlockLoad.
         iSplitR; [iPureIntro; exact Hdoc0 |].
         iSplitR; [iPureIntro; exact Hduq0 |].
         iSplitL "Hdlk0"; [iExact "Hdlk0" |]. iFrame.
-      - iDestruct "Hmk" as "[Hmk [Hdv [Hfv Htop]]]".
+      - iDestruct "Hmk" as "[Hmk [Hdv Hfv]]".
         destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
         + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
@@ -1186,7 +1222,7 @@ Section IlockLoad.
                   ltac:(solve_ndisj) logN_top Hfills Hinlt eq_refl Hdswf eq_refl
                   ltac:(rewrite Hagr; exact Htnz)
                   with "Hireg Hmk Hcl HL")
-            as "(%Hfresh & %Hty & %Htyok & Hwb & Hdn & HL)".
+            as "(%Hfresh & %Hty & %Htyok & Hwb & Hdn & HL & Htop)".
           rewrite Hagr in Hfresh. rewrite Hagr in Hty.
           rewrite Hagr in Htyok.
           iEval (rewrite Hagr) in "Hdn".
@@ -1197,6 +1233,10 @@ Section IlockLoad.
              contents are [∅] -- one free own-update (§9 Revision 2). *)
           iDestruct "Hdv" as (e0) "Hdv".
           iDestruct "Hfv" as (b0) "Hfv".
+          (* ...and the era's abstract value now comes out of the REGION,
+             where the claim parked it, rather than off the marker arm
+             (durable-disk C-3c).  It is untied either way -- the box is
+             [fresh_shape] -- so the retag below is unchanged. *)
           iDestruct "Htop" as (n0) "Htop".
           (* THE CLAIM BOX IS WELL-FORMED (durable-disk lane A): the retag
              owes the registry's row, and this arm proves the four facts it
@@ -1224,7 +1264,7 @@ Section IlockLoad.
             - exact (dir_uniq_size_zero dn _ Hfsz).
             - exact (dir_dots_ix_orphan (bv_unsigned inum) dn _
                        (fresh_shape_nlink dn Hfr0)). }
-          (* the marker arm's fragment is untied; retag it at the claim
+          (* the withdrawn fragment is untied; retag it at the claim
              box's own node, exactly as the two contents holds are set *)
           iMod (ireg_top_retag ⊤ gfs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))
@@ -2154,7 +2194,7 @@ Section IlockLoad.
     iDestruct (cpu_claim_ext_transport CID9 CID39 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iEval (rewrite -valid_word_true) in "Hvalid".
-    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g o cov logstart inodestart
+    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g d o cov logstart inodestart
               k ip dev inum dn bm fl pidv dq dqs m Z0 K eb b lks Vpr
               HK HZ0sp HZ0thr Hfr Hpost
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
@@ -2165,7 +2205,8 @@ Section IlockLoad.
     { (* the cells are held at [ip]; [ic_loaded] names them at the SLOT.
          [Hip] is the equation, and with the payload behind [ic_mk_loaded]
          it is rewritten into the two cell premises rather than into the
-         (now folded) goal. *)
+         (now folded) goal.  [ic_dep_held] is [ic_loaded] here by [Hrdf]. *)
+      rewrite /ic_dep_held Hrdf.
       iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hokw Hrl Hdok Hddix Hdoc Hduq
                 with "Hdlk Hdn [Hmty Hmmaj Hmmin Hmnl Hmsz] [Haddrs] Hindres
                       Hblocks Hdview Hfview Htop").
@@ -2184,7 +2225,7 @@ Section ProofIlockMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_ilock_sconf 
+  Lemma wp_ilock_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -2193,25 +2234,39 @@ Section ProofIlockMain.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g o dev inum
-                          pidv dq dqs m K eb b lks Vpr.
+    : wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+                              cov logstart inodestart nib k s g d o dev inum
+                              pidv dq dqs m K eb b lks Vpr.
   Proof.
-    cbv beta delta [wp_ilock_sconf_body].
-    intros pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
+    cbv beta delta [wp_ilock_dep_sconf_body].
+    intros pcE ip pj ret_tgt HK Hdshr Hrdo Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0
+           Hbelow.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (il_entry_nonzero k Hk)).
+    pose proof (ic_dep_gname_of_shr d s dev inum g Hdshr) as Hdg.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hitbl #Hesc #Hireg #Hslk
-              Href Hcl Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
+              Href Hside Hcl Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
+    (* THE READ ARM'S ONE-SHOT, TAKEN OUT OF THE LICENCE AND KEPT (durable-disk
+       B''-tx3).  At [DepRd] the caller is a [ShotK] site, so its licence IS
+       [IcacheRef.ity_shot] -- persistent, hence the licence itself survives
+       and every later use of [Hcl] is untouched. *)
+    iAssert (ireg_wd_lic o g (bv_unsigned inum) ∗
+             (if ic_dep_rd d then ∃ ty : bv 16, ity_shot g ty else emp))%I
+      with "[Hcl]" as "[Hcl #Hrdsh]".
+    { destruct (ic_dep_rd d) eqn:Hrd0.
+      - destruct (Hrdo eq_refl) as [ty ->].
+        rewrite /ireg_wd_lic. iDestruct "Hcl" as "#Hs".
+        iSplitR; [iExact "Hs" | iExists ty; iExact "Hs"].
+      - iSplitL; [iExact "Hcl" | done]. }
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
-    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
+    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g d o cov logstart inodestart k ip
                dev inum pidv dq dqs j m K eb b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
@@ -2498,9 +2553,62 @@ Section ProofIlockMain.
        exactly why the dev half had to come out with the payload. ---- *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_checkout cn gfs gi cov logstart k (DepShr s dev inum g) g
-            dev inum eq_refl eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
-    { rewrite /ic_dep_own. iSplitR; [iPureIntro; done |]. iExact "Href". }
+    (* THE ARM IS PUBLISHED HERE (durable-disk B''-tx3), not by a later fupd:
+       at a bundleless [d] the generic checkout leaves an empty arm, at
+       [DepRd] the read checkout sheds three quarters into it before the
+       escrow closes.  Both outcomes are [il_payload d], so the whole rest of
+       this proof is written once. *)
+    iAssert (|==> ((ic_escrow_body cn gfs gi cov logstart k ∗
+                    ic_deposit cn k d ∗
+                    (∃ v : bool,
+                       i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+                       i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
+                       i_valid (ientry k) ↦₄ valid_word v ∗
+                       il_payload d gfs gi cov logstart k inum g v))
+                   ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
+                      frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
+                      (frzown (bv_unsigned inum) -∗
+                       frzsel k ((1/2)/2)%Qp true -∗
+                         ic_escrow_body cn gfs gi cov logstart k))))%I
+      with "[Hbody Htok Href Hside]" as ">[Hok | Hfrz]".
+    { destruct (ic_dep_rd d) eqn:Hrd.
+      - (* THE READ ARM.  [ShotK]'s one-shot is what kills [valid = 0]
+           inside the checkout's own step, so the shed can run there. *)
+        iDestruct "Hrdsh" as (ty) "Hshot".
+        pose proof (ic_dep_rd_shr d s dev inum g Hdshr Hrd) as Hdrd.
+        rewrite Hdrd.
+        iMod (ic_swap_checkout_rd cn gfs gi cov logstart k s dev inum g ty
+                with "Hbody Htok Href Hshot") as "[Hok | Hfrz]";
+          [| iModIntro; iRight; iExact "Hfrz"].
+        iDestruct "Hok" as "(Hbody & Hdep & Hpay)".
+        iDestruct "Hpay" as (dn0 bm0) "(Hidv & Hinm & Hvld & Hheld & Hsh & Hoff)".
+        iModIntro. iLeft.
+        iSplitL "Hbody"; [iExact "Hbody" |].
+        iSplitL "Hdep"; [iExact "Hdep" |].
+        iExists true.
+        iSplitL "Hidv"; [iExact "Hidv" |].
+        iSplitL "Hinm"; [iExact "Hinm" |].
+        iSplitL "Hvld"; [iExact "Hvld" |].
+        rewrite /il_payload /ic_dep_held. cbn [ic_dep_rd].
+        iSplitR "Hoff"; [| iExact "Hoff"].
+        iExists dn0, bm0. iSplitL "Hheld"; [iExact "Hheld" | iExact "Hsh"].
+      - (* EVERY BUNDLELESS DESCRIPTOR, the write arm included: the arm
+           keeps nothing and the difference is what [ic_dep_side] parked. *)
+        iMod (ic_swap_checkout cn gfs gi cov logstart k d g dev inum Hdg Hrd
+                with "Hbody Htok [Href Hside]") as "[Hok | Hfrz]";
+          [iApply (ic_dep_own_of_shr k d s dev inum g Hdshr with "Href Hside")
+          | | iModIntro; iRight; iExact "Hfrz"].
+        iDestruct "Hok" as "(Hbody & Hdep & Hpay)".
+        iDestruct "Hpay" as (v) "(Hidv & Hinm & Hvld & Hpay)".
+        iModIntro. iLeft.
+        iSplitL "Hbody"; [iExact "Hbody" |].
+        iSplitL "Hdep"; [iExact "Hdep" |].
+        iExists v.
+        iSplitL "Hidv"; [iExact "Hidv" |].
+        iSplitL "Hinm"; [iExact "Hinm" |].
+        iSplitL "Hvld"; [iExact "Hvld" |].
+        iApply (il_payload_of_payload d gfs gi cov logstart k inum g v Hrd
+                  with "Hpay"). }
     2:{ (* ============ DEVIATION 1's OWED OBLIGATION, PAID BY RULING R-e
            (iclaim-ledger.md §5⁗⁗).  The checkout may find the free path's
            FROZEN PARK, and ilock holds no licence that decides it -- RULING
@@ -2570,11 +2678,7 @@ Section ProofIlockMain.
          so this arm proves the post's new conjunct with no work at all. *)
       (* A-PRIME's TOKEN comes off the payload here, exactly as it does on
          the uncached arm below (iclaim-ledger.md §3.9). *)
-      iDestruct (ic_payload_split with "Hpay") as "[Hpay Hfoff]".
-      iAssert (∃ (dn0 : dinode) (bm0 : blkmap),
-                 ic_loaded gfs gi cov logstart k inum dn0 bm0 ∗
-                 ity_shot g (di_type dn0))%I
-        with "[Hpay]" as "Hpay2"; [iExact "Hpay" |].
+      rewrite /il_payload. iDestruct "Hpay" as "[Hpay2 Hfoff]".
       iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
       (* THE CACHED ARM REFUTES [ClaimK] (RULING C', iclaim-ledger.md
          §5''''').  This entry was loaded by an earlier fill, so its
@@ -2585,12 +2689,19 @@ Section ProofIlockMain.
          indices pay nothing: the plain unit goes back untouched, the
          one-shot is persistent and was never taken. *)
       iApply fupd_wp.
-      iAssert (|={⊤}=> ic_loaded gfs gi cov logstart k inum dnp bmp
+      iAssert (|={⊤}=> ic_dep_held gfs gi cov logstart d k inum dnp bmp
                        ∗ ireg_wd_back o g (bv_unsigned inum)
                        ∗ ⌜ilk_post o false dnp⌝)%I
         with "[Hlk Hcl]" as ">(Hlk & Hwb & %Hpost)".
       { destruct o as [tyc | | tys].
-        - iDestruct "Hcl" as "[Hcl _]".
+        - (* the READ arm never gets here: [Hrdo] pins its index at [ShotK],
+             so [d] is bundleless and the payload is the whole [ic_loaded] --
+             which is what carries the [dinode_at] this refutation reads. *)
+          assert (Hrdf : ic_dep_rd d = false).
+          { destruct (ic_dep_rd d) eqn:Hrd0; [| reflexivity].
+            destruct (Hrdo eq_refl) as [ty Hty]. discriminate Hty. }
+          iEval (rewrite /ic_dep_held Hrdf) in "Hlk".
+          iDestruct "Hcl" as "[Hcl _]".
           iDestruct (ic_loaded_open with "Hlk") as (datx)
             "(%Hokx & %Hrlx & %Hdokx & %Hddixx & %Hdocx & %Hduqx & Hdlkx & Hdnx & Hrestx)".
           iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dnp tyc
@@ -2611,7 +2722,7 @@ Section ProofIlockMain.
       (* THE CACHED ARM REPORTS [filled = false]: the entry was loaded by
          some earlier fill and its record is whatever that fill read, so
          [fresh_shape] is not available and not claimed. *)
-      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g o cov logstart
+      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g d o cov logstart
                 inodestart k ip dev inum dnp bmp false pidv dq dqs m Q1 K eb b lks Vpr
                 HK HQ1sp HQ1thr ltac:(discriminate) Hpost
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
@@ -2640,13 +2751,17 @@ Section ProofIlockMain.
          [ip->nlink++] pay [wp_iupdate_link]'s pin with.  Routing it through
          [il_cont] to that post is the SAME un-landed item as the [iclaim]
          goal this file still carries (see [ireg_withdraw] in [il_load]). *)
+      (* [il_payload]'s UNLOADED alternative carries [ic_dep_rd d = false]:
+         the read arm's checkout killed [valid = 0] in its own ghost step, so
+         only a bundleless descriptor reaches the fill (durable-disk
+         B''-tx3). *)
+      rewrite /il_payload.
+      iDestruct "Hpay" as "[[%Hrdf Hpay] Hfoff]".
       iAssert (inode_raw (ientry k) ∗
                ipool_shape_np gfs gi cov logstart inum ∗
-               ity_pending g ∗
-               ifreeze_off (bv_unsigned inum))%I
-        with "[Hpay]" as "(Hraw & Hpool & Hpend & Hfoff)";
-        [rewrite /ic_payload /ic_payload_np /ic_unloaded;
-         iDestruct "Hpay" as "[[[$ $] $] $]" |].
+               ity_pending g)%I
+        with "[Hpay]" as "(Hraw & Hpool & Hpend)";
+        [rewrite /ic_unloaded; iDestruct "Hpay" as "[[$ $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
       (* THE UNCACHED ARM REFUTES [ShotK] (RULING C').  This arm's payload
          carries the generation's PENDING one-shot -- the fill has not run
@@ -2673,18 +2788,19 @@ Section ProofIlockMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
-                cn s g o cov logstart inodestart nib dev k ip inum
+                cn s g d o cov logstart inodestart nib dev k ip inum
                 pidv dq dqs m Q1 K eb b lks Vpr
-                HK Hfills HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
+                HK Hfills Hrdf HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
                       Hsl Hstok Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
   Qed.
 
-  (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the same code, the same
-     proof, plus one ghost step on the deposit the plain post already hands
-     out.  [SpecIlock.wp_ilock_tx_of_sconf] is the whole derivation. *)
+  (* THE TRANSACTIONAL FORM (durable-disk B''-tx, re-based by B''-tx3): the
+     same code, the same proof, and the arm is now the descriptor the CHECKOUT
+     publishes -- no bundleless out-state stands anywhere in the window.
+     [SpecIlock.wp_ilock_tx_of_dep] is the whole derivation. *)
   Lemma wp_ilock_tx_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -2702,8 +2818,8 @@ Section ProofIlockMain.
                              cov logstart inodestart nib k s g o dev inum
                              pidv dq dqs m K eb b lks Vpr.
   Proof.
-    apply wp_ilock_tx_of_sconf.
-    apply wp_ilock_sconf.
+    apply wp_ilock_tx_of_dep.
+    intros d. apply wp_ilock_dep_sconf.
   Qed.
 
 End ProofIlockMain.

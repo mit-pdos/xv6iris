@@ -1034,7 +1034,7 @@ Section ProofIget.
       iref_slots_auth -∗
       isl_pool M -∗
       ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
-      ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+      ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
       iref_slot -∗
       (* THE LICENCE rides the scan (increment IIIe): it is spent at whichever
          exit the scan takes, so it can no longer sit inside [TAILC]. *)
@@ -1073,7 +1073,7 @@ Section ProofIget.
         iref_slots_auth -∗
         isl_pool M -∗
         ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
-        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
         iref_slot -∗
         iname γi γfs inodestart inum l -∗
         TAILC -∗
@@ -1265,10 +1265,13 @@ Section ProofIget.
     (* Here the peek is [ic_open_empty_dev] run at [devN := devT]: it hands
        the empty arm's dev cell out and its wand takes it back unchanged, so
        the ghost re-tag is the identity. *)
+            (* durable-disk C-3b: the peek RE-TAGGED nothing even before,
+               so it now runs at the table's quarter ([ic_open_empty_dev_peek])
+               rather than joining the pool's in for a full unit. *)
             iApply fupd_wp.
             iInv "Hesc" as ">Hbodyp" "Hclosep".
-            iMod (ic_open_empty_dev cn γfs γi cov logstart e devT inumT devT
-                    with "Hbodyp Hgid") as "(Hcellp & Hgid & Hcbp)".
+            iDestruct (ic_open_empty_dev_peek cn γfs γi cov logstart e (1/4)
+                         devT inumT with "Hbodyp Hgid") as "(Hcellp & Hgid & Hcbp)".
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_dev (ientry e))
                          (DfracOwn 1) devT ltac:(lia) with "Hcellp") as "#Hclaim1".
             iMod ("Hclosep" with "[Hcbp Hcellp]") as "_";
@@ -1276,18 +1279,28 @@ Section ProofIget.
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
-                      (ic_id cn e (1/2) false dev inumT)
-                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
+                      (ic_id cn e (1/4) false dev inumT)
+                      (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) false
+                      ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hgid]").
             { iApply (igi_6e with "Htext"). }
             { rewrite Hpa6e. iExact "Hclaim1". }
             { rewrite Hpa6e Hsv6e.
+              (* THE POOL'S QUARTER (durable-disk C-3b): the identification
+                 ghost is re-tagged here, and the pool holds a quarter of it
+                 beside the partition, so the two are ONE ghost step.  The
+                 slot is NOT LIVE on either side of the re-tag, so the
+                 partition itself does not move ([ipool_id_lend]). *)
+              iMod (ipool_id_lend (⊤ ∖ ↑minstretN) cn γfs γi cov logstart nib
+                      e devT inumT ltac:(solve_ndisj) He with "Hpinv Hgid")
+                as "[Hgid Hidback]".
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_dev cn γfs γi cov logstart e devT inumT dev
                       with "Hbody Hgid") as "(Hcell & Hgid & Hcb)".
               iModIntro. iExists devT. iFrame "Hcell". iIntros "Hcell".
               iMod ("Hclose2" with "[Hcb Hcell]") as "_";
                 [ iNext; iApply ("Hcb" with "Hcell") |].
+              iMod ("Hidback" with "Hgid") as "Hgid".
               iModIntro. iFrame "Hgid". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc Hgid".
             assert (Hpp72 : add_vec_int (mword_of_int (KernelSyms.iget + 0x6e) : mword 64) 4
@@ -1299,18 +1312,20 @@ Section ProofIget.
                identity.  The recycler keeps a dev half and the table's ghost
                half -- the latter is what pins the arm's FULL inum cell at
                +0x7c. ---- *)
-            (* THE WITHDRAW (durable-disk B''-esc): the ordinary rows live in
-               the pool's own invariant now, so the take is a fupd -- run
-               here, before the store's atomic update, exactly where the pure
-               [ipool_take] used to sit.  What comes out is the FULL
-               [ipool_shape], so the peel below is unchanged. *)
-            iApply fupd_wp.
-            iMod (ipool_take ⊤ γfs γi cov logstart
-                    (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
-                    ltac:(solve_ndisj) Hzin with "Hpinv Hpool")
-              as "[Hbundle Hpool]".
-            iModIntro.
-            iEval (rewrite ig_moi_inum) in "Hbundle".
+            (* THE WITHDRAW (durable-disk B''-esc, moved by C-3b): the
+               ordinary rows live in the pool's own invariant, so the take is
+               a fupd -- and it runs INSIDE this store's atomic update, beside
+               the identity flip, not in a [fupd_wp] before it.  THE REASON IS
+               THE PARTITION (durable-fs-plan.md section 4; [FsCollect]'s
+               finding (A)): the pool invariant's row "the region's inums are
+               the pool's index together with the live slots' identities" is
+               FALSE between the take and the deposit into the MID arm, so the
+               two have to be ONE ghost step.  Under [fupd_wp] they were two,
+               and the intermediate closing could not re-establish the row.
+               Nothing about the WITHDRAW itself changed: what comes out is
+               still the FULL [ipool_shape] and the peel below is unchanged;
+               the lock's [ipool] simply travels through the update, which is
+               why it joins the store's post. *)
             assert (Hpa72 : add_vec (rget N1 Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                             = i_inum (ientry e)).
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
@@ -1327,19 +1342,36 @@ Section ProofIget.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
                       (mword_of_int 4 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
-                       ic_id cn e (1/2) true dev inum ∗ ic_mid cn e ∗
+                       ic_id cn e (1/4) true dev inum ∗ ic_mid cn e ∗
                        (* the PEELED ledger pair and the returned licence:
                           they come out of the pool bundle here and are spent
                           at +0x78's 0 -> 1 ([iref_alloc_store_au]) *)
                        icnt_half (bv_unsigned inum) 0%nat ∗
                        frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
-                       iname γi γfs inodestart inum l)%I
-                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
-                      with "Hcg Hpc [] [] [Hgid HinT Hbundle Hlic]").
+                       iname γi γfs inodestart inum l ∗
+                       (* the lock's pool, ONE ENTRY SHORTER: the take now
+                          happens inside this update (see the note above) *)
+                       ipool γfs γi cov logstart
+                         (region_inums nib ∖ ci_inums ci
+                          ∖ {[bv_unsigned inum]}) ∅)%I
+                      (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) false
+                      ltac:(solve_ndisj)
+                      with "Hcg Hpc [] [] [Hgid HinT Hpool Hlic]").
             { iApply (igi_72 with "Htext"). }
             { rewrite Hpa72. iExact "Hclaim2". }
             { rewrite Hpa72 Hsv72.
+              (* THE TAKE AND THE FLIP, ONE GHOST STEP (durable-disk C-3b):
+                 [ipool_take_lend] hands the row out, moves the inum out of
+                 the pool's index, and LENDS its quarter of this slot's
+                 identity so that the flip below has a whole unit; its wand
+                 records the new identity, which is what re-establishes the
+                 partition. *)
+              iMod (ipool_take_lend (⊤ ∖ ↑minstretN) cn γfs γi cov logstart nib
+                      (region_inums nib ∖ ci_inums ci) e (bv_unsigned inum)
+                      dev inumT ltac:(solve_ndisj) He Hzin with "Hpinv Hpool Hgid")
+                as "(Hbundle & Hpool & Hgid & Hidback)".
+              iEval (rewrite ig_moi_inum) in "Hbundle".
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_free cn γfs γi cov logstart e dev inumT dev inum
                       with "Hbody Hgid HinT")
@@ -1358,7 +1390,8 @@ Section ProofIget.
                  back the licence together with the bundle's two ghost columns
                  ([icnt_half] at 0 and the [ifreeze_off] token).  Both go on to
                  +0x78; the payload is not touched. *)
-              iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) γfs γi inodestart nib
+              iMod (ipool_shape_to_np
+                      (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) γfs γi inodestart nib
                       cov logstart inum l
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
                       with "Hrinv Hlic Hbundle")
@@ -1368,9 +1401,11 @@ Section ProofIget.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
                           with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
-              iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hmir0 Hfoff Hlic". }
+              iMod ("Hidback" $! dev inum with "[%] Hgid2") as "Hgid2";
+                [reflexivity |].
+              iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hmir0 Hfoff Hlic Hpool". }
             iApply wp_next_off_intro.
-            iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt & Hicnt0 & Hmir0 & Hfoff & Hlic)".
+            iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt & Hicnt0 & Hmir0 & Hfoff & Hlic & Hpool)".
             assert (Hpp76 : add_vec_int (mword_of_int (KernelSyms.iget + 0x72) : mword 64) 4
                             = mword_of_int (KernelSyms.iget + 0x76)) by pcw.
             iEval (rewrite Hpp76) in "Hpc".
@@ -1506,7 +1541,7 @@ Section ProofIget.
                       (mword_of_int 64 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
-                       ic_id cn e (1/2) true dev inum)%I
+                       ic_id cn e (1/4) true dev inum)%I
                       (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hmt Hgid2 Hd2 Hlvh Hpend Hfoff]").
             { iApply (igi_7c with "Htext"). }

@@ -1670,7 +1670,7 @@ Section ProofSysMknodBody.
       { iEval (rewrite HN4a0). iExact "Hbufk". }
       iIntros (CID26 Hq26 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
         "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
-         %Hns1 Hir %Hun1 HopS Htx Hok".
+         %Hns1 Hir %Hun1 HopS Hok".
       iEval (rewrite HN4a0) in "Hbufk".
       assert (Hpc44 : ret_pc (N4 !!! Regidx Rra : mword 64)
                       = mword_of_int (MN + 0x44)) by (rewrite HN4ra; pcw).
@@ -1733,28 +1733,34 @@ Section ProofSysMknodBody.
         iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
         iDestruct (mn_esc_acc cn gfs gi cov logstart kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
+        (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
+           the escrow parked half of the transaction's element at create's
+           own [ilock(ip)] and create handed the other half over inside the
+           bundle.  The release takes the ARMED contract (B''-tx4), which
+           retires the descriptor in the ghost step that parks the payload
+           and hands the whole token back. *)
         destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
         iDestruct (proc_priv_bare_acc gf pj pid (upd_upt V P') with "Hpriv")
           as "[Hpbare Hpback]".
         iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Iunlockput.wp_iunlockput_sconf (CID := CID28) gs j gl gu gd gk
+        iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID28) gs j gl gu gd gk
                   pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                   inodestart nib size dev kk qi ss gy inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
-                  (Hlb "log"%string)
+                  (Hlb "log"%string) Hclog
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                         Hesc Hireg [] Hslk Hslkd Hdep Hidev Hiinum Hivalid
                         Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs Hdev
-                        Hgeo Hdlk Hbsl [HopS Htx]").
+                        Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         (* RULING G: a runtime caller lends the SEALED arm. *)
         { iExact "Hiopen". }
-        { iApply (log_opS_op with "HopS Htx"). }
+        { iApply (log_opS_opb with "HopS"). }
         iIntros (CID29 Hq29 miu n2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
            Hop Hislot".
@@ -1852,7 +1858,7 @@ Section ProofSysMknodBody.
         { cbn in Hns1. lia. }
         { rewrite /sys_mknod_ret. left. rewrite Ha0f. exact HP2a0. }
       + (* ---------- ARM B: create returned 0 ---------- *)
-        iDestruct "Hok" as "%Hcrz".
+        iDestruct "Hok" as "[%Hcrz Htx]".
         iApply (wp_cbeqz_taken_s_sconf (CID := CID26) (mword_of_int (MN + 0x44))
                   (mword_of_int 10 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                   mcr (K - 20)%nat b

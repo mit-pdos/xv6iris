@@ -136,6 +136,14 @@ Definition create_fresh_ty_body
     (dev : mword 32) (ty : mword 16)
     (kd : nat) (dqp : dfrac)                     (* the LOCKED PARENT's slot *)
     (u : nat) (Sb : gset Z)
+    (* THE SHARE THE CHILD'S CHECKOUT PARKS (durable-disk B''-tx3).  The
+       slot and the generation are chosen INSIDE this span, so the descriptor
+       [ilock] publishes cannot be fixed by the caller -- but its transaction
+       and its share can, and that is all the arm needs.  create hands in
+       [qt] of transaction [t]'s element; on the ALLOC arm it comes back
+       inside the deposit, on the FAIL arm (where no lock was taken) it comes
+       back bare. *)
+    (t : nat) (qt : Qp)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (Ma : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) : Prop :=
@@ -194,14 +202,15 @@ Definition create_fresh_ty_body
      (pd' pav' pu' : mword 64) (bn' : bio_names)
      (γfs' : fs_names) (γi' : gname) (cn' : ic_names) (gil' gisl' : gname)
      (cov' : gset Z) (logstart' inodestart' : Z) (nib' : nat)
-     (k' : nat) (s' : Qp) (g' : gname) (o' : ilkc) (dev' inum' : mword 32)
+     (k' : nat) (s' : Qp) (g' : gname) (d' : ic_dep) (o' : ilkc)
+     (dev' inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate),
-     wp_ilock_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                         γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
-                         nib' k' s' g' o' dev' inum' pidv' dq' dqs'
-                         m' K' eb' b' lks' Vpr') ->
+     wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
+                             γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
+                             nib' k' s' g' d' o' dev' inum' pidv' dq' dqs'
+                             m' K' eb' b' lks' Vpr') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr KT1 Ma K b pj -∗
   cpu_own 0 eb pj b lks -∗
@@ -234,6 +243,8 @@ Definition create_fresh_ty_body
      it comes straight back.  It is the only piece of the locked parent the
      span touches. *)
   i_dev (ientry kd) ↦₄{dqp} dev -∗
+  (* the share the child's checkout parks -- see the header *)
+  t ↪[ln_tx icfg_log]{#qt} tt -∗
   log_opS γ (S u) Sb -∗
   wp_next true pj (fun (CIDo : CpuId) =>
   ∀ (Mo : regfile) (alloc : bool)
@@ -264,7 +275,7 @@ Definition create_fresh_ty_body
          is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                           (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) ∗
          sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
-         ic_deposit cn kslot (DepShr (q/2)%Qp dev inum g) ∗
+         ic_deposit cn kslot (DepTx (q/2)%Qp dev inum g t qt) ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
          i_valid (ientry kslot) ↦₄ valid_word true ∗
@@ -298,6 +309,8 @@ Definition create_fresh_ty_body
           = (mword_of_int 0 : mword 64)⌝ ∗
          pc_is (mword_of_int (KernelSyms.create + 0xec) : mword 64) ∗
          iref_slot ∗
+         (* no lock was taken, so the share comes back bare *)
+         t ↪[ln_tx icfg_log]{#qt} tt ∗
          log_opS γ (S u) Sb) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -378,13 +391,13 @@ Lemma create_fresh_ty :
       (cov : gset Z) (logstart inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (kd : nat) (dqp : dfrac)
-      (u : nat) (Sb : gset Z)
+      (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
-                           u Sb pidv dq dqs dqn Ma K eb b lks Vpr.
+                           u Sb t qt pidv dq dqs dqn Ma K eb b lks Vpr.
 Proof.
   intros.
   cbv beta delta [create_fresh_ty_body]. cbv zeta.
@@ -392,7 +405,7 @@ Proof.
          HAs4 HAs1 Hkdlt Heb Hbelow Hia Hil.
   iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hitb2 #Hitbl #Hesc
            #Hslks #Hireg #Hiopen #Hprocs #Hdevi #Hdgeom #Hdlk Hsbn Hsbi
-           Hppid Hbsl Hisl Hidev Hop Hcont".
+           Hppid Hbsl Hisl Hidev Htx Hop Hcont".
   iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
   iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
   assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
@@ -572,17 +585,21 @@ Proof.
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart
-              inodestart nib kslot (q/2)%Qp gsh (ClaimK ty) dev inum pidv dq dqs
+              inodestart nib kslot (q/2)%Qp gsh
+              (DepTx (q/2)%Qp dev inum gsh t qt) (ClaimK ty) dev inum pidv dq dqs
               B1 K eb b lks Vpr
-              HKil Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
+              HKil eq_refl ltac:(discriminate)
+              Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc Hireg
-                    Hslkc Hshr Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
+                    Hslkc Hshr [Htx] Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
                     Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
+    { rewrite /ic_dep_side. iExact "Htx". }
     iIntros (CID8 Hq8 Mo dnc bmc filled)
       "%Hcso Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
+    iEval (rewrite /ic_dep_held /=) in "Hcload".
     destruct Hilkp as [Hfilled Htyeq].
     pose proof (Hfrf Hfilled) as Hfresh.
     assert (Hcss3 : is_cs_idx Rs3 = true) by (vm_compute; reflexivity).
@@ -645,13 +662,14 @@ Proof.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! F1 false 0%nat 1%Qp γl inum γl γl dn' bm_empty
-              with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev [Hpc Hisl Hop]").
+              with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev [Hpc Hisl Htx Hop]").
     { intros c Hc Hne.
       rewrite (HF1cs c Hc Hne) (callee_saved_lookup Hcsi c Hc).
       exact (HA3cs c Hc). }
     iSplitR; [iPureIntro; exact HF1s3 |].
     iSplitL "Hpc"; [iExact "Hpc" |].
-    iSplitL "Hisl"; [iExact "Hisl" | iExact "Hop"].
+    iSplitL "Hisl"; [iExact "Hisl" |].
+    iSplitL "Htx"; [iExact "Htx" | iExact "Hop"].
 Qed.
 
 End CreateFreshTySpan.

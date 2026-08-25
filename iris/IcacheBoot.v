@@ -642,6 +642,30 @@ Section IcacheBootRegion.
       (nib : nat) : Prop :=
     forall z : Z, z ∈ region_inums nib -> N z = ireg_nl (image_dinode dss z).
 
+  (* ...AND CONJUNCT (14) [FsCfgBoot.fs_region_bare] RESTATED AT THE DECODED
+     RECORD (durable-disk C-3c).  [InodeRegion.ireg_top_park] parks a FREE
+     inum's [FsState.top_frag] TIED to the record beside it, and the tie says
+     the node is [InodeRegion.free_node] of that record -- which is only
+     [FsStateInode.inode_local] if the record names no block and has size
+     zero.  Every mkfs image satisfies it and every free record this kernel
+     writes does ([EscrowDeposit.ireg_free_deposit_au]'s own premise, itrunc
+     having run first); like (L3)/(L4)/(L5) it is unprovable here because the
+     bytes are the boot client's, so it rides the same ∀-over-decodings slot
+     and [ireg_alloc]'s premise list does not grow a second one. *)
+  Definition image_bare (dss : list (list dinode)) (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib ->
+      bv_unsigned (di_type (image_dinode dss z)) = 0 ->
+      ireg_bare (image_dinode dss z).
+
+  (* ...AND THE RECORD FUNCTION THE PARK IS INDEXED BY, for [image_nlink_at]'s
+     reason verbatim: the resource cannot mention [dss], which [ireg_alloc]
+     decodes internally, so the caller hands the family over indexed by a
+     FUNCTION and this is the equation that lands it on the decoded record.
+     At the caller it is [FsCfgBoot.image_dinode_fs_dinode]. *)
+  Definition image_rec_at (D : Z -> dinode) (dss : list (list dinode))
+      (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib -> D z = image_dinode dss z.
+
   (* ...AND SO DOES [InodeRegion.ireg_dir_wl0]: a record naming a DIRECTORY
      pays in the d-flavoured column ([ilinkd]/[ilinkdp]), never the plain
      one, so a directory's plain column must be EMPTY.  Boot mints no
@@ -878,8 +902,26 @@ Section IcacheBootRegion.
     iExists ((1%positive, 1%positive) : gname * gname). iExact "H".
   Qed.
 
+  (* THE FREE INUMS' ABSTRACT VALUE, AS BOOT HANDS IT OVER (durable-disk
+     C-3c).  [emp] at a live inum -- there the fragment rides TIED inside the
+     pool's allocated bundle ([ipool_shape_alloc]) -- and at a free one it is
+     the fragment at the node the record determines, which is exactly what
+     [InodeRegion.ireg_top_park] parks. *)
+  Definition ireg_top_boot (γfs : fs_names) (D : Z -> dinode) (z : Z)
+    : iProp Σ :=
+    (if decide (bv_unsigned (di_type (D z)) = 0)
+     then top_frag (fs_gamma_L γfs) z (free_node (D z))
+     else emp)%I.
+
+  Lemma ireg_top_boot_live (γfs : fs_names) (D : Z -> dinode) (z : Z) :
+    bv_unsigned (di_type (D z)) <> 0 -> ⊢ ireg_top_boot γfs D z.
+  Proof.
+    intros Hnz. rewrite /ireg_top_boot decide_False; [| exact Hnz]. done.
+  Qed.
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
-      (home : gset Z) (bss : nat -> list (bv 8)) (W N : Z -> nat) :
+      (home : gset Z) (bss : nat -> list (bv 8)) (W N : Z -> nat)
+      (D : Z -> dinode) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (* THE REGION'S BLOCKS ARE HOME BLOCKS (durable-disk 1c-flip step 3):
        [ireg_blk] holds each one's EXCLUSIVE byte run now, so the region's
@@ -898,7 +940,9 @@ Section IcacheBootRegion.
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
        image_link_le W dss nib
        /\ image_dir_wl0 W dss nib /\ image_ty_ok dss nib
-       /\ image_nlink_at N dss nib) ->
+       /\ image_nlink_at N dss nib
+       (* durable-disk C-3c, LAST so no existing destructuring moves *)
+       /\ image_bare dss nib /\ image_rec_at D dss nib) ->
     (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier;
        V4+V5's fused widening): the image's authorities are ALL-PLAIN,
        [wdu = wdt = 0] and [p = None] at every inum, so (T1), (T1') and
@@ -944,6 +988,12 @@ Section IcacheBootRegion.
        the ambient class's, so only the [own_alloc] that minted them can
        hand them over ([IcacheRef.icfg_alloc]). *)
     ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
+    (* THE FREE INUMS' ABSTRACT VALUE (durable-disk C-3c): one [top_frag] per
+       FREE inum, at the node its record determines, parked region-side in
+       [InodeRegion.ireg_top_park].  It used to go to the pool's marker arm
+       UNTIED, which is what left the commit's collection unable to build a
+       bundle at a free inum (FsCollect's supplier (D)). *)
+    ([∗ set] z ∈ region_inums nib, ireg_top_boot γfs D z) -∗
     ([∗ list] bi ∈ seq 0 nib,
        fsblock (fs_bytes γfs) (inodestart + Z.of_nat bi) (bss bi)) -∗
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
@@ -976,8 +1026,8 @@ Section IcacheBootRegion.
     intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He)
-      as (Hl3 & Hl4 & Hl1 & Hdw0 & Hl5 & Hlnkat).
-    iIntros "Hlk Hlnks Hcnts Hrcpts Hmirs Hepa Hblks #Hbinv #Hftopi Hboot Hrauth".
+      as (Hl3 & Hl4 & Hl1 & Hdw0 & Hl5 & Hlnkat & Hbare & Hrecat).
+    iIntros "Hlk Hlnks Hcnts Hrcpts Hmirs Hepa Htops Hblks #Hbinv #Hftopi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -1060,6 +1110,8 @@ Section IcacheBootRegion.
     iDestruct (big_sepS_sep_2 with "Hall Hmirs") as "Hall".
     (* ...and the link RA's per-inum pile (durable-disk 2b-inode-4) *)
     iDestruct (big_sepS_sep_2 with "Hall Hlnks") as "Hall".
+    (* ...and the FREE inums' abstract value (durable-disk C-3c) *)
+    iDestruct (big_sepS_sep_2 with "Hall Htops") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
        the other one is the payout; the ledger authority stays with the
        slot on BOTH arms (design §20.2) *)
@@ -1068,7 +1120,8 @@ Section IcacheBootRegion.
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir] Hlnk]".
+      iIntros "[[[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir] Hlnk] Htop]".
+      iEval (rewrite /ireg_top_boot (Hrecat z Hz)) in "Htop".
       iDestruct (ireg_lnk_of_at γfs z (N z) (image_dinode dss z)
                    (Hlnkat z Hz) with "Hlnk") as "Hlnk".
       assert (Hok : ireg_link_ok (image_dinode dss z) (W z + 0 + 0)).
@@ -1100,7 +1153,14 @@ Section IcacheBootRegion.
            freezes nothing (iclaim-ledger.md §3.14 as built) *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
                     ltac:(reflexivity) with "Hrcpt Hmir"). }
-        iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
+        iLeft. iSplitR "Hrf";
+          [iLeft; iSplitR; [iPureIntro; left; exact Hty |];
+           iSplitL "Hfrag"; [iExact "Hfrag" |];
+           (* [case_decide] on [ireg_out]'s own test has already resolved
+              the park's -- it is the same decidable proposition *)
+           iApply (ireg_top_park_free γfs z (image_dinode dss z)
+                     (Hbare z Hz Hty) with "Htop")
+          | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iDestruct (ireg_rcol_intro z (W z) 0 0 0 None 0 None (Some (Excl FrzOff))
                      0%nat 0%nat (image_dinode dss z)
@@ -1217,26 +1277,21 @@ Section IcacheBootPool.
        any and the first fill sets it. *)
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
     (∃ b, fv_ride (bv_unsigned inum) b) -∗
-    (* ...AND THE ERA'S ABSTRACT VALUE, UNTIED, for the contents holds'
-       reason verbatim (durable-disk 2b-inode-3): every inum in the region
-       owns exactly one [FsState.top_frag], and a FREE inum's rides on the
-       marker arm so that ialloc has one to tie when it claims the slot.
-       Boot's value is the image's own node -- see
-       [FsCfgBoot.img_nodes]. *)
-    (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+    (* THE ERA'S ABSTRACT VALUE IS NOT HERE (durable-disk C-3c): a FREE
+       inum's [FsState.top_frag] parks WITH its record, region-side, in
+       [InodeRegion.ireg_top_park] -- see [ireg_alloc]'s own premise. *)
     (* durable-disk B''-esc: boot stocks the pool with ORDINARY rows only --
        no inum is in transition before userspace exists -- so this builds
        [ipool_ord], which is what the pool INVARIANT holds. *)
     imark γi (bv_unsigned inum) -∗ ipool_ord γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir Hoff Hdv Hfv Htop Hmk".
+    iIntros "Hcnt Hmir Hoff Hdv Hfv Hmk".
     rewrite /ipool_ord /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iSplitR "Hoff"; [| iExact "Hoff"].
     iRight. iSplitL "Hmk"; [iExact "Hmk" |].
-    iSplitL "Hdv"; [iExact "Hdv" |].
-    iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"].
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
@@ -1373,13 +1428,9 @@ Section IcacheBootPool.
        ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e) -∗
     ([∗ set] z ∈ R ∖ A,
        ∃ b, fv_ride (bv_unsigned (mword_of_int z : mword 32)) b) -∗
-    ([∗ set] z ∈ R ∖ A,
-       ∃ n : fs_node,
-         top_frag (fs_gamma_L γfs)
-                  (bv_unsigned (mword_of_int z : mword 32)) n) -∗
     ipool_rows γfs γi cov logstart R.
   Proof.
-    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hdvf Hfvf Htopf".
+    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hdvf Hfvf".
     (* the ledger pair splits along the same subset the pool does *)
     rewrite (union_difference_L A R Hsub) !big_sepS_union; [| set_solver ..].
     iDestruct "Hcnts" as "[HcA HcF]". iDestruct "Hoffs" as "[HoA HoF]".
@@ -1401,11 +1452,10 @@ Section IcacheBootPool.
       iDestruct (big_sepS_sep_2 with "Hlg0 HoF") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hdvf") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hfvf") as "Hlg".
-      iDestruct (big_sepS_sep_2 with "Hlg Htopf") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hf") as "Hf".
       iApply (big_sepS_mono with "Hf"). intros z _.
-      iIntros "[[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Htop] Hmk]".
-      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hdv Hfv Htop Hmk").
+      iIntros "[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Hmk]".
+      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hdv Hfv Hmk").
   Qed.
 
   (* ...and the case that needs no image theory at all: an image whose inodes
@@ -1429,15 +1479,11 @@ Section IcacheBootPool.
     ([∗ set] z ∈ region_inums nib, ifreeze_off z) -∗
     ([∗ set] z ∈ region_inums nib, dv_ride z ∅) -∗
     ([∗ set] z ∈ region_inums nib, fv_ride z []) -∗
-    (* ...and the era's abstract value at every inum, untied (durable-disk
-       2b-inode-3) *)
-    ([∗ set] z ∈ region_inums nib,
-       ∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool_rows γfs γi cov logstart (region_inums nib).
   Proof.
-    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs Htops H". rewrite /ipool_rows.
+    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs H". rewrite /ipool_rows.
     iDestruct (region_key_shift nib (fun z => icnt_half z 0%nat) Hnib
                 with "Hcnts") as "Hcnts".
     iDestruct (region_key_shift nib (fun z => frzm_h z false) Hnib
@@ -1448,18 +1494,14 @@ Section IcacheBootPool.
                 with "Hdvs") as "Hdvs".
     iDestruct (region_key_shift nib (fun z => fv_ride z []) Hnib
                 with "Hfvs") as "Hfvs".
-    iDestruct (region_key_shift nib
-                 (fun z => ∃ n : fs_node, top_frag (fs_gamma_L γfs) z n)%I Hnib
-                with "Htops") as "Htops".
     iDestruct (big_sepS_sep_2 with "Hcnts Hmirs") as "Hlg0".
     iDestruct (big_sepS_sep_2 with "Hlg0 Hoffs") as "Hlg1".
     iDestruct (big_sepS_sep_2 with "Hlg1 Hdvs") as "Hlg2".
     iDestruct (big_sepS_sep_2 with "Hlg2 Hfvs") as "Hlg3".
-    iDestruct (big_sepS_sep_2 with "Hlg3 Htops") as "Hlg".
-    iDestruct (big_sepS_sep_2 with "Hlg H") as "H".
+    iDestruct (big_sepS_sep_2 with "Hlg3 H") as "H".
     iApply (big_sepS_mono with "H"). intros z Hz.
-    iIntros "[[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Htop] Hout]".
-    iApply (ipool_shape_free with "Hcnt Hmir Hoff [Hdv] [Hfv] Htop");
+    iIntros "[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Hout]".
+    iApply (ipool_shape_free with "Hcnt Hmir Hoff [Hdv] [Hfv]");
       [by iExists ∅ | by iExists [] |].
     iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
               (image_dinode dss z) (H0 z Hz) with "Hout").
@@ -1705,6 +1747,10 @@ Section IcacheBootTable.
        [ipool] conjunct, and [is_itable2] carries the invariant on. *)
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
     ghost_var icfg_pool 1 (∅ : gset Z) -∗
+    (* ...AND THE IN-TRANSITION KEY (durable-disk C-3b), whole and empty:
+       at boot no walk is carrying an inum and no pending/await row exists,
+       so the pool's partition is the two-way one. *)
+    ghost_var icfg_pext 1 (∅ : gset Z) -∗
     (* THE ITABLE LOCK'S GHOST, unbuilt: the two [excl_auth] halves at
        [None], as [WpLockAt.lock_ghost_alloc] mints them.  A PREMISE for the
        reason every other ghost here is one -- the gname is the caller's
@@ -1728,10 +1774,12 @@ Section IcacheBootTable.
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
     iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
-    iIntros "Hfree Htok Hmid Hgid".
-    (* the pool's own invariant, out of the stocked rows and the whole key *)
-    iMod (ipool_alloc_inv E γfs γi cov logstart (region_inums nib)
-            with "Hkey Hrows") as "[#Hpinv Hpool]".
+    iIntros "Hxkey Hfree Htok Hmid Hgid".
+    (* THE POOL'S INVARIANT IS ALLOCATED AFTER THE ESCROWS (durable-disk
+       C-3b), and it has to be: its body carries a QUARTER of every slot's
+       [ic_id] beside the partition, and those quarters do not exist until
+       the escrow loop below has re-tagged the fifty identities at the
+       values the entry cells actually hold. *)
     (* only the ZEROS are used: they are what [itable_body] parks for a free
        slot.  The [sl_free_tok]s beside them belong to whoever wants to build
        a lock AT [icfg_isl k], and this cache does not -- its locks carry
@@ -1765,7 +1813,9 @@ Section IcacheBootTable.
     iDestruct (big_sepL_sep_2 with "H2 Hmid") as "H3".
     iDestruct (big_sepL_sep_2 with "H3 Hgid") as "H4".
     iAssert ([∗ list] k ∈ seq 0 NINODE,
-               |={E}=> ic_escrow cn γfs γi cov logstart k ∗ islot_empty cn k)%I
+               |={E}=> ic_escrow cn γfs γi cov logstart k ∗
+                       (islot_empty cn k ∗
+                        ic_id cn k (1/4) false (dvs k).1 (dvs k).2))%I
       with "[H4]" as "Hesc".
     { iApply (big_sepL_mono with "H4"). intros idx k _.
       iIntros "(((([Hd Hn] & (%w & Hv)) & Hmir) & Hmd) & Hgd)".
@@ -1775,16 +1825,28 @@ Section IcacheBootTable.
       iDestruct "Hgd" as (v0 d0 n0) "Hgd".
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
+      (* THE TABLE'S HALF SPLITS AGAIN (durable-disk C-3b): a quarter stays
+         with [islot_empty] and a quarter goes to the pool's invariant, where
+         it is what makes the partition speak about this escrow. *)
+      iDestruct (ic_id_quarters_split with "Hgd2") as "[Hgd2 Hgd3]".
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
         rewrite /ic_empty_arm. iExists (dvs k).1, (dvs k).2, w. iFrame. }
-      iModIntro. iFrame "Hinv". rewrite /islot_empty.
-      iExists (dvs k).1, (dvs k).2. iFrame. }
+      iModIntro. iFrame "Hinv". iSplitR "Hgd3"; [| iExact "Hgd3"].
+      rewrite /islot_empty. iExists (dvs k).1, (dvs k).2. iFrame. }
     iMod (big_sepL_fupd with "Hesc") as "Hesc".
     iEval (rewrite big_sepL_sep) in "Hesc".
-    iDestruct "Hesc" as "[#Hescrows Hslots]".
+    iDestruct "Hesc" as "[#Hescrows Hrest]".
+    iEval (rewrite big_sepL_sep) in "Hrest".
+    iDestruct "Hrest" as "[Hslots Hquarters]".
+    (* the pool's own invariant, out of the stocked rows, the two keys and
+       the fifty quarters (durable-disk C-3b) *)
+    iDestruct (ic_ids_of_intro cn dvs with "Hquarters") as "Hids".
+    iMod (ipool_alloc_inv E cn γfs γi cov logstart nib (ic_ids_of dvs)
+            (ic_ids_of_length dvs) (ic_ids_of_live dvs)
+            with "Hkey Hxkey Hids Hrows") as "[#Hpinv Hpool]".
     (* ---- the itable lock's resource, and the lock ---- *)
     iAssert (itable_res2 cn γfs γi cov logstart nib dv)%I
       with "[HhalfL Hsupply Hslots Hpool Hislauth]" as "Hres".
@@ -1852,7 +1914,8 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
-    ghost_var icfg_pool 1 (∅ : gset Z)
+    ghost_var icfg_pool 1 (∅ : gset Z) -∗
+    ghost_var icfg_pext 1 (∅ : gset Z)
     ={E}=∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1862,11 +1925,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hfree Htok Hmid Hgid") as "H".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hfree Htok Hmid Hgid") as "H".
     iModIntro. iExists γl, cn. iExact "H".
   Qed.
 

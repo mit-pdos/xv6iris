@@ -570,11 +570,16 @@ Definition fviewUR : ucmra :=
    pinned by any resource. *)
 Inductive ic_dep : Type :=
   | DepNone
-  | DepRef (q : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
-  | DepShr (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+  (* THERE IS NO BUNDLELESS LOCK DESCRIPTOR (durable-disk B''-tx3/-tx4), and
+     that is what makes [IcacheEscrow.ic_slot_cover] finite: every [ilock] in
+     this kernel publishes its FINAL arm at the checkout and every park
+     retires it in the ghost step that parks the payload, so an arm the
+     commit meets is one of the three below.  iput's window exits are the
+     escrow's own ([IcacheEscrow.ic_held]) and [DepFrz]. *)
   | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32)
   (* THE WRITE ARM (durable-fs-plan.md section 3, [ilock]; durable-disk
-     B''-arm).  [DepShr] plus the transaction whose write lock this is:
+     B''-arm).  The caller's generation-named credential plus the transaction
+     whose write lock this is:
      while an inode is checked out FOR WRITING the escrow's OUT arm parks a
      SHARE [q] of transaction [t]'s [LogDefs.ln_tx] element, so [end_op] --
      which consumes the whole element -- cannot run, and the commit's
@@ -584,27 +589,23 @@ Inductive ic_dep : Type :=
      [(t, q)] ARE FIELDS, not existentials, and that is the whole mechanism:
      [IcacheEscrow.ic_deposit] is a [ghost_var] whose other half the holder
      carries, so the descriptor PINS the arm's transaction and share to the
-     holder's, and [IcacheEscrow.ic_disarm_tx] hands back exactly what
-     [ic_arm_tx] parked.  An existentially-keyed share cannot re-identify --
-     [IcacheTxRefute.tx_two_halves_no_whole] is the refutation.
-
-     LAST, so the ~66 [DepShr] sites in 23 files and every
-     [destruct d as [| .. | .. | ..]] keep their shape. *)
+     holder's, and the park hands back exactly what the checkout parked.  An
+     existentially-keyed share cannot re-identify --
+     [IcacheTxRefute.tx_two_halves_no_whole] is the refutation. *)
   | DepTx (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
           (t : nat) (q : Qp)
   (* THE READ ARM (durable-fs-plan.md section 3, [ilock] without a
-     transaction; durable-disk B''-join).  [DepShr]'s content exactly -- the
-     credential does not change -- but the arm at this descriptor keeps THREE
+     transaction; durable-disk B''-join).  The write arm's content minus the
+     parked share -- the credential does not change -- but the arm keeps THREE
      QUARTERS of the inode's bundle ([IcacheEscrow.ic_rd_arm]) instead of
      nothing, and the holder carries only the reader's quarter.  It is the
      other of the two states plan section 4's collection can close: an
      unlocked inode's bundle is inside at 1, a read-locked one's at 3/4, and
      [blk_owned_ne_34] is what makes 3/4 enough for cross-inode disjointness.
 
-     A SEPARATE CONSTRUCTOR rather than a re-reading of [DepShr] so that the
-     conversion of the twenty [ilock] call sites can land one file at a time:
-     [DepShr] is what a withdrawal that has done NEITHER looks like, and it
-     retires when the last caller has moved.  LAST, for [DepTx]'s reason. *)
+     A SEPARATE CONSTRUCTOR rather than a re-reading of the write arm,
+     because what the ESCROW keeps differs and the deposit is what selects
+     the arm. *)
   | DepRd (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname).
 
 (* THE LOCKED REGISTRY'S ENTRY (durable-disk lane A, re-keyed by B''-arm):

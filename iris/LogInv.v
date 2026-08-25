@@ -829,6 +829,40 @@ Section LogInv.
     rewrite dfrac_op_own Qp.half_half. iExact "H".
   Qed.
 
+  (* ---- THE ELEMENT AT AN ARBITRARY SHARE (durable-disk B''-tx2) ------
+     A walk that write-locks TWO inodes at one transaction parks a QUARTER
+     in each escrow ([IcacheEscrow.ic_tx_dep_at]) and keeps the rest, so the
+     halving above is one case of a general split.  All three are stated
+     with the total as an EQUATION premise rather than as [q1 + q2] in the
+     conclusion: a caller then never has to [rewrite] a [Qp] sum inside the
+     proofmode, where the split's evar is out of scope (durable-notes,
+     [rewrite -(Qp.div_2 q)]). *)
+  Lemma log_tx_split (γ : log_names) (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx γ]{#q} () -∗
+    t ↪[ln_tx γ]{#q1} () ∗ t ↪[ln_tx γ]{#q2} ().
+  Proof. intros ->. iIntros "H". iDestruct "H" as "[$ $]". Qed.
+
+  Lemma log_tx_add (γ : log_names) (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx γ]{#q1} () -∗ t ↪[ln_tx γ]{#q2} () -∗ t ↪[ln_tx γ]{#q} ().
+  Proof.
+    intros ->. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own. iExact "H".
+  Qed.
+
+  (* the two directions between the WHOLE element and the token, so that a
+     walk which has gathered every parked share back can close the id again
+     without unfolding the definition *)
+  Lemma log_tx_full (γ : log_names) (t : nat) :
+    t ↪[ln_tx γ]{#1} () -∗ log_tx γ.
+  Proof. iIntros "H". rewrite /log_tx. iExists t. iExact "H". Qed.
+
+  Lemma log_tx_open (γ : log_names) :
+    log_tx γ -∗ ∃ t : nat, t ↪[ln_tx γ]{#1} ().
+  Proof. iIntros "H". iExact "H". Qed.
+
   Lemma log_op_split γ u : log_op γ u -∗ log_opb γ u ∗ log_tx γ.
   Proof. iIntros "[$ $]". Qed.
 

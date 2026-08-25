@@ -53,8 +53,7 @@
      DepTx (s : Qp) (dev inum : mword 32) (g : gname) (t : nat) (q : Qp)
 
    makes the arm's [t] and [q] the holder's own, and [iunlock] recovers
-   EXACTLY the share it parked.  It is additive: the ~66 existing [DepShr]
-   sites in 23 files do not move, and the cost is the ten [match d with]
+   EXACTLY the share it parked.  The cost is the ten [match d with]
    sites ([ic_dep_own], [ic_dep_half], [ic_out_frz], [IcacheRef.ic_dep_gname]
    and their timeless/accessor twins) plus the writers' own checkout/park.
    The alternative -- exposing [t] in [log_op]'s ABI -- is the closure lane A

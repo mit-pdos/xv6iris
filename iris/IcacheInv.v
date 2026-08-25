@@ -375,7 +375,7 @@ Section IcacheGhost.
 
      §17.2 put the ½ in [ic_loaded], i.e. in the CHECKED-OUT thread's hand;
      §17.3 (A) showed that kills [IcacheEscrow.ic_open_auth_ref]'s REF-1
-     refutation of the OUT/[DepShr] arm, because the invariant's arm is then
+     refutation of the OUT arm, because the invariant's arm is then
      no longer the exact complement of what the opener holds.  With the ½ in
      the ARM, every live arm an opener can meet holds the exact complement
      again, and [live_whole_share_absurd] merely gains a [live_frac k (1/2)]

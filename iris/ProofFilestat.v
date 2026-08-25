@@ -667,24 +667,28 @@ Section ProofFilestat.
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
          payload's slice already does, so nothing has to be introduced here. *)
-      iApply (Ilock.wp_ilock_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
+      iApply (Ilock.wp_ilock_dep_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
-                icfg_nib ikk (ssh/2)%Qp gsh (ShotK tysh)
+                icfg_nib ikk (ssh/2)%Qp gsh
+                (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK tysh)
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
-                _ V (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                _ V (fst_av_ilock K HK) eq_refl
+                ltac:(intros _; exists tysh; reflexivity)
+                Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                      Hslk Hshr Hshot0 Hsb Hppid Hprocs
+                      Hslk Hshr [] Hshot0 Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
+      { rewrite /ic_dep_side. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
         "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
          Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
@@ -714,25 +718,22 @@ Section ProofFilestat.
         rewrite (callee_saved_lookup Hcsil c Hcs).
         exact (HQ3thr c Hcs N2 N8 N9 N18 N20). }
       (* ---- THE READ ARM (durable-fs-plan.md section 3, [ilock] without a
-         transaction; durable-disk B''-join).  filestat is one of the two true
-         read-lockers in this kernel -- it holds no [log_op] at all, so it can
-         park no transaction share and its withdrawal has to be a SHARE
-         instead.  It sheds three quarters of the bundle straight back into
-         the escrow's read arm and keeps the metadata CELLS, which is all
-         [stati] ever reads; the escrow keeps [dinode_at] (so this call cannot
-         move a record), the byte legs at 3/4, the link ledger and the two
-         contents holds -- i.e. exactly what plan section 4's collection wants
-         to find inside ([IcacheEscrow.ic_slot_cover]'s third alternative).
+         transaction; durable-disk B''-join, taken at the CHECKOUT by
+         B''-tx3).  filestat is one of the two true read-lockers in this
+         kernel -- it holds no [log_op] at all, so it can park no transaction
+         share and its withdrawal has to be a SHARE instead.  Three quarters
+         of the bundle stay in the escrow's read arm and what comes out is
+         the metadata CELLS, which is all [stati] ever reads; the escrow keeps
+         [dinode_at] (so this call cannot move a record), the byte legs at
+         3/4, the link ledger and the two contents holds -- i.e. exactly what
+         plan section 4's collection wants to find inside
+         ([IcacheEscrow.ic_slot_cover]'s third alternative).
 
-         Two ghost steps and no contract change: [SpecIlock] and [SpecIunlock]
-         are untouched, exactly as the write arm's [ic_arm_tx] leaves them. *)
-      iApply fupd_wp.
-      iMod (ic_shed_rd ⊤ (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
-              (fsn_logstart fn) ikk (ssh/2)%Qp icfg_dev inm gsh true dnl bml
-              ltac:(solve_ndisj) with "Hesc Hvalid Hdep Hlk")
-        as "(Hvalid & Hdep & Hrdh)".
-      iModIntro.
-      iDestruct "Hrdh" as (data) "(%Hiok & %Hloc & Hmeta & Haddrs & Hquarter)".
+         NO GHOST STEP AT ALL any more: the shed is inside the checkout
+         ([ic_swap_checkout_rd]), so the escrow never holds a bundleless arm
+         for this call and [ic_shed_rd] has no site left here. *)
+      iEval (rewrite /ic_dep_held /=) in "Hlk".
+      iDestruct "Hlk" as (data) "(%Hiok & %Hloc & Hmeta & Haddrs & Hquarter)".
       iEval (rewrite -Hipk) in "Hmeta".
       iEval (rewrite -Hipk) in "Hidev".
       iEval (rewrite -Hipk) in "Hinum".
@@ -897,22 +898,21 @@ Section ProofFilestat.
       { intros c Hcs N2 N8 N9 N18 N19 N20.
         rewrite (callee_saved_lookup Hcsst c Hcs).
         exact (HI4thr c Hcs N2 N8 N9 N18 N19 N20). }
-      (* ---- THE READ ARM COMES HOME (B''-join): the quarter goes back and
-         the escrow re-forms the payload against its own residue.  Nothing
+      (* ---- THE READ ARM COMES HOME (B''-join, at the PARK since B''-tx3):
+         the quarter goes back and the escrow re-forms the payload against its
+         own residue, inside [ic_swap_park_dep]'s own ghost step.  Nothing
          pins the arm's node but the QUARTER OF [top_frag] this quarter
          carries -- [FsStateEra.inode_rd_era_agree] and
          [FsStateEra.era_node_pair_inj] are the whole argument. ---- *)
       iEval (rewrite Hipk) in "Hmeta".
       iEval (rewrite Hipk) in "Hidev".
       iEval (rewrite Hipk) in "Hinum".
-      iApply fupd_wp.
-      iMod (ic_unshed_rd ⊤ (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
-              (fsn_logstart fn) ikk (ssh/2)%Qp icfg_dev inm gsh true dnl bml
-              ltac:(solve_ndisj) with "Hesc Hvalid Hdep [Hmeta Haddrs Hquarter]")
-        as "(Hvalid & Hdep & Hlk)".
-      { iExists data. iFrame "Hmeta Haddrs Hquarter".
+      iAssert (ic_dep_held (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
+                 (fsn_logstart fn) (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                 ikk inm dnl bml)%I
+        with "[Hmeta Haddrs Hquarter]" as "Hlk".
+      { rewrite /ic_dep_held /=. iExists data. iFrame "Hmeta Haddrs Hquarter".
         iSplitR; [iPureIntro; exact Hiok |]. iPureIntro; exact Hloc. }
-      iModIntro.
       (* +0x36 c.ld a0,24(s1) *)
       assert (Hpip3 : add_vec (rget mst Rs1)
                         (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip k).
@@ -974,13 +974,14 @@ Section ProofFilestat.
       iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
+      iApply (Iunlock.wp_iunlock_dep_sconf γs (fsn_fs fn) (fsn_ireg fn)
                 (fsn_ic fn) gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
-                ikk (ssh/2)%Qp gsh icfg_dev inm
+                ikk (ssh/2)%Qp gsh (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                icfg_dev inm
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj b lks
-                V (fst_av_iunlock K HK) Hik
+                V (fst_av_iunlock K HK) eq_refl Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
                    "bcache"(4), and [locks_below_mono] weakens it. *)
@@ -989,7 +990,7 @@ Section ProofFilestat.
                       Hheld Hppid Hprocs
                       Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
-      iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
+      iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr _".
       iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
       (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
