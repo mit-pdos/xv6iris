@@ -74,6 +74,11 @@ Record disk_names := DiskNames {
      it to the cell at the publish position, the publisher the other.  See
      [Xv6Cameras.disk_stage_inG] for why the gap exists at all. *)
   dn_stage : gname;
+  (* THE PER-DESCRIPTOR RECEIPT's ghost-map name ([Xv6Cameras.hstate]).  Its
+     authority rides in the vdisk_lock's resource beside the free array --
+     both are total over the eight descriptors -- and its fragments are what
+     a sleeping [virtio_disk_rw] holds across the lock release. *)
+  dn_head  : gname;
   (* the CRASH-PERMIT channel's ghost-map name (PermInv.v): the auth lives in
      [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)

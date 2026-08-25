@@ -231,6 +231,26 @@ Record dclaim := DClaim {
   dc_pin  : gmap Arch.pa (bv 8);
 }.
 
+(* THE PER-DESCRIPTOR RECEIPT (tools/vtest/README.md finding 5).
+
+   xv6 indexes [disk.info[]] by the HEAD descriptor of a chain, and the
+   interrupt handler learns a head -- [disk.used->ring[i].id] -- not a
+   position in the available ring.  Since the device may complete out of
+   turn those are different numbers, so the driver's per-request state is
+   keyed by head, over the fixed eight descriptors, exactly like
+   [disk.free[NUM]] and [disk.info[NUM]] in the C.
+
+   [HInactive] is a descriptor nobody has submitted: free (its bytes are in
+   the pool) or allocated and still being filled in.  [HActive v] is one
+   whose chain is live, and the claim [v] records what was published --
+   which buffer, which slot, which three descriptors, which pinned bytes.
+   The FRAGMENT is what [virtio_disk_rw] carries across [sleep()]'s release
+   of [vdisk_lock]: holding it is what re-authorises the poll of [b->disk]
+   on every re-acquire. *)
+Inductive hstate :=
+  | HInactive
+  | HActive (v : dclaim).
+
 (* NB: the disk IMAGE map is deliberately NOT here -- it is
    [DiskImg.diskImgG], which [RiscvPtsto.riscvFixedGS] carries
    ([riscvF_diskGS]), because the era auth rides in [state_interp] while
@@ -260,6 +280,8 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
      still live in disk_res (in flight or parked); the fragment is how a
      sleeping rw re-finds its own request (DiskInv.v).  See [dclaim]. *)
   disk_claim_inG :: ghost_mapG Σ nat dclaim;
+  (* the per-descriptor receipt, keyed by HEAD over the fixed eight *)
+  disk_head_inG :: ghost_mapG Σ nat hstate;
   (* THE COMPLETION ORDER: a request's POSITION in the available ring against
      the USED INDEX its completion was reported at.  Its elements are
      persistent identification, not ownership (DiskPtsto's [dn_ord]). *)
@@ -278,7 +300,7 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
 Definition diskGhostΣ : gFunctors :=
   #[ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
     mono_natΣ; ghost_varΣ nat; ghost_varΣ (option (bv 16));
-    ghost_mapΣ nat dclaim;
+    ghost_mapΣ nat dclaim; ghost_mapΣ nat hstate;
     ghost_mapΣ nat nat;
     GFunctor (dfrac_agreeR (leibnizO virtio_cfg));
     permΣ].

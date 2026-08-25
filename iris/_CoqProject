@@ -61,6 +61,7 @@ WireInv.v
 WpVirtio.v
 VirtioQueue.v
 DiskPtsto.v
+DiskAddrs.v
 VirtioProto.v
 RiscvExtras.v
 PowerBoot.v

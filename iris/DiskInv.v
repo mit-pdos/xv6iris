@@ -45,6 +45,7 @@ Require Import Xv6Cameras.
 Require Import KptPt.
 Require Import KMap.
 Require Export BufOwn.
+Require Export DiskAddrs.   (* [struct disk]'s field addresses, moved below VirtioProto *)
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -63,24 +64,10 @@ Local Open Scope Z_scope.
 (* geometry                                                                *)
 (* ---------------------------------------------------------------------- *)
 
-Definition disk_base : Arch.pa :=
-  SailStdpp.Values.mword_of_int (len := 64) KernelSyms.disk.
-
-Definition d_desc_ptr  : Arch.pa := pa_add disk_base 0.
-Definition d_avail_ptr : Arch.pa := pa_add disk_base 8.
-Definition d_used_ptr  : Arch.pa := pa_add disk_base 16.
-Definition d_free_cell (i : nat) : Arch.pa := pa_add disk_base (24 + i).
-Definition d_used_idx  : Arch.pa := pa_add disk_base 32.
-Definition d_info_b      (i : nat) : Arch.pa := pa_add disk_base (40 + 16 * i).
-Definition d_info_status (i : nat) : Arch.pa := pa_add disk_base (48 + 16 * i).
-Definition d_ops       (i : nat) : Arch.pa := pa_add disk_base (168 + 16 * i).
-Definition d_lock : Arch.pa := pa_add disk_base 296.
-
-(* descriptor-table entry i on the desc page *)
-Definition d_desc (pd : Arch.pa) (i : nat) : Arch.pa := pa_add pd (16 * i).
-
-(* avail-ring entry j (j < 8) on the avail page *)
-Definition d_ring (pav : Arch.pa) (j : nat) : Arch.pa := pa_add pav (4 + 2 * j).
+(* The [struct disk] field addresses moved to DiskAddrs.v, below
+   VirtioProto.v: the per-descriptor receipt lives in the device invariant
+   and has to name [disk.info[i].b] (finding 5).  Re-exported above, so
+   every spelling here and downstream is unchanged. *)
 
 (* struct buf fields (b_disk / b_blockno / b_data / ...) come from BufOwn.v,
    re-exported above -- the common home shared with the bio.c layer. *)
