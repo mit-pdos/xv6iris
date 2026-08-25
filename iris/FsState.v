@@ -90,6 +90,42 @@ Section FsState.
 
   Definition top_frag Γ (i : Z) (n : fs_node) : iProp Σ := i ↪[γtop Γ] n.
 
+  (* THE FRAGMENT AT A SHARE (durable-fs-plan.md section 3, [ilock]'s read
+     arm; durable-disk B''-join).  A read-locking [ilock] hands its holder a
+     QUARTER of this element beside the quarter of the byte legs, and the
+     escrow's read arm keeps three quarters.  Two things ride on that one
+     line: a read-locker cannot RETAG (every mover --
+     [InodeRegion.ireg_top_retag] -- needs the whole element), and the arm's
+     existentially-bound node is PINNED to the holder's by ghost-map
+     agreement, which is what lets [IcacheEscrow.ic_unshed_rd] re-form the
+     payload with no per-slot pin ghost at all.
+
+     [top_frag] IS ITS [DfracOwn 1] READING, on the nose ([k ↪[γ] v] IS
+     [k ↪[γ]{DfracOwn 1} v]), so no site that spells [top_frag] moves. *)
+  Definition top_frag_q Γ (dq : dfrac) (i : Z) (n : fs_node) : iProp Σ :=
+    i ↪[γtop Γ]{dq} n.
+
+  Lemma top_frag_1 Γ i n : top_frag Γ i n = top_frag_q Γ (DfracOwn 1) i n.
+  Proof. reflexivity. Qed.
+
+  Global Instance top_frag_q_timeless Γ dq i n : Timeless (top_frag_q Γ dq i n).
+  Proof. rewrite /top_frag_q. apply _. Qed.
+
+  Lemma top_frag_q_split Γ (q1 q2 : Qp) i n :
+    top_frag_q Γ (DfracOwn (q1 + q2)) i n
+    ⊣⊢ top_frag_q Γ (DfracOwn q1) i n ∗ top_frag_q Γ (DfracOwn q2) i n.
+  Proof.
+    rewrite /top_frag_q -ghost_map_elem_fractional //.
+  Qed.
+
+  (* THE PIN: two shares of the same inum's fragment name the SAME node. *)
+  Lemma top_frag_q_agree Γ dq1 dq2 i n1 n2 :
+    top_frag_q Γ dq1 i n1 -∗ top_frag_q Γ dq2 i n2 -∗ ⌜n1 = n2⌝.
+  Proof.
+    rewrite /top_frag_q. iIntros "H1 H2".
+    by iDestruct (ghost_map_elem_agree with "H1 H2") as %->.
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  3.  Timelessness: [fsΦ] timeless => everything timeless          *)
   (* ---------------------------------------------------------------- *)
