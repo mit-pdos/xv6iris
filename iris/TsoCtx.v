@@ -315,7 +315,15 @@ Section ctx.
      invariant handles, whole lock handles -- are covered by
      [ctx_morph_const]. *)
 
-  Global Instance ctx_morph_const (P : iProp Σ) : CtxMorph (λ _, P).
+  (* LOW PRIORITY, and it is a guard, not a tuning: [ctx_morph_const]
+     unifies with ANY payload whose context argument is still an evar
+     ([?R := λ _, ?P]), so an eager resolution while a call site's payload
+     is not yet pinned would silently commit it to a CONSTANT embedding.
+     With the priority, the pointsto/structural instances win whenever the
+     payload is known, and an evar payload stays pending until the framed
+     [is_lock]/[R cur_ctx] hypothesis pins it -- which is what makes
+     passing [_] for the payload at acquire/release call sites safe. *)
+  Global Instance ctx_morph_const (P : iProp Σ) : CtxMorph (λ _, P) | 100.
   Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
 
   Global Instance ctx_morph_pointsto (kt : ktier) a dq v :

@@ -591,7 +591,7 @@ Section twin2.
     iApply (mono_nat_lb_own_le with "Hlb'"). lia.
   Qed.
 
-  Global Instance ctx_morph_const (P : iProp Σ) : CtxMorph (λ _, P).
+  Global Instance ctx_morph_const (P : iProp Σ) : CtxMorph (λ _, P) | 100.
   Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
 
   Global Instance ctx_morph_sep (R1 R2 : CtxId → iProp Σ) :
