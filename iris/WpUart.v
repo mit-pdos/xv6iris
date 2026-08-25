@@ -901,6 +901,7 @@ Section DevLoops.
     iNext. iIntros (d' m' Hstep).
     iMod "Hmask" as "_".
     destruct Hstep as [mv i vnew w Hview Hdisk | mv i vnew Hview Hcap
+                      | mv vnew Hview Hpop
                       | s vnew Hdrain
                       | mv w Hview Hstall | p' Hirq Hlatch |].
     - (* the disk completes a queued request.  This is the only step that
@@ -1001,6 +1002,35 @@ Section DevLoops.
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       assert (Hdk : v_disk vnew = v_disk (dvirtio d))
         by (rewrite Hv; exact (virtio_capture_step_disk vs mv vnew i Hcap)).
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iEval (rewrite <- Hdk) in "Htie".
+      iFrame "Htie Hsa".
+      iApply "IH".
+
+    - (* THE POP -- the device takes the next available-ring entry
+         (tools/vtest/README.md finding 5).  This is the phase QEMU does
+         strictly IN ORDER, and it is what xv6's reuse of
+         [avail->ring[idx % NUM]] rests on.  It reads the ring and moves the
+         pop index; it writes NO byte memory, produces no used-ring entry,
+         raises no interrupt and moves no durable disk byte, so -- like the
+         capture -- there is no permit to spend and no image to move. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      rewrite Hv in Hpop.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iDestruct (virtio_proto_pop_step γd vs m mv vnew Hview Hpop
+                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iMod ("Hclose" with "[Hv' Hlease]") as "_".
+      { iNext. iExists vnew. iFrame "Hv' Hlease".
+        iPureIntro. exact (virtio_pop_step_isr_ok vs mv vnew Hvok Hpop). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
+        by (rewrite Hv; exact (virtio_pop_step_disk vs mv vnew Hpop)).
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
       rewrite <- Hdk in Hdview.

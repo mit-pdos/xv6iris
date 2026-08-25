@@ -2019,6 +2019,18 @@ Proof.
   intro H. injection H as <-. split; reflexivity.
 Qed.
 
+Lemma virtio_pop_step_disk (v : virtio_state) (mv : vmem) (v' : virtio_state) :
+  virtio_pop_step v mv = Some v' -> v_disk v' = v_disk v.
+Proof.
+  intro H. destruct (virtio_pop_step_shape _ _ _ H) as [_ ->]. reflexivity.
+Qed.
+
+Lemma virtio_pop_step_cfg (v : virtio_state) (mv : vmem) (v' : virtio_state) :
+  virtio_pop_step v mv = Some v' -> v_cfg v' = v_cfg v.
+Proof.
+  intro H. destruct (virtio_pop_step_shape _ _ _ H) as [_ ->]. reflexivity.
+Qed.
+
 Lemma virtio_pop_step_not_live (v : virtio_state) (mv : vmem) :
   virtio_live (v_cfg v) = false -> virtio_pop_step v mv = None.
 Proof.
@@ -3481,6 +3493,13 @@ Proof.
 Qed.
 
 (* neither a capture nor a drain touches the interrupt-status register *)
+Lemma virtio_pop_step_isr_ok (v : virtio_state) (mv : vmem) (v' : virtio_state) :
+  virtio_isr_ok v -> virtio_pop_step v mv = Some v' -> virtio_isr_ok v'.
+Proof.
+  intros Hok H. destruct (virtio_pop_step_shape _ _ _ H) as [_ ->].
+  unfold virtio_isr_ok in *. by rewrite virtio_pop_isr.
+Qed.
+
 Lemma virtio_capture_step_isr_ok (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (i : bv 16) :
   virtio_isr_ok v -> virtio_capture_step v mv i = Some v' -> virtio_isr_ok v'.

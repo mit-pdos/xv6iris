@@ -845,6 +845,11 @@ Proof.
   symmetry. apply insert_union_l.
 Qed.
 
+(* the POP touches no slot and no pin, so the per-slot map is untouched *)
+Lemma vp_spins_pop (pr : vproto) (sl : vslot) :
+  vp_spins (vproto_pop_state pr sl) = vp_spins pr.
+Proof. reflexivity. Qed.
+
 Lemma vp_spins_publish (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_spins (vproto_publish_state pr sl pin)
   = <[ vp_np pr := (sl, pin) ]> (vp_spins pr).
@@ -2301,6 +2306,79 @@ Section VirtioProto.
      because everything it read is still cached ([VirtioQueue.vs_todo_full]).
      Same set, so the per-slot resources ride through untouched -- which is
      why this accessor is a plain wand and not an update. *)
+  (* THE POP.  The device takes the next available-ring entry: it writes no
+     memory, moves no disk byte and touches no per-slot resource, so the
+     invariant travels by re-keying alone.  The entry it takes names the slot
+     at the pop index, and [spo_ring] is what says the head it reads is that
+     slot's own. *)
+  Lemma virtio_proto_pop_step (γ : disk_names) (v : virtio_state)
+      (m : gmap Arch.pa (bv 8)) (mv : vmem) (v' : virtio_state) :
+    mem_view m mv ->
+    virtio_pop_step v mv = Some v' ->
+    gen_heap_interp m -∗ virtio_proto γ v -∗
+      gen_heap_interp m ∗ virtio_proto γ v'.
+  Proof.
+    iIntros (Hview Hstep) "Hm Hp".
+    rewrite {1}/virtio_proto.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { exfalso. rewrite (virtio_pop_step_not_live v mv Hlive) in Hstep.
+      discriminate. }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
+        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hpend & Hdone)".
+    iDestruct (dma_agree with "Hm Hdma") as %Hsub.
+    assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
+      by (etransitivity; [exact Hctl | exact Hsub]).
+    assert (Hvctl : mem_view (vproto_ctl (v_cfg v) pr) mv)
+      by exact (mem_view_subseteq _ m mv Hctlm Hview).
+    destruct (virtio_pop_step_shape _ _ _ Hstep) as [Hpok ->].
+    unfold virtio_pop_ok in Hpok. apply andb_prop in Hpok as [_ Hne].
+    apply negb_true_iff, bool_decide_eq_false in Hne.
+    rewrite (avail_idx_pinned (v_cfg v) (vproto_ctl (v_cfg v) pr) mv
+               (wrap16 (vp_np pr)) Hvctl (vproto_ctl_idx _ _ _ Hok)) in Hne.
+    (* the pop index is strictly below the published count *)
+    assert (Hlt : (vp_lo pr < vp_np pr)%nat).
+    { pose proof (vpo_lo_np _ _ _ Hok) as Hle.
+      destruct (decide (vp_lo pr = vp_np pr)) as [Heq|Hnq]; [| lia].
+      exfalso. apply Hne. by rewrite Hseen Heq. }
+    (* ...so the entry it takes is a PENDING slot's *)
+    assert (Hlopd : vp_lo pr ∈ dom (vp_pend pr)).
+    { apply (vpo_pend_dom _ _ _ Hok). split; [exact Hlt|].
+      intro Hc. exact (Nat.lt_irrefl _ (vpo_srv_lo _ _ _ Hok _ Hc)). }
+    apply elem_of_dom in Hlopd as [sl Hsl].
+    assert (Hpin : exists pin, vp_pin pr !! vp_lo pr = Some pin).
+    { apply elem_of_dom. rewrite (vpo_pin_dom _ _ _ Hok).
+      apply elem_of_union_l, elem_of_dom. by exists sl. }
+    destruct Hpin as [pin Hpin].
+    pose proof (vpo_slot _ _ _ Hok _ sl pin
+                  (vproto_pend_slot pr _ _ Hsl) Hpin) as Hslotok.
+    assert (Hvpin : mem_view pin mv).
+    { apply (mem_view_subseteq pin (vproto_ctl (v_cfg v) pr) mv);
+        [ exact (vproto_pin_ctl _ pr (dom dma) _ pin Hok Hpin) | exact Hvctl ]. }
+    (* THE HEAD IT READS IS THIS SLOT'S: the pin holds that ring entry *)
+    assert (Hhd : avail_ring_at (v_cfg v) mv (v_seen v) = vs_hd sl).
+    { rewrite Hseen (avail_ring_at_wrap _ mv _ (vpo_qnum _ _ _ Hok)).
+      exact (view_word_read pin mv _ 2 _ Hvpin (spo_ring _ _ _ _ Hslotok)). }
+    iFrame "Hm".
+    rewrite /virtio_proto virtio_pop_cfg Hlive.
+    iExists (vproto_pop_state pr sl), dma.
+    rewrite (vp_spins_pop pr sl) vpop_nc vpop_np vpop_pend vpop_done vpop_uix.
+    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hpend Hdone".
+    iSplitR; [iPureIntro; exact Hctl|].
+    iSplitR; [iPureIntro; exact (vproto_ok_pop _ _ _ sl Hok Hlt Hsl)|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iSplitR.
+    { iPureIntro. rewrite virtio_pop_seen vpop_lo Hseen.
+      symmetry. apply wrap16_S. }
+    iSplitR.
+    { iPureIntro. rewrite virtio_pop_inflight vpop_fl Hhd Hah. reflexivity. }
+    iSplitR; [iPureIntro; rewrite virtio_pop_taken; exact Htkc|].
+    iSplitR; [iPureIntro; rewrite virtio_pop_uidx; exact Hui|].
+    iSplitR; [iPureIntro; exact Hridx|].
+    iSplitR; [iPureIntro; exact Hwce|].
+    iPureIntro. rewrite /vp_wt virtio_pop_cache. exact Hwt.
+  Qed.
+
   Lemma virtio_proto_capture_step (γ : disk_names) (v : virtio_state)
       (m : gmap Arch.pa (bv 8)) (mv : vmem) (i : bv 16) (v' : virtio_state) :
     mem_view m mv ->

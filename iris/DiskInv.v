@@ -1071,11 +1071,11 @@ Proof.
     pose proof (desc_at_of_reads c mv pin pd td _ _ _ _ Hc Hv Hdt) as Dt.
     assert (Hqn : bv_unsigned (vc_qnum c) = 8)
       by (rewrite Hq; vm_compute; reflexivity).
-    assert (Hhead : avail_ring_at c mv (wrap16 p) = Z_to_bv 16 (Z.of_nat hd)).
-    { rewrite (avail_ring_at_wrap c mv p Hq).
-      exact (view_word_read pin mv (ring_entry_pa c p) 2 _ Hv Hring). }
-    unfold req_at, chain_at. cbv zeta.
-    rewrite Hqn Hhead.
+    (* NO RING LOOKUP: the chain is read from the HEAD the slot names, which
+       for an [rw_slot] is [hd] itself. *)
+    unfold req_from, chain_from. cbv zeta.
+    cbn [rw_slot vs_hd vs_req vr_head].
+    rewrite Hqn.
     rewrite (bv16_small hd Hh).
     assert (Hlth : (Z.of_nat hd <? 8) = true) by (apply Z.ltb_lt; lia).
     rewrite Hlth. cbn [negb].
@@ -1095,4 +1095,16 @@ Proof.
     rewrite Hoff.
     rewrite (view_word_read pin mv (pa_add hops 8%nat) 8 sec Hv Hsec).
     reflexivity.
+  - (* spo_desc: the head descriptor's own bytes are pinned, which is what
+       makes the head EXCLUSIVE to this chain (VirtioQueue.vproto_hd_fresh) *)
+    cbn [rw_slot vs_hd vs_req vr_head].
+    rewrite (bv16_small hd Hh).
+    assert (Hbase : pa_off (vc_desc c) (vq_desc_size * Z.of_nat hd)
+                    = d_desc pd hd).
+    { rewrite Hc. unfold pa_off, d_desc, vq_desc_size, pa_add.
+      f_equal. lia. }
+    rewrite Hbase.
+    destruct Hdh as (Ha & _ & _ & _).
+    apply (read_bytes_dom_sub pin (d_desc pd hd) 8 _ Ha).
+    apply pa_range_base. change (N.to_nat 8) with 8%nat. lia.
 Qed.
