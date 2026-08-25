@@ -84,9 +84,11 @@ carries the file system across eras and `Himg` is deleted (lane E).
   `blk_ledger_cut` names the footprint slot by slot (`fp_slot`/`fp_list`)
   and `ledger_carve` spends it, the disjointness coming from the used-set
   coupling plus three per-object clauses at the END of `snap_bytes`
-  (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), each with its
-  witness; `fs_state_of_ledger_era` is the check that the same core
-  applies at `FsBytesGamma.fs_gamma_L`, which is what lane E calls.
+  (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), all three
+  discharged by `FsDurImg.img_snap_ok` and so witnessed at the literal
+  image by `FsAdequacyImg.fsimg_snap_ok`; `fs_state_of_ledger_era` is the
+  check that the same core applies at `FsBytesGamma.fs_gamma_L`, which is
+  what lane E calls.
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
   `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
   `snap_bytes`' used-set coupling — lane B's finding, plan §4, §8);

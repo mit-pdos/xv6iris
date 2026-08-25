@@ -361,33 +361,13 @@ Proof.
   rewrite /SB_BNO. lia.
 Qed.
 
-(* ---- THE THREE NEW CLAUSES ARE INHABITED ---------------------------- *)
-(*  Nothing in the tree proves [snap_bytes] yet (lane B does), so the      *)
-(*  clauses the cut added get their witnesses HERE, at xv6's own layout    *)
-(*  (plan section 7).  [sk_sbok] is [FsImg.fs_sb_wf], which the image      *)
-(*  conjunct W1 already carries; [sk_reg] admits every inum of the region  *)
-(*  INCLUDING the tail past [ninodes], which is exactly what the image     *)
-(*  instance names; [sk_slot] is free of a bare node -- the shape every    *)
-(*  free record has.                                                       *)
-
-Definition snap_sb_witness : fs_sb := MkFsSb FSMAGIC 37 1 16 31 2 33 35.
-
-Lemma snap_sb_witness_ok : fs_sb_ok snap_sb_witness.
-Proof. apply fs_sb_wf_ok. vm_compute. reflexivity. Qed.
-
-(* the region of that superblock is TWO blocks, so the clause admits the
-   thirty-two inums those blocks hold -- twice its [ninodes] *)
-Lemma snap_reg_witness (i : Z) :
-  0 <= i < 32 ->
-  0 <= i /\ i `div` 16 < sb_bmapstart snap_sb_witness
-                         - sb_inodestart snap_sb_witness.
-Proof.
-  intros Hi. split; [lia |].
-  change (sb_bmapstart snap_sb_witness - sb_inodestart snap_sb_witness) with 2.
-  pose proof (Z.div_mod i 16 ltac:(lia)).
-  pose proof (Z.mod_pos_bound i 16 ltac:(lia)). lia.
-Qed.
-
+(* THE THREE CUT CLAUSES ARE INHABITED at the REAL instance, and their
+   witness is [FsAdequacyImg.fsimg_snap_ok] -- [snap_ok] at the literal
+   mkfs image, unconditionally (plan section 7).  [FsDurImg.img_snap_ok]
+   discharges [sk_sbok] off W1, [sk_reg] off "the region is exactly
+   [[inodestart, bmapstart)]" and [sk_slot] off W4; the FREE inums, which
+   W4 says nothing about, go through the one reading below -- a bare node
+   names no block at all, so its footprint is injective for free. *)
 Lemma fn_slot_inj_bare (n : fs_node) : fn_bare n -> fn_slot_inj n.
 Proof.
   intros Hbare k j Hk Hj Hnz.
