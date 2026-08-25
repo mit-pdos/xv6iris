@@ -836,7 +836,7 @@ Section VdrwfP6.
     (* ================= STEP 1: withdraw the parked payoff ============== *)
     rewrite /vdrw_body.
     iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring)".
+                           Hpub & #Hlb & Hrd & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring)".
     assert (Hqpk : q ∈ dom pk) by (apply elem_of_dom; eexists; exact Hpq).
     assert (Hqnr : (q < nr)%nat) by exact (Hpkb q Hqpk).
     assert (Hnflq : q ∉ dom fl)
@@ -1331,7 +1331,7 @@ Section VdrwfP6.
     { intros i N1 N2 N3. rewrite /fr' (fr_upd_ne _ t i true N3)
         (fr_upd_ne _ m2 i true N2) (fr_upd_ne fr h i true N1). reflexivity. }
     iAssert (disk_res γd pd pav pu)
-      with "[Hpub Hcl Huidx Hflm Hpkm Hfb Hring]" as "HR".
+      with "[Hpub Hrd Hcl Huidx Hflm Hpkm Hfb Hring]" as "HR".
     { iApply (vdrw_body_close γd pd pav pu np nr fl (delete q pk) (delete q tr) fr').
       rewrite /vdrw_body.
       iSplitR; [iPureIntro; exact Hdfl|].
@@ -1372,7 +1372,7 @@ Section VdrwfP6.
         assert (Hnt : i <> t)
           by (intro Hc; subst i; exact (proj1 (elem_of_disjoint _ _) Hdj t Hi Hint)).
         rewrite (Hfr'other i Hnh Hnm Hnt). exact (Htrfr p T i Hp Hi). }
-      iFrame "Hpub Hlb Hcl Huidx Hflm Hpkm Hfb Hring". }
+      iFrame "Hpub Hlb Hrd Hcl Huidx Hflm Hpkm Hfb Hring". }
     (* ================= +0x210 .. +0x218: release ====================== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64) Ra0
               (mword_of_int 30 : mword 20) G3 (trap_res eb + (K - 12))%nat false

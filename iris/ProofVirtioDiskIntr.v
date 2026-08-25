@@ -2831,7 +2831,7 @@ Section VtLoopProof.
     destruct Hbnd as [Hnrc Hcnp].
     rewrite /disk_res_at.
     iDestruct "Hres" as "(%Hdomfl & %Hpkb & %Hdomtr & %Hcoh & %Htriok & %Htridisj & %Hfrfree &
-                          Hpub & #Hlbnr & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
+                          Hpub & #Hlbnr & Hrd & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
     destruct (vt_flight_at_nr np nr c fl Hdomfl Hnrc Hcnp) as [vv Hb].
     iDestruct (big_sepM_delete _ fl nr vv Hb with "Hfl") as "[Hflb Hfl]".
     set (b := dc_buf vv). set (sl := dc_slot vv). set (pin := dc_pin vv).
@@ -3140,7 +3140,7 @@ Section ProofVirtioDiskIntr.
     iDestruct (disk_res_at_elim with "HR") as (np nr fl pk tr fr) "Hres".
     rewrite /disk_res_at.
     iDestruct "Hres" as "(%Hdomfl & %Hpkb & %Hdomtr & %Hcoh & %Htriok & %Htridisj & %Hfrfree &
-                          Hpub & #Hlbnr & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
+                          Hpub & #Hlbnr & Hrd & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
     iApply (wp_vt_entry_test γu γd pd pav pu MI (trap_res b + (K - 4))%nat np nr pme HMIs1
               with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbnr Hidx").
     iSplit.
