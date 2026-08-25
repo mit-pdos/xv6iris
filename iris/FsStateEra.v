@@ -1182,13 +1182,20 @@ Section EraRes.
   (* ---- INJECTIVITY IS THE [*] ---------------------------------------- *)
 
   (* two DIFFERENT owned slots name two DIFFERENT blocks -- [blkmap_wf]'s
-     fifth conjunct, read off the ownership and not maintained anywhere *)
-  Lemma inode_owned_era_slot_inj γfs γi inum n :
-    inode_owned_era γfs γi inum n -∗
+     fifth conjunct, read off the ownership and not maintained anywhere.
+
+     AT A SHARE (lane B'): the reading holds of ANY [dq] whose double is
+     invalid, so it is available off the escrow's THREE-QUARTER residue of a
+     read-locked inode as well as off a full bundle -- which is what the
+     commit's collection needs (plan section 4, [blk_owned_ne_34]). *)
+  Lemma inode_owned_era_q_slot_inj γfs dq γi inum n :
+    ~ ✓ (dq ⋅ dq) ->
+    inode_owned_era_q γfs dq γi inum n -∗
     ⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
         bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
         bm_slot (bm_of n) k = bm_slot (bm_of n) j -> k = j⌝.
   Proof.
+    intros Hnv.
     iIntros "(_ & Hb & Hi & _ & %Hl)".
     iAssert (⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
                k <> j ->
@@ -1202,19 +1209,19 @@ Section EraRes.
       destruct (decide (k = MAXFILE)) as [Hkm | Hkm];
         destruct (decide (j = MAXFILE)) as [Hjm | Hjm]; [lia | | |].
       - (* k is the indirect block, j a data slot *)
-        rewrite /ind_owned (decide_False _ _ Hnk).
+        rewrite /ind_owned_q (decide_False _ _ Hnk).
         destruct (proj2 (inl_blk_dom Hl j
                     ltac:(rewrite -MAXFILE_FS; lia)) Hnj) as [bs Hbs].
         iDestruct (big_sepM_lookup _ _ j bs Hbs with "Hb") as "Hbj".
-        iApply (FsStateDefs.blk_owned_ne _ (fs_gamma_L_excl γfs)
-                  with "Hi Hbj").
+        iApply (FsStateDefs.blk_owned_q_ne _ (fs_gamma_L_excl γfs) dq dq
+                  _ _ _ _ Hnv with "Hi Hbj").
       - (* j is the indirect block, k a data slot *)
-        rewrite /ind_owned (decide_False _ _ Hnj).
+        rewrite /ind_owned_q (decide_False _ _ Hnj).
         destruct (proj2 (inl_blk_dom Hl k
                     ltac:(rewrite -MAXFILE_FS; lia)) Hnk) as [bs Hbs].
         iDestruct (big_sepM_lookup _ _ k bs Hbs with "Hb") as "Hbk".
-        iApply (FsStateDefs.blk_owned_ne _ (fs_gamma_L_excl γfs)
-                  with "Hbk Hi").
+        iApply (FsStateDefs.blk_owned_q_ne _ (fs_gamma_L_excl γfs) dq dq
+                  _ _ _ _ Hnv with "Hbk Hi").
       - (* two data slots *)
         destruct (proj2 (inl_blk_dom Hl k
                     ltac:(rewrite -MAXFILE_FS; lia)) Hnk) as [bsk Hbsk].
@@ -1224,12 +1231,75 @@ Section EraRes.
         assert (Hbsj' : delete k (fn_blk n) !! j = Some bsj)
           by (rewrite lookup_delete_ne; [exact Hbsj | done]).
         iDestruct (big_sepM_lookup _ _ j bsj Hbsj' with "Hrest") as "Hbj".
-        iApply (FsStateDefs.blk_owned_ne _ (fs_gamma_L_excl γfs)
-                  with "Hbk Hbj"). }
+        iApply (FsStateDefs.blk_owned_q_ne _ (fs_gamma_L_excl γfs) dq dq
+                  _ _ _ _ Hnv with "Hbk Hbj"). }
     iPureIntro. intros k j Hk Hj Hnk Heq.
     destruct (decide (k = j)) as [-> | Hkj]; [done |].
     exfalso. apply (Hne k j Hk Hj Hkj Hnk); rewrite -Heq; [exact Hnk |].
     by rewrite Heq.
+  Qed.
+
+  Lemma inode_owned_era_slot_inj γfs γi inum n :
+    inode_owned_era γfs γi inum n -∗
+    ⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
+        bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
+        bm_slot (bm_of n) k = bm_slot (bm_of n) j -> k = j⌝.
+  Proof.
+    rewrite inode_owned_era_1.
+    iApply (inode_owned_era_q_slot_inj γfs (DfracOwn 1) γi inum n
+              (dfrac_full_nvalid _)).
+  Qed.
+
+  (* the residue a READ-LOCKED inode leaves in its escrow is at three
+     quarters, and that is exactly the share at which the reading above
+     holds (3/4 + 3/4 > 1) *)
+  Lemma inode_owned_era_34_slot_inj γfs γi inum n :
+    inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
+    ⌜forall k j : nat, (k <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
+        bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
+        bm_slot (bm_of n) k = bm_slot (bm_of n) j -> k = j⌝.
+  Proof.
+    iApply (inode_owned_era_q_slot_inj γfs (DfracOwn (3/4)) γi inum n
+              dfrac_34_nvalid).
+  Qed.
+
+  Lemma inode_owned_era_q_local γfs dq γi inum n :
+    inode_owned_era_q γfs dq γi inum n -∗ ⌜inode_local (bv_unsigned inum) n⌝.
+  Proof. iIntros "(_ & _ & _ & _ & $)". Qed.
+
+  (* ---- THE DATA-BLOCK ACCESSOR AT A SHARE (plan section 3, lane B') ----
+
+     A READ of one slot's bytes takes the caller's fraction and hands it
+     straight back; a WRITE cannot use this at all, because
+     [SpecLogWrite.wp_log_write_au_range] needs fraction 1 and the borrow
+     comes out at whatever [dq] the bundle is at.  That is the resource
+     reading of "a read-locker cannot write a data block". *)
+  Lemma inode_owned_era_q_blk_read γfs dq γi inum n (k : nat) bs :
+    fn_blk n !! k = Some bs ->
+    inode_owned_era_q γfs dq γi inum n -∗
+      FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs
+      ∗ (FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs -∗
+           inode_owned_era_q γfs dq γi inum n).
+  Proof.
+    intros Hbs. iIntros "(Hd & Hb & Hi & Ht & %Hl)".
+    iDestruct (big_sepM_delete _ _ k bs Hbs with "Hb") as "[Hbk Hrest]".
+    iFrame "Hbk". iIntros "Hbk".
+    iDestruct (big_sepM_delete _ _ k bs Hbs) as "[_ Hback]".
+    iFrame. iSplitL; [| done]. iApply "Hback". iFrame.
+  Qed.
+
+  Lemma inode_bytes_era_blk_read γfs dq n (k : nat) bs :
+    fn_blk n !! k = Some bs ->
+    inode_bytes_era γfs dq n -∗
+      FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs
+      ∗ (FsStateDefs.blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs -∗
+           inode_bytes_era γfs dq n).
+  Proof.
+    intros Hbs. iIntros "[Hb Hi]".
+    iDestruct (big_sepM_delete _ _ k bs Hbs with "Hb") as "[Hbk Hrest]".
+    iFrame "Hbk". iIntros "Hbk".
+    iDestruct (big_sepM_delete _ _ k bs Hbs) as "[_ Hback]".
+    iFrame. iApply "Hback". iFrame.
   Qed.
 
   (* ---- COVERAGE IS A CONSEQUENCE OF OWNING THE RUN -------------------- *)
