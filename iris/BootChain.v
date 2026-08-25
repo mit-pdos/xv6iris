@@ -718,7 +718,8 @@ Section BootPrimary.
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
-    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
+       i ↪[dn_head γv] st) -∗
     disk_done_lb γv 0%nat -∗
     kpt_unset -∗
     kmap_auth kmap_M0 -∗

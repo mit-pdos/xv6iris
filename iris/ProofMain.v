@@ -1389,7 +1389,8 @@ Section ProofMain.
     ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
     d_used_idx ↦₂ wrap16 0%nat -∗
     ([∗ list] i ∈ seq 0 8, disk_slot_raw i) -∗
-    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
+       i ↪[dn_head γv] st) -∗
     disk_done_lb γv 0%nat -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) -∗

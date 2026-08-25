@@ -621,12 +621,13 @@ Section SpecMain.
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (* ...and the two disk ghosts the protocol invariant does NOT hold, minted
        with it at power-on ([VirtioProto.disk_ghosts_alloc]) and owed to the
-       vdisk_lock's resource at main's [newlock]: nothing has ever been
-       published (the [dn_claim] authority is at ∅) and the completed count is
-       at least 0 (persistent).  Together with [main_globals_raw]'s
+       vdisk_lock's resource at main's [newlock]: the eight per-descriptor
+       RECEIPTS, all at [HInactive] because nothing has ever been published,
+       and the completed count is at least 0 (persistent).  Together with [main_globals_raw]'s
        [d_used_idx] / [disk_slot_raw] cells and virtio_disk_init's
        postcondition these are exactly [DiskBoot.disk_res_boot]'s inputs. *)
-    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
+       i ↪[dn_head γv] st) -∗
     disk_done_lb γv 0%nat -∗
     (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
        stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
