@@ -229,6 +229,11 @@ Record dclaim := DClaim {
   dc_slot : vslot;
   dc_tri  : nat * nat * nat;
   dc_pin  : gmap Arch.pa (bv 8);
+  (* THE POSITION this chain was published at.  The receipt below carries the
+     [dn_slot] fragment for it while the request is live, and the interrupt
+     handler retires the slot with that fragment -- so the position has to be
+     pinned in the claim rather than existentially quantified. *)
+  dc_pos  : nat;
 }.
 
 (* THE PER-DESCRIPTOR RECEIPT (tools/vtest/README.md finding 5).
@@ -249,6 +254,11 @@ Record dclaim := DClaim {
    on every re-acquire. *)
 Inductive hstate :=
   | HInactive
+  (* [disk.info[i].b] has been written and [b->disk] set, but the chain is
+     not published yet -- xv6 does those two stores before it touches the
+     available ring. *)
+  | HStaged (v : dclaim)
+  (* published: the device has the chain, or it has come back *)
   | HActive (v : dclaim).
 
 (* NB: the disk IMAGE map is deliberately NOT here -- it is
