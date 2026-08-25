@@ -35,7 +35,10 @@ Require Import LogDefs.        (* [fs_home_set] *)
 Require Import FsCrash.        (* [fs_blocks] *)
 Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsCfgBoot.      (* [fs_boot_image_wf] *)
-Require Import FsCollect.      (* [col_geom] *)
+Require Import DinodeEnc.     (* [dinode], [di_type], [di_nlink]           *)
+Require Import InodeRegion.   (* [free_node], [ireg_bare], [ireg_top_park] *)
+Require Import FsStateEra.    (* [inode_owned_era] *)
+Require Import FsCollect.      (* [col_geom], [col_bundle_free]           *)
 Require Import BioDefs.        (* [bio_names] *)
 Require Import FsBlocks.       (* [fs_names], [fsblock] *)
 Require Import SbPark.         (* [sb_park], [sb_parked], [sb_park_acc]   *)
@@ -188,3 +191,79 @@ Section SbOwnedAcc.
   Qed.
 
 End SbOwnedAcc.
+
+(* ====================================================================== *)
+(*  SUPPLIER (D) AT THE BOOT STATE (durable-disk lane C-3c)                *)
+(*                                                                        *)
+(*  Plan section 7's discipline applied to the park: [InodeRegion.         *)
+(*  ireg_top_park]'s tie is GUARDED by [di_type = 0], so a witness is owed *)
+(*  that the guard really fires -- and at the mkfs image it fires at       *)
+(*  nearly every inum of the region, since boot stocks EVERY free inum's   *)
+(*  slot on the IN arm.  What the accessor then hands the commit is a      *)
+(*  bundle at THE IMAGE'S OWN NODE, [FsCfgBoot.img_node] -- the very value *)
+(*  [FsCfgBoot.img_nodes] puts in [InodeRegion.ftop_inv]'s map at boot --   *)
+(*  so [FsCollect.col_hand]'s big-op is satisfied at the abstract state    *)
+(*  the authority holds, and not at some node of the witness's choosing.   *)
+(*                                                                        *)
+(*  Conjunct (14) [FsImg.fs_region_bare] is the whole of what it costs,    *)
+(*  and it is already in the bundle both adequacy theorems carry.          *)
+(* ====================================================================== *)
+
+Section CollectImgFree.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  (* a free inum's node at the image IS [InodeRegion.free_node] of its
+     record: conjunct (14) makes the node bare, and a bare node has no
+     freedom left ([InodeRegion.free_node_of_bare]) *)
+  Lemma img_free_node (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
+      (cov : gset Z) (z : Z) :
+    fs_boot_image_wf dk ndisk sb nib cov ->
+    0 <= z < 16 * Z.of_nat nib ->
+    bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb z)) = 0 ->
+    img_node (fs_blocks dk) sb z = free_node (fs_dinode (fs_blocks dk) sb z).
+  Proof.
+    intros Hwf Hz Hty.
+    destruct Hwf as (_ & Hrw & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+                     & Hbare & _).
+    exact (free_node_of_bare (img_node (fs_blocks dk) sb z)
+             (img_node_bare (fs_blocks dk) sb nib z Hbare
+                (fs_region_wf_nlink _ _ _ Hrw) Hz Hty)).
+  Qed.
+
+  (* THE EXERCISE: the region's two halves at a free inum of the mkfs image
+     are a [FsCollect.col_bundle] at the image's own node. *)
+  Lemma img_col_bundle_free (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
+      (nib : nat) (cov : gset Z) (γfs : fs_names) (γi : gname)
+      (inum : bv 32) :
+    fs_boot_image_wf dk ndisk sb nib cov ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb (bv_unsigned inum))) = 0 ->
+    dinode_at γi inum (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) -∗
+    ireg_top_park γfs (bv_unsigned inum)
+      (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) -∗
+    col_bundle γfs γi (bv_unsigned inum)
+      (img_node (fs_blocks dk) sb (bv_unsigned inum)).
+  Proof.
+    intros Hwf Hlt Hty.
+    pose proof (bv_unsigned_in_range _ inum) as [Hlo _].
+    assert (Hz : 0 <= bv_unsigned inum < 16 * Z.of_nat nib) by lia.
+    pose proof Hwf as Hwf'.
+    destruct Hwf' as (_ & Hrw & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+                      & Hbare & _).
+    assert (Hb : ireg_bare (fs_dinode (fs_blocks dk) sb (bv_unsigned inum))).
+    { exact (ireg_bare_of_fn_bare (img_node (fs_blocks dk) sb (bv_unsigned inum))
+               (img_node_bare (fs_blocks dk) sb nib (bv_unsigned inum) Hbare
+                  (fs_region_wf_nlink _ _ _ Hrw) Hz Hty)). }
+    assert (Hnl : bv_unsigned
+                    (di_nlink (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)))
+                  = 0)
+      by exact (fs_region_nlink_free (fs_blocks dk) sb nib (bv_unsigned inum)
+                  (fs_region_wf_nlink _ _ _ Hrw) Hz Hty).
+    rewrite (img_free_node dk ndisk sb nib cov (bv_unsigned inum) Hwf Hz Hty).
+    iIntros "Hdn Hpk".
+    iApply (col_bundle_free γfs γi inum
+              (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) Hb Hnl Hty
+              with "Hdn Hpk").
+  Qed.
+
+End CollectImgFree.

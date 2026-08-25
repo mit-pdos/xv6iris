@@ -66,11 +66,9 @@
 (*                  [IregClean.ireg_snap_local_acc];                       *)
 (*    col_geom   -- the boot configuration ([FsCollectImg.img_col_geom]).  *)
 (*                                                                        *)
-(*  ONE SUPPLIER STILL DOES NOT EXIST IN THE TREE: (D), a lane C finding   *)
-(*  and not a proof difficulty -- it is an era-side invariant that FORGETS *)
-(*  a fact its producer holds.  (A) and (C) are SUPPLIED and their entries *)
-(*  below record where; (B) is the ABI sweep the plan sanctions as a       *)
-(*  hypothesis, and (A) hands it one more inum to cover.                   *)
+(*  THREE OF THE FOUR ARE SUPPLIED -- (A), (C) and (D), and their entries  *)
+(*  below record where.  WHAT REMAINS IS (B) ALONE: the ABI sweep the plan  *)
+(*  sanctions as a hypothesis (P1), which (A) hands one more inum to cover. *)
 (*                                                                        *)
 (*  (A) THE PARTITION -- SUPPLIED (durable-disk lane C-3b), AND IT HAS      *)
 (*      THREE PARTS.  [IcacheEscrow]'s section 5c: [ipool_body] gains [cn]  *)
@@ -128,52 +126,61 @@
 (*      the closure fixes it there; [sb_bmapstart sb] and [sb_size sb]     *)
 (*      against the config are the two ties that identification needs.     *)
 (*                                                                        *)
-(*  (D) A FREE INUM'S ABSTRACT NODE IS UNTIED TO ITS RECORD.               *)
-(*      [IcacheEscrow.ipool_shape_np]'s MARKER arm -- what a FREE inum's   *)
-(*      pool row is -- holds [InodeRegion.imark] and an existential        *)
-(*      [top_frag] its own comment calls UNTIED, and no [dinode_at].  The  *)
-(*      region holds that inum's record ([ireg_slot]'s [ireg_in] arm, the  *)
-(*      fragment [z ↪[γi] d]) and its link AUTHORITY at [ireg_nl d]        *)
-(*      ([ireg_lnk]).  Nothing connects the two, so for a free inum the    *)
-(*      commit can prove neither [sk_rec] (the region's bytes encode       *)
-(*      [fn_rec n]) nor [sk_links] ([fn_nlink n = ireg_nl d]): both run    *)
-(*      through [col_bundle_rec]'s ghost-map agreement, which only an      *)
-(*      ALLOCATED inum's [inode_owned_era] supplies.  The producer HAS the *)
-(*      fact -- iput's free path deposits the marker arm at the node it    *)
-(*      just flushed -- and the arm forgets it.  The cheapest fix is one   *)
-(*      tie: a HALF of [FsState.top_frag_q] parked region-side in          *)
-(*      [ireg_slot]'s free arm under [⌜fn_rec n = d⌝ ∗ ⌜inode_local z n⌝], *)
-(*      the pool's marker arm keeping the other half; it reaches           *)
-(*      [ProofIalloc]'s claim and [ProofIput]'s free deposit.              *)
-(*      IT IS NOT A CORNER CASE: boot stocks EVERY free inum as a marker   *)
-(*      arm ([IcacheBoot.ipool_shape_free], whose own comment says the     *)
-(*      value is the image's node but UNTIED), so at the mkfs image the    *)
-(*      first commit meets it at nearly every inum of the region.          *)
+(*  (D) A FREE INUM'S ABSTRACT NODE -- SUPPLIED (durable-disk lane C-3c).  *)
+(*      The era's [FsState.top_frag] used to ride the pool's MARKER arm    *)
+(*      ([IcacheEscrow.ipool_shape_np]) UNTIED, and the region held that   *)
+(*      inum's record separately, so at a free inum the commit could prove *)
+(*      neither [sk_rec] nor [sk_links].  The fragment now parks WITH the  *)
+(*      record, in [InodeRegion.ireg_top_park] -- a conjunct of            *)
+(*      [ireg_slot]'s IN arm and of its PENDING arm, i.e. of exactly the   *)
+(*      two arms that hold [z |->[γi] d].                                  *)
 (*                                                                        *)
-(*      MEASURED (durable-disk C-3b, not attempted).  The HALF above does  *)
-(*      not survive [InodeRegion.ireg_claim_au], which moves the record    *)
-(*      type-0 -> [fresh_shape] and cannot retag a half.  Two shapes do:   *)
-(*      GUARD the pin by [di_type d = 0] (the claim's obligation goes      *)
-(*      vacuous and nothing moves there), the half then leaving at         *)
-(*      [ireg_withdraw] -- the ONE exit from the [ireg_in] arm, since it   *)
-(*      requires [di_type <> 0], so a free record's fragment only ever     *)
-(*      leaves through a claim box; or park the WHOLE [top_frag]           *)
-(*      region-side and delete the marker arm's, in which case             *)
-(*      [ireg_claim_au] retags it itself ([ireg_inv] already bundles       *)
-(*      [ftop_inv]; the cost is one [ftopN] mask premise and its single    *)
-(*      caller is [ProofIalloc]).  Footprint either way: [ireg_slot]'s     *)
-(*      free sub-arm plus [ireg_slot_intro] (33 call sites), the withdraw, *)
-(*      the free flush, boot.                                             *)
-(*      AND THE TIE MUST GIVE MORE THAN [sk_rec]/[sk_links]: [col_hand]    *)
-(*      asks for a [col_bundle] at EVERY inum of [I], so a free inum needs *)
-(*      a whole [FsStateEra.inode_owned_era_q] -- the region's [z |->[gi]  *)
-(*      d] IS its [dinode_at] and the marker arm's fragment is its         *)
-(*      [top_frag_q], but the block and indirect legs are [emp] only if    *)
-(*      the record is BARE, so the pinned node has to be [MkNode d         *)
-(*      (replicate FS_NINDIRECT (bv_0 32)) empty] with [inode_local] of    *)
-(*      it -- which is exactly what forces bareness.                       *)
+(*      THE TIE IS GUARDED BY THE TYPE, and that is what makes it free at  *)
+(*      every mover.  At a TYPE-0 record the node is [InodeRegion.         *)
+(*      free_node d] outright -- the record is bare, so [FsStateInode.     *)
+(*      fn_bare] leaves the entry array and the block map no freedom       *)
+(*      ([free_node_of_bare]) -- and at a claim box the fragment rides     *)
+(*      UNTIED exactly as it did in the pool.  So [ireg_claim_au], which   *)
+(*      retags the record 0 -> [fresh_shape], carries it across with NO    *)
+(*      resource move and no [ftopN] open, and [ireg_withdraw] hands it to *)
+(*      the fill in the same shape the marker arm used to, leaving         *)
+(*      ProofIlock's [ireg_top_retag] untouched.                          *)
 (*                                                                        *)
-(*  NONE of them is visible from inside this file, which is the point of   *)
+(*      HOW IT GETS BACK TO THE REGION, which was the whole difficulty:    *)
+(*      the fragment a free inum needs is the one iput's payload carried,  *)
+(*      and the walk gives the pool entry up at +0x94 -- twenty            *)
+(*      instructions before the off-lock deposit that writes the type-0    *)
+(*      record.  The deposit cannot reach the pool (the itable lock is     *)
+(*      long gone) and the +0x94 park cannot reach the deposit; the ONE    *)
+(*      thing both open is the per-inum ESCROW.  So the fragment travels   *)
+(*      the road the standing freeze already travels -- in at              *)
+(*      [EscrowInode.escA_alloc], parked in the EMPTY arm of               *)
+(*      [escA_body] (which gains [γfs] for it), out at                     *)
+(*      [escA_deposit_acc] -- and [EscrowDeposit.ireg_free_deposit_au]     *)
+(*      retags it at the corpse's bare record and parks it region-side.    *)
+(*      That mover's two new premises are [↑ftopN] (the retag) and         *)
+(*      [InodeRegion.ireg_bare dn'], the latter free at iput because       *)
+(*      itrunc has already zeroed the size and the addresses.              *)
+(*                                                                        *)
+(*      THE ACCESSOR IS [col_free_slot_acc] (section 5 below): the pool's  *)
+(*      ordinary row is on its marker arm, which carries                   *)
+(*      [InodeRegion.imark], so the region's own marked arm is refuted     *)
+(*      ([imark_excl]) and the slot is on the IN arm or the PENDING one -- *)
+(*      both of which hold the record fragment AND the park.  It LENDS a   *)
+(*      whole [FsStateEra.inode_owned_era] at [free_node d] and takes it   *)
+(*      back, because every conclusion this file draws is pure.            *)
+(*      [col_bundle_free] is the same reading at [col_bundle]'s own shape. *)
+(*      NON-VACUITY AT THE REAL INSTANCE (plan section 7):                 *)
+(*      [FsCollectImg.img_col_bundle_free] -- at the mkfs image the bundle *)
+(*      comes out at [FsCfgBoot.img_node], the very value                  *)
+(*      [InodeRegion.ftop_inv]'s map holds at boot, off conjunct (14)      *)
+(*      [FsImg.fs_region_bare] and nothing else.  It is not a corner case: *)
+(*      boot stocks EVERY free inum's slot that way ([IcacheBoot.          *)
+(*      ireg_alloc], whose image premise family gains [image_bare] and     *)
+(*      [image_rec_at]), so the first commit meets it at nearly every inum *)
+(*      of the region.                                                     *)
+(*                                                                        *)
+(*  NEITHER is visible from inside this file, which is the point of        *)
 (*  stating [col_hand] as a named predicate: the collection is CLOSED      *)
 (*  (see [col_snap_ok]), and what remains is exactly its suppliers.        *)
 (* ====================================================================== *)
@@ -203,6 +210,7 @@ Require Import FsStateInode. (* [inode_local], [ind_owned_q]                *)
 Require Import FsStateBitmap. (* [free_bitmap_at], [free_pool_used_q]        *)
 Require Import FsState.       (* [fs_state_rec], [fs_links], [sb_owned]     *)
 Require Import FsStateEra.    (* [inode_owned_era_q]                        *)
+Require Import EscrowDefs.    (* [reg_full] / [reg_half] / [region_pending] *)
 Require Import InodeRegion.   (* [dinode_at], [ireg_recs], [ireg_couple]    *)
 Require Import FsDurSnap.     (* [snap_bytes], [snap_local], [snap_ok]      *)
 
@@ -1129,5 +1137,103 @@ Section Collect.
   Lemma free_node_nlink (d : dinode) :
     bv_unsigned (di_nlink d) = 0 -> fn_nlink (free_node d) = 0%nat.
   Proof. intros Hnl. rewrite /fn_nlink /free_node /= Hnl //. Qed.
+
+  (* ==================================================================== *)
+  (*  THE ACCESSOR SUPPLIER (D) IS: one region slot, lent and taken back   *)
+  (* ==================================================================== *)
+
+  (* WHAT THE COMMIT HOLDS AT A FREE INUM, and where each half is.  The
+     pool's ORDINARY row is on its MARKER arm ([IcacheEscrow.ipool_shape_np]'s
+     second alternative), which carries [InodeRegion.imark]; the region's
+     slot for that inum therefore cannot be on its own marked arm
+     ([InodeRegion.imark_excl]), so it is on the IN arm or the PENDING one --
+     and BOTH hold the record fragment and the park.  That is the whole
+     supplier: at a type-0 record the two are one [inode_owned_era].
+
+     IT IS AN ACCESSOR AND NOT A MOVE, for this file's own reason: every
+     conclusion the collection draws is PURE, so the slot goes back verbatim
+     and the region invariant closes with the body it was opened with.  The
+     [imark] is only READ (it refutes the marked arm) and comes straight
+     back.
+
+     THE SLOT, NOT THE INVARIANT: [InodeRegion.ireg_blks_acc_upd] and
+     [ireg_slots_acc_upd] are what open [iregN] down to one slot, and they
+     are the commit's business; this lemma is the last step, so [FsCollect]
+     stays a LEAF and the [icEscN]/[ipoolN] side never enters its cone. *)
+  (* A NESTED SECTION, and it costs the file nothing: [InodeRegion.ireg_slot]
+     is stated over the ambient region configuration, so naming it needs
+     [IcacheRef.icfg] -- a class the outer section deliberately does not have
+     (the arithmetic above is configuration-free).  A nested section puts the
+     parameter on these two lemmas alone. *)
+  Section FreeSlot.
+  Context `{ICFG : icfg}.
+
+  Lemma col_free_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    bv_unsigned (di_type d) = 0 ->
+    imark γi (bv_unsigned inum) -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+      imark γi (bv_unsigned inum)
+      ∗ inode_owned_era γfs γi inum (free_node d)
+      ∗ (inode_owned_era γfs γi inum (free_node d) -∗
+           ireg_slot γfs γi (bv_unsigned inum) d).
+  Proof.
+    intros Ht0. iIntros "Hmk Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
+                            %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+                            #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
+                            Harm) [Hep Hlnk]]".
+    (* (L3): a free record's link count is zero, proved inside the region *)
+    assert (Hnl : bv_unsigned (di_nlink d) = 0) by exact (proj1 (proj2 Hlok) Ht0).
+    iAssert (imark γi (bv_unsigned inum)
+             ∗ (bv_unsigned inum ↪[γi] d)
+             ∗ ireg_top_park γfs (bv_unsigned inum) d
+             ∗ ((bv_unsigned inum ↪[γi] d)
+                -∗ ireg_top_park γfs (bv_unsigned inum) d
+                -∗ (((⌜ireg_in d⌝ ∗ (bv_unsigned inum ↪[γi] d)
+                      ∗ ireg_top_park γfs (bv_unsigned inum) d)
+                     ∨ (⌜ireg_marked_ok cl d⌝ ∗ imark γi (bv_unsigned inum)))
+                    ∗ (∃ ge gr, reg_full (bv_unsigned inum) ge gr))
+                   ∨ (⌜bv_unsigned (di_type d) = 0⌝
+                      ∗ (bv_unsigned inum ↪[γi] d)
+                      ∗ (∃ ge gr, reg_half (bv_unsigned inum) ge gr)
+                      ∗ region_pending (bv_unsigned inum)
+                      ∗ ireg_top_park γfs (bv_unsigned inum) d)))%I
+      with "[Hmk Harm]" as "(Hmk & Hfr & Hpk & Hback)".
+    { iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
+      - iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk']]"; last first.
+        { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
+        iFrame "Hmk Hfr Hpk". iIntros "Hfr Hpk".
+        iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
+        iLeft. iSplitR; [iPureIntro; exact Hin1 |]. iFrame "Hfr Hpk".
+      - iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
+        iFrame "Hmk Hfr Hpk". iIntros "Hfr Hpk".
+        iRight. iSplitR; [iPureIntro; exact Htp |]. iFrame "Hfr Hrh Hrp Hpk". }
+    iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
+      as "[%Hb Htop]".
+    iFrame "Hmk".
+    iSplitL "Hfr Htop".
+    { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0 with "Hfr Htop"). }
+    iIntros "Hown".
+    iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
+    iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
+      as "Hpk".
+    iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl rl pl
+              fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+              with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hpk Hback]").
+    iApply ("Hback" with "Hfr Hpk").
+  Qed.
+
+  End FreeSlot.
+
+  (* ...and the collection's own view of what came out.  [col_hand]'s big-op
+     wants a [col_bundle] at every inum of the abstract map; at a free one
+     this is it, at share 1. *)
+  Lemma col_bundle_of_owned γfs (γi : gname) (inum : bv 32) (n : fs_node) :
+    inode_owned_era γfs γi inum n -∗ col_bundle γfs γi (bv_unsigned inum) n.
+  Proof.
+    iIntros "H". iExists (DfracOwn 1), inum.
+    iSplitR; [done |]. iSplitR; [iPureIntro; exact dfrac_full_nvalid |].
+    rewrite -inode_owned_era_1. iExact "H".
+  Qed.
 
 End Collect.
