@@ -160,23 +160,26 @@ with the default `cache=writeback`, 25/25 with `cache=none,aio=native`).
 
 **The model now produces both**, and `DiskOrder.v` proves it: the same program
 and the same start state under two schedules that differ only in which
-outstanding request the device picks up
+in-flight head the device completes first
 (`disk_order_admits_inorder` / `disk_order_admits_reordered`, and
 `disk_order_model_has_both` against the two captures).
-`model_serves_any_free_position` states the general fact off the model rather
-than off the test: a step answers the position it is handed, the only
-condition on that position is that the driver published it and the device has
-not served it, and afterwards exactly that position is gone from the free set.
+`model_completes_any_inflight_head` and `model_pops_in_order` state the
+general facts off the model rather than off the test: a completion answers
+the head it is handed, the only condition on it is that the device has popped
+it and not completed it, and afterwards exactly that head is gone from
+`v_inflight`; a pop takes the entry at `v_seen` and nothing else.
 
-**The device-side redesign** (design/virtio-driver.md has the rules):
-`virtio_req_step`/`virtio_capture_step` take the available-ring position as a
-parameter; the state carries a watermark `v_seen` plus the served-out-of-turn
-set `v_ahead`, with modular-distance window arithmetic (`vdist`, `vpos_pub`,
-`vfree`, section 5b of VirtioModel.v); `v_taken` names the position whose
-payload is latched rather than being a flag, and a completion releases the
-latch only if it held it.  `VirtioQueue`'s keyed protocol follows: `vp_srv`,
-`vp_lo`, `vp_tk`, `vp_uix`, with `vpo_win` (the eight-wide window) derived at
-the publish from the available-ring entry the watermark's own position pins.
+**The device-side design is QEMU's two-phase lifecycle** (design/virtio-driver.md
+has the rules): `virtio_pop_step` takes available-ring entries strictly in
+order (`v_seen` is the pop index) and what it takes is the DESCRIPTOR HEAD the
+entry names; `v_inflight : gset (bv 16)` is the set of heads popped and not
+yet completed; `virtio_req_step`/`virtio_capture_step` take the head as a
+parameter and are enabled exactly when it is in flight; `v_taken` names the
+head whose payload is latched, and a completion releases the latch only if it
+held it.  On the vtest side (`VSched.v`) that is one `SDiskPop` item per
+published request plus `SDiskCapture h`/`SDiskDma h` keyed by head; the eager
+schedule pops first, and `run_until`/`run_until_rev` differ only in
+`lowest_head` versus `highest_head`.
 
 **The Iris driver port has its own worklist:**
 [`virtio-finding5-driver-port.md`](virtio-finding5-driver-port.md); the

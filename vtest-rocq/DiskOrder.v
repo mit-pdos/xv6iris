@@ -29,14 +29,19 @@
    and waking [disk.info[id]], written that way precisely because
    completions need not come back in order.
 
-   THE FIX (claude-notes/design/virtio-driver.md).  A position is servable
-   when the driver has published it and the device has not served it yet, and
-   every step that answers a request takes the position as a PARAMETER: the
-   device state carries a watermark [v_seen] plus the set [v_inflight] of
-   positions served out of turn, and [vfree] is the window arithmetic that
-   decides which are left.  Both executions below run the SAME program on the
-   same machine; they differ only in which outstanding request the device
-   picks up ([VTest.run_until] versus [VTest.run_until_rev]). *)
+   THE FIX (claude-notes/design/virtio-driver.md) is QEMU's own two-phase
+   lifecycle.  The device POPS available-ring entries strictly in order
+   ([virtio_pop_step]: [v_seen] is the pop index, and what a pop takes is
+   the DESCRIPTOR HEAD the entry names), and it COMPLETES the heads it holds
+   in any order: [v_inflight] is the set of heads popped and not yet
+   completed, and every step that answers a request -- capture, completion
+   -- takes the HEAD as a parameter, enabled exactly when that head is in
+   flight.  The used ring reports the head back, which is why the ids the
+   test records ARE the heads: 0 for A, 3 for B.  Both executions below run
+   the SAME program on the same machine and pop both requests before
+   completing either; they differ only in which in-flight head the device
+   completes first ([VTest.run_until] takes the lowest, [VTest.run_until_rev]
+   the highest). *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list gmap bitvector.definitions.
@@ -124,38 +129,46 @@ Lemma disk_order_model_has_both :
 Proof. solve_vtest ord_qemu_orders. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 4. Stated off the MODEL rather than off this program: the served order   *)
-(*    is FREE.  A step answers the position it is given, and the only       *)
-(*    condition on that position is that the driver published it and the    *)
-(*    device has not served it yet -- there is nothing in the model that     *)
-(*    prefers one outstanding position to another.  This is the property    *)
-(*    whose absence was the finding.                                       *)
+(* 4. Stated off the MODEL rather than off this program: the completion     *)
+(*    order is FREE and the pop order is NOT.  A completion answers the     *)
+(*    head it is given, and the only condition on that head is that the     *)
+(*    device has popped it and not yet completed it -- there is nothing in  *)
+(*    the model that prefers one in-flight head to another.  This is the    *)
+(*    property whose absence was the finding.  The pop, by contrast, takes  *)
+(*    the entry at [v_seen] and nothing else, and moves [v_seen] by one:    *)
+(*    that is the half QEMU does in order, and the half xv6's ring-slot     *)
+(*    reuse depends on.                                                    *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma model_serves_any_free_position (v : virtio_state) (mv : vmem)
+Lemma model_completes_any_inflight_head (v : virtio_state) (mv : vmem)
     (i : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  (* the standing window fact, and the only thing the served set owes: a
-     position the device has served was one the driver had PUBLISHED, so the
-     published index is never in it ([VirtioModel.virtio_queue_ok] carries
-     exactly this conjunct) *)
-  avail_idx_at (v_cfg v) mv ∉ v_inflight v ->
   virtio_req_step v mv i = Some (v', w) ->
-  (* it answered the position it was handed... *)
-  (exists r, req_at (v_cfg v) mv i = Some r)
-  (* ...which was published and unserved, and nothing more was asked of it *)
-  /\ virtio_serve_ok v mv i = true
-  (* ...and afterwards exactly that position is gone from the free set *)
-  /\ (forall q, vfree (v_seen v') (avail_idx_at (v_cfg v) mv) (v_inflight v') q
-                = vfree (v_seen v) (avail_idx_at (v_cfg v) mv) (v_inflight v) q
-                  && negb (bool_decide (q = i))).
+  (* it answered the head it was handed... *)
+  (exists r, req_from (v_cfg v) mv i = Some r)
+  (* ...which was in flight, and nothing more was asked of it *)
+  /\ i ∈ v_inflight v
+  (* ...and afterwards exactly that head is gone from the in-flight set,
+     while the pop index has not moved *)
+  /\ v_inflight v' = v_inflight v ∖ {[ i ]}
+  /\ v_seen v' = v_seen v.
 Proof.
-  intros Hai H.
+  intro H.
   destruct (virtio_req_step_shape _ _ _ _ _ H) as (r & Hr & Hserve & _ & _).
-  split; [by exists r|]. split; [exact Hserve|].
-  intro q.
-  rewrite (virtio_req_step_seen _ _ _ _ _ H), (virtio_req_step_inflight _ _ _ _ _ H).
-  apply vserve_free; [ exact Hai | ].
-  exact (vfree_ne_ai _ _ _ _ (virtio_serve_free _ _ _ Hserve)).
+  split; [by exists r|].
+  split; [exact (virtio_serve_in _ _ _ Hserve)|].
+  split; [exact (virtio_req_step_inflight _ _ _ _ _ H)|].
+  exact (virtio_req_step_seen _ _ _ _ _ H).
+Qed.
+
+Lemma model_pops_in_order (v : virtio_state) (mv : vmem) (v' : virtio_state) :
+  virtio_pop_step v mv = Some v' ->
+  (* the entry taken is the one at the pop index, and only that one... *)
+  v_inflight v' = {[ avail_ring_at (v_cfg v) mv (v_seen v) ]} ∪ v_inflight v
+  (* ...and the index advances by exactly one *)
+  /\ v_seen v' = bv_add (v_seen v) one16.
+Proof.
+  intro H. destruct (virtio_pop_step_shape _ _ _ H) as [_ ->].
+  split; reflexivity.
 Qed.
 
 Definition ord_lens : list Z := [1; 1].

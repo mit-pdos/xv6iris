@@ -54,10 +54,16 @@ Proof. solve_vtest VBudget. Qed.
 (*    Without this, "the budget ran out" would be indistinguishable from    *)
 (*    "the budget was too small", which the README calls a broken test      *)
 (*    rather than a finding.  700 instructions is well past the notify, so  *)
-(*    the request is published and the device has seen it.                 *)
+(*    the request is published; the device then POPS it -- the pop reads    *)
+(*    only the ring entry, so it succeeds whatever the chain looks like --  *)
+(*    and it is the popped HEAD whose chain will not parse that stalls the  *)
+(*    device.  [SDiskPop] is [None] if nothing was published, and [None]    *)
+(*    propagates to [stalled_of = false], so this one equation also         *)
+(*    witnesses that the request was published at all.                     *)
 (* ---------------------------------------------------------------------- *)
 
-Definition chain_after_notify : option mstate := srun [SCpu 700] chain_start.
+Definition chain_after_notify : option mstate :=
+  srun [SCpu 700; SDiskPop] chain_start.
 
 Definition stalled_of (o : option mstate) : bool :=
   match o with
@@ -99,17 +105,17 @@ Proof. solve_vtest [7]. Qed.
 
 (* EXACTLY THREE, and the third must END the chain: if the descriptor that
    would be the status descriptor carries NEXT -- i.e. the chain is longer
-   than three -- [chain_at] has no parse at all.  That is the whole reason a
-   four-descriptor chain stalls this device. *)
-Lemma model_refuses_longer_chains (c : virtio_cfg) (mv : vmem) (i : bv 16) :
+   than three -- [chain_from] has no parse at all, at the HEAD the device
+   popped.  That is the whole reason a four-descriptor chain stalls this
+   device. *)
+Lemma model_refuses_longer_chains (c : virtio_cfg) (mv : vmem) (h : bv 16) :
   vd_has (desc_at c mv (bv_unsigned (vd_next
             (desc_at c mv (bv_unsigned (vd_next
-              (desc_at c mv (bv_unsigned (avail_ring_at c mv i)))))))))
+              (desc_at c mv (bv_unsigned h))))))))
          vring_desc_f_next = true ->
-  chain_at c mv i = None.
+  chain_from c mv h = None.
 Proof.
-  intro H3. unfold chain_at. cbv zeta.
-  set (h := avail_ring_at c mv i) in *.
+  intro H3. unfold chain_from. cbv zeta.
   set (e0 := desc_at c mv (bv_unsigned h)) in *.
   set (e1 := desc_at c mv (bv_unsigned (vd_next e0))) in *.
   set (e2 := desc_at c mv (bv_unsigned (vd_next e1))) in *.
@@ -124,10 +130,11 @@ Proof.
 Qed.
 
 (* ...and once the device is stalled, NEITHER ordinary arm is enabled: the
-   completion and the capture are both None at the position it stalled at,
-   while the request stays published.  So there is no schedule of ordinary steps -- no [sitem] list
-   built from [SDiskDma], [SDiskCapture] and [SDiskDrain] -- that gets the
-   used ring moving.  Only [SDiskWild] is left. *)
+   completion and the capture are both None at the head it stalled on,
+   while that head stays in flight.  So there is no schedule of ordinary
+   steps -- no [sitem] list built from [SDiskPop], [SDiskDma],
+   [SDiskCapture] and [SDiskDrain] -- that gets the used ring moving.  Only
+   [SDiskWild] is left. *)
 Lemma model_stalled_leaves_only_wild (v : virtio_state) (mv : vmem) :
   virtio_stalled v mv = true ->
   virtio_pending v mv = true
