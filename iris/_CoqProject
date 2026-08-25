@@ -1355,6 +1355,7 @@ FsDurDefer.v
 FsDurTrunc.v
 FsDurQuiesce.v
 IcacheTxRefute.v
+IcacheTxArm.v
 FsDurObj.v
 FsDurLedger.v
 IregClean.v
