@@ -1473,6 +1473,9 @@ Section ProofFilewrite.
     BitmapInv.bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn)
       (fwn_bmapstart fn) (fwn_size fn) ->
     SpecPrintk.printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
+    (* the ambient log, named -- the escrow's write arm parks at [icfg_log]
+       (durable-disk B''-tx) *)
+    fwn_log fn = icfg_log ->
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
     forall (W : nat) (iz : Z) (PI : uptd) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
@@ -1563,7 +1566,7 @@ Section ProofFilewrite.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hkf Hjp Hgsj Hlens Hfnj Hfnps Hn Heb Htyi Hwb Hspm Hpjeq.
-    intros P1 P2 P3q P4q P6 P7.
+    intros P1 P2 P3q P4q P6 P7 Hclog.
     (* [pj] is the CALLER's let-bound local and every callee contract below
        states its resources at [proc_addr jx]; the two are the same word and
        the equation is eliminated once here rather than rewritten at each of
@@ -1778,6 +1781,14 @@ Section ProofFilewrite.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDbo Hsbo mbo) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hlogop".
+    (* ---- THE WRITE ARM (durable-fs-plan.md section 3, [ilock];
+       durable-disk B''-tx).  The transaction token goes INTO [ilock], which
+       parks half of it in the escrow's checked-out arm for the whole locked
+       window; what crosses the window is the BUDGET half, which is the only
+       token [log_write] ever wanted -- so [writei] is called at its
+       [log_opS] GEN form here, exactly as B''-arm measured. *)
+    iDestruct (log_op_openS with "Hlogop") as (SbF) "[HlogS Htx]".
+    iEval (rewrite Hclog) in "Htx".
     iDestruct ("Hpbk1" with "Hppid") as "Hpriv".
     assert (Hpc88 : ret_pc (D1 !!! Regidx Rra) = mword_of_int (FW + 0x90)).
     { rewrite HD1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1841,7 +1852,7 @@ Section ProofFilewrite.
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Ilock.wp_ilock_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
+    iApply (Ilock.wp_ilock_tx_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_fs fn) (fwn_ireg fn) (fwn_ic fn)
               gil gisl
@@ -1857,7 +1868,7 @@ Section ProofFilewrite.
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
                     Hslk2 Hshrl Hty Hsbi Hppid Hprocs
-                    Hdev Hgeo Hdlk Hbsl1").
+                    Hdev Hgeo Hdlk Hbsl1 Htx").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -2053,7 +2064,7 @@ Section ProofFilewrite.
     { rewrite fw_bslots3. iFrame "Hbsl1 Hbsl2". }
     iDestruct (cpu_own_transport CIDil CIDa9 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Writei.wp_writei_sconf KT0 gs jx glp (fwn_uart fn) (fwn_disk fn)
+    iApply (Writei.wp_writei_gen KT0 gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn) (fwn_ireg fn) ga gf
               (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn) icfg_nib
@@ -2063,7 +2074,7 @@ Section ProofFilewrite.
               bml datal dnl dnl
               true (Z.to_nat (bv_unsigned v)) (Z.to_nat c)
               (fun _ => (mword_of_int 0 : mword 8))
-              (upd_upt V PI) MAXOPBLOCKS
+              (upd_upt V PI) MAXOPBLOCKS SbF
               pidv (DfracOwn 1) (DfracOwn (1/2)) (DfracOwn (1/2))
               (fwn_dqs fn) (fwn_dqb fn) (fwn_dqbs fn)
               Q6 (K - 12)%nat eb b lks
@@ -2086,7 +2097,7 @@ Section ProofFilewrite.
               HQ6a3 HQ6a4
               with "Hcg Hcnt [] [] Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbm
-                    Hireg Hdnat [Hpriv] Hprocs Hdev Hgeo Hdlk Hbsl Hlogop").
+                    Hireg Hdnat [Hpriv] Hprocs Hdev Hgeo Hdlk Hbsl HlogS").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -2099,11 +2110,12 @@ Section ProofFilewrite.
        AS WRITTEN is what the walk holds -- it is what stops compiling if
        SpecWritei's bracket changes shape again. *)
     { iExact "Hpriv". }
-    iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P')
+    iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
       "%Hcswi %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
-       %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Harms %Hbud %Hupt
+       %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Harms %Hbud
+       %HSbsub %Hwi16p %Hwi16sp %Hwi16at %Hupt
        Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb
-       Hdnat Hpriv Hbsl Hlogop".
+       Hdnat Hpriv Hbsl HlogS".
     assert (Hpca4 : ret_pc (Q6 !!! Regidx Rra) = mword_of_int (FW + 0xac)).
     { rewrite HQ6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpca4) in "Hpc".
@@ -2328,7 +2340,7 @@ Section ProofFilewrite.
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk3]".
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Iunlock.wp_iunlock_sconf gs (fwn_fs fn) (fwn_ireg fn)
+    iApply (Iunlock.wp_iunlock_tx_sconf gs (fwn_fs fn) (fwn_ireg fn)
               (fwn_ic fn) gil gisl
               (fwn_cov fn) (fwn_logstart fn)
               ik (sh / 2)%Qp g icfg_dev
@@ -2343,7 +2355,12 @@ Section ProofFilewrite.
                     Hdep Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
     all: try lkbelow.
     { rewrite Htyq. iExact "Hshot". }
-    iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb".
+    iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb Htx".
+    (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
+       descriptor named the share, so the token is whole again and [end_op]
+       gets its [log_op] back. *)
+    iEval (rewrite -Hclog) in "Htx".
+    iDestruct (log_opS_op with "HlogS Htx") as "Hlogop".
     iDestruct (inode_shr_gen_forget with "Hshrb") as "Hshrb".
     iDestruct ("Hpbk3" with "Hppid") as "Hpriv".
     assert (Hpcbc : ret_pc (X2 !!! Regidx Rra) = mword_of_int (FW + 0xc4)).
@@ -2660,7 +2677,8 @@ Section ProofFilewrite.
     : wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hbelow.
+    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hclog
+           Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
@@ -4265,7 +4283,7 @@ Section ProofFilewrite.
                            m K eb n b sp0 w12 pj lks
                            HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Htyi Hwb Hspm
                            ltac:(reflexivity)
-                           E1 E2 E3 E4 E5 E6
+                           E1 E2 E3 E4 E5 E6 Hclog
                            (Z.to_nat n) 0%Z (pv_upt V) L7
                            ltac:(rewrite (Z2Nat.id n Hn0); lia)
                            ltac:(lia)

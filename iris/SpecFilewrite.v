@@ -616,6 +616,15 @@ Definition wp_filewrite_sconf_body
   (* filewrite's FD_INODE arm is the whole cone: begin_op/end_op ("log", 3),
      ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
+  (* THE AMBIENT LOG, named (durable-fs-plan.md section 3, [ilock];
+     durable-disk B''-tx).  The FD_INODE arm write-locks its inode inside
+     its own transaction, and the escrow's write arm parks a share of
+     [icfg_log]'s element -- the escrow carries no [log_names] parameter.
+     It joins [fwn_j]/[fwn_procs] as one more equation the record takes
+     rather than derives; [ProofSyscall]'s [sysc_ties] already proves it
+     ([sct_log]).  It sits BEFORE the rank premise because every caller
+     discharges that one by [lkbelow] at the end. *)
+  fwn_log fn = icfg_log ->
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
