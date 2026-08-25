@@ -41,6 +41,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartSpanChar HartRunGen HartRegNode HartMCycle RegFile WpGpr.
 Require Import RiscvExtras RiscvFetchExec WpMmodeLeafBase HartMFrame
         ExecCommon HartMRun HartGoodb WpDecodeBridge.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* collapse the closed [Z.eqb] tests of the model's rX/wX cascades *)
@@ -258,7 +259,7 @@ Qed.
 
 Section jump.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- cells <-> the four-cell frame ---- *)
   Lemma jr_frames (dq : dfrac) (npc0 : SailStdpp.Values.mword 64) :

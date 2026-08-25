@@ -59,6 +59,7 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -82,7 +83,7 @@ Qed.
 Lemma f2p_range (fl : mword 64) : 0 <= f2p fl < 512.
 Proof. destruct (f2p_cases fl) as [-> | [-> | [-> | ->]]]; lia. Qed.
 
-Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (mm : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.flags2perm in
   let fl := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -103,7 +104,7 @@ Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
 
 Module Type FLAGS2PERM.
   Parameter wp_flags2perm_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (mm : regfile) (K : nat) (b : bool) (p : mword 64),
       wp_flags2perm_sconf_body mm K b p.
 End FLAGS2PERM.

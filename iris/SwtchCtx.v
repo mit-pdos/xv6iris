@@ -21,6 +21,7 @@ Require Import StackOwn.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -92,7 +93,7 @@ Proof. intro H; exact H. Qed.
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ================================================================== *)
   (* struct context: ownership of its 14 saved-register cells.           *)
@@ -220,15 +221,26 @@ Section SwtchCtx.
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
-    (∃ (vs : list (mword 64)) (av : nat),
+    (* THE PARKED RECORD OWNS ITS THREAD TOKEN (tso-port leg M2).  A parked
+       context IS a thread of control: [XIp] is ITS identity, held here
+       while it is not running, and its resume wand asks for the bundle at
+       THAT identity -- so the facts its closure captured (all indexed by
+       [XIp]) are the facts it wakes up holding.  EXISTENTIAL, like the
+       lock's internal context: no consumer of [valid_context] names it,
+       so no arity moves.  swtch is the one place the token is exchanged
+       (ProofSwtch.v): the parker's token goes INTO the record it builds,
+       the target's comes OUT of the record it resumes -- which is exactly
+       what makes the hart keep running while the THREAD changes. *)
+    (∃ (vs : list (mword 64)) (av : nat) (XIp : CtxId),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
+      own_context XIp ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr KT1 (CID := h) m av false p -∗
+         sie_cap_gpr KT1 (CID := h) (XI := XIp) m av false p -∗
          cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
@@ -272,7 +284,7 @@ End SwtchCtx.
 
 Section Swconf.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* The swtch-crossing configuration bundle: what a scheduler context    *)

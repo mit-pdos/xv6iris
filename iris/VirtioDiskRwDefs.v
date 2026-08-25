@@ -275,7 +275,7 @@ Ltac vdrw_hi_peel :=
 
 Section VdrwDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1  : mword 5).
   Notation Rtp := (mword_of_int 4  : mword 5).
@@ -579,6 +579,7 @@ End VdrwbDefs.
 (* ---- from ProofVirtioDiskRwC.v ---- *)
 
 Require Import WpSmodeHalf.
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.

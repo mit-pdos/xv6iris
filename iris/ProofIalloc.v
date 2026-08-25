@@ -113,12 +113,12 @@ Require Import CodeIalloc.
 Require Import SpecPrintk.
 Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecIalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -477,7 +477,7 @@ Section IallocDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition ia_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition ia_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γ : log_names) (bn : bio_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
@@ -541,7 +541,7 @@ Section IallocEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (γ : log_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z)
@@ -766,7 +766,7 @@ Section IallocOut.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
@@ -1031,7 +1031,7 @@ Section IallocOut.
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iApply (Hpk CID9 Q9 (K - 8)%nat true (proc_addr j)
+    iApply (Hpk CID9 cur_ctx Q9 (K - 8)%nat true (proc_addr j)
               DfracDiscarded ia_msg [] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -1101,7 +1101,7 @@ Section IallocClaim.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1316,17 +1316,16 @@ Section IallocClaim.
       rewrite /W3 upd_ne; [| regne]. exact (HW2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iEval (rewrite -HW3a0) in "Hby".
     (* memset's contract is context-indexed; this caller is not yet
-       converted, so it mints a context for the call (SC-only move,
-       becomes a compile error at cutover -- the leftover-work marker). *)
-    iMod (own_context_alloc) as (ξms) "Hctx".
-    iDestruct (ctx_buf_of_mem KT0 ξms with "Hby") as "Hby".
-    iApply (MS.wp_memset_sconf (XI := ξms) KT1 KT0 W3 (K - 8)%nat 64%nat
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hby") as "Hby".
+    iApply (MS.wp_memset_sconf KT1 KT0 W3 (K - 8)%nat 64%nat
               (mword_of_int 0 : mword 64)
               (fun jj => dinode_bytes (ds !!! DinodeEnc.islot inum) !!! jj)
               b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HW3a1 HW3a2
-              with "Hctx Hcg Htext Hpc Hby").
-    iIntros (CID5 Hq5 mM) "_ Hcg Hpc Hby %Hcsm".
+              with "Hcg Htext Hpc Hby").
+    iIntros (CID5 Hq5 mM) "Hcg Hpc Hby %Hcsm".
     iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HW3a0) in "Hby".
     assert (Hpc94 : ret_pc (W3 !!! Regidx Rra : mword 64)
@@ -1990,7 +1989,7 @@ Section IallocScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId}
+  Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2855,7 +2854,7 @@ Section IallocMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3340,7 +3339,7 @@ Section IallocMain.
      each arm's payout with [LogInv.log_opS_op].  Every landed consumer of
      ialloc (there is exactly one shape, and [LinkIalloc] is unmoved) sees
      the same statement it saw before.                                     *)
-  Lemma wp_ialloc_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ialloc_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

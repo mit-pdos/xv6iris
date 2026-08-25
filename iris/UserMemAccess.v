@@ -38,6 +38,7 @@ Require Import Riscv.rv64d_types Riscv.xv6iris_extras Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import ResvAxioms.
 Require Import HartMemRun HartMemAsm PtWalkCert.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -725,7 +726,7 @@ Qed.
 
 Section UserMemAccessGeneric.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
@@ -849,7 +850,7 @@ End UserMemAccessGeneric.
 (* the width instances -- the names the memory arms consume *)
 Section UserMemAccessInstances.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 
@@ -2025,7 +2026,7 @@ Qed.
 
 Section UserMemAccessBundle.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 
@@ -2045,7 +2046,7 @@ End UserMemAccessBundle.
 
 Section UserMemAccessBundleSC.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 
@@ -2069,7 +2070,7 @@ End UserMemAccessBundleSC.
 
 Section SplitLoadBundle.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)).
   Context (Huintb : uint (to_bits 64 bytes) = bytes).
@@ -2114,7 +2115,7 @@ End SplitLoadBundle.
 
 Section SplitStoreBundle.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)).
   Context (Huintb : uint (to_bits 64 bytes) = bytes).

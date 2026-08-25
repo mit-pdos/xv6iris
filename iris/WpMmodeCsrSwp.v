@@ -46,10 +46,11 @@ Local Ltac zt :=
 
 
 Require Import WpMmodeJump.
+Require Import TsoCtx.
 
 Section csrw.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the file: the written CSR on top of the three config pins *)
   Definition cw_rs (r : register) (v0 : type_of_register r) : regstate :=

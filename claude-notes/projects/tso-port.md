@@ -109,11 +109,33 @@ Rulings still open at this layer:
   free; the disk's durability story is device-side (M5 disk-as-agent
   pattern) and unaffected. Verify against `design/crash.md`'s
   crash-spanning disk invariant.
-- **FIFO-buffer presentation is a theorem, not the model** (recommended): if
-  the literal per-hart-buffer rendering is wanted for trust, prove it
-  equivalent to the annotated view machine later (small, because stores are
-  never early and drain in order — the log tail above all floors *is* the
-  union of buffers). Everything else consumes the view machine.
+**WHAT `TsoMem` IS, in one sentence, because the shape confuses people who
+picture TSO as memory + FIFO buffers:** it is TSO in the MEMORY-ORDER
+style (the SPARC/TSO formulation) — one total order on writes, and **a
+hart's "view" is where that hart's reads sit in that order**, NOT what has
+physically drained. That is why the per-hart state is a position rather
+than a buffer. The two arms of `visibleb` are the two clauses of the
+memory-order read rule: `t ≤ tv` is "already in memory as far as my reads
+are concerned", and the own-author arm IS store-buffer forwarding.
+
+**THE BUFFER-MACHINE EQUIVALENCE IS NOT OWED** (owner ruling): the
+standard machine (global memory + per-core FIFO buffers) characterizes the
+same model, and the port does not need the theorem. Recorded here so
+nobody re-opens it — and, more importantly, so nobody assumes it would be
+a BISIMULATION. **It cannot be:** the two machines fix the total store
+order at different moments — the view machine when a store ISSUES, the
+buffer machine when it DRAINS. Witness:
+
+    hart A:  x := 1
+    hart B:  x := 2 ; y := 1
+
+The buffer machine buffers all three, drains B's two FIRST and A's last,
+so memory order is `x=2, y=1, x=1` and a third hart legitimately reads
+`y=1` AND `x=1`. The view machine reaches that outcome only under the
+schedule that ISSUES B's stores before A's, because its log IS the memory
+order and so must be built in drain order. Same outcome, different
+interleaving — so any honest equivalence is per-program over OUTCOMES,
+with each machine's schedule existentially quantified, never step-for-step.
 
 **T2 — freeze Σ, the cutover contract.** The SC-degenerate side of Σ is
 begun: `iris/TsoCtx.v` (`CtxId`, ambient `CurCtx` with deliberately NO
@@ -261,6 +283,210 @@ worked instance is `memset`, the tree's first converted function:
   the file is deleted; every leftover boundary and every SC-only
   context mint becomes a compile error — the remaining worklist, not a
   soundness hole.
+
+## 2c. Leaves and text (rulings)
+
+**LEAF TWINS, ON DEMAND — the leaf conversion is small, not monumental.**
+Measured: 0 function-proof files reach below the AU tier (the whole
+`swp`/`HartSMem`/`HartMLoad`/`HartMStore` layer is below Σ, reproven only
+at cutover, invisible to function proofs); the leaf tier stating memory
+points-to facts is ~46 lemmas in 9 files (16 `WpSconfMem`, 9 `WpLock`,
+16 PT-mem trio, 5 misc) + 13 word/string-tower lemmas in `RiscvPtsto` —
+~60 statements. `WpSconfAlu`/`WpSconfBtype`/`WpSconfCtl` (95 lemmas)
+mention no memory fact and need nothing. The mechanism:
+
+- a ctx TWIN beside each original in the SAME kit file (`…_au_c` next to
+  `…_au`), stated in the Σ-frozen cutover form, derived from the original
+  in one line via the shim at SC — one honest proof per leaf;
+- twins are minted ON DEMAND when the first converted consumer needs
+  that leaf (scoreboard discipline, as in the instr-subgoal sweep);
+- WHICH leaf a proof calls is compiler-enforced, not policed:
+  `ctx_pointsto` is `Global Opaque`, so an `↦ₘ`-stated leaf cannot unify
+  against a `↦c` goal — converted and unconverted proofs cannot cross
+  wires by accident;
+- at cutover the twins get their direct TSO proofs (statements
+  unchanged), the originals are consumer-free and die with the shim.
+
+**TEXT AND `instr` ARE CONTEXT-FREE — better than a shared context.**
+Timestamp 0 is the era-initial image and `visibleb` at t = 0 holds for
+every agent at every view; kernel text is loaded in the boot image and
+never written, so a text byte's latest write is timestamp 0 forever and
+every hart at any view reads it. `kernel_text`, `↦ₓ□`, and every `instr`
+premise stay untouched through the whole port — no index, no twins, no
+sweep. Fetch reads at the hart's view like any load and latest-at-0
+immutable bytes are view-independent (no-icache boundary clause as on
+the weak-memory branch). Text that is WRITTEN during execution (kexec's
+new kernel, user-level instruction facts) has no obligations in today's
+tree; DEFERRED by owner ruling — cross that bridge when the tree grows
+such facts.
+
+## 2d. The M1+M2 sweep, as run — and what a script can and cannot do
+
+`tools/ctx_convert.py` (mode `binders`) is the sweep tool. Measured on the
+real tree:
+
+- **1342 edits over 402 files, fully scripted**: 302 section `Context`
+  lines and 1040 inline definition binders gained `` `{XI : CurCtx}``,
+  plus the `TsoCtx` import. Idempotent; a dry-run mode prints the
+  scoreboard.
+- **Two script rules that are NOT optional**, each learned from a
+  compile failure: (a) a BLACKLIST for files below `TsoCtx` in the
+  import order (`RiscvPtsto`, `RiscvLang`, `Ktier`, …) — and for
+  `WpNext.v`, which must stay context-TRANSPARENT because the whole
+  point is that ξ is fixed across the CPU binder; (b) comment-stripping
+  before the vocabulary match — 37 files matched only in prose and were
+  reverted.
+- **`own_context` rides in `sie_cap`, one level BELOW `sie_cap_gpr`**, so
+  the 20 `rewrite /sie_cap_gpr` sites, the ~55 four-tuple destructs, and
+  `sie_cap_gpr_split`/`_join`/`IntoSep`/`FromSep` all keep their shape.
+  Only capability OPENERS see the new conjunct.
+
+THE REPAIR CLASSES (the whole fallout of the sweep falls in these four):
+
+1. **Capability destructs** — `(Hstk & Htr & Harm & #Htc & #Hwit)` gains a
+   `Hctx` slot. Diagnosed by one error, always: `iIntuitionistic:
+   own_context not persistent` (the old pattern's trailing name silently
+   absorbed the remainder). Regex-automatable once seen.
+2. **Explicitly-quantified statements** — a statement that binds
+   `∀ (CID : CpuId)` by hand rather than through the section needs the
+   matching `∀ XI` (`SpecPrintk.printk_gen_contract`). Script-detectable.
+3. **Bundle-residue definitions** — a definition naming "everything in
+   the capability except X" (`WpIntrInv.sie_cap_rest`) must carry the new
+   conjunct, and its producers/consumers with it. Needs a human to
+   notice; trivial to fix.
+4. **Design-level seams** — where "which thread of control is this?" is a
+   real question. Exactly four, all recorded below.
+
+THE FOUR DESIGN SEAMS, and their rulings:
+
+- **The handler contract is CONTEXT-GENERIC** (`IntrDefs.ihs_body_of`):
+  `∀ XIb` in the □-prefix beside its hart genericity, with the
+  postcondition at the NEW hart `c'` but the SAME `XIb`. The trap serves
+  whichever thread traps, and a trap that reschedules moves the hart,
+  never the context — which the contract now says out loud.
+  `ihs`/`intr_res`/`trap_csrs` came out ξ-INDEPENDENT: the per-hart
+  resource stays one per hart, not one per thread.
+- **A parked context OWNS its thread token, existentially**
+  (`SwtchCtx.valid_context_pre`): a parked context IS a thread of
+  control, so its resume wand demands the bundle at ITS identity — the
+  facts its closure captured are the facts it wakes holding. Existential
+  like the lock's internal ξ, so no consumer's arity moves.
+- **swtch EXCHANGES tokens** (`ProofSwtch`): the parker's token goes INTO
+  the record it builds, the target's comes OUT of the record it resumes.
+  That is what "the hart keeps running while the thread changes" means,
+  and it is the one place in the kernel a token moves between records.
+- **Boot TAKES, adequacy MINTS — one token PER HART.** `boot_bridge`
+  (and `boot_entry_bridge`/`boot_hart_primary`/`_secondary`) take
+  `own_context cur_ctx` as a premise; the mints sit in
+  `SystemAdequacy.xv6_boot_era`, one per hart, each hart's chain
+  instantiated at its own `(XI := ξ)`. **There is no "single mint":**
+  `own_context` is exclusive and eight harts need eight capabilities,
+  so there are eight tokens at eight distinct `CtxId`s and no ambient
+  system-wide context exists. The mint belongs at the first layer that
+  HAS per-hart identity — `SystemAdequacy`, not the machine-level,
+  xv6-agnostic `RiscvAdequacy`: putting it lower would force a per-hart
+  `∃ ξ` row into `power_boot_res`/`boot_shared_alloc` and make
+  `PowerBoot`'s interface know about threads of control, for a resource
+  nothing between the two layers reads. For the same reason the token
+  is a SIBLING premise of the boot-chain lemmas rather than a member of
+  `boot_hart_res` (which is produced eight times under one ambient
+  context). Token lifecycle, entire: **born once per hart at
+  `xv6_boot_era`, exchanged at swtch, dropped at a zombie park.**
+
+**THE STANDING PRINCIPLE, which decides every seam:** a resource
+describing THIS thread carries the ambient ξ; a resource describing
+ANOTHER thread — parked, or not yet born — carries that thread's ξ
+INTERNALLY: existentially in a record, or ∀-quantified in a wand the
+resumer will apply. Instances: `ut_trap` (this thread) ambient;
+`valid_context` (a parked thread) existential; `ihs_body_of` (whichever
+thread traps) ∀; `ParkCap.park_pkg` (a child) ∀, quantified beside the
+hart it already quantifies for the same reason. The principle is what
+keeps `park_token` and therefore `ProofSyscall.syscall_env` ξ-FREE, so
+`SpecSyscall.v`'s "HART-FREE, AND THAT IS PART OF THE CONTRACT"
+paragraph stands verbatim and none of its Parameters move.
+
+**A USER EXCURSION IS NOT A CHANGE OF THREAD.** `ut_trap` is at the
+ambient ξ, not an internal one, because nothing but this thread can
+resume its own residue — unlike a swtch record, which the SCHEDULER (a
+foreign thread) resumes, which is the only reason THAT one needs an
+internal identity.
+
+**THE SCRIPT'S FUN-POSITION EDIT IS ONLY HALF A REPAIR.** A lambda cannot
+carry an implicit binder, so a `` `{XI : CurCtx} `` the sweep writes inside
+a `fun` is silently DEMOTED to a positional argument (Rocq says "Ignoring
+implicit binder declaration in unexpected position" — a warning, not an
+error). The fix is never to delete it: the lambda has a partner
+`Hypothesis`/`Parameter` that must gain the matching `∀ XI0`. Worst
+instance found: `ProofKvmmake`'s `wp_memset` hypothesis, whose COMMENT
+already asserted it was context-generic while the statement was not.
+
+**THE SILENT-DROP HAZARD HAS A SECOND FORM, and it is worse than the
+wildcard one:** `f (GEN := …) (CID := …)` with `XI` left to typeclass
+resolution COMPILES and picks the most-recently-introduced `CurCtx` —
+which, inside a `Prop`-carried contract that quantifies its OWN, is not
+the one the contract means. Two such sites existed (`ProofBmap`'s balloc
+and log_write producers) and are now explicit. **The tree is audited
+clean:** only three files have two contexts in scope at once
+(`IntrDefs`, `ProofBmap`, `SpecPrintk`) and all three now name it
+explicitly (`(XI := XIb)` / `(XI := XIc)` / `(XI := XIp)`). Do NOT try to
+audit this by grepping `(CID := ` without `XI :=` — there are ~974 such
+sites and almost all are correct, because one ambient context resolves
+unambiguously. The rule: **wherever a statement quantifies its own
+context, every application inside it must NAME that context.**
+
+**PREFER A SECTION BINDER TO AN INLINE ONE — a section variable is
+SELF-CLEANING, an inline binder is not.** Rocq generalizes a section
+variable only where it is USED, so an over-inclusive section sweep costs
+nothing. An inline `` `{XI : CurCtx} `` is always in the signature, so on
+a statement that mentions nothing context-dependent it becomes a PHANTOM
+argument: unifiable from nothing, and the consumer that lacks an ambient
+context fails at `Qed` with an unresolved evar — far from the cause.
+Confirmed instance: `UserTrap.swp_handle_interrupt_u` (an `swp`-tier
+lemma, entirely below the bundle) propagated a phantom into
+`WpUmodeStep`'s deliberately hart-free engine section. The workaround
+(give the consumer an ambient context) is in place; the ROOT fix is to
+drop the phantom binder where a statement does not use it, and that is a
+CLEANUP ITEM, not a blocker. Do not try to find these by grepping for
+absent vocabulary — a lemma whose statement merely NAMES a
+context-dependent body does not spell it, so the scan is mostly false
+positives; the compiler's unresolved-evar-at-`Qed` is the real detector.
+
+**RULES OF THUMB FOR THE REWRITES THEMSELVES**, learned the hard way:
+anchor a rewrite to a SYNTACTIC POSITION (declaration line, binder slot),
+never to a token that can appear anywhere — a raw `(CID0 : CPU)` rule
+fired inside `(CID1 : CPU) = (CID0 : CPU)` in 27 places across 12 files,
+and the build hid all but one behind the first. Prefer the version that
+UNDER-fires: a miss is a compile error next round, a corruption rewrites
+a theorem. And every pass must be idempotent with a dry-run FIXPOINT
+check, because each of this sweep's tooling bugs was a rule whose own
+edit invalidated its precondition (the last `Require` line; "this file
+has a section binder"; file-level vs section-level scope).
+
+**TWO TRAPS THE SWEEP FOUND, both worth a check of their own:**
+
+- **A TRAILING WILDCARD IN A CAPABILITY DESTRUCT IS A SILENT LEAK.**
+  `iDestruct "Hcap" as "(Hstk & Hstr & Harm & _)"` swallows the new
+  conjunct, and the file COMPILES — the resume direction fails loudly
+  (`iApply` mismatch) but the park direction just drops the thread's
+  identity into the affine void. Grep every capability opener for a
+  trailing `_`; the compiler will not find these. ONE KNOWN BENIGN HIT to
+  waive rather than "fix": `ProofKerneltrapParts`'s pure-extraction open
+  (`iDestruct "Hcgat" as "(_ & … & _)"` inside an `iAssert (⌜…⌝)%I as %H`)
+  restores the context afterwards, so its wildcard drops nothing.
+- **BINDER POSITION IS LOAD-BEARING IN A MODULE TYPE.** Section
+  variables are PREPENDED, so a `Parameter` declaring
+  `∀ {riscvGS} {GEN} {XI}` does not match an implementation that
+  inherits `XI` from its section (`∀ {XI} {riscvGS} {GEN}`) — subtyping
+  breaks with no clue at the definition site. A module-type Parameter
+  needs `` `{XI : CurCtx} `` hand-placed in the slot the implementation
+  uses; the two must move together.
+
+**`CtxId` NEEDS `Inhabited`, and it is load-bearing.** A `CtxId`
+existentially bound inside a ▷-guarded record (the parked context) can
+have its later pushed inward only by `bi.later_exist`, which holds only
+over an inhabited domain — without the instance a resumer cannot open the
+record it is about to run. General rule: any type existentially
+quantified inside a later-guarded resource needs `Inhabited`.
 
 ## 3. Leg M — the main sweeps (each independently landable, main green after each)
 

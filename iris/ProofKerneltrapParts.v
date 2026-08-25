@@ -50,6 +50,7 @@ Require Import ProofPushOff.
 Require Import CodeKerneltrap.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -72,7 +73,7 @@ Ltac ktne_ra :=
 
 Section ProofKerneltrapParts.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {p : mword 64}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -348,13 +349,13 @@ Section ProofKerneltrapParts.
               with "Hcg Hpc []").
     { iApply (kti_12 with "Htext"). }
     iApply wp_next_off_intro.
-    iIntros (ms0) "%Hms0f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie0' & Harm & #Htc & #Hwit)".
+    iIntros (ms0) "%Hms0f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie0' & Harm & Hctx & #Htc & #Hwit)".
     assert (Hsie0 : _get_Mstatus_SIE ms0 = ('b"0" : mword 1))
       by (cbn [sie_bit] in Hsie0'; exact Hsie0').
     iDestruct (sconf_at_sret ms0 ('b"1") ('b"1") with "Hsc Hmir") as %[Hspp0 Hspie0].
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
+    iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm Hctx] Hfile") as "Hcg".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
     set (A3 := <[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2).
     change (<[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2) with A3.
     assert (HA3sp : A3 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)
@@ -445,12 +446,12 @@ Section ProofKerneltrapParts.
               with "Hcg Hpc []").
     { iApply (kti_22 with "Htext"). }
     iApply wp_next_off_intro.
-    iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie1' & Harm & #Hwit2)".
+    iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie1' & Harm & Hctx & #Hwit2)".
     assert (Hsie1 : _get_Mstatus_SIE ms1 = ('b"0" : mword 1))
       by (cbn [sie_bit] in Hsie1'; exact Hsie1').
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit2". }
+    iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm Hctx] Hfile") as "Hcg".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Hwit2". }
     set (A7 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> A6).
     change (<[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> A6) with A7.
     assert (HA7sp : A7 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)

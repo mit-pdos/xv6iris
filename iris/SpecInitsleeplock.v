@@ -26,6 +26,7 @@ Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -34,7 +35,7 @@ Import Defs.
    [kernel_data] via [kernel_data_string]. *)
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007568.
 
-Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
     (av : nat) (b : bool) (p : mword 64) :=
@@ -75,7 +76,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
 
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (s : string)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
       (av : nat) (b : bool) (p : mword 64),
       wp_initsleeplock_sconf_body m s vlocked vlk vpid vlkname vcpu vname av b p.

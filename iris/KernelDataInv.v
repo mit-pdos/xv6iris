@@ -24,6 +24,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 Require Import KernelText.
 From Kernel Require KernelData KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -79,7 +80,7 @@ Qed.
 
 Section KernelDataInv.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* The initialized global-data image, RE-SCOPED to the READ-ONLY kernel-data
      window [kdata_ro]: the dump also carries 5332 sub-etext bytes

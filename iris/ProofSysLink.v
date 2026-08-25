@@ -139,6 +139,7 @@ Require Import ProofSysLinkTails.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -742,7 +743,7 @@ Section ProofSysLinkBody.
     by rewrite {1}(Qp.div_2 q) in Hc.
   Qed.
 
-  Lemma wp_sys_link_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_link_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

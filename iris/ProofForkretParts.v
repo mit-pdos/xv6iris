@@ -42,6 +42,7 @@ Require Import UserretDefs.
 Require Import SpecPrepareReturn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Notation FR := KernelSyms.forkret.
@@ -316,7 +317,7 @@ Qed.
 
 Section ForkretRodata.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- +0x4c addi a1,s0,-48 / a0 = the "/init" pointer: the SIX bytes
          kexec's path premise owns, [seq]-indexed.  The real fact is the

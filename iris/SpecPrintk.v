@@ -97,6 +97,7 @@ Require Export PrintkArgs.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* [pk_arg_desc] / [pk_desc_kind] / [pk_desc_res] / [pk_vararg] / [pk_pr_lock]
@@ -107,7 +108,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
    printint's 24. *)
 Notation printk_stack := (48%nat) (only parsing).
-Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (dqf : dfrac)
@@ -164,7 +165,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}
@@ -199,7 +200,7 @@ Definition pr_lock : mword 64 := mword_of_int KernelSyms.pr.
 
 Section PrintkGen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* pr.lock protects NOTHING: d80e61c5 put uartputc_sync's THR write under
      [tx_lock], so the transmitter is [UartTxInv.tx_res]'s and pr.lock is left
@@ -244,7 +245,7 @@ Section PrintkGen.
 
 End PrintkGen.
 
-Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string) :=
@@ -293,14 +294,14 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
    a holder pays nothing beyond the standing platform/stdlib axioms. *)
 Definition printk_gen_contract `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
-  forall (CIDp : CpuId)
+  forall (CIDp : CpuId) (XIp : CurCtx)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-    wp_printk_gen_sconf_body kt (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
+    wp_printk_gen_sconf_body kt (CID := CIDp) (XI := XIp) γpr γd γv m0 K eb pj dqf f descs b lks.
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
       wp_printk_gen_sconf_body kt γpr γd γv m0 K eb pj dqf f descs b lks.

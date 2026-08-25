@@ -85,6 +85,7 @@ Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpUmodeStep WpUmodeStore.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -650,7 +651,7 @@ End UmodeLoadExec.
 
 Section UvLoadPostFetch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the load twin of WpUmodeStore's [uv_store_post_fetch]: from the fetched
@@ -932,7 +933,7 @@ End UvLoadPostFetch.
 
 Section UvLoadObl.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uv_load_obl_base (R : iProp Σ) (Ψ : usys_protocol Σ)
@@ -1192,7 +1193,7 @@ End UvLoadObl.
 
 Section WpUmodeLoad.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

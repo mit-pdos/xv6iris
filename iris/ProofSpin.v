@@ -22,12 +22,13 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpMmodeLeafBase.
 Require Import SpecSpin.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Module SpinProof : SPIN.
 Section ProofSpin.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition h_spin : mword 16 := mword_of_int 0xa001.
   Definition imm_spin : mword 11 :=

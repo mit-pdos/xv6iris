@@ -16,6 +16,7 @@ From iris.bi.lib Require Import fractional.
 Require Import Riscv.riscv_extras SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -25,7 +26,7 @@ Local Open Scope Z_scope.
    former WpSmodeToBeDeleted.v so callers use the specific per-instruction lemmas. *)
 Section WpSmodeGprEngine.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

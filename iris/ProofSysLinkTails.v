@@ -100,6 +100,7 @@ Require Import ProofSysLinkParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -134,7 +135,7 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   (*  ARM B: +0xbc end_op ; +0xc0 a5 = -1 ; +0xc2 restore s1 ; +0xc4 j   *)
   (* ================================================================== *)
-  Lemma sl_tail_b `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -342,7 +343,7 @@ Section ProofSysLinkTails.
   (*  the [nlink++]), so neither carries a ledger fragment and the        *)
   (*  COUNTED iunlockput is what both call.                               *)
   (* ================================================================== *)
-  Lemma sl_tail_c `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_c `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -664,7 +665,7 @@ Section ProofSysLinkTails.
 
   (* ---- ARM D: the NLINK_MAX guard's own tail, ARM C's six
      instructions at +0xd6.  See ARM C's banner. ---- *)
-  Lemma sl_tail_d `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1015,7 +1016,7 @@ Section ProofSysLinkTails.
   (*  leaves [iput_units] in hand once the CREDITED flush ([cru := true], *)
   (*  paid for by the [++]'s own log_write) has cost nothing.             *)
   (* ================================================================== *)
-  Lemma sl_tail_bad `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1660,7 +1661,7 @@ Section ProofSysLinkTails.
   (*  the call reports -- which is [SysLinkBudget]'s theorems, verbatim,  *)
   (*  and nothing this lemma has to know.                                 *)
   (* ================================================================== *)
-  Lemma sl_tail_f `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_f `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1936,7 +1937,7 @@ Section ProofSysLinkTails.
   (*  tail's [ip->nlink--] consumes it back.  (Read the disassembly, not  *)
   (*  the C's reading order: the guard is after the mint, not before.)    *)
   (* ================================================================== *)
-  Lemma sl_tail_e2 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_e2 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)

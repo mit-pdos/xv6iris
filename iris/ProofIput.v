@@ -154,6 +154,7 @@ Require Import SpecIput.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -448,7 +449,7 @@ Section IputCommon.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Lemma ip_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      `{GEN : GenId} `{CID : CpuId} (p : mword 64) (lks : gset string) :
+      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (p : mword 64) (lks : gset string) :
     sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -537,7 +538,7 @@ Section IputTail.
      / [trap_csrs_ext_transport] under the [wp_next] wrapper below) -- which
      is exactly what [ip_tail_exit] did inline before the factoring, and what
      lets the two callers keep completely different posts. *)
-  Lemma ip_epilogue `{GEN : GenId} `{CID : CpuId}
+  Lemma ip_epilogue `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (j : nat) (D : regfile) (K : nat) (eb : bool)
       (sp0 v1 v2 v3 v4 v5 v6 : mword 64) :
     let pj := proc_addr j in
@@ -693,7 +694,7 @@ Section IputTail.
     rewrite /P1 upd_ne; [reflexivity | regne].
   Qed.
 
-  Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat) (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -897,7 +898,7 @@ Section IputTail.
   Qed.
 
   (* ---- THE TAIL PROPER: +0x20 (the re-read) .. +0x24 (the close) ---- *)
-  Lemma ip_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ip_tail `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat) (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
@@ -1393,7 +1394,7 @@ Section IputFreePath.
          parked at +0x94);
        - log ledger grown by the inode block; the frame still held.
      ====================================================================== *)
-  Lemma ip_free_offlock `{GEN : GenId} `{CID0 : CpuId}
+  Lemma ip_free_offlock `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2109,7 +2110,7 @@ Section IputFreePath.
      the premise site, and the 586 site in the body where the surplus half is
      now fed to the wand instead of dropped).
      ========================================================================== *)
-  Lemma ip_free_locked `{GEN : GenId} `{CID0 : CpuId}
+  Lemma ip_free_locked `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3577,7 +3578,7 @@ Section IputFreePath.
      frame slots and iput_regs are stated against it, as ip_tail does); [M] is
      the regfile HERE.  Exits: see the header.
      ========================================================================== *)
-  Lemma ip_free_entry `{GEN : GenId} `{CID0 : CpuId}
+  Lemma ip_free_entry `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -4627,7 +4628,7 @@ End IputFreePath.
 
 Section ProofIput.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).

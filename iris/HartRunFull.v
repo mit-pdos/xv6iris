@@ -62,6 +62,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
         WpDecodeBridge WpMmodeCsrSwp HartRunGen.
 Require Import SmodeCore WpIntrCore.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -85,7 +86,7 @@ Definition dispatch_of_pending (ip : mword 64)
 
 Section rundisp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [getPendingSet User].  Mirrors [WpIntrCore.swp_getPendingSet_S] node for
      node; the two boolean blocks are bridged as their exec facts, and at
@@ -280,7 +281,7 @@ End rundisp.
 
 Section runfull.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac r_glue :=
     cbn beta iota zeta delta

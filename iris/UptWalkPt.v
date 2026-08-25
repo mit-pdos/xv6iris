@@ -34,6 +34,7 @@ Require Import WpDecodeBridge KptGoodb.
 Require Import SmodeCorePt TrampStepPt WpSmodePtEngine.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -148,7 +149,7 @@ Definition upt_satp_ok_pt (uroot : mword 44) (satp0 : mword 64) : Prop :=
 
 Section UptRes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the NON-CELL residue, keyed on the tlb value the cell carries *)
   Definition upt_res_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
@@ -238,7 +239,7 @@ Definition upt_Dw (r : register) : bool := register_beq r (tlb : register).
 (* ===================================================================== *)
 Section UptWalk.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_translate_upt (acc : MemoryAccessType mem_payload)
       (Drw Dro : gset register) (Df : register -> dfrac) (rs : regstate)
@@ -633,7 +634,7 @@ Proof. intros (Hmode & _ & _ & _). rewrite Hmode. vm_compute. reflexivity. Qed.
 
 Section UptTramp.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac tlbpeel :=
     rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
@@ -1071,7 +1072,7 @@ Qed.
 
 Section UptData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma utf_translate (acc : MemoryAccessType mem_payload)
       (Drw Dro : gset register) (Df : register -> dfrac) (rs : regstate)

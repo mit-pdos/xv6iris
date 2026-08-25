@@ -92,6 +92,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -395,7 +396,7 @@ Section BoProps.
      closed).  Both are [wp_next]s ANCHORED at the function's entry hart
      [CID0]: the park inside the loop means either can be entered at a hart
      nobody knew about when it was established. *)
-  Definition bo_exit `{GEN : GenId} (CID0 : CPU)
+  Definition bo_exit `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
@@ -425,7 +426,7 @@ Section BoProps.
       pc_is (mword_of_int (KernelSyms.begin_op + 0x74)) -∗
       WP (Loop : expr riscv_lang)))%I.
 
-  Definition bo_loop `{GEN : GenId} (CID0 : CPU)
+  Definition bo_loop `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
@@ -467,7 +468,7 @@ Section BoBodies.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---- the exit path: +0x58 (a0 := &log) .. +0x6e (c.ret) ---- *)
-  Lemma bo_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma bo_exit_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
@@ -754,7 +755,7 @@ Section BoBodies.
      straight into the loop test at +0x2c.  Entered from the taken
      [c.bnez] at +0x2e, whose later has already been stripped, so the Löb
      hypothesis arrives here WITHOUT its [▷]. ---- *)
-  Lemma bo_armA_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma bo_armA_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
@@ -1025,7 +1026,7 @@ Section BoBodies.
      +0x4e whose [c.j] closes the back edge to +0x2c.  Entered from the
      FALLING [bge] at +0x42, which carries no later, so the Löb hypothesis
      arrives WITH its [▷] and is stripped at that [c.j]. ---- *)
-  Lemma bo_armB_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma bo_armB_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
@@ -1301,7 +1302,7 @@ Section BoBodies.
      three-way dispatch (committing arm / no-space arm / the grant tail
      +0x50..+0x54 that mints the reservation and hands control to
      [bo_exit]). ---- *)
-  Lemma bo_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma bo_loop_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
@@ -1799,7 +1800,7 @@ End BoBodies.
 
 Section ProofBeginOp.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_begin_op_sconf 
       (γs : list gname) (j : nat) (γl : gname)

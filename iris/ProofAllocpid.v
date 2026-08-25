@@ -50,6 +50,7 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -85,7 +86,7 @@ Module AllocpidProof (Acquire : ACQUIRE) (Release : RELEASE) : ALLOCPID.
 
 Section ProofAllocpid.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ai_ra := (mword_of_int 1 : mword 5).
   Notation ai_s0 := (mword_of_int 8 : mword 5).

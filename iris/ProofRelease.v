@@ -32,6 +32,7 @@ Require Import CodeRelease.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -40,7 +41,7 @@ Module ReleaseGenProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE_GEN.
 
 Section ProofRelease.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -503,7 +504,7 @@ Module ReleaseOfGen (G : RELEASE_GEN) : RELEASE.
 
 Section OfGen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_release_sconf
@@ -539,7 +540,7 @@ Module ReleaseCancelOfGen (G : RELEASE_GEN) : RELEASE_CANCEL.
 
 Section CancelOfGen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_release_cancel_sconf

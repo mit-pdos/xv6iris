@@ -76,6 +76,7 @@ Require Import TimerCap.   (* [timer_cap]: per-hart, M-mode-initialised, so it r
 Require WpGprCsrwCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -285,7 +286,7 @@ Notation kv_frame_slots := (90%nat) (only parsing).
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* §2 The SIE ghost choreography: 1/2 (live-bit tie) + 1/4 (kernel-code *)
@@ -2016,6 +2017,12 @@ Section IntrDefsBase.
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
      sie_arm_of R b p ∗
+     (* THE THREAD-OF-CONTROL TOKEN (tso-port leg M2): the capability to run
+        kernel code includes BEING a thread of control.  Inside [sie_cap] --
+        not [sie_cap_gpr] -- so every [rewrite /sie_cap_gpr] site and
+        4-tuple destruct in the tree keeps its shape; only cap openers see
+        it.  At SC an exclusive token; at cutover the context's view tie. *)
+     own_context cur_ctx ∗
      timer_cap ∗
      sr_ktier_wit strans_regime kt)%I.
 
@@ -2104,7 +2111,7 @@ End IntrDefsBase.
 Section IntrDefs.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ================================================================== *)
@@ -2158,11 +2165,18 @@ Section IntrDefs.
      and its [MIE_S] pin, the menvcfg pin), which is what makes the statement
      this short.  [av] is the handler's usable stack budget; the reserve it
      runs in is the enabled index's, re-indexed. *)
+  (* THE CONTRACT IS CONTEXT-GENERIC exactly as it is hart-generic
+     (tso-port leg M2): the handler serves WHICHEVER thread of control
+     traps, so ξ is ∀-quantified in the □-prefix beside the trap's other
+     data -- and the postcondition is at the NEW hart [c'] but the SAME
+     [XIb]: a trap that reschedules moves the hart, never the context.
+     [ihs]/[intr_res]/[trap_csrs] therefore do NOT depend on the ambient
+     [XI]; the per-hart resource stays one per hart, not one per thread. *)
   Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
       (handler : mword 64) : iProp Σ :=
-    (□ ∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
-        ihs_trap_of (CID := CIDb) kt R m av p pc0 sc tv handler
-          (fun c' => ihs_post_of (CID := c') kt R m av p pc0))%I.
+    (□ ∀ (XIb : CurCtx) (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
+        ihs_trap_of (CID := CIDb) (XI := XIb) kt R m av p pc0 sc tv handler
+          (fun c' => ihs_post_of (CID := c') (XI := XIb) kt R m av p pc0))%I.
 
   Definition ihs_of (kt : ktier) (R : CPU -d> iPropO Σ)
       : CPU -d> mword 64 -d> iPropO Σ :=
@@ -2238,24 +2252,25 @@ Section IntrDefs.
   Proof.
     iIntros (Hpc0 Hsc) "Hsp Hentry Hnext".
     iEval (rewrite intr_handler_spec_unfold /ihs_body_of) in "Hsp".
-    iSpecialize ("Hsp" $! m av p pc0 sc tv).
+    (* the contract is context-generic; consume it at the ambient thread *)
+    iSpecialize ("Hsp" $! XI m av p pc0 sc tv).
     iEval (rewrite /ihs_trap_of) in "Hsp".
     iApply ("Hsp" with "[%] [%] Hentry Hnext"); done.
   Qed.
 
   Lemma intr_handler_spec_intro {kt : ktier} (handler : mword 64) :
-    □ (∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
+    □ (∀ (XIc : CurCtx) (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
          ⌜ ret_pc pc0 = pc0 ⌝ -∗
          ⌜ s_cause_ok sc ⌝ -∗
-         ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 sc tv handler -∗
+         ihs_entry_of (XI := XIc) kt (ires_of (ihs kt)) m av p pc0 sc tv handler -∗
          wp_next true p
-           (fun c' => ihs_post_of (CID := c') kt (ires_of (ihs kt)) m av p pc0) -∗
+           (fun c' => ihs_post_of (CID := c') (XI := XIc) kt (ires_of (ihs kt)) m av p pc0) -∗
          WP (Loop : expr riscv_lang)) -∗
     intr_handler_spec kt handler.
   Proof.
     iIntros "#H".
     iEval (rewrite intr_handler_spec_unfold /ihs_body_of).
-    iModIntro. iIntros (m av p pc0 sc tv).
+    iModIntro. iIntros (XIc m av p pc0 sc tv).
     rewrite /ihs_trap_of. iApply "H".
   Qed.
 
@@ -2626,6 +2641,7 @@ Section IntrDefs.
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
      sie_arm kt b p ∗
+     own_context cur_ctx ∗   (* see the note at [sie_cap_of] *)
      timer_cap ∗
      sr_ktier_wit strans_regime kt)%I.
 
@@ -2655,9 +2671,10 @@ Section IntrDefs.
     ∃ root_ppn : mword 44,
       stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res true + avail) ∗
       strans_kpt ∗ tlb_res_pt root_ppn ∗ sie_arm kt true p ∗
+      own_context cur_ctx ∗
       timer_cap ∗ sr_ktier_wit strans_regime kt.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
+    iIntros "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
     { (* the arm's own KPT RECEIPT against the Bare arm's pending half: the
          one-shot conflict, no cell conflict needed (the receipt landed in
@@ -2666,7 +2683,7 @@ Section IntrDefs.
       iDestruct "Harm" as "(_ & _ & Hrcpt & _)".
       iDestruct (kpt_on_pending_False with "Hrcpt Hbit0") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlb".
-    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm Htc Hwit".
+    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm Hctx Htc Hwit".
   Qed.
 
   (* =================================================================== *)
@@ -2712,8 +2729,8 @@ Section IntrDefs.
     sie_cap kt m avail b p -∗
     sie_cap kt m avail b p ∗ sr_ktier_wit strans_regime kt.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
-    iFrame "Hstk Htr Harm Htc Hwit".
+    iIntros "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
+    iFrame "Hstk Htr Harm Hctx Htc Hwit".
   Qed.
 
   (* THERE IS DELIBERATELY NO "CONJURE THE WITNESS AT THE DEFAULT TIER"
@@ -2788,9 +2805,9 @@ Section IntrDefs.
     sie_cap kt m avail false p -∗ kpt_on cpu_id -∗
     sie_cap kt' m avail false p.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Htc & _) #Hkpt".
+    iIntros "(Hstk & Htr & Harm & Hctx & #Htc & _) #Hkpt".
     iSplitL "Hstk"; [ iApply (stack_ktier_mono kt kt' with "Hstk") |].
-    iFrame "Htr Harm Htc".
+    iFrame "Htr Harm Hctx Htc".
     iApply (strans_ktier_wit_intro with "Hkpt").
   Qed.
 
@@ -3059,6 +3076,7 @@ Section IntrDefs.
     strans_pending -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
+    own_context cur_ctx -∗   (* boot mints it: [own_context_alloc] *)
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
     (* THIS HART'S TIMER CAPABILITY, minted in M-mode by timerinit and handed
        across the bridge -- see the note at [sie_cap].  Persistent, so the
@@ -3066,11 +3084,12 @@ Section IntrDefs.
     timer_cap -∗
     sie_cap KT0 m avail false p.
   Proof.
-    iIntros "Hstk Hbit Hb Hstv Htok #Htc".
+    iIntros "Hstk Hbit Hb Hstv Hctx Htok #Htc".
     iFrame "Hstk".
     iSplitL "Hbit Hb Hstv".
     { iApply (strans_inv_intro_bare with "Hbit Hb Hstv"). }
     iSplitL "Htok"; [ rewrite /sie_arm; iExact "Htok" |].
+    iSplitL "Hctx"; [ iExact "Hctx" |].
     iSplitR; [ iExact "Htc" |].
     iApply (sr_ktier_wit_KT0 strans_regime).
   Qed.
@@ -3206,8 +3225,8 @@ Section IntrDefs.
   Lemma sie_cap_timer_cap {kt : ktier} m avail b p :
     sie_cap kt m avail b p -∗ timer_cap ∗ sie_cap kt m avail b p.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
-    iSplitR; [iExact "Htc"|]. iFrame "Hstk Htr Harm Htc Hwit".
+    iIntros "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
+    iSplitR; [iExact "Htc"|]. iFrame "Hstk Htr Harm Hctx Htc Hwit".
   Qed.
 
   Lemma sie_cap_gpr_timer_cap {kt : ktier} m avail b p :
@@ -3282,7 +3301,7 @@ Section IntrDefs.
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     sie_cap kt m avail b p -∗ sie_cap kt m' avail b p.
   Proof.
-    iIntros (Hsp) "(Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
+    iIntros (Hsp) "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
     rewrite Hsp. iExact "Hstk".
   Qed.
 
@@ -3299,7 +3318,7 @@ Section IntrDefs.
     sie_cap kt m' (avail - k) b p ∗
     stack_own (KTR := kt) (m !!! Regidx csp_rs1) k.
   Proof.
-    iIntros (Hk Hsp') "(Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
+    iIntros (Hk Hsp') "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
     (* [trap_res b] is an OPAQUE [nat] atom here -- [lia] carries it through
        untouched, which is why the premise [k <= avail] does not move. *)
     replace (trap_res b + avail)%nat
@@ -3325,7 +3344,7 @@ Section IntrDefs.
     sie_cap kt m avail b p -∗
     sie_cap kt m' (avail + k) b p.
   Proof.
-    iIntros (Hsp) "Hframe (Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
+    iIntros (Hsp) "Hframe (Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
     replace (trap_res b + (avail + k))%nat
       with (k + (trap_res b + avail))%nat by lia.
     iApply (stack_own_app (KTR := kt)). iFrame "Hframe". rewrite -Hsp.
@@ -3340,7 +3359,7 @@ Section IntrDefs.
     sie_cap kt m avail b p -∗
     sie_cap kt m (avail + k) b p.
   Proof.
-    iIntros "Hdeep (Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
+    iIntros "Hdeep (Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
     rewrite Nat.add_assoc. iApply (stack_own_app (KTR := kt)).
     iFrame "Hstk Hdeep".
   Qed.
@@ -3354,7 +3373,7 @@ Section IntrDefs.
     stack_own (KTR := kt)
       (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
   Proof.
-    iIntros (Hk) "(Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
+    iIntros (Hk) "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
     replace (trap_res b + avail)%nat
       with ((trap_res b + (avail - k)) + k)%nat by lia.
     iDestruct (stack_own_app (KTR := kt) with "Hstk") as "[Htop Hdeep]".

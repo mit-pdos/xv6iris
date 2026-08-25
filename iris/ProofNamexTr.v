@@ -97,6 +97,7 @@ Require Import ProofNamex.    (* READ-ONLY REUSE: its top-level pure lemmas *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -204,7 +205,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 Section ProofNamexTrMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.

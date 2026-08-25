@@ -89,6 +89,7 @@ Require Import KallocInv WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -106,7 +107,7 @@ Notation K_kvmmake := (166%nat) (only parsing).
 
 Section KvmSpecs.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* kalloc's ambient resources, bundled so callers can invoke kalloc
      REPEATEDLY: the kmem lock, the count ghost, and panic's contract (which

@@ -8,6 +8,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
 Require Import KMap.   (* kmap_static_claims, carried in hw_config *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -257,7 +258,7 @@ Definition cfg_ok (s : mstate) : Prop := cfg_ok_rs s.(sregs).
 
 Section HwConfig.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* mcountinhibit / minstretcfg are bundled here AGAIN.  They were removed
      when the exec-shaped [should_inc] turned out to be total and not to need

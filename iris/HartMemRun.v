@@ -184,7 +184,7 @@ Definition bytes_own `{!riscvGS Σ} (mm : gmap Arch.pa (bv 8)) : iProp Σ :=
 
 Section memrun.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* The owned bytes, read and written.                                    *)
@@ -705,6 +705,7 @@ Qed.
 (* ([hmrun_of_exec_after]).                                                 *)
 (* ====================================================================== *)
 Require Import RiscvTryStep WpDecodeBridge.
+Require Import TsoCtx.
 
 (* ---------------------------------------------------------------------- *)
 (* ONLY [dom mm] IS EVER CONSULTED (the header's claim, as a lemma): the     *)
@@ -1614,7 +1615,7 @@ Qed.
 
 Section memrun_exec.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE COMPOSITE RULE the user tier calls: a whole-cycle [exec] fact, a
      footprint certificate for it, and the hart's own resources in -- the

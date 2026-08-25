@@ -111,6 +111,7 @@ Require Import SmodeCorePt.
 Require Import WpSmodePtEngine WpSmodePtFetch.
 Require Export IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -185,7 +186,7 @@ Proof. reflexivity. Qed.
 
 Section IFrames.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma i_rw_split (rs : regstate) :
     (hreg_frame rs i_Drw : iProp Σ) ⊣⊢
@@ -713,7 +714,7 @@ Proof. reflexivity. Qed.
 
 Section TrapSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma ti_frames (dqp dqm dqv : dfrac) (ms sc sv se : mword 64)
       (p : Privilege) (npc pc0 mis stv : mword 64) (e : mword 1) :
@@ -1072,7 +1073,7 @@ End TrapSwp.
 Section IntrEngine.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) : Prop :=
@@ -1946,7 +1947,8 @@ Section IntrEngine.
   Definition sie_cap_rest (kt : ktier) (m : regfile) (av : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + av) ∗
-     sie_arm kt b p ∗ TimerCap.timer_cap ∗ sr_ktier_wit strans_regime kt)%I.
+     sie_arm kt b p ∗ own_context cur_ctx ∗
+     TimerCap.timer_cap ∗ sr_ktier_wit strans_regime kt)%I.
 
   (* THE RECEIPT IS THE PRICE OF THE tlb CELL, post-flip.  [strans_inv]'s
      Bare arm no longer owns one ([SRegime.bare_inv] lost it with the flip),
@@ -1967,14 +1969,14 @@ Section IntrEngine.
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p.
   Proof.
-    iIntros "#Hon (Hstk & Htr & Harm & #Htc & #Hwit)".
+    iIntros "#Hon (Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct (strans_swp_open with "Hon Htr") as (satp0 tlbv pcfg paddr)
       "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
     iExists satp0, tlbv, pcfg, paddr.
     iSplitR; [iPureIntro; exact Hsok |].
     iSplitR; [iPureIntro; exact Hpok |].
     rewrite /sie_cap_rest.
-    iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Htc Hwit".
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Hctx Htc Hwit".
   Qed.
 
   (* WHAT A HOLDER OF THE WRITE SET KNOWS ABOUT THE ARM.  Persistent, and it
@@ -2018,7 +2020,7 @@ Section IntrEngine.
          strans_res_at satp0 tv' -∗ sie_cap_rest kt m' av' b' p -∗
          sie_cap kt m' av' b' p).
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
+    iIntros "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ---- Bare: the frame gets NO cell; the slot keeps it ---- *)
       iDestruct "Hb" as (satp0) "(Hsatp & %Hmode & Hpmp)".
@@ -2035,10 +2037,10 @@ Section IntrEngine.
       iSplitL "Hpend Hstv".
       { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
         iPureIntro. exact Hmode. }
-      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
+      iSplitL "Hstk Harm Hctx"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hctx Htc Hwit" |].
       iIntros (m' av' b' tv') "Hsatp _ Hpcfg Hpaddr Hres Hrest".
-      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-      iFrame "Hstk Harm Htc Hwit".
+      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & Hctx & _)".
+      iFrame "Hstk Harm Hctx Htc Hwit".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
@@ -2072,11 +2074,11 @@ Section IntrEngine.
         iSplitR; [iPureIntro; exact Hmode |].
         rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
         iFrame "Hsnap Hkinv". }
-      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
+      iSplitL "Hstk Harm Hctx"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hctx Htc Hwit" |].
       iIntros (m' av' b' tv') "Hsatp Htlb Hpcfg Hpaddr Hres Hrest".
       rewrite s_tlb_at_kpt.
-      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-      iFrame "Hstk Harm Htc Hwit".
+      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & Hctx & _)".
+      iFrame "Hstk Harm Hctx Htc Hwit".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
       { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
@@ -2129,7 +2131,7 @@ Section IntrEngine.
          sie_cap kt m' av' b' p).
   Proof.
     intros HSD.
-    iIntros "#Hwitk (Hstk & Htr & Harm & #Htc & #Hwit)".
+    iIntros "#Hwitk (Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ---- Bare.  [SD] must be [s_Drwb]: at [s_Drw] the witness is
            [kpt_on], which this arm's [strans_pending] refutes. ---- *)
@@ -2153,10 +2155,10 @@ Section IntrEngine.
       iSplitL "Hpend Hstv".
       { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
         iPureIntro. exact Hmode. }
-      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
+      iSplitL "Hstk Harm Hctx"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hctx Htc Hwit" |].
       iIntros (m' av' b' tv') "_ Hsatp _ Hpcfg Hpaddr Hres Hrest".
-      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-      iFrame "Hstk Harm Htc Hwit".
+      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & Hctx & _)".
+      iFrame "Hstk Harm Hctx Htc Hwit".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
@@ -2188,11 +2190,11 @@ Section IntrEngine.
           iSplitR; [iPureIntro; exact Hmode |].
           rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
           iFrame "Hsnap Hkinv". }
-        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
+        iSplitL "Hstk Harm Hctx"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hctx Htc Hwit" |].
         iIntros (m' av' b' tv') "_ Hsatp Htlb Hpcfg Hpaddr Hres Hrest".
         rewrite s_tlb_at_kpt.
-        rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-        iFrame "Hstk Harm Htc Hwit".
+        rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & Hctx & _)".
+        iFrame "Hstk Harm Hctx Htc Hwit".
         rewrite /strans_res_at.
         iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
         { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
@@ -2214,11 +2216,11 @@ Section IntrEngine.
           iSplitR; [iPureIntro; exact Hmode |].
           rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
           iFrame "Hsnap Hkinv". }
-        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
+        iSplitL "Hstk Harm Hctx"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hctx Htc Hwit" |].
         iIntros (m' av' b' tv') "%Hpin Hsatp _ Hpcfg Hpaddr Hres Hrest".
         rewrite (Hpin eq_refl).
-        rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-        iFrame "Hstk Harm Htc Hwit".
+        rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & Hctx & _)".
+        iFrame "Hstk Harm Hctx Htc Hwit".
         rewrite /strans_res_at.
         iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
         { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
@@ -2248,8 +2250,8 @@ Section IntrEngine.
     sie_cap kt m av b p.
   Proof.
     intros Hsok Hpok.
-    iIntros "#Hon Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & #Htc & #Hwit)".
-    rewrite /sie_cap. iFrame "Hstk Harm Htc Hwit".
+    iIntros "#Hon Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & Hctx & #Htc & #Hwit)".
+    rewrite /sie_cap. iFrame "Hstk Harm Hctx Htc Hwit".
     iApply (strans_swp_close satp0 tlbv pcfg paddr Hsok Hpok
               with "Hon Hsatp Htlb Hpcfg Hpaddr Hres").
   Qed.
@@ -2523,11 +2525,11 @@ Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
    cycle boundary, not inside it -- so lending them costs the engine
    nothing, and [csrr time] / [csrr sip] / [csrw stimecmp] cannot be
    written without them. *)
-Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{XI : CurCtx}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
-    `{CID : CpuId} : iProp Σ :=
+    `{CID : CpuId} `{XI : CurCtx} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
     gpr_file (tp_pin m) -∗
@@ -2553,7 +2555,7 @@ Definition intr_cb `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
-    `{CID : CpuId} : iProp Σ :=
+    `{CID : CpuId} `{XI : CurCtx} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
     gpr_file (tp_pin m) -∗
@@ -2583,7 +2585,7 @@ Definition intr_cb `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
    mstatus VALUE and the residue to the satp/tlb values, and those values
    are in the frame.  Reading them off the landing file is what keeps the
    two halves talking about the same cells. *)
-Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (p : mword 64) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
@@ -2604,7 +2606,7 @@ Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
    [nextPC] is the pc the cycle commits, so both arms name their landing pc
    by reading it off rather than by an existential the continuation could
    not tie down. *)
-Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
@@ -2647,7 +2649,7 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
                    wp_next true p (fun CID =>
                      intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))))%I.
 
-Lemma wp_exec_step_intr_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_exec_step_intr_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
@@ -2667,7 +2669,7 @@ Proof.
   (* ---- open the bundle: cells out, non-cell residue kept aside ---- *)
   iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
   iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn)
-    "(Hstk & Hbit1 & Htlbres & Harm & #Htc & #Hwit)".
+    "(Hstk & Hbit1 & Htlbres & Harm & Hctx & #Htc & #Hwit)".
   rewrite {1}/sie_arm.
   iDestruct "Harm" as
     "(Hq1 & Hires & #Hkpt & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclm & Hcpu)".
@@ -2796,7 +2798,13 @@ Proof.
                        ∗ (∃ v : mword 64, stval ↦ᵣ v)
                        ∗ (∃ a b : mword 1, sret_bits a b)
                        ∗ cpu_claim p ∗ cpu_hart 0 true p ∅
-                       ∗ gpr_file (tp_pin m))%I
+                       ∗ gpr_file (tp_pin m)
+                       (* THE THREAD-OF-CONTROL TOKEN rides the W bundle:
+                          the trap arm and the instruction arm each rebuild
+                          [sie_cap], and the continuation goals here are
+                          handed an EMPTY spatial context, so the token has
+                          to travel with the rest of the capability. *)
+                       ∗ own_context cur_ctx)%I
                       (fun ii pr => ∃ rs2 : regstate,
                         ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2⌝ ∗
                         swp (handle_interrupt ii pr)
@@ -2808,7 +2816,7 @@ Proof.
                       with "Hcert Hinstr Hbit1 Hkinv Hsnap Hfrag
                             [$Hbody $Hhalf $Htie $Hstk $Hq1 $Hq4 $Hstv
                              $Hsepcx $Hscausex $Hstvalx $Hsppc $Hclm $Hcpu
-                             $Hfile]
+                             $Hfile $Hctx]
                             Hsrw Hsro [] []").
             (* ---------- THE TRAP ---------- *)
             iIntros (ii pr) "%Hd HW Hbit1 Hsnap' Hfrag Hsrw Hsro".
@@ -2817,7 +2825,7 @@ Proof.
             subst pr.
             iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hq1 & Hq4 &
                                 Hstv & Hsepcx & Hscausex & Hstvalx & Hsppc &
-                                Hclm & Hcpu & Hfile)".
+                                Hclm & Hcpu & Hfile & Hctx)".
             iDestruct "Hsepcx" as (se_old) "Hsepc".
             iDestruct "Hscausex" as (sc_old) "Hscause".
             iDestruct "Hstvalx" as (sv_old) "Hstval".
@@ -2877,8 +2885,8 @@ Proof.
             { rewrite /sret_tie trap_ms_SPP trap_ms_SPIE HSIE1. reflexivity. }
             rewrite Htie_eq trap_ms_SIE.
             iFrame "Hms Hhalf Htie Hmie Hmdl Hmenv Hsppc Hsepc Hscause Hstval".
-            iSplitL "Hstk Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap' Hq1".
-            { rewrite /sie_cap. iFrame "Hstk Htc Hwit".
+            iSplitL "Hstk Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap' Hq1 Hctx".
+            { rewrite /sie_cap. iFrame "Hstk Hctx Htc Hwit".
               iSplitL "Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap'".
               { iApply (strans_inv_intro root_ppn with "Hbit1").
                 iApply (tlb_res_of_cells root_ppn satp0 _ pcfg paddr
@@ -2901,7 +2909,7 @@ Proof.
             iIntros (tlbf) "HW Hbit1 Hsnap' Hresv' Hsrw Hsro".
             iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hq1 &
                                 Hq4 & Hstv & Hsepcx & Hscausex & Hstvalx &
-                                Hsppc & Hclm & Hcpu & Hfile)".
+                                Hsppc & Hclm & Hcpu & Hfile & Hctx)".
             pose proof (s_rs_set_nPC pc0 pc0
                        (add_vec_int pc0 (if is_rvc then 2 else 4)) msr
                        (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
@@ -2924,9 +2932,9 @@ Proof.
                         with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl
                               Hmenv"). }
             iAssert (sie_cap kt m av true p)
-              with "[Hstk Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap' Hq1 Hq4 Hstv
+              with "[Hstk Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap' Hq1 Hq4 Hstv Hctx
                      Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu]" as "Hcap".
-            { rewrite /sie_cap. iFrame "Hstk Htc Hwit".
+            { rewrite /sie_cap. iFrame "Hstk Hctx Htc Hwit".
               iSplitL "Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap'".
               { iApply (strans_inv_intro root_ppn with "Hbit1").
                 iApply (tlb_res_of_cells root_ppn satp0 _ pcfg paddr
@@ -3128,7 +3136,7 @@ Qed.
    which is what every leaf that does not name one wants -- and it is what
    keeps the 68 call sites of the funnel unchanged.                        *)
 (* ===================================================================== *)
-Lemma wp_exec_step_intr `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_exec_step_intr `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :

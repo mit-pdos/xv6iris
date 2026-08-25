@@ -25,10 +25,11 @@ Require Import CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
-Definition wp_walk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_walk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
@@ -78,7 +79,7 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
 
 Module Type WALK.
   Parameter wp_walk_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_walk_sconf_body kt γa γk mm t m K lvl eb p on b lks.
 End WALK.
@@ -94,7 +95,7 @@ End WALK.
 (* either the map's leaf (mapped) or the literal zero (unmapped).         *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (mm : regfile) (t : ptree)
+Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (mm : regfile) (t : ptree)
     (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.walk in
   let va := mm !!! Regidx (mword_of_int 11) in
@@ -127,7 +128,7 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
 
 Module Type WALK_NOALLOC.
   Parameter wp_walk_noalloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (mm : regfile) (t : ptree)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
       wp_walk_noalloc_sconf_body kt mm t m K dq b p.
 End WALK_NOALLOC.

@@ -59,6 +59,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartMCycle.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the two spine reducers this file needs, same whitelists HartMCycle uses *)
@@ -75,7 +76,7 @@ Local Ltac i_peel :=
 
 Section stepany.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* BOTH ARMS AT ONCE, and why one rule has to serve them.                *)

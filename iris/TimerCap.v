@@ -35,6 +35,7 @@ From iris.base_logic.lib Require Import invariants own.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -47,7 +48,7 @@ Proof. reflexivity. Qed.
 
 Section TimerCap.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* S-mode may read [time] and write [stimecmp]: persistent, duplicable. *)
   Definition sstc_enabled : iProp Σ :=

@@ -34,6 +34,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import StackOwn.
 Require Import RiscvExtras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* [pa_add] composes into a single offset -- the byte-run analogue of
@@ -76,7 +77,7 @@ Proof. intro Hj. apply nth_byte_assemble_len; cbn [length]; lia. Qed.
 
 Section StackBytes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* THE FRAME'S TIER.  A byte run in this file is always STACK scratch, so
      it rides the same tier as the frame it was carved out of -- the
      capability's [kt], not the ambient KT0 default.  The binder is the

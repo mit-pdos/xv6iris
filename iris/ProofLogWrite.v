@@ -85,6 +85,7 @@ Require Import SpecAcquire SpecRelease SpecBpin.
 Require Import SpecLogWrite.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -309,7 +310,7 @@ Section LogWriteDefs.
      proof instantiates it with the atomic update's [Φfsb]; the derived
      [wp_log_write_gen] takes [Φfsb := fsblock (fs_bytes γfs) (uint bno) bs],
      the shape this used to be spelled with. *)
-  Definition lw_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition lw_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (dev : mword 32) (k : nat) (pidv bno : mword 32)
       (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
@@ -329,7 +330,7 @@ Section LogWriteDefs.
 
   (* re-anchor the continuation from the hart a block was entered at to the
      hart it hands it on at (ProofBread.bd_cont_shift's twin) *)
-  Lemma lw_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
+  Lemma lw_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (dev : mword 32) (k : nat) (pidv bno : mword 32)
       (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
@@ -467,7 +468,7 @@ Section LogWriteBlocks.
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
   (*  Both paths converge here with [log_res] already reassembled.       *)
   (* ================================================================== *)
-  Local Lemma lw_rel `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma lw_rel `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
@@ -747,7 +748,7 @@ Section LogWriteBlocks.
   (*  falling through from +0x64, the absorb copy by the [beq a2,a5] at  *)
   (*  +0xaa when i == n (the n == 0 entry from the +0x34 guard).         *)
   (* ================================================================== *)
-  Local Lemma lw_pin `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma lw_pin `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
@@ -989,7 +990,7 @@ Section LogWriteBlocks.
   (*  bpin block when i == n (the n == 0 entry from the +0x34 guard) and  *)
   (*  otherwise falls through to the release.                            *)
   (* ================================================================== *)
-  Local Lemma lw_blk94 `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma lw_blk94 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
@@ -1264,7 +1265,7 @@ Section LogWriteBlocks.
   (*  4*lh.n.  Reached by falling out of the scan with i == n >= 1, and   *)
   (*  falling straight into the bpin block at +0x66.                     *)
   (* ================================================================== *)
-  Local Lemma lw_app52 `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma lw_app52 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
@@ -1480,7 +1481,7 @@ Section LogWriteBlocks.
   (*  negative fact [forall j < i, W !! j <> Some bno] -- which is what   *)
   (*  turns the fall-out into the append closer's ⌜bno ∉ W⌝ premise.     *)
   (* ================================================================== *)
-  Local Lemma lw_scan `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma lw_scan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
@@ -1759,7 +1760,7 @@ End LogWriteBlocks.
 
 Section ProofLogWrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE WHOLE-FUNCTION PROOF, at the most general (byte-range atomic-update)
      contract.  [wp_log_write_au] below is its whole-block instance,

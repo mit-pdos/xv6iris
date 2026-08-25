@@ -86,6 +86,7 @@ Require Import CodeKfork.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -142,7 +143,7 @@ Section ProofKforkB5.
   (* =================================================================== *)
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
-  Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Vc : pprivate)

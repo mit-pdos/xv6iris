@@ -51,6 +51,7 @@ Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -124,7 +125,7 @@ Section ProofKfork.
   (* The epilogue, restated over [kfk_frame] so the three exits agree on one
      shape.  It is [ProofKforkParts.kfk_epi] with the three lazy slots
      existentially quantified. *)
-  Lemma kfk_epi_frame `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kfk_epi_frame `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 rv : mword 64) (p : mword 64) (b : bool) :
     (8 <= K)%nat ->
@@ -167,7 +168,7 @@ Section ProofKfork.
   (*  caller's values are still sitting in the physical registers and     *)
   (*  [callee_saved] for them comes out of [Hthr] untouched.              *)
   (* =================================================================== *)
-  Lemma kfk_exit_alloc `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kfk_exit_alloc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64) (p : mword 64) (b : bool) :
     (8 <= K)%nat ->
@@ -248,7 +249,7 @@ Section ProofKfork.
   (*  all three, so it is the only one that reloads them; the two failure  *)
   (*  tails jump over this block entirely.                                *)
   (* =================================================================== *)
-  Lemma kfk_tail_succ `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kfk_tail_succ `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 rv w8 : mword 64) (p : mword 64) (b : bool) :
     (8 <= K)%nat ->

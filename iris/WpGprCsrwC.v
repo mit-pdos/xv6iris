@@ -34,6 +34,7 @@ Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import WpGprCsrrCommon.   (* drive_csr_term *)
 Require Import WpInstrConfig.     (* wp_instr_config: the raw-cell wrapper *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -774,7 +775,7 @@ Qed.
 (* ====================================================================== *)
 Section WpCsrwGprNewC.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- csrw mstatus (0x300): the continuation receives the RAW UNBUNDLED
      cells with the EXPLICIT legalized mstatus value, universally quantified

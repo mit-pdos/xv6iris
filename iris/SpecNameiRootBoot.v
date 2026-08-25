@@ -115,6 +115,7 @@ Require Import FsCfg FileInvDefs.
 Require Import ProcAvail.   (* [pavG], a binder of the proven corner *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -129,7 +130,7 @@ Notation K_namei_root_boot := (74%nat) (only parsing).
 
 Definition wp_namei_root_boot_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
@@ -194,7 +195,7 @@ Definition wp_namei_root_boot_body
 Module Type NAMEI_ROOT_BOOT.
   Parameter wp_namei_root_boot :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),

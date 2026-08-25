@@ -17,6 +17,7 @@ Require Import MinstretInv.   (* exec_clint_dispatch_false: writing stimecmp ref
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import WpGprCsrrCommon.   (* drive_csr_term *)
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* MONADIC-LEGALIZE REDUCTION LAYER.  Each legalize_* chains             *)
@@ -980,7 +981,7 @@ Qed.
 
 Section WpCsrwGprNewB.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* ------------------------------------------------------------------ *)
   (* mideleg: [write_CSR]'s menvcfg shape exactly -- read the cell, run a    *)
   (* READ-ONLY legalization, write it back, read it again.  So the           *)

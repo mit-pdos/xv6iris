@@ -61,6 +61,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -145,7 +146,7 @@ Section UiCont.
      pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
-  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
+  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}  (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
@@ -157,7 +158,7 @@ Section UiCont.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
-  Lemma ui_ret_cont_shift `{GEN : GenId} (CIDa CIDb : CpuId)  (m0 : regfile)
+  Lemma ui_ret_cont_shift `{GEN : GenId} `{XI : CurCtx} (CIDa CIDb : CpuId)  (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :
     (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     ui_ret_cont (CID0 := CIDa)  m0 av lvl eb pme b lks -∗
@@ -175,7 +176,7 @@ Module UG := UartgetcProof Uart.
 
 Section ProofUartintr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

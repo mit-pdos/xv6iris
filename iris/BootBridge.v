@@ -103,6 +103,7 @@ Require Import SpecMain.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -205,7 +206,7 @@ End BootStack.
 (* ===================================================================== *)
 
 (* the tp/cid convention at the boot hart: start() writes tp = mhartid. *)
-Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} (mh : mword 64) :
+Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mh : mword 64) :
   mh = (mword_of_int 0 : mword 64) ->
   cid_word = (zero_reg : mword 64) ->
   mb_tpv mh = cid_word.
@@ -253,7 +254,7 @@ Definition mstatus_reset : mword 64 := mword_of_int 0xA00000000.
 
 Section BootBridge.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* NO [KT0] BINDER: the boot capability is at KT0 by construction
      ([sie_cap_intro_bare]); see the note in [Section BootStack] above. *)
@@ -372,6 +373,17 @@ Section BootBridge.
     menvcfg ↦ᵣ menvcfgf -∗
     stack_own_phys sp0 n -∗
     (* --- the adequacy-minted inputs --- *)
+    (* THIS HART'S THREAD OF CONTROL (tso-port leg M2).  TAKEN, NOT MINTED:
+       the token is what makes the AMBIENT [XI] the identity of the thread
+       the bridge hands to main, so it has to arrive already at [cur_ctx].
+       Minting it here instead would force the conclusion to existentially
+       quantify the context, and every lemma below main would then have to
+       thread an explicit [(XI := ..)].  The mint is at the top of the chain
+       ([SystemAdequacy.xv6_boot_era], one per hart), which is also the only
+       place that can give the EIGHT harts eight DISTINCT contexts --
+       [own_context] is exclusive, so one ambient [XI] cannot serve them all.
+       It goes straight into [IntrDefs.sie_cap] via [sie_cap_intro_bare]. *)
+    own_context cur_ctx -∗
     strans_pending -∗
     strans_pending -∗
     (* this hart's SIE ghost, in the three pieces the choreography splits it
@@ -422,7 +434,7 @@ Section BootBridge.
   Proof.
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hmieval Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin #Htimc Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
-             Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
+             Hstk Hthr Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
              Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hlks Hssc Hmedl Hmse Hsse Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
@@ -459,8 +471,12 @@ Section BootBridge.
     (* [sie_cap_intro_bare]'s stack premise is PLAIN [avail], so it is
        instantiated at the whole carve in hand -- [kv_frame_slots + K] -- and
        the capability comes out AT THAT INDEX.  Nothing is dropped. *)
+    (* THE THREAD OF CONTROL goes in AT THE AMBIENT [XI] (tso-port leg M2):
+       [Hthr] is the premise, so the capability this bridge builds is the
+       one belonging to the boot thread the caller minted -- no [(XI := ..)]
+       annotation, which is exactly what keeps main's cone context-implicit. *)
     iDestruct (sie_cap_intro_bare Mf (kv_frame_slots + K)%nat stv0 (p := p0)
-                 with "Hstk Hbit Hbare Hstv He1 Htimc") as "Hcap".
+                 with "Hstk Hbit Hbare Hstv Hthr He1 Htimc") as "Hcap".
     (* --- the configuration bundle --- *)
     iEval (rewrite Hmenv) in "Hmenv".
     iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE msf))

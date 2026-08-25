@@ -123,10 +123,11 @@ Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
 (* ====================================================================== *)
 
 Require Import HartMFrame.
+Require Import TsoCtx.
 
 Section swpbase.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* THE NODE SHAPES, once each.                                          *)

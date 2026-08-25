@@ -27,6 +27,7 @@ Require Export WpSmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -49,7 +50,7 @@ Qed.
 
 Section WpHoldingInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- [smode_config] leaf wrappers for holding.  All config-preserving
      (holding never touches mstatus), so each just unbundles → raw leaf →

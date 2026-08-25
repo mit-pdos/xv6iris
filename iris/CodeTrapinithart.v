@@ -26,13 +26,14 @@ Require Import KernelDecode14.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeTrapinithart.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- trapinithart @ KernelSyms.trapinithart, 28 bytes ---- *)
 

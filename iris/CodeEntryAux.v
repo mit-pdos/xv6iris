@@ -33,6 +33,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto WpDecode.
 Require Export ExecCommon.
 Require Import CodeEntry.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ---- the eight instruction words, their operand fields, and their decodes ---- *)
@@ -121,7 +122,7 @@ Definition rsd_caddi : regidx :=
 
 Section CodeEntryAux.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 (* PCs of the eight instructions. *)
 Definition pc_e0 : mword 64 := mword_of_int (KernelSyms._entry).  (* AUIPC  *)

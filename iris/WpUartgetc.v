@@ -42,6 +42,7 @@ Require Import SpecUart.
 Require Import WpSconfAlu WpSconfBtype.
 Require Import WpSconfUartAccess.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Module UartgetcProof (Uart : UART).
@@ -50,7 +51,7 @@ Module UAcc := UartAccessProof Uart.
 Section WpUartgetc.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {p : mword 64}.
 
   Context {kt : ktier}.

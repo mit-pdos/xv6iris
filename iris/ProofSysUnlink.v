@@ -113,8 +113,6 @@ Require Import SpecNamecmp.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import SpecMemset.
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNamex.
@@ -127,6 +125,8 @@ Require Import ProofSysUnlinkTails.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -668,7 +668,7 @@ Section ProofSysUnlinkBody.
   (*  [w] pay-bit the zeroing's writei needs downstream; the [ok = false] *)
   (*  arm hands the whole allowance back and ARM B retires the op.        *)
   (* ================================================================== *)
-  Lemma su_w1 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w1 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -1397,7 +1397,7 @@ Section ProofSysUnlinkBody.
   (* the sp bound the capability underwrites, [ProofSysClose.sc_sp_bounds]'
      shape.  [0 < k] is mandatory: [trap_res false] is nothing, so at the
      interrupts-off arm the caller's own slots are all that bound sp. *)
-  Lemma su_sp_bounds `{GEN : GenId} `{CIDh : CpuId} (M : regfile) (k : nat)
+  Lemma su_sp_bounds `{GEN : GenId} `{CIDh : CpuId} `{XI : CurCtx} (M : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 M k b pp -∗
@@ -1419,7 +1419,7 @@ Section ProofSysUnlinkBody.
   (*  pid quarter plus its CLOSER, which is what keeps the cwd half out   *)
   (*  of this interface entirely.                                        *)
   (* ================================================================== *)
-  Lemma su_w2_bad `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w2_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -1601,7 +1601,7 @@ Section ProofSysUnlinkBody.
   (*  dirlookup, so the bundle ilock returned has never been opened and   *)
   (*  [su_tail_bad] takes it as it stands.  ARM D has, and repacks.       *)
   (* ================================================================== *)
-  Lemma su_w2 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w2 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -2609,7 +2609,7 @@ Section ProofSysUnlinkBody.
   (* ARM E's continuation: a live record was found, the loop leaves for
      +0x174 with ip's content intact and the answer discarded.  [dp]'s
      bundle and the exit ride in [X]. *)
-  Definition su_w4_exitE `{GEN : GenId}
+  Definition su_w4_exitE `{GEN : GenId} `{XI : CurCtx}
       (gfs : fs_names) (jx ki : nat)
       (dev : mword 32) (dni : dinode) (bmi : blkmap)
       (dati : nat -> list (bv 8))
@@ -2634,7 +2634,7 @@ Section ProofSysUnlinkBody.
   (* the EMPTY exit: every record past the dots is dead, and the payload
      clause is [dir_dots_only] -- exactly what W5-DIR's re-park
      ([su_dir_links_orphan]) reads, stated at the loop's own [dati]. *)
-  Definition su_w4_exitD `{GEN : GenId}
+  Definition su_w4_exitD `{GEN : GenId} `{XI : CurCtx}
       (gfs : fs_names) (jx ki : nat)
       (dev : mword 32) (dni : dinode) (bmi : blkmap)
       (dati : nat -> list (bv 8))
@@ -2662,7 +2662,7 @@ Section ProofSysUnlinkBody.
 
   (* THE ITERATION, by fuel over the remaining bytes.  Entry at +0x106
      with s3 = 16*jj, records 2..jj-1 known dead. *)
-  Local Lemma su_w4_loop `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma su_w4_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
@@ -3219,7 +3219,7 @@ Section ProofSysUnlinkBody.
   Qed.
 
   (* THE BLOCK: the entry test at +0xf8..+0x104, then the loop. *)
-  Lemma su_w4 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w4 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64) (bn : bio_names)
@@ -3439,7 +3439,7 @@ Section ProofSysUnlinkBody.
   (*  [true] and the process address is not zero), never by               *)
   (*  [wp_next_chain].                                                   *)
   (* ================================================================== *)
-  Lemma su_w3 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w3 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -4197,7 +4197,7 @@ Section ProofSysUnlinkBody.
   (*    reloads, and the shared epilogue.                                *)
 
   (* ================================================================== *)
-  Lemma su_w5_file `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w5_file `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -4593,17 +4593,16 @@ Section ProofSysUnlinkBody.
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
     (* memset's contract is context-indexed; this caller is not yet
-       converted, so it mints a context for the call (SC-only move,
-       becomes a compile error at cutover -- the leftover-work marker). *)
-    iMod (own_context_alloc) as (ξms1) "Hctx".
-    iDestruct (ctx_buf_of_mem KT1 ξms1 with "HbD") as "HbD".
-    iApply (Memset.wp_memset_sconf (XI := ξms1) KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "HbD") as "HbD".
+    iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
               ltac:(rewrite HA5a2; pcw)
-              with "Hctx Hcg Htext Hpc [HbD]").
+              with "Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
-    iIntros (D6 Hd6 mms) "_ Hcg Hpc HbD %Hcsms".
+    iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
     iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
@@ -5725,7 +5724,7 @@ Section ProofSysUnlinkBody.
   (*  model cannot yet supply -- see the statement's banner and           *)
   (*  fs-sysfile.md S7-unlink W5.  The seal is STOPPED on them.           *)
   (* ================================================================== *)
-  Lemma su_w5_dir `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w5_dir `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -6146,17 +6145,16 @@ Section ProofSysUnlinkBody.
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
     (* memset's contract is context-indexed; this caller is not yet
-       converted, so it mints a context for the call (SC-only move,
-       becomes a compile error at cutover -- the leftover-work marker). *)
-    iMod (own_context_alloc) as (ξms2) "Hctx".
-    iDestruct (ctx_buf_of_mem KT1 ξms2 with "HbD") as "HbD".
-    iApply (Memset.wp_memset_sconf (XI := ξms2) KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "HbD") as "HbD".
+    iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
               ltac:(rewrite HA5a2; pcw)
-              with "Hctx Hcg Htext Hpc [HbD]").
+              with "Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
-    iIntros (D6 Hd6 mms) "_ Hcg Hpc HbD %Hcsms".
+    iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
     iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
@@ -7778,7 +7776,7 @@ Section ProofSysUnlinkBody.
   (*  The T_DIR arm takes NO design-fact premise any more: (D1) and (D2)   *)
   (*  are derived inside [su_w5_dir] (V5' increment W).                    *)
   (* ==================================================================== *)
-  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga gpr : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

@@ -34,13 +34,14 @@ Require Import KernelDecode26.
 Require Import KernelDecode28.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeUartinit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- uartinit @ KernelSyms.uartinit, 86 bytes ---- *)
 

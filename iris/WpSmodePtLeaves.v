@@ -47,12 +47,13 @@ Require Import KptShare KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section WpSmodePtGprEngine.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* The generic RVC (2-byte) gpr-write engine over [tlb_inv_pt].         *)
@@ -138,7 +139,7 @@ End WpSmodePtGprEngine.
 (* ===================================================================== *)
 Section WpSmodePtItype.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 
@@ -332,7 +333,7 @@ End ExecLoadGSwalkPt.
 (* ===================================================================== *)
 Section WpSmodePtLoad.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* THE TIER-INDEXED FORM (sp-migration phase D, design §4).  [kt'] is the *)
@@ -841,7 +842,7 @@ Qed.
 
 Section WpSmodePtStore.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE TIER-INDEXED FORM -- see [wp_cld_s_r_t]'s note for the shape.  The
      STORE is tier-preserving in the same sense: the window is written and
@@ -1129,7 +1130,7 @@ End WpSmodePtStore.
 (* the PC-reading 4-byte gpr-write engine (auipc), over [tlb_inv_pt] *)
 Section WpSmodePtGprEnginePc.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 End WpSmodePtGprEnginePc.
@@ -1138,7 +1139,7 @@ End WpSmodePtGprEnginePc.
    c.addi16sp, jal rd) over [tlb_inv_pt] via [wp_instr_s_tlbinv_pt]. *)
 Section WpSmodePtGprGamma.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [hw_config] is [smode_config]'s first (persistent) conjunct; a leaf on
      the bundle needs it to pay the fetch translation. *)

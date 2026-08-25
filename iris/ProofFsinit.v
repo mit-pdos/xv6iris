@@ -97,6 +97,7 @@ Require Import SpecFsinit.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -192,7 +193,7 @@ Section FsinitDefs.
   (* THE CONTINUATION, named so the proofmode does not re-traverse it at
      every split (claude-notes/optimization.md).  It is the contract's post,
      verbatim. *)
-  Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
@@ -274,7 +275,7 @@ Section FsinitEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
@@ -523,7 +524,7 @@ Section FsinitMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

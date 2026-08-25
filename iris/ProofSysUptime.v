@@ -49,6 +49,7 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecSysUptime.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -113,7 +114,7 @@ Module SysUptimeProof (Acquire : ACQUIRE) (Release : RELEASE) : SYSUPTIME.
 
 Section ProofSysUptime.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Lemma wp_sys_uptime_sconf (γl : gname)

@@ -73,6 +73,7 @@ Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
    instantiates the sweeps, and it is NOT on this file's cone. *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* [own_context_alloc]: the per-hart thread-of-control mint *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -359,12 +360,24 @@ Section SystemBoot.
            unify", and the 400 GB divergence the deleted [adequacy_fscfg]
            was written to block). *)
         iDestruct "Hh0" as (iv) "Hh0".
-        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
+        (* THE BOOT HART'S THREAD OF CONTROL (tso-port leg M2), minted HERE
+           and used as the AMBIENT context of the whole chain below it
+           ([(XI := ξ0)]): that is what lets [BootBridge.boot_bridge] take
+           the token rather than mint it, and hence what keeps every lemma
+           in main's cone context-implicit.  ONE PER HART, not one for the
+           system: [TsoCtx.own_context] is exclusive, so the eight harts
+           must run at eight distinct [CtxId]s.  The mint sits under
+           [fupd_wp] because the era's own [={⊤}=∗] has already closed by
+           the time the harts' WPs are split apart. *)
+        iApply fupd_wp.
+        iMod own_context_alloc as (ξ0) "Hthr0".
+        iModIntro.
+        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) sb nib cov XV6_DISK_BYTES
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   Himg
-                  with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
+                  with "Htext Hdata Hh0 Hthr0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hfs Hmir Hirslot Hirauth Hcert Hseam
                         Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
@@ -372,10 +385,15 @@ Section SystemBoot.
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
       iDestruct "Hh" as (iv) "Hh".
-      iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c)
+      (* one thread of control per secondary hart, minted the same way and
+         for the same reason as the boot hart's above *)
+      iApply fupd_wp.
+      iMod own_context_alloc as (ξc) "Hthrc".
+      iModIntro.
+      iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξc)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
-                with "Htext Hdata Hh Hstarted"). }
+                with "Htext Hdata Hh Hthrc Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].
     iSplitR;
       [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].

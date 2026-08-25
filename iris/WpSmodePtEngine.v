@@ -32,6 +32,7 @@ Require Import MstatusBits WpGprMret WpMmodeLeafBase HartRunGen.
 Require Import HartMFrame HartMCycle WpMmodeJump WpDecode.
 Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -310,7 +311,7 @@ Qed.
 
 Section SretSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma sret_frames (ms : mword 64) (p : Privilege) (npc menv sep : mword 64) :
     (hreg_frame (sret_rs ms p npc menv sep) sret_Drw ∗
@@ -835,7 +836,7 @@ Qed.
 
 Section SdaFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma sda_rw_ext (rs rs' : regstate) :
     reg_agree_on (sda_Drw ∪ sda_Dro) rs rs' ->
@@ -1082,7 +1083,7 @@ Qed.
 
 Section SbBranch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the ONE cell a jump needs out of the persistent config bundle *)
   Lemma sb_hw_config_misa : hw_config -∗ misa ↦ᵣ□ MISA_C.
@@ -1297,7 +1298,7 @@ Proof. sjedf. Qed.
 
 Section CjCtl.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma cj_frames (dq : dfrac) (npc0 : SailStdpp.Values.mword 64) :
     (hreg_frame (cj_rs npc0) cj_Drw ∗

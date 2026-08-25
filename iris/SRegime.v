@@ -54,6 +54,7 @@ Require Import WpDecodeBridge CommonWalk.
 Require Import HartSwp HartLift HartSpan HartSpanChar.
 Require Import HartSKpt KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -341,7 +342,7 @@ Definition tlb_none : type_of_register tlb := vector_init (pow2 6) None.
 
 Section SRegimeDef.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE BARE ARM'S SATP FACT, stated before the record because
      [sr_slot_acc]'s Bare disjunct hands it out: it is what
@@ -1208,7 +1209,7 @@ End SRegimeDef.
 
 Section SRegimeShared.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma res_transform (root_ppn : mword 44) :
     forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
@@ -1747,7 +1748,7 @@ End SRegimeShared.
 
 Section SRegimeKtier.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE TIER-INDEXED ACCESS WITNESS the generic leaves take.  At KT0
      access rides the DATUM's own pin (the identity, discharged through

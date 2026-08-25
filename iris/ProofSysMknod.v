@@ -131,6 +131,7 @@ Require Import SpecSysMknod.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -628,7 +629,7 @@ Section ProofSysMknodEpilogue.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma mn_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma mn_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w19 w20 : mword 64) (bf : nat -> bv 8) :
     (20 <= K)%nat -> ((K - 20) + 20 = K)%nat ->
@@ -800,7 +801,7 @@ Section ProofSysMknodM1Tail.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma mn_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma mn_m1_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -984,7 +985,7 @@ Section ProofSysMknodBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma wp_sys_mknod_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_mknod_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga gpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

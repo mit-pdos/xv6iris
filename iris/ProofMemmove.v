@@ -30,7 +30,7 @@
    EXPLICIT-CPUID: the whole function threads a generic [b : bool], exactly the
    shape of ProofPlicinit.v / ProofStrlen.v.  [mm_epilogue] and [mm_fwd] are
    non-recursive fragments of the whole-function contract, so each takes its
-   own leading (shadowing) hart [`{CID0 : CpuId}`] and its continuation
+   own leading (shadowing) hart [`{CID0 : CpuId} `{XI : CurCtx}`] and its continuation
    argument is [wp_next]-wrapped, discharged the same two-step way the
    outermost function is; a caller then treats a call to one of them exactly
    like a leaf application, peeling a fresh [(CIDk, Hsk)] off its result.
@@ -62,6 +62,7 @@ Local Open Scope Z_scope.
 Require Import SpecMemmove.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -151,7 +152,7 @@ Module MemmoveProof : MEMMOVE.
 
 Section ProofMemmove.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.

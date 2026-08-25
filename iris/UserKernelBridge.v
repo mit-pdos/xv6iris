@@ -47,12 +47,13 @@ Require Import InstrBytes WpGpr RegFile.
 Require Import MstatusBits WpIntrCore.
 Require Import UserFrame.
 Require Import UptTree UserPtTree UserExec.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UserKernelBridge.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* -------------------------------------------------------------------- *)
   (* The pure mstatus obligation, factored out: the User-execution mstatus *)

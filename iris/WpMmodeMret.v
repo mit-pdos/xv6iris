@@ -49,6 +49,7 @@ Import Defs.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartRunGen HartRegNode
         HartMCycle HartMRun HartMFrame HartGoodb WpDecodeBridge ExecCommon.
 Require Import WpInstrConfig.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -288,7 +289,7 @@ Proof. reflexivity. Qed.
 
 Section MretSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma mr_frames (ms : mword 64) (p : Privilege) (npc menv mep : mword 64) :
     (hreg_frame (mr_rs ms p npc menv mep) mr_Drw ∗
@@ -620,7 +621,7 @@ End MretSwp.
 (* from WpGprMretNew.v *)
 Section WpMretGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* wp_mret_gpr: the new-layer MRET WP.  Unbundled config premises with the
      mstatus value [ms_cur] explicit; premises mirror [wp_mret]'s execute

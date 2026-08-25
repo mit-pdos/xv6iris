@@ -76,6 +76,7 @@ Require Import SpecGrowproc.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -121,7 +122,7 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
        (uint (pv_sz V) + sint (sbrk_arg v0) <= uvm_maxsz)%Z /\
        szv' = add_vec (pv_sz V) (sbrk_arg v0) ) )).
 
-Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string) :=
@@ -152,7 +153,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
 
 Module Type SYSSBRK.
   Parameter wp_sys_sbrk_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string),
       wp_sys_sbrk_sconf_body γa γf m av eb p pid V v0 v1 b lks.

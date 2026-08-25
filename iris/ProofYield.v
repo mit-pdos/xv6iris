@@ -56,6 +56,7 @@ Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecYield.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -114,7 +115,7 @@ Section YieldPostSched.
       | rewrite upd_ne; [| vm_compute; discriminate]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
-  Lemma yield_post_sched `{GEN : GenId} `{CID0 : CpuId}
+  Lemma yield_post_sched `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m msch : regfile) (av : nat) (eb : bool)
@@ -464,7 +465,7 @@ End YieldPostSched.
 
 Section ProofYield.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_yield_sconf 
       (γs : list gname) (j : nat) (γl : gname)

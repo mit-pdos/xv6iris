@@ -11,13 +11,14 @@ Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdp
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
 Require Import RiscvExtras.
+Require Import TsoCtx.
 Import Defs.
 Import Defs.
 
 (* from WpGprAuipc.v *)
 Section WpAuipcGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [instr]/[mmode_config]-formulated register-generic AUIPC WP, built on
      [wp_instr] -- stated exactly like [wp_addi_gpr] but with no source
@@ -65,7 +66,7 @@ End WpAuipcGpr.
 (* from WpGprLui.v *)
 Section WpLuiGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [instr]/[mmode_config]-formulated register-generic LUI WP, built on
      [wp_instr] -- stated exactly like [wp_auipc_gpr] but the written value is

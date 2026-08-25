@@ -75,6 +75,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecProcinit.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -267,7 +268,7 @@ Section ProofProcinit.
   (* [CID0] is its OWN binder here: this "post-resume half" gets applied at
      whichever hart the loop's own leaf steps actually migrated to, not
      necessarily the entry hart of [wp_procinit_sconf]. *)
-  Lemma piepi `{GEN : GenId} `{CID0 : CpuId} (m Me : regfile) (K : nat)
+  Lemma piepi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} (m Me : regfile) (K : nat)
       (b : bool) (p : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -534,7 +535,7 @@ Section ProofProcinit.
       continuation to the hart THIS iteration's leaves migrated to with
       [wp_next_shift] before recursing or handing off to [piepi].       *)
   (* ================================================================= *)
-  Lemma procinit_loop `{GEN : GenId} `{CID : CpuId} (m : regfile)
+  Lemma procinit_loop `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile)
       (K : nat) (b : bool) (p : mword 64) (fuel : nat) :
     let sp0 := (m !!! Regidx csp_rs1 : mword 64) in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -935,7 +936,7 @@ Section ProofProcinit.
   (* ================================================================= *)
   (*  procinit's whole-function WP.                                     *)
   (* ================================================================= *)
-  Lemma wp_procinit_sconf `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
+  Lemma wp_procinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat)
       (b : bool) (p : mword 64)
     : wp_procinit_sconf_body m K b p.
   Proof.

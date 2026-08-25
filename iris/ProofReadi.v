@@ -111,6 +111,7 @@ Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -270,7 +271,7 @@ Section ReadiDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition rd_cont `{CID0 : CpuId}
+  Definition rd_cont `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
@@ -323,7 +324,7 @@ Section ReadiRet.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma rd_ret `{CID0 : CpuId} 
+  Local Lemma rd_ret `{CID0 : CpuId} `{XI : CurCtx} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -646,7 +647,7 @@ Section ReadiJoin.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma rd_join `{CID0 : CpuId} 
+  Local Lemma rd_join `{CID0 : CpuId} `{XI : CurCtx} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -793,7 +794,7 @@ Section ReadiExit.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma rd_exit `{CID0 : CpuId} 
+  Local Lemma rd_exit `{CID0 : CpuId} `{XI : CurCtx} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -1058,7 +1059,7 @@ Section ReadiLoop.
      re-embedding ~20 lines of ∀/wands per step.  The ∀ binders stay
      visible at the [iAssert] below; only what they quantify over is
      folded here. *)
-  Definition rd_chunk_body
+  Definition rd_chunk_body `{XI : CurCtx}
       (j : nat) (b : bool) (K : nat) (m : regfile) (nc tot o : nat)
       (kkb : nat) (usv ip : mword 64) (off : nat) (CIDa14 : CpuId)
       (CIDb : CpuId) (Mb : regfile) (mm : nat) : iProp Σ :=
@@ -1080,7 +1081,7 @@ Section ReadiLoop.
      pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma rd_loop `{CID0 : CpuId}
+  Local Lemma rd_loop `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2400,7 +2401,7 @@ End ReadiLoop.
 (* ===================================================================== *)
 Section ReadiMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at

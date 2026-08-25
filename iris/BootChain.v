@@ -74,6 +74,7 @@ Require Import ProcAvail.
    [SpecMain]'s boot arm (fs-cfg-boot.md stage (e)). *)
 Require Import FsCfgBoot IrefSlots LogDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -261,7 +262,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section BootChain.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_entry_pre (E : coPset) (rs : regstate) :
     reset_regs cpu_id rs ->
@@ -393,7 +394,7 @@ End BootChain.
 
 Section BootRun.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
      once: [boot_entry_pre]'s output MINUS the two PLIC wire pins, plus the
@@ -468,6 +469,17 @@ Section BootRun.
        the per-hart bundle *)
     kernel_text -∗
     boot_hart_res rs iv dq -∗
+    (* THIS HART'S THREAD OF CONTROL (tso-port leg M2), at the AMBIENT [XI]:
+       taken, not minted, exactly as [BootBridge.boot_bridge] takes it, so
+       that main's whole cone runs at the caller's [XI] with no explicit
+       context anywhere.  It is NOT folded into [boot_hart_res] because
+       [own_context] is EXCLUSIVE and the eight harts need eight DISTINCT
+       contexts: [BootShared.boot_shared_alloc] hands its per-hart bundle out
+       under one ambient [XI], so a token inside it would have to carry its
+       own [∃ ξ] and re-instantiate the bundle hart by hart.  Keeping it a
+       separate premise lets [SystemAdequacy] mint one token per hart and
+       instantiate THIS lemma at that hart's [ξ]. *)
+    own_context cur_ctx -∗
     (* --- and what main's arm then wants of this hart --- *)
     (* THE avail INDEX IS [kv_frame_slots + K_main], NOT [K_main]: it is what
        [BootBridge.boot_bridge] hands back, and what it hands back is the
@@ -500,7 +512,7 @@ Section BootRun.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
-              Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hcont".
+              Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hthr Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
@@ -565,7 +577,7 @@ Section BootRun.
               Hlo Hhi
               eq_refl
               with "Hhw Hmin Htimc Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
-                    Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
+                    Hmenv Hstk Hthr Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
                     Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hlks
                     Hssc Hmede Hmse Hsse Hctx")
       as (mf) "(Hcap & Hctx & Hcpu & Hg & Hraw)".
@@ -593,7 +605,7 @@ End BootRun.
 
 Section BootSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_secondary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
@@ -603,13 +615,16 @@ Section BootSecondary.
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
+    (* this hart's thread of control -- see [boot_entry_bridge] for why it is
+       a premise and why it is not inside [boot_hart_res] *)
+    own_context cur_ctx -∗
     started_inv (main_deposit γd γv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
-    iIntros "#Htext #Hdata Hres #Hstarted".
-    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
+    iIntros "#Htext #Hdata Hres Hthr #Hstarted".
+    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
               (register_lookup tlb rs)
@@ -642,7 +657,7 @@ End BootSecondary.
 
 Section BootPrimary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
@@ -673,6 +688,9 @@ Section BootPrimary.
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
+    (* this hart's thread of control -- see [boot_entry_bridge] for why it is
+       a premise and why it is not inside [boot_hart_res] *)
+    own_context cur_ctx -∗
     started_inv (main_deposit γd γv) -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
@@ -726,10 +744,10 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive Himg.
-    iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
+    iIntros "#Htext #Hdata Hres Hthr #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
              #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
-    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
+    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres Hthr").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)

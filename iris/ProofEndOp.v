@@ -127,6 +127,7 @@ From Kernel Require KernelSyms.
 Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -695,7 +696,7 @@ Section EndOpDefs.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
      hart (durable-notes: a whole-function post must not be spelled inline). *)
-  Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -709,7 +710,7 @@ Section EndOpDefs.
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
+  Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
        (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (* the guard is at the LITERAL [true] now, matching eo_cont's own index *)
@@ -1042,7 +1043,7 @@ Section EndOpBlocks.
   (*  values on BOTH arms -- the commit arm restored them at +0x11a and  *)
   (*  the fast arm never wrote them.                                     *)
   (* ================================================================== *)
-  Local Lemma eo_epi `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma eo_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_end_op <= K)%nat ->
@@ -1293,7 +1294,7 @@ Section EndOpBlocks.
   (*  [c.j] at +0x120, from the commit body -- in both cases holding the *)
   (*  batch re-formed at n = 0.                                          *)
   (* ================================================================== *)
-  Local Lemma eo_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma eo_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
@@ -1840,7 +1841,7 @@ Section EndOpBlocks.
   (*  write_head, restore s3/s4/s5, and the [c.j] that rejoins the tail.  *)
   (*  Entered by falling out of the copy loop with the cursor at n.       *)
   (* ================================================================== *)
-  Local Lemma eo_commit `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma eo_commit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2597,7 +2598,7 @@ Section EndOpBlocks.
   (*  the home block's bytes; the home block itself rides through        *)
   (*  untouched, and its bytes are read off the AUTHORITY.               *)
   (* ================================================================== *)
-  Local Lemma eo_loop `{GEN : GenId} 
+  Local Lemma eo_loop `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3928,7 +3929,7 @@ Section EndOpBlocks.
   (*  +0x7a .. +0x8e : the FAST path -- wakeup(&log) with the lock still  *)
   (*  held, then release, falling straight into the epilogue at +0x92.    *)
   (* ================================================================== *)
-  Local Lemma eo_fast `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma eo_fast `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
@@ -4166,7 +4167,7 @@ End EndOpBlocks.
 
 Section ProofEndOp.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_end_op_sconf 
       (γs : list gname) (j : nat) (γl : gname)

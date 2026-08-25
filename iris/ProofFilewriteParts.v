@@ -88,6 +88,7 @@ Require Import CodeFilewrite.
 Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -460,7 +461,7 @@ Section ProofFilewriteParts.
   (*  seven slots it does NOT write come out at arbitrary words -- three   *)
   (*  of the six exits never spill them (Parts' header, fact 3).           *)
   (* =================================================================== *)
-  Lemma fw_pro `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_pro `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m : regfile) (K : nat) (sp0 : mword 64) (p : mword 64) (b : bool) :
     (12 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 ->
@@ -617,7 +618,7 @@ Section ProofFilewriteParts.
   (* =================================================================== *)
   (*  +0xfc .. +0x108 -- THE EPILOGUE.  All six returning exits reach it.  *)
   (* =================================================================== *)
-  Lemma fw_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s20 s50 s60 : mword 64) (rv : mword 64)
       (w3 w5 w6 w9 w10 w11 w12 : mword 64)
@@ -858,7 +859,7 @@ Section ProofFilewriteParts.
   (*  branch straight here.  One lemma over the block's seven pcs as       *)
   (*  LITERALS, so both call sites share it.                               *)
   (* =================================================================== *)
-  Lemma fw_rest6 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_rest6 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
       (v1 v3 v4 v7 v8 v9 : mword 64)
       (za zb zc zd ze zf zg : Z) (p : mword 64) (b : bool) :
@@ -1039,7 +1040,7 @@ Section ProofFilewriteParts.
   (*  fileread's, the value goes straight into a0: filewrite's epilogue    *)
   (*  has no [c.mv a0,s2] of its own.                                      *)
   (* =================================================================== *)
-  Lemma fw_m1j `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_m1j `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat)
       (za zb : Z) (jimm : mword 21) (p : mword 64) (b : bool) :
     add_vec_int (mword_of_int za : mword 64) 2 = mword_of_int zb ->
@@ -1086,7 +1087,7 @@ Section ProofFilewriteParts.
   (*  at +0x12e.  It is the [fw_m1j] block with s4's own restore wedged    *)
   (*  in, because the FD_INODE arm is the only one that spilled s4.        *)
   (* =================================================================== *)
-  Lemma fw_m1j4 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_m1j4 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v4 : mword 64)
       (za zb zc : Z) (jimm : mword 21) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 12 ->
@@ -1161,7 +1162,7 @@ Section ProofFilewriteParts.
   (*  function pointers) -- S3a's decode note 2, and the one place where   *)
   (*  copying fileread's block would have been WRONG.                      *)
   (* =================================================================== *)
-  Lemma fw_devidx `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_devidx `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (mj : Z) (slot : mword 64) (dq : dfrac)
       (p : mword 64) (b : bool) :
     (0 <= mj < 16)%Z ->
@@ -1291,7 +1292,10 @@ Section ProofFilewriteParts.
   (*  supplies it from its own [(PN : PANIC)].                             *)
   (* =================================================================== *)
   Section FwPanicArm.
-    Context `{GEN : GenId}.
+    (* [XI] is AMBIENT here, unlike [CID]: panic is called BY THIS THREAD, so
+       the assumed contract is needed at the caller's own context, while the
+       hart is quantified because a trap can move it (tso-port.md 2c). *)
+    Context `{GEN : GenId} `{XI : CurCtx}.
 
     (* CID is EXPLICIT here, unlike [PANIC]'s own [`{CID : CpuId}]: a
        maximally-inserted implicit is instantiated the moment the constant
@@ -1493,7 +1497,7 @@ Section ProofFilewriteParts.
   (*  then the six and a [c.j].  The disjunction in the postcondition is   *)
   (*  what a caller turns into [filewrite_ret].                            *)
   (* =================================================================== *)
-  Lemma fw_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fw_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s20 s40 s50 s60 : mword 64)
       (cs1 cs3 cs7 cs8 cs9 : mword 64)

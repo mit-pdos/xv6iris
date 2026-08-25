@@ -40,12 +40,13 @@ From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section WpMemsetS.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the entry halfword [c.addi sp,sp,-16], and the 4-byte fetch window it sits
      in (its own 0x1141 in the low half, the next halfword 0xe406 in the high). *)

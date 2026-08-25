@@ -30,6 +30,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -37,7 +38,7 @@ Import Defs.
 Definition cpuid_ret (tp : mword 64) : mword 64 :=
   sign_extend' 64 (subrange_vec_dec tp 31 0 : mword 32).
 
-Lemma cpuid_ret_cid `{GEN : GenId} `{CID : CpuId} : cpuid_ret cid_word = cid_word.
+Lemma cpuid_ret_cid `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : cpuid_ret cid_word = cid_word.
 Proof.
   destruct tp_ok_cid as [_ H].
   rewrite uint_unsigned in H.
@@ -54,7 +55,7 @@ Qed.
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_cpuid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_cpuid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -88,7 +89,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
+Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -113,9 +114,9 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
 
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64),
       wp_cpuid_sconf_body kt m0 n p.
   Parameter wp_call_cpuid_sconf_cs :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
       wp_call_cpuid_sconf_cs_body kt P jimm m n p.
 End CPUID.

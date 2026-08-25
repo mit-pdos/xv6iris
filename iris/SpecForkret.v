@@ -203,6 +203,7 @@ Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -213,7 +214,7 @@ Import Defs.
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
      trap-side residue with the translation slot dropped (the switch inside
@@ -238,10 +239,13 @@ End SpecForkret.
    into named definitions"). *)
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (* URes is indexed on the CONTEXT exactly as it is on the HART: the
+       closer describes the CHILD, so the child's identity is quantified
+       beside its hart (tso-port.md, the standing principle). *)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ)
     (W : iProp Σ) (γf : gname) (p ksp : mword 64) (pid : mword 32)
     (av : nat) : iProp Σ :=
-  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+  (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
@@ -263,8 +267,8 @@ Definition forkret_closer
         could not hold it.  forkret has one, out of the very capability it
         is about to hand back. *)
      TimerCap.timer_cap (CID := h) -∗
-     forkret_yield (CID := h) γf p ksp pid av V' -∗
-     URes h pt' ksp)%I.
+     forkret_yield (CID := h) (XI := Xc) γf p ksp pid av V' -∗
+     URes h Xc pt' ksp)%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
@@ -272,10 +276,10 @@ Definition forkret_closer
    the header for the three premises the boot arm costs and for why the
    descriptor is not a parameter. *)
 Definition wp_forkret_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ)
     (* WHAT THE RESIDUE CLOSER IS HANDED BESIDE [first_done] -- the park
        token ([ParkCap.park_token]) in practice, abstract here: forkret
        holds it ([W -∗] below), reads nothing off it, and hands it to the
@@ -342,11 +346,12 @@ Module Type FORKRET.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_forkret :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γf : gname)
       (pid : mword 32) (V : pprivate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
+      wp_forkret_gen_body
+        (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
         j γs γl γf pid V ks m av av2 eb.
 End FORKRET.

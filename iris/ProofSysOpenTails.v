@@ -105,6 +105,7 @@ Require Import ProofSysOpenParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -141,7 +142,7 @@ Section ProofSysOpenTails.
   (*  branch that reaches here), so their agreement is a premise and     *)
   (*  slots 4 and 5 ride through as the caller's junk.                   *)
   (* ================================================================== *)
-  Lemma so_tail_a `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_a `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -352,7 +353,7 @@ Section ProofSysOpenTails.
   (*  See ARM A-FAIL's banner for why this is a second lemma rather      *)
   (*  than a second application.                                        *)
   (* ================================================================== *)
-  Lemma so_tail_b `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -575,7 +576,7 @@ Section ProofSysOpenTails.
   (*  it, so what these arms carry is the join's plain count, which       *)
   (*  [SysOpenBudget.so_join_exact] puts at [iput_units] or better.       *)
   (* ================================================================== *)
-  Lemma so_tail_c `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_c `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -920,7 +921,7 @@ Section ProofSysOpenTails.
      [ProofSysOpenParts]'s [so_major_out]), so this is a single arm and
      not a short-circuit pair.  Same six instructions, same ledger, a
      separate lemma for the reason ARM C-FAIL's banner gives. ---- *)
-  Lemma so_tail_d `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1265,7 +1266,7 @@ Section ProofSysOpenTails.
      is ABOVE this branch and BELOW C's and D's, so this is the one tail
      that EARNS [M s2 = m s2] rather than assuming it, and the one whose
      slot 4 is not caller junk.  ARM F-FAIL falls into it. ---- *)
-  Lemma so_tail_e `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_e `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1657,7 +1658,7 @@ Section ProofSysOpenTails.
   Qed.
 
 
-  Lemma so_tail_f `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_f `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -1941,7 +1942,7 @@ Section ProofSysOpenTails.
   (*  arm's [c.li a0,-1] this is a [c.mv a0,s3], so the value is a        *)
   (*  PARAMETER here and the walk supplies fdalloc's literal.             *)
   (* ================================================================== *)
-  Lemma so_tail_s `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_s `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)

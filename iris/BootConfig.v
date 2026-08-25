@@ -40,6 +40,7 @@ Require Import MstatusFacts.
    unusable once the bitvector zify hook is loaded). *)
 Require Import PrintintArith.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -397,7 +398,7 @@ Qed.
 
 Section BootBundles.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [hw_config] out of the six FROZEN reset cells.  Persisting them is the
      only ghost step (they are never written again -- that is what makes the
@@ -521,7 +522,7 @@ Qed.
 
 Section BootRegs.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE AMBIENT HART'S SHARE of the client bundle both adequacy theorems
      hand out: [riscv_system_adequacy]'s first conjunct at [c := cpu_id],

@@ -70,6 +70,7 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecBunpin.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -95,7 +96,7 @@ Module BunpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BUNPIN.
 
 Section ProofBunpin.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra  := (mword_of_int 1 : mword 5).

@@ -87,6 +87,7 @@ From Kernel Require KernelSyms.
 Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -505,7 +506,7 @@ Section WriteiDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition wi_cont `{CID0 : CpuId}
+  Definition wi_cont `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (γf : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
@@ -604,7 +605,7 @@ Section WriteiRet.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_ret `{CID0 : CpuId} 
+  Local Lemma wi_ret `{CID0 : CpuId} `{XI : CurCtx} 
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (γf : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
@@ -992,7 +993,7 @@ Section WriteiJoin.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_join `{CID0 : CpuId} 
+  Local Lemma wi_join `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1389,7 +1390,7 @@ Section WriteiSize.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_size `{CID0 : CpuId} 
+  Local Lemma wi_size `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2008,7 +2009,7 @@ Section WriteiLoop.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Local Lemma wi_loop `{CID0 : CpuId} 
+  Local Lemma wi_loop `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -4008,7 +4009,7 @@ End WriteiLoop.
 (* ===================================================================== *)
 Section WriteiMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at

@@ -71,6 +71,7 @@ Require Import RegFile.
 Require Import WpIntrCore.
 Require Import UserFrame.
 Require Import UserPtTree.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -289,7 +290,7 @@ Definition post_fetch_cfg (σf : mstate) (va : mword 64) (miσ : bool) : Prop :=
 (* ---------------------------------------------------------------------- *)
 Section HwCounters.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma hw_config_counters : hw_config -∗ counter_caps.
   Proof.
@@ -302,7 +303,7 @@ End HwCounters.
 
 Section UserExec.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* The exclusive [usertrap_res]-shaped residue that must survive

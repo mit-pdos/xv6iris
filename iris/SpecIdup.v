@@ -180,12 +180,13 @@ Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* idup's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
    below that -- filedup's [K] budget exactly, and for the same frame. *)
 Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (dev : mword 32)
@@ -267,7 +268,7 @@ Definition wp_idup_sconf_body
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (dev : mword 32)

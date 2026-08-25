@@ -57,12 +57,13 @@ Require Import HartSwp HartLift HartSpan HartMCycle HartStepFull.
 Require Import UserFrame UserClassifyAsm.
 Require Import PtreeType PtTree SmodePte UserPtTree UserExec.
 Require Import HartMemRun PtBytes UserBytes.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UserStepFull.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
 

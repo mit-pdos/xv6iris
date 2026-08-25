@@ -51,12 +51,13 @@ Require Import Pt4kWalk.
 Require Import SmodePte.
 Require Import KptGhost.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section KptShare.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* §1 The shared invariant.                                            *)
@@ -243,7 +244,7 @@ End KptShare.
 
 Section KptShareTranslate.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_res_pt_translateAddr_at (root_ppn : mword 44) (va pa : mword 64)

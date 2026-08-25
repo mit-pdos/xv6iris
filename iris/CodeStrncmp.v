@@ -33,13 +33,14 @@ Require Import KernelDecode27.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
 Require Import UserExecFacts.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeStrncmp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- strncmp @ KernelSyms.strncmp, 58 bytes ---- *)
 

@@ -60,6 +60,7 @@ Require Import IntrDefs.
 Require Import CodeFileread.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -461,7 +462,7 @@ Section ProofFilereadParts.
   (* =================================================================== *)
   (*  +0x58 .. +0x62 -- THE EPILOGUE.  Every exit reaches it.             *)
   (* =================================================================== *)
-  Lemma fr_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fr_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s20 : mword 64) (rv : mword 64) (w3 w5 w6 : mword 64)
       (p : mword 64) (b : bool) :
@@ -641,7 +642,7 @@ Section ProofFilereadParts.
   (*  [c.ldsp s1,24(sp); c.ldsp s3,8(sp)] -- five copies, one lemma over  *)
   (*  the block's pcs as LITERALS.                                        *)
   (* =================================================================== *)
-  Lemma fr_rest2 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fr_rest2 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v1 v3 : mword 64)
       (za zb zc : Z) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 6 ->
@@ -715,7 +716,7 @@ Section ProofFilereadParts.
   (*  FD_DEVICE arm's TWO -1 exits (+0xb0 the out-of-range major, +0xba    *)
   (*  the null devsw slot).  Same block, so one lemma over its five pcs.   *)
   (* =================================================================== *)
-  Lemma fr_m1j `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fr_m1j `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v1 v3 : mword 64)
       (za zb zc zd ze : Z) (jimm : mword 21) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 6 ->

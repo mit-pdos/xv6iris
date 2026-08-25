@@ -39,6 +39,7 @@ Require Import KptPt.
 Local Open Scope Z_scope.
 
 Require Import InstrBytes WpInstrRun.
+Require Import TsoCtx.
 
 (* the read-only frame sees neither the nextPC commit nor the mip refresh:
    both cells are in [mm_Drw].  Discharged POSITIONALLY through
@@ -65,7 +66,7 @@ Qed.
 
 Section WpInstrMip.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* every tower lookup, in one tactic (clone of [WpInstr]'s) *)
   Local Ltac mmrs :=

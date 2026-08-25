@@ -50,6 +50,7 @@ Require Import ProcGeom.
 Require Import PrintkFmt.
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -269,7 +270,7 @@ Proof. vm_compute; reflexivity. Qed.
 
 Section ProcdumpData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* --- the three literals --- *)
   Lemma pd_nl_bytes :

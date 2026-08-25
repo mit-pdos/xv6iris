@@ -104,6 +104,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -124,7 +125,7 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -173,7 +174,7 @@ Definition create_fresh_ty_body
      [ProofIalloc] and [ProofIlock] load-bearing: the axiom below assumes
      nothing about either function, only about the record identity across
      the two calls. ---- *)
-  (forall `{CIDa : CpuId}
+  (forall `{CIDa : CpuId} `{XI : CurCtx}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
@@ -188,7 +189,7 @@ Definition create_fresh_ty_body
                         γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Vpr') ->
-  (forall `{CIDl : CpuId}
+  (forall `{CIDl : CpuId} `{XI : CurCtx}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
@@ -368,7 +369,7 @@ Local Ltac nz := vm_compute; discriminate.
 
 Lemma create_fresh_ty :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -473,7 +474,7 @@ Proof.
   iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr cov logstart
+  iApply (Hia CID3 XI γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr cov logstart
             inodestart ninodes nib dev ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
             Hbelow
@@ -571,7 +572,7 @@ Proof.
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart
+    iApply (Hil CID7 XI γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart
               inodestart nib kslot (q/2)%Qp gsh (ClaimK ty) dev inum pidv dq dqs
               B1 K eb b lks Vpr
               HKil Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)

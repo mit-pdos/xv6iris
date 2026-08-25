@@ -48,13 +48,14 @@ Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
 Require Import UserExecFacts.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeConsoleintr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- consoleintr @ KernelSyms.consoleintr, 364 bytes ---- *)
 

@@ -43,6 +43,7 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -74,7 +75,7 @@ Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
 
-Definition wp_filedup_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
+Definition wp_filedup_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
     (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool)
     (lks : gset string) :=
@@ -109,7 +110,7 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ
 
 Module Type FILEDUP.
   Parameter wp_filedup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool)
       (lks : gset string),

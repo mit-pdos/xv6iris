@@ -133,6 +133,7 @@ Require Import SpecSysChdir.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -478,7 +479,7 @@ Section ProofSysChdirEpilogue.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma sc_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sc_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 : mword 64) (bf : nat -> bv 8) :
     (20 <= K)%nat -> ((K - 20) + 20 = K)%nat ->
@@ -696,7 +697,7 @@ Section ProofSysChdirM1Tail.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma sc_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sc_m1_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -908,7 +909,7 @@ Section ProofSysChdirBody.
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
-  Lemma wp_sys_chdir_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_chdir_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

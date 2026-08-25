@@ -86,6 +86,7 @@ Require Import UartTxInv.
 Require Import PrintkArgs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -158,7 +159,7 @@ Section PanicEnv.
 
 End PanicEnv.
 
-Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (m : regfile) (K : nat)
     (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
@@ -182,7 +183,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
 
 Module Type PANIC.
   Parameter wp_panic_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),

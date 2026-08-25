@@ -128,13 +128,14 @@ Require Import ParkCap.   (* [park_token] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Local Open Scope Z_scope.
 
 Definition forkret_park_pkg
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ)
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
@@ -175,7 +176,7 @@ Definition forkret_park_pkg
           forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
           HANDED [first_done]") and the builder here owes only the
           persistent rows neither supplies. *)
-   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
@@ -190,14 +191,16 @@ Definition forkret_park_pkg
     could not hold it.  forkret has one, out of the very capability it
     is about to hand back. *)
       TimerCap.timer_cap (CID := h) -∗
-      forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av V' -∗
+      forkret_yield (CID := h) (XI := Xc) γf pa (add_vec ks (mword_of_int 4096)) pid av V' -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      URes h pt' (add_vec ks (mword_of_int 4096))))%I.
+      URes h Xc pt' (add_vec ks (mword_of_int 4096))))%I.
 
 Definition forkret_park_paid_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (* [URes] takes the thread beside the hart: this cap describes a CHILD
+       (see [ParkCap.park_pkg]'s note), so both are ∀-quantified below. *)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) : Prop :=
   (length rest = 12%nat) ->
@@ -242,11 +245,12 @@ Module Type FORKRET_PARK_PAID.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter forkret_park_paid :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate) (av : nat),
-      forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
+      forkret_park_paid_body
+        (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
         γs γf pa ks rest pid V av.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the

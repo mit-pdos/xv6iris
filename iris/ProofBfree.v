@@ -96,6 +96,7 @@ Require Import SpecBfree.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -505,7 +506,7 @@ Section BfreeDefs.
   
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition bf_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition bf_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (Bud : iProp Σ) (pidv : mword 32) (dq dqb : dfrac) (j : nat)
@@ -547,7 +548,7 @@ Definition bf_sp (m M : regfile) : Prop :=
 Section BfreeTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
@@ -994,7 +995,7 @@ End BfreeTail.
 (* ===================================================================== *)
 Section ProofBfreeMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bfree_gen 
       (γs : list gname) (j : nat) (γl : gname)

@@ -59,13 +59,14 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
 
 Module UservecProof (UT : UtResFits.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
 Section UservecAllPt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition usertrap_res := UT.usertrap_res.
   Definition usertrap_res_parked := UT.usertrap_res_parked.
@@ -80,7 +81,7 @@ Section UservecAllPt.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UT.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => UT.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := UT.usertrap_res_bare_park N av.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.

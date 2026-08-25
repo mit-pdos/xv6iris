@@ -64,6 +64,7 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeKkill.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc invariant otherwise
@@ -186,7 +187,7 @@ Section ProofKkill.
   (* ================================================================== *)
   (* The scan, +0x20 .. +0x52.                                          *)
   (* ================================================================== *)
-  Lemma wp_kkill_loop `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_kkill_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γs : list gname) (mb : regfile)
       (spd pidv pme : mword 64) (lvl av : nat) (eb : bool) (b : bool) (lks : gset string) :
     length γs = NPROC ->
@@ -852,7 +853,7 @@ End ProofKkill.
 (* ==================================================================== *)
 Section ProofKkillMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

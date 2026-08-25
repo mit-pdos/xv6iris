@@ -20,6 +20,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMDecode.
 Require Import RiscvExtras RiscvFetchExec.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Local Arguments Z.sub _ _ : simpl nomatch.
@@ -463,7 +464,7 @@ Qed.
 
 Section store.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_mem_write_ea (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pa : SailStdpp.Values.mword 64)

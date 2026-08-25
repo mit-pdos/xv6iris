@@ -65,7 +65,7 @@
    USE costs a [wp_next_chain].  The three straight-line stretches stay their
    own lemmas -- [asl_exit_body] (+0x36..ret), [asl_post_sleep_body]
    (+0x32..the branch) and [asl_loop_body] (+0x1c..the sleep call) -- each with
-   its OWN ambient [`{GEN : GenId} `{CID : CpuId}] plus the anchor [CID0] and the one chained
+   its OWN ambient [`{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}] plus the anchor [CID0] and the one chained
    equality that links them.  The anchor is taken at type [CPU] rather than
    [CpuId] on purpose: it must NOT be an instance candidate, or it would
    compete with the lemma's ambient hart.
@@ -149,6 +149,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -238,7 +239,7 @@ Section AslProps.
      section [Context {CID : CpuId}] here, so the [fun CID => ...] binder is
      the only hart in scope inside the body and every resource resolves at
      it automatically. *)
-  Definition asl_exit `{GEN : GenId} (CID0 : CPU)
+  Definition asl_exit `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
        (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32)
@@ -269,7 +270,7 @@ Section AslProps.
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
       WP (Loop : expr riscv_lang)))%I.
 
-  Definition asl_loop `{GEN : GenId} (CID0 : CPU)
+  Definition asl_loop `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32)
@@ -315,7 +316,7 @@ Section AslProps.
          a wakeup landing in the window (SpecSleep.v's header), so the
          locked branch is an honest Löb loop -- a thread that keeps being
          woken and keeps finding the sleeplock taken. *)
-  Definition asl_nexit `{GEN : GenId} `{CID : CpuId}
+  Definition asl_nexit `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γl γsl : gname) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp) (X : iProp Σ)
       (m : regfile) (j : nat) (pidv : mword 32)
       (av : nat) (Vpr : pprivate) (slk spd sp0 : mword 64)
@@ -338,7 +339,7 @@ Section AslProps.
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
       WP (Loop : expr riscv_lang))%I.
 
-  Definition asl_nloop `{GEN : GenId} `{CID : CpuId}
+  Definition asl_nloop `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γl γsl : gname) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp) (X : iProp Σ)
       (m : regfile) (j : nat) (pidv : mword 32)
       (av : nat) (Vpr : pprivate) (slk spd sp0 : mword 64)
@@ -385,7 +386,7 @@ Section AslBodies.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---- the exit path: +0x36 (locked:=1) .. +0x52 (c.ret) ---- *)
-  Lemma asl_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (γs : list gname) (j : nat)
+  Lemma asl_exit_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU) (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m M : regfile) (pidv : mword 32) (av : nat) (Vpr : pprivate)
       (slk spd sp0 : mword 64) (eb : bool) (lks : gset string) :
@@ -758,7 +759,7 @@ Section AslBodies.
      two instructions are interrupts-off and the hart does not move again
      inside this lemma.  Its two arms are the two anchored propositions: the
      exit path, or the loop's own Löb IH. ---- *)
-  Lemma asl_post_sleep_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma asl_post_sleep_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m M : regfile) (pidv : mword 32) (av : nat) (Vpr : pprivate)
@@ -857,7 +858,7 @@ Section AslBodies.
 
   (* ---- one loop iteration: +0x1c (sleep_prepare) .. +0x2e (the
      re-acquire), i.e. the whole four-call split-sleep protocol ---- *)
-  Lemma asl_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma asl_loop_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γs : list gname) (j : nat)
       (γpl γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m M : regfile) (pidv : mword 32) (av : nat) (Vpr : pprivate)
@@ -1121,7 +1122,7 @@ End AslBodies.
 
 Section ProofAcquiresleep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_acquiresleep_gen_sconf
       (γs : list gname) (j : nat)

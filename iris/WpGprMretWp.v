@@ -6,6 +6,7 @@ Require Import RiscvExtras.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode.
 From iris.base_logic.lib Require Import invariants.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -92,7 +93,7 @@ End ForwardMRET.
 (* ====================================================================== *)
 Section StepMRET.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
 
   (* Clean MRET post-state in terms of the OWNED register values             *)

@@ -87,6 +87,7 @@ Require Import SRegime.
    adds no edge to the require graph -- only the import. *)
 Require Import KptShare.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)
@@ -590,15 +591,15 @@ Qed.
    The count eighth is NOT here: it is accounted for by the leaf's
    [intr_count (S k) eb] postcondition, and handing out both would be
    handing out the same eighth at two different values. *)
-Definition cpu_priv_pay `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
+Definition cpu_priv_pay `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (b : bool) (p : mword 64) : iProp Σ :=
   (if b then cpu_priv 0 true p ∅ else emp)%I.
 
-Lemma cpu_priv_pay_on `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
+Lemma cpu_priv_pay_on `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (px : mword 64) :
   cpu_priv_pay true px ⊣⊢ cpu_priv 0 true px ∅.
 Proof. reflexivity. Qed.
 
-Lemma cpu_priv_pay_off `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
+Lemma cpu_priv_pay_off `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (px : mword 64) :
   cpu_priv_pay false px ⊣⊢ (emp : iProp Σ).
 Proof. reflexivity. Qed.
 
@@ -608,18 +609,18 @@ Proof. reflexivity. Qed.
    caller supplies instead is the PURE fact its own [cpu_own _ _ _ _ true]
    carries ([CpuOwn.cpu_own_on]) -- which is what pins the leaf's [k]/[eb]
    there, the arm having baked them in as 0 / true. *)
-Definition intr_count_pre `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_count_pre `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (b : bool) (n : nat) (eb : bool) : iProp Σ :=
   (if b then ⌜ n = 0%nat /\ eb = true ⌝ else intr_count n eb)%I.
 
 (* the two index-instances, so a proof never has to reduce the [if] by
    hand inside the proofmode. *)
-Lemma intr_count_pre_on `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma intr_count_pre_on `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (n : nat) (eb : bool) :
   intr_count_pre true n eb -∗ ⌜ n = 0%nat /\ eb = true ⌝.
 Proof. iIntros "H". iExact "H". Qed.
 
-Lemma intr_count_pre_off `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma intr_count_pre_off `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (n : nat) (eb : bool) :
   intr_count_pre false n eb -∗ intr_count n eb.
 Proof. iIntros "H". iExact "H". Qed.
@@ -722,7 +723,7 @@ Proof. reflexivity. Qed.
 
 Section SWrites.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [legalize_tvec] READS NOTHING -- it is a match on the written value's
      mode field over [returnM]s -- so its certificate needs no read set at
@@ -1450,7 +1451,7 @@ End SWrites.
 Section WpSconfCsr.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
@@ -2052,7 +2053,7 @@ Section WpSconfCsr.
     iSplitL "Hbit Hslot".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       (* the still-Bare receipt pins the arm and opens it *)
       iDestruct (strans_inv_acc_bare with "Hbit Htr")
         as "(Hbit & Hbit2 & Hbare & Hstv)".
@@ -2076,8 +2077,11 @@ Section WpSconfCsr.
       (* the slot move is a [bupd] under the caller's wand, and
          [HartSwp.swp_fupd_post] is what lets it run in the swp's POST. *)
       iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Harm Hhalf Hspp Hmie Hmdl Hmenv Hpmp Hstv Hbit Hbit2
+                "[Hstk Harm Hctx Hhalf Hspp Hmie Hmdl Hmenv Hpmp Hstv Hbit Hbit2
                   Hslot HPC HnPC Hresv] [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRReg_w_p (cw_Drw satp) (cw2_Dro mstatus)
                      (cw2_Df (DfracOwn 1) (DfracOwn 1) mstatus)
@@ -2113,7 +2117,7 @@ Section WpSconfCsr.
         { rewrite /sconf_at_priv. iExists mdv0.
           iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
           iPureIntro. split; [exact Hmsf | exact Hmm]. }
-        iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Htc Hwit". }
+        iSplitL "Hstk Htr Harm Hctx". { iFrame "Hstk Htr Harm Hctx Htc Hwit". }
         iFrame "Hf".
         iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hout".
       + (* the write itself *)
@@ -2671,7 +2675,7 @@ Section WpSconfCsr.
       subst misa0 mseccfg0.
       (* the disabled arm IS its own eighth; the agreement pins the live SIE
          bit at '0', which is what makes this write idempotent on the ghost. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (ghost_var_agree with "Hhalf Harm") as %Hb0.
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       iDestruct (pw_frames_in Supervisor (DfracOwn 1) (R_bitvector_64 mstatus)
@@ -2680,8 +2684,11 @@ Section WpSconfCsr.
                                Regidx (mword_of_int 0), CSRRC)))
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRC).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Htr Harm Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
+                "[Hstk Htr Harm Hctx Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
                  [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
@@ -2727,7 +2734,7 @@ Section WpSconfCsr.
         { rewrite /sconf_at_priv. iExists mdv0.
           iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
           iPureIntro. split; [exact Hmsf' | exact Hmm]. }
-        iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Htc Hwit". }
+        iSplitL "Hstk Htr Harm Hctx". { iFrame "Hstk Htr Harm Hctx Htc Hwit". }
         iFrame "Hf".
         iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. exists ms0. exact Hmsf.
@@ -2808,7 +2815,7 @@ Section WpSconfCsr.
       subst misa0 mseccfg0.
       (* the ENABLED arm rides through untouched; all that is wanted from it
          is its own eighth, for the agreement that pins the live bit at '1'. *)
-      iDestruct "Hcap" as "(Hstk & Htr & (Hq1 & Harest) & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & (Hq1 & Harest) & Hctx & #Hwit)".
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
       destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       iDestruct (pw_frames_in (CID := CID) Supervisor (DfracOwn 1)
@@ -2818,9 +2825,12 @@ Section WpSconfCsr.
                                Regidx (mword_of_int 0), CSRRS)))
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRS).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono (CID := CID) with
-                "[Hstk Htr Hq1 Harest Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
-                 [Hrw Hro Hfile]");
+                "[Hstk Htr Hq1 Harest Hctx Hhalf Hspp Hmie Hmdl Hmenv
+                  HPC HnPC Hresv] [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
                      (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
@@ -2868,7 +2878,7 @@ Section WpSconfCsr.
         { rewrite /sconf_at_priv. iExists mdv0.
           iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
           iPureIntro. split; [exact Hmsf' | exact Hmm]. }
-        iSplitL "Hstk Htr Hq1 Harest". { iFrame "Hstk Htr Hq1 Harest Hwit". }
+        iSplitL "Hstk Htr Hq1 Harest Hctx". { iFrame "Hstk Htr Hq1 Harest Hctx Hwit". }
         iFrame "Hf".
         iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
         iPureIntro. exists ms0. exact Hmsf.
@@ -2975,7 +2985,7 @@ Section WpSconfCsr.
           %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
           %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
       subst misa0 mseccfg0.
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (sie_arm_half_agree false p ms with "Hhalf Harm") as %Hsie_ms.
       (* the four field equalities [flip_core] wants: the premises pin
          [wval]'s side to a constant, [sconf_ms_facts] pins [ms]'s side to
@@ -3005,9 +3015,12 @@ Section WpSconfCsr.
          and the only one holding both halves.  The update is a [bupd], and
          [HartSwp.swp_fupd_post] is what lets it happen in the swp's POST. *)
       iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Htr Harm Hhalf Hspp Hsppc Hmie Hmdl Hmenv HPC HnPC Hresv]
-                 [Hrw Hro Hfile]");
+                "[Hstk Htr Harm Hctx Hhalf Hspp Hsppc Hmie Hmdl Hmenv
+                  HPC HnPC Hresv] [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRReg_w_p (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
                      (pw_rs Supervisor (R_bitvector_64 mstatus) ms)
@@ -3047,7 +3060,7 @@ Section WpSconfCsr.
         { rewrite /sconf_at_priv. iExists mdv0.
           iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
           iPureIntro. split; [exact Hf_facts | exact Hmm]. }
-        iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Htc Hwit". }
+        iSplitL "Hstk Htr Harm Hctx". { iFrame "Hstk Htr Harm Hctx Htc Hwit". }
         iFrame "Hf".
         iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
         iSplitR; [iPureIntro; exact Hf_sie|].
@@ -3175,7 +3188,7 @@ Section WpSconfCsr.
          bundle is rebuilt below.  The cell stays OUT of the read frame --
          it is read by [HartMFrame.swp_read_reg_cell], a one-cell node rule
          -- which is what keeps the frame the ordinary four-cell one. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr") as (root) "(Htlb & Htrback)".
       iDestruct (tlb_res_pt_kpt_inv with "Htlb") as "#Hkinv".
       iDestruct (tlb_res_pt_satp_acc with "Htlb")
@@ -3196,8 +3209,11 @@ Section WpSconfCsr.
                    with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       change (execute (CSRReg (csr_satp, zreg, Regidx rd, CSRRS)))
         with (execute_CSRReg csr_satp zreg (Regidx rd) CSRRS).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Harm Hsie Hsret Hmie Hmdl Hmenv Htrback Htlbback
+                "[Hstk Harm Hctx Hsie Hsret Hmie Hmdl Hmenv Htrback Htlbback
                   HPC HnPC Hresv] [Hrw Hro Hfile Hcell]");
         [| iApply (swp_execute_CSRReg_r_gen_p ∅ (cr_Dro (R_bitvector_64 mstatus))
                      (cr_Df (DfracOwn 1) (DfracOwn 1) (R_bitvector_64 mstatus))
@@ -3235,10 +3251,10 @@ Section WpSconfCsr.
         assert (Hsp : m !!! Regidx csp_rs1
                       = <[Regidx rd := regval_into_reg v]> m !!! Regidx csp_rs1)
           by (symmetry; apply upd_ne; congruence).
-        iSplitL "Hstk Harm Htlbback Htrback Hcelltmp".
+        iSplitL "Hstk Harm Htlbback Htrback Hcelltmp Hctx".
         { iApply (sie_cap_retarget m (<[Regidx rd := regval_into_reg v]> m)
-                    n false Hsp with "[Hstk Harm Htlbback Htrback Hcelltmp]").
-          rewrite /sie_cap. iFrame "Hstk Harm Htc Hwit".
+                    n false Hsp with "[Hstk Harm Hctx Htlbback Htrback Hcelltmp]").
+          rewrite /sie_cap. iFrame "Hstk Harm Hctx Htc Hwit".
           iApply "Htrback". iApply "Htlbback". iExact "Hcelltmp". }
         iSplitL "Hf".
         { iEval (rewrite (tp_pin_upd m rd (regval_into_reg v) Hrdtp)) in "Hf".
@@ -3300,7 +3316,7 @@ Section WpSconfCsr.
        with it the rider's hart-indexing problem. *)
     destruct b.
     { iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct "Harm" as "(Hq1 & Hhx' & Hkptr' & Hsepcx' & Hscausex' & Hstvalx' & Hsppc' & Hclmx' & Hcells')".
       iDestruct "Hsepcx" as (v1) "Hsepc1".
       iDestruct "Hsepcx'" as (v2) "Hsepc2".
@@ -3329,7 +3345,7 @@ Section WpSconfCsr.
           %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
           %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
       subst misa0 mseccfg0.
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       (* the quarter comes straight out of the resource the caller handed in;
          this used to be an [inv_acc] on [intrN] whose body supplied it. *)
@@ -3342,9 +3358,13 @@ Section WpSconfCsr.
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRS).
       iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Htr Harm Htok Hhalf Hspp Hqi Hstv Hkptr Hsepcx Hscausex
-                  Hstvalx Hsppc Hclm Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                "[Hstk Htr Harm Hctx Htok Hhalf Hspp Hqi Hstv Hkptr Hsepcx
+                  Hscausex Hstvalx Hsppc Hclm Hcells Hmie Hmdl Hmenv
+                  HPC HnPC Hresv]
                  [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
@@ -3400,9 +3420,9 @@ Section WpSconfCsr.
            out, both [kv_frame_slots + n] by conversion -- so [iExact] on the
            untouched [Hstk] closes it with no split and no arithmetic. *)
         iSplitL "Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm
-                 Hstk Htr Hcells".
+                 Hstk Htr Hcells Hctx".
         { iSplitL "Hstk". { iExact "Hstk". }
-          iFrame "Htr Htc Hwit".
+          iFrame "Htr Hctx Htc Hwit".
           iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
           iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
         iSplitL "Hf". { iExact "Hf". }
@@ -3515,6 +3535,14 @@ Section WpSconfCsr.
                      !!! Regidx csp_rs1) (trap_res b + n) ∗
         ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝ ∗
         sie_arm kt b p ∗
+        (* AND SO DOES THE THREAD-OF-CONTROL TOKEN -- the bundle carries it
+           for the same reason as the two below, but it is the one member of
+           the give-back that is NOT persistent.  This is the single leaf
+           that takes [IntrDefs.sie_cap] apart across the σ-callback, so a
+           give-back that did not NAME [own_context] would drop the thread's
+           identity here and leave every caller unable to re-fold the
+           capability -- there is nothing to conjure it back from. *)
+        own_context cur_ctx ∗
         (* AND SO DOES THE TIMER CAPABILITY, for exactly the reason the
            witness does: it is a conjunct of [IntrDefs.sie_cap] (see the note
            there) and this is the one leaf that takes the capability apart
@@ -3646,19 +3674,19 @@ Section WpSconfCsr.
            out of it. ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct "Hcg'" as "(Hhs & Hscat & Hcap & Hfile)".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct "Hscat" as "[Hown Hcl]".
       iDestruct "Hown" as "(Hms & Hhalf & Htie & %Hmsf)".
       iDestruct (sie_arm_half_agree (CID := CID) b p ms' with "Hhalf Harm")
         as %Hb.
       iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
       iApply ("Hcont" $! ms' with "[%] Hhs [Hms Hhalf Htie Hcl] Htr Hpc' Hfile
-                [Hstk Harm]").
+                [Hstk Harm Hctx]").
       { exact Hmsf. }
       { rewrite /sconf_at. iSplitL "Hms Hhalf Htie".
         { rewrite /sconf_msown. iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
         iExact "Hcl". }
-      { iFrame "Hstk Harm Htc Hwit". iPureIntro. exact Hb. }
+      { iFrame "Hstk Harm Hctx Htc Hwit". iPureIntro. exact Hb. }
   Qed.
 
   Lemma wp_csrci_sstatus_x0_s_sconf
@@ -3701,7 +3729,7 @@ Section WpSconfCsr.
        ghosts agree about nothing. *)
     destruct b.
     2: { iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-         iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+         iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
          iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
          iDestruct (ghost_var_agree with "Hcnt Harm") as %Hbad.
          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
@@ -3736,7 +3764,7 @@ Section WpSconfCsr.
           %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
           %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
       subst misa0 mseccfg0.
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       (* the only reachable arm: interrupts were ON -- the flip is real, and
          both eighths are in the arm (its own, and the one inside
          [cpu_hart 0 true p]), which the callback delivers at the rebound
@@ -3757,9 +3785,13 @@ Section WpSconfCsr.
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRC).
       iApply (swp_fupd_post (CID := CID)).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono (CID := CID) with
-                "[Hstk Htr Hq1 Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx Hscausex
-                  Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                "[Hstk Htr Hq1 Hctx Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx
+                  Hscausex Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv
+                  HPC HnPC Hresv]
                  [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
                      (cw_Drw (R_bitvector_64 mstatus))
@@ -3815,9 +3847,9 @@ Section WpSconfCsr.
         { rewrite /sconf_at_priv. iExists mdv0.
           iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
           iPureIntro. split; [exact Hmsf' | exact Hmm]. }
-        iSplitL "Hstk Htr Hq".
+        iSplitL "Hstk Htr Hq Hctx".
         { iSplitL "Hstk"; [iExact "Hstk"|].
-          iFrame "Htr Htc Hwit". iExact "Hq". }
+          iFrame "Htr Hctx Htc Hwit". iExact "Hq". }
         iSplitL "Hf". { iExact "Hf". }
         iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
         iSplitR. { iPureIntro. exists ms0. exact Hmsf. }
@@ -3931,7 +3963,7 @@ Section WpSconfCsr.
                       = <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
                           !!! Regidx csp_rs1)
           by (symmetry; apply upd_ne; congruence).
-        iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+        iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
         iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx &
                               Hsppc & Hclmx & (Hcells & Hc1))".
         iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
@@ -3946,9 +3978,13 @@ Section WpSconfCsr.
                                  Regidx rd, CSRRC)))
           with (execute_CSRImm csr_sstatus (mword_of_int 2) (Regidx rd) CSRRC).
         iApply (swp_fupd_post (CID := CID)).
+        (* [Hctx] -- the thread-of-control token -- travels with the rest of
+           the capability into the POST side of the [swp_mono], which is where
+           [sie_cap] is rebuilt; the [swp] side never touches it. *)
         iApply (swp_mono (CID := CID) with
-                  "[Hstk Htr Hq1 Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx Hscausex
-                    Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                  "[Hstk Htr Hq1 Hctx Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx
+                    Hscausex Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv
+                    HPC HnPC Hresv]
                    [Hrw Hro Hfile]");
           [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
                        (cw_Drw (R_bitvector_64 mstatus))
@@ -4005,9 +4041,9 @@ Section WpSconfCsr.
           { rewrite /sconf_at_priv. iExists mdv0.
             iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
             iPureIntro. split; [exact Hmsf' | exact Hmm]. }
-          iSplitL "Hstk Htr Hq".
+          iSplitL "Hstk Htr Hq Hctx".
           { iSplitL "Hstk". { rewrite -Hsp. iExact "Hstk". }
-            iFrame "Htr Htc Hwit". iExact "Hq". }
+            iFrame "Htr Hctx Htc Hwit". iExact "Hq". }
           iSplitL "Hf".
           { iEval (rewrite (tp_pin_upd (CID := CID) m rd
                               (regval_into_reg (sstatus_read ms0)) Hrdtp)) in "Hf".
@@ -4087,7 +4123,7 @@ Section WpSconfCsr.
                       = <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
                           !!! Regidx csp_rs1)
           by (symmetry; apply upd_ne; congruence).
-        iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+        iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
         iDestruct (ghost_var_agree with "Hhalf Harm") as %Hb0.
         destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
         iDestruct (intr_count_push_off k eb with "Harm Hcnt")
@@ -4098,8 +4134,12 @@ Section WpSconfCsr.
         change (execute (CSRImm (csr_sstatus, mword_of_int 2,
                                  Regidx rd, CSRRC)))
           with (execute_CSRImm csr_sstatus (mword_of_int 2) (Regidx rd) CSRRC).
+        (* [Hctx] -- the thread-of-control token -- travels with the rest of
+           the capability into the POST side of the [swp_mono], which is where
+           [sie_cap] is rebuilt; the [swp] side never touches it. *)
         iApply (swp_mono with
-                  "[Hstk Htr Harm Hcnt Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
+                  "[Hstk Htr Harm Hctx Hcnt Hhalf Hspp Hmie Hmdl Hmenv
+                    HPC HnPC Hresv]
                    [Hrw Hro Hfile]");
           [| iApply (swp_execute_CSRImm_rw_p
                        (cw_Drw (R_bitvector_64 mstatus))
@@ -4150,9 +4190,9 @@ Section WpSconfCsr.
           { rewrite /sconf_at_priv. iExists mdv0.
             iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
             iPureIntro. split; [exact Hmsf' | exact Hmm]. }
-          iSplitL "Hstk Htr Harm".
+          iSplitL "Hstk Htr Harm Hctx".
           { iSplitL "Hstk". { rewrite -Hsp. iExact "Hstk". }
-            iFrame "Htr Htc Hwit". iExact "Harm". }
+            iFrame "Htr Hctx Htc Hwit". iExact "Harm". }
           iSplitL "Hf".
           { iEval (rewrite (tp_pin_upd m rd
                               (regval_into_reg (sstatus_read ms0)) Hrdtp)) in "Hf".

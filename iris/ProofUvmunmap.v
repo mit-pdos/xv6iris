@@ -85,6 +85,7 @@ Require Import SpecUvmunmap.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* uvmunmap's arithmetic is all SHARED and lives at its own altitude: the
@@ -135,7 +136,7 @@ Module UvmunmapCore (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE).
 
 Section ProofUvmunmap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
@@ -1874,7 +1875,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* THE CONTENTS-INDEXED SEAL.  Same machine proof; [Own] is instantiated *)
@@ -2174,7 +2175,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapBare.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [bare_pt] IS the [∅] instance, definitionally -- there is nothing
      to owe. *)
@@ -2231,7 +2232,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapFixed.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_uvmunmap_fixed_sconf
       (γa : gname) (mm : regfile)

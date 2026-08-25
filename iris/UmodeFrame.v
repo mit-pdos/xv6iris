@@ -56,6 +56,7 @@ Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeArith.
 Require Import WpUmodeLeaf WpUmodeStore WpUmodeLoad.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -63,6 +64,9 @@ Set Printing Depth 40.
 Section UmodeFrame.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the ABI index UmodeAbi.v does not name (it names only ra/sp/a0/a1/a2) *)

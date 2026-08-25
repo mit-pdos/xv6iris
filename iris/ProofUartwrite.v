@@ -102,6 +102,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -387,7 +388,7 @@ Section UwProps.
 
   (* the byte loop's back edge: another byte went out, and there is at least
      one more to go, so control is at +0x4a again with the index bumped *)
-  Definition uw_next_cont `{CID0 : CpuId} (γu : uart_names)
+  Definition uw_next_cont `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
       (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset string) : iProp Σ :=
@@ -404,7 +405,7 @@ Section UwProps.
        WP (Loop : expr riscv_lang)))%I.
 
   (* the loop's exit: [i = n], control at the nine restores *)
-  Definition uw_exit_cont `{CID0 : CpuId} (γu : uart_names)
+  Definition uw_exit_cont `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
       (pidv : mword 32) (dqp : dfrac) (lks : gset string) : iProp Σ :=
@@ -420,7 +421,7 @@ Section UwProps.
        WP (Loop : expr riscv_lang)))%I.
 
   (* the loop head at +0x4a, ENTERED at whatever hart the last park landed on *)
-  Definition uw_head `{CID0 : CpuId} (γu : uart_names)
+  Definition uw_head `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
       (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset string) : iProp Σ :=
@@ -437,7 +438,7 @@ Section UwProps.
        WP (Loop : expr riscv_lang)))%I.
 
   (* the tail's own continuation: uartwrite's postcondition, at ANY hart *)
-  Definition uw_ret `{CID0 : CpuId} (γu : uart_names)
+  Definition uw_ret `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool)
       (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
@@ -479,7 +480,7 @@ Section UwBodies.
   (*  The epilogue: +0x76 -> return.  Reached only from the loop exit --   *)
   (*  the n = 0 path never gets a frame.                                  *)
   (* ------------------------------------------------------------------ *)
-  Lemma uw_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma uw_tail `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γu : uart_names)
       (j : nat) (m0 M : regfile) (av : nat) (eb : bool) (sp0 : mword 64)
       (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset string) :
@@ -750,7 +751,7 @@ Section UwBodies.
   (* ------------------------------------------------------------------ *)
   (*  ONE HEAD ENTRY at +0x4a, with the park's iLoeb inside.              *)
   (* ------------------------------------------------------------------ *)
-  Lemma uw_one `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma uw_one `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γl : gname) (γu : uart_names) (γv : disk_names)
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 M : regfile) (av : nat) (eb : bool)
@@ -1276,7 +1277,7 @@ Section UwBodies.
   (* ------------------------------------------------------------------ *)
   (*  THE LOOP: induction on the bytes still to go.                       *)
   (* ------------------------------------------------------------------ *)
-  Lemma uw_iter `{GEN : GenId} (CID0 : CPU)
+  Lemma uw_iter `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (γl : gname) (γu : uart_names) (γv : disk_names)
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 : regfile) (av : nat) (eb : bool)
@@ -1329,7 +1330,7 @@ End UwBodies.
 
 Section ProofUartwrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac rgne :=
     rewrite rget_ne;

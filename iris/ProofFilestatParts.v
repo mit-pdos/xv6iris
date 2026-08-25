@@ -61,6 +61,7 @@ Require Import SpecStati.
 Require Import CodeFilestat.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -678,7 +679,7 @@ Section ProofFilestatParts.
   (* =================================================================== *)
   (*  +0x56 .. +0x60 -- THE EPILOGUE.  Both exits reach it.               *)
   (* =================================================================== *)
-  Lemma fst_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fst_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s40 : mword 64) (rv : mword 64)
       (w4 w5 w7 w8 w9 w10 : mword 64)

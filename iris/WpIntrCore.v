@@ -46,6 +46,7 @@ Require Import WpGprMret.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -129,7 +130,7 @@ Qed.
 (* ===================================================================== *)
 Section SwpDispatch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [goodb] on a [returnm] is [true], but only once the [returnm] is
      unfolded -- name it rather than fighting [cbn] at each use. *)
@@ -985,7 +986,7 @@ End StepInterrupt.
 (* ===================================================================== *)
 Section WpIntrEngine.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* mstate_interp absorbs a same-value register write (the trap's
      [reset_elp], whose cell is pinned ↦ᵣ□ by hw_config). *)

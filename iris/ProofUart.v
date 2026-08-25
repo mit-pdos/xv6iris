@@ -37,13 +37,14 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SpecUart.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Module UartProof : UART.
 
 Section ProofUart.
 Context `{!riscvGS Σ, !xv6G Σ}.
-Context `{GEN : GenId} `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
@@ -108,7 +109,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
       (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
          [WpIntrInv.sda_slot_acc] below, the one place the two translation
          arms are told apart. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -164,8 +165,11 @@ Context `{GEN : GenId} `{CID : CpuId}.
               = returnM Supervisor)
               by (rewrite Lmst;
                   exact (effectivePrivilege_mprv0 (Store Data) _ Supervisor HMPRV)).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
       2:{ iApply (swp_execute_STORE_dev_S1 (CID := CID)
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -273,8 +277,8 @@ Context `{GEN : GenId} `{CID : CpuId}.
       { rewrite /sconf_at_priv. iExists mdv0.
         iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
         iPureIntro. split; assumption. }
-      iSplitL "Htr Hstk Harm".
-      { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Htr Hstk Harm Hctx".
+      { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iFrame "Hfile HS". iPureIntro. split_and!; reflexivity.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".
@@ -359,7 +363,7 @@ Qed.
       (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
          [WpIntrInv.sda_slot_acc] below, the one place the two translation
          arms are told apart. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -411,8 +415,11 @@ Qed.
               = returnM Supervisor)
               by (rewrite Lmst;
                   exact (effectivePrivilege_mprv0 (Load Data) _ Supervisor HMPRV)).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
       2:{ iApply (swp_execute_LOAD_dev_S1_ex (CID := CID)
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -529,8 +536,8 @@ Qed.
                     = <[Regidx rd := regval_into_reg (ldval bt)]> m
                         !!! Regidx csp_rs1)
         by (symmetry; apply upd_ne; congruence).
-      iSplitL "Htr Hstk Harm".
-      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Htr Hstk Harm Hctx".
+      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iSplitL "Hfile".
       { iEval (rewrite (tp_pin_upd m rd (regval_into_reg (ldval bt))
                           (rd_ok_tp _ Hrdok))) in "Hfile".

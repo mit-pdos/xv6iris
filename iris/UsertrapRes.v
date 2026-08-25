@@ -90,6 +90,7 @@ Require Import ProcAvail.
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* usertrap's own 32-byte frame is 4 slots; below it the deepest callee is
@@ -117,7 +118,7 @@ Import Defs.
 Notation K_usertrap := ((4 + kv_frame_slots + (4 + K_sys_exec))%nat) (only parsing).
 Section UsertrapRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* THE TRAP SIDE.  What Phase A turns into [sie_cap_gpr] + [cpu_own] +   *)
@@ -156,6 +157,23 @@ Section UsertrapRes.
         of SpecUsertrap.v's restatement *)
      strans_inv ∗
      sie_arm KT1 false pj ∗
+     (* THE THREAD-OF-CONTROL TOKEN, AT THE AMBIENT CONTEXT (tso-port leg
+        M2; owner ruling on the fifth design seam).  A USER EXCURSION DOES
+        NOT CHANGE THE THREAD OF CONTROL: the same kernel thread continues
+        after the trap, on the same hart, and -- unlike a
+        [SwtchCtx.valid_context] record, which the SCHEDULER (a different
+        thread) resumes -- nothing but this thread can ever resume this
+        residue.  So the residue is the thread's OWN parked state, held at
+        the thread's own identity, which is the ambient one wherever the
+        residue is manipulated.  That is why the token is [cur_ctx] here and
+        NOT existentially bound the way [valid_context_pre]'s is: internal
+        identity is only needed when a FOREIGN thread resumes the record.
+        ξ changes only at swtch, which owns the exchange and is a different
+        mechanism -- so "a thread never changes ξ across a user excursion"
+        is discharged by construction, not assumed.
+        Placed right after [sie_arm] to mirror [IntrDefs.sie_cap]'s own
+        order, since [ut_trap_open] hands these three straight across. *)
+     own_context cur_ctx ∗
      kpt_on cpu_id ∗
      (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
         [user_cfg]'s cells too (uservec/userret/user-mode hold them the
@@ -194,6 +212,11 @@ Section UsertrapRes.
       (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
      sie_arm KT1 false pj ∗
+     (* the token rides the parked twin too, in the same slot -- see
+        [ut_trap]'s note.  It is precisely what survives user execution
+        alongside the stack: the translation slot is what the park drops,
+        not the thread's identity. *)
+     own_context cur_ctx ∗
      strans_kpt ∗ kpt_on cpu_id ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj false lks ∗
@@ -203,8 +226,8 @@ Section UsertrapRes.
       (lks : gset string) (kroot : mword 44) :
     ut_trap_parked pj ksp av lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Harm & Hb1 & #Hb2 & Hgh & Hcpu & Hclm) Hkres".
-    rewrite /ut_trap. iFrame "Hstk Harm Hb2 Hgh Hcpu Hclm".
+    iIntros "(Hstk & Harm & Hctx & Hb1 & #Hb2 & Hgh & Hcpu & Hclm) Hkres".
+    rewrite /ut_trap. iFrame "Hstk Harm Hctx Hb2 Hgh Hcpu Hclm".
     iApply (strans_inv_intro kroot with "Hb1 Hkres").
   Qed.
 
@@ -213,14 +236,14 @@ Section UsertrapRes.
     ut_trap pj ksp av lks -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Hstr & Harm & #Hbit & Hgh & Hcpu & Hclm)".
+    iIntros "(Hstk & Hstr & Harm & Hctx & #Hbit & Hgh & Hcpu & Hclm)".
     (* the receipt BESIDE the slot pins the slot's arm: at Bare the shot's
        lower bound and the pending half conflict, so only KPT survives. *)
     iDestruct "Hstr" as "[(Hb0 & _ & _) | (Hb1 & Hkpt)]".
     { iDestruct (kpt_on_pending_False with "Hbit Hb0") as %[]. }
     iDestruct "Hkpt" as (kroot) "Hkres".
     iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked.
-    iFrame "Hstk Harm Hb1 Hbit Hgh Hcpu Hclm".
+    iFrame "Hstk Harm Hctx Hb1 Hbit Hgh Hcpu Hclm".
   Qed.
 
   (* NOT IN THE BUNDLE: [intr_handler_spec kernelvec], the contract the
@@ -291,7 +314,7 @@ Section UsertrapRes.
        ([strans_ktier_wit_intro] below) instead of re-conjuring a KT0 one:
        [ut_trap] carries [kpt_on cpu_id] at every tier, so the bundle it
        builds attests the access right whatever the hart's regime is. *)
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & #Hkpt & Hgh & Hcpu & Hclm)".
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hctx & #Hkpt & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
     (* A named [iFrame] here still makes the tactic hunt these five atoms
        through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
@@ -316,7 +339,11 @@ Section UsertrapRes.
       iExists menvcfg0. iFrame "Hmenv". subst menvcfg0.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
-    iFrame "Hstk Hstr Harm Htc".
+    (* the thread-of-control token comes STRAIGHT ACROSS, out of the
+       residue and into the capability: [ut_trap] parked it at the ambient
+       context and this is the same thread waking up.  No premise is added
+       to this lemma for it -- see [ut_trap]'s note. *)
+    iFrame "Hstk Hstr Harm Hctx Htc".
     iSplitR; [ iApply (strans_ktier_wit_intro with "Hkpt") |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
@@ -1325,7 +1352,7 @@ Section UsertrapRes.
   Proof.
     iIntros "H".
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
-    iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hback]".
     iFrame "Hcsrs". iIntros "Hcsrs".
     iDestruct ("Hback" with "Hcsrs") as "Hcpu".
@@ -1340,6 +1367,7 @@ Section UsertrapRes.
     iSplitR "Henv"; [| iExact "Henv"].
     iSplitL "Hstk"; [iExact "Hstk" |].
     iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "Hb2"; [iExact "Hb2" |].
     iSplitL "Hgh"; [iExact "Hgh" |].
@@ -1365,7 +1393,7 @@ Section UsertrapRes.
     iIntros "H".
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     (* the CSRs, out of the trap bundle's own [cpu_own] *)
-    iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hcback]".
     (* ... and the trapframe page, out of the process block *)
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hsy & Hownback)".
@@ -1392,6 +1420,7 @@ Section UsertrapRes.
       [| iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"]].
     iSplitL "Hstk"; [iExact "Hstk" |].
     iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "Hb2"; [iExact "Hb2" |].
     iSplitL "Hgh"; [iExact "Hgh" |].
@@ -1640,7 +1669,16 @@ Proof. rewrite /park_env. apply _. Qed.
 Definition ut_park_intro_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-    (URB : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (* [URB] TAKES THE THREAD BESIDE THE HART (tso-port leg M2).  This
+       statement describes ANOTHER thread -- a process that has never run --
+       so it names no ambient ξ: both the hart it wakes on and the identity
+       it wakes AS are ∀-quantified below and supplied by the resumer.  The
+       residue is ξ-dependent ([ut_trap_parked] owns the token), so the
+       quantified ξ has to reach the CONCLUSION too, which is why [URB] is
+       indexed on [CurCtx] exactly as it is on [CpuId].  That is what keeps
+       this definition -- and [ParkCap.park_token], and hence
+       [SpecSyscall]'s [syscall_env] -- free of an ambient ξ. *)
+    (URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ)
     (* WHAT THE SYSCALL ENVIRONMENT WANTS BESIDE THE FILE SYSTEM, supplied
        at the RESUME like [first_done] and the timer capability: an abstract
        [W] here, the fit check instantiates it ([UtResFits]).  It is the
@@ -1655,7 +1693,7 @@ Definition ut_park_intro_body
   (K_usertrap <= av)%nat ->
   ⊢ park_env N -∗
     park_own N -∗
-    (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+    (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
        ⌜pv_upt V' = pt'⌝ -∗
        (* THE KERNEL WORDS, at the resuming hart: prepare_return wrote them
           there, and [V'] is the descriptor it handed back -- see [ut_tfk]. *)
@@ -1668,12 +1706,12 @@ Definition ut_park_intro_body
           [devintr_caps_any]).  The party that resumes the process has one;
           a record parked before any of that happened could not. *)
        timer_cap (CID := h) -∗
-       ut_trap_parked (CID := h) (un_pj N)
+       ut_trap_parked (CID := h) (XI := Xc) (un_pj N)
          (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
        fd_slots FDSPARE -∗
        iref_slots IREFSPARE -∗
-       URB h pt' (add_vec (un_ks N) (mword_of_int 4096))).
+       URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096))).
 
 Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -1686,7 +1724,7 @@ Lemma ut_res_bare_park
   ut_park_caps N -∗
   (FirstTok.first_done -∗ W -∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
   park_own N -∗
-  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+  (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
      FirstTok.first_done -∗
@@ -1697,16 +1735,16 @@ Lemma ut_res_bare_park
         [devintr_caps_any]).  The party that resumes the process has one;
         a record parked before any of that happened could not. *)
      timer_cap (CID := h) -∗
-     ut_trap_parked (CID := h) (un_pj N)
+     ut_trap_parked (CID := h) (XI := Xc) (un_pj N)
        (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
      proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
      fd_slots FDSPARE -∗
      iref_slots IREFSPARE -∗
-     ut_res_bare (CID := h) Rsys pt'
+     ut_res_bare (CID := h) (XI := Xc) Rsys pt'
        (add_vec (un_ks N) (mword_of_int 4096))).
 Proof.
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+  iIntros (h Xc pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
@@ -1764,7 +1802,7 @@ Qed.
 (* was rejected for the reason the key is [(pt, ksp)] in the first place:   *)
 (* those are the only two things the TRAMPOLINE knows.                      *)
 (* ---------------------------------------------------------------------- *)
-Lemma wp_next_true_swap `{!riscvGS Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_next_true_swap `{!riscvGS Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (p q : mword 64) (K : forall CID : CpuId, iProp Σ) :
   p <> zero_reg ->
   wp_next true p K -∗ wp_next true q K.

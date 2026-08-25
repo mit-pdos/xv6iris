@@ -240,7 +240,7 @@ End WPDead.
 
 Section WPExec.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE SINGLE PER-HART FRAMING POINT, now per NODE of the Sail monad
      instead of per whole instruction.  Everything else about it is
@@ -794,6 +794,7 @@ Require Import SailStdpp.Base.
 (* per-file import order (model imported last).  mstate.mem's type is already    *)
 (* fixed (bv_countable) from the Lang section above, so this does not retype it.  *)
 Require Import Riscv.rv64d_types.
+Require Import TsoCtx.
 
 (* ===== RiscvModelExecClose ===== *)
 (* ====================================================================== *)

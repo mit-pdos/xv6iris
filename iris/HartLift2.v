@@ -18,6 +18,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartSpan.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -215,7 +216,7 @@ Qed.
 
 Section batch2.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* local helper (HartSpan's [hreg_frame_ro_ext_local] is Local there;
      re-derived here, mirroring [hreg_frame_ext]): the ro-frame only reads

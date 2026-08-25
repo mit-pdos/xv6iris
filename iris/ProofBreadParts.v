@@ -34,6 +34,7 @@ Require Import RiscvExtras.
 Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -45,7 +46,7 @@ Set Printing Depth 40.
 
 Section BreadEscrowLeaves.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
   Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :

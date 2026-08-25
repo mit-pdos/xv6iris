@@ -102,6 +102,7 @@ Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -1071,7 +1072,7 @@ Section ProofSysOpenEpilogue.
   Notation Rs3 := (mword_of_int 19 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma so_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 w4 w5 w6 w23 w24 : mword 64) (bp : nat -> bv 8) :
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->

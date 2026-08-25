@@ -53,7 +53,7 @@
    Löb IH sits under.  Nothing is returned, so no count has to survive.
 
    AFTER THE ENTRY [acquire] THE HART IS FIXED, and that is what makes every
-   arm below a plain lemma over `{CIDq : CpuId} with one chaining premise
+   arm below a plain lemma over `{CIDq : CpuId} `{XI : CurCtx} with one chaining premise
    rather than a [wp_next]-wrapped continuation: the whole critical section
    runs at [b = false], where [wp_next_off_intro] hands the callback back at
    the AMBIENT hart, and neither consputc nor wakeup rebinds one.  Only the
@@ -93,6 +93,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -364,7 +365,7 @@ Section CtBodies.
   Qed.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
-  Definition ct_ret `{CID0 : CpuId} (pme : mword 64) (m0 : regfile)
+  Definition ct_ret `{CID0 : CpuId} `{XI : CurCtx} (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ Mf : regfile,
@@ -377,7 +378,7 @@ Section CtBodies.
   (* =================================================================== *)
   (*  +0x110 .. +0x118 -- THE EPILOGUE.                                   *)
   (* =================================================================== *)
-  Lemma ct_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma ct_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (sp0 : mword 64) (b : bool) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -520,7 +521,7 @@ Module ConsoleintrProof (Acquire : ACQUIRE) (Consputc : CONSPUTC)
 
 Section ProofConsoleintr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
   Local Typeclasses Opaque cpu_own.

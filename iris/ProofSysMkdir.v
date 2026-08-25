@@ -121,6 +121,7 @@ Require Import SpecSysMkdir.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -397,7 +398,7 @@ Section ProofSysMkdirEpilogue.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma md_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma md_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (bf : nat -> bv 8) :
     (18 <= K)%nat -> ((K - 18) + 18 = K)%nat ->
@@ -566,7 +567,7 @@ Section ProofSysMkdirM1Tail.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma md_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma md_m1_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -746,7 +747,7 @@ Section ProofSysMkdirBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma wp_sys_mkdir_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_mkdir_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf ga gpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

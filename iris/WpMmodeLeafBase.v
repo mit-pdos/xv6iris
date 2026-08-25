@@ -8,6 +8,7 @@ From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec ExecCommon WpGpr RegFile RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -1014,7 +1015,7 @@ End ExecStoreG.
 (* WpGprStore.v : MemUpdate *)
 Section MemUpdate.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
 
   (* window update over an arbitrary index list (write_bytes is a foldr).
@@ -1588,7 +1589,7 @@ Definition cli_wval (imm6 : mword 6) : mword 64 :=
 (* WpGprRvc.v : GprFileX0 *)
 Section GprFileX0.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma gpr_file_x0 (m : regfile) (i : mword 5) :
     uint i = 0 ->

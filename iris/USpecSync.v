@@ -33,12 +33,13 @@ Require Import InstrBytes RegFile.
 Require Import UserPtTree UserExec.
 Require Import UmodeCap UmodeAbi UmodeSyscall UCodeSync.
 Require User.SyncSyms User.SyncInstrs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section USpecSync.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the sync program's protocol IS the kernel's table -- nothing

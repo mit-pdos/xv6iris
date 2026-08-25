@@ -31,13 +31,14 @@ Require Import KernelDecode22.
 Require Import KernelDecode24.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeUvmfree.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- uvmfree @ KernelSyms.uvmfree, 50 bytes ---- *)
 

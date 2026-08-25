@@ -24,6 +24,7 @@ Require Import PtBuild KvmSpec.
 Require Import ProcPt.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* [p->trapframe] -- the only field of the process this function reads -- is
@@ -52,7 +53,7 @@ Notation K_proc_pagetable := (3%nat) (only parsing).
    who knows [on = Some nb] with [K_proc_pagetable < nb] refute this arm, and
    so what lets one proof serve both the counted contract below and the
    uncounted one allocproc's failure tails need. *)
-Definition ppt_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition ppt_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (on : option nat) (tfp : mword 44) (rv : mword 64) : iProp Σ :=
   ((∃ t : ptree,
       ⌜rv = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ ∗
@@ -94,7 +95,7 @@ Definition ppt_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID 
    ERROR TAILS -- which the counted premise makes unreachable.  The bound is
    charged anyway: a stack budget is a property of the code, not of the path
    a particular caller proves it takes. *)
-Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
@@ -133,7 +134,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
    is stated at an ARBITRARY [on] -- including [None], which is where
    allocproc's own failure tails (and anything else outside the counted
    regime) have to call it. *)
-Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
@@ -162,14 +163,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
 
 Module Type PROC_PAGETABLE_GEN.
   Parameter wp_proc_pagetable_core :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks.
 End PROC_PAGETABLE_GEN.
 
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks.
 End PROC_PAGETABLE.

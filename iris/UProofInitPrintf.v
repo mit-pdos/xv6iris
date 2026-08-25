@@ -37,6 +37,7 @@ Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame.
 Require Import UCodeInit USpecInit UProofInitLib.
 Require User.InitSyms User.InitInstrs User.InitData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Import ListNotations.
@@ -152,6 +153,9 @@ Definition vp_rest (mx m : regfile) : Prop :=
 Section UProofInitPrintf.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Q : list (bv 8) -> list (list (bv 8)) -> iProp Σ).
   Context (W : Z -> list (bv 8) -> iProp Σ).

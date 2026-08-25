@@ -96,13 +96,14 @@ Require Import SpecForkretPark SpecForkretParkPaid ParkCap.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Local Open Scope Z_scope.
 
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is forkret's, re-exported unchanged *)
   Definition usertrap_res := FR.usertrap_res.
@@ -126,7 +127,7 @@ Section Res.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => FR.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := FR.usertrap_res_bare_park N av.
 End Res.
@@ -162,17 +163,25 @@ Lemma fkp_pstate_split `{!riscvGS Σ} (pa : mword 64) :
 Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 
 Theorem forkret_park_paid
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) :
-    forkret_park_paid_body (fun h : CpuId => FR.usertrap_res_bare (CID := h)) W
+    forkret_park_paid_body (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
       γs γf pa ks rest pid V av.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
   iIntros "Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
+  (* THE CHILD'S THREAD OF CONTROL IS BORN HERE (tso-port leg M2).  A forked
+     process's kernel thread is a NEW thread, so its identity is minted at
+     the park -- which is why the park's conclusion carries an update at all
+     -- and goes straight into the record it is building.  From here the
+     token only ever moves by the swtch exchange, until a zombie park drops
+     it.  The mint must precede the [iModIntro] below: that is the only
+     update this proof has. *)
+  iMod (own_context_alloc) as (XIc) "Hthr".
   (* the package is under a later and is opened only past the context's
      own [▷] -- which is what lets the token it names be a fixpoint *)
   iModIntro. iNext.
@@ -182,18 +191,22 @@ Proof.
   rewrite /proc_ctx
           (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
   iFrame "Hctx".
   iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
+  iSplitL "Hthr"; [iExact "Hthr" |].
   (* ================================================================== *)
   (* THE RESUME WAND -- forkret's precondition, assembled.               *)
   (* ================================================================== *)
   (* the child's two allowances are captured HERE, at the build, and fed
      to the closer at the resume: they are the record's, not the resuming
      hart's, and forkret itself never sees them. *)
-  iAssert (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+  (* the closer describes the CHILD, so its identity is quantified beside
+     its hart -- the resumer instantiates both (tso-port.md, the standing
+     principle). *)
+  iAssert (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
              ⌜pv_upt V' = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
@@ -201,13 +214,13 @@ Proof.
              first_done -∗
              W -∗
              TimerCap.timer_cap (CID := h) -∗
-             forkret_yield (CID := h) γf (proc_addr j)
+             forkret_yield (CID := h) (XI := Xc) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av V' -∗
-             FR.usertrap_res_bare (CID := h) pt'
+             FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
                (add_vec ks (mword_of_int 4096)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc Hy".
-    iApply ("Hclose" with "[%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
+  { iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc Hy".
+    iApply ("Hclose" $! h Xc pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
@@ -279,18 +292,29 @@ Theorem park_token_intro
     (γs : list gname) :
     ⊢ park_token γs.
 Proof.
-  iApply (park_token_intro_of (fun h : CpuId => FR.usertrap_res_bare (CID := h)) γs).
+  iApply (park_token_intro_of (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
   iIntros (γf pa ks rest pid V av) "%Hrest %Hj %Hav Hpkg HW Hchild".
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
-  iApply (forkret_park_paid (CID := 0%fin) (park_token γs) γs γf pa ks rest pid V av
+  (* THE AMBIENT HART AND CONTEXT ARE BOTH ARBITRARY HERE, and for the same
+     reason: [park_cap] describes a process that is NOT running -- neither
+     [park_pkg] nor [proc_ctx] mentions a hart or a ξ (the record mints and
+     hides the child's own identity, [forkret_park_paid] above).  So the
+     two ambient parameters of the theorem being applied are vacuous, and
+     any witness will do; [CurCtx] has no default instance by design
+     (TsoCtx.v, ruling 1), so one must be named. *)
+  iApply (forkret_park_paid (CID := 0%fin) (XI := MkCtxId inhabitant)
+            (park_token γs) γs γf pa ks rest pid V av
             Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
   iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
-  iIntros (h pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+  (* the closer describes the CHILD, so its identity is ∀-quantified beside
+     its hart on BOTH sides -- [park_pkg]'s wand and [forkret_park_pkg]'s --
+     and this hand-over just passes it through. *)
+  iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h Xc pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
     [exact HV | exact Hnorm | exact Hptwf].
 Qed.
 

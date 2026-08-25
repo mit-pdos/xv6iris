@@ -63,6 +63,7 @@ Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import ExecCommon.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -307,7 +308,7 @@ Qed.
 
 Section MinstretInv.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* The namespaces outlive the invariants: callers still carve masks with
      them (WpSconfTimer opens [timerN] at [⊤ ∖ ↑minstretN]), and keeping

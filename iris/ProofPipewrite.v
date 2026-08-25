@@ -84,6 +84,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -495,7 +496,7 @@ Proof. destruct V; reflexivity. Qed.
 
 Section PwPieces.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* copyin CONSUMES [kalloc_env] and hands nothing back, and the loop calls it
      once per byte -- so the bundle has to be duplicable.  At [on = None] every
@@ -662,7 +663,7 @@ Section PwConts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* +0x58: the common epilogue (mv a0,s2; reload ra/s0..s5; pop; ret). *)
-  Definition pw_epi `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
+  Definition pw_epi `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 : mword 64) : iProp Σ :=
@@ -682,7 +683,7 @@ Section PwConts.
 
   (* +0x108: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
      paths land here: the n <= 0 arm, the loop exit and the copyin failure. *)
-  Definition pw_tail `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
+  Definition pw_tail `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -706,7 +707,7 @@ Section PwConts.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
      epilogue.  Reached when readopen == 0 or the process was killed. *)
-  Definition pw_minus1 `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
+  Definition pw_minus1 `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -729,7 +730,7 @@ Section PwConts.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
      SHARE the epilogue closure. *)
-  Definition pw_exits `{GEN : GenId} (CID0 : CPU) (γf : gname) (γs : list gname) (j : nat)
+  Definition pw_exits `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -737,7 +738,7 @@ Section PwConts.
      ∧ pw_minus1 CID0 γf γs j γl γp w q m av eb lks pid V n sp0 pi)%I.
 
   (* +0x8c: the loop BODY, entered with 0 <= i < n. *)
-  Definition pw_loop `{GEN : GenId} (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
+  Definition pw_loop `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi addr : mword 64) : iProp Σ :=
@@ -781,7 +782,7 @@ End PwConts.
 (* ===================================================================== *)
 Section PwRestore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -914,7 +915,7 @@ End PwRestore.
 (* ===================================================================== *)
 Section PwGuard.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma pw_stack7_of (m : regfile) (sp0 : mword 64) :
     pw_frame5 m sp0 -∗ pw_chslot sp0 -∗ stack_own (KTR := KT1) (pa_stk sp0 7%nat) 7%nat.
@@ -1050,7 +1051,7 @@ Module PipewriteProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN) (Killed : KIL
 
 Section ProofPipewrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

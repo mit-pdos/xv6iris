@@ -65,6 +65,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecBinit.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -106,7 +107,7 @@ Section ProofBinit.
   (*  (shadowing any ambient hart) is the "decomposed helper" rule --     *)
   (*  worked example ProofFreerange.frepi / ProofIinit.iiepi.             *)
   (* ================================================================= *)
-  Lemma biepi `{GEN : GenId} `{CID0 : CpuId} (m Me : regfile) (K : nat) (b : bool) (pcur : mword 64) :
+  Lemma biepi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} (m Me : regfile) (K : nat) (b : bool) (pcur : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -330,7 +331,7 @@ Section ProofBinit.
   (* ================================================================= *)
   (*  binit's whole-function WP.                                        *)
   (* ================================================================= *)
-  Lemma wp_binit_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_binit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (pcur : mword 64)
     : wp_binit_sconf_body m K vlock vname vcpu b pcur.

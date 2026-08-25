@@ -88,6 +88,7 @@ Require Import SpecFreewalk.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -383,15 +384,21 @@ Section ProofFreewalk.
   (*  §2  The contract, as a Prop, so the induction can name it.         *)
   (* ================================================================== *)
 
+  (* The CONTEXT is quantified beside the HART, and for the same reason the
+     hart is: the recursive call is made by THIS thread, but a trap inside
+     the callee can move the hart, so the contract must be usable at
+     whichever hart resumes -- while [XI] is quantified only so that the
+     Prop can be stated in a section that fixes no ambient context; every
+     application instantiates it at the caller's own [XI]. *)
   Definition fw_rec (l : nat) : Prop :=
-    forall (CID0 : CpuId) (γa : gname) (mm : regfile) (t : ptree)
+    forall (CID0 : CpuId) (XI0 : CurCtx) (γa : gname) (mm : regfile) (t : ptree)
            (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string),
-      wp_freewalk_sconf_body (CID:=CID0) γa mm t l K eb p ilvl b lks.
+      wp_freewalk_sconf_body (CID:=CID0) (XI:=XI0) γa mm t l K eb p ilvl b lks.
 
   (* ================================================================== *)
   (*  §3  THE EXIT (+0x48 .. +0x5a): kfree(pagetable), then the epilogue. *)
   (* ================================================================== *)
-  Local Lemma fw_epilogue `{CID0 : CpuId} (ilvl : nat) (γa : gname)
+  Local Lemma fw_epilogue `{CID0 : CpuId} `{XI : CurCtx} (ilvl : nat) (γa : gname)
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (bpt : mword 44)
       (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
@@ -644,7 +651,7 @@ Section ProofFreewalk.
      before calling it, and TAIL re-anchors ["Hcont"] with [wp_next_shift]
      only at its OWN recurse-via-[IH] exit (the one place a wp_next-shaped
      resource is forwarded, rather than terminally applied). *)
-  Local Lemma fw_loop `{CID : CpuId} (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
+  Local Lemma fw_loop `{CID : CpuId} `{XI : CurCtx} (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
       (γa : gname)
       (mm : regfile) (t : ptree) (K : nat) (eb : bool) (p : mword 64)
       (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset string) :
@@ -985,7 +992,7 @@ Section ProofFreewalk.
        straight through with no [locks_below_mono] needed. *)
     iDestruct (cpu_own_transport CID CIDb9 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (REC l Hlt CIDb9 γa B6 c (K - 6)%nat eb p ilvl b _ HKrec Hilvl HB6a0 Hfok
+    iApply (REC l Hlt CIDb9 XI γa B6 c (K - 6)%nat eb p ilvl b _ HKrec Hilvl HB6a0 Hfok
               Hbelow
               with "Hcg Hcnt Htext Hpc Hch Henv").
     iIntros (CIDrec Hsrec mr) "Hcg Hcnt Hpc %Hrcs".
@@ -1052,7 +1059,7 @@ Section ProofFreewalk.
   (* ================================================================== *)
   Local Lemma fw_body (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l) : fw_rec lvl.
   Proof.
-    unfold fw_rec. intros CID0 γa mm t K eb p ilvl b lks.
+    unfold fw_rec. intros CID0 XI γa mm t K eb p ilvl b lks.
     cbv beta delta [wp_freewalk_sconf_body].
     intros pcE ret_tgt HK Hilvl Ha0 Hfree Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
@@ -1292,11 +1299,11 @@ Section ProofFreewalk.
     - apply fw_body. intros l Hl. apply IHn. lia.
   Qed.
 
-  Lemma wp_freewalk_sconf `{CID : CpuId} (γa : gname) (mm : regfile)
+  Lemma wp_freewalk_sconf `{CID : CpuId} `{XI : CurCtx} (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
     : wp_freewalk_sconf_body γa mm t lvl K eb p ilvl b lks.
-  Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) CID γa mm t K eb p ilvl b lks). Qed.
+  Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) CID XI γa mm t K eb p ilvl b lks). Qed.
 
 End ProofFreewalk.
 

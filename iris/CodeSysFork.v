@@ -25,13 +25,14 @@ Require Import KernelDecode14.
 Require Import KernelDecode24.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSysFork.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- sys_fork @ KernelSyms.sys_fork, 20 bytes ---- *)
 

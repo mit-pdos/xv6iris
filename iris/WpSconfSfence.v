@@ -46,6 +46,7 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
    (SmodePte).  [WpIntrInv] already requires all three, so no edge moves. *)
 Require Import KptShare PtTree SmodePte.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -59,7 +60,7 @@ Import Defs.
 
 Section SfenceFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* 1. THE FRAME.  SFENCE.VMA x0,x0 reads cur_privilege and mstatus and   *)
@@ -173,7 +174,7 @@ End SfenceFrames.
 
 Section SfenceLeaf.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (kt : ktier) (p : mword 64).
 
   (* ==================================================================== *)
@@ -384,7 +385,7 @@ Section SfenceLeaf.
     iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
         as (root) "(Hres & Htrback)".
       iDestruct (tlb_res_pt_open with "Hres") as (ksatp tlbv)
@@ -397,8 +398,11 @@ Section SfenceLeaf.
       pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
                           HMPP & HTVM).
       iDestruct (sf_frames_in ms0 tlbv with "Htlbc Hpriv Hms") as "[Hrw Hro]".
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Harm Hfile HPC HnPC Hhalf Hspp Hmie Hmdl Hmenv
+                "[Hstk Harm Hctx Hfile HPC HnPC Hhalf Hspp Hmie Hmdl Hmenv
                   Hsatp Hpmp Htrback] [Hrw Hro Hresv]");
         last first.
       { iApply (swp_execute_SFENCE_VMA_S (sf_rs ms0 tlbv)
@@ -430,7 +434,7 @@ Section SfenceLeaf.
       { rewrite /sconf_at_priv. iExists mdv0.
         iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
         iPureIntro. split; [exact Hmsf | exact Hmm]. }
-      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Hstk Htr Harm Hctx". { iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iFrame "Hfile". iSplitR; [done|]. iSplitR; [done|]. done.
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".

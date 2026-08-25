@@ -51,10 +51,11 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv WireInv.
 Require Import UserPtTree UserExec.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
-Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :=
   hw_config -∗ minstret_inv -∗ wire_inv -∗
   user_inv C pt Rut -∗ ▷ stvec_handler_wp C pt Rut -∗
@@ -62,7 +63,7 @@ Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
 
 Module Type USER.
   Parameter wp_user_exec_closed :
-    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
       wp_user_exec_closed_body C pt Rut.
 End USER.

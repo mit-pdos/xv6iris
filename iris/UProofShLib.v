@@ -40,6 +40,7 @@ Require Import UmodeFrame.
 Require Import UCodeSh USpecSh.
 Require User.ShSyms User.ShInstrs User.ShData.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -108,6 +109,9 @@ Proof. reflexivity. Qed.
 Section UProofShLib.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).
   Context (Q : list (bv 8) -> list (list (bv 8)) -> iProp Σ).

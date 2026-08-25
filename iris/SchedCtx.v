@@ -63,12 +63,22 @@ Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw
    14-word save area (boot; and while the scheduler itself runs).
    (Here rather than CpuOwn.v: it names [ctx_cells], and SwtchCtx now
    sits above CpuOwn so the ambient-bundle wand can mention [cpu_own].) *)
+(* NO [CurCtx] BINDER, deliberately.  The slot is the raw 14 words at this
+   hart's [a_cpu_ctx] -- pure per-cpu memory geometry, with no thread of
+   control in it (that is the whole meaning of "free": nobody is parked
+   here).  An inline binder that the body never mentions is a PHANTOM: it
+   cannot be inferred, so every consumer inherits an evar.  It broke
+   adequacy concretely -- [BootChain.boot_hart_res] picked the context up
+   through this conjunct alone, and [BootShared.boot_shared_alloc] mints
+   all eight harts' bundles under ONE ambient context, which the primary /
+   secondary boot lemmas then try to pin to eight DIFFERENT contexts. *)
 Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ :=
   (∃ vs : list (mword 64),
      ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
@@ -89,7 +99,7 @@ Qed.
 
 Section SchedCtx.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
 
@@ -569,7 +579,7 @@ Section SchedCtx.
   Lemma proc_ctx_cells (pa : mword 64) : proc_ctx pa -∗ own_ctx (p_context pa).
   Proof.
     rewrite /proc_ctx valid_context_unfold /valid_context_pre.
-    iIntros "(%vs & %av & %Hlen & _ & Hcells & _)".
+    iIntros "(%vs & %av & %XIp & %Hlen & _ & Hcells & _)".
     iExists vs. by iFrame "Hcells".
   Qed.
 

@@ -29,6 +29,7 @@ Require Import UserMem.
 Require Import UserFetch.
 Require Import UserMemPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -41,7 +42,7 @@ Import Defs.
 
 Section UserFetchPtWord.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the 4 bytes at the translated pc exist in the data pages (with SOME
      values -- contents are existential) and the window is RAM.  Borrowed
@@ -155,7 +156,7 @@ End UserFetchPtWord.
 
 Section UserFetchPtOk.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma user_pt_fetch_instr (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -237,7 +238,7 @@ Definition u_fetch_fault_flavor (tfp : mword 44)
 
 Section UserFetchPtFault.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma user_pt_fetch_fault (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va : mword 64) (σ : mstate) :
@@ -283,7 +284,7 @@ End UserFetchPtFault.
 
 Section UserFetchPtSplit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma user_pt_fetch_instr_2 (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -484,7 +485,7 @@ End UserFetchPtSplit.
 
 Section UserFetchPtSplitFault.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma user_pt_fetch_fault_2_first (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va : mword 64) (σ : mstate) :

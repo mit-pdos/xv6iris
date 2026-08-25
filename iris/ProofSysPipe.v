@@ -57,7 +57,7 @@
    Three consequences shape the script:
 
    * THE THREE BLOCK LEMMAS ([sp_ofile_null], [sp_close2], [sp_epi]) and the
-     unused-but-kept [sp_sp_bounds] each take their OWN `{CID0 : CpuId}
+     unused-but-kept [sp_sp_bounds] each take their OWN `{CID0 : CpuId} `{XI : CurCtx}
      binder and wrap their continuation in [wp_next b], closing it with
      [iSpecialize ("Hcont" $! CIDn with "[%]"); [wp_next_chain|]].  They are
      applied with the hart PINNED ([sp_close2 (CID0 := CID43) ...]): the
@@ -126,6 +126,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -384,7 +385,7 @@ Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC
 Section ProofSysPipe.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* register indices, named once *)
   Notation Rra := (mword_of_int 1 : mword 5).

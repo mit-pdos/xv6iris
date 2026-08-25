@@ -53,13 +53,14 @@ Require Import CpuOwn.
 Require Import WpPushOffCsr.   (* [csr_sstatus] -- WpSconfCsr's copy is [Local] *)
 Require Import WpSconfCsr.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section WpIntrOff.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_intr_off_lvl0_s_sconf

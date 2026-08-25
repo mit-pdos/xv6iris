@@ -31,6 +31,7 @@ Require Import UserPtTree UserExec UserClassifyAsm.
 Require Import UserTotalU UserActiveClass.
 Require Import UserMemArmsBase UserMemArmsC UserMemArmsA UserMemClassifyAmo.
 Require Import SpecUser.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -38,7 +39,7 @@ Module UserProof : USER.
 
 Section ProofUser.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
 

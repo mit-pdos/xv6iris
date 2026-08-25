@@ -64,6 +64,7 @@ Require Import HartRunGen HartStepFull HartMCycle.
 Require Import WpIntrInv.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -144,7 +145,7 @@ Proof. rewrite /wfi_Dro. set_solver. Qed.
 
 Section WfiFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wfi_rw_split (rs : regstate) :
     (hreg_frame rs wfi_Drw : iProp Σ) ⊣⊢
@@ -396,7 +397,7 @@ Qed.
 
 Section WfiWait.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition wfi_Dr : register -> bool := fun r =>
     orb (register_beq r (R_bitvector_64 mip))
@@ -475,7 +476,7 @@ End WfiWait.
 
 Section WfiBridge.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma s_Df_hart (dq : dfrac) : s_Df dq (hart_state : register) = dq.
   Proof.
@@ -516,7 +517,7 @@ End WfiBridge.
 (* ===================================================================== *)
 Section WfiRun.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context (Df : register -> dfrac).
   Context (pc ms : SailStdpp.Values.mword 64) (bmi : bool)
@@ -855,7 +856,7 @@ End WfiRun.
 Section WfiLeaf.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   Context {p : mword 64}.
 

@@ -55,6 +55,7 @@ Require Import HartGoodb WpDecodeBridge WpDecode RiscvExtras.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -126,7 +127,7 @@ Qed.
 
 Section HwMisa.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the ONE cell a jump needs out of the persistent config bundle *)
   Lemma hw_config_misa : hw_config -∗ misa ↦ᵣ□ MISA_C.
@@ -139,7 +140,7 @@ End HwMisa.
 
 Section WpSconfBranch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma sj_frames (npc0 : SailStdpp.Values.mword 64) :
     (hreg_frame (sj_rs npc0) sj_Drw ∗
@@ -351,7 +352,7 @@ Proof. sjedf. Qed.
 
 Section WpSconfCtlEng.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma sje_frames (npc0 : SailStdpp.Values.mword 64) :
     (hreg_frame (sje_rs npc0) sje_Drw ∗
@@ -683,7 +684,7 @@ End WpSconfCtlEng.
 Section WpSconfEngine.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   Context {p : mword 64}.
 

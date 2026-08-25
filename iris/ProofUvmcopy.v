@@ -94,6 +94,7 @@ Require Import SpecUvmcopy.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -309,7 +310,7 @@ Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmcopyDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* SpecUvmcopy's post disjunction, at an abstract return value *)
   Definition uc_pay (Pold Pnew : uptd) (sznew : Z)
@@ -360,7 +361,7 @@ Module UvmcopyProof (WalkNoalloc : WALK_NOALLOC) (Kalloc : KALLOC)
 
 Section ProofUvmcopy.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := URra.
   Notation Rtp := URtp.

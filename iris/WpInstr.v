@@ -25,10 +25,11 @@ Require Import KptPt.
 Local Open Scope Z_scope.
 
 Require Import InstrBytes WpInstrRun.
+Require Import TsoCtx.
 
 Section WpInstr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* every tower lookup, in one tactic: the [mm_rs_*] equations are complete,
      so any premise of the form [register_lookup r (mm_rs ..) = v] closes. *)

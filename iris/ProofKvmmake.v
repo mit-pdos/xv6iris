@@ -31,8 +31,6 @@ Require Import ByteBuf.   (* bb_choose: a window of existentials is an existenti
 Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.
 Require Import CodeKvmmake.
 Require Import SpecKalloc SpecMemset SpecKvmmap SpecProcMapstacks SpecKvmmake.
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -44,6 +42,8 @@ Require Import KernelRvcDecode.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -630,7 +630,7 @@ Proof. lia. Qed.
 
 Section KvmmakeHouse.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Ltac reg_neq :=
@@ -914,7 +914,7 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section KvmmakeBody.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* Each callee hypothesis is [CID]-GENERIC (its own fresh `{CID} binder,
@@ -935,7 +935,7 @@ Section KvmmakeBody.
      hypothesis is [XI]-generic exactly as it is [CID]-generic -- the call
      site below mints its own context, this file not being converted yet. *)
   Hypothesis wp_memset :
-    forall `{CID : CpuId} `{XI : CurCtx} (m0 : regfile) (n : nat) (len : nat)
+    forall `{CID : CpuId} `{XI0 : CurCtx} (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
   Hypothesis wp_kvmmap :
@@ -1156,15 +1156,14 @@ Section KvmmakeBody.
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bb_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
     (* memset's contract is context-indexed; this caller is not yet
-       converted, so it mints a context for the call (SC-only move,
-       becomes a compile error at cutover -- the leftover-work marker). *)
-    iMod (own_context_alloc) as (ξms) "Hctx".
-    iDestruct (ctx_buf_of_mem KT0 ξms with "Hbuf") as "Hbuf".
-    iApply (wp_memset (XI := ξms) M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hbuf") as "Hbuf".
+    iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
-              with "Hctx Hcg Htext Hpc [Hbuf]").
+              with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID12 Hs12 mfin) "_ Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
     iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -2288,7 +2287,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      BARE, at this [Definition]'s own ambient [CID], implicit-argument
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
-  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen

@@ -13,6 +13,7 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Local Open Scope Z_scope.
 Require Import WpGprCsrwCommon.
+Require Import TsoCtx.
 
 Definition csr_mcounteren : mword 12 := mword_of_int 0x306.
 
@@ -1009,7 +1010,7 @@ Qed.
 
 Section WpCsrwGprNewA.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [legalize_menvcfg] reads ONLY misa, whose value hw_config pins, so it IS
      goodb-transportable -- with the certificate ASSEMBLED above rather than

@@ -101,6 +101,7 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -683,7 +684,7 @@ Section InitlogBlocks.
   (*  [log.lh.block[t]], for t = 0 .. nh-1.  No calls, no ghosts -- four  *)
   (*  instructions and the back edge.                                     *)
   (* ================================================================== *)
-  Local Lemma il_copy `{GEN : GenId} (fuel : nat)
+  Local Lemma il_copy `{GEN : GenId} `{XI : CurCtx} (fuel : nat)
       (kk nh : nat) (bs_hdr : list (bv 8))
       (pj : SailStdpp.Values.mword 64) (nK : nat) (b : bool) :
     (kk < NBUF)%nat ->
@@ -909,7 +910,7 @@ Section InitlogBlocks.
   (*  cells arrive holding the decoded write set (empty at nh = 0) and    *)
   (*  the junk tail.                                                      *)
   (* ================================================================== *)
-  Local Lemma il_hd `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma il_hd `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (kk nh : nat) (bs_hdr : list (bv 8))
       (pj : SailStdpp.Values.mword 64) (nK : nat) (b : bool)
       (M : regfile) :
@@ -1130,7 +1131,7 @@ End InitlogBlocks.
 
 Section ProofInitlog.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_initlog_sconf 
       (γs : list gname) (j : nat) (γl : gname)

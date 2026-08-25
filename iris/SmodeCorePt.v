@@ -112,6 +112,7 @@ Require Import WpInstrRun WpSFrames.
 Require Import SmodePte RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -211,7 +212,7 @@ Proof. reflexivity. Qed.
 Section SmodeCorePt.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* WINDOW COLLAPSE (uniform-claims): a non-straddling [len]-byte chunk   *)

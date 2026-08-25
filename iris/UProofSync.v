@@ -28,6 +28,7 @@ Require Import UmodeCap UmodeAbi UmodeSyscall.
 Require Import WpUmodeStep WpUmodeLeaf WpUmodeStore.
 Require Import UCodeSync USpecSync.
 Require User.SyncSyms User.SyncInstrs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -79,6 +80,9 @@ Qed.
 Section UProofSync.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Local Notation Ψxv6 := (xv6_sys_protocol C pt).

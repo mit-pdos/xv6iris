@@ -72,6 +72,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -97,7 +98,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section ProofUsertrapTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the syscall environment, an ordinary hart-free parameter here: the tail
      never touches it, it only hands it on.  See SpecSyscall's note. *)
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
@@ -160,7 +161,7 @@ End ProofUsertrapTail.
 
 Section UtRet2.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
@@ -240,7 +241,7 @@ Section UtRet2.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_priv_open with "Hsc") as (msf) "(Hcl & Hpriv & Hmsown)".
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsf)".
-    iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Htc & #Hwit)".
+    iDestruct "Hcap" as "(Hstk & Hstr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct (sie_arm_half_agree false (un_pj N) msf with "Hhalf Harm") as %Hsie0.
     iDestruct (ghost_var_agree with "Hhalf Hq4") as %Hvb.
     rewrite Hsie0 in Hvb. rewrite -Hvb.
@@ -260,12 +261,13 @@ Section UtRet2.
       iSplitL "Hms"; [iExact "Hms"|]. iSplitL "Hhalf"; [iExact "Hhalf"|].
       iSplitL "Htie"; [iExact "Htie"|]. iPureIntro. exact Hmsf. }
     iAssert (sie_cap_gpr KT1 mf (trap_res b + nx)%nat false (un_pj N))
-      with "[Hhs Hsc Hstk Hstr Harm Hfile]" as "Hcg".
+      with "[Hhs Hsc Hstk Hstr Harm Hctx Hfile]" as "Hcg".
     { rewrite /sie_cap_gpr /sie_cap.
       iSplitL "Hhs"; [iExact "Hhs"|]. iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitR "Hfile"; [| iExact "Hfile"].
       iSplitL "Hstk"; [iExact "Hstk"|]. iSplitL "Hstr"; [iExact "Hstr"|].
       iSplitL "Harm"; [iExact "Harm"|].
+      iSplitL "Hctx"; [iExact "Hctx"|].
       iSplitR; [iExact "Htc"|]. iExact "Hwit". }
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     (* [ut_caps] is NOT destructured here: +0xb2..+0xc6 calls nothing, so no
@@ -615,10 +617,17 @@ Section UtRet2.
          too, are NOT in [ut_trap]: they go to the boundary raw (above). *)
       iSplitL "Hcap Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
       + rewrite /ut_trap /ut_stack /ut_ghosts.
-        iDestruct "Hcap" as "(Hstk & Hstr & Harm & _)".
+        (* THE TOKEN GOES BACK INTO THE RESIDUE (tso-port leg M2): the
+           capability's [own_context cur_ctx] is bound here instead of being
+           swallowed by the trailing [_], and parked in [ut_trap] -- the
+           exact inverse of [ut_trap_open], which takes it out again at the
+           next trap.  Same thread, same context: a user excursion does not
+           change the thread of control (see [ut_trap]'s note). *)
+        iDestruct "Hcap" as "(Hstk & Hstr & Harm & Hctx & _)".
         iSplitL "Hstk". { rewrite /S9 upd_eq. iExact "Hstk". }
         iSplitL "Hstr". { iExact "Hstr". }
         iSplitL "Harm". { iExact "Harm". }
+        iSplitL "Hctx". { iExact "Hctx". }
         iSplitL "Hkptr". { iExact "Hkptr". }
         iSplitL "Hhalf Hq4 Htie Hsret".
         { iSplitL "Hhalf". { iExact "Hhalf". }
@@ -634,7 +643,7 @@ End UtRet2.
 
 Section UtRet.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
@@ -756,7 +765,7 @@ End UtRet.
 
 Section UtA6.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
@@ -1016,7 +1025,7 @@ End UtA6.
 
 Section UtFa.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)

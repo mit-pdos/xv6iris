@@ -71,6 +71,7 @@ Require Import SpecUvmalloc.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -259,7 +260,7 @@ Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmallocDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
   Definition ua_pay (P : uptd) (M : gmap Z (bv 8))
@@ -321,7 +322,7 @@ Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
 
 Section ProofUvmalloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := URra.
   Notation Rtp := URtp.

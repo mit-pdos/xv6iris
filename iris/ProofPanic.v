@@ -51,6 +51,7 @@ Require Import SpecPanic.
 Require Import CodePanic.
 From Kernel Require KernelInstrs KernelData KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -138,7 +139,7 @@ End PanicData.
 (* ===================================================================== *)
 Section PanicSpin.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* [h] is bound as a [CpuId], not as a [CPU]: [Loop] itself is
@@ -178,7 +179,7 @@ End PanicSpin.
 Module PanicProof (Printk : PRINTK) : PANIC.
 Section ProofPanic.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.

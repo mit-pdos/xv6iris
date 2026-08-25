@@ -39,13 +39,14 @@ Require Import KernelDecode25.
 Require Import KernelDecode27.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSysSbrk.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- sys_sbrk @ KernelSyms.sys_sbrk, 120 bytes ---- *)
 

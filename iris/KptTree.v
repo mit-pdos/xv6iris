@@ -52,6 +52,7 @@ Require Import KptExecMap.
 Require Import KMap.
 Require Import Pt4kWalk.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -575,7 +576,7 @@ End PtSlotBridge.
 
 Section KptTreeInv.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* The generalized invariant (rwx-kmap): the table is constrained by the
      M-INDEXED spec [kpt_tree_spec_gen], and the kernel-mapping auth
@@ -1012,7 +1013,7 @@ End KptTranslateAddr.
 
 Section PtTranslateOwn.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   (* THE GENERIC ABSORPTION CORE, over the raw pieces: any owned tree, any
@@ -1160,7 +1161,7 @@ End PtTranslateOwn.
 
 Section KptTranslateIris.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   (* THE re-keyed absorption (rwx-kmap): keyed on a kernel-mapping CLAIM

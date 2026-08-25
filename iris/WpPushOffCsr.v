@@ -18,6 +18,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import ExecCommon.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -215,7 +216,7 @@ Qed.
 
 Section WpPushOffCsr.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- csrrci rd,sstatus,imm5 at Supervisor, SIE already 0 (idempotent) ----
      4-byte instruction: PC advances +4; needs fetch geom at pc and pc+2.

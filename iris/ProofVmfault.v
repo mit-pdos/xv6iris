@@ -98,6 +98,7 @@ Require Import SpecVmfault.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* proc_pt-altitude goals are enormous; without this a one-line mistake in the
@@ -145,7 +146,7 @@ Module VmfaultProof (Ismapped : ISMAPPED) (Kalloc : KALLOC)
 
 Section ProofVmfault.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).

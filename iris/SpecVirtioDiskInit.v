@@ -102,6 +102,7 @@ Require Import RegFile HartTp.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* the [struct disk] fields this function touches (kernel/virtio_disk.c):
@@ -137,7 +138,7 @@ Notation K_virtio_disk_init := (18%nat) (only parsing).
    [Typeclasses Opaque] (never [Opaque]) so instance search never walks in
    while [rewrite /vdi_post] at the return still does. *)
 Definition vdi_post
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γv : disk_names) (γa : gname) (γk : gname * gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (on : option nat)
@@ -185,7 +186,7 @@ Global Typeclasses Opaque vdi_post.
    [wp_next_off] anyway, since the hart cannot move); [vdi_post] above drops
    its own [b] parameter for the same reason. *)
 Definition wp_virtio_disk_init_sconf_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γv : disk_names) (γa : gname) (γk : gname * gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (on : option nat)
@@ -233,7 +234,7 @@ Definition wp_virtio_disk_init_sconf_body
 
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γv : disk_names) (γa : gname) (γk : gname * gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)

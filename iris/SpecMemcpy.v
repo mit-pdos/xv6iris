@@ -35,6 +35,7 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* THE TWO BUFFERS CARRY THEIR OWN TIERS.  [kts] is the SOURCE's, [ktw] the
@@ -45,7 +46,7 @@ Import Defs.
    [kt].  One shared datum tier cannot state any of those.  Both tiers are
    EXPLICIT: eager [KtierLe] refl would otherwise silently re-derive them as
    [kt] and every page caller would fail at its give-back. *) 
-Definition wp_memcpy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_memcpy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
     (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -76,7 +77,7 @@ Definition wp_memcpy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
 
 Module Type MEMCPY.
   Parameter wp_memcpy_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
       (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
       wp_memcpy_sconf_body kt kts ktw m0 n len src_bytes dst_olds b p.

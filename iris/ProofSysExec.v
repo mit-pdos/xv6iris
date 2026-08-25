@@ -115,14 +115,14 @@ Require Import SpecFetchstr.
 Require Import SpecKalloc.
 Require Import SpecKfree.
 Require Import SpecMemset.
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecKexec.
 Require Import CodeSysExec.
 Require Import SpecSysExec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -702,7 +702,7 @@ Section SysExecEpilogue.
   Local Ltac nz := vm_compute; discriminate.
   Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
-  Lemma sx_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sx_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64) :
     (60 <= K)%nat -> ((K - 60) + 60 = K)%nat ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -908,7 +908,7 @@ Module SysExecProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
 Section SysExecHead.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1460,7 +1460,7 @@ End SysExecHead.
 (* ===================================================================== *)
 Section SysExecSetup.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1763,14 +1763,13 @@ Section SysExecSetup.
     iDestruct (sx_bytes_name (pa_stk sp0 58) 256 with "Hab") as (af) "Haz".
     iEval (rewrite -HN5a0) in "Haz".
     (* memset's contract is context-indexed; this caller is not yet
-       converted, so it mints a context for the call (SC-only move,
-       becomes a compile error at cutover -- the leftover-work marker). *)
-    iMod (own_context_alloc) as (ξms) "Hctx".
-    iDestruct (ctx_buf_of_mem KT1 ξms with "Haz") as "Haz".
-    iApply (Memset.wp_memset_sconf (XI := ξms) KT1 KT1 N5 (K - 60)%nat 256%nat
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "Haz") as "Haz".
+    iApply (Memset.wp_memset_sconf KT1 KT1 N5 (K - 60)%nat 256%nat
               (mword_of_int 0 : mword 64) af b pj
-              K2 ltac:(lia) HN5a1 HN5a2 with "Hctx Hcg Htext Hpc Haz").
-    iIntros (CIDa6 Hqa6 N6) "_ Hcg Hpc Haz %Hcsa6".
+              K2 ltac:(lia) HN5a1 HN5a2 with "Hcg Htext Hpc Haz").
+    iIntros (CIDa6 Hqa6 N6) "Hcg Hpc Haz %Hcsa6".
     iDestruct (ctx_buf_to_mem with "Haz") as "Haz".
     iEval (rewrite HN5a0) in "Haz".
     assert (HN6sp : sx_sp sp0 N6).
@@ -2192,7 +2191,7 @@ Section SysExecFree.
      already been freed and the [c.beqz] is taken.  Reached from the head at
      [k = t], whatever the fuel, which is why it is a lemma of its own rather
      than the induction's base case. *)
-  Lemma sx_free_exit `{CID0 : CpuId}
+  Lemma sx_free_exit `{CID0 : CpuId} `{XI : CurCtx}
       (sp0 pj : mword 64)
       (K : nat) (eb b : bool) (lks : gset string)
       (pg : nat -> mword 64) (t : nat) (base ea : Z) (imm8 : mword 8)
@@ -2280,7 +2279,7 @@ Section SysExecFree.
        +10  bne   s1,s4,SX+base      the back edge; falls through at [k = 32]
      The induction is on the FUEL [W] bounding [t - k]; the head is entered
      only at [k < 32], so the array is never read out of range. *)
-  Lemma sx_free_loop `{CID0 : CpuId}
+  Lemma sx_free_loop `{CID0 : CpuId} `{XI : CurCtx}
       (ga : gname) (sp0 pj : mword 64)
       (K : nat) (eb b : bool) (lks : gset string)
       (pg : nat -> mword 64) (afun : nat -> nat -> bv 8) (t : nat)
@@ -2850,7 +2849,7 @@ End SysExecLoop.
 Section SysExecState.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -3036,7 +3035,7 @@ Section SysExecStep.
   (* ===================================================================== *)
   (*  ONE ITERATION, +0x056 .. +0x090.                                      *)
   (* ===================================================================== *)
-  Lemma sx_step `{CID0 : CpuId}
+  Lemma sx_step `{CID0 : CpuId} `{XI : CurCtx}
       (γf γa : gname) (jp : nat) (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
@@ -3691,7 +3690,7 @@ Section SysExecStep.
   (* ===================================================================== *)
   (*  THE LOOP, by induction on the fuel [32 - i].                          *)
   (* ===================================================================== *)
-  Lemma sx_loop `{CID0 : CpuId}
+  Lemma sx_loop `{CID0 : CpuId} `{XI : CurCtx}
       (γf γa : gname) (jp : nat) (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
@@ -3810,7 +3809,7 @@ Section SysExecReload.
   Qed.
 
   (* +base .. +base+12: [ld s1..s7] off the pushed sp *)
-  Lemma sx_reload `{CID0 : CpuId} (sp0 : mword 64) (m M : regfile) (K : nat)
+  Lemma sx_reload `{CID0 : CpuId} `{XI : CurCtx} (sp0 : mword 64) (m M : regfile) (K : nat)
       (b : bool) (pj : mword 64) (base : Z) :
     sx_sp sp0 M -> sx_thr m M ->
     sx_itxt (mword_of_int (SX + base) : mword 64) true
@@ -4148,7 +4147,7 @@ Section SysExecBadTail.
     rewrite !bv_wrap_add_idemp_r !bv_wrap_add_idemp_l. f_equal. lia.
   Qed.
 
-  Lemma sx_bad_tail `{CID0 : CpuId}
+  Lemma sx_bad_tail `{CID0 : CpuId} `{XI : CurCtx}
       (γf γa : gname) (jp : nat) (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
@@ -4352,7 +4351,7 @@ Section SysExecSuccTail.
   Local Ltac nz := vm_compute; discriminate.
   Local Ltac csf := vm_compute; reflexivity.
 
-  Lemma sx_succ_tail `{CID0 : CpuId}
+  Lemma sx_succ_tail `{CID0 : CpuId} `{XI : CurCtx}
       (γf γa : gname) (jp : nat) (pid : mword 32) (W : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
@@ -4640,7 +4639,7 @@ Section SysExecBreak.
     rewrite (pa_stk_addn sp0 58 i ltac:(lia)). reflexivity.
   Qed.
 
-  Lemma sx_break `{CID0 : CpuId}
+  Lemma sx_break `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -4938,7 +4937,7 @@ End SysExecBreak.
 (* ===================================================================== *)
 Section SysExecWhole.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

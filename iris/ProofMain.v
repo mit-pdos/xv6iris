@@ -126,6 +126,7 @@ From Kernel Require KernelSyms.
 Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -189,7 +190,7 @@ Module MainProof
 
 Section ProofMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -2117,8 +2118,8 @@ Section ProofMain.
     { rewrite Huartq Hdiskq. iExact "Hpenv". }
     assert (Hpkc : printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk).
     { rewrite Huartq Hdiskq. rewrite /printk_gen_contract.
-      intros CIDp m0 K0 eb pj dqf f descs bb lks.
-      exact (PrintkGen.wp_printk_gen_sconf (CID := CIDp) KT1 fsc_printk γd γv
+      intros CIDp XIp m0 K0 eb pj dqf f descs bb lks.
+      exact (PrintkGen.wp_printk_gen_sconf (CID := CIDp) (XI := XIp) KT1 fsc_printk γd γv
                m0 K0 eb pj (dqf := dqf) f descs bb lks). }
     (* ...and the crash seam, likewise: the boot chain hands it at the era's
        [cov] and superblock, [FirstTok] spells it at the configuration. *)

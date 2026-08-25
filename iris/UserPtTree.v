@@ -42,6 +42,7 @@ Require Import KptTree.
 Require Import UptTree.
 Require Import UserTranslate.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -896,7 +897,7 @@ Qed.
 
 Section UserPtInv.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* §3b Generic big-op plumbing.                                        *)
@@ -1346,7 +1347,7 @@ End UserPtInv.
 
 Section UserPtTranslate.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma utlb_inv_pt_translateAddr_u (uroot tfp : mword 44)
@@ -1422,7 +1423,7 @@ End UserPtTranslate.
 
 Section UserPtFault.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   (* NON-CANONICAL va: faults at the canonicality test; the invariant is
@@ -1728,7 +1729,7 @@ Definition u_fault_flavor (acc : MemoryAccessType mem_payload)
 
 Section UserPtFaultCombined.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma utlb_inv_pt_translateAddr_u_fault (uroot tfp : mword 44)

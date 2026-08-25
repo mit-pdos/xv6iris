@@ -118,6 +118,7 @@ From Kernel Require KernelSyms.
 Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -384,13 +385,13 @@ Section BmapKit.
      binder inside a Definition's BODY is silently ignored by Coq ("Ignoring
      implicit binder declaration in unexpected position"), and a hypothesis
      of a Pi type gets no implicit-argument metadata anyway, so a call site
-     passes them as [_ _].  That is not a loss: an evar whose type is a class
+     passes them as [_ _ _] (hart, context, generation).  That is not a loss: an evar whose type is a class
      is still filled by typeclass resolution -- with the most recently
      introduced CpuId, which is exactly what an implicit-instance argument
      would have picked, and is why every call site transports [cpu_own] to
      the current hart first. *)
   Definition balloc_contract : Prop :=
-    forall (GENa : GenId) (CIDa : CpuId)
+    forall (GENa : GenId) (CIDa : CpuId) (XIa : CurCtx)
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -403,13 +404,13 @@ Section BmapKit.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_balloc_gen_body (GEN := GENa) (CID := CIDa)
+      wp_balloc_gen_body (GEN := GENa) (CID := CIDa) (XI := XIa)
                             γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev γpr u cr Sb
                            pidv dq dqb dqs m K eb b lks Vpr.
 
   Definition log_write_contract : Prop :=
-    forall (GENa : GenId) (CIDa : CpuId)
+    forall (GENa : GenId) (CIDa : CpuId) (XIa : CurCtx)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -418,7 +419,7 @@ Section BmapKit.
       (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_log_write_gen_body (GEN := GENa) (CID := CIDa) bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_gen_body (GEN := GENa) (CID := CIDa) (XI := XIa) bn γ γfs γd cov logstart dev k pidv bno
                               bs bsl bsd d u cr Sb Psi m n eb p K b lks.
 End BmapKit.
 
@@ -426,7 +427,7 @@ End BmapKit.
    report keys off that suffix and this is an internal statement, not one of
    bmap's two public interfaces (tools/proof_coverage.py). *)
 Definition bm_gen_stmt
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -574,7 +575,7 @@ Section BmapDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition bm_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition bm_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
@@ -638,7 +639,7 @@ Definition bm_sp (m M : regfile) : Prop :=
 Section BmapEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -972,7 +973,7 @@ End BmapEpilogue.
 Section BmapRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -1164,7 +1165,7 @@ End BmapRelease.
 Section BmapTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1711,7 +1712,7 @@ Section BmapTail.
       assert (Hbal_w : (if crb then S ub else ub)%nat = S w)
         by (destruct crb; subst w ub; lia).
       iEval (rewrite Hnn) in "Hop".
-      iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
+      iApply (Hballoc _ _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bms sz dev γpr ub crb SbI
                 pidv dq dqb dqs A1
                 (K - 6)%nat eb b lks Vpr
@@ -1962,7 +1963,7 @@ Section BmapTail.
                       (uint (bm_ind bmI : mword 32))
                       (ind_bytes (<[q := blk]> (bm_ent bmI))) with "Hlctxa")
           as "Hpstep".
-        iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
+        iApply (Hlogwrite _ _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
                   (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1 Psi
                   G2 0%nat eb (proc_addr j) (K - 6)%nat b lks
@@ -2168,7 +2169,7 @@ End BmapTail.
 (* ===================================================================== *)
 Section ProofBmapMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_gen 
       (γs : list gname) (j : nat) (γl : gname)
@@ -2608,7 +2609,7 @@ Section ProofBmapMain.
         assert (Hnn : n = (2 + u2)%nat)
           by (pose proof (bmap_need_ge2 cr (bmap_ind fbn)); lia).
         iEval (rewrite Hnn) in "Hop".
-        iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
+        iApply (Hballoc _ _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart bms sz dev γpr u2 cr Sb pidv dq dqb dqs D5
                   (K - 6)%nat eb b lks Vpr
                   HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog
@@ -3177,7 +3178,7 @@ Section ProofBmapMain.
         assert (Hnn : n = (2 + u2)%nat)
           by (pose proof (bmap_need_ge2 cr (bmap_ind fbn)); lia).
         iEval (rewrite Hnn) in "Hop".
-        iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
+        iApply (Hballoc _ _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart bms sz dev γpr u2 cr Sb pidv dq dqb dqs P1
                   (K - 6)%nat eb b lks Vpr
                   HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog
@@ -3555,7 +3556,7 @@ Module Core := BmapCore BR BL.
 
 Section BmapSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_sconf 
       (γs : list gname) (j : nat) (γl : gname)
@@ -3596,10 +3597,10 @@ Section BmapSeal.
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size dqb dqs γpr)) γfs
               cov logstart dev ip bm data fbn n false Sb0 pidv dq dqd m K eb b lks Vpr
-              ltac:(intros _ GEN0 CID0;
-                    exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
-              ltac:(intros _ GEN0 CID0;
-                    exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
+              ltac:(intros _ GEN0 CID0 XI0;
+                    exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0) (XI := XI0)))
+              ltac:(intros _ GEN0 CID0 XI0;
+                    exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0) (XI := XI0)))
               ltac:(lkbelow)
               ltac:(intros _; exact Hbelow)
               HK
@@ -3672,10 +3673,10 @@ Section BmapSeal.
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size dqb dqs γpr)) γfs
               cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb b lks Vpr
-              ltac:(intros _ GEN0 CID0;
-                    exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
-              ltac:(intros _ GEN0 CID0;
-                    exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
+              ltac:(intros _ GEN0 CID0 XI0;
+                    exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0) (XI := XI0)))
+              ltac:(intros _ GEN0 CID0 XI0;
+                    exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0) (XI := XI0)))
               ltac:(lkbelow)
               ltac:(intros _; exact Hbelow)
               HK ltac:(intros _; exact Hneed)
@@ -3720,7 +3721,7 @@ Module Core := BmapCore BR BL.
 
 Section BmapNoallocSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_noalloc_sconf 
       (γs : list gname) (j : nat) (γl : gname)

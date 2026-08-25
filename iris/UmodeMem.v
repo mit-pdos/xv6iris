@@ -62,7 +62,7 @@ Proof. intro Hl. unfold uva_pa. rewrite Hl. reflexivity. Qed.
 
 Section UmodeMem.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the process image, keyed by user va.  One flat byte map: code, data,
      bss and stack are all just entries (the dumped [sync_bytes]/[sync_data]
@@ -186,6 +186,7 @@ Record uinstr (pt : uptd) (M : gmap Z (bv 8)) (pc : mword 64)
 (* ===================================================================== *)
 
 Require Import HartMemRun PtBytes.
+Require Import TsoCtx.
 
 (* [uva_pa pt] is injective on the image's keys -- the exact content of
    "the re-keying loses nothing" *)
@@ -291,7 +292,7 @@ Qed.
 
 Section UmodeMemBridge.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE INJECTIVITY, OUT OF THE OWNERSHIP.  Two distinct image keys own
      two [↦ₚ] cells; [PtBytes.phys_pointsto_ne] (the exclusivity of the

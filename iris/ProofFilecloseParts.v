@@ -53,6 +53,7 @@ Require Import IntrDefs.
 Require Import CodeFileclose.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Notation FC := KernelSyms.fileclose (only parsing).
@@ -339,7 +340,7 @@ Section ProofFilecloseParts.
   (* =================================================================== *)
   (*  +0x8e .. +0x96 -- THE EPILOGUE.  Every exit reaches it.             *)
   (* =================================================================== *)
-  Lemma fc_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fc_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 : mword 64) (w4 w5 w6 w7 w8 : mword 64)
       (p : mword 64) (b : bool) :
@@ -505,7 +506,7 @@ Section ProofFilecloseParts.
   (*  gcc emitted this THREE times (+0x64, +0xa0, +0xb8), so it is one    *)
   (*  lemma over the block's pcs as literals.                            *)
   (* =================================================================== *)
-  Lemma fc_restore4 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fc_restore4 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
       (v2 v3 v4 v5 : mword 64)
       (za zb zc zd ze : Z) (jimm : mword 21)

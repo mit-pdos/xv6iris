@@ -31,6 +31,7 @@ Require Import SpecHoldingsleep.
 Require Import ProcDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -59,7 +60,7 @@ Module HoldingsleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPRO
 
 Section ProofHoldingsleep.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)
   Local Ltac hpeel :=

@@ -53,6 +53,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -76,7 +77,7 @@ Local Lemma data2_id_4 (v : mword 32) :
 Section WpSconfLock.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
@@ -943,7 +944,7 @@ Section WpSconfLock.
       (* THE SLOT STAYS FOLDED -- the pre-port shape.  The frame comes out of
          [WpIntrInv.sda_slot_acc] below, which is the one place the two
          translation arms are told apart. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -1001,7 +1002,7 @@ Section WpSconfLock.
       assert (Hea : add_vec (tp_pin (CID := CID) m !!! Regidx rs1) (zeros' 64)
                     = pa) by (rewrite Lpin_rs1; reflexivity).
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
       2:{ iApply (swp_execute_AMOSWAP_S_ex_mode (CID := CID)
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -1165,8 +1166,8 @@ Section WpSconfLock.
                     = <[Regidx rd := regval_into_reg (amoswap_loaded bytes)]> m
                         !!! Regidx csp_rs1)
         by (symmetry; apply upd_ne; congruence).
-      iSplitL "Htr Hstk Harm".
-      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Htr Hstk Harm Hctx".
+      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iSplitL "Hfile".
       { iEval (rewrite (tp_pin_upd m rd
                           (regval_into_reg (amoswap_loaded bytes))

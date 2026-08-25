@@ -63,6 +63,7 @@ Require Import CodeItrunc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -85,7 +86,7 @@ Notation IT := KernelSyms.itrunc.
 Section ItruncCont.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
-  Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition it_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γ : log_names) (γfs : fs_names) (γi : gname) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
       (dev : mword 32)
@@ -189,7 +190,7 @@ Proof. apply elem_of_union_r, elem_of_singleton_2. reflexivity. Qed.
 Section ItruncTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
-  Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -672,7 +673,7 @@ Section ItruncDLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
-  Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
+  Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
@@ -696,7 +697,7 @@ Section ItruncDLoop.
                      crb Sb e0 w NDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (jx : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1244,7 +1245,7 @@ End ItruncDLoop.
 Section ItruncELoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
-  Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
+  Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
@@ -1270,7 +1271,7 @@ Section ItruncELoop.
                      crb Sb e0 w NINDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (jx : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1779,7 +1780,7 @@ Section ItruncIArm.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
-  Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
+  Definition it_armexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γ : log_names) (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
@@ -1804,7 +1805,7 @@ Section ItruncIArm.
         bm_paidS γ bmapstart crb w Sb e0 -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_iarm `{GEN : GenId} `{CID0 : CpuId}       (γs : list gname) (jx : nat) (γl : gname)
+  Local Lemma it_iarm `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}       (γs : list gname) (jx : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
@@ -2508,7 +2509,7 @@ Section ItruncMain.
      cannot be derived outside a walk; it has to BE the walk, and the counted
      contract is the ~20-line seal below, taken at the [log_op]
      existential's own witness. *)
-  Lemma wp_itrunc_gen `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
+  Lemma wp_itrunc_gen `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γi : gname)
@@ -3024,7 +3025,7 @@ Section ItruncMain.
   (*  are [S (S u) - 2 <= u'] and [u' + 1 <= S (S u)], i.e. the landed       *)
   (*  [u <= u' <= S u].                                                     *)
   (* ===================================================================== *)
-  Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
+  Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γi : gname)

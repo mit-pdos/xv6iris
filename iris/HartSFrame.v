@@ -57,6 +57,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartSpanChar.
 Require Import ColdBoot.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -474,7 +475,7 @@ Global Opaque s_rs.
 (* ===================================================================== *)
 Section SFrames.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{CID : CpuId} `{XI : CurCtx}.
 
   (* the persistent cells are exactly M-mode's: the hw_config pins plus the
      two counter-config cells.  Everything S-mode ADDS (satp, tlb, mie,

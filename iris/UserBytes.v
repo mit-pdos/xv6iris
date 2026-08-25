@@ -57,6 +57,7 @@ Require Import HartMemRun PtBytes.
 Require Import PtreeType CommonWalk Pt4kWalk PtTree.
 Require Import RiscvFetchExec PtTreeAdue SmodePte UptTree UserPtTree.
 Require Import UserBits.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -755,7 +756,7 @@ Qed.
 
 Section UserBytesData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE PROCESS'S MEMORY AS THE HART'S BYTE MAP.  The CONTENTS survive
      (the two maps hold the same bytes, re-keyed); only the KEYING moves.
@@ -820,7 +821,7 @@ End UserBytesData.
 
 Section UserPtInvBytes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the register cells [utlb_inv_pt] owns, as one bundle *)
   Definition upt_regs (P : uptd) (usatp : mword 64)

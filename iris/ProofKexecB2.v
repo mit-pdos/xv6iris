@@ -154,6 +154,7 @@ Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import SpecPanic.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Notation KXB := KernelSyms.kexec (only parsing).
 
@@ -236,7 +237,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
 
 Section KexecB2Body.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -772,7 +773,7 @@ Section KexecB2Loops.
   (*  enormous and never computed; what matters is that it is a [nat] the  *)
   (*  head can always supply.                                              *)
   (* =================================================================== *)
-  Lemma kxc_ls `{CID0 : CpuId}
+  Lemma kxc_ls `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)

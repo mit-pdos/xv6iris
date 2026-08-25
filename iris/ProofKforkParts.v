@@ -80,6 +80,7 @@ Require Import SpecFreeproc.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Notation KF := KernelSyms.kfork (only parsing).
@@ -275,7 +276,7 @@ Section ProofKforkParts.
   (*  conjuncts therefore come out of [Hthr], the premise about the map    *)
   (*  this block is entered with.                                         *)
   (* =================================================================== *)
-  Lemma kfk_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kfk_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 rv : mword 64) (w4 w5 w6 w8 : mword 64)
       (p : mword 64) (b : bool) :
@@ -659,7 +660,7 @@ End KforkRes.
 (* =================================================================== *)
 Section KforkFreeproc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* IT TAKES THE DEFICIT BLOCK, and that is forced: the premise
      [pv_cwd V = 0] and [ProcInv.cwd_ref] having no null arm together make

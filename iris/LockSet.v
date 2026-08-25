@@ -62,6 +62,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Export LockRank.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section LockSet.
@@ -237,7 +238,7 @@ End LockSet.
 
 Section LockSetAmbient.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{CID : CpuId} `{XI : CurCtx}.
 
   (* the ambient hart's held set -- the spelling every contract in the sconf
      tier uses, [cpu_hart] included. *)

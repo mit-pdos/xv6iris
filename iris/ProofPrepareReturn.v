@@ -77,6 +77,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -90,7 +91,7 @@ Module PrepareReturnProof (Myproc : MYPROC) : PREPARE_RETURN.
 
 Section ProofPrepareReturn.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -767,10 +768,10 @@ Section ProofPrepareReturn.
     iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile Harm".
     set (U12 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11).
     change (<[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11) with U12.
-    iDestruct "Harm" as "(Hstk & %Hsie1 & Harm & #Htc & #Hwit)".
+    iDestruct "Harm" as "(Hstk & %Hsie1 & Harm & Hctx & #Htc & #Hwit)".
     iAssert (sie_cap KT1 U12 (trap_res b + (av - 2))%nat false p)
-      with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
+      with "[Hstk Htr Harm Hctx]" as "Hcap".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
     assert (Hsie1' : _get_Mstatus_SIE ms1 = ('b"0" : mword 1))

@@ -201,6 +201,7 @@ Require Import IgetLic.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* iget's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00, with ra / s0 /
    s1 / s2 / s3 / s4 pushed at 40 / 32 / 24 / 16 / 8 / 0 and [c.addi4spn
@@ -208,7 +209,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    none.  [K_idup]'s budget for a frame half again as deep. *)
 Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (dev inum : mword 32)
@@ -284,7 +285,7 @@ Definition wp_iget_sconf_body
 
 Module Type IGET.
   Parameter wp_iget_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev inum : mword 32)

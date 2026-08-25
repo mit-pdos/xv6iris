@@ -10,6 +10,7 @@ Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
 From iris.base_logic.lib Require Import invariants.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -122,7 +123,7 @@ Qed.
 (* ====================================================================== *)
 Section WpMulGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
 
   (* [instr]/[mmode_config]-formulated register-generic MUL WP, built on

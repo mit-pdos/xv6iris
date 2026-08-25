@@ -56,6 +56,7 @@ Require Import RegFile.
 Require Import UserPtTree UserExec.
 Require Import UmodeCap UmodeAbi UmodeSyscall.
 Require Import Xv6G.   (* [uioG] lives here now, as an [xv6G] member *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -155,6 +156,9 @@ Inductive uio_sem : Type :=
 Section UmodeIo.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname).          (* stdin stream, program break *)
   Context (hbase hlen : Z).            (* the heap region, mapped in [pt] *)

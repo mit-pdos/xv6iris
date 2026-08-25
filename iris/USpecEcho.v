@@ -47,12 +47,13 @@ Require Import InstrBytes RegFile.
 Require Import UserPtTree UserExec.
 Require Import UmodeCap UmodeAbi UmodeSyscall UCodeEcho.
 Require User.EchoSyms User.EchoInstrs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section USpecEcho.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* echo's protocol IS the kernel's table -- nothing program-specific *)

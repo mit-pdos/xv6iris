@@ -42,6 +42,7 @@ Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
 Require Import WpMmodeLeafBase HartMFetch HartMStore HartEvents.
 Require Import PtTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -526,7 +527,7 @@ Qed.
 
 Section SPmpSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   (* the [swp] face of [spmp_hval_grant] -- one [swp_span], as with
@@ -576,7 +577,7 @@ End SPmpSwp.
 (* ====================================================================== *)
 Section pteread.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_checked_mem_read_pte8 (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
@@ -1113,7 +1114,7 @@ Local Ltac spte_glue :=
 
 Section ptewrite.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE PTE WRITE, as a node -- [HartMStore.swp_checked_mem_write]'s shape at
      the walk's access.  [R] is the caller's carried resource, exactly as
@@ -2362,7 +2363,7 @@ End PtUpdHit.
 
 Section PtFront.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   Lemma exec_translateAddr_pt_front (vpn : mword 27) (root : mword 44)
@@ -2887,7 +2888,7 @@ Qed.
 
 Section PtWriteIris.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* update an owned 8-byte slot to a new word, in step with the model's
      [write_bytes] memory update *)

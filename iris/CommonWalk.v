@@ -30,6 +30,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre.
 Require Import RiscvPtsto HartSwp HartLift HartRegNode HartSpan HartSpanChar
         HartGoodb.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -144,7 +145,7 @@ Local Ltac walk_peel_read st Hrd :=
 Section UserWalk.
   (* the [swp] layer's parameters, used only by the [swp_] lemmas below *)
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (vpn : mword 27) (root : mword 44).
   Context (pte2 pte1 pte0 : mword 64).
   Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
@@ -1285,7 +1286,7 @@ End UserWalkFault.
 (* ===================================================================== *)
 Section UserWalkEx.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (vpn : mword 27) (root : mword 44).
   Context (pte2 pte1 : mword 64).
   Context (P0 : mword 64 -> Prop).

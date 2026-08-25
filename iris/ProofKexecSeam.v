@@ -74,6 +74,7 @@ Require Import ProofKexecTail.
 Require Import SpecKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -381,7 +382,7 @@ Qed.
 (* ===================================================================== *)
 Section KexecBFrame.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the elf slots as 64 NAMED bytes, with the per-slot 8-alignment facts kept
      as a PURE side product: a byte run does not carry alignment and
@@ -476,7 +477,7 @@ End KexecBFrame.
 (* ===================================================================== *)
 Section KexecBFrameB.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
      they travel named, see the file header -- and (b) slots 5..13 and 67
@@ -517,7 +518,7 @@ Section KexecBSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.  (* NB: icacheG + icfg come
               from [fileG] -- ProofKexecA.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

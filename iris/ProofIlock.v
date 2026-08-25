@@ -145,6 +145,7 @@ Require Import SpecIlock.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -348,7 +349,7 @@ Section IlockDefs.
   (* [cn] and [s] are here for ONE resource: the other half of the entry
      sleeplock's checkout descriptor (§14.8).  SpecIlock v3 hands it to the
      caller, so both arms of the function have to carry it to the join. *)
-  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
       (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
@@ -402,7 +403,7 @@ End IlockDefs.
 Section IlockEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
       (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
@@ -686,7 +687,7 @@ Section IlockLoad.
       [done | exfalso; apply Hc; reflexivity].
   Qed.
 
-  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -2156,7 +2157,7 @@ End IlockLoad.
 
 Section ProofIlockMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_ilock_sconf 
       (gs : list gname) (j : nat) (gl : gname)

@@ -118,13 +118,13 @@ Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecPrintk.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset.
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import ProofBallocParts.
 Require Import SpecBalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -233,7 +233,7 @@ Section BallocDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition ba_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition ba_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (u : nat) (cr : bool) (Sb : gset Z)
@@ -347,7 +347,7 @@ Definition ba_sp (m M : regfile) : Prop :=
 Section BallocEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (u : nat) (cr : bool) (Sb : gset Z)
       (rv : mword 32)
@@ -613,7 +613,7 @@ End BallocEpilogue.
 Section BallocOut.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z) (u : nat) (cr : bool) (Sb : gset Z)
@@ -905,7 +905,7 @@ Section BallocOut.
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iApply (Hpk CID10 QA (K - 10)%nat eb (proc_addr j)
+    iApply (Hpk CID10 cur_ctx QA (K - 10)%nat eb (proc_addr j)
               DfracDiscarded ba_msg [] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -989,7 +989,7 @@ End BallocOut.
 Section BallocExhaust.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names)
@@ -1217,7 +1217,7 @@ End BallocExhaust.
 Section BallocRestore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (bi : Z)
       (u : nat) (cr : bool) (Sb : gset Z) (rv : mword 32)
@@ -1478,7 +1478,7 @@ End BallocRestore.
 Section BallocBzero.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1822,15 +1822,14 @@ Section BallocBzero.
       exact (HZ6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iEval (rewrite -HZ7a0) in "Hby".
     (* memset's contract is context-indexed; this caller is not yet
-       converted, so it mints a context for the call (SC-only move,
-       becomes a compile error at cutover -- the leftover-work marker). *)
-    iMod (own_context_alloc) as (ξms) "Hctx".
-    iDestruct (ctx_buf_of_mem KT0 ξms with "Hby") as "Hby".
-    iApply (MS.wp_memset_sconf (XI := ξms) KT1 KT0 Z7 (K - 10)%nat 1024%nat
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
+    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hby") as "Hby".
+    iApply (MS.wp_memset_sconf KT1 KT0 Z7 (K - 10)%nat 1024%nat
               (mword_of_int 0 : mword 64) (fun jj => bsD !!! jj) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HZ7a1 HZ7a2
-              with "Hctx Hcg Htext Hpc Hby").
-    iIntros (CID10 Hq10 mM) "_ Hcg Hpc Hby %Hcs2".
+              with "Hcg Htext Hpc Hby").
+    iIntros (CID10 Hq10 mM) "Hcg Hpc Hby %Hcs2".
     iDestruct (ctx_buf_to_mem with "Hby") as "Hby".
     iEval (rewrite HZ7a0) in "Hby".
     assert (Hpc64 : ret_pc (Z7 !!! Regidx Rra : mword 64)
@@ -2059,7 +2058,7 @@ End BallocBzero.
 Section BallocAlloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2532,7 +2531,7 @@ End BallocAlloc.
 Section BallocScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_scan `{GEN : GenId} 
+  Local Lemma ba_scan `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3385,7 +3384,7 @@ End BallocScan.
 (* ===================================================================== *)
 Section BallocMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [ba_main] IS THE ONE CORE both top-level lemmas below build on: the
      credited/[cr]/[Sb] shape, eb-generic.  Its statement now coincides

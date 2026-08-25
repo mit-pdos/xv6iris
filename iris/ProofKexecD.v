@@ -90,6 +90,7 @@ Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* durable-notes' rule: a goal over [proc_priv] carries [tf_page]'s
@@ -214,7 +215,7 @@ Section KexecDName.
      where [last] ends up, and the ONLY thing promised about it is that it
      is inside the buffer -- which is all [safestrcpy] needs and all
      [kexec_ok] asks for. *)
-  Definition kxd_scan_out `{CID0 : CpuId}
+  Definition kxd_scan_out `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
@@ -243,7 +244,7 @@ Section KexecDName.
   (*  On entry [a5 = path + (S i)] and the byte to read is [pfun (S i)];   *)
   (*  the [c.addi] steps [a5] past it and the [lbu -1(a5)] reads it back.  *)
   (* ------------------------------------------------------------------- *)
-  Lemma kxd_scan_tail `{CID0 : CpuId}
+  Lemma kxd_scan_tail `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
@@ -409,7 +410,7 @@ Section KexecDName.
   (*  The only thing the two arms differ in is [q], so the fetch block is  *)
   (*  called rather than written twice.                                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma kxd_name_step `{CID0 : CpuId}
+  Lemma kxd_name_step `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
@@ -517,7 +518,7 @@ Section KexecDName.
   (*  by the head's own [i < plen], carried as a PREMISE for exactly the   *)
   (*  reason ProofKexecC.kxc_argv_loop carries its own.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma kxd_name_loop `{CID0 : CpuId}
+  Lemma kxd_name_loop `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64) :
@@ -587,7 +588,7 @@ Module KexecDProof (PFP : PROC_FREEPAGETABLE) (SS : SAFESTRCPY).
 
 Section KexecDCommit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1852,7 +1853,7 @@ End KexecDCommit.
 
 Section KexecDMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

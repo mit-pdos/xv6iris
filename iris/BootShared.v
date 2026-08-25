@@ -69,6 +69,7 @@ Require Import BioDefs.        (* [fs_blocks] *)
 Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* [fs_cfg_alloc] and the two boot kits *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -1060,6 +1061,19 @@ Section BootAlloc.
      MEMBERS since 2b-inode-3 / 2b-inode-4, so this file -- above the
      bundle -- binds neither. *)
   Context `{GEN : GenId}.
+  (* [boot_hart_res] IS NOW CONTEXT-FREE, and it had to become so: the bundle
+     is pre-thread (a hart that has not run has no thread of control yet,
+     which is why the token is NOT a member of it).  Its parameter was a
+     PHANTOM inherited from [SchedCtx.cpu_ctx_free]'s inline binder, and this
+     lemma is exactly where that broke: [boot_shared_alloc] mints ALL EIGHT
+     harts' bundles under ONE ambient context, so the phantom became a single
+     evar at the application site that [boot_hart_primary (XI := ξ0)] and the
+     seven [boot_hart_secondary (XI := ξc)] then each tried to pin to a
+     DIFFERENT context -- leaving [SystemAdequacy.xv6_boot_era] incomplete at
+     [Qed].  The binder below is kept only as the ambient resolver for the
+     proof scripts in this section; nothing in the STATEMENTS needs it, so
+     section discharge drops it from every lemma's type. *)
+  Context `{XI : CurCtx}.
 
   (* The two PER-HART GHOST BUNDLES, NAMED -- and the naming is load-bearing:
      the per-element body of the zipped family below is a four-way conjunction

@@ -16,6 +16,7 @@ Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeJump.
 From iris.base_logic.lib Require Import invariants.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* register-generic JAL execute (reused verbatim from the old formulation --
@@ -41,7 +42,7 @@ Qed.
 
 Section WpJalGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [instr]/[mmode_config]-formulated register-generic JAL WP, built on
      [wp_instr] -- stated like [wp_auipc_gpr] (no source register) BUT it is a

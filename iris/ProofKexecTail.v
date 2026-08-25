@@ -123,6 +123,7 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -158,7 +159,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
    [⊣⊢], so both directions of every regrouping below are one rewrite. *)
 Section KexecAFrame.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kxc_slots_asc (sp0 : mword 64) (n j : nat) :
     stack_own (KTR := KT1) (pa_stk sp0 j) n ⊣⊢
@@ -494,7 +495,7 @@ Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section KexecA.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -967,7 +968,7 @@ Section KexecASeam.
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1082,7 +1083,7 @@ Section KexecExitQ.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma kxc_exit_qgen `{CIDx : CpuId}
+  Lemma kxc_exit_qgen `{CIDx : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (pj : mword 64) (ga gf : gname) (bmapstart inodestart : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1148,7 +1149,7 @@ Section KexecExitQ.
      wand is persistent, so a block with two [-1] tails can spend it twice;
      [KEX] itself is linear and whichever tail runs consumes it.  Stated at
      [fun _ => _] because the exit body names no hart. *)
-  Lemma kxc_exit_open `{CIDx : CpuId} (pj : mword 64)
+  Lemma kxc_exit_open `{CIDx : CpuId} `{XI : CurCtx} (pj : mword 64)
       (KEX E : CpuId -> iProp Σ) :
     □ (∀ CX : CpuId, KEX CX -∗ E CX) -∗
     wp_next (CID0 := CIDx) true pj KEX -∗
@@ -1173,7 +1174,7 @@ Section KexecAExit.
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1390,7 +1391,7 @@ Section KexecABad.
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1775,7 +1776,7 @@ Module T := KexecTailProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp.
 
 Section KexecCBad.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

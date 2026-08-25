@@ -46,6 +46,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CodeEntryAux.
 Require Import MbootVocab.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* Moved here from WpDecode.v via the late KernelBoot.v (this file is now their
@@ -74,7 +75,7 @@ Local Ltac en_look :=
 
 Section WpEntryNew.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* The load effective address: sp (just set by AUIPC) + sext(imm_ld).  The

@@ -55,6 +55,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the flag's address, and the two values it ever holds *)
@@ -82,7 +83,7 @@ Qed.
 
 Section StartedInv.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition startedN : namespace := nroot .@ "started".
 

@@ -87,6 +87,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -120,7 +121,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is the closed loop's, re-exported unchanged *)
   Definition usertrap_res := UC.usertrap_res.
@@ -144,7 +145,7 @@ Section Res.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UC.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => UC.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := UC.usertrap_res_bare_park N av.
 
@@ -181,7 +182,7 @@ End Res.
    arm never spent it, and the boot arm rebuilt it from
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
@@ -221,7 +222,7 @@ Lemma fkr_tail
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
-  forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
+  forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
                  W γf p ksp pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
@@ -559,7 +560,12 @@ Proof.
      which the closer would re-park. *)
   iDestruct "Hsc" as "(#Hhw & #Hmin & Hprivc & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (msg) "(Hms & Hhalf & Htie & %Hmsg)".
-  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Htc & #Hwit)".
+  (* CLASS 1 + the park's half of the token exchange (tso-port leg M2):
+     [Hctx] is bound out of the capability here and goes straight into the
+     [ut_trap] this proof builds below -- forkret is the new thread's FIRST
+     descent into the trap loop, so the residue it parks is its own, at its
+     own (ambient) context.  See [UsertrapRes.ut_trap]'s note. *)
+  iDestruct "Hcap" as "(Hstk & Hstr & Harm & Hctx & #Htc & #Hwit)".
   (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
      it existential because it never reads it; the arm it also hands back is
      at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -606,11 +612,12 @@ Proof.
     iSplitL "Hf16"; [iExact "Hf16" | iExact "Hstk"]. }
   (* ---- the trap-side residue, and the table it hands userret ---- *)
   iAssert (ut_trap p ksp av ∅)
-    with "[Hstack Hstr Harm Hkptr Hhalf Hq4 Htie Hsret Hcpu Hclaim]" as "Htrap".
+    with "[Hstack Hstr Harm Hctx Hkptr Hhalf Hq4 Htie Hsret Hcpu Hclaim]" as "Htrap".
   { rewrite /ut_trap /ut_stack /ut_ghosts.
     iSplitL "Hstack". { iExact "Hstack". }
     iSplitL "Hstr". { iExact "Hstr". }
     iSplitL "Harm". { iExact "Harm". }
+    iSplitL "Hctx". { iExact "Hctx". }
     iSplitL "Hkptr". { iExact "Hkptr". }
     iSplitL "Hhalf Hq4 Htie Hsret".
     { iSplitL "Hhalf". { iExact "Hhalf". }
@@ -657,7 +664,7 @@ Proof.
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
-  iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
+  iDestruct ("Hyield" $! CIDf XI pt (upd_upt V' pt)
                with "[%] [%] [%] Htfk' Hdone HW Htc Hyld")
     as "Hures"; [reflexivity | exact Hnorm | exact Hptwf |].
   (* ---- the config record for this round ---- *)
@@ -716,7 +723,7 @@ Qed.
        ([ProofSyscall.sysc_tfp_valid] is the same lemma; restated here so the
        forkret cone does not depend on the syscall proof.) ---- *)
 Lemma fkr_tfp_valid
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
   proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
 Proof.
@@ -741,7 +748,7 @@ Proof.
 Qed.
 
 Lemma fkr_boot
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
@@ -788,7 +795,7 @@ Lemma fkr_boot
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
-  forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
+  forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
                  W γf p ksp pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
@@ -1560,11 +1567,11 @@ Proof.
 Qed.
 
 Theorem wp_forkret
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
-    wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
+    wp_forkret_gen_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
       j γs γl γf pid V ks m av av2 eb.
 Proof.
   cbv beta delta [wp_forkret_gen_body].

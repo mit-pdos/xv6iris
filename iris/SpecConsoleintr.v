@@ -82,6 +82,7 @@ Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
    (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
@@ -103,7 +104,7 @@ Section ConsoleCaps.
 
 End ConsoleCaps.
 
-Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
     (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -139,7 +140,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fds
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
       wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks.

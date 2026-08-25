@@ -133,6 +133,7 @@ Require Import SpecCopyinstr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -197,7 +198,7 @@ Module CopyinstrProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) : COPYINSTR.
 
 Section ProofCopyinstr.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {ktb : ktier}.
 
   Notation Rx0 := (mword_of_int 0 : mword 5).

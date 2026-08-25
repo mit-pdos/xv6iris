@@ -25,13 +25,14 @@ Require Import KernelDecode14.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSysGetpid.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- sys_getpid @ KernelSyms.sys_getpid, 22 bytes ---- *)
 

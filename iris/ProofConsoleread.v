@@ -87,6 +87,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -229,7 +230,7 @@ Section CrBodies.
     /\ M !!! Regidx Rs11 = m0 !!! Regidx Rs11.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
-  Definition cr_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Definition cr_ret `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        ∀ (mf : regfile) (r : Z) (P' : uptd),
@@ -247,7 +248,7 @@ Section CrBodies.
   (*  +0xce .. +0xe0 -- THE EPILOGUE.  All three exits reach it with the  *)
   (*  answer already in a0.                                               *)
   (* =================================================================== *)
-  Lemma cr_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma cr_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -578,7 +579,7 @@ Section CrBodies.
   (*  over one at a time -- so what a caller supplies is only the four     *)
   (*  free ones, the answer in a0, and the process block.                  *)
   (* =================================================================== *)
-  Definition cr_epi_prop `{CID0 : CpuId}
+  Definition cr_epi_prop `{CID0 : CpuId} `{XI : CurCtx}
       (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDe : CpuId) =>
@@ -600,7 +601,7 @@ Section CrBodies.
      [upd_upt V P'], so the exit it carries has to speak that descriptor;
      without this the [uptd_ext] chain would have to be re-threaded at each
      of the five exits instead of once, here. *)
-  Lemma cr_ret_shift `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Lemma cr_ret_shift `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (P' : uptd) (n : Z) (lks : gset string) :
     uptd_ext (pv_upt V) P' ->
     cr_ret (CID0 := CID0) jp m0 av true pid V n lks -∗
@@ -616,7 +617,7 @@ Section CrBodies.
     - iExact "Hpriv".
   Qed.
 
-  Lemma cr_mk_epi `{CID : CpuId} (jp : nat) (sp0 : mword 64) (m0 : regfile)
+  Lemma cr_mk_epi `{CID : CpuId} `{XI : CurCtx} (jp : nat) (sp0 : mword 64) (m0 : regfile)
       (av : nat) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     (consoleread_stack <= av)%nat ->
@@ -646,7 +647,7 @@ Module ConsolereadProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Killed : KILLED)
 
 Section ProofConsoleread.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* Normalise every [rget m k] the leaves produce back to [m !!! Regidx k]
      across the WHOLE proofmode goal: away from tp the two are the same

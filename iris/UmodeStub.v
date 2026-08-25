@@ -33,6 +33,7 @@ Require Import AlignBits.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi.
 Require Import WpUmodeStep WpUmodeLeaf.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -40,6 +41,9 @@ Set Printing Depth 40.
 Section UmodeStub.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

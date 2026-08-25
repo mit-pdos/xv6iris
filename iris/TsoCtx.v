@@ -63,6 +63,13 @@ Add Printing Constructor CtxId.
 
 Global Instance ctx_id_eq_dec : EqDecision CtxId.
 Proof. solve_decision. Defined.
+(* INHABITED IS LOAD-BEARING, not decoration: a [CtxId] existentially bound
+   inside a ▷-guarded record (the parked context, SwtchCtx.valid_context_pre)
+   can only have its later pushed inward by [bi.later_exist], which HOLDS
+   ONLY OVER AN INHABITED DOMAIN.  Without this instance the resumer cannot
+   open the record it is about to run. *)
+Global Instance ctx_id_inhabited : Inhabited CtxId := populate (MkCtxId inhabitant).
+
 Global Instance ctx_id_countable : Countable CtxId.
 Proof. apply (inj_countable' ctx_name MkCtxId). by intros []. Qed.
 

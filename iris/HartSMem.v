@@ -61,6 +61,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
 Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
 Require Import WpMmodeLeafBase SmodePte PtTreeAdue.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -570,7 +571,7 @@ Definition mem_bytes_at (s : mstate) (pa : Arch.pa) (width : Z)
 
 Section smem.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- the section's width and its two per-width nodes ---- *)
   Variable width : Z.
@@ -1932,7 +1933,7 @@ Qed.
 
 Section snodes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac node_read req Hproj Hres :=
     let Hb := fresh in let Hcl := fresh in
@@ -2103,7 +2104,7 @@ End snodes.
 (* ====================================================================== *)
 Section smem_w.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Variable width : Z.
   Hypothesis Hvw : vmem_width width.
@@ -2880,7 +2881,7 @@ Proof. cbn [mwrite_req8 Interface.WriteReq.value]. apply TypeCasts.cast_N_refl. 
 
 Section swnodes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac node_write req Hproj Hval Hres :=
     let Hcl := fresh in
@@ -3268,7 +3269,7 @@ End dev_class.
 (* ====================================================================== *)
 Section sdevnodes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_dev_read_node1 (pa : SailStdpp.Values.mword 64)
       (bytes : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) :
@@ -3424,7 +3425,7 @@ Lemma uintw8 : uint (to_bits 64 8) = 8. Proof. vm_compute; reflexivity. Qed.
 
 Section instances.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the RAM obligations: the state is handed back UNCHANGED at a read and
      with exactly the written bytes at a write *)
@@ -3792,7 +3793,7 @@ Qed.
 
 Section samo_nodes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the EXCLUSIVE read node: the plain read plus the reservation update.  It
      is the ONLY thing the atomic window needs from the language -- what makes
@@ -3895,7 +3896,7 @@ Local Notation amoacc := (Atomic (AMOSWAP, true, false, Data, Data)).
 
 Section samo.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the PMP/PMA premise bundle repeated by all three AMO nodes *)
   Local Ltac apmp HR HW :=

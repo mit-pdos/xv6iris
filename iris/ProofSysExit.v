@@ -56,6 +56,7 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeSysExit.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -107,7 +108,7 @@ Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 Section ProofSysExit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 

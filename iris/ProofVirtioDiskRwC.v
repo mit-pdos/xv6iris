@@ -51,6 +51,7 @@ Local Open Scope Z_scope.
 Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* §2  P3 -- +0x0c4 .. +0x176, the chain formatting.                      *)
@@ -64,7 +65,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Section ProofVirtioDiskRwC.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rz  := (mword_of_int 0  : mword 5).

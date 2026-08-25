@@ -65,6 +65,7 @@ Require Import InodeInv.
 Require Import DirView.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -362,7 +363,7 @@ Proof. unfold dir_name. f_equal; lia. Qed.
 
 Section DlkBuf.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the [de] scratch record is a run of FRAME slots, so the whole section
      rides the caller's regime (StackOwn.v's KTR discipline). *)
   Context `{KTR : !CurKtier}.

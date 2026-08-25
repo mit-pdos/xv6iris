@@ -45,6 +45,7 @@ Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo
                UmodeInitIo UCodeInit.
 Require User.InitSyms User.InitInstrs User.InitData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Import ListNotations.
@@ -323,7 +324,7 @@ Qed.
 
 Section USpecInit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   (* the two observers, exactly as [xv6_init_protocol] takes them *)
   Context (Q : list (bv 8) -> list (list (bv 8)) -> iProp Σ).

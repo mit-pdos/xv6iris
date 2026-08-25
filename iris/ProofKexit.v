@@ -92,6 +92,7 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeKexit.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -317,7 +318,7 @@ Module KexitProof (Myproc : MYPROC) (Fileclose : FILECLOSE)
 (* ===================================================================== *)
 Section KexitPro.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* +0x00 .. +0x10: carve the 6-slot frame, save ra/s0..s4, set s0, and
      park the argument in s4.  Control lands on the [jal myproc]. *)
@@ -473,7 +474,7 @@ End KexitPro.
 Section KexitLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γft γf : gname) (fn : fclose_names)
       (j : nat) (pid : mword 32) (sv : mword 64) (cwdv : mword 64) (spF : mword 64)
       (av : nat) (eb : bool) (b : bool) (lks : gset string) :
@@ -908,7 +909,7 @@ End KexitLoop.
 Section KexitPark.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
-  Lemma kx_park `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kx_park `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname) (ip sv spF : mword 64) (dqi : dfrac)
       (M : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -1518,7 +1519,7 @@ Section KexitRest.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
 
-  Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1879,7 +1880,7 @@ End KexitRest.
 Section ProofKexit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

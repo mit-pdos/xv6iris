@@ -93,6 +93,7 @@ Local Open Scope Z_scope.
 Require Import CodeStartAux.
 Require Import MbootVocab.
 Require Import CodeTimerinitAux.
+Require Import TsoCtx.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).  start()'s *)
 (* own 16-byte frame reuses timerinit's slot geometry: the frame base is  *)
@@ -900,7 +901,7 @@ Local Ltac st_unfold :=
 (* ===================================================================== *)
 Section WpStartThm.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* two halves of a register cell rejoin to the full cell. *)
   Lemma reg_half_join (r : register) (v : type_of_register r) :

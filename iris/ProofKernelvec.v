@@ -64,6 +64,7 @@ From Kernel Require KernelSyms.
 Require Import KernelConsts.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -275,7 +276,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section KernelvecCore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the trap frame kernelvec carves is STACK memory, so its cells ride the
      hart's regime like every other frame slot. *)
 
@@ -1238,7 +1239,7 @@ Proof.
   by apply elem_of_nil in Hi.
 Qed.
 
-Lemma kv_file_restore `{CID : CpuId} (m Me mf : regfile) (spv : mword 64) :
+Lemma kv_file_restore `{CID : CpuId} `{XI : CurCtx} (m Me mf : regfile) (spv : mword 64) :
   (* what kerneltrap promises about the map kernelvec called it with *)
   callee_saved (kv_m2 Me) mf ->
   (* ...and how that map relates to the interrupted one: it is [m] tp-pinned at
@@ -1415,7 +1416,7 @@ Qed.
 (* ===================================================================== *)
 Section KernelvecHandler.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
@@ -1425,7 +1426,7 @@ Section KernelvecHandler.
     iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
     iApply intr_handler_spec_intro.
     iModIntro.
-    iIntros (m av p pc0 sc tv) "%Hpc0 %Hsc Hentry Hnext".
+    iIntros (XIc m av p pc0 sc tv) "%Hpc0 %Hsc Hentry Hnext".
     iEval (rewrite /ihs_entry_of) in "Hentry".
     (* [Hrcpt] is the KPT receipt (IntrDefs §6b), the tenth conjunct: the trap
        hands it over because the handler owes the ENABLED arm back, and the
@@ -1437,7 +1438,7 @@ Section KernelvecHandler.
     iEval (rewrite -intr_res_of_eq) in "Hires".
     (* ---- the bundle -> the raw cells the VC tier runs on ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct "Hcap" as "(Hstk & Htr & Hq0 & #Hwit0)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hq0 & Hctx & #Hwit0)".
     iDestruct "Hsc" as "(_ & _ & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
     iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
@@ -1669,11 +1670,12 @@ Section KernelvecHandler.
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
     iAssert (sie_cap KT1 (kv_m2 Me) (58 + av) false p)
-      with "[Hdeep Hbit1 Htlbinv Hq0]" as "Hcapn".
+      with "[Hdeep Hbit1 Htlbinv Hq0 Hctx]" as "Hcapn".
     { rewrite /sie_cap. iSplitL "Hdeep". { rewrite Hsp_l. iExact "Hdeep". }
       iSplitL "Hbit1 Htlbinv".
       { iApply (strans_inv_intro root_ppn with "Hbit1 Htlbinv"). }
-      iSplitL "Hq0"; [ iExact "Hq0" |]. iExact "Hwit0". }
+      iSplitL "Hq0"; [ iExact "Hq0" |].
+      iSplitL "Hctx"; [ iExact "Hctx" |]. iExact "Hwit0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
@@ -1691,7 +1693,7 @@ Section KernelvecHandler.
     iEval (rewrite Hret) in "Hpcf".
     iDestruct (sie_cap_gpr_at_close with "Hcgf") as "Hcgf".
     iDestruct (sie_cap_gpr_split with "Hcgf") as "(Hhsf & Hscf & Hcapf & Hfilef)".
-    iDestruct "Hcapf" as "(Hstkf & Htrf & Hq0f & #Hwitf)".
+    iDestruct "Hcapf" as "(Hstkf & Htrf & Hq0f & Hctxf & #Hwitf)".
     (* THE RESUMING HART'S OWN [hw_config] / [minstret_inv]: both hold that
        hart's register cells, so the section's copies are the wrong ones here. *)
     iDestruct "Hscf" as "(#Hhwf & #Hinvf & Hprivf & Hmsxf & Hmiexf & Hmenvxf)".
@@ -1834,11 +1836,12 @@ Section KernelvecHandler.
       iExists MENVCFG_S. iFrame "Hmenvf". iPureIntro.
       repeat split; try assumption; reflexivity. }
     iAssert (sie_cap KT1 (CID := CIDn) m (trap_res true + av) false p)
-      with "[Hstk Hbit1f Htlbinvf Hq0f]" as "Hcapf".
+      with "[Hstk Hbit1f Htlbinvf Hq0f Hctxf]" as "Hcapf".
     { rewrite /sie_cap. iSplitL "Hstk". { iExact "Hstk". }
       iSplitL "Hbit1f Htlbinvf".
       { iApply (strans_inv_intro (CID := CIDn) root_ppnf with "Hbit1f Htlbinvf"). }
-      iSplitL "Hq0f"; [ iExact "Hq0f" |]. iExact "Hwitf". }
+      iSplitL "Hq0f"; [ iExact "Hq0f" |].
+      iSplitL "Hctxf"; [ iExact "Hctxf" |]. iExact "Hwitf". }
     iDestruct (sie_cap_gpr_join (CID := CIDn) with "Hhsf Hscf Hcapf Hfilef") as "Hcgs".
     iApply (wp_sret_s_sconf (CID := CIDn)
               (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) m av pc0

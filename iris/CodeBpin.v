@@ -31,13 +31,14 @@ Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode30.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeBpin.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- bpin @ KernelSyms.bpin, 52 bytes ---- *)
 

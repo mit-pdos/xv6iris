@@ -32,7 +32,7 @@
 
    EXPLICIT-CPUID: the whole function threads a generic [b : bool].
    [mc_tail] is a non-recursive fragment, so it takes its own leading
-   (shadowing) hart [`{CID0 : CpuId}`].  [mc_loop] recurses via
+   (shadowing) hart [`{CID0 : CpuId} `{XI : CurCtx}`].  [mc_loop] recurses via
    [induction rem], so it needs TWO harts kept separate: [CIDh] (its
    [Hcont]'s fixed anchor, forwarded unchanged across every recursive call)
    and [CID0] (this iteration's own entry hart). *)
@@ -57,6 +57,7 @@ Require Import SpecMemcmp.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -69,7 +70,7 @@ Module MemcmpProof : MEMCMP.
 
 Section ProofMemcmp.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

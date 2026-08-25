@@ -119,6 +119,7 @@ Require Import SpecIreclaim.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -212,7 +213,7 @@ Section IreclaimDefs.
      split (claude-notes/optimization.md).  The bitmap no longer appears:
      under [BitmapInv.bitmap_inv] it is a PERSISTENT invariant the caller
      keeps, so nothing about it flows back out of ireclaim. *)
-  Definition irc_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition irc_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
@@ -240,7 +241,7 @@ Section IreclaimDefs.
      induction produces and the step block consumes; it is a plain ∀ (its
      own hart [CIDn] is bound inside), so it can be handed to a block lemma
      without a [wp_next_shift]. *)
-  Definition irc_loop `{GEN : GenId}
+  Definition irc_loop `{GEN : GenId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
@@ -295,7 +296,7 @@ Section IreclaimEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
@@ -674,7 +675,7 @@ Section IreclaimStep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32) (inum : mword 32) (fuel : nat)
@@ -925,7 +926,7 @@ Section IreclaimOrphan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1136,7 +1137,7 @@ Section IreclaimOrphan.
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iApply (Hpk CID3 O3 (K - 8)%nat eb (proc_addr j)
+    iApply (Hpk CID3 cur_ctx O3 (K - 8)%nat eb (proc_addr j)
               DfracDiscarded irc_msg [PkANum] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -2060,7 +2061,7 @@ Section IreclaimRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat)
       (γd : disk_names)
       (bn : bio_names) (γfs : fs_names)
@@ -2254,7 +2255,7 @@ Section IreclaimScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_scan `{GEN : GenId}
+  Local Lemma irc_scan `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3056,7 +3057,7 @@ Section IreclaimMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

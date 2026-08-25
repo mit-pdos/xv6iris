@@ -52,6 +52,7 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]).  Written
@@ -122,7 +123,7 @@ Module ReparentProof (Wakeup : WAKEUP) : REPARENT.
 (* ===================================================================== *)
 Section ProofReparentEnds.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* +0x00 .. +0x2a: carve the 6-slot frame, save ra/s0/s1..s4, set s0, park
      the argument in s2, materialise &proc[0] / &initproc / &proc[NPROC], and
@@ -598,7 +599,7 @@ End ProofReparentEnds.
 Section ProofReparentLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId}
+  Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
       (γs : list gname) (spF pme pv ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac)
@@ -1046,7 +1047,7 @@ End ProofReparentLoop.
 Section ProofReparent.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
     : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb b lks.

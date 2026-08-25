@@ -161,6 +161,7 @@ Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* claude-notes/optimization.md "Register maps": the leaves' premises are
@@ -1405,7 +1406,7 @@ Proof. unfold create_slots. lia. Qed.
 Section ProofCreateMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
@@ -4867,8 +4868,15 @@ Section ProofCreateMain.
               q1 Sb1 pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
-              (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
-              (fun CIDx : CpuId => IL.wp_ilock_sconf (CID := CIDx))
+              (* the two callee contracts are hand-quantified over the hart
+                 AND the context (ProofCreateFreshTy.v): a hypothesis that
+                 re-anchors [CpuId] across the span's [wp_next]s carries the
+                 ambient context beside it, so the positional supply has a
+                 second slot. *)
+              (fun (CIDx : CpuId) (XIx : CurCtx) =>
+                 IA.wp_ialloc_gen (CID := CIDx) (XI := XIx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) =>
+                 IL.wp_ilock_sconf (CID := CIDx) (XI := XIx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
                     Hppid Hbsl Hisl1 Hidev Hop").

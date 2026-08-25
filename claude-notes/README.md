@@ -22,6 +22,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`optimization.md`](optimization.md)** — proof performance: the diagnostics,
   the rules that keep a proof fast, and the negative results so nobody re-runs
   them. Apply the rules when writing new proofs, not after.
+- **[`interface-sweep-playbook.md`](interface-sweep-playbook.md)** — adding a
+  new AMBIENT INTERFACE AXIS (a typeclass-indexed parameter) to every WP
+  statement in the tree, mechanically: the tool
+  (`tools/ctx_convert.py`), the ordered procedure, the six repair
+  classes, the traps that COMPILE (silent leaks, phantom binders,
+  implicit-resolution pickups), the rules that keep a sweep script
+  honest, and the one principle that decides what the script cannot.
+  Read before any sweep of this shape — the tree has now done three.
 - **[`xv6-bump-playbook.md`](xv6-bump-playbook.md)** — moving to a new upstream
   `XV6_REV`: the mechanical steps and their silent no-ops, how to CLASSIFY a
   change before touching a proof, the two relayout tools, the categories of

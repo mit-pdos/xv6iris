@@ -82,8 +82,6 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import SpecAcquire SpecRelease SpecAllocpid SpecKalloc SpecProcPagetable SpecMemset.
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
 Require Import SpecFreeproc.
 Require Import SpecProcinit.
 Require Import SpecAllocproc.
@@ -93,6 +91,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -346,21 +346,21 @@ Notation ap_x0 := (mword_of_int 0 : mword 5).
 (* [rget] is the plain map lookup at every register this function reads --
    none of them is tp.  Stated once per register, with the hart IMPLICIT, so a
    [rewrite] fires at whatever hart the leaf's [let]-bound value carries. *)
-Lemma ap_rg_ra `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_ra = MM !!! Regidx ap_ra.
+Lemma ap_rg_ra `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_ra = MM !!! Regidx ap_ra.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s0 = MM !!! Regidx ap_s0.
+Lemma ap_rg_s0 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_s0 = MM !!! Regidx ap_s0.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s1 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s1 = MM !!! Regidx ap_s1.
+Lemma ap_rg_s1 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_s1 = MM !!! Regidx ap_s1.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s2 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s2 = MM !!! Regidx ap_s2.
+Lemma ap_rg_s2 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_s2 = MM !!! Regidx ap_s2.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a0 = MM !!! Regidx ap_a0.
+Lemma ap_rg_a0 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_a0 = MM !!! Regidx ap_a0.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a4 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a4 = MM !!! Regidx ap_a4.
+Lemma ap_rg_a4 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_a4 = MM !!! Regidx ap_a4.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a5 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a5 = MM !!! Regidx ap_a5.
+Lemma ap_rg_a5 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_a5 = MM !!! Regidx ap_a5.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_x0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_x0 = MM !!! Regidx ap_x0.
+Lemma ap_rg_x0 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_x0 = MM !!! Regidx ap_x0.
 Proof. rgne. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -402,7 +402,7 @@ Proof. rgne. reflexivity. Qed.
    This is the arm-generic-helper convention: a helper that is generic in the
    arm but applied at a pinned arm from a reserved window takes the reserve as
    a parameter rather than deriving it (see claude-notes). *)
-Definition ap_tail `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
+Definition ap_tail `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{XI : CurCtx}
      (m : regfile) (spd pme ret_tgt : mword 64) (K : nat) : iProp Σ :=
   (∀ (rsv : nat) (xb : bool) (CIDt : CpuId) (Mt : regfile) (rv : mword 64),
      ⌜ Mt !!! Regidx csp_rs1 = spd /\
@@ -435,7 +435,7 @@ Section ProofAllocproc.
      variable of that name would be shadowed by them -- while the lemma's own
      anchor has to stay nameable from INSIDE those lambdas (that is what
      [wp_next (CID0 := CID0)] and [wp_next_chain] compose against). *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Lemma wp_allocproc_core
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
@@ -1862,13 +1862,12 @@ Section ProofAllocproc.
         (* memset's contract is context-indexed; this caller is not yet
            converted, so it mints a context for the call (SC-only move,
            becomes a compile error at cutover -- the leftover-work marker). *)
-        iMod (own_context_alloc) as (ξms) "Hctx".
-        iApply (MS.wp_memset_sconf (XI := ξms) KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
+        iApply (MS.wp_memset_sconf KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
                   ltac:(pose proof (ap_K2 K HK); lia) ltac:(vm_compute; reflexivity) HG4a1 HG4a2
-                  with "Hctx Hcg Htext Hpc [Hbw]").
+                  with "Hcg Htext Hpc [Hbw]").
         { iEval (rewrite HG4a0).
-          iApply (ctx_buf_of_mem KT0 ξms with "Hbw"). }
-        iApply wp_next_off_intro. iIntros (mms) "_ Hcg Hpc Hbw %Hcsms".
+          iApply (ctx_buf_of_mem KT0 cur_ctx with "Hbw"). }
+        iApply wp_next_off_intro. iIntros (mms) "Hcg Hpc Hbw %Hcsms".
         iDestruct (ctx_buf_to_mem with "Hbw") as "Hbw".
         iEval (rewrite HG4a0) in "Hbw".
         assert (Hp66 : ret_pc (G4 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x66))
@@ -2319,7 +2318,7 @@ Module AllocprocSeal (Core : ALLOCPROC_GEN) : ALLOCPROC.
 
 Section SealAllocproc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Lemma wp_allocproc_sconf
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)

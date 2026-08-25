@@ -53,6 +53,7 @@ Require Import RiscvExtras.
 Require Import SmodePte.
 From Kernel Require Import KernelInstrs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1059,7 +1060,7 @@ End ExecLoadGSwalk.
 (* ===================================================================== *)
 Section WpInstrSConfig.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ------------------------------------------------------------------- *)
@@ -1091,7 +1092,7 @@ End WpInstrSConfig.
 (* ===================================================================== *)
 Section SmodeGprClients.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* C.1 GENERIC S-mode RVC gpr-write engine (TLB-hit fetch): mirror of   *)

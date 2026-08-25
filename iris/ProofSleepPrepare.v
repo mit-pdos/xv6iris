@@ -51,6 +51,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSleepPrepare.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -68,7 +69,7 @@ Module SleepPrepareProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEAS
 
 Section ProofSleepPrepare.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation spr_ra := (mword_of_int 1 : mword 5).
   Notation spr_s0 := (mword_of_int 8 : mword 5).

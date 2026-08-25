@@ -39,6 +39,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame.
 Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Local Arguments Z.sub _ _ : simpl nomatch.
@@ -271,7 +272,7 @@ Qed.
 
 Section load.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_checked_mem_read_load8 (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)

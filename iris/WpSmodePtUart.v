@@ -23,6 +23,7 @@ Require Import WpUart WpSmodeUart.
 Require Import MemAccessGen.
 Require Import WpSmodeGpr.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -215,7 +216,7 @@ Import Defs.
 
 Section WpSmodePtUart.
 Context `{!riscvGS Σ, !xv6G Σ}.
-Context `{GEN : GenId} `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 Existing Instance riscv_memGS.
 
 

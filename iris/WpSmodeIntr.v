@@ -84,13 +84,14 @@ Require Import HartLift HartSpan HartMCycle HartStepAny WpSFrames HartSFrame SRe
 Require Import IntrDefs WpIntrInv.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section WpSmodeIntr.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
@@ -297,13 +298,13 @@ Section WpSmodeIntr.
     (* SIE = 0 IS READ OFF THE CAPABILITY'S OWN GHOST QUARTER, which is what
        the arm index [b = false] MEANS.  It is what makes the dispatch's
        [Some] arm refutable below, so the whole trap payload is [False]. *)
-    iDestruct "Hrest" as "(Hstk & Harm & #Htc & #Hwit)".
+    iDestruct "Hrest" as "(Hstk & Harm & Hctx & #Htc & #Hwit)".
     iEval (rewrite /sie_arm) in "Harm".
     iDestruct (ghost_var_agree with "Hhalf Harm") as %HSIE0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE mst0) ('b"1") = false)
       by (rewrite HSIE0; vm_compute; reflexivity).
-    iAssert (sie_cap_rest kt m n false p) with "[Hstk Harm]" as "Hrest".
-    { rewrite /sie_cap_rest /sie_arm. iFrame "Hstk Harm Htc Hwit". }
+    iAssert (sie_cap_rest kt m n false p) with "[Hstk Harm Hctx]" as "Hrest".
+    { rewrite /sie_cap_rest /sie_arm. iFrame "Hstk Harm Hctx Htc Hwit". }
     iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
     iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".

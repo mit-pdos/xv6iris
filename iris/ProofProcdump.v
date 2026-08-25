@@ -42,6 +42,7 @@ Require Import ProofProcdumpParts.
 Require Import ProofProcdumpLoop.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -58,7 +59,7 @@ Proof. unfold NPROC. lia. Qed.
 Module ProcdumpProof : PROCDUMP.
 Section ProofProcdumpMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
@@ -116,7 +117,7 @@ Section ProofProcdumpMain.
     iPoseProof (pd_nl_str with "Hkdata") as "Hnlstr".
     iDestruct (cpu_own_transport CID CID2 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Hpk CID2 M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
+    iApply (Hpk CID2 cur_ctx M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
               (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)

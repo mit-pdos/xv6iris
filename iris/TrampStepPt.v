@@ -60,6 +60,7 @@ Require Import WpInstrRun.
 Require Import WpSmodePtFetch.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -258,7 +259,7 @@ Qed.
 
 Section SRsPFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [SmodeCorePt.spt_frames_close] at [cur_privilege := p] *)
   Lemma spt_frames_close_p (dq : dfrac) (p : Privilege)
@@ -382,7 +383,7 @@ Qed.
 
 Section TrampFetchPt.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition tramp_tr_obl (Df : register -> dfrac)
       (pc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)

@@ -87,6 +87,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -345,7 +346,7 @@ Qed.
 Section PrLeaves.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* copyin/copyout's one-byte buffer, in and out of the [seq 0 1] big-sep *)
   Lemma pr_buf1_intro (a : mword 64) (b : bv 8) :
@@ -383,7 +384,7 @@ Module PipereadProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN)
 
 Section ProofPiperead.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* register disequality guard (perf rule): [unify] settles convertibility
      cheaply, so [discriminate] only ever runs on a genuine miss. *)

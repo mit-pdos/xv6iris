@@ -89,6 +89,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -294,7 +295,7 @@ Section NameiInitPinnedBody.
     [hops := init_hops], which is [SpecNameiTr.wp_namei_tr_body]'s ambient
     environment verbatim: this is a corollary, not a new walk.            *)
 
-  Theorem wp_namei_init_pinned `{GEN : GenId} `{CID : CpuId}
+  Theorem wp_namei_init_pinned `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)

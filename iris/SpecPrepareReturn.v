@@ -118,6 +118,7 @@ Require Import WpGprCsrwA.   (* [mepc_val]: the sepc write legalizes *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -152,7 +153,7 @@ Definition prepare_return_tf (ws : list (mword 64))
    at the root the satp value decodes to, at the hart whose id was written.
    The one fact the residue ([UsertrapRes.ut_tfk]) is sealed with, so it is
    proved once here, beside the function that writes the words. *)
-Lemma prepare_return_tf_kernel_words_ok `{CID : CpuId}
+Lemma prepare_return_tf_kernel_words_ok `{CID : CpuId} `{XI : CurCtx}
     (ws : list (mword 64)) (ksat ksp : mword 64) (root : mword 44) :
   length ws = TFWORDS ->
   _get_Satp64_Mode (Mk_Satp64 ksat) = ('b"1000" : mword 4) ->
@@ -180,7 +181,7 @@ Proof.
 Qed.
 
 Definition wp_prepare_return_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (av : nat) (p : mword 64)
     (epc : mword 64) (b : bool) (lks : gset string) :=
@@ -269,7 +270,7 @@ Definition wp_prepare_return_sconf_body
 
 Module Type PREPARE_RETURN.
   Parameter wp_prepare_return_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
       (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string),

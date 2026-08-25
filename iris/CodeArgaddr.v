@@ -25,13 +25,14 @@ Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeArgaddr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- argaddr @ KernelSyms.argaddr, 28 bytes ---- *)
 

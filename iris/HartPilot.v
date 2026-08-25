@@ -30,6 +30,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec HartSwp
         HartLift HartEvents.
 Require Import ColdBoot.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -308,7 +309,7 @@ Proof. vm_cast_no_check (eq_refl 0%nat). Qed.
 
 Section pilot.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* 6a. The generic rule: silent stretch, RAM fetch-read pinned by      *)

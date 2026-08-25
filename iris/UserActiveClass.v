@@ -37,6 +37,7 @@ Require Import RiscvTryStep RiscvFetchExec.
 Require Import HartRunGen HartMemAsm PtWalkCert.
 Require Import UserFetch WpDecodeBridge DecodeTotalU UserTotalU.
 From iris.base_logic.lib Require Import ghost_map.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -245,7 +246,7 @@ Local Ltac u_in_ro := apply (bool_decide_unpack _); vm_compute; reflexivity.
 
 Section UserActiveClass.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
 

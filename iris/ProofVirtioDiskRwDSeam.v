@@ -68,6 +68,7 @@ Local Open Scope Z_scope.
 Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import ProofVirtioDiskRwD.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Module VirtioDiskRwRestD (Acquire : ACQUIRE) (Release : RELEASE)
                          (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
@@ -76,7 +77,7 @@ Module P3 := VirtioDiskRwRestC Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwDSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Ra0 := (mword_of_int 10 : mword 5).

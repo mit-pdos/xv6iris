@@ -82,6 +82,7 @@ Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecSleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -138,7 +139,7 @@ Section SleepJoin.
      a lemma sharing an enclosing section's [Context CID] would silently pin
      to the entry hart (porting guide, "a helper lemma sharing the enclosing
      Section's Context"). *)
-  Lemma sleep_join `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sleep_join `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m mj : regfile) (av : nat) (eb : bool)
@@ -493,7 +494,7 @@ End SleepJoin.
 
 Section ProofSleepBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_sleep_sconf
       (γs : list gname) (j : nat) (γl : gname)

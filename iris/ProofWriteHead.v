@@ -93,6 +93,7 @@ Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -464,7 +465,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the continuation, the frame and the register threading            *)
   (* ---------------------------------------------------------------- *)
-  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
@@ -519,7 +520,7 @@ Section WriteHeadBlocks.
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
   (*  Entered from the loop's exit AND from the [blez] shortcut (n = 0). *)
   (* ================================================================== *)
-  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1025,7 +1026,7 @@ Section WriteHeadBlocks.
   (*  A fuel induction on the entries still to copy; the exit test is a  *)
   (*  POINTER compare read back as an index compare.                    *)
   (* ================================================================== *)
-  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1322,7 +1323,7 @@ End WriteHeadBlocks.
 
 Section ProofWriteHead.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_write_head_sconf 
       (γs : list gname) (j : nat) (γl : gname)

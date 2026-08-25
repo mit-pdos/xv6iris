@@ -62,6 +62,7 @@ Require Import SpecIsmapped.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -80,7 +81,7 @@ Section IsmappedEpi.
     [ | let H1 := fresh in let H2 := fresh in
         intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
-  Lemma ismapped_epi `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
+  Lemma ismapped_epi `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (vpn : mword 27) (K : nat) (HK2 : (2 <= K)%nat) (dq : dfrac) (b : bool) (p : mword 64) (ret_tgt : mword 64)
       (Hrt_def : ret_tgt = ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)))
       (spr sp0 : mword 64)
@@ -234,7 +235,7 @@ End IsmappedEpi.
 
 Section ProofIsmapped.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac rgne :=
     rewrite rget_ne;

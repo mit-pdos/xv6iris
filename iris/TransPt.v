@@ -30,6 +30,7 @@ Require Import RiscvExtras.
 Require Import SmodePte.
 Require Import KMap MinstretInv KptGhost KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -436,7 +437,7 @@ End Pt2Translate.
 
 Section Pt2Inv.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [pmp_config]'s content is root-independent (the root is a phantom
      index); re-index it across the switch by conversion *)
@@ -560,7 +561,7 @@ End Pt2Inv.
 
 Section Pt2InvKcur.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition tlb_inv_pt2_kcur (rc : mword 44) (Sp : ptree -> Prop) : iProp Σ :=
     (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp tc0 : ptree),
@@ -670,7 +671,7 @@ End Pt2InvKcur.
 
 Section Pt2InvKprev.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition tlb_inv_pt2_kprev (rc kroot : mword 44) (Sc : ptree -> Prop) : iProp Σ :=
     (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp0 tc : ptree),
@@ -776,7 +777,7 @@ End Pt2InvKprev.
 
 Section Pt2TranslateIris.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_inv_pt2_translateAddr (rc : mword 44) (Sp Sc : ptree -> Prop)
@@ -1006,7 +1007,7 @@ End Pt2TranslateIris.
 
 Section Pt2TrampInst.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the spec-side premises the trampoline instantiation needs: a
      trampoline clause + an A/D write-back closure, per side *)
@@ -1110,7 +1111,7 @@ End Pt2TrampInst.
    once [Sc] is gone. *)
 Section Pt2TrampInstKcur.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma pt2_tramp_fetch_habs_kcur (rc : mword 44) (Sp : ptree -> Prop) :
     pt2_tramp_spec Sp ->
@@ -1390,7 +1391,7 @@ End Pt2TrampInstKcur.
    independent quantities, unlike [_kcur] where both coincided. *)
 Section Pt2TrampInstKprev.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma pt2_tramp_fetch_habs_kprev (rc kroot : mword 44) (Sc : ptree -> Prop) :
     pt2_tramp_spec Sc ->

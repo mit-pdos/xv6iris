@@ -25,7 +25,7 @@
 
    EXPLICIT-CPUID: the whole function threads a generic [b : bool].
    [mcp_tail] is a non-recursive fragment of the whole-function contract, so
-   it takes its own leading (shadowing) hart [`{CID0 : CpuId}`] and its
+   it takes its own leading (shadowing) hart [`{CID0 : CpuId} `{XI : CurCtx}`] and its
    continuation is [wp_next]-wrapped; the caller peels a fresh [(CIDk, Hsk)]
    off its result exactly as for a leaf application. *)
 From Stdlib Require Import ZArith Lia List.
@@ -49,6 +49,7 @@ Require Import SpecMemcpy.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -61,7 +62,7 @@ Module MemcpyProof (MM : MEMMOVE) : MEMCPY.
 
 Section ProofMemcpy.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* the source's and the destination's own tiers -- see SpecMemmove.v's note *)

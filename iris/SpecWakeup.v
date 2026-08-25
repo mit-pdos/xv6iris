@@ -24,6 +24,7 @@ Require Import SchedCtx.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* THE SCAN NO LONGER SKIPS THE RUNNING PROCESS.  xv6's wakeup used to guard
    the whole body with [if (p != myproc())]; it now acquires every slot's
@@ -39,7 +40,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    mirror, and the running thread's own half stays where it is; the write
    arm is licensed by the state READ being SLEEPING, which is unclaimed, so
    the proof never has to know which slot is the caller's. *)
-Definition wp_wakeup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_wakeup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -68,7 +69,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG 
 
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
       wp_wakeup_sconf_body m γs pme lvl K eb b lks.
 End WAKEUP.

@@ -37,6 +37,7 @@ Require Import SRegime SmodeCorePt.
 Require Import KptPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -87,7 +88,7 @@ Qed.
 
 Section SPtFetch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma spt_fetch_tr_of_regime (R : s_regime) (dq : dfrac)
       (pc mst0 satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
@@ -246,7 +247,7 @@ Qed.
 
 Section SPtData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE TIER SPLIT, [SRegime.sr_absorb_ktier]'s at the swp layer.  At KT0 the
      datum's own pin IS the identity claim, [sr_adm_of_pin] takes it and the
@@ -575,7 +576,7 @@ End SPtData.
 (* ===================================================================== *)
 Section SPtFolded.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- THE CLOSER, AS A RIDER ----------------------------------------
      The slot is opened at the TOP (the fetch's frame needs its cells),

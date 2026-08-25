@@ -55,6 +55,7 @@ Require Import SmodeCorePt TrampStepPt.
 Require Import UptWalkPt Pt2Walk TransPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -139,7 +140,7 @@ Qed.
 (* ===================================================================== *)
 Section Pt2OwnedWalk.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_translate_pt_slot (acc : MemoryAccessType mem_payload)
       (Drw Dro : gset register) (Df : register -> dfrac) (rs : regstate)
@@ -786,7 +787,7 @@ Definition kpt_slot_land (t0 : ptree) (rs : regstate)
 
 Section Pt2SharedWalk.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_translate_kpt_slot
       (acc : MemoryAccessType mem_payload)
@@ -1419,7 +1420,7 @@ End Pt2SharedWalk.
 
 Section Pt2Window.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- uservec's window: the SHARED kernel table is CURRENT ---------- *)
 
@@ -1980,7 +1981,7 @@ End Pt2Window.
 
 Section Pt2Tramp.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac tlbpeel :=
     rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
@@ -2320,7 +2321,7 @@ End Pt2Tramp.
 
 Section Pt2Engine.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_instr_pt2_tramp_kcur (rc : mword 44) (Sp : ptree -> Prop)
       (pc pa : mword 64) (is_rvc : bool) (i : instruction)

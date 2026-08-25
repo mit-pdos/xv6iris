@@ -74,13 +74,14 @@ Require Import SpecFiledup.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Module FiledupProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEDUP.
 
 Section ProofFiledup.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra  := (mword_of_int 1 : mword 5).

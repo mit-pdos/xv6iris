@@ -71,6 +71,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -269,7 +270,7 @@ Section CwBodies.
 
   (* ---- the function's own exit, as a [wp_next] at the entry hart ---- *)
 
-  Definition cw_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Definition cw_ret `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        ∀ (mf : regfile) (r : Z) (P' : uptd),
@@ -285,7 +286,7 @@ Section CwBodies.
 
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
      extension and the record compose, so the exit weakens along the loop. *)
-  Lemma cw_ret_weaken `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Lemma cw_ret_weaken `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (V : pprivate) (P1 : uptd) (n : Z) (lks : gset string) :
     uptd_ext (pv_upt V) P1 ->
     cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
@@ -305,7 +306,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x96 .. +0xa0 -- THE EPILOGUE.  All three exits reach it.          *)
   (* =================================================================== *)
-  Lemma cw_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma cw_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -499,7 +500,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x6c .. +0x7e -- THE LOOP EXIT: i = n, restore s2..s10 and jump    *)
   (* =================================================================== *)
-  Lemma cw_exit_done `{CID : CpuId} (CID0 : CPU)
+  Lemma cw_exit_done `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -722,7 +723,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x84 .. +0x94 -- THE COPY-FAILED EXIT: restore s2..s10, fall through *)
   (* =================================================================== *)
-  Lemma cw_exit_break `{CID : CpuId} (CID0 : CPU)
+  Lemma cw_exit_break `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -938,7 +939,7 @@ Section CwBodies.
   (*  bound on it will do.  The base case is vacuous -- the head is only   *)
   (*  ever entered with [i < n].                                          *)
   (* =================================================================== *)
-  Lemma cw_loop (mrem : nat) (CID0 : CPU)
+  Lemma cw_loop (mrem : nat) `{XI : CurCtx} (CID0 : CPU)
       (γa γf : gname) (γs : list gname) (jp : nat) (γlp γl : gname)
       (γu : uart_names) (γv : disk_names)
       (m0 : regfile) (av : nat) (eb : bool)
@@ -1525,7 +1526,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x00 .. +0x36 -- the prologue, the [n <= 0] exit, and the setup.   *)
   (* =================================================================== *)
-  Lemma wp_consolewrite_sconf `{CID : CpuId}
+  Lemma wp_consolewrite_sconf `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)
