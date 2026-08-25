@@ -572,7 +572,26 @@ Inductive ic_dep : Type :=
   | DepNone
   | DepRef (q : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
   | DepShr (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
-  | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32).
+  | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32)
+  (* THE WRITE ARM (durable-fs-plan.md section 3, [ilock]; durable-disk
+     B''-arm).  [DepShr] plus the transaction whose write lock this is:
+     while an inode is checked out FOR WRITING the escrow's OUT arm parks a
+     SHARE [q] of transaction [t]'s [LogDefs.ln_tx] element, so [end_op] --
+     which consumes the whole element -- cannot run, and the commit's
+     collection at quiescence can refute the arm outright against an EMPTY
+     [ln_tx] authority ([IcacheEscrow.ic_out_no_write_arm]).
+
+     [(t, q)] ARE FIELDS, not existentials, and that is the whole mechanism:
+     [IcacheEscrow.ic_deposit] is a [ghost_var] whose other half the holder
+     carries, so the descriptor PINS the arm's transaction and share to the
+     holder's, and [IcacheEscrow.ic_disarm_tx] hands back exactly what
+     [ic_arm_tx] parked.  An existentially-keyed share cannot re-identify --
+     [IcacheTxRefute.tx_two_halves_no_whole] is the refutation.
+
+     LAST, so the ~66 [DepShr] sites in 23 files and every
+     [destruct d as [| .. | .. | ..]] keep their shape. *)
+  | DepTx (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+          (t : nat) (q : Qp).
 
 (* THE LOCKED REGISTRY'S ENTRY (durable-disk lane A, re-keyed by B''-arm):
    one ARM.  [(t, q, S)] -- the transaction whose row is suspended, the

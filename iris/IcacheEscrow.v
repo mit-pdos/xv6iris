@@ -1302,6 +1302,16 @@ Section IcacheEscrow.
     (* the FROZEN window (IVd) holds no ordinary deposit at all -- see
        [ic_out_frz], which is what its arm holds instead *)
     | DepFrz _ _ _ => False%I
+    (* THE WRITE ARM (durable-fs-plan.md section 3): [DepShr]'s content
+       plus the PARKED TRANSACTION SHARE.  That share is the whole point --
+       [end_op] consumes the WHOLE [ln_tx] element, so it cannot run while
+       any inode of the transaction is checked out for writing, and at a
+       commit (where the authority is empty) this arm is refuted outright
+       ([ic_dep_own_tx_no_ops]).  The descriptor names [(t, q)], so
+       [ic_disarm_tx] gives back exactly what [ic_arm_tx] took. *)
+    | DepTx s dv nu g t q =>
+        (⌜dv = dev /\ nu = inum⌝ ∗ inode_shr_gen_bare k s dev inum g ∗
+         t ↪[ln_tx icfg_log]{#q} tt)%I
     end.
 
   (* ...and the ARM's OWN 1/2, which the checkout takes out of PARKED and the
@@ -1313,6 +1323,7 @@ Section IcacheEscrow.
     | DepRef _ _ _ g => live_gen k (1/2) g
     | DepShr _ _ _ g => live_gen k (1/2) g
     | DepFrz _ _ _ => False%I
+    | DepTx _ _ _ g _ _ => live_gen k (1/2) g
     end.
 
   Definition ic_dep_res (k : nat) (d : ic_dep) (dev inum : mword 32) : iProp Σ :=
@@ -1338,8 +1349,8 @@ Section IcacheEscrow.
     ∃ g : gname, ⌜ic_dep_gname d = Some g⌝ ∗ live_gen k (1/2) g.
   Proof.
     rewrite /ic_dep_half /ic_dep_gname.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu];
-      [iIntros "[]" | | | iIntros "[]"];
+    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q];
+      [iIntros "[]" | | | iIntros "[]" |];
       iIntros "H"; iExists g; by iFrame.
   Qed.
 
@@ -1354,14 +1365,17 @@ Section IcacheEscrow.
       (inode_ident k (DfracOwn f) dev inum -∗ ic_dep_own k d dev inum).
   Proof.
     rewrite /ic_dep_own.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu];
-      [iIntros "[]" | | | iIntros "[]"].
+    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q];
+      [iIntros "[]" | | | iIntros "[]" |].
     - iIntros "[%Heq (Hfr & Hlv & Hid)]". iExists q. iFrame "Hid".
       iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_ref_gen. iFrame.
     - iIntros "[%Heq [Hid Hlv]]". iExists s. iFrame "Hid".
       iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
+    - iIntros "[%Heq [[Hid Hlv] Htx]]". iExists s. iFrame "Hid".
+      iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
+      rewrite /inode_shr_gen_bare. iFrame.
   Qed.
 
   Lemma ic_dep_res_ident k d dev inum :
@@ -1386,8 +1400,8 @@ Section IcacheEscrow.
     ∃ s : Qp, live_frac k s ∗ (live_frac k s -∗ ic_dep_res k d dev inum).
   Proof.
     rewrite /ic_dep_res /ic_dep_half /live_frac.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu];
-      [iIntros "[[] _]" | | | iIntros "[[] _]"].
+    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q];
+      [iIntros "[[] _]" | | | iIntros "[[] _]" |].
     - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
       iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
       iIntros "[%g2 Hhalf]".
@@ -1402,6 +1416,13 @@ Section IcacheEscrow.
       iDestruct (live_gen_agree with "Hlv Hhalf") as %<-.
       iFrame "Hhalf". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
+    - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
+      iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
+      iIntros "[%g2 Hhalf]".
+      iDestruct "Hown" as "[%Heq [[Hid Hlv] Htx]]".
+      iDestruct (live_gen_agree with "Hlv Hhalf") as %<-.
+      iFrame "Hhalf". iSplitR; [iPureIntro; exact Heq |].
+      rewrite /inode_shr_gen_bare. iFrame.
   Qed.
 
   (* the depositor's OWN slice, named -- what the checkout agrees against *)
@@ -1411,22 +1432,26 @@ Section IcacheEscrow.
       (live_gen k s g -∗ ic_dep_own k d dev inum).
   Proof.
     rewrite /ic_dep_own /ic_dep_gname.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu];
-      [iIntros "[]" | | | iIntros "[]"].
+    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q];
+      [iIntros "[]" | | | iIntros "[]" |].
     - iIntros "[%Heq (Hfr & Hlv & Hid)]". iExists q, g. iSplitR; [done |].
       iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_ref_gen. iFrame.
     - iIntros "[%Heq [Hid Hlv]]". iExists s, g. iSplitR; [done |].
       iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
+    - iIntros "[%Heq [[Hid Hlv] Htx]]". iExists s, g. iSplitR; [done |].
+      iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
+      rewrite /inode_shr_gen_bare. iFrame.
   Qed.
 
   Lemma ic_dep_half_intro k d g :
     ic_dep_gname d = Some g -> live_gen k (1/2) g -∗ ic_dep_half k d.
   Proof.
     rewrite /ic_dep_gname /ic_dep_half.
-    destruct d as [| q dv nu g2 | s dv nu g2 | qf dv nu]; intros H;
-      [discriminate | | | discriminate];
+    destruct d as [| q dv nu g2 | s dv nu g2 | qf dv nu | s dv nu g2 t q];
+      intros H;
+      [discriminate | | | discriminate |];
       injection H as <-; iIntros "$".
   Qed.
 
@@ -2235,8 +2260,8 @@ Section IcacheEscrow.
           rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
           iExFalso. iPureIntro. cbn in Hn. lia. }
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu];
-        [| | | iDestruct "Hres" as "[[] _]"].
+      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu | s dv nu gd tx0 qx0];
+        [| | | iDestruct "Hres" as "[[] _]" |].
       + iDestruct "Hres" as "[[] _]".
       + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
         (* the arm's reference has no sleeplock slice of its own (the lock
@@ -2255,6 +2280,17 @@ Section IcacheEscrow.
            [1/2 - qt], the ARM's own 1/2 and the share's [s] sum past one.
            The 1/2 is what §17.2's placement lost and what puts this back. *)
         iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
+        iDestruct "Htok" as "(_ & Hlv & _)".
+        iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
+          [iExists gd; iExact "Hhf" |].
+        iAssert (live_frac k s) with "[Hlvs]" as "Hfs";
+          [iExists gd; iExact "Hlvs" |].
+        iMod (live_whole_share_absurd Eo M k q s 1%positive HE HMk
+                with "Hinv Hhalf Hlv Hfh Hfs") as "[]".
+      + (* THE WRITE ARM: [DepShr]'s refutation verbatim -- the parked
+           transaction share is extra content the live-mass argument does
+           not touch (durable-disk B''-arm). *)
+        iDestruct "Hres" as "[[_ [[_ Hlvs] _]] Hhf]".
         iDestruct "Htok" as "(_ & Hlv & _)".
         iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
           [iExists gd; iExact "Hhf" |].
@@ -2335,8 +2371,8 @@ Section IcacheEscrow.
           rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
           iExFalso. iPureIntro. cbn in Hn. lia. }
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu];
-        [| | | iDestruct "Hres" as "[[] _]"].
+      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu | s dv nu gd tx0 qx0];
+        [| | | iDestruct "Hres" as "[[] _]" |].
       + iDestruct "Hres" as "[[] _]".
       + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
         (* the arm's reference has no sleeplock slice of its own (the lock
@@ -2354,6 +2390,11 @@ Section IcacheEscrow.
            [1/2 - qt], the ARM's own 1/2 and the share's [s] sum past one.
            The 1/2 is what §17.2's placement lost and what puts this back. *)
         iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
+        iAssert (live_frac k s) with "[Hlvs]" as "Hfs";
+          [iExists gd; iExact "Hlvs" |].
+        iMod (frz_slot_kill Eo k ((1/2)/2)%Qp s HE Hk with "Hinv Hsel Hfs") as "[]".
+      + (* THE WRITE ARM: [DepShr]'s refutation verbatim (B''-arm). *)
+        iDestruct "Hres" as "[[_ [[_ Hlvs] _]] Hhf]".
         iAssert (live_frac k s) with "[Hlvs]" as "Hfs";
           [iExists gd; iExact "Hlvs" |].
         iMod (frz_slot_kill Eo k ((1/2)/2)%Qp s HE Hk with "Hinv Hsel Hfs") as "[]".
@@ -3052,6 +3093,199 @@ Section IcacheEscrow.
     iFrame "Hfr Hid Hrc Hsel".
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  4c.  THE WRITE ARM (durable-fs-plan.md section 3, [ilock];          *)
+  (*       durable-disk B''-arm)                                          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHAT IT IS FOR, in one sentence: [end_op] consumes the WHOLE [ln_tx]
+     element of its transaction, so a transaction that has parked a SHARE of
+     that element in an escrow cannot commit while the inode is checked out
+     for writing -- and at a commit, where the [ln_tx] authority is empty,
+     no escrow can be in this arm at all ([ic_out_no_write_arm]), which is
+     half of what the collection at quiescence reads (the other half is
+     [InodeRegion.ireg_clean_acc], the armed registry's).
+
+     WHY IT IS ITS OWN GHOST STEP AND NOT PART OF [ilock].  Both shapes give
+     the same guarantee, and the design of record puts the park at the lock;
+     what decides it is the ABI.  Bolting the share onto
+     [SpecIlock.wp_ilock_sconf_body] moves that contract's arity -- twenty
+     caller files -- and [SpecIunlock]'s with it, for a mechanism whose
+     value is only cashed once every transactional caller actually arms.  As
+     TWO GHOST STEPS on the deposit a walk already holds, it costs the
+     contracts NOTHING (no caller of ilock or iunlock moves at all) and each
+     walk converts independently: [ic_arm_tx] straight after its [ilock],
+     [ic_disarm_tx] straight before its [iunlock].  A walk that ilocks
+     inside a transaction only to READ (namex's lookups) need not arm, which
+     the coupled form could not express either.
+
+     THE DESCRIPTOR IS WHAT MAKES IT UNDOABLE.  [ic_deposit] is a
+     [ghost_var] whose other half the holder carries, so [DepTx]'s [(t, q)]
+     fields pin the arm's transaction and share to the holder's and
+     [ic_disarm_tx] returns EXACTLY what [ic_arm_tx] parked --
+     [IcacheTxRefute.tx_two_halves_no_whole] is why an existentially-keyed
+     share could not. *)
+
+  (* the arm, on the body: the OUT arm's descriptor moves from [DepShr] to
+     [DepTx] and the transaction share goes in beside the credential.  The
+     full valid cell is what selects OUT, exactly as in [ic_open_out]; a
+     holder between [ilock] and [iunlock] has it. *)
+  Lemma ic_arm_tx_body cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q : Qp) :
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepShr s dev inum g) -∗
+    t ↪[ln_tx icfg_log]{#q} tt ==∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepTx s dev inum g t q) ∗
+      ic_escrow_body cn γfs γi cov logstart k.
+  Proof.
+    iIntros "Hbody Hvld Hdep0 Htx".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & Hmt & Hgid)".
+      iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
+      iDestruct "Hres" as "[Hres | Hfrz]".
+      2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iDestruct "Hres" as "[[%Heq Hshr] Hhf]".
+      iMod (ghost_var_update_2 (DepTx s dev inum g t q) with "Hdep0 Hdep")
+        as "[Hdep0 Hdep]"; [rewrite Qp.half_half; reflexivity |].
+      iModIntro. iFrame "Hvld Hdep0".
+      iRight; iLeft. rewrite /ic_out.
+      iExists (DepTx s dev inum g t q), dev2, inum2.
+      iFrame "Hdep Hmt Hgid". iLeft.
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iFrame "Hhf". iSplitR; [iPureIntro; exact Heq |]. iFrame "Hshr Htx".
+    - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+  Qed.
+
+  (* ...and the DISARM, which is the same step backwards: the share comes
+     home at exactly the [(t, q)] the descriptor recorded. *)
+  Lemma ic_disarm_tx_body cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q : Qp) :
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepTx s dev inum g t q) ==∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepShr s dev inum g) ∗
+      t ↪[ln_tx icfg_log]{#q} tt ∗
+      ic_escrow_body cn γfs γi cov logstart k.
+  Proof.
+    iIntros "Hbody Hvld Hdep0".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & Hmt & Hgid)".
+      iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
+      iDestruct "Hres" as "[Hres | Hfrz]".
+      2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iDestruct "Hres" as "[[%Heq [Hshr Htx]] Hhf]".
+      iMod (ghost_var_update_2 (DepShr s dev inum g) with "Hdep0 Hdep")
+        as "[Hdep0 Hdep]"; [rewrite Qp.half_half; reflexivity |].
+      iModIntro. iFrame "Hvld Hdep0 Htx".
+      iRight; iLeft. rewrite /ic_out.
+      iExists (DepShr s dev inum g), dev2, inum2.
+      iFrame "Hdep Hmt Hgid". iLeft.
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iFrame "Hhf". iSplitR; [iPureIntro; exact Heq |]. iFrame "Hshr".
+    - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+  Qed.
+
+  (* the two as a walk meets them: one ghost step each, at the slot's own
+     namespace, opening nothing else. *)
+  Lemma ic_arm_tx (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q : Qp) :
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepShr s dev inum g) -∗
+    t ↪[ln_tx icfg_log]{#q} tt ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepTx s dev inum g t q).
+  Proof.
+    iIntros (HE) "#Hesc Hvld Hdep Htx".
+    iMod (inv_acc E (icEscN .@ k) with "Hesc") as "[Hbody Hclose]";
+      [exact HE |].
+    iDestruct "Hbody" as ">Hbody".
+    iMod (ic_arm_tx_body with "Hbody Hvld Hdep Htx")
+      as "(Hvld & Hdep & Hbody)".
+    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iModIntro. iFrame "Hvld Hdep".
+  Qed.
+
+  Lemma ic_disarm_tx (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q : Qp) :
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepTx s dev inum g t q) ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepShr s dev inum g) ∗
+      t ↪[ln_tx icfg_log]{#q} tt.
+  Proof.
+    iIntros (HE) "#Hesc Hvld Hdep".
+    iMod (inv_acc E (icEscN .@ k) with "Hesc") as "[Hbody Hclose]";
+      [exact HE |].
+    iDestruct "Hbody" as ">Hbody".
+    iMod (ic_disarm_tx_body with "Hbody Hvld Hdep")
+      as "(Hvld & Hdep & Htx & Hbody)".
+    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iModIntro. iFrame "Hvld Hdep Htx".
+  Qed.
+
+  (* ---- THE COMMIT'S READING OF THE WRITE ARM ------------------------
+
+     The core fact: a write arm holds a POSITIVE share of some transaction's
+     [ln_tx] element, and at a commit the WAL's authority for that map is
+     EMPTY ([LogInv.log_tx_empty_of_ops] reads it off the ledger), so no
+     escrow can be write-armed.  This is the escrow-side twin of
+     [InodeRegion.ireg_clean_acc]; together they are "no inode is
+     write-locked and no inum is armed", durable-fs-plan.md section 4's
+     first bullet. *)
+  Lemma ic_dep_own_tx_no_ops k (s : Qp) (dv nu : mword 32) (g : gname)
+      (t : nat) (q : Qp) (dev inum : mword 32) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ic_dep_own k (DepTx s dv nu g t q) dev inum -∗ False.
+  Proof.
+    iIntros "Ha Hown". rewrite /ic_dep_own.
+    iDestruct "Hown" as "[_ [_ Htx]]".
+    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
+    rewrite lookup_empty in Hbad. discriminate.
+  Qed.
+
+  (* ...as the collection meets it: the OUT arm beside a write-armed
+     deposit is refuted outright at an empty authority. *)
+  Lemma ic_out_no_write_arm cn k (s : Qp) (dev inum : mword 32) (g : gname)
+      (t : nat) (q : Qp) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ic_out cn k -∗ ic_deposit cn k (DepTx s dev inum g t q) -∗ False.
+  Proof.
+    iIntros "Ha Hout Hdep0".
+    iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & _ & _)".
+    iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
+    iDestruct "Hres" as "[Hres | Hfrz]".
+    2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
+    rewrite /ic_dep_res. iDestruct "Hres" as "[Hown _]".
+    iApply (ic_dep_own_tx_no_ops with "Ha Hown").
+  Qed.
+
   (* full ownership of a word is EXCLUSIVE -- [FileOff.word4_pointsto_excl]
      restated, because this file must not depend on the file layer *)
   Local Lemma iesc_word4_excl (a : Arch.pa) (dq : dfrac) (w1 w2 : bv 32) :
@@ -3256,8 +3490,8 @@ Section IcacheEscrow.
           rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
           iExFalso. iPureIntro. cbn in Hn. lia. }
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu];
-        [| | | iDestruct "Hres" as "[[] _]"].
+      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu | s dv nu gd tx0 qx0];
+        [| | | iDestruct "Hres" as "[[] _]" |].
       + iDestruct "Hres" as "[[] _]".
       + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
         (* the arm's reference has no sleeplock slice of its own (the lock
@@ -3271,6 +3505,14 @@ Section IcacheEscrow.
         rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
         iExFalso. iPureIntro. cbn in Hn. lia.
       + iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
+        iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
+          [iExists gd; iExact "Hhf" |].
+        iAssert (live_frac k s) with "[Hlvs]" as "Hfs";
+          [iExists gd; iExact "Hlvs" |].
+        iMod (live_whole_share_absurd Eo M k q s 1%positive HE HMk
+                with "Hinv Hhalf Hlvq Hfh Hfs") as "[]".
+      + (* THE WRITE ARM: [DepShr]'s refutation verbatim (B''-arm). *)
+        iDestruct "Hres" as "[[_ [[_ Hlvs] _]] Hhf]".
         iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
           [iExists gd; iExact "Hhf" |].
         iAssert (live_frac k s) with "[Hlvs]" as "Hfs";

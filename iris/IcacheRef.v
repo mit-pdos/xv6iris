@@ -720,6 +720,9 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
   | DepRef _ _ _ g => Some g
   | DepShr _ _ _ g => Some g
   | DepFrz _ _ _ => None
+  (* the write arm is a [DepShr] carrying a parked transaction share, so it
+     names the same generation (durable-disk B''-arm) *)
+  | DepTx _ _ _ g _ _ => Some g
   end.
 
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
