@@ -233,13 +233,11 @@ disturb it and why it is not carried through one.  `snap_bytes` is a
 * `sk_sbok` / `sk_reg` / `sk_slot` — the three CUT clauses a LINEAR ledger needs on top of the coupling: the superblock's own geometry (`FsImg.fs_sb_ok`), "every named inum sits in the region", and `FsImg.fs_slot_inj` ("one node never names one block twice").
 
 `sk_meta_used`/`sk_own_used`/`sk_disj` are THE ONE SANCTIONED whole-state
-pure clause (plan §4): read off the `∗` at a commit, off the snapshot at
-boot, never maintained.  What they buy is `snap_bytes_frame` with
-`snap_untouched_of_own`/`snap_untouched_of_free` — the frame's hypothesis
-quantifies over every inode of `S`, and the coupling turns it into a fact
-ONE writer holds about ONE object (the block is its own node's, or its bit
-read CLEAR), so no writer ever meets the quantifier.  The encoder
-injectivity the readings rest on is `dinode_bytes_inj`, `rec_in_blk_inj`,
+pure clause (plan §4): read off the `∗` at a commit (two full elements, or
+a full and a ¾, or two ¾, at one address are invalid), off the snapshot at
+boot, never maintained by any writer — `iris/FsDurTrunc.v` is the
+refutation of maintaining them per write.  The encoder injectivity the
+readings rest on is `dinode_bytes_inj`, `rec_in_blk_inj`,
 `snap_bytes_node_inj`.
 
 **ERA 0 COMES FROM THE IMAGE.**  `FsDurImg.img_snap_ok`:
