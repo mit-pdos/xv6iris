@@ -865,7 +865,7 @@ Lemma ireg_frzm_ok_false (f : frzUR) :
   frz_preb f = false -> ireg_frzm_ok false f.
 Proof. intros Hne. rewrite /ireg_frzm_ok Hne. reflexivity. Qed.
 
-Lemma ireg_frzm_ok_true (rg : bool) :
+Lemma ireg_frzm_ok_true (rg : frzidx) :
   ireg_frzm_ok true (Some (Excl (FrzPre rg))).
 Proof. reflexivity. Qed.
 
@@ -1972,11 +1972,46 @@ Section InodeRegion.
      nothing left to refute the left arm with.  Since the phase now REMEMBERS
      the arm ([frz]'s payload), the clause can be stated at the index, and the
      deposit's agreement with the walk's [ifreeze_post rg] token selects it. *)
+  (* ---- THE CORPSE WINDOW'S PARKED SHARE (durable-disk C-6, [FsCollect.v]'s
+     residue (F)) -----------------------------------------------------------
+
+     iput's free path leaves the region slot on the MARKED sub-arm -- [imark]
+     and NO record fragment -- from the eviction that hands
+     [IcacheEscrow.ipool_evict_lend] its share all the way to
+     [EscrowDeposit.ireg_free_deposit_au].  Across that window the inum has no
+     bundle ANYWHERE, so the commit's collection cannot reach it, and nothing
+     in [ireg_slot] used to distinguish the corpse from an ordinary
+     checked-out inode: the f column's clause was the REGIME alone, a
+     persistent [IcacheRef.ireg_open] at the runtime index, which an empty
+     [LogDefs.ln_tx] authority cannot touch ([FsCollect.col_corpse_not_refuted]
+     was that wall).
+
+     THE WINDOW IS INSIDE ONE TRANSACTION -- iput runs between its caller's
+     [begin_op] and [end_op] and holds a share of its token (durable-disk
+     B''-tx5) -- so the freeze PARKS a positive share of it beside the regime,
+     for exactly the window's length: [ireg_freeze_au] takes it at the mint,
+     the [FrzPre -> FrzPost] step rides it through ([ireg_fsh_step], which
+     moves the phase and not the index), and [ireg_free_deposit_au] returns it
+     with the regime.  At a commit the WAL's authority for that map is empty,
+     so [ireg_fsh_no_ops] reads [f = FrzOff] off the clause at EVERY slot.
+
+     It is [ireg_cpin]'s device at the f column, and the pair sits in the
+     phase's own INDEX for [IcacheTxRefute.tx_two_halves_no_whole]'s reason
+     verbatim -- iput's spec names [(tid, q)] and must get THAT element back,
+     and an existentially-keyed share cannot be re-identified.  The index is
+     where the freezer's own [IcacheRef.ifreeze_pre] / [ifreeze_post] fragment
+     already re-identifies it, so no new ghost and no new column. *)
+  Definition ireg_fpin (rg : frzidx) : iProp Σ :=
+    (rg.2.1 ↪[ln_tx icfg_log]{#(rg.2.2)} tt)%I.
+
+  Global Instance ireg_fpin_timeless rg : Timeless (ireg_fpin rg).
+  Proof. rewrite /ireg_fpin. apply _. Qed.
+
   Definition ireg_fsh (f : frzUR) : iProp Σ :=
     match f with
     | Some (Excl FrzOff)       => True
-    | Some (Excl (FrzPre rg))  => ireg_regime rg
-    | Some (Excl (FrzPost rg)) => ireg_regime rg
+    | Some (Excl (FrzPre rg))  => ireg_regime rg.1 ∗ ireg_fpin rg
+    | Some (Excl (FrzPost rg)) => ireg_regime rg.1 ∗ ireg_fpin rg
     | _                        => (ireg_open ∨ ireg_boot)
     end%I.
 
@@ -1986,19 +2021,43 @@ Section InodeRegion.
   Lemma ireg_fsh_off : ⊢ ireg_fsh (Some (Excl FrzOff)).
   Proof. rewrite /ireg_fsh. done. Qed.
 
-  Lemma ireg_fsh_pre (rg : bool) :
-    ireg_regime rg -∗ ireg_fsh (Some (Excl (FrzPre rg))).
-  Proof. iIntros "H". iExact "H". Qed.
+  Lemma ireg_fsh_pre (rg : frzidx) :
+    ireg_regime rg.1 -∗ ireg_fpin rg -∗ ireg_fsh (Some (Excl (FrzPre rg))).
+  Proof. iIntros "H1 H2". iFrame. Qed.
 
-  Lemma ireg_fsh_post (rg : bool) :
-    ireg_regime rg -∗ ireg_fsh (Some (Excl (FrzPost rg))).
-  Proof. iIntros "H". iExact "H". Qed.
+  Lemma ireg_fsh_post (rg : frzidx) :
+    ireg_regime rg.1 -∗ ireg_fpin rg -∗ ireg_fsh (Some (Excl (FrzPost rg))).
+  Proof. iIntros "H1 H2". iFrame. Qed.
 
   (* RULING G's RETURN LEG, as one line: with the column pinned at [FrzPost rg]
-     by the walk's own token, the parked arm IS the regime the freezer lent. *)
-  Lemma ireg_fsh_post_acc (rg : bool) :
-    ireg_fsh (Some (Excl (FrzPost rg))) -∗ ireg_regime rg.
-  Proof. iIntros "H". iExact "H". Qed.
+     by the walk's own token, the parked arm IS the regime the freezer lent --
+     and, since C-6, the share it lent with it. *)
+  Lemma ireg_fsh_post_acc (rg : frzidx) :
+    ireg_fsh (Some (Excl (FrzPost rg))) -∗ ireg_regime rg.1 ∗ ireg_fpin rg.
+  Proof. iIntros "[$ $]". Qed.
+
+  (* THE REFUTATION THE COMMIT READS (durable-disk C-6).  Both window phases
+     park a positive share of an open transaction's element, so at a commit --
+     where the WAL's authority for that map is empty -- no slot in the region
+     can be inside a freeze window.  [ireg_cpin_no_ops]'s line, at the f
+     column; [ireg_frz_ok] is what rules out the absent column and [ExclBot],
+     exactly as [ireg_claim_ok] does there. *)
+  Lemma ireg_fsh_no_ops (f : frzUR) (n : nat) (d : dinode) :
+    ireg_frz_ok f n d ->
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ireg_fsh f -∗ ⌜f = Some (Excl FrzOff)⌝.
+  Proof.
+    intros Hfrz. iIntros "Ha Hp".
+    destruct f as [[[| rg | rg] |] |]; [by iPureIntro | | | |].
+    - iDestruct "Hp" as "[_ Hp]". rewrite /ireg_fpin.
+      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
+      rewrite lookup_empty in Hbad. discriminate.
+    - iDestruct "Hp" as "[_ Hp]". rewrite /ireg_fpin.
+      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
+      rewrite lookup_empty in Hbad. discriminate.
+    - exfalso. exact Hfrz.
+    - exfalso. exact Hfrz.
+  Qed.
 
   (* ...and the RIDE-THROUGH every phase step wants: a mover that does not
      change the regime index (and, at the unfrozen column, cannot leave it)
@@ -2012,8 +2071,8 @@ Section InodeRegion.
   Proof.
     rewrite /ireg_fsh. destruct f as [[[| rg | rg] |] |].
     - iIntros "_ _". iPureIntro. reflexivity.
-    - iIntros "H Hb". iExFalso. iApply (ireg_regime_boot_excl with "H Hb").
-    - iIntros "H Hb". iExFalso. iApply (ireg_regime_boot_excl with "H Hb").
+    - iIntros "[H _] Hb". iExFalso. iApply (ireg_regime_boot_excl with "H Hb").
+    - iIntros "[H _] Hb". iExFalso. iApply (ireg_regime_boot_excl with "H Hb").
     - iIntros "H Hb". iExFalso. iDestruct "H" as "[Ho | Ho]";
         [ iApply (ireg_boot_open_excl with "Hb Ho")
         | rewrite /ireg_boot; iApply (ity_pending_excl icfg_boot with "Hb Ho") ].
@@ -4317,13 +4376,23 @@ Section InodeRegion.
      is at [c = None] and the new [ireg_claim_ok] conjunct is vacuous at the
      phase this mover writes. *)
   Lemma ireg_freeze_au (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (rg : bool) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (rg : frzidx) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     bv_unsigned (di_nlink dn) = 0 ->
     bv_unsigned (di_type dn) <> 0 ->
     ireg_inv γi γfs inodestart nib -∗
-    ireg_regime rg -∗
+    ireg_regime rg.1 -∗
+    (* THE WINDOW'S PARKED SHARE (durable-disk C-6, residue (F)): the freezer
+       lends a positive share of its own open transaction's [LogDefs.ln_tx]
+       element for the length of the freeze, and [EscrowDeposit.
+       ireg_free_deposit_au] hands it back beside the regime.  It is what
+       makes the corpse window -- the MARKED slot between iput's eviction and
+       its off-lock deposit, at which the inum has no bundle anywhere --
+       unreachable at a commit ([ireg_fsh_no_ops]).  The pair rides in [rg],
+       not existentially, so the deposit returns EXACTLY the element the
+       freezer parked ([IcacheTxRefute.tx_two_halves_no_whole]). *)
+    ireg_fpin rg -∗
     dinode_at γi inum dn -∗
     ifreeze FrzOff (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) 1%nat -∗
@@ -4346,7 +4415,7 @@ Section InodeRegion.
     (* ...and the mirror's lock half, UP (ZZProbeFrz P6: one bupd) *)
     frzm_h (bv_unsigned inum) true.
   Proof.
-    iIntros (HE Hin Hnl0 Hty0) "#Hinv Hsh Hdn Hoff Hhalf Hmir".
+    iIntros (HE Hin Hnl0 Hty0) "#Hinv Hsh Hfpin Hdn Hoff Hhalf Hmir".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -4411,14 +4480,14 @@ Section InodeRegion.
     subst b0.
     iMod (frzm_update (bv_unsigned inum) false true with "Hmr Hmir")
       as "[Hmr Hmir]".
-    iMod ("Hclose" with "[Ha Hreg Hfsb Hmk Hrf Hla Hep Hlnk Hslback Hback Hcnt Hsh Hmr Hfdisj]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Hmk Hrf Hla Hep Hlnk Hslback Hback Hcnt Hsh Hfpin Hmr Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Hmk Hrf Hla Hep Hlnk Hslback Hcnt Hsh Hmr Hfdisj]");
+      iApply ("Hback" $! m with "[%] [Hfsb Hmk Hrf Hla Hep Hlnk Hslback Hcnt Hsh Hfpin Hmr Hfdisj]");
         [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Hmk Hrf Hla Hep Hlnk Hcnt Hsh Hmr Hfdisj]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Hmk Hrf Hla Hep Hlnk Hcnt Hsh Hfpin Hmr Hfdisj]").
       rewrite Hkey.
       (* RULING R: the freeze moves the f column only -- neither r column,
          neither the count nor the record -- so the clause rides verbatim. *)
@@ -4428,12 +4497,14 @@ Section InodeRegion.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl (Some (Excl (FrzPre rg))) 1%nat
                 Hlok Hdir Hwl0 Hpar Hclm' Hfrz'
-                with "Hla Hep Hlnk Hdisj Hcnt [Hsh Hfdisj] [Hmr]").
+                with "Hla Hep Hlnk Hdisj Hcnt [Hsh Hfpin Hfdisj] [Hmr]").
       (* the c side of the shelter conjunct rides through untouched
-         (durable-disk C-5): the freeze moves the f column only. *)
+         (durable-disk C-5): the freeze moves the f column only.  The f side
+         is the regime the freezer lent TOGETHER WITH the window's share
+         (durable-disk C-6). *)
       { iApply (ireg_shp_intro cl (Some (Excl (FrzPre rg)))
-                  with "[Hsh] [Hfdisj]").
-        - iApply (ireg_fsh_pre rg with "Hsh").
+                  with "[Hsh Hfpin] [Hfdisj]").
+        - iApply (ireg_fsh_pre rg with "Hsh Hfpin").
         - iDestruct (ireg_shp_split with "Hfdisj") as "[_ $]". }
       { iApply (ireg_frzc_intro _ _ true (ireg_frzm_ok_true rg) with "[] Hmr").
         iLeft. iPureIntro. reflexivity. }

@@ -646,7 +646,7 @@ Section IcacheEscrow.
      this arm is byte-less, and the peel that turns it into an [imark] must
      find the inum's [dv_ride] somewhere. *)
   Definition pool_await (γfs : fs_names) (γi : gname) (z : Z) : iProp Σ :=
-    (∃ ge gr gd (rg : bool),
+    (∃ ge gr gd (rg : frzidx),
        escA_inv γfs ge gr gd γi z rg ∗ redeem_ticketA gr ∗
        (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
 
@@ -1412,7 +1412,7 @@ Section IcacheEscrow.
      [ifreeze_pre] the walk has kept in hand since the mint kills the LEFT
      alternative outright ([ifreeze_excl] -- one exclusive ledger cell, two
      fragments), so what comes back is the receipt. *)
-  Lemma ic_payload_arm_decide_frz γfs γi cov logstart k inum g v (rg : bool) :
+  Lemma ic_payload_arm_decide_frz γfs γi cov logstart k inum g v (rg : frzidx) :
     ifreeze_pre rg (bv_unsigned inum) -∗
     ic_payload_arm γfs γi cov logstart k inum g v -∗
     ifreeze_pre rg (bv_unsigned inum) ∗ frzown (bv_unsigned inum) ∗
@@ -3277,7 +3277,7 @@ Section IcacheEscrow.
      uncached ledger row the last close produced, and the escrow the freer
      minted around the [FrzPost] token it left standing. *)
   Lemma ipool_shape_await γfs γi cov logstart (inum : mword 32)
-      (ge gr gd : gname) (rg : bool) :
+      (ge gr gd : gname) (rg : frzidx) :
     icnt_half (bv_unsigned inum) 0%nat -∗
     frzm_h (bv_unsigned inum) false -∗
     escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
@@ -3302,7 +3302,7 @@ Section IcacheEscrow.
   Qed.
 
   Lemma ic_close_to_empty_await cn γfs γi cov logstart k (v : bool)
-      (ge gr gd : gname) (rg : bool) (dev inum : mword 32) :
+      (ge gr gd : gname) (rg : frzidx) (dev inum : mword 32) :
     ic_id cn k (1/2) true dev inum -∗
     ic_id cn k (1/2) true dev inum -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
@@ -3389,7 +3389,7 @@ Section IcacheEscrow.
      token, MID/HELD/EMPTY with the cells, and [ic_parked]'s ORDINARY
      alternative with the [ifreeze_pre] in its hand. *)
   Lemma ic_open_frozen cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32)
-      (rg : bool) :
+      (rg : frzidx) :
     ic_escrow_body cn γfs γi cov logstart k -∗
     ifreeze_pre rg (bv_unsigned inum) -∗
     inode_ident k (DfracOwn q) dev inum -∗

@@ -368,7 +368,7 @@ Definition frz_preb (f : frzUR) : bool :=
 (* ...and WHICH regime arm the phase is carrying, [None] at the unfrozen
    state.  The freeze's movers step the phase but never the index, and that
    invariant is exactly what [InodeRegion.ireg_fsh_step] reads. *)
-Definition frz_reg (ph : frz) : option bool :=
+Definition frz_reg (ph : frz) : option frzidx :=
   match ph with
   | FrzOff     => None
   | FrzPre rg  => Some rg
@@ -1420,8 +1420,13 @@ Section IcacheLink.
   (* RULING G' (iclaim-ledger.md §6''): the two window phases now REMEMBER
      which regime arm the freezer lent, so the deposit can give back the one
      it was handed rather than an un-indexed disjunction. *)
-  Definition ifreeze_pre (rg : bool) (z : Z) : iProp Σ := ifreeze (FrzPre rg) z.
-  Definition ifreeze_post (rg : bool) (z : Z) : iProp Σ := ifreeze (FrzPost rg) z.
+  (* ...AND, SINCE durable-disk C-6, the FREEZING TRANSACTION and its share
+     ([Xv6Cameras.frzidx]): the fragment is the one thing that re-identifies
+     the share [InodeRegion.ireg_fsh] parks for the window's length, so the
+     pair has to be an index and not an existential
+     ([IcacheTxRefute.tx_two_halves_no_whole]). *)
+  Definition ifreeze_pre (rg : frzidx) (z : Z) : iProp Σ := ifreeze (FrzPre rg) z.
+  Definition ifreeze_post (rg : frzidx) (z : Z) : iProp Σ := ifreeze (FrzPost rg) z.
 
   (* THE OPTION-FLAVOUR INDEX (R6's [filled]-retrofit precedent), WIDENED
      BY V5' from [option unit] to [option (option Z)].  Every landed

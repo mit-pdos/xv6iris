@@ -2573,7 +2573,7 @@ Section IcacheRefInvReg.
      non-last-close arm at +0x8a is refuted rather than admitted.  This is
      what retires the first of [IputFreeLockedDev]'s two admits. *)
   Lemma icnt_freeze_forces_one (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (n : nat) (rg : bool) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (n : nat) (rg : frzidx) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
@@ -2599,7 +2599,7 @@ Section IcacheRefInvReg.
      the WHOLE unit the last close surrenders ([frz_evict_mass]). *)
   Lemma frz_park_pre_reclaim (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (k : nat)
-      (rg : bool) :
+      (rg : frzidx) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
@@ -3266,7 +3266,7 @@ Section IcacheRefInvReg.
   Lemma iref_close_last_freeze_store_au (Eo : coPset)
       (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (qt : Qp)
-      (bfl : bool) (rg : bool) :
+      (bfl : bool) (rg : frzidx) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, 1%positive) ->

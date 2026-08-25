@@ -54,7 +54,7 @@ Section EscrowDeposit.
 
   Lemma ireg_free_deposit_au (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (bsl : list (bv 8)) (ge gr gd : gname) (rg : bool) :
+      (bsl : list (bv 8)) (ge gr gd : gname) (rg : frzidx) :
     ↑iregN ⊆ E ->
     ↑escAN (bv_unsigned inum) ⊆ E ∖ ↑iregN ->
     (* ...AND [ftopN] (durable-disk C-3c).  The deposit is where the freed
@@ -120,7 +120,15 @@ Section EscrowDeposit.
           record the freeze window opened.  Without it a boot-thread iput
           could lend [ireg_boot] and never get it back, and ireclaim's loop
           -- which needs it on every iteration -- would not close. *)
-       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg).
+       (* ...AND THE CORPSE WINDOW'S SHARE (durable-disk C-6, residue (F)).
+          [InodeRegion.ireg_freeze_au] parked a positive share of the
+          freezing transaction's [LogDefs.ln_tx] element in the slot's own
+          freeze clause at the mint, so that the window this deposit CLOSES
+          -- the MARKED slot at which the inum has no bundle anywhere -- is
+          refuted at a commit ([InodeRegion.ireg_fsh_no_ops]).  Here it comes
+          home, at exactly the [(t, q)] the index names, beside the regime
+          and for the same reason. *)
+       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg).
   Proof.
     iIntros (HE Hesc_mask Hftop_mask Hin Hdn' Hz Hbare Hnl) "#Hinv #Hesc Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
@@ -231,7 +239,7 @@ Section EscrowDeposit.
        -- the deposit does not touch the c column (the marked arm's own
        clause says it is [None]). *)
     iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
-    iAssert (ireg_regime rg)%I with "[Hfsh]" as "Hgreg".
+    iAssert (ireg_regime rg.1 ∗ ireg_fpin rg)%I with "[Hfsh]" as "[Hgreg Hfpin]".
     { iApply (ireg_fsh_post_acc rg with "Hfsh"). }
     (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
        the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
@@ -329,7 +337,8 @@ Section EscrowDeposit.
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].
       iSplitR "Hpark"; [iExists ge, gr; iFrame "Hrh2 Hcom" | iExact "Hpark"]. }
-    iModIntro. iSplitR; [iExact "Hcom" | iExact "Hgreg"].
+    iModIntro. iSplitR; [iExact "Hcom" |].
+    iSplitL "Hgreg"; [iExact "Hgreg" | iExact "Hfpin"].
   Qed.
 
 End EscrowDeposit.

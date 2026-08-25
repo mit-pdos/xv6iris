@@ -86,7 +86,7 @@ Section EscrowInode.
      [ifreeze_post] argument verbatim, and for the same reason (this file's
      (a)/(b) above): the EMPTY arm is the one place both ends can reach. *)
   Definition escA_body (γfs : fs_names) (ge gr gd γi : gname) (z : Z)
-      (rg : bool) : iProp Σ :=
+      (rg : frzidx) : iProp Σ :=
     ( (mono_nat_auth_own ge 1 ST_EMPTY ∗ ifreeze_post rg z
        ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n))
     ∨ (mono_nat_auth_own ge 1 ST_FILLED ∗ InodeRegion.imark γi z
@@ -96,7 +96,7 @@ Section EscrowInode.
 
   Definition escAN (z : Z) : namespace := (nroot .@ "icescA") .@ z.
   Definition escA_inv (γfs : fs_names) (ge gr gd γi : gname) (z : Z)
-      (rg : bool) : iProp Σ :=
+      (rg : frzidx) : iProp Σ :=
     inv (escAN z) (escA_body γfs ge gr gd γi z rg).
   Global Instance escA_inv_persistent γfs ge gr gd γi z rg :
     Persistent (escA_inv γfs ge gr gd γi z rg).
@@ -229,7 +229,7 @@ Section EscrowInode.
      N-5.2A: and the per-FILE contents hold beside it, untied for the same
      reason and carried the same way (namei-pinned-lookup.md §13). *)
   Definition pool_pending (γfs : fs_names) (γi : gname) (z : Z) : iProp Σ :=
-    (∃ ge gr gd (rg : bool),
+    (∃ ge gr gd (rg : frzidx),
        escA_inv γfs ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
        (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay

@@ -1423,7 +1423,7 @@ Section Collect.
   End ClaimBox.
 
   (* ==================================================================== *)
-  (*  5c.  THE CORPSE -- RESIDUE (F), AND THE WALL, MACHINE-CHECKED        *)
+  (*  5c.  THE CORPSE -- RESIDUE (F), CLOSED (durable-disk C-6)            *)
   (*                                                                      *)
   (*  iput's corpse is the window from the free path's eviction to         *)
   (*  [EscrowDeposit.ireg_free_deposit_au].  Across it the walk holds the  *)
@@ -1431,59 +1431,180 @@ Section Collect.
   (*  [InodeRegion.imark] and NO fragment -- so [col_region_slot_acc]      *)
   (*  hands out its LEFT branch and the bundle has to come from wherever   *)
   (*  the checkout parked it.  For an inum in the pool's pending/await set *)
-  (*  ([IcacheEscrow.ipool_ext], which is under the itable SPINLOCK and    *)
-  (*  therefore out of a commit's reach entirely) that is nowhere.          *)
+  (*  ([IcacheEscrow.ipool_ext]) that is nowhere.                         *)
   (*                                                                      *)
-  (*  WHY IT IS NOT REFUTABLE AS THE SLOT STANDS, which is the wall: the   *)
-  (*  only thing [InodeRegion.ireg_slot] carries that distinguishes the    *)
-  (*  corpse from an ordinary checked-out inode is the FREEZE COLUMN, and  *)
-  (*  at either window phase its clause is [InodeRegion.ireg_fsh] -- the   *)
-  (*  REGIME alone, a PERSISTENT [IcacheRef.ireg_open] at the runtime      *)
-  (*  index.  An empty [ln_tx] authority cannot touch it.  Below is that   *)
-  (*  statement: the clause and the empty authority coexist, twice.        *)
-  (*                                                                      *)
-  (*  WHAT WOULD CLOSE IT is (E)'s device at the f column instead of the   *)
-  (*  c column: the freeze index [rg] carries the freezing transaction and *)
-  (*  its share, [ireg_fsh]'s two window arms park it beside the regime,   *)
-  (*  [InodeRegion.ireg_freeze_au] takes it and                            *)
-  (*  [EscrowDeposit.ireg_free_deposit_au] returns it.  The pair has to be *)
-  (*  in the INDEX and not existential for [IcacheTxRefute.                *)
+  (*  THE WINDOW IS INSIDE ONE TRANSACTION -- iput runs between its        *)
+  (*  caller's [begin_op] and [end_op] and holds a share of its token      *)
+  (*  (durable-disk B''-tx5) -- and C-6 is (E)'s device at the f column:   *)
+  (*  the freeze index [rg] carries the freezing transaction and its share *)
+  (*  ([Xv6Cameras.frzidx]), [InodeRegion.ireg_fsh] parks it beside the    *)
+  (*  regime at BOTH window phases, [InodeRegion.ireg_freeze_au] takes it  *)
+  (*  and [EscrowDeposit.ireg_free_deposit_au] returns it.  The pair is in *)
+  (*  the INDEX and not existential for [IcacheTxRefute.                   *)
   (*  tx_two_halves_no_whole]'s reason -- iput's spec names [(tid, qtx)]   *)
-  (*  and must get that element back -- and the index is where the         *)
+  (*  and must get that element back -- and the index is exactly where the *)
   (*  freezer's own [IcacheRef.ifreeze_pre] / [ifreeze_post] fragment      *)
-  (*  already re-identifies it.  Measured: widening [Xv6Cameras.frz]'s     *)
-  (*  [rg] from [bool] to [bool * (nat * Qp)] leaves every [FrzPre rg] /   *)
-  (*  [FrzPost rg] site byte-stable (there is not one literal in the tree) *)
-  (*  and moves ~20 [rg : bool] binders in eight files plus the four       *)
-  (*  [ireg_regime_true]/[_false] readings; the WORK is iput's fraction    *)
-  (*  accounting, because the freeze window SPANS the eviction that hands  *)
-  (*  [IcacheEscrow.ipool_evict_lend] the whole share.                     *)
+  (*  already re-identifies it.                                           *)
+  (*                                                                      *)
+  (*  What it buys, at the region: [InodeRegion.ireg_fsh_no_ops] -- an     *)
+  (*  empty [ln_tx] authority forces EVERY region slot's f column to       *)
+  (*  [FrzOff].  [col_corpse_no_ops] below is that reading at the slot,    *)
+  (*  fed with the freezer's own phase fragment, which is the form the     *)
+  (*  pool-side consumer wants: the escrow the free path mints parks       *)
+  (*  [ifreeze_post rg] in its EMPTY state ([EscrowInode.escA_body]), so   *)
+  (*  "this inum's escrow has not been deposited into" and "no transaction *)
+  (*  is open" are contradictory.                                         *)
   (*                                                                      *)
   (*  AND IT DOES NOT FINISH [X] ON ITS OWN.  A MARKED slot at [FrzOff] is *)
   (*  perfectly ordinary -- it is every cached or pooled inode, whose      *)
   (*  record is checked out into its bundle -- so refuting the window      *)
   (*  gives "an [X] inum's slot is MARKED implies its column is [FrzOff]"  *)
-  (*  and no more.  Ruling that combination out needs a pool-side witness  *)
-  (*  for [X]'s rows (a [EscrowDefs.reg_half] per pending/await inum in    *)
-  (*  [ipool_body], colliding with the MARKED arm's [reg_full]), which is  *)
-  (*  [IcacheEscrow]'s file and lane B'/C-3b's business, not this one's.   *)
+  (*  and no more.  Ruling that combination out needs a POOL-SIDE witness  *)
+  (*  for [X]'s rows, and section 5d below is that wall, machine-checked.  *)
   (* ==================================================================== *)
 
   Section Corpse.
   Context `{ICFG : icfg}.
 
-  Lemma col_corpse_not_refuted :
-    ireg_open -∗
+  (* THE WINDOW, REFUTED.  A slot whose freeze token is in SOME thread's
+     hand -- either phase -- cannot coexist with a quiescent transaction
+     ledger, because the slot's own f clause is parking a positive share of
+     that thread's transaction.  This is residue (F) closed end to end: the
+     corpse -- the MARKED slot from iput's eviction to its off-lock deposit,
+     at which the inum has no bundle anywhere -- is exactly the state in
+     which [IcacheRef.ifreeze_post] stands, and the escrow's own EMPTY arm
+     is where it stands ([EscrowInode.escA_body]). *)
+  Lemma col_corpse_no_ops gfs (gi : gname) (inum : bv 32) (d : dinode)
+      (ph : frz) :
+    frz_reg ph <> None ->
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-      ireg_fsh (Some (Excl (FrzPre true)))
-      ∗ ireg_fsh (Some (Excl (FrzPost true)))
-      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
+    ifreeze ph (bv_unsigned inum) -∗
+    ireg_slot gfs gi (bv_unsigned inum) d -∗ False.
   Proof.
-    iIntros "#Ho Hauth". iFrame "Hauth".
-    iSplitL; [iApply (ireg_fsh_pre true with "Ho")
-             | iApply (ireg_fsh_post true with "Ho")].
+    intros Hph. iIntros "Hauth Hfz Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
+                            %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+                            #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
+                            Harm) [Hep Hlnk]]".
+    iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
+    iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh _]".
+    iDestruct (ireg_fsh_no_ops (Some (Excl ph)) cn d Hfrz with "Hauth Hfsh")
+      as %Heq.
+    injection Heq as ->. exfalso. exact (Hph eq_refl).
+  Qed.
+
+  (* ...AND THE READING THE ASSEMBLY TAKES: at a quiescent ledger every
+     region slot's f column is UNFROZEN, whatever else it is holding.  It is
+     stated at the slot (not at [ireg_fsh]) so a caller never has to name the
+     column, and it is PURE, so the slot comes straight back. *)
+  Lemma col_slot_unfrozen gfs (gi : gname) (inum : bv 32) (d : dinode)
+      (ph : frz) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ireg_slot gfs gi (bv_unsigned inum) d -∗
+    ifreeze ph (bv_unsigned inum) -∗
+      ⌜ph = FrzOff⌝
+      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ireg_slot gfs gi (bv_unsigned inum) d
+      ∗ ifreeze ph (bv_unsigned inum).
+  Proof.
+    iIntros "Hauth Hslot Hfz".
+    destruct ph as [| rg | rg]; [by iFrame | |].
+    - assert (Hne : frz_reg (FrzPre rg) <> None) by discriminate.
+      iExFalso.
+      iApply (col_corpse_no_ops gfs gi inum d (FrzPre rg) Hne
+                with "Hauth Hfz Hslot").
+    - assert (Hne : frz_reg (FrzPost rg) <> None) by discriminate.
+      iExFalso.
+      iApply (col_corpse_no_ops gfs gi inum d (FrzPost rg) Hne
+                with "Hauth Hfz Hslot").
   Qed.
 
   End Corpse.
+
+  (* ==================================================================== *)
+  (*  5d.  WHAT (F) DOES NOT FINISH: THE POOL-SIDE WITNESS FOR [X],        *)
+  (*       AND THE WALL, MACHINE-CHECKED (durable-disk C-6)                *)
+  (*                                                                      *)
+  (*  The commit's partition ([IcacheEscrow.ipool_quiesce_acc]) leaves     *)
+  (*  three parts: the ordinary pool rows [O], the fifty live slots, and   *)
+  (*  [X] -- the pending/await rows.  For an inum in [O] the collection    *)
+  (*  reads the pool row's MARKER arm, whose [InodeRegion.imark] refutes   *)
+  (*  the region's MARKED sub-arm and leaves the free bundle               *)
+  (*  ([col_free_slot_acc]).  For a live slot it reads the escrow's cover. *)
+  (*  For an inum in [X] IT HOLDS NOTHING AT ALL: [IcacheEscrow.ipool_ext] *)
+  (*  is under the itable SPINLOCK, which a commit's ghost step cannot     *)
+  (*  take, so the entire row -- escrow handle, redeem ticket, contents    *)
+  (*  holds -- is out of reach.                                           *)
+  (*                                                                      *)
+  (*  SO [ipool_body] MUST CARRY A WITNESS PER [X] INUM, and the shape     *)
+  (*  that would do the job is an [EscrowDefs.reg_half]: the region's      *)
+  (*  non-pending arms hold the WHOLE registry element, so a pool-side     *)
+  (*  half at the same key overflows fraction 1 and refutes both of them   *)
+  (*  ([EscrowDefs.reg_full_half_False], the law                           *)
+  (*  [InodeRegion.ireg_claim_au] already uses), leaving the PENDING arm,  *)
+  (*  which is a free bundle.                                             *)
+  (*                                                                      *)
+  (*  THE WALL IS THAT THE HALF DOES NOT EXIST, and it is an accounting    *)
+  (*  fact rather than a proof difficulty.  The registry element at one    *)
+  (*  inum is ENTIRELY REGION-SIDE at every arm: the IN and MARKED arms    *)
+  (*  hold [reg_full], and the PENDING arm holds [reg_half] beside         *)
+  (*  [EscrowDefs.region_pending]'s -- which is the OTHER half, also in    *)
+  (*  the slot.  [reg_full_no_pool_half] below is that statement at the    *)
+  (*  shape a witness would have to take.  Its ONE producer is             *)
+  (*  [EscrowDeposit.ireg_free_deposit_au]'s [EscrowDefs.reg_split], and   *)
+  (*  that mover runs OFF-LOCK, twenty instructions after iput has given   *)
+  (*  the itable lock up at +0x94 -- so it can reach neither [ipool]'s     *)
+  (*  rows nor [ipool_body]'s [X] index (knowing [z ∈ X] needs both halves *)
+  (*  of [IcacheRef.icfg_pext], and one of them is the lock's).  The       *)
+  (*  deposit can open [ipoolN]; what it cannot do is find the row for its *)
+  (*  own inum.                                                           *)
+  (*                                                                      *)
+  (*  WHAT WOULD CLOSE IT (for the successor lane).  A per-inum ghost map  *)
+  (*  keyed like [IcacheEscrow.ipool_tkey], whose AUTHORITY sits in        *)
+  (*  [ipool_body] and whose element the walk carries from [ipool_put] to  *)
+  (*  the deposit, so that the row's VALUE is what the body's big-op is    *)
+  (*  stated over: a [Corpse (t, q)] value parks a share of the freezing   *)
+  (*  transaction (refuted at a commit exactly as [ipool_transit] is) and  *)
+  (*  a [Deposited] value parks [InodeRegion.imark], which                 *)
+  (*  [col_free_slot_acc] then reads as the free bundle.  The [imark] is   *)
+  (*  the one the deposit today hands to [EscrowInode.escA_deposit]'s      *)
+  (*  FILLED state, so the escrow loses it and                             *)
+  (*  [IcacheEscrow.ipool_take_lend] -- the redeem -- produces it instead: *)
+  (*  that is the re-plumbing, and it reaches [ProofIget]'s recycle as     *)
+  (*  well as [ProofIput]'s two sites.  It is a lane of its own; C-6       *)
+  (*  leaves it stated rather than half-built.                            *)
+  (* ==================================================================== *)
+
+  Section PoolWitness.
+  Context `{ICFG : icfg}.
+
+  (* THE WALL.  Whatever the region slot is on, the registry element at that
+     inum is fully spoken for region-side -- so a [reg_half] parked in
+     [IcacheEscrow.ipool_body] for the same inum is refuted by the slot
+     itself, on EVERY arm and not only on the two the witness is meant to
+     rule out.  A pool-side witness of this shape therefore cannot be added
+     without first MOVING half of the element out of [ireg_slot], which is
+     the redesign the section header measures. *)
+  Lemma reg_full_no_pool_half gfs (gi : gname) (z : Z) (d : dinode)
+      (ge gr : gname) :
+    ireg_slot gfs gi z d -∗ reg_half z ge gr -∗ False.
+  Proof.
+    iIntros "Hslot Hrh".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
+                            %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+                            #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
+                            Harm) [Hep Hlnk]]".
+    iDestruct "Harm" as "[[_ Hrf] | Hpend]".
+    - iDestruct "Hrf" as (ge0 gr0) "Hrf".
+      iApply (reg_full_half_False with "Hrf Hrh").
+    - iDestruct "Hpend" as "(_ & _ & Hrh1 & Hrp & _)".
+      iDestruct "Hrh1" as (ge1 gr1) "Hrh1".
+      iDestruct "Hrp" as (ge2 gr2) "[Hrh2 _]".
+      iDestruct (reg_half_agree with "Hrh1 Hrh2") as %[-> ->].
+      iDestruct (reg_join with "Hrh1 Hrh2") as "Hrf".
+      iApply (reg_full_half_False with "Hrf Hrh").
+  Qed.
+
+  End PoolWitness.
 
 End Collect.

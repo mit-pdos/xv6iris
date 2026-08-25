@@ -534,7 +534,22 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    the itable lock; [InodeRegion.ireg_freeze_au] SWAPS it for
    [ifreeze_pre], so the mint is a fragment-in-hand step and double-freeze
    is refuted by [Excl] alone. *)
-Inductive frz := FrzOff | FrzPre (rg : bool) | FrzPost (rg : bool).
+(* THE FREEZE INDEX CARRIES THE FREEZING TRANSACTION (durable-disk C-6,
+   [FsCollect.v]'s residue (F)).  The window from iput's eviction to
+   [EscrowDeposit.ireg_free_deposit_au] leaves the region slot on the MARKED
+   sub-arm with NO record fragment, so the commit's collection finds no
+   bundle at that inum.  It is unreachable at a commit because the window is
+   inside iput's caller's transaction, and what PROVES that is a share of
+   that transaction's [LogDefs.ln_tx] element parked in the slot's own freeze
+   clause ([InodeRegion.ireg_fsh]).  A parked share has to come back to the
+   freezer AT ITS OWN [(t, q)] ([IcacheTxRefute.tx_two_halves_no_whole]), so
+   the pair rides in the phase's own INDEX beside the regime bit -- which is
+   exactly where the freezer's [IcacheRef.ifreeze_pre] / [ifreeze_post]
+   fragment already re-identifies it.  [rg.1] is RULING G''s regime arm as
+   before; [rg.2] is the transaction and its share. *)
+Definition frzidx : Type := (bool * (nat * Qp))%type.
+
+Inductive frz := FrzOff | FrzPre (rg : frzidx) | FrzPost (rg : frzidx).
 
 Global Instance frz_eq_dec : EqDecision frz.
 Proof. solve_decision. Defined.
