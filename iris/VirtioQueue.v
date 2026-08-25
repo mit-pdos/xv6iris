@@ -646,6 +646,12 @@ Definition vs_len (sl : vslot) : nat :=
    the data buffer.  The ring-entry clause is stated separately because the
    window argument (positions in flight pin DISTINCT ring entries, so there
    are at most 8 of them) keys off it. *)
+(* THE SLOT'S DEVICE-FACING NAME.  The driver keys a request by its RING
+   POSITION [p]; the device, once it has popped the entry, holds the
+   DESCRIPTOR HEAD.  [spo_ring] below is what ties the two together: the
+   entry at position [p] names exactly this head. *)
+Definition vs_hd (sl : vslot) : bv 16 := vr_head (vs_req sl).
+
 Record slot_pin_ok (c : virtio_cfg) (p : nat) (sl : vslot)
     (pin : gmap Arch.pa (bv 8)) : Prop := {
   spo_ring : read_bytes pin (ring_entry_pa c p) 2 = Some (vr_head (vs_req sl));
@@ -664,7 +670,7 @@ Record slot_pin_ok (c : virtio_cfg) (p : nat) (sl : vslot)
   spo_stat : vs_is_out sl = false ->
              vr_status (vs_req sl) ∉ pa_range (vr_buf (vs_req sl)) (vs_len sl);
   spo_req  : forall mv : vmem, mem_view pin mv ->
-             req_at c mv (wrap16 p) = Some (vs_req sl);
+             req_from c mv (vs_hd sl) = Some (vs_req sl);
 }.
 
 (* the slot's WRITABLE footprint: the status byte, and (for a read request,
@@ -695,7 +701,7 @@ Proof. unfold slot_fp. apply union_subseteq_r. Qed.
 Definition vslot_post (v : virtio_state) (sl : vslot) (i : bv 16)
   : virtio_state :=
   VirtioState (v_cfg v) (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
-    (vserve (v_seen v) (v_ahead v) i).1 (vserve (v_seen v) (v_ahead v) i).2
+    (v_seen v) (v_inflight v ∖ {[ i ]})
     (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v) (v_cache v)
     (if bool_decide (v_taken v = Some i) then None else v_taken v)
     (v_cap v).
@@ -835,16 +841,16 @@ Lemma vslot_req_step (c : virtio_cfg) (p : nat) (sl : vslot)
     (w : gmap Arch.pa (bv 8)) :
   slot_pin_ok c p sl pin -> mem_view pin mv ->
   v_cfg v = c ->
-  virtio_req_step v mv (wrap16 p) = Some (v', w) ->
-  v' = vslot_post v sl (wrap16 p)
+  virtio_req_step v mv (vs_hd sl) = Some (v', w) ->
+  v' = vslot_post v sl (vs_hd sl)
   /\ w = vslot_writes c (v_used_idx v) (cache_view v) sl.
 Proof.
   intros Hslot Hview Hcfg Hstep.
   unfold virtio_req_step in Hstep.
-  destruct (negb (virtio_serve_ok v mv (wrap16 p))); [discriminate|].
+  destruct (negb (virtio_serve_ok v mv (vs_hd sl))); [discriminate|].
   rewrite Hcfg, (spo_req _ _ _ _ Hslot mv Hview) in Hstep.
-  destruct (negb (virtio_complete_ok v (vs_req sl) (wrap16 p))); [discriminate|].
-  rewrite (vslot_complete c p sl pin mv v (wrap16 p) Hslot Hview Hcfg) in Hstep.
+  destruct (negb (virtio_complete_ok v (vs_req sl) (vs_hd sl))); [discriminate|].
+  rewrite (vslot_complete c p sl pin mv v (vs_hd sl) Hslot Hview Hcfg) in Hstep.
   injection Hstep as Hv Hw. split; [ symmetry; exact Hv | symmetry; exact Hw ].
 Qed.
 
@@ -859,14 +865,14 @@ Lemma vslot_req_step_gate (c : virtio_cfg) (p : nat) (sl : vslot)
     (w : gmap Arch.pa (bv 8)) :
   slot_pin_ok c p sl pin -> mem_view pin mv ->
   v_cfg v = c ->
-  virtio_req_step v mv (wrap16 p) = Some (v', w) ->
-  virtio_complete_ok v (vs_req sl) (wrap16 p) = true.
+  virtio_req_step v mv (vs_hd sl) = Some (v', w) ->
+  virtio_complete_ok v (vs_req sl) (vs_hd sl) = true.
 Proof.
   intros Hslot Hview Hcfg Hstep.
   unfold virtio_req_step in Hstep.
-  destruct (negb (virtio_serve_ok v mv (wrap16 p))); [discriminate|].
+  destruct (negb (virtio_serve_ok v mv (vs_hd sl))); [discriminate|].
   rewrite Hcfg, (spo_req _ _ _ _ Hslot mv Hview) in Hstep.
-  destruct (virtio_complete_ok v (vs_req sl) (wrap16 p)) eqn:Hd;
+  destruct (virtio_complete_ok v (vs_req sl) (vs_hd sl)) eqn:Hd;
     [reflexivity|].
   cbn [negb] in Hstep. discriminate.
 Qed.
@@ -1353,34 +1359,31 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* THE KEYED PROTOCOL STATE.  Positions are [nat] here and never wrap; the
-   device counts them in [bv 16] and does ([wrap16] is the bridge, and the
-   window bound [vpo_win] is what makes it injective where it matters).
+   driver keys everything by them.  The DEVICE does not: once it has popped
+   an entry it holds the DESCRIPTOR HEAD, which is what the used ring reports
+   and what xv6 indexes [disk.info[]] by.  [vp_fl] is that set of heads,
+   carried as a field so it mirrors [VirtioModel.v_inflight] directly rather
+   than being reconstructed from the slot map.
 
-   THE SERVED SET IS NOT AN INTERVAL any more (tools/vtest/README.md finding
-   5): the device answers published positions in whatever order it finishes
-   them, so [vp_srv] is an arbitrary subset of the published ones and
-   [vp_pend] is exactly its complement.  What stays contiguous is the WINDOW:
-   [vp_lo] is the lowest unserved position, everything below it is served and
-   forgotten, and the ring's eight entries bound its width. *)
+   THE COMPLETED SET IS NOT AN INTERVAL (tools/vtest/README.md finding 5):
+   the device answers the requests it has taken in whatever order it finishes
+   them, so [vp_srv] is an arbitrary subset of the POPPED positions.  What
+   stays contiguous is what it has NOT taken: popping is in order, so [vp_lo]
+   is the pop index and the untaken entries are exactly [[vp_lo, vp_np)] --
+   the interval the ring's eight entries bound. *)
 Record vproto := VProto {
   vp_nc   : nat;                                (* completions = used index *)
   vp_np   : nat;                                (* published count *)
-  vp_lo   : nat;                                (* the watermark *)
+  vp_lo   : nat;                                (* the POP index *)
   vp_nr   : nat;                                (* used indices READ so far *)
   vp_tk   : option nat;                         (* the latched position *)
-  vp_srv  : gset nat;                           (* the positions SERVED *)
+  vp_srv  : gset nat;                           (* the positions COMPLETED *)
+  vp_fl   : gset (bv 16);                       (* heads popped, not done *)
   vp_pend : gmap nat vslot;                     (* dom = [0,np) minus srv *)
-  vp_done : gmap nat vslot;                     (* served, not yet reclaimed *)
+  vp_done : gmap nat vslot;                     (* completed, not reclaimed *)
   vp_uix  : gmap nat nat;                       (* position -> used index *)
   vp_pin  : gmap nat (gmap Arch.pa (bv 8));     (* per-slot pins *)
 }.
-
-(* the served positions the WATERMARK has not absorbed, as the device holds
-   them: [VirtioModel.v_ahead] *)
-Definition vp_ah_of (lo : nat) (srv : gset nat) : gset (bv 16) :=
-  set_map wrap16 (filter (fun q => (lo <= q)%nat) srv).
-
-Definition vp_ah (pr : vproto) : gset (bv 16) := vp_ah_of (vp_lo pr) (vp_srv pr).
 
 Definition vp_slots (pr : vproto) : gmap nat vslot :=
   vp_pend pr ∪ vp_done pr.
@@ -1396,13 +1399,18 @@ Definition vproto_ctl (c : virtio_cfg) (pr : vproto) : gmap Arch.pa (bv 8) :=
 Record vproto_ok (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) : Prop := {
   vpo_qnum : vc_qnum c = Z_to_bv 32 8;
   vpo_live : virtio_live c = true;
-  (* THE WINDOW.  Published positions split into served and pending; the
-     watermark sits at the lowest unserved one; and the live window is at
-     most the ring's eight entries wide, which is what makes [wrap16]
-     injective on it ([vproto_wrap_inj]).  The width bound is not assumed at
-     the publish -- it is DERIVED there, from the fact that position
-     [lo + 8] would pin the same ring entry as [lo]. *)
-  vpo_srv_np : forall q, q ∈ vp_srv pr -> (q < vp_np pr)%nat;
+  (* THE WINDOW, in the shape the POP/COMPLETE SPLIT gives it.  Positions run
+     [0 .. vp_np); the device has POPPED the ones below [vp_lo] and COMPLETED
+     the ones in [vp_srv].  Popping is in order, so the popped positions are
+     an interval and the entries the device has not taken are exactly
+     [[vp_lo, vp_np)] -- which is what bounds the live window by the ring's
+     eight entries and makes [wrap16] injective on it ([vproto_wrap_inj]).
+     The width bound is not assumed at the publish: it is DERIVED there, from
+     the fact that position [lo + 8] would pin the same ring entry as [lo]. *)
+  (* A POSITION IS COMPLETED ONLY IF IT WAS POPPED.  This replaces the old
+     [vpo_lo_srv] ("everything below the watermark is served"), which the
+     split makes false: below the pop index a request may still be in flight. *)
+  vpo_srv_lo : forall q, q ∈ vp_srv pr -> (q < vp_lo pr)%nat;
   (* POINTWISE, not [dom = set_seq 0 np ∖ srv]: the set form puts
      [set_seq 0 (S np)] in every publish obligation, and any conversion that
      touches it unfolds the sequence into a gset union and then into the map
@@ -1411,9 +1419,22 @@ Record vproto_ok (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) : Prop := {
   vpo_pend_dom : forall q,
       q ∈ dom (vp_pend pr) <-> ((q < vp_np pr)%nat /\ q ∉ vp_srv pr);
   vpo_lo_np : (vp_lo pr <= vp_np pr)%nat;
-  vpo_lo_srv : forall q, (q < vp_lo pr)%nat -> q ∈ vp_srv pr;
-  vpo_lo_min : (vp_lo pr < vp_np pr)%nat -> vp_lo pr ∉ vp_srv pr;
   vpo_win : (vp_np pr - vp_lo pr <= 8)%nat;
+  (* THE IN-FLIGHT SET IS EXACTLY THE POPPED, UNCOMPLETED SLOTS' HEADS.  This
+     is what ties the driver's position keying to the device's head keying,
+     and [spo_ring] is what makes the head of a position well defined. *)
+  vpo_fl_slots : forall h,
+      h ∈ vp_fl pr
+      <-> (exists q sl, (q < vp_lo pr)%nat /\ vp_pend pr !! q = Some sl
+                        /\ vs_hd sl = h);
+  (* DISTINCT OUTSTANDING REQUESTS HAVE DISTINCT HEADS.  This is what makes
+     the head a NAME for a request rather than merely a label, and the driver
+     is what guarantees it: [alloc3_desc] hands out descriptors that no live
+     chain holds.  It is discharged at the PUBLISH, where the allocator's
+     freshness is in hand. *)
+  vpo_hd_inj : forall p q slp slq,
+      p <> q -> vp_pend pr !! p = Some slp -> vp_pend pr !! q = Some slq ->
+      vs_hd slp <> vs_hd slq;
   (* the used index counts completions, and each served position has its own *)
   vpo_nc : vp_nc pr = size (vp_srv pr);
   vpo_uix_dom : dom (vp_uix pr) = vp_srv pr;
@@ -1464,6 +1485,16 @@ Record vproto_ok (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) : Prop := {
   vpo_idx_D : avail_idx_dom c ⊆ D;
 }.
 
+(* a completed position was popped, and popping only reaches what was
+   published -- so the old field's statement survives as a derived fact *)
+Lemma vpo_srv_np (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
+  vproto_ok c pr D -> forall q, q ∈ vp_srv pr -> (q < vp_np pr)%nat.
+Proof.
+  intros Hok q Hq.
+  pose proof (vpo_srv_lo _ _ _ Hok q Hq).
+  pose proof (vpo_lo_np _ _ _ Hok). lia.
+Qed.
+
 (* pend and done never overlap: done is served, pend is exactly what is not *)
 Lemma vproto_pend_done_disj (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
   vproto_ok c pr D -> dom (vp_pend pr) ## dom (vp_done pr).
@@ -1484,17 +1515,30 @@ Proof.
   - by rewrite size_set_seq.
 Qed.
 
-(* a pending position is inside the window, and the pending positions are
-   exactly the unserved published ones *)
+(* A PENDING POSITION IS PUBLISHED -- and that is all.  It used to be at or
+   above the watermark too, but the pop/complete split makes that false: a
+   request the device has POPPED and not yet completed is still pending, and
+   sits BELOW the pop index. *)
 Lemma vproto_pend_win (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (q : nat) :
-  vproto_ok c pr D -> q ∈ dom (vp_pend pr) ->
-  (vp_lo pr <= q < vp_np pr)%nat.
+  vproto_ok c pr D -> q ∈ dom (vp_pend pr) -> (q < vp_np pr)%nat.
 Proof.
-  intros Hok Hq. apply (vpo_pend_dom _ _ _ Hok) in Hq as [Hlt Hns].
-  split; [| lia ].
-  destruct (decide (vp_lo pr <= q)%nat) as [Hle|Hgt]; [exact Hle|].
-  exfalso. apply Hns, (vpo_lo_srv _ _ _ Hok). lia.
+  intros Hok Hq. by apply (vpo_pend_dom _ _ _ Hok) in Hq as [Hlt _].
+Qed.
+
+(* the entries the device has NOT taken are the ones at or above the pop
+   index: pending, and not in flight *)
+Lemma vproto_unpopped (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (q : nat) (sl : vslot) :
+  vproto_ok c pr D -> vp_pend pr !! q = Some sl -> (vp_lo pr <= q)%nat ->
+  vs_hd sl ∉ vp_fl pr \/ exists q' sl', q' <> q /\ (q' < vp_lo pr)%nat
+                                        /\ vp_pend pr !! q' = Some sl'
+                                        /\ vs_hd sl' = vs_hd sl.
+Proof.
+  intros Hok Hsl Hge.
+  destruct (decide (vs_hd sl ∈ vp_fl pr)) as [Hin|Hout]; [|by left].
+  right. destruct (proj1 (vpo_fl_slots _ _ _ Hok _) Hin) as (q' & sl' & Hlt & Hsl' & Hhd).
+  exists q', sl'. split_and!; [lia|exact Hlt|exact Hsl'|exact Hhd].
 Qed.
 
 (* THE INJECTIVITY the [bv 16] side needs, and the only thing the window
@@ -1676,16 +1720,19 @@ Qed.
    flight pins its own avail-ring entry, the pins are disjoint, and there are
    only 8 ring entries -- so the window [min slot, np) has width at most 8,
    and in particular [np - nc <= 8]. *)
-(* the watermark never runs ahead of the completion count: everything below
-   it has been served, and each served position was counted *)
-Lemma vproto_lo_nc (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
-  vproto_ok c pr D -> (vp_lo pr <= vp_nc pr)%nat.
+(* THE COMPLETION COUNT NEVER RUNS AHEAD OF THE POP INDEX -- the other way
+   round from before the split, and for the obvious reason: the device
+   completes only what it has taken.  [vpo_srv_lo] puts every completed
+   position below [vp_lo], and each was counted once. *)
+Lemma vproto_nc_lo (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
+  vproto_ok c pr D -> (vp_nc pr <= vp_lo pr)%nat.
 Proof.
   intro Hok. rewrite (vpo_nc _ _ _ Hok).
   transitivity (size (set_seq 0 (vp_lo pr) : gset nat));
-    [ by rewrite size_set_seq | ].
+    [| by rewrite size_set_seq ].
   apply subseteq_size. intros q Hq.
-  apply elem_of_set_seq in Hq. apply (vpo_lo_srv _ _ _ Hok). lia.
+  apply elem_of_set_seq. split; [lia|].
+  exact (vpo_srv_lo _ _ _ Hok q Hq).
 Qed.
 
 (* TWO LIVE POSITIONS NEVER SHARE AN AVAILABLE-RING ENTRY: each pins its
@@ -1846,13 +1893,12 @@ Proof.
   rewrite length_fmap, length_seq, length_seq in Hlen. lia.
 Qed.
 
-(* AT MOST EIGHT REQUESTS ARE EVER OUTSTANDING, which is the ring's own
-   size: this is [vpo_win] read through the completion count. *)
-Lemma vproto_window (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
-  vproto_ok c pr D -> (vp_np pr - vp_nc pr <= 8)%nat.
+(* the published count is the pop index plus what the device has not taken *)
+Lemma vproto_np_nc (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
+  vproto_ok c pr D -> (vp_nc pr <= vp_np pr)%nat.
 Proof.
-  intro Hok. pose proof (vproto_lo_nc _ _ _ Hok).
-  pose proof (vpo_win _ _ _ Hok). lia.
+  intro Hok. pose proof (vproto_nc_lo _ _ _ Hok).
+  pose proof (vpo_lo_np _ _ _ Hok). lia.
 Qed.
 
 (* THE separation payoff: everything a slot's step may write -- its own
@@ -1897,45 +1943,63 @@ Qed.
 (* 3. The flat form: VirtioModel section 7 derived from the keyed state.  *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE SLOT SET THE MODEL'S OBLIGATION RANGES OVER is a set of HEADS now, so
+   it is the heads of the PENDING slots -- the requests the driver has
+   published and the device has not finished, whether or not it has taken
+   them yet. *)
+Definition vp_heads (pr : vproto) : gset (bv 16) :=
+  map_to_set (fun _ sl => vs_hd sl) (vp_pend pr).
+
+Lemma elem_of_vp_heads (pr : vproto) (h : bv 16) :
+  h ∈ vp_heads pr <-> exists q sl, vp_pend pr !! q = Some sl /\ vs_hd sl = h.
+Proof.
+  unfold vp_heads. rewrite elem_of_map_to_set. split.
+  - intros (q & sl & Hsl & Hh). by exists q, sl.
+  - intros (q & sl & Hsl & Hh). by exists q, sl.
+Qed.
+
 Lemma vproto_flat (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
   vproto_ok c pr D ->
   virtio_queue_ok c (vproto_ctl c pr) D
-    (set_map wrap16 (dom (vp_pend pr)))
-    (wrap16 (vp_np pr)) (wrap16 (vp_lo pr)) (vp_ah pr).
+    (vp_heads pr)
+    (wrap16 (vp_np pr)) (wrap16 (vp_lo pr)) (vp_fl pr).
 Proof.
   intros Hok _.
   split; [ exact (vproto_ctl_idx c pr D Hok) | ].
   split.
-  - (* THE PUBLISHED INDEX IS NOT ONE OF THE SERVED POSITIONS: a served
-       position was published, so it is strictly below [np], and [wrap16] is
-       injective on the window that contains both. *)
-    intro Hc. unfold vp_ah, vp_ah_of in Hc.
-    apply elem_of_map_1 in Hc as (q & Heq & Hq).
-    apply elem_of_filter in Hq as [Hlo Hsrv].
-    pose proof (vpo_srv_np _ _ _ Hok q Hsrv) as Hlt.
-    pose proof (vproto_wrap_inj c pr D q (vp_np pr) Hok
-                  ltac:(lia) ltac:(pose proof (vpo_lo_np _ _ _ Hok); lia)
-                  (eq_sym Heq)). lia.
+  - (* COVERAGE OF THE UNTAKEN ENTRIES.  A position the device has not popped
+       lies in [[lo, np)] -- [vpos_pub_wrap16] turns the modular window test
+       into "[lo] plus an offset below the width" -- so it is pending, and the
+       head its ring entry names is that slot's own ([spo_ring]). *)
+    intros p Hpub mv Hview.
+    apply (vpos_pub_wrap16 (vp_lo pr) (vp_np pr) p
+             (vpo_lo_np _ _ _ Hok) (vpo_win _ _ _ Hok)) in Hpub
+      as (k & Hk & ->).
+    assert (Hpd : (vp_lo pr + k)%nat ∈ dom (vp_pend pr)).
+    { apply (vpo_pend_dom _ _ _ Hok). split; [lia|].
+      intro Hsrv. pose proof (vpo_srv_lo _ _ _ Hok _ Hsrv). lia. }
+    apply elem_of_dom in Hpd as [sl Hsl].
+    assert (Hpin : exists pin, vp_pin pr !! (vp_lo pr + k)%nat = Some pin).
+    { apply elem_of_dom. rewrite (vpo_pin_dom _ _ _ Hok).
+      apply elem_of_union_l, elem_of_dom. by exists sl. }
+    destruct Hpin as [pin Hpin].
+    pose proof (vpo_slot _ _ _ Hok _ sl pin
+                  (vproto_pend_slot pr _ sl Hsl) Hpin) as Hslot.
+    assert (Hvpin : mem_view pin mv).
+    { apply (mem_view_subseteq pin (vproto_ctl c pr) mv);
+        [ exact (vproto_pin_ctl c pr D _ pin Hok Hpin) | exact Hview ]. }
+    rewrite (avail_ring_at_wrap c mv (vp_lo pr + k)%nat (vpo_qnum _ _ _ Hok)).
+    rewrite (view_word_read pin mv _ 2 _ Hvpin (spo_ring _ _ _ _ Hslot)).
+    apply elem_of_vp_heads. by exists (vp_lo pr + k)%nat, sl.
   - split.
-    + (* COVERAGE: a position the device may still serve is a pending one.
-         [vpos_pub_wrap16] turns the modular window test into "[lo] plus an
-         offset below the width", and the served ones are exactly the ones
-         the free test has already excluded. *)
-      intros p Hfree. unfold vfree in Hfree.
-      apply andb_prop in Hfree as [Hpub Hnah].
-      apply (vpos_pub_wrap16 (vp_lo pr) (vp_np pr) p
-               (vpo_lo_np _ _ _ Hok) (vpo_win _ _ _ Hok)) in Hpub
-        as (k & Hk & ->).
-      apply elem_of_map_2.
-      apply (vpo_pend_dom _ _ _ Hok). split; [lia|].
-      { intro Hsrv. apply negb_true_iff, bool_decide_eq_false in Hnah.
-        apply Hnah. unfold vp_ah, vp_ah_of.
-        apply elem_of_map_2, elem_of_filter. split; [lia|exact Hsrv]. }
-    + (* ...and every pending position is a well-formed request whose step
-         writes inside the lease. *)
-      intros i Hi. apply elem_of_map_1 in Hi as (p & -> & Hp).
-      pose proof Hp as Hp'.
-      apply elem_of_dom in Hp as [sl Hsl].
+    + (* ...every head in flight is a pending slot's *)
+      intros h Hh.
+      destruct (proj1 (vpo_fl_slots _ _ _ Hok h) Hh) as (q & sl & _ & Hsl & Hhd).
+      apply elem_of_vp_heads. by exists q, sl.
+    + (* ...and every pending slot is a well-formed request whose step writes
+         inside the lease. *)
+      intros i Hi. apply elem_of_vp_heads in Hi as (p & sl & Hsl & <-).
+      assert (Hp' : p ∈ dom (vp_pend pr)) by (apply elem_of_dom; by exists sl).
       assert (Hpd : p ∈ dom (vp_pin pr)).
       { rewrite (vpo_pin_dom _ _ _ Hok). apply elem_of_union_l, elem_of_dom.
         exists sl. exact Hsl. }
@@ -1948,8 +2012,8 @@ Proof.
           [ exact (vproto_pin_ctl c pr D p pin Hok Hpin) | exact Hview ]. }
       pose proof (spo_req _ _ _ _ Hslot mv Hvpin) as Hreq.
       split.
-      * unfold virtio_chain_ok. unfold req_at in Hreq.
-        destruct (chain_at c mv (wrap16 p)) as [[[[h d0] d1] d2]|];
+      * unfold virtio_chain_ok. unfold req_from in Hreq.
+        destruct (chain_from c mv (vs_hd sl)) as [[[[h d0] d1] d2]|];
           [reflexivity | discriminate].
       * intros isr lo ah ui dk ca tk cp v' w Hstep.
         destruct (vslot_req_step c p sl pin mv
@@ -1985,31 +2049,26 @@ Qed.
 Lemma vproto_serve_slot (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (v : virtio_state) (mv : vmem) (i : bv 16) :
   vproto_ok c pr D ->
-  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_ahead v = vp_ah pr ->
+  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_inflight v = vp_fl pr ->
   mem_view (vproto_ctl c pr) mv ->
   virtio_serve_ok v mv i = true ->
   exists p sl pin,
-    (vp_lo pr <= p < vp_np pr)%nat /\ i = wrap16 p
+    (p < vp_lo pr)%nat /\ i = vs_hd sl
     /\ vp_pend pr !! p = Some sl /\ vp_pin pr !! p = Some pin
     /\ slot_pin_ok c p sl pin.
 Proof.
   intros Hok Hcfg Hseen Hah Hview Hserve.
-  pose proof (virtio_serve_free _ _ _ Hserve) as Hfree.
-  rewrite Hcfg,
-          (avail_idx_pinned c (vproto_ctl c pr) mv (wrap16 (vp_np pr))
-             Hview (vproto_ctl_idx c pr D Hok)), Hseen, Hah in Hfree.
-  destruct (vproto_flat c pr D Hok (vpo_live _ _ _ Hok))
-    as (_ & _ & Hcov & _).
-  apply Hcov, elem_of_map_1 in Hfree as (p & -> & Hp).
-  pose proof (vproto_pend_win c pr D p Hok Hp) as Hwin.
-  apply elem_of_dom in Hp as [sl Hsl].
+  (* THE HEAD IS ONE THE DEVICE POPPED, and [vpo_fl_slots] says which slot
+     put it there -- that is the whole content of the head keying. *)
+  pose proof (virtio_serve_in _ _ _ Hserve) as Hin.
+  rewrite Hah in Hin.
+  destruct (proj1 (vpo_fl_slots _ _ _ Hok i) Hin) as (p & sl & Hlt & Hsl & Hhd).
   assert (Hpd : p ∈ dom (vp_pin pr)).
   { rewrite (vpo_pin_dom _ _ _ Hok). apply elem_of_union_l, elem_of_dom.
     exists sl. exact Hsl. }
   apply elem_of_dom in Hpd as [pin Hpin].
   exists p, sl, pin.
-  split_and!; [ exact (proj1 Hwin) | exact (proj2 Hwin) | reflexivity
-              | exact Hsl | exact Hpin | ].
+  split_and!; [ exact Hlt | by rewrite Hhd | exact Hsl | exact Hpin | ].
   exact (vpo_slot _ _ _ Hok _ sl pin (vproto_pend_slot pr _ _ Hsl) Hpin).
 Qed.
 
@@ -2027,16 +2086,16 @@ Lemma vproto_step_det (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (v : virtio_state) (mv : vmem) (i : bv 16) (v' : virtio_state)
     (w : gmap Arch.pa (bv 8)) :
   vproto_ok c pr D ->
-  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_ahead v = vp_ah pr ->
+  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_inflight v = vp_fl pr ->
   mem_view (vproto_ctl c pr) mv ->
   virtio_req_step v mv i = Some (v', w) ->
   exists p sl pin,
-    (vp_lo pr <= p < vp_np pr)%nat /\ i = wrap16 p /\
+    (p < vp_lo pr)%nat /\ i = vs_hd sl /\
     vp_pend pr !! p = Some sl /\ vp_pin pr !! p = Some pin /\
     slot_pin_ok c p sl pin /\
     mem_view pin mv /\
-    virtio_complete_ok v (vs_req sl) (wrap16 p) = true /\
-    v' = vslot_post v sl (wrap16 p)
+    virtio_complete_ok v (vs_req sl) (vs_hd sl) = true /\
+    v' = vslot_post v sl (vs_hd sl)
     /\ w = vslot_writes c (v_used_idx v) (cache_view v) sl.
 Proof.
   intros Hok Hcfg Hseen Hah Hview Hstep.
@@ -2049,7 +2108,7 @@ Proof.
   { apply (mem_view_subseteq pin (vproto_ctl c pr) mv);
       [ exact (vproto_pin_ctl c pr D _ pin Hok Hpin) | exact Hview ]. }
   exists p, sl, pin.
-  split_and!; [ exact (proj1 Hwin) | exact (proj2 Hwin) | reflexivity
+  split_and!; [ exact Hwin | reflexivity
               | exact Hsl | exact Hpin | exact Hslot | exact Hvpin | | | ].
   - exact (vslot_req_step_gate c p sl pin mv v v' w Hslot Hvpin Hcfg Hstep).
   - exact (proj1 (vslot_req_step c p sl pin mv v v' w
@@ -2058,19 +2117,21 @@ Proof.
                     Hslot Hvpin Hcfg Hstep)).
 Qed.
 
-(* Conversely, a step that FIRED means something was pending. *)
+(* Conversely, a step that FIRED means something had been POPPED -- not that
+   an entry was waiting.  Under the split those are different facts: the
+   completion answers a request the device already took. *)
 Lemma vproto_step_pend (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (v : virtio_state) (mv : vmem) (i : bv 16) (v' : virtio_state)
     (w : gmap Arch.pa (bv 8)) :
   vproto_ok c pr D ->
-  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_ahead v = vp_ah pr ->
+  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_inflight v = vp_fl pr ->
   mem_view (vproto_ctl c pr) mv ->
   virtio_req_step v mv i = Some (v', w) ->
-  (vp_lo pr < vp_np pr)%nat.
+  (0 < vp_lo pr)%nat.
 Proof.
   intros Hok Hcfg Hseen Hah Hview Hstep.
   destruct (vproto_step_det c pr D v mv i v' w Hok Hcfg Hseen Hah Hview Hstep)
-    as (p & sl & pin & Hlo & Hhi & _). lia.
+    as (p & sl & pin & Hlt & _). lia.
 Qed.
 
 (* THE CAPTURE, at the consumed position (claude-notes/projects/async-disk.md):
@@ -2081,15 +2142,15 @@ Qed.
 Lemma vproto_capture_det (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (v : virtio_state) (mv : vmem) (i : bv 16) (v' : virtio_state) :
   vproto_ok c pr D ->
-  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_ahead v = vp_ah pr ->
+  v_cfg v = c -> v_seen v = wrap16 (vp_lo pr) -> v_inflight v = vp_fl pr ->
   mem_view (vproto_ctl c pr) mv ->
   virtio_capture_step v mv i = Some v' ->
   exists p sl pin,
-    (vp_lo pr <= p < vp_np pr)%nat /\ i = wrap16 p /\
+    (p < vp_lo pr)%nat /\ i = vs_hd sl /\
     vp_pend pr !! p = Some sl /\ vp_pin pr !! p = Some pin /\
     slot_pin_ok c p sl pin /\
     vs_is_out sl = true /\ v_taken v = None /\
-    v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v)
+    v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v)
            (v_disk v) (vslot_cache sl ∪ v_cache v) (Some i) (v_cap v).
 Proof.
   intros Hok Hcfg Hseen Hah Hview Hstep.
@@ -2109,7 +2170,7 @@ Proof.
   assert (Hout : vs_is_out sl = true)
     by (unfold vs_is_out; rewrite Hty; unfold virtio_blk_t_out; reflexivity).
   exists p, sl, pin. split_and!;
-    [ exact (proj1 Hwin) | exact (proj2 Hwin) | exact Hi | exact Hsl
+    [ exact Hwin | exact Hi | exact Hsl
     | exact Hpin | exact Hslot | exact Hout | exact Ht | ].
   rewrite Hv', (vslot_vreq_cache c p sl pin mv Hslot Hvpin).
   reflexivity.
@@ -2131,7 +2192,7 @@ Lemma vproto_drain_det (c : virtio_cfg) (p : nat) (sl : vslot)
   virtio_drain_step v s = Some v' ->
   exists i, (i < wr_nsectors (vs_wr sl))%nat /\ s = vs_key sl i
     /\ v_cache v !! s = Some (wr_sector_bytes (vs_wr sl) i)
-    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v)
+    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v)
                (v_used_idx v) (wr_apply (wr_sector (vs_wr sl) i) (v_disk v))
                (delete s (v_cache v)) (v_taken v) (v_cap v).
 Proof.
@@ -2150,53 +2211,13 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 4b. THE WATERMARK, on both sides of the [wrap16] bridge.                *)
+(* 4b. THE PENDING DOMAIN, as the two transitions move it.                 *)
 (*                                                                        *)
-(*     The device walks its watermark forward past positions it has        *)
-(*     already served ([VirtioModel.vseen_adv]); the protocol does the same *)
-(*     walk over [nat] positions.  [vseen_adv_vp] is the one lemma that     *)
-(*     says the two walks agree -- which is what lets the keyed state       *)
-(*     predict the device's [v_seen]/[v_ahead] after a completion.  Both    *)
-(*     halves rest on [wrap16] being injective on the live window.          *)
+(*     The watermark walk that used to live here is gone with the model's  *)
+(*     ([VirtioModel] section 5b): popping is in order now, so [vp_lo]     *)
+(*     advances by exactly one and needs no walk to skip served positions. *)
 (* ---------------------------------------------------------------------- *)
 
-Fixpoint vp_adv (f lo : nat) (srv : gset nat) : nat :=
-  match f with
-  | O => lo
-  | S f' => if bool_decide (lo ∈ srv) then vp_adv f' (S lo) srv else lo
-  end.
-
-(* the walk moves forwards, no further than its fuel, over served positions
-   only, and stops at an unserved one unless it ran out *)
-Lemma vp_adv_ge (f lo : nat) (srv : gset nat) : (lo <= vp_adv f lo srv)%nat.
-Proof.
-  revert lo. induction f as [|f IH]; intro lo; cbn [vp_adv]; [lia|].
-  destruct (bool_decide (lo ∈ srv)); [| lia ].
-  pose proof (IH (S lo)). lia.
-Qed.
-
-Lemma vp_adv_le (f lo : nat) (srv : gset nat) :
-  (vp_adv f lo srv <= lo + f)%nat.
-Proof.
-  revert lo. induction f as [|f IH]; intro lo; cbn [vp_adv]; [lia|].
-  destruct (bool_decide (lo ∈ srv)); [| lia ].
-  pose proof (IH (S lo)). lia.
-Qed.
-
-Lemma vp_adv_below (f lo q : nat) (srv : gset nat) :
-  (lo <= q)%nat -> (q < vp_adv f lo srv)%nat -> q ∈ srv.
-Proof.
-  revert lo. induction f as [|f IH]; intros lo Hlo Hq; cbn [vp_adv] in Hq;
-    [lia|].
-  destruct (bool_decide (lo ∈ srv)) eqn:Hin; [| lia ].
-  apply bool_decide_eq_true in Hin.
-  destruct (decide (q = lo)) as [->|Hne]; [exact Hin|].
-  apply (IH (S lo)); [lia|exact Hq].
-Qed.
-
-(* THE PENDING SET'S DOMAIN, moved by hand rather than by [set_solver]:
-   these are the two shapes the transitions produce, and a general set
-   solver builds a proof term over [set_seq] that is expensive to check. *)
 Lemma pend_dom_publish (np : nat) (srv : gset nat) :
   np ∉ srv ->
   {[ np ]} ∪ (set_seq 0 np ∖ srv) = set_seq 0 (S np) ∖ srv.
@@ -2208,103 +2229,19 @@ Proof. set_solver. Qed.
 
 (* THE WATERMARK AFTER A SERVE.  Named rather than written inline so that
    [cbn] cannot unfold the walk's fuel into a term of a thousand matches. *)
-Definition vp_lo_next (lo : nat) (srv : gset nat) : nat := vp_adv 8 lo srv.
-
-Lemma vp_adv_np (f lo np : nat) (srv : gset nat) :
-  (forall q, q ∈ srv -> (q < np)%nat) -> (lo <= np)%nat ->
-  (vp_adv f lo srv <= np)%nat.
-Proof.
-  revert lo. induction f as [|f IH]; intros lo Hsrv Hle; cbn [vp_adv]; [lia|].
-  destruct (bool_decide (lo ∈ srv)) eqn:Hin; [| lia ].
-  apply bool_decide_eq_true in Hin. pose proof (Hsrv lo Hin).
-  apply IH; [exact Hsrv|lia].
-Qed.
-
-Lemma vp_adv_stop (f lo : nat) (srv : gset nat) :
-  vp_adv f lo srv = (lo + f)%nat \/ vp_adv f lo srv ∉ srv.
-Proof.
-  revert lo. induction f as [|f IH]; intro lo; cbn [vp_adv]; [left; lia|].
-  destruct (bool_decide (lo ∈ srv)) eqn:Hin.
-  - destruct (IH (S lo)) as [He|Hn]; [left; lia | by right].
-  - right. apply bool_decide_eq_false in Hin. exact Hin.
-Qed.
-
-(* membership in the device's served set, read back as a [nat] position *)
-Lemma vp_ah_of_mem (lo np q : nat) (srv : gset nat) :
-  (lo <= np)%nat -> (np - lo <= 8)%nat ->
-  (forall r, r ∈ srv -> (r < np)%nat) -> (lo <= q <= np)%nat ->
-  wrap16 q ∈ vp_ah_of lo srv <-> (q ∈ srv /\ (lo <= q)%nat).
-Proof.
-  intros Hle Hw Hsrv Hq. unfold vp_ah_of. split.
-  - intro Hin. apply elem_of_map_1 in Hin as (r & Heq & Hr).
-    apply elem_of_filter in Hr as [Hlo Hrs].
-    pose proof (Hsrv r Hrs) as Hrn.
-    assert (r = q).
-    { destruct (Nat.lt_total r q) as [Hlt|[He|Hgt]]; [| exact He |].
-      - exfalso. exact (wrap16_inj_window r q Hlt ltac:(lia) (eq_sym Heq)).
-      - exfalso. exact (wrap16_inj_window q r Hgt ltac:(lia) Heq). }
-    subst r. by split.
-  - intros [Hqs Hlo]. apply elem_of_map_2, elem_of_filter. by split.
-Qed.
-
-(* ...and one step of the walk, on the device's side *)
-Lemma vp_ah_of_succ (lo np : nat) (srv : gset nat) :
-  (lo <= np)%nat -> (np - lo <= 8)%nat ->
-  (forall r, r ∈ srv -> (r < np)%nat) ->
-  vp_ah_of lo srv ∖ {[ wrap16 lo ]} = vp_ah_of (S lo) srv.
-Proof.
-  intros Hle Hw Hsrv. apply set_eq. intro x. split.
-  - intro Hx. apply elem_of_difference in Hx as [Hin Hne].
-    unfold vp_ah_of in Hin |- *.
-    apply elem_of_map_1 in Hin as (r & -> & Hr).
-    apply elem_of_filter in Hr as [Hlo Hrs].
-    apply elem_of_map_2, elem_of_filter. split; [| exact Hrs ].
-    destruct (decide (r = lo)) as [->|Hrl]; [ set_solver | lia ].
-  - intro Hx. unfold vp_ah_of in Hx |- *.
-    apply elem_of_map_1 in Hx as (r & -> & Hr).
-    apply elem_of_filter in Hr as [Hlo Hrs].
-    pose proof (Hsrv r Hrs) as Hrn.
-    apply elem_of_difference. split.
-    + apply elem_of_map_2, elem_of_filter. split; [lia|exact Hrs].
-    + intro Hc. apply elem_of_singleton in Hc.
-      exact (wrap16_inj_window lo r ltac:(lia) ltac:(lia) (eq_sym Hc)).
-Qed.
-
-(* THE TWO WALKS AGREE.  Both stop at the first unserved position, and they
-   take the same steps to get there, so ONE fuel serves for both. *)
-Lemma vseen_adv_vp (f lo np : nat) (srv : gset nat) :
-  (lo <= np)%nat -> (np - lo <= 8)%nat ->
-  (forall q, q ∈ srv -> (q < np)%nat) ->
-  vseen_adv f (wrap16 lo) (vp_ah_of lo srv)
-  = (wrap16 (vp_adv f lo srv), vp_ah_of (vp_adv f lo srv) srv).
-Proof.
-  revert lo. induction f as [|f IH]; intros lo Hle Hw Hsrv;
-    cbn [vseen_adv vp_adv]; [reflexivity|].
-  destruct (decide (lo ∈ srv)) as [Hin|Hout].
-  - (* served: both walks advance *)
-    pose proof (Hsrv lo Hin) as Hlon.
-    rewrite (bool_decide_eq_true_2 (wrap16 lo ∈ vp_ah_of lo srv))
-      by (apply (vp_ah_of_mem lo np lo srv Hle Hw Hsrv ltac:(lia)); by split).
-    rewrite (vp_ah_of_succ lo np srv Hle Hw Hsrv).
-    rewrite (bool_decide_eq_true_2 (lo ∈ srv) Hin).
-    unfold one16. rewrite <- wrap16_S.
-    apply IH; [lia|lia|exact Hsrv].
-  - (* unserved: both stop here *)
-    rewrite (bool_decide_eq_false_2 (wrap16 lo ∈ vp_ah_of lo srv))
-      by (rewrite (vp_ah_of_mem lo np lo srv Hle Hw Hsrv ltac:(lia));
-          intros [Hc _]; exact (Hout Hc)).
-    by rewrite (bool_decide_eq_false_2 (lo ∈ srv) Hout).
-Qed.
-
 (* the keyed obligation survives its own step: [nc] moves from pend to done *)
 Definition vproto_step_state (pr : vproto) (p : nat) (sl : vslot) : vproto :=
   VProto (S (vp_nc pr)) (vp_np pr)
-         (vp_lo_next (vp_lo pr) ({[ p ]} ∪ vp_srv pr)) (vp_nr pr)
+         (* THE POP INDEX DOES NOT MOVE HERE.  Only [vproto_pop_state]
+            advances it, and by exactly one. *)
+         (vp_lo pr) (vp_nr pr)
          (* THE LATCH IS RELEASED ONLY BY ITS OWN REQUEST
             ([VirtioModel.virtio_complete]): completing some other position
             leaves another request's captured payload where it was. *)
          (if bool_decide (vp_tk pr = Some p) then None else vp_tk pr)
          ({[ p ]} ∪ vp_srv pr)
+         (* ...and the request's HEAD leaves the in-flight set *)
+         (vp_fl pr ∖ {[ vs_hd sl ]})
          (delete p (vp_pend pr))
          (<[ p := sl ]> (vp_done pr))
          (<[ p := vp_nc pr ]> (vp_uix pr))
@@ -2313,10 +2250,12 @@ Definition vproto_step_state (pr : vproto) (p : nat) (sl : vslot) : vproto :=
 Lemma vproto_ok_step (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (p : nat) (sl : vslot) :
   vproto_ok c pr D ->
+  (* THE DEVICE POPPED IT FIRST: a completion answers a request it took. *)
+  (p < vp_lo pr)%nat ->
   vp_pend pr !! p = Some sl ->
   vproto_ok c (vproto_step_state pr p sl) D.
 Proof.
-  intros Hok Hsl.
+  intros Hok Hplo Hsl.
   assert (Hslots : vp_slots (vproto_step_state pr p sl) = vp_slots pr).
   { unfold vp_slots, vproto_step_state. cbn [vp_pend vp_done].
     apply map_eq. intro q. destruct (decide (q = p)) as [->|Hne].
@@ -2330,42 +2269,43 @@ Proof.
   pose proof (vproto_pend_win c pr D p Hok Hpd) as Hwin.
   pose proof (vpo_win _ _ _ Hok) as Hw8.
   pose proof (vpo_lo_np _ _ _ Hok) as Hlonp.
-  (* the served set after the step, and the positions it bounds *)
-  set (srv' := {[ p ]} ∪ vp_srv pr).
-  assert (Hsrv' : forall q, q ∈ srv' -> (q < vp_np pr)%nat).
-  { intros q Hq. apply elem_of_union in Hq as [Hq|Hq].
-    - apply elem_of_singleton in Hq. lia.
-    - exact (vpo_srv_np _ _ _ Hok q Hq). }
-  set (lo' := vp_lo_next (vp_lo pr) srv').
-  assert (Hlo'ge : (vp_lo pr <= lo')%nat) by apply vp_adv_ge.
-  assert (Hlo'le : (lo' <= vp_np pr)%nat)
-    by exact (vp_adv_np 8 (vp_lo pr) (vp_np pr) srv' Hsrv' Hlonp).
   constructor.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
-  - unfold vproto_step_state. cbn [vp_srv vp_np]. exact Hsrv'.
+  - (* the completed set gains [p], which the device had popped *)
+    unfold vproto_step_state. cbn [vp_srv vp_lo]. intros q Hq.
+    apply elem_of_union in Hq as [Hq|Hq].
+    + apply elem_of_singleton in Hq. lia.
+    + exact (vpo_srv_lo _ _ _ Hok q Hq).
   - unfold vproto_step_state. cbn [vp_np vp_pend vp_srv]. intro q.
     rewrite dom_delete_L, elem_of_difference, elem_of_singleton,
             (vpo_pend_dom _ _ _ Hok q).
     split.
     + intros [[Hlt Hns] Hne]. split; [exact Hlt|]. set_solver.
     + intros [Hlt Hns]. split; [ split; [exact Hlt|] | ]; set_solver.
-  - unfold vproto_step_state. cbn [vp_lo vp_np]. unfold vp_lo_next.
-    exact (vp_adv_np 8 (vp_lo pr) (vp_np pr) ({[ p ]} ∪ vp_srv pr)
-             Hsrv' Hlonp).
-  - unfold vproto_step_state. cbn [vp_lo vp_srv]. unfold vp_lo_next.
-    intros q Hq.
-    destruct (decide (q < vp_lo pr)%nat) as [Hlt|Hge].
-    + apply elem_of_union_r, (vpo_lo_srv _ _ _ Hok). exact Hlt.
-    + apply (vp_adv_below 8 (vp_lo pr) q ({[ p ]} ∪ vp_srv pr));
-        [lia|exact Hq].
-  - unfold vproto_step_state. cbn [vp_lo vp_np vp_srv]. intro Hlt.
-    unfold vp_lo_next in Hlt |- *.
-    destruct (vp_adv_stop 8 (vp_lo pr) ({[ p ]} ∪ vp_srv pr)) as [He|Hn];
-      [| exact Hn ].
-    exfalso. rewrite He in Hlt. lia.
-  - unfold vproto_step_state. cbn [vp_lo vp_np]. unfold vp_lo_next.
-    pose proof (vp_adv_ge 8 (vp_lo pr) ({[ p ]} ∪ vp_srv pr)). lia.
+  - unfold vproto_step_state. cbn [vp_lo vp_np]. exact Hlonp.
+  - unfold vproto_step_state. cbn [vp_lo vp_np]. exact Hw8.
+  - (* THE HEAD LEAVES THE IN-FLIGHT SET with its request, and no other
+       pending slot can put it back: heads name requests uniquely. *)
+    unfold vproto_step_state. cbn [vp_fl vp_lo vp_pend]. intro h.
+    rewrite elem_of_difference, elem_of_singleton,
+            (vpo_fl_slots _ _ _ Hok h).
+    split.
+    + intros [(q & slq & Hlt & Hsq & Hhq) Hne].
+      assert (Hqp : q <> p) by (intro Hc; subst q; rewrite Hsl in Hsq;
+                                injection Hsq as <-; exact (Hne (eq_sym Hhq))).
+      exists q, slq. split_and!; [exact Hlt| |exact Hhq].
+      by rewrite lookup_delete_ne.
+    + intros (q & slq & Hlt & Hsq & Hhq).
+      apply lookup_delete_Some in Hsq as [Hne Hsq].
+      split; [ by exists q, slq |].
+      intro Hc. apply (vpo_hd_inj _ _ _ Hok q p slq sl
+                         (fun e => Hne (eq_sym e)) Hsq Hsl).
+      by rewrite Hhq.
+  - unfold vproto_step_state. cbn [vp_pend]. intros q1 q2 sl1 sl2 Hne H1 H2.
+    apply lookup_delete_Some in H1 as [_ H1].
+    apply lookup_delete_Some in H2 as [_ H2].
+    exact (vpo_hd_inj _ _ _ Hok q1 q2 sl1 sl2 Hne H1 H2).
   - (* the completion count is the served set's size, and [p] is new to it *)
     unfold vproto_step_state. cbn [vp_nc vp_srv].
     rewrite (vpo_nc _ _ _ Hok), size_union by set_solver.
@@ -2445,43 +2385,17 @@ Proof.
   - exact (vpo_idx_D _ _ _ Hok).
 Qed.
 
-(* THE STEP'S EFFECT ON THE DEVICE'S OWN WATERMARK AND SERVED SET: exactly
-   what [VirtioModel.vserve] computes, which is what lets the keyed state
-   predict the post-state of a completion. *)
-Lemma vproto_step_vserve (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
-    (p : nat) (sl : vslot) :
-  vproto_ok c pr D ->
-  vp_pend pr !! p = Some sl ->
-  vserve (wrap16 (vp_lo pr)) (vp_ah pr) (wrap16 p)
-  = (wrap16 (vp_lo (vproto_step_state pr p sl)),
-     vp_ah (vproto_step_state pr p sl)).
-Proof.
-  intros Hok Hsl.
-  assert (Hpd : p ∈ dom (vp_pend pr))
-    by (apply elem_of_dom; exists sl; exact Hsl).
-  destruct (vproto_pend_win c pr D p Hok Hpd) as [Hwlo Hwhi].
-  pose proof (vpo_win _ _ _ Hok) as Hw8.
-  pose proof (vpo_lo_np _ _ _ Hok) as Hlonp.
-  set (srv' := {[ p ]} ∪ vp_srv pr).
-  assert (Hsrv' : forall q, q ∈ srv' -> (q < vp_np pr)%nat).
-  { intros q Hq. apply elem_of_union in Hq as [Hq|Hq].
-    - apply elem_of_singleton in Hq. lia.
-    - exact (vpo_srv_np _ _ _ Hok q Hq). }
-  (* the device's set after the mark IS the protocol's *)
-  assert (Hah : {[ wrap16 p ]} ∪ vp_ah pr = vp_ah_of (vp_lo pr) srv').
-  { unfold vp_ah, vp_ah_of, srv'.
-    rewrite filter_union_L, set_map_union_L.
-    assert (Hfs : filter (fun q => (vp_lo pr <= q)%nat) ({[ p ]} : gset nat)
-                  = {[ p ]}) by (apply filter_singleton_L; [apply _|exact Hwlo]).
-    rewrite Hfs, set_map_singleton_L. reflexivity. all: apply _. }
-  (* one fuel serves both walks, so they run in lockstep *)
-  unfold vserve. rewrite Hah.
-  unfold vproto_step_state. cbn [vp_lo vp_srv].
-  unfold vp_ah. cbn [vp_lo vp_srv].
-  unfold vp_lo_next.
-  apply (vseen_adv_vp 8 (vp_lo pr) (vp_np pr) srv');
-    [ lia | lia | exact Hsrv' ].
-Qed.
+(* THE STEP'S EFFECT ON THE DEVICE'S OWN POP INDEX AND IN-FLIGHT SET.  Both
+   are immediate now: the pop index does not move at a completion, and the
+   set loses exactly the head that completed.  The watermark walk this used
+   to need is gone with the model's. *)
+Lemma vproto_step_seen (pr : vproto) (p : nat) (sl : vslot) :
+  wrap16 (vp_lo (vproto_step_state pr p sl)) = wrap16 (vp_lo pr).
+Proof. reflexivity. Qed.
+
+Lemma vproto_step_fl (pr : vproto) (p : nat) (sl : vslot) :
+  vp_fl (vproto_step_state pr p sl) = vp_fl pr ∖ {[ vs_hd sl ]}.
+Proof. reflexivity. Qed.
 
 (* the step does not move the control map: the device writes no pinned byte *)
 Lemma vproto_step_ctl (c : virtio_cfg) (pr : vproto) (p : nat) (sl : vslot) :
@@ -2508,10 +2422,114 @@ Proof.
     [ exact Hsub | exact (vproto_wr_off_ctl c pr D _ sl pin Hok Hs Hpin) ].
 Qed.
 
+(* THE POP: the device takes the entry at the pop index.  [vp_lo] advances by
+   exactly one -- popping is in order -- and the head that entry names joins
+   the in-flight set.  Nothing else moves: the request stays PENDING (it has
+   not completed), keeps its pin and its claim. *)
+Definition vproto_pop_state (pr : vproto) (sl : vslot) : vproto :=
+  VProto (vp_nc pr) (vp_np pr) (S (vp_lo pr)) (vp_nr pr) (vp_tk pr)
+         (vp_srv pr) ({[ vs_hd sl ]} ∪ vp_fl pr)
+         (vp_pend pr) (vp_done pr) (vp_uix pr) (vp_pin pr).
+
+Lemma vpop_nc (pr : vproto) (sl : vslot) :
+  vp_nc (vproto_pop_state pr sl) = vp_nc pr.
+Proof. reflexivity. Qed.
+Lemma vpop_np (pr : vproto) (sl : vslot) :
+  vp_np (vproto_pop_state pr sl) = vp_np pr.
+Proof. reflexivity. Qed.
+Lemma vpop_lo (pr : vproto) (sl : vslot) :
+  vp_lo (vproto_pop_state pr sl) = S (vp_lo pr).
+Proof. reflexivity. Qed.
+Lemma vpop_nr (pr : vproto) (sl : vslot) :
+  vp_nr (vproto_pop_state pr sl) = vp_nr pr.
+Proof. reflexivity. Qed.
+Lemma vpop_tk (pr : vproto) (sl : vslot) :
+  vp_tk (vproto_pop_state pr sl) = vp_tk pr.
+Proof. reflexivity. Qed.
+Lemma vpop_srv (pr : vproto) (sl : vslot) :
+  vp_srv (vproto_pop_state pr sl) = vp_srv pr.
+Proof. reflexivity. Qed.
+Lemma vpop_fl (pr : vproto) (sl : vslot) :
+  vp_fl (vproto_pop_state pr sl) = {[ vs_hd sl ]} ∪ vp_fl pr.
+Proof. reflexivity. Qed.
+Lemma vpop_pend (pr : vproto) (sl : vslot) :
+  vp_pend (vproto_pop_state pr sl) = vp_pend pr.
+Proof. reflexivity. Qed.
+Lemma vpop_done (pr : vproto) (sl : vslot) :
+  vp_done (vproto_pop_state pr sl) = vp_done pr.
+Proof. reflexivity. Qed.
+Lemma vpop_uix (pr : vproto) (sl : vslot) :
+  vp_uix (vproto_pop_state pr sl) = vp_uix pr.
+Proof. reflexivity. Qed.
+Lemma vpop_pin (pr : vproto) (sl : vslot) :
+  vp_pin (vproto_pop_state pr sl) = vp_pin pr.
+Proof. reflexivity. Qed.
+
 (* THE CAPTURE: the latch takes a position, and nothing else moves. *)
 Definition vproto_capture_state (pr : vproto) (p : nat) : vproto :=
   VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (vp_nr pr) (Some p) (vp_srv pr)
+         (vp_fl pr)
          (vp_pend pr) (vp_done pr) (vp_uix pr) (vp_pin pr).
+
+(* THE POP PRESERVES THE OBLIGATION.  The entry at the pop index leaves the
+   untaken interval and its head joins the in-flight set; the slot itself does
+   not move, so every per-slot field is inherited. *)
+Lemma vproto_ok_pop (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (sl : vslot) :
+  vproto_ok c pr D ->
+  (vp_lo pr < vp_np pr)%nat ->
+  vp_pend pr !! vp_lo pr = Some sl ->
+  vproto_ok c (vproto_pop_state pr sl) D.
+Proof.
+  intros Hok Hlt Hsl.
+  pose proof (vpo_lo_np _ _ _ Hok) as Hlonp.
+  constructor.
+  - exact (vpo_qnum _ _ _ Hok).
+  - exact (vpo_live _ _ _ Hok).
+  - rewrite vpop_srv, vpop_lo. intros q Hq.
+    pose proof (vpo_srv_lo _ _ _ Hok q Hq). lia.
+  - rewrite vpop_pend, vpop_np, vpop_srv. exact (vpo_pend_dom _ _ _ Hok).
+  - rewrite vpop_lo, vpop_np. lia.
+  - rewrite vpop_lo, vpop_np.
+    (* the untaken interval is one shorter, so the width bound survives *)
+    pose proof (vpo_win _ _ _ Hok). lia.
+  - (* the head the pop took joins the set, and it is this slot's *)
+    rewrite vpop_fl, vpop_lo, vpop_pend. intro h.
+    rewrite elem_of_union, elem_of_singleton, (vpo_fl_slots _ _ _ Hok h).
+    split.
+    + intros [->|(q & slq & Hq & Hsq & Hhq)].
+      * exists (vp_lo pr), sl. split_and!; [lia|exact Hsl|reflexivity].
+      * exists q, slq. split_and!; [lia|exact Hsq|exact Hhq].
+    + intros (q & slq & Hq & Hsq & Hhq).
+      destruct (decide (q = vp_lo pr)) as [->|Hne].
+      * left. rewrite Hsl in Hsq. by injection Hsq as <-.
+      * right. exists q, slq. split_and!; [lia|exact Hsq|exact Hhq].
+  - rewrite vpop_pend. exact (vpo_hd_inj _ _ _ Hok).
+  - rewrite vpop_nc, vpop_srv. exact (vpo_nc _ _ _ Hok).
+  - rewrite vpop_uix, vpop_srv. exact (vpo_uix_dom _ _ _ Hok).
+  - rewrite vpop_nr, vpop_nc. exact (vpo_nr_nc _ _ _ Hok).
+  - rewrite vpop_done, vpop_uix, vpop_nr. exact (vpo_done_uix _ _ _ Hok).
+  - rewrite vpop_uix, vpop_nc. exact (vpo_uix_lt _ _ _ Hok).
+  - rewrite vpop_uix. exact (vpo_uix_inj _ _ _ Hok).
+  - rewrite vpop_uix, vpop_nc. exact (vpo_uix_surj _ _ _ Hok).
+  - rewrite vpop_tk, vpop_pend. exact (vpo_tk _ _ _ Hok).
+  - rewrite vpop_done, vpop_srv. exact (vpo_done_lt _ _ _ Hok).
+  - unfold vp_slots. rewrite vpop_pend, vpop_done, vpop_pin.
+    exact (vpo_pin_dom _ _ _ Hok).
+  - unfold vp_slots. rewrite vpop_pend, vpop_done, vpop_pin.
+    exact (vpo_slot _ _ _ Hok).
+  - unfold vp_slots. rewrite vpop_pend, vpop_done, vpop_pin.
+    exact (vpo_fp_disj _ _ _ Hok).
+  - unfold vp_slots. rewrite vpop_pend, vpop_done, vpop_pin.
+    exact (vpo_wr_pin _ _ _ Hok).
+  - unfold vp_slots. rewrite vpop_pend, vpop_done, vpop_pin.
+    exact (vpo_standing _ _ _ Hok).
+  - exact (vpo_idx_used _ _ _ Hok).
+  - unfold vp_slots. rewrite vpop_pend, vpop_done, vpop_pin.
+    exact (vpo_fp_D _ _ _ Hok).
+  - exact (vpo_used_D _ _ _ Hok).
+  - exact (vpo_idx_D _ _ _ Hok).
+Qed.
 
 Lemma vproto_ok_capture (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (p : nat) (sl : vslot) :
@@ -2521,12 +2539,12 @@ Proof.
   intros Hok Hsl. constructor.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
-  - exact (vpo_srv_np _ _ _ Hok).
+  - exact (vpo_srv_lo _ _ _ Hok).
   - exact (vpo_pend_dom _ _ _ Hok).
   - exact (vpo_lo_np _ _ _ Hok).
-  - exact (vpo_lo_srv _ _ _ Hok).
-  - exact (vpo_lo_min _ _ _ Hok).
   - exact (vpo_win _ _ _ Hok).
+  - exact (vpo_fl_slots _ _ _ Hok).
+  - exact (vpo_hd_inj _ _ _ Hok).
   - exact (vpo_nc _ _ _ Hok).
   - exact (vpo_uix_dom _ _ _ Hok).
   - exact (vpo_nr_nc _ _ _ Hok).
@@ -2559,7 +2577,7 @@ Proof. reflexivity. Qed.
 Definition vproto_publish_state (pr : vproto) (sl : vslot)
     (pin : gmap Arch.pa (bv 8)) : vproto :=
   VProto (vp_nc pr) (S (vp_np pr)) (vp_lo pr) (vp_nr pr) (vp_tk pr)
-         (vp_srv pr)
+         (vp_srv pr) (vp_fl pr)
          (<[ vp_np pr := sl ]> (vp_pend pr))
          (vp_done pr)
          (vp_uix pr)
@@ -2584,6 +2602,9 @@ Lemma vppq_tk (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
 Proof. reflexivity. Qed.
 Lemma vppq_srv (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_srv (vproto_publish_state pr sl pin) = vp_srv pr.
+Proof. reflexivity. Qed.
+Lemma vppq_fl (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vp_fl (vproto_publish_state pr sl pin) = vp_fl pr.
 Proof. reflexivity. Qed.
 Lemma vppq_pend (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_pend (vproto_publish_state pr sl pin) = <[ vp_np pr := sl ]> (vp_pend pr).
@@ -2610,9 +2631,13 @@ Lemma vproto_ok_publish (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
   slot_pin_ok c (vp_np pr) sl pin ->
   slot_wr sl ## dom pin ->
   slot_fp sl pin ## D ->
+  (* THE FRESH CHAIN'S HEAD IS FRESH.  This is where head injectivity is
+     discharged, and it is the driver's [alloc3_desc] that supplies it: the
+     descriptors it hands out belong to no live chain. *)
+  (forall q slq, vp_pend pr !! q = Some slq -> vs_hd slq <> vs_hd sl) ->
   vproto_ok c (vproto_publish_state pr sl pin) (D ∪ slot_fp sl pin).
 Proof.
-  intros Hok Hnew Hwr Hdisj.
+  intros Hok Hnew Hwr Hdisj Hfresh.
   pose proof (vproto_ncnp _ _ _ Hok) as Hle.
   assert (Hslots : vp_slots (vproto_publish_state pr sl pin)
                    = <[ vp_np pr := sl ]> (vp_slots pr)).
@@ -2653,7 +2678,8 @@ Proof.
     assert (Hlolt : (vp_lo pr < vp_np pr)%nat) by lia.
     assert (Hlopd : vp_lo pr ∈ dom (vp_pend pr)).
     { apply (vpo_pend_dom _ _ _ Hok).
-      split; [ lia | exact (vpo_lo_min _ _ _ Hok Hlolt) ]. }
+      split; [ lia
+             | intro Hc; exact (Nat.lt_irrefl _ (vpo_srv_lo _ _ _ Hok _ Hc)) ]. }
     apply elem_of_dom in Hlopd as [sllo Hsllo].
     assert (Hpdlo : vp_lo pr ∈ dom (vp_pin pr)).
     { rewrite (vpo_pin_dom _ _ _ Hok). apply elem_of_union_l, elem_of_dom.
@@ -2686,8 +2712,7 @@ Proof.
   constructor.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
-  - rewrite vppq_srv, vppq_np. intros q Hq.
-    pose proof (vpo_srv_np _ _ _ Hok q Hq). lia.
+  - rewrite vppq_srv, vppq_lo. exact (vpo_srv_lo _ _ _ Hok).
   - rewrite vppq_pend, vppq_np, vppq_srv. intro q.
     rewrite dom_insert_L, elem_of_union, elem_of_singleton,
             (vpo_pend_dom _ _ _ Hok q).
@@ -2696,15 +2721,27 @@ Proof.
     + intros [Hlt Hns]. destruct (decide (q = vp_np pr)) as [->|Hne];
         [ by left | right; split; [lia|exact Hns] ].
   - rewrite vppq_lo, vppq_np. pose proof (vpo_lo_np _ _ _ Hok). lia.
-  - rewrite vppq_lo, vppq_srv. exact (vpo_lo_srv _ _ _ Hok).
-  - rewrite vppq_lo, vppq_np, vppq_srv. intro Hlt.
-    destruct (decide (vp_lo pr < vp_np pr)%nat) as [Hlo|Hlo].
-    + exact (vpo_lo_min _ _ _ Hok Hlo).
-    + intro Hc. apply Hnpsrv.
-      assert (He : vp_lo pr = vp_np pr)
-        by (pose proof (vpo_lo_np _ _ _ Hok); lia).
-      by rewrite <- He.
   - rewrite vppq_lo, vppq_np. lia.
+  - (* THE NEW SLOT IS NOT IN FLIGHT: the device cannot have popped an entry
+       the driver is only now publishing. *)
+    rewrite vppq_fl, vppq_lo, vppq_pend. intro h.
+    rewrite (vpo_fl_slots _ _ _ Hok h).
+    pose proof (vpo_lo_np _ _ _ Hok) as Hlonp.
+    split.
+    + intros (q & slq & Hlt & Hsq & Hhq). exists q, slq.
+      split_and!; [exact Hlt| |exact Hhq].
+      rewrite lookup_insert_ne; [exact Hsq|lia].
+    + intros (q & slq & Hlt & Hsq & Hhq).
+      apply lookup_insert_Some in Hsq as [[Hc _]|[_ Hsq]]; [lia|].
+      by exists q, slq.
+  - (* ...and its head is fresh, which is the publisher's own obligation *)
+    rewrite vppq_pend. intros q1 q2 sl1 sl2 Hne H1 H2.
+    apply lookup_insert_Some in H1 as [[<- <-]|[Hn1 H1]];
+      apply lookup_insert_Some in H2 as [[<- <-]|[Hn2 H2]].
+    + by exfalso.
+    + intro Hc. exact (Hfresh _ _ H2 (eq_sym Hc)).
+    + exact (Hfresh _ _ H1).
+    + exact (vpo_hd_inj _ _ _ Hok q1 q2 sl1 sl2 Hne H1 H2).
   - rewrite vppq_nc, vppq_srv. exact (vpo_nc _ _ _ Hok).
   - rewrite vppq_uix, vppq_srv. exact (vpo_uix_dom _ _ _ Hok).
   - rewrite vppq_nr, vppq_nc. exact (vpo_nr_nc _ _ _ Hok).
@@ -2795,7 +2832,7 @@ Qed.
 
 Definition vproto_reclaim_state (pr : vproto) (p : nat) : vproto :=
   VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (S (vp_nr pr)) (vp_tk pr)
-         (vp_srv pr)
+         (vp_srv pr) (vp_fl pr)
          (vp_pend pr) (delete p (vp_done pr)) (vp_uix pr)
          (delete p (vp_pin pr)).
 
@@ -2838,12 +2875,12 @@ Proof.
   constructor.
   - exact (vpo_qnum _ _ _ Hok).
   - exact (vpo_live _ _ _ Hok).
-  - exact (vpo_srv_np _ _ _ Hok).
+  - exact (vpo_srv_lo _ _ _ Hok).
   - exact (vpo_pend_dom _ _ _ Hok).
   - exact (vpo_lo_np _ _ _ Hok).
-  - exact (vpo_lo_srv _ _ _ Hok).
-  - exact (vpo_lo_min _ _ _ Hok).
   - exact (vpo_win _ _ _ Hok).
+  - exact (vpo_fl_slots _ _ _ Hok).
+  - exact (vpo_hd_inj _ _ _ Hok).
   - exact (vpo_nc _ _ _ Hok).
   - exact (vpo_uix_dom _ _ _ Hok).
   - (* the read watermark advances past the record just reclaimed *)
@@ -2949,7 +2986,7 @@ Qed.
 (* 7. The empty (fresh-after-init) instance.                              *)
 (* ---------------------------------------------------------------------- *)
 
-Definition vproto0 : vproto := VProto 0 0 0 0 None ∅ ∅ ∅ ∅ ∅.
+Definition vproto0 : vproto := VProto 0 0 0 0 None ∅ ∅ ∅ ∅ ∅ ∅.
 
 Lemma vproto_ok_init (c : virtio_cfg) :
   vc_qnum c = Z_to_bv 32 8 ->
@@ -2965,6 +3002,7 @@ Proof.
      representation into a goal that never needed it. *)
   assert (Hnc0 : vp_nc vproto0 = 0%nat) by reflexivity.
   assert (Hnr0 : vp_nr vproto0 = 0%nat) by reflexivity.
+  assert (Hfl0 : vp_fl vproto0 = (∅ : gset (bv 16))) by reflexivity.
   assert (Hnp0 : vp_np vproto0 = 0%nat) by reflexivity.
   assert (Hlo0 : vp_lo vproto0 = 0%nat) by reflexivity.
   assert (Htk0 : vp_tk vproto0 = None) by reflexivity.
@@ -2985,9 +3023,13 @@ Proof.
     + intro Hc. exfalso. exact (proj1 (elem_of_empty q) Hc).
     + intros [Hlt _]. exfalso. lia.
   - rewrite Hlo0, Hnp0. reflexivity.
-  - rewrite Hlo0. intros q Hq0. exfalso. lia.
-  - rewrite Hlo0, Hnp0, Hsrv0. intros _. apply not_elem_of_empty.
   - rewrite Hlo0, Hnp0. lia.
+  - (* nothing is in flight, and nothing is pending to have put it there *)
+    rewrite Hfl0, Hpend0. intro h. split.
+    + intro Hc. exfalso. exact (proj1 (elem_of_empty h) Hc).
+    + intros (q & sl & _ & Hsq & _). rewrite lookup_empty in Hsq. discriminate.
+  - rewrite Hpend0. intros q1 q2 sl1 sl2 _ H1.
+    rewrite lookup_empty in H1. discriminate.
   - rewrite Hnc0, Hsrv0. by rewrite size_empty.
   - rewrite Huix0, Hsrv0. by rewrite dom_empty_L.
   - rewrite Hnr0, Hnc0. reflexivity.

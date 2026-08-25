@@ -654,10 +654,10 @@ Lemma vslot_post_cfg (v : virtio_state) (sl : vslot) (i : bv 16) :
   v_cfg (vslot_post v sl i) = v_cfg v.
 Proof. reflexivity. Qed.
 Lemma vslot_post_seen (v : virtio_state) (sl : vslot) (i : bv 16) :
-  v_seen (vslot_post v sl i) = (vserve (v_seen v) (v_ahead v) i).1.
+  v_seen (vslot_post v sl i) = v_seen v.
 Proof. reflexivity. Qed.
-Lemma vslot_post_ahead (v : virtio_state) (sl : vslot) (i : bv 16) :
-  v_ahead (vslot_post v sl i) = (vserve (v_seen v) (v_ahead v) i).2.
+Lemma vslot_post_inflight (v : virtio_state) (sl : vslot) (i : bv 16) :
+  v_inflight (vslot_post v sl i) = v_inflight v ∖ {[ i ]}.
 Proof. reflexivity. Qed.
 Lemma vslot_post_uidx (v : virtio_state) (sl : vslot) (i : bv 16) :
   v_used_idx (vslot_post v sl i) = bv_add (v_used_idx v) (Z_to_bv 16 1).
@@ -1425,7 +1425,7 @@ Section VirtioProto.
              the COMPLETION COUNT and no longer the position of anything --
              that is exactly what the out-of-order fix separated. *)
           ⌜v_seen v = wrap16 (vp_lo pr)⌝ ∗
-          ⌜v_ahead v = vp_ah pr⌝ ∗
+          ⌜v_inflight v = vp_fl pr⌝ ∗
           ⌜v_taken v = wrap16 <$> vp_tk pr⌝ ∗
           ⌜v_used_idx v = wrap16 (vp_nc pr)⌝ ∗
           ⌜read_bytes dma (used_idx_pa (v_cfg v)) 2 = Some (wrap16 (vp_nc pr))⌝ ∗
@@ -1499,7 +1499,7 @@ Section VirtioProto.
            to be RECORDED here: it is what refutes the drain arm of
            [WpUart.wp_disk_loop] on a dead queue.  Recording both is also
            what lets the LIVE FLIP establish the live arm's [vp_wt]. *)
-        ⌜v_cache v = ∅⌝ ∗ ⌜v_taken v = None⌝ ∗ ⌜v_ahead v = ∅⌝ ∗
+        ⌜v_cache v = ∅⌝ ∗ ⌜v_taken v = None⌝ ∗ ⌜v_inflight v = ∅⌝ ∗
         (* ...and the cache MODE is already declined: the pre-flip
            DRIVER_FEATURES write is the one that decides it, and every write
            after it leaves [vc_dfeat] alone.  Carrying it on this arm too is
@@ -1543,7 +1543,7 @@ Section VirtioProto.
     (* the volatile write cache is empty and untaken, and the driver has
        negotiated nothing -- all four hold of ANY reset device
        ([VirtioModel.virtio_reset_cache]/[_taken]/[_wce]) *)
-    v_cache v = ∅ -> v_taken v = None -> v_ahead v = ∅ ->
+    v_cache v = ∅ -> v_taken v = None -> v_inflight v = ∅ ->
     virtio_wce (v_cfg v) = false ->
     ⊢ |==> ∃ γ : disk_names,
         (* the image name IS the era's: this is what lets the device thread
@@ -1608,7 +1608,7 @@ Section VirtioProto.
     virtio_wce c = false ->
     (* the empty, untaken cache the not-live arm was recording all along *)
     v_cache v1 = ∅ -> v_taken v1 = None ->
-    v_ahead v1 = ∅ ->
+    v_inflight v1 = ∅ ->
     disk_cfg γ c -∗
     ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) -∗
     ghost_map_auth (dn_ord γ) 1 (∅ : gmap nat nat) -∗
@@ -1677,7 +1677,7 @@ Section VirtioProto.
     v_cfg v1 = virtio_init_cfg pd pav pu ->
     v_seen v1 = v_seen v0 -> v_used_idx v1 = v_used_idx v0 ->
     v_cache v1 = v_cache v0 -> v_taken v1 = v_taken v0 ->
-    v_ahead v1 = v_ahead v0 ->
+    v_inflight v1 = v_inflight v0 ->
     virtio_pages_aligned (virtio_init_cfg pd pav pu) ->
     avail_idx_dom (virtio_init_cfg pd pav pu)
       ## used_page_pas (virtio_init_cfg pd pav pu) ->
@@ -1714,7 +1714,7 @@ Section VirtioProto.
       by (rewrite Hui Hui0; exact zero16_wrap16).
     assert (Hca1 : v_cache v1 = ∅) by (rewrite Hcae; exact Hca0).
     assert (Htk1 : v_taken v1 = None) by (rewrite Htke; exact Htk0).
-    assert (Hah1 : v_ahead v1 = ∅) by (rewrite Hahe; exact Hah0).
+    assert (Hah1 : v_inflight v1 = ∅) by (rewrite Hahe; exact Hah0).
     iApply (virtio_proto_intro_gen γ v1 (virtio_init_cfg pd pav pu)
               Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj Hs1 Hu1
               (virtio_init_cfg_wce pd pav pu) Hca1 Htk1 Hah1
@@ -1734,7 +1734,7 @@ Section VirtioProto.
     virtio_live c' = false ->
     v_cfg v' = c' ->
     v_seen v' = zero16 -> v_used_idx v' = zero16 ->
-    v_cache v' = ∅ -> v_taken v' = None -> v_ahead v' = ∅ ->
+    v_cache v' = ∅ -> v_taken v' = None -> v_inflight v' = ∅ ->
     (* THE ONE NEW OBLIGATION ON A PRE-FLIP WRITE (async-disk.md §2): the
        configuration it programs must still decline the cache.  Thirteen of
        the fourteen writes do not touch [vc_dfeat] at all; the DRIVER_FEATURES
@@ -1798,7 +1798,7 @@ Section VirtioProto.
     virtio_live c = false ->
     virtio_proto γ v -∗ disk_cfg_is γ (DfracOwn (1/2)) c -∗
     ⌜v_cfg v = c /\ v_seen v = zero16 /\ v_used_idx v = zero16
-     /\ v_cache v = ∅ /\ v_taken v = None /\ v_ahead v = ∅⌝.
+     /\ v_cache v = ∅ /\ v_taken v = None /\ v_inflight v = ∅⌝.
   Proof.
     iIntros (Hlive) "Hp Hmine". rewrite /virtio_proto.
     destruct (virtio_live (v_cfg v)) eqn:Hl.
@@ -1824,7 +1824,7 @@ Section VirtioProto.
      Both stores the live driver makes do
      ([VirtioModel.virtio_write_cache]/[_taken] at [vio_cfg_stable]). *)
   Lemma virtio_proto_stable (γ : disk_names) (v v' : virtio_state) :
-    v_cfg v' = v_cfg v -> v_seen v' = v_seen v -> v_ahead v' = v_ahead v ->
+    v_cfg v' = v_cfg v -> v_seen v' = v_seen v -> v_inflight v' = v_inflight v ->
     v_used_idx v' = v_used_idx v ->
     v_cache v' = v_cache v -> v_taken v' = v_taken v ->
     virtio_proto γ v -∗ virtio_proto γ v'.
@@ -2142,15 +2142,13 @@ Section VirtioProto.
     { iPureIntro. rewrite (dom_union_sub _ dma HwDdma).
       exact (vproto_ok_step (v_cfg v) pr (dom dma) p sl Hok Hsl). }
     iSplitR; [iPureIntro; exact Hal|].
-    (* THE WINDOW MOVED EXACTLY AS THE KEYED STATE SAYS ([vproto_step_vserve]):
-       the watermark absorbed whatever prefix the serve completed, and the
-       served-out-of-turn set is the protocol's own. *)
+    (* THE WINDOW MOVED EXACTLY AS THE KEYED STATE SAYS, and after the
+       pop/complete split that is immediate: the POP index does not move at a
+       completion, and the in-flight set loses exactly this request's head. *)
     iSplitR.
-    { iPureIntro. rewrite vslot_post_seen Hseen Hah.
-      by rewrite (vproto_step_vserve (v_cfg v) pr (dom dma) p sl Hok Hsl). }
+    { iPureIntro. rewrite vslot_post_seen. exact Hseen. }
     iSplitR.
-    { iPureIntro. rewrite vslot_post_ahead Hseen Hah.
-      by rewrite (vproto_step_vserve (v_cfg v) pr (dom dma) p sl Hok Hsl). }
+    { iPureIntro. rewrite vslot_post_inflight Hah. reflexivity. }
     (* THE LATCH: released exactly when the request that held it completed,
        and the two sides agree because [wrap16] is injective on the window. *)
     assert (Htkeq : (if bool_decide (v_taken v = Some (wrap16 p))
@@ -2357,7 +2355,7 @@ Section VirtioProto.
       rewrite Hsrc Htgt. iIntros "$". }
     iFrame "Hm".
     rewrite /virtio_proto Hv1.
-    cbn [v_cfg v_isr v_seen v_ahead v_used_idx v_disk v_cache v_taken].
+    cbn [v_cfg v_isr v_seen v_inflight v_used_idx v_disk v_cache v_taken].
     rewrite Hlive Hce.
     iExists (vproto_capture_state pr p), dma.
     iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hdone".
@@ -2503,7 +2501,7 @@ Section VirtioProto.
     iSplitL "Hauth".
     { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
     rewrite /virtio_proto Hv1.
-    cbn [v_cfg v_isr v_seen v_ahead v_used_idx v_disk v_cache v_taken].
+    cbn [v_cfg v_isr v_seen v_inflight v_used_idx v_disk v_cache v_taken].
     rewrite Hlive.
     iExists pr, dma. iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
