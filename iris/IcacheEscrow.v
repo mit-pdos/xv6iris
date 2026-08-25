@@ -4194,11 +4194,23 @@ Section IcacheEscrow.
            ([FsStateDefs.blk_owned_ne_34] at 3/4, [blk_owned_ne_full] at 1),
            and it is why the reader's withdrawal is a QUARTER and not a half.
        (d) THE RESIDUE -- the slot is live and the escrow holds no bundle at
-           all.  Three spans reach it: a checked-out bundle at a
-           [ic_dep_bundleless] descriptor (every unconverted transactional
-           [ilock]), iput's mid-free park and iput's authority-side window
-           ([ic_held]).  Naming it is the point: this alternative is exactly
-           what the caller sweep still owes, and NOTHING ELSE remains.
+           all.  Naming it is the point: this alternative is exactly what the
+           caller sweep still owes, and NOTHING ELSE remains.  What reaches
+           it, after durable-disk B''-tx2 armed the last three transactional
+           walks ([create], [sys_open], [sys_unlink]):
+
+             - iput's two descriptors [DepRef] and [DepFrz], its mid-free
+               park ([ic_payload_arm]'s frozen alternative) and its
+               authority-side window [ic_held].  Every [iput] in this kernel
+               runs INSIDE a transaction, but [SpecIput]'s contract does not
+               carry one, so none of those four can park a share until it
+               does.
+             - the [DepShr] the plain [ilock] publishes, in the gap between
+               its checkout and whichever ghost step arms or sheds it.  It
+               has NO non-lock use left -- every walk-level mention is gone
+               -- so it dies when the checkout itself publishes [DepRd] (the
+               read arm) or [DepTx] (the write arm), i.e. when
+               [ic_swap_checkout] takes the arm rather than a later fupd.
 
      THE WRITE ARM IS NOT AMONG THEM, and that is what the [ln_tx] authority
      buys: a [DepTx] arm holds a positive share of an open transaction's

@@ -849,6 +849,95 @@ as their remaining consumers.
   `create`/`sys_open`/`sys_unlink` and iput's windows are converted,
   `wp_ilock_sconf` becomes the READ form (folding `ic_shed_rd` in, two
   caller files), `DepShr` goes, and `ic_escrow_body_cover` loses arm (d).
+
+  **AS LANDED — B″-tx2: THE LAST THREE WALKS, AT A QUARTER EACH.**
+
+  TWO ARMS OF ONE TRANSACTION LIVE AT A QUARTER, AND THE ID IS NAMED.
+  `ic_tx_dep`'s invariant ("the arm holds `q`, the holder holds `q` beside
+  it") forces `q = 1/2`, so two of them at one transaction claim 2 — B″-tx's
+  wall.  `IcacheEscrow.ic_tx_dep_at cn k s dev inum g t q` is the same bundle
+  with the id and the share NAMED, and two arms of ¼ plus a residue of ½
+  rejoin to 1 exactly as one arm of ½ and a residue of ½ do.  The moves are
+  `ic_shrink_tx_body` / `ic_grow_tx_body` (`ic_arm_tx_body`'s
+  `ghost_var_update_2` with the share moving between the arm and the holder;
+  the total is an EQUATION PREMISE `q = q1 + q2`, so no caller ever rewrites
+  a `Qp` sum inside the proofmode) and their fupds `ic_shrink_tx` /
+  `ic_grow_tx`.  `ic_tx_dep2` is the two-slot form at a CLOSED id, with
+  `ic_arm_tx2` (shrink the first arm, arm the second) and `ic_disarm_tx2_fst`
+  / `_snd` (release either, the survivor GROWS back to a half); it is the
+  two-slot twin of `SpecCreate.create_locked`'s `ic_tx_dep` and NOTHING IN
+  THIS KERNEL CONSUMES IT YET — every walk uses the `_at` form directly,
+  because that is what keeps the sweep position-stable.  `LogInv` gained the
+  general share arithmetic beside `log_tx_halve`/`_join`: `log_tx_split` /
+  `log_tx_add` (equation premise) and `log_tx_full` / `log_tx_open`.
+
+  THE SWEEP MOVED NO CONJUNCT, and that was the point of naming the id.  A
+  stage's `ic_deposit cn k (DepShr s dev inum g)` becomes
+  `ic_deposit cn k (DepTx s dev inum g t (1/4))` IN PLACE; its `log_tx g`
+  becomes `t ↪[ln_tx g]{#(1/2)} tt` IN PLACE; a stage that carried the whole
+  `log_op g u` instead carries `log_opb g u` and bundles the residue into
+  `ic_tx_dep` (one lock) or into two `ic_tx_dep_at`s (two locks).  Exactly
+  ONE binder is added per stage statement, always LAST, and the walks' ~33
+  deposit conjuncts converted by substitution.  The one genuinely new premise
+  is `g = icfg_log`, added to nine lemmas that lacked it (`so_tail_pub`,
+  `so_stores`, `so_alloc`, `so_join`; `so_tail_c`/`_d`/`_e`/`_f`/`_s`;
+  `su_w2`, `su_w2_bad`, `su_w3`, `su_tail_bad`/`_d`/`_e`) — every caller
+  already proves it.
+
+  CONVERTED: `create` (+ `sys_mkdir`, `sys_mknod`), `sys_open`, `sys_unlink`.
+  `create` is the arming walk and its three shares now add up explicitly:
+  ¼ in the parent's escrow, ¼ in the child's, ½ in the registry.  `cr_dirty`
+  is therefore KEYED BY THE TRANSACTION ID (`cr_dirty t i = ∃ k,
+  ireg_armed k t (1/2) {[i]}`) and `cr_dirty_arm` runs off `InodeRegion`'s
+  SHARE form `ireg_arm` rather than the whole-token `ireg_arm_tx` —
+  `ireg_arm` already took a bare `t ↪[ln_tx icfg_log]{#q} tt` (B″-arm), so
+  `InodeRegion` did not move.  `SpecCreate.create_locked` carries
+  `ic_tx_dep` in the deposit's own position, and `wp_create_sconf_body`'s
+  post hands `log_tx` back only on the FAILURE arm (on the success arms it
+  is inside the bundle) — three caller files pay one `iDestruct` each.
+
+  TWO CONTRACTS HAD TO MOVE TO THEIR GEN FORMS, for one reason: a walk whose
+  token is half-parked cannot present a counted `log_op`.  `sys_open`'s
+  `so_stores` calls `SpecItrunc.wp_itrunc_gen` (`log_opSe` in, `log_opS` out,
+  `log_credit … false` by `log_credit_own`), and `sys_unlink`'s `su_tail_e` —
+  the one arm holding two locked inodes — calls
+  `SpecIunlockput.wp_iunlockput_gen`.  This is B″-arm's prediction at the
+  `_sconf` corollaries, and it is the whole held-lock ABI bill: two call
+  sites, both with the GEN contract already in the tree.
+
+  `DepShr` HAS NO NON-LOCK USE LEFT (checked): every remaining mention is
+  inside `SpecIlock`/`SpecIunlock`/`SpecIunlockput` and their proofs, plus
+  `ProofCreateFreshTy`, which relays `ilock`'s post to a caller that arms it
+  immediately.  `ic_slot_cover` therefore still has FOUR alternatives, and
+  its comment now names exactly what inhabits the residue: (i) iput's
+  `DepRef`/`DepFrz`/mid-free park/`ic_held`, and (ii) the `DepShr` the PLAIN
+  `ilock` publishes in the gap between its checkout and whichever later fupd
+  arms or sheds it.  (ii) is not closed by converting more callers: it dies
+  only when `ic_swap_checkout` ITSELF publishes `DepRd` or `DepTx`, i.e. when
+  the arm moves into the checkout's own ghost step rather than a fupd after
+  the contract's post.  That is one more increment in `ProofIlock` +
+  `SpecIlock` and it is what "retire `DepShr`" now means.
+
+  IPUT'S SHARE IS NOT DONE, AND THE MEASUREMENT IS THE DELIVERABLE.  Every
+  `iput` in this kernel runs inside a transaction (its `nlink = 0` path calls
+  `itrunc` + `iupdate`), so no window of it is exempt and nothing here needed
+  a premise nobody can discharge.  What blocks it is the CONTRACT: the
+  counted `SpecIput.wp_iput_sconf` carries the WHOLE `log_op g n`, while the
+  GEN `wp_iput_gen` carries `log_opSe` and no token at all — and it is the
+  GEN form that `SpecIunlockput` hands its interior iput.  Giving iput a
+  share means a third family (`log_opSe` beside `t ↪[ln_tx icfg_log]{#q} tt`,
+  in and out) across `SpecIput` (523 lines) + `ProofIput` (5246, sixteen
+  mentions of the four window predicates) + `SpecIunlockput` (902) +
+  `ProofIunlockput`, and the nine files that name an iput contract
+  (`LinkIput`, `ProofDirlink`, `ProofFileclose`, `ProofIreclaim` ×2,
+  `ProofIunlockput`, `ProofKexit`, `ProofNamex`, `ProofSysChdir`,
+  `ProofSysLink`).  Each of those callers already holds a share at the call —
+  the walks above put one in their hands — so the sweep is threading, not
+  design.
+
+  REMAINS: iput's share (above), the checkout-side arm that retires `DepShr`
+  (above), and B″-join's partition tie.  Until the first two land,
+  `ic_slot_cover` keeps arm (d) and `snap_ok` cannot be collected.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
