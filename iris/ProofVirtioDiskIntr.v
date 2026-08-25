@@ -42,6 +42,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpLoad WpAu4.
 Require Import MinstretInv.
 Require Import WpSmodeHalf.
 Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
@@ -910,15 +911,14 @@ End VtEpilogue.
 End VtEpilogue.
 
 (* ===================================================================== *)
-(* §3  Seams for the LOOP region (+0x30 .. +0x86), which is not yet       *)
-(*     proved.  Two things the loop needs that nothing else provides:     *)
+(* §3  Seams for the LOOP region (+0x30 .. +0x86).                        *)
 (*                                                                        *)
-(*  (a) [disk_res_at] -- [DiskInv.disk_res] with its six existentials     *)
+(*  (a) [disk_res_at] -- [DiskInv.disk_res] with its four existentials    *)
 (*      NAMED.  The loop carries the destructured form across iterations  *)
-(*      (its [nr] moves, its [fl]/[pk] move one position from flight to   *)
-(*      parked), so the invariant cannot be the packed [disk_res].        *)
-(*      Kept HERE, not in DiskInv.v, because virtio_disk_rw owns that     *)
-(*      file; if rw ends up wanting the same split, promote it there.     *)
+(*      (its [nr] moves), so the invariant cannot be the packed           *)
+(*      [disk_res].  Kept HERE, not in DiskInv.v, because virtio_disk_rw  *)
+(*      owns that file; if rw ends up wanting the same split, promote it  *)
+(*      there.                                                            *)
 (*                                                                        *)
 (*  (b) the queue pages' word-alignment, which is what turns the          *)
 (*      protocol's byte-granular [phys_word2]/[phys_word4] back into the  *)
@@ -926,8 +926,10 @@ End VtEpilogue.
 (*      [phys_to_word4] take it as a premise).  It is a consequence of    *)
 (*      [virtio_pages_aligned] alone, stated mword-free so [lia] works    *)
 (*      (durable-notes' zify gotcha).                                     *)
+(*                                                                        *)
+(*  (c) the width-1/4/8 [wordw_pointsto] the atomic-update leaves speak,  *)
+(*      as the [↦ₘ]/[↦₄]/[↦₈] the accessors hand out.                     *)
 (* ===================================================================== *)
-
 (* RESTATEMENTS of [DiskInv]'s family (it moved there: the queue pages'
    geometry, cloned by three files).  Local names kept, so no call site
    below changed. *)
@@ -958,78 +960,90 @@ Section VtLoopSeam.
 
   (* [DiskInv.disk_res]'s body with the four existentials named. *)
   Definition disk_res_at (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
-      (np nr : nat)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) : iProp Σ :=
-    (* the window bookkeeping, exactly as in [DiskInv.disk_res]: an arbitrary
-       set of live positions below [np].  There is no [fl]/[pk] split any
-       more -- a live request's state is its [HActive] receipt, held by the
-       publisher, not a row in a map the lock resource carries (finding 5). *)
-    (⌜forall p, p ∈ dom tr -> (p < np)%nat⌝ ∗
-     ⌜size tr = (np - nr)%nat⌝ ∗
-     ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
-     ⌜forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-        tri_set Tp ## tri_set Tq⌝ ∗
-     ⌜forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false⌝ ∗
+      (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool) : iProp Σ :=
+    ((* every row of the claim map is below the published count, names its
+        own position and links its slot to its buffer: the handler reads the
+        claim at the record it is looking at off THIS map, and that is how it
+        knows the head is below 8 and the status byte is [info[h].status] *)
+     ⌜forall p dc, cm !! p = Some dc ->
+        (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc)⌝ ∗
      disk_pub γ np ∗
      disk_done_lb γ nr ∗
-     (* the READ WATERMARK's half: the handler spends it to reclaim in order *)
+     (* the READ WATERMARK's half: the deposit at [b->disk = 0] spends it and
+        hands it back advanced, which is what drains the ring in order *)
      disk_read_at γ nr ∗
      (* nothing half-published while the lock is not held mid-publish *)
      disk_stage γ None ∗
+     (* THE CLAIM MAP'S AUTHORITY: the handler's carrier between its
+        openings of the device invariant.  It holds the lock for the whole
+        loop, so the map is stable in its hands; each accessor agrees the
+        receipt's fragment with it and speaks about the claim it read here. *)
+     ghost_map_auth (dn_claim γ) 1 cm ∗
      d_used_idx ↦₂ wrap16 nr ∗
      free_bundles γ pd fr)%I.
 
   Lemma disk_res_at_elim (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     disk_res γ pd pav pu -∗
-    ∃ (np nr : nat)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-      disk_res_at γ pd pav pu np nr tr fr.
+    ∃ (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool),
+      disk_res_at γ pd pav pu np nr cm fr.
   Proof.
     iIntros "H". rewrite /disk_res.
-    iDestruct "H" as (np nr tr fr) "H".
-    iExists np, nr, tr, fr. rewrite /disk_res_at /free_bundles. iExact "H".
+    iDestruct "H" as (np nr cm fr) "H".
+    iExists np, nr, cm, fr. rewrite /disk_res_at /free_bundles. iExact "H".
   Qed.
 
   Lemma disk_res_at_intro (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
-      (np nr : nat)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) :
-    disk_res_at γ pd pav pu np nr tr fr -∗ disk_res γ pd pav pu.
+      (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool) :
+    disk_res_at γ pd pav pu np nr cm fr -∗ disk_res γ pd pav pu.
   Proof.
     iIntros "H". rewrite /disk_res.
     iEval (rewrite /disk_res_at /free_bundles) in "H".
-    iExists np, nr, tr, fr. iExact "H".
+    iExists np, nr, cm, fr. iExact "H".
   Qed.
 
-  (* THE loop invariant's ghost content, at the loop head KernelSyms.virtio_disk_intr+0x3e: the
+  (* THE loop invariant's ghost content, at the loop head +0x3e: the
      destructured lock resource plus the observation that carried the thread
-     into the body -- the device is provably PAST the driver's [nr], which is
-     [VirtioProto.virtio_proto_reclaim_acc]'s premise at [p := nr]. *)
+     into the body -- the device is provably PAST the driver's [nr], which
+     is what entitles the handler to the completion record at [nr]
+     ([VirtioProto.virtio_proto_record_at] wants [disk_done_lb (S nr)]). *)
   Definition vt_loop_state (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
     : iProp Σ :=
-    (∃ (np nr : nat)
-       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (c : nat),
+    (∃ (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool) (c : nat),
        ⌜(nr < c)%nat /\ (c <= np)%nat⌝ ∗ disk_done_lb γ c ∗
-       disk_res_at γ pd pav pu np nr tr fr)%I.
+       disk_res_at γ pd pav pu np nr cm fr)%I.
 
   Lemma vt_loop_state_close (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     vt_loop_state γ pd pav pu -∗ disk_res γ pd pav pu.
   Proof.
-    iIntros "H". iDestruct "H" as (np nr tr fr c) "(_ & _ & H)".
+    iIntros "H". iDestruct "H" as (np nr cm fr c) "(_ & _ & H)".
     iApply (disk_res_at_intro with "H").
   Qed.
 
-  (* the flight entry the body consumes: [nr] is in the window whenever the
-     device is ahead of it, because [dom fl] is exactly [nr, np). *)
-  Lemma vt_flight_at_nr {A : Type} (np nr c : nat) (fl : gmap nat A) :
-    dom fl = set_seq nr (np - nr) ->
-    (nr < c)%nat -> (c <= np)%nat ->
-    exists v : A, fl !! nr = Some v.
-  Proof.
-    intros Hdom Hlt Hle.
-    assert (Hin : nr ∈ dom fl).
-    { rewrite Hdom. apply elem_of_set_seq. lia. }
-    apply elem_of_dom in Hin. destruct Hin as [b Hb]. exists b. exact Hb.
-  Qed.
+  (* the completed-count lower bound weakens *)
+  Lemma vt_done_lb_le (γ : disk_names) (n c : nat) :
+    (n <= c)%nat -> disk_done_lb γ c -∗ disk_done_lb γ n.
+  Proof. intro H. rewrite /disk_done_lb. iApply (mono_nat_lb_own_le n H). Qed.
+
+  (* the atomic-update leaves' window at the three widths the loop body
+     touches through the device invariant ([WpSconfMem.wordw1_byte] is the
+     byte instance; the other two are the definitions side by side) *)
+  Lemma vt_byte_wordw (a : Arch.pa) (b : bv 8) :
+    wordw_pointsto (KTR := KT0) 1 a (DfracOwn 1) b ⊣⊢ a ↦ₘ b.
+  Proof. exact (wordw1_byte (KTR := KT0) a (DfracOwn 1) b). Qed.
+
+  Lemma vt_word4_wordw (a : Arch.pa) (w : SailStdpp.Values.mword 32) :
+    a ↦₄ w ⊣⊢ wordw_pointsto (KTR := KT0) 4 a (DfracOwn 1) w.
+  Proof. rewrite /word4_pointsto /wordw_pointsto. reflexivity. Qed.
+
+  Lemma vt_word8_wordw (a : Arch.pa) (w : SailStdpp.Values.mword 64) :
+    a ↦₈ w ⊣⊢ wordw_pointsto (KTR := KT0) 8 a (DfracOwn 1) w.
+  Proof. rewrite /word_pointsto /wordw_pointsto. reflexivity. Qed.
+
+  (* the width-1 unsigned load's extension, as [wp_load_s_sconf_au] wants
+     it ([WpSconfMem]'s own copy is local to that file) *)
+  Lemma vt_ext1 (v : SailStdpp.Values.mword 8) :
+    extend_value true v = zero_extend' 64 v.
+  Proof. unfold extend_value. reflexivity. Qed.
 
 End VtLoopSeam.
 
@@ -1104,7 +1118,8 @@ Section VtDevRam.
      at +0x82.  Drives [virtio_proto_used_idx_acc]; the value is the
      device's completed count, and what survives is the pair of bounds
      [nr <= nc <= np] plus the persistent lower bound at [nc] -- which is
-     exactly the evidence the reclaim accessor wants. *)
+     what entitles the handler to the completion record at [nr]
+     ([virtio_proto_record_at]). *)
   Lemma wp_vt_lhu_used_idx (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (np nr : nat) (p : mword 64) :
@@ -1213,59 +1228,47 @@ Section VtDevRam.
     iApply ("Hcont" $! nc with "[%] Hlbc Hpub Hcg Hpc"). exact Hb.
   Qed.
 
+  (* the used-ring ELEMENT read: [c.lw a5,4(a5)] at +0x4e, at the watermark
+     [u].  Two accessors, both read-only, keyed by the record rather than by
+     a receipt (the handler holds none): [virtio_proto_record_at] names the
+     POSITION [p] the record at [u] is about and agrees the claim [dc] at
+     [p] with the handler's own map (the lock's [dn_claim] authority), and
+     [virtio_proto_used_peek_at] hands out the element's bytes for that
+     claim -- so the loaded id IS the head of [dc_slot dc].  Nothing is
+     spent: the watermark comes back at [u]; the deposit at [b->disk = 0]
+     (chunk C) is what advances it.
 
-  (* the used-ring ELEMENT read: [c.lw a5,4(a5)] at +0x4e.  Drives
-     [virtio_proto_reclaim_acc] at [p := nr]: the receipt plus the lower
-     bound [p < c] buy the loaded id (= the chain's head descriptor) AND the
-     whole payoff -- the pin bytes back, the status byte pinned at 0 (which
-     is what refutes the status panic two instructions later), the buffer and
-     the disk fragments.
-
-     [virtio_proto_reclaim_acc] exports the [disk_cfg] witness, so
-     [disk_cfg_agree] against [disk_geom]'s copy pins [v_cfg v] and makes
-     [used_elem_pa (v_cfg v) p] the very address the code computes off
-     [disk.used]. *)
+     The address claim is taken off the element's own points-to in one
+     read-only pre-opening (per node the access translates before it reads,
+     so the claim rides BESIDE the atomic update), and the peek runs again
+     inside the update for the value.  [disk_cfg_agree] against
+     [disk_geom]'s copy pins [v_cfg v] and makes [used_elem_pa (v_cfg v) u]
+     the very address the code computes off [disk.used]. *)
   Lemma wp_vt_lw_used_elem (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (np c q p : nat) (sl : vslot) (pin : _)
+      (m : regfile) (n : nat) (np u : nat) (cm : gmap nat dclaim)
       (pp : mword 64) :
-    (* [q] IS THE RING POSITION, [p] THE USED INDEX IT COMPLETED AT.  With the
-       served order free these are different numbers: the handler walks used
-       indices, and [disk_ord] is what names the position behind the one it is
-       looking at (tools/vtest/README.md finding 5). *)
-    (p < c)%nat ->
     add_vec (rget m rs1) (sign_extend' 64 imm)
-      = (pa_add pu (vt_uoff p) : SailStdpp.Values.mword 64) ->
+      = (pa_add pu (vt_uoff u) : SailStdpp.Values.mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
     sie_cap_gpr KT1 m n false pp -∗ pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ disk_receipt γd q sl pin -∗ disk_done_lb γd c -∗
-    disk_ord γd q p -∗
-    (* the READ WATERMARK, at exactly this record: reclaiming it is what
-       advances the handler past it, and out-of-order reclaim cannot even be
-       stated -- the credential would not typecheck. *)
-    disk_read_at γd p -∗
-    ( ⌜ slot_pin_ok (virtio_init_cfg pd pav pu) q sl pin ⌝ -∗
+    disk_pub γd np -∗ disk_done_lb γd (S u) -∗ disk_read_at γd u -∗
+    ghost_map_auth (dn_claim γd) 1 cm -∗
+    ( ∀ (p : nat) (dc : dclaim),
+      ⌜ cm !! p = Some dc ⌝ -∗
+      ⌜ slot_pin_ok (virtio_init_cfg pd pav pu) p (dc_slot dc) (dc_pin dc) ⌝ -∗
+      disk_ord γd p u -∗
       sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg
-          (sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
+          (sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))
                             : SailStdpp.Values.mword 32))]> m) n false pp -∗
       pc_is (add_vec_int pc 2) -∗
-      disk_pub γd np -∗ disk_done_lb γd (S p) -∗ disk_read_at γd (S p) -∗
-      phys_map pin -∗
-      phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero -∗
-      (* the SPENT crash permit's token rides WITH the payoff, on its way
-         from the completed slot to [DiskInv.parked_res] (PermInv.v) *)
-      (slot_perms_done γd sl ∗
-       ∃ bs : list (bv 8),
-         ⌜length bs = vs_len sl⌝ ∗
-         ⌜bs = vs_data sl⌝ ∗
-         disk_bytes γd (vs_sector_off sl) bs ∗
-         (if vs_is_out sl then emp else phys_list (vr_buf (vs_req sl)) bs)) -∗
+      disk_pub γd np -∗ disk_read_at γd u -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpc0 Hea Hrd Hrdok.
+    intros Hea Hrd Hrdok.
     (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
        applies a converted leaf at a VARIABLE register and carries no tp fact
        of its own, so the class has to be stated here; it is implicit, so this
@@ -1275,114 +1278,107 @@ Section VtDevRam.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
               = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrcpt #Hlbc #Hordq Hrd Hcont".
+    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb Hrd Hauth Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & _ & Hcanu).
     iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _)".
     destruct Hal0 as (_ & _ & Halu).
-    assert (Halign : is_aligned_paddr (Physaddr (pa_add pu (vt_uoff p))) 4 = true).
-    { apply (vt_aligned_off pu (vt_uoff p) 4 Halu);
-        [ exact (vt_uoff_lt_z p) | reflexivity | reflexivity | exact (vt_uoff_mod4 p) ]. }
+    assert (Halign : is_aligned_paddr (Physaddr (pa_add pu (vt_uoff u))) 4 = true).
+    { apply (vt_aligned_off pu (vt_uoff u) 4 Halu);
+        [ exact (vt_uoff_lt_z u) | reflexivity | reflexivity | exact (vt_uoff_mod4 u) ]. }
     assert (Hst4 : forall j, (j < 4)%nat ->
-              kmap_static (svpn_of (pa_add (pa_add pu (vt_uoff p)) j)) KP_rw).
+              kmap_static (svpn_of (pa_add (pa_add pu (vt_uoff u)) j)) KP_rw).
     { intros j Hj. rewrite pa_add_add.
-      exact (Hstu (vt_uoff p + j)%nat (vt_uoff_add_lt p j Hj)). }
+      exact (Hstu (vt_uoff u + j)%nat (vt_uoff_add_lt u j Hj)). }
     assert (Hcan4 : forall j, (j < 4)%nat ->
-              (uint (pa_add (pa_add pu (vt_uoff p)) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
+              (uint (pa_add (pa_add pu (vt_uoff u)) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add.
-      exact (Hcanu (vt_uoff p + j)%nat (vt_uoff_add_lt p j Hj)). }
-    (* THE ADDRESS CLAIM, off the used ELEMENT's own points-to.  The leaf
-       wants it BESIDE the atomic update (per node the access translates
-       several nodes before the memory node where the update is opened), and
-       [virtio_proto_reclaim_acc]'s closer is one-shot -- it spends the
-       receipt -- so the peek goes through the read-only
-       [VirtioProto.virtio_proto_used_peek], which hands everything back. *)
+      exact (Hcanu (vt_uoff u + j)%nat (vt_uoff_add_lt u j Hj)). }
+    (* THE RECORD, AND THE ADDRESS CLAIM off the used ELEMENT's own
+       points-to, in one read-only opening.  The leaf wants the claim BESIDE
+       the atomic update (per node the access translates several nodes
+       before the memory node where the update is opened). *)
     iApply fupd_wp.
     iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
     iInv "Hvinv" as ">Hdbodyp" "Hdclosep".
     iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
-    iDestruct (virtio_proto_used_peek γd vstp np q p sl pin
-                 with "Hprotop Hpub Hrcpt Hordq") as "(#Hcfgvp & Hw4p & Hbackp)".
+    iDestruct (virtio_proto_record_at γd vstp np u cm with "Hprotop Hpub Hlb Hrd Hauth")
+      as "(Hrec & Hprotop & Hpub & _ & Hrd & Hauth)".
+    iDestruct "Hrec" as (p dc) "(%Hcm & %Hpos & #Hord)".
+    iDestruct (virtio_proto_used_peek_at γd vstp np p u cm dc Hcm
+                 with "Hprotop Hpub Hord Hrd Hauth")
+      as "(_ & #Hcfgvp & %Hspop & Hw4p & Hbackp)".
     iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
-    assert (Haddrp : (pa_add pu (vt_uoff p) : Arch.pa) = used_elem_pa (v_cfg vstp) p)
+    assert (Haddrp : (pa_add pu (vt_uoff u) : Arch.pa) = used_elem_pa (v_cfg vstp) u)
       by (rewrite Hceqp; reflexivity).
+    assert (Hspo : slot_pin_ok (virtio_init_cfg pd pav pu) p (dc_slot dc) (dc_pin dc))
+      by (rewrite -Hceqp; exact Hspop).
     (* COPIES, not [rewrite ... in]: the body below re-opens the invariant at
        its OWN [vst], and rewriting the three shared facts to THIS peek's
        [vstp] would leave them unusable there. *)
     assert (Halignp : is_aligned_paddr
-                        (Physaddr (used_elem_pa (v_cfg vstp) p)) 4 = true)
+                        (Physaddr (used_elem_pa (v_cfg vstp) u)) 4 = true)
       by (rewrite -Haddrp; exact Halign).
     assert (Hst4p : forall j, (j < 4)%nat ->
-              kmap_static (svpn_of (pa_add (used_elem_pa (v_cfg vstp) p) j)) KP_rw)
+              kmap_static (svpn_of (pa_add (used_elem_pa (v_cfg vstp) u) j)) KP_rw)
       by (rewrite -Haddrp; exact Hst4).
     assert (Hcan4p : forall j, (j < 4)%nat ->
-              (uint (pa_add (used_elem_pa (v_cfg vstp) p) j
+              (uint (pa_add (used_elem_pa (v_cfg vstp) u) j
                      : SailStdpp.Values.mword 64) < 274877906944)%Z)
       by (rewrite -Haddrp; exact Hcan4).
-    iDestruct (phys_to_word4 (used_elem_pa (v_cfg vstp) p)
-                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+    iDestruct (phys_to_word4 (used_elem_pa (v_cfg vstp) u)
+                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
                  Halignp Hst4p Hcan4p with "Hkm Hw4p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (used_elem_pa (v_cfg vstp) p)
-                 (DfracOwn 1) (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (used_elem_pa (v_cfg vstp) u)
+                 (DfracOwn 1) (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
-    iDestruct (word4_to_phys (used_elem_pa (v_cfg vstp) p)
-                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) Hst4p
+    iDestruct (word4_to_phys (used_elem_pa (v_cfg vstp) u)
+                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))) Hst4p
                  with "Hkm Hcellp") as "Hw4p".
-    iDestruct ("Hbackp" with "Hw4p") as "(Hprotop & Hpub & Hrcpt)".
+    iDestruct ("Hbackp" with "Hw4p") as "(Hprotop & Hpub & Hrd & Hauth)".
     iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
     { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
     iModIntro.
     iApply (wp_load_s_sconf_au (CID:=CID) (kt := KT1) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
-              (fun w => (⌜w = (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
+              (fun w => (⌜w = (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))
                                : SailStdpp.Values.mword 32)⌝ ∗
-                         ⌜slot_pin_ok (virtio_init_cfg pd pav pu) q sl pin⌝ ∗
-                         disk_pub γd np ∗ disk_done_lb γd (S p) ∗
-                         disk_read_at γd (S p) ∗
-                         phys_map pin ∗
-                         phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
-                         (slot_perms_done γd sl ∗
-                          ∃ bs : list (bv 8),
-                            ⌜length bs = vs_len sl⌝ ∗
-                            ⌜bs = vs_data sl⌝ ∗
-                            disk_bytes γd (vs_sector_off sl) bs ∗
-                            (if vs_is_out sl then emp
-                             else phys_list (vr_buf (vs_req sl)) bs)))%I)
+                         disk_pub γd np ∗ disk_read_at γd u ∗
+                         ghost_map_auth (dn_claim γd) 1 cm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hrcpt Hrd] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hrd Hauth] [Hcont]").
     { rewrite Hea Haddrp. iExact "Hclaim0". }
     { iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
-      iDestruct (virtio_proto_reclaim_acc γd vst np q p sl pin
-                   with "Hproto Hpub Hrcpt Hordq Hrd")
-        as "(_ & #Hcfgv & _ & %Hspo & Hw4 & Hback)".
+      iDestruct (virtio_proto_used_peek_at γd vst np p u cm dc Hcm
+                   with "Hproto Hpub Hord Hrd Hauth")
+        as "(_ & #Hcfgv & _ & Hw4 & Hback)".
       iDestruct (disk_cfg_agree with "Hcfgv Hcfg0") as %Hceq.
-      assert (Haddr : (pa_add pu (vt_uoff p) : Arch.pa) = used_elem_pa (v_cfg vst) p).
+      assert (Haddr : (pa_add pu (vt_uoff u) : Arch.pa) = used_elem_pa (v_cfg vst) u).
       { rewrite Hceq. reflexivity. }
       rewrite Haddr in Halign Hst4 Hcan4.
-      iDestruct (phys_to_word4 (used_elem_pa (v_cfg vst) p)
-                   (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+      iDestruct (phys_to_word4 (used_elem_pa (v_cfg vst) u)
+                   (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
                    Halign Hst4 Hcan4 with "Hkm Hw4") as "Hcell".
       iModIntro.
-      iExists (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))) : SailStdpp.Values.mword 32).
+      iExists (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))) : SailStdpp.Values.mword 32).
       iSplitL "Hcell". { rewrite Hea Haddr. iExact "Hcell". }
       iIntros "Hcell". iEval (rewrite Hea Haddr) in "Hcell".
-      iDestruct (word4_to_phys (used_elem_pa (v_cfg vst) p)
-                   (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) Hst4
+      iDestruct (word4_to_phys (used_elem_pa (v_cfg vst) u)
+                   (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))) Hst4
                    with "Hkm Hcell") as "Hw4".
-      iMod ("Hback" with "Hw4") as "(Hproto & Hpub & #Hlbs & Hrd' & Hpin & Hstat & Hrest)".
+      iDestruct ("Hback" with "Hw4") as "(Hproto & Hpub & Hrd & Hauth)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-      iModIntro. iFrame "Hpub Hlbs Hrd' Hpin Hstat Hrest".
-      iSplitR; [done|]. iPureIntro. rewrite -Hceq. exact Hspo. }
+      iModIntro. iFrame "Hpub Hrd Hauth". done. }
     iIntros (w). iApply wp_next_off_intro.
-    iIntros "Hcg Hpc (-> & %Hspo & Hpub & #Hlbs & Hrd' & Hpin & Hstat & Hrest)".
-    iApply ("Hcont" with "[%] Hcg Hpc Hpub Hlbs Hrd' Hpin Hstat Hrest"). exact Hspo.
+    iIntros "Hcg Hpc (-> & Hpub & Hrd & Hauth)".
+    iApply ("Hcont" $! p dc with "[%] [%] Hord Hcg Hpc Hpub Hrd Hauth");
+      [ exact Hcm | exact Hspo ].
   Qed.
-
 
   (* the two 12-bit displacements the loop head uses, as plain 64-bit words *)
   Lemma vt_sext_2  : sign_extend' 64 (mword_of_int 2 : mword 12) = (mword_of_int 2 : mword 64).
@@ -1421,9 +1417,9 @@ Section VtDevRam.
   (*     the device's [used->idx] (the dev_inv-opening leaf), then       *)
   (*     branches.  The two arms are offered as an ADDITIVE conjunction  *)
   (*     so both see the same resources; the ENTER arm additionally      *)
-  (*     learns [nr < nc], which is [virtio_proto_reclaim_acc]'s premise *)
-  (*     at [p := nr]:  [nr <= nc] comes from the accessor and [nc <> nr] *)
-  (*     from the branch, by plain congruence on [wrap16].               *)
+  (*     learns [nr < nc], which is what entitles the body to the        *)
+  (*     completion record at [nr]:  [nr <= nc] comes from the accessor  *)
+  (*     and [nc <> nr] from the branch, by plain congruence on [wrap16]. *)
   (* ================================================================== *)
   Lemma wp_vt_entry_test (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64) (M : regfile) (n : nat)
       (np nr : nat) (p : mword 64) :
@@ -1855,106 +1851,132 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §6  The [disk_res] SURGERY the loop body performs: position [nr] moves *)
-(*     from the flight map to the parked map, its avail-ring cell comes   *)
-(*     back out of the reclaimed pin, and the used_idx counter advances.  *)
+(* §6  The [b->disk] PEEK.                                                *)
+(*                                                                        *)
+(*     The store [b->disk = 0] is an atomic-update leaf, and per node the *)
+(*     access TRANSLATES before it writes: the window's address claim     *)
+(*     ([WpSconfMem.wordw_claim]) has to arrive BESIDE the update, off    *)
+(*     the accessed bytes' own points-to (the standing ruling; deriving   *)
+(*     it from the static map is forbidden).  [virtio_proto_deposit_acc]  *)
+(*     is one-shot -- its closer performs the deposit -- so it cannot     *)
+(*     supply that claim; this is the read-only twin, keyed exactly like  *)
+(*     it, that hands the cell straight back.  It walks the same path     *)
+(*     [virtio_proto_infob_acc] does to the ACTIVE entry and refutes the  *)
+(*     came-back arm the way the deposit does.                            *)
+(*                                                                        *)
+(*     THIS LEMMA BELONGS IN VirtioProto.v BESIDE THE DEPOSIT; it is here *)
+(*     because that file is stage 0's.                                    *)
 (* ===================================================================== *)
-
-Lemma vt_dom_delete_seq {A : Type} (nr np : nat) (fl : gmap nat A) :
-  dom fl = set_seq nr (np - nr) -> (nr < np)%nat ->
-  dom (delete nr fl) = set_seq (S nr) (np - S nr).
-Proof.
-  intros Hd Hlt. rewrite dom_delete_L Hd.
-  apply leibniz_equiv, set_equiv. intro x.
-  rewrite elem_of_difference !elem_of_set_seq elem_of_singleton. lia.
-Qed.
-
-Lemma vt_union_move {A : Type} (nr : nat) (fl pk : gmap nat A) (b : A) :
-  fl !! nr = Some b -> pk !! nr = None ->
-  delete nr fl ∪ <[nr := b]> pk = fl ∪ pk.
-Proof.
-  intros Hfl Hpk. apply map_eq. intro k. rewrite !lookup_union.
-  destruct (decide (k = nr)) as [->|Hne].
-  - rewrite lookup_delete lookup_insert Hfl Hpk. reflexivity.
-  - rewrite lookup_delete_ne; [| exact (not_eq_sym Hne)].
-    rewrite lookup_insert_ne; [| exact (not_eq_sym Hne)]. reflexivity.
-Qed.
-
-Lemma vt_dom_tr_stable {A : Type} (nr : nat) (fl pk : gmap nat A) (b : A) :
-  nr ∈ dom fl ->
-  dom (delete nr fl) ∪ dom (<[nr := b]> pk) = dom fl ∪ dom pk.
-Proof.
-  intro Hin. rewrite dom_delete_L dom_insert_L.
-  apply leibniz_equiv, set_equiv. intro x.
-  rewrite !elem_of_union elem_of_difference !elem_of_singleton.
-  split.
-  - intros [[H1 _]|[->|H1]]; [ left; exact H1 | left; exact Hin | right; exact H1 ].
-  - intros [H1|H1].
-    + destruct (decide (x = nr)) as [->|Hne];
-        [ right; left; reflexivity | left; split; [exact H1 | exact Hne] ].
-    + right; right; exact H1.
-Qed.
-
-(* [vt_mod8_split] and [vt_mod8_head_fresh] are gone with the ring step
-   (finding 5): they said which pool cell the reclaimed position gives back
-   and that no other live position wants it.  No cell changes hands at
-   reclaim any more -- all eight are the device invariant's. *)
-
-
-(* the live window is at most two positions wide (three descriptors each,
-   eight in all), so after [nr] is reclaimed at most one remains *)
-Lemma vt_window_le {A : Type} (np nr : nat) (fl pk : gmap nat A)
-    (tr : gmap nat (nat * nat * nat)) :
-  dom fl = set_seq nr (np - nr) ->
-  dom tr = dom fl ∪ dom pk ->
-  (forall p T, tr !! p = Some T -> tri_ok T) ->
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  (np - nr <= 2)%nat.
-Proof.
-  intros Hfl Htr Hok Hdisj.
-  pose proof (tri_card_8 tr Hok Hdisj) as Hsz.
-  assert (Hdom : (size (dom fl) <= size (dom tr))%nat).
-  { apply subseteq_size. rewrite Htr. apply union_subseteq_l. }
-  rewrite Hfl size_set_seq size_dom in Hdom. lia.
-Qed.
-
-Section VtSurgery.
+Section VtPeek.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
-  (* the two avail-ring bytes come back OUT of the reclaimed pin: the pin
-     pins them ([slot_pin_ok]'s [spo_ring]), so they are a sub-map of it and
-     what is left is provably disjoint from the ring slot -- which is exactly
-     [parked_res]'s side condition. *)
-  Lemma vt_pin_ring_split (A : Arch.pa) (w : bv 16) (pin : _) :
-    read_bytes pin A 2 = Some w ->
-    phys_map pin -∗
-    phys_word2 A w ∗ phys_map (pin ∖ range_map A 2 (nth_byte w)).
+  Lemma vt_bdisk_peek (γ : disk_names) (v : virtio_state)
+      (np p u : nat) (cm : gmap nat dclaim) (dc : dclaim) :
+    cm !! p = Some dc ->
+    virtio_proto γ v -∗ disk_pub γ np -∗
+    disk_ord γ p u -∗
+    disk_read_at γ u -∗
+    ghost_map_auth (dn_claim γ) 1 cm -∗
+    b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) ∗
+    (b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
+       virtio_proto γ v ∗ disk_pub γ np ∗ disk_read_at γ u ∗
+       ghost_map_auth (dn_claim γ) 1 cm).
   Proof.
-    intro Hr.
-    set (rm := range_map A 2 (nth_byte w)).
-    assert (Hsub : rm ⊆ pin).
-    { apply range_map_sub; [lia|]. intros j Hj.
-      apply (read_bytes_spec pin A 2 w Hr j). lia. }
-    assert (Hd : rm ∪ (pin ∖ rm) = pin) by (apply map_difference_union; exact Hsub).
-    assert (Hdj : rm ##ₘ pin ∖ rm)
-      by (apply (map_disjoint_difference_r pin rm rm); reflexivity).
-    assert (Heq : phys_map pin ⊣⊢ phys_map rm ∗ phys_map (pin ∖ rm)).
-    { rewrite -(phys_map_union rm (pin ∖ rm) Hdj) Hd. reflexivity. }
-    iIntros "Hpin". iEval (rewrite Heq) in "Hpin".
-    iDestruct "Hpin" as "[Hring Hrest]".
-    iSplitL "Hring".
-    { iEval (rewrite -(phys_word2_map A w)) in "Hring". iExact "Hring". }
-    iExact "Hrest".
+    intro Hcm.
+    iIntros "Hp Hpub #Hordp Hrd Hcm".
+    rewrite /virtio_proto /disk_pub.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
+      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
+      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
+        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
+    (* the completion record puts [p] in [srv], hence out of [pend] *)
+    rewrite /disk_ord.
+    iDestruct (ghost_map_lookup with "Hord Hordp") as %Huix.
+    assert (Hsrv : p ∈ vp_srv pr).
+    { rewrite <- (vpo_uix_dom _ _ _ Hok). apply elem_of_dom. by exists u. }
+    assert (Hpendnone : vp_pend pr !! p = None).
+    { apply not_elem_of_dom. intro Hc'.
+      destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hc') as [_ Hns].
+      exact (Hns Hsrv). }
+    (* the watermark still owes this record a look, so its slot is in [done] *)
+    rewrite /disk_read_at.
+    iDestruct (ghost_var_agree with "Hnr Hrd") as %Hnreq.
+    assert (Hdonein : p ∈ dom (vp_done pr)).
+    { apply (vpo_done_uix _ _ _ Hok). exists u. split; [exact Huix | lia]. }
+    apply elem_of_dom in Hdonein as [sl Hdone].
+    assert (Hs : vp_slots pr !! p = Some sl).
+    { unfold vp_slots.
+      rewrite (lookup_union_r (vp_pend pr) (vp_done pr) p Hpendnone).
+      exact Hdone. }
+    assert (Hpinin : exists pin, vp_pin pr !! p = Some pin).
+    { apply elem_of_dom. rewrite (vproto_slot_dom (v_cfg v) pr (dom dma) Hok).
+      apply elem_of_dom. by exists sl. }
+    destruct Hpinin as [pin Hpin].
+    assert (Hspins : vp_spins pr !! p = Some (sl, pin))
+      by (unfold vp_spins; rewrite map_lookup_zip_with Hs Hpin; reflexivity).
+    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
+    destruct (Hhcoup p sl pin Hspins) as (w & Hhlk & Hdcsl & Hdcpin & Hdcpos).
+    iDestruct (big_sepM_delete _ hs _ (HActive w) Hhlk with "Hhbig")
+      as "[Hent Hrest]".
+    rewrite {1}/head_res.
+    iDestruct "Hent" as "(%Hdchd & Hclaim & Hinfo & Hdisj)".
+    (* the entry's row agrees with the handler's map: the claim is [dc] *)
+    iDestruct (ghost_map_lookup with "Hcm Hclaim") as %Hcmw.
+    rewrite Hdcpos Hcm in Hcmw. injection Hcmw as Heqw. subst w.
+    (* THE CHAIN IS OUT.  If the entry held it back already it would own
+       [dc_pin dc] -- which is [pin], which is in the lease -- and a byte
+       cannot be owned twice.  The head descriptor's own bytes are the
+       witness ([spo_desc]). *)
+    iDestruct "Hdisj" as "[[Hbd Hrecpt] | [_ Hback]]"; last first.
+    { rewrite /chain_back. iDestruct "Hback" as "[Hpinm _]".
+      rewrite Hdcpin.
+      iDestruct (dma_own_disj with "Hdma Hpinm") as %Hdj.
+      exfalso.
+      pose proof (vpo_fp_D _ _ _ Hok p sl pin Hs Hpin) as HfpD.
+      pose proof (spo_desc _ _ _ _ (vpo_slot _ _ _ Hok p sl pin Hs Hpin))
+        as Hdesc.
+      exact (proj1 (elem_of_disjoint _ _) Hdj _ Hdesc
+               (HfpD _ (slot_fp_pin sl pin _ Hdesc))). }
+    iFrame "Hbd". iIntros "Hbd".
+    (* both halves of [dn_nr] are in scope here, so isolate before framing *)
+    iSplitR "Hpub Hrd Hcm"; [| by iFrame "Hpub Hrd Hcm"].
+    iExists pr, dma.
+    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
+    iSplitR; [iPureIntro; exact Hctl|].
+    iSplitR; [iPureIntro; exact Hok|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hridx|].
+    iSplitR; [iPureIntro; exact Hwce|].
+    iSplitR; [iPureIntro; exact Hwt|].
+    iExists hs. iFrame "Hhauth".
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    rewrite (big_sepM_delete _ hs _ (HActive dc) Hhlk).
+    iFrame "Hrest". rewrite /head_res.
+    iSplitR; [by iPureIntro|]. iFrame "Hclaim Hinfo".
+    iLeft. iFrame "Hbd Hrecpt".
   Qed.
 
-End VtSurgery.
+End VtPeek.
 
 (* ===================================================================== *)
-(* §7  The LOOP BODY, in five Qed-sealed chunks (optimization.md: a       *)
+(* §7  The LOOP BODY, in four Qed-sealed chunks (optimization.md: a       *)
 (*     monolithic threading proof grows super-linearly in #instructions). *)
 (*     Every chunk states its register effect as a FRAME condition over   *)
 (*     an abstract output map, so the chain never carries a [set]-tower.  *)
+(*                                                                        *)
+(*     Every cell the body touches besides [disk.used_idx] is the device  *)
+(*     invariant's -- the used element, the status byte, [info[id].b] and *)
+(*     [b->disk] -- so every one of those accesses is an atomic-update    *)
+(*     leaf opening [dev_inv] around one instruction, keyed by the record  *)
+(*     at the watermark and the claim the handler read off its own map.  *)
+(*     The first three are peeks; the store is THE DEPOSIT.               *)
 (* ===================================================================== *)
 
 Section VtBody.
@@ -1973,49 +1995,40 @@ Section VtBody.
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
 
-  (* the reclaim payoff, as one bundle *)
-  Definition vt_payoff (γd : disk_names) (sl : vslot) (pin : _) : iProp Σ :=
-    (phys_map pin ∗
-     phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
-     (* the SPENT crash permit's token, on its way to [DiskInv.parked_res] *)
-     slot_perms_done γd sl ∗
-     (∃ bs : list (bv 8),
-        ⌜length bs = vs_len sl⌝ ∗
-        ⌜bs = vs_data sl⌝ ∗
-        disk_bytes γd (vs_sector_off sl) bs ∗
-        (if vs_is_out sl then emp else phys_list (vr_buf (vs_req sl)) bs)))%I.
-
-  (* ---- CHUNK A (+0x3e .. +0x4e): the fence, the ring-slot address     *)
-  (*      computation and the used-element load that RECLAIMS position   *)
-  (*      [nr].  Only a4/a5 move; a5 ends holding the chain head [h].    *)
+  (* ---- CHUNK A (+0x3e .. +0x4e): the fence, the used-element address   *)
+  (*      computation and the element load at the watermark [nr].  Only  *)
+  (*      a4/a5 move; a5 ends holding the reported id, the head of the    *)
+  (*      claim [dc] at the position [p] the record names.  The           *)
+  (*      completed-count observation [nr < c] is what entitles the       *)
+  (*      handler to that record.                                          *)
   Lemma wp_vt_reclaim (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64) (M : regfile) (n : nat)
-      (np c nr q h : nat) (sl : vslot) (pin : _) (pp : mword 64) :
+      (np c nr : nat) (cm : gmap nat dclaim) (pp : mword 64) :
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
-    (nr < c)%nat -> (h < 8)%nat ->
-    bv_unsigned (vr_head (vs_req sl)) = Z.of_nat h ->
+    (nr < c)%nat ->
     sie_cap_gpr KT1 M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    (* [q] is the POSITION the record at used index [nr] names -- a different
-       number now that the device answers out of turn (finding 5). *)
-    disk_pub γd np -∗ disk_receipt γd q sl pin -∗ disk_done_lb γd c -∗
-    disk_ord γd q nr -∗ disk_read_at γd nr -∗
+    disk_pub γd np -∗ disk_done_lb γd c -∗ disk_read_at γd nr -∗
+    ghost_map_auth (dn_claim γd) 1 cm -∗
     d_used_idx ↦₂ wrap16 nr -∗
-    ( ∀ M' : regfile,
-        ⌜ M' !!! Regidx a5_idx = (mword_of_int (Z.of_nat h) : mword 64)
+    ( ∀ (M' : regfile) (p : nat) (dc : dclaim),
+        ⌜ cm !! p = Some dc ⌝ -∗
+        ⌜ M' !!! Regidx a5_idx
+            = sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))
+                               : SailStdpp.Values.mword 32)
           /\ (forall r : mword 5, r <> a4_idx -> r <> a5_idx ->
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        ⌜ slot_pin_ok (virtio_init_cfg pd pav pu) q sl pin ⌝ -∗
+        disk_ord γd p nr -∗
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
         d_used_idx ↦₂ wrap16 nr -∗
-        disk_pub γd np -∗ disk_done_lb γd (S nr) -∗ disk_read_at γd (S nr) -∗
-        vt_payoff γd sl pin -∗
+        disk_pub γd np -∗ disk_read_at γd nr -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HMs1 Hnrc Hh8 Hhead.
-    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hpub Hrcpt #Hlbc #Hordq Hrd Hidx Hcont".
+    intros HMs1 Hnrc.
+    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hpub #Hlbc Hrd Hauth Hidx Hcont".
+    iDestruct (vt_done_lb_le γd (S nr) c Hnrc with "Hlbc") as "#Hlbs".
     iPoseProof "Hgeom" as "(_ & _ & #Hup & _)".
     (* ---- +0x3e: fence rw,rw ---- *)
     iApply (wp_fence_gen_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e))
@@ -2144,22 +2157,22 @@ Section VtBody.
       apply (vt_addv_pa pu _ _ (4 + 8 * (nr `mod` 8))%nat).
       apply vt_uelem_off. exact Hq8. }
     iApply (wp_vt_lw_used_elem γu γd pd pav pu (mword_of_int (KernelSyms.virtio_disk_intr + 0x4e))
-              a5_idx a5_idx (mword_of_int 4 : mword 12) K4 n np c q nr sl pin pp
-              Hnrc Hea ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc [] Hdinv Hgeom Hpub Hrcpt Hlbc Hordq Hrd").
+              a5_idx a5_idx (mword_of_int 4 : mword 12) K4 n np nr cm pp
+              Hea ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc [] Hdinv Hgeom Hpub Hlbs Hrd Hauth").
     { iApply (vti_4e with "Htext"). }
-    iIntros "%Hspo Hcg Hpc Hpub #Hlbs Hrd Hpin Hstat Hrest".
-    assert (Hidv : sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
-                                    : SailStdpp.Values.mword 32)
-                   = (mword_of_int (Z.of_nat h) : mword 64))
-      by (rewrite Hhead; apply vt_id_word; exact Hh8).
-    iEval (rewrite Hidv) in "Hcg".
-    set (K5 := <[Regidx a5_idx := regval_into_reg (mword_of_int (Z.of_nat h) : mword 64)]> K4).
-    change (<[Regidx a5_idx := regval_into_reg (mword_of_int (Z.of_nat h) : mword 64)]> K4) with K5.
+    iIntros (p dc) "%Hcm %Hspo #Hord Hcg Hpc Hpub Hrd Hauth".
+    set (K5 := <[Regidx a5_idx := regval_into_reg
+        (sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))
+                          : SailStdpp.Values.mword 32))]> K4).
+    change (<[Regidx a5_idx := regval_into_reg
+        (sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))
+                          : SailStdpp.Values.mword 32))]> K4) with K5.
     assert (Hp50 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_intr + 0x4e) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_intr + 0x50))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp50) in "Hpc".
-    iApply ("Hcont" $! K5 with "[%] [%] Hcg Hpc Hidx Hpub Hlbs Hrd [Hpin Hstat Hrest]").
+    iApply ("Hcont" $! K5 p dc with "[%] [%] Hord Hcg Hpc Hidx Hpub Hrd Hauth").
+    { exact Hcm. }
     { split.
       - rewrite /K5. apply upd_eq.
       - intros r N4 N5.
@@ -2169,8 +2182,6 @@ Section VtBody.
         rewrite /K2 upd_ne; [| congruence].
         rewrite /K1 upd_ne; [| congruence].
         rewrite /K0 upd_ne; [| congruence]. reflexivity. }
-    { exact Hspo. }
-    { rewrite /vt_payoff. iFrame "Hpin Hstat Hrest". }
   Qed.
 
   (* ---- the [struct disk] byte tier: the status cell is kernel DATA ---- *)
@@ -2198,32 +2209,40 @@ Section VtBody.
   Proof. rewrite vt_sext_4. unfold b_disk, pa_add, add_vec_int. reflexivity. Qed.
 
   (* ---- CHUNK B (+0x50 .. +0x5e): &disk.info[id].status, the load, and  *)
-  (*      the REFUTED panic branch (the byte is pinned at 0).             *)
-  Lemma wp_vt_status (γd : disk_names) (pd pav pu : mword 64) (M : regfile) (n h : nat)
-      (pp : mword 64) :
+  (* ---- CHUNK B (+0x50 .. +0x5e): &disk.info[id].status, the load, and  *)
+  (*      the REFUTED panic branch.  The byte is the chain's status       *)
+  (*      descriptor -- the device's, so the [lbu] opens the device        *)
+  (*      invariant: [virtio_proto_status_peek] at the claim [dc] says it *)
+  (*      reads 0, and the claim's [slot_buf_link] says its address is    *)
+  (*      [disk.info[h].status], the one the code computes.  a4/a5 move.  *)
+  Lemma wp_vt_status (γu : uart_names) (γd : disk_names) (M : regfile) (n h : nat)
+      (np p u : nat) (cm : gmap nat dclaim) (dc : dclaim) (pp : mword 64) :
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
     (M !!! Regidx a5_idx : mword 64) = (mword_of_int (Z.of_nat h) : mword 64) ->
     (h < 8)%nat ->
+    cm !! p = Some dc ->
+    vr_status (vs_req (dc_slot dc)) = d_info_status h ->
     sie_cap_gpr KT1 M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
-    disk_geom γd pd pav pu -∗
-    phys_pointsto (d_info_status h) (DfracOwn 1) byte_zero -∗
+    dev_inv γu γd -∗
+    disk_pub γd np -∗ disk_ord γd p u -∗ disk_read_at γd u -∗
+    ghost_map_auth (dn_claim γd) 1 cm -∗
     ( ∀ M' : regfile,
         ⌜ M' !!! Regidx a5_idx = (mword_of_int (Z.of_nat h) : mword 64)
           /\ (forall r : mword 5, r <> a4_idx -> r <> a5_idx ->
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x60) : mword 64) -∗
-        phys_pointsto (d_info_status h) (DfracOwn 1) byte_zero -∗
+        disk_pub γd np -∗ disk_read_at γd u -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HMs1 HMa5 Hh8.
-    iIntros "Hcg #Htext Hpc #Hgeom Hstat Hcont".
+    intros HMs1 HMa5 Hh8 Hcm Hstatus.
+    iIntros "Hcg #Htext Hpc #Hdinv Hpub #Hord Hrd Hauth Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     pose proof (kdata_svpn_class _ (vt_status_kdata h Hh8)) as Hstk.
     pose proof (vt_kdata_canon _ (vt_status_kdata h Hh8)) as Hstc.
-    iDestruct (phys_to_byte (d_info_status h) byte_zero Hstk Hstc with "Hkm Hstat") as "Hstat".
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
     (* ---- +0x50: slli a4,a5,0x4 ---- *)
     assert (Hsh4 : shift_bits_left (rget M a5_idx)
                      (subrange_vec_dec (mword_of_int 4 : mword 6) (Z.sub log2_xlen 1) 0)
@@ -2303,14 +2322,60 @@ Section VtBody.
     assert (Hsa : add_vec (rget B2 a4_idx) (sign_extend' 64 (mword_of_int 16 : mword 12))
                   = (d_info_status h : SailStdpp.Values.mword 64)).
     { rgne. rewrite HB2a4. apply vt_status_addr. exact Hh8. }
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x5a)) a4_idx a4_idx
-              (mword_of_int 16 : mword 12) B2 n byte_zero false
+    (* THE ADDRESS CLAIM, off the status byte's own points-to: one read-only
+       opening around [virtio_proto_status_peek], which hands the byte back
+       (the leaf wants the claim BESIDE the atomic update). *)
+    iApply fupd_wp.
+    iInv "Hvinv" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_status_peek γd vstp np p u cm dc Hcm
+                 with "Hprotop Hpub Hord Hrd Hauth")
+      as "(_ & _ & _ & Hstp & Hbackp)".
+    iEval (rewrite Hstatus) in "Hstp".
+    iDestruct (phys_to_byte (d_info_status h) byte_zero Hstk Hstc with "Hkm Hstp") as "Hbp".
+    iEval (rewrite -vt_byte_wordw) in "Hbp".
+    iDestruct (wordw_claim_of (KTR := KT0) 1 (d_info_status h) (DfracOwn 1) byte_zero
+                 ltac:(lia) with "Hbp") as "#Hcl".
+    iEval (rewrite vt_byte_wordw) in "Hbp".
+    iDestruct (byte_to_phys (d_info_status h) byte_zero Hstk with "Hkm Hbp") as "Hstp".
+    iEval (rewrite -Hstatus) in "Hstp".
+    iDestruct ("Hbackp" with "Hstp") as "(Hprotop & Hpub & Hrd & Hauth)".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
+    iApply (wp_load_s_sconf_au (CID:=CID) (kt := KT1) (ktd := KT0) 1 false true
+              (mword_of_int (KernelSyms.virtio_disk_intr + 0x5a)) a4_idx a4_idx
+              (mword_of_int 16 : mword 12) B2 n
+              (fun w => zero_extend' 64 w)
+              (fun w => (⌜w = (byte_zero : SailStdpp.Values.mword 8)⌝ ∗
+                         disk_pub γd np ∗ disk_read_at γd u ∗
+                         ghost_map_auth (dn_claim γd) 1 cm)%I)
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
+              WpSconfMem.exec_read_ram_plain_1 vt_ext1
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc [] [Hstat]").
+              ltac:(solve_ndisj) with "Hcg Hpc [] [] [Hpub Hrd Hauth] [Hcont]").
     { iApply (vti_5a with "Htext"). }
-    { iEval (rewrite Hsa). iExact "Hstat". }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Hstat". iEval (rewrite Hsa) in "Hstat".
+    { rewrite Hsa. iExact "Hcl". }
+    { iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
+      iDestruct (virtio_proto_status_peek γd vst np p u cm dc Hcm
+                   with "Hproto Hpub Hord Hrd Hauth")
+        as "(_ & _ & _ & Hst & Hback)".
+      iEval (rewrite Hstatus) in "Hst".
+      iDestruct (phys_to_byte (d_info_status h) byte_zero Hstk Hstc with "Hkm Hst") as "Hb".
+      iEval (rewrite -vt_byte_wordw) in "Hb".
+      iModIntro. iExists (byte_zero : SailStdpp.Values.mword 8).
+      iSplitL "Hb". { rewrite Hsa. iExact "Hb". }
+      iIntros "Hb". iEval (rewrite Hsa vt_byte_wordw) in "Hb".
+      iDestruct (byte_to_phys (d_info_status h) byte_zero Hstk with "Hkm Hb") as "Hst".
+      iEval (rewrite -Hstatus) in "Hst".
+      iDestruct ("Hback" with "Hst") as "(Hproto & Hpub & Hrd & Hauth)".
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      iModIntro. iFrame "Hpub Hrd Hauth". done. }
+    iIntros (w). iApply wp_next_off_intro.
+    iIntros "Hcg Hpc (-> & Hpub & Hrd & Hauth)".
     set (B3 := <[Regidx a4_idx := regval_into_reg
         (zero_extend' 64 (byte_zero : SailStdpp.Values.mword 8))]> B2).
     change (<[Regidx a4_idx := regval_into_reg
@@ -2335,8 +2400,7 @@ Section VtBody.
     assert (Hp60 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_intr + 0x5e) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_intr + 0x60))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp60) in "Hpc".
-    iDestruct (byte_to_phys (d_info_status h) byte_zero Hstk with "Hkm Hstat") as "Hstat".
-    iApply ("Hcont" $! B3 with "[%] Hcg Hpc Hstat").
+    iApply ("Hcont" $! B3 with "[%] Hcg Hpc Hpub Hrd Hauth").
     split.
     - rewrite /B3 upd_ne; [| reg_neq].
       rewrite /B2 upd_ne; [| reg_neq].
@@ -2349,29 +2413,41 @@ Section VtBody.
       rewrite /B0 upd_ne; [| congruence]. reflexivity.
   Qed.
 
-  (* ---- CHUNK C (+0x60 .. +0x6a): b = disk.info[id].b ; b->disk = 0 ---- *)
-  Lemma wp_vt_clear_disk (M : regfile) (n h : nat)
-      (b : Arch.pa) (pp : mword 64) :
+  (* ---- CHUNK C (+0x60 .. +0x6a): b = disk.info[id].b ; b->disk = 0.    *)
+  (*      Both cells are the receipt's, so both instructions open the     *)
+  (*      device invariant at the claim [dc]: the [ld] is a peek           *)
+  (*      ([virtio_proto_infob_acc]) whose value is [dc_buf dc] -- the     *)
+  (*      pure fact that carries to the store -- and the [sw] is THE       *)
+  (*      DEPOSIT ([virtio_proto_deposit_acc]): reclaim and hand-back in   *)
+  (*      one step, which is what advances the watermark.  a0/a5 move.    *)
+  Lemma wp_vt_clear_disk (γu : uart_names) (γd : disk_names) (M : regfile) (n h : nat)
+      (np p u : nat) (cm : gmap nat dclaim) (dc : dclaim) (pp : mword 64) :
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
     (M !!! Regidx a5_idx : mword 64) = (mword_of_int (Z.of_nat h) : mword 64) ->
     (h < 8)%nat ->
+    cm !! p = Some dc ->
+    bv_unsigned (vr_head (vs_req (dc_slot dc))) = Z.of_nat h ->
     sie_cap_gpr KT1 M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x60) : mword 64) -∗
-    d_info_b h ↦₈ (b : SailStdpp.Values.mword 64) -∗
-    b_disk b ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
+    dev_inv γu γd -∗
+    disk_pub γd np -∗ disk_ord γd p u -∗ disk_read_at γd u -∗
+    ghost_map_auth (dn_claim γd) 1 cm -∗
     ( ∀ M' : regfile,
-        ⌜ M' !!! Regidx a0_idx = (b : SailStdpp.Values.mword 64)
+        ⌜ M' !!! Regidx a0_idx = (dc_buf dc : SailStdpp.Values.mword 64)
           /\ (forall r : mword 5, r <> a0_idx -> r <> a5_idx ->
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x6e) : mword 64) -∗
-        d_info_b h ↦₈ (b : SailStdpp.Values.mword 64) -∗
-        b_disk b ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) -∗
+        disk_pub γd np -∗ disk_done_lb γd (S u) -∗ disk_read_at γd (S u) -∗
+        ghost_map_auth (dn_claim γd) 1 cm -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HMs1 HMa5 Hh8.
-    iIntros "Hcg #Htext Hpc Hib Hbd Hcont".
+    intros HMs1 HMa5 Hh8 Hcm Hhead.
+    assert (Hidxh : Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot dc)))) = h)
+      by (rewrite Hhead; apply Nat2Z.id).
+    iIntros "Hcg #Htext Hpc #Hdinv Hpub #Hord Hrd Hauth Hcont".
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
     (* ---- +0x60: c.slli a5,4 ---- *)
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x60)) (Regidx a5_idx) a5_idx
               (mword_of_int 4 : mword 6) M n false eq_refl
@@ -2451,38 +2527,110 @@ Section VtBody.
     assert (Hba : add_vec (rget C2 a5_idx) (sign_extend' 64 (mword_of_int 8 : mword 12))
                   = (d_info_b h : SailStdpp.Values.mword 64)).
     { rgne. rewrite HC2a5. apply vt_infob_addr. exact Hh8. }
-    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x68)) a0_idx a5_idx
-              (mword_of_int 8 : mword 12) C2 n (b : SailStdpp.Values.mword 64) false
-              (dqm := DfracOwn 1)
+    (* the address claim, off the cell's own points-to: one read-only
+       opening around [virtio_proto_infob_acc], which hands the cell back *)
+    iApply fupd_wp.
+    iInv "Hvinv" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_infob_acc γd vstp np p u cm dc Hcm
+                 with "Hprotop Hpub Hord Hrd Hauth")
+      as "(_ & _ & _ & Hibp & Hbackp)".
+    iEval (rewrite Hidxh vt_word8_wordw) in "Hibp".
+    iDestruct (wordw_claim_of (KTR := KT0) 8 (d_info_b h) (DfracOwn 1)
+                 (dc_buf dc : SailStdpp.Values.mword 64) ltac:(lia) with "Hibp") as "#Hcl8".
+    iEval (rewrite -vt_word8_wordw -Hidxh) in "Hibp".
+    iDestruct ("Hbackp" with "Hibp") as "(Hprotop & Hpub & Hrd & Hauth)".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
+    iApply (wp_load_s_sconf_au (CID:=CID) (kt := KT1) (ktd := KT0) 8 true false
+              (mword_of_int (KernelSyms.virtio_disk_intr + 0x68)) a0_idx a5_idx
+              (mword_of_int 8 : mword 12) C2 n
+              (fun w => w)
+              (fun w => (⌜w = (dc_buf dc : SailStdpp.Values.mword 64)⌝ ∗
+                         disk_pub γd np ∗ disk_read_at γd u ∗
+                         ghost_map_auth (dn_claim γd) 1 cm)%I)
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_8 data2_ext_8
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc [] [Hib]").
+              ltac:(solve_ndisj) with "Hcg Hpc [] [] [Hpub Hrd Hauth] [Hcont]").
     { iApply (vti_68 with "Htext"). }
-    { iEval (rewrite Hba). iExact "Hib". }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Hib". iEval (rewrite Hba) in "Hib".
-    set (C3 := <[Regidx a0_idx := regval_into_reg (b : SailStdpp.Values.mword 64)]> C2).
-    change (<[Regidx a0_idx := regval_into_reg (b : SailStdpp.Values.mword 64)]> C2) with C3.
+    { rewrite Hba. iExact "Hcl8". }
+    { iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
+      iDestruct (virtio_proto_infob_acc γd vst np p u cm dc Hcm
+                   with "Hproto Hpub Hord Hrd Hauth")
+        as "(_ & _ & _ & Hib & Hback)".
+      iEval (rewrite Hidxh vt_word8_wordw) in "Hib".
+      iModIntro. iExists (dc_buf dc : SailStdpp.Values.mword 64).
+      iSplitL "Hib". { rewrite Hba. iExact "Hib". }
+      iIntros "Hib". iEval (rewrite Hba -vt_word8_wordw -Hidxh) in "Hib".
+      iDestruct ("Hback" with "Hib") as "(Hproto & Hpub & Hrd & Hauth)".
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      iModIntro. iFrame "Hpub Hrd Hauth". done. }
+    iIntros (w). iApply wp_next_off_intro.
+    iIntros "Hcg Hpc (-> & Hpub & Hrd & Hauth)".
+    set (C3 := <[Regidx a0_idx := regval_into_reg (dc_buf dc : SailStdpp.Values.mword 64)]> C2).
+    change (<[Regidx a0_idx := regval_into_reg (dc_buf dc : SailStdpp.Values.mword 64)]> C2) with C3.
     assert (Hp6a : add_vec_int (mword_of_int (KernelSyms.virtio_disk_intr + 0x68) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_intr + 0x6a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp6a) in "Hpc".
-    (* ---- +0x6a: sw zero,4(a0) -- b->disk = 0 ---- *)
-    assert (HC3a0 : C3 !!! Regidx a0_idx = (b : SailStdpp.Values.mword 64))
+    (* ---- +0x6a: sw zero,4(a0) -- b->disk = 0: THE DEPOSIT ---- *)
+    assert (HC3a0 : C3 !!! Regidx a0_idx = (dc_buf dc : SailStdpp.Values.mword 64))
       by (rewrite /C3; apply upd_eq).
     assert (Hbda : add_vec (rget C3 a0_idx) (sign_extend' 64 (mword_of_int 4 : mword 12))
-                   = (b_disk b : SailStdpp.Values.mword 64)).
+                   = (b_disk (dc_buf dc) : SailStdpp.Values.mword 64)).
     { rgne. rewrite HC3a0. apply vt_bdisk_addr. }
-    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x6a)) a0_idx
-              (mword_of_int 4 : mword 12) C3 n
-              (SailStdpp.Values.mword_of_int (len := 32) 1) false
-              with "Hcg Hpc [] [Hbd]").
+    (* the stored value is x0's *)
+    assert (Hu0 : uint (mword_of_int 0 : mword 5) = 0) by (vm_compute; reflexivity).
+    iDestruct (sie_cap_gpr_x0 (kt := KT1) C3 n false pp (mword_of_int 0 : mword 5) Hu0
+                 with "Hcg") as "[%Hx0 Hcg]".
+    assert (Hzero : trunc32 (rget C3 (mword_of_int 0 : mword 5)) = (mword_of_int 0 : mword 32)).
+    { rgne. rewrite Hx0. apply bv_eq; vm_compute; reflexivity. }
+    (* the address claim, off [b->disk]'s own points-to: the read-only
+       [vt_bdisk_peek] (§6), since the deposit accessor is one-shot *)
+    iApply fupd_wp.
+    iInv "Hvinv" as ">Hdbodyq" "Hdcloseq".
+    iDestruct "Hdbodyq" as (vstq) "(Hvfq & Hprotoq & %Hvokq)".
+    iDestruct (vt_bdisk_peek γd vstq np p u cm dc Hcm
+                 with "Hprotoq Hpub Hord Hrd Hauth") as "(Hbdq & Hbackq)".
+    iEval (rewrite vt_word4_wordw) in "Hbdq".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_disk (dc_buf dc)) (DfracOwn 1)
+                 (mword_of_int 1 : mword 32) ltac:(lia) with "Hbdq") as "#Hcl4".
+    iEval (rewrite -vt_word4_wordw) in "Hbdq".
+    iDestruct ("Hbackq" with "Hbdq") as "(Hprotoq & Hpub & Hrd & Hauth)".
+    iMod ("Hdcloseq" with "[Hvfq Hprotoq]") as "_".
+    { iNext. iExists vstq. iFrame. iPureIntro. exact Hvokq. }
+    iModIntro.
+    iApply (wp_sw_au_s_sconf (kt := KT1) false
+              (mword_of_int (KernelSyms.virtio_disk_intr + 0x6a))
+              (mword_of_int 0 : mword 5) a0_idx (mword_of_int 4 : mword 12) C3 n
+              (disk_pub γd np ∗ disk_done_lb γd (S u) ∗ disk_read_at γd (S u) ∗
+               ghost_map_auth (dn_claim γd) 1 cm)%I
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) false ltac:(solve_ndisj)
+              with "Hcg Hpc [] [] [Hpub Hrd Hauth] [Hcont]").
     { iApply (vti_6a with "Htext"). }
-    { iEval (rewrite Hbda). iExact "Hbd". }
+    { rewrite Hbda. iExact "Hcl4". }
+    { iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
+      iDestruct (virtio_proto_deposit_acc γd vst np p u cm dc Hcm
+                   with "Hproto Hpub Hord Hrd Hauth")
+        as "(_ & _ & _ & _ & Hbd & Hback)".
+      iModIntro. iExists (mword_of_int 1 : mword 32).
+      iSplitL "Hbd". { rewrite Hbda. iExact "Hbd". }
+      iIntros "Hbd". iEval (rewrite Hbda Hzero) in "Hbd".
+      iMod ("Hback" with "Hbd") as "(Hproto & Hpub & #Hlbs & Hrd & Hauth)".
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      iModIntro. iFrame "Hpub Hlbs Hrd Hauth". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Hbd". iEval (rewrite Hbda) in "Hbd".
+    iIntros "Hcg Hpc (Hpub & #Hlbs & Hrd & Hauth)".
     assert (Hp6e : add_vec_int (mword_of_int (KernelSyms.virtio_disk_intr + 0x6a) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_intr + 0x6e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp6e) in "Hpc".
-    iApply ("Hcont" $! C3 with "[%] Hcg Hpc Hib Hbd").
+    iApply ("Hcont" $! C3 with "[%] Hcg Hpc Hpub Hlbs Hrd Hauth").
     split; [exact HC3a0|].
     intros r N0 N5.
     rewrite /C3 upd_ne; [| congruence].
@@ -2760,11 +2908,14 @@ Qed.
 (* ===================================================================== *)
 (* §9  THE LOOP (KernelSyms.virtio_disk_intr+0x3e .. KernelSyms.virtio_disk_intr+0x86), by Löb induction.                 *)
 (*                                                                        *)
-(*     One iteration: reclaim position [nr] out of the DMA lease, refute  *)
-(*     the status panic, clear [b->disk], wake the sleeper, bump          *)
-(*     [disk.used_idx], and re-read the device's used index.  The         *)
-(*     [disk_res] surgery moves [nr] from the flight map to the parked    *)
-(*     map and returns its avail-ring cell to the free ring pool.         *)
+(*     One iteration: read the used element at the watermark [nr] (which *)
+(*     names the record's position and, off the lock's own claim map,    *)
+(*     its claim), refute the status panic, deposit the completed chain  *)
+(*     with the store [b->disk = 0] (which advances the watermark), wake  *)
+(*     the sleeper, bump [disk.used_idx], and re-read the device's used   *)
+(*     index.  The lock resource comes back at [S nr] with its claim map  *)
+(*     untouched: the handler retires nothing -- the woken publisher does *)
+(*     that at free_chain.                                                *)
 (* ===================================================================== *)
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
@@ -2802,41 +2953,37 @@ Section VtLoopProof.
     iIntros (MB) "%Hregs Hcg Hpc Hown Hst Hexit".
     pose proof Hregs as Hregs'.
     destruct Hregs' as (Hsp & Hs1 & Hthr).
-    iDestruct "Hst" as (np nr fl pk tr fr c) "(%Hbnd & #Hlbc & Hres)".
+    iDestruct "Hst" as (np nr cm fr c) "(%Hbnd & #Hlbc & Hres)".
     destruct Hbnd as [Hnrc Hcnp].
     rewrite /disk_res_at.
-    iDestruct "Hres" as "(%Hdomfl & %Hpkb & %Hdomtr & %Hcoh & %Htriok & %Htridisj & %Hfrfree &
-                          Hpub & #Hlbnr & Hrd & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
-    destruct (vt_flight_at_nr np nr c fl Hdomfl Hnrc Hcnp) as [vv Hb].
-    iDestruct (big_sepM_delete _ fl nr vv Hb with "Hfl") as "[Hflb Hfl]".
-    set (b := dc_buf vv). set (sl := dc_slot vv). set (pin := dc_pin vv).
-    iDestruct "Hflb" as "(%Hlink & Hrcpt & Hbdisk & Hinfob)".
-    pose proof Hlink as Hlink2.
-    destruct Hlink2 as (h & Hh8 & Hhead & Hstatus & Hbufeq & Hlen1024).
-    assert (Hslh : sl_head sl = h)
-      by (unfold sl_head; rewrite Hhead; apply Nat2Z.id).
-    iEval (rewrite Hslh) in "Hinfob".
+    iDestruct "Hres" as "(%Hcl & Hpub & #Hlbnr & Hrd & Hstage & Hauth & Hidx & Hfree)".
     (* ================= CHUNK A: +0x3e .. +0x4e ================= *)
-    iApply (wp_vt_reclaim γu γd pd pav pu MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat np c nr h sl pin pme
-              Hs1 Hnrc Hh8 Hhead
-              with "Hcg Htext Hpc Hdinv Hgeom Hpub Hrcpt Hlbc Hidx").
-    iIntros (M1) "%Hfr1 %Hspo Hcg Hpc Hidx Hpub #Hlbs Hpay".
+    iApply (wp_vt_reclaim γu γd pd pav pu MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat np c nr cm pme
+              Hs1 Hnrc
+              with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbc Hrd Hauth Hidx").
+    iIntros (M1 p dc) "%Hcm %Hfr1 #Hord Hcg Hpc Hidx Hpub Hrd Hauth".
     destruct Hfr1 as [HM1a5 HM1thr].
-    iDestruct "Hpay" as "(Hpin & Hstat & Hrest)".
+    (* the claim the record names, read off the lock's own map: its slot is
+       linked to its buffer, which is what puts the head [h] below 8 and the
+       status byte at [disk.info[h].status] *)
+    destruct (Hcl p dc Hcm) as (_ & _ & (h & Hh8 & Hhead & Hstatus & _ & _)).
+    assert (HM1a5h : M1 !!! Regidx a5_idx = (mword_of_int (Z.of_nat h) : mword 64))
+      by (rewrite HM1a5 Hhead; apply vt_id_word; exact Hh8).
     (* ================= CHUNK B: +0x50 .. +0x5e ================= *)
     assert (HM1s1 : M1 !!! Regidx s1_idx = (disk_base : mword 64))
       by (rewrite (HM1thr s1_idx ltac:(reg_neq) ltac:(reg_neq)); exact Hs1).
-    iEval (rewrite Hstatus) in "Hstat".
-    iApply (wp_vt_status γd pd pav pu M1 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat h pme HM1s1 HM1a5 Hh8
-              with "Hcg Htext Hpc Hgeom Hstat").
-    iIntros (M2) "%Hfr2 Hcg Hpc Hstat".
+    iApply (wp_vt_status γu γd M1 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat h np p nr cm dc pme
+              HM1s1 HM1a5h Hh8 Hcm Hstatus
+              with "Hcg Htext Hpc Hdinv Hpub Hord Hrd Hauth").
+    iIntros (M2) "%Hfr2 Hcg Hpc Hpub Hrd Hauth".
     destruct Hfr2 as [HM2a5 HM2thr].
     (* ================= CHUNK C: +0x60 .. +0x6a ================= *)
     assert (HM2s1 : M2 !!! Regidx s1_idx = (disk_base : mword 64))
       by (rewrite (HM2thr s1_idx ltac:(reg_neq) ltac:(reg_neq)); exact HM1s1).
-    iApply (wp_vt_clear_disk M2 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat h b pme HM2s1 HM2a5 Hh8
-              with "Hcg Htext Hpc Hinfob Hbdisk").
-    iIntros (M3) "%Hfr3 Hcg Hpc Hinfob Hbdisk".
+    iApply (wp_vt_clear_disk γu γd M2 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat h np p nr cm dc pme
+              HM2s1 HM2a5 Hh8 Hcm Hhead
+              with "Hcg Htext Hpc Hdinv Hpub Hord Hrd Hauth").
+    iIntros (M3) "%Hfr3 Hcg Hpc Hpub #Hlbs Hrd Hauth".
     destruct Hfr3 as [HM3a0 HM3thr].
     (* ================= +0x6e: jal ra,wakeup ================= *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x6e)) ra_idx
@@ -2913,52 +3060,14 @@ Section VtLoopProof.
       - rewrite (Hchain s1_idx ltac:(vm_compute; reflexivity)). exact Hs1.
       - intros r Hcs Ncsp N8 N9.
         rewrite (Hchain r Hcs). exact (Hthr r Hcs Ncsp N8 N9). }
-    (* ================= THE disk_res SURGERY ================= *)
-    iPoseProof "Hgeom" as "Hgeomd".
-    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
-    iDestruct (disk_geom_static with "Hgeom") as %(_ & Hstav & _).
-    iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcanav & _).
-    iDestruct "Hgeomd" as "(_ & _ & _ & %Hal0 & _ & _ & _ & _)".
-    destruct Hal0 as (_ & Halav & _).
-    (* NO RING-CELL STEP HERE ANY MORE (finding 5).  The reclaimed pin never
-       held an avail-ring entry -- all eight cells are the device
-       invariant's, permanently -- so there is nothing to split off and
-       nothing to hand back to a driver-side pool.  The pin comes back whole
-       and goes straight into the parked payoff. *)
-    (* the parked payoff *)
-    iDestruct "Hrest" as "[Hperm Hrest]".
-    iDestruct "Hrest" as (bs) "(%Hbslen & %Hbsout & Hbytes & Hbuf)".
-    iAssert (parked_res γd pav nr vv)
-      with "[Hbdisk Hinfob Hpin Hstat Hbytes Hbuf Hperm]" as "Hparked".
-    { iExists bs. iEval (rewrite -Hslh) in "Hinfob".
-      iEval (rewrite -Hstatus) in "Hstat".
-      iFrame "Hbdisk Hinfob Hpin Hstat Hbytes Hperm Hbuf".
-      iPureIntro. split_and!; [ exact Hlink | exact Hbslen | exact Hbsout ]. }
-    (* the maps *)
-    assert (Hpknr : pk !! nr = None).
-    { apply not_elem_of_dom. intro Hc. pose proof (Hpkb nr Hc). lia. }
-    iAssert ([∗ map] p ↦ v ∈ <[nr := vv]> pk, parked_res γd pav p v)%I
-      with "[Hparked Hpk]" as "Hpk".
-    { rewrite (big_sepM_insert (fun p v => parked_res γd pav p v) pk nr vv Hpknr).
-      iFrame "Hparked Hpk". }
-    assert (Hunion : delete nr fl ∪ <[nr := vv]> pk = fl ∪ pk)
-      by (apply vt_union_move; [exact Hb | exact Hpknr]).
-    iEval (rewrite -Hunion) in "Hauth".
-    iAssert (disk_res_at γd pd pav pu np (S nr) (delete nr fl) (<[nr := vv]> pk) tr fr)
-      with "[Hpub Hauth Hidx Hfl Hpk Hfree Hring]" as "Hres".
+    (* ================= the lock resource, one record further ================= *)
+    (* nothing per-request moves: the chain went into the receipt at the
+       deposit, and the claim map is the publisher's to retire *)
+    iAssert (disk_res_at γd pd pav pu np (S nr) cm fr)
+      with "[Hpub Hrd Hstage Hauth Hidx Hfree]" as "Hres".
     { rewrite /disk_res_at.
-      iFrame "Hpub Hlbs Hauth Hidx Hfl Hpk Hfree Hring".
-      iPureIntro. split_and!.
-      - exact Hfl'.
-      - intros p Hp. rewrite dom_insert_L in Hp.
-        apply elem_of_union in Hp as [Hp|Hp].
-        + apply elem_of_singleton in Hp. lia.
-        + pose proof (Hpkb p Hp). lia.
-      - rewrite (vt_dom_tr_stable nr fl pk vv Hnrin). exact Hdomtr.
-      - rewrite Hunion. exact Hcoh.
-      - exact Htriok.
-      - exact Htridisj.
-      - exact Hfrfree. }
+      iSplitR; [iPureIntro; exact Hcl|].
+      iFrame "Hpub Hlbs Hrd Hstage Hauth Hidx Hfree". }
     (* ================= +0x86: bne a4,a5 ================= *)
     destruct (decide ((wrap16 nc : SailStdpp.Values.mword 16) = wrap16 (S nr))) as [Heq|Hne].
     - (* EXIT: the driver has caught up with the device *)
@@ -3002,7 +3111,7 @@ Section VtLoopProof.
       iApply ("IH" $! M5 with "[%] Hcg Hpc Hown [Hres] Hexit").
       { exact HregsM5. }
       { rewrite /vt_loop_state.
-        iExists np, (S nr), (delete nr fl), (<[nr := vv]> pk), tr, fr, nc.
+        iExists np, (S nr), cm, fr, nc.
         iFrame "Hlbc2 Hres". iPureIntro.
         split; [ exact Hnrnc | exact (proj2 Hbnd5) ]. }
   Qed.
@@ -3081,10 +3190,9 @@ Section ProofVirtioDiskIntr.
     (* ===================== the loop-entry test ===================== *)
     assert (HMIs1 : MI !!! Regidx s1_idx = (disk_base : mword 64))
       by (rewrite (HMIthr s1_idx ltac:(reg_neq) ltac:(reg_neq)); exact HMAs1).
-    iDestruct (disk_res_at_elim with "HR") as (np nr fl pk tr fr) "Hres".
+    iDestruct (disk_res_at_elim with "HR") as (np nr cm fr) "Hres".
     rewrite /disk_res_at.
-    iDestruct "Hres" as "(%Hdomfl & %Hpkb & %Hdomtr & %Hcoh & %Htriok & %Htridisj & %Hfrfree &
-                          Hpub & #Hlbnr & Hrd & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
+    iDestruct "Hres" as "(%Hcl & Hpub & #Hlbnr & Hrd & Hstage & Hauth & Hidx & Hfree)".
     iApply (wp_vt_entry_test γu γd pd pav pu MI (trap_res b + (K - 4))%nat np nr pme HMIs1
               with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbnr Hidx").
     iSplit.
@@ -3093,7 +3201,7 @@ Section ProofVirtioDiskIntr.
       (* [vt_exit] spells its window index with [outb] (no [b] in scope where it
          is defined); [Hbeq] bridges the two spellings. *)
       iEval (rewrite -Hbeq) in "Hcg".
-      iApply ("Hexit" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring]").
+      iApply ("Hexit" $! ME with "[%] Hcg Hpc Hown [Hpub Hrd Hstage Hauth Hidx Hfree]").
       { split_and!.
         - rewrite (HMEthr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)).
           rewrite (HMIthr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)). exact HMAcsp.
@@ -3105,9 +3213,9 @@ Section ProofVirtioDiskIntr.
             by (intro He; rewrite He in Hcs; vm_compute in Hcs; discriminate).
           rewrite (HMEthr r N4 N5). rewrite (HMIthr r N4 N5).
           exact (HMAthr r Hcs Ncsp N8 N9). }
-      { iApply (disk_res_at_intro γd pd pav pu np nr fl pk tr fr). rewrite /disk_res_at.
-        iFrame "Hpub Hlbnr Hauth Hidx Hfl Hpk Hfree Hring".
-        iPureIntro. split_and!; assumption. }
+      { iApply (disk_res_at_intro γd pd pav pu np nr cm fr). rewrite /disk_res_at.
+        iSplitR; [iPureIntro; exact Hcl|].
+        iFrame "Hpub Hlbnr Hrd Hstage Hauth Hidx Hfree". }
     - (* ---- the loop is entered ---- *)
       iIntros (ME nc) "%HMEthr %Hbnd #Hlbc Hcg Hpc Hpub Hidx".
       (* [vt_loop] also spells the window index with [outb]. *)
@@ -3115,7 +3223,7 @@ Section ProofVirtioDiskIntr.
       iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme sp0 lks
                     HKav Hlen Hlvl Hfresh
                     with "Htext Hpi Hdinv Hgeom") as "Hloop".
-      iApply ("Hloop" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring] Hexit").
+      iApply ("Hloop" $! ME with "[%] Hcg Hpc Hown [Hpub Hrd Hstage Hauth Hidx Hfree] Hexit").
       { split_and!.
         - rewrite (HMEthr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)).
           rewrite (HMIthr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)). exact HMAcsp.
@@ -3128,11 +3236,11 @@ Section ProofVirtioDiskIntr.
           rewrite (HMEthr r N4 N5). rewrite (HMIthr r N4 N5).
           exact (HMAthr r Hcs Ncsp N8 N9). }
       { rewrite /vt_loop_state.
-        iExists np, nr, fl, pk, tr, fr, nc. iFrame "Hlbc".
+        iExists np, nr, cm, fr, nc. iFrame "Hlbc".
         iSplitR; [iPureIntro; exact Hbnd|].
         rewrite /disk_res_at.
-        iFrame "Hpub Hlbnr Hauth Hidx Hfl Hpk Hfree Hring".
-        iPureIntro. split_and!; assumption. }
+        iSplitR; [iPureIntro; exact Hcl|].
+        iFrame "Hpub Hlbnr Hrd Hstage Hauth Hidx Hfree". }
   Qed.
 
 End ProofVirtioDiskIntr.
