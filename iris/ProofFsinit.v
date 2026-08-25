@@ -1521,7 +1521,7 @@ Section FsinitMain.
               (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0
-              Hbelow
+              Hbelow eq_refl
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hkdata Hpenv Hbio Hlctx Hseam
                     Hgen Hni Hist Hbms Hireg Hboot Hitb2 Hitbl Hesc Hslks Hbm Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
