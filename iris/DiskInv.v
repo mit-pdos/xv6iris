@@ -262,10 +262,12 @@ Section DiskInv.
        pa_add disk_base (168 + 16 * i + 8) ↦₈ s)%I.
 
   (* everything a FREE descriptor slot owns *)
+  (* [disk.info[i].b] IS NOT HERE any more (finding 5): the device
+     invariant's receipt owns that cell in every state, which is what lets
+     the interrupt handler read it and learn WHICH buffer without a lookup. *)
   Definition free_slot_res (pd : Arch.pa) (i : nat) : iProp Σ :=
     (desc_entry_own pd i ∗ ops_own i ∗
-     (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
-     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
+     (∃ sb : bv 8, d_info_status i ↦ₘ sb))%I.
 
   (* The part of [free_slot_res] that lives in [struct disk]'s .bss rather
      than on the descriptor page: slot [i]'s [ops] header, its
@@ -278,8 +280,13 @@ Section DiskInv.
      [desc_entry_own pd i], comes off the freshly-zeroed descriptor page. *)
   Definition disk_slot_raw (i : nat) : iProp Σ :=
     (ops_own i ∗
-     (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
-     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
+     (∃ sb : bv 8, d_info_status i ↦ₘ sb))%I.
+
+  (* ...and [info[i].b] on its own, because it no longer joins the free pool:
+     the eight of them go to the device invariant at the live flip, where the
+     receipts take them over for good (finding 5). *)
+  Definition disk_info_b_raw (i : nat) : iProp Σ :=
+    (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w)%I.
 
   Lemma free_slot_res_split (pd : Arch.pa) (i : nat) :
     free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗ disk_slot_raw i.
@@ -303,49 +310,12 @@ Section DiskInv.
 
   (* -- per-position states ---------------------------------------------- *)
 
-  (* published, not yet processed by the interrupt handler.
-
-     NOTHING here is existential any more: buffer, slot and pin all come out
-     of the position's [dclaim] value, so a woken publisher's claim fragment
-     pins exactly the request IT published. *)
-  Definition flight_res (γ : disk_names) (p : nat) (v : dclaim) : iProp Σ :=
-    (⌜slot_buf_link (dc_slot v) (dc_buf v)⌝ ∗
-     disk_receipt γ p (dc_slot v) (dc_pin v) ∗
-     b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) ∗
-     d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64))%I.
-
-  (* processed by the interrupt handler, not yet collected by its publisher:
-     the payoff of VirtioProto.virtio_proto_reclaim_acc, parked.  The pin
-     comes back WHOLE now (finding 5): it never held an avail-ring entry to
-     begin with, so there is nothing for the handler to split off and
-     nothing a later publisher of ring slot [p mod 8] could have to reach
-     into an uncollected payoff for.  [dc_ring_map] and [dc_pinr] are gone
-     with that step. *)
-  Definition parked_res (γ : disk_names) (pav : Arch.pa) (p : nat)
-      (v : dclaim) : iProp Σ :=
-    (∃ bs : list (bv 8),
-       ⌜slot_buf_link (dc_slot v) (dc_buf v)⌝ ∗
-       ⌜length bs = vs_len (dc_slot v)⌝ ∗
-       ⌜bs = vs_data (dc_slot v)⌝ ∗
-       b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) ∗
-       d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
-       phys_map (dc_pin v) ∗
-       phys_pointsto (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
-       disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
-       (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
-          CLAIM's own slot, so a woken publisher -- whose claim fragment pins
-          [dc_slot v], hence [vs_perm (dc_slot v)] -- gets it back at exactly
-          the key IT deposited, and can therefore match the invariant's
-          receipt against its own saved proposition.  An existential key here
-          would come back opaque and no receipt could ever be collected (the
-          [vs_data] rule, one layer up).  ONE token, not one per sector: the
-          request's whole obligation is a single SEQUENTIAL permit whose cell
-          was re-indexed at each landing and spent at the completion
-          (sector-atomic-disk.md §6e). *)
-       slot_perms_done γ (dc_slot v) ∗
-       (if vs_is_out (dc_slot v) then emp
-        else phys_list (vr_buf (vs_req (dc_slot v))) bs))%I.
-
+  (* [flight_res] and [parked_res] ARE GONE (finding 5).  They were the
+     driver's per-request state, split by whether the interrupt handler had
+     processed the position yet.  Both are now the device invariant's
+     per-descriptor receipt: its two disjuncts ARE that split, keyed by
+     [b->disk] rather than by which of two maps the entry sat in, and the
+     handler moves one to the other in a single store. *)
 
   (* -- descriptor-triple bookkeeping ------------------------------------ *)
 
@@ -370,31 +340,22 @@ Section DiskInv.
 
   (* -- THE lock resource ------------------------------------------------ *)
 
+  (* WHAT THE LOCK STILL OWNS (finding 5): the descriptor accounting, and
+     nothing per-request.  The buffer, the pinned chain, the crash permit,
+     [b->disk] and [disk.info[i].b] all live in the device invariant's
+     per-descriptor RECEIPT now -- that is where the publisher left them at
+     its [disk.info[id].b] store and where the interrupt handler puts the
+     completed chain back.  A sleeping [virtio_disk_rw] re-finds its own
+     request through the [HActive] receipt fragment it never let go of, so
+     the old claim map, [flight_res] and [parked_res] are all gone with it.
+
+     The triples stay: three descriptors per live request out of eight is
+     what bounds the live window, which is what the publish still needs. *)
   Definition disk_res (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) : iProp Σ :=
-    (∃ (np nr : nat) (fl pk : gmap nat dclaim)
-       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-       (* THE WINDOW BOOKKEEPING, no longer an interval.  The device may
-          complete in any order, so the positions still in flight after [nr]
-          reclaims are SOME [np - nr] of [0, np), not the top [np - nr] of it.
-          What the publisher actually needed from the old interval clause was
-          only these two facts -- that [np] itself is fresh, and how many
-          positions are live -- and both survive reordering. *)
-       ⌜forall p, p ∈ dom fl -> (p < np)%nat⌝ ∗
-       ⌜size fl = (np - nr)%nat⌝ ∗
-       (* a PARKED position is one whose record was reclaimed but whose claim
-          its sleeping publisher has not yet picked up.  It is below [np] like
-          any other live position; being below [nr] is what it no longer is. *)
-       ⌜forall p, p ∈ dom pk -> (p < np)%nat⌝ ∗
-       (* ...and the two are disjoint, which the interval clause used to give
-          for free (flight at or above [nr], parked below it) *)
-       ⌜dom fl ## dom pk⌝ ∗
-       (* descriptor triples: one per live position, well formed, pairwise
-          disjoint, and none of their members is marked free *)
-       ⌜dom tr = dom fl ∪ dom pk⌝ ∗
-       (* the triple map AGREES with the claims: this is what lets a woken
-          publisher read "my three descriptors are still allocated" off the
-          sixth conjunct below, using only its claim fragment. *)
-       ⌜forall p v, (fl ∪ pk) !! p = Some v -> tr !! p = Some (dc_tri v)⌝ ∗
+    (∃ (np nr : nat) (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
+       (* one triple per live position, all below the published count *)
+       ⌜forall p, p ∈ dom tr -> (p < np)%nat⌝ ∗
+       ⌜size tr = (np - nr)%nat⌝ ∗
        ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
        ⌜forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
           tri_set Tp ## tri_set Tq⌝ ∗
@@ -404,40 +365,28 @@ Section DiskInv.
        disk_done_lb γ nr ∗
        (* THE READ WATERMARK, exactly: [nr] is how far the handler has walked
           the used ring, and [d_used_idx] below is the driver's own copy of
-          it.  Reclaiming a record REQUIRES this half at that record's index
-          ([VirtioProto.virtio_proto_reclaim_acc]), which is what forces the
-          handler to drain in order (finding 5). *)
+          it.  Depositing a completed chain REQUIRES this half at that
+          record's index ([VirtioProto.virtio_proto_deposit_acc]), which is
+          what forces the handler to drain in order (finding 5). *)
        disk_read_at γ nr ∗
        (* NOTHING IS HALF-PUBLISHED while the lock is free: a publisher sets
           the staged head at its ring store and spends it at the index bump,
           both under [vdisk_lock]. *)
        disk_stage γ None ∗
-       ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
-       (* driver counters and cells *)
        d_used_idx ↦₂ wrap16 nr ∗
-       ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗
-       ([∗ map] p ↦ v ∈ pk, parked_res γ pav p v) ∗
-       (* free descriptors *)
+       (* THE FREE DESCRIPTORS, and each one's RECEIPT at [HInactive].  The
+          allocator hands both over together, which is what gives
+          [virtio_disk_rw] the token it flips to [HActive] and then holds
+          across [sleep()]. *)
        ([∗ list] i ∈ seq 0 8,
           d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-          (if fr i then free_slot_res pd i else emp)))%I.
-       (* the free-descriptor pool is the LAST conjunct now: the avail-ring
-          cells that used to follow it are the lease's (finding 5). *)
+          (if fr i then free_slot_res pd i ∗ i ↪[dn_head γ] HInactive
+           else emp)))%I.
 
-  (* the publisher's claim on its own position *)
-  Definition disk_claim (γ : disk_names) (p : nat) (v : dclaim) : iProp Σ :=
-    p ↪[dn_claim γ] v.
+  (* [disk_claim] is gone too: a sleeping publisher's handle on its own
+     request is the [HActive] receipt fragment, which names the buffer, the
+     slot, the three descriptors and the position all at once. *)
 
-  (* a claim locates its position in the live window and pins its value *)
-  Lemma disk_claim_agree (γ : disk_names) (p : nat) (v : dclaim)
-      (fl pk : gmap nat dclaim) :
-    ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) -∗ disk_claim γ p v -∗
-    ⌜fl !! p = Some v \/ (fl !! p = None /\ pk !! p = Some v)⌝.
-  Proof.
-    iIntros "Hauth Hfrag".
-    iDestruct (ghost_map_lookup with "Hauth Hfrag") as %Hl.
-    iPureIntro. apply lookup_union_Some_raw in Hl. exact Hl.
-  Qed.
 
   (* ==================================================================== *)
   (* Tier bridges over an ARBITRARY byte window.                          *)
