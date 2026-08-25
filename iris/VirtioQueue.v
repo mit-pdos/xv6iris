@@ -607,6 +607,7 @@ Lemma ring_bytes_dom (c : virtio_cfg) (rc : nat -> bv 16) :
   dom (ring_bytes c rc) ⊆ ring_cells_dom c.
 Proof. apply ring_bytes_upto_dom. lia. Qed.
 
+
 (* a write outside a range leaves the map alone there -- proved here because
    [VirtioQueue] sits below the file that states it for [footprint] *)
 Lemma write_foldr_lookup_off (pa : Arch.pa) (f : nat -> bv 8) (m : nat)
@@ -664,6 +665,30 @@ Qed.
 Lemma ring_bytes_read (c : virtio_cfg) (rc : nat -> bv 16) (j : nat) :
   (j < 8)%nat -> read_bytes (ring_bytes c rc) (ring_slot_pa c j) 2 = Some (rc j).
 Proof. intro Hj. apply ring_bytes_upto_read; lia. Qed.
+
+(* ...and it is the WHOLE region: all eight cells are written *)
+Lemma ring_bytes_dom_eq (c : virtio_cfg) (rc : nat -> bv 16) :
+  dom (ring_bytes c rc) = ring_cells_dom c.
+Proof.
+  apply set_eq. intro a. split; [ apply ring_bytes_dom |].
+  intro Ha. unfold ring_cells_dom in Ha.
+  apply pa_range_elim in Ha as (i & Hi & ->).
+  change (N.to_nat 16) with 16%nat in Hi.
+  assert (Heq : pa_add (pa_off (vc_avail c) vq_avail_ring_off) i
+                = pa_add (ring_slot_pa c (i / 2)%nat) (i mod 2)%nat).
+  { unfold ring_slot_pa, pa_off. rewrite !pa_add_add. f_equal.
+    assert (Hz : Z.to_nat (vq_avail_ring_off + 2 * Z.of_nat (i / 2)%nat)
+                 = (Z.to_nat vq_avail_ring_off + 2 * (i / 2))%nat)
+      by (unfold vq_avail_ring_off; lia).
+    rewrite Hz. pose proof (Nat.div_mod i 2 ltac:(lia)). lia. }
+  rewrite Heq.
+  assert (Hd8 : (i / 2 < 8)%nat) by (apply Nat.div_lt_upper_bound; lia).
+  apply (read_bytes_dom_sub (ring_bytes c rc) (ring_slot_pa c (i / 2)%nat) 2 _
+           (ring_bytes_read c rc (i / 2)%nat Hd8)).
+  apply pa_range_intro. change (N.to_nat 2) with 2%nat.
+  pose proof (Nat.mod_upper_bound i 2 ltac:(lia)). lia.
+Qed.
+
 
 (* the ring cells sit past the flags and index words, so they miss the
    published index outright *)
@@ -2792,6 +2817,117 @@ Lemma vproto_capture_ctl (c : virtio_cfg) (pr : vproto) (p : nat) :
 Proof. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 4b. The ring-cell store.                                               *)
+(*                                                                        *)
+(* xv6 publishes in two instructions:                                     *)
+(*                                                                        *)
+(*     disk.avail->ring[disk.avail->idx % NUM] = idx[0];                  *)
+(*     __sync_synchronize();                                              *)
+(*     disk.avail->idx += 1;                                              *)
+(*                                                                        *)
+(* and the device invariant closes between them, so the intermediate state *)
+(* -- cell written, position not yet published -- must be a legal protocol *)
+(* state in its own right.  It is, and harmlessly so: the device reads a   *)
+(* cell only when it pops, and it cannot pop a position the index bump has *)
+(* not yet announced.  This is why the cells can live in the lease at all. *)
+(*                                                                        *)
+(* The one thing to check is that the cell being overwritten is not still  *)
+(* SPOKEN FOR by a position the device has yet to pop.  That is where the  *)
+(* window bound earns its keep: at most seven positions can be waiting, so *)
+(* [np mod 8] is nobody else's cell.                                      *)
+(* ---------------------------------------------------------------------- *)
+
+(* two positions less than eight apart never share a cell *)
+Lemma vq_mod8_window_ne (lo p n : nat) :
+  (lo <= p < n)%nat -> (n - lo < 8)%nat ->
+  (p `mod` 8)%nat <> (n `mod` 8)%nat.
+Proof.
+  intros Hp Hw Hc.
+  assert (Hq : (p / 8 = n / 8)%nat).
+  { pose proof (Nat.mod_upper_bound p 8 ltac:(lia)).
+    pose proof (Nat.div_mod p 8 ltac:(lia)).
+    pose proof (Nat.div_mod n 8 ltac:(lia)). nia. }
+  pose proof (Nat.div_mod p 8 ltac:(lia)).
+  pose proof (Nat.div_mod n 8 ltac:(lia)). nia.
+Qed.
+
+Definition vproto_ring_state (pr : vproto) (h : bv 16) : vproto :=
+  VProto (vp_nc pr) (vp_np pr) (vp_lo pr) (vp_nr pr) (vp_tk pr)
+         (vp_srv pr) (vp_fl pr)
+         (fun j => if bool_decide (j = (vp_np pr `mod` 8)%nat)
+                   then h else vp_ring pr j)
+         (vp_pend pr) (vp_done pr) (vp_uix pr) (vp_pin pr).
+
+Lemma vprg_nc (pr : vproto) (h : bv 16) :
+  vp_nc (vproto_ring_state pr h) = vp_nc pr.
+Proof. reflexivity. Qed.
+Lemma vprg_np (pr : vproto) (h : bv 16) :
+  vp_np (vproto_ring_state pr h) = vp_np pr.
+Proof. reflexivity. Qed.
+Lemma vprg_lo (pr : vproto) (h : bv 16) :
+  vp_lo (vproto_ring_state pr h) = vp_lo pr.
+Proof. reflexivity. Qed.
+Lemma vprg_nr (pr : vproto) (h : bv 16) :
+  vp_nr (vproto_ring_state pr h) = vp_nr pr.
+Proof. reflexivity. Qed.
+Lemma vprg_tk (pr : vproto) (h : bv 16) :
+  vp_tk (vproto_ring_state pr h) = vp_tk pr.
+Proof. reflexivity. Qed.
+Lemma vprg_srv (pr : vproto) (h : bv 16) :
+  vp_srv (vproto_ring_state pr h) = vp_srv pr.
+Proof. reflexivity. Qed.
+Lemma vprg_fl (pr : vproto) (h : bv 16) :
+  vp_fl (vproto_ring_state pr h) = vp_fl pr.
+Proof. reflexivity. Qed.
+Lemma vprg_ring (pr : vproto) (h : bv 16) :
+  vp_ring (vproto_ring_state pr h)
+  = fun j => if bool_decide (j = (vp_np pr `mod` 8)%nat)
+             then h else vp_ring pr j.
+Proof. reflexivity. Qed.
+Lemma vprg_pend (pr : vproto) (h : bv 16) :
+  vp_pend (vproto_ring_state pr h) = vp_pend pr.
+Proof. reflexivity. Qed.
+Lemma vprg_done (pr : vproto) (h : bv 16) :
+  vp_done (vproto_ring_state pr h) = vp_done pr.
+Proof. reflexivity. Qed.
+Lemma vprg_uix (pr : vproto) (h : bv 16) :
+  vp_uix (vproto_ring_state pr h) = vp_uix pr.
+Proof. reflexivity. Qed.
+Lemma vprg_pin (pr : vproto) (h : bv 16) :
+  vp_pin (vproto_ring_state pr h) = vp_pin pr.
+Proof. reflexivity. Qed.
+Lemma vprg_slots (pr : vproto) (h : bv 16) :
+  vp_slots (vproto_ring_state pr h) = vp_slots pr.
+Proof. reflexivity. Qed.
+
+(* the control map: same index, same pins, one cell different *)
+Lemma vproto_ring_ctl (c : virtio_cfg) (pr : vproto) (h : bv 16) :
+  vproto_ctl c (vproto_ring_state pr h)
+  = (avail_idx_bytes c (vp_np pr)
+     ∪ ring_bytes c (vp_ring (vproto_ring_state pr h)))
+    ∪ pins_union (vp_pin pr).
+Proof. reflexivity. Qed.
+
+Lemma vproto_ok_ring (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (h : bv 16) :
+  vproto_ok c pr D ->
+  (* the window has room -- see the header *)
+  (vp_np pr - vp_lo pr < 8)%nat ->
+  vproto_ok c (vproto_ring_state pr h) D.
+Proof.
+  intros Hok Hnotfull.
+  pose proof (vpo_ring _ _ _ Hok) as Hring.
+  destruct Hok.
+  constructor; try assumption.
+  (* the only clause that reads the cells POSITIONALLY *)
+  rewrite vprg_ring, vprg_lo, vprg_np, vprg_pend.
+  intros q slq Hq Hsq.
+  rewrite (bool_decide_eq_false_2 ((q `mod` 8)%nat = (vp_np pr `mod` 8)%nat)
+             (vq_mod8_window_ne (vp_lo pr) q (vp_np pr) Hq Hnotfull)).
+  exact (Hring q slq Hq Hsq).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 5. Publish: appending slot [np].                                       *)
 (* ---------------------------------------------------------------------- *)
 
@@ -2799,9 +2935,12 @@ Definition vproto_publish_state (pr : vproto) (sl : vslot)
     (pin : gmap Arch.pa (bv 8)) : vproto :=
   VProto (vp_nc pr) (S (vp_np pr)) (vp_lo pr) (vp_nr pr) (vp_tk pr)
          (vp_srv pr) (vp_fl pr)
-         (* THE PUBLISH WRITES ONE CELL: the slot this position uses *)
-         (fun j => if bool_decide (j = (vp_np pr `mod` 8)%nat)
-                   then vs_hd sl else vp_ring pr j)
+         (* THE CELL IS ALREADY WRITTEN.  The driver stores the head into
+            [avail->ring[idx % NUM]] in an instruction of its OWN, one the
+            device invariant closes around ([vproto_ring_state]); by the time
+            the index bump makes the position visible, the cell holds the
+            head, and [vproto_ok_publish] takes that as a premise. *)
+         (vp_ring pr)
          (<[ vp_np pr := sl ]> (vp_pend pr))
          (vp_done pr)
          (vp_uix pr)
@@ -2831,9 +2970,7 @@ Lemma vppq_fl (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_fl (vproto_publish_state pr sl pin) = vp_fl pr.
 Proof. reflexivity. Qed.
 Lemma vppq_ring (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
-  vp_ring (vproto_publish_state pr sl pin)
-  = fun j => if bool_decide (j = (vp_np pr `mod` 8)%nat)
-             then vs_hd sl else vp_ring pr j.
+  vp_ring (vproto_publish_state pr sl pin) = vp_ring pr.
 Proof. reflexivity. Qed.
 Lemma vppq_pend (pr : vproto) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vp_pend (vproto_publish_state pr sl pin) = <[ vp_np pr := sl ]> (vp_pend pr).
@@ -2885,15 +3022,17 @@ Lemma vproto_ok_publish (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
   slot_pin_ok c (vp_np pr) sl pin ->
   slot_wr sl ## dom pin ->
   slot_fp sl pin ## D ->
-  (* THE WINDOW MUST NOT BE FULL.  This used to be DERIVED here, from the
-     publisher's pin holding the ring entry that position [lo] also held; the
-     cells belong to the lease now, so the driver proves it instead -- from
-     [vproto_nr_lo] and its own descriptor accounting, which bounds the
-     outstanding requests well below eight. *)
+  (* THE CELL THIS POSITION WILL USE ALREADY NAMES IT.  The driver's store to
+     [avail->ring[idx % NUM]] is a step of its own ([vproto_ok_ring]); this is
+     that step's effect, carried forward to the index bump. *)
+  vp_ring pr (vp_np pr `mod` 8)%nat = vs_hd sl ->
+  (* ...and the window still has room for the position itself ([vpo_win]).
+     Same bound the ring store needed, and the driver has it from the same
+     place: [vproto_nr_lo] and its descriptor accounting. *)
   (vp_np pr - vp_lo pr < 8)%nat ->
   vproto_ok c (vproto_publish_state pr sl pin) (D ∪ slot_fp sl pin).
 Proof.
-  intros Hok Hnew Hwr Hdisj Hnotfull.
+  intros Hok Hnew Hwr Hdisj Hcell Hnotfull.
   (* head freshness is not assumed: it follows from the publisher's pin being
      disjoint from the lease every live chain sits in *)
   pose proof (vproto_hd_fresh c pr D sl pin Hok Hnew Hdisj) as Hfresh.
@@ -2957,24 +3096,14 @@ Proof.
     + intro Hc. exact (Hfresh _ _ H2 (eq_sym Hc)).
     + exact (Hfresh _ _ H1).
     + exact (vpo_hd_inj _ _ _ Hok q1 q2 sl1 sl2 Hne H1 H2).
-  - (* THE ONE CELL THIS PUBLISH WRITES is the slot [np] uses, and the window
-       is not full ([Hnotfull]), so no OTHER untaken position uses it -- the
-       cells of the positions already there are untouched. *)
+  - (* THE RING IS UNTOUCHED HERE.  The new position's cell was written by the
+       preceding store ([Hcell]); every older position's cell is what it was. *)
     rewrite vppq_ring, vppq_lo, vppq_np, vppq_pend.
     intros q slq Hq Hsq.
     destruct (decide (q = vp_np pr)) as [->|Hne].
-    + rewrite lookup_insert in Hsq. injection Hsq as <-.
-      by rewrite (bool_decide_eq_true_2
-                    ((vp_np pr `mod` 8)%nat = (vp_np pr `mod` 8)%nat) eq_refl).
+    + rewrite lookup_insert in Hsq. injection Hsq as <-. exact Hcell.
     + rewrite lookup_insert_ne in Hsq by (exact (fun e => Hne (eq_sym e))).
-      rewrite (bool_decide_eq_false_2 ((q `mod` 8)%nat = (vp_np pr `mod` 8)%nat)).
-      * exact (vpo_ring _ _ _ Hok q slq ltac:(lia) Hsq).
-      * (* two untaken positions under eight apart differ mod eight *)
-        intro Hc. apply Hne.
-        pose proof (Nat.mod_upper_bound q 8 ltac:(lia)).
-        pose proof (Nat.div_mod q 8 ltac:(lia)).
-        pose proof (Nat.div_mod (vp_np pr) 8 ltac:(lia)).
-        assert (q / 8 = vp_np pr / 8)%nat by nia. nia.
+      exact (vpo_ring _ _ _ Hok q slq ltac:(lia) Hsq).
   - rewrite vppq_nc, vppq_srv. exact (vpo_nc _ _ _ Hok).
   - rewrite vppq_uix, vppq_srv. exact (vpo_uix_dom _ _ _ Hok).
   - rewrite vppq_nr, vppq_nc. exact (vpo_nr_nc _ _ _ Hok).
@@ -3031,7 +3160,7 @@ Lemma vproto_publish_ctl (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
   slot_fp sl pin ## D ->
   vproto_ctl c (vproto_publish_state pr sl pin)
   = (avail_idx_bytes c (S (vp_np pr))
-     ∪ ring_bytes c (vp_ring (vproto_publish_state pr sl pin)))
+     ∪ ring_bytes c (vp_ring pr))
     ∪ (pin ∪ pins_union (vp_pin pr)).
 Proof.
   intros Hok Hdisj.
@@ -3060,7 +3189,7 @@ Proof.
     - exact (vproto_pins_disj c pr D Hok q1 q2 m1 m2 Hne H1 H2). }
   assert (Hc1 : vproto_ctl c (vproto_publish_state pr sl pin)
                 = (avail_idx_bytes c (S (vp_np pr))
-                   ∪ ring_bytes c (vp_ring (vproto_publish_state pr sl pin)))
+                   ∪ ring_bytes c (vp_ring pr))
                   ∪ pins_union (<[ vp_np pr := pin ]> (vp_pin pr)))
     by reflexivity.
   rewrite Hc1, (pins_union_insert (vp_pin pr) (vp_np pr) pin Hnpin Hd).
