@@ -2,6 +2,14 @@
    against the real TSO semantics ([claude-notes/projects/tso-port.md],
    T2b).
 
+   SUPERSEDED BY [TsoCtxTwin2.v] (checkpoint 0.5's rebuild): this file's
+   global-map ghost shape is what [TsoCtxRehearsal.v] refuted two surface
+   statements against, and the corrected construction (authorities in the
+   tokens, one monotone nat per context, the clean/dirty bit in the fact)
+   lives there.  Kept, with the rehearsal, as the discovery record; its
+   PURE layer (§latest / the read bridge / the append lemmas) is still
+   imported by the successor.
+
    A self-contained Iris ghost theory over [TsoMem.v] -- no WP, no
    language, ghost updates only -- showing that the context surface's
    statement shape ([TsoCtx.v]'s SC-degenerate exports) is satisfiable by

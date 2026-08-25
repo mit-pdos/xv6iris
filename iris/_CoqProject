@@ -22,6 +22,7 @@ TsoMem.v
 TsoLitmus.v
 TsoCtxTwin.v
 TsoCtxRehearsal.v
+TsoCtxTwin2.v
 RiscvLang.v
 HartBlock.v
 HartSwp.v

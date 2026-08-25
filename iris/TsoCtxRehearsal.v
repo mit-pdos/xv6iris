@@ -1,5 +1,11 @@
 (* TsoCtxRehearsal.v -- THE CUTOVER REHEARSAL.
 
+   ANSWERED BY [TsoCtxTwin2.v]: every finding below is either encoded in
+   the corrected construction (the honest mints, the interp-free
+   transports, the dq axis) or shown to be an artefact of the old twin's
+   global-map shape (the two refutations -- see the successor's header
+   and §12).  Kept as the discovery record; do not extend.
+
    [TsoCtxTwin.v] showed that a TSO-shaped context machinery EXISTS over
    [TsoMem.v]'s Ztso view machine.  It was written before leg M swept the
    context axis through the tree, so it models only load/store/transport/
