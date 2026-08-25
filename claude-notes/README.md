@@ -142,6 +142,21 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the tree layer, the DESIGN OF RECORD for F1/F1.5: rulings R1–R12 (including
   the standing constraint that (L6) must NEVER be stated) over a verification
   report against the landed tree.
+
+## `projects/` — ongoing worklists & plans (one per effort)
+
+Eight remain open; each file's top banner says precisely what is left (the
+first five were audited against the tree 2026-08-22):
+
+- **[`virtio-finding5-driver-port.md`](projects/virtio-finding5-driver-port.md)**
+  — carrying the out-of-order completion fix into the Iris DRIVER proofs
+  (the model and `vtest` landed already).  The per-descriptor receipt keyed
+  by HEAD that replaces the position-keyed flight map, why `disk.info[i].b`
+  is driver-private, the vacuous-accessor trap, and THE OPEN PROBLEM: the
+  two facts the interrupt handler must carry across its four invariant
+  openings, with the three ways of avoiding new ghost state that do not
+  work.  Three files red on branch `virtio-finding5`.
+
 - **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
   31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
   hand-derived scheduler and kexec offset maps (the tools get both wrong on

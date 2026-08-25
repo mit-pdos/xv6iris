@@ -178,7 +178,15 @@ latch only if it held it.  `VirtioQueue`'s keyed protocol follows: `vp_srv`,
 `vp_lo`, `vp_tk`, `vp_uix`, with `vpo_win` (the eight-wide window) derived at
 the publish from the available-ring entry the watermark's own position pins.
 
-**THE IRIS DRIVER PORT IS NOT FINISHED.**  Green as of this note:
+**THE IRIS DRIVER PORT IS NOT FINISHED, and it now has its own worklist:**
+[`virtio-finding5-driver-port.md`](virtio-finding5-driver-port.md) is the
+live one — read it, not the two plan items below, which are STALE.  `dn_ord`
+landed; the position-keyed flight map they describe no longer exists (the
+per-descriptor receipt replaced it), and `DiskInv.disk_res` no longer has a
+flight map at all.  The paragraph below records where the port stood when
+this note was written.
+
+Green as of this note:
 `VirtioModel`, `RiscvLang`, `WpVirtio`, `VirtioQueue`, and the whole
 `vtest-rocq` suite.  In progress: `VirtioProto` (the invariant's coupling and
 the three device-thread rules are ported; the accessors are not).  Untouched:
