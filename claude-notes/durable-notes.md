@@ -419,6 +419,13 @@ Two smaller ones from the same proof:
   side condition mentions. (Same root cause as the `Qp.div_2` and
   `co_license` traps: a hole whose expected type is still an evar.)
 
+The MIRROR failure: **a keyed `rewrite length_app` / `rewrite app_assoc` that
+SUCCEEDS in the wrong place.** Keyed matching may unfold a definition to find
+its key — `dinode_bytes d` unfolds to an `app`, so the rewrite fires INSIDE
+the record's own encoding and the goal no longer mentions `dinode_bytes d`
+at all (seen in `FsDurImg.diblk_bytes_split`). Apply such lemmas at
+spelled-out arguments (`rewrite (length_app l1 l2)`), never bare.
+
 ## INCONSISTENT PREMISES ARE THE WORST DEFECT, AND NOTHING IN THE BUILD SEES THEM
 
 A hedged conjunct makes a postcondition say nothing. **Contradictory
