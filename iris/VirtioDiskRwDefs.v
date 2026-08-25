@@ -31,6 +31,9 @@ Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* [ghost_map]'s element notation: a free descriptor carries its receipt
+   fragment now (finding 5), and this section names it. *)
+From iris.base_logic.lib Require Import ghost_map.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -315,13 +318,17 @@ Section VdrwDefs.
      pa_stk sp0 9  ↦₈ (m !!! Regidx Rs7) ∗
      pa_stk sp0 10 ↦₈ (m !!! Regidx Rs8))%I.
 
-  (* one entry of [disk_res]'s eight-element free-descriptor conjunct *)
-  Definition free_cell_res (pd : Arch.pa) (fr : nat -> bool) (i : nat) : iProp Σ :=
+  (* one entry of [disk_res]'s eight-element free-descriptor conjunct.  A free
+     entry now carries its RECEIPT too (finding 5): the allocator hands the
+     token over with the bytes, and that token is what [virtio_disk_rw] flips
+     to [HActive] and then holds across [sleep()]. *)
+  Definition free_cell_res (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool)
+      (i : nat) : iProp Σ :=
     (d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-     (if fr i then free_slot_res pd i else emp))%I.
+     (if fr i then free_slot_res pd i ∗ i ↪[dn_head γ] HInactive else emp))%I.
 
-  Lemma free_bundles_cells (pd : Arch.pa) (fr : nat -> bool) :
-    free_bundles pd fr ⊣⊢ [∗ list] i ∈ seq 0 8, free_cell_res pd fr i.
+  Lemma free_bundles_cells (γ : disk_names) (pd : Arch.pa) (fr : nat -> bool) :
+    free_bundles γ pd fr ⊣⊢ [∗ list] i ∈ seq 0 8, free_cell_res γ pd fr i.
   Proof. reflexivity. Qed.
 
   (* the two scratch slots, contents irrelevant until P2 stores into them *)
@@ -505,9 +512,9 @@ Section VdrwbDefs.
      is all a re-fold needs.  The partial-free tail re-marks the descriptors
      it gives back, producing [fr_upd (fr_upd fr h false) h true], which is
      that -- but not syntactically [fr]. *)
-  Lemma free_bundles_ext (pd : Arch.pa) (fr fr' : nat -> bool) :
+  Lemma free_bundles_ext (γ : disk_names) (pd : Arch.pa) (fr fr' : nat -> bool) :
     (forall i, (i < 8)%nat -> fr i = fr' i) ->
-    free_bundles pd fr ⊣⊢ free_bundles pd fr'.
+    free_bundles γ pd fr ⊣⊢ free_bundles γ pd fr'.
   Proof.
     intro Hext. rewrite /free_bundles. apply big_sepL_proper.
     intros k y Hk. apply lookup_seq in Hk as [-> Hlt].
@@ -516,17 +523,15 @@ Section VdrwbDefs.
 
   (* THE P2/P3 SEAM: [disk_res] with its existentials named and the free
      bundle at whatever the allocator left behind. *)
+  (* [DiskInv.disk_res] with its existentials named.  The per-request maps are
+     gone with [flight_res]/[parked_res] (finding 5): that state is the device
+     invariant's per-descriptor receipt now, and what the lock still owns is
+     the free array, the counters and the triples that bound the window. *)
   Definition vdrw_body (γ : disk_names) (pd pav : mword 64)
-      (np nr : nat) (fl pk : gmap nat dclaim)
+      (np nr : nat)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) : iProp Σ :=
-    (* the window bookkeeping, split as in [DiskInv.disk_res]: an arbitrary
-       set of live positions below [np], counted, disjoint from the parked *)
-    (⌜forall p, p ∈ dom fl -> (p < np)%nat⌝ ∗
-     ⌜size fl = (np - nr)%nat⌝ ∗
-     ⌜forall p, p ∈ dom pk -> (p < np)%nat⌝ ∗
-     ⌜dom fl ## dom pk⌝ ∗
-     ⌜dom tr = dom fl ∪ dom pk⌝ ∗
-     ⌜forall p v, (fl ∪ pk) !! p = Some v -> tr !! p = Some (dc_tri v)⌝ ∗
+    (⌜forall p, p ∈ dom tr -> (p < np)%nat⌝ ∗
+     ⌜size tr = (np - nr)%nat⌝ ∗
      ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
      ⌜forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
         tri_set Tp ## tri_set Tq⌝ ∗
@@ -537,30 +542,26 @@ Section VdrwbDefs.
      disk_read_at γ nr ∗
      (* nothing half-published while the lock is not held mid-publish *)
      disk_stage γ None ∗
-     ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
      d_used_idx ↦₂ wrap16 nr ∗
-     ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗
-     ([∗ map] p ↦ v ∈ pk, parked_res γ pav p v) ∗
-     free_bundles pd fr)%I.
+     free_bundles γ pd fr)%I.
 
   Lemma vdrw_body_close (γ : disk_names) (pd pav pu : mword 64)
-      (np nr : nat) (fl pk : gmap nat dclaim)
+      (np nr : nat)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) :
-    vdrw_body γ pd pav np nr fl pk tr fr -∗ disk_res γ pd pav pu.
+    vdrw_body γ pd pav np nr tr fr -∗ disk_res γ pd pav pu.
   Proof.
     iIntros "H". rewrite /disk_res.
-    iExists np, nr, fl, pk, tr, fr. iExact "H".
+    iExists np, nr, tr, fr. iExact "H".
   Qed.
 
   Lemma vdrw_body_open (γ : disk_names) (pd pav pu : mword 64) :
     disk_res γ pd pav pu -∗
-    ∃ (np nr : nat) (fl pk : gmap nat dclaim)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-      vdrw_body γ pd pav np nr fl pk tr fr.
+    ∃ (np nr : nat) (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
+      vdrw_body γ pd pav np nr tr fr.
   Proof.
     iIntros "H". rewrite /disk_res.
-    iDestruct "H" as (np nr fl pk tr fr) "H".
-    iExists np, nr, fl, pk, tr, fr. iExact "H".
+    iDestruct "H" as (np nr tr fr) "H".
+    iExists np, nr, tr, fr. iExact "H".
   Qed.
 
   (* re-joining the [int idx[3]] straddle into the two frame slots *)
@@ -1003,13 +1004,14 @@ Section VdrwcDefs.
 
   (* the parts of a descriptor slot's bundle P3 does NOT touch: [free_desc]
      wants them back at P6, so they ride through unchanged. *)
+  (* [info[i].b] is NOT here any more: the device invariant's receipt owns it
+     in every state (finding 5), so it neither leaves nor rejoins the pool. *)
   Definition vdrw_slot_rest (i : nat) : iProp Σ :=
-    (ops_own i ∗ (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
-     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
+    (ops_own i ∗ (∃ sb : bv 8, d_info_status i ↦ₘ sb))%I.
 
   Lemma free_slot_split (pd : Arch.pa) (i : nat) :
     free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗ vdrw_slot_rest i.
-  Proof. rewrite /free_slot_res /vdrw_slot_rest. iSplit; iIntros "($ & $ & $ & $)". Qed.
+  Proof. rewrite /free_slot_res /vdrw_slot_rest. iSplit; iIntros "($ & $ & $)". Qed.
 
   (* THE P3/P4 SEAM: the seventeen cells the chain formatting writes, at the
      values it writes, plus the two untouched slot remainders. *)
