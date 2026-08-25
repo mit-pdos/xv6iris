@@ -239,40 +239,11 @@ Section DiskBoot.
     iApply (desc_entry_of_zeros pd (0 + k) Hm ltac:(lia)); iExact "H".
   Qed.
 
-  (* ==================================================================== *)
-  (* §3  THE AVAIL PAGE -> the unclaimed ring cells.                       *)
-  (* ==================================================================== *)
-
-  (* no position is live at boot, so every ring cell is in the pool *)
-  Local Lemma ring_slots_empty (pav : Arch.pa) :
-    ([∗ list] j ∈ seq 0 8, ∃ w : mword 16, d_ring pav j ↦₂ w)
-    ⊢ ring_slots_res pav ∅.
-  Proof.
-    rewrite /ring_slots_res. apply big_sepL_mono. intros k y Hy.
-    rewrite (bool_decide_eq_false_2 (y ∈ (∅ : gset nat)) (not_elem_of_empty y)).
-    reflexivity.
-  Qed.
-
-  Lemma avail_page_ring (pav : Arch.pa) :
-    bv_unsigned (pav : SailStdpp.Values.mword 64) `mod` 4096 = 0 ->
-    ([∗ list] j ∈ seq 4 4092, pa_add pav j ↦ₘ byte_zero)
-    ⊢ ring_slots_res pav ∅.
-  Proof.
-    intro Hm. iIntros "H".
-    iDestruct (zshift pav 4 4092 with "H") as "H".
-    rewrite (zsplit (pa_add pav 4) 16 4076 4092 ltac:(lia)).
-    iDestruct "H" as "[Hh _]".
-    iDestruct (zchunk (pa_add pav 4) 8 2 16 ltac:(lia) with "Hh") as "Hc".
-    iApply ring_slots_empty.
-    iApply (big_sepL_mono with "Hc"). intros k y Hy.
-    apply lookup_seq in Hy as [-> Hlt].
-    assert (Ar : pa_add (pa_add pav 4) ((0 + k) * 2)%nat = d_ring pav (0 + k)).
-    { rewrite pa_add_add. rewrite /d_ring. apply pa_add_eq. lia. }
-    rewrite Ar. iIntros "H".
-    iExists (mword_of_int 0 : mword 16).
-    iApply (zbytes_word2 (d_ring pav (0 + k))
-              (d_ring_aligned2 pav (0 + k) Hm ltac:(lia))); iExact "H".
-  Qed.
+  (* §3 IS GONE (finding 5).  It turned the cleared available page into the
+     driver's pool of unclaimed ring cells; all eight belong to the device
+     invariant's lease now, and the boot chain hands them to
+     [VirtioProto.virtio_proto_intro] at the flip instead
+     ([ProofVirtioDiskInit.vdi_ring_phys]). *)
 
   (* ==================================================================== *)
   (* §4  THE FREE-DESCRIPTOR BUNDLE.                                       *)
@@ -328,8 +299,11 @@ Section DiskBoot.
     (* ...including the READ WATERMARK's half, at zero: nothing has been
        published, so nothing is owed a look *)
     disk_read_at γ 0%nat -∗
+    (* ...and the STAGED HEAD at [None]: nothing is half-published *)
+    disk_stage γ None -∗
     ([∗ list] j ∈ seq 0 4096, pa_add pd j ↦ₘ byte_zero) -∗
-    ([∗ list] j ∈ seq 4 4092, pa_add pav j ↦ₘ byte_zero) -∗
+    (* NO AVAIL PAGE: its ring cells went into the lease at the flip, and
+       nothing else on that page is the driver's business (finding 5). *)
     ([∗ list] j ∈ seq 0 8, pa_add SpecVirtioDiskInit.disk_free j ↦ₘ (Z_to_bv 8 1)) -∗
     (* --- the boot tokens: [struct disk]'s untouched .bss cells... --- *)
     d_used_idx ↦₂ wrap16 0%nat -∗
@@ -340,19 +314,23 @@ Section DiskBoot.
     disk_res γ pd pav pu.
   Proof.
     intro Hal. destruct (init_cfg_pages_aligned pd pav pu Hal) as [Hpd Hpav].
-    iIntros "Hpub Hrd Hdesc Havail Hfree Huidx Hraw Hlb Hclaim".
+    iIntros "Hpub Hrd Hstg Hdesc Hfree Huidx Hraw Hlb Hclaim".
     iDestruct (desc_page_entries pd Hpd with "Hdesc") as "Hde".
-    iDestruct (avail_page_ring pav Hpav with "Havail") as "Hring".
     iDestruct (free_bundles_boot pd with "Hfree Hde Hraw") as "Hfb".
     assert (Hu : (∅ : gmap nat dclaim) ∪ ∅ = ∅)
       by (apply map_eq; intro k; rewrite lookup_union !lookup_empty; reflexivity).
     rewrite /disk_res.
     iExists 0%nat, 0%nat, ∅, ∅, ∅, (fun _ => true).
     rewrite Hu !dom_empty_L !big_sepM_empty.
+    (* nothing published, nothing in flight, nothing parked *)
+    iSplitR.
+    { iPureIntro. intros p Hp. exfalso. exact (not_elem_of_empty p Hp). }
     iSplitR.
     { iPureIntro. reflexivity. }
     iSplitR.
     { iPureIntro. intros p Hp. exfalso. exact (not_elem_of_empty p Hp). }
+    iSplitR.
+    { iPureIntro. set_solver. }
     iSplitR.
     { iPureIntro. set_solver. }
     iSplitR.
@@ -364,10 +342,8 @@ Section DiskBoot.
       discriminate. }
     iSplitR.
     { iPureIntro. intros p T i Hp _. rewrite lookup_empty in Hp. discriminate. }
-    iFrame "Hpub Hlb Hrd Hclaim Huidx".
-    assert (Hm8 : mod8 (∅ : gset nat) = ∅) by (rewrite /mod8; set_solver).
-    rewrite Hm8.
-    iFrame "Hfb Hring".
+    iFrame "Hpub Hlb Hrd Hstg Hclaim Huidx".
+    iFrame "Hfb".
   Qed.
 
 End DiskBoot.

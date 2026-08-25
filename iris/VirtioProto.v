@@ -747,6 +747,9 @@ Definition vinit_dma (c : virtio_cfg) : gmap Arch.pa (bv 8) :=
    ∪ ring_bytes c (fun _ : nat => zero16))
   ∪ range_map (vc_used c) 4096 (fun _ : nat => byte_zero).
 
+Lemma zero16_wrap16_pure : zero16 = wrap16 0%nat.
+Proof. apply bv_eq. vm_compute. reflexivity. Qed.
+
 Lemma nth_byte_wrap16_0 (j : nat) :
   (j < 2)%nat -> nth_byte (wrap16 0) j = byte_zero.
 Proof.
@@ -894,6 +897,50 @@ Proof.
 Qed.
 
 (* a cell sits inside the region the eight of them cover *)
+(* THE EIGHT CELLS OF A FRESHLY CLEARED PAGE.  [virtio_disk_init] zeroes the
+   available page before the flip, so the lease's ring region starts life as
+   sixteen zero bytes -- which is what lets the boot chain hand
+   [virtio_proto_intro] the [phys_map] it wants. *)
+Lemma ring_bytes_zero_range (c : virtio_cfg) :
+  ring_bytes c (fun _ : nat => zero16)
+  = range_map (ring_slot_pa c 0) 16 (fun _ : nat => byte_zero).
+Proof.
+  assert (Hbase : ring_slot_pa c 0 = pa_off (vc_avail c) vq_avail_ring_off).
+  { unfold ring_slot_pa. f_equal; lia. }
+  apply map_eq. intro a.
+  destruct (decide (a ∈ pa_range (ring_slot_pa c 0) 16)) as [Hin|Hout].
+  - apply pa_range_elim in Hin as (i & Hi & ->).
+    change (N.to_nat 16) with 16%nat in Hi.
+    rewrite (range_map_lookup (ring_slot_pa c 0) 16
+               (fun _ : nat => byte_zero) i ltac:(lia) Hi).
+    (* the address is byte [i mod 2] of cell [i / 2] *)
+    assert (Hd8 : (i / 2 < 8)%nat) by (apply Nat.div_lt_upper_bound; lia).
+    assert (Hm2 : (i `mod` 2 < 2)%nat) by (apply Nat.mod_upper_bound; lia).
+    assert (Heq : pa_add (ring_slot_pa c 0) i
+                  = pa_add (ring_slot_pa c (i / 2)%nat) (i `mod` 2)%nat).
+    { unfold ring_slot_pa, pa_off. rewrite !pa_add_add. f_equal.
+      (* [lia] cannot see through [Z.to_nat] of a symbolic sum; the same
+         shape [ring_bytes_dom_eq] handles, handled the same way *)
+      assert (Hz0 : Z.to_nat (vq_avail_ring_off + 2 * Z.of_nat 0)
+                    = Z.to_nat vq_avail_ring_off)
+        by (unfold vq_avail_ring_off; lia).
+      assert (Hz : Z.to_nat (vq_avail_ring_off + 2 * Z.of_nat (i / 2)%nat)
+                   = (Z.to_nat vq_avail_ring_off + 2 * (i / 2))%nat)
+        by (unfold vq_avail_ring_off; lia).
+      rewrite Hz0 Hz. pose proof (Nat.div_mod i 2 ltac:(lia)). lia. }
+    rewrite Heq.
+    rewrite (read_bytes_spec (ring_bytes c (fun _ : nat => zero16))
+               (ring_slot_pa c (i / 2)%nat) 2 zero16
+               (ring_bytes_read c (fun _ : nat => zero16) (i / 2)%nat Hd8)
+               (i `mod` 2)%nat ltac:(lia)).
+    rewrite zero16_wrap16_pure.
+    by rewrite (nth_byte_wrap16_0 (i `mod` 2)%nat Hm2).
+  - rewrite (range_map_lookup_out _ 16 (fun _ : nat => byte_zero) a Hout).
+    apply not_elem_of_dom.
+    rewrite (ring_bytes_dom_eq c (fun _ : nat => zero16)).
+    unfold ring_cells_dom. rewrite <- Hbase. exact Hout.
+Qed.
+
 Lemma pa_range_ring_cells (c : virtio_cfg) (k : nat) :
   (k < 8)%nat -> pa_range (ring_slot_pa c k) 2 ⊆ ring_cells_dom c.
 Proof.
@@ -1674,7 +1721,9 @@ Section VirtioProto.
     vc_qnum c = Z_to_bv 32 8 ->
     virtio_pages_aligned c ->
     avail_idx_dom c ## used_page_pas c ->
-    ring_cells_dom c ## used_page_pas c ->
+    (* the RING/USED disjointness is NOT a premise: it falls out of the two
+       resources below, the same way [vdi_dma_disj] gets the index one --
+       owning both regions is already proof they do not overlap. *)
     v_seen v1 = wrap16 0 ->
     v_used_idx v1 = wrap16 0 ->
     (* the cache mode the pre-flip DRIVER_FEATURES write decided *)
@@ -1697,10 +1746,16 @@ Section VirtioProto.
     phys_list (vc_used c) (replicate 4096 byte_zero) -∗
     virtio_proto γ v1.
   Proof.
-    intros Hcfg Hlive Hqnum Hal Hdisj Hdring Hseen Hui Hwce Hca Htk Hah.
+    intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui Hwce Hca Htk Hah.
     iIntros "#Hcfgp Hslot Hord Hnc Hnp Hnr Hstage Hidx Hring Hpage".
     assert (H4k : Z.of_nat 4096 < 18446744073709551616) by (rewrite z4096; lia).
     rewrite phys_word2_map (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
+    (* ...and there it is, off the ownership *)
+    iDestruct (phys_map_disj with "Hring Hpage") as %Hdring0.
+    apply map_disjoint_dom in Hdring0.
+    rewrite (ring_bytes_dom_eq c (fun _ : nat => zero16)) range_map_dom
+      in Hdring0.
+    assert (Hdring : ring_cells_dom c ## used_page_pas c) by exact Hdring0.
     iAssert (dma_own (vinit_dma c)) with "[Hidx Hring Hpage]" as "Hdma".
     { rewrite /vinit_dma /dma_own.
       rewrite (big_sepM_union (fun a b => phys_pointsto a (DfracOwn 1) b) _ _
@@ -1766,8 +1821,6 @@ Section VirtioProto.
     virtio_pages_aligned (virtio_init_cfg pd pav pu) ->
     avail_idx_dom (virtio_init_cfg pd pav pu)
       ## used_page_pas (virtio_init_cfg pd pav pu) ->
-    ring_cells_dom (virtio_init_cfg pd pav pu)
-      ## used_page_pas (virtio_init_cfg pd pav pu) ->
     virtio_proto γ v0 -∗
     (* the boot chain's half of the config tracker: it is what recombines
        with the invariant's half into the exclusive fraction the freeze needs,
@@ -1782,7 +1835,7 @@ Section VirtioProto.
          disk_stage γ None ∗
          disk_cfg γ (virtio_init_cfg pd pav pu).
   Proof.
-    intros Hlive0 Hc1 Hsn Hui Hcae Htke Hahe Hal Hdisj Hdring.
+    intros Hlive0 Hc1 Hsn Hui Hcae Htke Hahe Hal Hdisj.
     iIntros "Hp Hmine Hidx Hring Hpage".
     rewrite {1}/virtio_proto.
     rewrite Hlive0.
@@ -1811,7 +1864,7 @@ Section VirtioProto.
     assert (Htk1 : v_taken v1 = None) by (rewrite Htke; exact Htk0).
     assert (Hah1 : v_inflight v1 = ∅) by (rewrite Hahe; exact Hah0).
     iApply (virtio_proto_intro_gen γ v1 (virtio_init_cfg pd pav pu)
-              Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj Hdring
+              Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj
               Hs1 Hu1 (virtio_init_cfg_wce pd pav pu) Hca1 Htk1 Hah1
               with "Hcfg Hslot Hord Hnc Hnp1 Hnr1 Hstage1 Hidx Hring Hpage").
   Qed.

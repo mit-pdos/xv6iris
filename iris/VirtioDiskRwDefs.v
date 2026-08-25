@@ -519,8 +519,12 @@ Section VdrwbDefs.
   Definition vdrw_body (γ : disk_names) (pd pav : mword 64)
       (np nr : nat) (fl pk : gmap nat dclaim)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) : iProp Σ :=
-    (⌜dom fl = set_seq nr (np - nr)⌝ ∗
-     ⌜forall p, p ∈ dom pk -> (p < nr)%nat⌝ ∗
+    (* the window bookkeeping, split as in [DiskInv.disk_res]: an arbitrary
+       set of live positions below [np], counted, disjoint from the parked *)
+    (⌜forall p, p ∈ dom fl -> (p < np)%nat⌝ ∗
+     ⌜size fl = (np - nr)%nat⌝ ∗
+     ⌜forall p, p ∈ dom pk -> (p < np)%nat⌝ ∗
+     ⌜dom fl ## dom pk⌝ ∗
      ⌜dom tr = dom fl ∪ dom pk⌝ ∗
      ⌜forall p v, (fl ∪ pk) !! p = Some v -> tr !! p = Some (dc_tri v)⌝ ∗
      ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
@@ -531,12 +535,13 @@ Section VdrwbDefs.
      disk_done_lb γ nr ∗
      (* the READ WATERMARK's half, at the same [nr] the cell below holds *)
      disk_read_at γ nr ∗
+     (* nothing half-published while the lock is not held mid-publish *)
+     disk_stage γ None ∗
      ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
      d_used_idx ↦₂ wrap16 nr ∗
      ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗
      ([∗ map] p ↦ v ∈ pk, parked_res γ pav p v) ∗
-     free_bundles pd fr ∗
-     ring_slots_res pav (mod8 (dom fl)))%I.
+     free_bundles pd fr)%I.
 
   Lemma vdrw_body_close (γ : disk_names) (pd pav pu : mword 64)
       (np nr : nat) (fl pk : gmap nat dclaim)

@@ -64,7 +64,9 @@
 
    Two page conjuncts shrank, because the lease is paid from them: the used
    page goes to the device whole, and so do the two bytes of the available
-   ring's index field.  What comes back of the available page is [seq 4 4092],
+   ring's index field, AND its eight ring cells (finding 5 -- the device
+   invariant owns them now).  What comes back of the available page is
+   [seq 20 4076],
    i.e. from the ring entries on -- the two flags bytes below the index are
    forfeited too rather than handed back in two pieces, since no consumer has
    ever wanted them.  The descriptor page comes back whole (it is driver-owned
@@ -160,13 +162,16 @@ Definition vdi_post
        to reclaim used records in order, which is what keeps the unread ones a
        contiguous run (tools/vtest/README.md finding 5). *)
     disk_read_at γv 0%nat -∗
+    (* ...and the STAGED HEAD at [None]: no publish is half-done (finding 5) *)
+    disk_stage γv None -∗
     disk_cfg γv (virtio_init_cfg pd pav pu) -∗
     (* the queue pages, zeroed, minus what went to the device: the used page
-       whole, and the available page's flags+index words (the lease pins the
-       index at 0, which is what makes the published count start at 0).  What
-       comes back of the available page is the ring entries on. *)
+       whole, and the available page's flags+index words and eight ring cells
+       (the lease pins the index at 0, which is what makes the published count
+       start at 0, and owns the cells outright).  What comes back of the
+       available page is what lies past the ring. *)
     ([∗ list] j ∈ seq 0 4096, (pa_add pd j) ↦ₘ byte_zero) -∗
-    ([∗ list] j ∈ seq 4 4092, (pa_add pav j) ↦ₘ byte_zero) -∗
+    ([∗ list] j ∈ seq 20 4076, (pa_add pav j) ↦ₘ byte_zero) -∗
     disk_desc ↦₈ pd -∗
     disk_avail ↦₈ pav -∗
     disk_used ↦₈ pu -∗
