@@ -900,7 +900,7 @@ Section DevLoops.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' m' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [mv vnew w Hview Hdisk | mv vnew Hview Hcap
+    destruct Hstep as [mv i vnew w Hview Hdisk | mv i vnew Hview Hcap
                       | s vnew Hdrain
                       | mv w Hview Hstall | p' Hirq Hlatch |].
     - (* the disk completes a queued request.  This is the only step that
@@ -927,7 +927,7 @@ Section DevLoops.
       iEval (rewrite -Himg Hv) in "Hdur".
       (* the protocol step is an ACCESSOR over the permit channel: it hands
          out the completing request's PENDING token and owes the SPENT one *)
-      iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
+      iMod (virtio_proto_step γd vs m mv i vnew w Hview Hdisk
               with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
       (* the post-completion image, in the form the tie must move to: the
          IDENTITY, because every sector landed at its own earlier step *)
@@ -969,7 +969,7 @@ Section DevLoops.
       iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
-        iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
+        iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w i Hvok Hdisk). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem' Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
@@ -993,14 +993,14 @@ Section DevLoops.
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hcap.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iDestruct (virtio_proto_capture_step γd vs m mv vnew Hview Hcap
+      iDestruct (virtio_proto_capture_step γd vs m mv i vnew Hview Hcap
                    with "Hmem Hlease") as "[Hmem Hlease]".
       iMod ("Hclose" with "[Hv' Hlease]") as "_".
       { iNext. iExists vnew. iFrame "Hv' Hlease".
-        iPureIntro. exact (virtio_capture_step_isr_ok vs mv vnew Hvok Hcap). }
+        iPureIntro. exact (virtio_capture_step_isr_ok vs mv vnew i Hvok Hcap). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       assert (Hdk : v_disk vnew = v_disk (dvirtio d))
-        by (rewrite Hv; exact (virtio_capture_step_disk vs mv vnew Hcap)).
+        by (rewrite Hv; exact (virtio_capture_step_disk vs mv vnew i Hcap)).
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
       rewrite <- Hdk in Hdview.
