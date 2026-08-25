@@ -84,11 +84,12 @@ Section ProofVirtioDiskRwDSeam.
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
   (* ------------------------------------------------------------------- *)
-  (* THE P4/P5 SEAM at +0x19a.  The published position is no longer named:  *)
-  (* what the sleeper carries is the CLAIM fragment, from which P5 re-finds *)
-  (* its [b->disk] cell inside the flight or parked entry.  The triple      *)
-  (* (h,m2,t) and the [int idx[3]] local survive for P6's [free_chain];     *)
-  (* the two untouched descriptor-slot remainders come back with them.      *)
+  (* THE P4/P5 SEAM at +0x19a.  What the sleeper carries is the head's      *)
+  (* ACTIVE receipt fragment, keyed by the claim it published at position  *)
+  (* [q]; P5 polls [b->disk] through it and collects with it.  The triple  *)
+  (* (h,m2,t), the other two (still INACTIVE) receipts and the [int idx[3]] *)
+  (* local survive for P6's [free_chain]; the two untouched descriptor-slot *)
+  (* remainders come back with them.                                       *)
   (* ------------------------------------------------------------------- *)
   Definition vdrw_p4_exit (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
@@ -97,14 +98,14 @@ Section ProofVirtioDiskRwDSeam.
       (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
       (kq : nat * positive) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
-     ∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
-       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
+     ∀ (M : regfile) (q np nr : nat) (cm : gmap nat dclaim)
+       (fr : nat -> bool) (h m2 t : nat) pin,
        ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜M !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)⌝ -∗
        ⌜tri_ok (h, m2, t)⌝ -∗
-       (* THE PIN'S STRUCTURE, for P6's [free_chain]: what the interrupt
-          handler parks (the pin minus its avail-ring entry) is the fifteen
-          formatted windows plus, for a write, the payload. *)
+       (* THE PIN'S STRUCTURE, for P6's [free_chain]: what comes back with
+          the chain is the fifteen formatted windows plus, for a write, the
+          payload. *)
        ⌜pin = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
                             (vdrwd_bufwin b wr bs_buf))
         /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
@@ -112,46 +113,18 @@ Section ProofVirtioDiskRwDSeam.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) false lks -∗
+       cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
        trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
        locked γk cpu_id -∗
-       vdrw_body γd pd pav np nr fl pk tr fr -∗
-       disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
-                                    (vdrwd_sldata wr bs_buf bs_disk))
-                                (h, m2, t) pin) -∗
+       vdrw_body γd pd pav np nr cm fr -∗
+       h ↪[dn_head γd] HActive (DClaim b (vdrwd_slot kq b h wr sector
+                                            (vdrwd_sldata wr bs_buf bs_disk))
+                                       pin q) -∗
+       m2 ↪[dn_head γd] HInactive -∗
+       t ↪[dn_head γd] HInactive -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
-                    (mword_of_int (Z.of_nat t)) -∗
-       WP (Loop : expr riscv_lang)))%I.
-
-  (* [P3.vdrw_p3_exit] plus the triple-disjointness conjunct (see above). *)
-  Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname)
-      (γs : list gname) (j : nat) (γd : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
-      (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (m0 : regfile) (lks : gset string) : iProp Σ :=
-    (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
-     ∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
-       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
-       ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
-       ⌜M !!! Regidx Ra0 = (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 64)
-        /\ M !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
-        /\ M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
-       ⌜tri_ok (h, m2, t) /\ fr h = true /\ fr m2 = true /\ fr t = true⌝ -∗
-       ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
-       ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
-        /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) false lks -∗
-       trap_csrs KT1 -∗
-       cpu_claim (proc_addr j) -∗
-       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
-       locked γk cpu_id -∗
-       vdrw_body γd pd pav np nr fl pk tr
-         (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
-       vdrw_chain pd b h m2 t wr sector -∗
        vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
@@ -180,46 +153,36 @@ Section ProofVirtioDiskRwDSeam.
       (set_seq 0 (wr_nsectors (vdrwd_wr wr (1024 * uint bno)%Z bs_buf))) -∗
     vdrw_p4_exit CID γk γs jp γd pd pav pu K eb sp0 b wr (vdrw_sector_raw bno)
                  bs_buf bs_disk m0 kq lks -∗
-    vdrw_p3_exit_x CID γk γs jp γd pd pav pu K eb sp0 b wr (vdrw_sector_raw bno) m0 lks.
+    P3.vdrw_p3_exit CID γk γs jp γd pd pav pu K eb sp0 b wr (vdrw_sector_raw bno) m0 lks.
   Proof.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".
-    rewrite /vdrw_p3_exit_x.
-    iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hpin %Hfacts %Hdisj0 %Hal
-             Hcg Hown Htc Hclm Hpc Htok Hbody Hchain Hidx".
+    rewrite /P3.vdrw_p3_exit.
+    iIntros (CIDx Hsx M np nr cm fr h m2 t) "%Hrh %Hpin %Hfacts %Hal
+             Hcg Hown Htc Hclm Hpc Htok Hbody Hchain Hfh Hfm Hft Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hpin as (Ha0 & Ha1 & Ha5).
-    destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
-    pose proof Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hhm, Hht, Hmt.
+    destruct Hfacts as (Hok & _ & _ & _).
     iDestruct "Hdisk" as "[%Hlendisk Hdisk]".
-    (* the cleared free-map, at the publisher's own three descriptors *)
-    assert (Hch : fr_upd (fr_upd (fr_upd fr h false) m2 false) t false h = false).
-    { rewrite (fr_upd_ne _ t h false Hht) (fr_upd_ne _ m2 h false Hhm).
-      apply fr_upd_eq. }
-    assert (Hcm : fr_upd (fr_upd (fr_upd fr h false) m2 false) t false m2 = false).
-    { rewrite (fr_upd_ne _ t m2 false Hmt). apply fr_upd_eq. }
-    assert (Hct : fr_upd (fr_upd (fr_upd fr h false) m2 false) t false t = false)
-      by apply fr_upd_eq.
     (* the sector arithmetic P1 deferred *)
     assert (Hoff : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z = (1024 * uint bno)%Z).
     { rewrite (vdrwd_sector_raw_val bno Hbno). lia. }
     iApply (wp_vdrw_p4 (CID := CIDx) kq γu γd (proc_addr jp) M (trap_res eb + (K - 12))%nat pd pav pu b wr (vdrw_sector_raw bno)
-              np nr h m2 t fl pk tr
+              np nr h m2 t cm
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false)
               bs_buf bs_disk (1024 * uint bno)%Z
-              Hok Hdisj0 Hch Hcm Hct Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5
-              with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hbuf Hdisk Hpend").
-    iIntros (M1 pin) "%F %Hpinr Hcg Hpc Hbody Hclaim Hrm Hrt".
+              Hok Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5
+              with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hfh Hbuf Hdisk Hpend").
+    iIntros (M1 pin) "%F %Hpinr Hcg Hpc Hbody Hact Hrm Hrt".
     destruct F as (Hcs & H1a1).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np (S np) nr
               (<[ np := DClaim b (vdrwd_slot kq b h wr (vdrw_sector_raw bno)
                                     (vdrwd_sldata wr bs_buf bs_disk))
-                               (h, m2, t) pin ]> fl) pk
-              (<[ np := (h, m2, t) ]> tr)
+                               pin np ]> cm)
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) h m2 t pin
               with "[%] [%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok Hbody
-                    Hclaim Hrm Hrt Hidx").
+                    Hact Hfm Hft Hrm Hrt Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).
       unfold vdrw_regs. split_and!.

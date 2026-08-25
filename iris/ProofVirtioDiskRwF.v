@@ -15,16 +15,19 @@
      0x210 auipc/addi a0,&disk.vdisk_lock ; 0x218 jal release
      0x21c..0x22e c.ldsp ra,s0..s8 ; 0x230 c.addi16sp sp,96 ; 0x232 c.jr ra
 
-   THE CONTENT is the payoff withdrawal.  P5 leaves the publisher's position
-   PARKED, so P6 deletes it from [pk] (and from the claim auth and the triple
-   map) and collects: [b->disk] back at 0, [info[head].b], the residual pin,
-   the status byte at 0, the disk fragments and -- for a read -- the buffer.
-   The residual pin is the ONE thing that has to be taken apart again: it is
-   the fifteen descriptor/header windows the chain formatting wrote (plus, for
-   a write, the payload), and [free_desc] wants them back as word cells.  That
-   decomposition is the pure fact [vdrw_p5_exit] carries
-   ([ProofVirtioDiskRwD.vdrwd_pinr_regions] + [pm_ok]); here it is cashed with
-   [pm_split] and the [phys_map -> word] tier bridges.
+   THE CONTENT is the chain's return.  P5's poll read [b->disk] as 0 and
+   collected: the head's receipt is INACTIVE again, the claim's row is in
+   hand, and so are [info[head].b], [b->disk] at 0 and the whole chain
+   ([VirtioProto.chain_back]: the pinned bytes, the status byte at 0, the
+   spent crash permits and the sector data -- for a read, the buffer).  P6
+   deletes the row from the lock's claim map and takes the pin apart again:
+   it is the fifteen descriptor/header windows the chain formatting wrote
+   (plus, for a write, the payload), and [free_desc] wants them back as
+   word cells.  That decomposition is the pure fact [vdrw_p5_exit] carries
+   ([ProofVirtioDiskRwD.vdrwd_pinr_regions] + [pm_ok]); here it is cashed
+   with [pm_split] and the [phys_map -> word] tier bridges.  [free_desc]'s
+   "already free" panic arm is refuted by ownership: the caller holds the
+   descriptor's receipt, which the free bundle would hold too.
 
    The free-chain loop runs EXACTLY three times ([desc[h].flags = 1],
    [desc[m2].flags ∈ {1,3}], [desc[t].flags = 2]), so it is unrolled with a
@@ -441,27 +444,15 @@ Proof. lia. Qed.
 Lemma vdrwf_sec512 (x : Z) : (2 * x * 512)%Z = (1024 * x)%Z.
 Proof. lia. Qed.
 
-Lemma vdrwf_below_seq (q nr np : nat) :
-  (q < nr)%nat -> q ∉ set_seq (C := gset nat) nr (np - nr).
-Proof. intros Hq Hin. apply elem_of_set_seq in Hin. lia. Qed.
-
-(* THE TRIPLE-MEMBERSHIP AND DOMAIN FACTS, AS PURE LEMMAS.
-   [set_solver] costs 100-270 s PER CALL inside a large Iris WP context (it
-   rescans the whole hypothesis context -- optimization.md); proved here, in a
-   context of three set variables, each is instant.  Never call [set_solver]
-   from inside a phase proof. *)
-Lemma vdrwf_tri_mem (h m2 t : nat) :
-  h ∈ tri_set (h, m2, t) /\ m2 ∈ tri_set (h, m2, t) /\ t ∈ tri_set (h, m2, t).
+(* the lock's claim-map clause survives retiring a row *)
+Lemma vdrwf_cm_del (np q : nat) (cm : gmap nat dclaim) :
+  (forall p dc, cm !! p = Some dc ->
+     (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc)) ->
+  forall p dc, delete q cm !! p = Some dc ->
+    (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc).
 Proof.
-  unfold tri_set. cbn. split_and!.
-  - apply elem_of_union_l, elem_of_union_l, elem_of_singleton. reflexivity.
-  - apply elem_of_union_l, elem_of_union_r, elem_of_singleton. reflexivity.
-  - apply elem_of_union_r, elem_of_singleton. reflexivity.
+  intros Hcm p dc Hp. apply lookup_delete_Some in Hp as [_ Hp]. exact (Hcm p dc Hp).
 Qed.
-
-Lemma vdrwf_dom_delete (q : nat) (F P T : gset nat) :
-  T = F ∪ P -> q ∉ F -> T ∖ {[ q ]} = F ∪ (P ∖ {[ q ]}).
-Proof. intros -> Hq. set_solver. Qed.
 
 (* free_desc's argument bound, off the NORMALISED index word *)
 Lemma vdrwf_uint_small (i : nat) : (i < 8)%nat ->
@@ -519,12 +510,29 @@ Section VdrwfP6.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 
+  (* A DESCRIPTOR WHOSE RECEIPT THE CALLER HOLDS IS NOT IN THE FREE POOL:
+     the bundle at [fr i = true] would hold the same receipt, and the
+     fragment is exclusive.  This is what refutes [free_desc]'s "already
+     free" panic arm. *)
+  Lemma vdrwf_fr_false (γd : disk_names) (pd : Arch.pa) (fr : nat -> bool) (i : nat) :
+    (i < 8)%nat ->
+    free_bundles γd pd fr -∗ i ↪[dn_head γd] HInactive -∗ ⌜fr i = false⌝.
+  Proof.
+    intro Hi. iIntros "Hfb Hfrag".
+    destruct (fr i) eqn:Hfri; [| done].
+    iEval (rewrite (free_bundles_split γd pd fr i Hi)) in "Hfb".
+    iDestruct "Hfb" as "[[_ Hb] _]". rewrite Hfri.
+    iDestruct "Hb" as "[_ Hfrag2]".
+    iDestruct (ghost_map_elem_ne with "Hfrag Hfrag2") as %Hne.
+    exfalso. exact (Hne eq_refl).
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* ONE free_chain iteration: +0x1f4 .. +0x208, landing at +0x20c with    *)
   (* s1 = desc[i].flags and s2 = desc[i].next (both callee-saved, so they   *)
   (* survive the call), and descriptor [i] back in the free pool.           *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId}  (γs : list gname)
+  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId}  (γs : list gname) (γd : disk_names)
       (pd : SailStdpp.Values.mword 64) (i : nat) (fr : nat -> bool)
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
@@ -545,7 +553,10 @@ Section VdrwfP6.
     d_desc_ptr ↦₈□ pd -∗
     d_desc pd i ↦₈ va -∗ pa_add pd (16 * i + 8) ↦₄ vl -∗
     pa_add pd (16 * i + 12) ↦₂ vf -∗ pa_add pd (16 * i + 14) ↦₂ vn -∗
-    free_bundles pd fr -∗ vdrw_slot_rest i -∗
+    free_bundles γd pd fr -∗ vdrw_slot_rest i -∗
+    (* the descriptor's receipt, which re-marking it free puts back into the
+       bundle beside its bytes *)
+    i ↪[dn_head γd] HInactive -∗
     ( ∀ Mf : regfile,
         ⌜(forall r : mword 5, is_cs_idx r = true ->
             r <> Rs1 -> r <> Rs2 -> Mf !!! Regidx r = M !!! Regidx r)
@@ -554,12 +565,12 @@ Section VdrwfP6.
         sie_cap_gpr KT1 Mf av false pme -∗
         cpu_own 1 eb pme false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) -∗
-        free_bundles pd (fr_upd fr i true) -∗
+        free_bundles γd pd (fr_upd fr i true) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hi8 Hfri Hlen Hs2 Hs3 Hbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hfrag Hcont".
     (* ---- +0x1f4  slli a4,s2,4 ---- *)
     iApply (wp_slli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) Ra4 Rs2
               (mword_of_int 4 : mword 6)
@@ -698,7 +709,7 @@ Section VdrwfP6.
     assert (HN7s2 : N7 !!! Regidx Rs2 = (zero_extend' 64 vn : SailStdpp.Values.mword 64)).
     { rewrite /N7 upd_ne; [| reg_neq]. rewrite /N6; apply upd_eq. }
     (* the (already cleared) free cell for [i] *)
-    iEval (rewrite (free_bundles_split pd fr i Hi8)) in "Hbun".
+    iEval (rewrite (free_bundles_split γd pd fr i Hi8)) in "Hbun".
     iDestruct "Hbun" as "[[Hcell _] Hbrest]".
     iEval (rewrite Hfri) in "Hcell".
     iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme va vl vf vn false lks
@@ -710,7 +721,7 @@ Section VdrwfP6.
     assert (Hret : ret_pc (N7 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x20c))
       by (rewrite HN7ra; pcstep).
     iEval (rewrite Hret) in "Hpc".
-    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc [Hcell Hbrest Hrest Hd0 Hd8 Hd12 Hd14]").
+    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc [Hcell Hbrest Hrest Hfrag Hd0 Hd8 Hd12 Hd14]").
     { split_and!.
       - intros r Hr Hn1 Hn2.
         rewrite (callee_saved_lookup Hcs r Hr).
@@ -729,11 +740,11 @@ Section VdrwfP6.
         reflexivity.
       - rewrite (callee_saved_lookup Hcs Rs1 ltac:(vm_compute; reflexivity)). exact HN7s1.
       - rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)). exact HN7s2. }
-    rewrite (free_bundles_split pd (fr_upd fr i true) i Hi8).
+    rewrite (free_bundles_split γd pd (fr_upd fr i true) i Hi8).
     rewrite fr_upd_eq.
-    rewrite -(free_bundles_but_upd pd fr i true).
+    rewrite -(free_bundles_but_upd γd pd fr i true).
     iDestruct "Hrest" as "(Hops & Hst & Hib)".
-    iFrame "Hbrest Hcell Hops Hst Hib".
+    iFrame "Hbrest Hcell Hfrag Hops Hst Hib".
     iExists (zero_reg : SailStdpp.Values.mword 64), (mword_of_int 0 : mword 32),
             (mword_of_int 0 : mword 16), (mword_of_int 0 : mword 16).
     iFrame "Hd0 Hd8 Hd12 Hd14".
@@ -769,7 +780,7 @@ Section VdrwfP6.
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
        ours -- the claim pins [vs_perm] of our own slot, so the token the
-       parked payoff carries is at exactly this [kq]. *)
+       returned chain carries is at exactly this [kq]. *)
     perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
     disk_geom γd pd pav pu -∗
@@ -802,9 +813,9 @@ Section VdrwfP6.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
     iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
-    iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
-            "%Hrh %Hok %Hpq %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
-             Hbody Hclaim Hrm Hrt Hidx".
+    iIntros (CIDx Hsx M q np nr cm fr h m2 t pin)
+            "%Hrh %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
+             Hbody Hfragh Hclaim Hinfob Hbdisk Hback Hfm Hft Hrm Hrt Hidx".
     (* SPLIT AT THE INDEX, ONCE, RIGHT HERE: [Hpay] rides UNCHANGED through
        the whole free-chain/release stretch below exactly as it always did,
        and the complement [Hext] rides alongside it, untouched, until the
@@ -833,35 +844,20 @@ Section VdrwfP6.
               (uint (pa_add (b_data b) k : SailStdpp.Values.mword 64)
                < 274877906944)%Z)
       by (intros k Hk; apply vdrwf_kdata_canon, Hbufkd, Hk).
-    (* ================= STEP 1: withdraw the parked payoff ============== *)
+    (* ================= STEP 1: retire the claim, open the chain ========= *)
     rewrite /vdrw_body.
-    iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hrd & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring)".
-    assert (Hqpk : q ∈ dom pk) by (apply elem_of_dom; eexists; exact Hpq).
-    assert (Hqnr : (q < nr)%nat) by exact (Hpkb q Hqpk).
-    assert (Hnflq : q ∉ dom fl)
-      by (rewrite Hdfl; exact (vdrwf_below_seq q nr np Hqnr)).
-    assert (Hflq : fl !! q = None) by (apply not_elem_of_dom; exact Hnflq).
-    assert (Huq : (fl ∪ pk) !! q = Some (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))
-      by (rewrite (lookup_union_r fl pk q Hflq); exact Hpq).
-    assert (Htrq : tr !! q = Some (h, m2, t)) by exact (Hcoh q _ Huq).
-    destruct (vdrwf_tri_mem h m2 t) as (Hinh & Hinm & Hint).
-    assert (Hfrh : fr h = false) by exact (Htrfr q _ h Htrq Hinh).
-    assert (Hfrm : fr m2 = false) by exact (Htrfr q _ m2 Htrq Hinm).
-    assert (Hfrt : fr t = false) by exact (Htrfr q _ t Htrq Hint).
-    iDestruct (big_sepM_delete (fun p v => parked_res γd pav p v) pk q _ Hpq
-                 with "Hpkm") as "[Hpayoff Hpkm]".
+    iDestruct "Hbody" as "(%Hcm & Hpub & #Hlb & Hrd & Hstg & Hcl & Huidx & Hfb)".
+    (* the three descriptors are ours, so none is in the free pool *)
+    iDestruct (vdrwf_fr_false γd pd fr h Hh8 with "Hfb Hfragh") as %Hfrh.
+    iDestruct (vdrwf_fr_false γd pd fr m2 Hm8 with "Hfb Hfm") as %Hfrm.
+    iDestruct (vdrwf_fr_false γd pd fr t Ht8 with "Hfb Hft") as %Hfrt.
     iMod (ghost_map_delete with "Hcl Hclaim") as "Hcl".
-    assert (Hdelu : delete q (fl ∪ pk) = fl ∪ delete q pk)
-      by (rewrite delete_union (delete_notin fl q Hflq); reflexivity).
-    iEval (rewrite Hdelu) in "Hcl".
-    (* ---- the payoff, with the claim's projections named ---- *)
-    rewrite /parked_res.
-    iDestruct "Hpayoff" as (bs)
-      "(%Hlink & %Hbslen & %Hbsdata & Hbdisk & Hinfob & Hpinm & Hstat & Hdbytes &
-        Hperm & Hbufp)".
+    (* ---- the chain, with the slot's projections named ---- *)
+    rewrite /chain_back.
+    iDestruct "Hback" as "(Hpinm & Hstat & Hperm & Hbs)".
+    iDestruct "Hbs" as (bs) "(%Hbslen & %Hbsdata & Hdbytes & Hbufp)".
     (* ======== COLLECT THE RECEIPT (PermInv.v) ========================= *)
-    (* The parked payoff carries the SPENT permit's token at our own [kq]
+    (* The returned chain carries the SPENT permit's token at our own [kq]
        (the claim pinned [vs_perm] of the slot WE published), so this is the
        instant the client's receipt comes home.  Two laters: one is the
        permit invariant's own (it is not timeless -- it holds arbitrary
@@ -874,14 +870,12 @@ Section VdrwfP6.
     iMod (perm_collect gen_id (dn_perm γd) kq.1 kq.2 _ Q ⊤ ltac:(solve_ndisj)
             with "Hqinv Hrcpt Hperm") as "HQ".
     iModIntro.
-    assert (Hdcb : dc_buf (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = b) by reflexivity.
-    assert (Hdcs : dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))) by reflexivity.
-    assert (Hvsts : vr_status (vs_req (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))) = d_info_status h)
+    assert (Hvsts : vr_status (vs_req (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))) = d_info_status h)
       by reflexivity.
-    assert (Hvsout : vs_is_out (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = vdrwd_out wr) by reflexivity.
-    assert (Hvsbuf : vr_buf (vs_req (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))) = b_data b) by reflexivity.
-    assert (Hslen : vs_len (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = 1024%nat) by exact vdrwd_len1024.
-    assert (Hsloff : vs_sector_off (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = (1024 * uint bno)%Z).
+    assert (Hvsout : vs_is_out (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) = vdrwd_out wr) by reflexivity.
+    assert (Hvsbuf : vr_buf (vs_req (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))) = b_data b) by reflexivity.
+    assert (Hslen : vs_len (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) = 1024%nat) by exact vdrwd_len1024.
+    assert (Hsloff : vs_sector_off (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) = (1024 * uint bno)%Z).
     { transitivity (bv_unsigned sector * 512)%Z; [| exact Hsec].
       exact (vdrwd_slot_off kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)
                (bv_unsigned sector) eq_refl). }
@@ -897,22 +891,12 @@ Section VdrwfP6.
               vdrwd_bufwin b wr bs_buf
               = range_map (b_data b) 1024 (fun k => bs_buf !!! k)).
     { intro Ho. unfold vdrwd_out in Ho. unfold vdrwd_bufwin. rewrite Ho. reflexivity. }
-    iEval (rewrite Hdcb) in "Hbdisk".
-    iEval (rewrite Hdcs) in "Hinfob".
-    iEval (rewrite (vdrwd_slot_head kq b h wr sector
-                      (vdrwd_sldata wr bs_buf bs_disk) Hh8)) in "Hinfob".
-    iEval (rewrite Hdcb) in "Hinfob".
     iEval (rewrite Hvsts) in "Hstat".
     iEval (rewrite Hsloff) in "Hdbytes".
     iEval (rewrite Hvsout) in "Hbufp".
     iEval (rewrite Hvsbuf) in "Hbufp".
     (* ---- the residual pin, split into its fifteen (+1) windows ---- *)
-    assert (Hpinreq : dc_pinr pav q (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)
-                      = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
-                                         (vdrwd_bufwin b wr bs_buf))).
-    { rewrite /dc_pinr /dc_ring_map. cbn [dc_pin dc_slot].
-      unfold vdrwd_slot, rw_slot. cbn [vs_req vr_head]. exact Hpineq. }
-    iEval (rewrite Hpinreq) in "Hpinm".
+    iEval (rewrite Hpineq) in "Hpinm".
     iDestruct (pm_split _ Hpmok with "Hpinm") as "Hpl".
     rewrite /pm_list /vdrwd_pinr_regions.
     iDestruct "Hpl" as "(Wd0 & Wl0 & Wf0 & Wn0 & Wd1 & Wl1 & Wf1 & Wn1 &
@@ -1195,11 +1179,11 @@ Section VdrwfP6.
                    = mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4)) by pcstep.
     assert (Hp1ec1 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) 2
                      = mword_of_int (KernelSyms.virtio_disk_rw + 0x20e)) by pcstep.
-    iApply (wp_vdrwf_iter (CID := CIDx)  γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
+    iApply (wp_vdrwf_iter (CID := CIDx)  γs γd pd h fr (d_ops h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
               E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) ({["virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3 ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh Hfragh").
     iIntros (F1) "%HF1 Hcg Hown Hpc Hfb".
     destruct HF1 as (HF1thr & HF1s1 & HF1s2).
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
@@ -1241,12 +1225,12 @@ Section VdrwfP6.
       exact HE8sp. }
     assert (Hfr1m : fr_upd fr h true m2 = false)
       by (rewrite (fr_upd_ne fr h m2 true (not_eq_sym Hhm)); exact Hfrm).
-    iApply (wp_vdrwf_iter (CID := CIDx)  γs pd m2 (fr_upd fr h true)
+    iApply (wp_vdrwf_iter (CID := CIDx)  γs γd pd m2 (fr_upd fr h true)
               (b_data b : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
               G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) ({["virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3 ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm Hfm").
     iIntros (F2) "%HF2 Hcg Hown Hpc Hfb".
     destruct HF2 as (HF2thr & HF2s1 & HF2s2).
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
@@ -1289,12 +1273,12 @@ Section VdrwfP6.
     assert (Hfr2t : fr_upd (fr_upd fr h true) m2 true t = false).
     { rewrite (fr_upd_ne (fr_upd fr h true) m2 t true (not_eq_sym Hmt)).
       rewrite (fr_upd_ne fr h t true (not_eq_sym Hht)). exact Hfrt. }
-    iApply (wp_vdrwf_iter (CID := CIDx)  γs pd t (fr_upd (fr_upd fr h true) m2 true)
+    iApply (wp_vdrwf_iter (CID := CIDx)  γs γd pd t (fr_upd (fr_upd fr h true) m2 true)
               (d_info_status h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
               G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) ({["virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3 ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt Hft").
     iIntros (F3) "%HF3 Hcg Hown Hpc Hfb".
     destruct HF3 as (HF3thr & HF3s1 & HF3s2).
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
@@ -1327,52 +1311,12 @@ Section VdrwfP6.
       exact HG2sp. }
     (* ================= the lock resource, re-folded =================== *)
     set (fr' := fr_upd (fr_upd (fr_upd fr h true) m2 true) t true).
-    assert (Hfr'other : forall i, i <> h -> i <> m2 -> i <> t -> fr' i = fr i).
-    { intros i N1 N2 N3. rewrite /fr' (fr_upd_ne _ t i true N3)
-        (fr_upd_ne _ m2 i true N2) (fr_upd_ne fr h i true N1). reflexivity. }
     iAssert (disk_res γd pd pav pu)
-      with "[Hpub Hrd Hcl Huidx Hflm Hpkm Hfb Hring]" as "HR".
-    { iApply (vdrw_body_close γd pd pav pu np nr fl (delete q pk) (delete q tr) fr').
+      with "[Hpub Hrd Hstg Hcl Huidx Hfb]" as "HR".
+    { iApply (vdrw_body_close γd pd pav pu np nr (delete q cm) fr').
       rewrite /vdrw_body.
-      iSplitR; [iPureIntro; exact Hdfl|].
-      iSplitR.
-      { iPureIntro. intros p Hp. apply Hpkb.
-        rewrite dom_delete_L in Hp. apply elem_of_difference in Hp as [Hp _]. exact Hp. }
-      iSplitR.
-      { iPureIntro. rewrite !dom_delete_L.
-        exact (vdrwf_dom_delete q (dom fl) (dom pk) (dom tr) Hdtr Hnflq). }
-      iSplitR.
-      { iPureIntro. intros p v Hp.
-        assert (Hpq' : p <> q).
-        { intro Hc. subst p. rewrite (lookup_union_r fl (delete q pk) q Hflq) in Hp.
-          rewrite lookup_delete in Hp. discriminate. }
-        rewrite (lookup_delete_ne tr q p (not_eq_sym Hpq')). apply Hcoh.
-        destruct (fl !! p) as [w|] eqn:Hfp.
-        - rewrite (lookup_union_Some_l fl pk p w Hfp).
-          rewrite (lookup_union_Some_l fl (delete q pk) p w Hfp) in Hp. exact Hp.
-        - rewrite (lookup_union_r fl pk p Hfp).
-          rewrite (lookup_union_r fl (delete q pk) p Hfp) in Hp.
-          rewrite (lookup_delete_ne pk q p (not_eq_sym Hpq')) in Hp. exact Hp. }
-      iSplitR.
-      { iPureIntro. intros p T Hp.
-        apply lookup_delete_Some in Hp as [_ Hp]. exact (Htrok p T Hp). }
-      iSplitR.
-      { iPureIntro. intros p p' Tp Tq Hne Hp Hp'.
-        apply lookup_delete_Some in Hp as [_ Hp].
-        apply lookup_delete_Some in Hp' as [_ Hp'].
-        exact (Htrdj p p' Tp Tq Hne Hp Hp'). }
-      iSplitR.
-      { iPureIntro. intros p T i Hp Hi.
-        apply lookup_delete_Some in Hp as [Hpne Hp].
-        pose proof (Htrdj p q T (h, m2, t) (not_eq_sym Hpne) Hp Htrq) as Hdj.
-        assert (Hnh : i <> h)
-          by (intro Hc; subst i; exact (proj1 (elem_of_disjoint _ _) Hdj h Hi Hinh)).
-        assert (Hnm : i <> m2)
-          by (intro Hc; subst i; exact (proj1 (elem_of_disjoint _ _) Hdj m2 Hi Hinm)).
-        assert (Hnt : i <> t)
-          by (intro Hc; subst i; exact (proj1 (elem_of_disjoint _ _) Hdj t Hi Hint)).
-        rewrite (Hfr'other i Hnh Hnm Hnt). exact (Htrfr p T i Hp Hi). }
-      iFrame "Hpub Hlb Hrd Hcl Huidx Hflm Hpkm Hfb Hring". }
+      iSplitR; [iPureIntro; exact (vdrwf_cm_del np q cm Hcm)|].
+      iFrame "Hpub Hlb Hrd Hstg Hcl Huidx Hfb". }
     (* ================= +0x210 .. +0x218: release ====================== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64) Ra0
               (mword_of_int 30 : mword 20) G3 (trap_res eb + (K - 12))%nat false
@@ -1926,30 +1870,10 @@ Section ProofVirtioDiskRwF.
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) dsk0 m lks with "Htext Hgeom Hbdisk").
-    (* ---- P4: the ring write and THE PUBLISH ----
-
-       APPLIED AT THE UNION, and it is the only seam in this chain that is.
-       [ProofVirtioDiskRwDSeam] states BOTH its predicates ([vdrw_p4_exit],
-       [vdrw_p3_exit_x]) with a bare [lks] at the level-1 [cpu_own], where
-       [CSeam]'s [vdrw_p3_exit] and [E]'s [vdrw_p5_exit]/[vdrw_p5_loop] all
-       spell [{["virtio_disk"]} ∪ lks].  D is the outlier, so its
-       [lks] parameter means the FULL held set while everyone else's means the
-       OUTER one, and the translation between the two conventions is already
-       done by [wp_vdrw_p5_seam]'s conclusion.  Feeding D the union here is
-       what makes the two neighbours line up:
-
-         P3 seam consumes  vdrw_p3_exit    ... lks             = cpu_own ({[vd]} ∪ lks)
-         P4 seam produces  vdrw_p3_exit_x  ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)  ✓
-         P4 seam consumes  vdrw_p4_exit    ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)
-         P5 seam produces  vdrw_p4_exit    ... ({[vd]} ∪ lks)                            ✓
-
-       Do NOT "fix" this by passing the union to P3 as well: P3 seam produces
-       [P2.vdrw_p2_exit] at whatever index it is given, and P2's own wp leaves
-       that goal at the bare [lks].  Moving both moves the mismatch rather
-       than closing it. *)
+    (* ---- P4: the ring write and THE PUBLISH ---- *)
     iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk m kq ({["virtio_disk"]} ∪ lks)
+              bno bs_buf bs_disk m kq lks
               Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk Hpend").
     (* ---- P5: the device kick and the completion wait ---- *)

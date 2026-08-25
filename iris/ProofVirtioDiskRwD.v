@@ -123,85 +123,40 @@ Proof.
   intros H0 H1. rewrite vdrwd_wrap64_z. apply Z.mod_small. lia.
 Qed.
 
-(* ---- the WINDOW bound, from the descriptor-triple counting alone ------ *)
-(* [tri_card_8] already bounds the number of RECORDED triples by two, so
-   the live window is at most two positions wide -- and three consecutive
-   positions are pairwise distinct mod 8, which is all the ring-slot
-   freshness argument needs.  (A sharper bound of ONE is provable, but it
-   needs the publisher's own triple to be disjoint from every recorded one;
-   this weaker route needs nothing beyond [disk_res]'s own conjuncts.) *)
-
-Lemma vdrwd_mod8_ne (p q : nat) :
-  (p < q)%nat -> (q - p <= 2)%nat -> (p `mod` 8)%nat <> (q `mod` 8)%nat.
+(* ---- the CLAIM MAP at publish ---------------------------------------- *)
+(* [disk_res]'s clause on the claim map: every row is below the published
+   count, sits at its own position and links its slot to its buffer.  The
+   publisher's position is therefore not yet a row... *)
+Lemma vdrwd_cm_fresh (np : nat) (cm : gmap nat dclaim) :
+  (forall p dc, cm !! p = Some dc ->
+     (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc)) ->
+  cm !! np = None.
 Proof.
-  intros Hlt Hle Heq.
-  pose proof (Nat.div_mod_eq p 8) as Hp.
-  pose proof (Nat.div_mod_eq q 8) as Hq.
-  assert (Hd : (p / 8 <= q / 8)%nat) by (apply Nat.Div0.div_le_mono; lia).
-  lia.
+  intro Hcm. destruct (cm !! np) as [dc|] eqn:Hlk; [| reflexivity].
+  exfalso. destruct (Hcm np dc Hlk) as (Hlt & _ & _). lia.
 Qed.
 
-(* [vdrwd_mod8_fresh] is gone (finding 5): it said the cell the publisher is
-   about to write is not one of the flight positions' cells.  The cells are
-   the device invariant's now, and that argument lives in
-   [VirtioQueue.vproto_ok_ring]. *)
-
-
-(* the live window is at most two positions wide (three descriptors each,
-   eight in all).  Stated over the SPLIT bookkeeping now that the flight
-   positions need not be an interval (finding 5): what it uses is the count,
-   which reordering leaves alone. *)
-Lemma vdrwd_window_le2 {A : Type} (np nr : nat) (fl pk : gmap nat A)
-    (tr : gmap nat (nat * nat * nat)) :
-  (forall p, p ∈ dom fl -> (p < np)%nat) ->
-  size fl = (np - nr)%nat ->
-  (forall p, p ∈ dom pk -> (p < np)%nat) ->
-  dom tr = dom fl ∪ dom pk ->
-  (forall p T, tr !! p = Some T -> tri_ok T) ->
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  (np - nr <= 2)%nat.
+(* ...and the clause survives recording it, at the bumped count. *)
+Lemma vdrwd_cm_ins (np : nat) (cm : gmap nat dclaim) (dc : dclaim) :
+  (forall p dc', cm !! p = Some dc' ->
+     (p < np)%nat /\ dc_pos dc' = p /\ slot_buf_link (dc_slot dc') (dc_buf dc')) ->
+  dc_pos dc = np -> slot_buf_link (dc_slot dc) (dc_buf dc) ->
+  forall p dc', <[ np := dc ]> cm !! p = Some dc' ->
+    (p < S np)%nat /\ dc_pos dc' = p /\ slot_buf_link (dc_slot dc') (dc_buf dc').
 Proof.
-  intros Hfln Hcount Hpkb Htr Hok Hdisj.
-  pose proof (tri_card_8 tr Hok Hdisj) as Hsz.
-  assert (Hsub2 : dom fl ⊆ dom tr) by (rewrite Htr; apply union_subseteq_l).
-  pose proof (subseteq_size (dom fl) (dom tr) Hsub2) as Hdom.
-  pose proof (size_dom fl) as Hdf.
-  pose proof (size_dom tr) as Hdt.
-  lia.
+  intros Hcm Hpos Hlink p dc' Hp.
+  destruct (decide (p = np)) as [->|Hne].
+  - rewrite lookup_insert in Hp. injection Hp as <-.
+    split_and!; [lia | exact Hpos | exact Hlink].
+  - rewrite (lookup_insert_ne cm np p dc (not_eq_sym Hne)) in Hp.
+    destruct (Hcm p dc' Hp) as (Hlt & Hpp & Hl).
+    split_and!; [lia | exact Hpp | exact Hl].
 Qed.
 
-(* the [set_seq] surgery at publish: [np] joins the window *)
-Lemma vdrwd_set_seq_snoc (nr np : nat) :
-  (nr <= np)%nat -> set_seq nr (S np - nr) = (set_seq nr (np - nr) : gset nat) ∪ {[ np ]}.
-Proof.
-  intro Hle. apply set_eq. intro x.
-  rewrite elem_of_union elem_of_singleton !elem_of_set_seq. lia.
-Qed.
-
-(* The same surgery on the FREE map's domain, as a pure fact over set
-   variables.  It is stated here — rather than run inline at the publish
-   step — because that step's goal sits under a whole-function Iris context:
-   [set_solver] there rescans every hypothesis and cost 417 s of this file's
-   455 s, while the identical goal in this three-variable context is instant.
-   See optimization.md, "never call [set_solver] from inside a phase proof". *)
-(* the window bookkeeping at publish, over the SPLIT clauses (finding 5):
-   the new position is below [S np], and the count goes up by one. *)
-Lemma vdrwd_fl_ins_lt {A : Type} (np : nat) (fl : gmap nat A) (b : A) :
-  (forall p, p ∈ dom fl -> (p < np)%nat) ->
-  forall p, p ∈ dom (<[ np := b ]> fl) -> (p < S np)%nat.
-Proof.
-  intros Hfln p Hp. rewrite dom_insert_L elem_of_union elem_of_singleton in Hp.
-  destruct Hp as [->|Hp]; [lia|]. pose proof (Hfln p Hp). lia.
-Qed.
-
-Lemma vdrwd_fl_ins_size {A : Type} (nr np : nat) (fl : gmap nat A) (b : A) :
-  (nr <= np)%nat -> fl !! np = None -> size fl = (np - nr)%nat ->
-  size (<[ np := b ]> fl) = (S np - nr)%nat.
-Proof.
-  intros Hle Hfresh Hcount. rewrite map_size_insert_None; [| exact Hfresh ].
-  lia.
-Qed.
+(* the head, as the ring store spells it and as the receipt is keyed *)
+Lemma vdrwd_hd16 (h : nat) : (h < 8)%nat ->
+  Z.to_nat (bv_unsigned (Z_to_bv 16 (Z.of_nat h))) = h.
+Proof. intro Hh. rewrite (bv16_small h Hh). apply Nat2Z.id. Qed.
 
 (* ---- bitvector-level structural helpers ------------------------------ *)
 
@@ -628,21 +583,17 @@ Section VdrwdLeaves.
   (* ---- the avail-ring INDEX read: [lhu rd,2(rs1)] with rs1 = disk.avail.
      Drives [virtio_proto_avail_idx_acc]: the value is the driver's OWN
      published count, so nothing new is learned about it -- what the read is
-     for is that the code re-derives the ring slot from it.  The accessor
-     for the USED index is run alongside (read-only, immediately closed) to
-     export the window fact [nr <= np], which [disk_res] does not carry and
-     the ring-slot freshness argument needs. ---- *)
+     for is that the code re-derives the ring slot from it. ---- *)
   Lemma wp_vdrwd_lhu_avail (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (np nr : nat) :
+      (m : regfile) (n : nat) (np : nat) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
     sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ disk_done_lb γd nr -∗
-    ( ⌜(nr <= np)%nat⌝ -∗
-      disk_pub γd np -∗
+    disk_pub γd np -∗
+    ( disk_pub γd np -∗
       sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg
           (zero_extend' 64 (wrap16 np : SailStdpp.Values.mword 16))]> m) n false pme -∗
       pc_is (add_vec_int pc 4) -∗
@@ -659,7 +610,7 @@ Section VdrwdLeaves.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
               = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb0 Hcont".
+    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
@@ -704,7 +655,7 @@ Section VdrwdLeaves.
     iModIntro.
     iApply (wp_load_s_sconf_au (kt := KT1) (ktd := KT0) 2 false true pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
-              (fun w => (⌜w = wrap16 np⌝ ∗ ⌜(nr <= np)%nat⌝ ∗ disk_pub γd np)%I)
+              (fun w => (⌜w = wrap16 np⌝ ∗ disk_pub γd np)%I)
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -714,10 +665,6 @@ Section VdrwdLeaves.
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
-      (* the window fact, read off the used-index accessor and given back *)
-      iDestruct (virtio_proto_used_idx_acc γd vst np nr with "Hproto Hpub Hlb0")
-        as (nc) "(%Hnrnc & %Hncnp & _ & _ & _ & Hwu & Hbacku)".
-      iDestruct ("Hbacku" with "Hwu") as "[Hproto Hpub]".
       iDestruct (virtio_proto_avail_idx_acc γd vst np with "Hproto Hpub")
         as "(_ & #Hcfgv & _ & Hw2 & Hback)".
       iDestruct (disk_cfg_agree with "Hcfgv Hcfg0") as %Hceq.
@@ -735,46 +682,46 @@ Section VdrwdLeaves.
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-      iModIntro. iFrame "Hpub". iSplitR; [done|]. iPureIntro. lia. }
+      iModIntro. iFrame "Hpub". done. }
     iIntros (w). iApply wp_next_off_intro. iIntros "Hcg Hpc Hpost". rgall.
-    iDestruct "Hpost" as "(-> & %Hle & Hpub)".
-    iApply ("Hcont" with "[%] Hpub Hcg Hpc"). exact Hle.
+    iDestruct "Hpost" as "(-> & Hpub)".
+    iApply ("Hcont" with "Hpub Hcg Hpc").
   Qed.
 
   (* ---- THE RING STORE: [sh rs2,4(rs1)] with rs1 = disk.avail + 2*(np%8)
      and rs2 the descriptor head.  This is the instruction BEFORE the fence
      and the index bump, and the cell it writes belongs to the device
-     invariant's lease (finding 5) -- so it drives
-     [virtio_proto_ring_acc] rather than writing a cell the driver has been
-     holding.  What comes back is the STAGED HEAD, which the publish two
-     instructions later spends. ---- *)
+     invariant's lease -- so it drives [virtio_proto_ring_acc], keyed by the
+     head's still-INACTIVE receipt (which is what says the cell is nobody
+     else's).  What comes back is the STAGED HEAD, which the publish two
+     instructions later spends, and the receipt untouched. ---- *)
   Lemma wp_vdrwd_sh_ring (γu : uart_names) (γd : disk_names) (pme : Arch.pa)
       (pd pav pu : mword 64)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
-      (imm : mword 12) (m : regfile) (n : nat) (np nr : nat) (h : bv 16) :
+      (imm : mword 12) (m : regfile) (n : nat) (np : nat) (h : bv 16) :
     add_vec (rget m rs1) (sign_extend' 64 imm)
       = (d_ring pav (np `mod` 8) : mword 64) ->
     trunc16 (rget m rs2) = h ->
-    (* the cell is nobody else's: at most seven positions can be waiting *)
-    (np - nr < 8)%nat ->
     sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ disk_read_at γd nr -∗ disk_stage γd None -∗
+    disk_pub γd np -∗ disk_stage γd None -∗
+    (Z.to_nat (bv_unsigned h)) ↪[dn_head γd] HInactive -∗
     ( sie_cap_gpr KT1 m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
-      disk_pub γd np -∗ disk_read_at γd nr -∗ disk_stage γd (Some h) -∗
+      disk_pub γd np -∗ disk_stage γd (Some h) -∗
+      (Z.to_nat (bv_unsigned h)) ↪[dn_head γd] HInactive -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hea Hsv Hroom.
+    intros Hea Hsv.
     assert (Hea_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
               = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrd Hstg Hcont".
+    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hstg Hfrag Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
@@ -825,19 +772,20 @@ Section VdrwdLeaves.
     iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (h : SailStdpp.Values.mword 16)
-              (disk_pub γd np ∗ disk_read_at γd nr ∗ disk_stage γd (Some h))%I
+              (disk_pub γd np ∗ disk_stage γd (Some h) ∗
+               (Z.to_nat (bv_unsigned h)) ↪[dn_head γd] HInactive)%I
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hrd Hstg] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hstg Hfrag] [Hcont]").
     { rewrite Hea. iExact "Hcl". }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
-      iDestruct (virtio_proto_ring_acc γd vst np nr h Hroom
-                   with "Hproto Hpub Hrd Hstg") as "(_ & #Hcfgv & _ & Hexc & Hclose)".
+      iDestruct (virtio_proto_ring_acc γd vst np h
+                   with "Hproto Hpub Hstg Hfrag") as "(_ & #Hcfgv & _ & Hexc & Hclose)".
       iDestruct (disk_cfg_agree with "Hcfgv Hcfg0") as %Hceq.
       assert (Haddr : ring_slot_pa (v_cfg vst) (np `mod` 8)%nat
                       = d_ring pav (np `mod` 8)).
@@ -854,47 +802,52 @@ Section VdrwdLeaves.
       iDestruct (word2_to_phys (d_ring pav (np `mod` 8)) h Hst2
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
-      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hrd & Hstg)".
+      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hstg & Hfrag)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-      iModIntro. iFrame "Hpub Hrd Hstg". }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc [Hpub [Hrd Hstg]]". rgall.
-    iApply ("Hcont" with "Hcg Hpc Hpub Hrd Hstg").
+      iModIntro. iFrame "Hpub Hstg Hfrag". }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc [Hpub [Hstg Hfrag]]". rgall.
+    iApply ("Hcont" with "Hcg Hpc Hpub Hstg Hfrag").
   Qed.
 
   (* ---- THE PUBLISH: [sh rs2,2(rs1)] with rs1 = disk.avail and rs2 the
      incremented index.  Drives [virtio_proto_publish_acc]: the pin and the
      writable footprint go into the DMA lease, the disk fragments become the
-     slot's pending resource, and what comes back is the bumped publisher
-     credential plus the RECEIPT. ---- *)
+     slot's pending resource, the claim's row and the two driver cells
+     ([disk.info[h].b], [b->disk]) go into the head's receipt, and what
+     comes back is the bumped publisher credential plus the ACTIVE receipt
+     fragment the caller holds across [sleep()]. ---- *)
   Lemma wp_vdrwd_sh_publish (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-      (m : regfile) (n : nat) (np nr : nat) (sl : vslot) (pin wrb : _) :
+      (m : regfile) (n : nat) (np : nat) (sl : vslot) (dc : dclaim) (pin wrb : _) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
     trunc16 (rget m rs2) = (wrap16 (S np) : SailStdpp.Values.mword 16) ->
     slot_pin_ok (virtio_init_cfg pd pav pu) np sl pin ->
+    dc_slot dc = sl -> dc_pos dc = np -> dc_pin dc = pin ->
     dom wrb = slot_wr sl ->
     slot_wr sl ## dom pin ->
-    (* [vpo_win] has to survive the new position; the caller has this from
-       its descriptor accounting (finding 5) *)
-    (np - nr < 8)%nat ->
     sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ disk_read_at γd nr -∗
+    disk_pub γd np -∗
     (* the RING STORE two instructions back already put this chain's head in
        the cell; the bump spends that fact *)
     disk_stage γd (Some (vs_hd sl)) -∗
+    (Z.to_nat (bv_unsigned (vr_head (vs_req sl)))) ↪[dn_head γd] HInactive -∗
+    np ↪[dn_claim γd] dc -∗
+    d_info_b (Z.to_nat (bv_unsigned (vr_head (vs_req sl))))
+      ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) -∗
+    b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
     phys_map pin -∗ phys_map wrb -∗
     slot_pend_res γd (vs_all sl) sl -∗
     ( sie_cap_gpr KT1 m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
-      disk_pub γd (S np) -∗ disk_read_at γd nr -∗ disk_stage γd None -∗
-      disk_receipt γd np sl pin -∗
+      disk_pub γd (S np) -∗ disk_stage γd None -∗
+      (Z.to_nat (bv_unsigned (vr_head (vs_req sl)))) ↪[dn_head γd] HActive dc -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hea Hsv Hpinok Hwrbdom Hwrpin Hroom.
+    intros Hea Hsv Hpinok Hdcsl Hdcpos Hdcpin Hwrbdom Hwrpin.
     (* the class, consumed at [rs1 / rs2] -- see [IntrDefs.SrcOk].  This wrapper
        applies a converted leaf at a VARIABLE register and carries no tp fact
        of its own, so the class has to be stated here; it is implicit, so this
@@ -906,7 +859,7 @@ Section VdrwdLeaves.
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrd Hstg Hpin Hwrb Hpend Hcont".
+    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hstg Hfrag Hclaim Hinfo Hbd Hpin Hwrb Hpend Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
@@ -951,15 +904,15 @@ Section VdrwdLeaves.
     iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
-              (disk_pub γd (S np) ∗ disk_read_at γd nr ∗ disk_stage γd None ∗
-               disk_receipt γd np sl pin)%I
+              (disk_pub γd (S np) ∗ disk_stage γd None ∗
+               (Z.to_nat (bv_unsigned (vr_head (vs_req sl)))) ↪[dn_head γd] HActive dc)%I
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hinstr [] [Hpub Hrd Hstg Hpin Hwrb Hpend] [Hcont]").
+              with "Hcg Hpc Hinstr [] [Hpub Hstg Hfrag Hclaim Hinfo Hbd Hpin Hwrb Hpend] [Hcont]").
     { rewrite Hea. iExact "Hcl". }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
@@ -973,9 +926,10 @@ Section VdrwdLeaves.
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
       assert (Haddr : avail_idx_pa (v_cfg vst) = pa_add pav 2%nat)
         by (rewrite Hceq; reflexivity).
-      iDestruct (virtio_proto_publish_acc γd vst np nr sl pin wrb
-                   ltac:(rgall; rewrite Hceq; exact Hpinok) Hwrbdom Hwrpin Hroom
-                   with "Hproto Hpub Hrd Hstg Hpin Hwrb Hpend")
+      iDestruct (virtio_proto_publish_acc γd vst np sl dc pin wrb
+                   ltac:(rgall; rewrite Hceq; exact Hpinok)
+                   Hdcsl Hdcpos Hdcpin Hwrbdom Hwrpin
+                   with "Hproto Hpub Hstg Hfrag Hclaim Hinfo Hbd Hpin Hwrb Hpend")
         as "(_ & _ & Hw2 & Hclose)".
       iEval (rewrite Haddr) in "Hw2".
       iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
@@ -987,13 +941,13 @@ Section VdrwdLeaves.
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 (S np)) Hst2
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
-      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hrd & Hstg & Hrcpt)".
+      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hstg & Hact)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-      iModIntro. iFrame "Hpub Hrd Hstg Hrcpt". }
+      iModIntro. iFrame "Hpub Hstg Hact". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc [Hpub [Hrd [Hstg Hrcpt]]]". rgall.
-    iApply ("Hcont" with "Hcg Hpc Hpub Hrd Hstg Hrcpt").
+    iIntros "Hcg Hpc [Hpub [Hstg Hact]]". rgall.
+    iApply ("Hcont" with "Hcg Hpc Hpub Hstg Hact").
   Qed.
 
 End VdrwdLeaves.
@@ -1032,9 +986,9 @@ Definition vdrwd_bufwin (b : Arch.pa) (wr : SailStdpp.Values.mword 64)
   else ∅.
 
 (* THE PIN, minus its avail-ring entry: the fifteen word windows the chain
-   formatting wrote plus (for a write) the payload.  This is exactly what the
-   interrupt handler leaves in [DiskInv.dc_pinr], i.e. what P6 gets back and
-   has to split into cells again.  (No return-type annotation: a
+   formatting wrote plus (for a write) the payload.  This is exactly what
+   comes back with the chain ([VirtioProto.chain_back]'s [phys_map]), i.e.
+   what P6 gets back and has to split into cells again.  (No return-type annotation: a
    [gmap Arch.pa _] spelled out here would pick the wrong Countable
    instance.) *)
 Definition vdrwd_pinr_regions (pd : SailStdpp.Values.mword 64) (b : Arch.pa)
@@ -1435,120 +1389,8 @@ Section VdrwdPinBuild.
 End VdrwdPinBuild.
 
 (* ===================================================================== *)
-(* §5  The [disk_res] surgery at publish, as pure set/map facts.          *)
+(* §5  The published slot, as the claim records it.                       *)
 (* ===================================================================== *)
-
-(* [vdrwd_mod8_insert] likewise: no cell joins a driver-side pool at publish. *)
-
-
-Lemma vdrwd_fresh_pos {A : Type} (np nr : nat) (fl pk : gmap nat A) :
-  (nr <= np)%nat ->
-  (forall p, p ∈ dom fl -> (p < np)%nat) ->
-  (forall p, p ∈ dom pk -> (p < np)%nat) ->
-  (fl ∪ pk) !! np = None.
-Proof.
-  intros Hle Hfln Hpk.
-  apply not_elem_of_dom. rewrite dom_union_L. rewrite elem_of_union.
-  intros [Hin|Hin].
-  - pose proof (Hfln np Hin). lia.
-  - pose proof (Hpk np Hin). lia.
-Qed.
-
-Lemma vdrwd_fl_fresh {A : Type} (np nr : nat) (fl : gmap nat A) :
-  (nr <= np)%nat -> (forall p, p ∈ dom fl -> (p < np)%nat) -> fl !! np = None.
-Proof.
-  intros Hle Hfln. apply not_elem_of_dom.
-  intro Hin. pose proof (Hfln np Hin). lia.
-Qed.
-
-Lemma vdrwd_tr_fresh {A : Type} (np nr : nat) (fl pk : gmap nat A)
-    (tr : gmap nat (nat * nat * nat)) :
-  (nr <= np)%nat ->
-  (forall p, p ∈ dom fl -> (p < np)%nat) ->
-  (forall p, p ∈ dom pk -> (p < np)%nat) ->
-  dom tr = dom fl ∪ dom pk ->
-  tr !! np = None.
-Proof.
-  intros Hle Hfln Hpk Hdtr. apply not_elem_of_dom. rewrite Hdtr elem_of_union.
-  intros [Hin|Hin].
-  - pose proof (Hfln np Hin). lia.
-  - pose proof (Hpk np Hin). lia.
-Qed.
-
-(* the four [tr] conjuncts, after recording the publisher's own triple *)
-Lemma vdrwd_tr_ok_ins (tr : gmap nat (nat * nat * nat)) (np : nat) (T0 : nat * nat * nat) :
-  tri_ok T0 -> (forall p T, tr !! p = Some T -> tri_ok T) ->
-  forall p T, <[ np := T0 ]> tr !! p = Some T -> tri_ok T.
-Proof.
-  intros HT0 Hok p T Hp. destruct (decide (p = np)) as [->|Hne].
-  - rewrite lookup_insert in Hp. injection Hp as <-. exact HT0.
-  - rewrite (lookup_insert_ne tr np p T0 (not_eq_sym Hne)) in Hp. exact (Hok p T Hp).
-Qed.
-
-Lemma vdrwd_tr_disj_ins (tr : gmap nat (nat * nat * nat)) (np : nat)
-    (T0 : nat * nat * nat) :
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  (forall p T, tr !! p = Some T -> tri_set T ## tri_set T0) ->
-  forall p q Tp Tq, p <> q -> <[ np := T0 ]> tr !! p = Some Tp ->
-    <[ np := T0 ]> tr !! q = Some Tq -> tri_set Tp ## tri_set Tq.
-Proof.
-  intros Hdisj Hdisj0 p q Tp Tq Hpq Hp Hq.
-  destruct (decide (p = np)) as [->|Hpn]; destruct (decide (q = np)) as [->|Hqn].
-  - congruence.
-  - rewrite lookup_insert in Hp. injection Hp as <-.
-    rewrite (lookup_insert_ne tr np q T0 (not_eq_sym Hqn)) in Hq.
-    apply gset_disj_sym. exact (Hdisj0 q Tq Hq).
-  - rewrite lookup_insert in Hq. injection Hq as <-.
-    rewrite (lookup_insert_ne tr np p T0 (not_eq_sym Hpn)) in Hp.
-    exact (Hdisj0 p Tp Hp).
-  - rewrite (lookup_insert_ne tr np p T0 (not_eq_sym Hpn)) in Hp.
-    rewrite (lookup_insert_ne tr np q T0 (not_eq_sym Hqn)) in Hq.
-    exact (Hdisj p q Tp Tq Hpq Hp Hq).
-Qed.
-
-Lemma vdrwd_tri_set_elem (h m2 t i : nat) :
-  i ∈ tri_set (h, m2, t) -> i = h \/ i = m2 \/ i = t.
-Proof.
-  unfold tri_set. cbn. rewrite !elem_of_union !elem_of_singleton. tauto.
-Qed.
-
-Lemma vdrwd_tr_free_ins (tr : gmap nat (nat * nat * nat)) (np : nat)
-    (h m2 t : nat) (fr : nat -> bool) :
-  fr h = false -> fr m2 = false -> fr t = false ->
-  (forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false) ->
-  forall p T i, <[ np := (h, m2, t) ]> tr !! p = Some T -> i ∈ tri_set T ->
-    fr i = false.
-Proof.
-  intros Hh Hm Ht Hfree p T i Hp Hi.
-  destruct (decide (p = np)) as [->|Hne].
-  - rewrite lookup_insert in Hp. injection Hp as <-.
-    destruct (vdrwd_tri_set_elem h m2 t i Hi) as [-> | [-> | ->] ]; assumption.
-  - rewrite (lookup_insert_ne tr np p (h, m2, t) (not_eq_sym Hne)) in Hp.
-    exact (Hfree p T i Hp Hi).
-Qed.
-
-(* the claims/triples coherence conjunct, after recording the publisher's
-   own position in BOTH maps *)
-Lemma vdrwd_coh_ins (np : nat) (fl pk : gmap nat dclaim)
-    (tr : gmap nat (nat * nat * nat)) (v : dclaim) :
-  (forall p w, (fl ∪ pk) !! p = Some w -> tr !! p = Some (dc_tri w)) ->
-  forall p w, (<[ np := v ]> fl ∪ pk) !! p = Some w ->
-    <[ np := dc_tri v ]> tr !! p = Some (dc_tri w).
-Proof.
-  intros Hcoh p w Hp. rewrite -(insert_union_l fl pk np v) in Hp.
-  destruct (decide (p = np)) as [->|Hne].
-  - rewrite lookup_insert in Hp. injection Hp as <-. apply lookup_insert.
-  - rewrite (lookup_insert_ne (fl ∪ pk) np p v (not_eq_sym Hne)) in Hp.
-    rewrite (lookup_insert_ne tr np p (dc_tri v) (not_eq_sym Hne)).
-    exact (Hcoh p w Hp).
-Qed.
-
-Lemma vdrwd_dom_tr_ins {A : Type} (np : nat) (fl pk : gmap nat A)
-    (tr : gmap nat (nat * nat * nat)) (T0 : nat * nat * nat) (b : A) :
-  dom tr = dom fl ∪ dom pk ->
-  dom (<[ np := T0 ]> tr) = dom (<[ np := b ]> fl) ∪ dom pk.
-Proof. intro H. rewrite !dom_insert_L H. set_solver. Qed.
 
 (* the slot the publisher records really does describe the caller's buffer *)
 Lemma vdrwd_slot_link (kq : nat * positive) (b : Arch.pa) (h : nat)
@@ -1574,6 +1416,14 @@ Proof.
   intro Hh. unfold sl_head, vdrwd_slot. cbn [rw_slot vs_req vr_head].
   rewrite (bv16_small h Hh). lia.
 Qed.
+
+(* the same, as the receipt is keyed *)
+Lemma vdrwd_slot_hd (kq : nat * positive) (b : Arch.pa) (h : nat)
+    (wr sector : SailStdpp.Values.mword 64)
+    (bs : list (bv 8)) :
+  (h < 8)%nat ->
+  Z.to_nat (bv_unsigned (vr_head (vs_req (vdrwd_slot kq b h wr sector bs)))) = h.
+Proof. intro Hh. exact (vdrwd_slot_head kq b h wr sector bs Hh). Qed.
 
 Lemma vdrwd_slot_off (kq : nat * positive) (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64)
@@ -1646,12 +1496,9 @@ Section VdrwdP4.
       (M : regfile) (av : nat)
       (pd pav pu : SailStdpp.Values.mword 64) (b : Arch.pa)
       (wr sector : SailStdpp.Values.mword 64)
-      (np nr h m2 t : nat) (fl pk : gmap nat dclaim)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool)
+      (np nr h m2 t : nat) (cm : gmap nat dclaim) (fr : nat -> bool)
       (bs_buf bs_disk : list (bv 8)) (sec_off : Z) :
     tri_ok (h, m2, t) ->
-    (forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)) ->
-    fr h = false -> fr m2 = false -> fr t = false ->
     length bs_buf = 1024%nat -> length bs_disk = 1024%nat ->
     (forall j, (j < 1024)%nat -> addr_is_kdata (pa_add (b_data b) j)) ->
     (bv_unsigned sector * 512)%Z = sec_off ->
@@ -1660,8 +1507,11 @@ Section VdrwdP4.
     sie_cap_gpr KT1 M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    vdrw_body γd pd pav np nr fl pk tr fr -∗
+    vdrw_body γd pd pav np nr cm fr -∗
     vdrw_chain pd b h m2 t wr sector -∗
+    (* the head's receipt, still INACTIVE: the ring store is keyed by it and
+       the publish flips it *)
+    h ↪[dn_head γd] HInactive -∗
     ([∗ list] j ↦ x ∈ bs_buf, pa_add (b_data b) j ↦ₘ x) -∗
     disk_bytes γd sec_off bs_disk -∗
     (* THE CRASH PERMIT's token, deposited before the chain was formatted and
@@ -1681,21 +1531,22 @@ Section VdrwdP4.
                      (vdrwd_bufwin b wr bs_buf))⌝ -∗
         sie_cap_gpr KT1 M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
+        (* the lock resource, with the claim's row recorded at the old count *)
         vdrw_body γd pd pav (S np) nr
                   (<[ np := DClaim b (vdrwd_slot kq b h wr sector
                                         (vdrwd_sldata wr bs_buf bs_disk))
-                                   (h, m2, t) pin ]> fl) pk
-                  (<[ np := (h, m2, t) ]> tr) fr -∗
-        disk_claim γd np (DClaim b (vdrwd_slot kq b h wr sector
-                                      (vdrwd_sldata wr bs_buf bs_disk))
-                                 (h, m2, t) pin) -∗
+                                   pin np ]> cm) fr -∗
+        (* THE RECEIPT FRAGMENT the sleeper holds *)
+        h ↪[dn_head γd] HActive (DClaim b (vdrwd_slot kq b h wr sector
+                                            (vdrwd_sldata wr bs_buf bs_disk))
+                                       pin np) -∗
         vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Htok Hdisj0 Hfrh Hfrm Hfrt Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5.
+    intros Htok Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5.
     destruct Htok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hh8, Hm8, Ht8.
-    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hbody Hchain Hbuf Hdisk Hpend Hcont".
+    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hbody Hchain Hfrag Hbuf Hdisk Hpend Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(Hspd & Hspav & _).
     iPoseProof "Hgeom" as "Hgeom2".
@@ -1706,9 +1557,7 @@ Section VdrwdP4.
       by (intros j Hj; apply kdata_svpn_class, Hbufkd, Hj).
     (* ---- open the lock resource ---- *)
     rewrite /vdrw_body.
-    iDestruct "Hbody" as "(%Hfln & %Hcount & %Hpkb & %Hfpk & %Hdtr & %Hcoh &
-                           %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hrd & Hstg & Hclaim & Huidx & Hflm & Hpkm & Hfb)".
+    iDestruct "Hbody" as "(%Hcm & Hpub & #Hlb & Hrd & Hstg & Hclaim & Huidx & Hfb)".
     (* ---- +0x176  c.ld a3,8(a5) ---- *)
     assert (Hava : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_avail_ptr : SailStdpp.Values.mword 64))
@@ -1738,11 +1587,11 @@ Section VdrwdP4.
       by (rgall; rewrite HN1a3; apply vdrwd_idx_addr).
     iApply (wp_vdrwd_lhu_avail γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x178) : mword 64) Ra4 Ra3
-              (mword_of_int 2 : mword 12) N1 av np nr Hidxa
+              (mword_of_int 2 : mword 12) N1 av np Hidxa
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc [] Hdinv Hgeom Hpub Hlb").
+              with "Hcg Hpc [] Hdinv Hgeom Hpub").
     { iApply (rwi_178 with "Htext"). }
-    iIntros "%Hle Hpub Hcg Hpc".
+    iIntros "Hpub Hcg Hpc".
     set (N2 := <[Regidx Ra4 := regval_into_reg
                   (zero_extend' 64 (wrap16 np : SailStdpp.Values.mword 16))]> N1).
     change (<[Regidx Ra4 := regval_into_reg
@@ -1761,12 +1610,6 @@ Section VdrwdP4.
     assert (Hp168 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x178) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x17c)) by pcstep.
     iEval (rewrite Hp168) in "Hpc".
-    (* ---- THE WINDOW HAS ROOM: at most two positions are live (three
-       descriptors each, eight in all), so the cell [np mod 8] is nobody
-       else's.  NO CELL CHANGES HANDS HERE any more (finding 5) -- the store
-       below goes through the device invariant, which owns all eight. ---- *)
-    assert (Hw2 : (np - nr <= 2)%nat)
-      by exact (vdrwd_window_le2 np nr fl pk tr Hfln Hcount Hpkb Hdtr Htrok Htrdj).
     assert (Hmod8 : ((np `mod` 8) < 8)%nat) by (apply Nat.mod_upper_bound; lia).
     (* ---- +0x17c  c.andi a4,a4,7 ---- *)
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x17c) : mword 64) Ra4
@@ -1855,12 +1698,14 @@ Section VdrwdP4.
       by (rewrite HN5a0; exact (vdrwc_trunc16_idx' h Hh8)).
     iApply (wp_vdrwd_sh_ring γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64)
-              Ra0 Ra3 (mword_of_int 4 : mword 12) N5 av np nr
+              Ra0 Ra3 (mword_of_int 4 : mword 12) N5 av np
               (Z_to_bv 16 (Z.of_nat h))
-              Hring HN5sv ltac:(lia)
-              with "Hcg Hpc [] Hdinv Hgeom Hpub Hrd Hstg").
+              Hring HN5sv
+              with "Hcg Hpc [] Hdinv Hgeom Hpub Hstg [Hfrag]").
     { iApply (rwi_182 with "Htext"). }
-    iIntros "Hcg Hpc Hpub Hrd Hstg". rgall.
+    { rewrite (vdrwd_hd16 h Hh8). iExact "Hfrag". }
+    iIntros "Hcg Hpc Hpub Hstg Hfrag". rgall.
+    iEval (rewrite (vdrwd_hd16 h Hh8)) in "Hfrag".
     assert (Hp172 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x186)) by pcstep.
     iEval (rewrite Hp172) in "Hpc".
@@ -1899,11 +1744,11 @@ Section VdrwdP4.
       by (rgall; rewrite HN6a4; apply vdrwd_idx_addr).
     iApply (wp_vdrwd_lhu_avail γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x18c) : mword 64) Ra5 Ra4
-              (mword_of_int 2 : mword 12) N6 av np nr Hidxa2
+              (mword_of_int 2 : mword 12) N6 av np Hidxa2
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc [] Hdinv Hgeom Hpub Hlb").
+              with "Hcg Hpc [] Hdinv Hgeom Hpub").
     { iApply (rwi_18c with "Htext"). }
-    iIntros "_ Hpub Hcg Hpc".
+    iIntros "Hpub Hcg Hpc".
     set (N7 := <[Regidx Ra5 := regval_into_reg
                   (zero_extend' 64 (wrap16 np : SailStdpp.Values.mword 16))]> N6).
     change (<[Regidx Ra5 := regval_into_reg
@@ -1951,6 +1796,13 @@ Section VdrwdP4.
                  Hh8 Hm8 Ht8 Hlenbuf Hlensl Hbsl Hspd Hspav Hsbuf
                  with "Hkm Hchain Hbuf") as
       (pin wrb) "(%Hpinok & %Hwrbdom & %Hwrpin & %Hpinr & Hpin & Hwrb & Hib & Hbd & Hrm & Hrt)".
+    (* ---- the claim, recorded in the lock's map before the bump: fresh
+       because every row is below [np], and the fragment goes into the
+       receipt at the publish ---- *)
+    set (V := DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
+                     pin np).
+    iMod (ghost_map_insert np V (vdrwd_cm_fresh np cm Hcm) with "Hclaim")
+      as "[Hclaim Hcfrag]".
     (* ---- +0x192  sh a5,2(a4)  -- THE PUBLISH ---- *)
     assert (Hidxa3 : add_vec (rget N8 Ra4)
                        (sign_extend' 64 (mword_of_int 2 : mword 12))
@@ -1958,11 +1810,16 @@ Section VdrwdP4.
       by (rgall; rewrite HN8a4; apply vdrwd_idx_addr).
     iApply (wp_vdrwd_sh_publish γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) Ra5 Ra4
-              (mword_of_int 2 : mword 12) N8 av np nr
-              (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) pin wrb
-              Hidxa3 HN8sv Hpinok Hwrbdom Hwrpin ltac:(lia)
-              with "Hcg Hpc [] Hdinv Hgeom Hpub Hrd Hstg Hpin Hwrb [Hdisk Hpend]").
+              (mword_of_int 2 : mword 12) N8 av np
+              (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) V pin wrb
+              Hidxa3 HN8sv Hpinok eq_refl eq_refl eq_refl Hwrbdom Hwrpin
+              with "Hcg Hpc [] Hdinv Hgeom Hpub Hstg [Hfrag] Hcfrag [Hib] [Hbd] Hpin Hwrb
+                    [Hdisk Hpend]").
     { iApply (rwi_192 with "Htext"). }
+    { rewrite (vdrwd_slot_hd kq b h wr sector _ Hh8). iExact "Hfrag". }
+    { rewrite (vdrwd_slot_hd kq b h wr sector _ Hh8). rewrite /V. cbn [dc_buf].
+      iExact "Hib". }
+    { rewrite /V. cbn [dc_buf]. iExact "Hbd". }
     { iExists bs_disk. iSplitR.
       - iPureIntro. unfold vs_len, vdrwd_slot. cbn [rw_slot vs_req vr_len].
         rewrite vdrwd_len1024. exact Hlendisk.
@@ -1985,7 +1842,8 @@ Section VdrwdP4.
             rewrite /vs_all.
             rewrite (vdrwd_slot_wr kq b h wr sector bs_buf bs_disk sec_off Hoff).
             iExact "Hpend". }
-    iIntros "Hcg Hpc Hpub Hrd Hstg Hrcpt".
+    iIntros "Hcg Hpc Hpub Hstg Hact".
+    iEval (rewrite (vdrwd_slot_hd kq b h wr sector _ Hh8)) in "Hact".
     assert (Hp182 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x196)) by pcstep.
     iEval (rewrite Hp182) in "Hpc".
@@ -1999,23 +1857,8 @@ Section VdrwdP4.
     assert (Hp186 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x196) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x19a)) by pcstep.
     iEval (rewrite Hp186) in "Hpc".
-    (* ---- the claim, and the rebuilt lock resource ---- *)
-    set (V := DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
-                     (h, m2, t) pin).
-    iMod (ghost_map_insert np V
-            (vdrwd_fresh_pos np nr fl pk Hle Hfln Hpkb)
-            with "Hclaim") as "[Hclaim Hfrag]".
-    iDestruct (big_sepM_insert (fun p v => flight_res γd p v) fl np V
-                 (vdrwd_fl_fresh np nr fl Hle Hfln)
-                 with "[Hflm Hrcpt Hib Hbd]") as "Hflm".
-    { iSplitR "Hflm"; [| iExact "Hflm"]. rewrite /flight_res /V.
-      cbn [dc_buf dc_slot dc_tri dc_pin].
-      iSplitR; [iPureIntro;
-        exact (vdrwd_slot_link kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8)|].
-      iFrame "Hrcpt Hbd".
-      rewrite (vdrwd_slot_head kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8).
-      iExact "Hib". }
-    iApply ("Hcont" $! N8 pin with "[%] [%] Hcg Hpc [-Hfrag Hrm Hrt] [Hfrag] Hrm Hrt").
+    (* ---- the rebuilt lock resource ---- *)
+    iApply ("Hcont" $! N8 pin with "[%] [%] Hcg Hpc [-Hact Hrm Hrt] Hact Hrm Hrt").
     { split.
       - intros r Hr.
         rewrite /N8 upd_ne; [| csne]. rewrite /N7 upd_ne; [| csne].
@@ -2027,64 +1870,20 @@ Section VdrwdP4.
         rewrite /N4 upd_ne; [| reg_neq]. rewrite /N3 upd_ne; [| reg_neq].
         rewrite /N2 upd_ne; [| reg_neq]. rewrite /N1 upd_ne; [| reg_neq]. reflexivity. }
     { exact Hpinr. }
-    2:{ rewrite /disk_claim. iExact "Hfrag". }
     rewrite /vdrw_body.
     iSplitR.
-    { iPureIntro. exact (vdrwd_fl_ins_lt np fl _ Hfln). }
-    iSplitR.
-    { iPureIntro.
-      exact (vdrwd_fl_ins_size nr np fl _ Hle
-               (vdrwd_fl_fresh np nr fl Hle Hfln) Hcount). }
-    (* the parked positions are still below the (now larger) published count *)
-    iSplitR; [iPureIntro; intros p Hp; pose proof (Hpkb p Hp); lia|].
-    (* ...and the new position is not parked: it is fresh *)
-    iSplitR.
-    { iPureIntro. rewrite dom_insert_L. apply disjoint_union_l. split.
-      - apply disjoint_singleton_l. intro Hc. pose proof (Hpkb np Hc). lia.
-      - exact Hfpk. }
-    iSplitR.
-    { iPureIntro. exact (vdrwd_dom_tr_ins np fl pk tr (h, m2, t) V Hdtr). }
-    iSplitR.
-    { iPureIntro. exact (vdrwd_coh_ins np fl pk tr V Hcoh). }
-    iSplitR.
-    { iPureIntro.
-      apply (vdrwd_tr_ok_ins tr np (h, m2, t)); [| exact Htrok].
-      unfold tri_ok. cbn. split_and!; assumption. }
-    iSplitR.
-    { iPureIntro. exact (vdrwd_tr_disj_ins tr np (h, m2, t) Htrdj Hdisj0). }
-    iSplitR.
-    { iPureIntro. exact (vdrwd_tr_free_ins tr np h m2 t fr Hfrh Hfrm Hfrt Htrfr). }
-    iFrame "Hpub Hlb Hrd Hstg".
-    rewrite (insert_union_l fl pk np V). iFrame "Hclaim".
-    iFrame "Huidx Hflm Hpkm Hfb".
-    (* no ring pool to re-close: the cells never left the invariant *)
+    { iPureIntro. apply (vdrwd_cm_ins np cm V Hcm eq_refl).
+      exact (vdrwd_slot_link kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8). }
+    iFrame "Hpub Hlb Hrd Hstg Hclaim Huidx Hfb".
   Qed.
 
 End VdrwdP4.
 
 (* ===================================================================== *)
-(* §7  The P3 -> P4 glue and the P4/P5 SEAM.                              *)
+(* §7  The P3 -> P4 glue and the P4/P5 SEAM live in ProofVirtioDiskRwDSeam. *)
 (*                                                                       *)
 (* [P3.vdrw_p3_exit] lives inside ProofVirtioDiskRwC's functor, so the    *)
 (* glue re-opens the functor over the same four callee module types.      *)
-(*                                                                       *)
-(* !! THE ONE MISSING CONJUNCT.  What P4 provides is [vdrw_p3_exit_x],    *)
-(* which is [P3.vdrw_p3_exit] plus ONE extra pure hypothesis:             *)
-(*                                                                       *)
-(*   ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝    *)
-(*                                                                       *)
-(* -- the publisher's own descriptor triple is disjoint from every        *)
-(* recorded one.  [disk_res]'s sixth conjunct says every recorded triple  *)
-(* member has [fr i = false], and the allocator held [fr h = fr m2 =      *)
-(* fr t = true] BEFORE it cleared those three bits -- but the seam        *)
-(* exports the body at the CLEARED [fr], for which the conjunct is        *)
-(* vacuous at h/m2/t, so the fact is no longer derivable downstream.      *)
-(* It is available (and one line) in P2.3, where the bits are still set;  *)
-(* adding it to [vdrw_p2_exit]/[vdrw_p3_exit] and threading it through    *)
-(* [wp_vdrw_p3_seam] is what makes [vdrw_p3_exit_x] equal to              *)
-(* [P3.vdrw_p3_exit] and closes the composition.  P4 needs it BOTH to     *)
-(* record [np |-> (h,m2,t)] in [tr] (disk_res's fifth conjunct) and       *)
-(* nowhere else -- the ring-slot freshness is derived here from the       *)
-(* triple-counting bound alone ([vdrwd_window_le2]).                      *)
+(* Everything P4 needs arrives through that seam: the lock resource with   *)
+(* the claim map, the chain, and the three INACTIVE receipts.             *)
 (* ===================================================================== *)
-
