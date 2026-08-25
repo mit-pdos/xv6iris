@@ -37,6 +37,13 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import BioDefs.
 Require Import FsBlocks.
+(* BLOCK 1'S PARK (durable-disk lane C-3a).  A one-predicate file, not the
+   pure wf layer the next comment is about: it carries the superblock
+   block's byte run and the single local fact that run can state.  It is a
+   conjunct of [log_ctx] because [log_ctx] is the ONLY persistent bundle
+   [SpecEndOp.wp_end_op] holds, and the commit's collection has to reach
+   block 1 (durable-fs-plan.md section 4, gap (C) in FsCollect.v). *)
+Require Import SbPark.
 (* NOTHING IN THE CRASH/LOG LAYER IMPORTS THE PURE WF LAYER any more
    (durable-disk 1d).  [FsImg]/[FsWf]/[FsObj*] were here for row (a) --
    "the logged view is the committed view except at the pending objects" --
@@ -1141,7 +1148,13 @@ Section LogInv.
         [log_ctx] because [log_ctx] is already threaded to [log_write] and
         already carries [cov] and [logstart], so not one call site moves. *)
      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs)
-                  (fs_home_set cov logstart))%I.
+                  (fs_home_set cov logstart) ∗
+     (* BLOCK 1, OWNED (durable-disk lane C-3a).  The superblock's byte run
+        at FULL fraction, parked in [SbPark.sbN] with its parse; initlog
+        allocates it out of the run fsinit hands down and this is where the
+        commit reaches it.  LAST, so no pattern that opens this bundle
+        moves. *)
+     sb_parked γfs)%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -1176,7 +1189,7 @@ Section LogInv.
   Lemma log_ctx_bytes γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & $)". Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
   (* ...and the home-set-free form every bread client above takes *)
   Lemma log_ctx_bytes_any γ bn γfs cov logstart dev :
@@ -1188,7 +1201,15 @@ Section LogInv.
 
   Lemma log_ctx_swap γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $ & _)". Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $ & _ & _)". Qed.
+
+  (* BLOCK 1'S PARK, off the context end_op already threads (durable-disk
+     lane C-3a).  This is the whole of what the commit's collection needs of
+     the superblock: [SbPark.sb_park_acc] then opens it for the one ghost
+     step the collection runs in. *)
+  Lemma log_ctx_sb γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ sb_parked γfs.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)

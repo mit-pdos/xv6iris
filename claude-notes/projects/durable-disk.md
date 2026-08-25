@@ -869,9 +869,9 @@ as their remaining consumers.
   its two instances, and the general form is what the cover lemma's
   existentially-bound `dq` actually needs.
 
-  FOUR SUPPLIERS OF `col_hand` DO NOT EXIST IN THE TREE, and none is a proof
+  FOUR SUPPLIERS OF `col_hand` DID NOT EXIST IN THE TREE, and none is a proof
   difficulty (the full list, with the fix for each, is in `FsCollect.v`'s
-  header):
+  header).  (C) is SUPPLIED — see C-3a below:
 
   (A) THE PARTITION (B″-join's open item), unchanged in shape.  MEASURED
   here and it is what makes the increment delicate: the row is FALSE between
@@ -886,27 +886,12 @@ as their remaining consumers.
   (B) ALTERNATIVE (d) of `ic_escrow_body_cover` — the ABI sweep.  This is
   the ONE premise the plan sanctions taking as a hypothesis (P1).
 
-  (C) NOBODY OWNS BLOCK 1.  `col_hand` wants `FsState.sb_owned`: the
-  superblock's block at FULL fraction plus its parse.  The era hands
-  `fsblock (fs_bytes γfs) 1 bs_sb` to fsinit
-  (`FsCfgBoot.fs_kit_fsinit_ghost`), `SpecFsinit` returns it, and
-  `ProofForkret` DROPS it — the name `Hb1` occurs three times in that file
-  (bound, passed, returned) and is never spent.  So at a commit no resource
-  says what block 1 holds, and `sk_parse` and `sk_meta_used` at `SB_BNO`
-  have no source.  `FsCollectImg.img_sb_home` shows the GEOMETRY half is
-  free (block 1 is a home block, so `sk_sb` is satisfied by taking
-  `fss_sbb S` to be the view's own value there); only the OWNERSHIP is
-  missing.  It must be at fraction 1 and NOT discarded — `sk_own_used`
-  refutes a node owning block 1 through `blk_owned_ne_full`, and a discarded
-  share does not refute ¾.  It has to reach the commit through `log_ctx`
-  (the plan's parked law), whose only producer is `initlog`, whose only
-  caller is `fsinit` — which already holds block 1's run AND `ireg_inv`,
-  `bitmap_inv`, `ic_escrows`, `is_itable2`, i.e. every invariant the law
-  needs.  That is where the law should be assembled.  MEASURED: `log_ctx` is
-  built at exactly ONE site (`ProofInitlog.v:2697`) and `wp_initlog` has
-  exactly ONE caller (`ProofFsinit`), so the law costs `log_ctx` no arity
-  and `initlog` one premise — the ~75 files that thread `log_ctx` and the
-  53 `wp_end_op` call sites are untouched.
+  (C) NOBODY OWNED BLOCK 1 — closed by C-3a below.  `col_hand` wants
+  `FsState.sb_owned`: the superblock's block at FULL fraction plus its
+  parse.  It must be fraction 1 and NOT discarded — `sk_own_used` refutes a
+  node owning block 1 through `blk_owned_ne_full`, and a discarded share
+  does not refute ¾ — and it has to reach the commit through `log_ctx`,
+  which is the only persistent bundle `wp_end_op` carries.
 
   (D) A FREE INUM'S ABSTRACT NODE IS UNTIED TO ITS RECORD.
   `IcacheEscrow.ipool_shape_np`'s MARKER arm — what a FREE inum's pool row
@@ -927,12 +912,79 @@ as their remaining consumers.
   image's node but UNTIED), so at the mkfs image the first commit meets it
   at nearly every inum of the region.
 
-  NOT LANDED, and blocked on those four: the law parked in `log_ctx`,
+  NOT LANDED, and blocked on the rest of them: the law parked in `log_ctx`,
   `end_op`'s call at `outstanding = 0`, the two commit permits at
   `dsnap_step_of`, the receipt's snapshot state, `P_fs`'s conjunct →
   `P_dur (fr_D r)`, and the `fdn_*`/`riscv_dview_name` adequacy sweep.  The
   shape of the law is fixed by this increment: `col_snap_ok_ex` is what it
   concludes, and `col_hand` is what it must assemble.
+
+  **AS LANDED — C-3a: SUPPLIER (C), BLOCK 1 IS OWNED, AND ITS HOME IS
+  `log_ctx`.**
+
+  `iris/SbPark.v` is the park: `sb_park γfs sb` is
+  `inv sbN (∃ bs, ⌜fs_parse_sb (fun _ => bs) = Some sb⌝ ∗ fsblock
+  (fs_bytes γfs) SB_BNO bs)`, with `sb_park_alloc` and `sb_park_acc` — open,
+  read, close, the run handed back verbatim, because every conclusion the
+  collection draws from block 1 is pure.  `LogInv.log_ctx` gains
+  `sb_parked γfs` (`= ∃ sb, ⌜fs_sb_ok sb⌝ ∗ sb_park γfs sb`) as its LAST
+  conjunct: no arity change, and the only patterns that moved are the four
+  `rewrite /log_ctx` sites inside `LogInv.v` itself (`log_ctx_sb` is the new
+  projection).  `FsCollectImg` restates the accessor in the vocabulary
+  `col_hand`'s superblock leg actually asks for — `sb_park_owned_acc` and
+  `log_ctx_sb_owned_acc`, both concluding `FsState.sb_owned` through
+  `FsBytesGamma.gamma_blk_owned`.  The non-vacuity witness is
+  `FsCollectImg.log_ctx_sb_not_owned`, and it is `sk_meta_used`'s block-1
+  leg end to end: off `log_ctx` alone, no bundle's block is `SB_BNO`, by
+  `blk_owned_ne_full` against the park's FULL share.  A `DfracDiscarded`
+  park does not close that goal, which is the whole reason the run is at
+  fraction 1.
+
+  NOT `bitmap_body` NOR `ireg_body`, AND THE REASON IS TIMING, NOT
+  FOOTPRINT.  Both invariants are allocated in the era fupd
+  (`FsCfgBoot.fs_cfg_alloc`, via `bitmap_inv_alloc` and the icache boot) and
+  handed to fsinit as PERSISTENT credentials, while block 1's run is out of
+  every invariant from that same fupd until fsinit is past its `readsb`:
+  fsinit pins what bread returned by an agreement against the run it holds
+  (`ProofFsinit`, the `fs_bytes_agree_any` just after the bread at +0x12).  An invariant cannot be
+  allocated without its body, so there is no later deposit into either one.
+  `initlog` is the first point at which the run is free AND a bundle the
+  commit will hold is being built — and `SpecEndOp.wp_end_op` carries NO fs
+  invariant at all (only `log_ctx`, `fs_crash_seam`, `gen_cert`, `bio_ctx`),
+  so `log_ctx` is the only door in any case, exactly as C-2's finding (C)
+  said.  Measured: `log_ctx` is destructured in ONE file (`LogInv.v`, four
+  sites) and built at ONE site (`ProofInitlog.v`), so the conjunct costs the
+  ~75 files that thread it nothing.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `SpecInitlog.wp_initlog_sconf_body`
+  gains two binders (`bs_sb`, `sbrec`), two pure premises (`fs_sb_ok sbrec`,
+  `fs_parse_sb (fun _ => bs_sb) = Some sbrec`) and the run itself as its
+  last resource premise; initlog allocates the park in the same ghost step
+  as the "log" lock's seal.  `SpecFsinit.wp_fsinit_sconf_body` gains the
+  binder `sbrec` and the same two premises (as (a'), beside the image
+  premise (a)), and its POST LOSES `fsblock (fs_bytes γfs) 1 bs_sb` — the
+  run `ProofForkret` used to drop is spent inside.
+  `FirstTok.first_fsinit_pures` gains the two facts as its last two
+  conjuncts, which is how forkret supplies them;
+  `first_fsinit_pures_of_image` already took both (the parse is its
+  `Hparse` premise, discharged at the literal image by
+  `FsImgCheck.fsimg_parse_sb`; `fs_sb_ok` is its `fsimg_wf_sb`), so nothing
+  is recomputed on the adequacy cone.
+
+  WHAT THE LAW STILL OWES ON THIS LEG.  `log_ctx`'s conjunct closes over
+  `sb`, so a holder of `log_ctx` ALONE learns `fs_sb_ok sb` and the parse
+  but not that `sb` is the boot configuration's record — `log_ctx` has no
+  room for `fsc_bmapstart`/`fsc_size` and gaining a parameter would sweep
+  ~75 files.  That identification is the LAW's business and it is free
+  there: the law is assembled at fsinit/initlog, which hold the CONCRETE
+  `sb_park γfs sb` at the config's record beside `bitmap_inv`, `ireg_inv`
+  and `ic_escrows`, so the closure fixes all of them together.  Should the
+  collection instead take its own `sb` from the park, `col_geom` follows
+  from `fs_sb_ok sb` plus `sb_bmapstart sb = fsc_bmapstart` and
+  `sb_size sb = fsc_size`: `fs_sb_ok` pins `logstart`, `nlog`, `inodestart`
+  and `magic` outright, and `cg_nin` comes for free because
+  `sb_ninodes sb / 16 = sb_bmapstart sb - sb_inodestart sb - 1`.  Those two
+  field ties are the whole of what a `log_ctx`-only holder lacks.
 - [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
   `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
   prove `mknod_durable` off the snapshot; quote it here.  Then the

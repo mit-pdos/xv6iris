@@ -918,7 +918,7 @@ Proof.
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
-                      [Hhdr0 [H1cov H1log]]].
+                      [Hhdr0 [H1cov [H1log [Hsbparse Hsbok]]]]].
   (* the era's two readings of one image (durable-disk 1a): the boot mint
      built [L] from the era's disk, which is the same disk the era's mirror
      was born at.  Threaded straight through fsinit into initlog. *)
@@ -992,7 +992,13 @@ Proof.
             (FsCrash.mirror_of (FsCrash.fs_blocks dk)) L D
             vlock vname vcpu v_start v_dev v_nc v_n
             pid (DfracOwn 1) B6 av2 eb eb ∅ V
-            Hav2fs Hlg H1cov H1log Himg Hmagic eq_refl eq_refl eq_refl eq_refl
+            sb
+            Hav2fs Hlg H1cov H1log Himg
+            (* block 1's two pure facts (durable-disk lane C-3a): the run
+               fsinit used to hand back here, and this file used to DROP,
+               now goes down into initlog's park. *)
+            Hsbparse Hsbok
+            Hmagic eq_refl eq_refl eq_refl eq_refl
             Hn1 Hnnib Hn31 eq_refl eq_refl Hdev Hnib0
             Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb Hhdr0 HLdk Hpkc Hjlt Hgl
             HB6a0 ltac:(lkbelow)
@@ -1004,7 +1010,7 @@ Proof.
   all: try lkbelow.
   iIntros (CIDf1 Hkf1 mf1)
     "%Hcsf1 Hcg Hcpu Hextc Hclmc Hpc Hpbare Hmg Hsz Hnb Hni Hnl Hls Hist Hbms
-     Hb1 #Hlctx Hsl3 Hirs1 Hboot".
+     #Hlctx Hsl3 Hirs1 Hboot".
   assert (Hpcf1 : ret_pc (B6 !!! Regidx Rra : mword 64)
                   = mword_of_int (FR + 0x2c)) by (rewrite HB6ra; pcw).
   iEval (rewrite Hpcf1) in "Hpc".

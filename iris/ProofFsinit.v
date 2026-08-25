@@ -59,6 +59,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
+(* [fs_sb] -- the record block 1 decodes to (durable-disk lane C-3a).
+   EARLY, because this file's later imports own the names it shadows. *)
+Require Import FsImg.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import KernelRvcDecode.
@@ -197,7 +200,6 @@ Section FsinitDefs.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
-      (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -217,7 +219,9 @@ Section FsinitDefs.
         sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
         InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-        fsblock (fs_bytes γfs) 1 bs_sb -∗
+        (* block 1's run does NOT come back (durable-disk lane C-3a): it is
+           spent into [initlog]'s [SbPark] park and rides out inside the
+           [log_ctx] below. *)
         log_ctx icfg_log bn γfs cov logstart dev -∗
         bslots 3 -∗
         iref_slot -∗
@@ -279,7 +283,6 @@ Section FsinitEpilogue.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
-      (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_fsinit <= K)%nat ->
@@ -301,20 +304,19 @@ Section FsinitEpilogue.
     sb_logstart ↦₄ (mword_of_int logstart : mword 32) -∗
     InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
-    fsblock (fs_bytes γfs) 1 bs_sb -∗
     log_ctx icfg_log bn γfs cov logstart dev -∗
     bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
     fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
-             size dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
+             size dev v_magic v_size v_nblocks v_nlog pidv dq j
              m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls Hist
-              Hbms Hfsb Hlctx Hsl Hiref Hboot Hcont".
+              Hbms Hlctx Hsl Hiref Hboot Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     rewrite /fsi_frame.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4)".
@@ -509,7 +511,7 @@ Section FsinitEpilogue.
     rewrite /fsi_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hmg Hsz Hnb Hni
-                                  Hnl Hls Hist Hbms Hfsb Hlctx Hsl Hiref
+                                  Hnl Hls Hist Hbms Hlctx Hsl Hiref
                                   Hboot");
       [exact Hcs].
   Qed.
@@ -545,17 +547,19 @@ Section FsinitMain.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (sbrec : fs_sb) :
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr Mbrn L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb b lks Vpr.
+                           pidv dq m K eb b lks Vpr sbrec.
   Proof.
     cbv beta delta [wp_fsinit_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hmagic Hvni Hvis Hvbs Hvls
+    intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hsbparse Hsbok
+           Hmagic Hvni Hvis Hvbs Hvls
            Hn1 Hnnib Hn31 Hdevc Hnibc Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
            Hbmlog Hcovb Hhdr0 HLmir Hpk Hj Hgl Ha0 Hbelow.
     subst v_ninodes. subst v_inodestart. subst v_bmapstart.
@@ -589,7 +593,7 @@ Section FsinitMain.
     iPoseProof (bitmap_inv_bytes_at with "Hbm") as "#Hbrow".
     iPoseProof (bitmap_inv_bytes with "Hbm") as "#Hbany".
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
-               ninodes size dev v_magic v_size v_nblocks v_nlog bs_sb
+               ninodes size dev v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 : the 4-slot frame ===== *)
@@ -1417,6 +1421,7 @@ Section FsinitMain.
               Mbrn L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
+              bs_sb sbrec
               ltac:(lia) Hgeom Hj Hgl
               ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn; unfold LOGBLOCKS; lia)
               ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn; constructor)
@@ -1427,12 +1432,15 @@ Section FsinitMain.
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
+              (* block 1's two pure facts, straight from the contract
+                 (durable-disk lane C-3a) *)
+              Hsbok Hsbparse
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hseam
                     Hpenv Hnilhomes Hgen Hmirror
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbrow HauthL HauthD
-                    Hdirty Hhdr Hlslots Hsl34").
+                    Hdirty Hhdr Hlslots Hsl34 Hfsb").
     all: try lkbelow.
     iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 _ Hlctx".
     assert (Hpc52 : ret_pc (Q9 !!! Regidx Rra : mword 64)
@@ -1535,9 +1543,9 @@ Section FsinitMain.
       exact (HR1thr c Hcs N2' N8 N9 N18). }
     iApply (fsi_epilogue (CID0 := CID33) j bn γfs cov logstart bmapstart
               inodestart ninodes size dev v_magic v_size v_nblocks
-              v_nlog bs_sb pidv dq m mf K eb b lks Vpr HK Hmfsp Hmfthr
+              v_nlog pidv dq m mf K eb b lks Vpr HK Hmfsp Hmfthr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
-                    Hist Hbms Hfsb Hlctx Hsl3 Hiref Hboot [Hcont]").
+                    Hist Hbms Hlctx Hsl3 Hiref Hboot [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID33)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.

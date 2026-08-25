@@ -67,6 +67,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
+(* block 1's park (durable-disk lane C-3a).  EARLY, because this file's
+   later imports own the names [FsImg] shadows. *)
+Require Import FsImg.
+Require Import SbPark.
 Require Import KernelDataInv.
 Require Import InstrBytes.   (* [pc_is], for the stage-D block lemmas *)
 Require Import KernelText.   (* [kernel_text], same *)
@@ -1149,21 +1153,22 @@ Section ProofInitlog.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
+      (bs_sb : list (bv 8)) (sbrec : fs_sb)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
                             cov logstart dev sb bs_hdr Bh M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb b lks Vpr.
+                            pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hbnd Hndup Hin Hpk
-           Hma0 Hma1 HDf HLmir Hbelow.
+           Hma0 Hma1 HDf HLmir Hbelow Hsbok Hsbparse.
     destruct Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam
               #Hpenvpk Hhomes #Hcert Hmirf
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow HLauth HDauth Hcovf Hfsb
-              Hslotsfs Hslots Hcont".
+              Hslotsfs Hslots Hb1 Hcont".
     (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
        half at a NAMED picture and the swap receipt PowerOn's custody hook
        already earned.  There is no boot swap here any more; every write
@@ -2693,13 +2698,21 @@ Section ProofInitlog.
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
             (log_res γ bn γfs cov logstart)
             with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
+    (* BLOCK 1'S PARK, ALLOCATED (durable-disk lane C-3a).  It is minted
+       in the same ghost step as the lock's seal, which is the one place in
+       this walk where the run is free and the bundle it belongs to is
+       being built. *)
+    iMod (sb_park_alloc ⊤ γfs sbrec bs_sb Hsbparse with "Hb1") as "#Hsbp".
+    iPoseProof (sb_parked_of_park γfs sbrec Hsbok with "Hsbp")
+      as "#Hsbparked".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
     { rewrite /log_ctx.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp"|].
       iSplitR; [iExact "Hswlb"|].
-      iExact "Hbrow". }
+      iSplitR; [iExact "Hbrow"|].
+      iExact "Hsbparked". }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".
