@@ -2028,7 +2028,17 @@ as their remaining consumers.
   `col_snap_ok_ex` is still what the law concludes and `col_hand` still what
   it must assemble.
 
-- [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
+- [ ] **Lane E — PRIORITY after C-8 (owner) — boot and the theorem (plan §5).**  Stage 4: the era's
+  instance minted from the current snapshot by `fs_state_of_ledger` +
+  the era-only extras, distributed into region/bitmap/escrow/pool
+  (`fs_cfg_alloc`, `FsBoot`, `BootShared` lose every image premise;
+  `image_dinode_fs_dinode` disappears); [(14)/(15) are already conjuncts
+  of `fs_boot_image_wf` — lane C-img did that]; the `Pdur`
+  parameter on `riscv_power_adequacy` (3b''s finding: any boot-time fact
+  about the durable bundle needs it); then Stage I: delete `Himg`/
+  `fs_boot_image_eras`/`fsimg_at_every_era`; adequacy assumes era 0's
+  image only.  Definition of done: the boot mint CONSUMES the snapshot.
+- [ ] **Lane D — the durability theorem, and its worked instance (plan §5).  DEFERRED (owner): runs AFTER lane E lands.**
   The GENERAL statement is the commit's receipt itself: after a commit, the
   current snapshot's abstract state IS the era's abstract state (the
   `ftop_inv` map the transactions produced) — state it once as a theorem
@@ -2040,16 +2050,6 @@ as their remaining consumers.
   parent's entries containing `(name ↦ inum)`.  This lane is the vacuity
   check of plan §7, not a step in lane E; other syscalls' durable
   corollaries are the same two lines and are written only on request.
-- [ ] **Lane E — boot and the theorem (plan §5).**  Stage 4: the era's
-  instance minted from the current snapshot by `fs_state_of_ledger` +
-  the era-only extras, distributed into region/bitmap/escrow/pool
-  (`fs_cfg_alloc`, `FsBoot`, `BootShared` lose every image premise;
-  `image_dinode_fs_dinode` disappears); [(14)/(15) are already conjuncts
-  of `fs_boot_image_wf` — lane C-img did that]; the `Pdur`
-  parameter on `riscv_power_adequacy` (3b''s finding: any boot-time fact
-  about the durable bundle needs it); then Stage I: delete `Himg`/
-  `fs_boot_image_eras`/`fsimg_at_every_era`; adequacy assumes era 0's
-  image only.  Definition of done: the boot mint CONSUMES the snapshot.
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two
