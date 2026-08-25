@@ -621,6 +621,10 @@ the log's `pend`.
 
 ### Ruling 3 (owner, 2026-08-23): the log's contract is bytes + two AUs; the file system is nested SL predicates at two views
 
+> Superseded in its commit mechanism (2026-08-25): the durable snapshot is
+> RE-ALLOCATED per commit, never updated — see [`durable-fs-plan.md`](durable-fs-plan.md),
+> the design of record.  The log's contract and the era instance stand.
+
 Supersedes decisions 4–5 above in their CONTENT (the mechanics of
 `P_disk`, the lent auth, row (b), H2a stand).  The design of record is
 [`fs-state.md`](fs-state.md): the file system is one family of nested

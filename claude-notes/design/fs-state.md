@@ -249,6 +249,11 @@ region bundle would serve — and (ii) which blocks are in the byte bin, which
 moves per write and therefore belongs in the DEBT's own existential (the
 payload knows what the batch has taken out) rather than in `P_wf`.
 
+> **SECTIONS 4½–4⁹ BELOW ARE SUPERSEDED (2026-08-25).**  They are the
+> accreted rulings of the three-day redesign, kept for traceability.  The
+> design of record is now [`durable-fs-plan.md`](durable-fs-plan.md); §0–§2
+> above and §7 (as-built) remain the reference for the predicate.
+
 ## 4½. RULING (owner, 2026-08-24): the WAL exports a HOME VIEW; durable write permission IS the client's fupd
 
 Issued after lane 3a refuted the index-free `P_wf` and the orchestrator's
