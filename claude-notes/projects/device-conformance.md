@@ -181,7 +181,7 @@ published request plus `SDiskCapture h`/`SDiskDma h` keyed by head; the eager
 schedule pops first, and `run_until`/`run_until_rev` differ only in
 `lowest_head` versus `highest_head`.
 
-**The Iris driver port has its own worklist:**
+**The Iris driver port is LANDED:**
 [`completed/virtio-finding5-driver-port.md`](../completed/virtio-finding5-driver-port.md) (landed); the
 settled design is in [`design/virtio-driver.md`](../design/virtio-driver.md)
 (the per-descriptor receipt keyed by head, `dn_ord` for naming the position
