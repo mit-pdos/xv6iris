@@ -4011,25 +4011,44 @@ Section IcacheEscrow.
             ⌜~ ✓ (dq ⋅ dq)⌝ ∗
             ic_lend cn γfs γi cov logstart k
               (ic_id cn k (1/2) true dev inum
-               ∗ inode_owned_era_q γfs dq γi inum n)))%I.
+               ∗ inode_owned_era_q γfs dq γi inum n
+               (* ...AND THIS INODE'S LINK TOKENS (durable-disk C-8), which
+                  are what the collection's [FsState.fs_links] leg needs
+                  beside the region's per-inum authority.  See
+                  [ic_loaded_lend_owned] below. *)
+               ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
 
   (* the two readings of a bundle at a share the cover's third alternative
      is built from, as accessors, so the proof never unfolds [ic_loaded] or
      [ic_rd_arm] at the use site *)
+  (* THE LINK TOKENS RIDE OUT BESIDE THE BUNDLE (durable-disk C-8).  The
+     collection's [FsState.fs_links] leg is [own (fs_link γfs)
+     (link_elem_node i n)], and [FsStateInode.inode_link_iff] splits that
+     into the region's per-inum AUTHORITY ([InodeRegion.ireg_lnk], read off
+     the slot) and this inode's own entry TOKENS -- which live in the
+     payload's [dlinks] and nowhere else.  So the cover's bundle
+     alternative has to lend the pair: [inode_owned_era_q] carries no link
+     piece at all, and without the tokens [FsDurSnap.sk_links] (the
+     tokens-<=-nlink law the allocator's [own_alloc] needs) has no source.
+     The tokens are at the arm's OWN node, which is the same [n] the bundle
+     is lent at, so the pair travels as one. *)
   Lemma ic_loaded_lend_owned γfs γi cov logstart k (inum : mword 32)
       (dn : dinode) (bm : blkmap) :
     ic_loaded γfs γi cov logstart k inum dn bm -∗
     ∃ n : fs_node,
-      inode_owned_era_q γfs (DfracOwn 1) γi inum n
-      ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum n -∗
+      (inode_owned_era_q γfs (DfracOwn 1) γi inum n
+       ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)
+      ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
+          ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
            ic_loaded γfs γi cov logstart k inum dn bm).
   Proof.
     rewrite /ic_loaded. iIntros "H".
     iDestruct "H" as (data)
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
+    rewrite /dlinks. iDestruct "Hl" as "[Hdl Hte]".
     iExists (era_node dn bm data).
-    rewrite -inode_owned_era_1. iFrame "Hn". iIntros "Hn".
-    iExists data. iFrame "Hl Hn Hm Ha Hv Hw".
+    rewrite -inode_owned_era_1. iFrame "Hn Hte". iIntros "[Hn Hte]".
+    iExists data. rewrite /dlinks. iFrame "Hdl Hte Hn Hm Ha Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -4040,15 +4059,18 @@ Section IcacheEscrow.
   Lemma ic_rd_arm_lend_owned γfs γi cov logstart (inum : mword 32) :
     ic_rd_arm γfs γi cov logstart inum -∗
     ∃ n : fs_node,
-      inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-      ∗ (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
+      (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+       ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)
+      ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+          ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
            ic_rd_arm γfs γi cov logstart inum).
   Proof.
     rewrite /ic_rd_arm. iIntros "H".
     iDestruct "H" as (dn bm data)
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hv & Hw)".
-    iExists (era_node dn bm data). iFrame "Hn". iIntros "Hn".
-    iExists dn, bm, data. iFrame "Hl Hn Hv Hw".
+    rewrite /dlinks. iDestruct "Hl" as "[Hdl Hte]".
+    iExists (era_node dn bm data). iFrame "Hn Hte". iIntros "[Hn Hte]".
+    iExists dn, bm, data. rewrite /dlinks. iFrame "Hdl Hte Hn Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -4077,7 +4099,7 @@ Section IcacheEscrow.
         rewrite /ic_payload_np. destruct v.
         * (* LOADED: the bundle is inside at 1 *)
           iDestruct "Hp" as (dn bm) "[Hload #Hshot]".
-          iDestruct (ic_loaded_lend_owned with "Hload") as (n) "[Hn Hback]".
+          iDestruct (ic_loaded_lend_owned with "Hload") as (n) "[[Hn Hte] Hback]".
           iRight; iRight. iExists (DfracOwn 1), n.
           iSplitR; [iPureIntro; exact (dfrac_full_nvalid (DfracOwn 1)) |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
@@ -4088,17 +4110,19 @@ Section IcacheEscrow.
                      ∗ live_gen k (1/2) ga
                      ∗ ic_pin_rest k
                      ∗ ic_mid cn k
-                     ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum n -∗
+                     ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
+                         ∗ FsStateInode.ent_toks (fs_gamma_L γfs)
+                             (bv_unsigned inum) n) -∗
                           ic_loaded γfs γi cov logstart k inum dn bm))%I
-                    with "[Hgid Hn] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
-          { iFrame "Hgid Hn". }
+                    with "[Hgid Hn Hte] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
+          { iFrame "Hgid Hn Hte". }
           { iFrame "Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback". }
-          iIntros "[Hgid Hn] (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hback)".
+          iIntros "(Hgid & Hn & Hte) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hback)".
           iLeft. rewrite /ic_parked. iExists dev, inum, true, ga.
           iFrame "Hidd Hidn Hvld Hmt Hgid".
           rewrite /ic_payload_arm. iLeft. iFrame "Hoff Hlv Hpin".
           rewrite /ic_payload_np. iExists dn, bm. iFrame "Hshot".
-          iApply ("Hback" with "Hn").
+          iApply ("Hback" with "[$Hn $Hte]").
         * (* UNLOADED: the escrow holds a POOL row *)
           iDestruct "Hp" as "[Hun Hpend]".
           rewrite /ic_unloaded. iDestruct "Hun" as "[Hraw Hpool]".
@@ -4138,7 +4162,7 @@ Section IcacheEscrow.
         * (* THE READ ARM: three quarters are inside *)
           iFrame "Ha". iExists dev, inum.
           cbn [ic_out_rd].
-          iDestruct (ic_rd_arm_lend_owned with "Hrd") as (n) "[Hn Hback]".
+          iDestruct (ic_rd_arm_lend_owned with "Hrd") as (n) "[[Hn Hte] Hback]".
           iRight; iRight. iExists (DfracOwn (3/4)), n.
           iSplitR; [iPureIntro; exact dfrac_34_nvalid |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
@@ -4146,17 +4170,19 @@ Section IcacheEscrow.
                      ∗ ic_dep_res k (DepRd s dv nu g) dev inum
                      ∗ ic_mid cn k
                      ∗ ic_pin_rest k
-                     ∗ (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n -∗
+                     ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+                         ∗ FsStateInode.ent_toks (fs_gamma_L γfs)
+                             (bv_unsigned inum) n) -∗
                           ic_rd_arm γfs γi cov logstart inum))%I
-                    with "[Hgid Hn] [Hdep Hres Hmt Hpin Hback] []").
-          { iFrame "Hgid Hn". }
+                    with "[Hgid Hn Hte] [Hdep Hres Hmt Hpin Hback] []").
+          { iFrame "Hgid Hn Hte". }
           { iFrame "Hdep Hres Hmt Hpin Hback". }
-          iIntros "[Hgid Hn] (Hdep & Hres & Hmt & Hpin & Hback)".
+          iIntros "(Hgid & Hn & Hte) (Hdep & Hres & Hmt & Hpin & Hback)".
           iRight; iLeft. rewrite /ic_out.
           iExists (DepRd s dv nu g), dev, inum.
           iFrame "Hdep Hmt Hgid". iSplitL "Hres"; [iLeft; iExact "Hres" |].
-          cbn [ic_out_rd]. iSplitL "Hn Hback";
-            [iApply ("Hback" with "Hn") | iExact "Hpin"].
+          cbn [ic_out_rd]. iSplitL "Hn Hte Hback";
+            [iApply ("Hback" with "[$Hn $Hte]") | iExact "Hpin"].
       + (* the FROZEN alternative: [DepFrz], iput's +0x5e window -- and it
            parks its transaction's share in its own fields (B''-tx5) *)
         destruct d as [| qf dv nu tf qtf | s dv nu g t q | s dv nu g];

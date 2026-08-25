@@ -1364,3 +1364,4 @@ FsDurLedger.v
 IregClean.v
 FsCollect.v
 FsCollectImg.v
+FsCollectAll.v
