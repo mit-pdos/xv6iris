@@ -243,6 +243,76 @@ as their remaining consumers.
   a transactional `ilock` withdraws everything; `iunlock` returns the
   matching share.  Readers (`readi`, `stati`, `dirlookup`) are proven at
   ¼: measure the data-block accessor footprint first.  Green + audit.
+
+  **AS LANDED — THE PREDICATE HALF ONLY.**  `FsStateDefs.fsΦ` takes a
+  leading `dfrac`, and the block shapes gained `_q` forms
+  (`byte_range_q`, `blk_owned_q`, `FsStateInode.ind_owned_q`,
+  `FsStateEra.inode_owned_era_q` and its byte-legs-only `inode_bytes_era`).
+  THE UNSUFFIXED NAMES DID NOT MOVE: `byte_range`/`blk_owned`/`ind_owned`/
+  `inode_owned_era` are still written exactly as they were, as the
+  `DfracOwn 1` READINGS, which is what keeps the durable side
+  (`FsDurBytes`/`FsDurImg`/`FsDurObj`/`FsDurSnap`/`FsDurLedger`/
+  `FsStateBitmap`, ~75 uses) and `fs_state_of_ledger` textually unchanged —
+  the only durable-side edits are the ten places naming the FIELD `fsΦ`
+  and the three `MkFsView` constructions.  Measured before choosing: the
+  alternative (a dfrac argument on the unsuffixed names) is ~75 durable
+  edits plus ~40 era-side; a `q`-indexed `Γ` needs `fsΦ` to take the dfrac
+  anyway and adds a redundant second mechanism.
+
+  `phi_excl` is now `fsΦ dq1 a v ∗ fsΦ dq2 a w ⊢ ⌜✓ (dq1 ⋅ dq2)⌝`, with
+  `byte_range_excl`/`blk_owned_excl`/`blk_owned_ne`/`free_pool_used`
+  unchanged in statement (their `1 ⋅ 1` readings) and the two
+  specialisations the plan names: `blk_owned_ne_full` (1 against ANY share
+  — the resource reading of "a read-locker cannot write", since
+  `SpecLogWrite.wp_log_write_au_range` needs fraction 1) and
+  `blk_owned_ne_34` (¾ against ¾, off `dfrac_34_nvalid`), which is what
+  lane C's collection reads between two read-locked inodes.
+  `FsStateBitmap.free_pool_used_q` is the pool refutation at any share.
+  The splitting law is the new parameter `phi_frac` (the `Fractional` law,
+  witnessed at the era instance by `FsBytesGamma.fs_gamma_L_frac`; the
+  durable instances never split).  The escrow's arithmetic is
+  `FsStateEra.inode_owned_era_shed`: the bundle at 1 IS the bundle at ¾
+  beside the reader's quarter of the byte legs, both ways.  Era-side
+  readings at a share: `inode_owned_era_q_slot_inj` (hence
+  `inode_owned_era_34_slot_inj`), `inode_owned_era_q_local`, and the
+  read-only borrows `inode_owned_era_q_blk_read` /
+  `inode_bytes_era_blk_read`.
+
+  **THE ESCROW ARMS AND THE ONE `ilock` SPEC DID NOT LAND, AND THE WRITE
+  ARM IS REFUTED AS SPECIFIED** (`iris/IcacheTxRefute.v`, compiled).
+  Parking a FRACTION of `LogInv.log_tx` in the checked-out entry cannot be
+  undone at `iunlock`: `log_tx γ = ∃ t, t ↪[ln_tx γ] ()` closes the id
+  existentially (lane A did that on purpose — the ledger tie is
+  cardinality), so an arm holding a share binds its own `t`, the holder
+  holds its residue at ITS `t`, and two ghost-map elements at different
+  keys are consistent — `tx_two_halves_no_whole` exhibits the reachable
+  two-transaction state that satisfies the arm's predicate twice and
+  contains no whole token at any id.  Lane A met the same trap at the
+  registry and keyed it by TRANSACTION; the escrow cannot copy that,
+  because it is keyed by cache SLOT and `create` holds two slots inside
+  one transaction.  THE CHEAPEST FIX, and the recommendation: widen
+  `Xv6Cameras.ic_dep` with a write-checkout constructor
+  `DepTx (s : Qp) (dev inum) (g : gname) (t : nat) (q : Qp)` — the
+  `ic_deposit` ghost_var already pins the checkout's fraction, device and
+  inum between arm and holder, so it pins `(t, q)` for free; it is
+  ADDITIVE (the ~66 `DepShr` sites in 23 files do not move) and costs the
+  ten `match d with` sites plus the writers' checkout/park.
+
+  FOOTPRINTS MEASURED FOR THE NEXT INCREMENT.  The reader's ¼ needs the
+  BLOCK layer fraction-indexed too, not just the predicate:
+  `FsBlocks.fsblock` (34 files), `InodeInv.inode_blocks` (35, and
+  `Typeclasses Opaque`, so a fraction-1 wrapper does NOT frame through —
+  each caller needs one explicit `rewrite`), `blk_res` (6), `inode_map`
+  (31); `SpecReadi` takes `inode_blocks` and `inode_map` directly and its
+  buffer/bytes tie (`ProofReadiParts.rd_held_content` →
+  `fs_bytes_agree_any`) is an AGREEMENT, so it survives any share.  The
+  escrow side: `ic_out` is only 4 files / 16 mentions, `ic_loaded` is
+  named in 57 files but `rewrite /ic_loaded` in 11, `inode_owned_era` in
+  6.  `wp_ilock_sconf` has callers in 20 files, but the TRUE read-lockers
+  — the ones with no `log_op` in hand — are exactly two, `ProofFileread`
+  and `ProofFilestat`; every other `ilock` caller (`namex`, `create`,
+  `sys_open`/`link`/`unlink`/`chdir`, `kexec`, `filewrite`) already holds
+  a transaction and keeps the full bundle.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
