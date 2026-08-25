@@ -611,6 +611,7 @@ Section ProofSysOpenTails.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -628,7 +629,7 @@ Section ProofSysOpenTails.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -650,7 +651,7 @@ Section ProofSysOpenTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -679,7 +680,7 @@ Section ProofSysOpenTails.
   Proof.
     intros HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
-           HMs2 HMs3 Hal.
+           HMs2 HMs3 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
@@ -741,6 +742,17 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
+       of this transaction's element at the [ilock] and sys_open has carried
+       the other half inside the descriptor ever since, so the release
+       disarms first and the whole token comes home for the [end_op]. *)
+    iApply fupd_wp.
+    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
+            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
+      as "(Hivalid & Hdep & Htx)".
+    iModIntro.
+    iEval (rewrite -Hglog) in "Htx".
+    iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
@@ -956,6 +968,7 @@ Section ProofSysOpenTails.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -973,7 +986,7 @@ Section ProofSysOpenTails.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -995,7 +1008,7 @@ Section ProofSysOpenTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1024,7 +1037,7 @@ Section ProofSysOpenTails.
   Proof.
     intros HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
-           HMs2 HMs3 Hal.
+           HMs2 HMs3 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
@@ -1086,6 +1099,17 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
+       of this transaction's element at the [ilock] and sys_open has carried
+       the other half inside the descriptor ever since, so the release
+       disarms first and the whole token comes home for the [end_op]. *)
+    iApply fupd_wp.
+    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
+            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
+      as "(Hivalid & Hdep & Htx)".
+    iModIntro.
+    iEval (rewrite -Hglog) in "Htx".
+    iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
@@ -1300,6 +1324,7 @@ Section ProofSysOpenTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1317,7 +1342,7 @@ Section ProofSysOpenTails.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1339,7 +1364,7 @@ Section ProofSysOpenTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1368,7 +1393,7 @@ Section ProofSysOpenTails.
   Proof.
     intros HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
-           HMs3 Hal.
+           HMs3 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
@@ -1426,6 +1451,17 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
+       of this transaction's element at the [ilock] and sys_open has carried
+       the other half inside the descriptor ever since, so the release
+       disarms first and the whole token comes home for the [end_op]. *)
+    iApply fupd_wp.
+    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
+            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
+      as "(Hivalid & Hdep & Htx)".
+    iModIntro.
+    iEval (rewrite -Hglog) in "Htx".
+    iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
@@ -1696,6 +1732,7 @@ Section ProofSysOpenTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = fnode kf ->
     so_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1716,7 +1753,7 @@ Section ProofSysOpenTails.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1741,7 +1778,7 @@ Section ProofSysOpenTails.
     (* the unit fileclose borrows for the slot it frees, in and straight
        back out -- see SpecFileclose's own note. *)
     iref_slot -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1776,7 +1813,7 @@ Section ProofSysOpenTails.
   Proof.
     intros HKup HKeo HKfc HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
-           HMs2 Hal.
+           HMs2 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hftab Hfref Hfenv
               #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
@@ -1894,7 +1931,7 @@ Section ProofSysOpenTails.
               (m !!! Regidx Rs3 : mword 64) w6 w23 w24 bp
               Vpr HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HP1sp HP1thr
-              HP1s1 HP1s3 Hal
+              HP1s1 HP1s3 Hal Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
@@ -1966,6 +2003,7 @@ Section ProofSysOpenTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs3 : mword 64) = fdw ->
     so_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1980,7 +2018,7 @@ Section ProofSysOpenTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1995,7 +2033,7 @@ Section ProofSysOpenTails.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -2020,7 +2058,7 @@ Section ProofSysOpenTails.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
-           HMs3 Hal.
+           HMs3 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
               Hload #Hshot Hfrz Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4
@@ -2073,6 +2111,17 @@ Section ProofSysOpenTails.
       exact (HM1thr c Hc N2 N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
+    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
+       of this transaction's element at the [ilock] and sys_open has carried
+       the other half inside the descriptor ever since, so the release
+       disarms first and the whole token comes home for the [end_op]. *)
+    iApply fupd_wp.
+    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
+            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
+      as "(Hivalid & Hdep & Htx)".
+    iModIntro.
+    iEval (rewrite -Hglog) in "Htx".
+    iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iApply (Iunlock.wp_iunlock_sconf (CID := CID2) gs gfs gi cn gil gisl
               cov logstart kk s gy dev inum dn bm pidv dq M2 (K - 24)%nat eb
               (proc_addr jx) b lks
