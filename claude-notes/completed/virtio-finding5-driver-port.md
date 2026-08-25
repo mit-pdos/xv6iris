@@ -1,37 +1,27 @@
 # Project: finding 5 in the Iris driver — the completion order reaches the proofs
 
-## STATUS (2026-08-25)
+## STATUS: LANDED (2026-08-25)
 
-Branch `virtio-finding5`, 33 commits, **nothing pushed**, zero admits
-throughout. The model side and `vtest-rocq` landed earlier (see
-[`device-conformance.md`](device-conformance.md) §"Finding 5"); this file is
-the **Iris driver port**, which is what is left.
+Branch `virtio-finding5` (unpushed): the whole tree is green under the
+`-j192` VM sweep, `make vtest-check` passes, and `make audit-only` prints
+the documented three-axiom baseline.  What landed, by lane:
 
-**Build from the repo root, and pass `-j192`:**
+- **the interface** (`VirtioQueue.nat_inj_below8`, `VirtioProto` — the
+  claim fragment in `head_res`, `heads_res_at_window`, `record_at`, the
+  four handler accessors keyed by the lock's claim map, `bdisk_peek`;
+  `DiskInv.disk_res` per R3; the boot chain and adequacy carrying the empty
+  claim authority);
+- **the allocator and seams** (`ProofVirtioDiskRw`/`RwB`/`RwCSeam`: each
+  descriptor is handed out with its `HInactive` receipt);
+- **the handler** (`ProofVirtioDiskIntr`: chunks A–C are atomic-update
+  leaves over the peeks and the deposit; the loop carries `cm !! p = Some dc`);
+- **the publish, sleep loop, collect and free** (`RwD`/`RwDSeam`/`RwE`/`RwF`);
+- **vtest** (`VSched` pops in order and completes by head; `DiskOrder`
+  exhibits both QEMU orders).
 
-    cd /shared/xv6iris-2
-    ./gcp-rocq/run-on-gcp opam exec --switch=/shared/xv6rocq -- \
-      make -C iris -f CoqMakefile -j192 -k
-
-Running it from `iris/` gives `EXIT=127`; without `-j192` a four-minute
-sweep takes forty. The VM keeps its own `.vo`; the local `.vo` are stale.
-
-What that sweep reports today: three files fail —
-
-    ProofVirtioDiskIntr.vo    the handler: `virtio_proto_reclaim_acc` gone, loop body is pre-finding-5
-    ProofVirtioDiskRw.vo      :684  `free_cell_res` gained a leading γ
-    ProofVirtioDiskRwD.vo     :976  `publish_acc` takes a `dc : dclaim` now
-
-— and **five more never get attempted** because they sit downstream of
-`RwD`: `ProofVirtioDiskRwB`, `RwCSeam`, `RwDSeam`, `RwE`, `RwF`. All five
-are red once `RwD` compiles: their signatures still carry the deleted
-`fl pk : gmap nat dclaim` maps, `RwF` calls `vdrw_body_close` at the old
-arity, `RwE` reads `b->disk` out of the deleted `flight_res`/`parked_res`
-(`vdrw_p5_peek`), and **no rw file calls `virtio_proto_poll_acc`** — the
-sleep-loop half of the rw proof has not been ported at all. Plus the two
-`Link*` files behind them. Everything else — `VirtioModel`, `VirtioQueue`,
-`VirtioProto`, `DiskInv`, boot chain, `ProofVirtioDiskInit`, `RwC`, the fs
-and user stacks — is green.
+The design of record is in [`design/virtio-driver.md`](../design/virtio-driver.md);
+the rulings below are kept as the reasoning behind it.  Nothing is left to
+do; the file is archived for its rulings and gotchas.
 
 ---
 
@@ -251,136 +241,6 @@ survives `sleep` in the Coq context. Do not re-add it.
 
 ---
 
-## WORKLIST
-
-Stage 0 is a prerequisite for everything; stages 1–4 are independent lanes
-once 0 lands (the Spec files do not change, so nothing above the driver
-recompiles until the Link files). Each lane is one subagent's job; the
-orchestrator owns stage 0.
-
-### Stage 0 — the interface (`VirtioQueue.v`, `VirtioProto.v`, `DiskInv.v`, `VirtioDiskRwDefs.v`, `Xv6Cameras.v`)
-
-0.1 `VirtioQueue.v`: `nat_inj_below8` (R2). Pure; no Iris.
-
-0.2 `Xv6Cameras.v`: delete `dc_tri` from `dclaim` (and its comment). Grep
-    `dc_tri` — `DiskInv`, `RwD`, `RwDSeam`, `RwE`, `RwF`, `RwB`, `RwCSeam`,
-    `Intr`, `VirtioDiskRwDefs` all mention it, all in code that stage 1–4
-    rewrites anyway.
-
-0.3 `VirtioProto.v`:
-    - `head_res`: add `dc_pos v ↪[dn_claim γ] v` to the `HActive` arm,
-      SECOND (after the pure head clause, before `d_info_b`) — every
-      destructure of the arm is inside this file (`poll_acc`,
-      `publish_acc`, the four handler accessors, `heads_res_at_init`).
-    - `ring_acc`: drop `(np - nr < 8)`; add premise/return
-      `Z.to_nat (bv_unsigned h) ↪[dn_head γ] HInactive`; derive
-      `vp_np - vp_lo < 8` from `nat_inj_below8` + `Hhcoup` + the fragment
-      (the `Hroom`/`vproto_nr_lo` step at proof line ~20 is what it replaces).
-    - `publish_acc`: drop `(np - nr < 8)` and `disk_read_at` (only there for
-      `vproto_nr_lo`; keep if anything else uses it — check); same
-      derivation at proof line ~25; add premise `np ↪[dn_claim γ] dc` and
-      store it in the new ACTIVE entry.
-    - `poll_acc`: the 0-branch also returns `dc_pos dc ↪[dn_claim γ] dc`.
-    - `virtio_proto_ord_at` → `virtio_proto_record_at`: takes
-      `disk_read_at γ u` and `ghost_map_auth (dn_claim γ) 1 cm`, returns
-      `∃ p dc, ⌜cm !! p = Some dc ∧ dc_pos dc = p⌝ ∗ disk_ord γ p u` and
-      everything back. (`vpo_uix_surj` for `p`; then the same derivation as
-      `used_peek_at`'s proof to reach the entry, then `ghost_map_lookup` on
-      the entry's fragment against the auth.)
-    - `used_peek_at`, `status_peek`, `infob_acc`, `deposit_acc`: add
-      `ghost_map_auth (dn_claim γ) 1 cm -∗` and hypothesis
-      `cm !! p = Some dc`; delete the `∃ dc : dclaim, ⌜dc_pos dc = p⌝ ∗`
-      wrapper; state the word/byte/cell at `dc`; return the auth. Proofs:
-      after `destruct (Hhcoup ...) as (w & ...)`, `big_sepM_lookup` the
-      entry, `ghost_map_lookup` its fragment → `w = dc`, then `subst`.
-    - `disk_ghosts_alloc` keeps exporting `ghost_map_auth (dn_claim γ) 1 ∅`:
-      it is the lock resource's, and the boot chain has to carry it to
-      `main`'s `newlock` the way it carries the eight `HInactive` fragments
-      and `disk_done_lb 0`. Today `BootShared.v:1461` and
-      `RiscvAdequacy.v:821` drop it with `_`; `DiskBoot.v`, `BootChain.v`,
-      `SpecMain.v`, `ProofMain.v`, `BootShared.v` thread the other tokens
-      (`grep -n dn_head` in each) — add the auth beside them, at `∅`.
-
-0.4 `DiskInv.v`: `disk_res` per R3; delete `tri_set`/`tri_ok`, the
-    `:660–790` counting lemmas, `sl_head` stays. `VirtioDiskRwDefs.v`:
-    `vdrw_body`/`_open`/`_close` mirror R3.
-
-0.5 Build the chain `make -f CoqMakefile ProofVirtioDiskInit.vo
-    ProofVirtioDiskRwC.vo` on the VM (Init and RwC destructure the lock
-    resource; RwC is green today and must stay so), then the full sweep to
-    confirm the boot chain.
-
-### Stage 1 — the handler (`ProofVirtioDiskIntr.v`)
-
-`disk_res_at`/`vt_loop_state` per R3 (drop `tr fr` → `cm fr`; drop
-`vt_flight_at_nr`, `vt_payoff`, `vt_pin_ring_split`). The body, in the
-instruction order of `kernel.asm` `virtio_disk_intr+0x3e..+0x86`:
-
-- **A** `wp_vt_reclaim` (+0x3e..+0x4e): `record_at` in a `fupd_wp`
-  pre-opening gives `p, dc, disk_ord`; `wp_vt_lw_used_elem` loses
-  `disk_receipt`, `vt_payoff` and the watermark advance — it takes the auth
-  and `cm !! p = Some dc`, and returns `a5 = sl_head (dc_slot dc)` plus
-  `slot_pin_ok`. The address-claim pre-opening stays read-only
-  (`wordw_claim_of` depends only on the address).
-- **B** `wp_vt_status` (+0x50..+0x5e): the `lbu` becomes an opening step —
-  `wp_load_s_sconf_au` at width 1 (`wordw_pointsto 1 ⊣⊢ mem_pointsto`,
-  `WpSconfMem.v:1497`; `phys_to_byte` for the tier) with `status_peek` in
-  the slot, address `d_info_status h` via `slot_pin_ok`/`slot_buf_link`.
-  `bnez` not taken because the byte is `byte_zero`.
-- **C** `wp_vt_clear_disk` (+0x60..+0x6a): `ld a0,8(a5)` through
-  `infob_acc` (width 8, `↦₈` is `wordw_pointsto 8` up to `Z.to_nat`), then
-  `sw zero,4(a0)` through `deposit_acc` (`WpAu4.wp_sw_au_s_sconf`), which
-  returns `disk_done_lb (S nr)` and `disk_read_at (S nr)`.
-- `wakeup(b)` unchanged; **E** `wp_vt_advance` unchanged (it already wants
-  `disk_done_lb (S nr)`).
-- The back edge re-folds `disk_res_at … np (S nr) cm fr` — `cm` and `fr`
-  untouched, the pure clause untouched.
-
-### Stage 2 — the publish site and the scan (`ProofVirtioDiskRw.v`, `ProofVirtioDiskRwD.v`, `RwDSeam`, `RwCSeam`, `RwB`)
-
-- `Rw.v:684`: thread `γd` into `free_cell_res` in the `wp_vdrw_scan` family.
-- `RwD.v:976` (P4, the `sh` to `avail->idx`): build
-  `dc := {| dc_buf := b; dc_slot := sl; dc_pin := pin; dc_pos := np |}`;
-  `ghost_map_insert np dc` on the lock's auth (fresh: `cm !! np = None`
-  from the `p < np` clause); pass the fragment, the `HInactive` fragment
-  and the two cells `d_info_b h ↦₈ b` / `b_disk b ↦₄ 1` (`vdrw_chain`
-  carries both). The ring store's leaf (P3) passes the `HInactive`
-  fragment to `ring_acc` and gets it back. Delete `Hroom` and the
-  `tr`/`fl` lemmas (`:190–215`, `:1520–1700`, `vdrwd_coh_ins`).
-- `RwB`, `RwCSeam`, `RwDSeam`: signatures lose `fl pk tr`, gain nothing (the
-  `HActive` fragment is what P5 receives from P4 — check `vdrw_p2_exit`'s
-  consumers for where it enters).
-
-### Stage 3 — the sleep loop and the collect (`ProofVirtioDiskRwE.v`, `ProofVirtioDiskRwF.v`)
-
-- `RwE`: `vdrw_p5_loop`/`vdrw_p5_exit` take `h ↪[dn_head γd] HActive dc`
-  (with `dc` spelled out as the `DClaim b (vdrwd_slot …) pin np` it is) in
-  place of `disk_claim`; the exit additionally carries the collect's five
-  resources (R4). `vdrw_p5_peek` is deleted; both `lw` sites (`:665`,
-  `:816`) become `wp_lw_au_s_sconf` + `poll_acc` with the `dev_inv` opening
-  pattern of `wp_vt_lw_used_elem`. The 1-branch keeps the fragment and
-  sleeps; the 0-branch exits.
-- `RwF`: `wp_vdrw_p6_seam` takes the collect's resources; `pm_split` on
-  `dc_pin dc` recovers the descriptor/ops/payload windows exactly as the
-  old parked payoff did (`vdrwf_*` helpers stay); `free_chain` runs on the
-  owned descriptor words; delete `p` from the lock's `cm` before `release`
-  (`ghost_map_delete` with the collected fragment); the postcondition's
-  `buf_own`/`disk_block` come out of `chain_back`.
-
-### Stage 4 — after the tree is green
-
-- `LinkVirtioDiskRw.v`, `LinkVirtioDiskIntr.v` (should be untouched — the
-  Spec files did not change; confirm).
-- `vtest-rocq/VSched.v` / `DiskOrder.v` need a pop item; re-verify both
-  QEMU completion orders (`make vtest`).
-- Fold R1–R4 into [`design/virtio-driver.md`](../design/virtio-driver.md)
-  (its `disk_res` and `dclaim` sections describe the flight/parked/`dc_tri`
-  design and are wrong now), shrink `device-conformance.md`'s "Finding 5:
-  what is left" (items 1 and 2 are stale), then move this file to
-  `completed/`.
-
----
-
 ## GOTCHAS THAT COST TIME HERE
 
 - **`rewrite` in Iris proof mode rewrites the HYPOTHESIS CONTEXT too**, since
@@ -416,6 +276,10 @@ instruction order of `kernel.asm` `virtio_disk_intr+0x3e..+0x86`:
 - Keep `grep` out of `&&` chains: `grep -c` returning 0 exits nonzero and
   silently skipped a commit that had been reported as done.
 - `git commit -F <file>`, not `-m` — quoting in these messages breaks.
+- **An atomic-update STORE leaf needs the cell's address claim beside the
+  update, and a one-shot accessor cannot supply it.** Every one-shot
+  accessor (`deposit_acc`) needs a read-only twin (`bdisk_peek`) keyed the
+  same way, for the pre-opening that takes `wordw_claim_of` off the cell.
 - **A `-k` sweep does not attempt the dependents of a red file.** "Green
   except three files" means "three files failed *and everything behind them
   was never checked*". Take the reverse closure of each red file out of

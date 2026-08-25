@@ -182,7 +182,7 @@ schedule pops first, and `run_until`/`run_until_rev` differ only in
 `lowest_head` versus `highest_head`.
 
 **The Iris driver port has its own worklist:**
-[`virtio-finding5-driver-port.md`](virtio-finding5-driver-port.md); the
+[`completed/virtio-finding5-driver-port.md`](../completed/virtio-finding5-driver-port.md) (landed); the
 settled design is in [`design/virtio-driver.md`](../design/virtio-driver.md)
 (the per-descriptor receipt keyed by head, `dn_ord` for naming the position
 behind a used index, `vp_nr`/`vpo_done_uix` for "the used ring never

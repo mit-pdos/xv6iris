@@ -145,18 +145,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Eight remain open; each file's top banner says precisely what is left (the
-first five were audited against the tree 2026-08-22):
-
-- **[`virtio-finding5-driver-port.md`](projects/virtio-finding5-driver-port.md)**
-  — carrying the out-of-order completion fix into the Iris DRIVER proofs
-  (the model and `vtest` landed already).  The per-descriptor receipt keyed
-  by HEAD, the four RULINGS that settle the rest — the handler's carrier is
-  the lock-held claim map (no new ghost), the triple bookkeeping is replaced
-  by a pigeonhole over heads, the lock resource's final form, the rw sleep
-  loop polling through the device invariant — and the staged worklist.
-  Eight driver files red on branch `virtio-finding5` (five of them never
-  reached by the sweep).
+Seven remain open; each file's top banner says precisely what is left (the
+first four were audited against the tree 2026-08-22):
 
 - **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
   31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
@@ -233,6 +223,14 @@ first.
   header sits in sector 0. The machine permit became ONE sequential permit
   per request (`RiscvPtsto.sperm`); §6 records why independent per-sector
   permits cannot work (one mirror half, two permits, device-chosen order).
+
+`virtio-finding5-driver-port.md` (2026-08-25) is the out-of-order-completion
+port of the DRIVER proofs: read it for the four rulings — the interrupt
+handler's carrier is the LOCK-HELD claim map (the lock is the natural home
+of a fact that must survive several openings of an invariant, and nothing
+persistent is needed), the ring window is a pigeonhole over descriptor
+heads instead of a count of triples, why the receipt has exactly two arms,
+and why a one-shot accessor needs a read-only twin.
 
 `panic.md` is the one to open before proving any arm that ends in a `jal
 panic` — `forkret`'s `if (first)` is the only such arm left. It carries the arm
