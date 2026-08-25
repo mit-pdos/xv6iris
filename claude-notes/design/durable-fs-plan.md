@@ -107,18 +107,28 @@ live directory, unique names).  There is NO cross-inode pure clause:
   not bite); the only ABI change is that the token is FRACTIONAL while a
   lock is held (§3 `ilock`), so contracts spanning a held lock carry
   that form.
-- **`ilock i`** (TO BUILD, ONE spec): withdraws `i`'s bundle and registers
-  `i` in the LOCKED REGISTRY — an authority `LOCKED : inum → option
-  transaction-id` in the file system's own invariant (`ftopN`, beside
-  the abstract map's authority) — as `i ↦ Some t` if the caller passes a
-  transaction share (parking HALF of `t ↪ ()` in the registry) or
-  `i ↦ None` otherwise (`fileread`, `filestat`, lookups outside a
-  transaction); returns the matching receipt.  A transactional `ilock`
-  withdraws the whole bundle; a `None` one withdraws only a ¼ fraction of
-  its byte elements and leaves ¾ in the escrow (§4 says why ¼).
-  **`iunlock i`**: deposits the bundle CLEAN (`inode_local`, as today),
-  deletes the entry, returns the half share.  xv6's `ilock` is one function; the spec's optional
-  argument is the transaction share.
+- **`ilock i`** (ONE spec; the lock-side half TO BUILD in lane B′):
+  withdraws `i`'s bundle from its escrow.  With a transaction share it
+  withdraws everything and the escrow's "out for writing" arm PARKS a
+  share of the transaction's token `t ↪[γtx] ()` (so `end_op`, which
+  needs the whole token, cannot run while any inode of the transaction
+  is write-locked); without one (`fileread`, `filestat`, lookups outside
+  a transaction) it withdraws a ¼ fraction of the byte elements and the
+  "out for reading" arm keeps ¾ plus the rest of the bundle (§4 says why
+  ¼).  **`iunlock i`**: deposits the bundle CLEAN (`inode_local`, as
+  today) and returns the parked share.  The escrow — not `ftop_inv` —
+  is what knows the lock state, which is why the token parks there.
+- **The armed set** (LANDED, lane A): the abstract map's one mover
+  (`InodeRegion.ireg_top_retag`) requires `inode_local` of the new node
+  unless the transaction has ARMED the inum in `ftop_inv`'s registry
+  (`icfg_lk : txid → gset inum`, the entry parking the arming
+  transaction's whole token).  Only `create`'s mkdir child (`nlink = 1`
+  flushed before its dot entries) needs it in this kernel.  `ftop_inv`'s
+  row "every unarmed inum's node is `inode_local`" plus an empty `γtx`
+  authority yields `snap_local` of the abstract state
+  (`IregClean.ireg_snap_local_acc`/`_of_ops`).  A read-locker cannot move
+  a record because `ireg_write_au` takes the exclusive proxy `dinode_at`
+  that only a lock holder has.
 - **`log_write b`** (landed): requires a transaction token, the caller's
   byte elements for the range it changed (the byte-range AU,
   `SpecLogWrite.wp_log_write_au_range`; a whole-block writer uses the
@@ -157,10 +167,12 @@ refutation of a per-write accumulation, §8), and every such state
 belongs to an inode that is LOCKED.  So the commit RECONSTRUCTS it from
 the file system's own invariants at the one moment they are all clean:
 
-- **No inode is write-locked** — the locked registry (§3 `ilock`): at
-  commit the WAL's `γtx` authority is empty, so no share of any
-  transaction id exists, so no `Some t` entry exists.  Every inode is
-  either unlocked or read-locked.
+- **No inode is write-locked and no inode is armed** — at commit the
+  WAL's `γtx` authority is empty, so no share of any transaction id
+  exists: no escrow "out for writing" arm (it parks a share) and no armed
+  entry (it parks the whole token).  Every inode is either unlocked or
+  read-locked, and every node of the abstract map is `inode_local`
+  (`IregClean`).
 - **Every inode's validity predicate is inside the invariants.**  An
   unlocked inode's bundle (`inode_owned`: its record proxy, its data and
   indirect blocks' byte elements of `L` at FULL fraction, its abstract
