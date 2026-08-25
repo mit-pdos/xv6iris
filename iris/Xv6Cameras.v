@@ -83,7 +83,8 @@ Require Import SailStdpp.Operators_mwords.
 Require SailStdpp.Values.     (* [mword], referenced qualified -- see above   *)
 Require Import Riscv.rv64d_types.
 Require Import RiscvLang.     (* [CPU]                                        *)
-Require Import VirtioQueue.   (* [vslot]; brings [virtio_cfg] / [disk_wr]     *)
+Require Import VirtioModel.   (* [virtio_cfg], [disk_wr]                      *)
+Require Import VSlot.         (* [vslot] -- the TYPE only; see that file       *)
 Require Import DinodeEnc.     (* [dinode]                                     *)
 Require Import FsNode.        (* [fs_node] -- the era top map's value type    *)
 

@@ -59,6 +59,7 @@ MinstretInv.v
 MstatusFacts.v
 WireInv.v
 WpVirtio.v
+VSlot.v
 VirtioQueue.v
 DiskPtsto.v
 DiskAddrs.v

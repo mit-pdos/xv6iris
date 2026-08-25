@@ -107,7 +107,7 @@ Standing (position-independent, leased from init to forever):
 - the WHOLE used ring page (device-writable);
 - the avail `idx` field (2 bytes at `avail+2`, in `ctl`, content `wrap16 np`).
 
-The pure record (`VirtioQueue.v`, iris-free):
+The pure record (`VSlot.v`, iris-free; re-exported by `VirtioQueue.v`):
 
     Record vslot := VSlot {
       vs_req  : vio_req;         (* the parsed request; type ∈ {IN, OUT} *)
@@ -434,7 +434,8 @@ holds); its `i < 8` arm by the caller's bound.
 
 | file | contents | depends on |
 | --- | --- | --- |
-| `VirtioQueue.v` (iris-free) | wrap16, slot geometry, `vslot`, `slot_pin_ok`, `vproto_ok`, flat-derivation, publish/step/reclaim surgery, step determinism | VirtioModel |
+| `VSlot.v` (iris-free) | the `vslot` RECORD and nothing else, so that `Xv6Cameras.v` can have the type without the slot theory; `Require Export`ed by `VirtioQueue.v`, so every other consumer is unaffected | VirtioModel |
+| `VirtioQueue.v` (iris-free) | wrap16, slot geometry, `slot_pin_ok`, `vproto_ok`, flat-derivation, publish/step/reclaim surgery, step determinism | VSlot |
 | `DiskPtsto.v` | `γdk` ghost, `disk_byte/bytes/block`, `disk_view`, mint/agree/update | RiscvPtsto |
 | `VirtioProto.v` | `disk_names`/`diskGhostG`, `virtio_proto`, the four protocol view shifts, `virtio_proto_intro/init/stable` | WpVirtio, VirtioQueue, DiskPtsto |
 | `WpVirtio.v` | the base (`dma_own` etc.); the unkeyed `virtio_lease` survives here, used by nothing | — |
