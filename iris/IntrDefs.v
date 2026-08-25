@@ -3076,7 +3076,7 @@ Section IntrDefs.
     strans_pending -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
-    own_context cur_ctx -∗   (* boot mints it: [own_context_alloc] *)
+    own_context cur_ctx -∗   (* boot mints it: [own_context_boot] *)
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
     (* THIS HART'S TIMER CAPABILITY, minted in M-mode by timerinit and handed
        across the bridge -- see the note at [sie_cap].  Persistent, so the

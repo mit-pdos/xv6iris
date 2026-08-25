@@ -174,14 +174,18 @@ Proof.
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
   iIntros "Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
-  (* THE CHILD'S THREAD OF CONTROL IS BORN HERE (tso-port leg M2).  A forked
-     process's kernel thread is a NEW thread, so its identity is minted at
-     the park -- which is why the park's conclusion carries an update at all
-     -- and goes straight into the record it is building.  From here the
-     token only ever moves by the swtch exchange, until a zombie park drops
-     it.  The mint must precede the [iModIntro] below: that is the only
-     update this proof has. *)
-  iMod (own_context_alloc) as (XIc) "Hthr".
+  (* THE CHILD'S THREAD OF CONTROL IS BORN HERE -- PARKED (tso-port ruling
+     2d.4.1, realized by the checkpoint-0.5 repair).  A forked process's
+     kernel thread is a NEW thread that has never run, so its mint is the
+     PURE parked allocation ([TsoCtx.ctx_parked_alloc]) -- it claims no
+     hart and no visibility, which is why no machine evidence appears
+     here.  The token goes straight into the record it is building; the
+     dispatcher's resume ([TsoCtx.ctx_resume], via the p->lock acquire's
+     view receipt) is what first ties it to a hart.  From there it moves
+     only by the swtch exchange, until a zombie park drops it.  The mint
+     must precede the [iModIntro] below: that is the only update this
+     proof has. *)
+  iMod (ctx_parked_alloc) as (XIc) "Hthr".
   (* the package is under a later and is opened only past the context's
      own [▷] -- which is what lets the token it names be a fixpoint *)
   iModIntro. iNext.
@@ -191,7 +195,8 @@ Proof.
   rewrite /proc_ctx
           (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc,
+    0%nat.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
   iFrame "Hctx".
@@ -304,7 +309,7 @@ Proof.
      two ambient parameters of the theorem being applied are vacuous, and
      any witness will do; [CurCtx] has no default instance by design
      (TsoCtx.v, ruling 1), so one must be named. *)
-  iApply (forkret_park_paid (CID := 0%fin) (XI := MkCtxId inhabitant)
+  iApply (forkret_park_paid (CID := 0%fin) (XI := MkCtxId inhabitant inhabitant)
             (park_token γs) γs γf pa ks rest pid V av
             Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).

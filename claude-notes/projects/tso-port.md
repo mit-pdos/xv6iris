@@ -2,21 +2,116 @@
 
 ## 0. CHECKPOINT — READ THIS FIRST
 
-**Where the tree is.** Legs T and M are LANDED AND GREEN on branch `tso`
-(whole tree, `MAKEEXIT=0`, assumption audit unchanged at the standing
-baseline). `iris/TsoMem.v` is the minimal Ztso machine; `TsoLitmus.v` its
-8 verdicts; `TsoCtx.v` the SC-degenerate ownership surface Σ that ~600
-files now depend on; `TsoCtxTwin.v` the TSO-side gate; `TsoCtxRehearsal.v`
-the leg-C cutover rehearsal. `tools/ctx_convert.py` + the
+**Where the tree is.** Legs T and M are LANDED on branch `tso`.
+`iris/TsoMem.v` is the minimal Ztso machine; `TsoLitmus.v` its 8
+verdicts; `TsoCtx.v` the SC-degenerate ownership surface Σ that ~600
+files depend on; **`TsoCtxTwin2.v` is the CORRECTED construction, built
+and green — it supersedes `TsoCtxTwin.v` (the global-map prototype) and
+answers `TsoCtxRehearsal.v` (both kept as the discovery record)**.
+`tools/ctx_convert.py` + the
 [`interface-sweep-playbook.md`](../interface-sweep-playbook.md) are how
 the sweep was done and how to repeat it.
 
-**Where the DESIGN is: Σ's shape is not yet right, and the rehearsal
-plus the review that followed it say exactly how.** The corrections
-below are NOT yet implemented — `TsoCtx.v` still carries the refuted
-statements, deliberately, because the tree is green against them and the
-repair should land as one coherent change. Nothing in the sweep is
-wasted by them: they are statements, and the sweep installed the AXIS.
+**THE Σ REPAIR IS LANDED** (2026-08-25): `TsoCtx.v` now exports the
+corrected statement list (§0.1′ below), every export names its proven
+twin image in `TsoCtxTwin2.v`, and the checkpoint-0.4 items are closed
+or reduced as recorded in §0.4′. Sections 0.1–0.5 below are the PRE-
+repair analysis, kept because the twin's findings amended two of its
+rulings-of-record (see 0.1′); read 0.1′/0.4′ first.
+
+### 0.1′ The corrected construction, as landed
+
+`TsoCtxTwin2.v` — read its header first; in one breath: per-context
+state is ONE MONOTONE NAT (the bound, a `mono_nat` at a gname `CtxId`
+itself carries), the clean/dirty bit rides INSIDE `ctx_pointsto` (clean
+= a persistent bound-lb, COPIED by transport; dirty = a fragment of the
+context's own dirty set, its author-tie held in the running bundle),
+and BOTH per-context authorities travel IN THE TOKENS — the state
+interpretation owns machine ghosts only (latest-heap, persisted log
+entries, log length, hart views) and does not know contexts exist.
+Consequences, all proven:
+
+- **`CtxMorph`'s bare shape is TRUE AS WRITTEN** (`ctx_morph_pointsto`):
+  `ctx_dom ξ ξ'` carries half of ξ's authorities (value-pinned by
+  agreement with the halves left in the token) plus a bound-lb of ξ'.
+  Statable with no machine state, exactly as Σ requires. Mints:
+  `ctx_dom_to_parked` (release/fork side, INTERP-FREE — a parked
+  target's stamp may be raised at will) and `ctx_dom_of_parked`
+  (acquire side, the one mint needing the interp: at-the-top evidence).
+- **Park, resume, exchange, fork-mint and deposit are INTERP-FREE**
+  (`twin_park`, `twin_resume` — a WAND, `twin_exchange`, `twin_fork`,
+  `twin_parked_alloc`, `twin_deposit`, `twin_fork_deposit`). Park is
+  one bound-raise = the dirty→clean conversion; resume needs only the
+  stable pair `view_lb h K ∗ ⌜T ≤ K⌝` — no relation between harts.
+- **The stable view lower bound exists** (`view_lb h K`, persistent,
+  monotone, carrying a log-length receipt), and the acquire-side mint
+  that closes the swtch evidence chain is `twin_passed_get`: at the
+  AMO's at-the-top postcondition, the parked token's own `llb T`
+  receipt yields `view_lb h (tvs h) ∗ ⌜T ≤ tvs h⌝`.
+- **Cross-context sharing is LEGAL** (`twin_share`): transport COPIES a
+  clean justification instead of moving a ledger entry, so fractions of
+  one byte live at many contexts, a discarded byte is persistent at
+  every context that received it, and `ctx_pointsto_persist` no longer
+  fights transport. The old per-byte-ledger-uniqueness world (and its
+  `reh_pt_one_context` tension, old item 6) is GONE — no context-free
+  carve-out needed.
+- **TWO RULINGS AMENDED BY PROOF.** (a) `own_context_alloc`'s
+  refutation was an artefact of the hart-keyed run map: a free running
+  mint at bound 0 is SOUND in the corrected construction
+  (`twin_run_alloc`). The interface ruling stands as kernel meaning:
+  `TsoCtx.own_context_boot` (SystemAdequacy only) and the shim's
+  `own_context_alloc` (sweep-era throwaways) are the two licensed
+  spellings. (b) The fork stamp-at-the-parent's-counter mechanism is
+  SUBSUMED by `ctx_deposit`, which raises the parked stamp per
+  deposited fact — so `ProofForkretPark` mints at stamp 0 with the pure
+  `ctx_parked_alloc`, and uvmcopy-after-fork deposits (dirty bytes, any
+  fraction) with nothing to prove.
+
+### 0.4′ The old open items, disposed
+
+1. **`CtxMorph`'s shape** — FIXED before M3, as required. Class shape
+   unchanged in `TsoCtx.v`; now known-satisfiable.
+2. **The exchange/acquire evidence token** — CLOSED at the twin
+   (`twin_passed_get` + `ctx_parked_llb`); at the surface it is
+   `hart_view_lb K` (ambient-CID, persistent, sealed) consumed by
+   `ctx_resume`/`ctx_exchange`. REMAINING (the honest M2 item): thread
+   it from `SpecAcquire`'s AMO postcondition to `ProofSwtch`; until
+   then `TsoCtxShim.hart_view_lb_any` is the licensed SC-only stopgap
+   (FALSE at TSO, dies with the shim — the compile error it leaves IS
+   the M2 worklist entry).
+3. **The stable view lower bound** — EXISTS (`view_lb` twin,
+   `hart_view_lb` surface).
+4. **`own_context` hart-indexed** — the surface now says so:
+   `own_context {CID : CpuId} ξ`. Ambient spellings tree-wide were
+   unchanged (capability sections already carry CID); re-hosting is
+   `ctx_resume`/`ctx_exchange` through swtch, never a frame.
+5. **The parked-record shape** — DONE: `SwtchCtx.valid_context_pre`
+   holds `ctx_parked XIp Tp` (both existential; the record stays
+   migratable BECAUSE the parked token is hart-free), `ProofSwtch`
+   parks the old side and resumes the new side on this CPU,
+   `ProofForkretPark` mints parked, `SchedCtx` drops the token at the
+   zombie park.
+6. **Fractional/persistent sharing** — DISSOLVED (see 0.1′); the dq
+   axis is proven at the twin (`ctx_pointsto_frac_split`/`_persist`/
+   `_agree`/`_ne`, discarded-persistent instance).
+
+### 0.5′ What I would do next
+
+M2's honest evidence threading (`SpecAcquire` mints `hart_view_lb` at
+the AMO; the proc-lock payload carries the parked record; `ProofSwtch`
+consumes the real receipt and `TsoCtxShim.hart_view_lb_any` is
+deleted), then M3 (lock payload `CtxMorph` obligations — now unblocked)
+per §3. The `↦ₘ` notation flip (M1's tail) no longer waits on the
+persist/transport audit — old item 6 is gone.
+
+---
+
+**The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5
+described the design as of the rehearsal; where it conflicts with
+0.1′–0.5′ above, the primed sections govern.
+
+**Where the DESIGN was: Σ's shape was not yet right, and the rehearsal
+plus the review that followed it said exactly how.**
 
 ### 0.1 The ownership design, as it now stands
 

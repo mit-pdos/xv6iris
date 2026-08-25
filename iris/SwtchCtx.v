@@ -221,22 +221,30 @@ Section SwtchCtx.
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
-    (* THE PARKED RECORD OWNS ITS THREAD TOKEN (tso-port leg M2).  A parked
-       context IS a thread of control: [XIp] is ITS identity, held here
-       while it is not running, and its resume wand asks for the bundle at
-       THAT identity -- so the facts its closure captured (all indexed by
-       [XIp]) are the facts it wakes up holding.  EXISTENTIAL, like the
-       lock's internal context: no consumer of [valid_context] names it,
-       so no arity moves.  swtch is the one place the token is exchanged
-       (ProofSwtch.v): the parker's token goes INTO the record it builds,
-       the target's comes OUT of the record it resumes -- which is exactly
-       what makes the hart keep running while the THREAD changes. *)
-    (∃ (vs : list (mword 64)) (av : nat) (XIp : CtxId),
+    (* THE PARKED RECORD OWNS ITS THREAD TOKEN, IN PARKED FORM (tso-port
+       checkpoint 0.4 item 5).  A parked context IS a thread of control:
+       [XIp] is ITS identity, held here while it is not running, and its
+       resume wand asks for the bundle at THAT identity -- so the facts
+       its closure captured (all indexed by [XIp]) are the facts it wakes
+       up holding.  The token is [ctx_parked], NOT [own_context]: the
+       running token is hart-ambient (at TSO it ties the context's bound
+       to a hart's view), while this record is MIGRATABLE -- the ∀h wand
+       below is resumable at every hart, and a hart-tied token here would
+       pin it.  [Tp] is the parked stamp (the bound a resumer's view must
+       dominate; the resumer's p->lock acquire supplies the receipt --
+       [TsoCtx.hart_view_lb], via [TsoCtx.ctx_resume]).  Both EXISTENTIAL,
+       like the lock's internal context: no consumer of [valid_context]
+       names them, so no arity moves.  swtch is the one place the token is
+       exchanged (ProofSwtch.v): the parker's token parks INTO the record
+       it builds, the target's is resumed OUT of the record it consumes --
+       which is exactly what makes the hart keep running while the THREAD
+       changes. *)
+    (∃ (vs : list (mword 64)) (av : nat) (XIp : CtxId) (Tp : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
-      own_context XIp ∗
+      ctx_parked XIp Tp ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗

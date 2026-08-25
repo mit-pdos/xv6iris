@@ -30,7 +30,33 @@ Require Import TsoCtx.
 
 Section shim.
   Context `{!riscvGS Σ}.
-  Local Transparent ctx_pointsto.
+  Local Transparent ctx_pointsto own_context hart_view_lb.
+
+  (* THE SWEEP-ERA THROWAWAY MINT.  A converted callee demands a context
+     token its unconverted caller does not have, so the call site conjures
+     one ([ProofBalloc.v] is the reference diff).  Under the corrected TSO
+     construction this mint is actually satisfiable
+     ([TsoCtxTwin2.twin_run_alloc]) -- but it stays HERE, not in the
+     surface, because a conjured context is useless once [ctx_pointsto]
+     is real (its facts arrive through this file's [ctx_buf_of_mem], the
+     genuinely SC-only step): when the shim burns, each such site is a
+     caller whose own conversion is the remaining work. *)
+  Lemma own_context_alloc `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
+  Proof.
+    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
+    iModIntro. iExists (MkCtxId γ inhabitant), (0%fin : CPU). iExact "Hv".
+  Qed.
+
+  (* THE RESUME-EVIDENCE STOPGAP.  [ctx_resume]/[ctx_exchange] want the
+     stable pair "view receipt K, parked stamp ≤ K"; the honest producer
+     is the resuming hart's p->lock ACQUIRE ([TsoCtxTwin2.twin_passed_get])
+     and the M2 sweep threads it from [SpecAcquire] to [ProofSwtch].
+     Until then this SC-only intro discharges it -- FALSE at TSO (a view
+     receipt cannot be conjured), hence quarantined here: at cutover the
+     compile errors it leaves ARE the M2 worklist. *)
+  Lemma hart_view_lb_any `{CID : CpuId} (K : nat) :
+    ⊢@{iPropI Σ} hart_view_lb K.
+  Proof. done. Qed.
 
   Lemma ctx_pointsto_shim (KTR : CurKtier) (ξ : CtxId)
       (a : Arch.pa) (dq : dfrac) (v : bv 8) :

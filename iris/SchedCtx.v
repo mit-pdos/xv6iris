@@ -579,7 +579,7 @@ Section SchedCtx.
   Lemma proc_ctx_cells (pa : mword 64) : proc_ctx pa -∗ own_ctx (p_context pa).
   Proof.
     rewrite /proc_ctx valid_context_unfold /valid_context_pre.
-    iIntros "(%vs & %av & %XIp & %Hlen & _ & Hcells & _)".
+    iIntros "(%vs & %av & %XIp & %Tp & %Hlen & _ & Hcells & _)".
     iExists vs. by iFrame "Hcells".
   Qed.
 

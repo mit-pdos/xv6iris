@@ -56,6 +56,8 @@ From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxShim.   (* [hart_view_lb_any]: the SC-only resume
+   receipt, until M2 threads the honest one out of the p->lock acquire *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -143,8 +145,16 @@ Section ProofSwtch.
     iApply fupd_wp.
     iEval (rewrite (valid_context_unfold P An newc p)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
-    iDestruct "Hvalidnew" as (new_vs av_t XIt) "Hvalidnew".
+    iDestruct "Hvalidnew" as (new_vs av_t XIt Tt) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & >Hctx_t & Hnewwand)".
+    (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (tso-port checkpoint 0.4
+       items 2/5): the record's token is PARKED; resuming it here --
+       [TsoCtx.ctx_resume] -- ties it to this hart against a view receipt
+       dominating the parked stamp.  The receipt is the shim's SC-only
+       intro until the M2 sweep threads the honest one out of the p->lock
+       acquire ([SpecAcquire]); the exchange itself is in its final shape. *)
+    iMod (ctx_resume XIt Tt Tt (Nat.le_refl _) with "[] Hctx_t") as "Hctx_t".
+    { iApply hart_view_lb_any. }
     iModIntro.
     (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
        [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
@@ -221,6 +231,13 @@ Section ProofSwtch.
        caller's own business, so what crosses is just the CELLS the block
        above wrote -- which is all a slot that will never be resumed can use
        ([SchedCtx.proc_slots] at ZOMBIE wants [own_ctx] and nothing more). *)
+    (* THE PARKER'S HALF OF THE EXCHANGE: this thread's running token,
+       taken out of the capability above, PARKS into the record it leaves
+       behind ([TsoCtx.ctx_park] -- one ghost step, no machine evidence:
+       the stamp is read off the token's own receipts).  In the no-return
+       case the token is dropped instead -- the zombie park is the one
+       place a thread's identity dies. *)
+    iMod (ctx_park with "Hctx") as (Tp) "Hctx".
     iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
       with "[Holdpart Hstk Hwold Hctx]" as "Hvoldc".
     { destruct back; last first.
@@ -228,7 +245,7 @@ Section ProofSwtch.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iExact "Holdpart". }
       rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
-      iExists (callee_img m0), av, cur_ctx.
+      iExists (callee_img m0), av, cur_ctx, Tp.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.

@@ -73,7 +73,7 @@ Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
    instantiates the sweeps, and it is NOT on this file's cone. *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.   (* [own_context_alloc]: the per-hart thread-of-control mint *)
+Require Import TsoCtx.   (* [own_context_boot]: the per-hart thread-of-control mint *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -370,7 +370,7 @@ Section SystemBoot.
            [fupd_wp] because the era's own [={⊤}=∗] has already closed by
            the time the harts' WPs are split apart. *)
         iApply fupd_wp.
-        iMod own_context_alloc as (ξ0) "Hthr0".
+        iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
         iModIntro.
         iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
@@ -388,7 +388,7 @@ Section SystemBoot.
       (* one thread of control per secondary hart, minted the same way and
          for the same reason as the boot hart's above *)
       iApply fupd_wp.
-      iMod own_context_alloc as (ξc) "Hthrc".
+      iMod (own_context_boot (CID := FS c)) as (ξc) "Hthrc".
       iModIntro.
       iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξc)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
