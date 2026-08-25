@@ -151,11 +151,12 @@ first five were audited against the tree 2026-08-22):
 - **[`virtio-finding5-driver-port.md`](projects/virtio-finding5-driver-port.md)**
   — carrying the out-of-order completion fix into the Iris DRIVER proofs
   (the model and `vtest` landed already).  The per-descriptor receipt keyed
-  by HEAD that replaces the position-keyed flight map, why `disk.info[i].b`
-  is driver-private, the vacuous-accessor trap, and THE OPEN PROBLEM: the
-  two facts the interrupt handler must carry across its four invariant
-  openings, with the three ways of avoiding new ghost state that do not
-  work.  Three files red on branch `virtio-finding5`.
+  by HEAD, the four RULINGS that settle the rest — the handler's carrier is
+  the lock-held claim map (no new ghost), the triple bookkeeping is replaced
+  by a pigeonhole over heads, the lock resource's final form, the rw sleep
+  loop polling through the device invariant — and the staged worklist.
+  Eight driver files red on branch `virtio-finding5` (five of them never
+  reached by the sweep).
 
 - **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
   31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
