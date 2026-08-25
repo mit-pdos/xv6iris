@@ -681,6 +681,16 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      takes that lock -- can still open the invariant and read every ordinary
      bundle at one ghost step. *)
   icache_poolG :: ghost_varG Σ (gset Z);
+  (* THE FREE POOL'S TRANSIT LEDGER (durable-disk lane C-4, plan section 4).
+     The inums a walk is CARRYING between an eviction's identity flip and its
+     deposit, each with the transaction id and share the walk parked for it.
+     [(t, q)] are FIELDS and not existentials for [ic_dep]'s reason verbatim
+     ([IcacheTxRefute.tx_two_halves_no_whole]): the walk has to take back
+     EXACTLY what it parked, and an existentially-keyed share cannot be
+     re-identified.  One half of the ledger sits in the pool's invariant
+     beside the parked shares, the other in [IcacheEscrow.ipool] under the
+     itable lock. *)
+  icache_ptrnG :: ghost_varG Σ (gmap Z (nat * Qp));
   icache_cntG :: inG Σ icntUR;
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
@@ -697,6 +707,7 @@ Definition icacheΣ : gFunctors :=
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
     ghost_mapΣ nat ireg_arm_ent;
     ghost_varΣ (gset Z);
+    ghost_varΣ (gmap Z (nat * Qp));
     GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor hpnUR;
     GFunctor dviewUR;
     GFunctor fviewUR].

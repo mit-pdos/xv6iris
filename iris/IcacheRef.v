@@ -883,6 +883,16 @@ Class icfg := MkIcfg {
      so a threaded name would enter [ic_escrow]'s arity, i.e. every fs
      contract in the tree.  See [Xv6Cameras.hpnUR]'s header for what it pins. *)
   icfg_hpn : gname;
+  (* THE FREE POOL'S TRANSIT LEDGER's gname (durable-disk lane C-4, plan
+     section 4), ambient for [icfg_pext]'s reason verbatim and in the very
+     same two places.  [icfg_pext]'s set is the pending/await rows the itable
+     lock keeps; THIS one is the other face of C-3b's third part -- the inum
+     a walk is CARRYING across an eviction, with the transaction id and share
+     it parked for it.  Splitting the two is what makes the commit's twin
+     statable at all: an [ipool_ext] row stands across arbitrarily many
+     transactions and can park no share, while a transit row is inside one
+     ([IcacheEscrow.ipool_transit]). *)
+  icfg_ptrn : gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -1106,7 +1116,10 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          -- one whole element per SLOT at [None], "no slot is inside one of
          iput's two windows" -- so no caller has to supply it.
          [IcacheBoot]'s escrow loop hands one whole element to each arm. *)
-      own icfg_hpn hpn_boot_map.
+      own icfg_hpn hpn_boot_map ∗
+      (* ...AND THE TRANSIT LEDGER (durable-disk C-4), WHOLE and empty: no
+         walk exists yet, so nothing is in transit. *)
+      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)).
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1139,11 +1152,13 @@ Proof.
   iMod (ghost_var_alloc (∅ : gset Z)) as (γpext) "Hpext".
   (* the lock-window pin, one whole element per slot at [None] (B''-tx5) *)
   iMod (own_alloc hpn_boot_map) as (γhpn) "Hhpn"; [apply hpn_boot_map_valid |].
+  (* the transit ledger, whole and empty (durable-disk C-4) *)
+  iMod (ghost_var_alloc (∅ : gmap Z (nat * Qp))) as (γptrn) "Hptrn".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv γhpn), g0.
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv γhpn γptrn), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt icfg_frzo
-       icfg_frzm icfg_dview icfg_fview icfg_hpn].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn".
+       icfg_frzm icfg_dview icfg_fview icfg_hpn icfg_ptrn].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn".
 Qed.
 
 (* ===================================================================== *)

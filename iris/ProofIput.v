@@ -1132,8 +1132,14 @@ Section IputTail.
          then), so the evicted inum is in neither part of the partition in
          between: [ipool_evict_lend] puts it in the third one, and the lock
          carries it as [ipool]'s transit set until [ipool_put]. *)
+      (* THE TRANSIT ROW'S SHARE (durable-disk C-4): this walk holds a share
+         of its caller's transaction, so it parks one for the window and
+         [ipool_put] hands it straight back at the same [(tid, qtx)] -- which
+         is what makes the transit part of the partition REFUTABLE at a
+         commit ([IcacheEscrow.ipool_transit_no_ops]). *)
       iMod (ipool_evict_lend ⊤ cn gfs gi cov logstart nib
               (region_inums nib ∖ ci_inums ci) k (bv_unsigned inum) dev inum
+              tid qtx
               ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
         as "(Hpool & Hgid & Hidback)".
       iInv "Hesc" as ">Hbody" "Hclose".
@@ -1162,7 +1168,7 @@ Section IputTail.
               with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hpayl Hmt Hpin")
         as "(Hbody & Hgidf & Hbundle)".
       iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
-      iMod ("Hidback" $! dev inum with "Hgidf") as "Hgidf".
+      iMod ("Hidback" $! dev inum with "Hgidf Htx") as "Hgidf".
       iModIntro.
       (* the slot's share authority, out of the LOCK's resource *)
       iDestruct (isl_pool_acc_upd Mt k Hk with "Hipool") as "[Hisl Hislback]".
@@ -1216,9 +1222,9 @@ Section IputTail.
          line changes. *)
       iApply fupd_wp.
       iMod (ipool_put ⊤ cn gfs gi cov logstart nib
-              (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
+              (region_inums nib ∖ ci_inums ci) (bv_unsigned inum) tid qtx
               ltac:(solve_ndisj) ltac:(apply ip_notin_diff; exact Hincid)
-              with "Hpinv [Hbundle] Hpool") as "Hpool".
+              with "Hpinv [Hbundle] Hpool") as "[Hpool Htx]".
       { rewrite ip_moi_inum. iExact "Hbundle". }
       iModIntro.
       assert (Hpoolset : region_inums nib ∖ ci_inums (delete k ci)
@@ -3127,6 +3133,7 @@ Section IputFreePath.
        section 5c of [IcacheEscrow] records. *)
     iMod (ipool_evict_lend ⊤ cn γfs γi cov logstart nib
             (region_inums nib ∖ ci_inums ci2) k (bv_unsigned inum) dev inum
+            tid qtx
             ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
       as "(Hpool & Hgid & Hidback)".
     iInv "Hesc" as ">Hbody" "Hclose".
@@ -3168,7 +3175,7 @@ Section IputFreePath.
             with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hpinr Hrcpt")
       as "(Hbody & Hgidf & Hrcpt)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
-    iMod ("Hidback" $! dev inum with "Hgidf") as "Hgidf".
+    iMod ("Hidback" $! dev inum with "Hgidf Htx") as "Hgidf".
     iModIntro.
     assert (Hincid : bv_unsigned inum ∈ ci_inums ci2).
     { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik2 | reflexivity]. }
@@ -3292,9 +3299,9 @@ Section IputFreePath.
        B''-esc) -- [ipool_put] reads that off the shape itself. *)
     iApply fupd_wp.
     iMod (ipool_put ⊤ cn γfs γi cov logstart nib
-            (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum)
+            (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum) tid qtx
             ltac:(solve_ndisj) ltac:(apply fl_notin_diff; exact Hincid)
-            with "Hpinv [Hgap] Hpool") as "Hpool".
+            with "Hpinv [Hgap] Hpool") as "[Hpool Htx]".
     { rewrite fl_moi_inum. iExact "Hgap". }
     iModIntro.
     assert (Hpoolset : region_inums nib ∖ ci_inums (delete k ci2)

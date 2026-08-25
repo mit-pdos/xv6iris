@@ -4827,6 +4827,79 @@ Section IcacheEscrow.
   Definition ipool_xkey (X : gset Z) : iProp Σ :=
     ghost_var icfg_pext (1/2) X.
 
+  (* ==================================================================== *)
+  (*  5c'.  THE TRANSIT LEDGER (durable-disk lane C-4, plan section 4)     *)
+  (*                                                                      *)
+  (*  C-3b's third part [X] IS TWO THINGS, AND THEY ARE UNLIKE -- that is  *)
+  (*  B''-tx4's finding, and it is what forced this split.  An [ipool_ext] *)
+  (*  row (iput's free path's pending/await deposit) stands until a LATER  *)
+  (*  [iget] of that inum redeems it, arbitrarily many transactions on, so *)
+  (*  no share of the depositing transaction can ever be parked for it and *)
+  (*  "[X] is empty at a commit" is FALSE as stated.  The inum a walk is   *)
+  (*  CARRYING between an eviction's identity flip and its deposit is the  *)
+  (*  opposite: that window is INSIDE one transaction (iput holds a share  *)
+  (*  of its caller's token, durable-disk B''-tx5), so the row can park    *)
+  (*  one and the commit refutes it exactly as it refutes iput's three     *)
+  (*  windows ([ic_pin_tx_no_ops]).                                       *)
+  (*                                                                      *)
+  (*  SO THE TRANSIT PART GETS ITS OWN KEY, and the share must sit in      *)
+  (*  [ipool_body] -- not under the itable lock -- because the commit's    *)
+  (*  ghost step takes no lock.                                           *)
+  (*                                                                      *)
+  (*  [(t, q)] ARE FIELDS OF THE LEDGER and not existentials inside the    *)
+  (*  parked share, for [Xv6Cameras.ic_dep]'s reason verbatim              *)
+  (*  ([IcacheTxRefute.tx_two_halves_no_whole]): [ipool_put] has to hand   *)
+  (*  the walk back EXACTLY the element it parked, and an existentially    *)
+  (*  keyed share cannot be re-identified.  The ledger is a [ghost_var]    *)
+  (*  whose other half the walk carries inside [ipool], so the two agree.  *)
+  (* ==================================================================== *)
+
+  Definition ipool_tkey (T : gmap Z (nat * Qp)) : iProp Σ :=
+    ghost_var icfg_ptrn (1/2) T.
+
+  (* one parked share per inum in transit, at the ledger's own [(t, q)] *)
+  Definition ipool_transit (T : gmap Z (nat * Qp)) : iProp Σ :=
+    ([∗ map] z ↦ p ∈ T, p.1 ↪[ln_tx icfg_log]{#(p.2)} tt)%I.
+
+  Global Instance ipool_transit_timeless T : Timeless (ipool_transit T).
+  Proof. rewrite /ipool_transit. apply _. Qed.
+
+  (* THE REFUTATION THE COMMIT READS, and the whole reason the ledger exists:
+     every inum in transit has a POSITIVE share of some transaction's [ln_tx]
+     element parked for it, so at a commit -- where the WAL's authority for
+     that map is EMPTY -- nothing is in transit.  [ic_pin_tx_no_ops]'s line,
+     at the pool's ledger instead of a slot's pin. *)
+  Lemma ipool_transit_no_ops (T : gmap Z (nat * Qp)) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ipool_transit T -∗ ⌜T = ∅⌝.
+  Proof.
+    iIntros "Ha HT". rewrite /ipool_transit.
+    destruct (decide (T = ∅)) as [-> | Hne]; [done |].
+    destruct (map_choose T Hne) as (z & p & Hz).
+    iDestruct (big_sepM_lookup _ _ z p Hz with "HT") as "Htx".
+    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
+    rewrite lookup_empty in Hbad. discriminate.
+  Qed.
+
+  (* THE FOUR-PART PARTITION'S TWO SET MOVES, [gset_move_out]/[gset_move_mid]
+     at the row's own shape.  [set_solver] closes neither -- both need the
+     decidable split on [y = z]. *)
+  Lemma gset_move4_out (A B C D : gset Z) (z : Z) :
+    z ∈ A -> A ∪ B ∪ C ∪ D = (A ∖ {[z]}) ∪ B ∪ C ∪ (D ∪ {[z]}).
+  Proof.
+    intros Hz. apply set_eq. intros y.
+    rewrite !elem_of_union elem_of_difference elem_of_singleton.
+    destruct (decide (y = z)) as [->|Hne]; naive_solver.
+  Qed.
+
+  Lemma gset_move4_mid (A B C D : gset Z) (z : Z) :
+    z ∈ B -> A ∪ B ∪ C ∪ D = A ∪ (B ∖ {[z]}) ∪ C ∪ (D ∪ {[z]}).
+  Proof.
+    intros Hz. apply set_eq. intros y.
+    rewrite !elem_of_union elem_of_difference elem_of_singleton.
+    destruct (decide (y = z)) as [->|Hne]; naive_solver.
+  Qed.
+
   (* THE FIFTY IDENTITIES, as the POOL holds them: a quarter each, in slot
      order. *)
   Definition ic_ids (cn : ic_names)
@@ -4962,15 +5035,19 @@ Section IcacheEscrow.
      the in-transition index (under the lock), [ids] the fifty identities. *)
   Definition ipool_body (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) : iProp Σ :=
-    (∃ (O X : gset Z) (ids : list (bool * mword 32 * mword 32)),
+    (∃ (O X : gset Z) (T : gmap Z (nat * Qp))
+       (ids : list (bool * mword 32 * mword 32)),
        ⌜length ids = NINODE⌝ ∗
-       ⌜region_inums nib = O ∪ X ∪ ic_live_inums ids⌝ ∗
-       ipool_key O ∗ ipool_xkey X ∗ ic_ids cn ids ∗
+       ⌜region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids⌝ ∗
+       ipool_key O ∗ ipool_xkey X ∗ ipool_tkey T ∗ ipool_transit T ∗
+       ic_ids cn ids ∗
        ipool_rows γfs γi cov logstart O)%I.
 
   Global Instance ipool_body_timeless cn γfs γi cov logstart nib :
     Timeless (ipool_body cn γfs γi cov logstart nib).
-  Proof. rewrite /ipool_body /ipool_key /ipool_xkey. apply _. Qed.
+  Proof.
+    rewrite /ipool_body /ipool_key /ipool_xkey /ipool_tkey. apply _.
+  Qed.
 
   (* distinct from every namespace an opener may already hold: the escrow
      family [icEscN], the ref words [IcacheInv.icacheN], the region
@@ -4991,9 +5068,9 @@ Section IcacheEscrow.
      whatever this walk is CARRYING ([T], empty outside an eviction's
      window), and the in-transition rows the invariant may not hold. *)
   Definition ipool (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (logstart : Z) (P T : gset Z) : iProp Σ :=
+      (logstart : Z) (P : gset Z) (T : gmap Z (nat * Qp)) : iProp Σ :=
     (∃ O : gset Z,
-       ⌜O ⊆ P⌝ ∗ ipool_key O ∗ ipool_xkey ((P ∖ O) ∪ T) ∗
+       ⌜O ⊆ P⌝ ∗ ipool_key O ∗ ipool_xkey (P ∖ O) ∗ ipool_tkey T ∗
        [∗ set] z ∈ P ∖ O, ipool_ext γfs γi cov logstart (mword_of_int z))%I.
 
   (* the pool at its BOOT state: every row ordinary, no slot live, nothing
@@ -5007,12 +5084,13 @@ Section IcacheEscrow.
     ic_live_inums ids = ∅ ->
     ghost_var icfg_pool 1 (∅ : gset Z) -∗
     ghost_var icfg_pext 1 (∅ : gset Z) -∗
+    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
     ic_ids cn ids -∗
     ipool_rows γfs γi cov logstart (region_inums nib) ={E}=∗
       ipool_inv cn γfs γi cov logstart nib ∗
       ipool γfs γi cov logstart (region_inums nib) ∅.
   Proof.
-    intros Hlen Hlive. iIntros "Hkey Hxkey Hids Hrows".
+    intros Hlen Hlive. iIntros "Hkey Hxkey Htkey Hids Hrows".
     iMod (ghost_var_update (region_inums nib) with "Hkey") as "Hkey".
     iAssert (ipool_key (region_inums nib) ∗ ipool_key (region_inums nib))%I
       with "[Hkey]" as "[Hk1 Hk2]".
@@ -5023,17 +5101,22 @@ Section IcacheEscrow.
     { rewrite /ipool_xkey.
       iApply (ghost_var_split icfg_pext (∅ : gset Z) (1/2) (1/2)).
       rewrite Qp.half_half. iExact "Hxkey". }
+    iAssert (ipool_tkey ∅ ∗ ipool_tkey ∅)%I with "[Htkey]" as "[Ht1 Ht2]".
+    { rewrite /ipool_tkey.
+      iApply (ghost_var_split icfg_ptrn (∅ : gmap Z (nat * Qp)) (1/2) (1/2)).
+      rewrite Qp.half_half. iExact "Htkey". }
     iMod (inv_alloc ipoolN E (ipool_body cn γfs γi cov logstart nib)
-            with "[Hk1 Hx1 Hids Hrows]") as "#Hinv".
-    { iNext. rewrite /ipool_body. iExists (region_inums nib), ∅, ids.
+            with "[Hk1 Hx1 Ht1 Hids Hrows]") as "#Hinv".
+    { iNext. rewrite /ipool_body. iExists (region_inums nib), ∅, ∅, ids.
       iSplitR; [iPureIntro; exact Hlen |].
-      iSplitR; [iPureIntro; rewrite Hlive; set_solver |].
-      iFrame "Hk1 Hx1 Hids Hrows". }
+      iSplitR; [iPureIntro; rewrite Hlive dom_empty_L; set_solver |].
+      iFrame "Hk1 Hx1 Ht1 Hids Hrows".
+      rewrite /ipool_transit big_sepM_empty. done. }
     iModIntro. iFrame "Hinv". rewrite /ipool.
     iExists (region_inums nib). iSplitR; [iPureIntro; set_solver |].
     iFrame "Hk2".
-    rewrite difference_diag_L union_empty_l_L.
-    iFrame "Hx2". rewrite big_sepS_empty. done.
+    rewrite difference_diag_L.
+    iFrame "Hx2 Ht2". rewrite big_sepS_empty. done.
   Qed.
 
   (* ---- THE THREE MOVERS ----------------------------------------------
@@ -5093,12 +5176,15 @@ Section IcacheEscrow.
          ic_id cn k (1/4) true dv1 nu1).
   Proof.
     iIntros (HE Hk Hz) "#Hinv H Hq". rewrite {1}/ipool.
-    iDestruct "H" as (O) "(%Hsub & Hkey & Hxkey & Hext)".
+    iDestruct "H" as (O) "(%Hsub & Hkey & Hxkey & Htkey & Hext)".
     iMod (inv_acc E ipoolN with "Hinv") as "[Hb Hclose]"; [exact HE |].
     iDestruct "Hb" as ">Hb".
-    iDestruct "Hb" as (O' X ids) "(%Hlen & %Hrow & Hk1 & Hx1 & Hids & Hrows)".
+    iDestruct "Hb" as (O' X T ids)
+      "(%Hlen & %Hrow & Hk1 & Hx1 & Ht1 & Htr & Hids & Hrows)".
     iDestruct (ghost_var_agree with "Hk1 Hkey") as %->.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
+    iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
+    rewrite dom_empty_L in Hrow.
     assert (Hik : is_Some (ids !! k))
       by (apply lookup_lt_is_Some_2; rewrite Hlen; exact Hk).
     destruct Hik as [[[pv pd] pn] Hp].
@@ -5112,57 +5198,51 @@ Section IcacheEscrow.
         as "[Hk1 Hkey]".
       iDestruct (ic_id_quarters_join with "Hq Hqp") as "Hhalf".
       iModIntro. iSplitL "Hrow0"; [iApply (ipool_ord_shape with "Hrow0") |].
-      iSplitL "Hkey Hxkey Hext".
+      iSplitL "Hkey Hxkey Htkey Hext".
       { rewrite /ipool. iExists (O ∖ {[z]}).
-        iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey".
-        assert (Hset : ((P ∖ {[z]}) ∖ (O ∖ {[z]})) ∪ ∅ = (P ∖ O) ∪ ∅)
-          by set_solver.
-        rewrite Hset. iFrame "Hxkey".
+        iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey Htkey".
         assert (Hset2 : (P ∖ {[z]}) ∖ (O ∖ {[z]}) = P ∖ O) by set_solver.
-        rewrite Hset2. iExact "Hext". }
+        rewrite Hset2. iFrame "Hxkey". iExact "Hext". }
       iFrame "Hhalf".
       iIntros (dv1 nu1 Hnu1) "Hhalf".
       iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
       iDestruct ("Hidsback" $! true dv1 nu1 with "Hq2") as "Hids".
-      iMod ("Hclose" with "[Hk1 Hx1 Hids Hrows]") as "_".
+      iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows]") as "_".
       { iNext. rewrite /ipool_body.
-        iExists (O ∖ {[z]}), ((P ∖ O) ∪ ∅), (<[k := (true, dv1, nu1)]> ids).
+        iExists (O ∖ {[z]}), (P ∖ O), ∅, (<[k := (true, dv1, nu1)]> ids).
         iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
-        iSplitR; [| iFrame "Hk1 Hx1 Hids Hrows"].
-        iPureIntro.
+        iSplitR; [| iFrame "Hk1 Hx1 Ht1 Htr Hids Hrows"].
+        iPureIntro. rewrite dom_empty_L.
         pose proof (ic_live_inums_insert ids k (false, dv0, nu0)
                       (true, dv1, nu1) Hp) as Heq.
         assert (Hpe : ic_id_inum (false, dv0, nu0) = ∅) by reflexivity.
         assert (Hne : ic_id_inum (true, dv1, nu1) = {[z]})
           by (rewrite /ic_id_inum /=; by rewrite Hnu1).
         rewrite Hpe Hne union_empty_r_L in Heq.
-        rewrite Hrow Heq. exact (gset_move_out O ((P ∖ O) ∪ ∅) _ z Hzo). }
+        rewrite Hrow Heq. exact (gset_move4_out O (P ∖ O) ∅ _ z Hzo). }
       iModIntro. iExact "Hq1".
     - assert (Hzd : z ∈ P ∖ O) by set_solver.
       rewrite (big_sepS_delete _ (P ∖ O) z Hzd).
       iDestruct "Hext" as "[Hrow0 Hext]".
-      iMod (ghost_var_update_halves (((P ∖ O) ∪ ∅) ∖ {[z]}) with "Hx1 Hxkey")
+      iMod (ghost_var_update_halves ((P ∖ O) ∖ {[z]}) with "Hx1 Hxkey")
         as "[Hx1 Hxkey]".
       iDestruct (ic_id_quarters_join with "Hq Hqp") as "Hhalf".
       iModIntro. iSplitL "Hrow0"; [iApply (ipool_ext_shape with "Hrow0") |].
-      iSplitL "Hkey Hxkey Hext".
+      iSplitL "Hkey Hxkey Htkey Hext".
       { rewrite /ipool. iExists O.
-        iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey".
-        assert (Hset : ((P ∖ {[z]}) ∖ O) ∪ ∅ = ((P ∖ O) ∪ ∅) ∖ {[z]})
-          by set_solver.
-        rewrite Hset. iFrame "Hxkey".
+        iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey Htkey".
         assert (Hset2 : (P ∖ {[z]}) ∖ O = (P ∖ O) ∖ {[z]}) by set_solver.
-        rewrite Hset2. iExact "Hext". }
+        rewrite Hset2. iFrame "Hxkey". iExact "Hext". }
       iFrame "Hhalf".
       iIntros (dv1 nu1 Hnu1) "Hhalf".
       iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
       iDestruct ("Hidsback" $! true dv1 nu1 with "Hq2") as "Hids".
-      iMod ("Hclose" with "[Hk1 Hx1 Hids Hrows]") as "_".
+      iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows]") as "_".
       { iNext. rewrite /ipool_body.
-        iExists O, (((P ∖ O) ∪ ∅) ∖ {[z]}), (<[k := (true, dv1, nu1)]> ids).
+        iExists O, ((P ∖ O) ∖ {[z]}), ∅, (<[k := (true, dv1, nu1)]> ids).
         iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
-        iSplitR; [| iFrame "Hk1 Hx1 Hids Hrows"].
-        iPureIntro.
+        iSplitR; [| iFrame "Hk1 Hx1 Ht1 Htr Hids Hrows"].
+        iPureIntro. rewrite dom_empty_L.
         pose proof (ic_live_inums_insert ids k (false, dv0, nu0)
                       (true, dv1, nu1) Hp) as Heq.
         assert (Hpe : ic_id_inum (false, dv0, nu0) = ∅) by reflexivity.
@@ -5170,14 +5250,14 @@ Section IcacheEscrow.
           by (rewrite /ic_id_inum /=; by rewrite Hnu1).
         rewrite Hpe Hne union_empty_r_L in Heq.
         rewrite Hrow Heq.
-        assert (Hzx : z ∈ (P ∖ O) ∪ ∅) by set_solver.
-        exact (gset_move_mid O ((P ∖ O) ∪ ∅) _ z Hzx). }
+        exact (gset_move4_mid O (P ∖ O) ∅ _ z Hzd). }
       iModIntro. iExact "Hq1".
   Qed.
 
   Lemma ipool_evict_lend (E : coPset) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
-      (P : gset Z) (k : nat) (z : Z) (dv0 nu0 : mword 32) :
+      (P : gset Z) (k : nat) (z : Z) (dv0 nu0 : mword 32)
+      (t : nat) (q : Qp) :
     ↑ipoolN ⊆ E ->
     (k < NINODE)%nat ->
     bv_unsigned nu0 = z ->
@@ -5185,50 +5265,63 @@ Section IcacheEscrow.
     ipool γfs γi cov logstart P ∅ -∗
     ic_id cn k (1/4) true dv0 nu0 -∗
     |={E, E ∖ ↑ipoolN}=>
-      ipool γfs γi cov logstart P {[z]} ∗
+      ipool γfs γi cov logstart P {[z := (t, q)]} ∗
       ic_id cn k (1/2) true dv0 nu0 ∗
+      (* THE TRANSIT ROW'S SHARE (durable-disk C-4) IS PAID AT THE CLOSING
+         STEP, and that position is forced: the free path's evicting walk has
+         its transaction share parked in the escrow's FROZEN arm at the
+         opening and gets it back ([ic_pin_exit]) only inside the very window
+         this accessor holds [ipoolN] open for.  The ledger's VALUE moves at
+         the opening (both halves are in hand there); the share itself is
+         only needed when the body is put back together.  It comes home at
+         [ipool_put], AT THE SAME [(t, q)]: the ledger's other half rides in
+         [ipool], so the walk knows what it parked. *)
       (∀ dv1 nu1 : mword 32,
-         ic_id cn k (1/2) false dv1 nu1 ={E ∖ ↑ipoolN, E}=∗
-         ic_id cn k (1/4) false dv1 nu1).
+         ic_id cn k (1/2) false dv1 nu1 -∗ t ↪[ln_tx icfg_log]{#q} tt
+         ={E ∖ ↑ipoolN, E}=∗ ic_id cn k (1/4) false dv1 nu1).
   Proof.
     iIntros (HE Hk Hnu0) "#Hinv H Hq". rewrite {1}/ipool.
-    iDestruct "H" as (O) "(%Hsub & Hkey & Hxkey & Hext)".
+    iDestruct "H" as (O) "(%Hsub & Hkey & Hxkey & Htkey & Hext)".
     iMod (inv_acc E ipoolN with "Hinv") as "[Hb Hclose]"; [exact HE |].
     iDestruct "Hb" as ">Hb".
-    iDestruct "Hb" as (O' X ids) "(%Hlen & %Hrow & Hk1 & Hx1 & Hids & Hrows)".
+    iDestruct "Hb" as (O' X T ids)
+      "(%Hlen & %Hrow & Hk1 & Hx1 & Ht1 & Htr & Hids & Hrows)".
     iDestruct (ghost_var_agree with "Hk1 Hkey") as %->.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
+    iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
+    rewrite dom_empty_L in Hrow.
     assert (Hik : is_Some (ids !! k))
       by (apply lookup_lt_is_Some_2; rewrite Hlen; exact Hk).
     destruct Hik as [[[pv pd] pn] Hp].
     iDestruct (ic_ids_acc cn ids k pv pd pn Hp with "Hids") as "[Hqp Hidsback]".
     iDestruct (ic_id_agree with "Hq Hqp") as %(Hv & Hd & Hn).
     subst pv pd pn.
-    iMod (ghost_var_update_halves (((P ∖ O) ∪ ∅) ∪ {[z]}) with "Hx1 Hxkey")
-      as "[Hx1 Hxkey]".
+    iMod (ghost_var_update_halves {[z := (t, q)]} with "Ht1 Htkey")
+      as "[Ht1 Htkey]".
     iDestruct (ic_id_quarters_join with "Hq Hqp") as "Hhalf".
-    iModIntro. iSplitL "Hkey Hxkey Hext".
+    iModIntro. iSplitL "Hkey Hxkey Htkey Hext".
     { rewrite /ipool. iExists O. iSplitR; [iPureIntro; exact Hsub |].
-      iFrame "Hkey".
-      assert (Hset : (P ∖ O) ∪ {[z]} = ((P ∖ O) ∪ ∅) ∪ {[z]}) by set_solver.
-      rewrite Hset. iFrame "Hxkey Hext". }
+      iFrame "Hkey Hxkey Htkey Hext". }
     iFrame "Hhalf".
-    iIntros (dv1 nu1) "Hhalf".
+    iIntros (dv1 nu1) "Hhalf Htx".
     iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
     iDestruct ("Hidsback" $! false dv1 nu1 with "Hq2") as "Hids".
-    iMod ("Hclose" with "[Hk1 Hx1 Hids Hrows]") as "_".
+    iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Htx Hids Hrows]") as "_".
     { iNext. rewrite /ipool_body.
-      iExists O, (((P ∖ O) ∪ ∅) ∪ {[z]}), (<[k := (false, dv1, nu1)]> ids).
+      iExists O, (P ∖ O), {[z := (t, q)]}, (<[k := (false, dv1, nu1)]> ids).
       iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
-      iSplitR; [| iFrame "Hk1 Hx1 Hids Hrows"].
-      iPureIntro.
-      pose proof (ic_live_inums_insert ids k (true, dv0, nu0)
-                    (false, dv1, nu1) Hp) as Heq.
-      assert (Hpe : ic_id_inum (true, dv0, nu0) = {[z]}).
-      { rewrite /ic_id_inum /=. by rewrite Hnu0. }
-      assert (Hne : ic_id_inum (false, dv1, nu1) = ∅) by reflexivity.
-      rewrite Hpe Hne union_empty_r_L in Heq.
-      rewrite Hrow -Heq. clear Hrow. set_solver. }
+      iSplitR.
+      { iPureIntro. rewrite dom_singleton_L.
+        pose proof (ic_live_inums_insert ids k (true, dv0, nu0)
+                      (false, dv1, nu1) Hp) as Heq.
+        assert (Hpe : ic_id_inum (true, dv0, nu0) = {[z]}).
+        { rewrite /ic_id_inum /=. by rewrite Hnu0. }
+        assert (Hne : ic_id_inum (false, dv1, nu1) = ∅) by reflexivity.
+        rewrite Hpe Hne union_empty_r_L in Heq.
+        rewrite Hrow -Heq. clear Hrow. set_solver. }
+      iDestruct "Htr" as "_".
+      iFrame "Hk1 Hx1 Ht1 Hids Hrows".
+      rewrite /ipool_transit big_sepM_singleton /=. iExact "Htx". }
     iModIntro. iExact "Hq1".
   Qed.
 
@@ -5252,7 +5345,8 @@ Section IcacheEscrow.
     iIntros (HE Hk) "#Hinv Hq".
     iMod (inv_acc E ipoolN with "Hinv") as "[Hb Hclose]"; [exact HE |].
     iDestruct "Hb" as ">Hb".
-    iDestruct "Hb" as (O X ids) "(%Hlen & %Hrow & Hk1 & Hx1 & Hids & Hrows)".
+    iDestruct "Hb" as (O X T ids)
+      "(%Hlen & %Hrow & Hk1 & Hx1 & Ht1 & Htr & Hids & Hrows)".
     assert (Hik : is_Some (ids !! k))
       by (apply lookup_lt_is_Some_2; rewrite Hlen; exact Hk).
     destruct Hik as [[[pv pd] pn] Hp].
@@ -5264,11 +5358,11 @@ Section IcacheEscrow.
     iIntros (dv1 nu1) "Hhalf".
     iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
     iDestruct ("Hidsback" $! false dv1 nu1 with "Hq2") as "Hids".
-    iMod ("Hclose" with "[Hk1 Hx1 Hids Hrows]") as "_".
+    iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows]") as "_".
     { iNext. rewrite /ipool_body.
-      iExists O, X, (<[k := (false, dv1, nu1)]> ids).
+      iExists O, X, T, (<[k := (false, dv1, nu1)]> ids).
       iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
-      iSplitR; [| iFrame "Hk1 Hx1 Hids Hrows"].
+      iSplitR; [| iFrame "Hk1 Hx1 Ht1 Htr Hids Hrows"].
       iPureIntro.
       pose proof (ic_live_inums_insert ids k (false, dv0, nu0)
                     (false, dv1, nu1) Hp) as Heq.
@@ -5283,51 +5377,61 @@ Section IcacheEscrow.
      stays with the lock if it is not; either way the inum stops being in
      transit, and the fifty identities do not move. *)
   Lemma ipool_put (E : coPset) (cn : ic_names) (γfs : fs_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (P : gset Z) (z : Z) :
+      (cov : gset Z) (logstart : Z) (nib : nat) (P : gset Z) (z : Z)
+      (t : nat) (q : Qp) :
     ↑ipoolN ⊆ E ->
     z ∉ P ->
     ipool_inv cn γfs γi cov logstart nib -∗
     ipool_shape γfs γi cov logstart (mword_of_int z) -∗
-    ipool γfs γi cov logstart P {[z]} ={E}=∗
-      ipool γfs γi cov logstart ({[z]} ∪ P) ∅.
+    ipool γfs γi cov logstart P {[z := (t, q)]} ={E}=∗
+      ipool γfs γi cov logstart ({[z]} ∪ P) ∅ ∗
+      (* the share the eviction parked, back at the ledger's own [(t, q)] *)
+      t ↪[ln_tx icfg_log]{#q} tt.
   Proof.
     iIntros (HE Hz) "#Hinv Hrow H". rewrite {1}/ipool.
-    iDestruct "H" as (O) "(%Hsub & Hkey & Hxkey & Hext)".
+    iDestruct "H" as (O) "(%Hsub & Hkey & Hxkey & Htkey & Hext)".
     assert (Hzo : z ∉ O) by set_solver.
     iInv "Hinv" as ">Hb" "Hclose".
-    iDestruct "Hb" as (O' X ids) "(%Hlen & %Hrow & Hk1 & Hx1 & Hids & Hrows)".
+    iDestruct "Hb" as (O' X T ids)
+      "(%Hlen & %Hrow & Hk1 & Hx1 & Ht1 & Htr & Hids & Hrows)".
     iDestruct (ghost_var_agree with "Hk1 Hkey") as %->.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
+    iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
+    rewrite dom_singleton_L in Hrow.
+    rewrite /ipool_transit big_sepM_singleton /=.
+    iMod (ghost_var_update_halves (∅ : gmap Z (nat * Qp)) with "Ht1 Htkey")
+      as "[Ht1 Htkey]".
     iDestruct (ipool_shape_arms with "Hrow") as "[Hord | Hext1]".
     - iMod (ghost_var_update_halves ({[z]} ∪ O) with "Hk1 Hkey")
         as "[Hk1 Hkey]".
-      iMod (ghost_var_update_halves (P ∖ O) with "Hx1 Hxkey")
-        as "[Hx1 Hxkey]".
-      iMod ("Hclose" with "[Hk1 Hx1 Hids Hrows Hord]") as "_".
-      { iNext. rewrite /ipool_body. iExists ({[z]} ∪ O), (P ∖ O), ids.
+      iMod ("Hclose" with "[Hk1 Hx1 Ht1 Hids Hrows Hord]") as "_".
+      { iNext. rewrite /ipool_body. iExists ({[z]} ∪ O), (P ∖ O), ∅, ids.
         iSplitR; [iPureIntro; exact Hlen |].
-        iSplitR; [iPureIntro; rewrite Hrow; clear Hrow; set_solver |].
-        iFrame "Hk1 Hx1 Hids".
+        iSplitR;
+          [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
+        iFrame "Hk1 Hx1 Ht1 Hids".
+        iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
         rewrite /ipool_rows big_sepS_union; [| set_solver].
         iSplitL "Hord"; [| iExact "Hrows"].
         rewrite big_sepS_singleton. iExact "Hord". }
-      iModIntro. rewrite /ipool. iExists ({[z]} ∪ O).
-      iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey".
-      assert (Hset : (({[z]} ∪ P) ∖ ({[z]} ∪ O)) ∪ ∅ = P ∖ O) by set_solver.
-      rewrite Hset. iFrame "Hxkey".
+      iModIntro. iFrame "Htr". rewrite /ipool. iExists ({[z]} ∪ O).
+      iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey Htkey".
       assert (Hset2 : ({[z]} ∪ P) ∖ ({[z]} ∪ O) = P ∖ O) by set_solver.
-      rewrite Hset2. iExact "Hext".
-    - iMod ("Hclose" with "[Hk1 Hx1 Hids Hrows]") as "_".
-      { iNext. rewrite /ipool_body. iExists O, ((P ∖ O) ∪ {[z]}), ids.
+      rewrite Hset2. iFrame "Hxkey". iExact "Hext".
+    - iMod (ghost_var_update_halves ({[z]} ∪ (P ∖ O)) with "Hx1 Hxkey")
+        as "[Hx1 Hxkey]".
+      iMod ("Hclose" with "[Hk1 Hx1 Ht1 Hids Hrows]") as "_".
+      { iNext. rewrite /ipool_body. iExists O, ({[z]} ∪ (P ∖ O)), ∅, ids.
         iSplitR; [iPureIntro; exact Hlen |].
-        iSplitR; [iPureIntro; rewrite Hrow; clear Hrow; set_solver |].
-        iFrame "Hk1 Hx1 Hids Hrows". }
-      iModIntro. rewrite /ipool. iExists O.
-      iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey".
-      assert (Hset : (({[z]} ∪ P) ∖ O) ∪ ∅ = (P ∖ O) ∪ {[z]}) by set_solver.
-      rewrite Hset. iFrame "Hxkey".
+        iSplitR;
+          [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
+        iFrame "Hk1 Hx1 Ht1 Hids Hrows".
+        rewrite /ipool_transit big_sepM_empty; done. }
+      iModIntro. iFrame "Htr". rewrite /ipool. iExists O.
+      iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey Htkey".
       assert (Hset2 : ({[z]} ∪ P) ∖ O = {[z]} ∪ (P ∖ O)) by set_solver.
-      rewrite Hset2 big_sepS_union; [| set_solver].
+      rewrite Hset2. iFrame "Hxkey".
+      rewrite big_sepS_union; [| set_solver].
       iSplitL "Hext1"; [| iExact "Hext"].
       rewrite big_sepS_singleton. iExact "Hext1".
   Qed.
@@ -5392,29 +5496,79 @@ Section IcacheEscrow.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) :
     ↑ipoolN ⊆ E ->
     ipool_inv cn γfs γi cov logstart nib ={E, E ∖ ↑ipoolN}=∗
-      ∃ (O X : gset Z) (ids : list (bool * mword 32 * mword 32)),
+      ∃ (O X : gset Z) (T : gmap Z (nat * Qp))
+        (ids : list (bool * mword 32 * mword 32)),
         ⌜length ids = NINODE⌝ ∗
-        (* THE PARTITION (durable-disk C-3b), which is what makes the rows
-           below EXHAUSTIVE: see section 5c on why there are three parts
-           and not two. *)
-        ⌜region_inums nib = O ∪ X ∪ ic_live_inums ids⌝ ∗
+        (* THE PARTITION (durable-disk C-3b, split by C-4), which is what
+           makes the rows below EXHAUSTIVE: see sections 5c and 5c' on why
+           there are four parts and not two. *)
+        ⌜region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids⌝ ∗
         ipool_rows γfs γi cov logstart O ∗ ic_ids cn ids ∗
-        ((ipool_rows γfs γi cov logstart O ∗ ic_ids cn ids)
-           ={E ∖ ↑ipoolN, E}=∗ True).
+        ipool_transit T ∗
+        ((ipool_rows γfs γi cov logstart O ∗ ic_ids cn ids ∗
+          ipool_transit T) ={E ∖ ↑ipoolN, E}=∗ True).
   Proof.
     iIntros (HE) "#Hinv".
     iMod (inv_acc E ipoolN with "Hinv") as "[Hb Hclose]"; [exact HE |].
     iDestruct "Hb" as ">Hb".
-    iDestruct "Hb" as (O X ids) "(%Hlen & %Hrow & Hk & Hx & Hids & Hrows)".
+    iDestruct "Hb" as (O X T ids)
+      "(%Hlen & %Hrow & Hk & Hx & Ht & Htr & Hids & Hrows)".
+    iModIntro. iExists O, X, T, ids.
+    iSplitR; [iPureIntro; exact Hlen |].
+    iSplitR; [iPureIntro; exact Hrow |].
+    iFrame "Hrows Hids Htr".
+    iIntros "(Hrows & Hids & Htr)". iApply "Hclose". iNext.
+    rewrite /ipool_body. iExists O, X, T, ids.
+    iSplitR; [iPureIntro; exact Hlen |].
+    iSplitR; [iPureIntro; exact Hrow |].
+    iFrame "Hk Hx Ht Htr Hids Hrows".
+  Qed.
+
+  (* ---- THE POOL-SIDE TWIN OF [ic_escrow_body_cover] (durable-disk C-4) --
+     (durable-fs-plan.md section 4; the shape B''-tx5's REMAINS forced)
+
+     THE COMMIT'S DOOR AT QUIESCENCE, and the ONE thing it adds to
+     [ipool_inv_acc] is that NOTHING IS IN TRANSIT.  The escrow's per-slot
+     cover ([ic_escrow_body_cover_all]) says what each of the fifty slots is
+     holding; this says what the POOL is, and together they exhaust
+     [region_inums nib] -- which is the whole point of C-3b's partition.
+
+     [T = ∅] is read off the parked shares ([ipool_transit_no_ops]): a walk
+     between an eviction's identity flip and its deposit is inside iput,
+     hence inside its caller's transaction, and at a commit the WAL's
+     [ln_tx] authority is empty.  So the row comes out in B''-join's own
+     three-part shape, and the residue the collection still has to place is
+     [X] alone -- the pending/await rows, whose region slot carries C-3c's
+     [InodeRegion.ireg_top_park] on [ireg_slot]'s PENDING arm and whose
+     bundle the collection therefore reads REGION-side through
+     [FsCollect.col_free_slot_acc], owing the pool nothing.
+
+     The [ln_tx] authority is BORROWED and comes straight back: the
+     committer holds it inside [LogInv.log_res] and needs it there. *)
+  Lemma ipool_quiesce_acc (E : coPset) (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) :
+    ↑ipoolN ⊆ E ->
+    ipool_inv cn γfs γi cov logstart nib -∗
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ipoolN}=∗
+      ∃ (O X : gset Z) (ids : list (bool * mword 32 * mword 32)),
+        ⌜length ids = NINODE⌝ ∗
+        ⌜region_inums nib = O ∪ X ∪ ic_live_inums ids⌝ ∗
+        ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
+        ipool_rows γfs γi cov logstart O ∗ ic_ids cn ids ∗
+        ((ipool_rows γfs γi cov logstart O ∗ ic_ids cn ids)
+           ={E ∖ ↑ipoolN, E}=∗ True).
+  Proof.
+    iIntros (HE) "#Hinv Htxa".
+    iMod (ipool_inv_acc E cn γfs γi cov logstart nib HE with "Hinv")
+      as (O X T ids) "(%Hlen & %Hrow & Hrows & Hids & Htr & Hback)".
+    iDestruct (ipool_transit_no_ops T with "Htxa Htr") as %->.
     iModIntro. iExists O, X, ids.
     iSplitR; [iPureIntro; exact Hlen |].
-    iSplitR; [iPureIntro; exact Hrow |].
-    iFrame "Hrows Hids".
-    iIntros "[Hrows Hids]". iApply "Hclose". iNext.
-    rewrite /ipool_body. iExists O, X, ids.
-    iSplitR; [iPureIntro; exact Hlen |].
-    iSplitR; [iPureIntro; exact Hrow |].
-    iFrame "Hk Hx Hids Hrows".
+    iSplitR.
+    { iPureIntro. rewrite dom_empty_L in Hrow. rewrite Hrow. set_solver. }
+    iFrame "Htxa Hrows Hids".
+    iIntros "[Hrows Hids]". iApply "Hback". iFrame "Hrows Hids".
+    rewrite /ipool_transit big_sepM_empty. done.
   Qed.
 
   (* WHAT THE COLLECTION READS OFF THE PARTITION: every region inum is

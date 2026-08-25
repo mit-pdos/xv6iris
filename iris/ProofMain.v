@@ -1429,7 +1429,7 @@ Section ProofMain.
        +0x92's, so one open serves both. *)
     iDestruct (fs_kit_icache_rest_open with "Hkit1") as
       "(Hiref & Hlivef & Hislg & Hipool & Hpkey & Hxkey & Hitfree & Hictok & Hicmid & Hicid &
-        Hbiotok & Hblkpool & Hdllk & Hhpn)".
+        Hbiotok & Hblkpool & Hdllk & Hhpn & Htkey)".
     (* the two allocator-budget facts, in the closed form the callees ask for *)
     assert (Hnb3 : exists nb, avail_sub (Some (length ps)) K_kvmmake = Some nb
                               /\ (3 <= nb)%nat).
@@ -1546,7 +1546,7 @@ Section ProofMain.
     iMod (icache_boot_at ⊤ fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
             fsc_logst icfg_nib icfg_dev
             with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
-                  Hipool Hpkey Hxkey Hitfree Hictok Hicmid Hicid Hhpn")
+                  Hipool Hpkey Hxkey Hitfree Hictok Hicmid Hicid Hhpn Htkey")
       as "(#Hitl & #Hitinv & #Hesc & Hicsl)".
     iModIntro.
     (* ---- +0x96 jal fileinit ---- *)

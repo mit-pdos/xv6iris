@@ -544,8 +544,9 @@ redeems (escrow→`imark`, pool arm→normal, `reg_join`→`reg_full`).
 | `isl_pool M` / `iref_slots_auth` / `iref_slot` | as before: the slots' share authorities (lock-held) and the fungible reference-slot budget a caller brings to iget. |
 | `ipool_ord γfs γi cov ls z` | the ORDINARY pool row for uncached inum `z`, and the only alternative that carries an `inode_owned_era` at all: `icnt_half z 0 ∗ frzm_h z false ∗ ipool_shape_np ∗ ifreeze_off z`, TIMELESS.  `ipool_shape_np` is the ALLOC arm (`ipool_alloc`, whose ownership is `FsStateEra.inode_owned_era` at `era_node dn bm data` — the record proxy, every data block, the indirect block AND the era's abstract value `top_frag`) ∨ the MARKER arm (`imark` and the three untied holds `∃ e, dv_ride`, `∃ b, fv_ride`, `∃ n, top_frag`). |
 | `ipool_ext γfs γi cov ls z` | the pending / await row (`pool_pending` / `pool_await` beside `∃ n, top_frag`).  NOT Timeless — both alternatives hold `EscrowInode.escA_inv`, an `inv` — which is why it cannot live in an invariant and stays under the itable lock. |
-| `ipool_inv cn γfs γi cov ls nib` | `inv ipoolN (ipool_body …)`, `ipoolN = nroot .@ "ipool"`.  The body is `∃ O X ids, ⌜length ids = NINODE⌝ ∗ ⌜region_inums nib = O ∪ X ∪ ic_live_inums ids⌝ ∗ ipool_key O ∗ ipool_xkey X ∗ ic_ids cn ids ∗ ipool_rows … O` — TIMELESS, so `iInv .. as ">"` keeps working at both consumers, and the commit opens it ONCE and holds every ordinary bundle beside all fifty slot escrows. |
-| `ipool γfs γi cov ls P T` | what the itable LOCK keeps, in the old `ipool`'s own position and at `itable_res2`'s unchanged arity: `∃ O, ⌜O ⊆ P⌝ ∗ ipool_key O ∗ ipool_xkey ((P ∖ O) ∪ T) ∗ [∗ set] z ∈ P ∖ O, ipool_ext … z`.  `T` is the TRANSIT set — the one inum a walk is carrying between an eviction's identity flip and its deposit — and it is `∅` in `itable_res2`, because that walk holds the lock throughout. |
+| `ipool_inv cn γfs γi cov ls nib` | `inv ipoolN (ipool_body …)`, `ipoolN = nroot .@ "ipool"`.  The body is `∃ O X T ids, ⌜length ids = NINODE⌝ ∗ ⌜region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids⌝ ∗ ipool_key O ∗ ipool_xkey X ∗ ipool_tkey T ∗ ipool_transit T ∗ ic_ids cn ids ∗ ipool_rows … O` — TIMELESS, so `iInv .. as ">"` keeps working at both consumers, and the commit opens it ONCE and holds every ordinary bundle beside all fifty slot escrows. |
+| `ipool_tkey T` / `ipool_transit T` (C-4) | the TRANSIT LEDGER, `T : gmap Z (nat * Qp)`: `ghost_var icfg_ptrn (1/2) T` (one half here, one in `ipool`) beside `[∗ map] z ↦ (t, q) ∈ T, t ↪[ln_tx icfg_log]{#q} tt`.  `(t, q)` are FIELDS for `ic_dep`'s reason verbatim — `ipool_put` has to hand the walk back exactly the element it parked, and an existentially-keyed share cannot be re-identified (`IcacheTxRefute.tx_two_halves_no_whole`). |
+| `ipool γfs γi cov ls P T` | what the itable LOCK keeps, in the old `ipool`'s own position and at `itable_res2`'s unchanged arity: `∃ O, ⌜O ⊆ P⌝ ∗ ipool_key O ∗ ipool_xkey (P ∖ O) ∗ ipool_tkey T ∗ [∗ set] z ∈ P ∖ O, ipool_ext … z`.  `T` is the TRANSIT LEDGER — the one inum a walk is carrying between an eviction's identity flip and its deposit, with the share it parked — and it is `∅` in `itable_res2`, because that walk holds the lock throughout. |
 
 **Every region inum owns exactly one `top_frag`, always**: tied on the pool's
 allocated arm, untied on the marker/pending/await arms, and inside
@@ -589,17 +590,30 @@ no share of the depositing transaction can be parked for it.  The two halves
 therefore need different answers, and the twin has to SPLIT `X` (or carry
 the transit set under its own key) before it can state anything:
 
-* THE TRANSIT HALF IS REFUTABLE, and iput's share is what pays for it: the
-  set is grown only by `ipool_evict_lend`, which iput calls holding a share
-  of its caller's open transaction (§6), so a transit row can park one and
-  a commit refutes it exactly as it refutes iput's three windows (§5b).
-  The share must sit in `ipool_body`, not under the itable lock, for the
-  commit to see it — which is what "carry the transit set under its own
-  key" means.
-* THE PENDING/AWAIT HALF IS NOT A RESIDUE AT ALL.  Its region slot is on
-  `ireg_slot`'s PENDING arm, which carries C-3c's `ireg_top_park`, so the
-  collection reads the bundle REGION-side through
-  `FsCollect.col_free_slot_acc` and owes nothing extra.
+* THE TRANSIT HALF IS REFUTABLE, and iput's share is what pays for it —
+  BUILT, C-4.  The ledger is grown only by `ipool_evict_lend`, which iput
+  calls holding a share of its caller's open transaction (§6), so the row
+  parks one and a commit refutes it exactly as it refutes iput's three
+  windows (§5b): `ipool_transit_no_ops`.  The share sits in `ipool_body`,
+  not under the itable lock, which is what lets the commit see it, and it
+  is PAID AT `ipool_evict_lend`'s CLOSING STEP rather than its opening —
+  forced, because the free path's evicting walk has its share parked in the
+  escrow's frozen arm at the opening and gets it back (`ic_pin_exit`)
+  inside the very window the accessor holds `ipoolN` open for.  The
+  commit's door is `ipool_quiesce_acc`, which is `ipool_inv_acc` plus that
+  refutation and hands out B″-join's own three-part row.
+* THE PENDING/AWAIT HALF IS A RESIDUE AFTER ALL, and that is C-4's second
+  finding.  "Its region slot is on `ireg_slot`'s PENDING arm" is true only
+  AFTER iput's off-lock deposit (`EscrowDeposit.ireg_free_deposit_au`); the
+  pool's pending row is parked at +0x94 and the await row at the free
+  path's eviction, both BEFORE it, and until the deposit fires the region
+  slot is still on the MARKED sub-arm — which holds `imark` and NO record
+  fragment (`ireg_marked_ok` forces a nonzero type there), the fragment
+  being in the walk's own hand.  So such an inum has no bundle anywhere and
+  `FsCollect.col_free_slot_acc` does not reach it.  The window is inside
+  one transaction, so the fix is B″-tx5's ABI increment once more, at the
+  MARKED arm's freeze column — which is ON for exactly that window.  See
+  `FsCollect.v`'s header, residue (F).
 
 **THE MOVERS ARE ACCESSORS, NOT PLAIN FUPDS**, because the pool's quarter
 of `ic_id` has to be in the caller's hand at the same ghost step as the
@@ -614,9 +628,11 @@ re-tag, where the slot is dead on both sides; `ipool_put` puts an inum out
 of `X` into `O`, or leaves it in `X` when the row is a pending/await arm,
 and needs no identity at all.
 
-**THE COMMIT'S DOORS** are `ipool_inv_acc` — hands out `O`, `X`, `ids`, the
-ordinary rows and the fifty quarters, read-only, no lock, one ghost step —
-with its pure reading `ipool_cover_inum`, and `ic_ids_pin`: the identity
+**THE COMMIT'S DOORS** are `ipool_quiesce_acc` — `ipool_inv_acc` (hands out
+`O`, `X`, `T`, `ids`, the ordinary rows, the fifty quarters and the parked
+shares, read-only, no lock, one ghost step) with the transit ledger refuted
+against an empty `ln_tx` authority, so what comes out is `O`, `X`, `ids` and
+the three-part row — with its pure reading `ipool_cover_inum`, and `ic_ids_pin`: the identity
 the partition records for slot `k` IS the escrow arm's, one cell and two
 shares.  `ipool_partition_cached` exercises the pair at the real shape (an
 inum that is neither an ordinary row nor in transit is CACHED, and this
@@ -794,7 +810,9 @@ share of an open transaction's element.
 ### 5c. The ambient gname family (`icfg`, `IcacheRef.v`)
 
 `icfg_iref` (reference mass), `icfg_live` (live/generation cells + the
-reserved-key freeze selectors), `icfg_link` (THE link ledger, §3b),
+reserved-key freeze selectors), `icfg_ptrn` (the pool's TRANSIT LEDGER,
+C-4, beside `icfg_pext` and in the same two places), `icfg_link` (THE link
+ledger, §3b),
 `icfg_log`/`icfg_ist` (the log's names and the region's first block),
 `icfg_iep : Z → gname` (record epochs), `icfg_isl : nat → gname` (per-slot
 sleeplocks), `icfg_boot` (the boot one-shot), `icfg_reg` (the option-A
