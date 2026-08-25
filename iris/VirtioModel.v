@@ -1428,10 +1428,16 @@ Definition avail_ring_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : bv 16 :=
 
 (* The chain at available-ring position [i]: exactly three descriptors, each
    named by an in-range index.  This is the whole well-formedness condition. *)
-Definition chain_at (c : virtio_cfg) (mv : vmem) (i : bv 16)
+(* THE CHAIN FROM A DESCRIPTOR HEAD.  This is what the device actually holds
+   on to once it has taken a request: QEMU keeps the popped chain, not the
+   ring position it came from, and the used ring reports the HEAD back --
+   which is what xv6 indexes [disk.info[]] by.  Heads are descriptor indices,
+   so they are below [qnum] and distinct among live requests (a descriptor
+   belongs to one chain), which is why they do not wrap the way a
+   16-bit ring position does. *)
+Definition chain_from (c : virtio_cfg) (mv : vmem) (h : bv 16)
   : option (bv 16 * vq_desc * vq_desc * vq_desc) :=
   let qnum := bv_unsigned (vc_qnum c) in
-  let h := avail_ring_at c mv i in
   if negb (bv_unsigned h <? qnum) then None else
   let d0 := desc_at c mv (bv_unsigned h) in
   if negb (vd_has d0 vring_desc_f_next) then None else
@@ -1444,8 +1450,19 @@ Definition chain_at (c : virtio_cfg) (mv : vmem) (i : bv 16)
   if vd_has d2 vring_desc_f_next then None else
   Some (h, d0, d1, d2).
 
-Definition virtio_chain_ok (c : virtio_cfg) (mv : vmem) (i : bv 16) : bool :=
-  match chain_at c mv i with Some _ => true | None => false end.
+(* ...and the chain at an available-ring POSITION is the one whose head that
+   entry names.  Only the POP reads the ring; every later phase works from
+   the head it took. *)
+Definition chain_at (c : virtio_cfg) (mv : vmem) (i : bv 16)
+  : option (bv 16 * vq_desc * vq_desc * vq_desc) :=
+  chain_from c mv (avail_ring_at c mv i).
+
+Definition virtio_chain_ok (c : virtio_cfg) (mv : vmem) (h : bv 16) : bool :=
+  match chain_from c mv h with Some _ => true | None => false end.
+
+Lemma chain_at_from (c : virtio_cfg) (mv : vmem) (i : bv 16) :
+  chain_at c mv i = chain_from c mv (avail_ring_at c mv i).
+Proof. reflexivity. Qed.
 
 (* the decoded request: what the chain says to do, and where to report it *)
 Record vio_req := VioReq {
@@ -1464,8 +1481,8 @@ Record vio_req := VioReq {
   vr_wr     : bool;
 }.
 
-Definition req_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : option vio_req :=
-  match chain_at c mv i with
+Definition req_from (c : virtio_cfg) (mv : vmem) (h : bv 16) : option vio_req :=
+  match chain_from c mv h with
   | None => None
   | Some (h, d0, d1, d2) =>
       (* the header: type:4 reserved:4 sector:8 *)
@@ -1475,11 +1492,14 @@ Definition req_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : option vio_req :=
                      (vd_has d1 vring_desc_f_write))
   end.
 
+Definition req_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : option vio_req :=
+  req_from c mv (avail_ring_at c mv i).
+
 Lemma req_at_chain (c : virtio_cfg) (mv : vmem) (i : bv 16) :
-  virtio_chain_ok c mv i = true -> exists r, req_at c mv i = Some r.
+  virtio_chain_ok c mv i = true -> exists r, req_from c mv i = Some r.
 Proof.
-  unfold virtio_chain_ok, req_at.
-  destruct (chain_at c mv i) as [[[[h d0] d1] d2]|]; [|discriminate].
+  unfold virtio_chain_ok, req_from.
+  destruct (chain_from c mv i) as [[[[h d0] d1] d2]|]; [|discriminate].
   intros _. by eexists.
 Qed.
 
@@ -1961,37 +1981,39 @@ Definition virtio_pop_ok (v : virtio_state) (mv : vmem) : bool :=
   virtio_live (v_cfg v)
   && negb (bool_decide (v_seen v = avail_idx_at (v_cfg v) mv)).
 
-Definition virtio_pop (v : virtio_state) : virtio_state :=
+(* the pop READS the ring entry: what it takes away is the descriptor HEAD
+   the driver put there, which is what it will report back in the used ring *)
+Definition virtio_pop (v : virtio_state) (mv : vmem) : virtio_state :=
   VirtioState (v_cfg v) (v_isr v)
     (bv_add (v_seen v) one16)
-    ({[ v_seen v ]} ∪ v_inflight v)
+    ({[ avail_ring_at (v_cfg v) mv (v_seen v) ]} ∪ v_inflight v)
     (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v).
 
 Definition virtio_pop_step (v : virtio_state) (mv : vmem) : option virtio_state :=
-  if virtio_pop_ok v mv then Some (virtio_pop v) else None.
+  if virtio_pop_ok v mv then Some (virtio_pop v mv) else None.
 
-Lemma virtio_pop_cfg (v : virtio_state) : v_cfg (virtio_pop v) = v_cfg v.
+Lemma virtio_pop_cfg (v : virtio_state) (mv : vmem) : v_cfg (virtio_pop v mv) = v_cfg v.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_disk (v : virtio_state) : v_disk (virtio_pop v) = v_disk v.
+Lemma virtio_pop_disk (v : virtio_state) (mv : vmem) : v_disk (virtio_pop v mv) = v_disk v.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_cache (v : virtio_state) : v_cache (virtio_pop v) = v_cache v.
+Lemma virtio_pop_cache (v : virtio_state) (mv : vmem) : v_cache (virtio_pop v mv) = v_cache v.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_taken (v : virtio_state) : v_taken (virtio_pop v) = v_taken v.
+Lemma virtio_pop_taken (v : virtio_state) (mv : vmem) : v_taken (virtio_pop v mv) = v_taken v.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_isr (v : virtio_state) : v_isr (virtio_pop v) = v_isr v.
+Lemma virtio_pop_isr (v : virtio_state) (mv : vmem) : v_isr (virtio_pop v mv) = v_isr v.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_uidx (v : virtio_state) : v_used_idx (virtio_pop v) = v_used_idx v.
+Lemma virtio_pop_uidx (v : virtio_state) (mv : vmem) : v_used_idx (virtio_pop v mv) = v_used_idx v.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_seen (v : virtio_state) :
-  v_seen (virtio_pop v) = bv_add (v_seen v) one16.
+Lemma virtio_pop_seen (v : virtio_state) (mv : vmem) :
+  v_seen (virtio_pop v mv) = bv_add (v_seen v) one16.
 Proof. reflexivity. Qed.
-Lemma virtio_pop_inflight (v : virtio_state) :
-  v_inflight (virtio_pop v) = {[ v_seen v ]} ∪ v_inflight v.
+Lemma virtio_pop_inflight (v : virtio_state) (mv : vmem) :
+  v_inflight (virtio_pop v mv) = {[ avail_ring_at (v_cfg v) mv (v_seen v) ]} ∪ v_inflight v.
 Proof. reflexivity. Qed.
 
 Lemma virtio_pop_step_shape (v : virtio_state) (mv : vmem) (v' : virtio_state) :
   virtio_pop_step v mv = Some v' ->
-  virtio_pop_ok v mv = true /\ v' = virtio_pop v.
+  virtio_pop_ok v mv = true /\ v' = virtio_pop v mv.
 Proof.
   unfold virtio_pop_step. destruct (virtio_pop_ok v mv) eqn:Hp; [|discriminate].
   intro H. injection H as <-. split; reflexivity.
@@ -2142,7 +2164,7 @@ Qed.
 Definition virtio_req_step (v : virtio_state) (mv : vmem) (i : bv 16)
   : option (virtio_state * gmap Arch.pa (bv 8)) :=
   if negb (virtio_serve_ok v mv i) then None
-  else match req_at (v_cfg v) mv i with
+  else match req_from (v_cfg v) mv i with
        | None => None
        | Some r =>
            if negb (virtio_complete_ok v r i) then None
@@ -2154,13 +2176,13 @@ Definition virtio_req_step (v : virtio_state) (mv : vmem) (i : bv 16)
 Lemma virtio_req_step_shape (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) (i : bv 16) :
   virtio_req_step v mv i = Some (v', w) ->
-  exists r, req_at (v_cfg v) mv i = Some r
+  exists r, req_from (v_cfg v) mv i = Some r
     /\ virtio_serve_ok v mv i = true /\ virtio_complete_ok v r i = true
     /\ (v', w) = virtio_complete v mv r i.
 Proof.
   unfold virtio_req_step.
   destruct (virtio_serve_ok v mv i) eqn:Hp; [|discriminate].
-  destruct (req_at (v_cfg v) mv i) as [r|] eqn:Hr; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|] eqn:Hr; [|discriminate].
   destruct (virtio_complete_ok v r i) eqn:Hg; [|discriminate].
   intro Hs. exists r. split_and!; [reflexivity|reflexivity|exact Hg|].
   injection Hs as Hc. symmetry. exact Hc.
@@ -2187,7 +2209,7 @@ Qed.
 Definition virtio_capture_step (v : virtio_state) (mv : vmem) (i : bv 16)
   : option virtio_state :=
   if negb (virtio_serve_ok v mv i) then None
-  else match req_at (v_cfg v) mv i with
+  else match req_from (v_cfg v) mv i with
        | None => None
        | Some r =>
            if negb (bv_unsigned (vr_type r) =? virtio_blk_t_out) then None
@@ -2202,14 +2224,14 @@ Definition virtio_capture_step (v : virtio_state) (mv : vmem) (i : bv 16)
 Lemma virtio_capture_step_shape (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (i : bv 16) :
   virtio_capture_step v mv i = Some v' ->
-  exists r, req_at (v_cfg v) mv i = Some r
+  exists r, req_from (v_cfg v) mv i = Some r
     /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v)
               (v_used_idx v) (v_disk v) (vreq_cache mv r ∪ v_cache v)
               (Some i) (v_cap v).
 Proof.
   unfold virtio_capture_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|] eqn:Hr; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|] eqn:Hr; [|discriminate].
   destruct (negb (bv_unsigned (vr_type r) =? virtio_blk_t_out)); [discriminate|].
   destruct (bool_decide (v_taken v = None)); [|discriminate].
   intro Hs. injection Hs as <-. by exists r.
@@ -2285,7 +2307,7 @@ Qed.
 (* THE CACHE MOVE: exactly the request's own sectors, overwriting. *)
 Lemma virtio_capture_step_cache (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (r : vio_req) (i : bv 16) :
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_capture_step v mv i = Some v' ->
   v_cache v' = vreq_cache mv r ∪ v_cache v.
 Proof.
@@ -2297,7 +2319,7 @@ Qed.
 (* the enabling conditions, read back *)
 Lemma virtio_capture_step_enabled (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (r : vio_req) (i : bv 16) :
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_capture_step v mv i = Some v' ->
   virtio_serve_ok v mv i = true
   /\ bv_unsigned (vr_type r) = virtio_blk_t_out
@@ -2315,7 +2337,7 @@ Qed.
 (* ...in particular the request is a disk WRITE: nothing else is captured *)
 Lemma virtio_capture_step_out (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (r : vio_req) (i : bv 16) :
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_capture_step v mv i = Some v' ->
   bv_unsigned (vr_type r) = virtio_blk_t_out.
 Proof.
@@ -2464,9 +2486,9 @@ Lemma virtio_chain_bad_no_step (v : virtio_state) (mv : vmem) (i : bv 16) :
   virtio_chain_ok (v_cfg v) mv i = false ->
   virtio_req_step v mv i = None /\ virtio_capture_step v mv i = None.
 Proof.
-  unfold virtio_chain_ok, virtio_req_step, virtio_capture_step, req_at.
+  unfold virtio_chain_ok, virtio_req_step, virtio_capture_step, req_from.
   intro Hc.
-  destruct (chain_at (v_cfg v) mv i) as [[[[h d0] d1] d2]|]; [discriminate|].
+  destruct (chain_from (v_cfg v) mv i) as [[[[h d0] d1] d2]|]; [discriminate|].
   split; by destruct (negb (virtio_serve_ok v mv i)).
 Qed.
 
@@ -2539,7 +2561,7 @@ Proof.
   (* WORK IS EITHER AN UNTAKEN ENTRY OR ONE ALREADY IN FLIGHT.  The first is
      always answerable: the pop reads nothing and can never be refused. *)
   destruct (virtio_pending_serve v mv Hp) as [Hpop | [i Hi]].
-  { left. exists (virtio_pop v). unfold virtio_pop_step. by rewrite Hpop. }
+  { left. exists (virtio_pop v mv). unfold virtio_pop_step. by rewrite Hpop. }
   right.
   (* not stalled: the position the device picked has a well-formed chain *)
   assert (Hchain : forall p, virtio_serve_ok v mv p = true ->
@@ -2625,7 +2647,7 @@ Lemma virtio_req_step_cfg (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
@@ -2642,7 +2664,7 @@ Lemma virtio_req_step_seen (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
@@ -2657,7 +2679,7 @@ Lemma virtio_req_step_inflight (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
@@ -2673,7 +2695,7 @@ Lemma virtio_req_step_isr (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
@@ -2689,7 +2711,7 @@ Lemma virtio_req_step_disk (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   intro H. injection H as H1.
   assert (Hv : v' = (virtio_complete v mv r i).1)
@@ -2704,7 +2726,7 @@ Lemma virtio_req_step_cache (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   intro H. injection H as H1.
   assert (Hv : v' = (virtio_complete v mv r i).1)
@@ -2720,7 +2742,7 @@ Lemma virtio_req_step_taken (v : virtio_state) (mv : vmem)
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
-  destruct (req_at (v_cfg v) mv i) as [r|]; [|discriminate].
+  destruct (req_from (v_cfg v) mv i) as [r|]; [|discriminate].
   destruct (negb (virtio_complete_ok v r i)); [discriminate|].
   intro H. injection H as H1.
   assert (Hv : v' = (virtio_complete v mv r i).1)
@@ -2817,7 +2839,7 @@ Qed.
 Lemma virtio_capture_step_wt_inv (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (r : vio_req) (S : gset Z) (i : bv 16) :
   virtio_wt_inv v S ->
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_capture_step v mv i = Some v' ->
   virtio_wt_inv v' (vreq_sectors r).
 Proof.
@@ -2851,7 +2873,7 @@ Qed.
 Lemma virtio_req_step_wt_cache (v : virtio_state) (mv : vmem) (r : vio_req)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) (i : bv 16) :
   virtio_wce (v_cfg v) = false ->
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_wt_inv v (vreq_sectors r) ->
   virtio_req_step v mv i = Some (v', w) ->
   v_cache v = ∅.
@@ -2873,7 +2895,7 @@ Qed.
 Lemma virtio_req_step_wt_inv (v : virtio_state) (mv : vmem) (r : vio_req)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) (S : gset Z) (i : bv 16) :
   virtio_wce (v_cfg v) = false ->
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_wt_inv v (vreq_sectors r) ->
   virtio_req_step v mv i = Some (v', w) ->
   virtio_wt_inv v' S.
@@ -2992,7 +3014,7 @@ Qed.
 Lemma virtio_capture_step_cache_empty (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (r : vio_req) (i : bv 16) :
   v_cache v = ∅ ->
-  req_at (v_cfg v) mv i = Some r ->
+  req_from (v_cfg v) mv i = Some r ->
   virtio_capture_step v mv i = Some v' ->
   v_cache v' = vreq_cache mv r.
 Proof.
@@ -3057,15 +3079,13 @@ Definition virtio_queue_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
     (* the published index is itself pinned: the device and the claimant agree
        on how far the driver has got *)
     read_bytes ctl (pa_off (vc_avail c) vq_idx_off) 2 = Some ai
-    (* ...and it is not one the device has already popped: a popped position
-       was published, and the published index only ever grows *)
-    /\ ai ∉ ah
     (* EVERY POSITION THE DEVICE MAY LOOK AT is one the claimant has
        accounted for, and after the pop/complete split there are two kinds:
        the entries it has not taken yet -- the interval [[lo, ai)] -- and the
        ones it took and has not finished ([ah]). *)
-    /\ (forall p, vpos_pub lo ai p = true -> p ∈ S)
-    /\ (forall p, p ∈ ah -> p ∈ S)
+    /\ (forall p, vpos_pub lo ai p = true ->
+          forall mv : vmem, mem_view ctl mv -> avail_ring_at c mv p ∈ S)
+    /\ (forall h, h ∈ ah -> h ∈ S)
     (* ...and each of those is a well-formed request that writes inside the
        lease.  [S] is NOT all of [bv 16]: a driver cannot maintain
        well-formedness of ring slots it has not published, since xv6 leaves
@@ -3102,7 +3122,7 @@ Proof.
   intros Hok Hv.
   destruct (virtio_live (v_cfg v)) eqn:Hlive;
     [| exact (virtio_not_live_not_stalled v mv Hlive) ].
-  destruct (Hok Hlive) as (Hai & Hnai & Hcov & Hcovf & HS).
+  destruct (Hok Hlive) as (Hai & Hcov & Hcovf & HS).
   (* the stall is looked for among the IN-FLIGHT positions now, and the
      obligation covers every one of them *)
   unfold virtio_stalled. rewrite Hlive.
@@ -3127,7 +3147,7 @@ Proof.
   intros Hok Hv Hstep.
   destruct (virtio_req_step_shape _ _ _ _ _ Hstep) as (r & Hr & Hserve & _ & Hcomp).
   pose proof (virtio_serve_live _ _ _ Hserve) as Hlive.
-  destruct (Hok Hlive) as (Hai & Hnai & Hcov & Hcovf & HS).
+  destruct (Hok Hlive) as (Hai & Hcov & Hcovf & HS).
   pose proof (virtio_serve_in _ _ _ Hserve) as Hin.
   (* re-index the step at the split state, so the slot obligation applies *)
   assert (Hsplit : virtio_req_step
@@ -3149,8 +3169,7 @@ Proof.
   assert (Hfl : v_inflight v' = v_inflight v ∖ {[ i ]})
     by exact (virtio_req_step_inflight _ _ _ _ _ Hstep).
   rewrite Hseen, Hfl. intros _.
-  split; [exact Hai|]. split; [set_solver|].
-  split; [exact Hcov|]. split; [|exact HS].
+  split; [exact Hai|]. split; [exact Hcov|]. split; [|exact HS].
   intros q Hq. apply Hcovf. set_solver.
 Qed.
 
@@ -3192,18 +3211,17 @@ Proof.
   destruct (virtio_pop_step_shape _ _ _ Hstep) as [Hpok ->].
   unfold virtio_pop_ok in Hpok. apply andb_prop in Hpok as [Hlive Hne].
   apply negb_true_iff, bool_decide_eq_false in Hne.
-  destruct (Hok Hlive) as (Hai & Hnai & Hcov & Hcovf & HS).
+  destruct (Hok Hlive) as (Hai & Hcov & Hcovf & HS).
   rewrite (avail_idx_pinned _ _ _ _ Hv Hai) in Hne.
   rewrite virtio_pop_cfg, virtio_pop_seen, virtio_pop_inflight.
   intros _. split; [exact Hai|]. split.
-  { intro Hc. apply elem_of_union in Hc as [Hc|Hc]; [|exact (Hnai Hc)].
-    apply elem_of_singleton in Hc. exact (Hne (eq_sym Hc)). }
-  split.
   { intros q Hq. exact (Hcov q (vpos_pub_succ _ _ _ Hne Hq)). }
   split; [|exact HS].
-  intros q Hq. apply elem_of_union in Hq as [Hq|Hq]; [|exact (Hcovf q Hq)].
-  apply elem_of_singleton in Hq. subst q.
-  exact (Hcov _ (vpos_pub_mark _ _ Hne)).
+  (* the head the pop just took is the one its entry named, and the interval
+     half of the obligation had already accounted for it *)
+  intros h Hh. apply elem_of_union in Hh as [Hh|Hh]; [|exact (Hcovf h Hh)].
+  apply elem_of_singleton in Hh. subst h.
+  exact (Hcov _ (vpos_pub_mark _ _ Hne) mv Hv).
 Qed.
 
 Lemma virtio_queue_ok_capture_step (v : virtio_state)
