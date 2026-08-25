@@ -835,6 +835,96 @@ as their remaining consumers.
   (which are an adequacy sweep: `RiscvAdequacy`'s `Pc` takes the
   `fs_dur_names` bundle and the dview gname as arguments, and `FsDurLedger`
   still reads `fdn_bmap/ist/nin`).
+
+  **AS LANDED — C-2: THE COLLECTION'S ARITHMETIC CLOSES, AND FOUR SUPPLIERS
+  DO NOT EXIST.**
+
+  `iris/FsCollect.v` is the collection at quiescence with its sources named
+  as ONE predicate, `col_hand γfs γi ist nib sb sbb used I m Lb C home`, and
+  the whole of `snap_ok` read off it: `col_snap_bytes`, `col_snap_ok`,
+  `col_snap_ok_ex` (the `∃ S` form the parked law is stated at).  It is a
+  LEAF over the predicate layer on purpose — the commit's cone must not
+  acquire the boot chain — and every conclusion is PURE, so nothing is
+  consumed and a caller hands all fifty escrows back untouched.  The block
+  map is `col_view C home = fs_restrict (dv_of_D C) home`, which is
+  `FsCrash.fs_commit_L_sector0_rec`'s `D'` on the nose, `C` being the very
+  cache map `LogInv.log_state` carries.
+
+  WHERE EACH CLAUSE COMES FROM.  `sk_sb`/`sk_bmap`/`sk_rec`/`sk_blk`/`sk_ind`
+  are AGREEMENTS against the byte authority and need no share (`col_blk`,
+  over `FsBlocks.fsblock_q_home` + `map_seqZ_inj`); `sk_pool` and `sk_bsz`
+  off the free pool and the log invariant's own row (b); `sk_meta_used` and
+  `sk_own_used` by the pool refutation (`free_pool_used_q`) plus the three
+  FULL-fraction metadata owners (block 1, the bitmap block, the region's
+  record blocks); `sk_disj` and `sk_slot` off the `∗`; `sk_links` off
+  `FsState.fs_links_valid`; the geometry off `col_geom`, whose every clause
+  is `FsCfgBoot.fs_boot_image_wf`'s — witnessed at the real instance by
+  `FsCollectImg.img_col_geom` (plan §7), in its own file so `FsCollect`
+  stays a leaf.
+
+  THE SHARE LAW THE DESIGN'S ¾ RESTS ON IS `FsCollect.dfrac_nvalid_pair`:
+  two shares whose DOUBLES are invalid have an invalid PRODUCT.  That is
+  what makes cross-inode disjointness work between an unlocked inode at 1
+  and a read-locked one at ¾ — `blk_owned_ne_full` and `blk_owned_ne_34` are
+  its two instances, and the general form is what the cover lemma's
+  existentially-bound `dq` actually needs.
+
+  FOUR SUPPLIERS OF `col_hand` DO NOT EXIST IN THE TREE, and none is a proof
+  difficulty (the full list, with the fix for each, is in `FsCollect.v`'s
+  header):
+
+  (A) THE PARTITION (B″-join's open item), unchanged in shape.  MEASURED
+  here and it is what makes the increment delicate: the row is FALSE between
+  `ipool_take` and the escrow deposit, and at iget's recycle those are two
+  ghost steps — `ipool_take` under `fupd_wp` just before the `+0x72` store,
+  the deposit inside that store's atomic update.  Nothing is unsound today
+  (the leading fupd fuses with the step's own mask change, so no other
+  hart's ghost step interleaves), but the take must move INSIDE the atomic
+  update, beside the identity flip; `ipoolN` is outside that update's mask
+  already.
+
+  (B) ALTERNATIVE (d) of `ic_escrow_body_cover` — the ABI sweep.  This is
+  the ONE premise the plan sanctions taking as a hypothesis (P1).
+
+  (C) NOBODY OWNS BLOCK 1.  `col_hand` wants `FsState.sb_owned`: the
+  superblock's block at FULL fraction plus its parse.  The era hands
+  `fsblock (fs_bytes γfs) 1 bs_sb` to fsinit
+  (`FsCfgBoot.fs_kit_fsinit_ghost`), `SpecFsinit` returns it, and
+  `ProofForkret` DROPS it — the name `Hb1` occurs three times in that file
+  (bound, passed, returned) and is never spent.  So at a commit no resource
+  says what block 1 holds, and `sk_parse` and `sk_meta_used` at `SB_BNO`
+  have no source.  `FsCollectImg.img_sb_home` shows the GEOMETRY half is
+  free (block 1 is a home block, so `sk_sb` is satisfied by taking
+  `fss_sbb S` to be the view's own value there); only the OWNERSHIP is
+  missing.  It must be at fraction 1 and NOT discarded — `sk_own_used`
+  refutes a node owning block 1 through `blk_owned_ne_full`, and a discarded
+  share does not refute ¾.  It has to reach the commit through `log_ctx`
+  (the plan's parked law), whose only producer is `initlog`, whose only
+  caller is `fsinit` — which already holds block 1's run AND `ireg_inv`,
+  `bitmap_inv`, `ic_escrows`, `is_itable2`, i.e. every invariant the law
+  needs.  That is where the law should be assembled.
+
+  (D) A FREE INUM'S ABSTRACT NODE IS UNTIED TO ITS RECORD.
+  `IcacheEscrow.ipool_shape_np`'s MARKER arm — what a FREE inum's pool row
+  is — holds `InodeRegion.imark` and an existential `top_frag` its own
+  comment calls UNTIED, and no `dinode_at`.  The region holds that inum's
+  record (`ireg_slot`'s `ireg_in` arm, `z ↪[γi] d`) and its link AUTHORITY
+  at `ireg_nl d` (`ireg_lnk`).  Nothing connects the two, so for a free inum
+  the commit can prove neither `sk_rec` nor `sk_links`: both run through
+  `FsCollect.col_bundle_rec`'s ghost-map agreement, which only an ALLOCATED
+  inum's `inode_owned_era` supplies.  The producer HAS the fact — iput's
+  free path deposits the marker arm at the node it just flushed — and the
+  arm forgets it.  Cheapest fix: a HALF of `FsState.top_frag_q` parked
+  region-side in `ireg_slot`'s free arm under
+  `⌜fn_rec n = d⌝ ∗ ⌜inode_local z n⌝`, the marker arm keeping the other
+  half; it reaches `ProofIalloc`'s claim and `ProofIput`'s free deposit.
+
+  NOT LANDED, and blocked on those four: the law parked in `log_ctx`,
+  `end_op`'s call at `outstanding = 0`, the two commit permits at
+  `dsnap_step_of`, the receipt's snapshot state, `P_fs`'s conjunct →
+  `P_dur (fr_D r)`, and the `fdn_*`/`riscv_dview_name` adequacy sweep.  The
+  shape of the law is fixed by this increment: `col_snap_ok_ex` is what it
+  concludes, and `col_hand` is what it must assemble.
 - [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
   `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
   prove `mknod_durable` off the snapshot; quote it here.  Then the
