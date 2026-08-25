@@ -494,7 +494,7 @@ Section VdiLeaves.
       iMod (virtio_proto_cfg_write γv v (virtio_reset v) virtio_cfg0
               ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl
               ltac:(apply virtio_reset_cache) ltac:(apply virtio_reset_taken)
-              ltac:(apply virtio_reset_ahead)
+              ltac:(apply virtio_reset_inflight)
               ltac:(by vm_compute)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (virtio_reset v).

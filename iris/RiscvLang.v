@@ -429,6 +429,19 @@ Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
       mem_view m mv ->
       virtio_capture_step d.(dvirtio) mv i = Some v' ->
       disk_step d m (set_dvirtio d v') m
+  (* THE POP: the device takes the next available-ring entry.  This is the
+     phase that is STRICTLY IN ORDER -- QEMU's [virtqueue_pop] increments
+     [last_avail_idx] by one -- and it is what xv6's reuse of
+     [avail->ring[idx % NUM]] depends on: the entry the driver overwrites
+     belonged to a position the device is provably past.  It reads the
+     available index off the bus and moves no other byte: no memory write,
+     no used-ring entry, no interrupt, no disk byte.  WHICH requests then
+     complete, and in what order, is the separate freedom of
+     [DiskStepDma] (tools/vtest/README.md finding 5). *)
+  | DiskStepPop (mv : vmem) v' :
+      mem_view m mv ->
+      virtio_pop_step d.(dvirtio) mv = Some v' ->
+      disk_step d m (set_dvirtio d v') m
   (* ...and THEN the DRAINS: one cached 512-byte sector reaches the durable
      image per step, in ANY order, at times of the device's own choosing --
      so a power cycle between two of them leaves a half-written BLOCK on the

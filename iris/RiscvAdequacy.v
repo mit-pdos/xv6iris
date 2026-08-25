@@ -776,8 +776,8 @@ Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g
     (Hvtaken : v_taken g.(gdev).(dvirtio) = None)
     (* ...and nothing was SERVED OUT OF TURN either: with the completion
        order free the window carries a served-ahead set, and a reset device's
-       is empty ([virtio_reset_ahead]). *)
-    (Hvahead : v_ahead g.(gdev).(dvirtio) = ∅)
+       is empty ([virtio_reset_inflight]). *)
+    (Hvinflight : v_inflight g.(gdev).(dvirtio) = ∅)
     (Hvwce : virtio_wce (v_cfg g.(gdev).(dvirtio)) = false)
     (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
        PLIC plan): the interrupt-status register holds only defined bits.  A
@@ -816,7 +816,7 @@ Proof.
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
   iMod (disk_ghosts_alloc gen_id g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx
-          Hvcache Hvtaken Hvahead Hvwce)
+          Hvcache Hvtaken Hvinflight Hvwce)
     as (γv) "(%Himg & Hproto & _ & _ & _ & Hpbody)".
   iMod (dev_inv_alloc _ γ γv
           with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto] Hpbody") as "#Hinv".

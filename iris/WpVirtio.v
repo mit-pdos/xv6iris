@@ -141,7 +141,7 @@ Section WpVirtio.
   Definition virtio_lease (v : virtio_state) : iProp Σ :=
     (∃ (ctl dma : gmap Arch.pa (bv 8)) (S : gset (bv 16)) (ai : bv 16),
        dma_own dma ∗ ⌜ctl ⊆ dma⌝ ∗
-       ⌜virtio_queue_ok (v_cfg v) ctl (dom dma) S ai (v_seen v) (v_ahead v)⌝)%I.
+       ⌜virtio_queue_ok (v_cfg v) ctl (dom dma) S ai (v_seen v) (v_inflight v)⌝)%I.
 
   Global Instance virtio_lease_timeless v : Timeless (virtio_lease v).
   Proof. rewrite /virtio_lease. apply _. Qed.
@@ -149,9 +149,9 @@ Section WpVirtio.
   (* The lease depends on the queue CONFIGURATION and on how far the device has
      got, and on nothing else: it rides through any other change to the device
      state.  A driver's INTERRUPT_ACK and QUEUE_NOTIFY writes qualify
-     ([virtio_write_cfg_stable] + [virtio_write_seen]/[virtio_write_ahead]). *)
+     ([virtio_write_cfg_stable] + [virtio_write_seen]/[virtio_write_inflight]). *)
   Lemma virtio_lease_stable (v v' : virtio_state) :
-    v_cfg v' = v_cfg v -> v_seen v' = v_seen v -> v_ahead v' = v_ahead v ->
+    v_cfg v' = v_cfg v -> v_seen v' = v_seen v -> v_inflight v' = v_inflight v ->
     virtio_lease v -∗ virtio_lease v'.
   Proof. intros Hc Hs Ha. rewrite /virtio_lease Hc Hs Ha. iIntros "$". Qed.
 

@@ -1426,7 +1426,14 @@ Section VirtioProto.
              that is exactly what the out-of-order fix separated. *)
           ⌜v_seen v = wrap16 (vp_lo pr)⌝ ∗
           ⌜v_inflight v = vp_fl pr⌝ ∗
-          ⌜v_taken v = wrap16 <$> vp_tk pr⌝ ∗
+          (* THE LATCH, ACROSS THE TWO KEYINGS: the device holds the captured
+             request's HEAD, the protocol its POSITION.  [vpo_hd_inj] is what
+             makes the two agree -- a head names one pending request. *)
+          ⌜match vp_tk pr with
+            | None => v_taken v = None
+            | Some q => exists sl, vp_pend pr !! q = Some sl
+                                   /\ v_taken v = Some (vs_hd sl)
+            end⌝ ∗
           ⌜v_used_idx v = wrap16 (vp_nc pr)⌝ ∗
           ⌜read_bytes dma (used_idx_pa (v_cfg v)) 2 = Some (wrap16 (vp_nc pr))⌝ ∗
           (* XV6 DECLINED THE WRITE CACHE (claude-notes/completed/async-disk.md
@@ -1877,7 +1884,7 @@ Section VirtioProto.
     assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
       by (etransitivity; [exact Hctl | exact Hsub]).
     apply (virtio_queue_not_stalled v (vproto_ctl (v_cfg v) pr) (dom dma)
-             (set_map wrap16 (dom (vp_pend pr))) (wrap16 (vp_np pr)) mv).
+             (vp_heads pr) (wrap16 (vp_np pr)) mv).
     - rewrite Hseen Hah. exact (vproto_flat (v_cfg v) pr (dom dma) Hok).
     - exact (mem_view_subseteq _ m mv Hctlm Hview).
   Qed.
@@ -1936,7 +1943,7 @@ Section VirtioProto.
                 Hok eq_refl Hseen Hah Hvctl Hstep)
       as (p & sl & pin & Hwin & Hip & Hsl & Hpin & Hslotok & Hvpin &
           Hsdone & Hv1 & Hw1).
-    destruct Hwin as [Hplo Hphi].
+    (* [Hwin] is now the single fact that the device had POPPED this position *)
     subst i v' w. rewrite Hui.
     (* THE WRITETHROUGH PAYOFF (async-disk.md §2), now stated per REQUEST
        rather than over the whole cache: xv6 declined the cache, so the gate
@@ -1948,14 +1955,14 @@ Section VirtioProto.
     assert (Htouch : vreq_touch (vs_req sl) ∩ dom (v_cache v) = ∅).
     { destruct (decide (bv_unsigned (vr_type (vs_req sl)) = virtio_blk_t_out))
         as [Hout|Hnout].
-      - destruct (virtio_complete_ok_out v (vs_req sl) (wrap16 p) Hout Hsdone)
+      - destruct (virtio_complete_ok_out v (vs_req sl) (vs_hd sl) Hout Hsdone)
           as [_ [Hw|Hd]]; [ by rewrite Hwce in Hw | exact Hd ].
       - destruct (decide (bv_unsigned (vr_type (vs_req sl))
                           = virtio_blk_t_flush)) as [Hfl|Hnfl].
         + (* a FLUSH: the gate emptied the whole cache *)
-          rewrite (virtio_complete_ok_flush v (vs_req sl) (wrap16 p)
+          rewrite (virtio_complete_ok_flush v (vs_req sl) (vs_hd sl)
                      Hnout Hfl Hsdone) dom_empty_L. set_solver.
-        + destruct (virtio_complete_ok_read v (vs_req sl) (wrap16 p)
+        + destruct (virtio_complete_ok_read v (vs_req sl) (vs_hd sl)
                       Hnout Hnfl Hsdone) as [Hw|Hd];
             [ by rewrite Hwce in Hw | exact Hd ]. }
     (* ...so a READ's data collapses from the cache-overlaid image back to
@@ -1999,19 +2006,18 @@ Section VirtioProto.
          sectors is cached, so its todo set is empty *)
       assert (Hout2 : bv_unsigned (vr_type (vs_req sl)) = virtio_blk_t_out)
         by (unfold vs_is_out in Hout; by apply Z.eqb_eq).
-      destruct (virtio_complete_ok_out v (vs_req sl) (wrap16 p) Hout2 Hsdone)
+      destruct (virtio_complete_ok_out v (vs_req sl) (vs_hd sl) Hout2 Hsdone)
         as [Ht _].
-      (* the device's latch is the protocol's, and [wrap16] is injective on
-         the live window, so the latched POSITION is [p] *)
+      (* THE DEVICE'S LATCH IS THE PROTOCOL'S.  The gate says the device holds
+         THIS request's head; a head names one pending request
+         ([vpo_hd_inj]), so the latched POSITION is [p]. *)
       assert (Htkp : vp_tk pr = Some p).
-      { rewrite Htkc in Ht.
-        destruct (vp_tk pr) as [q|] eqn:Htq; [| discriminate ].
-        cbn [fmap option_fmap] in Ht. injection Ht as Ht.
-        f_equal. apply (vproto_wrap_inj (v_cfg v) pr (dom dma) q p Hok).
-        - destruct (vproto_pend_win (v_cfg v) pr (dom dma) q Hok
-                      (vpo_tk _ _ _ Hok q Htq)). lia.
-        - lia.
-        - apply bv_eq. exact Ht. }
+      { destruct (vp_tk pr) as [q|] eqn:Htq; last first.
+        { exfalso. rewrite Htkc in Ht. discriminate. }
+        destruct Htkc as (slq & Hslq & Htv).
+        rewrite Htv in Ht. injection Ht as Ht.
+        f_equal. destruct (decide (q = p)) as [->|Hne]; [reflexivity|].
+        exfalso. exact (vpo_hd_inj _ _ _ Hok q p slq sl Hne Hslq Hsl Ht). }
       rewrite (pend_todo_head _ _ p sl Htkp).
       apply vs_todo_done. intros k Hk Hin.
       assert (Hks : vs_key sl k ∈ vreq_touch (vs_req sl)).
@@ -2037,7 +2043,7 @@ Section VirtioProto.
     assert (Hin' : vs_is_out sl = false ->
               disk_read (v_disk v) (vs_sector_off sl) (vs_len sl) = bs)
       by (intros _; rewrite <- Hbslen; exact Hrd).
-    assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl (wrap16 p))))
+    assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl (vs_hd sl))))
       by (rewrite vslot_post_disk; exact Hdv).
     (* the byte lease and the counters *)
     iMod (dma_update _ m dma HwDdma with "Hm Hdma") as "[Hm Hdma]".
@@ -2140,7 +2146,7 @@ Section VirtioProto.
       exact (virtio_ctl_union _ _ _ Hwctl Hctl). }
     iSplitR.
     { iPureIntro. rewrite (dom_union_sub _ dma HwDdma).
-      exact (vproto_ok_step (v_cfg v) pr (dom dma) p sl Hok Hsl). }
+      exact (vproto_ok_step (v_cfg v) pr (dom dma) p sl Hok Hwin Hsl). }
     iSplitR; [iPureIntro; exact Hal|].
     (* THE WINDOW MOVED EXACTLY AS THE KEYED STATE SAYS, and after the
        pop/complete split that is immediate: the POP index does not move at a
@@ -2149,38 +2155,34 @@ Section VirtioProto.
     { iPureIntro. rewrite vslot_post_seen. exact Hseen. }
     iSplitR.
     { iPureIntro. rewrite vslot_post_inflight Hah. reflexivity. }
-    (* THE LATCH: released exactly when the request that held it completed,
-       and the two sides agree because [wrap16] is injective on the window. *)
-    assert (Htkeq : (if bool_decide (v_taken v = Some (wrap16 p))
-                     then None else v_taken v)
-                    = wrap16 <$> (if bool_decide (vp_tk pr = Some p)
-                                  then None else vp_tk pr)).
-    { (* [destruct ... eqn:] substitutes the case value in the COUPLING
-         hypothesis too, so it is already specialised -- just fold the [fmap]
-         away and rewrite the device side with it. *)
-      assert (Htv : v_taken v = wrap16 <$> vp_tk pr) by exact Htkc.
+    (* THE LATCH: released exactly when the request that held it completed.
+       The device tests its HEAD and the protocol its POSITION, and the two
+       agree because a head names one pending request ([vpo_hd_inj]). *)
+    iSplitR.
+    { iPureIntro. rewrite vslot_post_taken vps_tk.
       destruct (vp_tk pr) as [q|] eqn:Htq.
-      - cbn [fmap option_fmap] in Htv. rewrite Htv.
+      - destruct Htkc as (slq & Hslq & Htv).
         destruct (decide (q = p)) as [->|Hne].
-        + rewrite (bool_decide_eq_true_2 (Some (wrap16 p) = Some (wrap16 p))
-                     eq_refl).
-          by rewrite (bool_decide_eq_true_2 (Some p = Some p) eq_refl).
+        + rewrite Hsl in Hslq. injection Hslq as <-.
+          rewrite (bool_decide_eq_true_2 (Some p = Some p) eq_refl).
+          rewrite Htv.
+          by rewrite (bool_decide_eq_true_2
+                        (Some (vs_hd sl) = Some (vs_hd sl)) eq_refl).
         + assert (Hqp : Some q <> Some p)
             by (intro Hc; injection Hc as <-; exact (Hne eq_refl)).
           rewrite (bool_decide_eq_false_2 (Some q = Some p) Hqp).
-          rewrite (bool_decide_eq_false_2 (Some (wrap16 q) = Some (wrap16 p)));
-            [reflexivity|].
-          intro Hc. injection Hc as Hc. apply Hne.
-          apply (vproto_wrap_inj (v_cfg v) pr (dom dma) q p Hok).
-          * destruct (vproto_pend_win (v_cfg v) pr (dom dma) q Hok
-                        (vpo_tk _ _ _ Hok q Htq)). lia.
-          * lia.
-          * apply bv_eq. exact Hc.
-      - cbn [fmap option_fmap] in Htv. rewrite Htv.
-        by destruct (bool_decide (@None (bv 16) = Some (wrap16 p))),
-                    (bool_decide (@None nat = Some p)). }
-    iSplitR.
-    { iPureIntro. rewrite vslot_post_taken vps_tk. exact Htkeq. }
+          rewrite Htv.
+          rewrite (bool_decide_eq_false_2
+                     (Some (vs_hd slq) = Some (vs_hd sl))).
+          * exists slq. split; [| reflexivity ].
+            rewrite (lookup_delete_ne (vp_pend pr) p q
+                       (fun e => Hne (eq_sym e))).
+            exact Hslq.
+          * intro Hc. injection Hc as Hc.
+            exact (vpo_hd_inj _ _ _ Hok q p slq sl Hne Hslq Hsl Hc).
+      - assert (Hnh : @None (bv 16) <> Some (vs_hd sl)) by discriminate.
+        rewrite Htkc.
+        by rewrite (bool_decide_eq_false_2 (@None (bv 16) = Some (vs_hd sl)) Hnh). }
     iSplitR.
     { iPureIntro. rewrite vslot_post_uidx Hui. symmetry. apply wrap16_S. }
     iSplitR.
@@ -2327,8 +2329,8 @@ Section VirtioProto.
        the device's, and [vp_wt] says an unlatched device holds nothing. *)
     assert (Htkp : vp_tk pr = None).
     { destruct (vp_tk pr) as [q|] eqn:Ht; [| reflexivity ].
-      exfalso. rewrite Htkc in Htk. cbn [fmap option_fmap] in Htk.
-      discriminate. }
+      exfalso. destruct Htkc as (slq & _ & Htv).
+      rewrite Htv in Htk. discriminate. }
     pose proof (vp_wt_none pr (v_cache v) Htkp Hwt) as Hcae.
     assert (Hce : vslot_cache sl ∪ v_cache v = vslot_cache sl)
       by (rewrite Hcae; apply map_union_empty).
@@ -2364,7 +2366,10 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
     iSplitR; [iPureIntro; exact Hah|].
-    iSplitR; [iPureIntro; cbn [vp_tk]; by rewrite Hip|].
+    (* THE CAPTURE LATCHES THIS REQUEST: the protocol names its position, the
+       device the head its entry pointed at, and [Hip] is that they agree. *)
+    iSplitR; [iPureIntro; cbn [vp_tk]; exists sl; split;
+              [exact Hsl | by rewrite Hip]|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
     iSplitR; [iPureIntro; exact Hwce|].
@@ -2441,7 +2446,10 @@ Section VirtioProto.
     destruct (vproto_drain_det (v_cfg v) q sl pin v s v'
                 Hslotok Hdom Hcsub Hstep)
       as (i & Hi & Hskey & Hlk & Hv1).
-    assert (Htk : v_taken v = Some (wrap16 q)) by (by rewrite Htkc Htkq).
+    (* the device holds the latched request's HEAD, and [Htkq] names the slot *)
+    assert (Htk : v_taken v = Some (vs_hd sl)).
+    { rewrite Htkq in Htkc. destruct Htkc as (slq & Hslq & Htv).
+      rewrite Hsl in Hslq. by injection Hslq as <-. }
     iDestruct (big_sepM_delete _ (vp_pend pr) q sl Hsl with "Hpend")
       as "[Hslres Hpend]".
     (* the LATCHED slot's owed set, spelled out -- LOCALLY, so that the other
@@ -2747,7 +2755,15 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Hal|].
     iSplitR; [iPureIntro; exact Hseen|].
     iSplitR; [iPureIntro; exact Hah|].
-    iSplitR; [iPureIntro; exact Htkc|].
+    (* THE LATCH SURVIVES THE PUBLISH: a latched position is pending, hence
+       below [np], so the fresh slot's insert does not disturb its slot. *)
+    iSplitR.
+    { iPureIntro. rewrite vpp_tk.
+      destruct (vp_tk pr) as [q|] eqn:Htq; [| exact Htkc ].
+      destruct Htkc as (slq & Hslq & Htv). exists slq. split; [| exact Htv ].
+      rewrite lookup_insert_ne; [exact Hslq|].
+      (* the latched position is PENDING, and [np] is not *)
+      intro Hc. congruence. }
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR.
     { iPureIntro. apply (read_bytes_transfer dma); [| exact Hridx].

@@ -671,7 +671,14 @@ Record slot_pin_ok (c : virtio_cfg) (p : nat) (sl : vslot)
              vr_status (vs_req sl) ∉ pa_range (vr_buf (vs_req sl)) (vs_len sl);
   spo_req  : forall mv : vmem, mem_view pin mv ->
              req_from c mv (vs_hd sl) = Some (vs_req sl);
+  (* THE HEAD DESCRIPTOR ITSELF IS PINNED.  The driver wrote it, so it holds
+     it; recording it is what makes a head EXCLUSIVE -- two live chains with
+     one head would pin one byte twice, and the pins are disjoint.  That is
+     how [vproto_hd_fresh] discharges [vpo_hd_inj] at the publish. *)
+  spo_desc : pa_off (vc_desc c) (vq_desc_size * bv_unsigned (vs_hd sl))
+               ∈ dom pin;
 }.
+
 
 (* the slot's WRITABLE footprint: the status byte, and (for a read request,
    where the device writes the data) the whole buffer *)
@@ -2625,19 +2632,45 @@ Proof. reflexivity. Qed.
 (* All the NEW disjointness hypotheses come from OWNERSHIP at the Iris layer
    (the publisher physically holds the new pin and writable bytes, so they
    are disjoint from the lease, whose domain covers everything old). *)
+(* A FRESH CHAIN'S HEAD IS FRESH, from separation alone: every live slot's
+   pin is inside the lease, and the publisher's is disjoint from it, so the
+   two cannot pin the same descriptor byte. *)
+Lemma vproto_hd_fresh (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+  vproto_ok c pr D ->
+  slot_pin_ok c (vp_np pr) sl pin ->
+  slot_fp sl pin ## D ->
+  forall q slq, vp_pend pr !! q = Some slq -> vs_hd slq <> vs_hd sl.
+Proof.
+  intros Hok Hnew Hdisj q slq Hsq Hhd.
+  assert (Hpq : exists pinq, vp_pin pr !! q = Some pinq).
+  { apply elem_of_dom. rewrite (vpo_pin_dom _ _ _ Hok).
+    apply elem_of_union_l, elem_of_dom. by exists slq. }
+  destruct Hpq as [pinq Hpinq].
+  pose proof (vpo_slot _ _ _ Hok q slq pinq
+                (vproto_pend_slot pr _ _ Hsq) Hpinq) as Hslotq.
+  pose proof (spo_desc _ _ _ _ Hslotq) as Hinq.
+  pose proof (spo_desc _ _ _ _ Hnew) as Hinn.
+  rewrite Hhd in Hinq.
+  exact (proj1 (elem_of_disjoint _ _) Hdisj _ (slot_fp_pin sl pin _ Hinn)
+           (proj1 (elem_of_subseteq _ _)
+              (vpo_fp_D _ _ _ Hok q slq pinq
+                 (vproto_pend_slot pr _ _ Hsq) Hpinq) _
+              (slot_fp_pin slq pinq _ Hinq))).
+Qed.
+
 Lemma vproto_ok_publish (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
   vproto_ok c pr D ->
   slot_pin_ok c (vp_np pr) sl pin ->
   slot_wr sl ## dom pin ->
   slot_fp sl pin ## D ->
-  (* THE FRESH CHAIN'S HEAD IS FRESH.  This is where head injectivity is
-     discharged, and it is the driver's [alloc3_desc] that supplies it: the
-     descriptors it hands out belong to no live chain. *)
-  (forall q slq, vp_pend pr !! q = Some slq -> vs_hd slq <> vs_hd sl) ->
   vproto_ok c (vproto_publish_state pr sl pin) (D ∪ slot_fp sl pin).
 Proof.
-  intros Hok Hnew Hwr Hdisj Hfresh.
+  intros Hok Hnew Hwr Hdisj.
+  (* head freshness is not assumed: it follows from the publisher's pin being
+     disjoint from the lease every live chain sits in *)
+  pose proof (vproto_hd_fresh c pr D sl pin Hok Hnew Hdisj) as Hfresh.
   pose proof (vproto_ncnp _ _ _ Hok) as Hle.
   assert (Hslots : vp_slots (vproto_publish_state pr sl pin)
                    = <[ vp_np pr := sl ]> (vp_slots pr)).
