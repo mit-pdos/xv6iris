@@ -672,7 +672,7 @@ Section ProofVirtioDiskRw.
      ∨ (⌜forall i, (k <= i < 8)%nat -> fr i = false⌝ ∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x076) : mword 64)))%I.
 
-  Lemma wp_vdrw_scan (pme : Arch.pa)
+  Lemma wp_vdrw_scan (γd : disk_names) (pme : Arch.pa)
       (pd : Arch.pa) (fr : nat -> bool) (av : nat) :
     forall (n k : nat) (M : regfile),
     (k + S n = 8)%nat ->
@@ -681,11 +681,11 @@ Section ProofVirtioDiskRw.
     M !!! Regidx Rs1 = (mword_of_int 8 : mword 64) ->
     sie_cap_gpr KT1 M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x068) : mword 64) -∗
-    ([∗ list] i ∈ seq k (S n), free_cell_res pd fr i) -∗
+    ([∗ list] i ∈ seq k (S n), free_cell_res γd pd fr i) -∗
     ( ∀ M' : regfile,
         ⌜forall r : mword 5, r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
            M' !!! Regidx r = M !!! Regidx r⌝ -∗
-        ([∗ list] i ∈ seq k (S n), free_cell_res pd fr i) -∗
+        ([∗ list] i ∈ seq k (S n), free_cell_res γd pd fr i) -∗
         sie_cap_gpr KT1 M' av false pme -∗
         vdrw_scan_out fr k M' -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -907,7 +907,7 @@ Section ProofVirtioDiskRw.
     forall r : mword 5, r <> Ra1 -> r <> Ra2 -> r <> Ra3 -> r <> Ra4 ->
       r <> Ra5 -> r <> Rs2 -> M' !!! Regidx r = M !!! Regidx r.
 
-  Definition vdrw_iter_out (pd : Arch.pa) (fr : nat -> bool) (idxa : Arch.pa)
+  Definition vdrw_iter_out (γd : disk_names) (pd : Arch.pa) (fr : nat -> bool) (idxa : Arch.pa)
       (i : nat) (M M' : regfile) : iProp Σ :=
     ((∃ j : nat,
         ⌜(j < 8)%nat /\ fr j = true
@@ -915,16 +915,18 @@ Section ProofVirtioDiskRw.
          /\ M' !!! Regidx Ra2 = add_vec (M !!! Regidx Ra2) (mword_of_int 4)⌝ ∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x058) : mword 64) ∗
         idxa ↦₄[KT1] (mword_of_int (Z.of_nat j) : mword 32) ∗
-        free_slot_res pd j ∗
-        free_bundles pd (fr_upd fr j false))
+        (* the slot's bytes AND its receipt: a free descriptor carries its
+           [HInactive] token, and the allocator hands both over *)
+        (free_slot_res pd j ∗ j ↪[dn_head γd] HInactive) ∗
+        free_bundles γd pd (fr_upd fr j false))
      ∨ (⌜(forall k, (k < 8)%nat -> fr k = false)
          /\ M' !!! Regidx Rs2 = M !!! Regidx Rs2
          /\ M' !!! Regidx Ra2 = M !!! Regidx Ra2⌝ ∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x07a) : mword 64) ∗
         (∃ v : mword 32, idxa ↦₄[KT1] v) ∗
-        free_bundles pd fr))%I.
+        free_bundles γd pd fr))%I.
 
-  Lemma wp_vdrw_iter (pme : Arch.pa)
+  Lemma wp_vdrw_iter (γd : disk_names) (pme : Arch.pa)
       (pd : Arch.pa) (fr : nat -> bool) (av : nat)
       (i : nat) (idxa : Arch.pa) (M : regfile) :
     (i < 8)%nat ->
@@ -934,12 +936,12 @@ Section ProofVirtioDiskRw.
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat i) : mword 64) ->
     sie_cap_gpr KT1 M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x05c) : mword 64) -∗
-    free_bundles pd fr -∗
+    free_bundles γd pd fr -∗
     (∃ v : mword 32, idxa ↦₄[KT1] v) -∗
     ( ∀ M' : regfile,
         ⌜vdrw_iter_ag M M'⌝ -∗
         sie_cap_gpr KT1 M' av false pme -∗
-        vdrw_iter_out pd fr idxa i M M' -∗
+        vdrw_iter_out γd pd fr idxa i M M' -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1023,13 +1025,13 @@ Section ProofVirtioDiskRw.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x068)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp068) in "Hpc".
     (* ---- +0x068 .. +0x072  THE SCAN ---- *)
-    iApply (wp_vdrw_scan pme pd fr av 7 0 Q4 ltac:(reflexivity) HQ4a5 HQ4a4 HQ4s1
+    iApply (wp_vdrw_scan γd pme pd fr av 7 0 Q4 ltac:(reflexivity) HQ4a5 HQ4a4 HQ4s1
               with "Hcg Htext Hpc Hcells").
     iIntros (Q5) "%Hag5 Hcells Hcg Hor".
     rewrite /vdrw_scan_out.
     (* the scan hands the cells back in [big_sepL] form; [free_bundles] is
        that very term, so fold it once for the surgery below *)
-    iAssert (free_bundles pd fr) with "[Hcells]" as "Hcells".
+    iAssert (free_bundles γd pd fr) with "[Hcells]" as "Hcells".
     { iExact "Hcells". }
     assert (HQ5a1 : Q5 !!! Regidx Ra1 = (idxa : mword 64))
       by (rewrite (Hag5 Ra1 ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact HQ1a1).
@@ -1073,7 +1075,7 @@ Section ProofVirtioDiskRw.
                       = mword_of_int (KernelSyms.virtio_disk_rw + 0x04a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp04a) in "Hpc".
       (* peel slot j out of the free bundle *)
-      iEval (rewrite (free_bundles_split pd fr j Hj8)) in "Hcells".
+      iEval (rewrite (free_bundles_split γd pd fr j Hj8)) in "Hcells".
       iDestruct "Hcells" as "[[Hcell Hbun] Hrest]".
       iEval (rewrite Hfrj) in "Hcell". iEval (rewrite Hfrj) in "Hbun".
       (* +0x04a  sb zero,24(a4) *)
@@ -1179,8 +1181,8 @@ Section ProofVirtioDiskRw.
                  [ exact Hj8 | exact Hfrj | exact HQ8s2 | exact HQ8a2 ] |].
       iFrame "Hpc Hidx Hbun".
       (* re-close the free bundle at [fr] with slot j cleared *)
-      rewrite (free_bundles_split pd (fr_upd fr j false) j Hj8).
-      rewrite fr_upd_eq. rewrite -(free_bundles_but_upd pd fr j false).
+      rewrite (free_bundles_split γd pd (fr_upd fr j false) j Hj8).
+      rewrite fr_upd_eq. rewrite -(free_bundles_but_upd γd pd fr j false).
       iFrame "Hrest". iSplitL "Hcell"; [ iExact "Hcell" | done ].
     - (* ============ NOT FOUND: idx[i] = -1, on to the failure path ==== *)
       iDestruct "Hn" as "[%Hall Hpc]".
@@ -1259,28 +1261,30 @@ Section ProofVirtioDiskRw.
     - rewrite (fr_upd_ne fr h m false Hne) in H. split; [exact Hne | exact H].
   Qed.
 
-  Definition vdrw_alloc_fail (pd sp0 : Arch.pa) (fr : nat -> bool)
+  Definition vdrw_alloc_fail (γd : disk_names) (pd sp0 : Arch.pa) (fr : nat -> bool)
       (M' : regfile) : iProp Σ :=
     (( ⌜M' !!! Regidx Rs2 = (mword_of_int (Z.of_nat 0) : mword 64)⌝ ∗
-       free_bundles pd fr ∗
+       free_bundles γd pd fr ∗
        (∃ v0 v1 v2 : mword 32, vdrw_idx (KTR := KT1) sp0 v0 v1 v2))
      ∨ (∃ h : nat,
           ⌜(h < 8)%nat /\ fr h = true
            /\ M' !!! Regidx Rs2 = (mword_of_int (Z.of_nat 1) : mword 64)⌝ ∗
-          free_bundles pd (fr_upd fr h false) ∗ free_slot_res pd h ∗
+          free_bundles γd pd (fr_upd fr h false) ∗
+          (free_slot_res pd h ∗ h ↪[dn_head γd] HInactive) ∗
           (∃ v1 v2 : mword 32,
              vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) v1 v2))
      ∨ (∃ h m2 : nat,
           ⌜(h < 8)%nat /\ (m2 < 8)%nat /\ h <> m2
            /\ fr h = true /\ fr m2 = true
            /\ M' !!! Regidx Rs2 = (mword_of_int (Z.of_nat 2) : mword 64)⌝ ∗
-          free_bundles pd (fr_upd (fr_upd fr h false) m2 false) ∗
-          free_slot_res pd h ∗ free_slot_res pd m2 ∗
+          free_bundles γd pd (fr_upd (fr_upd fr h false) m2 false) ∗
+          (free_slot_res pd h ∗ h ↪[dn_head γd] HInactive) ∗
+          (free_slot_res pd m2 ∗ m2 ↪[dn_head γd] HInactive) ∗
           (∃ v2 : mword 32,
              vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h))
                           (mword_of_int (Z.of_nat m2)) v2)))%I.
 
-  Definition vdrw_alloc_out (pd sp0 : Arch.pa) (fr : nat -> bool)
+  Definition vdrw_alloc_out (γd : disk_names) (pd sp0 : Arch.pa) (fr : nat -> bool)
       (M' : regfile) : iProp Σ :=
     ((∃ h m2 t : nat,
         ⌜(h < 8)%nat /\ (m2 < 8)%nat /\ (t < 8)%nat
@@ -1289,12 +1293,14 @@ Section ProofVirtioDiskRw.
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) ∗
         vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                      (mword_of_int (Z.of_nat t)) ∗
-        free_slot_res pd h ∗ free_slot_res pd m2 ∗ free_slot_res pd t ∗
-        free_bundles pd (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false))
+        (free_slot_res pd h ∗ h ↪[dn_head γd] HInactive) ∗
+        (free_slot_res pd m2 ∗ m2 ↪[dn_head γd] HInactive) ∗
+        (free_slot_res pd t ∗ t ↪[dn_head γd] HInactive) ∗
+        free_bundles γd pd (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false))
      ∨ (pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x07a) : mword 64) ∗
-        vdrw_alloc_fail pd sp0 fr M'))%I.
+        vdrw_alloc_fail γd pd sp0 fr M'))%I.
 
-  Lemma wp_vdrw_alloc3 (pme : Arch.pa)
+  Lemma wp_vdrw_alloc3 (γd : disk_names) (pme : Arch.pa)
       (pd sp0 : Arch.pa) (fr : nat -> bool) (av : nat) (M : regfile) :
     M !!! Regidx Rs0 = (sp0 : mword 64) ->
     M !!! Regidx Rs5 = (disk_base : mword 64) ->
@@ -1302,7 +1308,7 @@ Section ProofVirtioDiskRw.
     M !!! Regidx Rs4 = (mword_of_int (Z.of_nat 3) : mword 64) ->
     sie_cap_gpr KT1 M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc) : mword 64) -∗
-    free_bundles pd fr -∗
+    free_bundles γd pd fr -∗
     vdrw_scratch (KTR := KT1) sp0 -∗
     (* the continuation is UNDER A LATER: the driver's outer sleep-retry
        iLoeb closes its back edge through this call, and the [c.j] at
@@ -1315,7 +1321,7 @@ Section ProofVirtioDiskRw.
         ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
          /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
         sie_cap_gpr KT1 M' av false pme -∗
-        vdrw_alloc_out pd sp0 fr M' -∗
+        vdrw_alloc_out γd pd sp0 fr M' -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1386,7 +1392,7 @@ Section ProofVirtioDiskRw.
       rewrite /D1 upd_ne; [reflexivity |].
       apply not_eq_sym, is_cs_idx_true_neq; [vm_compute; reflexivity | exact Hcs]. }
     (* ============================ ITERATION 0 ======================== *)
-    iApply (wp_vdrw_iter pme pd fr av 0 (pa_stk sp0 12) D2
+    iApply (wp_vdrw_iter γd pme pd fr av 0 (pa_stk sp0 12) D2
               ltac:(clear; lia) HD2a2 HD2s5 HD2s1 HD2s2
               with "Hcg Htext Hpc Hcells [Hx0]").
     { iExists u0. iExact "Hx0". }
@@ -1434,7 +1440,7 @@ Section ProofVirtioDiskRw.
     { intros r Hcs Hne. rewrite (Hag0 r ltac:(regne) ltac:(regne) ltac:(regne)
         ltac:(regne) ltac:(regne) Hne). exact (HD2cs r Hcs Hne). }
     (* ============================ ITERATION 1 ======================== *)
-    iApply (wp_vdrw_iter pme pd (fr_upd fr h false) av 1
+    iApply (wp_vdrw_iter γd pme pd (fr_upd fr h false) av 1
               (pa_add (pa_stk sp0 12) 4) E0
               ltac:(clear; lia) HE0a2' HE0s5 HE0s1 HE0s2
               with "Hcg Htext Hpc Hcells [Hx1]").
@@ -1482,7 +1488,7 @@ Section ProofVirtioDiskRw.
     { intros r Hcs Hne. rewrite (Hag1 r ltac:(regne) ltac:(regne) ltac:(regne)
         ltac:(regne) ltac:(regne) Hne). exact (HE0cs r Hcs Hne). }
     (* ============================ ITERATION 2 ======================== *)
-    iApply (wp_vdrw_iter pme pd (fr_upd (fr_upd fr h false) m2 false) av 2
+    iApply (wp_vdrw_iter γd pme pd (fr_upd (fr_upd fr h false) m2 false) av 2
               (pa_stk sp0 11) E1
               ltac:(clear; lia) HE1a2' HE1s5 HE1s1 HE1s2
               with "Hcg Htext Hpc Hcells [Hx2]").

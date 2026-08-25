@@ -316,13 +316,13 @@ Section DiskInv.
      [b->disk] rather than by which of two maps the entry sat in, and the
      handler moves one to the other in a single store. *)
 
-  (* -- descriptor-triple bookkeeping ------------------------------------ *)
+  (* -- the descriptor triple, as vocabulary ----------------------------- *)
 
-  (* Each published-but-unfreed chain uses exactly three descriptors.  The
-     triples are recorded (pure) per position so a PUBLISHER can bound the
-     live window: at publish it holds a fourth disjoint triple, and
-     4 * 3 > 8 forces |flight ∪ parked| <= 1 -- which is what makes its
-     avail-ring slot [np mod 8] provably unclaimed. *)
+  (* A chain is three descriptors; these say which three and that they are
+     three distinct real ones.  Pure vocabulary for the rw proof (the
+     allocator's result, [free_desc]'s [i < 8] premise) -- nothing is
+     COUNTED with them: the ring window is a pigeonhole over heads inside the
+     device invariant ([VirtioProto.heads_res_at_window]). *)
   Definition tri_set (T : nat * nat * nat) : gset nat :=
     {[ T.1.1 ]} ∪ {[ T.1.2 ]} ∪ {[ T.2 ]}.
 
@@ -339,26 +339,33 @@ Section DiskInv.
 
   (* -- THE lock resource ------------------------------------------------ *)
 
-  (* WHAT THE LOCK STILL OWNS (finding 5): the descriptor accounting, and
-     nothing per-request.  The buffer, the pinned chain, the crash permit,
-     [b->disk] and [disk.info[i].b] all live in the device invariant's
-     per-descriptor RECEIPT now -- that is where the publisher left them at
-     its [disk.info[id].b] store and where the interrupt handler puts the
+  (* WHAT THE LOCK OWNS (finding 5): the free array, the counters, and the
+     CLAIM MAP -- and nothing per-request.  The buffer, the pinned chain, the
+     crash permit, [b->disk] and [disk.info[i].b] all live in the device
+     invariant's per-descriptor RECEIPT: that is where the publisher left
+     them at its [avail->idx] bump and where the interrupt handler puts the
      completed chain back.  A sleeping [virtio_disk_rw] re-finds its own
-     request through the [HActive] receipt fragment it never let go of, so
-     the old claim map, [flight_res] and [parked_res] are all gone with it.
+     request through the [HActive] receipt fragment it never let go of.
 
-     The triples stay: three descriptors per live request out of eight is
-     what bounds the live window, which is what the publish still needs. *)
+     THE CLAIM MAP [dn_claim] is what the interrupt handler carries between
+     its openings of the device invariant.  It holds this lock for its whole
+     loop, so the map is stable in its hands; each receipt's [HActive] arm
+     holds the fragment for its own position, and an accessor agrees the two
+     -- so the claim the handler read off its own map at the used-element
+     load is the claim every later opening is about.  The publisher inserts
+     its row here (fresh: every row is below [np]) and hands the fragment to
+     the publish; the woken publisher gets it back with the chain and deletes
+     the row at free_chain.  Nothing is COUNTED: the ring window that the
+     descriptor triples used to bound is a pigeonhole over heads inside the
+     device invariant ([VirtioProto.heads_res_at_window]). *)
   Definition disk_res (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) : iProp Σ :=
-    (∃ (np nr : nat) (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-       (* one triple per live position, all below the published count *)
-       ⌜forall p, p ∈ dom tr -> (p < np)%nat⌝ ∗
-       ⌜size tr = (np - nr)%nat⌝ ∗
-       ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
-       ⌜forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-          tri_set Tp ## tri_set Tq⌝ ∗
-       ⌜forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false⌝ ∗
+    (∃ (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool),
+       (* every row is below the published count (so the publisher's is
+          fresh), names its own position, and links its slot to its buffer
+          -- which is how the handler, reading the claim off this map, knows
+          the status byte is [info[h].status] and the head is [h] *)
+       ⌜forall p dc, cm !! p = Some dc ->
+          (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc)⌝ ∗
        (* the protocol tokens *)
        disk_pub γ np ∗
        disk_done_lb γ nr ∗
@@ -372,6 +379,7 @@ Section DiskInv.
           the staged head at its ring store and spends it at the index bump,
           both under [vdisk_lock]. *)
        disk_stage γ None ∗
+       ghost_map_auth (dn_claim γ) 1 cm ∗
        d_used_idx ↦₂ wrap16 nr ∗
        (* THE FREE DESCRIPTORS, and each one's RECEIPT at [HInactive].  The
           allocator hands both over together, which is what gives
@@ -382,9 +390,6 @@ Section DiskInv.
           (if fr i then free_slot_res pd i ∗ i ↪[dn_head γ] HInactive
            else emp)))%I.
 
-  (* [disk_claim] is gone too: a sleeping publisher's handle on its own
-     request is the [HActive] receipt fragment, which names the buffer, the
-     slot, the three descriptors and the position all at once. *)
 
 
   (* ==================================================================== *)
@@ -648,148 +653,6 @@ Section DiskInv.
   Qed.
 
 End DiskInv.
-
-(* ====================================================================== *)
-(* The descriptor-triple counting argument (pure).                        *)
-(*                                                                        *)
-(* A publisher holds a fourth, disjoint, well-formed triple while the      *)
-(* lock is held, so 3 * (|live positions| + 1) <= 8 bounds the live        *)
-(* window at one -- which is what makes its avail-ring slot [np mod 8]     *)
-(* provably unclaimed (design/virtio-driver.md, the descriptor-triple  *)
-(* window argument).                                                                                                          *)
-(* ====================================================================== *)
-
-Lemma tri_set_size (T : nat * nat * nat) : tri_ok T -> size (tri_set T) = 3%nat.
-Proof.
-  destruct T as [[a b] c]. unfold tri_ok, tri_set. cbn.
-  intros (Hab & Hac & Hbc & _ & _ & _).
-  rewrite size_union; [| set_solver].
-  rewrite size_union; [| set_solver].
-  rewrite !size_singleton. reflexivity.
-Qed.
-
-(* k pairwise-disjoint well-formed triples inside [X] need 3k elements *)
-Lemma tri_card (tr : gmap nat (nat * nat * nat)) (X : gset nat) :
-  (forall p T, tr !! p = Some T -> tri_ok T) ->
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  (forall p T, tr !! p = Some T -> tri_set T ⊆ X) ->
-  (3 * size tr <= size X)%nat.
-Proof.
-  revert X. induction tr as [|i T tr Hi IH] using map_ind;
-    intros X Hok Hdisj Hsub.
-  { rewrite map_size_empty. lia. }
-  assert (HTok : tri_ok T)
-    by (apply (Hok i); rewrite lookup_insert; reflexivity).
-  assert (HTX : tri_set T ⊆ X)
-    by (apply (Hsub i); rewrite lookup_insert; reflexivity).
-  assert (Hne : forall p T', tr !! p = Some T' -> p <> i).
-  { intros p T' Hp ->. rewrite Hi in Hp. discriminate. }
-  assert (Hnei : forall p T', tr !! p = Some T' -> i <> p).
-  { intros p T' Hp Hc. exact (Hne p T' Hp (eq_sym Hc)). }
-  assert (Hother : forall p T', tr !! p = Some T' -> tri_set T' ## tri_set T).
-  { intros p T' Hp. apply (Hdisj p i T' T (Hne p T' Hp)).
-    - rewrite lookup_insert_ne; [exact Hp | exact (Hnei p T' Hp)].
-    - rewrite lookup_insert; reflexivity. }
-  assert (HIH : (3 * size tr <= size (X ∖ tri_set T))%nat).
-  { apply IH.
-    - intros p T' Hp. apply (Hok p).
-      rewrite lookup_insert_ne; [exact Hp | exact (Hnei p T' Hp)].
-    - intros p q Tp Tq Hpq Hp Hq. apply (Hdisj p q); [exact Hpq | | ].
-      + rewrite lookup_insert_ne; [exact Hp | exact (Hnei p Tp Hp)].
-      + rewrite lookup_insert_ne; [exact Hq | exact (Hnei q Tq Hq)].
-    - intros p T' Hp. intros x Hx. apply elem_of_difference. split.
-      + apply (Hsub p T'); [| exact Hx].
-        rewrite lookup_insert_ne; [exact Hp | exact (Hnei p T' Hp)].
-      + intro Hc.
-        exact (proj1 (elem_of_disjoint _ _) (Hother p T' Hp) x Hx Hc). }
-  rewrite map_size_insert_None; [| exact Hi].
-  rewrite size_difference in HIH; [| exact HTX].
-  rewrite (tri_set_size T HTok) in HIH.
-  pose proof (subseteq_size _ _ HTX) as Hle.
-  rewrite (tri_set_size T HTok) in Hle. lia.
-Qed.
-
-(* eight descriptors, three per chain: at most two live chains *)
-Lemma tri_card_8 (tr : gmap nat (nat * nat * nat)) :
-  (forall p T, tr !! p = Some T -> tri_ok T) ->
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  (size tr <= 2)%nat.
-Proof.
-  intros Hok Hdisj.
-  pose proof (tri_card tr (set_seq 0 8) Hok Hdisj) as Hc.
-  rewrite size_set_seq in Hc.
-  assert (Hsub : forall p T, tr !! p = Some T -> tri_set T ⊆ set_seq 0 8).
-  { intros p T Hp. pose proof (Hok p T Hp) as Hok'.
-    destruct T as [[a b] c]. unfold tri_ok in Hok'. cbn in Hok'.
-    destruct Hok' as (_ & _ & _ & Ha & Hb & Hcc).
-    intros x Hx. unfold tri_set in Hx. cbn in Hx.
-    rewrite !elem_of_union !elem_of_singleton in Hx.
-    apply elem_of_set_seq.
-    destruct Hx as [[->| ->]| ->]; lia. }
-  specialize (Hc Hsub). lia.
-Qed.
-
-(* THE window bound: a lock holder about to publish position [np] owns a
-   fourth triple disjoint from every recorded one, hence at most one
-   position is live and [np - nr <= 1]. *)
-Lemma disk_window_le {A : Type} (np nr : nat) (fl pk : gmap nat A)
-    (tr : gmap nat (nat * nat * nat)) (T0 : nat * nat * nat) :
-  (nr <= np)%nat ->
-  (* the interval clause split in two when the completion order came free *)
-  (forall p, p ∈ dom fl -> (p < np)%nat) ->
-  size fl = (np - nr)%nat ->
-  (forall p, p ∈ dom pk -> (p < np)%nat) ->
-  dom tr = dom fl ∪ dom pk ->
-  (forall p T, tr !! p = Some T -> tri_ok T) ->
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  tri_ok T0 ->
-  (forall p T, tr !! p = Some T -> tri_set T ## tri_set T0) ->
-  (np - nr <= 1)%nat.
-Proof.
-  intros Hnrnp Hfl Hcount Hpk Htr Hok Hdisj HT0 Hdisj0.
-  assert (Hfresh : tr !! np = None).
-  { destruct (tr !! np) as [T|] eqn:Hn; [| reflexivity]. exfalso.
-    assert (Hin : np ∈ dom tr) by (apply elem_of_dom; eexists; exact Hn).
-    rewrite Htr in Hin. apply elem_of_union in Hin as [Hin|Hin].
-    - pose proof (Hfl np Hin). lia.
-    - pose proof (Hpk np Hin). lia. }
-  set (tr' := <[ np := T0 ]> tr).
-  assert (Hok' : forall p T, tr' !! p = Some T -> tri_ok T).
-  { intros p T Hp. subst tr'. destruct (decide (p = np)) as [->|Hne].
-    - rewrite lookup_insert in Hp. injection Hp as <-. exact HT0.
-    - rewrite (lookup_insert_ne tr np p T0 (not_eq_sym Hne)) in Hp. exact (Hok p T Hp). }
-  assert (Hdisj' : forall p q Tp Tq, p <> q -> tr' !! p = Some Tp ->
-            tr' !! q = Some Tq -> tri_set Tp ## tri_set Tq).
-  { intros p q Tp Tq Hpq Hp Hq. subst tr'.
-    destruct (decide (p = np)) as [->|Hpn]; destruct (decide (q = np)) as [->|Hqn].
-    - congruence.
-    - rewrite lookup_insert in Hp. injection Hp as <-.
-      rewrite (lookup_insert_ne tr np q T0 (not_eq_sym Hqn)) in Hq.
-      apply gset_disj_sym. exact (Hdisj0 q Tq Hq).
-    - rewrite lookup_insert in Hq. injection Hq as <-.
-      rewrite (lookup_insert_ne tr np p T0 (not_eq_sym Hpn)) in Hp.
-      exact (Hdisj0 p Tp Hp).
-    - rewrite (lookup_insert_ne tr np p T0 (not_eq_sym Hpn)) in Hp.
-      rewrite (lookup_insert_ne tr np q T0 (not_eq_sym Hqn)) in Hq.
-      exact (Hdisj p q Tp Tq Hpq Hp Hq). }
-  pose proof (tri_card_8 tr' Hok' Hdisj') as Hsz.
-  assert (Hsz' : (S (size tr) <= 2)%nat)
-    by (subst tr'; rewrite map_size_insert_None in Hsz; [exact Hsz | exact Hfresh]).
-  assert (Hsub2 : dom fl ⊆ dom tr) by (rewrite Htr; apply union_subseteq_l).
-  pose proof (subseteq_size (dom fl) (dom tr) Hsub2) as Hdom.
-  (* [size_dom] on both sides, as facts rather than rewrites: the two are
-     different instances and a single [rewrite ... in] only takes one. *)
-  pose proof (size_dom fl) as Hdf.
-  pose proof (size_dom tr) as Hdt2.
-  lia.
-Qed.
-
-(* [mod8_set_seq_fresh] is gone with them: it said the cell the publisher is
-   about to write is not one of the flight positions' cells, which is now the
-   device invariant's business ([VirtioQueue.vproto_ok_ring]). *)
 
 (* ====================================================================== *)
 (* Building [slot_pin_ok] for the three-descriptor chain rw formats.       *)

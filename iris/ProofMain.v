@@ -1391,6 +1391,8 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 8, disk_slot_raw i) -∗
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
+    (* ...the CLAIM MAP's authority, empty (nothing has been published)... *)
+    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) -∗
@@ -1416,7 +1418,7 @@ Section ProofMain.
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
              Hldisk".
-    iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
+    iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim Hcmauth #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
     iDestruct "Hlbc" as (vbl vbn vbc) "(Hbw & Hbn & Hbc)".
     iDestruct "Hlit" as (vil vin vic) "(Hiw & Hin & Hic)".
@@ -1660,7 +1662,7 @@ Section ProofMain.
       iPureIntro; intros j Hj;
         apply page_in_range_addr_is_kdata; [exact Hpvu | exact Hj]. }
     iPoseProof (disk_res_boot γv pd pav pu Hal
-                  with "Hpub Hrdat Hstg Hdescpg Hdfree Hdusedidx Hdslots Hdone Hclaim")
+                  with "Hpub Hrdat Hstg Hdescpg Hdfree Hdusedidx Hdslots Hdone Hclaim Hcmauth")
       as "HRdisk".
     (* [newlock_at], NOT [newlock] (fs-cfg-boot.md stage (e), row (P3)): the
        lock's gname is the AMBIENT [fsc_dlock], minted by
@@ -2032,7 +2034,7 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2151,7 +2153,7 @@ Section ProofMain.
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
                     Hsbb Hlogr Hmir Hirslot Hirauth Hient
                     Hlft Hfents Hirfile Hfdauth Hldisk Hdiskptr Hdiskfree
-                    Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
+                    Hdusedidx Hdslots Hclaim Hcmauth Hdone Hcfg Hinitproc").
     { iApply (printk_env_panic with "Hpenv"). }
     iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom Hftfresh".
     (* ---- THE INSTALLED-HANDLER RESOURCE, folded HERE and not earlier: the

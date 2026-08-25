@@ -208,18 +208,17 @@ Proof. solve_inG. Qed.
 (*  5.  THE DISK DRIVER'S GHOSTS  (theory: DiskPtsto.v, DiskInv.v)        *)
 (* ===================================================================== *)
 
-(* THE CLAIM VALUE.  [dn_claim] is the publisher's private handle on its own
-   position, and the ONLY thing a process that slept through the request
-   still holds when it wakes -- so every fact the woken publisher needs
-   about "its" request has to be recoverable from the claim's VALUE.  Four
-   fields, one per downstream obligation:
+(* THE CLAIM VALUE.  What a publish records about a request, fixed for the
+   request's whole life: the [HActive] receipt carries it (that is what a
+   sleeping [virtio_disk_rw] re-finds its request through), and [dn_claim]
+   maps the position to it -- authority in the vdisk_lock's resource,
+   fragment in the receipt -- which is how the interrupt handler, holding
+   the lock, knows the SAME claim at each of its openings of the device
+   invariant.  Four fields, one per downstream obligation:
 
      dc_buf   the [struct buf]: which cache entry the payoff belongs to;
      dc_slot  the published slot: fixes [vs_data] (a write's payload) and
               which block, i.e. the postcondition's [disk_block ...];
-     dc_tri   the three descriptors of the chain, which is what tells the
-              woken publisher its descriptors were NOT recycled while it
-              slept -- hence that [free_desc] may have them back;
      dc_pin   the pinned bytes: naming the map is what lets the publisher
               split the reclaim payoff back into the windows it wrote.
 
@@ -227,7 +226,6 @@ Proof. solve_inG. Qed.
 Record dclaim := DClaim {
   dc_buf  : Arch.pa;
   dc_slot : vslot;
-  dc_tri  : nat * nat * nat;
   dc_pin  : gmap Arch.pa (bv 8);
   (* THE POSITION this chain was published at.  The receipt below carries the
      [dn_slot] fragment for it while the request is live, and the interrupt
@@ -255,7 +253,7 @@ Record dclaim := DClaim {
    the one stretch where its owner (the interrupt handler, which learns the
    head from the used ring) is not the thread that allocated it.  [HActive v] is one
    whose chain is live, and the claim [v] records what was published --
-   which buffer, which slot, which three descriptors, which pinned bytes.
+   which buffer, which slot, which pinned bytes, which position.
    The FRAGMENT is what [virtio_disk_rw] carries across [sleep()]'s release
    of [vdisk_lock]: holding it is what re-authorises the poll of [b->disk]
    on every re-acquire. *)

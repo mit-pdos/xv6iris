@@ -320,28 +320,20 @@ Section DiskBoot.
     disk_done_lb γ 0%nat -∗
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γ] st) -∗
+    (* ...and the CLAIM MAP's authority, empty: nothing is published *)
+    ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) -∗
     disk_res γ pd pav pu.
   Proof.
     intro Hal. destruct (init_cfg_pages_aligned pd pav pu Hal) as [Hpd Hpav].
-    iIntros "Hpub Hrd Hstg Hdesc Hfree Huidx Hraw Hlb Hfrags".
+    iIntros "Hpub Hrd Hstg Hdesc Hfree Huidx Hraw Hlb Hfrags Hcm".
     iDestruct (desc_page_entries pd Hpd with "Hdesc") as "Hde".
     iDestruct (free_bundles_boot γ pd with "Hfree Hde Hraw Hfrags") as "Hfb".
     rewrite /disk_res.
     (* nothing published, nothing live, every descriptor free *)
     iExists 0%nat, 0%nat, ∅, (fun _ => true).
     iSplitR.
-    { iPureIntro. intros p Hp. rewrite dom_empty_L in Hp.
-      exfalso. exact (not_elem_of_empty p Hp). }
-    iSplitR.
-    { iPureIntro. reflexivity. }
-    iSplitR.
-    { iPureIntro. intros p T Hp. rewrite lookup_empty in Hp. discriminate. }
-    iSplitR.
-    { iPureIntro. intros p q Tp Tq _ Hp _. rewrite lookup_empty in Hp.
-      discriminate. }
-    iSplitR.
-    { iPureIntro. intros p T i Hp _. rewrite lookup_empty in Hp. discriminate. }
-    iFrame "Hpub Hlb Hrd Hstg Huidx".
+    { iPureIntro. intros p dc Hp. rewrite lookup_empty in Hp. discriminate. }
+    iFrame "Hpub Hlb Hrd Hstg Hcm Huidx".
     iExact "Hfb".
   Qed.
 

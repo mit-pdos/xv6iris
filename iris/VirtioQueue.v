@@ -2137,6 +2137,42 @@ Proof.
   pose proof (vproto_nc_lo _ _ _ Hok). lia.
 Qed.
 
+(* THE RING WINDOW IS A PIGEONHOLE OVER HEADS (finding 5).  The positions the
+   device has not popped, [vp_lo, vp_np), are all pending, their heads are
+   pairwise distinct ([vpo_hd_inj]) and each is one of the eight descriptors;
+   a publisher's head is a further descriptor distinct from all of them (its
+   receipt is INACTIVE while every live head's is ACTIVE).  Nine distinct
+   numbers below 8 do not exist, so the window has room for the new position
+   -- which is what [vproto_ok_ring]/[vproto_ok_publish] ask for, and what
+   used to be a counting premise about the driver's descriptor triples. *)
+(* NINE DISTINCT NUMBERS BELOW 8 DO NOT EXIST: the positions [a, b) carry
+   pairwise-distinct values of [f] below 8, and [h] is a further value below 8
+   distinct from all of them, so [b - a + 1 <= 8]. *)
+Lemma nat_inj_below8 (a b h : nat) (f : nat -> nat) :
+  (forall q, (a <= q < b)%nat -> (f q < 8)%nat) ->
+  (forall q1 q2, (a <= q1 < b)%nat -> (a <= q2 < b)%nat -> f q1 = f q2 -> q1 = q2) ->
+  (forall q, (a <= q < b)%nat -> f q <> h) -> (h < 8)%nat ->
+  (b - a < 8)%nat.
+Proof.
+  intros Hlt Hinj Hne Hh.
+  set (l := h :: (f <$> seq a (b - a))).
+  assert (HND : NoDup l).
+  { constructor.
+    - rewrite elem_of_list_fmap. intros (q & Heq & Hq).
+      apply elem_of_seq in Hq. apply (Hne q); [lia | done].
+    - apply NoDup_fmap_2_strong; [| apply NoDup_seq].
+      intros q1 q2 Hq1 Hq2 Heq. apply elem_of_seq in Hq1, Hq2.
+      apply Hinj; [lia | lia | exact Heq]. }
+  assert (Hsub : l ⊆+ seq 0 8).
+  { apply NoDup_submseteq; [exact HND|].
+    intros x Hx. apply elem_of_seq.
+    apply elem_of_cons in Hx as [-> | Hx']; [lia|].
+    apply elem_of_list_fmap in Hx' as (q & -> & Hq).
+    apply elem_of_seq in Hq. pose proof (Hlt q ltac:(lia)). lia. }
+  apply submseteq_length in Hsub.
+  unfold l in Hsub. simpl in Hsub. rewrite length_fmap, length_seq in Hsub. lia.
+Qed.
+
 (* the published count is the pop index plus what the device has not taken *)
 Lemma vproto_np_nc (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
   vproto_ok c pr D -> (vp_nc pr <= vp_np pr)%nat.

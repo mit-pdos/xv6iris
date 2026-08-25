@@ -488,23 +488,6 @@ Proof. lia. Qed.
 Lemma vdrwb_lvl1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-(* THE conjunct the P2/P3/P4 seam has to carry: a triple whose three members
-   are still marked FREE cannot meet any RECORDED triple, because every
-   recorded member is marked not-free. *)
-Lemma vdrwb_tri_disj (fr : nat -> bool) (tr : gmap nat (nat * nat * nat))
-    (h m2 t : nat) :
-  (forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false) ->
-  fr h = true -> fr m2 = true -> fr t = true ->
-  forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t).
-Proof.
-  intros Hfree Hh Hm Ht p T Hp.
-  apply elem_of_disjoint. intros x Hx1 Hx2.
-  pose proof (Hfree p T x Hp Hx1) as Hfx.
-  unfold tri_set in Hx2. cbn in Hx2.
-  rewrite !elem_of_union !elem_of_singleton in Hx2.
-  destruct Hx2 as [[-> | ->] | ->]; congruence.
-Qed.
-
 Section VdrwbDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
 
@@ -529,39 +512,38 @@ Section VdrwbDefs.
      the free array, the counters and the triples that bound the window. *)
   Definition vdrw_body (γ : disk_names) (pd pav : mword 64)
       (np nr : nat)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) : iProp Σ :=
-    (⌜forall p, p ∈ dom tr -> (p < np)%nat⌝ ∗
-     ⌜size tr = (np - nr)%nat⌝ ∗
-     ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
-     ⌜forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-        tri_set Tp ## tri_set Tq⌝ ∗
-     ⌜forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false⌝ ∗
+      (cm : gmap nat dclaim) (fr : nat -> bool) : iProp Σ :=
+    (⌜forall p dc, cm !! p = Some dc ->
+        (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc)⌝ ∗
      disk_pub γ np ∗
      disk_done_lb γ nr ∗
      (* the READ WATERMARK's half, at the same [nr] the cell below holds *)
      disk_read_at γ nr ∗
      (* nothing half-published while the lock is not held mid-publish *)
      disk_stage γ None ∗
+     (* the CLAIM MAP's authority: the publisher inserts its row under the
+        lock, the woken publisher deletes it under the lock *)
+     ghost_map_auth (dn_claim γ) 1 cm ∗
      d_used_idx ↦₂ wrap16 nr ∗
      free_bundles γ pd fr)%I.
 
   Lemma vdrw_body_close (γ : disk_names) (pd pav pu : mword 64)
       (np nr : nat)
-      (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) :
-    vdrw_body γ pd pav np nr tr fr -∗ disk_res γ pd pav pu.
+      (cm : gmap nat dclaim) (fr : nat -> bool) :
+    vdrw_body γ pd pav np nr cm fr -∗ disk_res γ pd pav pu.
   Proof.
     iIntros "H". rewrite /disk_res.
-    iExists np, nr, tr, fr. iExact "H".
+    iExists np, nr, cm, fr. iExact "H".
   Qed.
 
   Lemma vdrw_body_open (γ : disk_names) (pd pav pu : mword 64) :
     disk_res γ pd pav pu -∗
-    ∃ (np nr : nat) (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-      vdrw_body γ pd pav np nr tr fr.
+    ∃ (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool),
+      vdrw_body γ pd pav np nr cm fr.
   Proof.
     iIntros "H". rewrite /disk_res.
-    iDestruct "H" as (np nr tr fr) "H".
-    iExists np, nr, tr, fr. iExact "H".
+    iDestruct "H" as (np nr cm fr) "H".
+    iExists np, nr, cm, fr. iExact "H".
   Qed.
 
   (* re-joining the [int idx[3]] straddle into the two frame slots *)

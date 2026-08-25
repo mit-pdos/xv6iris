@@ -92,8 +92,7 @@ Section ProofVirtioDiskRwCSeam.
   (* cells plus the two untouched slot remainders) and the caller's        *)
   (* [b->disk] cell is inside it at value 1, and (c) the three registers   *)
   (* P4/P5 still read are pinned: a0 = the head index, a1 = 1, a5 = &disk. *)
-  (* The ORIGINAL [fr] facts still travel: P4's window argument needs the  *)
-  (* fourth disjoint triple to be free before the allocator cleared it.    *)
+  (* The ORIGINAL [fr] facts still travel with the triple.                *)
   (* ------------------------------------------------------------------- *)
   Definition vdrw_p3_exit (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
@@ -101,14 +100,13 @@ Section ProofVirtioDiskRwCSeam.
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (m0 : regfile) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
-     ∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
-       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
+     ∀ (M : regfile) (np nr : nat) (cm : gmap nat dclaim)
+       (fr : nat -> bool) (h m2 t : nat),
        ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜M !!! Regidx Ra0 = (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
        ⌜tri_ok (h, m2, t) /\ fr h = true /\ fr m2 = true /\ fr t = true⌝ -∗
-       ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
@@ -117,9 +115,14 @@ Section ProofVirtioDiskRwCSeam.
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
        locked γk cpu_id -∗
-       vdrw_body γd pd pav np nr fl pk tr
+       vdrw_body γd pd pav np nr cm
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
        vdrw_chain pd b h m2 t wr sector -∗
+       (* the three descriptors' receipts, still INACTIVE: the publish flips
+          the head's, the other two ride to free_chain *)
+       h ↪[dn_head γd] HInactive -∗
+       m2 ↪[dn_head γd] HInactive -∗
+       t ↪[dn_head γd] HInactive -∗
        vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
@@ -138,8 +141,8 @@ Section ProofVirtioDiskRwCSeam.
   Proof.
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
-    iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hfacts %Hdisj0 %Hal
-             Hcg Hown Htc Hclm Hpc Htok Hbody Hbh Hbm Hbt Hidx".
+    iIntros (CIDx Hsx M np nr cm fr h m2 t) "%Hrh %Hfacts %Hal
+             Hcg Hown Htc Hclm Hpc Htok Hbody [Hbh Hfh] [Hbm Hfm] [Hbt Hft] Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
@@ -151,9 +154,9 @@ Section ProofVirtioDiskRwCSeam.
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".
     destruct F as (Hcs & H1a0 & H1a1 & H1a5).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
-    iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t
-              with "[%] [%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok Hbody
-                    Hchain Hidx").
+    iApply ("Hexit" $! M1 np nr cm fr h m2 t
+              with "[%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok Hbody
+                    Hchain Hfh Hfm Hft Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).
       unfold vdrw_regs. split_and!.
@@ -169,7 +172,6 @@ Section ProofVirtioDiskRwCSeam.
     - split_and!; [ exact H1a0 | exact H1a1 | exact H1a5 ].
     - split_and!; [ unfold tri_ok; cbn; split_and!; assumption
                   | exact Hfrh | exact Hfrm | exact Hfrt ].
-    - exact Hdisj0.
     - exact Hal.
   Qed.
 

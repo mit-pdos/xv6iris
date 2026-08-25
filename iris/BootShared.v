@@ -1287,6 +1287,7 @@ Section BootAlloc.
          ⌜virtio_live c0 = false⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c0) ∗
       ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
          i ↪[dn_head γv] st) ∗
+      ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) ∗
       disk_done_lb γv 0%nat ∗
       kpt_unset ∗ kmap_auth kmap_M0 ∗
       (* THE BOOT MINT IS GONE FROM THIS INTERFACE, and that is stage (d2b):
@@ -1459,7 +1460,7 @@ Section BootAlloc.
             ltac:(rewrite Hv0; apply virtio_reset_cache)
             ltac:(rewrite Hv0; apply virtio_reset_taken)
             ltac:(rewrite Hv0; apply virtio_reset_wce))
-      as (γv) "(%Himg & Hproto & Hcfg & _ & #Hdone & Hheads & Hpbody)".
+      as (γv) "(%Himg & Hproto & Hcfg & Hcmauth & #Hdone & Hheads & Hpbody)".
     iMod (dev_inv_alloc ⊤ γd γv
             with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hproto] Hpbody")
       as "#Hdev".
@@ -1581,6 +1582,7 @@ Section BootAlloc.
       iSplitR; [iPureIntro; rewrite Hv0; apply virtio_reset_not_live |].
       iExact "Hcfg". }
     iSplitL "Hheads"; [iExact "Hheads" |].
+    iSplitL "Hcmauth"; [iExact "Hcmauth" |].
     iSplitR; [iExact "Hdone" |].
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hkauth"; [iExact "Hkauth" |].

@@ -92,7 +92,7 @@ Section VdrwbFreeAt.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId}  (γs : list gname)
+  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId}  (γd : disk_names) (γs : list gname)
       (pd : mword 64) (i : nat) (fr : nat -> bool)
       (M : regfile) (av : nat) (eb : bool) (pme : mword 64)
       (idxa : Arch.pa) (off : Z) (imm : mword 12) (jimm : mword 21) (lks : gset string) :
@@ -119,19 +119,22 @@ Section VdrwbFreeAt.
           (LOAD (imm, Regidx Rs0, Regidx Ra0, false, 4)) -∗
     instr (mword_of_int (KernelSyms.virtio_disk_rw + off + 4) : mword 64) false (JAL (jimm, Regidx Rra)) -∗
     idxa ↦₄[KT1] (mword_of_int (Z.of_nat i) : mword 32) -∗
-    free_bundles pd fr -∗ free_slot_res pd i -∗
+    free_bundles γd pd fr -∗
+    (* the slot comes back WITH its receipt: re-marking the descriptor free
+       puts both back into the bundle *)
+    (free_slot_res pd i ∗ i ↪[dn_head γd] HInactive) -∗
     ( ∀ Mf : regfile,
         ⌜forall r : mword 5, is_cs_idx r = true -> Mf !!! Regidx r = M !!! Regidx r⌝ -∗
         sie_cap_gpr KT1 Mf av false pme -∗
         cpu_own 1 eb pme false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off + 8) : mword 64) -∗
         idxa ↦₄[KT1] (mword_of_int (Z.of_nat i) : mword 32) -∗
-        free_bundles pd (fr_upd fr i true) -∗
+        free_bundles γd pd (fr_upd fr i true) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hi8 Hfri Hlen Haddr Hp4 Hjt Hjal Hret Hlkbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hi0 Hi4 Hidx Hbun Hslot Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hi0 Hi4 Hidx Hbun [Hslot Hfrag] Hcont".
     (* ---- lw a0, imm(s0) ---- *)
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) Ra0 Rs0 imm M av
               (mword_of_int (Z.of_nat i) : mword 32) false (dqm := DfracOwn 1)
@@ -163,7 +166,7 @@ Section VdrwbFreeAt.
                     = add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + off + 4) : mword 64) 4)
       by (rewrite /N2; apply upd_eq).
     (* peel descriptor [i]'s (already cleared) free cell out of the bundle *)
-    iEval (rewrite (free_bundles_split pd fr i Hi8)) in "Hbun".
+    iEval (rewrite (free_bundles_split γd pd fr i Hi8)) in "Hbun".
     iDestruct "Hbun" as "[[Hcell _] Hrest]".
     iEval (rewrite Hfri) in "Hcell".
     (* take the slot apart: free_desc wants the four descriptor words *)
@@ -176,17 +179,17 @@ Section VdrwbFreeAt.
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14". rgall.
     destruct Hf as (Hcs & _).
     iEval (rewrite HN2ra Hret) in "Hpc".
-    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hidx [Hcell Hrest Hops Hst Hib Hd0 Hd8 Hd12 Hd14]").
+    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hidx [Hcell Hrest Hops Hst Hib Hfrag Hd0 Hd8 Hd12 Hd14]").
     { intros r Hr.
       rewrite (callee_saved_lookup Hcs r Hr).
       rewrite /N2 upd_ne; [| apply not_eq_sym, is_cs_idx_true_neq;
                              [vm_compute; reflexivity | exact Hr]].
       rewrite /N1 upd_ne; [reflexivity |].
       apply not_eq_sym, is_cs_idx_true_neq; [vm_compute; reflexivity | exact Hr]. }
-    rewrite (free_bundles_split pd (fr_upd fr i true) i Hi8).
+    rewrite (free_bundles_split γd pd (fr_upd fr i true) i Hi8).
     rewrite fr_upd_eq.
-    rewrite -(free_bundles_but_upd pd fr i true).
-    iFrame "Hrest Hcell Hops Hst Hib".
+    rewrite -(free_bundles_but_upd γd pd fr i true).
+    iFrame "Hrest Hcell Hfrag Hops Hst Hib".
     iExists (zero_reg : mword 64), (mword_of_int 0 : mword 32),
             (mword_of_int 0 : mword 16), (mword_of_int 0 : mword 16).
     iFrame "Hd0 Hd8 Hd12 Hd14".
@@ -233,18 +236,10 @@ Section ProofVirtioDiskRwB.
       (pd pav pu : mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
-     ∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
-       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
+     ∀ (M : regfile) (np nr : nat) (cm : gmap nat dclaim)
+       (fr : nat -> bool) (h m2 t : nat),
        ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜tri_ok (h, m2, t) /\ fr h = true /\ fr m2 = true /\ fr t = true⌝ -∗
-       (* the publisher's own triple is disjoint from every RECORDED one.
-          Only P2.3 can state this: it holds [disk_res] at the ORIGINAL [fr],
-          where the three bits are still set, and the body's sixth conjunct
-          ("every recorded triple member is not free") then refutes any
-          overlap.  Downstream the body is exported at the CLEARED [fr], for
-          which that conjunct says nothing at h/m2/t -- so the fact is no
-          longer derivable and has to travel. *)
-       ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
@@ -253,9 +248,13 @@ Section ProofVirtioDiskRwB.
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
        locked γk cpu_id -∗
-       vdrw_body γd pd pav np nr fl pk tr
+       vdrw_body γd pd pav np nr cm
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
-       free_slot_res pd h -∗ free_slot_res pd m2 -∗ free_slot_res pd t -∗
+       (* each allocated slot with its receipt, as the allocator hands
+          them out *)
+       (free_slot_res pd h ∗ h ↪[dn_head γd] HInactive) -∗
+       (free_slot_res pd m2 ∗ m2 ↪[dn_head γd] HInactive) -∗
+       (free_slot_res pd t ∗ t ↪[dn_head γd] HInactive) -∗
        vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
@@ -428,13 +427,10 @@ Section ProofVirtioDiskRwB.
       iDestruct "Hgeom'" as "(Hdp & _)".
       destruct Hregs' as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).
       (* open the lock's resource *)
-      iDestruct (vdrw_body_open γd pd pav pu with "HR") as (np nr fl pk tr fr) "Hbody".
-      iDestruct "Hbody" as "(%Hfln & %Hcount & %Hdpk & %Hfpk & %Hdtr & %Hcoh &
-                             %Htok1 & %Htok2 & %Htok3 &
-                             Hpub & Hlb & Hrd & Hstg & Hcl & Huidx & Hflight &
-                             Hparked & Hbun)".
+      iDestruct (vdrw_body_open γd pd pav pu with "HR") as (np nr cm fr) "Hbody".
+      iDestruct "Hbody" as "(%Hcmok & Hpub & Hlb & Hrd & Hstg & Hcl & Huidx & Hbun)".
       (* ---- the three-descriptor allocator ---- *)
-      iApply (P1.wp_vdrw_alloc3 (proc_addr j) pd sp0 fr (trap_res eb + (K - 12))%nat M
+      iApply (P1.wp_vdrw_alloc3 γd (proc_addr j) pd sp0 fr (trap_res eb + (K - 12))%nat M
                 Hs0 Hs5 Hs1 Hs4 with "Hcg Htext Hpc Hbun Hscr").
       (* the [iNext] here is what pays the Loeb later: [wp_vdrw_alloc3]'s
          continuation is guarded, and stripping it also strips "IH". *)
@@ -448,9 +444,9 @@ Section ProofVirtioDiskRwB.
         destruct Hfacts as (Hh8 & Hm8 & Ht8 & Hhm & Hht & Hmt & Hfrh & Hfrm & Hfrt).
         rewrite /vdrw_p2_exit.
         iSpecialize ("Hexit" $! CIDlp with "[%]"); [wp_next_chain|].
-        iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t with
-                  "[%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok
-                   [Hpub Hlb Hrd Hstg Hcl Huidx Hflight Hparked Hbun] Hbh Hbm Hbt Hidx").
+        iApply ("Hexit" $! M1 np nr cm fr h m2 t with
+                  "[%] [%] [%] Hcg Hown Htc Hclm Hpc Htok
+                   [Hpub Hlb Hrd Hstg Hcl Huidx Hbun] Hbh Hbm Hbt Hidx").
         - split;
             [| exact (vdrw_hi_frame1 M M1 m0 Rs2 ltac:(vm_compute; reflexivity) Hcs1 Hhi)].
           unfold vdrw_regs. split_and!.
@@ -460,13 +456,9 @@ Section ProofVirtioDiskRwB.
           + rewrite (Hcs1 Rs6 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs6.
           + rewrite (Hcs1 Rs7 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs7.
         - unfold tri_ok. cbn. split_and!; assumption.
-        - exact (vdrwb_tri_disj fr tr h m2 t Htok3 Hfrh Hfrm Hfrt).
         - exact Hal.
-        - rewrite /vdrw_body. iFrame "Hpub Hlb Hrd Hstg Hcl Huidx Hflight Hparked Hbun".
-          iPureIntro. split_and!; try assumption.
-          intros p T i HpT Hi.
-          apply fr_upd_false_pres, fr_upd_false_pres, fr_upd_false_pres.
-          exact (Htok3 p T i HpT Hi). }
+        - rewrite /vdrw_body. iFrame "Hpub Hlb Hrd Hstg Hcl Huidx Hbun".
+          iPureIntro. exact Hcmok. }
       (* ============ the partial-free failure tail ============ *)
       iDestruct "Hfail" as "[Hpc Hfail]".
       (* the register facts that survive the allocator *)
@@ -508,11 +500,11 @@ Section ProofVirtioDiskRwB.
                   cpu_claim (proc_addr j) -∗
                   pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x094) : mword 64) -∗
                   locked γk cpu_id -∗
-                  free_bundles pd fr -∗
+                  free_bundles γd pd fr -∗
                   vdrw_scratch (KTR := KT1) sp0 -∗
                   vdrw_p2_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
                   WP (Loop : expr riscv_lang))%I
-        with "[Hpub Hlb Hrd Hstg Hcl Huidx Hflight Hparked IH]" as "Hsleep".
+        with "[Hpub Hlb Hrd Hstg Hcl Huidx IH]" as "Hsleep".
       { iIntros (Mz) "%Hcsz Hcg Hown Htc Hclm Hpc Htok Hbun Hscr Hexit".
         assert (Hhiz : vdrw_hi Mz m0)
           by (exact (vdrw_hi_frame M1 Mz m0 Hcsz
@@ -621,11 +613,11 @@ Section ProofVirtioDiskRwB.
         (* re-close the lock's resource: the bundle is whole again.  It has
            to be whole BEFORE the release, which is the only consumer. *)
         iAssert (disk_res γd pd pav pu)
-          with "[Hpub Hlb Hrd Hstg Hcl Huidx Hflight Hparked Hbun]" as "HR".
-        { iApply (vdrw_body_close γd pd pav pu np nr fl pk tr fr).
+          with "[Hpub Hlb Hrd Hstg Hcl Huidx Hbun]" as "HR".
+        { iApply (vdrw_body_close γd pd pav pu np nr cm fr).
           rewrite /vdrw_body.
-          iFrame "Hpub Hlb Hrd Hstg Hcl Huidx Hflight Hparked Hbun".
-          iPureIntro. split_and!; assumption. }
+          iFrame "Hpub Hlb Hrd Hstg Hcl Huidx Hbun".
+          iPureIntro. exact Hcmok. }
         (* ============== sleep_prepare(&disk.free[0]) ==============
            Noff-balanced and index-generic: it neither parks nor touches the
            lock, so the condition lock and its resource just ride along. *)
@@ -921,7 +913,7 @@ Section ProofVirtioDiskRwB.
         iEval (rewrite Hp07e) in "Hpc".
         iDestruct "Hidx" as (v1 v2) "Hidx".
         iDestruct "Hidx" as "(Hx0 & Hx1 & Hx2 & Hxp)".
-        iApply (wp_vdrw_free_at (CID := CIDlp)  γs pd h (fr_upd fr h false) M1 (trap_res eb + (K - 12))%nat
+        iApply (wp_vdrw_free_at (CID := CIDlp) γd γs pd h (fr_upd fr h false) M1 (trap_res eb + (K - 12))%nat
                   eb (proc_addr j) (pa_stk sp0 12) 0x07e
                   (mword_of_int 4000 : mword 12) (mword_of_int 2096448 : mword 21)
                   ({["virtio_disk"]} ∪ lks)
@@ -976,7 +968,7 @@ Section ProofVirtioDiskRwB.
             [| apply not_eq_sym, is_cs_idx_true_neq;
                [vm_compute; reflexivity | exact Hr]].
           exact (Hcs2 r Hr). }
-        { iApply (free_bundles_ext pd (fr_upd (fr_upd fr h false) h true) fr).
+        { iApply (free_bundles_ext γd pd (fr_upd (fr_upd fr h false) h true) fr).
           { intros i _. destruct (Nat.eq_dec i h) as [->|Hne].
             - rewrite fr_upd_eq. symmetry. exact Hfrh.
             - rewrite (fr_upd_ne _ h i true Hne) (fr_upd_ne _ h i false Hne). reflexivity. }
@@ -1002,7 +994,7 @@ Section ProofVirtioDiskRwB.
         (* the first free: descriptor h, whose cell the allocator cleared *)
         assert (Hfrh' : fr_upd (fr_upd fr h false) m2 false h = false)
           by (rewrite (fr_upd_ne _ m2 h false Hhm); apply fr_upd_eq).
-        iApply (wp_vdrw_free_at (CID := CIDlp)  γs pd h
+        iApply (wp_vdrw_free_at (CID := CIDlp) γd γs pd h
                   (fr_upd (fr_upd fr h false) m2 false) M1 (trap_res eb + (K - 12))%nat
                   eb (proc_addr j) (pa_stk sp0 12) 0x07e
                   (mword_of_int 4000 : mword 12) (mword_of_int 2096448 : mword 21)
@@ -1060,7 +1052,7 @@ Section ProofVirtioDiskRwB.
           by (rewrite HG1s0; exact Hidx1s).
         assert (Hfrm' : fr_upd (fr_upd (fr_upd fr h false) m2 false) h true m2 = false).
         { rewrite (fr_upd_ne _ h m2 true (not_eq_sym Hhm)). apply fr_upd_eq. }
-        iApply (wp_vdrw_free_at (CID := CIDlp)  γs pd m2
+        iApply (wp_vdrw_free_at (CID := CIDlp) γd γs pd m2
                   (fr_upd (fr_upd (fr_upd fr h false) m2 false) h true) G1 (trap_res eb + (K - 12))%nat
                   eb (proc_addr j) (pa_add (pa_stk sp0 12) 4) 0x08c
                   (mword_of_int 4004 : mword 12) (mword_of_int 2096434 : mword 21)
@@ -1082,7 +1074,7 @@ Section ProofVirtioDiskRwB.
             [| apply not_eq_sym, is_cs_idx_true_neq;
                [vm_compute; reflexivity | exact Hr]].
           exact (Hcs2 r Hr). }
-        { iApply (free_bundles_ext pd
+        { iApply (free_bundles_ext γd pd
                     (fr_upd (fr_upd (fr_upd (fr_upd fr h false) m2 false) h true) m2 true)
                     fr).
           { intros i _. destruct (Nat.eq_dec i m2) as [->|Hnem].

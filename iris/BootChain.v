@@ -720,6 +720,8 @@ Section BootPrimary.
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
+    (* ...the CLAIM MAP's authority, empty (nothing has been published)... *)
+    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     kpt_unset -∗
     kmap_auth kmap_M0 -∗
@@ -729,7 +731,7 @@ Section BootPrimary.
     intros Hreset Hz Hprun Hlen Hlive Himg.
     iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
-             #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
+             #Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
@@ -744,7 +746,7 @@ Section BootPrimary.
                     Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
                     Hdev Hwire Htx Hsent Hlb Hdlab
-                    Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
+                    Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand
        is intro + exists + frame and nothing else. *)

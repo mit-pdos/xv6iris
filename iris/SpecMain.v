@@ -628,6 +628,8 @@ Section SpecMain.
        postcondition these are exactly [DiskBoot.disk_res_boot]'s inputs. *)
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
+    (* ...the CLAIM MAP's authority, empty (nothing has been published)... *)
+    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
        stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
