@@ -1259,7 +1259,10 @@ as their remaining consumers.
   share in and out.  The PENDING/AWAIT half is not a residue at all: its
   region slot is on `ireg_slot`'s PENDING arm carrying C-3c's
   `ireg_top_park`, so the collection reads the bundle region-side through
-  `FsCollect.col_free_slot_acc`.
+  `FsCollect.col_free_slot_acc`.  [BUILT by C-4 — and its LAST sentence is
+  WRONG: the pending/await row is parked BEFORE iput's off-lock deposit, so
+  the region slot is still MARKED for the length of that window.  See C-4's
+  residue (F).]
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
@@ -1654,6 +1657,96 @@ as their remaining consumers.
   WHAT (D) LEAVES.  Nothing of its own.  `col_hand`'s remaining supplier is
   (A)'s `X` row alone — see B″-tx5's REMAINS; alternative (d) of
   `ic_escrow_body_cover` is gone.
+
+  **AS LANDED — C-4: THE POOL-SIDE TWIN, AND TWO WINDOWS NOBODY HAD NAMED.**
+
+  B''-tx5's REMAINS, at the shape its finding forced.  The transit part of
+  C-3b's third component now has its OWN key and its own parked share:
+  `IcacheRef.icfg_ptrn` (a new ambient gname beside `icfg_pext`, one
+  `ghost_varG Σ (gmap Z (nat * Qp))` in `Xv6Cameras.icacheG`) carries the
+  ledger `T`, `IcacheEscrow.ipool_tkey` is its two halves (one in
+  `ipool_body`, one in `ipool`) and `ipool_transit T` the shares, one per
+  inum in transit.  `(t, q)` are FIELDS for `Xv6Cameras.ic_dep`'s reason
+  verbatim (`IcacheTxRefute.tx_two_halves_no_whole`): `ipool_put` has to
+  hand the walk back EXACTLY the element it parked, and an existentially
+  keyed share cannot be re-identified.  The row is
+  `region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids` and the body stays
+  TIMELESS.  `ipool_transit_no_ops` is the refutation and
+  **`ipool_quiesce_acc`** the commit's door: `ipool_inv_acc` plus that
+  refutation, handing out B''-join's own three-part row at an empty `ln_tx`
+  authority.
+
+  THE SHARE IS PAID AT `ipool_evict_lend`'s CLOSING STEP, NOT ITS OPENING,
+  and that position is forced: the free path's evicting walk has its share
+  parked in the escrow's FROZEN arm at the opening and gets it back
+  (`ic_pin_exit`) inside the very window the accessor holds `ipoolN` open
+  for.  The ledger's VALUE moves at the opening, where both halves are in
+  hand; only the resource waits for the close.  iput hands the WHOLE
+  `tid ↪[ln_tx icfg_log]{#qtx} ()` over at both eviction sites and takes it
+  back at `ipool_put` — nothing between the two uses it, so no split.
+
+  CONTRACTS WHOSE STATEMENT CHANGED: `IcacheEscrow.ipool` (its `T` is a
+  `gmap Z (nat * Qp)` and `ipool_xkey` no longer carries it), `ipool_body`,
+  `ipool_alloc_inv`, `ipool_evict_lend` (+`(t, q)`, the share at the closing
+  wand), `ipool_put` (+`(t, q)`, the share in the post), `ipool_inv_acc`
+  (+`T` and the shares); `IcacheRef.icfg`/`icfg_alloc`;
+  `IcacheBoot.icache_boot_at`/`icache_boot` and `FsCfgBoot.fs_kit_icache` /
+  `_rest` / their two `_open`s (+the ledger, LAST).  The consumer sweep is
+  three files: `ProofIput` (the two evict/put pairs), `ProofMain` (one
+  destructuring pattern, one `with`-list) and `FsCfgBoot`'s own kit plumbing.
+  UNTOUCHED: `log_ctx`, `log_op`, `wp_end_op`, `fs_crash_seam`, `P_fs`,
+  `is_itable2`/`itable_res2`'s arity, `ic_escrow_body`'s five arms and
+  `ic_escrow_body_cover`.
+
+  **THE ASSEMBLY (items 2–5) IS BLOCKED ON TWO WINDOWS THAT ARE NOT (A)–(D),
+  AND FINDING THEM IS THIS LANE'S OTHER RESULT.**  Both are inside ONE
+  transaction and therefore unreachable at a commit; neither is PROVED so,
+  because neither parks a share of its transaction's `ln_tx` element the way
+  `IcacheEscrow.ic_pin_tx` and `ipool_transit` do.  They are recorded as
+  residues (E) and (F) in `FsCollect.v`'s header.
+
+  (E) THE CLAIM BOX.  ialloc's `InodeRegion.ireg_claim_au` retags a FREE
+  record to a `fresh_shape` one — a NONZERO type by definition
+  (`InodeRegion.v:419`) — and the pool row for that inum stays on its MARKER
+  arm until the `iget` inside ialloc takes it.  In that window the region
+  slot is on `ireg_slot`'s IN arm (`ireg_in d = di_type d = 0 ∨ fresh_shape
+  d`), so `FsCollect.col_free_slot_acc`'s `di_type d = 0` premise fails and
+  `InodeRegion.ireg_top_park` is on its VACUOUS side: the fragment it carries
+  is at an ARBITRARY node.  `FsCollect.col_claim_box_untied` is that
+  statement, machine-checked.  So neither `sk_rec` nor `sk_links` can be read
+  at the inum — this is (D)'s residue at a record type (D) does not reach,
+  and it is NOT (A)'s: the inum is an ORDINARY pool row, in `O`.
+  THE FIX IS CHEAP IN SHAPE AND WIDE IN SWEEP, and it is `ireg_top_park`'s
+  own: a nonzero-type park occurs ONLY at a claim box (the two arms that hold
+  the park are IN, where `ireg_in`, and PENDING, where the type is zero), so
+  giving `ireg_top_park` a parked share on its nonzero-type side refutes the
+  window outright and lets `col_free_slot_acc` DROP its type premise at a
+  commit.  The sweep is `ireg_top_park_nz`/`_retype`, `ireg_claim_au`,
+  `ireg_withdraw` and then ialloc's spec and its callers — B''-tx5-sized.
+
+  (F) THE CORPSE BEFORE ITS DEPOSIT, and it CORRECTS B''-tx5's REMAINS.
+  "Every `X` inum's region slot is on `ireg_slot`'s PENDING arm carrying
+  `ireg_top_park`" is true only AFTER iput's off-lock deposit
+  (`EscrowDeposit.ireg_free_deposit_au`, which opens the arm on its MARKED
+  alternative).  The pool's pending row is parked at +0x94 and the await row
+  at the free path's eviction, BOTH BEFORE that deposit, and until it fires
+  the region slot is still MARKED — `InodeRegion.imark` and NO record
+  fragment (`ireg_marked_ok` forces a nonzero type there,
+  `InodeRegion.v:790`), the fragment being in the walk's own hand.  So such
+  an inum has no bundle anywhere, exactly as C-3b's `X` residue said, and
+  C-3c's accessor does not reach it.  THE HOOK FOR THE FIX IS THE FREEZE
+  COLUMN: `ireg_free_deposit_au`'s own proof reads `f = FrzPost` across that
+  window (its regime leg refutes `⌜f = FrzOff⌝` there), so the corpse window
+  is exactly "the MARKED arm at a non-`FrzOff` column" and a share parked in
+  `ireg_slot`'s freeze clause closes it.
+
+  NOT LANDED, and blocked on (E) and (F): `fs_collect_snap_ok` (the
+  assembly), the law parked in `log_ctx`, `eo_commit`'s call at
+  `outstanding = 0`, the two commit permits at `dsnap_step_of`,
+  `fs_commit_receipt`, `P_fs`'s conjunct → `P_dur (fr_D r)`, and the
+  `fs_dview`-as-slot / `fdn_*` / `riscv_dview_name` deletions.  Nothing of
+  the shape changed: `col_snap_ok_ex` is still what the law concludes and
+  `col_hand` still what it must assemble.
 
 - [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
   The GENERAL statement is the commit's receipt itself: after a commit, the

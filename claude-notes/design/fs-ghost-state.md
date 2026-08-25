@@ -183,6 +183,10 @@ byte authority at `L` plus "no transaction is open" into `∃ S, snap_ok S L`
 and hands the authority back — it concludes at `FsCollect.col_snap_ok_ex`
 and must assemble `col_hand`.  And `P_dur (fr_D r)` as `FsCrash.P_fs`'s
 durable conjunct, in place of today's flat `LogDefs.fs_dview` blob.
+Every SUPPLIER of `col_hand` now exists (§5a's `ipool_quiesce_acc` was the
+last, C-4), but the ASSEMBLY is blocked on two windows that are nobody's
+supplier — the claim box and the corpse before its deposit — recorded as
+residues (E) and (F) in `FsCollect.v`'s header.
 
 ## 2b. The durable side — the snapshot inside the crash predicate
 
