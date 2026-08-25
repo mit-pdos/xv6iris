@@ -1763,7 +1763,7 @@ Section IcacheBootTable.
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
-      iMod (inv_alloc icEscN E (ic_escrow_body cn γfs γi cov logstart k)
+      iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
         rewrite /ic_empty_arm. iExists (dvs k).1, (dvs k).2, w. iFrame. }

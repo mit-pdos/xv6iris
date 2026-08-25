@@ -2517,7 +2517,7 @@ Section ProofIlockMain.
            which is why the same line serves ClaimK, PlainK and ShotK. ==== *)
         iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
         iDestruct (ic_dep_own_live with "Hown") as (s0 g0) "(%Hg0 & Hlv & _)".
-        iMod (frz_slot_kill (⊤ ∖ ↑icEscN) k ((1/2)/2)%Qp s0
+        iMod (frz_slot_kill (⊤ ∖ ↑(icEscN .@ k)) k ((1/2)/2)%Qp s0
                 ltac:(solve_ndisj) Hk with "Hitbl Hsel [Hlv]") as "[]".
         iExists g0. iExact "Hlv". }
     iDestruct "Hok" as "(Hbody & Hdep & Hout)".

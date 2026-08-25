@@ -1102,7 +1102,7 @@ Section IputTail.
       (* the eviction runs BEFORE the store: [ic_open_auth_ref] wants the
          authority still showing the slot, and the store deletes it. *)
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_auth_ref cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
+      iMod (ic_open_auth_ref cn gfs gi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
               Mt qt qt dev inum ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
@@ -2453,7 +2453,7 @@ Section IputFreePath.
       [iExists g1; iExact "Hlvh" |].
     iInv "Hesc" as ">Hbody" "Hclose".
     iAssert (live_frac k q) with "[Hlvq]" as "Hlvqf"; [ iExists ga'; iExact "Hlvq" |].
-    iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
+    iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
             Mt q ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hfrg & Hlvq2 & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
@@ -2480,7 +2480,7 @@ Section IputFreePath.
        OUT arm here: the freer keeps the count fragment and the identity in
        its own hand and parks only the RECEIPT.
        ================================================================ *)
-    iMod (frz_slot_freeze (⊤ ∖ ↑icEscN) Mt k q 1%positive
+    iMod (frz_slot_freeze (⊤ ∖ ↑(icEscN .@ k)) Mt k q 1%positive
             ltac:(solve_ndisj) HMk1 with "Hitinv Hhalf [Hlvr] [Hlvh] Hselo")
       as "(Hhalf & Hselp & Hsele)";
       [iExists ga'; iExact "Hlvr" | iExists ga'; iExact "Hlvh" |].
@@ -3047,7 +3047,7 @@ Section IputFreePath.
     (* ---- the eviction runs BEFORE the store ---- *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_open_auth_frz cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
+    iMod (ic_open_auth_frz cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
             Mt2 q q dev inum ltac:(solve_ndisj) Hk HMk2
             with "Hitinv Hbody Hhalf Hfrg Hselp Hrident")
       as "(Hhalf & Hfrg & Hselp & Hrident & Harm & _)".
@@ -3911,7 +3911,7 @@ Section IputFreePath.
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
     iMod (ic_open_auth_ref cn γfs γi cov logstart k
-            (⊤ ∖ ↑icEscN) Mt q q dev inum
+            (⊤ ∖ ↑(icEscN .@ k)) Mt q q dev inum
             ltac:(solve_ndisj) HMk1 with "Hitinv Hbodyp Hhalf Hrtok Hrident")
       as "(Hhalf & Hrtok & Hrident & Harmp & Hparkp)".
     iDestruct "Harmp" as (vp gap) "(Hidvp & Hinhp & Hvldp & Hpaylp & Hmtp & Hgidap)".
@@ -3948,7 +3948,7 @@ Section IputFreePath.
                    else IcacheRef.inode_ident k (DfracOwn q) dev inum ∗
                         islot_rest_at k q dev inum) ∗
                   frzm_h (bv_unsigned inum) false)%I)
-              (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
+              (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc [] [] [Hhalf Hrtok Hrident Hrest Hmirf]").
     { iApply (ipi_3a with "Htext"). }
@@ -3956,7 +3956,7 @@ Section IputFreePath.
     { rewrite Hpa3a.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_auth_ref cn γfs γi cov logstart k
-              (⊤ ∖ ↑minstretN ∖ ↑icEscN) Mt q q dev inum
+              (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) Mt q q dev inum
               ltac:(solve_ndisj) HMk1 with "Hitinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
       iDestruct "Harm" as (vld ga) "(Hidv & Hinh & Hvld & Hpayl & Hmt & Hgida)".
@@ -3965,7 +3965,7 @@ Section IputFreePath.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
         rewrite /ic_payload_arm.
         iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh) | [Hrc _]]"; last first.
-        { iMod (ireg_frzown_off_absurd (⊤ ∖ ↑minstretN ∖ ↑icEscN)
+        { iMod (ireg_frzown_off_absurd (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
                   γi γfs inodestart nib inum ltac:(solve_ndisj) Hnib
                   with "Hireg Hmirf Hrc") as "[]". }
         iDestruct "Hrident" as "[Hrd Hrn]".
@@ -4194,7 +4194,7 @@ Section IputFreePath.
        WHOLE, which is exactly why this load is an AU at all. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
+    iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
             Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbodyp Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidvp & Hnfullp
@@ -4212,14 +4212,14 @@ Section IputFreePath.
                          live_gen k (1/2) ga ∗ ic_id cn k (1/2) true dev inum ∗
                          i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
                          ic_payload_at γfs γi cov logstart k inum ga dn bm)%I)
-              (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
+              (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc [] [] [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
     { iApply (ipi_46 with "Htext"). }
     { rewrite Hpa46. iExact "Hclaim46". }
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑icEscN)
+      iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
@@ -4339,7 +4339,7 @@ Section IputFreePath.
                   with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
                         Hblks Hdv Hfv Htop").
         rewrite /inode_meta. iFrame. }
-      iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
+      iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".

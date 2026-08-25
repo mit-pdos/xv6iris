@@ -1590,9 +1590,32 @@ Section IcacheEscrow.
      hold either of those open at the same instruction. *)
   Definition icEscN : namespace := nroot .@ "icesc".
 
+  (* ONE NAMESPACE PER SLOT, AND THAT IS LOAD-BEARING (durable-fs-plan.md
+     section 4, the commit's collection).  [inv N P] opens once per
+     namespace, so fifty escrows at the single [icEscN] can never be open
+     at the same ghost step -- and the commit has to open EVERY cached
+     inode's bundle at once to ∗ them together.  At [icEscN .@ k] the fifty
+     are pairwise disjoint ([ndot_ne_disjoint]) and open independently.
+
+     NO CALLER PAYS FOR IT.  [↑icEscN] still covers every slot's namespace
+     ([nclose_subseteq]), so a mask that merely EXCLUDES the family --
+     which is what every mask outside this file does -- is unchanged; only
+     a proof that OPENS a specific slot names [icEscN .@ k], and it knows
+     its [k]. *)
   Definition ic_escrow (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : iProp Σ :=
-    inv icEscN (ic_escrow_body cn γfs γi cov logstart k).
+    inv (icEscN .@ k) (ic_escrow_body cn γfs γi cov logstart k).
+
+  (* two DIFFERENT slots' escrows are at DISJOINT namespaces, which is what
+     lets the commit hold both open *)
+  Lemma ic_escrow_ns_disjoint (k j : nat) :
+    k <> j -> ↑(icEscN .@ k) ## (↑(icEscN .@ j) : coPset).
+  Proof. intros Hne. by apply ndot_ne_disjoint. Qed.
+
+  (* ...and each of them is inside the family's own mask, so a caller that
+     only excludes [↑icEscN] is unaffected *)
+  Lemma ic_escrow_ns_sub (k : nat) : ↑(icEscN .@ k) ⊆ (↑icEscN : coPset).
+  Proof. apply nclose_subseteq. Qed.
 
   Global Instance ic_escrow_persistent cn γfs γi cov logstart k :
     Persistent (ic_escrow cn γfs γi cov logstart k).

@@ -1273,7 +1273,7 @@ Section ProofIget.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (ic_id cn e (1/2) false dev inumT)
-                      (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
+                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hgid]").
             { iApply (igi_6e with "Htext"). }
             { rewrite Hpa6e. iExact "Hclaim1". }
@@ -1323,7 +1323,7 @@ Section ProofIget.
                        frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
                        iname γi γfs inodestart inum l)%I
-                      (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
+                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hgid HinT Hbundle Hlic]").
             { iApply (igi_72 with "Htext"). }
             { rewrite Hpa72. iExact "Hclaim2". }
@@ -1346,7 +1346,7 @@ Section ProofIget.
                  back the licence together with the bundle's two ghost columns
                  ([icnt_half] at 0 and the [ifreeze_off] token).  Both go on to
                  +0x78; the payload is not touched. *)
-              iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑icEscN) γfs γi inodestart nib
+              iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) γfs γi inodestart nib
                       cov logstart inum l
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
                       with "Hrinv Hlic Hbundle")
@@ -1495,7 +1495,7 @@ Section ProofIget.
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
                        ic_id cn e (1/2) true dev inum)%I
-                      (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
+                      (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hmt Hgid2 Hd2 Hlvh Hpend Hfoff]").
             { iApply (igi_7c with "Htext"). }
             { rewrite Hpa7c. iExact "Hclaim4". }
