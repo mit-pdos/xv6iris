@@ -322,7 +322,7 @@ Section ProofVirtioDiskRwE.
   Proof.
     iIntros "Hbody Hclaim". rewrite /vdrw_body.
     iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & Hlb & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring)".
+                           Hpub & Hlb & Hrd & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring)".
     iDestruct (disk_claim_agree γd q V fl pk with "Hcl Hclaim") as %[Hf | [_ Hp]].
     - (* IN FLIGHT: the cell reads 1 *)
       iDestruct (big_sepM_lookup_acc (fun p v => flight_res γd p v) fl q V Hf
@@ -338,7 +338,7 @@ Section ProofVirtioDiskRwE.
       iSplitR; [iPureIntro; exact Htrok|].
       iSplitR; [iPureIntro; exact Htrdj|].
       iSplitR; [iPureIntro; exact Htrfr|].
-      iFrame "Hpub Hlb Hcl Huidx Hpkm Hfb Hring".
+      iFrame "Hpub Hlb Hrd Hcl Huidx Hpkm Hfb Hring".
       iApply "Hback". iFrame "Hrcpt Hbd Hib". iPureIntro. exact Hlink.
     - (* PARKED: the cell reads 0, and P6 may collect *)
       iDestruct (big_sepM_lookup_acc (fun p v => parked_res γd pav p v) pk q V Hp
@@ -355,7 +355,7 @@ Section ProofVirtioDiskRwE.
       iSplitR; [iPureIntro; exact Htrok|].
       iSplitR; [iPureIntro; exact Htrdj|].
       iSplitR; [iPureIntro; exact Htrfr|].
-      iFrame "Hpub Hlb Hcl Huidx Hflm Hfb Hring".
+      iFrame "Hpub Hlb Hrd Hcl Huidx Hflm Hfb Hring".
       iApply "Hback". iExists bs.
       iFrame "Hbd Hib Hpinr Hstat Hbytes Hbuf".
       iPureIntro. split_and!; assumption.
@@ -790,7 +790,8 @@ Section ProofVirtioDiskRwE.
                 /\ virtio_isr_ok v'
                 /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
                 /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-                /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v).
+                /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v
+                /\ v_ahead v' = v_ahead v).
     { intros v Hvok. rewrite vdrwe_notify_off.
       apply (virtio_notify_write_ok v (mword_of_int 0 : mword 32));
         [ vm_compute; reflexivity | exact Hvok ]. }

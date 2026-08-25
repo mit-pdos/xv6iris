@@ -1580,7 +1580,7 @@ Section VdrwdP4.
     (* ---- open the lock resource ---- *)
     rewrite /vdrw_body.
     iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hclaim & Huidx & Hflm & Hpkm & Hfb & Hring)".
+                           Hpub & #Hlb & Hrd & Hclaim & Huidx & Hflm & Hpkm & Hfb & Hring)".
     (* ---- +0x176  c.ld a3,8(a5) ---- *)
     assert (Hava : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_avail_ptr : SailStdpp.Values.mword 64))
@@ -1913,7 +1913,7 @@ Section VdrwdP4.
     { iPureIntro. exact (vdrwd_tr_disj_ins tr np (h, m2, t) Htrdj Hdisj0). }
     iSplitR.
     { iPureIntro. exact (vdrwd_tr_free_ins tr np h m2 t fr Hfrh Hfrm Hfrt Htrfr). }
-    iFrame "Hpub Hlb".
+    iFrame "Hpub Hlb Hrd".
     rewrite (insert_union_l fl pk np V). iFrame "Hclaim".
     iFrame "Huidx Hflm Hpkm Hfb".
     rewrite dom_insert_L vdrwd_mod8_insert. iExact "Hring".

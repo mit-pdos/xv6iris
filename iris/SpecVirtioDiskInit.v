@@ -156,6 +156,10 @@ Definition vdi_post
        is in its live arm (the not-live arm owns the [dn_np] ghost_var whole) --
        together with the frozen configuration [DiskInv.disk_geom] is built on. *)
     disk_pub γv 0%nat -∗
+    (* ...and the READ WATERMARK's other half, at 0: the handler presents it
+       to reclaim used records in order, which is what keeps the unread ones a
+       contiguous run (tools/vtest/README.md finding 5). *)
+    disk_read_at γv 0%nat -∗
     disk_cfg γv (virtio_init_cfg pd pav pu) -∗
     (* the queue pages, zeroed, minus what went to the device: the used page
        whole, and the available page's flags+index words (the lease pins the

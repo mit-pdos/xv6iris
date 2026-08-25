@@ -420,6 +420,12 @@ Section DiskInv.
        (* the protocol tokens *)
        disk_pub γ np ∗
        disk_done_lb γ nr ∗
+       (* THE READ WATERMARK, exactly: [nr] is how far the handler has walked
+          the used ring, and [d_used_idx] below is the driver's own copy of
+          it.  Reclaiming a record REQUIRES this half at that record's index
+          ([VirtioProto.virtio_proto_reclaim_acc]), which is what forces the
+          handler to drain in order (finding 5). *)
+       disk_read_at γ nr ∗
        ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
        (* driver counters and cells *)
        d_used_idx ↦₂ wrap16 nr ∗

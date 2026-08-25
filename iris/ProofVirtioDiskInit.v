@@ -430,12 +430,13 @@ Section VdiLeaves.
               with "Hcg Hpc Hinstr Hdinv Hvc []").
     { iIntros (v Hvok) "Hproto Hmine".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui & Hca & Htk).
+        as %(Hcv & Hsn & Hui & Hca & Htk & Hah).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (set_vcfg v c') c'
               ltac:(rewrite Hcv; exact Hl0) Hl1 eq_refl
               ltac:(exact Hsn) ltac:(exact Hui)
-              ltac:(exact Hca) ltac:(exact Htk) ltac:(exact Hcwce)
+              ltac:(exact Hca) ltac:(exact Htk) ltac:(exact Hah)
+              ltac:(exact Hcwce)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (set_vcfg v c').
       iSplitR.
@@ -488,11 +489,12 @@ Section VdiLeaves.
               with "Hcg Hpc Hinstr Hdinv Hvc []").
     { iIntros (v Hvok) "Hproto Hmine".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui & Hca & Htk).
+        as %(Hcv & Hsn & Hui & Hca & Htk & Hah).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (virtio_reset v) virtio_cfg0
               ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl
               ltac:(apply virtio_reset_cache) ltac:(apply virtio_reset_taken)
+              ltac:(apply virtio_reset_ahead)
               ltac:(by vm_compute)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (virtio_reset v).
@@ -530,6 +532,10 @@ Section VdiLeaves.
     ( sie_cap_gpr KT1 m n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       disk_pub γv 0%nat -∗
+      (* the READ WATERMARK's other half, minted at the flip beside the
+         publisher credential: the interrupt handler presents it to reclaim
+         used records in order (finding 5). *)
+      disk_read_at γv 0%nat -∗
       disk_cfg γv (virtio_init_cfg pd pav pu) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -548,7 +554,8 @@ Section VdiLeaves.
               (disk_cfg_is γv (DfracOwn (1/2)) c ∗
                phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0%nat) ∗
                phys_list pu (replicate 4096 byte_zero))%I
-              (disk_pub γv 0%nat ∗ disk_cfg γv (virtio_init_cfg pd pav pu))%I
+              (disk_pub γv 0%nat ∗ disk_read_at γv 0%nat ∗
+               disk_cfg γv (virtio_init_cfg pd pav pu))%I
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)
@@ -557,20 +564,20 @@ Section VdiLeaves.
     { iFrame "Hvc Hidx Hpage". }
     { iIntros (v Hvok) "Hproto (Hmine & Hidx & Hpage)".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui & Hca & Htk).
+        as %(Hcv & Hsn & Hui & Hca & Htk & Hah).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_intro γv v (set_vcfg v (virtio_init_cfg pd pav pu))
               pd pav pu ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl
-              eq_refl eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage")
-        as "(Hproto & Hpub & #Hcfg)".
+              eq_refl eq_refl eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage")
+        as "(Hproto & Hpub & Hrd & #Hcfg)".
       iModIntro. iExists (set_vcfg v (virtio_init_cfg pd pav pu)).
       iSplitR.
       { iPureIntro. rewrite Ha8 Hoff Hsw'. exact (Hcw v Hcv). }
       iSplitR; [iPureIntro; exact Hvok|].
-      iFrame "Hproto Hpub Hcfg". }
+      iFrame "Hproto Hpub Hrd Hcfg". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc [Hpub #Hcfg]".
-    iApply ("Hcont" with "Hcg Hpc Hpub Hcfg").
+    iIntros "Hcg Hpc [Hpub [Hrd #Hcfg]]".
+    iApply ("Hcont" with "Hcg Hpc Hpub Hrd Hcfg").
   Qed.
 
   Lemma vdi_ldval (w : mword (8*4)) :
@@ -2476,7 +2483,7 @@ Section ProofVirtioDiskInit.
               (init_cfg_pages_aligned_of_valid pd pav pu Hpdv Hpavv Hpuv) Hdmadisj
               with "Hcg Hpc [] Hdinv Hvc Hidxp Hpup").
     { iApply (vdi_170 with "Htext"). }
-    iIntros "Hcg Hpc Hpub #Hcfgp".
+    iIntros "Hcg Hpc Hpub Hrd #Hcfgp".
     assert (Hp174 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x170) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_init + 0x174)) by pcs.
     iEval (rewrite Hp174) in "Hpc".
     (* ===== EPILOGUE (0x174..0x17e) ===== *)
@@ -2683,7 +2690,7 @@ Section ProofVirtioDiskInit.
        chain the proofmode re-traverses at every context split. *)
     iEval (rewrite /vdi_post) in "Hcont".
     iApply ("Hcont" $! P5 pd pav pu with
-      "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hpub Hcfgp Hbpd Hbpavr Hdesc Havail Hused Hfree Hlk Hlnm Hcp").
+      "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hpub Hrd Hcfgp Hbpd Hbpavr Hdesc Havail Hused Hfree Hlk Hlnm Hcp").
     { try iPureIntro. unfold callee_saved.
       split. { rewrite /P5 upd_eq. exact Hwv. }
       split. { rewrite /P5 upd_ne; [| reg_neq]. rewrite /P4 upd_ne; [| reg_neq].

@@ -325,6 +325,9 @@ Section DiskBoot.
     virtio_pages_aligned (virtio_init_cfg pd pav pu) ->
     (* --- what [SpecVirtioDiskInit.vdi_post] hands its caller --- *)
     disk_pub γ 0%nat -∗
+    (* ...including the READ WATERMARK's half, at zero: nothing has been
+       published, so nothing is owed a look *)
+    disk_read_at γ 0%nat -∗
     ([∗ list] j ∈ seq 0 4096, pa_add pd j ↦ₘ byte_zero) -∗
     ([∗ list] j ∈ seq 4 4092, pa_add pav j ↦ₘ byte_zero) -∗
     ([∗ list] j ∈ seq 0 8, pa_add SpecVirtioDiskInit.disk_free j ↦ₘ (Z_to_bv 8 1)) -∗
@@ -337,7 +340,7 @@ Section DiskBoot.
     disk_res γ pd pav pu.
   Proof.
     intro Hal. destruct (init_cfg_pages_aligned pd pav pu Hal) as [Hpd Hpav].
-    iIntros "Hpub Hdesc Havail Hfree Huidx Hraw Hlb Hclaim".
+    iIntros "Hpub Hrd Hdesc Havail Hfree Huidx Hraw Hlb Hclaim".
     iDestruct (desc_page_entries pd Hpd with "Hdesc") as "Hde".
     iDestruct (avail_page_ring pav Hpav with "Havail") as "Hring".
     iDestruct (free_bundles_boot pd with "Hfree Hde Hraw") as "Hfb".
@@ -361,7 +364,7 @@ Section DiskBoot.
       discriminate. }
     iSplitR.
     { iPureIntro. intros p T i Hp _. rewrite lookup_empty in Hp. discriminate. }
-    iFrame "Hpub Hlb Hclaim Huidx".
+    iFrame "Hpub Hlb Hrd Hclaim Huidx".
     assert (Hm8 : mod8 (∅ : gset nat) = ∅) by (rewrite /mod8; set_solver).
     rewrite Hm8.
     iFrame "Hfb Hring".

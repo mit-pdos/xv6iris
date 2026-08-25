@@ -529,6 +529,8 @@ Section VdrwbDefs.
      ⌜forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false⌝ ∗
      disk_pub γ np ∗
      disk_done_lb γ nr ∗
+     (* the READ WATERMARK's half, at the same [nr] the cell below holds *)
+     disk_read_at γ nr ∗
      ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
      d_used_idx ↦₂ wrap16 nr ∗
      ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗

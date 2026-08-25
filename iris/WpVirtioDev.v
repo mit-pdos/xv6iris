@@ -92,7 +92,8 @@ Lemma virtio_ack_write_ok (v : virtio_state) (w : bv 32) :
     /\ virtio_isr_ok v'
     /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
     /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-    /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v.
+    /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v
+    /\ v_ahead v' = v_ahead v.
 Proof.
   intro Hok. eexists. split; [ reflexivity |].
   split_and!; [| reflexivity .. ].
@@ -109,7 +110,8 @@ Lemma virtio_notify_write_ok (v : virtio_state) (w : bv 32) :
     /\ virtio_isr_ok v'
     /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
     /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
-    /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v.
+    /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v
+    /\ v_ahead v' = v_ahead v.
 Proof.
   intros Hw Hok. exists v.
   assert (Hz : (bv_unsigned w =? 0) = true) by (apply Z.eqb_eq; exact Hw).
@@ -860,7 +862,11 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword
           in-flight write's sequential permit is outstanding, so a
           protocol-neutral store has to leave both fields alone.  Both stores
           the live driver makes do. *)
-       /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v) ->
+       /\ v_cache v' = v_cache v /\ v_taken v' = v_taken v
+       (* ...AND THE SERVED-AHEAD SET (finding 5): the window is a watermark
+          plus the positions answered out of turn, so a protocol-neutral
+          store has to leave that set alone too ([virtio_write_ahead]). *)
+       /\ v_ahead v' = v_ahead v) ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
@@ -887,8 +893,9 @@ Proof.
   { done. }
   { iIntros (v Hvok) "Hproto _".
     destruct (Hwrite v Hvok)
-      as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk' & Hca' & Htk').
-    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused' Hca' Htk'
+      as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk' & Hca' & Htk' &
+          Hah').
+    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hah' Hused' Hca' Htk'
                  with "Hproto") as "Hproto".
     iModIntro. iExists v'.
     iSplitR; [iPureIntro; exact Hvw|].
