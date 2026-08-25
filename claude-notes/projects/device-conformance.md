@@ -178,41 +178,13 @@ latch only if it held it.  `VirtioQueue`'s keyed protocol follows: `vp_srv`,
 `vp_lo`, `vp_tk`, `vp_uix`, with `vpo_win` (the eight-wide window) derived at
 the publish from the available-ring entry the watermark's own position pins.
 
-**THE IRIS DRIVER PORT IS NOT FINISHED, and it now has its own worklist:**
-[`virtio-finding5-driver-port.md`](virtio-finding5-driver-port.md) is the
-live one — read it, not the two plan items below, which are STALE.  `dn_ord`
-landed; the position-keyed flight map they describe no longer exists (the
-per-descriptor receipt replaced it), and `DiskInv.disk_res` no longer has a
-flight map at all.  The paragraph below records where the port stood when
-this note was written.
-
-Green as of this note:
-`VirtioModel`, `RiscvLang`, `WpVirtio`, `VirtioQueue`, and the whole
-`vtest-rocq` suite.  In progress: `VirtioProto` (the invariant's coupling and
-the three device-thread rules are ported; the accessors are not).  Untouched:
-`DiskInv`, `ProofVirtioDiskIntr`, the six `ProofVirtioDiskRw*`, the specs and
-`WpUart`'s disk loop.  The two pieces of DESIGN still to do, both recorded
-here so the port is resumable:
-
-1. **The interrupt handler's identification.**  `virtio_disk_intr` walks USED
-   INDICES and the protocol is keyed by POSITION, and the two are different
-   numbers now.  The plan: `dn_ord`, a ghost_map from position to used index
-   whose elements are minted PERSISTENT at each completion (already added to
-   `disk_names`/`Xv6Cameras`/the invariant), plus `vpo_uix_surj` (every used
-   index below the count belongs to some position, already in `vproto_ok`).
-   The handler at used index `nr` gets `∃ p, disk_ord γ p nr`, and
-   `disk_ord_agree` is what tells it `p` is not one it has already processed.
-   `DiskInv.disk_res` then keys its flight map by position with
-   `dom fl = [0,np) ∖ processed` rather than by the interval `[nr, np)`.
-
-2. **The used ring must not overwrite an unconsumed element.**  The old proof
-   got this free (position = used index, and pins made positions distinct mod
-   8).  It now needs the fact that the unreclaimed done records' used indices
-   are exactly `[nr, nc)` — a `vp_nr` field plus `k ∈ dom vp_done ↔ nr ≤ vp_uix k`,
-   maintained by the step (adds `nc`) and by the reclaim (removes `nr`, which
-   is what the handler consumes).  With that, |done| = nc − nr, each done
-   position is still pinned, so nc − nr ≤ 8 and the new element never lands on
-   a live one.
+**The Iris driver port has its own worklist:**
+[`virtio-finding5-driver-port.md`](virtio-finding5-driver-port.md); the
+settled design is in [`design/virtio-driver.md`](../design/virtio-driver.md)
+(the per-descriptor receipt keyed by head, `dn_ord` for naming the position
+behind a used index, `vp_nr`/`vpo_done_uix` for "the used ring never
+overwrites an unread element", the lock-held claim map as the handler's
+carrier, and the ring window as a pigeonhole over heads).
 
 Finding 4's fix IS local — `virtio_used_writes` needs the request type to
 choose between `1` and `vr_len r + 1` — but it still moves a definition in
