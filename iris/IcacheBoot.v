@@ -1705,6 +1705,10 @@ Section IcacheBootTable.
        [ipool] conjunct, and [is_itable2] carries the invariant on. *)
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
     ghost_var icfg_pool 1 (∅ : gset Z) -∗
+    (* ...AND THE IN-TRANSITION KEY (durable-disk C-3b), whole and empty:
+       at boot no walk is carrying an inum and no pending/await row exists,
+       so the pool's partition is the two-way one. *)
+    ghost_var icfg_pext 1 (∅ : gset Z) -∗
     (* THE ITABLE LOCK'S GHOST, unbuilt: the two [excl_auth] halves at
        [None], as [WpLockAt.lock_ghost_alloc] mints them.  A PREMISE for the
        reason every other ghost here is one -- the gname is the caller's
@@ -1728,10 +1732,12 @@ Section IcacheBootTable.
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
     iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
-    iIntros "Hfree Htok Hmid Hgid".
-    (* the pool's own invariant, out of the stocked rows and the whole key *)
-    iMod (ipool_alloc_inv E γfs γi cov logstart (region_inums nib)
-            with "Hkey Hrows") as "[#Hpinv Hpool]".
+    iIntros "Hxkey Hfree Htok Hmid Hgid".
+    (* THE POOL'S INVARIANT IS ALLOCATED AFTER THE ESCROWS (durable-disk
+       C-3b), and it has to be: its body carries a QUARTER of every slot's
+       [ic_id] beside the partition, and those quarters do not exist until
+       the escrow loop below has re-tagged the fifty identities at the
+       values the entry cells actually hold. *)
     (* only the ZEROS are used: they are what [itable_body] parks for a free
        slot.  The [sl_free_tok]s beside them belong to whoever wants to build
        a lock AT [icfg_isl k], and this cache does not -- its locks carry
@@ -1765,7 +1771,9 @@ Section IcacheBootTable.
     iDestruct (big_sepL_sep_2 with "H2 Hmid") as "H3".
     iDestruct (big_sepL_sep_2 with "H3 Hgid") as "H4".
     iAssert ([∗ list] k ∈ seq 0 NINODE,
-               |={E}=> ic_escrow cn γfs γi cov logstart k ∗ islot_empty cn k)%I
+               |={E}=> ic_escrow cn γfs γi cov logstart k ∗
+                       (islot_empty cn k ∗
+                        ic_id cn k (1/4) false (dvs k).1 (dvs k).2))%I
       with "[H4]" as "Hesc".
     { iApply (big_sepL_mono with "H4"). intros idx k _.
       iIntros "(((([Hd Hn] & (%w & Hv)) & Hmir) & Hmd) & Hgd)".
@@ -1775,16 +1783,28 @@ Section IcacheBootTable.
       iDestruct "Hgd" as (v0 d0 n0) "Hgd".
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
+      (* THE TABLE'S HALF SPLITS AGAIN (durable-disk C-3b): a quarter stays
+         with [islot_empty] and a quarter goes to the pool's invariant, where
+         it is what makes the partition speak about this escrow. *)
+      iDestruct (ic_id_quarters_split with "Hgd2") as "[Hgd2 Hgd3]".
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
         rewrite /ic_empty_arm. iExists (dvs k).1, (dvs k).2, w. iFrame. }
-      iModIntro. iFrame "Hinv". rewrite /islot_empty.
-      iExists (dvs k).1, (dvs k).2. iFrame. }
+      iModIntro. iFrame "Hinv". iSplitR "Hgd3"; [| iExact "Hgd3"].
+      rewrite /islot_empty. iExists (dvs k).1, (dvs k).2. iFrame. }
     iMod (big_sepL_fupd with "Hesc") as "Hesc".
     iEval (rewrite big_sepL_sep) in "Hesc".
-    iDestruct "Hesc" as "[#Hescrows Hslots]".
+    iDestruct "Hesc" as "[#Hescrows Hrest]".
+    iEval (rewrite big_sepL_sep) in "Hrest".
+    iDestruct "Hrest" as "[Hslots Hquarters]".
+    (* the pool's own invariant, out of the stocked rows, the two keys and
+       the fifty quarters (durable-disk C-3b) *)
+    iDestruct (ic_ids_of_intro cn dvs with "Hquarters") as "Hids".
+    iMod (ipool_alloc_inv E cn γfs γi cov logstart nib (ic_ids_of dvs)
+            (ic_ids_of_length dvs) (ic_ids_of_live dvs)
+            with "Hkey Hxkey Hids Hrows") as "[#Hpinv Hpool]".
     (* ---- the itable lock's resource, and the lock ---- *)
     iAssert (itable_res2 cn γfs γi cov logstart nib dv)%I
       with "[HhalfL Hsupply Hslots Hpool Hislauth]" as "Hres".
@@ -1852,7 +1872,8 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
-    ghost_var icfg_pool 1 (∅ : gset Z)
+    ghost_var icfg_pool 1 (∅ : gset Z) -∗
+    ghost_var icfg_pext 1 (∅ : gset Z)
     ={E}=∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1862,11 +1883,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hfree Htok Hmid Hgid") as "H".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hfree Htok Hmid Hgid") as "H".
     iModIntro. iExists γl, cn. iExact "H".
   Qed.
 

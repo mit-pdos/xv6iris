@@ -1577,6 +1577,9 @@ Section FsCfgBootEra.
         [icache_boot_at] is what turns the pair into the pool's invariant
         plus the itable lock's [ipool] conjunct. *)
      ghost_var icfg_pool 1 (∅ : gset Z) ∗
+     (* ...and its IN-TRANSITION twin (durable-disk C-3b), whole: the pool
+        invariant's partition needs both keys. *)
+     ghost_var icfg_pext 1 (∅ : gset Z) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
@@ -1606,6 +1609,7 @@ Section FsCfgBootEra.
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
       ghost_var icfg_pool 1 (∅ : gset Z) ∗
+      ghost_var icfg_pext 1 (∅ : gset Z) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
@@ -1756,6 +1760,9 @@ Section FsCfgBootEra.
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
      ghost_var icfg_pool 1 (∅ : gset Z) ∗
+     (* ...and its IN-TRANSITION twin (durable-disk C-3b), whole: the pool
+        invariant's partition needs both keys. *)
+     ghost_var icfg_pext 1 (∅ : gset Z) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
@@ -1773,10 +1780,10 @@ Section FsCfgBootEra.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_icache_open with "H")
-      as "(Hiref & Hlive & Hislg & Hipool & Hpkey & Hitlk & Htok & Hmid & Hgid &
+      as "(Hiref & Hlive & Hislg & Hipool & Hpkey & Hxkey & Hitlk & Htok & Hmid & Hgid &
            Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth)".
     rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
-    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hpkey Hitlk Htok
+    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hpkey Hxkey Hitlk Htok
             Hmid Hgid Hbio Hpool Hdllk".
   Qed.
 
@@ -1795,6 +1802,7 @@ Section FsCfgBootEra.
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
       ghost_var icfg_pool 1 (∅ : gset Z) ∗
+      ghost_var icfg_pext 1 (∅ : gset Z) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
@@ -2098,7 +2106,7 @@ Section FsCfgBootEra.
             (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
-                     Hisl & Hrauth & Hlkauth & Hpkey)".
+                     Hisl & Hrauth & Hlkauth & Hpkey & Hxkey)".
     (* every ambient form below is stated at [icfg_nib]; make the caller's
        [nib] BE it, so no lemma has to be re-instantiated *)
     symmetry in Hnibq. subst nib.
@@ -2555,13 +2563,14 @@ Section FsCfgBootEra.
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     (* ---- kit 1 ---- *)
-    iSplitL "Hiref Hlive Hisl Hipool Hpkey Hitlk Htok Hmid Hgid Hbio Hpool
+    iSplitL "Hiref Hlive Hisl Hipool Hpkey Hxkey Hitlk Htok Hmid Hgid Hbio Hpool
              Hkmlk Hdllk Hprlk Hkav Hkauth".
     { iSplitL "Hiref"; [iExact "Hiref" |].
       iSplitL "Hlive"; [iExact "Hlive" |].
       iSplitL "Hisl"; [iExact "Hisl" |].
       iSplitL "Hipool"; [iExact "Hipool" |].
       iSplitL "Hpkey"; [iExact "Hpkey" |].
+      iSplitL "Hxkey"; [iExact "Hxkey" |].
       iSplitL "Hitlk"; [iExact "Hitlk" |].
       iSplitL "Htok"; [iExact "Htok" |].
       iSplitL "Hmid"; [iExact "Hmid" |].

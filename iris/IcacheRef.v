@@ -841,6 +841,17 @@ Class icfg := MkIcfg {
      conjunct of the itable spinlock's resource, so a threaded name would
      enter [ic_escrow]'s arity -- i.e. every fs contract in the tree. *)
   icfg_pool : gname;
+  (* THE FREE POOL'S IN-TRANSITION KEY (durable-disk lane C-3b, plan
+     section 4), ambient for [icfg_pool]'s reason verbatim and in the very
+     same two places.  The pool's invariant carries the PARTITION the
+     commit's collection reads -- "the region's inums are the ordinary
+     index, the in-transition index, and the fifty live slots' identities"
+     -- and the in-transition part is exactly what the itable lock holds:
+     the pending/await rows of [IcacheEscrow.ipool] plus the one inum a
+     walk is carrying between an eviction's identity flip and its deposit.
+     A bare existential there would make the partition VACUOUS (take it to
+     be the whole region), so the lock pins it: this is the other half. *)
+  icfg_pext : gname;
   (* THE COUNT COUPLING's gname (iclaim-ledger.md §2.2), ambient for
      [icfg_link]'s reason verbatim: one half is parked in
      [InodeRegion.ireg_slot] (hence inside [ireg_inv], whose arity is fixed
@@ -1043,7 +1054,10 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          altitude no pool exists yet.  [IcacheBoot.icache_boot_at] is what
          updates it to the region's inums, splits it, and puts one half
          inside the pool invariant it allocates. *)
-      ghost_var icfg_pool 1 (∅ : gset Z).
+      ghost_var icfg_pool 1 (∅ : gset Z) ∗
+      (* ...AND THE IN-TRANSITION KEY (durable-disk C-3b), WHOLE and empty:
+         at this altitude no pool exists, so nothing is in transit either. *)
+      ghost_var icfg_pext 1 (∅ : gset Z).
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1072,11 +1086,13 @@ Proof.
   iMod (ghost_map_alloc (∅ : gmap nat ireg_arm_ent)) as (γlkr) "[Hlkr _]".
   (* the free pool's residency key, whole and empty (durable-disk B''-esc) *)
   iMod (ghost_var_alloc (∅ : gset Z)) as (γpool) "Hpool".
+  (* ...and its IN-TRANSITION twin (durable-disk C-3b), likewise empty *)
+  iMod (ghost_var_alloc (∅ : gset Z)) as (γpext) "Hpext".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γcnt γfrzo γfrzm γdv γfv), g0.
-  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_icnt icfg_frzo
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv), g0.
+  cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt icfg_frzo
        icfg_frzm icfg_dview icfg_fview].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool".
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext".
 Qed.
 
 (* ===================================================================== *)

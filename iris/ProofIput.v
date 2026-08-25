@@ -953,7 +953,7 @@ Section IputTail.
     iref_slots_auth -∗
     isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
-    ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+    ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     IcacheRef.inode_ref k q dev inum -∗
     (* THE CLOSING REFERENCE's PROVENANCE UNIT (RULING R, item 7a-wire): both
        close AUs surrender it in the ghost step that moves the count, which is
@@ -1106,8 +1106,23 @@ Section IputTail.
         [ rewrite /iref_tok; iFrame |].
       (* the eviction runs BEFORE the store: [ic_open_auth_ref] wants the
          authority still showing the slot, and the store deletes it. *)
+      assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
+      { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
+        destruct Hciwf as (_ & _ & Hrange & _).
+        exact (Hrange k (dev, inum) Hcik). }
+      (* THE POOL'S QUARTER, AND THE IN-TRANSITION INDEX (durable-disk C-3b).
+         The identity goes DEAD here while the bundle is deposited only after
+         the refcount store (its three ledger columns do not exist until
+         then), so the evicted inum is in neither part of the partition in
+         between: [ipool_evict_lend] puts it in the third one, and the lock
+         carries it as [ipool]'s transit set until [ipool_put]. *)
+      iMod (ipool_evict_lend ⊤ cn gfs gi cov logstart nib
+              (region_inums nib ∖ ci_inums ci) k (bv_unsigned inum) dev inum
+              ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
+        as "(Hpool & Hgid & Hidback)".
       iInv "Hesc" as ">Hbody" "Hclose".
-      iMod (ic_open_auth_ref cn gfs gi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+      iMod (ic_open_auth_ref cn gfs gi cov logstart k
+              (⊤ ∖ ↑ipoolN ∖ ↑(icEscN .@ k))
               Mt qt qt dev inum ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
@@ -1130,11 +1145,8 @@ Section IputTail.
               with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hpayl Hmt")
         as "(Hbody & Hgidf & Hbundle)".
       iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
+      iMod ("Hidback" $! dev inum with "Hgidf") as "Hgidf".
       iModIntro.
-      assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
-      { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
-        destruct Hciwf as (_ & _ & Hrange & _).
-        exact (Hrange k (dev, inum) Hcik). }
       (* the slot's share authority, out of the LOCK's resource *)
       iDestruct (isl_pool_acc_upd Mt k Hk with "Hipool") as "[Hisl Hislback]".
       assert (Hincid : bv_unsigned inum ∈ ci_inums ci).
@@ -1186,7 +1198,7 @@ Section IputTail.
          [ipool_shape] and decides the side itself, so nothing above this
          line changes. *)
       iApply fupd_wp.
-      iMod (ipool_put ⊤ gfs gi cov logstart
+      iMod (ipool_put ⊤ cn gfs gi cov logstart nib
               (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
               ltac:(solve_ndisj) ltac:(apply ip_notin_diff; exact Hincid)
               with "Hpinv [Hbundle] Hpool") as "Hpool".
@@ -2191,7 +2203,7 @@ Section IputFreePath.
     itable_half Mt -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
-    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     (* ================================================================
        THE WINDOW'S i_inum SPLIT -- the entry can NOT ask for the islot2
        big-op and [inode_ref] here, and the reason is forced, not a
@@ -2216,9 +2228,9 @@ Section IputFreePath.
        ================================================================ *)
     ⌜ci !! k = Some (dev, inum)⌝ -∗
     iref_tok k q -∗
-    ic_id cn k (1/2) true dev inum -∗
+    ic_id cn k (1/4) true dev inum -∗
     (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-     ic_id cn k (1/2) true dev inum -∗
+     ic_id cn k (1/4) true dev inum -∗
      (* ...AND THE LIVE ARM's FIFTH CONJUNCT (iclaim-ledger.md §3.16, A⁗):
         the FROZEN PARK, which this body builds at the +0x62 re-park out of
         the mirror half the mint handed it and the two live slices it is
@@ -2469,7 +2481,7 @@ Section IputFreePath.
     iInv "Hesc" as ">Hbody" "Hclose".
     iAssert (live_frac k q) with "[Hlvq]" as "Hlvqf"; [ iExists ga'; iExact "Hlvq" |].
     iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
-            Mt q ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
+            Mt q (1/4) ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hfrg & Hlvq2 & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
     (* ---- THE 586 SITE.  [ic_open_held] hands [i_inum] back WHOLE; itrunc
@@ -3061,8 +3073,22 @@ Section IputFreePath.
     assert (Hqhalf2 : (q ≤ 1/2)%Qp) by (rewrite Hsum2; apply Qp.le_add_l).
     (* ---- the eviction runs BEFORE the store ---- *)
     iApply fupd_wp.
+    assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
+    { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
+      destruct Hciwf2 as (_ & _ & Hrange & _).
+      exact (Hrange k (dev, inum) Hcik2). }
+    (* THE IN-TRANSITION INDEX (durable-disk C-3b), exactly as at the
+       ordinary eviction -- and here the inum STAYS in it: what this path
+       deposits is an AWAIT row, which cannot live in the pool's invariant
+       at all ([EscrowInode.escA_inv] is an [inv]).  That is the residue
+       section 5c of [IcacheEscrow] records. *)
+    iMod (ipool_evict_lend ⊤ cn γfs γi cov logstart nib
+            (region_inums nib ∖ ci_inums ci2) k (bv_unsigned inum) dev inum
+            ltac:(solve_ndisj) Hk eq_refl with "Hpinv Hpool Hgid")
+      as "(Hpool & Hgid & Hidback)".
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_open_auth_frz cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
+    iMod (ic_open_auth_frz cn γfs γi cov logstart k
+            (⊤ ∖ ↑ipoolN ∖ ↑(icEscN .@ k))
             Mt2 q q dev inum ltac:(solve_ndisj) Hk HMk2
             with "Hitinv Hbody Hhalf Hfrg Hselp Hrident")
       as "(Hhalf & Hfrg & Hselp & Hrident & Harm & _)".
@@ -3096,11 +3122,8 @@ Section IputFreePath.
             with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hrcpt")
       as "(Hbody & Hgidf & Hrcpt)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
+    iMod ("Hidback" $! dev inum with "Hgidf") as "Hgidf".
     iModIntro.
-    assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
-    { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
-      destruct Hciwf2 as (_ & _ & Hrange & _).
-      exact (Hrange k (dev, inum) Hcik2). }
     assert (Hincid : bv_unsigned inum ∈ ci_inums ci2).
     { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik2 | reflexivity]. }
     iDestruct (isl_pool_acc_upd Mt2 k Hk with "Hipool") as "[Hisl Hislback]".
@@ -3214,7 +3237,7 @@ Section IputFreePath.
     (* the AWAIT row stays on the LOCK's side of the split (durable-disk
        B''-esc) -- [ipool_put] reads that off the shape itself. *)
     iApply fupd_wp.
-    iMod (ipool_put ⊤ γfs γi cov logstart
+    iMod (ipool_put ⊤ cn γfs γi cov logstart nib
             (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum)
             ltac:(solve_ndisj) ltac:(apply fl_notin_diff; exact Hincid)
             with "Hpinv [Hgap] Hpool") as "Hpool".
@@ -3654,7 +3677,7 @@ Section IputFreePath.
     iref_slots_auth -∗
     isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
-    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
     IcacheRef.inode_ref k q dev inum -∗
     is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                      (slh_tok (icfg_isl k)) -∗
@@ -3722,7 +3745,7 @@ Section IputFreePath.
        iref_slots_auth -∗
        isl_pool Mt -∗
        ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
-       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
        IcacheRef.inode_ref k q dev inum -∗
        (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
           regime the caller lent has not been spent and comes straight back. *)
@@ -3779,7 +3802,7 @@ Section IputFreePath.
        itable_half Mt -∗
        iref_slots_auth -∗
        isl_pool Mt -∗
-       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
+       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
        (* ================================================================
           THE WINDOW'S i_inum SPLIT -- the ONE place this Exit B is NOT
           byte-identical to [ip_free_locked]'s entry, and it is FORCED, not
@@ -3810,9 +3833,9 @@ Section IputFreePath.
           ================================================================ *)
        ⌜ci !! k = Some (dev, inum)⌝ -∗
        iref_tok k q -∗
-       ic_id cn k (1/2) true dev inum -∗
+       ic_id cn k (1/4) true dev inum -∗
        (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-        ic_id cn k (1/2) true dev inum -∗
+        ic_id cn k (1/4) true dev inum -∗
         (* ...AND THE ARM's FIFTH CONJUNCT (A⁗, §3.16): the caller supplies
            the FROZEN PARK it builds out of the mint's mirror half and the two
            live slices it is about to stop needing.  It cannot be built here:
@@ -4215,7 +4238,7 @@ Section IputFreePath.
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
     iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
-            Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+            Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
             with "Hitinv Hbodyp Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidvp & Hnfullp
            & Hvldxp & Hmtp & Hgidap)".
@@ -4229,7 +4252,7 @@ Section IputFreePath.
     iApply (wp_lw_au_s_sconf false (mword_of_int (KernelSyms.iput + 0x46)) Rs2 Rs1
               (mword_of_int 4 : mword 12) F2 (trap_res eb + (K - 6))%nat
               (fun w => (⌜w = inum⌝ ∗ itable_half Mt ∗ iref_frag k q ∗ live_frac k q ∗
-                         live_gen k (1/2) ga ∗ ic_id cn k (1/2) true dev inum ∗
+                         live_gen k (1/2) ga ∗ ic_id cn k (1/4) true dev inum ∗
                          i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
                          ic_payload_at γfs γi cov logstart k inum ga dn bm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) false
@@ -4240,7 +4263,7 @@ Section IputFreePath.
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
-              Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+              Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iDestruct "Hvldx" as (w0) "Hva".
@@ -4360,7 +4383,7 @@ Section IputFreePath.
                         Hblks Hdv Hfv Htop").
         rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑(icEscN .@ k))
-              Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+              Mt q (1/4) ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
               with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
         as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
@@ -4593,7 +4616,7 @@ Section IputFreePath.
     iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
     { rewrite /iref_tok. iFrame. }
     iAssert (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-             ic_id cn k (1/2) true dev inum -∗
+             ic_id cn k (1/4) true dev inum -∗
              frz_park k (bv_unsigned inum) -∗
                ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
                IcacheRef.inode_ident k (DfracOwn q) dev inum)%I
