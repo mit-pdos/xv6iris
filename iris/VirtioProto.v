@@ -775,7 +775,7 @@ Proof.
      much again at each [Qed].  Unfolding both names first makes the match
      syntactic. *)
   intros Hd Hdr. apply map_disjoint_dom.
-  rewrite dom_union_L !range_map_dom ring_bytes_dom_eq.
+  rewrite dom_union_L 2!range_map_dom ring_bytes_dom_eq.
   unfold avail_idx_dom, used_page_pas in Hd, Hdr.
   apply disjoint_union_l. split; [exact Hd | exact Hdr].
 Qed.
@@ -794,7 +794,13 @@ Lemma vinit_dma_dom (c : virtio_cfg) :
   = avail_idx_dom c ∪ ring_cells_dom c ∪ used_page_pas c.
 Proof.
   unfold vinit_dma, avail_idx_dom, used_page_pas.
-  rewrite !dom_union_L !range_map_dom ring_bytes_dom_eq. reflexivity.
+  (* COUNTED [!]s, per optimization.md's "a [!] always pays one full failing
+     pass".  Here that pass costs 16 s of the sentence's 17.3 s, because
+     deciding that [range_map _ 4096 _] is neither a [∪] nor a [dom] unfolds
+     the 4096-step [foldr]; [2!] performs exactly two rewrites and never
+     attempts a third, taking the sentence to 2.1 s. *)
+  rewrite 2!dom_union_L 2!range_map_dom ring_bytes_dom_eq.
+  reflexivity.
 Qed.
 
 Lemma vinit_dma_ctl (c : virtio_cfg) : vproto_ctl c vproto0 ⊆ vinit_dma c.

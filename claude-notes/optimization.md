@@ -353,6 +353,36 @@ worth 20× on individual files.
   - **A slow tactic looks like a hanging `Qed` and HIDES COMPILE ERRORS** —
     the log stays 0 bytes while the main process burns tactic time, and a real
     type error further down sits in unflushed stderr behind it.
+- **`done` ENDS IN A NO-ARGUMENT `discriminate`, WHICH HEAD-NORMALISES EVERY
+  HYPOTHESIS TYPE WITH DELTA — so `by` is a general-purpose closer too, and one
+  `⊆` between two gmaps is a large context all by itself.** `VirtioQueue.v`'s
+  `by exists (vp_lo pr + k)%nat, sl` cost **214.9 s** to close
+  `vp_pend pr !! q = Some sl ∧ vs_hd sl = vs_hd sl` — a goal whose two halves
+  are a hypothesis and `eq_refl`. `coqc -profile-ltac` put 99.9 % of it in a
+  SINGLE `discriminate` call, and clearing the context down to one hypothesis
+  at a time named the culprit exactly: `Hrsub : ring_bytes c (vp_ring pr) ⊆
+  vproto_ctl c pr`, on its own, is the whole 210 s. Nothing else in that
+  17-hypothesis context cost more than 0.011 s. The mechanism is that no-arg
+  `discriminate` walks the local context looking for an equation between
+  distinct constructors, and to decide that it `hnf`s each hypothesis's type
+  WITH delta — so a `⊆`/`##ₘ` between two *computed* gmaps (here a `write_bytes`
+  fold over eight ring cells, unioned into a lease) gets unfolded, and the
+  goal's own triviality never gets a chance to matter.
+  - **The fix is to say what the goal is**: `exists q, sl. exact (conj Hsl
+    eq_refl)` in place of `by exists q, sl` took the sentence 214.9 s → 0 s and
+    the FILE **227 s → 7.9 s**. Same shape as the `iPureIntro. done.` bullet
+    above, one level deeper: the giveaway is again that the goal is trivial to
+    read, so nobody suspects the closer.
+  - **Name the hypothesis whenever you do want `discriminate`.** The same file's
+    remaining cost was a bare `discriminate` in a branch whose goal was a fat
+    `⊆`: `discriminate H1`, where `H1 : None = Some _` is the equation meant all
+    along, skips the walk (4.1 s → 0 s across five sites). `discriminate Hreq`
+    likewise.
+  - **This is not specific to `by`.** Every `done`, every `by tac`, and every
+    bare `discriminate` in scope of a map-inclusion, map-disjointness or
+    map-subset hypothesis carries the same bill. Before believing such a
+    sentence is intrinsically slow, `clear` the fat hypothesis and re-time —
+    it is one run and it is conclusive.
 - **`naive_solver` on its own is still forbidden inside a whole-function
   proof** — it is the half of the old `set_solver` that the override does not
   reach when you call it directly. It ends in a search over *every* hypothesis
@@ -1223,7 +1253,14 @@ little. That is a ~778-file change, so it is a campaign, not a fix.
   **6.1 s** — two whole-goal traversals for nothing. `rewrite
   6!elem_of_difference 4!elem_of_union` took the file **15.4 s → 6.4 s**.
   Counting is mechanical: differences on both sides of the `↔`, unions in the
-  set the right-hand side names.
+  set the right-hand side names. Third instance (`VirtioProto.vinit_dma_dom`,
+  2026-08-25): `rewrite !dom_union_L !range_map_dom ring_bytes_dom_eq` was
+  **17.3 s**, of which **16.0 s** was the one failing `dom_union_L` pass —
+  deciding that `range_map (vc_used c) 4096 _` is not a `∪` unfolds
+  `range_map`'s 4096-step `foldr`. `rewrite 2!dom_union_L 2!range_map_dom …`
+  is **2.1 s**. The carrier does not have to be a set for this to bite: a
+  `gmap`-valued definition over a literal size is just as expensive to refute,
+  and here the *successful* rewrites cost 2 s between them for the same reason.
 - **`rewrite` ABSTRACTS, `exact` only UNIFIES — and a `nat` NUMERAL makes the
   gap enormous.** `rewrite H` must locate the occurrence, abstract it and build
   a motive that conversion then carries; `exact`/`apply` of the same equation
