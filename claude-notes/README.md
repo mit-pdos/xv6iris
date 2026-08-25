@@ -143,6 +143,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the tree layer, the DESIGN OF RECORD for F1/F1.5: rulings R1–R12 (including
   the standing constraint that (L6) must NEVER be stated) over a verification
   report against the landed tree.
+- **[`fs-ghost-state.md`](design/fs-ghost-state.md)** — the reference
+  INVENTORY of the file system's ghost state, bottom-up, one section per
+  layer: for each piece its RA/type, the invariant or lock-held bundle that
+  owns the authority, what a fragment in a client's hand means, and who
+  mints and spends it.  Covers the durable snapshot inside the crash
+  predicate, the transaction token and the armed registry, and the boot
+  seal `fs_ready`.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
