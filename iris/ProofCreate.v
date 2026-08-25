@@ -2983,13 +2983,13 @@ Section ProofCreateMain.
               ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
-                    Hppid Hcref Hpath Hnb14 Hbsl Hisl2 Hop").
+                    Hppid Hcref Hpath Hnb14 Hbsl Hisl2 [$Hop $Htx]").
     (* nameiparent is eb-generic now; create is still at [eb = true]. *)
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDnp Hsnp mnp n1 Sb1 okp nfp ipv w)
       "%Hcsnp Hcg Hcnt _ _ Hpc Hsbb Hsbi Hppid Hcref Hpath Hnb14
-       Hbsl %Hsb1 %Hwmem %Hnp1 Hop Hres".
+       Hbsl %Hsb1 %Hwmem %Hnp1 [Hop Htx] Hres".
     iEval (rewrite HR7a0) in "Hpath".
     iEval (rewrite HR7a1) in "Hnb14".
     assert (Hpcnp : ret_pc (R7 !!! Regidx Rra : mword 64)

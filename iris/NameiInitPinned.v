@@ -365,7 +365,8 @@ Section NameiInitPinnedBody.
          ↦ₘ[KT1]{dqpv} pfun i) -∗
     bslots 3 -∗
     iref_slots 2 -∗
-    log_opS g n Sb -∗
+    (* the set form beside the transaction's token (durable-disk B''-tx) *)
+    log_opSt g n Sb -∗
     (* ---- THE ONE NEW PREMISE: root's pin, saying "init" is 7.
            [rootpin_init] above derives it from [fs_cfg_alloc]'s W5a
            conjunct at the literal image. ---- *)
@@ -391,7 +392,8 @@ Section NameiInitPinnedBody.
         ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
         ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
          /\ (n' <= n)%nat⌝ -∗
-        log_opS g n' Sb' -∗
+        (* the set form beside the transaction's token (B''-tx) *)
+        log_opSt g n' Sb' -∗
         (if ok
          then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv⌝ ∗
               iref_slots 1 ∗

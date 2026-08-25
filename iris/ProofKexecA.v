@@ -609,10 +609,10 @@ Section KexecABody.
               Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
-                    Hcref Hpath Hbs Hirs Hlog").
+                    Hcref Hpath Hbs Hirs [$Hlog $Htx]").
     (* namei is eb-generic now; kexec is still at [eb = true]. *)
     iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
-             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
+             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 [Hlog Htx] Harm".
     iDestruct (log_opS_op with "Hlog Htx") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
        The walk spent at most two of the ten. *)

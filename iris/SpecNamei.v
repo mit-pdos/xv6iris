@@ -311,7 +311,10 @@ Definition wp_namei_gen_body
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   bslots 3 -∗
   iref_slots 2 -∗
-  log_opS g n Sb -∗
+  (* the set form beside the transaction's token: namex's [ilock] takes
+     the write arm (durable-disk B''-tx), and the pair rides in the set
+     form's own position so no stage lemma moved *)
+  log_opSt g n Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (through namex / dirlookup, down to ilock and sleep), so a park moves
      the hart with interrupts off and the crossing has nothing to do with
@@ -340,7 +343,8 @@ Definition wp_namei_gen_body
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
-      log_opS g n' Sb' -∗
+      (* the set form beside the transaction's token (B''-tx) *)
+      log_opSt g n' Sb' -∗
       (if ok
        then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv⌝ ∗
             inode_held ipv ∗

@@ -1269,14 +1269,14 @@ Section ProofSysLinkBody.
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                         Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                        Hbmres Hpidq Hcwdref [Hbufk] Hbsl Hir2 HopS").
+                        Hbmres Hpidq Hcwdref [Hbufk] Hbsl Hir2 [$HopS $Htx]").
         (* namei is eb-generic now; sys_link is still at [eb = true]. *)
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
         iIntros (CID24 Hq24 mna n1 Sb1 ok ipv w1)
           "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
-           Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
+           Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
         iEval (rewrite HQ2a0) in "Hbufk".
         assert (Hpc3e : ret_pc (Q2 !!! Regidx Rra : mword 64)
                         = mword_of_int (SL + 0x3e)) by (rewrite HQ2ra; pcw).
@@ -2092,7 +2092,7 @@ Section ProofSysLinkBody.
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab
                                 Hitinv Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk
                                 Hsbb Hsbi Hbmres Hpidq Hcwdref [Hbufw]
-                                [Hnm14] Hbsl Hir2 HopS").
+                                [Hnm14] Hbsl Hir2 [$HopS $Htx]").
                 (* nameiparent is eb-generic now; sys_link is at [eb = true]. *)
                 { rewrite Heb /trap_csrs_ext. done. }
                 { rewrite Heb /cpu_claim_ext. done. }
@@ -2100,7 +2100,7 @@ Section ProofSysLinkBody.
                 { iEval (rewrite HT2a1). iExact "Hnm14". }
                 iIntros (CID48 Hq48 mnp n2 Sb2 ok2 nf dpv w2)
                   "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq
-                   Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 HopS Hres2".
+                   Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 [HopS Htx] Hres2".
                 iEval (rewrite HT2a0) in "Hbufw".
                 iEval (rewrite HT2a1) in "Hnm14".
                 assert (Hpc7c : ret_pc (T2 !!! Regidx Rra : mword 64)

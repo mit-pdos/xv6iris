@@ -1192,7 +1192,7 @@ Section ProofSysUnlinkBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpidq Hcwdref [Hbufp] [Hnm14] Hbsl Hir
-                      HopS").
+                      [$HopS $Htx]").
       (* nameiparent is eb-generic now; sys_unlink is at [eb = true]. *)
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -1200,7 +1200,7 @@ Section ProofSysUnlinkBody.
       { iEval (rewrite HN3a1). iExact "Hnm14". }
       iIntros (CID17 Hq17 mnp n1 Sb1 ok1 nf dpv w1)
         "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
-         Hbufp Hnm14 Hbsl %HSb1 %Hw1 %Hn1 HopS Hres1".
+         Hbufp Hnm14 Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres1".
       iEval (rewrite HN3a0) in "Hbufp".
       iEval (rewrite HN3a1) in "Hnm14".
       assert (Hpc2c : ret_pc (N3 !!! Regidx Rra : mword 64)

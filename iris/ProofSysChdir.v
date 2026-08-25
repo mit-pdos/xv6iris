@@ -1425,14 +1425,14 @@ Section ProofSysChdirBody.
                 (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                      Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir HopS").
+                      Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir [$HopS $Htx]").
       (* namei is eb-generic now; sys_chdir is still at [eb = true]. *)
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (rewrite HN1a0). iExact "Hbufk". }
       iIntros (CID20 Hq20 mna n1 Sb1 ok ipv w1)
         "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpbare Hcwdref
-         Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
+         Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
       iEval (rewrite HN1a0) in "Hbufk".
       assert (Hpc30 : ret_pc (N1 !!! Regidx Rra : mword 64)
                       = mword_of_int (SC + 0x30)) by (rewrite HN1ra; pcw).

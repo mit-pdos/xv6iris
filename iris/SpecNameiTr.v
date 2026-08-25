@@ -239,7 +239,10 @@ Definition wp_namei_tr_body
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   bslots 3 -∗
   iref_slots 2 -∗
-  log_opS g n Sb -∗
+  (* the set form beside the transaction's token: namex's [ilock] takes
+     the write arm (durable-disk B''-tx), and the pair rides in the set
+     form's own position so no stage lemma moved *)
+  log_opSt g n Sb -∗
   (* ---- THE TRACE (the two new resource premises) ---- *)
   P 0%nat (bv_unsigned ROOTINO) -∗
   nx_hops_from P Pmiss pl 0%nat -∗
@@ -262,7 +265,8 @@ Definition wp_namei_tr_body
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
-      log_opS g n' Sb' -∗
+      (* the set form beside the transaction's token (B''-tx) *)
+      log_opSt g n' Sb' -∗
       (if ok
        then (* THE PIN: the register, the package AT ITS INUM, and the
                cursor having walked the whole path to that same inum.  The

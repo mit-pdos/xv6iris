@@ -832,6 +832,42 @@ Section LogInv.
   Lemma log_op_split γ u : log_op γ u -∗ log_opb γ u ∗ log_tx γ.
   Proof. iIntros "[$ $]". Qed.
 
+  (* ---- THE SET FORM BESIDE THE TOKEN, AS ONE CONJUNCT ----------------
+     (durable-fs-plan.md section 3, [ilock]; durable-disk B''-tx)
+
+     A WALK THAT WRITE-LOCKS carries both: the SET half is what [log_write]
+     accepts and what a [log_opS]-shaped callee wants, the TOKEN half is
+     what a transactional [ilock] parks in the escrow.  They ride together
+     because of durable-notes' bundling rule -- written as two conjuncts
+     they would move every pass-through site of the walk-stage statements
+     that already thread [log_opS]; written as ONE, in [log_opS]'s own
+     position, no stage lemma's arity changes at all.  It is split exactly
+     once per locked window, at the [ilock], and rejoined at the release. *)
+  Definition log_opSt (γ : log_names) (u : nat) (Sb : gset Z) : iProp Σ :=
+    (log_opS γ u Sb ∗ log_tx γ)%I.
+
+  Global Instance log_opSt_timeless γ u Sb : Timeless (log_opSt γ u Sb).
+  Proof. rewrite /log_opSt. apply _. Qed.
+
+  Lemma log_opSt_split γ u Sb :
+    log_opSt γ u Sb -∗ log_opS γ u Sb ∗ log_tx γ.
+  Proof. iIntros "[$ $]". Qed.
+
+  Lemma log_opSt_intro γ u Sb :
+    log_opS γ u Sb -∗ log_tx γ -∗ log_opSt γ u Sb.
+  Proof. iIntros "H Ht". rewrite /log_opSt. iFrame. Qed.
+
+  Lemma log_op_openSt γ u : log_op γ u -∗ ∃ Sb, log_opSt γ u Sb.
+  Proof.
+    iIntros "H". iDestruct (log_op_openS with "H") as (Sb) "[H Ht]".
+    iExists Sb. iApply (log_opSt_intro with "H Ht").
+  Qed.
+
+  Lemma log_opSt_op γ u Sb : log_opSt γ u Sb -∗ log_op γ u.
+  Proof.
+    iIntros "[H Ht]". iApply (log_opS_op with "H Ht").
+  Qed.
+
   Lemma log_opb_op γ u : log_opb γ u -∗ log_tx γ -∗ log_op γ u.
   Proof. iIntros "H Ht". iFrame. Qed.
 
