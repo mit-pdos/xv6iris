@@ -794,6 +794,7 @@ Section ProofSysUnlinkTails.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     su_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -811,7 +812,7 @@ Section ProofSysUnlinkTails.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -833,7 +834,7 @@ Section ProofSysUnlinkTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -865,7 +866,7 @@ Section ProofSysUnlinkTails.
   Proof.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
-           HMs3 Hal.
+           HMs3 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
@@ -927,6 +928,16 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): this is the LAST
+       release of the walk, so the disarm brings the whole element home and
+       the counted contract is available again. *)
+    iApply fupd_wp.
+    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
+            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
+      as "(Hivalid & Hdep & Htx)".
+    iModIntro.
+    iEval (rewrite -Hglog) in "Htx".
+    iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
@@ -1127,6 +1138,7 @@ Section ProofSysUnlinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     su_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1144,7 +1156,7 @@ Section ProofSysUnlinkTails.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep cn kk s dev inum gy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1166,7 +1178,7 @@ Section ProofSysUnlinkTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1197,7 +1209,7 @@ Section ProofSysUnlinkTails.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
-           Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal.
+           Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
@@ -1246,7 +1258,7 @@ Section ProofSysUnlinkTails.
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
               Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM1sp HM1thr
-              HM1s1 HM1s2 HM1s3 Hal
+              HM1s1 HM1s2 HM1s3 Hal Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
@@ -1291,7 +1303,7 @@ Section ProofSysUnlinkTails.
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) (Vpr : pprivate) :
+      (w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) (Vpr : pprivate) (t : nat) :
     (K_iunlockput <= K - 30)%nat -> (K_end_op <= K - 30)%nat ->
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
     (kk < NINODE)%nat -> (ki < NINODE)%nat ->
@@ -1316,6 +1328,7 @@ Section ProofSysUnlinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = ientry ki ->
     su_al sp0 ->
+    g = icfg_log ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1335,7 +1348,7 @@ Section ProofSysUnlinkTails.
     (* ---- dp, still locked: released in [bad:] ---- *)
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ic_tx_dep_at cn kk s dev inum gy t (1/4) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1351,7 +1364,7 @@ Section ProofSysUnlinkTails.
     (* ---- ip, released HERE ---- *)
     is_sleeplock_gen gili gisli (i_lock (ientry ki)) "inode"%string (ic_tok cn ki) (slh_tok (icfg_isl ki)) -∗
     sleeplocked_q gisli si (i_lock (ientry ki)) pidv -∗
-    ic_deposit cn ki (DepShr si dev inumi gyi) -∗
+    ic_tx_dep_at cn ki si dev inumi gyi t (1/4) -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry ki) ↦₄{DfracOwn (1/2)} inumi -∗
     i_valid (ientry ki) ↦₄ valid_word true -∗
@@ -1373,7 +1386,7 @@ Section ProofSysUnlinkTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots 3 -∗
-    log_op g u -∗
+    log_opb g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -1405,7 +1418,7 @@ Section ProofSysUnlinkTails.
   Proof.
     intros HKup HKeo HK30 Kpop Hkk Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hiblki Hiblogi Hinbi Hcovb Hiu Hj Hgl Hlkempty
-           Hsp0 HMsp HMthr HMs1 HMs2 Hal.
+           Hsp0 HMsp HMthr HMs1 HMs2 Hal Hglog.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hescki #Hireg #Hropen
               #Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru
@@ -1465,20 +1478,51 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
+    (* THE ARM COMES OFF THIS SLOT ONLY (durable-disk B''-tx2): [dp] stays
+       write-locked across this release, so a quarter of the transaction's
+       element is still parked in ITS escrow and the walk cannot present the
+       counted [log_op].  The GEN contract wants what is left. *)
+    rewrite /ic_tx_dep_at.
+    iDestruct "Hdep" as "[Hdep Htk]".
+    iDestruct "Hdepi" as "[Hdepi Hti]".
+    iApply fupd_wp.
+    iMod (ic_disarm_tx ⊤ cn gfs gi cov logstart ki si dev inumi gyi true
+            t (1/4)%Qp ltac:(solve_ndisj) with "Hescki Hivalidi Hdepi")
+      as "(Hivalidi & Hdepi & Htd)".
+    iModIntro.
+    iDestruct "Hop" as (SbE) "Hop".
+    iDestruct (log_opS_named with "Hop") as (eE) "Hop".
+    iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
-              inodestart nib size dev ki qip si gyi inumi dni bmi u pidv
+              inodestart nib size dev ki qip si gyi inumi dni bmi u SbE
+              false false false eE pidv
               dq dqb dqs M2 (K - 30)%nat eb b lks
-              Vpr HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
+              Vpr HKup Hki ltac:(discriminate) ltac:(discriminate)
+              Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hescki Hireg Hropen Hslkki Hslkdi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpid Hprocs
-                    Hdev Hgeo Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3 mup n2)
-      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
-       Hop Hislot".
+                    Hdev Hgeo Hdlk Hbsl [] Hop").
+    { iEval (cbn beta iota). iEmpIntro. }
+    iIntros (CID3 Hq3 mup n2 SbE2 wgE)
+      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %HsbE2 %HwgE
+       %HwgcE %Hn2 Hop Hislot".
+    (* ...and [dp]'s arm GROWS back to a half, which is where a one-lock
+       walk stands: [su_tail_bad] takes [ic_tx_dep]. *)
+    iApply fupd_wp.
+    iMod (ic_grow_tx ⊤ cn gfs gi cov logstart kk s dev inum gy true
+            t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
+            ltac:(solve_ndisj) with "Hesck Hivalid Hdep Htd")
+      as "(Hivalid & Hdep)".
+    iModIntro.
+    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
+                 (eq_sym Qp.quarter_quarter) with "Htk Hti") as "Htk".
+    iEval (rewrite -Hglog) in "Htk".
+    iDestruct (ic_tx_dep_intro with "Hdep [Htk]") as "Hdep";
+      [iEval (rewrite Hglog) in "Htk"; iExact "Htk" |].
+    iDestruct (log_opS_opb with "Hop") as "Hop".
     assert (Hpc17a : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x17a)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc17a) in "Hpc".
@@ -1571,8 +1615,8 @@ Section ProofSysUnlinkTails.
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)
               w6 w27 w30 bd bnm bp be
               Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
-              Hiblk Hiblog Hinb Hcovb ltac:(unfold iput_units in *; lia)
-              Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal
+              Hiblk Hiblog Hinb Hcovb ltac:(unfold iput_units, ip_spend_w, ip_bm in *; destruct wgE; cbn in *; lia)
+              Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
