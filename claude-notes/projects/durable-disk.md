@@ -298,6 +298,18 @@ as their remaining consumers.
   ADDITIVE (the ~66 `DepShr` sites in 23 files do not move) and costs the
   ten `match d with` sites plus the writers' checkout/park.
 
+  WHAT THE NEXT INCREMENT MUST DO FIRST, and it is structural: the bridge
+  `FsBytesGamma.gamma_blk_owned` ties `blk_owned` to `FsBlocks.fsblock`
+  AT FRACTION 1 ONLY, and `FsStateEra.inode_owned_era_of`/`_to` (the
+  conversion `ic_loaded` and `ipool_alloc` are stated through) go through
+  it.  So NOTHING at ¾ or ¼ can cross into the `InodeInv` vocabulary today:
+  the escrow's read arm and `readi` at ¼ both need `FsBlocks.fsblock_q`
+  and the `InodeInv` shapes over it before either can be written.  The
+  same `_q`-twin-plus-fraction-1-reading shape this lane used keeps every
+  existing site textually unchanged (`k ↪[γ] v` IS `k ↪[γ]{DfracOwn 1} v`,
+  so each `X = X_q … 1` equation is `reflexivity`), which is what makes
+  the ~106 `rewrite /byte_range`-style unfold sites cost nothing.
+
   FOOTPRINTS MEASURED FOR THE NEXT INCREMENT.  The reader's ¼ needs the
   BLOCK layer fraction-indexed too, not just the predicate:
   `FsBlocks.fsblock` (34 files), `InodeInv.inode_blocks` (35, and
