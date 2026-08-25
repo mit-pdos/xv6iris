@@ -118,8 +118,9 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
-  Definition iul_cont `{CID0 : CpuId} 
-      (cn : ic_names) (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+  Definition iul_cont `{CID0 : CpuId}
+      (cn : ic_names) (k : nat) (s : Qp) (g : gname) (d : ic_dep)
+      (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
@@ -131,25 +132,27 @@ Section ProofIunlockMain.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare p pidv Vpr -∗
         inode_shr_gen k s dev inum g -∗
+        ic_dep_side d -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Lemma wp_iunlock_sconf 
+  Lemma wp_iunlock_dep_sconf
       (gs : list gname)
       (gfs : fs_names) (gi : gname)
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p b lks Vpr.
+    : wp_iunlock_dep_sconf_body gs gfs gi cn gil gisl cov logstart k s g d
+                                dev inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
-    cbv beta delta [wp_iunlock_sconf_body].
-    intros pcE ip ret_tgt HK Hk Ha0 Hfresh.
-    pose proof HK as HK'. 
+    cbv beta delta [wp_iunlock_dep_sconf_body].
+    intros pcE ip ret_tgt HK Hdshr Hk Ha0 Hfresh.
+    pose proof HK as HK'.
+    pose proof (ic_dep_gname_of_shr d s dev inum g Hdshr) as Hdg.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
@@ -158,7 +161,7 @@ Section ProofIunlockMain.
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p b lks Vpr)%I
+    iAssert (iul_cont (CID0 := CID)  cn k s g d dev inum pidv dq m K eb p b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -433,8 +436,8 @@ Section ProofIunlockMain.
        is persistent, so it survives the close. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
-                 eq_refl with "Hbodyp Hvalid Hdep")
+    iDestruct (ic_open_out cn gfs gi cov logstart k d g true
+                 Hdg with "Hbodyp Hvalid Hdep")
       as "(Hvalid & Hdep & Hborp)".
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
     iMod (iref_live_load_au (⊤ ∖ ↑(icEscN .@ k)) k sbp
@@ -449,7 +452,7 @@ Section ProofIunlockMain.
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
                          i_valid (ientry k) ↦₄ valid_word true ∗
-                         ic_deposit cn k (DepShr s dev inum g))%I)
+                         ic_deposit cn k d)%I)
               (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k) ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc [] [] [Hvalid Hdep]").
@@ -461,8 +464,8 @@ Section ProofIunlockMain.
          what rules out [ic_out]'s frozen alternative -- the free path's
          window, which parks its live mass in [islot2] and deposits
          a [DepFrz], so there would be no slice to borrow. *)
-      iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
-                   eq_refl with "Hbody Hvalid Hdep")
+      iDestruct (ic_open_out cn gfs gi cov logstart k d g true
+                   Hdg with "Hbody Hvalid Hdep")
         as "(Hvalid & Hdep & Hbor)".
       iDestruct "Hbor" as (sb) "[Hlv Hbback]".
       iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) k sb
@@ -544,25 +547,19 @@ Section ProofIunlockMain.
        checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
        the sleeplock protects now -- and the caller's reference out. *)
     iApply fupd_wp.
-    (* THE PARKED PAYLOAD, AND ITS TOKEN (iclaim-ledger.md §3.9).
-       [IcacheEscrow.ic_payload] is the [_np] bundle plus the inum's
-       [ifreeze_off]; the token is the one [SpecIlock]'s post handed this
-       holder, threaded through its critical section untouched, and putting
-       it back is what re-establishes the parked arm's A-custody conjunct. *)
-    iAssert (ic_payload gfs gi cov logstart k inum g true)%I
-      with "[Hlk Hfrz]" as "Hpay".
-    { iApply (ic_payload_join with "[Hlk] Hfrz").
-      rewrite /ic_payload_np. iExists dn', bm'.
-      iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"]. }
+    (* THE PARK RETIRES THE DESCRIPTOR IN ITS OWN GHOST STEP (durable-disk
+       B''-tx3).  [IcacheEscrow.ic_swap_park_dep] rebuilds the parked payload
+       from what this holder carries -- the [_np] bundle at [d]'s arm plus the
+       inum's [ifreeze_off], the token [SpecIlock]'s post handed out and
+       threaded through the critical section untouched -- and, at [DepTx] or
+       [DepRd], undoes the arm at the same stroke, so no bundleless out-arm is
+       ever visible.  What comes back beside the share is [ic_dep_side d]. *)
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g) g
-                 true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")
-      as "(Hbody & Htok & Hrefout)".
+    iMod (ic_swap_park_dep cn gfs gi cov logstart k d s dev inum g dn' bm'
+            Hdshr with "Hbody Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz")
+      as "(Hbody & Htok & Href & Hside)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
     iModIntro.
-    (* the descriptor pins the fraction and the identity: the share comes back
-       at exactly [s], with no existential (§14.8) *)
-    iDestruct "Hrefout" as "[_ Href]".
     iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
@@ -791,8 +788,28 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iul_cont.
     iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Href").
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Href Hside").
     { unfold callee_saved. split_and!; assumption. }
+  Qed.
+
+  (* THE BUNDLELESS READING (durable-disk B''-tx3): the generic park at
+     [DepShr].  Byte-stable -- no caller moves. *)
+  Lemma wp_iunlock_sconf
+      (gs : list gname)
+      (gfs : fs_names) (gi : gname)
+      (cn : ic_names)
+      (gil gisl : gname)
+      (cov : gset Z) (logstart : Z)
+      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (pidv : mword 32) (dq : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
+                            dn' bm' pidv dq m K eb p b lks Vpr.
+  Proof.
+    apply wp_iunlock_sconf_of_dep.
+    apply wp_iunlock_dep_sconf.
   Qed.
 
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the disarm is a ghost
@@ -812,8 +829,8 @@ Section ProofIunlockMain.
     : wp_iunlock_tx_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev
                                inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
-    apply wp_iunlock_tx_of_sconf.
-    apply wp_iunlock_sconf.
+    apply wp_iunlock_tx_of_dep. intros d.
+    apply wp_iunlock_dep_sconf.
   Qed.
 
 End ProofIunlockMain.

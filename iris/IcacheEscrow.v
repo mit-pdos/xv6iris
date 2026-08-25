@@ -1616,6 +1616,65 @@ Section IcacheEscrow.
       injection H as <-; iIntros "$".
   Qed.
 
+
+  (* ---- WHAT A DESCRIPTOR ASKS OF THE WITHDRAWING CALLER ---------------
+     (durable-fs-plan.md section 3, [ilock]; durable-disk B''-tx3)
+
+     [ilock]'s three descriptors -- [DepShr], [DepTx] and [DepRd] -- carry the
+     SAME credential, the caller's generation-named share, and differ only in
+     what rides beside it: a parked transaction share at [DepTx], nothing at
+     the other two.  [ic_dep_shr] reads the common part off the descriptor and
+     [ic_dep_side] names the extra, so ONE proof of ilock's code serves all
+     three: it takes [inode_shr_gen] as it always did plus [ic_dep_side d],
+     and hands the checkout [ic_dep_own k d dev inum]. *)
+  Definition ic_dep_shr (d : ic_dep) : option (Qp * mword 32 * mword 32 * gname) :=
+    match d with
+    | DepShr s dv nu g => Some (s, dv, nu, g)
+    | DepTx s dv nu g _ _ => Some (s, dv, nu, g)
+    | DepRd s dv nu g => Some (s, dv, nu, g)
+    | _ => None
+    end.
+
+  Definition ic_dep_side (d : ic_dep) : iProp Σ :=
+    match d with
+    | DepTx _ _ _ _ t q => t ↪[ln_tx icfg_log]{#q} tt
+    | _ => emp%I
+    end.
+
+  Global Instance ic_dep_side_timeless d : Timeless (ic_dep_side d).
+  Proof. rewrite /ic_dep_side. destruct d; apply _. Qed.
+
+  Lemma ic_dep_gname_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) :
+    ic_dep_shr d = Some (s, dev, inum, g) -> ic_dep_gname d = Some g.
+  Proof.
+    rewrite /ic_dep_shr /ic_dep_gname.
+    destruct d; try discriminate; intros H; injection H as _ _ _ <-; reflexivity.
+  Qed.
+
+  Lemma ic_dep_rd_shr d (s : Qp) (dev inum : mword 32) (g : gname) :
+    ic_dep_shr d = Some (s, dev, inum, g) ->
+    ic_dep_rd d = true ->
+    d = DepRd s dev inum g.
+  Proof.
+    rewrite /ic_dep_shr /ic_dep_rd.
+    destruct d; try discriminate; intros H _;
+      injection H as <- <- <- <-; reflexivity.
+  Qed.
+
+  Lemma ic_dep_own_of_shr k d (s : Qp) (dev inum : mword 32) (g : gname) :
+    ic_dep_shr d = Some (s, dev, inum, g) ->
+    inode_shr_gen_bare k s dev inum g -∗ ic_dep_side d -∗
+    ic_dep_own k d dev inum.
+  Proof.
+    rewrite /ic_dep_shr /ic_dep_own /ic_dep_side.
+    destruct d; try discriminate; intros H; injection H as <- <- <- <-;
+      iIntros "Hshr Hpark".
+    - iSplitR; [iPureIntro; split; reflexivity | iExact "Hshr"].
+    - iSplitR; [iPureIntro; split; reflexivity |].
+      iSplitL "Hshr"; [iExact "Hshr" | iExact "Hpark"].
+    - iSplitR; [iPureIntro; split; reflexivity | iExact "Hshr"].
+  Qed.
+
   (* ---- THE OUT ARM AND ITS SECOND ALTERNATIVE (IVd, §3.16's item 7) ----
 
      iput's window exit at +0x5e must deposit NO live mass -- the mint at
@@ -1707,6 +1766,25 @@ Section IcacheEscrow.
   Proof. rewrite /ic_out_rd. destruct d; tl_struct. Qed.
 
   Local Typeclasses Opaque ic_out_rd.
+
+  (* ...AND WHAT THE HOLDER CARRIES OUT, the complement of [ic_out_rd] and
+     keyed by the same boolean (durable-disk B''-tx3).  A checkout at a
+     bundleless descriptor hands over the WHOLE loaded bundle; a checkout at
+     [DepRd] leaves three quarters in the arm and what leaves is the reader's
+     [ic_rd_held].  [SpecIlock]'s ONE generic contract posts this, so the
+     plain form and the read form are one statement. *)
+  Definition ic_dep_held (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (d : ic_dep) (k : nat) (inum : mword 32)
+      (dn : dinode) (bm : blkmap) : iProp Σ :=
+    (if ic_dep_rd d
+     then ic_rd_held γfs cov logstart k inum dn bm
+     else ic_loaded γfs γi cov logstart k inum dn bm)%I.
+
+  Lemma ic_dep_held_loaded γfs γi cov logstart d k (inum : mword 32) dn bm :
+    ic_dep_rd d = false ->
+    ic_loaded γfs γi cov logstart k inum dn bm -∗
+    ic_dep_held γfs γi cov logstart d k inum dn bm.
+  Proof. intros H. rewrite /ic_dep_held H. iIntros "$". Qed.
 
   (* THE ARM GAINED THE FILE SYSTEM'S NAMES, and nothing outside this file
      names [ic_out] at all. *)
@@ -2114,14 +2192,25 @@ Section IcacheEscrow.
      lemma serves ilock's share checkout and any future reference one.  What
      the winner keeps is the descriptor's other half, and that is what lets
      it find its own arm again at the park. *)
-  Lemma ic_swap_checkout cn γfs γi cov logstart k (d : ic_dep) (g : gname)
+  (* THE ARM IS TAKEN AT THE CHECKOUT'S OWN GHOST STEP (durable-disk
+     B''-tx3), and that is the whole point of the wand.  Under B''-join the
+     checkout could only publish a BUNDLELESS descriptor -- its side condition
+     was [ic_dep_rd d = false] and the OUT arm it left was closed with
+     [ic_out_rd_none]'s [emp] -- so every arm was a LATER fupd
+     ([ic_arm_tx] / [ic_shed_rd]) and a [DepShr] out-state stood between the
+     two steps, visible to the collection whatever the walk did.
+
+     Here the body comes back as a WAND TAKING [ic_out_rd d inum]: the caller
+     chooses the descriptor BEFORE the step and owes exactly what that
+     descriptor's arm keeps.  At a bundleless [d] that is [emp]
+     ([ic_swap_checkout] below is this lemma plus [ic_out_rd_none], and every
+     landed caller of it is unchanged); at [DepRd] it is the three quarters,
+     which the caller sheds off the payload it has just been handed
+     ([ic_loaded_shed]) inside the SAME [|==>].  There is no state in between,
+     so no [DepShr] is ever published. *)
+  Lemma ic_swap_checkout_gen cn γfs γi cov logstart k (d : ic_dep) (g : gname)
       (dev inum : mword 32) :
     ic_dep_gname d = Some g ->
-    (* NOT THE READ ARM (durable-disk B''-join): a checkout hands the holder
-       the WHOLE payload, so the arm it leaves keeps nothing -- which is what
-       [DepRd] is precisely not.  A read-lock withdrawal is that checkout
-       followed by [ic_shed_rd]. *)
-    ic_dep_rd d = false ->
     ic_escrow_body cn γfs γi cov logstart k -∗
     ic_tok cn k -∗
     ic_dep_own k d dev inum -∗
@@ -2139,19 +2228,20 @@ Section IcacheEscrow.
             the region's own receipt clause holds the receipt and
             [IcacheRef.frzown_excl] closes it).  DEVIATION 1's obligation,
             unchanged in kind and recorded at ProofIlock. *)
-      ((ic_escrow_body cn γfs γi cov logstart k ∗
-        ic_deposit cn k d ∗
+      ((ic_deposit cn k d ∗
         (∃ v : bool,
            i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
            i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
            i_valid (ientry k) ↦₄ valid_word v ∗
-           ic_payload γfs γi cov logstart k inum g v))
+           ic_payload γfs γi cov logstart k inum g v) ∗
+        (ic_out_rd γfs γi cov logstart d inum -∗
+           ic_escrow_body cn γfs γi cov logstart k))
        ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
           frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
           (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
              ic_escrow_body cn γfs γi cov logstart k))).
   Proof.
-    iIntros (Hdg Hnrd) "Hbody Htok Hown".
+    iIntros (Hdg) "Hbody Htok Hown".
     iDestruct (ic_dep_own_ident with "Hown") as (f) "[[Hrd Hrn] Hresb]".
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v ga)
@@ -2194,11 +2284,11 @@ Section IcacheEscrow.
          before it reaches the deposit -- 100 s for this one [iFrame]
          (optimization.md's 2026-08-11 section). *)
       iModIntro. iLeft.
-      iSplitR "Hdep2 Hid Hin Hvld Hpay Hoff".
-      { iRight; iLeft. rewrite /ic_out. iExists d, dev, inum.
-        rewrite (ic_out_rd_none γfs γi cov logstart d inum Hnrd). iFrame. }
       iSplitL "Hdep2"; [iExact "Hdep2" |].
-      iExists v. rewrite /ic_payload. iFrame.
+      iSplitL "Hid Hin Hvld Hpay Hoff".
+      { iExists v. rewrite /ic_payload. iFrame. }
+      iIntros "Hrdarm".
+      iRight; iLeft. rewrite /ic_out. iExists d, dev, inum. iFrame.
     - iDestruct "Hout" as (d' dev' inum') "(Hdep' & _ & _ & _ & _)".
       iExFalso. iApply (ic_tok_deposit_excl with "Htok Hdep'").
     - iDestruct "Hmid" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
@@ -2210,6 +2300,104 @@ Section IcacheEscrow.
     - (* HELD (§13.13): the FULL inum cell, exactly as MID above *)
       iDestruct "Hhd" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hin Hrn").
+  Qed.
+
+  (* ...AND THE BUNDLELESS COROLLARY, which is [ic_swap_checkout]'s landed
+     signature verbatim: at [ic_dep_rd d = false] the arm keeps nothing, so
+     the wand's argument is [emp] and the body comes straight back. *)
+  Lemma ic_swap_checkout cn γfs γi cov logstart k (d : ic_dep) (g : gname)
+      (dev inum : mword 32) :
+    ic_dep_gname d = Some g ->
+    ic_dep_rd d = false ->
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    ic_tok cn k -∗
+    ic_dep_own k d dev inum -∗
+    |==>
+      ((ic_escrow_body cn γfs γi cov logstart k ∗
+        ic_deposit cn k d ∗
+        (∃ v : bool,
+           i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+           i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
+           i_valid (ientry k) ↦₄ valid_word v ∗
+           ic_payload γfs γi cov logstart k inum g v))
+       ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
+          frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
+          (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+             ic_escrow_body cn γfs γi cov logstart k))).
+  Proof.
+    iIntros (Hdg Hnrd) "Hbody Htok Hown".
+    iMod (ic_swap_checkout_gen cn γfs γi cov logstart k d g dev inum Hdg
+            with "Hbody Htok Hown") as "[Hok | Hfrz]"; [| by iRight].
+    iDestruct "Hok" as "(Hdep & Hpay & Hback)".
+    rewrite (ic_out_rd_none γfs γi cov logstart d inum Hnrd).
+    iDestruct ("Hback" with "[]") as "Hbody"; [done |].
+    iModIntro. iLeft. iFrame "Hbody Hdep Hpay".
+  Qed.
+
+  (* ...AND THE READ ARM'S CHECKOUT, WHICH IS THE OTHER HALF OF B''-tx3.
+     [DepRd]'s arm keeps three quarters of the inode's bundle, so a checkout
+     at it can only be taken where a bundle EXISTS -- i.e. where the entry is
+     already loaded.  That is not a restriction on this kernel: the only two
+     [ilock] callers that hold no transaction are [fileread] and [filestat],
+     and both come in at [InodeRegion.ShotK], whose licence is this
+     generation's own TYPE ONE-SHOT.  A one-shot in hand means the generation
+     has already been filled ([IcacheRef.ity_pending_shot_excl] against the
+     unloaded payload's [ity_pending]), so the [valid = 0] outcome is dead
+     HERE, inside the checkout's own ghost step, and the shed
+     ([ic_loaded_shed]) runs before the escrow closes.  No [DepShr] is
+     published and no later fupd is needed: [ic_shed_rd] is what this
+     replaces. *)
+  Lemma ic_swap_checkout_rd cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (ty : bv 16) :
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    ic_tok cn k -∗
+    inode_shr_gen_bare k s dev inum g -∗
+    ity_shot g ty -∗
+    |==>
+      ((ic_escrow_body cn γfs γi cov logstart k ∗
+        ic_deposit cn k (DepRd s dev inum g) ∗
+        (∃ (dn : dinode) (bm : blkmap),
+           i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+           i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
+           i_valid (ientry k) ↦₄ valid_word true ∗
+           ic_rd_held γfs cov logstart k inum dn bm ∗
+           ity_shot g (di_type dn) ∗
+           ifreeze_off (bv_unsigned inum)))
+       ∨ (ic_tok cn k ∗ ic_dep_own k (DepRd s dev inum g) dev inum ∗
+          frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
+          (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
+             ic_escrow_body cn γfs γi cov logstart k))).
+  Proof.
+    iIntros "Hbody Htok Hshr #Hshot".
+    iMod (ic_swap_checkout_gen cn γfs γi cov logstart k
+            (DepRd s dev inum g) g dev inum eq_refl
+            with "Hbody Htok [Hshr]") as "[Hok | Hfrz]".
+    { rewrite /ic_dep_own.
+      iSplitR; [iPureIntro; split; reflexivity | iExact "Hshr"]. }
+    2:{ iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
+        iModIntro. iRight.
+        iSplitL "Htok"; [iExact "Htok" |].
+        iSplitL "Hown"; [iExact "Hown" |].
+        iSplitL "Hrcpt"; [iExact "Hrcpt" |].
+        iSplitL "Hsel"; [iExact "Hsel" | iExact "Hwand"]. }
+    iDestruct "Hok" as "(Hdep & Hpay & Hback)".
+    iDestruct "Hpay" as (v) "(Hidv & Hinm & Hvld & Hpay)".
+    rewrite /ic_payload. iDestruct "Hpay" as "[Hnp Hoff]".
+    rewrite /ic_payload_np. destruct v.
+    2:{ iDestruct "Hnp" as "[_ Hpend]".
+        iDestruct (ity_pending_shot_excl with "Hpend Hshot") as %[]. }
+    iDestruct "Hnp" as (dn bm) "[Hload #Hshotd]".
+    iDestruct (ic_loaded_shed with "Hload") as "[Harm Hheld]".
+    iDestruct ("Hback" with "[Harm]") as "Hbody"; [cbn [ic_out_rd]; iExact "Harm" |].
+    iModIntro. iLeft.
+    iSplitL "Hbody"; [iExact "Hbody" |].
+    iSplitL "Hdep"; [iExact "Hdep" |].
+    iExists dn, bm.
+    iSplitL "Hidv"; [iExact "Hidv" |].
+    iSplitL "Hinm"; [iExact "Hinm" |].
+    iSplitL "Hvld"; [iExact "Hvld" |].
+    iSplitL "Hheld"; [iExact "Hheld" |].
+    iSplitR; [iExact "Hshotd" | iExact "Hoff"].
   Qed.
 
   (* (b) PARK, [iunlock]'s release (BioInv.escrow_swap_park).
@@ -4059,6 +4247,86 @@ Section IcacheEscrow.
       as "(Hvld & Hdep & Hload & Hbody)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
     iModIntro. iFrame "Hvld Hdep Hload".
+  Qed.
+
+  (* ---- THE PARK AT ANY OF ILOCK'S THREE ARMS (durable-disk B''-tx3) ----
+
+     The mirror of [ic_swap_checkout_gen]: the descriptor is retired in the
+     SAME ghost step that parks the payload, so no bundleless [DepShr] out-arm
+     stands between an [ic_disarm_tx] / [ic_unshed_rd] fupd and the park.  The
+     two conversions are the existing [_body] lemmas, run under the caller's
+     one opening of the escrow; what the parker gets back beside its share is
+     [ic_dep_side d] -- the transaction share at [DepTx], nothing elsewhere. *)
+  Lemma ic_swap_park_dep cn γfs γi cov logstart k (d : ic_dep)
+      (s : Qp) (dev inum : mword 32) (g : gname)
+      (dn : dinode) (bm : blkmap) :
+    ic_dep_shr d = Some (s, dev, inum, g) ->
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    ic_deposit cn k d -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word true -∗
+    ic_dep_held γfs γi cov logstart d k inum dn bm -∗
+    ity_shot g (di_type dn) -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    |==> ic_escrow_body cn γfs γi cov logstart k ∗
+      ic_tok cn k ∗
+      inode_shr_gen_bare k s dev inum g ∗
+      ic_dep_side d.
+  Proof.
+    iIntros (Hdshr) "Hbody Hdep Hid Hin Hvld Hheld #Hshot Hoff".
+    rewrite /ic_dep_shr in Hdshr.
+    destruct d as [| s0 dv nu g0 | qf dv nu | s0 dv nu g0 t0 q0 | s0 dv nu g0 ];
+      try discriminate; injection Hdshr as -> -> -> ->.
+    - (* [DepShr] -- the landed park, verbatim *)
+      rewrite /ic_dep_held /=.
+      iAssert (ic_payload γfs γi cov logstart k inum g true)%I
+        with "[Hheld Hoff]" as "Hpay".
+      { iApply (ic_payload_join with "[Hheld] Hoff").
+        rewrite /ic_payload_np. iExists dn, bm.
+        iSplitL "Hheld"; [iExact "Hheld" | iExact "Hshot"]. }
+      iMod (ic_swap_park cn γfs γi cov logstart k (DepShr s dev inum g) g
+              true dev inum eq_refl with "Hbody Hdep Hid Hin Hvld Hpay")
+        as "(Hbody & Htok & Hown)".
+      rewrite /ic_dep_own. iDestruct "Hown" as "[_ Hshr]".
+      iModIntro.
+      iSplitL "Hbody"; [iExact "Hbody" |].
+      iSplitL "Htok"; [iExact "Htok" |].
+      iSplitL "Hshr"; [iExact "Hshr" | rewrite /ic_dep_side; done].
+    - (* [DepTx] -- the write arm hands its parked share back HERE *)
+      rewrite /ic_dep_held /=.
+      iMod (ic_disarm_tx_body cn γfs γi cov logstart k s dev inum g true t0 q0
+              with "Hbody Hvld Hdep") as "(Hvld & Hdep & Htx & Hbody)".
+      iAssert (ic_payload γfs γi cov logstart k inum g true)%I
+        with "[Hheld Hoff]" as "Hpay".
+      { iApply (ic_payload_join with "[Hheld] Hoff").
+        rewrite /ic_payload_np. iExists dn, bm.
+        iSplitL "Hheld"; [iExact "Hheld" | iExact "Hshot"]. }
+      iMod (ic_swap_park cn γfs γi cov logstart k (DepShr s dev inum g) g
+              true dev inum eq_refl with "Hbody Hdep Hid Hin Hvld Hpay")
+        as "(Hbody & Htok & Hown)".
+      rewrite /ic_dep_own. iDestruct "Hown" as "[_ Hshr]".
+      iModIntro.
+      iSplitL "Hbody"; [iExact "Hbody" |].
+      iSplitL "Htok"; [iExact "Htok" |].
+      iSplitL "Hshr"; [iExact "Hshr" | rewrite /ic_dep_side; iExact "Htx"].
+    - (* [DepRd] -- the read arm's three quarters rejoin HERE *)
+      rewrite /ic_dep_held /=.
+      iMod (ic_unshed_rd_body cn γfs γi cov logstart k s dev inum g true dn bm
+              with "Hbody Hvld Hdep Hheld") as "(Hvld & Hdep & Hload & Hbody)".
+      iAssert (ic_payload γfs γi cov logstart k inum g true)%I
+        with "[Hload Hoff]" as "Hpay".
+      { iApply (ic_payload_join with "[Hload] Hoff").
+        rewrite /ic_payload_np. iExists dn, bm.
+        iSplitL "Hload"; [iExact "Hload" | iExact "Hshot"]. }
+      iMod (ic_swap_park cn γfs γi cov logstart k (DepShr s dev inum g) g
+              true dev inum eq_refl with "Hbody Hdep Hid Hin Hvld Hpay")
+        as "(Hbody & Htok & Hown)".
+      rewrite /ic_dep_own. iDestruct "Hown" as "[_ Hshr]".
+      iModIntro.
+      iSplitL "Hbody"; [iExact "Hbody" |].
+      iSplitL "Htok"; [iExact "Htok" |].
+      iSplitL "Hshr"; [iExact "Hshr" | rewrite /ic_dep_side; done].
   Qed.
 
   (* ---- THE COMMIT'S READING OF THE WRITE ARM ------------------------
