@@ -389,23 +389,33 @@ Section DiskInv.
     T.1.1 <> T.1.2 /\ T.1.1 <> T.2 /\ T.1.2 <> T.2
     /\ (T.1.1 < 8)%nat /\ (T.1.2 < 8)%nat /\ (T.2 < 8)%nat.
 
-  (* -- the ring cells not claimed by any live position ------------------ *)
-
-  Definition ring_slots_res (pav : Arch.pa) (occ : gset nat) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8,
-       if bool_decide (j ∈ occ) then emp
-       else (∃ w : SailStdpp.Values.mword 16, d_ring pav j ↦₂ w))%I.
-
-  Definition mod8 (P : gset nat) : gset nat := set_map (fun p => p `mod` 8)%nat P.
+  (* THE AVAIL-RING CELLS ARE NOT HERE ANY MORE (finding 5).  All eight
+     belong to the device invariant's lease; the driver reaches its cell only
+     through [VirtioProto.virtio_proto_ring_acc], for the one instruction that
+     writes it.  Dropping them from this resource is what dropped the interval
+     clause below with them: the cells were the only reason the live positions
+     had to be a contiguous window. *)
 
   (* -- THE lock resource ------------------------------------------------ *)
 
   Definition disk_res (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) : iProp Σ :=
     (∃ (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-       (* the window bookkeeping: flight = [nr, np), parked below nr *)
-       ⌜dom fl = set_seq nr (np - nr)⌝ ∗
-       ⌜forall p, p ∈ dom pk -> (p < nr)%nat⌝ ∗
+       (* THE WINDOW BOOKKEEPING, no longer an interval.  The device may
+          complete in any order, so the positions still in flight after [nr]
+          reclaims are SOME [np - nr] of [0, np), not the top [np - nr] of it.
+          What the publisher actually needed from the old interval clause was
+          only these two facts -- that [np] itself is fresh, and how many
+          positions are live -- and both survive reordering. *)
+       ⌜forall p, p ∈ dom fl -> (p < np)%nat⌝ ∗
+       ⌜size fl = (np - nr)%nat⌝ ∗
+       (* a PARKED position is one whose record was reclaimed but whose claim
+          its sleeping publisher has not yet picked up.  It is below [np] like
+          any other live position; being below [nr] is what it no longer is. *)
+       ⌜forall p, p ∈ dom pk -> (p < np)%nat⌝ ∗
+       (* ...and the two are disjoint, which the interval clause used to give
+          for free (flight at or above [nr], parked below it) *)
+       ⌜dom fl ## dom pk⌝ ∗
        (* descriptor triples: one per live position, well formed, pairwise
           disjoint, and none of their members is marked free *)
        ⌜dom tr = dom fl ∪ dom pk⌝ ∗
@@ -426,6 +436,10 @@ Section DiskInv.
           ([VirtioProto.virtio_proto_reclaim_acc]), which is what forces the
           handler to drain in order (finding 5). *)
        disk_read_at γ nr ∗
+       (* NOTHING IS HALF-PUBLISHED while the lock is free: a publisher sets
+          the staged head at its ring store and spends it at the index bump,
+          both under [vdisk_lock]. *)
+       disk_stage γ None ∗
        ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
        (* driver counters and cells *)
        d_used_idx ↦₂ wrap16 nr ∗
@@ -435,9 +449,9 @@ Section DiskInv.
        ([∗ list] i ∈ seq 0 8,
           d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
           (if fr i then free_slot_res pd i else emp)) ∗
-       (* unclaimed avail-ring cells: only FLIGHT positions' ring entries are
-          away (in the lease); a parked one's came back at interrupt time *)
-       ring_slots_res pav (mod8 (dom fl)))%I.
+       (* the free-descriptor pool is the last conjunct now: the avail-ring
+          cells that used to follow it are the lease's *)
+       emp)%I.
 
   (* the publisher's claim on its own position *)
   Definition disk_claim (γ : disk_names) (p : nat) (v : dclaim) : iProp Σ :=
@@ -644,66 +658,10 @@ Section DiskInv.
     - rewrite bool_decide_eq_false_2; [reflexivity|]. cbn. exact Hne.
   Qed.
 
-  (* the residual ring pool does not see slot [j], so marking [j] occupied
-     leaves it unchanged *)
-  Lemma ring_slots_rest_ext (pav : Arch.pa) (occ : gset nat) (j : nat) :
-    ([∗ list] k ∈ seq 0 8,
-       if bool_decide (k = j) then emp
-       else if bool_decide (k ∈ occ) then emp
-            else (∃ w : SailStdpp.Values.mword 16, d_ring pav k ↦₂ w))
-    ⊣⊢
-    ([∗ list] k ∈ seq 0 8,
-       if bool_decide (k = j) then emp
-       else if bool_decide (k ∈ occ ∪ {[ j ]}) then emp
-            else (∃ w : SailStdpp.Values.mword 16, d_ring pav k ↦₂ w)).
-  Proof.
-    apply big_sepL_proper. intros k y Hk.
-    apply lookup_seq in Hk as [-> _].
-    case_bool_decide as Hd; [reflexivity|].
-    case_bool_decide as H1; case_bool_decide as H2; try reflexivity.
-    - exfalso. apply H2, elem_of_union_l. exact H1.
-    - exfalso. apply elem_of_union in H2 as [H2|H2]; [exact (H1 H2)|].
-      apply elem_of_singleton in H2. exact (Hd H2).
-  Qed.
-
-  (* the ring cell for slot [j] leaves the pool as its position is published *)
-  Lemma ring_slots_take (pav : Arch.pa) (occ : gset nat) (j : nat) :
-    (j < 8)%nat -> j ∉ occ ->
-    ring_slots_res pav occ -∗
-    (∃ w : SailStdpp.Values.mword 16, d_ring pav j ↦₂ w) ∗
-    ring_slots_res pav (occ ∪ {[ j ]}).
-  Proof.
-    intros Hj Hnin. rewrite /ring_slots_res (seq8_delete _ j Hj).
-    rewrite (seq8_delete
-               (fun k => if bool_decide (k ∈ occ ∪ {[ j ]}) then emp
-                         else (∃ w : SailStdpp.Values.mword 16, d_ring pav k ↦₂ w))%I
-               j Hj).
-    rewrite -ring_slots_rest_ext.
-    iIntros "[Hj $]".
-    case_bool_decide as Hc; [exfalso; exact (Hnin Hc)|].
-    iSplitL "Hj"; [iExact "Hj"|].
-    case_bool_decide as Hc2; [done|].
-    exfalso. apply Hc2, elem_of_union_r, elem_of_singleton. reflexivity.
-  Qed.
-
-  (* ...and comes back when the position is reclaimed *)
-  Lemma ring_slots_put (pav : Arch.pa) (occ : gset nat) (j : nat) :
-    (j < 8)%nat -> j ∉ occ ->
-    (∃ w : SailStdpp.Values.mword 16, d_ring pav j ↦₂ w) -∗
-    ring_slots_res pav (occ ∪ {[ j ]}) -∗
-    ring_slots_res pav occ.
-  Proof.
-    intros Hj Hnin. iIntros "Hcell Hrest".
-    rewrite /ring_slots_res (seq8_delete _ j Hj).
-    rewrite (seq8_delete
-               (fun k => if bool_decide (k ∈ occ ∪ {[ j ]}) then emp
-                         else (∃ w : SailStdpp.Values.mword 16, d_ring pav k ↦₂ w))%I
-               j Hj).
-    rewrite -ring_slots_rest_ext.
-    iDestruct "Hrest" as "[_ $]".
-    case_bool_decide as Hc; [exfalso; exact (Hnin Hc)|].
-    iExact "Hcell".
-  Qed.
+  (* THE THREE RING-POOL LEMMAS ARE GONE (finding 5).  They moved a cell
+     between the driver's pool and a request's pin at publish and reclaim;
+     all eight cells are the device invariant's now, and the driver touches
+     one only through [VirtioProto.virtio_proto_ring_acc]. *)
 
   (* the free-descriptor bundle for slot [i], taken out of [disk_res]'s
      eight-element conjunct.  [fr i = true] hands over the whole bundle and
@@ -851,8 +809,10 @@ Qed.
 Lemma disk_window_le {A : Type} (np nr : nat) (fl pk : gmap nat A)
     (tr : gmap nat (nat * nat * nat)) (T0 : nat * nat * nat) :
   (nr <= np)%nat ->
-  dom fl = set_seq nr (np - nr) ->
-  (forall p, p ∈ dom pk -> (p < nr)%nat) ->
+  (* the interval clause split in two when the completion order came free *)
+  (forall p, p ∈ dom fl -> (p < np)%nat) ->
+  size fl = (np - nr)%nat ->
+  (forall p, p ∈ dom pk -> (p < np)%nat) ->
   dom tr = dom fl ∪ dom pk ->
   (forall p T, tr !! p = Some T -> tri_ok T) ->
   (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
@@ -861,12 +821,12 @@ Lemma disk_window_le {A : Type} (np nr : nat) (fl pk : gmap nat A)
   (forall p T, tr !! p = Some T -> tri_set T ## tri_set T0) ->
   (np - nr <= 1)%nat.
 Proof.
-  intros Hnrnp Hfl Hpk Htr Hok Hdisj HT0 Hdisj0.
+  intros Hnrnp Hfl Hcount Hpk Htr Hok Hdisj HT0 Hdisj0.
   assert (Hfresh : tr !! np = None).
   { destruct (tr !! np) as [T|] eqn:Hn; [| reflexivity]. exfalso.
     assert (Hin : np ∈ dom tr) by (apply elem_of_dom; eexists; exact Hn).
     rewrite Htr in Hin. apply elem_of_union in Hin as [Hin|Hin].
-    - rewrite Hfl in Hin. apply elem_of_set_seq in Hin. lia.
+    - pose proof (Hfl np Hin). lia.
     - pose proof (Hpk np Hin). lia. }
   set (tr' := <[ np := T0 ]> tr).
   assert (Hok' : forall p T, tr' !! p = Some T -> tri_ok T).
@@ -890,34 +850,18 @@ Proof.
   pose proof (tri_card_8 tr' Hok' Hdisj') as Hsz.
   assert (Hsz' : (S (size tr) <= 2)%nat)
     by (subst tr'; rewrite map_size_insert_None in Hsz; [exact Hsz | exact Hfresh]).
-  assert (Hdom : (size (dom fl) <= size (dom tr))%nat).
-  { apply subseteq_size. rewrite Htr. apply union_subseteq_l. }
-  rewrite Hfl in Hdom. rewrite size_set_seq in Hdom.
-  rewrite size_dom in Hdom. lia.
+  assert (Hsub2 : dom fl ⊆ dom tr) by (rewrite Htr; apply union_subseteq_l).
+  pose proof (subseteq_size (dom fl) (dom tr) Hsub2) as Hdom.
+  (* [size_dom] on both sides, as facts rather than rewrites: the two are
+     different instances and a single [rewrite ... in] only takes one. *)
+  pose proof (size_dom fl) as Hdf.
+  pose proof (size_dom tr) as Hdt2.
+  lia.
 Qed.
 
-(* ...and hence the ring slot the publisher is about to write is not one of
-   the flight positions' slots. *)
-Lemma mod8_set_seq_fresh (nr np : nat) :
-  (nr <= np)%nat -> (np - nr <= 1)%nat ->
-  (np `mod` 8)%nat ∉ mod8 (set_seq nr (np - nr)).
-Proof.
-  intros Hle Hw. destruct (Nat.eq_dec np nr) as [->|Hne].
-  { replace (nr - nr)%nat with 0%nat by lia.
-    rewrite /mod8. rewrite /set_seq. rewrite set_map_empty. apply not_elem_of_empty. }
-  assert (Hnp : np = S nr) by lia.
-  replace (np - nr)%nat with 1%nat by lia.
-  rewrite /mod8. intro Hin.
-  apply elem_of_map in Hin as (p & Hp & Hpin).
-  apply elem_of_set_seq in Hpin.
-  assert (Hpe : p = nr) by lia. subst p. rewrite Hnp in Hp.
-  assert (Hb : (nr `mod` 8 < 8)%nat) by (apply Nat.mod_upper_bound; lia).
-  replace (S nr) with (nr + 1)%nat in Hp by lia.
-  rewrite <- Nat.Div0.add_mod_idemp_l in Hp.
-  destruct (Nat.eq_dec (nr `mod` 8)%nat 7%nat) as [Hr|Hr].
-  - rewrite Hr in Hp. cbn in Hp. lia.
-  - rewrite (Nat.mod_small (nr `mod` 8 + 1)%nat 8) in Hp; lia.
-Qed.
+(* [mod8_set_seq_fresh] is gone with them: it said the cell the publisher is
+   about to write is not one of the flight positions' cells, which is now the
+   device invariant's business ([VirtioQueue.vproto_ok_ring]). *)
 
 (* ====================================================================== *)
 (* Building [slot_pin_ok] for the three-descriptor chain rw formats.       *)
@@ -1014,8 +958,8 @@ Lemma mk_pin_slot_ok
   vc_qnum c = Z_to_bv 32 8 ->
   vc_desc c = pd ->
   (hd < 8)%nat -> (md < 8)%nat -> (td < 8)%nat ->
-  (* the avail-ring entry names the head *)
-  read_bytes pin (ring_entry_pa c p) 2 = Some (Z_to_bv 16 (Z.of_nat hd)) ->
+  (* NO avail-ring premise: the cell is the LEASE's, not the pin's (finding
+     5), so a publisher owes nothing about it here. *)
   (* desc[hd] : the 16-byte header, chained *)
   desc_reads pin pd hd (hops : bv 64) (Z_to_bv 32 16) (Z_to_bv 16 1)
              (Z_to_bv 16 (Z.of_nat md)) ->
@@ -1038,7 +982,7 @@ Lemma mk_pin_slot_ok
   sts ∉ pa_range buf 1024 ->
   slot_pin_ok c p (rw_slot hd ty sec buf sts bs kq) pin.
 Proof.
-  intros Hq Hc Hh Hm Ht Hring Hdh Hdm Hdt Hty Hsec Htyv Hout Hstat.
+  intros Hq Hc Hh Hm Ht Hdh Hdm Hdt Hty Hsec Htyv Hout Hstat.
   (* the two flag computations *)
   assert (Hf1 : vd_has (VqDesc (hops : bv 64) (Z_to_bv 32 16) (Z_to_bv 16 1)
                           (Z_to_bv 16 (Z.of_nat md))) vring_desc_f_next = true)
@@ -1053,7 +997,11 @@ Proof.
             vd_has (VqDesc a l (Z_to_bv 16 2) n) vring_desc_f_next = false)
     by (intros; vm_compute; reflexivity).
   constructor.
-  - (* spo_ring *) exact Hring.
+  (* NO [spo_ring]: the avail-ring cell belongs to the LEASE now, not to the
+     request's pin (finding 5).  The device reads it at the pop, out of the
+     invariant's own cell ([VirtioQueue.vpo_ring]), so a published chain owes
+     nothing about it -- which is exactly what frees the in-flight positions
+     from having to be an interval. *)
   - (* spo_type *) cbn [rw_slot vs_req vr_type]. exact Htyv.
   - (* spo_len *) cbn [rw_slot vs_req vr_len]. vm_compute. reflexivity.
   - (* spo_out *) intro Hoo. unfold vs_is_out in Hoo. cbn [rw_slot vs_req vr_type] in Hoo.
@@ -1107,4 +1055,8 @@ Proof.
     destruct Hdh as (Ha & _ & _ & _).
     apply (read_bytes_dom_sub pin (d_desc pd hd) 8 _ Ha).
     apply pa_range_base. change (N.to_nat 8) with 8%nat. lia.
+  - (* spo_hd: a head is a descriptor index, so under eight -- which is what
+       bounds the outstanding requests and hence the unread used records *)
+    cbn [rw_slot vs_hd vs_req vr_head].
+    rewrite (bv16_small hd Hh). lia.
 Qed.
