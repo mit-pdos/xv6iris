@@ -4338,10 +4338,8 @@ Section IcacheEscrow.
                is what closes it -- it retires the descriptor in the park's
                own ghost step -- and reaching those sites needs
                [SpecIunlockput]'s generic form beside [SpecIunlock]'s.  On the
-               WITHDRAWAL side there is exactly one left, create's fresh
-               child, whose slot and generation are chosen inside
-               [ProofCreateFreshTy]'s span and so must be threaded through
-               that span's own statement.
+               WITHDRAWAL side there is NONE left: every [ilock] in this
+               kernel now publishes its final descriptor at the checkout.
 
      LANE C READS THIS THROUGH [ic_escrow_body_cover_all], and alternative (d)
      is the whole of what it cannot close.

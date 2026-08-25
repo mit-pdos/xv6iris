@@ -5019,17 +5019,28 @@ Section ProofCreateMain.
       as "[Hppid Hppback]".
     iDestruct (cpu_own_transport CIDa CIDA1 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    (* THE PARENT'S ARM SHRINKS BEFORE THE SPAN (durable-disk B''-tx3): the
+       child's checkout is what parks the quarter, and the span's [ilock] is
+       the checkout, so the quarter has to be in hand on the way IN.  On the
+       ALLOC arm it comes back inside the child's deposit; on the FAIL arm,
+       bare, and the parent's arm grows back to a half. *)
+    iApply fupd_wp.
+    iMod (ic_shrink_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
+            t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
+            ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
+      as "(Hivalid & Hdep & Htp)".
+    iModIntro.
     (* ===== +0xa4 .. +0xb0 : THE FRESH-TYPE GATE SPAN ================= *)
     iApply (create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γpr cov logstart inodestart ninodes nib dev ty kd (DfracOwn (1/2))
-              q1 Sb1 pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
+              q1 Sb1 t (1/4)%Qp pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
               (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
-              (fun CIDx : CpuId => IL.wp_ilock_sconf (CID := CIDx))
+              (fun CIDx : CpuId => IL.wp_ilock_dep_sconf (CID := CIDx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
-                    Hppid Hbsl Hisl1 Hidev Hop").
+                    Hppid Hbsl Hisl1 Hidev Htp Hop").
     all: try lkbelow.
     iIntros (CIDo Hso Mo alloc kslot q g cinum gil gisl dnc bmc)
       "%Hcs3 Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev Hres".
@@ -5084,22 +5095,14 @@ Section ProofCreateMain.
          The FILE arm disarms immediately (its child is well-formed the
          moment the count lands), which is why nothing outside create ever
          sees a suspended row on that path. *)
-      (* BOTH INODES ARE WRITE-LOCKED NOW (durable-disk B''-tx2), so the
-         parent's arm SHRINKS to a quarter and the child's is armed with
-         what comes back; the half that is left is what the registry's arm
-         below parks.  Quarter + quarter + half = the whole element. *)
+      (* BOTH INODES ARE WRITE-LOCKED NOW (durable-disk B''-tx2): the
+         parent's arm shrank to a quarter before the span and the child's
+         CHECKOUT parked what came back (B''-tx3), so the half that is left
+         is what the registry's arm below parks.  Quarter + quarter + half =
+         the whole element. *)
       iDestruct (cr_esc_acc cn γfs γi cov logstart kslot Hkslt with "Hesc")
         as "#Hescc".
       iEval (rewrite Hglog) in "Htx".
-      iApply fupd_wp.
-      iMod (ic_shrink_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-              t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
-              ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-        as "(Hivalid & Hdep & Htp)".
-      iMod (ic_arm_tx ⊤ cn γfs γi cov logstart kslot (q/2)%Qp dev cinum g true
-              t (1/4)%Qp ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep Htp")
-        as "[Hcivalid Hcdep]".
-      iModIntro.
       iApply fupd_wp.
       iMod (cr_dirty_arm ⊤ γfs t (bv_unsigned cinum)
               (era_node dnc bmc datc)
@@ -6274,7 +6277,15 @@ Section ProofCreateMain.
     - (* ============================================================== *)
       (*  ARM A-FAIL (+0xec): ialloc returned 0, nothing was claimed     *)
       (* ============================================================== *)
-      iDestruct "Hres" as "(%Hs3z & Hpc & Hislg & Hop)".
+      iDestruct "Hres" as "(%Hs3z & Hpc & Hislg & Htp & Hop)".
+      (* nothing was claimed, so no second lock was taken: the quarter goes
+         straight back into the parent's arm (durable-disk B''-tx3). *)
+      iApply fupd_wp.
+      iMod (ic_grow_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
+              t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
+              ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htp")
+        as "(Hivalid & Hdep)".
+      iModIntro.
       assert (HMoregs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                           (mword_of_int 0 : mword 64) ty major minor Mo)
         by exact (cr_regs3_of_span m sp0 (ientry kd) (mword_of_int 0 : mword 64)

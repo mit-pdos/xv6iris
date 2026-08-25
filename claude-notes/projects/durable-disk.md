@@ -938,6 +938,143 @@ as their remaining consumers.
   REMAINS: iput's share (above), the checkout-side arm that retires `DepShr`
   (above), and B″-join's partition tie.  Until the first two land,
   `ic_slot_cover` keeps arm (d) and `snap_ok` cannot be collected.
+
+  **AS LANDED — B″-tx3: THE ARM MOVES INTO THE CHECKOUT, AND THE READ ARM
+  WITH IT.**
+
+  THE DEAD DESCRIPTOR WENT FIRST.  `Xv6Cameras.ic_dep`'s `DepRef` — "iput's
+  authority-side window exit, which deposits its WHOLE reference" — had NO
+  PRODUCER anywhere in this kernel: iput's window exits through
+  `IcacheEscrow.ic_held` and its freeze window through `DepFrz`.  It cost
+  `ic_escrow_body_cover` an alternative nothing could ever populate and every
+  arm-generic lemma a branch.  Retired; every positional
+  `destruct d as [| … ]` in `IcacheEscrow.v` loses a slot.
+
+  A `DepShr` OUT-STATE USED TO STAND AT EVERY LOCK, AND IT IS A REAL STATE.
+  Under B″-tx/-tx2 the arm was a fupd on the deposit `ilock`'s post handed out
+  (`ic_arm_tx_log`, `ic_shed_rd`), and `ilock` RETURNS between the two: the
+  escrow is closed at a bundleless descriptor across a program step, which is
+  exactly what another thread's commit can open.  The same held at the far end
+  (`ic_disarm_tx` then `iunlock`) and, worse, ACROSS THE WHOLE FILL — the
+  uncached arm holds its deposit through `bread`.  Two lemmas move it:
+
+  * `IcacheEscrow.ic_swap_checkout_gen` states the checkout in WAND form — the
+    body comes back as `ic_out_rd d inum -∗ ic_escrow_body`, so the caller
+    picks the descriptor BEFORE the ghost step and owes exactly what that
+    descriptor's arm keeps.  `ic_swap_checkout` is that plus `ic_out_rd_none`
+    and is byte-stable.
+  * `IcacheEscrow.ic_swap_park_dep` is the mirror at the park: the two
+    conversions (`ic_disarm_tx_body`, `ic_unshed_rd_body`) run under the
+    caller's OWN opening of the escrow and then `ic_swap_park`, so the
+    descriptor is retired in the step that parks the payload.  A `DepShr` that
+    exists only between two bupds inside one opening is not a state.
+
+  ONE CONTRACT, THREE ARMS, AND FOUR BYTE-STABLE READINGS.
+  `SpecIlock.wp_ilock_dep_sconf_body` and `SpecIunlock.wp_iunlock_dep_sconf_body`
+  take the descriptor; `wp_ilock_sconf` / `wp_ilock_tx_sconf` and
+  `wp_iunlock_sconf` / `wp_iunlock_tx_sconf` are their `DepShr` and `DepTx`
+  readings (`wp_ilock_sconf_of_dep` / `wp_ilock_tx_of_dep`,
+  `wp_iunlock_sconf_of_dep` / `wp_iunlock_tx_of_dep`) and not one of the four
+  statements moved.  What the three arms SHARE is `IcacheEscrow.ic_dep_shr` —
+  the caller's generation-named slice, identical at `DepShr`, `DepTx` and
+  `DepRd`; what DIFFERS is two projections, `ic_dep_side` (the parked
+  transaction share at `DepTx`, `emp` elsewhere) and `ic_dep_held` (the whole
+  bundle, or the reader's `ic_rd_held`), with `ic_dep_gname_of_shr` /
+  `ic_dep_rd_shr` / `ic_dep_own_of_shr` / `ic_dep_held_loaded` the four
+  readings.  Inside `ProofIlock` the three stage predicates (`il_cont`,
+  `il_epilogue`, `il_load`) take the descriptor and `il_payload` is the
+  checkout's outcome at either arm; its UNLOADED alternative carries
+  `⌜ic_dep_rd d = false⌝`, which is what says the read arm never meets the
+  fill.  `wp_ilock_tx_of_sconf`, `ic_shed_rd`, `ic_shed_rd_body` and
+  `ic_unshed_rd` retire.
+
+  THE READ ARM'S PREMISE IS THE ONE ITS TWO CALLERS ALREADY PAY, and it is
+  what makes a checkout-side shed possible at all.  `DepRd`'s arm keeps three
+  quarters of a BUNDLE, so the checkout can only be taken where one exists —
+  and at `valid = 0` there is none, which is why B″-join could only shed
+  afterwards.  `InodeRegion.ShotK` closes it: `fileread`'s and `filestat`'s
+  licence index IS this generation's type one-shot, so
+  `ic_swap_checkout_rd` kills the `valid = 0` outcome INSIDE its own ghost
+  step (`ity_pending_shot_excl` against the unloaded payload's `ity_pending`)
+  and `ic_loaded_shed` runs before the escrow closes.  The generic contract
+  states it as the pure premise `ic_dep_rd d = true -> ∃ ty, o = ShotK ty`,
+  which pays for a second thing too: the CACHED arm's `ClaimK` refutation
+  reads `dinode_at` off the holder's bundle, and a read-locker's stays in the
+  arm.  Both read-lockers are converted, their five `ic_shed_rd` /
+  `ic_unshed_rd` fupds are gone, and `ilock`'s post hands out `ic_rd_held`
+  directly.
+
+  ALL SIX WITHDRAWAL SITES CONVERTED — `sys_unlink`'s two, `sys_open`'s,
+  `create`'s parent and re-locked child, and create's FRESH child behind
+  `ProofCreateFreshTy`'s span.  At a quarter site the `ic_shrink_tx` simply
+  moves ABOVE the call; the arithmetic is unchanged.  The span was the only
+  one with a shape problem — its slot and generation are chosen INSIDE it, so
+  the descriptor cannot be fixed by the caller — and the fix is that the
+  descriptor need not be: `create_fresh_ty_body` takes `(t, qt)` and the share
+  itself, publishes `DepTx (q/2) dev inum g t qt` at the checkout its own
+  `ilock` hypothesis performs, and hands the share back BARE on the A-FAIL arm
+  (where no lock was taken and create grows the parent's arm back with
+  `ic_grow_tx`).  So no `ilock` in this kernel leaves a bundleless arm behind
+  any more, and `ic_arm_tx` / `ic_arm_tx_log` / `ic_arm_tx2` have no walk-side
+  caller left.
+
+  WHAT `ic_slot_cover` STILL HAS, and it is FOUR alternatives, not three.
+  Alternative (d) is inhabited by exactly two things now, and the comment at
+  the definition names both:
+
+  1. IPUT'S THREE WINDOWS — `DepFrz` (+0x5e), the mid-free park
+     (`ic_payload_arm`'s frozen alternative, +0x70) and the authority-side
+     window `ic_held` (+0x3c).
+  2. THE `DepShr` LEFT ON THE RETIREMENT SIDE, between an `ic_disarm_tx` /
+     `ic_disarm_tx_log` fupd and the `iunlock` / `iunlockput` after it.
+
+  (2) IS PURE SWEEP AND THE TOOL FOR IT IS ALREADY IN TREE:
+  `ic_swap_park_dep` closes it, `SpecIunlock`'s generic form already reaches
+  `iunlock`'s five direct callers, and what is missing is the same generic for
+  `SpecIunlockput` — one `wp_iunlockput_dep_gen_body` / `_dep_sconf_body` pair
+  in `SpecIunlockput` (902 lines), `d` threaded through `ProofIunlockput`'s
+  single `IU.wp_iunlock_sconf` call, and then ~20 caller sites that drop their
+  `ic_disarm_tx` and pass the descriptor: `ProofCreate` ×9, `ProofSysUnlink`
+  ×4, `ProofSysOpenTails` ×4, `ProofSysUnlinkTails` ×2, `ProofSysMknod`,
+  `ProofSysMkdir`.  The six B″-tx-converted walks pay NOTHING — their
+  `ic_disarm_tx_log` lives inside `SpecIunlockput`'s own `_tx_of_*`
+  derivations.
+
+  (1) IS A WALL, AND IT IS A SPEC-SHAPE FACT.  Every `iput` in this kernel
+  does run inside a transaction, and `DepFrz` and the mid-free park could take
+  a share the way `DepTx` does — the descriptor is a `ghost_var` the holder
+  pins, and the park's `frzown`/`frzsel` pair could carry `(t, q)` as fields.
+  `ic_held` CANNOT.  Its window spans iput's `acquiresleep` (+0x3c..+0x5e):
+  before that call the slot's descriptor variable is inside the ENTRY'S
+  SLEEPLOCK (`ic_tok cn k`), not in iput's hand and not in the escrow, and
+  `ic_held` holds only cells, `ic_mid` and half of `ic_id` — none of which can
+  carry a transaction id.  So a share parked in `ic_held` comes back from
+  `ic_open_held` at an EXISTENTIAL `(t, q)`, which iput cannot rejoin with the
+  residue its caller has to get back.  Two escapes were checked and both fail:
+  parking a WHOLE `LogInv.log_tx` element (then the existential closure IS the
+  currency and no re-identification is needed) requires iput to hold the whole
+  token, which `sys_unlink`'s `su_tail_e` — the arm that calls `iunlockput`
+  with a second inode still write-locked at a quarter — cannot supply; and
+  parking the arm in `InodeRegion`'s registry instead moves the share out of
+  the slot, where the per-slot cover lemma cannot see it.  **Giving `ic_held` a
+  share needs a pin the slot does not have today** (a per-slot
+  `ghost_var Σ (option (nat * Qp))`, i.e. one new `icfg` field and its boot
+  allocation), and that is a ruling, not a proof step.  Nothing here invented a
+  premise for it.
+
+  ALSO NOT DONE: item 3's pool-side twin for C-3b's transit set `X`.  It reads
+  "an inum in `X` is carried by a walk inside iput's window, which now holds a
+  share" — and iput does not hold one, so the twin has no premise to run off.
+  It falls out of (1), not of anything this lane could close on its own.
+
+  FOOTPRINT, for whoever picks this up: `DepShr` is mentioned in 13 files (89
+  lines, most of them prose) and NO walk names it any more -- the two that did
+  (`ProofCreateFreshTy`, and every `ic_arm_tx` call site) are gone.  Every
+  remaining RESOURCE-level mention is either one of the four byte-stable
+  `_sconf` readings or an intermediate inside `ic_swap_park_dep` /
+  `ic_unshed_rd_body`; retiring the constructor outright needs (2) plus a
+  direct `DepTx`/`DepRd` park that skips the `DepShr` hop, and it still would
+  not take `ic_slot_cover` below four alternatives while (1) stands.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
