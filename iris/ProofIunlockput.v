@@ -603,7 +603,7 @@ Section ProofIunlockputMain.
               Hropen #Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
-    iDestruct "Hlogop" as (Sb0) "Hlogop".
+    iDestruct (log_op_openS with "Hlogop") as (Sb0) "[Hlogop Htx]".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
     iApply (wp_iunlockput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev
@@ -616,7 +616,7 @@ Section ProofIunlockputMain.
                     Hropen Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
                     Hparp
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
-                    Hlogop [Hcont]").
+                    Hlogop [Hcont Htx]").
     all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
@@ -625,11 +625,11 @@ Section ProofIunlockputMain.
                                Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                     Hbslots [%] [Hlogop] Hslot").
+                     Hbslots [%] [Hlogop Htx] Hslot").
     { exact Hcs. }
     { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.
       destruct wf; simpl in Hbnd; lia. }
-    { iApply (log_opS_op with "Hlogop"). }
+    { iApply (log_opS_op with "Hlogop Htx"). }
   Qed.
 
 End ProofIunlockputMain.

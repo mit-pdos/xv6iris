@@ -2217,7 +2217,7 @@ Qed.
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcrd".
@@ -2231,16 +2231,16 @@ Qed.
               Vpr HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
-                    [Hcont]").
+                    [Hcont Htx]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
-                     Hsb Hiout Hsl [Hop]").
+                     Hsb Hiout Hsl [Hop Htx]").
     { exact Hcs. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
   Qed.
 
   (* THE LINK-MINTING SEAL (design fs-icache.md §20.18, stage C2).  The

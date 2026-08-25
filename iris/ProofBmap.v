@@ -3586,7 +3586,7 @@ Section BmapSeal.
        is fs-icache.md section 18's "derived counted form", taken at the
        witness rather than at the empty set so that no caller has to prove
        its set empty -- which would be false as well as unnecessary. *)
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (bm_kit_intro γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n Sb0 eq_refl Hbgok
                  with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbminv") as "Hkit".
@@ -3608,7 +3608,7 @@ Section BmapSeal.
               ltac:(intros Hc; discriminate Hc)
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
               with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hprk Hbio Hrow Hidev Hmap Hblocks Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -3620,7 +3620,7 @@ Section BmapSeal.
     iDestruct (bm_slots_join 1 2 with "Hsl1 Hsl2") as "Hsl".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf bm' n' data'
-              with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hidev Hmap [%] Hblocks [Hsl] [%] [Hop]").
+              with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hidev Hmap [%] Hblocks [Hsl] [%] [Hop Htx]").
     { exact Hcs. }
     { exact Hwf'. }
     { exact Hag. }
@@ -3633,7 +3633,7 @@ Section BmapSeal.
       destruct Hled as (Hlo & Hhi & _).
       pose proof (bmap_cost_le3 false (bmap_alloced bm bm' fbn) (bmap_ind fbn)).
       split; lia. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
   Qed.
 
   (* the SET-FORM contract: the core, sealed, with nothing weakened *)

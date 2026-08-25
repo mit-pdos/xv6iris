@@ -2424,6 +2424,9 @@ Section ProofSysOpenBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_opS g MAXOPBLOCKS Sb -∗
+    (* the transaction token, beside the budget: this arm's tail closes the
+       operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
+    log_tx g -∗
     bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
@@ -2453,7 +2456,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpre #Hftab #Hbio
               #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hireg
               #Hropen
-              Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS
+              Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
               Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
               Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
@@ -2682,7 +2685,7 @@ Section ProofSysOpenBody.
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID6 CID8 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iDestruct (log_opS_op with "HopS") as "Hop".
+      iDestruct (log_opS_op with "HopS Htx") as "Hop".
       iApply (Tails.so_tail_a (CID0 := CID8) gs jx gl gu gd gk pd pav pu bn g
                 gfs cov logstart dev u1 pidv (DfracOwn (1/4)) m P1 sp0 K eb b
                 lks w4 w5 w6 (word_of_words lo om) w24 bp1 V
@@ -2741,7 +2744,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp48) in "Hpc".
     assert (HP1s1i : (P1 !!! Regidx Rs1 : mword 64) = ientry kk)
       by (rewrite HP1s1; exact Hcra0).
-    iDestruct (log_opS_op with "HopS") as "Hop".
+    iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iDestruct (cpu_own_transport CID6 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     (* ---- THE ADAPTER: the syscall's exit continuation, weakened to the
@@ -2883,6 +2886,9 @@ Section ProofSysOpenBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_opS g MAXOPBLOCKS Sb -∗
+    (* the transaction token, beside the budget: this arm's tail closes the
+       operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
+    log_tx g -∗
     bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
@@ -2913,7 +2919,7 @@ Section ProofSysOpenBody.
       by (revert Hnsb; unfold sys_open_slots, create_slots; lia).
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpre #Hftab #Hbio
               #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hireg #Hropen
-              Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS
+              Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
               Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
               Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
@@ -3085,7 +3091,7 @@ Section ProofSysOpenBody.
       assert (Hnsb2 : (2 + (ns - 2))%nat = ns) by lia.
       iEval (rewrite Hnsb2) in "Hisl".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
-      iDestruct (log_opS_op with "HopS") as "Hop".
+      iDestruct (log_opS_op with "HopS Htx") as "Hop".
       iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Tails.so_tail_b (CID0 := CID5) gs jx gl gu gd gk pd pav pu bn g
@@ -3299,7 +3305,7 @@ Section ProofSysOpenBody.
       assert (Hdirw : bv_unsigned (di_type dn) = T_DIR_z ->
                       om = (mword_of_int 0 : mword 32)).
       { intro Hc. exfalso. exact (so_tdir_zne (di_type dn) Hty Hc). }
-      iDestruct (log_opS_op with "HopS") as "Hop".
+      iDestruct (log_opS_op with "HopS Htx") as "Hop".
       iDestruct (cpu_own_transport CID7 CID10 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       (* THE ADAPTER, the else arm's copy: the iref interval widens from
@@ -3389,7 +3395,7 @@ Section ProofSysOpenBody.
                            (sign_extend' 13 (concat_vec (mword_of_int 178 : mword 8) ('b"0"))))
                       = mword_of_int (SO + 0x5e)) by pcw.
       iEval (rewrite Htgfa) in "Hpc".
-      iDestruct (log_opS_op with "HopS") as "Hop".
+      iDestruct (log_opS_op with "HopS Htx") as "Hop".
       iDestruct (cpu_own_transport CID7 CID12 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iAssert (wp_next true (proc_addr jx)
@@ -3437,7 +3443,7 @@ Section ProofSysOpenBody.
     iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeepe".
     iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
     iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
-    iDestruct (log_opS_op with "HopS") as "Hop".
+    iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iDestruct (cpu_own_transport CID7 CID12 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Tails.so_tail_c (CID0 := CID12) gs jx gl gu gd gk pd pav pu bn g
@@ -4075,7 +4081,7 @@ Section ProofSysOpenBody.
                     = mword_of_int (SO + 0x2e)) by (rewrite HR3ra; pcw).
     iEval (rewrite Hpc2e) in "Hpc".
     iDestruct ("Hpback0" with "Hpbare") as "Hpriv".
-    iDestruct "Hop" as (Sb0) "HopS".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
     assert (Hbosp : so_sp sp0 mbo).
     { rewrite /so_sp (callee_saved_lookup Hcsbo csp_rs1 ltac:(vm_compute; reflexivity)).
       exact HR3sp. }
@@ -4193,7 +4199,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpre Hftab Hbio
                       Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg Hropen
                       Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
-                      HopS Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
+                      HopS Htx Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
                       H23hi H24 Hcont0").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. } }
@@ -4225,7 +4231,7 @@ Section ProofSysOpenBody.
                     Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg
                     Hropen
                     Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
-                    HopS Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
+                    HopS Htx Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
                     H23hi H24 Hcont0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }

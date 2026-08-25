@@ -4435,7 +4435,7 @@ Section BallocMain.
     intros pcE pj ret_tgt HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx Hppid
               Hsbsz Hsbbm #Hbminv #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb) "[Hop Htx]".
     (* [ba_main] is the eb-generic core both top-level lemmas share -- see
        its header comment -- so [wp_balloc_sconf], which genuinely needs
        [eb = false], applies it directly instead of routing through
@@ -4446,14 +4446,14 @@ Section BallocMain.
               Vpr HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog ltac:(discriminate)
               Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hpenv Hbio Hlctx Hppid
-                    Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl Harms".
-    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms]");
+    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms Htx]");
       [exact Hcs|].
     iDestruct "Harms" as "[(%Hz & Hop) | Hr]".
     - iLeft. iSplitR; [iPureIntro; exact Hz|].
-      iApply (log_opS_op with "Hop").
+      iApply (log_opS_op with "Hop Htx").
     - iDestruct "Hr" as (blk) "(%Ha & %Hnz & %Hcv & %Hlg & Hfsb & Hop)".
       iRight. iExists blk.
       iSplitR; [iPureIntro; exact Ha|].
@@ -4461,7 +4461,7 @@ Section BallocMain.
       iSplitR; [iPureIntro; exact Hcv|].
       iSplitR; [iPureIntro; exact Hlg|].
       iFrame "Hfsb".
-      iApply (log_opS_op with "Hop").
+      iApply (log_opS_op with "Hop Htx").
   Qed.
 
 End BallocMain.

@@ -2013,8 +2013,8 @@ Section ProofLogWrite.
       iSplitL "Hr8"; [iExact "Hr8"|]. iExists vg4. iExact "Hg4". }
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
-    iDestruct "HRres" as (out cmt nc om Ep Xr)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hbatch)".
+    iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hbatch)".
     (* THIS OP'S BIRTH EPOCH ARRIVES NAMED (fs-log.md §G.19): the credit's
        group form is stated against it, so the contract takes [log_opSe] and
        [e0] is a parameter.  The auth's own soundness clause is about to pin
@@ -2467,7 +2467,7 @@ Section ProofLogWrite.
     (* ================= THE TWO CLOSING WANDS ================= *)
     iAssert (lw_closeA Psi γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W
              ∧ lw_closeB Psi γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W)%I
-      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
              Hmirh Hpsi Hjtail HpL HpD Hextra Hslk Hvalid Hdevh Hbdisk Hbytes Hdisk
              HPhifsb Hop]"
       as "Hcl".
@@ -2482,7 +2482,7 @@ Section ProofLogWrite.
         iModIntro.
         iSplitR "HpL HpD Href Hslk Hvalid Hdevh Hbnoc Hbdisk Hbytes Hdisk HPhifsb Hop Hslot".
         + rewrite /log_res.
-          iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}).
+          iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}), Tx.
           iFrame "Houtc Hcmtc Hncc Hoauth".
           iSplitR; [iPureIntro; exact HszL|].
           iSplitR; [iPureIntro; exact HbndL|].
@@ -2498,6 +2498,8 @@ Section ProofLogWrite.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hcap e' b' Hin).
             - apply elem_of_singleton in Hin. injection Hin as -> ->. lia. }
+          iFrame "Htxa".
+          iSplitR; [iPureIntro; rewrite Hszt Hsz -HszL; reflexivity|].
           iExists nl, LB. iSplitR; [iPureIntro; exact HsumA|].
           (* ABSORB: W is unchanged, so LB is too, and the block is already
              in it -- which is exactly what [Hmem] says. *)
@@ -2580,7 +2582,7 @@ Section ProofLogWrite.
         iSplitR "HpL HpD Hrt Hrdev Hrbno Hslk Hvalid Hdevh Hbnoc Hbdisk Hbytes
                  Hdisk HPhifsb Hop Hslot".
         + rewrite /log_res.
-          iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}).
+          iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}), Tx.
           iFrame "Houtc Hcmtc Hncc Hoauth".
           iSplitR; [iPureIntro; exact HszL|].
           iSplitR; [iPureIntro; exact HbndL|].
@@ -2595,6 +2597,8 @@ Section ProofLogWrite.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hcap e' b' Hin).
             - apply elem_of_singleton in Hin. injection Hin as -> ->. lia. }
+          iFrame "Htxa".
+          iSplitR; [iPureIntro; rewrite Hszt Hsz -HszL; reflexivity|].
           iExists (S nl), (LB ∪ {[uint bno]}).
           (* THE APPEND BRANCH IS UNREACHABLE UNDER A CREDIT: the scan
              reported [bno] absent from lh.block[], but a credit says it is
@@ -2984,15 +2988,17 @@ Section ProofLogWrite.
     cbv beta delta [wp_log_write_sconf_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hno.
     iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hlctx Hstep Hbslot Hop Hfsb Hheld Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
+    (* the transaction token rides BESIDE the budget across the callee --
+       log_write neither opens nor closes a transaction (durable-disk lane A) *)
+    iDestruct (log_op_openS with "Hop") as (Sb) "[Hop Htx]".
     iApply (wp_log_write_gen bn γ γfs γd cov logstart dev k pidv bno
               bs bsl bsd d u false Sb Psi m n eb p K b lks
               HK Hnoff Hk Ha0 Hcovbno Hnotlog ltac:(discriminate) Hno
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hstep Hbslot Hop Hfsb Hheld [Hcont]").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hstep Hbslot Hop Hfsb Hheld [Hcont Htx]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS Hfsb Hlk Hslot".
-    iDestruct (log_opS_op with "HopS") as "Hop".
+    iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] Hop Hfsb Hlk Hslot").
     exact Hcs.
   Qed.

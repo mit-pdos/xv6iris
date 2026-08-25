@@ -3356,31 +3356,31 @@ Section IallocMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
+    iDestruct (log_op_openS with "Hop") as (Sb) "[HopS Htx]".
     iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ γfs γi
               cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m K eb b lks
               Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx
                     Hsbn Hsbi Hireg Hiopen Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
-                    Hitb2 Hitbl Hesc Hiref HopS [Hcont]").
+                    Hitb2 Hitbl Hesc Hiref HopS [Hcont Htx]").
     all: try lkbelow.
     iIntros (CID') "%Hq".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hq |].
     iIntros (mf alloc kslot q inum dn') "%Hcs Hcg Hcnt Hpc Hsbn Hsbi Hppid
               Hsl Harm".
     iApply ("Hcont" $! mf alloc kslot q inum dn'
-              with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Harm]");
+              with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Harm Htx]");
       [exact Hcs |].
     destruct alloc.
     - iDestruct "Harm" as "(%Hp & Hpkg & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Hpkg"; [iExact "Hpkg" |].
-      iApply (log_opS_op with "HopS").
+      iApply (log_opS_op with "HopS Htx").
     - iDestruct "Harm" as "(%Hp & Hiref & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Hiref"; [iExact "Hiref" |].
-      iApply (log_opS_op with "HopS").
+      iApply (log_opS_op with "HopS Htx").
   Qed.
 
 End IallocMain.

@@ -1412,7 +1412,7 @@ Section ProofSysChdirBody.
       iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
       iDestruct (sc_buf_split (pa_stk sp0 20) bf pk Hpk with "Hbuf")
         as "[Hbufk Hbufrest]".
-      iDestruct "Hop" as (Sb0) "HopS".
+      iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
       iDestruct (cpu_own_transport CID15 CID19 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Namei.wp_namei_gen (CID := CID19) gs j gl gu gd gk pd pav pu bn
@@ -1831,10 +1831,10 @@ Section ProofSysChdirBody.
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hescc Hireg Hropen Hslkc [$Hrefc $Hruc] Hsbb Hsbi Hbmres Hpbare Hprocs
-                          Hdev Hgeo Hdlk Hbsl [HopS]").
+                          Hdev Hgeo Hdlk Hbsl [HopS Htx]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /log_op. iExists Sb1. iExact "HopS". }
+          { iApply (log_opS_op with "HopS Htx"). }
           iIntros (CID33 Hq33 mip n2)
             "%Hcsip Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
              Hop Hislot".
@@ -2101,10 +2101,10 @@ Section ProofSysChdirBody.
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpbare
-                          Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
+                          Hprocs Hdev Hgeo Hdlk Hbsl [HopS Htx]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /log_op. iExists Sb1. iExact "HopS". }
+          { iApply (log_opS_op with "HopS Htx"). }
           iIntros (CID30 Hq30 mup n2)
             "%Hcsup Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
              Hop Hislot".
@@ -2301,11 +2301,11 @@ Section ProofSysChdirBody.
                   (upd_upt V P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4 Hbuf
+                        Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4 Hbuf
                         [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hftok Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { rewrite /log_op. iExists Sb1. iExact "HopS". }
+        { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
         iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".

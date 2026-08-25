@@ -1913,7 +1913,7 @@ Section IreclaimOrphan.
        difference at this site -- its witness and birth epoch are the
        [log_op] existential's own, exactly as [ProofIput]'s own counted seal
        derives them. *)
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (log_opS_named with "Hop") as (e00) "Hop".
     iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev
@@ -1937,7 +1937,7 @@ Section IreclaimOrphan.
     iIntros (CID24 Hq24 mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
                                       Hsl %Hssub %Hwbm %Hwc %Hbnd
                                       Hop Hiref Hboot".
-    iDestruct (log_opS_op with "Hop") as "Hop".
+    iDestruct (log_opS_op with "Hop Htx") as "Hop".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))
       by (rewrite HOGra; pcw).

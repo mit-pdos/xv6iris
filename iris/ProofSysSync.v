@@ -290,13 +290,13 @@ Section SsProps.
        log_res Psi γ bn γfs cov logstart).
   Proof.
     rewrite /log_res.
-    iIntros "H". iDestruct "H" as (out cmt nc om E X)
+    iIntros "H". iDestruct "H" as (out cmt nc om E X T)
       "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
     iExists out, cmt, nc.
     iSplitR; [iPureIntro; exact Hout3|].
     iFrame "Hout Hcmt Hnc".
     iIntros "Hout Hcmt Hnc".
-    iExists out, cmt, nc, om, E, X.
+    iExists out, cmt, nc, om, E, X, T.
     iFrame "Hout Hcmt Hnc Hauth".
     iSplitR; [iPureIntro; exact Hsz|].
     iSplitR; [iPureIntro; exact Hbnd|].

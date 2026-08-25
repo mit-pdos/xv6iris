@@ -1350,8 +1350,8 @@ Section BoBodies.
       by (vm_compute; reflexivity).
     (* open the lock's resource for the committing test *)
     rewrite /log_res.
-    iDestruct "Hres" as (out cmt nc om Ep Xr)
-      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
+    iDestruct "Hres" as (out cmt nc om Ep Xr Tx)
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hrest)".
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
@@ -1383,7 +1383,7 @@ Section BoBodies.
     destruct cmt.
     - (* ================= COMMITTING: c.bnez TAKEN -> +0x24 ================= *)
       iAssert (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32) (om : gmap nat op_entry)
-                 (E : nat) (X : gset (nat * Z)),
+                 (E : nat) (X : gset (nat * Z)) (T : gmap nat unit),
                  l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
                  l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
                  l_ncommit ↦₄ nc ∗
@@ -1397,14 +1397,16 @@ Section BoBodies.
                  own (ln_lg γ) (● X) ∗
                  ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
                  ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
+                 ghost_map_auth (ln_tx γ) 1 T ∗
+                 ⌜size T = size om⌝ ∗
                  (if cmt then emp
                   else ∃ (n : nat) (LB : gset Z),
                        ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
                        ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
                        ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
                        log_state Psi bn γfs cov logstart n LB (op_pending om)))%I
-        with "[Hout Hcmt Hnc Hauth Hepa Hxa Hrest]" as "Hres".
-      { iExists out, true, nc, om, Ep, Xr. iFrame "Hout Hcmt Hnc Hauth".
+        with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hrest]" as "Hres".
+      { iExists out, true, nc, om, Ep, Xr, Tx. iFrame "Hout Hcmt Hnc Hauth".
         iSplitR; [iPureIntro; exact Hsz|].
         iSplitR; [iPureIntro; exact Hbnd|].
         iSplitR; [iPureIntro; exact Hout3|].
@@ -1414,6 +1416,8 @@ Section BoBodies.
         iFrame "Hxa".
         iSplitR; [iPureIntro; exact Hlive|].
         iSplitR; [iPureIntro; exact Hcap|].
+        iFrame "Htxa".
+        iSplitR; [iPureIntro; exact Hszt|].
         iExact "Hrest". }
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1702,12 +1706,18 @@ Section BoBodies.
            re-packs it. *)
         iMod (log_begin_step γ om Ep Hepos with "Hauth Hepa")
           as (i Hi) "(Hauth & Hepa & HopS)".
+        (* ...AND THE TRANSACTION IS BORN WITH IT (durable-disk lane A).
+           The two mints are separate steps at one instant, which is what
+           keeps the tie a CARDINALITY one: nothing here relates [t] to [i],
+           and nothing downstream needs to. *)
+        iMod (log_tx_mint γ Tx with "Htxa") as (t Ht) "(Htxa & Htx)".
         iDestruct (log_opSe_opS with "HopS") as "HopS".
-        iDestruct (log_opS_op with "HopS") as "Hop".
+        iDestruct (log_opS_op with "HopS Htx") as "Hop".
         iAssert (log_res Psi γ bn γfs cov logstart)
-          with "[Hout Hcmt Hnc Hauth Hepa Hxa Hlhn Hbclose]" as "Hres".
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hlhn Hbclose]" as "Hres".
         { rewrite /log_res.
-          iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, (∅ : gset Z), Ep)]> om), Ep, Xr.
+          iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, (∅ : gset Z), Ep)]> om), Ep, Xr,
+                  (<[t := tt]> Tx).
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR.
           { iPureIntro. rewrite map_size_insert_None; [ by rewrite Hsz | exact Hi ]. }
@@ -1733,6 +1743,11 @@ Section BoBodies.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hlive k e Hk). }
           (* the registry and the epoch are untouched by a begin_op *)
           iSplitR; [iPureIntro; exact Hcap|].
+          iFrame "Htxa".
+          (* one row joins each map, so the cardinality tie survives *)
+          iSplitR.
+          { iPureIntro. rewrite (map_size_insert_None _ _ _ Ht).
+            rewrite (map_size_insert_None _ _ _ Hi). by rewrite Hszt. }
           iExists n, LB. iSplitR.
           { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, (∅ : gset Z), Ep) Hi).
             exact (log_reserve_ok n out om Hsz Hbnd (bo_guard_sum out n Hle)). }
@@ -1763,8 +1778,8 @@ Section BoBodies.
         exact HboE9.
       + (* ---- NO SPACE: the branch FALLS THROUGH, control at +0x46 ---- *)
         iAssert (log_res Psi γ bn γfs cov logstart)
-          with "[Hout Hcmt Hnc Hauth Hepa Hxa Hlhn Hbclose]" as "Hres".
-        { rewrite /log_res. iExists out, false, nc, om, Ep, Xr.
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hlhn Hbclose]" as "Hres".
+        { rewrite /log_res. iExists out, false, nc, om, Ep, Xr, Tx.
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR; [iPureIntro; exact Hsz|].
           iSplitR; [iPureIntro; exact Hbnd|].
@@ -1775,6 +1790,8 @@ Section BoBodies.
           iFrame "Hxa".
           iSplitR; [iPureIntro; exact Hlive|].
           iSplitR; [iPureIntro; exact Hcap|].
+          iFrame "Htxa".
+          iSplitR; [iPureIntro; exact Hszt|].
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
           iSplitR; [iPureIntro; exact Hsub|].
           iSplitR; [iPureIntro; exact Hreg|].

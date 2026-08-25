@@ -649,13 +649,13 @@ Section ProofNameiMain.
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hlog" as (Sb0) "Hlog".
+    iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
     iApply (wp_namei_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib
               size dev plen pfun n Sb0
               pidv dq dqb dqs dqpv m K eb b
               _ Vpr HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs
-              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hbslot Hislot Hlog [Hcont]").
+              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hbslot Hislot Hlog [Hcont Htx]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' Sb' ok ipv w)
@@ -664,11 +664,11 @@ Section ProofNameiMain.
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' ok ipv
               with "[%] Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
-                    Hpath Hbslot [%] [Hlog] Hok").
+                    Hpath Hbslot [%] [Hlog Htx] Hok").
     { exact Hcs. }
     { split; [exact (walk_spend_counted L n n' w ok Hbud (proj1 Hbnd))
              | exact (proj2 Hbnd)]. }
-    { iApply (log_opS_op with "Hlog"). }
+    { iApply (log_opS_op with "Hlog Htx"). }
   Qed.
 
 End ProofNameiMain.

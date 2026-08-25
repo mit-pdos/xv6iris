@@ -3051,7 +3051,7 @@ Section ItruncMain.
        tier down (fs-log.md §G.20) -- the birth epoch it was hiding too.
        Both are opened here and neither reaches a counted caller: the
        credit at [cru = false] is [emp]. *)
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcru".
@@ -3064,7 +3064,7 @@ Section ItruncMain.
               Hnib Hdtnz Hstab Hnlk Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Hlkbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hblks Hsbb Hsbi Hbmi Hireg Hdn Hppid Hprocs Hdevi
-                    Hdgeom Hdlock Hsl Hcru Hop [Hcont]").
+                    Hdgeom Hdlock Hsl Hcru Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -3073,12 +3073,12 @@ Section ItruncMain.
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iDestruct "Hop" as (wf u' Sb') "(_ & _ & _ & _ & %Hbnd & Hop)".
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
-                     Hsbb Hsbi Hmeta Hmap Hblks Hdn Hsl [Hop]");
+                     Hsbb Hsbi Hmeta Hmap Hblks Hdn Hsl [Hop Htx]");
       [exact Hcs |].
     iExists u'. iSplitR.
     { iPureIntro. unfold it_entry, it_spend, it_iu, it_bm in Hbnd.
       destruct wf; simpl in Hbnd; lia. }
-    iApply (log_opS_op with "Hop").
+    iApply (log_opS_op with "Hop Htx").
   Qed.
 
 End ItruncMain.

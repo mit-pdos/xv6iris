@@ -5200,7 +5200,7 @@ Section ProofIput.
     (* THE WITNESS: the set the counted reservation was hiding, and the birth
        epoch it was hiding under it ([log_opS_named]).  Both are the gen
        contract's own existentials, so the seal derives with no new fact. *)
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (log_opS_named with "Hop") as (e00) "Hop".
     (* SIMP-1: the runtime contract states the regime at the persistent
        [ireg_open] itself; the indexed form the gen contract keeps is that
@@ -5214,7 +5214,7 @@ Section ProofIput.
               Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hinv Hesc Hireg
                     Hropen Hslk Hrefp Hbms Hins Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots [] Hop
-                    [Hcont]").
+                    [Hcont Htx]").
     all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
@@ -5223,11 +5223,11 @@ Section ProofIput.
                                Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Hislot _".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
-                     Hbslots [%] [Hop] Hislot").
+                     Hbslots [%] [Hop Htx] Hislot").
     { exact Hcs. }
     { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.
       destruct wf; simpl in Hbnd; lia. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
   Qed.
 
 End ProofIput.

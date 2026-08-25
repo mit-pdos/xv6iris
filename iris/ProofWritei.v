@@ -5064,7 +5064,7 @@ Section WriteiMain.
               Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hszc Hbmsc #Hbminv #Hireg Hdn Hsrc
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iApply (wp_writei_gen γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
               cov logstart inodestart nib bmapstart size dev γpr
               ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
@@ -5074,7 +5074,7 @@ Section WriteiMain.
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbminv Hireg Hdn Hsrc
-                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -5088,12 +5088,12 @@ Section WriteiMain.
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     [%]
                     Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
-                    Hszc Hbmsc Hdn Hsrc Hsl [Hop]").
+                    Hszc Hbmsc Hdn Hsrc Hsl [Hop Htx]").
     { exact D1. } { exact D3. } { exact D4. } { exact D5. }
     { exact D6. } { exact D7. } { exact Dcap. } { exact Dsz. } { exact D8. }
     { exact D9. } { exact D9k. } { exact D10. } { exact D11. } { exact D12. }
     { exact D13. } { exact D14. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
   Qed.
 
 End WriteiMain.

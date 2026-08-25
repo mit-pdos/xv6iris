@@ -1842,7 +1842,7 @@ Section ProofBfreeMain.
            Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb) "[Hop Htx]".
     (* the counted form opens its own birth epoch and presents the EMPTY
        credit ([cr = false], where [log_credit] is [emp]); closing it again
        on the way out is what keeps every counted caller byte-stable *)
@@ -1855,12 +1855,12 @@ Section ProofBfreeMain.
               Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbslen Hj Hgl Ha0 Ha1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont Htx]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hsl HopS".
     iDestruct (log_opSe_opS with "HopS") as "HopS".
-    iDestruct (log_opS_op with "HopS") as "Hop".
+    iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hsl Hop").
     exact Hcs.
   Qed.

@@ -545,6 +545,7 @@ Record log_names := MkLogNames {
   ln_ops : gname;   (* the operation ledger *)
   ln_ep  : gname;   (* the batch epoch *)
   ln_lg  : gname;   (* the append registry *)
+  ln_tx  : gname;   (* the open transactions (durable-disk lane A) *)
 }.
 
 (* ==================================================================== *)
@@ -578,7 +579,10 @@ Section LogGhostAlloc.
     (lock_free_tok (ln_lk γ) ∗
      ghost_map_auth (ln_ops γ) 1 (∅ : gmap nat op_entry) ∗
      mono_nat_auth_own (ln_ep γ) 1 1%nat ∗
-     own (ln_lg γ) (● (∅ : gset (nat * Z))))%I.
+     own (ln_lg γ) (● (∅ : gset (nat * Z))) ∗
+     (* the open-transaction authority, born empty: no transaction has run
+        yet, which is [LogInv.log_res]'s [size T = size om] at both zeroes *)
+     ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit))%I.
 
   Lemma log_ghost_alloc : ⊢ |==> ∃ γ : log_names, log_free_tok γ.
   Proof.
@@ -587,7 +591,8 @@ Section LogGhostAlloc.
     iMod (mono_nat_own_alloc 1%nat) as (γep) "[Hep _]".
     iMod (own_alloc (● (∅ : gset (nat * Z)))) as (γlg) "Hlg";
       [ apply auth_auth_valid; done | ].
-    iModIntro. iExists (MkLogNames γlk γops γep γlg).
-    rewrite /log_free_tok /=. iFrame "Hlk Hops Hep Hlg".
+    iMod (ghost_map_alloc_empty (K:=nat) (V:=unit)) as (γtx) "Htx".
+    iModIntro. iExists (MkLogNames γlk γops γep γlg γtx).
+    rewrite /log_free_tok /=. iFrame "Hlk Hops Hep Hlg Htx".
   Qed.
 End LogGhostAlloc.

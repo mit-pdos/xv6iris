@@ -1255,7 +1255,7 @@ Section ProofSysLinkBody.
         assert (HQ2regs : sl_regs m sp0 (m !!! Regidx Rs1 : mword 64)
                             (m !!! Regidx Rs2 : mword 64) Q2)
           by (rewrite /Q2; apply sl_regs_caller; [exact Hcsra | exact HQ1regs]).
-        iDestruct "Hop" as (Sb0) "HopS".
+        iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
         iDestruct (sl_buf_split (pa_stk sp0 38) bo1 pk1 Hpk1 with "HbO")
           as "[Hbufk Hbufrest]".
         sl_own_transport CID21 CID23 eb pj b.
@@ -1494,12 +1494,12 @@ Section ProofSysLinkBody.
                              Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep
                              Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb
                              Hsbi
-                             Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
+                             Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS Htx]
                              Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                              [Hsbs Hir1 Hir1b Hcwdref Hofiles Hftok Hcont]").
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
-             { rewrite /log_op. iExists Sb1. iExact "HopS". }
+             { iApply (log_opS_op with "HopS Htx"). }
              iEval (rewrite /wp_next).
              iIntros (CIDy) "%Hqy". iIntros (mf)
                "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
@@ -1654,11 +1654,11 @@ Section ProofSysLinkBody.
                                 Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru
                                 Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
-                                [HopS] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
+                                [HopS Htx] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                 [Hsbs Hir1 Hir1b Hcwdref Hofiles Hftok Hcont]").
                 { rewrite Heb /trap_csrs_ext. done. }
                 { rewrite Heb /cpu_claim_ext. done. }
-                { rewrite /log_op. iExists Sb1. iExact "HopS". }
+                { iApply (log_opS_op with "HopS Htx"). }
                 iEval (rewrite /wp_next).
                 iIntros (CIDy) "%Hqy". iIntros (mf)
                   "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
@@ -2361,7 +2361,7 @@ Section ProofSysLinkBody.
                                      Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hslkdd
                                      Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                      Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
-                                     Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
+                                     Hgeo Hdlk Hbsl HopE Htx Hf1 Hf2 Hf3 Hf4
                                      HbN HbW HbO
                                      [Hsbs Hir1c Hcwdref Hofiles Hftok Hcont]").
                      iEval (rewrite /wp_next).
@@ -2754,7 +2754,7 @@ Section ProofSysLinkBody.
                                        Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hslkdd
                                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                        Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
-                                       Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
+                                       Hgeo Hdlk Hbsl HopE Htx Hf1 Hf2 Hf3 Hf4
                                        HbN HbW HbO
                                        [Hsbs Hir1c Hcwdref Hofiles Hftok Hcont]").
                        iEval (rewrite /wp_next).
@@ -3181,10 +3181,10 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hesck Hireg Hropen Hslkk [$Hrefip $Hru]
                                             Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
-                                            Hdlk Hbsl [HopS]").
+                                            Hdlk Hbsl [HopS Htx]").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
-                            { rewrite /log_op. iExists Sb4. iExact "HopS". }
+                            { iApply (log_opS_op with "HopS Htx"). }
                             iIntros (CID67 Hq67 mip n5)
                               "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                Hbsl %Hn5 Hop Hisloti".
@@ -3530,7 +3530,7 @@ Section ProofSysLinkBody.
                                             Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd Hrud
                                             Hsbb
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
-                                            Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
+                                            Hdlk Hbsl HopE Htx Hf1 Hf2 Hf3 Hf4
                                             HbN HbW HbO
                                             [Hsbs Hir1c Hcwdref Hofiles Hftok Hcont]").
                             iEval (rewrite /wp_next).
@@ -3611,7 +3611,7 @@ Section ProofSysLinkBody.
                                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hkeep Hru Hshr
                                    Hshot2 Hilink Htoken Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
-                                   Hdlk Hbsl HopS Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
+                                   Hdlk Hbsl HopS Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwdref Hofiles Hftok Hcont]").
                    iEval (rewrite /wp_next).
                    iIntros (CIDy) "%Hqy". iIntros (mf)
@@ -3657,13 +3657,13 @@ Section ProofSysLinkBody.
                     (sl_regs_sp _ _ _ _ _ HQ3regs) (sl_regs_thr _ _ _ _ _ HQ3regs)
                     HQ3s2 Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                          Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
+                          Hpidq Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4
                           HbN HbW HbO
                           [Hbsl Hsbb Hsbi Hsbs Hir1 Hir2b Hcwdref
                            Hofiles Hftok Hcont]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /log_op. iExists Sb1. iExact "HopS". }
+          { iApply (log_opS_op with "HopS Htx"). }
           iEval (rewrite /wp_next).
           iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                                Hpc Hpidq".

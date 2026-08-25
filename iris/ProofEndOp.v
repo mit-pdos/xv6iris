@@ -1463,8 +1463,8 @@ Section EndOpBlocks.
       rewrite (callee_saved_lookup Hacq_cs c Hcs). exact (HE4thr c Hcs N2 N8 N9 N18). }
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
-    iDestruct "HRres" as (out cmt nc om Ep Xr)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
+    iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hrest)".
     (* committing IS still set: the committer holds the batch's fs_cache
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
@@ -1695,8 +1695,8 @@ Section EndOpBlocks.
        fire on it again.  Nothing is revoked; the index simply moves on. *)
     iMod (log_epoch_bump γ Ep with "Hepa") as "Hepa".
     iAssert (log_res Psi γ bn γfs cov logstart)
-      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Hbatch]" as "HRres".
-    { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr.
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hbatch]" as "HRres".
+    { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr, Tx.
       iSplitL "Houtc"; [iExact "Houtc"|].
       iSplitL "Hcmtc"; [iExact "Hcmtc"|].
       iSplitL "Hncc"; [iExact "Hncc"|].
@@ -1715,7 +1715,9 @@ Section EndOpBlocks.
       (* the registry still does not run ahead: the cap only went UP *)
       iSplitR.
       { iPureIntro. intros e' b' Hin. pose proof (Hcap e' b' Hin). lia. }
-      iExists 0%nat, ∅. iSplitR; [iPureIntro; exact Hsum|].
+      iSplitL "Htxa"; [iExact "Htxa"|].
+      iSplitR; [iPureIntro; exact Hszt|].
+      iExists 0%nat, (∅ : gset Z). iSplitR; [iPureIntro; exact Hsum|].
       iSplitR.
       { iPureIntro. intros i e Hi. rewrite Hommt lookup_empty in Hi.
         discriminate. }
@@ -4500,15 +4502,24 @@ Section ProofEndOp.
         rewrite (callee_saved_lookup Hacq c Hcs). exact (HR6thr c Hcs N2 N8 N9 N18). }
     (* ================= THE ACCOUNTING CRITICAL SECTION ================= *)
     rewrite /log_res.
-    iDestruct "HRres" as (out cmt nc om Ep Xr)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
+    iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hrest)".
     iDestruct (log_op_positive with "Hoauth Hop") as %Hpos.
     (* the "log.committing" PANIC IS DEAD: an op token forces out >= 1, and
        log_res's own conjunct then refutes committing. *)
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
     iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
-    iMod (log_end_step with "Hoauth Hop") as (i0 Sb0 e00) "(%Hi0 & Hoauth)".
+    (* the token splits into the budget half the ledger retires and the
+       transaction element the authority deletes (durable-disk lane A).  A
+       transaction that still has an inode's row suspended cannot be here:
+       its element is parked in the locked registry, so what it holds is the
+       budget half alone and this [iDestruct] would have nothing to give. *)
+    iDestruct (log_op_split with "Hop") as "[Hopb Htx]".
+    iMod (log_end_step with "Hoauth Hopb") as (i0 Sb0 e00) "(%Hi0 & Hoauth)".
+    iMod (log_tx_retire with "Htxa Htx") as (tt0 Htt0) "Htxa".
+    assert (Hsztd : size (delete tt0 Tx) = size (delete i0 om)).
+    { rewrite !map_size_delete Htt0 Hi0. by rewrite Hszt. }
     assert (Hszd : size (delete i0 om) = (out - 1)%nat).
     { rewrite map_size_delete Hi0 Hsz. symmetry. apply Nat.sub_1_r. }
     assert (Hbndd : forall i e, delete i0 om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat).
@@ -4767,8 +4778,9 @@ Section ProofEndOp.
       clear Hsv34.
       (* ---- the batch is CHECKED OUT and log_res re-closed at cmt = true ---- *)
       iAssert (log_res Psi γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa]" as "HRres".
-      { rewrite /log_res. iExists (out - 1)%nat, true, nc, (delete i0 om), Ep, Xr.
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa]" as "HRres".
+      { rewrite /log_res. iExists (out - 1)%nat, true, nc, (delete i0 om), Ep, Xr,
+                (delete tt0 Tx).
         iSplitL "Houtc"; [iExact "Houtc"|].
         iSplitL "Hcmtc"; [iExact "Hcmtc"|].
         iSplitL "Hncc"; [iExact "Hncc"|].
@@ -4783,7 +4795,9 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hepos|].
         iSplitL "Hxa"; [iExact "Hxa"|].
         iSplitR; [iPureIntro; exact Hlived|].
-        iSplitR; [iPureIntro; exact Hcap|]. done. }
+        iSplitR; [iPureIntro; exact Hcap|].
+        iSplitL "Htxa"; [iExact "Htxa"|].
+        iSplitR; [iPureIntro; exact Hsztd|]. done. }
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.end_op + 0x34) : mword 64) 2
                       = mword_of_int (KernelSyms.end_op + 0x36))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -5144,8 +5158,9 @@ Section ProofEndOp.
         destruct (out - 1)%nat; [contradiction | reflexivity]. }
       (* the batch goes straight back in, at the decremented outstanding *)
       iAssert (log_res Psi γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Hbatch]" as "HRres".
-      { rewrite /log_res. iExists (out - 1)%nat, false, nc, (delete i0 om), Ep, Xr.
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hbatch]" as "HRres".
+      { rewrite /log_res. iExists (out - 1)%nat, false, nc, (delete i0 om), Ep, Xr,
+                (delete tt0 Tx).
         iSplitL "Houtc"; [iExact "Houtc"|].
         iSplitL "Hcmtc"; [iExact "Hcmtc"|].
         iSplitL "Hncc"; [iExact "Hncc"|].
@@ -5161,6 +5176,8 @@ Section ProofEndOp.
         iSplitL "Hxa"; [iExact "Hxa"|].
         iSplitR; [iPureIntro; exact Hlived|].
         iSplitR; [iPureIntro; exact Hcap|].
+        iSplitL "Htxa"; [iExact "Htxa"|].
+        iSplitR; [iPureIntro; exact Hsztd|].
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
         iSplitR; [iPureIntro; exact Hsubd|].
         iSplitR; [iPureIntro; exact Hreg|].

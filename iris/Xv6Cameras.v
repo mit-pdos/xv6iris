@@ -345,9 +345,19 @@ Definition op_entry : Type := (nat * gset Z * nat)%type.
 Class logG (Σ : gFunctors) := LogG {
   logops_inG :: ghost_mapG Σ nat op_entry;
   loglg_inG :: inG Σ (authR (gsetUR (nat * Z)));
+  (* THE OPEN-TRANSACTION AUTHORITY (durable-disk lane A).  One element per
+     transaction alive right now, at the unit value: the element carries no
+     information, only EXISTENCE, so a half of it never blocks the ledger
+     entry's own budget updates (which is why this cannot be the ledger map
+     itself).  begin_op mints one, end_op consumes it whole, and the locked
+     registry parks one while an inode's row is suspended -- so "no open
+     transaction" is what makes "every inode is well-formed" readable at a
+     commit ([LogInv.log_tx], [InodeRegion.ireg_locked]). *)
+  logtx_inG :: ghost_mapG Σ nat unit;
 }.
 Definition logΣ : gFunctors :=
-  #[ghost_mapΣ nat op_entry; GFunctor (authR (gsetUR (nat * Z)))].
+  #[ghost_mapΣ nat op_entry; GFunctor (authR (gsetUR (nat * Z)));
+    ghost_mapΣ nat unit].
 Global Instance subG_logΣ {Σ} : subG logΣ Σ -> logG Σ.
 Proof. solve_inG. Qed.
 

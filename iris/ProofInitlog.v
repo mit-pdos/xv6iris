@@ -1601,7 +1601,7 @@ Section ProofInitlog.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iModIntro.
     iEval (rewrite /log_free_tok) in "Hlfree".
-    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa)".
+    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa)".
     (* ===== +0x28 lw a1,20(s3) : a1 := sb->logstart ===== *)
     assert (Hsbad : add_vec (rget mil Rs3)
                       (sign_extend' 64 (mword_of_int 20 : mword 12))
@@ -2669,13 +2669,13 @@ Section ProofInitlog.
                  (fun bb Hbb => Hrow0 bb Hbb (not_elem_of_empty bb))).
       iApply fs_dstep_id. }
     iAssert (log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
-      with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
+      with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
          "never observed" counter value is zero, and the two must not
          collide.  Both epoch clauses stay vacuous. *)
       iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry), 1%nat,
-              (∅ : gset (nat * Z)).
+              (∅ : gset (nat * Z)), (∅ : gmap nat unit).
       iSplitL "Hout"; [iExact "Hout"|].
       iSplitL "Hcmt"; [iExact "Hcmt"|].
       iSplitL "Hnc"; [iExact "Hnc"|].
@@ -2694,7 +2694,11 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; intros e' b' Hi;
                 exfalso; exact (not_elem_of_empty _ Hi)|].
-      iExists 0%nat, ∅.
+      (* NO TRANSACTION IS OPEN AT GENESIS (durable-disk lane A): both maps
+         are empty, which is the cardinality tie read at zero. *)
+      iSplitL "Htxa"; [iExact "Htxa"|].
+      iSplitR; [iPureIntro; rewrite !map_size_empty; reflexivity|].
+      iExists 0%nat, (∅ : gset Z).
       iSplitR; [iPureIntro; rewrite op_sum_empty; unfold LOGBLOCKS; lia|].
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; intros b' Hi;

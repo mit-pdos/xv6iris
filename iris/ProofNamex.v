@@ -6018,7 +6018,7 @@ Section ProofNamexMain.
               #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               #Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* THE WITNESS: the set the counted reservation was hiding *)
-    iDestruct "Hlog" as (Sb0) "Hlog".
+    iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
     iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun nfun npar n Sb0 pidv dq dqb dqs dqpv m K eb b lks Vpr
@@ -6028,7 +6028,7 @@ Section ProofNamexMain.
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog
-                    [Hcont]").
+                    [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -6057,11 +6057,11 @@ Section ProofNamexMain.
       destruct npar; [iApply (inode_held_ty_forget with "Hip") | iExact "Hip"]. }
     iApply ("Hcont" $! mf n' ok nf ipv
               with "[%] Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
-                    Hpath Hname Hbslot [%] [Hlog] Harm").
+                    Hpath Hname Hbslot [%] [Hlog Htx] Harm").
     { exact Hcs. }
     { split; [exact (walk_spend_counted L n n' w ok Hbud (proj1 Hbnd))
              | exact (proj2 Hbnd)]. }
-    { iApply (log_opS_op with "Hlog"). }
+    { iApply (log_opS_op with "Hlog Htx"). }
   Qed.
 
 End ProofNamexMain.

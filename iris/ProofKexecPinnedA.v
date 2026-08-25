@@ -661,7 +661,7 @@ Section KexecPinnedABody.
        [∃ Sb, log_opS], so entering the set form is one [iDestruct] and
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
-    iDestruct "Hlog" as (Sb0) "Hlog".
+    iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
     (* ---- THE PINNED WALK, NOT THE OPAQUE ONE.  Same environment, same
        ledger, same fractions -- [NameiInitPinned.wp_namei_init_pinned]'s
        premise list IS [wp_namei_gen]'s plus the two "/init" facts, and its
@@ -682,7 +682,7 @@ Section KexecPinnedABody.
     (* namei is eb-generic now; kexec is still at [eb = true]. *)
     iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
              Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
-    iDestruct (log_opS_op with "Hlog") as "Hlog".
+    iDestruct (log_opS_op with "Hlog Htx") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
        The walk spent at most two of the ten. *)
     assert (Hiu1 : (iput_units <= n1)%nat).

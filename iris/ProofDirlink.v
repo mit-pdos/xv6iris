@@ -3514,7 +3514,7 @@ Section ProofDirlinkMain.
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb #Hbmr
               #Hiregi #Hropen Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hlinks Hop Hcont".
-    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     (* THE COUNTED SEAL'S ONE NEW STEP (D0 pre-stage 1): the gen form asks
        for the honest [dl_need], the counted form was given the constant,
        and [dl_need_le] is the whole bridge -- six is the worst case and
@@ -3531,7 +3531,7 @@ Section ProofDirlinkMain.
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
                     Hiregi Hropen Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
-                    Hitb2 Hitbl Hesc Hslks Hislot Hlinks Hop [Hcont]").
+                    Hitb2 Hitbl Hesc Hslks Hislot Hlinks Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -3541,11 +3541,11 @@ Section ProofDirlinkMain.
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf found bm' data' dn' dn0' n' tot
               with "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                    Hsbs Hsbb Hdat Hppid Hbsl Hislot Hlinks [%] [Hop] [%]
+                    Hsbs Hsbb Hdat Hppid Hbsl Hislot Hlinks [%] [Hop Htx] [%]
                     [%] [%]").
     { exact E1. }
     { exact E2. }
-    { iApply (log_opS_op with "Hop"). }
+    { iApply (log_opS_op with "Hop Htx"). }
     { exact E3. }
     { exact E4. }
     { exact E5. }

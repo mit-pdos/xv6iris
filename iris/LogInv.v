@@ -473,8 +473,43 @@ Section LogInv.
      contract.  Only the two arms that CLAIM the absorption credit --
      log_write's and bfree's -- mention [log_opS], and only itrunc, which
      needs the credit to survive 269 frees, threads it. *)
-  Definition log_op (γ : log_names) (u : nat) : iProp Σ :=
+  Definition log_opb (γ : log_names) (u : nat) : iProp Σ :=
     (∃ Sb : gset Z, log_opS γ u Sb)%I.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE OPEN TRANSACTION (durable-disk lane A, plan section 3)       *)
+  (* ---------------------------------------------------------------- *)
+
+  (* One element of [ln_tx] per transaction that is open right now, at the
+     unit value -- the element says only that its id EXISTS.  It is minted
+     by begin_op and consumed WHOLE by end_op, and while an inode's
+     well-formedness row is suspended the element is parked in the locked
+     registry ([InodeRegion.ireg_locked]), which is what makes "no
+     transaction is open" imply "no row is suspended" at a commit.
+
+     THE ID IS EXISTENTIAL, and no client ever names it: the ending
+     transaction does not have to say which id it retires, because
+     [log_res] ties the ledger to the transactions by CARDINALITY
+     ([size T = size om]) rather than by identity -- a tie that survives
+     any retire, and all a commit needs ([om = empty] forces [T = empty]).
+
+     WHY IT IS NOT INSIDE [log_opS]: a suspended row's owner must keep
+     WRITING (create's mkdir writes the two dot entries while its child is
+     still dotless), so the token it retains across the suspension has to
+     be one [log_write] accepts.  That token is the BUDGET half above --
+     which is exactly the pre-lane-A [log_op] -- so no callee below
+     [log_op] moves at all. *)
+  Definition log_tx (γ : log_names) : iProp Σ :=
+    (∃ t : nat, t ↪[ln_tx γ] ())%I.
+
+  Definition log_op (γ : log_names) (u : nat) : iProp Σ :=
+    (log_opb γ u ∗ log_tx γ)%I.
+
+  Global Instance log_tx_timeless γ : Timeless (log_tx γ).
+  Proof. rewrite /log_tx. apply _. Qed.
+
+  Global Instance log_opb_timeless γ u : Timeless (log_opb γ u).
+  Proof. rewrite /log_opb. apply _. Qed.
 
   Global Instance log_opSe_timeless γ u Sb e0 : Timeless (log_opSe γ u Sb e0).
   Proof. apply _. Qed.
@@ -739,9 +774,33 @@ Section LogInv.
   Proof. apply _. Qed.
 
   (* the forgetful direction, used wherever a credited op is handed to a
-     callee that does not care *)
-  Lemma log_opS_op γ u Sb : log_opS γ u Sb -∗ log_op γ u.
-  Proof. iIntros "H". rewrite /log_op. iExists Sb. iFrame. Qed.
+     callee that does not care.  It takes the transaction token back
+     BESIDE the budget, because the two travel together everywhere except
+     inside a suspended row's window. *)
+  Lemma log_opS_op γ u Sb : log_opS γ u Sb -∗ log_tx γ -∗ log_op γ u.
+  Proof.
+    iIntros "H Ht". rewrite /log_op /log_opb. iFrame "Ht". iExists Sb. iFrame.
+  Qed.
+
+  (* ...and its budget-only half, for a walk that is between the arm and
+     the disarm of a row and therefore holds no transaction token *)
+  Lemma log_opS_opb γ u Sb : log_opS γ u Sb -∗ log_opb γ u.
+  Proof. iIntros "H". rewrite /log_opb. iExists Sb. iFrame. Qed.
+
+  (* THE OPENING EVERY THREADER USES: the budget at a named set beside the
+     transaction token.  Written as one lemma so a caller that used to
+     destructure [log_op]'s existential keeps one line. *)
+  Lemma log_op_openS γ u : log_op γ u -∗ ∃ Sb, log_opS γ u Sb ∗ log_tx γ.
+  Proof.
+    iIntros "[Hb Ht]". rewrite /log_opb. iDestruct "Hb" as (Sb) "Hb".
+    iExists Sb. iFrame.
+  Qed.
+
+  Lemma log_op_split γ u : log_op γ u -∗ log_opb γ u ∗ log_tx γ.
+  Proof. iIntros "[$ $]". Qed.
+
+  Lemma log_opb_op γ u : log_opb γ u -∗ log_tx γ -∗ log_op γ u.
+  Proof. iIntros "H Ht". iFrame. Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The ERA's half of the log-region MIRROR (phase C2b/D1 stage 2)    *)
@@ -1042,7 +1101,8 @@ Section LogInv.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) : iProp Σ :=
     (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32)
-       (om : gmap nat op_entry) (E : nat) (X : gset (nat * Z)),
+       (om : gmap nat op_entry) (E : nat) (X : gset (nat * Z))
+       (T : gmap nat unit),
        l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
        l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
        l_ncommit ↦₄ nc ∗
@@ -1075,6 +1135,23 @@ Section LogInv.
           minted at the epoch current when it was minted, and the epoch only
           grows.  This is the half that turns [e0 <= e] into [e = E]. *)
        ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
+       (* THE OPEN TRANSACTIONS (durable-disk lane A, plan section 3).
+          OUTSIDE the committing arm -- a commit is exactly the instant this
+          authority has to be READABLE, and [log_state] is checked out then.
+          It sits here rather than in [log_state] for that reason and for one
+          more: it is the ledger's own twin, and the ledger's authority is
+          here.  It is the LAST conjunct that is not the committing arm,
+          which is the cheapest position: the arm is what every opener
+          destructures further, so a conjunct after it would cost each of
+          them a restructuring rather than one name in a pattern.
+
+          THE TIE IS CARDINALITY, not identity ([log_tx_retire]'s note): a
+          retiring transaction hands back an element whose id it never
+          named, so nothing can relate that id to the ledger entry the same
+          end_op retires -- but both retires drop exactly one row, which is
+          all the commit reads ([log_tx_empty_of_ops]). *)
+       ghost_map_auth (ln_tx γ) 1 T ∗
+       ⌜size T = size om⌝ ∗
        (if cmt then emp
         else ∃ (n : nat) (LB : gset Z),
           ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
@@ -1408,15 +1485,66 @@ Section LogInv.
   (* ...AND THE ALREADY-LOGGED BLOCK SET COMES BACK WITH IT, which is what
      end_op's re-deposit shrinks [op_pending] by ([op_pending_delete]). *)
   Lemma log_end_step γ (om : gmap nat op_entry) (u : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u ==∗
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opb γ u ==∗
     ∃ i Sb e0, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
       ghost_map_auth (ln_ops γ) 1 (delete i om).
   Proof.
-    iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
+    iIntros "Ha He". rewrite /log_opb /log_opS /log_opSe.
     iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_delete with "Ha He") as "Ha".
     iModIntro. iExists i, Sb, e0. by iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE TRANSACTION AUTHORITY'S TWO STEPS (durable-disk lane A)      *)
+  (* ---------------------------------------------------------------- *)
+
+  (* begin_op's mint, beside the ledger's.  Free: allocation at a fresh id,
+     and the id never leaves this proof. *)
+  Lemma log_tx_mint (γ : log_names) (T : gmap nat unit) :
+    ghost_map_auth (ln_tx γ) 1 T ==∗
+    ∃ t, ⌜T !! t = None⌝ ∗
+      ghost_map_auth (ln_tx γ) 1 (<[t := tt]> T) ∗ log_tx γ.
+  Proof.
+    iIntros "Ha".
+    set (t := fresh (dom T)).
+    assert (Ht : T !! t = None).
+    { apply not_elem_of_dom. apply is_fresh. }
+    iMod (ghost_map_insert t tt Ht with "Ha") as "[Ha He]".
+    iModIntro. iExists t. iSplitR; [done|]. iFrame "Ha".
+    rewrite /log_tx. iExists t. iExact "He".
+  Qed.
+
+  (* end_op's retire, and the reason the tie is cardinality: the token is
+     the FULL element, so the id it carries really is a live row -- but the
+     token never named it, so no lemma can relate it to the ledger entry
+     this same end_op retires.  Both retires drop exactly one row, which is
+     what [log_res]'s [size T = size om] is stated to survive. *)
+  Lemma log_tx_retire (γ : log_names) (T : gmap nat unit) :
+    ghost_map_auth (ln_tx γ) 1 T -∗ log_tx γ ==∗
+    ∃ t, ⌜T !! t = Some tt⌝ ∗ ghost_map_auth (ln_tx γ) 1 (delete t T).
+  Proof.
+    iIntros "Ha He". rewrite /log_tx. iDestruct "He" as (t) "He".
+    iDestruct (ghost_map_lookup with "Ha He") as %Ht.
+    iMod (ghost_map_delete with "Ha He") as "Ha".
+    iModIntro. iExists t. iSplitR; [by destruct (T !! t) as [[]|]; simplify_eq|].
+    iExact "Ha".
+  Qed.
+
+  (* THE COMMIT'S READING (durable-disk lane A item 5, plan section 4b).
+     No open ledger entry means no open transaction, so no share of any
+     transaction id can exist anywhere -- which is what the locked registry
+     turns into "every inode is well-formed"
+     ([InodeRegion.ireg_locked_clean_of_tx]).  It is the cardinality tie
+     read at zero, and nothing else in the ledger is consulted. *)
+  Lemma log_tx_empty_of_ops (om : gmap nat op_entry) (T : gmap nat unit) :
+    size T = size om ->
+    om = ∅ ->
+    T = ∅.
+  Proof.
+    intros Hsz ->. rewrite map_size_empty in Hsz.
+    by apply map_size_empty_iff.
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's
@@ -1453,15 +1581,20 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u -∗
     ⌜(1 <= size om)%nat⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
-    iDestruct (ghost_map_lookup with "Ha He") as %Hi.
-    iPureIntro.
-    assert (Hne : om ≠ ∅).
-    { intros ->. rewrite lookup_empty in Hi. done. }
-    assert (Hs : size om ≠ 0%nat).
-    { intros Hz. apply Hne. by apply map_size_empty_iff. }
-    lia.
+    iIntros "Ha [He _]". rewrite /log_opb /log_opS.
+    iDestruct "He" as (Sb e0) "He".
+    iApply (log_opSe_positive with "Ha He").
+  Qed.
+
+  (* ...and the same fact off the BUDGET half alone, which is what a walk
+     between the arm and the disarm of a row holds *)
+  Lemma log_opb_positive γ (om : gmap nat op_entry) (u : nat) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opb γ u -∗
+    ⌜(1 <= size om)%nat⌝.
+  Proof.
+    iIntros "Ha He". rewrite /log_opb /log_opS.
+    iDestruct "He" as (Sb e0) "He".
+    iApply (log_opSe_positive with "Ha He").
   Qed.
 
   (* ---------------------------------------------------------------- *)
