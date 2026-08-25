@@ -902,7 +902,11 @@ as their remaining consumers.
   (the plan's parked law), whose only producer is `initlog`, whose only
   caller is `fsinit` — which already holds block 1's run AND `ireg_inv`,
   `bitmap_inv`, `ic_escrows`, `is_itable2`, i.e. every invariant the law
-  needs.  That is where the law should be assembled.
+  needs.  That is where the law should be assembled.  MEASURED: `log_ctx` is
+  built at exactly ONE site (`ProofInitlog.v:2697`) and `wp_initlog` has
+  exactly ONE caller (`ProofFsinit`), so the law costs `log_ctx` no arity
+  and `initlog` one premise — the ~75 files that thread `log_ctx` and the
+  53 `wp_end_op` call sites are untouched.
 
   (D) A FREE INUM'S ABSTRACT NODE IS UNTIED TO ITS RECORD.
   `IcacheEscrow.ipool_shape_np`'s MARKER arm — what a FREE inum's pool row
