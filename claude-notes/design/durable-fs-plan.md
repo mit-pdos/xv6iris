@@ -177,8 +177,14 @@ the file system's own invariants at the one moment they are all clean:
   unlocked inode's bundle (`inode_owned`: its record proxy, its data and
   indirect blocks' byte elements of `L` at FULL fraction, its abstract
   fragment, its link authority and entry tokens, and `inode_local`) sits
-  in the cache escrow (`ic_loaded`, `inv icEscN`) or the pool (`live_pool`
-  inside `inv icacheN`); the records themselves sit region-side at full
+  in its cache-slot escrow (`ic_loaded`; one invariant PER SLOT at
+  `icEscN .@ k`, so the commit can open all fifty at once — lane B′; a
+  single shared namespace opens only once, `FsDurQuiesce.ns_not_reopenable`)
+  or, uncached, in the pool (`IcacheEscrow.ipool` — its own invariant at
+  per-inum namespaces, lane B′; it must NOT sit in the itable spinlock's
+  resource `itable_res2`, which only a lock holder reaches and the commit
+  never does; `IcacheInv.live_pool` inside `inv icacheN` is the
+  refcount pool and holds no bundle); the records themselves sit region-side at full
   fraction always (`ireg_recs`, `inv iregN`); the free blocks and the
   bitmap sit in `bitmap_inv`; the abstract map's authority in `ftop_inv`.
   A READ-LOCKED inode (`ilock` with no transaction — `fileread`, `stat`,
