@@ -20,6 +20,35 @@ against the union of states it might see.  The consumer-facing shape of
 v2 additionally matches DFSCQ's tree-sequence idea (crash = a recent
 past state), specialized by the WAL's batch atomicity.
 
+> **IMPACT NOTE (2026-08-25): the durable plan underneath changed.**
+> [`durable-fs-plan.md`](durable-fs-plan.md) (ruling 4⁹) superseded the
+> fold/ledger commit this doc's internal story cites: the durable view
+> is now a FROZEN SNAPSHOT — a fresh copy of `fs_state` re-allocated at
+> each group commit from the era's own quiescent value, never updated —
+> and `FsDurLedger`'s fold family is on the deletion list.  The owner's
+> call: no refinement of this doc until the durable plan is fully
+> proven.  What to know when that refinement happens:
+>
+> - **The three consumer principles SURVIVE, and land more directly.**
+>   Snapshot-per-commit literally IS "recovery = the current state as of
+>   some batch boundary" (SNAPSHOT); the snapshot certificate is
+>   persistent and 4⁹.3 explicitly names "sync-style receipts are
+>   copies" — the state-shaped `flushed` receipt (BOUND) now has a
+>   designated producer; the spike theorem `mknod_durable` (read the
+>   child's entry off the current snapshot) is a PER-NODE PERSISTENCE
+>   instance.
+> - **Drift-impossibility survives with a different justification.**
+>   §5's "one delta log, durable = prefix fold" is no longer the
+>   internal model; instead the snapshot is allocated FROM the era
+>   state's own value (the transport lemma reads `S_L` off `γtop_L`'s
+>   authority), so there is still no independently-specified second
+>   state — the consumer-facing claim is unchanged.
+> - **DEAD as written:** §4's `FsDurLedger` alignment note (δ-as-`dent`
+>   readings) and §5's `S_dur`-as-fold definition plus the fold-now
+>   derivation chain for sys_sync; each is marked inline below.
+> - **§9's open question 4 (batch identity)** has a new natural answer:
+>   the epoch pointer the crash predicate now carries (4⁹.1).
+
 Related: [`fs-state.md`](fs-state.md) (design of record for the
 two-view ghost state this layer rests on), [`fs-fragments.md`](fs-fragments.md)
 (§1.1 inum-keyed store, §1.4 custody theorem),
@@ -209,6 +238,11 @@ truncate syscall):
 δ_free   i             :  delete i from aview     (iput at nlink 0, last ref)
 ```
 
+**[SUPERSEDED 2026-08-25 — see the IMPACT NOTE at the top: ruling 4⁹
+replaced the ledger/fold commit with snapshot re-allocation and slates
+`FsDurLedger`'s fold family for deletion; the paragraph below is kept
+for traceability only.]**
+
 **ALIGNMENT WITH `FsDurLedger` (3c), recorded 2026-08-25.**  The durable
 campaign's ruled flip now carries a machine-checked delta ledger of its
 own: `dent` entries (`DeRec i n' gh` — a record move with its ghost/link
@@ -268,6 +302,13 @@ This section replaces v1's per-op `logged δ b` tokens and its
 batch-indexed second reading.  The redesign is driven by one question:
 WHAT DOES A CONSUMER ACTUALLY HAVE TO PROVE, and what is the least it
 must know to prove it?
+
+**[MODEL SUPERSEDED 2026-08-25 — see the IMPACT NOTE at the top: the
+durable view is now the frozen per-commit SNAPSHOT, not a prefix fold
+of a delta log.  The consumer-facing conclusion of this paragraph — no
+second state, drift unstatable — survives; only the internal
+justification changes (the snapshot is allocated from the era state's
+own value).]**
 
 **The model (internal — consumers never see it).**  The linearized op
 deltas form one log, partitioned into BATCHES (the group-commit windows
@@ -345,6 +386,14 @@ first instance), not a consumer-visible statement.
    continuous op stream defers the commit unboundedly.  The spec above
    is safety-only; termination of `sys_sync` would need a fairness
    assumption and is out of scope here.
+
+   **[PARTLY SUPERSEDED 2026-08-25 — see the IMPACT NOTE at the top.
+   In the chain below, (i)'s fold-now body is dead: the checkpoint is
+   now the snapshot commit (`durable-fs-plan.md` §3–§4, the transport
+   at quiescence), and 4⁹.3 names sync receipts as persistent snapshot
+   certificate copies.  (ii)'s mono-nat now naturally rides the crash
+   predicate's epoch pointer (4⁹.1).  (iii) — the R10 parallel form —
+   stands unchanged.]**
 
    DERIVATION STATUS (owner + Fable, 2026-08-24): NOT derivable from the
    landed contracts, BY THE TREE'S OWN ADMISSION — `SpecSysSync.v`'s
