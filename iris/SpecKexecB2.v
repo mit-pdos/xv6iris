@@ -301,7 +301,7 @@ Section KexecB2Res.
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
     (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
-     log_op g n2 ∗
+     log_opb g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -457,7 +457,7 @@ Section KexecB2Res.
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
     is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
     sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-    ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+    ic_tx_dep cn kf sf dev inumf gyf -∗
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
     i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -655,7 +655,7 @@ Definition kxc_bad324_body
   ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
   bslots 3 -∗
   iref_slots 1 -∗
-  log_op g n2 -∗
+  log_opb g n2 -∗
   kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
     (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
     (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)

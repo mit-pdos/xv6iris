@@ -1246,6 +1246,9 @@ Section KexecAExit.
   (* =================================================================== *)
   Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g gfs gi cn gtl
       cov logstart inodestart nib dev :
+    (* the fabric's last conjunct (durable-disk B''-tx), FIRST in the wand
+       chain so a caller writes it as one [[%]] slot *)
+    ⌜g = icfg_log⌝ -∗
     kernel_data -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -1265,7 +1268,7 @@ Section KexecAExit.
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev.
   Proof.
-    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
+    iIntros "%Hclogf Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
              Hprocs Hdevi Hdgeom Hdlock".
     rewrite /fs_fabric.
     iSplitL "Hkd"; [iExact "Hkd" |].
@@ -1282,7 +1285,9 @@ Section KexecAExit.
     iSplitL "Hropen"; [iExact "Hropen" |].
     iSplitL "Hprocs"; [iExact "Hprocs" |].
     iSplitL "Hdevi"; [iExact "Hdevi" |].
-    iSplitL "Hdgeom"; [iExact "Hdgeom" | iExact "Hdlock"].
+    iSplitL "Hdgeom"; [iExact "Hdgeom" |].
+    iSplitL "Hdlock"; [iExact "Hdlock" |].
+    iPureIntro; exact Hclogf.
   Qed.
 
   (* =================================================================== *)
@@ -1477,7 +1482,7 @@ Section KexecABad.
     is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
     sleeplocked_q gisl sq (i_lock (ientry k)) pidv -∗
-    ic_deposit cn k (DepShr sq dev inum gy) -∗
+    ic_tx_dep cn k sq dev inum gy -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -1504,7 +1509,7 @@ Section KexecABad.
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
     bslots 3 -∗
     iref_slots 1 -∗
-    log_op g n2 -∗
+    log_opb g n2 -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (V' : pprivate)
@@ -1541,7 +1546,7 @@ Section KexecABad.
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
-                          #Hdlock)".
+                          #Hdlock & %Hclogf)".
     iDestruct (kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
     iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
       as "(Hppid & Hcref & Hpvbk)".
@@ -1588,12 +1593,12 @@ Section KexecABad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
+    iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat eb eb lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
-              Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
+              Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0 ltac:(lkbelow) Hclogf
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs

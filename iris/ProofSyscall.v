@@ -1185,7 +1185,10 @@ Section SyscallVocab.
     iSplitR; [iExact "Hprocs"  |].
     iSplitR; [iExact "Hdevi"   |].
     iSplitR; [iExact "Hgeom"   |].
-    iExact "Hdlock".
+    iSplitR; [iExact "Hdlock"  |].
+    (* the fabric's last conjunct (durable-disk B''-tx): the ambient log,
+       named.  [sysc_fs_env_all] has said so all along ([Hlogn]). *)
+    iPureIntro; exact Hlogn.
   Qed.
 
   (* THE THREE RESOURCES [SpecFileclose.fileclose_bm] USED TO CARRY, and all

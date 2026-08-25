@@ -1292,7 +1292,10 @@ Proof.
     iSplitR; [iExact "Hpinv" |].
     iSplitR; [iExact "Hdevi" |].
     iSplitR; [iExact "Hdgeom" |].
-    iExact "Hdlock". }
+    iSplitR; [iExact "Hdlock" |].
+    (* the fabric's last conjunct (durable-disk B''-tx): this assembly is AT
+       [icfg_log] literally. *)
+    iPureIntro; reflexivity. }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
   iAssert (proc_priv γf p pid V) with "[Hpbare Hcwd Hofiles]" as "Hpriv".

@@ -819,7 +819,7 @@ Section KexecB2Loops.
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
-                          #Hdlock)".
+                          #Hdlock & %Hclogf)".
     rewrite /kxc_res.
     iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins & Hbits & Hbs & Hpt &
                           Hpriv & Hpath & Hargv & Hargs & Helf & Hframe)".
@@ -1608,9 +1608,9 @@ Section KexecB2Loops.
                     with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hka
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
-          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
+          { iApply (A.fs_fabric_mk with "[%] Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                          Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                         Hdlock"). }
+                                         Hdlock"). exact Hclogf. }
           { rewrite /kxc_res.
             iSplitL "Hopen"; [iExact "Hopen" |].
             iSplitL "Hlog"; [iExact "Hlog" |]. iSplitL "Hirs"; [iExact "Hirs" |].
@@ -1663,9 +1663,9 @@ Section KexecB2Loops.
                   with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
-        { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
+        { iApply (A.fs_fabric_mk with "[%] Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                        Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                       Hdlock"). } }
+                                       Hdlock"). exact Hclogf. } }
 
     (* ---- +0x10e: bgeu s9,a5,+0x0da ---- *)
     assert (Hcmp : zopz0zKzJ_u (rget N9 Rs9) (rget N9 Ra5)

@@ -276,7 +276,7 @@ Section KexecBBody.
     cpu_claim_ext eb (proc_addr jp) -∗
     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
-    log_op g n2 -∗
+    log_opb g n2 -∗
     iref_slots 1 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
