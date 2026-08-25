@@ -332,6 +332,21 @@ Section FsBytes.
   Lemma fsblock_1 gL b bs : fsblock gL b bs = fsblock_q gL (DfracOwn 1) b bs.
   Proof. reflexivity. Qed.
 
+  (* THE CROSSING AS A WAND, WHICH IS WHAT A PROOF NEEDS.  The equation
+     above holds by conversion, but both heads are [Typeclasses Opaque]
+     (they have to be -- a 1024-element [big_sepL] behind a [Definition] is
+     an [iFrame] hang), so neither [iFrame] nor [IntoWand] will cross it and
+     a rewrite inside the proofmode is fiddly.  A caller that has just
+     learned its share IS 1 -- an ALLOCATING bmap arm, where balloc hands
+     over a full run -- crosses with one [iDestruct]. *)
+  Lemma fsblock_q_1_of gL dq b bs :
+    dq = DfracOwn 1 -> fsblock_q gL dq b bs -∗ fsblock gL b bs.
+  Proof. intros ->. rewrite fsblock_1. iIntros "H". iExact "H". Qed.
+
+  Lemma fsblock_q_1_to gL dq b bs :
+    dq = DfracOwn 1 -> fsblock gL b bs -∗ fsblock_q gL dq b bs.
+  Proof. intros ->. rewrite fsblock_1. iIntros "H". iExact "H". Qed.
+
   Global Instance byte_range_timeless gL b off bs :
     Timeless (byte_range gL b off bs).
   Proof. apply _. Qed.

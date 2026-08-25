@@ -468,8 +468,12 @@ Definition bm_gen_stmt
   (* see [SpecBmap] -- the kit is [None] on the read path *)
   fs_bytes_any γfs -∗
   i_dev ip ↦₄{dqd} dev -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  (* the block runs at a SHARE [dq] -- lane B''-blk; see [SpecBmap]'s
+     no-alloc contract.  The allocating instantiation passes
+     [DfracOwn 1] and [wp_bmap_gen]'s [Hdq1] premise makes that the only
+     possibility whenever [ak <> None]. *)
+  inode_map_q γfs dq ip bm -∗
+  inode_blocks_q γfs dq bm data -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -502,11 +506,11 @@ Definition bm_gen_stmt
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
-      inode_map γfs ip bm' -∗
+      inode_map_q γfs dq ip bm' -∗
       ⌜data' = data
        \/ (bv_unsigned (blkmap_get bm fbn) = 0
            /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
-      inode_blocks γfs bm' data' -∗
+      inode_blocks_q γfs dq bm' data' -∗
       bslots 1 -∗
       ⌜bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb'⌝ -∗
       bm_kit ak bn γfs cov logstart dev n' Sb' -∗
@@ -601,11 +605,11 @@ Section BmapDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         i_dev ip ↦₄{dqd} dev -∗
-        inode_map γfs ip bm' -∗
+        inode_map_q γfs dq ip bm' -∗
         ⌜data' = data
          \/ (bv_unsigned (blkmap_get bm fbn) = 0
              /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
-        inode_blocks γfs bm' data' -∗
+        inode_blocks_q γfs dq bm' data' -∗
         bslots 1 -∗
         ⌜bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb'⌝ -∗
         bm_kit ak bn γfs cov logstart dev n' Sb' -∗
@@ -669,8 +673,8 @@ Section BmapEpilogue.
     bm_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗
-    inode_map γfs ip bm' -∗
-    inode_blocks γfs bm' data' -∗
+    inode_map_q γfs dq ip bm' -∗
+    inode_blocks_q γfs dq bm' data' -∗
     bslots 1 -∗
     bm_kit ak bn γfs cov logstart dev n' Sb' -∗
     bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
@@ -1017,8 +1021,8 @@ Section BmapRelease.
     bm_frame4 m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗
-    inode_map γfs ip bm' -∗
-    inode_blocks γfs bm' data' -∗
+    inode_map_q γfs dq ip bm' -∗
+    inode_blocks_q γfs dq bm' data' -∗
     bm_kit ak bn γfs cov logstart dev n' Sb' -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev ibn bsX bsdX dX -∗
     bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
@@ -1230,6 +1234,11 @@ Section BmapTail.
        the caller that cannot allocate (BmapNoallocProof, ak = None) never
        has to supply "log" -- only the unconditional "bcache" above. *)
     (ak <> None -> locks_below lks "log") ->
+    (* THE ALLOCATING ARMS ARE FRACTION-1 ARMS, and only they: balloc hands
+       over a FULL byte run, so depositing it into the bundle needs the
+       bundle at 1.  A caller that cannot allocate ([ak = None]) supplies
+       this vacuously and may hold any share (lane B''-blk). *)
+    (ak <> None -> dq = DfracOwn 1) ->
     sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1249,8 +1258,8 @@ Section BmapTail.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_addrs ip (bm_cells bmI) -∗
-    ind_blk γfs bmI -∗
-    inode_blocks γfs bmI data -∗
+    ind_blk_q γfs dq bmI -∗
+    inode_blocks_q γfs dq bmI data -∗
     bslots 1 -∗
     bm_kit ak bn γfs cov logstart dev nI SbI -∗
     bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
@@ -1258,7 +1267,7 @@ Section BmapTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom HwfI Hfbn Hq Hagr Hindnz HakI Haknz Hn3i Hcrb Hcri Hled0 Hbud2
-           HSbI Hba Hlw Hj Hgl Hsp Hthr Hs1 Hs2 Hs3 Hbc Hlog.
+           HSbI Hba Hlw Hj Hgl Hsp Hthr Hs1 Hs2 Hs3 Hbc Hlog Hdq1.
     pose proof HK as HK'. 
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -1403,12 +1412,12 @@ Section BmapTail.
     (* THE COUPLING: the buffer's bytes ARE the entry list's byte image *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (bm_held_k with "Hheld") as %Hkk.
-    iEval (rewrite /ind_blk) in "Hindblk".
+    iEval (rewrite /ind_blk_q) in "Hindblk".
     destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz0|_];
       [exfalso; exact (Hindnz Hz0)|].
     iEval (rewrite -Huind) in "Hindblk".
     iApply fupd_wp.
-    iMod (bm_held_content ⊤ bn γfs γd dev cov kk pidv dev
+    iMod (bm_held_content ⊤ bn γfs γd dq dev cov kk pidv dev
             (bm_ind bmI : mword 32) _ _ _ _ _ logN_top
             with "Hrow Hindblk Hheld")
       as "(%Hbs0 & Hindblk & Hheld)".
@@ -1614,6 +1623,8 @@ Section BmapTail.
       destruct ak as [[γ bms sz dqb dqs γpr]|];
         [| exfalso; apply (Haknz eq_refl); rewrite Hgetq; exact Hentz].
       pose proof (Hn3i ltac:(discriminate)) as Hn3.
+      (* AN ALLOCATING ARM IS A FRACTION-1 ARM (lane B''-blk) *)
+      pose proof (Hdq1 ltac:(discriminate)) as Hd1.
       pose proof (Hba ltac:(discriminate)) as Hballoc.
       pose proof (Hlw ltac:(discriminate)) as Hlogwrite.
       pose proof (Hlog ltac:(discriminate)) as Hbelow_log.
@@ -1788,8 +1799,8 @@ Section BmapTail.
                        (4 * q)%nat) with "Hcell") as "Hbuf".
         iEval (rewrite (bm_buf_restore (ind_bytes (bm_ent bmI)) q Hlen0)) in "Hbuf".
         iDestruct ("Hheldback" $! (ind_bytes (bm_ent bmI)) with "Hbuf") as "Hheld".
-        iAssert (inode_map γfs ip bmI) with "[Haddrs Hindblk]" as "Hmap".
-        { rewrite /inode_map /ind_res /ind_blk.
+        iAssert (inode_map_q γfs dq ip bmI) with "[Haddrs Hindblk]" as "Hmap".
+        { rewrite /inode_map_q /ind_res_q /ind_blk_q.
           iSplitL "Haddrs"; [iExact "Haddrs"|].
           destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
             [exfalso; exact (Hindnz Hz1)|].
@@ -1833,10 +1844,10 @@ Section BmapTail.
         iEval (rewrite Hbal_w) in "Hop".
         (* the freshness that re-establishes injectivity: the fresh block's
            own EXCLUSIVE run against the runs the inode already holds *)
-        iEval (rewrite (ind_blk_run γfs bmI _ Hindnz Huind)) in "Hindblk".
-        iDestruct (inode_fresh γfs bmI data (bv_unsigned blk)
+        iEval (rewrite (ind_blk_q_run γfs dq bmI _ Hindnz Huind)) in "Hindblk".
+        iDestruct (inode_fresh_q γfs dq bmI data (bv_unsigned blk)
                      with "Hfsb Hindblk Hblocks") as %Hfresh.
-        iEval (rewrite -(ind_blk_run γfs bmI _ Hindnz Huind)) in "Hindblk".
+        iEval (rewrite -(ind_blk_q_run γfs dq bmI _ Hindnz Huind)) in "Hindblk".
         (* +0xa2 c.mv s1,a0 *)
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.bmap + 0xa2)) Rs1 Ra0
                   mA (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
@@ -1955,6 +1966,11 @@ Section BmapTail.
            Psi-free forms of [log_write] retired with the payload's second
            index, so this arm opens [LogInv.log_ctx]'s existential and
            discharges the payload-step premise from the log's own law. *)
+        (* log_write moves the logged view at those bytes, so it takes the
+           byte run at fraction 1 -- available here because this is an
+           allocating arm (lane B''-blk) *)
+        iDestruct (fsblock_q_1_of (fs_bytes γfs) dq _ _ Hd1 with "Hindblk")
+          as "Hindblk".
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
                   (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1
@@ -1967,6 +1983,8 @@ Section BmapTail.
                   Hbelow_log
                   with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl1 Hop Hindblk Hheld").
         iIntros (CID21 Hq21 mL) "Hcg Hcnt Hpc %Hcs3 Hop Hindblk Hheld Hsl1".
+        iDestruct (fsblock_q_1_to (fs_bytes γfs) dq _ _ Hd1 with "Hindblk")
+          as "Hindblk".
         assert (Hpcb0 : ret_pc (G2 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.bmap + 0xb0)) by (rewrite HG2ra; pcw).
         iEval (rewrite Hpcb0) in "Hpc".
@@ -2028,17 +2046,23 @@ Section BmapTail.
         { rewrite -(bm_slot_lt bmJ fbn Hfbnlt) (Hslotd fbn ltac:(lia)).
           destruct (decide (fbn = (NDIRECT + q)%nat)) as [_|Hc];
             [reflexivity | exfalso; apply Hc; exact Hfbn]. }
-        iAssert (inode_map γfs ip bmJ) with "[Haddrs Hindblk]" as "Hmap".
-        { rewrite /inode_map /ind_res /ind_blk /bmJ.
+        iAssert (inode_map_q γfs dq ip bmJ) with "[Haddrs Hindblk]" as "Hmap".
+        { rewrite /inode_map_q /ind_res_q /ind_blk_q /bmJ.
           cbn [bm_ind bm_ent bm_dir].
           iSplitL "Haddrs"; [iExact "Haddrs"|].
           destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
             [exfalso; exact (Hindnz Hz1)|].
           iEval (rewrite -Huind). iExact "Hindblk". }
+        (* the ONE fraction-1 step of the tail: balloc's fresh run is FULL,
+           so this deposit is only available on an allocating arm *)
+        iDestruct (inode_blocks_q_1_of γfs dq bmI data Hd1 with "Hblocks")
+          as "Hblocks".
         iDestruct (inode_blocks_insert γfs bmI bmJ data fbn blk
                      (replicate BSIZE (bv_0 8)) Hfbnlt
                      ltac:(rewrite Hgetq; exact Hentz) HgetJf HgetJ
                      with "Hblocks Hfsb") as "Hblocks".
+        iDestruct (inode_blocks_q_1_to γfs dq bmJ _ Hd1 with "Hblocks")
+          as "Hblocks".
         iDestruct (bm_slots_join 1 1 with "Hslr Hsl1") as "Hsl".
         iDestruct (cpu_own_transport CID21 CID22 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2125,8 +2149,8 @@ Section BmapTail.
                      (4 * q)%nat) with "Hcell") as "Hbuf".
       iEval (rewrite (bm_buf_restore (ind_bytes (bm_ent bmI)) q Hlen0)) in "Hbuf".
       iDestruct ("Hheldback" $! (ind_bytes (bm_ent bmI)) with "Hbuf") as "Hheld".
-      iAssert (inode_map γfs ip bmI) with "[Haddrs Hindblk]" as "Hmap".
-      { rewrite /inode_map /ind_res /ind_blk.
+      iAssert (inode_map_q γfs dq ip bmI) with "[Haddrs Hindblk]" as "Hmap".
+      { rewrite /inode_map_q /ind_res_q /ind_blk_q.
         iSplitL "Haddrs"; [iExact "Haddrs"|].
         destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
           [exfalso; exact (Hindnz Hz1)|].
@@ -2182,6 +2206,8 @@ Section ProofBmapMain.
          / ak-gated log rather than one premise. *)
       (Hbc : locks_below lks "bcache")
       (Hlog : ak <> None -> locks_below lks "log")
+      (* see [bm_indirect_tail]: only the allocating arms need fraction 1 *)
+      (Hdq1 : ak <> None -> dq = DfracOwn 1)
     : bm_gen_stmt γs j γl γu γd γk pd pav pu bn ak γfs
                   cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb b lks Vpr.
   Proof.
@@ -2520,6 +2546,8 @@ Section ProofBmapMain.
         (* ...so the caller was an ALLOCATING one, and the kit opens. *)
         destruct ak as [[γ bms sz dqb dqs γpr]|]; [| exfalso; exact (Haknz eq_refl Hdz)].
         pose proof (Hn5i ltac:(discriminate)) as Hn5.
+        (* AN ALLOCATING ARM IS A FRACTION-1 ARM (lane B''-blk) *)
+        pose proof (Hdq1 ltac:(discriminate)) as Hd1.
         pose proof (Hba ltac:(discriminate)) as Hballoc.
         pose proof (Hlog ltac:(discriminate)) as Hbelow_log.
         iDestruct (bm_kit_elim γ bms sz dqb dqs γpr _ bn γfs cov logstart dev n
@@ -2667,8 +2695,8 @@ Section ProofBmapMain.
           iDestruct ("Hback" $! (blkmap_get bm fbn) with "Hcell") as "Haddrs".
           iEval (rewrite (list_insert_id (bm_cells bm) fbn (blkmap_get bm fbn)
                             (bm_cells_dir bm fbn Hdirlen Hdir))) in "Haddrs".
-          iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk]" as "Hmap".
-          { rewrite /inode_map /ind_res.
+          iAssert (inode_map_q γfs dq ip bm) with "[Haddrs Hindblk]" as "Hmap".
+          { rewrite /inode_map_q /ind_res_q.
             iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
           iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
           { rewrite /bm_frame.
@@ -2702,7 +2730,7 @@ Section ProofBmapMain.
         * (* ------ balloc SUCCEEDED: install into addrs[bn] ------ *)
           iDestruct "Hsucc" as (blk)
             "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Hop)".
-          iDestruct (inode_fresh γfs bm data (bv_unsigned blk)
+          iDestruct (inode_fresh_q γfs dq bm data (bv_unsigned blk)
                        with "Hfsb Hindblk Hblocks") as %Hfresh.
           iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.bmap + 0x2e)) Rs1 Ra0
                     mD (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
@@ -2794,13 +2822,17 @@ Section ProofBmapMain.
             destruct (decide (fbn = fbn)); [reflexivity | congruence]. }
           iDestruct ("Hback" $! blk with "Hcell") as "Haddrs".
           iEval (rewrite (bm_cells_insert_dir bm fbn blk Hdirlen Hdir)) in "Haddrs".
-          iAssert (inode_map γfs ip bmD) with "[Haddrs Hindblk]" as "Hmap".
-          { rewrite /inode_map /ind_res /ind_blk /bmD.
+          iAssert (inode_map_q γfs dq ip bmD) with "[Haddrs Hindblk]" as "Hmap".
+          { rewrite /inode_map_q /ind_res_q /ind_blk_q /bmD.
             cbn [bm_ind bm_ent bm_dir].
             iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
+          iDestruct (inode_blocks_q_1_of γfs dq bm data Hd1 with "Hblocks")
+            as "Hblocks".
           iDestruct (inode_blocks_insert γfs bm bmD data fbn blk
                        (replicate BSIZE (bv_0 8)) Hfbn Hdz HgetDf HgetD
                        with "Hblocks Hfsb") as "Hblocks".
+          iDestruct (inode_blocks_q_1_to γfs dq bmD _ Hd1 with "Hblocks")
+            as "Hblocks".
           iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
           { rewrite /bm_frame.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -2877,8 +2909,8 @@ Section ProofBmapMain.
         iDestruct ("Hback" $! (blkmap_get bm fbn) with "Hcell") as "Haddrs".
         iEval (rewrite (list_insert_id (bm_cells bm) fbn (blkmap_get bm fbn)
                           (bm_cells_dir bm fbn Hdirlen Hdir))) in "Haddrs".
-        iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk]" as "Hmap".
-        { rewrite /inode_map /ind_res.
+        iAssert (inode_map_q γfs dq ip bm) with "[Haddrs Hindblk]" as "Hmap".
+        { rewrite /inode_map_q /ind_res_q.
           iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
         iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
         { rewrite /bm_frame.
@@ -3085,6 +3117,8 @@ Section ProofBmapMain.
              exact (blkmap_wf_ind_nz cov logstart bm fbn Hwf Hge Hfbn
                       (Haknz eq_refl) Hiz)].
         pose proof (Hn5i ltac:(discriminate)) as Hn5.
+        (* AN ALLOCATING ARM IS A FRACTION-1 ARM (lane B''-blk) *)
+        pose proof (Hdq1 ltac:(discriminate)) as Hd1.
         pose proof (Hba ltac:(discriminate)) as Hballoc.
         pose proof (Hlog ltac:(discriminate)) as Hbelow_log.
         iDestruct (bm_kit_elim γ bms sz dqb dqs γpr _ bn γfs cov logstart dev n
@@ -3246,8 +3280,8 @@ Section ProofBmapMain.
           iDestruct ("Hback" $! (bm_ind bm) with "Hcell") as "Haddrs".
           iEval (rewrite (list_insert_id (bm_cells bm) NDIRECT (bm_ind bm)
                             (bm_cells_ind bm Hdirlen))) in "Haddrs".
-          iAssert (inode_map γfs ip bm) with "[Haddrs Hindblk]" as "Hmap".
-          { rewrite /inode_map /ind_res.
+          iAssert (inode_map_q γfs dq ip bm) with "[Haddrs Hindblk]" as "Hmap".
+          { rewrite /inode_map_q /ind_res_q.
             iSplitL "Haddrs"; [iExact "Haddrs"|]. iExact "Hindblk". }
           iAssert (bm_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
           { rewrite /bm_frame.
@@ -3285,7 +3319,7 @@ Section ProofBmapMain.
         * (* ------ balloc SUCCEEDED: install the indirect block ------ *)
           iDestruct "Hsucc" as (blk)
             "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Hop)".
-          iDestruct (inode_fresh γfs bm data (bv_unsigned blk)
+          iDestruct (inode_fresh_q γfs dq bm data (bv_unsigned blk)
                        with "Hfsb Hindblk Hblocks") as %Hfresh.
           assert (HP2s1 : P2 !!! Regidx Rs1 = (sign_extend' 64 blk : mword 64)).
           { rewrite /P2 upd_eq. rgne. rewrite Ha0v. apply add_vec_zero_l. }
@@ -3382,7 +3416,9 @@ Section ProofBmapMain.
           { rewrite /ind_blk /bmI. cbn [bm_ind bm_ent].
             case_decide as Hz; [exfalso; exact (Hblknz Hz)|].
             rewrite Hindz. iExact "Hfsb". }
-          iDestruct (inode_blocks_frame γfs bm bmI data data
+          iDestruct (ind_blk_q_1_to γfs dq bmI Hd1 with "Hindblk2")
+            as "Hindblk2".
+          iDestruct (inode_blocks_q_frame γfs dq bm bmI data data
                        ltac:(intros i Hi; split; [exact (HgetI i Hi) | reflexivity])
                        with "Hblocks") as "Hblocks".
           iAssert (bm_frame4 m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
@@ -3449,7 +3485,7 @@ Section ProofBmapMain.
                     ltac:(intros c Hcs N2 N8 N9 N18 N19 N20;
                           exact (HP2thr c Hcs N2 N8 N9 N18 N19))
                     ltac:(rewrite /bmI; cbn [bm_ind]; exact HP2s1) HP2s2 HP2s3
-                    Hbc Hlog
+                    Hbc Hlog ltac:(intros _; exact (Hdq1 ltac:(discriminate)))
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hprk Hbio Hrow Hprocs
                           Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                           Haddrs Hindblk2 Hblocks Hsl Hkit [Hcont]").
@@ -3525,7 +3561,7 @@ Section ProofBmapMain.
                   ltac:(intros c Hcs N2 N8 N9 N18 N19 N20;
                         exact (HJ4thr c Hcs N2 N8 N9 N18 N19))
                   HJ4s1 HJ4s2 HJ4s3
-                  Hbc Hlog
+                  Hbc Hlog Hdq1
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hprk Hbio Hrow Hprocs
                         Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                         Haddrs Hindblk Hblocks Hsl Hkit [Hcont]").
@@ -3574,6 +3610,11 @@ Section BmapSeal.
               Hsbsz Hsbbm #Hbminv
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iDestruct (bm_slots_split 1 2 with "Hsl") as "[Hsl1 Hsl2]".
+    (* the core is stated at a SHARE of the block runs (lane B''-blk); the
+       ALLOCATING instantiation is the fraction-1 one, and [inode_blocks]
+       is sealed against instance search, so the crossing is explicit. *)
+    iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     (* THE COUNTED FORM'S SET is whatever the [log_op] existential is hiding:
        nothing is claimed about it, and [cr := false] claims no credit -- this
        is fs-icache.md section 18's "derived counted form", taken at the
@@ -3588,13 +3629,14 @@ Section BmapSeal.
     { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size dqb dqs γpr)) γfs
-              cov logstart dev ip bm data fbn n false Sb0 pidv dq dqd m K eb b lks Vpr
+              cov logstart dev ip bm data fbn n false Sb0 pidv (DfracOwn 1) dqd m K eb b lks Vpr
               ltac:(intros _ GEN0 CID0;
                     exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
                     exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
               ltac:(lkbelow)
               ltac:(intros _; exact Hbelow)
+              ltac:(intros _; reflexivity)
               HK
               ltac:(intros _; pose proof (bmap_need_le4 false (bmap_ind fbn)); lia)
               ltac:(intros Hc; discriminate Hc)
@@ -3607,6 +3649,8 @@ Section BmapSeal.
     iIntros (CIDf) "%Hchain".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
+    iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iDestruct (bm_kit_elim γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & _)".
@@ -3656,6 +3700,11 @@ Section BmapSeal.
               Hsbsz Hsbbm #Hbminv
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iDestruct (bm_slots_split 1 2 with "Hsl") as "[Hsl1 Hsl2]".
+    (* the core is stated at a SHARE of the block runs (lane B''-blk); the
+       ALLOCATING instantiation is the fraction-1 one, and [inode_blocks]
+       is sealed against instance search, so the crossing is explicit. *)
+    iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iDestruct (bm_kit_intro γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n Sb eq_refl Hbgok
                  with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbminv") as "Hkit".
@@ -3664,13 +3713,14 @@ Section BmapSeal.
     { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size dqb dqs γpr)) γfs
-              cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb b lks Vpr
+              cov logstart dev ip bm data fbn n cr Sb pidv (DfracOwn 1) dqd m K eb b lks Vpr
               ltac:(intros _ GEN0 CID0;
                     exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
                     exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
               ltac:(lkbelow)
               ltac:(intros _; exact Hbelow)
+              ltac:(intros _; reflexivity)
               HK ltac:(intros _; exact Hneed)
               ltac:(intros Hc; cbn [bm_bmsset ba_bms];
                     exact (bmset_sing_sub _ _ (Hcrp Hc)))
@@ -3683,6 +3733,8 @@ Section BmapSeal.
     iIntros (CIDf) "%Hchain".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
+    iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iDestruct (bm_kit_elim γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & _)".
@@ -3739,6 +3791,7 @@ Section BmapNoallocSeal.
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               Hbelow
+              ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               HK ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               ltac:(intros Hc; discriminate Hc)

@@ -1633,10 +1633,12 @@ Section ProofDirlookupMain.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         (* the byte view's row (durable-disk 1c-flip step 3) *)
         iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
+        iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+        iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
         iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
-                  pidv dq dqd L6 (K - 12)%nat eb b lks
+                  pidv (DfracOwn 1) dqd L6 (K - 12)%nat eb b lks
                   ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                   ltac:(lia)
                   ltac:(intros _; change (Z.of_nat 16) with 16; lia)
@@ -1650,6 +1652,8 @@ Section ProofDirlookupMain.
         iIntros (CIDrd Hsrd mrd tot P')
           "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks
            Hdst2 Hbslot".
+        iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+        iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
         first [ iEval (rewrite Hpjd) in "Hcg" | idtac ].
         first [ iEval (rewrite Hpjd) in "Hcnt" | idtac ].
         iAssert (([∗ list] ii ∈ seq 0 16,

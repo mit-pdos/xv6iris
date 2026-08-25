@@ -2020,10 +2020,14 @@ Section ItruncIArm.
     iEval (rewrite -Huc) in "Hindblk".
     iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hrow".
     iApply fupd_wp.
-    iMod (bm_held_content ⊤ bn γfs γd dev cov kk pidv dev
+    (* the agreement is fraction-generic (lane B''-blk); itrunc WRITES, so
+       it holds the run whole and crosses back at once *)
+    iDestruct (fsblock_q_1_to _ _ _ _ eq_refl with "Hindblk") as "Hindblk".
+    iMod (bm_held_content ⊤ bn γfs γd (DfracOwn 1) dev cov kk pidv dev
             (bm_ind bm : mword 32) _ _ _ _ _ logN_top
             with "Hrow Hindblk Hheld")
       as "(%Hbsl & Hindblk & Hheld)".
+    iDestruct (fsblock_q_1_of _ _ _ _ eq_refl with "Hindblk") as "Hindblk".
     iModIntro.
     iEval (rewrite Huc) in "Hindblk".
     (* ===== +0x5a mv s4,a0 : s4 := bp ===== *)

@@ -2902,9 +2902,11 @@ Section ProofSysUnlinkBody.
       by (rewrite /N6; apply su_regs_caller; [exact Hcsra | exact HN5regs]).
     iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iApply (Readi.wp_readi_sconf KT1 (CID := CID6) gs jx gl gu gd gk pd pav pu bn
               gfs ga gf cov logstart dev (ientry ki) bmi dati dni false
-              (16 * jj)%nat 16%nat bcur Vpr pidv dq (DfracOwn (1/2))
+              (16 * jj)%nat 16%nat bcur Vpr pidv (DfracOwn 1) (DfracOwn (1/2))
               N6 (K - 30)%nat eb b lks
               ltac:(exact Kre) Hgeom Hbmwf Hbmcv Hszcap
               ltac:(assert (E32 : (2 ^ 32 = 4294967296)%Z)
@@ -2927,6 +2929,8 @@ Section ProofSysUnlinkBody.
     iIntros (CID7 Hq7 mrd tot P')
       "%Hcsrd %Hupt' %Htotle %Harm Hcg Hown _ _ Hpc Hidev Hmeta Hmap Hblocks
        [Hbuf Hpidq] Hbslot".
+    iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iEval (rewrite HN6a2) in "Hbuf".
     assert (Hpc116 : ret_pc (N6 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x116)) by (rewrite HN6ra; pcw).

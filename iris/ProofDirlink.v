@@ -2966,10 +2966,12 @@ Section ProofDirlinkMain.
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           (* the byte view's row (durable-disk 1c-flip step 3) *)
           iPoseProof (ireg_inv_bytes with "Hiregi") as "#Hrow".
+          iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+          iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
           iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol Vpr
-                    pidv dq dqd L6 (K - 10)%nat eb b lks
+                    pidv (DfracOwn 1) dqd L6 (K - 10)%nat eb b lks
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
                     ltac:(lia)
                     ltac:(intros _; change (Z.of_nat 16%nat) with 16; lia)
@@ -2988,6 +2990,8 @@ Section ProofDirlinkMain.
           iIntros (CIDrd Hsrd mrd tot P')
             "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
              Hdst2 Hbs1".
+          iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+          iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii
                         ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)

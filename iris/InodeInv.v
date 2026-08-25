@@ -792,6 +792,14 @@ Section InodeRes.
     ind_res γfs bm = ind_res_q γfs (DfracOwn 1) bm.
   Proof. reflexivity. Qed.
 
+  Lemma ind_blk_q_1_of (γfs : fs_names) (dq : dfrac) (bm : blkmap) :
+    dq = DfracOwn 1 -> ind_blk_q γfs dq bm -∗ ind_blk γfs bm.
+  Proof. intros ->. rewrite ind_blk_1. iIntros "H". iExact "H". Qed.
+
+  Lemma ind_blk_q_1_to (γfs : fs_names) (dq : dfrac) (bm : blkmap) :
+    dq = DfracOwn 1 -> ind_blk γfs bm -∗ ind_blk_q γfs dq bm.
+  Proof. intros ->. rewrite ind_blk_1. iIntros "H". iExact "H". Qed.
+
   Lemma ind_blk_q_run (γfs : fs_names) (dq : dfrac) (bm : blkmap) (bi : Z) :
     bv_unsigned (bm_ind bm) <> 0 -> bi = bv_unsigned (bm_ind bm) ->
     fsblock_q (fs_bytes γfs) dq bi (ind_bytes (bm_ent bm)) ⊣⊢ ind_blk_q γfs dq bm.
@@ -828,6 +836,16 @@ Section InodeRes.
     inode_map γfs ip bm = inode_map_q γfs (DfracOwn 1) ip bm.
   Proof. reflexivity. Qed.
 
+  Lemma inode_map_q_1_of (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) :
+    dq = DfracOwn 1 -> inode_map_q γfs dq ip bm -∗ inode_map γfs ip bm.
+  Proof. intros ->. rewrite inode_map_1. iIntros "H". iExact "H". Qed.
+
+  Lemma inode_map_q_1_to (γfs : fs_names) (dq : dfrac) (ip : mword 64)
+      (bm : blkmap) :
+    dq = DfracOwn 1 -> inode_map γfs ip bm -∗ inode_map_q γfs dq ip bm.
+  Proof. intros ->. rewrite inode_map_1. iIntros "H". iExact "H". Qed.
+
   (* --- inode_blocks: one fs_chalf per allocated file index ------------- *)
 
   Definition blk_res (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) : iProp Σ :=
@@ -855,6 +873,22 @@ Section InodeRes.
       (data : nat -> list (bv 8)) :
     inode_blocks γfs bm data = inode_blocks_q γfs (DfracOwn 1) bm data.
   Proof. reflexivity. Qed.
+
+  (* THE CROSSINGS AS WANDS (see [FsBlocks.fsblock_q_1_of] for why the
+     equations alone are not enough): what an ALLOCATING bmap arm, which
+     has just learned its share is 1, uses to reach the fraction-1
+     deposit lemmas. *)
+  Lemma inode_blocks_q_1_of (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    dq = DfracOwn 1 ->
+    inode_blocks_q γfs dq bm data -∗ inode_blocks γfs bm data.
+  Proof. intros ->. rewrite inode_blocks_1. iIntros "H". iExact "H". Qed.
+
+  Lemma inode_blocks_q_1_to (γfs : fs_names) (dq : dfrac) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    dq = DfracOwn 1 ->
+    inode_blocks γfs bm data -∗ inode_blocks_q γfs dq bm data.
+  Proof. intros ->. rewrite inode_blocks_1. iIntros "H". iExact "H". Qed.
 
   Lemma blk_res_q_split (γfs : fs_names) (q1 q2 : Qp) (w : bv 32)
       (bs : list (bv 8)) :

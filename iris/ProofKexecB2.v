@@ -1358,9 +1358,11 @@ Section KexecB2Loops.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       (* the byte view's row (durable-disk 1c-flip step 3) *)
       iPoseProof (log_ctx_bytes_any with "Hlogc") as "#Hrow".
+      iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+      iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
       iApply (Readi.wp_readi_sconf KT0 gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
-                pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat eb
+                pidv (DfracOwn 1) (DfracOwn (1/2)) D6 (K - 68)%nat eb
                 eb lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                 ltac:(rewrite HoffnZ; lia)
                 ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
@@ -1373,6 +1375,8 @@ Section KexecB2Loops.
       { iSplitL "Hdst"; [iExact "Hdst" | iExact "Hppid"]. }
       iIntros (CIDrd Hsrd M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
                Hidev Hmeta Hmap Hblocks [Hdst Hppid] Hbs1".
+      iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+      iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
       assert (Hpcea : ret_pc (D6 !!! Regidx Rra) = mword_of_int (KXB + 0x0ea))
         by (rewrite HD6ra; lpcw).
       iEval (rewrite Hpcea) in "Hpc".

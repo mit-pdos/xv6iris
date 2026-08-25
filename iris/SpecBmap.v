@@ -722,8 +722,16 @@ Definition wp_bmap_noalloc_sconf_body
      Persistent, and every caller has one. *)
   fs_bytes_any γfs -∗
   i_dev ip ↦₄{dqd} dev -∗
-  inode_map γfs ip bm -∗
-  inode_blocks γfs bm data -∗
+  (* THE BLOCK RESOURCES AT A SHARE [dq] (durable-fs-plan.md sections 4, 6;
+     lane B''-blk).  [dq] was a vestigial parameter of this contract and is
+     now the fraction of the DATA and INDIRECT blocks' byte runs -- the
+     arity did not move.  The no-alloc bmap reads the indirect block by
+     AGREEMENT and frames [inode_blocks] untouched, so nothing here needs a
+     full element; a read-locker calls it at a QUARTER.  The ADDRS cells
+     inside [inode_map_q] are NOT shared (records park region-side at
+     fraction 1 always, plan section 2). *)
+  inode_map_q γfs dq ip bm -∗
+  inode_blocks_q γfs dq bm data -∗
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle: bmap still SLEEPS, in bread *)
   procs_inv γs -∗
@@ -754,8 +762,8 @@ Definition wp_bmap_noalloc_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
-      inode_map γfs ip bm -∗
-      inode_blocks γfs bm data -∗
+      inode_map_q γfs dq ip bm -∗
+      inode_blocks_q γfs dq bm data -∗
       bslot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

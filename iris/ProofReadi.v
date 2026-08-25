@@ -292,8 +292,8 @@ Section ReadiDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         i_dev ip ↦₄{dqd} dev -∗
         inode_meta ip dn -∗
-        inode_map γfs ip bm -∗
-        inode_blocks γfs bm data -∗
+        inode_map_q γfs dq ip bm -∗
+        inode_blocks_q γfs dq bm data -∗
         rd_dst γf j pidv dq user (upd_upt V P') V
                (m !!! Regidx Ra2 : mword 64) n
                (rd_delivered data dst_olds off tot) -∗
@@ -353,8 +353,8 @@ Section ReadiRet.
     rd_fr7 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
-    inode_map γfs ip bm -∗
-    inode_blocks γfs bm data -∗
+    inode_map_q γfs dq ip bm -∗
+    inode_blocks_q γfs dq bm data -∗
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P') V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
@@ -675,8 +675,8 @@ Section ReadiJoin.
     rd_fr8 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
-    inode_map γfs ip bm -∗
-    inode_blocks γfs bm data -∗
+    inode_map_q γfs dq ip bm -∗
+    inode_blocks_q γfs dq bm data -∗
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P') V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
@@ -845,8 +845,8 @@ Section ReadiExit.
     rd_fr13 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
-    inode_map γfs ip bm -∗
-    inode_blocks γfs bm data -∗
+    inode_map_q γfs dq ip bm -∗
+    inode_blocks_q γfs dq bm data -∗
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P') V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
@@ -1137,8 +1137,8 @@ Section ReadiLoop.
     rd_fr13 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
-    inode_map γfs ip bm -∗
-    inode_blocks γfs bm data -∗
+    inode_map_q γfs dq ip bm -∗
+    inode_blocks_q γfs dq bm data -∗
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V PI) V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
@@ -1269,7 +1269,7 @@ Section ReadiLoop.
                  with "Hcont") as "Hcont".
     assert (HKbm : (K_bmap <= K - 14)%nat) by (lia).
     iApply (BM.wp_bmap_noalloc_sconf γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev ip bm data fbn pidv (rd_q user dq) dqd
+              cov logstart dev ip bm data fbn pidv dq dqd
               A3 (K - 14)%nat eb b
               _ (if user then upd_upt V PI else V) HKbm Hgeom0 Hfbnlt Hwf Hbnzz Hj Hgl HA3a0 HA3a1
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hrow Hidev Hmap Hblocks Hppid
@@ -1449,13 +1449,13 @@ Section ReadiLoop.
       by (rewrite (callee_saved_lookup Hcs2c Rs8 ltac:(vm_compute; reflexivity));
           exact HB3s8).
     (* THE COUPLING: the buffer's bytes ARE the block's logical content *)
-    iDestruct (inode_blocks_acc γfs bm data fbn Hfbnlt Hbnzz with "Hblocks")
+    iDestruct (inode_blocks_q_acc γfs dq bm data fbn Hfbnlt Hbnzz with "Hblocks")
       as "[Hfsb1 Hblback]".
     iEval (rewrite -Hubno) in "Hfsb1".
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (rd_held_k with "Hheld") as %Hkklt.
     iApply fupd_wp.
-    iMod (rd_held_content ⊤ bn γfs γd dev cov _ pidv dev _
+    iMod (rd_held_content ⊤ bn γfs γd dq dev cov _ pidv dev _
             _ _ _ _ _ logN_top with "Hrow Hfsb1 Hheld")
       as "(%Hbs0eq & Hfsb1 & Hheld)".
     iModIntro.
@@ -1944,7 +1944,7 @@ Section ReadiLoop.
         iEval (rewrite Hpc6e) in "Hpc".
         iEval (rewrite Hubno) in "Hfsb1".
         iDestruct ("Hblback" $! (data fbn) with "Hfsb1") as "Hblocks".
-        iDestruct (rd_blocks_restore γfs bm data fbn with "Hblocks") as "Hblocks".
+        iDestruct (rd_blocks_restore γfs dq bm data fbn with "Hblocks") as "Hblocks".
         pose proof HcsR as HcsRc.
         assert (HRsp : rd_sp m mR).
         { rewrite /rd_sp
@@ -2231,7 +2231,7 @@ Section ReadiLoop.
         iEval (rewrite Hpcb0) in "Hpc".
         iEval (rewrite Hubno) in "Hfsb1".
         iDestruct ("Hblback" $! (data fbn) with "Hfsb1") as "Hblocks".
-        iDestruct (rd_blocks_restore γfs bm data fbn with "Hblocks") as "Hblocks".
+        iDestruct (rd_blocks_restore γfs dq bm data fbn with "Hblocks") as "Hblocks".
         pose proof HcsR as HcsRc.
         assert (HRsp : rd_sp m mR).
         { rewrite /rd_sp

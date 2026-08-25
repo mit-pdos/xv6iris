@@ -2259,6 +2259,8 @@ Section ProofFileread.
                           with "Hcnt") as "Hcnt".
              (* the byte view's row (durable-disk 1c-flip step 3) *)
              iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
+             iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+             iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
              iApply (Readi.wp_readi_sconf KT0 γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
@@ -2279,6 +2281,8 @@ Section ProofFileread.
              { rewrite Heb /cpu_claim_ext. done. }
              iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
                                               Hpriv Hbslot".
+             iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+             iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
              assert (Hpc42 : ret_pc (J6 !!! Regidx Rra) = mword_of_int (FR + 0x48)).
              { rewrite HJ6ra. apply bv_eq; vm_compute; reflexivity. }
              iEval (rewrite Hpc42) in "Hpc".

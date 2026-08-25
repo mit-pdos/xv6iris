@@ -1123,9 +1123,11 @@ Section KexecB3Body.
     iEval (rewrite -HU5a2) in "Hphb".
     (* the byte view's row (durable-disk 1c-flip step 3) *)
     iPoseProof (log_ctx_bytes_any with "Hlogc") as "#Hrow".
+    iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     iApply (Readi.wp_readi_sconf KT1 gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry kf) bmf datl dnf false offn 56%nat phb V
-              pidv (DfracOwn (1/4)) (DfracOwn (1/2)) U5 (K - 68)%nat eb
+              pidv (DfracOwn 1) (DfracOwn (1/2)) U5 (K - 68)%nat eb
               eb ∅ ltac:(lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(rewrite HoffnZ; lia)
               ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
@@ -1140,6 +1142,8 @@ Section KexecB3Body.
     { iSplitL "Hphb"; [iExact "Hphb" | iExact "Hppid"]. }
     iIntros (CIDrd Hsrd M2 tot Pr) "%Hcsrd %Huptr %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
              Hidev Hmeta Hmap Hblocks [Hphb Hppid] Hbs1".
+    iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
+    iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
     assert (Hpc13e : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KXB + 0x13e))
       by (rewrite HU5ra; bpcw).
     iEval (rewrite Hpc13e) in "Hpc".
