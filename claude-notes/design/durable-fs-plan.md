@@ -110,67 +110,83 @@ live directory, unique names).  There is NO cross-inode pure clause:
   the abstract map's authority) — as `i ↦ Some t` if the caller passes a
   transaction share (parking HALF of `t ↪ ()` in the registry) or
   `i ↦ None` otherwise (`fileread`, `filestat`, lookups outside a
-  transaction); returns the matching receipt.  **`iunlock i`**: deposits
-  the bundle CLEAN (`inode_local`, as today), deletes the entry, returns
-  the half share.  xv6's `ilock` is one function; the spec's optional
+  transaction); returns the matching receipt.  A transactional `ilock`
+  withdraws the whole bundle; a `None` one withdraws only a ¼ fraction of
+  its byte elements and leaves ¾ in the escrow (§4 says why ¼).
+  **`iunlock i`**: deposits the bundle CLEAN (`inode_local`, as today),
+  deletes the entry, returns the half share.  xv6's `ilock` is one function; the spec's optional
   argument is the transaction share.
-- **`log_write b`** (landed shape, TO ADJUST): requires a transaction
-  token, the caller's byte elements for the range it changed (the
-  byte-range AU, `SpecLogWrite.wp_log_write_au_range`; a whole-block
-  writer uses the `off = 0` corollary), and — for an inode record or a
-  data block — the `Some t` receipt for the owning inode (so a
-  read-locker cannot write: the region's write lemmas
-  `ireg_write_*`/the escrow's data-block accessors take the receipt).
-  It moves `L` at those bytes and the caller re-establishes the two pure
-  facts of §4(a) in the parked payload.
+- **`log_write b`** (landed): requires a transaction token, the caller's
+  byte elements for the range it changed (the byte-range AU,
+  `SpecLogWrite.wp_log_write_au_range`; a whole-block writer uses the
+  `off = 0` corollary), and — for an inode record or a data block — the
+  `Some t` receipt for the owning inode (so a read-locker cannot write:
+  the region's write lemmas `ireg_write_*`/the escrow's data-block
+  accessors take the receipt).  It moves `L` at those bytes.  IT PROVES
+  NOTHING ABOUT THE FILE SYSTEM: no pure fact is re-established at a
+  write, and the WAL's lock invariant carries no file-system payload
+  (the parked `Ψ D₀ Dc` and the `log_psi_*` laws are deleted — §4, §8).
 - **Commit** (`end_op` at `outstanding = 0`; WAL-internal, TO BUILD):
-  reads the abstract value off the abstract map's authority (`ftop_inv`),
-  the bitmap invariant's used set and the superblock; with the two pure
-  facts of §4 allocates a fresh durable snapshot at that value
-  (`fs_snap_alloc`, a basic update — allocation needs nothing from
-  anyone); installs "`D := L`" (as today, `FsCrash.fs_commit_L_*`);
-  drops the old snapshot (`FsDurSnap.dsnap_step_of`).  Its receipt: the
-  committed view equals the logged view (`D' = L` at home maps) AND the
-  new snapshot's state is the quiescent abstract state.  NO caller of
-  any WAL function supplies a fupd; the only fupd in the durability story
-  is the machine's disk-interface permit, which the WAL discharges.
+  installs "`D := L`" (as today, `FsCrash.fs_commit_L_*`) and, at the same
+  ghost step, RECONSTRUCTS the file-system predicate over `L` and clones
+  it onto fresh names as the new snapshot (§4), dropping the old one
+  (`FsDurSnap.dsnap_step_of`).  The reconstruction is a persistent,
+  file-system-supplied law parked in `log_ctx` (the WAL stays
+  file-system-agnostic): given the byte authority at `L` and "no
+  transaction is open", it yields `∃ S, snap_ok S L` and hands the
+  authority back — it moves NO durable resource (§8's refutation is about
+  fupds that do).  Its receipt: the committed view equals the logged view
+  (`D' = L` at home maps) AND the new snapshot's state is the quiescent
+  abstract state.  NO caller of any WAL function supplies anything at the
+  call site; the only fupd in the durability story is the machine's
+  disk-interface permit, which the WAL discharges.
 
-## 4. The two pure facts the commit needs, and how they are maintained
+## 4. Where the commit's proof comes from: collection at quiescence
 
-**(a) The bytes match** — `FsDurSnap.snap_bytes S Dc` (LANDED): "there is
-an abstract state `S` whose encoding is exactly the current logged
-bytes (records at their slots, data blocks, the bitmap block as
-`bm_bytes` of the used set, free blocks present), every inode's blocks
-are marked used in the bitmap and are not metadata blocks, and no two
-inodes name the same block."  Maintained at each `log_write` by the
-writer ALONE (`snap_bytes_frame`): its write changed only its own
-object's bytes (its buffer read-modify-write, `FsBlocks.blk_splice`), so
-every other inode's encoding is untouched (`snap_untouched_of_own`);
-when it adopts a fresh block the bit it read was clear
-(`snap_untouched_of_free`), so no inode could have owned that block.
-The used-set clause is the ONE whole-map pure statement in the design
-(the owner accepted it, 2026-08-25, "if it closes"); its maintenance is
-local.  The record-encoder is injective on well-formed records
-(`dinode_bytes_inj`, `rec_in_blk_inj`), so `snap_bytes` pins every
-inode's node (`snap_bytes_node_inj`).  The parked payload
-`LogInv`'s `Ψ D₀ Dc` becomes exactly `⌜∃ S, snap_bytes S Dc ∧ S agrees
-with γtop_L's map / the used set / the config's superblock⌝`.
+The allocator (`FsDurSnap.fs_snap_alloc`, over the Γ-generic core
+`fs_state_of_ledger`) takes the value `L` and `snap_ok S L` — "the bytes
+are the encoding of `S`, every inode of `S` is well-formed, no two share
+a block".  NOTHING MAINTAINS THAT FACT INCREMENTALLY.  It is false in the
+middle of an operation on the byte side exactly as on the local side
+(`itrunc` frees blocks one `log_write` at a time and rewrites the record
+once, at its tail `iupdate`; `FsDurTrunc.v` is the machine-checked
+refutation of a per-write accumulation, §8), and every such state
+belongs to an inode that is LOCKED.  So the commit RECONSTRUCTS it from
+the file system's own invariants at the one moment they are all clean:
 
-**(b) All inodes clean** — the locked registry (TO BUILD): the
-file-system invariant carries "every inode whose registry entry is
-`None` or absent is well-formed (`inode_local`) at the current logged
-state" (`FsDurSnap.snap_local`, restricted).  Transactional `ilock`
-weakens it (free); `iunlock` re-establishes it for the released inode
-(already proven today at the escrow deposit); `end_op` cannot run while
-any lock is held (a half share is parked in the registry); at commit the
-WAL's `γtx` authority is empty, so no share of any id can exist, so no
-`Some t` entry can exist, so EVERY inode is clean.  Mid-transaction
-states (`create`'s `nlink = 1` written before its dot entries;
-`itrunc`'s bits cleared before the pointers are zeroed) never reach a
-snapshot — snapshots are taken at quiescence only.
+- **No inode is write-locked** — the locked registry (§3 `ilock`): at
+  commit the WAL's `γtx` authority is empty, so no share of any
+  transaction id exists, so no `Some t` entry exists.  Every inode is
+  either unlocked or read-locked.
+- **Every inode's validity predicate is inside the invariants.**  An
+  unlocked inode's bundle (`inode_owned`: its record proxy, its data and
+  indirect blocks' byte elements of `L` at FULL fraction, its abstract
+  fragment, its link authority and entry tokens, and `inode_local`) sits
+  in the cache escrow (`ic_loaded`, `inv icEscN`) or the pool (`live_pool`
+  inside `inv icacheN`); the records themselves sit region-side at full
+  fraction always (`ireg_recs`, `inv iregN`); the free blocks and the
+  bitmap sit in `bitmap_inv`; the abstract map's authority in `ftop_inv`.
+  A READ-LOCKED inode (`ilock` with no transaction — `fileread`, `stat`,
+  lookups) has withdrawn only a ¼ FRACTION of its byte elements; the
+  escrow keeps ¾ and the rest of the bundle.  A transactional `ilock`
+  withdraws everything.
+- **Collected, they ARE `fs_state` over `L`.**  Opening those invariants
+  at the commit's ghost step and ∗-ing the bundles gives, against the
+  byte authority in `fs_bytes_inv`: the bytes at every record slot and
+  data block by AGREEMENT (any fraction suffices), the used set and the
+  free blocks' bytes off `bitmap_inv`, `inode_local` of every inode off
+  its bundle, and cross-inode block DISJOINTNESS from separation logic —
+  two full elements at one address are inconsistent, and so are two ¾
+  elements (¾ + ¾ > 1), which is why the reader's share is ¼ and not ½.
+  That is `snap_ok S L` for the abstract `S` the `ftop_inv` authority
+  holds; the allocator clones it.  The same collection lemma is what
+  §5's boot mint runs in the other direction.
 
-Together, (a) ∧ (b) at `outstanding = 0` is `FsDurSnap.snap_ok S_L (lm_logged L)`,
-the exact premise of `fs_snap_alloc`.
+There is NO cross-inode pure clause anywhere and no obligation on any
+writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` keeps
+its used-set coupling clauses (`sk_own_used`, `sk_disj`) because the
+allocator needs them to SPLIT a linear ledger; at the commit they are
+read off the ∗, at boot off the snapshot.
 
 ## 5. Boot, adequacy, and the theorem
 
@@ -196,15 +212,16 @@ the same way.
 ## 6. What it costs, and what is deleted
 
 Costs: the transaction token is fractional while locks are held
-(contracts spanning a held lock carry that form — wide, shallow); nine
-`log_write` call sites each prove the "only my object changed" step
-(`ProofBfree`, `ProofBmap`, `ProofBalloc` ×2, `ProofIupdate`, `ProofIalloc`,
-`ProofIput`, `ProofWritei` ×2 — today each is one `log_psi_write_rebase`
-line); the one whole-map pure clause of §4(a).
+(contracts spanning a held lock carry that form — wide, shallow); the
+inode bundle's byte elements are fraction-indexed so a read-locker can
+take ¼ (`inode_owned_era`/`blk_owned` at `fs_gamma_L` are dfrac-1 today:
+the footprint is every consumer of the bundle's data-block accessors);
+the commit's collection lemma opens five invariant families at one ghost
+step.  Nothing is owed at a `log_write` beyond the bytes it writes.
 
 Deleted once consumers are re-pointed: `FsDurWire`'s `P_wf_dec`/`Psi_dec`/
 `kinds_of_state`/`dwire_geom`/`psi_*` (the rejected pure-kinds tie),
-`LogInv.log_psi_*`, `LogDefs.fs_dstep`/`fs_dstep_rebase`/`fs_dview`-as-`P_wf`,
+`LogInv.log_psi_*` and the parked `Ψ D₀ Dc` (with the nine suppliers' `log_psi_write_rebase` lines), `LogDefs.fs_dstep`/`fs_dstep_rebase`/`fs_dview`-as-`P_wf`,
 `RiscvPtsto.fdn_bmap/ist/nin` and `riscv_dview_name` (geometry equations
 become by-construction), `FsDurLedger`'s fold family (its entry
 constructors are era-side content — keep if consumed).
@@ -241,3 +258,9 @@ compiles".
 - The pure delta LEDGER with a fold over an updated durable body: closed
   (`FsDurLedger.dled_fold_body`) but needed cross-write "hands" and the
   geometry equations; superseded by snapshots, where nothing is updated.
+- A per-`log_write` accumulation of the bytes-match fact (`snap_bytes` as
+  the WAL's parked payload, re-proven by every writer): refuted
+  (`FsDurTrunc.v`) — `itrunc`'s window holds a record naming blocks whose
+  bits are clear, so no abstract state fits the logged bytes; every
+  mid-operation state is a LOCKED inode's, which is why the fact is
+  collected at quiescence (§4) and never carried.

@@ -38,7 +38,7 @@ carries the file system across eras and `Himg` is deleted (lane E).
   witness AT THE REAL INSTANCE (plan §7).
 - LOCAL REASONING (fs-state.md §0): no lemma above one inode states a
   pure fact about more than one inode, except the ONE sanctioned
-  used-set clause of `snap_bytes` (plan §4a).  "Geometry gunk" is
+  used-set clauses of `snap_bytes` (plan §4: read off the ∗ at commit, off the snapshot at boot).  "Geometry gunk" is
   tolerated only where the plan names it.
 - The traps in `durable-notes.md` (Typeclasses Opaque for big_sepL
   behind definitions; capacity classes must be `Require Import`ed;
@@ -80,7 +80,7 @@ carries the file system across eras and `Himg` is deleted (lane E).
   constructors — era-side content; its fold is superseded).
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
   `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
-  `snap_bytes`' used-set coupling — lane B's finding, plan §4a);
+  `snap_bytes`' used-set coupling — lane B's finding, plan §4, §8);
   `FsDurWire.v` is the rejected kinds tie (delete in lane C).
 - Image checks (14) `fs_region_bare` and (15) `fs_root_no_self` in
   `FsImg`/`FsImgCheck`, and (lane C-img) they are now the LAST two
@@ -137,56 +137,42 @@ reusable is on `main`.
   5. The commit-side consequence as a lemma: `γtx` empty ⊢ `dom LOCKED`
      has no `Some` entries ⊢ `snap_local` of the current state.
   6. Green; note the fractional-token footprint as landed.
-- [ ] **Lane B — the payload becomes the bytes-match fact (plan §4a).**
-  `Ψ D₀ Dc := ⌜∃ S, snap_bytes S Dc ∧ ⟨S's inodes = γtop_L's map; used set
-  = the bitmap invariant's; sb = the config's⟩⌝`; `SpecLogWrite`'s
-  payload premise becomes this pure step, discharged by each of the nine
-  suppliers from its splice fact (`snap_bytes_frame` + `snap_untouched_of_own`;
-  adoption via `snap_untouched_of_free` off the bitmap AU); the
-  `log_psi_*` laws die; `ProofInitlog` parks the boot payload off `P_dur`'s
-  own `snap_ok`.  Per-supplier: `bm` writes (balloc ×2, bfree), data
-  writes (bzero, bmap-indirect, writei ×2), record writes (ialloc,
-  iupdate, iput).
-
-  **REFUTED (`iris/FsDurTrunc.v`).**  The used-set coupling
-  (`snap_bytes`' `sk_own_used`/`sk_disj`) is NOT true mid-operation, so
-  there is no per-write accumulation of `snap_bytes` to have: `itrunc`
-  calls `bfree` up to 269 times and flushes the record ONCE, at its tail
-  `iupdate`, so throughout that window the logged bytes hold a record
-  naming blocks whose bitmap bit is clear — and `snap_bytes` reads its
-  state OFF those bytes (`sk_rec` pins the record, `inode_repr`'s
-  `inr_blk_dom` forces the slot, `sk_own_used` then demands the cleared
-  bit be set).  `FsDurTrunc.bfree_used_coupling_refuted` shows the payload
-  step at `ProofBfree`'s `log_write` has no witness at all;
-  `bfree_payload_step_false` states it at the premise's own shape.  The
-  same window kills `sk_disj` at the RECORD writers
-  (`record_write_disj_refuted`): the freed block is allocatable at once, so
-  a second inode's `iupdate` names it while `itrunc`'s stale record still
-  does.  Patching inside the payload is closed in four directions (the
-  file's header enumerates them); the exemption a repair needs is the
-  LOCKED registry, a ghost value a pure payload cannot name, and the
-  exempt set must SHRINK at `iunlock`, which does not hold the log lock.
-  So the coupling's home is a design decision above this lane.
-  Two further gaps, independent of the refutation and true of any repair:
-  a supplier cannot read `Dc` (universally quantified in the premise), so
-  the payload must PIN the superblock or the bitmap writer cannot tell the
-  bitmap block from a region block; and a supplier cannot NAME the payload
-  (`log_ctx` is the existential closure of `log_ctx_at`, so it only ever
-  holds an abstract `Ψ` and can move it through a LAW stating the concrete
-  fact) — three routes with prices in `FsDurTrunc.v`'s header (a)/(b)/(c).
-  A record writer additionally needs `⌜Dc !! (inodestart + i/16) = Some bsl⌝`
-  handed to it by `log_write` to run `rec_in_blk_inj`.  Nothing else of the
-  lane landed: `LogInv.log_psi_*` and the nine `log_psi_write_rebase` lines
-  stand.
-- [ ] **Lane C — `P_fs`'s durable slot and the commit (plan §3 commit).**
-  `P_fs`'s durable conjunct → `P_dur (fr_D r)` (arity-free); both commit
-  permits: fr_D advance + `dsnap_step_of` at `snap_ok S_L (lm_logged L)`
-  = lane B's payload ∧ lane A's item 5, with the allocator inside the
-  permit (a bupd); receipt gains the snapshot's state; `P_fs_alloc` via
-  `FsDurImg` at `snap_ok` for the image (coupling from W3/W4/W5,
-  `sk_links` from `img_link_valid`; the (14)/(15) premises through
-  `SystemAdequacy` off `FsImgCheck`); timelessness; DELETE the superseded
-  families (previous section) incl. `fdn_*`/`riscv_dview_name`.
+- [x] **Lane B — CLOSED BY REFUTATION** (`iris/FsDurTrunc.v`): the
+  per-write accumulation of `snap_bytes` as the WAL's payload has no
+  witness at `bfree`'s `log_write` (`itrunc`'s window) and `sk_disj` dies
+  at the record writers; plan §4 and §8 record the ruling that replaced
+  it (collection at quiescence).  Nothing else of the original item is
+  wanted; `LogInv.log_psi_*` and the nine `log_psi_write_rebase` lines are
+  deleted by lane C.
+- [ ] **Lane B′ — fraction-indexed inode bundles (plan §4, §6).**  The
+  bundle's byte elements (`FsStateEra.inode_owned_era` → `blk_owned` at
+  `fs_gamma_L`, today dfrac 1) become fraction-indexed; `ilock` without a
+  transaction withdraws ¼ and the escrow keeps ¾ plus the rest of the
+  bundle (`ic_out` becomes "out for reading at ¼" vs "out for writing");
+  a transactional `ilock` withdraws everything; `iunlock` returns the
+  matching share.  Readers (`readi`, `stati`, `dirlookup`) are proven at
+  ¼: measure the data-block accessor footprint first.  Green + audit.
+- [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
+  1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
+     entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
+     at a ghost step and ∗-ing every inode's bundle against the byte
+     authority of `fs_bytes_inv` yields `∃ S, snap_ok S L` with `S` the
+     `ftop_inv` authority's map; disjointness from the ∗ (full elements
+     for unlocked inodes; ¾ for read-locked ones once lane B′ lands —
+     until then every bundle is full or absent, and a read-locked inode
+     at commit is the ONE case the lemma cannot close: state it as the
+     premise "no inode is out for reading" and let B′ discharge it).
+  2. The law parked in `log_ctx` (persistent; pure-fact-producing; hands
+     the authority back), discharged once by the FS from item 1;
+     `end_op`'s commit path calls it at `outstanding = 0`; the parked
+     `Ψ`/`log_psi_*` and the nine `log_psi_write_rebase` lines are
+     deleted; `SpecLogWrite` loses its payload premise.
+  3. `P_fs`'s durable conjunct → `P_dur (fr_D r)` (arity-free; boot via
+     `FsDurImg.img_boot_P_fs_dur`); both commit permits: fr_D advance +
+     `dsnap_step_of` at the collected `snap_ok`, allocator inside the
+     permit (a bupd); receipt gains the snapshot's state; timelessness;
+     DELETE the superseded families incl. `fdn_*`/`riscv_dview_name`,
+     `FsDurWire.v`.
 
   **AS LANDED — THE IMAGE HALF ONLY (lane C-img).**  The image's tie is
   `FsDurImg.img_snap_ok`: `FsCfgBoot.fs_boot_image_wf dk ndisk sb nib cov`
