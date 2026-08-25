@@ -453,9 +453,10 @@ as their remaining consumers.
   and (ii) the five files that name `log_tx` (`SpecCreate`, `ProofCreate`,
   `ProofSysOpen`, `ProofSysUnlink`, `ProofSysLinkTails`).
 
-  ONE `ilock` SPEC: unchanged.  Its read arm is still blocked on the block
-  layer's fraction indexing (B′'s structural note) and its write arm on the
-  wall above, so `ilock` still withdraws the whole bundle and parks nothing.
+  ONE `ilock` SPEC: unchanged, and it stays that way — both arms landed as
+  GHOST STEPS on the deposit a holder already carries (B″-arm's `ic_arm_tx`,
+  B″-join's `ic_shed_rd`), which is what keeps `SpecIlock` and `SpecIunlock`
+  byte-stable across twenty caller files.
   **AS LANDED — THE BLOCK HALF (lane B″-blk).**  The block layer now
   carries a share, in the same shape lane B′ used one level up: `_q` twins
   beside unsuffixed names that DID NOT MOVE and are their `DfracOwn 1`
@@ -525,23 +526,10 @@ as their remaining consumers.
   `ProofDirlink`, `ProofKexecA`/`B2`/`B3`, `ProofSysUnlink`; three of them
   were passing `DfracOwn (1/4)` into the vestigial slot and now pass 1).
 
-  WHAT THE JOIN WITH THE ESCROW LANE NEEDS.  `ProofFileread` and
-  `ProofFilestat` still call `wp_ilock` at the FULL bundle and are
-  unchanged in that respect.  When B″-esc's read arm lands, `ilock`
-  without a transaction hands the holder `inode_meta`, `inode_addrs`, the
-  pure facts and `inode_bytes_era γfs (DfracOwn (1/4)) n` (the escrow
-  keeping `inode_owned_era_q γfs (DfracOwn (3/4))`, i.e. `dinode_at` — so
-  a read-locker still cannot move a record — plus the ¾ residue).
-  `fileread` then applies `FsStateEra.inode_bytes_era_to`, pairs the
-  result with `inode_addrs` to make `inode_map_q γfs ¼ ip bm`, and calls
-  `readi` at `dq := DfracOwn (1/4)`: one argument change and the two
-  crossing `iDestruct`s deleted.  `filestat` needs no change at all.
   LEFTOVER: the ALLOCATING bmap contracts (`wp_bmap_sconf_body`,
   `wp_bmap_gen_body`) still carry `dq` as a vestigial binder while the
   no-alloc one uses it as the fraction; `ProofReadi.rd_q` now feeds only
   bread/brelse's own vestigial slots.
-  layer's fraction indexing (B′'s structural note); its write arm is
-  B″-arm's, below.
 
   **AS LANDED — B″-arm: THE TWO WALLS ARE GONE, AND THE WRITE ARM IS ARMED.**
 
@@ -624,10 +612,118 @@ as their remaining consumers.
   `ProofIput`'s windows and `ipool_inv`/`ipool_body`/`ipool` gain `cn`, so it
   is its own increment.
 
-  REMAINS: that partition tie; the ABI sweep that arms the other
+  REMAINS: that partition tie, and the ABI sweep that arms the other
   transactional walks (`create` first — it is the arming walk, and its arm
-  and its write lock now coexist); and the read arm, still on lane B″-blk's
-  block-layer fraction indexing.
+  and its write lock now coexist).
+
+  **AS LANDED — B″-join: THE READ ARM, AND THE COVERAGE LEMMA OVER THE
+  FIFTY SLOTS.**
+
+  THE READ ARM IS `Xv6Cameras.DepRd` (LAST, after `DepTx`, so the ~66
+  `DepShr` sites in 23 files and every `destruct d` keep their shape), and
+  what distinguishes it is not the credential — `ic_dep_own` at `DepRd` is
+  `DepShr`'s verbatim — but what the escrow KEEPS beside it.
+  `IcacheEscrow.ic_rd_arm` is that residue: the five pure clauses, `dlinks`,
+  `inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n` and the two contents
+  holds, at an existential `(dn, bm, data)`.  `ic_rd_held` is what a
+  read-locker carries in its place: `inode_ok`, `inode_local`, the metadata
+  and addrs CELLS (fraction 1 — the design keeps in-memory cells there) and
+  `FsStateEra.inode_rd_era γfs (DfracOwn (1/4)) inum n`.  `ic_loaded_shed`
+  and `ic_rd_join` are the two directions; `ic_out` gained `γfs γi cov
+  logstart` and one LAST conjunct `ic_out_rd` (`ic_rd_arm` at `DepRd`, `emp`
+  everywhere else, `ic_out_rd_none` the equation), and NOTHING OUTSIDE
+  `IcacheEscrow.v` names `ic_out`, so that arity move cost one file.
+  `ic_swap_checkout` and `ic_close_out` keep their ABSTRACT descriptor and
+  gained the pure side condition `IcacheRef.ic_dep_rd d = false` (a checkout
+  hands the holder the WHOLE payload; `ProofIlock` pays `eq_refl`).
+
+  IT IS TWO GHOST STEPS, NOT A CONTRACT CHANGE — `IcacheEscrow.ic_shed_rd` /
+  `ic_unshed_rd` at `icEscN .@ k`, the full valid cell selecting OUT exactly
+  as `ic_open_out` does — for B″-arm's measured reason: bolting the arm onto
+  `SpecIlock.wp_ilock_sconf_body` moves that contract's arity (20 caller
+  files) and `SpecIunlock`'s with it.  Both contracts are BYTE-STABLE and
+  each read-locker converts on its own.
+
+  THE RE-IDENTIFICATION IS A QUARTER OF `top_frag`, AND THAT IS THE WHOLE
+  DIFFERENCE BETWEEN THE TWO ARMS.  A transaction's id is determined by
+  nothing the escrow holds (`IcacheTxRefute.tx_two_halves_no_whole`), so the
+  write arm had to write `(t, q)` into the descriptor; an inode's NODE is
+  determined — so `FsStateEra.inode_owned_era_q` takes the share on the
+  abstract fragment too (`FsState.top_frag_q`, with `top_frag` its `DfracOwn
+  1` reading, so no site that spells `top_frag` moved), the reader carries
+  `inode_rd_era` = byte legs ∗ fragment at ¼, and
+  `FsStateEra.inode_rd_era_agree` pins the arm's existential node to the
+  holder's.  `FsStateEra.era_node_pair_inj` turns that into the PAIR equal:
+  two `inode_ok` pairs with the same node ARE the same pair, `data` playing
+  no part (it is not determined, which is exactly why the join re-forms
+  `ic_loaded` at the ARM's `data`).  Two of the design's sentences become
+  resource facts: `dinode_at` never leaves the escrow, so a read-locker
+  cannot move a record; the fragment is short of a whole element, so it
+  cannot retag.  `inode_owned_era_shed` is restated over `inode_rd_era`, and
+  `inode_owned_era_shed_to` / `_of` are its two WAND readings.
+
+  THE TWO TRUE READ-LOCKERS ARE CONVERTED, and they are the arm's
+  non-vacuity witness.  `ProofFilestat`'s `ic_loaded_open` / `ic_mk_loaded`
+  pair is gone outright — `stati` reads only the metadata cells.
+  `ProofFileread` sheds around the offset borrow, turns the quarter into
+  `readi`'s `inode_map_q` / `inode_blocks_q` pair with the new
+  `FsStateEra.inode_rd_era_era_node_to` / `_of`, and calls
+  `SpecReadi.wp_readi_sconf` at `dq := DfracOwn (1/4)` — exactly B″-blk's
+  prediction: one argument change and the four crossing `iDestruct`s
+  deleted.  No contract moved.
+
+  THE COVERAGE LEMMA IS `IcacheEscrow.ic_escrow_body_cover` (and
+  `_cover_all`, the same under a `big_sepS` over a `gset nat` of slots).  At
+  an EMPTY `ln_tx` authority it classifies slot `k` EXHAUSTIVELY into
+  `ic_slot_cover`'s four alternatives — (a) the slot is not live; (b) live
+  but unloaded, and what the escrow holds IS an `ipool_shape_np` row, the
+  same shape `ipool_inv` hands out; (c) live and loaded, the bundle inside
+  at a share whose double is INVALID (1 unlocked, ¾ read-locked — the
+  premise `blk_owned_ne_full` / `blk_owned_ne_34` want, and the reason the
+  reader's share is a quarter and not a half); (d) the RESIDUE.  It moves no
+  resource — the authority comes straight back and each alternative carries
+  its own closing wand (`ic_lend`, whose frame is existential) — so the
+  commit can hold all fifty open at one ghost step.  The WRITE arm is not
+  among the four: a `DepTx` arm holds a positive share of an open
+  transaction's element and is refuted outright (`ic_dep_own_tx_no_ops`).
+  `ic_out_no_write_arm` gained `ic_out`'s four new arguments.
+
+  ALTERNATIVE (d) IS EXACTLY WHAT THE CALLER SWEEP STILL OWES, and nothing
+  else: a checked-out bundle at an `ic_dep_bundleless` descriptor (`DepShr`
+  — every transactional `ilock` not yet converted to `DepTx`; `DepRef` and
+  `DepFrz` — iput's two windows), iput's mid-free park
+  (`ic_payload_arm`'s frozen alternative) and iput's authority-side window
+  `ic_held`.  Lane C can take the collection as far as the sweep has got and
+  no further; the lemma names the gap rather than hiding it in a premise.
+
+  TWO PERFORMANCE FACTS, both instances of durable-notes rules and both
+  worth the scale they set.  (i) `inode_owned_era_q` / `inode_bytes_era` /
+  `inode_rd_era` are `Global Typeclasses Opaque`: each is a `∗` over a
+  `big_sepM` of block runs beside an `ind_owned_q` whose body is a `decide`
+  no resolution can reduce, and UNSEALED, one `apply _` for `ic_rd_arm`'s
+  `Timeless` instance ran **nineteen minutes** with no error and no output —
+  it reads as a hung build, and `rocq compile -time` streamed to a file is
+  what names the sentence.  The read arm's own `ic_rd_arm` / `ic_rd_held` /
+  `ic_out_rd` are sealed inside the section too, with `tl_struct` moved
+  above them.  (ii) `inode_owned_era_shed` is an `⊣⊢`, and `rewrite`ing it
+  inside a proof that carries the payload rewrites the whole proofmode goal,
+  environments included; use the wand readings.  The same proofs spell every
+  re-pack of `ic_escrow_body` as `iSplitL`-by-name plus `iExact`, never a
+  bare `iFrame` — the body is the goal's last conjunct and a framing search
+  walks it first.
+
+  REMAINS.  (1) THE ABI SWEEP that arms the other transactional walks: ~56
+  `ic_deposit … (DepShr …)` conjuncts in the walk-stage statements of 15
+  files become `DepTx … t q` (two extra binders per stage lemma), and the
+  `log_tx γ` those stages carry across the locked window becomes the residue
+  half `t ↪[ln_tx icfg_log]{#(1/2)} tt` (5 files name `log_tx`).
+  `sys_chdir` is the worked instance and costs three ghost steps wherever
+  `ilock` and `iunlock` sit in one proof block; `create` is next.  Until it
+  is done, alternative (d) is inhabited and `snap_ok` cannot be collected.
+  (2) THE PARTITION TIE (`region_inums nib = O ∪ {inum_k | slot k live}`, a
+  quarter of `ic_id` in `ipool_body`, `ipool_inv`/`ipool_body`/`ipool`
+  gaining `cn`) — untouched here; it reaches into `ProofIget`'s recycle and
+  `ProofIput`'s two evictions and is its own increment.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
