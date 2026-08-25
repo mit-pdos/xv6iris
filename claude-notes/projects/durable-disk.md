@@ -1110,6 +1110,105 @@ as their remaining consumers.
   and `magic` outright, and `cg_nin` comes for free because
   `sb_ninodes sb / 16 = sb_bmapstart sb - sb_inodestart sb - 1`.  Those two
   field ties are the whole of what a `log_ctx`-only holder lacks.
+
+  **AS LANDED — C-3b: SUPPLIER (A), AND THE PARTITION HAS THREE PARTS.**
+
+  The pool's own invariant now CARRIES the partition.  `IcacheEscrow`'s
+  `ipool_body` gains `cn` and `nib` and holds
+  `⌜region_inums nib = O ∪ X ∪ ic_live_inums ids⌝` beside a QUARTER of every
+  slot's `ic_id` (`ic_ids cn ids`, `length ids = NINODE`); `islot2`'s and
+  `islot_empty`'s share drops from a half to a quarter to pay for it, and the
+  escrow arm's half is untouched, so the five arms and `ic_escrow_body_ident`
+  are byte-stable.  `ipool_inv` gains `cn`/`nib` (`is_itable2` already carried
+  both, so its arity does not move); `ipool` gains a TRANSIT set `T`, `∅` in
+  `itable_res2`.
+
+  IT IS A THREE-WAY PARTITION AND NOT B″-join's TWO-WAY ONE, and that is the
+  finding.  "`O` together with the live slots' identities exhausts
+  `region_inums nib`" is FALSE in this kernel, for one reason with two faces
+  — an inum a WALK is carrying.  (i) iput's free path deposits an AWAIT row
+  (`ipool_ext`), which cannot live in an invariant at all (`escA_inv` is an
+  `inv`; that is B″-esc's own reason for splitting the pool), so it sits under
+  the itable lock in `ipool`'s `P ∖ O` for as long as it stands — and it holds
+  NO `inode_owned_era`, so no partition could have handed the commit a bundle
+  for it anyway.  (ii) an eviction's identity flip and its deposit are two
+  ghost steps: the deposited bundle's three ledger columns (`icnt_half` at 0,
+  the mirror, `ifreeze_off`) do not exist until the refcount store has fired,
+  so the evicted inum is in neither part in between.  Both go into one third
+  part `X`, PINNED and not free: a new ambient gname `icfg_pext` whose other
+  half is a conjunct of `ipool` at `(P ∖ O) ∪ T`, so only a lock holder can
+  grow `X` and the row cannot go vacuous by taking `X` to be the region.  At
+  boot `X = ∅` and the partition IS the two-way one (`ipool_alloc_inv`).  What
+  it leaves the collection is ONE residue, the pool-side twin of
+  `ic_escrow_body_cover`'s alternative (d): an inum in `X` has no bundle
+  anywhere.  It is refutable at a commit for (d)'s reason — a walk inside
+  iput's free window holds an open transaction's token and the commit runs at
+  `outstanding = 0` — so closing it is (d)'s ABI sweep and belongs with it.
+
+  THE MOVERS ARE ACCESSORS, NOT PLAIN FUPDS, and that is what forced C-3b's
+  first commit: the pool's quarter has to be in the caller's hand at the same
+  ghost step as the escrow arm's half, because the flip needs the whole cell
+  and the partition moves with it.  Each lends a HALF (its quarter joined to
+  the table's), so `ic_open_empty_free` and the `ic_close_to_empty` family are
+  called UNCHANGED.  `ipool_take_lend` — iget's recycle: hands the row out,
+  takes the inum out of `O` or out of `X`, lends the quarter, and its wand
+  records the new identity.  `ipool_evict_lend` — iput's two evictions: flips
+  live → dead and puts the inum into `X`.  `ipool_id_lend` — iget's `+0x6e`
+  dev re-tag, where the slot is dead on both sides so only the recorded words
+  move.  `ipool_put` — out of `X` into `O`, or left in `X` when the row is a
+  pending/await arm; it needs no identity at all.  The `+0x6e` PEEK re-tagged
+  nothing even before, so it now runs at the table's quarter alone
+  (`ic_open_empty_dev_peek`), and `ic_open_held` takes the table's share at a
+  fraction parameter `qid` (it only READS it).
+
+  THE TWO ACCESSOR LEMMAS THE COLLECTION CALLS.  `ipool_inv_acc` (restated:
+  hands out `O`, `X`, `ids`, the row and the fifty quarters, read-only), with
+  its pure reading `ipool_cover_inum`; and `ic_ids_pin` — the identity the
+  partition records for slot `k` IS the escrow arm's, one cell and two shares.
+  Exercised at the real shape by `ipool_partition_cached`: an inum that is
+  neither an ordinary row nor in transit is CACHED, and this names the slot,
+  reads the escrow's own identity half off the open body and pins it to that
+  inum — which is exactly what `ic_escrow_body_cover`'s four alternatives are
+  stated at.  Two set moves `set_solver` will not do (they need the decidable
+  split on `y = z`) are `gset_move_out`/`gset_move_mid`.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `IcacheRef.icfg` gains `icfg_pext` and
+  `icfg_alloc` a conjunct; `IcacheBoot.icache_boot_at`/`icache_boot` gain the
+  premise `ghost_var icfg_pext 1 ∅` and allocate the pool invariant AFTER the
+  escrow loop (the quarters do not exist until that loop re-tags the fifty
+  identities at the values the entry cells hold);
+  `FsCfgBoot.fs_kit_icache`/`_open`/`_rest`/`_rest_open` gain the same
+  conjunct.  `IcacheEscrow.ipool_alloc_inv`, `ipool_inv_acc`, `ipool_put`,
+  `ic_open_held` and `is_itable2_pool` changed shape; `ipool_take` is gone,
+  replaced by `ipool_take_lend`.  UNTOUCHED: the escrow's five arms,
+  `ic_escrow_body_cover`/`ic_slot_cover`, `is_itable2`'s and `itable_res2`'s
+  arity, and every consumer of `ipool` outside `ProofIget`, `ProofIput` and
+  `ProofIdup` (which only passes it through).
+
+  (D) IS NOT DONE, AND HERE IS WHAT IT COSTS.  Measured, not attempted: the
+  notes' cheapest fix (a HALF of `top_frag_q` parked region-side in
+  `ireg_slot`'s free arm under `⌜fn_rec n = d⌝`) does not survive
+  `ireg_claim_au`, which moves the record type-0 → `fresh_shape` and cannot
+  retag a half.  Two shapes do: (a) GUARD the pin by `⌜di_type d = 0⌝`, so the
+  claim's obligation goes vacuous and no resource moves there — but the half
+  must then leave at `ireg_withdraw` (the ONE exit from the `ireg_in` arm: it
+  requires `di_type ≠ 0`, so a free record's fragment only ever leaves through
+  a claim box), which grows an output; or (b) park the WHOLE `top_frag`
+  region-side and delete the marker arm's, in which case `ireg_claim_au`
+  retags it itself (`ireg_inv` already bundles `ftop_inv`; the cost is one
+  `↑ftopN ⊆ E` premise and its single caller is `ProofIalloc`), `ireg_withdraw`
+  hands it to the filler, and the free flush deposits it.  Either way the
+  footprint is `ireg_slot`'s free sub-arm plus `ireg_slot_intro` (33 call
+  sites: `InodeRegion` 16, `IcacheInv` 5, `IgetLic` 3, `IregDirBit` 3,
+  `IregLinkNz` 3, `IcacheBoot` 2, `EscrowDeposit` 1), `ireg_withdraw`, the
+  free flush and boot.  AND THE TIE MUST GIVE MORE THAN `sk_rec`/`sk_links`:
+  `col_hand` asks for a `col_bundle` at EVERY inum of `I`, so a free inum
+  needs a whole `inode_owned_era_q` — the region's `z ↪[γi] d` IS its
+  `dinode_at` and the marker arm's fragment is its `top_frag_q`, but the block
+  and indirect legs are `emp` only if the record is BARE, so the pinned node
+  has to be `free_node d = MkNode d (replicate FS_NINDIRECT (bv_0 32)) ∅` with
+  `inode_local z (free_node d)` (which is exactly what forces bareness).
+
 - [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
   `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
   prove `mknod_durable` off the snapshot; quote it here.  Then the
