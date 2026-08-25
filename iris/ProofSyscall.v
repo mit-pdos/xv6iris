@@ -649,8 +649,7 @@ Section SyscallVocab.
         precondition is the SAME precondition, spelled where the pages
         actually live. *)
      disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -816,10 +815,9 @@ Section SyscallVocab.
     gen_cert ∗
     dev_inv (fcn_uart fn) (fcn_disk fn) ∗
     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-    is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-      (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+    is_lock (fcn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
     is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
+      <{ kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
     kalloc_avail (fcn_kalloc fn) None ∗
     (* [sysc_ic_env fn] USED TO BE HERE, between the allocator and
        [ireg_open].  It is [sysc_ic_env_of_ready] now: the icache rows are a
@@ -952,9 +950,9 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) : iProp Σ :=
     (∃ (γp γw γft γtk : gname),
-       is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
+       is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
        procs_avail None ∗
-       is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
+       is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
        is_ftable γft γf ∗
        is_tickslock γtk)%I.
 
@@ -1036,7 +1034,7 @@ Section SyscallVocab.
     fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
     fcn_dq fn = DfracOwn (1/4) ->
     sysc_park_extra γtk -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     is_ftable γft γf -∗
     procs_inv (fcn_procs fn) -∗
     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -1123,9 +1121,9 @@ Section SyscallVocab.
     ∃ (γa γp γw γft γtk γpr : gname)
       (γud : uart_names) (γvd : disk_names),
       kalloc_env γa None ∗
-      is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
+      is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
       procs_avail None ∗
-      is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
+      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
       is_ftable γft γf ∗
       is_tickslock γtk ∗
       printk_env γpr γud γvd ∗

@@ -113,7 +113,7 @@ Section SpecMainSecondary.
           closes over ([SpecDevintr.devintr_caps]) and which no hart can make
           for itself: both halves are locks over static globals. *)
        console_caps γd ∗
-       is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+       is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□

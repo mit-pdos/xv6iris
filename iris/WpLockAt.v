@@ -26,10 +26,13 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Export WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Local Open Scope Z_scope.
 
 Section LockAt.
   Context `{!riscvGS Σ, !lockG Σ}.
+  (* the creator deposits the payload at its own context; see WpLock.v *)
+  Context `{XI : CurCtx}.
 
   (* the free arm's ghost pair.  GHOST-ONLY on purpose (SleepLock's
      [sl_free_tok] makes the same choice and says why): a client that mints
@@ -57,14 +60,15 @@ Section LockAt.
   (* [WpLock.newlock] with its [own_alloc] taken out: a free physical lock
      (word 0, cpu word 0), its name, its resource and the pre-minted ghost
      pair become THE lock at the gname the caller already published. *)
-  Lemma newlock_at E (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma newlock_at E (γ : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) :
     lock_free_tok γ -∗
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-    R ={E}=∗ is_lock γ lk s R.
+    R cur_ctx ={E}=∗ is_lock γ lk s R.
   Proof.
     iIntros "[Ha Hf] #Hnm Hword Hcpu HR".
+    iAssert (∃ ξ : CtxId, R ξ)%I with "[HR]" as "HR"; first by iExists cur_ctx.
     iMod (inv_alloc lockN E (lock_inv γ lk s R)
             with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. iExists (mword_of_int 0 : mword 32), None.

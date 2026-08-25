@@ -501,7 +501,7 @@ Section ProofClockintr.
         rewrite /B1 upd_ne; [| vm_compute; discriminate].
         rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Hmosp. }
       (* ===================== acquire(&tickslock) ===================== *)
-      iApply (Acquire.wp_acquire_sconf KT1 γl "time"%string ticks_res B2
+      iApply (Acquire.wp_acquire_sconf KT1 γl "time"%string <{ ticks_res }> B2
                 n eb p (av - 2)%nat false lks
                 ltac:(lia)
                 ltac:(lia)
@@ -510,7 +510,7 @@ Section ProofClockintr.
       all: try lkbelow.
       { iEval (rewrite HB2a0). iExact "Hlkl". }
       iApply wp_next_off_intro.
-      iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
+      iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
       assert (Hpc34 : ret_pc (B2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.clockintr + 0x34))
         by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc34) in "Hpc".
@@ -722,7 +722,7 @@ Section ProofClockintr.
                       = (trap_res (match n with O => eb | S _ => false end)
                          + (av - 2))%nat) by (rewrite Hout; reflexivity).
       iEval (rewrite Hridx) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl a_tickslock "time"%string ticks_res E2
+      iApply (Release.wp_release_sconf KT1 γl a_tickslock "time"%string <{ ticks_res }> E2
                 n eb p (av - 2)%nat
                 ({["time"]} ∪ lks)
                 ltac:(rewrite HE2a0; apply addv_sext0)

@@ -177,7 +177,7 @@ Section ProofKalloc.
        acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string (kmem_res γk fl) mA
+    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string <{ kmem_res γk fl }> mA
               n eb p (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
@@ -185,7 +185,7 @@ Section ProofKalloc.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc16 : ret_pc (mA !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x16)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc16) in "Hpc".
@@ -291,7 +291,7 @@ Section ProofKalloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
-      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
+      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string <{ kmem_res γk fl }> E3
                 n eb p (K - 4)%nat ({["kmem"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -585,7 +585,7 @@ Section ProofKalloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
-      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
+      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string <{ kmem_res γk fl }> R12
                 n eb p (K - 4)%nat ({["kmem"]} ∪ lks)
                 ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)

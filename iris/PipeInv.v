@@ -32,6 +32,7 @@ Require Import PageFields.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export PipeInvDefs.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
@@ -266,7 +267,7 @@ Section PipeInv.
      Note the data buffer is NOT zeroed by pipealloc -- [bs] is whatever kalloc
      handed over -- which is exactly right: no byte of it is readable until
      nwrite has passed it. *)
-  Lemma new_pipe E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
+  Lemma new_pipe `{XI : CurCtx} E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
     page_valid pi ->
     length bs = PIPESIZE ->
     lock_name_field pi ↦₈ vname -∗
@@ -285,7 +286,7 @@ Section PipeInv.
     (* the lock's state gname FIRST: [pipe_dead] mentions it. *)
     iMod (newlock_d E pi with "Hword Hcpu") as (γl) "Hmake".
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
-    iMod ("Hmake" $! (pipe_res γp pi) (pipe_dead γl γp)
+    iMod ("Hmake" $! (<{ pipe_res γp pi }>) (pipe_dead γl γp)
             with "[Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk".
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
               (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.

@@ -92,6 +92,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Local Open Scope Z_scope.
 
 Section SleepLock.
@@ -428,7 +429,7 @@ Section SleepLock.
   Definition is_sleeplock_gen (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) : iProp Σ :=
     (sl_name slk s ∗
-     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H))%I.
+     is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>)%I.
 
   Definition is_sleeplock (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) : iProp Σ :=
@@ -456,11 +457,11 @@ Section SleepLock.
   Proof. iIntros "[$ _]". Qed.
   Lemma is_sleeplock_gen_lock γl γ slk s R H :
     is_sleeplock_gen γl γ slk s R H -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H).
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>.
   Proof. iIntros "[_ $]". Qed.
   Lemma is_sleeplock_gen_intro γl γ slk s R H :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H) -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }> -∗
     is_sleeplock_gen γl γ slk s R H.
   Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
 
@@ -469,11 +470,11 @@ Section SleepLock.
   Proof. apply is_sleeplock_gen_name. Qed.
   Lemma is_sleeplock_lock γl γ slk s R :
     is_sleeplock γl γ slk s R -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R).
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }>.
   Proof. apply is_sleeplock_gen_lock. Qed.
   Lemma is_sleeplock_intro γl γ slk s R :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R) -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }> -∗
     is_sleeplock γl γ slk s R.
   Proof. apply is_sleeplock_gen_intro. Qed.
 
@@ -587,7 +588,7 @@ Section SleepLock.
     iModIntro. iExists γ. iFrame "Hauth". iExists 1%Qp. iFrame.
   Qed.
 
-  Lemma new_sleeplock_gen_at E (γ : gname) (slk : mword 64) (s : string)
+  Lemma new_sleeplock_gen_at `{XI : CurCtx} E (γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_tok γ -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
@@ -600,14 +601,14 @@ Section SleepLock.
   Proof.
     iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H)
+    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>
             with "Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as (γl) "#Hlk".
     { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iModIntro. iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
-  Lemma new_sleeplock_gen E (slk : mword 64) (s : string) (R : iProp Σ)
+  Lemma new_sleeplock_gen `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
@@ -624,7 +625,7 @@ Section SleepLock.
     { rewrite -!pair_op !left_id !right_id. apply pair_valid.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R (H γ))
+    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R (H γ) }>
             with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
     { iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
@@ -632,7 +633,7 @@ Section SleepLock.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
-  Lemma new_sleeplock E (slk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma new_sleeplock `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -680,7 +681,7 @@ Section SleepLock.
   (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
      word of the inner spinlock goes INTO [lock_inv] (WpLock.v owns both lock
      words). *)
-  Lemma sl_fresh_new_gen E (slk : mword 64) (s : string) (R : iProp Σ)
+  Lemma sl_fresh_new_gen `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗
     ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
@@ -689,7 +690,7 @@ Section SleepLock.
     iApply (new_sleeplock_gen E slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
   Qed.
 
-  Lemma sl_fresh_new E (slk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma sl_fresh_new `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
     iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
@@ -699,7 +700,7 @@ Section SleepLock.
   (* [sl_fresh_new_gen] at a PRE-ALLOCATED gname -- what an array
      initializer (iinit over itable.inode[]) uses when the gnames had to be
      fixed before the locks were built.  See [new_sleeplock_gen_at]. *)
-  Lemma sl_fresh_new_gen_at E (γ : gname) (slk : mword 64) (s : string)
+  Lemma sl_fresh_new_gen_at `{XI : CurCtx} E (γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_tok γ -∗ sl_fresh slk s -∗ R ={E}=∗
     ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
@@ -712,7 +713,7 @@ Section SleepLock.
   (* the TRACKED end: the caller keeps the authoritative zero and hands out
      shares from it.  [slh_auth γ None] in hand is exactly the evidence the
      non-blocking acquiresleep asks for. *)
-  Lemma sl_fresh_new_tok E (slk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma sl_fresh_new_tok `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗
     ∃ γl γ : gname, is_sleeplock_tok γl γ slk s R ∗ slh_auth γ None.
   Proof. iIntros "Hf HR". iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf HR"). Qed.

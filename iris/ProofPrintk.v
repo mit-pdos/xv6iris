@@ -682,7 +682,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x254) : mword 64) -∗
     pk_frame sp0 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s2_idx) -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     R -∗
@@ -751,7 +751,7 @@ Section ProofPrintk.
       rewrite /L1 upd_ne; [exact Hsp | reg_neq]. }
     iEval (rewrite HAV) in "Hcg". iEval (rewrite -Houtb) in "Hcg".
     (* ===================== release(&pr.lock) ===================== *)
-    iApply (Release.wp_release_sconf kt γpr pk_pr_lock "pr"%string (emp : iProp Σ) L3
+    iApply (Release.wp_release_sconf kt γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> L3
               n eb pcur (K - 24)%nat lks
               ltac:(rewrite HL3a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hlk Hlkd [] Hcnt Hpay").
@@ -957,7 +957,7 @@ Section ProofPrintk.
     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx s2_idx) -∗
     pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) -∗
     pk_slots_rest sp0 -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     R -∗
@@ -1037,7 +1037,7 @@ Section ProofPrintk.
     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx s2_idx) -∗
     pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) -∗
     pk_slots_rest sp0 -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     R -∗
@@ -1175,7 +1175,7 @@ Section ProofPrintk.
     sie_cap_gpr kt mp K false pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x2a) : mword 64) -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     fmt ↦ₛ{ dqf } f -∗
@@ -1220,7 +1220,7 @@ Section ProofPrintk.
               mq !!! Regidx c = m !!! Regidx c) ⌝ -∗
       sie_cap_gpr kt mq K false pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x7a) : mword 64) -∗
-      is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+      is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr h n eb pcur -∗
       cpu_own (S n) eb pcur false lks -∗
       fmt ↦ₛ{ dqf } f -∗
@@ -7731,7 +7731,7 @@ Section ProofPrintk.
       fmtv ↦ₛ{ dqf } f -∗
       ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
       cpu_own (S n) eb pcur false lks -∗
-      is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+      is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr hh n eb pcur -∗
       dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
       pk_loop_frame k -∗
@@ -8046,7 +8046,7 @@ Section ProofPrintk.
       fmtv ↦ₛ{ dqf } f -∗
       ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
       cpu_own (S n) eb pcur false lks -∗
-      is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+      is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr hh n eb pcur -∗
       dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
       pk_loop_frame k -∗
@@ -8205,12 +8205,12 @@ Section ProofPrintk.
       rewrite /A1 upd_ne; [reflexivity | reg_neq]. }
     iDestruct (cpu_own_transport CIDpro CIDa3 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_retarget CID CIDa3 b p _ ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (Acquire.wp_acquire_sconf kt (CID := CIDa3) γpr "pr"%string (emp : iProp Σ) A3
+    iApply (Acquire.wp_acquire_sconf kt (CID := CIDa3) γpr "pr"%string <{ emp : iProp Σ }> A3
               n eb p (K - 24)%nat b lks ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA3a0). iExact "Hlk". }
-    iIntros (CIDacq Hstacq ms mfin) "%Hms Hcg Hpc %HcsA Hlkd Hemp Hcnt Hpay".
+    iIntros (CIDacq Hstacq ms mfin) "%Hms Hcg Hpc %HcsA Hlkd Hemp _ Hcnt Hpay".
     assert (Hretacq : ret_pc (A3 !!! Regidx ra_idx) = mword_of_int (KernelSyms.printk + 0x2a))
       by (rewrite HA3ra; unfold ret_pc; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hretacq) in "Hpc".

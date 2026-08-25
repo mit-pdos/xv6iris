@@ -253,13 +253,12 @@ Section ProofSleepPrepare.
     (* ===================== acquire(&p->lock) ===================== *)
     iDestruct (cpu_own_transport CID9 CID11 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B2 n eb pj (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> B2 n eb pj (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB2a0). iExact "Hislock". }
-    iIntros (CIDacq Hsacq ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
+    iIntros (CIDacq Hsacq ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hp18 : ret_pc (B2 !!! Regidx spr_ra) = mword_of_int (KernelSyms.sleep_prepare + 0x18))
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
@@ -338,8 +337,7 @@ Section ProofSleepPrepare.
     { iApply (proc_lock_res_intro γs γl (proc_addr j) st chv with "Hstate Hpg Hchcell Hpub Hslot"). }
     (* ===================== release(&p->lock) ===================== *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C2 n eb pj (av - 4)%nat
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> C2 n eb pj (av - 4)%nat
               ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").

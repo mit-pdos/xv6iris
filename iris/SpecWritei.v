@@ -690,7 +690,7 @@ Definition wp_writei_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -964,7 +964,7 @@ Definition wp_writei_gen_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗

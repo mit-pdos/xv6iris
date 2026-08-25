@@ -307,7 +307,7 @@ Section ProofVirtioDiskRwB.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
  procs_inv γs -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     locked γk cpu_id -∗
     disk_res γd pd pav pu -∗
     vdrw_scratch (KTR := KT1) sp0 -∗
@@ -714,8 +714,7 @@ Section ProofVirtioDiskRwB.
         iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm")
           as "[Hpay [Hextc Hextm]]".
         (* ==================== release(&disk.vdisk_lock) ==================== *)
-        iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
-                  (disk_res γd pd pav pu) C3 0%nat eb (proc_addr j) (K - 12)%nat
+        iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> C3 0%nat eb (proc_addr j) (K - 12)%nat
                   ({["virtio_disk"]} ∪ lks)
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
@@ -841,13 +840,12 @@ Section ProofVirtioDiskRwB.
         (* ==================== acquire(&disk.vdisk_lock) ==================== *)
         iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
-                  (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
+        iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                   vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
-        iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR Hown Hpay". rgall.
+        iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
         assert (Hr0bc : ret_pc (D3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc))
           by (rewrite HD3ra; apply bv_eq; vm_compute; reflexivity).

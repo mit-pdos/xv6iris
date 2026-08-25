@@ -738,7 +738,7 @@ Section ProofSched.
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf KT1 γl (proc_addr j) "proc"
-              (proc_lock_res γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
+              <{ proc_lock_res γs γl (proc_addr j) }> False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked").
     { iApply (is_lock_openable with "Hislock"). }

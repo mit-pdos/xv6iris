@@ -157,6 +157,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
@@ -3503,8 +3504,7 @@ Section IcacheEscrow.
   Definition is_itable2 (γl : gname) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string
-      (itable_res2 cn γfs γi cov logstart nib dv).
+    is_lock γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dv }>.
 
   Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib dv :
     Persistent (is_itable2 γl cn γfs γi cov logstart nib dv).

@@ -283,13 +283,12 @@ Section ProofKkill.
       (* ---- acquire(&p->lock) ---- *)
       iDestruct (cpu_own_transport CIDk CIDb lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDb) γk "proc"%string
-                (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme av b lks
+      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDb) γk "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> M22 lvl eb pme av b lks
                 ltac:(lia) ltac:(lia) Hno
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM22a0). iExact "Hlockk". }
-      iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
+      iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
       assert (Hpc26 : ret_pc (M22 !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x26))
         by (rewrite HM22ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc26) in "Hpc".
@@ -421,8 +420,7 @@ Section ProofKkill.
              brings the release's [match lvl]-phrased continuation back to [b],
              which is what the code after the call is written against. *)
           iEval (rewrite Hbmatch) in "Hcg".
-          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string
-                    (proc_lock_res γs γk (proc_addr k)) Mr4c lvl eb pme av
+          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> Mr4c lvl eb pme av
                     ({["proc"]} ∪ lks)
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
@@ -710,8 +708,7 @@ Section ProofKkill.
         (* Nested release: same [b] vs [match lvl] reserve-spelling step as the
            +0x4c site above -- see the comment there. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string
-                  (proc_lock_res γs γk (proc_addr k)) M2e lvl eb pme av
+        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> M2e lvl eb pme av
                   ({["proc"]} ∪ lks)
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").

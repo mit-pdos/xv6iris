@@ -277,7 +277,7 @@ Definition wp_allocproc_sconf_body
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
   kalloc_env_at γa γk on -∗
   (* the proc table's regime, threaded exactly as [kalloc_env] is *)
   procs_avail op -∗
@@ -312,7 +312,7 @@ Definition wp_allocproc_core_body
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
   kalloc_env_at γa γk on -∗
   (* the proc table's regime, threaded exactly as [kalloc_env] is *)
   procs_avail op -∗

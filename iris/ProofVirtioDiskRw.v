@@ -138,7 +138,7 @@ Section ProofVirtioDiskRw.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x000) : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     b_blockno bp ↦₄{DfracOwn (1/2)} bno -∗
     wp_next (CID0 := CID) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
@@ -539,13 +539,12 @@ Section ProofVirtioDiskRw.
       by (rewrite /R11; apply upd_eq).
     iDestruct (cpu_own_transport CID CIDp21 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
-              (disk_res γd pd pav pu) R11 0%nat eb pj (K - 12)%nat eb lks
+    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> R11 0%nat eb pj (K - 12)%nat eb lks
               vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hfresh
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".
+    iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR _ Hown Hpay".
     (* THE COMPLEMENT RIDES ALONG, UNTOUCHED, THROUGH THE WHOLE PROLOGUE --
        transport it to the acquire-return hart in ONE step, using exactly the
        chain of per-instruction guards [cpu_own_transport] above already

@@ -512,7 +512,7 @@ Section SpecMain.
          printk_env γpr γd γv -∗
          procs_inv γs -∗
          console_caps γd -∗
-         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+         is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗
          (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
@@ -532,7 +532,7 @@ Section SpecMain.
        main spends the [nextpid] half immediately: it is the whole of
        [SpecAllocpid.nextpid_res], so the [newlock] on procinit's
        [lk_fresh pid_lock_addr "nextpid"] turns the pair into the
-       [is_lock γp alp_pid_lock "nextpid" nextpid_res] that allocproc -- and
+       [is_lock γp alp_pid_lock "nextpid" <{ nextpid_res }>] that allocproc -- and
        hence kfork, sys_fork and userinit -- takes.  `first` is forkret's;
        main carries it and drops it. *)
     (* PINNED, not existential: forkret's branch is decided by this cell,

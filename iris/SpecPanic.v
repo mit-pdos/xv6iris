@@ -101,7 +101,7 @@ Section PanicEnv.
      hypothesis.  All hart-free, so this crosses a migration untouched. *)
   Definition panic_env_at (γpr γl : gname) (γd : uart_names) (γv : disk_names)
     : iProp Σ :=
-    (is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) ∗
+    (is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> ∗
      dev_inv γd γv ∗
      is_txlock γl γd)%I.
 
@@ -150,7 +150,7 @@ Section PanicEnv.
 
   (* the shape a site actually has in hand: the three credentials loose. *)
   Lemma panic_env_of γpr γl γd γv :
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ panic_env.
   Proof.
     iIntros "#Hl #Hd #Ht". iExists γpr, γl, γd, γv.

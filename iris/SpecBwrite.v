@@ -109,7 +109,7 @@ Definition wp_bwrite_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* the held buffer, payload aside (its interior disk fragment included) *)
   bio_hold0 bn V k pidv dev bno bs bsd -∗
   (* THE CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3): bwrite

@@ -855,13 +855,12 @@ Section ProofAllocproc.
         exact (Hkrest r Hr Ncsp N8 N9 N18). }
       iDestruct (cpu_own_transport CIDk CIDl2 lvl eb pme b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDl2) γl "proc"%string
-                (proc_lock_res γs γl (proc_addr k)) L2 lvl eb pme (K - 4)%nat b lks
+      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDl2) γl "proc"%string <{ proc_lock_res γs γl (proc_addr k) }> L2 lvl eb pme (K - 4)%nat b lks
                 (ap_lvl1 lvl Hlvl) ltac:(pose proof (ap_K10 K HK); lia) Hbelow
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
       { iEval (rewrite HL2a0). iExact "Hislock". }
-      iIntros (CIDf Hsf ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".
+      iIntros (CIDf Hsf ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR _ Hcpu Hpay".
       assert (Hp22 : ret_pc (L2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x22))
         by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22) in "Hpc".
@@ -1308,8 +1307,7 @@ Section ProofAllocproc.
             apply kv_addv_zero. }
           (* [b] IS [outb] ([cpu_own] forces it); pure re-spelling for release. *)
           iEval (rewrite Hbmatch) in "Hcg".
-          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γl (proc_addr k) "proc"%string
-                    (proc_lock_res γs γl (proc_addr k)) T4 lvl eb pme (K - 4)%nat
+          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γl (proc_addr k) "proc"%string <{ proc_lock_res γs γl (proc_addr k) }> T4 lvl eb pme (K - 4)%nat
                     ({["proc"]} ∪ lks)
                     Hlka1 ltac:(pose proof (ap_K10 K HK); lia)
                     with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1681,8 +1679,7 @@ Section ProofAllocproc.
             apply kv_addv_zero. }
           (* [b] IS [outb] ([cpu_own] forces it); pure re-spelling for release. *)
           iEval (rewrite Hbmatch) in "Hcg".
-          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γl (proc_addr k) "proc"%string
-                    (proc_lock_res γs γl (proc_addr k)) U4 lvl eb pme (K - 4)%nat
+          iApply (Release.wp_release_sconf KT1 (CID := CIDf) γl (proc_addr k) "proc"%string <{ proc_lock_res γs γl (proc_addr k) }> U4 lvl eb pme (K - 4)%nat
                     ({["proc"]} ∪ lks)
                     Hlka2 ltac:(pose proof (ap_K10 K HK); lia)
                     with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -2149,8 +2146,7 @@ Section ProofAllocproc.
           apply kv_addv_zero. }
         (* [b] IS [outb] ([cpu_own] forces it); pure re-spelling for release. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γl (proc_addr k) "proc"%string
-                  (proc_lock_res γs γl (proc_addr k)) R2 lvl eb pme (K - 4)%nat
+        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γl (proc_addr k) "proc"%string <{ proc_lock_res γs γl (proc_addr k) }> R2 lvl eb pme (K - 4)%nat
                   ({["proc"]} ∪ lks)
                   Hlka ltac:(pose proof (ap_K10 K HK); lia)
                   with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").

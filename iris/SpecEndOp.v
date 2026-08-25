@@ -163,7 +163,7 @@ Definition wp_end_op_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* THE operation being closed, at whatever budget it has left *)
   log_op γ u -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP

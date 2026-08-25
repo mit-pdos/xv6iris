@@ -484,7 +484,7 @@ Section ProofKfree.
        CID22..CID25), so acquire wants it at CID25. *)
     iDestruct (cpu_own_transport CID CID25 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string (kmem_res γk fl) Kacq
+    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string <{ kmem_res γk fl }> Kacq
               n eb pcur (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
@@ -492,7 +492,7 @@ Section ProofKfree.
               with "Hcg Hcnt Htext Hpc [Hkmem]").
     all: try lkbelow.
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc44 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kfree + 0x44)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
@@ -601,7 +601,7 @@ Section ProofKfree.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
-    iApply (Release.wp_release_sconf kt γl lk "kmem"%string (kmem_res γk fl) Rrel
+    iApply (Release.wp_release_sconf kt γl lk "kmem"%string <{ kmem_res γk fl }> Rrel
               n eb pcur (K - 4)%nat ({["kmem"]} ∪ lks)
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)

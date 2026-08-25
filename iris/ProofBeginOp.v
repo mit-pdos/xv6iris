@@ -593,8 +593,7 @@ Section BoBodies.
        [eb = true], [emp] at [eb = false] -- and the complement rides out to
        the caller, which is what makes this contract index-generic. *)
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
-    iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res Psi γ bn γfs cov logstart) X3 0%nat eb pj (K - 4)%nat
+    iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> X3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -905,8 +904,7 @@ Section BoBodies.
     assert (HArel_lka : add_vec (A3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HA3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
-    iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res Psi γ bn γfs cov logstart) A3 0%nat eb pj (K - 4)%nat
+    iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> A3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               HArel_lka ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -1000,13 +998,12 @@ Section BoBodies.
     assert (HboA6 : bo_regs m A6 spd) by (apply (bo_regs_cs m mfs A6 spd HcsA6 HboASl)).
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDAs CIDAn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res Psi γ bn γfs cov logstart) A6 0%nat eb pj (K - 4)%nat eb lks
+    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res Psi γ bn γfs cov logstart }> A6 0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
-    iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres Hown Hpay".
+    iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres _ Hown Hpay".
     assert (HAp8 : ret_pc (A6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x3a))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HAp8) in "Hpc".
@@ -1171,8 +1168,7 @@ Section BoBodies.
     assert (HBrel_lka : add_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HB3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
-    iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res Psi γ bn γfs cov logstart) B3 0%nat eb pj (K - 4)%nat
+    iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> B3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               HBrel_lka ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -1262,13 +1258,12 @@ Section BoBodies.
     assert (HboB6 : bo_regs m B6 spd) by (apply (bo_regs_cs m mfs B6 spd HcsB6 HboBSl)).
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDBs CIDBn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res Psi γ bn γfs cov logstart) B6 0%nat eb pj (K - 4)%nat eb lks
+    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res Psi γ bn γfs cov logstart }> B6 0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HB6a0). iExact "Hislock". }
-    iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres Hown Hpay".
+    iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres _ Hown Hpay".
     assert (HBp8 : ret_pc (B6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x6a))
       by (rewrite HB6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HBp8) in "Hpc".
@@ -1992,13 +1987,13 @@ Section ProofBeginOp.
     (* ===================== acquire(&log.lock) ===================== *)
     iDestruct (cpu_own_transport CID CID9 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string (log_res Psi γ bn γfs cov logstart) Maq
+    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res Psi γ bn γfs cov logstart }> Maq
               0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
-    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".
+    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.

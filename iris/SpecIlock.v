@@ -320,7 +320,7 @@ Definition wp_ilock_sconf_body
   (* the disk fabric *)
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its

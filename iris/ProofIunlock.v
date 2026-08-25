@@ -564,8 +564,7 @@ Section ProofIunlockMain.
     (* the descriptor pins the fraction and the identity: the share comes back
        at exactly [s], with no existential (§14.8) *)
     iDestruct "Hrefout" as "[_ Href]".
-    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
+    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] [Hstok] Htok Hprocs").

@@ -164,7 +164,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   procs_inv γs -∗
   (* the running-thread bundle sleep needs *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
   kalloc_env γa None -∗
   (* the caller's own private block: copyout reads p->pagetable and p->sz *)

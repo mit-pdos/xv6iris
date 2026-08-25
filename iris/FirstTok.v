@@ -45,6 +45,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import FdSlots.
 Require Import WpUart.
 Require Import DiskInv.
@@ -231,8 +232,7 @@ Section FirstTok.
      dev_inv fsc_uart fsc_disk ∗
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
-        is_lock fsc_dlock d_lock "virtio_disk"%string
-                (disk_res fsc_disk pd pav pu)) ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -241,7 +241,7 @@ Section FirstTok.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> ∗
      ⌜fs_geom_ok⌝)%I.
 
   Global Instance first_boot_persist_persistent : Persistent first_boot_persist.

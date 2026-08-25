@@ -26,6 +26,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FileInvDefs.
@@ -49,7 +50,7 @@ Section FileInv.
   (* the whole table: the spinlock named "ftable" over that resource.
      Persistent, so every core shares it. *)
   Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string (ftable_res γ).
+    is_lock γl ftable_addr "ftable"%string <{ ftable_res γ }>.
 
   Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
   Proof. apply _. Qed.

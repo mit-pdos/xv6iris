@@ -31,6 +31,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import SleepLock.
 Require Import WpLockAt.
 Require Import SleepLockAt.
@@ -147,7 +148,7 @@ Section BioInitAt.
      built AT [bn_slk bn k] rather than gathered into a function, and the
      bcache lock needs no [newlock_delayed] because [bcache_res bn V] is
      statable before it is sealed. *)
-  Lemma bio_init_at (bn : bio_names) (V : bio_view Σ) E :
+  Lemma bio_init_at `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
     bio_free_tok bn -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -224,7 +225,7 @@ Section BioInitAt.
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock, at its published gname, over the assembled
        resource *)
-    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V)
+    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>
             with "Hlkg Hnm Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
       as "#Hlock".
     { rewrite /bcache_res /bcache_scan.

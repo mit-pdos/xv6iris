@@ -35,6 +35,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang.   (* [GenId]/[gen_id]: [log_ctx]'s swap receipt *)
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import BioDefs.
 Require Import FsBlocks.
 (* NOTHING IN THE CRASH/LOG LAYER IMPORTS THE PURE WF LAYER any more
@@ -1107,8 +1108,7 @@ Section LogInv.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=
-    (is_lock (ln_lk γ) log_addr "log"%string
-       (log_res Psi γ bn γfs cov logstart) ∗
+    (is_lock (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> ∗
      l_dev ↦₄□ dev ∗
      l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
      (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
@@ -1153,7 +1153,7 @@ Section LogInv.
 
   Lemma log_ctx_at_lock Psi γ bn γfs cov logstart dev :
     log_ctx_at Psi γ bn γfs cov logstart dev -∗
-    is_lock (ln_lk γ) log_addr "log"%string (log_res Psi γ bn γfs cov logstart).
+    is_lock (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }>.
   Proof. rewrite /log_ctx_at. iIntros "($ & _)". Qed.
 
   Lemma log_ctx_at_psi Psi γ bn γfs cov logstart dev :

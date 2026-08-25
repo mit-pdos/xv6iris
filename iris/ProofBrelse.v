@@ -274,7 +274,7 @@ Section ProofBrelse.
     sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.brelse + 0x60) : mword 64) -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
+    is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
     cpu_own 1%nat eb p false ({["bcache"]} ∪ lks) -∗
@@ -359,7 +359,7 @@ Section ProofBrelse.
       by (rewrite (HT3thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HMsp).
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
-    iApply (Rl.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
+    iApply (Rl.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> T3
               0%nat eb p (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -967,7 +967,7 @@ Section ProofBrelse.
       by (rewrite /U3; apply upd_eq).
     iDestruct (cpu_own_transport CID15 CID18 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Aq.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string (bcache_res bn V) U3
+    iApply (Aq.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string <{ bcache_res bn V }> U3
               0%nat b p (K - 4)%nat b lks
               ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -977,7 +977,7 @@ Section ProofBrelse.
        whole critical section below runs at the literal [false] index and
        [wp_next_off] pins the hart at [CIDa] -- which is what keeps [Htok]
        ([locked _ cpu_id]) and [Hpay] usable across every leaf. *)
-    iIntros (CIDa Hsa ms mQ) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDa Hsa ms mQ) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc2c : ret_pc (U3 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x2c)).
     { rewrite HU3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc2c) in "Hpc".

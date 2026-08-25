@@ -711,7 +711,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
@@ -1497,7 +1497,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     bslots 3 -∗
     iref_slots 1 -∗
     log_op g u -∗
@@ -1653,7 +1653,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
@@ -2707,7 +2707,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} dev -∗
     inode_meta (ientry ki) dni -∗
     inode_map gfs (ientry ki) bmi -∗
@@ -3259,7 +3259,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} dev -∗
     inode_meta (ientry ki) dni -∗
     inode_map gfs (ientry ki) bmi -∗
@@ -3511,7 +3511,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
@@ -4281,7 +4281,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
@@ -5832,7 +5832,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗

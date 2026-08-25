@@ -149,7 +149,7 @@ Section DevintrCaps.
     ( dev_inv γu γv ∗
       console_caps γu ∗
       disk_geom γv pd pav pu ∗
-      is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+      is_lock γdk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
       timer_cap ∗
       tick_keeper γtl γs ∗
       procs_inv γs )%I.

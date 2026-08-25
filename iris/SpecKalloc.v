@@ -39,7 +39,7 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
   sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
+  is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string <{ kmem_res γk fl }> -∗
   kalloc_avail γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,

@@ -33,6 +33,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxShim.   (* [ctx_dom_sc]: the SC-only transport evidence
+   behind the context-shaped spec, until the cutover kit mints it from the
+   machine (TsoCtxTwin2.v) *)
 Import Defs.
 
 
@@ -54,7 +57,7 @@ Section ProofRelease.
         intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
   Lemma wp_release_gen_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
     : wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
@@ -72,6 +75,11 @@ Section ProofRelease.
     pose (outb := match n with O => eb | S _ => false end).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hfin Hown Hpay Hcont".
+    (* the deposit arrives at the caller's own context; the invariant parks
+       it ∃-closed (tso-port M3 -- at cutover this introduction becomes the
+       transport into the lock's internal context,
+       [TsoCtxTwin2.ctx_dom_to_parked]) *)
+    iAssert (∃ ξ : CtxId, R ξ)%I with "[HR]" as "HR"; first by iExists cur_ctx.
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (R0 := <[Regidx csp_rs1 := regval_into_reg
@@ -508,7 +516,7 @@ Section OfGen.
 
   Context {kt : ktier}.
   Lemma wp_release_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
@@ -544,7 +552,7 @@ Section CancelOfGen.
 
   Context {kt : ktier}.
   Lemma wp_release_cancel_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (D Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
@@ -558,7 +566,15 @@ Section CancelOfGen.
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
-    { iApply (lock_finisher_destroy with "Hbuild"). }
+    { (* the destroyer's completion wand speaks at ITS context; the
+         invariant's parked payload is ∃-closed -- bridge with the shim's
+         SC-only transport (the cutover kit's finisher morphs against real
+         AMO evidence instead) *)
+      iApply lock_finisher_destroy.
+      iIntros "Hfrag HRx". iDestruct "HRx" as (ξ0) "HRx".
+      iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
+      iMod (ctx_morph ξ0 cur_ctx with "Hdom HRx") as "[_ HRx]".
+      iApply ("Hbuild" with "Hfrag HRx"). }
     iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").

@@ -785,8 +785,7 @@ Section ProofUserinit.
     assert (Hlka : add_vec (R11 !!! Regidx Ra0)
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr j)
       by (rewrite HR11a0; apply addv_sext0).
-    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) R11 0%nat b pj (K - 4)%nat
+    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> R11 0%nat b pj (K - 4)%nat
               ({["proc"]} ∪ lks) Hlka Krl
               with "Hcg Htext Hpc [] Htok HR Hcpu Hpay").
     { iApply (procs_inv_lookup γs j γl Hgl with "Hpinv"). }

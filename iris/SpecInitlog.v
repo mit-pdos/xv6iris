@@ -281,7 +281,7 @@ Definition wp_initlog_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* ---- the superblock field, read once ---- *)
   pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
   (* ---- the RAW spinlock cells of struct log (&log.lock = &log) ---- *)

@@ -707,7 +707,7 @@ Section SchedCtx.
   Definition procs_inv : iProp Σ :=
     (⌜length γs = NPROC⌝ ∗
      ([∗ list] i ↦ γl ∈ γs,
-        is_lock γl (proc_addr i) "proc"%string (proc_lock_res γl (proc_addr i))) ∗
+        is_lock γl (proc_addr i) "proc"%string <{ proc_lock_res γl (proc_addr i) }>) ∗
      [∗ list] i ↦ _ ∈ γs, ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I.
 
   Global Instance procs_inv_persistent : Persistent procs_inv.
@@ -716,7 +716,7 @@ Section SchedCtx.
   (* the per-proc [is_lock] extracted from the global invariant. *)
   Lemma procs_inv_lookup (i : nat) (γl : gname) :
     γs !! i = Some γl ->
-    procs_inv -∗ is_lock γl (proc_addr i) "proc"%string (proc_lock_res γl (proc_addr i)).
+    procs_inv -∗ is_lock γl (proc_addr i) "proc"%string <{ proc_lock_res γl (proc_addr i) }>.
   Proof.
     iIntros (Hi) "[_ [Hbig _]]".
     by iDestruct (big_sepL_lookup with "Hbig") as "$".

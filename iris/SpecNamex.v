@@ -532,7 +532,7 @@ Definition wp_namex_sconf_body
   procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
   (* ---- iput's / itrunc's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -704,7 +704,7 @@ Definition wp_namex_gen_body
   procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
   (* ---- iput's / itrunc's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

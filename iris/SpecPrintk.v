@@ -146,7 +146,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
      mutual exclusion between two harts' format walks -- real, but invisible in
      separation logic, so the resource is [emp] and the acquire is nearly
      free. *)
-  is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+  is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
   uart_sent_sub γd bs -∗
@@ -220,7 +220,7 @@ Section PrintkGen.
      has been sent, so the empty sublist is all the corollary below ever
      needs to hand [wp_printk_sconf_body]'s [bs]. *)
   Definition printk_env (γpr : gname) (γd : uart_names) (γv : disk_names) : iProp Σ :=
-    (is_lock γpr pr_lock "pr"%string (pr_res γd) ∗
+    (is_lock γpr pr_lock "pr"%string <{ pr_res γd }> ∗
      uart_dlab_off γd ∗
      dev_inv γd γv ∗
      (∃ γl : gname, is_txlock γl γd) ∗

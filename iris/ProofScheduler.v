@@ -1103,8 +1103,7 @@ Section ProofScheduler.
          the in-lock carve [av - 12]; its exit is [n], the index the tail owes
          its caller. *)
       iEval (rewrite -Hn) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) T1 0 ebx zero_reg n
+      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> T1 0 ebx zero_reg n
                 {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1260,8 +1259,7 @@ Section ProofScheduler.
          contract all carry. *)
       assert (Hnoproc : locks_below (∅ : gset string) "proc")
         by (exact (locks_below_empty "proc")).
-      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
+      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> M1 0 ebc zero_reg n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
@@ -1269,7 +1267,7 @@ Section ProofScheduler.
       (* acquire's crossing index is its ENTRY [ebc] (a trap can land on its
          first instruction, before push_off disables) -- idle hatch again. *)
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR Hcpu Hpay".
+      iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR _ Hcpu Hpay".
       (* acquire hands back [{[rank "proc"]} ∪ ∅]; normalise it to the literal
          singleton every in-lock site below (and [Tail]) is written at. *)
       assert (Hequn : ({["proc"]} : gset string) ∪ ∅ = {["proc"]})

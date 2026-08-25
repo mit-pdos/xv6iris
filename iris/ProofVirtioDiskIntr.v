@@ -381,7 +381,7 @@ Section VtPrologue.
     sie_cap_gpr KT1 m av b pme -∗
     cpu_own n eb pme b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ (MA : regfile) (sp0 : mword 64),
         ⌜ sp0 = m !!! Regidx csp_rs1
@@ -576,12 +576,12 @@ Section VtPrologue.
       rewrite /A5 upd_ne; [| vm_compute; discriminate].
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s1. }
     iDestruct (cpu_own_transport CID CID10 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string (disk_res γd pd pav pu) A6
+    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> A6
               n eb pme (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
-    iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
+    iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     assert (Hpc1e : ret_pc (A6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x1e))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
@@ -659,7 +659,7 @@ Section VtEpilogue.
     locks_below lks "virtio_disk" ->
     sie_cap_gpr KT1 MB (trap_res b + (av - 4))%nat false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
     cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay KT1 n eb pme -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx ra_idx) -∗
@@ -751,7 +751,7 @@ Section VtEpilogue.
        what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
+    iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> E2
               n eb pme (av - 4)%nat ({["virtio_disk"]} ∪ lks)
               ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").

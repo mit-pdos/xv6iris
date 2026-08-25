@@ -64,6 +64,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import DevModel DiskPtsto WpUart.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -126,21 +127,21 @@ Section UartTxInv.
      [uart_sent], because another hart may interleave between two of its
      bytes.  That is what [uart_sent_sub] below is for. *)
   Definition is_txlock (γl : gname) (γu : uart_names) : iProp Σ :=
-    (is_lock γl a_tx_lock "uart"%string (tx_res γu) ∗
+    (is_lock γl a_tx_lock "uart"%string <{ tx_res γu }> ∗
      uart_dlab_off γu)%I.
 
   Global Instance is_txlock_persistent γl γu : Persistent (is_txlock γl γu).
   Proof. apply _. Qed.
 
   Lemma is_txlock_lock γl γu :
-    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string (tx_res γu).
+    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string <{ tx_res γu }>.
   Proof. iIntros "[$ _]". Qed.
 
   Lemma is_txlock_dlab γl γu : is_txlock γl γu -∗ uart_dlab_off γu.
   Proof. iIntros "[_ $]". Qed.
 
   Lemma is_txlock_intro γl γu :
-    is_lock γl a_tx_lock "uart"%string (tx_res γu) -∗
+    is_lock γl a_tx_lock "uart"%string <{ tx_res γu }> -∗
     uart_dlab_off γu -∗ is_txlock γl γu.
   Proof. iIntros "#Hl #Ho". by iFrame "Hl Ho". Qed.
 

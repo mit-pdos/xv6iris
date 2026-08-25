@@ -673,13 +673,12 @@ Section ProofIget.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string
-              (itable_res2 cn γfs γi cov logstart nib dev) mA
+    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> mA
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x20)).
     { rewrite HmAra. pcw. }
     iEval (rewrite Hpc20) in "Hpc".
@@ -1645,8 +1644,7 @@ Section ProofIget.
                are the same bool.  Pure re-spelling; it is what makes the
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
-            iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
-                      (itable_res2 cn γfs γi cov logstart nib dev) V4
+            iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -2144,8 +2142,7 @@ Section ProofIget.
           by (rewrite (HL7thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HL3sp).
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
-                  (itable_res2 cn γfs γi cov logstart nib dev) L7
+        iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").

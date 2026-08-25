@@ -25,6 +25,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -44,26 +45,26 @@ Section TicksInv.
   Proof. iIntros "H". iExists t. iFrame "H". Qed.
 
   Definition is_tickslock (γl : gname) : iProp Σ :=
-    is_lock γl a_tickslock "time"%string ticks_res.
+    is_lock γl a_tickslock "time"%string <{ ticks_res }>.
 
   Global Instance is_tickslock_persistent γl : Persistent (is_tickslock γl).
   Proof. apply _. Qed.
 
   Lemma is_tickslock_lock γl :
-    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string ticks_res.
+    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string <{ ticks_res }>.
   Proof. iIntros "$". Qed.
 
   (* ---- construction (the "newlock" ghost step): what a caller does with
      trapinit's postcondition -- the freshly zeroed lock word and its
      persistent name, plus the counter cell, become the tickslock. *)
-  Lemma new_tickslock E (t : mword 32) :
+  Lemma new_tickslock `{XI : CurCtx} E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu a_tickslock ↦₈ (zero_reg : mword 64) -∗
     a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
   Proof.
     iIntros "#Hnm Hlkw Hcpu Hticks".
-    iApply (newlock E a_tickslock "time"%string ticks_res
+    iApply (newlock E a_tickslock "time"%string <{ ticks_res }>
               with "Hnm Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.

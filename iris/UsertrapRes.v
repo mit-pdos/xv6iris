@@ -565,7 +565,7 @@ Section UsertrapRes.
     (dev_inv γu γv ∗
      console_caps γu ∗
      disk_geom γv pd pav pu ∗
-     is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+     is_lock γdk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
      (* the tick keeper's REAL arm, spelled: the left disjunct is
         [⌜tick_hart = false⌝], a statement about a particular hart, and this
         bundle is not allowed to depend on one. *)
@@ -633,12 +633,11 @@ Section UsertrapRes.
      devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (un_pr N) (un_u N) (un_v N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (un_kl N) (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
-     is_lock (un_k N) d_lock "virtio_disk"%string
-       (disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N)) ∗
+       <{ kmem_res (un_ka N) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
+     is_lock (un_k N) d_lock "virtio_disk"%string <{ disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N) }> ∗
      bio_ctx (un_bn N) (fs_view (un_fs N) (un_v N) (un_dev N) (un_cov N)) ∗
      log_ctx (un_lg N) (un_bn N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N) ∗
      fs_crash_seam (un_cov N) (un_logstart N) ∗
@@ -701,7 +700,7 @@ Section UsertrapRes.
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
      park_world (un_s N))%I.

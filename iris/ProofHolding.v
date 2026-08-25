@@ -92,7 +92,7 @@ Section ProofHolding.
 
   Context {kt : ktier}.
   Lemma wp_holding_lockinv_s_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64) (lks : gset string)
     : wp_holding_lockinv_s_sconf_body kt γl lka s R Tc Dc m n p lks.
   Proof.
@@ -504,7 +504,7 @@ Section ProofHolding.
   Qed.
 
   Lemma wp_holding_lockinv_locked_s_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64)
     : wp_holding_lockinv_locked_s_sconf_body kt γl lka s R Dc m n p.
   Proof.

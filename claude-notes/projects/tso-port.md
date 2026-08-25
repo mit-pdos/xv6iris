@@ -104,6 +104,46 @@ deleted), then M3 (lock payload `CtxMorph` obligations — now unblocked)
 per §3. The `↦ₘ` notation flip (M1's tail) no longer waits on the
 persist/transport audit — old item 6 is gone.
 
+### 0.6′ THE LOCK SURFACE IS CONTEXT-SHAPED (landed 2026-08-25, in place)
+
+M3's statement half plus M2's receipt, converted IN PLACE — no twins, no
+parallel forms:
+
+- **The payload of every spinlock is `R : CtxId → iProp`** (`WpLock.v`:
+  `lock_inv`'s free arm parks `∃ ξ, R ξ`; `is_lock`/`lock_openable`/
+  `lock_finisher`/the `newlock` family all at the new arity, creators
+  depositing at `R cur_ctx` under a new ambient `{XI : CurCtx}`).
+  Clients spell payloads with **`TsoCtx.<{ P }>`** (the weak-memory
+  wrapper verbatim: binds a `CurCtx`, so a converted payload's ambient
+  facts re-index under it; an unconverted payload embeds constantly).
+  `Typeclasses Transparent CurCtx` is REQUIRED for instance search to
+  see through the wrapper's binder type — without it every
+  `Persistent (is_lock … <{P}>)`/`CtxMorph <{P}>` resolution dies.
+- **`SpecAcquire`/`SpecRelease` restated**: the `CtxMorph R` obligation
+  rides as an implicit class binder on the module-type Parameters (so
+  every call site discharges it by instance search, zero edits); the
+  acquire postcondition hands back `R cur_ctx` (bound OUTSIDE `wp_next`
+  — migration survival in the statement) **and `∃ K, hart_view_lb K`**
+  at the hart that won the lock (the M2 receipt; acquire-call intro
+  patterns tree-wide gained one `_` slot). Release deposits `R cur_ctx`;
+  no receipt (a TSO release is a plain store — that asymmetry is the
+  model).
+- **The two shim steps in `ProofAcquire`** (`ctx_dom_sc` for the
+  ∃ξ→cur_ctx morph at the win, `hart_view_lb_any` for the receipt) are
+  exactly where the cutover kit's direct proof puts the AMO's honest
+  evidence (`TsoCtxTwin2.ctx_dom_of_parked`/`twin_passed_get`).
+- Fallout: ~180 files, all mechanical (payload wraps at `is_lock`/spec
+  applications; one receipt slot per acquire continuation; `{XI}`
+  binders up the lock-CREATION call chains — creators deposit at
+  cur_ctx, so `newlock`-callers to `xv6_boot_era` gained the ambient
+  binder, adequacy instantiating it at a dummy identity until the kit
+  mints the real boot context). Tree green on the VM; audit at
+  baseline.
+- REMAINING for M3 proper: convert lock USERS' payloads semantically —
+  replace the constant embeddings `<{ mem-facts }>` with genuinely
+  context-indexed payloads (`↦c` facts) carrying real `CtxMorph`
+  instances, one lock at a time (kmem is the natural first).
+
 ---
 
 **The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5

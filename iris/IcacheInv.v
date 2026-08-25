@@ -61,6 +61,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock SleepLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import LogInv.
 Require Export IcacheRef.   (* the geometry, the algebra, [inode_ref] *)
 Require Import InodeInv.
@@ -3618,7 +3619,7 @@ Section IcacheTable.
        [∗ list] k ∈ seq 0 NINODE, islot M k)%I.
 
   Definition is_itable (γl : gname) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string itable_res.
+    is_lock γl itable_lock "itable"%string <{ itable_res }>.
 
   Global Instance is_itable_persistent γl : Persistent (is_itable γl).
   Proof. apply _. Qed.

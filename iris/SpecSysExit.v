@@ -149,12 +149,12 @@ Definition wp_sys_exit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page *)
   is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string
-    (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) -∗
+    <{ kmem_res γka (mword_of_int (KernelSyms.kmem + 24)) }> -∗
   kalloc_avail γka on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] inside kexit *)
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -163,7 +163,7 @@ Definition wp_sys_exit_sconf_body
   gen_cert -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   bslots 3 -∗
   (* the inode cache and the two regions iput's truncate arm frees into,
      kexit's verbatim *)

@@ -73,6 +73,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import SleepLock.
 Require Import BufOwn.
 Require Import DiskPtsto.
@@ -989,7 +990,7 @@ Section BioInv.
   (* ------------------------------------------------------------------ *)
 
   Definition bio_ctx (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
-    (is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) ∗
+    (is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> ∗
      [∗ list] k ∈ seq 0 NBUF,
        (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
           (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
@@ -1000,7 +1001,7 @@ Section BioInv.
 
   Lemma bio_ctx_lock bn V :
     bio_ctx bn V -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V).
+    is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>.
   Proof. iIntros "[$ _]". Qed.
 
   Lemma bio_ctx_buf bn V k :
@@ -1139,7 +1140,7 @@ Section BioInv.
      for the log layer, the mkfs image's content against the logged-view
      ghost), and 0 must be outside the covered range because every zeroed
      blockno cell claims it. *)
-  Lemma bio_init (V : bio_view Σ) E :
+  Lemma bio_init `{XI : CurCtx} (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
@@ -1240,7 +1241,7 @@ Section BioInv.
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock over the assembled resource *)
-    iMod ("Hmk" $! (bcache_res bn V) with "[Hauth Hsa Hslots Hlru Hpool]")
+    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[Hauth Hsa Hslots Hlru Hpool]")
       as "#Hlock".
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),

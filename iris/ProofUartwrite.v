@@ -920,14 +920,14 @@ Section UwBodies.
       { rewrite /Q4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsQ3]. }
       iDestruct (cpu_own_transport CIDp CIDa4 0 true pj true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Acquire.wp_acquire_sconf KT1 γl "uart"%string (tx_res γu) Q4
+      iApply (Acquire.wp_acquire_sconf KT1 γl "uart"%string <{ tx_res γu }> Q4
                 0%nat true pj (av - 10)%nat true lks ltac:(lia)
                 ltac:(lia)
                 ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc [Hlk]").
       all: try lkbelow.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
-      iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR Hcnt Hpay".
+      iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
       iEval (rewrite HQ4ra P56) in "Hpc".
       assert (HregsA : uw_loop_regs m0 MA (pa_stk sp0 10) buf n i).
       { apply (uw_loop_regs_cs m0 Q4 MA); [exact HcsA|].
@@ -1010,7 +1010,7 @@ Section UwBodies.
           by (rewrite /K2 upd_eq; reflexivity).
         assert (HcsK2 : callee_saved D2 K2).
         { rewrite /K2. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsK1]. }
-        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string (tx_res γu) K2
+        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string <{ tx_res γu }> K2
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HK2a0; apply uw_addv_0)
                   ltac:(lia)
@@ -1177,7 +1177,7 @@ Section UwBodies.
           by (rewrite /G4 upd_eq; reflexivity).
         assert (HcsG4 : callee_saved D2 G4).
         { rewrite /G4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsG3]. }
-        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string (tx_res γu) G4
+        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string <{ tx_res γu }> G4
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HG4a0; apply uw_addv_0)
                   ltac:(lia)

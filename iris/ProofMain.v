@@ -544,8 +544,7 @@ Section ProofMain.
     iPoseProof (uart_sent_sub_nil γd l0 with "Hsent") as "#Hsub0".
     (* [newlock_at] at [fsc_printk], not [newlock] with a fresh γ *)
     rewrite /fs_kit_printk.
-    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string
-            (pr_res γd) with "Hkprintk Hprnm Hprw Hprcpu []") as "#Hprlk".
+    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hprw Hprcpu []") as "#Hprlk".
     { rewrite /pr_res. done. }
     (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
        consoleinit has just run [initlock] on cons.lock and, through uartinit,
@@ -558,7 +557,7 @@ Section ProofMain.
        consoleintr takes both locks.  Nothing consumed it before consoleintr
        was proven, which is why the two steps sat here un-taken. ---- *)
     iDestruct "Hlkfresh" as "(Htxw & #Htxnm & Htxcpu)".
-    iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string (tx_res γd)
+    iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string <{ tx_res γd }>
             with "Htxnm Htxw Htxcpu [Htx]") as (γtx) "#Htxinv".
     { iApply (tx_res_intro γd l0 with "Htx"). }
     (* [is_txlock]'s two halves are exactly [Htxinv]/[Hdoff] -- the same pair
@@ -571,7 +570,7 @@ Section ProofMain.
       iSplitR; [iExact "Hdoff" |].
       iSplitR; [iExact "Hdev" |].
       iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
-    iMod (newlock ⊤ a_cons "cons"%string cons_res
+    iMod (newlock ⊤ a_cons "cons"%string <{ cons_res }>
             with "Hclnm Hclw Hclcpu Hring") as (γcl) "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
     { rewrite /console_caps. iExists γtx, γcl.
@@ -860,17 +859,17 @@ Section ProofMain.
            postcondition, forwarded instead of being sealed inside the
            bundle one line up. *)
         is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-          (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+          <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
         procs_inv γs -∗
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
            and -- at its real contract -- userinit all do. *)
-        is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+        is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
         (* THE wait_lock, built the same way and for the first time.  Every
            consumer in the tree takes it -- kexit, kwait, reparent, the
            syscall environment -- and nothing has ever built one; see
            projects/forkret-park.md E3. *)
-        is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+        is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -1061,7 +1060,7 @@ Section ProofMain.
            writable .data words; see [KernelDataInv]'s header. ---- *)
     iDestruct (lk_fresh_pieces pid_lock_addr "nextpid"%string with "Hlpidf")
       as "(#Hpnm & Hpw & Hpc0)".
-    iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res
+    iMod (newlock ⊤ alp_pid_lock "nextpid"%string <{ nextpid_res }>
             with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
     { rewrite /nextpid_res. iExact "Hnpid". }
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit
@@ -1070,7 +1069,7 @@ Section ProofMain.
            [p_parent] cells was a resource for it to be over. ---- *)
     iDestruct (lk_fresh_pieces wait_lock_addr "wait_lock"%string with "Hlwaitf")
       as "(#Hwnm & Hww & Hwc0)".
-    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string wait_res
+    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string <{ wait_res }>
             with "Hwnm Hww Hwc0 Hwres") as (γw) "#Hwaitlock".
     iModIntro.
     iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
@@ -1146,8 +1145,7 @@ Section ProofMain.
     (* a fupd in front of a [WP (Loop)] goal: the tree's idiom is to peel it
        with [fupd_wp] first (ProofIupdate.v records the same). *)
     iApply fupd_wp.
-    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string
-            ticks_res with "Htn2 Htw2 Htc2 [Hticks]") as (γtl) "#Htl".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string <{ ticks_res }> with "Htn2 Htw2 Htc2 [Hticks]") as (γtl) "#Htl".
     { iApply (ticks_res_intro t0 with "Hticks"). }
     iModIntro.
     assert (Hretti : ret_pc (T1 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
@@ -1293,7 +1291,7 @@ Section ProofMain.
     console_caps γd -∗
     ConsoleInv.console_ready -∗
     is_tickslock γtl -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
        [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
        [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
@@ -1301,7 +1299,7 @@ Section ProofMain.
        this group -- they are parked in the boot token at +0x9e. ---- *)
     printk_env fsc_printk fsc_uart fsc_disk -∗
     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+      <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
     gen_cert -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
@@ -1328,7 +1326,7 @@ Section ProofMain.
     (* ...and the [nextpid] lock, for the same reason and to the same place:
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
-    is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+    is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
     kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1399,7 +1397,7 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+        is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
         disk_geom γv pd pav pu -∗
         (* ...AND THE OPEN-FILE TABLE'S LOCK, which is fileinit's output plus
            the resource the carve now hands over.  The two gnames are this
@@ -1584,8 +1582,7 @@ Section ProofMain.
     iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
     iApply fupd_wp.
     iMod (ftable_res_boot ⊤ with "Hfents Hfdauth Hirfile") as (γf) "Hfres".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string
-            (ftable_res γf) with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string <{ ftable_res γf }> with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
     iModIntro.
     (* [is_ftable γft γf] is [Hftable] at [ftable_addr]'s spelling *)
     iAssert (is_ftable γft γf) as "#Hftable'".
@@ -1669,8 +1666,7 @@ Section ProofMain.
        γ chosen here could never be shown equal to the field.  The free
        token [Hdllk] is kit 1's row; everything else is what the old
        [newlock] took, in the same order. *)
-    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string
-            (disk_res γv pd pav pu)
+    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }>
             with "Hdllk Hdlnm Hdlkw Hdcpu HRdisk") as "#Hdlock".
     iModIntro.
     (* ---- +0x9e jal userinit ---- *)
@@ -1754,8 +1750,7 @@ Section ProofMain.
     { rewrite Huartq Hdiskq. iExact "Hdev". }
     iAssert (∃ pd' pav' pu' : mword 64,
                disk_geom fsc_disk pd' pav' pu' ∗
-               is_lock fsc_dlock d_lock "virtio_disk"%string
-                       (disk_res fsc_disk pd' pav' pu'))%I as "#Hdpair".
+               is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd' pav' pu' }>)%I as "#Hdpair".
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
     (* THE DEVICE COMPLEMENT the park wants, at the ambient names: every
        member is in hand here and none is assumed. *)
@@ -1845,7 +1840,7 @@ Section ProofMain.
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
          console_caps γd -∗
-         is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
+         is_lock γk' d_lock "virtio_disk"%string <{ disk_res γv pd' pav' pu' }> -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
          (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
@@ -1856,7 +1851,7 @@ Section ProofMain.
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□

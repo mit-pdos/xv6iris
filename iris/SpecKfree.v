@@ -41,7 +41,7 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
   sie_cap_gpr kt m K b pcur -∗
   cpu_own n eb pcur b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
+  is_lock γl lk "kmem"%string <{ kmem_res γk fl }> -∗
   kfree_pre p -∗
   kalloc_avail γk on -∗
   wp_next b pcur (fun (CID : CpuId) =>

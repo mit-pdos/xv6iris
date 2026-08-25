@@ -47,8 +47,7 @@
    in [SpecProcinit.v]'s vocabulary: [lk_raw] in (three cells, 24 bytes),
    [lk_fresh] out.  Those are exactly [WpLock.newlock]'s premises minus the
    resource, so the caller's ghost step
-   [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart"
-   (tx_res γd)] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
+   [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart" <{ tx_res γd }>] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
    what a boot assembly feeds to [WpLock.newlock].
 
    ProofUartinit.v proves it by running each of the seven writes through the

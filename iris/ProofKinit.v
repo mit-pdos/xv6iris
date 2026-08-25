@@ -231,7 +231,7 @@ Section ProofKinit.
     iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
-    iMod (newlock_at ⊤ γl lk "kmem"%string (kmem_res γk fl)
+    iMod (newlock_at ⊤ γl lk "kmem"%string <{ kmem_res γk fl }>
             with "Hlkfree Hlnm Hlock Hcpu HR") as "#Hkmem".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.

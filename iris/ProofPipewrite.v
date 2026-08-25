@@ -1414,7 +1414,7 @@ Section ProofPipewrite.
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
-        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
                   T4 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaT4 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -1484,7 +1484,7 @@ Section ProofPipewrite.
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
-        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
                   Q2 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaQ2 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -1812,13 +1812,13 @@ Section ProofPipewrite.
       rewrite /B1 upd_eq. unfold regval_into_reg. rewrite Ha0M0. apply add_vec_zero_l. }
     iDestruct (cpu_own_transport CIDmp CIDp33 0 true pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
+    iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }> (pipe_ref γp w q)
               (pipe_dead γl γp) B3 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
               ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
               with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { rgall. iEval (rewrite Ha0B3). iExact "Hopen". }
-    iIntros (CIDaq Hsaq ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres Hown Hpay". rgall.
+    iIntros (CIDaq Hsaq ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres _ Hown Hpay". rgall.
     iEval (rewrite HraB3) in "Hpc".
     assert (Hpp24 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x20) : mword 64) 4)
                     = (mword_of_int (KernelSyms.pipewrite + 0x24) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2479,7 +2479,7 @@ Section ProofPipewrite.
               { rewrite /G4 /G3.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsp. }
-              iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
+              iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
                         G4 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaG4 Hav10
                         ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -2562,13 +2562,13 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsl. }
               iDestruct (cpu_own_transport CIDsl0 CIDp52 0 true pj true ltac:(wp_next_chain)
                            with "Hown") as "Hown".
-              iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
+              iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }> (pipe_ref γp w q)
                         (pipe_dead γl γp) G7 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
                         with "Hcg Hown Htext Hpc [] Href").
               all: try lkbelow.
               { rgall. iEval (rewrite Ha0G7). iExact "Hopen". }
-              iIntros (CIDsl Hssl ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres Hown Hpay". rgall.
+              iIntros (CIDsl Hssl ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
               iEval (rewrite HraG7) in "Hpc".
               assert (Hpp88 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x84) : mword 64) 4)
                               = (mword_of_int (KernelSyms.pipewrite + 0x88) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).

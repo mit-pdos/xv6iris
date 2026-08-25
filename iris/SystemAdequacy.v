@@ -261,7 +261,7 @@ Section SystemBoot.
      MINTS both inside the era fupd, off the era's own disk, and hands the
      class back existentially; only the camera ([fileGpreS]) is a functor
      constraint. *)
-  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
+  Lemma xv6_boot_era `{XI : CurCtx} (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
     boot_facts g ->
     fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
       sb nib cov ->
@@ -547,7 +547,8 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & Gd & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen
+            (MkCtxId inhabitant inhabitant) g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
@@ -705,7 +706,8 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gdv & Gsw & Gd & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen
+            (MkCtxId inhabitant inhabitant) g' sb nib cov Hbf
             (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.

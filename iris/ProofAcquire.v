@@ -29,6 +29,9 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxShim.   (* [ctx_dom_sc]/[hart_view_lb_any]: the SC-only
+   transport evidence and view receipt behind the context-shaped spec,
+   until the cutover kit mints them from the AMO (TsoCtxTwin2.v) *)
 Import Defs.
 
 (* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)
@@ -96,7 +99,7 @@ Section ProofAcquire.
      to the pre-port shape -- the one new line per leaf, per the porting
      guide's "consumer side" recipe. *)
   Lemma wp_acquire_lock_loop_sconf `{CID0 : CpuId}
-      (γl : gname) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (M0 : regfile) (n : nat) (a5v lk : mword 64) (p : mword 64) :
     let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
@@ -109,7 +112,7 @@ Section ProofAcquire.
     ( Tc -∗
       sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
-      locked_pre γl cpu_id -∗ R -∗
+      locked_pre γl cpu_id -∗ (∃ ξ : CtxId, R ξ) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -220,7 +223,7 @@ Section ProofAcquire.
      [if(holding(lk)) panic] check, so neither tier carries a panic
      credential any more. *)
   Lemma wp_acquire_gen_fresh_sconf
-      (γl : gname) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Tc Dc : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
     : wp_acquire_gen_fresh_sconf_body kt γl s R Tc Dc m n eb p av b lks.
@@ -652,8 +655,19 @@ Section ProofAcquire.
        Hs1..Hs7 (the seven pre-push_off leaf hops) plus [Hspo] (push_off's
        own conditional equality) gets us there via [wp_next_chain], with no
        case split on [b]. *)
+    (* THE CONTEXT HAND-OFF (tso-port M3): the payload came out of the
+       invariant at SOME context; re-index it to the caller's own, and
+       mint the view receipt.  Both evidence tokens are the shim's SC-only
+       stopgaps here; the cutover kit's direct proof mints them from the
+       AMO's at-the-top postcondition ([TsoCtxTwin2.ctx_dom_of_parked] /
+       [twin_passed_get]). *)
+    iDestruct "HRes" as (ξ0) "HRes".
+    iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
+    iMod (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
+    iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
+    { iExists 0%nat. iApply hart_view_lb_any. }
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hown Hpay").
+    iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay").
     { exact Hmsf. }
     (* [s0]/[s1] never surface as separate goals below: each is restored by
        an epilogue [ldsp] as the LITERAL value [m !!! reg] (the leaf's own
@@ -791,7 +805,7 @@ Section ProofAcquire.
   (* THE BELOW TIER, as a corollary: the contract is antitone in its held-set
      precondition and [locks_below lks s] implies [s ∉ lks]. *)
   Lemma wp_acquire_gen_sconf
-      (γl : gname) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Tc Dc : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
     : wp_acquire_gen_sconf_body kt γl s R Tc Dc m n eb p av b lks.
@@ -819,7 +833,7 @@ Section OfGen.
      weakening as at the generic level.  Doing it the other way round would
      make this fifteen-line script a cross-product. *)
   Lemma wp_acquire_fresh_sconf
-      (γl : gname) (s : string) (R : iProp Σ)
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
       (lks : gset string)
@@ -833,13 +847,13 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hown Hpay".
+    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hown Hpay").
+    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hlb Hown Hpay").
   Qed.
 
   Lemma wp_acquire_sconf
-      (γl : gname) (s : string) (R : iProp Σ)
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
       (lks : gset string)

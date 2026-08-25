@@ -729,7 +729,7 @@ Section IlockLoad.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     il_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -2436,8 +2436,7 @@ Section ProofIlockMain.
     (* acquiresleep is index-generic now and takes the trap-CSR complement
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
-    iApply (ASL.wp_acquiresleep_gen_sconf gs j gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks
+    iApply (ASL.wp_acquiresleep_gen_sconf gs j gil gisl "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)

@@ -947,7 +947,7 @@ Section KexitPark.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
     procs_inv γs -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     (* the cwd's unit REJOINED with the allowance: [iput] handed the [1]
@@ -1040,14 +1040,14 @@ Section KexitPark.
       rewrite /P0 upd_ne; [exact Hs4 | vm_compute; discriminate]. }
     iDestruct (cpu_own_transport CID0 CIDw 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string wait_res
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string <{ wait_res }>
               P2 0 eb pj av b lks ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP2a0). iExact "Hwl". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD: index [false] throughout. *)
-    iIntros (CIDa Hsa msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres Hown Hpay".
+    iIntros (CIDa Hsa msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres _ Hown Hpay".
     (* ONE WIDE HOP: acquire does not thread the complement, so it is moved
        across the whole prologue-plus-acquire stretch at once, from where it
        came in to the hart the lock was won on. *)
@@ -1270,8 +1270,7 @@ Section KexitPark.
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* [Hfresh_proc], derived above for wakeup's own call, is exactly what
        this nested acquire needs too. *)
-    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDa) γl "proc"%string
-              (proc_lock_res γs γl pj) P8 1%nat eb pj (trap_res b + av)%nat false
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDa) γl "proc"%string <{ proc_lock_res γs γl pj }> P8 1%nat eb pj (trap_res b + av)%nat false
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(lia)
               Hfresh_proc
@@ -1279,7 +1278,7 @@ Section KexitPark.
     all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hislock". }
     iApply wp_next_off_intro.
-    iIntros (msb mlk) "%Hmsfb Hcg Hpc %Hcsl Hlkp HR Hown Hpay2".
+    iIntros (msb mlk) "%Hmsfb Hcg Hpc %Hcsl Hlkp HR _ Hown Hpay2".
     assert (Hpc80 : ret_pc (P8 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x80))
       by (rewrite HP8ra; apply bv_eq; vm_compute; reflexivity).
@@ -1432,7 +1431,7 @@ Section KexitPark.
                  [av].  Level 2 -> 1 is itself carve-neutral ([trap_res false]
                  on entry), so both sides of this call sit at
                  [trap_res b + av]. *)
-              wait_res PC 1%nat eb pj (trap_res b + av)%nat
+              <{ wait_res }> PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hwl Hlkw [Hpar] Hown Hpay2").
@@ -1570,14 +1569,14 @@ Section KexitRest.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv γs -∗ panic_env -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 3 -∗
     (* ---- the inode cache's persistent set, and the two regions ---- *)
     is_itable2 γtl cn γfs γi cov logstart nib dev -∗

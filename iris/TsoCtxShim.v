@@ -30,7 +30,7 @@ Require Import TsoCtx.
 
 Section shim.
   Context `{!riscvGS Σ}.
-  Local Transparent ctx_pointsto own_context hart_view_lb.
+  Local Transparent ctx_pointsto own_context hart_view_lb ctx_dom.
 
   (* THE SWEEP-ERA THROWAWAY MINT.  A converted callee demands a context
      token its unconverted caller does not have, so the call site conjures
@@ -56,6 +56,17 @@ Section shim.
      compile errors it leaves ARE the M2 worklist. *)
   Lemma hart_view_lb_any `{CID : CpuId} (K : nat) :
     ⊢@{iPropI Σ} hart_view_lb K.
+  Proof. done. Qed.
+
+  (* THE TRANSPORT-EVIDENCE STOPGAP.  [ctx_dom ξ ξ'] licenses moving facts
+     from ξ to ξ'; at TSO it is minted only against real synchronization
+     evidence (the lock lemmas' AMO-at-the-top, [TsoCtxTwin2]'s two mints)
+     and carries ξ's own authorities -- it can never be conjured.  Until
+     the cutover kit proves the lock internals against the TSO machine,
+     the SC lock proofs ([ProofAcquire]'s context tier) mint it here.
+     FALSE at TSO; dies with the shim; each leftover use is a lock-kit
+     worklist entry. *)
+  Lemma ctx_dom_sc (ξ ξ' : CtxId) : ⊢@{iPropI Σ} ctx_dom ξ ξ'.
   Proof. done. Qed.
 
   Lemma ctx_pointsto_shim (KTR : CurKtier) (ξ : CtxId)

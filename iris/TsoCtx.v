@@ -403,6 +403,31 @@ Notation "a ↦c[ kt ] dq v" := (ctx_pointsto (KTR := kt) cur_ctx a dq v)
   (at level 20, kt at level 50, dq custom dfrac at level 1,
    format "a  ↦c[ kt ] dq  v") : bi_scope.
 
+(* THE PAYLOAD WRAPPER (the M3 sweep's client spelling; the `weak-memory`
+   branch's `<{ }>`, adopted verbatim).  A lock client writes its payload
+   as a plain [iProp] with the ambient spellings; this turns it into the
+   [CtxId → iProp] the lock surface needs by making the BOUND context the
+   ambient one inside -- [CurCtx] is a definitional class over [CtxId],
+   so the λ binder shadows the ambient instance and every [↦c]/ambient
+   fact in [P] re-indexes under it.  An UNCONVERTED payload (no
+   context-dependent fact inside) embeds constantly, which is why the
+   mechanical phase of the client sweep is just wrapping.
+   THE SPELLING IS [<{ P }>] AND NOT [<[ P ]>]: stdpp's insert notation
+   shares the [<[] prefix and Coq reports the two as incompatible
+   (measured on the branch; the brace form is free). *)
+Notation "<{ P }>" := (λ XLK : CurCtx, P%I)
+  (at level 0, P at level 200, format "<{  P  }>").
+
+(* The class TYPE is transparent to typeclass unification: [CurCtx] is
+   definitionally [CtxId], and instance search must see through the
+   wrapper's binder type or every [Persistent (is_lock … <{P}>)] /
+   [CtxMorph <{P}>] resolution dies at the (CurCtx → iProp) vs
+   (CtxId → iProp) seam.  This transparency is about the TYPE only; which
+   ambient [CurCtx] INSTANCE a term picks up is unaffected (the
+   silent-drop hazard in tso-port.md §2d concerns instance selection, not
+   type unfolding). *)
+Global Typeclasses Transparent CurCtx.
+
 (* The seal.  [ctx_dom] and [hart_view_lb] stay opaque too: nothing above
    this file may learn they are [True] at SC, and nothing may learn
    [ctx_parked] ignores its stamp. *)

@@ -14,7 +14,7 @@
    the C code says it should be:
 
      is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗
-                           inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi)
+                           inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }>
                                       ∨ pipe_dead γl γp)
 
    persistent, and [pipe_res] owns every remaining byte of the page -- the
@@ -127,6 +127,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import KallocInv.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
@@ -598,14 +599,14 @@ Section PipeInv.
      re-freeable, so it has to survive to pipeclose. *)
   Definition is_pipe (γl : gname) (γp : pipe_names) (pi : mword 64) : iProp Σ :=
     (⌜page_valid pi⌝ ∗
-     inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi) ∨ pipe_dead γl γp))%I.
+     inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> ∨ pipe_dead γl γp))%I.
 
   Global Instance is_pipe_persistent γl γp pi : Persistent (is_pipe γl γp pi).
   Proof. apply _. Qed.
 
   (* PERFORMANCE: seal it, for the same reason [WpLock.is_lock] is sealed --
      without this, every [iIntros "#Hpipe"] re-derives persistence by unfolding
-     into [lock_inv γl pi "pipe" (pipe_res γp pi)] and descending through [pipe_res]
+     into [lock_inv γl pi "pipe" <{ pipe_res γp pi }>] and descending through [pipe_res]
      instead of stopping at the instance above.  Worth 6.5 % of [ProofPiperead]
      on its own (104 s -> 97 s).  The three lemmas below are the interface. *)
   Global Typeclasses Opaque is_pipe.
@@ -613,14 +614,14 @@ Section PipeInv.
   Lemma is_pipe_valid γl γp pi : is_pipe γl γp pi -∗ ⌜page_valid pi⌝.
   Proof. rewrite /is_pipe. by iIntros "[$ _]". Qed.
   Lemma is_pipe_inv γl γp pi :
-    is_pipe γl γp pi -∗ inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi) ∨ pipe_dead γl γp).
+    is_pipe γl γp pi -∗ inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> ∨ pipe_dead γl γp).
   Proof. rewrite /is_pipe. by iIntros "[_ $]". Qed.
 
   (* what acquire / holding / release take.  The credential is left to the
      caller: a reference for acquire, the holder token for release. *)
   Lemma is_pipe_openable γl γp pi :
     is_pipe γl γp pi -∗
-    lock_openable γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp).
+    lock_openable γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp).
   Proof. iIntros "H". iApply lock_openable_of_dead. by iApply is_pipe_inv. Qed.
 
   (* ---- what a [struct file] of type FD_PIPE carries, ADDRESS-KEYED ----

@@ -57,6 +57,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis *)
 Require Import SleepLock.
 Require Import BufOwn.
 Require Import VirtioModel.
@@ -522,7 +523,7 @@ Section FsBoot.
   (* THE BUNDLE a boot client applies.  [bio_init]'s premises are copied
      verbatim, in order; the pool bundle it also wants is what this lemma
      manufactures out of the mint. *)
-  Lemma fs_boot_bundle (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
+  Lemma fs_boot_bundle `{XI : CurCtx} (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (γlk γtp : gname)
       (E : coPset) :
     fs_cov_in cov ndisk ->

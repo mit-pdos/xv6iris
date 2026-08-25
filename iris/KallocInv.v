@@ -10,7 +10,7 @@
    owned by the allocator.  The allocator's protected resource [kmem_res fl]
    owns the global head pointer (at address [fl] = &kmem.freelist) plus every
    page in the chain.  It becomes the resource [R] of a spin-lock over
-   &kmem.lock, giving [is_kmem γ lk fl := is_lock γ lk "kmem" (kmem_res fl)].
+   &kmem.lock, giving [is_kmem γ lk fl := is_lock γ lk "kmem" <{ kmem_res fl }>].
 
    THE PAGE-COUNT GHOST.  On top of the chain, the protected resource carries
    an authoritative count of the free pages, [kmem_avail_auth γk (length
@@ -59,6 +59,7 @@ From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Export PageGeom.  (* the pure page geometry: page_valid / page_base / nullp *)
 Local Open Scope Z_scope.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
@@ -296,7 +297,7 @@ Section Kalloc.
 
   (* the whole allocator = a spinlock whose resource is [kmem_res].  Persistent. *)
   Definition is_kmem (γ : gname) (γk : gname * gname) (lk fl : mword 64) : iProp Σ :=
-    is_lock γ lk "kmem"%string (kmem_res γk fl).
+    is_lock γ lk "kmem"%string <{ kmem_res γk fl }>.
   Global Instance is_kmem_persistent γ γk lk fl : Persistent (is_kmem γ γk lk fl).
   Proof. apply _. Qed.
 

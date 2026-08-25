@@ -121,7 +121,7 @@ Section WpSconfLock.
   (* fields' claims and hands the caller's credential straight back.        *)
   (* ==================================================================== *)
   Lemma lock_claims (γl : gname) (lk : mword 64) (str : string)
-      (R T Dc : iProp Σ) (E : coPset) :
+      (R : CtxId → iProp Σ) (T Dc : iProp Σ) (E : coPset) :
     ↑lockN ⊆ E ->
     (⊢ T -∗ Dc -∗ False) ->
     lock_openable γl lk str R Dc -∗ T ={E}=∗
@@ -149,7 +149,7 @@ Section WpSconfLock.
 
   (* holding's [lw a5,0(a0)]: any value, no evidence in or out. *)
   Lemma wp_clw_lockopen_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -211,7 +211,7 @@ Section WpSconfLock.
      prints the same at every hart, INVISIBLY) rebind it to the hart the
      step resumes on. *)
   Lemma wp_clw_lockopen_locked_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -288,7 +288,7 @@ Section WpSconfLock.
      already dead.  It could not be anything else -- an object's last
      reference has necessarily gone home by the time release runs. *)
   Lemma wp_sw_zero_lockfin_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Dc Out : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc Out : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -299,7 +299,7 @@ Section WpSconfLock.
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     lock_openable γl lk s R Dc -∗
     locked_pre γl cpu_id -∗
-    R -∗
+    (∃ ξ : CtxId, R ξ) -∗
     lock_finisher γl lk s R Dc Out (⊤ ∖ ↑minstretN) -∗
     wp_next b p (fun (CID : CpuId) =>
       Out -∗
@@ -364,7 +364,7 @@ Section WpSconfLock.
   (* the generic read: the caller's evidence [T] (a ticket or the holder
      token) determines a fact [phi] about the recorded owner word. *)
   Lemma wp_ld_lkcpu_lockopen_gen (cmp : bool)
-      (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (T : iProp Σ) (phi : mword 64 -> Prop) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -444,7 +444,7 @@ Section WpSconfLock.
      whatever it is (a non-holder learns nothing about it -- which is why
      holding() may answer either way, and acquire's panic arm is real). *)
   Lemma wp_cld_lkcpu_lockopen_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -497,7 +497,7 @@ Section WpSconfLock.
      The authority is threaded in and back out: it is not persistent, and its
      owner -- [cpu_own] -- wants it back. *)
   Lemma wp_cld_lkcpu_lockopen_notheld_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) (lks : gset string) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -567,7 +567,7 @@ Section WpSconfLock.
      even runs), so writing them literally inside the continuation would
      silently rebind them to whichever hart the step resumes on. *)
   Lemma wp_cld_lkcpu_lockopen_locked_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -613,7 +613,7 @@ Section WpSconfLock.
      [T'] as the ghost state moves to [stn], whose recorded owner word is
      exactly what the instruction stores. *)
   Lemma wp_sd_lkcpu_lockopen_gen (cmp : bool)
-      (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (T T' : iProp Σ) (stn : lock_state) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -769,7 +769,7 @@ Section WpSconfLock.
      for what that cost.  (The lock ORDER strengthens this to
      [LockRank.locks_below S s] in a later phase.) *)
   Lemma wp_csd_lkcpu_lockopen_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) (S : gset string) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -825,7 +825,7 @@ Section WpSconfLock.
      HALF of the cpu field, so this store is IMPOSSIBLE until the hart
      redeems its set fragment for the other half ([cpu_locks_delete]). *)
   Lemma wp_sd_zero_lkcpu_lockopen_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) (S : gset string) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -889,7 +889,7 @@ Section WpSconfLock.
      [cpu_id] literally inside the continuation would silently rebind it
      to whichever hart the step resumes on. *)
   Lemma wp_amoswap_lockopen_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (pc : mword 64) (rd rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (zeros' 64) in
@@ -909,7 +909,7 @@ Section WpSconfLock.
         Tc -∗
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
-        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ R
+        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
          ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
@@ -924,7 +924,7 @@ Section WpSconfLock.
                    ⌜npc = add_vec_int pc 4⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m⌝ ∗
                    ⌜n' = n⌝ ∗ Tc ∗
-                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ R
+                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
                     ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝))%I
               with "Hcg Hpc Hinstr [HTc Hcont]").
     iNext.
@@ -1011,7 +1011,7 @@ Section WpSconfLock.
                     (fun _ => Tc)
                     (fun bytes => Tc ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ R
+                          locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
                     (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
@@ -1092,7 +1092,7 @@ Section WpSconfLock.
                     with "Hk Hmem Hw") as "[Hmem Hw]".
             iAssert (|={⊤ ∖ ↑lockN, ⊤}=>
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ ▷ R
+                          locked_pre γl h0 ∗ ▷ (∃ ξ : CtxId, R ξ)
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
               with "[Hw Hcpu Hg Hbr Hcl]" as ">Hpay".
             { iDestruct "Hbr" as "[(>%Hnone & >%Hw0 & >Hfrag2 & HR) |

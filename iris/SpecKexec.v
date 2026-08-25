@@ -372,7 +372,7 @@ Definition fs_fabric
    procs_inv gs ∗
    dev_inv gu gd ∗
    disk_geom gd pd pav pu ∗
-   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
+   is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }>)%I.
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,

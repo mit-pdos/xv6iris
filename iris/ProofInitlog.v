@@ -2705,8 +2705,7 @@ Section ProofInitlog.
        the caller already owns the free ghost state of -- the era fupd's
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
-    iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
-            (log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart)
+    iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string <{ log_res (fs_dstep riscv_dview_name) γ bn γfs cov logstart }>
             with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
     iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
     { rewrite /log_ctx. iExists (fs_dstep riscv_dview_name). rewrite /log_ctx_at.

@@ -255,7 +255,7 @@ Section ProofSysUptime.
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspA0. }
     (* ===================== acquire(&tickslock) ===================== *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "time"%string ticks_res A4
+    iApply (Acquire.wp_acquire_sconf KT1 γl "time"%string <{ ticks_res }> A4
               n eb p (av - 4)%nat b lks
               ltac:(exact Hn)
               ltac:(lia)
@@ -263,7 +263,7 @@ Section ProofSysUptime.
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hlk". }
-    iIntros (CID9 Hs9 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
+    iIntros (CID9 Hs9 ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     assert (Hpc16 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x16))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
@@ -380,7 +380,7 @@ Section ProofSysUptime.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl a_tickslock "time"%string ticks_res B5
+    iApply (Release.wp_release_sconf KT1 γl a_tickslock "time"%string <{ ticks_res }> B5
               n eb p (av - 4)%nat
               ({["time"]} ∪ lks)
               ltac:(rewrite HB5a0; apply addv_sext0)

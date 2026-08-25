@@ -93,6 +93,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvModelBytes.
 Require Import ArrCursor.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import WpLockAt.   (* [lock_free_tok] / [newlock_at]: the pre-minted
                               lock gname, for [icache_boot_at] below *)
 Require Import SleepLock.
@@ -1660,7 +1661,7 @@ Section IcacheBootTable.
          straight through.
      [icache_boot] below is this lemma plus the two mints, so there is one
      body and the old signature is a corollary. *)
-  Lemma icache_boot_at (E : coPset) (γl : gname) (cn : ic_names)
+  Lemma icache_boot_at `{XI : CurCtx} (E : coPset) (γl : gname) (cn : ic_names)
       (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     (* THE COUNT AUTHORITY, at the empty table.  A PREMISE rather than an
@@ -1784,8 +1785,7 @@ Section IcacheBootTable.
       { iApply (big_sepL_mono with "Hslots"). intros idx k _.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
-    iMod (newlock_at E γl itable_lock "itable"%string
-            (itable_res2 cn γfs γi cov logstart nib dv)
+    iMod (newlock_at E γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dv }>
             with "Hfree Hnm Hlkw Hcpu Hres") as "#Hlock".
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".
@@ -1826,7 +1826,7 @@ Section IcacheBootTable.
      [icache_boot_at] overwrites the identification values, so the mint runs
      at [ic_dv_dummy] and [fun_of_big] never has to happen before it.  That
      is the same fact that makes the [_at] form possible at all. *)
-  Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
+  Lemma icache_boot `{XI : CurCtx} (E : coPset) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗

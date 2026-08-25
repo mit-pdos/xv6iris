@@ -345,7 +345,7 @@ Definition wp_sys_unlink_sconf_body
   gen_cert -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region the two flushes write ---- *)
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗

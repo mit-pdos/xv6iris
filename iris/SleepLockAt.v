@@ -17,6 +17,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Export WpLockAt.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Export SleepLock.
 Local Open Scope Z_scope.
 
@@ -39,7 +40,7 @@ Section SleepLockAt.
 
   (* [SleepLock.new_sleeplock_gen_at] with the inner spinlock's gname given
      as well: nothing is minted here, so the conclusion is not existential. *)
-  Lemma new_sleeplock_gen_at2 E (p : gname * gname) (slk : mword 64)
+  Lemma new_sleeplock_gen_at2 `{XI : CurCtx} E (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_pair p -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
@@ -52,8 +53,7 @@ Section SleepLockAt.
   Proof.
     iIntros "[Hlfree Hfree] #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string
-            (sl_res_gen p.2 slk R H)
+    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string <{ sl_res_gen p.2 slk R H }>
             with "Hlfree Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as "#Hlk".
     { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iModIntro. iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
@@ -61,7 +61,7 @@ Section SleepLockAt.
 
   (* the two forms an array initializer uses: initsleeplock's packaged output
      ([sl_fresh]) against a pre-minted pair. *)
-  Lemma sl_fresh_new_gen_at2 E (p : gname * gname) (slk : mword 64)
+  Lemma sl_fresh_new_gen_at2 `{XI : CurCtx} E (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_pair p -∗ sl_fresh slk s -∗ R ={E}=∗
     is_sleeplock_gen p.1 p.2 slk s R H.
@@ -71,7 +71,7 @@ Section SleepLockAt.
               with "Hp Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
   Qed.
 
-  Lemma sl_fresh_new_at2 E (p : gname * gname) (slk : mword 64)
+  Lemma sl_fresh_new_at2 `{XI : CurCtx} E (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) :
     sl_free_pair p -∗ sl_fresh slk s -∗ R ={E}=∗ is_sleeplock p.1 p.2 slk s R.
   Proof.

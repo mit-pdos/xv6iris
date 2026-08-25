@@ -609,7 +609,7 @@ Section ProofMainSecondary.
        the geometry are the pieces that are not this hart's to make.
        Persistent, so they simply ride in. *)
     console_caps γd -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
     disk_geom γv pd pav pu -∗
     (* this hart's timer capability, allocated in the boot chain *)
     timer_cap -∗

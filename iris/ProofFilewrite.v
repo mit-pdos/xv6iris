@@ -1537,8 +1537,7 @@ Section ProofFilewrite.
     ic_sleeplocks (fwn_ic fn) -∗
     dev_inv (fwn_uart fn) (fwn_disk fn) -∗
     DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
-    is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string
-      (DiskInv.disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
+    is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string <{ DiskInv.disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> -∗
     (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
        the persistent half rather than being loop-carried. *)
     BitmapInv.bitmap_inv (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn)

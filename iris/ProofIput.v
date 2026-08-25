@@ -723,8 +723,7 @@ Section IputTail.
        lemma proves); [lks] is the caller's OWN held set, below it. *)
     locks_below lks "itable" ->
     kernel_text -∗
-    is_lock gtl itable_lock "itable"%string
-      (itable_res2 cn gfs gi cov logstart nib dev) -∗
+    is_lock gtl itable_lock "itable"%string <{ itable_res2 cn gfs gi cov logstart nib dev }> -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x24) : mword 64) -∗
     sie_cap_gpr KT1 D (trap_res eb + (K - 6))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
@@ -835,8 +834,7 @@ Section IputTail.
       rewrite /D3 upd_ne; [reflexivity | regne]. }
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spd)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
-    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
-              (itable_res2 cn gfs gi cov logstart nib dev) D5
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string <{ itable_res2 cn gfs gi cov logstart nib dev }> D5
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -932,8 +930,7 @@ Section IputTail.
        is already past iput's FIRST [acquire(&itable.lock)]. *)
     locks_below lks "itable" ->
     kernel_text -∗
-    is_lock gtl itable_lock "itable"%string
-      (itable_res2 cn gfs gi cov logstart nib dev) -∗
+    is_lock gtl itable_lock "itable"%string <{ itable_res2 cn gfs gi cov logstart nib dev }> -∗
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart k -∗
     (* THE REGION, NEW AT §2.2/§2.3: every count move now reaches the [icnt]
@@ -1469,7 +1466,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots 2 -∗
     log_epoch_lb γ v -∗
@@ -2182,7 +2179,7 @@ Section IputFreePath.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     (* the itable, HELD *)
-    is_lock gtl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) -∗
+    is_lock gtl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> -∗
     itable_inv -∗
     ic_escrow cn γfs γi cov logstart k -∗
     locked gtl cpu_id -∗
@@ -2311,7 +2308,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
@@ -2423,8 +2420,7 @@ Section IputFreePath.
     rewrite (isl_slot_some Mt k q 1%positive HMk1).
     iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
     iMod (slh_return_last (icfg_isl k) q with "Hisl Hrslh") as "Hisl".
-    iApply (ASL.wp_acquiresleep_nb_sconf j gil gisl "inode"%string
-              (ic_tok cn k) (icfg_isl k) q R0 pidv Vpr (trap_res eb + (K - 6))%nat eb 0%nat
+    iApply (ASL.wp_acquiresleep_nb_sconf j gil gisl "inode"%string (ic_tok cn k) (icfg_isl k) q R0 pidv Vpr (trap_res eb + (K - 6))%nat eb 0%nat
               ({["itable"]} ∪ lks)
               ltac:(lia) ltac:(cbn; lia) Hslfresh
               with "Hcg Hcnt Htext Hpc [] Hisl Hppid").
@@ -2579,8 +2575,7 @@ Section IputFreePath.
                        H3 !!! Regidx c = mfa !!! Regidx c).
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
-              (itable_res2 cn γfs γi cov logstart nib dev) H3
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres Hcnt Hpay").
@@ -2893,13 +2888,12 @@ Section IputFreePath.
       rewrite /J8 upd_ne; [| regne]. rewrite /J7 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
-              (itable_res2 cn γfs γi cov logstart nib dev) J9
+    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> J9
               0%nat eb pj (K - 6)%nat eb lks ltac:(lia) ltac:(lia) Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitlk]").
     all: try lkbelow.
     { iEval (rewrite HJ9a0). iExact "Hitlk". }
-    iIntros (CIDac2 Hsac2 ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 Hcnt Hpay".
+    iIntros (CIDac2 Hsac2 ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 _ Hcnt Hpay".
     assert (Hpc86 : ret_pc (J9 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x86))
       by (rewrite HJ9ra; pcw).
     iEval (rewrite Hpc86) in "Hpc".
@@ -3280,8 +3274,7 @@ Section IputFreePath.
                        G3 !!! Regidx c = F1 !!! Regidx c).
     { intros c Hcs. rewrite /G3 upd_ne; [| regne].
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
-              (itable_res2 cn γfs γi cov logstart nib dev) G3
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres3 Hcnt Hpay").
@@ -3636,7 +3629,7 @@ Section IputFreePath.
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    is_lock gtl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) -∗
+    is_lock gtl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dev }> -∗
     itable_inv -∗
     ic_escrow cn γfs γi cov logstart k -∗
     locked gtl cpu_id -∗
@@ -3675,7 +3668,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 3 -∗
     log_epoch_lb γ v -∗
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
@@ -4869,15 +4862,14 @@ Section ProofIput.
                 [ reflexivity | vm_compute; reflexivity | nz | nz | nz ] ]. }
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
-              (itable_res2 cn gfs gi cov logstart nib dev) mA
+    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string <{ itable_res2 cn gfs gi cov logstart nib dev }> mA
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(lia) ltac:(lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hitab]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hitab". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x18)).
     { rewrite HmAra. pcw. }
     iEval (rewrite Hpc18) in "Hpc".
