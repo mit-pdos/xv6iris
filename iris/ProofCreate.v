@@ -3117,33 +3117,33 @@ Section ProofCreateMain.
         by (rewrite /Q2; apply cr_regs_caller; [exact Hcsra | exact HQ1regs]).
       iDestruct (cpu_own_transport CIDnp CID17 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
-                gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd PlainK
-                dev dind
-                pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
-                V ltac:(exact HKil) Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
-                      Hslkd Hshr Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
-      all: try lkbelow.
-      { rewrite Heb /trap_csrs_ext. done. }
-      { rewrite Heb /cpu_claim_ext. done. }
-      iIntros (CIDil Hqil mil dnl bml fld)
-        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep
-         Hidev Hiinum Hivalid Hload #Hshotl Hfrzl %Hfrd Hrud %Hilkpd".
-      (* THE PARENT'S CHECKOUT IS ARMED (durable-disk B''-tx2), and the
-         TRANSACTION ID IS NAMED FROM HERE ON.  create's second lock has to
-         park at the SAME transaction as this one, so the id leaves
-         [LogInv.log_tx]'s existential once, at the first lock, and re-enters
-         it only at an exit that holds no lock at all. *)
+      (* THE PARENT'S CHECKOUT IS ARMED (durable-disk B''-tx2) AT THE
+         CHECKOUT ITSELF (B''-tx3), and the TRANSACTION ID IS NAMED FROM HERE
+         ON.  create's second lock has to park at the SAME transaction as this
+         one, so the id leaves [LogInv.log_tx]'s existential once, before the
+         first lock, and re-enters it only at an exit that holds no lock at
+         all. *)
       iEval (rewrite Hglog) in "Htx".
       iDestruct (log_tx_open with "Htx") as (t) "Htw".
       iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                    (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
-      iApply fupd_wp.
-      iMod (ic_arm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-              t (1/2)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htp")
-        as "[Hivalid Hdep]".
-      iModIntro.
+      iApply (IL.wp_ilock_dep_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
+                gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd
+                (DepTx (qd/2)%Qp dev dind gd t (1/2)) PlainK
+                dev dind
+                pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
+                V ltac:(exact HKil) eq_refl ltac:(discriminate)
+                Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
+                      Hslkd Hshr [Htp] Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
+      all: try lkbelow.
+      { rewrite Heb /trap_csrs_ext. done. }
+      { rewrite Heb /cpu_claim_ext. done. }
+      { rewrite /ic_dep_side. iExact "Htp". }
+      iIntros (CIDil Hqil mil dnl bml fld)
+        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep
+         Hidev Hiinum Hivalid Hload #Hshotl Hfrzl %Hfrd Hrud %Hilkpd".
+      iEval (rewrite /ic_dep_held /=) in "Hload".
       assert (Hpcil : ret_pc (Q2 !!! Regidx Rra : mword 64)
                       = mword_of_int (CK + 0x2a)) by (rewrite HQ2ra; pcw).
       iEval (rewrite Hpcil) in "Hpc".
@@ -3801,28 +3801,27 @@ Section ProofCreateMain.
           iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDu1 CID29 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
+          (* THE CHILD'S CHECKOUT IS ARMED (durable-disk B''-tx2) AT THE
+             CHECKOUT ITSELF (B''-tx3).  The parent went home at +0x50, so
+             this arm parks exactly the half that came back from its disarm,
+             at the same transaction. *)
+          iApply (IL.wp_ilock_dep_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
                     gilc gislc cov logstart inodestart nib kslot (qq/2)%Qp gc
-                    PlainK
+                    (DepTx (qq/2)%Qp dev cinum gc t (1/2)) PlainK
                     dev cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
-                    V ltac:(exact HKil) Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
+                    V ltac:(exact HKil) eq_refl ltac:(discriminate)
+                    Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc
-                          Hiregi Hslkc Hcshr Hruc Hsbi Hppid Hprocs Hdevi Hgeom
+                          Hiregi Hslkc Hcshr [Htp] Hruc Hsbi Hppid Hprocs Hdevi Hgeom
                           Hdlk Hbs1").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
+          { rewrite /ic_dep_side. iExact "Htp". }
           iIntros (CIDic Hqic mic dnc bmc flc)
             "%Hcsic Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep
              Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrc Hruc %Hilkpc".
-          (* THE CHILD'S CHECKOUT IS ARMED (durable-disk B''-tx2).  The
-             parent went home at +0x50, so this arm parks exactly the half
-             that came back from its disarm, at the same transaction. *)
-          iApply fupd_wp.
-          iMod (ic_arm_tx ⊤ cn γfs γi cov logstart kslot (qq/2)%Qp dev cinum gc true
-                  t (1/2)%Qp ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep Htp")
-            as "[Hcivalid Hcdep]".
-          iModIntro.
+          iEval (rewrite /ic_dep_held /=) in "Hcload".
           assert (Hpcic : ret_pc (F5 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x5a)) by (rewrite HF5ra; pcw).
           iEval (rewrite Hpcic) in "Hpc".

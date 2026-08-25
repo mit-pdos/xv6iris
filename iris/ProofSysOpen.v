@@ -3224,29 +3224,32 @@ Section ProofSysOpenBody.
       exact (HP1thr c Hc N2b N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID3 CID6 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Ilock.wp_ilock_sconf (CID := CID6) gs jx gl gu gd gk pd pav pu bn
+    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2) AT THE CHECKOUT ITSELF
+       (B''-tx3): half of this transaction's element is handed to [ilock] as
+       the descriptor's own parked share, so the slot's escrow holds a [DepTx]
+       from the instant the entry leaves; sys_open keeps the other half inside
+       the descriptor until the release, so the walk carries only the BUDGET
+       half of the token from here on. *)
+    iEval (rewrite Hlogc) in "Htx".
+    iDestruct (log_tx_halve with "Htx") as (t) "[Htp Htr]".
+    iApply (Ilock.wp_ilock_dep_sconf (CID := CID6) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib
-              kk (qq/2)%Qp gy PlainK dev inum pidv (DfracOwn (1/4)) dqs
+              kk (qq/2)%Qp gy (DepTx (qq/2)%Qp dev inum gy t (1/2)) PlainK
+              dev inum pidv (DfracOwn (1/4)) dqs
               P2 (K - 24)%nat eb b lks V
-              HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP2a0
+              HKil eq_refl ltac:(discriminate)
+              Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
-                    Hslkk Hshr Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkk Hshr [Htp] Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
+    { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID7 Hq7 mil dn bm fl)
       "%Hcsil Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
        Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
-    (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): half of this
-       transaction's element parks in the slot's escrow and sys_open keeps
-       the other half inside the descriptor until the release, so the walk
-       carries only the BUDGET half of the token from here on. *)
-    iApply fupd_wp.
-    iEval (rewrite Hlogc) in "Htx".
-    iMod (SpecIlock.ic_arm_tx_log ⊤ cn gfs gi cov logstart kk (qq/2)%Qp dev
-            inum gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep Htx")
-      as "(Hivalid & Hdep)".
-    iModIntro.
+    iEval (rewrite /ic_dep_held /=) in "Hload".
+    iDestruct (ic_tx_dep_intro with "Hdep Htr") as "Hdep".
     assert (Hpcil : ret_pc (P2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0xec)) by (rewrite HP2ra; pcw).
     iEval (rewrite Hpcil) in "Hpc".

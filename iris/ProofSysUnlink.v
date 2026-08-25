@@ -1898,31 +1898,32 @@ Section ProofSysUnlinkBody.
       by (rewrite /R0; apply su_regs_caller; [exact Hcsra | exact Hregs]).
     iDestruct (cpu_own_transport CID0 CID1 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Ilock.wp_ilock_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
-              gfs gi cn gild gisld cov logstart inodestart nib kd (qd/2)%Qp
-              gyd PlainK dev dinum pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b
-              lks
-              (upd_upt V P1) ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl HR0a0
-              (Hlb "bcache"%string)
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hitinv Hescd Hireg
-                    Hslkd0 Hshrd Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
-    { rewrite Heb /trap_csrs_ext. done. }
-    { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID2 Hq2 mil dnd bmd fld)
-      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep
-       Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
-    (* THE PARENT'S CHECKOUT IS ARMED (durable-disk B''-tx2), and the
-       transaction id is named from here on: sys_unlink's second lock has to
-       park at the SAME transaction. *)
+    (* THE PARENT'S CHECKOUT IS ARMED (durable-disk B''-tx2), AT THE CHECKOUT
+       ITSELF (B''-tx3): the half is handed to [ilock] as the descriptor's own
+       parked share, so the escrow's OUT arm is a [DepTx] from the instant the
+       entry leaves.  The transaction id is named from here on: sys_unlink's
+       second lock has to park at the SAME transaction. *)
     iEval (rewrite Hglog) in "Htx".
     iDestruct (log_tx_open with "Htx") as (t) "Htw".
     iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                  (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
-    iApply fupd_wp.
-    iMod (ic_arm_tx ⊤ cn gfs gi cov logstart kd (qd/2)%Qp dev dinum gyd true
-            t (1/2)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htp")
-      as "[Hivalid Hdep]".
-    iModIntro.
+    iApply (Ilock.wp_ilock_dep_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
+              gfs gi cn gild gisld cov logstart inodestart nib kd (qd/2)%Qp
+              gyd (DepTx (qd/2)%Qp dev dinum gyd t (1/2)) PlainK dev dinum
+              pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b
+              lks
+              (upd_upt V P1) ltac:(exact Kil) eq_refl ltac:(discriminate)
+              Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl HR0a0
+              (Hlb "bcache"%string)
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hitinv Hescd Hireg
+                    Hslkd0 Hshrd [Htp] Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
+    { rewrite /ic_dep_side. iExact "Htp". }
+    iIntros (CID2 Hq2 mil dnd bmd fld)
+      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep
+       Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
+    iEval (rewrite /ic_dep_held /=) in "Hload".
     assert (Hpc34 : ret_pc (R0 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x34)) by (rewrite HR0ra; pcw).
     iEval (rewrite Hpc34) in "Hpc".
@@ -3874,36 +3875,39 @@ Section ProofSysUnlinkBody.
       by (rewrite /R0; apply su_regs_caller; [exact Hcsra | exact Hregs]).
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Ilock.wp_ilock_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
-              gfs gi cn gili gisli cov logstart inodestart nib ks (qs/2)%Qp
-              gyi PlainK dev
-              (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
-              pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
-              (upd_upt V P1) ltac:(exact Kil) Hks Hgeom Hist0 Hiblki Hinb Hj Hgl HR0a0
-              (Hlb "bcache"%string)
-              with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hitinv Hesci Hireg
-                    Hslki Hshri Hrui Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
-    { rewrite Heb /trap_csrs_ext. done. }
-    { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID3 Hq3 mil dni bmi fldi)
-      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi
-       Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi Hrui %Hilkpi".
-    assert (Hpc78 : ret_pc (R0 !!! Regidx Rra : mword 64)
-                    = mword_of_int (SU + 0x78)) by (rewrite HR0ra; pcw).
-    iEval (rewrite Hpc78) in "Hpc".
-    (* BOTH INODES ARE WRITE-LOCKED NOW (durable-disk B''-tx2): the parent's
-       arm SHRINKS to a quarter and the child's is armed with what comes
-       back, so the residue the walk keeps is a half. *)
+    (* BOTH INODES ARE WRITE-LOCKED NOW (durable-disk B''-tx2), and the
+       child's arm is taken AT ITS CHECKOUT (B''-tx3): the parent's arm
+       SHRINKS to a quarter first and what comes back is what [ilock] parks,
+       so the residue the walk keeps is a half and no bundleless arm ever
+       stands. *)
     iApply fupd_wp.
     iMod (ic_shrink_tx ⊤ cn gfs gi cov logstart kd sd dev dinum gyd true
             t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter)
             ltac:(solve_ndisj) with "Hescd Hivalidd Hdepd")
       as "(Hivalidd & Hdepd & Htp)".
-    iMod (ic_arm_tx ⊤ cn gfs gi cov logstart ks (qs/2)%Qp dev
-            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hesci Hivalidi Hdepi Htp")
-      as "[Hivalidi Hdepi]".
     iModIntro.
+    iApply (Ilock.wp_ilock_dep_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
+              gfs gi cn gili gisli cov logstart inodestart nib ks (qs/2)%Qp
+              gyi (DepTx (qs/2)%Qp dev
+                     (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                     gyi t (1/4)) PlainK dev
+              (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+              pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
+              (upd_upt V P1) ltac:(exact Kil) eq_refl ltac:(discriminate)
+              Hks Hgeom Hist0 Hiblki Hinb Hj Hgl HR0a0
+              (Hlb "bcache"%string)
+              with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hitinv Hesci Hireg
+                    Hslki Hshri [Htp] Hrui Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
+    { rewrite /ic_dep_side. iExact "Htp". }
+    iIntros (CID3 Hq3 mil dni bmi fldi)
+      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi
+       Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi Hrui %Hilkpi".
+    iEval (rewrite /ic_dep_held /=) in "Hloadi".
+    assert (Hpc78 : ret_pc (R0 !!! Regidx Rra : mword 64)
+                    = mword_of_int (SU + 0x78)) by (rewrite HR0ra; pcw).
+    iEval (rewrite Hpc78) in "Hpc".
     assert (Hilregs : su_regs m sp0 (ientry kd) (ientry ks)
                         (m !!! Regidx Rs3 : mword 64) mil)
       by exact (su_regs_cs m sp0 _ _ _ R0 mil Hcsil HR0regs).

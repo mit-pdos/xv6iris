@@ -4081,14 +4081,13 @@ Section IcacheEscrow.
   (*       transaction; durable-disk B''-join)                             *)
   (* ------------------------------------------------------------------ *)
 
-  (* THE SHED AND THE UNSHED, the read arm's twin of [ic_arm_tx] /
-     [ic_disarm_tx] and for the same reason: as TWO GHOST STEPS on the
-     deposit a holder already carries they cost [SpecIlock] and [SpecIunlock]
-     nothing (no caller of either moves at all), and each read-locker converts
-     on its own -- [ic_shed_rd] straight after its [ilock], [ic_unshed_rd]
-     straight before its [iunlock].  There are exactly two of them
-     ([ProofFileread], [ProofFilestat]); every other caller of [ilock] holds a
-     transaction and takes the WRITE arm.
+  (* THE UNSHED, the read arm's re-join.  Under B''-join the shed and the
+     unshed were two GHOST STEPS a read-locker ran on the deposit it already
+     carried; since B''-tx3 both are INSIDE the contracts -- the shed in
+     [ic_swap_checkout_rd], the unshed here, called only from
+     [ic_swap_park_dep] -- so the escrow never holds a bundleless arm for a
+     read-locker at all and [ProofFileread] / [ProofFilestat] run no ghost
+     step of their own.
 
      WHAT MAKES THE UNSHED UNDOABLE is not the descriptor here but the
      QUARTER OF [top_frag] the holder carries: the arm's existentially-bound
@@ -4098,60 +4097,6 @@ Section IcacheEscrow.
      between the two arms: a transaction's id is not determined by anything
      the escrow holds ([IcacheTxRefute.tx_two_halves_no_whole]), so the write
      arm had to write [(t, q)] down; an inode's node IS. *)
-  Lemma ic_shed_rd_body cn γfs γi cov logstart k
-      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
-      (dn : dinode) (bm : blkmap) :
-    ic_escrow_body cn γfs γi cov logstart k -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
-    ic_loaded γfs γi cov logstart k inum dn bm ==∗
-      i_valid (ientry k) ↦₄ valid_word v ∗
-      ic_deposit cn k (DepRd s dev inum g) ∗
-      ic_rd_held γfs cov logstart k inum dn bm ∗
-      ic_escrow_body cn γfs γi cov logstart k.
-  Proof.
-    iIntros "Hbody Hvld Hdep0 Hload".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
-    - iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & Hvld' & _ & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
-    - iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & Hmt & Hgid & _)".
-      iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
-      iDestruct "Hres" as "[Hres | Hfrz]".
-      2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
-      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      iDestruct "Hres" as "[[%Heq Hshr] Hhf]".
-      destruct Heq as [-> ->].
-      iDestruct (ic_loaded_shed with "Hload") as "[Harm Hheld]".
-      iMod (ghost_var_update_2 (DepRd s dev2 inum2 g) with "Hdep0 Hdep")
-        as "[Hdep0 Hdep]"; [rewrite Qp.half_half; reflexivity |].
-      (* EVERY SPLIT IS BY NAME AND EVERY LEAF IS AN [iExact].  A bare
-         [iFrame] here searches the goal's LAST conjunct, [ic_escrow_body] --
-         five arms over the payload's big-ops -- before it reaches anything,
-         and that one search is minutes (optimization.md's measurement at
-         [ic_swap_checkout]). *)
-      iModIntro.
-      iSplitL "Hvld"; [iExact "Hvld" |].
-      iSplitL "Hdep0"; [iExact "Hdep0" |].
-      iSplitL "Hheld"; [iExact "Hheld" |].
-      iRight; iLeft. rewrite /ic_out.
-      iExists (DepRd s dev2 inum2 g), dev2, inum2.
-      iSplitL "Hdep"; [iExact "Hdep" |].
-      iSplitL "Hshr Hhf".
-      { iLeft. rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-        iSplitL "Hshr";
-          [iSplitR; [iPureIntro; split; reflexivity | iExact "Hshr"]
-          | iExact "Hhf"]. }
-      iSplitL "Hmt"; [iExact "Hmt" |].
-      iSplitL "Hgid"; [iExact "Hgid" |].
-      iExact "Harm".
-    - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
-    - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
-    - iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
-  Qed.
-
   Lemma ic_unshed_rd_body cn γfs γi cov logstart k
       (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
       (dn : dinode) (bm : blkmap) :
@@ -4201,52 +4146,6 @@ Section IcacheEscrow.
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
-  Qed.
-
-  (* the two as a read-locker meets them: one ghost step each, at the slot's
-     own namespace, opening nothing else. *)
-  Lemma ic_shed_rd (E : coPset) cn γfs γi cov logstart k
-      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
-      (dn : dinode) (bm : blkmap) :
-    ↑(icEscN .@ k) ⊆ E ->
-    ic_escrow cn γfs γi cov logstart k -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
-    ic_loaded γfs γi cov logstart k inum dn bm ={E}=∗
-      i_valid (ientry k) ↦₄ valid_word v ∗
-      ic_deposit cn k (DepRd s dev inum g) ∗
-      ic_rd_held γfs cov logstart k inum dn bm.
-  Proof.
-    iIntros (HE) "#Hesc Hvld Hdep Hload".
-    iMod (inv_acc E (icEscN .@ k) with "Hesc") as "[Hbody Hclose]";
-      [exact HE |].
-    iDestruct "Hbody" as ">Hbody".
-    iMod (ic_shed_rd_body with "Hbody Hvld Hdep Hload")
-      as "(Hvld & Hdep & Hheld & Hbody)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
-    iModIntro. iFrame "Hvld Hdep Hheld".
-  Qed.
-
-  Lemma ic_unshed_rd (E : coPset) cn γfs γi cov logstart k
-      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
-      (dn : dinode) (bm : blkmap) :
-    ↑(icEscN .@ k) ⊆ E ->
-    ic_escrow cn γfs γi cov logstart k -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_deposit cn k (DepRd s dev inum g) -∗
-    ic_rd_held γfs cov logstart k inum dn bm ={E}=∗
-      i_valid (ientry k) ↦₄ valid_word v ∗
-      ic_deposit cn k (DepShr s dev inum g) ∗
-      ic_loaded γfs γi cov logstart k inum dn bm.
-  Proof.
-    iIntros (HE) "#Hesc Hvld Hdep Hheld".
-    iMod (inv_acc E (icEscN .@ k) with "Hesc") as "[Hbody Hclose]";
-      [exact HE |].
-    iDestruct "Hbody" as ">Hbody".
-    iMod (ic_unshed_rd_body with "Hbody Hvld Hdep Hheld")
-      as "(Hvld & Hdep & Hload & Hbody)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
-    iModIntro. iFrame "Hvld Hdep Hload".
   Qed.
 
   (* ---- THE PARK AT ANY OF ILOCK'S THREE ARMS (durable-disk B''-tx3) ----
@@ -4373,11 +4272,11 @@ Section IcacheEscrow.
 
   (* A DESCRIPTOR THAT NEITHER ARM OWNS.  [DepRd] leaves three quarters of the
      bundle in the escrow and [DepTx] parks a transaction share the commit can
-     refute; these three leave NOTHING and say nothing, which is exactly the
-     state plan section 3's ONE [ilock] spec retires.  [DepRef] and [DepFrz]
-     are iput's two windows; [DepShr] is a lock withdrawal that has done
-     neither -- i.e. every transactional caller of [ilock] the sweep has not
-     yet converted. *)
+     refute; these two leave NOTHING and say nothing, which is exactly the
+     state plan section 3's ONE [ilock] spec retires.  [DepFrz] is iput's
+     freeze window; [DepShr] is a lock withdrawal that has armed NEITHER way,
+     and since durable-disk B''-tx3 no CHECKOUT publishes one -- what is left
+     of it is named at [ic_slot_cover]'s alternative (d) below. *)
   Definition ic_dep_bundleless (d : ic_dep) : bool :=
     match d with
     | DepShr _ _ _ _ | DepFrz _ _ _ => true
@@ -4418,21 +4317,34 @@ Section IcacheEscrow.
        (d) THE RESIDUE -- the slot is live and the escrow holds no bundle at
            all.  Naming it is the point: this alternative is exactly what the
            caller sweep still owes, and NOTHING ELSE remains.  What reaches
-           it, after durable-disk B''-tx2 armed the last three transactional
-           walks ([create], [sys_open], [sys_unlink]):
+           it, after durable-disk B''-tx3 moved the arm into the checkout and
+           the retirement into the park:
 
-             - iput's two descriptors [DepRef] and [DepFrz], its mid-free
-               park ([ic_payload_arm]'s frozen alternative) and its
-               authority-side window [ic_held].  Every [iput] in this kernel
-               runs INSIDE a transaction, but [SpecIput]'s contract does not
-               carry one, so none of those four can park a share until it
-               does.
-             - the [DepShr] the plain [ilock] publishes, in the gap between
-               its checkout and whichever ghost step arms or sheds it.  It
-               has NO non-lock use left -- every walk-level mention is gone
-               -- so it dies when the checkout itself publishes [DepRd] (the
-               read arm) or [DepTx] (the write arm), i.e. when
-               [ic_swap_checkout] takes the arm rather than a later fupd.
+             - IPUT'S THREE WINDOWS: [DepFrz] (the +0x5e freeze window), the
+               mid-free park ([ic_payload_arm]'s frozen alternative, +0x70)
+               and the authority-side window [ic_held] (+0x3c).  Every [iput]
+               in this kernel runs INSIDE a transaction, but [SpecIput]'s
+               contract does not carry one, so none of the three can park a
+               share until it does.  [ic_held] is the one that cannot simply
+               be given the share: its window spans [acquiresleep], where the
+               slot's descriptor variable is inside the entry's SLEEPLOCK and
+               iput holds no per-slot ghost at all, so a share parked in it
+               could not be re-identified at the exit ([ic_open_held] would
+               hand back an existential [(t, q)]).  Giving it one needs a
+               pin the slot does not have today.
+             - THE [DepShr] LEFT ON THE RETIREMENT SIDE, in the gap between an
+               [ic_disarm_tx] / [ic_disarm_tx_log] fupd and the [iunlock] /
+               [iunlockput] that follows it.  [IcacheEscrow.ic_swap_park_dep]
+               is what closes it -- it retires the descriptor in the park's
+               own ghost step -- and reaching those sites needs
+               [SpecIunlockput]'s generic form beside [SpecIunlock]'s.  On the
+               WITHDRAWAL side there is exactly one left, create's fresh
+               child, whose slot and generation are chosen inside
+               [ProofCreateFreshTy]'s span and so must be threaded through
+               that span's own statement.
+
+     LANE C READS THIS THROUGH [ic_escrow_body_cover_all], and alternative (d)
+     is the whole of what it cannot close.
 
      THE WRITE ARM IS NOT AMONG THEM, and that is what the [ln_tx] authority
      buys: a [DepTx] arm holds a positive share of an open transaction's
