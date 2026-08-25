@@ -182,23 +182,25 @@ each now the recipe:
    (`page_head8_word_at`, `run_page_page_own`, `kmem_res_push`) leave
    an unresolved evar that surfaces as incomplete-proof-at-Qed far from
    the cause; pass `(ξc := cur_ctx)`.
-5. **ERASE THE PAYLOAD ARGUMENT AT ACQUIRE/RELEASE CALL SITES FIRST.**
-   The lock-invariant argument of `wp_acquire_*`/`wp_release_*`
-   applications unifies from the framed `is_lock`/`R cur_ctx`
-   hypotheses, so `_` works there (verified on ProofKalloc, both
-   directions) — and unlike ambient resolution it is DETERMINISTIC: an
-   evar must MATCH the held resource, it cannot silently bind the wrong
-   context.  So run a mechanical pass replacing the explicit payload at
-   every acquire/release call site with `_` BEFORE converting payloads:
-   each later payload conversion then touches only the payload's own
-   definition file and its `is_lock`-creation sites, with zero
-   call-site churn (the kmem conversion paid that churn by hand at ~10
-   sites; the next payloads should not).  Guard rails: keep the
-   explicit spelling in STATEMENTS (specs' `is_lock` premises,
-   `iAssert`s, definitions), where there is no frame to pin the evar;
-   and `TsoCtx.ctx_morph_const` carries priority `| 100` so an eager
-   typeclass resolution can never commit a still-flexible payload evar
-   to the constant embedding.
+5. **THE PAYLOAD ARGUMENT STAYS EXPLICIT AT CALL SITES** (owner ruling
+   2026-08-25, reversing the first version of this rule).  An `_` there
+   IS sound — the evar unifies from the framed `is_lock`/`R cur_ctx`
+   hypotheses, verified on ProofKalloc both directions — but it is BAD
+   FOR PROOF PERFORMANCE: the specs' implicit `{!CtxMorph R}` argument
+   runs instance search while `R` is still a flexible evar, and the
+   structural instances (`ctx_morph_sep`/`exist`/`big_sepL`) unify with
+   an evar by INVENTING structure, then backtrack — the pipe proofs
+   went from minutes to unbounded (15+ min rocqworkers, killed).  The
+   full 156-site erasure sweep was applied and REVERTED;
+   `tools/lock_ctx_sweep.py`'s `erase` mode is kept as the record of
+   the experiment, marked rejected.  Consequence: a payload conversion
+   includes a mechanical call-site pass (the old payload expression is
+   the grep key; kmem measured ~10 sed sites per lock).
+   `TsoCtx.ctx_morph_const`'s `| 100` priority stays — it is the right
+   ordering for concrete payloads regardless.  If call-site erasure is
+   ever wanted again, the prerequisite is a
+   `Hint Mode CtxMorph - - !` suspending instance search until `R` is
+   rigid — measure before adopting.
 
 Tree green on the VM (full rebuild + 88-file follow-up, EXIT=0), audit
 at baseline.  Next payloads repeat 1–4; after the M1 flip, step 3's
