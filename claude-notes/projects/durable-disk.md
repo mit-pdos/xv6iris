@@ -540,6 +540,94 @@ as their remaining consumers.
   `wp_bmap_gen_body`) still carry `dq` as a vestigial binder while the
   no-alloc one uses it as the fraction; `ProofReadi.rd_q` now feeds only
   bread/brelse's own vestigial slots.
+  layer's fraction indexing (B′'s structural note); its write arm is
+  B″-arm's, below.
+
+  **AS LANDED — B″-arm: THE TWO WALLS ARE GONE, AND THE WRITE ARM IS ARMED.**
+
+  THE ARMED REGISTRY IS KEYED BY AN ARM ID AND PARKS A SHARE.  This
+  SUPERSEDES lane A's "keyed by TRANSACTION" paragraph above and plan §3/§4's
+  "the entry parking the arming transaction's WHOLE token" — both now
+  misdescribe the mechanism and the plan needs the one-line correction.  Lane
+  A keyed by transaction because `ghost_map_insert` needs `A !! t = None` and
+  the only proof of that was "a parked entry would hold this very element";
+  keyed by an ARM ID freshness costs nothing at all — the ghost step SEES the
+  registry's map, so `fresh (dom A)` is a key nobody holds and the arm may
+  park ANY share.  `Xv6Cameras.ireg_arm_ent = (nat * Qp * gset Z)` is the
+  entry (transaction, share parked, inums suspended); the share is a FIELD
+  for `ic_dep`'s reason — an arm must hand back exactly what it took.  What
+  the parked share still buys is the ONLY thing the commit reads off the
+  registry (`InodeRegion.ireg_clean_acc`, hence
+  `IregClean.ireg_snap_local_acc`): every entry holds a POSITIVE share, so an
+  empty `ln_tx` authority refutes it.  Names: `ireg_armed k t q S`,
+  `ireg_parked e`, `ireg_arm` (a bare `t ↪[ln_tx icfg_log]{#q} tt` in, no
+  freshness), `ireg_arm_more` / `ireg_disarm` / `ireg_top_retag_armed` (gain
+  `k`, `q`), `ireg_release` (hands back the share), and the whole-token
+  readings `ireg_arm_tx` / `ireg_release_tx`.  `create` got SIMPLER: `cr_dirty
+  i = ∃ k t, ireg_armed k t 1 {[i]}` and the family gained `cr_dirty_arm`
+  (arm + first retag), so all four exits speak only
+  `cr_dirty_arm`/`_retag`/`_clear` — the two raw registry dances in the FILE
+  and orphan arms are gone.  `wp_create_sconf_body` and its three callers are
+  byte-stable.
+
+  THE WRITE ARM IS `Xv6Cameras.DepTx (s : Qp) (dev inum) (g : gname) (t :
+  nat) (q : Qp)`, LAST so the ~66 `DepShr` sites in 23 files and every
+  `destruct d as [| .. | .. | ..]` keep their shape.  `IcacheEscrow`'s OUT
+  arm at that descriptor holds `DepShr`'s content PLUS the parked share
+  `t ↪[ln_tx icfg_log]{#q} tt`.  IT IS ITS OWN GHOST STEP, NOT PART OF
+  `ilock`, and that was a measurement, not a preference: bolting the share
+  onto `SpecIlock.wp_ilock_sconf_body` moves that contract's arity (20 caller
+  files) and `SpecIunlock`'s with it, and it additionally costs the ~56
+  `ic_deposit cn k (DepShr …)` conjuncts in the walk-stage statements of 15
+  files — for a mechanism whose value is only cashed once every transactional
+  caller actually arms.  As two ghost steps on a deposit the walk already
+  holds, `IcacheEscrow.ic_arm_tx` / `ic_disarm_tx` (at `icEscN .@ k`, the
+  full valid cell selecting the OUT arm exactly as `ic_open_out` does) cost
+  the contracts NOTHING and each walk converts independently; a walk that
+  `ilock`s inside a transaction only to READ (namex's lookups) need not arm,
+  which the coupled form could not express.  `LogInv.log_tx_halve` /
+  `log_tx_join` take the id out of `log_tx`'s existential for the arm to name
+  it and put it straight back, so nothing above those two lines sees an id.
+
+  THE TWO LEMMAS THE COLLECTION CALLS: `IcacheEscrow.ic_out_no_write_arm`
+  (an OUT arm beside a write-armed deposit is refuted at an empty `ln_tx`
+  authority; its core is `ic_dep_own_tx_no_ops`) and
+  `IregClean.ireg_snap_local_acc` (nothing is armed, hence `snap_local`).
+  Together they are plan §4's "no inode is write-locked and no inum is
+  armed".
+
+  THE NON-VACUITY WITNESS IS `sys_chdir`, converted: it already split its
+  `log_op` into `log_opS` + `log_tx` at begin_op and framed `log_tx` across
+  the whole `ilock` .. `iunlock`/`iunlockput` window, and calls nothing that
+  wants the token in between — so the conversion is three ghost steps and no
+  contract change.  Both release paths recover exactly the half parked.  It
+  is the ONLY cheap one: every other transactional `ilock` caller threads
+  `ic_deposit` through its walk-stage statements, and converting one is that
+  file's share of the ~56-conjunct ABI bill.
+
+  COVERAGE (B″-esc's open item): the commit can already name EVERY CACHED
+  INUM with no lock — all five arms of `ic_escrow_body` carry the escrow's
+  own half of the identification ghost as their LAST conjunct, so
+  `IcacheEscrow.ic_escrow_body_ident` reads (live, dev, inum) off an open
+  body.  The per-inum token on ~40 payload sites B″-esc costed is therefore
+  NOT the cheapest shape and should not be built.  WHAT IS ACTUALLY MISSING
+  is the PARTITION — that `ipool_inv`'s index `O` plus those fifty identities
+  exhausts `region_inums nib`.  That is `ic_ci_wf`'s `dom ci = dom M` plus
+  `ipool`'s domain, both under the itable lock, and NO resource ties the pool
+  invariant to the escrows: the lock is the only place the two meet (the pool
+  shares `ipool_key` with it, the escrows share `ic_id`).  It needs exactly
+  one new tie, and the cheapest is a QUARTER of `ic_id` parked in
+  `ipool_body` for every slot beside the pure row `region_inums nib = O ∪
+  {inum_k | live_k}`: every mover of a slot's identity (iget's recycle,
+  iput's two evictions) already opens the pool invariant, and that is exactly
+  where the partition changes.  It reaches into `ProofIget`'s and
+  `ProofIput`'s windows and `ipool_inv`/`ipool_body`/`ipool` gain `cn`, so it
+  is its own increment.
+
+  REMAINS: that partition tie; the ABI sweep that arms the other
+  transactional walks (`create` first — it is the arming walk, and its arm
+  and its write lock now coexist); and the read arm, still on lane B″-blk's
+  block-layer fraction indexing.
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
