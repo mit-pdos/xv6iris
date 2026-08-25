@@ -3434,6 +3434,62 @@ Section IcacheEscrow.
      instance was unused (verified) and is removed.  The itable free pool is
      lock-held, never [iInv .. as ">"], so Timelessness is not needed there. *)
 
+  (* ---- WHY THE POOL CANNOT SIMPLY MOVE INTO AN INVARIANT --------------
+     (durable-fs-plan.md section 4: the commit has to collect the UNCACHED
+     inodes' bundles too, and it cannot take the itable spinlock.)
+
+     [inv N P] hands its opener [▷ P].  Both of this pool's consumers --
+     iget's miss (ProofIget.v, the [ipool_acc] at the +0x72 store) and
+     iput's eviction (ProofIput.v, the two [ipool_insert]s) -- spend the
+     bundle inside a store's ATOMIC UPDATE, where there is no step left to
+     absorb a later (this file's own note at the head of section 0), and
+     this tree has no later credits ([RiscvPtsto.num_laters_per_step _ :=
+     0]).  So an invariant-resident pool would have to be TIMELESS, and
+     [ipool_shape] is not: its pending and await alternatives hold
+     [EscrowInode.escA_inv], an [inv].  [ipool_no_timeless_check] below is
+     that obstruction, checked.
+
+     THE SPLIT THAT DOES WORK, and the numbers for it.  The ORDINARY
+     alternative -- [ipool_shape_np] beside the count half, the freeze
+     mirror half and [ifreeze_off] -- IS timeless
+     ([ipool_shape_ord_timeless] below), and it is the only alternative
+     that carries an [FsStateEra.inode_owned_era] at all, i.e. the only one
+     the commit's collection wants.  So the pool splits by ARM: the
+     ordinary inums go into an Iris invariant (timeless body, so
+     [iInv .. as ">"] keeps working at both consumers), the pending/await
+     inums stay under the itable lock, and the lock keeps the residency
+     key for the invariant's index set.  A consumer that lands on a
+     pending/await inum refutes it exactly where it does today, with the
+     licence ([ipool_shape_to_np]'s [ifreeze_off] premise and
+     [IcacheRef.ifreeze_excl]) -- but now in the MAIN FLOW, off the
+     lock-held side, with no invariant open and no later in the way. *)
+
+  Lemma ipool_no_timeless_check (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (inum : mword 32) : True.
+  Proof.
+    (* the ordinary alternative is timeless ... *)
+    assert (Timeless (icnt_half (bv_unsigned inum) 0%nat ∗
+                      frzm_h (bv_unsigned inum) false ∗
+                      ipool_shape_np γfs γi cov logstart inum ∗
+                      ifreeze_off (bv_unsigned inum))%I) by apply _.
+    (* ... the whole shape is NOT, and neither is the [inv] that makes it
+       so -- which is what forbids [iInv .. as ">"] on a pool invariant. *)
+    Fail (assert (Timeless (ipool_shape γfs γi cov logstart inum)) by apply _).
+    Fail (assert (forall (N : namespace) (P : iProp Σ), Timeless (inv N P))
+           by (intros; apply _)).
+    done.
+  Qed.
+
+  (* the timeless half the split above puts in the invariant.  A plain
+     Lemma, not an [Instance]: structural search already finds it, and a
+     shape this specific has no business in the tree's instance table. *)
+  Lemma ipool_shape_ord_timeless γfs γi cov logstart inum :
+    Timeless (icnt_half (bv_unsigned inum) 0%nat ∗
+              frzm_h (bv_unsigned inum) false ∗
+              ipool_shape_np γfs γi cov logstart inum ∗
+              ifreeze_off (bv_unsigned inum))%I.
+  Proof. apply _. Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  6.  THE itable LOCK'S RESOURCE, v2                                 *)
   (* ------------------------------------------------------------------ *)

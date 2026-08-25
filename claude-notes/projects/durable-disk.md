@@ -310,6 +310,46 @@ as their remaining consumers.
   so each `X = X_q … 1` equation is `reflexivity`), which is what makes
   the ~106 `rewrite /byte_range`-style unfold sites cost nothing.
 
+  **THE TWO PLACEMENT FACTS LANE C ASKED FOR.**  (1) LANDED: the fifty
+  entry escrows are at `icEscN .@ k`, one namespace each, so the commit can
+  hold them all open at one ghost step (`ic_escrow_ns_disjoint`,
+  `ic_escrow_ns_sub`); no contract's arity moved and `↑icEscN` still covers
+  the family, so only the twenty-one masks written INSIDE an escrow opening
+  changed, each to the slot it already names.  (2) NOT LANDED, and the
+  obstruction is checked in the tree
+  (`IcacheEscrow.ipool_no_timeless_check`): `ipool` cannot simply move into
+  an Iris invariant, because `inv N P` hands its opener `▷ P`, both
+  consumers (iget's miss at the `+0x72` store, iput's two evictions) spend
+  the bundle inside an ATOMIC UPDATE with no step to absorb a later, and
+  this tree has no later credits (`RiscvPtsto.num_laters_per_step _ := 0`)
+  — while `ipool_shape` is NOT timeless: its pending and await
+  alternatives hold `EscrowInode.escA_inv`, an `inv`.  That placement is
+  the escrow's own recorded trade ("`esc_inv` (not Timeless) rides the POOL
+  side, so this stays Timeless", `IcacheEscrow.v` at `pool_await`), and it
+  is what `ic_escrow_body_timeless` — hence every `iInv "Hesc" as ">"` in
+  the tree — is built on.
+
+  THE SPLIT THAT DOES WORK, with its enabling fact already proven
+  (`IcacheEscrow.ipool_shape_ord_timeless`): the ORDINARY alternative
+  (`ipool_shape_np` beside the count half, the freeze-mirror half and
+  `ifreeze_off`) IS timeless, and it is the only alternative carrying an
+  `inode_owned_era` at all — i.e. the only one the collection wants.  So
+  split the pool BY ARM: the ordinary inums into an invariant (timeless
+  body, `iInv .. as ">"` keeps working at both consumers), the
+  pending/await inums under the itable lock as today, with the lock holding
+  the residency key for the invariant's index set as ONE conjunct in
+  `ipool`'s old position (so `itable_res2`'s arity and iget's scan-loop
+  hypothesis list do not move).  A consumer landing on a pending/await inum
+  refutes it exactly where it does today — the licence, `ipool_shape_to_np`'s
+  `ifreeze_off` premise and `IcacheRef.ifreeze_excl` — but now in the MAIN
+  FLOW, off the lock-held side, with no invariant open and no later in the
+  way.  Sites: `IcacheEscrow` (the definitions and `itable_res2`),
+  `IcacheBoot` (boot builds the invariant with `Pext = ∅`), `FsCfgBoot`
+  (thread the persistent invariant — bundling it into `is_itable2` keeps
+  that predicate's arity and leaves its 55 files untouched), `ProofIget`
+  (one withdraw plus the case split), `ProofIput` (two deposits),
+  `ProofIdup`/`ProofMain` (pass-through).
+
   FOOTPRINTS MEASURED FOR THE NEXT INCREMENT.  The reader's ¼ needs the
   BLOCK layer fraction-indexed too, not just the predicate:
   `FsBlocks.fsblock` (34 files), `InodeInv.inode_blocks` (35, and
