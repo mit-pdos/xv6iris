@@ -1352,6 +1352,7 @@ FsDurSnap.v
 FsDurImg.v
 FsDurRefute.v
 FsDurDefer.v
+FsDurTrunc.v
 FsDurObj.v
 FsDurWire.v
 FsDurLedger.v

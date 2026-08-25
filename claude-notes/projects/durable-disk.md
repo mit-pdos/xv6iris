@@ -79,8 +79,9 @@ carries the file system across eras and `Himg` is deleted (lane E).
   image instance; adapt to `snap_ok`), `iris/FsDurLedger.v` (entry
   constructors — era-side content; its fold is superseded).
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
-  `iris/FsDurDefer.v`; `FsDurWire.v` is the rejected kinds tie (delete
-  in lane C).
+  `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
+  `snap_bytes`' used-set coupling — lane B's finding, plan §4a);
+  `FsDurWire.v` is the rejected kinds tie (delete in lane C).
 - Image checks (14) `fs_region_bare` and (15) `fs_root_no_self` in
   `FsImg`/`FsImgCheck`, and (lane C-img) they are now the LAST two
   conjuncts of `FsCfgBoot.fs_boot_image_wf`, discharged in
@@ -146,6 +147,37 @@ reusable is on `main`.
   own `snap_ok`.  Per-supplier: `bm` writes (balloc ×2, bfree), data
   writes (bzero, bmap-indirect, writei ×2), record writes (ialloc,
   iupdate, iput).
+
+  **REFUTED (`iris/FsDurTrunc.v`).**  The used-set coupling
+  (`snap_bytes`' `sk_own_used`/`sk_disj`) is NOT true mid-operation, so
+  there is no per-write accumulation of `snap_bytes` to have: `itrunc`
+  calls `bfree` up to 269 times and flushes the record ONCE, at its tail
+  `iupdate`, so throughout that window the logged bytes hold a record
+  naming blocks whose bitmap bit is clear — and `snap_bytes` reads its
+  state OFF those bytes (`sk_rec` pins the record, `inode_repr`'s
+  `inr_blk_dom` forces the slot, `sk_own_used` then demands the cleared
+  bit be set).  `FsDurTrunc.bfree_used_coupling_refuted` shows the payload
+  step at `ProofBfree`'s `log_write` has no witness at all;
+  `bfree_payload_step_false` states it at the premise's own shape.  The
+  same window kills `sk_disj` at the RECORD writers
+  (`record_write_disj_refuted`): the freed block is allocatable at once, so
+  a second inode's `iupdate` names it while `itrunc`'s stale record still
+  does.  Patching inside the payload is closed in four directions (the
+  file's header enumerates them); the exemption a repair needs is the
+  LOCKED registry, a ghost value a pure payload cannot name, and the
+  exempt set must SHRINK at `iunlock`, which does not hold the log lock.
+  So the coupling's home is a design decision above this lane.
+  Two further gaps, independent of the refutation and true of any repair:
+  a supplier cannot read `Dc` (universally quantified in the premise), so
+  the payload must PIN the superblock or the bitmap writer cannot tell the
+  bitmap block from a region block; and a supplier cannot NAME the payload
+  (`log_ctx` is the existential closure of `log_ctx_at`, so it only ever
+  holds an abstract `Ψ` and can move it through a LAW stating the concrete
+  fact) — three routes with prices in `FsDurTrunc.v`'s header (a)/(b)/(c).
+  A record writer additionally needs `⌜Dc !! (inodestart + i/16) = Some bsl⌝`
+  handed to it by `log_write` to run `rec_in_blk_inj`.  Nothing else of the
+  lane landed: `LogInv.log_psi_*` and the nine `log_psi_write_rebase` lines
+  stand.
 - [ ] **Lane C — `P_fs`'s durable slot and the commit (plan §3 commit).**
   `P_fs`'s durable conjunct → `P_dur (fr_D r)` (arity-free); both commit
   permits: fr_D advance + `dsnap_step_of` at `snap_ok S_L (lm_logged L)`
