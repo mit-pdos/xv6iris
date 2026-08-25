@@ -46,17 +46,30 @@ Require Import FsBytesGamma.
 Require Import InodeRegion.
 Require Import EscrowDefs.
 Require Import EscrowInode.
+(* durable-disk C-7: the deposit's own ghost step is a CORPSE LEDGER swap,
+   and the ledger's authority is a conjunct of [IcacheEscrow.ipool_body].
+   Imported LAST of the fs files for the reason [EscrowInode]'s preamble
+   gives about import order. *)
+Require Import IcacheEscrow.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Section EscrowDeposit.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
-  Lemma ireg_free_deposit_au (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (bsl : list (bv 8)) (ge gr gd : gname) (rg : frzidx) :
+  Lemma ireg_free_deposit_au (E : coPset) (icn : ic_names) (γi : gname)
+      (γfs : fs_names) (inodestart : Z) (cov : gset Z) (logstart : Z)
+      (nib : nat) (inum : bv 32) (dn dn' : dinode)
+      (bsl : list (bv 8)) (ge gr gd : gname) (rg : frzidx)
+      (t : nat) (q : Qp) :
     ↑iregN ⊆ E ->
     ↑escAN (bv_unsigned inum) ⊆ E ∖ ↑iregN ->
+    (* ...AND [ipoolN] (durable-disk C-7).  The deposit's marker no longer
+       goes into the escrow: it goes into the CORPSE LEDGER row this walk's
+       element names, and the freeing transaction's parked share comes back
+       out of that row.  The open is a strict step inside the escrow's own,
+       so the mask is the deposit's minus both. *)
+    ↑ipoolN ⊆ E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum) ->
     (* ...AND [ftopN] (durable-disk C-3c).  The deposit is where the freed
        payload's [FsState.top_frag] is RE-TIED at the corpse's own record and
        parked region-side ([InodeRegion.ireg_top_park]), which is what gives
@@ -74,7 +87,13 @@ Section EscrowDeposit.
     ireg_bare dn' ->
     di_nlink_stable dn' dn ->
     ireg_inv γi γfs inodestart nib -∗
-    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd (bv_unsigned inum) rg -∗
+    (* the pool's own invariant, for the corpse row (durable-disk C-7) *)
+    ipool_inv icn γfs γi cov logstart nib -∗
+    (* ...AND THE ROW'S ELEMENT, carried from [IcacheEscrow.ipool_put_corpse]
+       at iput+0x94.  It is what locates the row: this mover is off-lock and
+       cannot see [IcacheEscrow.ipool]'s index at all. *)
+    crp_elem (bv_unsigned inum) (CrpPre t q) -∗
     dinode_at γi inum dn -∗
     (* THE FREEZE, RETIRED HERE (iclaim-ledger.md §1.4, and this mover's
        own row in RULING A's mover table).  The deposit is a type-0 write over
@@ -128,9 +147,17 @@ Section EscrowDeposit.
           refuted at a commit ([InodeRegion.ireg_fsh_no_ops]).  Here it comes
           home, at exactly the [(t, q)] the index names, beside the regime
           and for the same reason. *)
-       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg).
+       (* ...AND THE CORPSE ROW'S SHARE (durable-disk C-7).  The +0x94 park
+          moved the share [IcacheEscrow.ipool_evict_lend] took into the
+          ledger's [CrpPre] row, so that the window this deposit CLOSES is
+          refuted at a commit ([IcacheEscrow.ipool_corpse_no_ops]); here it
+          comes home, at exactly the [(t, q)] the row names, beside the
+          freeze index's own. *)
+       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg
+                          ∗ t ↪[ln_tx icfg_log]{#q} tt).
   Proof.
-    iIntros (HE Hesc_mask Hftop_mask Hin Hdn' Hz Hbare Hnl) "#Hinv #Hesc Hdn Hdep".
+    iIntros (HE Hesc_mask Hpool_mask Hftop_mask Hin Hdn' Hz Hbare Hnl)
+      "#Hinv #Hesc #Hpinv Hel Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -207,7 +234,7 @@ Section EscrowDeposit.
     (* the escrow opens HERE, and its EMPTY state hands over the standing
        freeze; it closes again three lines below the region's re-park, with
        the marker and the retired token. *)
-    iMod (escA_deposit_acc (E ∖ ↑iregN) γfs ge gr gd γi (bv_unsigned inum) rg
+    iMod (escA_deposit_acc (E ∖ ↑iregN) γfs ge gr gd (bv_unsigned inum) rg
             Hesc_mask with "Hesc Hdep") as "(Hfz & Htop & Hescl)".
     (* THE ERA'S ABSTRACT VALUE, RE-TIED AT THE CORPSE'S BARE RECORD
        (durable-disk C-3c).  The escrow held the freed payload's fragment
@@ -290,7 +317,14 @@ Section EscrowDeposit.
     iEval (rewrite /reg_full) in "Hrf".
     iDestruct "Hreg" as (mr) "(%Hcovr & Hauthr & Hlends)".
     iMod (ghost_map_update (ge, gr) with "Hauthr Hrf") as "[Hauthr Hrf]".
-    iMod ("Hescl" with "Hmk Hoff") as "#Hcom".
+    (* THE CORPSE ROW'S SWAP (durable-disk C-7): the marker this open just
+       took off the MARKED arm goes into the ledger, the freeing
+       transaction's share comes out, and the element -- now at [CrpDep] --
+       is what the escrow's FILLED arm parks in the marker's place. *)
+    iMod (ipool_deposit_corpse (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum))
+            icn γfs γi cov logstart nib (bv_unsigned inum) t q Hpool_mask
+            with "Hpinv Hel Hmk") as "[Hel Hshare]".
+    iMod ("Hescl" with "Hel Hoff") as "#Hcom".
     iDestruct (reg_split (bv_unsigned inum) ge gr with "[Hrf]") as "[Hrh1 Hrh2]".
     { rewrite /reg_full. iExact "Hrf". }
     (* N-4 PHASE B: the lend column rides through this rebind untouched --
@@ -338,7 +372,8 @@ Section EscrowDeposit.
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].
       iSplitR "Hpark"; [iExists ge, gr; iFrame "Hrh2 Hcom" | iExact "Hpark"]. }
     iModIntro. iSplitR; [iExact "Hcom" |].
-    iSplitL "Hgreg"; [iExact "Hgreg" | iExact "Hfpin"].
+    iSplitL "Hgreg"; [iExact "Hgreg" |].
+    iSplitL "Hfpin"; [iExact "Hfpin" | iExact "Hshare"].
   Qed.
 
 End EscrowDeposit.

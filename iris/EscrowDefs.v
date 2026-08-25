@@ -40,6 +40,33 @@ Section EscrowDefs.
     exfalso. exact (exclusive_l (Excl ()) (Excl ()) Hv).
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE CORPSE LEDGER's ELEMENT (durable-disk lane C-7)                 *)
+  (* ------------------------------------------------------------------ *)
+  (* One row per inum in the pool's IN-TRANSITION index, at the ambient
+     [IcacheRef.icfg_pcrp].  The AUTHORITY is a conjunct of
+     [IcacheEscrow.ipool_body] (so the commit reads every row with no lock
+     taken); THIS is the element the freeing walk carries from the +0x94 park
+     ([IcacheEscrow.ipool_put_corpse]) to the off-lock deposit
+     ([EscrowDeposit.ireg_free_deposit_au]) -- across the release of the
+     itable lock, which is why the ledger is a [ghost_map] and not a paired
+     [ghost_var] like [IcacheEscrow.ipool_tkey]: the element ALONE locates
+     the row.  [Xv6Cameras.icorpse] says what each value parks. *)
+  Definition crp_elem (z : Z) (v : icorpse) : iProp Σ :=
+    (z ↪[icfg_pcrp] v)%I.
+
+  Global Instance crp_elem_timeless z v : Timeless (crp_elem z v).
+  Proof. rewrite /crp_elem. apply _. Qed.
+
+  (* two elements at one inum are absurd: the ledger is exclusive per key,
+     which is what makes the element a walk's private handle. *)
+  Lemma crp_elem_excl z v1 v2 : crp_elem z v1 -∗ crp_elem z v2 -∗ False.
+  Proof.
+    rewrite /crp_elem. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. rewrite dfrac_valid_own in Hv. exact (Qp.not_add_le_l 1 1 Hv).
+  Qed.
+
   (* the per-inum registry element (icacheG's [icache_regG], over [icfg_reg]).
      A pending slot holds the HALF region-side; the pool's pending_free arm
      holds the other half; a non-pending/boot-free inum's FULL element rides

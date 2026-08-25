@@ -1361,17 +1361,28 @@ Section ProofIget.
             { iApply (igi_72 with "Htext"). }
             { rewrite Hpa72. iExact "Hclaim2". }
             { rewrite Hpa72 Hsv72.
-              (* THE TAKE AND THE FLIP, ONE GHOST STEP (durable-disk C-3b):
-                 [ipool_take_lend] hands the row out, moves the inum out of
-                 the pool's index, and LENDS its quarter of this slot's
-                 identity so that the flip below has a whole unit; its wand
-                 records the new identity, which is what re-establishes the
-                 partition. *)
-              iMod (ipool_take_lend (⊤ ∖ ↑minstretN) cn γfs γi cov logstart nib
-                      (region_inums nib ∖ ci_inums ci) e (bv_unsigned inum)
-                      dev inumT ltac:(solve_ndisj) He Hzin with "Hpinv Hpool Hgid")
-                as "(Hbundle & Hpool & Hgid & Hidback)".
-              iEval (rewrite ig_moi_inum) in "Hbundle".
+              (* THE TAKE, THE PEEL AND THE FLIP, ONE GHOST STEP
+                 (durable-disk C-3b, C-7): [ipool_take_lend] hands the row
+                 out, moves the inum out of the pool's index, and LENDS its
+                 quarter of this slot's identity so that the flip below has a
+                 whole unit; its wand records the new identity, which is what
+                 re-establishes the partition.
+                 THE PEEL IS PART OF IT since C-7: an in-transition row's
+                 [InodeRegion.imark] lives in the CORPSE LEDGER, whose row can
+                 only be spent with the element the escrow's FILLED arm hands
+                 back, so the redeem (or, before the deposit, the licence's
+                 refutation of the standing freeze) runs inside this accessor.
+                 What comes out is an ORDINARY row's four pieces -- the [np]
+                 shape, the count half at 0, the mirror and the [ifreeze_off]
+                 token, all spent at +0x78 -- plus the borrowed licence. *)
+              iMod (ipool_take_lend (⊤ ∖ ↑minstretN) cn γfs γi inodestart cov
+                      logstart nib (region_inums nib ∖ ci_inums ci) e inum
+                      dev inumT l
+                      ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
+                      ltac:(solve_ndisj) He Hzin Hnib
+                      with "Hrinv Hpinv Hpool Hgid Hlic")
+                as "(Hlic & Hbundle & Hicnt0 & Hmir0 & Hfoff & Hpool & Hgid &
+                     Hidback)".
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_free cn γfs γi cov logstart e dev inumT dev inum
                       with "Hbody Hgid HinT")
@@ -1379,23 +1390,6 @@ Section ProofIget.
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
               iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
-              (* OPTION A (b)(ii): redeem a genuine pending entry to [imark]
-                 pool-locally, converting the full pool shape to the [np] the
-                 escrow's unloaded arm needs.  SINCE INCREMENT IIIe the peel is
-                 FUPD-SHAPED AND LICENCE-TAKING (iclaim-ledger.md §3.1,
-                 A-refuter): [ipool_await_refuter] is deleted -- a bare wand
-                 into [False] is not producible out of an [ireg_inv] opening --
-                 so the await arm's standing [ifreeze_post] is refuted INSIDE
-                 the peel's own fupd, from the borrowed [l], and the peel hands
-                 back the licence together with the bundle's two ghost columns
-                 ([icnt_half] at 0 and the [ifreeze_off] token).  Both go on to
-                 +0x78; the payload is not touched. *)
-              iMod (ipool_shape_to_np
-                      (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) γfs γi inodestart nib
-                      cov logstart inum l
-                      ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
-                      with "Hrinv Hlic Hbundle")
-                as "(Hlic & Hbundle & Hicnt0 & Hmir0 & Hfoff)".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1 Hpin]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv

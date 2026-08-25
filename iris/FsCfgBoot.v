@@ -1616,7 +1616,10 @@ Section FsCfgBootEra.
      ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
      (* ...AND THE POOL'S TRANSIT LEDGER (durable-disk C-4), whole and empty.
         LAST, for the pin's reason verbatim. *)
-     ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)))%I.
+     ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+     (* ...AND THE POOL'S CORPSE LEDGER (durable-disk C-7), whole and empty:
+        the image has no corpses.  LAST, for the transit ledger's reason. *)
+     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse))%I.
 
   Lemma fs_kit_icache_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
@@ -1641,7 +1644,8 @@ Section FsCfgBootEra.
       kalloc_avail fsc_kpages (Some 0%nat) ∗
       kmem_avail_auth fsc_kpages 0%nat ∗
       ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
-      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)).
+      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -1797,7 +1801,10 @@ Section FsCfgBootEra.
      ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
      (* ...AND THE POOL'S TRANSIT LEDGER (durable-disk C-4), whole and empty.
         LAST, for the pin's reason verbatim. *)
-     ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)))%I.
+     ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+     (* ...AND THE POOL'S CORPSE LEDGER (durable-disk C-7), whole and empty:
+        the image has no corpses.  LAST, for the transit ledger's reason. *)
+     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse))%I.
 
   Lemma fs_kit_icache_split (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
@@ -1807,10 +1814,10 @@ Section FsCfgBootEra.
     iIntros "H".
     iDestruct (fs_kit_icache_open with "H")
       as "(Hiref & Hlive & Hislg & Hipool & Hpkey & Hxkey & Hitlk & Htok & Hmid & Hgid &
-           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth & Hhpn & Htkey)".
+           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth & Hhpn & Htkey & Hckey)".
     rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
     iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hpkey Hxkey Hitlk Htok
-            Hmid Hgid Hbio Hpool Hdllk Hhpn Htkey".
+            Hmid Hgid Hbio Hpool Hdllk Hhpn Htkey Hckey".
   Qed.
 
   Lemma fs_kit_kalloc_open (ICFG : icfg) (FSC : fscfg) :
@@ -1839,7 +1846,8 @@ Section FsCfgBootEra.
          pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
       lock_free_tok fsc_dlock ∗
       ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
-      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)).
+      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
   Proof. iIntros "H". iExact "H". Qed.
 
   (*  THE ONE ROW OF KIT 2 THAT main ITSELF NEEDS, peeled without spending
@@ -2134,7 +2142,8 @@ Section FsCfgBootEra.
             (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
-                     Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey)".
+                     Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
+                     Hckey)".
     (* the lock-window pin's boot map, fanned out one whole element per slot
        (durable-disk B''-tx5) *)
     iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
@@ -2642,7 +2651,7 @@ Section FsCfgBootEra.
     iSplitR; [iPureIntro; reflexivity |].
     (* ---- kit 1 ---- *)
     iSplitL "Hiref Hlive Hisl Hipool Hpkey Hxkey Hitlk Htok Hmid Hgid Hbio Hpool
-             Hkmlk Hdllk Hprlk Hkav Hkauth Hhpn Htkey".
+             Hkmlk Hdllk Hprlk Hkav Hkauth Hhpn Htkey Hckey".
     { iSplitL "Hiref"; [iExact "Hiref" |].
       iSplitL "Hlive"; [iExact "Hlive" |].
       iSplitL "Hisl"; [iExact "Hisl" |].
@@ -2660,7 +2669,8 @@ Section FsCfgBootEra.
       iSplitL "Hprlk"; [iExact "Hprlk" |].
       iSplitL "Hkav"; [iExact "Hkav" |].
       iSplitL "Hkauth"; [iExact "Hkauth" |].
-      iSplitL "Hhpn"; [iExact "Hhpn" | iExact "Htkey"]. }
+      iSplitL "Hhpn"; [iExact "Hhpn" |].
+      iSplitL "Htkey"; [iExact "Htkey" | iExact "Hckey"]. }
     (* ---- kit 2 ---- *)
     iSplitL "Hlogtok"; [iExact "Hlogtok" |].
     iSplitL "Hboot"; [iExact "Hboot" |].

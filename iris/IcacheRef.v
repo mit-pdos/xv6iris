@@ -893,6 +893,16 @@ Class icfg := MkIcfg {
      transactions and can park no share, while a transit row is inside one
      ([IcacheEscrow.ipool_transit]). *)
   icfg_ptrn : gname;
+  (* THE FREE POOL'S CORPSE LEDGER's gname (durable-disk lane C-7, plan
+     section 4), ambient for [icfg_ptrn]'s reason and one door further: its
+     ELEMENT is what iput's free path carries from the +0x94 park to the
+     OFF-LOCK deposit at +0xba, i.e. across a release of the itable lock, so
+     no threaded name could reach both ends.  The AUTHORITY is a conjunct of
+     [IcacheEscrow.ipool_body]; the element ALONE locates the row, which is
+     the whole reason the ledger is a [ghost_map] and not [ipool_tkey]'s
+     paired [ghost_var] (the deposit holds neither half of
+     [icfg_pext]). *)
+  icfg_pcrp : gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -1119,7 +1129,12 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       own icfg_hpn hpn_boot_map ∗
       (* ...AND THE TRANSIT LEDGER (durable-disk C-4), WHOLE and empty: no
          walk exists yet, so nothing is in transit. *)
-      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)).
+      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+      (* ...AND THE CORPSE LEDGER (durable-disk C-7), WHOLE and EMPTY: no
+         walk exists yet, so no inum's deposit is outstanding.  The image has
+         no corpses either -- [IcacheBoot.icache_boot_at] hands this straight
+         to [IcacheEscrow.ipool_alloc_inv], whose [X] is [∅]. *)
+      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1154,11 +1169,13 @@ Proof.
   iMod (own_alloc hpn_boot_map) as (γhpn) "Hhpn"; [apply hpn_boot_map_valid |].
   (* the transit ledger, whole and empty (durable-disk C-4) *)
   iMod (ghost_var_alloc (∅ : gmap Z (nat * Qp))) as (γptrn) "Hptrn".
+  (* the corpse ledger, whole and empty (durable-disk C-7) *)
+  iMod (ghost_map_alloc (∅ : gmap Z icorpse)) as (γpcrp) "[Hpcrp _]".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv γhpn γptrn), g0.
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv γhpn γptrn γpcrp), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt icfg_frzo
-       icfg_frzm icfg_dview icfg_fview icfg_hpn icfg_ptrn].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn".
+       icfg_frzm icfg_dview icfg_fview icfg_hpn icfg_ptrn icfg_pcrp].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp".
 Qed.
 
 (* ===================================================================== *)

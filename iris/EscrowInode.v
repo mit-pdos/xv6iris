@@ -85,27 +85,44 @@ Section EscrowInode.
      at the mint, and out again at the deposit's own opening.  It is the
      [ifreeze_post] argument verbatim, and for the same reason (this file's
      (a)/(b) above): the EMPTY arm is the one place both ends can reach. *)
-  Definition escA_body (γfs : fs_names) (ge gr gd γi : gname) (z : Z)
+  (* ---- WHAT THE FILLED ARM HOLDS SINCE durable-disk C-7 ---------------
+
+     NOT the region marker any more: [InodeRegion.imark] is what the commit's
+     collection needs at a freed-but-unrecycled inum (it refutes the region
+     slot's own MARKED arm and leaves the free bundle on the PENDING one),
+     and this escrow is an [inv] behind the itable spinlock, so the commit
+     cannot reach it.  The marker therefore rides the CORPSE LEDGER, whose
+     authority is a conjunct of [IcacheEscrow.ipool_body]; what stands in its
+     place here is that ledger row's ELEMENT at [CrpDep].
+
+     THE SWAP IS WHAT TIES THE TWO ONE-SHOTS TOGETHER, and that is its whole
+     point.  This escrow and the ledger both record "has the deposit run",
+     and a recycler that peels the escrow must be able to conclude the
+     ledger's state from it: it does, because the element it gets back here
+     agrees with the ledger's authority by [ghost_map_lookup]
+     ([IcacheEscrow.ipool_take_lend]).  Without the swap the two state
+     machines are untied and the recycle cannot produce the marker at all. *)
+  Definition escA_body (γfs : fs_names) (ge gr gd : gname) (z : Z)
       (rg : frzidx) : iProp Σ :=
     ( (mono_nat_auth_own ge 1 ST_EMPTY ∗ ifreeze_post rg z
        ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n))
-    ∨ (mono_nat_auth_own ge 1 ST_FILLED ∗ InodeRegion.imark γi z
+    ∨ (mono_nat_auth_own ge 1 ST_FILLED ∗ crp_elem z CrpDep
        ∗ ifreeze_off z ∗ redeem_ticketA gd)
     ∨ (mono_nat_auth_own ge 1 ST_REDEEMED ∗ redeem_ticketA gr
        ∗ redeem_ticketA gd) )%I.
 
   Definition escAN (z : Z) : namespace := (nroot .@ "icescA") .@ z.
-  Definition escA_inv (γfs : fs_names) (ge gr gd γi : gname) (z : Z)
+  Definition escA_inv (γfs : fs_names) (ge gr gd : gname) (z : Z)
       (rg : frzidx) : iProp Σ :=
-    inv (escAN z) (escA_body γfs ge gr gd γi z rg).
-  Global Instance escA_inv_persistent γfs ge gr gd γi z rg :
-    Persistent (escA_inv γfs ge gr gd γi z rg).
+    inv (escAN z) (escA_body γfs ge gr gd z rg).
+  Global Instance escA_inv_persistent γfs ge gr gd z rg :
+    Persistent (escA_inv γfs ge gr gd z rg).
   Proof. rewrite /escA_inv. apply _. Qed.
 
   (* minted at iput+0x86 (before itable.lock release): fresh escrow, EMPTY,
      with its exclusive ticket.  The deposit that fills it happens later, at
      the off-lock ifree. *)
-  Lemma escA_alloc E γfs γi z rg :
+  Lemma escA_alloc E γfs z rg :
     (* THE STANDING FREEZE GOES IN AT THE MINT (§3.16): iput's last close has
        just stepped the column to [FrzPost], and this is where the fragment
        lives until the off-lock deposit retires it. *)
@@ -114,13 +131,13 @@ Section EscrowInode.
        the walk hands over here instead of parking it in the pool's await
        arm; the deposit takes it out again and ties it region-side. *)
     (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) ={E}=∗ ∃ ge gr gd,
-      escA_inv γfs ge gr gd γi z rg ∗ redeem_ticketA gr ∗ redeem_ticketA gd.
+      escA_inv γfs ge gr gd z rg ∗ redeem_ticketA gr ∗ redeem_ticketA gd.
   Proof.
     iIntros "Hfz Htop".
     iMod (mono_nat_own_alloc ST_EMPTY) as (ge) "[Hauth _]".
     iMod (own_alloc (Excl ())) as (gr) "Htick"; [done|].
     iMod (own_alloc (Excl ())) as (gd) "Hdep"; [done|].
-    iMod (inv_alloc (escAN z) _ (escA_body γfs ge gr gd γi z rg)
+    iMod (inv_alloc (escAN z) _ (escA_body γfs ge gr gd z rg)
             with "[Hauth Hfz Htop]") as "#Hinv".
     { iNext. iLeft. iFrame "Hauth Hfz Htop". }
     iModIntro. iExists ge, gr, gd. iFrame "Hinv Htick Hdep".
@@ -137,12 +154,17 @@ Section EscrowInode.
      afterwards -- so the escrow is HELD OPEN across the region step rather
      than handed a wand, and the depositor's own ticket is what rules out the
      two arms in which the token is no longer here. *)
-  Lemma escA_deposit_acc E γfs ge gr gd γi z rg :
+  (* ...AND WHAT IT TAKES BACK IS THE LEDGER'S ELEMENT (durable-disk C-7):
+     the depositor updates its corpse row from [CrpPre] to [CrpDep] -- parking
+     [InodeRegion.imark] there in place of the freeing transaction's share --
+     and hands the element it gets back to this escrow, where it stands until
+     a recycler peels the arm. *)
+  Lemma escA_deposit_acc E γfs ge gr gd z rg :
     ↑escAN z ⊆ E →
-    escA_inv γfs ge gr gd γi z rg -∗ redeem_ticketA gd
+    escA_inv γfs ge gr gd z rg -∗ redeem_ticketA gd
       ={E, E ∖ ↑escAN z}=∗
       ifreeze_post rg z ∗ (∃ n : fs_node, top_frag (fs_gamma_L γfs) z n) ∗
-      (InodeRegion.imark γi z -∗ ifreeze_off z
+      (crp_elem z CrpDep -∗ ifreeze_off z
          ={E ∖ ↑escAN z, E}=∗ committedA ge).
   Proof.
     iIntros (HE) "#Hinv Hdep".
@@ -160,10 +182,10 @@ Section EscrowInode.
   Qed.
 
   (* the redeemer's ticket + the region's committed recover the marker *)
-  Lemma escA_redeem E γfs ge gr gd γi z rg :
+  Lemma escA_redeem E γfs ge gr gd z rg :
     ↑escAN z ⊆ E →
-    escA_inv γfs ge gr gd γi z rg -∗ redeem_ticketA gr -∗ committedA ge
-      ={E}=∗ InodeRegion.imark γi z ∗ ifreeze_off z.
+    escA_inv γfs ge gr gd z rg -∗ redeem_ticketA gr -∗ committedA ge
+      ={E}=∗ crp_elem z CrpDep ∗ ifreeze_off z.
   Proof.
     iIntros (HE) "#Hinv Htick #Hcom".
     iInv "Hinv" as ">Hbody" "Hcl".
@@ -184,9 +206,9 @@ Section EscrowInode.
      gets instead is the STANDING freeze the escrow is holding, which its own
      LICENCE refutes at the region ([IgetLic.iname_freeze_off]).  The token is
      borrowed and given straight back, so the refuter pays nothing for it. *)
-  Lemma escA_await_peel E γfs ge gr gd γi z rg (P : iProp Σ) :
+  Lemma escA_await_peel E γfs ge gr gd z rg (P : iProp Σ) :
     ↑escAN z ⊆ E →
-    escA_inv γfs ge gr gd γi z rg -∗ redeem_ticketA gr -∗
+    escA_inv γfs ge gr gd z rg -∗ redeem_ticketA gr -∗
     (* the refuter's OWN resource (in practice the peeler's licence), carried
        through so the SUCCESS branch does not lose it to the wand's closure *)
     P -∗
@@ -196,7 +218,7 @@ Section EscrowInode.
        presented), which needs [↑iregN] and nothing this escrow holds, so the
        mask is the peel's own minus this one namespace. *)
     (P -∗ ifreeze_post rg z ={E ∖ ↑escAN z}=∗ False)
-      ={E}=∗ P ∗ InodeRegion.imark γi z ∗ ifreeze_off z.
+      ={E}=∗ P ∗ crp_elem z CrpDep ∗ ifreeze_off z.
   Proof.
     iIntros (HE) "#Hinv Htick HP Href".
     iInv "Hinv" as ">Hbody" "Hcl".
@@ -228,9 +250,9 @@ Section EscrowInode.
      to an [imark] would have to conjure the hold.
      N-5.2A: and the per-FILE contents hold beside it, untied for the same
      reason and carried the same way (namei-pinned-lookup.md §13). *)
-  Definition pool_pending (γfs : fs_names) (γi : gname) (z : Z) : iProp Σ :=
+  Definition pool_pending (γfs : fs_names) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : frzidx),
-       escA_inv γfs ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
+       escA_inv γfs ge gr gd z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
        (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)

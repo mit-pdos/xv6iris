@@ -1221,7 +1221,7 @@ Section IputTail.
          [ipool_shape] and decides the side itself, so nothing above this
          line changes. *)
       iApply fupd_wp.
-      iMod (ipool_put ⊤ cn gfs gi cov logstart nib
+      iMod (ipool_put_ord ⊤ cn gfs gi cov logstart nib
               (region_inums nib ∖ ci_inums ci) (bv_unsigned inum) tid qtx
               ltac:(solve_ndisj) ltac:(apply ip_notin_diff; exact Hincid)
               with "Hpinv [Hbundle] Hpool") as "[Hpool Htx]".
@@ -1445,14 +1445,15 @@ Section IputFreePath.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γ : log_names) (γfs : fs_names) (γi : gname) (cn : ic_names)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat)
       (dev : mword 32) (inum : mword 32) (dn : dinode)
       (ge gr gd : gname)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqs : dfrac)
       (sp0 vra vs0 vs1 vs2 vs3 vs4 : mword 64)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (rg : frzidx) :
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (rg : frzidx)
+      (t : nat) (q : Qp) :
     let pj := proc_addr j in
     let bno := (mword_of_int (IBLOCK inum inodestart) : mword 32) in
     let dn' := set_ditype0 dn in
@@ -1509,7 +1510,7 @@ Section IputFreePath.
 
        WHAT THE DEPOSITOR STILL CARRIES is the escrow itself (persistent) and
        its DEPOSIT ticket, below -- the two things the +0xba fill needs. *)
-    escA_inv γfs ge gr gd γi (bv_unsigned inum) rg -∗
+    escA_inv γfs ge gr gd (bv_unsigned inum) rg -∗
     (* THE DEPOSIT TICKET (A⁗, §3.16), in place of IVa's [ifreeze_post].  The
        standing freeze now lives in the ESCROW's EMPTY state -- it has to,
        because that is the only place from which a RECYCLER peeling the pool's
@@ -1518,6 +1519,14 @@ Section IputFreePath.
        [EscrowInode.escA_deposit_acc] hands it the token, takes the retired
        one back, and rules out a second deposit. *)
     redeem_ticketA gd -∗
+    (* THE POOL'S INVARIANT AND THIS CORPSE'S LEDGER ELEMENT (durable-disk
+       C-7).  The +0x94 park created the row -- at [CrpPre], parking the
+       freeing transaction's share -- and the deposit below is where it is
+       SPENT: the marker this walk's region open takes off the MARKED arm
+       goes in, and the share comes back out.  The element is what locates
+       the row, because this tail holds no half of [IcacheRef.icfg_pext]. *)
+    ipool_inv cn γfs γi cov logstart nib -∗
+    crp_elem (bv_unsigned inum) (CrpPre t q) -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
@@ -1565,6 +1574,11 @@ Section IputFreePath.
            for the window's length is a share of the freezing transaction's
            [LogDefs.ln_tx] element, at the [(t, q)] the index names. *)
         ireg_fpin rg -∗
+        (* ...AND THE CORPSE ROW'S SHARE (durable-disk C-7), the OTHER of the
+           two halves iput split at +0x3a: the +0x94 park parked it in the
+           ledger row instead of handing it back, and the deposit is what
+           hands it back. *)
+        t ↪[ln_tx icfg_log]{#q} tt -∗
         (* the frame ra/s0/s1 slots, still saved, for the epilogue *)
         add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
         add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
@@ -1604,7 +1618,7 @@ Section IputFreePath.
     assert (Hnlst : di_nlink_stable dn' dn).
     { rewrite /di_nlink_stable /dn' /set_ditype0 /=. split; [reflexivity | intros _; exact Hnl0]. }
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hireg Hdn
-             #Hesc Hdep Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsb Hsl #Hvlb #Hcrd0 Hop
+             #Hesc Hdep #Hpinv Hcel Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsb Hsl #Hvlb #Hcrd0 Hop
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -1828,11 +1842,12 @@ Section IputFreePath.
                     = add_vec_int (mword_of_int (KernelSyms.iput + 0xba) : mword 64) 4)
       by (rewrite /R5; apply upd_eq).
     (* ---- the deposit's AU, adapted to log_write's anchor form ---- *)
-    iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn'
-                  (diblk_bytes ds) ge gr gd rg
+    iPoseProof (ireg_free_deposit_au ⊤ cn γi γfs inodestart cov logstart nib
+                  inum dn dn' (diblk_bytes ds) ge gr gd rg t q
                   ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
+                  ltac:(solve_ndisj)
                   Hnib Hdn'wf Hdn'ty Hdn'bare Hnlst
-                  with "Hireg Hesc Hdn Hdep") as "Hau0".
+                  with "Hireg Hesc Hpinv Hcel Hdn Hdep") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
        atomic-update contract is stated over the Psi-NAMED context, because
@@ -1844,7 +1859,8 @@ Section IputFreePath.
     iDestruct (lw_au_rec γ γfs (uint bno) (⊤ ∖ ↑iregN)
                  (DinodeEnc.islot inum)
                  (diblk_bytes ds) (dinode_bytes dn')
-                 (committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg)%I e0
+                 (committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg ∗
+                  t ↪[ln_tx icfg_log]{#q} tt)%I e0
                  with "Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
@@ -1870,7 +1886,9 @@ Section IputFreePath.
     iApply (LW.wp_log_write_au_range bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
               (64 * DinodeEnc.islot inum)%nat 64%nat (dinode_bytes dn')
-              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg)%I
+              cru Sb e0 v (⊤ ∖ ↑iregN)
+              (committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg ∗
+               t ↪[ln_tx icfg_log]{#q} tt)%I
               R5 0%nat eb pj K b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1883,7 +1901,8 @@ Section IputFreePath.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.
-    iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS (#Hcom & Hgreg & Hfpin) Hlk Hsl".
+    iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS
+                              (#Hcom & Hgreg & Hfpin & Htxc) Hlk Hsl".
     (* NO POOL ENTRY IS ASSEMBLED HERE (IVd).  The bundle was parked at the
        +0x94 release on the AWAIT arm, which is the arm's own stated purpose;
        the [committedA] the deposit just produced is not needed to state it
@@ -2047,7 +2066,7 @@ Section IputFreePath.
                  with "Hcont") as "Hcont".
     iSpecialize ("Hcont" $! CID29 with "[]"); [iPureIntro; wp_next_chain |].
     iApply ("Hcont" $! P3 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hsb Hsl Hop Hwit
-                                Hgreg Hfpin Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
+                                Hgreg Hfpin Htxc Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
     { split_and!; [exact Hthr | exact HP3sp | exact HP3s2 | exact HP3s3 | exact HP3s4]. }
   Qed.
 
@@ -3297,7 +3316,7 @@ Section IputFreePath.
        deposit cannot reach the pool (the itable lock goes at +0x94) but it
        DOES open this escrow, so the fragment travels the road the standing
        freeze already travels and the deposit ties it region-side. *)
-    iMod (escA_alloc ⊤ γfs γi (bv_unsigned inum) rg with "Hfzpost [Htop2]")
+    iMod (escA_alloc ⊤ γfs (bv_unsigned inum) rg with "Hfzpost [Htop2]")
       as (ge gr gd) "(#Hescr & Htkr & Htkd)";
       [by iExists (era_node dn bm data2) |].
     iModIntro.
@@ -3311,10 +3330,15 @@ Section IputFreePath.
     (* the AWAIT row stays on the LOCK's side of the split (durable-disk
        B''-esc) -- [ipool_put] reads that off the shape itself. *)
     iApply fupd_wp.
-    iMod (ipool_put ⊤ cn γfs γi cov logstart nib
+    (* THE PARK IS A CORPSE (durable-disk C-7): the row is half of one, and
+       the invariant's half is the LEDGER row this put creates.  The share
+       [ipool_evict_lend] took does NOT come home here -- it moves into that
+       row, where a commit refutes it -- and what comes out instead is the
+       row's element, which travels to the off-lock deposit. *)
+    iMod (ipool_put_corpse ⊤ cn γfs γi cov logstart nib
             (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum) tid qtx
             ltac:(solve_ndisj) ltac:(apply fl_notin_diff; exact Hincid)
-            with "Hpinv [Hgap] Hpool") as "[Hpool Htx]".
+            with "Hpinv [Hgap] Hpool") as "[Hpool Hcel]".
     { rewrite fl_moi_inum. iExact "Hgap". }
     iModIntro.
     assert (Hpoolset : region_inums nib ∖ ci_inums (delete k ci2)
@@ -3584,20 +3608,22 @@ Section IputFreePath.
     iDestruct (cpu_claim_ext_transport CIDit CIDp5 eb pj
                  ltac:(wp_next_chain) with "Hclm") as "Hclm".
     (* ===== +0xa8 .. j 0x30 : ip_free_offlock ===== *)
-    iApply (ip_free_offlock γs j γl γu γd γk pd pav pu bn γ γfs γi
+    iApply (ip_free_offlock γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               cov logstart inodestart nib dev inum dn2 ge gr gd
               uoff Sb' true e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks Vpr rg
+              tid qtx
               ltac:(lia) ltac:(lia) ltac:(lia)
               Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hdn2bare Hj Hgl
               ltac:(exact (eq_sym HP5sp)) HP5a0 HP5a1 HP5s2 Hlkbelow
               with "Hcg Hcnt Hextc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hireg
-                    Hdn2 Hescr Htkd Hppid Hprocs Hdevi Hdgeom Hdlock Hins Hbs2
+                    Hdn2 Hescr Htkd Hpinv Hcel Hppid Hprocs Hdevi Hdgeom Hdlock
+                    Hins Hbs2
                     Hvlb2 Hcrd2 Hop Hra Hs0f Hs1f Hs2f Hs3f Hs4f [-]").
     (* ---- the continuation: offlock's post at 0x30, re-shaped into ours ---- *)
     iIntros (CIDf Hstf).
     iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hbs2 Hop2 Hwit Hgreg Hfpin
-                  Hra Hs0f Hs1f Hs2f Hs3f Hs4f".
+                  Htx Hra Hs0f Hs1f Hs2f Hs3f Hs4f".
     (* the whole walk never touched a callee-saved register, so [P5] agrees
        with [m] on all of them and offlock's threading composes to ours *)
     assert (Hmfam : forall c : mword 5, is_cs_idx c = true ->

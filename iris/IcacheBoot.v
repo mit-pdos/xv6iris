@@ -1784,7 +1784,13 @@ Section IcacheBootTable.
     (* THE POOL'S TRANSIT LEDGER (durable-disk C-4), WHOLE and empty: at
        boot no walk is carrying an inum across an eviction.  LAST, for
        [hpn_full]'s reason verbatim. *)
-    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp))
+    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
+    (* THE POOL'S CORPSE LEDGER (durable-disk C-7), WHOLE and empty: the
+       image has no corpses -- every free inum's record is bare and its
+       marker rides the pool's own ordinary row -- so the in-transition index
+       and the ledger are empty together.  LAST, for [ghost_var icfg_ptrn]'s
+       reason verbatim. *)
+    ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse)
     ={E}=∗
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1795,7 +1801,7 @@ Section IcacheBootTable.
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
     iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
-    iIntros "Hxkey Hfree Htok Hmid Hgid Hhpn Htkey".
+    iIntros "Hxkey Hfree Htok Hmid Hgid Hhpn Htkey Hckey".
     (* THE POOL'S INVARIANT IS ALLOCATED AFTER THE ESCROWS (durable-disk
        C-3b), and it has to be: its body carries a QUARTER of every slot's
        [ic_id] beside the partition, and those quarters do not exist until
@@ -1868,7 +1874,7 @@ Section IcacheBootTable.
     iDestruct (ic_ids_of_intro cn dvs with "Hquarters") as "Hids".
     iMod (ipool_alloc_inv E cn γfs γi cov logstart nib (ic_ids_of dvs)
             (ic_ids_of_length dvs) (ic_ids_of_live dvs)
-            with "Hkey Hxkey Htkey Hids Hrows") as "[#Hpinv Hpool]".
+            with "Hkey Hxkey Htkey Hckey Hids Hrows") as "[#Hpinv Hpool]".
     (* ---- the itable lock's resource, and the lock ---- *)
     iAssert (itable_res2 cn γfs γi cov logstart nib dv)%I
       with "[HhalfL Hsupply Hslots Hpool Hislauth]" as "Hres".
@@ -1942,7 +1948,9 @@ Section IcacheBootTable.
        B''-tx5); see [icache_boot_at]'s own row *)
     ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) -∗
     (* the pool's transit ledger (durable-disk C-4); see [icache_boot_at] *)
-    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp))
+    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
+    (* the pool's corpse ledger (durable-disk C-7); see [icache_boot_at] *)
+    ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse)
     ={E}=∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1952,11 +1960,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hhpn Htkey".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hhpn Htkey Hckey".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hfree Htok Hmid Hgid Hhpn Htkey") as "H".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hfree Htok Hmid Hgid Hhpn Htkey Hckey") as "H".
     iModIntro. iExists γl, cn. iExact "H".
   Qed.
 

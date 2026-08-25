@@ -729,6 +729,32 @@ Inductive ic_dep : Type :=
    form). *)
 Definition ireg_arm_ent : Type := (nat * Qp * gset Z)%type.
 
+(* THE CORPSE LEDGER's value (durable-disk C-7, plan section 4).  One row per
+   inum in the pool's IN-TRANSITION index -- the pending/await entries iput's
+   free path parks at +0x94 -- recording whether that inum's OFF-LOCK DEPOSIT
+   ([EscrowDeposit.ireg_free_deposit_au]) has run yet.
+
+   The two values are what the row PARKS, and each is what the commit needs
+   at that state:
+
+   - [CrpPre t q]: the deposit has NOT run, and the row parks a positive
+     share [q] of the freeing transaction [t]'s [LogDefs.ln_tx] element --
+     so the state is refuted outright at a commit, exactly as
+     [IcacheEscrow.ipool_transit] is ([ipool_corpse_no_ops]).  [(t, q)] are
+     FIELDS and not existentials for [ic_dep]'s reason verbatim
+     ([IcacheTxRefute.tx_two_halves_no_whole]): the deposit hands the freer
+     back EXACTLY the share [ipool_put_corpse] parked.
+   - [CrpDep]: the deposit HAS run, and the row parks [InodeRegion.imark] --
+     which is what refutes the region slot's own MARKED arm and leaves the
+     commit's collection the free bundle on the PENDING one
+     ([FsCollect.col_free_slot_acc]).  It is the marker
+     [EscrowInode.escA_body]'s FILLED state used to hold; the escrow keeps
+     the ledger's ELEMENT in its place, which is what ties the two one-shots
+     together ([IcacheEscrow.ipool_take_lend]).  *)
+Inductive icorpse : Type :=
+  | CrpPre (t : nat) (q : Qp)
+  | CrpDep.
+
 (* The link ledger, the count coupling, the freeze receipt and the freeze
    mirror all ride in [icacheG] rather than in classes of their own, and
    all for one reason: each has one half in [InodeRegion.ireg_slot] and the
@@ -769,6 +795,14 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      beside the parked shares, the other in [IcacheEscrow.ipool] under the
      itable lock. *)
   icache_ptrnG :: ghost_varG Σ (gmap Z (nat * Qp));
+  (* THE FREE POOL'S CORPSE LEDGER (durable-disk lane C-7, plan section 4).
+     One row per inum in the pool's IN-TRANSITION index [X], keyed so that
+     the OFF-LOCK deposit -- which cannot reach [IcacheEscrow.ipool]'s rows
+     nor its [X] index, the itable lock being twenty instructions gone --
+     locates its own row with the ELEMENT alone.  The AUTHORITY sits in the
+     pool's invariant beside the parked rows; see [icorpse]'s header for what
+     each value parks. *)
+  icache_pcrpG :: ghost_mapG Σ Z icorpse;
   icache_cntG :: inG Σ icntUR;
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
@@ -786,6 +820,7 @@ Definition icacheΣ : gFunctors :=
     ghost_mapΣ nat ireg_arm_ent;
     ghost_varΣ (gset Z);
     ghost_varΣ (gmap Z (nat * Qp));
+    ghost_mapΣ Z icorpse;
     GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor hpnUR;
     GFunctor dviewUR;
     GFunctor fviewUR].
