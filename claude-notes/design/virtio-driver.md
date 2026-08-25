@@ -89,7 +89,10 @@ For a request at position `p` (all geometry is `qnum = 8`, the only
 configuration ever live):
 
 Pinned (read-only for the device, part of `ctl ⊆ dma`), the slot's `pin` map:
-- the avail-ring entry at `avail+4+2*(p mod 8)` (2 bytes) — names the head `h`;
+- (NOT the avail-ring entry: all eight ring cells belong to the lease
+  permanently, and the driver writes one through `virtio_proto_ring_acc`,
+  with a STAGED-HEAD token `dn_stage` bridging the two instructions of a
+  publish; a pin holds no ring cell.)
 - the three descriptor entries `desc+16*h / *m / *t` (48 bytes) — the chain;
 - the request header `ops[h]` = `disk+0xa8+16*h` (16 bytes) — type + sector;
 - for a WRITE (`VIRTIO_BLK_T_OUT`): the 1024 data bytes at `b->data`.
@@ -118,8 +121,8 @@ The pure record (`VirtioQueue.v`, iris-free):
 `slot_pend_res` pins `vs_is_out sl = false → bs = vs_data sl` (an OUT
 request's *current* content is arbitrary — the device is about to overwrite
 it — so that half stays existential), and `slot_done_res` /
-`virtio_proto_reclaim_acc` / `DiskInv.parked_res` then export the
-unconditional `bs = vs_data sl`.  Without it a publisher that hands its
+`VirtioProto.chain_back` (what the deposit parks in the receipt) then export
+the unconditional `bs = vs_data sl`.  Without it a publisher that hands its
 exclusive `disk_block` fragments into the pending resource and then SLEEPS
 gets them back as an opaque list and can never identify them with what its
 caller gave it — `virtio_disk_rw`'s read postcondition is unprovable.
@@ -241,17 +244,18 @@ inside a `dev_inv`-opening leaf; conclusions ⌜…⌝ mean facts learned):
 
 1. **publish** (rw's `sh` to `avail+2`): consumes the new slot's pin bytes +
    writable bytes (as `phys_pointsto`, disjoint from `dma` by ownership), the
-   `disk_bytes` deposit, and produces the receipt `np ↪[γslot] sl` +
-   ⌜the store's old bytes were `wrap16 np`⌝.
+   `disk_bytes` deposit, the head's `HInactive` receipt fragment, the claim's
+   row and the two driver-side cells (`info[h].b`, `b->disk = 1`); the
+   `np ↪[γslot] sl` receipt goes INTO the head's entry (the deposit spends
+   it), and the caller keeps `h ↪[dn_head] HActive dc` across `sleep()`.
 2. **observe-used-idx** (intr's / rw-irrelevant `lhu` of `used+2`): read-only;
    produces ⌜loaded = wrap16 nc⌝ ∗ `mono_nat_lb γnc nc`.
-3. **reclaim** (intr's `lw` of the used element at `p mod 8`): consumes the
-   receipt `p ↪[γslot] sl` + `mono_nat_lb γnc c` with `p < c`; since receipts
-   live in `pend ∪ done` = `[nr', np)` and `p < c ≤ nc`, position `p ∈ done`;
-   produces ⌜loaded id = vr_head (vs_req sl)⌝ ∗ the PAYOFF: all of `pin(p)`
-   and the slot's writable bytes back as `phys_pointsto` — the status byte
-   with value 0, the buffer holding (IN) the block's contents / (OUT) the
-   payload — ∗ `disk_bytes` at the block's (new) contents.
+3. **the handler's four openings** (`record_at`, `used_peek_at`,
+   `status_peek`, `infob_acc`, `deposit_acc`): keyed by `disk_ord γ p u`, the
+   watermark `disk_read_at γ u` and the lock's claim-map authority (see "The
+   CLAIM MAP" below); the first three are read-only peeks, the deposit
+   (`b->disk = 0`) reclaims the slot AND parks the chain in the receipt's
+   came-back arm in one step, advancing the watermark.
 4. **device step** (`wp_dev_loop` only): `vproto_step` + the `γdk` update for
    an OUT slot + `mono_nat` bump; packaged as `virtio_proto_step`, plus
    `virtio_proto_not_stalled` refuting `DevStepDiskWild`. These two are what
@@ -261,86 +265,117 @@ MMIO writes the driver performs while live (`QUEUE_NOTIFY`, `INTERRUPT_ACK`)
 are cfg/seen/used-idx-stable, so `virtio_proto` rides through them
 (`virtio_proto_stable`, the analogue of `virtio_lease_stable`).
 
+## The per-descriptor RECEIPT: where a request's state lives (finding 5)
+
+The device may complete requests in any order, so a request has three
+different numbers: its POSITION (the protocol's key), the USED INDEX its
+completion is reported at (what `disk.used_idx` and the handler walk), and
+its HEAD descriptor `< 8` (what `disk.info[]` is indexed by and what the used
+ring reports). The driver's per-request state is keyed by HEAD, inside the
+device invariant, exactly like `disk.info[NUM]` in the C:
+
+    Xv6Cameras.hstate := HInactive | HActive (v : dclaim)
+    dclaim = { dc_buf : Arch.pa; dc_slot : vslot; dc_pin : gmap Arch.pa (bv 8); dc_pos : nat }
+
+`VirtioProto.head_res γ i st` is the receipt's content — `HInactive` owns
+nothing; `HActive v` owns `⌜head (dc_slot v) = i⌝`, the claim's row
+`dc_pos v ↪[dn_claim γ] v`, `d_info_b i ↦₈ dc_buf v`, and EITHER
+`b_disk (dc_buf v) ↦₄ 1 ∗ disk_receipt γ (dc_pos v) (dc_slot v) (dc_pin v)`
+(the chain is out) OR `b_disk (dc_buf v) ↦₄ 0 ∗ chain_back γ (dc_slot v)
+(dc_pin v)` (it all came back: the pin, the status byte at 0, the spent
+permits, the block's bytes). Two arms and never a third: reclaim and deposit
+are ONE atomic step (`virtio_proto_deposit_acc`), which is what makes a
+second reclaim of the same position refutable. `heads_res_at γ (vp_spins pr)`
+holds the `dn_head` authority, totality over the eight descriptors, and the
+COUPLING: every live position's head is `HActive` with a claim naming its
+slot, pin and position.
+
+Ownership replaces every count: two live requests cannot share a head (the
+entry would own `d_info_b` twice); a chain cannot "already be back" (that arm
+owns `dc_pin`, which is in the lease); a publisher's head is fresh (its
+`h ↪[dn_head] HInactive` fragment contradicts the coupling's `HActive`).
+
+`disk.info[i].b` is driver-private — no descriptor names it, the device
+never touches it — so it rides in the free slot (`free_slot_res`) while the
+descriptor is idle and transfers into the receipt ONLY for the in-flight
+window, the one stretch where its reader (the handler) is not the thread
+that allocated it. Rule: transfer a cell into the invariant at the point the
+CODE transfers it, not for the slot's whole lifetime.
+
+### The ring window is a pigeonhole over heads
+
+`vproto_ok`'s `vpo_win : vp_np − vp_lo ≤ 8` has to survive a publish and the
+ring store before it. Nothing counts descriptor triples for it: the unpopped
+positions `[vp_lo, vp_np)` are pending with pairwise-distinct heads
+(`vpo_hd_inj`), each `< 8` (the coupling puts it in `dom hs`), and the
+publisher's head is a ninth distinct value because its receipt is
+`HInactive` — `VirtioQueue.nat_inj_below8` / `VirtioProto.heads_res_at_window`.
+Both `ring_acc` and `publish_acc` take the fresh head's fragment and derive
+the bound themselves.
+
 ## `disk_res`: what `vdisk_lock` protects
 
-`is_lock γvd disk_lock "virtio_disk" disk_res`, with (all cells as physical
-points-tos of the static `struct disk` at `KernelSyms.disk`; geometry:
-desc ptr +0, avail ptr +8, used ptr +16, `free[8]` +0x18, `used_idx` +0x20,
-`info[i].b` +0x28+16i, `info[i].status` +0x30+16i, `ops[i]` +0xa8+16i,
-`vdisk_lock` +0x128):
+`is_lock γvd disk_lock "virtio_disk" disk_res` (geometry of the static
+`struct disk` at `KernelSyms.disk`: desc ptr +0, avail ptr +8, used ptr +16,
+`free[8]` +0x18, `used_idx` +0x20, `info[i].b` +0x28+16i, `info[i].status`
++0x30+16i, `ops[i]` +0xa8+16i, `vdisk_lock` +0x128; `DiskAddrs.v`):
 
-    disk_res γ := ∃ (nr np_d : nat) (flight : gmap nat flight_info) …,
-      (* the three queue-page pointer cells, holding pd/pav/pu *)
-      (* used_idx cell ↦ wrap16 nr *)
-      (* per descriptor i < 8: free[i] cell ↦ bit_i, and if bit_i = 1:
-           the 16 desc-entry bytes at pd+16i ∗ ops[i] (16 bytes) ∗
-           info[i].status byte *)
-      (* info[i].b cells, pinned to fl_buf for i = head of some flight slot *)
-      (* per p ∈ dom flight = [nr, np_d): the receipt p ↪[γslot] (fl_slot p),
-           the b->disk word of that request's buf ↦ 1, … *)
-      (* parked payoffs for completed-and-processed requests keyed by
-           position, deposited by intr, withdrawn by the sleeping rw *)
-      (* the inert remainders of the three pages (bytes no one touches) *)
+    disk_res γ pd pav pu := ∃ (np nr : nat) (cm : gmap nat dclaim) (fr : nat -> bool),
+      ⌜∀ p dc, cm !! p = Some dc → p < np ∧ dc_pos dc = p ∧ slot_buf_link (dc_slot dc) (dc_buf dc)⌝ ∗
+      disk_pub γ np ∗ disk_done_lb γ nr ∗ disk_read_at γ nr ∗ disk_stage γ None ∗
+      ghost_map_auth (dn_claim γ) 1 cm ∗
+      d_used_idx ↦₂ wrap16 nr ∗
+      free_bundles γ pd fr          (* per i < 8: free[i] cell; if free, free_slot_res pd i ∗ i ↪[dn_head γ] HInactive *)
 
-Key moves, all under the lock, all plain owned accesses (NO invariant opening):
-- **alloc_desc**: find `free[i] = 1`, clear it, take the desc entry + ops +
-  status bytes out of `disk_res`.
-- **free_desc(i)**: caller returns those bytes; the `free[i]` panic arm is
-  refuted by SEPARATION (if `free[i] = 1`, `disk_res` also owns the desc-entry
-  bytes the caller is holding — two full points-tos, `False`); the `i < 8` arm
-  by the caller's pure bound. Then `wakeup(&disk.free[0])`.
-- **rw's descriptor formatting**: plain stores to bytes rw took at alloc.
-- **intr's processing**: withdraws payoff at the reclaim leaf (see above),
-  writes `b->disk = 0` (the cell is in the flight entry), moves the flight
-  entry to a parked payoff, bumps the `used_idx` cell to `wrap16 (nr+1)`.
-- **rw's completion wait**: the loop's `lw b->disk` reads the cell from the
-  flight entry (value 1 → `sleep(b, &disk.vdisk_lock)`) or from the parked
-  payoff (value 0 → exit); after exit rw withdraws the parked payoff — buffer
-  contents, status 0, `disk_bytes` — then `free_chain` returns the descriptor
-  bytes via `free_desc`, and `release`.
+Nothing per-request lives here. `np` is the publish count (the other half of
+`dn_np` is in the protocol), `nr` the handler's READ WATERMARK (its half of
+`dn_nr`; the deposit demands it at the record's used index and hands it back
+advanced, which is what forces in-order draining), `disk_stage None` says no
+publish is half-done while the lock is free.
 
-### The CLAIM is what a woken publisher has left
+### The CLAIM MAP is the interrupt handler's carrier
 
-`dn_claim` is a `ghost_map nat dclaim` (DiskPtsto.v); the auth is in
-`disk_res` over `flight ∪ parked` and the fragment is the publisher's. After
-`sleep` it is the ONLY handle the process still holds on its own request, so
-its value has to carry every fact the rest of `virtio_disk_rw` needs:
+`dn_claim : ghost_map nat dclaim` — authority in `disk_res`, fragment in the
+`HActive` receipt. `virtio_disk_intr` touches the device invariant four times
+per completion (the used element, `info[id].status`, `info[id].b`,
+`b->disk = 0`), each at an address computed from a register, and an
+invariant lends nothing across a close. But the handler holds `vdisk_lock`
+for its whole loop, so `cm` is stable in its hands: `virtio_proto_record_at`
+(keyed by `disk_done_lb (S u)`, `disk_read_at u` and the auth) names the
+position `p` behind used index `u` (`disk_ord γ p u`, persistent) and the
+claim `cm !! p = Some dc`; every later accessor takes the auth and that pure
+fact, finds the entry through `disk_ord` + the watermark (`vpo_done_uix`
+puts `p` in `vp_done`) + the coupling, and agrees the entry's fragment with
+the auth — so the head it loaded is `sl_head (dc_slot dc)` and the buffer it
+loaded is `dc_buf dc`. Nothing persistent is minted for this, and `dn_ord`
+stays what it is (persistent, insert-only, `vp_uix`-backed: the handler walks
+used indices and needs some persistent way to name a position).
 
-    Record dclaim := DClaim {
-      dc_buf  : Arch.pa;                (* which struct buf              *)
-      dc_slot : vslot;                  (* fixes vs_data / vs_sector_off *)
-      dc_tri  : nat * nat * nat;        (* the chain's three descriptors *)
-      dc_pin  : gmap Arch.pa (bv 8);    (* the pinned bytes              *)
-    }.
+The publisher inserts its row under the lock (fresh: every row is `< np`) and
+hands the fragment to `publish_acc`; the collect returns it with the chain;
+the woken publisher deletes its row at `free_chain`, under the lock.
+`slot_buf_link` in the row is how the handler knows `vr_status = d_info_status h`
+and `h < 8` for the claim it read.
 
-`flight_res`/`parked_res` take the record — no existentials over buffer, slot
-or pin. Two of the fields exist for reasons that are not obvious:
+### The rw sleep loop polls through the device invariant
 
-* `dc_tri`, plus the `disk_res` conjunct
-  `∀ p v, (fl ∪ pk) !! p = Some v → tr !! p = Some (dc_tri v)`, is what lets
-  the publisher read "my three descriptors are still allocated" (`fr i =
-  false`) off the triple bookkeeping. It cannot be carried as a pure fact
-  instead: `fr` is a different function after every `sleep`.
-* `dc_pin` makes the parked payoff's residual pin CONCRETE
-  (`dc_pinr pav p v := dc_pin v ∖ dc_ring_map pav p v`). An existential pin
-  would hand the publisher an opaque `phys_map` out of which the descriptor
-  words `free_chain` must return could never be recovered.
+`while (b->disk == 1) sleep(b, &disk.vdisk_lock)` reads `b->disk` out of the
+receipt: `WpAu4.wp_lw_au_s_sconf` with `virtio_proto_poll_acc` in the
+atomic-update slot, keyed by the `h ↪[dn_head] HActive dc` fragment the
+publisher kept across `sleep()`. Reading 1 hands the fragment back; reading 0
+IS the collect — the same step returns `h ↪ HInactive`, the claim's row,
+`d_info_b h`, `b_disk b ↦₄ 0` and `chain_back`, and `free_chain` runs on the
+owned descriptor words (the pin's structure is a pure fact about the fixed
+`dc_pin dc`, carried across the sleep in the Coq context). An accessor that
+took `b_disk ↦₄ 0` from the caller would be VACUOUS (the came-back arm owns
+it); the read decides on the value it sees.
 
-Naming the pin is necessary but not sufficient: `free_chain` needs the pin's
-STRUCTURE (which byte belongs to which descriptor word), which is not
-recoverable from the map. So the publisher carries it as a pure fact across
-the sleep — `ProofVirtioDiskRwD.vdrwd_regions` is written as a CONS of the
-avail-ring window onto `vdrwd_pinr_regions` (the twelve descriptor words, the
-three `ops[head]` words, and a write's payload window), and the P4/P5/P6 seams
-carry `pin ∖ ring = foldr union ∅ (vdrwd_pinr_regions …)` together with the
-list's pairwise disjointness (`pm_ok`).  `pm_union` / `pm_split` are the two
-directions of "separately-owned windows ⇄ one `phys_map` of their union".
-
-The window/aliasing facts needed at publish (ring slot `np mod 8` bytes are in
-driver hands, distinct from every pinned slot) come from OWNERSHIP, not
-arithmetic: rw wrote that ring entry as a plain owned store just before the
-publish leaf, so the bytes are in hand, and `dma_own ∗ phys_pointsto` forces
-domain disjointness.
+The allocator hands each descriptor out WITH its `HInactive` receipt
+(`free_bundles` carries them); the head's is flipped at the publish, the
+other two ride to `free_chain`, and `free_desc`'s wrapper puts slot and
+receipt back together. `free_desc`'s own panic arm is refuted by separation
+(if `free[i] = 1`, `disk_res` also owns the descriptor bytes the caller
+holds); its `i < 8` arm by the caller's bound.
 
 ## The specs (module shape, per design/spec-modules.md)
 
@@ -406,7 +441,7 @@ domain disjointness.
 | `WpUart.v` | the device invariants; `disk_inv_body` carries `virtio_proto`; `wp_dev_loop`'s disk case runs on `virtio_proto_step`/`_not_stalled` | VirtioProto |
 | `RiscvAdequacy.v` | allocates `disk_names` and the initial `virtio_proto` | VirtioProto |
 | `WpVirtioDev.v` | the MMIO leaves above | WpPlic(Exec), VirtioProto |
-| `DiskInv.v` | `struct disk` geometry, `disk_res`, its open/close/alloc lemmas | VirtioProto, WpLock, ProcGeom |
+| `DiskInv.v` | `struct disk` geometry, `disk_res` (counters, claim-map authority, free bundles with their receipts), `slot_buf_link`, the tier bridges | VirtioProto, WpLock, ProcGeom |
 | `SpecFreeDesc/SpecVirtioDiskRw/SpecVirtioDiskIntr.v` + Proof/Link | the functions | the above |
 
 ## Why the alternatives were rejected
