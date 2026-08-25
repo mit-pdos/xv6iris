@@ -1083,9 +1083,9 @@ as their remaining consumers.
   its two instances, and the general form is what the cover lemma's
   existentially-bound `dq` actually needs.
 
-  FOUR SUPPLIERS OF `col_hand` DID NOT EXIST IN THE TREE, and none is a proof
-  difficulty (the full list, with the fix for each, is in `FsCollect.v`'s
-  header).  (C) is SUPPLIED — see C-3a below:
+  FOUR SUPPLIERS OF `col_hand` DID NOT EXIST IN THE TREE, and none was a proof
+  difficulty (the full list is in `FsCollect.v`'s header).  Three are now
+  supplied — (A) by C-3b, (C) by C-3a, (D) by C-3c; (B) is what remains:
 
   (A) THE PARTITION (B″-join's open item), unchanged in shape.  MEASURED
   here and it is what makes the increment delicate: the row is FALSE between
@@ -1107,24 +1107,10 @@ as their remaining consumers.
   does not refute ¾ — and it has to reach the commit through `log_ctx`,
   which is the only persistent bundle `wp_end_op` carries.
 
-  (D) A FREE INUM'S ABSTRACT NODE IS UNTIED TO ITS RECORD.
-  `IcacheEscrow.ipool_shape_np`'s MARKER arm — what a FREE inum's pool row
-  is — holds `InodeRegion.imark` and an existential `top_frag` its own
-  comment calls UNTIED, and no `dinode_at`.  The region holds that inum's
-  record (`ireg_slot`'s `ireg_in` arm, `z ↪[γi] d`) and its link AUTHORITY
-  at `ireg_nl d` (`ireg_lnk`).  Nothing connects the two, so for a free inum
-  the commit can prove neither `sk_rec` nor `sk_links`: both run through
-  `FsCollect.col_bundle_rec`'s ghost-map agreement, which only an ALLOCATED
-  inum's `inode_owned_era` supplies.  The producer HAS the fact — iput's
-  free path deposits the marker arm at the node it just flushed — and the
-  arm forgets it.  Cheapest fix: a HALF of `FsState.top_frag_q` parked
-  region-side in `ireg_slot`'s free arm under
-  `⌜fn_rec n = d⌝ ∗ ⌜inode_local z n⌝`, the marker arm keeping the other
-  half; it reaches `ProofIalloc`'s claim and `ProofIput`'s free deposit.  It
-  is NOT a corner case: boot stocks EVERY free inum as a marker arm
-  (`IcacheBoot.ipool_shape_free`, whose own comment says the value is the
-  image's node but UNTIED), so at the mkfs image the first commit meets it
-  at nearly every inum of the region.
+  (D) A FREE INUM'S ABSTRACT NODE WAS UNTIED TO ITS RECORD — closed by C-3c
+  below.  The pool's marker arm held the era's `top_frag` UNTIED while the
+  region held the record, so at a free inum the commit could prove neither
+  `sk_rec` nor `sk_links`.
 
   NOT LANDED, and blocked on the rest of them: the law parked in `log_ctx`,
   `end_op`'s call at `outstanding = 0`, the two commit permits at
@@ -1274,29 +1260,78 @@ as their remaining consumers.
   arity, and every consumer of `ipool` outside `ProofIget`, `ProofIput` and
   `ProofIdup` (which only passes it through).
 
-  (D) IS NOT DONE, AND HERE IS WHAT IT COSTS.  Measured, not attempted: the
-  notes' cheapest fix (a HALF of `top_frag_q` parked region-side in
-  `ireg_slot`'s free arm under `⌜fn_rec n = d⌝`) does not survive
-  `ireg_claim_au`, which moves the record type-0 → `fresh_shape` and cannot
-  retag a half.  Two shapes do: (a) GUARD the pin by `⌜di_type d = 0⌝`, so the
-  claim's obligation goes vacuous and no resource moves there — but the half
-  must then leave at `ireg_withdraw` (the ONE exit from the `ireg_in` arm: it
-  requires `di_type ≠ 0`, so a free record's fragment only ever leaves through
-  a claim box), which grows an output; or (b) park the WHOLE `top_frag`
-  region-side and delete the marker arm's, in which case `ireg_claim_au`
-  retags it itself (`ireg_inv` already bundles `ftop_inv`; the cost is one
-  `↑ftopN ⊆ E` premise and its single caller is `ProofIalloc`), `ireg_withdraw`
-  hands it to the filler, and the free flush deposits it.  Either way the
-  footprint is `ireg_slot`'s free sub-arm plus `ireg_slot_intro` (33 call
-  sites: `InodeRegion` 16, `IcacheInv` 5, `IgetLic` 3, `IregDirBit` 3,
-  `IregLinkNz` 3, `IcacheBoot` 2, `EscrowDeposit` 1), `ireg_withdraw`, the
-  free flush and boot.  AND THE TIE MUST GIVE MORE THAN `sk_rec`/`sk_links`:
-  `col_hand` asks for a `col_bundle` at EVERY inum of `I`, so a free inum
-  needs a whole `inode_owned_era_q` — the region's `z ↪[γi] d` IS its
-  `dinode_at` and the marker arm's fragment is its `top_frag_q`, but the block
-  and indirect legs are `emp` only if the record is BARE, so the pinned node
-  has to be `free_node d = MkNode d (replicate FS_NINDIRECT (bv_0 32)) ∅` with
-  `inode_local z (free_node d)` (which is exactly what forces bareness).
+  **AS LANDED — C-3c: SUPPLIER (D), AND THE FRAGMENT PARKS WITH THE
+  RECORD.**
+
+  `InodeRegion.ireg_top_park γfs z d` is the park: `∃ n, ⌜di_type d = 0 →
+  ireg_bare d ∧ n = free_node d⌝ ∗ top_frag …`, a conjunct of `ireg_slot`'s
+  IN sub-arm and of its PENDING arm — exactly the two arms that hold
+  `z ↪[γi] d`.  THE TIE IS GUARDED BY THE TYPE, and that is what makes it
+  free at every mover: at a type-0 record the node is `free_node d`
+  outright (`fn_bare` pins the entry array and the block map, so
+  `free_node_of_bare` leaves no choice), and at a claim box the fragment
+  rides UNTIED exactly as it did in the pool.  So `ireg_claim_au` carries it
+  0 → `fresh_shape` with NO resource move and no `↑ftopN` premise, and
+  `ireg_withdraw` hands it to the fill in the shape the marker arm used to —
+  `ProofIlock`'s `ireg_top_retag` is unchanged.  Neither of the two shapes
+  C-3b measured is what landed: the whole fragment goes region-side (b's
+  half) but the tie is guarded (a's), which is strictly cheaper than either.
+
+  THE ROAD BACK TO THE REGION IS THE ESCROW, and that was the whole
+  difficulty.  A free record is created by ONE mover — iput's off-lock
+  deposit — and the fragment it must park is the one the freed payload
+  carried, which the walk gives up at +0x94 when it parks the pool entry.
+  The deposit cannot reach the pool (the itable lock went at +0x94) and the
+  park cannot reach the deposit; the one thing both open is the per-inum
+  escrow.  So the fragment travels the road the standing freeze already
+  travels: in at `EscrowInode.escA_alloc`, parked in `escA_body`'s EMPTY
+  arm, out at `escA_deposit_acc`.  `ProofIput` moves one hypothesis between
+  two adjacent lines; no contract spanning iput's sleeplock window changes.
+
+  A PENDING SLOT IS NOT A RESIDUE.  The deposit re-parks into `ireg_slot`'s
+  PENDING arm, which stands until a later claim, so it had to carry the park
+  too — and it does, which is why the collection owes nothing extra at a
+  freed-but-unrecycled inum beyond (A)'s `X` row.
+
+  THE ACCESSOR IS `FsCollect.col_free_slot_acc`: the pool's ordinary row is
+  on its marker arm, which carries `imark`, so the region's own marked arm is
+  refuted (`imark_excl`) and the slot is on the IN or the PENDING arm — both
+  hold the fragment and the park.  It LENDS a whole
+  `FsStateEra.inode_owned_era` at `free_node d` and takes it back (every
+  conclusion the collection draws is pure); `col_bundle_free` and
+  `col_bundle_of_owned` are the same reading at `col_bundle`'s shape.  It
+  lives in a nested section so only those lemmas take the `icfg` parameter,
+  and `FsCollect` stays a leaf.  Non-vacuity at the real instance:
+  `FsCollectImg.img_col_bundle_free` — at the mkfs image the bundle comes out
+  at `FsCfgBoot.img_node`, the very value `ftop_inv`'s map holds at boot, off
+  conjunct (14) `fs_region_bare` and nothing else.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `EscrowInode.escA_body`/`escA_inv`/
+  `escA_alloc`/`escA_deposit_acc`/`escA_redeem`/`escA_await_peel` and
+  `pool_pending` gain `γfs`; `escA_alloc` takes the fragment and
+  `escA_deposit_acc` hands it out.  `EscrowDeposit.ireg_free_deposit_au`
+  gains `↑ftopN ⊆ E ∖ ↑iregN ∖ ↑escAN z` and `InodeRegion.ireg_bare dn'`
+  (free at iput: itrunc has zeroed size and addresses) and does the retag
+  itself.  `InodeRegion.ireg_slot`/`ireg_slot_intro` gain the park in two
+  sub-arms — only the three sites that BUILD those arms moved (the claim,
+  the free deposit, boot); the other 30 `ireg_slot_intro` calls re-park the
+  arm verbatim and are byte-stable.  `ireg_withdraw` gains the fragment as
+  its last output.  `IcacheEscrow.ipool_shape_np`'s marker arm and
+  `ipool_shape`/`ipool_ext`'s two in-transition arms LOSE theirs, and with
+  them `ipool_shape_await`, `ic_close_to_empty_await`, `ipool_shape_free`,
+  `ipool_alloc` and `ipool_alloc_all_free` lose an argument.
+  `IcacheBoot.ireg_alloc` gains a record function `D : Z → dinode`, two
+  ∀-over-decodings conjuncts (`image_bare`, `image_rec_at`, LAST) and the
+  free inums' fragments (`ireg_top_boot`); `FsCfgBoot.ipool_alloc_of_image`
+  takes only the LIVE inums'; `image_ireg_premises` gains
+  `fs_region_bare … = true`.  `SpecIput`'s off-lock lemma
+  `ProofIput.ip_free_offlock` gains `InodeRegion.ireg_bare dn`.
+  UNTOUCHED: `log_op`, `wp_end_op`, `fs_crash_seam`, `P_fs`, `log_ctx`,
+  `ireg_inv`'s arity, `ic_escrow_body`'s five arms.
+
+  WHAT (D) LEAVES.  Nothing of its own.  `col_hand`'s remaining supplier is
+  (B) alone — alternative (d) of `ic_escrow_body_cover` plus (A)'s `X` row,
+  one ABI sweep.
 
 - [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
   `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
