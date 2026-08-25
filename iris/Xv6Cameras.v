@@ -570,7 +570,12 @@ Definition fviewUR : ucmra :=
    pinned by any resource. *)
 Inductive ic_dep : Type :=
   | DepNone
-  | DepRef (q : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+  (* [DepRef] -- iput's authority-side window exit, which was to deposit its
+     WHOLE reference -- IS GONE (durable-disk B''-tx3).  Nothing in this
+     kernel ever built one: iput's window exits through [IcacheEscrow.ic_held]
+     and its freeze window through [DepFrz], so the constructor had no
+     producer and only cost [IcacheEscrow.ic_escrow_body_cover] an
+     alternative it could never populate. *)
   | DepShr (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
   | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32)
   (* THE WRITE ARM (durable-fs-plan.md section 3, [ilock]; durable-disk

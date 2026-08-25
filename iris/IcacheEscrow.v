@@ -1445,8 +1445,6 @@ Section IcacheEscrow.
   Definition ic_dep_own (k : nat) (d : ic_dep) (dev inum : mword 32) : iProp Σ :=
     match d with
     | DepNone => False%I
-    | DepRef q dv nu g =>
-        (⌜dv = dev /\ nu = inum⌝ ∗ inode_ref_gen_bare k q dev inum g)%I
     | DepShr s dv nu g =>
         (⌜dv = dev /\ nu = inum⌝ ∗ inode_shr_gen_bare k s dev inum g)%I
     (* the FROZEN window (IVd) holds no ordinary deposit at all -- see
@@ -1478,7 +1476,6 @@ Section IcacheEscrow.
   Definition ic_dep_half (k : nat) (d : ic_dep) : iProp Σ :=
     match d with
     | DepNone => False%I
-    | DepRef _ _ _ g => live_gen k (1/2) g
     | DepShr _ _ _ g => live_gen k (1/2) g
     | DepFrz _ _ _ => False%I
     | DepTx _ _ _ g _ _ => live_gen k (1/2) g
@@ -1508,9 +1505,9 @@ Section IcacheEscrow.
     ∃ g : gname, ⌜ic_dep_gname d = Some g⌝ ∗ live_gen k (1/2) g.
   Proof.
     rewrite /ic_dep_half /ic_dep_gname.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q
+    destruct d as [| s dv nu g | qf dv nu | s dv nu g t q
                   | s dv nu g];
-      [iIntros "[]" | | | iIntros "[]" | |];
+      [iIntros "[]" | | iIntros "[]" | |];
       iIntros "H"; iExists g; by iFrame.
   Qed.
 
@@ -1525,12 +1522,9 @@ Section IcacheEscrow.
       (inode_ident k (DfracOwn f) dev inum -∗ ic_dep_own k d dev inum).
   Proof.
     rewrite /ic_dep_own.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q
+    destruct d as [| s dv nu g | qf dv nu | s dv nu g t q
                   | s dv nu g];
-      [iIntros "[]" | | | iIntros "[]" | |].
-    - iIntros "[%Heq (Hfr & Hlv & Hid)]". iExists q. iFrame "Hid".
-      iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
-      rewrite /inode_ref_gen. iFrame.
+      [iIntros "[]" | | iIntros "[]" | |].
     - iIntros "[%Heq [Hid Hlv]]". iExists s. iFrame "Hid".
       iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
@@ -1564,16 +1558,9 @@ Section IcacheEscrow.
     ∃ s : Qp, live_frac k s ∗ (live_frac k s -∗ ic_dep_res k d dev inum).
   Proof.
     rewrite /ic_dep_res /ic_dep_half /live_frac.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q
+    destruct d as [| s dv nu g | qf dv nu | s dv nu g t q
                   | s dv nu g];
-      [iIntros "[[] _]" | | | iIntros "[[] _]" | |].
-    - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
-      iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
-      iIntros "[%g2 Hhalf]".
-      iDestruct "Hown" as "[%Heq (Hfr & Hlv & Hid)]".
-      iDestruct (live_gen_agree with "Hlv Hhalf") as %<-.
-      iFrame "Hhalf". iSplitR; [iPureIntro; exact Heq |].
-      rewrite /inode_ref_gen. iFrame.
+      [iIntros "[[] _]" | | iIntros "[[] _]" | |].
     - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
       iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
       iIntros "[%g2 Hhalf]".
@@ -1604,12 +1591,9 @@ Section IcacheEscrow.
       (live_gen k s g -∗ ic_dep_own k d dev inum).
   Proof.
     rewrite /ic_dep_own /ic_dep_gname.
-    destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q
+    destruct d as [| s dv nu g | qf dv nu | s dv nu g t q
                   | s dv nu g];
-      [iIntros "[]" | | | iIntros "[]" | |].
-    - iIntros "[%Heq (Hfr & Hlv & Hid)]". iExists q, g. iSplitR; [done |].
-      iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
-      rewrite /inode_ref_gen. iFrame.
+      [iIntros "[]" | | iIntros "[]" | |].
     - iIntros "[%Heq [Hid Hlv]]". iExists s, g. iSplitR; [done |].
       iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
@@ -1625,10 +1609,10 @@ Section IcacheEscrow.
     ic_dep_gname d = Some g -> live_gen k (1/2) g -∗ ic_dep_half k d.
   Proof.
     rewrite /ic_dep_gname /ic_dep_half.
-    destruct d as [| q dv nu g2 | s dv nu g2 | qf dv nu | s dv nu g2 t q
+    destruct d as [| s dv nu g2 | qf dv nu | s dv nu g2 t q
                   | s dv nu g2];
       intros H;
-      [discriminate | | | discriminate | |];
+      [discriminate | | discriminate | |];
       injection H as <-; iIntros "$".
   Qed.
 
@@ -2463,22 +2447,10 @@ Section IcacheEscrow.
           rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
           iExFalso. iPureIntro. cbn in Hn. lia. }
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu | s dv nu gd tx0 qx0
+      destruct d as [| s dv nu gd | qf dv nu | s dv nu gd tx0 qx0
                     | s dv nu gd];
-        [| | | iDestruct "Hres" as "[[] _]" | |].
+        [| | iDestruct "Hres" as "[[] _]" | |].
       + iDestruct "Hres" as "[[] _]".
-      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
-        (* the arm's reference has no sleeplock slice of its own (the lock
-           holds it), so the refutation's [iref_tok] borrows the OPENER's --
-           which is sound because the two are refuted together. *)
-        (* the arm's reference has no sleeplock slice of its own -- the
-           entry's LOCK holds it -- so the refutation reads the bare count
-           fragments, which is all it ever used. *)
-        iDestruct "Htok" as "(Hfrq & Hlvq & Hshq)".
-        iDestruct (iref_frag_two_lookup with "Hhalf Hfrq Hfr'")
-          as %(qt' & n & HMk' & Hn).
-        rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
-        iExFalso. iPureIntro. cbn in Hn. lia.
       + (* THE REF-1 REFUTATION OF A SHARE DEPOSIT, under the restated
            ledger (§17.3 (A)): the opener's [q = qt], the invariant's
            [1/2 - qt], the ARM's own 1/2 and the share's [s] sum past one.
@@ -2586,21 +2558,10 @@ Section IcacheEscrow.
           rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
           iExFalso. iPureIntro. cbn in Hn. lia. }
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu | s dv nu gd tx0 qx0
+      destruct d as [| s dv nu gd | qf dv nu | s dv nu gd tx0 qx0
                     | s dv nu gd];
-        [| | | iDestruct "Hres" as "[[] _]" | |].
+        [| | iDestruct "Hres" as "[[] _]" | |].
       + iDestruct "Hres" as "[[] _]".
-      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
-        (* the arm's reference has no sleeplock slice of its own (the lock
-           holds it), so the refutation's [iref_tok] borrows the OPENER's --
-           which is sound because the two are refuted together. *)
-        (* the arm's reference has no sleeplock slice of its own -- the
-           entry's LOCK holds it -- so the refutation reads the bare count
-           fragments, which is all it ever used. *)
-        iDestruct (iref_frag_two_lookup with "Hhalf Hfrq Hfr'")
-          as %(qt' & n & HMk' & Hn).
-        rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
-        iExFalso. iPureIntro. cbn in Hn. lia.
       + (* THE REF-1 REFUTATION OF A SHARE DEPOSIT, under the restated
            ledger (§17.3 (A)): the opener's [q = qt], the invariant's
            [1/2 - qt], the ARM's own 1/2 and the share's [s] sum past one.
@@ -4151,7 +4112,7 @@ Section IcacheEscrow.
      yet converted. *)
   Definition ic_dep_bundleless (d : ic_dep) : bool :=
     match d with
-    | DepRef _ _ _ _ | DepShr _ _ _ _ | DepFrz _ _ _ => true
+    | DepShr _ _ _ _ | DepFrz _ _ _ => true
     | _ => false
     end.
 
@@ -4349,22 +4310,9 @@ Section IcacheEscrow.
          the other three are the residue *)
       iDestruct "Hout" as (d dev inum) "(Hdep & Hres & Hmt & Hgid & Hrd)".
       iDestruct "Hres" as "[Hres | Hfrz]".
-      + destruct d as [| q dv nu g | s dv nu g | qf dv nu | s dv nu g t q
+      + destruct d as [| s dv nu g | qf dv nu | s dv nu g t q
                       | s dv nu g].
         * rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[[] _]".
-        * (* DepRef -- iput's authority-side deposit: the residue *)
-          iFrame "Ha". iExists dev, inum.
-          iRight; iRight; iRight.
-          iApply (ic_lend_intro _ _ _ _ _ _ _
-                    (ic_deposit cn k (DepRef q dv nu g)
-                     ∗ ic_dep_res k (DepRef q dv nu g) dev inum
-                     ∗ ic_mid cn k
-                     ∗ ic_out_rd γfs γi cov logstart (DepRef q dv nu g) inum)%I
-                    with "Hgid [Hdep Hres Hmt Hrd] []").
-          { iFrame "Hdep Hres Hmt Hrd". }
-          iIntros "Hgid (Hdep & Hres & Hmt & Hrd)".
-          iRight; iLeft. rewrite /ic_out. iExists (DepRef q dv nu g), dev, inum.
-          iFrame "Hdep Hmt Hgid Hrd". iLeft. iExact "Hres".
         * (* DepShr -- an UNCONVERTED transactional lock withdrawal *)
           iFrame "Ha". iExists dev, inum.
           iRight; iRight; iRight.
@@ -4403,7 +4351,7 @@ Section IcacheEscrow.
           iFrame "Hdep Hmt Hgid". iSplitL "Hres"; [iLeft; iExact "Hres" |].
           cbn [ic_out_rd]. iApply ("Hback" with "Hn").
       + (* the FROZEN alternative: [DepFrz], iput's +0x5e window *)
-        rewrite /ic_out_frz. destruct d as [| q dv nu g | s dv nu g | qf dv nu
+        rewrite /ic_out_frz. destruct d as [| s dv nu g | qf dv nu
                                            | s dv nu g t q | s dv nu g];
           try (iDestruct "Hfrz" as "[]").
         iFrame "Ha". iExists dev, inum.
@@ -4692,21 +4640,10 @@ Section IcacheEscrow.
           rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
           iExFalso. iPureIntro. cbn in Hn. lia. }
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu | s dv nu gd tx0 qx0
+      destruct d as [| s dv nu gd | qf dv nu | s dv nu gd tx0 qx0
                     | s dv nu gd];
-        [| | | iDestruct "Hres" as "[[] _]" | |].
+        [| | iDestruct "Hres" as "[[] _]" | |].
       + iDestruct "Hres" as "[[] _]".
-      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
-        (* the arm's reference has no sleeplock slice of its own (the lock
-           holds it), so the refutation's [iref_tok] borrows the OPENER's --
-           which is sound because the two are refuted together. *)
-        (* the arm's reference has no sleeplock slice of its own -- the
-           entry's LOCK holds it -- so the refutation reads the bare count
-           fragments, which is all it ever used. *)
-        iDestruct (iref_frag_two_lookup with "Hhalf Hfrq Hfr'")
-          as %(qt' & n & HMk' & Hn).
-        rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
-        iExFalso. iPureIntro. cbn in Hn. lia.
       + iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
         iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
           [iExists gd; iExact "Hhf" |].

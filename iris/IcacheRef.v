@@ -717,7 +717,6 @@ Qed.
 Definition ic_dep_gname (d : ic_dep) : option gname :=
   match d with
   | DepNone => None
-  | DepRef _ _ _ g => Some g
   | DepShr _ _ _ g => Some g
   | DepFrz _ _ _ => None
   (* the write arm is a [DepShr] carrying a parked transaction share, so it
