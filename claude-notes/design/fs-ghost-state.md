@@ -362,7 +362,7 @@ the rc-0/f-None defaulted aliases that keep old literals byte-stable).
 | `r` | outstanding PLAIN references — **ACTIVE** (item 7a) | `runit_plain z` (the renamed `iref_lic`; `runit_any := runit_plain`) | minted at iget by licence flavour, spent at iput's last close | the reference-provenance unit: every non-allocator reference carries one, and the pin `c ≠ None ⟹ r = 0` is how fifteen ilock sites DERIVE `c = None` at their fill. |
 | `rc` | outstanding CLAIM-flavoured references | `runit_claim z` | ialloc's own ClaimL iget mints it; the withdraw's conversion spends it (`rc→rc−1`, `r→r+1`) | keeps the allocator's reference counted without breaking the `r = 0` pin; `runit (b:bool) z` is the flavour-indexed form (`is_claim l`). |
 | `p` | parent register (`option (dfrac_agree Z)`) | rides `ilinkdp`/`iparent` | mkdir / rmdir | fractional agreement on who the parent is. |
-| `f` | the freeze phase: `frz := FrzOff \| FrzPre (rg:bool) \| FrzPost (rg:bool)` (`option (excl frz)`) | `ifreeze_off z`, `ifreeze_pre rg z`, `ifreeze_post rg z` | boot mints `FrzOff`; `ireg_freeze_au` steps Off→Pre; the +0x8a last close steps Pre→Post; the deposit retires Post→Off | **exclusive free-in-flight, carrying the REGIME INDEX `rg`** — which arm of `ireg_open ∨ ireg_boot` the freezer lent (RULING G′), so the deposit can return exactly it.  `ifreeze_off` rides the payload at rest (pool bundle / escrow tail / ilock holder's hand); the Pre/Post fragment stays in the FREER's hand from mint to deposit — it is what decides the escrow-tail disjunct at +0x70/+0x8a. |
+| `f` | the freeze phase: `frz := FrzOff \| FrzPre (rg:frzidx) \| FrzPost (rg:frzidx)` (`option (excl frz)`), `frzidx = bool * (nat * Qp)` | `ifreeze_off z`, `ifreeze_pre rg z`, `ifreeze_post rg z` | boot mints `FrzOff`; `ireg_freeze_au` steps Off→Pre; the +0x8a last close steps Pre→Post; the deposit retires Post→Off | **exclusive free-in-flight, carrying the REGIME INDEX `rg.1`** — which arm of `ireg_open ∨ ireg_boot` the freezer lent (RULING G′), so the deposit can return exactly it — **and the FREEZING TRANSACTION `rg.2`**, whose share `ireg_fsh` parks for the window's length (3c; the c column's device at the f column).  `ifreeze_off` rides the payload at rest (pool bundle / escrow tail / ilock holder's hand); the Pre/Post fragment stays in the FREER's hand from mint to deposit — it is what decides the escrow-tail disjunct at +0x70/+0x8a and what re-identifies the parked share. |
 
 The count coupling `icnt_half z n` and the pin `ireg_ref_ok r rc n c d`
 (`r + rc ≤ n`; `type = 0 ⟹ r = rc = 0`; `c ≠ None ⟹ r = 0`) ride in
@@ -489,12 +489,21 @@ What is left region-side is the authority and the root's keep-alive.
 - `ireg_frz_ok f n d` — the **freeze pin**, rg-blind: `FrzPre _ ⟹
   nlink = 0 ∧ type ≠ 0 ∧ n = 1`; `FrzPost _ ⟹ same ∧ n = 0`.  B1's
   `cnt2 = 1` payout.
-- `ireg_fsh f` — the **regime shelter** (G′), the f half of `ireg_shp`:
-  `True` at `FrzOff`,
-  `ireg_regime rg` (= `if rg then ireg_open else ireg_boot`) parked at both
-  window phases — the mint parks the lent arm, the deposit extracts and
-  RETURNS it (agreement with the freer's own phase fragment selects it).
-  This is ireclaim's boot round-trip made ghost-complete.
+- `ireg_fsh f` — the **regime shelter + the freeze window's parked share**
+  (G′ and C-6), the f half of `ireg_shp`: `True` at `FrzOff`,
+  `ireg_regime rg.1` (= `if rg.1 then ireg_open else ireg_boot`) **∗
+  `ireg_fpin rg`** (= `rg.2.1 ↪[ln_tx icfg_log]{#(rg.2.2)} tt`) at both
+  window phases — the mint parks both, the deposit extracts and RETURNS both
+  (agreement with the freer's own phase fragment selects them).  The regime
+  half is ireclaim's boot round-trip made ghost-complete; the share is the
+  c column's `ireg_cpin` device at the f column, and what it buys is
+  `ireg_fsh_no_ops`: at an empty `ln_tx` authority every region slot's f
+  column reads `FrzOff`, so the CORPSE — the MARKED slot between iput's
+  eviction and its off-lock deposit, at which the inum has no bundle
+  anywhere — is unreachable at a commit (`FsCollect.col_corpse_no_ops`).
+  The pair is in the INDEX and not existential for
+  `IcacheTxRefute.tx_two_halves_no_whole`'s reason: iput's spec names
+  `(tid, q)` and must get that element back.
 - `ireg_frzc z f` — the **receipt + mirror** conjunct: `(⌜f is FrzPre⌝ ∨
   frzown z)` — the receipt `frzown` is region-parked at every phase except
   `FrzPre`, so "receipt in a thread's hand" ⟺ "this column reads FrzPre"
@@ -541,7 +550,7 @@ unit and DERIVES `c = None` by the `ireg_ref_ok` collision
 
 | piece | type / home | meaning |
 |---|---|---|
-| `escA_inv ge gr gd γi z rg` | tiny invariant per in-flight free (`EscrowInode.v`), **rg-indexed** (G′) | the bridge carrying "the disk free COMMITTED" from the off-lock tail to the next allocator/recycler.  Three gnames now: `ge` (state), `gr` (redeem ticket), `gd` (the **deposit ticket**, item 7c — lets the deposit rule out the FILLED/REDEEMED arms). |
+| `escA_inv ge gr gd γi z rg` | tiny invariant per in-flight free (`EscrowInode.v`), **rg-indexed** (G′/C-6: `rg : frzidx` is the regime arm and the freezing transaction's `(t, q)`) | the bridge carrying "the disk free COMMITTED" from the off-lock tail to the next allocator/recycler.  Three gnames now: `ge` (state), `gr` (redeem ticket), `gd` (the **deposit ticket**, item 7c — lets the deposit rule out the FILLED/REDEEMED arms). |
 | its arms | `EMPTY ∗ ifreeze_post rg z` → `FILLED ∗ imark ∗ ifreeze_off ∗ ticket gd` → `REDEEMED ∗ ticket gr ∗ ticket gd` | the standing `ifreeze_post` lives HERE between iput+0x8a and the deposit; its agreement with the region's f-column is what tells the deposit which regime arm to hand back. |
 | `committedA ge` | persistent `mono_nat_lb` at `ST_FILLED` | "the type-0 write is in the log" — minted by `ireg_free_deposit_au`, read by the redeem. |
 | `redeem_ticketA gr` | `Excl ()` | the one-shot right to redeem the escrow back into a normal free-pool entry; parked pool-side (`pool_await`). |
@@ -635,19 +644,32 @@ the transit set under its own key) before it can state anything:
   slot is still on the MARKED sub-arm — which holds `imark` and NO record
   fragment (`ireg_marked_ok` forces a nonzero type there), the fragment
   being in the walk's own hand.  So such an inum has no bundle anywhere and
-  `FsCollect.col_free_slot_acc` does not reach it.  The window is inside
-  one transaction, so the fix is the c column's own increment once more
-  (§3c's `ireg_cpin`), at the MARKED arm's FREEZE column — which is ON for
-  exactly that window, and whose index `rg` is where the freezing
-  transaction and its share would have to ride so the deposit can hand
-  iput back the element its spec names.  It DOES NOT FINISH `X` on its own:
-  a MARKED slot at `FrzOff` is every cached or pooled inode, so refuting
-  the window yields only "an `X` inum's slot is MARKED implies its column
-  is `FrzOff`"; ruling that combination out needs a pool-side witness for
-  `X`'s rows (a `reg_half` per pending/await inum in `ipool_body`,
-  colliding with the MARKED arm's `reg_full`), which is this file's
-  business and not the region's.  See `FsCollect.v` section 5c, the wall
-  machine-checked.
+  `FsCollect.col_free_slot_acc` does not reach it.
+  THE CORPSE WINDOW ITSELF IS CLOSED (C-6): it is inside one transaction, and
+  the freeze column now carries that transaction — `frzidx` (§3b) — with
+  `ireg_fsh` parking its share for the window's length, so
+  `InodeRegion.ireg_fsh_no_ops` reads `f = FrzOff` off an empty `ln_tx`
+  authority at every slot and `FsCollect.col_corpse_no_ops` refutes a slot
+  whose freeze token is in some thread's hand.
+  WHAT REMAINS IS THE POOL-SIDE WITNESS FOR `X`, and it is this file's
+  business, not the region's: a MARKED slot at `FrzOff` is every cached or
+  pooled inode, so the refutation above yields only "an `X` inum's slot is
+  MARKED implies its column is `FrzOff`".  The obvious witness — a
+  `reg_half` per pending/await inum inside `ipool_body`, colliding with the
+  MARKED arm's `reg_full` — CANNOT BE MINTED: the registry element at one
+  inum is entirely region-side on every arm (IN and MARKED hold `reg_full`;
+  PENDING holds `reg_half` beside `region_pending`'s, which is the other
+  half), and its one producer, the deposit's `reg_split`, runs OFF-LOCK,
+  twenty instructions after iput gave the itable lock up at +0x94 — so it
+  can reach neither `ipool`'s rows nor `ipool_body`'s `X` index (knowing
+  `z ∈ X` needs both halves of `icfg_pext`, one of which is the lock's).
+  `FsCollect.reg_full_no_pool_half` is that wall, machine-checked; section
+  5d there records the shape that would close it (a per-inum ghost map like
+  `ipool_tkey`, its authority in `ipool_body` and its element carried by the
+  walk from `ipool_put` to the deposit, whose value parks a share of the
+  freezing transaction before the deposit and `imark` after it — which
+  moves the `imark` out of `escA_body`'s FILLED arm and makes
+  `ipool_take_lend` produce it, so the re-plumbing reaches `ProofIget`).
 
 **THE MOVERS ARE ACCESSORS, NOT PLAIN FUPDS**, because the pool's quarter
 of `ic_id` has to be in the caller's hand at the same ghost step as the

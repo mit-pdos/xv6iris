@@ -1841,6 +1841,102 @@ as their remaining consumers.
   Nothing of the shape changed: `col_snap_ok_ex` is still what the law
   concludes and `col_hand` still what it must assemble.
 
+  **AS LANDED — C-6: THE CORPSE WINDOW PARKS ITS TRANSACTION, AND THE
+  POOL-SIDE WITNESS IS A WALL.**
+
+  RESIDUE (F) IS CLOSED, by (E)'s device at the f column and at exactly the
+  measured shape.  `Xv6Cameras.frzidx = bool * (nat * Qp)` is the freeze
+  phase's index: `rg.1` is RULING G′'s regime arm as before, `rg.2` the
+  freezing transaction and its share.  `InodeRegion.ireg_fpin rg` is that
+  share (`rg.2.1 ↪[ln_tx icfg_log]{#(rg.2.2)} tt`) and `ireg_fsh` parks it
+  BESIDE the regime at both window phases; `ireg_freeze_au` takes it at the
+  mint, `IcacheInv.iref_close_last_freeze_store_au` rides it through the
+  `FrzPre → FrzPost` step (`ireg_fsh_step` moves the phase, never the
+  index), and `EscrowDeposit.ireg_free_deposit_au` returns it with the
+  regime.  `InodeRegion.ireg_fsh_no_ops` is the reading the commit takes:
+  at an empty `ln_tx` authority every region slot's f column is `FrzOff`,
+  `ireg_frz_ok` ruling out the absent column and `ExclBot` exactly as
+  `ireg_claim_ok` does for the c column.  The widening was byte-stable
+  wherever C-5 measured it: not one `FrzPre`/`FrzPost` literal in the tree,
+  and the binder sweep was ~10 `(rg : bool)` → `(rg : frzidx)` in six files
+  (`EscrowInode`, `EscrowDeposit`, `IcacheRef`, `IcacheInv`,
+  `IcacheEscrow`, `ProofIput`).  `ireg_regime` stays at `bool` and
+  `ireg_fsh_step`, `ireg_fsh_boot_off`, `ireg_frzm_ok_*`, `frz_close`,
+  `frz_reg` need no statement change beyond the index's type.
+
+  IPUT'S FRACTION PLAN, which was the work.  The freeze window SPANS the
+  eviction that hands `ipool_evict_lend` its share, so one share cannot
+  serve both.  `ProofIput.ip_free_entry` splits the caller's `qtx` in half
+  at the one point before either park — immediately before the +0x3a
+  checkout window — with `LogInv.log_tx_split` at `eq_sym (Qp.div_2 qtx)`:
+  one half enters the window (`ic_pin_enter`, then the +0x5e exit, the
+  mid-free park, the +0x8a eviction and `ipool_put`), the other is the
+  freeze index's `(tid, qtx/2)`.  BOTH Exit-A arms rejoin inside
+  `ip_free_entry` (`log_tx_join_q`), so the caller never sees the split;
+  on Exit B `wp_iput_gen` instantiates `ip_free_locked` at `qtx/2` and at
+  `rg := (rg, (tid, qtx/2))` and joins its two outputs.  Consequence:
+  `wp_iput_gen`, `wp_iput_sconf` and `SpecIput` keep their `(rg : bool)`
+  and their `tid ↪{#qtx}`, so ireclaim and the sixteen iput call sites are
+  untouched.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `Xv6Cameras.frz` (both payloads);
+  `IcacheRef.ifreeze_pre`/`ifreeze_post`/`frz_reg` (+the index type);
+  `InodeRegion.ireg_fsh` (the share beside the regime), `ireg_fsh_pre`/
+  `_post` (two arguments), `ireg_fsh_post_acc` (a pair out),
+  `ireg_frzm_ok_true`, `ireg_freeze_au` (+`ireg_fpin rg`, and its regime
+  premise is now `ireg_regime rg.1`); `EscrowInode.escA_body`/`escA_inv`/
+  `pool_await`; `EscrowDeposit.ireg_free_deposit_au` (its second fupd
+  yields `committedA ge ∗ ireg_regime rg.1 ∗ ireg_fpin rg`);
+  `IcacheInv.icnt_freeze_forces_one`/`frz_park_pre_reclaim`/
+  `iref_close_last_freeze_store_au`; `IcacheEscrow.ic_payload_arm_decide_frz`/
+  `ipool_shape_await`/`ic_close_to_empty_await`/`ic_open_frozen`;
+  `ProofIput.ip_free_locked` and `ip_free_offlock` (+`ireg_fpin rg` in the
+  post, after the regime).  NEW: `InodeRegion.ireg_fpin`,
+  `ireg_fsh_no_ops`.  UNTOUCHED: `log_ctx`, `log_op`, `wp_end_op`,
+  `fs_crash_seam`, `P_fs`, `ireg_slot`/`ireg_slot_intro`'s arity,
+  `ireg_shp`, `ic_escrow_body`'s five arms, `ipool`'s shape, `LogInv`.
+
+  THE COLLECTION'S SIDE.  `FsCollect` section 5c is no longer a wall:
+  `col_corpse_no_ops` refutes a slot whose freeze token is in ANY thread's
+  hand at either phase against an empty `ln_tx` authority, and
+  `col_slot_unfrozen` is the accessor form (pure, the slot comes straight
+  back) that a pool-side consumer would feed with the `ifreeze_post rg`
+  standing in `escA_body`'s EMPTY arm.  `col_region_slot_acc` and
+  `col_free_slot_acc` did not have to move.
+
+  **(G), THE POOL-SIDE WITNESS FOR `X`, IS A WALL — `FsCollect` section 5d,
+  machine-checked.**  The measured fix ("a `EscrowDefs.reg_half` per
+  pending/await inum inside `ipool_body`, colliding with the MARKED arm's
+  `reg_full`") CANNOT BE MINTED, and the obstruction is accounting, not
+  proof.  The registry element at one inum is entirely REGION-side on every
+  arm: IN and MARKED hold `reg_full`, and the PENDING arm holds `reg_half`
+  beside `EscrowDefs.region_pending`'s — which is the other half, also in
+  `ireg_slot`.  `FsCollect.reg_full_no_pool_half` states exactly that (a
+  `reg_half` at an inum is refuted by that inum's slot on EVERY arm, not
+  just the two the witness is meant to rule out), so the half would have to
+  be MOVED out of the region first — and its one producer, the deposit's
+  `reg_split`, runs OFF-LOCK: iput gives the itable lock up at +0x94,
+  twenty instructions before `ireg_free_deposit_au`, so the deposit can
+  open `ipoolN` but cannot find the row for its own inum (`z ∈ X` needs
+  both halves of `icfg_pext`, one of which is the lock's).  The same wall
+  kills every cheaper variant: `ipool_ext`'s rows are lock-side, so the
+  commit sees NOTHING at an `X` inum, and `escA_inv` is an `inv` and
+  therefore cannot move into the Timeless `ipool_body`.
+
+  THE SHAPE THAT WOULD CLOSE IT, for the successor lane.  A per-inum ghost
+  map keyed like `IcacheEscrow.ipool_tkey`: its AUTHORITY in `ipool_body`,
+  its element carried by the walk from `ipool_put` to the deposit, and the
+  body's big-op stated over the VALUE — `Corpse (t, q)` parks a share of
+  the freezing transaction (refuted at a commit exactly as `ipool_transit`
+  is) and `Deposited` parks `imark`, which `col_free_slot_acc` reads as the
+  free bundle.  The `imark` is the one the deposit hands to
+  `EscrowInode.escA_deposit`'s FILLED state today, so the escrow loses it
+  and `ipool_take_lend` — the redeem — produces it instead; that
+  re-plumbing reaches `ProofIget`'s recycle as well as `ProofIput`'s two
+  sites, plus a new camera/gname and its boot premises
+  (`IcacheBoot`/`FsCfgBoot`).  It is a lane of its own, B″-tx5-sized twice
+  over, and C-6 leaves it stated rather than half-built.
+
 - [ ] **Lane D — the durability theorem, and its worked instance (plan §5).**
   The GENERAL statement is the commit's receipt itself: after a commit, the
   current snapshot's abstract state IS the era's abstract state (the
