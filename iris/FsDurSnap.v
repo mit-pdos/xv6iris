@@ -199,7 +199,7 @@ Definition snap_meta (S : fs_state_rec) (b : Z) : Prop :=
 (*  the two fields a writer must re-prove its own clauses at -- [fn_ent]   *)
 (*  (whose only pin, [ind_bytes_inj], needs the entry array's LENGTH) and  *)
 (*  [fn_blk]'s DOMAIN -- and no era-side fact reaches an existential.      *)
-(*  See claude-notes/projects/durable-disk.md item 4b.                     *)
+(*  See claude-notes/design/durable-fs-plan.md section 4a.                 *)
 (* ===================================================================== *)
 Record inode_repr (n : fs_node) : Prop := MkInodeRepr {
   inr_rec_wf   : dinode_wf (fn_rec n);
@@ -230,20 +230,18 @@ Qed.
 (* ===================================================================== *)
 (*  1b. THE BYTE HALF: the tie, and the USED-SET COUPLING                 *)
 (*                                                                        *)
-(*  THE ACCUMULATED PURE CONTENT (fs-state.md 4^9, addendum 7): an         *)
-(*  abstract state [S] and the committed block map [D] agree at [S]'s      *)
-(*  FOOTPRINT, and the state's own blocks are laid out DISJOINTLY inside   *)
-(*  the bitmap's used set.  This half is true EVEN MID-OPERATION, which is *)
-(*  why it -- and not [snap_ok] -- is what a batch accumulates per write.  *)
+(*  THE ACCUMULATED PURE CONTENT (plan section 4a): an abstract state      *)
+(*  [S] and the committed block map [D] agree at [S]'s FOOTPRINT, and the  *)
+(*  state's own blocks are laid out DISJOINTLY inside the bitmap's used    *)
+(*  set.  This half is true EVEN MID-OPERATION, which is why it -- and     *)
+(*  not [snap_ok] -- is what a batch accumulates per write.                *)
 (*                                                                        *)
 (*  Every byte clause names ONE object and its own bytes.  Three do not,   *)
 (*  and each is named at its definition:                                   *)
 (*                                                                        *)
-(*  - [snap_dom], the inode map's DOMAIN over the region.  It is           *)
-(*    fs-state.md 4.5 (2)'s per-inum EXISTENCE witness and 3c's third      *)
-(*    [dgeo_ok] equation, and under snapshots it is by construction: the   *)
-(*    value [S] is read off the era's own top-map authority, whose domain  *)
-(*    IS the region's inums.                                              *)
+(*  - [snap_dom], the inode map's DOMAIN over the region.  Under           *)
+(*    snapshots it is by construction: the value [S] is read off the       *)
+(*    era's own top-map authority, whose domain IS the region's inums.     *)
 (*  - [snap_links], the link family's validity.  It is the tokens-<=-nlink *)
 (*    law, which fs-state.md section 7 already names as the one            *)
 (*    whole-state fact in the design; it is never MAINTAINED here, only    *)
@@ -253,7 +251,7 @@ Qed.
 (*    log's own row (b) property.                                          *)
 (*                                                                        *)
 (*  THE COUPLING -- [snap_meta_used], [snap_own_used], [snap_disj] -- IS   *)
-(*  THE ONE SANCTIONED WHOLE-STATE PURE CLAUSE (fs-state.md 4^9 (7)):      *)
+(*  THE ONE SANCTIONED WHOLE-STATE PURE CLAUSE (plan section 4a):          *)
 (*  section 0's LETTER is bent here and nowhere else, and its SPIRIT       *)
 (*  (local maintenance) holds.  What it BUYS is exactly                    *)
 (*  [snap_untouched_of_own] and [snap_untouched_of_free] in 1e below: the  *)
@@ -985,7 +983,7 @@ Inductive fp_slot :=
 
 (* the byte-address map of the run [bs] at offset [off] of block [b]:
    [FsStateDefs.byte_range]'s flat reading, and the unit the cut works in *)
-Definition rng (b off : Z) (bs : list (bv 8)) : gmap Z (bv 8) :=
+Definition fp_run (b off : Z) (bs : list (bv 8)) : gmap Z (bv 8) :=
   map_seqZ (b * BSIZE_z + off) bs.
 
 Definition fp_blk (S : fs_state_rec) (x : fp_slot) : Z :=
@@ -1013,9 +1011,9 @@ Definition fp_bs (S : fs_state_rec) (D : gmap Z (list (bv 8)))
   | FpPool b => if decide (b ∈ fss_used S) then [] else default [] (D !! b)
   end.
 
-Definition fp (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+Definition fp_map (S : fs_state_rec) (D : gmap Z (list (bv 8)))
     (x : fp_slot) : gmap Z (bv 8) :=
-  rng (fp_blk S x) (fp_off x) (fp_bs S D x).
+  fp_run (fp_blk S x) (fp_off x) (fp_bs S D x).
 
 (* the six slots' three components, READ OUT.  Every one of them is a
    [reflexivity] or one [lookup_total_correct]; they exist so that the
@@ -1106,12 +1104,12 @@ Definition fp_valid (S : fs_state_rec) (x : fp_slot) : Prop :=
 
 (* a run that IS a slice of a block of [D] is a sub-map of the flattening,
    and it sits inside its own block *)
-Lemma rng_of_slice (D : gmap Z (list (bv 8))) (b off : Z)
+Lemma fp_run_of_slice (D : gmap Z (list (bv 8))) (b off : Z)
     (bs pre sub post : list (bv 8)) :
   (forall c cs, D !! c = Some cs -> length cs = BSIZE) ->
   D !! b = Some bs -> bs = (pre ++ sub ++ post)%list ->
   Z.of_nat (length pre) = off ->
-  rng b off sub ⊆ fs_dbytes D
+  fp_run b off sub ⊆ fs_dbytes D
   /\ 0 <= off /\ off + Z.of_nat (length sub) <= BSIZE_z.
 Proof.
   intros Hlen Hb Hbs Hoff.
@@ -1121,7 +1119,7 @@ Proof.
   assert (Hst : Z.of_nat BSIZE = BSIZE_z) by reflexivity.
   split; [| split; [lia |]].
   - apply map_subseteq_spec. intros a v Ha.
-    rewrite /rng in Ha.
+    rewrite /fp_run in Ha.
     apply lookup_map_seqZ_Some in Ha as [Hge Ha].
     set (j := Z.to_nat (a - (b * BSIZE_z + off))).
     assert (Hj : Z.of_nat j = a - (b * BSIZE_z + off)) by (rewrite /j; lia).
@@ -1138,28 +1136,28 @@ Proof.
   - rewrite -Hoff in Hbl *. lia.
 Qed.
 
-Lemma rng_of_block (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
+Lemma fp_run_of_block (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
   (forall c cs, D !! c = Some cs -> length cs = BSIZE) ->
   D !! b = Some bs ->
-  rng b 0 bs ⊆ fs_dbytes D /\ 0 <= 0 /\ 0 + Z.of_nat (length bs) <= BSIZE_z.
+  fp_run b 0 bs ⊆ fs_dbytes D /\ 0 <= 0 /\ 0 + Z.of_nat (length bs) <= BSIZE_z.
 Proof.
   intros Hlen Hb.
-  apply (rng_of_slice D b 0 bs [] bs []);
+  apply (fp_run_of_slice D b 0 bs [] bs []);
     [exact Hlen | exact Hb | rewrite /= app_nil_r // | reflexivity].
 Qed.
 
 (* TWO RUNS ARE DISJOINT when they sit in different blocks, or in the same
    block at offsets that do not overlap.  Everything the cut has to know
    about geometry funnels through this one arithmetic step. *)
-Lemma rng_disj (b1 off1 : Z) (s1 : list (bv 8)) (b2 off2 : Z)
+Lemma fp_run_disj (b1 off1 : Z) (s1 : list (bv 8)) (b2 off2 : Z)
     (s2 : list (bv 8)) :
   0 <= off1 -> off1 + Z.of_nat (length s1) <= BSIZE_z ->
   0 <= off2 -> off2 + Z.of_nat (length s2) <= BSIZE_z ->
   (b1 <> b2 \/ off1 + Z.of_nat (length s1) <= off2
              \/ off2 + Z.of_nat (length s2) <= off1) ->
-  rng b1 off1 s1 ##ₘ rng b2 off2 s2.
+  fp_run b1 off1 s1 ##ₘ fp_run b2 off2 s2.
 Proof.
-  intros H1 H2 H3 H4 Hsep. rewrite /rng. apply map_seqZ_disjoint.
+  intros H1 H2 H3 H4 Hsep. rewrite /fp_run. apply map_seqZ_disjoint.
   change BSIZE_z with 1024 in *.
   destruct Hsep as [Hne | [Hs | Hs]]; [| lia | lia].
   destruct (Z.lt_trichotomy b1 b2) as [Hlt | [Heq | Hlt]].
@@ -1172,7 +1170,7 @@ Qed.
 
 Lemma fp_ok (S : fs_state_rec) (D : gmap Z (list (bv 8))) (x : fp_slot) :
   snap_bytes S D -> fp_valid S x ->
-  fp S D x ⊆ fs_dbytes D
+  fp_map S D x ⊆ fs_dbytes D
   /\ 0 <= fp_off x
   /\ fp_off x + Z.of_nat (length (fp_bs S D x)) <= BSIZE_z.
 Proof.
@@ -1180,25 +1178,25 @@ Proof.
   assert (Hlen : forall c cs, D !! c = Some cs -> length cs = BSIZE)
     by exact (sk_bsz Hb).
   (* the empty run is a sub-map of anything and occupies nothing *)
-  assert (Hnil : forall c : Z, rng c 0 [] ⊆ fs_dbytes D
+  assert (Hnil : forall c : Z, fp_run c 0 [] ⊆ fs_dbytes D
                    /\ 0 <= 0 /\ 0 + Z.of_nat (length (@nil (bv 8))) <= BSIZE_z).
-  { intros c. rewrite /rng /=. split; [apply map_empty_subseteq |].
+  { intros c. rewrite /fp_run /=. split; [apply map_empty_subseteq |].
     rewrite /BSIZE_z. lia. }
-  destruct x as [| | i | i k | i | b]; rewrite /fp /fp_bs /fp_blk /fp_off.
-  - exact (rng_of_block D SB_BNO (fss_sbb S) Hlen (sk_sb Hb)).
-  - exact (rng_of_block D _ _ Hlen (sk_bmap Hb)).
+  destruct x as [| | i | i k | i | b]; rewrite /fp_map /fp_bs /fp_blk /fp_off.
+  - exact (fp_run_of_block D SB_BNO (fss_sbb S) Hlen (sk_sb Hb)).
+  - exact (fp_run_of_block D _ _ Hlen (sk_bmap Hb)).
   - destruct Hv as [n Hn]. rewrite (lookup_total_correct _ _ _ Hn).
     destruct (sk_rec Hb i n Hn) as (bs & Hbs & pre & post & Hsp & Hoff).
-    exact (rng_of_slice D _ _ bs pre _ post Hlen Hbs Hsp Hoff).
+    exact (fp_run_of_slice D _ _ bs pre _ post Hlen Hbs Hsp Hoff).
   - destruct Hv as [[n Hn] Hk]. rewrite (lookup_total_correct _ _ _ Hn) in Hk *.
     destruct Hk as [bs Hbs]. rewrite Hbs /=.
-    exact (rng_of_block D _ bs Hlen (sk_blk Hb i n k bs Hn Hbs)).
+    exact (fp_run_of_block D _ bs Hlen (sk_blk Hb i n k bs Hn Hbs)).
   - destruct Hv as [n Hn]. rewrite (lookup_total_correct _ _ _ Hn).
     destruct (decide (fn_indb n = 0)) as [Hz | Hnz]; [exact (Hnil _) |].
-    exact (rng_of_block D _ _ Hlen (sk_ind Hb i n Hn Hnz)).
+    exact (fp_run_of_block D _ _ Hlen (sk_ind Hb i n Hn Hnz)).
   - destruct (decide (b ∈ fss_used S)) as [Hu | Hu]; [exact (Hnil _) |].
     destruct (sk_pool Hb b Hv Hu) as [bs Hbs]. rewrite Hbs /=.
-    exact (rng_of_block D b bs Hlen Hbs).
+    exact (fp_run_of_block D b bs Hlen Hbs).
 Qed.
 
 (* ---- 2c.  ...AND TWO SLOTS ARE DISJOINT ----------------------------- *)
@@ -1415,16 +1413,16 @@ Qed.
 
 Lemma fp_disj (S : fs_state_rec) (D : gmap Z (list (bv 8))) (x y : fp_slot) :
   snap_bytes S D -> fp_valid S x -> fp_valid S y -> x <> y ->
-  fp S D x ##ₘ fp S D y.
+  fp_map S D x ##ₘ fp_map S D y.
 Proof.
   intros Hb Hx Hy Hne.
   destruct (decide (fp_bs S D x = [])) as [Hx0 | Hx0].
-  { rewrite /fp /rng Hx0 /=. apply map_disjoint_empty_l. }
+  { rewrite /fp_map /fp_run Hx0 /=. apply map_disjoint_empty_l. }
   destruct (decide (fp_bs S D y = [])) as [Hy0 | Hy0].
-  { rewrite /fp /rng Hy0 /=. apply map_disjoint_empty_r. }
+  { rewrite /fp_map /fp_run Hy0 /=. apply map_disjoint_empty_r. }
   destruct (fp_ok S D x Hb Hx) as (_ & Hx1 & Hx2).
   destruct (fp_ok S D y Hb Hy) as (_ & Hy1 & Hy2).
-  rewrite /fp. apply (rng_disj _ _ _ _ _ _ Hx1 Hx2 Hy1 Hy2).
+  rewrite /fp_map. apply (fp_run_disj _ _ _ _ _ _ Hx1 Hx2 Hy1 Hy2).
   exact (fp_sep S D x y Hb Hx Hy Hne Hx0 Hy0).
 Qed.
 
@@ -1609,15 +1607,15 @@ Section Ledger.
   (*  3a.  A RUN OF BYTES IS A SUB-MAP OF THE FLATTENING                 *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma byte_range_rng Γ b off bs :
-    byte_range Γ b off bs ⊣⊢ ([∗ map] a ↦ v ∈ rng b off bs, fsΦ Γ a v).
-  Proof. rewrite /rng big_sepM_map_seqZ_gen /byte_range //. Qed.
+  Lemma byte_range_run Γ b off bs :
+    byte_range Γ b off bs ⊣⊢ ([∗ map] a ↦ v ∈ fp_run b off bs, fsΦ Γ a v).
+  Proof. rewrite /fp_run big_sepM_map_seqZ_gen /byte_range //. Qed.
 
-  Lemma blk_owned_rng Γ b bs :
+  Lemma blk_owned_run Γ b bs :
     length bs = BSIZE ->
-    blk_owned Γ b bs ⊣⊢ ([∗ map] a ↦ v ∈ rng b 0 bs, fsΦ Γ a v).
+    blk_owned Γ b bs ⊣⊢ ([∗ map] a ↦ v ∈ fp_run b 0 bs, fsΦ Γ a v).
   Proof.
-    intros Hl. rewrite /blk_owned byte_range_rng.
+    intros Hl. rewrite /blk_owned byte_range_run.
     iSplit.
     - iIntros "[_ H]". iExact "H".
     - iIntros "H". iSplitR; [by iPureIntro | iExact "H"].
@@ -1672,13 +1670,13 @@ Section Ledger.
   Proof.
     intros Hb.
     rewrite /blk_ledger -(fs_dbytes_blocks Γ D (sk_bsz Hb)).
-    rewrite (ledger_carve (fsΦ Γ) (fs_dbytes D) (fp_list S) (fp S D)
+    rewrite (ledger_carve (fsΦ Γ) (fs_dbytes D) (fp_list S) (fp_map S D)
                (fp_list_nodup S)
                (fun x Hx => proj1 (fp_ok S D x Hb (fp_list_valid S x Hx)))
                (fun x y Hx Hy Hne =>
                   fp_disj S D x y Hb (fp_list_valid S x Hx)
                           (fp_list_valid S y Hy) Hne)).
-    apply big_sepL_mono. intros k x _. rewrite /fp byte_range_rng //.
+    apply big_sepL_mono. intros k x _. rewrite /fp_map byte_range_run //.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1723,9 +1721,9 @@ Section Ledger.
     - (* the superblock *)
       rewrite /sb_owned. iSplitL; [| iPureIntro; exact (sk_parse Hok)].
       iEval (rewrite fp_sb_blk fp_sb_off (fp_sb_bs S D)) in "Hsb".
-      rewrite (blk_owned_rng Γ SB_BNO (fss_sbb S)
+      rewrite (blk_owned_run Γ SB_BNO (fss_sbb S)
                  (sk_bsz Hok SB_BNO (fss_sbb S) (sk_sb Hok))).
-      rewrite -byte_range_rng. iExact "Hsb".
+      rewrite -byte_range_run. iExact "Hsb".
     - (* the inodes *)
       rewrite /fs_inodes /inode_owned /inode_phi /inode_ghost.
       iEval (rewrite /fs_links) in "Hlinks".
@@ -1748,26 +1746,26 @@ Section Ledger.
              iIntros "!#" (k bs Hk) "Hc".
              iEval (rewrite (fp_dat_blk S i n k Hi) (fp_dat_off i k)
                             (fp_dat_bs S D i n k bs Hi Hk)) in "Hc".
-             rewrite (blk_owned_rng Γ (fn_naddr n k) bs
+             rewrite (blk_owned_run Γ (fn_naddr n k) bs
                         (sk_bsz Hok _ bs (sk_blk Hok i n k bs Hi Hk))).
-             rewrite -byte_range_rng. iExact "Hc".
+             rewrite -byte_range_run. iExact "Hc".
           -- (* the indirect block *)
              rewrite /ind_owned.
              destruct (decide (fn_indb n = 0)) as [Hz | Hnz]; [done |].
              iEval (rewrite (fp_indb_blk S i n Hi) (fp_indb_off i)
                             (fp_indb_bs S D i n Hi Hnz)) in "Hb".
-             rewrite (blk_owned_rng Γ (fn_indb n) (ind_bytes (fn_ent n))
+             rewrite (blk_owned_run Γ (fn_indb n) (ind_bytes (fn_ent n))
                         (sk_bsz Hok _ _ (sk_ind Hok i n Hi Hnz))).
-             rewrite -byte_range_rng. iExact "Hb".
+             rewrite -byte_range_run. iExact "Hb".
       + iDestruct (inode_link_scatter with "Hl") as "[$ $]".
         iPureIntro. exact (Hloc i n Hi).
     - (* the bitmap block and the free pool *)
       rewrite /free_bitmap /free_bitmap_at. iSplitL "Hbm".
       + iEval (rewrite fp_bmap_blk fp_bmap_off (fp_bmap_bs S D)) in "Hbm".
-        rewrite (blk_owned_rng Γ (sb_bmapstart (fss_sb S))
+        rewrite (blk_owned_run Γ (sb_bmapstart (fss_sb S))
                    (bm_bytes BSIZE (fss_used S))
                    (sk_bsz Hok _ _ (sk_bmap Hok))).
-        rewrite -byte_range_rng. iExact "Hbm".
+        rewrite -byte_range_run. iExact "Hbm".
       + rewrite /free_pool.
         iApply (big_sepL_mono with "Hpool"). intros k b Hk.
         apply lookup_seqZ in Hk as [-> Hk].

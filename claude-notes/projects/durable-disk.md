@@ -78,6 +78,15 @@ carries the file system across eras and `Himg` is deleted (lane E).
   `iris/FsDurBytes.v` (the byte-map flattening), `iris/FsDurImg.v` (the
   image instance; adapt to `snap_ok`), `iris/FsDurLedger.v` (entry
   constructors — era-side content; its fold is superseded).
+  Lane 4c as landed: the durable byte points-to is EXCLUSIVE
+  (`snap_gamma_excl` is `phi_excl`, so `free_pool_used`/`blk_owned_ne`
+  read on the durable side too), and the core takes a LINEAR ledger —
+  `blk_ledger_cut` names the footprint slot by slot (`fp_slot`/`fp_list`)
+  and `ledger_carve` spends it, the disjointness coming from the used-set
+  coupling plus three per-object clauses at the END of `snap_bytes`
+  (`sk_sbok`, `sk_reg`, `sk_slot` = `FsImg.fs_slot_inj`), each with its
+  witness; `fs_state_of_ledger_era` is the check that the same core
+  applies at `FsBytesGamma.fs_gamma_L`, which is what lane E calls.
 - **Refutations kept as documentation:** `iris/FsDurRefute.v`,
   `iris/FsDurDefer.v`, `iris/FsDurTrunc.v` (the per-write accumulation of
   `snap_bytes`' used-set coupling — lane B's finding, plan §4, §8);
@@ -157,7 +166,9 @@ reusable is on `main`.
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
      at a ghost step and ∗-ing every inode's bundle against the byte
      authority of `fs_bytes_inv` yields `∃ S, snap_ok S L` with `S` the
-     `ftop_inv` authority's map; disjointness from the ∗ (full elements
+     `ftop_inv` authority's map; the three CUT clauses `sk_sbok`/`sk_reg`/
+     `sk_slot` off the config's superblock, the region's numbering and one
+     inode's own ∗; disjointness from the ∗ (full elements
      for unlocked inodes; ¾ for read-locked ones once lane B′ lands —
      until then every bundle is full or absent, and a read-locked inode
      at commit is the ONE case the lemma cannot close: state it as the

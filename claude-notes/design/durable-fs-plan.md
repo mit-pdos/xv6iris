@@ -43,8 +43,11 @@ own log blocks; only the FS-facing byte view is home-only.
 the file-system predicate (§2) over its OWN ghost names, describing `D`.
 It is NEVER UPDATED.  At each group commit the WAL allocates a fresh copy
 over fresh names and drops the old one (affine).  Nothing outside the
-crash predicate ever holds a piece of a snapshot.  Its byte points-to
-may be persistent (frozen ghosts can be); the link family is not.
+crash predicate ever holds a piece of a snapshot.  Its byte points-to is
+EXCLUSIVE — the same full ghost-map element the era's view uses — because
+that is what makes the `∗` between two inodes of a durable `fs_state`
+mean something, and because the ONE allocator core has to serve the boot
+mint too (§5) and the era's `fsΦ` cannot be `□`-ed.
 
 ## 2. The file-system predicate `fs_state Γ S`
 
