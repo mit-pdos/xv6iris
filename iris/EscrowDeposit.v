@@ -226,8 +226,13 @@ Section EscrowDeposit.
        parked arm and what comes out is the INDEXED regime -- the very arm the
        mint was handed at iput+0x50, not an un-indexed disjunction ireclaim
        could not re-bind. *)
-    iAssert (ireg_regime rg)%I with "[Hfdisj]" as "Hgreg".
-    { iApply (ireg_fsh_post_acc rg with "Hfdisj"). }
+    (* the shelter conjunct splits (durable-disk C-5): the regime comes off
+       its f side and the claim window's [ireg_cpin] rides back in verbatim
+       -- the deposit does not touch the c column (the marked arm's own
+       clause says it is [None]). *)
+    iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
+    iAssert (ireg_regime rg)%I with "[Hfsh]" as "Hgreg".
+    { iApply (ireg_fsh_post_acc rg with "Hfsh"). }
     (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
        the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
        [FrzPre], so the slot's receipt clause is on its [frzown] arm both
@@ -287,9 +292,9 @@ Section EscrowDeposit.
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
-    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark]").
+      iApply ("Hback" $! m' with "[%] [Hrecb Hdn Hla Hep Hlnk Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -310,13 +315,14 @@ Section EscrowDeposit.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hrecb"; [iExact "Hrecb" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark]").
+      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 (Some (Excl FrzOff)) cn
                 Hlok' Hdir' Hwl0' Hpar Hclm' Hfrz'
-                with "Hla Hep Hlnk Hdisj Hcnt [] [Hrcpt Hmr]").
-      { iApply ireg_fsh_off. }
+                with "Hla Hep Hlnk Hdisj Hcnt [Hcpin] [Hrcpt Hmr]").
+      { iApply (ireg_shp_intro cl (Some (Excl FrzOff)) with "[] Hcpin").
+        iApply ireg_fsh_off. }
       { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
                   ltac:(reflexivity) with "Hrcpt Hmr"). }
       iRight. iSplitR; [iPureIntro; exact Hz |].

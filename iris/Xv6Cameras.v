@@ -550,7 +550,21 @@ Definition frzUR : ucmra := optionUR frzR.
 (* THE TYPED CLAIM COLUMN (iclaim-ledger.md §5.2(a) item 7b): the c column
    carries the CLAIMED TYPE, so [ialloc]'s fill has a source for
    [di_type dnc = ty].  Spelled as a NAMED atom for [frzR]'s reason. *)
-Definition ctyR  : cmra  := exclR (leibnizO (bv 16)).
+(* THE CLAIM'S VALUE CARRIES THE CLAIMING TRANSACTION (durable-disk C-5,
+   [FsCollect.v]'s residue (E)).  A claim box -- the [fresh_shape] record
+   [InodeRegion.ireg_claim_au] writes and [ireg_withdraw] retires -- is a
+   NONZERO-typed record sitting on the region's IN arm, and the commit's
+   collection cannot read a bundle at such an inum ([FsCollect.
+   col_claim_box_untied]).  It is unreachable at a commit because ialloc
+   runs inside a transaction, and what PROVES that is a share of the
+   claiming transaction's [LogDefs.ln_tx] element parked in the region's
+   slot ([InodeRegion.ireg_cpin]).  A parked share has to come back to the
+   claimant AT ITS OWN [(t, q)] ([IcacheTxRefute.tx_two_halves_no_whole]),
+   so the pair rides in the c column's own VALUE: the column is keyed by
+   the INUM, the claimant holds the exclusive fragment at that key, and
+   [IcacheRef.link_claim_agree] is the re-identification. *)
+Definition ctyval : Type := (bv 16 * (nat * Qp))%type.
+Definition ctyR  : cmra  := exclR (leibnizO ctyval).
 Definition ctyUR : ucmra := optionUR ctyR.
 
 (* THE LINK LEDGER's element (design §20.2).  [linkElemUR0] is spelled as a

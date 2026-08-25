@@ -133,7 +133,7 @@ Local Open Scope Z_scope.
 Inductive ilic :=
   | LinkedL
   | HeldL (d : dinode)
-  | ClaimL (ty : bv 16)
+  | ClaimL (ty : bv 16) (t : nat) (q : Qp)
   | BufL (bno : Z) (ds : list dinode)
   | RootL.
 
@@ -199,7 +199,7 @@ Section IgetLic.
      licence mints [runit_plain].  One function, so the mint sites, the
      contracts and the pin's side condition all read the same index. *)
   Definition is_claim (l : ilic) : bool :=
-    match l with ClaimL _ => true | _ => false end.
+    match l with ClaimL _ _ _ => true | _ => false end.
 
   (* ------------------------------------------------------------------ *)
   (*  THE LICENCE ITSELF                                                  *)
@@ -221,7 +221,7 @@ Section IgetLic.
     | HeldL d => (dinode_at γi inum d ∗
                   ⌜bv_unsigned (di_type d) <> 0⌝ ∗
                   ⌜bv_unsigned (di_nlink d) <> 0⌝)                   (* c *)
-    | ClaimL ty => iclaim (bv_unsigned inum) ty                     (* d *)
+    | ClaimL ty t q => iclaim (bv_unsigned inum) ty t q             (* d *)
     (* (e) BOOT-GATED BY §2.6: the presenter also LENDS [ireg_boot].
        Runtime: nobody has it after the seal fires, so licence (e) is
        unpresentable at all and the free-side table has nothing to refute.
@@ -544,7 +544,10 @@ Section IgetLic.
     ghost_map_auth γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n d -∗
     ireg_lnk γfs (bv_unsigned inum) d -∗
-    ireg_fsh f -∗
+    (* the slot's shelter conjunct, whole (durable-disk C-5): the c side is
+       the claim window's parked share and rides straight back out, so a
+       caller hands this row over exactly as the slot gave it. *)
+    ireg_shp c f -∗
     iname γi γfs inodestart inum l -∗
     ⌜f = Some (Excl FrzOff)⌝.
   Proof.
@@ -554,8 +557,10 @@ Section IgetLic.
     iAssert (⌜bv_unsigned (di_nlink d) <> 0⌝ -∗ ⌜f = Some (Excl FrzOff)⌝)%I
       as "Hnz".
     { iIntros (Hnl). iPureIntro. exact (ireg_frz_ok_nz f n d Hnl Hfrz). }
-    iIntros "Ha Hla Hlnk Hsh Hl". rewrite /iname.
-    destruct l as [| d' | tyc | bno ds |].
+    iIntros "Ha Hla Hlnk Hshp Hl".
+    iDestruct (ireg_shp_split with "Hshp") as "[Hsh _]".
+    rewrite /iname.
+    destruct l as [| d' | tyc tc qc | bno ds |].
     - (* (a) LinkedL -- the RA's law at the target's own authority *)
       iDestruct (ireg_lnk_tok_nz with "Hlnk Hl") as %Hnl1.
       iApply "Hnz". iPureIntro. exact Hnl1.
@@ -634,7 +639,7 @@ Section IgetLic.
     iname γi γfs inodestart inum l.
   Proof.
     iIntros (HE Hwf) "#Hbinv Hfsb Hl".
-    destruct l as [| d' | tyc | bno ds0 |];
+    destruct l as [| d' | tyc tc qc | bno ds0 |];
       [ iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate
       | iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate
       | iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate
@@ -686,7 +691,7 @@ Section IgetLic.
                  (ireg_claim_ok_shape (Some x) f (ds !!! islot inum)
                     ltac:(discriminate) Hclm)). }
     iIntros "Ha Hla Hlnk Hsh Hl". rewrite /iname /is_claim.
-    destruct l as [| d' | tyc | bno ds0 |].
+    destruct l as [| d' | tyc tc qc | bno ds0 |].
     - (* (a) LinkedL -- the RA's law at the target's own authority *)
       iDestruct (ireg_lnk_tok_nz with "Hlnk Hl") as %Hnl1.
       destruct (Hnzb Hnl1) as [H1 H2].

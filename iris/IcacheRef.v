@@ -1343,8 +1343,15 @@ Section IcacheLink.
      create's fill, which is where [create_fresh_ty]'s [di_type dnc = ty]
      comes from.  Still EXCLUSIVE -- [Excl] over a value is exclusive for
      the same reason [Excl tt] was. *)
-  Definition iclaim (z : Z) (ty : bv 16) : iProp Σ :=
-    link_frag_e z (lelem 0 0 0 0 (Some (Excl ty)) 0 None).
+  (* ...AND IT NAMES THE CLAIMING TRANSACTION (durable-disk C-5).  The
+     region parks a share [t |->[ln_tx icfg_log]{#q} tt] of the claiming
+     transaction's element for as long as the claim box stands, which is
+     what refutes the box at a commit; the share has to come back at
+     exactly the [(t, q)] that went in, so the c column's value carries
+     them and [link_claim_agree] is the re-identification.  See
+     [Xv6Cameras.ctyval]. *)
+  Definition iclaim (z : Z) (ty : bv 16) (t : nat) (q : Qp) : iProp Σ :=
+    link_frag_e z (lelem 0 0 0 0 (Some (Excl ((ty, (t, q)) : ctyval))) 0 None).
   Definition iref_lic (z : Z) : iProp Σ :=
     link_frag_e z (lelem 0 0 0 0 None 1 None).
 
@@ -1452,7 +1459,7 @@ Section IcacheLink.
   Proof. destruct fl as [[pv |] |]; apply _. Qed.
   Global Instance igrey_timeless z : Timeless (igrey z).
   Proof. apply _. Qed.
-  Global Instance iclaim_timeless z ty : Timeless (iclaim z ty).
+  Global Instance iclaim_timeless z ty t q : Timeless (iclaim z ty t q).
   Proof. apply _. Qed.
   Global Instance iref_lic_timeless z : Timeless (iref_lic z).
   Proof. apply _. Qed.
@@ -1634,8 +1641,9 @@ Section IcacheLink.
      extension, so an outstanding token pins the authority's slot. *)
   Lemma link_claim_agree (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
       (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat)
-      (ty : bv 16) :
-    link_auth z wl wdu wdt g c r p f rc -∗ iclaim z ty -∗ ⌜c = Some (Excl ty)⌝.
+      (ty : bv 16) (t : nat) (qt : Qp) :
+    link_auth z wl wdu wdt g c r p f rc -∗ iclaim z ty t qt -∗
+    ⌜c = Some (Excl ((ty, (t, qt)) : ctyval))⌝.
   Proof.
     rewrite /link_auth /iclaim /link_auth_e /link_frag_e. iIntros "Ha Hb".
     iDestruct (own_valid_2 with "Ha Hb") as %Hv.
@@ -1655,8 +1663,8 @@ Section IcacheLink.
     apply leibniz_equiv in Hc. rewrite -Hc. reflexivity.
   Qed.
 
-  Lemma iclaim_excl (z : Z) (ty ty' : bv 16) :
-    iclaim z ty -∗ iclaim z ty' -∗ False.
+  Lemma iclaim_excl (z : Z) (ty ty' : bv 16) (t t' : nat) (q q' : Qp) :
+    iclaim z ty t q -∗ iclaim z ty' t' q' -∗ False.
   Proof.
     rewrite /iclaim /link_frag_e. iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
@@ -2015,21 +2023,23 @@ Section IcacheLink.
      the free must re-establish, §20.7's open obligation. *)
   Lemma link_mint_claim (z : Z) (wl wdu wdt g r : nat)
       (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat)
-      (ty : bv 16) :
+      (ty : bv 16) (t : nat) (qt : Qp) :
     link_auth z wl wdu wdt g None r p f rc ==∗
-    link_auth z wl wdu wdt g (Some (Excl ty)) r p f rc ∗ iclaim z ty.
+    link_auth z wl wdu wdt g (Some (Excl ((ty, (t, qt)) : ctyval))) r p f rc
+    ∗ iclaim z ty t qt.
   Proof.
     rewrite /link_auth /iclaim. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
     apply lelemc_local_update; try apply link_lu_id.
-    apply (alloc_option_local_update (A := ctyR) (Excl ty)). done.
+    apply (alloc_option_local_update (A := ctyR)
+             (Excl ((ty, (t, qt)) : ctyval))). done.
   Qed.
 
   Lemma link_spend_claim (z : Z) (wl wdu wdt g : nat)
       (c : ctyUR) (r : nat)
       (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat)
-      (ty : bv 16) :
-    link_auth z wl wdu wdt g c r p f rc -∗ iclaim z ty ==∗
+      (ty : bv 16) (t : nat) (qt : Qp) :
+    link_auth z wl wdu wdt g c r p f rc -∗ iclaim z ty t qt ==∗
     link_auth z wl wdu wdt g None r p f rc.
   Proof.
     rewrite /link_auth /iclaim. iIntros "Ha Hb".
@@ -2038,7 +2048,8 @@ Section IcacheLink.
             (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
     apply lelemc_local_update; try apply link_lu_id.
-    apply (delete_option_local_update (A := ctyR) _ (Excl ty)), _.
+    apply (delete_option_local_update (A := ctyR) _
+             (Excl ((ty, (t, qt)) : ctyval))), _.
   Qed.
 
   (* THE REFERENCE LICENCE (§20.7's (M1)). *)
@@ -3195,23 +3206,28 @@ Section IcacheRef.
      [InodeRegion.inode_claimed_to_ClaimK]: the pair after the reference IS
      [ireg_wd_lic (ClaimK ty)], i.e. exactly what create's fill presents to
      ilock, so the receipt travels as one row and unpacks in one destruct. *)
+  (* THE TRANSACTION RIDES IN THE RECEIPT (durable-disk C-5), as the c
+     column's own two extra fields and LAST so no landed destructuring
+     pattern moves: [t] and [qt] are the claiming transaction and the share
+     ialloc handed the region at [InodeRegion.ireg_claim_au], and the fill's
+     [ireg_withdraw] gives that very share back. *)
   Definition inode_claimed (ty : bv 16) (k : nat) (q : Qp)
-      (dev inum : mword 32) : iProp Σ :=
+      (dev inum : mword 32) (t : nat) (qt : Qp) : iProp Σ :=
     (inode_ref k q dev inum ∗
      runit_claim (bv_unsigned inum) ∗
-     iclaim (bv_unsigned inum) ty)%I.
+     iclaim (bv_unsigned inum) ty t qt)%I.
 
   (* SAT: exactly [SpecIalloc]'s three receipt rows. *)
-  Lemma inode_claimed_intro ty k q dev inum :
+  Lemma inode_claimed_intro ty k q dev inum t qt :
     inode_ref k q dev inum -∗ runit_claim (bv_unsigned inum) -∗
-    iclaim (bv_unsigned inum) ty -∗
-    inode_claimed ty k q dev inum.
+    iclaim (bv_unsigned inum) ty t qt -∗
+    inode_claimed ty k q dev inum t qt.
   Proof. iIntros "H1 H2 H3". iFrame. Qed.
 
-  Lemma inode_claimed_elim ty k q dev inum :
-    inode_claimed ty k q dev inum ⊣⊢
+  Lemma inode_claimed_elim ty k q dev inum t qt :
+    inode_claimed ty k q dev inum t qt ⊣⊢
     inode_ref k q dev inum ∗ runit_claim (bv_unsigned inum) ∗
-    iclaim (bv_unsigned inum) ty.
+    iclaim (bv_unsigned inum) ty t qt.
   Proof. reflexivity. Qed.
 
   Global Instance inode_refb_timeless b k q dev inum :
@@ -3220,8 +3236,8 @@ Section IcacheRef.
   Global Instance inode_refp_timeless k q dev inum :
     Timeless (inode_refp k q dev inum).
   Proof. apply _. Qed.
-  Global Instance inode_claimed_timeless ty k q dev inum :
-    Timeless (inode_claimed ty k q dev inum).
+  Global Instance inode_claimed_timeless ty k q dev inum t qt :
+    Timeless (inode_claimed ty k q dev inum t qt).
   Proof. apply _. Qed.
 
 End IcacheRef.

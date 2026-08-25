@@ -1207,59 +1207,128 @@ Section Collect.
   Section FreeSlot.
   Context `{ICFG : icfg}.
 
-  Lemma col_free_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    bv_unsigned (di_type d) = 0 ->
-    imark γi (bv_unsigned inum) -∗
+  (* ==================================================================== *)
+  (*  THE DOOR: ONE REGION SLOT, AT A QUIESCENT TRANSACTION LEDGER         *)
+  (*  (durable-disk C-5, and it is what closes residue (E))                *)
+  (*                                                                      *)
+  (*  [ireg_slot]'s arm says where the inum's RECORD is.  On the MARKED    *)
+  (*  sub-arm it is checked out -- to a cache escrow, to the pool's        *)
+  (*  allocated bundle, or to a lock holder -- and the collection finds    *)
+  (*  the bundle there.  On the IN arm and on the PENDING one the region   *)
+  (*  itself holds it, and THIS is the bundle: a free record owns no       *)
+  (*  block, so [FsStateEra.inode_owned_era] at [free_node d] is the       *)
+  (*  fragment together with [InodeRegion.ireg_top_park]'s tied node.      *)
+  (*                                                                      *)
+  (*  WHAT THE EMPTY [ln_tx] AUTHORITY BUYS, and it is the whole of        *)
+  (*  residue (E): the IN arm ALSO admits a CLAIM BOX -- ialloc's          *)
+  (*  [fresh_shape] record, a nonzero type at which the park's tie is on   *)
+  (*  its vacuous side ([col_claim_box_untied] below).  A claim box parks  *)
+  (*  a positive share of its transaction's element in the slot            *)
+  (*  ([InodeRegion.ireg_cpin]), so at a commit the c column reads [None]  *)
+  (*  ([InodeRegion.ireg_cpin_no_ops]) and the arm's own clause collapses  *)
+  (*  to [di_type d = 0] ([InodeRegion.ireg_in_quiesce]).  So the type is  *)
+  (*  a CONCLUSION here, not a premise.                                    *)
+  (*                                                                      *)
+  (*  The authority is BORROWED and comes straight back, like every other  *)
+  (*  reading in this file, and so does the slot: both branches carry      *)
+  (*  their own closing wand.                                              *)
+  Lemma col_region_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
-      imark γi (bv_unsigned inum)
-      ∗ inode_owned_era γfs γi inum (free_node d)
-      ∗ (inode_owned_era γfs γi inum (free_node d) -∗
-           ireg_slot γfs γi (bv_unsigned inum) d).
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ((imark γi (bv_unsigned inum)
+          ∗ (imark γi (bv_unsigned inum)
+             -∗ ireg_slot γfs γi (bv_unsigned inum) d))
+         ∨ (⌜bv_unsigned (di_type d) = 0⌝
+            ∗ inode_owned_era γfs γi inum (free_node d)
+            ∗ (inode_owned_era γfs γi inum (free_node d)
+               -∗ ireg_slot γfs γi (bv_unsigned inum) d))).
   Proof.
-    intros Ht0. iIntros "Hmk Hslot".
+    iIntros "Hauth Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
                             %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
                             #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
                             Harm) [Hep Hlnk]]".
-    (* (L3): a free record's link count is zero, proved inside the region *)
-    assert (Hnl : bv_unsigned (di_nlink d) = 0) by exact (proj1 (proj2 Hlok) Ht0).
-    iAssert (imark γi (bv_unsigned inum)
-             ∗ (bv_unsigned inum ↪[γi] d)
-             ∗ ireg_top_park γfs (bv_unsigned inum) d
-             ∗ ((bv_unsigned inum ↪[γi] d)
-                -∗ ireg_top_park γfs (bv_unsigned inum) d
-                -∗ (((⌜ireg_in d⌝ ∗ (bv_unsigned inum ↪[γi] d)
-                      ∗ ireg_top_park γfs (bv_unsigned inum) d)
-                     ∨ (⌜ireg_marked_ok cl d⌝ ∗ imark γi (bv_unsigned inum)))
-                    ∗ (∃ ge gr, reg_full (bv_unsigned inum) ge gr))
-                   ∨ (⌜bv_unsigned (di_type d) = 0⌝
-                      ∗ (bv_unsigned inum ↪[γi] d)
-                      ∗ (∃ ge gr, reg_half (bv_unsigned inum) ge gr)
-                      ∗ region_pending (bv_unsigned inum)
-                      ∗ ireg_top_park γfs (bv_unsigned inum) d)))%I
-      with "[Hmk Harm]" as "(Hmk & Hfr & Hpk & Hback)".
-    { iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
-      - iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk']]"; last first.
-        { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
-        iFrame "Hmk Hfr Hpk". iIntros "Hfr Hpk".
+    (* NO CLAIM IS STANDING (durable-disk C-5): a claim box parks a share
+       of its transaction's element, and there is no transaction. *)
+    iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
+    iDestruct (ireg_cpin_no_ops cl fz d Hclm with "Hauth Hcpin") as %Hc0.
+    iDestruct (ireg_shp_intro cl fz with "Hfsh Hcpin") as "Hfdisj".
+    iFrame "Hauth".
+    iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
+    - iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
+      + (* THE IN ARM, unclaimed: a FREE record, and its bundle is here *)
+        assert (Ht0 : bv_unsigned (di_type d) = 0)
+          by exact (ireg_in_quiesce cl d Hc0 Hin1).
+        assert (Hnl : bv_unsigned (di_nlink d) = 0)
+          by exact (proj1 (proj2 Hlok) Ht0).
+        iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
+          as "[%Hb Htop]".
+        iRight. iSplitR; [iPureIntro; exact Ht0 |].
+        iSplitL "Hfr Htop".
+        { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0
+                    with "Hfr Htop"). }
+        iIntros "Hown".
+        iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
+        iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
+          as "Hpk".
+        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl
+                  rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                  with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hpk Hrf]").
         iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
         iLeft. iSplitR; [iPureIntro; exact Hin1 |]. iFrame "Hfr Hpk".
-      - iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
-        iFrame "Hmk Hfr Hpk". iIntros "Hfr Hpk".
-        iRight. iSplitR; [iPureIntro; exact Htp |]. iFrame "Hfr Hrh Hrp Hpk". }
-    iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
-      as "[%Hb Htop]".
-    iFrame "Hmk".
-    iSplitL "Hfr Htop".
-    { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0 with "Hfr Htop"). }
-    iIntros "Hown".
-    iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
-    iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
-      as "Hpk".
-    iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl rl pl
-              fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
-              with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hpk Hback]").
-    iApply ("Hback" with "Hfr Hpk").
+      + (* THE MARKED ARM: the record is checked out, and the collection
+           reads this inum's bundle wherever the checkout parked it *)
+        iLeft. iFrame "Hmk". iIntros "Hmk".
+        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl
+                  rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                  with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hmk Hrf]").
+        iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
+        iRight. iSplitR; [iPureIntro; exact Ht2 |]. iExact "Hmk".
+    - (* THE PENDING ARM: a freed-but-unrecycled inum, type 0 by its own
+         clause, and its bundle is here for (D)'s reason verbatim *)
+      iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
+      assert (Hnl : bv_unsigned (di_nlink d) = 0)
+        by exact (proj1 (proj2 Hlok) Htp).
+      iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Htp with "Hpk")
+        as "[%Hb Htop]".
+      iRight. iSplitR; [iPureIntro; exact Htp |].
+      iSplitL "Hfr Htop".
+      { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Htp with "Hfr Htop"). }
+      iIntros "Hown".
+      iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
+      iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
+        as "Hpk".
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl
+                rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hrh Hrp Hpk]").
+      iRight. iSplitR; [iPureIntro; exact Htp |]. iFrame "Hfr Hrh Hrp Hpk".
+  Qed.
+
+  (* ...AND THE MARKER-ARM READING, which is how supplier (D) reaches it:
+     the pool's ordinary row carries [InodeRegion.imark], so the region's
+     own marked arm is refuted ([imark_excl]) and what is left is the free
+     bundle.  THE TYPE PREMISE IS GONE (durable-disk C-5): at a quiescent
+     ledger the type is a conclusion, so the caller does not have to know
+     in advance that the record it is about to read is free. *)
+  Lemma col_free_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    imark γi (bv_unsigned inum) -∗
+    ireg_slot γfs γi (bv_unsigned inum) d -∗
+      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ⌜bv_unsigned (di_type d) = 0⌝
+      ∗ imark γi (bv_unsigned inum)
+      ∗ inode_owned_era γfs γi inum (free_node d)
+      ∗ (inode_owned_era γfs γi inum (free_node d) -∗
+           ireg_slot γfs γi (bv_unsigned inum) d).
+  Proof.
+    iIntros "Hauth Hmk Hslot".
+    iDestruct (col_region_slot_acc γfs γi inum d with "Hauth Hslot")
+      as "[Hauth Harm]".
+    iFrame "Hauth".
+    iDestruct "Harm" as "[[Hmk' _] | (%Ht0 & Hown & Hback)]".
+    { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
+    iSplitR; [iPureIntro; exact Ht0 |]. iFrame "Hmk Hown Hback".
   Qed.
 
   End FreeSlot.

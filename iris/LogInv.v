@@ -843,6 +843,20 @@ Section LogInv.
     t ↪[ln_tx γ]{#q1} () ∗ t ↪[ln_tx γ]{#q2} ().
   Proof. intros ->. iIntros "H". iDestruct "H" as "[$ $]". Qed.
 
+  (* ...and its inverse at ARBITRARY fractions ([log_tx_join] above is the
+     1/2 + 1/2 reading).  A walk that lends a share of its transaction to a
+     callee -- create's [ProofCreateFreshTy] span lends one to the claim box
+     it is about to fill (durable-disk C-5) -- needs to put its residue back
+     together at whatever fractions it chose. *)
+  Lemma log_tx_join_q (γ : log_names) (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx γ]{#q1} () -∗ t ↪[ln_tx γ]{#q2} () -∗ t ↪[ln_tx γ]{#q} ().
+  Proof.
+    intros ->. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own. iExact "H".
+  Qed.
+
   Lemma log_tx_add (γ : log_names) (t : nat) (q q1 q2 : Qp) :
     q = (q1 + q2)%Qp ->
     t ↪[ln_tx γ]{#q1} () -∗ t ↪[ln_tx γ]{#q2} () -∗ t ↪[ln_tx γ]{#q} ().

@@ -192,7 +192,8 @@ Definition wp_ialloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (t : nat) (qt : Qp) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -283,6 +284,16 @@ Definition wp_ialloc_sconf_body
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION: the one log_write the claim runs *)
   log_op γ (S u) -∗
+  (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5, [FsCollect.v]'s
+     residue (E)).  ialloc's claim leaves a CLAIM BOX -- a [fresh_shape]
+     record on the region's IN arm -- standing until create's own [ilock]
+     fills it, and the commit's collection can read no bundle at such an
+     inum.  The window is inside ONE transaction, and this share is what
+     proves it: [InodeRegion.ireg_claim_au] parks it in the slot and
+     [ireg_withdraw] hands it back at the fill, at this very [(t, qt)] --
+     which is why the receipt names them.  Returned UNSPENT on the
+     no-inodes arm, where no box is created. *)
+  t ↪[ln_tx icfg_log]{#qt} tt -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -337,12 +348,14 @@ Definition wp_ialloc_sconf_body
             [InodeRegion.inode_claimed_to_ClaimK]: what sits beside the
             surviving reference IS [ireg_wd_lic (ClaimK ty)], the licence
             [wp_ilock_sconf]'s ClaimK arm asks for. *)
-         inode_claimed ty kslot q dev inum ∗
+         inode_claimed ty kslot q dev inum t qt ∗
          log_op γ u
-       else (* NO INODES: a0 = 0, the ledger unit back, nothing spent *)
+       else (* NO INODES: a0 = 0, the ledger unit back, nothing spent -- and
+               no claim box, so the transaction's share comes straight back *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗
          iref_slot ∗
+         t ↪[ln_tx icfg_log]{#qt} tt ∗
          log_op γ (S u)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -379,7 +392,8 @@ Definition wp_ialloc_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (t : nat) (qt : Qp) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -474,6 +488,16 @@ Definition wp_ialloc_gen_body
      carries no boolean where [wp_iupdate_cred] carries [cru]
      ([CreateBudget.ia_spend] is the literal 1). *)
   log_opS γ (S u) Sb -∗
+  (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5, [FsCollect.v]'s
+     residue (E)).  ialloc's claim leaves a CLAIM BOX -- a [fresh_shape]
+     record on the region's IN arm -- standing until create's own [ilock]
+     fills it, and the commit's collection can read no bundle at such an
+     inum.  The window is inside ONE transaction, and this share is what
+     proves it: [InodeRegion.ireg_claim_au] parks it in the slot and
+     [ireg_withdraw] hands it back at the fill, at this very [(t, qt)] --
+     which is why the receipt names them.  Returned UNSPENT on the
+     no-inodes arm, where no box is created. *)
+  t ↪[ln_tx icfg_log]{#qt} tt -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -506,14 +530,16 @@ Definition wp_ialloc_gen_body
           /\ fresh_shape dn'⌝ ∗
          (* THE RECEIPT, AS ONE ROW -- see the sconf twin above (SIMP-2;
             §2.4 / IIIb step 4). *)
-         inode_claimed ty kslot q dev inum ∗
+         inode_claimed ty kslot q dev inum t qt ∗
          (* THE SET GROWTH IS DETERMINATE, exactly as [wp_iupdate_gen]'s is:
             ialloc logs the claimed inum's HOME BLOCK and nothing else. *)
          log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
-       else (* NO INODES: a0 = 0, the ledger unit back, nothing spent *)
+       else (* NO INODES: a0 = 0, the ledger unit back, nothing spent -- and
+               no claim box, so the transaction's share comes straight back *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗
          iref_slot ∗
+         t ↪[ln_tx icfg_log]{#qt} tt ∗
          log_opS γ (S u) Sb) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -537,10 +563,11 @@ Module Type IALLOC.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (t : nat) (qt : Qp),
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
-                         pidv dq dqs dqn m K eb b lks Vpr.
+                         pidv dq dqs dqn m K eb b lks Vpr t qt.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
@@ -557,8 +584,9 @@ Module Type IALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (t : nat) (qt : Qp),
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
-                           pidv dq dqs dqn m K eb b lks Vpr.
+                           pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

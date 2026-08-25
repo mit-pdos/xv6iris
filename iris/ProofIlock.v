@@ -1192,9 +1192,9 @@ Section IlockLoad.
                          ∗ ireg_wd_back o g (bv_unsigned inum)
                          ∗ ⌜ilk_post o false dn⌝)%I
           with "[Hdn Hcl]" as ">(Hdn & Hwb & %Hpost0)".
-        { destruct o as [tyc | | tys].
+        { destruct o as [tyc tc qc | | tys].
           - iDestruct "Hcl" as "[Hcl _]".
-            iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dn tyc
+            iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dn tyc tc qc
                     ltac:(solve_ndisj) Hinlt with "Hireg Hdn Hcl") as %[].
           - iModIntro. iSplitL "Hdn"; [iExact "Hdn" |].
             iSplitL "Hcl"; [iExact "Hcl" |]. iPureIntro. exact I.
@@ -2693,7 +2693,7 @@ Section ProofIlockMain.
                        ∗ ireg_wd_back o g (bv_unsigned inum)
                        ∗ ⌜ilk_post o false dnp⌝)%I
         with "[Hlk Hcl]" as ">(Hlk & Hwb & %Hpost)".
-      { destruct o as [tyc | | tys].
+      { destruct o as [tyc tc qc | | tys].
         - (* the READ arm never gets here: [Hrdo] pins its index at [ShotK],
              so [d] is bundleless and the payload is the whole [ic_loaded] --
              which is what carries the [dinode_at] this refutation reads. *)
@@ -2704,7 +2704,7 @@ Section ProofIlockMain.
           iDestruct "Hcl" as "[Hcl _]".
           iDestruct (ic_loaded_open with "Hlk") as (datx)
             "(%Hokx & %Hrlx & %Hdokx & %Hddixx & %Hdocx & %Hduqx & Hdlkx & Hdnx & Hrestx)".
-          iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dnp tyc
+          iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dnp tyc tc qc
                   ltac:(solve_ndisj) Hinlt with "Hireg Hdnx Hcl") as %[].
         - iModIntro. iSplitL "Hlk"; [iExact "Hlk" |].
           iSplitL "Hcl"; [iExact "Hcl" |]. iPureIntro. exact I.

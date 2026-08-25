@@ -2417,8 +2417,12 @@ Section IcacheRefInvReg.
         destruct ph' as [| rg' | rg']; [reflexivity | discriminate Hr
                                        | discriminate Hr]. }
       rewrite Hp'. split_and!; [exact Hfs | reflexivity | exact Hty]. }
-    iAssert (ireg_fsh (Some (Excl ph')))%I with "[Hfdisj]" as "Hfdisj'".
-    { iApply (ireg_fsh_step ph ph' Hsh with "Hfdisj"). }
+    (* the shelter conjunct's c side rides through the phase step untouched
+       (durable-disk C-5): the step moves the f column only. *)
+    iAssert (ireg_shp cl (Some (Excl ph')))%I with "[Hfdisj]" as "Hfdisj'".
+    { iDestruct (ireg_shp_split with "Hfdisj") as "[Hf Hc]".
+      iApply (ireg_shp_intro cl (Some (Excl ph')) with "[Hf] Hc").
+      iApply (ireg_fsh_step ph ph' Hsh with "Hf"). }
     iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj' Hfrcp Hmr]")
       as "_".
     { iNext. iExists mrg. iFrame "Ha Hreg".

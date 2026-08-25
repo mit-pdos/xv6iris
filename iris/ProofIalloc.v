@@ -455,10 +455,12 @@ Section IallocDefs.
      was dropped at the claim site's [iIntros]. *)
   Definition ia_arms (γ : log_names) (dev : mword 32)
       (inodestart ninodes : Z) (nib : nat) (ty : mword 16) (u : nat)
-      (Sb : gset Z) (av : mword 64) : iProp Σ :=
+      (Sb : gset Z) (t : nat) (qt : Qp) (av : mword 64) : iProp Σ :=
     ((* NO INODES: a0 = 0, the iget ledger unit unspent, the reservation
-        untouched *)
-     (⌜av = (mword_of_int 0 : mword 64)⌝ ∗ iref_slot ∗ log_opS γ (S u) Sb)
+        untouched -- and no claim box, so the transaction's share comes
+        straight back (durable-disk C-5) *)
+     (⌜av = (mword_of_int 0 : mword 64)⌝ ∗ iref_slot
+      ∗ t ↪[ln_tx icfg_log]{#qt} tt ∗ log_opS γ (S u) Sb)
      ∨
      (* THE CLAIM: iget's postcondition verbatim, and one unit gone *)
      (∃ (kslot : nat) (q : Qp) (inum : mword 32),
@@ -470,7 +472,7 @@ Section IallocDefs.
         (* the minted provenance unit, at the CLAIM flavour (item 7a-wire;
            spelled [runit_claim] since RULING C' -- see SpecIalloc) *)
         runit_claim (bv_unsigned inum) ∗
-        iclaim (bv_unsigned inum) ty ∗
+        iclaim (bv_unsigned inum) ty t qt ∗
         log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})))%I.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
@@ -479,7 +481,8 @@ Section IallocDefs.
       (γ : log_names) (bn : bio_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate)
+      (t : nat) (qt : Qp) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
         (dn' : dinode),
@@ -503,10 +506,11 @@ Section IallocDefs.
                  post.  [ia_arms] below still carries the three constituents
                  separately -- that is the epilogue's internal shape, and the
                  pack happens once, here, where the contract is met. *)
-              inode_claimed ty kslot q dev inum ∗
+              inode_claimed ty kslot q dev inum t qt ∗
               log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
          else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
               iref_slot ∗
+              t ↪[ln_tx icfg_log]{#qt} tt ∗
               log_opS γ (S u) Sb) -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -542,7 +546,7 @@ Section IallocEpilogue.
   Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γ : log_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
-      (u : nat) (Sb : gset Z)
+      (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ialloc <= K)%nat ->
@@ -563,9 +567,10 @@ Section IallocEpilogue.
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots 2 -∗
-    ia_arms γ dev inodestart ninodes nib ty u Sb (M !!! Regidx Ra0 : mword 64) -∗
+    ia_arms γ dev inodestart ninodes nib ty u Sb t qt
+            (M !!! Regidx Ra0 : mword 64) -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
-            pidv dq dqs dqn j m K b lks Vpr -∗
+            pidv dq dqs dqn j m K b lks Vpr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hty Htyk Hsp Hthr.
@@ -768,7 +773,7 @@ Section IallocOut.
       (j : nat) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
-      (u : nat) (Sb : gset Z)
+      (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ialloc <= K)%nat ->
@@ -789,15 +794,19 @@ Section IallocOut.
     bslots 2 -∗
     iref_slot -∗
     log_opS γ (S u) Sb -∗
+    (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5): parked in the
+       region by [InodeRegion.ireg_claim_au] for as long as the claim box
+       stands, returned unspent on the no-inodes arm. *)
+    t ↪[ln_tx icfg_log]{#qt} tt -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
-            pidv dq dqs dqn j m K b lks Vpr -∗
+            pidv dq dqs dqn j m K b lks Vpr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hty Htyk Hpk Hsp Hthr.
     pose proof HK as HK'. 
     pose proof ia_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv Hframe Hppid
-              Hsbn Hsbi Hsl Hiref Hop Hcont".
+              Hsbn Hsbi Hsl Hiref Hop Htx Hcont".
     iPoseProof (kernel_data_string ia_msg_addr ia_msg
                   (mword_of_int ia_msg_addr) eq_refl
                   ltac:(unfold text_end, ia_msg_addr; lia)
@@ -1071,12 +1080,12 @@ Section IallocOut.
     iDestruct (cpu_own_transport CID10 CID11 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (ia_epilogue (CID0 := CID11) j bn γ inodestart ninodes nib dev ty u Sb
-              pidv dq dqs dqn m QB K b lks Vpr HK Hty Htyk HQBsp HQBthr
+              t qt pidv dq dqs dqn m QB K b lks Vpr HK Hty Htyk HQBsp HQBthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
-                    [Hiref Hop] [Hcont]").
+                    [Hiref Hop Htx] [Hcont]").
     { rewrite /ia_arms. iLeft.
       iSplitR; [iPureIntro; exact HQBa0 |].
-      iSplitL "Hiref"; [iExact "Hiref" | iExact "Hop"]. }
+      iFrame "Hiref Htx Hop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID11) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -1108,6 +1117,7 @@ Section IallocClaim.
       (cov : gset Z) (logstart inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (inum : mword 32) (ds : list dinode) (u : nat) (Sb : gset Z)
+      (t : nat) (qt : Qp)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -1164,10 +1174,14 @@ Section IallocClaim.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots 1 -∗
     log_opS γ (S u) Sb -∗
+    (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5): parked in the
+       region by [InodeRegion.ireg_claim_au] for as long as the claim box
+       stands, returned unspent on the no-inodes arm. *)
+    t ↪[ln_tx icfg_log]{#qt} tt -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes ds) (diblk_bytes ds) bsd d0 -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
-            pidv dq dqs dqn j m K b lks Vpr -∗
+            pidv dq dqs dqn j m K b lks Vpr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsp Hthr Hs1 Hs3 Hs5 Hs6 Hs2 Hkk Hbno Hcov Hlog
@@ -1177,7 +1191,7 @@ Section IallocClaim.
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanenv #Hbio #Hlctx #Hireg #Hiopen
               #Hprocs
               #Hdevi #Hdgeom #Hdlock Hitb2 Hitbl Hesc Hiref
-              Hframe Hppid Hsbn Hsbi Hsl Hop Hheld Hcont".
+              Hframe Hppid Hsbn Hsbi Hsl Hop Htx Hheld Hcont".
     (* ---- THE BYTES: peel the 64-byte slot window out of the handle ---- *)
     iDestruct (iu_held_swap with "Hheld") as "[Hbuf Hheldback]".
     iDestruct (iu_buf_bytes (bpa kk) bno (mword_of_int 0 : mword 32) ds Hdswf
@@ -1498,7 +1512,7 @@ Section IallocClaim.
               (* THE ANCHOR IS NO LONGER THE UNIT (iclaim-ledger.md §2.4 /
                  IIIb step 4): [ireg_claim_au]'s closing wand delivers the
                  [c]-column receipt, so log_write carries it out for us. *)
-              false Sb e0 0%nat (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
+              false Sb e0 0%nat (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty t qt)
               W5 0%nat true (proc_addr j) (K - 8)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1511,7 +1525,7 @@ Section IallocClaim.
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcrd HopS [Htx] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
       (* log_write's own two closing inputs (the epoch witness and its
@@ -1519,8 +1533,8 @@ Section IallocClaim.
          but the ANCHOR is now [iclaim]; see the instantiation above. *)
       iApply lw_au_rec.
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
-                ltac:(solve_ndisj) Hnib Hdswf Ht0
-                (ialloc_fresh_shape ty Hty) Htyk with "Hireg Hiopen"). }
+                t qt ltac:(solve_ndisj) Hnib Hdswf Ht0
+                (ialloc_fresh_shape ty Hty) Htyk with "Hireg Hiopen Htx"). }
     (* THE RECEIPT LANDS HERE (iclaim-ledger.md §2.4 / IIIb step 4).  The
        slot this names used to be [_]: [ireg_claim_au]'s closing wand has
        delivered [iclaim] since increment I and ialloc dropped it on the
@@ -1735,7 +1749,7 @@ Section IallocClaim.
         It is create's [ilock(ip)] that finally spends it, at
         [InodeRegion.ireg_withdraw]. *)
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
-              (ClaimL ty)
+              (ClaimL ty t qt)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
@@ -1749,7 +1763,7 @@ Section IallocClaim.
     (* the minted unit, at the CLAIM flavour and KEPT there (RULING C'):
        [runit (is_claim (ClaimL ty))] IS [runit_claim], which is what
        [ireg_withdraw]'s ClaimK arm converts at create's fill. *)
-    iEval (change (runit (is_claim (ClaimL ty)) (bv_unsigned inum))
+    iEval (change (runit (is_claim (ClaimL ty t qt)) (bv_unsigned inum))
              with (runit_claim (bv_unsigned inum))) in "Hru".
     destruct Higp as (Hcsi & Hkslot & Higa0).
     assert (Hpcae : ret_pc (WA !!! Regidx Rra : mword 64)
@@ -1947,7 +1961,7 @@ Section IallocClaim.
     iDestruct (cpu_own_transport CID16 CID23 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (ia_epilogue (CID0 := CID23) j bn γ inodestart ninodes nib dev ty u Sb
-              pidv dq dqs dqn m V6 K b lks Vpr HK Hty Htyk HV6sp HV6thr
+              t qt pidv dq dqs dqn m V6 K b lks Vpr HK Hty Htyk HV6sp HV6thr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
                     [Href Hru Hclaim Hop] [Hcont]").
     { rewrite /ia_arms. iRight. iExists kslot, q, inum.
@@ -1981,6 +1995,7 @@ Section IallocScan.
       (cn : ic_names) (gtl : gname) (γpr : gname)
       (cov : gset Z) (logstart inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16) (u : nat) (Sb : gset Z)
+      (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ialloc <= K)%nat ->
@@ -2038,8 +2053,9 @@ Section IallocScan.
          bslots 2 -∗
          iref_slot -∗
          log_opS γ (S u) Sb -∗
+         t ↪[ln_tx icfg_log]{#qt} tt -∗
          ia_cont (CID0 := CIDc) γ bn inodestart ninodes nib dev ty u Sb
-                 pidv dq dqs dqn j m K b lks Vpr -∗
+                 pidv dq dqs dqn j m K b lks Vpr t qt -∗
          WP (Loop : expr riscv_lang))).
   Proof.
     intros HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow.
@@ -2053,12 +2069,12 @@ Section IallocScan.
     - (* ---- FUEL 0: unreachable, [inum < ninodes] leaves at least one turn ---- *)
       iIntros (CIDl Hql).
       iIntros (Ml inum CIDc) "%Hfuel %Hinum %Hsp %Hthr %Hs2 %Hs4 %Hs5 %Hs6".
-      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsl Hiref Hop Hcont".
+      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsl Hiref Hop Htx Hcont".
       exfalso. lia.
     - (* ---- FUEL S: one turn of the loop ---- *)
       iIntros (CIDl Hql).
       iIntros (Ml inum CIDc) "%Hfuel %Hinum %Hsp %Hthr %Hs2 %Hs4 %Hs5 %Hs6".
-      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsl Hiref Hop Hcont".
+      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsl Hiref Hop Htx Hcont".
       pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum32].
       assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
         by (vm_compute; reflexivity).
@@ -2560,14 +2576,14 @@ Section IallocScan.
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (ia_claim (CID0 := CID13) γs j γl γu γd γk pd pav pu bn γ γfs γi
                   cn gtl cov logstart inodestart ninodes nib dev ty inum ds u Sb
-                  kk bno bsd0 d0 pidv dq dqs dqn m GA K b lks
+                  t qt kk bno bsd0 d0 pidv dq dqs dqn m GA K b lks
                   Vpr HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Htyk Hinum Hslotal
                   Hbelow
                   with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hlctx Hireg Hiopen
                         Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc Hiref Hframe
-                        Hppid Hsbn Hsbi Hsl Hop Hheld [Hcont]").
+                        Hppid Hsbn Hsbi Hsl Hop Htx Hheld [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID13)
                     ltac:(wp_next_chain) with "Hcont"). }
       + (* ---- FALL: brelse, inum++, and the loop test ---- *)
@@ -2794,7 +2810,7 @@ Section IallocScan.
           iPoseProof ("IH" $! CIDl with "[%]") as "IHx"; [exact Hql |].
           iApply ("IHx" $! GE inum1 CID19
                     with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe
-                          Hppid Hsbn Hsbi Hsl Hiref Hop Hcont").
+                          Hppid Hsbn Hsbi Hsl Hiref Hop Htx Hcont").
           { rewrite Hinum1u. apply Z.ltb_lt in Hlt. lia. }
           { rewrite Hinum1u. apply Z.ltb_lt in Hlt. lia. }
           { exact HGEsp. }
@@ -2821,10 +2837,10 @@ Section IallocScan.
           iDestruct (cpu_own_transport CID15 CID19 0 true (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (ia_out (CID0 := CID19) j bn γ γpr γu γd inodestart ninodes nib
-                    dev ty u Sb pidv dq dqs dqn m GE K b lks
+                    dev ty u Sb t qt pidv dq dqs dqn m GE K b lks
                     Vpr HK Hty Htyk Hpk HGEsp HGEthr
                     with "Hcg Hcnt Htext Hkdata Hpc Hpenv Hframe Hppid
-                          Hsbn Hsbi Hsl Hiref Hop [Hcont]").
+                          Hsbn Hsbi Hsl Hiref Hop Htx [Hcont]").
           { iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID19)
                       ltac:(wp_next_chain) with "Hcont"). }
   Qed.
@@ -2851,10 +2867,11 @@ Section IallocMain.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (t : nat) (qt : Qp) :
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
-                         pidv dq dqs dqn m K eb b lks Vpr.
+                         pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
     cbv beta delta [wp_ialloc_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl
@@ -2875,9 +2892,9 @@ Section IallocMain.
       apply not_true_is_false. intro Hc. apply Z.geb_le in Hc. lia. }
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
-              #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
+              #Hitb2 #Hitbl #Hesc Hiref Hop Htx Hcont".
     iAssert (ia_cont (CID0 := CID) γ bn inodestart ninodes nib dev ty u Sb
-               pidv dq dqs dqn j m K b lks Vpr)%I with "[Hcont]" as "Hcont";
+               pidv dq dqs dqn j m K b lks Vpr t qt)%I with "[Hcont]" as "Hcont";
       [rewrite /ia_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi16sp sp,-64 : the 8-slot frame ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -3297,7 +3314,7 @@ Section IallocMain.
       change (2^32)%Z with 4294967296%Z. lia. }
     iPoseProof (ia_scan (CIDe := CID19) γs j γl γu γd γk pd pav pu bn γ γfs γi
                   cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
-                  pidv dq dqs dqn m K b lks
+                  t qt pidv dq dqs dqn m K b lks
                   Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hiopen Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc") as "Hscan".
@@ -3306,7 +3323,7 @@ Section IallocMain.
       [intros _; reflexivity |].
     iApply ("Hscan1" $! RA (mword_of_int 1 : mword 32) CID19
               with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe Hppid
-                    Hsbn Hsbi Hsl Hiref Hop Hcont").
+                    Hsbn Hsbi Hsl Hiref Hop Htx Hcont").
     { rewrite Hunit1. lia. }
     { rewrite Hunit1. lia. }
     { exact HRAsp. }
@@ -3336,25 +3353,26 @@ Section IallocMain.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (t : nat) (qt : Qp) :
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
-                           pidv dq dqs dqn m K eb b lks Vpr.
+                           pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
     cbv beta delta [wp_ialloc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl
            Ha0 Ha1 Heb Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
-              #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
+              #Hitb2 #Hitbl #Hesc Hiref Hop Htxc Hcont".
     iDestruct (log_op_openS with "Hop") as (Sb) "[HopS Htx]".
     iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ γfs γi
               cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m K eb b lks
-              Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
+              Vpr t qt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx
                     Hsbn Hsbi Hireg Hiopen Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
-                    Hitb2 Hitbl Hesc Hiref HopS [Hcont Htx]").
+                    Hitb2 Hitbl Hesc Hiref HopS Htxc [Hcont Htx]").
     all: try lkbelow.
     iIntros (CID') "%Hq".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hq |].
@@ -3368,9 +3386,10 @@ Section IallocMain.
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Hpkg"; [iExact "Hpkg" |].
       iApply (log_opS_op with "HopS Htx").
-    - iDestruct "Harm" as "(%Hp & Hiref & HopS)".
+    - iDestruct "Harm" as "(%Hp & Hiref & Htxc & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Hiref"; [iExact "Hiref" |].
+      iSplitL "Htxc"; [iExact "Htxc" |].
       iApply (log_opS_op with "HopS Htx").
   Qed.
 

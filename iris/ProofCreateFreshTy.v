@@ -144,6 +144,16 @@ Definition create_fresh_ty_body
        inside the deposit, on the FAIL arm (where no lock was taken) it comes
        back bare. *)
     (t : nat) (qt : Qp)
+    (* THE SHARE THE CLAIM BOX PARKS (durable-disk C-5, [FsCollect.v]'s
+       residue (E)).  ialloc's claim leaves a [fresh_shape] record on the
+       region's IN arm until the [ilock] two instructions later fills it,
+       and a commit cannot read a bundle at such an inum.  The window is
+       inside this span, so create hands in a SECOND positive share of the
+       same transaction: [InodeRegion.ireg_claim_au] parks it and
+       [ireg_withdraw]'s [ireg_wd_side] gives it back at the fill, on BOTH
+       arms of this span.  It is separate from [qt] because the fill's
+       checkout parks [qt] at the same instant the claim returns [qc]. *)
+    (qc : Qp)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (Ma : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) : Prop :=
@@ -191,11 +201,11 @@ Definition create_fresh_ty_body
      (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
-     (lks' : gset string) (Vpr' : pprivate),
+     (lks' : gset string) (Vpr' : pprivate) (t' : nat) (qt' : Qp),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                         γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
-                        m' K' eb' b' lks' Vpr') ->
+                        m' K' eb' b' lks' Vpr' t' qt') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
@@ -245,6 +255,8 @@ Definition create_fresh_ty_body
   i_dev (ientry kd) ↦₄{dqp} dev -∗
   (* the share the child's checkout parks -- see the header *)
   t ↪[ln_tx icfg_log]{#qt} tt -∗
+  (* the share the CLAIM BOX parks -- see the binder *)
+  t ↪[ln_tx icfg_log]{#qc} tt -∗
   log_opS γ (S u) Sb -∗
   wp_next true pj (fun (CIDo : CpuId) =>
   ∀ (Mo : regfile) (alloc : bool)
@@ -300,6 +312,10 @@ Definition create_fresh_ty_body
             §5''.3): ialloc's [ClaimL] iget minted it, and the iunlockput
             that closes the child spends it. *)
          runit_any (bv_unsigned inum) ∗
+         (* ...AND THE CLAIM BOX'S SHARE, HOME (durable-disk C-5): the fill
+            is the box's exit, so what ialloc parked in the region comes
+            back here, at the very [(t, qc)] that went in. *)
+         t ↪[ln_tx icfg_log]{#qc} tt ∗
          (* ialloc's [ia_spend = 1], and the membership create's own
             [iupdate(ip)] and every [dirlink] on [ip] credit against *)
          log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
@@ -309,8 +325,10 @@ Definition create_fresh_ty_body
           = (mword_of_int 0 : mword 64)⌝ ∗
          pc_is (mword_of_int (KernelSyms.create + 0xec) : mword 64) ∗
          iref_slot ∗
-         (* no lock was taken, so the share comes back bare *)
+         (* no lock was taken and no box was claimed, so both shares come
+            back bare *)
          t ↪[ln_tx icfg_log]{#qt} tt ∗
+         t ↪[ln_tx icfg_log]{#qc} tt ∗
          log_opS γ (S u) Sb) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -391,13 +409,13 @@ Lemma create_fresh_ty :
       (cov : gset Z) (logstart inodestart : Z) (ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16)
       (kd : nat) (dqp : dfrac)
-      (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
+      (u : nat) (Sb : gset Z) (t : nat) (qt : Qp) (qc : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
-                           u Sb t qt pidv dq dqs dqn Ma K eb b lks Vpr.
+                           u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Vpr.
 Proof.
   intros.
   cbv beta delta [create_fresh_ty_body]. cbv zeta.
@@ -405,7 +423,7 @@ Proof.
          HAs4 HAs1 Hkdlt Heb Hbelow Hia Hil.
   iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hitb2 #Hitbl #Hesc
            #Hslks #Hireg #Hiopen #Hprocs #Hdevi #Hdgeom #Hdlk Hsbn Hsbi
-           Hppid Hbsl Hisl Hidev Htx Hop Hcont".
+           Hppid Hbsl Hisl Hidev Htx Htc Hop Hcont".
   iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
   iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
   assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
@@ -488,10 +506,12 @@ Proof.
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
   iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr cov logstart
             inodestart ninodes nib dev ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
+            t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
             Hbelow
             with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hsbn Hsbi Hireg Hiopen
-                  Hppid Hprocs Hdevi Hdgeom Hdlk Hbs2 Hitb2 Hitbl Hesc Hisl Hop").
+                  Hppid Hprocs Hdevi Hdgeom Hdlk Hbs2 Hitb2 Hitbl Hesc Hisl Hop
+                  Htc").
   iIntros (CID4 Hq4 Mi alloc kslot q inum dn')
     "%Hcsi Hcg Hcnt Hpc Hsbn Hsbi Hppid Hbs2 Hres".
   iEval (rewrite Hpcac) in "Hpc".
@@ -572,7 +592,7 @@ Proof.
        handed over as it stands.  ([ireg_wd_lic]'s
        ClaimK arm does not mention its gname, so the [γi] here is any gname
        in scope and the [gsh] the call wants is convertible with it.) *)
-    iDestruct (inode_claimed_to_ClaimK ty kslot q dev inum γi with "Hpkg")
+    iDestruct (inode_claimed_to_ClaimK ty kslot q dev inum t qc γi with "Hpkg")
       as "[Href Hlic]".
     (* the claimant's reference SHEDS a share for ilock and keeps the rest *)
     iEval (rewrite inode_ref_shed) in "Href".
@@ -586,7 +606,7 @@ Proof.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart
               inodestart nib kslot (q/2)%Qp gsh
-              (DepTx (q/2)%Qp dev inum gsh t qt) (ClaimK ty) dev inum pidv dq dqs
+              (DepTx (q/2)%Qp dev inum gsh t qt) (ClaimK ty t qc) dev inum pidv dq dqs
               B1 K eb b lks Vpr
               HKil eq_refl ltac:(discriminate)
               Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
@@ -599,6 +619,10 @@ Proof.
     iIntros (CID8 Hq8 Mo dnc bmc filled)
       "%Hcso Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
+    (* THE CLAIM ARM'S PAYOUT IS A PAIR since durable-disk C-5: the plain
+       provenance unit the child reference carries from here on, and the
+       transaction share the claim box parked in the region. *)
+    iDestruct "Hwb" as "[Hwb Hws]".
     iEval (rewrite /ic_dep_held /=) in "Hcload".
     destruct Hilkp as [Hfilled Htyeq].
     pose proof (Hfrf Hfilled) as Hfresh.
@@ -612,7 +636,7 @@ Proof.
     iApply ("Hcont" $! Mo true kslot q gsh inum gilc gislc dnc bmc
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev
                     [Hpc Hslq Hdep Hcidev Hciinum Hcivalid Hcload Hcfrz
-                     Hkeep Hwb Hop]").
+                     Hkeep Hwb Hws Hop]").
     { intros c Hc Hne.
       rewrite (callee_saved_lookup Hcso c Hc) (HB1cs c Hc Hne)
               (callee_saved_lookup Hcsi c Hc).
@@ -634,11 +658,12 @@ Proof.
     iSplitR; [iExact "Hcshot" |].
     iSplitL "Hcfrz"; [iExact "Hcfrz" |].
     iSplitL "Hkeep"; [iExact "Hkeep" |].
-    iSplitL "Hwb"; [iExact "Hwb" | iExact "Hop"].
+    iSplitL "Hwb"; [iExact "Hwb" |].
+    iSplitL "Hws"; [iExact "Hws" | iExact "Hop"].
   - (* ============================================================== *)
     (*  NO INODES: a0 = 0, the branch is TAKEN, to +0xec               *)
     (* ============================================================== *)
-    iDestruct "Hres" as "(%Ha0z & Hisl & Hop)".
+    iDestruct "Hres" as "(%Ha0z & Hisl & Htc & Hop)".
     assert (HF1s3 : F1 !!! Regidx Rs3 = (mword_of_int 0 : mword 64)).
     { rewrite /F1 upd_eq Ha0z. apply add_vec_zero_l. }
     assert (Htk : add_vec (mword_of_int (CK + 0xae) : mword 64)
@@ -662,14 +687,15 @@ Proof.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! F1 false 0%nat 1%Qp γl inum γl γl dn' bm_empty
-              with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev [Hpc Hisl Htx Hop]").
+              with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev [Hpc Hisl Htx Htc Hop]").
     { intros c Hc Hne.
       rewrite (HF1cs c Hc Hne) (callee_saved_lookup Hcsi c Hc).
       exact (HA3cs c Hc). }
     iSplitR; [iPureIntro; exact HF1s3 |].
     iSplitL "Hpc"; [iExact "Hpc" |].
     iSplitL "Hisl"; [iExact "Hisl" |].
-    iSplitL "Htx"; [iExact "Htx" | iExact "Hop"].
+    iSplitL "Htx"; [iExact "Htx" |].
+    iSplitL "Htc"; [iExact "Htc" | iExact "Hop"].
 Qed.
 
 End CreateFreshTySpan.

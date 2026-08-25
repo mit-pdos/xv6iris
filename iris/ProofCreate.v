@@ -5022,17 +5022,28 @@ Section ProofCreateMain.
             ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
       as "(Hivalid & Hdep & Htp)".
     iModIntro.
+    (* THE CLAIM BOX'S SHARE (durable-disk C-5).  The span's [ialloc] leaves
+       a claim box standing until its own [ilock] fills it, and what proves
+       that window is inside a transaction is a POSITIVE share of this one
+       parked in the region.  It cannot be the quarter the child's checkout
+       parks -- the fill parks that at the same instant the claim returns
+       this one -- so create lends a second quarter out of its own residue
+       and takes it back on BOTH arms of the span. *)
+    iEval (rewrite Hglog) in "Htx".
+    iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
+                 (eq_sym Qp.quarter_quarter) with "Htx") as "[Htcl Htx]".
     (* ===== +0xa4 .. +0xb0 : THE FRESH-TYPE GATE SPAN ================= *)
     iApply (create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γpr cov logstart inodestart ninodes nib dev ty kd (DfracOwn (1/2))
-              q1 Sb1 t (1/4)%Qp pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
+              q1 Sb1 t (1/4)%Qp (1/4)%Qp
+              pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
               (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
               (fun CIDx : CpuId => IL.wp_ilock_dep_sconf (CID := CIDx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
-                    Hppid Hbsl Hisl1 Hidev Htp Hop").
+                    Hppid Hbsl Hisl1 Hidev Htp Htcl Hop").
     all: try lkbelow.
     iIntros (CIDo Hso Mo alloc kslot q g cinum gil gisl dnc bmc)
       "%Hcs3 Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev Hres".
@@ -5046,7 +5057,11 @@ Section ProofCreateMain.
          the pure arm is FALSE. *)
       iDestruct "Hres" as "(%Hpure & Hpc & #Hslkc & Hcslkd & Hcdep &
                             Hcidev & Hciinum & Hcivalid & Hcload & #Hcshot &
-                            Hcfrz & Hckeep & Hruc & Hop)".
+                            Hcfrz & Hckeep & Hruc & Htcl & Hop)".
+      (* the claim box's quarter is home (durable-disk C-5) *)
+      iDestruct (log_tx_join_q icfg_log t (1/2) (1/4) (1/4)
+                   (eq_sym Qp.quarter_quarter) with "Htcl Htx") as "Htx".
+      iEval (rewrite -Hglog) in "Htx".
       destruct Hpure as (Hs3 & Hkslt & Hcpos & Hcinb & Htyc & Hfresh).
       destruct (Hiregb cinum Hcinb) as [Hcblk Hcblog].
       assert (HMoregs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6272,7 +6287,11 @@ Section ProofCreateMain.
     - (* ============================================================== *)
       (*  ARM A-FAIL (+0xec): ialloc returned 0, nothing was claimed     *)
       (* ============================================================== *)
-      iDestruct "Hres" as "(%Hs3z & Hpc & Hislg & Htp & Hop)".
+      iDestruct "Hres" as "(%Hs3z & Hpc & Hislg & Htp & Htcl & Hop)".
+      (* the claim box's quarter is home, unspent (durable-disk C-5) *)
+      iDestruct (log_tx_join_q icfg_log t (1/2) (1/4) (1/4)
+                   (eq_sym Qp.quarter_quarter) with "Htcl Htx") as "Htx".
+      iEval (rewrite -Hglog) in "Htx".
       (* nothing was claimed, so no second lock was taken: the quarter goes
          straight back into the parent's arm (durable-disk B''-tx3). *)
       iApply fupd_wp.

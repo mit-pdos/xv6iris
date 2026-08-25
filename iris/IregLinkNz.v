@@ -146,12 +146,13 @@ Section IregLinkNz.
      -- when [iclaim] is actually mintable (F1.5c's (M1)), this is what lets
      ireclaim's free supply the [c = None] that §7.1.5 shows it needs. *)
   Lemma ireg_boot_no_claim (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (ty : bv 16) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (ty : bv 16)
+      (t : nat) (qt : Qp) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     ireg_boot -∗
-    iclaim (bv_unsigned inum) ty ={E}=∗ False.
+    iclaim (bv_unsigned inum) ty t qt ={E}=∗ False.
   Proof.
     iIntros (HE Hin) "#Hinv Hboot Hcl".
     pose proof (islot_lt inum) as Hsl.

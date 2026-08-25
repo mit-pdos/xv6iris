@@ -1147,8 +1147,13 @@ Section IcacheBootRegion.
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
         (* ...and the FREEZE's clause is vacuous at the UNFROZEN column,
-           which is boot's everywhere (iclaim-ledger.md §2.3 / §6'' G') *)
-        { iApply ireg_fsh_off. }
+           which is boot's everywhere (iclaim-ledger.md §2.3 / §6'' G').
+           BOOT HAS NO CLAIM BOXES (durable-disk C-5): the whole image is
+           minted at [c = None], so the shelter's claim side is [emp] and
+           the region's IN arm is on its type-0 disjunct at every free
+           inum -- which is what makes [FsCollect.col_region_slot_acc]'s
+           reading non-vacuous at the very first commit. *)
+        { iApply ireg_shp_none. iApply ireg_fsh_off. }
         (* ...and the RECEIPT's clause is on its [frzown] arm, because boot
            freezes nothing (iclaim-ledger.md §3.14 as built) *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
@@ -1175,8 +1180,13 @@ Section IcacheBootRegion.
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
         (* ...and the FREEZE's clause is vacuous at the UNFROZEN column,
-           which is boot's everywhere (iclaim-ledger.md §2.3 / §6'' G') *)
-        { iApply ireg_fsh_off. }
+           which is boot's everywhere (iclaim-ledger.md §2.3 / §6'' G').
+           BOOT HAS NO CLAIM BOXES (durable-disk C-5): the whole image is
+           minted at [c = None], so the shelter's claim side is [emp] and
+           the region's IN arm is on its type-0 disjunct at every free
+           inum -- which is what makes [FsCollect.col_region_slot_acc]'s
+           reading non-vacuous at the very first commit. *)
+        { iApply ireg_shp_none. iApply ireg_fsh_off. }
         (* ...and the RECEIPT's clause is on its [frzown] arm, because boot
            freezes nothing (iclaim-ledger.md §3.14 as built) *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
