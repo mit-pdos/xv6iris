@@ -184,8 +184,8 @@
       because [wi_blocks_le4] bounds [off `mod` BSIZE] rather than [off].
       So every chunk filewrite can ask for is payable.  ([fw_budget_ok].)
    3. THE SHARE ALGEBRA COMPOSES.  SpecIlock v5 consumes
-      [inode_shr_gen k s dev inum g] and returns [ic_deposit cn k
-      (DepShr s dev inum g)]; SpecIunlock takes that deposit back and
+      [inode_shr_gen k s dev inum g] and returns the checkout descriptor;
+      SpecIunlock takes that deposit back and
       returns the arity-preserving [inode_shr k s dev inum].  Lending
       [s/2] therefore leaves [inode_shr_gen k (s/2) .. g] in hand and gets
       [inode_shr k (s/2) ..] back, which is exactly [fw_shr_regen]'s two

@@ -472,9 +472,9 @@ Section CreateSpec.
        (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): create returns with
           the child still write-locked, so what it hands over is the
           TRANSACTIONAL descriptor -- the escrow's arm at a half beside the
-          holder's own half of the same element.  It stands exactly where
-          [ic_deposit cn k (DepShr s dev inum g)] stood, at the same
-          arguments, and it is why this contract's post no longer hands the
+          holder's own half of the same element.  It stands exactly where a
+          bare [ic_deposit cn k d] stands, at the same arguments, and it is
+          why this contract's post no longer hands the
           caller a separate [LogInv.log_tx] on the success arm. *)
        ic_tx_dep cn k s dev inum g ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗

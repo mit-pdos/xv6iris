@@ -102,7 +102,7 @@
 (*      separately.                                                       *)
 (*                                                                        *)
 (*  (B) ALTERNATIVE (d) OF [ic_escrow_body_cover] -- the residue.  Until   *)
-(*      the ABI sweep arms the transactional walks ([DepShr] -> [DepTx]),  *)
+(*      the ABI sweep gives iput's three windows a transaction share,     *)
 (*      a slot may be live with no bundle in the escrow.  This is the ONE  *)
 (*      premise the plan sanctions taking as a hypothesis (P1).            *)
 (*                                                                        *)

@@ -792,29 +792,9 @@ Section ProofIunlockMain.
     { unfold callee_saved. split_and!; assumption. }
   Qed.
 
-  (* THE BUNDLELESS READING (durable-disk B''-tx3): the generic park at
-     [DepShr].  Byte-stable -- no caller moves. *)
-  Lemma wp_iunlock_sconf
-      (gs : list gname)
-      (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
-      (gil gisl : gname)
-      (cov : gset Z) (logstart : Z)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
-      (dn' : dinode) (bm' : blkmap)
-      (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p b lks Vpr.
-  Proof.
-    apply wp_iunlock_sconf_of_dep.
-    apply wp_iunlock_dep_sconf.
-  Qed.
-
-  (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the disarm is a ghost
-     step BEFORE the call, so this is a derivation and nothing of iunlock's
-     own proof is re-run. *)
+  (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the descriptor is retired
+     in the park's own ghost step, so this is a derivation and nothing of
+     iunlock's own proof is re-run. *)
   Lemma wp_iunlock_tx_sconf
       (gs : list gname)
       (gfs : fs_names) (gi : gname)

@@ -52,7 +52,7 @@
    iunlock.  That is why this contract hands nothing back that could be
    spent, and why SpecIunlock v3 is the only way to recover the share.  What
    it DOES hand back is the other half of the entry sleeplock's descriptor
-   variable ([IcacheEscrow.ic_deposit] at [DepShr s dev inum]) -- §14.8's
+   variable ([IcacheEscrow.ic_deposit] at the checkout descriptor) -- §14.8's
    repair: with the OUT arm able to hold either a share or a reference, that
    half is what lets the parker find its own arm again, and it pins the
    fraction and the identity so that iunlock's postcondition needs no
@@ -220,11 +220,9 @@ Definition wp_ilock_dep_sconf_body
   (* ---- THE DESCRIPTOR THE CHECKOUT PUBLISHES (durable-fs-plan.md section
      3, [ilock]; durable-disk B''-tx3).  ONE proof of ilock's code, three
      arms, selected by [d] BEFORE the call and published at the checkout's own
-     ghost step -- so no [DepShr] out-state stands between the contract's post
-     and a later arming fupd, whatever the caller is.
+     ghost step -- so no bundleless out-state stands between the contract's
+     post and a later arming fupd, whatever the caller is.
 
-       [DepShr s dev inum g]        the bundleless withdrawal, i.e. this
-                                    contract's [wp_ilock_sconf] reading;
        [DepTx s dev inum g t q]     THE WRITE ARM: the escrow's OUT arm parks
                                     [q] of transaction [t]'s [LogInv.log_tx]
                                     element for the whole locked window, so
@@ -445,229 +443,20 @@ Definition wp_ilock_dep_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Definition wp_ilock_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
-    (pd pav pu : mword 64)
-    (bn : bio_names)
-    (gfs : fs_names) (gi : gname)                      (* fs blocks + region  *)
-    (cn : ic_names)                                    (* the icache's names  *)
-    (gil gisl : gname)                                 (* ip->lock            *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
-    (pidv : mword 32) (dq dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.ilock in
-  let ip : mword 64 := ientry k in
-  let pj := proc_addr j in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (K_ilock <= K)%nat ->
-  (* THE ENTRY IS SLOT [k]; this is also the null test's refutation *)
-  (k < NINODE)%nat ->
-
-  (* the covered range's block-number bounds: bread's 2^31 arithmetic
-     premise, and 0 is never a client block *)
-  log_geom_ok cov logstart ->
-  (* the superblock field is a real block number, so the [addw] that forms
-     IBLOCK cannot wrap *)
-  0 <= inodestart ->
-  (* the inode's own block is a covered HOME block: bread's premise *)
-  IBLOCK inum inodestart ∈ cov ->
-  (* the inum is inside the inode region: [ireg_read]'s premise *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
-  (j < NPROC)%nat ->
-  gs !! j = Some gl ->
-  (* a0 = ip *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-  (* ilock's cone touches "sleep lock"(6) via acquiresleep and "bcache"(4)
-     via bread/brelse (on the invalid-entry fill arm); bcache is the LOWER
-     of the two, so one premise at its rank covers the whole cone via
-     [locks_below_mono]. *)
-  locks_below lks "bcache" ->
-  sie_cap_gpr KT1 m K b pj -∗
-  cpu_own 0 eb pj b lks -∗
-  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread
-     both sleep, and a parking thread hands [trap_csrs] / [cpu_claim] across
-     the crossing (SpecSched.v).  At [eb = true] ilock's own [acquiresleep]
-     acquire frees them out of [sie_arm true], so the complement is [emp]
-     and the caller brings nothing -- which is why this used to be an
-     [eb = true] premise instead.  At [eb = false] the caller brings the
-     pair, holding it because the TRAP handed it over. *)
-  trap_csrs_ext KT1 eb -∗
-  cpu_claim_ext eb pj -∗
-  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_env -∗
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
-     the inode region *)
-  itable_inv -∗
-  ic_escrow cn gfs gi cov logstart k -∗
-  ireg_inv gi gfs inodestart nib -∗
-  (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-  (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
-     for the slot: what a holder deposits in it is a share of somebody's
-     REFERENCE ([SleepLock.slh_tok]), which is what lets iput -- holding the
-     only reference -- prove the lock free rather than block on it
-     (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
-     is the [slh_tok] slice of the very share it consumes below, so no
-     caller pays anything new. *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
-                   (slh_tok (icfg_isl k)) -∗
-  (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
-     GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
-     slice belongs to slot [k]'s current generation [g], and naming it is
-     what lets this contract EXPOSE that generation's type witness below.
-     Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
-     is the existential its [inode_shr] already carries. *)
-  inode_shr_gen k s dev inum g -∗
-  (* ---- THE FILL's LICENCE, INDEXED (iclaim-ledger.md §5''''', RULING C')
-
-     §16.4's fill has a sub-arm -- the CLAIM BOX -- that no caller can be
-     left stuck on, and [InodeRegion.ireg_withdraw] is the only thing that
-     can discharge it.  The index says which of the three currencies this
-     caller brought and therefore which discharge runs; see
-     [InodeRegion.ilkc].  In one line each:
-
-       [ClaimK ty]  create's child fill, and the only site that can present
-                    ialloc's typed [iclaim].  It brings the claim TOGETHER
-                    with the claim-flavoured provenance unit its own
-                    reference carries, the withdraw CONVERTS the pair into
-                    the plain unit, and the post below pins BOTH
-                    [filled = true] and [di_type dn = ty] -- which is
-                    exactly [ProofCreateFreshTy]'s span conjunct.  The
-                    other two shapes the entry could be in
-                    (cached, or a pool bundle) are refuted by
-                    [InodeRegion.ireg_claim_no_out]: a claimed inum's record
-                    is INSIDE the region, so nobody holds its [dinode_at].
-       [PlainK]     the twelve in-file-unit sites.  The unit their own
-                    reference carries collides with the claim pin's (R3),
-                    which DERIVES [c = None] -- the box arm is refuted and
-                    the unit comes straight back out.
-       [ShotK ty]   the three fd sites, which can hold no whole unit across
-                    this call (their inode payload is behind a cancellable
-                    invariant no syscall may keep open here).  What they DO
-                    hold, free and persistent, is this generation's own
-                    one-shot -- and a one-shot in hand means the generation
-                    has already been filled, so it refutes the UNCACHED arm
-                    outright ([IcacheRef.ity_pending_shot_excl]) and the
-                    post reports [filled = false].
-
-     STATED AT THE CALLER'S [g], like [ity_shot] below and for the same
-     reason. *)
-  ireg_wd_lic o g (bv_unsigned inum) -∗
-  (* sb.inodestart, read once *)
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  (* the caller's own pid cell (acquiresleep records it in the lock) *)
-  proc_priv_bare pj pidv Vpr -∗
-  (* the running-thread bundle *)
-  procs_inv gs -∗
-  (* the disk fabric *)
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-  (* ONE slot unit: bread's reference, which brelse gives back *)
-  bslot -∗
-  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
-     acquiresleep sleeps), and a park moves the hart with interrupts off, so
-     the crossing has nothing to do with SIE -- the porting guide's "a
-     PARKING function's [wp_next] index is [true] UNCONDITIONALLY".  While
-     the contract was pinned at [b = true] the two spellings coincided; at
-     [b = false] the [b] form would claim the function returns on the hart
-     that called it, which is false. *)
-  wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr KT1 mf K b pj -∗
-      cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext KT1 eb -∗
-      cpu_claim_ext eb pj -∗
-      pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      bslot -∗
-      (* THE LOCK IS HELD ... *)
-      sleeplocked_q gisl s (i_lock ip) pidv -∗
-      (* ... and the entry is CHECKED OUT and LOADED: the checkout
-         descriptor's other half (§14.8 -- what the parker selects its arm
-         with, and what pins [s], [dev] and [inum] there), the escrow's two
-         identity halves, the valid cell, and the loaded content at a
-         record the region agrees with.  Exactly [ic_swap_park]'s input,
-         i.e. exactly SpecIunlock v3's precondition. *)
-      ic_deposit cn k (DepShr s dev inum g) -∗
-      i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
-      i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
-      i_valid ip ↦₄ valid_word true -∗
-      ic_loaded gfs gi cov logstart k inum dn bm -∗
-      (* THE FD-TYPE WITNESS (design fs-icache.md 17.6 (5), ratified 17.7).
-         PERSISTENT, ADDITIVE, and ignored by every caller that does not
-         write: this generation's one-shot, spent by the fill against the
-         record the fill read.  It is stated at the CALLER'S [g] -- the one
-         its share names -- and nothing pins it to the arm's but
-         [IcacheRef.live_gen_agree], which needs no itable fact at all
-         (17.1's currency requirement, discharged).
-
-         What it is FOR: filewrite's re-park must know the inode it is
-         writing is not a directory, and "not a directory" is sys_open's
-         invariant, five frames up.  [FileInv.inode_pay] carries the fd's own
-         [ity_shot g ty] with [fc_wbool C = true -> ty <> T_DIR];
-         [IcacheRef.ity_shot_agree] joins the two, and [DirView.dir_ok] is
-         vacuous.  A generation sees at most one fill (17.6), which is what
-         makes that agreement sound. *)
-      ity_shot g (di_type dn) -∗
-      (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.1 A-custody /
-         §3.9 RULING A-prime).  A-custody puts the token on the PAYLOAD's
-         custody path -- pool bundle <-> parked arm <-> holder -- and this is
-         the holder's end of it: [IcacheEscrow.ic_payload], the predicate
-         [ic_swap_checkout] takes out of the parked arm, carries
-         [ifreeze_off], so a checkout hands it over exactly as it hands over
-         [ic_loaded].  [SpecIunlock]'s precondition takes it back.
-
-         WHY THE CONTRACT GREW (§3.9's ruling, and its price): the freeze
-         pin's premise on [InodeRegion.ireg_write_link_fl] is FALSE at
-         create's fresh child ([fresh_shape] pins the pre-count at zero) and
-         unavailable at sys_link's [ip->nlink++] (no guard, no ilink in
-         hand); IIIc refuted every cheaper route.  The honest supply is this
-         token, and a checked-out holder is exactly who has it.
-
-         WHAT A CALLER THAT DOES NOT WRITE DOES WITH IT: nothing -- it
-         threads it to its own iunlock.  iProp is affine, so a caller that
-         parks through some other route may drop it. *)
-      ifreeze_off (bv_unsigned inum) -∗
-      (* THE CLAIM-BOX INDICATOR -- see the header.  Proven content, not a
-         new obligation: [InodeRegion.ireg_withdraw] pays [fresh_shape] to
-         §16.4's fill sub-arm and this clause is where it now leaves. *)
-      ⌜filled = true -> fresh_shape dn⌝ -∗
-      (* ...AND THE LICENCE's PAYOUT (RULING C').  [ClaimK]'s pair has
-         CONVERTED into the plain unit the child reference carries from
-         here on; [PlainK]'s unit is the caller's own, borrowed and
-         returned; [ShotK]'s one-shot is persistent and comes back
-         because it never left. *)
-      ireg_wd_back o g (bv_unsigned inum) -∗
-      (* ...and what the index BUYS, which is the whole of item 7: at
-         [ClaimK] the fill is FORCED and the record is the record the claim
-         wrote. *)
-      ⌜ilk_post o filled dn⌝ -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
 (* ---- THE TRANSACTIONAL FORM (durable-fs-plan.md section 3, [ilock];
    durable-disk B''-tx) -------------------------------------------------
 
-   ONE C FUNCTION, TWO SPEC FORMS, SELECTED BY WHAT THE CALLER HOLDS.  The
-   body below is [wp_ilock_sconf_body] with exactly two lines different: it
-   CONSUMES [LogInv.log_tx icfg_log] and it PRODUCES
-   [IcacheEscrow.ic_tx_dep] where the other produces the bare [ic_deposit]
-   at [DepShr].  The ghost step is [IcacheEscrow.ic_arm_tx], run inside the
-   contract rather than voluntarily at the call site, so a transactional
-   walk cannot forget to arm and the escrow's OUT arm at a bundleless
-   descriptor becomes unreachable for it.
+   ONE C FUNCTION, ONE PROOF, TWO PUBLISHED FORMS, selected by what the
+   caller holds.  The body below is the generic one at [DepTx]: it CONSUMES
+   [LogInv.log_tx icfg_log] and PRODUCES [IcacheEscrow.ic_tx_dep], the
+   descriptor and the holder's residue bundled.  The escrow's OUT arm is a
+   [DepTx] from the instant the entry leaves -- the checkout itself
+   publishes it -- so a transactional walk cannot forget to arm and no
+   bundleless arm is reachable for it.
 
-   [ProofIlock] proves it by DERIVATION from the plain form
-   ([wp_ilock_tx_of_sconf] below): the arm is a fupd on the deposit the
-   plain post already hands out, and [fupd_wp] absorbs it. *)
+   [ProofIlock] proves it by DERIVATION from the generic form
+   ([wp_ilock_tx_of_dep] below); not a line of ilock's own proof is
+   re-run. *)
 Definition wp_ilock_tx_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
@@ -803,9 +592,9 @@ Definition wp_ilock_tx_sconf_body
   (* ---- THE TRANSACTION'S TOKEN, HANDED IN AT THE LOCK ---------------
      (durable-fs-plan.md section 3, [ilock]; durable-disk B''-tx)
 
-     This is the ONLY difference from [wp_ilock_sconf_body] on the way in,
-     and the postcondition's [IcacheEscrow.ic_tx_dep] is the only one on the
-     way out.  A caller that brings [LogInv.log_tx] gets the WRITE ARM: half
+     This is the ONLY difference from the generic body on the way in, and the
+     postcondition's [IcacheEscrow.ic_tx_dep] is the only one on the way
+     out.  A caller that brings [LogInv.log_tx] gets the WRITE ARM: half
      its transaction's element is parked in the escrow's checked-out arm for
      the whole locked window, so [end_op] -- which consumes the whole element
      -- cannot commit while this inode is out, which is exactly what the
@@ -898,78 +687,10 @@ Definition wp_ilock_tx_sconf_body
 
 (* THE [log_tx] READING OF THE ARM, which is where the id leaves and re-enters
    [LogInv.log_tx]'s existential ([IcacheTxRefute] is why it has to). *)
-Section IlockTxArm.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
-
-  Lemma ic_arm_tx_log (E : coPset) cn γfs γi cov logstart k
-      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool) :
-    ↑(icEscN .@ k) ⊆ E ->
-    ic_escrow cn γfs γi cov logstart k -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
-    log_tx icfg_log ={E}=∗
-      i_valid (ientry k) ↦₄ valid_word v ∗ ic_tx_dep cn k s dev inum g.
-  Proof.
-    iIntros (HE) "#Hesc Hvld Hdep Htx".
-    iDestruct (log_tx_halve with "Htx") as (t) "[Ht1 Ht2]".
-    iApply (ic_arm_tx_half E cn γfs γi cov logstart k s dev inum g v t HE
-              with "Hesc Hvld Hdep Ht1 Ht2").
-  Qed.
-End IlockTxArm.
-
-(* THE TWO PUBLISHED READINGS, BOTH DERIVATIONS OF THE ONE GENERIC BODY, and
-   neither re-proves a line of ilock's code (durable-disk B''-tx3).  What
-   changed against B''-tx is WHERE the arm is taken: it used to be a fupd on
-   the deposit the plain post handed out ([ic_arm_tx_log]), which left a
-   [DepShr] out-state standing between the two steps; it is now the descriptor
-   the checkout itself publishes, so the escrow's OUT arm is a [DepTx] from
-   the instant the entry leaves. *)
-
-(* (i) the BUNDLELESS reading: the generic at [DepShr], where both
-   projections are [emp] and the held bundle is [ic_loaded].  Byte-stable --
-   no caller of [wp_ilock_sconf] moves. *)
-Lemma wp_ilock_sconf_of_dep
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gs : list gname) (j : nat) (gl : gname)
-    (gu : uart_names) (gd : disk_names) (gk : gname)
-    (pd pav pu : mword 64)
-    (bn : bio_names)
-    (gfs : fs_names) (gi : gname)
-    (cn : ic_names)
-    (gil gisl : gname)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
-    (pidv : mword 32) (dq dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :
-  wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g
-                          (DepShr s dev inum g) o dev inum
-                          pidv dq dqs m K eb b lks Vpr ->
-  wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                      cov logstart inodestart nib k s g o dev inum
-                      pidv dq dqs m K eb b lks Vpr.
-Proof.
-  cbv beta delta [wp_ilock_sconf_body wp_ilock_dep_sconf_body].
-  intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
-  iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio #Hitbl #Hesc Hireg
-           Hslk Hshr Hlic Hsb Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcont".
-  iApply (Hgen HK eq_refl ltac:(discriminate) Hk Hgeom Hst Hcov Hinlt Hj Hgl
-            Ha0 Hbelow
-            with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hitbl Hesc
-                  Hireg Hslk Hshr [] Hlic Hsb Hppid Hprocs Hdevi Hdgeom
-                  Hdlock Hsl [Hcont]").
-  { rewrite /ic_dep_side. done. }
-  iIntros (CIDx Hqx mf dn bm filled)
-    "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev Hiinum
-     Hivalid Hload #Hshot Hfrz %Hfl Hlicb %Hilk".
-  iEval (rewrite /ic_dep_held; cbn [ic_dep_rd]) in "Hload".
-  iApply ("Hcont" $! CIDx Hqx mf dn bm filled with
-            "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev
-             Hiinum Hivalid Hload Hshot Hfrz [%] Hlicb [%]");
-    [exact Hcs | exact Hfl | exact Hilk].
-Qed.
-
+(* THE PUBLISHED READING, A DERIVATION OF THE ONE GENERIC BODY, which
+   re-proves no line of ilock's code (durable-disk B''-tx3/-tx4).  The
+   read-lockers ([fileread], [filestat]) call the generic form at [DepRd]
+   directly. *)
 (* (ii) THE WRITE ARM: the generic at [DepTx … t (1/2)], with the transaction
    id taken out of [LogInv.log_tx]'s existential before the call and the two
    halves rejoined into [IcacheEscrow.ic_tx_dep] at the post.  The escrow
@@ -1021,9 +742,8 @@ Qed.
 
 Module Type ILOCK.
   (* THE GENERIC FORM (durable-disk B''-tx3): ONE proof of ilock's code, the
-     checkout's descriptor chosen by the caller.  [wp_ilock_sconf] and
-     [wp_ilock_tx_sconf] below are its [DepShr] and [DepTx] readings
-     ([wp_ilock_sconf_of_dep] / [wp_ilock_tx_of_dep]); a READ-locker
+     checkout's descriptor chosen by the caller.  [wp_ilock_tx_sconf] below
+     is its [DepTx] reading ([wp_ilock_tx_of_dep]); a READ-locker
      ([fileread], [filestat]) uses it at [DepRd] directly, which is what
      retires [ic_shed_rd] at those two sites. *)
   Parameter wp_ilock_dep_sconf :
@@ -1044,28 +764,9 @@ Module Type ILOCK.
       wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                               cov logstart inodestart nib k s g d o dev inum
                               pidv dq dqs m K eb b lks Vpr.
-  Parameter wp_ilock_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-      (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
-      (gil gisl : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
-      (pidv : mword 32) (dq dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g o dev inum
-                          pidv dq dqs m K eb b lks Vpr.
-  (* THE TRANSACTIONAL FORM, beside the read one (durable-disk B''-tx).
-     Same C function, same proof; what selects it is whether the caller
-     brings [LogInv.log_tx].  [ProofIlock] defines it by
-     [wp_ilock_tx_of_sconf]. *)
+  (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
+     proof; what selects it is whether the caller brings [LogInv.log_tx].
+     [ProofIlock] defines it by [wp_ilock_tx_of_dep]. *)
   Parameter wp_ilock_tx_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 

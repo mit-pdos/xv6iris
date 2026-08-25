@@ -22,7 +22,7 @@
                                     field copies, the memmove, brelse,
                                     ip->valid = 1, the dead type panic,
                                     restore s2, [c.j] back to +0x1e
-     [wp_ilock_sconf] +0x00 .. +0x1c prologue, the two dead panic tests,
+     ilock's +0x00 .. +0x1c prologue, the two dead panic tests,
                                     acquiresleep, and the ip->valid branch
 
    THE GUARD READ IS AN ATOMIC UPDATE.  [ip->ref] lives in [itable_inv],
@@ -750,7 +750,7 @@ Section IlockLoad.
     gs !! j = Some gl ->
     (* il_load reaches bread/brelse, whose bound is "bcache" (4); it is the
        whole point of this helper (the fill arm), so it needs the premise
-       threaded on its own binder list just like [wp_ilock_sconf] itself. *)
+       threaded on its own binder list just like the contract itself. *)
     locks_below lks "bcache" ->
     sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
@@ -2592,7 +2592,7 @@ Section ProofIlockMain.
         rewrite /il_payload /ic_dep_held. cbn [ic_dep_rd].
         iSplitR "Hoff"; [| iExact "Hoff"].
         iExists dn0, bm0. iSplitL "Hheld"; [iExact "Hheld" | iExact "Hsh"].
-      - (* EVERY BUNDLELESS DESCRIPTOR, [DepShr] and [DepTx] alike: the arm
+      - (* EVERY BUNDLELESS DESCRIPTOR, the write arm included: the arm
            keeps nothing and the difference is what [ic_dep_side] parked. *)
         iMod (ic_swap_checkout cn gfs gi cov logstart k d g dev inum Hdg Hrd
                 with "Hbody Htok [Href Hside]") as "[Hok | Hfrz]";
@@ -2797,32 +2797,9 @@ Section ProofIlockMain.
                       Hsl Hstok Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
   Qed.
 
-  (* THE BUNDLELESS READING (durable-disk B''-tx3): the generic contract at
-     [DepShr].  Byte-stable -- no caller moves. *)
-  Lemma wp_ilock_sconf
-      (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (gfs : fs_names) (gi : gname)
-      (cn : ic_names)
-      (gil gisl : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
-      (pidv : mword 32) (dq dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g o dev inum
-                          pidv dq dqs m K eb b lks Vpr.
-  Proof.
-    apply wp_ilock_sconf_of_dep.
-    apply wp_ilock_dep_sconf.
-  Qed.
-
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx, re-based by B''-tx3): the
      same code, the same proof, and the arm is now the descriptor the CHECKOUT
-     publishes -- no [DepShr] out-state stands anywhere in the window.
+     publishes -- no bundleless out-state stands anywhere in the window.
      [SpecIlock.wp_ilock_tx_of_dep] is the whole derivation. *)
   Lemma wp_ilock_tx_sconf
       (gs : list gname) (j : nat) (gl : gname)

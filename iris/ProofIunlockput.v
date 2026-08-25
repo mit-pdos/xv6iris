@@ -632,59 +632,10 @@ Section ProofIunlockputMain.
     { iApply (log_opS_opb with "Hlogop"). }
   Qed.
 
-  (* ---- THE FOUR PUBLISHED READINGS, all instances of the two generic
-     forms above (durable-disk B''-tx4).  The plain ones sit at a bundleless
-     descriptor; the transactional ones at [DepTx], where the share the arm
-     parked comes back in the post and rejoins the caller's residue -- so no
-     disarm fupd stands before an iunlockput any more. *)
-  Lemma wp_iunlockput_gen
-      (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
-      (dn' : dinode) (bm' : blkmap)
-      (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
-                             gil gisl cov logstart bmapstart inodestart nib
-                             size dev k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb b lks Vpr.
-  Proof.
-    apply wp_iunlockput_gen_of_dep.
-    apply wp_iunlockput_dep_gen.
-  Qed.
-
-  Lemma wp_iunlockput_sconf
-      (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (gtl : gname) (gil gisl : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
-      (dn' : dinode) (bm' : blkmap)
-      (n : nat)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
-                               gil gisl cov logstart bmapstart inodestart nib
-                               size dev k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb b lks Vpr.
-  Proof.
-    apply wp_iunlockput_sconf_of_dep.
-    apply wp_iunlockput_dep_sconf.
-  Qed.
-
+  (* ---- THE TWO PUBLISHED READINGS, instances of the two generic forms
+     above at [DepTx] (durable-disk B''-tx4): the share the arm parked comes
+     back in the post and rejoins the caller's residue, so no disarm fupd
+     stands before an iunlockput any more. *)
   Lemma wp_iunlockput_tx_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

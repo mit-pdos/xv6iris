@@ -717,10 +717,7 @@ Qed.
 Definition ic_dep_gname (d : ic_dep) : option gname :=
   match d with
   | DepNone => None
-  | DepShr _ _ _ g => Some g
   | DepFrz _ _ _ => None
-  (* the write arm is a [DepShr] carrying a parked transaction share, so it
-     names the same generation (durable-disk B''-arm) *)
   | DepTx _ _ _ g _ _ => Some g
   | DepRd _ _ _ g => Some g
   end.
@@ -730,7 +727,7 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
    ([IcacheEscrow.ic_rd_arm]); at every other descriptor it keeps nothing, and
    this boolean is the pure side condition the two arm-generic constructors
    ([ic_swap_checkout], [ic_close_out]) carry so that they may keep taking an
-   ABSTRACT descriptor.  Both callers pass a [DepShr] and pay [reflexivity]. *)
+   ABSTRACT descriptor. *)
 Definition ic_dep_rd (d : ic_dep) : bool :=
   match d with DepRd _ _ _ _ => true | _ => false end.
 
