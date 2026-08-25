@@ -3882,6 +3882,58 @@ Section IcacheEscrow.
       rewrite big_sepS_singleton. iExact "Hext1".
   Qed.
 
+  (* ---- WHAT A SLOT SAYS ABOUT ITSELF WITH NO LOCK TAKEN -------------
+     (durable-fs-plan.md section 4, the commit's collection; durable-disk
+     B''-arm)
+
+     THE COMMIT CAN NAME EVERY CACHED INUM FOR FREE.  All five arms of
+     [ic_escrow_body] carry the escrow's OWN half of the identification
+     ghost -- as their LAST conjunct, uniformly -- so a reader that has the
+     body open reads (is this slot live, and at which device and inum)
+     straight off it.  The OTHER half is [IcacheInv.islot2]'s, under the
+     itable spinlock, and this accessor does not want it: the commit's ghost
+     step runs inside a disk-write permit where no lock can be taken, and it
+     opens all fifty escrows anyway ([ic_escrow_ns_disjoint]).
+
+     SO THE ONLY THING THE COLLECTION STILL LACKS IS THE PARTITION: that
+     [ipool_inv]'s index [O] together with those fifty identities EXHAUSTS
+     the region's inums.  That fact is [IcacheEscrow.ic_ci_wf]'s [dom ci =
+     dom M] plus [ipool]'s domain, and BOTH live under the itable lock; no
+     resource ties the pool invariant to the escrows directly, because the
+     lock is the only place the two meet (the pool shares [ipool_key] with
+     it, the escrows share [ic_id] with it).  Making it invariant-visible
+     therefore needs one new tie, and the cheapest shape is a QUARTER of
+     [ic_id] parked in [ipool_body] for every slot beside the pure row
+     "[region_inums nib = O ∪ {inum_k | live_k}]": every mover of a slot's
+     identity (iget's recycle, iput's two evictions) already opens the pool
+     invariant, and it is exactly there that the partition changes.  That is
+     lane C's (or a successor lane's) work -- it reaches into [ProofIget]'s
+     and [ProofIput]'s windows, which is why it is not done here. *)
+  Lemma ic_escrow_body_ident cn γfs γi cov logstart k :
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    ∃ (live : bool) (dev inum : mword 32),
+      ic_id cn k (1/2) live dev inum ∗
+      (ic_id cn k (1/2) live dev inum -∗
+         ic_escrow_body cn γfs γi cov logstart k).
+  Proof.
+    iIntros "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - iDestruct "Hpk" as (dev inum v ga) "(H1 & H2 & H3 & H4 & H5 & Hgid)".
+      iExists true, dev, inum. iFrame "Hgid". iIntros "Hgid".
+      iLeft. iExists dev, inum, v, ga. iFrame.
+    - iDestruct "Hout" as (d dev inum) "(H1 & H2 & H3 & Hgid)".
+      iExists true, dev, inum. iFrame "Hgid". iIntros "Hgid".
+      iRight; iLeft. iExists d, dev, inum. iFrame.
+    - iDestruct "Hmid" as (dev inum w) "(H1 & H2 & H3 & H4 & Hgid)".
+      iExists true, dev, inum. iFrame "Hgid". iIntros "Hgid".
+      iRight; iRight; iLeft. iExists dev, inum, w. iFrame.
+    - iDestruct "Hvg" as (dev inum w) "(H1 & H2 & H3 & H4 & H5 & Hgid)".
+      iExists false, dev, inum. iFrame "Hgid". iIntros "Hgid".
+      iRight; iRight; iRight; iLeft. iExists dev, inum, w. iFrame.
+    - iDestruct "Hhd" as (dev inum w) "(H1 & H2 & H3 & H4 & Hgid)".
+      iExists true, dev, inum. iFrame "Hgid". iIntros "Hgid".
+      iRight; iRight; iRight; iRight. iExists dev, inum, w. iFrame.
+  Qed.
+
   (* THE COMMIT'S DOOR (durable-fs-plan.md section 4): every ordinary
      uncached inum's bundle, at ONE ghost step and with no lock taken.
      Read-only -- the rows go straight back -- so it disturbs nothing a
