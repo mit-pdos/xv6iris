@@ -1360,3 +1360,4 @@ FsDurObj.v
 FsDurLedger.v
 IregClean.v
 FsCollect.v
+FsCollectImg.v
