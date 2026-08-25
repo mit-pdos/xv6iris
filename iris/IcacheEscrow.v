@@ -3489,6 +3489,84 @@ Section IcacheEscrow.
     iModIntro. iFrame "Hvld Hdep Htx".
   Qed.
 
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE WRITE ARM AS A WALK CARRIES IT (durable-disk B''-tx)            *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ONE PREDICATE AT [ic_deposit]'S OWN ARITY.  A walk between its [ilock]
+     and its [iunlock] threads the checkout descriptor through its stage
+     statements -- ~56 conjuncts across fifteen files -- and if the arm's
+     [(t, q)] appeared there, every one of those lemmas would gain two
+     binders.  It need not: the transaction id is DETERMINED by the residue
+     the holder keeps, so bundling the two closes the id existentially at
+     the holder's end as well, and [ic_tx_dep cn k s dev inum g] is
+     TEXTUALLY [ic_deposit cn k (DepShr s dev inum g)]'s replacement --
+     same arguments, same position, no new binder anywhere.
+
+     THE SHARE IS FIXED AT A HALF, and that is what makes the bundle
+     re-joinable: [ic_disarm_tx] hands back exactly the descriptor's [q], so
+     the two halves at the descriptor's [t] combine to the whole element
+     [LogInv.log_tx] existentially closes.  A walk therefore hands its
+     [log_tx] in at the lock and gets it back at the unlock, and in between
+     it holds NO token at all -- which is why every interior contract such a
+     walk calls must be the [log_opS]/GEN form. *)
+  Definition ic_tx_dep (cn : ic_names) (k : nat) (s : Qp)
+      (dev inum : mword 32) (g : gname) : iProp Σ :=
+    (∃ t : nat, ic_deposit cn k (DepTx s dev inum g t (1/2))
+                ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt)%I.
+
+  Global Instance ic_tx_dep_timeless cn k s dev inum g :
+    Timeless (ic_tx_dep cn k s dev inum g).
+  Proof. rewrite /ic_tx_dep. apply _. Qed.
+
+  Lemma ic_tx_dep_intro cn k s dev inum g (t : nat) :
+    ic_deposit cn k (DepTx s dev inum g t (1/2)) -∗
+    t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    ic_tx_dep cn k s dev inum g.
+  Proof. iIntros "Hd Ht". iExists t. iFrame. Qed.
+
+  (* the arm and the disarm at that packaging.  They are stated over the two
+     HALVES rather than over [LogInv.log_tx] because this file has no [logG]
+     in its context (see [PoolPeelLic]); the [log_tx] readings are
+     [SpecIlock.ic_arm_tx_log] / [SpecIunlock.ic_disarm_tx_log], one line
+     each over [LogInv.log_tx_halve] / [log_tx_join]. *)
+  Lemma ic_arm_tx_half (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool) (t : nat) :
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepShr s dev inum g) -∗
+    t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    t ↪[ln_tx icfg_log]{#(1/2)} tt ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v
+      ∗ ic_tx_dep cn k s dev inum g.
+  Proof.
+    iIntros (HE) "#Hesc Hvld Hdep Ht1 Ht2".
+    iMod (ic_arm_tx E cn γfs γi cov logstart k s dev inum g v t (1/2)%Qp HE
+            with "Hesc Hvld Hdep Ht1") as "[Hvld Hdep]".
+    iModIntro. iFrame "Hvld".
+    iApply (ic_tx_dep_intro with "Hdep Ht2").
+  Qed.
+
+  Lemma ic_disarm_tx_half (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool) :
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_tx_dep cn k s dev inum g ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v
+      ∗ ic_deposit cn k (DepShr s dev inum g)
+      ∗ ∃ t : nat, t ↪[ln_tx icfg_log]{#(1/2)} tt
+                   ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt.
+  Proof.
+    iIntros (HE) "#Hesc Hvld Hdep".
+    iDestruct "Hdep" as (t) "[Hdep Ht2]".
+    iMod (ic_disarm_tx E cn γfs γi cov logstart k s dev inum g v t (1/2)%Qp HE
+            with "Hesc Hvld Hdep") as "(Hvld & Hdep & Ht1)".
+    iModIntro. iFrame "Hvld Hdep". iExists t. iFrame.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  4d.  THE READ ARM (durable-fs-plan.md section 3, [ilock] with no      *)
   (*       transaction; durable-disk B''-join)                             *)

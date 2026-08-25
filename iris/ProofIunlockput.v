@@ -632,6 +632,57 @@ Section ProofIunlockputMain.
     { iApply (log_opS_op with "Hlogop Htx"). }
   Qed.
 
+  (* THE TWO TRANSACTIONAL FORMS (durable-disk B''-tx): the disarm is a
+     ghost step BEFORE the call, so both are derivations and nothing of
+     iunlockput's own proof is re-run. *)
+  Lemma wp_iunlockput_tx_sconf
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (n : nat)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                                  gil gisl cov logstart bmapstart inodestart
+                                  nib size dev k qi s gy inum dn' bm' n
+                                  pidv dq dqb dqs m K eb b lks Vpr.
+  Proof.
+    apply wp_iunlockput_tx_of_sconf.
+    apply wp_iunlockput_sconf.
+  Qed.
+
+  Lemma wp_iunlockput_tx_gen
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                                gil gisl cov logstart bmapstart inodestart nib
+                                size dev k qi s gy inum dn' bm' n Sb crb cru
+                                crz e0 pidv dq dqb dqs m K eb b lks Vpr.
+  Proof.
+    apply wp_iunlockput_tx_of_gen.
+    apply wp_iunlockput_gen.
+  Qed.
+
 End ProofIunlockputMain.
 
 End IunlockputProof.

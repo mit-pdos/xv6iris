@@ -88,6 +88,7 @@ Require Import InodeLock.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import LogInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -182,6 +183,160 @@ Definition wp_iunlock_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ---- THE TRANSACTIONAL FORM (durable-disk B''-tx) ---------------------
+   [wp_iunlock_sconf_body] with the checkout descriptor at the write arm and
+   [LogInv.log_tx] handed back.  [ProofIunlock] proves it by DERIVATION
+   ([wp_iunlock_tx_of_sconf]): the disarm is a fupd BEFORE the call, so no
+   line of iunlock's own proof is re-run. *)
+Definition wp_iunlock_tx_sconf_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+
+    (gs : list gname)
+    (gfs : fs_names) (gi : gname)
+    (cn : ic_names)
+    (gil gisl : gname)
+    (cov : gset Z) (logstart : Z)
+    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+    (dn' : dinode) (bm' : blkmap)
+    (pidv : mword 32) (dq : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (p : mword 64)
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
+  let ip : mword 64 := ientry k in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iunlock <= K)%nat ->
+  (* the entry is slot [k]: a0 = ip, and the null test dies here *)
+  (k < NINODE)%nat ->
+
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* THE FRESHNESS PREMISE: iunlock's own [holdingsleep] acquires and
+     releases the sleeplock's inner "sleep lock" spinlock internally, so
+     the caller must already hold only locks BELOW its rank. *)
+  locks_below lks "sleep lock" ->
+  sie_cap_gpr KT1 m K b p -∗
+  cpu_own 0 eb p b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  (* the [ref] words, and the entry's content escrow *)
+  itable_inv -∗
+  ic_escrow cn gfs gi cov logstart k -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
+  (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
+  sleeplocked_q gisl s (i_lock ip) pidv -∗
+  proc_priv_bare p pidv Vpr -∗
+  (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
+  procs_inv gs -∗
+  (* THE CHECKED-OUT ENTRY, surrendered back into the escrow.  Exactly
+     SpecIlock v3's postcondition, and exactly [ic_swap_park]'s input;
+     [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation, and
+     the descriptor half is what selects this holder's own arm (§14.8). *)
+  (* ---- THE WRITE ARM COMES HOME (durable-fs-plan.md section 3, [ilock];
+     durable-disk B''-tx).  This is the ONLY difference from
+     [wp_iunlock_sconf_body]: the descriptor arrives at [DepTx] with the
+     holder's residue beside it ([IcacheEscrow.ic_tx_dep]), and the
+     postcondition hands [LogInv.log_tx] back whole.  [ic_disarm_tx] returns
+     exactly the share the descriptor recorded, which is what makes the two
+     halves rejoin. *)
+  ic_tx_dep cn k s dev inum g -∗
+  i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+  i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
+  i_valid ip ↦₄ valid_word true -∗
+  ic_loaded gfs gi cov logstart k inum dn' bm' -∗
+  (* THE GENERATION'S TYPE WITNESS, back where it came from (design
+     fs-icache.md 17.6 (5), ratified 17.7).  [ic_payload]'s TRUE polarity is
+     what this park rebuilds, so the witness for the record being parked is
+     part of what the parker owes.  Every existing caller threads ilock's
+     copy unchanged: none of the five (fileread, filestat, namex, ireclaim,
+     iunlockput) alters [di_type], so [dn'] is ilock's [dn]. *)
+  ity_shot g (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, back with the payload it rode out on
+     (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- the predicate [ic_swap_park] rebuilds --
+     now carries [ifreeze_off], so the parker owes it exactly as it owes the
+     type witness above.  It costs no caller anything new: this IS the token
+     [SpecIlock]'s post handed out, unspent (the one mover that touches it,
+     [SpecIupdate.wp_iupdate_link]'s freeze-pin arm, borrows and returns it),
+     so every ilock/iunlock pair threads one hypothesis through untouched. *)
+  ifreeze_off (bv_unsigned inum) -∗
+  wp_next b p (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr KT1 mf K b p -∗
+      cpu_own 0 eb p b lks -∗
+      pc_is ret_tgt -∗
+      proc_priv_bare p pidv Vpr -∗
+      (* the caller's share, back whole, at ITS OWN fraction and device --
+         AND AT THE GENERATION IT CAME IN ON.  The share the caller still
+         holds is what denies [IcacheRef.live_gen_bump] the slot's whole
+         unit, so no recycler can move the generation under it; the erased
+         form was a deliberate forget at this boundary and it cost every
+         caller the ability to carry an [ity_shot] across its own
+         [iunlock]/re-[ilock] window.  A consumer that does not want the
+         name applies [IcacheRef.inode_shr_gen_forget] here. *)
+      inode_shr_gen k s dev inum g -∗
+      (* the transaction's token, whole again *)
+      log_tx icfg_log -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* THE [log_tx] READING OF THE DISARM: the id goes back into the
+   existential, so nothing above this line ever sees one. *)
+Section IunlockTxArm.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+
+  Lemma ic_disarm_tx_log (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool) :
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_tx_dep cn k s dev inum g ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v
+      ∗ ic_deposit cn k (DepShr s dev inum g)
+      ∗ log_tx icfg_log.
+  Proof.
+    iIntros (HE) "#Hesc Hvld Hdep".
+    iMod (ic_disarm_tx_half E cn γfs γi cov logstart k s dev inum g v HE
+            with "Hesc Hvld Hdep") as "(Hvld & Hdep & Hts)".
+    iDestruct "Hts" as (t) "[Ht1 Ht2]".
+    iModIntro. iFrame "Hvld Hdep".
+    iApply (log_tx_join icfg_log t with "Ht1 Ht2").
+  Qed.
+End IunlockTxArm.
+
+Lemma wp_iunlock_tx_of_sconf
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    (gs : list gname)
+    (gfs : fs_names) (gi : gname)
+    (cn : ic_names)
+    (gil gisl : gname)
+    (cov : gset Z) (logstart : Z)
+    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+    (dn' : dinode) (bm' : blkmap)
+    (pidv : mword 32) (dq : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (p : mword 64)
+    (b : bool) (lks : gset string) (Vpr : pprivate) :
+  wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
+                        dn' bm' pidv dq m K eb p b lks Vpr ->
+  wp_iunlock_tx_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
+                           dn' bm' pidv dq m K eb p b lks Vpr.
+Proof.
+  cbv beta delta [wp_iunlock_sconf_body wp_iunlock_tx_sconf_body].
+  intros Hplain pcE ip ret_tgt HK Hk Ha0 Hbelow.
+  iIntros "Hcg Hown Htext Hpc #Hitbl #Hesc Hslk Hslkd Hppid Hprocs
+           Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hcont".
+  iApply fupd_wp.
+  iMod (ic_disarm_tx_log ⊤ cn gfs gi cov logstart k s dev inum g true
+          ltac:(solve_ndisj) with "Hesc Hivalid Hdep")
+    as "(Hivalid & Hdep & Htx)".
+  iModIntro.
+  iApply (Hplain HK Hk Ha0 Hbelow
+            with "Hcg Hown Htext Hpc Hitbl Hesc Hslk Hslkd Hppid Hprocs
+                  Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz [Htx Hcont]").
+  iIntros (CIDx Hqx mf) "%Hcs Hcg Hown Hpc Hppid Hshr".
+  iApply ("Hcont" $! CIDx Hqx mf with "[%] Hcg Hown Hpc Hppid Hshr Htx").
+  exact Hcs.
+Qed.
+
 Module Type IUNLOCK.
   Parameter wp_iunlock_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -198,4 +353,21 @@ Module Type IUNLOCK.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p b lks Vpr.
+  (* the transactional form -- [ProofIunlock] defines it by
+     [wp_iunlock_tx_of_sconf]. *)
+  Parameter wp_iunlock_tx_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+
+      (gs : list gname)
+      (gfs : fs_names) (gi : gname)
+      (cn : ic_names)
+      (gil gisl : gname)
+      (cov : gset Z) (logstart : Z)
+      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (pidv : mword 32) (dq : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string) (Vpr : pprivate),
+      wp_iunlock_tx_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev
+                               inum dn' bm' pidv dq m K eb p b lks Vpr.
 End IUNLOCK.

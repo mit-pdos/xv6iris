@@ -2682,6 +2682,30 @@ Section ProofIlockMain.
                       Hsl Hstok Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
   Qed.
 
+  (* THE TRANSACTIONAL FORM (durable-disk B''-tx): the same code, the same
+     proof, plus one ghost step on the deposit the plain post already hands
+     out.  [SpecIlock.wp_ilock_tx_of_sconf] is the whole derivation. *)
+  Lemma wp_ilock_tx_sconf
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (gfs : fs_names) (gi : gname)
+      (cn : ic_names)
+      (gil gisl : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+      (pidv : mword 32) (dq dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+                             cov logstart inodestart nib k s g o dev inum
+                             pidv dq dqs m K eb b lks Vpr.
+  Proof.
+    apply wp_ilock_tx_of_sconf.
+    apply wp_ilock_sconf.
+  Qed.
+
 End ProofIlockMain.
 
 End IlockProof.
