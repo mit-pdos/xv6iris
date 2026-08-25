@@ -1326,7 +1326,8 @@ Section BootAlloc.
   Proof.
     intros Hbf Himg.
     destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
-                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq).
+                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq &
+                      Hbare & Hnoself).
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.

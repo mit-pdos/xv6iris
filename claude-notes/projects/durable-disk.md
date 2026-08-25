@@ -82,8 +82,14 @@ carries the file system across eras and `Himg` is deleted (lane E).
   `iris/FsDurDefer.v`; `FsDurWire.v` is the rejected kinds tie (delete
   in lane C).
 - Image checks (14) `fs_region_bare` and (15) `fs_root_no_self` in
-  `FsImg`/`FsImgCheck` (not yet wired into `fs_boot_image_wf`; taken as
-  premises by `FsDurImg`).
+  `FsImg`/`FsImgCheck`, and (lane C-img) they are now the LAST two
+  conjuncts of `FsCfgBoot.fs_boot_image_wf`, discharged in
+  `FsAdequacyImg.fsimg_image_wf` off those two citations.
+- **The image's snapshot tie (lane C-img):** `FsDurImg.img_snap_ok`
+  (`fs_boot_image_wf` ⊢ `snap_ok (img_state …) (fs_restrict … home)`),
+  `img_P_dur_alloc`, `img_boot_P_fs_dur` (the boot point, `P_fs_alloc_clean`
+  plus `P_dur` at the same `D0`), witnessed at the literal image by
+  `FsAdequacyImg.fsimg_snap_ok`.
 - The demolition of the old link ledger: slice 6a only (the root clause).
 
 ## STILL PRESENT BUT SUPERSEDED (delete when their consumers move)
@@ -149,6 +155,41 @@ reusable is on `main`.
   `sk_links` from `img_link_valid`; the (14)/(15) premises through
   `SystemAdequacy` off `FsImgCheck`); timelessness; DELETE the superseded
   families (previous section) incl. `fdn_*`/`riscv_dview_name`.
+
+  **AS LANDED — THE IMAGE HALF ONLY (lane C-img).**  The image's tie is
+  `FsDurImg.img_snap_ok`: `FsCfgBoot.fs_boot_image_wf dk ndisk sb nib cov`
+  ALONE yields `snap_ok (img_state (fs_blocks dk) sb nib) (fs_restrict
+  (fs_blocks dk) (fs_home_set cov (sb_logstart sb)))` — the state is the
+  decoder already in the tree (`img_state`/`img_nodes`; no second one
+  exists) and the map is exactly `FsCrash.P_fs_alloc_clean`'s `fr_D`.
+  Conjuncts (14) `fs_region_bare` and (15) `fs_root_no_self` are WIRED INTO
+  `fs_boot_image_wf`, last so no destructuring pattern moves; the sweep was
+  four sites (`BootShared`, `ProofMain`, `FsDurImg`'s two lemmas — which
+  therefore LOST their two extra premises — and the discharge in
+  `FsAdequacyImg.fsimg_image_wf`, two `FsImgCheck` citations, no new
+  computation).  The used-set coupling is W3/W4/W5 through three pure
+  readings: `img_node_owns_slot` (a node's own block IS a `FsImg.fs_slot` of
+  its record), `img_owned_block` (hence in `fs_inode_blocks`, hence in W3's
+  `[fs_data_start, size)`) and `img_used_of_blocks` (hence bit-set, W5); a
+  FREE inum owns nothing, which is conjunct (14)'s second use; `sk_disj` is
+  W4's `NoDup` via `fs_inode_blocks_disjoint`.  The record tie is
+  `diblk_bytes_split` + `img_rec_in_blk` (the pure half of
+  `FsStateInode.rec_owned_at_diblk`; `diblk_bytes_split` belongs in
+  `DinodeEnc.v`), `sk_links` is `img_link_valid`, `snap_local` is
+  `img_inode_local`.  Boot: `FsDurImg.img_P_dur_alloc` (`⊢ |==> P_dur D0`
+  off the bundle alone — the snapshot needs NO resource from anyone, which
+  is what makes this lane's `P_fs` change arity-free) and
+  `img_boot_P_fs_dur`, which is `P_fs_alloc_clean` with `P_dur (fr_D r)`
+  beside it at the same `D0`; W2 discharges its clean-log premise, so no
+  caller gains one.  `FsCrash.v` is UNTOUCHED.  Non-vacuity at the literal
+  image: `FsAdequacyImg.fsimg_snap_ok`.  RETIRED (nothing consumed them):
+  `FsDurImg`'s 3b' kind assignment `img_kinds*`/`img_region_*`/
+  `img_dur_seed` and its `FsDurObj`/`FsDurWire` imports — `FsDurWire.v` now
+  has NO importer at all.  STILL PRESENT AND SUPERSEDED: `fs_dur_of_image`/
+  `fs_dur_view_of_image` (the resource-MOVING image conversion; lane E says
+  whether the boot mint still wants it).  REMAINS for lane C proper:
+  `P_fs`'s own conjunct, the two commit permits, the receipt, timelessness,
+  and the `fdn_*`/`riscv_dview_name`/`log_psi_*` deletions.
 - [ ] **Lane D — the spike theorem (plan §5).**  `ProofSysMknod` keeps
   `create`'s `made` clause (today discarded at its `iDestruct`, ~`:1690`);
   prove `mknod_durable` off the snapshot; quote it here.  Then the
@@ -158,8 +199,8 @@ reusable is on `main`.
   instance minted from the current snapshot by `fs_state_of_ledger` +
   the era-only extras, distributed into region/bitmap/escrow/pool
   (`fs_cfg_alloc`, `FsBoot`, `BootShared` lose every image premise;
-  `image_dinode_fs_dinode` disappears); wire (14)/(15) into
-  `fs_boot_image_wf` or retire that predicate to era 0; the `Pdur`
+  `image_dinode_fs_dinode` disappears); [(14)/(15) are already conjuncts
+  of `fs_boot_image_wf` — lane C-img did that]; the `Pdur`
   parameter on `riscv_power_adequacy` (3b''s finding: any boot-time fact
   about the durable bundle needs it); then Stage I: delete `Himg`/
   `fs_boot_image_eras`/`fsimg_at_every_era`; adequacy assumes era 0's

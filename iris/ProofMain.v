@@ -2024,7 +2024,8 @@ Section ProofMain.
        other nine are what [FirstTok.fs_geom_ok_of_image] and
        [FirstTok.first_fsinit_pures_of_image] consume at +0x9e. *)
     destruct Himg as (Hiwf & Hirw & Hinin & Hinib32 & Hnib0 & Hinibeq &
-                      Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq).
+                      Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq &
+                      Hibare & Hinoself).
     assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".

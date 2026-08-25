@@ -41,6 +41,9 @@ Require Import FsCfgBoot.       (* [fs_boot_image_wf], moved down at stage (f) *
 Require Import SystemAdequacy.  (* the two generic theorems, and [xv6Σ] *)
 Require Import FsImgDisk.       (* [fsimg_dk] / [fsimg_D0] / [fsimg_recovery] *)
 Require Import FsImgCheck.      (* what the image MEANS as a file system *)
+Require Import LogDefs.         (* [fs_restrict] / [fs_home_set] *)
+Require Import FsDurSnap.       (* [snap_ok] -- the durable snapshot's tie *)
+Require Import FsDurImg.        (* [img_state] / [img_snap_ok] *)
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -132,7 +135,41 @@ Proof.
   split; [rewrite xv6_disk_bytes_z; cbv [fsimg_sb sb_size]; lia |].
   (* (13) the file-nlink EQUALITY sweep -- CITED, like (1)/(2)/(10):
      [FsImgCheck.fsimg_links_eq], and [fsimg_P] IS [fs_blocks fsimg_dk]. *)
-  exact fsimg_links_eq.
+  split; [exact fsimg_links_eq |].
+  (* (14) every FREE record of the region is BARE -- CITED:
+     [FsImgCheck.fsimg_region_bare], the same thirteen inode blocks the two
+     region sweeps above read. *)
+  split; [exact fsimg_region_bare |].
+  (* (15) no live non-dot root record names the root -- CITED:
+     [FsImgCheck.fsimg_root_no_self], one O(nrec) pass over the root. *)
+  exact fsimg_root_no_self.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 2b. THE NON-VACUITY WITNESS FOR THE DURABLE SNAPSHOT (plan section 7).  *)
+(*                                                                        *)
+(* [FsDurImg.img_snap_ok] is hedged behind [fs_boot_image_wf]'s fifteen     *)
+(* conjuncts, so the plan's vacuity discipline owes a witness AT THE REAL   *)
+(* INSTANCE -- xv6's own superblock layout, not a made-up one.  This is     *)
+(* it, and it costs NO computation: it is [fsimg_image_wf] above, whose     *)
+(* every image conjunct is a [FsImgCheck] citation.  What it says is that   *)
+(* the mkfs image really does denote an abstract file-system state whose    *)
+(* encoding is the image's own committed home blocks, with the used-set     *)
+(* coupling and the per-inode local clauses -- i.e. that the durable        *)
+(* snapshot the WAL carries is not empty at era 0.                          *)
+(*                                                                        *)
+(* IT MUST BE HERE AND NOT INSIDE A SECTION: a [vm_compute] on a goal       *)
+(* containing a section variable hangs (durable-notes.md), and every        *)
+(* literal-image fact this cites is already a closed lemma of              *)
+(* [FsImgCheck].                                                           *)
+(* ---------------------------------------------------------------------- *)
+Theorem fsimg_snap_ok :
+  snap_ok (img_state fsimg_P fsimg_sb fsimg_nib)
+          (fs_restrict fsimg_P
+             (fs_home_set fsimg_cov (FsImg.sb_logstart fsimg_sb))).
+Proof.
+  exact (img_snap_ok FsImgDisk.fsimg_dk XV6_DISK_BYTES fsimg_sb fsimg_nib
+           fsimg_cov fsimg_image_wf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)

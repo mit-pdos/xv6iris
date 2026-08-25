@@ -2432,7 +2432,26 @@ Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
      row's [A] at era 0.  Cited at the literal image by
      [FsImgCheck.fsimg_links_eq], exactly as (10) cites [fsimg_parse_sb], so
      this costs the adequacy cone no new computation. *)
-  /\ FsImg.fs_links_eq (FsCrash.fs_blocks dk) sb = true.
+  /\ FsImg.fs_links_eq (FsCrash.fs_blocks dk) sb = true
+  (* ---- (14)/(15) THE TWO DURABLE-SIDE SWEEPS (durable-disk lane C) ----
+     Both are consumed by [FsDurImg], whose header (2)/(3) says why each is
+     needed and neither derivable: (14) [FsImg.fs_region_bare] -- every
+     type-0 record of the region has zero size and thirteen zero addresses,
+     which is what makes [FsStateInode.inode_local] true of a FREE record
+     and what makes a free inum's node own NO block; (15)
+     [FsImg.fs_root_no_self] -- no live record of the root names the root
+     under a name other than ["."] or [".."], which reconciles the image's
+     ticket discipline with the link RA's and so proves
+     [FsDurImg.img_link_valid].  They ride in this bundle rather than as
+     two extra premises on every consumer because the bundle is what both
+     adequacy theorems already carry; cited at the literal image by
+     [FsImgCheck.fsimg_region_bare] / [fsimg_root_no_self], exactly as
+     (1)/(2)/(10)/(13) are, so the adequacy cone gains no computation.
+     THEY GO LAST, so that no existing destructuring pattern moves
+     (durable-notes.md, "when a new conjunct goes into a predicate forty
+     proofs destructure, put it LAST"). *)
+  /\ FsImg.fs_region_bare (FsCrash.fs_blocks dk) sb nib = true
+  /\ FsImg.fs_root_no_self (FsCrash.fs_blocks dk) sb = true.
 
 (* ====================================================================== *)
 (*  THE FILE SYSTEM'S BOOT-ERA OUTPUT, AS ONE ROW.                         *)

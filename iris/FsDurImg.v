@@ -1,9 +1,20 @@
 (* ====================================================================== *)
 (* FsDurImg.v -- THE DURABLE FILE SYSTEM, BUILT FROM AN IMAGE              *)
 (*                                                                        *)
-(* durable-disk 2c-img, leaf 2.  Design of record:                        *)
-(* claude-notes/design/fs-state.md sections 1-4;                          *)
-(* claude-notes/projects/durable-disk.md item 2c, finding (iv).           *)
+(* durable-disk 2c-img, leaf 2, and lane C's image half.  Design of        *)
+(* record: claude-notes/design/durable-fs-plan.md sections 2, 4a, 5 (the   *)
+(* SNAPSHOT design); claude-notes/design/fs-state.md sections 1-4 for the  *)
+(* predicate itself.                                                       *)
+(*                                                                        *)
+(* WHAT A READER SHOULD LOOK AT FIRST: SECTION 11.  Under the snapshot     *)
+(* ruling the durable instance is never updated and never handed anyone    *)
+(* else's resource -- it is ALLOCATED from a value and pure facts -- so    *)
+(* the image side of the boot is the ONE pure theorem [img_snap_ok]        *)
+(* (section 11) plus [FsDurSnap.P_dur_alloc], and section 12 is the boot   *)
+(* point.  Sections 3-10 are the older RESOURCE-MOVING conversion, kept    *)
+(* because nothing has replaced its distribution of the image's blocks     *)
+(* into an era instance (lane E); the 3b' KIND ASSIGNMENT that used to     *)
+(* ride beside it is deleted -- it was the rejected pure-kinds tie.        *)
 (*                                                                        *)
 (* [FsCrash.P_fs_alloc] fills the durable byte map [riscv_dview_name] with *)
 (* [LogDefs.fs_dbytes D0] -- the flat byte elements of the boot era's      *)
@@ -46,7 +57,11 @@
 (*     would be false of a garbage type-0 record.  [FsImg.fs_region_bare]  *)
 (*     is the sweep, in [FsImg.fs_region_free]'s own idiom and reading the *)
 (*     same thirteen inode blocks; [FsImgCheck.fsimg_region_bare]          *)
-(*     discharges it at the literal image.                                 *)
+(*     discharges it at the literal image.  It is also what makes a free   *)
+(*     inum own NO BLOCK, which section 11's used-set coupling needs.      *)
+(*     SINCE LANE C IT IS CONJUNCT (14) OF [FsCfgBoot.fs_boot_image_wf]    *)
+(*     rather than a separate premise -- the bundle is what every consumer *)
+(*     already carries, and the discharge is still the same citation.      *)
 (*                                                                        *)
 (* (3) THE LINK FAMILY'S VALIDITY IS A THEOREM, and it costs ONE MORE      *)
 (*     IMAGE SWEEP: CONJUNCT (15).  [FsState.fs_boot_alloc_at] needs       *)
@@ -61,13 +76,14 @@
 (*     out, and section 9 then PROVES [img_link_valid] -- W9 forces the    *)
 (*     image to have exactly ONE directory, so the family is one authority *)
 (*     per inum composed with the root's outgoing tokens, and the tokens   *)
-(*     are covered record by record.                                       *)
+(*     are covered record by record.  Conjunct (15) of                     *)
+(*     [FsCfgBoot.fs_boot_image_wf] since lane C, for (14)'s reason.       *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac excl numbers.
-From iris.base_logic.lib Require Import iprop own ghost_map.
+From iris.base_logic.lib Require Import iprop own ghost_map mono_nat.
 Require Import SailStdpp.Operators_mwords.
 Require Import RiscvPtsto.
 (* EARLY, before the block layer: [FsState] exports four names that collide
@@ -76,6 +92,7 @@ Require Import RiscvPtsto.
 Require Import FsState.
 Require Import BioDefs.
 Require Import BitmapEnc.
+Require Import BlockWords.      (* [ind_bytes] -- [FsDurSnap.sk_ind]'s encoder *)
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import FsTree.
@@ -98,10 +115,13 @@ Require Import Xv6G.
 (* LAST: it re-exports [FsStateDefs], whose [byte_range]/[blk_owned] must
    win over the block layer's twins. *)
 Require Import FsDurBytes.
-(* the durable tie's vocabulary (durable-disk 3b'): the object/kind algebra
-   and the bridge [FsCrash.P_fs_alloc] now has to be handed at the image *)
-Require Import FsDurObj.
-Require Import FsDurWire.
+(* THE DURABLE SIDE, AND IT IS THE SNAPSHOT ONE (durable-disk lane C):
+   [snap_ok] / [P_dur] / [P_dur_alloc].  It re-exports [FsState], so it
+   comes after [FsDurBytes] for the same collision reason.  The 3b' object
+   and kind algebras ([FsDurObj]/[FsDurWire]) are NOT imported any more --
+   the pure-kinds tie they carry is the REJECTED design (plan section 8),
+   and section 11's header says what replaced it here. *)
+Require Import FsDurSnap.
 
 Local Open Scope Z_scope.
 
@@ -1243,10 +1263,9 @@ Section DurImgMain.
 
   Lemma fs_dur_of_image (g : gname) (dk : Z -> bv 8) (ndisk : nat)
       (sb : fs_sb) (nib : nat) (cov : gset Z) :
+    (* the two image sweeps this file's header (2)/(3) names are conjuncts
+       (14)/(15) of the bundle since durable-disk lane C *)
     fs_boot_image_wf dk ndisk sb nib cov ->
-    (* the two image sweeps this file's header (2)/(3) name *)
-    fs_region_bare (fs_blocks dk) sb nib = true ->
-    fs_root_no_self (fs_blocks dk) sb = true ->
     fs_dbelems g (fs_dbytes (fs_restrict (fs_blocks dk)
                               (fs_home_set cov (FsImg.sb_logstart sb))))
     ⊢ |==> ∃ Gd : fs_dur_names,
@@ -1268,7 +1287,7 @@ Section DurImgMain.
              blk_owned (fs_gamma_D g Gd) b (fs_blocks dk b)).
   Proof.
     intros (Hwf & Hrw & Hnin & Hnib32 & Hnibpos & Hnibq & Hcovin & Hcovmeta
-            & Hcovdata & Hparse & Hnib16 & Hndisk & Hlinkeq) Hbare Hns.
+            & Hcovdata & Hparse & Hnib16 & Hndisk & Hlinkeq & Hbare & Hns).
     (* the link family's own law, PROVED (section 9h) *)
     pose proof (img_link_valid (fs_blocks dk) sb nib Hwf Hrw Hlinkeq Hns Hnin)
       as Hlink.
@@ -1491,8 +1510,6 @@ Section DurImgMain.
   Corollary fs_dur_view_of_image (g : gname) (dk : Z -> bv 8) (ndisk : nat)
       (sb : fs_sb) (nib : nat) (cov : gset Z) :
     fs_boot_image_wf dk ndisk sb nib cov ->
-    fs_region_bare (fs_blocks dk) sb nib = true ->
-    fs_root_no_self (fs_blocks dk) sb = true ->
     fs_dbelems g (fs_dbytes (fs_restrict (fs_blocks dk)
                               (fs_home_set cov (FsImg.sb_logstart sb))))
     ⊢ |==> ∃ Gd : fs_dur_names,
@@ -1503,9 +1520,9 @@ Section DurImgMain.
                        ∖ img_owned (fs_blocks dk) sb nib,
              blk_owned (fs_gamma_D g Gd) b (fs_blocks dk b)).
   Proof.
-    intros Himg Hbare Hns.
+    intros Himg.
     iIntros "Hd".
-    iMod (fs_dur_of_image g dk ndisk sb nib cov Himg Hbare Hns with "Hd")
+    iMod (fs_dur_of_image g dk ndisk sb nib cov Himg with "Hd")
       as (Gd) "(Htopa & Htfr & Hst & Hrem)".
     iModIntro. iExists Gd. iFrame "Htfr Hrem".
     rewrite /FsState.fs_view. iExists (img_state (fs_blocks dk) sb nib).
@@ -1515,304 +1532,533 @@ Section DurImgMain.
 End DurImgMain.
 
 (* ===================================================================== *)
-(* 11.  THE IMAGE'S KIND ASSIGNMENT, AND THE DURABLE TIE AT IT            *)
-(*      (durable-disk 3b')                                                *)
+(* 11.  THE IMAGE'S SNAPSHOT TIE: [FsDurSnap.snap_ok] AT THE IMAGE        *)
+(*      (durable-disk lane C, image half; plan sections 2, 4a, 5)         *)
 (*                                                                        *)
-(*  [FsCrash.P_fs_alloc] used to fill [P_wf] by an unconditional re-base   *)
-(*  of a flat byte blob.  With the flip the durable body carries the PURE  *)
-(*  tie [FsDurWire.kinds_of_state] beside the blob, so the boot owes THREE *)
-(*  pure facts about the image: a kind per home block, that every home     *)
-(*  block's bytes ARE that kind's encoding ([dwire_bridge]), and that the  *)
-(*  assignment agrees with the image's own abstract state at the image's   *)
-(*  own geometry.  All three are here, and all three are PURE -- nothing   *)
-(*  in this section mentions a resource.                                   *)
+(*  WHAT THIS SECTION REPLACES.  Sections 3-7 and 10 build the durable    *)
+(*  instance by MOVING the boot's byte elements into it, and the flip's   *)
+(*  pure KIND ASSIGNMENT ([img_kinds*], [img_dur_seed]) used to ride      *)
+(*  beside them.  Under the SNAPSHOT ruling (plan section 2) nothing is   *)
+(*  moved and nothing is ever updated: [FsDurSnap.P_dur D] is allocated   *)
+(*  from NOTHING but the pure tie [FsDurSnap.snap_ok S D], so the whole   *)
+(*  image side of the boot is ONE pure theorem -- [img_snap_ok] -- plus   *)
+(*  [FsDurSnap.P_dur_alloc].  The kind assignment and its seed were the   *)
+(*  rejected pure-kinds tie (plan section 6, section 8's third bullet)    *)
+(*  and are DELETED with this lane; nothing consumed them.                *)
 (*                                                                        *)
-(*  THE ASSIGNMENT IS THE OBVIOUS ONE and its three arms are exactly the   *)
-(*  three [kind_write_ok] discharges the suppliers use: the bitmap block   *)
-(*  is the image's own bit set, a block of the inode region is its own     *)
-(*  sixteen records, and everything else is its bytes.  The region arm     *)
-(*  takes [k mod 16] rather than [k] so that the function is TOTAL in the  *)
-(*  slot index: [ko_recwf] quantifies over every [j : nat], and a record   *)
-(*  read at a slot past the block's sixteen is not a record of the image   *)
-(*  at all (it would name an inum in the NEXT block, whose decode says     *)
-(*  nothing about this one).  [di_recs] reads only [0..15], where          *)
-(*  [k mod 16 = k], so nothing else ever sees the wrap.                    *)
+(*  THE STATE AND THE MAP.  [S] is [img_state] (section 8) -- the SAME    *)
+(*  decoder sections 8/10 read the image with, so no second decoder       *)
+(*  exists -- and [D] is the clean image's committed home map             *)
+(*  [fs_restrict (fs_blocks dk) (fs_home_set cov logstart)], which is     *)
+(*  exactly the [fr_D] of the record [FsCrash.P_fs_alloc_clean] mints.    *)
+(*                                                                        *)
+(*  WHERE EACH CLAUSE COMES FROM.  The three byte ties are the PURE       *)
+(*  halves of what sections 5/6 do with resources: the record from        *)
+(*  [IcacheBoot.diblk_bytes_surj] + [FsImg.fs_dinode_of_diblk] (11a), the *)
+(*  data blocks from [FsImg.fs_data_of_addr] and the indirect block from  *)
+(*  [FsImg.fs_ind_bytes_round_trip] (11b).  THE USED-SET COUPLING -- the  *)
+(*  one whole-map clause the plan sanctions (section 4a) -- is W3/W4/W5:  *)
+(*  a node's own block is a [FsImg.fs_slot] of its record (11b), hence a  *)
+(*  member of [FsImg.fs_inode_blocks] (W3's range bound), hence marked in *)
+(*  use (W5) and above [fs_data_start] and so no metadata block; and two  *)
+(*  nodes cannot share one because W4 says [fs_used_blocks] has no        *)
+(*  duplicate.  A FREE inum owns no block at all -- that is conjunct      *)
+(*  (14)'s ([FsImg.fs_region_bare]) second use, beside [inode_local].     *)
+(*  [sk_links] is section 9h's [img_link_valid] and [snap_local] is       *)
+(*  section 2's [img_inode_local]; both were already proved.              *)
 (* ===================================================================== *)
 
-Definition img_kinds (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-  : Z -> blk_kind :=
-  fun b =>
-    if decide (b = FsImg.sb_bmapstart sb)
-    then KBitmap (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb)))
-    else if decide (FsImg.sb_inodestart sb <= b
-                    /\ b < FsImg.sb_inodestart sb + Z.of_nat nib)
-    then KInode (fun k : nat =>
-                   img_node P sb (16 * (b - FsImg.sb_inodestart sb)
-                                  + Z.of_nat (k mod 16)%nat))
-    else KData (P b).
+(* ---- 11a.  A RECORD SITS AT ITS SLOT, PURELY ------------------------- *)
 
-Lemma img_kinds_at_bmap (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
-  img_kinds P sb nib (FsImg.sb_bmapstart sb)
-  = KBitmap (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))).
-Proof. rewrite /img_kinds decide_True //. Qed.
-
-Lemma img_kinds_at_region (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (j : Z) :
-  FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
-  0 <= j -> j < Z.of_nat nib ->
-  img_kinds P sb nib (FsImg.sb_inodestart sb + j)
-  = KInode (fun k : nat => img_node P sb (16 * j + Z.of_nat (k mod 16)%nat)).
+(*  [DinodeEnc.diblk_bytes] SPLIT at one slot -- the shape
+    [FsDurSnap.rec_in_blk] is stated in, and the pure content of
+    [FsStateInode.rec_owned_at_diblk].  FOR RELOCATION: it belongs beside
+    [DinodeEnc.diblk_bytes_lookup]; it is here because an additive change
+    to a file that low rebuilds its whole cone on every iteration
+    (durable-notes.md).                                                    *)
+Lemma diblk_bytes_split (ds : list dinode) (k : nat) :
+  Forall dinode_wf ds -> (k < length ds)%nat ->
+  exists pre post,
+    diblk_bytes ds = (pre ++ dinode_bytes (ds !!! k) ++ post)%list
+    /\ length pre = (64 * k)%nat.
 Proof.
-  intros Hgeo Hj0 Hjn. rewrite /img_kinds.
-  rewrite decide_False; [| lia].
-  rewrite decide_True; [| lia].
-  replace (FsImg.sb_inodestart sb + j - FsImg.sb_inodestart sb) with j
-    by lia.
-  reflexivity.
+  revert k. induction ds as [| d ds IH]; intros k Hall Hk;
+    [simpl in Hk; lia |].
+  apply Forall_cons in Hall as [Hd Hall].
+  destruct k as [| k].
+  - exists [], (diblk_bytes ds).
+    rewrite diblk_bytes_cons. split; reflexivity.
+  - simpl in Hk.
+    destruct (IH k Hall ltac:(lia)) as (pre & post & Heq & Hlen).
+    exists (dinode_bytes d ++ pre)%list, post.
+    assert (Hs : (d :: ds) !!! S k = ds !!! k) by reflexivity.
+    (* NEITHER [rewrite length_app] NOR [rewrite app_assoc] MAY BE LEFT TO
+       FIND ITS OWN MATCH HERE.  This file's [rewrite] is ssreflect's, and
+       its keyed matching unfolds [dinode_bytes] to reach an EARLIER
+       [_ ++ _] inside the record's own encoding -- so both rules fire in
+       the wrong place and leave a goal that no longer mentions
+       [dinode_bytes d] at all (durable-notes.md, "rewrite can fail on a
+       subterm that prints character-for-character").  Both are applied at
+       spelled-out arguments instead, and the length side is arithmetic. *)
+    assert (Hla : length ((dinode_bytes d ++ pre)%list)
+                  = (length (dinode_bytes d) + length pre)%nat)
+      by apply length_app.
+    pose proof (dinode_bytes_length d Hd) as H64.
+    split; [| lia].
+    rewrite Hs diblk_bytes_cons Heq.
+    first [ exact (app_assoc (dinode_bytes d) pre
+                     (dinode_bytes (ds !!! k) ++ post)%list)
+          | exact (eq_sym (app_assoc (dinode_bytes d) pre
+                     (dinode_bytes (ds !!! k) ++ post)%list)) ].
 Qed.
 
-Lemma img_kinds_at_data (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (b : Z) :
-  b <> FsImg.sb_bmapstart sb ->
-  ~ (FsImg.sb_inodestart sb <= b
-     /\ b < FsImg.sb_inodestart sb + Z.of_nat nib) ->
-  img_kinds P sb nib b = KData (P b).
+(*  ...and the image's own record at its own slot.  [FsImg.fs_dinode] is
+    the DECODER; this says the encoder's image of what it decodes sits in
+    the block where [FsDurSnap.sk_rec] asks for it.  No image
+    well-formedness is needed -- only that a block is a block.            *)
+Lemma img_rec_in_blk (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  fs_blocks_full P -> 0 <= i < 2 ^ 32 ->
+  rec_in_blk (P (FsImg.sb_inodestart sb + i `div` 16))
+             (64 * (i `mod` 16)) (fs_dinode P sb i).
 Proof.
-  intros H1 H2. rewrite /img_kinds decide_False; [| exact H1].
-  rewrite decide_False; [reflexivity | exact H2].
+  intros Hfull Hi.
+  assert (H32 : bv_modulus 32 = (2 ^ 32)%Z) by (vm_compute; reflexivity).
+  assert (Hbv : bv_unsigned (fs_inum_bv i) = i).
+  { rewrite /fs_inum_bv. apply Z_to_bv_small. rewrite H32. lia. }
+  assert (Hblk : IBLOCK (fs_inum_bv i) (FsImg.sb_inodestart sb)
+                 = FsImg.sb_inodestart sb + i `div` 16)
+    by (rewrite /IBLOCK Hbv; lia).
+  destruct (diblk_bytes_surj (P (FsImg.sb_inodestart sb + i `div` 16))
+              (Hfull _)) as (ds & Hdwf & Hde).
+  pose proof Hdwf as [Hlen16 Hall].
+  pose proof (islot_lt (fs_inum_bv i)) as Hlt16.
+  assert (Hks : (islot (fs_inum_bv i) < length ds)%nat) by lia.
+  assert (Hrec : fs_dinode P sb i = ds !!! islot (fs_inum_bv i)).
+  { apply (fs_dinode_of_diblk P sb i ds Hdwf). rewrite Hblk. exact Hde. }
+  destruct (diblk_bytes_split ds (islot (fs_inum_bv i)) Hall Hks)
+    as (pre & post & Heq & Hlp).
+  rewrite /rec_in_blk. exists pre, post. split.
+  - rewrite Hde Heq Hrec. reflexivity.
+  - rewrite Hlp /islot Hbv.
+    pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Hm0 Hm1]. lia.
 Qed.
 
-(* THE ONE PIECE OF SLOT ARITHMETIC, factored so the encoding lemma and
-   the well-formedness lemma share it: at a block of the region whose bytes
-   decode to [ds], inum [16*j + k] reads record [k]. *)
-Lemma img_region_slot (P : Z -> list (bv 8)) (sb : fs_sb)
-    (j : Z) (k : nat) (ds : list dinode) :
-  diblk_wf ds -> P (FsImg.sb_inodestart sb + j) = diblk_bytes ds ->
-  0 <= j -> 0 <= 16 * j + Z.of_nat k < 2 ^ 32 -> (k < 16)%nat ->
-  fs_dinode P sb (16 * j + Z.of_nat k) = ds !!! k.
+(* ---- 11b.  A NODE'S OWN BLOCK IS A SLOT OF ITS RECORD ---------------- *)
+
+(*  [FsDurSnap.fn_owns] names a node's data blocks and its indirect block;
+    [FsImg.fs_slot] names the same thirteen-plus-256 addresses on the
+    image side.  This is the one translation, and it is what turns the
+    used-set coupling into W3/W4/W5.                                      *)
+Lemma img_node_owns_slot (P : Z -> list (bv 8)) (sb : fs_sb) (z b : Z) :
+  fn_owns (img_node P sb z) b ->
+  exists k : nat, (k <= FS_MAXFILE)%nat
+               /\ fs_slot P (fs_dinode P sb z) k = b /\ b <> 0.
 Proof.
-  intros Hdwf Hblk Hj0 Hrng Hk.
-  assert (Hbv : bv_unsigned (fs_inum_bv (16 * j + Z.of_nat k))
-                = 16 * j + Z.of_nat k).
-  { rewrite /fs_inum_bv. apply Z_to_bv_small.
-    assert (Hm : bv_modulus 32 = 2 ^ 32) by (vm_compute; reflexivity).
-    rewrite Hm. lia. }
-  assert (Hslot : islot (fs_inum_bv (16 * j + Z.of_nat k)) = k).
-  { rewrite /islot Hbv (Z.mul_comm 16 j) Z.add_comm Z_mod_plus_full.
-    rewrite Z.mod_small; lia. }
-  assert (Hblk2 : P (IBLOCK (fs_inum_bv (16 * j + Z.of_nat k))
-                            (FsImg.sb_inodestart sb)) = diblk_bytes ds).
-  { rewrite /IBLOCK Hbv.
-    assert (Hd : (16 * j + Z.of_nat k) `div` 16 = j).
-    { rewrite (Z.mul_comm 16 j) Z.div_add_l; [| lia].
-      rewrite (Z.div_small (Z.of_nat k) 16); lia. }
-    rewrite Hd.
-    replace (j + FsImg.sb_inodestart sb)
-      with (FsImg.sb_inodestart sb + j) by lia.
-    exact Hblk. }
-  rewrite (fs_dinode_of_diblk P sb (16 * j + Z.of_nat k) ds Hdwf Hblk2)
-          Hslot //.
+  intros Hown.
+  pose proof (fs_dinode_wf P sb z) as Hwf.
+  assert (Hsl : forall j : nat, (j < FS_MAXFILE)%nat ->
+            fs_slot P (fs_dinode P sb z) j
+            = fs_blk_addr P (fs_dinode P sb z) j).
+  { intros j Hj. rewrite /fs_slot.
+    destruct (decide (j = FS_MAXFILE)) as [-> | _]; [lia | reflexivity]. }
+  destruct Hown as [(k & Hk & Hnad) | [Hnz Heq]].
+  - rewrite /img_node era_node_blk node_blk_lookup in Hk.
+    destruct (decide ((k < MAXFILE)%nat
+                /\ bv_unsigned
+                     (blkmap_get (img_blkmap P (fs_dinode P sb z)) k) <> 0))
+      as [[Hklt Hbnz] | _]; [| destruct Hk as (? & Hc); discriminate Hc].
+    assert (Hkf : (k < FS_MAXFILE)%nat)
+      by (unfold MAXFILE, FS_MAXFILE in *; lia).
+    exists k. split; [lia |].
+    rewrite (Hsl k Hkf).
+    rewrite (img_blkmap_get P (fs_dinode P sb z) k Hwf Hklt) in Hbnz.
+    rewrite /img_node
+      (era_node_naddr (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+         (fs_data_of P (fs_dinode P sb z)) k
+         (eq_sym (img_blkmap_cells P (fs_dinode P sb z) Hwf))
+         (img_blkmap_dirlen P (fs_dinode P sb z) Hwf) Hklt)
+      (img_blkmap_get P (fs_dinode P sb z) k Hwf Hklt) in Hnad.
+    split; [exact Hnad | rewrite -Hnad; exact Hbnz].
+  - exists FS_MAXFILE. split; [lia |].
+    rewrite fs_slot_max.
+    assert (Hind : fn_indb (img_node P sb z)
+                   = bv_unsigned (di_addrs (fs_dinode P sb z) !!! 12%nat))
+      by reflexivity.
+    rewrite Hind in Hnz, Heq.
+    split; [exact Heq | rewrite -Heq; exact Hnz].
 Qed.
 
-(* ...and its two readings *)
-Lemma img_region_block_enc (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (j : Z) :
-  fs_blocks_full P -> 16 * Z.of_nat nib <= 2 ^ 32 ->
-  0 <= j -> j < Z.of_nat nib ->
-  diblk_bytes
-    (di_recs (fun k : nat => img_node P sb (16 * j + Z.of_nat (k mod 16)%nat)))
-  = P (FsImg.sb_inodestart sb + j).
+(*  ...and the bytes at a HELD slot are the block's own, which is
+    [FsDurSnap.sk_blk] with the map's lookup removed.                     *)
+Lemma img_node_blk_at (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
+    (k : nat) (bs : list (bv 8)) :
+  fn_blk (img_node P sb z) !! k = Some bs ->
+  bs = P (fn_naddr (img_node P sb z) k)
+  /\ fn_owns (img_node P sb z) (fn_naddr (img_node P sb z) k).
 Proof.
-  intros Hfull Hnib Hj0 Hjn.
-  destruct (diblk_bytes_surj (P (FsImg.sb_inodestart sb + j)) (Hfull _))
-    as (ds & Hdwf & Hde).
-  rewrite Hde. f_equal.
-  pose proof Hdwf as [Hlen Hall].
-  apply list_eq. intros k.
-  destruct (Nat.lt_ge_cases k 16%nat) as [Hk | Hk].
-  - rewrite (di_recs_lookup _ k Hk) era_node_rec.
-    assert (Hmod : (k mod 16)%nat = k) by (apply Nat.mod_small; lia).
-    rewrite Hmod.
-    assert (Hrng : 0 <= 16 * j + Z.of_nat k < 2 ^ 32) by lia.
-    rewrite (img_region_slot P sb j k ds Hdwf Hde Hj0 Hrng Hk).
-    assert (Hkl : (k < length ds)%nat) by lia.
-    destruct (lookup_lt_is_Some_2 ds k Hkl) as [d Hd].
-    rewrite Hd (list_lookup_total_correct ds k d Hd) //.
-  - rewrite lookup_ge_None_2; [| rewrite di_recs_length; lia].
-    rewrite lookup_ge_None_2; [reflexivity | lia].
+  intros Hk.
+  pose proof (fs_dinode_wf P sb z) as Hwf.
+  split; [| left; exists k; split; [by exists bs | reflexivity]].
+  assert (Hb := Hk).
+  rewrite /img_node era_node_blk node_blk_lookup in Hb.
+  destruct (decide ((k < MAXFILE)%nat
+              /\ bv_unsigned
+                   (blkmap_get (img_blkmap P (fs_dinode P sb z)) k) <> 0))
+    as [[Hklt Hbnz] | _]; [| discriminate Hb].
+  apply (inj Some) in Hb. subst bs.
+  assert (Hna : fn_naddr (img_node P sb z) k
+                = fs_blk_addr P (fs_dinode P sb z) k).
+  { rewrite /img_node
+      (era_node_naddr (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+         (fs_data_of P (fs_dinode P sb z)) k
+         (eq_sym (img_blkmap_cells P (fs_dinode P sb z) Hwf))
+         (img_blkmap_dirlen P (fs_dinode P sb z) Hwf) Hklt).
+    exact (img_blkmap_get P (fs_dinode P sb z) k Hwf Hklt). }
+  rewrite (img_blkmap_get P (fs_dinode P sb z) k Hwf Hklt) in Hbnz.
+  rewrite Hna fs_data_of_addr (proj2 (Z.eqb_neq _ _) Hbnz). reflexivity.
 Qed.
 
-Lemma img_region_rec_wf (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (j : Z) (k : nat) :
-  fs_blocks_full P -> 16 * Z.of_nat nib <= 2 ^ 32 ->
-  0 <= j -> j < Z.of_nat nib -> (k < 16)%nat ->
-  dinode_wf (fs_dinode P sb (16 * j + Z.of_nat k)).
+(*  the same for the INDIRECT block: its bytes are [BlockWords.ind_bytes]
+    of the node's entry array, which is [FsImg.fs_ind_bytes_round_trip]    *)
+Lemma img_node_ind_at (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fs_blocks_full P -> fn_indb (img_node P sb z) <> 0 ->
+  P (fn_indb (img_node P sb z)) = ind_bytes (fn_ent (img_node P sb z))
+  /\ fn_owns (img_node P sb z) (fn_indb (img_node P sb z)).
 Proof.
-  intros Hfull Hnib Hj0 Hjn Hk.
-  destruct (diblk_bytes_surj (P (FsImg.sb_inodestart sb + j)) (Hfull _))
-    as (ds & Hdwf & Hde).
-  pose proof Hdwf as [Hlen Hall].
-  assert (Hrng : 0 <= 16 * j + Z.of_nat k < 2 ^ 32) by lia.
-  rewrite (img_region_slot P sb j k ds Hdwf Hde Hj0 Hrng Hk).
-  assert (Hkl : (k < length ds)%nat) by lia.
-  destruct (lookup_lt_is_Some_2 ds k Hkl) as [d Hd].
-  rewrite (list_lookup_total_correct ds k d Hd).
-  exact (Forall_lookup_1 _ _ _ _ Hall Hd).
+  intros Hfull Hnz.
+  split; [| right; split; [exact Hnz | reflexivity]].
+  assert (Hind : fn_indb (img_node P sb z)
+                 = bv_unsigned (di_addrs (fs_dinode P sb z) !!! 12%nat))
+    by reflexivity.
+  assert (Hent : fn_ent (img_node P sb z)
+                 = (fun q => Z_to_bv 32 q)
+                     <$> fs_ind_ents P (fs_dinode P sb z))
+    by reflexivity.
+  rewrite Hind Hent. symmetry.
+  apply (fs_ind_bytes_round_trip P (fs_dinode P sb z) Hfull).
+  rewrite -Hind. exact Hnz.
 Qed.
 
-(* EVERY HOME BLOCK'S BYTES ARE ITS KIND'S ENCODING -- and in fact every
-   block's are, so the bridge below needs no home-set case analysis. *)
-Lemma img_kinds_enc (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) (b : Z) :
-  fs_blocks_full P -> 16 * Z.of_nat nib <= 2 ^ 32 ->
-  FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
-  kind_enc (img_kinds P sb nib b) = P b.
+(* ---- 11c.  ...AND THAT BLOCK IS IN USE, ABOVE ALL METADATA ----------- *)
+
+Lemma img_owned_block (P : Z -> list (bv 8)) (sb : fs_sb) (z b : Z) :
+  fsimg_wf P sb = true ->
+  0 <= z < FsImg.sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb z)) <> 0 ->
+  fn_owns (img_node P sb z) b ->
+  b ∈ fs_inode_blocks P (fs_dinode P sb z)
+  /\ fs_data_start sb <= b < FsImg.sb_size sb.
 Proof.
-  intros Hfull Hnib Hgeo.
-  destruct (decide (b = FsImg.sb_bmapstart sb)) as [-> | Hbm].
-  { rewrite img_kinds_at_bmap. cbn [kind_enc].
-    exact (bm_bytes_fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))
-             (Hfull _)). }
-  destruct (decide (FsImg.sb_inodestart sb <= b
-                    /\ b < FsImg.sb_inodestart sb + Z.of_nat nib))
-    as [Hin | Hout].
-  { assert (Hj0 : 0 <= b - FsImg.sb_inodestart sb) by lia.
-    assert (Hjn : b - FsImg.sb_inodestart sb < Z.of_nat nib) by lia.
-    replace b with (FsImg.sb_inodestart sb + (b - FsImg.sb_inodestart sb))
-      by lia.
-    rewrite (img_kinds_at_region P sb nib (b - FsImg.sb_inodestart sb)
-               Hgeo Hj0 Hjn).
-    cbn [kind_enc].
-    exact (img_region_block_enc P sb nib (b - FsImg.sb_inodestart sb)
-             Hfull Hnib Hj0 Hjn). }
-  rewrite (img_kinds_at_data P sb nib b Hbm Hout) //.
+  intros Hwf Hran Hty Hown.
+  pose proof (fsimg_wf_inode P sb z Hwf Hran Hty) as Hok.
+  destruct (img_node_owns_slot P sb z b Hown) as (k & Hk & Hsl & Hnz).
+  assert (Hsnz : fs_slot P (fs_dinode P sb z) k <> 0)
+    by (rewrite Hsl; exact Hnz).
+  pose proof (fs_inode_blocks_lookup P sb (fs_dinode P sb z) k Hok Hk Hsnz)
+    as Hlk.
+  rewrite Hsl in Hlk.
+  pose proof (elem_of_list_lookup_2 _ _ _ Hlk) as Hin.
+  split; [exact Hin | exact (fs_inode_blocks_range P sb _ b Hok Hin)].
 Qed.
 
-Lemma img_kinds_blocksized (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (cov : gset Z) (ls : Z) :
-  fs_blocks_full P -> 16 * Z.of_nat nib <= 2 ^ 32 ->
-  FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
-  kinds_blocksized (img_kinds P sb nib) cov ls.
+(*  W5 read FORWARD: a block below [size] that is either metadata or in
+    the used set has its BIT SET, hence lies in the block's own bit set --
+    which is [img_state]'s [fss_used].                                    *)
+Lemma img_used_of_blocks (P : Z -> list (bv 8)) (sb : fs_sb) (b : Z) :
+  fsimg_wf P sb = true -> 0 <= b < FsImg.sb_size sb ->
+  (b < fs_data_start sb \/ b ∈ fs_used_blocks P sb) ->
+  b ∈ FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb)).
 Proof.
-  intros Hfull Hnib Hgeo b _.
-  rewrite (img_kinds_enc P sb nib b Hfull Hnib Hgeo). exact (Hfull b).
+  intros Hwf Hb Hor.
+  pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
+  pose proof (sbo_one_bitmap sb Hsb) as Hone.
+  destruct (fsimg_wf_used P sb Hwf) as (u & Hus & _ & Hbw).
+  apply fs_bmap_set_elem.
+  split; [rewrite BSIZE_z_nat; lia |].
+  apply (proj2 (fs_bitmap_wf_spec P sb u b Hbw Hb)).
+  destruct Hor as [Hlt | Hin]; [by left |].
+  right. exact (proj2 (fs_used_set_elem P sb u b Hus) Hin).
 Qed.
 
-Lemma img_kinds_bridge (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
-    (cov : gset Z) (ls : Z) :
-  fs_blocks_full P -> 16 * Z.of_nat nib <= 2 ^ 32 ->
-  FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
-  dwire_bridge (img_kinds P sb nib)
-    (fs_restrict P (fs_home_set cov ls)) cov ls.
-Proof.
-  intros Hfull Hnib Hgeo. split.
-  - apply fs_restrict_dom.
-  - intros b Hb.
-    assert (Hlk : fs_restrict P (fs_home_set cov ls) !! b = Some (P b)).
-    { apply fs_restrict_lookup_Some. split; [exact Hb | reflexivity]. }
-    rewrite Hlk (img_kinds_enc P sb nib b Hfull Hnib Hgeo) //.
-Qed.
+(* ---- 11d.  THE THEOREM ----------------------------------------------- *)
 
-(* THE TIE ITSELF, at the image's own geometry.  [nin] is [16 * nib] --
-   the inums the REGION holds, which is what indexes [ko_slot] -- and not
-   [sb_ninodes], because [ko_inodeblk] has to cover every block of the
-   region and mkfs rounds the inode count up to a whole block. *)
-Lemma img_kinds_of_state (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
-  fs_blocks_full P -> 16 * Z.of_nat nib <= 2 ^ 32 ->
-  FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
-  kinds_of_state
-    (MkDGeom (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb))
-    (16 * Z.of_nat nib) (img_state P sb nib) (img_kinds P sb nib).
+(*  THE IMAGE'S SNAPSHOT TIE.  Every premise is a conjunct of
+    [FsCfgBoot.fs_boot_image_wf] -- (14)/(15) among them since this lane --
+    so no consumer carries anything new, and the literal-image discharge
+    stays in [FsImgCheck]/[FsAdequacyImg] (ruling R3: this file computes
+    nothing).  Non-vacuity at the real image:
+    [FsAdequacyImg.fsimg_snap_ok].                                        *)
+Theorem img_snap_ok (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
+    (cov : gset Z) :
+  fs_boot_image_wf dk ndisk sb nib cov ->
+  snap_ok (img_state (fs_blocks dk) sb nib)
+          (fs_restrict (fs_blocks dk)
+             (fs_home_set cov (FsImg.sb_logstart sb))).
 Proof.
-  intros Hfull Hnib Hgeo. split; cbn [dg_bmap dg_ist].
-  - rewrite img_kinds_at_bmap /img_state. cbn [fss_used]. reflexivity.
-  - intros j Hj0 Hjn16.
-    assert (Hjn : j < Z.of_nat nib) by lia.
-    eexists. exact (img_kinds_at_region P sb nib j Hgeo Hj0 Hjn).
-  - intros i n Hi. rewrite /img_state in Hi. cbn [fss_inodes] in Hi.
-    destruct (img_nodes_lookup_inv P sb nib i n Hi) as [Hreg ->].
+  intros (Hwf & Hrw & Hnin & Hnib32 & Hnibpos & Hnibq & Hcovin & Hcovmeta
+          & Hcovdata & Hparse & Hnib16 & Hndisk & Hlinkeq & Hbare & Hns).
+  (* ---- the geometry, off [fs_sb_ok] alone --------------------------- *)
+  pose proof (fsimg_wf_sb _ _ Hwf) as Hsb.
+  pose proof (fs_sb_ok_meta sb Hsb) as (Hi2 & Hids & Hdss).
+  pose proof (sbo_logstart sb Hsb) as Hls.
+  pose proof (sbo_nlog sb Hsb) as Hnl.
+  pose proof (sbo_inodestart sb Hsb) as Hist.
+  pose proof (sbo_bmapstart sb Hsb) as Hbms.
+  pose proof (sbo_ninodes sb Hsb) as Hni. unfold FsImg.ROOTINO in Hni.
+  assert (Hdiv0 : 0 <= FsImg.sb_ninodes sb / 16) by (apply Z.div_pos; lia).
+  assert (Hfull : fs_blocks_full (fs_blocks dk))
+    by (intros c; apply fs_blocks_length).
+  destruct (fsimg_wf_used (fs_blocks dk) sb Hwf) as (u & Hus & Hnd & Hbw).
+  (* ---- the home set: which blocks are in it ------------------------- *)
+  assert (HlogI : forall b : Z,
+            b ∈ log_region_set (FsImg.sb_logstart sb) ->
+            1 < b < FsImg.sb_inodestart sb).
+  { intros b Hb.
+    pose proof (log_region_bound (FsImg.sb_logstart sb) b Hb).
+    unfold LOGBLOCKS in *. lia. }
+  assert (Hhome1 : (1 : Z) ∈ fs_home_set cov (FsImg.sb_logstart sb)).
+  { rewrite /fs_home_set. apply elem_of_difference. split.
+    - apply Hcovmeta. unfold fs_data_start in *. lia.
+    - intros Hc. pose proof (HlogI 1 Hc). lia. }
+  assert (Hhome_reg : forall b : Z,
+            FsImg.sb_inodestart sb <= b < fs_data_start sb ->
+            b ∈ fs_home_set cov (FsImg.sb_logstart sb)).
+  { intros b Hb. rewrite /fs_home_set. apply elem_of_difference. split.
+    - apply Hcovmeta. lia.
+    - intros Hc. pose proof (HlogI b Hc). lia. }
+  assert (Hhome_data : forall b : Z,
+            fs_data_start sb <= b < FsImg.sb_size sb ->
+            b ∈ fs_home_set cov (FsImg.sb_logstart sb)).
+  { intros b Hb. rewrite /fs_home_set. apply elem_of_difference. split.
+    - apply Hcovdata. lia.
+    - intros Hc. pose proof (HlogI b Hc). unfold fs_data_start in *. lia. }
+  (* ---- the state's four fields, as equations ------------------------ *)
+  assert (Hpsb : fss_sb (img_state (fs_blocks dk) sb nib) = sb)
+    by reflexivity.
+  assert (Hpsbb : fss_sbb (img_state (fs_blocks dk) sb nib)
+                  = fs_blocks dk SB_BNO) by reflexivity.
+  assert (Hpin : fss_inodes (img_state (fs_blocks dk) sb nib)
+                 = img_nodes (fs_blocks dk) sb nib) by reflexivity.
+  assert (Hpu : fss_used (img_state (fs_blocks dk) sb nib)
+                = FsImg.fs_bmap_set BSIZE
+                    (fs_blocks dk (FsImg.sb_bmapstart sb))) by reflexivity.
+  (* ---- ONLY A LIVE INUM OWNS A BLOCK -- conjunct (14)'s second use --- *)
+  assert (Hlive_of_owns : forall (i b : Z),
+            i ∈ region_inums nib ->
+            fn_owns (img_node (fs_blocks dk) sb i) b ->
+            0 <= i < FsImg.sb_ninodes sb
+            /\ bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb i)) <> 0).
+  { intros i b Hreg Hown.
+    pose proof (proj1 (region_inums_spec nib i) Hreg) as Hri.
+    destruct (decide
+                (bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb i)) = 0))
+      as [H0 | Hnz].
+    - exfalso.
+      pose proof (img_node_bare (fs_blocks dk) sb nib i Hbare
+                    (fs_region_wf_nlink _ _ _ Hrw) Hri H0) as Hb.
+      pose proof Hb as (_ & _ & Hblk0 & _ & _).
+      destruct Hown as [(k & Hk & _) | [Hnzi _]].
+      + rewrite Hblk0 lookup_empty in Hk.
+        destruct Hk as (? & Hc). discriminate Hc.
+      + exact (Hnzi (fn_bare_indb _ Hb)).
+    - split; [| exact Hnz]. split; [lia |].
+      destruct (Z_lt_ge_dec i (FsImg.sb_ninodes sb)) as [Hlt | Hge];
+        [exact Hlt |].
+      exfalso. apply Hnz.
+      exact (fs_region_free_spec (fs_blocks dk) sb nib i
+               (fs_region_wf_free _ _ _ Hrw)
+               ltac:(lia) ltac:(lia) ltac:(lia)). }
+  (* ---- an owned block: in the home set, in the used list, in range --- *)
+  assert (Hownhome : forall (i b : Z),
+            0 <= i < FsImg.sb_ninodes sb ->
+            bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb i)) <> 0 ->
+            fn_owns (img_node (fs_blocks dk) sb i) b ->
+            b ∈ fs_home_set cov (FsImg.sb_logstart sb)
+            /\ b ∈ fs_used_blocks (fs_blocks dk) sb
+            /\ fs_data_start sb <= b < FsImg.sb_size sb).
+  { intros i b Hran Hty Hown.
+    destruct (img_owned_block (fs_blocks dk) sb i b Hwf Hran Hty Hown)
+      as [Hin Hrng].
+    split; [apply Hhome_data; lia |].
+    split; [| exact Hrng].
+    exact (fs_used_blocks_inode (fs_blocks dk) sb i b Hran Hty Hin). }
+  (* ---- every metadata block sits below the data region --------------- *)
+  assert (Hmeta_below : forall b : Z,
+            snap_meta (img_state (fs_blocks dk) sb nib) b ->
+            1 <= b < fs_data_start sb).
+  { intros b Hm. rewrite /snap_meta Hpsb Hpin in Hm.
+    destruct Hm as [-> | [-> | (i & Hi & ->)]].
+    - unfold SB_BNO, fs_data_start in *. lia.
+    - unfold fs_data_start in *. lia.
+    - destruct Hi as [n Hn].
+      destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hn)
+        as [Hreg _].
+      apply region_inums_spec in Hreg.
+      assert (Hd : 0 <= i `div` 16 < Z.of_nat nib).
+      { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
+      unfold fs_data_start in *. lia. }
+  (* ---- the LOCAL half, off section 2 --------------------------------- *)
+  assert (Hloc : snap_local (img_state (fs_blocks dk) sb nib)).
+  { intros i n Hi. rewrite Hpin in Hi.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hreg ->].
+    exact (img_inode_local (fs_blocks dk) sb cov nib i Hwf Hrw Hbare Hfull
+             Hnin Hcovdata Hreg). }
+  (* =================================================================== *)
+  apply snap_ok_intro; [| exact Hloc].
+  split.
+  - (* sk_bsz *)
+    intros b bs Hb. apply fs_restrict_lookup_Some in Hb as [_ ->].
+    apply fs_blocks_length.
+  - (* sk_sb *)
+    rewrite Hpsbb. apply fs_restrict_lookup_Some.
+    split; [exact Hhome1 | reflexivity].
+  - (* sk_parse *)
+    rewrite Hpsbb Hpsb. exact Hparse.
+  - (* sk_bmap *)
+    rewrite Hpsb Hpu (bm_bytes_fs_bmap_set BSIZE _ (Hfull _)).
+    apply fs_restrict_lookup_Some. split; [| reflexivity].
+    apply Hhome_reg. unfold fs_data_start in *. lia.
+  - (* sk_pool *)
+    rewrite Hpsb Hpu. intros b Hb Hnu.
+    destruct (fs_bmap_set_free (fs_blocks dk) sb u b Hsb Hbw Hb Hnu)
+      as [Hge _].
+    exists (fs_blocks dk b). apply fs_restrict_lookup_Some.
+    split; [apply Hhome_data; lia | reflexivity].
+  - (* sk_inum *)
+    rewrite Hpin. intros i n Hi.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi) as [Hreg _].
+    apply region_inums_spec in Hreg. lia.
+  - (* sk_repr *)
+    intros i n Hi. exact (inode_repr_of_local i n (Hloc i n Hi)).
+  - (* sk_rec *)
+    rewrite Hpsb Hpin. intros i n Hi.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hreg ->].
     apply region_inums_spec in Hreg.
-    assert (Hd0 : 0 <= i `div` 16) by (apply Z.div_pos; lia).
-    assert (Hdn : i `div` 16 < Z.of_nat nib).
-    { apply (Z.div_lt_upper_bound i 16 (Z.of_nat nib)); lia. }
-    split; [lia |].
-    eexists. split.
-    + exact (img_kinds_at_region P sb nib (i `div` 16) Hgeo Hd0 Hdn).
-    + cbv beta.
-      assert (Hm : (Z.to_nat (i `mod` 16) mod 16)%nat
-                   = Z.to_nat (i `mod` 16)).
-      { apply Nat.mod_small.
-        pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Ha Hb]. lia. }
-      rewrite Hm.
-      pose proof (Z.div_mod i 16 ltac:(lia)) as Hdm.
-      pose proof (Z.mod_pos_bound i 16 ltac:(lia)) as [Ha Hb].
-      replace (16 * (i `div` 16) + Z.of_nat (Z.to_nat (i `mod` 16)))
-        with i by lia.
-      reflexivity.
-  - intros b nd HK j.
-    destruct (decide (b = FsImg.sb_bmapstart sb)) as [-> | Hbm].
-    { rewrite img_kinds_at_bmap in HK. discriminate. }
-    destruct (decide (FsImg.sb_inodestart sb <= b
-                      /\ b < FsImg.sb_inodestart sb + Z.of_nat nib))
-      as [Hin | Hout];
-      [| rewrite (img_kinds_at_data P sb nib b Hbm Hout) in HK;
-         discriminate].
-    assert (Hj0 : 0 <= b - FsImg.sb_inodestart sb) by lia.
-    assert (Hjn : b - FsImg.sb_inodestart sb < Z.of_nat nib) by lia.
-    assert (Hb : b = FsImg.sb_inodestart sb
-                     + (b - FsImg.sb_inodestart sb)) by lia.
-    rewrite Hb (img_kinds_at_region P sb nib (b - FsImg.sb_inodestart sb)
-                  Hgeo Hj0 Hjn) in HK.
-    injection HK as <-. rewrite era_node_rec.
-    assert (Hmod : (j mod 16 < 16)%nat)
-      by (apply Nat.mod_upper_bound; lia).
-    exact (img_region_rec_wf P sb nib (b - FsImg.sb_inodestart sb)
-             (j mod 16)%nat Hfull Hnib Hj0 Hjn Hmod).
+    assert (Hd : 0 <= i `div` 16 < Z.of_nat nib).
+    { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
+    exists (fs_blocks dk (FsImg.sb_inodestart sb + i `div` 16)). split.
+    + apply fs_restrict_lookup_Some. split; [| reflexivity].
+      apply Hhome_reg. unfold fs_data_start in *. lia.
+    + rewrite (img_node_rec (fs_blocks dk) sb i).
+      apply (img_rec_in_blk (fs_blocks dk) sb i Hfull). lia.
+  - (* sk_blk *)
+    rewrite Hpin. intros i n k bs Hi Hk.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hreg ->].
+    destruct (img_node_blk_at (fs_blocks dk) sb i k bs Hk) as [-> Hown].
+    destruct (Hlive_of_owns i _ Hreg Hown) as [Hran Hty].
+    destruct (Hownhome i _ Hran Hty Hown) as (Hh & _ & _).
+    apply fs_restrict_lookup_Some. split; [exact Hh | reflexivity].
+  - (* sk_ind *)
+    rewrite Hpin. intros i n Hi Hnz.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hreg ->].
+    destruct (img_node_ind_at (fs_blocks dk) sb i Hfull Hnz) as [Heq Hown].
+    destruct (Hlive_of_owns i _ Hreg Hown) as [Hran Hty].
+    destruct (Hownhome i _ Hran Hty Hown) as (Hh & _ & _).
+    apply fs_restrict_lookup_Some.
+    split; [exact Hh | symmetry; exact Heq].
+  - (* sk_dom *)
+    rewrite Hpsb Hpin. intros i Hi.
+    exists (img_node (fs_blocks dk) sb i).
+    apply img_nodes_lookup, region_inums_spec. lia.
+  - (* sk_links *)
+    rewrite Hpin.
+    exact (img_link_valid (fs_blocks dk) sb nib Hwf Hrw Hlinkeq Hns Hnin).
+  - (* sk_meta_used -- the metadata roles are MARKED IN USE *)
+    rewrite Hpu. intros b Hm.
+    pose proof (Hmeta_below b Hm) as Hbr.
+    apply (img_used_of_blocks (fs_blocks dk) sb b Hwf); [lia | left; lia].
+  - (* sk_own_used -- a node's own blocks are used, and are not metadata *)
+    rewrite Hpin Hpu. intros i n b Hi Hown.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hreg ->].
+    destruct (Hlive_of_owns i b Hreg Hown) as [Hran Hty].
+    destruct (Hownhome i b Hran Hty Hown) as (_ & Hub & Hrng).
+    split.
+    + apply (img_used_of_blocks (fs_blocks dk) sb b Hwf);
+        [lia | right; exact Hub].
+    + intros Hm. pose proof (Hmeta_below b Hm). lia.
+  - (* sk_disj -- W4: no block is named twice *)
+    rewrite Hpin. intros i n j m b Hi Hj Hoi Hoj.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hregi ->].
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib j m Hj)
+      as [Hregj ->].
+    destruct (Hlive_of_owns i b Hregi Hoi) as [Hrani Htyi].
+    destruct (Hlive_of_owns j b Hregj Hoj) as [Hranj Htyj].
+    destruct (decide (i = j)) as [-> | Hne]; [reflexivity |].
+    exfalso.
+    destruct (img_owned_block (fs_blocks dk) sb i b Hwf Hrani Htyi Hoi)
+      as [Hbi _].
+    destruct (img_owned_block (fs_blocks dk) sb j b Hwf Hranj Htyj Hoj)
+      as [Hbj _].
+    pose proof (fs_inode_blocks_disjoint (fs_blocks dk) sb i j Hnd
+                  Hrani Hranj Hne Htyi Htyj) as Hdj.
+    rewrite elem_of_disjoint in Hdj.
+    apply (Hdj b);
+      rewrite /fs_inode_blocks_set elem_of_list_to_set; assumption.
 Qed.
 
-(* ---- THE BOOT'S SEED, PACKAGED (durable-disk 3b') --------------------
-   [FsCrash.P_fs_alloc]'s durable conjunct at the flip is
-   [FsDurWire.P_wf_dec], and what it cannot build for itself is the
-   durable top map with all its fragments plus the pure bridge.  This is
-   that, at the image: the two gnames come from [FsState.fs_boot_alloc_at]
-   (the CLIENT allocates them -- the link family's camera has no authority
-   over which keys exist, so a family allocated at the unit cannot be
-   grown), and the geometry fields come from the image's own superblock.
+(* ===================================================================== *)
+(* 12.  THE DURABLE SNAPSHOT AT BOOT                                      *)
+(*                                                                        *)
+(*  [FsDurSnap.P_dur D] is a function of [D] ALONE and is allocated by a  *)
+(*  basic update from nothing -- so the image side of the boot needs NO   *)
+(*  resource from anybody, which is what makes lane C's change to         *)
+(*  [FsCrash.P_fs] arity-free.                                            *)
+(* ===================================================================== *)
 
-   THE GEOMETRY IN THE BUNDLE IS THE IMAGE'S, and that is the whole content
-   of the era-side equation the suppliers owe: [fdn_bmap] IS
-   [sb_bmapstart sb], which [FsCfgBoot.fs_cfg_alloc] already reports as
-   [fsc_bmapstart], and [fdn_ist] IS [sb_inodestart sb], which it already
-   reports as [icfg_ist]. *)
-Section DurImgSeed.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+Section DurImgSnap.
+  Context `{!riscvGS Σ, !xv6G Σ, !fsCrashG Σ, !lockG Σ}.
 
-  Lemma img_dur_seed (g : gname) (dk : Z -> bv 8) (sb : fs_sb) (nib : nat)
-      (cov : gset Z) (ls : Z) (gl gt : gname) :
-    16 * Z.of_nat nib <= 2 ^ 32 ->
-    FsImg.sb_inodestart sb + Z.of_nat nib <= FsImg.sb_bmapstart sb ->
-    ghost_map_auth gt 1 (img_nodes (fs_blocks dk) sb nib) -∗
-    ([∗ map] i ↦ n ∈ img_nodes (fs_blocks dk) sb nib, i ↪[gt] n) -∗
-    dur_seed g
-      (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb)
-         (16 * Z.of_nat nib))
-      cov ls (fs_restrict (fs_blocks dk) (fs_home_set cov ls)).
+  Lemma img_P_dur_alloc (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
+      (nib : nat) (cov : gset Z) :
+    fs_boot_image_wf dk ndisk sb nib cov ->
+    ⊢ |==> P_dur (fs_restrict (fs_blocks dk)
+                    (fs_home_set cov (FsImg.sb_logstart sb))).
   Proof.
-    intros Hnib Hgeo.
-    assert (Hfull : fs_blocks_full (fs_blocks dk))
-      by (intros c; apply fs_blocks_length).
-    iIntros "Hauth Hfr".
-    iApply (dur_seed_intro g
-              (MkFsDurNames gl gt (FsImg.sb_bmapstart sb)
-                 (FsImg.sb_inodestart sb) (16 * Z.of_nat nib))
-              cov ls (fs_restrict (fs_blocks dk) (fs_home_set cov ls))
-              (img_state (fs_blocks dk) sb nib)
-              (img_kinds (fs_blocks dk) sb nib)
-              (img_kinds_bridge (fs_blocks dk) sb nib cov ls Hfull Hnib Hgeo)
-              (img_kinds_blocksized (fs_blocks dk) sb nib cov ls Hfull Hnib
-                 Hgeo)
-              (img_kinds_of_state (fs_blocks dk) sb nib Hfull Hnib Hgeo)).
-    rewrite /dur_top /img_state. cbn [fss_inodes].
-    iFrame "Hauth". rewrite /top_frag /=. iExact "Hfr".
+    intros Himg.
+    exact (P_dur_alloc (img_state (fs_blocks dk) sb nib)
+             (fs_restrict (fs_blocks dk)
+                (fs_home_set cov (FsImg.sb_logstart sb)))
+             (img_snap_ok dk ndisk sb nib cov Himg)).
   Qed.
 
-End DurImgSeed.
+  (*  THE BOOT POINT (plan section 5).  [FsCrash.P_fs_alloc_clean] mints
+      the crash predicate of a CLEAN image at
+      [D0 = fs_restrict (fs_blocks dk) (fs_home_set cov logstart)] -- that
+      IS the record's own [fr_D] -- and W2 of [fsimg_wf] is exactly its
+      zero-log-header premise, so the bundle already carries it.  This is
+      that mint WITH the durable snapshot at the same [D0] beside it: lane
+      C's [P_fs] can carry [P_dur (fr_D r)] with no arity change and no new
+      premise on any caller, because the snapshot costs nothing to make.  *)
+  Lemma img_boot_P_fs_dur (gsw greg gst gv : gname) (Gd : fs_dur_names)
+      (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
+      (cov : gset Z) :
+    fs_boot_image_wf dk ndisk sb nib cov ->
+    mono_nat_auth_own gsw 1 0%nat ∗
+    ghost_map_auth gv 1 (∅ : gmap Z (bv 8)) ⊢ |==> ∃ gs : fs_crash_names,
+      ⌜fcn_swap gs = gsw /\ fcn_reg gs = greg /\ fcn_start gs = gst⌝ ∗
+      P_fs gs gv Gd cov (FsImg.sb_logstart sb) dk ∗
+      fs_receipt gs (fs_restrict (fs_blocks dk)
+                       (fs_home_set cov (FsImg.sb_logstart sb))) ∗
+      P_dur (fs_restrict (fs_blocks dk)
+               (fs_home_set cov (FsImg.sb_logstart sb))).
+  Proof.
+    intros Himg.
+    assert (Hclean : hdr_n (fs_blocks dk
+                              (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
+    { rewrite /hdr_n /log_hdr_bno.
+      exact (fsimg_wf_log (fs_blocks dk) sb (proj1 Himg)). }
+    iIntros "H".
+    iMod (P_fs_alloc_clean gsw greg gst gv Gd dk cov (FsImg.sb_logstart sb)
+            Hclean with "H") as (gs) "(%Heq & HP & Hrc)".
+    iMod (img_P_dur_alloc dk ndisk sb nib cov Himg) as "Hdur".
+    iModIntro. iExists gs. iFrame "HP Hrc Hdur".
+    iPureIntro. exact Heq.
+  Qed.
+
+End DurImgSnap.
