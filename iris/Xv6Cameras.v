@@ -574,6 +574,23 @@ Inductive ic_dep : Type :=
   | DepShr (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
   | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32).
 
+(* THE LOCKED REGISTRY'S ENTRY (durable-disk lane A, re-keyed by B''-arm):
+   one ARM.  [(t, q, S)] -- the transaction whose row is suspended, the
+   SHARE of its [LogDefs.ln_tx] element the registry has parked, and the
+   inums whose well-formedness row that arm suspends.
+
+   THE SHARE IS A FIELD, and that is the whole point of the re-key: an arm
+   must hand back EXACTLY what it parked (the walk recombines it into the
+   whole element [end_op] consumes), so an existential fraction inside the
+   registry cannot be undone -- the same reason [ic_dep] spells its fraction
+   as a field.  And the registry is keyed by an ARM id, not by the
+   transaction: [InodeRegion.ireg_arm] then needs no freshness argument at
+   all (a fresh [nat] key is free in a map the ghost step can see), which is
+   what lets a walk arm from a RESIDUE after an [ilock] has parked a share
+   of the same token ([IcacheTxArm.v] is the refutation of the whole-token
+   form). *)
+Definition ireg_arm_ent : Type := (nat * Qp * gset Z)%type.
+
 (* The link ledger, the count coupling, the freeze receipt and the freeze
    mirror all ride in [icacheG] rather than in classes of their own, and
    all for one reason: each has one half in [InodeRegion.ireg_slot] and the
@@ -590,12 +607,13 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   (* OPTION A escrow: the redemption ticket and the per-inum name registry. *)
   icache_tickG :: inG Σ (exclR unitO);
   icache_regG :: ghost_mapG Σ Z (gname * gname)%type;
-  (* THE LOCKED REGISTRY (durable-disk lane A): which transaction has
-     suspended which inums' well-formedness row.  Keyed by TRANSACTION id,
-     not by inum, so that a walk holding an open transaction's token can
-     prove its own row is not registered yet -- the entry parks that very
-     token, and two whole elements of one key cannot coexist. *)
-  icache_lkG :: ghost_mapG Σ nat (gset Z);
+  (* THE LOCKED REGISTRY (durable-disk lane A, re-keyed by B''-arm): which
+     transaction has suspended which inums' well-formedness row, and at what
+     share of its token.  Keyed by ARM id -- a fresh [nat] the ghost step
+     picks out of the map it can already see -- so that arming needs no
+     freshness argument about the transaction and a walk that has parked a
+     share elsewhere can still arm ([Xv6Cameras.ireg_arm_ent]'s header). *)
+  icache_lkG :: ghost_mapG Σ nat ireg_arm_ent;
   (* THE FREE POOL'S RESIDENCY KEY (durable-disk lane B''-esc, plan section 4).
      The uncached inums whose row sits in the pool INVARIANT, as one set: the
      invariant holds one half and the itable lock's resource the other, so a
@@ -613,7 +631,7 @@ Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * SailStdpp.Values.mword 32 * SailStdpp.Values.mword 32);
     GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
-    ghost_mapΣ nat (gset Z);
+    ghost_mapΣ nat ireg_arm_ent;
     ghost_varΣ (gset Z);
     GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR;
     GFunctor fviewUR].

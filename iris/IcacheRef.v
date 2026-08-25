@@ -1025,7 +1025,7 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       (* THE LOCKED REGISTRY's auth, handed out EMPTY: at boot no
          transaction exists, so no inum's row is suspended (durable-disk
          lane A).  [InodeRegion.ftop_alloc] takes it. *)
-      ghost_map_auth icfg_lk 1 (∅ : gmap nat (gset Z)) ∗
+      ghost_map_auth icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ∗
       (* THE FREE POOL'S RESIDENCY KEY, WHOLE and at the empty set: at this
          altitude no pool exists yet.  [IcacheBoot.icache_boot_at] is what
          updates it to the region's inums, splits it, and puts one half
@@ -1056,7 +1056,7 @@ Proof.
      [ireg_body] (where [reg_full] refutes the pending arm). *)
   iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
   (* the locked registry, empty (durable-disk lane A) *)
-  iMod (ghost_map_alloc (∅ : gmap nat (gset Z))) as (γlkr) "[Hlkr _]".
+  iMod (ghost_map_alloc (∅ : gmap nat ireg_arm_ent)) as (γlkr) "[Hlkr _]".
   (* the free pool's residency key, whole and empty (durable-disk B''-esc) *)
   iMod (ghost_var_alloc (∅ : gset Z)) as (γpool) "Hpool".
   iModIntro.

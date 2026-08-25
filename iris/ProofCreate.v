@@ -1593,25 +1593,45 @@ Section ProofCreateMain.
      id is EXISTENTIAL: no arm of this function ever compares one -- what
      matters is only that the id belongs to a transaction that is still
      open, and the registry parks its token to say so. *)
-  Definition cr_dirty (i : Z) : iProp Σ := (∃ t : nat, ireg_armed t {[i]})%I.
+  (* The ARM ID and the transaction id are BOTH existential (durable-disk
+     B''-arm re-keyed the registry by arm id), and the share is the whole
+     token: create parks nothing else, so what [cr_dirty_clear] hands back
+     recombines to [log_tx] on the nose. *)
+  Definition cr_dirty (i : Z) : iProp Σ :=
+    (∃ k t : nat, ireg_armed k t 1%Qp {[i]})%I.
 
-  (* THE TWO MOVES A SUSPENDED CHILD NEEDS, so that no arm of create spells
-     the three-step dance out.  RETAG under the receipt: the row says
-     nothing about an armed inum, so the new node may be anything.  CLEAR:
-     retag, disarm at the node that is well-formed again, and hand the
-     transaction token back -- create's four exits (the FILE arm, the two
-     mkdir failures, the mkdir success) each take exactly one of these. *)
+  (* THE THREE MOVES A SUSPENDED CHILD NEEDS, so that no arm of create
+     spells the registry dance out.  ARM: hand the transaction token over
+     and retag to the half-built node in one step.  RETAG under the receipt:
+     the row says nothing about an armed inum, so the new node may be
+     anything.  CLEAR: retag, disarm at the node that is well-formed again,
+     and hand the transaction token back -- create's four exits (the FILE
+     arm, the two mkdir failures, the mkdir success) each take exactly one
+     of these. *)
+  Lemma cr_dirty_arm (E : coPset) (γfs : fs_names) (i : Z) (n n' : fs_node) :
+    ↑ftopN ⊆ E ->
+    ftop_inv γfs -∗ log_tx icfg_log -∗ top_frag (fs_gamma_L γfs) i n ={E}=∗
+      cr_dirty i ∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE) "#Hi Htx Hf".
+    iMod (ireg_arm_tx E γfs i HE with "Hi Htx") as (k t) "Harm".
+    iMod (ireg_top_retag_armed E γfs k t 1%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+      as "[Harm Hf]".
+    iModIntro. iFrame "Hf". rewrite /cr_dirty. iExists k, t. iExact "Harm".
+  Qed.
+
   Lemma cr_dirty_retag (E : coPset) (γfs : fs_names) (i : Z) (n n' : fs_node) :
     ↑ftopN ⊆ E ->
     ftop_inv γfs -∗ cr_dirty i -∗ top_frag (fs_gamma_L γfs) i n ={E}=∗
       cr_dirty i ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
     iIntros (HE) "#Hi Hd Hf". rewrite /cr_dirty.
-    iDestruct "Hd" as (t) "Harm".
-    iMod (ireg_top_retag_armed E γfs t {[i]} i n n' HE
+    iDestruct "Hd" as (k t) "Harm".
+    iMod (ireg_top_retag_armed E γfs k t 1%Qp {[i]} i n n' HE
             ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
       as "[Harm Hf]".
-    iModIntro. iFrame "Hf". iExists t. iExact "Harm".
+    iModIntro. iFrame "Hf". iExists k, t. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_clear (E : coPset) (γfs : fs_names) (i : Z) (n n' : fs_node) :
@@ -1621,14 +1641,14 @@ Section ProofCreateMain.
       log_tx icfg_log ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
     iIntros (HE Hloc) "#Hi Hd Hf". rewrite /cr_dirty.
-    iDestruct "Hd" as (t) "Harm".
-    iMod (ireg_top_retag_armed E γfs t {[i]} i n n' HE
+    iDestruct "Hd" as (k t) "Harm".
+    iMod (ireg_top_retag_armed E γfs k t 1%Qp {[i]} i n n' HE
             ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
       as "[Harm Hf]".
-    iMod (ireg_disarm E γfs t {[i]} i n' HE Hloc with "Hi Harm Hf")
+    iMod (ireg_disarm E γfs k t 1%Qp {[i]} i n' HE Hloc with "Hi Harm Hf")
       as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
-    iMod (ireg_release E γfs t HE with "Hi Harm") as "Htx".
+    iMod (ireg_release_tx E γfs k t HE with "Hi Harm") as "Htx".
     iModIntro. iFrame "Htx Hf".
   Qed.
 
@@ -4993,20 +5013,14 @@ Section ProofCreateMain.
          The FILE arm disarms immediately (its child is well-formed the
          moment the count lands), which is why nothing outside create ever
          sees a suspended row on that path. *)
-      assert (Hcin1 : bv_unsigned cinum ∈ ({[bv_unsigned cinum]} : gset Z))
-        by apply elem_of_singleton, eq_refl.
       iEval (rewrite Hglog) in "Htx".
       iApply fupd_wp.
-      iMod (ireg_arm ⊤ γfs (bv_unsigned cinum) ltac:(solve_ndisj)
-              with "[] Htx") as (tdirty) "Harm";
-        [iApply (ireg_inv_ftop with "Hiregi") |].
-      iMod (ireg_top_retag_armed ⊤ γfs tdirty {[bv_unsigned cinum]}
-              (bv_unsigned cinum)
+      iMod (cr_dirty_arm ⊤ γfs (bv_unsigned cinum)
               (era_node dnc bmc datc)
               (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
-              ltac:(solve_ndisj) Hcin1 with "[] Harm Hctop")
-        as "[Harm Hctop]";
+              ltac:(solve_ndisj) with "[] Htx Hctop")
+        as "[Hdirty Hctop]";
         [iApply (ireg_inv_ftop with "Hiregi") |].
       iModIntro.
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
@@ -5283,8 +5297,6 @@ Section ProofCreateMain.
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* the child's suspended row travels into the mkdir arm, which is
            where its dot entries land and the row comes back (lane A) *)
-        iAssert (cr_dirty (bv_unsigned cinum)) with "[Harm]" as "Hdirty".
-        { rewrite /cr_dirty. iExists tdirty. iExact "Harm". }
         iSpecialize ("Hmk" $! kd qd gd γil γisl dind dn bm data nf nsl).
         iPoseProof ("Hmk" $! CIDB8) as "Hm".
         iSpecialize ("Hm" with "[%]"); [wp_next_chain |].
@@ -5367,16 +5379,13 @@ Section ProofCreateMain.
           - apply dir_uniq_not_dir. rewrite cr_setf_type. exact Htdirz.
           - apply dir_dots_ix_not_dir. rewrite cr_setf_type. exact Htdirz. }
         iApply fupd_wp.
-        iMod (ireg_disarm ⊤ γfs tdirty {[bv_unsigned cinum]}
-                (bv_unsigned cinum)
+        iMod (cr_dirty_clear ⊤ γfs (bv_unsigned cinum)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
-                ltac:(solve_ndisj) Hlocfile with "[] Harm Hctop")
-          as "[Harm Hctop]";
-          [iApply (ireg_inv_ftop with "Hiregi") |].
-        iEval (rewrite difference_diag_L) in "Harm".
-        iMod (ireg_release ⊤ γfs tdirty ltac:(solve_ndisj) with "[] Harm")
-          as "Htx";
+                (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
+                          bmc datc)
+                ltac:(solve_ndisj) Hlocfile with "[] Hdirty Hctop")
+          as "[Htx Hctop]";
           [iApply (ireg_inv_ftop with "Hiregi") |].
         iEval (rewrite -Hglog) in "Htx".
         iModIntro.
@@ -7607,25 +7616,12 @@ Section ProofCreateMain.
                  (cr_setf_size _ _ _ _) Hcduq).
       - exact (dir_dots_ix_orphan (bv_unsigned cinum) _ datc Hznl). }
     iApply fupd_wp.
-    rewrite /cr_dirty. iDestruct "Hdirty" as (tdirty) "Harm".
-    iMod (ireg_top_retag_armed ⊤ γfs tdirty {[bv_unsigned cinum]}
-            (bv_unsigned cinum)
+    iMod (cr_dirty_clear ⊤ γfs (bv_unsigned cinum)
             (era_node dc bmc datc)
             (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj)
-            ltac:(apply elem_of_singleton, eq_refl)
-            with "[] Harm Hctop") as "[Harm Hctop]";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
-    iMod (ireg_disarm ⊤ γfs tdirty {[bv_unsigned cinum]} (bv_unsigned cinum)
-            (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
-                      bmc datc)
-            ltac:(solve_ndisj) Hlocorph with "[] Harm Hctop")
-      as "[Harm Hctop]";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
-    iEval (rewrite difference_diag_L) in "Harm".
-    iMod (ireg_release ⊤ γfs tdirty ltac:(solve_ndisj) with "[] Harm")
-      as "Htx";
+            ltac:(solve_ndisj) Hlocorph with "[] Hdirty Hctop")
+      as "[Htx Hctop]";
       [iApply (ireg_inv_ftop with "Hiregi") |].
     iEval (rewrite -Hglog) in "Htx".
     iModIntro.
