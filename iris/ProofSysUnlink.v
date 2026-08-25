@@ -5237,17 +5237,16 @@ Section ProofSysUnlinkBody.
       as "#Hescd".
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
     (* [dp]'s arm comes off at its own release (durable-disk B''-tx2) *)
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn gfs gi cov logstart kd sd dev dinum gyd true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescd Hivalidd Hdepd")
-      as "(Hivalidd & Hdepd & Htq1)".
-    iModIntro.
-    iApply (Iunlockput.wp_iunlockput_gen (CID := D20) gs jx gl gu gd gk pd pav
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the quarter it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
-              inodestart nib size dev kd qdi sd gyd dinum dnW bm'
+              inodestart nib size dev kd qdi sd gyd
+              (DepTx sd dev dinum gyd t (1/4)%Qp) dinum dnW bm'
               nw Sbw false true false e0 pid (DfracOwn (1/4)) dqb dqs
               C5 (K - 30)%nat eb b lks
-              (upd_upt V P1) ltac:(exact Kiup) Hkd ltac:(discriminate)
+              (upd_upt V P1) ltac:(exact Kiup) eq_refl Hkd ltac:(discriminate)
               ltac:(intros _; exact Hibd16)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string)
@@ -5260,7 +5259,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D21 Hd21 mup n2 Sb2 wg)
       "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi Hbsl %Hsb2 %Hwg
-       %Hwgc %Hn2 HopS Hisl".
+       %Hwgc %Hn2 HopS Hisl Htq1".
     assert (Hpcbe : ret_pc (C5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xbe)) by (rewrite HC5ra; pcw).
     iEval (rewrite Hpcbe) in "Hpc".
@@ -5587,22 +5586,22 @@ Section ProofSysUnlinkBody.
     assert (Hnu2 : (iput_units <= c2)%nat).
     { unfold iput_units. lia. }
     (* ...and [ip]'s at its own *)
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn gfs gi cov logstart ks si dev
-            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hesci Hivalidi Hdepi")
-      as "(Hivalidi & Hdepi & Htq2)".
-    iModIntro.
-    iApply (Iunlockput.wp_iunlockput_gen (CID := D29) gs jx gl gu gd gk pd pav
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the quarter it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev ks qsi si gyi
+              (DepTx si dev
+                 (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                 gyi t (1/4)%Qp)
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
               dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
               false true false e1 pid (DfracOwn (1/4)) dqb dqs
               E2 (K - 30)%nat eb b lks
-              (upd_upt V P1) Kiup Hks Hcrb2 Hcru2
+              (upd_upt V P1) Kiup eq_refl Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
@@ -5615,7 +5614,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D30 Hd30 mip n3 Sb3 wh)
       "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi Hbsl %Hsb3
-       %Hwh %Hwhc %Hn3 HopS Hisl2".
+       %Hwh %Hwhc %Hn3 HopS Hisl2 Htq2".
     clear Hcrb2 Hcru2 Hnu2 dni2.
     assert (Hpcd4 : ret_pc (E2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xd4)) by (rewrite HE2ra; pcw).
@@ -7290,17 +7289,16 @@ Section ProofSysUnlinkBody.
     assert (Hnud2 : (iput_units <= S c1)%nat).
     { unfold iput_units. lia. }
     (* [dp]'s arm comes off at its own release (durable-disk B''-tx2) *)
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn gfs gi cov logstart kd sd dev dinum gyd true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescd Hivalidd Hdepd")
-      as "(Hivalidd & Hdepd & Htq1)".
-    iModIntro.
-    iApply (Iunlockput.wp_iunlockput_gen (CID := D20) gs jx gl gu gd gk pd pav
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the quarter it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
-              inodestart nib size dev kd qdi sd gyd dinum dnW2 bm'
+              inodestart nib size dev kd qdi sd gyd
+              (DepTx sd dev dinum gyd t (1/4)%Qp) dinum dnW2 bm'
               (S c1) (Sbw ∪ {[IBLOCK dinum inodestart]}) false true false e0 pid (DfracOwn (1/4)) dqb dqs
               C5 (K - 30)%nat eb b lks
-              (upd_upt V P1) Kiup Hkd Hcrbd2 Hcrud2
+              (upd_upt V P1) Kiup eq_refl Hkd Hcrbd2 Hcrud2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
@@ -7313,7 +7311,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D21 Hd21 mup n2 Sb2 wg)
       "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi Hbsl %Hsb2 %Hwg
-       %Hwgc %Hn2 HopS Hisl".
+       %Hwgc %Hn2 HopS Hisl Htq1".
     clear Hcrbd2 Hcrud2 Hnud2 dnW2.
     assert (Hpcbe : ret_pc (C5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xbe)) by (rewrite HC5ra; pcw).
@@ -7693,22 +7691,22 @@ Section ProofSysUnlinkBody.
     assert (Hnu2 : (iput_units <= c2)%nat).
     { unfold iput_units. lia. }
     (* ...and [ip]'s at its own *)
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn gfs gi cov logstart ks si dev
-            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hesci Hivalidi Hdepi")
-      as "(Hivalidi & Hdepi & Htq2)".
-    iModIntro.
-    iApply (Iunlockput.wp_iunlockput_gen (CID := D29) gs jx gl gu gd gk pd pav
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the quarter it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev ks qsi si gyi
+              (DepTx si dev
+                 (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                 gyi t (1/4)%Qp)
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
               dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
               false true false e1 pid (DfracOwn (1/4)) dqb dqs
               E2 (K - 30)%nat eb b lks
-              (upd_upt V P1) Kiup Hks Hcrb2 Hcru2
+              (upd_upt V P1) Kiup eq_refl Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
@@ -7721,7 +7719,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D30 Hd30 mip n3 Sb3 wh)
       "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi Hbsl %Hsb3
-       %Hwh %Hwhc %Hn3 HopS Hisl2".
+       %Hwh %Hwhc %Hn3 HopS Hisl2 Htq2".
     clear Hcrb2 Hcru2 Hnu2 dni2.
     assert (Hpcd4 : ret_pc (E2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xd4)) by (rewrite HE2ra; pcw).

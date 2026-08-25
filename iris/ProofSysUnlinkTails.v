@@ -929,22 +929,15 @@ Section ProofSysUnlinkTails.
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): this is the LAST
-       release of the walk, so the disarm brings the whole element home and
-       the counted contract is available again. *)
-    iApply fupd_wp.
-    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
-            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
-      as "(Hivalid & Hdep & Htx)".
-    iModIntro.
-    iEval (rewrite -Hglog) in "Htx".
-    iDestruct (log_opb_op with "Hop Htx") as "Hop".
-    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
+       release of the walk, so the ARMED contract (B''-tx4) brings the whole
+       element home in the ghost step that parks the payload. *)
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
-              ltac:(rewrite Hlkempty; apply locks_below_empty)
+              ltac:(rewrite Hlkempty; apply locks_below_empty) Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
@@ -1485,19 +1478,18 @@ Section ProofSysUnlinkTails.
     rewrite /ic_tx_dep_at.
     iDestruct "Hdep" as "[Hdep Htk]".
     iDestruct "Hdepi" as "[Hdepi Hti]".
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn gfs gi cov logstart ki si dev inumi gyi true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescki Hivalidi Hdepi")
-      as "(Hivalidi & Hdepi & Htd)".
-    iModIntro.
     iDestruct "Hop" as (SbE) "Hop".
     iDestruct (log_opS_named with "Hop") as (eE) "Hop".
-    iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the quarter it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (Iunlockput.wp_iunlockput_dep_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
-              inodestart nib size dev ki qip si gyi inumi dni bmi u SbE
+              inodestart nib size dev ki qip si gyi
+              (DepTx si dev inumi gyi t (1/4)%Qp) inumi dni bmi u SbE
               false false false eE pidv
               dq dqb dqs M2 (K - 30)%nat eb b lks
-              Vpr HKup Hki ltac:(discriminate) ltac:(discriminate)
+              Vpr HKup eq_refl Hki ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -1508,7 +1500,7 @@ Section ProofSysUnlinkTails.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CID3 Hq3 mup n2 SbE2 wgE)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %HsbE2 %HwgE
-       %HwgcE %Hn2 Hop Hislot".
+       %HwgcE %Hn2 Hop Hislot Htd".
     (* ...and [dp]'s arm GROWS back to a half, which is where a one-lock
        walk stands: [su_tail_bad] takes [ic_tx_dep]. *)
     iApply fupd_wp.

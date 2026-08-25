@@ -3262,23 +3262,17 @@ Section ProofCreateMain.
           by (rewrite /G2; apply cr_regs_caller; [exact Hcsra | exact HG1regs]).
         iDestruct (cpu_own_transport CIDil CID21 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply fupd_wp.
-        iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-                t (1/2)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-          as "(Hivalid & Hdep & Htp)".
-        iModIntro.
-        iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
-                     (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
-        iDestruct (log_tx_full with "Htw") as "Htx".
-        iEval (rewrite -Hglog) in "Htx".
+        (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+           goes in and the share it parked comes back in the post, so no
+           bundleless out-state stands across the call. *)
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-        iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+        iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
-                  kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
+                  kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                   G2 (K - 10)%nat eb b lks
-                  V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
+                  V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -3291,7 +3285,11 @@ Section ProofCreateMain.
         { iEval (cbn beta iota). iEmpIntro. }
         iIntros (CIDup Hqup mup n2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl".
+           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl Htp".
+        iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
+                     (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
+        iDestruct (log_tx_full with "Htw") as "Htx".
+        iEval (rewrite -Hglog) in "Htx".
         assert (Hpcup : ret_pc (G2 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x8a)) by (rewrite HG2ra; pcw).
         iEval (rewrite Hpcup) in "Hpc".
@@ -3709,19 +3707,17 @@ Section ProofCreateMain.
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           iDestruct (cpu_own_transport CIDdl CID27 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply fupd_wp.
-          iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-                  t (1/2)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-            as "(Hivalid & Hdep & Htp)".
-          iModIntro.
+          (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+             goes in and the share it parked comes back in the post, so no
+             bundleless out-state stands across the call. *)
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-          iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
+          iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                     cn gtl gild gisld cov logstart bmapstart inodestart nib size
-                    dev kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
+                    dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                     false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                     F3 (K - 10)%nat eb b lks
-                    V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
+                    V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -3734,7 +3730,7 @@ Section ProofCreateMain.
           { iEval (cbn beta iota). iEmpIntro. }
           iIntros (CIDu1 Hqu1 mu1 n2 Sb2 wf1)
             "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-             %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl".
+             %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl Htp".
           assert (Hpcu1 : ret_pc (F3 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x54)) by (rewrite HF3ra; pcw).
           iEval (rewrite Hpcu1) in "Hpc".
@@ -3943,23 +3939,17 @@ Section ProofCreateMain.
               by (rewrite /B2; apply cr_regs_caller; [exact Hcsra | exact HB1regs]).
             iDestruct (cpu_own_transport CIDb CIDB2 0%nat eb (proc_addr j) b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-            iApply fupd_wp.
-            iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kslot (qq/2)%Qp dev cinum gc true
-                    t (1/2)%Qp ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep")
-              as "(Hcivalid & Hcdep & Htp)".
-            iModIntro.
-            iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
-                         (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
-            iDestruct (log_tx_full with "Htw") as "Htx".
-            iEval (rewrite -Hglog) in "Htx".
+            (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+               goes in and the share it parked comes back in the post, so no
+               bundleless out-state stands across the call. *)
             iDestruct (log_opS_named with "Hop") as (ec) "Hop".
             iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckeep2".
-            iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
+            iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                       cn gtl gilc gislc cov logstart bmapstart inodestart nib
-                      size dev kslot (qq/2)%Qp (qq/2)%Qp gc cinum dnc bmc
+                      size dev kslot (qq/2)%Qp (qq/2)%Qp gc (DepTx (qq/2)%Qp dev cinum gc t (1/2)%Qp) cinum dnc bmc
                       n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
                       B2 (K - 10)%nat eb b lks
-                      V ltac:(exact HKiup) Hkslot ltac:(discriminate)
+                      V ltac:(exact HKiup) eq_refl Hkslot ltac:(discriminate)
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
@@ -3974,7 +3964,11 @@ Section ProofCreateMain.
             { iEval (cbn beta iota). iEmpIntro. }
             iIntros (CIDU2 HqU2 mu2 n3 Sb3 wf2)
               "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-               %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2".
+               %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2 Htp".
+            iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
+                         (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
+            iDestruct (log_tx_full with "Htw") as "Htx".
+            iEval (rewrite -Hglog) in "Htx".
             assert (Hpcu2 : ret_pc (B2 !!! Regidx Rra : mword 64)
                             = mword_of_int (CK + 0x9e)) by (rewrite HB2ra; pcw).
             iEval (rewrite Hpcu2) in "Hpc".
@@ -4487,23 +4481,17 @@ Section ProofCreateMain.
           by (rewrite /J2; apply cr_regs_caller; [exact Hcsra | exact HJ1regs]).
         iDestruct (cpu_own_transport CIDil CID21 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply fupd_wp.
-        iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-                t (1/2)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-          as "(Hivalid & Hdep & Htp)".
-        iModIntro.
-        iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
-                     (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
-        iDestruct (log_tx_full with "Htw") as "Htx".
-        iEval (rewrite -Hglog) in "Htx".
+        (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+           goes in and the share it parked comes back in the post, so no
+           bundleless out-state stands across the call. *)
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-        iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+        iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
-                  kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
+                  kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                   J2 (K - 10)%nat eb b lks
-                  V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
+                  V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -4516,7 +4504,11 @@ Section ProofCreateMain.
         { iEval (cbn beta iota). iEmpIntro. }
         iIntros (CIDup Hqup mup n2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl".
+           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl Htp".
+        iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
+                     (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
+        iDestruct (log_tx_full with "Htw") as "Htx".
+        iEval (rewrite -Hglog) in "Htx".
         assert (Hpcup : ret_pc (J2 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x94)) by (rewrite HJ2ra; pcw).
         iEval (rewrite Hpcup) in "Hpc".
@@ -5955,21 +5947,19 @@ Section ProofCreateMain.
                by exact (cr_alloc_ip (S q2) n' _ _ _ _ _ ltac:(lia) Hspend).
              iDestruct (cpu_own_transport CIDdl CIDD3 0%nat eb (proc_addr j) b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-             iApply fupd_wp.
-             iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-                     t (1/4)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-               as "(Hivalid & Hdep & Htp)".
-             iModIntro.
+             (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+                goes in and the share it parked comes back in the post, so no
+                bundleless out-state stands across the call. *)
              iDestruct (log_opS_named with "Hop") as (e0) "Hop".
              iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
              iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
              { rewrite Hty'. iExact "Hshotl". }
-             iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
+             iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
-                       size dev kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
+                       size dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dn' bm'
                        n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb b lks
-                       V ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
+                       V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
@@ -5982,7 +5972,7 @@ Section ProofCreateMain.
              { iEval (cbn beta iota). iEmpIntro. }
              iIntros (CIDU2 HqU2 mu2 n2 Sb2 wf2)
                "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-                %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2".
+                %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2 Htp".
              assert (Hpcu2 : ret_pc (Y2 !!! Regidx Rra : mword 64)
                              = mword_of_int (CK + 0xe6)) by (rewrite HY2ra; pcw).
              iEval (rewrite Hpcu2) in "Hpc".
@@ -6346,23 +6336,17 @@ Section ProofCreateMain.
       iDestruct (cpu_own_transport CIDo CIDF2 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iEval (rewrite Hglog) in "Htx".
-      iApply fupd_wp.
-      iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-              t (1/2)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-        as "(Hivalid & Hdep & Htp)".
-      iModIntro.
-      iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
-                   (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
-      iDestruct (log_tx_full with "Htw") as "Htx".
-      iEval (rewrite -Hglog) in "Htx".
+      (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+         goes in and the share it parked comes back in the post, so no
+         bundleless out-state stands across the call. *)
       iDestruct (log_opS_named with "Hop") as (e0) "Hop".
       iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-      iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+      iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γil γisl cov logstart bmapstart inodestart nib size dev
-                kd (qd/2)%Qp (qd/2)%Qp gd dind dn bm (S q1) Sb1
+                kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dn bm (S q1) Sb1
                 false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                 Z2 (K - 10)%nat eb b lks
-                V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
+                V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -6375,7 +6359,11 @@ Section ProofCreateMain.
       { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDU HqU mu n2 Sb2 wf)
         "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-         %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl".
+         %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl Htp".
+      iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
+                   (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
+      iDestruct (log_tx_full with "Htw") as "Htx".
+      iEval (rewrite -Hglog) in "Htx".
       assert (Hpcu : ret_pc (Z2 !!! Regidx Rra : mword 64)
                      = mword_of_int (CK + 0xf2)) by (rewrite HZ2ra; pcw).
       iEval (rewrite Hpcu) in "Hpc".
@@ -6855,20 +6843,18 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iDestruct (cpu_own_transport CIDG4 CIDG6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kslot (q/2)%Qp dev cinum g true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep")
-      as "(Hcivalid & Hcdep & Htq1)".
-    iModIntro.
-    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the share it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              kslot (q/2)%Qp (q/2)%Qp g cinum
+              kslot (q/2)%Qp (q/2)%Qp g (DepTx (q/2)%Qp dev cinum g t (1/4)%Qp) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
-              V ltac:(exact HKiup) Hkslt
+              V ltac:(exact HKiup) eq_refl Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
               ltac:(intros _; exact (cr_in_union_sing Sb4
@@ -6885,7 +6871,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDG7 HqG7 mu1 n5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1".
+       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 Htq1".
     (* THE LEDGER, at the body's disjunction (finding (3) in the banner) *)
     assert (Hipn5 : (iput_units <= n5)%nat).
     { destruct (decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
@@ -7073,23 +7059,15 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iDestruct (cpu_own_transport CIDG7 CIDG9 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-      as "(Hivalid & Hdep & Htq2)".
-    iModIntro.
-    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
-                 (eq_sym Qp.quarter_quarter) with "Htq1 Htq2") as "Htp".
-    iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
-                 (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
-    iDestruct (log_tx_full with "Htw") as "Htx".
-    iEval (rewrite -Hglog) in "Htx".
-    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the share it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
-              kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
+              kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dn' bm'
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
-              V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
+              V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -7102,7 +7080,13 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDGA HqGA mu2 n6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2".
+       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 Htq2".
+    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
+                 (eq_sym Qp.quarter_quarter) with "Htq1 Htq2") as "Htp".
+    iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
+                 (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
+    iDestruct (log_tx_full with "Htw") as "Htx".
+    iEval (rewrite -Hglog) in "Htx".
     assert (Hpcu2 : ret_pc (G6 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x15c)) by (rewrite HG6ra; pcw).
     iEval (rewrite Hpcu2) in "Hpc".
@@ -7811,20 +7795,18 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iDestruct (cpu_own_transport CIDG4 CIDG6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kslot (q/2)%Qp dev cinum g true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep")
-      as "(Hcivalid & Hcdep & Htq1)".
-    iModIntro.
-    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the share it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              kslot (q/2)%Qp (q/2)%Qp g cinum
+              kslot (q/2)%Qp (q/2)%Qp g (DepTx (q/2)%Qp dev cinum g t (1/4)%Qp) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
-              V ltac:(exact HKiup) Hkslt
+              V ltac:(exact HKiup) eq_refl Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
               ltac:(intros _; exact (cr_in_union_sing Sb4
@@ -7841,7 +7823,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDG7 HqG7 mu1 n5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1".
+       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 Htq1".
     assert (Hipn5 : (iput_units <= n5)%nat).
     { destruct (decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
         as [Hin | Hout].
@@ -7923,23 +7905,15 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iDestruct (cpu_own_transport CIDG7 CIDG9 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply fupd_wp.
-    iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
-            t (1/4)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-      as "(Hivalid & Hdep & Htq2)".
-    iModIntro.
-    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
-                 (eq_sym Qp.quarter_quarter) with "Htq1 Htq2") as "Htp".
-    iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
-                 (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
-    iDestruct (log_tx_full with "Htw") as "Htx".
-    iEval (rewrite -Hglog) in "Htx".
-    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+       goes in and the share it parked comes back in the post, so no
+       bundleless out-state stands across the call. *)
+    iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
-              kd (qd/2)%Qp (qd/2)%Qp gd dind dp bmp
+              kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dp bmp
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
-              V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
+              V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -7952,7 +7926,13 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDGA HqGA mu2 n6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2".
+       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 Htq2".
+    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
+                 (eq_sym Qp.quarter_quarter) with "Htq1 Htq2") as "Htp".
+    iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
+                 (eq_sym Qp.half_half) with "Htp Htx") as "Htw".
+    iDestruct (log_tx_full with "Htw") as "Htx".
+    iEval (rewrite -Hglog) in "Htx".
     assert (Hpcu2 : ret_pc (G6 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x15c)) by (rewrite HG6ra; pcw).
     iEval (rewrite Hpcu2) in "Hpc".
@@ -9863,22 +9843,20 @@ Section ProofCreateMain.
             by (intros _; exact (cr_in_union_sing Sb6 (IBLOCK dind inodestart))).
           iDestruct (cpu_own_transport CIDh7 CIDT2 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply fupd_wp.
-          iMod (ic_disarm_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd
-                  true t (1/4)%Qp ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
-            as "(Hivalid & Hdep & Htq2)".
-          iModIntro.
+          (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
+             goes in and the share it parked comes back in the post, so no
+             bundleless out-state stands across the call. *)
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-          iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
+          iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γil γisl cov logstart bmapstart inodestart nib
-                    size dev kd (qd/2)%Qp (qd/2)%Qp gd dind
+                    size dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
                     true true false e0 pidv (DfracOwn (1/4)) dqb dqs
                     T2 (K - 10)%nat eb b lks
-                    V ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
+                    V ltac:(exact HKiup) eq_refl Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
@@ -9891,7 +9869,7 @@ Section ProofCreateMain.
           { iEval (cbn beta iota). iEmpIntro. }
           iIntros (CIDT3 HqT3 mu2 n7 Sb7 wf7)
             "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
-             %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2".
+             %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2 Htq2".
           assert (Hpcu2 : ret_pc (T2 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0xe6)) by (rewrite HT2ra; pcw).
           iEval (rewrite Hpcu2) in "Hpc".

@@ -744,22 +744,16 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
        of this transaction's element at the [ilock] and sys_open has carried
-       the other half inside the descriptor ever since, so the release
-       disarms first and the whole token comes home for the [end_op]. *)
-    iApply fupd_wp.
-    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
-            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
-      as "(Hivalid & Hdep & Htx)".
-    iModIntro.
-    iEval (rewrite -Hglog) in "Htx".
-    iDestruct (log_opb_op with "Hop Htx") as "Hop".
-    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
+       the other half inside the descriptor ever since.  The release takes
+       the ARMED contract (B''-tx4), which retires the descriptor in the
+       ghost step that parks the payload and hands the whole token back. *)
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
-              ltac:(rewrite Hlkempty; apply locks_below_empty)
+              ltac:(rewrite Hlkempty; apply locks_below_empty) Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
@@ -1101,22 +1095,16 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
        of this transaction's element at the [ilock] and sys_open has carried
-       the other half inside the descriptor ever since, so the release
-       disarms first and the whole token comes home for the [end_op]. *)
-    iApply fupd_wp.
-    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
-            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
-      as "(Hivalid & Hdep & Htx)".
-    iModIntro.
-    iEval (rewrite -Hglog) in "Htx".
-    iDestruct (log_opb_op with "Hop Htx") as "Hop".
-    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
+       the other half inside the descriptor ever since.  The release takes
+       the ARMED contract (B''-tx4), which retires the descriptor in the
+       ghost step that parks the payload and hands the whole token back. *)
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
-              ltac:(rewrite Hlkempty; apply locks_below_empty)
+              ltac:(rewrite Hlkempty; apply locks_below_empty) Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
@@ -1453,22 +1441,16 @@ Section ProofSysOpenTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
        of this transaction's element at the [ilock] and sys_open has carried
-       the other half inside the descriptor ever since, so the release
-       disarms first and the whole token comes home for the [end_op]. *)
-    iApply fupd_wp.
-    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
-            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
-      as "(Hivalid & Hdep & Htx)".
-    iModIntro.
-    iEval (rewrite -Hglog) in "Htx".
-    iDestruct (log_opb_op with "Hop Htx") as "Hop".
-    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
+       the other half inside the descriptor ever since.  The release takes
+       the ARMED contract (B''-tx4), which retires the descriptor in the
+       ghost step that parks the payload and hands the whole token back. *)
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 24)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
-              ltac:(rewrite Hlkempty; apply locks_below_empty)
+              ltac:(rewrite Hlkempty; apply locks_below_empty) Hglog
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
@@ -2113,23 +2095,19 @@ Section ProofSysOpenTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): the escrow parked half
        of this transaction's element at the [ilock] and sys_open has carried
-       the other half inside the descriptor ever since, so the release
-       disarms first and the whole token comes home for the [end_op]. *)
-    iApply fupd_wp.
-    iMod (SpecIunlock.ic_disarm_tx_log ⊤ cn gfs gi cov logstart kk s dev inum
-            gy true ltac:(solve_ndisj) with "Hesck Hivalid Hdep")
-      as "(Hivalid & Hdep & Htx)".
-    iModIntro.
-    iEval (rewrite -Hglog) in "Htx".
-    iDestruct (log_opb_op with "Hop Htx") as "Hop".
-    iApply (Iunlock.wp_iunlock_sconf (CID := CID2) gs gfs gi cn gil gisl
+       the other half inside the descriptor ever since.  The release takes
+       the ARMED contract (B''-tx4), which retires the descriptor in the
+       ghost step that parks the payload and hands the whole token back. *)
+    iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID2) gs gfs gi cn gil gisl
               cov logstart kk s gy dev inum dn bm pidv dq M2 (K - 24)%nat eb
               (proc_addr jx) b lks
               Vpr HKiu Hkk HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
                     Hpid Hprocs Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz").
-    iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr".
+    iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr Htx".
+    iEval (rewrite -Hglog) in "Htx".
+    iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0xbe)) by (rewrite HM2ra; pcw).
