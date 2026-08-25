@@ -84,7 +84,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   is_pipe γl γp pi -∗
   pipe_ref γp w 1 -∗
   (* kfree's resources: the kmem lock and the page count *)
-  is_lock γkl klk "kmem"%string <{ kmem_res γk kfl }> -∗
+  is_lock γkl klk "kmem"%string (λ ξ : CtxId, kmem_res ξ γk kfl) -∗
   kalloc_avail γk on -∗
   (* wakeup's *)
   procs_inv γs -∗

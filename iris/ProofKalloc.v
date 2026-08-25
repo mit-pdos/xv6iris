@@ -177,7 +177,7 @@ Section ProofKalloc.
        acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string <{ kmem_res γk fl }> mA
+    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) mA
               n eb p (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
@@ -211,7 +211,7 @@ Section ProofKalloc.
               R6 (trap_res b + (K - 4))%nat head false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hflw]").
     { iApply (kai_1a with "Htext"). }
-    { iEval (rewrite -Hldaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
+    { iEval (rewrite -Hldaddr) in "Hflw". iApply (word_at_to_mem with "Hflw"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hflw".
     iEval (rewrite Hldaddr) in "Hflw".
@@ -238,9 +238,10 @@ Section ProofKalloc.
       iEval (rewrite Htgtbeq) in "Hpc".
       (* the empty list pins the caller's count (if any) to 0 *)
       iDestruct (kalloc_avail_zero γk on with "Havail Hauth") as %Hzero.
-      iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HRres".
-      { iApply (kmem_res_close γk fl head []). rewrite /word_at.
-        iFrame "Hflw Hauth". iPureIntro. exact Hhead. }
+      iAssert (kmem_res cur_ctx γk fl) with "[Hflw Hauth]" as "HRres".
+      { iApply (kmem_res_close γk fl head []).
+        iSplitL "Hflw"; [iApply (word_at_of_mem with "Hflw")|].
+        iSplitR "Hauth"; [iPureIntro; exact Hhead | iExact "Hauth"]. }
       (* +0x4c auipc a0,0x12 *)
       iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kalloc + 0x4c)) (mword_of_int 10 : mword 5) (mword_of_int 0x12 : mword 20)
                 R7 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -291,7 +292,7 @@ Section ProofKalloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
-      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string <{ kmem_res γk fl }> E3
+      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) E3
                 n eb p (K - 4)%nat ({["kmem"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -486,7 +487,7 @@ Section ProofKalloc.
                 R7 (trap_res b + (K - 4))%nat nxt false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hpnext]").
       { iApply (kai_20 with "Htext"). }
-      { iEval (rewrite Hpaddr). rewrite /word_at. iExact "Hpnext". }
+      { iEval (rewrite Hpaddr). iApply (word_at_to_mem with "Hpnext"). }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hpnext".
       iEval (rewrite Hpaddr) in "Hpnext".
@@ -513,15 +514,17 @@ Section ProofKalloc.
       iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.kalloc + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x8ae : mword 12)
                 R9 (trap_res b + (K - 4))%nat pg false with "Hcg Hpc [] [Hflw]").
       { iApply (kai_26 with "Htext"). }
-      { iEval (rewrite -Hstaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
+      { iEval (rewrite -Hstaddr) in "Hflw". iExact "Hflw". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hflw".
       iEval (repeat rgne) in "Hflw".
       iEval (rewrite Ha5R9) in "Hflw". iEval (rewrite Hstaddr) in "Hflw".
-      iAssert (kmem_res γk fl) with "[Hflw Hchain Hauth]" as "HRres".
-      { iApply (kmem_res_close γk fl nxt ps). rewrite /word_at. iFrame "Hflw Hchain Hauth". }
+      iAssert (kmem_res cur_ctx γk fl) with "[Hflw Hchain Hauth]" as "HRres".
+      { iApply (kmem_res_close γk fl nxt ps).
+        iSplitL "Hflw"; [iApply (word_at_of_mem with "Hflw") | iFrame "Hchain Hauth"]. }
       iAssert (page_own pg) with "[Hpnext Hprest]" as "Hpage".
-      { iApply (run_page_page_own pg nxt). rewrite /run_page /word_at. iFrame "Hpnext Hprest". }
+      { iApply (run_page_page_own (ξc := cur_ctx) pg nxt). rewrite /run_page.
+        iSplitL "Hpnext"; [iApply (word_at_of_mem with "Hpnext") | iExact "Hprest"]. }
       assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x26) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2a) in "Hpc".
       (* +0x2a auipc a0,0x12 ; +0x2e addi a0,a0,2000 (a0 := &kmem) *)
@@ -585,7 +588,7 @@ Section ProofKalloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
-      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string <{ kmem_res γk fl }> R12
+      iApply (Release.wp_release_sconf kt γl (mword_of_int KernelSyms.kmem) "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) R12
                 n eb p (K - 4)%nat ({["kmem"]} ∪ lks)
                 ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)

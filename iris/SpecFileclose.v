@@ -222,7 +222,7 @@ Section SpecFileclose.
     (⌜(Z.of_nat n + 2 < 2 ^ 31)%Z⌝ ∗
      procs_inv (fcn_procs fn) ∗
      is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
-       <{ kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
+       (λ ξ : CtxId, kmem_res ξ (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail (fcn_kalloc fn) on)%I.
 
   (* the page came back iff this was the pipe's LAST end; the caller cannot

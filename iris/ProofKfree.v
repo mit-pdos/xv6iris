@@ -484,7 +484,7 @@ Section ProofKfree.
        CID22..CID25), so acquire wants it at CID25. *)
     iDestruct (cpu_own_transport CID CID25 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string <{ kmem_res γk fl }> Kacq
+    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) Kacq
               n eb pcur (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
@@ -510,7 +510,7 @@ Section ProofKfree.
               macq (trap_res b + (K - 4))%nat head false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hflw]").
     { iApply (kfi_44 with "Htext"). }
-    { iEval (rewrite -Hldaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
+    { iEval (rewrite -Hldaddr) in "Hflw". iApply (word_at_to_mem with "Hflw"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hflw".
     iEval (rewrite Hldaddr) in "Hflw".
@@ -526,7 +526,7 @@ Section ProofKfree.
     (* +0x48 c.sd a5,0(s1) : p->next := head *)
     iEval (rewrite page_own_split) in "Hpage".
     iDestruct "Hpage" as "[Hpghead Hpgrest]".
-    iDestruct (page_head8_word_at p Hpv with "Hpghead") as (wold) "Hpw".
+    iDestruct (page_head8_word_at (ξc := cur_ctx) p Hpv with "Hpghead") as (wold) "Hpw".
     assert (Hsdaddr : add_vec (Rld !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))) = p).
     { replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
@@ -534,14 +534,15 @@ Section ProofKfree.
     iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.kfree + 0x48)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               Rld (trap_res b + (K - 4))%nat wold false with "Hcg Hpc [] [Hpw]").
     { iApply (kfi_48 with "Htext"). }
-    { iEval (rewrite -Hsdaddr) in "Hpw". rewrite /word_at. iExact "Hpw". }
+    { iEval (rewrite -Hsdaddr) in "Hpw". iApply (word_at_to_mem with "Hpw"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hpw".
     iEval (repeat rgne) in "Hpw".
     iEval (rewrite Hsdaddr) in "Hpw".
     iEval (rewrite HRlda5) in "Hpw".
-    iAssert (run_page p head) with "[Hpw Hpgrest]" as "Hrun".
-    { rewrite /run_page. rewrite /word_at. iFrame "Hpw Hpgrest". }
+    iAssert (run_page cur_ctx p head) with "[Hpw Hpgrest]" as "Hrun".
+    { rewrite /run_page. iSplitL "Hpw";
+        [iApply (word_at_of_mem with "Hpw") | iExact "Hpgrest"]. }
     assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.kfree + 0x48) : mword 64) 2 = mword_of_int (KernelSyms.kfree + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4a) in "Hpc".
     (* +0x4a sd s1,24(s2) : kmem.freelist := p *)
@@ -550,16 +551,16 @@ Section ProofKfree.
     iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.kfree + 0x4a)) (mword_of_int 9 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0x18 : mword 12)
               Rld (trap_res b + (K - 4))%nat head false with "Hcg Hpc [] [Hflw]").
     { iApply (kfi_4a with "Htext"). }
-    { iEval (rewrite -Hsdaddr2) in "Hflw". rewrite /word_at. iExact "Hflw". }
+    { iEval (rewrite -Hsdaddr2) in "Hflw". iExact "Hflw". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hflw".
     iEval (repeat rgne) in "Hflw".
     iEval (rewrite Hsdaddr2) in "Hflw".
     iEval (rewrite HRlds1) in "Hflw".
     (* refold the freelist invariant with [p] pushed; the count ghost-steps up *)
-    iMod (kmem_res_push γk fl p head pages on Hpv with "Havail [Hflw] Hrun Hchain Hauth")
+    iMod (kmem_res_push (ξc := cur_ctx) γk fl p head pages on Hpv with "Havail [Hflw] Hrun Hchain Hauth")
       as "[Havail HRres]".
-    { rewrite /word_at. iExact "Hflw". }
+    { iApply (word_at_of_mem with "Hflw"). }
     assert (Hpp4e : add_vec_int (mword_of_int (KernelSyms.kfree + 0x4a) : mword 64) 4 = mword_of_int (KernelSyms.kfree + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4e) in "Hpc".
     (* ===== RELEASE setup + call (intr_count S n -> n, deep-10 lent) ===== *)
@@ -601,7 +602,7 @@ Section ProofKfree.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
-    iApply (Release.wp_release_sconf kt γl lk "kmem"%string <{ kmem_res γk fl }> Rrel
+    iApply (Release.wp_release_sconf kt γl lk "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) Rrel
               n eb pcur (K - 4)%nat ({["kmem"]} ∪ lks)
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)

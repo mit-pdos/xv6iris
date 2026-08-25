@@ -636,7 +636,7 @@ Section UsertrapRes.
      is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (un_kl N) (mword_of_int KernelSyms.kmem) "kmem"%string
-       <{ kmem_res (un_ka N) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
+       (λ ξ : CtxId, kmem_res ξ (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
      is_lock (un_k N) d_lock "virtio_disk"%string <{ disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N) }> ∗
      bio_ctx (un_bn N) (fs_view (un_fs N) (un_v N) (un_dev N) (un_cov N)) ∗
      log_ctx (un_lg N) (un_bn N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N) ∗

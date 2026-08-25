@@ -144,6 +144,50 @@ parallel forms:
   context-indexed payloads (`↦c` facts) carrying real `CtxMorph`
   instances, one lock at a time (kmem is the natural first).
 
+### 0.7′ KMEM IS THE WORKED PAYLOAD INSTANCE (landed 2026-08-25) — THE RECIPE
+
+The kmem lock's UNDER-THE-LOCK facts (the freelist head cell and each
+free page's next-pointer word: `KallocInv.word_at`, threaded through
+`run_page`/`freelist_chain`/`kmem_res`) are context-indexed; the page
+BODIES (`byte_any`/`page_own`, which cross the kalloc/kfree CLIENT
+boundary into ~56 files) stay `↦ₘ` until the M1 flip.  Four findings,
+each now the recipe:
+
+1. **A CONVERTED PAYLOAD NAMES ITS CONTEXT** — explicit `(ξc : CtxId)`
+   argument, spelled `ctx_pointsto ξc`, and lock mentions read
+   `(λ ξ : CtxId, kmem_res ξ γk fl)`.  NOT ambient-under-the-wrapper:
+   the `<{ P }>` wrapper's bound instance is resolved per elaboration
+   site, and the silent-drop hazard fired VERBATIM on the first try
+   (one site bound the wrapper's context, another the file's ambient
+   `XI` — visible only under `Set Printing Implicit`).  `<{ }>` remains
+   for UNCONVERTED constant payloads only, where the ambiguity is
+   harmless.
+2. **`CtxMorph` instances export beside the sealed definitions**
+   (`word_at_morph` → `run_page_morph` → `freelist_chain_morph` by
+   induction → `kmem_res_morph`), and inside those proofs the
+   structural instances must be applied AS TERMS
+   (`ctx_morph_big_sepL … (λ i x, ctx_morph_pointsto …)`): instance
+   SEARCH cannot do the higher-order big-op unification.
+3. **ctx↔mem seams are named bridges, never unfolds.**
+   `word_at_of_mem`/`word_at_to_mem` (derived from the shim; KallocInv
+   imports it = the seam marker) sit at exactly the leaf boundaries in
+   ProofKalloc/ProofKfree/ProofKinit.  The old blanket
+   `rewrite /word_at; iExact` pattern DEGENERATES against the sealed
+   ctx fact — a 157 GB, 35-minute rocqworker chewing on an
+   8-byte-big-op unification (found by `ps -o rss` on the VM, the
+   durable-notes diagnosis verbatim).  If a build round stalls, look
+   for a worker like that before suspecting the machine.
+4. **Name `ξc` where the conclusion doesn't pin it** — applications of
+   lemmas whose ξ appears only in a premise or an intermediate
+   (`page_head8_word_at`, `run_page_page_own`, `kmem_res_push`) leave
+   an unresolved evar that surfaces as incomplete-proof-at-Qed far from
+   the cause; pass `(ξc := cur_ctx)`.
+
+Tree green on the VM (full rebuild + 88-file follow-up, EXIT=0), audit
+at baseline.  Next payloads repeat 1–4; after the M1 flip, step 3's
+bridges die and step 1's spelling is what the flip's review must keep
+deterministic.
+
 ---
 
 **The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5

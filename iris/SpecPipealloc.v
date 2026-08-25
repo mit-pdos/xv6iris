@@ -187,7 +187,7 @@ Definition wp_pipealloc_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
   is_ftable γfl γf -∗
-  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string <{ kmem_res γk fl }> -∗
+  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) -∗
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
   panic_env -∗

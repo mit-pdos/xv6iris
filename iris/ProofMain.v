@@ -859,7 +859,7 @@ Section ProofMain.
            postcondition, forwarded instead of being sealed inside the
            bundle one line up. *)
         is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-          <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
+          (λ ξ : CtxId, kmem_res ξ fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
         procs_inv γs -∗
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
@@ -1299,7 +1299,7 @@ Section ProofMain.
        this group -- they are parked in the boot token at +0x9e. ---- *)
     printk_env fsc_printk fsc_uart fsc_disk -∗
     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-      <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
+      (λ ξ : CtxId, kmem_res ξ fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
     gen_cert -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
