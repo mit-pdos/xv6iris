@@ -1776,23 +1776,14 @@ Section IputFreePath.
        atomic-update contract is stated over the Psi-NAMED context, because
        the AU hands the log's parked payload to the client's own update.
        The plain form is recovered immediately, so nothing else moves. *)
-    iDestruct "Hlctx" as (Psi) "#Hlctxa".
-    iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
     (* the RECORD-granular adapter (durable-disk 2b-inode-1): the deposit
        writes one 64-byte slot, so [lw_au_rec] is what carries it into
        [log_write]'s sub-range atomic update. *)
-    (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)): the block's
-       new LOGGED content is the whole retagged inode block, which the
-       record writer knows even though it owns only its own slot. *)
-    iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                  (uint bno) (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds))
-                  with "Hlctxa") as "Hpstep".
     iDestruct (lw_au_rec γ γfs (uint bno) (⊤ ∖ ↑iregN)
                  (DinodeEnc.islot inum)
-                 (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds))
                  (diblk_bytes ds) (dinode_bytes dn')
-                 (committedA ge ∗ ireg_regime rg)%I e0 Psi
-                 with "Hpstep Hau0") as "Hau".
+                 (committedA ge ∗ ireg_regime rg)%I e0
+                 with "Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1817,7 +1808,7 @@ Section IputFreePath.
     iApply (LW.wp_log_write_au_range bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
               (64 * DinodeEnc.islot inum)%nat 64%nat (dinode_bytes dn')
-              cru Sb e0 v Psi (⊤ ∖ ↑iregN) (committedA ge ∗ ireg_regime rg)%I
+              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge ∗ ireg_regime rg)%I
               R5 0%nat eb pj K b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1828,7 +1819,7 @@ Section IputFreePath.
               ltac:(lia)
               Hsplice
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hsl Hvlb Hcrd HopS Hau Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.
     iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS [#Hcom Hgreg] Hlk Hsl".
     (* NO POOL ENTRY IS ASSEMBLED HERE (IVd).  The bundle was parked at the

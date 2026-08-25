@@ -2483,23 +2483,6 @@ Section fs_crash_seam.
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     ▷ log_mirror_half M0 -∗
-    (* THE CLIENT'S PREPARED DURABLE STEP (durable-disk 1d', item 4).  The
-       commit is the one write kind that moves the committed view, so it is
-       the one place [gamma_D]'s authority and [P_wf] move -- and they move
-       by running a basic update the CLIENT built earlier, at the log's own
-       linearization point, where its invariants were openable.  This lemma
-       LENDS both to it for the instant, at mask [empty]; the step's inputs
-       and outputs are the auth and [LogDefs.fs_dview], and the step is
-       stated at [V], the caller's OFF-HEADER view, for the same reason
-       every other picture premise here is: both landing orders reach this
-       shift and only one of them has moved the header row.
-
-       [LogDefs.fs_dstep_rebase] is the trivial witness, which is what the
-       boot's payload ([Psi := fun _ => emp]) and every Psi-free caller
-       supply; stage 2's real payload supplies its debt instead. *)
-    fs_dstep riscv_dview_name
-             (fs_restrict V (fs_home_set cov ls))
-             (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     fs_rec_permit cov ls gen_id
       (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
              take virtio_sector_bytes bs))
@@ -2509,7 +2492,7 @@ Section fs_crash_seam.
        ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
   Proof.
     intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Htie Hslot.
-    iIntros "#Hreg #Hswlb Hmir Hstep".
+    iIntros "#Hreg #Hswlb Hmir".
     assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hdec /=; lia).
     assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
       by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
@@ -2572,16 +2555,15 @@ Section fs_crash_seam.
       by (rewrite -hdr_dec_n Hdk0 //).
     assert (HfrD : fr_D r = fs_restrict V (fs_home_set cov ls))
       by (rewrite -Hres; exact (proj1 (fs_recovery_clean _ _ _ _ Hn0) Hrec)).
-    (* ---- THE DURABLE VIEW ADVANCES (durable-disk 1d').  This is the one
-       write kind that moves the committed view, so it is the one place the
-       byte view's authority and [P_wf] move -- together, in one step, at a
-       [D'] the caller can NAME (it is [L] on the home set, computed just
-       above), and by running the CLIENT'S OWN prepared step: the auth and
-       [P_wf] are LENT to it here and handed straight back at [D'].  The old
-       unconditional [fs_dview_rebase] is now the trivial WITNESS a Psi-free
-       caller supplies, not something this permit performs. ---- *)
-    iEval (rewrite -HfrD) in "Hstep".
-    iMod ("Hstep" with "Hva Hvw") as "[Hva Hvw]".
+    (* ---- THE DURABLE VIEW ADVANCES.  This is the one write kind that
+       moves the committed view, so it is the one place the byte view's
+       authority and [P_wf] move -- together, in one step, at a [D'] the
+       caller can NAME (it is [L] on the home set, computed just above).
+       Nothing is asked of the caller: a [log_write] proves nothing about
+       the file system, so there is no client debt to run here (plan
+       sections 3 and 8). ---- *)
+    iMod (fs_dview_rebase riscv_dview_name (fs_dbytes (fr_D r)) (fs_dbytes D')
+            with "Hva Hvw") as "[Hva Hvw]".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
     iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".
@@ -2975,19 +2957,12 @@ Section fs_crash_seam.
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_half M0 -∗
-    (* THE CLIENT'S PREPARED DURABLE STEP -- see
-       [fs_commit_L_sector0_rec], which is where it is spent.  It rides
-       BOTH landing orders: the two branches of [disk_seq_permit_two] are an
-       Iris conjunction, so each of them gets the whole context. *)
-    fs_dstep riscv_dview_name
-             (fs_restrict V (fs_home_set cov ls))
-             (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
   Proof.
     intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hrow Hslot.
-    iIntros "#Hseam #Hreg #Hswlb Hmir Hstep".
+    iIntros "#Hseam #Hreg #Hswlb Hmir".
     assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
       by exact (log_hdr_in_ext cov ls).
     assert (Hwfh : forall (M : log_mirror) (r : fs_rec) (dk : Z -> bv 8),
@@ -3010,7 +2985,7 @@ Section fs_crash_seam.
                  ∗ fs_receipt_any
                      (fs_restrict (dv_of_D L) (fs_home_set cov ls))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
-                with "[] [Hmir Hstep]").
+                with "[] [Hmir]").
       { iIntros "(Hm & #Hrc & _)".
         iApply (fs_permit_of_rec with "Hseam").
         iApply (fs_rec_permit_mono cov ls gen_id _
@@ -3033,7 +3008,7 @@ Section fs_crash_seam.
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_commit_L_sector0_rec cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
-                Hin HM0 Hoff Hrow Hslot with "Hreg Hswlb [Hmir] Hstep").
+                Hin HM0 Hoff Hrow Hslot with "Hreg Hswlb [Hmir]").
       iNext. iExact "Hmir".
     - (* SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit *)
       iApply (fs_permit_of_rec with "Hseam").
@@ -3041,7 +3016,7 @@ Section fs_crash_seam.
                 (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
                     (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
-                with "[Hstep] [Hmir]").
+                with "[] [Hmir]").
       { iIntros "[Hm %Hlold]".
         assert (HM1 : lm_hdr (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) ls
@@ -3068,13 +3043,13 @@ Section fs_crash_seam.
                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                         (log_hdr_bno ls)) = BSIZE⌝)%I _
-                  with "[] [Hm Hstep]").
+                  with "[] [Hm]").
         { iIntros "(Hm2 & Hrc & _)". iApply disk_write_permit_intro.
           iSplitL "Hm2".
           { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
           iExact "Hrc". }
         iApply (fs_commit_L_sector0_rec cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
-                  Hin HM1 HoffM1 Hrow Hslot with "Hreg Hswlb [Hm] Hstep").
+                  Hin HM1 HoffM1 Hrow Hslot with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
                 (Hwfh M0) with "Hreg Hswlb [Hmir]").

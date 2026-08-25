@@ -1353,7 +1353,7 @@ FsDurImg.v
 FsDurRefute.v
 FsDurDefer.v
 FsDurTrunc.v
+FsDurQuiesce.v
 FsDurObj.v
-FsDurWire.v
 FsDurLedger.v
 IregClean.v

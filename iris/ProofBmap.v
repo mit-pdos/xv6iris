@@ -415,11 +415,10 @@ Section BmapKit.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat) (cr : bool) (Sb : gset Z)
-      (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gen_body (GEN := GENa) (CID := CIDa) bn γ γfs γd cov logstart dev k pidv bno
-                              bs bsl bsd d u cr Sb Psi m n eb p K b lks.
+                              bs bsl bsd d u cr Sb m n eb p K b lks.
 End BmapKit.
 
 (* THE CORE CONTRACT.  Deliberately NOT named [wp_..._body]: the coverage
@@ -1956,15 +1955,9 @@ Section BmapTail.
            Psi-free forms of [log_write] retired with the payload's second
            index, so this arm opens [LogInv.log_ctx]'s existential and
            discharges the payload-step premise from the log's own law. *)
-        iDestruct "Hlctx" as (Psi) "#Hlctxa".
-        iPoseProof (log_ctx_of_at with "Hlctxa") as "#Hlctx".
-        iPoseProof (log_psi_write_rebase Psi γ bn γfs cov logstart dev
-                      (uint (bm_ind bmI : mword 32))
-                      (ind_bytes (<[q := blk]> (bm_ent bmI))) with "Hlctxa")
-          as "Hpstep".
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
-                  (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1 Psi
+                  (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1
                   G2 0%nat eb (proc_addr j) (K - 6)%nat b lks
                   HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HG2a0
                   ltac:(rewrite Huind; exact Hicov)
@@ -1972,7 +1965,7 @@ Section BmapTail.
                   ltac:(intros Hc; rewrite Huind HS1;
                         exact (bmset_in_l3 _ _ _ _ (Hcri Hc)))
                   Hbelow_log
-                  with "Hcg Hcnt Htext Hpc Hbio Hlctxa Hpstep Hsl1 Hop Hindblk Hheld").
+                  with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl1 Hop Hindblk Hheld").
         iIntros (CID21 Hq21 mL) "Hcg Hcnt Hpc %Hcs3 Hop Hindblk Hheld Hsl1".
         assert (Hpcb0 : ret_pc (G2 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.bmap + 0xb0)) by (rewrite HG2ra; pcw).

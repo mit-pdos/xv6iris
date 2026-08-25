@@ -347,67 +347,6 @@ Section FsDurableView.
     rewrite right_id_L. by iFrame.
   Qed.
 
-  (* THE COMMIT'S PREPARED STEP (durable-disk 1d', item 4).  The client
-     builds this at the LOG's linearization point, where its own invariants
-     are openable, and the commit permit runs it later, at mask [empty],
-     with [gamma_D]'s authority and [P_wf] LENT to it for the instant.
-     That is the only shape the commit AU can have: moving
-     [ghost_map_auth gamma_D 1 B] to [B'] needs the ELEMENTS of [B], and
-     those may not be owned by anything mortal (crash.md, principle 1), so
-     they are [P_wf]'s and live inside [crashN].
-
-     THE GNAME IS A PARAMETER, and it is the REAL durable name.  [gamma_D]
-     is [RiscvPtsto.riscv_dview_name], a FIXED-layer field, so every
-     consumer holding a [riscvFixedGS] can spell it and the step is the
-     client's actual debt at the committed view.  This file sits BELOW
-     [RiscvPtsto] and may not import it, so the name arrives here as an
-     argument; [LogInv.log_psi_commit] and [FsCrash]'s seam section, which
-     do have the record, instantiate it AMBIENTLY at [riscv_dview_name] --
-     the same way they spell [riscv_disk_name], and the one kind of gname
-     this tree does not thread explicitly.  The trivial witness is
-     [fs_dstep_rebase] below. *)
-  Definition fs_dstep (g : gname) (D D' : gmap Z (list (bv 8))) : iProp Σ :=
-    (ghost_map_auth g 1 (fs_dbytes D) -∗ fs_dview g (fs_dbytes D) ==∗
-     ghost_map_auth g 1 (fs_dbytes D') ∗ fs_dview g (fs_dbytes D'))%I.
-
-  (* THE TRIVIAL INSTANTIATION, AND IT IS A PARAMETER OF THIS STAGE, NOT A
-     THEOREM ABOUT THE FILE SYSTEM: while [P_wf] is a bare byte map the
-     durable side can be re-based unconditionally, so the boot's payload
-     ([Psi := fun _ => emp]) discharges its law with this and nothing else.
-     Stage 2 replaces the body of [fs_dview] by [fs_view Gamma_D] and this
-     lemma STOPS holding -- which is the point: the step then carries the
-     file system's own content and only the client can build it. *)
-  Lemma fs_dstep_rebase (g : gname) (D D' : gmap Z (list (bv 8))) :
-    ⊢ fs_dstep g D D'.
-  Proof.
-    rewrite /fs_dstep. iIntros "Ha Hd".
-    iApply (fs_dview_rebase g (fs_dbytes D) (fs_dbytes D') with "Ha Hd").
-  Qed.
-
-  (* THE DEBT'S ALGEBRA (durable-disk 2c-body).  Composition and the
-     identity are the ONLY two laws the client's debt is ever built with:
-     the payload parks the identity at a fresh index and each supplier's
-     [log_write] AU composes its own per-object step onto the right of the
-     chain.  Neither lemma mentions [fs_dview]'s BODY, so both survive the
-     stage-2 flip of that body VERBATIM -- which is exactly what separates
-     them from [fs_dstep_rebase] above, whose proof runs
-     [fs_dview_rebase] and therefore dies with the flip.
-
-     [fs_dstep_id] is the ONE instance of [fs_dstep_rebase] that survives
-     it, and it is honest at any body: a step that changes no byte is the
-     identity update.  It is what a batch that has written nothing parks,
-     and (with [lm_committed_clean]) what a clean boot parks. *)
-  Lemma fs_dstep_id (g : gname) (D : gmap Z (list (bv 8))) :
-    ⊢ fs_dstep g D D.
-  Proof. rewrite /fs_dstep. iIntros "Ha Hd". iModIntro. iFrame. Qed.
-
-  Lemma fs_dstep_trans (g : gname) (D D' D'' : gmap Z (list (bv 8))) :
-    fs_dstep g D D' -∗ fs_dstep g D' D'' -∗ fs_dstep g D D''.
-  Proof.
-    rewrite /fs_dstep. iIntros "H1 H2 Ha Hd".
-    iMod ("H1" with "Ha Hd") as "[Ha Hd]".
-    iApply ("H2" with "Ha Hd").
-  Qed.
 End FsDurableView.
 
 (* THE LOGGED VIEW'S ONE MOVE: a [log_write] AT A HOME BLOCK.  Its two
