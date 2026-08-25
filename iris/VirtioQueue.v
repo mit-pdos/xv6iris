@@ -666,6 +666,39 @@ Lemma ring_bytes_read (c : virtio_cfg) (rc : nat -> bv 16) (j : nat) :
   (j < 8)%nat -> read_bytes (ring_bytes c rc) (ring_slot_pa c j) 2 = Some (rc j).
 Proof. intro Hj. apply ring_bytes_upto_read; lia. Qed.
 
+(* ...and CHANGING one cell leaves every byte outside it alone.  This is what
+   says the ring store is a one-cell write: the publisher's [sh] touches two
+   bytes, and the seven other cells of the lease are the bytes they were. *)
+Lemma ring_bytes_upto_off (c : virtio_cfg) (rc rc' : nat -> bv 16)
+    (n k : nat) (a : Arch.pa) :
+  (n <= 8)%nat -> (k < 8)%nat ->
+  (forall j, (j < n)%nat -> j <> k -> rc j = rc' j) ->
+  a ∉ pa_range (ring_slot_pa c k) 2 ->
+  ring_bytes_upto c rc n !! a = ring_bytes_upto c rc' n !! a.
+Proof.
+  induction n as [|m IH]; intros Hn Hk Hagree Ha; [reflexivity|].
+  cbn [ring_bytes_upto].
+  destruct (decide (a ∈ pa_range (ring_slot_pa c m) 2)) as [Hin|Hout].
+  - (* inside the cell this step writes: [m] cannot be [k], so the two
+       functions agree there and both writes lay down the same byte *)
+    assert (Hmk : m <> k) by (intros ->; exact (Ha Hin)).
+    apply pa_range_elim in Hin as (i & Hi & ->).
+    change (N.to_nat 2) with 2%nat in Hi.
+    rewrite !write_bytes_lookup; [| lia | lia | lia | lia].
+    by rewrite (Hagree m ltac:(lia) Hmk).
+  - rewrite !write_bytes_lookup_off; [| exact Hout | exact Hout ].
+    apply IH; [lia | exact Hk | intros j Hj Hjk; exact (Hagree j ltac:(lia) Hjk)
+              | exact Ha ].
+Qed.
+
+Lemma ring_bytes_off (c : virtio_cfg) (rc rc' : nat -> bv 16)
+    (k : nat) (a : Arch.pa) :
+  (k < 8)%nat ->
+  (forall j, (j < 8)%nat -> j <> k -> rc j = rc' j) ->
+  a ∉ pa_range (ring_slot_pa c k) 2 ->
+  ring_bytes c rc !! a = ring_bytes c rc' !! a.
+Proof. intros Hk Hag Ha. by apply (ring_bytes_upto_off c rc rc' 8 k a). Qed.
+
 (* ...and it is the WHOLE region: all eight cells are written *)
 Lemma ring_bytes_dom_eq (c : virtio_cfg) (rc : nat -> bv 16) :
   dom (ring_bytes c rc) = ring_cells_dom c.
@@ -731,6 +764,17 @@ Lemma avail_idx_bytes_dom (c : virtio_cfg) (np : nat) :
 Proof.
   unfold avail_idx_bytes, avail_idx_dom. rewrite write_bytes_dom.
   change (N.to_nat 2) with 2%nat. rewrite dom_empty_L. set_solver.
+Qed.
+
+(* the index word and the ring cells are different bytes of the avail page,
+   which is what lets [vproto_ctl] hold both as a disjoint union *)
+Lemma idx_ring_bytes_disj (c : virtio_cfg) (np : nat) (rc : nat -> bv 16) :
+  ring_cells_dom c ## avail_idx_dom c ->
+  avail_idx_bytes c np ##ₘ ring_bytes c rc.
+Proof.
+  intro Hdisj. apply map_disjoint_dom.
+  rewrite avail_idx_bytes_dom, (ring_bytes_dom_eq c rc).
+  apply gset_disj_sym. exact Hdisj.
 Qed.
 
 Lemma avail_idx_bytes_read (c : virtio_cfg) (np : nat) :

@@ -69,6 +69,11 @@ Record disk_names := DiskNames {
      used records a contiguous run, and hence what says a completion can
      never overwrite one the driver still owes a look (finding 5). *)
   dn_nr    : gname;
+  (* THE STAGED HEAD, between the ring store and the index bump.  A
+     [ghost_var (option (bv 16))]: the invariant holds one half and couples
+     it to the cell at the publish position, the publisher the other.  See
+     [Xv6Cameras.disk_stage_inG] for why the gap exists at all. *)
+  dn_stage : gname;
   (* the CRASH-PERMIT channel's ghost-map name (PermInv.v): the auth lives in
      [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)
