@@ -1299,18 +1299,20 @@ Section ProofIget.
                identity.  The recycler keeps a dev half and the table's ghost
                half -- the latter is what pins the arm's FULL inum cell at
                +0x7c. ---- *)
-            (* THE WITHDRAW (durable-disk B''-esc): the ordinary rows live in
-               the pool's own invariant now, so the take is a fupd -- run
-               here, before the store's atomic update, exactly where the pure
-               [ipool_take] used to sit.  What comes out is the FULL
-               [ipool_shape], so the peel below is unchanged. *)
-            iApply fupd_wp.
-            iMod (ipool_take ⊤ γfs γi cov logstart
-                    (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
-                    ltac:(solve_ndisj) Hzin with "Hpinv Hpool")
-              as "[Hbundle Hpool]".
-            iModIntro.
-            iEval (rewrite ig_moi_inum) in "Hbundle".
+            (* THE WITHDRAW (durable-disk B''-esc, moved by C-3b): the
+               ordinary rows live in the pool's own invariant, so the take is
+               a fupd -- and it runs INSIDE this store's atomic update, beside
+               the identity flip, not in a [fupd_wp] before it.  THE REASON IS
+               THE PARTITION (durable-fs-plan.md section 4; [FsCollect]'s
+               finding (A)): the pool invariant's row "the region's inums are
+               the pool's index together with the live slots' identities" is
+               FALSE between the take and the deposit into the MID arm, so the
+               two have to be ONE ghost step.  Under [fupd_wp] they were two,
+               and the intermediate closing could not re-establish the row.
+               Nothing about the WITHDRAW itself changed: what comes out is
+               still the FULL [ipool_shape] and the peel below is unchanged;
+               the lock's [ipool] simply travels through the update, which is
+               why it joins the store's post. *)
             assert (Hpa72 : add_vec (rget N1 Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                             = i_inum (ientry e)).
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
@@ -1334,9 +1336,14 @@ Section ProofIget.
                        icnt_half (bv_unsigned inum) 0%nat ∗
                        frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
-                       iname γi γfs inodestart inum l)%I
+                       iname γi γfs inodestart inum l ∗
+                       (* the lock's pool, ONE ENTRY SHORTER: the take now
+                          happens inside this update (see the note above) *)
+                       ipool γfs γi cov logstart
+                         (region_inums nib ∖ ci_inums ci
+                          ∖ {[bv_unsigned inum]}))%I
                       (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
-                      with "Hcg Hpc [] [] [Hgid HinT Hbundle Hlic]").
+                      with "Hcg Hpc [] [] [Hgid HinT Hpool Hlic]").
             { iApply (igi_72 with "Htext"). }
             { rewrite Hpa72. iExact "Hclaim2". }
             { rewrite Hpa72 Hsv72.
@@ -1358,6 +1365,13 @@ Section ProofIget.
                  back the licence together with the bundle's two ghost columns
                  ([icnt_half] at 0 and the [ifreeze_off] token).  Both go on to
                  +0x78; the payload is not touched. *)
+              (* THE TAKE, HERE (durable-disk C-3b): one ghost step with the
+                 identity flip above and the deposit into the MID arm below. *)
+              iMod (ipool_take (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) γfs γi cov logstart
+                      (region_inums nib ∖ ci_inums ci) (bv_unsigned inum)
+                      ltac:(solve_ndisj) Hzin with "Hpinv Hpool")
+                as "[Hbundle Hpool]".
+              iEval (rewrite ig_moi_inum) in "Hbundle".
               iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) γfs γi inodestart nib
                       cov logstart inum l
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
@@ -1368,9 +1382,9 @@ Section ProofIget.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
                           with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
-              iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hmir0 Hfoff Hlic". }
+              iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hmir0 Hfoff Hlic Hpool". }
             iApply wp_next_off_intro.
-            iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt & Hicnt0 & Hmir0 & Hfoff & Hlic)".
+            iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt & Hicnt0 & Hmir0 & Hfoff & Hlic & Hpool)".
             assert (Hpp76 : add_vec_int (mword_of_int (KernelSyms.iget + 0x72) : mword 64) 4
                             = mword_of_int (KernelSyms.iget + 0x76)) by pcw.
             iEval (rewrite Hpp76) in "Hpc".
