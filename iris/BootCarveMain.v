@@ -777,8 +777,7 @@ Section BootCarveMain.
                    (KernelSyms.disk + 40 + 16 * Z.of_nat 8%nat) -∗
     boot_raw_ran g (KernelSyms.disk + 168)
                    (KernelSyms.disk + 168 + 16 * Z.of_nat 8%nat)
-    -∗ ([∗ list] i ∈ seq 0 8, disk_slot_raw i)
-       ∗ ([∗ list] i ∈ seq 0 8, disk_info_b_raw i).
+    -∗ ([∗ list] i ∈ seq 0 8, disk_slot_raw i).
   Proof.
     intro Hmem. iIntros "#Hcl Hi Ho".
     iDestruct (boot_stride_family_seq g dinfo_raw (KernelSyms.disk + 40) 16 8%nat
@@ -810,11 +809,8 @@ Section BootCarveMain.
                 dops_raw (pa_of_z (KernelSyms.disk + 168 + 16 * Z.of_nat i))))%I
       with "[Hi Ho]" as "H".
     { rewrite big_sepL_sep. iFrame "Hi Ho". }
-    (* [info[i].b] now travels on its own: the free pool does not take it,
-       the device invariant's receipt does, at the live flip (finding 5) *)
-    rewrite -big_sepL_sep.
     iApply (big_sepL_mono with "H"). iIntros (k i _) "[Hi Ho]".
-    rewrite /disk_slot_raw /disk_info_b_raw /ops_own
+    rewrite /disk_slot_raw /ops_own
             (d_info_b_of_z i) (d_info_status_of_z i) (d_ops_of_z i)
             (d_ops_res_of_z i) (d_ops_sec_of_z i) /dinfo_raw /dops_raw.
     iDestruct "Hi" as "[Hb Hs]". iFrame "Ho Hs Hb".

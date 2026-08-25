@@ -1457,8 +1457,10 @@ Section VirtioProto.
          else phys_list (vr_buf (vs_req sl)) bs)))%I.
 
   (* THE PER-DESCRIPTOR RECEIPT'S CONTENT.
-     [HInactive] -- nobody has submitted descriptor [i]; the invariant holds
-     its [disk.info[i].b] cell and says nothing about any chain.
+     [HInactive] -- nobody has submitted descriptor [i]; the receipt holds
+     NOTHING.  [disk.info[i].b] is driver-private (no descriptor names it),
+     so while the slot is idle its cell sits in the lock resource alongside
+     the rest of the free slot, and only the publish moves it in here.
      [HActive v] -- descriptor [i] heads a live chain, and the claim [v]
      records what was published.  The entry owns [disk.info[i].b] PINNED to
      that claim's buffer, which is what lets the interrupt handler learn
@@ -1468,13 +1470,7 @@ Section VirtioProto.
      [b->disk = 0] and the whole chain is back inside. *)
   Definition head_res (γ : disk_names) (i : nat) (st : hstate) : iProp Σ :=
     match st with
-    | HInactive => (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w)%I
-    | HStaged v =>
-        (* the two stores [b->disk = 1] and [disk.info[id].b = b] have run;
-           the chain is still the driver's, being filled in *)
-        (⌜Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot v)))) = i⌝ ∗
-         d_info_b i ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
-         b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1))%I
+    | HInactive => emp%I
     | HActive v =>
         (⌜Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot v)))) = i⌝ ∗
          d_info_b i ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
@@ -1531,17 +1527,16 @@ Section VirtioProto.
   Proof. rewrite /heads_res. apply _. Qed.
 
   (* THE RECEIPTS AT THE LIVE FLIP.  The authority has been carried since
-     power-on with every entry INACTIVE; the eight [disk.info[i].b] cells
-     arrive now, out of the boot chain's .bss.  Nothing is published yet, so
-     the coupling clause is vacuous. *)
+     power-on with every entry INACTIVE, and an INACTIVE entry owns nothing,
+     so the flip needs no resources at all.  Nothing is published yet, so the
+     coupling clause is vacuous. *)
   Lemma heads_res_at_init (γ : disk_names) (hs : gmap nat hstate) :
     dom hs = set_seq 0 8 ->
     (forall i st, hs !! i = Some st -> st = HInactive) ->
     ghost_map_auth (dn_head γ) 1 hs -∗
-    ([∗ list] i ∈ seq 0 8, ∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w) -∗
     heads_res_at γ (vp_spins vproto0).
   Proof.
-    intros Hdom Hinact. iIntros "Hauth Hcells".
+    intros Hdom Hinact. iIntros "Hauth".
     rewrite /heads_res_at. iExists hs. iFrame "Hauth".
     iSplitR; [by iPureIntro|].
     iSplitR.
@@ -1555,9 +1550,7 @@ Section VirtioProto.
     (* every entry is INACTIVE, so the body ignores the value *)
     rewrite (big_sepM_proper _ (fun i _ => head_res γ i HInactive));
       [| intros i st Hst; by rewrite (Hinact i st Hst) ].
-    rewrite big_sepM_dom Hdom -list_to_set_seq.
-    rewrite big_sepS_list_to_set; [| apply NoDup_seq ].
-    iExact "Hcells".
+    rewrite /head_res. by iApply big_sepM_intro.
   Qed.
   (* the coupling only has to cover the slots that are live, so it survives
      any transition that removes some -- the reclaim, in particular *)
@@ -1903,13 +1896,12 @@ Section VirtioProto.
     (* nothing half-published at the flip *)
     ghost_var (dn_stage γ) (1/2) (None : option (bv 16)) -∗
     (* THE RECEIPTS' AUTHORITY, carried from power-on with every entry
-       INACTIVE, and the eight [disk.info[i].b] cells that go with them --
-       .bss the boot chain has held since the loader zeroed it (finding 5). *)
+       INACTIVE.  No cells come with it: [disk.info[i].b] is driver-private
+       and stays in the lock resource until a publish hands it over. *)
     (∃ hs : gmap nat hstate,
        ⌜dom hs = set_seq 0 8⌝ ∗
        ⌜forall i st, hs !! i = Some st -> st = HInactive⌝ ∗
        ghost_map_auth (dn_head γ) 1 hs) -∗
-    ([∗ list] i ∈ seq 0 8, ∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w) -∗
     phys_word2 (avail_idx_pa c) (wrap16 0) -∗
     (* THE EIGHT RING CELLS, zero like the rest of the page the driver just
        cleared: they belong to the lease now, not to any request. *)
@@ -1918,7 +1910,7 @@ Section VirtioProto.
     virtio_proto γ v1.
   Proof.
     intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui Hwce Hca Htk Hah.
-    iIntros "#Hcfgp Hslot Hord Hnc Hnp Hnr Hstage Hheads Hinfo Hidx Hring Hpage".
+    iIntros "#Hcfgp Hslot Hord Hnc Hnp Hnr Hstage Hheads Hidx Hring Hpage".
     iDestruct "Hheads" as (hs) "(%Hhdom & %Hhinact & Hhauth)".
     assert (H4k : Z.of_nat 4096 < 18446744073709551616) by (rewrite z4096; lia).
     rewrite phys_word2_map (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
@@ -1960,9 +1952,9 @@ Section VirtioProto.
     rewrite Hpe Hde Hue !big_sepM_empty.
     iSplitR; [done|].
     iSplitL "Hstage"; [by iExists None; iFrame "Hstage"|].
-    (* THE RECEIPTS ARRIVE: authority as carried, cells out of .bss *)
-    iSplitL "Hhauth Hinfo".
-    { iApply (heads_res_at_init γ hs Hhdom Hhinact with "Hhauth Hinfo"). }
+    (* THE RECEIPTS ARRIVE: authority as carried, every entry empty *)
+    iSplitL "Hhauth".
+    { iApply (heads_res_at_init γ hs Hhdom Hhinact with "Hhauth"). }
     iSplit; done.
   Qed.
 
@@ -2002,9 +1994,6 @@ Section VirtioProto.
        and holding it is what made the driver's knowledge of [v_cfg v0]
        deterministic all the way to this point. *)
     disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v0) -∗
-    (* the eight [disk.info[i].b] cells, out of the boot chain's .bss: the
-       receipts own them from the flip on (finding 5) *)
-    ([∗ list] i ∈ seq 0 8, ∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w) -∗
     phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0) -∗
     (* the eight ring cells, still zero from the driver's page clear *)
     phys_map (ring_bytes (virtio_init_cfg pd pav pu) (fun _ : nat => zero16)) -∗
@@ -2014,7 +2003,7 @@ Section VirtioProto.
          disk_cfg γ (virtio_init_cfg pd pav pu).
   Proof.
     intros Hlive0 Hc1 Hsn Hui Hcae Htke Hahe Hal Hdisj.
-    iIntros "Hp Hmine Hinfo Hidx Hring Hpage".
+    iIntros "Hp Hmine Hidx Hring Hpage".
     rewrite {1}/virtio_proto.
     rewrite Hlive0.
     iDestruct "Hp" as "(Hcfg & %Hsn0 & %Hui0 & %Hca0 & %Htk0 & %Hah0 & %Hwce0 &
@@ -2044,7 +2033,7 @@ Section VirtioProto.
     iApply (virtio_proto_intro_gen γ v1 (virtio_init_cfg pd pav pu)
               Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj
               Hs1 Hu1 (virtio_init_cfg_wce pd pav pu) Hca1 Htk1 Hah1
-              with "Hcfg Hslot Hord Hnc Hnp1 Hnr1 Hstage1 Hheads Hinfo Hidx Hring Hpage").
+              with "Hcfg Hslot Hord Hnc Hnp1 Hnr1 Hstage1 Hheads Hidx Hring Hpage").
   Qed.
 
   (* THE PRE-FLIP CONFIGURATION WRITE.  Each of the fourteen MMIO writes
@@ -3056,85 +3045,6 @@ Section VirtioProto.
   Qed.
 
   (* ==================================================================== *)
-  (* driver operation 0: THE INFO STORE                                   *)
-  (*                                                                      *)
-  (*     b->disk = 1;                                                     *)
-  (*     disk.info[idx[0]].b = b;                                         *)
-  (*                                                                      *)
-  (* the two stores [virtio_disk_rw] makes before it touches the ring.    *)
-  (* [disk.info[i].b] is the receipt's, so the second goes through here;  *)
-  (* [b->disk] is the caller's until now and is deposited with it.  What  *)
-  (* comes back is the ACTIVE-side receipt fragment -- the token the      *)
-  (* caller will hold across [sleep()], and its licence to poll b->disk.  *)
-  (* ==================================================================== *)
-
-  Lemma virtio_proto_info_acc (γ : disk_names) (v : virtio_state)
-      (np i : nat) (dc : dclaim) :
-    Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot dc)))) = i ->
-    virtio_proto γ v -∗ disk_pub γ np -∗
-    (* the descriptor's receipt, as the allocator handed it over *)
-    i ↪[dn_head γ] HInactive -∗
-    (* ...and [b->disk], just set to 1 *)
-    b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
-    ⌜virtio_live (v_cfg v) = true⌝ ∗
-    disk_cfg γ (v_cfg v) ∗
-    (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w) ∗
-    (d_info_b i ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) ==∗
-       virtio_proto γ v ∗ disk_pub γ np ∗ i ↪[dn_head γ] HStaged dc).
-  Proof.
-    intro Hhd.
-    iIntros "Hp Hpub Hfrag Hbd". rewrite /virtio_proto /disk_pub.
-    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
-      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
-      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
-    iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
-        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
-    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
-    iDestruct (ghost_map_lookup with "Hhauth Hfrag") as %Hlk.
-    (* the entry is INACTIVE, so it holds the cell and nothing else *)
-    iDestruct (big_sepM_delete _ hs i HInactive Hlk with "Hhbig") as "[Hent Hrest]".
-    iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
-    iFrame "Hent". iIntros "Hcell".
-    (* THE FLIP: the entry takes the cell at its new value and [b->disk] *)
-    iMod (ghost_map_update (HStaged dc) with "Hhauth Hfrag") as "[Hhauth Hfrag]".
-    iModIntro. iFrame "Hpub Hfrag".
-    iExists pr, dma.
-    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
-    iSplitR; [iPureIntro; exact Hctl|].
-    iSplitR; [iPureIntro; exact Hok|].
-    iSplitR; [iPureIntro; exact Hal|].
-    iSplitR; [iPureIntro; exact Hseen|].
-    iSplitR; [iPureIntro; exact Hah|].
-    iSplitR; [iPureIntro; exact Htkc|].
-    iSplitR; [iPureIntro; exact Hui|].
-    iSplitR; [iPureIntro; exact Hridx|].
-    iSplitR; [iPureIntro; exact Hwce|].
-    iSplitR; [iPureIntro; exact Hwt|].
-    (* the receipts: one entry moved INACTIVE -> HStaged *)
-    iExists (<[ i := HStaged dc ]> hs). iFrame "Hhauth".
-    iSplitR; [iPureIntro; rewrite dom_insert_L Hhdom;
-              apply subseteq_union_1_L, singleton_subseteq_l;
-              rewrite -Hhdom; apply elem_of_dom; by exists HInactive|].
-    iSplitR.
-    { (* NO LIVE SLOT HAS THIS HEAD: one whose head were [i] would make the
-         coupling say [hs !! i] is ACTIVE, and it is INACTIVE. *)
-      iPureIntro. intros q sl pin Hq.
-      destruct (Hhcoup q sl pin Hq) as (w & Hw & Hws).
-      destruct (decide (Z.to_nat (bv_unsigned (vr_head (vs_req sl))) = i))
-        as [Heq|Hne].
-      - exfalso. rewrite Heq Hlk in Hw. discriminate.
-      - exists w. rewrite lookup_insert_ne; [| exact (not_eq_sym Hne) ].
-        by split. }
-    rewrite (big_sepM_delete _ (<[ i := HStaged dc ]> hs) i (HStaged dc));
-      [| apply lookup_insert ].
-    iSplitL "Hcell Hbd".
-    { rewrite /head_res. iFrame "Hcell Hbd". by iPureIntro. }
-    rewrite delete_insert_delete. iExact "Hrest".
-  Qed.
-
-  (* ==================================================================== *)
   (* driver operation 4: THE POLL, and THE COLLECT                        *)
   (*                                                                      *)
   (*     while (b->disk == 1) { sleep_prepare(b); release; sleep; acquire; }
@@ -3144,8 +3054,19 @@ Section VirtioProto.
   (* The receipt is what re-authorises the poll on every re-acquire: the   *)
   (* caller has held [HActive dc] since its publish, across [sleep()]'s    *)
   (* release of vdisk_lock, and it names the buffer whose [b->disk] the    *)
-  (* loop reads.  READ-ONLY: it puts the cell straight back, so the loop   *)
-  (* may run any number of times.                                         *)
+  (* loop reads.                                                          *)
+  (*                                                                      *)
+  (* THE READ IS WHAT COLLECTS.  The value decides: read 1 and the receipt *)
+  (* goes back untouched, so the loop may spin any number of times; read 0 *)
+  (* and the deposit has already happened, so this step is also where the  *)
+  (* whole chain comes home -- the receipt retires to INACTIVE and the     *)
+  (* caller walks away owning [chain_back], [disk.info[i].b] and           *)
+  (* [b->disk].  Splitting that into a separate collect accessor is not    *)
+  (* possible: the loop only ever learns the VALUE 0, never the cell, and  *)
+  (* an accessor demanding [b_disk ↦₄ 0] up front could never be applied   *)
+  (* (the ACTIVE entry owns that cell too, so the premises are jointly     *)
+  (* contradictory and the lemma is vacuous).  Deciding at the read is     *)
+  (* what makes the transfer expressible.                                 *)
   (* ==================================================================== *)
 
   Lemma virtio_proto_poll_acc (γ : disk_names) (v : virtio_state)
@@ -3158,9 +3079,17 @@ Section VirtioProto.
     (∃ w : SailStdpp.Values.mword 32,
        b_disk (dc_buf dc) ↦₄ w ∗
        (* [b->disk] is 0 exactly when the chain is back inside the receipt --
-          which is the whole point of the loop's test *)
-       (b_disk (dc_buf dc) ↦₄ w -∗
-          virtio_proto γ v ∗ disk_pub γ np ∗ i ↪[dn_head γ] HActive dc)).
+          which is the whole point of the loop's test, and the value read is
+          what decides whether this step also retires the slot *)
+       (b_disk (dc_buf dc) ↦₄ w ==∗
+          virtio_proto γ v ∗ disk_pub γ np ∗
+          ((⌜w = (SailStdpp.Values.mword_of_int (len := 32) 1)⌝ ∗
+            i ↪[dn_head γ] HActive dc)
+           ∨ (⌜w = (SailStdpp.Values.mword_of_int (len := 32) 0)⌝ ∗
+              i ↪[dn_head γ] HInactive ∗
+              d_info_b i ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) ∗
+              b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) ∗
+              chain_back γ (dc_slot dc) (dc_pin dc))))).
   Proof.
     intro Hhd.
     iIntros "Hp Hpub Hfrag". rewrite /virtio_proto /disk_pub.
@@ -3181,8 +3110,9 @@ Section VirtioProto.
     (* either way the entry owns [b->disk]; the loop only reads it *)
     iDestruct "Hdisj" as "[[Hbd Hrest2] | [Hbd Hrest2]]".
     - iExists (SailStdpp.Values.mword_of_int (len := 32) 1).
-      iFrame "Hbd". iIntros "Hbd".
-      iFrame "Hpub Hfrag". iExists pr, dma.
+      iFrame "Hbd". iIntros "Hbd". iModIntro.
+      iFrame "Hpub". iSplitR "Hfrag"; [| iLeft; by iFrame "Hfrag"].
+      iExists pr, dma.
       iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
       iSplitR; [iPureIntro; exact Hctl|].
       iSplitR; [iPureIntro; exact Hok|].
@@ -3199,9 +3129,22 @@ Section VirtioProto.
       rewrite (big_sepM_delete _ hs i (HActive dc) Hhlk).
       iFrame "Hrest". rewrite /head_res.
       iSplitR; [by iPureIntro|]. iFrame "Hinfo". iLeft. iFrame "Hbd Hrest2".
-    - iExists (SailStdpp.Values.mword_of_int (len := 32) 0).
+    - (* THE CHAIN IS BACK.  This read is the collect: take the disjointness
+         the coupling obligation needs while the chain is still a hypothesis,
+         then retire the receipt and hand the caller everything. *)
+      rewrite {1}/chain_back.
+      iDestruct "Hrest2" as "(Hpinm & Hbst & Hbpm & Hbbs)".
+      iDestruct (dma_own_disj with "Hdma Hpinm") as %Hdj.
+      iAssert (chain_back γ (dc_slot dc) (dc_pin dc))
+        with "[Hpinm Hbst Hbpm Hbbs]" as "Hback".
+      { rewrite /chain_back. iFrame "Hpinm Hbst Hbpm Hbbs". }
+      iExists (SailStdpp.Values.mword_of_int (len := 32) 0).
       iFrame "Hbd". iIntros "Hbd".
-      iFrame "Hpub Hfrag". iExists pr, dma.
+      iMod (ghost_map_update HInactive with "Hhauth Hfrag") as "[Hhauth Hfrag]".
+      iModIntro. iFrame "Hpub".
+      iSplitR "Hfrag Hinfo Hbd Hback".
+      2:{ iRight. iSplitR; [done|]. iFrame "Hfrag Hbd Hback". iExact "Hinfo". }
+      iExists pr, dma.
       iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
       iSplitR; [iPureIntro; exact Hctl|].
       iSplitR; [iPureIntro; exact Hok|].
@@ -3213,11 +3156,35 @@ Section VirtioProto.
       iSplitR; [iPureIntro; exact Hridx|].
       iSplitR; [iPureIntro; exact Hwce|].
       iSplitR; [iPureIntro; exact Hwt|].
-      iExists hs. iFrame "Hhauth".
-      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-      rewrite (big_sepM_delete _ hs i (HActive dc) Hhlk).
-      iFrame "Hrest". rewrite /head_res.
-      iSplitR; [by iPureIntro|]. iFrame "Hinfo". iRight. iFrame "Hbd Hrest2".
+      iExists (<[ i := HInactive ]> hs). iFrame "Hhauth".
+      iSplitR; [iPureIntro; rewrite dom_insert_L Hhdom;
+                apply subseteq_union_1_L, singleton_subseteq_l;
+                rewrite -Hhdom; apply elem_of_dom; by exists (HActive dc)|].
+      iSplitR.
+      { (* THIS REQUEST IS NO LONGER LIVE, so no live one has this head.
+           The chain is in the caller's hands now, hence not in the lease --
+           and a live request's pinned bytes are.  The head descriptor's own
+           byte would have to be in both, which cannot be. *)
+        iPureIntro. intros q sl' pin' Hq.
+        destruct (Hhcoup q sl' pin' Hq) as (w & Hw & Hws).
+        destruct (decide (Z.to_nat (bv_unsigned (vr_head (vs_req sl'))) = i))
+          as [Heq|Hne].
+        - exfalso. rewrite Heq Hhlk in Hw. injection Hw as <-.
+          destruct Hws as (Hsl' & Hpin' & _).
+          apply map_lookup_zip_with_Some in Hq as (sl2 & pin2 & Heq2 & Hsl2 & Hpin2).
+          injection Heq2 as <- <-.
+          pose proof (vpo_fp_D _ _ _ Hok q sl' pin' Hsl2 Hpin2) as HfpD.
+          pose proof (spo_desc _ _ _ _ (vpo_slot _ _ _ Hok q sl' pin' Hsl2 Hpin2))
+            as Hdesc.
+          rewrite Hpin' in Hdj.
+          exact (proj1 (elem_of_disjoint _ _) Hdj _ Hdesc
+                   (HfpD _ (slot_fp_pin sl' pin' _ Hdesc))).
+        - exists w. rewrite lookup_insert_ne; [| exact (not_eq_sym Hne) ].
+          by split. }
+      rewrite (big_sepM_delete _ (<[ i := HInactive ]> hs) i HInactive);
+        [| apply lookup_insert ].
+      rewrite delete_insert_delete. rewrite /head_res.
+      iSplitR; [done|]. iExact "Hrest".
   Qed.
 
   (* [b->disk] cannot be owned twice.  [BioInv]'s [word4_pointsto_excl] says
@@ -3234,104 +3201,6 @@ Section VirtioProto.
     iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne. done.
   Qed.
 
-  (* THE COLLECT: the woken publisher takes its chain back out of the
-     receipt and returns the descriptor to the free side.  [b->disk] reads 0,
-     so the entry is in the came-back disjunct; the caller hands back the
-     [disk.info[i].b] cell it is about to clear, and the receipt goes
-     INACTIVE -- ready for the allocator to hand out again. *)
-  Lemma virtio_proto_collect_acc (γ : disk_names) (v : virtio_state)
-      (np i : nat) (dc : dclaim) :
-    Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot dc)))) = i ->
-    virtio_proto γ v -∗ disk_pub γ np -∗
-    i ↪[dn_head γ] HActive dc -∗
-    (* the caller has just read [b->disk] as 0 through [virtio_proto_poll_acc],
-       and gives that knowledge back as the cell itself *)
-    b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) -∗
-    ⌜virtio_live (v_cfg v) = true⌝ ∗
-    disk_cfg γ (v_cfg v) ∗
-    (∃ w : SailStdpp.Values.mword 64,
-       d_info_b i ↦₈ w ∗
-       (d_info_b i ↦₈ w ==∗
-          virtio_proto γ v ∗ disk_pub γ np ∗
-          i ↪[dn_head γ] HInactive ∗
-          chain_back γ (dc_slot dc) (dc_pin dc))).
-  Proof.
-    intro Hhd.
-    iIntros "Hp Hpub Hfrag Hbd0". rewrite /virtio_proto /disk_pub.
-    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
-      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
-      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
-    iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
-        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
-    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
-    iDestruct (ghost_map_lookup with "Hhauth Hfrag") as %Hhlk.
-    iDestruct (big_sepM_delete _ hs i (HActive dc) Hhlk with "Hhbig")
-      as "[Hent Hrest]".
-    rewrite {1}/head_res.
-    iDestruct "Hent" as "(%Hdchd & Hinfo & Hdisj)".
-    (* the chain IS back: the other branch would own [b->disk] a second time *)
-    (* the chain IS back: the other branch would own [b->disk] a second time *)
-    iDestruct "Hdisj" as "[[Hbd1 _] | [_ Hback]]".
-    { iDestruct (vp_word4_excl with "Hbd0 Hbd1") as %[]. }
-    (* the disjointness the coupling obligation below needs, taken while the
-       chain is still an Iris hypothesis *)
-    rewrite {1}/chain_back.
-    iDestruct "Hback" as "(Hpinm & Hbst & Hbpm & Hbbs)".
-    iDestruct (dma_own_disj with "Hdma Hpinm") as %Hdj.
-    iAssert (chain_back γ (dc_slot dc) (dc_pin dc))
-      with "[Hpinm Hbst Hbpm Hbbs]" as "Hback".
-    { rewrite /chain_back. iFrame "Hpinm Hbst Hbpm Hbbs". }
-    iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
-    iExists (dc_buf dc : SailStdpp.Values.mword 64).
-    iFrame "Hinfo". iIntros "Hinfo".
-    (* the receipt goes back to INACTIVE, keeping only the cell *)
-    iMod (ghost_map_update HInactive with "Hhauth Hfrag") as "[Hhauth Hfrag]".
-    iModIntro. iFrame "Hpub Hfrag Hback".
-    iExists pr, dma.
-    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
-    iSplitR; [iPureIntro; exact Hctl|].
-    iSplitR; [iPureIntro; exact Hok|].
-    iSplitR; [iPureIntro; exact Hal|].
-    iSplitR; [iPureIntro; exact Hseen|].
-    iSplitR; [iPureIntro; exact Hah|].
-    iSplitR; [iPureIntro; exact Htkc|].
-    iSplitR; [iPureIntro; exact Hui|].
-    iSplitR; [iPureIntro; exact Hridx|].
-    iSplitR; [iPureIntro; exact Hwce|].
-    iSplitR; [iPureIntro; exact Hwt|].
-    iExists (<[ i := HInactive ]> hs). iFrame "Hhauth".
-    iSplitR; [iPureIntro; rewrite dom_insert_L Hhdom;
-              apply subseteq_union_1_L, singleton_subseteq_l;
-              rewrite -Hhdom; apply elem_of_dom; by exists (HActive dc)|].
-    iSplitR.
-    { (* THIS REQUEST IS NO LONGER LIVE -- the handler retired it before it
-         ever set [b->disk] to 0 -- so no live one has this head. *)
-      iPureIntro. intros q sl' pin' Hq.
-      destruct (Hhcoup q sl' pin' Hq) as (w & Hw & Hws).
-      destruct (decide (Z.to_nat (bv_unsigned (vr_head (vs_req sl'))) = i))
-        as [Heq|Hne].
-      - (* THE CHAIN IS IN THE RECEIPT, so it is not in the lease -- and a
-           live request's pinned bytes are.  The head descriptor's own byte
-           is in both, which cannot be. *)
-        exfalso. rewrite Heq Hhlk in Hw. injection Hw as <-.
-        destruct Hws as (Hsl' & Hpin' & _).
-        apply map_lookup_zip_with_Some in Hq as (sl2 & pin2 & Heq2 & Hsl2 & Hpin2).
-        injection Heq2 as <- <-.
-        pose proof (vpo_fp_D _ _ _ Hok q sl' pin' Hsl2 Hpin2) as HfpD.
-        pose proof (spo_desc _ _ _ _ (vpo_slot _ _ _ Hok q sl' pin' Hsl2 Hpin2))
-          as Hdesc.
-        rewrite Hpin' in Hdj.
-        exact (proj1 (elem_of_disjoint _ _) Hdj _ Hdesc
-                 (HfpD _ (slot_fp_pin sl' pin' _ Hdesc))).
-      - exists w. rewrite lookup_insert_ne; [| exact (not_eq_sym Hne) ].
-        by split. }
-    rewrite (big_sepM_delete _ (<[ i := HInactive ]> hs) i HInactive);
-      [| apply lookup_insert ].
-    iSplitL "Hinfo"; [by iExists (dc_buf dc : SailStdpp.Values.mword 64)|].
-    rewrite delete_insert_delete. iExact "Hrest".
-  Qed.
 
   (* ==================================================================== *)
   (* driver operation 1b: THE RING STORE                                  *)
@@ -3588,12 +3457,16 @@ Section VirtioProto.
        this names is an OLDER position's, so the invariant goes back to
        holding nothing staged. *)
     disk_stage γ (Some (vs_hd sl)) -∗
-    (* THE RECEIPT for this chain's head, already ACTIVE: the store to
-       [disk.info[id].b] earlier in [virtio_disk_rw] flipped it and handed the
-       invariant [b->disk = 1] (finding 5).  BORROWED here -- the publish
-       reads it to extend the coupling to the new position and hands it
-       straight back, because the caller sleeps holding it. *)
-    (Z.to_nat (bv_unsigned (vr_head (vs_req sl)))) ↪[dn_head γ] HStaged dc -∗
+    (* THE RECEIPT for this chain's head, still INACTIVE -- the allocator
+       handed it over with the slot and nothing has published it since. *)
+    (Z.to_nat (bv_unsigned (vr_head (vs_req sl)))) ↪[dn_head γ] HInactive -∗
+    (* ...and the two driver-side cells the publish transfers in with it:
+       [disk.info[id].b], written back at +0x172, and [b->disk], set to 1 at
+       +0x16e.  This store is where the device gets the chain, so this is
+       where they stop being the driver's (finding 5). *)
+    d_info_b (Z.to_nat (bv_unsigned (vr_head (vs_req sl))))
+      ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) -∗
+    b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
     phys_map pin -∗ phys_map wrb -∗
     (* NOTHING HAS DRAINED YET: a freshly published request owes its whole
        write, which is exactly the root of the sequential permit and exactly
@@ -3612,7 +3485,7 @@ Section VirtioProto.
        (Z.to_nat (bv_unsigned (vr_head (vs_req sl)))) ↪[dn_head γ] HActive dc).
   Proof.
     intros Hslotok Hdcsl Hdcpos Hdcpin Hwrbdom Hwrpin Hroom.
-    iIntros "Hp Hpub Hnrd Hstg Hfrag Hpin Hwrb Hpres".
+    iIntros "Hp Hpub Hnrd Hstg Hfrag Hinfo Hbd Hpin Hwrb Hpres".
     rewrite {1}/virtio_proto /disk_pub.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
     { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
@@ -3839,19 +3712,19 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Hwt'|].
     (* nothing is staged once the bump has landed *)
     iSplitL "Hstage"; [by iExists None; iFrame "Hstage"|].
-    (* THE RECEIPTS: the map is untouched -- the flip happened at the
-       [disk.info[id].b] store -- but the coupling now has one more slot to
-       cover, and the caller's own receipt is what covers it. *)
-    iSplitL "Hhauth Hhbig Hrec".
+    (* THE RECEIPTS: this store is the handover, so the entry flips INACTIVE
+       -> ACTIVE here and the two driver-side cells move in with it.  The
+       coupling also gains a slot to cover, and the caller's own receipt is
+       what covers it. *)
+    iSplitL "Hhauth Hhbig Hrec Hinfo Hbd".
     { rewrite /heads_res_at.
       set (i := Z.to_nat (bv_unsigned (vr_head (vs_req sl)))).
-      iDestruct (big_sepM_delete _ hs i (HStaged dc) Hlk with "Hhbig")
-        as "[Hent Hrest]".
-      rewrite {1}/head_res. iDestruct "Hent" as "(_ & Hinfo & Hbd)".
+      iDestruct (big_sepM_delete _ hs i HInactive Hlk with "Hhbig")
+        as "[_ Hrest]".
       iExists (<[ i := HActive dc ]> hs). iFrame "Hhauth".
       iSplitR; [iPureIntro; rewrite dom_insert_L Hhdom;
                 apply subseteq_union_1_L, singleton_subseteq_l;
-                rewrite -Hhdom; apply elem_of_dom; by exists (HStaged dc)|].
+                rewrite -Hhdom; apply elem_of_dom; by exists HInactive|].
       iSplitR.
       { (* the rebuild's own rewrite already put [vp_spins] in insert form *)
         iPureIntro. intros q sl' pin' Hq.
@@ -3860,7 +3733,7 @@ Section VirtioProto.
           subst i. rewrite Hdcsl lookup_insert.
           split_and!; [reflexivity | reflexivity | exact Hdcpin | exact Hdcpos].
         - (* an OLDER live request cannot have this head: the coupling would
-             put its entry ACTIVE, and it was STAGED *)
+             put its entry ACTIVE, and it was INACTIVE *)
           destruct (Hhcoup q sl' pin' Hq) as (w & Hw & Hws).
           destruct (decide (Z.to_nat (bv_unsigned (vr_head (vs_req sl'))) = i))
             as [Heq|Hne].
@@ -4125,6 +3998,107 @@ Section VirtioProto.
     iExists u. iSplitR; [done|].
     iExists bs. iFrame "Hbs Hdone0".
     all: try (iPureIntro; split_and!; assumption).
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE HANDLER'S BUF READ: [struct buf *b = disk.info[id].b].           *)
+  (*                                                                      *)
+  (* A PEEK, keyed exactly like the deposit below -- the completion        *)
+  (* record at [p] plus the watermark still at [u] -- so both accessors    *)
+  (* land on the SAME map entry [hs !! id] and therefore the same claim.   *)
+  (* That is what lets the handler carry the value it read here across to  *)
+  (* the store: not a resource (an invariant cannot lend one across a      *)
+  (* close) but the pure fact that the address it now holds in [b] is      *)
+  (* [dc_buf dc] for the very claim the deposit will find.                 *)
+  (*                                                                      *)
+  (* The cell is PINNED to that buffer in both arms of the disjunct, so    *)
+  (* this read does not care whether the chain is still out or already     *)
+  (* back, and it spends nothing: the watermark comes back unmoved.        *)
+  (* ==================================================================== *)
+  Lemma virtio_proto_infob_acc (γ : disk_names) (v : virtio_state)
+      (np p u : nat) :
+    virtio_proto γ v -∗ disk_pub γ np -∗
+    disk_ord γ p u -∗
+    disk_read_at γ u -∗
+    ⌜virtio_live (v_cfg v) = true⌝ ∗
+    disk_cfg γ (v_cfg v) ∗
+    (∃ dc : dclaim,
+       ⌜dc_pos dc = p⌝ ∗
+       ⌜slot_pin_ok (v_cfg v) p (dc_slot dc) (dc_pin dc)⌝ ∗
+       d_info_b (Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
+         ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) ∗
+       (d_info_b (Z.to_nat (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
+          ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) -∗
+          virtio_proto γ v ∗ disk_pub γ np ∗ disk_read_at γ u)).
+  Proof.
+    iIntros "Hp Hpub #Hordp Hrd".
+    rewrite /virtio_proto /disk_pub.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
+      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
+      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
+        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
+    (* the completion record puts [p] in [srv], hence out of [pend] *)
+    rewrite /disk_ord.
+    iDestruct (ghost_map_lookup with "Hord Hordp") as %Huix.
+    assert (Hsrv : p ∈ vp_srv pr).
+    { rewrite <- (vpo_uix_dom _ _ _ Hok). apply elem_of_dom. by exists u. }
+    assert (Hpendnone : vp_pend pr !! p = None).
+    { apply not_elem_of_dom. intro Hc'.
+      destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hc') as [_ Hns].
+      exact (Hns Hsrv). }
+    (* the watermark still owes this record a look, so its slot is in [done] *)
+    rewrite /disk_read_at.
+    iDestruct (ghost_var_agree with "Hnr Hrd") as %Hnreq.
+    assert (Hdonein : p ∈ dom (vp_done pr)).
+    { apply (vpo_done_uix _ _ _ Hok). exists u. split; [exact Huix | lia]. }
+    apply elem_of_dom in Hdonein as [sl Hdone].
+    assert (Hs : vp_slots pr !! p = Some sl).
+    { unfold vp_slots.
+      rewrite (lookup_union_r (vp_pend pr) (vp_done pr) p Hpendnone).
+      exact Hdone. }
+    assert (Hpinin : exists pin, vp_pin pr !! p = Some pin).
+    { apply elem_of_dom. rewrite (vproto_slot_dom (v_cfg v) pr (dom dma) Hok).
+      apply elem_of_dom. by exists sl. }
+    destruct Hpinin as [pin Hpin].
+    assert (Hspins : vp_spins pr !! p = Some (sl, pin))
+      by (unfold vp_spins; rewrite map_lookup_zip_with Hs Hpin; reflexivity).
+    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
+    destruct (Hhcoup p sl pin Hspins) as (dc & Hhlk & Hdcsl & Hdcpin & Hdcpos).
+    iDestruct (big_sepM_delete _ hs _ (HActive dc) Hhlk with "Hhbig")
+      as "[Hent Hrest]".
+    rewrite {1}/head_res.
+    iDestruct "Hent" as "(%Hdchd & Hinfo & Hdisj)".
+    iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
+    iExists dc.
+    iSplitR; [iPureIntro; exact Hdcpos|].
+    iSplitR.
+    { iPureIntro. rewrite Hdcsl Hdcpin.
+      exact (vpo_slot _ _ _ Hok p sl pin Hs Hpin). }
+    (* the entry is keyed by [sl]'s head; the statement says [dc_slot dc] *)
+    rewrite Hdcsl.
+    iFrame "Hinfo". iIntros "Hinfo".
+    (* both halves of [dn_nr] are in scope here, so isolate before framing *)
+    iSplitR "Hpub Hrd"; [| by iFrame "Hpub Hrd"].
+    iExists pr, dma.
+    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
+    iSplitR; [iPureIntro; exact Hctl|].
+    iSplitR; [iPureIntro; exact Hok|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hah|].
+    iSplitR; [iPureIntro; exact Htkc|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hridx|].
+    iSplitR; [iPureIntro; exact Hwce|].
+    iSplitR; [iPureIntro; exact Hwt|].
+    iExists hs. iFrame "Hhauth".
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    rewrite (big_sepM_delete _ hs _ (HActive dc) Hhlk).
+    iFrame "Hrest". rewrite /head_res Hdcsl.
+    iSplitR; [by iPureIntro|]. iFrame "Hinfo". iExact "Hdisj".
   Qed.
 
   (* ==================================================================== *)

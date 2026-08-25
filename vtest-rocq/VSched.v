@@ -76,7 +76,7 @@ Proof. intros a b Hb. unfold view_of. by rewrite Hb. Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition set_vdisk (v : virtio_state) (dk : Z -> bv 8) : virtio_state :=
-  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) dk
+  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) dk
               (v_cache v) (v_taken v) (v_cap v).
 
 (* the disk image as the device sees it: a TOTAL function over a finite
@@ -123,7 +123,7 @@ Inductive sitem : Type :=
 (* THE OLDEST OUTSTANDING POSITION -- what the nullary disk arms serve. *)
 Definition first_free (d : dev_state) (mv : vmem) : option (bv 16) :=
   let v := dvirtio d in
-  head (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v)).
+  head (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_inflight v)).
 
 (* ---------------------------------------------------------------------- *)
 (* 3. Applying one item.                                                   *)
@@ -266,7 +266,7 @@ Definition settle_wire (s : mstate) : option mstate :=
    identical. *)
 Definition last_free (d : dev_state) (mv : vmem) : option (bv 16) :=
   let v := dvirtio d in
-  last (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v)).
+  last (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_inflight v)).
 
 Definition pick_at (pick : dev_state -> vmem -> option (bv 16))
     (f : Z -> sitem) (s : mstate) : option mstate :=

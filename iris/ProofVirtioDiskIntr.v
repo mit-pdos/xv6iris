@@ -956,18 +956,16 @@ Proof. exact (pa_add_aligned_in_page p k d). Qed.
 Section VtLoopSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
-  (* [DiskInv.disk_res]'s body with the six existentials named. *)
+  (* [DiskInv.disk_res]'s body with the four existentials named. *)
   Definition disk_res_at (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
-      (np nr : nat) (fl pk : gmap nat dclaim)
+      (np nr : nat)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) : iProp Σ :=
-    (* the window bookkeeping, split as in [DiskInv.disk_res]: an arbitrary
-       set of live positions below [np], counted, disjoint from the parked *)
-    (⌜forall p, p ∈ dom fl -> (p < np)%nat⌝ ∗
-     ⌜size fl = (np - nr)%nat⌝ ∗
-     ⌜forall p, p ∈ dom pk -> (p < np)%nat⌝ ∗
-     ⌜dom fl ## dom pk⌝ ∗
-     ⌜dom tr = dom fl ∪ dom pk⌝ ∗
-     ⌜forall p v, (fl ∪ pk) !! p = Some v -> tr !! p = Some (dc_tri v)⌝ ∗
+    (* the window bookkeeping, exactly as in [DiskInv.disk_res]: an arbitrary
+       set of live positions below [np].  There is no [fl]/[pk] split any
+       more -- a live request's state is its [HActive] receipt, held by the
+       publisher, not a row in a map the lock resource carries (finding 5). *)
+    (⌜forall p, p ∈ dom tr -> (p < np)%nat⌝ ∗
+     ⌜size tr = (np - nr)%nat⌝ ∗
      ⌜forall p T, tr !! p = Some T -> tri_ok T⌝ ∗
      ⌜forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
         tri_set Tp ## tri_set Tq⌝ ∗
@@ -978,31 +976,28 @@ Section VtLoopSeam.
      disk_read_at γ nr ∗
      (* nothing half-published while the lock is not held mid-publish *)
      disk_stage γ None ∗
-     ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
      d_used_idx ↦₂ wrap16 nr ∗
-     ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗
-     ([∗ map] p ↦ v ∈ pk, parked_res γ pav p v) ∗
-     free_bundles pd fr)%I.
+     free_bundles γ pd fr)%I.
 
   Lemma disk_res_at_elim (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     disk_res γ pd pav pu -∗
-    ∃ (np nr : nat) (fl pk : gmap nat dclaim)
+    ∃ (np nr : nat)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
-      disk_res_at γ pd pav pu np nr fl pk tr fr.
+      disk_res_at γ pd pav pu np nr tr fr.
   Proof.
     iIntros "H". rewrite /disk_res.
-    iDestruct "H" as (np nr fl pk tr fr) "H".
-    iExists np, nr, fl, pk, tr, fr. rewrite /disk_res_at /free_bundles. iExact "H".
+    iDestruct "H" as (np nr tr fr) "H".
+    iExists np, nr, tr, fr. rewrite /disk_res_at /free_bundles. iExact "H".
   Qed.
 
   Lemma disk_res_at_intro (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
-      (np nr : nat) (fl pk : gmap nat dclaim)
+      (np nr : nat)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) :
-    disk_res_at γ pd pav pu np nr fl pk tr fr -∗ disk_res γ pd pav pu.
+    disk_res_at γ pd pav pu np nr tr fr -∗ disk_res γ pd pav pu.
   Proof.
     iIntros "H". rewrite /disk_res.
     iEval (rewrite /disk_res_at /free_bundles) in "H".
-    iExists np, nr, fl, pk, tr, fr. iExact "H".
+    iExists np, nr, tr, fr. iExact "H".
   Qed.
 
   (* THE loop invariant's ghost content, at the loop head KernelSyms.virtio_disk_intr+0x3e: the
@@ -1011,15 +1006,15 @@ Section VtLoopSeam.
      [VirtioProto.virtio_proto_reclaim_acc]'s premise at [p := nr]. *)
   Definition vt_loop_state (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
     : iProp Σ :=
-    (∃ (np nr : nat) (fl pk : gmap nat dclaim)
+    (∃ (np nr : nat)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (c : nat),
        ⌜(nr < c)%nat /\ (c <= np)%nat⌝ ∗ disk_done_lb γ c ∗
-       disk_res_at γ pd pav pu np nr fl pk tr fr)%I.
+       disk_res_at γ pd pav pu np nr tr fr)%I.
 
   Lemma vt_loop_state_close (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     vt_loop_state γ pd pav pu -∗ disk_res γ pd pav pu.
   Proof.
-    iIntros "H". iDestruct "H" as (np nr fl pk tr fr c) "(_ & _ & H)".
+    iIntros "H". iDestruct "H" as (np nr tr fr c) "(_ & _ & H)".
     iApply (disk_res_at_intro with "H").
   Qed.
 

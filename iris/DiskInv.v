@@ -261,13 +261,17 @@ Section DiskInv.
        d_ops i ↦₄ t ∗ pa_add disk_base (168 + 16 * i + 4) ↦₄ r ∗
        pa_add disk_base (168 + 16 * i + 8) ↦₈ s)%I.
 
-  (* everything a FREE descriptor slot owns *)
-  (* [disk.info[i].b] IS NOT HERE any more (finding 5): the device
-     invariant's receipt owns that cell in every state, which is what lets
-     the interrupt handler read it and learn WHICH buffer without a lookup. *)
+  (* everything a FREE descriptor slot owns.  [disk.info[i].b] IS here: no
+     descriptor ever names that cell, so the device cannot touch it, and
+     while the slot is free it is ordinary driver state like the rest.  It
+     leaves for the receipt only at the publish and comes back when the poll
+     reads [b->disk] as 0 (finding 5) -- that in-flight window is exactly the
+     stretch when its reader is the interrupt handler rather than the thread
+     that allocated the slot. *)
   Definition free_slot_res (pd : Arch.pa) (i : nat) : iProp Σ :=
     (desc_entry_own pd i ∗ ops_own i ∗
-     (∃ sb : bv 8, d_info_status i ↦ₘ sb))%I.
+     (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
+     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
 
   (* The part of [free_slot_res] that lives in [struct disk]'s .bss rather
      than on the descriptor page: slot [i]'s [ops] header, its
@@ -280,13 +284,8 @@ Section DiskInv.
      [desc_entry_own pd i], comes off the freshly-zeroed descriptor page. *)
   Definition disk_slot_raw (i : nat) : iProp Σ :=
     (ops_own i ∗
-     (∃ sb : bv 8, d_info_status i ↦ₘ sb))%I.
-
-  (* ...and [info[i].b] on its own, because it no longer joins the free pool:
-     the eight of them go to the device invariant at the live flip, where the
-     receipts take them over for good (finding 5). *)
-  Definition disk_info_b_raw (i : nat) : iProp Σ :=
-    (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w)%I.
+     (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
+     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
 
   Lemma free_slot_res_split (pd : Arch.pa) (i : nat) :
     free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗ disk_slot_raw i.

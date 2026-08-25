@@ -32,7 +32,7 @@
    THE FIX (claude-notes/design/virtio-driver.md).  A position is servable
    when the driver has published it and the device has not served it yet, and
    every step that answers a request takes the position as a PARAMETER: the
-   device state carries a watermark [v_seen] plus the set [v_ahead] of
+   device state carries a watermark [v_seen] plus the set [v_inflight] of
    positions served out of turn, and [vfree] is the window arithmetic that
    decides which are left.  Both executions below run the SAME program on the
    same machine; they differ only in which outstanding request the device
@@ -138,22 +138,22 @@ Lemma model_serves_any_free_position (v : virtio_state) (mv : vmem)
      position the device has served was one the driver had PUBLISHED, so the
      published index is never in it ([VirtioModel.virtio_queue_ok] carries
      exactly this conjunct) *)
-  avail_idx_at (v_cfg v) mv ∉ v_ahead v ->
+  avail_idx_at (v_cfg v) mv ∉ v_inflight v ->
   virtio_req_step v mv i = Some (v', w) ->
   (* it answered the position it was handed... *)
   (exists r, req_at (v_cfg v) mv i = Some r)
   (* ...which was published and unserved, and nothing more was asked of it *)
   /\ virtio_serve_ok v mv i = true
   (* ...and afterwards exactly that position is gone from the free set *)
-  /\ (forall q, vfree (v_seen v') (avail_idx_at (v_cfg v) mv) (v_ahead v') q
-                = vfree (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v) q
+  /\ (forall q, vfree (v_seen v') (avail_idx_at (v_cfg v) mv) (v_inflight v') q
+                = vfree (v_seen v) (avail_idx_at (v_cfg v) mv) (v_inflight v) q
                   && negb (bool_decide (q = i))).
 Proof.
   intros Hai H.
   destruct (virtio_req_step_shape _ _ _ _ _ H) as (r & Hr & Hserve & _ & _).
   split; [by exists r|]. split; [exact Hserve|].
   intro q.
-  rewrite (virtio_req_step_seen _ _ _ _ _ H), (virtio_req_step_ahead _ _ _ _ _ H).
+  rewrite (virtio_req_step_seen _ _ _ _ _ H), (virtio_req_step_inflight _ _ _ _ _ H).
   apply vserve_free; [ exact Hai | ].
   exact (vfree_ne_ai _ _ _ _ (virtio_serve_free _ _ _ Hserve)).
 Qed.

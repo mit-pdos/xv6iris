@@ -246,7 +246,14 @@ Record dclaim := DClaim {
    [disk.free[NUM]] and [disk.info[NUM]] in the C.
 
    [HInactive] is a descriptor nobody has submitted: free (its bytes are in
-   the pool) or allocated and still being filled in.  [HActive v] is one
+   the pool) or allocated and still being filled in.  It says NOTHING about
+   [disk.info[i].b] -- unlike [info[i].status], which [desc[t]] points at and
+   the device writes, [info[i].b] is named by no descriptor and the device
+   never sees it, so while the slot is idle that cell is plain driver state
+   and rides in the lock resource with the rest of the free slot.  It
+   transfers into the receipt only for the in-flight window, because that is
+   the one stretch where its owner (the interrupt handler, which learns the
+   head from the used ring) is not the thread that allocated it.  [HActive v] is one
    whose chain is live, and the claim [v] records what was published --
    which buffer, which slot, which three descriptors, which pinned bytes.
    The FRAGMENT is what [virtio_disk_rw] carries across [sleep()]'s release
@@ -254,10 +261,6 @@ Record dclaim := DClaim {
    on every re-acquire. *)
 Inductive hstate :=
   | HInactive
-  (* [disk.info[i].b] has been written and [b->disk] set, but the chain is
-     not published yet -- xv6 does those two stores before it touches the
-     available ring. *)
-  | HStaged (v : dclaim)
   (* published: the device has the chain, or it has come back *)
   | HActive (v : dclaim).
 

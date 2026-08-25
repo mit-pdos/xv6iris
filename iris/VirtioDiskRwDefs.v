@@ -1007,11 +1007,12 @@ Section VdrwcDefs.
   (* [info[i].b] is NOT here any more: the device invariant's receipt owns it
      in every state (finding 5), so it neither leaves nor rejoins the pool. *)
   Definition vdrw_slot_rest (i : nat) : iProp Σ :=
-    (ops_own i ∗ (∃ sb : bv 8, d_info_status i ↦ₘ sb))%I.
+    (ops_own i ∗ (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
+     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
 
   Lemma free_slot_split (pd : Arch.pa) (i : nat) :
     free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗ vdrw_slot_rest i.
-  Proof. rewrite /free_slot_res /vdrw_slot_rest. iSplit; iIntros "($ & $ & $)". Qed.
+  Proof. rewrite /free_slot_res /vdrw_slot_rest. iSplit; iIntros "($ & $ & $ & $)". Qed.
 
   (* THE P3/P4 SEAM: the seventeen cells the chain formatting writes, at the
      values it writes, plus the two untouched slot remainders. *)
