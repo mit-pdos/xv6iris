@@ -1688,6 +1688,45 @@ Proof.
     split; [exact Heq | rewrite -Heq; exact Hnz].
 Qed.
 
+(*  ...and the SAME reading pointwise, which is what [FsDurSnap.sk_slot]
+    is stated over: the node's slot [k] IS the record's [FsImg.fs_slot k],
+    the indirect block included.                                          *)
+Lemma img_node_fn_naddr (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
+    (k : nat) :
+  (k < FS_MAXFILE)%nat ->
+  fn_naddr (img_node P sb z) k = fs_blk_addr P (fs_dinode P sb z) k.
+Proof.
+  intros Hk.
+  pose proof (fs_dinode_wf P sb z) as Hwf.
+  assert (Hklt : (k < MAXFILE)%nat)
+    by (unfold MAXFILE, FS_MAXFILE in *; lia).
+  rewrite /img_node
+    (era_node_naddr (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+       (fs_data_of P (fs_dinode P sb z)) k
+       (eq_sym (img_blkmap_cells P (fs_dinode P sb z) Hwf))
+       (img_blkmap_dirlen P (fs_dinode P sb z) Hwf) Hklt)
+    (img_blkmap_get P (fs_dinode P sb z) k Hwf Hklt) //.
+Qed.
+
+Lemma img_node_fn_slot (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) (k : nat) :
+  (k <= FS_MAXFILE)%nat ->
+  fn_slot (img_node P sb z) k = fs_slot P (fs_dinode P sb z) k.
+Proof.
+  intros Hk. rewrite /fn_slot /fs_slot.
+  destruct (decide (k = FS_MAXFILE)) as [-> | Hne];
+    [reflexivity | apply img_node_fn_naddr; lia].
+Qed.
+
+(* W4 at one inum, in the node vocabulary *)
+Lemma img_node_slot_inj (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fs_slot_inj P (fs_dinode P sb z) -> fn_slot_inj (img_node P sb z).
+Proof.
+  intros Hinj k j Hk Hj Hnz Heq. apply (Hinj k j Hk Hj).
+  - rewrite -(img_node_fn_slot P sb z k Hk). exact Hnz.
+  - rewrite -(img_node_fn_slot P sb z k Hk) -(img_node_fn_slot P sb z j Hj).
+    exact Heq.
+Qed.
+
 (*  ...and the bytes at a HELD slot are the block's own, which is
     [FsDurSnap.sk_blk] with the map's lookup removed.                     *)
 Lemma img_node_blk_at (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
@@ -2000,6 +2039,36 @@ Proof.
     rewrite elem_of_disjoint in Hdj.
     apply (Hdj b);
       rewrite /fs_inode_blocks_set elem_of_list_to_set; assumption.
+  - (* sk_sbok -- W1 *)
+    rewrite Hpsb. exact Hsb.
+  - (* sk_reg -- the region is EXACTLY [[inodestart, bmapstart)], which is
+       the [nib = ninodes/16 + 1] conjunct of [fs_boot_image_wf] *)
+    rewrite Hpsb Hpin. intros i n Hi.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi) as [Hreg _].
+    apply region_inums_spec in Hreg.
+    assert (Hd : 0 <= i `div` 16 < Z.of_nat nib).
+    { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
+    split; lia.
+  - (* sk_slot -- W4 per inum; a FREE inum's node is BARE and owes nothing *)
+    rewrite Hpin. intros i n Hi.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi) as [Hreg ->].
+    pose proof (proj1 (region_inums_spec nib i) Hreg) as Hri.
+    destruct (decide
+                (bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb i)) = 0))
+      as [H0 | Hnz].
+    + apply fn_slot_inj_bare.
+      exact (img_node_bare (fs_blocks dk) sb nib i Hbare
+               (fs_region_wf_nlink _ _ _ Hrw) Hri H0).
+    + assert (Hran : 0 <= i < FsImg.sb_ninodes sb).
+      { split; [lia |].
+        destruct (Z_lt_ge_dec i (FsImg.sb_ninodes sb)) as [Hlt | Hge];
+          [exact Hlt |].
+        exfalso. apply Hnz.
+        exact (fs_region_free_spec (fs_blocks dk) sb nib i
+                 (fs_region_wf_free _ _ _ Hrw)
+                 ltac:(lia) ltac:(lia) ltac:(lia)). }
+      apply (img_node_slot_inj (fs_blocks dk) sb i).
+      exact (fsimg_wf_slot_inj (fs_blocks dk) sb i Hwf Hran Hnz).
 Qed.
 
 (* ===================================================================== *)
