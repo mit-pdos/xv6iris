@@ -118,11 +118,13 @@ live directory, unique names).  There is NO cross-inode pure clause:
   ¼).  **`iunlock i`**: deposits the bundle CLEAN (`inode_local`, as
   today) and returns the parked share.  The escrow — not `ftop_inv` —
   is what knows the lock state, which is why the token parks there.
-- **The armed set** (LANDED, lane A): the abstract map's one mover
-  (`InodeRegion.ireg_top_retag`) requires `inode_local` of the new node
-  unless the transaction has ARMED the inum in `ftop_inv`'s registry
-  (`icfg_lk : txid → gset inum`, the entry parking the arming
-  transaction's whole token).  Only `create`'s mkdir child (`nlink = 1`
+- **The armed set** (LANDED, lanes A and B″-arm): the abstract map's one
+  mover (`InodeRegion.ireg_top_retag`) requires `inode_local` of the new
+  node unless the transaction has ARMED the inum in `ftop_inv`'s registry
+  (`icfg_lk : arm-id → (txid, share, gset inum)`; an entry parks ANY
+  positive share of the arming transaction's token, keyed by a fresh arm
+  id so no freshness of the transaction is needed — a walk that has
+  parked shares in escrows can still arm).  Only `create`'s mkdir child (`nlink = 1`
   flushed before its dot entries) needs it in this kernel.  `ftop_inv`'s
   row "every unarmed inum's node is `inode_local`" plus an empty `γtx`
   authority yields `snap_local` of the abstract state
@@ -169,8 +171,9 @@ the file system's own invariants at the one moment they are all clean:
 
 - **No inode is write-locked and no inode is armed** — at commit the
   WAL's `γtx` authority is empty, so no share of any transaction id
-  exists: no escrow "out for writing" arm (it parks a share) and no armed
-  entry (it parks the whole token).  Every inode is either unlocked or
+  exists: no escrow "out for writing" arm (it parks a share,
+  `IcacheEscrow.ic_out_no_write_arm`) and no armed entry (it parks a
+  share, `IregClean.ireg_snap_local_acc`).  Every inode is either unlocked or
   read-locked, and every node of the abstract map is `inode_local`
   (`IregClean`).
 - **Every inode's validity predicate is inside the invariants.**  An
