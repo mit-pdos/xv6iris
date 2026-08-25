@@ -1375,7 +1375,7 @@ Section ProofIget.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_free cn γfs γi cov logstart e dev inumT dev inum
                       with "Hbody Hgid HinT")
-                as "(Hincell & Hdcell & Hvld & Hraw & Hmt & Hgid1 & Hgid2)".
+                as "(Hincell & Hdcell & Hvld & Hraw & Hmt & Hgid1 & Hgid2 & Hpin)".
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
               iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
@@ -1396,10 +1396,10 @@ Section ProofIget.
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
                       with "Hrinv Hlic Hbundle")
                 as "(Hlic & Hbundle & Hicnt0 & Hmir0 & Hfoff)".
-              iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1]") as "_".
+              iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1 Hpin]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
-                          with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1").
+                          with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1 Hpin").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
               iMod ("Hidback" $! dev inum with "[%] Hgid2") as "Hgid2";
                 [reflexivity |].
@@ -1523,10 +1523,10 @@ Section ProofIget.
             iDestruct (ic_open_mid cn γfs γi cov logstart e with "Hmt Hbodyp")
               as "[Hmt Harmp]".
             iDestruct "Harmp" as (devp inump wvp)
-              "(Hd1p & Hincellp & Hvldp & Hpayp & Hgid1p)".
+              "(Hd1p & Hincellp & Hvldp & Hpayp & Hgid1p & Hpinp)".
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry e))
                          (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
-            iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p]") as "_".
+            iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p Hpinp]") as "_".
             { iNext. iApply (ic_close_mid cn γfs γi cov logstart e).
               (* NAMED, in the goal's conjunct order (optimization.md,
                  "Never bare iFrame in a large context"): [ic_mid_arm]'s
@@ -1535,7 +1535,7 @@ Section ProofIget.
                  spatial context against every one of its leaves -- 26.7 s,
                  the most expensive statement in this file. *)
               rewrite /ic_mid_arm. iExists devp, inump, wvp.
-              iFrame "Hd1p Hincellp Hvldp Hpayp Hgid1p". }
+              iFrame "Hd1p Hincellp Hvldp Hpayp Hgid1p Hpinp". }
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
                       (mword_of_int 64 : mword 12) V1 (trap_res b + (K - 6))%nat
@@ -1550,7 +1550,8 @@ Section ProofIget.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iDestruct (ic_open_mid cn γfs γi cov logstart e with "Hmt Hbody")
                 as "[Hmt Harm]".
-              iDestruct "Harm" as (dev' inum' wv) "(Hd1 & Hincell & Hvld & Hpay & Hgid1)".
+              iDestruct "Harm" as (dev' inum' wv)
+                "(Hd1 & Hincell & Hvld & Hpay & Hgid1 & Hpin)".
               iDestruct (ic_id_agree with "Hgid2 Hgid1") as %(_ & <- & <-).
               iModIntro. iExists wv. iFrame "Hvld". iIntros "Hvld".
               (* the fresh generation's PENDING one-shot is deposited HERE
@@ -1558,7 +1559,7 @@ Section ProofIget.
                  +0x78, carried by hand across MID, and until §17.6 it was
                  simply dropped at this line. *)
               iDestruct (ic_close_mid_to_parked cn γfs γi cov logstart e dev inum gnew
-                           with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh Hpend Hfoff")
+                           with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh Hpend Hfoff Hpin")
                 as "[Hbody Hinhalf]".
               iMod ("Hclose2" with "[Hbody]") as "_"; [by iNext |].
               iModIntro. iFrame "Hd2 Hinhalf Hgid2". }

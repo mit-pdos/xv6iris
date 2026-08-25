@@ -1763,7 +1763,14 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, ic_tok cn k) -∗
     ([∗ list] k ∈ seq 0 NINODE, ic_mid cn k) -∗
     ([∗ list] k ∈ seq 0 NINODE,
-       ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n)
+       ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n) -∗
+    (* THE LOCK-WINDOW PIN (durable-disk B''-tx5), one WHOLE element per SLOT
+       at [None]: "no slot is inside one of iput's two windows at boot".  A
+       PREMISE for the reason every other ghost here is one -- the gname is
+       the ambient [IcacheRef.icfg_hpn] -- and [IcacheRef.icfg_alloc] +
+       [IcacheRef.hpn_boot_split] is what discharges it.  LAST, so no
+       existing call site's [with]-list order moved above it. *)
+    ([∗ list] k ∈ seq 0 NINODE, hpn_full k None)
     ={E}=∗
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1774,7 +1781,7 @@ Section IcacheBootTable.
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
     iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey".
-    iIntros "Hxkey Hfree Htok Hmid Hgid".
+    iIntros "Hxkey Hfree Htok Hmid Hgid Hhpn".
     (* THE POOL'S INVARIANT IS ALLOCATED AFTER THE ESCROWS (durable-disk
        C-3b), and it has to be: its body carries a QUARTER of every slot's
        [ic_id] beside the partition, and those quarters do not exist until
@@ -1812,13 +1819,14 @@ Section IcacheBootTable.
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".
     iDestruct (big_sepL_sep_2 with "H2 Hmid") as "H3".
     iDestruct (big_sepL_sep_2 with "H3 Hgid") as "H4".
+    iDestruct (big_sepL_sep_2 with "H4 Hhpn") as "H4".
     iAssert ([∗ list] k ∈ seq 0 NINODE,
                |={E}=> ic_escrow cn γfs γi cov logstart k ∗
                        (islot_empty cn k ∗
                         ic_id cn k (1/4) false (dvs k).1 (dvs k).2))%I
       with "[H4]" as "Hesc".
     { iApply (big_sepL_mono with "H4"). intros idx k _.
-      iIntros "(((([Hd Hn] & (%w & Hv)) & Hmir) & Hmd) & Hgd)".
+      iIntros "((((([Hd Hn] & (%w & Hv)) & Hmir) & Hmd) & Hgd) & Hpin)".
       (* the caller minted this variable blind; WRITE what the cells say.
          [Hd]/[Hn] are slot [k]'s dev/inum cells at [(dvs k).1]/[(dvs k).2],
          so this is the one place the recorded identity can be made true. *)
@@ -1831,7 +1839,7 @@ Section IcacheBootTable.
       iDestruct (ic_id_quarters_split with "Hgd2") as "[Hgd2 Hgd3]".
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
-              with "[Hd Hn1 Hv Hmir Hmd Hgd1]") as "#Hinv".
+              with "[Hd Hn1 Hv Hmir Hmd Hgd1 Hpin]") as "#Hinv".
       { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
         rewrite /ic_empty_arm. iExists (dvs k).1, (dvs k).2, w. iFrame. }
       iModIntro. iFrame "Hinv". iSplitR "Hgd3"; [| iExact "Hgd3"].
@@ -1915,7 +1923,10 @@ Section IcacheBootTable.
     iref_slots_auth -∗
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
     ghost_var icfg_pool 1 (∅ : gset Z) -∗
-    ghost_var icfg_pext 1 (∅ : gset Z)
+    ghost_var icfg_pext 1 (∅ : gset Z) -∗
+    (* the lock-window pin, one whole element per slot (durable-disk
+       B''-tx5); see [icache_boot_at]'s own row *)
+    ([∗ list] k ∈ seq 0 NINODE, hpn_full k None)
     ={E}=∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
@@ -1925,11 +1936,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hhpn".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hfree Htok Hmid Hgid") as "H".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hrows Hkey Hxkey Hfree Htok Hmid Hgid Hhpn") as "H".
     iModIntro. iExists γl, cn. iExact "H".
   Qed.
 

@@ -1609,7 +1609,11 @@ Section FsCfgBootEra.
      lock_free_tok fsc_printk ∗
      (* --- kinit's page count, at zero: the pair [fsc_kpages] names --- *)
      kalloc_avail fsc_kpages (Some 0%nat) ∗
-     kmem_avail_auth fsc_kpages 0%nat)%I.
+     kmem_avail_auth fsc_kpages 0%nat ∗
+     (* ...AND THE LOCK-WINDOW PIN (durable-disk B''-tx5), one WHOLE element
+        per SLOT at [None]: [icache_boot_at]'s escrow loop puts one into
+        each arm it builds.  LAST, so no destructuring pattern above moved. *)
+     ([∗ list] k ∈ seq 0 NINODE, hpn_full k None))%I.
 
   Lemma fs_kit_icache_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
@@ -1632,7 +1636,8 @@ Section FsCfgBootEra.
       lock_free_tok fsc_dlock ∗
       lock_free_tok fsc_printk ∗
       kalloc_avail fsc_kpages (Some 0%nat) ∗
-      kmem_avail_auth fsc_kpages 0%nat.
+      kmem_avail_auth fsc_kpages 0%nat ∗
+      ([∗ list] k ∈ seq 0 NINODE, hpn_full k None).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -1781,7 +1786,11 @@ Section FsCfgBootEra.
      bio_free_tok fsc_bio ∗
      ([∗ set] b ∈ fsc_cov,
         pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
-     lock_free_tok fsc_dlock)%I.
+     lock_free_tok fsc_dlock ∗
+     (* ...AND THE LOCK-WINDOW PIN (durable-disk B''-tx5), one WHOLE element
+        per SLOT at [None]: [icache_boot_at]'s escrow loop puts one into
+        each arm it builds.  LAST, so no destructuring pattern above moved. *)
+     ([∗ list] k ∈ seq 0 NINODE, hpn_full k None))%I.
 
   Lemma fs_kit_icache_split (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
@@ -1791,10 +1800,10 @@ Section FsCfgBootEra.
     iIntros "H".
     iDestruct (fs_kit_icache_open with "H")
       as "(Hiref & Hlive & Hislg & Hipool & Hpkey & Hxkey & Hitlk & Htok & Hmid & Hgid &
-           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth)".
+           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth & Hhpn)".
     rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
     iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hpkey Hxkey Hitlk Htok
-            Hmid Hgid Hbio Hpool Hdllk".
+            Hmid Hgid Hbio Hpool Hdllk Hhpn".
   Qed.
 
   Lemma fs_kit_kalloc_open (ICFG : icfg) (FSC : fscfg) :
@@ -1821,7 +1830,8 @@ Section FsCfgBootEra.
       bio_free_tok fsc_bio ∗
       ([∗ set] b ∈ fsc_cov,
          pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
-      lock_free_tok fsc_dlock.
+      lock_free_tok fsc_dlock ∗
+      ([∗ list] k ∈ seq 0 NINODE, hpn_full k None).
   Proof. iIntros "H". iExact "H". Qed.
 
   (*  THE ONE ROW OF KIT 2 THAT main ITSELF NEEDS, peeled without spending
@@ -2116,7 +2126,10 @@ Section FsCfgBootEra.
             (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
-                     Hisl & Hrauth & Hlkauth & Hpkey & Hxkey)".
+                     Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn)".
+    (* the lock-window pin's boot map, fanned out one whole element per slot
+       (durable-disk B''-tx5) *)
+    iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
     (* every ambient form below is stated at [icfg_nib]; make the caller's
        [nib] BE it, so no lemma has to be re-instantiated *)
     symmetry in Hnibq. subst nib.
@@ -2621,7 +2634,7 @@ Section FsCfgBootEra.
     iSplitR; [iPureIntro; reflexivity |].
     (* ---- kit 1 ---- *)
     iSplitL "Hiref Hlive Hisl Hipool Hpkey Hxkey Hitlk Htok Hmid Hgid Hbio Hpool
-             Hkmlk Hdllk Hprlk Hkav Hkauth".
+             Hkmlk Hdllk Hprlk Hkav Hkauth Hhpn".
     { iSplitL "Hiref"; [iExact "Hiref" |].
       iSplitL "Hlive"; [iExact "Hlive" |].
       iSplitL "Hisl"; [iExact "Hisl" |].
@@ -2637,7 +2650,8 @@ Section FsCfgBootEra.
       iSplitL "Hkmlk"; [iExact "Hkmlk" |].
       iSplitL "Hdllk"; [iExact "Hdllk" |].
       iSplitL "Hprlk"; [iExact "Hprlk" |].
-      iSplitL "Hkav"; [iExact "Hkav" | iExact "Hkauth"]. }
+      iSplitL "Hkav"; [iExact "Hkav" |].
+      iSplitL "Hkauth"; [iExact "Hkauth" | iExact "Hhpn"]. }
     (* ---- kit 2 ---- *)
     iSplitL "Hlogtok"; [iExact "Hlogtok" |].
     iSplitL "Hboot"; [iExact "Hboot" |].

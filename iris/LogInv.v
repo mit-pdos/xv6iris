@@ -902,6 +902,36 @@ Section LogInv.
     iIntros "[H Ht]". iApply (log_opS_op with "H Ht").
   Qed.
 
+  (* ---- THE EPOCH-NAMED SET FORM BESIDE A *NAMED SHARE* --------------
+     (durable-disk B''-tx5, plan section 3/4)
+
+     [log_opSt]'s twin one level down, and it is what [SpecIput] threads.
+     iput's three windows -- [IcacheEscrow]'s [DepFrz], its mid-free park and
+     its authority-side [ic_held] -- each park a SHARE of the freeing
+     transaction's element, which is what lets the commit refute them at an
+     empty [ln_tx] authority; and a share must be handed back at exactly the
+     [(t, q)] it went in at, so the id is a FIELD here where [log_tx] closes
+     it existentially ([IcacheTxRefute.tx_two_halves_no_whole] is why).
+
+     Bundled as ONE conjunct in [log_opSe]'s own position for [log_opSt]'s
+     reason verbatim: written as two, every threading site of iput's
+     contract would move; written as one, they move by substitution. *)
+  Definition log_opSet (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat)
+      (t : nat) (q : Qp) : iProp Σ :=
+    (log_opSe γ u Sb e0 ∗ t ↪[ln_tx γ]{#q} ())%I.
+
+  Global Instance log_opSet_timeless γ u Sb e0 t q :
+    Timeless (log_opSet γ u Sb e0 t q).
+  Proof. rewrite /log_opSet. apply _. Qed.
+
+  Lemma log_opSet_split γ u Sb e0 t q :
+    log_opSet γ u Sb e0 t q -∗ log_opSe γ u Sb e0 ∗ t ↪[ln_tx γ]{#q} ().
+  Proof. iIntros "[$ $]". Qed.
+
+  Lemma log_opSet_intro γ u Sb e0 t q :
+    log_opSe γ u Sb e0 -∗ t ↪[ln_tx γ]{#q} () -∗ log_opSet γ u Sb e0 t q.
+  Proof. iIntros "H Ht". rewrite /log_opSet. iFrame. Qed.
+
   Lemma log_opb_op γ u : log_opb γ u -∗ log_tx γ -∗ log_op γ u.
   Proof. iIntros "H Ht". iFrame. Qed.
 

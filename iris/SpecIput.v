@@ -149,6 +149,15 @@ Definition wp_iput_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iput <= K)%nat ->
+  (* THE ONE NEW PREMISE (durable-disk B''-tx5).  iput's three windows park a
+     SHARE of the freeing transaction's [LogDefs.ln_tx] element in the slot's
+     escrow, which is what lets a commit refute them; the escrow has no
+     [log_names] parameter, so the share it parks is [icfg_log]'s.  This form
+     needs no extra RESOURCE for it -- [log_op g n]'s own [LogInv.log_tx] is
+     the WHOLE element, and the derivation halves it -- only the equation
+     that says the two are the same log.  Every caller has it: it is
+     [ProofSyscall]'s [sct_log], the walk's own [g = icfg_log]. *)
+  g = icfg_log ->
   (* ENTRY BY SLOT -- a0 is the entry address, and [ientry_inj] is what
      makes the 64-bit pointer and the slot the same thing *)
   (k < NINODE)%nat ->
@@ -358,6 +367,7 @@ Definition wp_iput_gen_body
     (size : Z) (dev : mword 32)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
+    (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) :=
@@ -366,6 +376,8 @@ Definition wp_iput_gen_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iput <= K)%nat ->
+  (* see [wp_iput_sconf_body]: the escrow parks at [icfg_log]. *)
+  g = icfg_log ->
   (k < NINODE)%nat ->
   (* the two absorption credits, travelling to itrunc unchanged *)
   (crb = true -> bmapstart ∈ Sb) ->
@@ -447,7 +459,12 @@ Definition wp_iput_gen_body
   (* the reservation, EPOCH-NAMED (§G.20's asymmetry: [log_opSe] in,
      [log_opS] out -- nothing above log_write compares epochs).  [e0] is the
      op's birth epoch, the one the credit above is ordered against. *)
-  log_opSe g n Sb e0 -∗
+  (* ...AND THE TRANSACTION SHARE BESIDE IT (durable-disk B''-tx5), bundled
+     into [log_opSe]'s own position so that the ~10 threading sites move by
+     substitution.  iput parks it in whichever of its three windows the free
+     path enters and takes it back at the window's exit, so it comes home on
+     EVERY arm -- see the post. *)
+  log_opSet g n Sb e0 tid qtx -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
@@ -472,6 +489,11 @@ Definition wp_iput_gen_body
       ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
+      (* the share, back at exactly the [(t, qt)] that went in: the windows
+         NAME what they parked ([Xv6Cameras.DepFrz]'s two fields,
+         [IcacheRef.hpn_h] for the other two), which is the whole reason the
+         pin exists (durable-disk B''-tx5). *)
+      tid ↪[ln_tx g]{#qtx} () -∗
       iref_slot -∗
       (* RULING G: the regime comes back, on every arm (see the premise). *)
       ireg_regime rg -∗
@@ -514,10 +536,11 @@ Module Type IPUT.
       (size : Z) (dev : mword 32)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
+      (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks Vpr rg.
+                       k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.

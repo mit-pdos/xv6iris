@@ -539,6 +539,25 @@ Definition frzoUR : ucmra := gmapUR Z (exclR unitO).
    region-vs-lock BRANCH SELECTOR the payload disjunction needed. *)
 Definition frzmUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO bool)).
 
+(* THE LOCK-WINDOW PIN (durable-disk B''-tx5), the escrow's per-SLOT twin of
+   [ic_dep]'s [(t, q)] fields.  Two of [IcacheEscrow]'s arms -- the
+   authority-side window [ic_held] and [ic_payload_arm]'s frozen alternative
+   -- are windows iput holds across a program step at which it carries NO
+   per-slot ghost of its own ([ic_held] spans [acquiresleep], where the
+   slot's descriptor variable is inside the entry's sleeplock).  A share of
+   the transaction's [LogDefs.ln_tx] element parked in such an arm would come
+   back at an EXISTENTIAL [(t, q)] and could not be rejoined with the residue
+   iput's caller must get back, so the arm has to NAME what it parked: one
+   half of this cell sits in the arm beside the share, the other in iput's
+   hand, and [hpn_agree] is what re-identifies the pair at the exit.
+
+   [frzmUR]'s shape at the SLOT key and the pair value.  It is an [icfg]
+   field, not a field of [ic_names]: [IcacheEscrow.ic_payload_arm] takes no
+   [cn] at all (37 sites in that file alone), and an ambient name costs no
+   arity anywhere. *)
+Definition hpnUR : ucmra :=
+  gmapUR nat (dfrac_agreeR (leibnizO (option (nat * Qp)))).
+
 (* THE PER-DIRECTORY CONTENTS GHOST (namei-pinned-lookup.md §9 W1).  [icntUR]
    at the ABSTRACT ENTRY MAP: a per-inum agreement on what a directory's bytes
    say, tied definitionally to those bytes ([DirViewG.dv_of]) everywhere the
@@ -576,7 +595,14 @@ Inductive ic_dep : Type :=
      retires it in the ghost step that parks the payload, so an arm the
      commit meets is one of the three below.  iput's window exits are the
      escrow's own ([IcacheEscrow.ic_held]) and [DepFrz]. *)
-  | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32)
+  (* [(t, qt)] ARE FIELDS, for [DepTx]'s reason verbatim (durable-disk
+     B''-tx5): iput's freeze window (+0x5e..+0x70) parks a SHARE of its
+     transaction's [LogDefs.ln_tx] element in [IcacheEscrow.ic_out_frz], so a
+     commit refutes the arm outright, and the descriptor -- a [ghost_var]
+     whose other half the freer carries -- pins the share to the one the
+     freer must get back.  The escrow's OTHER two windows carry no descriptor
+     and use [IcacheRef.hpn_h] instead. *)
+  | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32) (t : nat) (qt : Qp)
   (* THE WRITE ARM (durable-fs-plan.md section 3, [ilock]; durable-disk
      B''-arm).  The caller's generation-named credential plus the transaction
      whose write lock this is:
@@ -658,6 +684,10 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   icache_cntG :: inG Σ icntUR;
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
+  (* THE LOCK-WINDOW PIN (durable-disk B''-tx5), ambient for [icfg_frzm]'s
+     reason verbatim: one half rides in an [IcacheEscrow] arm and the other
+     in the freeing walk's hand across a window that spans a program step. *)
+  icache_hpnG :: inG Σ hpnUR;
   icache_dviewG :: inG Σ dviewUR;
   icache_fviewG :: inG Σ fviewUR;
 }.
@@ -667,7 +697,8 @@ Definition icacheΣ : gFunctors :=
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
     ghost_mapΣ nat ireg_arm_ent;
     ghost_varΣ (gset Z);
-    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR;
+    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor hpnUR;
+    GFunctor dviewUR;
     GFunctor fviewUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.

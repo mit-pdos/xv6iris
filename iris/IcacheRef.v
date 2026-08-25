@@ -717,7 +717,7 @@ Qed.
 Definition ic_dep_gname (d : ic_dep) : option gname :=
   match d with
   | DepNone => None
-  | DepFrz _ _ _ => None
+  | DepFrz _ _ _ _ _ => None
   | DepTx _ _ _ g _ _ => Some g
   | DepRd _ _ _ g => Some g
   end.
@@ -876,6 +876,13 @@ Class icfg := MkIcfg {
      the hold rides inside [IcacheEscrow.ipool_alloc] and
      [IcacheEscrow.ic_loaded] beside its twin. *)
   icfg_fview : gname;
+  (* THE LOCK-WINDOW PIN's gname (durable-disk B''-tx5, plan section 3/4),
+     ambient for [icfg_frzm]'s reason verbatim and one door further: one half
+     rides inside [IcacheEscrow.ic_held] and [IcacheEscrow.ic_payload_arm]'s
+     frozen alternative -- and [ic_payload_arm] takes no [ic_names] at all --
+     so a threaded name would enter [ic_escrow]'s arity, i.e. every fs
+     contract in the tree.  See [Xv6Cameras.hpnUR]'s header for what it pins. *)
+  icfg_hpn : gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -929,6 +936,46 @@ Qed.
 
 Lemma live_boot_map_valid (g : gname) : ✓ live_boot_map g.
 Proof. apply live_seq_valid. Qed.
+
+(* THE LOCK-WINDOW PIN AT BOOT: one WHOLE element per SLOT at [None] -- "no
+   slot is inside one of iput's two windows at boot", which is the
+   [hpn_full k None] every escrow arm but those two carries.  Spelled as the
+   big-op of singletons for [live_boot_map]'s reason: the split is then
+   [big_opL_own_1] and needs no [gset] detour. *)
+Definition hpn_boot_map : hpnUR :=
+  ([^op list] k ∈ seq 0 NINODE,
+     ({[ k := to_frac_agree 1 (None : leibnizO (option (nat * Qp))) ]} : hpnUR)).
+
+Local Lemma hpn_seq_lookup_lt (n m i : nat) :
+  (i < n)%nat ->
+  ([^op list] k ∈ seq n m,
+     ({[ k := to_frac_agree 1 (None : leibnizO (option (nat * Qp))) ]} : hpnUR))
+    !! i = None.
+Proof.
+  revert n. induction m as [|m IH]; intros n Hi.
+  - assert (Hnil : seq n 0 = []) by reflexivity.
+    rewrite Hnil big_opL_nil. done.
+  - assert (Hcons : seq n (S m) = n :: seq (S n) m) by reflexivity.
+    rewrite Hcons big_opL_cons lookup_op (IH (S n) ltac:(lia))
+            lookup_singleton_ne; [done | lia].
+Qed.
+
+Local Lemma hpn_seq_valid (n m : nat) :
+  ✓ ([^op list] k ∈ seq n m,
+       ({[ k := to_frac_agree 1 (None : leibnizO (option (nat * Qp))) ]} : hpnUR)).
+Proof.
+  revert n. induction m as [|m IH]; intros n.
+  - assert (Hnil : seq n 0 = []) by reflexivity.
+    rewrite Hnil big_opL_nil. apply ucmra_unit_valid.
+  - assert (Hcons : seq n (S m) = n :: seq (S n) m) by reflexivity.
+    rewrite Hcons big_opL_cons -insert_singleton_op;
+      [| apply hpn_seq_lookup_lt; lia].
+    apply insert_valid; [| apply IH].
+    done.
+Qed.
+
+Lemma hpn_boot_map_valid : ✓ hpn_boot_map.
+Proof. apply hpn_seq_valid. Qed.
 
 (* ALLOCATING ONE, for a boot that wants to CREATE the authority rather
    than assume it: the class is inhabited at any device and region size,
@@ -1053,7 +1100,13 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       ghost_var icfg_pool 1 (∅ : gset Z) ∗
       (* ...AND THE IN-TRANSITION KEY (durable-disk C-3b), WHOLE and empty:
          at this altitude no pool exists, so nothing is in transit either. *)
-      ghost_var icfg_pext 1 (∅ : gset Z).
+      ghost_var icfg_pext 1 (∅ : gset Z) ∗
+      (* THE LOCK-WINDOW PIN's boot map (durable-disk B''-tx5), minted here
+         and NOT an argument: its contents are a fact this file knows in full
+         -- one whole element per SLOT at [None], "no slot is inside one of
+         iput's two windows" -- so no caller has to supply it.
+         [IcacheBoot]'s escrow loop hands one whole element to each arm. *)
+      own icfg_hpn hpn_boot_map.
 Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1084,11 +1137,13 @@ Proof.
   iMod (ghost_var_alloc (∅ : gset Z)) as (γpool) "Hpool".
   (* ...and its IN-TRANSITION twin (durable-disk C-3b), likewise empty *)
   iMod (ghost_var_alloc (∅ : gset Z)) as (γpext) "Hpext".
+  (* the lock-window pin, one whole element per slot at [None] (B''-tx5) *)
+  iMod (own_alloc hpn_boot_map) as (γhpn) "Hhpn"; [apply hpn_boot_map_valid |].
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv), g0.
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzo γfrzm γdv γfv γhpn), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt icfg_frzo
-       icfg_frzm icfg_dview icfg_fview].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext".
+       icfg_frzm icfg_dview icfg_fview icfg_hpn].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn".
 Qed.
 
 (* ===================================================================== *)
@@ -2232,6 +2287,99 @@ Section IcacheLink.
   Lemma frzm_join (z : Z) (b : bool) :
     frzm_h z b -∗ frzm_h z b -∗ frzm_full z b.
   Proof. iIntros "H1 H2". rewrite frzm_split. iFrame. Qed.
+
+  (* ===================================================================== *)
+  (*  THE LOCK-WINDOW PIN [hpn] (durable-disk B''-tx5)                      *)
+  (* ===================================================================== *)
+
+  (* [frzm]'s vocabulary cloned at the SLOT key and at the pair value.  What
+     it pins is WHICH transaction and WHICH share an escrow arm has parked,
+     for the two arms of [IcacheEscrow] that hold no descriptor of their own:
+     the authority-side window [ic_held] (iput +0x3c..+0x5e, which spans
+     [acquiresleep]) and [ic_payload_arm]'s frozen alternative (the +0x70
+     mid-free park).  Everywhere else the arm is [hpn_full k None] and the
+     pin says "this slot is in no window at all".
+
+     THE VALUE IS THE PAIR, NOT A BOOLEAN, and that is the whole point: at
+     the window's exit [ic_open_held] hands its share back at the [(t, q)]
+     the arm NAMES, so the freeing walk can rejoin it with the residue its
+     caller must get back.  An existentially-keyed share cannot
+     ([IcacheTxRefute.tx_two_halves_no_whole]). *)
+  Definition hpn_at (k : nat) (q : Qp) (o : option (nat * Qp)) : iProp Σ :=
+    own icfg_hpn
+      ({[ k := to_frac_agree q (o : leibnizO (option (nat * Qp))) ]} : hpnUR).
+
+  (* the only spelling any consumer sees *)
+  Definition hpn_h (k : nat) (o : option (nat * Qp)) : iProp Σ :=
+    hpn_at k (1/2) o.
+
+  Global Instance hpn_at_timeless k q o : Timeless (hpn_at k q o).
+  Proof. apply _. Qed.
+  Global Instance hpn_half_timeless k o : Timeless (hpn_h k o).
+  Proof. apply _. Qed.
+
+  (* AGREEMENT NEEDS NO OPEN AT ALL ([frzm_agree]'s line).  This is the
+     RE-IDENTIFICATION: the walk's half against the arm's half says the
+     [(t, q)] coming back out of the window is the one that went in. *)
+  Lemma hpn_agree (k : nat) (o1 o2 : option (nat * Qp)) :
+    hpn_h k o1 -∗ hpn_h k o2 -∗ ⌜o1 = o2⌝.
+  Proof.
+    rewrite /hpn_h /hpn_at. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    apply frac_agree_op_valid_L in Hv as [_ Ho].
+    by iPureIntro.
+  Qed.
+
+  Lemma hpn_update (k : nat) (o o' : option (nat * Qp)) :
+    hpn_h k o -∗ hpn_h k o ==∗ hpn_h k o' ∗ hpn_h k o'.
+  Proof.
+    rewrite /hpn_h /hpn_at. iIntros "H1 H2".
+    iCombine "H1 H2" as "H".
+    iMod (own_update _ _
+            (({[ k := to_frac_agree (1/2) (o' : leibnizO (option (nat * Qp))) ]} : hpnUR)
+             ⋅ ({[ k := to_frac_agree (1/2) (o' : leibnizO (option (nat * Qp))) ]} : hpnUR))
+           with "H") as "[$ $]"; [| done].
+    rewrite !singleton_op -!frac_agree_op !Qp.half_half.
+    apply singleton_update, cmra_update_exclusive. done.
+  Qed.
+
+  Definition hpn_full (k : nat) (o : option (nat * Qp)) : iProp Σ :=
+    hpn_at k 1 o.
+
+  Global Instance hpn_full_timeless k o : Timeless (hpn_full k o).
+  Proof. apply _. Qed.
+
+  Lemma hpn_split (k : nat) (o : option (nat * Qp)) :
+    hpn_full k o ⊣⊢ hpn_h k o ∗ hpn_h k o.
+  Proof.
+    rewrite /hpn_full /hpn_h /hpn_at -own_op singleton_op.
+    by rewrite -frac_agree_op Qp.half_half.
+  Qed.
+
+  Lemma hpn_join (k : nat) (o : option (nat * Qp)) :
+    hpn_h k o -∗ hpn_h k o -∗ hpn_full k o.
+  Proof. iIntros "H1 H2". rewrite hpn_split. iFrame. Qed.
+
+  (* THE ONE MOVER A WINDOW NEEDS: with the WHOLE cell in hand (which is
+     what an arm at rest hands out) the value moves freely, and the result
+     splits into the arm's half and the walk's. *)
+  Lemma hpn_full_update (k : nat) (o o' : option (nat * Qp)) :
+    hpn_full k o ==∗ hpn_full k o'.
+  Proof.
+    rewrite /hpn_full /hpn_at. iIntros "H".
+    iApply (own_update with "H").
+    apply singleton_update, cmra_update_exclusive. done.
+  Qed.
+
+  (* the boot map fans out into the fifty pins the escrows start with *)
+  Lemma hpn_boot_split :
+    own icfg_hpn hpn_boot_map ⊢ [∗ list] k ∈ seq 0 NINODE, hpn_full k None.
+  Proof.
+    rewrite /hpn_boot_map. iIntros "H".
+    iDestruct (big_opL_own_1 with "H") as "H".
+    iApply (big_sepL_mono with "H"). intros idx j _. iIntros "H". iExact "H".
+  Qed.
 
   (* ===================================================================== *)
   (*  THE TWO BOOT SPLITS (increment IIIa)                                  *)
