@@ -102,6 +102,17 @@ carries the file system across eras and `Himg` is deleted (lane E).
   `img_P_dur_alloc`, `img_boot_P_fs_dur` (the boot point, `P_fs_alloc_clean`
   plus `P_dur` at the same `D0`), witnessed at the literal image by
   `FsAdequacyImg.fsimg_snap_ok`.
+- **The collection and the law (lane C items 1–2, C-8):**
+  `iris/FsCollectAll.v` — `fs_collect_snap_ok` (six invariant families
+  opened at ONE ghost step, `col_hand` assembled, `⌜∃ S, snap_ok S L⌝` out,
+  every invariant closed with the body it opened) over `pure_keep` (an
+  entailment `R ⊢ ⌜φ⌝` yields `R ⊢ ⌜φ⌝ ∗ R`, which is what lets the
+  collection run destructively) and `fs_snap_law_build`;
+  `iris/LogSnapLaw.v` — `snap_law`, `LogInv.log_ctx`'s last conjunct, with
+  `log_ctx_snap_law_of_ops` as the reading at the ledger.  The law is
+  supplied at `initlog` MINUS block 1's park (one `□`-wand premise on
+  `wp_initlog_sconf_body`, and nothing else of the file system crosses into
+  the WAL); `FsCollect.col_geom` rides `FirstTok.first_fsinit_pures`.
 - The demolition of the old link ledger: slice 6a only (the root clause).
 
 ## STILL PRESENT BUT SUPERSEDED (delete when their consumers move)
@@ -1264,6 +1275,7 @@ as their remaining consumers.
   the region slot is still MARKED for the length of that window.  See C-4's
   residue (F).]
 - [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
+  ITEMS 1 AND 2 ARE DONE (C-8); item 3 is what is left.
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
      at a ghost step and ∗-ing every inode's bundle against the byte
@@ -2020,13 +2032,125 @@ as their remaining consumers.
   `FsCfgBoot.img_node`, the value `ftop_inv`'s map holds at boot, with the
   marker and the slot handed back.
 
-  WHAT REMAINS FOR THE ASSEMBLY (items 2–5), now with no residue under it:
-  `fs_collect_snap_ok`, the law parked in `log_ctx`, `eo_commit`'s call at
-  `outstanding = 0`, the two commit permits at `dsnap_step_of`,
-  `fs_commit_receipt`, `P_fs`'s conjunct → `P_dur (fr_D r)`, and the
-  `fs_dview`-as-slot / `fdn_*` / `riscv_dview_name` deletions.
-  `col_snap_ok_ex` is still what the law concludes and `col_hand` still what
-  it must assemble.
+  THE ASSEMBLY IS C-8's, and there is no residue under it: `col_snap_ok_ex`
+  is what the law concludes and `col_hand` what it assembles.
+
+  **AS LANDED — C-8: THE ASSEMBLY, THE LAW IN `log_ctx`, AND WHAT A PURE
+  CONCLUSION IS WORTH.**
+
+  ITEM 1 IS `FsCollectAll.fs_collect_snap_ok`.  At ONE ghost step with the
+  `ln_tx` authority empty it opens `ftopN`, `iregN`, `bitmapN`, `sbN`,
+  `ipoolN` and all fifty `icEscN .@ k`, assembles `FsCollect.col_hand` and
+  concludes `⌜∃ S, snap_ok S (col_view C home)⌝`, closing every invariant
+  with the body it opened.  Its ONE non-resource premise is `col_geom`; the
+  byte authority is the CALLER's, because the commit runs with `logN` open.
+
+  **`pure_keep` IS THE DEVICE, AND IT IS WHAT MADE THE ASSEMBLY POSSIBLE.**
+  An ENTAILMENT `R ⊢ ⌜φ⌝` yields `R ⊢ ⌜φ⌝ ∗ R` — a pure proposition is
+  persistent and `iProp` is affine — so the collection proper
+  (`col_bodies_snap_ok`) runs entirely DESTRUCTIVELY and the caller still
+  hands every invariant back.  That is not a convenience: the partition row
+  `region_inums nib = O ∪ X ∪ ic_live_inums ids` is a UNION and the three
+  parts are NOT provably disjoint, so an accessor-shaped collection would
+  have to carry the overlap as a leftover at every step
+  (`big_sepS_union_weak` and `big_sepS_of_list`, the two crossings, both
+  simply DROP duplicates).  `pure_keep_wand` is the proof-mode form; the
+  entailment must stay a Coq hypothesis, since the iProp-level
+  `(R -∗ ⌜φ⌝) -∗ R -∗ ⌜φ⌝ ∗ R` is false.
+
+  THE LINK LEG HAD NO SUPPLIER, and that is the one interface this lane
+  moved.  `col_hand`'s `FsState.fs_links` is `own (fs_link γfs)
+  (link_elem_node i n)`, which `FsStateInode.inode_link_iff` splits into the
+  region's per-inum AUTHORITY (`InodeRegion.ireg_lnk`) and this inode's
+  entry TOKENS — and `FsStateEra.inode_owned_era_q` carries no link piece at
+  all.  So `IcacheEscrow.ic_slot_cover`'s bundle alternative now lends
+  `ent_toks` beside the bundle (`ic_loaded_lend_owned` /
+  `ic_rd_arm_lend_owned` lend the pair), `FsCollect.col_side` carries it on
+  its bundle arm, and `col_region_quiesce_take` — the DESTRUCTIVE twin of
+  `col_region_quiesce_acc` — hands the authority out BESIDE the bundle.  No
+  accessor can do that: `ireg_lnk` is a conjunct of the very slot the marker
+  arm's reading consumes, so the wand's closure swallows it.
+
+  THE SNAPSHOT'S STATE IS THE `ftop` MAP RESTRICTED TO THE REGION
+  (`col_reg_map`).  `InodeRegion.ftop_body` carries no domain row, so "the
+  map names exactly the region's inums" is not available; every region inum
+  IS in the restriction (its bundle's `top_frag`, read against the
+  authority) and nothing else is, which is exactly `col_hand`'s domain row.
+  The restriction is invisible to a reader, which names an inum of the
+  region.  `snap_local` needs no separate supplier: it is
+  `inode_owned_era_q`'s own last conjunct, gathered by
+  `col_bundles_local` — `IregClean` is not on the assembly's path at all.
+
+  ITEM 2 IS `LogSnapLaw.snap_law`, `LogInv.log_ctx`'s LAST conjunct.  Given
+  the byte authority at `L` and the empty `ln_tx` authority it yields
+  `⌜snap_law_ok C home⌝` (`∃ S, snap_ok S (fs_restrict (dv_of_D C) home)`)
+  and hands both authorities back.  ARITY-FREE for `sb_parked`'s reason
+  verbatim: the mask it runs in is CLOSED OVER, with the one fact a
+  committer needs beside it — that `logN` is not in it.  `log_ctx_snap_law`
+  is the projection and `log_ctx_snap_law_of_ops` the reading at the ledger
+  (`log_tx_empty_of_ops` inside), which is the form `eo_commit` will meet.
+  `LogSnapLaw` is a LEAF over `FsDurSnap`, so the WAL's cone gains the
+  snapshot's PREDICATE and nothing above it; `log_ctx`, `log_op`,
+  `wp_end_op` and `fs_crash_seam` keep their arity and their ~75 threading
+  files are untouched.
+
+  **THE LAW IS SUPPLIED AT `initlog`, MINUS BLOCK 1'S PARK, AND THAT SHAPE
+  IS FORCED.**  The law needs block 1's OWNERSHIP, which nobody has until
+  `initlog` parks it — so `wp_initlog_sconf_body` gains ONE premise,
+  `□ (sb_park γfs sbrec -∗ snap_law γ γfs cov logstart)`, and composes the
+  two in the same ghost step as `SbPark.sb_park_alloc`.  No gname of the
+  region, no cache configuration and no geometry crosses into the WAL.
+  `ProofFsinit` builds the wand out of the four invariants it already holds
+  (`FsCollectAll.fs_snap_law_build`), read at the record block 1 DECODES to
+  rather than at the config numbers.
+
+  **`col_geom` COMES FROM THE BOOT IMAGE AND NOWHERE ELSE, AND THAT IS THIS
+  LANE'S OTHER FINDING.**  `cg_reg` ("the region stops below the bitmap")
+  is `FsImg.sbo_bmapstart` against the region's WIDTH tie
+  `nib = ninodes/16 + 1`, and that tie exists nowhere below `FirstTok`:
+  `InodeInv.ireg_blocks_ok` says only that the region's blocks are covered,
+  and `FsReady.fs_geom_ok` does not carry it either.  So `col_geom` — with
+  the two field ties `sb_bmapstart sb = fsc_bmapstart` and
+  `sb_size sb = fsc_size` that bridge the config numbers to the decoded
+  record (`cg_ist` is the third) — rides `FirstTok.first_fsinit_pures`,
+  proved by the new `FirstTok.col_geom_of_image` off `fs_geom_ok` plus that
+  tie, i.e. off exactly what `fs_geom_ok_of_image` already consumes.
+
+  CONTRACTS WHOSE STATEMENT CHANGED.  `IcacheEscrow.ic_slot_cover` (its
+  bundle alternative lends `ent_toks`), `ic_loaded_lend_owned`,
+  `ic_rd_arm_lend_owned`; `FsCollect.col_side` (+`ent_toks` on the bundle
+  arm) and `col_region_quiesce_acc` (+`ent_toks` in and out);
+  `LogInv.log_ctx` (+`snap_law`, LAST — destructured in `LogInv.v` alone,
+  built in `ProofInitlog.v` alone); `SpecInitlog.wp_initlog_sconf_body`
+  (+the law-minus-park wand, LAST before the continuation);
+  `SpecFsinit.wp_fsinit_sconf_body` (+`col_geom` and the two field ties, as
+  PURE premises); `FirstTok.first_fsinit_pures` (+those three, LAST) and
+  `first_fsinit_pures_of_image` (+`fs_geom_ok` and the width tie).  NEW:
+  `FsCollectAll.v` (`pure_keep`/`pure_keep_wand`, `big_sepS_of_list`,
+  `big_sepS_union_weak`, `nested_to_set`, `ireg_blks_collect`,
+  `ipool_shape_np_side`/`ipool_ord_side`/`ipool_rows_side`, `imarks_side`,
+  `ic_slot_cover_side`, `esc_covers_live`, `ic_escrows_open_list`,
+  `col_reg_map`, `col_sides_bundles`, `col_bodies_snap_ok`,
+  `fs_collect_snap_ok`, `fs_snap_law_build`), `LogSnapLaw.v`
+  (`snap_law_ok`, `snap_law_at`, `snap_law`, `snap_law_intro`,
+  `snap_law_run`), `FsCollect.col_free_ent_toks`/`col_slot_lnk_acc`/
+  `col_link_of`/`col_bundle_top`/`col_region_slot_take`/
+  `col_region_quiesce_take`, `LogInv.log_ctx_snap_law`/
+  `log_ctx_snap_law_of_ops`, `FirstTok.col_geom_of_image`.  UNTOUCHED:
+  `log_ctx`'s ARITY, `log_op`, `wp_end_op`, `fs_crash_seam`, `P_fs`,
+  `ireg_inv`/`ireg_slot`/`ireg_body`, `is_itable2`/`itable_res2`,
+  `ic_escrow_body`'s five arms, `ipool`'s shape, every syscall contract.
+
+  ITEM 3 IS WHAT REMAINS, and nothing under it is open: `eo_commit`'s call
+  to `log_ctx_snap_law_of_ops` at `outstanding = 0`, the two commit permits
+  (`FsCrash.fs_commit_L_sector0_rec` / `_seq_permit`) gaining
+  `FsDurSnap.dsnap_step_of` at the collected `snap_ok` with the allocator
+  inside, `FsCrash.P_fs`'s durable conjunct becoming `P_dur (fr_D r)` (boot
+  via `FsDurImg.img_boot_P_fs_dur`), `fs_commit_receipt`, and the
+  `LogDefs.fs_dview`-as-slot / `RiscvPtsto.fdn_*` / `riscv_dview_name`
+  deletions.  `snap_law_run` is stated at `⊤ ∖ ↑logN`; a committer at a
+  smaller mask takes `snap_law_at` out of the definition and discharges
+  `N ⊆ E` from its own opening.
 
 - [ ] **Lane E — PRIORITY after C-8 (owner) — boot and the theorem (plan §5).**  Stage 4: the era's
   instance minted from the current snapshot by `fs_state_of_ledger` +

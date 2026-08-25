@@ -141,7 +141,8 @@ live directory, unique names).  There is NO cross-inode pure clause:
   NOTHING ABOUT THE FILE SYSTEM: no pure fact is re-established at a
   write, and the WAL's lock invariant carries no file-system payload
   (the parked `Ψ D₀ Dc` and the `log_psi_*` laws are deleted — §4, §8).
-- **Commit** (`end_op` at `outstanding = 0`; WAL-internal, TO BUILD):
+- **Commit** (`end_op` at `outstanding = 0`; WAL-internal.  THE LAW IS
+  BUILT; the CALL and the snapshot step are what remain):
   installs "`D := L`" (as today, `FsCrash.fs_commit_L_*`) and, at the same
   ghost step, RECONSTRUCTS the file-system predicate over `L` and clones
   it onto fresh names as the new snapshot (§4), dropping the old one
@@ -150,11 +151,16 @@ live directory, unique names).  There is NO cross-inode pure clause:
   file-system-agnostic): given the byte authority at `L` and "no
   transaction is open", it yields `∃ S, snap_ok S L` and hands the
   authority back — it moves NO durable resource (§8's refutation is about
-  fupds that do).  Its receipt: the committed view equals the logged view
-  (`D' = L` at home maps) AND the new snapshot's state is the quiescent
-  abstract state.  NO caller of any WAL function supplies anything at the
-  call site; the only fupd in the durability story is the machine's
-  disk-interface permit, which the WAL discharges.
+  fupds that do).  It is `LogSnapLaw.snap_law`, `log_ctx`'s last conjunct,
+  read at the ledger by `LogInv.log_ctx_snap_law_of_ops`; it is ARITY-FREE
+  (the mask it runs in is closed over, with the one fact a committer needs
+  beside it — that `logN` is not in it), and it is supplied at `initlog`
+  MINUS block 1's park, since nobody owns block 1 until `initlog` parks it.
+  Its receipt: the committed view equals the logged view (`D' = L` at home
+  maps) AND the new snapshot's state is the quiescent abstract state.  NO
+  caller of any WAL function supplies anything at the call site; the only
+  fupd in the durability story is the machine's disk-interface permit,
+  which the WAL discharges.
 
 ## 4. Where the commit's proof comes from: collection at quiescence
 
@@ -211,6 +217,16 @@ writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` keeps
 its used-set coupling clauses (`sk_own_used`, `sk_disj`) because the
 allocator needs them to SPLIT a linear ledger; at the commit they are
 read off the ∗, at boot off the snapshot.
+
+**THE COLLECTION IS `FsCollectAll.fs_collect_snap_ok`**, and what makes it
+possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields
+`R ⊢ ⌜φ⌝ ∗ R` in an affine logic (`FsCollectAll.pure_keep`), so the
+collection runs DESTRUCTIVELY — dropping the overlap of the pool's index,
+the corpse ledger's and the fifty slots', which the partition row does not
+make disjoint — while the caller still closes every invariant with the body
+it opened.  Its one non-resource premise is `FsCollect.col_geom`, whose
+`cg_reg` rests on the region's width tie and therefore comes from the boot
+image (`FirstTok.first_fsinit_pures`) and nowhere else.
 
 ## 5. Boot, adequacy, and the theorem
 

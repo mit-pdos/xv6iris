@@ -136,7 +136,7 @@ post-seal reads it off `fs_ready`.
 
 | piece | type / home | meaning |
 |---|---|---|
-| `log_ctx γ bn γfs cov logstart dev` | the persistent bundle every log function threads (`LogInv.v`) | the sealed "log" lock, the two frozen cells, the era's swap receipt `swap_lb`, the byte view's row `fs_bytes_inv`, and block 1's park `sb_parked`.  IT NAMES NO FILE-SYSTEM PAYLOAD — a `log_write` proves nothing about the file system, so the lock resource carries no client proposition and this bundle carries no client law.  There is no existential closure over a parked client proposition and no `_at_` projection family; `log_ctx` IS the bundle, at the arity the ~75 files that thread it have.  Projections: `log_ctx_lock`/`_frozen`/`_bytes`/`_bytes_any`/`_swap`/`_sb`. |
+| `log_ctx γ bn γfs cov logstart dev` | the persistent bundle every log function threads (`LogInv.v`) | the sealed "log" lock, the two frozen cells, the era's swap receipt `swap_lb`, the byte view's row `fs_bytes_inv`, block 1's park `sb_parked`, and the file system's LAW `LogSnapLaw.snap_law`.  IT NAMES NO FILE-SYSTEM PAYLOAD — a `log_write` proves nothing about the file system, so the lock resource carries no client proposition and the law is PURE-FACT-PRODUCING: the WAL supplies nothing to it and reads nothing out of it but a `⌜ ⌝`.  There is no existential closure over a parked client proposition and no `_at_` projection family; `log_ctx` IS the bundle, at the arity the ~75 files that thread it have.  Projections: `log_ctx_lock`/`_frozen`/`_bytes`/`_bytes_any`/`_swap`/`_sb`/`_snap_law`. |
 | `log_res γ bn γfs cov logstart` | the "log" lock's resource (`LogInv.v`) | the ledger (`ghost_map_auth (ln_ops γ) 1 om` at the open ops), the epoch and the append registry, the OPEN-TRANSACTION authority `ghost_map_auth (ln_tx γ) 1 T` with the pure tie `⌜size T = size om⌝`, and — outside the committing arm — `log_state`.  The transaction authority sits HERE and not in `log_state` because a commit is exactly the instant it must be READABLE, and `log_state` is checked out then; and because it is the ledger's own twin, and the ledger's authority is here. |
 | `log_tx γ` | `∃ t, t ↪[ln_tx γ] ()` (`LogInv.v`) | **the open-transaction token**: one WHOLE ghost-map element at a transaction id nobody ever names.  `begin_op` mints it, `end_op` consumes it, and the tie to the ledger is CARDINALITY rather than identity — a retiring transaction hands back an element whose id it never named, and `log_tx_empty_of_ops` reads `size T = size om` at zero, which is the commit's "no transaction is open". |
 | `log_op γ u` | `log_opb γ u ∗ log_tx γ` | the transaction token as a client holds it: the BUDGET half `log_opb` (`u` units of write budget — the pre-transaction `log_op` verbatim, which is why no callee below it moved) beside the tx element.  `log_op_split`/`log_opb_op` are the two directions. |
@@ -176,17 +176,40 @@ premise.  The commit permits `FsCrash.fs_commit_L_sector0_rec` and
 `fs_commit_L_seq_permit` install `D := L` and run `fs_dview_rebase`
 themselves.
 
-STILL TO COME, one line each; the shape is fixed and the work is lane C of
-[`../projects/durable-disk.md`](../projects/durable-disk.md).  The
-persistent, file-system-supplied LAW parked in `log_ctx` that turns the
-byte authority at `L` plus "no transaction is open" into `∃ S, snap_ok S L`
-and hands the authority back — it concludes at `FsCollect.col_snap_ok_ex`
-and must assemble `col_hand`.  And `P_dur (fr_D r)` as `FsCrash.P_fs`'s
-durable conjunct, in place of today's flat `LogDefs.fs_dview` blob.
-Every SUPPLIER of `col_hand` now exists (§5a's `ipool_quiesce_acc` was the
-last, C-4), but the ASSEMBLY is blocked on two windows that are nobody's
-supplier — the claim box and the corpse before its deposit — recorded as
-residues (E) and (F) in `FsCollect.v`'s header.
+**THE LAW IS `LogSnapLaw.snap_law`, AND IT IS ARITY-FREE FOR `sb_parked`'s
+REASON VERBATIM.**  Given the byte authority at `L` and the empty `ln_tx`
+authority it yields `⌜LogSnapLaw.snap_law_ok C home⌝` (`∃ S, snap_ok S
+(fs_restrict (dv_of_D C) home)`) and hands BOTH authorities back; the mask it
+runs in is CLOSED OVER — the era's file-system namespaces, which `LogInv`
+cannot name and the ~75 files that thread `log_ctx` have no business seeing
+— with the one fact a caller needs beside it, that `logN` is not among them,
+since a committer runs the law with the byte view already open.
+`log_ctx_snap_law_of_ops` is the reading at the LEDGER
+(`log_tx_empty_of_ops` inside), i.e. the form with no ghost-state premise
+the WAL does not already hold.  `LogSnapLaw` is a LEAF over `FsDurSnap`, so
+`log_ctx`'s cone gains the snapshot's PREDICATE and nothing above it.
+
+**WHERE THE LAW COMES FROM, AND WHY THAT IS FORCED.**  It needs block 1's
+OWNERSHIP, which nobody has until `initlog` parks it — so what
+`SpecInitlog.wp_initlog_sconf_body` takes is the law MINUS the park,
+`□ (sb_park γfs sbrec -∗ snap_law γ γfs cov logstart)`, and `initlog`
+composes the two in the same ghost step as `SbPark.sb_park_alloc`.  That is
+the ONE premise the file system adds to the WAL's contracts: no gname of the
+region, no cache configuration, no geometry.  `ProofFsinit` builds the wand
+out of the four invariants it already holds
+(`FsCollectAll.fs_snap_law_build` over `fs_collect_snap_ok`), read at the
+record block 1 DECODES to rather than at the config numbers; the bridge is
+`FsCollect.col_geom` plus the two field ties `sb_bmapstart sb = bmapstart`
+and `sb_size sb = size`, and all three ride
+`FirstTok.first_fsinit_pures` — because `col_geom`'s `cg_reg` rests on the
+region's WIDTH tie (`nib = ninodes/16 + 1`), which exists nowhere lower.
+
+STILL TO COME, and it is lane C item 3 of
+[`../projects/durable-disk.md`](../projects/durable-disk.md): `P_dur (fr_D r)`
+as `FsCrash.P_fs`'s durable conjunct, in place of today's flat
+`LogDefs.fs_dview` blob, with `end_op`'s commit calling the law at
+`outstanding = 0` and the two commit permits gaining
+`FsDurSnap.dsnap_step_of` at the collected `snap_ok`.
 
 ## 2b. The durable side — the snapshot inside the crash predicate
 
@@ -273,22 +296,46 @@ cache map `log_state` carries.  The hand's legs, and who supplies each:
 | `free_bitmap_at` | `BitmapInv.bitmap_body` at `bitmapN` |
 | `col_recs` (the region's records and the proxy authority) | `InodeRegion.ireg_body` at `iregN`; `ireg_recs` IS `col_recs`' row |
 | one `col_bundle` per region inum | the fifty `IcacheEscrow.ic_escrow`s at `icEscN .@ k` through `ic_escrow_body_cover` — alternative (c) IS `col_bundle`, share condition and all — plus `ipool_inv_acc`'s ordinary rows |
-| `fs_links (fs_link γfs) I` | the region's `ireg_lnk` authorities, read by `FsState.fs_links_valid` |
-| `snap_local`, and the map `I` itself | `ftop_inv` at `ftopN` through `IregClean.ireg_snap_local_acc` |
+| `fs_links (fs_link γfs) I` | the region's `ireg_lnk` authority per inum PLUS the payload's entry tokens (`FsCollect.col_link_of` over `FsStateInode.inode_link_iff`), read by `FsState.fs_links_valid` |
+| the map `I` itself | the `fs_top` authority in `ftop_body` at `ftopN` |
 
-**THE SUPPLIERS THAT DO NOT EXIST YET** are stated in `FsCollect.v`'s own
-header, which is the authority on the list.  As it stands there: **(A)** the
-PARTITION and **(C)** block 1's owner are SUPPLIED; **(B)** alternative (d)
-of `ic_escrow_body_cover` — the ABI sweep that arms the remaining
-transactional walks — is the ONE premise the plan sanctions taking as a
-hypothesis, and (A) hands it one more inum to cover, an inum in the pool's
-in-transition part `X`; **(D)** a free inum's abstract node is UNTIED to
-its record, because `IcacheEscrow.ipool_shape_np`'s MARKER arm holds
-`InodeRegion.imark` and an existential `top_frag` its own comment calls
-untied and no `dinode_at`, so for a free inum neither `sk_rec` nor
-`sk_links` can be proven — both run through `FsCollect.col_bundle_rec`'s
-ghost-map agreement, which only an ALLOCATED inum's `inode_owned_era`
-supplies.
+**THE ASSEMBLY IS `FsCollectAll.fs_collect_snap_ok`, AND EVERY SUPPLIER IS
+IN PLACE** — `FsCollect.v`'s own header is the authority on the list, and
+nothing on it is outstanding.  At one ghost step it opens `ftopN`, `iregN`,
+`bitmapN`, `sbN`, `ipoolN` and all fifty `icEscN .@ k`, and it closes every
+one of them with the body it opened.  Its ONE non-resource premise is
+`col_geom`.
+
+**A PURE CONCLUSION IS FREE, AND THAT IS WHAT MAKES THE ASSEMBLY POSSIBLE**
+(`FsCollectAll.pure_keep`): an ENTAILMENT `R ⊢ ⌜φ⌝` yields `R ⊢ ⌜φ⌝ ∗ R`,
+because a pure proposition is persistent and `iProp` is affine.  So the
+collection proper runs entirely DESTRUCTIVELY — it drops the overlap of the
+three index sets, forgets a lend's frame, existentially closes a share —
+and the caller still hands every invariant back.  That is not a
+convenience: §5a's partition row is a UNION and its three parts are not
+provably disjoint, so an accessor-shaped collection would have to carry the
+overlap as a leftover at every step.  `pure_keep_wand` is the proof-mode
+form; the entailment must stay a COQ hypothesis, since the iProp-level
+`(R -∗ ⌜φ⌝) -∗ R -∗ ⌜φ⌝ ∗ R` is false.
+
+**THE LINK LEG IS WHY `ic_slot_cover` LENDS `ent_toks`.**
+`FsStateEra.inode_owned_era_q` carries no link piece at all, and
+`fs_links` is the region's per-inum AUTHORITY beside this inode's entry
+TOKENS.  So the cover's bundle alternative lends the pair, `col_side`
+carries it on its bundle arm, and `FsCollect.col_region_quiesce_take` — the
+DESTRUCTIVE twin of `col_region_quiesce_acc` — hands the authority out
+BESIDE the bundle.  No accessor can do both: `ireg_lnk` is a conjunct of
+the very slot the marker arm's reading consumes.
+
+**THE STATE IS THE `ftop` MAP RESTRICTED TO THE REGION**
+(`FsCollectAll.col_reg_map`).  §5a′'s `ftop_body` carries no domain row, so
+"the map names exactly the region's inums" is not available; every region
+inum IS in the restriction (its bundle's `top_frag`, read against the
+authority) and nothing else is, which is exactly `col_hand`'s domain row,
+and the restriction is invisible to a reader — a reader names an inum of
+the region.  `snap_local` needs no supplier of its own: it is
+`inode_owned_era_q`'s own last conjunct, gathered by
+`FsCollect.col_bundles_local`.
 
 **THE KEPT REFUTATIONS**, one line each, because each closes a shape
 somebody will otherwise re-derive:
