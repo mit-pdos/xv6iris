@@ -796,6 +796,32 @@ Section LogInv.
     iExists Sb. iFrame.
   Qed.
 
+  (* ---- THE TOKEN, HALVED ACROSS A HELD WRITE LOCK -------------------
+     (durable-fs-plan.md section 3, [ilock]; durable-disk B''-arm)
+
+     A transactional [ilock] parks a SHARE of the transaction's element in
+     the escrow's write arm ([IcacheEscrow.ic_arm_tx]), so that [end_op] --
+     which consumes the WHOLE element -- cannot commit while the inode is
+     write-locked.  The id has to come OUT of [log_tx]'s existential for the
+     arm to name it, which is exactly [IcacheTxRefute]'s finding: an
+     existentially-keyed share can never be rejoined.  It goes back in at
+     the join, so nothing above these two lines ever sees an id. *)
+  Lemma log_tx_halve (γ : log_names) :
+    log_tx γ -∗ ∃ t : nat,
+      t ↪[ln_tx γ]{#(1/2)} () ∗ t ↪[ln_tx γ]{#(1/2)} ().
+  Proof.
+    iIntros "H". rewrite /log_tx. iDestruct "H" as (t) "Ht".
+    iExists t. iDestruct "Ht" as "[$ $]".
+  Qed.
+
+  Lemma log_tx_join (γ : log_names) (t : nat) :
+    t ↪[ln_tx γ]{#(1/2)} () -∗ t ↪[ln_tx γ]{#(1/2)} () -∗ log_tx γ.
+  Proof.
+    iIntros "H1 H2". rewrite /log_tx. iExists t.
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own Qp.half_half. iExact "H".
+  Qed.
+
   Lemma log_op_split γ u : log_op γ u -∗ log_opb γ u ∗ log_tx γ.
   Proof. iIntros "[$ $]". Qed.
 
