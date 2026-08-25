@@ -5244,12 +5244,12 @@ Section ProofSysUnlinkBody.
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev kd qdi sd gyd
               (DepTx sd dev dinum gyd t (1/4)%Qp) dinum dnW bm'
-              nw Sbw false true false e0 pid (DfracOwn (1/4)) dqb dqs
+              nw Sbw false true false e0 _ _ pid (DfracOwn (1/4)) dqb dqs
               C5 (K - 30)%nat eb b lks
               (upd_upt V P1) ltac:(exact Kiup) eq_refl Hkd ltac:(discriminate)
               ltac:(intros _; exact Hibd16)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
-              ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string)
+              ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string) Hglog eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hropen Hslkd Hslkdq Hdepd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
@@ -5599,11 +5599,11 @@ Section ProofSysUnlinkBody.
               dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
-              false true false e1 pid (DfracOwn (1/4)) dqb dqs
+              false true false e1 _ _ pid (DfracOwn (1/4)) dqb dqs
               E2 (K - 30)%nat eb b lks
               (upd_upt V P1) Kiup eq_refl Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
-              Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
+              Hnu2 Hj Hgl HE2a0 (Hlb "log"%string) Hglog eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hropen Hslki Hslkiq Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq
@@ -7296,11 +7296,11 @@ Section ProofSysUnlinkBody.
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev kd qdi sd gyd
               (DepTx sd dev dinum gyd t (1/4)%Qp) dinum dnW2 bm'
-              (S c1) (Sbw ∪ {[IBLOCK dinum inodestart]}) false true false e0 pid (DfracOwn (1/4)) dqb dqs
+              (S c1) (Sbw ∪ {[IBLOCK dinum inodestart]}) false true false e0 _ _ pid (DfracOwn (1/4)) dqb dqs
               C5 (K - 30)%nat eb b lks
               (upd_upt V P1) Kiup eq_refl Hkd Hcrbd2 Hcrud2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
-              Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
+              Hnud2 Hj Hgl HC5a0 (Hlb "log"%string) Hglog eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hropen Hslkd Hslkdq Hdepd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
@@ -7704,11 +7704,11 @@ Section ProofSysUnlinkBody.
               dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
-              false true false e1 pid (DfracOwn (1/4)) dqb dqs
+              false true false e1 _ _ pid (DfracOwn (1/4)) dqb dqs
               E2 (K - 30)%nat eb b lks
               (upd_upt V P1) Kiup eq_refl Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
-              Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
+              Hnu2 Hj Hgl HE2a0 (Hlb "log"%string) Hglog eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hropen Hslki Hslkiq Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq

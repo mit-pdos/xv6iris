@@ -3270,11 +3270,11 @@ Section ProofCreateMain.
         iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
-                  false false false e0 pidv (DfracOwn (1/4)) dqb dqs
+                  false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                   G2 (K - 10)%nat eb b lks
                   V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
-                  ltac:(exact Hn1ip) Hj Hgs HG2a0
+                  ltac:(exact Hn1ip) Hj Hgs HG2a0 ltac:(lkbelow) Hglog eq_refl
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                         Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
@@ -3715,11 +3715,11 @@ Section ProofCreateMain.
           iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                     cn gtl gild gisld cov logstart bmapstart inodestart nib size
                     dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
-                    false false false e0 pidv (DfracOwn (1/4)) dqb dqs
+                    false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                     F3 (K - 10)%nat eb b lks
                     V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
-                    ltac:(exact Hn1ip) Hj Hgs HF3a0
+                    ltac:(exact Hn1ip) Hj Hgs HF3a0 ltac:(lkbelow) Hglog eq_refl
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                           Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                           Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
@@ -3947,12 +3947,12 @@ Section ProofCreateMain.
             iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                       cn gtl gilc gislc cov logstart bmapstart inodestart nib
                       size dev kslot (qq/2)%Qp (qq/2)%Qp gc (DepTx (qq/2)%Qp dev cinum gc t (1/2)%Qp) cinum dnc bmc
-                      n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
+                      n2 Sb2 false false false ec _ _ pidv (DfracOwn (1/4)) dqb dqs
                       B2 (K - 10)%nat eb b lks
                       V ltac:(exact HKiup) eq_refl Hkslot ltac:(discriminate)
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
-                      ltac:(exact Hn2ip) Hj Hgs HB2a0
+                      ltac:(exact Hn2ip) Hj Hgs HB2a0 ltac:(lkbelow) Hglog eq_refl
                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                             Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep
                             Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz [$Hckeep2 $Hruc] Hsbb
@@ -4489,11 +4489,11 @@ Section ProofCreateMain.
         iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dnl bml n1 Sb1
-                  false false false e0 pidv (DfracOwn (1/4)) dqb dqs
+                  false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                   J2 (K - 10)%nat eb b lks
                   V ltac:(exact HKiup) eq_refl Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
-                  ltac:(exact Hn1ip) Hj Hgs HJ2a0
+                  ltac:(exact Hn1ip) Hj Hgs HJ2a0 ltac:(lkbelow) Hglog eq_refl
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                         Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
@@ -5617,11 +5617,15 @@ Section ProofCreateMain.
         (* dirlink borrows the LEDGER half alone (durable-disk 2b-inode-5);
            the counting RA's tokens stay in this walk's hand and the
            deposit below files the [+0xc4] mint's unit among them. *)
+        (* dirlink's own [iput] may need a share (durable-disk B''-tx5); the
+           FILE arm has the residue free, so it simply lends it. *)
+        iEval (rewrite -Hglog) in "Htx".
         iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                   (ientry kd) dind bm data dn dn nf (cr_low16 cinum)
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
                           ∪ {[IBLOCK cinum inodestart]})
+                  _ _
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1) dqs
                   dqb dqbs (DfracOwn (1/2))
                   X4 (K - 10)%nat eb b lks
@@ -5637,16 +5641,17 @@ Section ProofCreateMain.
                   Hlg Hbmwf Hholes Hdaddr Hsz31 Hist0 Hdblk Hdblog Hdib
                   Hcl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
                   ltac:(exact (cr_alloc_dlneed (S q2) _ _ ltac:(lia)))
-                  Hj Hgs HX4a0 HX4a2 Heb
+                  Hj Hgs HX4a0 HX4a2 Heb ltac:(lkbelow) Hglog
                   with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
                         Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                        Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
+                        Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop Htx").
         all: try lkbelow.
         iIntros (CIDdl Hsdl mdl found bm' data' dn' dn0' n' Sb' tot)
           "%Hcsdl Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs
-           Hsbb Hdiat Hppid Hbsl Hislk Hdlnk %Hn' %Hsb' %Hdl16 %Hfd0 Hop
+           Hsbb Hdiat Hppid Hbsl Hislk Hdlnk %Hn' %Hsb' %Hdl16 %Hfd0 Hop Htx
            %Hcapp %Hsizedp %Harm".
+        iEval (rewrite Hglog) in "Htx".
         (* the borrow comes back as the PAIR; open it here, because the
            deposit below files the [+0xc4] mint's unit among the home's
            entry units (durable-disk 2b-inode-5) *)
@@ -5957,11 +5962,11 @@ Section ProofCreateMain.
              iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
                        size dev kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dn' bm'
-                       n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
+                       n' Sb' false true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb b lks
                        V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
-                       ltac:(exact Hipn') Hj Hgs HY2a0
+                       ltac:(exact Hipn') Hj Hgs HY2a0 ltac:(lkbelow) Hglog eq_refl
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                              Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev
                              Hiinum Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
@@ -6344,11 +6349,11 @@ Section ProofCreateMain.
       iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γil γisl cov logstart bmapstart inodestart nib size dev
                 kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/2)%Qp) dind dn bm (S q1) Sb1
-                false false false e0 pidv (DfracOwn (1/4)) dqb dqs
+                false false false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                 Z2 (K - 10)%nat eb b lks
                 V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
-                ltac:(exact Hn1ip) Hj Hgs HZ2a0
+                ltac:(exact Hn1ip) Hj Hgs HZ2a0 ltac:(lkbelow) Hglog eq_refl
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                       Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                       Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
@@ -6852,7 +6857,7 @@ Section ProofCreateMain.
               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
-              true false e0 pidv (DfracOwn (1/4)) dqb dqs
+              true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
               V ltac:(exact HKiup) eq_refl Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
@@ -6860,7 +6865,7 @@ Section ProofCreateMain.
               ltac:(intros _; exact (cr_in_union_sing Sb4
                                        (IBLOCK cinum inodestart)))
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
-              ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
+              ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0 ltac:(lkbelow) Hglog eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
@@ -7065,11 +7070,11 @@ Section ProofCreateMain.
     iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dn' bm'
-              n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
+              n5 Sb5 false false false e1 _ _ pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
               V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
-              ltac:(exact Hipn5) Hj Hgs HG6a0
+              ltac:(exact Hipn5) Hj Hgs HG6a0 ltac:(lkbelow) Hglog eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                     Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
@@ -7804,7 +7809,7 @@ Section ProofCreateMain.
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
-              true false e0 pidv (DfracOwn (1/4)) dqb dqs
+              true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
               V ltac:(exact HKiup) eq_refl Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
@@ -7812,7 +7817,7 @@ Section ProofCreateMain.
               ltac:(intros _; exact (cr_in_union_sing Sb4
                                        (IBLOCK cinum inodestart)))
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
-              ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
+              ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0 ltac:(lkbelow) Hglog eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
@@ -7911,11 +7916,11 @@ Section ProofCreateMain.
     iApply (IUP.wp_iunlockput_dep_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               kd (qd/2)%Qp (qd/2)%Qp gd (DepTx (qd/2)%Qp dev dind gd t (1/4)%Qp) dind dp bmp
-              n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
+              n5 Sb5 false false false e1 _ _ pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
               V ltac:(exact HKiup) eq_refl Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
-              ltac:(exact Hipn5) Hj Hgs HG6a0
+              ltac:(exact Hipn5) Hj Hgs HG6a0 ltac:(lkbelow) Hglog eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                     Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
@@ -8400,12 +8405,25 @@ Section ProofCreateMain.
     (* THE LICENCE'S LEFT DISJUNCT HERE IS [ip->nlink = 1], flushed by the
        three [sh]s at +0xfc..+0x102 before this call (§7.5.6, row 3): the
        record the contract runs at IS [cr_setf dnc _ _ 1]. *)
+    (* THE SHARE DIRLINK'S OWN [iput] MAY NEED (durable-disk B''-tx5).  Inside
+       the armed span this walk holds no free residue -- a quarter is in each
+       escrow and the registry's arm has the half -- so it shrinks the
+       PARENT'S arm by an eighth for the duration of the call and grows it
+       back at the return.  The eighth is enough: what iput's windows need is
+       a POSITIVE share of an OPEN transaction, and any is. *)
+    iApply fupd_wp.
+    iMod (ic_shrink_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
+            t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
+            ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
+      as "(Hivalid & Hdep & Htxs)".
+    iModIntro. iEval (rewrite -Hglog) in "Htxs".
     iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
               (ientry kslot) cinum bmc datc
               (cr_setf dnc major minor (mword_of_int 1 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16))
               cr_dot_f (cr_low16 cinum) n3 Sb3
+              _ _
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) DfracDiscarded dqs
               dqb dqbs (DfracOwn (1/2))
               Z5 (K - 10)%nat eb b lks
@@ -8420,16 +8438,24 @@ Section ProofCreateMain.
               Hcl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
               ltac:(rewrite Hcnrec0 Hck0; rewrite Hind0;
                     exact (cr_alloc_dlneed n3 _ false Hn3lo))
-              Hj Hgs HZ5a0 HZ5a2 Heb
+              Hj Hgs HZ5a0 HZ5a2 Heb ltac:(lkbelow) Hglog
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw Hsbi Hsbs Hsbb
                     Hbmr Hiregi Hiopen Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                    Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk0i Hop").
+                    Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk0i Hop Htxs").
     all: try lkbelow.
     iIntros (CIDd1 Hsd1 md1 found1 bm1 dat1 dc1 dc01 n4 Sb4 tot1)
       "%Hcsd1 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw1 Hsbi
        Hsbs Hsbb Hcdiat Hppid Hbsl Hislk Hcdlnk0 %Hn4c %Hsb4 %Hdlp1 %Hfd1
-       Hop %Hcap1 %Hsizedp1 %Harm1".
+       Hop Htxs %Hcap1 %Hsizedp1 %Harm1".
+    iEval (rewrite Hglog) in "Htxs".
+    iApply fupd_wp.
+    iMod (ic_grow_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
+            t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
+            ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htxs")
+      as "(Hivalid & Hdep)".
+    iModIntro.
+
     (* the borrow comes back as the PAIR; open it here, because the deposit
        below files the child's ["."] entry among its own units *)
     iRename "Hcdlnk0" into "Hcdlnk0P".
@@ -8766,10 +8792,23 @@ Section ProofCreateMain.
         rewrite Hc1nrec Hc1k0 Hind1 Hcrb2
                 (proj1 (proj2 SpecDirlink.dl_need_values)).
         pose proof (cr_mkdir_dl1 n3 n4 _ _ _ Hspend1); lia. }
+    (* THE SHARE DIRLINK'S OWN [iput] MAY NEED (durable-disk B''-tx5).  Inside
+       the armed span this walk holds no free residue -- a quarter is in each
+       escrow and the registry's arm has the half -- so it shrinks the
+       PARENT'S arm by an eighth for the duration of the call and grows it
+       back at the return.  The eighth is enough: what iput's windows need is
+       a POSITIVE share of an OPEN transaction, and any is. *)
+    iApply fupd_wp.
+    iMod (ic_shrink_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
+            t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
+            ltac:(solve_ndisj) with "Hescd Hivalid Hdep")
+      as "(Hivalid & Hdep & Htxs)".
+    iModIntro. iEval (rewrite -Hglog) in "Htxs".
       iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                 (ientry kslot) cinum bm1 dat1 dc1 dc1
                 cr_dotdot_f (cr_low16 dind) n4 Sb4
+                _ _
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) DfracDiscarded dqs
                 dqb dqbs (DfracOwn (1/2))
                 Y5 (K - 10)%nat eb b lks
@@ -8787,16 +8826,24 @@ Section ProofCreateMain.
                 Hlg Hwf1 Hholes1 Haddr1 Hsz311 Hist0 Hcblk Hcblog Hcinb
                 Hdl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
                 Hdlneed4
-                Hj Hgs HY5a0 HY5a2 Heb
+                Hj Hgs HY5a0 HY5a2 Heb ltac:(lkbelow) Hglog
                 with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                       Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw Hsbi Hsbs Hsbb
                       Hbmr Hiregi Hiopen Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                      Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk1 Hop").
+                      Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk1 Hop Htxs").
       all: try lkbelow.
       iIntros (CIDd2 Hsd2 md2 found2 bm2 dat2 dc2 dc02 n5 Sb5 tot2)
         "%Hcsd2 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw2 Hsbi
          Hsbs Hsbb Hcdiat Hppid Hbsl Hislk Hcdlnk1 %Hn5c %Hsb5 %Hdlp2 %Hfd2
-         Hop %Hcap2 %Hsizedp2 %Harm2".
+         Hop Htxs %Hcap2 %Hsizedp2 %Harm2".
+      iEval (rewrite Hglog) in "Htxs".
+    iApply fupd_wp.
+    iMod (ic_grow_tx ⊤ cn γfs γi cov logstart kd (qd/2)%Qp dev dind gd true
+            t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
+            ltac:(solve_ndisj) with "Hescd Hivalid Hdep Htxs")
+      as "(Hivalid & Hdep)".
+    iModIntro.
+
       iRename "Hcdlnk1" into "Hcdlnk1P".
       iDestruct (dlinks_open with "Hcdlnk1P") as "[Hcdlnk1 Hcetk2]".
       assert (Hpcd2 : ret_pc (Y5 !!! Regidx Rra : mword 64)
@@ -9125,10 +9172,20 @@ Section ProofCreateMain.
         { rewrite /inode_map. iFrame. }
         iDestruct (cpu_own_transport CIDd2 CIDe11 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+        (* the eighth dirlink's own [iput] may need -- see the two dot
+           links above; here it comes off the CHILD's arm, because the call
+           itself is over the parent. *)
+        iApply fupd_wp.
+        iMod (ic_shrink_tx ⊤ cn γfs γi cov logstart kslot (q/2)%Qp dev cinum g
+                true t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
+                ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep")
+          as "(Hcivalid & Hcdep & Htxs)".
+        iModIntro. iEval (rewrite -Hglog) in "Htxs".
         iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                   (ientry kd) dind bm data dn dn nf (cr_low16 cinum)
                   n5 Sb5
+                  _ _
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1) dqs
                   dqb dqbs (DfracOwn (1/2))
                   W4 (K - 10)%nat eb b lks
@@ -9146,16 +9203,24 @@ Section ProofCreateMain.
                   ltac:(rewrite Hcrb3;
                         exact (cr_mkdir_dl3_need n3 n4 n5 _ _ _ _ _ true _
                                  Hn3lo Hcorr' Hspend1 Hspend2 eq_refl eq_refl))
-                  Hj Hgs HW4a0 HW4a2 Heb
+                  Hj Hgs HW4a0 HW4a2 Heb ltac:(lkbelow) Hglog
                   with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
                         Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                        Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
+                        Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop Htxs").
         all: try lkbelow.
         iIntros (CIDd3 Hsd3 md3 found3 bm3 dat3 dp3 dp03 n6 Sb6 tot3)
           "%Hcsd3 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi
            Hsbs Hsbb Hdiat Hppid Hbsl Hislk Hdlnk %Hn6c %Hsb6 %Hdlp3 %Hfd3
-           Hop %Hcap3 %Hsizedp3 %Harm3".
+           Hop Htxs %Hcap3 %Hsizedp3 %Harm3".
+        iEval (rewrite Hglog) in "Htxs".
+        iApply fupd_wp.
+        iMod (ic_grow_tx ⊤ cn γfs γi cov logstart kslot (q/2)%Qp dev cinum g
+                true t (1/4) ((1/4)/2) ((1/4)/2) (eq_sym (Qp.div_2 (1/4)))
+                ltac:(solve_ndisj) with "Hescc Hcivalid Hcdep Htxs")
+          as "(Hcivalid & Hcdep)".
+        iModIntro.
+
         iDestruct (dlinks_open with "Hdlnk") as "[Hdlnk Hetk]".
         iEval (rewrite HW4a1) in "Hnb14".
         assert (Hpcd3 : ret_pc (W4 !!! Regidx Rra : mword 64)
@@ -9854,11 +9919,11 @@ Section ProofCreateMain.
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
-                    true true false e0 pidv (DfracOwn (1/4)) dqb dqs
+                    true true false e0 _ _ pidv (DfracOwn (1/4)) dqb dqs
                     T2 (K - 10)%nat eb b lks
                     V ltac:(exact HKiup) eq_refl Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
-                    ltac:(exact Hipn6) Hj Hgs HT2a0
+                    ltac:(exact Hipn6) Hj Hgs HT2a0 ltac:(lkbelow) Hglog eq_refl
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                           Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev
                           Hiinum Hivalid Hload Hshotf Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr

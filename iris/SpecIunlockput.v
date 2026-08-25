@@ -104,6 +104,35 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
+(* ---- THE PARK'S OWN ARM, AS A PURE READING (durable-disk B''-tx5) ------
+
+   iput's three windows -- [IcacheEscrow]'s [DepFrz], its mid-free park and
+   its authority-side [ic_held] -- each park a SHARE of the freeing
+   transaction's [LogDefs.ln_tx] element, which is what lets a commit refute
+   them at an empty authority; [SpecIput.wp_iput_gen_body] therefore takes
+   one.  iunlockput needs no caller to supply it: it is [iunlock] then
+   [iput], and the share the WRITE ARM parked comes home at the first of the
+   two ([IcacheEscrow.ic_dep_side]).  This is that observation as a pure
+   equation on the descriptor, so the two generic bodies below can name the
+   [(t, q)] without destructing anything. *)
+Definition ic_dep_side_tx (d : ic_dep) : option (nat * Qp) :=
+  match d with
+  | DepTx _ _ _ _ t q => Some (t, q)
+  | _ => None
+  end.
+
+Section IunlockputSide.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
+
+  Lemma ic_dep_side_of_tx (d : ic_dep) (t : nat) (q : Qp) :
+    ic_dep_side_tx d = Some (t, q) ->
+    ic_dep_side d = (t ↪[ln_tx icfg_log]{#q} ())%I.
+  Proof.
+    destruct d; try discriminate. cbn. intro H.
+    injection H as -> ->. reflexivity.
+  Qed.
+End IunlockputSide.
+
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
    its deepest callee is iput (60).  iunlock wants 26.
 
@@ -188,6 +217,14 @@ Definition wp_iunlockput_dep_sconf_body
      no landed positional argument list above it moved; the two published
      [_tx_] readings below already carry the very same equation. *)
   g = icfg_log ->
+  (* ...AND THE PARK IS A *WRITE* ARM'S (durable-disk B''-tx5).  iunlockput
+     is [iunlock] then [iput], and the share the arm parked comes home at the
+     FIRST of the two -- so the share iput's three windows need is the one
+     this function has just been handed, and NO CALLER HAS TO FIND ONE.  What
+     the premise says is that the descriptor is the write arm, which every
+     iunlockput in this kernel is: a read-locker never puts.  Non-vacuity:
+     all sixteen direct call sites name a [Xv6Cameras.DepTx]. *)
+  ic_dep_side_tx d = Some (tid, qtx) ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -256,11 +293,6 @@ Definition wp_iunlockput_dep_sconf_body
      post hands the parked share back as [ic_dep_side d] and the caller
      rejoins it there ([LogInv.log_opb_op]). *)
   log_opb g n -∗
-  (* THE FREEING TRANSACTION'S SHARE, relayed straight to iput (durable-disk
-     B''-tx5): its three windows park it, so a commit refutes them.  The
-     [_tx_] reading below supplies it out of the very element the walk is
-     re-forming, so no landed caller has to find one. *)
-  tid ↪[ln_tx g]{#qtx} () -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -278,8 +310,6 @@ Definition wp_iunlockput_dep_sconf_body
       bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opb g n' -∗
-      (* ...and back, at exactly the [(tid, qtx)] that went in. *)
-      tid ↪[ln_tx g]{#qtx} () -∗
       iref_slot -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other descriptors. *)
@@ -349,6 +379,14 @@ Definition wp_iunlockput_dep_gen_body
      no landed positional argument list above it moved; the two published
      [_tx_] readings below already carry the very same equation. *)
   g = icfg_log ->
+  (* ...AND THE PARK IS A *WRITE* ARM'S (durable-disk B''-tx5).  iunlockput
+     is [iunlock] then [iput], and the share the arm parked comes home at the
+     FIRST of the two -- so the share iput's three windows need is the one
+     this function has just been handed, and NO CALLER HAS TO FIND ONE.  What
+     the premise says is that the descriptor is the write arm, which every
+     iunlockput in this kernel is: a read-locker never puts.  Non-vacuity:
+     all sixteen direct call sites name a [Xv6Cameras.DepTx]. *)
+  ic_dep_side_tx d = Some (tid, qtx) ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -418,10 +456,8 @@ Definition wp_iunlockput_dep_gen_body
   (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
                 ⌜inodestart = icfg_ist⌝
    else emp) -∗
-  (* the reservation, EPOCH-NAMED and BUNDLED WITH THE SHARE iput's windows
-     park (durable-disk B''-tx5): [log_opSet] in, [log_opS] plus the share
-     out. *)
-  log_opSet g n Sb e0 tid qtx -∗
+  (* the reservation, EPOCH-NAMED: [log_opSe] in, [log_opS] out *)
+  log_opSe g n Sb e0 -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -448,8 +484,6 @@ Definition wp_iunlockput_dep_gen_body
       ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
-      (* the share, back at exactly the [(tid, qtx)] that went in. *)
-      tid ↪[ln_tx g]{#qtx} () -∗
       iref_slot -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other descriptors. *)
@@ -809,28 +843,16 @@ Section IunlockputOfDep.
              Hbs Hopb Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    (* THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5) COMES OUT OF THE
-       WALK'S OWN RESIDUE.  The arm keeps a half and the walk keeps a half;
-       the walk lends iput a QUARTER of its half and keeps the other, so the
-       three pieces rejoin into the whole element this contract re-forms and
-       no caller of a [_tx_] form has to find a share of its own. *)
-    iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
-                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2")
-      as "[Ht2a Ht2b]".
-    iEval (rewrite -Hclog) in "Ht2b".
-    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/4)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
-              Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow Hclog
+    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
+              Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow Hclog eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
                     Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hbs Hopb Ht2b [Ht2a Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hbs Hopb [Ht2 Hcont]").
     { rewrite /ic_dep_held /=. iExact "Hload". }
     iIntros (CIDx Hqx mf n') "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi
-             Hbs %Hbnd Hopb Ht2b Hslot Ht1".
+             Hbs %Hbnd Hopb Hslot Ht1".
     rewrite /ic_dep_side.
-    iEval (rewrite Hclog) in "Ht2b".
-    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
-                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2a Ht2b") as "Ht2".
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
     iEval (rewrite -Hclog) in "Htx".
     iApply ("Hcont" $! CIDx Hqx mf n' with
@@ -874,26 +896,17 @@ Section IunlockputOfDep.
              Hbs Hcr Hops Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    (* the quarter iput's windows park -- see [wp_iunlockput_tx_of_dep_sconf] *)
-    iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
-                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2")
-      as "[Ht2a Ht2b]".
-    iEval (rewrite -Hclog) in "Ht2b".
-    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/4)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
+    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
               Hsz Hbm0 Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0
-              Hbelow Hclog
+              Hbelow Hclog eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
                     Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hbs Hcr [Hops Ht2b] [Ht2a Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hbs Hcr Hops [Ht2 Hcont]").
     { rewrite /ic_dep_held /=. iExact "Hload". }
-    { rewrite /log_opSet. iFrame "Hops Ht2b". }
     iIntros (CIDx Hqx mf n' Sb' w) "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb
-             Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Ht2b Hslot Ht1".
+             Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Hslot Ht1".
     rewrite /ic_dep_side.
-    iEval (rewrite Hclog) in "Ht2b".
-    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
-                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2a Ht2b") as "Ht2".
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
     iEval (rewrite -Hclog) in "Htx".
     iApply ("Hcont" $! CIDx Hqx mf n' Sb' w with

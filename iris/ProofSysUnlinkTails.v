@@ -1487,12 +1487,12 @@ Section ProofSysUnlinkTails.
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev ki qip si gyi
               (DepTx si dev inumi gyi t (1/4)%Qp) inumi dni bmi u SbE
-              false false false eE pidv
+              false false false eE _ _ pidv
               dq dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup eq_refl Hki ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
-              ltac:(rewrite Hlkempty; apply locks_below_empty)
+              ltac:(rewrite Hlkempty; apply locks_below_empty) Hglog eq_refl
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hescki Hireg Hropen Hslkki Hslkdi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpid Hprocs

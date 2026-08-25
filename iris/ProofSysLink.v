@@ -2607,10 +2607,24 @@ Section ProofSysLinkBody.
                    (* dirlink borrows the LEDGER half alone (durable-disk
                       2b-inode-5); the counting RA's tokens stay in this
                       walk's hand and the deposit below files one of them. *)
+                   (* THE SHARE DIRLINK'S OWN [iput] MAY NEED (durable-disk
+                      B''-tx5).  The write-arm bundle this walk carries IS a
+                      descriptor beside a residue half; a QUARTER of that
+                      residue goes with the call and comes back, so nothing
+                      about the arm moves.  Any positive share of an open
+                      transaction is what iput's windows want. *)
+                   iDestruct (ic_tx_dep_at_of_half with "Hdepd") as (td) "Hdepd".
+                   rewrite /ic_tx_dep_at.
+                   iDestruct "Hdepd" as "[Hdepd Htd]".
+                   iDestruct (log_tx_split icfg_log td (1/2) (1/4) (1/4)
+                                (eq_sym Qp.quarter_quarter) with "Htd")
+                     as "[Htd Htxs]".
+                   iEval (rewrite -Hclog) in "Htxs".
                    iApply (Dirlink.wp_dirlink_gen (CID := CID59) gs j gl gu gd gk pd
                              pav pu bn g gfs gi cn gtl γa γf γpr cov logstart
                              inodestart nib bmapstart size dev (ientry kd)
                              dinum bmd datd dnd dnd nf (sl_low16 inum) n2 Sb2
+                             _ _
                              pid (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                              dqs dqb dqbs (DfracOwn (1/2))
                              U6 (K - 38)%nat eb b lks
@@ -2643,17 +2657,22 @@ Section ProofSysLinkBody.
                              Hist0 Hdiblk Hdiblog Hdinb Hlow16 Hbmgeo Hprkc Hsize
                              Hbm0 Hbmcov Hbmlog Hcovb Hiregb
                              ltac:(exact (sl_dl_need_ok _ w1 w2 _ n2 Hcrok2 Hu3))
-                             Hj Hgl HU6a0 HU6a2 Heb (Hlb "log"%string)
+                             Hj Hgl HU6a0 HU6a2 Heb (Hlb "log"%string) Hclog
                              with "Hcg Hown Htext Hpc Hdata Hprk Hbio Hlog
                                    Hkenv Hidevd Hiinumd Hmetad Hmapd Hblocksd
                                    [Hnm14] Hsbi Hsbs Hsbb Hbmres Hireg Hropen Hdiatd Hpidq
                                    Hprocs Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows
-                                   Hslks Hir1c Hdlnkd HopS").
+                                   Hslks Hir1c Hdlnkd HopS Htxs").
                    { iEval (rewrite HU6a1). iExact "Hnm14". }
                    iIntros (CID60 Hq60 mdl found bmd' datd' dnd' dnd0' n3 Sb3 tot)
                      "%Hcsdl Hcg Hown Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
                       Hnm14 Hsbi Hsbs Hsbb Hdiatd Hpidq Hbsl Hir1c Hdlnkd %Hn3
-                      %HSb3 %Hdlp %Hfnd HopS %Hcapd %Hsizedd %Harm".
+                      %HSb3 %Hdlp %Hfnd HopS Htxs %Hcapd %Hsizedd %Harm".
+                   iEval (rewrite Hclog) in "Htxs".
+                   iDestruct (log_tx_add icfg_log td (1/2) (1/4) (1/4)
+                                (eq_sym Qp.quarter_quarter) with "Htd Htxs")
+                     as "Htd".
+                   iDestruct (ic_tx_dep_intro with "Hdepd Htd") as "Hdepd".
                    (* the borrow comes back as the PAIR; open it here,
                       because the deposit below files the +0x94 mint's unit
                       among the home's entry units (durable-disk
