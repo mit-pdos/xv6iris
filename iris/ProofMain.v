@@ -2095,9 +2095,13 @@ Section ProofMain.
       by exact (fs_geom_ok_of_image dk ndisk sb nib cov Hiwf Hinin Hiush
                   Hnib0 Hinibeq Hicovin Hind Hicovmeta
                   Hdevq Hnibq Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq).
+    (* THE COLLECTION'S GEOMETRY RIDES THE SAME BLOCK (durable-disk C-8):
+       it needs [fs_geom_ok] -- just produced -- and the region's width tie,
+       which is the very hypothesis [fs_geom_ok_of_image] above consumes. *)
     assert (Hpures : first_fsinit_pures dk sb)
       by exact (first_fsinit_pures_of_image dk sb cov Hiwf Hiparse Hicovmeta
-                  Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq).
+                  Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq Hgeomok
+                  ltac:(rewrite Hnibq; exact Hinibeq)).
     (* kit 1's two EARLY peels: the "pr" lock's ghost goes to the printk
        group at +0x6a and the "kmem" trio to the kvm group at +0x6e, so the
        three [newlock]s that used to invent their own gnames now fill the

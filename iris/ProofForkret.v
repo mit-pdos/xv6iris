@@ -918,7 +918,8 @@ Proof.
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
-                      [Hhdr0 [H1cov [H1log [Hsbparse Hsbok]]]]].
+                      [Hhdr0 [H1cov [H1log [Hsbparse [Hsbok
+                       [Hcgeom [Hbmq Hszq]]]]]]]].
   (* the era's two readings of one image (durable-disk 1a): the boot mint
      built [L] from the era's disk, which is the same disk the era's mirror
      was born at.  Threaded straight through fsinit into initlog. *)
@@ -998,6 +999,10 @@ Proof.
                fsinit used to hand back here, and this file used to DROP,
                now goes down into initlog's park. *)
             Hsbparse Hsbok
+            (* the collection's geometry and its two field ties
+               (durable-disk C-8): fsinit builds the commit's law out of
+               them and hands it to initlog *)
+            Hcgeom Hbmq Hszq
             Hmagic eq_refl eq_refl eq_refl eq_refl
             Hn1 Hnnib Hn31 eq_refl eq_refl Hdev Hnib0
             Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb Hhdr0 HLdk Hpkc Hjlt Hgl

@@ -76,6 +76,13 @@ Require Import ProcAvail.
 Require Import FsBoot.
 Require Import FsImg.
 Require Import FsImgBridge.
+(* THE COLLECTION'S GEOMETRY (durable-disk C-8).  [FsCollect.col_geom] is
+   the one non-resource premise of the commit's collection, and the only
+   place in the tree that can discharge it is where the boot image's own
+   arithmetic is: [FsImg.sbo_bmapstart] is what makes the region's [nib]
+   blocks stop below the bitmap, and nothing below [FsReady.fs_geom_ok]
+   carries the width tie [nib = ninodes/16 + 1] it needs. *)
+Require Import FsCollect.
 Require Import FsCfgBoot.
 Require Import FsReady.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -281,7 +288,21 @@ Section FirstTok.
        record ([SbPark.sb_park]).  LAST, so no destructuring pattern that
        already opens this block moves. *)
     /\ FsImg.fs_parse_sb (fun _ => FsCrash.fs_blocks dk 1) = Some sb
-    /\ FsImg.fs_sb_ok sb.
+    /\ FsImg.fs_sb_ok sb
+    (* ...AND THE COLLECTION'S GEOMETRY (durable-disk C-8), with the two
+       field ties the file system's law needs beside it.  The law the
+       commit runs is supplied at [initlog] out of the era's own
+       invariants, which are stated at the CONFIG numbers, while the
+       snapshot is stated at the record block 1 DECODES to; these three
+       are the bridge ([col_geom]'s own [cg_ist] is the third tie).  They
+       belong HERE for one reason: [cg_reg] -- the region stops below the
+       bitmap -- rests on [FsImg.sbo_bmapstart] against the width tie
+       [nib = ninodes/16 + 1], and that tie exists nowhere below this
+       file.  LAST, so no destructuring pattern that already opens this
+       block moves. *)
+    /\ col_geom sb icfg_ist icfg_nib (fs_home_set fsc_cov fsc_logst)
+    /\ FsImg.sb_bmapstart sb = fsc_bmapstart
+    /\ FsImg.sb_size sb = fsc_size.
 
   (* ================================================================== *)
   (*  3.  THE EXCLUSIVE HALF -- [SpecFsinit]'s premise pile               *)
@@ -657,6 +678,41 @@ Section FirstTok.
      [FsImg.fs_parse_sb] is exactly that reading, and
      [FsImgCheck.fsimg_parse_sb] already proves it at the literal image --
      so this premise costs the adequacy cone no new computation. *)
+  (* THE COLLECTION'S GEOMETRY, OFF THE BOOT CONFIGURATION (durable-disk
+     C-8).  Four of the six clauses are [FsReady.fs_geom_ok]'s own -- the
+     inum bound, the [ushort] width, the coverage bound and the covered
+     range's positivity -- and the fifth, [cg_reg], is [FsImg.sbo_bmapstart]
+     against the region's WIDTH TIE.  That tie ([nib = ninodes/16 + 1]) is
+     what [fs_geom_ok_of_image] above is already stated at, so this lemma
+     costs the boot chain nothing it does not already prove. *)
+  Lemma col_geom_of_image (sb : FsImg.fs_sb) :
+    fs_geom_ok ->
+    FsImg.fs_sb_ok sb ->
+    icfg_ist = FsImg.sb_inodestart sb ->
+    fsc_size = FsImg.sb_size sb ->
+    fsc_ninodes = FsImg.sb_ninodes sb ->
+    Z.of_nat icfg_nib = FsImg.sb_ninodes sb / 16 + 1 ->
+    col_geom sb icfg_ist icfg_nib (fs_home_set fsc_cov fsc_logst).
+  Proof.
+    intros G Hsb Histq Hszq Hninq Hnibw.
+    pose proof (FsImg.sbo_bmapstart sb Hsb) as Hbms.
+    pose proof (fgo_nin_hi G) as Hnhi.
+    pose proof (fgo_ushort G) as Hush.
+    pose proof (fgo_covbelow G) as Hcb.
+    pose proof (fgo_loggeom G) as [Hcovok _].
+    split.
+    - exact Hsb.
+    - by rewrite Histq.
+    - rewrite Histq Hnibw Hbms. lia.
+    - rewrite -Hninq. exact Hnhi.
+    - assert (H216 : (2 ^ 16 <= 2 ^ 32)%Z) by (apply Z.pow_le_mono_r; lia).
+      lia.
+    - intros b Hb. rewrite /fs_home_set in Hb.
+      apply elem_of_difference in Hb as [Hb _].
+      pose proof (Hcovok b Hb) as Hb0. pose proof (Hcb b Hb) as Hb1.
+      rewrite -Hszq. lia.
+  Qed.
+
   Lemma first_fsinit_pures_of_image (dk : Z -> bv 8) (sb : FsImg.fs_sb)
       (cov : gset Z) :
     FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true ->
@@ -666,9 +722,13 @@ Section FirstTok.
     fsc_cov = cov -> fsc_logst = FsImg.sb_logstart sb ->
     fsc_bmapstart = FsImg.sb_bmapstart sb ->
     fsc_size = FsImg.sb_size sb -> fsc_ninodes = FsImg.sb_ninodes sb ->
+    (* the two the collection's geometry adds (durable-disk C-8), both
+       already in hand wherever [fs_geom_ok_of_image] is called *)
+    fs_geom_ok ->
+    Z.of_nat icfg_nib = FsImg.sb_ninodes sb / 16 + 1 ->
     first_fsinit_pures dk sb.
   Proof.
-    intros Hwf Hparse Hcovmeta Histq Hcovq Hlogq Hbmq Hszq Hninq.
+    intros Hwf Hparse Hcovmeta Histq Hcovq Hlogq Hbmq Hszq Hninq Hgok Hnibw.
     pose proof (FsImg.fsimg_wf_sb _ _ Hwf) as Hsb.
     pose proof (FsImg.sbo_magic sb Hsb) as Hmag.
     pose proof (FsImg.sbo_logstart sb Hsb) as Hls.
@@ -690,7 +750,8 @@ Section FirstTok.
       [| discriminate].
     injection Hparse as Hsbeq.
     rewrite /first_fsinit_pures.
-    split; [| split; [| split; [| split; [| split]]]].
+    split;
+      [| split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]]].
     - exists (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 0 4)),
              (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 8 4)),
              (Z_to_bv 32 (FsImg.fs_le_at (FsCrash.fs_blocks dk FsImg.SB_BNO) 16 4)).
@@ -708,6 +769,9 @@ Section FirstTok.
     - rewrite /FsImg.fs_parse_sb. rewrite /FsImg.fs_parse_sb in Hparse0.
       exact Hparse0.
     - exact Hsb.
+    - exact (col_geom_of_image sb Hgok Hsb Histq Hszq Hninq Hnibw).
+    - by rewrite Hbmq.
+    - by rewrite Hszq.
   Qed.
 
 End FirstTok.

@@ -97,6 +97,12 @@ Require Import BioDefs.   (* [hdr_dec], for the general initlog premises *)
 Require Import LogDefs.
 Require Import SpecPrintk.
 Require Import SpecFsinit.
+(* the commit's law and its FS-side discharge (durable-disk C-8) *)
+Require Import InodeRegion.
+Require Import FsCollect.
+Require Import SbPark.
+Require Import LogSnapLaw.
+Require Import FsCollectAll.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -559,6 +565,7 @@ Section FsinitMain.
   Proof.
     cbv beta delta [wp_fsinit_sconf_body].
     intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hsbparse Hsbok
+           Hcgeom Hbmq Hszq
            Hmagic Hvni Hvis Hvbs Hvls
            Hn1 Hnnib Hn31 Hdevc Hnibc Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
            Hbmlog Hcovb Hhdr0 HLmir Hpk Hj Hgl Ha0 Hbelow.
@@ -592,6 +599,28 @@ Section FsinitMain.
        form. *)
     iPoseProof (bitmap_inv_bytes_at with "Hbm") as "#Hbrow".
     iPoseProof (bitmap_inv_bytes with "Hbm") as "#Hbany".
+    (* THE FILE SYSTEM'S LAW, MINUS BLOCK 1'S PARK (durable-disk C-8).  It
+       is assembled out of the four invariants fsinit already holds, read at
+       the record block 1 DECODES to rather than at the config numbers --
+       the three ties above are that bridge.  The park itself is initlog's
+       own, minted in the same ghost step as the log lock's seal, so what
+       goes down to [initlog] is the WAND and initlog composes the two.
+       Nothing else about the file system crosses into the WAL. *)
+    assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) nib
+                        (fs_home_set cov logstart))
+      by (rewrite (cg_ist Hcgeom); exact Hcgeom).
+    iAssert (ireg_inv γi γfs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
+    { rewrite (cg_ist Hcgeom). iExact "Hireg". }
+    iAssert (bitmap_inv γfs (FsImg.sb_bmapstart sbrec) cov logstart
+               (FsImg.sb_size sbrec)) as "#Hbm'".
+    { rewrite Hbmq Hszq. iExact "Hbm". }
+    iPoseProof (is_itable2_pool with "Hitb2") as "#Hpoolinv".
+    iAssert (□ (sb_park γfs sbrec -∗ snap_law icfg_log γfs cov logstart))%I
+      as "#Hlawf".
+    { iModIntro. iIntros "#Hpark".
+      iApply (fs_snap_law_build icfg_log cn γfs γi cov logstart nib sbrec
+                eq_refl Hcgeom'
+                with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size dev v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
@@ -1440,7 +1469,7 @@ Section FsinitMain.
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbrow HauthL HauthD
-                    Hdirty Hhdr Hlslots Hsl34 Hfsb").
+                    Hdirty Hhdr Hlslots Hsl34 Hfsb Hlawf").
     all: try lkbelow.
     iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 _ Hlctx".
     assert (Hpc52 : ret_pc (Q9 !!! Regidx Rra : mword 64)

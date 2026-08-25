@@ -1365,3 +1365,4 @@ IregClean.v
 FsCollect.v
 FsCollectImg.v
 FsCollectAll.v
+LogSnapLaw.v

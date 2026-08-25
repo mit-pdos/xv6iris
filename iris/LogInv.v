@@ -44,6 +44,13 @@ Require Import FsBlocks.
    [SpecEndOp.wp_end_op] holds, and the commit's collection has to reach
    block 1 (durable-fs-plan.md section 4, gap (C) in FsCollect.v). *)
 Require Import SbPark.
+(* THE FILE SYSTEM'S LAW (durable-disk C-8).  The commit RECONSTRUCTS the
+   file-system predicate at quiescence and the WAL stays file-system
+   agnostic: what it holds is a PERSISTENT, PURE-FACT-PRODUCING law, parked
+   here beside block 1 and never looked inside.  The file it lives in is a
+   LEAF over [FsDurSnap] -- the WAL's cone gains the snapshot's PREDICATE
+   and nothing above it. *)
+Require Import LogSnapLaw.
 (* NOTHING IN THE CRASH/LOG LAYER IMPORTS THE PURE WF LAYER any more
    (durable-disk 1d).  [FsImg]/[FsWf]/[FsObj*] were here for row (a) --
    "the logged view is the committed view except at the pending objects" --
@@ -1268,7 +1275,18 @@ Section LogInv.
         allocates it out of the run fsinit hands down and this is where the
         commit reaches it.  LAST, so no pattern that opens this bundle
         moves. *)
-     sb_parked γfs)%I.
+     sb_parked γfs ∗
+     (* THE FILE SYSTEM'S LAW (durable-disk C-8, plan section 3's "Commit").
+        Given the byte authority at the logged view and "no transaction is
+        open", it yields [∃ S, snap_ok S L] and hands both authorities back.
+        ARITY-FREE for [sb_parked]'s reason verbatim: the mask it runs in is
+        CLOSED OVER, with the one fact a committer needs beside it (that
+        [logN] is not in it -- a committer runs the law with the byte view
+        already open).  The WAL supplies nothing to it and reads nothing out
+        of it but a pure proposition, so the log's lock resource still
+        carries no client payload.  LAST, after the park, so no pattern that
+        opens this bundle moves. *)
+     snap_law γ γfs cov logstart)%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -1323,7 +1341,15 @@ Section LogInv.
      step the collection runs in. *)
   Lemma log_ctx_sb γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ sb_parked γfs.
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & $)". Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & $ & _)". Qed.
+
+  (* THE LAW, off the context end_op already threads (durable-disk C-8).
+     This is the whole of what the commit needs of the file system: it runs
+     the law at its own ghost step, gets a pure fact, and hands both
+     authorities back.  [LogSnapLaw.snap_law_run] is the reading. *)
+  Lemma log_ctx_snap_law γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ snap_law γ γfs cov logstart.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & $)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)
@@ -1510,6 +1536,39 @@ Section LogInv.
   Proof.
     intros Hsz ->. rewrite map_size_empty in Hsz.
     by apply map_size_empty_iff.
+  Qed.
+
+  (* ...AND THE LAW, READ AT THE LEDGER (durable-disk C-8).  This is the
+     form the commit meets: [log_res] carries the transaction authority
+     beside the ledger's with [size T = size om], a commit is exactly the
+     step at which the ledger is empty, and the byte authority is the one
+     the committer has just taken out of [fs_bytes_inv].  It moves NO
+     durable resource -- both authorities come straight back -- so the
+     commit runs it at its own ghost step. *)
+  Lemma log_ctx_snap_law_of_ops (γ : log_names) (bn : bio_names)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (dev : SailStdpp.Values.mword 32)
+      (om : gmap nat op_entry) (T : gmap nat unit)
+      (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) :
+    size T = size om ->
+    om = ∅ ->
+    dom C = fs_home_set cov logstart ->
+    (forall (b : Z) (bs : list (bv 8)),
+       lookup b C = Some bs -> length bs = BioDefs.BSIZE) ->
+    bytes_tie Lb C ->
+    bytes_dom Lb (fs_home_set cov logstart) ->
+    log_ctx γ bn γfs cov logstart dev -∗
+    ghost_map_auth (fs_bytes γfs) 1 Lb -∗
+    ghost_map_auth (ln_tx γ) 1 T ={⊤ ∖ ↑logN}=∗
+      ⌜snap_law_ok C (fs_home_set cov logstart)⌝
+      ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
+      ∗ ghost_map_auth (ln_tx γ) 1 T.
+  Proof.
+    intros Hsz Hom Hdom Hlens Htie Hdm. iIntros "#Hctx Hb Ht".
+    rewrite (log_tx_empty_of_ops om T Hsz Hom).
+    iDestruct (log_ctx_snap_law with "Hctx") as "#Hlaw".
+    iApply (snap_law_run γ γfs cov logstart Lb C Hdom Hlens Htie Hdm
+              with "Hlaw Hb Ht").
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's

@@ -74,6 +74,7 @@ Require Import FsDurSnap.
 Require Import FsCollect.
 Require Import IregClean.
 Require Import FsDurQuiesce.    (* [esc_ns_still_open] *)
+Require Import LogSnapLaw.      (* [snap_law] -- what [log_ctx] parks *)
 
 Local Open Scope Z_scope.
 
@@ -814,6 +815,61 @@ Section CollectAll.
     { iNext. rewrite /ftop_body. iExists I, A. iFrame "Hta Hlk Hpk".
       iPureIntro. exact Hclean. }
     iModIntro. iFrame "Hauth Htx". iPureIntro. exact Hok.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (*  5.  THE LAW, DISCHARGED                                              *)
+  (*                                                                      *)
+  (*  [LogSnapLaw.snap_law] is what [LogInv.log_ctx] parks and the commit  *)
+  (*  runs; this is the file system supplying it, ONCE, out of the         *)
+  (*  invariants the boot chain has just allocated.  The mask the law      *)
+  (*  closes over is the six namespaces the collection opens, and the one  *)
+  (*  fact a holder still needs about it is that [logN] is not among them  *)
+  (*  -- a committer runs the law with the byte view already open.         *)
+  (*                                                                      *)
+  (*  [γ = icfg_log] is the tie every contract that mixes a threaded log   *)
+  (*  gname with the region already carries (fs-log.md section G.17): the  *)
+  (*  escrows and the region park shares of [ln_tx icfg_log], while        *)
+  (*  [log_ctx] is stated at its own [γ].  True at boot by construction.   *)
+  (* ==================================================================== *)
+
+  Lemma fs_snap_law_build (γ : log_names) (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (ls : Z) (nib : nat) (sb : fs_sb) :
+    γ = icfg_log ->
+    col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
+    ireg_inv γi γfs (FsImg.sb_inodestart sb) nib -∗
+    bitmap_inv γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
+    ic_escrows cn γfs γi cov ls -∗
+    ipool_inv cn γfs γi cov ls nib -∗
+    sb_park γfs sb -∗
+    snap_law γ γfs cov ls.
+  Proof.
+    intros -> Hgeom.
+    iIntros "#Hireg #Hbm #Hesc #Hpool #Hpark".
+    iApply (snap_law_intro icfg_log γfs cov ls
+              ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
+               ∪ ↑icEscN)).
+    { solve_ndisj. }
+    rewrite /snap_law_at.
+    iModIntro. iIntros (E Lb C) "%HN %Hdom %Hlens %Htie %Hdm Hb Ht".
+    assert (Hft : (↑ftopN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hir : (↑iregN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hbn : (↑bitmapN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hsn : (↑sbN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hpn : (↑ipoolN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    iMod (fs_collect_snap_ok E cn γfs γi cov ls nib sb Lb C Hgeom
+            Hft Hir Hbn Hsn Hpn Hen
+            with "Hireg Hbm Hesc Hpool Hpark [Hb] Ht")
+      as "(%Hok & Hauth & Ht)".
+    { rewrite /col_auth. iFrame "Hb".
+      iSplitR; [iPureIntro; exact Hdom |].
+      iSplitR; [iPureIntro; exact Hlens |].
+      iSplitR; [iPureIntro; exact Htie |].
+      iPureIntro; exact Hdm. }
+    rewrite /col_auth. iDestruct "Hauth" as "(Hb & _ & _ & _ & _)".
+    iModIntro. iFrame "Hb Ht". iPureIntro. exact Hok.
   Qed.
 
 End CollectAll.

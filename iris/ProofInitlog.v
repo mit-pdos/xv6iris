@@ -1168,7 +1168,7 @@ Section ProofInitlog.
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow HLauth HDauth Hcovf Hfsb
-              Hslotsfs Hslots Hb1 Hcont".
+              Hslotsfs Hslots Hb1 #Hlawf Hcont".
     (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
        half at a NAMED picture and the swap receipt PowerOn's custody hook
        already earned.  There is no boot swap here any more; every write
@@ -2712,7 +2712,13 @@ Section ProofInitlog.
       iSplitR; [iExact "Hstp"|].
       iSplitR; [iExact "Hswlb"|].
       iSplitR; [iExact "Hbrow"|].
-      iExact "Hsbparked". }
+      iSplitR; [iExact "Hsbparked"|].
+      (* THE FILE SYSTEM'S LAW (durable-disk C-8).  The caller handed it in
+         minus block 1's park, which is the one piece it could not have --
+         nobody owns block 1 until the line above runs.  Composing the two
+         HERE is what makes the law arity-free at [log_ctx] and keeps the
+         WAL from ever naming a file-system gname. *)
+      iApply ("Hlawf" with "Hsbp"). }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".

@@ -172,6 +172,11 @@ Require Import FsCrash.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
+(* the commit's collection geometry and the law it supports (durable-disk
+   C-8): fsinit is what carries the law down to [initlog], which is the one
+   site that can compose it with block 1's park *)
+Require Import FsCollect.
+Require Import LogSnapLaw.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -300,6 +305,18 @@ Definition wp_fsinit_sconf_body
          [FsCfgBoot.fs_boot_image_wf]) rather than recomputed. *)
   fs_parse_sb (fun _ => bs_sb) = Some sbrec ->
   fs_sb_ok sbrec ->
+  (* (a'') THE COLLECTION'S GEOMETRY AND THE TWO FIELD TIES (durable-disk
+          C-8).  fsinit's invariants are stated at the CONFIG numbers and
+          the durable snapshot at the record block 1 DECODES to; these are
+          the bridge, and [FsCollect.cg_ist] is the third tie.  All three
+          come off [FirstTok.first_fsinit_pures], where the region's width
+          tie that [cg_reg] rests on actually lives -- see that file.  They
+          are consumed here and nowhere else: fsinit builds the file
+          system's law out of the invariants it already holds and hands it
+          to [initlog], which parks it in [LogInv.log_ctx]. *)
+  col_geom sbrec inodestart nib (fs_home_set cov logstart) ->
+  FsImg.sb_bmapstart sbrec = bmapstart ->
+  FsImg.sb_size sbrec = size ->
   (* (b) the magic, which is what refutes the LIVE panic arm at +0x40 *)
   bv_unsigned v_magic = FSMAGIC ->
   (* (c) the three field values every fs contract downstream reads *)

@@ -116,6 +116,8 @@ Require Import DiskPtsto DiskInv.
 Require Import SpecPrintk.  (* the recovery printk, via install_trans *)
 Require Import BioInv.
 Require Import FsBlocks LogInv.
+Require Import SbPark.      (* [sb_park] -- what initlog mints at +0x74 *)
+Require Import LogSnapLaw.  (* [snap_law] -- the file system's law *)
 Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -343,6 +345,17 @@ Definition wp_initlog_sconf_body
      conjunction, and a discarded share does not refute a read-locked
      inode's 3/4. *)
   fsblock (fs_bytes γfs) SB_BNO bs_sb -∗
+  (* THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (durable-disk C-8).  The commit
+     reconstructs the file-system predicate at quiescence, and what the WAL
+     holds is a persistent, pure-fact-producing law parked in [log_ctx].
+     The law needs block 1's OWNERSHIP -- which nobody has until the line
+     above is parked, HERE -- so what the caller supplies is the law minus
+     that park, and initlog composes the two in the same ghost step as
+     [SbPark.sb_park_alloc].  It is the ONE premise the file system adds to
+     this contract: no gname of the region, no cache configuration, no
+     geometry, and [wp_end_op] is untouched.  LAST, before the
+     continuation. *)
+  □ (sb_park γfs sbrec -∗ snap_law γ γfs cov logstart) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
