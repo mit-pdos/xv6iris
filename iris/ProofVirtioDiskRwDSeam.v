@@ -105,9 +105,7 @@ Section ProofVirtioDiskRwDSeam.
        (* THE PIN'S STRUCTURE, for P6's [free_chain]: what the interrupt
           handler parks (the pin minus its avail-ring entry) is the fifteen
           formatted windows plus, for a write, the payload. *)
-       ⌜pin ∖ range_map (d_ring pav (q `mod` 8)) 2
-                (nth_byte (Z_to_bv 16 (Z.of_nat h)))
-         = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
+       ⌜pin = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
                             (vdrwd_bufwin b wr bs_buf))
         /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗

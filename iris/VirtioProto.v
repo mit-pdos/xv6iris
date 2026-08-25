@@ -2822,6 +2822,58 @@ Section VirtioProto.
     iPureIntro. split_and!; assumption.
   Qed.
 
+  (* A READ-ONLY LOOK AT A RING CELL.  The store below needs an address
+     claim taken off the cell's own points-to before it can run, and taking
+     it must not spend the staged head -- so this hands the cell out and
+     takes it back exactly as it came, moving no part of the protocol.  The
+     read-only sibling of [virtio_proto_ring_acc], as
+     [virtio_proto_avail_idx_acc] is of the publish. *)
+  Lemma virtio_proto_ring_peek (γ : disk_names) (v : virtio_state)
+      (np j : nat) :
+    (j < 8)%nat ->
+    virtio_proto γ v -∗ disk_pub γ np -∗
+    ⌜virtio_live (v_cfg v) = true⌝ ∗
+    disk_cfg γ (v_cfg v) ∗
+    ⌜virtio_pages_aligned (v_cfg v)⌝ ∗
+    (∃ w : bv 16,
+       phys_word2 (ring_slot_pa (v_cfg v) j) w ∗
+       (phys_word2 (ring_slot_pa (v_cfg v) j) w -∗
+          virtio_proto γ v ∗ disk_pub γ np)).
+  Proof.
+    intro Hj.
+    iIntros "Hp Hpub". rewrite /virtio_proto /disk_pub.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage)".
+      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
+      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
+        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hpend & Hdone)".
+    iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
+    assert (Hringsub : ring_bytes (v_cfg v) (vp_ring pr) ⊆ dma).
+    { etransitivity; [| exact Hctl ]. unfold vproto_ctl.
+      etransitivity;
+        [ apply (map_union_subseteq_r _ _
+                   (idx_ring_bytes_disj (v_cfg v) (vp_np pr) (vp_ring pr)
+                      (vpo_ring_idx _ _ _ Hok)))
+        | apply map_union_subseteq_l ]. }
+    pose proof (read_bytes_mono _ _ _ 2 _ Hringsub
+                  (ring_bytes_read (v_cfg v) (vp_ring pr) j Hj)) as Hcellread.
+    assert (Hcellsub : range_map (ring_slot_pa (v_cfg v) j) 2
+                         (nth_byte (vp_ring pr j)) ⊆ dma).
+    { apply range_map_sub; [lia|]. intros k Hk.
+      apply (read_bytes_spec dma (ring_slot_pa (v_cfg v) j) 2 _ Hcellread). lia. }
+    iDestruct (dma_own_acc_same _ dma Hcellsub with "Hdma") as "[Hcell Hback]".
+    iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iExists (vp_ring pr j). rewrite phys_word2_map. iFrame "Hcell".
+    iIntros "Hcell".
+    iDestruct ("Hback" with "Hcell") as "Hdma".
+    iFrame "Hpub". iExists pr, dma.
+    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
+    iPureIntro. split_and!; assumption.
+  Qed.
+
   (* ==================================================================== *)
   (* driver operation 1b: THE RING STORE                                  *)
   (*                                                                      *)

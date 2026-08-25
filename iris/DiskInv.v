@@ -329,18 +329,11 @@ Section DiskInv.
 
   (* processed by the interrupt handler, not yet collected by its publisher:
      the payoff of VirtioProto.virtio_proto_reclaim_acc, parked.  The pin
-     comes back MINUS its avail-ring entry: the interrupt handler splits
-     those two bytes off and returns them to [ring_slots_res] immediately,
-     so a later publisher reusing ring slot [p mod 8] never has to reach
-     into somebody's uncollected payoff. *)
-  (* the two avail-ring bytes the interrupt handler splits back off the
-     reclaimed pin -- so [dc_pinr] is exactly what a parked payoff owns *)
-  Definition dc_ring_map (pav : Arch.pa) (p : nat) (v : dclaim) : gmap Arch.pa (bv 8) :=
-    range_map (d_ring pav (p `mod` 8)) 2 (nth_byte (vr_head (vs_req (dc_slot v)))).
-
-  Definition dc_pinr (pav : Arch.pa) (p : nat) (v : dclaim) : gmap Arch.pa (bv 8) :=
-    dc_pin v ∖ dc_ring_map pav p v.
-
+     comes back WHOLE now (finding 5): it never held an avail-ring entry to
+     begin with, so there is nothing for the handler to split off and
+     nothing a later publisher of ring slot [p mod 8] could have to reach
+     into an uncollected payoff for.  [dc_ring_map] and [dc_pinr] are gone
+     with that step. *)
   Definition parked_res (γ : disk_names) (pav : Arch.pa) (p : nat)
       (v : dclaim) : iProp Σ :=
     (∃ bs : list (bv 8),
@@ -349,7 +342,7 @@ Section DiskInv.
        ⌜bs = vs_data (dc_slot v)⌝ ∗
        b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) ∗
        d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
-       phys_map (dc_pinr pav p v) ∗
+       phys_map (dc_pin v) ∗
        phys_pointsto (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
        disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
        (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
@@ -366,14 +359,6 @@ Section DiskInv.
        (if vs_is_out (dc_slot v) then emp
         else phys_list (vr_buf (vs_req (dc_slot v))) bs))%I.
 
-  (* the residual pin never covers the ring slot: the publisher's own
-     [ring_slots_res] cell is back in the pool, not in somebody's payoff *)
-  Lemma dc_pinr_ring_disj (pav : Arch.pa) (p : nat) (v : dclaim) :
-    pa_range (d_ring pav (p `mod` 8)) 2 ## dom (dc_pinr pav p v).
-  Proof.
-    rewrite /dc_pinr dom_difference_L /dc_ring_map range_map_dom.
-    apply disjoint_difference_r1. reflexivity.
-  Qed.
 
   (* -- descriptor-triple bookkeeping ------------------------------------ *)
 
@@ -448,10 +433,9 @@ Section DiskInv.
        (* free descriptors *)
        ([∗ list] i ∈ seq 0 8,
           d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-          (if fr i then free_slot_res pd i else emp)) ∗
-       (* the free-descriptor pool is the last conjunct now: the avail-ring
-          cells that used to follow it are the lease's *)
-       emp)%I.
+          (if fr i then free_slot_res pd i else emp)))%I.
+       (* the free-descriptor pool is the LAST conjunct now: the avail-ring
+          cells that used to follow it are the lease's (finding 5). *)
 
   (* the publisher's claim on its own position *)
   Definition disk_claim (γ : disk_names) (p : nat) (v : dclaim) : iProp Σ :=

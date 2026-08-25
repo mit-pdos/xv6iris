@@ -1620,7 +1620,7 @@ Section ProofMain.
     all: try lkbelow.
     rewrite /vdi_post.
     iIntros (mvd pd pav pu) "Hcg Hcpu Hpc %Hcsvd %Hpvd %Hpva %Hpvu Hkenv".
-    iIntros "Hpub Hrdat #Hdcfg Hdescpg Havpg Hdd Hda Hdu Hdfree Hdlkw Hdlnm Hdcpu".
+    iIntros "Hpub Hrdat Hstg #Hdcfg Hdescpg Havpg Hdd Hda Hdu Hdfree Hdlkw Hdlnm Hdcpu".
     assert (Hretvd : ret_pc (tp_pin F4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x9e) : mword 64)).
     { rewrite (mn_tp_pin_ne F4 (mword_of_int 1 : mword 5) ltac:(reg_neq)).
@@ -1659,7 +1659,7 @@ Section ProofMain.
       iPureIntro; intros j Hj;
         apply page_in_range_addr_is_kdata; [exact Hpvu | exact Hj]. }
     iPoseProof (disk_res_boot γv pd pav pu Hal
-                  with "Hpub Hrdat Hdescpg Havpg Hdfree Hdusedidx Hdslots Hdone Hclaim")
+                  with "Hpub Hrdat Hstg Hdescpg Hdfree Hdusedidx Hdslots Hdone Hclaim")
       as "HRdisk".
     (* [newlock_at], NOT [newlock] (fs-cfg-boot.md stage (e), row (P3)): the
        lock's gname is the AMBIENT [fsc_dlock], minted by

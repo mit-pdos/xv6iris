@@ -141,29 +141,34 @@ Proof.
   lia.
 Qed.
 
-Lemma vdrwd_mod8_fresh (nr np : nat) :
-  (np - nr <= 2)%nat -> (np `mod` 8)%nat ∉ mod8 (set_seq nr (np - nr)).
-Proof.
-  intros Hw Hin. rewrite /mod8 in Hin.
-  apply elem_of_map in Hin as (p & Hp & Hpin).
-  apply elem_of_set_seq in Hpin.
-  exact (vdrwd_mod8_ne p np ltac:(lia) ltac:(lia) (eq_sym Hp)).
-Qed.
+(* [vdrwd_mod8_fresh] is gone (finding 5): it said the cell the publisher is
+   about to write is not one of the flight positions' cells.  The cells are
+   the device invariant's now, and that argument lives in
+   [VirtioQueue.vproto_ok_ring]. *)
 
+
+(* the live window is at most two positions wide (three descriptors each,
+   eight in all).  Stated over the SPLIT bookkeeping now that the flight
+   positions need not be an interval (finding 5): what it uses is the count,
+   which reordering leaves alone. *)
 Lemma vdrwd_window_le2 {A : Type} (np nr : nat) (fl pk : gmap nat A)
     (tr : gmap nat (nat * nat * nat)) :
-  dom fl = set_seq nr (np - nr) ->
+  (forall p, p ∈ dom fl -> (p < np)%nat) ->
+  size fl = (np - nr)%nat ->
+  (forall p, p ∈ dom pk -> (p < np)%nat) ->
   dom tr = dom fl ∪ dom pk ->
   (forall p T, tr !! p = Some T -> tri_ok T) ->
   (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
      tri_set Tp ## tri_set Tq) ->
   (np - nr <= 2)%nat.
 Proof.
-  intros Hfl Htr Hok Hdisj.
+  intros Hfln Hcount Hpkb Htr Hok Hdisj.
   pose proof (tri_card_8 tr Hok Hdisj) as Hsz.
-  assert (Hdom : (size (dom fl) <= size (dom tr))%nat)
-    by (apply subseteq_size; rewrite Htr; apply union_subseteq_l).
-  rewrite Hfl size_set_seq size_dom in Hdom. lia.
+  assert (Hsub2 : dom fl ⊆ dom tr) by (rewrite Htr; apply union_subseteq_l).
+  pose proof (subseteq_size (dom fl) (dom tr) Hsub2) as Hdom.
+  pose proof (size_dom fl) as Hdf.
+  pose proof (size_dom tr) as Hdt.
+  lia.
 Qed.
 
 (* the [set_seq] surgery at publish: [np] joins the window *)
@@ -180,13 +185,22 @@ Qed.
    [set_solver] there rescans every hypothesis and cost 417 s of this file's
    455 s, while the identical goal in this three-variable context is instant.
    See optimization.md, "never call [set_solver] from inside a phase proof". *)
-Lemma vdrwd_dom_fl_ins {A : Type} (nr np : nat) (fl : gmap nat A) (b : A) :
-  (nr <= np)%nat -> dom fl = set_seq nr (np - nr) ->
-  dom (<[ np := b ]> fl) = (set_seq nr (S np - nr) : gset nat).
+(* the window bookkeeping at publish, over the SPLIT clauses (finding 5):
+   the new position is below [S np], and the count goes up by one. *)
+Lemma vdrwd_fl_ins_lt {A : Type} (np : nat) (fl : gmap nat A) (b : A) :
+  (forall p, p ∈ dom fl -> (p < np)%nat) ->
+  forall p, p ∈ dom (<[ np := b ]> fl) -> (p < S np)%nat.
 Proof.
-  intros Hle Hdfl.
-  rewrite dom_insert_L Hdfl (vdrwd_set_seq_snoc nr np Hle).
-  apply union_comm_L.
+  intros Hfln p Hp. rewrite dom_insert_L elem_of_union elem_of_singleton in Hp.
+  destruct Hp as [->|Hp]; [lia|]. pose proof (Hfln p Hp). lia.
+Qed.
+
+Lemma vdrwd_fl_ins_size {A : Type} (nr np : nat) (fl : gmap nat A) (b : A) :
+  (nr <= np)%nat -> fl !! np = None -> size fl = (np - nr)%nat ->
+  size (<[ np := b ]> fl) = (S np - nr)%nat.
+Proof.
+  intros Hle Hfresh Hcount. rewrite map_size_insert_None; [| exact Hfresh ].
+  lia.
 Qed.
 
 (* ---- bitvector-level structural helpers ------------------------------ *)
@@ -727,6 +741,127 @@ Section VdrwdLeaves.
     iApply ("Hcont" with "[%] Hpub Hcg Hpc"). exact Hle.
   Qed.
 
+  (* ---- THE RING STORE: [sh rs2,4(rs1)] with rs1 = disk.avail + 2*(np%8)
+     and rs2 the descriptor head.  This is the instruction BEFORE the fence
+     and the index bump, and the cell it writes belongs to the device
+     invariant's lease (finding 5) -- so it drives
+     [virtio_proto_ring_acc] rather than writing a cell the driver has been
+     holding.  What comes back is the STAGED HEAD, which the publish two
+     instructions later spends. ---- *)
+  Lemma wp_vdrwd_sh_ring (γu : uart_names) (γd : disk_names) (pme : Arch.pa)
+      (pd pav pu : mword 64)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+      (imm : mword 12) (m : regfile) (n : nat) (np nr : nat) (h : bv 16) :
+    add_vec (rget m rs1) (sign_extend' 64 imm)
+      = (d_ring pav (np `mod` 8) : mword 64) ->
+    trunc16 (rget m rs2) = h ->
+    (* the cell is nobody else's: at most seven positions can be waiting *)
+    (np - nr < 8)%nat ->
+    sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
+    dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
+    disk_pub γd np -∗ disk_read_at γd nr -∗ disk_stage γd None -∗
+    ( sie_cap_gpr KT1 m n false pme -∗
+      pc_is (add_vec_int pc 4) -∗
+      disk_pub γd np -∗ disk_read_at γd nr -∗ disk_stage γd (Some h) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hea Hsv Hroom.
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
+    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrd Hstg Hcont".
+    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
+    iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
+    iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
+    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _)".
+    destruct Hal0 as (_ & Hala & _).
+    assert (Hq8 : ((np `mod` 8) < 8)%nat) by (apply Nat.mod_upper_bound; lia).
+    assert (Halign : is_aligned_paddr (Physaddr (d_ring pav (np `mod` 8))) 2 = true).
+    { unfold d_ring.
+      apply (vdrwd_aligned_off pav (4 + 2 * (np `mod` 8))%nat 2 Hala);
+        [ apply vdrwd_ring_off_lt_z; exact Hq8 | reflexivity | reflexivity
+        | apply vdrwd_ring_off_mod2 ]. }
+    assert (Hst2 : forall j, (j < 2)%nat ->
+              kmap_static (svpn_of (pa_add (d_ring pav (np `mod` 8)) j)) KP_rw).
+    { intros j Hj. unfold d_ring. rewrite pa_add_add.
+      apply Hsta. apply vdrwd_ring_off_lt; [exact Hq8 | exact Hj]. }
+    assert (Hcan2 : forall j, (j < 2)%nat ->
+              (uint (pa_add (d_ring pav (np `mod` 8)) j : SailStdpp.Values.mword 64)
+               < 274877906944)%Z).
+    { intros j Hj. unfold d_ring. rewrite pa_add_add.
+      apply Hcana. apply vdrwd_ring_off_lt; [exact Hq8 | exact Hj]. }
+    (* THE ADDRESS CLAIM, off the cell itself -- one peek-open that moves
+       nothing ([virtio_proto_ring_peek]); the claim is persistent, so it
+       survives the close. *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv0".
+    iInv "Hvinv0" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_ring_peek γd vstp np (np `mod` 8)%nat Hq8
+                 with "Hprotop Hpub") as "(_ & #Hcfgvp & _ & Hexp)".
+    iDestruct "Hexp" as (w0) "[Hw2p Hbackp]".
+    iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
+    assert (Haddrp : ring_slot_pa (v_cfg vstp) (np `mod` 8)%nat
+                     = d_ring pav (np `mod` 8)).
+    { rewrite Hceqp. unfold ring_slot_pa, d_ring, pa_off, vq_avail_ring_off.
+      cbn [vc_avail]. f_equal. lia. }
+    iEval (rewrite Haddrp) in "Hw2p".
+    iDestruct (phys_to_word2 (d_ring pav (np `mod` 8)) w0 Halign Hst2 Hcan2
+                 with "Hkm Hw2p") as "Hcellp".
+    iDestruct (wordw_claim_of (KTR := KT0) 2 (d_ring pav (np `mod` 8)) (DfracOwn 1)
+                 (w0 : SailStdpp.Values.mword 16) ltac:(lia)
+                 with "Hcellp") as "#Hcl".
+    iDestruct (word2_to_phys (d_ring pav (np `mod` 8)) w0 Hst2
+                 with "Hkm Hcellp") as "Hw2p".
+    iEval (rewrite -Haddrp) in "Hw2p".
+    iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
+    iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
+              (h : SailStdpp.Values.mword 16)
+              (disk_pub γd np ∗ disk_read_at γd nr ∗ disk_stage γd (Some h))%I
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) false
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_2
+              ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hrd Hstg] [Hcont]").
+    { rewrite Hea. iExact "Hcl". }
+    { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+      iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
+      iDestruct (virtio_proto_ring_acc γd vst np nr h Hroom
+                   with "Hproto Hpub Hrd Hstg") as "(_ & #Hcfgv & _ & Hexc & Hclose)".
+      iDestruct (disk_cfg_agree with "Hcfgv Hcfg0") as %Hceq.
+      assert (Haddr : ring_slot_pa (v_cfg vst) (np `mod` 8)%nat
+                      = d_ring pav (np `mod` 8)).
+      { rewrite Hceq. unfold ring_slot_pa, d_ring, pa_off, vq_avail_ring_off.
+        cbn [vc_avail]. f_equal. lia. }
+      iDestruct "Hexc" as (w1) "Hw2".
+      iEval (rewrite Haddr) in "Hw2".
+      iDestruct (phys_to_word2 (d_ring pav (np `mod` 8)) w1 Halign Hst2 Hcan2
+                   with "Hkm Hw2") as "Hcell".
+      iModIntro. iExists (w1 : SailStdpp.Values.mword 16).
+      iSplitL "Hcell".
+      { rewrite Hea. iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      iDestruct (word2_to_phys (d_ring pav (np `mod` 8)) h Hst2
+                   with "Hkm Hcell") as "Hw2".
+      iEval (rewrite -Haddr) in "Hw2".
+      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hrd & Hstg)".
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      iModIntro. iFrame "Hpub Hrd Hstg". }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc [Hpub [Hrd Hstg]]". rgall.
+    iApply ("Hcont" with "Hcg Hpc Hpub Hrd Hstg").
+  Qed.
+
   (* ---- THE PUBLISH: [sh rs2,2(rs1)] with rs1 = disk.avail and rs2 the
      incremented index.  Drives [virtio_proto_publish_acc]: the pin and the
      writable footprint go into the DMA lease, the disk fragments become the
@@ -734,24 +869,32 @@ Section VdrwdLeaves.
      credential plus the RECEIPT. ---- *)
   Lemma wp_vdrwd_sh_publish (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-      (m : regfile) (n : nat) (np : nat) (sl : vslot) (pin wrb : _) :
+      (m : regfile) (n : nat) (np nr : nat) (sl : vslot) (pin wrb : _) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
     trunc16 (rget m rs2) = (wrap16 (S np) : SailStdpp.Values.mword 16) ->
     slot_pin_ok (virtio_init_cfg pd pav pu) np sl pin ->
     dom wrb = slot_wr sl ->
     slot_wr sl ## dom pin ->
+    (* [vpo_win] has to survive the new position; the caller has this from
+       its descriptor accounting (finding 5) *)
+    (np - nr < 8)%nat ->
     sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ phys_map pin -∗ phys_map wrb -∗
+    disk_pub γd np -∗ disk_read_at γd nr -∗
+    (* the RING STORE two instructions back already put this chain's head in
+       the cell; the bump spends that fact *)
+    disk_stage γd (Some (vs_hd sl)) -∗
+    phys_map pin -∗ phys_map wrb -∗
     slot_pend_res γd (vs_all sl) sl -∗
     ( sie_cap_gpr KT1 m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
-      disk_pub γd (S np) -∗ disk_receipt γd np sl pin -∗
+      disk_pub γd (S np) -∗ disk_read_at γd nr -∗ disk_stage γd None -∗
+      disk_receipt γd np sl pin -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hea Hsv Hpinok Hwrbdom Hwrpin.
+    intros Hea Hsv Hpinok Hwrbdom Hwrpin Hroom.
     (* the class, consumed at [rs1 / rs2] -- see [IntrDefs.SrcOk].  This wrapper
        applies a converted leaf at a VARIABLE register and carries no tp fact
        of its own, so the class has to be stated here; it is implicit, so this
@@ -763,7 +906,7 @@ Section VdrwdLeaves.
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hpin Hwrb Hpend Hcont".
+    iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrd Hstg Hpin Hwrb Hpend Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
@@ -808,13 +951,15 @@ Section VdrwdLeaves.
     iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
-              (disk_pub γd (S np) ∗ disk_receipt γd np sl pin)%I
+              (disk_pub γd (S np) ∗ disk_read_at γd nr ∗ disk_stage γd None ∗
+               disk_receipt γd np sl pin)%I
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hpin Hwrb Hpend] [Hcont]").
+              ltac:(solve_ndisj)
+              with "Hcg Hpc Hinstr [] [Hpub Hrd Hstg Hpin Hwrb Hpend] [Hcont]").
     { rewrite Hea. iExact "Hcl". }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
@@ -828,9 +973,10 @@ Section VdrwdLeaves.
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
       assert (Haddr : avail_idx_pa (v_cfg vst) = pa_add pav 2%nat)
         by (rewrite Hceq; reflexivity).
-      iDestruct (virtio_proto_publish_acc γd vst np sl pin wrb
-                   ltac:(rgall; rewrite Hceq; exact Hpinok) Hwrbdom Hwrpin
-                   with "Hproto Hpub Hpin Hwrb Hpend") as "(_ & _ & Hw2 & Hclose)".
+      iDestruct (virtio_proto_publish_acc γd vst np nr sl pin wrb
+                   ltac:(rgall; rewrite Hceq; exact Hpinok) Hwrbdom Hwrpin Hroom
+                   with "Hproto Hpub Hrd Hstg Hpin Hwrb Hpend")
+        as "(_ & _ & Hw2 & Hclose)".
       iEval (rewrite Haddr) in "Hw2".
       iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
                    with "Hkm Hw2") as "Hcell".
@@ -841,12 +987,13 @@ Section VdrwdLeaves.
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 (S np)) Hst2
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
-      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hrcpt)".
+      iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hrd & Hstg & Hrcpt)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-      iModIntro. iFrame "Hpub Hrcpt". }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc [Hpub Hrcpt]". rgall.
-    iApply ("Hcont" with "Hcg Hpc Hpub Hrcpt").
+      iModIntro. iFrame "Hpub Hrd Hstg Hrcpt". }
+    iApply wp_next_off_intro.
+    iIntros "Hcg Hpc [Hpub [Hrd [Hstg Hrcpt]]]". rgall.
+    iApply ("Hcont" with "Hcg Hpc Hpub Hrd Hstg Hrcpt").
   Qed.
 
 End VdrwdLeaves.
@@ -910,13 +1057,15 @@ Definition vdrwd_pinr_regions (pd : SailStdpp.Values.mword 64) (b : Arch.pa)
   ; range_map (pa_add disk_base (168 + 16 * h + 8)) 8 (nth_byte sector)
   ; mbuf ].
 
-(* ...and the pin itself: the avail-ring entry, then those fifteen (+ the
-   payload window).  Written as a CONS so that [pin ∖ ring] is one
-   [map_union_diff_l]. *)
+(* ...and the pin itself.  THE AVAIL-RING ENTRY IS NOT IN IT ANY MORE
+   (finding 5): that cell belongs to the device invariant's lease, and a pin
+   that also claimed it would make [slot_fp sl pin ## dom dma] -- the
+   publish accessor's premise, and what [vproto_hd_fresh] rests on -- false.
+   So the pin is exactly the fifteen chain regions plus the payload window,
+   and [pin ∖ ring] has nothing left to do. *)
 Definition vdrwd_regions (pd pav : SailStdpp.Values.mword 64) (b : Arch.pa)
     (np h m2 t : nat) (wr sector : SailStdpp.Values.mword 64) (mbuf : _) :=
-  range_map (d_ring pav (np `mod` 8)) 2 (nth_byte (Z_to_bv 16 (Z.of_nat h)))
-  :: vdrwd_pinr_regions pd b h m2 t wr sector mbuf.
+  vdrwd_pinr_regions pd b h m2 t wr sector mbuf.
 
 Lemma vdrwd_ring_off_nat (k : nat) :
   Z.to_nat (4 + 2 * Z.of_nat (k `mod` 8))%Z = (4 + 2 * (k `mod` 8))%nat.
@@ -960,43 +1109,40 @@ Proof.
   - exact Hh.
   - exact Hm.
   - exact Ht.
-  - rewrite vdrwd_ring_pa.
-    apply (vdrwd_read_reg _ 2 (Z_to_bv 16 (Z.of_nat h)) pin ltac:(lia)).
-    apply Hsub. apply (elem_of_list_lookup_2 _ 0). reflexivity.
   - split_and!.
     + apply (vdrwd_read_reg _ 8 (d_ops h : SailStdpp.Values.mword 64) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 1). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 0). reflexivity.
     + apply (vdrwd_read_reg _ 4 (Z_to_bv 32 16) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 2). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 1). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 1) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 3). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 2). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 (Z.of_nat m2)) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 4). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 3). reflexivity.
   - split_and!.
     + apply (vdrwd_read_reg _ 8 (b_data b : SailStdpp.Values.mword 64) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 5). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 4). reflexivity.
     + apply (vdrwd_read_reg _ 4 (Z_to_bv 32 1024) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 6). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 5). reflexivity.
     + assert (Hr : read_bytes pin (pa_add pd (16 * m2 + 12)) 2 = Some (vdrw_flags wr)).
       { apply (vdrwd_read_reg _ 2 (vdrw_flags wr) pin ltac:(lia)).
-        apply Hsub. apply (elem_of_list_lookup_2 _ 7). reflexivity. }
+        apply Hsub. apply (elem_of_list_lookup_2 _ 6). reflexivity. }
       rewrite Hr Hflags. reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 (Z.of_nat t)) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 8). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 7). reflexivity.
   - split_and!.
     + apply (vdrwd_read_reg _ 8 (d_info_status h : SailStdpp.Values.mword 64) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 9). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 8). reflexivity.
     + apply (vdrwd_read_reg _ 4 (Z_to_bv 32 1) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 10). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 9). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 2) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 11). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 10). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 0) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 12). reflexivity.
+      apply Hsub. apply (elem_of_list_lookup_2 _ 11). reflexivity.
   - apply (vdrwd_read_reg _ 4 (vdrw_ty wr) pin ltac:(lia)).
-    apply Hsub. apply (elem_of_list_lookup_2 _ 13). reflexivity.
+    apply Hsub. apply (elem_of_list_lookup_2 _ 12). reflexivity.
   - rewrite vdrwd_ops_sec_pa.
     apply (vdrwd_read_reg _ 8 sector pin ltac:(lia)).
-    apply Hsub. apply (elem_of_list_lookup_2 _ 15). reflexivity.
+    apply Hsub. apply (elem_of_list_lookup_2 _ 14). reflexivity.
   - exact Htyv.
   - intro Hout.
     replace 1024%nat with (length bs) by exact Hlen.
@@ -1096,19 +1242,18 @@ Section VdrwdPinBuild.
     (forall j, (j < 4096)%nat -> kmap_static (svpn_of (pa_add pav j)) KP_rw) ->
     (forall j, (j < 1024)%nat -> kmap_static (svpn_of (pa_add (b_data b) j)) KP_rw) ->
     kmap_static_claims -∗
-    d_ring pav (np `mod` 8) ↦₂ (Z_to_bv 16 (Z.of_nat h)) -∗
+    (* NO RING CELL: it is the lease's, and the store that put the head there
+       went through the device invariant (finding 5) *)
     vdrw_chain pd b h m2 t wr sector -∗
     ([∗ list] j ↦ x ∈ bs, pa_add (b_data b) j ↦ₘ x) -∗
     ∃ pin wrb,
       ⌜slot_pin_ok (virtio_init_cfg pd pav pu) np (vdrwd_slot kq b h wr sector bsl) pin⌝ ∗
       ⌜dom wrb = slot_wr (vdrwd_slot kq b h wr sector bsl)⌝ ∗
       ⌜slot_wr (vdrwd_slot kq b h wr sector bsl) ## dom pin⌝ ∗
-      (* THE STRUCTURE OF THE PIN, for P6: the residue after the interrupt
-         handler splits the avail-ring entry back off is exactly the fifteen
-         formatted windows (plus a write's payload), pairwise disjoint. *)
-      ⌜pin ∖ range_map (d_ring pav (np `mod` 8)) 2
-                (nth_byte (Z_to_bv 16 (Z.of_nat h)))
-        = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
+      (* THE STRUCTURE OF THE PIN, for P6: exactly the fifteen formatted
+         windows (plus a write's payload), pairwise disjoint.  No ring
+         residue to take off any more -- the pin never held that cell. *)
+      ⌜pin = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
                            (vdrwd_bufwin b wr bs))
        /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                    (vdrwd_bufwin b wr bs))⌝ ∗
@@ -1118,16 +1263,12 @@ Section VdrwdPinBuild.
       vdrw_slot_rest m2 ∗ vdrw_slot_rest t.
   Proof.
     intros Hh Hm Ht Hlen Hlensl Hbsl Hspd Hspav Hsbuf.
-    iIntros "#Hkm Hring Hchain Hbuf".
+    iIntros "#Hkm Hchain Hbuf".
     rewrite /vdrw_chain.
     iDestruct "Hchain" as "(Hops0 & Hops1 & Hops2 & Hda0 & Hdl0 & Hdf0 & Hdn0 &
                             Hda1 & Hdl1 & Hdf1 & Hdn1 & Hda2 & Hdl2 & Hdf2 & Hdn2 &
                             Hst & Hib & Hbd & Hrm & Hrt)".
     (* ---- every window into the [phys_map (range_map ...)] shape ---- *)
-    iDestruct (vdrwd_w2 (d_ring pav (np `mod` 8)) (Z_to_bv 16 (Z.of_nat h))
-                 ltac:(apply (vdrwd_off_static pav _ (4 + 2 * (np `mod` 8))%nat 2 eq_refl
-                                ltac:(pose proof (Nat.mod_upper_bound np 8 ltac:(lia)); lia) Hspav))
-                 with "Hkm Hring") as "Hring".
     iDestruct (vdrwd_w8 (d_desc pd h) (d_ops h : SailStdpp.Values.mword 64)
                  ltac:(apply (vdrwd_off_static pd _ (16 * h)%nat 8 eq_refl ltac:(lia) Hspd))
                  with "Hkm Hda0") as "Hda0".
@@ -1191,11 +1332,10 @@ Section VdrwdPinBuild.
     (* ---- the sixteen fixed windows, as a function of the last one ---- *)
     iAssert (∀ mm, phys_map mm -∗
                pm_list (vdrwd_regions pd pav b np h m2 t wr sector mm))%I
-      with "[Hring Hda0 Hdl0 Hdf0 Hdn0 Hda1 Hdl1 Hdf1 Hdn1 Hda2 Hdl2 Hdf2 Hdn2
+      with "[Hda0 Hdl0 Hdf0 Hdn0 Hda1 Hdl1 Hdf1 Hdn1 Hda2 Hdl2 Hdf2 Hdn2
              Hops0 Hops1 Hops2]" as "Hpl".
     { iIntros (mm) "Hmm".
       rewrite /pm_list /vdrwd_regions /vdrwd_pinr_regions.
-      iSplitL "Hring"; [iExact "Hring"|].
       iSplitL "Hda0"; [iExact "Hda0"|].
       iSplitL "Hdl0"; [iExact "Hdl0"|].
       iSplitL "Hdf0"; [iExact "Hdf0"|].
@@ -1224,14 +1364,14 @@ Section VdrwdPinBuild.
               {[ d_info_status h := Z_to_bv 8 255 ]}.
       iDestruct (phys_map_disj with "Hpin Hst") as %Hpw.
       iFrame "Hpin Hst Hib Hbd Hrm Hrt".
-      destruct Hpmok as [Hdring Hpmok'].
+      (* [pm_ok] of the pin IS [pm_ok] of the residue: same list now *)
       iPureIntro. split_and!.
       + apply (vdrwd_mk_pin kq pd pav pu b np h m2 t wr sector bsl _
                  (range_map (b_data b) 1024 (fun j => bs !!! j))
                  Hh Hm Ht Hlensl).
         * exact Hsub.
         * intros _. rewrite Hbe.
-          apply Hsub. apply (elem_of_list_lookup_2 _ 16). reflexivity.
+          apply Hsub. apply (elem_of_list_lookup_2 _ 15). reflexivity.
         * exact Hstat.
       + rewrite dom_singleton_L.
         unfold slot_wr, vdrwd_slot, vs_is_out.
@@ -1246,9 +1386,10 @@ Section VdrwdPinBuild.
           by (apply map_disjoint_dom; symmetry; exact Hpw).
         rewrite dom_singleton_L in Hd. rewrite union_empty_r_L. exact Hd.
       + rewrite /vdrwd_bufwin Hout.
-        cbn [vdrwd_regions foldr] in Hdring |- *.
-        apply map_union_diff_l. exact Hdring.
-      + rewrite /vdrwd_bufwin Hout. exact Hpmok'.
+        (* [vdrwd_regions] IS [vdrwd_pinr_regions] now: no ring cell to take
+           off the front (finding 5) *)
+        reflexivity.
+      + rewrite /vdrwd_bufwin Hout. exact Hpmok.
     - (* IN *)
       iDestruct (phys_map_disj with "Hst Hbuf") as %Hsb.
       iAssert (phys_map ∅)%I as "Hemp".
@@ -1264,7 +1405,7 @@ Section VdrwdPinBuild.
       { rewrite (phys_map_union _ _ Hsb). iFrame. }
       iDestruct (phys_map_disj with "Hpin Hwrb") as %Hpw.
       iFrame "Hpin Hwrb Hib Hbd Hrm Hrt".
-      destruct Hpmok as [Hdring Hpmok'].
+      (* [pm_ok] of the pin IS [pm_ok] of the residue: same list now *)
       iPureIntro. split_and!.
       + apply (vdrwd_mk_pin kq pd pav pu b np h m2 t wr sector bsl _ ∅
                  Hh Hm Ht Hlensl).
@@ -1285,9 +1426,10 @@ Section VdrwdPinBuild.
         cbn [rw_slot vs_req vr_type vr_status vr_buf vr_len].
         rewrite Hout vdrwd_len1024. exact Hd.
       + rewrite /vdrwd_bufwin Hout.
-        cbn [vdrwd_regions foldr] in Hdring |- *.
-        apply map_union_diff_l. exact Hdring.
-      + rewrite /vdrwd_bufwin Hout. exact Hpmok'.
+        (* [vdrwd_regions] IS [vdrwd_pinr_regions] now: no ring cell to take
+           off the front (finding 5) *)
+        reflexivity.
+      + rewrite /vdrwd_bufwin Hout. exact Hpmok.
   Qed.
 
 End VdrwdPinBuild.
@@ -1296,53 +1438,40 @@ End VdrwdPinBuild.
 (* §5  The [disk_res] surgery at publish, as pure set/map facts.          *)
 (* ===================================================================== *)
 
-Lemma vdrwd_mod8_insert (X : gset nat) (p : nat) :
-  mod8 ({[ p ]} ∪ X) = mod8 X ∪ {[ (p `mod` 8)%nat ]}.
-Proof.
-  unfold mod8. apply set_eq. intro x.
-  rewrite elem_of_union elem_of_singleton. split.
-  - intro Hx. apply elem_of_map in Hx as (y & -> & Hy).
-    apply elem_of_union in Hy as [Hy|Hy].
-    + apply elem_of_singleton in Hy as ->. right. reflexivity.
-    + left. apply elem_of_map. exists y. split; [reflexivity | exact Hy].
-  - intros [Hx|Hx].
-    + apply elem_of_map in Hx as (y & -> & Hy). apply elem_of_map.
-      exists y. split; [reflexivity | apply elem_of_union_r; exact Hy].
-    + subst x. apply elem_of_map. exists p. split; [reflexivity |].
-      apply elem_of_union_l, elem_of_singleton. reflexivity.
-Qed.
+(* [vdrwd_mod8_insert] likewise: no cell joins a driver-side pool at publish. *)
+
 
 Lemma vdrwd_fresh_pos {A : Type} (np nr : nat) (fl pk : gmap nat A) :
   (nr <= np)%nat ->
-  dom fl = set_seq nr (np - nr) ->
-  (forall p, p ∈ dom pk -> (p < nr)%nat) ->
+  (forall p, p ∈ dom fl -> (p < np)%nat) ->
+  (forall p, p ∈ dom pk -> (p < np)%nat) ->
   (fl ∪ pk) !! np = None.
 Proof.
-  intros Hle Hdfl Hpk.
+  intros Hle Hfln Hpk.
   apply not_elem_of_dom. rewrite dom_union_L. rewrite elem_of_union.
   intros [Hin|Hin].
-  - rewrite Hdfl in Hin. apply elem_of_set_seq in Hin. lia.
+  - pose proof (Hfln np Hin). lia.
   - pose proof (Hpk np Hin). lia.
 Qed.
 
 Lemma vdrwd_fl_fresh {A : Type} (np nr : nat) (fl : gmap nat A) :
-  (nr <= np)%nat -> dom fl = set_seq nr (np - nr) -> fl !! np = None.
+  (nr <= np)%nat -> (forall p, p ∈ dom fl -> (p < np)%nat) -> fl !! np = None.
 Proof.
-  intros Hle Hdfl. apply not_elem_of_dom. rewrite Hdfl.
-  intro Hin. apply elem_of_set_seq in Hin. lia.
+  intros Hle Hfln. apply not_elem_of_dom.
+  intro Hin. pose proof (Hfln np Hin). lia.
 Qed.
 
 Lemma vdrwd_tr_fresh {A : Type} (np nr : nat) (fl pk : gmap nat A)
     (tr : gmap nat (nat * nat * nat)) :
   (nr <= np)%nat ->
-  dom fl = set_seq nr (np - nr) ->
-  (forall p, p ∈ dom pk -> (p < nr)%nat) ->
+  (forall p, p ∈ dom fl -> (p < np)%nat) ->
+  (forall p, p ∈ dom pk -> (p < np)%nat) ->
   dom tr = dom fl ∪ dom pk ->
   tr !! np = None.
 Proof.
-  intros Hle Hdfl Hpk Hdtr. apply not_elem_of_dom. rewrite Hdtr elem_of_union.
+  intros Hle Hfln Hpk Hdtr. apply not_elem_of_dom. rewrite Hdtr elem_of_union.
   intros [Hin|Hin].
-  - rewrite Hdfl in Hin. apply elem_of_set_seq in Hin. lia.
+  - pose proof (Hfln np Hin). lia.
   - pose proof (Hpk np Hin). lia.
 Qed.
 
@@ -1546,9 +1675,7 @@ Section VdrwdP4.
     ( ∀ (M1 : regfile) pin,
         ⌜(forall r : mword 5, is_cs_idx r = true -> M1 !!! Regidx r = M !!! Regidx r)
          /\ M1 !!! Regidx Ra1 = M !!! Regidx Ra1⌝ -∗
-        ⌜pin ∖ range_map (d_ring pav (np `mod` 8)) 2
-                 (nth_byte (Z_to_bv 16 (Z.of_nat h)))
-          = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
+        ⌜pin = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
                              (vdrwd_bufwin b wr bs_buf))
          /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                      (vdrwd_bufwin b wr bs_buf))⌝ -∗
@@ -1579,8 +1706,9 @@ Section VdrwdP4.
       by (intros j Hj; apply kdata_svpn_class, Hbufkd, Hj).
     (* ---- open the lock resource ---- *)
     rewrite /vdrw_body.
-    iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hrd & Hclaim & Huidx & Hflm & Hpkm & Hfb & Hring)".
+    iDestruct "Hbody" as "(%Hfln & %Hcount & %Hpkb & %Hfpk & %Hdtr & %Hcoh &
+                           %Htrok & %Htrdj & %Htrfr &
+                           Hpub & #Hlb & Hrd & Hstg & Hclaim & Huidx & Hflm & Hpkm & Hfb)".
     (* ---- +0x176  c.ld a3,8(a5) ---- *)
     assert (Hava : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_avail_ptr : SailStdpp.Values.mword 64))
@@ -1633,15 +1761,13 @@ Section VdrwdP4.
     assert (Hp168 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x178) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x17c)) by pcstep.
     iEval (rewrite Hp168) in "Hpc".
-    (* ---- THE RING SLOT IS FREE: the window is at most two positions wide ---- *)
+    (* ---- THE WINDOW HAS ROOM: at most two positions are live (three
+       descriptors each, eight in all), so the cell [np mod 8] is nobody
+       else's.  NO CELL CHANGES HANDS HERE any more (finding 5) -- the store
+       below goes through the device invariant, which owns all eight. ---- *)
     assert (Hw2 : (np - nr <= 2)%nat)
-      by exact (vdrwd_window_le2 np nr fl pk tr Hdfl Hdtr Htrok Htrdj).
-    assert (Hfresh : (np `mod` 8)%nat ∉ mod8 (dom fl))
-      by (rewrite Hdfl; exact (vdrwd_mod8_fresh nr np Hw2)).
+      by exact (vdrwd_window_le2 np nr fl pk tr Hfln Hcount Hpkb Hdtr Htrok Htrdj).
     assert (Hmod8 : ((np `mod` 8) < 8)%nat) by (apply Nat.mod_upper_bound; lia).
-    iDestruct (ring_slots_take pav (mod8 (dom fl)) (np `mod` 8)%nat Hmod8 Hfresh
-                 with "Hring") as "[Hcell Hring]".
-    iDestruct "Hcell" as (w0) "Hcell".
     (* ---- +0x17c  c.andi a4,a4,7 ---- *)
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x17c) : mword 64) Ra4
               (mword_of_int 7 : mword 6) N2 av false
@@ -1724,12 +1850,17 @@ Section VdrwdP4.
                       (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = (d_ring pav (np `mod` 8) : SailStdpp.Values.mword 64))
       by (rewrite HN5a3; apply vdrwd_ring_addr).
-    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64) Ra0 Ra3
-              (mword_of_int 4 : mword 12) N5 av w0 false with "Hcg Hpc [] [Hcell]").
+    assert (HN5sv : trunc16 (N5 !!! Regidx Ra0)
+                    = (Z_to_bv 16 (Z.of_nat h) : SailStdpp.Values.mword 16))
+      by (rewrite HN5a0; exact (vdrwc_trunc16_idx' h Hh8)).
+    iApply (wp_vdrwd_sh_ring γu γd pme pd pav pu
+              (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64)
+              Ra0 Ra3 (mword_of_int 4 : mword 12) N5 av np nr
+              (Z_to_bv 16 (Z.of_nat h))
+              Hring HN5sv ltac:(lia)
+              with "Hcg Hpc [] Hdinv Hgeom Hpub Hrd Hstg").
     { iApply (rwi_182 with "Htext"). }
-    { rgall. iEval (rewrite Hring). iExact "Hcell". }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell". rgall.
-    iEval (rewrite Hring HN5a0 (vdrwc_trunc16_idx' h Hh8)) in "Hcell".
+    iIntros "Hcg Hpc Hpub Hrd Hstg". rgall.
     assert (Hp172 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x186)) by pcstep.
     iEval (rewrite Hp172) in "Hpc".
@@ -1818,7 +1949,7 @@ Section VdrwdP4.
     iDestruct (vdrwd_pin_res kq pd pav pu b np h m2 t wr sector bs_buf
                  (vdrwd_sldata wr bs_buf bs_disk)
                  Hh8 Hm8 Ht8 Hlenbuf Hlensl Hbsl Hspd Hspav Hsbuf
-                 with "Hkm Hcell Hchain Hbuf") as
+                 with "Hkm Hchain Hbuf") as
       (pin wrb) "(%Hpinok & %Hwrbdom & %Hwrpin & %Hpinr & Hpin & Hwrb & Hib & Hbd & Hrm & Hrt)".
     (* ---- +0x192  sh a5,2(a4)  -- THE PUBLISH ---- *)
     assert (Hidxa3 : add_vec (rget N8 Ra4)
@@ -1827,10 +1958,10 @@ Section VdrwdP4.
       by (rgall; rewrite HN8a4; apply vdrwd_idx_addr).
     iApply (wp_vdrwd_sh_publish γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) Ra5 Ra4
-              (mword_of_int 2 : mword 12) N8 av np
+              (mword_of_int 2 : mword 12) N8 av np nr
               (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) pin wrb
-              Hidxa3 HN8sv Hpinok Hwrbdom Hwrpin
-              with "Hcg Hpc [] Hdinv Hgeom Hpub Hpin Hwrb [Hdisk Hpend]").
+              Hidxa3 HN8sv Hpinok Hwrbdom Hwrpin ltac:(lia)
+              with "Hcg Hpc [] Hdinv Hgeom Hpub Hrd Hstg Hpin Hwrb [Hdisk Hpend]").
     { iApply (rwi_192 with "Htext"). }
     { iExists bs_disk. iSplitR.
       - iPureIntro. unfold vs_len, vdrwd_slot. cbn [rw_slot vs_req vr_len].
@@ -1854,7 +1985,7 @@ Section VdrwdP4.
             rewrite /vs_all.
             rewrite (vdrwd_slot_wr kq b h wr sector bs_buf bs_disk sec_off Hoff).
             iExact "Hpend". }
-    iIntros "Hcg Hpc Hpub Hrcpt".
+    iIntros "Hcg Hpc Hpub Hrd Hstg Hrcpt".
     assert (Hp182 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x196)) by pcstep.
     iEval (rewrite Hp182) in "Hpc".
@@ -1872,10 +2003,10 @@ Section VdrwdP4.
     set (V := DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
                      (h, m2, t) pin).
     iMod (ghost_map_insert np V
-            (vdrwd_fresh_pos np nr fl pk Hle Hdfl Hpkb)
+            (vdrwd_fresh_pos np nr fl pk Hle Hfln Hpkb)
             with "Hclaim") as "[Hclaim Hfrag]".
     iDestruct (big_sepM_insert (fun p v => flight_res γd p v) fl np V
-                 (vdrwd_fl_fresh np nr fl Hle Hdfl)
+                 (vdrwd_fl_fresh np nr fl Hle Hfln)
                  with "[Hflm Hrcpt Hib Hbd]") as "Hflm".
     { iSplitR "Hflm"; [| iExact "Hflm"]. rewrite /flight_res /V.
       cbn [dc_buf dc_slot dc_tri dc_pin].
@@ -1899,8 +2030,18 @@ Section VdrwdP4.
     2:{ rewrite /disk_claim. iExact "Hfrag". }
     rewrite /vdrw_body.
     iSplitR.
-    { iPureIntro. exact (vdrwd_dom_fl_ins nr np fl _ Hle Hdfl). }
-    iSplitR; [iPureIntro; exact Hpkb|].
+    { iPureIntro. exact (vdrwd_fl_ins_lt np fl _ Hfln). }
+    iSplitR.
+    { iPureIntro.
+      exact (vdrwd_fl_ins_size nr np fl _ Hle
+               (vdrwd_fl_fresh np nr fl Hle Hfln) Hcount). }
+    (* the parked positions are still below the (now larger) published count *)
+    iSplitR; [iPureIntro; intros p Hp; pose proof (Hpkb p Hp); lia|].
+    (* ...and the new position is not parked: it is fresh *)
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L. apply disjoint_union_l. split.
+      - apply disjoint_singleton_l. intro Hc. pose proof (Hpkb np Hc). lia.
+      - exact Hfpk. }
     iSplitR.
     { iPureIntro. exact (vdrwd_dom_tr_ins np fl pk tr (h, m2, t) V Hdtr). }
     iSplitR.
@@ -1913,10 +2054,10 @@ Section VdrwdP4.
     { iPureIntro. exact (vdrwd_tr_disj_ins tr np (h, m2, t) Htrdj Hdisj0). }
     iSplitR.
     { iPureIntro. exact (vdrwd_tr_free_ins tr np h m2 t fr Hfrh Hfrm Hfrt Htrfr). }
-    iFrame "Hpub Hlb Hrd".
+    iFrame "Hpub Hlb Hrd Hstg".
     rewrite (insert_union_l fl pk np V). iFrame "Hclaim".
     iFrame "Huidx Hflm Hpkm Hfb".
-    rewrite dom_insert_L vdrwd_mod8_insert. iExact "Hring".
+    (* no ring pool to re-close: the cells never left the invariant *)
   Qed.
 
 End VdrwdP4.

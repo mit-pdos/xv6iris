@@ -1900,36 +1900,11 @@ Proof.
     + right; right; exact H1.
 Qed.
 
-Lemma vt_mod8_split {A : Type} (nr : nat) (fl : gmap nat A) :
-  nr ∈ dom fl ->
-  mod8 (dom fl) = mod8 (dom (delete nr fl)) ∪ {[ (nr `mod` 8)%nat ]}.
-Proof.
-  intro Hin. rewrite dom_delete_L.
-  apply leibniz_equiv, set_equiv. intro x.
-  rewrite elem_of_union elem_of_singleton. unfold mod8. rewrite !elem_of_map.
-  split.
-  - intros (p & -> & Hp). destruct (decide (p = nr)) as [->|Hne]; [right; reflexivity|].
-    left. exists p. split; [reflexivity|].
-    apply elem_of_difference. split; [exact Hp|]. rewrite elem_of_singleton. exact Hne.
-  - intros [(p & -> & Hp)| ->].
-    + exists p. split; [reflexivity|]. apply elem_of_difference in Hp as [Hp _]. exact Hp.
-    + exists nr. split; [reflexivity | exact Hin].
-Qed.
+(* [vt_mod8_split] and [vt_mod8_head_fresh] are gone with the ring step
+   (finding 5): they said which pool cell the reclaimed position gives back
+   and that no other live position wants it.  No cell changes hands at
+   reclaim any more -- all eight are the device invariant's. *)
 
-Lemma vt_mod8_head_fresh (nr np : nat) :
-  (np - S nr <= 1)%nat -> (nr `mod` 8)%nat ∉ mod8 (set_seq (S nr) (np - S nr)).
-Proof.
-  intro Hw. unfold mod8. intro Hin.
-  apply elem_of_map in Hin as (p & Hp & Hpin).
-  apply elem_of_set_seq in Hpin.
-  assert (Hpe : p = S nr) by lia. subst p. symmetry in Hp.
-  assert (Hb : (nr `mod` 8 < 8)%nat) by (apply Nat.mod_upper_bound; lia).
-  replace (S nr) with (nr + 1)%nat in Hp by lia.
-  rewrite <- Nat.Div0.add_mod_idemp_l in Hp.
-  destruct (Nat.eq_dec (nr `mod` 8)%nat 7%nat) as [Hr|Hr].
-  - rewrite Hr in Hp. cbn in Hp. lia.
-  - rewrite (Nat.mod_small (nr `mod` 8 + 1)%nat 8) in Hp; lia.
-Qed.
 
 (* the live window is at most two positions wide (three descriptors each,
    eight in all), so after [nr] is reclaimed at most one remains *)
@@ -2950,50 +2925,19 @@ Section VtLoopProof.
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcanav & _).
     iDestruct "Hgeomd" as "(_ & _ & _ & %Hal0 & _ & _ & _ & _)".
     destruct Hal0 as (_ & Halav & _).
-    assert (Hq8 : (nr `mod` 8 < 8)%nat) by (apply Nat.mod_upper_bound; lia).
-    (* the avail-ring cell out of the pin *)
-    pose proof (spo_ring _ _ _ _ Hspo) as Hspring.
-    rewrite (vt_ring_addr pd pav pu nr) in Hspring.
-    iDestruct (vt_pin_ring_split (d_ring pav (nr `mod` 8)) (vr_head (vs_req sl)) pin
-                 Hspring with "Hpin") as "[Hw2 Hpinr]".
-    assert (Hringal : is_aligned_paddr (Physaddr (d_ring pav (nr `mod` 8))) 2 = true).
-    { unfold d_ring. apply (vt_aligned_off pav (4 + 2 * (nr `mod` 8))%nat 2 Halav);
-        [ apply vt_ring_off_lt; exact Hq8 | reflexivity | reflexivity
-        | apply vt_ring_off_mod2 ]. }
-    assert (Hst2 : forall j, (j < 2)%nat ->
-              kmap_static (svpn_of (pa_add (d_ring pav (nr `mod` 8)) j)) KP_rw).
-    { intros j Hj. unfold d_ring. rewrite pa_add_add.
-      apply Hstav. apply vt_ring_off_add_lt; [exact Hq8 | exact Hj]. }
-    assert (Hcan2 : forall j, (j < 2)%nat ->
-              (uint (pa_add (d_ring pav (nr `mod` 8)) j : SailStdpp.Values.mword 64)
-               < 274877906944)%Z).
-    { intros j Hj. unfold d_ring. rewrite pa_add_add.
-      apply Hcanav. apply vt_ring_off_add_lt; [exact Hq8 | exact Hj]. }
-    iDestruct (phys_to_word2 (d_ring pav (nr `mod` 8)) (vr_head (vs_req sl))
-                 Hringal Hst2 Hcan2 with "Hkm Hw2") as "Hcell".
-    (* the ring pool takes it back *)
-    assert (Hnrin : nr ∈ dom fl) by (apply elem_of_dom; exists vv; exact Hb).
-    assert (Hfl' : dom (delete nr fl) = set_seq (S nr) (np - S nr))
-      by (apply vt_dom_delete_seq; [exact Hdomfl | lia]).
-    assert (Hwin : (np - nr <= 2)%nat)
-      by (apply (vt_window_le np nr fl pk tr); assumption).
-    assert (Hlkbelow : (nr `mod` 8)%nat ∉ mod8 (dom (delete nr fl))).
-    { rewrite Hfl'. apply vt_mod8_head_fresh. lia. }
-    assert (Hmod8 : mod8 (dom fl) = mod8 (dom (delete nr fl)) ∪ {[ (nr `mod` 8)%nat ]})
-      by (apply vt_mod8_split; exact Hnrin).
-    iEval (rewrite Hmod8) in "Hring".
-    iDestruct (ring_slots_put pav (mod8 (dom (delete nr fl))) (nr `mod` 8)%nat
-                 Hq8 Hlkbelow with "[Hcell] Hring") as "Hring".
-    { iExists (vr_head (vs_req sl)). iExact "Hcell". }
+    (* NO RING-CELL STEP HERE ANY MORE (finding 5).  The reclaimed pin never
+       held an avail-ring entry -- all eight cells are the device
+       invariant's, permanently -- so there is nothing to split off and
+       nothing to hand back to a driver-side pool.  The pin comes back whole
+       and goes straight into the parked payoff. *)
     (* the parked payoff *)
     iDestruct "Hrest" as "[Hperm Hrest]".
     iDestruct "Hrest" as (bs) "(%Hbslen & %Hbsout & Hbytes & Hbuf)".
     iAssert (parked_res γd pav nr vv)
-      with "[Hbdisk Hinfob Hpinr Hstat Hbytes Hbuf Hperm]" as "Hparked".
+      with "[Hbdisk Hinfob Hpin Hstat Hbytes Hbuf Hperm]" as "Hparked".
     { iExists bs. iEval (rewrite -Hslh) in "Hinfob".
       iEval (rewrite -Hstatus) in "Hstat".
-      rewrite /dc_pinr /dc_ring_map.
-      iFrame "Hbdisk Hinfob Hpinr Hstat Hbytes Hperm Hbuf".
+      iFrame "Hbdisk Hinfob Hpin Hstat Hbytes Hperm Hbuf".
       iPureIntro. split_and!; [ exact Hlink | exact Hbslen | exact Hbsout ]. }
     (* the maps *)
     assert (Hpknr : pk !! nr = None).
