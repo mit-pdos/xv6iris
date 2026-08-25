@@ -393,6 +393,14 @@ Three smaller ones from the same effort:
   reported ~60 characters later with an unrelated `[ltac_use_default]`
   message. Quoting C in a comment needs the `*` broken up.
 
+## `NoDup_fmap_2_strong` WITH A SECTION-VARIABLE `f` LEAVES THE LIST AN EVAR
+
+stdpp's `NoDup_fmap_2_strong` applied when `f` is a section variable
+leaves the list argument as an evar; the follow-up `apply NoDup_elements`
+then fails with an `ElemOf Z <your record type>` instance error that
+names the wrong cause entirely. Take `f` explicitly (see
+`FsDurSnap.NoDup_fmap_inj`) or hand `NoDup_elements` its set.
+
 ## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
 
 **"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal
