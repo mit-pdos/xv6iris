@@ -231,15 +231,27 @@ Record virtio_cfg := VirtioCfg {
 Record virtio_state := VirtioState {
   v_cfg      : virtio_cfg;
   v_isr      : bv 32;        (* interrupt status; nonzero drives the irq line *)
-  (* THE SERVED SET, in two pieces (claude-notes/design/virtio-driver.md).
-     The device may serve any published position it has not served yet, in
-     ANY order -- which is what a device with more than one request in flight
-     does, and what the used ring reports back.  [v_seen] is the LOW
-     WATERMARK: every position before it has been served.  [v_ahead] holds
-     the ones served OUT OF TURN, which is exactly the set that keeps the
-     watermark from moving. *)
-  v_seen     : bv 16;        (* watermark: everything before it is served *)
-  v_ahead    : gset (bv 16); (* served out of turn, at or after the mark *)
+  (* THE REQUEST LIFECYCLE, IN TWO PHASES (claude-notes/design/virtio-driver.md).
+     QEMU keeps these separate and so must we, because xv6's safety depends
+     on the difference:
+
+       POP -- the device takes the next available-ring entry.  This is
+       STRICTLY IN ORDER ([virtqueue_pop] increments [last_avail_idx] by
+       one); [v_seen] is that index, and the positions the driver has
+       published but the device has not popped are exactly the interval
+       [[v_seen, avail_idx)].  In-order popping is what lets xv6 reuse the
+       ring slot [idx % NUM]: the entry it overwrites belonged to a position
+       the device is provably past.
+
+       COMPLETE -- the device pushes a used-ring element for a request it
+       popped earlier.  This may happen in ANY order among the requests in
+       flight (tools/vtest/README.md finding 5), which is what the two
+       captures in vtest-rocq/DiskOrder.v show and what xv6's interrupt
+       handler is written for.
+
+     [v_inflight] is the set BETWEEN the two: popped, not yet completed. *)
+  v_seen     : bv 16;        (* the POP index: entries before it are taken *)
+  v_inflight : gset (bv 16); (* popped, not yet completed -- any may finish *)
   v_used_idx : bv 16;        (* used-ring index produced so far *)
   v_disk     : Z -> bv 8;    (* the DURABLE disk image, byte-addressed *)
   (* THE VOLATILE WRITE CACHE (claude-notes/projects/async-disk.md).  A disk
@@ -274,7 +286,7 @@ Record virtio_state := VirtioState {
 
 (* replace the dynamic part, keeping the configuration *)
 Definition set_vcfg (v : virtio_state) (c : virtio_cfg) : virtio_state :=
-  VirtioState c (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v).
+  VirtioState c (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v).
 
 (* THE DISK IMAGE'S GHOST VIEW (claude-notes/design/crash.md).  The image is
    a TOTAL function, while its ghost mirror is a partial map -- a fragment
@@ -450,7 +462,7 @@ Proof. reflexivity. Qed.
 Lemma virtio_reset_cache (v : virtio_state) : v_cache (virtio_reset v) = ∅.
 Proof. reflexivity. Qed.
 
-Lemma virtio_reset_ahead (v : virtio_state) : v_ahead (virtio_reset v) = ∅.
+Lemma virtio_reset_inflight (v : virtio_state) : v_inflight (virtio_reset v) = ∅.
 Proof. reflexivity. Qed.
 
 Lemma virtio_reset_taken (v : virtio_state) : v_taken (virtio_reset v) = None.
@@ -527,7 +539,7 @@ Definition virtio_write (v : virtio_state) (off : Z) (w : bv 32)
     Some v
   else if off =? vio_off_interrupt_ack then
     Some (VirtioState c (Z_to_bv 32 (Z.land (bv_unsigned (v_isr v))
-                                            (Z.lnot (bv_unsigned w)))) (v_seen v) (v_ahead v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v))
+                                            (Z.lnot (bv_unsigned w)))) (v_seen v) (v_inflight v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v))
   else if off =? vio_off_queue_desc_low then
     if negb qsel0 then Some v else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
@@ -665,10 +677,10 @@ Proof.
   - intro He; injection He as <-; reflexivity.
 Qed.
 
-Lemma virtio_write_ahead (v : virtio_state) (off : Z) (w : bv 32)
+Lemma virtio_write_inflight (v : virtio_state) (off : Z) (w : bv 32)
     (v' : virtio_state) :
   vio_cfg_stable off = true ->
-  virtio_write v off w = Some v' -> v_ahead v' = v_ahead v.
+  virtio_write v off w = Some v' -> v_inflight v' = v_inflight v.
 Proof.
   unfold vio_cfg_stable. intro H.
   apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
@@ -735,7 +747,7 @@ Qed.
 (* Record eta, so a fact stated over the split state applies to a state that
    arrived whole (as the device thread's does). *)
 Lemma virtio_state_eta (v : virtio_state) :
-  v = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v).
+  v = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v).
 Proof. by destruct v. Qed.
 
 (* No MMIO write touches the disk image -- not even the reset command. *)
@@ -1481,7 +1493,7 @@ Qed.
 (*     is what the used ring reports back (QEMU produces both orders for   *)
 (*     two in-flight writes; tools/vtest/README.md finding 5).  So the     *)
 (*     device state cannot be a single consumed index: it is a WATERMARK   *)
-(*     [v_seen] plus the set [v_ahead] of positions served out of turn.    *)
+(*     [v_seen] plus the set [v_inflight] of positions served out of turn.    *)
 (*                                                                        *)
 (*     The window arithmetic is the hardware's own: positions are 16-bit   *)
 (*     counters that wrap, and "published" is a MODULAR DISTANCE test      *)
@@ -1569,165 +1581,6 @@ Proof.
   pose proof (vdist_bounds lo p). lia.
 Qed.
 
-(* THE POSITIONS A DEVICE MAY STILL SERVE: published, and not served yet. *)
-Definition vfree (lo ai : bv 16) (ah : gset (bv 16)) (p : bv 16) : bool :=
-  vpos_pub lo ai p && negb (bool_decide (p ∈ ah)).
-
-(* ADVANCING THE WATERMARK past positions that were served out of turn.
-   Purely bookkeeping: it does not change the free set (that is
-   [vseen_adv_free] below), it only keeps [v_ahead] from accumulating
-   positions the window has left behind.  It walks while the mark itself is
-   in the served set, which terminates at the set's size -- and it is exactly
-   the served set's own elements that it consumes, so the fuel is that. *)
-Fixpoint vseen_adv (fuel : nat) (lo : bv 16) (ah : gset (bv 16))
-  : bv 16 * gset (bv 16) :=
-  match fuel with
-  | O => (lo, ah)
-  | S f =>
-      if bool_decide (lo ∈ ah)
-      then vseen_adv f (bv_add lo one16) (ah ∖ {[ lo ]})
-      else (lo, ah)
-  end.
-
-(* the served set only shrinks -- which is what keeps the published index out
-   of it, the side condition every window lemma below runs on *)
-Lemma vseen_adv_sub (fuel : nat) (lo : bv 16) (ah : gset (bv 16)) :
-  (vseen_adv fuel lo ah).2 ⊆ ah.
-Proof.
-  revert lo ah. induction fuel as [|f IH]; intros lo ah; cbn [vseen_adv fst snd];
-    [reflexivity|].
-  destruct (bool_decide (lo ∈ ah)); [| reflexivity ].
-  etransitivity; [ apply IH | set_solver ].
-Qed.
-
-(* ONE advance leaves every position's freedom exactly as it was: the
-   position it steps over is served (so not free), and every other position's
-   distance to [lo] and to [ai] drops by one together.  [ai ∉ ah] is what
-   says the walk cannot step over the published index -- a position that has
-   been SERVED was published, and the driver's index only ever grows. *)
-Lemma vseen_adv_one (ai lo q : bv 16) (ah : gset (bv 16)) :
-  lo ∈ ah -> ai ∉ ah ->
-  vfree (bv_add lo one16) ai (ah ∖ {[ lo ]}) q = vfree lo ai ah q.
-Proof.
-  intros Hin Hai0.
-  assert (Hne : lo <> ai) by (intro Hc; apply Hai0; by rewrite <- Hc).
-  assert (Hai : vdist lo ai <> 0)
-    by (intro H0; exact (Hne (vdist_zero _ _ H0))).
-  pose proof (vdist_bounds lo ai) as Hab.
-  unfold vfree, vpos_pub.
-  destruct (decide (q = lo)) as [->|Hq].
-  - (* the position stepped over: served, hence not free, on both sides *)
-    rewrite vdist_succ_self, (vdist_succ_pos lo ai Hai).
-    rewrite (proj2 (Z.ltb_ge 65535 (vdist lo ai - 1))) by lia.
-    cbn [andb].
-    rewrite (bool_decide_eq_true_2 (lo ∈ ah) Hin), andb_false_r. reflexivity.
-  - (* any other position: both distances drop by one *)
-    assert (Hqd : vdist lo q <> 0)
-      by (intro H0; exact (Hq (eq_sym (vdist_zero _ _ H0)))).
-    rewrite (vdist_succ_pos lo q Hqd), (vdist_succ_pos lo ai Hai).
-    f_equal; [ apply eq_iff_eq_true; rewrite !Z.ltb_lt; lia | ].
-    f_equal. apply eq_iff_eq_true. rewrite !bool_decide_eq_true.
-    split; [ set_solver | intro H; set_solver ].
-Qed.
-
-(* ...and therefore so does the whole run of them. *)
-Lemma vseen_adv_free (fuel : nat) (ai lo q : bv 16) (ah : gset (bv 16)) :
-  ai ∉ ah ->
-  vfree (vseen_adv fuel lo ah).1 ai (vseen_adv fuel lo ah).2 q
-  = vfree lo ai ah q.
-Proof.
-  revert lo ah. induction fuel as [|f IH]; intros lo ah Hai;
-    cbn [vseen_adv fst snd]; [reflexivity|].
-  destruct (bool_decide (lo ∈ ah)) eqn:Hg; [| reflexivity ].
-  apply bool_decide_eq_true in Hg.
-  rewrite IH by set_solver. by apply vseen_adv_one.
-Qed.
-
-(* ...and with fuel to spare the walk lands in the same place whatever the
-   fuel was: each step consumes one of the served positions, so any bound at
-   or above the set's size is enough. *)
-Lemma vseen_adv_sat (f g : nat) (lo : bv 16) (ah : gset (bv 16)) :
-  (size ah <= f)%nat -> (size ah <= g)%nat ->
-  vseen_adv f lo ah = vseen_adv g lo ah.
-Proof.
-  revert g lo ah. induction f as [|f IH]; intros g lo ah Hf Hg.
-  - assert (Hout : lo ∉ ah).
-    { intro Hin. pose proof (subseteq_size {[lo]} ah ltac:(set_solver)) as Hs.
-      rewrite size_singleton in Hs. lia. }
-    cbn [vseen_adv]. destruct g as [|g]; cbn [vseen_adv]; [reflexivity|].
-    by rewrite (bool_decide_eq_false_2 (lo ∈ ah) Hout).
-  - cbn [vseen_adv]. destruct (decide (lo ∈ ah)) as [Hin|Hout].
-    + rewrite (bool_decide_eq_true_2 (lo ∈ ah) Hin).
-      assert (Hsz : size (ah ∖ {[lo]}) = (size ah - 1)%nat).
-      { rewrite size_difference by set_solver. by rewrite size_singleton. }
-      assert (Hpos : (0 < size ah)%nat).
-      { pose proof (subseteq_size {[lo]} ah ltac:(set_solver)) as Hs.
-        rewrite size_singleton in Hs. lia. }
-      destruct g as [|g]; [lia|].
-      cbn [vseen_adv]. rewrite (bool_decide_eq_true_2 (lo ∈ ah) Hin).
-      apply IH; lia.
-    + rewrite (bool_decide_eq_false_2 (lo ∈ ah) Hout).
-      destruct g as [|g]; cbn [vseen_adv]; [reflexivity|].
-      by rewrite (bool_decide_eq_false_2 (lo ∈ ah) Hout).
-Qed.
-
-(* MARKING position [p] SERVED: add it to the out-of-turn set, then let the
-   watermark absorb whatever prefix of the window that completes.
-
-   THE FUEL IS SEMANTICALLY INERT.  Advancing the watermark does not change
-   which positions are free ([vseen_adv_free]) -- it only keeps [v_ahead]
-   from carrying positions the window has left behind -- so a walk that
-   stopped early would still be a correct device state.  Eight is the
-   available ring's own size, which is what bounds a live window. *)
-Definition vserve (lo : bv 16) (ah : gset (bv 16)) (p : bv 16)
-  : bv 16 * gset (bv 16) :=
-  vseen_adv 8 lo ({[ p ]} ∪ ah).
-
-Lemma vserve_sub (lo p : bv 16) (ah : gset (bv 16)) :
-  (vserve lo ah p).2 ⊆ {[ p ]} ∪ ah.
-Proof. apply vseen_adv_sub. Qed.
-
-(* THE ONE FACT THE WHOLE PROTOCOL LAYER RUNS ON: serving a position removes
-   it from the free set and touches nothing else. *)
-Lemma vserve_free (ai lo p q : bv 16) (ah : gset (bv 16)) :
-  ai ∉ ah -> p <> ai ->
-  vfree (vserve lo ah p).1 ai (vserve lo ah p).2 q
-  = vfree lo ai ah q && negb (bool_decide (q = p)).
-Proof.
-  intros Hai Hp. unfold vserve.
-  rewrite (vseen_adv_free _ ai) by set_solver. unfold vfree.
-  destruct (decide (q = p)) as [Heq|Hne].
-  - assert (H1 : bool_decide (q = p) = true) by (apply bool_decide_eq_true; done).
-    assert (H2 : bool_decide (q ∈ ({[p]} ∪ ah)) = true)
-      by (apply bool_decide_eq_true; set_solver).
-    rewrite H1, H2. cbn [negb]. by rewrite !andb_false_r.
-  - assert (H1 : bool_decide (q = p) = false)
-      by (apply bool_decide_eq_false; done).
-    assert (H2 : bool_decide (q ∈ ({[p]} ∪ ah)) = bool_decide (q ∈ ah)).
-    { apply eq_iff_eq_true. rewrite !bool_decide_eq_true.
-      split; set_solver. }
-    rewrite H1, H2. cbn [negb]. by rewrite andb_true_r.
-Qed.
-
-(* the free set only ever shrinks under a serve -- the form the lease's
-   reachable-window argument needs *)
-Lemma vserve_free_sub (ai lo p q : bv 16) (ah : gset (bv 16)) :
-  ai ∉ ah -> p <> ai ->
-  vfree (vserve lo ah p).1 ai (vserve lo ah p).2 q = true ->
-  vfree lo ai ah q = true.
-Proof.
-  intros Hai Hp. rewrite (vserve_free ai lo p q ah Hai Hp).
-  intro H. by apply andb_prop in H as [H _].
-Qed.
-
-(* a free position is not the published index itself *)
-Lemma vfree_ne_ai (lo ai p : bv 16) (ah : gset (bv 16)) :
-  vfree lo ai ah p = true -> p <> ai.
-Proof.
-  unfold vfree, vpos_pub. intros H ->.
-  apply andb_prop in H as [H _]. apply Z.ltb_lt in H. lia.
-Qed.
-
 (* THE ENUMERATION.  The window is [lo], [lo+1], ... for as many positions
    as the driver is ahead by, so "is there anything to serve?" is a fold over
    a list whose length is the outstanding count -- decidable and computable,
@@ -1764,48 +1617,6 @@ Proof.
   split; [ apply Z.ltb_lt | apply Z.ltb_lt ].
 Qed.
 
-(* "the device has something it may serve" *)
-Definition vhas_free (lo ai : bv 16) (ah : gset (bv 16)) : bool :=
-  existsb (vfree lo ai ah) (avail_positions lo ai).
-
-Lemma vhas_free_spec (lo ai : bv 16) (ah : gset (bv 16)) :
-  vhas_free lo ai ah = true <-> exists p, vfree lo ai ah p = true.
-Proof.
-  unfold vhas_free. rewrite existsb_exists. split.
-  - intros (p & _ & Hp). by exists p.
-  - intros (p & Hp). exists p. split; [| exact Hp ].
-    apply elem_of_list_In, avail_positions_spec.
-    unfold vfree in Hp. by apply andb_prop in Hp as [Hp _].
-Qed.
-
-Lemma vhas_free_none (lo ai : bv 16) (ah : gset (bv 16)) (p : bv 16) :
-  vhas_free lo ai ah = false -> vfree lo ai ah p = false.
-Proof.
-  intro H. destruct (vfree lo ai ah p) eqn:Hp; [| reflexivity ].
-  exfalso. rewrite (proj2 (vhas_free_spec lo ai ah) (ex_intro _ p Hp)) in H.
-  discriminate.
-Qed.
-
-(* an empty window has nothing free -- the "device is idle" side *)
-Lemma vhas_free_empty (lo : bv 16) (ah : gset (bv 16)) :
-  vhas_free lo lo ah = false.
-Proof.
-  unfold vhas_free, avail_positions. by rewrite vdist_refl.
-Qed.
-
-(* ...and the free positions themselves, as a list *)
-Definition vfree_list (lo ai : bv 16) (ah : gset (bv 16)) : list (bv 16) :=
-  List.filter (vfree lo ai ah) (avail_positions lo ai).
-
-Lemma vfree_list_spec (lo ai : bv 16) (ah : gset (bv 16)) (p : bv 16) :
-  p ∈ vfree_list lo ai ah <-> vfree lo ai ah p = true.
-Proof.
-  unfold vfree_list. rewrite elem_of_list_In, filter_In. split.
-  - intros [_ H]. exact H.
-  - intro H. split; [| exact H].
-    apply elem_of_list_In, avail_positions_spec.
-    unfold vfree in H. by apply andb_prop in H as [H _].
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 6. The autonomous request step: the device's own execution context.     *)
@@ -2078,13 +1889,15 @@ Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
             then virtio_blk_s_ok else virtio_blk_s_unsupp in
   let ws := <[ vr_status r := Z_to_bv 8 st ]>
               (virtio_used_writes (v_cfg v) (v_used_idx v) r) in
-  let sv := vserve (v_seen v) (v_ahead v) i in
+  (* the request leaves the in-flight set; the POP index does not move -- it
+     is advanced only by [virtio_pop], and only by one *)
+  let fl := v_inflight v ∖ {[ i ]} in
   (* THE LATCH IS RELEASED ONLY BY THE REQUEST THAT HOLDS IT: completing some
      OTHER position leaves another request's payload exactly where it was. *)
   let tk := if bool_decide (v_taken v = Some i) then None else v_taken v in
   let vd := VirtioState (v_cfg v)
               (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
-              sv.1 sv.2
+              (v_seen v) fl
               (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v)
               (v_cache v) tk (v_cap v) in
   if bv_unsigned (vr_type r) =? virtio_blk_t_in then
@@ -2134,19 +1947,74 @@ Proof.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in); reflexivity.
 Qed.
 
-(* the device has work to do: the queue is live and the driver has published
-   an entry the device has not taken yet *)
+(* ====================================================================== *)
+(* THE POP.  The device takes the entry at [v_seen] and advances by ONE.    *)
+(* This is the phase QEMU does strictly in order, and the phase xv6's ring  *)
+(* -slot reuse depends on: the driver overwrites [avail->ring[idx % NUM]],  *)
+(* and that entry is dead precisely because the device is past it.  The pop *)
+(* reads no memory the model tracks and writes none: it only moves the      *)
+(* index and remembers that the position is now in flight.                  *)
+(* ====================================================================== *)
+
+(* there is an entry to take: the driver has published past the pop index *)
+Definition virtio_pop_ok (v : virtio_state) (mv : vmem) : bool :=
+  virtio_live (v_cfg v)
+  && negb (bool_decide (v_seen v = avail_idx_at (v_cfg v) mv)).
+
+Definition virtio_pop (v : virtio_state) : virtio_state :=
+  VirtioState (v_cfg v) (v_isr v)
+    (bv_add (v_seen v) one16)
+    ({[ v_seen v ]} ∪ v_inflight v)
+    (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v).
+
+Definition virtio_pop_step (v : virtio_state) (mv : vmem) : option virtio_state :=
+  if virtio_pop_ok v mv then Some (virtio_pop v) else None.
+
+Lemma virtio_pop_cfg (v : virtio_state) : v_cfg (virtio_pop v) = v_cfg v.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_disk (v : virtio_state) : v_disk (virtio_pop v) = v_disk v.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_cache (v : virtio_state) : v_cache (virtio_pop v) = v_cache v.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_taken (v : virtio_state) : v_taken (virtio_pop v) = v_taken v.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_isr (v : virtio_state) : v_isr (virtio_pop v) = v_isr v.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_uidx (v : virtio_state) : v_used_idx (virtio_pop v) = v_used_idx v.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_seen (v : virtio_state) :
+  v_seen (virtio_pop v) = bv_add (v_seen v) one16.
+Proof. reflexivity. Qed.
+Lemma virtio_pop_inflight (v : virtio_state) :
+  v_inflight (virtio_pop v) = {[ v_seen v ]} ∪ v_inflight v.
+Proof. reflexivity. Qed.
+
+Lemma virtio_pop_step_shape (v : virtio_state) (mv : vmem) (v' : virtio_state) :
+  virtio_pop_step v mv = Some v' ->
+  virtio_pop_ok v mv = true /\ v' = virtio_pop v.
+Proof.
+  unfold virtio_pop_step. destruct (virtio_pop_ok v mv) eqn:Hp; [|discriminate].
+  intro H. injection H as <-. split; reflexivity.
+Qed.
+
+Lemma virtio_pop_step_not_live (v : virtio_state) (mv : vmem) :
+  virtio_live (v_cfg v) = false -> virtio_pop_step v mv = None.
+Proof.
+  intro Hl. unfold virtio_pop_step, virtio_pop_ok. by rewrite Hl.
+Qed.
+
+(* the device has work to do: it can pop, or it can answer something it has
+   already popped *)
 Definition virtio_pending (v : virtio_state) (mv : vmem) : bool :=
   virtio_live (v_cfg v)
-  && vhas_free (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v).
+  && (negb (bool_decide (v_seen v = avail_idx_at (v_cfg v) mv))
+      || negb (bool_decide (v_inflight v = ∅))).
 
-(* ...and THIS ONE the driver has published and the device has not served:
-   the enabling condition of every step that answers a request.  Which of
-   them the device picks is the schedule's choice, not the model's -- that is
-   the whole content of the completion-order fix. *)
+(* A position may be answered exactly when the device has POPPED it and not
+   yet completed it.  Which of those it picks is free -- that is finding 5 --
+   but it can only pick from the ones it took, and it took them in order. *)
 Definition virtio_serve_ok (v : virtio_state) (mv : vmem) (i : bv 16) : bool :=
-  virtio_live (v_cfg v)
-  && vfree (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v) i.
+  virtio_live (v_cfg v) && bool_decide (i ∈ v_inflight v).
 
 (* a servable position is work to do *)
 Lemma virtio_serve_pending (v : virtio_state) (mv : vmem) (i : bv 16) :
@@ -2154,25 +2022,33 @@ Lemma virtio_serve_pending (v : virtio_state) (mv : vmem) (i : bv 16) :
 Proof.
   unfold virtio_serve_ok, virtio_pending. intro H.
   apply andb_prop in H as [Hl Hf]. rewrite Hl. cbn [andb].
-  apply vhas_free_spec. by exists i.
+  apply bool_decide_eq_true in Hf.
+  rewrite (bool_decide_eq_false_2 (v_inflight v = ∅)); [by rewrite orb_true_r|].
+  intro Hc. rewrite Hc in Hf. by apply elem_of_empty in Hf.
 Qed.
 
 Lemma virtio_serve_live (v : virtio_state) (mv : vmem) (i : bv 16) :
   virtio_serve_ok v mv i = true -> virtio_live (v_cfg v) = true.
 Proof. intro H. by apply andb_prop in H as [Hl _]. Qed.
 
-Lemma virtio_serve_free (v : virtio_state) (mv : vmem) (i : bv 16) :
-  virtio_serve_ok v mv i = true ->
-  vfree (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v) i = true.
-Proof. intro H. by apply andb_prop in H as [_ Hf]. Qed.
-
-(* the device has work exactly when SOME position is servable *)
-Lemma virtio_pending_serve (v : virtio_state) (mv : vmem) :
-  virtio_pending v mv = true -> exists i, virtio_serve_ok v mv i = true.
+Lemma virtio_serve_in (v : virtio_state) (mv : vmem) (i : bv 16) :
+  virtio_serve_ok v mv i = true -> i ∈ v_inflight v.
 Proof.
-  unfold virtio_pending, virtio_serve_ok. intro H.
-  apply andb_prop in H as [Hl Hf]. apply vhas_free_spec in Hf as [p Hp].
-  exists p. by rewrite Hl, Hp.
+  intro H. apply andb_prop in H as [_ Hf].
+  by apply bool_decide_eq_true in Hf.
+Qed.
+
+(* the device has work exactly when it can pop or SOME position is servable *)
+Lemma virtio_pending_serve (v : virtio_state) (mv : vmem) :
+  virtio_pending v mv = true ->
+  virtio_pop_ok v mv = true \/ exists i, virtio_serve_ok v mv i = true.
+Proof.
+  unfold virtio_pending, virtio_pop_ok, virtio_serve_ok. intro H.
+  apply andb_prop in H as [Hl Hf]. apply orb_prop in Hf as [Hf|Hf].
+  - left. by rewrite Hl, Hf.
+  - right. apply negb_true_iff, bool_decide_eq_false in Hf.
+    destruct (set_choose_L _ Hf) as [i Hi].
+    exists i. rewrite Hl. cbn [andb]. by apply bool_decide_eq_true_2.
 Qed.
 
 (* THE COMPLETION GATE, and the ONE place the cache mode is visible to the
@@ -2316,7 +2192,7 @@ Definition virtio_capture_step (v : virtio_state) (mv : vmem) (i : bv 16)
        | Some r =>
            if negb (bv_unsigned (vr_type r) =? virtio_blk_t_out) then None
            else if bool_decide (v_taken v = None) then
-             Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v)
+             Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v)
                      (v_used_idx v) (v_disk v) (vreq_cache mv r ∪ v_cache v)
                      (Some i) (v_cap v))
            else None
@@ -2327,7 +2203,7 @@ Lemma virtio_capture_step_shape (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (i : bv 16) :
   virtio_capture_step v mv i = Some v' ->
   exists r, req_at (v_cfg v) mv i = Some r
-    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v)
+    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v)
               (v_used_idx v) (v_disk v) (vreq_cache mv r ∪ v_cache v)
               (Some i) (v_cap v).
 Proof.
@@ -2357,9 +2233,9 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma virtio_capture_step_ahead (v : virtio_state) (mv : vmem)
+Lemma virtio_capture_step_inflight (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (i : bv 16) :
-  virtio_capture_step v mv i = Some v' -> v_ahead v' = v_ahead v.
+  virtio_capture_step v mv i = Some v' -> v_inflight v' = v_inflight v.
 Proof.
   intro Hs. destruct (virtio_capture_step_shape _ _ _ _ Hs) as (r & _ & ->).
   reflexivity.
@@ -2473,13 +2349,13 @@ Definition virtio_drain_step (v : virtio_state) (s : Z) : option virtio_state :=
   match v_cache v !! s with
   | None => None
   | Some bs =>
-      Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (disk_write (v_disk v) (virtio_sector_size * s) bs) (delete s (v_cache v)) (v_taken v) (v_cap v))
+      Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (disk_write (v_disk v) (virtio_sector_size * s) bs) (delete s (v_cache v)) (v_taken v) (v_cap v))
   end.
 
 Lemma virtio_drain_step_shape (v : virtio_state) (s : Z) (v' : virtio_state) :
   virtio_drain_step v s = Some v' ->
   exists bs, v_cache v !! s = Some bs
-    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (disk_write (v_disk v) (virtio_sector_size * s) bs) (delete s (v_cache v)) (v_taken v) (v_cap v).
+    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (disk_write (v_disk v) (virtio_sector_size * s) bs) (delete s (v_cache v)) (v_taken v) (v_cap v).
 Proof.
   unfold virtio_drain_step.
   destruct (v_cache v !! s) as [bs|] eqn:Hbs; [|discriminate].
@@ -2500,8 +2376,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma virtio_drain_step_ahead (v : virtio_state) (s : Z) (v' : virtio_state) :
-  virtio_drain_step v s = Some v' -> v_ahead v' = v_ahead v.
+Lemma virtio_drain_step_inflight (v : virtio_state) (s : Z) (v' : virtio_state) :
+  virtio_drain_step v s = Some v' -> v_inflight v' = v_inflight v.
 Proof.
   intro Hs. destruct (virtio_drain_step_shape _ _ _ Hs) as (bs & _ & ->).
   reflexivity.
@@ -2579,7 +2455,7 @@ Proof. intro H. apply virtio_drain_step_none. rewrite H. apply lookup_empty. Qed
 Definition virtio_stalled (v : virtio_state) (mv : vmem) : bool :=
   virtio_live (v_cfg v)
   && existsb (fun p => negb (virtio_chain_ok (v_cfg v) mv p))
-       (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv) (v_ahead v)).
+       (elements (v_inflight v)).
 
 (* A MALFORMED CHAIN IS A DEAD POSITION: neither half of the request
    protocol has a transition for it.  Stated at the position rather than at
@@ -2602,8 +2478,10 @@ Proof.
   unfold virtio_stalled, virtio_pending. intro H.
   apply andb_prop in H as [Hl Hex]. rewrite Hl. cbn [andb].
   apply existsb_exists in Hex as (p & Hin & _).
-  apply elem_of_list_In, vfree_list_spec in Hin as Hfree.
-  apply vhas_free_spec. by exists p.
+  apply elem_of_list_In, elem_of_elements in Hin.
+  rewrite (bool_decide_eq_false_2 (v_inflight v = ∅));
+    [by rewrite orb_true_r|].
+  intro Hc. rewrite Hc in Hin. by apply elem_of_empty in Hin.
 Qed.
 
 (* ...and the position it stalled AT: some servable one whose chain is bad *)
@@ -2615,9 +2493,9 @@ Proof.
   unfold virtio_stalled, virtio_serve_ok. intro H.
   apply andb_prop in H as [Hl Hex].
   apply existsb_exists in Hex as (p & Hin & Hbad).
-  apply elem_of_list_In, vfree_list_spec in Hin as Hfree.
-  exists p. rewrite Hl, Hfree. split; [reflexivity|].
-  by apply negb_true_iff in Hbad.
+  apply elem_of_list_In, elem_of_elements in Hin.
+  exists p. rewrite Hl, (bool_decide_eq_true_2 (p ∈ v_inflight v) Hin).
+  split; [reflexivity|]. by apply negb_true_iff in Hbad.
 Qed.
 
 (* ...and neither does it have a CAPTURE step: a malformed chain names no
@@ -2652,12 +2530,17 @@ Definition virtio_latch_ok (v : virtio_state) (mv : vmem) : Prop :=
 Lemma virtio_not_stalled_step (v : virtio_state) (mv : vmem) :
   virtio_pending v mv = true -> virtio_stalled v mv = false ->
   virtio_latch_ok v mv ->
-  (exists i v', virtio_capture_step v mv i = Some v')
+  (exists v', virtio_pop_step v mv = Some v')
+  \/ (exists i v', virtio_capture_step v mv i = Some v')
   \/ (exists s v', virtio_drain_step v s = Some v')
   \/ (exists i v' w, virtio_req_step v mv i = Some (v', w)).
 Proof.
   intros Hp Hs Hlatch.
-  destruct (virtio_pending_serve v mv Hp) as [i Hi].
+  (* WORK IS EITHER AN UNTAKEN ENTRY OR ONE ALREADY IN FLIGHT.  The first is
+     always answerable: the pop reads nothing and can never be refused. *)
+  destruct (virtio_pending_serve v mv Hp) as [Hpop | [i Hi]].
+  { left. exists (virtio_pop v). unfold virtio_pop_step. by rewrite Hpop. }
+  right.
   (* not stalled: the position the device picked has a well-formed chain *)
   assert (Hchain : forall p, virtio_serve_ok v mv p = true ->
                      virtio_chain_ok (v_cfg v) mv p = true).
@@ -2666,11 +2549,10 @@ Proof.
     exfalso. unfold virtio_stalled in Hs.
     rewrite (virtio_serve_live _ _ _ Hpp) in Hs. cbn [andb] in Hs.
     assert (Hex : existsb (fun q => negb (virtio_chain_ok (v_cfg v) mv q))
-                    (vfree_list (v_seen v) (avail_idx_at (v_cfg v) mv)
-                       (v_ahead v)) = true).
+                    (elements (v_inflight v)) = true).
     { apply existsb_exists. exists p. split.
-      - apply elem_of_list_In, vfree_list_spec,
-              (virtio_serve_free _ _ _ Hpp).
+      - apply elem_of_list_In, elem_of_elements,
+              (virtio_serve_in _ _ _ Hpp).
       - by rewrite Hc. }
     rewrite Hex in Hs. discriminate. }
   (* the latched request, if there is one, can always get out of the way *)
@@ -2750,11 +2632,13 @@ Proof.
     intro H; injection H as H1 H2; by subst v'.
 Qed.
 
-(* the device MARKS the position it served, and the watermark follows *)
+(* THE POP INDEX DOES NOT MOVE AT A COMPLETION.  It is advanced only by
+   [virtio_pop], by exactly one -- which is what keeps the entries the device
+   has not taken a contiguous interval below it. *)
 Lemma virtio_req_step_seen (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) (i : bv 16) :
   virtio_req_step v mv i = Some (v', w) ->
-  v_seen v' = (vserve (v_seen v) (v_ahead v) i).1.
+  v_seen v' = v_seen v.
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
@@ -2765,11 +2649,11 @@ Proof.
     intro H; injection H as H1 H2; by subst v'.
 Qed.
 
-(* ...and the served set the same way *)
-Lemma virtio_req_step_ahead (v : virtio_state) (mv : vmem)
+(* ...and the completing request LEAVES the in-flight set *)
+Lemma virtio_req_step_inflight (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) (i : bv 16) :
   virtio_req_step v mv i = Some (v', w) ->
-  v_ahead v' = (vserve (v_seen v) (v_ahead v) i).2.
+  v_inflight v' = v_inflight v ∖ {[ i ]}.
 Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_serve_ok v mv i)); [discriminate|].
@@ -3043,7 +2927,7 @@ Lemma virtio_drains_cache_of (v : virtio_state) (mv : vmem) (r : vio_req)
   NoDup is ->
   v_cache v = vreq_cache_of mv r is ->
   virtio_drains v (vreq_key r <$> is)
-  = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (wr_foldl (vreq_wr mv r) is (v_disk v)) ∅ (v_taken v) (v_cap v)).
+  = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (wr_foldl (vreq_wr mv r) is (v_disk v)) ∅ (v_taken v) (v_cap v)).
 Proof.
   intro Hout. revert v. induction is as [|i is IH]; intros v Hnd Hc.
   - rewrite fmap_nil. cbn [virtio_drains]. unfold wr_foldl. cbn [foldl].
@@ -3066,12 +2950,12 @@ Proof.
     { rewrite Hc, vreq_cache_of_cons, delete_insert_delete.
       rewrite delete_notin by exact Hnone. reflexivity. }
     assert (Hd : virtio_drain_step v (vreq_key r i)
-                 = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (disk_write (v_disk v)
+                 = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (disk_write (v_disk v)
                               (virtio_sector_size * vreq_key r i)
                               (wr_sector_bytes (vreq_wr mv r) i)) (delete (vreq_key r i) (v_cache v)) (v_taken v) (v_cap v))).
     { unfold virtio_drain_step. by rewrite Hlk. }
     rewrite fmap_cons. cbn [virtio_drains]. rewrite Hd.
-    rewrite (IH (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (disk_write (v_disk v) (virtio_sector_size * vreq_key r i)
+    rewrite (IH (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (disk_write (v_disk v) (virtio_sector_size * vreq_key r i)
                       (wr_sector_bytes (vreq_wr mv r) i)) (delete (vreq_key r i) (v_cache v)) (v_taken v) (v_cap v))
                Hnd' Hrest).
     cbn [v_cfg v_isr v_seen v_used_idx v_disk v_taken v_cap].
@@ -3088,7 +2972,7 @@ Lemma virtio_capture_drain_all (v : virtio_state) (mv : vmem) (r : vio_req)
   is ≡ₚ seq 0 (vreq_nsectors r) ->
   v_cache v = vreq_cache mv r ->
   virtio_drains v (vreq_key r <$> is)
-  = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (wr_apply (vreq_wr mv r) (v_disk v)) ∅ (v_taken v) (v_cap v)).
+  = Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (wr_apply (vreq_wr mv r) (v_disk v)) ∅ (v_taken v) (v_cap v)).
 Proof.
   intros Hout Hperm Hc.
   assert (Hnd : NoDup is) by (rewrite Hperm; apply NoDup_seq).
@@ -3173,13 +3057,15 @@ Definition virtio_queue_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
     (* the published index is itself pinned: the device and the claimant agree
        on how far the driver has got *)
     read_bytes ctl (pa_off (vc_avail c) vq_idx_off) 2 = Some ai
-    (* ...and it is not one of the positions the device has already served,
-       which is what keeps the watermark from walking past it: a served
-       position was PUBLISHED, and the published index only ever grows *)
+    (* ...and it is not one the device has already popped: a popped position
+       was published, and the published index only ever grows *)
     /\ ai ∉ ah
-    (* every position the device may still serve is one the claimant has
-       accounted for... *)
-    /\ (forall p, vfree lo ai ah p = true -> p ∈ S)
+    (* EVERY POSITION THE DEVICE MAY LOOK AT is one the claimant has
+       accounted for, and after the pop/complete split there are two kinds:
+       the entries it has not taken yet -- the interval [[lo, ai)] -- and the
+       ones it took and has not finished ([ah]). *)
+    /\ (forall p, vpos_pub lo ai p = true -> p ∈ S)
+    /\ (forall p, p ∈ ah -> p ∈ S)
     (* ...and each of those is a well-formed request that writes inside the
        lease.  [S] is NOT all of [bv 16]: a driver cannot maintain
        well-formedness of ring slots it has not published, since xv6 leaves
@@ -3209,19 +3095,21 @@ Qed.
    position the device may serve, not just at the watermark. *)
 Lemma virtio_queue_not_stalled (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
     (D : gset Arch.pa) (S : gset (bv 16)) (ai : bv 16) (mv : vmem) :
-  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_ahead v) ->
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_inflight v) ->
   mem_view ctl mv ->
   virtio_stalled v mv = false.
 Proof.
   intros Hok Hv.
   destruct (virtio_live (v_cfg v)) eqn:Hlive;
     [| exact (virtio_not_live_not_stalled v mv Hlive) ].
-  destruct (Hok Hlive) as (Hai & Hnai & Hcov & HS).
-  unfold virtio_stalled. rewrite (avail_idx_pinned _ _ _ _ Hv Hai), Hlive.
+  destruct (Hok Hlive) as (Hai & Hnai & Hcov & Hcovf & HS).
+  (* the stall is looked for among the IN-FLIGHT positions now, and the
+     obligation covers every one of them *)
+  unfold virtio_stalled. rewrite Hlive.
   cbn [andb]. apply not_true_is_false. intro Hex.
   apply existsb_exists in Hex as (p & Hin & Hbad).
-  apply elem_of_list_In, vfree_list_spec in Hin as Hfree.
-  destruct (HS p (Hcov p Hfree) mv Hv) as [Hchain _].
+  apply elem_of_list_In, elem_of_elements in Hin.
+  destruct (HS p (Hcovf p Hin) mv Hv) as [Hchain _].
   rewrite Hchain in Hbad. discriminate.
 Qed.
 
@@ -3230,74 +3118,118 @@ Qed.
 Lemma virtio_queue_ok_step (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
     (D : gset Arch.pa) (S : gset (bv 16)) (ai : bv 16) (mv : vmem)
     (i : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_ahead v) ->
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_inflight v) ->
   mem_view ctl mv ->
   virtio_req_step v mv i = Some (v', w) ->
   dom w ⊆ D /\ dom w ## dom ctl
-  /\ virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_ahead v').
+  /\ virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_inflight v').
 Proof.
   intros Hok Hv Hstep.
   destruct (virtio_req_step_shape _ _ _ _ _ Hstep) as (r & Hr & Hserve & _ & Hcomp).
   pose proof (virtio_serve_live _ _ _ Hserve) as Hlive.
-  destruct (Hok Hlive) as (Hai & Hnai & Hcov & HS).
-  pose proof (virtio_serve_free _ _ _ Hserve) as Hfree.
-  rewrite (avail_idx_pinned _ _ _ _ Hv Hai) in Hfree.
-  pose proof (vfree_ne_ai _ _ _ _ Hfree) as Hpai.
+  destruct (Hok Hlive) as (Hai & Hnai & Hcov & Hcovf & HS).
+  pose proof (virtio_serve_in _ _ _ Hserve) as Hin.
   (* re-index the step at the split state, so the slot obligation applies *)
   assert (Hsplit : virtio_req_step
-                     (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v)
+                     (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v)
                                   (v_used_idx v) (v_disk v) (v_cache v)
                                   (v_taken v) (v_cap v)) mv i
                    = Some (v', w)).
   { rewrite <- virtio_state_eta. exact Hstep. }
-  destruct (proj2 (HS i (Hcov i Hfree) mv Hv) (v_isr v) (v_seen v) (v_ahead v)
+  destruct (proj2 (HS i (Hcovf i Hin) mv Hv) (v_isr v) (v_seen v) (v_inflight v)
               (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) (v_cap v) v' w
               Hsplit) as [Hdw Hdisj].
   split; [exact Hdw|]. split; [exact Hdisj|].
   rewrite (virtio_req_step_cfg _ _ _ _ _ Hstep).
-  (* the served position left the window and nothing else moved *)
-  assert (Hseen : v_seen v' = (vserve (v_seen v) (v_ahead v) i).1)
+  (* THE COMPLETION ONLY SHRINKS THE IN-FLIGHT SET.  The pop index and the
+     published index are both untouched, so the interval half of the
+     obligation is literally unchanged and the in-flight half is inherited. *)
+  assert (Hseen : v_seen v' = v_seen v)
     by exact (virtio_req_step_seen _ _ _ _ _ Hstep).
-  assert (Hah : v_ahead v' = (vserve (v_seen v) (v_ahead v) i).2)
-    by exact (virtio_req_step_ahead _ _ _ _ _ Hstep).
-  intros _. split; [exact Hai|]. split.
-  { rewrite Hah. intro Hmem.
-    pose proof (vserve_sub (v_seen v) i (v_ahead v) ai Hmem) as Hin.
-    set_solver. }
-  split; [|exact HS].
-  intros q Hq. apply Hcov.
-  apply (vserve_free_sub ai (v_seen v) i q (v_ahead v) Hnai Hpai).
-  by rewrite <- Hseen, <- Hah.
+  assert (Hfl : v_inflight v' = v_inflight v ∖ {[ i ]})
+    by exact (virtio_req_step_inflight _ _ _ _ _ Hstep).
+  rewrite Hseen, Hfl. intros _.
+  split; [exact Hai|]. split; [set_solver|].
+  split; [exact Hcov|]. split; [|exact HS].
+  intros q Hq. apply Hcovf. set_solver.
 Qed.
 
 (* PAYOFF 3: neither a CAPTURE nor a DRAIN writes any memory, and neither
    moves the configuration, the watermark or the served set, so the
    obligation is preserved for free -- the same reason [virtio_cfg] is a
    separate record. *)
+(* the interval SHRINKS from the left as the device takes entries: anything
+   still untaken after the pop was untaken before it *)
+Lemma vpos_pub_succ (lo ai p : bv 16) :
+  lo <> ai -> vpos_pub (bv_add lo one16) ai p = true -> vpos_pub lo ai p = true.
+Proof.
+  intros Hne Hp. unfold vpos_pub in *. apply Z.ltb_lt. apply Z.ltb_lt in Hp.
+  assert (Hai : vdist lo ai <> 0)
+    by (intro H0; exact (Hne (vdist_zero _ _ H0))).
+  rewrite (vdist_succ_pos lo ai Hai) in Hp.
+  destruct (decide (vdist lo p = 0)) as [Hz|Hz].
+  - (* [p] is the entry the pop just took: it is no longer in the interval,
+       so this case is vacuous -- its distance wrapped to the far end *)
+    exfalso. rewrite (vdist_zero _ _ Hz) in Hp.
+    rewrite vdist_succ_self in Hp.
+    pose proof (vdist_bounds p ai). lia.
+  - rewrite (vdist_succ_pos lo p Hz) in Hp. lia.
+Qed.
+
+(* PAYOFF 2b: THE POP.  It takes the entry at the pop index and nothing else
+   moves, so the obligation follows: the untaken interval shrinks by one from
+   the left, and the entry it lost is exactly the one that joined the
+   in-flight set -- which the interval half had already accounted for. *)
+Lemma virtio_queue_ok_pop_step (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (S : gset (bv 16)) (ai : bv 16) (mv : vmem)
+    (v' : virtio_state) :
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_inflight v) ->
+  mem_view ctl mv ->
+  virtio_pop_step v mv = Some v' ->
+  virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_inflight v').
+Proof.
+  intros Hok Hv Hstep.
+  destruct (virtio_pop_step_shape _ _ _ Hstep) as [Hpok ->].
+  unfold virtio_pop_ok in Hpok. apply andb_prop in Hpok as [Hlive Hne].
+  apply negb_true_iff, bool_decide_eq_false in Hne.
+  destruct (Hok Hlive) as (Hai & Hnai & Hcov & Hcovf & HS).
+  rewrite (avail_idx_pinned _ _ _ _ Hv Hai) in Hne.
+  rewrite virtio_pop_cfg, virtio_pop_seen, virtio_pop_inflight.
+  intros _. split; [exact Hai|]. split.
+  { intro Hc. apply elem_of_union in Hc as [Hc|Hc]; [|exact (Hnai Hc)].
+    apply elem_of_singleton in Hc. exact (Hne (eq_sym Hc)). }
+  split.
+  { intros q Hq. exact (Hcov q (vpos_pub_succ _ _ _ Hne Hq)). }
+  split; [|exact HS].
+  intros q Hq. apply elem_of_union in Hq as [Hq|Hq]; [|exact (Hcovf q Hq)].
+  apply elem_of_singleton in Hq. subst q.
+  exact (Hcov _ (vpos_pub_mark _ _ Hne)).
+Qed.
+
 Lemma virtio_queue_ok_capture_step (v : virtio_state)
     (ctl : gmap Arch.pa (bv 8)) (D : gset Arch.pa) (S : gset (bv 16))
     (ai : bv 16) (mv : vmem) (i : bv 16) (v' : virtio_state) :
-  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_ahead v) ->
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_inflight v) ->
   virtio_capture_step v mv i = Some v' ->
-  virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_ahead v').
+  virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_inflight v').
 Proof.
   intros Hok Hstep.
   by rewrite (virtio_capture_step_cfg _ _ _ _ Hstep),
              (virtio_capture_step_seen _ _ _ _ Hstep),
-             (virtio_capture_step_ahead _ _ _ _ Hstep).
+             (virtio_capture_step_inflight _ _ _ _ Hstep).
 Qed.
 
 Lemma virtio_queue_ok_drain_step (v : virtio_state)
     (ctl : gmap Arch.pa (bv 8)) (D : gset Arch.pa) (S : gset (bv 16))
     (ai : bv 16) (s : Z) (v' : virtio_state) :
-  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_ahead v) ->
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) (v_inflight v) ->
   virtio_drain_step v s = Some v' ->
-  virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_ahead v').
+  virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v') (v_inflight v').
 Proof.
   intros Hok Hstep.
   by rewrite (virtio_drain_step_cfg _ _ _ Hstep),
              (virtio_drain_step_seen _ _ _ Hstep),
-             (virtio_drain_step_ahead _ _ _ Hstep).
+             (virtio_drain_step_inflight _ _ _ Hstep).
 Qed.
 
 (* [ctl] stays inside the memory the step produced -- the fact that makes the
@@ -3330,7 +3262,7 @@ Definition virtio0_state : virtio_state :=
   VirtioState virtio_cfg0 zero32 zero16 ∅ zero16 (fun _ => byte_zero) ∅ None (Z_to_bv 64 virtio_capacity0).
 
 Definition set_vcap (v : virtio_state) (cap : bv 64) : virtio_state :=
-  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_ahead v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) cap.
+  VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_inflight v) (v_used_idx v) (v_disk v) (v_cache v) (v_taken v) cap.
 
 Lemma virtio0_not_live : virtio_live (v_cfg virtio0_state) = false.
 Proof. reflexivity. Qed.
