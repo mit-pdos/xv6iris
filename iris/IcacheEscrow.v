@@ -3600,6 +3600,341 @@ Section IcacheEscrow.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  4c-2.  TWO SLOTS AT ONE TRANSACTION (durable-disk B''-tx2)          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHY A SECOND SHAPE AT ALL.  [ic_tx_dep]'s invariant is "the arm holds
+     [q] and the holder holds [q] beside it", which forces [q = 1/2] for the
+     two to rejoin into the whole element [LogInv.log_tx] closes -- so TWO of
+     them at one transaction claim 2 and the pair is UNSATISFIABLE, a premise
+     nobody can discharge.  [create] (parent + fresh child) and [sys_unlink]
+     ([dp] + [ip]) each hold two write locks at once, so each needs the arms
+     at a QUARTER: two arms of 1/4 and a residue of 1/2 rejoin to 1 exactly
+     as one arm of 1/2 and a residue of 1/2 do.
+
+     THE ID IS NAMED HERE and closed existentially only at a boundary.  Two
+     arms of one transaction must be at the SAME [t] -- shares at different
+     ghost-map keys never rejoin into a whole element -- and nothing about
+     the escrow determines an id ([IcacheTxRefute.tx_two_halves_no_whole]),
+     so a walk that holds two locks binds [t] in its stage statement and
+     spells each conjunct at [ic_tx_dep_at]'s own arity.  That is what keeps
+     the sweep POSITION-STABLE: a stage's [ic_deposit cn k (DepShr ..)]
+     becomes [ic_tx_dep_at cn k .. t (1/4)] in place, its [log_tx g] (or its
+     whole [log_op g u], which becomes [log_opb g u]) loses the residue the
+     two [ic_tx_dep_at]s now carry, and only ONE binder is added. *)
+  Definition ic_tx_dep_at (cn : ic_names) (k : nat) (s : Qp)
+      (dev inum : mword 32) (g : gname) (t : nat) (q : Qp) : iProp Σ :=
+    (ic_deposit cn k (DepTx s dev inum g t q)
+     ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
+
+  Global Instance ic_tx_dep_at_timeless cn k s dev inum g t q :
+    Timeless (ic_tx_dep_at cn k s dev inum g t q).
+  Proof. rewrite /ic_tx_dep_at. apply _. Qed.
+
+  Lemma ic_tx_dep_at_half cn k s dev inum g t :
+    ic_tx_dep_at cn k s dev inum g t (1/2) -∗ ic_tx_dep cn k s dev inum g.
+  Proof.
+    rewrite /ic_tx_dep_at. iIntros "[Hd Ht]".
+    iApply (ic_tx_dep_intro with "Hd Ht").
+  Qed.
+
+  Lemma ic_tx_dep_at_of_half cn k s dev inum g :
+    ic_tx_dep cn k s dev inum g -∗
+    ∃ t : nat, ic_tx_dep_at cn k s dev inum g t (1/2).
+  Proof.
+    rewrite /ic_tx_dep /ic_tx_dep_at. iIntros "H".
+    iDestruct "H" as (t) "[Hd Ht]". iExists t. iFrame.
+  Qed.
+
+  (* the element's own splitting, spelled once: a [ghost_map] element at
+     [#(q1 + q2)] IS the two, by the library's [Fractional] instance. *)
+  Local Lemma ic_tx_share_split (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx icfg_log]{#q} tt -∗
+    t ↪[ln_tx icfg_log]{#q1} tt ∗ t ↪[ln_tx icfg_log]{#q2} tt.
+  Proof. intros ->. iIntros "H". iDestruct "H" as "[$ $]". Qed.
+
+  Local Lemma ic_tx_share_join (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx icfg_log]{#q1} tt -∗ t ↪[ln_tx icfg_log]{#q2} tt -∗
+    t ↪[ln_tx icfg_log]{#q} tt.
+  Proof.
+    intros ->. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own. iExact "H".
+  Qed.
+
+  (* THE SHRINK, on the body: the OUT arm is already at [DepTx] and its
+     share drops from [q1 + q2] to [q1], the difference coming home to the
+     holder.  It is [ic_arm_tx_body]'s [ghost_var_update_2] verbatim, with
+     the descriptor moving between two [DepTx]s rather than from [DepShr]. *)
+  Lemma ic_shrink_tx_body cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepTx s dev inum g t q) ==∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepTx s dev inum g t q1) ∗
+      t ↪[ln_tx icfg_log]{#q2} tt ∗
+      ic_escrow_body cn γfs γi cov logstart k.
+  Proof.
+    intros ->.
+    iIntros "Hbody Hvld Hdep0".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & Hmt & Hgid & Hrd)".
+      iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
+      iDestruct "Hres" as "[Hres | Hfrz]".
+      2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iDestruct "Hres" as "[[%Heq [Hshr Htx]] Hhf]".
+      iDestruct (ic_tx_share_split _ _ q1 q2 eq_refl with "Htx")
+        as "[Htx1 Htx2]".
+      iMod (ghost_var_update_2 (DepTx s dev inum g t q1) with "Hdep0 Hdep")
+        as "[Hdep0 Hdep]"; [rewrite Qp.half_half; reflexivity |].
+      iModIntro. iFrame "Hvld Hdep0 Htx2".
+      iRight; iLeft. rewrite /ic_out.
+      iExists (DepTx s dev inum g t q1), dev2, inum2.
+      rewrite (ic_out_rd_none γfs γi cov logstart (DepTx s dev inum g t q1)
+                 inum2 eq_refl).
+      iFrame "Hdep Hmt Hgid". iLeft.
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iFrame "Hhf". iSplitR; [iPureIntro; exact Heq |]. iFrame "Hshr Htx1".
+    - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+  Qed.
+
+  (* ...and THE GROW, the same step backwards: the holder pays [q2] back
+     into the arm.  A teardown of the two-slot form runs it on whichever
+     slot SURVIVES the first release. *)
+  Lemma ic_grow_tx_body cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepTx s dev inum g t q1) -∗
+    t ↪[ln_tx icfg_log]{#q2} tt ==∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepTx s dev inum g t q) ∗
+      ic_escrow_body cn γfs γi cov logstart k.
+  Proof.
+    intros ->.
+    iIntros "Hbody Hvld Hdep0 Htx2".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & Hmt & Hgid & Hrd)".
+      iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
+      iDestruct "Hres" as "[Hres | Hfrz]".
+      2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iDestruct "Hres" as "[[%Heq [Hshr Htx1]] Hhf]".
+      iDestruct (ic_tx_share_join _ _ q1 q2 eq_refl with "Htx1 Htx2")
+        as "Htx".
+      iMod (ghost_var_update_2 (DepTx s dev inum g t (q1 + q2))
+              with "Hdep0 Hdep")
+        as "[Hdep0 Hdep]"; [rewrite Qp.half_half; reflexivity |].
+      iModIntro. iFrame "Hvld Hdep0".
+      iRight; iLeft. rewrite /ic_out.
+      iExists (DepTx s dev inum g t (q1 + q2)), dev2, inum2.
+      rewrite (ic_out_rd_none γfs γi cov logstart
+                 (DepTx s dev inum g t (q1 + q2)) inum2 eq_refl).
+      iFrame "Hdep Hmt Hgid". iLeft.
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      iFrame "Hhf". iSplitR; [iPureIntro; exact Heq |]. iFrame "Hshr Htx".
+    - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+  Qed.
+
+  (* the two as a walk meets them: one ghost step each, at the slot's own
+     namespace, opening nothing else. *)
+  Lemma ic_shrink_tx (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepTx s dev inum g t q) ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepTx s dev inum g t q1) ∗
+      t ↪[ln_tx icfg_log]{#q2} tt.
+  Proof.
+    iIntros (Hq HE) "#Hesc Hvld Hdep".
+    iMod (inv_acc E (icEscN .@ k) with "Hesc") as "[Hbody Hclose]";
+      [exact HE |].
+    iDestruct "Hbody" as ">Hbody".
+    iMod (ic_shrink_tx_body _ _ _ _ _ _ _ _ _ _ _ _ q q1 q2 Hq
+            with "Hbody Hvld Hdep")
+      as "(Hvld & Hdep & Htx & Hbody)".
+    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iModIntro. iFrame "Hvld Hdep Htx".
+  Qed.
+
+  Lemma ic_grow_tx (E : coPset) cn γfs γi cov logstart k
+      (s : Qp) (dev inum : mword 32) (g : gname) (v : bool)
+      (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    ↑(icEscN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_deposit cn k (DepTx s dev inum g t q1) -∗
+    t ↪[ln_tx icfg_log]{#q2} tt ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_deposit cn k (DepTx s dev inum g t q).
+  Proof.
+    iIntros (Hq HE) "#Hesc Hvld Hdep Htx".
+    iMod (inv_acc E (icEscN .@ k) with "Hesc") as "[Hbody Hclose]";
+      [exact HE |].
+    iDestruct "Hbody" as ">Hbody".
+    iMod (ic_grow_tx_body _ _ _ _ _ _ _ _ _ _ _ _ q q1 q2 Hq
+            with "Hbody Hvld Hdep Htx")
+      as "(Hvld & Hdep & Hbody)".
+    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iModIntro. iFrame "Hvld Hdep".
+  Qed.
+
+  (* THE TWO-SLOT FORM AT A CLOSED ID, for a boundary that must not name the
+     transaction ([SpecCreate.create_locked] is the one in this kernel, and
+     it names one slot; this is its two-slot twin, and what a caller holding
+     two locks hands across a call).  Inside a walk the [_at] form is what
+     the stage statements use, so that nothing but the descriptor's own
+     arguments changes. *)
+  Definition ic_tx_dep2 (cn : ic_names)
+      (k1 : nat) (s1 : Qp) (dev1 inum1 : mword 32) (g1 : gname)
+      (k2 : nat) (s2 : Qp) (dev2 inum2 : mword 32) (g2 : gname) : iProp Σ :=
+    (∃ t : nat, ic_tx_dep_at cn k1 s1 dev1 inum1 g1 t (1/4)
+                ∗ ic_tx_dep_at cn k2 s2 dev2 inum2 g2 t (1/4))%I.
+
+  Global Instance ic_tx_dep2_timeless cn k1 s1 dev1 inum1 g1
+      k2 s2 dev2 inum2 g2 :
+    Timeless (ic_tx_dep2 cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2).
+  Proof. rewrite /ic_tx_dep2. apply _. Qed.
+
+  Lemma ic_tx_dep2_intro cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2 (t : nat) :
+    ic_tx_dep_at cn k1 s1 dev1 inum1 g1 t (1/4) -∗
+    ic_tx_dep_at cn k2 s2 dev2 inum2 g2 t (1/4) -∗
+    ic_tx_dep2 cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2.
+  Proof. iIntros "H1 H2". iExists t. iFrame. Qed.
+
+  Lemma ic_tx_dep2_open cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2 :
+    ic_tx_dep2 cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2 -∗
+    ∃ t : nat, ic_tx_dep_at cn k1 s1 dev1 inum1 g1 t (1/4)
+               ∗ ic_tx_dep_at cn k2 s2 dev2 inum2 g2 t (1/4).
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* BUILDING IT: shrink the first arm from a half to a quarter and arm the
+     second with what comes back.  The walk's second [ilock] publishes a
+     [DepShr] exactly as its first did, so this is the second lock's own
+     ghost step and nothing about either contract moves. *)
+  Lemma ic_arm_tx2 (E : coPset) cn γfs γi cov logstart
+      (k1 : nat) (s1 : Qp) (dev1 inum1 : mword 32) (g1 : gname) (v1 : bool)
+      (k2 : nat) (s2 : Qp) (dev2 inum2 : mword 32) (g2 : gname) (v2 : bool) :
+    ↑(icEscN .@ k1) ⊆ E ->
+    ↑(icEscN .@ k2) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k1 -∗
+    ic_escrow cn γfs γi cov logstart k2 -∗
+    i_valid (ientry k1) ↦₄ valid_word v1 -∗
+    i_valid (ientry k2) ↦₄ valid_word v2 -∗
+    ic_tx_dep cn k1 s1 dev1 inum1 g1 -∗
+    ic_deposit cn k2 (DepShr s2 dev2 inum2 g2) ={E}=∗
+      i_valid (ientry k1) ↦₄ valid_word v1
+      ∗ i_valid (ientry k2) ↦₄ valid_word v2
+      ∗ ic_tx_dep2 cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2.
+  Proof.
+    iIntros (HE1 HE2) "#Hesc1 #Hesc2 Hvld1 Hvld2 Hdep1 Hdep2".
+    iDestruct (ic_tx_dep_at_of_half with "Hdep1") as (t) "Hdep1".
+    rewrite /ic_tx_dep_at. iDestruct "Hdep1" as "[Hd1 Ht1]".
+    iMod (ic_shrink_tx E cn γfs γi cov logstart k1 s1 dev1 inum1 g1 v1
+            t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter) HE1
+            with "Hesc1 Hvld1 Hd1") as "(Hvld1 & Hd1 & Ht2)".
+    iMod (ic_arm_tx E cn γfs γi cov logstart k2 s2 dev2 inum2 g2 v2
+            t (1/4) HE2 with "Hesc2 Hvld2 Hdep2 Ht2") as "(Hvld2 & Hd2)".
+    iModIntro. iFrame "Hvld1 Hvld2".
+    iDestruct (ic_tx_share_split t (1/2) (1/4) (1/4)
+                 (eq_sym Qp.quarter_quarter) with "Ht1") as "[Ht1a Ht1b]".
+    iApply (ic_tx_dep2_intro _ _ _ _ _ _ _ _ _ _ _ t
+              with "[Hd1 Ht1a] [Hd2 Ht1b]");
+      rewrite /ic_tx_dep_at; iFrame.
+  Qed.
+
+  (* TEARING IT DOWN IN EITHER ORDER: whichever slot is released first
+     disarms outright, and the survivor GROWS its arm back from a quarter to
+     a half with the share that comes home.  Both directions leave the other
+     slot at [ic_tx_dep], i.e. exactly where a one-lock walk stands. *)
+  Lemma ic_disarm_tx2_fst (E : coPset) cn γfs γi cov logstart
+      (k1 : nat) (s1 : Qp) (dev1 inum1 : mword 32) (g1 : gname) (v1 : bool)
+      (k2 : nat) (s2 : Qp) (dev2 inum2 : mword 32) (g2 : gname) (v2 : bool) :
+    ↑(icEscN .@ k1) ⊆ E ->
+    ↑(icEscN .@ k2) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k1 -∗
+    ic_escrow cn γfs γi cov logstart k2 -∗
+    i_valid (ientry k1) ↦₄ valid_word v1 -∗
+    i_valid (ientry k2) ↦₄ valid_word v2 -∗
+    ic_tx_dep2 cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2 ={E}=∗
+      i_valid (ientry k1) ↦₄ valid_word v1
+      ∗ i_valid (ientry k2) ↦₄ valid_word v2
+      ∗ ic_deposit cn k1 (DepShr s1 dev1 inum1 g1)
+      ∗ ic_tx_dep cn k2 s2 dev2 inum2 g2.
+  Proof.
+    iIntros (HE1 HE2) "#Hesc1 #Hesc2 Hvld1 Hvld2 H".
+    iDestruct (ic_tx_dep2_open with "H") as (t) "[H1 H2]".
+    rewrite /ic_tx_dep_at.
+    iDestruct "H1" as "[Hd1 Ht1]". iDestruct "H2" as "[Hd2 Ht2]".
+    iMod (ic_disarm_tx E cn γfs γi cov logstart k1 s1 dev1 inum1 g1 v1
+            t (1/4) HE1 with "Hesc1 Hvld1 Hd1") as "(Hvld1 & Hd1 & Ht3)".
+    iMod (ic_grow_tx E cn γfs γi cov logstart k2 s2 dev2 inum2 g2 v2
+            t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter) HE2
+            with "Hesc2 Hvld2 Hd2 Ht3") as "(Hvld2 & Hd2)".
+    iModIntro. iFrame "Hvld1 Hvld2 Hd1".
+    iApply (ic_tx_dep_intro with "Hd2 [Ht1 Ht2]").
+    iApply (ic_tx_share_join t (1/2) (1/4) (1/4)
+              (eq_sym Qp.quarter_quarter) with "Ht1 Ht2").
+  Qed.
+
+  Lemma ic_disarm_tx2_snd (E : coPset) cn γfs γi cov logstart
+      (k1 : nat) (s1 : Qp) (dev1 inum1 : mword 32) (g1 : gname) (v1 : bool)
+      (k2 : nat) (s2 : Qp) (dev2 inum2 : mword 32) (g2 : gname) (v2 : bool) :
+    ↑(icEscN .@ k1) ⊆ E ->
+    ↑(icEscN .@ k2) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k1 -∗
+    ic_escrow cn γfs γi cov logstart k2 -∗
+    i_valid (ientry k1) ↦₄ valid_word v1 -∗
+    i_valid (ientry k2) ↦₄ valid_word v2 -∗
+    ic_tx_dep2 cn k1 s1 dev1 inum1 g1 k2 s2 dev2 inum2 g2 ={E}=∗
+      i_valid (ientry k1) ↦₄ valid_word v1
+      ∗ i_valid (ientry k2) ↦₄ valid_word v2
+      ∗ ic_tx_dep cn k1 s1 dev1 inum1 g1
+      ∗ ic_deposit cn k2 (DepShr s2 dev2 inum2 g2).
+  Proof.
+    iIntros (HE1 HE2) "#Hesc1 #Hesc2 Hvld1 Hvld2 H".
+    iDestruct (ic_tx_dep2_open with "H") as (t) "[H1 H2]".
+    rewrite /ic_tx_dep_at.
+    iDestruct "H1" as "[Hd1 Ht1]". iDestruct "H2" as "[Hd2 Ht2]".
+    iMod (ic_disarm_tx E cn γfs γi cov logstart k2 s2 dev2 inum2 g2 v2
+            t (1/4) HE2 with "Hesc2 Hvld2 Hd2") as "(Hvld2 & Hd2 & Ht3)".
+    iMod (ic_grow_tx E cn γfs γi cov logstart k1 s1 dev1 inum1 g1 v1
+            t (1/2) (1/4) (1/4) (eq_sym Qp.quarter_quarter) HE1
+            with "Hesc1 Hvld1 Hd1 Ht3") as "(Hvld1 & Hd1)".
+    iModIntro. iFrame "Hvld1 Hvld2 Hd2".
+    iApply (ic_tx_dep_intro with "Hd1 [Ht1 Ht2]").
+    iApply (ic_tx_share_join t (1/2) (1/4) (1/4)
+              (eq_sym Qp.quarter_quarter) with "Ht1 Ht2").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  4d.  THE READ ARM (durable-fs-plan.md section 3, [ilock] with no      *)
   (*       transaction; durable-disk B''-join)                             *)
   (* ------------------------------------------------------------------ *)
