@@ -1459,6 +1459,7 @@ Section BootAlloc.
             ltac:(rewrite Hv0; apply virtio_reset_used_idx)
             ltac:(rewrite Hv0; apply virtio_reset_cache)
             ltac:(rewrite Hv0; apply virtio_reset_taken)
+            ltac:(rewrite Hv0; apply virtio_reset_inflight)
             ltac:(rewrite Hv0; apply virtio_reset_wce))
       as (γv) "(%Himg & Hproto & Hcfg & Hcmauth & #Hdone & Hheads & Hpbody)".
     iMod (dev_inv_alloc ⊤ γd γv

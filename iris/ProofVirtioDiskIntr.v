@@ -1850,120 +1850,6 @@ Proof.
   apply vt_disk_kdata_z; [ exact (Nat2Z.is_nonneg k) | lia ].
 Qed.
 
-(* ===================================================================== *)
-(* §6  The [b->disk] PEEK.                                                *)
-(*                                                                        *)
-(*     The store [b->disk = 0] is an atomic-update leaf, and per node the *)
-(*     access TRANSLATES before it writes: the window's address claim     *)
-(*     ([WpSconfMem.wordw_claim]) has to arrive BESIDE the update, off    *)
-(*     the accessed bytes' own points-to (the standing ruling; deriving   *)
-(*     it from the static map is forbidden).  [virtio_proto_deposit_acc]  *)
-(*     is one-shot -- its closer performs the deposit -- so it cannot     *)
-(*     supply that claim; this is the read-only twin, keyed exactly like  *)
-(*     it, that hands the cell straight back.  It walks the same path     *)
-(*     [virtio_proto_infob_acc] does to the ACTIVE entry and refutes the  *)
-(*     came-back arm the way the deposit does.                            *)
-(*                                                                        *)
-(*     THIS LEMMA BELONGS IN VirtioProto.v BESIDE THE DEPOSIT; it is here *)
-(*     because that file is stage 0's.                                    *)
-(* ===================================================================== *)
-Section VtPeek.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-
-  Lemma vt_bdisk_peek (γ : disk_names) (v : virtio_state)
-      (np p u : nat) (cm : gmap nat dclaim) (dc : dclaim) :
-    cm !! p = Some dc ->
-    virtio_proto γ v -∗ disk_pub γ np -∗
-    disk_ord γ p u -∗
-    disk_read_at γ u -∗
-    ghost_map_auth (dn_claim γ) 1 cm -∗
-    b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) ∗
-    (b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
-       virtio_proto γ v ∗ disk_pub γ np ∗ disk_read_at γ u ∗
-       ghost_map_auth (dn_claim γ) 1 cm).
-  Proof.
-    intro Hcm.
-    iIntros "Hp Hpub #Hordp Hrd Hcm".
-    rewrite /virtio_proto /disk_pub.
-    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & _ & _ & _ & Hslot & Hord & Hnc & Hnp & Hnr & Hstage & Hheads)".
-      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
-      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
-    iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hah & %Htkc & %Hui & %Hridx &
-        %Hwce & %Hwt & Hslot & Hord & #Hordm & Hnc & Hnp & Hnr & Hstage & Hheads & Hpend & Hdone)".
-    (* the completion record puts [p] in [srv], hence out of [pend] *)
-    rewrite /disk_ord.
-    iDestruct (ghost_map_lookup with "Hord Hordp") as %Huix.
-    assert (Hsrv : p ∈ vp_srv pr).
-    { rewrite <- (vpo_uix_dom _ _ _ Hok). apply elem_of_dom. by exists u. }
-    assert (Hpendnone : vp_pend pr !! p = None).
-    { apply not_elem_of_dom. intro Hc'.
-      destruct (proj1 (vpo_pend_dom _ _ _ Hok p) Hc') as [_ Hns].
-      exact (Hns Hsrv). }
-    (* the watermark still owes this record a look, so its slot is in [done] *)
-    rewrite /disk_read_at.
-    iDestruct (ghost_var_agree with "Hnr Hrd") as %Hnreq.
-    assert (Hdonein : p ∈ dom (vp_done pr)).
-    { apply (vpo_done_uix _ _ _ Hok). exists u. split; [exact Huix | lia]. }
-    apply elem_of_dom in Hdonein as [sl Hdone].
-    assert (Hs : vp_slots pr !! p = Some sl).
-    { unfold vp_slots.
-      rewrite (lookup_union_r (vp_pend pr) (vp_done pr) p Hpendnone).
-      exact Hdone. }
-    assert (Hpinin : exists pin, vp_pin pr !! p = Some pin).
-    { apply elem_of_dom. rewrite (vproto_slot_dom (v_cfg v) pr (dom dma) Hok).
-      apply elem_of_dom. by exists sl. }
-    destruct Hpinin as [pin Hpin].
-    assert (Hspins : vp_spins pr !! p = Some (sl, pin))
-      by (unfold vp_spins; rewrite map_lookup_zip_with Hs Hpin; reflexivity).
-    iDestruct "Hheads" as (hs) "(%Hhdom & %Hhcoup & Hhauth & Hhbig)".
-    destruct (Hhcoup p sl pin Hspins) as (w & Hhlk & Hdcsl & Hdcpin & Hdcpos).
-    iDestruct (big_sepM_delete _ hs _ (HActive w) Hhlk with "Hhbig")
-      as "[Hent Hrest]".
-    rewrite {1}/head_res.
-    iDestruct "Hent" as "(%Hdchd & Hclaim & Hinfo & Hdisj)".
-    (* the entry's row agrees with the handler's map: the claim is [dc] *)
-    iDestruct (ghost_map_lookup with "Hcm Hclaim") as %Hcmw.
-    rewrite Hdcpos Hcm in Hcmw. injection Hcmw as Heqw. subst w.
-    (* THE CHAIN IS OUT.  If the entry held it back already it would own
-       [dc_pin dc] -- which is [pin], which is in the lease -- and a byte
-       cannot be owned twice.  The head descriptor's own bytes are the
-       witness ([spo_desc]). *)
-    iDestruct "Hdisj" as "[[Hbd Hrecpt] | [_ Hback]]"; last first.
-    { rewrite /chain_back. iDestruct "Hback" as "[Hpinm _]".
-      rewrite Hdcpin.
-      iDestruct (dma_own_disj with "Hdma Hpinm") as %Hdj.
-      exfalso.
-      pose proof (vpo_fp_D _ _ _ Hok p sl pin Hs Hpin) as HfpD.
-      pose proof (spo_desc _ _ _ _ (vpo_slot _ _ _ Hok p sl pin Hs Hpin))
-        as Hdesc.
-      exact (proj1 (elem_of_disjoint _ _) Hdj _ Hdesc
-               (HfpD _ (slot_fp_pin sl pin _ Hdesc))). }
-    iFrame "Hbd". iIntros "Hbd".
-    (* both halves of [dn_nr] are in scope here, so isolate before framing *)
-    iSplitR "Hpub Hrd Hcm"; [| by iFrame "Hpub Hrd Hcm"].
-    iExists pr, dma.
-    iFrame "Hcfg Hdma Hslot Hord Hordm Hnc Hnp Hnr Hstage Hpend Hdone".
-    iSplitR; [iPureIntro; exact Hctl|].
-    iSplitR; [iPureIntro; exact Hok|].
-    iSplitR; [iPureIntro; exact Hal|].
-    iSplitR; [iPureIntro; exact Hseen|].
-    iSplitR; [iPureIntro; exact Hah|].
-    iSplitR; [iPureIntro; exact Htkc|].
-    iSplitR; [iPureIntro; exact Hui|].
-    iSplitR; [iPureIntro; exact Hridx|].
-    iSplitR; [iPureIntro; exact Hwce|].
-    iSplitR; [iPureIntro; exact Hwt|].
-    iExists hs. iFrame "Hhauth".
-    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    rewrite (big_sepM_delete _ hs _ (HActive dc) Hhlk).
-    iFrame "Hrest". rewrite /head_res.
-    iSplitR; [by iPureIntro|]. iFrame "Hclaim Hinfo".
-    iLeft. iFrame "Hbd Hrecpt".
-  Qed.
-
-End VtPeek.
 
 (* ===================================================================== *)
 (* §7  The LOOP BODY, in four Qed-sealed chunks (optimization.md: a       *)
@@ -2590,11 +2476,11 @@ Section VtBody.
     assert (Hzero : trunc32 (rget C3 (mword_of_int 0 : mword 5)) = (mword_of_int 0 : mword 32)).
     { rgne. rewrite Hx0. apply bv_eq; vm_compute; reflexivity. }
     (* the address claim, off [b->disk]'s own points-to: the read-only
-       [vt_bdisk_peek] (§6), since the deposit accessor is one-shot *)
+       [VirtioProto.virtio_proto_bdisk_peek], since the deposit accessor is one-shot *)
     iApply fupd_wp.
     iInv "Hvinv" as ">Hdbodyq" "Hdcloseq".
     iDestruct "Hdbodyq" as (vstq) "(Hvfq & Hprotoq & %Hvokq)".
-    iDestruct (vt_bdisk_peek γd vstq np p u cm dc Hcm
+    iDestruct (virtio_proto_bdisk_peek γd vstq np p u cm dc Hcm
                  with "Hprotoq Hpub Hord Hrd Hauth") as "(Hbdq & Hbackq)".
     iEval (rewrite vt_word4_wordw) in "Hbdq".
     iDestruct (wordw_claim_of (KTR := KT0) 4 (b_disk (dc_buf dc)) (DfracOwn 1)

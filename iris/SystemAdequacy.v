@@ -305,7 +305,7 @@ Section SystemBoot.
       as (Hfd Hir Hpav Hbs HF γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
-        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
+        Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
        [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
@@ -342,12 +342,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -366,7 +366,7 @@ Section SystemBoot.
                   Himg
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hfs Hmir Hirslot Hirauth Hcert Hseam
-                        Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
+                        Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
       iApply (big_sepL_impl with "Hhrest").
