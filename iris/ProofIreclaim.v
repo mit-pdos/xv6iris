@@ -1933,20 +1933,26 @@ Section IreclaimOrphan.
        derives them. *)
     iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
     iDestruct (log_opS_named with "Hop") as (e00) "Hop".
+    (* THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5): ireclaim holds
+       the WHOLE token -- it is inside its own transaction, opened at +0x1e
+       and ended after this call -- so half of it is what iput takes and the
+       two rejoin below. *)
+    iDestruct (log_tx_halve with "Htx") as (t0) "[Htx1 Htx2]".
     iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev
-              kslot q inum MAXOPBLOCKS Sb0 false false false e00
+              kslot q inum MAXOPBLOCKS Sb0 false false false e00 t0 (1/2)%Qp
               pidv dq dqb dqs OG (K - 8)%nat eb b lks Vpr false
-              ltac:(lia) Hkslot ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) Hclog Hkslot ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
                     Hireg Hboot Hslk [$Href $Hru] Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
-                    Hdlock Hsl [] Hop").
+                    Hdlock Hsl [] [Hop Htx1]").
     all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
+    { rewrite /log_opSet. iFrame "Hop Htx1". }
     (* RULING G' (iclaim-ledger.md §6''): ireclaim lends its EXCLUSIVE
        [ireg_boot] at [rg := false] and the indexed post gives it back as
        [ireg_regime false = ireg_boot] -- re-bound here under its own name, so
@@ -1954,7 +1960,8 @@ Section IreclaimOrphan.
        and integration-2's un-indexed disjunction could not close. *)
     iIntros (CID24 Hq24 mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
                                       Hsl %Hssub %Hwbm %Hwc %Hbnd
-                                      Hop Hiref Hboot".
+                                      Hop Htx1 Hiref Hboot".
+    iDestruct (log_tx_join γ t0 with "Htx1 Htx2") as "Htx".
     iDestruct (log_opS_op with "Hop Htx") as "Hop".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))

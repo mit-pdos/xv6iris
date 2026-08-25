@@ -1557,6 +1557,11 @@ Section KexitRest.
        "log", 3) and the tail [kx_park] (rank "wait_lock", 10) both follow
        by [locks_below_mono]. *)
     locks_below lks "log" ->
+    (* THE AMBIENT LOG, named (durable-disk B''-tx5): iput's three windows
+       park a share of [icfg_log]'s element, so its contract has to know the
+       walk's log IS that one.  Free at the one call site below -- this walk
+       is instantiated at [icfg_log]. *)
+    γ = icfg_log ->
     sie_cap_gpr KT1 M av b pj -∗
     (* the dying thread's stack closer, on its way to the park -- see
        [kx_park].  Nothing between here and the [jal sched] touches it: the
@@ -1601,7 +1606,7 @@ Section KexitRest.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hgl Hav Hgeom Hregs Hof Hcdev Hcnib
-           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb Hfresh.
+           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb Hfresh Hclog.
     destruct Hregs as (Hs3 & Hs4 & Hsp0 & Hdom).
     iIntros "Hcg Hcloser Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
@@ -1748,7 +1753,7 @@ Section KexitRest.
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
               Q2 av eb b lks
-              V ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              V ltac:(lia) Hclog Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
@@ -2301,7 +2306,7 @@ Section ProofKexit.
                   Mx (av - 6)%nat eb b lks pid Vx
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
-                  ltac:(lkbelow)
+                  ltac:(lkbelow) eq_refl
                   with "Hcg Hcloser Hown Htce Hcce Htext Hkd Hpc Hprocs Hpanenv Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hropen Hslks Hsbb Hsbi Hbmres

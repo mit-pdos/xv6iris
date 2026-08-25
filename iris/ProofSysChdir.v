@@ -1841,7 +1841,7 @@ Section ProofSysChdirBody.
                     g gfs gi cn gtl gilc gislc cov logstart bmapstart inodestart
                     nib size dev kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
                     P6 (K - 20)%nat eb b lks
-                    (upd_upt V P') ltac:(lia) Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+                    (upd_upt V P') ltac:(lia) Hclog Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv

@@ -145,7 +145,7 @@ Definition wp_iunlockput_dep_sconf_body
     (size : Z) (dev : mword 32)
     (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
-    (n : nat)
+    (n : nat) (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -182,6 +182,12 @@ Definition wp_iunlockput_dep_sconf_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
+  (* THE AMBIENT LOG, named (durable-disk B''-tx5): the share this contract
+     relays to iput is of [icfg_log]'s element -- the escrow's windows park
+     it and have no [log_names] parameter -- so the two must agree.  LAST, so
+     no landed positional argument list above it moved; the two published
+     [_tx_] readings below already carry the very same equation. *)
+  g = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -250,6 +256,11 @@ Definition wp_iunlockput_dep_sconf_body
      post hands the parked share back as [ic_dep_side d] and the caller
      rejoins it there ([LogInv.log_opb_op]). *)
   log_opb g n -∗
+  (* THE FREEING TRANSACTION'S SHARE, relayed straight to iput (durable-disk
+     B''-tx5): its three windows park it, so a commit refutes them.  The
+     [_tx_] reading below supplies it out of the very element the walk is
+     re-forming, so no landed caller has to find one. *)
+  tid ↪[ln_tx g]{#qtx} () -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -267,6 +278,8 @@ Definition wp_iunlockput_dep_sconf_body
       bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opb g n' -∗
+      (* ...and back, at exactly the [(tid, qtx)] that went in. *)
+      tid ↪[ln_tx g]{#qtx} () -∗
       iref_slot -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other descriptors. *)
@@ -290,6 +303,7 @@ Definition wp_iunlockput_dep_gen_body
     (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
+    (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -329,6 +343,12 @@ Definition wp_iunlockput_dep_gen_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
+  (* THE AMBIENT LOG, named (durable-disk B''-tx5): the share this contract
+     relays to iput is of [icfg_log]'s element -- the escrow's windows park
+     it and have no [log_names] parameter -- so the two must agree.  LAST, so
+     no landed positional argument list above it moved; the two published
+     [_tx_] readings below already carry the very same equation. *)
+  g = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -398,8 +418,10 @@ Definition wp_iunlockput_dep_gen_body
   (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
                 ⌜inodestart = icfg_ist⌝
    else emp) -∗
-  (* the reservation, EPOCH-NAMED: [log_opSe] in, [log_opS] out *)
-  log_opSe g n Sb e0 -∗
+  (* the reservation, EPOCH-NAMED and BUNDLED WITH THE SHARE iput's windows
+     park (durable-disk B''-tx5): [log_opSet] in, [log_opS] plus the share
+     out. *)
+  log_opSet g n Sb e0 tid qtx -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -426,6 +448,8 @@ Definition wp_iunlockput_dep_gen_body
       ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
+      (* the share, back at exactly the [(tid, qtx)] that went in. *)
+      tid ↪[ln_tx g]{#qtx} () -∗
       iref_slot -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other descriptors. *)
@@ -765,11 +789,11 @@ Section IunlockputOfDep.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-    (forall d : ic_dep,
+    (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
                                     gtl gil gisl cov logstart bmapstart
                                     inodestart nib size dev k qi s gy d inum
-                                    dn' bm' n pidv dq dqb dqs m K eb b lks
+                                    dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
                                     Vpr) ->
     wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 gil gisl cov logstart bmapstart inodestart nib
@@ -785,16 +809,28 @@ Section IunlockputOfDep.
              Hbs Hopb Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    iApply (Hgen (DepTx s dev inum gy t (1/2)) HK eq_refl Hk Hgeom Hsz Hbm0
-              Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow
+    (* THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5) COMES OUT OF THE
+       WALK'S OWN RESIDUE.  The arm keeps a half and the walk keeps a half;
+       the walk lends iput a QUARTER of its half and keeps the other, so the
+       three pieces rejoin into the whole element this contract re-forms and
+       no caller of a [_tx_] form has to find a share of its own. *)
+    iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
+                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2")
+      as "[Ht2a Ht2b]".
+    iEval (rewrite -Hclog) in "Ht2b".
+    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/4)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
+              Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow Hclog
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
                     Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hbs Hopb [Ht2 Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hbs Hopb Ht2b [Ht2a Hcont]").
     { rewrite /ic_dep_held /=. iExact "Hload". }
     iIntros (CIDx Hqx mf n') "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi
-             Hbs %Hbnd Hopb Hslot Ht1".
+             Hbs %Hbnd Hopb Ht2b Hslot Ht1".
     rewrite /ic_dep_side.
+    iEval (rewrite Hclog) in "Ht2b".
+    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
+                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2a Ht2b") as "Ht2".
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
     iEval (rewrite -Hclog) in "Htx".
     iApply ("Hcont" $! CIDx Hqx mf n' with
@@ -818,11 +854,11 @@ Section IunlockputOfDep.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-    (forall d : ic_dep,
+    (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
                                   gtl gil gisl cov logstart bmapstart
                                   inodestart nib size dev k qi s gy d inum
-                                  dn' bm' n Sb crb cru crz e0
+                                  dn' bm' n Sb crb cru crz e0 tid qtx
                                   pidv dq dqb dqs m K eb b lks Vpr) ->
     wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                               gil gisl cov logstart bmapstart inodestart nib
@@ -838,17 +874,26 @@ Section IunlockputOfDep.
              Hbs Hcr Hops Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    iApply (Hgen (DepTx s dev inum gy t (1/2)) HK eq_refl Hk Hcrb0 Hcru0 Hgeom
+    (* the quarter iput's windows park -- see [wp_iunlockput_tx_of_dep_sconf] *)
+    iDestruct (log_tx_split icfg_log t (1/2) (1/4) (1/4)
+                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2")
+      as "[Ht2a Ht2b]".
+    iEval (rewrite -Hclog) in "Ht2b".
+    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/4)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
               Hsz Hbm0 Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0
-              Hbelow
+              Hbelow Hclog
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
                     Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hbs Hcr Hops [Ht2 Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hbs Hcr [Hops Ht2b] [Ht2a Hcont]").
     { rewrite /ic_dep_held /=. iExact "Hload". }
+    { rewrite /log_opSet. iFrame "Hops Ht2b". }
     iIntros (CIDx Hqx mf n' Sb' w) "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb
-             Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Hslot Ht1".
+             Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Ht2b Hslot Ht1".
     rewrite /ic_dep_side.
+    iEval (rewrite Hclog) in "Ht2b".
+    iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
+                 ltac:(by rewrite Qp.quarter_quarter) with "Ht2a Ht2b") as "Ht2".
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
     iEval (rewrite -Hclog) in "Htx".
     iApply ("Hcont" $! CIDx Hqx mf n' Sb' w with
@@ -875,14 +920,14 @@ Module Type IUNLOCKPUT.
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
-      (n : nat)
+      (n : nat) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
                                    gtl gil gisl cov logstart bmapstart
                                    inodestart nib size dev k qi s gy d inum
-                                   dn' bm' n pidv dq dqb dqs m K eb b lks Vpr.
+                                   dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Parameter wp_iunlockput_dep_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
@@ -896,13 +941,14 @@ Module Type IUNLOCKPUT.
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
+      (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                  gil gisl cov logstart bmapstart inodestart
                                  nib size dev k qi s gy d inum dn' bm' n Sb
-                                 crb cru crz e0 pidv dq dqb dqs m K eb b lks
+                                 crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
                                  Vpr.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
      defines them by [wp_iunlockput_tx_of_sconf] / [_of_gen]. *)

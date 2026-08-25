@@ -1511,7 +1511,7 @@ Section ProofFileclose.
                     icfg_dev kk qq inum MAXOPBLOCKS
                     pidv (fcn_dq fn) DfracDiscarded DfracDiscarded
                     B3 (K - 8)%nat eb b lks Vpr
-                    ltac:(lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
+                    ltac:(lia) eq_refl Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinumb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)

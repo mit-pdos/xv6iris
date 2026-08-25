@@ -3205,7 +3205,7 @@ Section ProofSysLinkBody.
                                       kk (qq/2 + qq/2)%Qp inum n4
                                       pid (DfracOwn (1/4)) dqb dqs
                                       W3 (K - 38)%nat eb b lks
-                                      (upd_upt V P2) ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
+                                      (upd_upt V P2) ltac:(exact Kip) Hclog Hkk Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)

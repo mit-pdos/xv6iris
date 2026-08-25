@@ -547,6 +547,11 @@ Definition wp_dirlink_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
+  (* THE AMBIENT LOG, named (durable-disk B''-tx5): dirlink's "already
+     exists" arm iputs the inode dirlookup found, and iput's three windows
+     park a share of [icfg_log]'s element.  LAST, so no landed positional
+     argument list moved. *)
+  γ = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -729,7 +734,7 @@ Definition wp_dirlink_gen_body
     (dn dn0 : dinode)
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (inum : mword 16)                                 (* the LINKED inum     *)
-    (ncount : nat) (Sb : gset Z)
+    (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -824,6 +829,11 @@ Definition wp_dirlink_gen_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
+  (* THE AMBIENT LOG, named (durable-disk B''-tx5): dirlink's "already
+     exists" arm iputs the inode dirlookup found, and iput's three windows
+     park a share of [icfg_log]'s element.  LAST, so no landed positional
+     argument list moved. *)
+  γ = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -875,6 +885,12 @@ Definition wp_dirlink_gen_body
   IcacheEscrow.dlinks γfs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_opS γ ncount Sb -∗
+  (* ...AND THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5).  dirlink
+     holds no token of its own -- a write-locked walk's is part-parked in the
+     escrow -- so its caller lends a share out of the residue it kept, and it
+     comes back below.  The COUNTED form has the whole element and halves it
+     ([wp_dirlink_sconf]), so no landed caller of THAT one moved. *)
+  tid ↪[ln_tx γ]{#qtx} () -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
      and a park moves the hart with interrupts off, so the crossing has
      nothing to do with SIE.  Spelled [b] the two coincide at the only
@@ -935,6 +951,8 @@ Definition wp_dirlink_gen_body
          ([sl_found_at_four_busts] refutes four). *)
       ⌜found = true -> ((ncount - iput_units)%nat <= n')%nat⌝ -∗
       log_opS γ n' Sb' -∗
+      (* the share, back at exactly the [(tid, qtx)] that went in *)
+      tid ↪[ln_tx γ]{#qtx} () -∗
       (* ---- THE TWO [inode_ok] CONJUNCTS A RE-PARKER NEEDS, AS
          PRESERVATIONS (fs-sysfile S5a finding 2; the cap, D₀-a repair 3b) --
          [InodeLock.inode_ok] has seven conjuncts and the arms below
@@ -1051,13 +1069,13 @@ Module Type DIRLINK.
       (dn dn0 : dinode)
       (fn : nat -> bv 8)
       (inum : mword 16)
-      (ncount : nat) (Sb : gset Z)
+      (ncount : nat) (Sb : gset Z) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
                           size dev ip dinum bm data dn dn0 fn inum
-                          ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
+                          ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
                           m K eb b lks Vpr.
 End DIRLINK.

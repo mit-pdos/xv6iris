@@ -2684,25 +2684,36 @@ Section ProofNamexMain.
                iDestruct (wp_next_shift (b := true) (CIDa := CIDl) (CIDb := CIDA3)
                             ltac:(wp_next_chain) with "Hcont") as "Hcont".
                iDestruct (log_opS_named with "Hlog") as (enxA) "Hlog".
+               (* THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5): namex
+                  is HOLDING its transaction's token at this level (it must
+                  be, for the per-level [ilock]), so half of it goes with the
+                  iput and the two rejoin on the way out. *)
+               iEval (rewrite Htlog) in "Htx".
+               iDestruct (log_tx_halve with "Htx") as (tnx) "[Htxa Htxb]".
+               iEval (rewrite -Htlog) in "Htxa".
                iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi
                          cn gtl gilp gislp cov logstart bmapstart inodestart
                          nib size dev pk pq pinum ncur Scur wc false
-                         false enxA pidv dq dqb dqs
+                         false enxA tnx (1/2)%Qp pidv dq dqb dqs
                          T2 (K - 12)%nat eb b
-                         _ Vpr true Kip Hpk HbW ltac:(discriminate)
+                         _ Vpr true Kip Htlog Hpk HbW ltac:(discriminate)
                          Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
                          Hibc Hibl Hpb' Hcovb HbD
                          Hj Hgs HT2a0 Hbelow
                          with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                                Hescp Hireg [] Hslkp [$Href $Hru] Hbmap Hinos Hbits Hppid
-                               Hprocs Hdev Hgeom Hdlk Hbslot [] Hlog").
+                               Hprocs Hdev Hgeom Hdlk Hbslot [] [Hlog Htxa]").
                all: try lkbelow.
                (* RULING G: a runtime caller lends the SEALED arm. *)
                { iExact "Hropen". }
                { iEval (cbn beta iota). iEmpIntro. }
+               { rewrite /log_opSet. iFrame "Hlog Htxa". }
                iIntros (CIDip Hqip mip nip Sip wip)
                  "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos Hbslot
-                  %Hsip %Hwip %Hwipc %Hbdip Hlog Hisl2 _".
+                  %Hsip %Hwip %Hwipc %Hbdip Hlog Htxa Hisl2 _".
+               iEval (rewrite Htlog) in "Htxa".
+               iDestruct (log_tx_join icfg_log tnx with "Htxa Htxb") as "Htx".
+               iEval (rewrite -Htlog) in "Htx".
                  (* THE CREDITED BOUND IS STRONGER THAN THE COUNTED ONE, and
                     namex is stated at the counted one.  [ip_spend_w w false
                     false = 2] where [iput_units = 3] -- iput's own third unit

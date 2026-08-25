@@ -101,23 +101,27 @@ Section ProofIunlockputMain.
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
+      (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                  gil gisl cov logstart bmapstart inodestart nib
                                  size dev k qi s gy d inum dn' bm' n Sb crb cru
-                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
+                                 crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_dep_gen_body].
     intros pcE ip pj ret_tgt HK Hdsh Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
-           Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
+           Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh Hclog.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               Hropen #Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
+    (* the reservation and the share iput's windows park travel bundled
+       (durable-disk B''-tx5) *)
+    iDestruct (log_opSet_split with "Hlogop") as "[Hlogop Htx]".
     (* SIMP-2: the short parent arrives PACKAGED with its provenance unit
        ([IcacheRef.inode_refp_short]); split once, and the gather below is
        unchanged. *)
@@ -353,18 +357,19 @@ Section ProofIunlockputMain.
     iEval (rewrite -ireg_regime_true) in "Hropen".
     iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev
-              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks Vpr true
-              ltac:(lia) Hk Hcrb Hcru
+              k (qi + s)%Qp inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs R6 (K - 4)%nat eb b lks Vpr true
+              ltac:(lia) Hclog Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
               Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hropen Hslk [$Href $Hru] Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
-                    Hbslots Hnlz Hlogop").
+                    Hbslots Hnlz [Hlogop Htx]").
     all: try lkbelow.
+    { rewrite /log_opSet. iFrame "Hlogop Htx". }
     iIntros (CID11 Hq11 mP n' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins Hbslots
-             %Hssub %Hwbm %Hwc %Hbud Hlogop Hslot _".
+             %Hssub %Hwbm %Hwc %Hbud Hlogop Htx Hslot _".
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))
       by (rewrite HR6ra; pcw).
@@ -563,7 +568,7 @@ Section ProofIunlockputMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P4 n' Sb' wp with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                                             Hbslots [%] [%] [%] [%] Hlogop Hslot Hside").
+                                             Hbslots [%] [%] [%] [%] Hlogop Htx Hslot Hside").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hssub. }
     { exact Hwbm. }
@@ -587,45 +592,46 @@ Section ProofIunlockputMain.
       (size : Z) (dev : mword 32)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
-      (n : nat)
+      (n : nat) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn
                                    gtl gil gisl cov logstart bmapstart
                                    inodestart nib size dev k qi s gy d inum
-                                   dn' bm' n pidv dq dqb dqs m K eb b lks Vpr.
+                                   dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_dep_sconf_body].
     intros pcE ip pj ret_tgt HK Hdsh Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
-           Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
+           Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh Hclog.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               Hropen #Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
-              Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
+              Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop Htx
               Hcont".
     rewrite {1}/log_opb. iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
     iApply (wp_iunlockput_dep_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev
-              k qi s gy d inum dn' bm' n Sb0 false false false e00
+              k qi s gy d inum dn' bm' n Sb0 false false false e00 tid qtx
               pidv dq dqb dqs m K eb b lks Vpr
               HK Hdsh Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
-              Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
+              Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh Hclog
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hropen Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
                     Hparp
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
-                    Hlogop [Hcont]").
+                    [Hlogop Htx] [Hcont]").
     all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
+    { rewrite /log_opSet. iFrame "Hlogop Htx". }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' Sb' wf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                               Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot Hside".
+                               Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Htx Hslot Hside".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                     Hbslots [%] [Hlogop] Hslot Hside").
+                     Hbslots [%] [Hlogop] Htx Hslot Hside").
     { exact Hcs. }
     { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.
       destruct wf; simpl in Hbnd; lia. }
@@ -656,7 +662,7 @@ Section ProofIunlockputMain.
                                   nib size dev k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
-    apply wp_iunlockput_tx_of_dep_sconf. intros d.
+    apply wp_iunlockput_tx_of_dep_sconf. intros d tid qtx.
     apply wp_iunlockput_dep_sconf.
   Qed.
 
@@ -680,7 +686,7 @@ Section ProofIunlockputMain.
                                 size dev k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
-    apply wp_iunlockput_tx_of_dep_gen. intros d.
+    apply wp_iunlockput_tx_of_dep_gen. intros d tid qtx.
     apply wp_iunlockput_dep_gen.
   Qed.
 
