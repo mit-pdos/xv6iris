@@ -2683,7 +2683,7 @@ Proof.
      and therefore survives every later split, which is what lets the trap
      arm apply the contract in the cycle's continuation. *)
   iEval (rewrite /intr_res) in "Hires".
-  iDestruct "Hires" as (handler vb C) "(%Htvd & %Hsb & Hq4 & Hstv & #Hcaps & #Hsp)".
+  iDestruct "Hires" as (handler vb C) "(%Htvd & %Hsb & Hq4 & Hstv & #Hcm & #Hcaps & #Hsp)".
   iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
     "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie & Hmdl &
       Hmenv)".
@@ -2907,7 +2907,7 @@ Proof.
             iFrame "Hclm".
             iSplitL "Hq4 Hstv".
             { iApply (intr_res_intro handler ('b"0" : mword 1) C Htvd Hsb
-                        with "Hq4 Hstv Hcaps"). iNext. iExact "Hsp". }
+                        with "Hq4 Hstv Hcm Hcaps"). iNext. iExact "Hsp". }
             srs. rewrite Hsb.
             iFrame "Hcaps Hsp Hfile Hwn".
             iApply (resv_any_intro with "Hfrag").
@@ -2951,7 +2951,7 @@ Proof.
               rewrite /sie_arm.
               iFrame "Hq1 Hkpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu".
               iApply (intr_res_intro handler vb C Htvd Hsb
-                        with "Hq4 Hstv Hcaps").
+                        with "Hq4 Hstv Hcm Hcaps").
               iNext. iExact "Hsp". }
             iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hwn")
               as "[Hobl Hcont]".

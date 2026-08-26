@@ -2071,7 +2071,12 @@ either been proven in the kit or measured against the build.
 >
 > 1. **The half-written-`.vo` caveat of A6.25 is DISCHARGED.**  505 files
 >    compiled from source reproduce the incremental frontier exactly; the
->    concurrent-`make` incident left no corruption.
+>    concurrent-`make` incident left no corruption.  **AND THE NUMBER IS
+>    SELF-VERIFYING:** the log shows 508 files ATTEMPTED, 505 `.vo`s
+>    produced, 3 errors — so every file `make` reached is accounted for as
+>    green or red, with none silently skipped.  `grep -c 'ROCQ compile'`
+>    against `ls *.vo | wc -l` against the error count is the cheapest
+>    integrity check on any sweep, and worth running on every one.
 > 2. **THE TRUE FRESH-GREEN COUNT IS 505, NOT A6.25's 630.**  The 630 was
 >    inflated by ~125 stale-but-valid `.vo`s built while `KptTree` was
 >    still green — i.e. against the PRE-A6.21 `PtTree`.  Once `KptTree`

@@ -334,7 +334,7 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string <{ SchedCtx.proc_lock_res γs γl (proc_addr j) }> M2 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string (λ ξ : CtxId, SchedCtx.proc_lock_res (XI := ξ) γs γl (proc_addr j)) M2 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka1 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
@@ -553,7 +553,7 @@ Section ProofKforkB5.
     assert (HM10a0 : M10 !!! Regidx Ra0 = (proc_addr j))
       by (rewrite /M10 upd_ne; [exact HM9a0 | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CID6 CID8 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf KT1 (CID := CID8) γl "proc"%string <{ SchedCtx.proc_lock_res γs γl (proc_addr j) }>
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID8) γl "proc"%string (λ ξ : CtxId, SchedCtx.proc_lock_res (XI := ξ) γs γl (proc_addr j))
               M10 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh_proc
               with "Hcg Hown Htext Hpc [Hpinv]").
@@ -670,7 +670,7 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf KT1 (CID := CID9) γl (proc_addr j) "proc"%string <{ SchedCtx.proc_lock_res γs γl (proc_addr j) }> M13 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 (CID := CID9) γl (proc_addr j) "proc"%string (λ ξ : CtxId, SchedCtx.proc_lock_res (XI := ξ) γs γl (proc_addr j)) M13 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka3 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok2 HR3 Hown Hpay").

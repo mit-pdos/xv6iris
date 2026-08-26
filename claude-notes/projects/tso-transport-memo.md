@@ -333,3 +333,44 @@ The exception is **(a1)'s fractional `ctx_dom`**: an arity change on a sealed co
 - **`tso-port.md` §0.12′ memo-correction**: *"`file_core`'s `is_pipe` is a second instance of the same thing"* — it is not. `is_pipe` is `inv lockN (lock_inv … <{ pipe_res }>)`, an ordinary `const_pay` payload over a ▷-free, `inv`-free `pipe_res`. **The M3 sweep is blocked on ONE payload (`off_hold`), not two.**
 - **`tso-port.md` §0.12′ ruling on ∀-`Xr`**: *"right, and free once the handles are ξ-free. It is just not sufficient on its own."* — the quantifier is wrong, not insufficient. The record binds `∃ XIp` and the protocol makes the resumer *become* `XIp`; a second `∀ Xr` is stale one ghost step after the exchange.
 - **`TsoCtx.v:479` / `TsoCtxTwin2.v:566`**: the `==∗` is unused in every twin proof, at SC and at the REAL kit. The class is an entailment.
+
+---
+
+## 8. CORRECTIONS FROM THE LANDING (2026-08-26; see tso-port.md §0.15′)
+
+Ruling 1 landed and is confirmed on the real tree: `valid_context`,
+`SchedCtx.p_sched`, `proc_ctx` and `sched_vc_at` all print with no
+`CurCtx`, contractiveness closes with the tree's own tactic, and `▷
+proc_ctx` / `▷ sched_vc_at` are `ctx_morph_const`. Three things the memo
+got wrong:
+
+- **§5's `ires_uniform` fallback (`∃ C, □ (∀ ξ, C ξ) ∗ ▷ ihs kt C h`) is
+  UNSOUND and must not be taken.** `devintr_caps` holds two rows of cells
+  discarded at RUNTIME — `disk_geom`'s three ring-page pointers and
+  `procs_inv`'s per-slot `is_kstack` — and a ∀-context form over a `t > 0`
+  discarded fact is exactly what §2(c)'s own stage-2 caveat (tso-port.md
+  §0.4 item 6) forbids. What the swtch deposit needs is not context
+  freedom but TRANSPORTABILITY: `IntrDefs.caps_morph C :=
+  □ ∀ ξ ξ', ctx_dom ξ ξ' -∗ □ C ξ -∗ ctx_dom ξ ξ' ∗ □ C ξ'`, carried by
+  `intr_res` beside `□ C ξ` and discharged once from the structural
+  instances. **§4's gate (`trap_csrs` `NOTCONV → CONV`) is therefore the
+  wrong test and never had to flip**; `trap_csrs` stays `NOTCONV` and is
+  `CtxMorph`, which is all the deposit wanted.
+- **§2(e)'s cascade count omitted the section surgery.** A section
+  variable cannot be instantiated inside the section that binds it, so
+  `valid_context_pre` (which must spell `ctx_cells (XI := XIp)`) and
+  `p_sched` (which must spell `proc_held (XI := ξ)`) have to sit BELOW the
+  sections that define those. `SwtchCtx.v` is two sections above its shim,
+  `SchedCtx.v` four. The sections that must not capture an ambient declare no `XI` at
+  all, so a forgotten annotation is an elaboration error rather than a
+  silent capture.
+- **§4 step 5 is REFUTED, on one row.** With every other row transporting,
+  `forkret_park_paid`'s deposit into the fresh `XIc` fails at
+  `park_globals`' `FileInv.is_ftable` — `is_lock γl ftable_addr "ftable"
+  <{ ftable_res γ }>`, a constant embedding of a still-ξ-indexed payload,
+  hence two `inv`s over different bodies. Measured: `NOTCONV is_ftable`,
+  `NOTCONV ftable_res`, `NO-INSTANCE CtxMorph is_ftable`, against `MORPH
+  procs_inv OK` / `MORPH console_caps OK` / `MORPH console_ready OK`. The
+  memo's ruling 2 (the `fp_ctx` field) was already refuted at §0.14′; its
+  replacement (the off-borrow cinv stops holding a points-to fraction) is
+  what unblocks the park, and it is now the ONLY thing that does.

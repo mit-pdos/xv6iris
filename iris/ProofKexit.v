@@ -1274,7 +1274,7 @@ Section KexitPark.
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* [Hfresh_proc], derived above for wakeup's own call, is exactly what
        this nested acquire needs too. *)
-    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDa) γl "proc"%string <{ proc_lock_res γs γl pj }> P8 1%nat eb pj (trap_res b + av)%nat false
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDa) γl "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl pj) P8 1%nat eb pj (trap_res b + av)%nat false
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(lia)
               Hfresh_proc

@@ -2180,6 +2180,47 @@ Section IntrDefs.
   (* ------------------------------------------------------------------- *)
   Notation caps_fam := (CtxId -d> iPropO Σ) (only parsing).
 
+  (* ------------------------------------------------------------------- *)
+  (* THE FAMILY'S OWN TRANSPORT CERTIFICATE, AND WHY THE RESOURCE CARRIES  *)
+  (* IT.                                                                  *)
+  (*                                                                      *)
+  (* [C] is EXISTENTIAL in [ires_of] / [intr_res] -- that is what keeps    *)
+  (* [sie_cap]'s arity out of the 425 files that state it -- so nothing    *)
+  (* downstream can know that [□ C ξ] is transportable to [□ C ξ'].  And   *)
+  (* it has to be: [trap_csrs] rides [SchedCtx.p_sched], and since the     *)
+  (* parked record's rows are spelled at the record's own [XIp]            *)
+  (* (SwtchCtx.v), the party that resumes a record must hand its trap CSRs *)
+  (* in at THAT context -- [TsoCtx.ctx_deposit], whose obligation is       *)
+  (* [CtxMorph] on the deposited payload.                                  *)
+  (*                                                                      *)
+  (* SO THE RESOURCE CARRIES THE TRANSPORT BESIDE THE CREDENTIALS.  It is  *)
+  (* [CtxMorph (λ ξ, □ C ξ)] internalised: persistent, context-free, and   *)
+  (* GATED ON [ctx_dom] -- which is the whole point.  A ∀-CONTEXT form     *)
+  (* ([□ ∀ ξ, C ξ]) would be cheaper to state and is FALSE at TSO: the     *)
+  (* bundle holds cells discarded at RUNTIME ([disk_geom]'s three ring     *)
+  (* pointers, [procs_inv]'s [is_kstack]), and a [t > 0] discarded fact    *)
+  (* needs the reader's own bound to dominate [t] -- i.e. exactly a        *)
+  (* [ctx_dom] (tso-port.md §0.4 item 6 / the park memo's ruling 4).  The  *)
+  (* certificate says only what [ctx_morph_word] actually proves.          *)
+  (* ------------------------------------------------------------------- *)
+  Definition caps_morph (C : caps_fam) : iProp Σ :=
+    (□ ∀ ξ ξ' : CtxId, ctx_dom ξ ξ' -∗ □ C ξ -∗ ctx_dom ξ ξ' ∗ □ C ξ')%I.
+
+  Global Instance caps_morph_persistent (C : caps_fam) : Persistent (caps_morph C).
+  Proof. rewrite /caps_morph. apply _. Qed.
+
+  (* the certificate for any payload family that is [CtxMorph] and
+     persistent -- i.e. for every credential bundle the tree builds.  The
+     proof consumes nothing, which is what lets it sit under the [□]. *)
+  Lemma caps_morph_intro (C : caps_fam) `{!CtxMorph C}
+      `{HP : !forall ξ : CtxId, Persistent (C ξ)} :
+    ⊢ caps_morph C.
+  Proof.
+    rewrite /caps_morph. iModIntro. iIntros (ξ ξ') "Hd #HC".
+    iDestruct (ctx_morph ξ ξ' with "Hd HC") as "[Hd #HC']".
+    iFrame "Hd". iModIntro. iExact "HC'".
+  Qed.
+
   (* the installed-handler resource, parameterized by the contract it
      carries.  [intr_res] below is this at [T := ihs], spelled out again so
      that its one-step unfolding is the shape consumers already destructure.
@@ -2202,6 +2243,7 @@ Section IntrDefs.
        ⌜ stvec_base h = h ⌝ ∗
        ghost_var (sie_name c) (1/4) b ∗
        reg_pointsto_at c stvec (DfracOwn 1) h ∗
+       caps_morph C ∗
        □ C ξ ∗
        ▷ T C c h)%I.
 
@@ -2449,6 +2491,7 @@ Section IntrDefs.
        ⌜ stvec_base h = h ⌝ ∗
        ghost_var sie_gname (1/4) b ∗
        stvec ↦ᵣ h ∗
+       caps_morph C ∗
        □ C cur_ctx ∗
        ▷ intr_handler_spec kt C h)%I.
 
@@ -2464,12 +2507,13 @@ Section IntrDefs.
     stvec_base h = h ->
     ghost_var sie_gname (1/4) b -∗
     stvec ↦ᵣ h -∗
+    caps_morph C -∗
     □ C cur_ctx -∗
     ▷ intr_handler_spec kt C h -∗
     intr_res kt.
   Proof.
-    iIntros (Htvd Hsb) "Hq Hstv #Hcaps #Hspec".
-    iExists h, b, C. iFrame "Hq Hstv Hcaps Hspec". by iSplit.
+    iIntros (Htvd Hsb) "Hq Hstv #Hcm #Hcaps #Hspec".
+    iExists h, b, C. iFrame "Hq Hstv Hcm Hcaps Hspec". by iSplit.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -3582,6 +3626,43 @@ Section IntrDefs.
 
 
 End IntrDefs.
+
+(* ===================================================================== *)
+(* THE TRAP BUNDLE'S TRANSPORT (tso-port M3).  [trap_csrs] rides          *)
+(* [SchedCtx.p_sched], and since a parked record's rows are spelled at    *)
+(* the record's own [XIp] (SwtchCtx.v), the resumer has to hand its trap  *)
+(* CSRs in at that context -- [TsoCtx.ctx_deposit], whose obligation is   *)
+(* exactly this class.  Everything in the bundle except [intr_res] is a   *)
+(* register or a ghost and so is context-CONSTANT; [intr_res]'s one       *)
+(* context-indexed row is its credential bundle [□ C ξ], and the resource *)
+(* carries its own [caps_morph C] certificate for precisely this step.    *)
+(* OUTSIDE the section, because each instance quantifies the context the  *)
+(* section fixes. *)
+(* ===================================================================== *)
+Section IntrDefsMorph.
+  Context `{!riscvGS Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Global Instance intr_res_morph (kt : ktier) :
+    CtxMorph (fun xi : CtxId => intr_res (XI := xi) kt).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /intr_res.
+    iDestruct "H" as (h b C) "(%Hd0 & %Hsb & Hq & Hstv & #Hcm & #Hcaps & #Hspec)".
+    iDestruct ("Hcm" $! ξ ξ' with "Hd Hcaps") as "[Hd #Hcaps']".
+    iFrame "Hd". iExists h, b, C. iFrame "Hq Hstv Hcm Hcaps' Hspec".
+    iSplit; done.
+  Qed.
+
+  Global Instance trap_csrs_morph (kt : ktier) :
+    CtxMorph (fun xi : CtxId => trap_csrs (XI := xi) kt).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /trap_csrs.
+    iDestruct "H" as "(H1 & H2 & H3 & H4 & Hres & Hkpt)".
+    iDestruct (intr_res_morph kt ξ ξ' with "Hd Hres") as "[Hd Hres]".
+    iFrame.
+  Qed.
+End IntrDefsMorph.
 
 (* ===================================================================== *)
 (* TRANSPORTING [trap_csrs_ext] ACROSS A MIGRATION -- the [cpu_own]       *)

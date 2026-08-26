@@ -199,10 +199,10 @@ Section WpSconfSret.
         as "(Hms & Hpriv & HnPC & _ & Hmenv & Hsepc)".
       iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iEval (rewrite /intr_res) in "Hhx".
-      iDestruct "Hhx" as (handler vb Cx) "(%Htvd & %Hsb & Hqi & Hstv & #Hcapsx & #Hspec)".
+      iDestruct "Hhx" as (handler vb Cx) "(%Htvd & %Hsb & Hqi & Hstv & #Hcmx & #Hcapsx & #Hspec)".
       iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi")
         as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-      iDestruct (intr_res_intro handler _ Cx Htvd Hsb with "Hqi Hstv Hcapsx Hspec")
+      iDestruct (intr_res_intro handler _ Cx Htvd Hsb with "Hqi Hstv Hcmx Hcapsx Hspec")
         as "Hintr".
       (* ---- THE TIE MOVES: ('1','1') -> ('0','1') on BOTH halves at once. *)
       iMod (sret_bits_update ('b"1") ('b"1") ('b"1") ('b"1") ('b"0") ('b"1")

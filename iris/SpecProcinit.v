@@ -352,7 +352,7 @@ Section ProcinitProcsInv.
                  (fun i g => ((∀ R : CtxId → iProp Σ,
                                  R cur_ctx ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
-                 (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string <{ proc_lock_res γs g (proc_addr i) }> ∗
+                 (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
     { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
@@ -363,7 +363,7 @@ Section ProcinitProcsInv.
       iAssert (kstack_free (proc_addr i)) with "[Hstk]" as "Hkst".
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
-      iMod ("Hmk" $! (<{ proc_lock_res γs g (proc_addr i) }>)
+      iMod ("Hmk" $! ((λ ξ : CtxId, proc_lock_res (XI := ξ) γs g (proc_addr i)))
               with "[Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "#Hlk".
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
                   with "Hst Hg Hch Hpub [Hdorm Hpark Hkst]").

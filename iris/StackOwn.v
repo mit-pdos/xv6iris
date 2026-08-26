@@ -408,6 +408,27 @@ Section stack_own.
 
 End stack_own.
 
+(* THE REGION'S TRANSPORT (tso-port M3).  A stack region is a big-op of
+   word cells, so [ctx_morph_word] does all the work -- what it buys is the
+   parked kernel stack inside [ProcDefs.kstack_free] / a dormant slot, which
+   is what makes [SchedCtx.proc_lock_res] a transportable lock payload.
+   OUTSIDE the section, necessarily: the statement names two contexts, and
+   a section variable cannot be instantiated inside its own section.
+   The structural instances are applied AS TERMS: the [ctx_word_pointsto]
+   index sits under the class projection [cur_ctx], which instance search
+   will not unfold (the M3 recipe's rule 3). *)
+Global Instance stack_own_morph `{!riscvGS Σ} `{KTR : !CurKtier}
+    (sp : Arch.pa) (n : nat) :
+  CtxMorph (fun xi : CtxId => stack_own (XI := xi) sp n).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /stack_own.
+  iDestruct "H" as (ws) "[%Hlen H]".
+  iDestruct (ctx_morph_big_sepL ws
+      (fun i w xi => ctx_word_pointsto (KTR := KTR) xi (pa_stk sp (S i)) (DfracOwn 1) w)
+      (fun i x => ctx_morph_word _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
+  iFrame "Hd". iExists ws. by iFrame.
+Qed.
+
 (* THE WEAKENING ALONG THE TIER ORDER.  A stack region is a big-op of
    [word_pointsto]s at one tier, and each of those weakens
    ([RiscvPtsto.word_ktier_mono]), so the region does -- which is what makes
@@ -418,18 +439,6 @@ End stack_own.
    its own section variables -- [stack_own (KTR := kt)] written above fails
    with "Wrong argument name KTR", the same rule the hart binder obeys
    (durable-notes, "CpuId IS A CLASS, SO A CROSSING NEEDS A NEW SECTION"). *)
-(* SHIM-TIER (dies at cutover): a stack region re-indexed between two
-   contexts -- the swtch hand-off crosses the M2 seam here at SC. *)
-Lemma stack_own_reindex `{!riscvGS Σ} `{KTR : !CurKtier} (ξ ξ' : CtxId)
-    (sp : Arch.pa) (n : nat) :
-  stack_own (XI := ξ) sp n ⊢ stack_own (XI := ξ') sp n.
-Proof.
-  rewrite /stack_own. iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
-  iExists ws. iSplitR; [done |].
-  iApply (big_sepL_mono with "H"). iIntros (i w _) "H".
-  iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
-  iApply (TsoCtxShim.ctx_word_of_mem with "H").
-Qed.
 
 Lemma stack_ktier_mono `{!riscvGS Σ} `{XI : CurCtx} (kt kt' : ktier) `{!KtierLe kt kt'}
     (sp : Arch.pa) (n : nat) :

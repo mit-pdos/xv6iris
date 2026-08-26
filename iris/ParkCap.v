@@ -155,7 +155,7 @@ Section ParkCap.
           later, for the same reason *)
        ▷ W -∗
        park_child (XI := ξp) γs γf pa ks rest pid V -∗
-       |==> ▷ proc_ctx (XI := ξp) γs pa)%I.
+       |==> ▷ proc_ctx γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for

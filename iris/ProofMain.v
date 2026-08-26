@@ -2174,8 +2174,9 @@ Section ProofMain.
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
                  (devintr_caps_fam γd γv γk γtl γs pd pav pu)
                  kernelvec_tv_direct kernelvec_stvec_base
-                 with "Hq Hstvec [] []")
+                 with "Hq Hstvec [] [] []")
       as "Hintr".
+    { iApply devintr_caps_fam_morph. }
     { iModIntro. iExact "Hcaps". }
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)

@@ -729,7 +729,8 @@ Section UtDispatch.
       iApply (ut_csrs_raw_fold
                 (devintr_caps_fam (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                    (un_pd N) (un_pav N) (un_pu N))
-                ep sc st with "Hraw Hdc Hih"). }
+                ep sc st with "Hraw [] Hdc Hih").
+      iApply devintr_caps_fam_morph. }
     iSplitL "Hclm"; [rewrite /cpu_claim_ext; iExact "Hclm" | iExact "Henv"].
   Qed.
 

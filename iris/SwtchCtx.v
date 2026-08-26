@@ -92,7 +92,7 @@ Proof. intro H; exact H. Qed.
 (* The pc a coroutine resumes on is [ret_pc] of its saved return address
    (RiscvExtras): the [c.ret] the swtch epilogue executes clears bit 0. *)
 
-Section SwtchCtx.
+Section SwtchCtxCells.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
@@ -126,11 +126,85 @@ Section SwtchCtx.
   Proof. rewrite /ctx_cells. apply _. Qed.
 
   (* ... and so is the contents-existential form.  Needed as an INSTANCE
-     rather than derived at the use site: [SchedCtx.proc_ctx_own_ctx] strips
-     the ▷ a parked record always arrives under, and instance search does not
-     unfold [own_ctx] on its own. *)
+     rather than derived at the use site: a parked record always arrives
+     under a ▷, and instance search does not unfold [own_ctx] on its own. *)
   Global Instance own_ctx_timeless pa : Timeless (own_ctx pa).
   Proof. rewrite /own_ctx. apply _. Qed.
+
+End SwtchCtxCells.
+
+(* ====================================================================== *)
+(* THE PARKED RECORD, AND WHY THIS SECTION BINDS NO AMBIENT CONTEXT.       *)
+(*                                                                        *)
+(* A parked record's rows are the PARKED THREAD's own: every one of them   *)
+(* is spelled at the record's own existential identity [XIp], never at the *)
+(* ambient.  That is what the block above [valid_context_pre] has always   *)
+(* claimed as INTENT ("[XIp] is ITS identity ... so the facts its closure  *)
+(* captured are the facts it wakes up holding"); the implementation used   *)
+(* to leave five of the seven rows at the installer's context, which       *)
+(* captured that context inside the guarded fixpoint and made              *)
+(* [valid_context] -- and hence [SchedCtx.proc_ctx] / [sched_vc_at] /       *)
+(* [proc_lock_res] / [procs_inv] -- ξ-dependent under a [▷].  Nothing can   *)
+(* transport a [▷]-guarded ξ-dependent payload (TsoCtx: [ctx_dom] is       *)
+(* deliberately non-persistent, so no bare entailment brings the           *)
+(* authority under the later and back out), so the M3 payload sweep was    *)
+(* blocked on it.  With every row at [XIp] the fixpoint is a CLOSED TERM:  *)
+(* [▷ valid_context …] is [ctx_morph_const] and no transport is invoked.   *)
+(*                                                                        *)
+(* THE SECTION DELIBERATELY DOES NOT DECLARE [XI : CurCtx].  [CurCtx] is a *)
+(* transparent definitional class over [CtxId], so a [CtxId]-typed binder  *)
+(* in scope is itself an instance candidate: with no ambient in scope an   *)
+(* unannotated row can only pick up [XIp] (right) or fail to elaborate,    *)
+(* never silently capture an installer's context (tso-port.md §0.8′ rule   *)
+(* 3).  Every row nevertheless spells [(XI := XIp)] explicitly.            *)
+(*                                                                        *)
+(* THE PRICE, and it is the one place it is paid: the party that RESUMES a *)
+(* record holds the wand's premises at ITS OWN ξ and must hand them in at  *)
+(* [XIp].  That is [TsoCtx.ctx_deposit] -- running context, parked         *)
+(* context, a [CtxMorph] payload -- and the record itself supplies the     *)
+(* [ctx_parked XIp Tp] premise.  ProofSwtch.v is the only site.            *)
+(* ====================================================================== *)
+Section SwtchCtxVC.
+  Context `{!riscvGS Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* THE SAVE AREA TRANSPORTS.  Fourteen word cells and nothing else, so
+     [ctx_morph_word] does all the work; the induction is only there
+     because the run is a Fixpoint rather than a big-op.  This is what lets
+     [TsoCtx.ctx_deposit] hand a resumed record's cells to the thread that
+     is about to run as its context (ProofSwtch.v).
+     THE STRUCTURAL INSTANCES ARE APPLIED AS TERMS (the M3 recipe's rule 3):
+     the [↦₈] notation puts the index under the class projection [cur_ctx],
+     so instance search cannot unify [λ ξ, _ (cur_ctx ξ) …] with
+     [ctx_morph_word]'s [λ ξ, _ ξ …] without a delta step it will not take. *)
+  Global Instance ctx_cells_at_morph (c : mword 64) (off : Z)
+      (vs : list (mword 64)) :
+    CtxMorph (λ ξ0 : CtxId, ctx_cells_at (XI := ξ0) c off vs).
+  Proof.
+    revert off. induction vs as [|v vs IH] => off.
+    - iIntros (ξ ξ') "Hd H". simpl. by iFrame.
+    - iIntros (ξ ξ') "Hd H". simpl. iDestruct "H" as "[Hv Hrest]".
+      iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hv") as "[Hd Hv]".
+      iDestruct (IH (off + 8)%Z ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
+      iFrame.
+  Qed.
+
+  Global Instance ctx_cells_morph (c : mword 64) (vs : list (mword 64)) :
+    CtxMorph (λ ξ0 : CtxId, ctx_cells (XI := ξ0) c vs).
+  Proof.
+    iIntros (ξ ξ') "Hd H".
+    iDestruct (ctx_cells_at_morph c 0 vs ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame.
+  Qed.
+
+  Global Instance own_ctx_morph (pa : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, own_ctx (XI := ξ0) pa).
+  Proof.
+    iIntros (ξ ξ') "Hd H". iDestruct "H" as (vs) "[%Hl H]".
+    iDestruct (ctx_cells_morph pa vs ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExists vs. by iFrame.
+  Qed.
 
   (* -------------------------------------------------------------------- *)
   (* valid_context P A c : the context saved at [c] admits a WP to       *)
@@ -220,7 +294,7 @@ Section SwtchCtx.
      rebinding [h] rebinds it -- and a MIGRATABLE record still names no
      hart, which is what lets [SchedCtx.procs_inv] store one. *)
   Definition valid_context_pre
-      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
@@ -245,23 +319,23 @@ Section SwtchCtx.
     (∃ (vs : list (mword 64)) (av : nat) (XIp : CtxId) (Tp : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
-      ctx_cells c vs ∗
-      stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
+      ctx_cells (XI := XIp) c vs ∗
+      stack_own (KTR := KT1) (XI := XIp) (nth 1 vs (mword_of_int 0)) av ∗
       ctx_parked XIp Tp ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
          sie_cap_gpr KT1 (CID := h) (XI := XIp) m av false p -∗
-         cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
+         cpu_own (CID := h) (XI := XIp) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
-         ctx_cells c vs -∗
+         ctx_cells (XI := XIp) c vs -∗
          (∃ (A' : ctx_adm) (cret : mword 64) (back : bool),
-            (if back then ▷ rec A' cret p else own_ctx cret) ∗
-            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back) -∗
+            (if back then ▷ rec A' cret p else own_ctx (XI := XIp) cret) ∗
+            P XIp h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back) -∗
          WP (LoopE gen_id h : expr riscv_lang)))%I.
 
   Global Instance valid_context_pre_contractive
-      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ) :
     Contractive (valid_context_pre P).
   (* [solve_contractive] gets all the way to the recursive occurrence and
@@ -278,20 +352,20 @@ Section SwtchCtx.
   Qed.
 
   Definition valid_context
-      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ :=
     fixpoint (valid_context_pre P).
 
   Lemma valid_context_unfold
-      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CtxId -d> CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (A : ctx_adm) (c p : mword 64) :
     valid_context P A c p ⊣⊢
       valid_context_pre P (valid_context P) A c p.
   Proof. apply (fixpoint_unfold (valid_context_pre P) A c p). Qed.
 
-End SwtchCtx.
+End SwtchCtxVC.
 
 (* SHIM-TIER (dies at cutover): re-index a save area's cells between
    contexts.  OUTSIDE the section, because the section's ambient [XI] fixes

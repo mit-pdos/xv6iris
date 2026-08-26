@@ -187,7 +187,7 @@ Section ProofSetkilled.
     (* ===================== acquire(&p->lock) ===================== *)
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> B1 n eb p (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
@@ -277,7 +277,7 @@ Section ProofSetkilled.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> C3 n eb p (av - 4)%nat
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) C3 n eb p (av - 4)%nat
               ({["proc"%string]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").

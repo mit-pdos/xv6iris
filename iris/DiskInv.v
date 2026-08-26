@@ -877,6 +877,24 @@ Section DiskCtx.
                  ξ ξ' with "Hd Hfree") as "[Hd Hfree]".
     iFrame "Hd". iExists np, nr, fl, pk, tr, fr. iFrame.
   Qed.
+  (* THE GEOMETRY.  Three [↦₈□] cells written once by virtio_disk_init and
+     then discarded, plus a ghost and pure facts.  Discarded is NOT
+     context-free: the cells are written at WP time ([t > 0]), so a reader
+     at another context needs its own bound to dominate that timestamp --
+     i.e. a [ctx_dom], which is exactly what this class consumes.  (A
+     ∀-context form would be the unsound reading; tso-port.md §0.4 item 6.) *)
+  Global Instance disk_geom_morph (γ : disk_names)
+      (pd pav pu : SailStdpp.Values.mword 64) :
+    CtxMorph (λ ξ0 : CtxId, disk_geom (XI := ξ0) γ pd pav pu).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /disk_geom.
+    iDestruct "H" as "(H1 & H2 & H3 & %Hal & Hcfg & %Hk1 & %Hk2 & %Hk3)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H3") as "[Hd H3]".
+    iFrame "Hd H1 H2 H3 Hcfg". iPureIntro. auto.
+  Qed.
+
 End DiskCtx.
 
 (* ====================================================================== *)

@@ -144,7 +144,7 @@ Section YieldPostSched.
        (yield's own [lks] is [∅], so this is [locks_below_empty]) *)
     locks_below lks "proc" ->
     kernel_text -∗
-    is_lock γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> -∗
+    is_lock γl (proc_addr j) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) -∗
     sie_cap_gpr KT1 msch (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
@@ -275,7 +275,7 @@ Section YieldPostSched.
     iDestruct (cpu_claim_proc j Hj with "Hclm Htagb") as "Hclm".
     iEval (rewrite -(cpu_claim_ext_split eb pj)) in "Hclm".
     iDestruct "Hclm" as "[Hclmp Hclmx]".
-    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> D1 0 eb pj (av - 4)%nat
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) D1 0 eb pj (av - 4)%nat
               ({["proc"]} ∪ lks) Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
@@ -620,7 +620,7 @@ Section ProofYield.
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     iDestruct (cpu_own_transport CID7 CID9 0 eb pj eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> B1 0 eb pj (av - 4)%nat eb ∅
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) B1 0 eb pj (av - 4)%nat eb ∅
               ltac:(lia)
               ltac:(lia)
               (locks_below_empty "proc")

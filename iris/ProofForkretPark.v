@@ -123,8 +123,12 @@ Section Res.
      it; the entry exists so that whoever PARKS a never-run process can
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
+  (* [XI] IS SPELLED, and it must be LAST: an implicitly generalized binder
+     lands at the first [`{…}] group, which is not where the module type
+     wants it (§0.12′'s [ProofProcMapstacks] lesson, again). *)
   Definition usertrap_res_bare_park
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      `{XIb : CurCtx}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc))
@@ -199,6 +203,66 @@ Proof.
     0%nat.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
+  (* ==================================================================== *)
+  (* THE PARK'S SECOND CROSSING -- AND THE M3 SWEEP'S LAST PAYLOAD IS ALL   *)
+  (* THAT IS LEFT OF IT.  Left failing HERE, deliberately, as the worklist  *)
+  (* entry; the [Abort] keeps the failure FAST.                             *)
+  (*                                                                        *)
+  (* WHERE IT NOW STANDS.  Since the [XIp] reshape (tso-port.md §0.15′,     *)
+  (* SwtchCtx.v) a parked record's rows are the PARKED thread's own, so     *)
+  (* every row of the record this proof is building -- its save area, its   *)
+  (* stack, its resume wand's whole premise list, and the chain payload --  *)
+  (* is spelled at [XIc], the identity minted three lines above.  That is   *)
+  (* the RIGHT shape and it is what makes [valid_context] a closed term;    *)
+  (* the price is that this proof, which holds those rows at the PARKER's   *)
+  (* ξ, must hand them over -- [TsoCtx.ctx_deposit], "a fork's              *)
+  (* hand-me-downs", whose premises are the parker's [own_context] (a       *)
+  (* conjunct of its [sie_cap], to be threaded into                         *)
+  (* [ParkCap.park_cap] / [forkret_park_paid_body]) and the freshly minted  *)
+  (* [ctx_parked XIc], which is in hand.                                    *)
+  (*                                                                        *)
+  (* AND ONE ROW CANNOT BE DEPOSITED.  [ctx_deposit]'s obligation is        *)
+  (* [CtxMorph] on the payload, and of what forkret needs at [XIc] --        *)
+  (* [procs_inv], [park_globals], [is_kstack], [proc_priv], the save area,  *)
+  (* the stack -- the row that fails it STRUCTURALLY is                      *)
+  (* [UsertrapRes.park_globals]' [FileInv.is_ftable].  MEASURED (§0.13′'s    *)
+  (* kit, on this tree):                                                     *)
+  (*                                                                        *)
+  (*     MORPH procs_inv OK        MORPH console_caps OK                     *)
+  (*     MORPH console_ready OK    (the initproc cell: ctx_morph_word)       *)
+  (*     NOTCONV is_ftable         NO-INSTANCE CtxMorph is_ftable            *)
+  (*     NOTCONV ftable_res                                                  *)
+  (*                                                                        *)
+  (* [is_ftable γl γ] is [is_lock γl ftable_addr "ftable" <{ ftable_res γ }>] *)
+  (* -- a CONSTANT embedding of a payload that is still ξ-INDEXED, so the    *)
+  (* two handles are [inv]s over DIFFERENT bodies and no law relates them.   *)
+  (* [ftable_res]'s ξ-dependence is [FileInvDefs.off_hold]'s [cinv] over     *)
+  (* [off_content], i.e. the borrowed [a_fip k ↦₈{1/2}] half -- the ONE      *)
+  (* payload the M3 sweep has not converted, and the one tso-port.md §0.14′  *)
+  (* leaves with a recommended ruling (the off-borrow cinv must stop holding *)
+  (* a points-to fraction of a flipped cell; replace the parked half with    *)
+  (* ghost state pinning [ip], so [off_content] is ξ-free outright).         *)
+  (*                                                                        *)
+  (* ([proc_priv]'s own chain -- [first_tok] -> [first_done] -> [fs_ready]   *)
+  (* -- is NOT measured here and may hold more of the same; every handle it  *)
+  (* carries whose payload the M3 sweep already converted or measured ξ-free *)
+  (* is a closed term, so it is expected to go through, but check it.)       *)
+  (*                                                                        *)
+  (* SO THE ORDER IS FORCED, and it is short: (i) land §0.14′'s off-borrow   *)
+  (* ruling so [ftable_res] converts and [is_ftable] becomes a closed term;  *)
+  (* (ii) thread the parker's [own_context] through [ParkCap.park_cap] and   *)
+  (* [forkret_park_paid_body] (both parkers hold one inside their            *)
+  (* [sie_cap_gpr]); (iii) deposit the six rows above into [XIc] and finish  *)
+  (* this proof with the body kept in the comment below.  Nothing else in    *)
+  (* the park is open: the swtch deposit is PROVED (ProofSwtch.v), the       *)
+  (* trap bundle transports (IntrDefs.caps_morph), and [proc_lock_res] is a  *)
+  (* converted payload.                                                      *)
+  (* ==================================================================== *)
+Abort.
+
+(* the body from the record's own rows down, kept for the redesign -- every
+   line of it is right except that its rows are at the PARKER's ξ and the
+   record now asks for them at [XIc]:
   iFrame "Hctx".
   iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
   iSplitL "Hthr"; [iExact "Hthr" |].
@@ -238,7 +302,7 @@ Proof.
      the resumer's own record ("Hrec") is that hart's parked scheduler --
      and a dispatching scheduler always leaves one, so [backr] is [true] and
      "Hrec" is a record rather than bare cells. *)
-  iDestruct (p_sched_at_proc γs h A' j cret _ (proc_addr j) backr Hj with "Hpay")
+  iDestruct (p_sched_at_proc γs XIc h A' j cret _ (proc_addr j) backr Hj with "Hpay")
     as "(%Htp & %Hcret & %Hpj & %HA & %Hbackr & Htc & Hrest)".
   iDestruct "Hrest" as (γl ch) "(%Hgl & Hheld & Htag)".
   subst cret A' backr.
@@ -280,43 +344,12 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  (* ==================================================================== *)
-  (* THE PARK PROTOCOL'S SECOND CROSSING -- M2, AND IT IS NOT A PARK        *)
-  (* PROBLEM.  Left failing HERE, deliberately, as the worklist entry; the  *)
-  (* [Abort] keeps the failure FAST (the [iApply] below CRAWLS -- measured  *)
-  (* past twenty-three minutes -- rather than erroring).                    *)
-  (*                                                                        *)
-  (* WHAT IT IS.  This proof MINTS the child's own thread identity          *)
-  (* ([TsoCtx.ctx_parked_alloc], [XIc]) and                                 *)
-  (* [SwtchCtx.valid_context_pre]'s resume wand hands the resumed bundle at *)
-  (* THAT identity, so forkret runs at [XIc] -- while every ξ-dependent     *)
-  (* premise it needs ([procs_inv], [park_globals], [trap_csrs],            *)
-  (* [proc_lock_res], [is_kstack], [proc_priv]) reaches this proof from the *)
-  (* PARKER, at the parker's ξ.  A FRESHLY MINTED CONTEXT CANNOT HOLD AN    *)
-  (* [is_lock]/[inv] HANDLE: the payload is embedded at a ξ ([<{ P }>]),    *)
-  (* invariant bodies are not updatable, and the twin's own transport       *)
-  (* ([ctx_dom] / [twin_share]) is DATA-only by construction.               *)
-  (*                                                                        *)
-  (* THE ∀-RESUMED-CONTEXT RESHAPE WAS TRIED AND MEASURED (tso-port.md      *)
-  (* §0.12′): quantifying [Xr] in the resume wand does not close it, and    *)
-  (* pushing every ξ-dependent premise into the wand only moves the wall to *)
-  (* the resume site, whose deposit ([SchedCtx.p_sched]: [trap_csrs] --     *)
-  (* which carries the trap handler's caps bundle since §0.11′ -- and       *)
-  (* [proc_held] -> [proc_ctx]) is itself handle-bearing.  The ways out are *)
-  (* the M3 λ-payload sweep (measured-blocked on [proc_lock_res] and        *)
-  (* [ftable_res]) or restating [wp_forkret] with its GLOBAL premises at an *)
-  (* explicit context supplied by the producer -- no new law, pure effort   *)
-  (* inside this cone.  See §0.12′ for both.                                *)
-  (* ==================================================================== *)
-Abort.
-
-(* the last step, kept for the redesign -- it is the one that crosses:
   iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γft γf pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hkmap Hpc Hpinv Hglobp Hcg Hcpu Htc Hclm
                 Hlocked HR Hks Hpriv HW Hclose").
-   (end of kept step) *)
+   (end of kept body) *)
 
 (* ===================================================================== *)
 (* THE TOKEN.  The cap above at [W := park_token γs], and the residue's     *)
@@ -347,7 +380,16 @@ Proof.
             Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
-  iFrame "Htext Hwire Hkmap Hpinv Hglobp Hmk Hstk".
+  (* row by row, not one [iFrame]: the globals row is an ∃ over a discarded
+     cell and a named frame will not match it (ParkCap.park_token_park makes
+     the same move for the same reason). *)
+  iSplitR; [iExact "Htext"|].
+  iSplitR; [iExact "Hwire"|].
+  iSplitR; [iExact "Hkmap"|].
+  iSplitR; [iExact "Hpinv"|].
+  iSplitR; [iExact "Hglobp"|].
+  iSplitR; [iExact "Hmk"|].
+  iSplitL "Hstk"; [iExact "Hstk"|].
   (* the closer describes the CHILD, so its identity is ∀-quantified beside
      its hart on BOTH sides -- [park_pkg]'s wand and [forkret_park_pkg]'s --
      and this hand-over just passes it through. *)

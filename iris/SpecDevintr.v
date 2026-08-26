@@ -161,6 +161,45 @@ Section DevintrCaps.
 End DevintrCaps.
 
 (* ===================================================================== *)
+(* THE BUNDLE'S TRANSPORT (tso-port M3, §4 step 4), and WHY IT IS A       *)
+(* [ctx_dom]-GATED MORPH RATHER THAN A ∀-CONTEXT FORM.                    *)
+(*                                                                       *)
+(* Five of the seven conjuncts are closed terms after the M3 payload      *)
+(* sweep ([dev_inv], [console_caps], the disk [is_lock], [timer_cap], and *)
+(* -- through [procs_inv]'s converted proc-lock payload -- the handles    *)
+(* inside [tick_keeper]).  The remaining ξ-dependence is CELLS, and they  *)
+(* are the same two rows in both places: [disk_geom]'s three ring-page    *)
+(* pointers and [procs_inv]'s per-slot [is_kstack].  Both are DISCARDED   *)
+(* and both are written at WP time by init code, i.e. at timestamp > 0 -- *)
+(* so "an immutable byte is context-free" is FALSE of them (tso-port.md   *)
+(* §0.4 item 6, re-worded), and the honest statement is exactly what      *)
+(* [ctx_morph_word] proves: transportable ALONG A DOMINATION.             *)
+(*                                                                       *)
+(* This is what [IntrDefs.caps_morph] internalises, and it is what the    *)
+(* installed-handler resource carries beside the credentials so that the  *)
+(* swtch deposit can move a parked thread's [trap_csrs] to the record's   *)
+(* own context.                                                           *)
+(* ===================================================================== *)
+Section DevintrCapsMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Global Instance devintr_caps_morph (γu : uart_names) (γv : disk_names)
+      (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    CtxMorph (fun xi : CtxId =>
+                devintr_caps (XI := xi) γu γv γdk γtl γs pd pav pu).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /devintr_caps.
+    iDestruct "H" as "(Hdev & Hcons & Hgeom & Hdlk & Htmr & Htick & Hpi)".
+    iDestruct (disk_geom_morph γv pd pav pu ξ ξ' with "Hd Hgeom") as "[Hd Hgeom]".
+    iDestruct (tick_keeper_morph γtl γs ξ ξ' with "Hd Htick") as "[Hd Htick]".
+    iDestruct (procs_inv_morph γs ξ ξ' with "Hd Hpi") as "[Hd Hpi]".
+    iFrame.
+  Qed.
+
+End DevintrCapsMorph.
+
+(* ===================================================================== *)
 (* THE SAME BUNDLE AS A CONTEXT-INDEXED FAMILY -- what the trap handler's  *)
 (* contract takes.                                                        *)
 (*                                                                        *)
@@ -206,6 +245,16 @@ Section DevintrCapsFam.
     devintr_caps_fam γu γv γdk γtl γs pd pav pu ξ ⊣⊢
     devintr_caps (XI := ξ) γu γv γdk γtl γs pd pav pu.
   Proof. reflexivity. Qed.
+
+  (* the family's TRANSPORT CERTIFICATE -- what [IntrDefs.intr_res] carries
+     beside [□ C ξ], so that a parked thread's [trap_csrs] can be deposited
+     at the record's own context ([TsoCtx.ctx_deposit], ProofSwtch.v).
+     Every supply site (the [intr_res_intro] callers, and [ProofUsertrap]'s
+     [ut_csrs_raw_fold]) discharges it with this lemma and nothing else. *)
+  Lemma devintr_caps_fam_morph (γu : uart_names) (γv : disk_names)
+      (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    ⊢ caps_morph (devintr_caps_fam γu γv γdk γtl γs pd pav pu).
+  Proof. iApply caps_morph_intro. Qed.
 
 End DevintrCapsFam.
 

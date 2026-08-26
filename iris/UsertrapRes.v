@@ -429,11 +429,16 @@ Section UsertrapRes.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
+    (* THE FAMILY'S TRANSPORT CERTIFICATE, folded in beside the credentials:
+       [trap_csrs] rides the swtch payload, and a parked record's rows are
+       stated at the record's own context, so the bundle has to be able to
+       move along a [ctx_dom] ([IntrDefs.caps_morph], ProofSwtch.v). *)
+    caps_morph C -∗
     □ C cur_ctx -∗
     intr_handler_spec KT1 C (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
-    iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hc #Hih".
+    iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hcm #Hc #Hih".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
     - rewrite /trap_csrs_raw.
       iSplitL "Hep"; [iExists ep; iExact "Hep" |].
@@ -442,7 +447,7 @@ Section UsertrapRes.
       iExists ('b"0" : mword 1), ('b"1" : mword 1). iExact "Hsret".
     - iApply (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64)
                 ('b"0" : mword 1) C kernelvec_tv_direct kernelvec_stvec_base
-                with "Hq Hstv Hc [Hih]").
+                with "Hq Hstv Hcm Hc [Hih]").
       iApply bi.later_intro. iExact "Hih".
   Qed.
 
@@ -1534,13 +1539,14 @@ Section UsertrapRes.
 
   Lemma ut_csrs_raw_fold (C : CtxId -d> iPropO Σ) (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
+    caps_morph C -∗
     □ C cur_ctx -∗
     intr_handler_spec KT1 C (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
-    iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hc #Hih".
+    iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hcm #Hc #Hih".
     iApply (ut_trap_csrs_fold C ep sc st
-              with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hc Hih").
+              with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hcm Hc Hih").
   Qed.
 
   (* EVERYTHING ELSE A BLOCK CARRIES, at its own SIE index: the per-cpu
@@ -1639,7 +1645,7 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
     (ξ : CtxId) (γs : list gname) (γft γf : gname) : iProp Σ :=
   (procs_inv (XI := ξ) γs ∗
    is_ftable (XI := ξ) γft γf ∗
-   console_caps (XI := ξ) fsc_uart ∗
+   console_caps fsc_uart ∗
    console_ready (XI := ξ) ∗
    (∃ ip : mword 64,
       ctx_word_pointsto ξ (mword_of_int KernelSyms.initproc : mword 64)

@@ -738,7 +738,7 @@ Section ProofSched.
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf KT1 γl (proc_addr j) "proc"
-              <{ proc_lock_res γs γl (proc_addr j) }> False%I B1 (av - 6)%nat pj
+              (λ ξ : CtxId, proc_lock_res (XI := ξ) γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked").
     { iApply (is_lock_openable with "Hislock"). }
@@ -1345,7 +1345,7 @@ Section ProofSched.
         iSplitL "Hframe6"; [iExact "Hframe6" |].
         iEval (rewrite Hgeom6). iExact "Hstk". }
       iPoseProof ("Hpay" with "Hfull") as "Hpp".
-      iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
+      iPoseProof (p_sched_to_cpu γs cur_ctx cpu_id j γl st ch Hj Hgl Hneeds
                     with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpp") as "HP".
       { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
       iEval (rewrite Hnc) in "HP".
@@ -1363,7 +1363,7 @@ Section ProofSched.
     { iApply (park_pay_needs_ctx (proc_addr j) st Hnc). }
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
-    iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
+    iPoseProof (p_sched_to_cpu γs cur_ctx cpu_id j γl st ch Hj Hgl Hneeds
                   with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpp") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     iEval (rewrite Hnc) in "HP".
@@ -1391,7 +1391,7 @@ Section ProofSched.
     (* resume: elim the SECOND disjunct (dispatched proc).  It delivers the
        lock at hart [h] and hart [h]'s trap CSRs ([intr_res] among them). *)
     iDestruct "Hresume" as (A' cret backr) "[Hvc' Hpayr]".
-    iDestruct (p_sched_at_proc γs h A' j cret (rget (CID := h) m' (mword_of_int 4 : mword 5)) pj backr Hj with "Hpayr")
+    iDestruct (p_sched_at_proc γs cur_ctx h A' j cret (rget (CID := h) m' (mword_of_int 4 : mword 5)) pj backr Hj with "Hpayr")
       as "(%Htpv & %Hcret & %Hpidx & %HA' & %Hbackr & Htc' & Hpay2)".
     subst A'. subst backr.
     iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Htag')".

@@ -567,6 +567,27 @@ Section ctx.
       iFrame.
   Qed.
 
+  (* THE GUARDED SLOT.  A payload that is present on some states and [emp]
+     on the others -- [SchedCtx.proc_slots]' five arms, every [if ... then
+     ... else emp] in a lock invariant -- transports arm by arm.  Stated as
+     two instances rather than one over an [option] because the tree writes
+     the guard as a plain [bool] and the [emp] side varies.
+     (Kit obligation: both are derivable from [ctx_morph] alone, exactly as
+     [ctx_morph_big_sepL] is, so the twin's block needs them at the swap.) *)
+  Global Instance ctx_morph_if_then (b : bool) (R : CtxId → iProp Σ) :
+    CtxMorph R → CtxMorph (λ ξ, if b then R ξ else emp)%I.
+  Proof.
+    intros HR. destruct b; [| iIntros (ξ ξ') "Hd _"; by iFrame ].
+    iIntros (ξ ξ') "Hd H". by iApply (ctx_morph with "Hd H").
+  Qed.
+
+  Global Instance ctx_morph_if_else (b : bool) (R : CtxId → iProp Σ) :
+    CtxMorph R → CtxMorph (λ ξ, if b then emp else R ξ)%I.
+  Proof.
+    intros HR. destruct b; [ iIntros (ξ ξ') "Hd _"; by iFrame |].
+    iIntros (ξ ξ') "Hd H". by iApply (ctx_morph with "Hd H").
+  Qed.
+
   (* the word cell's transport obligation, once for every payload *)
   Global Instance ctx_morph_word (kt : ktier) a dq w :
     CtxMorph (λ ξ, ctx_word_pointsto (KTR := kt) ξ a dq w).

@@ -1090,6 +1090,188 @@ its 7-file cone.  Three consecutive full VM rounds; the 173-site
 (`ProofFilewrite.v:1542`, a MODULE-QUALIFIED `<{ DiskInv.disk_res … }>`
 the unqualified grep missed — worth remembering for the next sweep).
 
+### 0.15′ THE `XIp` RESHAPE IS LANDED, AND THE PARK'S LAST BLOCKER IS ONE PAYLOAD (2026-08-26)
+
+Implements `tso-transport-memo.md` §4 steps 3–5.  Steps 3 and 4 are
+landed and green; step 5 is **refuted by measurement**, on one row, and
+that row is `tso-port.md` §0.14′'s own unfinished business.
+
+**A PARKED RECORD'S ROWS ARE THE PARKED THREAD'S OWN.**
+`SwtchCtx.valid_context_pre`'s six ambient rows now read the record's own
+existential identity `XIp`, and `P` takes it as a leading argument.
+`valid_context` — hence `SchedCtx.proc_ctx` / `sched_vc_at` / `p_sched`
+— is a **CLOSED TERM** (`Check` prints no `CurCtx`), so `▷ proc_ctx` and
+`▷ sched_vc_at` are `ctx_morph_const` and **no `▷`-capable transport is
+invoked anywhere**.  Contractiveness closes with the tree's own tactic
+unchanged, exactly as the memo's Probe A predicted.
+
+**THE M3 SWEEP'S STEP 3 IS LANDED.** `proc_lock_res` is a CONVERTED
+payload (`procs_inv` spells `(λ ξ, proc_lock_res (XI := ξ) …)`, 41 sites
+in 17 files), so the per-proc `is_lock` HANDLE is a closed term and the
+acquirer re-indexes the payload along `ctx_dom` — the honest TSO reading
+of an acquire.  `procs_inv` is **transportable, not context-free**, and
+cannot be either: it also carries the per-slot `is_kstack`.
+
+**THE SWTCH DEPOSIT IS PROVED** (`ProofSwtch.v`).  `wp_swtch_sconf` gains
+one instance-implicit premise, `CtxMorph (λ ξ, P ξ cpu_id Ao newc oldc …)`,
+resolved by `SchedCtx.p_sched_morph` at both call sites; the proof
+deposits the target's post-block save area, `cpu_own`, the chain payload
+and (at `back = false`) the old context's raw cells into the record's
+`XIt` with `TsoCtx.ctx_deposit`, then exchanges the tokens.
+
+#### THE MEMO'S §5 FALLBACK IS UNSOUND, AND THE RIGHT SHAPE IS A GATED CERTIFICATE
+
+`tso-transport-memo.md` §5 pre-approves restating `intr_res` as
+`∃ C, □ (∀ ξ, C ξ) ∗ ▷ ihs kt C h` if the "§4 gate" (`trap_csrs`
+`NOTCONV → CONV`) does not flip.  **Do not take it.**  `devintr_caps`
+holds two rows of cells that are DISCARDED AT RUNTIME — `disk_geom`'s
+three ring-page pointers and `procs_inv`'s per-slot `is_kstack` — and a
+∀-context form over a `t > 0` discarded fact is precisely what §0.4 item
+6 forbids: it would look green at SC and be false at the flip.
+
+What the deposit actually needs is not context-FREEDOM but
+TRANSPORTABILITY, and that is `CtxMorph`.  So `IntrDefs` now carries
+
+```coq
+Definition caps_morph (C : caps_fam) : iProp Σ :=
+  (□ ∀ ξ ξ' : CtxId, ctx_dom ξ ξ' -∗ □ C ξ -∗ ctx_dom ξ ξ' ∗ □ C ξ')%I.
+```
+
+— `CtxMorph (λ ξ, □ C ξ)` internalised, `ctx_dom`-GATED — as a row of
+`ires_of` / `intr_res` beside `□ C ξ`.  It is discharged once, by
+`caps_morph_intro` (from the structural instances alone, consuming
+nothing, hence sittable under the `□`) at
+`SpecDevintr.devintr_caps_fam_morph`.  Cost: one row, the
+`intr_res_intro` callers, the `rewrite /intr_res` destructuring sites, and
+`ut_trap_csrs_fold` / `ut_csrs_raw_fold` (which take the certificate as a
+premise and get it from `devintr_caps_fam_morph` at `ProofUsertrap`) — the
+same fallout list §0.11′ recorded, again.
+
+> **THE RULE.  When an ∃-bound abstract payload has to change context,
+> give the resource the TRANSPORT, not the uniformity.  A ∀-context form
+> is only sound for timestamp-0 (boot-image) facts; everything written at
+> WP time transports along a `ctx_dom` and nothing else.**
+>
+> Corollary, and it retires a measurement: §4's gate is the WRONG TEST.
+> `trap_csrs` stays `NOTCONV` and always will (it carries the whole
+> device bundle); `CtxMorph (λ ξ, trap_csrs (XI := ξ) kt)` is what the
+> deposit wanted, and it holds.  §0.14′'s "the §4 gate did NOT flip …
+> and the two rows still holding it are `disk_geom` and `procs_inv`" is
+> answered by making both TRANSPORT, not by making either disappear.
+
+#### STEP 5 IS REFUTED, AND IT IS ONE ROW
+
+`ProofForkretPark.forkret_park_paid` stays at `Abort`.  With the reshape
+the record's rows are all at the freshly minted `XIc`, so the proof must
+hand its six ξ-dependent rows over with `ctx_deposit` — `procs_inv`,
+`park_globals`, `is_kstack`, `proc_priv`, the save area and the stack —
+whose obligation is `CtxMorph` on each.  MEASURED with §0.13′'s kit on
+this tree:
+
+```
+MORPH procs_inv OK          MORPH console_caps OK
+MORPH console_ready OK      (the initproc cell: ctx_morph_word)
+NOTCONV is_ftable           NO-INSTANCE CtxMorph is_ftable
+NOTCONV ftable_res
+```
+
+`UsertrapRes.park_globals`' `FileInv.is_ftable` is
+`is_lock γl ftable_addr "ftable" <{ ftable_res γ }>` — a CONSTANT
+embedding of a payload that is still ξ-INDEXED, so two handles are `inv`s
+over DIFFERENT bodies and no law relates them.  `ftable_res`'s
+ξ-dependence is `FileInvDefs.off_hold`'s `cinv` over `off_content`, i.e.
+the borrowed `a_fip k ↦₈{1/2}` half — **the one payload the M3 sweep has
+not converted, and the one §0.14′ leaves with a recommended ruling.**
+(`proc_priv`'s own chain — `first_tok` → `first_done` → `fs_ready` — is
+NOT measured; every handle it carries whose payload the sweep converted or
+measured ξ-free is a closed term, so it is expected to go through, but it
+is the next thing to check, not something to assume.)
+
+**So the order is forced, and it is short.**  (i) Land §0.14′'s
+off-borrow ruling (the parked half becomes ghost state pinning `ip`), so
+`ftable_res` converts and `is_ftable` is a closed term.  (ii) Thread the
+parker's `own_context` through `ParkCap.park_cap` and
+`forkret_park_paid_body` — `ctx_deposit`'s first premise, which no
+persistent surrogate can replace (the depositor's authority over its own
+context is what bounds the deposited facts' timestamps).  Both parkers
+hold one inside their `sie_cap_gpr`; quantify the HART beside the context
+in `park_cap` so the token stays hart-free (ruling 1).  (iii) Deposit the
+six rows into `XIc` and finish with the body kept in
+`ProofForkretPark.v`'s trailing comment.
+
+#### MECHANICS WORTH KEEPING
+
+- **A section variable cannot be instantiated inside the section that
+  binds it, and that is what shapes both files.**  `valid_context_pre`
+  must spell `ctx_cells (XI := XIp)`, so it moved below the section that
+  defines `ctx_cells`; `p_sched` must spell `proc_held (XI := ξ)`, so
+  `SchedCtx.v` is now FOUR sections (payload halves → chain → lock
+  invariant → `procs_inv`, the last one split off only so its payload
+  could be λ-converted).  **The sections that must not capture an ambient
+  declare no `XI` at all** — with none in scope a forgotten annotation is
+  an elaboration error instead of a silent capture (§0.8′ rule 3).
+- **`Global Typeclasses Transparent cur_ctx` does NOT help** (measured).
+  `↦₈`/`↦ₘ` put the index under the class projection `cur_ctx`, and
+  instance search will not take that delta step, so `ctx_morph_word` /
+  `ctx_morph_pointsto` must be **applied AS TERMS** for every payload
+  written with the notations — the `KallocInv` recipe's rule 3 is a
+  requirement, not a style.
+- **Two new structural instances**, `TsoCtx.ctx_morph_if_then` /
+  `ctx_morph_if_else`: a payload guarded by a boolean with `emp` on the
+  other arm (`proc_slots`' five arms) transports arm by arm.  Kit
+  obligation: derivable from `ctx_morph` alone, like `ctx_morph_big_sepL`.
+- **ξ-profile, measured, worth not re-deriving:** `proc_pt` is ξ-FREE (it
+  is entirely physical tier), and so are `tf_page`, `pstate_lock`,
+  `hart_at`, `hart_at_any`, `pslot_used_at`, `proc_pub`, `hart_full`,
+  `cpu_locks_lvl`, `hart_csrs`, `wire_inv`, `kmap_at`, `kernel_text`,
+  `cwd_ref`.  `cpu_own`'s ONLY context-indexed row is `ProcGeom.cur_proc`
+  (one word cell).  `SpecConsoleintr.console_caps` carried a PHANTOM
+  `CurCtx` binder its body never mentioned; dropped, and it is now a
+  closed term.
+- **The swtch seam has exactly one shim use, and the reshape moved it.**
+  `StackOwn.stack_own_reindex` is GONE ENTIRELY — the record's stack is
+  already at `XIt`, `ProofSwtch` was its only caller, and one piece of
+  cutover debt goes with it; `ctx_cells_reindex XIt cur_ctx` takes its
+  place on
+  the INBOUND leg, because the machine block reads the target's save area
+  at the RUNNING hart's index and the sealed surface has no
+  parked→running law (a resumer is entitled to those cells by its
+  p->lock acquire's `ctx_dom`, which is not threaded to that proof yet —
+  the same M2 seam `SchedCtx.cpu_ctx_free`'s ∃-context records).  The
+  OUTBOUND leg is honest `ctx_deposit`.
+- `SchedCtx.proc_ctx_cells` / `proc_ctx_own_ctx` were dead tree-wide and
+  are deleted; they were the only ξ-crossing the reshape would have made
+  unprovable.
+
+#### THE CONE SWEEP, AND WHAT IT STILL HIDES
+
+Swept per §0.12′'s lesson (stub the deliberate `Abort` once, force the
+7-file cone, restore).  Two real breakages found and fixed:
+`ProofForkretPark.usertrap_res_bare_park`'s implicitly generalized
+`CurCtx` landed at the FIRST `` `{…} `` group while the module type wants
+it LAST (the `ProofProcMapstacks` lesson, fifth occurrence — spell it),
+and `park_token_intro`'s package hand-over needs the row-by-row
+`iSplitR`/`iExact` spelling rather than one `iFrame`, because the globals
+row is an ∃ over a discarded cell (`ParkCap.park_token_park` already
+carries that note).
+
+**The third is not repaired and is not this tranche's:** `BootShared.v`'s
+`.bss` carve has been stale since the M1 flip.  `Section BootBss` /
+`Section BootBssChain` bind no `CurCtx` while `cpu_slot_raw` and
+`boot_hart_bss` hold `↦₈` cells and an `own_ctx`; and because `BootCarve`
+sits BELOW the seam (its `↦₈` is the RAW `word_pointsto`) while
+`BootShared` imports `TsoCtx`, every cell the carve hands to a ξ-indexed
+consumer needs the phys→ctx mint `TsoCtxShim.ctx_word_of_mem` —
+`BootCarveMain.v` already does exactly this at ~60 sites and is the
+template.  Scope: two section binders plus ~25 mint insertions across
+`BootShared`'s 35 `boot_ran_cell8*` sites (the `↦₄`/`↦₂` ones need
+nothing — stage 1 does not flip them), then whatever the five files above
+it hide in turn.  **Nothing above it can be checked until the park's
+`Abort` goes, so budget this WITH the off-borrow ruling, not after it.**
+
+**Red set unchanged:** `ProofForkretPark.v` (the deliberate `Abort`) and
+its 7-file cone.
+
 ---
 
 ---
