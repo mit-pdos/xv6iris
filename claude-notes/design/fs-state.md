@@ -1538,29 +1538,59 @@ The rest is deleted when the `Γ`-predicates replace their consumers, not
 before.
 
 
-## 6½. RULING: the parent link is a REGISTER IN THE LINK RA, not a clause
+## 6½. The parent link is a REGISTER IN THE LINK RA, not a clause
 
-rmdir pays `dp->nlink--` with the child's `..` token, and needs the
-child's `..` to NAME `dp`.  That is cross-inode as a pure fact and is
-never stated as one.  The per-inum link RA at `γlink` is
-`auth nat × option (dfrac_agree Z)`: the count authority as before, plus a
-directory's PARENT REGISTER — `par_half Γ child dp`, a ½ of `agree dp` at
-the child's key.  The child's `inode_owned` holds one half beside its
-`..` entry (which names `dp`); `dp`'s holds the other beside its entry
-for `child` (an entry whose target is a directory).  Agreement of the
-two halves IS "child's `..` = dp".  `mkdir` mints the pair, rmdir retires
-it (the walk holds both bundles, so both halves); an orphan directory
-(`nlink = 0`) has no register, matching the `..`-of-an-orphan token
-exemption.  `Γ` is unchanged.
+rmdir pays `dp->nlink--` with the child's `..` token, and needs the child's
+`..` to NAME `dp`.  That is cross-inode as a pure fact and is never stated
+as one, so it is a RESOURCE both parties hold.  The per-inum link RA at
+`γlink` is `auth nat × auth (gmultiset (option Z))` — the count authority as
+before, plus a PARENT REGISTER at the TARGET's key holding the multiset of
+inums that name it.
 
-The snapshot states nothing new: `snap_bytes`' `sk_links` is
-`✓ link_elem (fss_inodes S)`, the validity of the RA element built from
-`S`, and with the richer RA that element carries the register halves —
-its validity IS the parent fact.  Read off the collected halves at a
-commit (`own_valid`), allocated and distributed at boot exactly like the
-tokens.  The rmdir arm's other old reading, `2 ≤ nlink dp`, is FALSE
-(rmdir inside an unlinked cwd takes `dp` to 0 and `iput` frees it) and is
-not stated; the decrement needs only the token in hand.
+- **The fragment rides with the entry token**, inside
+  `FsStateInode.ent_tok`, one per token-bearing entry, at
+  `ent_par_val self s`: `Some self` for a NAME record (its home names the
+  target), `None` for a dot record (it points the other way — but it still
+  holds a link, so it still holds a unit, which is what makes the bound
+  below survive the decrement that removes it).  It is UNCONDITIONAL: it
+  never asks what the target's TYPE is, and that is the whole reason this
+  shape works where a `dfrac_agree` pair of halves does not
+  (`iris/FsParRefute.v` is the machine-checked refutation: locality forces
+  the parent side to be unconditional, an unconditional half dies at the
+  third hard link, and the only unbounded-sharing alternative is core-id,
+  hence unretractable, hence incompatible with inode reuse).
+- **The authority is the child's own**, under one clause: `size P ≤ nlink`
+  (what makes a FREED inum's register empty, so the next `mkdir` can install
+  its own singleton) and — at a LIVE DIRECTORY — `∀ j, Some j ∈ P →
+  j = the node's own ".." target`.  Agreement of the two IS the parent fact:
+  `dp`'s entry says `Some dp ∈ P(child)`, the child says only its `..`
+  target may be there, so `dp` IS that target.
+- **The value is NOT fixed at the mint**, and that is forced by the kernel:
+  `sys_link` runs `ip->nlink++` BEFORE `nameiparent` resolves the directory
+  the new record will live in.  The unit is minted unattributed and
+  RE-VALUED at the `dirlink` that files it
+  (`IregLinkNz.ireg_par_revalue`, one mask-preserving step on the target's
+  own slot).  `create`/`mkdir` know `dp` at the mint and pass the value
+  straight through.
+
+The snapshot states nothing new: `snap_bytes`' `sk_links` is the validity of
+the RA element built from `S`, and with the richer RA that element carries
+the register, so its validity IS the parent fact.  Read off the collected
+units at a commit (`own_valid`), allocated and distributed at boot exactly
+like the tokens.  The rmdir arm's other old reading, `2 ≤ nlink dp`, is
+FALSE (rmdir inside an unlinked cwd takes `dp` to 0 and `iput` frees it) and
+is not stated; the decrement needs only the unit in hand.
+
+WHERE THE AUTHORITY LIVES decides which half of the clause can be stated.
+The inode REGION's slot carries a record and no data, so region-side it can
+state `size P ≤ nlink` and nothing more; the DIRECTORY clause reads the
+node's `..` entry and therefore belongs in the checked-out payload
+(`IcacheEscrow.dlinks`, whose `data` parameter is right there).  As built,
+the authority is region-side under the bound alone
+(`InodeRegion.ireg_par`, inside `ireg_lnk_at`) and the fragments' values are
+carried but not yet read; moving it into the payload with the directory
+clause is the same step that drops `DirLinks.dir_links` from `dlinks`, and
+is what lets rmdir read (D1) off the register.
 
 ## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
 

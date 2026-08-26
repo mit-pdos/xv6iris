@@ -2620,6 +2620,72 @@ so it never wanted that shape.
     `ireg_write_unlink`/`_d`/`_p` — are deleted (260 lines).
     `ProofIupdate` applies `ireg_write_link_fl`/`_unlink_fl` directly.
 
+  **AS LANDED — G2 (the PARENT REGISTER, wired end to end).  6c/6d/6e
+  ARE STILL AHEAD, and what is now in front of them is ONE step, not two.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline.
+
+  - **THE RULED SHAPE DOES NOT WORK, and `iris/FsParRefute.v` is the
+    machine-checked refutation.**  A `dfrac_agree` half at the child's key
+    states its PARENT side at "an entry whose target is a DIRECTORY", and a
+    dirent carries no type — so that side is either a function of the whole
+    inode map (the arity of `ent_toks`, hence `inode_owned`, hence every
+    payload site; and at the RUNTIME payload, which has no such map, only an
+    existential flavour refuted against the region's type clause, i.e. the
+    `DirLinks` apparatus this lane exists to delete), or unconditional, and
+    then `par_half_three_namers` (three hard links put three halves at one
+    key) and `nondir_marker_stuck` (the only unbounded-sharing alternative is
+    core-id, hence unretractable, hence incompatible with `ialloc`'s reuse)
+    kill it.
+  - **WHAT IS BUILT** (fs-state.md §6½ as amended, fs-ghost-state.md §3b′):
+    `Xv6Cameras.fsLinkUR` widens to `gmapUR Z (prodUR (authUR natUR)
+    fsParUR)` with `fsParUR = authUR (gmultisetUR (option Z))` — at the
+    TARGET's key, the multiset of inums naming it.  The FRAGMENT rides
+    inside `FsStateInode.ent_tok` at `ent_par_val self s` (`Some self` at a
+    name record, `None` at a dot record, which still holds a link and so
+    still holds a unit); it is UNCONDITIONAL, which is what makes both
+    halves definable one inode at a time.  The AUTHORITY parks region-side
+    beside the count's (`InodeRegion.ireg_par` inside `ireg_lnk_at`) under
+    `size P ≤ nlink`.
+  - **THE VALUE IS NOT FIXED AT THE MINT** and cannot be: `sys_link` runs
+    `ip->nlink++` before `nameiparent` names the directory the record will
+    live in.  The unit is minted unattributed and RE-VALUED at the `dirlink`
+    that files it — `IregLinkNz.ireg_par_revalue`, one mask-preserving step
+    on the target's slot (`InodeRegion.ireg_lnk_par_move` is its RA half).
+    create/mkdir know `dp` at the mint and pass the value through.
+  - **Contracts whose statement changed:**
+    `SpecIupdate.wp_iupdate_link_body`/`_unlink_body` (a `prv` parameter and
+    the register unit beside the counting token — nine call sites moved),
+    `InodeRegion.ireg_write_link_fl`/`_unlink_fl`, `ireg_lnk_bump`/`_drop`,
+    `FsStateInode.ent_tok_of_link`/`ent_tok_ne`/`ent_tok_dotdot`/
+    `ent_toks_orphan`, `FsStateEra.ent_toks_era_unlink`/`_era_orphan`,
+    `FsState.link_elem`/`fs_links`/`fs_boot_alloc*`/`link_full_elem` (a
+    per-inum choice function for the authority's value; `fs_link_node` is
+    the named per-inode conjunct), `FsDurSnap.sk_links` (an existential
+    choice function beside validity), `FsDurLedger.dhand` (keyed by inum and
+    valued by the multiset of register values it holds there — the count is
+    that multiset's size).
+  - **Boot and snapshot:** `FsCfgBoot.img_ticket_par` is the image fact the
+    routing needs (every ticketed record of a well-formed image is a NAME
+    record of the ROOT — W9's (T) leaves one directory, W6/W7 make both its
+    dot records name it), `img_par` and `FsDurImg.img_par_f` are the two
+    choice functions, and `FsDurImg.pars_of_list`/`par_toks_of` are the
+    register twins of the token routing.
+
+  **WHAT REMAINS, AND IT IS ONE STEP.**  The clause that gives the register
+  its CONTENT — a live directory admits only its own `..` target as a namer,
+  which is exactly rmdir's (D1) — reads the node's DATA, so it can only be
+  stated where the data is: the checked-out payload.  Moving
+  `FsStateInode.inode_par` from `InodeRegion.ireg_lnk` into
+  `IcacheEscrow.dlinks` (whose `data` parameter is right there) IS 6c's
+  first half — `dlinks` loses `DirLinks.dir_links` and gains `inode_par` in
+  the same edit, so the ~40 pass-through payload sites keep their arity and
+  only the ~30 `dlinks_open`/`_intro` sites and the 8 free-discharge sites
+  (`dlinks_not_dir`/`_size_zero`, which stop being free) move.  With the
+  clause in place `FsStateInode.inode_par_namer` (deleted here, since
+  nothing could read it yet) gives rmdir (D1) directly and 6d/6e follow as
+  the worklist has them.
+
   **BLOCKED, and the block is 6c, not the snapshot.**  Every one of 6d's
   five columns is read through `DirLinks.dir_links`
   (`iris/DirLinks.v:566`), the first conjunct of `IcacheEscrow.dlinks`

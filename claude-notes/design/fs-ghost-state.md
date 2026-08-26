@@ -483,16 +483,39 @@ readers) and the six caller-less instance wrappers of
 ### 3b′. The link-counting RA's per-inum AUTHORITY — `ireg_lnk`
 
 Beside the ledger above, and a different ghost entirely: `fs-state.md` §2's
-counting RA (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (authR
-natUR)`, one auth-of-nat per inum in a single element at `fs_link γfs`).
-`ireg_slot` carries
+counting RA (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (prodUR
+(authUR natUR) fsParUR)`, one element per inum in a single ghost element at
+`fs_link γfs`).  `ireg_slot` carries
 
     ireg_keep γfs z  := if z = ireg_root then link_tok (fs_gamma_L γfs) z else emp
-    ireg_lnk γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d) ∗ ireg_keep γfs z
+    ireg_par γfs z n := ∃ P, par_auth (fs_gamma_L γfs) z P ∗ ⌜size P ≤ n⌝
+    ireg_lnk γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d)
+                        ∗ ireg_keep γfs z ∗ ireg_par γfs z (ireg_nl d)
 
 where `ireg_nl d = Z.to_nat (bv_unsigned (di_nlink d))`.  The value is tied
 to the slot's record BY CONSTRUCTION — the definition names `d` once — so
 "the authority stands at this record's `nlink`" is never a clause.
+
+**THE SECOND COLUMN IS THE PARENT REGISTER** (`fsParUR = authUR (gmultisetUR
+(option Z))`, fs-state.md §6½): at the TARGET's key, the multiset of inums
+that hold a NAME record for it.  Its FRAGMENTS ride inside
+`FsStateInode.ent_tok` — one per token-bearing entry, at `ent_par_val self
+s`, which is `Some self` at a name record and `None` at a dot record — so
+every counting token in the tree travels with exactly one register unit,
+minted with it (`ireg_lnk_bump`), spent with it (`ireg_lnk_drop`), routed
+with it at boot and collected with it at a commit.  **The value is not fixed
+at the mint**: `sys_link` raises `ip->nlink` before `nameiparent` names the
+directory the record will live in, so the unit arrives unattributed and is
+RE-VALUED at the `dirlink` that files it (`IregLinkNz.ireg_par_revalue`, one
+mask-preserving step; `InodeRegion.ireg_lnk_par_move` is its RA half).
+`iris/FsParRefute.v` is the machine-checked refutation of every shape whose
+parent side has to know the target's TYPE.
+
+Region-side the register can only carry `size P ≤ nlink`, because a slot
+holds a RECORD and no data.  The clause that gives it its content — a live
+directory admits only its own `..` target as a namer, which is what rmdir
+reads — needs the node's `..` entry and therefore belongs in the checked-out
+payload; it lands when `IcacheEscrow.dlinks` loses `DirLinks.dir_links`.
 
 **THE TOKENS ARE NOT HERE.**  A directory's tokens ride in its CHECKED-OUT
 PAYLOAD (`FsStateInode.ent_toks`, inside `IcacheEscrow.ic_loaded` /
@@ -525,11 +548,14 @@ about the root anywhere in `ireg_slot`.
 
 The three movers are `ireg_lnk_stable` (`bv_unsigned (di_nlink d') =
 bv_unsigned (di_nlink d)` — every ordinary flush, the claim, the free
-deposit), `ireg_lnk_bump` (`= +1`: one `link_mint`, and the minted token
-goes **OUT**, to the `dirlink` that files it in a directory's `ent_toks` —
-`ireg_write_link_fl`) and `ireg_lnk_drop` (`link_return`, paid for by a
-token the caller brings **IN** out of the entry it is removing —
-`ireg_write_unlink_fl`).  The readers are `ireg_lnk_root_alive` and
+deposit), `ireg_lnk_bump` (`= +1`: one `link_mint` and one `par_alloc`, and
+the minted token and its register unit go **OUT**, to the `dirlink` that
+files them in a directory's `ent_toks` — `ireg_write_link_fl`) and
+`ireg_lnk_drop` (`link_return` + `par_dealloc`, paid for by the pair the
+caller brings **IN** out of the entry it is removing —
+`ireg_write_unlink_fl`).  Both flavour-indexed movers, and
+`SpecIupdate.wp_iupdate_link`/`_unlink` above them, carry the register
+value as a parameter `prv`.  The readers are `ireg_lnk_root_alive` and
 `ireg_lnk_toks_le` / `ireg_lnk_tok_nz` / `ireg_lnk_root_min2` (the RA's law
 at this slot).
 
