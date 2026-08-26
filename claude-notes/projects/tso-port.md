@@ -681,6 +681,208 @@ rounds.
   makes the goal `?C cur_ctx` against a seven-conjunct bundle:
   higher-order, fails).  §0.8′ rule 3's hazard, exactly.
 
+### 0.12′ DESIGN PROBLEM 1 — THE PARK PROTOCOL, SPLIT THREE WAYS (2026-08-26)
+
+Implements `tso-park-protocol-memo.md`'s option (b).  The two lemmas the
+memo names as the whole problem — `UsertrapRes.ut_res_bare_park` and
+`UtResFits.usertrap_res_bare_park` — are **PROVED**.
+
+**THE RULE THE SPLIT IS BUILT ON, and it is worth stating once because it
+governs every future record in this port:** a parked record is read at the
+context of whichever thread RESUMES it.  Since the M1 flip an
+`is_lock`/`inv` handle over a `<{ P }>` payload is a *different
+proposition* at a different ξ, and invariant bodies are not updatable, so
+no transport exists and none can be written.  Therefore:
+
+| what | where it rides | why |
+|---|---|---|
+| pure facts (`fclose_ties`, `un_pr = fsc_printk`, `un_dqi = DfracDiscarded`) | the record | pure |
+| context-FREE resources (wait lock, ticks lock, nextpid lock, `procs_avail`, `wire_inv`, `kmap_at`) | the record | MEASURED to cross: their payloads are closed terms, so `is_lock γ lk s R` is ξ-free |
+| ξ-DEPENDENT resources (`procs_inv`, `is_ftable`, `console_ready`, `console_caps`, the `initproc` share) | **the resumer**, inside the ∀, as `UsertrapRes.park_globals Xc γs γft γf` | cannot cross |
+| everything the file system carries | `first_done` ⇒ `fs_ready`, at `Xc` | already per-resume |
+| three ξ-INDEXED DISCARDED CELLS (`is_kstack`, `disk_geom` at the record's pages, `initproc ↦₈□`) | the record — **but only to be consumed into pure equations** | `TsoCtx.ctx_word_pointsto_agree` is stated over two FREE contexts and needs no `ctx_dom`; it is the only law in the sealed surface that relates two contexts for nothing |
+
+`ut_caps_of_park` is now a TWO-CONTEXT lemma and is the join:
+`ut_wf N → ut_park_caps N -∗ park_globals Xc (un_s N) (un_ft N) (un_f N) -∗
+fs_ready (XI := Xc) -∗ ut_caps (XI := Xc) N`.  The only thing that crosses
+between the parker's ξ and `Xc` inside it is `⌜pd = pd'⌝`-shaped.
+
+**THE FOUR RULINGS (revisit welcome).**
+
+1. **`W` STAYS AN `iProp`; the PARKER's ξ is ∀-quantified instead** (the
+   memo's alternative to `W : CurCtx → iProp`, and it won).
+   `ParkCap.park_cap`/`park_chan`/`park_token_F`/`park_token` now name **no
+   context at all**: `park_cap` is `□ ∀ (ξp : CtxId) …` and `park_chan` is
+   `□ ∀ (ξp : CtxId) (N : ut_names) (av : nat) …`.  A context-free token
+   instantiates at every `Xc` for nothing, which is exactly what
+   `UtResFits` needed.  Three reasons it is strictly better than the main
+   line: (i) it makes TRUE again the two standing header claims the M1
+   flip had falsified (`ParkCap.v`'s "ξ-FREE" note and `SpecSyscall.v:265`
+   "HART-FREE, AND THAT IS PART OF THE CONTRACT"); (ii)
+   `SpecForkretParkPaid.FORKRET_PARK_PAID`'s `park_token_intro` Parameter
+   is written with NO `CurCtx` binder and has silently assumed this since
+   before the flip — under the main line it would have needed one; (iii)
+   `park_token_F_contractive` closes with `solve_contractive` unchanged, so
+   the `CurCtx -d> iPropO` OFE the memo budgeted an hour for is not needed.
+   `ProofForkretPark.park_token_intro` already discharged the cap at an
+   ARBITRARY `(XI := MkCtxId inhabitant inhabitant)` — the ∀ is what that
+   proof was morally doing, and it now says so.
+2. **Console rows: NOT moved into `fs_ready`.**  The memo asked to reverse
+   `ConsoleInv.v:255–262` and add `console_ready`/`console_caps fsc_uart`
+   as `fs_ready` rows.  Once `park_globals` exists they are simply two more
+   of its rows, which costs two conjuncts instead of two `fs_ready` rows +
+   two projections + a builder edit + a reversed ruling.  **`ConsoleInv`'s
+   ruling stands.**  (If a later consumer needs the console from
+   `first_done` alone, revisit.)
+3. **`park_own` DROPS THE `initproc` SHARE** — as ruled.  Both parkers pass
+   `DfracDiscarded`, `ut_park_caps` now pins that as
+   `⌜un_dqi N = DfracDiscarded⌝`, and the resumer's `park_globals` carries
+   `∃ ip, initproc ↦₈□ ip`; the record's own copy is spent on the agreement
+   that pins the VALUE.  `park_own N = bslots 3` — context-FREE, which
+   removes the last exclusive ξ-crossing from the park.
+4. **§0.4 item 6 re-worded** (below), per the memo: "immutable bytes are
+   context-free" is true of **timestamp-0** (boot-image) bytes only.
+
+**`park_globals` DOES NOT SHARE A PREDICATE WITH `devintr_caps_fam`** (the
+memo's last section asked for 30 minutes on this; here is the answer).  The
+sketch was "`devintr_caps_any` minus `procs_inv` minus `disk_geom`".  It
+does not work, and the reason is instructive: the two bundles have
+DIFFERENT SUPPLY CHANNELS.  The park's resumer is forkret, which holds
+`first_done` and can therefore derive `dev_inv`, the disk lock and geometry
+(∃-witnessed), `printk_env` and the kmem lock for free — so `park_globals`
+is only what `fs_ready` does NOT reach.  The trap handler's supplier is the
+TRAPPING THREAD, at leaf altitude, which has no `fs_ready` at all and must
+carry the whole `devintr_caps` in its `intr_res`.  Their intersection is
+`procs_inv` and nothing else.  One predicate cannot serve both; two small
+named ones do.
+
+**MEMO CORRECTIONS (all measured, all worth keeping).**
+- **`ut_tfk` is CONTEXT-FREE.**  §1.2 names it as the first failure under
+  the hermetic seal ("`kpt_inv` = `inv kptN (kpt_body root)` and
+  `KptShare` imports `TsoCtx`, so the invariant body is ξ-indexed").  It is
+  not: `ut_tfk` crosses two context variables by `iExact`.  It needs no
+  index in any of the new statements.
+- **The `ftable_res` λ-conversion is BLOCKED, not bounded.**  §3 option (b)
+  calls it a "plain resource -- no ▷, no fixpoint, no WP -- so `CtxMorph`
+  follows from the existing structural instances".  It does not:
+  `ftable_res → fslot → file_pay → file_payload → off_hold` ends in
+  `cinv (offN .@ k) γx (off_content γ k armed)`, and `off_content` unfolds
+  to `off_raw`/`off_body`, both of which hold `a_fip k ↦₈` — an INVARIANT
+  over a ξ-indexed body, which `CtxMorph` cannot cross for exactly the
+  reason `proc_lock_res` cannot.  `file_core`'s `is_pipe` is a second
+  instance of the same thing.  **So `is_ftable` is resumer-supplied
+  (`park_globals`), and the 10 `<{ ftable_res }>` sites are untouched.**
+  The M3 λ-payload sweep is therefore blocked on TWO payloads, not one.
+- **The minimal restatement is not enough, and it fails by CRAWLING.**
+  Keeping the bundle record-carried and repairing only `Rsys`/the
+  derive-wand (memo §1.3) leaves `ut_caps_of_park (XI := Xc)` against a
+  ξ-indexed `ut_park_caps`, which runs past ten minutes rather than failing.
+  A crawl IS the signature of an unprovable crossing here — the hermetic
+  seal fails FAST only when the two sides differ at the head symbol, and
+  these differ deep inside a 64-element big-op of invariants.  Budget
+  accordingly: never leave such a goal running.
+
+**THE PARK'S SECOND CROSSING — STILL OPEN, AND IT IS NOT A PARK PROBLEM.**
+`ProofForkretPark.forkret_park_paid` — the park's CAP, not its channel — has
+a second context crossing the memo does not mention and §0.12′'s split does
+not touch.  That proof MINTS the child's own thread identity
+(`TsoCtx.ctx_parked_alloc`, `XIc`) and `SwtchCtx.valid_context_pre`'s resume
+wand hands the resumed bundle at THAT identity, so forkret runs at `XIc` —
+while every ξ-dependent premise it needs (`procs_inv`, `park_globals`,
+`trap_csrs`, `proc_lock_res`, `is_kstack`, `proc_priv`) reaches the proof
+from the PARKER, at the parker's ξ.  **A freshly minted context cannot hold
+an `is_lock`/`inv` handle**: the payload is embedded at a ξ by `<{ P }>`,
+invariant bodies are not updatable, and the twin's own transport
+(`ctx_dom` / `twin_share`) is DATA-only by construction.  Measured: the
+`iApply` crawls past twenty-three minutes.
+
+**RULING (i) WAS IMPLEMENTED AND MEASURED, AND IT DOES NOT CLOSE IT.**  The
+resume wand was changed to quantify the resumed context instead of naming
+the parked one, in all three places that have to agree:
+
+```coq
+(* SwtchCtx.valid_context_pre, and SpecSwtch's caller-continuation premise *)
+  OLD  ∀ (h : CPU)              (m : regfile) (eb' : bool), …
+         sie_cap_gpr KT1 (CID := h) (XI := XIp) m av false p -∗ …
+  NEW  ∀ (h : CPU) (Xr : CtxId) (m : regfile) (eb' : bool), …
+         sie_cap_gpr KT1 (CID := h) (XI := Xr)  m av false p -∗ …
+```
+
+WHAT IT BOUGHT: `SwtchCtx` (including `valid_context_pre_contractive`, the
+extra ∀ being structural) and `ProofSwtch` both close, and the two
+parking-side call sites need one binder each
+(`ProofSched.v:1390`, `ProofScheduler.v:1568`).
+
+WHAT IT DID NOT BUY, measured on a full round: `ProofSched.v:1515` and
+`ProofScheduler.v:1625` then fail on the RESUMED BUNDLE, because a parked
+continuation captures its own facts at its own ξ and now receives
+`sie_cap_gpr` at a ∀-bound `Xr` (the yielder's six saved frame words, its
+`proc_held` / `trap_csrs` / `own_ctx`).  And the reframing that would fix
+that — put EVERY ξ-dependent fact in the wand's premise list at `Xr`, so the
+producer serves every `Xr` trivially and the RESUME SITE supplies them —
+moves the wall exactly one tier down rather than removing it: the resume
+site's deposit is `SchedCtx.p_sched`, and `p_sched` carries `trap_csrs`
+(which since §0.11′ carries the trap handler's caps bundle) and
+`proc_held` → `proc_ctx`, i.e. handles again.  No site anywhere holds an
+`inv`-based handle at a context it did not already have it at, and the two
+context-motion laws are `ctx_park : own_context ξ ==∗ ∃T, ctx_parked ξ T`
+and `ctx_resume : ctx_parked ξ T ==∗ own_context ξ` — both ξ-PRESERVING, by
+design (identity is the ghost name `ctx_bound_name ξ`).
+
+**So the swtch-tier change was reverted** (`SwtchCtx`, `SpecSwtch`,
+`ProofSwtch`, `ProofSched`, `ProofScheduler` are back at their committed
+text) and `forkret_park_paid` is left at `Abort` with the crossing step kept
+in a comment — the tree's convention for an M2 worklist entry, and it keeps
+the failure fast.  **Keep the ∀-`Xr` shape in mind: it is right, and it is
+free once the handles are ξ-free.  It is just not sufficient on its own.**
+
+**THE TWO WAYS OUT, ranked.**
+1. **Restate `wp_forkret` with its GLOBAL premises at an explicit context.**
+   `wp_forkret_gen_body` gains `(ξg : CtxId)`; `procs_inv`, `park_globals`,
+   `proc_lock_res` and `is_kstack` move to `ξg` while the thread-local rows
+   (`sie_cap_gpr`, `trap_csrs`, `cpu_own`, `proc_priv`, `pc_is`) stay at the
+   ambient.  `forkret_park_paid` then supplies the globals from its own ξ
+   and the thread-local rows from the wand.  **This needs NO new law** — it
+   is sound because `is_lock γ lk s R` is ξ-free in shape and its resource
+   `proc_lock_res (XI := ξg)` is produced and consumed at the same `ξg`
+   throughout.  The cost is entirely inside `ProofForkret`'s ~1900 lines
+   (its acquire/release of p->lock is already consistent at one ξ; the risk
+   is the boot arm, where kexec/fsinit mix the two).  EFFORT, not machinery.
+2. **The M3 λ-payload sweep** (option (ii)), which makes the handles closed
+   terms so a fresh context can hold them.  Measured-blocked on
+   `CtxMorph proc_lock_res` (a `▷` over `valid_context`) and — this port's
+   own finding — on `CtxMorph ftable_res` (a `cinv` over `off_content`, an
+   `is_pipe` over `pipe_res`).
+
+**Red list:** `ProofForkretPark.v` and its 7-file cone
+(`LinkForkretParkPaid`, `LinkMain`, `LinkUserinit`, `BootChain`,
+`BootShared`, `FsAdequacyImg`, `SystemAdequacy`).  Everything else is green,
+including `UsertrapRes`, `ParkCap`, `UtResFits`, `ProofUsertrap`,
+`ProofForkret`, `ProofUserinit`, `ProofKforkB5`, `ProofSwtch`, `ProofSched`
+and `ProofScheduler`.
+
+**THE STALE CONE, AND WHAT IT WAS HIDING.**  `UtResFits.vo`'s 21-file
+downstream cone (`ProofUsertrap`, `ProofForkret`, `ProofForkretPark`,
+`ProofUserinit`, `SystemAdequacy`, the Link* files, …) had not been
+rebuilt since before the hermetic seal, because the aborted lemma stopped
+`make` at the root.  Stubbing the abort and forcing the cone through found
+SIX real breakages, all mechanical and all now fixed:
+`SpecForkretParkPaid.forkret_park_pkg` had no `CurCtx` binder; four
+`usertrap_res_bare_park` pass-through echoes
+(`ProofUserretClosed`/`ProofUservec`/`ProofForkret`/`ProofUsertrap`) had an
+implicitly generalized `XI` in the WRONG SIGNATURE POSITION (Coq inserts it
+at the first `` `{…} `` group, the module type wanted it last — the
+`ProofProcMapstacks` lesson again, and the reason every one of them now
+spells `` `{XI : CurCtx} `` explicitly);
+`ProofUserinit`'s `word_pointsto_persist` → `ctx_word_pointsto_persist`
+(replay class (a)); and one leftover from §0.11′ (`ProofUsertrap`'s
+`ut_csrs_raw_fold` needed the caps family PINNED — `?C cur_ctx` against a
+seven-conjunct bundle is higher-order).  **LESSON: an `Abort` at a root
+hides its whole cone from the build.  When one is left deliberately, stub
+it once per sweep and run the cone.**
+
+---
+
 ---
 
 **The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5
@@ -787,9 +989,23 @@ transport needs the interp. Three rounds of review on it:
    three proofs, no consumer arity moves (the identity is existential).
 6. **Fractional/persistent sharing** — under the twin all facts about one
    byte live in ONE context, so a discarded (immutable) byte is pinned
-   forever and `ctx_pointsto_persist` fights transport. Likely answer:
-   immutable bytes are CONTEXT-FREE, same as kernel text. Invisible today
-   (the `↦ₘ` notation flip has not landed); audit before M1's flip.
+   forever and `ctx_pointsto_persist` fights transport.
+   **RE-WORDED 2026-08-26 (§0.12′ ruling 4; the audit this item asked for,
+   done).**  "Immutable bytes are CONTEXT-FREE" holds for **timestamp-0**
+   bytes ONLY — the boot image, `TsoCtxTwin2.own_context_lb0` /
+   `ctx_pointsto_intro_zero`, "the twin image of kernel text is
+   context-free".  That is `kernel_data`'s ∀-context form (§0.8′ ruling 1)
+   and it is sound.  A byte discarded at RUNTIME (`t > 0`) — `p->kstack`,
+   the virtio ring-page pointers, `devsw[]`, the `initproc` cell, all
+   written at WP time by `procinit`/`virtio_disk_init`/`consoleinit`/
+   `userinit` — needs `mono_nat_lb_own (tc_bnd ξ') t` at the reader's
+   context, i.e. re-indexing along `ctx_dom` (`twin_share`), and `ctx_dom`
+   is deliberately NOT persistent and is minted only at release/acquire and
+   park/resume.  **So a runtime-discarded fact CANNOT ride a parked record
+   by fiat.**  It must be re-supplied by the resumer or reduced to a pure
+   equation through the cross-context agreement laws — which is exactly
+   what §0.12′'s three pins do.  A fix built on the stronger reading would
+   look green at SC and fail at cutover.
 
 ### 0.5 What I would do next
 

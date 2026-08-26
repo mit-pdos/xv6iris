@@ -237,25 +237,48 @@ Section ProofKforkB5.
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid_c).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
+    (* THE RECORD-CARRIED HALF ONLY (the M2 split, UsertrapRes.v "THE
+       RESUMER'S HALF"): three pure ties, six context-FREE resources, and the
+       three pins.  [procs_inv], [devintr_caps_any], [is_ftable],
+       [console_ready] and [park_world] are NOT here any more -- they are
+       ξ-dependent, so the resumer supplies them ([park_globals]) or derives
+       them from its own [first_done]. *)
     iAssert (park_env N) as "#Henv".
     { iAssert (disk_geom fsc_disk pd pav pu) as "#Hgeom".
       { iDestruct "Hdcaps" as "(_ & _ & $ & _)". }
+      iAssert (TicksInv.is_tickslock γtl) as "#Htl".
+      { iDestruct "Hdcaps" as "(_ & _ & _ & _ & $ & _)". }
+      iDestruct "Hextra" as "(#Hnp & #Hpav & _ & _)".
       rewrite /park_env /ut_park_caps.
-      iSplitL; [| iExact "Hextra"].
       iSplitR; [iPureIntro; constructor; reflexivity|].
       iSplitR; [iPureIntro; reflexivity|].
-      iSplitR; [iExact "Hpinv"|].
-      iSplitR; [iExact "Hks"|].
-      iSplitR; [iExact "Hdcaps"|].
+      iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iExact "Hwl"|].
-      iSplitR; [iExact "Hft"|].
+      iSplitR; [iExact "Htl"|].
+      iSplitR; [iExact "Hnp"|].
+      iSplitR; [iExact "Hpav"|].
+      iSplitR; [iExact "Hwire"|].
+      iSplitR; [iExact "Htramp"|].
+      iSplitR; [iExact "Hks"|].
       iSplitR; [iExact "Hgeom"|].
-      iExact "Hworld". }
+      iExact "Hip1". }
+    (* ...and the resumer-supplied half, which the forking parent holds at
+       its own context (it is running on it). *)
+    iAssert (park_globals cur_ctx γs γft γf) as "#Hglobp".
+    { rewrite /park_globals.
+      iDestruct "Hdcaps" as "(_ & #Hcc & _ & _ & _ & _)".
+      iDestruct "Hworld" as (γtl' pd' pav' pu')
+        "(_ & _ & _ & _ & _ & _ & #Hcready & _ & _ & _ & _ & #Hipw)".
+      iSplitR; [iExact "Hpinv"|].
+      iSplitR; [iExact "Hft"|].
+      iSplitR; [iExact "Hcc"|].
+      iSplitR; [iExact "Hcready"|].
+      iExact "Hipw". }
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
-    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    { rewrite /park_own. iExact "Hbsl". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
+            with "Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
       (* the two files each define forkret's entry; the constants are equal *)

@@ -165,10 +165,10 @@ Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
-    (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (γs : list gname) (γft γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) :
     forkret_park_paid_body (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
-      γs γf pa ks rest pid V av.
+      γs γft γf pa ks rest pid V av.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
@@ -190,7 +190,7 @@ Proof.
      own [▷] -- which is what lets the token it names be a fixpoint *)
   iModIntro. iNext.
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
   rewrite /proc_ctx
           (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
@@ -215,8 +215,9 @@ Proof.
              ⌜pv_upt V' = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
+             UsertrapRes.park_globals Xc γs γft γf -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
-             first_done -∗
+             first_done (XI := Xc) -∗
              W -∗
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) (XI := Xc) γf (proc_addr j)
@@ -224,8 +225,9 @@ Proof.
              FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
                (add_vec ks (mword_of_int 4096)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc Hy".
-    iApply ("Hclose" $! h Xc pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
+  { iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Hglob #Htfk Hdone HW #Htc Hy".
+    iApply ("Hclose" $! h Xc pt' V'
+              with "[%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
@@ -278,12 +280,43 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret (CID := h) W j γs γl γf pid V ks m av
+  (* ==================================================================== *)
+  (* THE PARK PROTOCOL'S SECOND CROSSING -- M2, AND IT IS NOT A PARK        *)
+  (* PROBLEM.  Left failing HERE, deliberately, as the worklist entry; the  *)
+  (* [Abort] keeps the failure FAST (the [iApply] below CRAWLS -- measured  *)
+  (* past twenty-three minutes -- rather than erroring).                    *)
+  (*                                                                        *)
+  (* WHAT IT IS.  This proof MINTS the child's own thread identity          *)
+  (* ([TsoCtx.ctx_parked_alloc], [XIc]) and                                 *)
+  (* [SwtchCtx.valid_context_pre]'s resume wand hands the resumed bundle at *)
+  (* THAT identity, so forkret runs at [XIc] -- while every ξ-dependent     *)
+  (* premise it needs ([procs_inv], [park_globals], [trap_csrs],            *)
+  (* [proc_lock_res], [is_kstack], [proc_priv]) reaches this proof from the *)
+  (* PARKER, at the parker's ξ.  A FRESHLY MINTED CONTEXT CANNOT HOLD AN    *)
+  (* [is_lock]/[inv] HANDLE: the payload is embedded at a ξ ([<{ P }>]),    *)
+  (* invariant bodies are not updatable, and the twin's own transport       *)
+  (* ([ctx_dom] / [twin_share]) is DATA-only by construction.               *)
+  (*                                                                        *)
+  (* THE ∀-RESUMED-CONTEXT RESHAPE WAS TRIED AND MEASURED (tso-port.md      *)
+  (* §0.12′): quantifying [Xr] in the resume wand does not close it, and    *)
+  (* pushing every ξ-dependent premise into the wand only moves the wall to *)
+  (* the resume site, whose deposit ([SchedCtx.p_sched]: [trap_csrs] --     *)
+  (* which carries the trap handler's caps bundle since §0.11′ -- and       *)
+  (* [proc_held] -> [proc_ctx]) is itself handle-bearing.  The ways out are *)
+  (* the M3 λ-payload sweep (measured-blocked on [proc_lock_res] and        *)
+  (* [ftable_res]) or restating [wp_forkret] with its GLOBAL premises at an *)
+  (* explicit context supplied by the producer -- no new law, pure effort   *)
+  (* inside this cone.  See §0.12′ for both.                                *)
+  (* ==================================================================== *)
+Abort.
+
+(* the last step, kept for the redesign -- it is the one that crosses:
+  iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γft γf pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hkmap Hpc Hpinv Hcg Hcpu Htc Hclm
+          with "Htext Hwire Hkmap Hpc Hpinv Hglobp Hcg Hcpu Htc Hclm
                 Hlocked HR Hks Hpriv HW Hclose").
-Qed.
+   (end of kept step) *)
 
 (* ===================================================================== *)
 (* THE TOKEN.  The cap above at [W := park_token γs], and the residue's     *)
@@ -293,14 +326,14 @@ Qed.
 (* the knot well-founded: see ParkCap.v.                                   *)
 (* ===================================================================== *)
 Theorem park_token_intro
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (γs : list gname) :
     ⊢ park_token γs.
 Proof.
   iApply (park_token_intro_of (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (γf pa ks rest pid V av) "%Hrest %Hj %Hav Hpkg HW Hchild".
+  iIntros (ξp γft γf pa ks rest pid V av) "%Hrest %Hj %Hav Hpkg HW Hchild".
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
   (* THE AMBIENT HART AND CONTEXT ARE BOTH ARBITRARY HERE, and for the same
      reason: [park_cap] describes a process that is NOT running -- neither
@@ -309,17 +342,18 @@ Proof.
      two ambient parameters of the theorem being applied are vacuous, and
      any witness will do; [CurCtx] has no default instance by design
      (TsoCtx.v, ruling 1), so one must be named. *)
-  iApply (forkret_park_paid (CID := 0%fin) (XI := MkCtxId inhabitant inhabitant)
-            (park_token γs) γs γf pa ks rest pid V av
+  iApply (forkret_park_paid (CID := 0%fin) (XI := ξp)
+            (park_token γs) γs γft γf pa ks rest pid V av
             Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
-  iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iFrame "Htext Hwire Hkmap Hpinv Hglobp Hmk Hstk".
   (* the closer describes the CHILD, so its identity is ∀-quantified beside
      its hart on BOTH sides -- [park_pkg]'s wand and [forkret_park_pkg]'s --
      and this hand-over just passes it through. *)
-  iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h Xc pt' V' with "[%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+  iIntros (h Xc pt' V') "%HV %Hnorm %Hptwf #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h Xc pt' V'
+            with "[%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
     [exact HV | exact Hnorm | exact Hptwf].
 Qed.
 

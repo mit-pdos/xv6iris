@@ -22,6 +22,20 @@ are the standing red tail — see tso-port.md §0.11′ for the exact state.
 Items here marked RULING are design decisions of this flip; revisit is
 welcome, silence is consent.
 
+STEP 5, ITEM-(iii) TIER (2026-08-26, later session): the four dead-shim
+files and one tranche-3 leaf are GREEN — `KernelDataInv`, `StackOwn`,
+`WpLock`, `DiskInv`, `HartPilot` — on the back of five additive laws and
+two new gates in `TsoCtx.v` (`ctx_pointsto_forget` /
+`ctx_word_pointsto_forget`, `ctx_pointsto_canonical`, `ctx_ktier_mono` /
+`ctx_word_ktier_mono`, and the PRISTINE BYTE gate).  Two lemmas that were
+FALSE at TSO were replaced by the true ones (`stack_own_reindex` is now
+the `ctx_dom` transport; `lk_cpu_cell_acc` is gone).  What is left of the
+tier is THREE STATEMENT-LEVEL DECISIONS, each with its exact statement
+written out: A6.10 (`WpMmodeLoad` wants one persistent premise),
+A6.11 (`RiscvLang`'s DMA write set is under-determined, which blocks
+`WpUart`), A6.12 (`HartMemRun`'s `bytes_own` must go context-indexed,
+which is the whole user tier).  A6.8–A6.12 below are the record.
+
 ## 0. The one-paragraph shape
 
 The machine keeps `gmem` — re-read as the FLAT memory, i.e. the log
@@ -697,6 +711,376 @@ settled — even though every write statement is already ported.
 `wp_pilot_started_store`) have NO consumers, so they are free to change
 shape when the ruling lands; only its `phys_*` byte lemmas are used
 elsewhere (`HartLift2`, `PtTreeAdue`, `WpMmodeLoad`, `HartMemRun`).
+
+### A6.8 THE FORGETFUL PROJECTION IS THE ONLY SURVIVING CROSSING, AND IT
+### IS EXPORTED ONCE, BY NAME (step-5 tranche 3; landed)
+
+The dead shim's `ctx_*_of/to_mem` pairs split cleanly, and the split is
+now realised in `TsoCtx.v`'s law surface rather than re-derived per site:
+
+- **`ctx_pointsto_forget : ctx_pointsto ξ a dq v ⊢ mem_pointsto a dq v`**
+  (and `ctx_word_pointsto_forget` for the 8-byte tower).  This is the old
+  `Local` projection `ctx_pointsto_mem_proj`, promoted.  Its header states
+  the price where nobody can miss it: it drops the timestamp fragment and
+  the clean/dirty bit, NEITHER of which can be recovered, and the result
+  **licenses no plain load** (`ctx_load_ok` needs exactly the two dropped
+  conjuncts).  `grep ctx_pointsto_forget` is now the honest inventory of
+  bytes parked OUTSIDE the ledger — the unflipped `↦ₛ`/`↦₂`/`↦₄` towers,
+  the deliberately-raw lock metadata (0.8′ ruling 2), the phys tier
+  (ruling 6).  Rejected alternative: leaving it `Local` and restructuring
+  each site — the sites are exactly the tiers the standing rulings say
+  must STAY raw, so there is nothing to restructure, only a crossing to
+  name.
+- **`ctx_pointsto_canonical`** and **`ctx_ktier_mono` /
+  `ctx_word_ktier_mono`**: the pure conjunct and the tier weakening, read
+  off the sealed body directly.  These retire two rehearsal-era seams —
+  0.9′'s "`mem_ktier_mono` rides the raw law between two shims" and every
+  `to_mem`-then-`mem_canonical` step — for FREE, because neither ever
+  wanted a context.  A crossing that exists only to reach a pure fact is
+  a crossing that should not exist.
+
+Landed at: `KernelDataInv.kernel_data_string` (the `↦ₛ` seam, unchanged
+otherwise), `WpLock.lock_name_intro`, `StackOwn.stack_own_sp_bounds` /
+`stack_ktier_mono`, `DiskInv.mem_win_to_phys` / `mem_win_canonical` /
+`byte_to_phys`.  All four files GREEN.
+
+**AND TWO FALSE LEMMAS DIED, EACH REPLACED BY THE TRUE ONE:**
+
+- `StackOwn.stack_own_reindex` was `stack_own (XI:=ξ) ⊢ stack_own (XI:=ξ')`.
+  It is now the TRANSPORT
+  `ctx_dom ξ ξ' -∗ stack_own (XI:=ξ) sp n ==∗ ctx_dom ξ ξ' ∗ stack_own (XI:=ξ') sp n`
+  — i.e. `CtxMorph` at the stack region, proven by `ctx_morph_big_sepL` +
+  `ctx_morph_word`.  Its one call site (`ProofSwtch`) must now SUPPLY the
+  domination, which is the M2 entry the placeholder was standing in for,
+  made visible in the statement instead of hidden in the proof.
+- `WpLock.lk_cpu_cell_acc` was
+  `(∃ ξ, ctx_word_pointsto ξ (lock_cpu lk) 1 v) ⊣⊢ lock_cpu lk ↦₈ v`.
+  THE ELIMINATION DIRECTION IS FALSE and, worse, unfixable as stated: the
+  ∃ hides WHICH context owns the cell, and nothing can dominate an unknown
+  context.  Replaced by a named `lk_cpu_cell` (the ∃ itself), the three
+  `lk_cpu_res_free/win/held` unfold lemmas restated at it, and the trivial
+  `lk_cpu_cell_intro`.  `lk_cpu_res` stays ∃-context (0.8′ ruling 2
+  holds).  The M4 entry, now written in the file: the invariant must hold
+  the cell's context PARKED, the acquirer mints `ctx_dom` from it with
+  `ctx_dom_of_parked` and moves the word with `ctx_morph_word`.  The
+  failures at `WpSconfLock` (which reads and writes the cell) ARE that
+  entry.
+
+### A6.9 THE LEDGER HAS NO MINT — WHY EVERY `_of_mem` IS STRUCTURALLY
+### DEAD, AND WHAT THE DMA RECLAIM ACTUALLY NEEDS
+
+The shim's header called the `_of_mem` directions "FALSE at TSO".  They
+are worse than false-as-stated; they are **unreachable by any premise**,
+and it is worth knowing why before anyone tries to rescue one with a side
+condition.
+
+`ctx_pointsto` carries `(pa_of ppn a) ↪[ts_name]{dq} t`, a `ghost_map`
+ELEMENT of `era_ts_name`, and `tso_interp_at`'s tie is
+`⌜dom TM = dom g.(gmem)⌝`.  A `ghost_map` element can only be created by
+`ghost_map_insert`, which demands the key be ABSENT from the authority —
+so every byte's element was handed out exactly once, at era allocation,
+and no rule above the interpretation can produce another.  A raw byte has
+left the ledger permanently.  There is no "given the interp and a full
+points-to, mint the timestamp" gate, and there cannot be one at the
+current tie.
+
+TWO CONSEQUENCES WORTH CARRYING:
+
+1. **The phys tier cannot STORE, either.**  A store's `Wobl_ram` owes the
+   γts update over its footprint, which needs the elements.  So ruling
+   6's "phys tier stays RAW" reads, post-flip, as "phys bytes are
+   read-only and only through a pristine/strong arm".  `HartPilot`'s
+   pilot rule is the worked instance: its store's append is now a
+   THREADED premise, not a discharged one.
+2. **If the tie were weakened to `dom TM ⊆ dom g.(gmem)`**, `ghost_map_insert`
+   becomes available and a real mint gate exists — but it would still have
+   to PROVE the byte's latest write visible, and the only free ways to
+   know that are the top view (post-AMO) or the solo era.  That is a
+   `RiscvPtsto.v` change (a full rebuild) and is recorded as an option,
+   not taken.
+
+**THE DMA RECLAIM, in full, since `DiskInv` is where it bites.**  The
+device's bytes reach a driver's ledger for exactly one reason — the
+driver's hart view passed the DMA's timestamp — and only an acquire says
+so.  The shape:
+
+  - the lease holds the window's context PARKED (`ctx_parked ξ T`)
+    together with its timestamp elements;
+  - `wp_disk_step`'s callback moves those elements to the appended log
+    (A6.2, already stated in the rule);
+  - the reclaiming thread, whose lock acquire put its view at the log top,
+    mints `ctx_dom ξ cur_ctx` with `ctx_dom_of_parked` and re-registers the
+    bytes through `ctx_morph_word`.
+
+That is the `ctx_dom` handoff tso-port.md §1's RULING 2 promised, spelled
+out.  **What was done instead, to keep `DiskInv` green and put the errors
+where the work is:** the window bridge's CORE is now stated at the RAW
+fact in both directions (`mem_win_to_phys_raw` / `phys_win_to_mem`) —
+it is a pure kmap/identity-mapping fact and never wanted a context, and
+the ctx entry point `mem_win_to_phys` is a thin `_forget` wrapper.  That
+makes `word2_to_phys`/`word4_to_phys`/`phys_to_word2`/`phys_to_word4`
+CROSSING-FREE (the `↦₂`/`↦₄` towers are unflipped, so the flip-era ctx
+detour through the shim was pure overhead).  Only two lemmas' statements
+moved, both flagged in place:
+
+    phys_to_word8 : … -∗ phys_word8 a w -∗ word_pointsto a (DfracOwn 1) w
+    phys_to_byte  : … -∗ phys_pointsto a (DfracOwn 1) b -∗
+                          mem_pointsto a (DfracOwn 1) b
+
+(both were `↦₈` / `↦ₘ`, i.e. ctx).  Their four call sites —
+`ProofVirtioDiskRwF` ×3, `ProofVirtioDiskIntr` ×1 — are the DMA-reclaim
+worklist, one entry each, and they are precisely the windows the DEVICE
+writes (the descriptor doubleword and the status byte).
+
+### A6.10 THE PRISTINE BYTE: THE RAW TIER'S OWN LOAD GATE
+### (landed in `TsoCtx.v`; the `WpMmodeLoad` fix is one edit away)
+
+A6.7(B)'s "the data half is a Σ-surface restructuring" is right for a byte
+that is WRITTEN.  It is wrong for the ones M-mode actually loads, and the
+cheap gate for those is now in the kit.
+
+A byte whose LATEST WRITE IS THE ERA IMAGE — timestamp 0 — is visible to
+EVERY agent at EVERY view, unconditionally (`TsoMemPa.read_down_0`:
+`visibleb h tv log 0` is `true` with no side condition).  So its value
+determines a plain load with **no context, no view, no bound, no log
+length**.  The resource that says it:
+
+    pristine_byte a  :=  a ↪[ts_name]□ 0
+    pristine_win a n :=  [∗ list] j ∈ seq 0 n, pristine_byte (pa_add a j)
+
+DISCARDED is exactly the right strength and it is not a convenience: a
+discarded element also forbids the byte from ever being STORED to again (a
+store must UPDATE it).  Read-only-forever and readable-from-anywhere are
+the same fact here, so one resource says both — and it is persistent, so
+it costs a holder nothing and serves every consumer of an image byte at
+once.  The two gates, both proven:
+
+**AND `ctx_pointsto`'s CLEAN ARM CHANGED SHAPE FOR THE SAME REASON.**  It
+was `mono_nat_lb_own (ctx_bound_name ξ) t`; it is now
+`llb (ctx_bound_name ξ) t`, i.e. that lower bound **or `⌜t = 0⌝`** —
+`TsoGhost.llb`'s own trick, at the context's bound instead of the log
+length.  This is not tidying.  `mono_nat_lb_own_0` is an UPDATE
+(`⊢ |==> mono_nat_lb_own γ 0`), so with the bare bound an image byte's
+justification costs one bupd PER CONTEXT — and a `∀ ξ` image fact would
+need infinitely many under the binder, which makes
+`KernelDataInv.kernel_data` (and kernel text) **unmintable as stated**.
+With the `⌜t = 0⌝` arm the justification mentions no context at all, and
+the mint is a plain entailment:
+
+    ctx_pointsto_of_pristine     : kmap_at (svpn_of a) ppn KP_rw -∗
+                                   mem_pointsto a DfracDiscarded v -∗
+                                   pristine_byte (pa_of ppn a) -∗
+                                   ctx_pointsto ξ a DfracDiscarded v
+    ctx_pointsto_of_pristine_all : … -∗ ∀ ξ, ctx_pointsto ξ a DfracDiscarded v
+
+(every premise persistent, so the ∀ costs nothing; `ppn` is explicit
+because the mem fact's page number is existential while the receipt lives
+at the PHYSICAL address, and the caller's own `kmap_at` pins it).  Nothing
+downstream noticed: `llb_valid` gives `t ≤ B` on one arm and `0 ≤ B` on
+the other, which is all `ctx_load_ok` and `ctx_morph_pointsto` ever asked.
+One helper was needed — `llb_valid_q`, the fraction-generic form, because
+`ctx_dom` holds only half the bound authority.
+
+**THIS IS `BootCarve.kernel_data_intro`'s FIX**, and it is the shape of
+every boot mint: the carve hands raw discarded image bytes plus their
+pristine receipts and gets the `∀ ξ` fact.  Not applied here — `BootCarve`
+is on the boot/adequacy import blacklist (it may not `Import TsoCtx`, only
+name it qualified), its statement change cascades into `BootCarveMain` and
+step 6, and the receipts themselves are minted by the era's initial-state
+ghosts, which is step 6's own work.
+
+The two load gates, both proven:
+
+    pristine_read_ok       : gen_heap_interp g.(gmem) -∗ tso_interp_at … g -∗
+                             phys_pointsto a dq v -∗ pristine_byte a -∗
+                             ⌜∀ h tv, tso_read g.(gimg) g.(glog) h tv a = Some v⌝
+    pristine_read_bytes_ok : … the window form, concluding
+                             ⌜∀ h tv, tso_read_bytes … a n w⌝
+
+Note the shape: `∀ tv` with **no lower bound at all**, so a consumer's
+`tv ≤ tv'` / `tv' ≤ length log` premises are simply not needed —
+`HartMLoad.robl_ram` falls out.
+
+WHO MINTS IT: the era's initial-state ghosts (step 6 / adequacy), beside
+`kernel_text`/`kernel_data`'s mints — the image is where timestamp 0 comes
+from.  This is the standing text-is-timestamp-0 ruling, stated as a
+resource and extended from text to every never-written image byte.
+
+**`WpMmodeLoad` — THE EXACT STATEMENT, reported rather than applied**
+(0.8′'s hard rule: `wp_ld_gpr`'s consumers `WpEntryNew`/`WpTimerinit` are
+above the kit).  `phys_word_pointsto` STAYS RAW; the fix is one new
+PERSISTENT premise on `wp_ld_gpr` and `wp_ld_gpr_tor`:
+
+    …
+    instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    phys_word_pointsto ea dq v -∗
+    TsoCtx.pristine_win ea 8 -∗            (* <-- THE MISSING RESOURCE *)
+    ( … unchanged … )
+
+and the read node's obligation is then discharged by
+`pristine_read_bytes_ok` at `gs_of` (the A6.1a bridge: the leaf holds
+`tso_interp_of`, the gate wants `tso_interp_at`, and
+`tso_interp_of_pin` + `tso_interp_of_at_gs` reconcile them — exactly as
+`ctx_load_ok` is reached).  IS THE PREMISE SATISFIABLE?  Yes, and it is
+the truth about these loads: M-mode's only 8-byte data load in this tree
+is `entry`'s `ld sp, stack0`, a link-time constant in the image that
+nothing ever stores to.  The cascade is `WpEntryNew` and `WpTimerinit`
+threading it up to the boot theorem, where adequacy mints it — which is
+where an era-image fact belongs.
+
+### A6.11 THE DMA WRITE SET IS ∃-QUANTIFIED, AND THAT MAKES `wp_disk_loop`
+### UNPROVABLE (machine-tier) — **RULED, OPTION (A), AND LANDED**
+
+**RULING (owner, 2026-08-26): option (A).**  "An under-determined `W` isn't
+just unprovable downstream, it's a weaker machine than the device contract
+intends."  Implemented: `disk_step d m d' W`'s second OUTPUT is now the
+WRITE SET, not the post-state map — `DiskStepDma` yields its own `w`,
+every other arm yields `∅`, and a caller reads the post-state as `W ∪ m`.
+The `prim_step` arm's log clause became deterministic,
+
+    ((W = ∅ /\ log' = g.(glog))
+     \/ (W <> ∅ /\ log' = g.(glog) ++ [PWMsg W disk_agent]))
+
+and `wp_disk_step`'s callback now takes `(d' W log')` with
+`⌜disk_step d m d' W⌝` and owes the bundle at `W ∪ m`.  `RiscvLang.v`,
+`RiscvExec.v` GREEN; the one fallout inside `RiscvLang` was
+`prim_step_mm_ok`'s destructuring (`[(-> & ->) | (_ & ->)]`).
+`RiscvExec.tso_interp_of_disk_idle` is the new one-liner the five
+non-writing arms use: their `W = ∅` forces `log' = log`, and `avf` pins the
+disk agent to the top, so `vstep disk_agent (length log) log V` IS the
+bundle they were handed.
+
+THE ORIGINAL DIAGNOSIS, KEPT because it is the reason the shape is wrong:
+
+`WpUart.wp_disk_loop` is blocked, and NOT on plumbing.  `RiscvLang`'s disk
+arm reads
+
+    exists d' (W : gmap Arch.pa (bv 8)) log',
+      disk_step g.(gdev) g.(gmem) d' (W ∪ g.(gmem)) /\
+      ((W = ∅ /\ log' = g.(glog))
+       \/ log' = g.(glog) ++ [PWMsg W disk_agent]) /\ …
+
+`W` is tied to the step ONLY through `W ∪ gmem = m'`, which does not
+determine it: for ANY arm — including `DiskStepIdle`, where `m' = m` — the
+machine may choose a non-empty `W` of bytes already holding those values
+and append `PWMsg W disk_agent`.  The WP rule must then hand the callback
+a bundle at that appended log, and the callback must re-establish the
+`latest` tie for `W`'s addresses, which needs their timestamp elements —
+which it does not have and, for arbitrary `W`, cannot have.  So EVERY arm
+of `wp_disk_loop`, not just the DMA completion, owes ghost steps it cannot
+pay.
+
+THE FIX IS MACHINE-SIDE AND SMALL, and there are two shapes:
+
+- **(A) Make the write set a constructor output**: `disk_step d m d' W`
+  with `m' := W ∪ m`, so the arms' own `w` IS the `W` the log records.
+  Honest and total; touches `RiscvLang.v` (both copies of the arm), the
+  `prim_step_disk_inv` inversion, and `WpUart`'s destructuring.
+- **(B) Constrain `W` to the CHANGED bytes**
+  (`∀ a v, W !! a = Some v → g.(gmem) !! a ≠ Some v`), which pins `W`
+  uniquely as the difference and collapses the disjunction.  One clause;
+  the honest weakening it buys is that a device write that changes no byte
+  publishes nothing — unobservable except to a hart whose view is stale,
+  and only for a value it would have read anyway.
+
+Either is a `RiscvLang.v` edit and therefore a full rebuild.  (A) was the
+recommendation and is what landed: it says what §2's DMA arm meant.
+
+**AND IT IS NOT ENOUGH TO CLOSE `WpUart`** — measured, not predicted.  With
+A6.11 five of `disk_step`'s six arms hand the bundle straight back and the
+sixth is refuted, but the DMA COMPLETION arm still owes the append's four
+ghost steps over the device's write set `w`, and the timestamp elements for
+those addresses would have to come from the DMA LEASE — which holds
+`phys_map`, raw gen_heap bytes with no ledger residue (A6.9).  So A6.11
+removes a spurious blockage and leaves the real one: **`WpUart` is an A6.9
+entry, not an A6.11 entry**, and its fix is the lease-as-parked-context
+restructuring spelled out there.  A premise on `wp_disk_loop` of the shape
+"∀ W, publish W" was considered and REJECTED: it is false as stated (it
+would let anyone publish arbitrary bytes) and would compile — the
+unsatisfiable-premise defect durable-notes calls the worst one.
+
+### A6.12 THE USER TIER IS BLOCKED BY RULING 6, AND IT IS THE BIG ONE
+
+`HartMemRun.swp_hmrun` — the memory-inclusive walker every user-tier proof
+runs on (~60 consumers, `UserMem*`, `WpUmode*`, and the `Proof*` syscall
+files) — carries its owned bytes as
+`bytes_own mm := [∗ map] a ↦ b ∈ mm, a ↦ₚ b`, i.e. the RAW phys tier.
+Post-flip its RAM branches split three ways and TWO of them are
+unprovable from that resource:
+
+- the FETCH read is fine — post-A6.7(B) it is `ak_strong`, RULING 1's flat
+  arm, and the `bytes_own_read` discharge is unchanged;
+- the PLAIN data load owes `Mobl_ram_plain`, which a flat cell cannot
+  give (A6.7(B)'s measurement, and A6.10's pristine gate does not apply —
+  user memory is written);
+- the STORE owes the append's four ghost steps, which need the timestamp
+  elements (A6.9).
+
+So the whole user tier waits on ONE decision: `bytes_own` becomes
+context-indexed.  The shape that costs least, recorded so it is not
+re-derived:
+
+    bytes_own mm := [∗ map] a ↦ b ∈ mm, ctx_pointsto cur_ctx a (DfracOwn 1) b
+
+— SAME NAME, SAME ARITY, so the ~60 pass-through call sites are textually
+unchanged (the M1-flip trick, again) — plus an `own_context cur_ctx`
+premise on `swp_hmrun`, threaded in and out.  THAT premise is the real
+cost: it breaks every `iApply`, and it cannot be folded into `bytes_own`
+(the token is exclusive, so `bytes_own (mm1 ∪ mm2)` would duplicate it).
+It also wants a `ctx_store_ok` in `TsoCtx` — §6 named it (`twin_store_ok`
+is proven in `TsoCtxTwin2.v`) but the kit gate was never ported; the
+current gate list is load / view-receipt / acquire-domination / pristine
+only.
+
+### A6.13 THE FRONTIER AFTER THE (iii) TRANCHE, AND THE THREE NEW FILES
+### THE GREENING EXPOSED
+
+A full `-k` sweep after the tranche gives **eight red files**, all in the
+leaf/kit tier; the rest of the tree is behind them.  Three of them were
+NOT visible before, because their prerequisite cone ran through files this
+tranche fixed — so they are new entries, not regressions:
+
+- `PageFields.v` — `bytes_word4` (4 × `ctx_pointsto_to_mem`, the FORGET
+  direction, mechanical) and `word4_bwin` (`ctx_pointsto_of_mem`).
+- `ByteBuf.v` — `bb_word4_acc`: `ctx_buf_to_mem` (forget) then
+  `ctx_buf_of_mem` on the give-back.
+- `BootCarve.v` — `kernel_data_intro`, the boot mint (`ctx_pointsto_of_mem`).
+  A6.10 has its fix.
+
+`PageFields` and `ByteBuf` are the SAME shape and it is worth naming as a
+class rather than as two files: **the unflipped `↦₂`/`↦₄` towers are now a
+ONE-WAY TRAPDOOR.**  `bytes_word4` takes context bytes and builds a raw
+`↦₄`, forgetting the residue; `word4_bwin` takes the raw `↦₄` apart again
+and wants `byte_any` — which IS context-indexed (`↦ₘ` flipped).  The round
+trip loses the ledger and cannot recover it (A6.9), so the pair is
+unprovable as a pair.  **The fix is M1 STAGE 2 — flip `↦₂`/`↦₄` — not a
+per-site repair**, and it deletes the whole class (`WpSconfMem`'s
+`wordw8_ctx` adapters, `PageFields`, `ByteBuf`, `DiskInv`'s word2/word4
+bridges' remaining asymmetry).  Any per-site patching here is work that
+stage 2 throws away.
+
+The full red set, with what each is:
+
+    HartMemRun.v    A6.12 — the user tier (bytes_own must go ctx)
+    WpMmodeLoad.v   A6.10 — one persistent premise, statement written out
+    WpMmodeStore.v  A6.9  — the phys tier cannot store (same class)
+    WpUart.v        A6.11 — RiscvLang's DMA write set is under-determined
+    PtTreeAdue.v    A6.7(B)'s own leftover — the 8-byte PTE read needs an
+                    `mread_req8_ttw` twin (already listed as STILL TO ABSORB)
+    PageFields.v    stage 2 (the ↦₄ trapdoor)
+    ByteBuf.v       stage 2 (the ↦₄ trapdoor)
+    BootCarve.v     A6.10 — the boot mint; needs the pristine receipts
+
+Two full `-k` sweeps were run and the second reproduces the set exactly
+(same eight files, same lines) — the tranche is closed by the standing
+criterion.  Numbers: **1036 of 1330 `.v` files carry a fresh `.vo`**; the
+294 that do not are these eight plus their 286 dependents.
+
+RECOMMENDED ORDER for the next session: A6.11 first (one
+`RiscvLang.v` clause, unblocks `WpUart` and costs a rebuild that everything
+else will want anyway), then M1 stage 2 (kills two entries and a standing
+adapter class), then A6.12 (the big one), with A6.10's two one-line premise
+edits landing whenever step 6 is ready to mint the receipts.
 
 ## 7. Order of work
 

@@ -726,7 +726,10 @@ Section UtDispatch.
     iSplitL "Hcpu"; [iExact "Hcpu" |].
     iSplitL "Hraw".
     { rewrite /trap_csrs_ext.
-      iApply (ut_csrs_raw_fold _ ep sc st with "Hraw Hdc Hih"). }
+      iApply (ut_csrs_raw_fold
+                (devintr_caps_fam (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+                   (un_pd N) (un_pav N) (un_pu N))
+                ep sc st with "Hraw Hdc Hih"). }
     iSplitL "Hclm"; [rewrite /cpu_claim_ext; iExact "Hclm" | iExact "Henv"].
   Qed.
 
@@ -1200,7 +1203,7 @@ Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp). Qed.
 (* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
    above: it is proved under the same [SY], so this is a rename. *)
 Definition usertrap_res_bare_park
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
       (fun (h : CpuId) (Xc : CurCtx) => Fits.usertrap_res_bare (CID := h) (XI := Xc))
