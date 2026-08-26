@@ -582,6 +582,11 @@ Proof.
                (dir_nrec (bv_unsigned (di_size dn))) 1%nat
                (Huniq (proj1 Hdirb Hd)) Hlt1 Hlive1).
     by eexists.
+  - (* [inl_bare_free] (durable-disk lane E-boot): VACUOUS here, because
+       [inode_ok] carries [di_type dn <> 0] -- an allocated node is never
+       free.  The clause's real producer is [inode_local_bare]. *)
+    intros Hz. exfalso. apply Hty0.
+    rewrite /fn_type era_node_rec in Hz. exact Hz.
 Qed.
 
 (* ===================================================================== *)

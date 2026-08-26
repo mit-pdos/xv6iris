@@ -95,6 +95,19 @@ Definition fn_orphan (n : fs_node) : bool := bool_decide (fn_nlink n = 0%nat).
 (*  2.  The local clauses                                              *)
 (* ------------------------------------------------------------------ *)
 
+(* A node with no blocks, no indirect block, size 0 and nlink 0 -- the
+   shape of every FREE record, of [ialloc]'s claim box and of the corpse
+   [itrunc]/[iput] leave.  It is defined HERE, before [inode_local], because
+   that record's last clause [inl_bare_free] names it; section 2a below is
+   where its readings live. *)
+Definition fn_bare (n : fs_node) : Prop :=
+  (* [13] is [FS_NDIRECT + 1], spelled as [dinode_wf] spells it *)
+  di_addrs (fn_rec n) = replicate 13 (bv_0 32)
+  /\ fn_ent n = replicate FS_NINDIRECT (bv_0 32)
+  /\ fn_blk n = ∅
+  /\ fn_size n = 0
+  /\ fn_nlink n = 0%nat.
+
 Record inode_local (i : Z) (n : fs_node) : Prop := MkInodeLocal {
   (* representation *)
   inl_rec_wf     : dinode_wf (fn_rec n);
@@ -132,6 +145,20 @@ Record inode_local (i : Z) (n : fs_node) : Prop := MkInodeLocal {
                      dir_entries n !! DOT = Some i;
   inl_dir_dotdot : fn_is_dir n = true -> fn_nlink n <> 0%nat ->
                      is_Some (dir_entries n !! DOTDOT);
+  (* ---- A FREE NODE IS BARE (durable-disk lane E-boot, plan section 5's
+     second missing clause).  [inl_free] already says a type-0 record has no
+     links; this says it names no block and has size zero, which is what
+     makes a free inum's abstract value the CANONICAL [free_node] of its own
+     record -- the form the inode region parks
+     ([InodeRegion.ireg_top_park]) and the form a boot mint from the durable
+     snapshot has to re-found the region at.  It is PER-OBJECT, it is true
+     of every free record this kernel writes ([iput] clears the blocks and
+     the size in [itrunc] BEFORE it clears the type) and of every mkfs
+     image ([FsImg.fs_region_bare]), and it costs nothing at the two
+     producers: [inode_local_bare] has it outright and [inode_local_of_ok]
+     is vacuous at it, because [FsStateEra.inode_ok] carries [di_type <> 0].
+     LAST, so no destructuring pattern above moves (durable-notes.md). *)
+  inl_bare_free  : fn_type n = 0 -> fn_bare n;
 }.
 
 Global Arguments inl_rec_wf {_ _} _.
@@ -149,6 +176,7 @@ Global Arguments inl_dir_size {_ _} _.
 Global Arguments inl_dir_uniq {_ _} _.
 Global Arguments inl_dir_dot {_ _} _.
 Global Arguments inl_dir_dotdot {_ _} _.
+Global Arguments inl_bare_free {_ _} _.
 
 (* the reading is total below the size: [inl_covers] plus [inl_blk_dom] *)
 Lemma inode_local_data_owned i n k :
@@ -198,13 +226,8 @@ Qed.
 Lemma dir_nrec_zero : dir_nrec 0 = 0%nat.
 Proof. reflexivity. Qed.
 
-Definition fn_bare (n : fs_node) : Prop :=
-  (* [13] is [FS_NDIRECT + 1], spelled as [dinode_wf] spells it *)
-  di_addrs (fn_rec n) = replicate 13 (bv_0 32)
-  /\ fn_ent n = replicate FS_NINDIRECT (bv_0 32)
-  /\ fn_blk n = ∅
-  /\ fn_size n = 0
-  /\ fn_nlink n = 0%nat.
+(* [fn_bare] itself is defined ABOVE, immediately before [inode_local],
+   because that record's last clause [inl_bare_free] names it. *)
 
 Lemma fn_bare_wf n : fn_bare n -> dinode_wf (fn_rec n).
 Proof. intros (Ha & _). rewrite /dinode_wf Ha length_replicate //. Qed.
@@ -287,6 +310,7 @@ Proof.
   - intros _. rewrite (fn_bare_nrec n Hb). intros j k Hj. exfalso. lia.
   - intros _ Hne. exfalso. exact (Hne Hnl).
   - intros _ Hne. exfalso. exact (Hne Hnl).
+  - intros _. exact Hb.
 Qed.
 
 (* ------------------------------------------------------------------ *)
