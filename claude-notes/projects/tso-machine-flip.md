@@ -38,6 +38,14 @@ the `ctx_dom` transport; `lk_cpu_cell_acc` is gone; `disk_step` yields its
 write set).  A6.8–A6.14 below are the record; A6.13 is the standing
 frontier and A6.14 the one tranche that remains.
 
+M1 STAGE 2 (2026-08-26, same session, next wave): `↦₂`/`↦₄` are FLIPPED —
+the ctx towers are in `TsoCtx.v`, the notations re-declared, and the
+fallout absorbed in 14 error-driven rounds.  `PageFields` and `ByteBuf`
+went green with their shim crossings DELETED rather than converted, which
+is the whole point of a stage.  `↦ₛ` was assessed and DELIBERATELY NOT
+flipped (it would put a real ξ inside `is_lock` and buy nothing — A6.15
+has the argument).  The red set is down to FIVE, all A6.14/A6.9.
+
 ## 0. The one-paragraph shape
 
 The machine keeps `gmem` — re-read as the FLAT memory, i.e. the log
@@ -1177,6 +1185,136 @@ The `ctx_store_ok` gate (§6's `Wobl_ram`; `TsoCtxTwin2.twin_store_ok` is
 already proven) must be ported into `TsoCtx` before any of these can
 close — the current gate list is load / view-receipt / acquire-domination
 / pristine only.
+
+### A6.15 M1 STAGE 2 IS LANDED — ↦₂/↦₄ ARE CONTEXT-INDEXED, ↦ₛ IS NOT
+
+**The flip.**  `TsoCtx.v` gained the 2- and 4-byte ctx towers, character
+for character the 8-byte one at width 2/4 (`ctx_word{2,4}_pointsto` +
+unfold / aligned_p / bytes / intro / timeless / discarded-persistent /
+frac_split / half / half_split / half_join / persist / agree /
+ktier_mono / forget, plus `ctx_morph_word{2,4}`), and all four dfrac
+spellings of `↦₂` and `↦₄` are re-declared at them — bracket form
+included, modifiers copied exactly.  Neither tower is sealed, for the
+reason the 8-byte one is not: a tower OVER the sealed byte leaks nothing
+and the tree's proofs destruct the word shape structurally.
+
+**THE WAVE WAS SMALL — 14 rounds, not stage 1's ~30, and only ONE new
+error file per round after the first.**  That is the flip working as
+designed twice over: the ↦ₘ/↦₈ seams stage 1 found are the SAME seams,
+already fixed, so stage 2 only had to re-point law names and add binders.
+
+**THE PAYOFF, exactly as predicted.**  `PageFields` and `ByteBuf` are
+GREEN and their shim crossings are GONE, not converted — in both files
+the bytes and the word were on opposite sides of the seal only because
+the tower had not flipped:
+
+  - `PageFields.bytes_word4` dropped FOUR `ctx_pointsto_to_mem` lines and
+    `word4_bwin` dropped its `ctx_pointsto_of_mem`; neither file imports
+    `TsoCtxShim` any more.
+  - `ByteBuf.bb_word4_acc` dropped `ctx_buf_to_mem` AND `ctx_buf_of_mem`
+    — the out-and-back pair that A6.9 says can never be crossed once it
+    has left the ledger simply never leaves it now.
+  - `InodeInv`'s hermetic-seal crossing (`ctx_pointsto_shim` under
+    `bi.pure_True`) became `reflexivity`.
+
+`DiskInv`'s three widths are now uniform: all three `_to_phys` directions
+forget, all three `phys_to_` directions are stated at the RAW fact
+(`phys_to_word2`/`_word4` joined `_word8`/`_byte`), and the flip-era ctx
+detour through the shim in `word2_to_phys`/`word4_to_phys` — which was
+pure overhead once `↦₂`/`↦₄` were raw on both ends — is gone.
+
+**↦ₛ DOES NOT FLIP, and that is a ruling, not an omission.**  It was
+listed with `↦₂`/`↦₄`; it is the one that must not move.
+
+  1. IT WOULD PUT A CONTEXT INSIDE `is_lock`.  `WpLock.lock_name` is
+     `∃ p, word_pointsto (lock_name_field lk) □ p ∗ p ↦ₛ□ s`, and
+     `lock_name` is half of the PERSISTENT lock handle.  Flipping `↦ₛ`
+     makes the handle ξ-dependent IN THE STATEMENT — not as the artifact
+     of the constant embedding that tso-port.md §0.11′ measured — and a
+     boot-minted `is_lock` then cannot be stated at another thread.  That
+     is §0.8′ ruling 2, and it is the root both design problems were
+     routed around.
+  2. IT WOULD BUY NOTHING.  Every string fact in the tree is a DISCARDED
+     image literal (lock names, panic messages).  A discarded byte can
+     never owe `Wobl_ram`, and its load obligation is discharged by the
+     PRISTINE gate (A6.10), which needs no context at all.  The ledger
+     index would be dead weight on 37 files.
+
+  Net: flipping it removes ONE `forget` (in `kernel_data_string`), ADDS
+  one (in `lock_name_intro`), puts a binder on 37 files and a real ξ in
+  the lock handle.  `↦ₛ` therefore LEAVES the stage-2 list and joins
+  `↦ₓ`/`↦ᵣ`/`↦ₚ` as deliberately raw.  The reasoning is recorded in
+  `TsoCtx.v` beside the stage-2 notations.
+
+**THE ICACHE CLUSTER HAD TO PICK ONE TIER, AND IT PICKED CTX.**  The one
+real design decision of the wave.  `IcacheRef.inode_ident`'s two cells
+(`i_dev`/`i_inum`) are held in HALVES by `IcacheEscrow`'s arms and by
+`IcacheInv`'s `islot_rest`; `IcacheRef` did not import `TsoCtx`, so after
+the flip a ctx arm met a raw `inode_ident` — which is not a seam that can
+be crossed, it is ONE TIER DISAGREEING WITH ITSELF.  Two ways out were
+tried, in this order:
+
+  - RAW, via a `Local Notation` re-declaring `↦₄` at `word4_pointsto` in
+    `IcacheInv` and `IcacheEscrow`.  Rejected after measurement: it only
+    moves the disagreement (`InodeInv.inode_meta`'s `i_size` IS ctx, and
+    `IcacheEscrow` holds both families), and a NON-local `Notation`
+    ESCAPES to importers and silently un-flips their `↦₄` too — measured,
+    it broke `IcacheEscrow`, which imports `IcacheInv` after `TsoCtx`.
+    **Any per-file tier override must be `Local Notation`; a plain one is
+    a tree-wide silent un-flip.**
+  - CTX, by flipping `IcacheRef` itself.  Taken: it has TWO `↦₄`
+    occurrences and no invariants, so the cheapest place to decide the
+    cluster's tier is the file that owns the cells.  `IcacheRef`,
+    `IcacheInv`, `IcacheEscrow`, `IcacheBoot`, `InodeInv`, `InodeLock`,
+    `InodeRegion`, `BioInv`, `BioInitAt`, `BreadLru`, `ProofBreadParts`
+    all follow.
+
+**ONE FILE IS GENUINELY MIXED, AND IT IS SPELLED OUT.**  `BreadLru` takes
+the flip for its `↦₄` slot cells but its six `bcache_lru` LINK words are
+`BcacheInv`'s, which stays raw — so those six statements spell
+`word_pointsto` explicitly.  A file that imports `TsoCtx` for one family
+and needs another raw spells the raw one out; that is the rule.
+
+**THE STANDING QUESTION STAGE 2 WIDENS (not opens): CTX FACTS INSIDE A
+BARE `inv`.**  Three files now hold context-indexed cells inside an
+`inv` body at the section's ambient context — `BioInv` (`buf_escrow_body`,
+which ALREADY did from stage 1: `BufOwn.buf_own` is `{XI : CurCtx}`),
+`IcacheInv` (`itable_body`'s `iref_cells`) and `InodeRegion`.  An
+invariant body that names a context can only be used by a thread AT that
+context; the honest forms are the ones §0.8′ already ruled for the cases
+it met — ∀-context (`kernel_data`), ∃-context plus a parked handshake
+(`lk_cpu_res`, `cpu_ctx_free`), or raw (`lock_name`).  Deciding which for
+these three is an M2/M4 entry, not a stage-2 one, and it is NOT made
+worse by the flip: stage 1 had already put the pattern in the tree.
+
+**FIX-TABLE ADDITIONS from this wave** (for `tso-flip-replay.md`, if the
+process is ever re-run):
+
+| symptom | fix |
+|---|---|
+| `word{2,4}_pointsto_<law>` applied to a ctx fact | the `ctx_` twin; the rename is safe file-wide EXCEPT in files that import `TsoCtxShim` (those hold deliberate raw facts) — 19 files renamed blind, 14 skipped on that rule |
+| a plain `Notation` re-declaring a family raw | make it `Local`, always |
+| `XI is already used` in a file with inline binders | strip BOTH inline binders and use one section binder, when the decls are plain lemmas |
+| a raw fact meeting a ctx one at the SAME address | not a seam — one tier disagreeing with itself; flip the file that OWNS the cells |
+
+**THE UNREACHABLE INVENTORY.**  `grep TsoCtxShim` still names ~40 files
+whose shim uses are labelled "↦₂/↦₄ has NOT flipped (M1 stage 2)".  Those
+comments are now stale and most of those uses are simply DELETABLE — but
+every one of them is behind the A6.14 frontier, so this wave could not
+reach, fix or validate them.  They come out with their files.
+
+**FRONTIER.**  Two identical full `-k` sweeps.  **1044 of 1330 files
+fresh-green** (up from 1037), red set down from seven to **FIVE**, and
+every one of them is an A6.14/A6.9 item:
+
+    HartMemRun.v    A6.14 — the user tier
+    HartSMem.v      A6.14 — the S-mode data nodes
+    WpMmodeStore.v  A6.14 — M-mode stores (check the solo-era shape first)
+    KptTree.v       A6.14 — the PT-slot phys↔ctx pair
+    WpUart.v        A6.9  — the DMA lease has no ledger residue
+
+M1 is now COMPLETE except for the deliberately-raw tiers
+(`↦ₓ`/`↦ᵣ`/`↦ₚ`/`↦ₛ` and the four A6.14 members' own resources).
 
 ## 7. Order of work
 
