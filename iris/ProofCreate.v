@@ -7189,14 +7189,15 @@ Section ProofCreateMain.
     assert (Hgrow0 : forall s', is_Some (dir_entries (era_node dn bm data) !! s')
                                 -> is_Some (dir_entries (era_node dn' bm' data') !! s'))
       by (intros s' Hs'; rewrite Heqent0; exact Hs').
-    iDestruct (dlinks_intro _ _ _ _ _ D
-                 ltac:(exact (FsStateInode.ent_dset_ok_grow _ _ D
-                                Hgrow0 Hdok0))
-                 ltac:(exact (FsStateInode.node_exact_cong _ _ D
-                                ltac:(rewrite /fn_is_dir /fn_type !era_node_rec
-                                        Hty' //)
-                                ltac:(rewrite /fn_nlink !era_node_rec Hnl' //)
-                                Hxact0))
+    assert (Hdok0' : FsStateInode.ent_dset_ok (era_node dn' bm' data') D)
+      by exact (FsStateInode.ent_dset_ok_grow _ _ D Hgrow0 Hdok0).
+    assert (Hxact0' : FsStateInode.node_exact (era_node dn' bm' data') D).
+    { apply (FsStateInode.node_exact_cong (era_node dn bm data)
+               (era_node dn' bm' data') D).
+      - rewrite /fn_is_dir /fn_type !era_node_rec Hty' //.
+      - rewrite /fn_nlink !era_node_rec Hnl' //.
+      - exact Hxact0. }
+    iDestruct (dlinks_intro _ _ _ _ _ D Hdok0' Hxact0'
                  with "Hdlnk Hetk") as "Hdlnk".
     assert (Hiok' : inode_ok cov logstart dn' bm' data').
     { rewrite /inode_ok. split_and!.

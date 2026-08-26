@@ -883,6 +883,20 @@ Section InodeOwned.
     split_and!; [exact (Hgrow s Hex) | exact H1 | exact H2].
   Qed.
 
+  (* ...and the UNLINK's twin: an entry map that loses ONE name keeps every
+     marker, provided the lost name was not one of them.  ([ent_dset_ok] is
+     an existence claim, so only the deleted key can break it.) *)
+  Lemma ent_dset_ok_delete (n n' : fs_node) (s : fname) (D : gset fname) :
+    dir_entries n' = delete s (dir_entries n) -> s ∉ D ->
+    ent_dset_ok n D -> ent_dset_ok n' D.
+  Proof.
+    intros Hents Hs Hok t Ht.
+    destruct (Hok t Ht) as (Hsome & Hd & Hdd).
+    split_and!; [| exact Hd | exact Hdd].
+    rewrite Hents lookup_delete_ne; [exact Hsome |].
+    intros ->. exact (Hs Ht).
+  Qed.
+
   Lemma node_exact_cong n n' D :
     fn_is_dir n' = fn_is_dir n -> fn_nlink n' = fn_nlink n ->
     node_exact n D -> node_exact n' D.

@@ -1819,18 +1819,17 @@ Section ProofSysLinkBody.
                           pd pav pu bn g gfs gi cov logstart inodestart nib dev
                           (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None
                           (* pin = true: this site pays the TOKEN arm (§3.9) *)
-                          (* THE REGISTER UNIT'S VALUE IS ARBITRARY HERE:
-                             [nameiparent] has not run, so the namer is not
-                             known yet -- the [dirlink] below re-values it
-                             ([IregLinkNz.ireg_par_revalue]).  It is an
-                             ARBITRARY *NAME* value and not [None], because
-                             [None] is what an UP-POINTING record carries and
-                             [InodeRegion]'s (U1)/(U2) price one: minting it
-                             would claim [ip] is a directory some [".."]
-                             names, which sys_link's own ARM C has just
-                             refused.  [Some 0] is as good as any other -- the
-                             deposit fixes it. *)
-                          true (Some 0)
+                          (* NO REGISTER VALUE IS CHOSEN HERE (lane G5).  The
+                             fill's premise is what lets a caller PICK the
+                             value, and only create's fresh child does; every
+                             other raising flush stands at [None] and takes
+                             the value the register already holds.  Which is
+                             the whole reason the old re-valuation step is
+                             gone: [ip]'s value is already whatever its own
+                             record says, and ARM C refused [T_DIR] at +0x4c,
+                             so the fragment that comes back is [TFile] --
+                             exactly what a NAME record must carry. *)
+                          true None
                           pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
@@ -1842,8 +1841,8 @@ Section ProofSysLinkBody.
                           ltac:(intros _; rewrite /sl_incnl sl_setnl_type;
                                 exact (sl_tdir_zne _ Hty))
                           ltac:(intros pv Hc; discriminate Hc)
-                          (* (U1)/(U2): the minted unit is a NAME unit. *)
-                          ltac:(intros Hc; discriminate Hc)
+                          (* THE FILL'S PREMISE: vacuous, nothing is filled. *)
+                          ltac:(intros v Hc; discriminate Hc)
                           ltac:(rewrite /sl_incnl; apply sl_setnl_nlink)
                           Hnl
                           (* ===== THE IIIc WALL, SITE 2 OF 2 -- PAID
@@ -1874,7 +1873,21 @@ Section ProofSysLinkBody.
                 { rewrite /InodeRegion.ireg_link_pin. iExact "Hfrz". }
                 iIntros (CID41 Hq41 miu)
                   "%Hcsiu Hcg Hown Hpc Hpidq Hidev Hiinum Hmeta Hmap Hsbi Hdiat
-                   Hilink Htoken Hptok Hpin Hbs2 HopS".
+                   Hilink (%vtok & [%Hvok _] & Htoken) Hpin Hbs2 HopS".
+                (* the minted fragment's VALUE, read off [ip]'s own record:
+                   ARM C refused [T_DIR] at +0x4c, so it is [TFile]. *)
+                assert (Hvfile : vtok = TFile).
+                { destruct vtok as [| pv]; [reflexivity |].
+                  exfalso. rewrite /InodeRegion.ireg_reg_ok in Hvok.
+                  rewrite /sl_incnl sl_setnl_type in Hvok.
+                  exact (sl_tdir_zne _ Hty Hvok). }
+                (* ...and the pile is ONE unit: [ip] is not a directory. *)
+                assert (Hdelta1 : InodeRegion.ireg_dot_delta
+                                    (bv_unsigned (di_type dn))
+                                    (bv_unsigned (di_nlink dn)) = 1%nat)
+                  by exact (InodeRegion.ireg_dot_delta_not_dir _ _
+                              (sl_tdir_zne _ Hty)).
+                iEval (rewrite Hdelta1 FsStateLink.link_reps_1) in "Htoken".
                 (* at [pin = true] the premise that comes back IS the token,
                    by [InodeRegion.ireg_link_pin]'s own definition. *)
                 iEval (rewrite /InodeRegion.ireg_link_pin) in "Hpin".
@@ -2396,7 +2409,7 @@ Section ProofSysLinkBody.
                                Hncd
                                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hropen Hslkk
-                                     Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hptok Hslkdd
+                                     Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hslkdd
                                      Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                      Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -2691,7 +2704,8 @@ Section ProofSysLinkBody.
                       because the deposit below files the +0x94 mint's unit
                       among the home's entry units (durable-disk
                       2b-inode-5). *)
-                   iDestruct (dlinks_open with "Hdlnkd") as "[Hdlnkd Hetkd]".
+                   iDestruct (dlinks_open with "Hdlnkd")
+                     as "[Hdlnkd (%Dd & [%Hdokd %Hxactd] & Hetkd)]".
                    iEval (rewrite HU6a1) in "Hnm14".
                    assert (Hpca0 : ret_pc (U6 !!! Regidx Rra : mword 64)
                                    = mword_of_int (SL + 0xa0)) by (rewrite HU6ra; pcw).
@@ -2746,7 +2760,8 @@ Section ProofSysLinkBody.
                        subst bmd' datd' dnd' dnd0'.
                        (* dirlink handed the ledger half back verbatim and
                           moved no record, so the pair re-packs unchanged. *)
-                       iDestruct (dlinks_intro with "Hdlnkd Hetkd") as "Hdlnkd".
+                       iDestruct (dlinks_intro _ _ _ _ _ Dd Hdokd Hxactd
+                                    with "Hdlnkd Hetkd") as "Hdlnkd".
                        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
                          with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd
                                 Hfviewd Htopd]"
@@ -2808,7 +2823,7 @@ Section ProofSysLinkBody.
                                  Hncd
                                  with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hropen Hslkk
-                                       Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hptok Hslkdd
+                                       Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hslkdd
                                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                        Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -2959,26 +2974,14 @@ Section ProofSysLinkBody.
                                       (mword_of_int (SL + 0xa0) : mword 64) 4
                                       = mword_of_int (SL + 0xa4)) by pcw.
                             iEval (rewrite Hppa4) in "Hpc".
-                            (* THE REGISTER UNIT IS RE-VALUED HERE, and this
-                               is the site the mechanism exists for: the [++]
-                               at +0x5e minted it before [nameiparent] named
-                               the directory, so it arrives unattributed and
-                               takes the namer's value at the deposit
-                               ([IregLinkNz.ireg_par_revalue], one
-                               mask-preserving step at this inum's slot). *)
-                            iApply fupd_wp.
-                            iMod (IregLinkNz.ireg_par_revalue ⊤ gi gfs
-                                    inodestart nib inum (Some 0)
-                                    (FsStateInode.ent_par_val
-                                       (bv_unsigned dinum) (bname 14 nf))
-                                    ltac:(solve_ndisj) Hinb
-                                    (* the deposited record is a NAME record:
-                                       dirlink's own [dirlookup] MISSED, and a
-                                       live directory's records 0 and 1 are the
-                                       two dot names
-                                       ([DirView.dir_dots_miss_not_dots]). *)
-                                    ltac:(intros Hc; exfalso;
-                                      destruct (dir_dots_miss_not_dots
+                            (* THE DOT NAMES ARE MISSED (durable-disk G5).
+                               [dirlink]'s own [dirlookup] came back empty and
+                               a live directory's records 0 and 1 are the two
+                               dot names ([DirView.dir_dots_miss_not_dots]) --
+                               so the appended name is a NAME name, which is
+                               what both the marker set and the register value
+                               below need. *)
+                            destruct (dir_dots_miss_not_dots
                                         (bv_unsigned dinum) dnd datd
                                         (bname 14 nf)
                                         ltac:(clear -Htyd; rewrite Htyd;
@@ -2987,17 +2990,27 @@ Section ProofSysLinkBody.
                                               apply Hdnl0; apply bv_eq;
                                               rewrite Hcc; vm_compute;
                                               reflexivity)
-                                        Hddixd Hnone) as [Hnd1 Hnd2];
-                                      rewrite (FsStateInode.ent_par_val_name
-                                                 (bv_unsigned dinum)
-                                                 (bname 14 nf)
-                                                 ltac:(rewrite FsStateEra.DOT_dot;
-                                                       exact Hnd1)
-                                                 ltac:(rewrite FsStateEra.DOTDOT_dotdot;
-                                                       exact Hnd2)) in Hc;
-                                      discriminate Hc)
-                                    with "Hireg Hptok") as "Hptok".
-                            iModIntro.
+                                        Hddixd Hnone) as [Hnd1 Hnd2].
+                            assert (Hnfd' : bname 14 nf <> DOT)
+                              by (rewrite FsStateEra.DOT_dot; exact Hnd1).
+                            assert (Hnfdd' : bname 14 nf <> DOTDOT)
+                              by (rewrite FsStateEra.DOTDOT_dotdot; exact Hnd2).
+                            assert (Hdzd : bv_unsigned (di_type dnd) = T_DIR_z)
+                              by (clear -Htyd; rewrite Htyd;
+                                  vm_compute; reflexivity).
+                            (* the appended name is not MARKED: it is not an
+                               entry at all yet. *)
+                            assert (HsD : bname 14 nf ∉ Dd).
+                            { intros Hin. destruct (Hdokd _ Hin) as ([tt Htt] & _ & _).
+                              rewrite (dir_entries_era_node dnd bmd datd
+                                         (proj1 (proj2 (proj2 (proj2 (proj2
+                                            (proj2 Hdiok))))))
+                                         (proj1 (proj2 (proj2 (proj2 (proj2
+                                            Hdiok))))))
+                                (bool_decide_eq_true_2 _ Hdzd)
+                                (proj2 (dir_view_lookup_None datd _
+                                          (bname 14 nf)) Hnone)
+                                in Htt. discriminate. }
                             (* THE DEPOSIT.  The [ilink] the [++] minted at
                                +0x5e goes into the PARENT's ledger here,
                                caller-side (fs-icache.md 20.18 ruling 1 keeps
@@ -3062,21 +3075,53 @@ Section ProofSysLinkBody.
                                             Hdiok)))))
                                          (proj1 (proj2 (proj2 (proj2 (proj2
                                             Hdiok')))))
-                                         with "Hetkd [Htoken Hptok]") as "Hetkd'".
+                                         HsD Hnfdd'
+                                         with "Hetkd [Htoken]") as "Hetkd'".
                             { iEval (rewrite -Hli) in "Htoken".
-                              iEval (rewrite -Hli) in "Hptok".
                               iApply (ent_tok_of_link (fs_gamma_L gfs)
                                         (bv_unsigned dinum)
+                                        (fn_dd (era_node dnd bmd datd))
                                         (fn_orphan (era_node dnd bmd datd))
+                                        false
                                         (bname 14 nf)
                                         (bv_unsigned (sl_low16 inum))
-                                        ltac:(intros _; apply fn_orphan_era_nz;
-                                              clear -Hdnl0; intro Hc;
-                                              apply Hdnl0; apply bv_eq;
-                                              rewrite Hc; vm_compute;
-                                              reflexivity)
-                                        with "Htoken Hptok"). }
-                            iDestruct (dlinks_intro with "Hdlnkd' Hetkd'")
+                                        vtok
+                                        ltac:(apply FsStateInode.ent_ty_ok_name;
+                                              [exact Hnfd' | exact Hnfdd'
+                                               | exact Hvfile])
+                                        with "Htoken"). }
+                            assert (Hgrowd := dir_entries_dirlink_grow
+                                       dnd dnd' bmd bmd' datd datd'
+                                       (sl_low16 inum) (bname 14 nf)
+                                       (dir_nrec (bv_unsigned (di_size dnd)))
+                                       (dir_slot datd
+                                          (dir_nrec (bv_unsigned (di_size dnd))))
+                                       tot eq_refl eq_refl Hatom
+                                       (bname_length_le 14 nf) (cut_nul_nonul _)
+                                       Hdzd Htyeq Hszmax Hrng Hnone
+                                       (proj1 (proj2 (proj2 (proj2 (proj2
+                                          (proj2 Hdiok))))))
+                                       Hholes3
+                                       (proj1 (proj2 (proj2 (proj2 (proj2
+                                          Hdiok)))))
+                                       (proj1 (proj2 (proj2 (proj2 (proj2
+                                          Hdiok')))))).
+                            iDestruct (dlinks_intro _ _ _ _ _ Dd
+                                         ltac:(exact (FsStateInode.ent_dset_ok_grow
+                                                        _ _ Dd Hgrowd Hdokd))
+                                         ltac:(exact (FsStateInode.node_exact_cong
+                                                        (era_node dnd bmd datd)
+                                                        (era_node dnd' bmd' datd')
+                                                        Dd
+                                                        ltac:(rewrite /fn_is_dir
+                                                                /fn_type
+                                                                !era_node_rec
+                                                                Htyeq //)
+                                                        ltac:(rewrite /fn_nlink
+                                                                !era_node_rec
+                                                                Hnleq //)
+                                                        Hxactd))
+                                         with "Hdlnkd' Hetkd'")
                               as "Hdlnkd'".
                             (* THE MOVER (namei-pinned-lookup.md §9 W3,
                                dirlink's row): the record and the bytes both
@@ -3523,7 +3568,7 @@ Section ProofSysLinkBody.
                                          (dir_nrec (bv_unsigned (di_size dnd)))
                                          (dir_slot datd
                                             (dir_nrec (bv_unsigned (di_size dnd))))
-                                         tot eq_refl (dir_slot_le _ _) Htot0
+                                         tot Dd eq_refl (dir_slot_le _ _) Htot0
                                          Htyeq Hnleq Hszmax Hrng
                                          (proj1 (proj2 (proj2 (proj2 (proj2
                                             (proj2 Hdiok))))))
@@ -3533,7 +3578,46 @@ Section ProofSysLinkBody.
                                          (proj1 (proj2 (proj2 (proj2 (proj2
                                             Hdiok')))))
                                          with "Hetkd") as "Hetkd'".
-                            iDestruct (dlinks_intro with "Hdlnkd' Hetkd'")
+                            assert (Heqentd := dir_entries_dirlink_nop_eq
+                                       dnd dnd' bmd bmd' datd datd'
+                                       (fun j => dirent_bytes
+                                          (de_of_name (sl_low16 inum)
+                                             (bname 14 nf)) !!! j)
+                                       (dir_nrec (bv_unsigned (di_size dnd)))
+                                       (dir_slot datd
+                                          (dir_nrec (bv_unsigned (di_size dnd))))
+                                       tot eq_refl (dir_slot_le _ _) Htot0
+                                       Htyeq Hszmax Hrng
+                                       (proj1 (proj2 (proj2 (proj2 (proj2
+                                          (proj2 Hdiok))))))
+                                       Hholes3
+                                       (proj1 (proj2 (proj2 (proj2 (proj2
+                                          Hdiok)))))
+                                       (proj1 (proj2 (proj2 (proj2 (proj2
+                                          Hdiok')))))).
+                            assert (Hgrowd0 : forall s',
+                                       is_Some (dir_entries
+                                                  (era_node dnd bmd datd) !! s')
+                                       -> is_Some (dir_entries
+                                                     (era_node dnd' bmd' datd')
+                                                     !! s'))
+                              by (intros s' Hs'; rewrite Heqentd; exact Hs').
+                            iDestruct (dlinks_intro _ _ _ _ _ Dd
+                                         ltac:(exact (FsStateInode.ent_dset_ok_grow
+                                                        _ _ Dd Hgrowd0 Hdokd))
+                                         ltac:(exact (FsStateInode.node_exact_cong
+                                                        (era_node dnd bmd datd)
+                                                        (era_node dnd' bmd' datd')
+                                                        Dd
+                                                        ltac:(rewrite /fn_is_dir
+                                                                /fn_type
+                                                                !era_node_rec
+                                                                Htyeq //)
+                                                        ltac:(rewrite /fn_nlink
+                                                                !era_node_rec
+                                                                Hnleq //)
+                                                        Hxactd))
+                                         with "Hdlnkd' Hetkd'")
                               as "Hdlnkd'".
                             (* THE MOVER (namei-pinned-lookup.md §9 W3,
                                dirlink's row): the record and the bytes both
@@ -3636,7 +3720,7 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
                                             Hireg Hropen Hslkk Hslkd0 Hkeep Hru Hshr Hshot2
-                                            Hilink Htoken Hptok
+                                            Hilink Htoken
                                             Hslkdd Hdepd Hidevd Hiinumd
                                             Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd Hrud
                                             Hsbb
@@ -3720,7 +3804,7 @@ Section ProofSysLinkBody.
                              (sl_regs_s1 _ _ _ _ _ HT3regs) Hal Hncd
                              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hkeep Hru Hshr
-                                   Hshot2 Hilink Htoken Hptok Hsbb Hsbi Hbmres Hpidq Hprocs
+                                   Hshot2 Hilink Htoken Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
                                    Hdlk Hbsl HopS Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwdref Hofiles Hftok Hcont]").

@@ -2638,6 +2638,37 @@ Section EraRes.
     iExact "Ht".
   Qed.
 
+  (* THE UNLINK'S ENTRY MAP, as a pure equation: zeroing a winning record
+     deletes exactly its name.  It is [ent_toks_unlink]'s own [Hents']
+     step, exported, because the caller needs it to re-seal the marker set
+     ([FsStateInode.ent_dset_ok_delete]). *)
+  Lemma dir_entries_unlink_eq (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8)) (k0 : nat) :
+    (k0 < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_live data k0 ->
+    dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))) ->
+    dir_zeroed_at data data' k0 ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    di_type dn' = di_type dn ->
+    di_size dn' = di_size dn ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_entries (era_node dn' bm' data')
+    = delete (dir_bname data k0) (dir_entries (era_node dn bm data)).
+  Proof.
+    intros Hk0 Hlive Hu Hzer Hty Hty' Hsz Hh Hh' Hb.
+    assert (Hb' : bv_unsigned (di_size dn')
+                  <= Z.of_nat MAXFILE * Z.of_nat BSIZE)
+      by (rewrite Hsz; exact Hb).
+    assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
+      by (rewrite Hty'; exact Hty).
+    rewrite (dir_entries_era_node dn bm data Hh Hb)
+      (bool_decide_eq_true_2 _ Hty)
+      (dir_entries_era_node dn' bm' data' Hh' Hb')
+      (bool_decide_eq_true_2 _ Hty2) Hsz.
+    exact (dir_view_zero data data' _ k0 Hu Hk0 Hlive Hzer).
+  Qed.
+
   (* THE ENTRY MAP ONLY GROWS AT A [dirlink], on either arm: the no-write
      arm leaves it alone and the append inserts one name.  It is what
      carries [FsStateInode.ent_dset_ok] across the write. *)
@@ -2888,6 +2919,47 @@ Section EraRes.
       register unit; this one lends the PAIR, and is keyed by the record
       INDEX rather than by a [dir_first] hit, which is the form a walk
       that already knows its record's index and liveness has. *)
+  (* THE ["."] RECORD'S FRAGMENT, borrowed and handed straight back
+     (durable-disk G5, (D1)'s engine).  A live directory's own ["."] names
+     its home and STILL owes a fragment -- that is the [+1] in
+     [FsStateInode.fn_mult] -- and the fragment's value PINS the home's
+     [".."] target ([FsStateInode.ent_ty_ok]'s dot arm).  rmdir reads it
+     against the parent's own name record for the same inum. *)
+  Lemma ent_toks_era_borrow_dot (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
+      (D : gset fname) :
+    bv_unsigned (di_nlink dn) <> 0 ->
+    dir_entries (era_node dn bm data) !! DOT = Some i ->
+    ent_toks Γ i (era_node dn bm data) D -∗
+      (∃ ty, link_tok Γ i ty
+             ∗ ⌜forall p q : Z, ty = TDir p ->
+                  FsStateInode.fn_dd (era_node dn bm data) = Some q -> q = p⌝)
+      ∗ ((∃ ty, link_tok Γ i ty
+                ∗ ⌜forall p q : Z, ty = TDir p ->
+                     FsStateInode.fn_dd (era_node dn bm data) = Some q
+                     -> q = p⌝)
+         -∗ ent_toks Γ i (era_node dn bm data) D).
+  Proof.
+    intros Hnz Hlk.
+    assert (Htl : FsStateInode.ent_tokenless i
+                    (fn_orphan (era_node dn bm data)) DOT i = false).
+    { rewrite /FsStateInode.ent_tokenless
+        (fn_orphan_era_nz dn bm data Hnz)
+        (bool_decide_eq_true_2 (DOT = DOT) eq_refl)
+        (bool_decide_eq_true_2 (i = i) eq_refl) //. }
+    rewrite /ent_toks. iIntros "H".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hlk with "H") as "[Ht Hback]".
+    rewrite /FsStateInode.ent_tok Htl.
+    iSplitL "Ht".
+    - iDestruct "Ht" as (ty) "[Ht %Hok]". iExists ty. iFrame "Ht".
+      iPureIntro. rewrite /FsStateInode.ent_ty_ok
+        (bool_decide_eq_true_2 (DOT = DOT) eq_refl) in Hok. exact Hok.
+    - iIntros "Ht". iApply "Hback". rewrite /FsStateInode.ent_tok Htl.
+      iDestruct "Ht" as (ty) "[Ht %Hok]". iExists ty. iFrame "Ht".
+      iPureIntro. rewrite /FsStateInode.ent_ty_ok
+        (bool_decide_eq_true_2 (DOT = DOT) eq_refl). exact Hok.
+  Qed.
+
   Lemma ent_toks_era_borrow_at (Γ : fs_view_names Σ) (i : Z)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (k : nat)
       (D : gset fname) :

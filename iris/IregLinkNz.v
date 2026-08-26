@@ -79,6 +79,68 @@ Section IregLinkNz.
      exactly as the fragment was, because the caller still has to spend it
      at the flush this fact licences ([ireg_tok_root_min2] below borrows
      its token the same way). *)
+  (* TWO FRAGMENTS AT ONE INUM AGREE (durable-disk G5, (D1)'s walk lemma).
+     The authority is a UNIFORM multiset, so any two held fragments carry
+     the SAME value -- and the value is the record's kind.  rmdir reads the
+     child's own ["."] fragment (which pins the child's [".."] target)
+     against the parent's name record for the child (which asserts
+     [TDir dp]), and the two together ARE (D1).  Stated as an ACCESSOR over
+     [ireg_inv] for §7.1.4's reason, exactly as [ireg_tok_nz] is. *)
+  Lemma ireg_toks_agree (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (v v' : ity) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn -∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v -∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v'
+    ={E}=∗
+    ⌜v = v' /\ ireg_reg_ok (bv_unsigned (di_type dn)) v⌝ ∗
+    dinode_at γi inum dn ∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v ∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v'.
+  Proof.
+    iIntros (HE Hin) "#Hinv Hdn Hfrag Hfrag2".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    rewrite /dinode_at.
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
+    assert (Hdeq : ds !!! islot inum = dn).
+    { specialize (Hcp (islot inum) Hsl).
+      rewrite -ireg_key_split in Hcp. congruence. }
+    iDestruct (ireg_lnk_toks_agree with "Hlnk Hfrag Hfrag2") as %Hnz0.
+    iDestruct (ireg_lnk_tok_ty with "Hlnk Hfrag") as %Hty0.
+    rewrite Hdeq in Hty0.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
+    { iNext. iExists m. iFrame "Ha Hreg".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
+    iModIntro. iFrame "Hdn Hfrag Hfrag2". iPureIntro.
+    split; [exact Hnz0 | exact Hty0].
+  Qed.
+
   Lemma ireg_tok_nz (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (v : ity) :
     ↑iregN ⊆ E ->
