@@ -13,7 +13,13 @@ lemmas tree-wide.
 **Goal (owner):** xv6 correctness across crashes INCLUDING file-system
 consistency.  `SystemAdequacy.xv6_power_adequacy` is vacuous today (its
 `Himg` premise is refutable); it becomes true when the durable snapshot
-carries the file system across eras and `Himg` is deleted (lane E).
+carries the file system across eras and `Himg` is deleted (lane E).  The
+DURABILITY PROPERTY itself is proven and exported already: "the physical
+disk recovers to a committed view that IS a file system" is a conjunct of
+`SystemAdequacy.fs_boot_pure`, which the trace corollary instantiates `phi`
+at, so it holds at every reachable state.  What is missing is that the
+BOOT re-founds the era from it, which is what makes the whole theorem
+non-vacuous — lane E's wall, measured below.
 
 ## Working rules (keep; they proved out)
 
@@ -102,6 +108,14 @@ carries the file system across eras and `Himg` is deleted (lane E).
   `img_P_dur_alloc`, `img_boot_P_fs_dur` (the boot point, `P_fs_alloc_clean`
   plus `P_dur` at the same `D0`), witnessed at the literal image by
   `FsAdequacyImg.fsimg_snap_ok`.
+- **The commit's snapshot step (lane C item 3, CE):** `FsCrash.P_fs`'s
+  durable conjunct IS `FsDurSnap.P_dur (fr_D r)`; the two commit permits
+  step it (`dsnap_step_of` inside their own `bupd`) off one PURE premise,
+  which `wp_end_op_sconf` reads from `log_ctx`'s law in the accounting
+  critical section and carries across the lock release as a Coq hypothesis
+  (`ProofEndOp.eo_open_snap_law`).  `FsCrash.fs_commit_receipt` /
+  `P_fs_dur_acc` are the readings; `P_fs_project` and
+  `SystemAdequacy.fs_boot_pure` carry the tie out to the whole trace.
 - **The collection and the law (lane C items 1–2, C-8):**
   `iris/FsCollectAll.v` — `fs_collect_snap_ok` (six invariant families
   opened at ONE ghost step, `col_hand` assembled, `⌜∃ S, snap_ok S L⌝` out,
@@ -117,12 +131,16 @@ carries the file system across eras and `Himg` is deleted (lane E).
 
 ## STILL PRESENT BUT SUPERSEDED (delete when their consumers move)
 
-`LogDefs.fs_dview` as `P_fs`'s durable slot (`FsCrash.P_fs` still holds
-`ghost_map_auth γv 1 (fs_dbytes (fr_D r)) ∗ fs_dview γv …`, and the commit
-permits still re-base it themselves); `RiscvPtsto.fs_dur_names`'
-`fdn_bmap/ist/nin` and `riscv_dview_name`, with `RiscvAdequacy`/
-`SystemAdequacy`'s `Pc` arguments and `FsDurLedger`'s geometry equations
-as their remaining consumers.
+`RiscvPtsto.fs_dur_names`' `fdn_bmap/ist/nin` (only consumer:
+`FsDurLedger`'s superseded fold) and `riscv_dview_name` (the `gamma_v`
+parameter `FsCrash.P_fs`/`fs_crash_seam` still thread and nothing reads;
+deleting it is a sweep of `Pc`'s arity through `RiscvAdequacy`/
+`SystemAdequacy`, both slow serial files, so it was left for a cleanup lane).
+GONE with lane CE: `LogDefs.fs_dview`/`fs_dview_rebase`,
+`FsDurBytes.fs_dview_dbelems`/`fs_dview_dbytes`, and `FsDurImg`'s
+resource-MOVING image conversion `fs_dur_of_image`/`fs_dur_view_of_image`
+(section 10) — the boot mint runs the allocator core at the ERA's own view,
+so it never wanted that shape.
 
 ## The lanes, in order (each is one green checkpoint; specs cite the plan)
 
@@ -1274,8 +1292,8 @@ as their remaining consumers.
   WRONG: the pending/await row is parked BEFORE iput's off-lock deposit, so
   the region slot is still MARKED for the length of that window.  See C-4's
   residue (F).]
-- [ ] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
-  ITEMS 1 AND 2 ARE DONE (C-8); item 3 is what is left.
+- [x] **Lane C — the commit reconstructs the snapshot (plan §3 commit, §4).**
+  ITEMS 1 AND 2 ARE C-8's; ITEM 3 IS CE's.
   1. The COLLECTION lemma: with `γtx` empty (lane A item 5 ⇒ no `Some`
      entry in LOCKED), opening `ftopN`/`iregN`/`icacheN`/`icEscN`/`bitmapN`
      at a ghost step and ∗-ing every inode's bundle against the byte
@@ -2141,27 +2159,166 @@ as their remaining consumers.
   `ireg_inv`/`ireg_slot`/`ireg_body`, `is_itable2`/`itable_res2`,
   `ic_escrow_body`'s five arms, `ipool`'s shape, every syscall contract.
 
-  ITEM 3 IS WHAT REMAINS, and nothing under it is open: `eo_commit`'s call
-  to `log_ctx_snap_law_of_ops` at `outstanding = 0`, the two commit permits
-  (`FsCrash.fs_commit_L_sector0_rec` / `_seq_permit`) gaining
-  `FsDurSnap.dsnap_step_of` at the collected `snap_ok` with the allocator
-  inside, `FsCrash.P_fs`'s durable conjunct becoming `P_dur (fr_D r)` (boot
-  via `FsDurImg.img_boot_P_fs_dur`), `fs_commit_receipt`, and the
-  `LogDefs.fs_dview`-as-slot / `RiscvPtsto.fdn_*` / `riscv_dview_name`
-  deletions.  `snap_law_run` is stated at `⊤ ∖ ↑logN`; a committer at a
-  smaller mask takes `snap_law_at` out of the definition and discharges
-  `N ⊆ E` from its own opening.
+  **AS LANDED — CE: ITEM 3, AND THE ONE THING THAT WAS NOT WHERE C-8
+  PREDICTED.**
 
-- [ ] **Lane E — PRIORITY after C-8 (owner) — boot and the theorem (plan §5).**  Stage 4: the era's
+  `FsCrash.P_fs`'s durable conjunct is `FsDurSnap.P_dur (fr_D r)`, LAST, in
+  place of the flat `ghost_map_auth γv … ∗ fs_dview γv …`.  Arity-free as
+  predicted: `P_dur` is a function of the map and its gname family is
+  existential, so the `gamma_v` parameter and the ~90 files that name
+  `fs_crash_seam` are untouched.  The price is two capacity classes
+  (`fsLinkG`, `fsTopG`) on `FsCrash`'s two sections; every consumer has them
+  out of `Xv6G.xv6G`, so the sweep was zero files.  `FsCrash` gains
+  `FsDurSnap` in its import list (its cone grows from 39 files to ~60, all of
+  whose consumers were already above `FsState`).  Timelessness is free
+  (`P_dur_timeless` off `snap_gamma_gtimeless`).
+
+  **THE LAW CANNOT BE RUN WHERE THE COMMIT WRITES, AND THAT IS THIS ITEM'S
+  ONE FINDING.**  C-8 expected `eo_commit` to meet
+  `log_ctx_snap_law_of_ops`.  It cannot: the law needs
+  `ghost_map_auth (ln_tx γ) 1 T`, that authority lives in `LogInv.log_res`,
+  and `end_op` RELEASES the log lock (`+0x38`) before the commit body runs
+  and only re-acquires in `eo_tail`.  What makes the placement work anyway is
+  that the law's conclusion is PURE — the same observation `pure_keep` is —
+  so `wp_end_op_sconf` runs it in the ACCOUNTING CRITICAL SECTION, in the
+  commit arm, where `out - 1 = 0` forces `delete i0 om = ∅` and `log_res`'s
+  cardinality tie forces the transaction map empty with it, and the resulting
+  `⌜∃ S, snap_ok S (fs_restrict (dv_of_D L) home)⌝` crosses the release as a
+  COQ HYPOTHESIS.  Consequences: `eo_open_of_batch` MOVES UP into the
+  critical section (naming the logged view needs the checked-out cache
+  authority), and `eo_commit`/`eo_loop` each gain that pure premise —
+  `eo_loop` re-establishes it at its back edge in three lines, because a fill
+  writes a log SLOT and `eo_home_restrict_upd` says the home restriction does
+  not move.
+
+  NEW in `ProofEndOp`: `eo_home_restrict_upd`, `eo_cache_body_sub` (the
+  checked-out cache authority against `fs_bytes_body`'s parked halves — at a
+  HALF, so `ghost_map_lookup_big`'s fraction-1 statement does not serve and
+  it is `byte_range_q_lookup`'s three-line idiom), `eo_restrict_of_sub` (the
+  invariant's cache picture `C` and the committer's `L` restrict to the same
+  map on the home set), `eo_snap_law_of_auth`, `eo_open_snap_law`.  Its
+  `FsDurSnap`/`LogSnapLaw` imports go BEFORE `FsBlocks`/`LogInv`, since
+  `FsDurSnap` re-exports `FsState` whose `fs_view` family would otherwise
+  shadow the block layer's.
+
+  NEW in `FsCrash`: `fs_commit_receipt` (the disk recovers to a `D` and `D`
+  IS a file system — the citable form; `D' = L` at home maps is the permit's
+  own `fs_receipt_any` index) and `P_fs_dur_acc` (the snapshot lent out with
+  a wand back — the channel a boot mint takes).  THE SNAPSHOT'S STATE IS
+  EXISTENTIAL in the law and that costs nothing: `snap_bytes_node_inj` /
+  `_sb_inj` / `_used_agree` make the state a function of the map, so "the new
+  snapshot's `S` is the `ftop` map restricted to the region" is recoverable
+  node by node rather than carried.
+
+  CONTRACTS WHOSE STATEMENT CHANGED: `FsCrash.P_fs`; `P_fs_alloc` /
+  `P_fs_alloc_clean` (+ `∃ S, snap_ok S D0`, discharged at era 0 by
+  `FsDurImg.img_snap_ok`); `fs_commit_L_sector0_rec` / `fs_commit_L_seq_permit`
+  (+ the same pure premise, LAST among the pure ones); `P_fs_rec_named_wf` /
+  `P_fs_project` (+ the snapshot's tie, LAST); `FsDurImg.img_boot_P_fs_dur`
+  (it DISCHARGES the premise instead of handing out a separate `P_dur`);
+  `ProofEndOp.eo_commit` / `eo_loop`; `SystemAdequacy.fs_boot_pure`.
+  UNTOUCHED: `log_ctx`, `log_op`, `wp_end_op`, `fs_crash_seam`, every syscall
+  contract, `LogSnapLaw` and `FsCollectAll`.
+
+  DELETED: `LogDefs.fs_dview`/`fs_dview_timeless`/`fs_dview_rebase` and the
+  `FsDurableView` section; `FsDurBytes.fs_dview_dbelems`/`fs_dview_dbytes`;
+  `FsDurImg` section 10 (`fs_dur_of_image`/`fs_dur_view_of_image`, the
+  resource-MOVING image conversion — the boot mint runs the allocator core at
+  the era's own view, so nothing wanted it).  NOT deleted:
+  `RiscvPtsto.fdn_*` (consumed by `FsDurLedger`'s fold) and
+  `riscv_dview_name` (a sweep of `Pc`'s arity through the two slow adequacy
+  files, and pure cleanup).
+
+  `snap_law_run` is stated at `⊤ ∖ ↑logN`; the committer meets it exactly
+  there, opening `logN` itself for the byte authority.
+
+- [ ] **Lane E — boot and the theorem (plan §5).**  Stage 4: the era's
   instance minted from the current snapshot by `fs_state_of_ledger` +
   the era-only extras, distributed into region/bitmap/escrow/pool
   (`fs_cfg_alloc`, `FsBoot`, `BootShared` lose every image premise;
   `image_dinode_fs_dinode` disappears); [(14)/(15) are already conjuncts
-  of `fs_boot_image_wf` — lane C-img did that]; the `Pdur`
-  parameter on `riscv_power_adequacy` (3b''s finding: any boot-time fact
-  about the durable bundle needs it); then Stage I: delete `Himg`/
+  of `fs_boot_image_wf` — lane C-img did that]; then Stage I: delete `Himg`/
   `fs_boot_image_eras`/`fsimg_at_every_era`; adequacy assumes era 0's
   image only.  Definition of done: the boot mint CONSUMES the snapshot.
+
+  **MEASURED (CE), AND THE WALL IS BOOT ORDER — not the ghost theory, and
+  not `riscv_power_adequacy`'s shape.**  The channel 3b'' asked for is
+  already built and needs no parameter: `P_dur`'s content is PURE, so
+  `FsCrash.P_fs_project` reads `∃ S, snap_ok S D` off it and
+  `SystemAdequacy.fs_boot_pure` carries it into every era through the
+  existing `Ppure`/`Hproj`.  What blocks the mint is where the era's byte
+  view comes from:
+
+  - `FsCfgBoot.fs_cfg_alloc` (650 lines, body 563) runs at **PowerOn**
+    (`BootShared.boot_shared_alloc`), takes the RAW disk
+    `disk_bytes γv 0 (disk_read dk 0 ndisk)`, and mints the era's `fs_cache`
+    AND `fs_bytes` at ONE value map — `fs_blocks dk` — through
+    `FsBoot.fs_boot_ghosts` → `FsBoot.fs_boot_carve` → `FsBlocks.fs_alloc`
+    (the byte map is grown from the cache halves, so the two cannot disagree
+    by construction).  Two invariants then pin that value: `BioInv.pool_blk`
+    (`∃ bs, disk_block γv b bs ∗ fs_mclean γfs b bs` — ONE existential over
+    the disk cell and the cache half, and the cell arrives exclusive at the
+    raw bytes) and `FsBlocks.fs_bytes_body`'s `bytes_tie`.  The snapshot
+    stands at the COMMITTED view, which equals the raw home blocks only when
+    the on-disk log header is clean.  At a dirty log a mint at `D` falsifies
+    one of those two, and the mirror born at `mirror_of (fs_blocks dk)` in
+    `RiscvAdequacy`'s PowerOn arm falsifies `SpecInitlog`'s
+    `L !! b = Some (lm_view M b)` row as well.
+  - The only instant `L = D` on the home set is AFTER `install_trans` /
+    `write_head`, i.e. inside `initlog`, which runs at `forkret` → `fsinit` —
+    thousands of instructions after `fs_cfg_alloc`.  So the FS half of the
+    mint (`fs_boot_alloc_full`, `ftop_alloc`, `ireg_alloc`, the two
+    `*_lend_mint`s, `ipool_alloc`, `bitmap_inv_alloc`, the byte-run peels)
+    has to move behind recovery, the block half staying at PowerOn.  And
+    `IcacheBoot.icache_boot_at` consumes `ipool_rows` at `main+0x92`, before
+    `fsinit`, so it must move too or seal an EMPTY pool and be stocked later
+    through the itable lock.  `SpecFsinit`/`ProofFsinit` still carry "the
+    header is clean" as a premise; that is the same wall from the other side.
+  - `fs_cfg_alloc`'s `dv_pin`/`fv_pin` name the mkfs image's root map and
+    `/init`'s bytes AT INUM 7.  No snapshot at era N carries that, and their
+    consumer (`NameiInitPinned`) needs it, so they stay behind an era-0
+    hypothesis whatever else moves.
+
+  **THE PREMISE→SUPPLIER TABLE.**  Of `fs_cfg_alloc`'s eleven premises,
+  `Hwf` (via `fsimg_wf_sb`) is `sk_sbok`; `img_nodes_local` is `snap_local`
+  verbatim; the W1–W8 sweep behind `ipool_alloc_of_image` is
+  `FsStateEra.inode_ok_of_local`/`inode_owned_era_ok` off `snap_local` plus
+  ownership; the bitmap group is `sk_bmap`/`sk_pool`/`sk_meta_used`/
+  `sk_own_used`/`sk_disj` (indeed `free_bitmap` is already a conjunct of
+  `fs_state`); `Hnin`/`Hnib32`/`Hnib0`/`Hnibeq` are `sk_sbok` arithmetic
+  (`Hnibeq` becomes a DEFINITION of `nib` from `S`, off `sbo_bmapstart`);
+  `Hrw`'s L4 is `snap_local`'s `inl_nlink`; `Hcovin`/`Hcovmeta` stay (facts
+  about `cov`/`ndisk`, and the LOG REGION is by construction not in `D`);
+  `Hcovdata` is `sk_blk`/`sk_ind`/`sk_pool` for every block anyone owns.
+  THREE HAVE NO SUPPLIER, and all three are admissible under §4's local rule:
+
+  1. **the region's TAIL inums.**  `sk_dom` names `0 ≤ i < ninodes`; the era
+     needs `0 ≤ i < 16·nib` (`ireg_recs` is sixteen records per region block;
+     `ftop_alloc`/`ipool_alloc` run over `region_inums nib`).  A DOMAIN row,
+     and the commit can supply it — the collection's state IS the `ftop` map
+     restricted to the region (`FsCollect.col_reg_map`).  Witness at the
+     image: `img_nodes` has exactly that domain.
+  2. **a FREE inum's node is BARE**: `fn_type n = 0 → fn_bare n` (size 0,
+     thirteen zero addresses).  PER-OBJECT ⇒ into `snap_local`.  Witnessed at
+     the image by `FsImg.fs_region_bare` (conjunct (14), already inside
+     `fs_boot_image_wf`, read by `FsCfgBoot.img_node_bare`).  The price is
+     that every `iunlock` re-proves it, i.e. `inode_local` grows a clause
+     that ~40 proofs destructure — put it LAST.
+  3. **the ROOT's keep-alive slack**: `InodeRegion.ireg_keep` holds one spare
+     `link_tok` at `ROOTINO`, and `sk_links` gives tokens ≤ nlink without the
+     `+1` there.  PER-OBJECT (one inum).  Witnessed at the image by
+     `FsImg.fsimg_wf_root_link` through `FsCfgBoot.ireg_lnks_of_image`.
+
+  **SIZES.**  `fs_cfg_alloc` 650 lines (96 body lines name an image
+  function); the era-0-only decode lemmas in `FsCfgBoot` total ~633 lines
+  (`ipool_alloc_of_image` 223, `image_ireg_premises` 72, `ireg_lnks_of_image`
+  56, `img_node_bare` 56, `bitmap_res_of_image` 34, `image_dinode_fs_dinode`
+  33, …); `IcacheBoot`'s image apparatus ~200 lines plus `ireg_alloc`'s
+  13-line ∀-over-decodings premise.  `IcacheBoot.ipool_alloc` (69 lines) is
+  ALREADY image-free and is the clean boundary: `inode_owned Γ_L i n`
+  instantiates it at `(fn_rec n, bm_of n, fn_data n)`.  `BootShared`'s
+  plumbing is ~14 code lines.  Consumers whose statements move:
+  `fs_boot_image_wf`'s 20-odd sites and `fs_boot_supply`'s ~15.
 - [ ] **Lane D — the durability theorem, and its worked instance (plan §5).  DEFERRED (owner): runs AFTER lane E lands.**
   The GENERAL statement is the commit's receipt itself: after a commit, the
   current snapshot's abstract state IS the era's abstract state (the

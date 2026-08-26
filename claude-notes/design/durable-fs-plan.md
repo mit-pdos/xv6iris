@@ -85,9 +85,11 @@ live directory, unique names).  There is NO cross-inode pure clause:
   (`dlinks` → `ent_toks`).  ALL of this is LANDED (stage 2b).
 - **Durable instance** (over fresh names): held whole, immutable.
   `FsDurSnap.fs_snap_alloc` allocates one from a VALUE and pure facts
-  (§4); `FsDurSnap.P_dur D` is the snapshot as a function of `D` alone
-  (drops into `P_fs` with no arity change).  LANDED (lane 4); NOT YET in
-  `P_fs`.
+  (§4); `FsDurSnap.P_dur D` is the snapshot as a function of `D` alone, and
+  it IS `FsCrash.P_fs`'s last conjunct, at `fr_D r` — arity-free, since the
+  gname family is existential.  The cost is two capacity classes
+  (`fsLinkG`/`fsTopG`) on `FsCrash`'s sections, which every consumer already
+  has out of `Xv6G.xv6G`.
 
 ## 3. The WAL's client-facing contracts
 
@@ -141,26 +143,48 @@ live directory, unique names).  There is NO cross-inode pure clause:
   NOTHING ABOUT THE FILE SYSTEM: no pure fact is re-established at a
   write, and the WAL's lock invariant carries no file-system payload
   (the parked `Ψ D₀ Dc` and the `log_psi_*` laws are deleted — §4, §8).
-- **Commit** (`end_op` at `outstanding = 0`; WAL-internal.  THE LAW IS
-  BUILT; the CALL and the snapshot step are what remain):
-  installs "`D := L`" (as today, `FsCrash.fs_commit_L_*`) and, at the same
-  ghost step, RECONSTRUCTS the file-system predicate over `L` and clones
-  it onto fresh names as the new snapshot (§4), dropping the old one
-  (`FsDurSnap.dsnap_step_of`).  The reconstruction is a persistent,
-  file-system-supplied law parked in `log_ctx` (the WAL stays
-  file-system-agnostic): given the byte authority at `L` and "no
-  transaction is open", it yields `∃ S, snap_ok S L` and hands the
-  authority back — it moves NO durable resource (§8's refutation is about
-  fupds that do).  It is `LogSnapLaw.snap_law`, `log_ctx`'s last conjunct,
-  read at the ledger by `LogInv.log_ctx_snap_law_of_ops`; it is ARITY-FREE
-  (the mask it runs in is closed over, with the one fact a committer needs
-  beside it — that `logN` is not in it), and it is supplied at `initlog`
-  MINUS block 1's park, since nobody owns block 1 until `initlog` parks it.
-  Its receipt: the committed view equals the logged view (`D' = L` at home
-  maps) AND the new snapshot's state is the quiescent abstract state.  NO
-  caller of any WAL function supplies anything at the call site; the only
-  fupd in the durability story is the machine's disk-interface permit,
-  which the WAL discharges.
+- **Commit** (`end_op` at `outstanding = 0`; WAL-internal.  LANDED):
+  installs "`D := L`" (`FsCrash.fs_commit_L_*`) and, at the same ghost step,
+  allocates a FRESH snapshot at the new committed map and drops the old one
+  (`FsDurSnap.dsnap_step_of`, inside the permit's own `bupd`).  What makes
+  that step legal is a persistent, file-system-supplied law parked in
+  `log_ctx` (the WAL stays file-system-agnostic): given the byte authority
+  at `L` and "no transaction is open", it yields `∃ S, snap_ok S L` and
+  hands the authority back — it moves NO durable resource (§8's refutation
+  is about fupds that do).  It is `LogSnapLaw.snap_law`, `log_ctx`'s last
+  conjunct, read at the ledger by `LogInv.log_ctx_snap_law_of_ops`; it is
+  ARITY-FREE (the mask it runs in is closed over, with the one fact a
+  committer needs beside it — that `logN` is not in it), and it is supplied
+  at `initlog` MINUS block 1's park, since nobody owns block 1 until
+  `initlog` parks it.
+
+  **THE LAW IS RUN BEFORE THE LOCK IS RELEASED, AND THAT PLACEMENT IS
+  FORCED.**  It needs the WAL's transaction authority, which lives inside
+  `log_res` — behind the log lock, which `end_op` RELEASES before the commit
+  body runs and only re-acquires afterwards.  So the committer runs it in
+  the accounting critical section, at the one instant the ledger is provably
+  empty (the commit arm IS `outstanding − 1 = 0`, and `log_res`'s
+  cardinality tie empties the transaction map with it), and carries the
+  result down as a PURE hypothesis — which is exactly what a pure conclusion
+  is worth (`FsCollectAll.pure_keep` is the same observation one level
+  down).  Nothing resource-shaped crosses the release.  The batch is opened
+  there rather than after it, because naming the logged view needs the
+  checked-out cache authority; the copy loop then writes only log SLOTS, so
+  the map the hypothesis is stated at is literally the same term at the
+  write (`ProofEndOp.eo_home_restrict_upd`, riding `eo_loop`'s fuel
+  induction beside row (b)).  `ProofEndOp.eo_open_snap_law` over
+  `eo_snap_law_of_auth` is the reading.
+
+  Its receipt is `FsCrash.fs_commit_receipt`: the committed view equals the
+  logged view (`D' = L` at home maps, which is `fs_receipt_any`'s index) and
+  the current snapshot stands at it, so what the machine would recover to IS
+  a file system.  The snapshot's STATE is EXISTENTIAL in the law — the WAL
+  cannot name the file system's abstract state — and that costs nothing,
+  because the state is DETERMINED by the map (`snap_bytes_node_inj`,
+  `snap_bytes_sb_inj`, `snap_bytes_used_agree`).  NO caller of any WAL
+  function supplies anything at the call site; the only fupd in the
+  durability story is the machine's disk-interface permit, which the WAL
+  discharges.
 
 ## 4. Where the commit's proof comes from: collection at quiescence
 
@@ -230,15 +254,74 @@ image (`FirstTok.first_fsinit_pures`) and nowhere else.
 
 ## 5. Boot, adequacy, and the theorem
 
-**Boot** (stage 4): the SAME allocator core (`FsDurSnap.fs_state_of_ledger`
-— Γ-generic, value-plus-pure-facts in, instance out) clones the current
-snapshot onto fresh era ghosts, followed by the era-only extras (the
-cache/dirty ghosts, the observation pairs) and the distribution of the
-pieces into the region/bitmap/escrow/pool.  This REPLACES the boot-time
-decoding of `fs.img` (`FsCfgBoot.img_nodes`, `image_*` premises), which
-then survives only at era 0 inside `P_fs_alloc` (`FsDurImg`), and lets
-the adequacy theorem delete `Himg`/`fs_boot_image_eras` and assume only
-era 0's image — the theorem becomes TRUE (today it is vacuous).
+**Boot** (stage 4, NOT BUILT — the wall is BOOT ORDER, not the ghost
+theory).  The intent stands: the SAME allocator core
+(`FsDurSnap.fs_state_of_ledger` — Γ-generic, value-plus-pure-facts in,
+instance out) clones the current snapshot onto fresh era ghosts, followed by
+the era-only extras and the distribution into the region/bitmap/escrow/pool,
+REPLACING the boot-time decoding of `fs.img`.  Three things have to move
+first, and none of them is about the snapshot:
+
+- **The era's byte view and cache map are born at the RAW disk, and the
+  snapshot stands at the COMMITTED one.**  `FsCfgBoot.fs_cfg_alloc` runs at
+  PowerOn (`BootShared.boot_shared_alloc`), takes `disk_bytes γv 0 (disk_read
+  dk 0 ndisk)`, and mints `fs_cache`/`fs_bytes` through `FsBoot.fs_boot_ghosts`
+  → `FsBlocks.fs_alloc` at ONE value map, `fs_blocks dk`.  Two invariants pin
+  it there: `BioInv.pool_blk`'s single existential `∃ bs, disk_block γv b bs ∗
+  fs_mclean γfs b bs` (the disk cell and the cache half must name the same
+  list, and the cell comes exclusive from `FsBoot.fs_boot_carve`), and
+  `FsBlocks.fs_bytes_body`'s `bytes_tie` (the byte view reads off the cache
+  map).  At an era whose on-disk log is DIRTY the committed view differs from
+  the raw home blocks at exactly the batch's entries, so a mint at `D` makes
+  one of those two false.  The only instant `L = D` on the home set is AFTER
+  `install_trans`/`write_head` — inside `initlog`, which runs at `forkret` →
+  `fsinit`, thousands of instructions after `fs_cfg_alloc`.
+- **So the FS ghost mint has to move behind recovery**: everything from
+  `fs_cfg_alloc`'s `fs_boot_alloc_full` onward (`ftop_alloc`, `ireg_alloc`,
+  the two `*_lend_mint`s, `ipool_alloc`, `bitmap_inv_alloc`, the byte-run
+  peels) — the block layer's half stays at PowerOn.  `IcacheBoot.icache_boot_at`
+  then also has to move or to seal an EMPTY pool, because it consumes
+  `ipool_rows` at `main+0x92`, before `fsinit` runs.  `SpecFsinit` and
+  `ProofFsinit` still carry "the on-disk header is clean" as a premise, which
+  is the same wall from the other side (the dirty-log arm has to route the
+  recovered entries' home halves out of the coverage remainder).
+- **Two era-0-only conjuncts cannot be re-derived at all**: `fs_cfg_alloc`'s
+  `dv_pin`/`fv_pin` name the mkfs image's root directory and `/init`'s bytes
+  at inum 7, and no snapshot at era N carries "/init is at inum 7".  They
+  stay behind an era-0 hypothesis.
+
+**AND THE SNAPSHOT'S TIE IS THREE CLAUSES SHORT of what the mint reads.**
+Measured against `fs_cfg_alloc`'s premises, every one is supplied by a
+`sk_*` field or by `snap_local` except:
+
+- the region's TAIL inums are not named.  `sk_dom` says `0 ≤ i < ninodes →
+  is_Some (fss_inodes S !! i)`; the era needs it at the region's WIDTH,
+  `0 ≤ i < 16·nib` (`ireg_recs` is sixteen records per region block, and
+  `ftop_alloc`/`ipool_alloc` run over `region_inums nib`).  A domain row, and
+  the commit CAN supply it — the collection's state is the `ftop` map
+  restricted to the region (`FsCollect.col_reg_map`).
+- a FREE inum's node is not known to be BARE: `fn_type n = 0 → fn_bare n`
+  (size 0, thirteen zero addresses).  PER-OBJECT, so it may go into
+  `snap_local`; it is witnessed at the image by `FsImg.fs_region_bare`
+  (conjunct (14), already inside `fs_boot_image_wf`), and the price is that
+  every `iunlock` re-proves it.
+- the ROOT's keep-alive slack: `InodeRegion.ireg_keep` holds one spare
+  `link_tok` at `ROOTINO`, and `sk_links` gives only tokens ≤ nlink without
+  the `+1` there.  PER-OBJECT (one inum), witnessed at the image by
+  `FsImg.fsimg_wf_root_link`.
+
+None of the three is a cross-inode content clause, so all three are
+admissible under §4's rule; each is a separate sweep.  Until the mint lands,
+`Himg`/`fs_boot_image_eras` cannot be deleted and `xv6_power_adequacy` stays
+vacuous.
+
+**WHAT DOES REACH EVERY ERA TODAY** is the snapshot's PURE tie, through the
+projection channel: `FsCrash.P_fs_project` reads `∃ S, snap_ok S D` off
+`P_dur` and `SystemAdequacy.fs_boot_pure` carries it, so
+"the physical disk recovers to a committed view that IS a file system" holds
+at every state the operational semantics can reach (`xv6_trace_pure`, §4b's
+corollary).  That is the durability property, exported; what it does not do
+is re-found an era, which is what deleting `Himg` needs.
 
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
@@ -261,10 +344,15 @@ step.  Nothing is owed at a `log_write` beyond the bytes it writes.
 
 Deleted once consumers are re-pointed: `FsDurWire`'s `P_wf_dec`/`Psi_dec`/
 `kinds_of_state`/`dwire_geom`/`psi_*` (the rejected pure-kinds tie),
-`LogInv.log_psi_*` and the parked `Ψ D₀ Dc` (with the nine suppliers' `log_psi_write_rebase` lines), `LogDefs.fs_dstep`/`fs_dstep_rebase`/`fs_dview`-as-`P_wf`,
 `RiscvPtsto.fdn_bmap/ist/nin` and `riscv_dview_name` (geometry equations
-become by-construction), `FsDurLedger`'s fold family (its entry
-constructors are era-side content — keep if consumed).
+become by-construction; `fdn_*`'s only consumer left is `FsDurLedger`'s
+superseded fold, and `riscv_dview_name`'s deletion is a sweep of `Pc`'s
+arity through `RiscvAdequacy`/`SystemAdequacy`), `FsDurLedger`'s fold family
+(its entry constructors are era-side content — keep if consumed).  ALREADY
+GONE: `LogInv.log_psi_*` and the parked `Ψ D₀ Dc`;
+`LogDefs.fs_dview`/`fs_dstep` and `FsDurImg`'s resource-MOVING image
+conversion `fs_dur_of_image`/`fs_dur_view_of_image` (the boot mint runs the
+allocator core at the era's own view, not through an image conversion).
 `FsDurRefute.v`/`FsDurDefer.v` stay as the documented refutations.
 
 ## 7. The vacuity discipline (why the tie cannot silently go empty)

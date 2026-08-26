@@ -161,7 +161,13 @@ first four were audited against the tree 2026-08-22):
   durable FS predicate is re-allocated per commit, never updated; a
   locked-inode registry keyed on transaction ids gives "all inodes clean
   at commit").  Landed: the log's contract, the nested predicate, the
-  whole era instance, the durable allocator.  Lanes A–G in the file.
+  whole era instance, the durable allocator, and the COMMIT's snapshot step
+  (the crash predicate carries one copy of the FS predicate at the committed
+  map, and "the disk recovers to a committed view that IS a file system" is
+  exported at every reachable state).  What is left is the BOOT mint from
+  that snapshot, which is blocked on boot ORDER (the era's byte view is born
+  at the raw disk, before recovery runs) — so `Himg` is still assumed and
+  `xv6_power_adequacy` is still vacuous.  Lanes A–G in the file.
   History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`

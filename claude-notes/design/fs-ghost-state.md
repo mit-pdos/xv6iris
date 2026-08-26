@@ -173,8 +173,9 @@ the law is assembled where the concrete `sb_park γfs sb` is in hand.
 the range it changed, at fraction 1, and moves `L` there; no pure fact is
 re-established, and the three atomic-update forms carry no payload-step
 premise.  The commit permits `FsCrash.fs_commit_L_sector0_rec` and
-`fs_commit_L_seq_permit` install `D := L` and run `fs_dview_rebase`
-themselves.
+`fs_commit_L_seq_permit` install `D := L` and STEP THE DURABLE SNAPSHOT
+themselves (`FsDurSnap.dsnap_step_of`, inside the permit's own `bupd`), off
+one PURE premise: `∃ S, snap_ok S (fs_restrict (dv_of_D L) home)`.
 
 **THE LAW IS `LogSnapLaw.snap_law`, AND IT IS ARITY-FREE FOR `sb_parked`'s
 REASON VERBATIM.**  Given the byte authority at `L` and the empty `ln_tx`
@@ -204,12 +205,21 @@ and `sb_size sb = size`, and all three ride
 `FirstTok.first_fsinit_pures` — because `col_geom`'s `cg_reg` rests on the
 region's WIDTH tie (`nib = ninodes/16 + 1`), which exists nowhere lower.
 
-STILL TO COME, and it is lane C item 3 of
-[`../projects/durable-disk.md`](../projects/durable-disk.md): `P_dur (fr_D r)`
-as `FsCrash.P_fs`'s durable conjunct, in place of today's flat
-`LogDefs.fs_dview` blob, with `end_op`'s commit calling the law at
-`outstanding = 0` and the two commit permits gaining
-`FsDurSnap.dsnap_step_of` at the collected `snap_ok`.
+**THE COMMITTER RUNS THE LAW BEFORE IT RELEASES THE LOCK, AND CARRIES A COQ
+HYPOTHESIS ACROSS.**  The law needs the transaction authority, which is in
+`log_res` — behind the log lock, which `end_op` releases before the commit
+body runs.  So `ProofEndOp`'s commit arm reads it in the accounting critical
+section, where the ledger is provably empty, and the PURE result travels
+down: `eo_open_snap_law` (the reading at the opened batch) over
+`eo_snap_law_of_auth` (at the cache authority; it opens `logN` for the byte
+authority, agrees the invariant's cache picture `C` with the checked-out `L`
+by `eo_cache_body_sub`, and `eo_restrict_of_sub` says the two restrictions to
+the home set are the same map) over `LogInv.log_ctx_snap_law_of_ops`.  The
+batch is opened THERE rather than after the release, because naming the
+logged view needs the checked-out cache authority; the copy loop writes only
+log SLOTS, so the map does not move (`eo_home_restrict_upd`) and the
+hypothesis rides `eo_loop`'s fuel induction beside row (b).  `eo_commit` and
+`eo_loop` each carry it as one pure premise.
 
 ## 2b. The durable side — the snapshot inside the crash predicate
 
@@ -267,14 +277,32 @@ refutation of maintaining them per write.  The encoder injectivity the
 readings rest on is `dinode_bytes_inj`, `rec_in_blk_inj`,
 `snap_bytes_node_inj`.
 
+**IT IS `FsCrash.P_fs`'s LAST CONJUNCT, AT `fr_D r`.**  Arity-free: `P_dur`
+is a function of the map and its gname family is existential, so the
+`gamma_v` parameter `P_fs` threads (and the ~90 files that name
+`fs_crash_seam`) are untouched; the cost is `fsLinkG`/`fsTopG` on `FsCrash`'s
+two sections, which every consumer has out of `Xv6G.xv6G`.  What a reader
+takes off it: `FsCrash.fs_commit_receipt` ("the disk recovers to a `D`, and
+`D` IS a file system") and `P_fs_dur_acc` (the snapshot lent out with a wand
+back — the channel the boot mint will take).  `P_fs_alloc` gained exactly one
+PURE premise, `∃ S, snap_ok S D0`.
+
+**AND IT REACHES THE WHOLE EXECUTION AS A PURE FACT.**
+`FsCrash.P_fs_rec_named_wf`/`P_fs_project` read `∃ S, snap_ok S D` off it
+without spending anything (the tie is a `⌜ ⌝`), and
+`SystemAdequacy.fs_boot_pure` carries it — which is what
+`SystemAdequacy`'s trace corollary instantiates `phi` at.  So "the physical
+disk recovers to a committed view that IS a file system" holds at EVERY state
+the CSL-free operational semantics can reach, across every power cycle.
+
 **ERA 0 COMES FROM THE IMAGE.**  `FsDurImg.img_snap_ok`:
 `FsCfgBoot.fs_boot_image_wf` ALONE yields `snap_ok (img_state …)
 (fs_restrict … home)` — the state is the decoder already in the tree and
 the map is exactly `FsCrash.P_fs_alloc_clean`'s `fr_D`.
 `img_P_dur_alloc` produces `P_dur D0` off that bundle alone, and
-`img_boot_P_fs_dur` is `P_fs_alloc_clean` with `P_dur (fr_D r)` beside it
-at the same `D0`, so this change to `P_fs` is arity-free and no caller
-gains a premise.  Non-vacuity at the literal mkfs image:
+`img_boot_P_fs_dur` is `P_fs_alloc_clean` with that premise DISCHARGED, so
+no caller gains one.  It is the only place the image decoder is read on the
+durable side.  Non-vacuity at the literal mkfs image:
 `FsAdequacyImg.fsimg_snap_ok`.
 
 **WHAT THE COMMIT COLLECTS** is `FsCollect.col_hand γfs γi ist nib sb sbb
