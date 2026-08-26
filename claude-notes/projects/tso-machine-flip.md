@@ -1623,7 +1623,52 @@ RAW window … deliberately raw"), `ProofBrelse.v:203` and
 through the `↦₈` wrappers, which are ALREADY context-indexed — which is
 itself the evidence that the raw spelling is the odd one out now.
 
-**THE RULING NEEDED.**  §0.10′ ruling 4 / §0.8′ ruling 6 declare
+**RATIFIED (owner, 2026-08-26), and recorded as the forced amendment to
+§0.8′ ruling 6 / §0.10′ ruling 4 for the S-mode data tier — same family as
+A6.14.**  The BODY flips to `ctx_pointsto cur_ctx` at the section's ambient
+`XI`; every exported statement stays TEXTUALLY UNCHANGED, and that textual
+invariance IS the acceptance test.  **It held**: the flip is three lines in
+the definition, `wordw8_ctx` collapsed to its own body (no shim, no
+`setoid_rewrite`, no continuation adapter), `mem_pointsto_claim` swapped
+one shim name for `ctx_pointsto_forget`, and `wordw_claim_of` simply
+dropped a conversion line.  No exported statement changed spelling.
+
+**CAVEAT, stated plainly: `WpSconfMem.v` HAS NOT BEEN COMPILED.**  It sits
+transitively above `HartSKpt` in the dependency cone, and `HartSKpt` is
+blocked on A6.21's decision — so the acceptance test above is verified at
+the STATEMENT level (nothing changed spelling, and the shim uses are gone
+by inspection), not by the build.  The first thing to do after A6.21 lands
+is `make WpSconfMem.vo` and re-check.
+
+**AND `HartSMem` IS GREEN AGAINST IT** (the discharge point now exists).
+The port is smaller than A6.14 predicted, because of one measurement:
+
+> **THE EXCLUSIVE READ'S OBLIGATION DOES NOT CHANGE.**  RULING 4 says an
+> exclusive read reads at the log top, i.e. off the FLAT cache — so
+> `swp_read_ram_node4_racq`/`_ex` still owe a `mem_bytes_at` fact and
+> nothing else, and the node simply FRAMES the bundle the rule hands it
+> (dropping the receipt, which the leaf mints where it is wanted).  Only
+> the PLAIN read and the STORES changed shape.
+
+What moved: the three node tactics, the four `swp_read_ram_node*` and their
+four `_ex` twins (to `swp_hart_ram_read_plain` and a `tso_read_bytes`
+obligation), the four `swp_write_ram_node*` (the append), the conditional
+write node and the three AMOSWAP engines' write-continuation premises (the
+append at `S (length log)` — an AMO takes the view PAST its own append,
+which is what makes it an acquire), and the `Mobl_ram` / `Wobl_ram` /
+`Mobl_ram_ex` abbreviations.  **Everything above them is abstract over the
+obligation and was untouched** — which is exactly the property that made
+"28 uses inside, ONE outside" true in the first place.
+
+TWO Ltac TRAPS, recorded because each cost a round: an identifier written
+inside an `Ltac` body is resolved as a TERM at definition time (so
+`iMod ("H" $! _ img log …)` fails with "the reference img was not found" —
+use `$! _ _ _ _ _`), and a name bound by `let … := fresh` shadows the Coq
+hypothesis a `"[%Hb …]"` intro pattern introduces (so `exact Hb` picks up
+the Ltac variable).  Taking the pure fact as an Iris hypothesis
+(`"[Hb Hcl]"` + `iExact "Hb"`) sidesteps both.
+
+**THE ORIGINAL RULING TEXT, kept.**  §0.10′ ruling 4 / §0.8′ ruling 6 declare
 `WpSconfMem.wordw_pointsto` deliberately RAW.  That ruling was made in
 the CUTOVER REHEARSAL, when the only cost of a ctx datum was crossing a
 seal for nothing.  Post-flip the ctx datum is the only one that can
@@ -1695,6 +1740,132 @@ re-derive them:
   `BootChain.boot_entry_bridge` holds it across the whole M-mode
   bracket); what is missing is a premise on the intermediate statements.
   Mechanical, wide, and the cost A6.12 budgeted for.
+
+### A6.20 THE WRITE-ONLY LEDGER BYTE HAS A CONSUMER AFTER ALL, AND IT IS
+### THE PAGE TABLE (the A6.18 tranche; kit landed)
+
+A6.17 measured a third store shape at `WpMmodeStore` and rejected it there:
+a store's four ghost steps need the timestamp ELEMENTS but **not a
+context** — the clean/dirty bit is what licenses a later plain LOAD — so
+dropping the bit gives a resource that can be stored to for ever and
+licenses no load.  It was rejected because `own_context` already arrives
+at the M-mode bracket and a loadable byte is strictly stronger.
+
+**At the KERNEL PAGE TABLE the judgement reverses, and it is forced.**
+`KptShare.kpt_body` holds `ptree_own 2 (DfracOwn 1) t` inside
+`inv kptN`, a BARE invariant shared by every S-mode thread.  An invariant
+body may not name a context (§0.8′ ruling 2), so its slots cannot be
+`ctx_phys_pointsto`.  And they do not need to be:
+
+> **a PTE is read at `Read_ttw` — RULING 1's FLAT arm — so no load license
+> is ever wanted, while the Svadu A/D write-back is a real store and owes
+> the append.**  Context-free ledger is the only sound shape there, and it
+> is also the cheapest.
+
+Landed in `TsoCtx.v` (all proven):
+
+    phys_ledger a dq v := ∃ t, phys_pointsto a dq v ∗ a ↪[ts_name]{dq} t
+                                                    (* sealed *)
+    ctx_phys_pointsto_ledger : ctx_phys_pointsto ξ a dq v ⊢ phys_ledger a dq v
+                               (* the bit is what is dropped, and with it
+                                  the load licence, nothing else *)
+    ledger_store_ok      — THREE of the four ghost steps (γts to the new
+                           top, γlogm persist, the mono_nat bump) and NO
+                           dirty-set insert, because there is no context to
+                           insert into.  No [own_context] premise anywhere.
+    ledger_store_win_ok / phys_ledger_win_map — the window forms.
+
+The per-byte loop is strictly simpler than `ctx_store_bytes`: two
+authorities instead of three, and no freshness obligation.
+
+### A6.21 `pt_page_own`'s TIER IS NOT UNIFORM — THE KERNEL PT AND THE USER
+### PTs WANT DIFFERENT LEDGERS (design point; NOT implemented)
+
+`PtTree.pt_page_own` holds a node's 512 slots and serves BOTH:
+
+  - the **kernel** page table, inside `KptShare.kpt_inv` — shared across
+    contexts, read by the HARDWARE walker at `Read_ttw` (flat), written by
+    the A/D write-back ⇒ **`phys_ledger`** (A6.20);
+  - the **user** page tables, owned by a thread through
+    `walk`/`freewalk`/`copyout` — read by SOFTWARE at `Read_plain` through
+    `WpSconfMem.wordw_pointsto`, which needs a plain-load licence ⇒
+    **`ctx_phys_word_pointsto`** (A6.16, and it is what `KptTree`'s now-green
+    slot isomorphism hands back).
+
+One tier cannot serve both: the context-free byte licenses no load, and
+the ctx byte cannot live in a bare `inv`.  So `pt_page_own` has to be
+PARAMETERISED — the natural shape is an `option CtxId` index (`None` = the
+context-free ledger, `Some ξ` = the registered one), sound because
+`ctx_phys_pointsto ξ … ⊢ phys_ledger …` is proven, so `Some ξ` is strictly
+stronger and the kernel invariant simply takes `None`.
+
+**This is `HartSKpt`'s blocker and it is a design decision, not a repair**,
+which is why it is reported rather than improvised.  The chain is
+`HartSKpt`'s `iAssert`-built `Hrdx`/`Hwr` seams → `PtTreeAdue`'s
+`xread_obl_ex`/`wpte_obl_at` (already ported, already bundle-carrying) →
+`KptShare.kpt_body` → `PtTree.pt_page_own`.  Note the read seams need only
+FRAMING (an exclusive/`Read_ttw` read is flat); only the A/D write-back
+needs A6.20's gate.
+
+### A6.22 A WALK THAT OWNS NO BYTES NEEDS NO THREAD IDENTITY — AND THAT IS
+### WHAT KEEPS THE REGISTER-ONLY SITES UNCHANGED
+
+A6.12 budgeted the `own_context` premise as "the real cost: it breaks
+every `iApply`".  Most of that cost is avoidable, and the reason is worth
+stating as a rule:
+
+> `swp_hmrun_of_exec` takes the token unconditionally because its RAM arms
+> cannot know IN ADVANCE that they will not fire.  **At `mm = ∅` they
+> cannot fire at all** — the walker's own map answers nothing, so every
+> memory arm is refuted by the walk equation itself, and `bytes_own ∅` is
+> `emp` on both sides.  So the token can be MINTED inside the lemma and
+> dropped: `TsoCtx.own_context_boot` is an UNCONDITIONAL mint, and the
+> token never escapes, so no identity is claimed anywhere and the
+> one-token-per-hart discipline is untouched.
+
+`HartMemRun.swp_hmrun_of_exec_reg` is that form.  With it,
+**`HartStepFull` and `UserTrap` are GREEN with ZERO statement changes** —
+`swp_try_step_waiting`, `swp_exec_step_waiting`, `UserStep` and
+`WpSmodeWfi` never learn that anything happened.  Without it, the premise
+would have had to be threaded through four statements and their cones for
+a resource none of them uses.
+
+**THE RULE TO CARRY:** before threading `own_context` anywhere, ask
+whether the site owns bytes at all.  The register-only walks (the WFI
+loop, the waiting step, the trap prelude, the CSR windows) do not, and
+they are a large fraction of the ~60 `bytes_own` consumers.
+
+### A6.23 THE FRONTIER AFTER THE A6.18 TRANCHE
+
+**Two identical full `-k` sweeps** (the second compiled exactly the eight
+red retries and nothing else).  **EIGHT red files, 646 of 1330
+fresh-green.**  Green this tranche: `HartSMem` (the Σ-seam's own file),
+`HartStepFull`, `UserTrap`, `PtBytes` — and `WpSconfMem` is now behind
+`HartSKpt` rather than blocked on a ruling.
+
+    HartSKpt.v      A6.21 — BLOCKED ON A DECISION (pt_page_own's tier)
+    UserBytes.v     A6.21 — same decision, downstream
+    UmodeMem.v      A6.21 — same decision, downstream
+    PtWalkCert.v    A6.21 — same decision, downstream
+    ProcPtOwn.v     A6.16 — page_own ↔ phys_page_own at an identity map
+    KstackOwn.v     A6.16 — the KT0↔KT1 kernel-stack rekey; the BYTE half
+                            is [ctx_pointsto_phys] verbatim, the WORD half
+                            also has to leave the raw [word_pointsto] tower
+    WpTimerinit.v   A6.17 — the M-mode boot-stack cascade: the ctx word AND
+                            the token, threaded from
+                            [BootChain.boot_entry_bridge] down through
+                            [wp_entry_boot] / [WpStartNew] / [WpTimerinit]
+    WpUart.v        A6.9  — the DMA lease (unchanged; the one genuine
+                            design item left, and it now has a gate shape
+                            to be written against: A6.20's context-free
+                            store is what a lease reclaim wants, since the
+                            lease is invariant-owned too)
+
+**FOUR OF THE EIGHT ARE ONE DECISION.**  `HartSKpt`, `UserBytes`,
+`UmodeMem` and `PtWalkCert` all bottom out in `PtTree.pt_page_own`, and
+A6.21 is the decision they wait on.  That is the honest shape of the
+remaining frontier: it is no longer a list of repairs, it is one
+parameterisation plus two small conversions plus one design item.
 
 ## 7. Order of work
 
