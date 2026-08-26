@@ -2183,7 +2183,7 @@ Section ProofDirlookupMain.
                           (dir_bname data i) = Some i)
                   by (rewrite Hbi; exact Hsome).
                 iDestruct (IcacheEscrow.dlinks_open with "Hlinks")
-                  as "[Hlnk0 (%D & [%Hdok %Hxact] & Hetk)]".
+                  as "(%D & [%Hdok %Hxact] & Hetk)".
                 iDestruct (ent_toks_borrow (fs_gamma_L gfs) (bv_unsigned dinum)
                              dn bm data i D Htyz Hnl0 Hfirsti Hnself
                              Hholes Hszb with "Hetk") as "(%tyb & Hp & Hback)".
@@ -2194,7 +2194,7 @@ Section ProofDirlookupMain.
                 iIntros "Hp". iFrame "Hdi".
                 iDestruct ("Hback" with "Hp") as "Hetk".
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
-                          with "Hlnk0 Hetk"). }
+                          with "Hetk"). }
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic

@@ -516,16 +516,13 @@ Section FsCfgBootPool.
      every [b ∈ cov]) the very resources the pool's allocated arm asks for,
      and [FsImgDisk.fsimg_P] IS that at the literal image.
 
-     THE ONE RESOURCE WITH NO PRODUCER IN REACH IS [dir_links] (see the
-     report / the file's worklist entry): it is a PREMISE here, exactly as
-     [IcacheBoot.ipool_shape_alloc] takes it and for the same reason
-     [dinode_at] is a premise -- [dinode_at] is minted by
-     [IcacheBoot.ireg_alloc] and arrives inside its [ireg_out] payout,
-     while [dir_links]' only constructor [DirLinks.dir_links_of_plain]
-     wants one [IcacheRef.ilink] per live non-self record of each image
-     directory, which [ireg_alloc]'s all-plain ledger premise
-     ([link_auth z 0 ...]) cannot coexist with.  Nothing is improvised for
-     it here. *)
+     THE ONE RESOURCE WITH NO PRODUCER IN REACH IS [IcacheEscrow.dlinks]:
+     it is a PREMISE here, exactly as [IcacheBoot.ipool_shape_alloc] takes
+     it and for the same reason [dinode_at] is a premise -- [dinode_at] is
+     minted by [IcacheBoot.ireg_alloc] and arrives inside its [ireg_out]
+     payout, while the type register's per-entry fragments have to be
+     routed out of [ireg_lnks_of_image]'s per-inum piles ([ent_toks_of_region]
+     below).  Nothing is improvised for it here. *)
   (* [C] IS THE RESOURCE SET, AND IT IS NOT [cov].  The pool's LOGICAL
      coverage is [cov] ([inode_ok]'s [blkmap_wf] is stated at it and the
      pool carries it), but the blocks this lemma is HANDED cannot be all of
@@ -763,22 +760,19 @@ Section FsCfgBootPool.
   Qed.
 
   (* ==================================================================== *)
-  (*  THE [dir_links] PRODUCER (stage-(d) item i)                          *)
+  (*  THE LINKS-PAYLOAD PRODUCER (stage-(d) item i)                        *)
   (* ==================================================================== *)
 
-  (*  [ipool_alloc_of_image] above takes the [dir_links] big-op as a PREMISE
-      because nothing could produce it: [DirLinks.dir_links_of_plain] wants
-      one [IcacheRef.ilink] per live non-self record of each image directory
-      and stage A's all-plain ledger ([link_auth z 0 ...]) excluded every
-      fragment.  Stage B mints them ([IcacheBoot.link_boot_mint_w] at
-      [W := FsImg.fs_link_count P sb]) and this is where they are SPENT.
+  (*  [ipool_alloc_of_image] above takes the links big-op as a PREMISE
+      because nothing could produce it: the per-entry fragments have to
+      come out of the per-inum authorities the region mints.
 
-      THE BOOKKEEPING PROBLEM AND ITS SHAPE.  The mint is per NAMED inum --
-      [W z] tickets filed against [z]'s own authority -- while the payload
-      is per DIRECTORY: [dir_links z' dn data] consumes one ticket for each
-      of [z']'s records, at the inum that record NAMES.  So the supply has
-      to be reindexed across directories.  It is done in TWO moves, neither
-      of which walks a big-op by search:
+      THE BOOKKEEPING PROBLEM AND ITS SHAPE.  The supply is per NAMED inum
+      -- [W z] units filed against [z]'s own authority -- while the payload
+      is per DIRECTORY: [z']'s payload consumes one unit for each of [z']'s
+      records, at the inum that record NAMES.  So the supply has to be
+      reindexed across directories.  It is done in TWO moves, neither of
+      which walks a big-op by search:
 
         (1) [big_sepS_tick_route] distributes the per-inum PILES onto the
             image's flat ticket LIST ([FsImg.fs_all_tickets]) by ONE
@@ -789,8 +783,11 @@ Section FsCfgBootPool.
             needed anywhere.
         (2) the list is a [mjoin] of per-inum [omap]s, so
             [big_sepL_mjoin] + [big_sepL_omap_match] put each directory's
-            sublist back at its own record indices, which is exactly
-            [dir_links_of_plain]'s input shape.                            *)
+            sublist back at its own record indices.
+
+      Until lane G6 the same two moves also fed the old flavoured ledger
+      ([DirLinks.dir_links_of_plain]); [ent_toks_of_region] below is the
+      surviving reader.                                                   *)
 
   Lemma big_sepL_mjoin {A : Type} (Φ : A -> iProp Σ) (ls : list (list A)) :
     ([∗ list] x ∈ mjoin ls, Φ x) ⊢ [∗ list] l ∈ ls, [∗ list] x ∈ l, Φ x.
@@ -808,8 +805,7 @@ Section FsCfgBootPool.
      TARGET predicate abstract and two pointwise premises rather than with a
      [match] in the conclusion: at a [Some] slot the caller turns the ticket
      into the record's payload, at a [None] slot it owes an emp-valid
-     payload -- which is literally what [DirLinks.dir_link_at] is at a
-     record that bears no ticket. *)
+     payload. *)
   Lemma big_sepL_omap_mono {A B : Type} (f : A -> option B) (l : list A)
       (Φ : B -> iProp Σ) (Ψ : A -> iProp Σ) :
     (forall (a : A) (b : B), f a = Some b -> Φ b ⊢ Ψ a) ->
@@ -886,109 +882,6 @@ Section FsCfgBootPool.
     intros ->. apply Hz, elem_of_singleton. reflexivity.
   Qed.
 
-  (* **ONE DIRECTORY'S PAYLOAD**, out of its own ticket sublist.  Every pure
-     fact is a lookup spec: W9's [nlink = 1] discharges [DirView.dlc_bound]
-     at the all-false flavour map ([dlc_bound_le1]), W9's [z = ROOTINO] is
-     [DirLinks.dir_par_tie]'s root exclusion, and a NON-directory's sublist
-     is [] so its payload is [DirLinks.dir_links_not_dir]. *)
-  Lemma dir_links_of_tickets (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
-    fsimg_wf P sb = true -> 0 <= z < FsImg.sb_ninodes sb ->
-    ([∗ list] t ∈ fs_dir_tickets_at P sb z, ilink t) -∗
-    dir_links z (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)).
-  Proof.
-    intros Hwf Hran.
-    rewrite /fs_dir_tickets_at /fs_dir_tickets. cbv zeta.
-    destruct (bv_unsigned (di_type (fs_dinode P sb z)) =? T_DIR_z) eqn:Hty.
-    - apply Z.eqb_eq in Hty.
-      assert (Hnl : bv_unsigned (di_nlink (fs_dinode P sb z)) = 1)
-        by exact (fsimg_wf_dir_nlink P sb z Hwf Hran Hty).
-      assert (Hrt : bv_unsigned (di_nlink (fs_dinode P sb z)) <> 0 ->
-                    (2 <= dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))%nat ->
-                    z = dl_root).
-      { intros _ _. rewrite (fsimg_wf_dir_root P sb z Hwf Hran Hty).
-        reflexivity. }
-      (* the ticket guard IS [dir_link_at]'s guard, so ONE [destruct] on it
-         serves the record's payload and the ticket's [option] together *)
-      assert (HS : forall (k : nat) (t : Z),
-                fs_rec_ticket P z (fs_dinode P sb z) k = Some t ->
-                ilink t ⊢ dir_link_at z (fs_dinode P sb z)
-                            (fs_data_of P (fs_dinode P sb z)) k).
-      { intros k t. rewrite /fs_rec_ticket /dir_link_at. cbv zeta.
-        destruct (dir_liveb (fs_data_of P (fs_dinode P sb z)) k
-                  && negb (bool_decide
-                             (bv_unsigned
-                                (dir_inum (fs_data_of P (fs_dinode P sb z)) k)
-                              = z))).
-        - intros Hk. injection Hk as <-. iIntros "H". iLeft. iExact "H".
-        - discriminate. }
-      assert (HN : forall k : nat,
-                fs_rec_ticket P z (fs_dinode P sb z) k = None ->
-                ⊢ dir_link_at z (fs_dinode P sb z)
-                    (fs_data_of P (fs_dinode P sb z)) k).
-      { intros k. rewrite /fs_rec_ticket /dir_link_at. cbv zeta.
-        destruct (dir_liveb (fs_data_of P (fs_dinode P sb z)) k
-                  && negb (bool_decide
-                             (bv_unsigned
-                                (dir_inum (fs_data_of P (fs_dinode P sb z)) k)
-                              = z))).
-        - discriminate.
-        - intros _. done. }
-      iIntros "H".
-      iApply (dir_links_of_plain z (fs_dinode P sb z)
-                (fs_data_of P (fs_dinode P sb z)) Hty
-                (dlc_bound_le1 (fun _ => false) (fs_dinode P sb z)
-                   (fs_data_of P (fs_dinode P sb z)) ltac:(lia))
-                Hrt with "[H]").
-      iApply (big_sepL_omap_mono _ _ _ _ HS HN with "H").
-    - assert (Hne : bv_unsigned (di_type (fs_dinode P sb z)) <> T_DIR_z)
-        by (apply Z.eqb_neq; exact Hty).
-      iIntros "_".
-      iApply (dir_links_not_dir z (fs_dinode P sb z)
-                (fs_data_of P (fs_dinode P sb z)) Hne).
-  Qed.
-
-  (* **THE PRODUCER, off the flat ticket list.** *)
-  Lemma dir_links_of_image (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z) :
-    fsimg_wf P sb = true ->
-    (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
-    ([∗ list] t ∈ fs_all_tickets P sb, ilink t) -∗
-    [∗ set] z ∈ A, dir_links z (fs_dinode P sb z)
-                     (fs_data_of P (fs_dinode P sb z)).
-  Proof.
-    intros Hwf HA. iIntros "H".
-    rewrite /fs_all_tickets.
-    iDestruct (big_sepL_mjoin (fun t => ilink t) with "H") as "H".
-    rewrite big_sepL_fmap.
-    (* one directory at a time, while still indexed by the sweep's [seq] *)
-    iAssert ([∗ list] i ∈ seq 0 (Z.to_nat (FsImg.sb_ninodes sb)),
-               dir_links (Z.of_nat i) (fs_dinode P sb (Z.of_nat i))
-                 (fs_data_of P (fs_dinode P sb (Z.of_nat i))))%I
-      with "[H]" as "H".
-    { iApply (big_sepL_mono with "H"). intros idx i Hi.
-      apply lookup_seq in Hi as [-> Hilt]. iIntros "Ht".
-      iApply (dir_links_of_tickets P sb (Z.of_nat (0 + idx)) Hwf
-                ltac:(lia) with "Ht"). }
-    (* ...then as a SET, then cut down to [A] *)
-    iAssert ([∗ list] z ∈ (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb))),
-               dir_links z (fs_dinode P sb z)
-                 (fs_data_of P (fs_dinode P sb z)))%I with "[H]" as "H".
-    { rewrite big_sepL_fmap. iExact "H". }
-    assert (Hnd : base.NoDup
-                    (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb)))).
-    { apply NoDup_fmap_2_strong;
-        [intros a b _ _ Hab; lia | apply NoDup_seq]. }
-    iDestruct (big_sepL_to_set _ _ Hnd with "H") as "H".
-    assert (Hsub : A ⊆ list_to_set
-                        (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb)))).
-    { apply elem_of_subseteq. intros z Hz.
-      apply elem_of_list_to_set, elem_of_list_fmap.
-      exists (Z.to_nat z). pose proof (HA z Hz) as Hr.
-      assert (Hz0 : 0 <= z) by (lia).
-      split; [rewrite (Z2Nat.id z Hz0); reflexivity |].
-      apply elem_of_seq. lia. }
-    iDestruct (big_sepS_split_sub _ _ A Hsub with "H") as "[H _]".
-    iExact "H".
-  Qed.
 
   (* ==================================================================== *)
   (*  THE BRIDGE, SPENT: [ireg_alloc]'s THREE WIDENED IMAGE PREMISES        *)
@@ -1027,27 +920,6 @@ Section FsCfgBootPool.
       apply (fsimg_wf_link_dir P sb z Hwf).
       (* [InodeRegion.ireg_dir_ty] and [DirView.T_DIR_z] are the same 1 *)
       rewrite Hty. reflexivity. }
-  Qed.
-
-  (* **THE FORM [fs_cfg_alloc] USES**: straight off
-     [IcacheBoot.link_boot_mint_w]'s second column. *)
-  Lemma dir_links_of_region (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z) :
-    fsimg_wf P sb = true ->
-    FsImg.sb_ninodes sb <= 16 * Z.of_nat icfg_nib ->
-    (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
-    ([∗ set] z ∈ region_inums icfg_nib,
-       [∗ list] _ ∈ seq 0 (fs_link_count P sb z), ilink z) -∗
-    [∗ set] z ∈ A, dir_links z (fs_dinode P sb z)
-                     (fs_data_of P (fs_dinode P sb z)).
-  Proof.
-    intros Hwf Hnin HA. iIntros "H".
-    iApply (dir_links_of_image P sb A Hwf HA).
-    iApply (big_sepS_tick_route (fun z => ilink z) (fs_all_tickets P sb)
-              (region_inums icfg_nib) (fs_link_count P sb) with "H").
-    - intros t Ht.
-      pose proof (fs_all_tickets_range P sb t (fsimg_wf_dirs P sb Hwf) Ht).
-      apply region_inums_spec. lia.
-    - intros z. unfold fs_link_count. lia.
   Qed.
 
   (* ================================================================== *)
@@ -2219,7 +2091,7 @@ Section FsCfgBootEra.
         (2) [IcacheRef.icfg_alloc] at the four ALL-PLAIN boot maps -> ICFG;
         (3) stage B: [link_boot_split] then [link_boot_mint_w] at
             [W := FsImg.fs_link_count] -> the ledger authorities at the
-            image's counts AND the [ilink] tickets [dir_links] needs
+            image's counts AND the [ilink] tickets the old ledger needed
             (the boot-map-split route is a measured >60 s [linkElemUR]
             conversion -- do not retry it);
         (4) [FsBoot.fs_boot_ghosts] -> γfs and the block ghosts;
@@ -2227,7 +2099,7 @@ Section FsCfgBootEra.
             pool and consumes the inode region's halves;
         (6) [ireg_alloc] -> γi + [ireg_inv] + the [ireg_out] payout,
             restated at [fs_dinode] by [image_dinode_fs_dinode];
-        (7) [dir_links_of_region] + [ipool_alloc_of_image] -> the stocked
+        (7) [ent_toks_of_region] + [ipool_alloc_of_image] -> the stocked
             pool;
         (8) the gname-only mints, and FSC.                                *)
   (* ---- THE ERA'S INITIAL INODE MAP (durable-disk 2b-A / B3) ----------
@@ -2810,24 +2682,20 @@ Section FsCfgBootEra.
               0 <= z < FsImg.sb_ninodes sb).
     { intros z Hz. apply (fs_live_set_elem_of (fs_blocks dk) sb z) in Hz.
       tauto. }
-    iDestruct (dir_links_of_region (fs_blocks dk) sb
-                 (fs_live_set (fs_blocks dk) sb) Hwf Hnin HAran with "Htk")
-      as "Hdlk".
-    (* ...and the SAME supply at the counting RA (durable-disk 2b-inode-5),
-       routed out of the per-inum piles [ireg_lnks_of_image] left over
-       after the region kept the authorities and the root's keep-alive. *)
+    (* the supply at the TYPE REGISTER (fs-state.md §6½), routed out of the
+       per-inum piles [ireg_lnks_of_image] left over after the region kept
+       the authorities and the root's keep-alive. *)
     iDestruct (ent_toks_of_region γfs (fs_blocks dk) sb
                  (fs_live_set (fs_blocks dk) sb) Hwf Hnin HAran
-                 with "Hetk Hdots") as "Hetks".
-    iDestruct (big_sepS_sep_2 with "Hdlk Hetks") as "Hdlk".
+                 with "Hetk Hdots") as "Hdlk".
     iAssert ([∗ set] z ∈ fs_live_set (fs_blocks dk) sb,
                dlinks γfs z (fs_dinode (fs_blocks dk) sb z)
                  (img_blkmap (fs_blocks dk) (fs_dinode (fs_blocks dk) sb z))
                  (fs_data_of (fs_blocks dk) (fs_dinode (fs_blocks dk) sb z)))%I
       with "[Hdlk]" as "Hdlk".
     { iApply (big_sepS_mono with "Hdlk"). intros z _.
-      iIntros "[H1 (%D & %Hd & %Hx & H2)]".
-      iApply (dlinks_intro _ _ _ _ _ D Hd Hx with "H1 H2"). }
+      iIntros "(%D & %Hd & %Hx & H2)".
+      iApply (dlinks_intro _ _ _ _ _ D Hd Hx with "H2"). }
     iDestruct (ipool_alloc_of_image γfs γi (fs_blocks dk) sb cov
                  (((cov ∖ ({[ (1:Z) ]} : gset Z))
                      ∖ log_region_set (sb_logstart sb))

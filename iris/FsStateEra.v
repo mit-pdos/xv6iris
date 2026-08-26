@@ -2616,6 +2616,35 @@ Section EraRes.
     iApply (ent_toks_era_dots_only Γ i dn bm data ∅ Hz Hh Hb Hdots).
   Qed.
 
+  (* ...AND A DOTS-ONLY DIRECTORY'S MARKER SET IS FORCED EMPTY, at ANY
+     count.  [ent_dset_ok] admits only entries that are neither dot name,
+     and a dots-only directory has no others -- so a bundle opened at such
+     a record hands back [D = ∅], and [node_exact] then reads the count off
+     the liveness bit alone.  This is what [ProofSysUnlink]'s rmdir arm
+     reads at the emptied child before the decrement (durable-disk G5's
+     FINDING 3); until G6 the same fact came off the old ledger's count
+     clause ([DirLinks.dir_links_empty_nlink]). *)
+  Lemma ent_dset_ok_dots_only (dn : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) (D : gset fname) :
+    blk_holes_zero bm data ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_dots_only dn data ->
+    FsStateInode.ent_dset_ok (era_node dn bm data) D -> D = ∅.
+  Proof.
+    intros Hh Hb Hdots Hdok.
+    destruct (decide (D = ∅)) as [Hz | Hne]; [exact Hz |].
+    exfalso. apply set_choose_L in Hne as [s Hs].
+    destruct (Hdok s Hs) as ([t Ht] & Hnd & Hndd).
+    rewrite (dir_entries_era_node dn bm data Hh Hb) in Ht.
+    destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
+      [| rewrite lookup_empty in Ht; discriminate].
+    destruct (dv_lookup_some_inv _ data (dir_nrec (bv_unsigned (di_size dn)))
+                s t eq_refl Ht) as (k & _ & Hk & Hlv & Hnm & _).
+    destruct (Hdots k Hk Hlv) as [Hd | Hdd].
+    - apply Hnd. rewrite -Hnm. exact Hd.
+    - apply Hndd. rewrite -Hnm. exact Hdd.
+  Qed.
+
   (* ---- THE COUNT-ONLY MOVE (durable-disk 2b-inode-5) ---------------- *)
 
   (*  A flush that moves ONLY [di_nlink] leaves the entry map alone, so the

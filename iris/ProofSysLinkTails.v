@@ -1098,9 +1098,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     inode_shr_gen kk s dev inum gy -∗
     ity_shot gy ty -∗
-    (* THE FRAGMENT THE [--] SPENDS *)
-    ilink (bv_unsigned inum) -∗
-    (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5):
+    (* THE UNIT THE [--] SPENDS (durable-disk 2b-inode-5):
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L gfs) (bv_unsigned inum) uty -∗
@@ -1145,7 +1143,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
            Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Hilink Htoken Hsbb Hsbi #Hbmres Hpid
+              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Htoken Hsbb Hsbi #Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1386,7 +1384,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart inodestart nib dev (ientry kk) inum
-              dn' dn bm u Sb true None uty pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
+              dn' dn bm u Sb true uty pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               P4 (K - 38)%nat eb b lks
               Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
@@ -1394,7 +1392,7 @@ Section ProofSysLinkTails.
               Haddreq Hdirlen Hj Hgl HP4a0 Heb
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum Hmeta Hmap
-                    Hsbi Hireg Hdiat Hilink [Htoken] [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
+                    Hsbi Hireg Hdiat [Htoken] [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
                     Hop").
     { assert (Hdn'ty : bv_unsigned (di_type dn') <> T_DIR_z)
         by (rewrite /dn' sl_setnl_type; exact Hnotdir).
@@ -1787,8 +1785,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     inode_shr_gen kk s dev inum gy -∗
     ity_shot gy ty -∗
-    ilink (bv_unsigned inum) -∗
-    (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5):
+    (* THE UNIT THE [--] SPENDS (durable-disk 2b-inode-5):
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L gfs) (bv_unsigned inum) uty -∗
@@ -1847,7 +1844,7 @@ Section ProofSysLinkTails.
            Hcrb Hcru Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Htoken Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Htoken Hslkd
               Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -1944,7 +1941,7 @@ Section ProofSysLinkTails.
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Htoken Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Htoken Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
@@ -2066,8 +2063,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     inode_shr_gen kk s dev inum gy -∗
     ity_shot gy ty -∗
-    ilink (bv_unsigned inum) -∗
-    (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5):
+    (* THE UNIT THE [--] SPENDS (durable-disk 2b-inode-5):
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L gfs) (bv_unsigned inum) uty -∗
@@ -2126,7 +2122,7 @@ Section ProofSysLinkTails.
            Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Htoken Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Htoken Hslkd
               Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -2243,7 +2239,7 @@ Section ProofSysLinkTails.
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Htoken Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Htoken Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).

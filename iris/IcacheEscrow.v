@@ -450,21 +450,22 @@ Section IcacheEscrow.
      region size, capacity and not resource.  The FREE arm needs no such
      conjunct: it carries no data at all, and its type is 0.
 
-     ...AND ITS RESOURCE TWIN (§20.3, stage B).  [DirLinks.dir_links] rides
-     BESIDE [dir_ok], not inside it: one ledger fragment per live non-self
-     record, in one of the two colours [ilink]/[igrey].  [dir_ok] says the
-     named inum is IN RANGE; the twin says it is ALLOCATED, which is a fact
-     about another inum's REGION record and therefore cannot be a [Prop]
-     over [data] (§20.1, §20.9(a)).  No arity moves -- the colour
-     disjunction is inside [dir_link_at] -- and both fragments are timeless,
-     so the [Timeless] instance below survives verbatim.
+     ...AND ITS RESOURCE TWIN (§20.3, stage B; since G6 the TYPE REGISTER).
+     [dlinks] rides BESIDE [dir_ok], not inside it: one type-register
+     fragment per live non-self record (fs-state.md §6½).  [dir_ok] says the
+     named inum is IN RANGE; the twin says it is ALLOCATED and reveals its
+     TYPE, which is a fact about another inum's REGION record and therefore
+     cannot be a [Prop] over [data] (§20.1, §20.9(a)).  It is timeless, so
+     the [Timeless] instance below survives verbatim.  (Through G5 the
+     conjunct was the old flavoured ledger [DirLinks.dir_links] carried
+     beside it; G6 deleted the ledger.)
 
      ...AND THE ".." INDEX CLAUSE (fs-icache §20.17.4, fs-fragments R9).
      [DirView.dir_dots_ix]: a LIVE directory ([T_DIR] and [nlink <> 0]) has
      at least two records and its record 1 is the live [".."].  It is what
-     lets S7 name the one [ilink dp] it must convert -- [dir_link_at] is
-     keyed by record INDEX and is name-blind, so without it nothing says
-     WHICH ticket in a child's [dir_links] is the parent's.  It rides HERE,
+     lets S7 name the one entry unit at [dp] it must convert -- an entry's
+     unit is keyed by record INDEX and is name-blind, so without it nothing
+     says WHICH unit in a child's [dlinks] is the parent's.  It rides HERE,
      beside [dir_ok], for [dir_ok]'s own reason: it is a fact about this
      payload's bytes that no contract in the tree wants to carry, and the
      [Timeless] instances below are unaffected because it is pure.
@@ -479,7 +480,7 @@ Section IcacheEscrow.
      zero, and it carries three loads at once -- fs-icache §20.6's itrunc
      row, §20.17.5's residue, and [sys_unlink]'s own input premise, since a
      live NON-dot record under it forces the home's count nonzero, which is
-     [DirLinks.dir_links_unlink]'s home-live premise. *)
+     what [FsStateEra.ent_toks_era_unlink] needs of the home. *)
   (* ...AND ITS OWNERSHIP IS THE ERA BUNDLE (durable-disk 2b-inode-3).
      The three RESOURCE conjuncts [dinode_at] / [ind_res] / [inode_blocks]
      are gone; what stands in their place is
@@ -499,34 +500,30 @@ Section IcacheEscrow.
      and no arm that unpacks inside an [iInv] becomes unprovable.  The
      derivation is landed and is what an arm that would rather NOT maintain
      the coverage sweep or the injectivity uses. *)
-  (* ---- THE LINKS CONJUNCT, DURING THE FLIP (durable-disk 2b-inode-5) --
+  (* ---- THE LINKS CONJUNCT (durable-disk G6: THE OLD LEDGER IS GONE) --
 
-     The payload's links half is the counting RA's TOKENS
-     ([FsStateInode.ent_toks] at this payload's own node): one per entry of
-     this directory that names another inum, drawn out of that inum's
-     region-side authority at the [iupdate] that raised its count.
+     The payload's links half is the TYPE REGISTER's fragments
+     ([FsStateInode.ent_toks] at this payload's own node; fs-state.md
+     §6½): one per entry of this directory that names another inum, drawn
+     out of that inum's region-side authority at the [iupdate] that raised
+     its count.  Through 2b-inode-5..G5 it rode BESIDE the old flavoured
+     ledger [DirLinks.dir_links], so that the ~forty payload sites which
+     only pass the conjunct through never moved; G6 deleted that first
+     conjunct and the payloads keep their arity again.
 
-     WHILE THE LEDGER IS STILL ALIVE the two supplies ride TOGETHER in one
-     conjunct.  That is what keeps the flip off the ~forty payload sites
-     that only pass the conjunct through: their [iDestruct] patterns and
-     their [with "[...]"] selections do not move at all, and only the
-     handful of walks that actually SPEND or MINT a unit open the pair.
-     When [DirLinks.v] goes, this definition loses its first conjunct and
-     the payloads keep their arity again. *)
-  (* SINCE LANE G5 the second conjunct is the DEPOSIT-TIME form
-     [FsStateInode.ent_toks_x]: the marker set is existential and the
-     per-directory count is EXACT, which is where [ProofSysUnlink]'s (D2)
-     reads "a directory holding a live subdirectory record has at least two
-     links".  A checked-out walk OPENS it -- [dlinks_open] names the marker
-     set -- moves entries and counts freely, and re-seals at [dlinks_intro]
-     with the equation restored.  create's mkdir arm is exactly the window
-     that needs the freedom: it appends [dp]'s record for the child and
-     raises [dp->nlink] at two different instructions. *)
+     The form is the DEPOSIT-TIME [FsStateInode.ent_toks_x]: the marker set
+     is existential and the per-directory count is EXACT, which is where
+     [ProofSysUnlink]'s (D2) reads "a directory holding a live subdirectory
+     record has at least two links".  A checked-out walk OPENS it --
+     [dlinks_open] names the marker set -- moves entries and counts freely,
+     and re-seals at [dlinks_intro] with the equation restored.  create's
+     mkdir arm is exactly the window that needs the freedom: it appends
+     [dp]'s record for the child and raises [dp->nlink] at two different
+     instructions. *)
   Definition dlinks (γfs : fs_names) (self : Z) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) : iProp Σ :=
-    (dir_links self dn data
-     ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) self
-         (era_node dn bm data))%I.
+    (FsStateInode.ent_toks_x (fs_gamma_L γfs) self
+       (era_node dn bm data))%I.
 
   Global Instance dlinks_timeless γfs self dn bm data :
     Timeless (dlinks γfs self dn bm data).
@@ -534,24 +531,22 @@ Section IcacheEscrow.
 
   Lemma dlinks_open γfs self dn bm data :
     dlinks γfs self dn bm data -∗
-      dir_links self dn data
-      ∗ ∃ D, ⌜FsStateInode.ent_dset_ok (era_node dn bm data) D
-              /\ FsStateInode.node_exact (era_node dn bm data) D⌝
-             ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self
-                 (era_node dn bm data) D.
+      ∃ D, ⌜FsStateInode.ent_dset_ok (era_node dn bm data) D
+            /\ FsStateInode.node_exact (era_node dn bm data) D⌝
+           ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self
+               (era_node dn bm data) D.
   Proof.
-    iIntros "[$ (%D & %Hd & %Hx & Ht)]". iExists D.
+    iIntros "(%D & %Hd & %Hx & Ht)". iExists D.
     iSplitR; [iPureIntro; split; [exact Hd | exact Hx] |]. iExact "Ht".
   Qed.
 
   Lemma dlinks_intro γfs self dn bm data D :
     FsStateInode.ent_dset_ok (era_node dn bm data) D ->
     FsStateInode.node_exact (era_node dn bm data) D ->
-    dir_links self dn data -∗
     FsStateInode.ent_toks (fs_gamma_L γfs) self (era_node dn bm data) D -∗
     dlinks γfs self dn bm data.
   Proof.
-    intros Hd Hx. iIntros "H1 H2". iFrame "H1". iExists D.
+    intros Hd Hx. iIntros "H2". iExists D.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |]. iExact "H2".
   Qed.
 
@@ -560,20 +555,18 @@ Section IcacheEscrow.
   Lemma dlinks_not_dir γfs self dn bm data :
     bv_unsigned (di_type dn) <> T_DIR_z -> ⊢ dlinks γfs self dn bm data.
   Proof.
-    intros Hne. rewrite /dlinks. iSplitR.
-    - iApply (dir_links_not_dir self dn data Hne).
-    - iApply (FsStateEra.ent_toks_x_era_not_dir _ self dn bm data Hne).
+    intros Hne. rewrite /dlinks.
+    iApply (FsStateEra.ent_toks_x_era_not_dir _ self dn bm data Hne).
   Qed.
 
   Lemma dlinks_size_zero γfs self dn bm data :
     bv_unsigned (di_size dn) = 0 ->
     bv_unsigned (di_nlink dn) <= 1 -> ⊢ dlinks γfs self dn bm data.
   Proof.
-    intros Hsz Hnl. rewrite /dlinks. iSplitR.
-    - iApply (dir_links_size_zero self dn data Hsz Hnl).
-    - iApply (FsStateEra.ent_toks_x_era_nrec0 _ self dn bm data
-                ltac:(rewrite Hsz /dir_nrec //)).
-      intros _. pose proof (di_nlink_nonneg dn). lia.
+    intros Hsz Hnl. rewrite /dlinks.
+    iApply (FsStateEra.ent_toks_x_era_nrec0 _ self dn bm data
+              ltac:(rewrite Hsz /dir_nrec //)).
+    intros _. pose proof (di_nlink_nonneg dn). lia.
   Qed.
 
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
@@ -820,11 +813,11 @@ Section IcacheEscrow.
      dischargeable at a directory nobody named in advance.
 
      ...AND ITS RESOURCE TWIN (§20.3, stage B), the twin of [ipool_alloc]'s:
-     [DirLinks.dir_links] over this record's own [data].  It is what
-     dirlookup will hand [iget] as licence (a)/(b) in stage C, borrowed out
-     of this payload at the matched index and returned before the holder's
-     iunlock.  Every re-park in the landed tree carries it unchanged
-     ([dir_links_eq]) because none of them changes a DIRECTORY's bytes.
+     [dlinks] over this record's own [data].  It is what dirlookup will hand
+     [iget] as licence (a)/(b) in stage C, borrowed out of this payload at
+     the matched index and returned before the holder's iunlock.  Every
+     re-park in the landed tree carries it unchanged because none of them
+     changes a DIRECTORY's bytes.
 
      ...AND THE ".." INDEX CLAUSE, the twin of [ipool_alloc]'s: see there.
      create is its sole PRODUCER (at [dirlink(ip, "..", dp->inum)]); every

@@ -846,22 +846,11 @@ Definition wp_iupdate_credgen_body
 (*  cut to create's altitude -- a syscall runs with an enabled base, and   *)
 (*  no nlink-raising flush in the kernel runs anywhere else.               *)
 (*                                                                        *)
-(*  THE OPTION-FLAVOUR INDEX [fl] (V1's count-fact carrier; R6's           *)
-(*  [filled]-retrofit precedent).  [fl = None] is this contract as it      *)
-(*  landed -- same premises (the new one is vacuous), same payout          *)
-(*  ([IcacheRef.ilink_fl None] IS [ilink], by iota) -- and EVERY caller in *)
-(*  the tree stands there.  [fl = Some tt] pays out [ilinkd] instead and   *)
-(*  takes ONE extra premise, [InodeRegion.ireg_dir_ok]'s antecedent at the *)
-(*  flushed record: the raise buys a record naming a DIRECTORY, and the    *)
-(*  writer is the only party that can see the type.                       *)
+(*  THE OPTION-FLAVOUR INDEX [fl] IS GONE (lane G6).  Through G5 this     *)
+(*  body also paid out one unit of the OLD link ledger, at a flavour the  *)
+(*  caller chose ([IcacheRef.ilink_fl]); the ledger is deleted and the     *)
+(*  register pile below is the whole payout.                              *)
 (*                                                                        *)
-(*  IT IS AN INDEXED *INPUT*, NOT AN OBLIGATION, which is why R6 applies   *)
-(*  and §20.16.5(e)'s death certificate does not: nothing the contract     *)
-(*  owes anyone changes at [None], and no landed proof discharges anything *)
-(*  new.  The index is a POSITIONAL parameter beside [cru] rather than a   *)
-(*  sixth contract, because unlike the four widenings above this one's     *)
-(*  premises AND postcondition differ only by a [match] the caller's own   *)
-(*  choice reduces away.                                                  *)
 (* ===================================================================== *)
 Definition wp_iupdate_link_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
@@ -874,7 +863,7 @@ Definition wp_iupdate_link_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+    (u : nat) (Sb : gset Z) (cru : bool)
     (pin : bool) (oty : option ity)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -893,21 +882,6 @@ Definition wp_iupdate_link_body
   (* THE ADDED PREMISE (see the banner): (L3) plus the increment below make
      a type-0 flush contradictory, so the region cannot take one here. *)
   bv_unsigned (di_type dn) <> 0 ->
-  (* THE FLAVOUR'S OWN PREMISES (see the banner; the index is widened to
-     [option (option Z)] by V5' -- [None] plain, [Some None] untagged-d,
-     [Some (Some pv)] tagged).  (T1) at the flushed record for EITHER d
-     flavour; (T1')'s mirror at the plain one (V4): a plain mint's record
-     is NOT a directory -- a walk-level fact at every plain-minting site;
-     and the tagged mint's legality (V5'): the pre-record is the fresh
-     child's, its count zero.  Stated at [InodeRegion.ireg_dir_ty] rather
-     than [DirView.T_DIR_z] so this file acquires no import
-     ([IregDirBit.ireg_dir_ty_T_DIR_z] is the bridge, one
-     [reflexivity]). *)
-  (forall od : option Z,
-     fl = Some od -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty) ->
-  (fl = None -> bv_unsigned (di_type dn) <> InodeRegion.ireg_dir_ty) ->
-  (forall pv : Z,
-     fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
   (* THE FILL'S PREMISE (lane G5, [InodeRegion.ireg_lnk_fill]).  A caller
      may CHOOSE the register's value only where the register is empty --
      create's fresh child, the one flush in the kernel that installs one
@@ -1015,7 +989,6 @@ Definition wp_iupdate_link_body
          FLAVOUR: [None] reduces to [ilink] by iota, so no landed caller's
          continuation moves a character. *)
       dinode_at γi inum dn -∗
-      ilink_fl fl (bv_unsigned inum) -∗
       (* ...AND THE COUNTING RA's OWN UNIT (durable-disk 2b-inode-5), which
          is what the [dirlink] that follows files in the directory's
          [FsStateInode.ent_toks] inside its checked-out payload.  The
@@ -1094,14 +1067,9 @@ Definition wp_iupdate_link_body
 (*  [cru]-credited and [eb := true], cut to create's altitude, exactly as  *)
 (*  the fifth is.                                                         *)
 (*                                                                        *)
-(*  FLAVOUR-INDEXED SINCE V1, exactly as its dual and for the same reason  *)
-(*  (R6).  Here the index sits on the PREMISE rather than the payout --    *)
-(*  [IcacheRef.ilink_fl fl] is what the drop spends -- and NO premise is   *)
-(*  added on either arm: [InodeRegion.ireg_write_unlink_fl] discharges     *)
-(*  (T1) rather than taking it, because lowering [wd] only weakens the     *)
-(*  clause's antecedent.  Every landed caller stands at [None], where      *)
-(*  [ilink_fl None] IS [ilink] by iota and the [with "… Hlink …"] spec     *)
-(*  pattern is unchanged.                                                 *)
+(*  THE FLAVOUR INDEX IS GONE (lane G6): through G5 this body also SPENT  *)
+(*  one unit of the old link ledger ([IcacheRef.ilink_fl]) beside the      *)
+(*  register pile.  The ledger is deleted; the pile is the whole spend.    *)
 (* ===================================================================== *)
 Definition wp_iupdate_unlink_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
@@ -1114,7 +1082,7 @@ Definition wp_iupdate_unlink_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z)) (uty : ity)
+    (u : nat) (Sb : gset Z) (cru : bool) (uty : ity)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -1171,9 +1139,6 @@ Definition wp_iupdate_unlink_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
-  (* THE FRAGMENT THE DROP SPENDS (edit (ii)): consumed, not returned.  AT
-     THE CALLER'S OWN FLAVOUR since V1 -- [None] is [ilink] by iota. *)
-  ilink_fl fl (bv_unsigned inum) -∗
   (* ...AND THE COUNTING RA's UNIT BESIDE IT (durable-disk 2b-inode-5),
      also consumed: this is the one flush in the kernel that LOWERS a
      count, so it is the one that returns a token to the region's
@@ -1323,13 +1288,13 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+      (u : nat) (Sb : gset Z) (cru : bool)
       (pin : bool) (oty : option ity)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
+                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
@@ -1347,12 +1312,12 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+      (u : nat) (Sb : gset Z) (cru : bool)
       (uty : ity)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                             cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
+                             cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.
