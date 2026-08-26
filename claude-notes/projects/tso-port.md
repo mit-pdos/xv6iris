@@ -395,6 +395,176 @@ Residual red at the rehearsal commit (8f675587): BootCarveMain's
 and the `SpecSyscall.syscall_env_park` Parameter binder pending one
 verification round.
 
+### 0.10′ HANDOFF (2026-08-26, end of session) — EXACT STATE AND WORKLIST
+
+**Branch state.** `tso`, HEAD = d3db2b27.  The relevant commits, newest
+first: d3db2b27 (rehearsal wide layer), 8f675587 (THE HERMETIC SEAL),
+b7bb2990 (the replay runbook, `tso-flip-replay.md`), fba0ae63 + 3dfbcfcc
+(the M1 notation flip of ↦ₘ/↦₈ + the kmem minimal-diff redo).  Build on
+the GCP VM only, from the REPO ROOT:
+`./gcp-rocq/run-on-gcp opam exec --switch=/shared/xv6rocq -- bash -c
+'cd iris && make -f CoqMakefile -j180 -k'`; watch
+`--no-sync ps -o pid,etime,rss -C rocqworker --sort=-etime` and autopsy
+any 8-min-plus worker with single-file `coqc -time`.
+
+**What the tree IS right now.**
+1. `↦ₘ` and `↦₈` (all four spellings each) denote
+   `ctx_pointsto ξ a q v` / its 8-byte tower at the ambient `cur_ctx`,
+   in every file that imports TsoCtx (import order decides; `↦ₓ`/`↦ᵣ`
+   never flip; `↦₂`/`↦₄`/`↦ₛ`/`↦ₚ` still plain).  At SC the definition
+   ignores ξ.
+2. THE SEAL IS HERMETIC (8f675587): `ctx_pointsto`, `own_context`,
+   `ctx_parked`, `hart_view_lb`, `ctx_dom` are Qed-opaque via the
+   sig-projection idiom; each has an `X_unseal : X … = X_def …`
+   equation.  Coq's unification can no longer δ-cross ctx↔mem as a
+   fallback (it could under plain `Global Opaque`, which is how the
+   tree had accumulated ungreppable implicit uses of the equality).
+   ONLY TsoCtx's own law proofs and TsoCtxShim use the unseal
+   equations.  To revert to the permeable SC seal: make the five plain
+   Definitions again (one block in TsoCtx.v, marked "CUTOVER
+   REHEARSAL") and restore the shim's `Local Transparent` proofs.
+3. `<{ P }>` is the combinator `const_pay P` (any `CurCtx`-typed λ
+   binder — even anonymous — is a TC candidate inside P, resolved
+   site-dependently; measured).  Converted lock payloads are spelled
+   `(λ ξ : CtxId, pay (XI := ξ) …)` and bring a CtxMorph (kmem is the
+   reference, KallocInv.v).
+4. Design rulings in force (0.8′ has the WHY): kernel_data is
+   ∀-context; lock_name/sl_name raw; lk_cpu_res ∃-context behind
+   `WpLock.lk_cpu_cell_acc`; cpu_ctx_free ∃-context with
+   `SwtchCtx.ctx_cells_reindex`; StackOwn flipped (stack frames are
+   thread data; `stack_own_reindex` marks the swtch crossing);
+   `WpSconfMem.wordw_pointsto` deliberately RAW with named shim
+   crossings; the ↦₈ leaf wrappers bridge via `WpSconfMem.wordw8_ctx`
+   with hand-written continuation adapters (setoid_rewrite leaves
+   undefined evars under wp_next's binder — adapters re-intro the
+   continuation and rewrite the fact top-level on both sides).
+
+**RED, exactly (46 files, from the last full round; log
+`gcp-sealH.log` in the session scratchpad, but just re-run make):**
+
+```
+BootCarveMain.v:1028
+DinodeSlot.v:523
+ProofAllocproc.v:1866
+ProofArgfd.v:681
+ProofArgraw.v:253
+ProofBinit.v:637
+ProofBread.v:1833
+ProofBrelse.v:202
+ProofDirlink.v:653
+ProofFilestatParts.v:333
+ProofFilewriteParts.v:1258
+ProofKexecTail.v:409
+ProofKexit.v:1163
+ProofKfork.v:82
+ProofKforkB5.v:408
+ProofKvmmake.v:1161
+ProofKwait.v:1318
+ProofMain.v:962
+ProofMemcpy.v:122
+ProofMemmove.v:1014
+ProofPipealloc.v:949
+ProofPipewrite.v:574
+ProofPrintk.v:2189
+ProofReparent.v:801
+ProofSysClose.v:526
+ProofSysExec.v:1768
+ProofSysExit.v:167
+ProofSysKill.v:99
+ProofSysLinkParts.v:636
+ProofSysMkdir.v:303
+ProofSysMknod.v:1049
+ProofSysOpenParts.v:669
+ProofSysPause.v:1896
+ProofSysPipe.v:1146
+ProofSysRead.v:427
+ProofSysSbrk.v:609
+ProofSysUnlinkParts.v:909
+ProofSysWrite.v:450
+ProofSyscall.v:2064
+ProofUvmcreate.v:559
+ProofVirtioDiskInit.v:720
+ProofVirtioDiskRwD.v:1053
+ProofWalk.v:696
+UtResFits.v:56
+WpSconfLock.v:435
+WpSmodePtMem.v:2006
+```
+
+All of these are the THREE mechanical classes — no new class has
+appeared for many rounds:
+- (a) a `word_pointsto_*` / `mem_pointsto_*` / `word{2,4}_pointsto_*`
+  law applied to a now-ctx fact → use the `ctx_word_pointsto_*` /
+  `ctx_pointsto_*` twin (arity gains a leading ξ: one extra `_`), or
+  where the target really is the unflipped ↦₂/↦₄ tower or gen_heap,
+  insert the named shim conversion
+  (`TsoCtxShim.ctx_pointsto_of/to_mem`, `ctx_word_of/to_mem`,
+  `ctx_buf_of/to_mem`, `ctx_eslot_of/to_mem`);
+- (b) a flip-era shim conversion that the permeable seal tolerated in
+  the WRONG DIRECTION (it was a no-op then) → delete it or reverse it;
+  the error names it precisely;
+- (c) a decl whose `?XI : CurCtx` cannot resolve → binder
+  (`tools/ctx_convert.py ambient|inline`, or a backward-walk inline
+  `\`{XI : CurCtx}` after the decl name; QUALIFIED
+  `\`{XI : TsoCtx.CurCtx}` in boot files that must not import TsoCtx).
+Two known specifics: `UtResFits.v:56` and `DinodeSlot.v:523` are class
+(c); `BootCarveMain.v:1028` needs a NAMED bridge
+`bpay_raw (pa_of_z (buf_base + buf_stride*k)) ⊢ buf_raw k` (the two
+bodies are shape-identical but the whole-body conversion that used to
+close it can no longer see through the seal — address equations plus
+`ctx_buf` shims on the 1024-byte run).  Expect ~10 more error-driven
+rounds at ~3-6 files each; the loop and fix recipes are
+`tso-flip-replay.md` verbatim.
+
+**THE TWO DESIGN PROBLEMS (not mechanical; owner-decided direction):**
+1. *sleep/swtch parking.*  A parking proc stores, under `p->lock` and
+   a ▷, a continuation wand for its resumer.  The wand's premises
+   include the persistent handle bundle — `is_lock` for
+   kmem/virtio_disk/per-proc locks, `procs_inv`, bcache/log invariant
+   handles.  `is_lock γ lk R = lock_name ∗ inv lockN (lock_inv γ lk R)`
+   and R now contains ctx-indexed points-tos, so the HANDLE PROPOSITION
+   depends on ξ.  The record fixes ξ = the parker's; the continuation
+   ∀-quantifies the resumer's ξ'.  `is_lock γ lk R(ξ)` vs
+   `is_lock γ lk R(ξ')` are invariant assertions with different bodies:
+   NOT interderivable, and MEASURED not convertible with every seal
+   removed (`proc_ctx (XI := ξ) ⊣⊢ (XI := ξ')` fails `reflexivity`
+   fast under full transparency).  FIX DIRECTION (sketched in
+   UsertrapRes.v at the aborted lemma): the bundle is persistent and
+   every thread already threads it through its syscall spec, so the
+   RESUMER supplies it — the same channel the statement already uses
+   for `timer_cap`/`first_done`/the fs resource `W`.  Cascade:
+   `UsertrapRes.ut_res_bare_park` (proof currently ends in `Abort`,
+   deliberately, so the build fails fast there — the old body is kept
+   in a comment), `ut_park_intro_body`, `ParkCap.park_chan`/`park_cap`/
+   `park_token` (a guarded fixpoint), `UtResFits`, `ProofForkretPark`,
+   `ProofUserretClosed`, and the resume sites in the scheduler chain.
+   One open sub-question: `park_env N` is keyed by `un_* N` fields of
+   which only `un_s N = γs` is pinned at the channel — either pin the
+   rest as pure ties, or split the bundle into the global part
+   (resumer-supplied) and the N-specific pure facts (record-carried).
+2. *kernelvec/kerneltrap.*  Same shape: the interrupt handler's spec is
+   installed once (inside intr_res) with its `devintr_caps`
+   (dev_inv + console/disk `is_lock` handles) captured at the
+   installing thread's ξ; the handler body runs at the trapping
+   thread's ξ'.  Site: `ProofKernelvec.v:1681` (an iApply already pins
+   `(GEN:=GEN) (CID:=CID) (XI:=XIc)` — the entry context bound at
+   line 1429 — the remaining mismatch is the caps premise).  Fix
+   direction: caps premise moves inside `intr_handler_spec`'s ∀,
+   supplied by the trapping thread.
+
+**What the REAL cutover still needs after all the above is green:**
+(i) add the real construction's ghost state — one mono_nat per context
+plus a ghost_map for dirty (t,addr) pairs — to the Σ assumptions
+(TsoCtxTwin2.v carries its own typeclass; threading it is a Context
+sweep); (ii) replace the sealed `_def` bodies with TsoCtxTwin2's
+definitions and re-prove TsoCtx's exported law surface (each law names
+its already-proven twin lemma beside it); (iii) re-prove the load/store
+WP leaves against a store-buffer machine (TsoMem.v) instead of
+gen_heap — exactly the sites now marked by shim conversions, so
+`grep -l TsoCtxShim iris/*.v` is that worklist, honest again;
+(iv) the two design problems above (they are prerequisites: their
+fixes remove the last is_lock-handle crossings).
+
 ---
 
 **The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5
