@@ -161,16 +161,49 @@ Agents: `agent := nat`; `hart_agent c := fin_to_nat c`;
 
 ## 3. Rulings
 
-RULING 1 (coherent ifetch + coherent page walk).  Instruction fetches
-and translation-table walks read the FLAT memory and do not move the
-hart's view.  Ztso as an ISA memory model governs EXPLICIT accesses;
-fetch and PTW coherence are separate axes (Zifencei / Svvptc /
-sfence.vma discipline), and xv6's uses are covered by stronger events
-anyway.  This keeps the whole fetch-geometry and TLB lanes' proofs
-against `gen_heap`(flat) — including the Svadu A/D write-back story —
-out of the port, matching the standing "text is timestamp-0" ruling.
-The honest weakening is recorded here; revisit only if the tree grows
-self-modifying-code obligations (kexec's are deferred by owner ruling).
+RULING 1 — **OVERRULED BY OWNER (2026-08-26): implicit accesses take
+the PLAIN ARM.**  Instruction fetches and translation-table walks go
+through the same nondeterministic view advance as plain explicit data
+loads — no strong arm, no `ak_strong`, no access-kind classification
+at the machine.  The owner's staging argument, recorded verbatim in
+spirit: the SC model ALREADY conflates the fetch/translation axes with
+the data axis (implicit accesses were perfectly coherent, no separate
+icache is modeled, and `sfence.vma`'s modeled role is the TLB flush,
+which the proof fully reasons about); TSO-for-everything is strictly
+weaker than the SC illusion and is the current goal; the further
+weakening to real Zifencei/sfence.vma staleness (a separate icache /
+walker-staleness axis with its own fence semantics) is a SECOND,
+LATER de-confliction step, deliberately out of scope now.  The
+original ruling's text (flat implicit reads — an SC residue for the
+implicit axes, argued from RVWMO's explicit-access scope) is kept in
+git history and in the A6.7 block; the ISA-scope evidence gathered
+for it (RVWMO's "not (yet) formalized" carve-out, Zifencei, the
+sfence.vma implicit-read text) is the design basis FOR THE LATER
+de-confliction project, not for this port.  Consequences:
+- the machine loses the strong RAM-read arm; the plain arm's guard is
+  `ak_excl = false` alone;
+- THE A6.7(B) SAIL PATCH IS PARKED, NOT ADOPTED: the model needs no
+  access-kind distinction while all non-exclusive reads take one arm.
+  The patch, its idempotence measurement and its fallout map stay
+  recorded in the A6.7 block and in the backup
+  (`/shared/xv6iris-3-fliptree-backup/sail-riscv`, commit 00046a7) as
+  the ready-made prerequisite for the de-confliction project — which
+  WILL need the model to tell the access classes apart;
+- kernel text and boot-built PT mappings discharge their plain-load
+  obligations via the pristine/timestamp-0 tier (visible at every
+  view — no fence reasoning); own-hart PT writes via store
+  forwarding; cross-hart handoffs via the lock acquires the proofs
+  already pass through;
+- THE ONE GENUINELY NEW OBLIGATION: kernel-PTE low bytes are racy at
+  runtime (the Svadu A/D write-back mutates bits 6–7 from any hart),
+  so a walk at a nondeterministic view may see either value — walk
+  certificates weaken from "reads exactly w" to "reads w modulo A/D
+  bits"; the write-back path itself stays deterministic (the fork's
+  atomic update reads EXCLUSIVE, at the top).  A6.20's "licenses no
+  plain load" justification for the kernel-PT `phys_ledger` tier dies
+  with the old ruling — the kernel-PT slots need a read story
+  (boot-published receipt + stable-modulo-A/D), a design item for the
+  implementing lane.
 
 RULING 2 (MMIO and DMA strongly ordered) — already ratified in
 tso-port.md §1: device transactions are direct; the disk reads/writes

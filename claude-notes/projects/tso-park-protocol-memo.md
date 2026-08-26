@@ -384,3 +384,33 @@ predicate serves both fixes** and problem 2 collapses into "the
 trapping thread supplies `park_globals` at its own ξ".  Worth 30
 minutes of confirmation before the shape of `park_globals` is frozen —
 the difference between one M2 change and two.
+
+---
+
+## 5. CORRECTION FROM THE §0.16′ LANDING (2026-08-26)
+
+§2's inherited claim (quoted from tso-port.md §0.11′) that *"the ξ-dependence
+of every handle in the tree is an artifact of the constant embedding, not of
+the semantics"* is true of LOCK HANDLES and only of them, and the park keeps
+running into the exception.  A lock handle has an ACQUIRE, which is where a
+λ-converted payload re-indexes along the acquirer's `ctx_dom`; a bare `inv`
+has no acquire, so its body's ξ-dependence is not an artifact and no
+`CtxMorph` crosses it.  Two of those stood between the park and its deposit:
+
+- `FileInvDefs.off_hold`'s cinv -- **removed** at §0.16′, because its
+  ξ-dependence was a redundant copy of `f->ip` kept only so the invariant
+  could name an inode.  `FileInv.is_ftable` is a closed term now, and ruling
+  item 1's `park_globals` row for it costs nothing.
+- `BioInv.buf_escrow` -- **not removable that way**: it OWNS the cached
+  block's bytes while they are parked between bread and brelse.  It reaches
+  the park through `ProcInv.proc_priv` → `FirstTok.first_tok` → both of
+  `FsReady.fs_ready` and `FirstTok.first_boot_persist` → `BioInv.bio_ctx`,
+  and it is what `ProofForkretPark.forkret_park_paid` now aborts on.
+
+Ruling item 1 (`W` stays an `iProp`, the parker's ξ is ∀-quantified) is
+UNCHANGED and still right; §0.16′ adds only that the parker's HART must be
+∀-quantified beside its ξ once `park_cap` carries the parker's `own_context`
+(which `TsoCtx.ctx_deposit` requires and no persistent surrogate replaces).
+That change was built, measured and reverted -- see tso-port.md §0.16′ step
+(ii) for the one thing it teaches: **the package's `▷` has to move onto its
+closer row alone**, because a deposit cannot run under a later.
