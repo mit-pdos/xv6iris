@@ -881,6 +881,76 @@ seven-conjunct bundle is higher-order).  **LESSON: an `Abort` at a root
 hides its whole cone from the build.  When one is left deliberately, stub
 it once per sweep and run the cone.**
 
+### 0.13′ WAY OUT 1 IS REFUTED, AND THE REFUTATION IS A RULE
+
+§0.12′ ranked "restate `wp_forkret` with its GLOBAL premises at an explicit
+context" as EFFORT, not machinery.  **It is machinery, and the reason is
+structural rather than a matter of how many rows move.**  The statement
+change was implemented and measured (`wp_forkret_gen_body` gained
+`(ξg : CtxId)`; `procs_inv` / `park_globals` / `proc_lock_res` /
+`is_kstack` moved to it; `fkr_tail` and `fkr_boot` threaded it), and
+`ProofForkret` fails TWICE, neither failure in the boot arm the ruling
+flagged as the risk:
+
+1. **`fkr_tail`, at prepare_return** — `iSpecialize: cannot instantiate
+   (is_kstack p ks -∗ … ) with (is_kstack ξg p ks)`.  Every callee takes
+   its rows at ITS ambient, and a callee's ambient is fixed by the
+   `sie_cap_gpr` it also takes, so a caller cannot hand one row at another
+   context.  `is_kstack` is a discarded `↦₈` cell and does not cross
+   (MEASURED: `NOTCONV`; only `ut_tfk` of the park's rows is `CONV`).
+2. **`fkr_tail`, at the residue closer** — `cannot instantiate
+   (park_globals XI γs γft γf -∗ …) with (park_globals ξg γs γft γf)`.
+   This one is the rule:
+
+> **A thread's AMBIENT context is its identity** — `own_context cur_ctx`
+> is a conjunct of `IntrDefs.sie_cap`, beside the stack — **and the trap
+> loop's residue is stated at that ambient** — `SpecUserretClosed`'s
+> `URes : CpuId -> uptd -> mword 64 -> iProp` has no context argument, so
+> `wp_userret_closed` consumes `usertrap_res_bare` at the ambient and
+> forkret must therefore instantiate its closer at `Xc := XI`
+> (`ProofForkret.v:669`).  Since §0.12′ made the residue's handle rows
+> RESUMER-SUPPLIED (`park_globals Xc`), **the resumer must HOLD the
+> system's handles at its own running context.**  A freshly minted context
+> has none, and none can be given to it: no law transports an
+> `is_lock`/`inv` handle, and `TsoCtx.ctx_deposit` — the one law written
+> for exactly this hand-over ("a fork's hand-me-downs") — transports only
+> `CtxMorph` payloads, i.e. DATA.
+
+So `forkret` cannot run at the child's fresh `XIc`, and no redistribution
+of its premises changes that: the ξ that must serve `park_globals` is the
+one the WP conclusion runs at.  The corollary kills the tree-wide
+generalisation too: pinning EVERY handle at one explicit `ξg` would leave
+the data under those handles at `ξg` while the thread writes at its own
+ambient, and `WpSconfMem.wp_sd_s_sconf` binds the `↦₈` and the
+`sie_cap_gpr` at ONE ambient — so the first `p->chan ↦₈` store by any
+thread at another context fails.  **Handles and the data they protect are
+one context; a thread is one context; therefore a thread's handles are its
+own.**
+
+**WHAT THIS LEAVES.**  Way out 2 — the M3 λ-payload sweep, so a handle is a
+CLOSED term and the acquire re-indexes the payload to the acquirer
+(`ctx_dom` + `CtxMorph`) — is now the ONLY way out, and it is the honest
+TSO story rather than a workaround: at TSO a lock acquire is exactly where
+a payload changes context.  It is blocked where §0.12′ measured it, on
+`CtxMorph proc_lock_res` (a `▷` over `valid_context`, a guarded fixpoint)
+and `CtxMorph ftable_res` (a `cinv` over `off_content`, an `is_pipe` over
+`pipe_res`) — i.e. on a ▷/fixpoint/invariant-capable transport, which is
+real machinery and is the next design problem to solve, not an errand.
+`ProofForkretPark.forkret_park_paid` stays at `Abort` until it lands; the
+red list is unchanged (that file plus its 7-file cone).
+
+**MEASUREMENT KIT, worth keeping.**  Two probes answer "is this predicate
+ξ-dependent, and does it cross?" in one cheap file, with no crawl risk:
+`Check @f` (a `TsoCtx.CurCtx` in the printed type = ξ-indexed) and
+`Goal (f (XI := xi) … : iProp Σ) = f (XI := xj) …;
+tryif reflexivity then idtac "CONV f" else idtac "NOTCONV f"` — the
+hermetic seal makes the non-crossing case fail FAST under `reflexivity`,
+where `iExact` is what crawls.  Results for the park's rows:
+`cpu_own`, `trap_csrs`, `intr_res`, `proc_priv`, `is_kstack`, `procs_inv`,
+`proc_lock_res`, `proc_held`, `ctx_cells`, `stack_own`, `first_done`,
+`sie_cap_gpr`, `ut_trap_parked` all `NOTCONV`; `ut_tfk` `CONV`.
+`cpu_claim`, `locked` and `pc_is` take no `CurCtx` at all.
+
 ---
 
 ---
