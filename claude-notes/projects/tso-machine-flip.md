@@ -22,19 +22,21 @@ are the standing red tail — see tso-port.md §0.11′ for the exact state.
 Items here marked RULING are design decisions of this flip; revisit is
 welcome, silence is consent.
 
-STEP 5, ITEM-(iii) TIER (2026-08-26, later session): the four dead-shim
-files and one tranche-3 leaf are GREEN — `KernelDataInv`, `StackOwn`,
-`WpLock`, `DiskInv`, `HartPilot` — on the back of five additive laws and
-two new gates in `TsoCtx.v` (`ctx_pointsto_forget` /
-`ctx_word_pointsto_forget`, `ctx_pointsto_canonical`, `ctx_ktier_mono` /
-`ctx_word_ktier_mono`, and the PRISTINE BYTE gate).  Two lemmas that were
+STEP 5, ITEM-(iii) TIER (2026-08-26, later session).  TWELVE files went
+GREEN across two tranches: `KernelDataInv`, `StackOwn`, `WpLock`,
+`DiskInv`, `HartPilot`, then (after the owner's rulings) `WpMmodeLoad`,
+`BootCarve`, `PtTreeAdue` and their cascade `HartSTrans`, `WpEntryNew`,
+plus the machine files `RiscvLang`/`RiscvExec` re-cut for A6.11.  The
+kit grew five additive laws and four gates in `TsoCtx.v`
+(`ctx_pointsto_forget` / `ctx_word_pointsto_forget`,
+`ctx_pointsto_canonical`, `ctx_ktier_mono` / `ctx_word_ktier_mono`, the
+PRISTINE BYTE gate and its two image mints), `ctx_pointsto`'s clean arm
+became `llb`-shaped so an image byte needs no per-context ghost step, and
+`HartMFetch` gained the `mread_req8_ttw` twins.  Three lemmas that were
 FALSE at TSO were replaced by the true ones (`stack_own_reindex` is now
-the `ctx_dom` transport; `lk_cpu_cell_acc` is gone).  What is left of the
-tier is THREE STATEMENT-LEVEL DECISIONS, each with its exact statement
-written out: A6.10 (`WpMmodeLoad` wants one persistent premise),
-A6.11 (`RiscvLang`'s DMA write set is under-determined, which blocks
-`WpUart`), A6.12 (`HartMemRun`'s `bytes_own` must go context-indexed,
-which is the whole user tier).  A6.8–A6.12 below are the record.
+the `ctx_dom` transport; `lk_cpu_cell_acc` is gone; `disk_step` yields its
+write set).  A6.8–A6.14 below are the record; A6.13 is the standing
+frontier and A6.14 the one tranche that remains.
 
 ## 0. The one-paragraph shape
 
@@ -881,13 +883,35 @@ the other, which is all `ctx_load_ok` and `ctx_morph_pointsto` ever asked.
 One helper was needed — `llb_valid_q`, the fraction-generic form, because
 `ctx_dom` holds only half the bound authority.
 
-**THIS IS `BootCarve.kernel_data_intro`'s FIX**, and it is the shape of
-every boot mint: the carve hands raw discarded image bytes plus their
-pristine receipts and gets the `∀ ξ` fact.  Not applied here — `BootCarve`
-is on the boot/adequacy import blacklist (it may not `Import TsoCtx`, only
-name it qualified), its statement change cascades into `BootCarveMain` and
-step 6, and the receipts themselves are minted by the era's initial-state
-ghosts, which is step 6's own work.
+**THIS IS `BootCarve.kernel_data_intro`'s FIX, AND IT IS LANDED.**  The
+carve hands raw discarded image bytes PLUS their pristine receipts and gets
+the `∀ ξ` fact:
+
+    kernel_data_intro (g : gstate) :
+      (forall x, ram_lo <= x < ram_hi -> g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+      ([∗ map] a ↦ b ∈ ran_bytes g text_end rodata_end, a ↦ₘ□ b) -∗
+      ([∗ map] a ↦ _ ∈ ran_bytes g text_end rodata_end, TsoCtx.pristine_va a) -∗
+      kernel_data
+
+`BootCarve` stays on the import blacklist — it names `TsoCtx` QUALIFIED
+(`Require TsoCtx`, no `Import`), exactly as it named the shim before.  The
+VA-side receipt `pristine_va a := ∃ ppn, kmap_at (svpn_of a) ppn KP_rw ∗
+pristine_byte (pa_of ppn a)` exists because a consumer names an image byte
+by its VA and does not know the page number, while the ledger is keyed
+physically; `kmap_at_agree` is what lets it meet the `mem_pointsto`'s own
+existential.  The second premise is `BootCarveMain`'s and then step 6's,
+where the era's initial-state ghosts mint it.
+
+**A MEASURED TRAP, recorded because it cost 30 minutes and looked like a
+hang in an unrelated place.**  The obvious script — pull the byte out of
+the big-op at `boot_byte a`, then `rewrite Hbb` to turn it into `b` —
+does not terminate: two whole-range `big_sepM`s over `ran_bytes` are in the
+proofmode environment, and `rewrite` walks them.  `coqc -time` names the
+sentence exactly (the stream stops on it, at 14 GB RSS).  The fix is to
+pin the value IN THE PURE LOOKUP (`rewrite <- (boot_byte_data …)` inside
+the `assert`) so no `rewrite` ever touches the Iris goal — the same
+discipline `KernelDataInv.kdata_ro_lookup`'s note already states for
+`map_lookup_filter_Some_2`.
 
 The two load gates, both proven:
 
@@ -906,10 +930,9 @@ WHO MINTS IT: the era's initial-state ghosts (step 6 / adequacy), beside
 from.  This is the standing text-is-timestamp-0 ruling, stated as a
 resource and extended from text to every never-written image byte.
 
-**`WpMmodeLoad` — THE EXACT STATEMENT, reported rather than applied**
-(0.8′'s hard rule: `wp_ld_gpr`'s consumers `WpEntryNew`/`WpTimerinit` are
-above the kit).  `phys_word_pointsto` STAYS RAW; the fix is one new
-PERSISTENT premise on `wp_ld_gpr` and `wp_ld_gpr_tor`:
+**`WpMmodeLoad` — RATIFIED BY THE OWNER AND LANDED.**  `wp_ld_gpr`,
+`wp_ld_gpr_tor` and `wp_cldsp_gpr_tor` each gained ONE persistent premise;
+`phys_word_pointsto` is untouched and stays RAW.  GREEN.  The statement:
 
     …
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
@@ -927,6 +950,17 @@ is `entry`'s `ld sp, stack0`, a link-time constant in the image that
 nothing ever stores to.  The cascade is `WpEntryNew` and `WpTimerinit`
 threading it up to the boot theorem, where adequacy mints it — which is
 where an era-image fact belongs.
+
+**ONE IMPLEMENTATION NOTE WORTH THE HOUR IT COST.**  The obligation is
+spelled INLINE at the two call sites, not factored into a lemma in
+`WpMmodeLoad.v`, and that is forced: the file imports `SailStdpp.Base`, so
+a `gmap Arch.pa (bv 8)` BINDER written in it elaborates at the Sail key
+instances (`Decidable_eq_mword`/`Countable_mword`) and will not unify with
+`tso_interp_of`'s stdpp-keyed one — the durable-notes binder trap, whose
+error names neither file.  The `img` the obligation talks about is
+INTRODUCED FROM THE GOAL (it comes from `HartMLoad`'s premise), so it
+carries the right instances and the trap does not fire.  `BootCarve.v`'s
+header records the same rule for the same reason.
 
 ### A6.11 THE DMA WRITE SET IS ∃-QUANTIFIED, AND THAT MAKES `wp_disk_loop`
 ### UNPROVABLE (machine-tier) — **RULED, OPTION (A), AND LANDED**
@@ -1059,7 +1093,35 @@ per-site repair**, and it deletes the whole class (`WpSconfMem`'s
 bridges' remaining asymmetry).  Any per-site patching here is work that
 stage 2 throws away.
 
-The full red set, with what each is:
+**AFTER THE FOLLOW-UP TRANCHE** (A6.11 landed, `WpMmodeLoad`/`BootCarve`/
+`PtTreeAdue` green, and their cascade `HartSTrans`/`WpEntryNew` absorbed),
+the red set is SEVEN files and it has stopped moving — two consecutive
+full `-k` sweeps, no file joining:
+
+    HartMemRun.v    A6.14 — the user tier (bytes_own must go ctx)
+    HartSMem.v      A6.14 — the S-mode data nodes; NEW, was behind PtTreeAdue
+    WpMmodeStore.v  A6.14 — M-mode stores; check solo-era first
+    KptTree.v       A6.14 — the PT-slot phys↔ctx pair; NEW, was behind PtTreeAdue
+    WpUart.v        A6.9  — the DMA lease has no ledger residue (NOT A6.11:
+                            that landed and freed five of the six arms)
+    PageFields.v    M1 stage 2 (the ↦₄ trapdoor)
+    ByteBuf.v       M1 stage 2 (the ↦₄ trapdoor)
+
+Numbers: **1037 of 1330 `.v` files carry a fresh `.vo`**; the 293 that do
+not are these seven plus their dependents.  The count barely moved because
+the tranche traded blocked cones for different ones — five files went
+green, two previously-unreachable ones (`HartSMem`, `KptTree`) surfaced,
+and both are A6.14 members.
+
+RECOMMENDED ORDER from here: **M1 stage 2** (`PageFields`, `ByteBuf`, and
+the standing `WpSconfMem.wordw8_ctx` adapter class — build the ↦₂/↦₄ ctx
+towers in `TsoCtx` mirroring the ↦₈ one, flip the notations, absorb
+error-driven), then **A6.14 as ONE tranche** (port `ctx_store_ok` first;
+then `HartSMem` — the smallest blast radius of the four — then
+`WpMmodeStore` after checking the solo-era question, then `KptTree`, then
+`HartMemRun`), with `WpUart`'s lease restructuring (A6.9) alongside.
+
+THE PRE-TRANCHE SET, kept for the record:
 
     HartMemRun.v    A6.12 — the user tier (bytes_own must go ctx)
     WpMmodeLoad.v   A6.10 — one persistent premise, statement written out
@@ -1071,16 +1133,50 @@ The full red set, with what each is:
     ByteBuf.v       stage 2 (the ↦₄ trapdoor)
     BootCarve.v     A6.10 — the boot mint; needs the pristine receipts
 
-Two full `-k` sweeps were run and the second reproduces the set exactly
-(same eight files, same lines) — the tranche is closed by the standing
-criterion.  Numbers: **1036 of 1330 `.v` files carry a fresh `.vo`**; the
-294 that do not are these eight plus their 286 dependents.
+### A6.14 RULING 6 IS AMENDED, AND THE AMENDMENT HAS FOUR MEMBERS
 
-RECOMMENDED ORDER for the next session: A6.11 first (one
-`RiscvLang.v` clause, unblocks `WpUart` and costs a rebuild that everything
-else will want anyway), then M1 stage 2 (kills two entries and a standing
-adapter class), then A6.12 (the big one), with A6.10's two one-line premise
-edits landing whenever step 6 is ready to mint the receipts.
+**RULING (owner, 2026-08-26), recorded as the forced amendment to
+tso-port.md §0.8′ ruling 6:** the phys tier stays RAW **only for tiers
+whose RAM accesses are rescued by pristine receipts (A6.10) or by the
+solo/top collapses**.  A tier that performs plain data loads AND stores of
+RUNTIME-WRITTEN bytes must carry ctx facts plus `own_context`, because
+A6.9 leaves no other payer for the store's ghost steps.
+
+Four files are in that class, and they are one tranche, not four:
+
+  - `HartMemRun` — the USER TIER's walker (A6.12).  `bytes_own` is `↦ₚ`.
+    28 internal uses, ~60 consumers.
+  - `HartSMem` — the S-MODE data nodes (`swp_read_ram_node1/2/4/8`, driven
+    by the `node_read` tactic).  Same shape one privilege level down: the
+    reads are `Read_plain`, so they owe `Mobl_ram_plain`, and the
+    threading has to reach an owner.  Blast radius is small and precise —
+    28 uses inside `HartSMem`, exactly ONE outside (`WpSconfMem`) — but
+    `WpSconfMem`'s own words are deliberately RAW (0.10′ ruling 4), so the
+    obligation arrives somewhere that cannot pay it; the discharge point
+    has to be designed, not just reached.
+  - `WpMmodeStore` — the M-mode store leaf.  A6.10 does NOT rescue this
+    one: a pristine byte is read-only by construction (the discarded
+    timestamp element forbids the update a store needs), so the M-mode
+    stores must either carry ctx facts or be shown boot/solo-era only.
+    **The cheaper thing to check first** (owner's ruling 4): if every
+    M-mode store in this tree runs before the other harts are released,
+    the honest shape is a solo-era store (`TsoMemPa.all_own`) rather than
+    a ctx migration — report which it is before building either.
+  - `KptTree` — `pt_slot_phys_to_mem`, the PT-slot `↦ₚ₈ ↔ ↦₈` bridge.
+    Used in OUT-AND-BACK PAIRS by `ProofCopyout` / `ProofFreewalk` /
+    `ProofUvmunmap`: the walk takes a slot down to the phys tier for the
+    machine leaf and brings it back.  The round trip loses the ledger and
+    A6.9 says it cannot be recovered.  Tempting fix — a `ctx_residue`
+    split/join, so the caller keeps the timestamp+bit while the flat cell
+    goes down — and it WOULD work for a pair that only READS.  It does not
+    work here: the leaf STORES the slot, and a store must UPDATE the
+    timestamp, so the residue goes stale in the caller's hand.  The PT-slot
+    lane has to carry ctx facts all the way to the leaf.
+
+The `ctx_store_ok` gate (§6's `Wobl_ram`; `TsoCtxTwin2.twin_store_ok` is
+already proven) must be ported into `TsoCtx` before any of these can
+close — the current gate list is load / view-receipt / acquire-domination
+/ pristine only.
 
 ## 7. Order of work
 
