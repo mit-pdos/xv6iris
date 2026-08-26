@@ -2989,6 +2989,343 @@ number is not merely optimistic, it is meaningless.**
 6. `PtWalkCert` is MOOT — its planned `MemAccessGen` treatment was A6.7(B)
    fallout and dies with the patch.
 
+### A6.39 THE MEASUREMENT THAT INVALIDATES A6.38's NUMBER: THE MODEL WAS
+### REVERTED IN THE SOURCE AND NEVER IN THE BUILD
+
+Found in the first five minutes of the next lane, and it is the reason
+A6.38's "244 of 1330, THREE red" must not be carried forward as a
+baseline.
+
+    model-xv6iris/rv64d.v    2026-08-26 18:37   (RESTORED to the pinned baseline)
+    model-xv6iris/rv64d.vo   2026-08-26 11:15   (the A6.7(B) PATCHED build)
+
+`iris/CoqMakefile` has no rule for the generated model (durable-notes says
+so in as many words), so nothing in an `iris/` build ever notices that
+`rv64d.v` moved.  Every `.vo` in the tree was consistent **with the other
+`.vo` files**, Coq's digest check passed, and the whole clean rebuild ran
+green against the model the revert was supposed to have removed.  A6.36's
+claim "the generated model is RESTORED to the pinned baseline" is true of
+the SOURCE and was never true of anything the proofs were checked against.
+
+**HOW IT SURFACED**, and why it would not have surfaced on its own for a
+long time: `HartMFetch`'s re-port restored `read_kind_of_flags` to the
+`cbn` delta list, and the goal came back reading `read_ram Read_ifetch`
+— a constructor the pinned model still HAS (A6.36's own observation) but
+which `read_kind_of_flags false false false` cannot produce.  The two
+`md5sum`s of `rv64d.v` (fliptree vs main repo) were identical; the `.vo`
+mtime was the tell.
+
+**THE RULE, beside A6.38's stale-`.vo` one.**  A6.38 said only a clean
+rebuild counts after a machine change.  That is not sufficient: a clean
+rebuild of `iris/` says nothing about `model-xv6iris/`.  **After any edit
+under `model-xv6iris/`, rebuild the model FIRST**
+(`make -f CoqMakefile` in `model-xv6iris/`, ~40 s) and check
+`ls -la model-xv6iris/*.v model-xv6iris/*.vo` — a `.v` newer than its
+`.vo` is the whole diagnostic, and it is the same check durable-notes
+prescribes after a `git pull` that touches the model.  The failure mode
+here is worse than the pull's, because the pull's version eventually dies
+at `RiscvLang.v` with a model-field error, while a REVERT that leaves the
+old `.vo` in place produces a tree that builds perfectly and proves
+statements about the wrong machine.
+
+**WHAT IT COSTS.**  A6.38's 244/1330 is void.  The revert's real fallout
+is the A6.7(B) list, which had been recorded as "STILL TO ABSORB" but was
+in fact silently green: `RiscvTryStep`, `RiscvFetchExec`, `SmodeCore`,
+`UserMem` (the `Read_ifetch` twins and the `(access, res)` reductions),
+plus `WpLoad`/`SmodePte`/`MemAccessGen`/`UserMemMis`/`PtTreeAdue`/
+`HartMFetch`'s `Read_ttw` mentions.
+
+### A6.40 THE READ-SIDE RE-PORT IS LANDED — AND KERNEL TEXT PAYS WITH A
+### PRISTINE RECEIPT BESIDE ITS BYTES, NOT INSTEAD OF THEM
+
+A6.38's two-file frontier, worked in its order.
+
+**`HartMFetch`** — the recipe held exactly.  `swp_checked_mem_read_ifetch4`
+and `_ifetch2` go back to `mread_req`/`mread_req2` at
+`read_ram Read_plain`, take `swp_hart_ram_read_plain`, and their premise
+changes from the flat `⌜read_bytes σ.(mem) pa n = Some bytes⌝` to the
+view-indexed
+
+    Definition fobl_ram (img : TsoMemPa.bytemap) (log : list pwmsg)
+        (tv : nat) (pa : Arch.pa) (n : N) {m : N} (w : bv m) : Prop :=
+      ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+        tso_read_bytes img log (hart_agent cpu_id) tv' pa n w.
+
+— `HartMLoad.robl_ram` at the fetch widths, with the same pass-through
+discipline down `swp_fetch_ram` / `_rvc2` / `_base2` (the `_base2` wrapper
+carries TWO of them, one per halfword).  The proof scripts are main's
+verbatim once `read_kind_of_flags` is back in the `cbn` delta list; the
+`Read_ttw` 8-byte twins and the `_ifetch` request twins are DELETED, with
+a comment in each place saying what went and why.
+
+**AND THE PAYER IS NAMED IN THE SAME FILE**, because "kernel text is
+timestamp 0" is now a resource obligation rather than a ruling:
+
+    Lemma fobl_ram_pristine (img : TsoMemPa.bytemap) (sg : mstate)
+        (log : list pwmsg) (V : agent -> nat)
+        (pa : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) (tv : nat) :
+      gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
+      tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+      ([∗ list] j ∈ seq 0 (N.to_nat n),
+         phys_pointsto (pa_add pa j) dq (nth_byte w j)) -∗
+      TsoCtx.pristine_win pa (N.to_nat n) -∗
+      ⌜fobl_ram img log tv pa n w⌝.
+
+the mirror of `HartMLoad.robl_ram_ctx` one tier down, through
+`TsoCtx.pristine_read_bytes_ok` and the A6.1a bridge
+(`tso_interp_of_pin` + `tso_interp_of_at_gs` at `gs_of`).  **The shape to
+carry upward: a fetch site now owes `↦ₚ` bytes AND a `pristine_win`
+receipt.**  The bytes alone are not a load licence and never were — A6.8
+said so about `ctx_pointsto_forget`; what changed is that the fetch lane
+has joined the tiers that have to say it.
+
+**`HartPilot`** — `hp_fetch_strong` is deleted (it VM-checked the tagging
+that no longer happens), `wp_hart_rw_seq` loses the `ak_strong` premise,
+and its fetch takes the plain rule with a `TsoCtx.pristine_win` premise
+beside the `↦ₚ{dqf}` run.  Both pilot lemmas had no consumers (A6.7), so
+this is the re-cut that ruling licensed.
+
+> **ONE TACTIC FINDING, worth the line.**  The A6.1a bridge's
+> `rewrite (tso_interp_of_at_gs …)` FAILS inside a whole-instruction WP
+> with `Error: _pattern_value_ is used in conclusion` — the goal there
+> carries the model's `let '(data, finished, i) := vars in …` loop
+> patterns and `rewrite` will not abstract under them.  The fix is not a
+> different tactic: state the discharge as its own lemma (`hp_read_pristine`,
+> `fobl_ram_pristine`) where the goal is just the `⌜…⌝`, and `iDestruct`
+> it at the call site.  That is why both payers above are lemmas and not
+> inline scripts, and it is a reason to keep every kit-gate discharge out
+> of the middle of a WP.
+
+### A6.41 THE A6.37 RULING (b) HAS NO NODE EITHER — `sfence.vma` REACHES
+### THE MACHINE ONLY THROUGH THE `tlb` REGISTER (STOP)
+
+The ratified fix for the hart-0 half was "at whatever outcome node
+`execute_SFENCE_VMA` actually reaches the machine through (the
+`TlbOp`/flush path — find it), the arm sets
+`tv' := max(tv, own_pub h log)`".  I looked for that node.  **There is
+none**, and the shape of the finding is A6.7(B)'s exactly: the outcome the
+ruling names exists in the INTERFACE and is never emitted by the generated
+model.
+
+Four facts, each checked:
+
+1. **`Interface.TlbOp` EXISTS** — `SailStdpp.ConcurrencyInterface`'s
+   `outcome` has `Barrier`, `CacheOp` and `TlbOp`, and
+   `ConcurrencyInterfaceBuiltins`'s `sail_tlbi` emits
+   `Next (TlbOp op) Ret`.  So the concurrency interface has a first-class
+   TLB-maintenance node.
+2. **`rv64d.v` NEVER EMITS IT.**  `execute_SFENCE_VMA` (`rv64d.v:41179`)
+   is `rX_bits`, `read_reg cur_privilege`, `read_reg mstatus`, a TVM
+   check, and `flush_TLB`.  `flush_TLB` (`rv64d.v:24735`) is
+   `read_reg tlb` (four sites), a `foreach_ZM_up` over the 64 entries,
+   `write_reg tlb` on the matching ones, and three PURE callbacks
+   (`tlb_flush_begin_callback`/`tlb_flush_callback`/`tlb_flush_end_callback`,
+   all `: unit`).  The RISC-V model keeps its TLB in an ARCHITECTURAL
+   REGISTER and does its maintenance by register update; it does not use
+   the interface's TLB node at all.
+3. **KEYING THE DRAIN ON THE `tlb` REGISTER OVER-DRAINS, AND FATALLY.**
+   `translate` (`rv64d.v:25236`) calls `lookup_TLB`, which is
+   `read_reg tlb`.  So EVERY paged access reads that register: a drain
+   there would advance the hart's view to `own_pub` on every S- and
+   U-mode load, store and fetch, i.e. it would make the machine
+   essentially SC once paging is on.  That is not a conservative
+   simplification — a memory model must OVER-approximate the hardware,
+   and a machine with fewer behaviours than the hardware makes every
+   theorem above it unsound.
+4. **KEYING ON THE `tlb` WRITE FAILS IN EXACTLY THE CASE WE NEED.**
+   `flush_TLB` writes the register only for entries that MATCH, so an
+   `sfence.vma` on a hart whose TLB is empty emits no write at all — and
+   hart 0's first `kvminithart` (`main` → `kinit(); kvminit();
+   kvminithart();`, before any translation has ever run) is precisely
+   that case.
+
+**THE INSTRUCTION-ORDER CHECK THE REDIRECT ASKED FOR: xv6 IS FINE, AND
+THAT IS NOT THE PROBLEM.**  `kvminithart()` is
+
+    sfence_vma();                       // "wait for any previous writes
+                                        //  to the page table memory to finish"
+    w_satp(MAKE_SATP(kernel_pagetable));
+    sfence_vma();                       // flush stale entries from the TLB
+
+so the first hardware walk (the fetch of the instruction after the second
+`sfence.vma`, once `satp` is live) happens AFTER both fences.  Had the
+drain a node to sit on, it would have sufficed exactly where the ruling
+expected.  The blocker is the model, not the program.
+
+**WHAT THIS LEAVES, and it needs a ruling.**  A6.37's three options are
+now: (a) EXPORT THE AUTHOR (`ledger_msg_at` + `ledger_read_own_ok`) —
+unchanged, still small, still additive over existing ghosts, and now the
+ONLY one implementable without touching the Sail sources; (b) is a MODEL
+change of the same class as the parked A6.7(B) patch (a `sail_tlbi` call
+in `flush_TLB`, or a new outcome), so adopting it re-opens exactly the
+regeneration cost the overruling was taken to avoid — and note it would
+be a SMALLER patch than A6.7(B)'s and would also give the later
+de-confliction project its `TlbOp` node for free; (c) stays rejected (the
+proof does not edit the program).  **My recommendation flips to (a)**, on
+the ground that (b) is no longer "one arm plus a full rebuild" but a
+model-source change, and that the surface (a) widens is one persistent
+fragment about the log — which the kit already stores, persists at append
+and never exposes.
+
+**AND ONE THING (a) DOES NOT COVER, found while checking the other half.**
+The SECONDARY-hart route needs the flag read to MINT `view_lb h F`, and
+xv6's flag read is `__atomic_load_n(&started, __ATOMIC_ACQUIRE)` — a
+plain `lw` plus a `fence r,rw`, NOT an exclusive read.  `fence_drains`
+correctly declines `r_rw` (no W→R edge), and A6.6(b) mints the receipt
+only at the EXCLUSIVE read and the AMO write, so **nothing on that path
+mints a receipt today**.  The honest fix is inside the existing design:
+`wp_hart_ram_read_plain` already CHOOSES the advanced view `tvn` with the
+view authority open, so it can hand back `view_lb h tvn` in its
+postcondition at no cost, and the flag-read leaf then argues `F ≤ tvn`
+from the VALUE it read (reading `started = 1` at `tvn` when the message
+publishing 1 sits at `F` and the reader is not its author forces
+`tvn ≥ F` — the MP shape).  That is a `HartEvents` statement change plus
+a full rebuild, and it is item 1 of whatever lane picks this up.
+
+### A6.42 THE A6.37 KIT, SECONDARY-HART HALF: LANDED IN `TsoCtx`
+
+The half A6.37 called "fully determined and needs no ruling" is
+implemented and green, exactly as written there:
+
+    phys_ledger_at a dq v t := phys_pointsto a dq v ∗ a ↪[ts_name]{dq} t
+    phys_ledger_at_ledger  : phys_ledger_at a dq v t ⊢ phys_ledger a dq v
+    phys_ledger_of_at      : phys_ledger a dq v ⊢ ∃ t, phys_ledger_at a dq v t
+    phys_ledger_at_forget  : phys_ledger_at a dq v t ⊢ phys_pointsto a dq v
+
+    ledger_read_at_ok `{CID} (g : gstate) a dq v (t F : nat) :
+      (t ≤ F)%nat ->
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      view_lb view_name loglen_name (hart_agent cpu_id) F -∗
+      phys_ledger_at a dq v t -∗
+      ⌜∀ tv', (g.(gtv) cpu_id <= tv')%nat ->
+         tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' a = Some v⌝
+
+    ledger_read_ok `{CID} (g : gstate) a (n : N) {m} (w : bv m) dq (F : nat) :
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      view_lb view_name loglen_name (hart_agent cpu_id) F -∗
+      ([∗ list] j ∈ seq 0 (N.to_nat n),
+         ∃ t, ⌜(t ≤ F)%nat⌝ ∗ phys_ledger_at (pa_add a j) dq (nth_byte w j) t) -∗
+      ⌜∀ tv', (g.(gtv) cpu_id <= tv')%nat ->
+         tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' a n w⌝
+
+TWO THINGS THE SKETCH DID NOT SAY, both decided by the proof:
+
+- **The timestamp is PER BYTE, under ONE receipt.**  `ledger_read_ok`'s
+  premise is `[∗ list] j, ∃ t, ⌜t ≤ F⌝ ∗ …` and not a single `t` for the
+  window, because a page-table page is written slot by slot and a common
+  timestamp would be a false statement.  The receipt is shared; the
+  timestamps are not.
+- **The conclusion's lower bound is `g.(gtv) cpu_id`, not `F`**, i.e. it
+  is `ctx_phys_load_bytes_ok`'s shape character for character — which is
+  what lets a caller feed it to `Mobl_ram_plain` without any arithmetic.
+  The proof is `ctx_phys_load_ok`'s CLEAN arm with `llb_valid` replaced by
+  `view_auth_valid`: `t ≤ F ≤ avf g h = gtv cpu_id ≤ tv'`, then
+  `visibleb_below`.  The DIRTY arm has no counterpart, which is the whole
+  point — a context-free fact cannot own a dirty byte.
+
+`kpt_body`'s `⌜t ≤ B⌝` tie is NOT landed: it is a change to `PtTree`'s
+tiered slot with a mid-tree cascade, and its consumers
+(`KptShare`/`HartSKpt`/`PtTreeAdue`) sit above the frontier, so it is
+written where it can be checked against a real error rather than
+predicted.
+
+### A6.43 `↦ₓ` CARRIES ITS OWN TIMESTAMP NOW — AND THAT IS WHY THE FETCH
+### TIER COST NOTHING ABOVE THE LEAVES
+
+The overruling's real bill lands at the two places a fetch obligation is
+DISCHARGED rather than threaded — `InstrBytes.text_fetch_obl` (the M-mode
+loop's, from `instr_bytes`' persistent window) and `SmodeCorePt`'s S-mode
+twin.  Both held `↦ₓ□` bytes and proved the flat `read_bytes`; neither can
+prove the view-indexed fact, because a flat cell says nothing about what a
+view below the top sees.  Three shapes were available and the third was
+taken:
+
+- thread a `pristine_win` premise from the payer up to the ~135 leaf
+  sites — rejected, it is the whole tree;
+- add the receipt as a conjunct of `instr_bytes` and mint it in
+  `KernelText`'s two intro lemmas — better (≈6 files), but it puts a
+  fetch-specific fact in a fetch-specific predicate and leaves `↦ₓ`
+  itself still unable to pay;
+- **put the DISCARDED timestamp element inside `text_pointsto`** — TAKEN.
+
+      Definition pristine_elem (a : Arch.pa) : iProp Σ := a ↪[ts_name]□ 0%nat.
+
+      text_pointsto va dq v := ∃ ppn, kmap_at (svpn_of va) ppn KP_rx ∗
+        ⌜canonical⌝ ∗ ⌜addr_is_text (pa_of ppn va)⌝ ∗
+        ⌜ktier_pin cur_ktier ppn va⌝ ∗
+        pointsto (pa_of ppn va) dq v ∗
+        pristine_elem (pa_of ppn va)                      (* NEW *)
+
+**WHY THIS IS THE HONEST ONE, not merely the cheap one.**  `↦ₓ` means "a
+kernel-TEXT byte at a `KP_rx` mapping".  DISCARDED at timestamp 0 says two
+things at once — the byte's latest write is the era image (so every agent
+at every view reads it) and no store can ever touch it again (a store must
+UPDATE the element, which a discarded one forbids).  Both are already what
+`↦ₓ` is FOR, so the resource now states its own meaning instead of relying
+on a ruling; W^X over the text region becomes a consequence rather than an
+assumption.
+
+**AND THE PROPAGATION IS THE POINT.**  `kernel_text` is a `big_sepM` of
+`↦ₓ□`; `KernelText.kernel_window_pc` cuts a window out of it;
+`InstrBytes.instr_bytes` holds the window; `wp_instr` hands it to the 135
+leaf sites.  Every one of those is TEXTUALLY UNCHANGED, and
+`text_fetch_obl`'s PREMISE is character for character what it was — only
+its conclusion moved.  The whole change is:
+
+  - `RiscvPtsto`: the definition, `pristine_elem` + its two instances, and
+    the six destructuring patterns inside the file; `text_pointsto_acc`
+    and `text_pointsto_pin` EXPOSE the element (persistent, so their
+    give-back wands are unchanged);
+  - `HartLift2`: `text_byte_phys_pristine` (one `↦ₓ□` byte → a
+    `phys_pointsto` plus a `TsoCtx.pristine_byte`, through the KT0 pin) and
+    `text_tso_read_bytes`, the TSO twin of `text_read_bytes`, whose
+    conclusion is `∀ agent, ∀ view` — no premise about either;
+  - `InstrBytes.text_fetch_obl`: restated at `HartMFetch.fobl_ram`,
+    discharged by the above through the A6.1a bridge;
+  - `TrampText.tramp_text_mint`: the element travels with the byte (the
+    KT1 va and the KT0 identity address name the same physical byte);
+  - `KMap.phys_ident_text` and `BootCarve.boot_text_persist`: the ONE new
+    obligation, at the one place `↦ₓ` is born from raw memory.  Its
+    supplier is the era's initial-state ghost allocation — the same place
+    `kernel_data_intro`'s `pristine_va` premise comes from — and its two
+    callers (`BootShared`, `RiscvAdequacy`) were already red, so the
+    change turned NO green file red.
+
+**THE BINDER TRAP FIRED, AND `pristine_elem` IS THE FIX.**  Spelling the
+element inline as `pa ↪[ts_name]□ 0%nat` inside `KMap.v` — a file that
+imports `SailStdpp.Base` — fails with `Could not find an instance for
+?EqDecision0 : EqDecision (mword 64)`: the Sail key instances elaborate a
+fresh binder that will not unify with the stdpp-keyed ghost map.  Same
+trap, same fix as `TsoMemPa.bytemap` (A6.38): give the thing a NAME whose
+argument type is `Arch.pa`, and use the name everywhere.
+
+**ONE MORE SCRIPT FINDING, cheap and repeated.**  A blind
+`sed`/`str.replace` of an `iDestruct` pattern like
+`"(Hk1 & _ & _ & _ & Hp1)"` hits `mem_pointsto`'s and `text_pointsto`'s
+sites alike — they have the SAME arity — and the resulting failure
+(`iAndDestructChoice: cannot destruct (pointsto …)`) names a line
+hundreds above the edit.  Count the occurrences before replacing, and
+check every one against the `rewrite /..._pointsto` on the line above it.
+
+### A6.44 THE PT-READ LANE IS THREADED, AND THE DISCHARGE IS THE ONE
+### DESIGN ITEM LEFT IN IT
+
+`PtTreeAdue`'s two non-exclusive PTE reads (`swp_checked_mem_read_pte8`
+and its predicate-indexed twin) take `swp_hart_ram_read_plain` at
+`mread_req8` / `Read_plain`, and their obligation is
+`fobl_ram img log tv pa 8 bytes` — threaded, not discharged, exactly as
+`HartMLoad` threads `robl_ram`.  The `Read_ttw` request twins and their
+`hread_*` lemmas are deleted with the patch.  The EXCLUSIVE twin (the A/D
+write-back's `read_pte_exclusive`, `res = true`) is untouched: it still
+reads at the top and still mints its receipt.
+
+So the kernel-PT read story is now a single named hole at the far end:
+whoever OWNS a kernel-PT slot (`KptShare`'s `kpt_body`, `HartSKpt`'s walk
+lemmas) must pay `fobl_ram` from A6.42's `ledger_read_ok` — which needs
+the `⌜t ≤ B⌝` tie in the slot and a `view_lb` receipt on the reading hart.
+For a secondary hart that receipt is the boot MP one (A6.41 records that
+the flag read does not mint it yet); for hart 0 it is A6.41's open ruling.
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
@@ -3009,3 +3346,25 @@ number is not merely optimistic, it is meaningless.**
 
 Steps 1–4 are this session's target; 5–6 are the standing red tail the
 tso branch exists to carry, worked file-by-file after.
+
+## A6.39 — OWNER-RATIFIED (2026-08-26): the lock kit's designated
+fallback at the real semantics is the parked-record + absorb idiom
+
+When this workspace's step-5 tail reaches the lock tier (WpLock
+internals, SpecAcquire/SpecRelease/ProofAcquire against the real
+machine), the plan of record for the acquire-side payload transport is
+still the twin's `ctx_dom_of_parked` at the AMO's at-the-top evidence.
+**If that mint fights the real interp at the lock leaves, do not
+wrestle it**: the owner has ratified the convergence of the lock kit
+onto the parked-record idiom — `lock_inv`'s free arm holds
+`∃ ξ T, ctx_parked ξ T ∗ R ξ`, release = `ctx_deposit` at
+`T' ≤ t_release`, acquire = `ctx_absorb` from the AMO receipt, token
+travels with the holder — which makes the acquire transport
+INTERP-FREE and unifies the tree on one transfer algebra (deposit at
+publish points, absorb at claim points).  Full statement, the
+evidence-tie subtlety (`T ≤ t_release`, load-bearing only for
+non-draining acquire paths like a plain-load TTAS spin), and the
+expected client-file invariance:
+`claude-notes/projects/tso-absorb-memo.md` §12.  Either way it is its
+own tranche against a green main tree, with the bcache escrow as the
+worked precedent.

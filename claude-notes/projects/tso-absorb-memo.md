@@ -289,3 +289,58 @@ Both are cheap and neither can crawl.
 After the ruling lands, `ProofForkretPark.forkret_park_paid`'s six deposit rows are all payable, and §0.16′'s step (ii) — threading the parker's `own_context` through `ParkCap.park_cap` / `forkret_park_paid_body`, with the hart ∀-quantified beside the context and the package's `▷` on its closer row alone — is the re-derivable remainder (built, measured, reverted; the shape is recorded verbatim at §0.16′ step (ii)). `SystemAdequacy`'s eight-hart fan-out closes on member 2. That is the whole red list.
 
 **Two owner decisions:** (1) adopt the parked-record idiom and `ctx_absorb` as a sealed-surface law (§1, twinned in §2); (2) name `started_inv`'s deposit context rather than ∃-closing it (§5). Everything else in this memo is mechanical and counted.
+
+---
+
+## 12. OWNER-RATIFIED DIRECTION (2026-08-26): the lock kit converges on this idiom
+
+Ratified by the owner in conversation, recorded here because this memo
+is where the relationship was first observed (§2: "absorb is
+`twin_resume` generalised from a whole token to a single payload, and
+it sits one strict notch below the mint it generalises" — the mint
+being the lock kit's `ctx_dom_of_parked`).
+
+**The conversion.**  The spinlock's `lock_inv` free arm becomes the
+parked-record idiom: `∃ ξ T, ctx_parked ξ T ∗ R ξ` in place of
+`∃ ξ, R ξ`.  Release = `ctx_deposit` (already its moral content —
+`ctx_dom_to_parked` is deposit's ancestor), with the deposited stamp
+`T' ≤ t_release` (the log position of the release store; the payload's
+timestamps all precede it, so `T' :=` log length at deposit time
+works).  Acquire = `ctx_absorb`, its `hart_view_lb K ∗ ⌜T ≤ K⌝`
+premise discharged from the AMO receipt (`SpecAcquire` already exports
+`∃ K, hart_view_lb K`; the AMO drains to top ≥ any stamp).  Unlike the
+escrow's unbounded claim, a lock transfer is EXCLUSIVE: the free arm
+flips to held at acquire, so the token travels with the holder (or
+sits in the held arm — implementer's pick, record which) and is
+re-deposited at release, stamp ratcheting.
+
+**What it buys.**  The acquire-side transport becomes INTERP-FREE:
+`ctx_dom_of_parked` — the one lock-leaf step that reaches into the
+state interpretation for at-the-top evidence — collapses into
+"receipt + absorb", the same stable-pair premise as the escrow, the
+boot deposit, and resume.  One transfer algebra tree-wide: deposit at
+publish points, absorb at claim points; `ctx_dom` retreats to an
+internal construction detail.  Exported statements (`is_lock`,
+`SpecAcquire`/`SpecRelease` shapes) should not move — the ~180 client
+files are expected untouched.
+
+**The evidence tie, stated carefully.**  `T ≤ t_release`, NOT
+equality, and today it is stronger than needed (the AMO's top
+dominates every stamp).  It becomes load-bearing exactly when an
+acquire path does NOT drain to top — a plain-load
+test-and-test-and-set spin before the AMO, or any future acquire-like
+pattern built from plain loads + the MP argument.  That is the same
+message-passing shape as the boot `started` flag and the kernel-PT
+publication: the lock bit IS the flag.
+
+**When.**  Its own tranche, AFTER the absorb implementation lands and
+the main tree is green — it is a simplification, not a blocker, best
+done against a green tree with the escrow as the worked precedent.
+**AND: this is the DESIGNATED FALLBACK if the spinlock re-proof
+against the real Ztso semantics (the flip workspace's WpLock/
+SpecAcquire/ProofAcquire tier) hits trouble with the current
+`ctx_dom_of_parked` route** — the owner flagged that case explicitly.
+If the at-the-top mint fights the real interp at the lock leaves, do
+not wrestle it: convert to the parked-record idiom per this section
+instead, and the acquire leaf's only ghost obligation becomes the
+receipt it already holds.
