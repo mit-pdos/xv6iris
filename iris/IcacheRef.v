@@ -1605,21 +1605,6 @@ Section IcacheLink.
     exact Heq.
   Qed.
 
-  (* the flavour-indexed reading: EVERY flavour forces the SUM up, which is
-     (L1)'s side of the widening and the only thing a spender needs. *)
-  Lemma link_wsum_ge (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
-      (r : nat) (p : option (dfrac_agreeR (leibnizO Z)))
-      (fl : option (option Z)) (f : frzUR) (rc : nat) :
-    link_auth z wl wdu wdt g c r p f rc -∗ ilink_fl fl z -∗
-    ⌜(1 <= wl + wdu + wdt)%nat⌝.
-  Proof.
-    iIntros "Ha Hb". destruct fl as [[pv |] |]; cbn.
-    - iDestruct "Hb" as "[Hb _]".
-      iDestruct (link_wdt_ge with "Ha Hb") as %[H _]. iPureIntro. lia.
-    - iDestruct (link_wd_ge with "Ha Hb") as %H. iPureIntro. lia.
-    - iDestruct (link_w_ge with "Ha Hb") as %H. iPureIntro. lia.
-  Qed.
-
   Lemma link_r_ge (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
       (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat) :
     link_auth z wl wdu wdt g c r p f rc -∗ iref_lic z -∗ ⌜(1 <= r)%nat⌝.

@@ -303,7 +303,7 @@ Section DirLinks.
      A sixteen-bit [++] wraps only at 65535, where it lands at ZERO -- so
      an increment whose result is known nonzero did not wrap, and the
      lower clause's EXACT [+1] is free.  The nonzero fact is the flush's
-     own read-back ([IregLinkNz.ireg_link_nz] at the bumped record). *)
+     own read-back ([IregLinkNz.ireg_tok_nz] at the bumped record). *)
   Lemma dlc_bv_add1_nz_eq (h : mword 16) :
     bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <> 0 ->
     bv_unsigned (add_vec h (mword_of_int 1 : mword 16))
@@ -1089,7 +1089,7 @@ Section DirLinks.
      needs the exact [+1] -- an [<=] would let the wrap under the clause.
      The caller derives it from the machine's [++] plus the flush's own
      nonzero read-back ([dlc_bv_add1_nz_eq]; the read-back is
-     [IregLinkNz.ireg_link_nz] at the bumped record, which create's site
+     [IregLinkNz.ireg_tok_nz] at the bumped record, which create's site
      already fires for [dir_orphan_clean]) -- still no (L4) and no kernel
      guard.
 

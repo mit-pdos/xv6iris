@@ -1016,7 +1016,7 @@ Section ProofSysLinkTails.
   (*  another thread may hold the sleeplock in between.  The nonzero      *)
   (*  count [wp_iupdate_unlink]'s Z premise needs therefore cannot come   *)
   (*  from the walk; it comes from the FRAGMENT, through (L1), by         *)
-  (*  [IregLinkNz.ireg_link_nz].  That is the whole reason the ledger     *)
+  (*  [IregLinkNz.ireg_tok_nz].  That is the whole reason the token       *)
   (*  exists, exercised here for the first time.                          *)
   (*                                                                     *)
   (*  (2) THE RECEIPT GOES THROUGH THE LEFT DISJUNCT.  The nlink <> 0     *)
@@ -1239,11 +1239,11 @@ Section ProofSysLinkTails.
       as %Htyshot.
     assert (Hnotdir : bv_unsigned (di_type dn) <> T_DIR_z)
       by (rewrite <- Htyshot; exact Hncd).
-    (* THE LEDGER'S OWN FACT: the fragment forces (L1)'s lower bound at the
-       record this arm is about to lower.  Nothing in the WALK can say it. *)
+    (* THE COUNTING RA's OWN FACT: the token this arm is about to spend
+       bounds the record's count below.  Nothing in the WALK can say it. *)
     iApply fupd_wp.
-    iMod (ireg_link_nz ⊤ gi gfs inodestart nib inum dn ltac:(solve_ndisj) Hinb
-            with "Hireg Hdiat Hilink") as "(%Hnz & Hdiat & Hilink)".
+    iMod (ireg_tok_nz ⊤ gi gfs inodestart nib inum dn ltac:(solve_ndisj) Hinb
+            with "Hireg Hdiat Htoken") as "(%Hnz & Hdiat & Htoken)".
     iModIntro.
     (* ===== +0xfa lhu a5,74(s1) ===== *)
     iApply (wp_lhu_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0xfa)) Ra5 Rs1

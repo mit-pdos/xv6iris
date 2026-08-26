@@ -1846,7 +1846,7 @@ Qed.
    exactly one.  The EXACT increment on the left is forced -- an [<=]
    would let the sixteen-bit wrap (65535 -> 0) under the clause -- and
    the caller has it from the flush's own nonzero read-back
-   ([IregLinkNz.ireg_link_nz]): a [++] that lands nonzero did not wrap. *)
+   ([IregLinkNz.ireg_tok_nz]): a [++] that lands nonzero did not wrap. *)
 Lemma dlc_lower_bump (F G : nat -> bool) (dn dn' : dinode)
     (data data' : nat -> list (bv 8)) :
   bv_unsigned (di_nlink dn) <> 0 ->

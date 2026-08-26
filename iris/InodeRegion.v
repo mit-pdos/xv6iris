@@ -87,12 +87,14 @@
                           go through the ordinary flush at all.
 
    THE LEDGER'S CLAUSES ARE (L1) AND (L3), stated in [ireg_link_ok] below
-   and re-established by all six arm moves.  Their payoff is two lines:
-   [ireg_link_ok_alloc] ("an outstanding fragment means an ALLOCATED
-   record") and [EscrowDeposit.ireg_free_deposit_au]'s own [w = 0] ("at the instant an inode is
-   freed nothing names it").  [ireg_link_alloc] at the end of the file is
-   the accessor that cashes the first for a caller holding the inum's
-   dinode block.  What is still NOT stated is §20.2's (L2) and the
+   and re-established by all six arm moves.  Since durable-disk lane G's
+   slice 6b their ONE remaining payoff is [ireg_link_ok_free] ("at the
+   instant an inode is freed nothing names it"), which is what makes the
+   claim mover's collapse of the [wl+wdu+wdt] sum legal; the old
+   [ireg_link_ok_alloc] / [ireg_link_alloc] pair ("an outstanding fragment
+   means an ALLOCATED record") is gone, its readings now taken off the
+   counting RA ([ireg_lnk_tok_nz], [IgetLic]'s licence (a),
+   [IregLinkNz.ireg_tok_nz]).  What is still NOT stated is §20.2's (L2) and the
    [c = None] half of (L3): nothing mints an [iclaim] yet, and the free
    cannot re-establish [c = None] without consuming one -- see
    [EscrowDeposit.ireg_free_deposit_au]'s note and design §20.15.
@@ -1156,7 +1158,7 @@ Definition ireg_root : Z := 1.
 
    WHY IT IS A SEPARATE CONJUNCT AND NOT A FOURTH CLAUSE OF [ireg_link_ok].
    That predicate has consumers all over the tree reading it BY PROJECTION
-   ([ireg_link_ok_alloc] / [_short] / [_free] and eleven destructurings in
+   ([ireg_link_ok_short] / [_free] and eleven destructurings in
    this file), and a fourth conjunct moves every one of them.  Stated
    beside, the widening costs the six movers an arithmetic rewrite
    ([ireg_link_ok] is applied at [wl + wd] and is ITSELF UNCHANGED)
@@ -1671,16 +1673,6 @@ Section InodeRegion.
     /\ (bv_unsigned (di_type d) = 0 -> bv_unsigned (di_nlink d) = 0)  (* L3 *)
     /\ bv_unsigned (di_nlink d) <= 32767                              (* L4 *)
     /\ ireg_ty_ok d.                                                  (* L5 *)
-
-  (* (L1)'s contrapositive, and the reason the ledger exists: a record with
-     an outstanding fragment is ALLOCATED.  Pure, so that every arm move
-     and every consumer reads it off the clause the same way. *)
-  Lemma ireg_link_ok_alloc (d : dinode) (w : nat) :
-    ireg_link_ok d w -> (1 <= w)%nat -> bv_unsigned (di_type d) <> 0.
-  Proof.
-    intros [Hle [Hz _]] Hw H0. specialize (Hz H0).
-    rewrite Hz in Hle. cbn in Hle. lia.
-  Qed.
 
   (* (L4) read off without destructuring three ways -- the one clause a
      WRITER needs and the two above do not mention. *)
@@ -2216,17 +2208,6 @@ Section InodeRegion.
   Proof.
     rewrite /ireg_rcol. iIntros "(%rc & Hla & _) Hb".
     iApply (link_wdt_ge with "Hla Hb").
-  Qed.
-
-  Lemma ireg_rcol_wsum_ge (z : Z) (wl wdu wdt g : nat)
-      (c : ctyUR) (r : nat)
-      (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat)
-      (d : dinode) (fl : option (option Z)) :
-    ireg_rcol z wl wdu wdt g c r p f n d -∗ ilink_fl fl z -∗
-    ⌜(1 <= wl + wdu + wdt)%nat⌝.
-  Proof.
-    rewrite /ireg_rcol. iIntros "(%rc & Hla & _) Hb".
-    iApply (link_wsum_ge with "Hla Hb").
   Qed.
 
   Lemma ireg_rcol_claim_agree (z : Z) (wl wdu wdt g : nat)
@@ -5942,99 +5923,12 @@ Section InodeRegion.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  §20.2's PAYOFF: A NAMED INUM IS AN ALLOCATED INUM                   *)
-  (* ------------------------------------------------------------------ *)
-
-  (* [ilink z] ==> [w >= 1] ([link_w_ge]) ==> (L1) [di_nlink >= 1] ==> (L3,
-     contrapositive) [di_type <> 0] -- ALLOCATED.  [ireg_link_ok_alloc] is
-     that chain, pure; this is its ACCESSOR, and its shape is forced.
-
-     The fact is about a record the caller does NOT hold a fragment for --
-     that is the whole point, since the fragment for a named inum is
-     wherever that inum's owner put it -- so the caller cannot name the
-     record through [dinode_at].  The one thing that CAN name it is the
-     dinode block's machinery half, which pins the region's parked bytes:
-     [ireg_read_blk]'s credential.  So the caller is between a [bread] and
-     a [brelse] of the inum's own block, decodes the list, and learns the
-     type of the slot the arithmetic lands on.
-
-     Mask-preserving: nothing moves but the reading, and the fragment goes
-     straight back (§20.4's "borrowed, not consumed" -- a licence that a
-     directory's payload owns has to return at its holder's iunlock). *)
-  Lemma ireg_link_alloc (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32)
-      (b : Z) (bsl : list (bv 8)) :
-    ↑iregN ⊆ E ->
-    (* see [ireg_read] (durable-disk 1c-flip step 3) *)
-    ↑logN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    b = IBLOCK inum inodestart ->
-    ireg_inv γi γfs inodestart nib -∗
-    ilink (bv_unsigned inum) -∗
-    (b ↪[fs_cache γfs]{#(1/2)} bsl) ={E}=∗
-    ⌜exists ds : list dinode,
-       diblk_wf ds /\ bsl = diblk_bytes ds /\
-       bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝ ∗
-    ilink (bv_unsigned inum) ∗
-    (b ↪[fs_cache γfs]{#(1/2)} bsl).
-  Proof.
-    iIntros (HE HEl Hin Hb) "#Hinv Hfrag Hhalf".
-    pose proof (islot_lt inum) as Hsl.
-    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
-                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iDestruct "Hrb" as (home) "#Hbinv".
-    assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
-      by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
-    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
-    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
-                with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hrec & >Hsls)".
-    iDestruct (ireg_recs_to_blk γfs inodestart (ireg_bi inum) ds Hwf
-                with "Hrec") as "Hfsb".
-    rewrite -(ireg_bi_iblock inum inodestart) -Hb.
-    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
-            b (diblk_bytes ds) bsl HlogI with "Hbinv Hfsb Hhalf")
-      as "(%Hbytes & Hfsb & Hhalf)".
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
-                with "Hsls") as "[Hslot Hslback]".
-    iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
-    iDestruct (ireg_rcol_w_ge with "Hla Hfrag") as %Hw1.
-    assert (Hws : (1 <= wl + wdu + wdt)%nat) by lia.
-    assert (Hnz : bv_unsigned (di_type (ds !!! islot inum)) <> 0)
-      by exact (ireg_link_ok_alloc (ds !!! islot inum) _ Hlok Hws).
-    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
-    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
-    { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
-      iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      rewrite (ireg_bi_iblock inum inodestart) in Hb.
-      rewrite Hb. iSplitL "Hfsb";
-        [iApply (ireg_recs_of_blk γfs inodestart (ireg_bi inum) ds Hwf
-                   with "Hfsb") |].
-      iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
-      rewrite Hkey.
-      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
-    iModIntro. iFrame "Hfrag Hhalf". iPureIntro.
-    exists ds. split; [exact Hwf | split; [exact Hbytes | exact Hnz]].
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
   (*  §20.8's ORPHAN COLOUR: THE FREE MINT                                *)
   (*     design: fs-icache.md §20.18 ruling 2                             *)
   (* ------------------------------------------------------------------ *)
 
-  (* [ireg_link_alloc]'s shape with the BLOCK HALF removed: it reads
-     nothing, so it needs no [fs_cache] credential and no [ds], and it takes no
-     fragment in.  Mask-preserving, like every other ledger move (§20.2:
+  (* THE FREE MINT: it reads nothing, so it needs no [fs_cache]
+     credential and no [ds], and it takes no fragment in.  Mask-preserving, like every other ledger move (§20.2:
      the update is purely ghost, so it threads through no contract and a
      caller may fire it at any point in its own proof).
 

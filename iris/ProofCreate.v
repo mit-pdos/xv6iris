@@ -9499,7 +9499,7 @@ Section ProofCreateMain.
              ([dlc_lower] rides in the payload), and the only honest
              source of "the [++] did not wrap" is the flush's own nonzero
              read-back -- so the deposit fires three instructions below,
-             right after [ireg_link_nz_fl], with the record and the
+             right after [ireg_tok_nz], with the record and the
              ticket both still in hand.  Nothing in between touches
              either. *)
           (* ===== +0x13e c.mv a0,s1 ================================= *)
@@ -9617,24 +9617,24 @@ Section ProofCreateMain.
           iIntros (CIDh7 Hsh7 mmt)
             "%Hcsmt Hcg Hcnt Hpc Hppid Hidev Hiinum Hmeta Hmap Hsbi Hdiat
              Hilinkd Htokend Hpin Hbs2 Hop".
-          (* (L1) AT THE BUMPED RECORD, and it has to be taken HERE: the
-             [ilink] the flush just minted is the only witness, and three
-             lines below it is spent into the child's [".."] ticket.  It is
-             what the complement dot clause needs at the re-park -- the
-             [++] is the one create site where [dir_orphan_clean] is not
-             free, because [nlink + 1 = 0] is a wrap the NLINK_MAX guard
-             (a SIGNED test) does not exclude and no pure fact in this walk
-             rules out.  [IregLinkNz.ireg_link_nz] is mask-preserving and
-             hands everything back. *)
+          (* THE COUNT'S LOWER BOUND AT THE BUMPED RECORD, and it has to be
+             taken HERE: the [link_tok] the flush just minted is the only
+             witness, and three lines below it is spent into the child's
+             [".."] entry.  It is what the complement dot clause needs at
+             the re-park -- the [++] is the one create site where
+             [dir_orphan_clean] is not free, because [nlink + 1 = 0] is a
+             wrap the NLINK_MAX guard (a SIGNED test) does not exclude and
+             no pure fact in this walk rules out.
+             [IregLinkNz.ireg_tok_nz] is mask-preserving and hands
+             everything back. *)
           iApply fupd_wp.
-          iMod (ireg_link_nz_fl ⊤ γi γfs inodestart nib dind
+          iMod (ireg_tok_nz ⊤ γi γfs inodestart nib dind
                   (cr_setf dp3 (di_major dp3) (di_minor dp3)
                      (add_vec (di_nlink dp3 : mword 16)
                         (mword_of_int 1 : mword 16)))
-                  (Some None)
                   ltac:(solve_ndisj) Hdib
-                  with "Hiregi Hdiat Hilinkd")
-            as "(%Hmtnz & Hdiat & Hilinkd)".
+                  with "Hiregi Hdiat Htokend")
+            as "(%Hmtnz & Hdiat & Htokend)".
           iModIntro.
           (* THE FUSED DEPOSIT, DEFERRED TO HERE (see the note at +0x13a):
              the read-back [Hmtnz] is what turns the machine's [++] into

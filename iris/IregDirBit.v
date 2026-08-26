@@ -10,7 +10,7 @@
     and it is the clause the widened ledger's [wd] component buys
     (S7-unlink FINDING 3, V1; [IcacheRef.ilinkd]).  A caller that holds an
     [ilinkd] wants the fact read off the record IT names, i.e. off its own
-    [dinode_at γi inum dn], which is exactly [IregLinkNz.ireg_link_nz]'s
+    [dinode_at γi inum dn], which is exactly [IregLinkNz.ireg_tok_nz]'s
     position one clause across.  This file is that lemma with (L1) replaced
     by (T1), and it is deliberately its structural copy: same premises, same
     opening, same re-park, one different pure step.
@@ -25,13 +25,13 @@
     records can exist at all.
 
     MASK-PRESERVING, AND EVERYTHING GOES BACK.  The fragment is BORROWED,
-    exactly as [ireg_link_nz] and [InodeRegion.ireg_link_alloc] borrow
+    exactly as [IregLinkNz.ireg_tok_nz] borrows
     theirs: a holder still has to spend it at the flush the fact licences,
     and a payload that owns a licence has to return it at its holder's
     iunlock.
 
     HOME.  It belongs in [InodeRegion.v]; it is here for
-    [IregLinkNz.ireg_link_nz]'s reason -- that file sits under ~350
+    [IregLinkNz.ireg_tok_nz]'s reason -- that file sits under ~350
     dependents and an additive lemma inside it costs that cone on every
     iteration (durable-notes, "the rebuild cone is the dev-loop cost").
     Fold both leaves back at a milestone. *)

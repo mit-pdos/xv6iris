@@ -261,7 +261,7 @@ Section IgetLic.
 
   (*  STANDING CONSTRAINT (§7.1.4, the [ProofCreateFreshTy.v] header's test).
       Every reading below is an ACCESSOR OVER [ireg_inv], in
-      [IregLinkNz.ireg_link_nz]'s shape: it opens the region, reads the
+      [IregLinkNz.ireg_tok_nz]'s shape: it opens the region, reads the
       ledger's own clauses at the slot the caller's [dinode_at] names, and
       hands everything back.  A free-standing entailment
 
@@ -279,7 +279,7 @@ Section IgetLic.
   (*  [link_tok Γ z] ⇒ [1 <= nlink] ([InodeRegion.ireg_lnk_tok_nz], which is
       the RA's law [link_auth_toks_le] read at the authority the region
       parks at THIS inum's slot) ⇒ (L3)'s contrapositive [di_type <> 0].
-      Everything is borrowed and returned, exactly as [ireg_link_nz] borrows
+      Everything is borrowed and returned, exactly as [ireg_tok_nz] borrows
       it; the opening is mask-preserving.  The (L3) step is why this is not
       simply the RA law plus a corollary: (L3) is a clause of [ireg_slot]
       and can only be read INSIDE the opening -- and so, now, is the

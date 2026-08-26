@@ -6,22 +6,20 @@
 
 (*  WHY THIS FILE EXISTS.
 
-    [InodeRegion.ireg_link_alloc] is §20.2's payoff at a record the caller
-    can NOT name -- it reads the type of a slot out of the dinode block's
-    machinery half, because the fragment for a NAMED inum lives wherever
-    that inum's owner put it.  A caller that spends its OWN fragment is in
-    the opposite position: it holds [dinode_at γi inum dn] and wants (L1)
-    read off THAT record.
+    A caller that is about to spend a link unit holds [dinode_at γi inum
+    dn] and wants "this record's count is not already zero" read off THAT
+    record.
 
     That is what a [nlink--] needs.  [SpecIupdate.wp_iupdate_unlink] takes
     the Z equation "the OLD count is the new one plus one", and the only
     honest source of its side condition -- the count it is about to lower
-    is not already zero -- is the fragment being spent: (L1) says
-    [w <= di_nlink], the fragment says [1 <= w].  Nothing in the WALK can
-    supply it, because the record a re-[ilock] returns is a fresh
+    is not already zero -- is the unit being spent: the counting RA says
+    "an outstanding [FsStateLink.link_tok] at [z] bounds [z]'s own
+    [di_nlink] below" ([InodeRegion.ireg_lnk_tok_nz]).  Nothing in the
+    WALK can supply it, because the record a re-[ilock] returns is a fresh
     existential: sys_link's [bad:] arm unlocks [ip] at +0x6c and re-locks
     it at +0xe8, and between those two another thread may hold the sleep
-    lock.  The ledger is what crosses that window, and this is the
+    lock.  The token is what crosses that window, and [ireg_tok_nz] is the
     accessor that reads it.
 
     [dir_links_nlink_drop] is the resource consequence at the same record.
@@ -62,22 +60,35 @@ Section IregLinkNz.
   Context `{ICFG : icfg}.
 
   (* ------------------------------------------------------------------ *)
-  (*  (L1) AT A RECORD THE CALLER NAMES                                   *)
+  (*  "A HELD TOKEN MEANS A NONZERO COUNT", AT A RECORD THE CALLER NAMES  *)
   (* ------------------------------------------------------------------ *)
 
-  (* [ilink z] ==> [1 <= w] ([IcacheRef.link_w_ge]) ==> (L1) [1 <= nlink].
-     Mask-preserving, and everything goes back: the fragment is BORROWED,
-     exactly as [ireg_link_alloc] borrows it, because the caller still has
-     to spend it at the flush this fact licences. *)
-  Lemma ireg_link_nz (E : coPset) (γi : gname) (γfs : fs_names)
+  (* THE COUNTING RA's READING, and it REPLACES the old ledger's (durable-
+     disk lane G, slice 6b).  This used to be [ireg_link_nz] / [_fl]: an
+     [IcacheRef.ilink] (resp. [ilink_fl]) bounded the ledger's [wl+wdu+wdt]
+     below, and (L1) turned that into [1 <= di_nlink].  The same fact off
+     the counting RA is [InodeRegion.ireg_lnk_tok_nz] -- one outstanding
+     [FsStateLink.link_tok] at [z] bounds [z]'s own [di_nlink] below, by
+     the RA's own law -- and it is FLAVOUR-BLIND, so the two old spellings
+     collapse into this one.  Every walk that used to present a colour
+     already holds the token beside it ([SpecIupdate.wp_iupdate_link] pays
+     both out and [_unlink] takes the token back), so no caller gained a
+     premise.
+
+     Mask-preserving, and everything goes back: the token is BORROWED,
+     exactly as the fragment was, because the caller still has to spend it
+     at the flush this fact licences ([ireg_tok_root_min2] below borrows
+     its token the same way). *)
+  Lemma ireg_tok_nz (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    ilink (bv_unsigned inum) ={E}=∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) ={E}=∗
     ⌜bv_unsigned (di_nlink dn) <> 0⌝ ∗
-    dinode_at γi inum dn ∗ ilink (bv_unsigned inum).
+    dinode_at γi inum dn ∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum).
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hfrag".
     pose proof (islot_lt inum) as Hsl.
@@ -95,16 +106,13 @@ Section IregLinkNz.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
-    iDestruct (ireg_rcol_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
     { specialize (Hcp (islot inum) Hsl).
       rewrite -ireg_key_split in Hcp. congruence. }
-    (* (L1), read at the caller's own record *)
-    assert (Hnz : bv_unsigned (di_nlink dn) <> 0).
-    { rewrite -Hdeq. pose proof (di_nlink_nonneg (ds !!! islot inum)) as Hnn.
-      destruct Hlok as [Hle _]. lia. }
+    iDestruct (ireg_lnk_tok_nz with "Hlnk Hfrag") as %Hnz0.
+    rewrite Hdeq in Hnz0.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
     iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
@@ -118,7 +126,7 @@ Section IregLinkNz.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
-    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz0.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -176,63 +184,6 @@ Section IregLinkNz.
     iDestruct (ireg_boot_open_excl with "Hboot Hopen") as %[].
   Qed.
 
-  (* ...AND ITS FLAVOURED FORM.  After V4's flip create's [dp->nlink++]
-     mints [ilinkd], and the read-back the fused deposit needs
-     ([DirLinks.dlc_bv_add1_nz_eq]'s nonzero premise) is this same fact
-     off the d-flavoured unit.  Any flavour bounds the SUM below, and
-     (L1) does the rest. *)
-  Lemma ireg_link_nz_fl (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
-      (fl : option (option Z)) :
-    ↑iregN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    ireg_inv γi γfs inodestart nib -∗
-    dinode_at γi inum dn -∗
-    ilink_fl fl (bv_unsigned inum) ={E}=∗
-    ⌜bv_unsigned (di_nlink dn) <> 0⌝ ∗
-    dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum).
-  Proof.
-    iIntros (HE Hin) "#Hinv Hdn Hfrag".
-    pose proof (islot_lt inum) as Hsl.
-    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
-                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
-    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
-    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
-                with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
-                with "Hsls") as "[Hslot Hslback]".
-    iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
-    iDestruct (ireg_rcol_wsum_ge with "Hla Hfrag") as %Hw1.
-    rewrite /dinode_at.
-    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
-    assert (Hdeq : ds !!! islot inum = dn).
-    { specialize (Hcp (islot inum) Hsl).
-      rewrite -ireg_key_split in Hcp. congruence. }
-    assert (Hnz : bv_unsigned (di_nlink dn) <> 0).
-    { rewrite -Hdeq. pose proof (di_nlink_nonneg (ds !!! islot inum)) as Hnn.
-      destruct Hlok as [Hle _]. lia. }
-    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
-    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
-    { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
-      iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      iSplitL "Hfsb"; [iExact "Hfsb" |].
-      iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
-      rewrite Hkey.
-      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
-    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
-  Qed.
-
   (* THE ROOT'S MINIMUM AT A HELD TOKEN (S7-unlink's dir arm, (D1) step 2):
      the region's unspendable keep-alive token plus ANY token the caller
      holds put the root's count at TWO or more -- so a directory whose count
@@ -242,7 +193,7 @@ Section IregLinkNz.
 
      The content is [InodeRegion.ireg_lnk_root_min2], read at the slot's own
      [ireg_lnk]; this is its ACCESSOR, and the token is BORROWED and handed
-     straight back, exactly as [ireg_link_nz] borrows its unit -- the caller
+     straight back, exactly as [ireg_tok_nz] borrows its token -- the caller
      still has to spend it at the [nlink--] this refutation licences. *)
   Lemma ireg_tok_root_min2 (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :

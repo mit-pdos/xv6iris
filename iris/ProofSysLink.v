@@ -1846,7 +1846,7 @@ Section ProofSysLinkBody.
                              [nlink] conjunct, and this walk holds no [ilink]
                              for [ip] -- [namei]'s licence is borrowed and
                              returned at the iget (IgetLic §7.1.6), so
-                             [IregLinkNz.ireg_link_nz] has no fragment to read.
+                             [IregLinkNz.ireg_tok_nz] has no fragment to read.
                              [Hfrz] is [ip]'s own freeze token, handed over by
                              the [ilock(ip)] at +0x4a: A-custody puts it on the
                              payload's path and [SpecIlock]'s post now surfaces

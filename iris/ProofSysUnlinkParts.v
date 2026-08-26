@@ -754,7 +754,7 @@ Qed.
    Z one: the OLD count is the new one plus one.  Sound at BOTH flushes
    because the [blez] at +0x7c is walked before either -- for [ip] the
    count is literally the one the guard tested, and for [dp] it is the one
-   [IregLinkNz.ireg_link_nz] reads off the [ilink] the ".." record's ticket
+   [IregLinkNz.ireg_tok_nz] reads off the [ilink] the ".." record's ticket
    supplies. *)
 Lemma su_nlink_decr (h : mword 16) :
   bv_unsigned h <> 0%Z ->
