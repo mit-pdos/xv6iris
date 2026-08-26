@@ -1438,6 +1438,50 @@ Proof.
   right. exact (proj2 (fs_used_set_elem P sb u b Hus) Hin).
 Qed.
 
+(* ---- 11c'. THE THREE DIRECTORY CLAUSES AT AN IMAGE NODE
+       (durable-disk lane E-clauses) --------------------------------------
+
+    [FsDurSnap.sk_dirloc] is what a boot mint needs to re-found
+    [IcacheEscrow.ipool_alloc]'s three [DirView] premises.  At the image
+    all three are W6/W7/W8 read through [FsImgBridge], exactly as
+    [FsCfgBoot.img_inode_local_live] reads [dir_uniq] and [dir_dots_ix] --
+    nothing is recomputed here.  The free arm is vacuous: a type-0 record
+    is no directory.                                                       *)
+Lemma img_node_dir_local (P : Z -> list (bv 8)) (sb : fs_sb) (cov : gset Z)
+    (nib : nat) (z : Z) :
+  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+  fs_blocks_full P ->
+  FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+  (forall b : Z, fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov) ->
+  z ∈ region_inums nib ->
+  node_dir_local z nib (img_node P sb z).
+Proof.
+  intros Hwf Hrw Hfull Hnin Hcov Hz.
+  apply region_inums_spec in Hz.
+  destruct (decide (bv_unsigned (di_type (fs_dinode P sb z)) = 0))
+    as [H0 | Hnz].
+  - apply node_dir_local_free. rewrite /img_node era_node_rec. exact H0.
+  - assert (Hran : 0 <= z < FsImg.sb_ninodes sb).
+    { split; [lia |].
+      destruct (Z_lt_ge_dec z (FsImg.sb_ninodes sb)) as [Hlt | Hge];
+        [exact Hlt |].
+      exfalso. apply Hnz.
+      exact (fs_region_free_spec P sb nib z (fs_region_wf_free _ _ _ Hrw)
+               ltac:(lia) ltac:(lia) ltac:(lia)). }
+    assert (Hdir : bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
+                   fs_dir_ok P sb z (fs_dinode P sb z))
+      by (intros Hd; exact (fsimg_wf_dir P sb z Hwf Hran Hd)).
+    rewrite /img_node.
+    apply (FsStateEra.node_dir_local_of_ok z cov (FsImg.sb_logstart sb) nib
+             (fs_dinode P sb z) (img_blkmap P (fs_dinode P sb z))
+             (fs_data_of P (fs_dinode P sb z))
+             (img_inode_ok_at P sb cov z Hwf Hfull Hcov Hran Hnz)).
+    + exact (img_dir_ok P sb z (fs_dinode P sb z) nib Hnin Hdir).
+    + intros Hd Hnl0. exact (fsimg_wf_dots P sb z Hwf Hran Hd Hd Hnl0).
+    + exact (img_dir_orphan_clean P sb (fs_dinode P sb z)
+               (fsimg_wf_inode P sb z Hwf Hran Hnz)).
+Qed.
+
 (* ---- 11d.  THE THEOREM ----------------------------------------------- *)
 
 (*  THE IMAGE'S SNAPSHOT TIE.  Every premise is a conjunct of
@@ -1695,6 +1739,17 @@ Proof.
     rewrite Hpsb Hpin. intros i Hi.
     exists (img_node (fs_blocks dk) sb i).
     apply img_nodes_lookup, region_inums_spec. lia.
+  - (* sk_dirloc (durable-disk lane E-clauses): the three directory
+       clauses the escrow payloads carry, at the state's own region
+       width -- which is [nib], by conjunct (6). *)
+    rewrite Hpsb Hpin.
+    assert (Hw : Z.to_nat (FsImg.sb_ninodes sb / 16 + 1) = nib)
+      by (rewrite -Hnibq Nat2Z.id //).
+    rewrite Hw. intros i n Hi.
+    destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi)
+      as [Hreg ->].
+    exact (img_node_dir_local (fs_blocks dk) sb cov nib i Hwf Hrw Hfull
+             Hnin Hcovdata Hreg).
 Qed.
 
 (* ===================================================================== *)

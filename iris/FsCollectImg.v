@@ -57,13 +57,22 @@ Local Open Scope Z_scope.
    [FsBoot.fs_cov_in] against conjunct (12) (the disk image is no larger
    than [size] blocks), which is the only place the bitmap's range meets
    the coverage set. *)
+Section ImgGeom.
+  Context `{ICFG : icfg}.
+
 Lemma img_col_geom (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
     (cov : gset Z) :
   fs_boot_image_wf dk ndisk sb nib cov ->
+  (* the image's region width IS the cache's (durable-disk lane E-clauses;
+     [FsCollect.cg_icfg]).  At the boot configuration the two are the same
+     number by construction -- [FirstTok.col_geom_of_image] builds the
+     record AT [icfg_nib] -- so this hypothesis is what an image-side
+     statement at an arbitrary [nib] owes. *)
+  nib = icfg_nib ->
   col_geom sb (sb_inodestart sb) nib (fs_home_set cov (sb_logstart sb)).
 Proof.
   intros (Hwf & Hrwf & Hnin & Hwide & Hnib0 & Hnibeq & Hcov & Hcovm & Hcovd
-          & Hparse & Hus & Hnd & Hleq & Hbare & Hself).
+          & Hparse & Hus & Hnd & Hleq & Hbare & Hself) Hicfg.
   pose proof (fsimg_wf_sb (fs_blocks dk) sb Hwf) as Hsbok.
   split.
   - exact Hsbok.
@@ -76,7 +85,11 @@ Proof.
     destruct (Hcov b Hb) as [Hb0 Hbn]. lia.
   - (* [cg_width] (durable-disk lane E-boot) is conjunct (6) itself. *)
     exact Hnibeq.
+  - (* [cg_icfg] (durable-disk lane E-clauses) is this lemma's hypothesis. *)
+    exact Hicfg.
 Qed.
+
+End ImgGeom.
 
 (* THE SUPERBLOCK'S BLOCK IS A HOME BLOCK, which is the half of
    [FsDurSnap.sk_sb] that is pure: block 1 is covered (mkfs's metadata

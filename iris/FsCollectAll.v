@@ -279,11 +279,18 @@ Section CollectAll.
     iIntros "[Halloc | (Hmk & _ & _)]".
     - rewrite /ipool_alloc.
       iDestruct "Halloc" as (dn0 bm0 data0)
-        "(_ & _ & _ & _ & _ & Hdl & Hn & _ & _)".
+        "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hdl & Hn & _ & _)".
       rewrite /dlinks. iDestruct "Hdl" as "[_ Hte]".
       iRight. iExists (era_node dn0 bm0 data0), (DfracOwn 1).
       iSplitR;
         [iPureIntro; exact (FsStateDefs.dfrac_full_nvalid (DfracOwn 1)) |].
+      (* the pool row carries the three directory clauses already
+         (durable-disk lane E-clauses); the node is [era_node] of its
+         triple, so the transport is one lemma *)
+      iSplitR.
+      { iPureIntro.
+        exact (FsStateEra.node_dir_local_of_ok (bv_unsigned w) cov ls
+                 icfg_nib dn0 bm0 data0 Hok Hdok Hddix Hdoc). }
       rewrite -inode_owned_era_1. iFrame "Hn Hte".
     - iLeft. iExact "Hmk".
   Qed.
@@ -339,11 +346,12 @@ Section CollectAll.
     - rewrite /ic_lend. iDestruct "Hb" as "[[Hid Hnp] _]".
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
       iApply (ipool_shape_np_side with "Hnp").
-    - iDestruct "Hc" as (dq n) "[%Hdq Hl]".
+    - iDestruct "Hc" as (dq n) "[%Hdq [%Hdl Hl]]".
       rewrite /ic_lend. iDestruct "Hl" as "[(Hid & Hn & Hte) _]".
       iDestruct (ic_id_agree with "Hq Hid") as %(_ & _ & <-).
       rewrite /col_side. iRight. iExists n, dq.
-      iSplitR; [iPureIntro; exact Hdq |]. iFrame "Hn Hte".
+      iSplitR; [iPureIntro; exact Hdq |].
+      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hn Hte".
   Qed.
 
   Lemma ic_live_inums_cons_true (dev inum : mword 32)
@@ -443,6 +451,7 @@ Section CollectAll.
       ∗ ireg_lnk γfs z d
       ∗ ∃ (n : fs_node) (dq : dfrac),
           ⌜~ ✓ (dq ⋅ dq)⌝
+          ∗ ⌜node_dir_local z icfg_nib n⌝
           ∗ inode_owned_era_q γfs dq γi w n
           ∗ ent_toks (fs_gamma_L γfs) z n.
   Proof.
@@ -465,6 +474,7 @@ Section CollectAll.
       ∗ ([∗ set] z ∈ Rs,
            (∃ n : fs_node,
               ⌜I !! z = Some n⌝
+              ∗ ⌜node_dir_local z icfg_nib n⌝
               ∗ col_bundle γfs γi z n
               ∗ own (fs_link γfs) (link_elem_node z n))
            (* the region's keep-alive token, [emp] everywhere but the root
@@ -489,7 +499,7 @@ Section CollectAll.
       rewrite /col_sidez.
       iDestruct (col_region_quiesce_take_z γfs γi z (mword_of_int z) d Hmoi
                    with "Ht Hside Hslot") as
-        "(Ht & Hlnk & %n & %dq & %Hdq & Hown & Hte)".
+        "(Ht & Hlnk & %n & %dq & %Hdq & %Hdl & Hown & Hte)".
       iDestruct (col_bundle_of_side γfs γi (mword_of_int z : mword 32) n dq
                    Hdq with "Hown") as "Hb".
       rewrite Hmoi.
@@ -502,7 +512,8 @@ Section CollectAll.
       iDestruct (col_link_of γfs z n d (eq_sym Hrec) with "Hlnk Hte")
         as "[Hle Hkp]".
       iSplitR "Hkp"; [| iExact "Hkp"].
-      iExists n. iSplitR; [iPureIntro; exact HIz |]. iFrame "Hb Hle".
+      iExists n. iSplitR; [iPureIntro; exact HIz |].
+      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hb Hle".
   Qed.
 
   (* ...and the ONE token that survives the collection: [ireg_keep] is [emp]
@@ -552,7 +563,8 @@ Section CollectAll.
       (I : gmap Z fs_node) :
     ([∗ set] z ∈ Rs,
        ∃ n : fs_node,
-         ⌜I !! z = Some n⌝ ∗ col_bundle γfs γi z n
+         ⌜I !! z = Some n⌝ ∗ ⌜node_dir_local z icfg_nib n⌝
+         ∗ col_bundle γfs γi z n
          ∗ own (fs_link γfs) (link_elem_node z n))
     ⊢ ⌜Rs ⊆ dom I⌝.
   Proof.
@@ -566,6 +578,32 @@ Section CollectAll.
       + apply elem_of_singleton in Hy as ->.
         apply elem_of_dom. by eexists.
       + exact (Hsub y Hy).
+  Qed.
+
+  (* ...and the same reading for the DIRECTORY clauses the sides brought
+     out (durable-disk lane E-clauses): a whole-map pure row is what
+     [FsCollect.col_hand]'s last conjunct wants, and the per-inum facts
+     compose into it exactly as the domain row does. *)
+  Lemma col_bundles_dirloc γfs (γi : gname) (Rs : gset Z)
+      (I : gmap Z fs_node) :
+    ([∗ set] z ∈ Rs,
+       ∃ n : fs_node,
+         ⌜I !! z = Some n⌝ ∗ ⌜node_dir_local z icfg_nib n⌝
+         ∗ col_bundle γfs γi z n
+         ∗ own (fs_link γfs) (link_elem_node z n))
+    ⊢ ⌜forall (i : Z) (n : fs_node),
+         i ∈ Rs -> I !! i = Some n -> node_dir_local i icfg_nib n⌝.
+  Proof.
+    induction Rs as [| z Rs Hnz IH] using set_ind_L.
+    - iIntros "_". iPureIntro. intros i n Hi. set_solver.
+    - rewrite big_sepS_insert; [| exact Hnz].
+      iIntros "[(%n & %Hn & %Hdl & _) Hrest]".
+      iDestruct (IH with "Hrest") as %Hall.
+      iPureIntro. intros i x Hi Hix.
+      apply elem_of_union in Hi as [Hi | Hi].
+      + apply elem_of_singleton in Hi as ->.
+        rewrite Hn in Hix. injection Hix as <-. exact Hdl.
+      + exact (Hall i x Hi Hix).
   Qed.
 
   (* THE CORE.  Everything on the left is CONSUMED -- the caller gets it all
@@ -639,6 +677,7 @@ Section CollectAll.
     rewrite big_sepS_sep. iDestruct "HB" as "[HB Hkeeps]".
     iDestruct (col_keeps_root γfs nib Hrootin with "Hkeeps") as "Hkeep".
     iDestruct (col_bundles_domsub with "HB") as %Hdom.
+    iDestruct (col_bundles_dirloc with "HB") as %Hdirl.
     (* ---- the abstract state is the map RESTRICTED to the region ---- *)
     assert (HdomIq : dom (col_reg_map nib I) = region_inums nib)
       by exact (col_reg_map_dom nib I Hdom).
@@ -647,7 +686,8 @@ Section CollectAll.
              ∗ fs_links (fs_link γfs) (col_reg_map nib I))%I
       with "[HB]" as "[Hbund Hlnks]".
     { rewrite /fs_links -big_sepM_sep.
-      iApply (big_sepM_impl with "HB"). iIntros "!>" (i x Hix) "(%n & %Hn & Hb & Hl)".
+      iApply (big_sepM_impl with "HB").
+      iIntros "!>" (i x Hix) "(%n & %Hn & %Hdl & Hb & Hl)".
       apply col_reg_map_lookup in Hix as [HI _].
       rewrite HI in Hn. injection Hn as Hnx. subst x.
       iFrame "Hb Hl". }
@@ -666,7 +706,12 @@ Section CollectAll.
       iSplitL "Hbm"; [iExact "Hbm" |].
       iSplitL "Hm Hrecs".
       { rewrite /col_recs. iFrame "Hm Hrecs". }
-      iFrame "Hbund Hlnks Hkeep". }
+      iFrame "Hbund Hlnks Hkeep".
+      (* the last row: the per-inum directory clauses, at the RESTRICTED
+         map (durable-disk lane E-clauses) *)
+      iPureIntro. intros i n Hi.
+      apply col_reg_map_lookup in Hi as [HI Hz].
+      exact (Hdirl i n Hz HI). }
     iDestruct (col_snap_ok_ex with "Hhand") as %Hok.
     iPureIntro. exact Hok.
   Qed.

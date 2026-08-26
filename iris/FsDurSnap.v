@@ -353,6 +353,27 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
      LAST, so no destructuring pattern above moves. *)
   sk_regdom : forall i, 0 <= i < 16 * (sb_ninodes (fss_sb S) / 16 + 1) ->
                 is_Some (fss_inodes S !! i);
+  (* ---- THE THREE DIRECTORY CLAUSES THE ESCROW PAYLOADS CARRY
+     (durable-disk lane E-clauses; plan section 5's mint).
+     [FsStateInode.node_dir_local] is [DirView.dir_ok] (every live entry's
+     inum is inside the region), [dir_dots_ix] (a live directory's records
+     0 and 1 POSITIONALLY are the dots -- which [inl_dir_dot] /
+     [inl_dir_dotdot] do NOT say: those are about the name -> inum view)
+     and [dir_orphan_clean] (an orphan directory holds only dot records).
+     [IcacheEscrow.ipool_alloc] and [ic_loaded] take all three, so a BOOT
+     MINT that re-founds the pool from a snapshot needs them; the escrow's
+     deposit arms re-prove exactly these at every [iunlock], so the commit
+     reads them off the same payloads it reads [inode_local] off
+     ([FsCollect.col_side]'s bundle arm).
+
+     IT IS PER-OBJECT, and it is here rather than in [inode_local] because
+     [dir_ok] needs the REGION'S WIDTH: [inode_local i n] takes an inum and
+     a node and nothing else, while a [snap_bytes] clause may read [S]'s own
+     superblock -- which is exactly how [sk_regdom] is stated, and
+     [snap_nib] below is that same [ninodes/16 + 1].
+     LAST, so no destructuring pattern above moves. *)
+  sk_dirloc : forall i n, fss_inodes S !! i = Some n ->
+                node_dir_local i (Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1)) n;
 }.
 
 Global Arguments sk_bsz {_ _} _.
@@ -374,6 +395,34 @@ Global Arguments sk_sbok {_ _} _.
 Global Arguments sk_reg {_ _} _.
 Global Arguments sk_slot {_ _} _.
 Global Arguments sk_regdom {_ _} _.
+Global Arguments sk_dirloc {_ _} _.
+
+(* THE REGION'S WIDTH, off [S]'s own superblock: mkfs rounds [ninodes] up to
+   a whole inode block, so the region is [ninodes/16 + 1] blocks and the
+   inum space is [16 *] that.  It is the width [sk_regdom] is stated at and
+   the one [sk_dirloc]'s [DirView.dir_ok] is bounded by; at the boot
+   configuration it IS [IcacheRef.icfg_nib]
+   ([FirstTok.col_geom_of_image]'s own hypothesis). *)
+Definition snap_nib (S : fs_state_rec) : nat :=
+  Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1).
+
+(* THE MINT-SIDE READING (durable-disk lane E-clauses).  The three
+   [DirView] premises [IcacheEscrow.ipool_alloc] takes, off the snapshot's
+   node -- so the boot mint's snapshot route has a twin of
+   [FsCfgBoot.ipool_alloc_of_image]'s image route.  [nib] is the caller's
+   region width, tied to the state's superblock exactly as
+   [FsCollect.col_geom]'s [cg_width] ties it. *)
+Lemma snap_node_dir_local (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (i : Z) (n : fs_node) (nib : nat) :
+  snap_bytes S D -> fss_inodes S !! i = Some n ->
+  Z.of_nat nib = sb_ninodes (fss_sb S) / 16 + 1 ->
+  node_dir_local i nib n.
+Proof.
+  intros Hb Hi Hw.
+  assert (Hnib : nib = snap_nib S).
+  { rewrite /snap_nib -Hw Nat2Z.id //. }
+  rewrite Hnib. exact (sk_dirloc Hb i n Hi).
+Qed.
 
 (* the plain family validity, which is [sk_links]'s own left factor: the
    allocator ([FsState.fs_links_alloc]) takes this, the mint takes the
@@ -848,6 +897,7 @@ Proof.
   - exact (sk_reg Hok).
   - exact (sk_slot Hok).
   - exact (sk_regdom Hok).
+  - exact (sk_dirloc Hok).
 Qed.
 
 (* ...and the reading at the whole tie, for a consumer that holds both

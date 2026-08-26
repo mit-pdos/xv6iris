@@ -178,6 +178,62 @@ Global Arguments inl_dir_dot {_ _} _.
 Global Arguments inl_dir_dotdot {_ _} _.
 Global Arguments inl_bare_free {_ _} _.
 
+(* ------------------------------------------------------------------ *)
+(*  2a'. THE THREE DIRECTORY CLAUSES THE ESCROW PAYLOADS CARRY, AT A    *)
+(*       NODE (durable-disk lane E-clauses)                            *)
+(*                                                                     *)
+(*  [IcacheEscrow.ic_loaded] and [ipool_alloc] each carry three pure    *)
+(*  directory facts beside [inode_local]'s, stated over the payload's   *)
+(*  own record and total [data]:                                       *)
+(*                                                                     *)
+(*    [DirView.dir_ok]           every live entry's inum is inside the  *)
+(*                               inode region ([< 16 * nib]);          *)
+(*    [DirView.dir_dots_ix]      a LIVE directory's records 0 and 1     *)
+(*                               POSITIONALLY are ["."] and [".."] --   *)
+(*                               strictly stronger than [inl_dir_dot] / *)
+(*                               [inl_dir_dotdot], which are about the  *)
+(*                               name -> inum VIEW and blind to which   *)
+(*                               record carries a name;                 *)
+(*    [DirView.dir_orphan_clean] an ORPHAN directory ([nlink = 0])      *)
+(*                               holds only dot records.                *)
+(*                                                                     *)
+(*  A BOOT MINT HAS TO RE-FOUND THOSE PAYLOADS, so the durable snapshot *)
+(*  must carry them ([FsDurSnap.sk_dirloc]); this is the NODE-shaped    *)
+(*  spelling both sides meet, with [FsStateEra.node_dir_local_of_ok]    *)
+(*  the transport from a payload's [(dn, bm, data)] triple.             *)
+(*                                                                     *)
+(*  THEY ARE NOT CLAUSES OF [inode_local], AND ONE OF THEM CANNOT BE.   *)
+(*  [inode_local i n] takes an inum and a node and nothing else, while  *)
+(*  [dir_ok] needs the region's WIDTH -- a superblock number.  So the   *)
+(*  three travel together here, are carried by the snapshot's byte half *)
+(*  (which knows [S]'s superblock, exactly as [sk_regdom] does), and    *)
+(*  reach the commit off the escrow payloads that already re-prove them *)
+(*  at every [iunlock].                                                 *)
+(* ------------------------------------------------------------------ *)
+Definition node_dir_local (i : Z) (nib : nat) (n : fs_node) : Prop :=
+  dir_ok nib (fn_rec n) (fn_data n)
+  /\ dir_dots_ix i (fn_rec n) (fn_data n)
+  /\ dir_orphan_clean (fn_rec n) (fn_data n).
+
+(* the free-record discharge: a type-0 record is no directory, so all
+   three are vacuous.  This is what the region's parked free node and the
+   corpse ledger's markers use. *)
+Lemma node_dir_local_free (i : Z) (nib : nat) (n : fs_node) :
+  bv_unsigned (di_type (fn_rec n)) = 0 -> node_dir_local i nib n.
+Proof.
+  intros H0. rewrite /node_dir_local. split_and!.
+  - exact (dir_ok_free nib (fn_rec n) (fn_data n) H0).
+  - apply dir_dots_ix_not_dir. rewrite H0 /T_DIR_z. lia.
+  - exact (dir_orphan_clean_free (fn_rec n) (fn_data n) H0).
+Qed.
+
+Definition node_dir_local_ok {i nib n} (H : node_dir_local i nib n) :
+  dir_ok nib (fn_rec n) (fn_data n) := proj1 H.
+Definition node_dir_local_ix {i nib n} (H : node_dir_local i nib n) :
+  dir_dots_ix i (fn_rec n) (fn_data n) := proj1 (proj2 H).
+Definition node_dir_local_orph {i nib n} (H : node_dir_local i nib n) :
+  dir_orphan_clean (fn_rec n) (fn_data n) := proj2 (proj2 H).
+
 (* the reading is total below the size: [inl_covers] plus [inl_blk_dom] *)
 Lemma inode_local_data_owned i n k :
   inode_local i n -> (k < FS_MAXFILE)%nat ->

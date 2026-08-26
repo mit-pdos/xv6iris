@@ -430,6 +430,13 @@ Qed.
 
 Section Collect.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  (* THE BOOT CONFIGURATION (durable-disk lane E-clauses).  It was declared
+     per NESTED section until [col_geom] and [col_hand] gained rows about
+     the inode region's WIDTH: [IcacheRef.icfg_nib] is the width every
+     escrow payload's [DirView.dir_ok] is stated at, and tying it to the
+     collected state's superblock is what lets the commit read
+     [FsDurSnap.sk_dirloc].  Instance-implicit, so no call site moves. *)
+  Context `{ICFG : icfg}.
 
   Implicit Types γfs : fs_names.
 
@@ -540,6 +547,16 @@ Section Collect.
        which is stated at that tie already ([fs_geom_ok_of_image]'s), so the
        boot chain pays nothing new.  LAST, so no destructuring moves. *)
     cg_width : Z.of_nat nib = sb_ninodes sb / 16 + 1;
+    (* THE REGION'S WIDTH IS THE CACHE'S (durable-disk lane E-clauses).
+       Every escrow payload states [DirView.dir_ok] at [IcacheRef.icfg_nib]
+       -- the ambient boot configuration's width, which is what [iget]'s
+       region bound is checked against -- while the collection is stated at
+       its own [nib].  They are the same number, and saying so HERE is what
+       lets [col_snap_bytes] turn the payloads' clause into
+       [FsDurSnap.sk_dirloc] at [S]'s own superblock.  Both producers have
+       it for free: [FirstTok.col_geom_of_image] builds the record AT
+       [icfg_nib].  LAST, so no destructuring moves. *)
+    cg_icfg : nib = icfg_nib;
   }.
 
   Global Arguments cg_sbok {_ _ _ _} _.
@@ -549,6 +566,7 @@ Section Collect.
   Global Arguments cg_wide {_ _ _ _} _.
   Global Arguments cg_size {_ _ _ _} _.
   Global Arguments cg_width {_ _ _ _} _.
+  Global Arguments cg_icfg {_ _ _ _} _.
 
   (* THE HAND.  Every conjunct is a piece the era already parks somewhere an
      invariant opening reaches (plan section 4's second bullet); assembling
@@ -575,9 +593,17 @@ Section Collect.
         elements it is [FsDurSnap.sk_links], the SLACKED validity the boot
         mint allocates from.  The collection already PRODUCES it at every
         inum ([col_link_of]'s second conjunct, dropped until now); this row
-        is the one at the root being kept.  LAST, so no destructuring
-        pattern above moves. *)
-     ireg_keep γfs ireg_root)%I.
+        is the one at the root being kept. *)
+     ireg_keep γfs ireg_root ∗
+     (* THE THREE DIRECTORY CLAUSES, PER INODE (durable-disk lane
+        E-clauses).  [IcacheEscrow.ic_loaded] and [ipool_alloc] carry them
+        already -- the escrow's deposit arms re-prove them at every
+        [iunlock] -- and [col_side]'s bundle arm brings them out beside the
+        node; this row is what [col_snap_bytes] reads [FsDurSnap.sk_dirloc]
+        off.  Stated at [icfg_nib], the width the payloads use, which
+        [cg_icfg] ties to this collection's own [nib].
+        LAST, so no destructuring pattern above moves. *)
+     ⌜forall i n, I !! i = Some n -> node_dir_local i icfg_nib n⌝)%I.
 
   (* the abstract state the hand describes: the superblock the region was
      configured from, block 1's bytes, the map the [ftop_inv] authority
@@ -1107,7 +1133,8 @@ Section Collect.
     col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
     ⌜snap_bytes (col_state sb sbb I used) (col_view C home)⌝.
   Proof.
-    iIntros "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk & Hkeep)".
+    iIntros "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk & Hkeep
+              & %Hdirloc)".
     rewrite /sb_owned. iDestruct "Hsb" as "[Hsbb %Hparse]".
     rewrite /free_bitmap_at. iDestruct "Hbm" as "[Hbmb Hpool]".
     (* ---- the byte agreements ---- *)
@@ -1172,6 +1199,14 @@ Section Collect.
          superblock's own [ninodes/16 + 1]. *)
       intros i Hi. apply elem_of_dom. apply Hdi.
       pose proof (cg_width Hg). lia.
+    - (* sk_dirloc (durable-disk lane E-clauses): the payloads' three
+         directory clauses, restated at [S]'s own region width.  The
+         payloads use [icfg_nib]; [cg_icfg] and [cg_width] say that IS
+         [ninodes/16 + 1]. *)
+      assert (Hw : Z.to_nat (sb_ninodes sb / 16 + 1) = icfg_nib).
+      { pose proof (cg_width Hg) as Hcw. pose proof (cg_icfg Hg) as Hci.
+        rewrite -Hcw Nat2Z.id. exact Hci. }
+      rewrite Hw. exact Hdirloc.
   Qed.
 
   (* THE WHOLE OF WHAT [FsDurSnap.fs_snap_alloc] TAKES, and it is the pure
@@ -1302,7 +1337,6 @@ Section Collect.
      (the arithmetic above is configuration-free).  A nested section puts the
      parameter on these two lemmas alone. *)
   Section FreeSlot.
-  Context `{ICFG : icfg}.
 
   (* ==================================================================== *)
   (*  THE DOOR: ONE REGION SLOT, AT A QUIESCENT TRANSACTION LEDGER         *)
@@ -1471,7 +1505,16 @@ Section Collect.
   Definition col_side γfs (γi : gname) (inum : bv 32) : iProp Σ :=
     (imark γi (bv_unsigned inum)
      ∨ ∃ (n : fs_node) (dq : dfrac),
-         ⌜~ ✓ (dq ⋅ dq)⌝ ∗ inode_owned_era_q γfs dq γi inum n
+         ⌜~ ✓ (dq ⋅ dq)⌝
+         (* ...AND THE NODE'S THREE DIRECTORY CLAUSES (durable-disk lane
+            E-clauses).  They are what [col_hand]'s last row -- hence
+            [FsDurSnap.sk_dirloc] -- is read off; the payload that lends
+            the bundle carries them already
+            ([IcacheEscrow.ic_slot_cover]'s bundle alternative,
+            [ipool_alloc]), and being pure they cost the closing wand
+            nothing. *)
+         ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
+         ∗ inode_owned_era_q γfs dq γi inum n
          ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)%I.
 
   (* A FREE INUM OWNS NO ENTRY TOKENS: its record's type is zero, so the
@@ -1529,6 +1572,7 @@ Section Collect.
       ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ∃ (n : fs_node) (dq : dfrac),
           ⌜~ ✓ (dq ⋅ dq)⌝
+          ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
           ∗ inode_owned_era_q γfs dq γi inum n
           ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n
           ∗ ((inode_owned_era_q γfs dq γi inum n
@@ -1537,14 +1581,17 @@ Section Collect.
                ∗ ireg_slot γfs γi (bv_unsigned inum) d).
   Proof.
     iIntros "Hauth Hside Hslot".
-    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & Hown & Hte)]".
+    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & %Hdl & Hown & Hte)]".
     - (* THE MARKER: the region holds this inum's record, and the bundle is
          the free one it parks beside it. *)
       iDestruct (col_free_slot_acc γfs γi inum d with "Hauth Hmk Hslot")
         as "(Hauth & %Ht0 & Hmk & Hown & Hback)".
+      assert (Hdl0 : node_dir_local (bv_unsigned inum) icfg_nib (free_node d)).
+      { apply node_dir_local_free. rewrite free_node_rec. exact Ht0. }
       iFrame "Hauth". iExists (free_node d), (DfracOwn 1).
       iSplitR; [iPureIntro; exact dfrac_full_nvalid |].
       rewrite -inode_owned_era_1.
+      iSplitR; [iPureIntro; exact Hdl0 |].
       iSplitL "Hown"; [iExact "Hown" |].
       iSplitR; [iApply (col_free_ent_toks γfs (bv_unsigned inum) d Ht0) |].
       iIntros "[Hown _]". iSplitL "Hmk"; [iLeft; iExact "Hmk" |].
@@ -1553,11 +1600,12 @@ Section Collect.
          region slot is not touched. *)
       iFrame "Hauth". iExists n, dq.
       iSplitR; [iPureIntro; exact Hdq |].
+      iSplitR; [iPureIntro; exact Hdl |].
       iSplitL "Hown"; [iExact "Hown" |].
       iSplitL "Hte"; [iExact "Hte" |].
       iIntros "[Hown Hte]". iSplitR "Hslot"; [| iExact "Hslot"].
       iRight. iExists n, dq. iSplitR; [iPureIntro; exact Hdq |].
-      iFrame "Hown Hte".
+      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hown Hte".
   Qed.
 
   (* ==================================================================== *)
@@ -1620,6 +1668,7 @@ Section Collect.
       ∗ ireg_lnk γfs (bv_unsigned inum) d
       ∗ ∃ (n : fs_node) (dq : dfrac),
           ⌜~ ✓ (dq ⋅ dq)⌝
+          ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
           ∗ inode_owned_era_q γfs dq γi inum n
           ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n.
   Proof.
@@ -1627,17 +1676,22 @@ Section Collect.
     iDestruct (col_region_slot_take γfs γi inum d with "Hauth Hslot")
       as "(Hauth & Hlnk & Harm)".
     iFrame "Hauth Hlnk".
-    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & Hown & Hte)]".
+    iDestruct "Hside" as "[Hmk | (%n & %dq & %Hdq & %Hdl & Hown & Hte)]".
     - (* THE MARKER: the pool's marker refutes the region's own marked arm,
-         so the slot's free bundle is what is left. *)
+         so the slot's free bundle is what is left.  A type-0 record is no
+         directory, so its three directory clauses are vacuous. *)
       iDestruct "Harm" as "[Hmk' | (%Ht0 & Hown)]".
       { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
       iExists (free_node d), (DfracOwn 1).
       iSplitR; [iPureIntro; exact dfrac_full_nvalid |].
+      iSplitR.
+      { iPureIntro. apply node_dir_local_free.
+        rewrite free_node_rec. exact Ht0. }
       rewrite -inode_owned_era_1. iFrame "Hown".
       iApply (col_free_ent_toks γfs (bv_unsigned inum) d Ht0).
     - (* A CACHED OR ALLOCATED INUM: the bundle is already in hand. *)
-      iExists n, dq. iSplitR; [iPureIntro; exact Hdq |]. iFrame "Hown Hte".
+      iExists n, dq. iSplitR; [iPureIntro; exact Hdq |].
+      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hown Hte".
   Qed.
 
   End FreeSlot.
@@ -1679,7 +1733,6 @@ Section Collect.
   (* ==================================================================== *)
 
   Section ClaimBox.
-  Context `{ICFG : icfg}.
 
   Lemma col_claim_box_untied γfs (z : Z) (d : dinode) (n : fs_node) :
     fresh_shape d ->
@@ -1750,7 +1803,6 @@ Section Collect.
   (* ==================================================================== *)
 
   Section Corpse.
-  Context `{ICFG : icfg}.
 
   (* THE WINDOW, REFUTED.  A slot whose freeze token is in SOME thread's
      hand -- either phase -- cannot coexist with a quiescent transaction
@@ -1851,7 +1903,6 @@ Section Collect.
   (* ==================================================================== *)
 
   Section PoolWitness.
-  Context `{ICFG : icfg}.
 
   (* WHY THE WITNESS IS THE MARKER AND NOT A REGISTRY HALF.  Whatever the
      region slot is on, the registry element at that inum is fully spoken

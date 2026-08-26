@@ -4009,6 +4009,11 @@ Section IcacheEscrow.
             ∗ ipool_shape_np γfs γi cov logstart inum)
        ∨ (∃ (dq : dfrac) (n : fs_node),
             ⌜~ ✓ (dq ⋅ dq)⌝ ∗
+            (* ...AND THIS INODE'S THREE DIRECTORY CLAUSES (durable-disk
+               lane E-clauses), which is what the commit's collection
+               reads [FsDurSnap.sk_dirloc] off.  Pure, so the closing
+               wand is unaffected. *)
+            ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝ ∗
             ic_lend cn γfs γi cov logstart k
               (ic_id cn k (1/2) true dev inum
                ∗ inode_owned_era_q γfs dq γi inum n
@@ -4036,7 +4041,14 @@ Section IcacheEscrow.
       (dn : dinode) (bm : blkmap) :
     ic_loaded γfs γi cov logstart k inum dn bm -∗
     ∃ n : fs_node,
-      (inode_owned_era_q γfs (DfracOwn 1) γi inum n
+      (* the payload's three DIRECTORY clauses, at the NODE (durable-disk
+         lane E-clauses).  They ride out beside the bundle for the same
+         reason the link tokens do: the commit's collection has to read
+         [FsDurSnap.sk_dirloc] off the payloads, and
+         [FsStateEra.inode_owned_era_q] carries only [inode_local] -- which
+         cannot state [DirView.dir_ok] at all (it has no region width). *)
+      ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
+      ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum n
        ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)
       ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
           ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
@@ -4047,6 +4059,10 @@ Section IcacheEscrow.
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
     rewrite /dlinks. iDestruct "Hl" as "[Hdl Hte]".
     iExists (era_node dn bm data).
+    iSplitR.
+    { iPureIntro.
+      exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
+               icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
     rewrite -inode_owned_era_1. iFrame "Hn Hte". iIntros "[Hn Hte]".
     iExists data. rewrite /dlinks. iFrame "Hdl Hte Hn Hm Ha Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
@@ -4059,7 +4075,9 @@ Section IcacheEscrow.
   Lemma ic_rd_arm_lend_owned γfs γi cov logstart (inum : mword 32) :
     ic_rd_arm γfs γi cov logstart inum -∗
     ∃ n : fs_node,
-      (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
+      (* ...and the read arm's own copy of the three, for the same reason *)
+      ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
+      ∗ (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
        ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)
       ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
           ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
@@ -4069,7 +4087,12 @@ Section IcacheEscrow.
     iDestruct "H" as (dn bm data)
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hv & Hw)".
     rewrite /dlinks. iDestruct "Hl" as "[Hdl Hte]".
-    iExists (era_node dn bm data). iFrame "Hn Hte". iIntros "[Hn Hte]".
+    iExists (era_node dn bm data).
+    iSplitR.
+    { iPureIntro.
+      exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
+               icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
+    iFrame "Hn Hte". iIntros "[Hn Hte]".
     iExists dn, bm, data. rewrite /dlinks. iFrame "Hdl Hte Hn Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
@@ -4099,9 +4122,11 @@ Section IcacheEscrow.
         rewrite /ic_payload_np. destruct v.
         * (* LOADED: the bundle is inside at 1 *)
           iDestruct "Hp" as (dn bm) "[Hload #Hshot]".
-          iDestruct (ic_loaded_lend_owned with "Hload") as (n) "[[Hn Hte] Hback]".
+          iDestruct (ic_loaded_lend_owned with "Hload")
+            as (n) "[%Hdl [[Hn Hte] Hback]]".
           iRight; iRight. iExists (DfracOwn 1), n.
           iSplitR; [iPureIntro; exact (dfrac_full_nvalid (DfracOwn 1)) |].
+          iSplitR; [iPureIntro; exact Hdl |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
                     (i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev
                      ∗ i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum
@@ -4162,9 +4187,11 @@ Section IcacheEscrow.
         * (* THE READ ARM: three quarters are inside *)
           iFrame "Ha". iExists dev, inum.
           cbn [ic_out_rd].
-          iDestruct (ic_rd_arm_lend_owned with "Hrd") as (n) "[[Hn Hte] Hback]".
+          iDestruct (ic_rd_arm_lend_owned with "Hrd")
+            as (n) "[%Hdl [[Hn Hte] Hback]]".
           iRight; iRight. iExists (DfracOwn (3/4)), n.
           iSplitR; [iPureIntro; exact dfrac_34_nvalid |].
+          iSplitR; [iPureIntro; exact Hdl |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
                     (ic_deposit cn k (DepRd s dv nu g)
                      ∗ ic_dep_res k (DepRd s dv nu g) dev inum

@@ -726,6 +726,36 @@ Proof.
   - rewrite -(Hb 1%nat ltac:(lia)). exact Hn1.
 Qed.
 
+(* ...AND THE OTHER TWO DIRECTORY CLAUSES A PAYLOAD CARRIES (durable-disk
+   lane E-clauses), the same way.  Both read strictly below the record
+   count, so the record's own [16 * dir_nrec] bound is all they need. *)
+
+Lemma dir_ok_data_ext (nib : nat) dn data data' :
+  fb_agree data data' (16 * dir_nrec (bv_unsigned (di_size dn))) ->
+  dir_ok nib dn data -> dir_ok nib dn data'.
+Proof.
+  intros Hag Hd Hty k Hk Hlv.
+  rewrite -(dir_inum_data_ext data data'
+              (16 * dir_nrec (bv_unsigned (di_size dn))) k Hag ltac:(lia)).
+  apply (Hd Hty k Hk).
+  rewrite /dir_live (dir_inum_data_ext data data'
+             (16 * dir_nrec (bv_unsigned (di_size dn))) k Hag ltac:(lia)).
+  exact Hlv.
+Qed.
+
+Lemma dir_orphan_clean_data_ext dn data data' :
+  fb_agree data data' (16 * dir_nrec (bv_unsigned (di_size dn))) ->
+  dir_orphan_clean dn data -> dir_orphan_clean dn data'.
+Proof.
+  intros Hag Hd Hty Hnl k Hk Hlv.
+  rewrite -(dir_name14_data_ext data data'
+              (16 * dir_nrec (bv_unsigned (di_size dn))) k Hag ltac:(lia)).
+  apply (Hd Hty Hnl k Hk).
+  rewrite /dir_live (dir_inum_data_ext data data'
+             (16 * dir_nrec (bv_unsigned (di_size dn))) k Hag ltac:(lia)).
+  exact Hlv.
+Qed.
+
 (* ---- and the two facts that instantiate it at [era_node] ---------------- *)
 
 Lemma dir_nrec_bound (sz : Z) :
@@ -831,6 +861,35 @@ Proof.
   apply (inode_local_of_ok i cov ls dn bm data Hok Hty Hnl Hdsz).
   - exact (dir_uniq_data_ext dn data _ Hag Huniq).
   - exact (dir_dots_ix_data_ext i dn data _ Hag Hdots).
+Qed.
+
+(* THE THREE DIRECTORY CLAUSES, TRANSPORTED ONTO THE NODE (durable-disk
+   lane E-clauses).  A payload states them over its own total [data]
+   ([IcacheEscrow.ic_loaded], [ipool_alloc]); the snapshot states them over
+   the NODE ([FsStateInode.node_dir_local], carried by
+   [FsDurSnap.sk_dirloc]).  This is the one step between, and it is the
+   same [fb_agree] argument [inode_local_of_ok_data] runs. *)
+Lemma node_dir_local_of_ok (i : Z) (cov : gset Z) (ls : Z) (nib : nat)
+    (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  inode_ok cov ls dn bm data ->
+  dir_ok nib dn data ->
+  dir_dots_ix i dn data ->
+  dir_orphan_clean dn data ->
+  node_dir_local i nib (era_node dn bm data).
+Proof.
+  intros Hok Hdok Hdix Hdoc.
+  pose proof Hok as (_ & _ & _ & _ & Hsz & Hholes & _).
+  assert (Hb : (16 * dir_nrec (bv_unsigned (di_size dn)) <= MAXFILE * BSIZE)%nat).
+  { apply dir_nrec_bound; [| exact Hsz].
+    pose proof (bv_unsigned_in_range _ (di_size dn)) as [Hge _]. exact Hge. }
+  assert (Hag : fb_agree data (fn_data (era_node dn bm data))
+                  (16 * dir_nrec (bv_unsigned (di_size dn)))).
+  { apply (fb_agree_mono _ _ (MAXFILE * BSIZE) _ Hb).
+    apply fb_agree_sym. exact (era_node_fb_agree dn bm data Hholes). }
+  rewrite /node_dir_local era_node_rec. split_and!.
+  - exact (dir_ok_data_ext nib dn data _ Hag Hdok).
+  - exact (dir_dots_ix_data_ext i dn data _ Hag Hdix).
+  - exact (dir_orphan_clean_data_ext dn data _ Hag Hdoc).
 Qed.
 
 (* ===================================================================== *)

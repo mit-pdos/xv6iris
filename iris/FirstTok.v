@@ -714,6 +714,9 @@ Section FirstTok.
     - (* [cg_width] (durable-disk lane E-boot): the region's width tie, which
          is this lemma's own hypothesis. *)
       exact Hnibw.
+    - (* [cg_icfg] (durable-disk lane E-clauses): this record IS built at
+         [icfg_nib]. *)
+      reflexivity.
   Qed.
 
   Lemma first_fsinit_pures_of_image (dk : Z -> bv 8) (sb : FsImg.fs_sb)
