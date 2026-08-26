@@ -1364,5 +1364,6 @@ FsDurLedger.v
 IregClean.v
 FsCollect.v
 FsCollectImg.v
+FsBootWall.v
 FsCollectAll.v
 LogSnapLaw.v
