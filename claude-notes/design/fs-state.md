@@ -1538,118 +1538,46 @@ The rest is deleted when the `Γ`-predicates replace their consumers, not
 before.
 
 
-## 6½. The parent link is a REGISTER IN THE LINK RA, not a clause
+## 6½. The parent link is a REGISTER IN THE LINK RA, not a clause (RULING, lane G4)
 
-rmdir pays `dp->nlink--` with the child's `..` token, and needs the child's
-`..` to NAME `dp`.  That is cross-inode as a pure fact and is never stated
-as one, so it is a RESOURCE both parties hold.  The per-inum link RA at
-`γlink` is `auth nat × auth (gmultiset (option Z))` — the count authority as
-before, plus a PARENT REGISTER at the TARGET's key holding the multiset of
-inums that name it.
+Every dirent owns one unit of its TARGET's link count, tagged with the
+directory that holds the dirent: the per-inum link RA at `γlink` is
+`auth nat × auth (gmultiset (option Z))` — the COUNT authority, and the
+NAMER-MULTISET authority.  `..` is not special: it is a dirent in the
+child owning a unit at `dp`.  The one asymmetry is xv6's, not ours: `.`
+is uncounted by the kernel, so it is tokenless.
 
-- **The fragment rides with the entry token**, inside
-  `FsStateInode.ent_tok`, one per token-bearing entry, at
-  `ent_par_val self s`: `Some self` for a NAME record (its home names the
-  target), `None` for a dot record (it points the other way — but it still
-  holds a link, so it still holds a unit, which is what makes the bound
-  below survive the decrement that removes it).  It is UNCONDITIONAL: it
-  never asks what the target's TYPE is, and that is the whole reason this
-  shape works where a `dfrac_agree` pair of halves does not
-  (`iris/FsParRefute.v` is the machine-checked refutation: locality forces
-  the parent side to be unconditional, an unconditional half dies at the
-  third hard link, and the only unbounded-sharing alternative is core-id,
-  hence unretractable, hence incompatible with inode reuse).
-- **The authority is the child's own**, under one clause: `size P ≤ nlink`
-  (what makes a FREED inum's register empty, so the next `mkdir` can install
-  its own singleton) and — at a LIVE DIRECTORY — `∀ j, Some j ∈ P →
-  j = the node's own ".." target`.  Agreement of the two IS the parent fact:
-  `dp`'s entry says `Some dp ∈ P(child)`, the child says only its `..`
-  target may be there, so `dp` IS that target.
-- **The value is NOT fixed at the mint**, and that is forced by the kernel:
-  `sys_link` runs `ip->nlink++` BEFORE `nameiparent` resolves the directory
-  the new record will live in.  The unit is minted unattributed and
-  RE-VALUED at the `dirlink` that files it
-  (`IregLinkNz.ireg_par_revalue`, one mask-preserving step on the target's
-  own slot).  `create`/`mkdir` know `dp` at the mint and pass the value
-  straight through.
+- **Where the two authorities live.**  The count authority stays
+  REGION-SIDE (`InodeRegion.ireg_lnk_at`): `iget`'s licence confronts a
+  token with the target's authority without holding the target.  The
+  namer authority lives IN THE INODE'S OWN PAYLOAD (`IcacheEscrow.dlinks`,
+  beside its data and its record); the product RA splits componentwise.
+- **No re-value.**  A FILE's unit is minted at its `nlink++` under its
+  own lock (`sys_link`, before `nameiparent`) as `None` and stays `None`
+  — nobody needs a file's namers to be exact.  A DIRECTORY's units are
+  minted only by `mkdir`, under the child's lock, by a walk that knows
+  `dp`: `Some dp`.  So the namer authority is only ever touched under the
+  target's lock, which is what lets it sit in the payload.
+- **The content clause is one-holder** (`inode_par_namer`, in the
+  payload): for a live directory (type DIR, `nlink ≠ 0`), every `Some j`
+  in its namer multiset has `j` = its `..` entry's target, and
+  `size P ≤ nlink` off its own record.
+- **rmdir** (both locked): the child's payload says namers = {`Some X`}
+  with `X` its `..` target; `dp`'s dirent unit for the child is `Some dp`;
+  hence `dp = X`, and `dp->nlink--` is paid with the child's `..` unit.
+  `2 ≤ nlink dp` is TRUE and needed (an orphan directory holds only dots;
+  `dp` still has entries) and is read off `dp`'s payload: its `..`-unit
+  count is below `nlink` at a live directory.
+- **What dies:** the old ledger's `p`/`iparent`/`ilinkdp` column,
+  `DirLinks.dir_par_tie`, `dir_links`, the flavoured columns — every
+  two-holder tie.  `iris/FsParRefute.v` records why a ½-agreement in
+  `dp`'s bundle keyed by the target's type cannot be stated.
 
-The snapshot states nothing new: `snap_bytes`' `sk_links` is the validity of
-the RA element built from `S`, and with the richer RA that element carries
-the register, so its validity IS the parent fact.  Read off the collected
-units at a commit (`own_valid`), allocated and distributed at boot exactly
-like the tokens.
-
-**THE RMDIR ARM'S OTHER READING, `2 ≤ nlink dp`, IS TRUE, IS NEEDED, AND
-COMES OFF THE REGISTER TOO** (lane G3; this paragraph corrects the earlier
-ruling, which said it was false and dropped it).  It is not droppable: the
-decrement can take `dp` to zero, and at zero `dp`'s payload owes
-`DirView.dir_orphan_clean` — an orphan directory's live records are exactly
-its dots — which is FALSE of a `dp` that still holds other entries.  That
-clause is fs-fragments F1.5d's isdirempty plank and `FsDurSnap.sk_dirloc`
-reads it, so deleting the demand is not an option either.  And the reading
-IS true of this binary: a directory is never hard-linked, `unlink` refuses a
-non-empty one, and both `create` and `sys_link` refuse to `dirlink` into a
-directory whose count has already fallen to zero, so a live subdirectory
-record implies its home still has a name of its own.
-
-The register states it with TWO clauses, both readings of the RECORD, so
-both stand region-side beside the bound (`InodeRegion.ireg_par`):
-
-- **(U1)** at a record that is not a directory the register holds no
-  up-pointing namer — `ireg_ups P = 0`, where `ireg_ups` is the
-  multiplicity of `None`;
-- **(U2)** a LIVE record's count exceeds its up-pointing namers,
-  `ireg_ups P < nlink`, i.e. "a live inum has at least one NAME".
-
-(D2) is then one step: `dp` holds the child's `..` unit, so `ireg_ups
-P(dp) ≥ 1`, so `nlink dp ≥ 2` (`InodeRegion.ireg_lnk_up_min2`, accessor
-`IregLinkNz.ireg_par_up_min2`).  **There is no root exception**: the root's
-`..` is a SELF record and tokenless, so an empty root sits at `0 < 1` and
-each subdirectory raises both sides by one — the same slack `ireg_keep`
-parks, read from the other end.  (U1) is what makes (U2) inductive: dropping
-a NAME unit at a node that stays live has to leave a name behind, and the
-only locally evident case is "no up-pointing namers at all", i.e. "not a
-directory" — which matches the kernel's two shapes exactly (a file loses one
-of several names; a directory loses its only name and dies with it).
-
-WHERE THE AUTHORITY LIVES decides which half of the DIRECTORY clause can be
-stated.  The inode REGION's slot carries a record and no data, so
-region-side it can state `size P ≤ nlink` plus (U1)/(U2) and nothing more;
-the clause "a live directory admits only its own `..` target as a namer",
-which is rmdir's (D1), reads the node's `..` ENTRY and would therefore have
-to live in the checked-out payload (`IcacheEscrow.dlinks`, whose `data`
-parameter is right there).
-
-**AND IT CANNOT MOVE THERE — lane G3's finding, and it is the resource
-design, not the value side.**  Putting the authority in the payload makes
-`IregLinkNz.ireg_par_revalue` unreachable: `sys_link` raises `ip->nlink`
-BEFORE `nameiparent` runs, so the unit is minted unattributed and re-valued
-at the `dirlink` that files it — and by then xv6 has run `iunlock(ip)`, so
-the walk holds only `IcacheRef.inode_ref` for `ip` (its two identity cells)
-and `dp`'s payload.  `ip`'s own payload is checked in, in the escrow, behind
-a sleeplock the code does not re-take.  The witnesses are
-`iris/ProofSysLink.v:1818` (the mint, which cannot know the namer) and
-`iris/ProofSysLink.v:2961` (the re-valuation, which reaches the authority
-through `ireg_inv` at `iregN` precisely because it is region-side).
-
-Two repairs are available and the choice belongs to the owner:
-
-1. **Keep the `p` column** (`IcacheRef`'s `option (dfrac_agree Z)` and
-   `DirLinks.dir_par_tie`) as the two-holder tie for (D1), relocated out of
-   `DirLinks.v`, and let the register replace `wl`/`wdu`/`wdt`/`g` only.
-   The `wdt` TICKET (`ilinkdp`) can still go: with a region-side clause
-   tying `p` to the register (`type = DIR → p = Some pv → ∀ j, Some j ∈ P →
-   j = pv`), (D1) is "borrow `dp`'s entry unit for `ip`, open the region,
-   read `p`, agree with the payload's `dir_par_tie`".  Nothing new is
-   allocated and `linkElemUR0` narrows to `c/r/rc/f/p`.
-2. **Give the register a third kind of value** — a "self-up" unit at the
-   node's OWN key recording its `..` target, minted by the `dirlink` that
-   writes `..`, NOT counted by `size P ≤ nlink` (the bound gains `+1` at a
-   live directory, which the region can see) and carried in `dlinks` as a
-   FRAGMENT computed from the data.  Then (D1) is region-side too and the
-   `p` column dies.  This one DOES hit the value side: the register's value
-   type widens, which is `link_elem`/`img_par`/`fs_boot_alloc*`/`sk_links`/
-   `dhand` again.
+The snapshot states nothing new: `sk_links` is `✓ link_elem S`; validity
+is the fact; read off the collected resources at a commit (`own_valid`),
+allocated and distributed at boot like the tokens (the value-first form
+lane H deletes — a directory child's token is `Some dp`, a file's `None`,
+which at the value level reads the target's type in one place).
 
 ## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
 
