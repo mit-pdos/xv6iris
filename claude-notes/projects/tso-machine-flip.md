@@ -1,6 +1,15 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE A6.26 TRANCHE (2026-08-26, later session).  A6.24 IS LANDED
+STEP 5, THE RATIFIED TRANCHE (2026-08-26, latest session).  A6.30's rule
+is RATIFIED and implemented: **the A/D write-back is PAID**, at
+`HartSKpt`'s `wpte_obl_at` seam, and `HartSKpt` is GREEN along with
+`SRegime`/`IntrDefs` (the exec lane threaded) and `KstackOwn`.  The A6.18
+acceptance compile is STILL not reached — A6.33 is the verdict and names
+the blocker, which is A6.18's own predicted store half.  Clean build:
+**550 of 1330, EIGHT red** (up from 513).  A6.32–A6.35 are the record;
+**A6.35 is the frontier**.
+
+STEP 5, THE A6.26 TRANCHE (2026-08-26, earlier session).  A6.24 IS LANDED
 (`KptTree` + both callers), A6.17's cascade is landed at its leaves
 (`StackOwn`/`WpMmodeLoad`/`WpTimerinit`), and `WpUart`'s plumbing is
 A6.11-shaped with ONE open goal.  Clean build: **513 of 1330, EIGHT red**.
@@ -2450,6 +2459,196 @@ verification entry AND is red on A6.7(B)'s own leftover.)
 `UptTree`, `PtTree`/`PtBuild`'s consumers, `StackOwn`, `HartMLoad`,
 `WpMmodeLoad`, `WpTimerinit`, `TsoCtx` (the author-generic ledger gate),
 and `WpUart`'s five closing arms.
+
+### A6.32 THE A/D WRITE-BACK IS PAID — `HartSKpt` IS GREEN, AND A6.30's RULE
+### IS WHAT FOUND THE PAYMENT POINT (ratified tranche, ruling 2)
+
+**LANDED, and it is the confirmation of A6.30(b).**  `HartSKpt` is GREEN.
+Three pieces:
+
+1. **`HartMStore.wobl_ram_ledger` and `wobl_ram_ledger_ex`** — the
+   context-free twins of `wobl_ram_ctx`: a window of UNREGISTERED ledger
+   bytes pays the flat update and the append's THREE ghost steps, with NO
+   `own_context`.  **The `_ex` form is the one the page table needs and it
+   was not predicted**: the Svadu A/D write-back is a CONDITIONAL write
+   (`HartMStore.mwrite_req8_con` is `AV_exclusive`), so `wstore_tv` puts the
+   hart's view PAST its own append and the plain form's `ak_excl = false`
+   premise is unsatisfiable there.  Only the view arithmetic differs; the
+   gate is the same.
+2. **`HartSKpt.kpt_leaf_write_node` is now stated AT `PtTreeAdue.wpte_obl_at`**
+   and discharges it against the `None`-tier slot `kpt_body` now holds.
+   This is A6.30(b) realised: the obligation is a CALLBACK, so the seam
+   holds the slot AND the bundle at the same instant — which is exactly what
+   the gate needs, since the interp's tie means neither the flat cell nor
+   the ledger may move without the other.
+3. **`kpt_leaf_node_canon_obl`** — the read seam at `xread_obl_ex`, a pure
+   framing wrapper.  The bundle-FREE `kpt_leaf_node_canon` KEEPS its own
+   consumer (`swp_read_pte_kpt_ex`, the leaf read node), which is why this
+   is a wrapper and not a restatement.  A PTE read is `Read_ttw`, RULING 1's
+   flat arm, and owes no ghost step at all.
+
+**AND THE EXEC LANE WAS THREADED ANYWAY, because it has to COMPILE even
+though it cannot pay.**  A6.30(a) measured that `sr_absorb` dead-ends in
+consumer-free lemmas; it does not follow that it can be left alone, because
+`KptShare.tlb_res_pt_translateAddr_at` is its instance.  So `Sto`/`Stoq` and
+the address-generic payer wand now ride through **both `s_regime` record
+fields** (`sr_absorb`, `sr_absorb_wit`) and all of their instances and
+dispatchers: `bare_absorb(_wit)` (returns `Sto` untouched — Bare translates
+without touching memory), `res_absorb(_wit)`, `sr_absorb_ktier`,
+`IntrDefs.strans_absorb(_wit)`.  `SRegime` and `IntrDefs` are GREEN.  The
+record's payer is stated over `TsoCtx.phys_ledger_word` and that is not a
+narrowing: the `s_regime` face only ever carries the SHARED KERNEL table or
+Bare — a user page table translates through `UptTree`, not through this
+record.
+
+### A6.33 THE A6.18 ACCEPTANCE COMPILE, THIRD ATTEMPT: STILL NOT REACHED —
+### AND THE THING IN THE WAY IS THE ONE A6.18 ITSELF PREDICTED
+
+**VERDICT, stated plainly: `WpSconfMem.vo` STILL DOES NOT EXIST.**  The
+blocker is no longer `HartSKpt` (green) or A6.21 (landed).  It is
+`SmodeCorePt`, and it is **A6.18's own "THE STORE HALF IS THE HIDDEN HALF"
+coming due** — measured this session, at every call site:
+
+> `SmodeCorePt.s_win_write` (`:362`), `word_pointsto_write_c` (`:394`) and
+> `word4_pointsto_write_c` (`:416`) change the VALUE of a now
+> context-indexed byte using `gen_heap_interp` ALONE.  They compiled only
+> through `TsoCtxShim.ctx_pointsto_{to,of}_mem`, which no longer exist.
+> **`TsoCtx` exports no law that can replace them**, and that is by design:
+> every value-changing law (`ctx_store_ok` / `_win_ok` / `_sub_ok`,
+> `ledger_store_ok` / `_win_ok`) takes `gen_heap_interp` AND `tso_interp_at`
+> TOGETHER, plus `own_context` at the registered tier.  The only update
+> concluding a `ctx_pointsto` at an UNCHANGED value is
+> `ctx_pointsto_persist` (a dfrac move).
+
+**THE OBLIGATION IS ALREADY THE RIGHT SHAPE; THE PROOFS ARE STALE.**
+`HartSMem.Wobl_ram` (`:3541`) is bundle-carrying, and so is the AMO twin
+inside `swp_execute_AMOSWAP_S_ex_mode` (`HartSMem.v:4937`).  Every one of
+the six consumers still enters the write node with the OLD one-binder
+intro (`iIntros (sigma) "Hsi"`), so the bundle is OFFERED and never taken.
+The full site table, which is the worklist:
+
+| site | enclosing lemma | bundle taken? | `own_context` |
+|---|---|---|---|
+| `WpSconfMem.v:216` | `wordw_pointsto_write_c` (`:203`) | no — helper, no bundle in its statement | no |
+| `WpSconfMem.v:245` | `mem_pointsto_write_c` (`:230`) | no — same | no |
+| `WpSconfMem.v:1190` | `wp_store_s_sconf_au` (`:1023`) | offered by `Wobl_ram`, not intro'd | **OWNED** (`sie_cap_gpr`, destructured `:1082`) but parked on the `swp_mono` POST bracket at `:1140` |
+| `WpSconfLock.v:1105` | `wp_amoswap_lockopen_s_sconf` (`:906`) | offered, not intro'd | **OWNED** (`:917`, destructured `:962`), parked on the post bracket at `:1019` |
+| `WpSmodePtLeaves.v:1027` | `wp_csd_s_r_t` (`:856`) | offered, not intro'd | **ABSENT from the whole file** |
+| `WpSmodePtMem.v:1806` | `wp_csw_s_r_t` (`:1624`) | offered, not intro'd | **ABSENT** |
+| `WpSmodePtMem.v:2111` | `wp_sd_s_r_t` (`:1929`) | offered, not intro'd | **ABSENT** |
+
+So the tranche splits cleanly in two, and the split is the useful part:
+
+- **`WpSconfMem` and `WpSconfLock` need NO new premise.**  They already own
+  the token through `IntrDefs.sie_cap`; it is merely routed into the
+  `swp_mono` POST bracket instead of the engine's.  Re-route it, take the
+  `img log tv V` binders and the bundle the obligation already hands over,
+  and pay with a bundle-carrying restatement of the two helpers.  **A6.18's
+  textual-invariance claim survives this**: the change is inside
+  `Local Lemma`s and a proof script, not in any of the ~20 exported
+  statements.
+- **`WpSmodePtLeaves` and `WpSmodePtMem` DO need one** — `own_context` does
+  not occur anywhere in either file; their premises are raw CSR cells.
+  These are the S-mode leaves that store a PTE from SOFTWARE, i.e. a USER
+  page table, which the storing thread owns — so `own_context cur_ctx` is
+  the honest premise, and this is the A6.14/A6.18 threading class already
+  ratified, just not yet reached.  It is a statement change on three leaves
+  plus their cones.
+
+**THE HELPERS' REPLACEMENT SHAPE**, so it is not re-derived: one
+bundle-carrying window store in `SmodeCorePt`, stated at the leaf's own
+footprint (`pa_of ppn a`, width `n`), taking `gen_heap_interp σ.(mem)`,
+`tso_interp_of img σ.(mem) log V` and `own_context cur_ctx`, returning the
+heap at `write_bytes` and the bundle at the appended log — i.e.
+`HartSMem.Wobl_ram`'s conclusion, proven by `TsoCtx.ctx_store_win_ok` after
+`TsoCtx.ctx_pointsto_phys` turns the VA window into the physical one
+(`kmap_at_agree` pins the page number; the tier pin comes out of the same
+destruct and goes back in on the way up).  `s_win_write`'s LIST-of-offsets
+shape does not survive: the gate is a WINDOW gate because a store is ONE
+append over n bytes, and both of its callers use `seq 0 n` or `[0]` anyway.
+
+### A6.34 THE BOOT MINT'S FAR END: THE BRIDGE IS LANDED, ITS HOLDER IS
+### LOCATED, AND ONLY THE CARVE'S RANGE PLUMBING IS LEFT (ruling 3)
+
+`TsoCtx` gained, both one-liners over the sealed bodies:
+
+    ledger_elem0 a dq        :=  a ↪[ts_name]{dq} 0
+    phys_ledger_of_elem      :  phys_pointsto a dq v -∗ ledger_elem0 a dq -∗
+                                phys_ledger a dq v
+    ctx_phys_pointsto_of_elem:  phys_pointsto a dq v -∗ ledger_elem0 a dq -∗
+                                ctx_phys_pointsto ξ a dq v
+
+**A6.9 IS NOT WEAKENED, and the ruling's condition is met.**  Nothing here
+MINTS an element.  `ledger_elem0` is the EXCLUSIVE twin of A6.10's
+`pristine_byte` (which is the same element DISCARDED), and its holder is
+the same one: **the era's initial-state ghost allocation** — the single
+place any timestamp element is ever created, and demonstrably the supplier
+already, since it is where `BootCarve.kernel_data_intro`'s `pristine_va`
+premise and its image bytes come from.  The two laws only let the carve
+pair an element back up with the byte it belongs to.  The timestamp is 0
+because the era's log is empty at allocation, which is also what makes the
+CLEAN arm free (`TsoGhost.llb`'s `⌜K = 0⌝` disjunct — no bupd, no context;
+the same trick A6.10 needed to make `kernel_data` mintable at all).
+
+**WHAT IS LEFT IS PLUMBING, NOT DESIGN.**  `BootCarve.boot_stack_own_phys`
+(`:1157`) builds `stack_own_phys` out of `boot_raw_ran` by induction, and
+`boot_raw_ran` is a big-op of bare `pointsto`s with its own split/word
+lemma family (`boot_ran_split`, `boot_ran_word`).  Giving the carve ledger
+bytes means carrying the element through THAT family — either a fused
+`boot_led_ran` with the three lemmas re-proven, or an element big-op over
+the same `ran_bytes` map split in step with it.  Either is mechanical; it is
+the only reason `BootCarve` is still red.
+
+### A6.35 THE FRONTIER AFTER THE RATIFIED TRANCHE — 550 OF 1330, EIGHT RED
+
+**ONE CLEAN BUILD** (`iris/*.vo` deleted, one `make -j12 -k`).  The A6.26
+integrity check holds: **558 attempted, 550 `.vo`, 8 errors** — every file
+`make` reached is accounted for.
+
+> **550 of 1330 fresh-green, up from A6.31's 513, with the red set still
+> at EIGHT.**  Both numbers moved the right way for once: the A/D
+> write-back being paid greened `HartSKpt` and unblocked ~37 files of its
+> cone, and nothing regressed.
+
+Green this tranche, each verified by its own `.vo`: **`HartSKpt`**,
+`SRegime`, `IntrDefs`, **`KstackOwn`**, `KptShare`, `KptTree`, `UptTree`,
+`HartMStore`, `TsoCtx`.
+
+    SmodeCorePt.v:380  A6.33 — the three gen_heap-only write helpers.  THIS
+                               is what now stands between the tree and the
+                               A6.18 acceptance compile.
+    WpUart.v:1002      A6.29 — the DMA completion (ruling 1; last by order)
+    BootCarve.v:1162   A6.34 — the carve's range plumbing (kit landed)
+    WpStartNew.v:1138  A6.28 — the M-mode store/load sites + Entry/BootChain
+    UserPtTree.v:1382  A6.27 — [Sto]/[Stoq] through five statements
+    TransPt.v:910      A6.27 — the same, one lane over
+    PtWalkCert.v:840   A6.7(B) — see A6.35's last paragraph
+    CpuOwn.v:110       NEW, and it is the OLDEST class in the port: a raw
+                       `mem_pointsto_ne` applied to a now-ctx byte — the M1
+                       flip's error class (a), one `ctx_` twin away.  It was
+                       never visible before because it sits behind
+                       `KstackOwn` in the DAG.
+
+**AND `WpSconfMem` IS STILL UNREACHED — for the THIRD tranche running.**
+`.vo` absent, along with `WpSconfLock`, `WpSmodePtMem`, `WpSmodePtLeaves`,
+`UserBytes`, `UmodeMem`, `ProcPtOwn`: they are all behind `SmodeCorePt`.
+A6.18's textual-invariance acceptance test therefore remains verified at
+the STATEMENT level only.  **A6.33 is now the whole of what stands in the
+way, and it is A6.18's own predicted store half** — so the next session's
+first move is `SmodeCorePt`'s three helpers, and its first check after that
+is `make WpSconfMem.vo`.
+
+**`PtWalkCert` IS NOT THE ONE-LINE FIX A6.31 CALLED IT.**  Measured: its
+`pr_exec_chk` (`:832`) is inside a section whose `res` is ABSTRACT
+(`Context (aq rl res : bool)`), so the patched `checked_mem_read`'s
+`match (access, res)` cannot reduce — at `Load PageTableEntry` the arm
+taken depends on `res` (`Read_ttw` when false, `read_kind_of_flags` when
+true, and the two are a `returnR` and a `liftR` respectively, so they do
+not even have the same sequencing lemma).  Worse, its two instantiations
+(`:970`, `:995`) name `Read_plain` for `res = false`, which the patch has
+made WRONG.  This is `MemAccessGen`'s case exactly, and it wants
+`MemAccessGen`'s fix: a side condition plus a `rk_select_*` rewriting
+lemma, so the long proof script is untouched.
 
 ## 7. Order of work
 
