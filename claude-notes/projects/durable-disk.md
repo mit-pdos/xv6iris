@@ -2346,6 +2346,79 @@ so it never wanted that shape.
     the three-entry baseline.  `ProofForkret.fkr_boot`'s "NOT PROVED YET"
     banner was stale and now says what the arm is.
 
+    **AS LANDED (E-clauses): THE ROOT'S SLACK, THE THREE DIRECTORY CLAUSES,
+    AND THE HOME BRIDGE.  Block 1's WAL row is the one wall.**
+
+    CLAUSE (3), the ROOT KEEP-ALIVE SLACK, is `FsDurSnap.sk_links` RESTATED
+    (not a second clause -- the plain form is its own left factor,
+    `sk_links_plain`, and the record has exactly two readers):
+    `✓ (link_elem (fss_inodes S) ⋅ link_tok_elem ROOTINO 1)`.  The mint's
+    one `own_alloc` at it yields `fs_links` plus the spare token
+    (`FsState.fs_boot_alloc_root_slack`).  Image witness
+    `FsDurImg.img_link_valid`, off `FsImg.fsimg_wf_root_link`; the slack
+    rides as one extra `ROOTINO` at the HEAD of `img_link_incl`'s ticket
+    list, and `link_elem_valid_of_root` generalises to an arbitrary slack
+    element.  Commit supplier: the region ALREADY produces the token at
+    every inum (`FsCollect.col_link_of`'s second conjunct, dropped until
+    now); `FsCollectAll.col_sides_bundles` keeps it as its own column,
+    `col_keeps_root` takes the root's, `col_hand` carries it, and
+    `col_snap_bytes` reads the clause by one `own_valid`
+    (`FsState.fs_links_valid_tok`).
+
+    THE THREE DIRECTORY CLAUSES ARE `FsStateInode.node_dir_local`, and they
+    are `snap_bytes`' new LAST clause `sk_dirloc` -- NOT `inode_local`
+    clauses, and one of them CANNOT be: `inode_local i n` takes an inum and
+    a node and nothing else, while `DirView.dir_ok` needs the region's
+    WIDTH.  A `snap_bytes` clause may read `S`'s own superblock (`sk_regdom`,
+    `sk_reg`, `sk_own_used` all do), so all three travel there at
+    `snap_nib S = ninodes/16 + 1`.  The second consequence is that the ~25
+    `FsStateEra.inode_local_of_ok_rec` call sites -- ProofCreate,
+    ProofSysLink*, ProofSysUnlink*, ProofIlock, ProofSysOpen, ProofFilewrite,
+    IcacheEscrow, IcacheBoot -- do not move at all.
+    Suppliers: `FsDurImg.img_node_dir_local` off `FsImgBridge.img_dir_ok` /
+    `img_dir_orphan_clean` and `FsImg.fs_dots_wf_ok` (W6/W7/W8, nothing
+    recomputed) at the image; at the commit the payloads carry all three
+    already, so `IcacheEscrow.ic_slot_cover`'s bundle alternative and
+    `FsCollect.col_side` lend them out beside the node
+    (`FsStateEra.node_dir_local_of_ok` is the `(dn, bm, data)` -> node
+    transport, over two new `fb_agree` laws) and `col_hand`'s new last row,
+    collected by `FsCollectAll.col_bundles_dirloc`, is what `col_snap_bytes`
+    reads `sk_dirloc` off.  `FsCollect.col_geom` gained `cg_icfg :
+    nib = icfg_nib` for it (`FirstTok.col_geom_of_image` builds the record AT
+    `icfg_nib`, so it is `reflexivity`), and `Section Collect`'s `ICFG`
+    context moved up out of its four nested sections.
+    `FsDurSnap.snap_node_dir_local` is the mint-side reading: `ipool_alloc`'s
+    three `DirView` premises off the snapshot's node.
+
+    THE HOME BRIDGE is `FsDurSnap` section 9a: `blk_ledger_of_home` (one
+    `FsBlocks.fsblock` per home block IS `blk_ledger` at
+    `fs_restrict P home`, no side condition) plus `snap_names` /
+    `snap_names_dom` / `snap_names_home` / `snap_names_cov` -- every block
+    the snapshot names is a block of `D`, hence a HOME block, hence covered
+    and outside the log region.  That is `InodeLock.inode_ok`'s
+    coverage/log-disjointness pair with NO new clause, and it is pure
+    bookkeeping over `fs_restrict`.
+
+    **THE WALL: BLOCK 1 IS NEVER LOGGED is a WAL row, and it cannot be
+    landed from this side.**  `FsCrash.fs_recovery_untouched` is the mint's
+    reading (recovery leaves a home block the header does not name alone,
+    off `fs_install_miss`), with the missing premise NAMED rather than
+    assumed.  Closing it is three edits and every one of them lands on a
+    file this lane may not touch or on the WAL: `LogInv.log_state`'s
+    existing pure row about `W` gains `uint w <> SB_BNO`; `ProofLogWrite`'s
+    append path re-establishes it -- either from the resource refutation
+    (`SbPark.sb_park` holds block 1 at fraction 1 inside `log_ctx`, so no
+    `log_write` can own the bytes) or from one more `SpecLogWrite` premise
+    beside the `log_region_set` one, which is ~20 call sites including
+    `InodeRegion` and `SpecIupdate`/`ProofIupdate`; and `hdr_wf` gains the
+    same conjunct so it survives a power cycle, costing ONE premise on
+    `FsCrash.fs_commit_L_sector0_rec` (the only permit that writes a nonzero
+    header -- every other `hdr_wf` producer is `hdr_wf_zero` or an
+    "the header did not change" congruence) plus its discharge in
+    `ProofEndOp`.  `hdr_wf`'s own footprint is TINY (FsCrash, SpecInitlog,
+    SystemAdequacy); `log_state` is constructed only in ProofInitlog,
+    ProofBeginOp, ProofLogWrite, ProofEndOp and the install path, and in NO
+    forbidden file.
   - **E-recover** (fs-log.md stage 4) — real `n > 0` recovery in
     `initlog`/`install_trans`, with the WAL-owned exception set for the
     ≤ LOGSIZE pending home blocks that `install_trans` shrinks (plan §5);

@@ -697,6 +697,51 @@ Proof.
   - by rewrite fs_install_miss.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* 1c''. WHAT RECOVERY LEAVES ALONE (durable-disk lane E-clauses, plan       *)
+(*       section 5's "one small fact the mint needs").                       *)
+(*                                                                          *)
+(* [fsinit] calls [readsb] BEFORE [initlog], so the superblock record the    *)
+(* whole file-system configuration is built from ([IcacheRef.icfg_nib],      *)
+(* [icfg_ist], the region geometry) is decoded from the RAW disk, while the  *)
+(* snapshot the boot mint reads describes the RECOVERED view [D].  The two   *)
+(* agree at a home block exactly when the on-disk log's write set does not   *)
+(* name it, and that is all recovery does: [fs_install] touches the blocks   *)
+(* the header names and nothing else ([fs_install_miss]).                     *)
+(*                                                                          *)
+(* THE PREMISE IS A REAL, OPEN WAL OBLIGATION, AND IT IS SCOPED HERE RATHER  *)
+(* THAN ASSUMED.  "The write set never names block 1" is TRUE of this        *)
+(* kernel -- [SbPark.sb_park] holds block 1's byte run at FRACTION 1 inside  *)
+(* an invariant [log_ctx] carries, so no [log_write] can ever own the bytes  *)
+(* it would have to own to log that block -- but it is not yet a MAINTAINED  *)
+(* row anywhere, so it appears below as a hypothesis and NOT as a clause of  *)
+(* [hdr_wf].  Closing it is three edits, none of which is this lane's:       *)
+(*                                                                          *)
+(*   - [LogInv.log_state]'s existing pure row about [W] ("logged blocks are  *)
+(*     covered HOME blocks") gains [uint w <> SB_BNO];                       *)
+(*   - [ProofLogWrite]'s append path re-establishes it, either from the      *)
+(*     resource refutation above or from one more [SpecLogWrite] premise     *)
+(*     beside the [log_region_set] one it already takes (~20 call sites,     *)
+(*     each discharging it from geometry it already carries);                *)
+(*   - [hdr_wf] gains the same conjunct so it survives a power cycle, which  *)
+(*     costs one premise on [fs_commit_L_sector0_rec] (the only permit that  *)
+(*     writes a NONZERO header; every other producer is [hdr_wf_zero] or an  *)
+(*     "the header did not change" congruence) and its discharge in          *)
+(*     [ProofEndOp] off the row above.                                       *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma fs_recovery_untouched (P : Z -> list (bv 8)) D (cov : gset Z)
+    (logstart b : Z) :
+  fs_recovery P D cov logstart ->
+  b ∈ fs_home_set cov logstart ->
+  b ∉ (hdr_dec (P (log_hdr_bno logstart))).2 ->
+  D !! b = Some (P b).
+Proof.
+  intros -> Hhome Hout.
+  rewrite /fs_recovery (fs_install_miss P logstart _ _ b Hout).
+  apply fs_restrict_lookup_Some. split; [exact Hhome | reflexivity].
+Qed.
+
 (* Two congruences.  The first needs no uniqueness (only the slot contents
    move); the second lets the home map move too, at keys the write set names,
    and that is where NoDup is unavoidable. *)

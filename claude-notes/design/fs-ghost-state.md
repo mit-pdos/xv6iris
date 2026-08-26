@@ -282,11 +282,13 @@ disturb it and why it is not carried through one.  `snap_bytes` is a
 * `sk_pool` — every block below `sb_size` whose bit reads FREE is a block of `D`.
 * `sk_inum` / `sk_repr` / `sk_dom` — the inum range, one node's representability, and "the region's inums are all named".
 * `sk_rec` / `sk_blk` / `sk_ind` — the three BYTE ties (record slot, data block, indirect block).  All three are AGREEMENTS at the commit, so any share suffices.
-* `sk_links` — `✓ link_elem (fss_inodes S)`, the tokens-≤-nlink law: carried, never maintained, and needed because `own_alloc` needs a valid element.
+* `sk_links` — `✓ (link_elem (fss_inodes S) ⋅ link_tok_elem ROOTINO 1)`, the tokens-≤-nlink law SLACKED BY ONE TOKEN AT THE ROOT: carried, never maintained, and needed because `own_alloc` needs a valid element.  The slack is the root's keep-alive token (`InodeRegion.ireg_keep`, which `ent_tokenless`'s SELF exemption leaves unaccounted for), so the mint's one `own_alloc` yields `fs_links` plus that token (`FsState.fs_boot_alloc_root_slack`); `sk_links_plain` is the unslacked left factor the allocator takes.
 * `sk_meta_used` — the metadata roles are marked IN USE, so a block whose bit reads clear is none of them.
 * `sk_own_used` — every node's own blocks are in use and none of them is metadata.
 * `sk_disj` — no two nodes share a block.
 * `sk_sbok` / `sk_reg` / `sk_slot` — the three CUT clauses a LINEAR ledger needs on top of the coupling: the superblock's own geometry (`FsImg.fs_sb_ok`), "every named inum sits in the region", and `FsImg.fs_slot_inj` ("one node never names one block twice").
+* `sk_regdom` — the region's TAIL inums are named too: every `i` in `[0, 16·(ninodes/16 + 1))` has a node.  The width is spelled off `S`'s OWN superblock, because a `snap_bytes` clause is a function of `S` and `D` alone.
+* `sk_dirloc` — the three DIRECTORY clauses every escrow payload carries, at the node: `FsStateInode.node_dir_local i (snap_nib S) n` = `DirView.dir_ok` (every live entry's inum is inside the region) ∧ `dir_dots_ix` (a LIVE directory's records 0 and 1 POSITIONALLY are the dots — stronger than `inl_dir_dot`/`inl_dir_dotdot`, which are about the name→inum view) ∧ `dir_orphan_clean` (an orphan directory holds only dot records).  **It is here and not in `inode_local` because `dir_ok` needs the region's WIDTH** and `inode_local i n` takes an inum and a node and nothing else; a `snap_bytes` clause may read `S`'s superblock, exactly as `sk_regdom`/`sk_reg` do.  `IcacheEscrow.ipool_alloc` takes all three, so a boot mint that re-founds the pool needs them; `FsDurSnap.snap_node_dir_local` is that reading.
 
 `sk_meta_used`/`sk_own_used`/`sk_disj` are THE ONE SANCTIONED whole-state
 pure clause (plan §4): read off the `∗` at a commit (two full elements, or
