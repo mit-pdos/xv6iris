@@ -2341,6 +2341,42 @@ Section EraRes.
      the record count, so the entry map -- hence the token map -- is the
      same one.  The [then] branch of the range clause is a PARAMETER, so a
      caller passes its own without restating it. *)
+  (* the no-write arm's entry map does not move at all -- the pure half of
+     [ent_toks_dirlink_nop], which is what re-seals the marker set. *)
+  Lemma dir_entries_dirlink_nop_eq (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8)) (f : nat -> bv 8)
+      (nrec k0 tot : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    (k0 <= nrec)%nat -> tot = 0%nat ->
+    di_type dn' = di_type dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then f (x - 16 * k0)%nat
+         else file_byte data x) ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_entries (era_node dn' bm' data') = dir_entries (era_node dn bm data).
+  Proof.
+    intros Hnrec Hk0le Htot Hty Hsz Hrng Hh Hh' Hb Hb'. subst tot.
+    assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+    destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+    rewrite <- Hnrec in Hnr1, Hnr2.
+    assert (Hszeq : bv_unsigned (di_size dn') = bv_unsigned (di_size dn))
+      by (rewrite Hsz; lia).
+    assert (Hbytes : forall x : nat, file_byte data' x = file_byte data x).
+    { intros x. rewrite (Hrng x). rewrite decide_False; [reflexivity | lia]. }
+    rewrite (dir_entries_era_node dn bm data Hh Hb)
+      (dir_entries_era_node dn' bm' data' Hh' Hb') Hty Hszeq.
+    destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
+      [| reflexivity].
+    apply dir_view_data_ext. intros y _. exact (Hbytes y).
+  Qed.
+
   Lemma ent_toks_dirlink_nop (Γ : fs_view_names Σ) (i : Z)
       (dn dn' : dinode) (bm bm' : blkmap)
       (data data' : nat -> list (bv 8)) (f : nat -> bv 8)

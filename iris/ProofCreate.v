@@ -900,6 +900,29 @@ Proof.
   - rewrite Hdty. intros Hc. apply Hne. apply bv_eq. exact Hc.
 Qed.
 
+(* the fail arm's [ip->nlink = 0] retires exactly what the fill minted:
+   the record it writes has count zero, so [ireg_dot_delta] is TWO at a
+   directory and ONE at a file -- [cr_delta] on the nose. *)
+Lemma cr_delta_eq (ty major minor : mword 16) (dnc : dinode) (nl : mword 16) :
+  di_type dnc = ty -> bv_unsigned nl = 0 ->
+  InodeRegion.ireg_dot_delta
+    (bv_unsigned (di_type (cr_setf dnc major minor nl)))
+    (bv_unsigned (di_nlink (cr_setf dnc major minor nl))) = cr_delta ty.
+Proof.
+  intros Hty Hz.
+  rewrite cr_setf_type cr_setf_nlink Hty Hz
+    /InodeRegion.ireg_dot_delta /cr_delta
+    (bool_decide_eq_true_2 (0 = 0) eq_refl) andb_true_r.
+  assert (Hdty : InodeRegion.ireg_dir_ty = bv_unsigned SpecDirlookup.T_DIR)
+    by (vm_compute; reflexivity).
+  rewrite Hdty.
+  destruct (decide (ty = SpecDirlookup.T_DIR)) as [-> | Hne].
+  - rewrite (bool_decide_eq_true_2 _ eq_refl) //.
+  - rewrite (bool_decide_eq_false_2
+               (bv_unsigned ty = bv_unsigned SpecDirlookup.T_DIR)
+               ltac:(intros Hc; apply Hne; by apply bv_eq)) //.
+Qed.
+
 Lemma cr_ity_dir (ty : mword 16) (dpv : Z) :
   ty = SpecDirlookup.T_DIR -> cr_ity ty dpv = TDir dpv.
 Proof. intro H. rewrite /cr_ity decide_True; [reflexivity | exact H]. Qed.
@@ -6353,7 +6376,8 @@ Section ProofCreateMain.
              (* nothing was written, so the tokens ride and the [+0xc4]
                 mint's unit travels on to the fail arm's [ip->nlink = 0]
                 (durable-disk 2b-inode-5). *)
-             iDestruct (dlinks_intro with "Hdlnk Hetk") as "Hdlnk".
+             iDestruct (dlinks_intro _ _ _ _ _ D Hdok0 Hxact0
+                          with "Hdlnk Hetk") as "Hdlnk".
              iEval (rewrite -Hglog) in "Htx".
              iSpecialize ("Hfl" $! kd qd gd γil γisl dind dn bm data nf nsl t).
              iPoseProof ("Hfl" $! CIDE1) as "Hf".
@@ -6852,22 +6876,21 @@ Section ProofCreateMain.
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
-              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) pidv
+              u0 Sb4 true (cr_flav ty (bv_unsigned dind))
+              (cr_ity ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab
               ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
               Hdec
-              (* (U2): the fail arm writes [nlink = 0], so the retired NAME
-                 unit leaves no live record behind to owe a name. *)
-              ltac:(intros jz _; left; rewrite cr_setf_nlink;
-                    vm_compute; reflexivity)
               Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
-                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken [] Hppid Hprocs
+                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink [Htoken] [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
+    { rewrite (cr_delta_eq ty major minor dnc (mword_of_int 0 : mword 16)
+                 Htyc ltac:(vm_compute; reflexivity)). iExact "Htoken". }
     { iLeft. iSplit; iPureIntro; [exact Hglog | exact Hist]. }
     iIntros (CIDG4 HsG4 mfl)
       "%Hcsfl Hcg Hcnt Hpc Hppid Hcidev Hciinum Hcmeta Hcmap Hsbi Hcdiat
@@ -7150,12 +7173,31 @@ Section ProofCreateMain.
                  (fun j => dirent_bytes (de_of_name (cr_low16 cinum)
                              (bname 14 nf)) !!! j)
                  (dir_nrec (bv_unsigned (di_size dn)))
-                 (dir_slot data (dir_nrec (bv_unsigned (di_size dn)))) 0%nat
+                 (dir_slot data (dir_nrec (bv_unsigned (di_size dn)))) 0%nat D
                  eq_refl Hk0le eq_refl Hty' Hnl' Hszmax Hrng
                  (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hiok))))))
                  Hholes' Hszcap Hszcap'
                  with "Hetk") as "Hetk".
-    iDestruct (dlinks_intro with "Hdlnk Hetk") as "Hdlnk".
+    assert (Heqent0 := dir_entries_dirlink_nop_eq dn dn' bm bm' data data'
+               (fun j => dirent_bytes (de_of_name (cr_low16 cinum)
+                           (bname 14 nf)) !!! j)
+               (dir_nrec (bv_unsigned (di_size dn)))
+               (dir_slot data (dir_nrec (bv_unsigned (di_size dn)))) 0%nat
+               eq_refl Hk0le eq_refl Hty' Hszmax Hrng
+               (proj1 (proj2 (proj2 (proj2 (proj2 (proj2 Hiok))))))
+               Hholes' Hszcap Hszcap').
+    assert (Hgrow0 : forall s', is_Some (dir_entries (era_node dn bm data) !! s')
+                                -> is_Some (dir_entries (era_node dn' bm' data') !! s'))
+      by (intros s' Hs'; rewrite Heqent0; exact Hs').
+    iDestruct (dlinks_intro _ _ _ _ _ D
+                 ltac:(exact (FsStateInode.ent_dset_ok_grow _ _ D
+                                Hgrow0 Hdok0))
+                 ltac:(exact (FsStateInode.node_exact_cong _ _ D
+                                ltac:(rewrite /fn_is_dir /fn_type !era_node_rec
+                                        Hty' //)
+                                ltac:(rewrite /fn_nlink !era_node_rec Hnl' //)
+                                Hxact0))
+                 with "Hdlnk Hetk") as "Hdlnk".
     assert (Hiok' : inode_ok cov logstart dn' bm' data').
     { rewrite /inode_ok. split_and!.
       - exact Hwf'.
@@ -7810,7 +7852,8 @@ Section ProofCreateMain.
     iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) dc bmc
-              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) pidv
+              u0 Sb4 true (cr_flav ty (bv_unsigned dind))
+              (cr_ity ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
@@ -7821,9 +7864,11 @@ Section ProofCreateMain.
                     vm_compute; reflexivity)
               Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
-                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken [] Hppid Hprocs
+                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink [Htoken] [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
+    { rewrite (cr_delta_eq ty major minor dnc (mword_of_int 0 : mword 16)
+                 Htyc ltac:(vm_compute; reflexivity)). iExact "Htoken". }
     { iLeft. iSplit; iPureIntro; [exact Hglog | exact Hist]. }
     iIntros (CIDG4 HsG4 mfl)
       "%Hcsfl Hcg Hcnt Hpc Hppid Hcidev Hciinum Hcmeta Hcmap Hsbi Hcdiat
