@@ -209,6 +209,12 @@ deterministic.
 
 ### 0.8′ THE M1 NOTATION FLIP, STAGE 1 (2026-08-25/26) — ↦ₘ AND ↦₈ ARE CONTEXT-INDEXED
 
+**THE REPLAY RUNBOOK IS ITS OWN FILE:**
+[`tso-flip-replay.md`](tso-flip-replay.md) — the re-application
+process for main (passes, tool invocations, the error-class → fix
+table, the three probes, the landmines).  This section keeps the WHAT
+and the WHY; that file keeps the HOW.
+
 **What flipped.** `TsoCtx.v` re-declares all four `↦ₘ` spellings as
 `ctx_pointsto cur_ctx …` and all four `↦₈` spellings as
 `ctx_word_pointsto cur_ctx …` (a full word tower — `ctx_word_pointsto`
