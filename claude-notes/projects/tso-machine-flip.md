@@ -38,6 +38,20 @@ the `ctx_dom` transport; `lk_cpu_cell_acc` is gone; `disk_step` yields its
 write set).  A6.8–A6.14 below are the record; A6.13 is the standing
 frontier and A6.14 the one tranche that remains.
 
+THE A6.14 TRANCHE (2026-08-26, next session).  `ctx_store_ok` IS PORTED,
+and porting it turned up the piece the plan had not named: **all five
+members are PHYSICAL and the flip had only built the VA tower**.  So
+`TsoCtx.v` gained `ctx_phys_pointsto` (the ledger byte at a physical
+address, sealed) plus its 8-byte tower, the store gate in three forms
+(map / window / submap), the physical load gate, and the `⊣⊢` that makes
+the VA family the kmap claim over the physical one.  On that kit
+**`KptTree`, `WpMmodeStore` and `HartMemRun` went GREEN** — the PT-slot
+out-and-back is an ISOMORPHISM (A6.9's "cannot come back" was about
+leaving the ledger, and the round trip never has to), and the whole user
+tier's walker now runs on a ledger map.  `HartSMem` is a reported Σ-SEAM
+STOP (A6.18) and `WpUart` is still A6.9's.  A6.16–A6.19 are the record;
+A6.19 is the frontier, and explains why the green count went DOWN.
+
 M1 STAGE 2 (2026-08-26, same session, next wave): `↦₂`/`↦₄` are FLIPPED —
 the ctx towers are in `TsoCtx.v`, the notations re-declared, and the
 fallout absorbed in 14 error-driven rounds.  `PageFields` and `ByteBuf`
@@ -1428,23 +1442,52 @@ gates are stated ONCE, physically, and the VA forms are corollaries.
   …).  `PtTree.v` does not import `TsoCtx` today, so that is a section
   binder plus the A6.12 same-name move.
 
-**THE REMAINING THREE MEMBERS, in the shape the gate now makes available**
-(none implemented this session):
+**THREE OF THE FOUR A6.14 MEMBERS WENT GREEN ON THIS GATE.**
 
-- `HartMemRun` — `bytes_own mm := [∗ map] a ↦ b ∈ mm, ctx_phys_pointsto
-  cur_ctx a (DfracOwn 1) b` (same name, same arity, one ambient
-  `CurCtx` binder on the definition, which every one of the ~60 consumers
-  already has), plus `own_context cur_ctx` on `swp_hmrun`.  The plain read
-  discharges by `ctx_phys_load_bytes_ok`, the write by `ctx_store_ok` —
-  the walker's own resource IS a map, so the map form applies with no
-  bridge at all.
-- `WpMmodeStore` — `↦ₚ₈` → `ctx_phys_word_pointsto`; see A6.17.
-- `WpUart` — the lease's `phys_map` becomes a parked context's
-  `ctx_phys_pointsto` map, and `wp_disk_step`'s callback pays the same
-  four steps with `ctx_store_ok` at `disk_agent` (A6.9's DMA-reclaim
-  shape, now with a gate to write it against; the gate is stated at
-  `hart_agent cpu_id` and needs its author generalised to an `agent`
-  parameter for this one caller).
+- **`KptTree` — GREEN** (above): the slot crossing is an isomorphism.
+- **`WpMmodeStore` — GREEN.**  `↦ₚ₈` → `ctx_phys_word_pointsto` in
+  `wp_store_gpr` / `wp_store_gpr_tor` / `wp_csdsp_gpr_tor`, plus
+  `own_context cur_ctx` in and out.  The obligation is discharged by a new
+  **`HartMStore.wobl_ram_ctx`** — "[`wobl_ram`] says WHAT is owed; this
+  says WHO can pay" — which is the one place A6.1a's bridge is paid TWICE,
+  once in each direction (`tso_interp_of` → `gs_of` → gate → back), and
+  the reason the gate's field-equation form matters: nothing has to be
+  rebuilt, only the pin re-established at the moved view.  See A6.17 for
+  the ruling this settles.
+- **`HartMemRun` — GREEN, and it is the whole user tier.**
+  `bytes_own mm := [∗ map] a ↦ b ∈ mm, ctx_phys_pointsto XI a (DfracOwn 1) b`
+  — same name, same arity, one ambient `CurCtx` binder — plus
+  `own_context` threaded through `swp_hmrun` and `swp_hmrun_of_exec`.
+  Three findings worth keeping:
+  1. **The walker's own resource IS a map**, so `ctx_store_ok`'s map form
+     applies with no window bridge at all — via the new
+     **`ctx_store_sub_ok`** (the writer owns MORE than it writes; the
+     split is `Pold := mm ∩ Pnew`, stdpp's intersection keeping the LEFT,
+     i.e. OLD, values, and the rejoined map is `Pnew ∪ mm`, which IS
+     `write_bytes mm pa n v`).
+  2. **The read arm splits THREE ways in the proof**, not two: exclusive
+     (flat, RULING 4), `ak_strong` (the FETCH — RULING 1's flat arm,
+     `bytes_own_read` verbatim through `_forget`), and plain (the Ztso
+     arm, `bytes_own_tso_read`).  `hmrun` does not distinguish them, so
+     the split is a `destruct (ak_strong …)` inside the RAM-read case.
+  3. **A LATENT BUG THE FLIP EXPOSED, worth its own line:**
+     `HartMemRun.v` Required `TsoCtx` at line 843, HALFWAY DOWN, while its
+     sections at lines 187 and 1753 write `` `{XI : CurCtx} ``.  With the
+     class not yet in scope, implicit generalisation invented a fresh
+     `CurCtx : Type` VARIABLE and `XI` was a dummy — the binders were
+     silent no-ops.  Moving the `Require Import` to the top is the fix.
+     **`grep -n 'Require Import TsoCtx' *.v` against the line number of
+     the first `` `{XI : CurCtx} `` is a cheap audit for the same defect
+     elsewhere**, and the error it produces when it finally bites names
+     neither file (`Could not find an instance for "TsoCtx.CurCtx"`).
+- **`WpUart` — STILL RED, and it is still A6.9's entry.**  The gate does
+  not reach it: `ctx_store_ok` is stated at `hart_agent cpu_id` and would
+  need its author generalised to an `agent` parameter, but that is the
+  easy half.  The hard half is unchanged — the lease holds `phys_map`,
+  raw gen_heap bytes with no timestamp elements, so the DMA completion
+  arm has no payer.  The fix is the lease-as-parked-context restructuring
+  A6.9 spells out; four of `disk_step`'s six arms hand the bundle straight
+  back (`tso_interp_of_disk_idle`) and only the completion arm is open.
 
 ### A6.17 THE `WpMmodeStore` SOLO-ERA QUESTION, MEASURED — SOLO-ERA IS
 ### REFUTED, AND THE EXPENSIVE HALF OF THE CTX SHAPE IS ALREADY PAID
@@ -1588,6 +1631,70 @@ discharge either obligation, so the ruling has to be amended exactly the
 way A6.14 amended ruling 6.  **`HartSMem` cannot be closed until it is**
 — its 28 internal uses can be ported and the obligation threaded, but it
 would land at `WpSconfMem` with no payer.
+
+### A6.19 THE FRONTIER AFTER THE A6.14 TRANCHE — THE WALL MOVED, AND THE
+### GREEN COUNT WENT DOWN BECAUSE OF IT
+
+**Two identical full `-k` sweeps.  ELEVEN red files, 643 of 1330
+fresh-green (down from 1044).**  The drop is the tranche working, not
+breaking, and it is worth stating plainly because the headline number
+reads backwards:
+
+> A6.12 said "the whole user tier waits on ONE decision".  Making that
+> decision does not green the tier — it moves the wall from ONE file to
+> that file's ~400-file cone, which then has to convert.  `bytes_own`
+> going context-indexed and `PtBytes.phys_word_bytes_own_full` moving to
+> the ledger word are consumed by `UserMem*`, `WpUmode*` and the `Proof*`
+> syscall files, so ~400 files that had been sitting ABOVE the old
+> frontier — never once compiled against a ctx `bytes_own` — are now
+> behind it.  The 1044 was measured with the user tier's decision still
+> unmade.
+
+    HartSMem.v      A6.18 — Σ-SEAM STOP, reported not changed
+    WpUart.v        A6.9  — the DMA lease still has no ledger residue
+    HartSKpt.v      NEW   — the S-mode kernel-PT walk: the A/D write-back's
+                            [xread_obl_ex]/[wpte_obl_at] pair.  Surfaced
+                            when KptTree went green; an A6.14-class store.
+    KstackOwn.v     NEW   — `kstack_byte_rekey` / `kstack_word_rekey`, the
+                            KT0↔KT1 rekey.  Same A6.16 shape as KptTree
+                            (`ctx_pointsto_phys` is the general bridge and
+                            needs no new kit), but the word half also has
+                            to leave the RAW `word_pointsto` tower.
+    ProcPtOwn.v     NEW   — `page_own` ↔ `phys_page_own` at an identity
+                            mapping; A6.16 verbatim.
+    UserBytes.v     NEW   — `PtBytes.phys_word_bytes_own_full`'s one
+                            consumer; follows it to the ledger word.
+    UmodeMem.v      NEW   — the U-mode data tier, same class.
+    PtWalkCert.v    NEW   — the walk certificate over `bytes_own`.
+    HartStepFull.v  NEW   — `swp_hmrun_of_exec` at `bytes_own ∅`: the walk
+                            touches no memory, but the rule wants the token
+                            anyway.  A6.12's predicted `own_context`
+                            threading, first instance.
+    UserTrap.v      NEW   — the same, at the trap handler's `bytes_own ∅`.
+    WpTimerinit.v   NEW   — A6.17's cascade: the ctx word + the token, from
+                            `BootChain.boot_entry_bridge` down.
+
+(`PtBytes.v` was on this list and is now GREEN: `phys_word_bytes_own_full`
+restated at `ctx_phys_word_pointsto`, and its three sections given the
+ambient `CurCtx` binder — the mechanical half of the class below.)
+
+**THE TWO CLASSES THE NEW NINE SPLIT INTO**, so the next session does not
+re-derive them:
+
+- **(A6.16 verbatim)** `HartSKpt`, `KstackOwn`, `ProcPtOwn`, `UserBytes`,
+  `UmodeMem`, `PtWalkCert` —
+  a raw physical resource meeting a ctx one at an identity mapping.  The
+  fix is `TsoCtx.ctx_pointsto_phys` (the general `⊣⊢`) or its two
+  identity-mapped corollaries; NO new kit is needed.  What is needed is
+  deciding, per file, which tier its OWNER holds (`pt_page_own`'s 512
+  slots, `phys_page_own`'s 4096 bytes, the kernel stack's words) — the
+  same "flip the file that OWNS the cells" rule A6.15 recorded.
+- **(the `own_context` threading)** `HartStepFull`, `UserTrap`,
+  `WpTimerinit` — the token has to reach the leaf.  It EXISTS at every one
+  of these (it is a conjunct of `IntrDefs.sie_cap`, and
+  `BootChain.boot_entry_bridge` holds it across the whole M-mode
+  bracket); what is missing is a premise on the intermediate statements.
+  Mechanical, wide, and the cost A6.12 budgeted for.
 
 ## 7. Order of work
 
