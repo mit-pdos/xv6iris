@@ -2602,6 +2602,111 @@ Section EraRes.
     iExact "Ht".
   Qed.
 
+  (* THE ENTRY MAP ONLY GROWS AT A [dirlink], on either arm: the no-write
+     arm leaves it alone and the append inserts one name.  It is what
+     carries [FsStateInode.ent_dset_ok] across the write. *)
+  Lemma dir_entries_dirlink_grow (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : fname) (nrec k0 tot : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (tot = 0%nat \/ tot = 16%nat) ->
+    (length s <= 14)%nat -> nonul s ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    di_type dn' = di_type dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_first data nrec s = None ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    forall s', is_Some (dir_entries (era_node dn bm data) !! s') ->
+               is_Some (dir_entries (era_node dn' bm' data') !! s').
+  Proof.
+    intros Hnrec Hk0 Hatom Hlen Hs Hty Hty' Hsz Hrng Hnone Hh Hh' Hb Hb'.
+    assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
+      by (rewrite Hty'; exact Hty).
+    assert (Hents : dir_entries (era_node dn bm data) = dir_view data nrec).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Hty) Hnrec //. }
+    assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+    destruct Hatom as [-> | ->].
+    - assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+        by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+      destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn)
+        as [Hnr1 Hnr2].
+      rewrite <- Hnrec in Hnr1, Hnr2.
+      assert (Hszeq : bv_unsigned (di_size dn') = bv_unsigned (di_size dn))
+        by (rewrite Hsz; lia).
+      assert (Hbytes : forall x : nat, file_byte data' x = file_byte data x).
+      { intros x. rewrite (Hrng x). rewrite decide_False; [reflexivity | lia]. }
+      assert (Heq : dir_entries (era_node dn' bm' data')
+                    = dir_entries (era_node dn bm data)).
+      { rewrite (dir_entries_era_node dn bm data Hh Hb)
+          (dir_entries_era_node dn' bm' data' Hh' Hb') Hty' Hszeq.
+        destruct (bool_decide (bv_unsigned (di_type dn) = T_DIR_z));
+          [| reflexivity].
+        apply dir_view_data_ext. intros y _. exact (Hbytes y). }
+      intros s' Hs'. rewrite Heq. exact Hs'.
+    - destruct (decide (inum = bv_0 16)) as [Hz | Hnz].
+      + (* the written record is DEAD: nothing is inserted *)
+        assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+          by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+        assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+          by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+        destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn)
+          as [Hnr1 Hnr2].
+        destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn')
+          as [Hnr1' Hnr2'].
+        rewrite <- Hnrec in Hnr1, Hnr2.
+        assert (Hrin : dir_inum data' k0 = bv_0 16).
+        { assert (Hlen16 : forall j : nat, (j < 16)%nat ->
+                    file_byte data' (16 * k0 + j)%nat
+                    = dirent_bytes (de_of_name inum s) !!! j).
+          { intros j Hj. rewrite (Hrng (16 * k0 + j)%nat).
+            rewrite decide_True; [| lia].
+            replace (16 * k0 + j - 16 * k0)%nat with j by lia. reflexivity. }
+          destruct (dir_record_of_name data' k0 inum s Hlen Hs Hlen16)
+            as [Hrin _]. rewrite Hrin Hz //. }
+        assert (Hk0dead : ~ dir_live data' k0)
+          by (rewrite /dir_live Hrin; intros Hc; exact (Hc eq_refl)).
+        assert (Hagr : forall q : nat, q <> k0 -> dir_win_agree data data' q).
+        { intros q Hq j Hj. rewrite (Hrng (16 * q + j)%nat).
+          rewrite decide_False; [reflexivity |].
+          intros [Hlo Hhi]. apply Hq. lia. }
+        assert (Hfree : (k0 < nrec)%nat -> ~ dir_live data k0).
+        { intros Hlt Hlv. apply Hlv.
+          rewrite Hk0. apply dir_slot_free. rewrite <- Hk0. exact Hlt. }
+        assert (Hdead : forall r : nat,
+                  (nrec <= r < dir_nrec (bv_unsigned (di_size dn')))%nat ->
+                  r <> k0 -> ~ dir_live data' r)
+          by (intros r Hr Hrk; exfalso; lia).
+        assert (Hcle : (nrec <= dir_nrec (bv_unsigned (di_size dn')))%nat)
+          by lia.
+        assert (Heq : dir_entries (era_node dn' bm' data') = dir_view data nrec).
+        { rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+            (bool_decide_eq_true_2 _ Hty2).
+          exact (dir_view_dead_write data data' nrec
+                   (dir_nrec (bv_unsigned (di_size dn'))) k0
+                   Hcle Hdead Hk0dead Hagr Hfree). }
+        intros s' Hs'. rewrite Heq -Hents. exact Hs'.
+      + assert (Heq : dir_entries (era_node dn' bm' data')
+                      = <[s := bv_unsigned inum]> (dir_view data nrec)).
+        { rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+            (bool_decide_eq_true_2 _ Hty2).
+          exact (dir_view_dirlink dn dn' data data' inum s nrec k0
+                   Hnrec Hk0 Hlen Hs Hnz Hsz Hrng Hnone). }
+        intros s' Hs'. rewrite Heq. rewrite Hents in Hs'.
+        destruct (decide (s' = s)) as [-> | Hne].
+        * rewrite lookup_insert. by eexists.
+        * rewrite lookup_insert_ne //.
+  Qed.
+
   (* **THE FORM A WALK APPLIES**, and its premise list is
      [DirView.dir_uniq_dirlink]'s verbatim: the two arms
      [SpecDirlink]'s relay of writei's single-block atomicity offers, the

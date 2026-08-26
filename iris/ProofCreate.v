@@ -5763,7 +5763,8 @@ Section ProofCreateMain.
         (* the borrow comes back as the PAIR; open it here, because the
            deposit below files the [+0xc4] mint's unit among the home's
            entry units (durable-disk 2b-inode-5) *)
-        iDestruct (dlinks_open with "Hdlnk") as "[Hdlnk Hetk]".
+        iDestruct (dlinks_open with "Hdlnk")
+          as "[Hdlnk (%D & [%Hdok0 %Hxact0] & Hetk)]".
         iEval (rewrite HX4a1) in "Hnb14".
         assert (Hpcdl : ret_pc (X4 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0xdc)) by (rewrite HX4ra; pcw).
@@ -5895,25 +5896,64 @@ Section ProofCreateMain.
              (* ...and the counting RA's SAME move (durable-disk 2b-inode-5):
                 the unit the [ip->nlink = 1] flush minted goes in at the
                 NAME the appended record now carries. *)
+             (* the two facts the marker set owes at this append: the name
+                is not an entry yet (so it is not marked), and it is not a
+                dot name ([DirView.dir_dots_miss_not_dots]). *)
+             destruct (dir_dots_miss_not_dots (bv_unsigned dind) dn data
+                         (bname 14 nf)
+                         ltac:(rewrite Htydir; vm_compute; reflexivity)
+                         (cr_nl0z dn Hnl0) Hddix Hnone) as [Hnfd Hnfdd].
+             assert (Hnfd' : bname 14 nf <> DOT)
+               by (rewrite FsStateEra.DOT_dot; exact Hnfd).
+             assert (Hnfdd' : bname 14 nf <> DOTDOT)
+               by (rewrite FsStateEra.DOTDOT_dotdot; exact Hnfdd).
+             assert (HsD : bname 14 nf ∉ D).
+             { intros Hin. destruct (Hdok0 _ Hin) as ([tt Htt] & _ & _).
+               rewrite (dir_entries_era_node dn bm data Hholes Hszcap)
+                 (bool_decide_eq_true_2 _ Hdz)
+                 (proj2 (dir_view_lookup_None data _ (bname 14 nf)) Hnone)
+                 in Htt. discriminate. }
              iDestruct (ent_toks_dirlink_arm (fs_gamma_L γfs) (bv_unsigned dind)
                           dn dn' bm bm' data data'
                           (cr_low16 cinum) (bname 14 nf)
                           (dir_nrec (bv_unsigned (di_size dn)))
                           (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
-                          tot eq_refl eq_refl Hatom
+                          tot D false eq_refl eq_refl Hatom
                           (bname_length_le 14 nf) (cut_nul_nonul _)
                           Hdz Hty' Hnl' Hszmax Hrng Hnone
-                          Hholes Hholes' Hszcap (Hcapp Hszcap)
-                          with "Hetk [Htoken Hptok]") as "Hetk".
+                          Hholes Hholes' Hszcap (Hcapp Hszcap) HsD Hnfdd'
+                          with "Hetk [Htoken]") as "Hetk".
              { iEval (rewrite -Hcl16) in "Htoken".
-               iEval (rewrite -Hcl16) in "Hptok".
+               rewrite (cr_delta_file ty Htdir) FsStateLink.link_reps_1.
                iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned dind)
-                         (fn_orphan (era_node dn bm data)) (bname 14 nf)
-                         (bv_unsigned (cr_low16 cinum))
-                         ltac:(intros _; apply fn_orphan_era_nz;
-                               exact (cr_nl0z dn Hnl0))
-                         with "Htoken Hptok"). }
-             iDestruct (dlinks_intro with "Hdlnk Hetk") as "Hdlnk".
+                         (fn_dd (era_node dn bm data))
+                         (fn_orphan (era_node dn bm data)) false
+                         (bname 14 nf) (bv_unsigned (cr_low16 cinum))
+                         (cr_ity ty (bv_unsigned dind))
+                         ltac:(apply FsStateInode.ent_ty_ok_name;
+                               [exact Hnfd' | exact Hnfdd' |
+                                exact (cr_ity_file ty (bv_unsigned dind) Htdir)])
+                         with "Htoken"). }
+             assert (Hgrow := dir_entries_dirlink_grow dn dn' bm bm' data data'
+                        (cr_low16 cinum) (bname 14 nf)
+                        (dir_nrec (bv_unsigned (di_size dn)))
+                        (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
+                        tot eq_refl eq_refl Hatom
+                        (bname_length_le 14 nf) (cut_nul_nonul _)
+                        Hdz Hty' Hszmax Hrng Hnone
+                        Hholes Hholes' Hszcap (Hcapp Hszcap)).
+             assert (Hisdir' : fn_is_dir (era_node dn' bm' data')
+                               = fn_is_dir (era_node dn bm data))
+               by (rewrite /fn_is_dir /fn_type !era_node_rec Hty' //).
+             assert (Hnleq : fn_nlink (era_node dn' bm' data')
+                             = fn_nlink (era_node dn bm data))
+               by (rewrite /fn_nlink !era_node_rec Hnl' //).
+             iDestruct (dlinks_intro _ _ _ _ _ D
+                          ltac:(exact (FsStateInode.ent_dset_ok_grow _ _ D
+                                         Hgrow Hdok0))
+                          ltac:(exact (FsStateInode.node_exact_cong _ _ D
+                                         Hisdir' Hnleq Hxact0))
+                          with "Hdlnk Hetk") as "Hdlnk".
              assert (Hiok' : inode_ok cov logstart dn' bm' data').
              { rewrite /inode_ok. split_and!.
                - exact Hwf'.
@@ -7095,7 +7135,8 @@ Section ProofCreateMain.
                   (Z.of_nat (16 * dir_slot data
                      (dir_nrec (bv_unsigned (di_size dn))) + 0)))
       by (rewrite Hdn'; exact (cr_wi_size_max dn bm' _ 0%nat Hoff32)).
-    iDestruct (dlinks_open with "Hdlnk") as "[Hdlnk Hetk]".
+    iDestruct (dlinks_open with "Hdlnk")
+          as "[Hdlnk (%D & [%Hdok0 %Hxact0] & Hetk)]".
     iDestruct (dir_links_dirlink_nop (bv_unsigned dind) dn dn' data data'
                  (cr_low16 cinum) (bname 14 nf)
                  (dir_nrec (bv_unsigned (di_size dn)))
@@ -8585,7 +8626,8 @@ Section ProofCreateMain.
     (* the borrow comes back as the PAIR; open it here, because the deposit
        below files the child's ["."] entry among its own units *)
     iRename "Hcdlnk0" into "Hcdlnk0P".
-    iDestruct (dlinks_open with "Hcdlnk0P") as "[Hcdlnk0 Hcetk]".
+    iDestruct (dlinks_open with "Hcdlnk0P")
+      as "[Hcdlnk0 (%Dc & [%Hcdok %Hcxact] & Hcetk)]".
     assert (Hpcd1 : ret_pc (Z5 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x10a)) by (rewrite HZ5ra; pcw).
     iEval (rewrite Hpcd1) in "Hpc".
@@ -8971,7 +9013,8 @@ Section ProofCreateMain.
     iModIntro.
 
       iRename "Hcdlnk1" into "Hcdlnk1P".
-      iDestruct (dlinks_open with "Hcdlnk1P") as "[Hcdlnk1 Hcetk2]".
+      iDestruct (dlinks_open with "Hcdlnk1P")
+        as "[Hcdlnk1 (%Dc1 & [%Hcdok1 %Hcxact1] & Hcetk2)]".
       assert (Hpcd2 : ret_pc (Y5 !!! Regidx Rra : mword 64)
                       = mword_of_int (CK + 0x11e)) by (rewrite HY5ra; pcw).
       iEval (rewrite Hpcd2) in "Hpc".
@@ -9347,7 +9390,8 @@ Section ProofCreateMain.
           as "(Hcivalid & Hcdep)".
         iModIntro.
 
-        iDestruct (dlinks_open with "Hdlnk") as "[Hdlnk Hetk]".
+        iDestruct (dlinks_open with "Hdlnk")
+          as "[Hdlnk (%D & [%Hdok0 %Hxact0] & Hetk)]".
         iEval (rewrite HW4a1) in "Hnb14".
         assert (Hpcd3 : ret_pc (W4 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x130)) by (rewrite HW4ra; pcw).

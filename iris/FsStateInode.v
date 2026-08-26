@@ -871,6 +871,45 @@ Section InodeOwned.
     dir_entries n' = dir_entries n -> ent_dset_ok n D -> ent_dset_ok n' D.
   Proof. intros He Hok s Hs. rewrite He. exact (Hok s Hs). Qed.
 
+  (* the marker set rides any move that only ADDS entries, and the count
+     rides any move that leaves [nlink] and the type alone.  Together they
+     are what re-seals [IcacheEscrow.dlinks] after a [dirlink] that names a
+     FILE, and after a write that touches no entry at all. *)
+  Lemma ent_dset_ok_grow n n' D :
+    (forall s, is_Some (dir_entries n !! s) -> is_Some (dir_entries n' !! s)) ->
+    ent_dset_ok n D -> ent_dset_ok n' D.
+  Proof.
+    intros Hgrow Hok s Hs. destruct (Hok s Hs) as (Hex & H1 & H2).
+    split_and!; [exact (Hgrow s Hex) | exact H1 | exact H2].
+  Qed.
+
+  Lemma node_exact_cong n n' D :
+    fn_is_dir n' = fn_is_dir n -> fn_nlink n' = fn_nlink n ->
+    node_exact n D -> node_exact n' D.
+  Proof.
+    intros Hd Hnl Hx Hdir. rewrite /node_exact in Hx.
+    rewrite /fn_orphan. rewrite !Hnl. apply Hx. rewrite -Hd. exact Hdir.
+  Qed.
+
+  (* ...and the one create's mkdir arm takes: BOTH sides rise by one, the
+     entry the [dirlink] appended and the [dp->nlink++] fused with it. *)
+  Lemma node_exact_bump n n' D s :
+    fn_is_dir n' = fn_is_dir n ->
+    fn_nlink n' = S (fn_nlink n) ->
+    fn_nlink n <> 0%nat ->
+    s ∉ D ->
+    node_exact n D -> node_exact n' ({[s]} ∪ D).
+  Proof.
+    intros Hd Hnl Hnz HsD Hx Hdir.
+    assert (Hx' := Hx ltac:(rewrite -Hd; exact Hdir)).
+    rewrite /fn_orphan in Hx' |- *.
+    rewrite (bool_decide_eq_false_2 (fn_nlink n = 0%nat) Hnz) in Hx'.
+    rewrite Hnl (bool_decide_eq_false_2 (S (fn_nlink n) = 0%nat)
+                   ltac:(lia)).
+    rewrite size_union; [| set_solver].
+    rewrite size_singleton. lia.
+  Qed.
+
   Lemma ent_dset_ok_empty n : ent_dset_ok n ∅.
   Proof. intros s Hs. exfalso. set_solver. Qed.
 
