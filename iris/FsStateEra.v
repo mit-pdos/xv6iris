@@ -2582,6 +2582,56 @@ Section EraRes.
       ([di_nlink <> 0], which the found arm holds out of
       [SpecDirlookup.dl_lic_live]) -- which is exactly why that guard is
       on the definition. *)
+  (* ---- ONE ENTRY'S PAIR, ON LOAN (durable-disk G3) ------------------ *)
+
+  (*  S7-unlink's dir arm has to READ two of its own entries' units before
+      it may spend anything: [dp]'s record for [ip] (whose counting token
+      refutes [ip = root], (D1) step 2) and [ip]'s own [".."] (whose
+      REGISTER unit is what [InodeRegion]'s (U2) reads (D2) off).  Both
+      readings come before the zeroing, so both units go out on loan and
+      come straight back.
+
+      [ent_toks_borrow] above is the same split at the COUNTING token
+      alone, kept as it is because licence (a)'s caller never wants the
+      register unit; this one lends the PAIR, and is keyed by the record
+      INDEX rather than by a [dir_first] hit, which is the form a walk
+      that already knows its record's index and liveness has. *)
+  Lemma ent_toks_era_borrow_at (Γ : fs_view_names Σ) (i : Z)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (k : nat) :
+    bv_unsigned (di_nlink dn) <> 0 ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    blk_holes_zero bm data ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))) ->
+    (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_live data k ->
+    bv_unsigned (dir_inum data k) <> i ->
+    ent_toks Γ i (era_node dn bm data) -∗
+      (link_tok Γ (bv_unsigned (dir_inum data k))
+       ∗ par_tok Γ (bv_unsigned (dir_inum data k))
+           (ent_par_val i (dir_bname data k)))
+      ∗ ((link_tok Γ (bv_unsigned (dir_inum data k))
+          ∗ par_tok Γ (bv_unsigned (dir_inum data k))
+              (ent_par_val i (dir_bname data k)))
+         -∗ ent_toks Γ i (era_node dn bm data)).
+  Proof.
+    intros Hnz Hty Hh Hb Hu Hnr Hlv Hne.
+    assert (Hlk : dir_entries (era_node dn bm data) !! dir_bname data k
+                  = Some (bv_unsigned (dir_inum data k))).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Hty).
+      exact (dir_view_live data _ k Hu Hnr Hlv). }
+    rewrite /ent_toks (fn_orphan_era_nz dn bm data Hnz).
+    iIntros "H".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hlk with "H") as "[Ht Hback]".
+    iEval (rewrite (ent_tok_ne Γ i false (dir_bname data k)
+                      (bv_unsigned (dir_inum data k)) Hne eq_refl)) in "Ht".
+    iFrame "Ht". iIntros "Ht". iApply "Hback".
+    iEval (rewrite (ent_tok_ne Γ i false (dir_bname data k)
+                      (bv_unsigned (dir_inum data k)) Hne eq_refl)).
+    iExact "Ht".
+  Qed.
+
   Lemma ent_toks_borrow (Γ : fs_view_names Σ) (self : Z)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (k : nat) :
     bv_unsigned (di_type dn) = T_DIR_z ->

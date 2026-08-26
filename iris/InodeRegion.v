@@ -2676,6 +2676,37 @@ Section InodeRegion.
     iPureIntro. lia.
   Qed.
 
+  (* ===== S7-unlink's (D2), AT THE REGISTER (durable-disk G3) =========
+     A directory holding a LIVE SUBDIRECTORY record has at least TWO links.
+     The child's [".."] puts an up-pointing unit in the parent's register,
+     so (U2) -- "a live inum's count exceeds its up-pointing namers" --
+     reads the second link straight off.  No ledger, no data, no root
+     exception: the root's own [".."] is a SELF record and carries no unit
+     at all, so an empty root sits at [0 < 1] and each subdirectory raises
+     both sides by one.
+
+     This replaces [IregDirBit.dir_links_subdir_nlink2], whose carrier was
+     [DirView.dlc_lower] inside [DirLinks.dir_links]. *)
+  Lemma ireg_lnk_up_min2 γfs z d :
+    ireg_lnk γfs z d -∗
+    FsStateLink.par_tok (fs_gamma_L γfs) z None -∗
+    ⌜2 <= bv_unsigned (di_nlink d)⌝.
+  Proof.
+    rewrite /ireg_lnk /ireg_lnk_at /ireg_par /ireg_nl.
+    iIntros "(_ & _ & (%P & Hp & %Hsz & _ & %Hu2)) Ht".
+    iDestruct (FsStateLink.par_auth_tok_in with "Hp Ht") as %Hin.
+    iPureIntro.
+    assert (Hups : (1 <= ireg_ups P)%nat).
+    { rewrite /ireg_ups. multiset_solver. }
+    pose proof (di_nlink_nonneg d) as Hnn.
+    destruct (decide (Z.to_nat (bv_unsigned (di_nlink d)) = 0%nat))
+      as [Hz | Hnz].
+    - exfalso.
+      assert (HP : P = ∅) by (apply gmultiset_size_empty_inv; lia).
+      rewrite HP ireg_ups_empty in Hups. lia.
+    - pose proof (Hu2 Hnz). lia.
+  Qed.
+
   (* ...AND THE ROOT'S MINIMUM AT A HELD TOKEN.  The keep-alive token
      cannot be spent and the caller's is a SECOND one, so the RA's law puts
      the root's count at TWO -- hence a directory whose count is ONE is not

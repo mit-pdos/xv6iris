@@ -5933,10 +5933,14 @@ Section ProofSysUnlinkBody.
               guard wants comes from [IregLinkNz.ireg_tok_root_min2]
               against FINDING 3's [nlink ip = 1].
          (D2) [2 <= bv_unsigned (di_nlink dnd)] -- a directory holding a
-              live subdirectory entry has at least two links.  Derived
-              before the zeroing by [IregDirBit.dir_links_subdir_nlink2],
-              which is (T1')'s plain-flavour refutation plus
-              [DirView.dlc_lower] at the counted record.
+              live subdirectory entry has at least two links.  Derived off
+              the PARENT REGISTER since G3, AFTER (D1) and still before the
+              zeroing: the child's [".."] is an up-pointing unit standing
+              in [dp]'s own register, borrowed out of [ip]'s [ent_toks]
+              ([FsStateEra.ent_toks_era_borrow_at]) and read by
+              [IregLinkNz.ireg_par_up_min2] against [InodeRegion]'s (U2).
+              (D1) is what names that unit [dp]'s, which is why the two
+              readings run in this order.
        ==== *)
     sie_cap_gpr KT1 M3 (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
@@ -6710,55 +6714,24 @@ Section ProofSysUnlinkBody.
                       : mword 64)) 31 0)))) = di_size dnd)
       by (rewrite su_setnl_size; exact Hsz'v).
     (* ===================================================================
-       (D2) FALLS HERE, and the premise is gone (V5' increment W).  A
-       directory holding a LIVE record for a directory has at least two
-       links: the record's ticket is d-flavoured (a PLAIN one dies against
-       (T1') at the child the walk names), so [DirView.dlc_lower] counts it
-       and reads [1 + 1 <= nlink] off [dp]'s own payload.  All of that is
-       [IregDirBit.dir_links_subdir_nlink2], one mask-preserving step, and
-       every one of its premises is a holding of the +0x8a seam.  It runs
-       BEFORE the zeroing because it reads [dp]'s payload at the record the
-       zeroing is about to kill.
+       (D1) AND (D2) FALL HERE, IN THAT ORDER (durable-disk G3).  The old
+       order ran (D2) first, off the ledger's [DirView.dlc_lower] counting
+       [dp]'s d-flavoured record; (D2) now comes off the PARENT REGISTER
+       instead, and the unit it reads is the CHILD's [".."] -- so (D1),
+       which is what names that [".."]'s target, has to come first.
+
+       Nothing else moves: both readings are still BEFORE the zeroing's
+       ghost move, and each borrows its unit out of an [ent_toks] and
+       hands it straight back.
        =================================================================== *)
     iDestruct (dlinks_open with "Hdlnkd") as "[Hdlnkd Hetkd]".
-    iApply fupd_wp.
-    iMod (dir_links_subdir_nlink2 ⊤ gi gfs inodestart nib
-            (bv_unsigned dinum) dnd datd kk
-            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
-            ltac:(solve_ndisj) Hinb Htydz Hdplive ltac:(lia) Hkklt Hkklive
-            Hnotself (su_zext32_unsigned (dir_inum datd kk)) Htyzi
-            with "Hireg Hdiati Hdlnkd") as "(%Hdp2 & Hdiati & Hdlnkd)".
-    iModIntro.
-    (* ===== VERDICT #1 (dir arm): [dir_links_unlink] at the record the
-       [+0x146] tail is ABOUT to flush -- the [b = true] flavour needs no
-       refutation, because the [dp->nlink--] pays the unit ===== *)
-    assert (HnlzF2a : bv_unsigned (di_nlink (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0))))) <> 0).
-    { rewrite su_setnl_nlink.
-      exact (su_decr_pos _ _ _ HdecrW HdWnd Hdp2). }
     assert (Hkknotdot : dir_bname datd kk <> DOT).
     { rewrite /dir_bname Hkkname. intro Hc. apply Hnotdot.
       rewrite Hc DOT_dot_name. reflexivity. }
-    (* ...and the counting RA's half of the same move (durable-disk
-       2b-inode-5): the zeroed entry gives up its token, which is what
-       pays for the CHILD's own [ip->nlink--] below. *)
-    iDestruct (ent_toks_unlink (fs_gamma_L gfs) (bv_unsigned dinum)
-                 dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bmd bm' datd data' kk
-                 Hkklt Hkklive Hnotself Hkknotdot (Hduq Htydz)
-                 (conj Hz' (conj Hagree Hnm')) Htydz Hdplive HnlzF2a
-                 HtyF2 HszF2 Hhzd Hhz' Hszcap
-                 with "Hetkd") as "[[Htoken Hptok] Hetkd]".
-    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Htoken".
-    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hptok".
+    (* ===== VERDICT #1 (dir arm): [dir_links_unlink] at the record the
+       [+0x146] tail is ABOUT to flush -- the [b = true] flavour needs no
+       refutation, because the [dp->nlink--] pays the unit.  It runs before
+       the counting RA's half now, because (D1) reads its ticket. ===== *)
     iDestruct (dir_links_unlink (bv_unsigned dinum) dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
@@ -6786,9 +6759,6 @@ Section ProofSysUnlinkBody.
               ltac:(solve_ndisj) Hinb with "Hireg Hdiati Hticket")
         as "(%Hndi & _ & _)".
       destruct (Hndi Htyzi). }
-    iDestruct ("Hrepark" with "[%]") as "Hdlnkd2".
-    { cbn. rewrite <- HdWnd. exact (eq_sym HdecrW). }
-    iDestruct (dlinks_intro with "Hdlnkd2 Hetkd") as "Hdlnkd2".
     (* ===================================================================
        (D1) FALLS HERE, IN THREE STEPS, and the premise is gone (V5'
        increment W).  This is the fact the whole parent-register carrier
@@ -6820,12 +6790,24 @@ Section ProofSysUnlinkBody.
        reads are at create's mint and at the spend below.
        =================================================================== *)
     iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
+    (* the counting token the root refutation reads is BORROWED out of
+       [dp]'s own record for [ip]: the zeroing's ghost move has not run
+       yet, so it is still in [dp]'s [ent_toks]
+       ([FsStateEra.ent_toks_era_borrow_at]), and it goes straight back. *)
+    iDestruct (ent_toks_era_borrow_at (fs_gamma_L gfs) (bv_unsigned dinum)
+                 dnd bmd datd kk Hdplive Htydz Hhzd Hszcap (Hduq Htydz)
+                 Hkklt Hkklive Hnotself
+                 with "Hetkd") as "[[Htokb Hpb] Hetkdback]".
+    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Htokb".
     iApply fupd_wp.
     iMod (ireg_tok_root_min2 ⊤ gi gfs inodestart nib
             (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
             ltac:(solve_ndisj) Hinb
-            with "Hireg Hdiati Htoken") as "(%Hrmin & Hdiati & Htoken)".
+            with "Hireg Hdiati Htokb") as "(%Hrmin & Hdiati & Htokb)".
     iModIntro.
+    iEval (rewrite (su_zext32_unsigned (dir_inum datd kk))) in "Htokb".
+    iDestruct ("Hetkdback" with "[Htokb Hpb]") as "Hetkd".
+    { iSplitL "Htokb"; [iExact "Htokb" | iExact "Hpb"]. }
     assert (Hipnroot : bv_unsigned (zero_extend' 32
                          (dir_inum datd kk : mword 16) : mword 32)
                        <> dl_root).
@@ -6845,6 +6827,84 @@ Section ProofSysUnlinkBody.
     (* the half comes out at the payload's own reading of the register;
        the agreement is what lets the SPEND below name it [dp]'s *)
     iEval (rewrite -Hagr) in "Hipar".
+    (* ===================================================================
+       (D2) FALLS HERE, OFF THE PARENT REGISTER (durable-disk G3), and the
+       ledger has no part in it.  [dp] holds a LIVE SUBDIRECTORY record, so
+       the child's [".."] stands as an up-pointing unit in [dp]'s register,
+       and [InodeRegion]'s (U2) -- a live inum's count exceeds its
+       up-pointing namers -- reads the second link straight off it
+       ([IregLinkNz.ireg_par_up_min2], one mask-preserving step).  The unit
+       is borrowed out of [ip]'s own [ent_toks] and handed straight back;
+       the SPEND of it is the orphan move far below, which takes it again
+       once [ip]'s own count reaches zero.
+
+       (D1) IS WHAT NAMES IT [dp]'s.  Without [Hpar] the borrowed unit
+       stands at [ip]'s [".."] target and the region reading would be about
+       the wrong slot -- which is why this arm's two readings had to swap
+       order when (D2) came off [DirView.dlc_lower].
+       =================================================================== *)
+    assert (Hz1ne0 : bv_unsigned (dir_inum dati 1)
+                     <> (bv_unsigned (zero_extend' 32
+                    (dir_inum datd kk : mword 16) : mword 32))).
+    { rewrite su_zext32_unsigned Hpar. intro Hc. apply Hnotself.
+      symmetry. exact Hc. }
+    assert (Hhzi0 : blk_holes_zero bmi dati).
+    { destruct Hioki as (_ & _ & _ & _ & _ & Hc & _). exact Hc. }
+    assert (Hszcapi0 : bv_unsigned (di_size dni)
+                       <= Z.of_nat MAXFILE * Z.of_nat BSIZE).
+    { destruct Hioki as (_ & _ & _ & _ & Hc & _). exact Hc. }
+    iDestruct (ent_toks_era_borrow_at (fs_gamma_L gfs)
+                 (bv_unsigned (zero_extend' 32
+                    (dir_inum datd kk : mword 16) : mword 32))
+                 dni bmi dati 1%nat Hnlzi Htyzi Hhzi0 Hszcapi0
+                 (Hduqi Htyzi) Hnrec2i Hlv1i Hz1ne0
+                 with "Hetki") as "[[Hupt Hupp] Hetkiback]".
+    iEval (rewrite (FsStateInode.ent_par_val_dotname
+                      (bv_unsigned (zero_extend' 32
+                    (dir_inum datd kk : mword 16) : mword 32))
+                      (dir_bname dati 1%nat) (or_intror Hname1i))) in "Hupp".
+    iEval (rewrite Hpar) in "Hupp".
+    iApply fupd_wp.
+    iMod (ireg_par_up_min2 ⊤ gi gfs inodestart nib dinum dnW
+            ltac:(solve_ndisj) Hdinb
+            with "Hireg Hdiatd Hupp") as "(%Hdp2W & Hdiatd & Hupp)".
+    iModIntro.
+    assert (Hdp2 : 2 <= bv_unsigned (di_nlink dnd))
+      by (rewrite -HdWnd; exact Hdp2W).
+    iEval (rewrite -Hpar) in "Hupp".
+    iEval (rewrite -(FsStateInode.ent_par_val_dotname
+                       (bv_unsigned (zero_extend' 32
+                    (dir_inum datd kk : mword 16) : mword 32))
+                       (dir_bname dati 1%nat) (or_intror Hname1i))) in "Hupp".
+    iDestruct ("Hetkiback" with "[Hupt Hupp]") as "Hetki".
+    { iSplitL "Hupt"; [iExact "Hupt" | iExact "Hupp"]. }
+    (* ...and the counting RA's half of the zeroing move (durable-disk
+       2b-inode-5): the zeroed entry gives up its token, which is what
+       pays for the CHILD's own [ip->nlink--] below. *)
+    assert (HnlzF2a : bv_unsigned (di_nlink (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
+                            : mword 64)
+                     (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 63 : mword 6))
+                      : mword 64)) 31 0))))) <> 0).
+    { rewrite su_setnl_nlink.
+      exact (su_decr_pos _ _ _ HdecrW HdWnd Hdp2). }
+    iDestruct (ent_toks_unlink (fs_gamma_L gfs) (bv_unsigned dinum)
+                 dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
+                            : mword 64)
+                     (sign_extend' 64
+                        (sign_extend' 12 (mword_of_int 63 : mword 6))
+                      : mword 64)) 31 0)))) bmd bm' datd data' kk
+                 Hkklt Hkklive Hnotself Hkknotdot (Hduq Htydz)
+                 (conj Hz' (conj Hagree Hnm')) Htydz Hdplive HnlzF2a
+                 HtyF2 HszF2 Hhzd Hhz' Hszcap
+                 with "Hetkd") as "[[Htoken Hptok] Hetkd]".
+    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Htoken".
+    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hptok".
+    iDestruct ("Hrepark" with "[%]") as "Hdlnkd2".
+    { cbn. rewrite <- HdWnd. exact (eq_sym HdecrW). }
+    iDestruct (dlinks_intro with "Hdlnkd2 Hetkd") as "Hdlnkd2".
     (* [dp]'s pure re-park facts, moved DOWN to the decremented record *)
     assert (HiokF2 : inode_ok cov logstart (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)

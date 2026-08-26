@@ -260,89 +260,17 @@ Section IregDirBit.
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 
-  (* ==================================================================== *)
-  (*  (D2), DERIVED: A DIRECTORY HOLDING A LIVE SUBDIRECTORY ENTRY HAS    *)
-  (*  AT LEAST TWO LINKS (V4's payoff, S7-unlink W5-DIR's premise)        *)
-  (* ==================================================================== *)
+  (* (D2) USED TO BE DERIVED HERE (durable-disk G3).  "A directory holding
+     a live SUBDIRECTORY entry has at least two links" was V4's payoff and
+     S7-unlink W5-DIR's premise, and its carrier was [DirView.dlc_lower]
+     inside [DirLinks.dir_links] -- one of the two things blocking the 6d
+     column deletion.  It comes off the PARENT REGISTER now
+     ([InodeRegion]'s (U1)/(U2), read by [IregLinkNz.ireg_par_up_min2]):
+     the child's [".."] stands as an up-pointing unit in the parent's own
+     register, and (U2) says a live inum's count exceeds its up-pointing
+     namers.  No ledger, no data, no root exception.  [dlc_lower] is still
+     MAINTAINED inside [dir_links] and has no reader left; it goes with the
+     columns. *)
 
-  (* The three-step consumption bridge, packaged so the seal applies ONE
-     lemma at the +0x8a seam's T_DIR arm:
-
-       1. borrow the found record's ticket out of [dp]'s payload -- it is
-          live, non-dot, non-self, and the home is live;
-       2. REFUTE the plain flavour: the walk holds the CHILD's own
-          [dinode_at] and its type test said T_DIR, so a plain ticket
-          dies against (T1') ([ireg_link_not_dir] above);
-       3. the ticket is therefore d-flavoured -- COUNTED, since the index
-          is past the dots -- and [dlc_lower] reads
-          [2 <= 1 + count <= nlink] off the same [F].
-
-     Everything is borrowed and everything goes back; the conclusion is
-     pure.  [su_w5_dir]'s (D2) premise [2 <= bv_unsigned (di_nlink dnd)]
-     is exactly this lemma's conclusion -- the seal derives it here and
-     feeds the premise; (D1) remains V5''s. *)
-  Lemma dir_links_subdir_nlink2 (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (self : Z) (dnd : dinode)
-      (datd : nat -> list (bv 8)) (kk : nat) (inum : bv 32)
-      (dni : dinode) :
-    ↑iregN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    bv_unsigned (di_type dnd) = T_DIR_z ->
-    bv_unsigned (di_nlink dnd) <> 0 ->
-    (2 <= kk)%nat ->
-    (kk < dir_nrec (bv_unsigned (di_size dnd)))%nat ->
-    dir_live datd kk ->
-    bv_unsigned (dir_inum datd kk) <> self ->
-    bv_unsigned inum = bv_unsigned (dir_inum datd kk) ->
-    bv_unsigned (di_type dni) = T_DIR_z ->
-    ireg_inv γi γfs inodestart nib -∗
-    dinode_at γi inum dni -∗
-    dir_links self dnd datd ={E}=∗
-    ⌜2 <= bv_unsigned (di_nlink dnd)⌝ ∗
-    dinode_at γi inum dni ∗ dir_links self dnd datd.
-  Proof.
-    iIntros (HE Hin Htyd Hnzd Hk2 Hklt Hlv Hnself Hieq Htyi)
-      "#Hinv Hdni Hdlnk".
-    rewrite /dir_links decide_True; [| exact Htyd].
-    iDestruct "Hdlnk" as (F) "(%Hbnd & %Hlow & Htie & H)".
-    iDestruct (big_sepL_lookup_acc _
-                 (seq 0 (dir_nrec (bv_unsigned (di_size dnd)))) kk kk
-                 with "H") as "[Hk Hback]".
-    { apply lookup_seq. lia. }
-    (* the ticket, naked: the record is live and not the self record *)
-    iEval (rewrite /dir_link_at_f
-             (proj2 (dir_liveb_true datd kk) Hlv)
-             (bool_decide_eq_false_2
-                (bv_unsigned (dir_inum datd kk) = self) Hnself);
-           cbn [negb andb]) in "Hk".
-    iDestruct "Hk" as "[Hticket | [_ %Hz]]"; last first.
-    { exfalso. exact (Hnzd Hz). }
-    destruct (F kk) eqn:EFkk.
-    - (* d-flavoured: the record is COUNTED and [dlc_lower] closes *)
-      assert (Hcnt : (1 <= dlc_count F datd
-                        (dir_nrec (bv_unsigned (di_size dnd))))%nat)
-        by exact (dlc_count_pos F datd _ kk Hk2 Hklt Hlv EFkk).
-      pose proof (Hlow Hnzd) as Hl2.
-      iDestruct ("Hback" with "[Hticket]") as "H".
-      { rewrite /dir_link_at_f.
-        rewrite (proj2 (dir_liveb_true datd kk) Hlv).
-        rewrite (bool_decide_eq_false_2
-                   (bv_unsigned (dir_inum datd kk) = self) Hnself).
-        cbn [negb andb]. iLeft. rewrite EFkk. iExact "Hticket". }
-      iModIntro.
-      iSplitR; [iPureIntro; lia |].
-      iFrame "Hdni".
-      iExists F. iSplitR; [iPureIntro; exact Hbnd |].
-      iSplitR; [iPureIntro; exact Hlow |].
-      (* V5': the parent tie is untouched -- this lemma BORROWS one record
-         and hands it straight back *)
-      iSplitL "Htie"; [iExact "Htie" |]. iExact "H".
-    - (* plain: dies against (T1') at the child the walk NAMES *)
-      iEval (cbn [dlc_tick]) in "Hticket".
-      iEval (rewrite -Hieq) in "Hticket".
-      iMod (ireg_link_not_dir E γi γfs inodestart nib inum dni HE Hin
-              with "Hinv Hdni Hticket") as "(%Hnd & _ & _)".
-      exfalso. exact (Hnd Htyi).
-  Qed.
 
 End IregDirBit.

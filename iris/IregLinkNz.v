@@ -301,6 +301,67 @@ Section IregLinkNz.
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin0.
   Qed.
 
+  (* S7-unlink's (D2), AT THE REGISTER (durable-disk G3): a directory
+     holding a LIVE SUBDIRECTORY record has at least TWO links.  The
+     child's [".."] puts an up-pointing unit in the parent's register, and
+     [InodeRegion]'s (U2) reads the second link off it.  The unit is
+     BORROWED and handed straight back -- the caller still has to spend it
+     at the [dp->nlink--] this reading licences.
+
+     It replaces [IregDirBit.dir_links_subdir_nlink2], whose carrier was
+     [DirView.dlc_lower] inside [DirLinks.dir_links]: (D2) is off the
+     ledger, and with it one of 6d's two blockers. *)
+  Lemma ireg_par_up_min2 (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn -∗
+    FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+      None ={E}=∗
+    ⌜2 <= bv_unsigned (di_nlink dn)⌝ ∗
+    dinode_at γi inum dn ∗
+    FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) None.
+  Proof.
+    iIntros (HE Hin) "#Hinv Hdn Hfrag".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    rewrite /dinode_at.
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
+    assert (Hdeq : ds !!! islot inum = dn).
+    { specialize (Hcp (islot inum) Hsl).
+      rewrite -ireg_key_split in Hcp. congruence. }
+    iDestruct (ireg_lnk_up_min2 with "Hlnk Hfrag") as %Hmin0.
+    rewrite Hdeq in Hmin0.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
+    { iNext. iExists m. iFrame "Ha Hreg".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin0.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  THE ROOT INUM, ACROSS THE TWO SPELLINGS                             *)
   (* ------------------------------------------------------------------ *)
