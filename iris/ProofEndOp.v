@@ -446,13 +446,29 @@ Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
 (* the batch's home-blocks row, restated at the DECODED header's spelling --
    what [FsCrash.fs_commit_L_seq_permit]'s home-blocks premise wants *)
 Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
-  (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
+  (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)
+                   /\ uint w <> FsImg.SB_BNO) ->
   forall b : Z, b ∈ map uint W -> b ∈ cov /\ b ∉ log_region_set logstart.
 Proof.
   intros Hwok b Hb.
   change (map uint W) with (uint <$> W) in Hb.
   apply elem_of_list_fmap in Hb.
-  destruct Hb as (w & -> & Hw). exact (Hwok w Hw).
+  destruct Hb as (w & -> & Hw). destruct (Hwok w Hw) as (Hc & Hl & _).
+  split; assumption.
+Qed.
+(* ...and its BLOCK 1 half (durable-disk lane E-blk1), which is the premise
+   [FsCrash.fs_commit_L_sector0_rec] takes so that the header it writes
+   carries the clause too.  The row it reads is [LogInv.log_state]'s, kept
+   true at every [log_write] by the park's own resource. *)
+Lemma eo_hdr_ne_sb (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
+  (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)
+                   /\ uint w <> FsImg.SB_BNO) ->
+  forall b : Z, b ∈ map uint W -> b <> FsImg.SB_BNO.
+Proof.
+  intros Hwok b Hb.
+  change (map uint W) with (uint <$> W) in Hb.
+  apply elem_of_list_fmap in Hb.
+  destruct Hb as (w & -> & Hw). exact (proj2 (proj2 (Hwok w Hw))).
 Qed.
 Lemma eo_t_lt_lb (t n : nat) : (t < n)%nat -> (n <= LOGBLOCKS)%nat -> (t < LOGBLOCKS)%nat.
 Proof. lia. Qed.
@@ -838,7 +854,7 @@ Section EndOpDefs.
     intros Hsz Hom. iIntros "#Hctx HcL Ht".
     iPoseProof (log_ctx_bytes with "Hctx") as "#Hbinv".
     rewrite /fs_bytes_inv.
-    iMod (inv_acc ⊤ logN with "Hbinv") as "[Hbody Hclose]"; [exact logN_top |].
+    iMod (inv_acc ⊤ fsbN with "Hbinv") as "[Hbody Hclose]"; [exact fsbN_top |].
     iDestruct "Hbody" as (Lb C) ">(Hba & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (eo_cache_body_sub γfs L C with "HcL HC") as %Hsub.
     iMod (log_ctx_snap_law_of_ops γ bn γfs cov logstart dev om T Lb C
@@ -888,7 +904,8 @@ Section EndOpDefs.
       (M0 : log_mirror),
       ⌜n = length W /\ (n <= LOGBLOCKS)%nat⌝ ∗
       ⌜NoDup (map uint W)⌝ ∗
-      ⌜forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)⌝ ∗
+      ⌜forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)
+         /\ uint w <> FsImg.SB_BNO⌝ ∗
       (* THE ERA'S MIRROR HALF LEAVES THE CHECKOUT AT A NAME (durable-disk
          flip-B).  It travels OUTSIDE [eo_open] -- the commit moves the
          on-disk header away from clean and back, so it cannot ride a bundle
@@ -1963,7 +1980,8 @@ Section EndOpBlocks.
     γs !! j = Some γl ->
     (n = length W /\ (n <= LOGBLOCKS)%nat) ->
     NoDup (map uint W) ->
-    (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
+    (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)
+                   /\ uint w <> FsImg.SB_BNO) ->
     (forall (i : nat) (w : mword 32), W !! i = Some w -> L !! uint w = Some (Lw i)) ->
     (* THE CHAINED PICTURE the copy loop handed over (durable-disk flip-B):
        a clean on-disk header, and every slot at the content the batch named
@@ -2090,6 +2108,7 @@ Section EndOpBlocks.
                 ltac:(exact Hlen') ltac:(exact Hdec')
                 ltac:(exact Hn30) ltac:(by apply NoDup_ListNoDup)
                 ltac:(exact (eo_hdr_in W cov logstart Hwok))
+                ltac:(exact (eo_hdr_ne_sb W cov logstart Hwok))
                 HMchdr (fun _ _ => eq_refl)
                 (* ROW (b), with the write set spelled as a LIST *)
                 ltac:(intros b Hb HbW; apply (Hrow b Hb); intros Hc;
@@ -2125,7 +2144,7 @@ Section EndOpBlocks.
     assert (Hnehdr : forall (k : nat) (v : mword 32), W !! k = Some v ->
               uint v <> log_hdr_bno logstart).
     { intros k v Hv. apply FsCrash.home_ne_hdr.
-      exact (proj2 (Hwok v (eo_lookup_elem W k v Hv))). }
+      exact (proj1 (proj2 (Hwok v (eo_lookup_elem W k v Hv)))). }
     (* the install pass writes home blocks only, so the committed header's
        reading rides the whole pass unchanged -- which is what each entry's
        permit needs to know that the block it overwrites is a LOGGED one *)
@@ -2161,7 +2180,7 @@ Section EndOpBlocks.
                  (log_slot_bno logstart jj) ltac:(lia)
                  ltac:(intros k u Hk Hu;
                        apply (FsCrash.home_ne_slot logstart (uint u) jj);
-                       [ exact (proj2 (Hwok u (eo_lookup_elem W k u Hu)))
+                       [ exact (proj1 (proj2 (Hwok u (eo_lookup_elem W k u Hu))))
                        | exact (eo_t_lt_lb jj n Hjlt Hn30) ])).
       symmetry. exact (HMcmslot jj Hjlt). }
     assert (Hpc108 : ret_pc (A1 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x108)).
@@ -2245,7 +2264,7 @@ Section EndOpBlocks.
              (<[log_hdr_bno logstart := bs1]> L) !! uint w = Some (Lw i)).
     { intros i w Hw. rewrite lookup_insert_ne.
       - exact (HLw i w Hw).
-      - intro Heqk. destruct (Hwok w (eo_lookup_elem W i w Hw)) as [_ Hnl].
+      - intro Heqk. destruct (Hwok w (eo_lookup_elem W i w Hw)) as (_ & Hnl & _).
         apply Hnl. rewrite -Heqk. apply eo_hdr_in_region. }
     iDestruct (cpu_own_transport CIDb1 CIDa3 0 eb (proc_addr j) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2264,7 +2283,11 @@ Section EndOpBlocks.
                  log_mirror_half (eo_minst logstart W Lw
                     (lm_upd Mc (log_hdr_bno logstart) bs1) i)) lks Vpr
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl HA3a0
-              (conj HnW Hn30) Hnd Hwok (fun _ => HLw')
+              (conj HnW Hn30) Hnd
+              (* install_trans reads only the covered-home half of the row *)
+              ltac:(intros w Hw; destruct (Hwok w Hw) as (Hc & Hl & _);
+                    exact (conj Hc Hl))
+              (fun _ => HLw')
               ltac:(intros Hab; discriminate)
               ltac:(lkbelow)
               ltac:(intros Hab; discriminate)
@@ -2287,7 +2310,7 @@ Section EndOpBlocks.
                 ltac:(rewrite length_map; lia)
                 ltac:(exact (eo_map_lookup W i w Hwi))
                 ltac:(exact (proj1 (Hwok w (eo_lookup_elem W i w Hwi))))
-                ltac:(exact (proj2 (Hwok w (eo_lookup_elem W i w Hwi))))
+                ltac:(exact (proj1 (proj2 (Hwok w (eo_lookup_elem W i w Hwi)))))
                 ltac:(apply HMihdr; apply lookup_lt_Some in Hwi; lia)
                 with "Hseam Hregc Hswlb"). }
     { iNext. iExact "Hmirc". }
@@ -2700,7 +2723,8 @@ Section EndOpBlocks.
     γs !! j = Some γl ->
     (n = length W /\ (n <= LOGBLOCKS)%nat) ->
     NoDup (map uint W) ->
-    (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
+    (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)
+                   /\ uint w <> FsImg.SB_BNO) ->
     (* threaded through the whole fuel induction unchanged (no acquire in
        this loop's own body) to [eo_commit] -> [eo_tail]'s re-acquire. *)
     locks_below lks "log" ->
@@ -2779,7 +2803,7 @@ Section EndOpBlocks.
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
     (* ---- the entry at the cursor, and every bound the two breads need ---- *)
     destruct (lookup_lt_is_Some_2 W t (eo_lt_len t n W Ht HnW)) as [w Hw].
-    pose proof (Hwok w (eo_lookup_elem W t w Hw)) as [Hwcov Hwnlog].
+    pose proof (Hwok w (eo_lookup_elem W t w Hw)) as (Hwcov & Hwnlog & _).
     pose proof (Hcovok (uint w) Hwcov) as Hwrange.
     assert (Hslotcov : log_slot_bno logstart t ∈ cov)
       by (apply Hlogsub; apply eo_slot_in_region; exact (eo_t_lt_lb t n Ht Hn30)).
@@ -3862,7 +3886,7 @@ Section EndOpBlocks.
     { intros i v Hi Hv.
       assert (Hne : uint bnol <> uint v).
       { rewrite Hubnol. intro Hbad.
-        destruct (Hwok v (eo_lookup_elem W i v Hv)) as [_ Hnl].
+        destruct (Hwok v (eo_lookup_elem W i v Hv)) as (_ & Hnl & _).
         apply Hnl. rewrite -Hbad. apply eo_slot_in_region.
         exact (eo_t_lt_lb t n Ht Hn30). }
       rewrite lookup_insert_ne; [| exact Hne].

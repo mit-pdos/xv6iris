@@ -16,8 +16,8 @@
 (*  to run in is CLOSED OVER (the era's file-system namespaces, which      *)
 (*  [LogInv] cannot name and the ~75 files that thread [log_ctx] have no   *)
 (*  business seeing), with the one fact a caller does need beside it --    *)
-(*  that the mask is disjoint from the byte view's own [logN], so a        *)
-(*  committer holding [logN] open can still run it.                       *)
+(*  that the mask is disjoint from the byte view's own [fsbN], so a        *)
+(*  committer holding [fsbN] open can still run it.                       *)
 (*                                                                        *)
 (*  THE AUTHORITY IS TAKEN AND RETURNED, not borrowed through an           *)
 (*  accessor: the law's whole content is a PURE fact, and                  *)
@@ -43,7 +43,7 @@ Require Import BioDefs.        (* [BSIZE] *)
 Require Import LogDefs.        (* [log_names], [ln_tx], [fs_restrict],
                                   [fs_home_set]                        *)
 Require Import FsWf.           (* [dv_of_D] *)
-Require Import FsBlocks.       (* [fs_names], [fs_bytes], [logN],
+Require Import FsBlocks.       (* [fs_names], [fs_bytes], [logN]/[fsbN],
                                   [bytes_tie], [bytes_dom]             *)
 Require Import FsDurSnap.      (* [snap_ok], [fs_state_rec] *)
 
@@ -62,7 +62,7 @@ Section SnapLaw.
   Context `{!riscvGS Σ, !fsLogG Σ, !logG Σ}.
 
   (* THE LAW, at a NAMED mask.  Every premise below is a row of
-     [FsBlocks.fs_bytes_body] -- what a committer holds when it has [logN]
+     [FsBlocks.fs_bytes_body] -- what a committer holds when it has [fsbN]
      open -- plus the empty transaction authority. *)
   Definition snap_law_at (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (N : coPset) : iProp Σ :=
@@ -84,7 +84,7 @@ Section SnapLaw.
   Definition snap_law (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) : iProp Σ :=
     (∃ N : coPset,
-       ⌜(↑logN : coPset) ## N⌝ ∗ snap_law_at γ γfs cov logstart N)%I.
+       ⌜(↑fsbN : coPset) ## N⌝ ∗ snap_law_at γ γfs cov logstart N)%I.
 
   Global Instance snap_law_at_persistent γ γfs cov logstart N :
     Persistent (snap_law_at γ γfs cov logstart N).
@@ -96,18 +96,18 @@ Section SnapLaw.
 
   Lemma snap_law_intro (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (N : coPset) :
-    (↑logN : coPset) ## N ->
+    (↑fsbN : coPset) ## N ->
     snap_law_at γ γfs cov logstart N -∗ snap_law γ γfs cov logstart.
   Proof.
     intros Hdj. iIntros "#H". rewrite /snap_law. iExists N.
     iSplitR; [iPureIntro; exact Hdj |]. iExact "H".
   Qed.
 
-  (* THE READING A COMMITTER TAKES.  It holds [logN] open -- that is where
+  (* THE READING A COMMITTER TAKES.  It holds [fsbN] open -- that is where
      the byte authority came from -- so the mask it can offer the law is
-     everything BUT [logN], and the closed-over disjointness is exactly
-     what makes that enough.  Stated at [⊤ ∖ ↑logN] and not at a general
-     [E ∖ ↑logN]: the closure names no upper bound on its own mask other
+     everything BUT [fsbN], and the closed-over disjointness is exactly
+     what makes that enough.  Stated at [⊤ ∖ ↑fsbN] and not at a general
+     [E ∖ ↑fsbN]: the closure names no upper bound on its own mask other
      than [⊤], so a caller at a smaller mask must take [snap_law_at]
      itself (which the definition hands out unchanged) and discharge
      [N ⊆ E] however its own opening lets it. *)
@@ -120,16 +120,16 @@ Section SnapLaw.
     bytes_dom Lb (fs_home_set cov logstart) ->
     snap_law γ γfs cov logstart -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ={⊤ ∖ ↑logN}=∗
+    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ={⊤ ∖ ↑fsbN}=∗
       ⌜snap_law_ok C (fs_home_set cov logstart)⌝
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit).
   Proof.
     intros Hdom Hlens Htie Hdm. iIntros "#Hlaw Hb Ht".
     iDestruct "Hlaw" as (N Hdj) "#Hbody".
-    iApply ("Hbody" $! (⊤ ∖ ↑logN) Lb C with "[%] [%] [%] [%] [%] Hb Ht");
+    iApply ("Hbody" $! (⊤ ∖ ↑fsbN) Lb C with "[%] [%] [%] [%] [%] Hb Ht");
       [| exact Hdom | exact Hlens | exact Htie | exact Hdm].
-    (* the law's mask misses [logN] -- the one namespace a committer, which
+    (* the law's mask misses [fsbN] -- the one namespace a committer, which
        is holding the byte view open, cannot offer it *)
     intros x Hx. apply elem_of_difference. split.
     - apply elem_of_top'.

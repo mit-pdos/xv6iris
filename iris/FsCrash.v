@@ -339,12 +339,20 @@ Qed.
 (* recovery home write discharges it in).                                  *)
 (* ---------------------------------------------------------------------- *)
 
+(* AND BLOCK 1 IS IN THE ROW (durable-disk lane E-blk1, plan section 5's
+   "one small fact the mint needs").  [LogInv.log_state] keeps "the write set
+   never names block 1" true in the era -- off [SbPark]'s park, not off any
+   premise -- and the header is what has to carry it ACROSS a power cycle,
+   since the boot mint reads a header nobody in this era wrote.  It rides the
+   third clause's own conjunction, LAST, so [hdr_wf]'s top-level arity does
+   not move and no [destruct Hwf as (_ & _ & _)] anywhere changes.  What
+   consumes it is [fs_recovery_sb_raw] below. *)
 Definition hdr_wf (P : Z -> list (bv 8)) (cov : gset Z) (logstart : Z)
     : Prop :=
   ((hdr_dec (P (log_hdr_bno logstart))).1 <= LOGBLOCKS)%nat
   /\ NoDup (hdr_dec (P (log_hdr_bno logstart))).2
   /\ (forall b : Z, b ∈ (hdr_dec (P (log_hdr_bno logstart))).2 ->
-        b ∈ cov /\ b ∉ log_region_set logstart).
+        b ∈ cov /\ b ∉ log_region_set logstart /\ b <> FsImg.SB_BNO).
 
 (* a clean header is well formed -- mkfs's disk, and every swap/clear *)
 Lemma hdr_wf_zero (P : Z -> list (bv 8)) (cov : gset Z) (logstart : Z) :
@@ -698,7 +706,7 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 1c''. WHAT RECOVERY LEAVES ALONE (durable-disk lane E-clauses, plan       *)
+(* 1c''. WHAT RECOVERY LEAVES ALONE (durable-disk lanes E-clauses/E-blk1,   *)
 (*       section 5's "one small fact the mint needs").                       *)
 (*                                                                          *)
 (* [fsinit] calls [readsb] BEFORE [initlog], so the superblock record the    *)
@@ -709,25 +717,19 @@ Qed.
 (* name it, and that is all recovery does: [fs_install] touches the blocks   *)
 (* the header names and nothing else ([fs_install_miss]).                     *)
 (*                                                                          *)
-(* THE PREMISE IS A REAL, OPEN WAL OBLIGATION, AND IT IS SCOPED HERE RATHER  *)
-(* THAN ASSUMED.  "The write set never names block 1" is TRUE of this        *)
-(* kernel -- [SbPark.sb_park] holds block 1's byte run at FRACTION 1 inside  *)
-(* an invariant [log_ctx] carries, so no [log_write] can ever own the bytes  *)
-(* it would have to own to log that block -- but it is not yet a MAINTAINED  *)
-(* row anywhere, so it appears below as a hypothesis and NOT as a clause of  *)
-(* [hdr_wf].  Closing it is three edits, none of which is this lane's:       *)
+(* THE PREMISE IS CLOSED (durable-disk lane E-blk1).  "The write set never   *)
+(* names block 1" is now a MAINTAINED row and not a hypothesis: it rides     *)
+(* [LogInv.log_state] through the era -- re-established at every append by   *)
+(* [SbPark.sb_parked_bno_ne], since the park holds block 1's run at fraction *)
+(* 1 inside [log_ctx] and [log_write]'s byte-range update holds the caller's *)
+(* window at fraction 1 -- and it rides [hdr_wf] across the power cycle,     *)
+(* [fs_commit_L_sector0_rec] (the only permit that writes a NONZERO header)  *)
+(* taking it as one premise that [ProofEndOp] discharges off that same row.  *)
+(* NO caller of [wp_log_write_*] pays anything for it.                       *)
 (*                                                                          *)
-(*   - [LogInv.log_state]'s existing pure row about [W] ("logged blocks are  *)
-(*     covered HOME blocks") gains [uint w <> SB_BNO];                       *)
-(*   - [ProofLogWrite]'s append path re-establishes it, either from the      *)
-(*     resource refutation above or from one more [SpecLogWrite] premise     *)
-(*     beside the [log_region_set] one it already takes (~20 call sites,     *)
-(*     each discharging it from geometry it already carries);                *)
-(*   - [hdr_wf] gains the same conjunct so it survives a power cycle, which  *)
-(*     costs one premise on [fs_commit_L_sector0_rec] (the only permit that  *)
-(*     writes a NONZERO header; every other producer is [hdr_wf_zero] or an  *)
-(*     "the header did not change" congruence) and its discharge in          *)
-(*     [ProofEndOp] off the row above.                                       *)
+(* This lemma keeps its GENERAL statement -- a home block the header does    *)
+(* not name reads through -- and [fs_recovery_sb_raw] just below is the      *)
+(* block 1 instance the mint uses.                                           *)
 (* ---------------------------------------------------------------------- *)
 
 Lemma fs_recovery_untouched (P : Z -> list (bv 8)) D (cov : gset Z)
@@ -740,6 +742,48 @@ Proof.
   intros -> Hhome Hout.
   rewrite /fs_recovery (fs_install_miss P logstart _ _ b Hout).
   apply fs_restrict_lookup_Some. split; [exact Hhome | reflexivity].
+Qed.
+
+(* ...AND AT BLOCK 1, WITH NOTHING LEFT TO ASSUME (durable-disk lane
+   E-blk1).  The hypothesis above is now a clause of [hdr_wf], so recovery
+   provably leaves the superblock alone: what [fsinit]'s [readsb] pulls off
+   the RAW disk before [initlog] runs is the very block the committed view
+   [D] holds.  The home-membership premise is the image's own geometry
+   ([FsCollectImg.img_sb_home] discharges it: block 1 is covered metadata and
+   sits below the log). *)
+Lemma fs_recovery_sb_raw (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (cov : gset Z) (logstart : Z) :
+  fs_recovery P D cov logstart ->
+  hdr_wf P cov logstart ->
+  FsImg.SB_BNO ∈ fs_home_set cov logstart ->
+  D !! FsImg.SB_BNO = Some (P FsImg.SB_BNO).
+Proof.
+  intros Hrec Hwf Hhome.
+  apply (fs_recovery_untouched P D cov logstart FsImg.SB_BNO Hrec Hhome).
+  intros Hmem. exact (proj2 (proj2 (proj2 (proj2 Hwf) _ Hmem)) eq_refl).
+Qed.
+
+(* THE MINT'S READING OF IT (plan section 5).  The era's file-system instance
+   is cloned from the snapshot, which describes [D]; the file-system
+   CONFIGURATION ([IcacheRef.icfg_nib], the region geometry) is decoded from
+   the record [readsb] parsed off the raw disk.  Those are one record: the
+   snapshot's two superblock clauses ([FsDurSnap.sk_sb], [sk_parse]) read at
+   [D]'s block 1, which the lemma above identifies with the raw one. *)
+Lemma fs_recovery_sb_parse (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
+    (cov : gset Z) (logstart : Z) (S : fs_state_rec) :
+  fs_recovery P D cov logstart ->
+  hdr_wf P cov logstart ->
+  FsImg.SB_BNO ∈ fs_home_set cov logstart ->
+  snap_bytes S D ->
+  P FsImg.SB_BNO = fss_sbb S /\
+  FsImg.fs_parse_sb (fun _ => P FsImg.SB_BNO) = Some (fss_sb S).
+Proof.
+  intros Hrec Hwf Hhome Hb.
+  assert (Heq : Some (P FsImg.SB_BNO) = Some (fss_sbb S)).
+  { rewrite -(sk_sb Hb). symmetry.
+    exact (fs_recovery_sb_raw P D cov logstart Hrec Hwf Hhome). }
+  apply (inj Some) in Heq.
+  split; [exact Heq |]. rewrite Heq. exact (sk_parse Hb).
 Qed.
 
 (* Two congruences.  The first needs no uniqueness (only the slot contents
@@ -2585,6 +2629,12 @@ Section fs_crash_seam.
     (nn <= LOGBLOCKS)%nat ->
     NoDup Ws ->
     (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
+    (* AND THE BLOCK 1 CLAUSE (durable-disk lane E-blk1).  The only permit
+       that writes a NONZERO header is the one that has to carry [hdr_wf]'s
+       new clause, and the committer discharges it off [LogInv.log_state]'s
+       write-set row ([ProofEndOp.eo_hdr_ne_sb]) -- the same row the era
+       keeps true at every [log_write]. *)
+    (forall b : Z, b ∈ Ws -> b <> FsImg.SB_BNO) ->
     lm_hdr M0 ls = (0%nat, []) ->
     (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
     (* ROW (b) at the commit *)
@@ -2612,7 +2662,7 @@ Section fs_crash_seam.
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))
        ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
   Proof.
-    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Htie Hslot [Sn Hsnap].
+    intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Htie Hslot [Sn Hsnap].
     iIntros "#Hreg #Hswlb Hmir".
     assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hdec /=; lia).
     assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
@@ -2709,7 +2759,9 @@ Section fs_crash_seam.
                  (fs_blocks dk' (log_hdr_bno ls)) eq_refl Hmiss).
       - rewrite last_snoc. reflexivity.
       - rewrite /hdr_wf Hdec' /=.
-        split_and!; [exact Hnn | exact Hnd | exact Hin].
+        split_and!; [exact Hnn | exact Hnd |].
+        intros b Hb. destruct (Hin b Hb) as [Hbc Hbl].
+        split_and!; [exact Hbc | exact Hbl | exact (Hinsb b Hb)].
       }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
@@ -2804,7 +2856,7 @@ Section fs_crash_seam.
                   eq_refl Hn0' Hmiss _ _ Hrec).
         { exact Hndw. }
         intros j b Hjb. rewrite Hdkh /= in Hjb.
-        assert (Hbc : b ∈ cov /\ b ∉ log_region_set ls).
+        assert (Hbc : b ∈ cov /\ b ∉ log_region_set ls /\ b <> FsImg.SB_BNO).
         { apply Hhome. rewrite Hdkh /=.
           exact (elem_of_list_lookup_2 _ _ _ Hjb). }
         assert (Hbhome : b ∈ fs_home_set cov ls)
@@ -3069,6 +3121,12 @@ Section fs_crash_seam.
     (nn <= LOGBLOCKS)%nat ->
     NoDup Ws ->
     (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
+    (* AND THE BLOCK 1 CLAUSE (durable-disk lane E-blk1).  The only permit
+       that writes a NONZERO header is the one that has to carry [hdr_wf]'s
+       new clause, and the committer discharges it off [LogInv.log_state]'s
+       write-set row ([ProofEndOp.eo_hdr_ne_sb]) -- the same row the era
+       keeps true at every [log_write]. *)
+    (forall b : Z, b ∈ Ws -> b <> FsImg.SB_BNO) ->
     lm_hdr M0 ls = (0%nat, []) ->
     (forall b : Z, b <> log_hdr_bno ls -> lm_view M0 b = V b) ->
     (* ROW (b) at the commit ([LogInv.log_mirror_tie_body], through [Hoff]) *)
@@ -3090,7 +3148,7 @@ Section fs_crash_seam.
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
   Proof.
-    intros Hlen Hdec Hnn Hnd Hin HM0 Hoff Hrow Hslot Hsnap.
+    intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Hrow Hslot Hsnap.
     iIntros "#Hseam #Hreg #Hswlb Hmir".
     assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
       by exact (log_hdr_in_ext cov ls).
@@ -3137,7 +3195,7 @@ Section fs_crash_seam.
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_commit_L_sector0_rec cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
-                Hin HM0 Hoff Hrow Hslot Hsnap with "Hreg Hswlb [Hmir]").
+                Hin Hinsb HM0 Hoff Hrow Hslot Hsnap with "Hreg Hswlb [Hmir]").
       iNext. iExact "Hmir".
     - (* SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit *)
       iApply (fs_permit_of_rec with "Hseam").
@@ -3178,7 +3236,7 @@ Section fs_crash_seam.
           { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
           iExact "Hrc". }
         iApply (fs_commit_L_sector0_rec cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
-                  Hin HM1 HoffM1 Hrow Hslot Hsnap with "Hreg Hswlb [Hm]").
+                  Hin Hinsb HM1 HoffM1 Hrow Hslot Hsnap with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
                 (Hwfh M0) with "Hreg Hswlb [Hmir]").

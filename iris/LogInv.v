@@ -1099,9 +1099,22 @@ Section LogInv.
        ⌜LB = list_to_set (map uint W)⌝ ∗
        ⌜NoDup (map uint W)⌝ ∗
        (* logged blocks are covered HOME blocks: never the log's own
-          storage, never the header *)
+          storage, never the header -- AND NEVER BLOCK 1 (durable-disk lane
+          E-blk1, plan section 5's "one small fact the mint needs").
+          [fsinit] reads the superblock off the RAW disk before [initlog]
+          runs, while the snapshot the boot mint reads describes the
+          RECOVERED view, so the two are one record only if recovery leaves
+          block 1 alone.  It is not a premise on anybody: [SbPark.sb_parked]
+          -- a conjunct of [log_ctx] -- holds block 1's run at fraction 1,
+          [log_write]'s byte-range update holds the caller's window at
+          fraction 1, and two full owners of one byte are inconsistent
+          ([SbPark.sb_parked_bno_ne], read at the append arm).  The third
+          conjunct is LAST inside the row so that no site which passes the
+          row through moves.  [FsCrash.hdr_wf] carries the same clause, which
+          is what makes it survive a power cycle. *)
        ⌜forall w, w ∈ W -> uint w ∈ cov /\
-          ~ (uint w ∈ log_region_set logstart)⌝ ∗
+          ~ (uint w ∈ log_region_set logstart) /\
+          uint w <> FsImg.SB_BNO⌝ ∗
        lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
        ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) ∗
        ([∗ list] i ∈ seq n (LOGBLOCKS - n),
@@ -1281,7 +1294,7 @@ Section LogInv.
         open", it yields [∃ S, snap_ok S L] and hands both authorities back.
         ARITY-FREE for [sb_parked]'s reason verbatim: the mask it runs in is
         CLOSED OVER, with the one fact a committer needs beside it (that
-        [logN] is not in it -- a committer runs the law with the byte view
+        [fsbN] is not in it -- a committer runs the law with the byte view
         already open).  The WAL supplies nothing to it and reads nothing out
         of it but a pure proposition, so the log's lock resource still
         carries no client payload.  LAST, after the park, so no pattern that
@@ -1559,7 +1572,7 @@ Section LogInv.
     bytes_dom Lb (fs_home_set cov logstart) ->
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-    ghost_map_auth (ln_tx γ) 1 T ={⊤ ∖ ↑logN}=∗
+    ghost_map_auth (ln_tx γ) 1 T ={⊤ ∖ ↑fsbN}=∗
       ⌜snap_law_ok C (fs_home_set cov logstart)⌝
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 T.

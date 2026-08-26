@@ -56,7 +56,21 @@ Local Open Scope Z_scope.
 Section SbPark.
   Context `{!riscvGS Σ, !xv6G Σ}.
 
-  Definition sbN : namespace := nroot .@ "fssb".
+  (* A CHILD OF [FsBlocks.logN], AND THE SIBLING OF THE BYTE VIEW'S OWN
+     [fsbN] (durable-disk lane E-blk1; the reasoning is written out at
+     [FsBlocks.fsbN]).  Every FS-side byte accessor already carries
+     [↑logN ⊆ E], so ONE premise now reaches both the byte view and block
+     1's park -- which is what lets [log_write] refute a write at block 1
+     inside its own atomic-update window, whose mask is the caller's [Efs]
+     and about which its contract says only [↑logN ⊆ Efs].  Siblings and
+     not nested: the commit holds the byte view open while the collection
+     reads block 1. *)
+  Definition sbN : namespace := logN .@ "sb".
+
+  Lemma sbN_sub (E : coPset) : (↑logN : coPset) ⊆ E -> (↑sbN : coPset) ⊆ E.
+  Proof.
+    intros HE. etrans; [| exact HE]. rewrite /sbN. apply nclose_subseteq.
+  Qed.
 
   (* THE BODY.  The bytes are existential -- nothing outside ever names
      them -- and the record they decode to is a PARAMETER, because that is
@@ -137,10 +151,40 @@ Section SbPark.
     by iModIntro.
   Qed.
 
-  (* the byte view's own invariant is at [logN]; block 1's park is not,
-     so a consumer may hold both open *)
-  Lemma logN_sbN_disj : (↑logN : coPset) ## ↑sbN.
+  (* the byte view's own invariant is at [FsBlocks.fsbN]; block 1's park is
+     its SIBLING under [logN], so a consumer may hold both open *)
+  Lemma fsbN_sbN_disj : (↑fsbN : coPset) ## ↑sbN.
   Proof. solve_ndisj. Qed.
+
+  (* ---- THE REFUTATION [log_write] READS (durable-disk lane E-blk1) ---- *)
+
+  (* NOBODY CAN OWN A RUN INSIDE BLOCK 1, and that is what makes "the log's
+     write set never names block 1" a maintained row of [LogInv.log_state]
+     rather than a premise on twenty call sites.  [SpecLogWrite]'s
+     byte-range atomic update hands the callee the caller's window at
+     FRACTION 1; the park holds the whole block at fraction 1; two full
+     owners of one byte are inconsistent.
+
+     Stated at [↑logN ⊆ E] and not at [↑sbN ⊆ E] because that is the mask
+     premise [log_write]'s contract already carries -- see [sbN] above.
+     [FsCollectImg.log_ctx_sb_not_owned] is the same refutation at a WHOLE
+     block, in the abstract byte view's vocabulary. *)
+  Lemma sb_parked_bno_ne (E : coPset) (γfs : fs_names) (b : Z) (off : nat)
+      (sub : list (bv 8)) :
+    (↑logN : coPset) ⊆ E -> (off < BSIZE)%nat -> (0 < length sub)%nat ->
+    sb_parked γfs -∗
+    byte_range (fs_bytes γfs) b (Z.of_nat off) sub ={E}=∗
+      ⌜b <> SB_BNO⌝ ∗ byte_range (fs_bytes γfs) b (Z.of_nat off) sub.
+  Proof.
+    intros HE Hoff Hpos. iIntros "#Hp Hr".
+    rewrite /sb_parked. iDestruct "Hp" as (sb) "[%Hok #Hpark]".
+    iMod (sb_park_acc E γfs sb (sbN_sub E HE) with "Hpark")
+      as (bs) "(%Hparse & Hb & Hclose)".
+    iDestruct (fsblock_byte_range_ne (fs_bytes γfs) SB_BNO b off bs sub
+                 Hoff Hpos with "Hb Hr") as %Hne.
+    iMod ("Hclose" with "Hb") as "_".
+    iModIntro. iSplitR; [iPureIntro; exact (not_eq_sym Hne) |]. iExact "Hr".
+  Qed.
 
 End SbPark.
 

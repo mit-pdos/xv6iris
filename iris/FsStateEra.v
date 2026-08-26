@@ -1670,7 +1670,7 @@ Section EraRes.
   Proof.
     iIntros (HE) "#Hinv Hn".
     iDestruct "Hn" as "(Hd & Hb & Hi & Ht & %Hl)".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iAssert (⌜forall k : nat, (k <= MAXFILE)%nat ->
                bv_unsigned (bm_slot (bm_of n) k) <> 0 ->

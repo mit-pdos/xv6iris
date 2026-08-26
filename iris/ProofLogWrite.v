@@ -257,15 +257,24 @@ Proof.
     apply Hni. apply elem_of_list_In. exact Hx.
 Qed.
 
+(* THE APPEND ARM'S ROW, WITH BLOCK 1 IN IT (durable-disk lane E-blk1).
+   The third clause travels exactly as the other two do; what is new is that
+   the appending arm has to SUPPLY it, and it does so from the park's own
+   resource ([SbPark.sb_parked_bno_ne] fired inside the atomic update's
+   window) rather than from a premise -- so no caller of [wp_log_write_*]
+   gained anything. *)
 Local Lemma lw_wok_snoc (W : list (mword 32)) (w : mword 32)
     (cov : gset Z) (logstart : Z) :
-  (forall v, v ∈ W -> uint v ∈ cov /\ ~ (uint v ∈ log_region_set logstart)) ->
+  (forall v, v ∈ W -> uint v ∈ cov /\ ~ (uint v ∈ log_region_set logstart)
+                   /\ uint v <> FsImg.SB_BNO) ->
   uint w ∈ cov -> ~ (uint w ∈ log_region_set logstart) ->
-  forall v, v ∈ W ++ [w] -> uint v ∈ cov /\ ~ (uint v ∈ log_region_set logstart).
+  uint w <> FsImg.SB_BNO ->
+  forall v, v ∈ W ++ [w] -> uint v ∈ cov /\ ~ (uint v ∈ log_region_set logstart)
+                         /\ uint v <> FsImg.SB_BNO.
 Proof.
-  intros Hall Hc Hl v Hv. apply elem_of_app in Hv as [Hv | Hv].
+  intros Hall Hc Hl Hs v Hv. apply elem_of_app in Hv as [Hv | Hv].
   - exact (Hall v Hv).
-  - apply elem_of_list_singleton in Hv. subst v. split; assumption.
+  - apply elem_of_list_singleton in Hv. subst v. split_and!; assumption.
 Qed.
 
 (* uint is injective on [mword 32] -- the scan compares words, the batch's
@@ -1792,6 +1801,8 @@ Section ProofLogWrite.
     (* the byte view's invariant, off the context log_write already threads
        (durable-disk 1c-flip step 4) *)
     iPoseProof (log_ctx_bytes with "Hlctx") as "#Hbinv".
+    (* BLOCK 1'S PARK, off the same context (durable-disk lane E-blk1) *)
+    iPoseProof (log_ctx_sb with "Hlctx") as "#Hsbp".
     iAssert (lw_cont (CID0 := CID) bn γ γfs γd cov dev k pidv bno bs bsd Φfsb Bud
                      m K n eb p b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /lw_cont; iExact "Hcont"|].
@@ -2241,6 +2252,19 @@ Section ProofLogWrite.
        two inputs the closing wand takes; together they are exactly
        [InodeRegion.izrcpt]'s witness disjunct. *)
     iMod "Hau" as (sub_old v') "(%Hlsub & Hfsb & #Hvlb' & HauClose)".
+    (* ---- BLOCK 1 IS NEVER LOGGED, AND IT IS A RESOURCE FACT (durable-disk
+       lane E-blk1, plan section 5's "one small fact the mint needs").  This
+       is the ONE instant at which the caller's run for [bno] exists at
+       FRACTION 1, so it is the one instant at which the park -- which holds
+       block 1's run at fraction 1 inside [log_ctx] -- can refute [bno = 1].
+       The mask is the caller's [Efs] and the contract promises only
+       [↑logN ⊆ Efs]; that is enough because [SbPark.sbN] is a CHILD of
+       [logN] (see [FsBlocks.fsbN]).  The fact is what the append arm below
+       re-establishes [LogInv.log_state]'s write-set row with, and through
+       [FsCrash.hdr_wf] it is what survives the power cycle. ---- *)
+    iMod (SbPark.sb_parked_bno_ne Efs γfs (uint bno) off sub_old HlogE
+            ltac:(lia) ltac:(rewrite Hlsub; exact Hlenpos)
+            with "Hsbp Hfsb") as "(%Hnsb & Hfsb)".
     (* [e0] is already [Ep] here -- a live entry is born at the current
        epoch, [subst] above -- so this IS the comparison the wand wants. *)
     iDestruct (log_epoch_lb_le γ Ep v' with "Hepa Hvlb'") as %Hvle'.

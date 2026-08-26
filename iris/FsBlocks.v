@@ -284,12 +284,47 @@ Qed.
 
 Definition logN : namespace := nroot .@ "fslogbytes".
 
+(* ---------------------------------------------------------------------- *)
+(*  [logN] IS A FAMILY, NOT ONE INVARIANT (durable-disk lane E-blk1).      *)
+(*                                                                        *)
+(*  The cache/byte tie below lives at [fsbN = logN .@ "b"] and block 1's   *)
+(*  park at [SbPark.sbN = logN .@ "sb"] -- SIBLINGS, because the commit    *)
+(*  holds the byte view open while the collection reads block 1, so they   *)
+(*  must be independently openable.                                       *)
+(*                                                                        *)
+(*  WHY THE PARK LIVES UNDER [logN] AT ALL.  [SpecLogWrite]'s byte-range   *)
+(*  atomic update runs at the CALLER's mask [Efs], about which the         *)
+(*  contract says one thing only: [↑logN ⊆ Efs].  That window -- between   *)
+(*  firing the update and closing it -- is the ONE moment at which         *)
+(*  [log_write] holds the caller's run at fraction 1, hence the one moment *)
+(*  at which "this is not block 1" is provable at all                      *)
+(*  ([SbPark.sb_parked_bno_ne], read into [LogInv.log_state]'s write-set   *)
+(*  row by [ProofLogWrite]).  Making the park a CHILD of [logN] is what    *)
+(*  buys that mask with no new premise at any of log_write's ~20 call      *)
+(*  sites; the alternative -- one more [↑sbN ⊆ Efs] premise on every       *)
+(*  [wp_log_write_*] -- would land on all of them.                        *)
+(*                                                                        *)
+(*  Every [↑logN ⊆ E] premise in the tree is UNCHANGED by the split        *)
+(*  ([logN]'s own value did not move); only the [inv_acc]s inside this     *)
+(*  file and the committer's own open name [fsbN] instead.                *)
+(* ---------------------------------------------------------------------- *)
+Definition fsbN : namespace := logN .@ "b".
+
+Lemma fsbN_logN : (↑fsbN : coPset) ⊆ ↑logN.
+Proof. apply nclose_subseteq. Qed.
+
+Lemma fsbN_sub (E : coPset) : (↑logN : coPset) ⊆ E -> (↑fsbN : coPset) ⊆ E.
+Proof. intros HE. etrans; [apply fsbN_logN | exact HE]. Qed.
+
 (* the mask side condition every reader at the top mask discharges.  Proved
    ONCE, here, in an empty context: [set_solver] inside a syscall-altitude
    proof walks the whole context (durable-notes), and every call site of
    [fs_bytes_agree] below is at [⊤] or at [⊤] minus one namespace. *)
 Lemma logN_top : (↑logN : coPset) ⊆ ⊤.
 Proof. set_solver. Qed.
+
+Lemma fsbN_top : (↑fsbN : coPset) ⊆ ⊤.
+Proof. exact (fsbN_sub ⊤ logN_top). Qed.
 
 Section FsBytes.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
@@ -454,6 +489,33 @@ Section FsBytes.
     rewrite fsblock_1.
     iApply (fsblock_q_ne gL (DfracOwn 1) dq b1 b2 bs1 bs2
               (blk_dfrac_full_nvalid _)).
+  Qed.
+
+  (* ...AND THE FORM A SUB-BLOCK WRITER'S REFUTATION NEEDS (durable-disk
+     lane E-blk1).  [SpecLogWrite]'s byte-range atomic update surrenders a
+     RUN INSIDE a block, not the whole block, so the park's whole-block
+     owner has to be played against a window: at [off < BSIZE] the two runs
+     share the byte at [b * BSZ + off], and both are at fraction 1.  This is
+     [fsblock_ne_full] one granularity down, and it is what makes "block 1
+     is never logged" a resource fact rather than a premise. *)
+  Lemma fsblock_byte_range_ne gL (b1 b2 : Z) (off : nat)
+      (bs sub : list (bv 8)) :
+    (off < BSIZE)%nat -> (0 < length sub)%nat ->
+    fsblock gL b1 bs -∗ byte_range gL b2 (Z.of_nat off) sub -∗ ⌜b1 <> b2⌝.
+  Proof.
+    intros Hoff Hpos. iIntros "[%Hlen Hr1] Hr2".
+    destruct (decide (b1 = b2)) as [->|Hne]; [| done].
+    destruct (lookup_lt_is_Some_2 bs off ltac:(rewrite Hlen; exact Hoff))
+      as [v Hv].
+    destruct (lookup_lt_is_Some_2 sub 0%nat Hpos) as [w Hw].
+    rewrite /byte_range.
+    iDestruct (big_sepL_lookup _ _ off v Hv with "Hr1") as "H1".
+    iDestruct (big_sepL_lookup _ _ 0%nat w Hw with "Hr2") as "H2".
+    assert (Haddr : (b2 * BSZ + 0 + Z.of_nat off)%Z
+                    = (b2 * BSZ + Z.of_nat off + Z.of_nat 0)%Z) by lia.
+    iEval (rewrite Haddr) in "H1".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hval _].
+    exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hval).
   Qed.
 
   Lemma fsblock_ne_34 gL b1 b2 bs1 bs2 :
@@ -703,7 +765,7 @@ Section FsBytes.
   Proof. apply _. Qed.
 
   Definition fs_bytes_inv (gL gc : gname) (home : gset Z) : iProp Σ :=
-    inv logN (fs_bytes_body gL gc home).
+    inv fsbN (fs_bytes_body gL gc home).
 
   Global Instance fs_bytes_inv_persistent gL gc home :
     Persistent (fs_bytes_inv gL gc home).
@@ -779,7 +841,7 @@ Section FsBytes.
     fsblock gL b bs ={E}=∗ ⌜b ∈ home⌝ ∗ fsblock gL b bs.
   Proof.
     iIntros (HE) "#Hinv Hfb".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
     iMod ("Hclose" with "[Ha HC]") as "_".
@@ -795,7 +857,7 @@ Section FsBytes.
       ⌜bsm = bs⌝ ∗ fsblock gL b bs ∗ (b ↪[gc]{#(1/2)} bsm).
   Proof.
     iIntros (HE) "#Hinv Hfb Hm".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
     assert (Hin : is_Some (C !! b)).
@@ -863,7 +925,7 @@ Section FsBytes.
     fsblock_q gL dq b bs ={E}=∗ ⌜b ∈ home⌝ ∗ fsblock_q gL dq b bs.
   Proof.
     iIntros (HE) "#Hinv Hfb".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
     iMod ("Hclose" with "[Ha HC]") as "_".
@@ -883,7 +945,7 @@ Section FsBytes.
       ⌜bsm = bs⌝ ∗ fsblock_q gL dq b bs ∗ (b ↪[gc]{#(1/2)} bsm).
   Proof.
     iIntros (HE) "#Hinv Hfb Hm".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
     assert (Hin : is_Some (C !! b)).
@@ -943,7 +1005,7 @@ Section FsBytes.
       (b ↪[gc]{#(1/2)} blk_splice off sub_new bs_old).
   Proof.
     iIntros (HE Hoff Hpos Hshape) "#Hinv Hca Hr Hm".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C0) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (byte_range_home gL L home b off sub_old Hdm
                  ltac:(lia) Hpos with "Ha Hr") as %Hb.
@@ -1198,7 +1260,7 @@ Section FsBytes.
       - intros [v Hv]. rewrite lookup_empty in Hv. done.
       - intros (b' & Hb' & _). set_solver. }
     rewrite left_id_L in Hdm.
-    iMod (inv_alloc logN E (fs_bytes_body gL gc (dom C)) with "[Ha HC]") as "#Hinv".
+    iMod (inv_alloc fsbN E (fs_bytes_body gL gc (dom C)) with "[Ha HC]") as "#Hinv".
     { iNext. iExists L, C. iFrame "Ha HC". iPureIntro. auto. }
     iModIntro. iExists gL. iFrame "Hinv Hfb".
   Qed.

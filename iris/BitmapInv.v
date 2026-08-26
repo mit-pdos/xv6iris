@@ -393,7 +393,7 @@ Section BitmapRes.
       ∗ free_pool (fs_gamma_L γfs) size u.
   Proof.
     iIntros (HE) "#Hinv Hpool".
-    iMod (inv_acc E logN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
     iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
     iDestruct (pool_home_pure γfs L home size u Hdm with "Ha Hpool") as %Hres.
     iMod ("Hclose" with "[Ha HC]") as "_".

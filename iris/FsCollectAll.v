@@ -924,7 +924,17 @@ Section CollectAll.
     iApply (snap_law_intro icfg_log γfs cov ls
               ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
                ∪ ↑icEscN)).
-    { solve_ndisj. }
+    (* [sbN] IS A CHILD OF [logN] (durable-disk lane E-blk1), so
+       [solve_ndisj] alone no longer closes this: block 1's park is a
+       SIBLING of the byte view's own [fsbN] under one parent, and the fact
+       the committer needs is disjointness from [fsbN], not from [logN].
+       The other five namespaces are outside [logN] altogether. *)
+    { assert (Hoth : (↑logN : coPset)
+                     ## ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑ipoolN
+                         ∪ ↑icEscN)) by solve_ndisj.
+      pose proof (fsbN_logN) as Hfb.
+      pose proof (fsbN_sbN_disj) as Hsb.
+      set_solver. }
     rewrite /snap_law_at.
     iModIntro. iIntros (E Lb C) "%HN %Hdom %Hlens %Htie %Hdm Hb Ht".
     assert (Hft : (↑ftopN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
