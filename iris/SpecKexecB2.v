@@ -413,7 +413,7 @@ Section KexecB2Res.
   (*  [nn] of them NAMED (its post is stated over the old contents), and   *)
   (*  the giveback wants them anonymous again.                            *)
   (* ------------------------------------------------------------------ *)
-  Lemma kxc_page_take (q : mword 64) (nn : nat) :
+  Lemma kxc_page_take `{XI : CurCtx} (q : mword 64) (nn : nat) :
     (nn <= 4096)%nat ->
     page_own q ⊢
     ∃ f : nat -> bv 8,
@@ -426,7 +426,7 @@ Section KexecB2Res.
     iDestruct "H" as "(A & B & _)". iSplitL "A"; [iExact "A" | iExact "B"].
   Qed.
 
-  Lemma kxc_page_give (q : mword 64) (nn : nat) (f h : nat -> bv 8) :
+  Lemma kxc_page_give `{XI : CurCtx} (q : mword 64) (nn : nat) (f h : nat -> bv 8) :
     (nn <= 4096)%nat ->
     ([∗ list] j ∈ seq 0 nn, pa_add q j ↦ₘ h j) -∗
     ([∗ list] j ∈ seq 0 (4096 - nn), pa_add (pa_add q nn) j ↦ₘ f (nn + j)%nat) -∗
@@ -492,7 +492,7 @@ Section KexecB2Res.
   (*  needs all three separately -- and it hands them back before the      *)
   (*  back edge, because [kxc_at_12c] carries the chunk whole.             *)
   (* ------------------------------------------------------------------ *)
-  Lemma kxc_ph_slots_of_stack (sp0 : mword 64) :
+  Lemma kxc_ph_slots_of_stack `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) (pa_stk sp0 54) 9 ⊢
     ([∗ list] i ∈ seq 0 7,
        ∃ w : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
@@ -506,7 +506,7 @@ Section KexecB2Res.
     iFrame "H7 H6 H5 H4 H3 H2 H1".
   Qed.
 
-  Lemma kxc_stack_of_ph_slots (sp0 : mword 64) (w62 w63 : mword 64) :
+  Lemma kxc_stack_of_ph_slots `{XI : CurCtx} (sp0 : mword 64) (w62 w63 : mword 64) :
     ([∗ list] i ∈ seq 0 7,
        ∃ w : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 62) (DfracOwn 1) w62 -∗
@@ -523,7 +523,7 @@ Section KexecB2Res.
   (* ...and the byte view of the seven, with the per-slot alignment kept as
      a PURE side product -- a byte run does not carry alignment and
      [bytes_own_slotsn] demands it back.  [kxc_elf_take]'s twin. *)
-  Lemma kxc_ph_take (sp0 : mword 64) :
+  Lemma kxc_ph_take `{XI : CurCtx} (sp0 : mword 64) :
     ([∗ list] i ∈ seq 0 7,
        ∃ w : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ⊢
     ⌜forall i, (i < 7)%nat ->
@@ -538,7 +538,7 @@ Section KexecB2Res.
     iExact "Hb".
   Qed.
 
-  Lemma kxc_ph_give (sp0 : mword 64) (h : nat -> bv 8) :
+  Lemma kxc_ph_give `{XI : CurCtx} (sp0 : mword 64) (h : nat -> bv 8) :
     (forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
     ([∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ[KT1] h j) ⊢
@@ -553,7 +553,7 @@ Section KexecB2Res.
   (* An 8-byte READ window into a named run -- [ProofKexecSeam.kxc_win2] and
      [kxc_win4] at the width the three [ld]s of ph.vaddr / ph.filesz /
      ph.memsz use. *)
-  Lemma kxc_win8 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
+  Lemma kxc_win8 `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 8 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 8 = true ->
     ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢

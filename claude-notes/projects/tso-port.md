@@ -302,19 +302,31 @@ through a converted definition name, so the build's `?XI : CurCtx`
 existential errors are the signal to extend it.
 
 **NOT GREEN YET — the open tail (all M2-shaped):**
-- `UsertrapRes.ut_res_bare_park` — the park lemma's continuation binds
-  the RESUMING context (`∀ h Xc`), and `iExact "Hcaps"` pits
-  `devintr_caps` at the outer ambient against the same at `Xc`; the
-  permeable-seal unification crawls (35 min, killed).  Needs a
-  shim-tier `devintr_caps` transport (or `devintr_caps_any`, which the
-  file already defines for exactly this hart-free crossing) — genuine
-  M2 park/resume work.
-- `ProofKernelvec` (~1681) — the trap RESUME crossing: the kerneltrap
-  continuation's `sie_cap_gpr` will not instantiate against the
-  caller's (hidden index mismatch); same family.
-- Last few binder/seam stragglers surfaced by the most recent round
-  (BootCarveMain disk records, ProofSysOpenParts/ProofSysUnlink/
-  SpecKexecB2) have fixes applied but not yet verified green.
+- `UsertrapRes.ut_res_bare_park` — the park protocol's capability
+  crossing is UNPROVABLE post-flip, not slow: the record stores
+  `park_env`/`ut_park_caps` at PARK time and replays them at the
+  ∀-quantified RESUME context `Xc`, and the bundle's handles
+  (`procs_inv` → wrapped proc payloads → `proc_ctx`/`valid_context`)
+  are now genuinely ξ-dependent — MEASURED: `proc_ctx (XI := ξ) ⊣⊢
+  (XI := ξ')` fails `reflexivity` fast with every sealed constant
+  transparent, so the 35-minute `iExact "Hcaps"` was unification
+  exhausting an unprovable goal.  The fix is the redesign the file's
+  own M2 comments sketch: the env moves INSIDE the ∀, resumer-supplied
+  (the `W`/`first_done`/`timer_cap` channel), which wants either the
+  proc-lock payload λ-converted (rule 1, so `procs_inv` is a CLOSED
+  term — its CtxMorph then needs a ▷-capable transport, the real M2
+  machinery) or the resumer's global bundle pinned to `N`'s `un_*`
+  fields.  Cascades through `ParkCap.park_chan`/`park_token` (a
+  guarded fixpoint), `UtResFits`, and the resume sites.  OWNER
+  DECISION RECOMMENDED before implementing.
+- `ProofKernelvec` (~1681) — the trap RESUME crossing, same family:
+  the kerneltrap continuation's premises will not instantiate against
+  the caller's (hidden context index differs across the crossing).
+- Downstream of those two files only; everything else builds.  Last
+  round's numbers: full tree minus {UsertrapRes, ProofKernelvec,
+  BootCarveMain (disk-record mints, fix applied unverified),
+  ProofSysOpenParts, SpecKexecB2 (binders applied unverified)} and
+  their dependents.
 
 **Where the flip's honesty lives now:** grep `TsoCtxShim` (imports =
 seams), `Local Transparent ctx_pointsto` (one use, `SchedCtx`'s

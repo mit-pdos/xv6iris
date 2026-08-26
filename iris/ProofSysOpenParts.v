@@ -942,7 +942,7 @@ Section ProofSysOpenFrame.
     iFrame "H1 H2 H3 H4 H5 H6 HbP H23 H24". iPureIntro. exact HalP.
   Qed.
 
-  Lemma so_frame_join (sp0 : mword 64)
+  Lemma so_frame_join `{XI : CurCtx} (sp0 : mword 64)
       (w1 w2 w3 w4 w5 w6 w23 w24 : mword 64) :
     so_al sp0 ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
@@ -985,12 +985,12 @@ Section ProofSysOpenFrame.
   (* THE OMODE CELL, and the only 4-byte view of a frame slot sys_open
      needs.  The lower word of slot 23 is dead (it is the [int fd] gcc never
      spilled); it rides through as an arbitrary word and comes back. *)
-  Lemma so_omode_split (sp0 : mword 64) (w : mword 64) :
+  Lemma so_omode_split `{XI : CurCtx} (sp0 : mword 64) (w : mword 64) :
     (pa_stk sp0 23) ↦₈[KT1] w ⊢
     (pa_stk sp0 23) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] word_hi w.
   Proof. apply word_pointsto_split4. Qed.
 
-  Lemma so_omode_join (sp0 : mword 64) (lo hi : bv 32) :
+  Lemma so_omode_join `{XI : CurCtx} (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     (pa_stk sp0 23) ↦₄[KT1] lo -∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] hi -∗
     (pa_stk sp0 23) ↦₈[KT1] word_of_words lo hi.
@@ -998,18 +998,18 @@ Section ProofSysOpenFrame.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak
      the [seq]-indexed byte window, not [bytes_own]. *)
-  Lemma so_bytes_name (a : mword 64) (N : nat) :
+  Lemma so_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma so_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma so_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): the walkers read the NUL-terminated prefix, the
      rest rides through untouched *)
-  Lemma so_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma so_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -1021,7 +1021,7 @@ Section ProofSysOpenFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma so_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma so_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,

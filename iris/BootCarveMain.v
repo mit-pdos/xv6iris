@@ -876,7 +876,7 @@ Section BootCarveMain.
   (* the per-element shape, NAMED: the family's [Φ] is applied to the element
      address, and a LAMBDA there leaves the per-element goal a beta-redex that
      [iApply] will not see through. *)
-  Local Definition bnode_raw (a : Arch.pa) : iProp Σ :=
+  Local Definition bnode_raw `{XI : TsoCtx.CurCtx} (a : Arch.pa) : iProp Σ :=
     (sl_raw (buf_lock a) ∗ blink_raw a ∗ bpay_raw a)%I.
 
   Lemma boot_buf_node (g : gstate) (A : Z) :

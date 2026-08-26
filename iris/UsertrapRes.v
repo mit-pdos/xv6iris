@@ -1712,6 +1712,23 @@ Definition ut_park_intro_body `{XI : CurCtx}
        iref_slots IREFSPARE -∗
        URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096))).
 
+  (* BROKEN BY THE M1 FLIP, AND HONESTLY SO -- THE M2 PARK-PROTOCOL SEAM.
+     The park record stores [park_env]/[ut_park_caps] at PARK time and the
+     continuation replays them at the ∀-quantified RESUME context [Xc].
+     Pre-flip the bundle was ξ-free and this was sound.  Post-flip the
+     handles inside ([procs_inv]'s per-proc [is_lock]s, whose wrapped
+     payloads reach [proc_ctx]/[valid_context]) are ξ-DEPENDENT, and the
+     two spellings are NOT convertible even with every sealed constant
+     transparent (measured: [proc_ctx (XI := ξ) ⊣⊢ (XI := ξ')] fails
+     [reflexivity] fast; the earlier 35-minute [iExact "Hcaps"] was
+     unification exhausting itself on an unprovable goal).  The fix is the
+     M2 redesign this file's own comments already sketch: the env moves
+     INSIDE the ∀ and is supplied by the RESUMER (the same channel as
+     [W]/[first_done]/[timer_cap]) -- which in turn wants the proc-lock
+     payload λ-converted (recipe rule 1) so [procs_inv] is a CLOSED term,
+     or the resumer's global bundle pinned to [N]'s [un_*] fields.  Left
+     failing HERE deliberately: this Qed is the M2 worklist entry. *)
+
 Lemma ut_res_bare_park `{XI : CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}

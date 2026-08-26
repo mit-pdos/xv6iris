@@ -594,7 +594,7 @@ Section ProofSysUnlinkBody.
        ∗ ([∗ list] j ∈ seq 0 14, pa_add (pa_add a 2) j ↦ₘ[KT1] f (2 + j)%nat).
   Proof. exact (bb_split a 2 14 f). Qed.
 
-  Lemma su_half_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+  Lemma su_half_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] file_byte data (16 * i + j)%nat)
     ⊣⊢ a ↦₂[KT1] dir_inum data i.
@@ -610,7 +610,7 @@ Section ProofSysUnlinkBody.
     - iIntros "H". iApply (word2_pointsto_bytes (KTR := KT1) with "H").
   Qed.
 
-  Lemma su_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+  Lemma su_name_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] file_byte data (16 * i + (2 + j))%nat)
     ⊣⊢ ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] dir_name data i j).
   Proof.
@@ -620,7 +620,7 @@ Section ProofSysUnlinkBody.
   Qed.
 
   (* the whole record, split for the [lhu] and put back *)
-  Lemma su_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+  Lemma su_de_view `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)
     ⊣⊢ a ↦₂[KT1] dir_inum data i
@@ -633,7 +633,7 @@ Section ProofSysUnlinkBody.
   Qed.
 
   (* readi's sixteen delivered bytes ARE the record's bytes at [tot = 16] *)
-  Lemma su_rdd_view (data : nat -> list (bv 8)) (olds : nat -> bv 8)
+  Lemma su_rdd_view `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)
       (i : nat) (a : Arch.pa) :
     ([∗ list] jj ∈ seq 0 16,
        pa_add a jj ↦ₘ[KT1] rd_delivered data olds (16 * i)%nat 16 jj)
