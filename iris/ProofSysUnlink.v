@@ -5130,7 +5130,13 @@ Section ProofSysUnlinkBody.
                   Hkklt Hkklive (Hduq Htydz)
                   (conj Hz' (conj Hagree Hnm')) Htydz Hty'v Hsz'v
                   Hhzd Hhz' Hszcap).
-    assert (HDdiff : Dd ∖ {[dir_bname datd kk]} = Dd) by set_solver.
+    (* PERFORMANCE (durable-notes): [set_solver] walks the WHOLE ambient
+       context, which at this depth is several hundred machine-word and
+       map hypotheses.  Every set fact in this lane's new blocks is a
+       one-lemma step, so none of them calls it. *)
+    assert (HDdiff : Dd ∖ {[dir_bname datd kk]} = Dd)
+      by (apply leibniz_equiv, difference_disjoint,
+                disjoint_singleton_r; exact HnotD).
     iEval (rewrite HDdiff) in "Hetkd".
     assert (Hdokd' : FsStateInode.ent_dset_ok (era_node dnW bm' data') Dd)
       by exact (FsStateInode.ent_dset_ok_delete _ _ (dir_bname datd kk) Dd
@@ -6917,7 +6923,7 @@ Section ProofSysUnlinkBody.
       rewrite /fn_nlink era_node_rec (fn_orphan_era_nz dnd bmd datd Hdplive)
         in Hex.
       pose proof (subseteq_size {[dir_bname datd kk]} Dd
-                    ltac:(set_solver)) as Hsz1.
+                    ltac:(apply singleton_subseteq_l; exact HmarkD)) as Hsz1.
       rewrite size_singleton in Hsz1.
       pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dnd))) as Hnn.
       lia. }
@@ -7014,7 +7020,7 @@ Section ProofSysUnlinkBody.
                   Hkklt Hkklive (Hduq Htydz)
                   (conj Hz' (conj Hagree Hnm')) Htydz HtyF2 HszF2
                   Hhzd Hhz' Hszcap).
-    assert (HdokF2 : FsStateInode.ent_dset_ok (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+    assert (HdokF2E : FsStateInode.ent_dset_ok (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
                      (sign_extend' 64
@@ -7022,9 +7028,12 @@ Section ProofSysUnlinkBody.
                       : mword 64)) 31 0)))) bm' data')
                        (Dd ∖ {[dir_bname datd kk]}))
       by exact (FsStateInode.ent_dset_ok_delete _ _ (dir_bname datd kk) _
-                  HentsD ltac:(set_solver)
-                  ltac:(intros t Ht; apply Hdokd; set_solver)).
-    assert (HxactF2 : FsStateInode.node_exact (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+                  HentsD
+                  ltac:(apply not_elem_of_difference; right;
+                        apply elem_of_singleton; reflexivity)
+                  ltac:(intros tz Htz; apply Hdokd;
+                        exact (proj1 (proj1 (elem_of_difference _ _ _) Htz)))). 
+    assert (HxactF2E : FsStateInode.node_exact (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
                      (sign_extend' 64
@@ -7037,12 +7046,12 @@ Section ProofSysUnlinkBody.
       rewrite /fn_nlink era_node_rec (fn_orphan_era_nz dnd bmd datd Hdplive)
         in Hex.
       pose proof (subseteq_size {[dir_bname datd kk]} Dd
-                    ltac:(set_solver)) as Hsz1.
+                    ltac:(apply singleton_subseteq_l; exact HmarkD)) as Hsz1.
       rewrite size_singleton in Hsz1.
-      pose proof (size_difference {[dir_bname datd kk]} Dd
-                    ltac:(set_solver)) as Hszd.
+      pose proof (size_difference Dd {[dir_bname datd kk]}
+                    ltac:(apply singleton_subseteq_l; exact HmarkD)) as Hszd.
       rewrite size_singleton in Hszd.
-      rewrite /fn_nlink /fn_orphan era_node_rec.
+      rewrite /fn_nlink era_node_rec.
       rewrite (fn_orphan_era_nz (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
@@ -7058,9 +7067,18 @@ Section ProofSysUnlinkBody.
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0))))))) as Hnn2.
       rewrite su_setnl_nlink in Hnn2 |- *.
-      rewrite -HdecrW HdWnd in Hex. lia. }
+      (* the count itself, in small steps: [lia] does not see through
+         [Z.to_nat] of a decremented halfword in one go. *)
+      match goal with
+      | |- Z.to_nat ?X = _ =>
+          assert (HXd : X = bv_unsigned (di_nlink dnd) - 1)
+            by (rewrite -HdWnd HdecrW Z.add_simpl_r; reflexivity);
+          rewrite HXd
+      end.
+      rewrite Z2Nat.inj_sub; [| clear; lia].
+      rewrite Hex. clear -Hsz1. change (Z.to_nat 1) with 1%nat. lia. }
     iDestruct (dlinks_intro _ _ _ _ _ (Dd ∖ {[dir_bname datd kk]})
-                 HdokF2 HxactF2 with "Hdlnkd2 Hetkd") as "Hdlnkd2".
+                 HdokF2E HxactF2E with "Hdlnkd2 Hetkd") as "Hdlnkd2".
     (* [dp]'s pure re-park facts, moved DOWN to the decremented record *)
     assert (HiokF2 : inode_ok cov logstart (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -7342,7 +7360,7 @@ Section ProofSysUnlinkBody.
        marker set is EMPTY -- which is what re-seals its bundle at the
        orphaned record. *)
     assert (HDiempty : Di = ∅).
-    { apply size_empty_inv.
+    { apply leibniz_equiv, size_empty_inv.
       pose proof (Hxacti ltac:(rewrite /fn_is_dir /fn_type era_node_rec;
                                apply bool_decide_eq_true; exact Htyzi)) as Hex.
       rewrite /fn_nlink era_node_rec Hnl1
@@ -7354,15 +7372,16 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati) Di)
-      by (rewrite HDiempty; intros t Ht; exfalso; set_solver).
+      by (rewrite HDiempty; intros tz Htz;
+          exfalso; exact (not_elem_of_empty tz Htz)).
     assert (HxactiZ : FsStateInode.node_exact (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
                             : mword 64)
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati) Di).
-    { intros _. rewrite /fn_nlink /fn_orphan era_node_rec Hnl2za HDiempty
-        size_empty (bool_decide_eq_true_2 (Z.to_nat 0 = 0%nat) eq_refl) //. }
+    { intros _. rewrite /fn_orphan /fn_nlink era_node_rec Hnl2za HDiempty
+        size_empty. reflexivity. }
     assert (Hmoidin : (mword_of_int (bv_unsigned dinum) : mword 32) = dinum)
       by (exact (su_moi32_id dinum)).
     destruct nw as [| c1]; [exfalso; lia |].
@@ -7377,7 +7396,7 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0))))
-              dnW bm' c1 (Sbw : gset Z) true (dlc_fl b2) None pid
+              dnW bm' c1 (Sbw : gset Z) true (dlc_fl b2) tyup pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G4 (K - 30)%nat eb b lks
               (upd_upt V P1) ltac:(exact Kiupd) ltac:(intros _; exact Hibd16) Hgeom Hist0
@@ -7748,7 +7767,7 @@ Section ProofSysUnlinkBody.
     { (* THE DELTA IS TWO (lane G5): the child's multiplicity crosses
          [1 + 1 -> 0], and the two fragments are its NAME in [dp] (freed by
          the zeroing) and its own ["."] (freed by the orphan move). *)
-      assert (Hd2 : InodeRegion.ireg_dot_delta
+      assert (Hdd2 : InodeRegion.ireg_dot_delta
                       (bv_unsigned (di_type (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
                             : mword 64)
@@ -7766,7 +7785,7 @@ Section ProofSysUnlinkBody.
           (bool_decide_eq_true_2
              (bv_unsigned (di_type dni) = InodeRegion.ireg_dir_ty)
              ltac:(rewrite /InodeRegion.ireg_dir_ty; exact Htyzi)) //. }
-      rewrite Hd2 FsStateLink.link_toks_reps_S FsStateLink.link_reps_1.
+      rewrite Hdd2 FsStateLink.link_toks_reps_S FsStateLink.link_reps_1.
       iSplitL "Htoken".
       - rewrite -Hutyd'. iExact "Htoken".
       - rewrite -Hutyd' Hagd. iExact "Hdotf". }
