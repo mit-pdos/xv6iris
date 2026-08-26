@@ -1847,13 +1847,15 @@ Section Ledger.
              rewrite (blk_owned_run Γ (fn_indb n) (ind_bytes (fn_ent n))
                         (sk_bsz Hok _ _ (sk_ind Hok i n Hi Hnz))).
              rewrite -byte_range_run. iExact "Hb".
-      + iDestruct "Hl" as (vv tyf) "[%Hokp Hl]".
+      + iDestruct "Hl" as (DD vv tyf) "[%Hokp Hl]".
+        destruct Hokp as (Hv & Hdok & Hxx & Hentok).
         iDestruct (inode_link_scatter with "Hl") as "[Ha Ht]".
         rewrite /inode_ghost. iExists vv.
-        iSplitR; [iPureIntro; exact (proj1 Hokp) |]. iFrame "Ha".
+        iSplitR; [by iPureIntro |]. iFrame "Ha".
         iSplitL "Ht"; [| iPureIntro; exact (Hloc i n Hi)].
-        iApply (ent_toks_of_at Γ i (fn_dd n) (fn_orphan n) (dir_entries n)
-                  tyf (proj2 Hokp) with "Ht").
+        iExists DD. iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+        iApply (ent_toks_of_at Γ i (fn_dd n) (fn_orphan n) DD
+                  (dir_entries n) tyf Hentok with "Ht").
     - (* the bitmap block and the free pool *)
       rewrite /free_bitmap /free_bitmap_at. iSplitL "Hbm".
       + iEval (rewrite fp_bmap_blk fp_bmap_off (fp_bmap_bs S D)) in "Hbm".

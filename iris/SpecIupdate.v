@@ -875,7 +875,7 @@ Definition wp_iupdate_link_body
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
-    (pin : bool) (prv : option Z)
+    (pin : bool) (oty : option ity)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -908,16 +908,15 @@ Definition wp_iupdate_link_body
   (fl = None -> bv_unsigned (di_type dn) <> InodeRegion.ireg_dir_ty) ->
   (forall pv : Z,
      fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
-  (* THE UP-POINTING MINT'S PREMISE (durable-disk G3; [InodeRegion]'s (U1)
-     and (U2), which is where S7-unlink's (D2) now comes from).  An
-     UNATTRIBUTED register unit -- [prv = None] -- is what a [".."] record
-     carries, and exactly one flush in the kernel mints one: mkdir's
-     [dp->nlink++], paying for the fresh child's up-pointing record.  Both
-     halves are free there and nowhere else is the premise non-vacuous:
-     create's fresh-child mint and sys_link's [ip->nlink++] both fix a
-     [Some]. *)
-  (prv = None -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty
-                 /\ bv_unsigned (di_nlink dn0) <> 0) ->
+  (* THE FILL'S PREMISE (lane G5, [InodeRegion.ireg_lnk_fill]).  A caller
+     may CHOOSE the register's value only where the register is empty --
+     create's fresh child, the one flush in the kernel that installs one
+     (at [TDir dp], which is what lets the parent's name record assert
+     "my target's parent is me").  Vacuous at [None], where every other
+     raising flush stands. *)
+  (forall v : ity, oty = Some v ->
+     InodeRegion.ireg_mult dn0 = 0%nat
+     /\ InodeRegion.ireg_reg_ok (bv_unsigned (di_type dn)) v) ->
   (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
      the count by exactly one, and that one unit is what pays for the
      [ilink] the post hands out (§20.6's mkdir/sys_link rows).
@@ -1021,13 +1020,20 @@ Definition wp_iupdate_link_body
          is what the [dirlink] that follows files in the directory's
          [FsStateInode.ent_toks] inside its checked-out payload.  The
          region keeps only the per-inum AUTHORITY. *)
-      FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) -∗
-      (* ...AND THE PARENT REGISTER's unit beside it (durable-disk G2), at
-         the value the naming record fixes ([FsStateInode.ent_par_val] of
-         the naming directory and the name).  It is filed in the same
-         [FsStateInode.ent_tok]. *)
-      FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
-        prv -∗
+      (* ...AND IT IS A PILE, not a single unit (lane G5): at create's
+         fresh-DIRECTORY fill the multiplicity crosses [0 -> 2] -- the name
+         in the parent, and the child's own ["."] --  and everywhere else
+         the delta is one ([InodeRegion.ireg_dot_delta]).  The value is the
+         region's, handed back existentially, and equal to the caller's
+         choice wherever it made one. *)
+      (∃ v : ity,
+         ⌜InodeRegion.ireg_reg_ok (bv_unsigned (di_type dn)) v
+          /\ (forall w, oty = Some w -> v = w)⌝
+         ∗ FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs)
+             (bv_unsigned inum)
+             (FsStateLink.link_reps
+                (InodeRegion.ireg_dot_delta (bv_unsigned (di_type dn0))
+                   (bv_unsigned (di_nlink dn0))) v)) -∗
       (* ...and the freeze-pin premise back, unspent (§3.9's
          borrowed-and-returned).  A caller that came in on the pure arm gets
          the pure arm back and ignores it; a caller that paid the token gets
@@ -1108,7 +1114,7 @@ Definition wp_iupdate_unlink_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z)) (prv : option Z)
+    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z)) (uty : ity)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -1142,17 +1148,6 @@ Definition wp_iupdate_unlink_body
      invariant already bounded.  Matching the shapes would buy symmetry
      and cost the landed consumer a re-thread, so it is not done. *)
   bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
-  (* THE NAME-DROP'S PREMISE (durable-disk G3; [InodeRegion]'s (U2)).
-     Retiring a NAME unit -- [prv = Some j] -- at a record that stays LIVE
-     has to leave a name behind, and the two shapes this kernel has both
-     make it evident at the call site: a FILE loses one of several names
-     (not a directory, so (U1) says it carries no up-pointing namer at
-     all), or a DIRECTORY loses its only name and dies with it (rmdir,
-     whose [isdirempty] refused a non-empty one).  [dp->nlink--] spends a
-     [None] and pays nothing. *)
-  (forall j : Z, prv = Some j ->
-     bv_unsigned (di_nlink dn) = 0
-     \/ bv_unsigned (di_type dn0) <> InodeRegion.ireg_dir_ty) ->
   di_addrs dn = bm_cells bm ->
   length (bm_dir bm) = NDIRECT ->
   (j < NPROC)%nat ->
@@ -1184,11 +1179,13 @@ Definition wp_iupdate_unlink_body
      count, so it is the one that returns a token to the region's
      authority -- the token the removed directory entry gave up out of its
      own [FsStateInode.ent_toks]. *)
-  FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) -∗
-  (* ...AND THE PARENT REGISTER's unit beside it (durable-disk G2), at the
-     value the removed record carried ([FsStateInode.ent_par_val]). *)
-  FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
-    prv -∗
+  (* ...AND IT IS A PILE (lane G5): at rmdir's [ip->nlink--] the child's
+     multiplicity crosses [2 -> 0] -- its name in the parent, and its own
+     ["."] -- and everywhere else the delta is one. *)
+  FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+    (FsStateLink.link_reps
+       (InodeRegion.ireg_dot_delta (bv_unsigned (di_type dn))
+          (bv_unsigned (di_nlink dn))) uty) -∗
   (* THE RECEIPT PREMISE (edit (iv); see the banner).  Persistent in both
      arms, so it costs a caller nothing to keep, and pure in both, so the
      choice is made with one [iLeft]/[iRight]. *)
@@ -1327,13 +1324,13 @@ Module Type IUPDATE.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
-      (pin : bool) (prv : option Z)
+      (pin : bool) (oty : option ity)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                           pin prv pidv dq dqd dqn dqs m K eb b lks Vpr.
+                           pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
      at a flush that LOWERS [nlink] by one, spending the [ilink] that drop
@@ -1351,11 +1348,11 @@ Module Type IUPDATE.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
-      (prv : option Z)
+      (uty : ity)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                             prv pidv dq dqd dqn dqs m K eb b lks Vpr.
+                             uty pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.

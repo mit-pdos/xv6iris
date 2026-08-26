@@ -1,3 +1,14 @@
+(* ====================================================================== *)
+(*  SUPERSEDED BY THE SNAPSHOT; DELETED FROM THE BUILD (owner ruling,      *)
+(*  lane G5).  Off [_CoqProject]: nothing in the tree imports this file,   *)
+(*  and the delta-ledger fold it carries was superseded by the SNAPSHOT    *)
+(*  commit (fs-state.md section 4-9: the durable instance is re-allocated  *)
+(*  per commit, never updated).  It is kept as source for its findings     *)
+(*  only; it does not typecheck against the type register                  *)
+(*  ([Xv6Cameras.fsLinkUR], lane G5), whose fragments carry a VALUE that   *)
+(*  the fold's hand -- a function of the ledger -- cannot name.            *)
+(* ====================================================================== *)
+
 (* FsDurObj.v -- THE OBJECT-GRANULAR PENDING POOL (fs-state.md section 4.875),
    as machine-checked statements rather than as prose.
 

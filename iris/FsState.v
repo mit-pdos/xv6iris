@@ -201,19 +201,26 @@ Section FsState.
      the pair [link_elem_ok] + [✓ link_elem] and nothing else about it; the
      value-first allocator that computes [f] from [I] is [FsCfgBoot]'s and
      is what the resource-transport mint replaces. *)
-  Definition link_choice : Type := Z -> ity * (fname -> ity).
+  Definition link_choice : Type :=
+    Z -> gset fname * (ity * (fname -> ity)).
+
+  Definition lc_D (f : link_choice) (i : Z) : gset fname := (f i).1.
+  Definition lc_v (f : link_choice) (i : Z) : ity := (f i).2.1.
+  Definition lc_tyf (f : link_choice) (i : Z) : fname -> ity := (f i).2.2.
 
   Definition link_elem_ok (I : gmap Z fs_node) (f : link_choice) : Prop :=
-    forall i n, I !! i = Some n -> node_ent_ok i n (f i).1 (f i).2.
+    forall i n, I !! i = Some n ->
+      node_ent_ok i n (lc_D f i) (lc_v f i) (lc_tyf f i).
 
   Definition link_elem (I : gmap Z fs_node) (f : link_choice) : fsLinkUR :=
-    ([^op map] i ↦ n ∈ I, link_elem_node i n (f i).1 (f i).2).
+    ([^op map] i ↦ n ∈ I, link_elem_node i n (lc_v f i) (lc_tyf f i)).
 
   (* ONE inode's whole contribution, under the existential its register
      authority is bound by.  Named, because it is what the commit's
      collection produces one inum at a time. *)
   Definition fs_link_node (g : gname) (i : Z) (n : fs_node) : iProp Σ :=
-    (∃ v tyf, ⌜node_ent_ok i n v tyf⌝ ∗ own g (link_elem_node i n v tyf))%I.
+    (∃ D v tyf, ⌜node_ent_ok i n D v tyf⌝
+                ∗ own g (link_elem_node i n v tyf))%I.
 
   Global Instance fs_link_node_timeless g i n : Timeless (fs_link_node g i n).
   Proof. rewrite /fs_link_node. apply _. Qed.
@@ -227,7 +234,7 @@ Section FsState.
     link_elem I f ≡ link_elem I g.
   Proof.
     intros Hfg. rewrite /link_elem. apply big_opM_proper.
-    intros i n Hi. rewrite (Hfg i ltac:(by eexists)) //.
+    intros i n Hi. rewrite /lc_v /lc_tyf (Hfg i ltac:(by eexists)) //.
   Qed.
 
   (* A big-op of SINGLETONS AT THEIR OWN KEYS reads pointwise: the one
@@ -260,20 +267,21 @@ Section FsState.
   Lemma link_elem_insert (I : gmap Z fs_node) (i : Z) (n : fs_node)
       (f : link_choice) :
     I !! i = None ->
-    link_elem (<[i := n]> I) f ≡ link_elem_node i n (f i).1 (f i).2 ⋅ link_elem I f.
+    link_elem (<[i := n]> I) f ≡ link_elem_node i n (lc_v f i) (lc_tyf f i) ⋅ link_elem I f.
   Proof. intros Hi. rewrite /link_elem big_opM_insert //. Qed.
 
   Lemma link_elem_delete (I : gmap Z fs_node) (i : Z) (n : fs_node)
       (f : link_choice) :
     I !! i = Some n ->
-    link_elem I f ≡ link_elem_node i n (f i).1 (f i).2 ⋅ link_elem (delete i I) f.
+    link_elem I f ≡ link_elem_node i n (lc_v f i) (lc_tyf f i) ⋅ link_elem (delete i I) f.
   Proof. intros Hi. rewrite /link_elem (big_opM_delete _ I i n) //. Qed.
 
   Lemma link_elem_ok_ext (I : gmap Z fs_node) (f g : link_choice) :
     (forall i, is_Some (I !! i) -> f i = g i) ->
     link_elem_ok I f -> link_elem_ok I g.
   Proof.
-    intros Hfg Hok i n Hi. rewrite -(Hfg i ltac:(by eexists)). exact (Hok i n Hi).
+    intros Hfg Hok i n Hi. rewrite /lc_D /lc_v /lc_tyf.
+    rewrite -(Hfg i ltac:(by eexists)). exact (Hok i n Hi).
   Qed.
 
   Definition fs_pure S : iProp Σ :=
@@ -295,7 +303,7 @@ Section FsState.
     rewrite /fs_ghost /fs_pure /fs_links /fs_link_node.
     rewrite (big_sepM_proper
                (fun i n => inode_ghost Γ i n)%I
-               (fun i n => (∃ v tyf, ⌜node_ent_ok i n v tyf⌝
+               (fun i n => (∃ D v tyf, ⌜node_ent_ok i n D v tyf⌝
                                  ∗ own (γlink Γ) (link_elem_node i n v tyf))
                            ∗ ⌜inode_local i n⌝)%I);
       last first.
@@ -317,26 +325,28 @@ Section FsState.
     ∃ f, ⌜link_elem_ok I f⌝ ∗ own g (x ⋅ link_elem I f).
   Proof.
     revert x. induction I as [| i n I Hi IH] using map_ind; intros x.
-    - iIntros "Hx _". iExists (fun _ => (TFile, fun _ => TFile)). iSplitR.
+    - iIntros "Hx _". iExists (fun _ => (∅, (TFile, fun _ => TFile))). iSplitR.
       { iPureIntro. intros j m Hj. rewrite lookup_empty in Hj. discriminate. }
       rewrite link_elem_empty right_id. iFrame.
     - rewrite /fs_links /fs_link_node big_sepM_insert //.
-      iIntros "Hx [(%vv & %P & %Hok & Hi) Hrest]".
+      iIntros "Hx [(%DD & %vv & %P & %Hok & Hi) Hrest]".
       iDestruct (own_op with "[$Hx $Hi]") as "Hxi".
       iDestruct (IH (x ⋅ link_elem_node i n vv P) with "Hxi Hrest")
         as (f) "[%Hf Hr]".
-      set (f' := fun z => if decide (z = i) then (vv, P) else f z).
+      set (f' := fun z => if decide (z = i) then (DD, (vv, P)) else f z).
       assert (Hext : forall j, is_Some (I !! j) -> f j = f' j).
       { intros j [m Hj]. rewrite /f'. destruct (decide (j = i)) as [-> |];
           [rewrite Hi in Hj; discriminate | done]. }
-      assert (Hfi : f' i = (vv, P)) by (rewrite /f' decide_True //).
+      assert (Hfi : f' i = (DD, (vv, P))) by (rewrite /f' decide_True //).
       iExists f'. iSplitR.
       { iPureIntro. intros j m Hj.
         destruct (decide (j = i)) as [-> | Hne].
-        - rewrite lookup_insert in Hj. injection Hj as <-. rewrite Hfi //.
+        - rewrite lookup_insert in Hj. injection Hj as <-.
+          rewrite /lc_D /lc_v /lc_tyf Hfi //.
         - rewrite lookup_insert_ne // in Hj.
-          rewrite -(Hext j ltac:(by eexists)). exact (Hf j m Hj). }
-      rewrite (link_elem_insert I i n f' Hi) Hfi.
+          rewrite /lc_D /lc_v /lc_tyf -(Hext j ltac:(by eexists)).
+          exact (Hf j m Hj). }
+      rewrite (link_elem_insert I i n f' Hi) /lc_v /lc_tyf Hfi.
       rewrite -(link_elem_ext I f f' ltac:(intros j Hj; exact (Hext j Hj))).
       rewrite assoc. iFrame.
   Qed.
@@ -345,27 +355,29 @@ Section FsState.
     fs_links g I -∗ ⌜∃ f, link_elem_ok I f /\ ✓ link_elem I f⌝.
   Proof.
     destruct (decide (I = ∅)) as [-> | Hne].
-    - iIntros "_". iPureIntro. exists (fun _ => (TFile, fun _ => TFile)). split.
+    - iIntros "_". iPureIntro. exists (fun _ => (∅, (TFile, fun _ => TFile))). split.
       + intros j m Hj. rewrite lookup_empty in Hj. discriminate.
       + rewrite link_elem_empty. apply ucmra_unit_valid.
     - apply map_choose in Hne as (i & n & Hin).
       rewrite /fs_links /fs_link_node (big_sepM_delete _ I i n) //.
-      iIntros "[(%vv & %P & %Hok & Hi) Hrest]".
+      iIntros "[(%DD & %vv & %P & %Hok & Hi) Hrest]".
       iDestruct (fs_links_gather g (delete i I) (link_elem_node i n vv P)
                    with "Hi Hrest") as (f) "[%Hf H]".
       iDestruct (own_valid with "H") as %Hv.
       iPureIntro.
-      set (f' := fun z => if decide (z = i) then (vv, P) else f z).
+      set (f' := fun z => if decide (z = i) then (DD, (vv, P)) else f z).
       assert (Hext : forall j, is_Some (delete i I !! j) -> f j = f' j).
       { intros j [m Hj]. rewrite /f'. destruct (decide (j = i)) as [-> |];
           [rewrite lookup_delete in Hj; discriminate | done]. }
-      assert (Hfi : f' i = (vv, P)) by (rewrite /f' decide_True //).
+      assert (Hfi : f' i = (DD, (vv, P))) by (rewrite /f' decide_True //).
       exists f'. split.
       + intros j m Hj. destruct (decide (j = i)) as [-> | Hne'].
-        * rewrite Hin in Hj. injection Hj as <-. rewrite Hfi //.
-        * rewrite -(Hext j ltac:(eexists; rewrite lookup_delete_ne //)).
+        * rewrite Hin in Hj. injection Hj as <-.
+          rewrite /lc_D /lc_v /lc_tyf Hfi //.
+        * rewrite /lc_D /lc_v /lc_tyf
+            -(Hext j ltac:(eexists; rewrite lookup_delete_ne //)).
           apply (Hf j m). rewrite lookup_delete_ne //.
-      + rewrite (link_elem_delete I i n f' Hin) Hfi.
+      + rewrite (link_elem_delete I i n f' Hin) /lc_v /lc_tyf Hfi.
         rewrite -(link_elem_ext (delete i I) f f'
                     ltac:(intros j Hj; exact (Hext j Hj))).
         exact Hv.
@@ -399,8 +411,8 @@ Section FsState.
     rewrite /fs_links /fs_link_node /link_elem.
     iDestruct (big_opM_own_1 with "H") as "H".
     iApply (big_sepM_mono with "H"). intros i n Hi; simpl.
-    iIntros "H". iExists (f i).1, (f i).2. iFrame. iPureIntro.
-    exact (Hok i n Hi).
+    iIntros "H". iExists (lc_D f i), (lc_v f i), (lc_tyf f i). iFrame.
+    iPureIntro. exact (Hok i n Hi).
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -435,19 +447,20 @@ Section FsState.
       (f : link_choice) (j : Z) :
     (forall i n, I !! i = Some n -> dir_entries n = ∅) ->
     link_elem I f !! j
-    ≡ (fun n => (● (link_reps (fn_mult n) (f j).1) : fsLinkElemUR))
+    ≡ (fun n => (● (link_reps (fn_mult n) (lc_v f j)) : fsLinkElemUR))
       <$> (I !! j).
   Proof.
     intros Hall.
     assert (Heq : link_elem I f
                   ≡ ([^op map] i ↦ n ∈ I,
-                       ({[ i := (● (link_reps (fn_mult n) (f i).1)
+                       ({[ i := (● (link_reps (fn_mult n) (lc_v f i))
                                  : fsLinkElemUR) ]} : fsLinkUR))).
     { rewrite /link_elem. apply big_opM_proper. intros i n Hi.
-      exact (link_elem_node_no_ents i n (f i).1 (f i).2 (Hall i n Hi)). }
+      exact (link_elem_node_no_ents i n (lc_v f i) (lc_tyf f i)
+               (Hall i n Hi)). }
     rewrite (Heq j).
     exact (big_op_singletons_lookup I
-             (fun i n => (● (link_reps (fn_mult n) (f i).1)
+             (fun i n => (● (link_reps (fn_mult n) (lc_v f i))
                           : fsLinkElemUR)) j).
   Qed.
 
@@ -588,8 +601,8 @@ Section FsState.
     rewrite /fs_links /fs_link_node /link_elem.
     iDestruct (big_opM_own_1 with "Hl") as "Hl".
     iApply (big_sepM_mono with "Hl"). intros i n Hi; simpl.
-    iIntros "H". iExists (f i).1, (f i).2. iFrame. iPureIntro.
-    exact (Hok i n Hi).
+    iIntros "H". iExists (lc_D f i), (lc_v f i), (lc_tyf f i). iFrame.
+    iPureIntro. exact (Hok i n Hi).
   Qed.
 
   (* THE DEGENERATE INSTANCE, and it is what durable-disk 2c's fixed-layer
@@ -603,7 +616,7 @@ Section FsState.
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 (∅ : gmap Z fs_node) ∗ fs_links gl ∅.
   Proof.
-    iMod (fs_boot_alloc_at ∅ ∅ (fun _ => (TFile, fun _ => TFile))) as (gl gt) "(Ha & _ & Hl)".
+    iMod (fs_boot_alloc_at ∅ ∅ (fun _ => (∅, (TFile, fun _ => TFile)))) as (gl gt) "(Ha & _ & Hl)".
     { intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
     { apply link_elem_valid_no_ents.
       intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
