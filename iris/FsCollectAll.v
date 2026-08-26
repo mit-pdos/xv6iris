@@ -476,7 +476,7 @@ Section CollectAll.
               ⌜I !! z = Some n⌝
               ∗ ⌜node_dir_local z icfg_nib n⌝
               ∗ col_bundle γfs γi z n
-              ∗ own (fs_link γfs) (link_elem_node z n))
+              ∗ fs_link_node (fs_link γfs) z n)
            (* the region's keep-alive token, [emp] everywhere but the root
               (durable-disk lane E-clauses).  [FsCollect.col_link_of] has
               always produced it; KEEPING it is what supplies
@@ -565,7 +565,7 @@ Section CollectAll.
        ∃ n : fs_node,
          ⌜I !! z = Some n⌝ ∗ ⌜node_dir_local z icfg_nib n⌝
          ∗ col_bundle γfs γi z n
-         ∗ own (fs_link γfs) (link_elem_node z n))
+         ∗ fs_link_node (fs_link γfs) z n)
     ⊢ ⌜Rs ⊆ dom I⌝.
   Proof.
     induction Rs as [| z Rs Hnz IH] using set_ind_L.
@@ -590,7 +590,7 @@ Section CollectAll.
        ∃ n : fs_node,
          ⌜I !! z = Some n⌝ ∗ ⌜node_dir_local z icfg_nib n⌝
          ∗ col_bundle γfs γi z n
-         ∗ own (fs_link γfs) (link_elem_node z n))
+         ∗ fs_link_node (fs_link γfs) z n)
     ⊢ ⌜forall (i : Z) (n : fs_node),
          i ∈ Rs -> I !! i = Some n -> node_dir_local i icfg_nib n⌝.
   Proof.

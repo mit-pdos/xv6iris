@@ -1072,6 +1072,49 @@ Section FsCfgBootPool.
       anything. *)
 
   (* TWO [omap]s OVER ONE INDEX LIST. *)
+  (* the same, with the index's MEMBERSHIP in hand -- which is what makes
+     "this record is inside the directory's record range" available to the
+     per-record obligation. *)
+  Lemma big_sepL_omap_pair_in {A B C : Type}
+      (f : A -> option B) (g : A -> option C) (l : list A)
+      (Phi : B -> iProp Σ) (Psi : C -> iProp Σ) :
+    (forall (a : A) (b : B) (c : C),
+       a ∈ l -> f a = Some b -> g a = Some c -> Phi b ⊢ Psi c) ->
+    (forall (a : A) (c : C),
+       a ∈ l -> f a = None -> g a = Some c -> ⊢ Psi c) ->
+    ([∗ list] x ∈ omap f l, Phi x) ⊢ [∗ list] y ∈ omap g l, Psi y.
+  Proof.
+    induction l as [| a l IH]; intros HS HN; [iIntros "_"; done |].
+    assert (Hcf : omap f (a :: l)
+                  = match f a with
+                    | Some b => b :: omap f l
+                    | None => omap f l
+                    end)
+      by (cbn [omap list_omap]; destruct (f a); reflexivity).
+    assert (Hcg : omap g (a :: l)
+                  = match g a with
+                    | Some c => c :: omap g l
+                    | None => omap g l
+                    end)
+      by (cbn [omap list_omap]; destruct (g a); reflexivity).
+    assert (HS' : forall (x : A) (b : B) (c : C),
+                    x ∈ l -> f x = Some b -> g x = Some c -> Phi b ⊢ Psi c)
+      by (intros x b c Hx; apply HS; by apply elem_of_cons; right).
+    assert (HN' : forall (x : A) (c : C),
+                    x ∈ l -> f x = None -> g x = Some c -> ⊢ Psi c)
+      by (intros x c Hx; apply HN; by apply elem_of_cons; right).
+    assert (Ha : a ∈ a :: l) by (apply elem_of_cons; by left).
+    rewrite Hcf Hcg.
+    destruct (f a) as [b |] eqn:Hf; destruct (g a) as [c |] eqn:Hg.
+    - rewrite !big_sepL_cons. iIntros "[H1 H2]".
+      iSplitL "H1"; [iApply (HS a b c Ha Hf Hg); iExact "H1" |].
+      iApply (IH HS' HN' with "H2").
+    - rewrite big_sepL_cons. iIntros "[_ H2]". iApply (IH HS' HN' with "H2").
+    - rewrite big_sepL_cons. iIntros "H".
+      iSplitR; [iApply (HN a c Ha Hf Hg) |]. iApply (IH HS' HN' with "H").
+    - iIntros "H". iApply (IH HS' HN' with "H").
+  Qed.
+
   Lemma big_sepL_omap_pair {A B C : Type}
       (f : A -> option B) (g : A -> option C) (l : list A)
       (Phi : B -> iProp Σ) (Psi : C -> iProp Σ) :
@@ -1152,13 +1195,51 @@ Section FsCfgBootPool.
     base.NoDup ((omap (dir_entry data) (seq 0 nrec)).*1).
   Proof. rewrite dir_entry_fst. apply dir_wins_names_nodup. Qed.
 
+  (* ---- EVERY TICKETED RECORD OF THE IMAGE IS A NAME RECORD ----------
+     -- so its PARENT REGISTER unit is [Some z], and W9's (T) then makes
+     that [Some ROOTINO] at every ticket in the image.  A dot record of a
+     directory names the directory itself: ["."] by W6's [fdo_dot] at any
+     directory, [".."] by W7 at the root, which W9's (T) says is the only
+     directory there is.  A record that names its own home carries no
+     ticket, so a ticketed record's name is neither. *)
+  Lemma img_ticket_par (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) (k : nat) :
+    fsimg_wf P sb = true -> 0 <= z < FsImg.sb_ninodes sb ->
+    bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
+    (k < dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))%nat ->
+    dir_live (fs_data_of P (fs_dinode P sb z)) k ->
+    bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k) <> z ->
+    FsStateInode.ent_par_val z
+      (dir_bname (fs_data_of P (fs_dinode P sb z)) k) = Some ROOTINO.
+  Proof.
+    intros Hwf Hran Hty Hk Hlive Hne.
+    pose proof (fsimg_wf_dir P sb z Hwf Hran Hty) as Hdok.
+    pose proof (fdo_unique P sb z (fs_dinode P sb z) Hdok) as Hu.
+    pose proof (dir_view_live (fs_data_of P (fs_dinode P sb z))
+                  (dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))
+                  k Hu Hk Hlive) as Hlk.
+    pose proof (fsimg_wf_dir_root P sb z Hwf Hran Hty) as Hzr.
+    assert (Hnd : dir_bname (fs_data_of P (fs_dinode P sb z)) k <> DOT).
+    { intros Hc. rewrite Hc in Hlk.
+      rewrite (fdo_dot P sb z (fs_dinode P sb z) Hdok) in Hlk.
+      injection Hlk as Hlk. exact (Hne (eq_sym Hlk)). }
+    assert (Hndd : dir_bname (fs_data_of P (fs_dinode P sb z)) k <> DOTDOT).
+    { intros Hc. rewrite Hc in Hlk.
+      pose proof (fs_root_wf_dotdot P sb (fsimg_wf_root P sb Hwf)) as Hrd.
+      rewrite /fs_file_data -Hzr in Hrd.
+      rewrite Hrd in Hlk. injection Hlk as Hlk.
+      apply Hne. rewrite -Hlk Hzr //. }
+    rewrite (FsStateInode.ent_par_val_name z
+               (dir_bname (fs_data_of P (fs_dinode P sb z)) k) Hnd Hndd) Hzr //.
+  Qed.
+
   (* ---- ONE DIRECTORY'S TOKENS, out of its own ticket sublist --------- *)
 
   Lemma ent_toks_of_tickets (gfs : fs_names) (P : Z -> list (bv 8))
       (sb : fs_sb) (z : Z) :
     fsimg_wf P sb = true -> 0 <= z < FsImg.sb_ninodes sb ->
     ([∗ list] t ∈ fs_dir_tickets_at P sb z,
-       FsStateLink.link_tok (fs_gamma_L gfs) t) -∗
+       FsStateLink.link_tok (fs_gamma_L gfs) t
+       ∗ FsStateLink.par_tok (fs_gamma_L gfs) t (Some ROOTINO)) -∗
     FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z).
   Proof.
     intros Hwf Hran.
@@ -1195,16 +1276,18 @@ Section FsCfgBootPool.
                  (fun s t => FsStateInode.ent_tok (fs_gamma_L gfs) z false s t)
                  _ (dir_entry_names_nodup _ _)).
       iIntros "H".
-      iApply (big_sepL_omap_pair
+      iApply (big_sepL_omap_pair_in
                 (fs_rec_ticket P z (fs_dinode P sb z))
                 (dir_entry (fs_data_of P (fs_dinode P sb z)))
                 (seq 0 (dir_nrec (bv_unsigned (di_size (fs_dinode P sb z)))))
-                (fun t => FsStateLink.link_tok (fs_gamma_L gfs) t)
+                (fun t => (FsStateLink.link_tok (fs_gamma_L gfs) t
+                           ∗ FsStateLink.par_tok (fs_gamma_L gfs) t
+                               (Some ROOTINO))%I)
                 (fun e => FsStateInode.ent_tok (fs_gamma_L gfs) z false e.1 e.2)
                 with "H").
       + (* a WINNING record that is not a self record: the ticket IS the
            token *)
-        intros k t e. rewrite /fs_rec_ticket /dir_entry. cbv zeta.
+        intros k t e Hkin. rewrite /fs_rec_ticket /dir_entry. cbv zeta.
         destruct (dir_wins (fs_data_of P (fs_dinode P sb z)) k) eqn:Hw;
           [| intros _ Hc; discriminate Hc].
         destruct (dir_liveb (fs_data_of P (fs_dinode P sb z)) k
@@ -1214,15 +1297,20 @@ Section FsCfgBootPool.
                               = z))) eqn:Hg;
           [| intros Hc; discriminate Hc].
         intros Ht He. injection Ht as <-. injection He as <-.
-        apply andb_true_iff in Hg as [_ Hne].
+        apply andb_true_iff in Hg as [Hlvb Hne].
         apply negb_true_iff, bool_decide_eq_false in Hne.
+        apply dir_wins_true in Hw as [Hlv _].
+        apply elem_of_seq in Hkin.
         cbn [fst snd].
+        rewrite -(img_ticket_par P sb z k Hwf Hran Htyb
+                    ltac:(lia) Hlv Hne).
+        iIntros "[Ht Hp]".
         iApply (FsStateInode.ent_tok_of_link (fs_gamma_L gfs) z false
                   (dir_bname (fs_data_of P (fs_dinode P sb z)) k)
                   (bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k))
-                  ltac:(intros _; reflexivity)).
+                  ltac:(intros _; reflexivity) with "Ht Hp").
       + (* a SELF record: no ticket, and no token owed either *)
-        intros k e. rewrite /fs_rec_ticket /dir_entry. cbv zeta.
+        intros k e _. rewrite /fs_rec_ticket /dir_entry. cbv zeta.
         destruct (dir_wins (fs_data_of P (fs_dinode P sb z)) k) eqn:Hw;
           [| intros _ Hc; discriminate Hc].
         apply dir_wins_true in Hw as [Hlv _].
@@ -1256,13 +1344,16 @@ Section FsCfgBootPool.
     fsimg_wf P sb = true ->
     (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
     ([∗ list] t ∈ fs_all_tickets P sb,
-       FsStateLink.link_tok (fs_gamma_L gfs) t) -∗
+       FsStateLink.link_tok (fs_gamma_L gfs) t
+       ∗ FsStateLink.par_tok (fs_gamma_L gfs) t (Some ROOTINO)) -∗
     [∗ set] z ∈ A, FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z).
   Proof.
     intros Hwf HA. iIntros "H".
     rewrite /fs_all_tickets.
     iDestruct (big_sepL_mjoin
-                 (fun t => FsStateLink.link_tok (fs_gamma_L gfs) t) with "H")
+                 (fun t => (FsStateLink.link_tok (fs_gamma_L gfs) t
+                            ∗ FsStateLink.par_tok (fs_gamma_L gfs) t
+                                (Some ROOTINO))%I) with "H")
       as "H".
     rewrite big_sepL_fmap.
     iAssert ([∗ list] i ∈ seq 0 (Z.to_nat (FsImg.sb_ninodes sb)),
@@ -1302,13 +1393,16 @@ Section FsCfgBootPool.
     (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
     ([∗ set] z ∈ region_inums icfg_nib,
        [∗ list] _ ∈ seq 0 (fs_link_count P sb z),
-         FsStateLink.link_tok (fs_gamma_L gfs) z) -∗
+         (FsStateLink.link_tok (fs_gamma_L gfs) z
+          ∗ FsStateLink.par_tok (fs_gamma_L gfs) z (Some ROOTINO))) -∗
     [∗ set] z ∈ A, FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z).
   Proof.
     intros Hwf Hnin HA. iIntros "H".
     iApply (ent_toks_of_image gfs P sb A Hwf HA).
     iApply (big_sepS_tick_route
-              (fun z => FsStateLink.link_tok (fs_gamma_L gfs) z)
+              (fun z => (FsStateLink.link_tok (fs_gamma_L gfs) z
+                         ∗ FsStateLink.par_tok (fs_gamma_L gfs) z
+                             (Some ROOTINO))%I)
               (fs_all_tickets P sb)
               (region_inums icfg_nib) (fs_link_count P sb) with "H").
     - intros t Ht.
@@ -1957,7 +2051,14 @@ Section FsCfgBootEra.
      READS OFF the durable instance at the mint, and which the boot, having no
      durable instance, owes.  At the zero map it is free: no node has an entry,
      so no token exists and every inum's auth stands alone. *)
-  Lemma fs_boot_inodes_valid (nib : nat) : ✓ link_elem (fs_boot_inodes nib).
+  Lemma fs_boot_inodes_ok (nib : nat) :
+    link_elem_ok (fs_boot_inodes nib) (fun _ => ∅).
+  Proof.
+    intros i n Hi. rewrite /fn_par_ok gmultiset_size_empty. lia.
+  Qed.
+
+  Lemma fs_boot_inodes_valid (nib : nat) :
+    ✓ link_elem (fs_boot_inodes nib) (fun _ => ∅).
   Proof.
     apply link_elem_valid_no_ents. exact (fs_boot_inodes_no_ents nib).
   Qed.
@@ -1984,15 +2085,24 @@ Section FsCfgBootEra.
      the links step, which hands a directory's tokens to its checked-out
      payload, is what makes W9 + conjunct (13) [FsImg.fs_links_eq] come
      due. *)
+  (* THE IMAGE'S REGISTER CHOICE: every unit at an inum comes from the ONE
+     directory a well-formed image has (W9's (T)), so the pile is [nlink]
+     copies of [Some ROOTINO].  Its SIZE is what [InodeRegion.ireg_par]'s
+     bound reads; the values are what the entries demand. *)
+  Definition img_par (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
+    : gmultiset (option Z) :=
+    FsStateLink.par_reps (fn_nlink (img_node P sb z)) (Some ROOTINO).
+
   Lemma ireg_lnks_of_image (γfs : fs_names)
       (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
     fsimg_wf P sb = true ->
-    fs_links_full (fs_link γfs) (img_nodes P sb nib) -∗
+    fs_links_full (fs_link γfs) (img_nodes P sb nib) (img_par P sb) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_lnk_at γfs z (fn_nlink (img_node P sb z)))
     ∗ ([∗ set] z ∈ region_inums nib,
          [∗ list] _ ∈ seq 0 (fs_link_count P sb z),
-           FsStateLink.link_tok (fs_gamma_L γfs) z).
+           (FsStateLink.link_tok (fs_gamma_L γfs) z
+            ∗ FsStateLink.par_tok (fs_gamma_L γfs) z (Some ROOTINO))).
   Proof.
     intros Hwf.
     (* THE ONE ARITHMETIC FACT, AND IT IS W9's (durable-disk 2b-inode-5).
@@ -2017,14 +2127,19 @@ Section FsCfgBootEra.
         assert (Hz1 : z = ROOTINO) by (rewrite Hr; reflexivity).
         rewrite Hz1 Hc0 Hnl. lia.
       - lia. }
+    assert (Hpc : forall z : Z,
+              (fs_link_count P sb z <= fn_nlink (img_node P sb z))%nat).
+    { intros z. pose proof (Hle z). lia. }
     rewrite /fs_links_full.
     rewrite (big_sepM_img_nodes
-               (fun i n => own (fs_link γfs) (link_full_elem i (fn_nlink n)))
+               (fun i n => own (fs_link γfs)
+                             (link_full_elem i (fn_nlink n) (img_par P sb i)))
                P sb nib).
     rewrite -big_sepS_sep.
     iIntros "H". iApply (big_sepS_mono with "H"). intros z _.
-    rewrite (link_full_split (fs_gamma_L γfs) z (fn_nlink (img_node P sb z))).
-    iIntros "[Ha Ht]".
+    rewrite (link_full_split (fs_gamma_L γfs) z (fn_nlink (img_node P sb z))
+               (img_par P sb z)).
+    iIntros "[[Ha Ht] [Hpa Hpt]]".
     iDestruct (FsStateLink.link_toks_le_split (fs_gamma_L γfs) z
                  (fn_nlink (img_node P sb z))
                  (fs_link_count P sb z
@@ -2033,12 +2148,21 @@ Section FsCfgBootEra.
                  (Hle z) with "Ht") as "[Ht _]".
     iEval (rewrite FsStateLink.link_toks_split) in "Ht".
     iDestruct "Ht" as "[Htc Htk]".
-    rewrite /ireg_lnk_at /InodeRegion.ireg_keep.
-    iSplitR "Htc".
-    - iFrame "Ha".
-      destruct (bool_decide (z = InodeRegion.ireg_root));
-        [iExact "Htk" | iClear "Htk"; done].
-    - iApply (FsStateLink.link_toks_list with "Htc").
+    rewrite /img_par.
+    iDestruct (FsStateLink.par_toks_le_split (fs_gamma_L γfs) z
+                 (fn_nlink (img_node P sb z)) (fs_link_count P sb z)
+                 (Some ROOTINO) (Hpc z) with "Hpt") as "[Hpt _]".
+    rewrite /ireg_lnk_at /InodeRegion.ireg_keep /InodeRegion.ireg_par.
+    iSplitR "Htc Hpt".
+    - iFrame "Ha". iSplitR "Hpa".
+      + destruct (bool_decide (z = InodeRegion.ireg_root));
+          [iExact "Htk" | iClear "Htk"; done].
+      + iExists (FsStateLink.par_reps (fn_nlink (img_node P sb z))
+                   (Some ROOTINO)).
+        iFrame "Hpa". iPureIntro. rewrite FsStateLink.par_reps_size. lia.
+    - rewrite big_sepL_sep.
+      iSplitL "Htc"; [iApply (FsStateLink.link_toks_list with "Htc") |].
+      iApply (FsStateLink.par_toks_list with "Hpt").
   Qed.
 
   Lemma fs_cfg_alloc (γd : uart_names) (γv : disk_names)
@@ -2289,7 +2413,7 @@ Section FsCfgBootEra.
        W9 + conjunct (13) [FsImg.fs_links_eq] come due only when the links
        step hands a directory's tokens to its checked-out payload. *)
     iMod (fs_boot_alloc_full (img_nodes (fs_blocks dk) sb icfg_nib)
-            (img_nodes (fs_blocks dk) sb icfg_nib))
+            (img_nodes (fs_blocks dk) sb icfg_nib) (img_par (fs_blocks dk) sb))
       as (γlk γtp) "(Htopa & Htopf & Hlnk)".
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
             ROOTDEV γlk γtp E Hcovin Hhomesub with "Hdisk")

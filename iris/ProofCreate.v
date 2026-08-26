@@ -2341,6 +2341,10 @@ Section ProofCreateMain.
           the [ip->nlink = 0] flush returns it to the region on the fail
           arms, and the [dirlink] files it in [dp] on the mkdir arm. *)
        FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned cinum) -∗
+       (* ...and the PARENT REGISTER's unit beside it (durable-disk G2), at
+          the value the record [dirlink] is about to write demands. *)
+       FsStateLink.par_tok (fs_gamma_L γfs) (bv_unsigned cinum)
+         (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) -∗
        (* everything the contract still owes back *)
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2556,6 +2560,10 @@ Section ProofCreateMain.
           the [ip->nlink = 0] flush returns it to the region on the fail
           arms, and the [dirlink] files it in [dp] on the mkdir arm. *)
        FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned cinum) -∗
+       (* ...and the PARENT REGISTER's unit beside it (durable-disk G2), at
+          the value the record [dirlink] is about to write demands. *)
+       FsStateLink.par_tok (fs_gamma_L γfs) (bv_unsigned cinum)
+         (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -5289,6 +5297,7 @@ Section ProofCreateMain.
                 q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true
                 (cr_flav ty (bv_unsigned dind))
                 (* pin = true: this site pays the TOKEN arm (§3.9) *) true
+                (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf))
                 pidv
                 (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                 W3 (K - 10)%nat eb b lks
@@ -5326,7 +5335,7 @@ Section ProofCreateMain.
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu)
         "%Hcsiu Hcg Hcnt Hpc Hppid Hcidev Hciinum Hcmeta Hcmap Hsbi Hcdiat
-         Hilink Htoken Hpin Hbs2 Hop".
+         Hilink Htoken Hptok Hpin Hbs2 Hop".
       (* the pin premise came back, and at [pin = true] it IS the token
          ([InodeRegion.ireg_link_pin]'s own definition).  It goes home at the
          child's iunlock. *)
@@ -5407,7 +5416,7 @@ Section ProofCreateMain.
                         Htop Hshotl Hfrzl Hkeep Hrud
                         Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
                         Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot Hcfrz
-                        Hckeep Hruc Hilink Htoken Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
+                        Hckeep Hruc Hilink Htoken Hptok Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
                         Hbsl Hislr Hop Hdirty Hcont").
         { exact HW4regs. }
         { exact Htdir. }
@@ -5811,14 +5820,15 @@ Section ProofCreateMain.
                           (bname_length_le 14 nf) (cut_nul_nonul _)
                           Hdz Hty' Hnl' Hszmax Hrng Hnone
                           Hholes Hholes' Hszcap (Hcapp Hszcap)
-                          with "Hetk [Htoken]") as "Hetk".
+                          with "Hetk [Htoken Hptok]") as "Hetk".
              { iEval (rewrite -Hcl16) in "Htoken".
+               iEval (rewrite -Hcl16) in "Hptok".
                iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned dind)
                          (fn_orphan (era_node dn bm data)) (bname 14 nf)
                          (bv_unsigned (cr_low16 cinum))
                          ltac:(intros _; apply fn_orphan_era_nz;
                                exact (cr_nl0z dn Hnl0))
-                         with "Htoken"). }
+                         with "Htoken Hptok"). }
              iDestruct (dlinks_intro with "Hdlnk Hetk") as "Hdlnk".
              assert (Hiok' : inode_ok cov logstart dn' bm' data').
              { rewrite /inode_ok. split_and!.
@@ -6234,7 +6244,7 @@ Section ProofCreateMain.
                              Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotl
                              Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hcidev
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
-                             Hcblocks Hcdview Hcfview Hctop Hcshot Hcfrz Hckeep Hruc Hilink Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
+                             Hcblocks Hcdview Hcfview Hctop Hcshot Hcfrz Hckeep Hruc Hilink Htoken Hptok Hsbn Hsbi Hsbs Hsbb Hbmr
                              Hppid Hppback Hpath Hbsl Hislr Hop Htx Hcont").
              { exact Hmdlregs. }
              { exact Htdir. }
@@ -6609,7 +6619,7 @@ Section ProofCreateMain.
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
              #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid Hcdlnk
-             Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Hilink Htoken
+             Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Hilink Htoken Hptok
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Htx
              Hcont".
     iEval (rewrite Hglog) in "Htx".
@@ -6718,7 +6728,7 @@ Section ProofCreateMain.
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
-              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
+              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
@@ -6726,7 +6736,7 @@ Section ProofCreateMain.
               ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
               Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
-                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken [] Hppid Hprocs
+                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken Hptok [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
     { iLeft. iSplit; iPureIntro; [exact Hglog | exact Hist]. }
@@ -7419,6 +7429,10 @@ Section ProofCreateMain.
           the [ip->nlink = 0] flush returns it to the region on the fail
           arms, and the [dirlink] files it in [dp] on the mkdir arm. *)
        FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned cinum) -∗
+       (* ...and the PARENT REGISTER's unit beside it (durable-disk G2), at
+          the value the record [dirlink] is about to write demands. *)
+       FsStateLink.par_tok (fs_gamma_L γfs) (bv_unsigned cinum)
+         (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -7521,7 +7535,7 @@ Section ProofCreateMain.
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
              #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-             Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Hilink Htoken
+             Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Hilink Htoken Hptok
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
              Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -7666,14 +7680,14 @@ Section ProofCreateMain.
     iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) dc bmc
-              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
+              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) (FsStateInode.ent_par_val (bv_unsigned dind) (bname 14 nf)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab Htyz0
               Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
-                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken [] Hppid Hprocs
+                    Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken Hptok [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
     { iLeft. iSplit; iPureIntro; [exact Hglog | exact Hist]. }
@@ -8155,7 +8169,7 @@ Section ProofCreateMain.
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
              #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-             Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Hilink Htoken
+             Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Hilink Htoken Hptok
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
              Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -9593,7 +9607,10 @@ Section ProofCreateMain.
                     dp3 bm3 u6 Sb6 true (Some None)
                     (* pin = false: mkdir's [dp->nlink++] is RULING A's one
                        free site -- a live directory the caller has locked --
-                       so it pays the PURE arm (§3.9). *) false pidv
+                       so it pays the PURE arm (§3.9). *) false
+                    (FsStateInode.ent_par_val (bv_unsigned cinum)
+                       (bname 14 cr_dotdot_f))
+                    pidv
                     (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                     V4 (K - 10)%nat eb b lks
                     V HKiu Hmtcru
@@ -9616,7 +9633,7 @@ Section ProofCreateMain.
             rewrite /InodeRegion.ireg_link_pin. exact Hp3nlnz. }
           iIntros (CIDh7 Hsh7 mmt)
             "%Hcsmt Hcg Hcnt Hpc Hppid Hidev Hiinum Hmeta Hmap Hsbi Hdiat
-             Hilinkd Htokend Hpin Hbs2 Hop".
+             Hilinkd Htokend Hptokd Hpin Hbs2 Hop".
           (* THE COUNT'S LOWER BOUND AT THE BUMPED RECORD, and it has to be
              taken HERE: the [link_tok] the flush just minted is the only
              witness, and three lines below it is spent into the child's
@@ -9668,13 +9685,14 @@ Section ProofCreateMain.
                        (bname_length_le 14 nf) (cut_nul_nonul _)
                        Hdntdir Hp3ty Hp3nl Hp3szmax Hrng3 Hnone
                        Hholes Hholes3 Hszcap (Hcap3 Hszcap)
-                       with "Hetk [Htoken]") as "Hetk".
+                       with "Hetk [Htoken Hptok]") as "Hetk".
           { iEval (rewrite -Hcl16) in "Htoken".
+            iEval (rewrite -Hcl16) in "Hptok".
             iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned dind)
                       (fn_orphan (era_node dn bm data)) (bname 14 nf)
                       (bv_unsigned (cr_low16 cinum))
                       ltac:(intros _; apply fn_orphan_era_nz; exact Hdnnlnz)
-                      with "Htoken"). }
+                      with "Htoken Hptok"). }
           iDestruct (ent_toks_era_nlink (fs_gamma_L γfs) (bv_unsigned dind)
                        dp3 (cr_setf dp3 (di_major dp3) (di_minor dp3)
                           (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16))) bm3 dat3
@@ -9726,14 +9744,15 @@ Section ProofCreateMain.
                        Hc2ty0 Hc2nl0 Hc2szmax Hrng2
                        (cr_first_miss_dotdot dat1 (cr_low16 cinum) Hwin1)
                        Hholes1 Hholes2 (Hcap1 Hccap) (Hcap2 (Hcap1 Hccap))
-                       with "Hcetk2 [Htokend]") as "Hcetk3".
+                       with "Hcetk2 [Htokend Hptokd]") as "Hcetk3".
           { iEval (rewrite -Hdl16) in "Htokend".
+            iEval (rewrite -Hdl16) in "Hptokd".
             iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned cinum)
                       (fn_orphan (era_node dc1 bm1 dat1))
                       (bname 14 cr_dotdot_f) (bv_unsigned (cr_low16 dind))
                       ltac:(intros _; apply fn_orphan_era_nz;
                             rewrite Hc1nl; vm_compute; discriminate)
-                      with "Htokend"). }
+                      with "Htokend Hptokd"). }
           iDestruct (dlinks_intro with "Hcdlnk2 Hcetk3") as "Hcdlnk2".
           (* ===== +0x144 c.j +0xe0 : into ARM C-OK's own block ======= *)
           assert (Htg0e0 : add_vec (mword_of_int (CK + 0x144) : mword 64)
@@ -10225,7 +10244,7 @@ Section ProofCreateMain.
                           Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotp3 Hfrzl Hkeep Hrud
                           Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
                           Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot2 Hcfrz Hckeep Hruc
-                          Hilink Htoken
+                          Hilink Htoken Hptok
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                           Hislr Hop Hdirty Hcont").
           { exact Hmd3regs. }
@@ -10323,7 +10342,7 @@ Section ProofCreateMain.
                         Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
                         Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotl Hfrzl Hkeep Hrud
                         Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-                        Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot2 Hcfrz Hckeep Hruc Hilink Htoken
+                        Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot2 Hcfrz Hckeep Hruc Hilink Htoken Hptok
                         Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                         Hislr Hop Hdirty Hcont").
         { exact Hmd2regs. }
@@ -10421,7 +10440,7 @@ Section ProofCreateMain.
                       Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
                       Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotl Hfrzl Hkeep Hrud
                       Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-                      Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot1 Hcfrz Hckeep Hruc Hilink Htoken
+                      Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot1 Hcfrz Hckeep Hruc Hilink Htoken Hptok
                       Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                       Hislr Hop Hdirty Hcont").
       { exact Hmd1regs. }

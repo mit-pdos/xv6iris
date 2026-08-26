@@ -125,7 +125,7 @@ Qed.
 
 (* The parent side composes for ANY number of namers: a lone [auth]
    fragment is valid whatever the multiset. *)
-Theorem par_frag_any (c : Z) (Q : gmultiset Z) :
+Theorem par_frag_any (c : Z) (Q : gmultiset (option Z)) :
   ✓ ({[ c := ((ε : authUR natUR), (◯ Q : fsParUR)) ]} : fsLinkUR).
 Proof.
   apply singleton_valid, pair_valid.
@@ -134,7 +134,7 @@ Qed.
 
 (* ...and the law is read at a SATISFIABLE premise: the authority and the
    fragment a [mkdir] mints stand together. *)
-Theorem par_pair_valid (c p : Z) :
+Theorem par_pair_valid (c : Z) (p : option Z) :
   ✓ (par_auth_elem c {[+ p +]} ⋅ par_tok_elem c p).
 Proof.
   rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op.
@@ -152,27 +152,28 @@ Section Roundtrip.
      namer's fragment is then pinned to the parent [dp], which is (D1);
      and rmdir's retirement returns the register to empty, so the inum is
      reusable as a directory again. *)
-  Lemma par_register_mint (Γ : fs_view_names Σ) (c dp : Z) :
+  Lemma par_register_mint (Γ : fs_view_names Σ) (c : Z) (dp : option Z) :
     par_auth Γ c ∅ ==∗ par_auth Γ c {[+ dp +]} ∗ par_tok Γ c dp.
   Proof.
     iIntros "Ha".
     iMod (par_alloc Γ c ∅ dp with "Ha") as "[Ha $]".
-    assert (Hemp : (∅ : gmultiset Z) ⊎ {[+ dp +]} = {[+ dp +]})
+    assert (Hemp : (∅ : gmultiset (option Z)) ⊎ {[+ dp +]} = {[+ dp +]})
       by multiset_solver.
     rewrite Hemp. by iFrame.
   Qed.
 
-  Lemma par_register_retire (Γ : fs_view_names Σ) (c dp : Z) :
+  Lemma par_register_retire (Γ : fs_view_names Σ) (c : Z) (dp : option Z) :
     par_auth Γ c {[+ dp +]} -∗ par_tok Γ c dp ==∗ par_auth Γ c ∅.
   Proof.
     iIntros "Ha Ht".
-    assert (Hemp : (∅ : gmultiset Z) ⊎ {[+ dp +]} = {[+ dp +]})
+    assert (Hemp : (∅ : gmultiset (option Z)) ⊎ {[+ dp +]} = {[+ dp +]})
       by multiset_solver.
     iApply (par_dealloc Γ c ∅ dp with "[Ha] Ht"). rewrite Hemp. iFrame "Ha".
   Qed.
 
-  Theorem par_register_roundtrip (Γ : fs_view_names Σ) (c dp : Z) :
-    par_auth Γ c ∅ ==∗ ∃ j : Z, ⌜j = dp⌝ ∗ par_auth Γ c ∅.
+  Theorem par_register_roundtrip (Γ : fs_view_names Σ) (c : Z)
+      (dp : option Z) :
+    par_auth Γ c ∅ ==∗ ∃ j : option Z, ⌜j = dp⌝ ∗ par_auth Γ c ∅.
   Proof.
     iIntros "Ha".
     iMod (par_register_mint with "Ha") as "[Ha Ht]".

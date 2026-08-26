@@ -1547,12 +1547,13 @@ Section Collect.
     fn_rec n = d ->
     ireg_lnk γfs i d -∗
     ent_toks (fs_gamma_L γfs) i n -∗
-      own (fs_link γfs) (link_elem_node i n) ∗ ireg_keep γfs i.
+      fs_link_node (fs_link γfs) i n ∗ ireg_keep γfs i.
   Proof.
-    intros Hrec. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl -Hrec /fn_nlink.
-    iIntros "[Hla Hkp] Hte". iFrame "Hkp".
-    iApply (inode_link_iff (fs_gamma_L γfs) i n).
-    iFrame "Hla Hte".
+    intros Hrec. rewrite /ireg_lnk /ireg_lnk_at /ireg_par /ireg_nl -Hrec
+      /fn_nlink.
+    iIntros "(Hla & Hkp & (%P & Hpa & %Hsz)) Hte". iFrame "Hkp".
+    iExists P. iSplitR; [by iPureIntro |].
+    iApply (inode_link_pack (fs_gamma_L γfs) i n P with "Hla Hpa Hte").
   Qed.
 
   Lemma col_bundle_of_side γfs (γi : gname) (inum : bv 32) (n : fs_node)

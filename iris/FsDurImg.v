@@ -589,22 +589,36 @@ Definition img_owned (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
 Definition ent_ops (i : Z) (n : fs_node) : fsLinkUR :=
   [^op map] s ↦ t ∈ dir_entries n, ent_elem i (fn_orphan n) s t.
 
-(* ...and the two halves of [FsState.link_full_map] *)
+(* ...and the FOUR halves of [FsState.link_full_map]: the count's authority
+   and tokens, and the PARENT REGISTER's (durable-disk G2). *)
 Definition link_auths (I : gmap Z fs_node) : fsLinkUR :=
   [^op map] i ↦ n ∈ I, link_auth_elem i (fn_nlink n).
 Definition link_toks_of (I : gmap Z fs_node) : fsLinkUR :=
   [^op map] i ↦ n ∈ I, link_tok_elem i (fn_nlink n).
+Definition par_auths (I : gmap Z fs_node) (f : Z -> gmultiset (option Z))
+  : fsLinkUR :=
+  [^op map] i ↦ n ∈ I, par_auth_elem i (f i).
+Definition par_toks_of (I : gmap Z fs_node) (f : Z -> gmultiset (option Z))
+  : fsLinkUR :=
+  [^op map] i ↦ n ∈ I, par_toks_elem i (f i).
 
-Lemma link_full_map_split (I : gmap Z fs_node) :
-  link_full_map I ≡ link_auths I ⋅ link_toks_of I.
+Lemma link_full_map_split (I : gmap Z fs_node)
+    (f : Z -> gmultiset (option Z)) :
+  link_full_map I f
+  ≡ (link_auths I ⋅ link_toks_of I) ⋅ (par_auths I f ⋅ par_toks_of I f).
 Proof.
-  rewrite /link_full_map /link_auths /link_toks_of -big_opM_op //.
+  rewrite /link_full_map /link_auths /link_toks_of /par_auths /par_toks_of.
+  rewrite -!big_opM_op. apply big_opM_proper. intros i n _.
+  rewrite /link_full_elem /par_full_elem //.
 Qed.
 
-Lemma link_elem_split (I : gmap Z fs_node) :
-  link_elem I ≡ link_auths I ⋅ ([^op map] i ↦ n ∈ I, ent_ops i n).
+Lemma link_elem_split (I : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+  link_elem I f
+  ≡ (link_auths I ⋅ par_auths I f) ⋅ ([^op map] i ↦ n ∈ I, ent_ops i n).
 Proof.
-  rewrite /link_elem /link_auths /link_elem_node -big_opM_op //.
+  rewrite /link_elem /link_auths /par_auths /link_elem_node.
+  rewrite -!big_opM_op. apply big_opM_proper. intros i n _.
+  rewrite /ent_ops //.
 Qed.
 
 Lemma ent_ops_empty (i : Z) (n : fs_node) :
@@ -636,18 +650,26 @@ Qed.
    ([InodeRegion.ireg_keep]) out of the same [own_alloc].  At [e = ε] this
    is the plain statement, and nothing about the proof changes -- the slack
    rides through the same inclusion into [link_full_map]. *)
-Lemma link_elem_valid_of_root (I : gmap Z fs_node) (d : Z) (nd : fs_node)
-    (e : fsLinkUR) :
+Lemma link_elem_valid_of_root (I : gmap Z fs_node)
+    (f : Z -> gmultiset (option Z)) (d : Z) (nd : fs_node) (e : fsLinkUR) :
   I !! d = Some nd ->
   (forall i n, I !! i = Some n -> i <> d -> dir_entries n = ∅) ->
-  ent_ops d nd ⋅ e ≼ link_toks_of I ->
-  ✓ (link_elem I ⋅ e).
+  ent_ops d nd ⋅ e ≼ link_toks_of I ⋅ par_toks_of I f ->
+  ✓ (link_elem I f ⋅ e).
 Proof.
   intros Hd Hrest [x Hx].
-  apply (cmra_valid_included (link_elem I ⋅ e) (link_full_map I)
-           (link_full_map_valid I)).
-  rewrite link_full_map_split link_elem_split (ent_ops_one I d nd Hd Hrest).
-  rewrite Hx. exists x. rewrite !assoc //.
+  apply (cmra_valid_included (link_elem I f ⋅ e) (link_full_map I f)
+           (link_full_map_valid I f)).
+  rewrite (link_full_map_split I f) (link_elem_split I f)
+          (ent_ops_one I d nd Hd Hrest).
+  assert (Hsw : forall a1 b1 c1 d1 : fsLinkUR,
+                  (a1 ⋅ b1) ⋅ (c1 ⋅ d1) ≡ (a1 ⋅ c1) ⋅ (b1 ⋅ d1)).
+  { intros a1 b1 c1 d1. rewrite -!assoc. f_equiv. rewrite !assoc. f_equiv.
+    apply cmra_comm. }
+  exists x.
+  rewrite -(assoc op ((link_auths I ⋅ par_auths I f) ⋅ ent_ops d nd) e x).
+  rewrite -(assoc op (link_auths I ⋅ par_auths I f) (ent_ops d nd) (e ⋅ x)).
+  rewrite (assoc op (ent_ops d nd) e x) -Hx. apply Hsw.
 Qed.
 
 (* ---- 9b.   A LIST OF TOKENS AS ONE RA ELEMENT ----------------------- *)
@@ -666,6 +688,39 @@ Proof. rewrite /toks_of_list big_opL_app //. Qed.
 Lemma toks_of_list_singleton (t : Z) :
   toks_of_list [t] ≡ link_tok_elem t 1%nat.
 Proof. rewrite /toks_of_list big_opL_singleton //. Qed.
+
+(* the PARENT REGISTER's twin of [toks_of_list]: one unit per ticket, all
+   at the SAME value, which is what a well-formed image's tickets carry --
+   every one of them is a NAME record of the ONE directory W9's (T) allows
+   ([FsCfgBoot.img_ticket_par]). *)
+Definition pars_of_list (v : option Z) (L : list Z) : fsLinkUR :=
+  [^op list] t ∈ L, par_tok_elem t v.
+
+Lemma pars_of_list_app (v : option Z) (L1 L2 : list Z) :
+  pars_of_list v (L1 ++ L2) ≡ pars_of_list v L1 ⋅ pars_of_list v L2.
+Proof. rewrite /pars_of_list big_opL_app //. Qed.
+
+Lemma pars_of_list_singleton (v : option Z) (t : Z) :
+  pars_of_list v [t] ≡ par_tok_elem t v.
+Proof. rewrite /pars_of_list big_opL_singleton //. Qed.
+
+(* ...and the two together, which is exactly what ONE ticketed record's
+   [FsStateInode.ent_elem] is. *)
+Definition ents_of_list (v : option Z) (L : list Z) : fsLinkUR :=
+  toks_of_list L ⋅ pars_of_list v L.
+
+Lemma ents_of_list_app (v : option Z) (L1 L2 : list Z) :
+  ents_of_list v (L1 ++ L2) ≡ ents_of_list v L1 ⋅ ents_of_list v L2.
+Proof.
+  rewrite /ents_of_list toks_of_list_app pars_of_list_app.
+  rewrite -!assoc. f_equiv. rewrite !assoc. f_equiv. apply cmra_comm.
+Qed.
+
+Lemma ents_of_list_singleton (v : option Z) (t : Z) :
+  ents_of_list v [t] ≡ link_tok_elem t 1%nat ⋅ par_tok_elem t v.
+Proof.
+  rewrite /ents_of_list toks_of_list_singleton pars_of_list_singleton //.
+Qed.
 
 Lemma fs_tick_count_cons (t : Z) (L : list Z) (z : Z) :
   fs_tick_count (t :: L) z
@@ -725,6 +780,93 @@ Proof.
   - rewrite /link_toks_of big_opM_insert //.
     rewrite -/(link_toks_of I) IH fmap_insert /link_tok_elem.
     rewrite insert_singleton_op; [done |]. rewrite lookup_fmap Hi //.
+Qed.
+
+(* the PAR column's lookups, [toks_of_list_lookup_*]'s twins *)
+Lemma pars_of_list_lookup_zero (v : option Z) (L : list Z) (z : Z) :
+  fs_tick_count L z = 0%nat -> pars_of_list v L !! z = None.
+Proof.
+  induction L as [| t L IH]; intros H0.
+  - reflexivity.
+  - rewrite fs_tick_count_cons in H0.
+    assert (Hne : t <> z).
+    { intros ->. rewrite (bool_decide_eq_true_2 (z = z) eq_refl) in H0.
+      discriminate. }
+    rewrite (bool_decide_eq_false_2 (t = z) Hne) in H0.
+    rewrite /pars_of_list big_opL_cons -/(pars_of_list v L) lookup_op.
+    rewrite /par_tok_elem /par_toks_elem lookup_singleton_ne; [| exact Hne].
+    rewrite (IH H0). reflexivity.
+Qed.
+
+Lemma pars_of_list_lookup_pos (v : option Z) (L : list Z) (z : Z) :
+  (0 < fs_tick_count L z)%nat ->
+  pars_of_list v L !! z
+  ≡ Some ((ε : authUR natUR),
+          (◯ (FsStateLink.par_reps (fs_tick_count L z) v) : fsParUR)).
+Proof.
+  induction L as [| t L IH]; intros Hp.
+  - rewrite /fs_tick_count /= in Hp. lia.
+  - rewrite /pars_of_list big_opL_cons -/(pars_of_list v L) lookup_op.
+    rewrite fs_tick_count_cons in Hp |- *.
+    destruct (decide (t = z)) as [-> | Hne].
+    + rewrite (bool_decide_eq_true_2 (z = z) eq_refl) in Hp |- *.
+      rewrite /par_tok_elem /par_toks_elem lookup_singleton.
+      destruct (decide (fs_tick_count L z = 0%nat)) as [H0 | H0].
+      * rewrite (pars_of_list_lookup_zero v L z H0) H0 right_id.
+        replace (FsStateLink.par_reps 1 v)
+          with ({[+ v +]} : gmultiset (option Z))
+          by (simpl; multiset_solver).
+        reflexivity.
+      * rewrite (IH ltac:(lia)) -Some_op -pair_op_2 -auth_frag_op.
+        reflexivity.
+    + rewrite (bool_decide_eq_false_2 (t = z) Hne) in Hp |- *.
+      rewrite /par_tok_elem /par_toks_elem lookup_singleton_ne; [| exact Hne].
+      rewrite left_id. exact (IH Hp).
+Qed.
+
+Lemma par_toks_of_lookup (I : gmap Z fs_node)
+    (f : Z -> gmultiset (option Z)) (z : Z) :
+  par_toks_of I f !! z
+  ≡ (fun _ : fs_node => ((ε : authUR natUR), (◯ (f z) : fsParUR)))
+    <$> (I !! z).
+Proof.
+  revert z. induction I as [| i n I Hi IH] using map_ind; intros z.
+  - rewrite /par_toks_of big_opM_empty lookup_empty //.
+  - assert (Heq : par_toks_of (<[i := n]> I) f
+                  ≡ par_toks_elem i (f i) ⋅ par_toks_of I f)
+      by (rewrite /par_toks_of big_opM_insert //).
+    rewrite (Heq z) lookup_op.
+    destruct (decide (z = i)) as [-> | Hne].
+    + pose proof (IH i) as IHi. rewrite Hi in IHi. simpl in IHi.
+      rewrite /par_toks_elem lookup_singleton lookup_insert IHi right_id.
+      reflexivity.
+    + rewrite /par_toks_elem lookup_singleton_ne; [| by apply not_eq_sym].
+      rewrite lookup_insert_ne; [| by apply not_eq_sym].
+      rewrite left_id. exact (IH z).
+Qed.
+
+Lemma pars_of_list_incl (v : option Z) (L : list Z) (I : gmap Z fs_node)
+    (f : Z -> gmultiset (option Z)) :
+  (forall z : Z, (0 < fs_tick_count L z)%nat ->
+     exists n : fs_node,
+       I !! z = Some n
+       /\ f z = FsStateLink.par_reps (fn_nlink n) v
+       /\ (fs_tick_count L z <= fn_nlink n)%nat) ->
+  pars_of_list v L ≼ par_toks_of I f.
+Proof.
+  intros H. apply lookup_included. intros z.
+  destruct (decide (fs_tick_count L z = 0%nat)) as [H0 | H0].
+  - rewrite (pars_of_list_lookup_zero v L z H0). apply option_included.
+    by left.
+  - destruct (H z ltac:(lia)) as (n & Hn & Hf & Hle).
+    rewrite (pars_of_list_lookup_pos v L z ltac:(lia)).
+    rewrite (par_toks_of_lookup I f z) Hn /=.
+    apply Some_included_2. right. apply pair_included.
+    split; [apply ucmra_unit_least |].
+    apply auth_frag_mono. rewrite Hf. apply gmultiset_included.
+    replace (fn_nlink n) with (fs_tick_count L z + (fn_nlink n - fs_tick_count L z))%nat
+      by lia.
+    rewrite FsStateLink.par_reps_add. multiset_solver.
 Qed.
 
 (* THE INCLUSION, per key *)
@@ -906,23 +1048,25 @@ Lemma view_ops_incl (data : nat -> list (bv 8)) (self : Z) (orph : bool)
   (forall k : nat, (k < n)%nat -> dir_wins data k = true ->
      ent_tokenless self orph (dir_bname data k)
        (bv_unsigned (dir_inum data k)) = false ->
-     tick k = Some (bv_unsigned (dir_inum data k))) ->
+     tick k = Some (bv_unsigned (dir_inum data k))
+     /\ ent_par_val self (dir_bname data k) = Some self) ->
   ([^op map] s ↦ t ∈ dir_view data n, ent_elem self orph s t)
-    ≼ toks_of_list (omap tick (seq 0 n)).
+    ≼ ents_of_list (Some self) (omap tick (seq 0 n)).
 Proof.
   induction n as [| n IH].
   - intros _. rewrite dir_view_nil big_opM_empty. apply ucmra_unit_least.
   - intros Hself.
     assert (IHn : ([^op map] s ↦ t ∈ dir_view data n, ent_elem self orph s t)
-                    ≼ toks_of_list (omap tick (seq 0 n)))
+                    ≼ ents_of_list (Some self) (omap tick (seq 0 n)))
       by (apply IH; intros k Hk; apply Hself; lia).
     rewrite seq_S. replace (0 + n)%nat with n by lia.
-    rewrite omap_app toks_of_list_app dir_view_S.
+    rewrite omap_app ents_of_list_app dir_view_S.
     destruct (dir_wins data n) eqn:Hw; last first.
     { rewrite right_id_L.
-      apply (cmra_included_trans _ (toks_of_list (omap tick (seq 0 n))));
+      apply (cmra_included_trans _
+               (ents_of_list (Some self) (omap tick (seq 0 n))));
         [exact IHn |].
-      exists (toks_of_list (omap tick [n])). reflexivity. }
+      exists (ents_of_list (Some self) (omap tick [n])). reflexivity. }
     (* the record enters the view, at a name the prefix does not carry *)
     assert (Hfresh : dir_view data n !! dir_bname data n = None).
     { apply dir_view_lookup_None.
@@ -938,10 +1082,10 @@ Proof.
     destruct (ent_tokenless self orph (dir_bname data n)
                 (bv_unsigned (dir_inum data n))) eqn:Htl.
     { rewrite /ent_elem Htl. apply ucmra_unit_least. }
-    pose proof (Hself n ltac:(lia) Hw Htl) as Ht.
+    pose proof (Hself n ltac:(lia) Hw Htl) as [Ht Hpv].
     assert (Homap : omap tick [n] = [bv_unsigned (dir_inum data n)])
       by (cbn; rewrite Ht; reflexivity).
-    rewrite Homap toks_of_list_singleton /ent_elem Htl.
+    rewrite Homap ents_of_list_singleton /ent_elem Htl Hpv.
     exists ε. by rewrite right_id.
 Qed.
 
@@ -957,13 +1101,21 @@ Lemma view_ops_incl_tickets (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
      bv_unsigned (dir_inum (fs_data_of P dn) k) = self ->
      dir_bname (fs_data_of P dn) k = DOT
      \/ dir_bname (fs_data_of P dn) k = DOTDOT) ->
+  (forall k : nat,
+     (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+     dir_wins (fs_data_of P dn) k = true ->
+     ent_tokenless self orph (dir_bname (fs_data_of P dn) k)
+       (bv_unsigned (dir_inum (fs_data_of P dn) k)) = false ->
+     ent_par_val self (dir_bname (fs_data_of P dn) k) = Some self) ->
   ([^op map] s ↦ t ∈ dir_view (fs_data_of P dn)
                        (dir_nrec (bv_unsigned (di_size dn))),
      ent_elem self orph s t)
-    ≼ toks_of_list (fs_dir_tickets P self dn).
+    ≼ ents_of_list (Some self) (fs_dir_tickets P self dn).
 Proof.
-  intros Hself. rewrite /fs_dir_tickets.
+  intros Hself Hpv. rewrite /fs_dir_tickets.
   apply view_ops_incl. intros k Hk Hw Htl.
+  split; [| exact (Hpv k Hk Hw Htl)].
+  revert Hk Hw Htl. intros Hk Hw Htl.
   assert (Hlv : dir_live (fs_data_of P dn) k)
     by exact (dir_wins_live (fs_data_of P dn) k Hw).
   assert (Hne : bv_unsigned (dir_inum (fs_data_of P dn) k) <> self).
@@ -1022,6 +1174,14 @@ Qed.
 
 (* ---- 9g.   THE BRIDGE ------------------------------------------------ *)
 
+(* THE IMAGE'S REGISTER CHOICE (durable-disk G2): every unit at an inum
+   comes from the ONE directory a well-formed image has (W9's (T)), so the
+   pile is [nlink] copies of [Some ROOTINO].  Its SIZE is what
+   [FsStateInode.fn_par_ok] reads; the values are what the entries carry. *)
+Definition img_par_f (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
+  : gmultiset (option Z) :=
+  FsStateLink.par_reps (fn_nlink (img_node P sb z)) (Some FsImg.ROOTINO).
+
 (* IT CARRIES THE ROOT'S KEEP-ALIVE TOKEN (durable-disk lane E-clauses).
    The slack rides as one extra [ROOTINO] at the HEAD of the ticket list --
    [toks_of_list_cons] is exactly [link_tok_elem ROOTINO 1] beside the
@@ -1029,14 +1189,17 @@ Qed.
    the ONE image fact [FsImg.fsimg_wf_root_link]: the root receives no
    ticket at all ([fs_link_count P sb ROOTINO = 0], W9's directory arm)
    while its record says [nlink = 1], so 0 + 1 <= 1.  That is the
-   non-vacuity witness plan section 7 demands, at xv6's own mkfs image. *)
+   non-vacuity witness plan section 7 demands, at xv6's own mkfs image.
+   The REGISTER column takes no slack: the keep-alive is a counting token
+   and nothing else. *)
 Lemma img_link_incl (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
   fsimg_wf P sb = true -> fs_links_eq P sb = true ->
   fs_root_no_self P sb = true ->
   FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
   ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO)
     ⋅ link_tok_elem FsImg.ROOTINO 1%nat
-    ≼ link_toks_of (img_nodes P sb nib).
+    ≼ link_toks_of (img_nodes P sb nib)
+      ⋅ par_toks_of (img_nodes P sb nib) (img_par_f P sb).
 Proof.
   intros Hwf Heq Hns Hnib.
   assert (Hty : bv_unsigned (di_type (fs_dinode P sb FsImg.ROOTINO))
@@ -1059,21 +1222,86 @@ Proof.
       rewrite /fs_dir_tickets_at. cbv zeta.
       rewrite (proj2 (Z.eqb_eq _ _) Hty) //.
     - apply elem_of_seq. unfold FsImg.ROOTINO in *. lia. }
+  assert (Hsw3 : forall a b c : fsLinkUR, (a ⋅ b) ⋅ c ≡ (c ⋅ a) ⋅ b).
+  { intros a b c. rewrite (cmra_comm (a ⋅ b) c) assoc //. }
+  assert (Hone : ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO)
+                 ≼ ents_of_list (Some FsImg.ROOTINO)
+                     (fs_dir_tickets P FsImg.ROOTINO
+                 (fs_dinode P sb FsImg.ROOTINO))).
+  { rewrite /ent_ops (img_root_entries P sb Hwf).
+    apply view_ops_incl_tickets.
+    { intros k Hk Hlv Hc.
+      exact (fs_root_no_self_at P sb k Hns Hk Hlv Hc). }
+    { intros k Hk Hw Htl.
+      assert (Hlv : dir_live (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k)
+        by exact (dir_wins_live _ k Hw).
+      assert (Hne : bv_unsigned
+                      (dir_inum (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k)
+                    <> FsImg.ROOTINO).
+      { intros Hc. rewrite /ent_tokenless Hc in Htl.
+        rewrite (bool_decide_eq_true_2 (FsImg.ROOTINO = FsImg.ROOTINO) eq_refl)
+          in Htl. cbn [orb] in Htl. discriminate. }
+      pose proof (dir_view_live (fs_data_of P (fs_dinode P sb FsImg.ROOTINO))
+                    (dir_nrec (bv_unsigned (di_size (fs_dinode P sb FsImg.ROOTINO))))
+                    k (fdo_unique P sb FsImg.ROOTINO _ Hdok) Hk Hlv) as Hlk.
+      apply FsStateInode.ent_par_val_name.
+      - intros Hc. rewrite Hc in Hlk.
+        rewrite (fdo_dot P sb FsImg.ROOTINO _ Hdok) in Hlk.
+        injection Hlk as Hlk. exact (Hne (eq_sym Hlk)).
+      - intros Hc. rewrite Hc in Hlk.
+        pose proof (fs_root_wf_dotdot P sb (fsimg_wf_root P sb Hwf)) as Hrd.
+        rewrite /fs_file_data in Hrd. rewrite Hrd in Hlk.
+        injection Hlk as Hlk. exact (Hne (eq_sym Hlk)). } }
   apply (cmra_included_trans _
            (toks_of_list (FsImg.ROOTINO
-                          :: fs_dir_tickets P FsImg.ROOTINO
-                               (fs_dinode P sb FsImg.ROOTINO)))).
-  (* STEP ONE: the root's tokens are covered by the root's tickets, and the
-     keep-alive token by the consed head *)
+                          :: (fs_dir_tickets P FsImg.ROOTINO
+                 (fs_dinode P sb FsImg.ROOTINO)))
+            ⋅ pars_of_list (Some FsImg.ROOTINO)
+                (fs_dir_tickets P FsImg.ROOTINO
+                 (fs_dinode P sb FsImg.ROOTINO)))).
+  (* STEP ONE: the root's units are covered by its own tickets, and the
+     keep-alive TOKEN by the consed head -- the register column takes no
+     slack, so it is the ticket list's own pile there. *)
   { rewrite toks_of_list_cons.
-    rewrite (comm op (ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO))
-               (link_tok_elem FsImg.ROOTINO 1%nat)).
-    apply cmra_mono_l.
-    rewrite /ent_ops (img_root_entries P sb Hwf).
-    apply view_ops_incl_tickets. intros k Hk Hlv Hc.
-    exact (fs_root_no_self_at P sb k Hns Hk Hlv Hc). }
-  (* STEP TWO: the tickets -- the root's own plus the keep-alive one -- are
-     covered by the inodes' nlinks *)
+    rewrite -(Hsw3 (toks_of_list (fs_dir_tickets P FsImg.ROOTINO
+                 (fs_dinode P sb FsImg.ROOTINO)))
+                (pars_of_list (Some FsImg.ROOTINO) (fs_dir_tickets P FsImg.ROOTINO
+                 (fs_dinode P sb FsImg.ROOTINO)))
+                (link_tok_elem FsImg.ROOTINO 1%nat)).
+    apply cmra_mono; [rewrite /ents_of_list in Hone; exact Hone | done]. }
+  (* STEP TWO: both columns are covered by the inodes' nlinks. *)
+  apply cmra_mono; last first.
+  { apply pars_of_list_incl. intros z Hz.
+    pose proof (fs_tick_count_elem _ z Hz) as Hin.
+    rewrite /fs_dir_tickets in Hin.
+    apply elem_of_list_omap in Hin as (k & Hk & Hkt).
+    apply elem_of_seq in Hk as [_ Hk].
+    rewrite /fs_rec_ticket in Hkt. cbv zeta in Hkt.
+    destruct (dir_liveb (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k
+              && negb (bool_decide
+                         (bv_unsigned
+                            (dir_inum
+                               (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k)
+                          = FsImg.ROOTINO))) eqn:Hg; [| discriminate].
+    injection Hkt as <-.
+    apply andb_true_iff in Hg as [Hlv Hself].
+    apply negb_true_iff, bool_decide_eq_false in Hself.
+    destruct (fdo_ent P sb FsImg.ROOTINO (fs_dinode P sb FsImg.ROOTINO) Hdok
+                k Hk (proj1 (dir_liveb_true _ k) Hlv)) as [Hran Hlive].
+    set (t := bv_unsigned
+                (dir_inum (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k))
+      in *.
+    assert (Htran : 0 <= t < FsImg.sb_ninodes sb) by lia.
+    exists (img_node P sb t). split_and!.
+    { apply img_nodes_lookup. apply region_inums_spec. lia. }
+    { rewrite /img_par_f //. }
+    assert (Hnd : bv_unsigned (di_type (fs_dinode P sb t)) <> T_DIR_z).
+    { intros Hc.
+      destruct (proj2 (fs_links_wf_at P sb t (fsimg_wf_links P sb Hwf) Htran)
+                  Hc) as (_ & _ & Hr).
+      exact (Hself Hr). }
+    pose proof (fs_links_eq_at P sb t Heq Htran Hlive Hnd) as Hnl.
+    rewrite /fn_nlink img_node_rec Hnl Nat2Z.id. exact (Hjoin t). }
   apply toks_of_list_incl. intros z Hz.
   rewrite fs_tick_count_cons in Hz |- *.
   destruct (decide (FsImg.ROOTINO = z)) as [<- | Hzne].
@@ -1126,7 +1354,7 @@ Lemma img_link_valid (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
   fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
   fs_links_eq P sb = true -> fs_root_no_self P sb = true ->
   FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
-  ✓ (link_elem (img_nodes P sb nib)
+  ✓ (link_elem (img_nodes P sb nib) (img_par_f P sb)
      ⋅ link_tok_elem FsImg.ROOTINO 1%nat).
 Proof.
   intros Hwf Hrw Heq Hns Hnin.
@@ -1134,7 +1362,7 @@ Proof.
   unfold FsImg.ROOTINO in Hni.
   assert (Hrootin : FsImg.ROOTINO ∈ region_inums nib)
     by (apply region_inums_spec; rewrite /FsImg.ROOTINO; lia).
-  apply (link_elem_valid_of_root _ FsImg.ROOTINO
+  apply (link_elem_valid_of_root _ (img_par_f P sb) FsImg.ROOTINO
            (img_node P sb FsImg.ROOTINO) _
            (img_nodes_lookup P sb nib FsImg.ROOTINO Hrootin));
     [| exact (img_link_incl P sb nib Hwf Heq Hns Hnin)].
@@ -1671,8 +1899,12 @@ Proof.
     exists (img_node (fs_blocks dk) sb i).
     apply img_nodes_lookup, region_inums_spec. lia.
   - (* sk_links *)
-    rewrite Hpin.
-    exact (img_link_valid (fs_blocks dk) sb nib Hwf Hrw Hlinkeq Hns Hnin).
+    rewrite Hpin. exists (img_par_f (fs_blocks dk) sb). split.
+    + intros i n Hi.
+      destruct (img_nodes_lookup_inv (fs_blocks dk) sb nib i n Hi) as [_ ->].
+      rewrite /FsStateInode.fn_par_ok /img_par_f
+        FsStateLink.par_reps_size. lia.
+    + exact (img_link_valid (fs_blocks dk) sb nib Hwf Hrw Hlinkeq Hns Hnin).
   - (* sk_meta_used -- the metadata roles are MARKED IN USE *)
     rewrite Hpu. intros b Hm.
     pose proof (Hmeta_below b Hm) as Hbr.

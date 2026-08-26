@@ -875,7 +875,7 @@ Definition wp_iupdate_link_body
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
-    (pin : bool)
+    (pin : bool) (prv : option Z)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -1012,6 +1012,12 @@ Definition wp_iupdate_link_body
          [FsStateInode.ent_toks] inside its checked-out payload.  The
          region keeps only the per-inum AUTHORITY. *)
       FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) -∗
+      (* ...AND THE PARENT REGISTER's unit beside it (durable-disk G2), at
+         the value the naming record fixes ([FsStateInode.ent_par_val] of
+         the naming directory and the name).  It is filed in the same
+         [FsStateInode.ent_tok]. *)
+      FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+        prv -∗
       (* ...and the freeze-pin premise back, unspent (§3.9's
          borrowed-and-returned).  A caller that came in on the pure arm gets
          the pure arm back and ignores it; a caller that paid the token gets
@@ -1092,7 +1098,7 @@ Definition wp_iupdate_unlink_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z)) (prv : option Z)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -1158,6 +1164,10 @@ Definition wp_iupdate_unlink_body
      authority -- the token the removed directory entry gave up out of its
      own [FsStateInode.ent_toks]. *)
   FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) -∗
+  (* ...AND THE PARENT REGISTER's unit beside it (durable-disk G2), at the
+     value the removed record carried ([FsStateInode.ent_par_val]). *)
+  FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+    prv -∗
   (* THE RECEIPT PREMISE (edit (iv); see the banner).  Persistent in both
      arms, so it costs a caller nothing to keep, and pure in both, so the
      choice is made with one [iLeft]/[iRight]. *)
@@ -1296,13 +1306,13 @@ Module Type IUPDATE.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
-      (pin : bool)
+      (pin : bool) (prv : option Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                           pin pidv dq dqd dqn dqs m K eb b lks Vpr.
+                           pin prv pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
      at a flush that LOWERS [nlink] by one, spending the [ilink] that drop
@@ -1320,10 +1330,11 @@ Module Type IUPDATE.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+      (prv : option Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                             pidv dq dqd dqn dqs m K eb b lks Vpr.
+                             prv pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.

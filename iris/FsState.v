@@ -193,11 +193,87 @@ Section FsState.
   (*  5.  The link family, gathered                                    *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_elem (I : gmap Z fs_node) : fsLinkUR :=
-    ([^op map] i ↦ n ∈ I, link_elem_node i n).
+  (* THE REGISTER'S AUTHORITY IS EXISTENTIAL IN THE BUNDLE (a file has many
+     namers, so no function of the node alone can name it), so the FAMILY's
+     element is indexed by a CHOICE FUNCTION -- one multiset per inum, each
+     satisfying that inum's own [fn_par_ok].  Everything downstream reads
+     the pair [link_elem_ok] + [✓ link_elem] and nothing else about it; the
+     value-first allocator that computes [f] from [I] is [FsCfgBoot]'s and
+     is what the resource-transport mint replaces. *)
+  Definition link_elem_ok (I : gmap Z fs_node) (f : Z -> gmultiset (option Z))
+    : Prop :=
+    forall i n, I !! i = Some n -> fn_par_ok n (f i).
+
+  Definition link_elem (I : gmap Z fs_node) (f : Z -> gmultiset (option Z))
+    : fsLinkUR :=
+    ([^op map] i ↦ n ∈ I, link_elem_node i n (f i)).
+
+  (* ONE inode's whole contribution, under the existential its register
+     authority is bound by.  Named, because it is what the commit's
+     collection produces one inum at a time. *)
+  Definition fs_link_node (g : gname) (i : Z) (n : fs_node) : iProp Σ :=
+    (∃ P, ⌜fn_par_ok n P⌝ ∗ own g (link_elem_node i n P))%I.
+
+  Global Instance fs_link_node_timeless g i n : Timeless (fs_link_node g i n).
+  Proof. rewrite /fs_link_node. apply _. Qed.
 
   Definition fs_links (g : gname) (I : gmap Z fs_node) : iProp Σ :=
-    ([∗ map] i ↦ n ∈ I, own g (link_elem_node i n))%I.
+    ([∗ map] i ↦ n ∈ I, fs_link_node g i n)%I.
+
+  (* [link_elem] only ever reads [f] inside [I]'s domain *)
+  Lemma link_elem_ext (I : gmap Z fs_node) (f g : Z -> gmultiset (option Z)) :
+    (forall i, is_Some (I !! i) -> f i = g i) ->
+    link_elem I f ≡ link_elem I g.
+  Proof.
+    intros Hfg. rewrite /link_elem. apply big_opM_proper.
+    intros i n Hi. rewrite (Hfg i ltac:(by eexists)) //.
+  Qed.
+
+  (* A big-op of SINGLETONS AT THEIR OWN KEYS reads pointwise: the one
+     induction every "the family is valid" argument in this file needs, and
+     the reason none of them has to name an [fmap]. *)
+  Lemma big_op_singletons_lookup {A : cmra} (I : gmap Z fs_node)
+      (h : Z -> fs_node -> A) (j : Z) :
+    (([^op map] i ↦ n ∈ I, ({[ i := h i n ]} : gmap Z A)) !! j)
+    ≡ (fun n => h j n) <$> (I !! j).
+  Proof.
+    revert j. induction I as [| i n I Hi IH] using map_ind; intros j.
+    - rewrite big_opM_empty lookup_empty //.
+    - assert (Heq : ([^op map] k ↦ m ∈ <[i := n]> I,
+                       ({[ k := h k m ]} : gmap Z A))
+                    ≡ ({[ i := h i n ]} : gmap Z A)
+                      ⋅ ([^op map] k ↦ m ∈ I, ({[ k := h k m ]} : gmap Z A)))
+        by (rewrite big_opM_insert //).
+      rewrite (Heq j) lookup_op.
+      destruct (decide (j = i)) as [-> | Hne].
+      + pose proof (IH i) as IHi. rewrite Hi in IHi. simpl in IHi.
+        rewrite lookup_singleton lookup_insert IHi right_id //.
+      + rewrite lookup_singleton_ne; [| done].
+        rewrite lookup_insert_ne; [| done].
+        rewrite left_id. exact (IH j).
+  Qed.
+
+  Lemma link_elem_empty (f : Z -> gmultiset (option Z)) : link_elem ∅ f = ε.
+  Proof. rewrite /link_elem big_opM_empty //. Qed.
+
+  Lemma link_elem_insert (I : gmap Z fs_node) (i : Z) (n : fs_node)
+      (f : Z -> gmultiset (option Z)) :
+    I !! i = None ->
+    link_elem (<[i := n]> I) f ≡ link_elem_node i n (f i) ⋅ link_elem I f.
+  Proof. intros Hi. rewrite /link_elem big_opM_insert //. Qed.
+
+  Lemma link_elem_delete (I : gmap Z fs_node) (i : Z) (n : fs_node)
+      (f : Z -> gmultiset (option Z)) :
+    I !! i = Some n ->
+    link_elem I f ≡ link_elem_node i n (f i) ⋅ link_elem (delete i I) f.
+  Proof. intros Hi. rewrite /link_elem (big_opM_delete _ I i n) //. Qed.
+
+  Lemma link_elem_ok_ext (I : gmap Z fs_node) (f g : Z -> gmultiset (option Z)) :
+    (forall i, is_Some (I !! i) -> f i = g i) ->
+    link_elem_ok I f -> link_elem_ok I g.
+  Proof.
+    intros Hfg Hok i n Hi. rewrite -(Hfg i ltac:(by eexists)). exact (Hok i n Hi).
+  Qed.
 
   Definition fs_pure S : iProp Σ :=
     (⌜fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S)⌝
@@ -215,14 +291,14 @@ Section FsState.
   Lemma fs_ghost_split Γ S :
     fs_ghost Γ S ⊣⊢ fs_links (γlink Γ) (fss_inodes S) ∗ fs_pure S.
   Proof.
-    rewrite /fs_ghost /fs_pure /fs_links /inode_ghost.
+    rewrite /fs_ghost /fs_pure /fs_links /fs_link_node.
     rewrite (big_sepM_proper
-               (fun i n => link_auth Γ i (fn_nlink n) ∗ ent_toks Γ i n
-                           ∗ ⌜inode_local i n⌝)%I
-               (fun i n => own (γlink Γ) (link_elem_node i n)
+               (fun i n => inode_ghost Γ i n)%I
+               (fun i n => (∃ P, ⌜fn_par_ok n P⌝
+                                 ∗ own (γlink Γ) (link_elem_node i n P))
                            ∗ ⌜inode_local i n⌝)%I);
       last first.
-    { intros i n _. rewrite assoc inode_link_iff //. }
+    { intros i n _. rewrite inode_ghost_iff //. }
     rewrite big_sepM_sep.
     iSplit.
     - iIntros "(%Hp & Hl & Hc)". by iFrame.
@@ -230,19 +306,68 @@ Section FsState.
   Qed.
 
   (* THE ONE PLACE the whole-state counting fact is ever produced: it is
-     READ OFF the instance's own [own], not proved. *)
-  Lemma fs_links_valid g I : fs_links g I -∗ ⌜✓ link_elem I⌝.
+     READ OFF the instance's own [own], not proved.  The choice function
+     comes out of the same walk that gathers the [own]s. *)
+  (* THE ACCUMULATOR FORM: the empty map contributes the unit, which an
+     [emp] cannot produce, so the walk starts from a resource the caller
+     already holds -- exactly [own_gather_map]'s shape one level up. *)
+  Lemma fs_links_gather g I (x : fsLinkUR) :
+    own g x -∗ fs_links g I -∗
+    ∃ f, ⌜link_elem_ok I f⌝ ∗ own g (x ⋅ link_elem I f).
+  Proof.
+    revert x. induction I as [| i n I Hi IH] using map_ind; intros x.
+    - iIntros "Hx _". iExists (fun _ => ∅). iSplitR.
+      { iPureIntro. intros j m Hj. rewrite lookup_empty in Hj. discriminate. }
+      rewrite link_elem_empty right_id. iFrame.
+    - rewrite /fs_links /fs_link_node big_sepM_insert //.
+      iIntros "Hx [(%P & %Hok & Hi) Hrest]".
+      iDestruct (own_op with "[$Hx $Hi]") as "Hxi".
+      iDestruct (IH (x ⋅ link_elem_node i n P) with "Hxi Hrest")
+        as (f) "[%Hf Hr]".
+      set (f' := fun z => if decide (z = i) then P else f z).
+      assert (Hext : forall j, is_Some (I !! j) -> f j = f' j).
+      { intros j [m Hj]. rewrite /f'. destruct (decide (j = i)) as [-> |];
+          [rewrite Hi in Hj; discriminate | done]. }
+      assert (Hfi : f' i = P) by (rewrite /f' decide_True //).
+      iExists f'. iSplitR.
+      { iPureIntro. intros j m Hj.
+        destruct (decide (j = i)) as [-> | Hne].
+        - rewrite lookup_insert in Hj. injection Hj as <-. rewrite Hfi //.
+        - rewrite lookup_insert_ne // in Hj.
+          rewrite -(Hext j ltac:(by eexists)). exact (Hf j m Hj). }
+      rewrite (link_elem_insert I i n f' Hi) Hfi.
+      rewrite -(link_elem_ext I f f' ltac:(intros j Hj; exact (Hext j Hj))).
+      rewrite assoc. iFrame.
+  Qed.
+
+  Lemma fs_links_valid g I :
+    fs_links g I -∗ ⌜∃ f, link_elem_ok I f /\ ✓ link_elem I f⌝.
   Proof.
     destruct (decide (I = ∅)) as [-> | Hne].
-    - iIntros "_". iPureIntro.
-      rewrite /link_elem big_opM_empty. apply ucmra_unit_valid.
+    - iIntros "_". iPureIntro. exists (fun _ => ∅). split.
+      + intros j m Hj. rewrite lookup_empty in Hj. discriminate.
+      + rewrite link_elem_empty. apply ucmra_unit_valid.
     - apply map_choose in Hne as (i & n & Hin).
-      rewrite /fs_links (big_sepM_delete _ I i n) //.
-      iIntros "[Hi Hrest]".
-      iDestruct (own_gather_map (A := fsLinkUR) g link_elem_node (delete i I)
-                   (link_elem_node i n) with "Hi Hrest") as "H".
+      rewrite /fs_links /fs_link_node (big_sepM_delete _ I i n) //.
+      iIntros "[(%P & %Hok & Hi) Hrest]".
+      iDestruct (fs_links_gather g (delete i I) (link_elem_node i n P)
+                   with "Hi Hrest") as (f) "[%Hf H]".
       iDestruct (own_valid with "H") as %Hv.
-      iPureIntro. rewrite /link_elem (big_opM_delete _ I i n) //.
+      iPureIntro.
+      set (f' := fun z => if decide (z = i) then P else f z).
+      assert (Hext : forall j, is_Some (delete i I !! j) -> f j = f' j).
+      { intros j [m Hj]. rewrite /f'. destruct (decide (j = i)) as [-> |];
+          [rewrite lookup_delete in Hj; discriminate | done]. }
+      assert (Hfi : f' i = P) by (rewrite /f' decide_True //).
+      exists f'. split.
+      + intros j m Hj. destruct (decide (j = i)) as [-> | Hne'].
+        * rewrite Hin in Hj. injection Hj as <-. rewrite Hfi //.
+        * rewrite -(Hext j ltac:(eexists; rewrite lookup_delete_ne //)).
+          apply (Hf j m). rewrite lookup_delete_ne //.
+      + rewrite (link_elem_delete I i n f' Hin) Hfi.
+        rewrite -(link_elem_ext (delete i I) f f'
+                    ltac:(intros j Hj; exact (Hext j Hj))).
+        exact Hv.
   Qed.
 
   (* ...AND THE SAME READING WITH A SPARE FRAGMENT IN HAND (durable-disk
@@ -254,22 +379,26 @@ Section FsState.
      a non-case. *)
   Lemma fs_links_valid_tok g I i k :
     fs_links g I -∗ own g (link_tok_elem i k) -∗
-    ⌜✓ (link_elem I ⋅ link_tok_elem i k)⌝.
+    ⌜∃ f, link_elem_ok I f /\ ✓ (link_elem I f ⋅ link_tok_elem i k)⌝.
   Proof.
     iIntros "HI Ht".
-    iDestruct (own_gather_map (A := fsLinkUR) g link_elem_node I
-                 (link_tok_elem i k) with "Ht HI") as "H".
+    iDestruct (fs_links_gather g I (link_tok_elem i k) with "Ht HI")
+      as (f) "[%Hf H]".
     iDestruct (own_valid with "H") as %Hv.
-    iPureIntro. rewrite comm. exact Hv.
+    iPureIntro. exists f. split; [exact Hf |]. rewrite comm. exact Hv.
   Qed.
 
-  Lemma fs_links_alloc (I : gmap Z fs_node) :
-    ✓ link_elem I -> ⊢ |==> ∃ g : gname, fs_links g I.
+  Lemma fs_links_alloc (I : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+    link_elem_ok I f -> ✓ link_elem I f ->
+    ⊢ |==> ∃ g : gname, fs_links g I.
   Proof.
-    intros Hv.
-    iMod (own_alloc (link_elem I)) as (g) "H"; [done |].
+    intros Hok Hv.
+    iMod (own_alloc (link_elem I f)) as (g) "H"; [done |].
     iExists g. iModIntro.
-    rewrite /fs_links /link_elem. by iApply big_opM_own_1.
+    rewrite /fs_links /fs_link_node /link_elem.
+    iDestruct (big_opM_own_1 with "H") as "H".
+    iApply (big_sepM_mono with "H"). intros i n Hi; simpl.
+    iIntros "H". iExists (f i). iFrame. iPureIntro. exact (Hok i n Hi).
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -286,34 +415,48 @@ Section FsState.
   (*  and [FsImg.fs_links_eq] (the file-nlink equality).                 *)
   (* ---------------------------------------------------------------- *)
 
-  (* A node with no directory entries carries no tokens, so its whole
-     contribution to the family is its own auth. *)
-  Lemma link_elem_no_ents (I : gmap Z fs_node) :
-    (forall i n, I !! i = Some n -> dir_entries n = ∅) ->
-    link_elem I ≡ (fun n => ((● (fn_nlink n) : authUR natUR),
-                             (ε : fsParUR))) <$> I.
+  (* A node with no directory entries carries no tokens and no register
+     fragments, so its whole contribution to the family is its own two
+     authorities. *)
+  Lemma link_elem_node_no_ents (i : Z) (n : fs_node)
+      (P : gmultiset (option Z)) :
+    dir_entries n = ∅ ->
+    link_elem_node i n P
+    ≡ ({[ i := ((● (fn_nlink n) : authUR natUR), (● P : fsParUR)) ]}
+       : fsLinkUR).
   Proof.
-    induction I as [| i n I Hi IH] using map_ind; intros Hall.
-    - rewrite /link_elem big_opM_empty fmap_empty //.
-    - assert (Hin : <[i := n]> I !! i = Some n) by (rewrite lookup_insert //).
-      assert (Hrest : forall j m, I !! j = Some m -> dir_entries m = ∅).
-      { intros j m Hj. apply (Hall j m).
-        rewrite lookup_insert_ne; [exact Hj |].
-        intros ->. rewrite Hi in Hj. done. }
-      rewrite /link_elem big_opM_insert //.
-      rewrite {1}/link_elem_node (Hall i n Hin) big_opM_empty right_id.
-      rewrite -/(link_elem I) (IH Hrest) fmap_insert.
-      rewrite insert_singleton_op; [done |]. rewrite lookup_fmap Hi //.
+    intros He. rewrite /link_elem_node He big_opM_empty right_id
+      /link_auth_elem /par_auth_elem singleton_op
+      -pair_op right_id left_id //.
   Qed.
 
-  Lemma link_elem_valid_no_ents (I : gmap Z fs_node) :
-    (forall i n, I !! i = Some n -> dir_entries n = ∅) -> ✓ link_elem I.
+  Lemma link_elem_no_ents_lookup (I : gmap Z fs_node)
+      (f : Z -> gmultiset (option Z)) (j : Z) :
+    (forall i n, I !! i = Some n -> dir_entries n = ∅) ->
+    link_elem I f !! j
+    ≡ (fun n => ((● (fn_nlink n) : authUR natUR), (● (f j) : fsParUR)))
+      <$> (I !! j).
   Proof.
-    intros Hall. rewrite (link_elem_no_ents I Hall).
-    intros j. rewrite lookup_fmap.
+    intros Hall.
+    assert (Heq : link_elem I f
+                  ≡ ([^op map] i ↦ n ∈ I,
+                       ({[ i := ((● (fn_nlink n) : authUR natUR),
+                                 (● (f i) : fsParUR)) ]} : fsLinkUR))).
+    { rewrite /link_elem. apply big_opM_proper. intros i n Hi.
+      exact (link_elem_node_no_ents i n (f i) (Hall i n Hi)). }
+    rewrite (Heq j).
+    exact (big_op_singletons_lookup I
+             (fun i n => ((● (fn_nlink n) : authUR natUR),
+                          (● (f i) : fsParUR))) j).
+  Qed.
+
+  Lemma link_elem_valid_no_ents (I : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+    (forall i n, I !! i = Some n -> dir_entries n = ∅) -> ✓ link_elem I f.
+  Proof.
+    intros Hall j. rewrite (link_elem_no_ents_lookup I f j Hall).
     destruct (I !! j) as [n |] eqn:E; [| done].
     rewrite /= Some_valid. apply pair_valid.
-    split; [by apply auth_auth_valid | apply ucmra_unit_valid].
+    split; by apply auth_auth_valid.
   Qed.
 
   (* BOTH era ghosts, allocated together from a map of nodes: the top map's
@@ -329,15 +472,15 @@ Section FsState.
      whole family, so while the link step is still ahead it is allocated at
      the zero map, where the obligation is free ([link_elem_valid_no_ents]).
      [fs_boot_alloc] is this at [IL = IT]. *)
-  Lemma fs_boot_alloc_at (IL IT : gmap Z fs_node) :
-    ✓ link_elem IL ->
+  Lemma fs_boot_alloc_at (IL IT : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+    link_elem_ok IL f -> ✓ link_elem IL f ->
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 IT
         ∗ ([∗ map] i ↦ n ∈ IT, i ↪[gt] n)
         ∗ fs_links gl IL.
   Proof.
-    intros Hv.
-    iMod (fs_links_alloc IL Hv) as (gl) "Hl".
+    intros Hok Hv.
+    iMod (fs_links_alloc IL f Hok Hv) as (gl) "Hl".
     iMod (ghost_map_alloc IT) as (gt) "[Ha Hf]".
     iModIntro. iExists gl, gt. iFrame.
   Qed.
@@ -358,41 +501,53 @@ Section FsState.
   (*  [FsImg]'s W9 + [fs_links_eq] instead; that is the links step.      *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_full_map (I : gmap Z fs_node) : fsLinkUR :=
-    ([^op map] i ↦ n ∈ I, link_full_elem i (fn_nlink n)).
+  Definition link_full_map (I : gmap Z fs_node) (f : Z -> gmultiset (option Z))
+    : fsLinkUR :=
+    ([^op map] i ↦ n ∈ I, link_full_elem i (fn_nlink n) (f i)).
 
-  Definition fs_links_full (g : gname) (I : gmap Z fs_node) : iProp Σ :=
-    ([∗ map] i ↦ n ∈ I, own g (link_full_elem i (fn_nlink n)))%I.
+  Definition fs_links_full (g : gname) (I : gmap Z fs_node)
+      (f : Z -> gmultiset (option Z)) : iProp Σ :=
+    ([∗ map] i ↦ n ∈ I, own g (link_full_elem i (fn_nlink n) (f i)))%I.
 
-  Global Instance fs_links_full_timeless g I : Timeless (fs_links_full g I).
+  Global Instance fs_links_full_timeless g I f :
+    Timeless (fs_links_full g I f).
   Proof. rewrite /fs_links_full. apply _. Qed.
 
-  Lemma link_full_map_fmap (I : gmap Z fs_node) :
-    link_full_map I
+  Lemma link_full_map_lookup (I : gmap Z fs_node) (f : Z -> gmultiset (option Z))
+      (j : Z) :
+    link_full_map I f !! j
     ≡ (fun n => ((● (fn_nlink n) ⋅ ◯ (fn_nlink n) : authUR natUR),
-                 (ε : fsParUR))) <$> I.
+                 (● (f j) ⋅ ◯ (f j) : fsParUR))) <$> (I !! j).
   Proof.
-    induction I as [| i n I Hi IH] using map_ind.
-    - rewrite /link_full_map big_opM_empty fmap_empty //.
-    - rewrite /link_full_map big_opM_insert // link_full_elem_singleton.
-      rewrite -/(link_full_map I) IH fmap_insert.
-      rewrite insert_singleton_op; [done |]. rewrite lookup_fmap Hi //.
+    assert (Heq : link_full_map I f
+                  ≡ ([^op map] i ↦ n ∈ I,
+                       ({[ i := ((● (fn_nlink n) ⋅ ◯ (fn_nlink n)
+                                  : authUR natUR),
+                                 (● (f i) ⋅ ◯ (f i) : fsParUR)) ]}
+                        : fsLinkUR))).
+    { rewrite /link_full_map. apply big_opM_proper. intros i n Hi.
+      exact (link_full_elem_singleton i (fn_nlink n) (f i)). }
+    rewrite (Heq j).
+    exact (big_op_singletons_lookup I
+             (fun i n => ((● (fn_nlink n) ⋅ ◯ (fn_nlink n) : authUR natUR),
+                          (● (f i) ⋅ ◯ (f i) : fsParUR))) j).
   Qed.
 
-  Lemma link_full_map_valid (I : gmap Z fs_node) : ✓ link_full_map I.
+  Lemma link_full_map_valid (I : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+    ✓ link_full_map I f.
   Proof.
-    rewrite link_full_map_fmap. intros j. rewrite lookup_fmap.
+    intros j. rewrite (link_full_map_lookup I f j).
     destruct (I !! j) as [n |] eqn:E; [| done].
-    rewrite /= Some_valid. apply pair_valid.
-    split; [| apply ucmra_unit_valid].
-    apply auth_both_valid_discrete.
-    split; [apply nat_included; lia | done].
+    rewrite /= Some_valid. apply pair_valid. split.
+    - apply auth_both_valid_discrete. split; [apply nat_included; lia | done].
+    - apply auth_both_valid_discrete.
+      split; [by apply gmultiset_included | done].
   Qed.
 
-  Lemma fs_links_full_alloc (I : gmap Z fs_node) :
-    ⊢ |==> ∃ g : gname, fs_links_full g I.
+  Lemma fs_links_full_alloc (I : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+    ⊢ |==> ∃ g : gname, fs_links_full g I f.
   Proof.
-    iMod (own_alloc (link_full_map I)) as (g) "H";
+    iMod (own_alloc (link_full_map I f)) as (g) "H";
       [apply link_full_map_valid |].
     iExists g. iModIntro.
     rewrite /fs_links_full /link_full_map. by iApply big_opM_own_1.
@@ -400,13 +555,13 @@ Section FsState.
 
   (* ...and the two ghosts allocated together, the region's way: no
      validity premise at all, because nothing is outstanding. *)
-  Lemma fs_boot_alloc_full (IL IT : gmap Z fs_node) :
+  Lemma fs_boot_alloc_full (IL IT : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 IT
         ∗ ([∗ map] i ↦ n ∈ IT, i ↪[gt] n)
-        ∗ fs_links_full gl IL.
+        ∗ fs_links_full gl IL f.
   Proof.
-    iMod (fs_links_full_alloc IL) as (gl) "Hl".
+    iMod (fs_links_full_alloc IL f) as (gl) "Hl".
     iMod (ghost_map_alloc IT) as (gt) "[Ha Hf]".
     iModIntro. iExists gl, gt. iFrame.
   Qed.
@@ -418,21 +573,25 @@ Section FsState.
      [InodeRegion.ireg_keep] -- so the mint never has to split a family it
      has already handed out.  The root inum is a PARAMETER: this file sits
      below [InodeRegion], and [ireg_root] is [FsImg.ROOTINO]. *)
-  Lemma fs_boot_alloc_root_slack (I : gmap Z fs_node) (r : Z) :
-    ✓ (link_elem I ⋅ link_tok_elem r 1%nat) ->
+  Lemma fs_boot_alloc_root_slack (I : gmap Z fs_node)
+      (f : Z -> gmultiset (option Z)) (r : Z) :
+    link_elem_ok I f -> ✓ (link_elem I f ⋅ link_tok_elem r 1%nat) ->
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 I
         ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
         ∗ fs_links gl I
         ∗ own gl (link_tok_elem r 1%nat).
   Proof.
-    intros Hv.
-    iMod (own_alloc (link_elem I ⋅ link_tok_elem r 1%nat)) as (gl) "H";
+    intros Hok Hv.
+    iMod (own_alloc (link_elem I f ⋅ link_tok_elem r 1%nat)) as (gl) "H";
       [done |].
     iDestruct (own_op with "H") as "[Hl Ht]".
     iMod (ghost_map_alloc I) as (gt) "[Ha Hf]".
     iModIntro. iExists gl, gt. iFrame "Ha Hf Ht".
-    rewrite /fs_links /link_elem. by iApply big_opM_own_1.
+    rewrite /fs_links /fs_link_node /link_elem.
+    iDestruct (big_opM_own_1 with "Hl") as "Hl".
+    iApply (big_sepM_mono with "Hl"). intros i n Hi; simpl.
+    iIntros "H". iExists (f i). iFrame. iPureIntro. exact (Hok i n Hi).
   Qed.
 
   (* THE DEGENERATE INSTANCE, and it is what durable-disk 2c's fixed-layer
@@ -446,19 +605,20 @@ Section FsState.
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 (∅ : gmap Z fs_node) ∗ fs_links gl ∅.
   Proof.
-    iMod (fs_boot_alloc_at ∅ ∅) as (gl gt) "(Ha & _ & Hl)".
+    iMod (fs_boot_alloc_at ∅ ∅ (fun _ => ∅)) as (gl gt) "(Ha & _ & Hl)".
+    { intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
     { apply link_elem_valid_no_ents.
       intros i n Hi. rewrite lookup_empty in Hi. discriminate. }
     iModIntro. iExists gl, gt. iFrame.
   Qed.
 
-  Lemma fs_boot_alloc (I : gmap Z fs_node) :
-    ✓ link_elem I ->
+  Lemma fs_boot_alloc (I : gmap Z fs_node) (f : Z -> gmultiset (option Z)) :
+    link_elem_ok I f -> ✓ link_elem I f ->
     ⊢ |==> ∃ gl gt : gname,
         ghost_map_auth gt 1 I
         ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
         ∗ fs_links gl I.
-  Proof. exact (fs_boot_alloc_at I I). Qed.
+  Proof. exact (fs_boot_alloc_at I I f). Qed.
 
   (* The two directions of the factoring, AS WANDS.  A bare [rewrite] of an
      [⊣⊢] inside the proofmode rewrites the CONTEXT and the CONCLUSION
@@ -493,8 +653,8 @@ Section FsState.
   Proof.
     iIntros "HD Hfp".
     iDestruct (fs_state_to with "HD") as "(HDfp & HDl & #Hpure)".
-    iDestruct (fs_links_valid with "HDl") as %Hv.
-    iMod (fs_links_alloc (fss_inodes S) Hv) as (gl) "HLl".
+    iDestruct (fs_links_valid with "HDl") as %(f & Hok & Hv).
+    iMod (fs_links_alloc (fss_inodes S) f Hok Hv) as (gl) "HLl".
     iMod (ghost_map_alloc_empty (K := Z) (V := fs_node)) as (gt) "_".
     iModIntro. iExists gl, gt.
     iSplitL "HDfp HDl".
@@ -516,8 +676,8 @@ Section FsState.
   Proof.
     iIntros "HD Hfp".
     iDestruct (fs_state_to with "HD") as "(HDfp & HDl & #Hpure)".
-    iDestruct (fs_links_valid with "HDl") as %Hv.
-    iMod (fs_links_alloc (fss_inodes S) Hv) as (gl) "HLl".
+    iDestruct (fs_links_valid with "HDl") as %(f & Hok & Hv).
+    iMod (fs_links_alloc (fss_inodes S) f Hok Hv) as (gl) "HLl".
     iMod (ghost_map_alloc (fss_inodes S)) as (gt) "[Hauth Hfrag]".
     iModIntro. iExists gl, gt.
     iSplitL "HDfp HDl".

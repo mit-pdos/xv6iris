@@ -5074,7 +5074,7 @@ Section ProofSysUnlinkBody.
                  Hkklt Hkklive Hnotself Hkknotdot (Hduq Htydz)
                  (conj Hz' (conj Hagree Hnm')) Htydz Hdplive Hnlz'
                  Hty'v Hsz'v Hhzd Hhz' Hszcap
-                 with "Hetkd") as "[Htoken Hetkd]".
+                 with "Hetkd") as "[[Htoken Hptok] Hetkd]".
     iDestruct (dir_links_unlink (bv_unsigned dinum) dnd dnW datd data'
                  dirent_zero (dir_nrec (bv_unsigned (di_size dnd))) kk 16
                  Htydz eq_refl Hkklt ltac:(lia) ltac:(lia) su_dz_inum
@@ -5397,6 +5397,7 @@ Section ProofSysUnlinkBody.
     (* the spent ticket, at the region's own index spelling *)
     iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
     iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Htoken".
+    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hptok".
     iApply (Iupdate.wp_iupdate_unlink (CID := D26) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart inodestart nib dev (ientry ks)
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
@@ -5406,7 +5407,8 @@ Section ProofSysUnlinkBody.
                     (sign_extend' 64
                        (sign_extend' 12 (mword_of_int 63 : mword 6))
                      : mword 64)) 31 0))))
-              dni bmi c2 (Sb2 : gset Z) false None pid
+              dni bmi c2 (Sb2 : gset Z) false None
+              (FsStateInode.ent_par_val (bv_unsigned dinum) (dir_bname datd kk)) pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               C9 (K - 30)%nat eb b lks
               (upd_upt V P1) ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0 Hiblki
@@ -5416,7 +5418,7 @@ Section ProofSysUnlinkBody.
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
               with "Hcg Hown Htext Hdata Hpc Hpanenv Hbio Hlog Hidevi Hiinumi Hmetai
-                    [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket] Htoken [] Hpidq
+                    [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket] Htoken Hptok [] Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsi Hindi". }
     { iEval (cbn [ilink_fl]). iExact "Hticket". }
@@ -6751,8 +6753,9 @@ Section ProofSysUnlinkBody.
                  Hkklt Hkklive Hnotself Hkknotdot (Hduq Htydz)
                  (conj Hz' (conj Hagree Hnm')) Htydz Hdplive HnlzF2a
                  HtyF2 HszF2 Hhzd Hhz' Hszcap
-                 with "Hetkd") as "[Htoken Hetkd]".
+                 with "Hetkd") as "[[Htoken Hptok] Hetkd]".
     iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Htoken".
+    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hptok".
     iDestruct (dir_links_unlink (bv_unsigned dinum) dnd (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
@@ -7102,7 +7105,7 @@ Section ProofSysUnlinkBody.
                  (su_setnl_type _ _) (su_setnl_size _ _) Hnlzi Hnl2za
                  Htyzi Hhzi Hszcapi (Hduqi Htyzi) Hnrec2i Hlv1i Hname1i Hpar
                  ltac:(intro Hc; exact (Hz1ne (eq_trans Hpar Hc)))
-                 with "Hetki") as "[Htokend Hetki]".
+                 with "Hetki") as "[[Htokend Hptokd] Hetki]".
     assert (Hmoidin : (mword_of_int (bv_unsigned dinum) : mword 32) = dinum)
       by (exact (su_moi32_id dinum)).
     destruct nw as [| c1]; [exfalso; lia |].
@@ -7117,7 +7120,7 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0))))
-              dnW bm' c1 (Sbw : gset Z) true (dlc_fl b2) pid
+              dnW bm' c1 (Sbw : gset Z) true (dlc_fl b2) None pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G4 (K - 30)%nat eb b lks
               (upd_upt V P1) ltac:(exact Kiupd) ltac:(intros _; exact Hibd16) Hgeom Hist0
@@ -7128,7 +7131,7 @@ Section ProofSysUnlinkBody.
               ltac:(exact (blkmap_wf_dir_len cov logstart bm' Hwf'))
               Hj Hgl HG4a0 Heb (Hlb "log"%string)
               with "Hcg Hown Htext Hdata Hpc Hpanenv Hbio Hlog Hidevd Hiinumd Hmetad
-                    [Haddrsd Hindd] Hsbi Hireg [Hdiatd] [Hticket2] Htokend []
+                    [Haddrsd Hindd] Hsbi Hireg [Hdiatd] [Hticket2] Htokend Hptokd []
                     Hpidq Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsd Hindd". }
     { iExact "Hdiatd". }
@@ -7466,7 +7469,8 @@ Section ProofSysUnlinkBody.
                        (sign_extend' 12 (mword_of_int 63 : mword 6))
                      : mword 64)) 31 0))))
               dni bmi c2 (Sb2 : gset Z) false
-              (Some (Some (bv_unsigned dinum))) pid
+              (Some (Some (bv_unsigned dinum)))
+              (FsStateInode.ent_par_val (bv_unsigned dinum) (dir_bname datd kk)) pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               C9 (K - 30)%nat eb b lks
               (upd_upt V P1) ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0 Hiblki
@@ -7476,7 +7480,7 @@ Section ProofSysUnlinkBody.
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
               with "Hcg Hown Htext Hdata Hpc Hpanenv Hbio Hlog Hidevi Hiinumi Hmetai
-                    [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket Hipar] Htoken []
+                    [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket Hipar] Htoken Hptok []
                     Hpidq Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsi Hindi". }
     { cbn [ilink_fl]. iSplitL "Hticket"; [iExact "Hticket" | iExact "Hipar"]. }

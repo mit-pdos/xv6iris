@@ -520,7 +520,7 @@ Proof. solve_inG. Qed.
    existentially bound in the bundle under [size P <= nlink] -- that bound
    is what makes a FREED inum's register empty again, so the next [mkdir]
    can install its own singleton. *)
-Definition fsParUR : ucmra := authUR (gmultisetUR Z).
+Definition fsParUR : ucmra := authUR (gmultisetUR (option Z)).
 Definition fsLinkElemUR : ucmra := prodUR (authUR natUR) fsParUR.
 Definition fsLinkUR : ucmra := gmapUR Z fsLinkElemUR.
 

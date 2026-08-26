@@ -2403,7 +2403,8 @@ Section EraRes.
     bv_unsigned (dir_inum data 1%nat) = t ->
     t <> i ->
     ent_toks Γ i (era_node dn bm data) -∗
-    link_tok Γ t ∗ ent_toks Γ i (era_node dn' bm data).
+    (link_tok Γ t ∗ par_tok Γ t None)
+    ∗ ent_toks Γ i (era_node dn' bm data).
   Proof.
     intros Hty Hsz Hnz Hz Htyd Hh Hb Hu Hnr Hlv Hnm Hin Hne.
     assert (Hents : dir_entries (era_node dn' bm data)
@@ -2450,7 +2451,9 @@ Section EraRes.
     blk_holes_zero bm data -> blk_holes_zero bm' data' ->
     bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     ent_toks Γ i (era_node dn bm data) -∗
-    link_tok Γ (bv_unsigned (dir_inum data k0))
+    (link_tok Γ (bv_unsigned (dir_inum data k0))
+     ∗ par_tok Γ (bv_unsigned (dir_inum data k0))
+         (ent_par_val i (dir_bname data k0)))
     ∗ ent_toks Γ i (era_node dn' bm' data').
   Proof.
     intros Hk0 Hlive Hne Hnd Hu Hzer Hty Hnz Hnz' Hty' Hsz Hh Hh' Hb.
@@ -2605,11 +2608,14 @@ Section EraRes.
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hlk with "H") as "[Ht Hback]".
     iEval (rewrite (ent_tok_ne Γ self false (dir_bname data k)
                       (bv_unsigned (dir_inum data k)) Hself eq_refl)) in "Ht".
+    (* the REGISTER unit stays inside the wand: the borrow is the counting
+       token alone, so licence (a)'s caller is unchanged by the register. *)
+    iDestruct "Ht" as "[Ht Hp]".
     iFrame "Ht". iIntros "Ht".
     iApply "Hback".
     iEval (rewrite (ent_tok_ne Γ self false (dir_bname data k)
                       (bv_unsigned (dir_inum data k)) Hself eq_refl)).
-    iExact "Ht".
+    iFrame "Ht Hp".
   Qed.
 
 End EraRes.

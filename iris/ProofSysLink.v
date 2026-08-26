@@ -1819,7 +1819,12 @@ Section ProofSysLinkBody.
                           pd pav pu bn g gfs gi cov logstart inodestart nib dev
                           (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None
                           (* pin = true: this site pays the TOKEN arm (§3.9) *)
-                          true pid
+                          (* the REGISTER unit's value is arbitrary here:
+                             [nameiparent] has not run, so the namer is not
+                             known yet -- the [dirlink] below re-values it
+                             ([IregLinkNz.ireg_par_revalue]). *)
+                          true None
+                          pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
                           (upd_upt V P2) ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
@@ -1860,7 +1865,7 @@ Section ProofSysLinkBody.
                 { rewrite /InodeRegion.ireg_link_pin. iExact "Hfrz". }
                 iIntros (CID41 Hq41 miu)
                   "%Hcsiu Hcg Hown Hpc Hpidq Hidev Hiinum Hmeta Hmap Hsbi Hdiat
-                   Hilink Htoken Hpin Hbs2 HopS".
+                   Hilink Htoken Hptok Hpin Hbs2 HopS".
                 (* at [pin = true] the premise that comes back IS the token,
                    by [InodeRegion.ireg_link_pin]'s own definition. *)
                 iEval (rewrite /InodeRegion.ireg_link_pin) in "Hpin".
@@ -2365,7 +2370,7 @@ Section ProofSysLinkBody.
                                kk (qq/2)%Qp (qq/2)%Qp gsh inum
                                (di_type (sl_incnl dn))
                                kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
-                               n2 Sb2 e0 pid (DfracOwn (1/4)) dqb dqs
+                               n2 Sb2 e0 _ pid (DfracOwn (1/4)) dqb dqs
                                m Ug sp0 K eb b lks bn1 bw2 bo2
                                (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
@@ -2382,7 +2387,7 @@ Section ProofSysLinkBody.
                                Hncd
                                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hropen Hslkk
-                                     Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hslkdd
+                                     Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hptok Hslkdd
                                      Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                      Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -2775,7 +2780,7 @@ Section ProofSysLinkBody.
                                  (di_type (sl_incnl dn))
                                  kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                  n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
-                                 pid (DfracOwn (1/4)) dqb dqs
+                                 _ pid (DfracOwn (1/4)) dqb dqs
                                  m mdl sp0 K eb b lks bn1 bw2 bo2
                                  (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                  ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
@@ -2794,7 +2799,7 @@ Section ProofSysLinkBody.
                                  Hncd
                                  with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hropen Hslkk
-                                       Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hslkdd
+                                       Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Htoken Hptok Hslkdd
                                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                        Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -2945,6 +2950,21 @@ Section ProofSysLinkBody.
                                       (mword_of_int (SL + 0xa0) : mword 64) 4
                                       = mword_of_int (SL + 0xa4)) by pcw.
                             iEval (rewrite Hppa4) in "Hpc".
+                            (* THE REGISTER UNIT IS RE-VALUED HERE, and this
+                               is the site the mechanism exists for: the [++]
+                               at +0x5e minted it before [nameiparent] named
+                               the directory, so it arrives unattributed and
+                               takes the namer's value at the deposit
+                               ([IregLinkNz.ireg_par_revalue], one
+                               mask-preserving step at this inum's slot). *)
+                            iApply fupd_wp.
+                            iMod (IregLinkNz.ireg_par_revalue ⊤ gi gfs
+                                    inodestart nib inum None
+                                    (FsStateInode.ent_par_val
+                                       (bv_unsigned dinum) (bname 14 nf))
+                                    ltac:(solve_ndisj) Hinb
+                                    with "Hireg Hptok") as "Hptok".
+                            iModIntro.
                             (* THE DEPOSIT.  The [ilink] the [++] minted at
                                +0x5e goes into the PARENT's ledger here,
                                caller-side (fs-icache.md 20.18 ruling 1 keeps
@@ -3009,8 +3029,9 @@ Section ProofSysLinkBody.
                                             Hdiok)))))
                                          (proj1 (proj2 (proj2 (proj2 (proj2
                                             Hdiok')))))
-                                         with "Hetkd [Htoken]") as "Hetkd'".
+                                         with "Hetkd [Htoken Hptok]") as "Hetkd'".
                             { iEval (rewrite -Hli) in "Htoken".
+                              iEval (rewrite -Hli) in "Hptok".
                               iApply (ent_tok_of_link (fs_gamma_L gfs)
                                         (bv_unsigned dinum)
                                         (fn_orphan (era_node dnd bmd datd))
@@ -3021,7 +3042,7 @@ Section ProofSysLinkBody.
                                               apply Hdnl0; apply bv_eq;
                                               rewrite Hc; vm_compute;
                                               reflexivity)
-                                        with "Htoken"). }
+                                        with "Htoken Hptok"). }
                             iDestruct (dlinks_intro with "Hdlnkd' Hetkd'")
                               as "Hdlnkd'".
                             (* THE MOVER (namei-pinned-lookup.md §9 W3,
@@ -3561,7 +3582,7 @@ Section ProofSysLinkBody.
                                       inum (di_type (sl_incnl dn))
                                       kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd' bmd'
                                       n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
-                                      pid (DfracOwn (1/4)) dqb dqs
+                                      _ pid (DfracOwn (1/4)) dqb dqs
                                       m mdl sp0 K eb b lks bn1 bw2 bo2
                                       (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
@@ -3582,7 +3603,7 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
                                             Hireg Hropen Hslkk Hslkd0 Hkeep Hru Hshr Hshot2
-                                            Hilink Htoken
+                                            Hilink Htoken Hptok
                                             Hslkdd Hdepd Hidevd Hiinumd
                                             Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd Hrud
                                             Hsbb
@@ -3653,7 +3674,7 @@ Section ProofSysLinkBody.
                              bmapstart inodestart nib size dev kk
                              (qq/2)%Qp (qq/2)%Qp gsh inum
                              (di_type (sl_incnl dn)) c2 Sb2
-                             pid (DfracOwn (1/4)) dqb dqs
+                             _ pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
                              (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
                              ltac:(exact Keo) K38 Kpop Hkk Hclog Hcist Hgeom
@@ -3666,7 +3687,7 @@ Section ProofSysLinkBody.
                              (sl_regs_s1 _ _ _ _ _ HT3regs) Hal Hncd
                              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hkeep Hru Hshr
-                                   Hshot2 Hilink Htoken Hsbb Hsbi Hbmres Hpidq Hprocs
+                                   Hshot2 Hilink Htoken Hptok Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
                                    Hdlk Hbsl HopS Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwdref Hofiles Hftok Hcont]").

@@ -1040,6 +1040,7 @@ Section ProofSysLinkTails.
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (u : nat) (Sb : gset Z)
+      (prv : option Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
@@ -1103,6 +1104,9 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L gfs) (bv_unsigned inum) -∗
+    (* ...and the PARENT REGISTER's unit beside it (durable-disk G2): the
+       two travel together, minted together and spent together. *)
+    FsStateLink.par_tok (fs_gamma_L gfs) (bv_unsigned inum) prv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
@@ -1144,7 +1148,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
            Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Hilink Htoken Hsbb Hsbi #Hbmres Hpid
+              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Hilink Htoken Hptok Hsbb Hsbi #Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1384,14 +1388,14 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart inodestart nib dev (ientry kk) inum
-              dn' dn bm u Sb true None pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
+              dn' dn bm u Sb true None prv pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               P4 (K - 38)%nat eb b lks
               Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
               Htynz Hdec Haddreq Hdirlen Hj Hgl HP4a0 Heb
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum Hmeta Hmap
-                    Hsbi Hireg Hdiat Hilink Htoken [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
+                    Hsbi Hireg Hdiat Hilink Htoken Hptok [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
                     Hop").
     { iLeft. iSplit; iPureIntro; assumption. }
     iIntros (CID9 Hq9 miu)
@@ -1709,6 +1713,7 @@ Section ProofSysLinkTails.
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
       (dnd : dinode) (bmd : blkmap)
       (n : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
+      (prv : option Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
@@ -1784,6 +1789,9 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L gfs) (bv_unsigned inum) -∗
+    (* ...and the PARENT REGISTER's unit beside it (durable-disk G2): the
+       two travel together, minted together and spent together. *)
+    FsStateLink.par_tok (fs_gamma_L gfs) (bv_unsigned inum) prv -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ic_tx_dep cn kd sd dev dinum gyd -∗
@@ -1839,7 +1847,7 @@ Section ProofSysLinkTails.
            Hcrb Hcru Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Htoken Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Htoken Hptok Hslkd
               Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -1930,13 +1938,13 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID3) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
+              kk qi s gy inum ty u1 Sb1 prv pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Htoken Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Htoken Hptok Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
@@ -1988,6 +1996,7 @@ Section ProofSysLinkTails.
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
       (dnd : dinode) (bmd : blkmap)
       (n : nat) (Sb : gset Z) (e0 : nat)
+      (prv : option Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
@@ -2062,6 +2071,9 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L gfs) (bv_unsigned inum) -∗
+    (* ...and the PARENT REGISTER's unit beside it (durable-disk G2): the
+       two travel together, minted together and spent together. *)
+    FsStateLink.par_tok (fs_gamma_L gfs) (bv_unsigned inum) prv -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ic_tx_dep cn kd sd dev dinum gyd -∗
@@ -2117,7 +2129,7 @@ Section ProofSysLinkTails.
            Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Htoken Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Htoken Hptok Hslkd
               Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -2228,13 +2240,13 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
+              kk qi s gy inum ty u1 Sb1 prv pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Htoken Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Htoken Hptok Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).

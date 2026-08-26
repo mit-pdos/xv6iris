@@ -79,10 +79,18 @@ Section Link.
      [i]", minted beside the entry TOKEN at every name record and returned
      with it.  Unconditional in [j]'s bundle -- it never asks what [i]'s
      type is. *)
-  Definition par_auth_elem (i : Z) (P : gmultiset Z) : fsLinkUR :=
+  (* THE VALUE IS AN [option Z]: [Some j] is "the NAME record of [j]",
+     [None] is "an up-pointing record" -- whose home is NOT a namer of this
+     inum, but which still holds one link and so must still hold one
+     register unit, or the [size P <= nlink] bound could not survive the
+     decrement that removes it. *)
+  Definition par_auth_elem (i : Z) (P : gmultiset (option Z)) : fsLinkUR :=
     {[ i := ((ε : authUR natUR), (● P : fsParUR)) ]}.
-  Definition par_tok_elem (i j : Z) : fsLinkUR :=
-    {[ i := ((ε : authUR natUR), (◯ {[+ j +]} : fsParUR)) ]}.
+  Definition par_toks_elem (i : Z) (P : gmultiset (option Z)) : fsLinkUR :=
+    {[ i := ((ε : authUR natUR), (◯ P : fsParUR)) ]}.
+
+  Definition par_tok_elem (i : Z) (v : option Z) : fsLinkUR :=
+    par_toks_elem i {[+ v +]}.
 
   (* "inum [i]'s on-disk record says [n] links".  Held by [inode_owned]. *)
   Definition link_auth Γ (i : Z) (n : nat) : iProp Σ :=
@@ -104,13 +112,75 @@ Section Link.
 
   (* "the inums holding a NAME record for [i] are among [P]" -- inum [i]'s
      OWN half of the parent register, carried by [i]'s bundle. *)
-  Definition par_auth Γ (i : Z) (P : gmultiset Z) : iProp Σ :=
+  Definition par_auth Γ (i : Z) (P : gmultiset (option Z)) : iProp Σ :=
     own (γlink Γ) (par_auth_elem i P).
 
   (* "[j] holds a name record for [i]" -- the fragment that rides beside
      the entry token of every NAME record in [j]. *)
-  Definition par_tok Γ (i j : Z) : iProp Σ :=
-    own (γlink Γ) (par_tok_elem i j).
+  Definition par_tok Γ (i : Z) (v : option Z) : iProp Σ :=
+    own (γlink Γ) (par_tok_elem i v).
+
+  (* a whole PILE of fragments at one key, as one resource -- the shape the
+     boot's routing splits and the "all at home" family below carries. *)
+  Definition par_toks Γ (i : Z) (P : gmultiset (option Z)) : iProp Σ :=
+    own (γlink Γ) (par_toks_elem i P).
+
+  Global Instance par_toks_timeless Γ i P : Timeless (par_toks Γ i P).
+  Proof. rewrite /par_toks. apply _. Qed.
+
+  Lemma par_toks_split Γ i P Q :
+    par_toks Γ i (P ⊎ Q) ⊣⊢ par_toks Γ i P ∗ par_toks Γ i Q.
+  Proof.
+    rewrite /par_toks /par_toks_elem -own_op singleton_op.
+    by rewrite -pair_op_2 -auth_frag_op.
+  Qed.
+
+  Lemma par_toks_one Γ i j : par_toks Γ i {[+ j +]} ⊣⊢ par_tok Γ i j.
+  Proof. done. Qed.
+
+  (* [n] copies of one value -- the shape the BOOT's per-inum pile takes,
+     where every unit comes from the one directory the image has. *)
+  Fixpoint par_reps (n : nat) (v : option Z) : gmultiset (option Z) :=
+    match n with 0%nat => ∅ | S m => {[+ v +]} ⊎ par_reps m v end.
+
+  Lemma par_reps_size n v : size (par_reps n v) = n.
+  Proof.
+    induction n as [| n IH]; [apply gmultiset_size_empty |].
+    simpl. rewrite gmultiset_size_disj_union gmultiset_size_singleton IH //.
+  Qed.
+
+  Lemma par_reps_add n m v :
+    par_reps (n + m) v = par_reps n v ⊎ par_reps m v.
+  Proof.
+    induction n as [| n IH]; [multiset_solver |].
+    simpl. rewrite IH. multiset_solver.
+  Qed.
+
+  (* take a PREFIX of a pile and drop the rest, [link_toks_le_split]'s twin *)
+  Lemma par_toks_le_split Γ i n k v :
+    (k <= n)%nat ->
+    par_toks Γ i (par_reps n v)
+    ⊢ par_toks Γ i (par_reps k v) ∗ par_toks Γ i (par_reps (n - k) v).
+  Proof.
+    intros Hle.
+    assert (Hn : n = (k + (n - k))%nat) by lia.
+    rewrite {1}Hn par_reps_add par_toks_split. done.
+  Qed.
+
+  (* ...and the LIST form the boot's routing walks *)
+  Lemma par_toks_list_at Γ i k v j :
+    par_toks Γ i (par_reps k v) ⊢ [∗ list] _ ∈ seq j k, par_tok Γ i v.
+  Proof.
+    revert j. induction k as [| k IH]; intros j; [iIntros "_"; done |].
+    replace (seq j (S k)) with (j :: seq (S j) k) by reflexivity.
+    rewrite big_sepL_cons.
+    simpl. rewrite par_toks_split. iIntros "[$ Ht]".
+    iApply (IH (S j) with "Ht").
+  Qed.
+
+  Lemma par_toks_list Γ i k v :
+    par_toks Γ i (par_reps k v) ⊢ [∗ list] _ ∈ seq 0 k, par_tok Γ i v.
+  Proof. exact (par_toks_list_at Γ i k v 0). Qed.
 
   Global Instance par_auth_timeless Γ i P : Timeless (par_auth Γ i P).
   Proof. rewrite /par_auth. apply _. Qed.
@@ -301,27 +371,47 @@ Section Link.
   (*  the one that lowers it.                                           *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_full_elem (i : Z) (n : nat) : fsLinkUR :=
-    link_auth_elem i n ⋅ link_tok_elem i n.
+  Definition par_full_elem (i : Z) (P : gmultiset (option Z)) : fsLinkUR :=
+    par_auth_elem i P ⋅ par_toks_elem i P.
 
-  Lemma link_full_elem_singleton i n :
-    link_full_elem i n
+  Definition link_full_elem (i : Z) (n : nat) (P : gmultiset (option Z)) : fsLinkUR :=
+    (link_auth_elem i n ⋅ link_tok_elem i n) ⋅ par_full_elem i P.
+
+  Lemma link_toks_full_singleton i n :
+    link_auth_elem i n ⋅ link_tok_elem i n
     ≡ {[ i := ((● n ⋅ ◯ n : authUR natUR), (ε : fsParUR)) ]}.
   Proof.
-    rewrite /link_full_elem /link_auth_elem /link_tok_elem singleton_op
-            -pair_op_1 //.
+    rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op_1 //.
   Qed.
 
-  Lemma link_full_elem_valid i n : ✓ link_full_elem i n.
+  Lemma par_full_elem_singleton i P :
+    par_full_elem i P
+    ≡ {[ i := ((ε : authUR natUR), (● P ⋅ ◯ P : fsParUR)) ]}.
+  Proof.
+    rewrite /par_full_elem /par_auth_elem /par_toks_elem singleton_op
+            -pair_op_2 //.
+  Qed.
+
+  Lemma link_full_elem_singleton i n P :
+    link_full_elem i n P
+    ≡ {[ i := ((● n ⋅ ◯ n : authUR natUR), (● P ⋅ ◯ P : fsParUR)) ]}.
+  Proof.
+    rewrite /link_full_elem link_toks_full_singleton par_full_elem_singleton
+            singleton_op -pair_op right_id left_id //.
+  Qed.
+
+  Lemma link_full_elem_valid i n P : ✓ link_full_elem i n P.
   Proof.
     rewrite link_full_elem_singleton. apply singleton_valid, pair_valid.
-    split; [| apply ucmra_unit_valid].
-    apply auth_both_valid_discrete. split; [apply nat_included; lia | done].
+    split.
+    - apply auth_both_valid_discrete. split; [apply nat_included; lia | done].
+    - apply auth_both_valid_discrete. split; [by apply gmultiset_included | done].
   Qed.
 
-  Lemma link_full_split Γ i n :
-    own (γlink Γ) (link_full_elem i n) ⊣⊢ link_auth Γ i n ∗ link_toks Γ i n.
-  Proof. rewrite /link_full_elem own_op //. Qed.
+  Lemma link_full_split Γ i n P :
+    own (γlink Γ) (link_full_elem i n P)
+    ⊣⊢ (link_auth Γ i n ∗ link_toks Γ i n) ∗ (par_auth Γ i P ∗ par_toks Γ i P).
+  Proof. rewrite /link_full_elem /par_full_elem !own_op //. Qed.
 
   Lemma link_auth_of_elem Γ i n :
     own (γlink Γ) (link_auth_elem i n) ⊣⊢ link_auth Γ i n.
