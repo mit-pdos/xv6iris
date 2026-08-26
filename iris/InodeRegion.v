@@ -73,20 +73,21 @@
                       marker, take the fragment.  The marker is what makes
                       that case analysis exhaustive.
 
-   ---- AND TWO MORE, FOR THE LINK LEDGER (§20.6, fs-sysfile S5f) ---------
+   ---- AND TWO MORE, FOR THE COUNT (§20.6, fs-sysfile S5f) --------------
 
-     [ireg_write_link]    mkdir's [".."] and sys_link's [ip->nlink++]:
-                          mint one [ilink] in the SAME ghost step as the
-                          count that pays for it, so the ledger's (L1) cap
-                          grows on both sides at once.
-     [ireg_write_unlink]  sys_unlink's [ip->nlink--], the ONLY nlink-
+     [ireg_write_link_reg]   mkdir's [".."] and sys_link's [ip->nlink++]:
+                          mint the TYPE REGISTER's fragments in the SAME
+                          ghost step as the count that pays for them
+                          (fs-state.md §6½ -- the count IS the fragment
+                          count).
+     [ireg_write_unlink_reg] sys_unlink's [ip->nlink--], the ONLY nlink-
                           LOWERING region write in the kernel: it CONSUMES
-                          one [ilink] as it lowers.  That is precisely why
+                          them as it lowers.  That is precisely why
                           the ordinary flush may demand [di_nlink_stable]
                           -- the one writer that would violate it does not
                           go through the ordinary flush at all.
 
-   THE LEDGER'S CLAUSES ARE (L1) AND (L3), stated in [ireg_link_ok] below
+   THE SURVIVING CLAUSES ARE (L3)/(L4)/(L5), stated in [ireg_link_ok] below
    and re-established by all six arm moves.  Since durable-disk lane G's
    slice 6b their ONE remaining payoff is [ireg_link_ok_free] ("at the
    instant an inode is freed nothing names it"), which is what makes the
@@ -405,11 +406,11 @@ Proof. intros H1 H2 Heq. lia. Qed.
    and [DirView.dir_ok_size_zero] ride on the zero size).
 
    THE NLINK CONJUNCT (design §20.18 ruling 1, the C1 layer).  The claim box
-   is the ONE record shape a caller may hold whose [nlink] the ledger has
-   never constrained from outside -- the fragment sits inside the region at
-   this arm and (L1) is discharged there from (L3) -- and create's COMMIT is
-   the first writer that has to say what that count IS: it mints one [ilink]
-   against [nlink 0 -> 1], and "the record I am flushing over has nlink 0"
+   is the ONE record shape a caller may hold whose [nlink] nothing outside
+   constrains -- and create's COMMIT is
+   the first writer that has to say what that count IS: it mints the
+   register's fragments against [nlink 0 -> 1], and "the record I am
+   flushing over has nlink 0"
    is exactly what makes the arithmetic a fact rather than a caller's claim.
    Free at the ONE producer ([SpecIalloc.ialloc_fresh_shape], where it is
    [reflexivity] over [memset]'s zero) and free at every consumer, which
@@ -1036,10 +1037,9 @@ Proof. right. reflexivity. Qed.
    the record it writes:
 
      the FIRST conjunct -- [nlink] does not MOVE.  Without it any holder
-     of [dinode_at] could lower [nlink] under an outstanding [ilink] and
-     (L1) would break; with it, "a fragment outstanding implies
-     [nlink >= 1]" is a theorem of the region rather than a survey of this
-     tree's callers.  It is an EQUALITY and not "does not fall", because
+     of [dinode_at] could lower [nlink] under an outstanding register
+     fragment; with it, "a fragment outstanding implies [nlink >= 1]" is a
+     theorem of the region rather than a survey of this tree's callers.  It is an EQUALITY and not "does not fall", because
      that is what every discharge site in the tree actually has: no writer
      that goes through the ordinary flush moves [nlink] at all, so
      [di_nlink_stable_refl] / [di_nlink_stable_free] take the equation as
@@ -1462,16 +1462,18 @@ Section InodeRegion.
     intros -> [H0 | [_ Hc]]; [exact H0 | exfalso; exact (Hc eq_refl)].
   Qed.
 
-  (* THE LINK LEDGER's PER-INUM CLAUSES (design §20.2's (L1)/(L3)).
+  (* THE PER-INUM RECORD CLAUSES (design §20.2's (L1)/(L3)).
 
-     (L1) [w <= di_nlink d] -- at most one live directory record per unit
-     of [nlink].  Its contrapositive is the whole point: an outstanding
-     [ilink z] forces [di_nlink >= 1] at the record the REGION holds, and
-     (L3) then forces a nonzero TYPE.  "A reference implies an allocated
-     inode" stops being a fact about this tree's callers.
+     (L1) [w <= di_nlink d] IS GONE with the ledger column [w] it bounded
+     (lane G6, fs-state.md §6½).  Its contrapositive was the whole point --
+     an outstanding ticket forced [di_nlink >= 1] at the record the REGION
+     holds -- and the type register says it directly instead
+     ([FsStateLink.link_auth_toks_le] at [ireg_lnk], read by
+     [IregLinkNz.ireg_tok_nz]).  (L3) still forces a nonzero TYPE from
+     there, so "a reference implies an allocated inode" is unchanged.
 
      (L3) [di_type d = 0 -> di_nlink d = 0] -- a free record's link count
-     is zero, which is what makes (L1) collapse to [w = 0] there:
+     is zero, which is what made (L1) collapse to [w = 0] there:
      **a free inode is named by no live directory record**, proved inside
      the region with no caller obligation at all.
 
@@ -1745,15 +1747,11 @@ Section InodeRegion.
      consumer of the body moves.  A SEPARATE conjunct beside [ireg_link_ok]
      rather than a fourth conjunct inside it, because that predicate has
      consumers all over the tree reading it by projection. *)
-  (* THE LEDGER'S [w] IS THE PAIR [(wl, wd)] SINCE V1, and (L1) and the root
-     clause are both applied AT THE SUM -- which is why neither predicate
-     moved and why no consumer of either outside this file did.  (T1) is the
-     third pure conjunct, beside them for their own reason. *)
-  (* SINCE THE FUSED V4+V5' INCREMENT the pure block carries FIVE clauses:
-     (L1) and the root clause at the ternary sum, (T1) at the d-SUM
-     [wdu + wdt], (T1') at [wl], and [ireg_par_ok] tying the register to
-     the tagged count.  Separate conjuncts throughout -- each mover
-     re-establishes exactly the ones its components move. *)
+  (* LANE G6: the pure block carries ONE clause, [ireg_link_ok].  Through
+     G5 it carried five -- (L1) and the root clause at the ledger's ternary
+     sum, (T1) at the d-sum, (T1') at [wl] and [ireg_par_ok] tying the
+     parent register to the tagged count -- and all five went with the
+     columns (fs-state.md §6½). *)
   (* OPTION A, STAGE 1b: the gate that demarcates the binary.  The current
      (free-under-lock) binary has NO off-lock free, so no slot is ever in the
      pending-free state; the reordered binary (Stage 3) redefines this to the
@@ -5080,20 +5078,13 @@ Section InodeRegion.
      re-argue.  The fragment travels to the [dirlink] that deposits it in
      the directory's payload.
 
-     FLAVOUR-INDEXED SINCE V1 (R6's [filled]-retrofit precedent), AND THE
-     INDEX WIDENED BY V5' to [option (option Z)]: [None] is the landed
-     mover verbatim -- same premises up to the one V4 adds, same payout,
-     and [ireg_write_link] below is that instance; [Some None] mints the
-     UNTAGGED [ilinkd] (V1's [Some tt]) and takes (T1) at the record it
-     writes; [Some (Some pv)] is the TAGGED mint -- create's +0xc4, the
-     one per-directory parent-record unit -- which allocates the parent
-     REGISTER at [pv] and pays out BOTH halves ([ilinkdp] and [iparent]).
-     Its legality premise is the pre-record's [nlink = 0] (the fresh
-     child), which collapses every count and forces [p = None] through
-     [ireg_par_ok] -- nothing is remembered from any earlier episode
-     (V5' Correction 1).
+     LANE G6 DELETED THE FLAVOUR INDEX (V1's [fl], widened by V5' to
+     [option (option Z)]) with the ledger it selected: it chose which of
+     [ilink]/[ilinkd]/[ilinkdp]+[iparent] the mint paid out and carried
+     three type premises for the choice.  The type register's fragments are
+     one shape, so the mover pays out one pile and takes none of them.
 
-     V4's PREMISE AT [fl = None]: a PLAIN mint must show its record is
+     WHAT V4'S DEAD PREMISE SAID: a PLAIN mint must show its record is
      NOT a directory, which is (T1')'s preservation -- and a walk-level
      fact at all three plain-minting sites (create's non-dir child,
      sys_link's file target).
@@ -5197,7 +5188,7 @@ Section InodeRegion.
        §3.9).  RULING A priced this as the pure left disjunct alone and IIIc
        proved that row FALSE at two of the mover's three sites: create's
        FRESH CHILD (whose pre-record's count is pinned at zero by
-       [fresh_shape]) and sys_link's [ip->nlink++] (no guard, no [ilink] in
+       [fresh_shape]) and sys_link's [ip->nlink++] (no guard, no fragment in
        hand -- namei's licence is borrowed and returned at the iget).  Every
        cheaper route was refuted there: no record fact and no count fact
        separates a fresh claim box from a mid-free box (that is §0's B1/B2
@@ -5418,9 +5409,9 @@ Section InodeRegion.
 
   (* [ip->nlink--; iupdate(ip)] -- sys_unlink's decrement, and THE ONLY
      nlink-LOWERING region write in the kernel (design §20.6).  It is the
-     dual of [ireg_write_link]: the drop is paid for by CONSUMING one
-     [ilink], so (L1) falls on both sides at once and no fragment is ever
-     left stranded above the count that backs it.
+     dual of [ireg_write_link_reg]: the drop is paid for by CONSUMING the
+     register's fragments, so no fragment is ever left stranded above the
+     count that backs it.
 
      This is exactly why [ireg_write_au] may demand [di_nlink_stable]: the
      one writer that would violate it does not go through the ordinary

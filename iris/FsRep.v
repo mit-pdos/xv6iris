@@ -12,14 +12,17 @@
 
       the NODE   [InodeRegion.dinode_at] (an exclusive [ghost_map Z dinode]
                  element) plus [InodeInv.inode_blocks];
-      the EDGES  [DirLinks.dir_links], verbatim -- **there is NO separate
-                 edge resource and none may be created** (§2(ii)).  The
-                 landed ticket says WHO IS POINTED AT ([dir_link_at]'s
-                 payload is [ilink (dir_inum data k)]); the (source, name)
-                 half is carried by the BYTES, i.e. by [fnode i (NDir
-                 ents)].  Out-edges are owned by the source node, which is
-                 exactly the fragment locality this layer wants, already
-                 paid for.
+      the EDGES  the payload's own entry units, verbatim -- **there is NO
+                 separate edge resource and none may be created**
+                 (§2(ii)).  The unit says WHO IS POINTED AT (and, since
+                 lane G5, what TYPE the target is); the (source, name) half
+                 is carried by the BYTES, i.e. by [fnode i (NDir ents)].
+                 Out-edges are owned by the source node, which is exactly
+                 the fragment locality this layer wants, already paid for.
+                 (Through G5 the carrier was [DirLinks.dir_links], the old
+                 flavoured ledger; lane G6 deleted it and the type register
+                 [FsStateInode.ent_toks] carries the same reading --
+                 design/fs-state.md §6½.)
 
     **NO NEW AUTHORITY, NO NEW GHOST NAME, NO NEW INVARIANT** (R3).  Three
     §20.9 death certificates cover every home a whole-tree authority could
@@ -45,24 +48,28 @@
     is a single [dirlookup] under one lock (R8), not a re-derivation of
     namex's postcondition.
 
-    Second consequence, from §20.9(h)/(i): the edge ticket keeps its grey
-    disjunct, so **an edge of [t] may point at a node that is not in [t]**.
-    [fs_closed] is false in general and is not defined here.
-    FRAGMENTS-WITH-HOLES is the only consistent top-level shape.
+    Second consequence, from §20.9(h)/(i): **an edge of [t] may point at a
+    node that is not in [t]** -- under the old ledger because the edge
+    ticket kept a GREY disjunct that asserted nothing, and under the type
+    register because a fragment says its target is allocated and typed, not
+    that the target is in this fragment of the tree.  [fs_closed] is false
+    in general and is not defined here.  FRAGMENTS-WITH-HOLES is the only
+    consistent top-level shape.
 
     ---- THE HEADLINE: §20.17.4's OWED FACT --------------------------------
 
-    sys_unlink's grey conversion (S7) has to know WHICH [ilink dp] to
-    convert, and the only one is inside [ip]'s [dir_links] at [ip]'s
-    [".."] record -- but [dir_link_at] is keyed by record INDEX and the
-    model has no invariant placing [".."] at index 1
-    (fs-icache.md:5270-5280: "§20.6's preservation table quietly assumes it
-    and nobody had noticed").  In the tree the fact is free and it is named
-    rather than positional: [fnode_dotdot] turns [ents !! ".." = Some dp]
-    into the RECORD INDEX dirlookup would stop at, live and naming [dp],
-    and a caller that holds [DirLinks.dir_links] can open it at that
-    index.  **[fnode_dotdot] is the clearest single place where the tree
-    layer pays for itself.**                                              *)
+    sys_unlink's [dp->nlink--] has to know WHICH unit at [dp] to spend, and
+    the only one is inside [ip]'s payload at [ip]'s [".."] record -- but a
+    payload's units are keyed by record INDEX and the model has no
+    invariant placing [".."] at index 1 (fs-icache.md:5270-5280: "§20.6's
+    preservation table quietly assumes it and nobody had noticed").  In the
+    tree the fact is free and it is named rather than positional:
+    [fnode_dotdot] turns [ents !! ".." = Some dp] into the RECORD INDEX
+    dirlookup would stop at, live and naming [dp], and a caller holding the
+    payload can open it at that index.  **[fnode_dotdot] is the clearest
+    single place where the tree layer pays for itself.**  (The kernel's own
+    walk does not go through it: since lane G5 rmdir reads (D1) off the
+    register's agreement instead -- fs-state.md §6½.)                      *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -175,17 +182,16 @@ Section FsRep.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  2.  THE EDGES -- [dir_links], VERBATIM                             *)
+  (*  2.  THE EDGES -- THE PAYLOAD'S OWN UNITS, VERBATIM                 *)
   (* ------------------------------------------------------------------ *)
 
-  (* NOTHING HERE ANY MORE (durable-disk lane G, slice 6f).  The tree layer
-     used to restate [DirLinks.dir_links] under the name [fedges], with an
-     accessor [fedges_acc] handing out one record's ticket.  Neither had a
-     consumer -- [fnode_dotdot] below supplies the index, but no proof in
-     the tree ever asked for the ticket -- so both are gone and the one
-     place that did need the resource ([FsLookup.wp_dirlookup_tree_body])
-     names [dir_links] outright.  The edge map itself belongs to the byte
-     layer and dies with the old link ledger (slice 6c). *)
+  (* NOTHING HERE ANY MORE (durable-disk lane G, slices 6f and 6c).  The
+     tree layer used to restate [DirLinks.dir_links] under the name
+     [fedges], with an accessor [fedges_acc] handing out one record's
+     ticket.  Neither had a consumer -- [fnode_dotdot] below supplies the
+     index, but no proof in the tree ever asked for the ticket -- so both
+     went at 6f, and the ledger they restated went at G6.  The edge map
+     itself belongs to the byte layer. *)
 
   (* ------------------------------------------------------------------ *)
   (*  3.  READING AN ENTRY OFF A DIRECTORY NODE                          *)
@@ -238,8 +244,8 @@ Section FsRep.
      owed for.  This is [fnode_ent] at [s := DOTDOT], stated on its own
      because the fact it delivers -- "[ip]'s parent link is the record at
      index [k], and that record is live and names [dp]" -- is the premise
-     S7 could not previously write down at all.  Open [DirLinks.dir_links]
-     at [k] and the [ilink dp] to convert is in hand. *)
+     S7 could not previously write down at all.  Open the payload's
+     [FsStateInode.ent_toks] at [k] and the unit at [dp] is in hand. *)
   Lemma fnode_dotdot (γi : gname) (γfs : fs_names) (ip dp : Z)
       (ents : gmap fname Z) :
     ents !! DOTDOT = Some dp ->

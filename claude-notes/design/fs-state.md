@@ -1603,6 +1603,21 @@ re-tagging, G3's `ups` counter, G4's `p`-column repair
 (`g4-superseded-ptie`).  `iris/FsParRefute.v` records why a
 type-conditional half in the parent's bundle cannot be stated.
 
+**ALL OF IT IS DEAD AS OF LANE G6**, whole tree green at the three-entry
+baseline.  `DirLinks.v` and `IregDirBit.v` are off `_CoqProject` (sources
+kept, headers pointing here); `IcacheEscrow.dlinks` is
+`FsStateInode.ent_toks_x` alone; `Xv6Cameras.linkElemUR0` is `c`/`r` and
+`IcacheRef`'s element `c`/`r`/`f`/`rc`; `ilink`/`ilinkd`/`ilinkdp`/
+`iparent`/`igrey`/`ilink_fl` and `DirView.dlc_*` are deleted, and with them
+`InodeRegion`'s (L1), (T1) `ireg_dir_ok`, (T1') `ireg_dir_wl0`,
+`ireg_par_ok` and `ireg_link_grey`; `SpecIupdate`'s two link bodies lost the
+`fl` parameter and the three flavour premises (`InodeRegion.ireg_write_link_fl`
+/`_unlink_fl` are `ireg_write_link_reg`/`_unlink_reg`); the boot's stage-B
+mint (`IcacheBoot.link_boot_mint_w`) and its two image premises went with
+them.  `iris/FsBootWall.v` is CLOSED — the wall it recorded was exactly
+these objects.  The two pure `mword 16` increment facts `DirLinks` happened
+to hold live on as `InodeRegion.nlink_add1_le`/`_nz_eq`.
+
 ## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
 
 Five files, 1687 lines, all in `iris/_CoqProject` after `BitmapEnc.v`:

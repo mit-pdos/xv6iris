@@ -2578,7 +2578,9 @@ so it never wanted that shape.
   notes another session landed); the `P_log`/`P_fs` split as two
   ordinary invariants if wanted (the crash predicate slims to the WAL's
   half; `P_fs` an `inv` over immortal gnames); any further local clauses.
-- [ ] **Lane G — cleanups (independent, run in the gaps).**  The
+- [ ] **Lane G — cleanups (independent, run in the gaps).**  THE
+  DEMOLITION (slices 6b–6f) IS DONE at G6; what is left of this item is
+  the three NON-ledger cleanups listed below and nothing else.  The
   demolition slices 6b–6f of the old link ledger (`DirLinks.v` 2009
   lines, `IcacheRef`'s five columns, `IregLinkNz.v`, the `fl` index,
   `FsRep.fedges`; 6c's rmdir question is RULED — fs-state.md §6½: the
@@ -3032,6 +3034,96 @@ so it never wanted that shape.
     `FsDurBytes.v` STAYS (`FsDurImg`/`FsCrash` import it).  `DirLinks.v`
     cannot go before `IcacheEscrow.dlinks` loses its conjunct, and that
     single edit is what unblocks `FsBootWall`'s (a)/(b)/(c).
+
+  **AS LANDED — G6: THE DEMOLITION, IN FULL.  GREEN (branch
+  `lane-g6-demolition`, whole `iris/` tree; `make audit-only` at the
+  THREE-ENTRY BASELINE -- `resv_matches`, `resv_is_valid`,
+  `functional_extensionality_dep` -- and nothing else).  SLICE 6 IS DONE;
+  what remains of Lane G is the three cleanups that were never about the
+  ledger -- the `eo_minst`/`lm_install` unification, the 2c-img lemma
+  relocations, and `FsBoot.fs_boot_bundle` (still caller-less).**
+
+  Slice 6's deletion list was taken as written and every item is out.  What
+  is worth knowing is the ONE ordering fact the list did not say and the
+  three places where a reading had to be re-derived rather than deleted.
+
+  - **THE FIVE SLICES ARE ONE CHECKPOINT, and the forcing edge is not the
+    one G4 named.**  G4 said 6c and 6d/6e cannot be split; the reason is
+    narrower and it is `ProofSysUnlink`'s rmdir arm.  `SpecIupdate`'s `fl`
+    resource at that site is SOURCED from `DirLinks.dir_links_dotdot_out`
+    (`ProofSysUnlink.v`, the `Hdotacc`/`Hticket2` pair), so slice 1 cannot
+    drop `dir_links` unless slice 3 has already dropped `fl`; and slice 3
+    cannot drop `fl` without slice 4, because `ireg_write_unlink_fl` must
+    LOWER `wl+wdu+wdt` to keep (L1) across an `nlink--` and has no fragment
+    to spend once the payout is gone.  So the order in the brief is a
+    reading order, not a landing order: one commit, or none.
+  - **THREE READINGS WERE RE-DERIVED, not deleted.**
+    (i) rmdir's child count.  `DirLinks.dir_links_empty_nlink` gave
+    `nlink ip <= 1` off `DirView.dlc_bound`; the replacement is
+    `FsStateEra.ent_dset_ok_dots_only` (new, 20 lines) -- a dots-only
+    directory's entry map has only the two dot names, `ent_dset_ok` admits
+    neither, so its marker set is `∅` and `node_exact` reads `nlink = 1`
+    directly.  `dir_dots_only dni dati` is already a premise of the arm.
+    (ii) create's fail-arm orphan re-park and sys_unlink's.  Both used
+    `ireg_link_grey`'s free mint because the old ledger demanded a ticket
+    for an orphan's live `".."`; an orphan's `".."` is TOKENLESS
+    (`ent_tokenless`), so both arms now re-park with
+    `FsStateEra.ent_toks_era_dots_only` and owe nothing.  §20.18 ruling 2's
+    permanent cost (the `g` column can never carry information) is retired
+    with the column.
+    (iii) rmdir's root refutation is no longer NEEDED.  `IregLinkNz.
+    ireg_tok_root_le` was spent only to discharge `dir_par_tie`'s root
+    exclusion; (D1) comes off `ireg_toks_agree` with no root case at all.
+    The lemma stays (it is the register's own reading); its one caller went.
+  - **Contracts whose statement changed:** `IcacheEscrow.dlinks`
+    (= `ent_toks_x` alone) and `dlinks_open`/`dlinks_intro`/`dlinks_not_dir`/
+    `dlinks_size_zero`; `SpecIupdate.wp_iupdate_link_body`/`_unlink_body`
+    and `ProofIupdate.iu_step_link`/`_unlink` (the `fl` parameter and its
+    three flavour premises out, nine call sites);
+    `InodeRegion.ireg_write_link_fl`/`_unlink_fl` renamed
+    `ireg_write_link_reg`/`_unlink_reg`; `InodeRegion.ireg_link_ok` (`w`
+    and (L1) out), `ireg_rcol`, `ireg_slot`, `ireg_slot_intro`,
+    `ireg_link_pin_read`, `IgetLic.iname_not_frozen`/`iname_mint_ok`;
+    `IcacheRef.link_auth`/`lelem*`/`link_agree` (the last reports `r`
+    alone) and the six `link_*` mint/spend laws for the dead columns;
+    `IcacheBoot.ireg_alloc` (the `W` parameter and two image premises out);
+    `FsCfgBoot.image_ireg_premises`.  `ProofCreate`'s three fail/continue
+    bodies (`cr_cont_body`, `cr_fail_body`, `cr_fail_mkdir_body`) and
+    `ProofSysLinkTails`' three tails each lost one `ilink_fl`/`ilink`
+    premise.
+  - **Deleted outright:** `iris/DirLinks.v` (2009 lines) and
+    `iris/IregDirBit.v` (276) off `_CoqProject`, sources kept with headers
+    pointing at fs-state.md §6½; `DirView`'s whole count-clause block
+    (`dcnt`, `dlc_*`, 540 lines, to EOF); `FsCfgBoot.dir_links_of_tickets`/
+    `_of_image`/`_of_region` and `image_link_premises`;
+    `IcacheBoot.link_mint_pile`/`link_boot_mint_w`/`image_link_le`/
+    `image_dir_wl0`; `InodeRegion.ireg_dir_ok*`/`ireg_dir_wl0*`/
+    `ireg_par_ok*`/`ireg_sum_zero*`/`ireg_link_ok_free`/`ireg_link_grey`;
+    `IregLinkNz.dir_link_at_nlink_drop`/`dir_links_nlink_drop`/
+    `dl_root_ireg_root`/`dl_root_ROOTINO`;
+    `ProofSysUnlinkParts`' `ProofSysUnlinkOrphan` section;
+    `ProofCreate.cr_grey_links`/`cr_grey_dir_links`.  The two pure
+    `mword 16` increment facts `DirLinks` happened to carry live on as
+    `InodeRegion.nlink_add1_le`/`nlink_add1_nz_eq`.
+  - **`FsBootWall.v` IS CLOSED** and restated as the record of a wall that
+    no longer exists: its two theorems quantified over `dlc_bound` and
+    `ireg_dir_wl0` and are deleted with them, and the header now says what
+    the boot builds INSTEAD (`FsCfgBoot.ent_toks_of_region` + `FsDurImg`
+    §9's single value function `fv`).  The file stays in `_CoqProject` as a
+    comment-only module.
+  - **Footprint, measured on this branch:** `IcacheRef` 100 `lelem*` sites,
+    `InodeRegion` ~240 column sites, and FIVE files outside the brief's list
+    that destructure `ireg_slot` and therefore had to move mechanically:
+    `IcacheInv` (5 patterns), `FsCollect` (4), `IgetLic` (3),
+    `IregLinkNz` (4), `EscrowDeposit` (1), `FsCollectAll` (1).  Nothing in
+    `FsCollect*` changed but arity.
+  - **LEFT BEHIND, deliberately:** the tree still has ~35 files whose PROSE
+    names `dir_links` / `ilinkd` / `dlc_bound` / (T1) in explanatory
+    comments.  The headers that state a LIVE mechanism were rewritten
+    (`IcacheRef`, `InodeRegion`, `IcacheEscrow`, `SpecIupdate`, `IcacheBoot`,
+    `FsCfgBoot`, `DirLinks`, `IregDirBit`, `FsBootWall`); the rest are
+    historical asides in walk files and are cheap to sweep when someone is
+    next in them.
 
 ## Sizing notes for whoever runs the lanes
 

@@ -964,8 +964,10 @@ share of an open transaction's element.
 
 `icfg_iref` (reference mass), `icfg_live` (live/generation cells + the
 reserved-key freeze selectors), `icfg_ptrn` (the pool's TRANSIT LEDGER,
-C-4, beside `icfg_pext` and in the same two places), `icfg_link` (THE link
-ledger, §3b),
+C-4, beside `icfg_pext` and in the same two places), `icfg_link` (THE
+inode-reference element — claim / reference / claim-reference / freeze,
+§3b; through lane G5 it also carried the link ledger, which the type
+register at `fs_link γfs` replaced),
 `icfg_log`/`icfg_ist` (the log's names and the region's first block),
 `icfg_iep : Z → gname` (record epochs), `icfg_isl : nat → gname` (per-slot
 sleeplocks), `icfg_boot` (the boot one-shot), `icfg_reg` (the option-A
