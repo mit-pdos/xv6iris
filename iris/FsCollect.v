@@ -1551,7 +1551,7 @@ Section Collect.
   Proof.
     intros Hrec. rewrite /ireg_lnk /ireg_lnk_at /ireg_par /ireg_nl -Hrec
       /fn_nlink.
-    iIntros "(Hla & Hkp & (%P & Hpa & %Hsz)) Hte". iFrame "Hkp".
+    iIntros "(Hla & Hkp & (%P & Hpa & %Hsz & _ & _)) Hte". iFrame "Hkp".
     iExists P. iSplitR; [by iPureIntro |].
     iApply (inode_link_pack (fs_gamma_L γfs) i n P with "Hla Hpa Hte").
   Qed.

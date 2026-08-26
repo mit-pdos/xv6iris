@@ -5415,6 +5415,9 @@ Section ProofSysUnlinkBody.
               Hiblogi Hinb (su_setnl_type_stable dni _)
               ltac:(rewrite su_setnl_type; exact Htynzi0)
               ltac:(exact Hdecr)
+              (* (U2): the file arm's target is not a directory, so (U1)
+                 says it carries no up-pointing namer at all. *)
+              ltac:(intros j _; right; exact Htynzi)
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
               with "Hcg Hown Htext Hdata Hpc Hpanenv Hbio Hlog Hidevi Hiinumi Hmetai
@@ -7127,6 +7130,9 @@ Section ProofSysUnlinkBody.
               Hdiblk Hdiblog Hdinb (su_setnl_type_stable dnW _)
               ltac:(rewrite su_setnl_type Hty'v Htydz; unfold T_DIR_z; lia)
               ltac:(rewrite su_setnl_nlink; exact HdecrW)
+              (* (U2): this decrement spends the CHILD's up-pointing unit,
+                 which is [None] -- no name is retired here. *)
+              ltac:(intros j Hc; discriminate Hc)
               ltac:(rewrite su_setnl_addrs; exact Haddr'v)
               ltac:(exact (blkmap_wf_dir_len cov logstart bm' Hwf'))
               Hj Hgl HG4a0 Heb (Hlb "log"%string)
@@ -7477,6 +7483,9 @@ Section ProofSysUnlinkBody.
               Hiblogi Hinb (su_setnl_type_stable dni _)
               ltac:(rewrite su_setnl_type; exact Htynzi0)
               ltac:(exact Hdecr)
+              (* (U2): rmdir takes the child to ZERO -- [isdirempty]
+                 refused a non-empty one, so its only link was its name. *)
+              ltac:(intros j _; left; exact Hnl2za)
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
               with "Hcg Hown Htext Hdata Hpc Hpanenv Hbio Hlog Hidevi Hiinumi Hmetai

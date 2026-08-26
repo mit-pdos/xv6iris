@@ -250,6 +250,11 @@ Section IupdateDefs.
        fl = Some od -> bv_unsigned (di_type dn) = ireg_dir_ty) ->
     (fl = None -> bv_unsigned (di_type dn) <> ireg_dir_ty) ->
     (forall pv : Z, fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
+    (* ...and the UP-POINTING MINT's, relayed the same way
+       ([InodeRegion]'s (U1)/(U2)): an unattributed [None] unit is minted
+       only by mkdir's [dp->nlink++], at a live directory. *)
+    (prv = None -> bv_unsigned (di_type dn) = ireg_dir_ty
+                   /\ bv_unsigned (di_nlink dn0) <> 0) ->
     ireg_inv γi γfs inodestart nib -∗
     (* THE FREEZE-PIN PREMISE, RULING A-prime's two-armed form
        (iclaim-ledger.md §3.9), relayed straight to the mover: either the
@@ -264,7 +269,7 @@ Section IupdateDefs.
          prv ∗
        ireg_link_pin pin (bv_unsigned inum) dn0).
   Proof.
-    intros Hnib Hdnwf Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp.
+    intros Hnib Hdnwf Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp Hup.
     iIntros "#Hireg Hpin" (ds) "%Hdswf Hdn".
     (* nlink RISES here, so the receipt is vacuous at the written record
        and the anchor is the unit -- the same one adapter line the ordinary
@@ -273,7 +278,7 @@ Section IupdateDefs.
     iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn
               (diblk_bytes ds) fl pin prv
               ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hbump Hgrd
-              Hfl Hnfl Hflp
+              Hfl Hnfl Hflp Hup
               with "Hireg Hdn Hpin").
   Qed.
 
@@ -305,6 +310,11 @@ Section IupdateDefs.
     bv_unsigned (di_type dn) <> 0 ->
     di_type_stable dn dn0 ->
     bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
+    (* ...and the NAME-DROP's, relayed ([InodeRegion]'s (U2)): retiring a
+       NAME unit at a node that stays live has to leave a name behind. *)
+    (forall j : Z, prv = Some j ->
+       bv_unsigned (di_nlink dn) = 0
+       \/ bv_unsigned (di_type dn0) <> ireg_dir_ty) ->
     ireg_inv γi γfs inodestart nib -∗
     ilink_fl fl (bv_unsigned inum) -∗
     (* THE COUNTING RA's UNIT, COMING BACK (durable-disk 2b-inode-5): the
@@ -319,12 +329,12 @@ Section IupdateDefs.
     iu_region_step γ γfs γi inodestart inum dn dn0 e0
       (dinode_at γi inum dn).
   Proof.
-    intros Hnib Hdnwf Hnz Hstab Hnl.
+    intros Hnib Hdnwf Hnz Hstab Hnl Hnm.
     iIntros "#Hireg Hfrag Htok Hptok Hrc" (ds) "%Hdswf Hdn".
     rewrite /iu_region_au.
     iMod (ireg_write_unlink_fl ⊤ γi γfs inodestart nib inum dn0 dn
             (diblk_bytes ds) fl prv
-            ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hnl
+            ltac:(solve_ndisj) Hnib Hdnwf Hnz Hstab Hnl Hnm
             with "Hireg Hdn Hfrag Htok Hptok")
       as (rec_old v) "(%Hlr & Hrun & #Hvlb & Hcl)".
     iEval (rewrite FsBytesGamma.gamma_byte_range) in "Hrun".
@@ -2257,7 +2267,7 @@ Qed.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hfl Hnfl
-           Hflp Hbump Hgrd
+           Hflp Hup Hbump Hgrd
            Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
@@ -2272,7 +2282,7 @@ Qed.
     (* THE ONE SUBSTITUTION *)
     iPoseProof (iu_step_link γ γfs γi inodestart nib inum dn dn0 e0 fl pin prv Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd
-                  Hfl Hnfl Hflp
+                  Hfl Hnfl Hflp Hup
                   with "Hireg Hpin") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
@@ -2326,7 +2336,8 @@ Qed.
                              prv pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iupdate_unlink_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hda Hdirlen
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hnm
+           Hda Hdirlen
            Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
@@ -2342,7 +2353,7 @@ Qed.
       as "#Hcrd".
     (* THE ONE SUBSTITUTION *)
     iPoseProof (iu_step_unlink γ γfs γi inodestart nib inum dn dn0 e0 fl prv Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl Hnm
                   with "Hireg Hlink Htok Hptok Hrc") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat

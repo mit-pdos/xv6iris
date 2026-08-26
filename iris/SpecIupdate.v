@@ -908,6 +908,16 @@ Definition wp_iupdate_link_body
   (fl = None -> bv_unsigned (di_type dn) <> InodeRegion.ireg_dir_ty) ->
   (forall pv : Z,
      fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
+  (* THE UP-POINTING MINT'S PREMISE (durable-disk G3; [InodeRegion]'s (U1)
+     and (U2), which is where S7-unlink's (D2) now comes from).  An
+     UNATTRIBUTED register unit -- [prv = None] -- is what a [".."] record
+     carries, and exactly one flush in the kernel mints one: mkdir's
+     [dp->nlink++], paying for the fresh child's up-pointing record.  Both
+     halves are free there and nowhere else is the premise non-vacuous:
+     create's fresh-child mint and sys_link's [ip->nlink++] both fix a
+     [Some]. *)
+  (prv = None -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty
+                 /\ bv_unsigned (di_nlink dn0) <> 0) ->
   (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
      the count by exactly one, and that one unit is what pays for the
      [ilink] the post hands out (§20.6's mkdir/sys_link rows).
@@ -1132,6 +1142,17 @@ Definition wp_iupdate_unlink_body
      invariant already bounded.  Matching the shapes would buy symmetry
      and cost the landed consumer a re-thread, so it is not done. *)
   bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
+  (* THE NAME-DROP'S PREMISE (durable-disk G3; [InodeRegion]'s (U2)).
+     Retiring a NAME unit -- [prv = Some j] -- at a record that stays LIVE
+     has to leave a name behind, and the two shapes this kernel has both
+     make it evident at the call site: a FILE loses one of several names
+     (not a directory, so (U1) says it carries no up-pointing namer at
+     all), or a DIRECTORY loses its only name and dies with it (rmdir,
+     whose [isdirempty] refused a non-empty one).  [dp->nlink--] spends a
+     [None] and pays nothing. *)
+  (forall j : Z, prv = Some j ->
+     bv_unsigned (di_nlink dn) = 0
+     \/ bv_unsigned (di_type dn0) <> InodeRegion.ireg_dir_ty) ->
   di_addrs dn = bm_cells bm ->
   length (bm_dir bm) = NDIRECT ->
   (j < NPROC)%nat ->

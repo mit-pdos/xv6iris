@@ -2098,7 +2098,8 @@ Section FsCfgBootEra.
     fsimg_wf P sb = true ->
     fs_links_full (fs_link γfs) (img_nodes P sb nib) (img_par P sb) -∗
     ([∗ set] z ∈ region_inums nib,
-       ireg_lnk_at γfs z (fn_nlink (img_node P sb z)))
+       ireg_lnk_at γfs z (fn_nlink (img_node P sb z))
+         (bv_unsigned (di_type (fs_dinode P sb z))))
     ∗ ([∗ set] z ∈ region_inums nib,
          [∗ list] _ ∈ seq 0 (fs_link_count P sb z),
            (FsStateLink.link_tok (fs_gamma_L γfs) z
@@ -2159,7 +2160,25 @@ Section FsCfgBootEra.
           [iExact "Htk" | iClear "Htk"; done].
       + iExists (FsStateLink.par_reps (fn_nlink (img_node P sb z))
                    (Some ROOTINO)).
-        iFrame "Hpa". iPureIntro. rewrite FsStateLink.par_reps_size. lia.
+        (* (U1) AND (U2) ARE FREE AT AN IMAGE (InodeRegion): every unit the
+           image's register carries names the ROOT, so the pile holds NO
+           up-pointing namer at all -- [ireg_ups = 0] -- and both clauses
+           collapse to arithmetic.  W9's (T) is what makes it so: a
+           well-formed image has one directory and its two dot records are
+           SELF records that bear no unit. *)
+        assert (Hups : InodeRegion.ireg_ups
+                         (FsStateLink.par_reps (fn_nlink (img_node P sb z))
+                            (Some ROOTINO)) = 0%nat).
+        { rewrite /InodeRegion.ireg_ups.
+          generalize (fn_nlink (img_node P sb z)) as k. intro k.
+          induction k as [| k IH]; [rewrite multiplicity_empty // |].
+          cbn [FsStateLink.par_reps]. rewrite multiplicity_disj_union
+            (multiplicity_singleton_ne None (Some ROOTINO)
+               ltac:(discriminate)) IH //. }
+        iFrame "Hpa". iPureIntro. rewrite Hups. split_and!.
+        * rewrite FsStateLink.par_reps_size. lia.
+        * intros _. reflexivity.
+        * intros Hnz. lia.
     - rewrite big_sepL_sep.
       iSplitL "Htc"; [iApply (FsStateLink.link_toks_list with "Htc") |].
       iApply (FsStateLink.par_toks_list with "Hpt").

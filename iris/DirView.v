@@ -970,6 +970,37 @@ Definition dir_dots_ix (self : Z) (dn : dinode)
     /\ dir_live data 1
     /\ bname 14 (dir_name data 1) = dotdot_name.
 
+(* ---- A NAME A LOOKUP MISSED IS NEITHER DOT NAME (durable-disk G3) ----
+   [InodeRegion]'s (U1)/(U2) price a register unit at [None] -- the value an
+   UP-POINTING record carries -- so both walks that DEPOSIT a name record
+   ([create]'s and [sys_link]'s) owe "the name I am about to write is not a
+   dot name".  Neither has to look: the deposit only happens on the arm
+   where [dirlookup] MISSED over the whole record range, and a live
+   directory's records 0 and 1 ARE the two dot names.  The kernel agrees --
+   xv6's [create] returns the existing inode and its [dirlink] returns -1. *)
+Lemma dir_dots_miss_not_dots (self : Z) (dn : dinode)
+    (data : nat -> list (bv 8)) (s : list (bv 8)) :
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  bv_unsigned (di_nlink dn) <> 0 ->
+  dir_dots_ix self dn data ->
+  dir_first data (dir_nrec (bv_unsigned (di_size dn))) s = None ->
+  s <> dot_name /\ s <> dotdot_name.
+Proof.
+  intros Hty Hnl Hddix Hnone.
+  destruct (Hddix Hty Hnl) as (Hn2 & Hlv0 & _ & Hnm0 & Hlv1 & Hnm1).
+  pose proof (proj1 (dir_first_None data
+                       (dir_nrec (bv_unsigned (di_size dn))) s) Hnone) as Hm.
+  split; intro Hc.
+  - apply (Hm 0%nat); [lia |].
+    unfold dir_match. split.
+    + exact Hlv0.
+    + rewrite Hnm0. rewrite Hc. reflexivity.
+  - apply (Hm 1%nat); [lia |].
+    unfold dir_match. split.
+    + exact Hlv1.
+    + rewrite Hnm1. rewrite Hc. reflexivity.
+Qed.
+
 (* the record count is monotone in the size, which is all a dirlink ever
    does to it ([cr_wi_size_max]: [di_size dn' = Z.max (di_size dn) …]) *)
 Lemma dir_nrec_mono (sz sz' : Z) :

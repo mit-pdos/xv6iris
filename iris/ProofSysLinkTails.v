@@ -1392,7 +1392,11 @@ Section ProofSysLinkTails.
               P4 (K - 38)%nat eb b lks
               Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
-              Htynz Hdec Haddreq Hdirlen Hj Hgl HP4a0 Heb
+              Htynz Hdec
+              (* (U2): [ip] is not a directory -- sys_link's ARM C refused
+                 [T_DIR] and [ity_shot_agree] pinned the type. *)
+              ltac:(intros j _; right; exact Hnotdir)
+              Haddreq Hdirlen Hj Hgl HP4a0 Heb
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum Hmeta Hmap
                     Hsbi Hireg Hdiat Hilink Htoken Hptok [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2

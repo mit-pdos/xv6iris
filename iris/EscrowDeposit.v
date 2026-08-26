@@ -302,8 +302,14 @@ Section EscrowDeposit.
     assert (Hlnkeq : bv_unsigned (di_nlink dn')
                      = bv_unsigned (di_nlink (ds !!! islot inum)))
       by (rewrite Hdeq Hnl0 Hnl0'; reflexivity).
-    iDestruct (ireg_lnk_stable γfs (bv_unsigned inum) (ds !!! islot inum) dn'
-                 Hlnkeq with "Hlnk") as "Hlnk".
+    (* the free deposit is one of the kernel's two TYPE writes, and it
+       stands at [nlink = 0] on both sides -- where the register is empty
+       and [InodeRegion]'s (U1)/(U2) are vacuous at any type at all. *)
+    assert (Hnl0d : bv_unsigned (di_nlink (ds !!! islot inum)) = 0)
+      by (rewrite Hdeq0; exact Hnl0).
+    iDestruct (ireg_lnk_free_retype γfs (bv_unsigned inum)
+                 (ds !!! islot inum) dn' Hnl0d Hnl0'
+                 with "Hlnk") as "Hlnk".
     iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".

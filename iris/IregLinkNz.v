@@ -138,12 +138,16 @@ Section IregLinkNz.
       (inodestart : Z) (nib : nat) (inum : bv 32) (v w : option Z) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
+    (* the move may not CREATE an up-pointing namer ([InodeRegion]'s (U1)/
+       (U2)): sys_link's is the only re-valuation in the kernel and it goes
+       the other way, onto the [Some dp] the deposited NAME record fixes. *)
+    (w = None -> v = None) ->
     ireg_inv γi γfs inodestart nib -∗
     FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v
     ={E}=∗
     FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) w.
   Proof.
-    iIntros (HE Hin) "#Hinv Hfrag".
+    iIntros (HE Hin Hwv) "#Hinv Hfrag".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -160,7 +164,9 @@ Section IregLinkNz.
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iMod (ireg_lnk_par_move γfs (bv_unsigned inum)
-            (ireg_nl (ds !!! islot inum)) v w with "Hlnk Hfrag")
+            (ireg_nl (ds !!! islot inum))
+            (bv_unsigned (di_type (ds !!! islot inum))) v w Hwv
+            with "Hlnk Hfrag")
       as "[Hlnk Hout]".
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }

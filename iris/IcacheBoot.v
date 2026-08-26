@@ -962,7 +962,8 @@ Section IcacheBootRegion.
        [FsState.fs_boot_alloc_full]'s and only its [own_alloc] can hand it
        over.  Nothing is outstanding at boot, so the family's validity is
        free and no image sweep is spent on it. *)
-    ([∗ set] z ∈ region_inums nib, ireg_lnk_at γfs z (N z)) -∗
+    ([∗ set] z ∈ region_inums nib,
+       ireg_lnk_at γfs z (N z) (bv_unsigned (di_type (D z)))) -∗
     (* THE COUNT COUPLING's REGION HALVES (iclaim-ledger.md §2.2), one per
        inum and all at ZERO -- boot caches no inode.  A PREMISE for the
        ledger's own reason: the gname is the ambient class's, so only the
@@ -1122,8 +1123,10 @@ Section IcacheBootRegion.
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
       iIntros "[[[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir] Hlnk] Htop]".
       iEval (rewrite /ireg_top_boot (Hrecat z Hz)) in "Htop".
-      iDestruct (ireg_lnk_of_at γfs z (N z) (image_dinode dss z)
-                   (Hlnkat z Hz) with "Hlnk") as "Hlnk".
+      iDestruct (ireg_lnk_of_at γfs z (N z) (bv_unsigned (di_type (D z)))
+                   (image_dinode dss z)
+                   (Hlnkat z Hz) ltac:(rewrite (Hrecat z Hz); reflexivity)
+                   with "Hlnk") as "Hlnk".
       assert (Hok : ireg_link_ok (image_dinode dss z) (W z + 0 + 0)).
       { pose proof (Hl1 z Hz).
         split_and!;

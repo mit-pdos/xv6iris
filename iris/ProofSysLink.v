@@ -1819,11 +1819,18 @@ Section ProofSysLinkBody.
                           pd pav pu bn g gfs gi cov logstart inodestart nib dev
                           (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None
                           (* pin = true: this site pays the TOKEN arm (§3.9) *)
-                          (* the REGISTER unit's value is arbitrary here:
+                          (* THE REGISTER UNIT'S VALUE IS ARBITRARY HERE:
                              [nameiparent] has not run, so the namer is not
                              known yet -- the [dirlink] below re-values it
-                             ([IregLinkNz.ireg_par_revalue]). *)
-                          true None
+                             ([IregLinkNz.ireg_par_revalue]).  It is an
+                             ARBITRARY *NAME* value and not [None], because
+                             [None] is what an UP-POINTING record carries and
+                             [InodeRegion]'s (U1)/(U2) price one: minting it
+                             would claim [ip] is a directory some [".."]
+                             names, which sys_link's own ARM C has just
+                             refused.  [Some 0] is as good as any other -- the
+                             deposit fixes it. *)
+                          true (Some 0)
                           pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
@@ -1835,6 +1842,8 @@ Section ProofSysLinkBody.
                           ltac:(intros _; rewrite /sl_incnl sl_setnl_type;
                                 exact (sl_tdir_zne _ Hty))
                           ltac:(intros pv Hc; discriminate Hc)
+                          (* (U1)/(U2): the minted unit is a NAME unit. *)
+                          ltac:(intros Hc; discriminate Hc)
                           ltac:(rewrite /sl_incnl; apply sl_setnl_nlink)
                           Hnl
                           (* ===== THE IIIc WALL, SITE 2 OF 2 -- PAID
@@ -2959,10 +2968,34 @@ Section ProofSysLinkBody.
                                mask-preserving step at this inum's slot). *)
                             iApply fupd_wp.
                             iMod (IregLinkNz.ireg_par_revalue ⊤ gi gfs
-                                    inodestart nib inum None
+                                    inodestart nib inum (Some 0)
                                     (FsStateInode.ent_par_val
                                        (bv_unsigned dinum) (bname 14 nf))
                                     ltac:(solve_ndisj) Hinb
+                                    (* the deposited record is a NAME record:
+                                       dirlink's own [dirlookup] MISSED, and a
+                                       live directory's records 0 and 1 are the
+                                       two dot names
+                                       ([DirView.dir_dots_miss_not_dots]). *)
+                                    ltac:(intros Hc; exfalso;
+                                      destruct (dir_dots_miss_not_dots
+                                        (bv_unsigned dinum) dnd datd
+                                        (bname 14 nf)
+                                        ltac:(clear -Htyd; rewrite Htyd;
+                                              vm_compute; reflexivity)
+                                        ltac:(clear -Hdnl0; intro Hcc;
+                                              apply Hdnl0; apply bv_eq;
+                                              rewrite Hcc; vm_compute;
+                                              reflexivity)
+                                        Hddixd Hnone) as [Hnd1 Hnd2];
+                                      rewrite (FsStateInode.ent_par_val_name
+                                                 (bv_unsigned dinum)
+                                                 (bname 14 nf)
+                                                 ltac:(rewrite FsStateEra.DOT_dot;
+                                                       exact Hnd1)
+                                                 ltac:(rewrite FsStateEra.DOTDOT_dotdot;
+                                                       exact Hnd2)) in Hc;
+                                      discriminate Hc)
                                     with "Hireg Hptok") as "Hptok".
                             iModIntro.
                             (* THE DEPOSIT.  The [ilink] the [++] minted at

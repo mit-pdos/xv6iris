@@ -5308,6 +5308,21 @@ Section ProofCreateMain.
                         (cr_setf_type dnc major minor _)))
                 ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
                 ltac:(exact Hflty) ltac:(exact Hnflty) ltac:(exact Hflpz)
+                (* (U1)/(U2): the unit this mint fixes is a NAME unit, not an
+                   up-pointing one -- create's [dirlookup] MISSED, and a live
+                   directory's records 0 and 1 are the two dot names, so the
+                   name it is about is neither ([DirView.dir_dots_miss_not_dots]). *)
+                ltac:(intros Hc;
+                      destruct (dir_dots_miss_not_dots (bv_unsigned dind) dn data
+                                  (bname 14 nf)
+                                  ltac:(rewrite Htydir; vm_compute; reflexivity)
+                                  (cr_nl0z dn Hnl0) Hddix Hnone) as [Hnd1 Hnd2];
+                      rewrite (FsStateInode.ent_par_val_name
+                                 (bv_unsigned dind) (bname 14 nf)
+                                 ltac:(rewrite FsStateEra.DOT_dot; exact Hnd1)
+                                 ltac:(rewrite FsStateEra.DOTDOT_dotdot;
+                                       exact Hnd2)) in Hc;
+                      discriminate Hc)
                 Hbump Hgrd
                 (* ===== THE IIIc WALL, SITE 1 OF 2 -- PAID (RULING A-prime,
                    iclaim-ledger.md §3.9) =====================================
@@ -6734,7 +6749,12 @@ Section ProofCreateMain.
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab
               ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
-              Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
+              Hdec
+              (* (U2): the fail arm writes [nlink = 0], so the retired NAME
+                 unit leaves no live record behind to owe a name. *)
+              ltac:(intros jz _; left; rewrite cr_setf_nlink;
+                    vm_compute; reflexivity)
+              Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
                     Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken Hptok [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
@@ -7685,7 +7705,11 @@ Section ProofCreateMain.
               G2 (K - 10)%nat eb b lks
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab Htyz0
-              Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
+              Hdec
+              (* (U2): this arm writes [nlink = 0]. *)
+              ltac:(intros jz _; left; rewrite cr_setf_nlink;
+                    vm_compute; reflexivity)
+              Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
                     Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink Htoken Hptok [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
@@ -9620,6 +9644,12 @@ Section ProofCreateMain.
                           exact Hdntdir)
                     ltac:(intros Hc; discriminate Hc)
                     ltac:(intros pvw Hc; injection Hc as Hc; discriminate Hc)
+                    (* (U1)/(U2): THE one site in the kernel that mints an
+                       up-pointing unit.  [dp] is a directory and create's
+                       own orphan guard refused a [dp] at count zero. *)
+                    ltac:(intros _; split;
+                          [rewrite cr_setf_type Hp3ty; exact Hdntdir
+                          | exact Hp3nlnz])
                     Hmtbump Hmtgrd
                     Hmtaddr Hmtdirlen
                     Hj Hgs HV4a0 Heb
