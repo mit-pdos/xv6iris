@@ -2973,19 +2973,32 @@ so it never wanted that shape.
           (ProofCreate.v:10866, child `dc1`) keeps the whole pile and needs
           nothing else.
      (ii) RECOVER the unit at the two fail entries that follow a WRITTEN
-          `"."` (ProofCreate.v:10675 and :10775, child `dc2`).  The fail
-          body takes the child WITHOUT its `dir_links` and MINTS a fresh
-          grey one out of `ireg_inv` (`cr_grey_dir_links`, ProofCreate.v:7770),
-          so the child's old `ent_toks` — and with it the `"."` fragment —
-          is dropped at the CALLER's boundary.  Before each call, open the
-          child's `dlinks`, take the fragment with
-          `FsStateInode.ent_toks_dot_take`, value it against the sibling
-          with `IregLinkNz.ireg_toks_agree`, and re-form the pile with
-          `FsStateLink.link_toks_reps_S`.  Every lemma that needs is
-          already landed and green; the `"."` entry's own witness is
-          `Hc2ddix Ht162` (and `Hc1ddix` at the other), read through
-          `DirView.dir_view_live` exactly as `Hdot1` is in the mkdir
-          preamble.
+          `"."` (`cr_fail_mkdir_half`, ProofCreate.v:10664 and :10764, both
+          at child `dc2`).  The fail body takes the child WITHOUT its
+          `dir_links` and MINTS a fresh grey one out of `ireg_inv`
+          (`cr_grey_dir_links`, ProofCreate.v:7770), so the child's old
+          `ent_toks` — and with it the `"."` fragment — is dropped at the
+          boundary.  The step itself is short and every lemma it needs is
+          landed and green:
+
+            open the child's `dlinks`; `FsStateInode.ent_toks_dot_take`;
+            value the fragment against the sibling the walk still holds
+            with `IregLinkNz.ireg_toks_agree`; re-form the pile with
+            `FsStateLink.link_toks_reps_S` + `link_reps_1`.  The `"."`
+            entry's own witness is `Hc2ddix Ht162` read through
+            `DirView.dir_view_live`, exactly as `Hdot1` is built in the
+            mkdir preamble at ProofCreate.v:9962.
+
+          MEASURED, AND THIS IS THE ONLY UNKNOWN LEFT: at both entries the
+          child's `dlinks` is NOT in the Iris context under `Hcdlnk2` — it
+          was consumed at ProofCreate.v:10533 into `ic_mk_loaded`'s
+          `Hcloadf`, which then went to the `+0x14c` continuation.  So the
+          two fail entries reach the child through the ESCROW rather than
+          through the walk, and the recovery has to happen wherever that
+          re-acquisition unpacks the payload (the contract's own phrase is
+          "THE LOCKED CHILD -- WITHOUT its [dir_links]", ProofCreate.v:7503).
+          Whoever finishes this should start by finding that unpack; the
+          `dlinks` it drops is where the unit is.
 
     Nothing above `ProofCreate` moves and no lemma in `FsStateLink` /
     `FsStateInode` / `FsStateEra` / `InodeRegion` / `IregLinkNz` /
