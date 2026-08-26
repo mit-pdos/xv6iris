@@ -2706,6 +2706,90 @@ so it never wanted that shape.
   fragment.  **G2 should do 6c and 6d/6e in one lane**; splitting them
   again buys nothing.
 
+  **AS LANDED — G3 (S7-unlink's (D2) OFF THE LEDGER).  THE CUSTODY MOVE
+  6c ASKED FOR IS REFUTED; 6d/6e ARE STILL AHEAD AND WHAT BLOCKS THEM IS
+  NOW (D1) ALONE.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline.
+
+  - **THE STEP 6c ASKS FOR DOES NOT WORK, and the wall is the resource
+    design, not the value side.**  Moving the register's AUTHORITY from
+    `InodeRegion.ireg_par` into `IcacheEscrow.dlinks` makes
+    `IregLinkNz.ireg_par_revalue` unreachable.  `sys_link` raises
+    `ip->nlink` BEFORE `nameiparent` runs, so the register unit is minted
+    unattributed and re-valued at the `dirlink` that files it — and by then
+    xv6 has run `iunlock(ip)`: the walk holds `dp`'s payload and only
+    `IcacheRef.inode_ref` for `ip` (its two identity cells), while `ip`'s
+    payload is checked in behind a sleeplock the code never re-takes.
+    Witnesses: `iris/ProofSysLink.v:1818` (the mint, which cannot know the
+    namer — `nameiparent` has not run) and `iris/ProofSysLink.v:2961` (the
+    re-valuation, which reaches the authority through `ireg_inv` at
+    `iregN` PRECISELY because it is region-side).  fs-state.md §6½ carries
+    the finding and the two repairs; the cheap one keeps the `p` column and
+    `DirLinks.dir_par_tie` for (D1) alone (and can still retire the `wdt`
+    TICKET `ilinkdp`, with a region-side clause tying `p` to the register),
+    the other widens the register's value type and is a value-side lane.
+  - **AND 6c's OTHER RULING IS WRONG: `2 ≤ nlink dp` is TRUE, IS NEEDED,
+    and now comes off the REGISTER.**  It is not droppable — at
+    `nlink dp = 0` the re-park owes `DirView.dir_orphan_clean`, a conjunct
+    of `IcacheEscrow.ic_loaded`/`ipool_alloc` that `FsDurSnap.sk_dirloc`
+    reads and that is FALSE of a `dp` still holding other entries; it is
+    fs-fragments F1.5d's isdirempty plank, so deleting the demand is not an
+    option either.  It is true of this binary because a directory is never
+    hard-linked, `unlink` refuses a non-empty one, and BOTH `create` (ARM
+    G) and `sys_link` (ARM E2) refuse to `dirlink` into a directory at
+    count zero.
+  - **WHAT IS BUILT: two region-side clauses on `InodeRegion.ireg_par`,
+    which now takes the record's TYPE.**  (U1) a record that is not a
+    directory has no up-pointing namer (`ireg_ups P = 0`, `ireg_ups` being
+    the multiplicity of `None`); (U2) a LIVE record's count exceeds its
+    up-pointing namers (`ireg_ups P < nlink`) — "a live inum has at least
+    one NAME".  (D2) is one step off them (`ireg_lnk_up_min2`, accessor
+    `IregLinkNz.ireg_par_up_min2`), with NO root exception: the root's `..`
+    is a SELF record and tokenless, so an empty root sits at `0 < 1`.  (U1)
+    is what makes (U2) inductive.
+  - **Contracts whose statement changed** (one pure premise each, LAST in
+    the pure list, so no landed argument position moved):
+    `InodeRegion.ireg_par`/`ireg_lnk_at` (the type), `ireg_lnk_stable` (type
+    stability) with `ireg_lnk_free_retype` beside it for the kernel's two
+    TYPE writes, `ireg_lnk_bump`/`ireg_write_link_fl`/
+    `ProofIupdate.iu_step_link`/`SpecIupdate.wp_iupdate_link_body`
+    (`prv = None → type = DIR ∧ nlink ≠ 0`),
+    `ireg_lnk_drop`/`ireg_write_unlink_fl`/`iu_step_unlink`/
+    `wp_iupdate_unlink_body` (`prv = Some j → nlink' = 0 ∨ type ≠ DIR`),
+    `ireg_lnk_par_move`/`IregLinkNz.ireg_par_revalue` (`w = None → v = None`).
+    New: `DirView.dir_dots_miss_not_dots` (a name `dirlookup` MISSED is
+    neither dot name — a live directory's records 0 and 1 ARE the two dot
+    names), `FsStateEra.ent_toks_era_borrow_at` (one entry's PAIR on loan,
+    keyed by the record's index).  sys_link's unattributed mint moved from
+    `None` to `Some 0`: `None` is what an UP-POINTING record carries and
+    (U1) prices it.
+  - **The rmdir arm's two readings SWAPPED ORDER** and that is the whole
+    change to `ProofSysUnlink.su_w5_dir`: (D2)'s unit is the CHILD's `..`,
+    so (D1) — which names that `..`'s target — has to come first.  Both
+    still run before the zeroing's ghost move, and each borrows its unit
+    out of an `ent_toks` and hands it back; `dir_links_unlink` moved up
+    (it needs nothing from (D2)) and the root refutation's counting token
+    now comes out of `dp`'s own record for `ip` on loan instead of out of
+    `ent_toks_unlink`'s release.
+  - **Deleted:** `IregDirBit.dir_links_subdir_nlink2` (84 lines), (D2)'s
+    old derivation.  **Left behind:** `DirView.dlc_lower` and its five
+    lemmas are still MAINTAINED inside `DirLinks.dir_links` with NO reader
+    at all — ~15 sites inside `DirLinks.v` plus the definitions in
+    `DirView.v`.  They go with the `wl`/`wdu`/`wdt`/`g` columns rather than
+    alone; `IregDirBit.v`'s header says so.
+  - Boot paid nothing: `FsCfgBoot.img_par` is `nlink` copies of
+    `Some ROOTINO`, so `ireg_ups` is zero at every image inum and both
+    clauses collapse to arithmetic.  The tripwire did NOT fire.
+
+  **WHAT REMAINS.**  6d/6e are blocked on (D1) alone now.  The owner has to
+  pick a repair (fs-state.md §6½); under repair 1 the lane is: state the
+  region-side `p`↔register tie, re-derive (D1) off it (dropping `ilinkdp`),
+  then delete `dir_links`, `dlc_*`, the `wl`/`wdu`/`wdt`/`g` columns, (L1),
+  `ireg_dir_ok`/`ireg_dir_wl0`/`ireg_link_ok_free`, `IcacheBoot.image_dir_wl0`,
+  `FsCfgBoot.dir_links_of_region`/`_of_image` and the `fl` index, keeping
+  `p`, `ireg_par_ok` and `dir_par_tie` (relocated out of `DirLinks.v`).
+
 ## Sizing notes for whoever runs the lanes
 
 - Big cones: `ProofEndOp` (commit path), `ProofInitlog` (2748 lines —

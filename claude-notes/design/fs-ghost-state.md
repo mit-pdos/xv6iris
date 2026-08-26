@@ -465,7 +465,10 @@ The count coupling `icnt_half z n` and the pin `ireg_ref_ok r rc n c d`
 `ireg_rcol` beside the authority, with `rc` existentially bound so no
 destructure site ever names it.
 
-**ALL NINE COLUMNS ARE STILL LIVE, and the reason is one file.**  The
+**ALL NINE COLUMNS ARE STILL LIVE, and the reason is one file** (lane G3
+took ONE of the two readings off it — S7-unlink's (D2) is §3b′'s (U1)/(U2)
+now, so `DirView.dlc_lower` is maintained-but-unread; (D1) is the one that
+keeps `DirLinks` alive, and fs-state.md §6½ says why it cannot move).  The
 demolition (worklist lane G, slice 6d) would keep `c`/`r`/`rc`/`f` and
 drop `wl`/`wdu`/`wdt`/`g`/`p`, but every one of those five is read through
 `DirLinks.dir_links` — the first conjunct of `IcacheEscrow.dlinks`, which
@@ -487,10 +490,14 @@ counting RA (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (prodUR
 (authUR natUR) fsParUR)`, one element per inum in a single ghost element at
 `fs_link γfs`).  `ireg_slot` carries
 
-    ireg_keep γfs z  := if z = ireg_root then link_tok (fs_gamma_L γfs) z else emp
-    ireg_par γfs z n := ∃ P, par_auth (fs_gamma_L γfs) z P ∗ ⌜size P ≤ n⌝
-    ireg_lnk γfs z d := link_auth (fs_gamma_L γfs) z (ireg_nl d)
-                        ∗ ireg_keep γfs z ∗ ireg_par γfs z (ireg_nl d)
+    ireg_keep γfs z     := if z = ireg_root then link_tok (fs_gamma_L γfs) z else emp
+    ireg_ups P          := multiplicity None P
+    ireg_par γfs z n ty := ∃ P, par_auth (fs_gamma_L γfs) z P ∗ ⌜size P ≤ n⌝
+                                ∗ ⌜ty ≠ ireg_dir_ty → ireg_ups P = 0⌝        (U1)
+                                ∗ ⌜n ≠ 0 → ireg_ups P < n⌝                   (U2)
+    ireg_lnk γfs z d    := link_auth (fs_gamma_L γfs) z (ireg_nl d)
+                           ∗ ireg_keep γfs z
+                           ∗ ireg_par γfs z (ireg_nl d) (di_type d)
 
 where `ireg_nl d = Z.to_nat (bv_unsigned (di_nlink d))`.  The value is tied
 to the slot's record BY CONSTRUCTION — the definition names `d` once — so
@@ -511,11 +518,28 @@ mask-preserving step; `InodeRegion.ireg_lnk_par_move` is its RA half).
 `iris/FsParRefute.v` is the machine-checked refutation of every shape whose
 parent side has to know the target's TYPE.
 
-Region-side the register can only carry `size P ≤ nlink`, because a slot
-holds a RECORD and no data.  The clause that gives it its content — a live
-directory admits only its own `..` target as a namer, which is what rmdir
-reads — needs the node's `..` entry and therefore belongs in the checked-out
-payload; it lands when `IcacheEscrow.dlinks` loses `DirLinks.dir_links`.
+**(U1)/(U2) ARE S7-UNLINK'S (D2)** (lane G3), and they are readings of the
+RECORD, which is why they can stand here: `dp` holds a live subdirectory
+record, so the child's `..` puts an up-pointing unit in `dp`'s register, and
+(U2) reads `2 ≤ nlink dp` off it — `InodeRegion.ireg_lnk_up_min2`, accessor
+`IregLinkNz.ireg_par_up_min2`.  That retires `IregDirBit.dir_links_subdir_nlink2`
+and leaves `DirView.dlc_lower` maintained-but-unread inside `dir_links`.
+There is NO root exception: the root's `..` is a SELF record and tokenless,
+so an empty root sits at `0 < 1`.  (U1) is what makes (U2) inductive — a
+name-drop at a node that stays live has to leave a name behind, and the only
+locally evident case is "no up-pointing namers", i.e. "not a directory".
+The premises the two movers gained are in fs-state.md §6½ and in
+`SpecIupdate`'s two bodies; the one that is not vacuous anywhere else is
+mkdir's `dp->nlink++`, the ONLY site in the kernel that mints a `None` unit.
+
+The clause that gives the register its remaining content — a live directory
+admits only its own `..` target as a namer, which is rmdir's (D1) — needs
+the node's `..` ENTRY and would belong in the checked-out payload.  **It
+cannot go there**: `sys_link` re-values `ip`'s unit at a `dirlink` that runs
+AFTER `iunlock(ip)`, so `ip`'s payload is checked in and
+`IregLinkNz.ireg_par_revalue` would have no authority to reach
+(`iris/ProofSysLink.v:2961`).  fs-state.md §6½ has the finding and the two
+repairs; (D1) therefore still runs on the `p` column.
 
 **THE TOKENS ARE NOT HERE.**  A directory's tokens ride in its CHECKED-OUT
 PAYLOAD (`FsStateInode.ent_toks`, inside `IcacheEscrow.ic_loaded` /
@@ -546,9 +570,10 @@ about the root anywhere in `ireg_slot`.
   `link_mint`/`link_return` are basic updates, so they compose into that
   AU at no mask cost.
 
-The three movers are `ireg_lnk_stable` (`bv_unsigned (di_nlink d') =
-bv_unsigned (di_nlink d)` — every ordinary flush, the claim, the free
-deposit), `ireg_lnk_bump` (`= +1`: one `link_mint` and one `par_alloc`, and
+The movers are `ireg_lnk_stable` (`nlink` AND `di_type` equal — every
+ordinary flush), `ireg_lnk_free_retype` (both counts zero — the kernel's two
+TYPE writes, the claim and the free deposit, where the register is empty and
+(U1)/(U2) are vacuous at any type), `ireg_lnk_bump` (`= +1`: one `link_mint` and one `par_alloc`, and
 the minted token and its register unit go **OUT**, to the `dirlink` that
 files them in a directory's `ent_toks` — `ireg_write_link_fl`) and
 `ireg_lnk_drop` (`link_return` + `par_dealloc`, paid for by the pair the
