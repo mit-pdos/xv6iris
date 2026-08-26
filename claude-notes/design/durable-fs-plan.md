@@ -271,14 +271,17 @@ disk — the header says `n = 0` and `D` is the raw home blocks, or `n > 0`
 and `D` is the raw disk with the batch installed — the snapshot describes
 `D`, and `install_trans` moves only the PHYSICAL home blocks toward `D`.
 The era's logged view `L` is therefore minted EQUAL TO `D` (§1), never to
-the raw bytes as such.  Under the clean-header premise `initlog` carries
-today (`n = 0`, fs-log.md stage 4) `D` IS the raw home set, so every
-existing boot tie (`BioInv.pool_blk`, `FsBlocks.bytes_tie`, the mirror at
-`mirror_of (fs_blocks dk)`, `SpecInitlog`'s `lm_view` row) holds unchanged
-and the mint needs no reordering.  THAT PREMISE IS AS REFUTABLE AS
-`Himg` (any trace with a mid-commit crash), so it is NEVER restated as a
-premise of the theorem — no "clean header at every boot" trace
-assumption exists or may be added.  `Himg` stays in the theorem's
+the raw bytes as such.  Under the clean-header premise the BOOT PATH still
+carries — `SpecFsinit`'s (g); `initlog` itself has had none since 1a — `D`
+IS the raw home set, so every existing boot tie (`BioInv.pool_blk`,
+`FsBlocks.bytes_tie`, the mirror at `mirror_of (fs_blocks dk)`,
+`SpecInitlog`'s `lm_view` row) holds unchanged and the mint needs no
+reordering.  THAT PREMISE IS AS REFUTABLE AS `Himg` (any trace with a
+mid-commit crash), so it is NEVER restated as a premise of the theorem —
+no "clean header at every boot" trace assumption exists or may be added.
+AND IT IS EXACTLY WHAT KEEPS THE MINT AT POWERON FREE: the paragraph below
+is the measurement of what the mint costs once that premise goes, and "boot
+order is not a wall" is a statement about the tree WITH it, not without.  `Himg` stays in the theorem's
 statement until real recovery lands and both go together; the
 theorem's assumption list is then era 0's image and nothing else
 (the `make audit-only` baseline is the check).
