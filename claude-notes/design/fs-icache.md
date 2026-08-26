@@ -4212,14 +4212,16 @@ found arm already holds out of `SpecDirlookup.dl_lic_live`, and
 
 Landed (durable-disk 2b-inode-4/-5): the RA's per-inum AUTHORITY lives in
 `ireg_slot` as `InodeRegion.ireg_lnk` beside the root's keep-alive token
-(`fs-ghost-state.md` §3b′); `ireg_write_link_fl` pays a `link_tok` OUT and
-`ireg_write_unlink_fl` takes one IN; boot routes the image's piles into the
-checked-out payloads.  A directory's tokens ride in
+(`fs-ghost-state.md` §3b′); `ireg_write_link_reg` pays a pile of `link_tok`s
+OUT and `ireg_write_unlink_reg` takes one IN; boot routes the image's piles
+into the checked-out payloads.  A directory's tokens ride in
 `IcacheEscrow.ic_loaded` / `ipool_alloc`, which carry
-`dlinks γfs self dn bm data := DirLinks.dir_links ∗ FsStateInode.ent_toks`
-in `dir_links`' own conjunct position — ONE conjunct, so the ~forty payload
-sites that only pass it through do not move — until the ledger dies, when
-`dlinks` loses its first half.  The per-move lemmas are
+`dlinks γfs self dn bm data := FsStateInode.ent_toks_x` — ONE conjunct, so
+the ~forty payload sites that only pass it through never moved.  (Through
+lane G5 the same conjunct also carried `DirLinks.dir_links`, in the
+ledger's own position, which is what kept the flip off those sites; G6
+deleted the ledger and the conjunct kept its arity again.)  The per-move
+lemmas are
 `FsStateEra.ent_toks_dirlink_arm` (dirlink, at `SpecDirlink`'s own premise
 list), `ent_toks_unlink` (the entry zeroing), `ent_toks_era_orphan` (rmdir's
 grey `".."`), `ent_toks_era_nlink` (a count-only flush) and

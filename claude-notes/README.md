@@ -168,12 +168,12 @@ first four were audited against the tree 2026-08-22):
   the boot mint needs (`FsStateInode.inl_bare_free`, `FsDurSnap.sk_regdom`).
   What is left is the BOOT mint from that snapshot.  Boot ORDER is NOT what
   blocks it (the clean-header fact `initlog` already carries makes the
-  committed view equal the raw home blocks, so the mint stays at PowerOn);
-  the blocker is the OLD link ledger — boot's only directory stock,
-  `DirLinks.dir_links_of_plain`, forces every live directory to `nlink ≤ 1`
-  and to BE the root, which `iris/FsBootWall.v` refutes for any era where
-  `mkdir` has run.  So lane G's demolition of `DirLinks` precedes lane E, and
-  meanwhile `Himg` is still assumed and `xv6_power_adequacy` is still vacuous.
+  committed view equal the raw home blocks, so the mint stays at PowerOn),
+  and neither is the OLD link ledger any more: lane G6 demolished it, so
+  `iris/FsBootWall.v` is CLOSED and the boot builds the type register's
+  fragments off `FsCfgBoot.ent_toks_of_region` instead of a per-record
+  ticket stock.  Meanwhile `Himg` is still assumed and
+  `xv6_power_adequacy` is still vacuous.
   Lanes A–G in the file.
   History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
