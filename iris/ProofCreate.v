@@ -8935,6 +8935,26 @@ Section ProofCreateMain.
       assert (Hc1nrec : dir_nrec (bv_unsigned (di_size dc1)) = 1%nat)
         by (rewrite Hc1sz; exact cr_nrec_16).
       assert (Hc1k0 : dir_slot dat1 1 = 1%nat) by exact (cr_slot_1 dat1 Hd1live).
+      (* THE CHILD'S ["."] ENTRY, as a fact about its ENTRY VIEW (lane G5).
+         Every fail entry below this point has to reach through the child's
+         payload for the fragment that record owes -- the [ip->nlink = 0]
+         flush spends the WHOLE pile the fill minted, and one of its units
+         is filed here -- so the reading is stated once, in the arm that
+         wrote the record. *)
+      assert (Hc1dzc : bv_unsigned (di_type dc1) = T_DIR_z)
+        by (rewrite Hc1ty Htdirc; vm_compute; reflexivity).
+      assert (Horph1c : fn_orphan (era_node dc1 bm1 dat1) = false).
+      { rewrite /fn_orphan /fn_nlink era_node_rec Hc1nl.
+        apply bool_decide_eq_false. clear. vm_compute. discriminate. }
+      assert (Hdot1c : dir_entries (era_node dc1 bm1 dat1) !! DOT
+                       = Some (bv_unsigned cinum)).
+      { rewrite (dir_entries_era_node dc1 bm1 dat1 Hholes1 (Hcap1 Hccap))
+          (bool_decide_eq_true_2 _ Hc1dzc) Hc1nrec -Hcl16 -Hd1inum.
+        replace DOT with (dir_bname dat1 0%nat)
+          by (rewrite /dir_bname Hd1name DOT_dot_name; reflexivity).
+        exact (dir_view_live dat1 1%nat 0%nat
+                 ltac:(rewrite -Hc1nrec; exact (Hc1duq Hc1dzc))
+                 ltac:(clear; apply Nat.lt_0_succ) Hd1live). }
       (* ===== +0x10e c.lw a2,4(s1) : the PARENT's inum ================ *)
       iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x10e)) Ra2 Rs1
                 (mword_of_int 4 : mword 12) md1 (K - 10)%nat dind b
@@ -10661,6 +10681,32 @@ Section ProofCreateMain.
                   ltac:(solve_ndisj) with "[] Hdirty Hctop") as "[Hdirty Hctop]";
             [iApply (ireg_inv_ftop with "Hiregi") |].
           iModIntro.
+          (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
+             G5).  [cr_fail_mkdir_body] takes the child WITHOUT its
+             [dir_links] and mints a fresh grey one, so this walk is the
+             last holder of the child's own tokens -- and the
+             [ip->nlink = 0] flush below still needs the WHOLE pile the
+             fill minted, one of whose units this arm's
+             [dirlink(ip, ".", ip)] filed in the child's ["."] entry.  The
+             value comes off the sibling the walk still holds, by the
+             register's own agreement. *)
+          iDestruct (FsStateInode.ent_toks_dot_take (fs_gamma_L γfs)
+                       (bv_unsigned cinum) (era_node dc1 bm1 dat1) Dc1
+                       Hdot1c Horph1c with "Hcetk2") as "[(%vf1 & Hdotf1) _]".
+          iApply fupd_wp.
+          iMod (IregLinkNz.ireg_toks_agree ⊤ γi γfs inodestart nib cinum _
+                  vf1 (cr_ity ty (bv_unsigned dind))
+                  ltac:(solve_ndisj) Hcinb
+                  with "Hiregi Hcdiat Hdotf1 Htoken")
+            as "([%Hvf1 _] & Hcdiat & Hdotf1 & Htoken)".
+          iModIntro.
+          iAssert (FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned cinum)
+                     (FsStateLink.link_reps (cr_delta ty)
+                        (cr_ity ty (bv_unsigned dind))))
+            with "[Htoken Hdotf1]" as "Htoken".
+          { rewrite (cr_delta_dir ty Htdirc) FsStateLink.link_toks_reps_S
+              FsStateLink.link_reps_1.
+            iSplitL "Htoken"; [iExact "Htoken" | rewrite -Hvf1; iExact "Hdotf1"]. }
           iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γfs γi
                         cn gtl γa γf γpr cov logstart bmapstart inodestart nib
                         ninodes size dev plen pfun pv ty major minor V u
@@ -10761,6 +10807,32 @@ Section ProofCreateMain.
                 ltac:(solve_ndisj) with "[] Hdirty Hctop") as "[Hdirty Hctop]";
           [iApply (ireg_inv_ftop with "Hiregi") |].
         iModIntro.
+        (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
+           G5).  [cr_fail_mkdir_body] takes the child WITHOUT its
+           [dir_links] and mints a fresh grey one, so this walk is the
+           last holder of the child's own tokens -- and the
+           [ip->nlink = 0] flush below still needs the WHOLE pile the
+           fill minted, one of whose units this arm's
+           [dirlink(ip, ".", ip)] filed in the child's ["."] entry.  The
+           value comes off the sibling the walk still holds, by the
+           register's own agreement. *)
+        iDestruct (FsStateInode.ent_toks_dot_take (fs_gamma_L γfs)
+                     (bv_unsigned cinum) (era_node dc1 bm1 dat1) Dc1
+                     Hdot1c Horph1c with "Hcetk2") as "[(%vf1 & Hdotf1) _]".
+        iApply fupd_wp.
+        iMod (IregLinkNz.ireg_toks_agree ⊤ γi γfs inodestart nib cinum _
+                vf1 (cr_ity ty (bv_unsigned dind))
+                ltac:(solve_ndisj) Hcinb
+                with "Hiregi Hcdiat Hdotf1 Htoken")
+          as "([%Hvf1 _] & Hcdiat & Hdotf1 & Htoken)".
+        iModIntro.
+        iAssert (FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned cinum)
+                   (FsStateLink.link_reps (cr_delta ty)
+                      (cr_ity ty (bv_unsigned dind))))
+          with "[Htoken Hdotf1]" as "Htoken".
+        { rewrite (cr_delta_dir ty Htdirc) FsStateLink.link_toks_reps_S
+            FsStateLink.link_reps_1.
+          iSplitL "Htoken"; [iExact "Htoken" | rewrite -Hvf1; iExact "Hdotf1"]. }
         iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                       gtl γa γf γpr cov logstart bmapstart inodestart nib ninodes
                       size dev plen pfun pv ty major minor V u Sb ns pidv
