@@ -220,7 +220,7 @@ Section ProofProcinit.
   (* [proc_dormant_prestk], not [proc_dormant]: the slot's stack cannot be
      deposited until [p->kstack] is written AND persisted, and this loop is
      what writes it -- see [ProcInv.proc_dormant_prestk]. *)
-  Definition proc_seal (pa : mword 64) : iProp Σ :=
+  Definition proc_seal `{XI : CurCtx} (pa : mword 64) : iProp Σ :=
     (∃ (vst : mword 32) (vks : mword 64),
        lk_raw pa ∗
        p_state pa ↦₄ vst ∗
@@ -234,7 +234,7 @@ Section ProofProcinit.
      distribution: [BSLOTS = 1024] against [3 * NPROC = 192], so the carve
      fits with room to spare, and from here on every slot owns three at
      every state ([ProcDefs.proc_dormant]'s note has the ledger). *)
-  Lemma proc_seal_list (l : list nat) :
+  Lemma proc_seal_list `{XI : CurCtx} (l : list nat) :
     ([∗ list] i ∈ l, proc_raw (proc_addr i)) -∗
     fd_slots (length l * (NOFILE + FDSPARE)) -∗
     iref_slots (length l * (1 + IREFSPARE)) -∗

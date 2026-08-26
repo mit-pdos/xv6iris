@@ -1349,7 +1349,7 @@ Section IputFreePath.
       M !!! Regidx c = (m !!! Regidx c : mword 64).
 
   (* [iu_held_L], inlined (ProofIupdate-module-local otherwise). *)
-  Lemma ipo_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma ipo_held_L `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗

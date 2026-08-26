@@ -353,7 +353,7 @@ Qed.
 Section VdrwfBridges.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
-  Lemma vdrwf_w2b (a : Arch.pa) (w : bv 16) :
+  Lemma vdrwf_w2b `{XI : CurCtx} (a : Arch.pa) (w : bv 16) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     (forall j, (j < 2)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 2)%nat ->
@@ -365,7 +365,7 @@ Section VdrwfBridges.
     iApply (phys_to_word2 a w Hal Hs Hc with "Hb H").
   Qed.
 
-  Lemma vdrwf_w4b (a : Arch.pa) (w : bv 32) :
+  Lemma vdrwf_w4b `{XI : CurCtx} (a : Arch.pa) (w : bv 32) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 4)%nat ->
@@ -377,7 +377,7 @@ Section VdrwfBridges.
     iApply (phys_to_word4 a w Hal Hs Hc with "Hb H").
   Qed.
 
-  Lemma vdrwf_w8b (a : Arch.pa) (w : bv 64) :
+  Lemma vdrwf_w8b `{XI : CurCtx} (a : Arch.pa) (w : bv 64) :
     is_aligned_paddr (Physaddr a) 8 = true ->
     (forall j, (j < 8)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 8)%nat ->
@@ -390,7 +390,7 @@ Section VdrwfBridges.
   Qed.
 
   (* the buffer, back at the VA tier where [buf_own] wants it *)
-  Lemma vdrwf_plist_mem (a : Arch.pa) (bs : list (bv 8)) :
+  Lemma vdrwf_plist_mem `{XI : CurCtx} (a : Arch.pa) (bs : list (bv 8)) :
     (forall j, (j < length bs)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < length bs)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->

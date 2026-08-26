@@ -218,6 +218,7 @@ Qed.
 
 Section BioInv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* full ownership of a 4-byte cell is exclusive: the escrow's park swap
      refutes the parked arm with the full valid cell in hand. *)
@@ -1140,7 +1141,7 @@ Section BioInv.
      for the log layer, the mkfs image's content against the logged-view
      ghost), and 0 must be outside the covered range because every zeroed
      blockno cell claims it. *)
-  Lemma bio_init `{XI : CurCtx} (V : bio_view Σ) E :
+  Lemma bio_init (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗

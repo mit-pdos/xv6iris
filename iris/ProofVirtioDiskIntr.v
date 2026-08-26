@@ -956,7 +956,7 @@ Section VtLoopSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* [DiskInv.disk_res]'s body with the six existentials named. *)
-  Definition disk_res_at (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
+  Definition disk_res_at `{XI : CurCtx} (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
       (np nr : nat) (fl pk : gmap nat dclaim)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) : iProp Σ :=
     (⌜dom fl = set_seq nr (np - nr)⌝ ∗
@@ -976,7 +976,7 @@ Section VtLoopSeam.
      free_bundles pd fr ∗
      ring_slots_res pav (mod8 (dom fl)))%I.
 
-  Lemma disk_res_at_elim (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
+  Lemma disk_res_at_elim `{XI : CurCtx} (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     disk_res γ pd pav pu -∗
     ∃ (np nr : nat) (fl pk : gmap nat dclaim)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool),
@@ -987,7 +987,7 @@ Section VtLoopSeam.
     iExists np, nr, fl, pk, tr, fr. rewrite /disk_res_at /free_bundles. iExact "H".
   Qed.
 
-  Lemma disk_res_at_intro (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
+  Lemma disk_res_at_intro `{XI : CurCtx} (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
       (np nr : nat) (fl pk : gmap nat dclaim)
       (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) :
     disk_res_at γ pd pav pu np nr fl pk tr fr -∗ disk_res γ pd pav pu.
@@ -1001,14 +1001,14 @@ Section VtLoopSeam.
      destructured lock resource plus the observation that carried the thread
      into the body -- the device is provably PAST the driver's [nr], which is
      [VirtioProto.virtio_proto_reclaim_acc]'s premise at [p := nr]. *)
-  Definition vt_loop_state (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
+  Definition vt_loop_state `{XI : CurCtx} (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
     : iProp Σ :=
     (∃ (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (c : nat),
        ⌜(nr < c)%nat /\ (c <= np)%nat⌝ ∗ disk_done_lb γ c ∗
        disk_res_at γ pd pav pu np nr fl pk tr fr)%I.
 
-  Lemma vt_loop_state_close (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
+  Lemma vt_loop_state_close `{XI : CurCtx} (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     vt_loop_state γ pd pav pu -∗ disk_res γ pd pav pu.
   Proof.
     iIntros "H". iDestruct "H" as (np nr fl pk tr fr c) "(_ & _ & H)".

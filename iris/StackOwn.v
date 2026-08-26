@@ -31,6 +31,13 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
+(* THE M1 FLIP (tso-port): a stack FRAME is thread data -- saved registers,
+   spilled locals -- so its slots are context-indexed like every other
+   thread-owned byte.  [stack_own_phys] (the boot-side physical carve,
+   below) stays raw; the boot chain converts at the hand-off to the first
+   thread of control, which is the honest seam. *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* [stack_ktier_mono] rides the raw tier law *)
 Local Open Scope Z_scope.
 
 (* [pa_stk sp k] is the address [8*k] bytes below [sp] -- the base of the [k]-th
@@ -129,6 +136,7 @@ Qed.
 
 Section stack_own.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
   (* The ambient TIER.  [stack_own] is a plain NAME (no notation) used
      textually at ~330 sites, so the tier rides in as an instance-implicit
      argument rather than as a positional one: [stack_own sp n] is
@@ -143,7 +151,7 @@ Section stack_own.
      counted downward from [sp]) holds some word at [pa_stk sp (S i)]. *)
   Definition stack_own (sp : Arch.pa) (n : nat) : iProp Σ :=
     (∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
-       [∗ list] i ↦ w ∈ ws, word_pointsto (pa_stk sp (S i)) (DfracOwn 1) w)%I.
+       [∗ list] i ↦ w ∈ ws, ctx_word_pointsto cur_ctx (pa_stk sp (S i)) (DfracOwn 1) w)%I.
 
   Lemma stack_own_0 (sp : Arch.pa) : stack_own sp 0 ⊣⊢ emp.
   Proof.
@@ -193,7 +201,7 @@ Section stack_own.
 
   (* a single slot is exactly one existential word points-to at [sp-8]. *)
   Lemma stack_own_1 (sp : Arch.pa) :
-    stack_own sp 1 ⊣⊢ ∃ w : bv 64, word_pointsto (pa_stk sp 1) (DfracOwn 1) w.
+    stack_own sp 1 ⊣⊢ ∃ w : bv 64, ctx_word_pointsto cur_ctx (pa_stk sp 1) (DfracOwn 1) w.
   Proof.
     rewrite /stack_own. iSplit.
     - iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
@@ -204,7 +212,7 @@ Section stack_own.
   Qed.
 
   Lemma stack_own_1_intro (sp : Arch.pa) (w : bv 64) :
-    word_pointsto (pa_stk sp 1) (DfracOwn 1) w ⊢ stack_own sp 1.
+    ctx_word_pointsto cur_ctx (pa_stk sp 1) (DfracOwn 1) w ⊢ stack_own sp 1.
   Proof. rewrite stack_own_1. iIntros "H". by iExists w. Qed.
 
   (* Expose the whole region as [n] cleanly-addressed slots (slot [k] at
@@ -213,7 +221,7 @@ Section stack_own.
      with a single [iDestruct "(S1 & .. & Sn & _)"] and no nested [pa_stk]. *)
   Lemma stack_own_slots (sp : Arch.pa) (n : nat) :
     stack_own sp n ⊣⊢
-    [∗ list] k ∈ seq 1 n, ∃ w : bv 64, word_pointsto (pa_stk sp k) (DfracOwn 1) w.
+    [∗ list] k ∈ seq 1 n, ∃ w : bv 64, ctx_word_pointsto cur_ctx (pa_stk sp k) (DfracOwn 1) w.
   Proof.
     revert sp. induction n as [|n IH]; intro sp.
     - rewrite stack_own_0. by rewrite big_sepL_nil.
@@ -240,7 +248,7 @@ Section stack_own.
   Lemma stack_own_base (sp : Arch.pa) (n : nat) :
     stack_own sp n ⊣⊢
     [∗ list] j ∈ seq 0 n, ∃ w : bv 64,
-      word_pointsto (add_vec_int (pa_stk sp n) (8 * Z.of_nat j)) (DfracOwn 1) w.
+      ctx_word_pointsto cur_ctx (add_vec_int (pa_stk sp n) (8 * Z.of_nat j)) (DfracOwn 1) w.
   Proof.
     induction n as [|n IH].
     - rewrite stack_own_0. by rewrite big_sepL_nil.
@@ -275,8 +283,8 @@ Section stack_own.
      clean [pa_stk sp 1] / [pa_stk sp 2] addresses. ---- *)
   Lemma stack_own_2_elim (sp : Arch.pa) :
     stack_own sp 2 ⊢ ∃ w1 w2 : bv 64,
-      word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 ∗
-      word_pointsto (pa_stk sp 2) (DfracOwn 1) w2.
+      ctx_word_pointsto cur_ctx (pa_stk sp 1) (DfracOwn 1) w1 ∗
+      ctx_word_pointsto cur_ctx (pa_stk sp 2) (DfracOwn 1) w2.
   Proof.
     rewrite (stack_own_app sp 1 1) stack_own_1.
     iIntros "[H1 H2]". iDestruct "H1" as (w1) "H1".
@@ -285,8 +293,8 @@ Section stack_own.
   Qed.
 
   Lemma stack_own_2_intro (sp : Arch.pa) (w1 w2 : bv 64) :
-    word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 -∗
-    word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 -∗
+    ctx_word_pointsto cur_ctx (pa_stk sp 1) (DfracOwn 1) w1 -∗
+    ctx_word_pointsto cur_ctx (pa_stk sp 2) (DfracOwn 1) w2 -∗
     stack_own sp 2.
   Proof.
     iIntros "H1 H2". rewrite (stack_own_app sp 1 1). iSplitL "H1".
@@ -299,10 +307,10 @@ Section stack_own.
      two locals), the twin of the two-slot pair above. ---- *)
   Lemma stack_own_4_elim (sp : Arch.pa) :
     stack_own sp 4 ⊢ ∃ w1 w2 w3 w4 : bv 64,
-      word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 ∗
-      word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 ∗
-      word_pointsto (pa_stk sp 3) (DfracOwn 1) w3 ∗
-      word_pointsto (pa_stk sp 4) (DfracOwn 1) w4.
+      ctx_word_pointsto cur_ctx (pa_stk sp 1) (DfracOwn 1) w1 ∗
+      ctx_word_pointsto cur_ctx (pa_stk sp 2) (DfracOwn 1) w2 ∗
+      ctx_word_pointsto cur_ctx (pa_stk sp 3) (DfracOwn 1) w3 ∗
+      ctx_word_pointsto cur_ctx (pa_stk sp 4) (DfracOwn 1) w4.
   Proof.
     assert (E3 : pa_stk (pa_stk sp 2) 1 = pa_stk sp 3) by (rewrite pa_stk_assoc; reflexivity).
     assert (E4 : pa_stk (pa_stk sp 2) 2 = pa_stk sp 4) by (rewrite pa_stk_assoc; reflexivity).
@@ -316,10 +324,10 @@ Section stack_own.
   Qed.
 
   Lemma stack_own_4_intro (sp : Arch.pa) (w1 w2 w3 w4 : bv 64) :
-    word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 -∗
-    word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 -∗
-    word_pointsto (pa_stk sp 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto cur_ctx (pa_stk sp 1) (DfracOwn 1) w1 -∗
+    ctx_word_pointsto cur_ctx (pa_stk sp 2) (DfracOwn 1) w2 -∗
+    ctx_word_pointsto cur_ctx (pa_stk sp 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto cur_ctx (pa_stk sp 4) (DfracOwn 1) w4 -∗
     stack_own sp 4.
   Proof.
     assert (E3 : pa_stk (pa_stk sp 2) 1 = pa_stk sp 3) by (rewrite pa_stk_assoc; reflexivity).
@@ -369,7 +377,7 @@ Section stack_own.
   Proof.
     intro Hn. rewrite (stack_own_split_1 sp 1 n ltac:(lia)).
     iIntros "[H1 _]". rewrite stack_own_1. iDestruct "H1" as (w) "H1".
-    rewrite word_pointsto_unfold. iDestruct "H1" as "[_ Hbs]".
+    rewrite ctx_word_pointsto_unfold. iDestruct "H1" as "[_ Hbs]".
     assert (Hs : seq 0 8 = (0%nat :: seq 1 7)%list) by reflexivity.
     rewrite Hs. iDestruct "Hbs" as "[Hb0 _]".
     rewrite pa_add_0.
@@ -409,13 +417,29 @@ End stack_own.
    its own section variables -- [stack_own (KTR := kt)] written above fails
    with "Wrong argument name KTR", the same rule the hart binder obeys
    (durable-notes, "CpuId IS A CLASS, SO A CROSSING NEEDS A NEW SECTION"). *)
-Lemma stack_ktier_mono `{!riscvGS Σ} (kt kt' : ktier) `{!KtierLe kt kt'}
+(* SHIM-TIER (dies at cutover): a stack region re-indexed between two
+   contexts -- the swtch hand-off crosses the M2 seam here at SC. *)
+Lemma stack_own_reindex `{!riscvGS Σ} `{KTR : !CurKtier} (ξ ξ' : CtxId)
+    (sp : Arch.pa) (n : nat) :
+  stack_own (XI := ξ) sp n ⊢ stack_own (XI := ξ') sp n.
+Proof.
+  rewrite /stack_own. iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
+  iExists ws. iSplitR; [done |].
+  iApply (big_sepL_mono with "H"). iIntros (i w _) "H".
+  iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
+  iApply (TsoCtxShim.ctx_word_of_mem with "H").
+Qed.
+
+Lemma stack_ktier_mono `{!riscvGS Σ} `{XI : CurCtx} (kt kt' : ktier) `{!KtierLe kt kt'}
     (sp : Arch.pa) (n : nat) :
   stack_own (KTR := kt) sp n ⊢ stack_own (KTR := kt') sp n.
 Proof.
   rewrite /stack_own. iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
   iExists ws. iSplitR; [done |].
   iApply (big_sepL_mono with "H"). iIntros (i w _) "H".
+  (* per-slot through the shim: the raw tier-weakening law, re-indexed *)
+  iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
+  iApply TsoCtxShim.ctx_word_of_mem.
   iApply (word_ktier_mono kt kt' with "H").
 Qed.
 
@@ -454,7 +478,7 @@ Lemma sp_bounds_nonzero (x : SailStdpp.Values.mword 64) :
   (8 <= uint x < 274877906944 + 8)%Z -> x <> (zero_reg : mword 64).
 Proof. intros Hb He. rewrite He uint_zero_reg in Hb. lia. Qed.
 
-Lemma stack_own_sp_nonzero `{!riscvGS Σ} (sp : Arch.pa) (n : nat) :
+Lemma stack_own_sp_nonzero `{!riscvGS Σ} `{XI : CurCtx} (sp : Arch.pa) (n : nat) :
   (0 < n)%nat -> stack_own sp n ⊢ ⌜sp <> (zero_reg : mword 64)⌝.
 Proof.
   intro Hn. iIntros "H".

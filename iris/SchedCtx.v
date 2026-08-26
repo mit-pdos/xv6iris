@@ -80,8 +80,12 @@ Local Open Scope Z_scope.
    all eight harts' bundles under ONE ambient context, which the primary /
    secondary boot lemmas then try to pin to eight DIFFERENT contexts. *)
 Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ :=
-  (∃ vs : list (mword 64),
-     ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
+  (* the save-area cells belong to NO thread while free, so their context is
+     ∃-quantified (an ambient binder here is the eight-hart adequacy trap
+     this file's header records; the scheduler's park/resume proofs trade
+     the ∃ for their own ambient through the shim -- the M2 seam). *)
+  (∃ (vs : list (mword 64)) (ξ : CtxId),
+     ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
 
 (* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the two live values
    of the field, and they are DISJOINT: proc[] does not start at address 0. *)
@@ -780,3 +784,4 @@ Section SchedCtx.
   Qed.
 
 End SchedCtx.
+

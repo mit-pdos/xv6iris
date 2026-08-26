@@ -113,6 +113,7 @@ Require Import SmodePte RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the claim-keyed writes cross the ctx/mem seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -397,15 +398,17 @@ Section SmodeCorePt.
     gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn va) 8 vnew) ∗ va ↦₈ vnew.
   Proof.
     intros Hcan Hoff. iIntros "#Hk Hm Hw".
-    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hb".
     iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 8)
             ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
                   change (Z.of_nat 8) with 8%Z in Hnz; lia)
             mm with "Hk Hm Hb") as "[Hm Hb]".
     iModIntro. unfold write_bytes. change (N.to_nat 8) with 8%nat. iFrame "Hm".
-    iApply word_pointsto_intro; [exact Hal | iExact "Hb"].
+    iApply ctx_word_pointsto_intro; [exact Hal | ].
+    iApply (TsoCtxShim.ctx_buf_of_mem with "Hb").
   Qed.
 
   (* 4-byte claim-keyed write (the width-4 analogue). *)

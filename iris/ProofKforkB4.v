@@ -148,7 +148,7 @@ Section KforkB4Res.
      same shape (open [proc_fields], hand out the one field, take back a
      REPLACEMENT of the same length), and every future name-writer (there is
      only kfork today) would want it. *)
-  Lemma kfk_name_open (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+  Lemma kfk_name_open `{XI : CurCtx} (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv γf pa pid V -∗
     pname_cells pa (DfracOwn 1) (pv_name V) ∗
     ⌜length (pv_name V) = PNAMELEN⌝ ∗

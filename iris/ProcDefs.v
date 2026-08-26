@@ -15,6 +15,7 @@ Require Import FdSlots IrefSlots.
 (* EXPORTED, not merely imported: [proc_dormant] mentions [bslots], so every
    file that unfolds the dormant block needs the vocabulary in scope. *)
 Require Export BioDefs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -38,6 +39,7 @@ Proof. destruct V; reflexivity. Qed.
 
 Section ProcDefs.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* THE NUL LIVES HERE, not in [proc_fields], and that is deliberate: very
      few places unpack [pname_cells], while [proc_fields] is threaded through

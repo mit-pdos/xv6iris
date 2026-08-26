@@ -56,6 +56,8 @@ Require Import RiscvExtras.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the phys tier and the unflipped ↦₂/↦₄ towers cross the seam *)
 
 Local Open Scope Z_scope.
 
@@ -194,6 +196,7 @@ Qed.
 
 Section DiskInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* -- the immutable page pointers (persistent after boot wiring) ------- *)
 
@@ -492,6 +495,7 @@ Section DiskInv.
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     iDestruct (phys_pointsto_ram with "H") as %Hram.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
               (Hstat (0 + k)%nat ltac:(lia)) Hram (Hcan (0 + k)%nat ltac:(lia))
               with "Hb H").
@@ -538,6 +542,7 @@ Section DiskInv.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word2.
     iDestruct (phys_win_to_mem a 2 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
+    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hm") as "Hm".
     rewrite /word2_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
@@ -560,6 +565,7 @@ Section DiskInv.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word4.
     iDestruct (phys_win_to_mem a 4 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
+    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hm") as "Hm".
     rewrite /word4_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
@@ -587,7 +593,7 @@ Section DiskInv.
     iIntros (Hal Hs Hc) "#Hb Hbytes". rewrite /phys_word8.
     iDestruct (phys_win_to_mem a 8 (DfracOwn 1) (fun j => nth_byte w j) Hs Hc
                  with "Hb Hbytes") as "Hm".
-    rewrite /word_pointsto. iFrame "Hm". iPureIntro. exact Hal.
+    rewrite /ctx_word_pointsto. iFrame "Hm". iPureIntro. exact Hal.
   Qed.
 
   (* the single byte, for the status cell *)

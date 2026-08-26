@@ -522,7 +522,7 @@ Section ProofKwait.
   (* The nine callee-saved cells kwait's prologue pushes, plus the padding
      slot 10 the code never touches.  Bundled so that every block lemma
      carries the frame as ONE hypothesis instead of ten. *)
-  Definition kw_frame (sp0 : mword 64) (mm : regfile) : iProp Σ :=
+  Definition kw_frame `{XI : CurCtx} (sp0 : mword 64) (mm : regfile) : iProp Σ :=
     (pa_stk sp0 1  ↦₈[KT1] (mm !!! Regidx Rra) ∗
      pa_stk sp0 2  ↦₈[KT1] (mm !!! Regidx Rs0) ∗
      pa_stk sp0 3  ↦₈[KT1] (mm !!! Regidx Rs1) ∗

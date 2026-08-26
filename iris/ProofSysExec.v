@@ -365,18 +365,18 @@ Proof. lia. Qed.
 Section SysExecZeros.
   Context `{!riscvGS Σ}.
 
-  Lemma sx_zero_slot (a : mword 64) (zb : bv 8) :
+  Lemma sx_zero_slot `{XI : CurCtx} (a : mword 64) (zb : bv 8) :
     (forall j, (j < 8)%nat -> nth_byte (mword_of_int 0 : mword 64) j = zb) ->
     is_aligned_paddr (Physaddr a) 8 = true ->
     ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ[KT1] zb) ⊢ a ↦₈[KT1] (mword_of_int 0 : mword 64).
   Proof.
     intros Hzb Hal. iIntros "H".
-    iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
+    iApply (ctx_word_pointsto_intro (KTR := KT1) _ _ _ _ Hal).
     iApply (big_sepL_mono with "H"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite (Hzb i Hlt). done.
   Qed.
 
-  Lemma sx_zeros_slots (sp : mword 64) (zb : bv 8) (k n : nat) :
+  Lemma sx_zeros_slots `{XI : CurCtx} (sp : mword 64) (zb : bv 8) (k n : nat) :
     (forall j, (j < 8)%nat -> nth_byte (mword_of_int 0 : mword 64) j = zb) ->
     (n <= S k)%nat ->
     (forall i, (i < n)%nat ->
@@ -413,7 +413,7 @@ Section SysExecFrame.
     forall i, (i < 32)%nat ->
       is_aligned_paddr (Physaddr (pa_stk sp0 (58 - i)%nat)) 8 = true.
 
-  Lemma sx_frame_carve (sp0 : mword 64) :
+  Lemma sx_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 60 -∗
     ⌜sx_alp sp0⌝ ∗ ⌜sx_ala sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
@@ -506,7 +506,7 @@ Section SysExecFrame.
     iSplitL "Hpb"; [iExact "Hpb" | iExact "Hab"].
   Qed.
 
-  Lemma sx_frame_join (sp0 : mword 64)
+  Lemma sx_frame_join `{XI : CurCtx} (sp0 : mword 64)
       (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v59 v60 : mword 64) :
     sx_alp sp0 -> sx_ala sp0 ->
     (pa_stk sp0 1) ↦₈[KT1] v1 -∗
@@ -598,16 +598,16 @@ Section SysExecFrame.
 
   (* the path buffer, named as bytes and back, and split at the NUL that
      [fetchstr] reports: kexec reads the prefix, the rest rides through. *)
-  Lemma sx_bytes_name (a : mword 64) (N : nat) :
+  Lemma sx_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma sx_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma sx_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
-  Lemma sx_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma sx_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -622,7 +622,7 @@ Section SysExecFrame.
   (* the two halves are named INDEPENDENTLY -- the string [argstr] left and
      the rest of the buffer are separate functions everywhere downstream, so
      a single [f] would force the body to reconcile them at every seam. *)
-  Lemma sx_buf_join (a : mword 64) (f g : nat -> bv 8) (k : nat) :
+  Lemma sx_buf_join `{XI : CurCtx} (a : mword 64) (f g : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat, pa_add (pa_add a (S k)) j ↦ₘ[KT1] g j) -∗
@@ -658,7 +658,7 @@ Section SysExecEpilogue.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   (* everything in the frame the epilogue does not itself touch *)
-  Definition sx_rest (sp0 : mword 64) : iProp Σ :=
+  Definition sx_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : mword 64, (pa_stk sp0 3) ↦₈[KT1] w) ∗
     ((∃ w : mword 64, (pa_stk sp0 4) ↦₈[KT1] w) ∗
     ((∃ w : mword 64, (pa_stk sp0 5) ↦₈[KT1] w) ∗
@@ -672,7 +672,7 @@ Section SysExecEpilogue.
      bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 26) 128 ∗
      bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 58) 256))))))))))%I.
 
-  Lemma sx_rest_join (sp0 v1 v2 : mword 64) :
+  Lemma sx_rest_join `{XI : CurCtx} (sp0 v1 v2 : mword 64) :
     sx_alp sp0 -> sx_ala sp0 ->
     (pa_stk sp0 1) ↦₈[KT1] v1 -∗ (pa_stk sp0 2) ↦₈[KT1] v2 -∗ sx_rest sp0 -∗
     stack_own (KTR := KT1) sp0 60.
@@ -2082,7 +2082,7 @@ Section SysExecFree.
      as a COQ premise rather than as conjuncts -- they are what kexec's own
      contract already states about [avf], so restating them here would make
      the seam a re-derivation. *)
-  Definition sx_argv_at (sp0 : mword 64) (k t : nat) (pg : nat -> mword 64)
+  Definition sx_argv_at `{XI : CurCtx} (sp0 : mword 64) (k t : nat) (pg : nat -> mword 64)
       : iProp Σ :=
     (([∗ list] j ∈ seq 0 k, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w) ∗
      ([∗ list] j ∈ seq k (t - k), (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j) ∗
@@ -2091,17 +2091,17 @@ Section SysExecFree.
 
   (* the pages themselves, as the named byte runs kexec was handed and kfree
      wants back *)
-  Definition sx_pages (pg : nat -> mword 64) (afun : nat -> nat -> bv 8)
+  Definition sx_pages `{XI : CurCtx} (pg : nat -> mword 64) (afun : nat -> nat -> bv 8)
       (k t : nat) : iProp Σ :=
     ([∗ list] j ∈ seq k (t - k),
        [∗ list] i ∈ seq 0 4096, pa_add (pg j) i ↦ₘ afun j i)%I.
 
   (* every slot back in the caller's hands, contents forgotten: what the
      epilogue's [bytes_own] carve is rebuilt from *)
-  Definition sx_argv_free (sp0 : mword 64) : iProp Σ :=
+  Definition sx_argv_free `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 32, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w)%I.
 
-  Local Lemma sx_ex_app (sp0 : mword 64) (t n : nat) :
+  Local Lemma sx_ex_app `{XI : CurCtx} (sp0 : mword 64) (t n : nat) :
     ([∗ list] j ∈ seq 0 t, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w) -∗
     ([∗ list] j ∈ seq t n, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w) -∗
     ([∗ list] j ∈ seq 0 (t + n), ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w).
@@ -2109,7 +2109,7 @@ Section SysExecFree.
 
   (* both exits leave the cursor AT the first NULL -- the early one because
      that is what it tested, the fall-through because [t = 32] there. *)
-  Lemma sx_argv_done (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
+  Lemma sx_argv_done `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t <= 32)%nat -> sx_argv_at sp0 t t pg ⊢ sx_argv_free sp0.
   Proof.
     intro Ht. rewrite /sx_argv_at /sx_argv_free Nat.sub_diag.
@@ -2132,7 +2132,7 @@ Section SysExecFree.
 
   (* peel the live cell at the cursor, with the wand that puts it back as a
      freed one *)
-  Local Lemma sx_argv_peel (sp0 : mword 64) (k t : nat) (pg : nat -> mword 64) :
+  Local Lemma sx_argv_peel `{XI : CurCtx} (sp0 : mword 64) (k t : nat) (pg : nat -> mword 64) :
     (k < t)%nat ->
     sx_argv_at sp0 k t pg -∗
     (pa_stk sp0 (58 - k)) ↦₈[KT1] pg k ∗
@@ -2148,7 +2148,7 @@ Section SysExecFree.
   Qed.
 
   (* the NULL at the cursor, with the wand that closes the loop out *)
-  Local Lemma sx_argv_null (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
+  Local Lemma sx_argv_null `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t < 32)%nat ->
     sx_argv_at sp0 t t pg -∗
     (pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) ∗
@@ -2169,7 +2169,7 @@ Section SysExecFree.
     iSplitL "Hcell"; [iExact "Hcell" | iExact "Hhi"].
   Qed.
 
-  Local Lemma sx_pages_peel (pg : nat -> mword 64) (afun : nat -> nat -> bv 8)
+  Local Lemma sx_pages_peel `{XI : CurCtx} (pg : nat -> mword 64) (afun : nat -> nat -> bv 8)
       (k t : nat) :
     (k < t)%nat ->
     sx_pages pg afun k t -∗
@@ -2629,14 +2629,14 @@ Section SysExecLoop.
 
   (* ---- the array, as the FILL loop sees it: filled below [t], memset's
          zero from [t] up ---- *)
-  Definition sx_argv0 (sp0 : mword 64) (t : nat) (pg : nat -> mword 64)
+  Definition sx_argv0 `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64)
       : iProp Σ :=
     (([∗ list] j ∈ seq 0 t, (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j) ∗
      ([∗ list] j ∈ seq t (32 - t),
         (pa_stk sp0 (58 - j)) ↦₈[KT1] (mword_of_int 0 : mword 64)))%I.
 
   (* the array MINUS the slot at the cursor *)
-  Definition sx_argv_rest (sp0 : mword 64) (t : nat) (pg : nat -> mword 64)
+  Definition sx_argv_rest `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64)
       : iProp Σ :=
     (([∗ list] j ∈ seq 0 t, (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j) ∗
      ([∗ list] j ∈ seq (S t) (31 - t),
@@ -2647,7 +2647,7 @@ Section SysExecLoop.
 
   (* the fill loop's view and the free loop's view are one predicate -- the
      free loop just starts with an empty freed prefix. *)
-  Lemma sx_argv0_at (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
+  Lemma sx_argv0_at `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     sx_argv0 sp0 t pg ⊢ sx_argv_at sp0 0 t pg.
   Proof.
     rewrite /sx_argv0 /sx_argv_at Nat.sub_0_r sx_seq00 big_sepL_nil.
@@ -2655,7 +2655,7 @@ Section SysExecLoop.
     iSplitL "A"; [iExact "A" | iExact "B"].
   Qed.
 
-  Lemma sx_argv0_open (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
+  Lemma sx_argv0_open `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t < 32)%nat ->
     sx_argv0 sp0 t pg ⊢
     (pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) ∗
@@ -2668,7 +2668,7 @@ Section SysExecLoop.
     iSplitL "Hmid"; [iExact "Hmid" | iExact "Hhi"].
   Qed.
 
-  Lemma sx_argv0_shut (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
+  Lemma sx_argv0_shut `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t < 32)%nat ->
     (pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) -∗
     sx_argv_rest sp0 t pg -∗ sx_argv0 sp0 t pg.
@@ -2680,7 +2680,7 @@ Section SysExecLoop.
     iSplitL "Hcell"; [iExact "Hcell" | iExact "Hhi"].
   Qed.
 
-  Lemma sx_argv0_close (sp0 : mword 64) (t : nat) (pg pg' : nat -> mword 64) :
+  Lemma sx_argv0_close `{XI : CurCtx} (sp0 : mword 64) (t : nat) (pg pg' : nat -> mword 64) :
     (t < 32)%nat -> (forall j, (j < t)%nat -> pg' j = pg j) ->
     (pa_stk sp0 (58 - t)) ↦₈[KT1] pg' t -∗ sx_argv_rest sp0 t pg -∗
     sx_argv0 sp0 (S t) pg'.
@@ -2695,7 +2695,7 @@ Section SysExecLoop.
     - rewrite (_ : (32 - S t)%nat = (31 - t)%nat); [| lia]. iExact "Hhi".
   Qed.
 
-  Lemma sx_pages_close (pg pg' : nat -> mword 64)
+  Lemma sx_pages_close `{XI : CurCtx} (pg pg' : nat -> mword 64)
       (afun afun' : nat -> nat -> bv 8) (t : nat) :
     (forall j, (j < t)%nat -> pg' j = pg j) ->
     (forall j, (j < t)%nat -> afun' j = afun j) ->
@@ -2715,7 +2715,7 @@ Section SysExecLoop.
 
   (* ---- everything the loop only CARRIES: the ten spill slots and the
          path buffer, split at the NUL argstr reported ---- *)
-  Definition sx_carry (sp0 : mword 64) (m : regfile) (plen : nat)
+  Definition sx_carry `{XI : CurCtx} (sp0 : mword 64) (m : regfile) (plen : nat)
       (pfun rest : nat -> bv 8) : iProp Σ :=
     ((pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
@@ -3773,7 +3773,7 @@ Section SysExecReload.
 
   (* the seven lazily-spilled callee-saved registers, at the values the
      epilogue's premises want them back at *)
-  Definition sx_spill (sp0 : mword 64) (m : regfile) : iProp Σ :=
+  Definition sx_spill `{XI : CurCtx} (sp0 : mword 64) (m : regfile) : iProp Σ :=
     ((pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
      (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
@@ -4039,7 +4039,7 @@ Section SysExecReload.
 
   (* ---- the frame, opened for the reload and closed for the epilogue ---- *)
 
-  Lemma sx_carry_open (sp0 : mword 64) (m : regfile) (plen : nat)
+  Lemma sx_carry_open `{XI : CurCtx} (sp0 : mword 64) (m : regfile) (plen : nat)
       (pfun rest : nat -> bv 8) :
     sx_carry sp0 m plen pfun rest -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
@@ -4061,7 +4061,7 @@ Section SysExecReload.
     iSplitL "Hp"; [iExact "Hp" | iExact "Hs"].
   Qed.
 
-  Lemma sx_rest_build (sp0 : mword 64) (m : regfile) (plen : nat)
+  Lemma sx_rest_build `{XI : CurCtx} (sp0 : mword 64) (m : regfile) (plen : nat)
       (pfun rest : nat -> bv 8) (uav : mword 64) :
     (plen < 128)%nat ->
     sx_spill sp0 m -∗
@@ -4096,7 +4096,7 @@ Section SysExecReload.
      points-to carries its own alignment, and [slotsn_bytes_own (KTR := KT1)] hands the
      whole run's out.  The round trip through [bytes_own_slotsn (KTR := KT1)] is what
      makes the extraction non-consuming. *)
-  Lemma sx_argv_ala (sp0 : mword 64) :
+  Lemma sx_argv_ala `{XI : CurCtx} (sp0 : mword 64) :
     sx_argv_free sp0 ⊢ ⌜sx_ala sp0⌝ ∗ sx_argv_free sp0.
   Proof.
     rewrite /sx_argv_free. iIntros "H".
@@ -4572,7 +4572,7 @@ Section SysExecBreak.
   (* THE CHANGE OF VIEW.  Both sides own the same 32 cells; the loop counts
      them from the array's base and kexec counts them from its argument
      pointer, and the NULL is the one cell they disagree about naming. *)
-  Lemma sx_argv_kx (sp0 : mword 64) (i : nat) (pg : nat -> mword 64) :
+  Lemma sx_argv_kx `{XI : CurCtx} (sp0 : mword 64) (i : nat) (pg : nat -> mword 64) :
     (i < 32)%nat ->
     sx_argv0 sp0 i pg ⊣⊢
     (([∗ list] j ∈ seq 0 (S i),
@@ -4606,7 +4606,7 @@ Section SysExecBreak.
       iSplitL "B"; [iExact "B" | iExact "Cc"].
   Qed.
 
-  Lemma sx_pages_ext (pg pg' : nat -> mword 64) (afun : nat -> nat -> bv 8)
+  Lemma sx_pages_ext `{XI : CurCtx} (pg pg' : nat -> mword 64) (afun : nat -> nat -> bv 8)
       (t : nat) :
     (forall j, (j < t)%nat -> pg' j = pg j) ->
     sx_pages pg afun 0 t ⊣⊢ sx_pages pg' afun 0 t.

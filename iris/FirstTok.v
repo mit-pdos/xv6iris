@@ -204,6 +204,7 @@ Section FirstTok.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   Context `{!xv6G Σ, !bioslotG Σ} `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  1.  THE PERSISTENT HALF -- what main has built by +0x9e             *)
@@ -241,7 +242,7 @@ Section FirstTok.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (λ ξ : CtxId, kmem_res ξ fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      ⌜fs_geom_ok⌝)%I.
 
   Global Instance first_boot_persist_persistent : Persistent first_boot_persist.

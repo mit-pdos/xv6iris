@@ -36,6 +36,7 @@ Local Open Scope Z_scope.
 
 Section FileInv.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
 
 
   Definition ftable_res (γ : gname) : iProp Σ :=
@@ -96,12 +97,12 @@ Section FileInv.
   Proof.
     rewrite /file_fields.
     rewrite (word4_pointsto_frac_split (a_ftype k)).
-    rewrite (mem_pointsto_frac_split (a_freadable k)).
-    rewrite (mem_pointsto_frac_split (a_fwritable k)).
-    rewrite (word_pointsto_frac_split (a_fpipe k)).
+    rewrite (ctx_pointsto_frac_split _ (a_freadable k)).
+    rewrite (ctx_pointsto_frac_split _ (a_fwritable k)).
+    rewrite (ctx_word_pointsto_frac_split _ (a_fpipe k)).
     rewrite (word2_pointsto_frac_split (a_fmajor k)).
     (* the ip cell is at HALF, and halving distributes over the sum *)
-    rewrite Qp.div_add_distr (word_pointsto_frac_split (a_fip k)).
+    rewrite Qp.div_add_distr (ctx_word_pointsto_frac_split _ (a_fip k)).
     iSplit.
     - iIntros "([A1 B1] & [A2 B2] & [A3 B3] & [A4 B4] & [A5 B5] & [A6 B6])".
       iFrame.
@@ -705,7 +706,7 @@ Section FileGhostAlloc.
   (* [ftable_ghosts_alloc] could not know: it hands out [inhabitant] and   *)
   (* this lemma overwrites the [fp_ocv] field with [fpay_tok_update].      *)
   (* ================================================================== *)
-  Lemma ftable_res_boot (E : coPset) :
+  Lemma ftable_res_boot `{XI : CurCtx} (E : coPset) :
     ([∗ list] k ∈ seq 0 NFILE, fentry_raw k) -∗
     fd_slots_auth -∗
     iref_slots NFILE ={E}=∗
@@ -730,7 +731,7 @@ Section FileGhostAlloc.
                             (%pp & Hpp) & (%ip & Hip) & Hoff & (%mj & Hmj))".
       (* [f->ip] in half: the reference's half and the invariant's. *)
       iDestruct (bi.equiv_entails_1_1 _ _
-                   (word_pointsto_frac_split (a_fip k) (1/2) (1/2) ip)
+                   (ctx_word_pointsto_frac_split _ (a_fip k) (1/2) (1/2) ip)
                    with "[Hip]") as "[Hip1 Hip2]".
       { iEval (rewrite Qp.div_2). iExact "Hip". }
       iMod (off_hold_alloc E γ k false with "[Hip2 Hoff]") as (γx) "Hoffhold".

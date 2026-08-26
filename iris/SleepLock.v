@@ -97,6 +97,7 @@ Local Open Scope Z_scope.
 
 Section SleepLock.
   Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- geometry, in the EXACT instruction address forms so the cells
      unify with the leaf and call specs without rewriting:
@@ -115,8 +116,11 @@ Section SleepLock.
 
   (* the sleeplock's own name field (+32), mirroring [lock_name]: written
      once by initsleeplock and then discarded, so persistent. *)
+  (* RAW (context-free), for the same reason as [WpLock.lock_name]: name
+     metadata inside the persistent handle must not drag a context in. *)
   Definition sl_name (slk : mword 64) (s : string) : iProp Σ :=
-    (∃ p : mword 64, sl_name_field slk ↦₈□ p ∗ p ↦ₛ□ s)%I.
+    (∃ p : mword 64,
+       word_pointsto (sl_name_field slk) DfracDiscarded p ∗ p ↦ₛ□ s)%I.
 
   Global Instance sl_name_persistent slk s : Persistent (sl_name slk s).
   Proof. apply _. Qed.
@@ -588,7 +592,7 @@ Section SleepLock.
     iModIntro. iExists γ. iFrame "Hauth". iExists 1%Qp. iFrame.
   Qed.
 
-  Lemma new_sleeplock_gen_at `{XI : CurCtx} E (γ : gname) (slk : mword 64) (s : string)
+  Lemma new_sleeplock_gen_at E (γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_tok γ -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗
@@ -608,7 +612,7 @@ Section SleepLock.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
-  Lemma new_sleeplock_gen `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ)
+  Lemma new_sleeplock_gen E (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
@@ -633,7 +637,7 @@ Section SleepLock.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
 
-  Lemma new_sleeplock `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma new_sleeplock E (slk : mword 64) (s : string) (R : iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -681,7 +685,7 @@ Section SleepLock.
   (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
      word of the inner spinlock goes INTO [lock_inv] (WpLock.v owns both lock
      words). *)
-  Lemma sl_fresh_new_gen `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ)
+  Lemma sl_fresh_new_gen E (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗
     ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
@@ -690,7 +694,7 @@ Section SleepLock.
     iApply (new_sleeplock_gen E slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
   Qed.
 
-  Lemma sl_fresh_new `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma sl_fresh_new E (slk : mword 64) (s : string) (R : iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
     iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
@@ -700,7 +704,7 @@ Section SleepLock.
   (* [sl_fresh_new_gen] at a PRE-ALLOCATED gname -- what an array
      initializer (iinit over itable.inode[]) uses when the gnames had to be
      fixed before the locks were built.  See [new_sleeplock_gen_at]. *)
-  Lemma sl_fresh_new_gen_at `{XI : CurCtx} E (γ : gname) (slk : mword 64) (s : string)
+  Lemma sl_fresh_new_gen_at E (γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_tok γ -∗ sl_fresh slk s -∗ R ={E}=∗
     ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
@@ -713,7 +717,7 @@ Section SleepLock.
   (* the TRACKED end: the caller keeps the authoritative zero and hands out
      shares from it.  [slh_auth γ None] in hand is exactly the evidence the
      non-blocking acquiresleep asks for. *)
-  Lemma sl_fresh_new_tok `{XI : CurCtx} E (slk : mword 64) (s : string) (R : iProp Σ) :
+  Lemma sl_fresh_new_tok E (slk : mword 64) (s : string) (R : iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗
     ∃ γl γ : gname, is_sleeplock_tok γl γ slk s R ∗ slh_auth γ None.
   Proof. iIntros "Hf HR". iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf HR"). Qed.

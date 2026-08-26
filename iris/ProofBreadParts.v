@@ -98,6 +98,7 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 
 Section BreadScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* the one-slot update of the scan's [devs] / [bnos] functions.  Named (not
      an inline [fun j => if decide (j = k) then v else f j]) because the

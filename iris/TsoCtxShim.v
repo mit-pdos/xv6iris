@@ -83,6 +83,45 @@ Section shim.
     ctx_pointsto (KTR := KTR) ξ a dq v -∗ mem_pointsto (KTR := KTR) a dq v.
   Proof. rewrite ctx_pointsto_shim. auto. Qed.
 
+  (* THE WORD BRIDGE (M1 flip stage 1): the flipped [↦₈] against the
+     kit's raw word fact.  The leaf proofs' one-line conversion; dies at
+     cutover with the file. *)
+  Lemma ctx_word_shim (KTR : CurKtier) (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+    ctx_word_pointsto (KTR := KTR) ξ a dq w
+    ⊣⊢ word_pointsto (KTR := KTR) a dq w.
+  Proof.
+    rewrite /ctx_word_pointsto word_pointsto_unfold.
+    apply bi.sep_proper; [done|].
+    apply big_opL_proper. intros ? j ?. apply ctx_pointsto_shim.
+  Qed.
+
+  Lemma ctx_word_of_mem (KTR : CurKtier) (ξ : CtxId) a dq w :
+    word_pointsto (KTR := KTR) a dq w -∗
+    ctx_word_pointsto (KTR := KTR) ξ a dq w.
+  Proof. rewrite ctx_word_shim. auto. Qed.
+
+  Lemma ctx_word_to_mem (KTR : CurKtier) (ξ : CtxId) a dq w :
+    ctx_word_pointsto (KTR := KTR) ξ a dq w -∗
+    word_pointsto (KTR := KTR) a dq w.
+  Proof. rewrite ctx_word_shim. auto. Qed.
+
+  (* the ∃-slot forms the stack-frame hand-offs trade in (a frame slot
+     whose value nobody names) *)
+  Lemma ctx_eslot_of_mem (KTR : CurKtier) (ξ : CtxId) (a : Arch.pa) :
+    (∃ w : bv 64, word_pointsto (KTR := KTR) a (DfracOwn 1) w) -∗
+    ∃ w : mword 64, ctx_word_pointsto (KTR := KTR) ξ a (DfracOwn 1) w.
+  Proof.
+    iIntros "[%w Hw]". iExists w. iApply (ctx_word_of_mem with "Hw").
+  Qed.
+
+  Lemma ctx_eslot_to_mem (KTR : CurKtier) (ξ : CtxId) (a : Arch.pa) :
+    (∃ w : mword 64, ctx_word_pointsto (KTR := KTR) ξ a (DfracOwn 1) w) -∗
+    ∃ w : bv 64, word_pointsto (KTR := KTR) a (DfracOwn 1) w.
+  Proof.
+    iIntros "[%w Hw]". iExists w. iApply (ctx_word_to_mem with "Hw").
+  Qed.
+
   (* the [∗ list] window form the buffer specs trade in *)
   Lemma ctx_buf_of_mem (KTR : CurKtier) (ξ : CtxId)
       (p : Arch.pa) (len : nat) (f : nat -> bv 8) (dq : dfrac) :

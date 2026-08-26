@@ -203,7 +203,7 @@ Section BallocDefs.
   (* balloc's 80-byte frame: ra@72 s0@64 s1@56 s2@48 s3@40 s4@32 s5@24
      s6@16 s7@8 s8@0.  [pa_stk sp j] counts DOWN from the entry sp, so slot
      j holds the register saved at (newsp + 80 - 8j). *)
-  Definition ba_frame (m : regfile) : iProp Σ :=
+  Definition ba_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -267,7 +267,7 @@ Section BallocDefs.
   
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new byte
      list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
-  Lemma ba_buf_byte (pb : mword 64) (bno dsk : mword 32)
+  Lemma ba_buf_byte `{XI : CurCtx} (pb : mword 64) (bno dsk : mword 32)
       (l : list (bv 8)) (d : nat) :
     length l = 1024%nat -> (d < 1024)%nat ->
     buf_own pb bno dsk l -∗
@@ -299,7 +299,7 @@ Section BallocDefs.
 
   (* THE WHOLE data area, in the [∗ list] shape [SpecMemset] takes and
      gives back -- the inlined bzero's window. *)
-  Lemma ba_buf_all (pb : mword 64) (bno dsk : mword 32) (l : list (bv 8)) :
+  Lemma ba_buf_all `{XI : CurCtx} (pb : mword 64) (bno dsk : mword 32) (l : list (bv 8)) :
     length l = 1024%nat ->
     buf_own pb bno dsk l -∗
       ([∗ list] jj ∈ seq 0 1024, pa_add (b_data pb) jj ↦ₘ (l !!! jj)) ∗

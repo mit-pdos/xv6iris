@@ -32,6 +32,7 @@ Local Open Scope Z_scope.
 
 Section TicksInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
      belong to [lock_inv] (WpLock.v); nothing here names the cpu word. *)
@@ -57,7 +58,7 @@ Section TicksInv.
   (* ---- construction (the "newlock" ghost step): what a caller does with
      trapinit's postcondition -- the freshly zeroed lock word and its
      persistent name, plus the counter cell, become the tickslock. *)
-  Lemma new_tickslock `{XI : CurCtx} E (t : mword 32) :
+  Lemma new_tickslock E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu a_tickslock ↦₈ (zero_reg : mword 64) -∗

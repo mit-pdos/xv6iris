@@ -571,7 +571,12 @@ Section PwPieces.
     iDestruct "A7" as (w14) "H14". iEval (rewrite E14) in "H14".
     iDestruct (slot_bytes_own (KTR := KT1) with "H13") as "[%Hal Hb13]".
     iSplitL "H8 H9 H10 H11 H12".
-    { iExists w8, w9, w10, w11, w12. iFrame "H8 H9 H10 H11 H12". }
+    { iDestruct (TsoCtxShim.ctx_word_of_mem with "H8") as "H8".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "H9") as "H9".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "H10") as "H10".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "H11") as "H11".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "H12") as "H12".
+      iExists w8, w9, w10, w11, w12. iFrame "H8 H9 H10 H11 H12". }
     rewrite /pw_chslot. iSplitR; [done|]. iFrame "Hb13". iExists w14. iFrame "H14".
   Qed.
 

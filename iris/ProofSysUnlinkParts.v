@@ -79,6 +79,7 @@ Require Import SpecSysUnlink.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ has not flipped: word split/join cross the seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -855,7 +856,7 @@ Definition su_al (sp0 : mword 64) : Prop :=
 Section ProofSysUnlinkFrame.
   Context `{!riscvGS Σ}.
 
-  Lemma su_frame_carve (sp0 : mword 64) :
+  Lemma su_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 30 -∗
     ⌜su_al sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
@@ -905,11 +906,17 @@ Section ProofSysUnlinkFrame.
       as "[%HalE HbE]".
     { cbn [seq]. iSplitL "H29"; [iExact "H29" |].
       iSplitL "H28"; [iExact "H28" |]. done. }
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H4") as "H4".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H5") as "H5".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H6") as "H6".
     iFrame "H1 H2 H3 H4 H5 H6 HbD HbN HbP H27 HbE H30". iPureIntro.
     split_and!; assumption.
   Qed.
 
-  Lemma su_frame_join (sp0 : mword 64) (w1 w2 w3 w4 w5 w6 w27 w30 : mword 64) :
+  Lemma su_frame_join `{XI : CurCtx} (sp0 : mword 64) (w1 w2 w3 w4 w5 w6 w27 w30 : mword 64) :
     su_al sp0 ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
     (pa_stk sp0 3) ↦₈[KT1] w3 -∗ (pa_stk sp0 4) ↦₈[KT1] w4 -∗
@@ -967,18 +974,18 @@ Section ProofSysUnlinkFrame.
   (* the buffers, named as bytes and back: argstr / nameiparent / namecmp /
      dirlookup / memset / readi / writei all speak the [seq]-indexed byte
      window, not [bytes_own]. *)
-  Lemma su_bytes_name (a : mword 64) (N : nat) :
+  Lemma su_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma su_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma su_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): nameiparent reads the NUL-terminated prefix and
      the rest rides through untouched *)
-  Lemma su_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma su_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -990,7 +997,7 @@ Section ProofSysUnlinkFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma su_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma su_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
@@ -1008,7 +1015,7 @@ Section ProofSysUnlinkFrame.
   (* the NAME buffer is sixteen bytes of frame but FOURTEEN of DIRSIZ; the
      two trailing bytes ride through nameiparent and both namecmps and
      dirlookup untouched. *)
-  Lemma su_nm_split (a : mword 64) (f : nat -> bv 8) :
+  Lemma su_nm_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] f j)
     ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[KT1] f (14 + j)%nat).
@@ -1017,7 +1024,7 @@ Section ProofSysUnlinkFrame.
     rewrite (bb_split a 14 2 f). iIntros "[$ $]".
   Qed.
 
-  Lemma su_nm_join (a : mword 64) (f g : nat -> bv 8) :
+  Lemma su_nm_join `{XI : CurCtx} (a : mword 64) (f g : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] g j) -∗
     ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[KT1] f (14 + j)%nat) -∗
     bytes_own (KTR := KT1) (DfracOwn 1) a 16.
@@ -1033,16 +1040,26 @@ Section ProofSysUnlinkFrame.
   (* THE [off] CELL, the one 4-byte view of a frame slot sys_unlink needs.
      The LOWER word of slot 27 is dead; it rides through as an arbitrary
      word and comes back. *)
-  Lemma su_off_split (sp0 : mword 64) (w : mword 64) :
+  Lemma su_off_split `{XI : CurCtx} (sp0 : mword 64) (w : mword 64) :
     (pa_stk sp0 27) ↦₈[KT1] w ⊢
     (pa_stk sp0 27) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 27) 4) ↦₄[KT1] word_hi w.
-  Proof. apply word_pointsto_split4. Qed.
+  Proof.
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
+       4-byte tower through the shim *)
+    iIntros "H". iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
+    iDestruct (word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iFrame "Hlo Hhi".
+  Qed.
 
-  Lemma su_off_join (sp0 : mword 64) (lo hi : bv 32) :
+  Lemma su_off_join `{XI : CurCtx} (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 27)) 8 = true ->
     (pa_stk sp0 27) ↦₄[KT1] lo -∗ (pa_add (pa_stk sp0 27) 4) ↦₄[KT1] hi -∗
     (pa_stk sp0 27) ↦₈[KT1] word_of_words lo hi.
-  Proof. intro Hal. apply word_pointsto_join4. exact Hal. Qed.
+  Proof.
+    intro Hal. iIntros "Hlo Hhi".
+    iApply TsoCtxShim.ctx_word_of_mem.
+    iApply (word_pointsto_join4 _ _ _ _ Hal with "Hlo Hhi").
+  Qed.
 
 End ProofSysUnlinkFrame.
 

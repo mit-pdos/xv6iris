@@ -96,6 +96,7 @@ Notation panic_stack := (52%nat) (only parsing).
 Section PanicEnv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* the three persistent credentials the printk cone needs, as one
      hypothesis.  All hart-free, so this crosses a migration untouched. *)

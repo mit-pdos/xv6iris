@@ -465,7 +465,7 @@ Section BfreeDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
-  Definition bf_frame (m : regfile) : iProp Σ :=
+  Definition bf_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -473,7 +473,7 @@ Section BfreeDefs.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new
      byte list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
-  Lemma bf_buf_byte (pb : mword 64) (bno dsk : mword 32)
+  Lemma bf_buf_byte `{XI : CurCtx} (pb : mword 64) (bno dsk : mword 32)
       (l : list (bv 8)) (d : nat) :
     length l = 1024%nat -> (d < 1024)%nat ->
     buf_own pb bno dsk l -∗

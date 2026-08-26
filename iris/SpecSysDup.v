@@ -88,7 +88,7 @@ Section SpecSysDup.
   (* sys_dup's result, keyed by the returned a0.  THREE arms, because there are
      two ways to fail and they are distinguishable: no such descriptor, or no
      room for another one.  Both leave the process exactly as it was. *)
-  Definition sys_dup_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_dup_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (V : pprivate) (v : mword 64) (r : mword 64) : iProp Σ :=
     ((* argfd said no: the argument is not an open descriptor *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile V) = None⌝ ∗

@@ -139,7 +139,7 @@ Section SpecSysPipe.
      [upd_upt], so this predicate is purely about the DESCRIPTORS).
 
      Both arms hand back the two fd units: see the table in the header. *)
-  Definition sys_pipe_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_pipe_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (W : pprivate) (r : mword 64) : iProp Σ :=
     ((* FAILURE.  Whichever tail ran, the descriptor array is EXACTLY as it
         came in: the two arms that had already installed a descriptor null

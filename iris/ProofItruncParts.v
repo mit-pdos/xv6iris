@@ -321,6 +321,7 @@ Require Import LogInv.
 Require Import BitmapInv.
 Require Import SpecItrunc.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Notation Rra := (mword_of_int 1 : mword 5).
 Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -333,6 +334,7 @@ Notation Ra1 := (mword_of_int 11 : mword 5).
 
 Section ItruncDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* itrunc's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 6 (@0)
      which the DIRECT path never touches -- [sd s4,0(sp)] is at +0x50,

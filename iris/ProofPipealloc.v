@@ -946,7 +946,9 @@ Section ProofPipealloc.
       iSpecialize ("Ht8" $! CID14 with "[%]"); [wp_next_chain|].
       iApply ("Ht8" $! mB with "[%] Hcg Hpc Hcnt Hextc Hextm [Hr16 Hr8] [Hc0] Hslota' [Hc1 Hslotb] Hav Hpbare Hiru").
       { split; [exact HmBsp|]. split; [exact HmBs4 | exact HmBthr]. }
-      { iExists u16, u8. iFrame "Hr16 Hr8". }
+      { iDestruct (TsoCtxShim.ctx_word_of_mem with "Hr16") as "Hr16".
+        iDestruct (TsoCtxShim.ctx_word_of_mem with "Hr8") as "Hr8".
+        iExists u16, u8. iFrame "Hr16 Hr8". }
       { iExists (mB !!! Regidx Ra0). iExact "Hc0". }
       { rewrite /PF1. iLeft. iFrame "Hc1 Hslotb". } }
     iDestruct "Hpost0" as (k0 Cf0) "[%Hk0 Href0]".

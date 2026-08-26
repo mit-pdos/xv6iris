@@ -817,7 +817,7 @@ Section SyscallVocab.
     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
     is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
-      (λ ξ : CtxId, kmem_res ξ (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
+      (λ ξ : CtxId, kmem_res (XIk := ξ) (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
     kalloc_avail (fcn_kalloc fn) None ∗
     (* [sysc_ic_env fn] USED TO BE HERE, between the allocator and
        [ireg_open].  It is [sysc_ic_env_of_ready] now: the icache rows are a

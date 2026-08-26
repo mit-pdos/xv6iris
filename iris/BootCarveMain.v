@@ -60,6 +60,9 @@ Require Import LogDefs LogInv.
 Require Import SpecMain.
 Require Import FileInvDefs.   (* the open-file table's geometry and [fentry_raw] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* [Require] WITHOUT [Import]: this boot file's ↦-statements stay RAW;
+   the shim is named qualified only to hand converted facts across. *)
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* --- the alignment arithmetic the structured carves need, over plain [Z] --- *)
@@ -486,7 +489,7 @@ Section BootCarveMain.
   (* after their [sign_extend']-ed 12-bit literal offsets reduce by      *)
   (* [vm_compute].                                                      *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_lk_raw (g : gstate) (A : Z) :
+  Lemma boot_lk_raw `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> A + 24 <= ram_hi -> A mod 8 = 0 ->
@@ -519,6 +522,8 @@ Section BootCarveMain.
     iDestruct (boot_ran_cell8 g (A + 16) Hmem ltac:(lia) ltac:(lia) Hal16
                  with "Hcl H2") as (vcpu) "H2".
     rewrite /lk_raw /lock_name_field /lk_cpu E8 E16 !off_of_z.
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H2") as "H2".
     iExists vlock, vname, vcpu. iFrame "H0 H1 H2".
   Qed.
 
@@ -532,7 +537,7 @@ Section BootCarveMain.
   (* lock consoleinit has just initialised.  The four bytes of padding   *)
   (* between the ring's end and [pr] are dropped, as everywhere.         *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_cons_res (g : gstate) :
+  Lemma boot_cons_res `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= KernelSyms.cons ->
@@ -605,7 +610,7 @@ Section BootCarveMain.
      [lk.name ↦₈] at +16, [lk.cpu ↦₈] at +24), then [name ↦₈] at +32 and
      [pid ↦₄] at +40.  Serves every sleeplock in the image: the NBUF buffer
      locks and the NINODE inode locks. *)
-  Lemma boot_sl_raw (g : gstate) (A : Z) :
+  Lemma boot_sl_raw `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> A + 44 <= ram_hi -> A mod 8 = 0 ->
@@ -670,6 +675,9 @@ Section BootCarveMain.
       as (vpid) "H5".
     rewrite /sl_raw /sl_lkcpu /sl_name_field /sl_pid /lock_name_field /sl_lk
             E8 E16 E32 E40 !off_of_z En16 En24.
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H4") as "H4".
     iExists vlocked, vlk, vpid, vlkname, vcpu, vname.
     iFrame "H0 H1 H2 H3 H4 H5".
   Qed.
@@ -769,7 +777,7 @@ Section BootCarveMain.
   Qed.
 
   (* the eight slots, out of the two ranges. *)
-  Lemma boot_disk_slots (g : gstate) :
+  Lemma boot_disk_slots `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -813,7 +821,16 @@ Section BootCarveMain.
     rewrite /disk_slot_raw /ops_own
             (d_info_b_of_z i) (d_info_status_of_z i) (d_ops_of_z i)
             (d_ops_res_of_z i) (d_ops_sec_of_z i) /dinfo_raw /dops_raw.
-    iDestruct "Hi" as "[Hb Hs]". iFrame "Ho Hs Hb".
+    iDestruct "Hi" as "[Hb Hs]".
+    iDestruct "Ho" as (t r s) "(Ht & Hr & Hos)".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hos") as "Hos".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "Hb") as "Hb".
+    iDestruct "Hs" as (sb) "Hsb".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hsb") as "Hsb".
+    iSplitR "Hb Hsb"; last iSplitL "Hsb".
+    { iExists t, r, s. iFrame "Ht Hr Hos". }
+    { iExists sb. iExact "Hsb". }
+    iExact "Hb".
   Qed.
 
   (* ------------------------------------------------------------------ *)

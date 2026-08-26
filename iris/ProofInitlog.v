@@ -382,7 +382,7 @@ Section InitlogDefs.
      initlog never WRITES the buffer, so the give-back is at the same word,
      and [ByteBuf.bb_set_mk] -- writing back what was read changes nothing --
      is what says the handle brelse gets is bread's, byte for byte. *)
-  Lemma il_hdr_acc (a : Arch.pa) (bs : list (bv 8)) :
+  Lemma il_hdr_acc `{XI : CurCtx} (a : Arch.pa) (bs : list (bv 8)) :
     (4 <= length bs)%nat ->
     is_aligned_paddr (Physaddr a) 4 = true ->
     ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x) -∗
@@ -446,7 +446,7 @@ Section InitlogDefs.
     rewrite (il_take4 bs (4 * k)%nat Hle). reflexivity.
   Qed.
 
-  Lemma il_word_acc (a : Arch.pa) (bs : list (bv 8)) (k : nat) :
+  Lemma il_word_acc `{XI : CurCtx} (a : Arch.pa) (bs : list (bv 8)) (k : nat) :
     (4 * k + 4 <= length bs)%nat ->
     is_aligned_paddr (Physaddr (pa_add a (4 * k)%nat)) 4 = true ->
     ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x) -∗

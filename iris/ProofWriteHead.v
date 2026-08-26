@@ -190,7 +190,7 @@ Lemma wh_ptr_eqb (p : SailStdpp.Values.mword 64) (a b : nat) :
 Proof. intros Ha Hb. apply ByteCursor.pa_add_eqb; lia. Qed.
 
 (* the ONE content fact the postcondition states: the header's [n] field *)
-Lemma wh_take4 (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) :
+Lemma wh_take4 `{XI : CurCtx} (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) :
   (forall j, (j < 4)%nat -> f j = nth_byte nn j) ->
   hdr_n (f <$> seq 0 1024) = bv_unsigned nn.
 Proof.
@@ -223,7 +223,7 @@ Proof.
 Qed.
 
 (* [wh_take4] at an arbitrary aligned offset *)
-Lemma wh_take4_at (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) (o : nat) :
+Lemma wh_take4_at `{XI : CurCtx} (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) (o : nat) :
   (o + 4 <= 1024)%nat ->
   (forall j, (j < 4)%nat -> f (o + j)%nat = nth_byte nn j) ->
   assemble_bytes (take 4 (drop o (f <$> seq 0 1024))) = bv_unsigned nn.
@@ -274,7 +274,7 @@ Qed.
    decodes to exactly the in-memory header [(n, W)].  [Hf4] is the [n] field
    ([wh_take4]'s hypothesis, unchanged) and [Henc] is the loop's strengthened
    invariant: entry [i'] went to the word at byte offset [4 * S i']. *)
-Lemma wh_hdr_dec (f : nat -> bv 8) (n : nat) (W : list (SailStdpp.Values.mword 32)) :
+Lemma wh_hdr_dec `{XI : CurCtx} (f : nat -> bv 8) (n : nat) (W : list (SailStdpp.Values.mword 32)) :
   n = length W -> (n <= LOGBLOCKS)%nat ->
   (forall jj, (jj < 4)%nat ->
      f jj = nth_byte (mword_of_int (Z.of_nat n) : SailStdpp.Values.mword 32) jj) ->
@@ -386,7 +386,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the payload-less handle, with its bytes in window form            *)
   (* ---------------------------------------------------------------- *)
-  Definition wh_hold (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Definition wh_hold `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (f : nat -> bv 8) (bsd : list (bv 8)) : iProp Σ :=
     (⌜(k < NBUF)%nat⌝ ∗
      ⌜uint bno ∈ bv_cov V⌝ ∗
@@ -399,7 +399,7 @@ Section WriteHeadDefs.
      bb_bytes (b_data (bnode k)) 1024 f ∗
      disk_block (bv_gd V) (uint bno) bsd)%I.
 
-  Lemma wh_hold_of (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Lemma wh_hold_of `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (bs bsd : list (bv 8)) :
     bio_hold0 bn V k pidv dev bno bs bsd -∗
     wh_hold bn V k pidv dev bno (fun j => bs !!! j) bsd.
@@ -416,7 +416,7 @@ Section WriteHeadDefs.
     iSplitL "Hby"; [iExact "Hby"|]. iExact "H6".
   Qed.
 
-  Lemma wh_hold_to (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Lemma wh_hold_to `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (f : nat -> bv 8) (bsd : list (bv 8)) :
     wh_hold bn V k pidv dev bno f bsd -∗
     bio_hold0 bn V k pidv dev bno (f <$> seq 0 1024) bsd.
@@ -491,7 +491,7 @@ Section WriteHeadDefs.
         WP (Loop : expr riscv_lang))%I.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
-  Definition wh_frame (m : regfile) : iProp Σ :=
+  Definition wh_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗

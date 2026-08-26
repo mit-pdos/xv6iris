@@ -658,7 +658,7 @@ Section KexecDCommit.
     rewrite (bb_split3 a o 8 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
+    { iApply (ctx_word_pointsto_intro (KTR := KT1) _ _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }

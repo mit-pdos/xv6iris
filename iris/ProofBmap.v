@@ -546,7 +546,7 @@ Section BmapDefs.
      s4's home -- held ANONYMOUSLY, because the direct arm never writes it
      and the indirect arms have read it back by the time the epilogue
      runs. *)
-  Definition bm_frame (m : regfile) : iProp Σ :=
+  Definition bm_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -556,7 +556,7 @@ Section BmapDefs.
 
   (* the frame with slot 0 pinned to s4's entry value: what the indirect
      arms hold between the [c.sdsp s4] and the [c.ldsp s4] *)
-  Definition bm_frame4 (m : regfile) : iProp Σ :=
+  Definition bm_frame4 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -564,7 +564,7 @@ Section BmapDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64))%I.
 
-  Lemma bm_frame_of4 (m : regfile) : bm_frame4 m -∗ bm_frame m.
+  Lemma bm_frame_of4 `{XI : CurCtx} (m : regfile) : bm_frame4 m -∗ bm_frame m.
   Proof.
     rewrite /bm_frame4 /bm_frame.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6)".

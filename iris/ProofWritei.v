@@ -400,7 +400,7 @@ Section WriteiDefs.
   (* the SEVEN unconditional saves (+0x008..+0x014), which is all the join
      at +0xd6 may assume: the other seven slots are written only on the
      paths that got that far. *)
-  Definition wi_fr7 (m : regfile) : iProp Σ :=
+  Definition wi_fr7 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] v) ∗
@@ -417,7 +417,7 @@ Section WriteiDefs.
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...plus s3's slot, pinned from +0x032 to the [c.ldsp s3] at +0xd4 *)
-  Definition wi_fr8 (m : regfile) : iProp Σ :=
+  Definition wi_fr8 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] v) ∗
@@ -434,7 +434,7 @@ Section WriteiDefs.
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...and all thirteen, which is what the loop holds (+0x038..+0x040) *)
-  Definition wi_fr13 (m : regfile) : iProp Σ :=
+  Definition wi_fr13 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -450,7 +450,7 @@ Section WriteiDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈[KT1] (m !!! Regidx Rs11 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
-  Lemma wi_fr7_of8 (m : regfile) : wi_fr8 m -∗ wi_fr7 m.
+  Lemma wi_fr7_of8 `{XI : CurCtx} (m : regfile) : wi_fr8 m -∗ wi_fr7 m.
   Proof.
     rewrite /wi_fr8 /wi_fr7.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & HA & HB & HC & HD & HE)".
@@ -480,7 +480,7 @@ Section WriteiDefs.
   Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
     if user then DfracOwn (1/4) else dq.
 
-  Lemma wi_src_bare (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+  Lemma wi_src_bare `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
       (* TWO pprivate slots, one per arm: the user arm comes back at a page
          table copyin may have GROWN, the kernel arm -- memmove, not copyin --
          at the [V] it went in at.  Same shape as readi's [rd_dst]. *)

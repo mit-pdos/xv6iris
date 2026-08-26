@@ -66,6 +66,7 @@ Local Open Scope Z_scope.
 
 Section SyscParkEnv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* the nextpid lock's gname is EXISTENTIAL, exactly as [sysc_proc_env]
      carries it: nothing outside allocpid ever names it, and a parker that
@@ -85,6 +86,7 @@ End SyscParkEnv.
 Section ParkWorld.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* THE PARK'S WORLD, as a process hands it to its children.  A parent that
      forks builds the child's trap-loop environment, and the rows the child

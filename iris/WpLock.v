@@ -50,6 +50,8 @@ Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
    of the thread of control that holds its facts -- see the block above
    [lock_inv]. *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* [lock_name_intro]: the raw name-field metadata is
+                         minted from a context-indexed store result *)
 Local Open Scope Z_scope.
 
 
@@ -262,8 +264,18 @@ Section Lock.
     | _ => emp
     end%I.
 
+  (* THE OWNER CELL'S CONTEXT IS ∃-QUANTIFIED, not ambient: [lk_cpu_res]
+     sits inside [lock_inv] under the invariant, so an ambient index here
+     would drag a context into [is_lock] -- the persistent HANDLE -- and a
+     handle minted at boot could not be stated at another thread.  ∃ is
+     also the true SC-era statement: the cell belongs to whichever hart
+     last stored it.  The window lemmas below trade it for the acting
+     hart's ambient form through the shim; at cutover those shim uses are
+     M4 worklist entries (lock-internal cells become racy-kit facts). *)
   Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : string) : iProp Σ :=
-    (lock_cpu lk ↦₈ lk_cpu_val st ∗ lk_cpu_frag st r)%I.
+    ((∃ ξ : CtxId,
+        ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) (lk_cpu_val st)) ∗
+     lk_cpu_frag st r)%I.
 
   (* the leaves strip this under [>] inside the step engine's callback, and
      [st] is a VARIABLE there, so the match is stuck and the structural
@@ -273,17 +285,30 @@ Section Lock.
   Global Instance lk_cpu_res_timeless st lk r : Timeless (lk_cpu_res st lk r).
   Proof. apply _. Qed.
 
+  (* the ∃-cell against the acting hart's ambient form, via the shim; the
+     SC-only step is the ∃-side ELIMINATION (a real TSO ledger fact is
+     pinned to its context), which is exactly the M4 seam. *)
+  Lemma lk_cpu_cell_acc (lk : mword 64) (v : mword 64) :
+    (∃ ξ : CtxId, ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) v)
+    ⊣⊢ lock_cpu lk ↦₈ v.
+  Proof.
+    iSplit.
+    - iIntros "[%ξ H]". iApply TsoCtxShim.ctx_word_of_mem.
+      iApply (TsoCtxShim.ctx_word_to_mem with "H").
+    - iIntros "H". iExists cur_ctx. iExact "H".
+  Qed.
+
   (* the free / window form: the whole cell at 0 and no fragment. *)
   Lemma lk_cpu_res_free (lk : mword 64) (r : string) :
     lk_cpu_res None lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
-  Proof. rewrite /lk_cpu_res /=. apply bi.sep_emp. Qed.
+  Proof. rewrite /lk_cpu_res /= lk_cpu_cell_acc. apply bi.sep_emp. Qed.
   Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, false)) lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
-  Proof. rewrite /lk_cpu_res /=. apply bi.sep_emp. Qed.
+  Proof. rewrite /lk_cpu_res /= lk_cpu_cell_acc. apply bi.sep_emp. Qed.
   Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, true)) lk r ⊣⊢
     lock_cpu lk ↦₈ cpus_ptr i ∗ lk_in i r.
-  Proof. reflexivity. Qed.
+  Proof. rewrite /lk_cpu_res /= lk_cpu_cell_acc. reflexivity. Qed.
 
   (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already
      carries it, so instantiating with [lock_rank s] leaves no second degree
@@ -328,8 +353,16 @@ Section Lock.
   Definition lock_name_field (lk : mword 64) : mword 64 :=
     add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)).
 
+  (* RAW (context-free) since the M1 flip, deliberately: the name field is
+     lock METADATA -- written once by initlock, discarded, read by nobody's
+     data path -- and it rides inside [is_lock].  Were it the flipped [↦₈□]
+     it would drag the ambient context into the HANDLE, and a handle minted
+     at boot's context could not even be stated at another thread's.  The
+     intro below converts the minter's (context-indexed) store result
+     through the shim. *)
   Definition lock_name (lk : mword 64) (s : string) : iProp Σ :=
-    (∃ p : mword 64, lock_name_field lk ↦₈□ p ∗ p ↦ₛ□ s)%I.
+    (∃ p : mword 64,
+       word_pointsto (lock_name_field lk) DfracDiscarded p ∗ p ↦ₛ□ s)%I.
 
   Global Instance lock_name_persistent lk s : Persistent (lock_name lk s).
   Proof. apply _. Qed.
@@ -343,6 +376,7 @@ Section Lock.
     p ↦ₛ□ s -∗ lock_name_field lk ↦₈ p ==∗ lock_name lk s.
   Proof.
     iIntros "#Hs Hf".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hf") as "Hf".
     iMod (word_pointsto_persist with "Hf") as "#Hfp".
     iModIntro. iExists p. by iFrame "Hfp Hs".
   Qed.

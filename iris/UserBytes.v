@@ -104,6 +104,7 @@ Definition ptree_bytes (lvl : nat) (t : ptree) : pamap := ⋃ (pt_maps lvl t).
 
 Section UserBytesTree.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* the node-identity ghosts, which are NOT bytes.  Persistent, so keeping
      them aside across the byte view costs nothing. *)

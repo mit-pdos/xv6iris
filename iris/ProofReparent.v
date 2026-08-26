@@ -78,7 +78,7 @@ Proof. intro Hk. apply proc_addr_inj_le; lia. Qed.
 Definition rp_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition rp_frame `{!riscvGS Σ} (spF : mword 64)
+Definition rp_frame `{XI : CurCtx} `{!riscvGS Σ} (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 : mword 64) : iProp Σ :=
   (rp_fcell spF 5 ↦₈[KT1] vra ∗ rp_fcell spF 4 ↦₈[KT1] vs0 ∗ rp_fcell spF 3 ↦₈[KT1] vs1 ∗
    rp_fcell spF 2 ↦₈[KT1] vs2 ∗ rp_fcell spF 1 ↦₈[KT1] vs3 ∗ rp_fcell spF 0 ↦₈[KT1] vs4)%I.

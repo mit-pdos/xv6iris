@@ -1016,6 +1016,7 @@ Proof. intros -> Hkn Hs j Hj. rewrite pa_add_add. apply Hs. lia. Qed.
 
 Section VdrwdPinRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* the three word widths and the byte, straight into the [range_map] shape *)
   Lemma vdrwd_w2 (a : Arch.pa) (w : bv 16) :
@@ -1081,6 +1082,7 @@ End VdrwdPinRes.
 
 Section VdrwdPinBuild.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* THE ownership half: the seventeen formatted cells, the ring cell and the
      caller's buffer become the pin and the writable footprint the publish

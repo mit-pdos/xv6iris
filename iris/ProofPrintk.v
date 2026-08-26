@@ -50,6 +50,8 @@ From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the epilogue's stack_own hand-back crosses to the
+                         raw stack carve *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -123,6 +125,8 @@ Section ProofPrintk.
   Definition pk_frame (sp0 ra0 s00 s20 : mword 64) : iProp Σ :=
     ((pa_stk sp0 9) ↦₈[kt] ra0 ∗ (pa_stk sp0 10) ↦₈[kt] s00 ∗ (pa_stk sp0 12) ↦₈[kt] s20 ∗
      pk_slots sp0)%I.
+
+
 
   (* the whole frame, as the pop wants it *)
   Lemma pk_frame_stack_own (sp0 ra0 s00 s20 : mword 64) :
@@ -1151,7 +1155,11 @@ Section ProofPrintk.
     iIntros "H".
     iDestruct (big_sepL_lookup_acc _ _ j (pk_fbyte f j) with "H") as "[Hb Hcl]".
     { rewrite /pk_fbyte. apply list_lookup_lookup_total_lt. exact Hj. }
-    iFrame "Hb Hcl".
+    (* the format string is rodata (raw ↦ₛ tower); its byte crosses to the
+       load leaf's ctx slot and back through the shim *)
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb") as "Hb".
+    iFrame "Hb". iIntros "Hb". iApply "Hcl".
+    iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hb").
   Qed.
 
   Lemma wp_printk_setup `{CID0 : CpuId}

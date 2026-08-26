@@ -154,7 +154,7 @@ Definition wp_sys_exit_sconf_body
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page *)
   is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string
-    (λ ξ : CtxId, kmem_res ξ γka (mword_of_int (KernelSyms.kmem + 24))) -∗
+    (λ ξ : CtxId, kmem_res (XIk := ξ) γka (mword_of_int (KernelSyms.kmem + 24))) -∗
   kalloc_avail γka on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] inside kexit *)
   bio_ctx bn (fs_view γfs γd dev cov) -∗

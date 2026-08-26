@@ -1541,7 +1541,9 @@ Section ProofSysPipe.
       { split; [exact HW1sp|]. split; [exact HW1a5 | exact HthrW1]. }
       { apply uptd_ext_refl. }
       { by iExists on. }
-      { iExists v, w6, w7. iFrame "Hb5 Hb6 Hb7". }
+      { iExists v, w6, w7.
+        iSplitL "Hb5"; [iExact "Hb5"|]. iSplitL "Hb6"; [iExact "Hb6"|].
+        iExact "Hb7". }
       { iExists (word_lo u8), (word_hi u8). iFrame "Hlo Hhi". }
       (* NB: split the post's two components BEFORE framing.  [iFrame] on the
          whole [sys_pipe_post] searches inside [proc_priv] for a place to put
@@ -1755,7 +1757,9 @@ Section ProofSysPipe.
         intros r Hr N2 N8 N9. rewrite (Hmrcs r Hr). apply HthrY0; assumption. }
       { apply uptd_ext_refl. }
       { iExact "Hpenv". }
-      { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
+      { iExists v, (fnode k0), (fnode k1).
+        iSplitL "Hb5"; [iExact "Hb5"|]. iSplitL "Hb6"; [iExact "Hb6"|].
+        iExact "Hb7". }
       { iExists (word_lo u8), (trunc32 (Y0 !!! Regidx Ra0)). iFrame "Hlo Hhi". }
       (* NB: split the post's two components BEFORE framing.  [iFrame] on the
          whole [sys_pipe_post] searches inside [proc_priv] for a place to put
@@ -1994,7 +1998,9 @@ Section ProofSysPipe.
         rewrite (HF2thr r N15 N15). apply HthrF1; assumption. }
       { apply uptd_ext_refl. }
       { iExact "Hpenv". }
-      { iExists v, (fnode k0'), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
+      { iExists v, (fnode k0'), (fnode k1).
+        iSplitL "Hb5"; [iExact "Hb5"|]. iSplitL "Hb6"; [iExact "Hb6"|].
+        iExact "Hb7". }
       { iExists (trunc32 (U0 !!! Regidx Ra0)), (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)).
         iFrame "Hlo Hhi". }
       (* NB: split the post's two components BEFORE framing.  [iFrame] on the
@@ -2503,7 +2509,9 @@ Section ProofSysPipe.
         intros r Hr N2 N8 N9. rewrite (Hmrcs r Hr). apply HthrE4; assumption. }
       { exact Hxt. }
       { iExact "Hpenv". }
-      { iExists v, (fnode k0'), (fnode k1'). iFrame "Hb5 Hb6 Hb7". }
+      { iExists v, (fnode k0'), (fnode k1').
+        iSplitL "Hb5"; [iExact "Hb5"|]. iSplitL "Hb6"; [iExact "Hb6"|].
+        iExact "Hb7". }
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
                 (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)). iFrame "Hlo Hhi". }
       rewrite /sys_pipe_post.
@@ -2823,7 +2831,9 @@ Section ProofSysPipe.
       { split; [exact HD1sp|]. split; [exact HD1a5 | exact HthrD1]. }
       { exact (uptd_ext_sz_ext _ _ _ Hextb). }
       { by iExists on. }
-      { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
+      { iExists v, (fnode k0), (fnode k1).
+        iSplitL "Hb5"; [iExact "Hb5"|]. iSplitL "Hb6"; [iExact "Hb6"|].
+        iExact "Hb7". }
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
                 (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)). iFrame "Hlo Hhi". }
       rewrite /sys_pipe_post.

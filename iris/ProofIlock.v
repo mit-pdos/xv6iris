@@ -224,7 +224,7 @@ Section IlockParts.
      4-alignment the byte view forgets is carried by the wand's closure,
      and it depends only on the LENGTH -- which is why one length premise
      is all the wand needs. *)
-  Lemma il_addrs_buf_upd (ip : mword 64) (l : list (bv 32)) :
+  Lemma il_addrs_buf_upd `{XI : CurCtx} (ip : mword 64) (l : list (bv 32)) :
     inode_addrs ip l -∗
       bb_bytes (i_addr ip 0) (4 * length l)%nat (fun j => ind_bytes l !!! j) ∗
       (∀ l' : list (bv 32), ⌜length l' = length l⌝ -∗
@@ -340,7 +340,7 @@ Section IlockDefs.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
-  Definition il_frame (m : regfile) : iProp Σ :=
+  Definition il_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗

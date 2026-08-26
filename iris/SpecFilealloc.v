@@ -62,7 +62,7 @@ Section SpecFilealloc.
      (FdSlots.v).  A caller that retries, or that allocates two files and
      must return its whole allowance whichever way the calls went (pipealloc,
      hence sys_pipe), cannot balance its books without this. *)
-  Definition filealloc_post (γf : gname) (r : mword 64) : iProp Σ :=
+  Definition filealloc_post `{XI : CurCtx} (γf : gname) (r : mword 64) : iProp Σ :=
     (⌜r = (zero_reg : mword 64)⌝ ∗ fd_slot
      ∨ ∃ (k : nat) (Cf : fcontent),
          ⌜(k < NFILE)%nat /\ r = fnode k /\ fc_type Cf = FD_NONE⌝ ∗

@@ -47,6 +47,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import InstrBytes.
 Require Import KallocInv.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -279,6 +280,7 @@ Qed.
 
 Section ByteBuf.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
   (* A byte run is memory like any other: a disk buffer or a page is KT0, a
      STACK buffer rides its hart's regime.  So the family takes the ambient
      tier (StackOwn.v / StackBytes.v's KTR discipline) and every existing KT0
@@ -563,13 +565,13 @@ Section ByteBuf.
        ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ f j) -∗ ∃ w' : mword 64, a ↦₈ w').
   Proof.
     iIntros "Hw".
-    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word_pointsto_bytes with "Hw") as "$".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "$".
     iIntros (f) "Hf".
     set (bs := [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
                 f 4%nat; f 5%nat; f 6%nat; f 7%nat]).
     iExists (Z_to_bv 64 (assemble_bytes bs) : mword 64).
-    iApply (word_pointsto_intro _ _ _ Hal).
+    iApply (ctx_word_pointsto_intro _ _ _ _ Hal).
     iApply (big_sepL_mono with "Hf"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt].
     rewrite (nth_byte_assemble_len 64 bs i ltac:(cbn; lia) ltac:(cbn; lia)).
@@ -658,6 +660,7 @@ End ByteBuf.
    identity-mapped page and carries no tier index. *)
 Section ByteBufPage.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma bb_page_named (q : mword 64) :
     page_own q ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.

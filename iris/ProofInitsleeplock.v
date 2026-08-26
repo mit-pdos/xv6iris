@@ -36,6 +36,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecInitsleeplock.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* [sl_name] is raw metadata; its bytes arrive ctx *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -336,6 +337,7 @@ Section ProofInitsleeplock.
     iEval (rewrite Hpc2a) in "Hpc".
     (* persist the name field, pairing with the caller's [name ↦ₛ□ s] -> sl_name *)
     iApply fupd_wp.
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hnamefield") as "Hnamefield".
     iMod (word_pointsto_persist (KTR := KT0) with "Hnamefield") as "#Hnamefield".
     iModIntro.
     iAssert (sl_name slk s) as "#Hslname".

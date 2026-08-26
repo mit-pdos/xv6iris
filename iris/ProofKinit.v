@@ -228,11 +228,10 @@ Section ProofKinit.
        not-holder ticket still comes out.  Pure ghost step, unaffected by
        which hart we are on. ===== *)
     iApply fupd_wp.
-    iAssert (kmem_res cur_ctx γk fl) with "[Hflw Hauth]" as "HR".
-    { iApply (kmem_res_close γk fl nullp []).
-      iSplitL "Hflw"; [iApply (word_at_of_mem with "Hflw") |].
-      iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
-    iMod (newlock_at ⊤ γl lk "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl)
+    iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
+    { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
+      iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
+    iMod (newlock_at ⊤ γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl)
             with "Hlkfree Hlnm Hlock Hcpu HR") as "#Hkmem".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.

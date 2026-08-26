@@ -176,7 +176,7 @@ Section SpecArgfd.
     intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
   Qed.
 
-  Definition argfd_post (pfd pf : mword 64) (oldfd : mword 32) (oldf : mword 64)
+  Definition argfd_post `{XI : CurCtx} (pfd pf : mword 64) (oldfd : mword 32) (oldf : mword 64)
       (v : mword 64) (fs : list (mword 64)) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v fs = None⌝ ∗
        ofd_out pfd oldfd ∗ pf ↦₈[KT1] oldf

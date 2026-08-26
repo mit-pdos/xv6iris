@@ -548,7 +548,7 @@ Section ProofVmfault.
         - exact HR3sp.
         - exact HR3s4.
         - exact HR3thr. }
-      { iExists u24, u16, u8. iFrame "Hk3 Hk4 Hk5". }
+      { iExists u24, u16, u8. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk4"; [iExact "Hk4"|]. iExact "Hk5". }
       { rewrite /PAY. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. } }
 
     (* ---- va < psz: the real work, at +0x1c ---- *)
@@ -987,7 +987,7 @@ Section ProofVmfault.
             rewrite /B1. rewrite upd_ne;
               [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
             apply HA2thr; assumption. }
-        { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
+        { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk4"; [iExact "Hk4"|]. iExact "Hk5". }
         { rewrite /PAY. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. } }
       (* ---- kalloc returned a page r ---- *)
       set (r := (mk !!! Regidx Ra0 : mword 64)).
@@ -1450,7 +1450,7 @@ Section ProofVmfault.
             rewrite /S1. rewrite upd_ne;
               [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
             apply Hmgthr; assumption. }
-        { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
+        { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk4"; [iExact "Hk4"|]. iExact "Hk5". }
         { rewrite /PAY. iRight. iExists r.
           iSplitR; [iPureIntro; reflexivity |].
           iSplitR; [iPureIntro; exact Hpv |].
@@ -1640,7 +1640,7 @@ Section ProofVmfault.
           rewrite /F3. rewrite upd_ne;
             [| intros Hx; injection Hx as Hx2; subst c; apply H20; reflexivity].
           apply Hmfkthr; assumption. }
-      { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
+      { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk4"; [iExact "Hk4"|]. iExact "Hk5". }
       { rewrite /PAY. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. } }
 
     (* ================= ALREADY MAPPED: return 0 ==================== *)
@@ -1714,7 +1714,7 @@ Section ProofVmfault.
         rewrite /D1. rewrite upd_ne;
           [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
         apply HN1thr; assumption. }
-    { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
+    { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk4"; [iExact "Hk4"|]. iExact "Hk5". }
     { rewrite /PAY. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. }
   Qed.
 

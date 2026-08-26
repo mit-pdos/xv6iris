@@ -155,6 +155,7 @@ Section FsReady.
   (* FsSyscalls' own [Section FsBundles] context, verbatim... *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
   (* ...AND THE CACHE'S INDEX, EXPLICIT AND DECLARED LAST (the header's
      last section).  Last, because instance resolution prefers the most
      recently declared candidate: with these here, every icache conjunct
@@ -333,7 +334,7 @@ Section FsReady.
         does) could never tie its own name to a hidden one.  [fs_ready_kalloc]
         below recovers the bundled form for everyone else. *)
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (λ ξ : CtxId, kmem_res ξ fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail fsc_kpages None ∗
      (* ...AND THE IMAGE'S OWN ARITHMETIC AND THE FOUR SUPERBLOCK CELLS.
         See §0 and §0b: what "ready to operate" means includes the geometry
@@ -410,7 +411,7 @@ Section FsReady.
      ic_sleeplocks fsc_ic ∗
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (λ ξ : CtxId, kmem_res ξ fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail fsc_kpages None ∗
      ⌜fs_geom_ok⌝ ∗
      fs_sb_cells ∗
@@ -568,7 +569,7 @@ Section FsReady.
   Lemma fs_ready_kmem :
     fs_ready -∗
     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-      (λ ξ : CtxId, kmem_res ξ fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+      (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
     kalloc_avail fsc_kpages None.
   Proof.
     rewrite /fs_ready.

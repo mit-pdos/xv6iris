@@ -103,7 +103,7 @@ Section SpecPipealloc.
     fc_readable C = ((if w then mword_of_int 0 else mword_of_int 1) : mword 8) /\
     fc_writable C = ((if w then mword_of_int 1 else mword_of_int 0) : mword 8).
 
-  Definition pipealloc_post (γf : gname) (γk : gname * gname) (on : option nat)
+  Definition pipealloc_post `{XI : CurCtx} (γf : gname) (γk : gname * gname) (on : option nat)
       (pf0 pf1 r : mword 64) : iProp Σ :=
     ((* FAILURE (a0 = -1): the ftable was full, or kalloc found no page.  Every
         file reference taken on the way was given back (fileclose), the page
@@ -187,7 +187,7 @@ Definition wp_pipealloc_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
   is_ftable γfl γf -∗
-  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) -∗
+  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl) -∗
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
   panic_env -∗

@@ -22,6 +22,8 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* [ctx_cells_reindex]: the free save area's ∃-context
+                         against a holder's ambient one (M2 seam) *)
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -105,6 +107,7 @@ Section SwtchCtx.
     end.
   Definition ctx_cells (c : mword 64) (vs : list (mword 64)) : iProp Σ :=
     ctx_cells_at c 0 vs.
+
 
   (* 14-slot context-field ownership, contents existential: what a RUNNING
      party holds of its own context field between switches (the resume wand
@@ -289,6 +292,32 @@ Section SwtchCtx.
   Proof. apply (fixpoint_unfold (valid_context_pre P) A c p). Qed.
 
 End SwtchCtx.
+
+(* SHIM-TIER (dies at cutover): re-index a save area's cells between
+   contexts.  OUTSIDE the section, because the section's ambient [XI] fixes
+   the index it must vary.  SC-only -- the honest TSO transport of parked
+   cells is the M2 park/resume machinery; each use is an M2 worklist entry. *)
+Section CtxCellsReindex.
+  Context `{!riscvGS Σ}.
+
+  Lemma ctx_cells_at_reindex (ξ ξ' : CtxId) (c : mword 64) (off : Z)
+      (vs : list (mword 64)) :
+    ctx_cells_at (XI := ξ) c off vs -∗ ctx_cells_at (XI := ξ') c off vs.
+  Proof.
+    revert off. induction vs as [|v vs IH] => off; simpl.
+    - auto.
+    - iIntros "[Hv Hrest]".
+      iSplitL "Hv".
+      { iDestruct (TsoCtxShim.ctx_word_to_mem with "Hv") as "Hv".
+        iApply (TsoCtxShim.ctx_word_of_mem with "Hv"). }
+      iApply (IH with "Hrest").
+  Qed.
+
+  Lemma ctx_cells_reindex (ξ ξ' : CtxId) (c : mword 64)
+      (vs : list (mword 64)) :
+    ctx_cells (XI := ξ) c vs -∗ ctx_cells (XI := ξ') c vs.
+  Proof. apply ctx_cells_at_reindex. Qed.
+End CtxCellsReindex.
 
 Section Swconf.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.

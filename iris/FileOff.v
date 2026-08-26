@@ -101,11 +101,13 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
 Section FileOff.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  OBLIGATION (a): the borrow, under the inode's lock                  *)

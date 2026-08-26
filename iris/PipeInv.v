@@ -38,6 +38,7 @@ Local Open Scope Z_scope.
 
 Section PipeInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  Carving kalloc's page into the cells [struct pipe] names            *)
@@ -267,7 +268,7 @@ Section PipeInv.
      Note the data buffer is NOT zeroed by pipealloc -- [bs] is whatever kalloc
      handed over -- which is exactly right: no byte of it is readable until
      nwrite has passed it. *)
-  Lemma new_pipe `{XI : CurCtx} E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
+  Lemma new_pipe E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
     page_valid pi ->
     length bs = PIPESIZE ->
     lock_name_field pi ↦₈ vname -∗

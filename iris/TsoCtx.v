@@ -61,8 +61,8 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import ghost_var.
 Require Import SailStdpp.Base SailStdpp.Values.
-Require Import Riscv.rv64d_types.
-Require Import RiscvLang RiscvPtsto Ktier.
+Require Import Riscv.rv64d_types Riscv.rv64d.   (* [is_aligned_paddr]/[Physaddr]: the word tower's alignment vocabulary *)
+Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
 
 (* ------------------------------------------------------------------ *)
 (* The context identity and the ambient class                          *)
@@ -287,6 +287,117 @@ Section ctx.
   Proof. rewrite /ctx_pointsto. apply mem_pointsto_persist. Qed.
 
   (* ---------------------------------------------------------------- *)
+  (* The context-indexed WORD tower (the M1 notation flip's carrier)    *)
+  (* ---------------------------------------------------------------- *)
+
+  (* [RiscvPtsto.word_pointsto]'s shape over the context fact: an 8-byte
+     little-endian doubleword owned by thread-of-control ξ, alignment
+     bundled.  This is what the [↦₈] spellings mean above the seam after
+     the flip; the raw [word_pointsto] stays the kit's (below-Σ) fact.
+     Every law is derived from [ctx_pointsto]'s exported surface alone,
+     so the tower is honest at both instantiations with no shim. *)
+
+  (* byte-window agreement and splitting, the two engine lemmas *)
+  Lemma ctx_bytes_agree {m : N} {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
+      (a : Arch.pa) (k n : nat) (dq1 dq2 : dfrac) (w1 w2 : bv m) :
+    ([∗ list] j ∈ seq k n,
+       ctx_pointsto (KTR := kt1) ξ1 (pa_add a j) dq1 (nth_byte w1 j)) -∗
+    ([∗ list] j ∈ seq k n,
+       ctx_pointsto (KTR := kt2) ξ2 (pa_add a j) dq2 (nth_byte w2 j)) -∗
+    ⌜forall j, (k <= j < k + n)%nat -> nth_byte w1 j = nth_byte w2 j⌝.
+  Proof.
+    revert k. induction n as [|n IH]; intros k; simpl.
+    - iIntros "_ _". iPureIntro. intros j Hj. lia.
+    - iIntros "[Hh1 Ht1] [Hh2 Ht2]".
+      iDestruct (ctx_pointsto_agree with "Hh1 Hh2") as %Heq.
+      iDestruct (IH (S k) with "Ht1 Ht2") as %Hrest.
+      iPureIntro. intros j Hj.
+      destruct (decide (j = k)) as [->|Hne]; [exact Heq|].
+      apply Hrest. lia.
+  Qed.
+
+  Lemma ctx_bytes_frac_split `{KTR : !CurKtier} {m : N} (ξ : CtxId)
+      (a : Arch.pa) (k n : nat) (q1 q2 : Qp) (w : bv m) :
+    ([∗ list] j ∈ seq k n,
+       ctx_pointsto ξ (pa_add a j) (DfracOwn (q1 + q2)) (nth_byte w j)) ⊣⊢
+    ([∗ list] j ∈ seq k n,
+       ctx_pointsto ξ (pa_add a j) (DfracOwn q1) (nth_byte w j)) ∗
+    ([∗ list] j ∈ seq k n,
+       ctx_pointsto ξ (pa_add a j) (DfracOwn q2) (nth_byte w j)).
+  Proof.
+    rewrite -big_sepL_sep. apply big_opL_proper. intros ? j ?.
+    apply ctx_pointsto_frac_split.
+  Qed.
+
+  Definition ctx_word_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+      (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+     [∗ list] j ∈ seq 0 8, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j))%I.
+
+  Section ctx_word.
+    Context `{KTR : !CurKtier}.
+
+    Lemma ctx_word_pointsto_unfold ξ a dq w :
+      ctx_word_pointsto ξ a dq w ⊣⊢
+      ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+      ([∗ list] j ∈ seq 0 8, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j)).
+    Proof. reflexivity. Qed.
+
+    Lemma ctx_word_pointsto_aligned_p ξ a dq w :
+      ctx_word_pointsto ξ a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 8 = true⌝.
+    Proof. iIntros "[$ _]". Qed.
+
+    Lemma ctx_word_pointsto_bytes ξ a dq w :
+      ctx_word_pointsto ξ a dq w ⊢
+      [∗ list] j ∈ seq 0 8, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j).
+    Proof. iIntros "[_ $]". Qed.
+
+    Lemma ctx_word_pointsto_intro ξ a dq w :
+      is_aligned_paddr (Physaddr a) 8 = true ->
+      ([∗ list] j ∈ seq 0 8, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j))
+      ⊢ ctx_word_pointsto ξ a dq w.
+    Proof. iIntros (Hal) "H". by iFrame. Qed.
+
+    Global Instance ctx_word_pointsto_timeless ξ a dq w :
+      Timeless (ctx_word_pointsto ξ a dq w).
+    Proof. rewrite /ctx_word_pointsto. apply _. Qed.
+
+    Global Instance ctx_word_pointsto_discarded_persistent ξ a w :
+      Persistent (ctx_word_pointsto ξ a DfracDiscarded w).
+    Proof. rewrite /ctx_word_pointsto. apply _. Qed.
+
+    Lemma ctx_word_pointsto_frac_split ξ a q1 q2 w :
+      ctx_word_pointsto ξ a (DfracOwn (q1 + q2)) w ⊣⊢
+      ctx_word_pointsto ξ a (DfracOwn q1) w ∗
+      ctx_word_pointsto ξ a (DfracOwn q2) w.
+    Proof.
+      rewrite /ctx_word_pointsto (ctx_bytes_frac_split ξ a 0 8 q1 q2 w).
+      iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
+    Qed.
+
+    Lemma ctx_word_pointsto_persist ξ a dq w :
+      ctx_word_pointsto ξ a dq w ==∗ ctx_word_pointsto ξ a DfracDiscarded w.
+    Proof.
+      iIntros "[#Hal H]".
+      iAssert (|==> [∗ list] j ∈ seq 0 8,
+        ctx_pointsto ξ (pa_add a j) DfracDiscarded (nth_byte w j))%I
+        with "[H]" as ">H".
+      { iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+        iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_persist. }
+      iModIntro. by iFrame "Hal H".
+    Qed.
+  End ctx_word.
+
+  Lemma ctx_word_pointsto_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId) a dq1 w1 dq2 w2 :
+    ctx_word_pointsto (KTR := kt1) ξ1 a dq1 w1 -∗
+    ctx_word_pointsto (KTR := kt2) ξ2 a dq2 w2 -∗ ⌜w1 = w2⌝.
+  Proof.
+    iIntros "[_ H1] [_ H2]".
+    iDestruct (ctx_bytes_agree ξ1 ξ2 a 0 8 with "H1 H2") as %Hb.
+    iPureIntro. apply (bv_eq_of_bytes (n:=8)). intros j Hj. apply Hb. lia.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (* Transport: the ONLY ways a fact changes context                   *)
   (* ---------------------------------------------------------------- *)
 
@@ -360,6 +471,18 @@ Section ctx.
       iModIntro. iFrame.
   Qed.
 
+  (* the word cell's transport obligation, once for every payload *)
+  Global Instance ctx_morph_word (kt : ktier) a dq w :
+    CtxMorph (λ ξ, ctx_word_pointsto (KTR := kt) ξ a dq w).
+  Proof.
+    iIntros (ξ ξ') "Hd [%Hal H]".
+    iMod (ctx_morph_big_sepL (seq 0 8)
+            (λ _ j ξ0, ctx_pointsto (KTR := kt) ξ0 (pa_add a j) dq (nth_byte w j))
+            (λ i x, ctx_morph_pointsto _ _ _ _)
+            ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iSplit; [done|]. iExact "H".
+  Qed.
+
   (* The composition acid test: a lock-payload-shaped assertion is
      morphable by typeclass search alone.  If this ever needs a manual
      proof, an instance regressed. *)
@@ -412,19 +535,45 @@ Notation "a ↦c[ kt ] dq v" := (ctx_pointsto (KTR := kt) cur_ctx a dq v)
    format "a  ↦c[ kt ] dq  v") : bi_scope.
 
 (* THE PAYLOAD WRAPPER (the M3 sweep's client spelling; the `weak-memory`
-   branch's `<{ }>`, adopted verbatim).  A lock client writes its payload
-   as a plain [iProp] with the ambient spellings; this turns it into the
-   [CtxId → iProp] the lock surface needs by making the BOUND context the
-   ambient one inside -- [CurCtx] is a definitional class over [CtxId],
-   so the λ binder shadows the ambient instance and every [↦c]/ambient
-   fact in [P] re-indexes under it.  An UNCONVERTED payload (no
-   context-dependent fact inside) embeds constantly, which is why the
-   mechanical phase of the client sweep is just wrapping.
+   branch's `<{ }>`, adopted with ONE deliberate change).  A lock client
+   writes its payload as a plain [iProp] with the ambient spellings; this
+   turns it into the [CtxId → iProp] the lock surface needs as a CONSTANT
+   embedding.
+
+   THE BINDER IS ANONYMOUS, unlike the branch's [λ XLK : CurCtx, P].  A
+   NAMED [CurCtx] binder is a typeclass instance candidate inside [P], so
+   an ambient-spelled fact in [P] re-indexes under it -- or not, depending
+   on elaboration order at each mention site (the silent-drop hazard the
+   kmem conversion recorded as recipe rule 1, observed live again when
+   [proc_lock_res] picked up context-indexed conjuncts at the M1 flip and
+   its ~40 wrapped mention sites stopped unifying with each other).  With
+   [_] the wrapper can NEVER capture: everything inside [P] elaborates at
+   the OUTER ambient, identically at every site, and [ctx_morph_const]
+   applies.  A payload that should genuinely re-index is CONVERTED, not
+   wrapped: it is passed as [(λ ξ : CtxId, pay (XI := ξ) ...)] and brings
+   its own [CtxMorph] (rule 1's spelling; kmem_res is the reference).
    THE SPELLING IS [<{ P }>] AND NOT [<[ P ]>]: stdpp's insert notation
    shares the [<[] prefix and Coq reports the two as incompatible
-   (measured on the branch; the brace form is free). *)
-Notation "<{ P }>" := (λ XLK : CurCtx, P%I)
+   (measured on the branch; the brace form is free).
+
+   IT IS A COMBINATOR, NOT A λ.  Even an ANONYMOUS [λ _ : CurCtx, P]
+   captures: Coq auto-names the binder (H) and -- [CurCtx] being a
+   transparent definitional class -- typeclass search inside [P] can still
+   pick it up, at some sites and not others (observed live: two
+   elaborations of the same wrapped [proc_lock_res] payload that refuse to
+   unify).  With [const_pay], [P] is elaborated as the combinator's
+   ARGUMENT -- outside any [CurCtx]-typed binder -- so its ambient facts
+   always bind the caller's context, identically at every site. *)
+Definition const_pay {Σ : gFunctors} (P : iProp Σ) : CtxId → iProp Σ :=
+  λ _, P.
+Notation "<{ P }>" := (const_pay P%I)
   (at level 0, P at level 200, format "<{  P  }>").
+
+(* the combinator's transport obligation: same guard role and priority
+   story as [ctx_morph_const] (which still serves bare λ-spellings). *)
+Global Instance ctx_morph_const_pay `{!riscvGS Σ} (P : iProp Σ) :
+  CtxMorph (const_pay P) | 99.
+Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
 
 (* The class TYPE is transparent to typeclass unification: [CurCtx] is
    definitionally [CtxId], and instance search must see through the
@@ -436,9 +585,47 @@ Notation "<{ P }>" := (λ XLK : CurCtx, P%I)
    type unfolding). *)
 Global Typeclasses Transparent CurCtx.
 
+(* ================================================================== *)
+(* THE M1 NOTATION FLIP (stage 1: the byte and 8-byte-word families).
+   The [↦ₘ] and [↦₈] spellings are REBOUND here to the context-indexed
+   facts; this declaration OVERRIDES [RiscvPtsto]'s in every file that
+   imports this one after [RiscvPtsto] (the tree-wide import-order audit
+   is [tools/lock_ctx_sweep.py] check mode's job).  Files below this one
+   -- the kit -- never import it and keep the raw meanings; that split
+   IS the seam.  The spellings are character-identical, which is the
+   whole point: statement text above the seam does not change, its
+   MEANING does.  [↦c] becomes a synonym and is retired by attrition.
+   Stage 2 flips [↦₄]/[↦₂]/[↦ₛ]/[↦ₚ]; [↦ₓ] (text) and [↦ᵣ] (registers)
+   NEVER flip -- text is timestamp-0 context-free by the port's ruling,
+   and registers are per-hart machine state. *)
+Notation "a ↦ₘ{ dq } v" := (ctx_pointsto cur_ctx a dq v)
+  (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
+Notation "a ↦ₘ□ v" := (ctx_pointsto cur_ctx a DfracDiscarded v)
+  (at level 20, format "a  ↦ₘ□  v") : bi_scope.
+Notation "a ↦ₘ v" := (ctx_pointsto cur_ctx a (DfracOwn 1) v)
+  (at level 20, format "a  ↦ₘ  v") : bi_scope.
+Notation "a ↦ₘ[ kt ] dq v" := (ctx_pointsto (KTR := kt) cur_ctx a dq v)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦ₘ[ kt ] dq  v") : bi_scope.
+
+Notation "a ↦₈{ dq } w" := (ctx_word_pointsto cur_ctx a dq w)
+  (at level 20, format "a  ↦₈{ dq }  w") : bi_scope.
+Notation "a ↦₈ w" := (ctx_word_pointsto cur_ctx a (DfracOwn 1) w)
+  (at level 20, format "a  ↦₈  w") : bi_scope.
+Notation "a ↦₈□ w" := (ctx_word_pointsto cur_ctx a DfracDiscarded w)
+  (at level 20, format "a  ↦₈□  w") : bi_scope.
+Notation "a ↦₈[ kt ] dq w" := (ctx_word_pointsto (KTR := kt) cur_ctx a dq w)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦₈[ kt ] dq  w") : bi_scope.
+
 (* The seal.  [ctx_dom] and [hart_view_lb] stay opaque too: nothing above
    this file may learn they are [True] at SC, and nothing may learn
    [ctx_parked] ignores its stamp. *)
 Global Typeclasses Opaque own_context ctx_parked hart_view_lb
   ctx_pointsto ctx_dom.
 Global Opaque own_context ctx_parked hart_view_lb ctx_pointsto ctx_dom.
+(* [ctx_word_pointsto] is NOT sealed at all: it is a tower OVER the sealed
+   byte fact, so exposing its ⌜aligned⌝ ∗ big-op shape leaks nothing about
+   SC-degeneracy -- and the tree's pre-flip proofs destruct/frame the word
+   shape structurally (that worked when [word_pointsto] was transparent, and
+   keeps working now).  The BYTE seal below it is the one that matters. *)

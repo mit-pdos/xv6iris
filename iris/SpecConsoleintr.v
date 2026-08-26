@@ -95,11 +95,11 @@ Section ConsoleCaps.
      baseline its echo extends.  The ghost NAMES are existential: nothing
      above consoleintr names either lock, so binding them here keeps the
      bundle parameter-free in [γu] alone. *)
-  Definition console_caps (γu : uart_names) : iProp Σ :=
+  Definition console_caps `{XI : CurCtx} (γu : uart_names) : iProp Σ :=
     (∃ γtx γc : gname,
        is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [])%I.
 
-  Global Instance console_caps_persistent γu : Persistent (console_caps γu).
+  Global Instance console_caps_persistent `{XI : CurCtx} γu : Persistent (console_caps γu).
   Proof. rewrite /console_caps. apply _. Qed.
 
 End ConsoleCaps.

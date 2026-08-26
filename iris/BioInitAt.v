@@ -45,6 +45,7 @@ Local Open Scope Z_scope.
 
 Section BioInitAt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  The free state of a [bio_names] record                              *)
@@ -148,7 +149,7 @@ Section BioInitAt.
      built AT [bn_slk bn k] rather than gathered into a function, and the
      bcache lock needs no [newlock_delayed] because [bcache_res bn V] is
      statable before it is sealed. *)
-  Lemma bio_init_at `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) E :
+  Lemma bio_init_at (bn : bio_names) (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
     bio_free_tok bn -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗

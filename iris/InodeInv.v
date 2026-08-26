@@ -64,6 +64,7 @@ Require Export InodeDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -744,6 +745,7 @@ Qed.
 
 Section InodeRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* --- inode_map: the thirteen addrs cells, plus the indirect block --- *)
 

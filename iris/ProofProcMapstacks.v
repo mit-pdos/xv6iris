@@ -411,7 +411,7 @@ Section ProofPMS.
   Qed.
 
   (* pas-extension congruence on the accumulated page_own list *)
-  Lemma pms_pages_ext (i : nat) (f g : nat -> mword 44) :
+  Lemma pms_pages_ext `{XI : CurCtx} (i : nat) (f g : nat -> mword 44) :
     (forall j, (j < i)%nat -> f j = g j) ->
     ([∗ list] j ∈ seq 0 i, page_own (zero_extend' 64 (concat_vec (f j) (zeros' 12 : mword 12))))
     ⊢ ([∗ list] j ∈ seq 0 i, page_own (zero_extend' 64 (concat_vec (g j) (zeros' 12 : mword 12)))).

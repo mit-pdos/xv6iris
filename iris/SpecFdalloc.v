@@ -200,7 +200,7 @@ Section SpecFdalloc.
   (* fdalloc's result, keyed by the returned a0.  The two arms are decided
      by the process's own descriptor array, so the disjunction is a CASE
      ANALYSIS on [fd_frees], not an unconstrained choice. *)
-  Definition fdalloc_post (γf : gname) (p : mword 64)
+  Definition fdalloc_post `{XI : CurCtx} (γf : gname) (p : mword 64)
       (V : pprivate) (D : gset nat) (k : nat) (r : mword 64) : iProp Σ :=
     ((* the table is full: nothing happened *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ fd_frees (pv_ofile V) = []⌝ ∗

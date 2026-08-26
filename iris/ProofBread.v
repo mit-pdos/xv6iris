@@ -342,7 +342,7 @@ Section BreadDefs.
 
   (* the six frame slots, as one bundle (slot 6 -- offset 0 -- is pushed but
      never written) *)
-  Definition bd_frame (m : regfile) : iProp Σ :=
+  Definition bd_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[KT1] (m !!! Regidx Rra) ∗
      pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[KT1] (m !!! Regidx Rs0) ∗
      pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[KT1] (m !!! Regidx Rs1) ∗

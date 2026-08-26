@@ -150,13 +150,13 @@ Section CwBodies.
   (* ---- the frame, in three pieces ---------------------------------- *)
 
   (* ra / s0 / s1, saved unconditionally by the prologue *)
-  Definition cw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition cw_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1))%I.
 
   (* s2..s10, saved only on the [n > 0] path (slots 4..12) *)
-  Definition cw_spill (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition cw_spill `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 4  ↦₈[KT1] (m0 !!! Regidx Rs2) ∗
      pa_stk sp0 5  ↦₈[KT1] (m0 !!! Regidx Rs3) ∗
      pa_stk sp0 6  ↦₈[KT1] (m0 !!! Regidx Rs4) ∗
@@ -169,14 +169,14 @@ Section CwBodies.
 
   (* everything below the three unconditional saves, as WORDS -- what the
      pop needs.  Slots 4..16. *)
-  Definition cw_rest (sp0 : mword 64) : iProp Σ :=
+  Definition cw_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ([∗ list] k ∈ seq 4 13, ∃ w : mword 64, pa_stk sp0 k ↦₈[KT1] w)%I.
 
   (* ...and the same region with its four lowest slots carved into bytes *)
-  Definition cw_buf (sp0 : mword 64) : iProp Σ :=
+  Definition cw_buf `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 16) 32.
 
-  Lemma cw_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma cw_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own (KTR := KT1) sp0 16.
   Proof.
     iIntros "(H1 & H2 & H3) Hr".
@@ -189,7 +189,7 @@ Section CwBodies.
 
   (* the four buffer slots, as words again -- run BEFORE the epilogue.  The
      alignment facts are the ones the prologue's carve handed out. *)
-  Lemma cw_buf_slots (sp0 : mword 64) :
+  Lemma cw_buf_slots `{XI : CurCtx} (sp0 : mword 64) :
     (forall i, (i < 4)%nat -> is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     cw_buf sp0 ⊢ [∗ list] i ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - i) ↦₈[KT1] w.
   Proof.
@@ -255,7 +255,7 @@ Section CwBodies.
      against it does not terminate in any useful time (measured: > 2 min on
      this one line, with nothing else in the context).  Keeping the tail as
      ONE hypothesis makes the rebuild an [iExact] -- a syntactic check. *)
-  Lemma cw_priv_pid (pa : mword 64) (pid : mword 32) (V : pprivate) :
+  Lemma cw_priv_pid `{XI : CurCtx} (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv_core pa pid V ⊢
     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/2)} pid -∗ proc_priv_core pa pid V).
@@ -478,7 +478,7 @@ Section CwBodies.
 
   (* the whole of what the pop needs: the nine spill slots plus the four the
      buffer was carved out of, in slot order. *)
-  Lemma cw_rest_of (sp0 : mword 64) (m0 : regfile) :
+  Lemma cw_rest_of `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     (forall i, (i < 4)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     cw_spill sp0 m0 -∗ cw_buf sp0 -∗ cw_rest sp0.

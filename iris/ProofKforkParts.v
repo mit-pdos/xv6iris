@@ -507,7 +507,7 @@ Section KforkRes.
      [sd a0,336(s4)] installs its working directory, so every accessor
      applied to the child in that window needs this shape.  It does not touch
      [p->cwd], which is why it is a twin and not a weakening. *)
-  Lemma proc_priv_nocwd_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
+  Lemma proc_priv_nocwd_tf_upd `{XI : CurCtx} (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     proc_priv_nocwd γf pa pid V -∗
     p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
@@ -528,7 +528,7 @@ Section KforkRes.
     iFrame "Hpid Hf Hpg Htfc Hptt Htfp Ho".
   Qed.
 
-  Lemma proc_priv_nocwd_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32)
+  Lemma proc_priv_nocwd_tfp_valid `{XI : CurCtx} (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     proc_priv_nocwd γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
   Proof.
@@ -549,7 +549,7 @@ Section KforkRes.
      block rather than a premise on it: [ProcPtOwn.proc_pt_wf]'s last
      conjunct.  The trapframe-copy loop's exit test needs it (see
      [kfk_tf_inj]) and so does [SpecFreeproc.fp_tf]. *)
-  Lemma proc_priv_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32)
+  Lemma proc_priv_tfp_valid `{XI : CurCtx} (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
   Proof.
@@ -591,7 +591,7 @@ Section KforkRes.
      the latter now carries [pname_wf], and these two lemmas are the byte-
      level plumbing on either side of safestrcpy -- the invariant is
      re-established once, at the call's post, not shuffled through here. *)
-  Lemma kfk_pname_bytes (pa : mword 64) (dq : dfrac) (bs : list (bv 8))
+  Lemma kfk_pname_bytes `{XI : CurCtx} (pa : mword 64) (dq : dfrac) (bs : list (bv 8))
       (f : nat -> bv 8) :
     (forall i, (i < length bs)%nat -> bs !! i = Some (f i)) ->
     pname_bytes pa dq bs ⊣⊢
@@ -605,7 +605,7 @@ Section KforkRes.
     by rewrite kfk_name_addr.
   Qed.
 
-  Lemma kfk_bytes_pname (pa : mword 64) (dq : dfrac) (n : nat) (h : nat -> bv 8) :
+  Lemma kfk_bytes_pname `{XI : CurCtx} (pa : mword 64) (dq : dfrac) (n : nat) (h : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 n, pa_add (kfk_name_base pa) j ↦ₘ{dq} h j) -∗
     pname_bytes pa dq (h <$> seq 0 n).
   Proof.

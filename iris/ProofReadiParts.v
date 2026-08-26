@@ -52,6 +52,7 @@ Require Import ProcInv.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -385,6 +386,7 @@ Proof. vm_compute. reflexivity. Qed.
    a section variable can only be instantiated from OUTSIDE the section. *)
 Section ReadiBytes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
   Context `{KTR : !CurKtier}.
 
   (* --- conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so the call
@@ -445,6 +447,7 @@ End ReadiBytes.
 
 Section ReadiRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* A [len]-byte WINDOW of a checked-out buffer's data area, borrowed at
      offset [o] and handed back UNCHANGED -- readi's copy reads it, so the

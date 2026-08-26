@@ -86,7 +86,7 @@ Section SpecSysClose.
   (* sys_close's result, keyed by the returned a0.  In the success case the
      descriptor named by the argument is null and one file reference is
      gone; in the failure case nothing at all has happened. *)
-  Definition sys_close_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_close_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (V : pprivate) (v : mword 64) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile V) = None⌝ ∗
        proc_priv γf p pid V

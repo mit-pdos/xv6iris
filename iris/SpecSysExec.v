@@ -167,7 +167,7 @@ Section SpecSysExec.
      reaches kexec returns -1 with the block unchanged, which is that
      relation's own failure arm.  [V] here is the block AFTER the copy-ins'
      page-table growth -- the caller reads it as [upd_upt V P']. *)
-  Definition sys_exec_post (γf : gname) (pa : mword 64) (pid : mword 32)
+  Definition sys_exec_post `{XI : CurCtx} (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (∃ (V' : pprivate) (na : nat) (alen : nat -> nat)
        (entry spv szv' : mword 64),

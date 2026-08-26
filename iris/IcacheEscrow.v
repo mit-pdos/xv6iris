@@ -214,6 +214,7 @@ Section IcacheEscrow.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  Timeless instances the arms are built out of                       *)

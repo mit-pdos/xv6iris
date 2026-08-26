@@ -636,7 +636,7 @@ Section UsertrapRes.
      is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (un_kl N) (mword_of_int KernelSyms.kmem) "kmem"%string
-       (λ ξ : CtxId, kmem_res ξ (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
      is_lock (un_k N) d_lock "virtio_disk"%string <{ disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N) }> ∗
      bio_ctx (un_bn N) (fs_view (un_fs N) (un_v N) (un_dev N) (un_cov N)) ∗
      log_ctx (un_lg N) (un_bn N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N) ∗
@@ -1650,12 +1650,12 @@ End UsertrapRes.
    caps half is process/device plumbing every parker already has, and the
    [Rsys] half is the syscall table's, which only [SpecSyscall.SYSCALL] can
    produce ([syscall_env_park]). *)
-Definition park_env `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+Definition park_env `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
                       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (N : ut_names) : iProp Σ :=
   (ut_park_caps N ∗ sysc_park_extra (un_tk N))%I.
 
-Global Instance park_env_persistent
+Global Instance park_env_persistent `{XI : CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} (N : ut_names) :
   Persistent (park_env N).
@@ -1665,7 +1665,7 @@ Proof. rewrite /park_env. apply _. Qed.
    uses so that a Module Type and its implementation cannot drift apart.
    [URB] is the bare residue, which is a [Parameter] wherever this is stated
    abstractly; here it is whatever the instantiation's is. *)
-Definition ut_park_intro_body
+Definition ut_park_intro_body `{XI : CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (* [URB] TAKES THE THREAD BESIDE THE HART (tso-port leg M2).  This
@@ -1712,7 +1712,7 @@ Definition ut_park_intro_body
        iref_slots IREFSPARE -∗
        URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096))).
 
-Lemma ut_res_bare_park
+Lemma ut_res_bare_park `{XI : CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)

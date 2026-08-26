@@ -79,6 +79,7 @@ Proof. done. Qed.
 
 Section UartTxInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
   (* [WpUart.dev_inv] carries the era-local permit channel at the ambient
      generation (PermInv.v), so the two lemmas below that OPEN it are
      [GenId]-indexed too.  Implicit, so no caller changes: every holder of

@@ -186,7 +186,7 @@ Proof. intros Hi Hfd Heq. apply (p_ofile_end_inj i (S fd) Hi ltac:(lia) Heq). Qe
 Definition kx_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition kx_frame `{!riscvGS Σ} (spF : mword 64) : iProp Σ :=
+Definition kx_frame `{XI : CurCtx} `{!riscvGS Σ} (spF : mword 64) : iProp Σ :=
   (∃ v5 v4 v3 v2 v1 v0 : mword 64,
      kx_fcell spF 5 ↦₈[KT1] v5 ∗ kx_fcell spF 4 ↦₈[KT1] v4 ∗ kx_fcell spF 3 ↦₈[KT1] v3 ∗
      kx_fcell spF 2 ↦₈[KT1] v2 ∗ kx_fcell spF 1 ↦₈[KT1] v1 ∗ kx_fcell spF 0 ↦₈[KT1] v0)%I.
@@ -205,7 +205,7 @@ Qed.
    saved cells are dead the moment the swtch happens and they belong to the
    page the dying thread donates -- this is [kstack_closer_frame]'s argument
    at the prologue.  Existential contents are exactly what [stack_own] is. *)
-Lemma kx_frame_stack `{!riscvGS Σ} (sp0 : mword 64) :
+Lemma kx_frame_stack `{XI : CurCtx} `{!riscvGS Σ} (sp0 : mword 64) :
   kx_frame (pa_stk sp0 6) ⊢ stack_own (KTR := KT1) sp0 6.
 Proof.
   assert (Hb5 : kx_fcell (pa_stk sp0 6) 5 = pa_stk sp0 1).

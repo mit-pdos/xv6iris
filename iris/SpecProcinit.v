@@ -120,11 +120,11 @@ Section SpecProcinit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---- what a lock looks like before and after initlock ---- *)
-  Definition lk_raw (lk : mword 64) : iProp Σ :=
+  Definition lk_raw `{XI : CurCtx} (lk : mword 64) : iProp Σ :=
     (∃ (vlock : mword 32) (vname vcpu : mword 64),
        lk ↦₄ vlock ∗ lock_name_field lk ↦₈ vname ∗ lk_cpu lk ↦₈ vcpu)%I.
 
-  Definition lk_fresh (lk : mword 64) (s : string) : iProp Σ :=
+  Definition lk_fresh `{XI : CurCtx} (lk : mword 64) (s : string) : iProp Σ :=
     (lk ↦₄ (mword_of_int 0 : mword 32) ∗
      lock_name lk s ∗
      lk_cpu lk ↦₈ (zero_reg : mword 64))%I.
@@ -132,7 +132,7 @@ Section SpecProcinit.
   (* ---- one process, before ---- *)
   (* [p_state] and [p_kstack] are the only two private cells procinit
      writes; everything else it is handed is already in its final shape. *)
-  Definition proc_raw (pa : mword 64) : iProp Σ :=
+  Definition proc_raw `{XI : CurCtx} (pa : mword 64) : iProp Σ :=
     (∃ (vst : mword 32) (vks : mword 64),
        lk_raw pa ∗
        p_state pa ↦₄ vst ∗
@@ -144,7 +144,7 @@ Section SpecProcinit.
      has just written [p->kstack], and the slot's stack cannot be deposited
      until that cell is persisted into [is_kstack], which is the caller's
      next ghost step ([procs_inv_alloc] below). *)
-  Definition proc_ready (i : nat) : iProp Σ :=
+  Definition proc_ready `{XI : CurCtx} (i : nat) : iProp Σ :=
     (lk_fresh (proc_addr i) "proc"%string ∗
      p_state (proc_addr i) ↦₄ UNUSED ∗
      p_kstack (proc_addr i) ↦₈ kstack_va i ∗
@@ -157,7 +157,7 @@ Section SpecProcinit.
      happens ONCE, here, at the deposit -- rather than by restating
      [kstack_free] at 512, which would oblige the exit path to give back
      words nobody ever tracked.  The tail is dropped (affine). *)
-  Lemma kstack_bank_carve :
+  Lemma kstack_bank_carve `{XI : CurCtx} :
     kstack_bank ⊢
     [∗ list] i ∈ seq 0 NPROC,
       stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV.

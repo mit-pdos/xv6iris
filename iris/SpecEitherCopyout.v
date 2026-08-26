@@ -104,7 +104,7 @@ Section SpecEitherCopyout.
      its tier ([ktb]) at the use below. *)
 
   (* What comes back, keyed by the flag and by the returned a0. *)
-  Definition either_copyout_post (ktb : ktier) (user : bool) (γf : gname) (p : mword 64)
+  Definition either_copyout_post `{XI : CurCtx} (ktb : ktier) (user : bool) (γf : gname) (p : mword 64)
       (pid : mword 32) (V : pprivate) (dst : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user

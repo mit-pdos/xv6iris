@@ -331,6 +331,7 @@ Definition pn_mark (γp : pipe_names) (w : bool) : gname :=
 
 Section PipeInv.
   Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- THE reference: a share of one END of the pipe ----
 

@@ -140,7 +140,7 @@
 
        Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
          if user then DfracOwn (1/4) else dq.
-       Lemma wi_src_pid … : <the bracket> -∗
+       Lemma wi_src_pid `{XI : CurCtx} … : <the bracket> -∗
          p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
          (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗ <the bracket>).
 
@@ -369,6 +369,7 @@ Require Import SpecConsolewrite.
 Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -756,6 +757,7 @@ End FwSlots.
    of a hand-reduced paraphrase of it: if SpecWritei's bracket ever changes
    shape again, this stops compiling.  ------------------------------------- *)
 Section FwWriteiSrc.
+  Context `{XI : CurCtx}.
   (* exactly [ProcInv]'s own context for [proc_priv].  [lockG] IS QUALIFIED
      ON PURPOSE: this file does not [Require Import WpLock], so the plain
      spelling does not fail -- Rocq's backtick binders generalize, and it
@@ -841,7 +843,6 @@ Require Import IcacheEscrow.
 Require Import SpecFileread.
 Require Import CodeFilewrite ProofFilereadParts ProofFilewriteParts.
 Require Import ProcAvail.
-Require Import TsoCtx.
 
 Set Printing Depth 40.
 

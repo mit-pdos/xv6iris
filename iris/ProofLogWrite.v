@@ -346,7 +346,7 @@ Section LogWriteDefs.
   Qed.
 
   (* the four frame slots (slot 4 -- offset 0 -- is pushed but never written) *)
-  Definition lw_frame (m : regfile) : iProp Σ :=
+  Definition lw_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -363,7 +363,7 @@ Section LogWriteDefs.
           M !!! Regidx c = (m !!! Regidx c : mword 64)).
 
   (* what the caller gets back *)
-  Definition lw_res (bn : bio_names) (γ : log_names) (γfs : fs_names)
+  Definition lw_res `{XI : CurCtx} (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (dev : mword 32) (k : nat)
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ) : iProp Σ :=
     (Bud ∗ Fb ∗
@@ -375,7 +375,7 @@ Section LogWriteDefs.
   (* ABSORB: the slot array comes back UNCHANGED (the store rewrote W[i]
      with the same word), the junk head and lh.n untouched, and the
      caller's own slot unit passes straight through. *)
-  Definition lw_closeA (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeA `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) (W : list (mword 32)) : iProp Σ :=
@@ -390,7 +390,7 @@ Section LogWriteDefs.
 
   (* APPEND: the junk cell at index nl now holds bno, bpin's reference has
      been minted, and lh.n has been bumped. *)
-  Definition lw_closeB (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeB `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) (W : list (mword 32)) : iProp Σ :=
@@ -405,7 +405,7 @@ Section LogWriteDefs.
 
   (* what [lw_pin] (+0x66) still owes: the bpin reference and the bumped
      lh.n cell *)
-  Definition lw_closeP (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeP `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) : iProp Σ :=
@@ -416,7 +416,7 @@ Section LogWriteDefs.
      lw_res bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud)%I.
 
   (* ... and what the absorb path still owes at the +0xaa fall-through *)
-  Definition lw_closeR (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeR `{XI : CurCtx} (Psi : gmap Z (list (bv 8)) -> gmap Z (list (bv 8)) -> iProp Σ) (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) : iProp Σ :=
@@ -463,7 +463,6 @@ End LogWriteDefs.
 (* ===================================================================== *)
 Section LogWriteBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-
   (* ================================================================== *)
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
   (*  Both paths converge here with [log_res] already reassembled.       *)

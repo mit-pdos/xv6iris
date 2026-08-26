@@ -184,7 +184,7 @@ Section FsinitDefs.
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
-  Definition fsi_frame (m : regfile) : iProp Σ :=
+  Definition fsi_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -229,7 +229,7 @@ Section FsinitDefs.
   (* THE BUFFER'S DATA BYTES, out of the handle and back.  [ds_held_L]'s *)
   (* twin for the raw window: the whole of what fsinit's memmove wants.  *)
   (* ------------------------------------------------------------------ *)
-  Lemma fsi_data_acc (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Lemma fsi_data_acc `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dv bno : mword 32) (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held bn V k pidv dv bno bs bsl bsd d -∗
       ⌜length bs = 1024%nat⌝ ∗
@@ -253,7 +253,7 @@ Section FsinitDefs.
   (* [RiscvPtsto.word4_pointsto_bytes]: the alignment is a premise (the   *)
   (* bytes do not carry it) and the naming function is read at [o + jj].  *)
   (* ------------------------------------------------------------------ *)
-  Lemma fsi_word4 (a : mword 64) (o : nat) (w : mword 32) (f : nat -> bv 8) :
+  Lemma fsi_word4 `{XI : CurCtx} (a : mword 64) (o : nat) (w : mword 32) (f : nat -> bv 8) :
     is_aligned_paddr (Physaddr (pa_add a o)) 4 = true ->
     (forall jj, (jj < 4)%nat -> f (o + jj)%nat = nth_byte w jj) ->
     ([∗ list] jj ∈ seq 0 4, pa_add (pa_add a o) jj ↦ₘ f (o + jj)%nat) -∗

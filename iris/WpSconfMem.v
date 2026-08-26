@@ -101,8 +101,12 @@ Section WpSconfMem.
      [wordw_pointsto width a dq w] is unchanged and an explicit-tier one is
      [wordw_pointsto (KTR := ktd) width a dq w]. *)
   Definition wordw_pointsto `{KTR : !CurKtier} (width : Z) (a : Arch.pa) (dq : dfrac) (w : mword (8*width)) : iProp Σ :=
+    (* members spelled with the FLIPPED ↦ₘ (ctx at the ambient context): the
+       leaf's statements went ctx at the M1 flip, so its internal window
+       plumbing ([s_win_write]'s lists) must be ctx too or every [iFrame]
+       across it dies syntactically. *)
     (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
-     [∗ list] j ∈ seq 0 (Z.to_nat width), mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+     [∗ list] j ∈ seq 0 (Z.to_nat width), pa_add a j ↦ₘ{dq} nth_byte w j)%I.
 
   (* THE ADDRESS CLAIM, AND WHY THE ATOMIC-UPDATE FORMS TAKE IT.
      Per node, an access TRANSLATES before it reads, and the translation
@@ -1501,7 +1505,7 @@ Section WpSconfMem.
      is [Z.rem _ 1 = 0] and its list is the single byte at offset 0. *)
   Lemma wordw1_byte `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac)
       (w : mword (8*1)) :
-    wordw_pointsto 1 a dq w ⊣⊢ mem_pointsto a dq w.
+    wordw_pointsto 1 a dq w ⊣⊢ a ↦ₘ{dq} w.
   Proof.
     rewrite /wordw_pointsto. change (Z.to_nat 1) with 1%nat.
     rewrite big_sepL_singleton pa_add_0 nth_byte0_id.

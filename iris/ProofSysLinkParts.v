@@ -583,7 +583,7 @@ Definition sl_al (sp0 : mword 64) : Prop :=
 Section ProofSysLinkFrame.
   Context `{!riscvGS Σ}.
 
-  Lemma sl_frame_carve (sp0 : mword 64) :
+  Lemma sl_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 38 -∗
     ⌜sl_al sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
@@ -633,11 +633,15 @@ Section ProofSysLinkFrame.
       iSplitL "H26"; [iExact "H26" |]. iSplitL "H25"; [iExact "H25" |].
       iSplitL "H24"; [iExact "H24" |]. iSplitL "H23"; [iExact "H23" |].
       done. }
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H4") as "H4".
     iFrame "H1 H2 H3 H4 HbN HbW HbO". iPureIntro.
     split_and!; assumption.
   Qed.
 
-  Lemma sl_frame_join (sp0 : mword 64) (w1 w2 w3 w4 : mword 64) :
+  Lemma sl_frame_join `{XI : CurCtx} (sp0 : mword 64) (w1 w2 w3 w4 : mword 64) :
     sl_al sp0 ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
     (pa_stk sp0 3) ↦₈[KT1] w3 -∗ (pa_stk sp0 4) ↦₈[KT1] w4 -∗
@@ -690,18 +694,18 @@ Section ProofSysLinkFrame.
 
   (* the buffers, named as bytes and back: argstr / namei / nameiparent /
      dirlink all speak the [seq]-indexed byte window, not [bytes_own]. *)
-  Lemma sl_bytes_name (a : mword 64) (N : nat) :
+  Lemma sl_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma sl_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma sl_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): the walkers read the NUL-terminated prefix, the
      rest rides through untouched *)
-  Lemma sl_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma sl_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -713,7 +717,7 @@ Section ProofSysLinkFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma sl_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma sl_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
@@ -730,7 +734,7 @@ Section ProofSysLinkFrame.
 
   (* the NAME buffer is sixteen bytes of frame but FOURTEEN of DIRSIZ; the
      two trailing bytes ride through the two walkers untouched. *)
-  Lemma sl_nm_split (a : mword 64) (f : nat -> bv 8) :
+  Lemma sl_nm_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] f j)
     ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[KT1] f (14 + j)%nat).
@@ -739,7 +743,7 @@ Section ProofSysLinkFrame.
     rewrite (bb_split a 14 2 f). iIntros "[$ $]".
   Qed.
 
-  Lemma sl_nm_join (a : mword 64) (f g : nat -> bv 8) :
+  Lemma sl_nm_join `{XI : CurCtx} (a : mword 64) (f g : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] g j) -∗
     ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[KT1] f (14 + j)%nat) -∗
     bytes_own (KTR := KT1) (DfracOwn 1) a 16.

@@ -910,7 +910,7 @@ Section ProofUvmalloc.
           destruct (decide (c = Rs6)) as [->|H22].
           { rewrite /N8 upd_eq. reflexivity. }
           ua_thr_peel. apply Hmdthr; assumption. }
-      { iExists _, _, _. iFrame "Hk3 Hk5 Hk8". }
+      { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk5"; [iExact "Hk5"|]. iExact "Hk8". }
       { rewrite /ua_pay. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. } }
     (* ================= kalloc returned a page r ======================= *)
     set (r := (mk !!! Regidx Ra0 : mword 64)).
@@ -1484,7 +1484,7 @@ Section ProofUvmalloc.
           destruct (decide (c = Rs6)) as [->|H22].
           { rewrite /X4 upd_eq. reflexivity. }
           ua_thr_peel. apply Hmgthr; assumption. }
-      { iExists _, _, _. iFrame "Hk3 Hk5 Hk8". }
+      { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk5"; [iExact "Hk5"|]. iExact "Hk8". }
       { rewrite /ua_pay. iRight. iExists Pj.
         iSplitR; [iPureIntro; exact Hextj |].
         iSplitR; [iPureIntro; rewrite <- Hlast; exact Hdomj |].
@@ -1809,7 +1809,7 @@ Section ProofUvmalloc.
         destruct (decide (c = Rs6)) as [->|H22].
         { rewrite /G8 upd_eq. reflexivity. }
         ua_thr_peel. apply Hd2thr; assumption. }
-    { iExists _, _, _. iFrame "Hk3 Hk5 Hk8". }
+    { iExists _, _, _. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk5"; [iExact "Hk5"|]. iExact "Hk8". }
     { rewrite /ua_pay. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. }
   Qed.
 
@@ -2492,7 +2492,7 @@ Section ProofUvmalloc.
         - intros c Hc H2 H8 H18 H20 H21 H23.
           rewrite /Z1. rewrite upd_ne; [| ua_thr_ne].
           apply HR10thr; assumption. }
-      { iExists u56, u40, u16. iFrame "Hk3 Hk5 Hk8". }
+      { iExists u56, u40, u16. iSplitL "Hk3"; [iExact "Hk3"|]. iSplitL "Hk5"; [iExact "Hk5"|]. iExact "Hk8". }
       { rewrite /ua_pay. iRight. iExists P.
         iSplitR; [iPureIntro; apply uptd_ext_refl |].
         iSplitR; [iPureIntro; rewrite Hn0; apply dom_run_0 |].

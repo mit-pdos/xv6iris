@@ -327,7 +327,7 @@ Section IallocBytes.
      this composed with [dislot_acc_gen]; ialloc needs the RAW form too,
      because [SpecMemset] takes and returns a byte window and not the six
      typed cells. *)
-  Lemma ia_win_acc (a : mword 64) (ds : list dinode) (k : nat) :
+  Lemma ia_win_acc `{XI : CurCtx} (a : mword 64) (ds : list dinode) (k : nat) :
     diblk_wf ds -> (k < 16)%nat ->
     bb_bytes a 1024 (fun j => diblk_bytes ds !!! j) -∗
       ([∗ list] j ∈ seq 0 64,
@@ -374,7 +374,7 @@ Section IallocBytes.
      ones bread returned, and the handle's payload carries exactly that -- on
      BOTH polarities.  [ProofIupdate.iu_held_L] verbatim; a Proof file may
      not require another Proof file, so it is restated here. *)
-  Lemma ia_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma ia_held_L `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
@@ -431,7 +431,7 @@ Section IallocDefs.
   (* ialloc's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0.
      [pa_stk sp j] counts DOWN from the entry sp, so slot j holds the
      register saved at (newsp + 64 - 8j). *)
-  Definition ia_frame (m : regfile) : iProp Σ :=
+  Definition ia_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗

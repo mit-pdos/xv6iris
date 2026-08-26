@@ -10,7 +10,16 @@
    owned by the allocator.  The allocator's protected resource [kmem_res fl]
    owns the global head pointer (at address [fl] = &kmem.freelist) plus every
    page in the chain.  It becomes the resource [R] of a spin-lock over
-   &kmem.lock, giving [is_kmem γ lk fl := is_lock γ lk "kmem" <{ kmem_res fl }>].
+   &kmem.lock, giving
+   [is_kmem γ lk fl := is_lock γ lk "kmem" (λ ξ, kmem_res (XIk := ξ) fl)].
+
+   THE CONTEXT AXIS (tso-port M1/M3).  Every points-to below is the flipped
+   [↦ₘ]/[↦₈] -- context-indexed at the ambient [XIk] the section binds -- so
+   the BODIES are the SC bodies verbatim; the context appears exactly twice:
+   the section binder, and the λ at [is_kmem] (a lock payload must NAME its
+   context -- the recipe's rule 1 -- because the resource changes hands
+   between threads of control).  The [CtxMorph] instances after the section
+   are the transport obligation that hand-off carries.
 
    THE PAGE-COUNT GHOST.  On top of the chain, the protected resource carries
    an authoritative count of the free pages, [kmem_avail_auth γk (length
@@ -60,11 +69,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
-Require Import TsoCtxShim.   (* THE SEAM MARKER (tso-port M3, kmem worked
-   instance): this file's payload is context-indexed but the page-byte tier
-   below it ([byte_any]/[page_own]) is not yet -- the ctx↔mem word bridges
-   ([word_at_of_mem]/[word_at_to_mem]) cross that boundary and die at the
-   M1 notation flip. *)
 Require Export PageGeom.  (* the pure page geometry: page_valid / page_base / nullp *)
 Local Open Scope Z_scope.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
@@ -113,63 +117,32 @@ Qed.
 
 Section Kalloc.
   Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
-
+  (* the context axis: everything below is stated at this ambient context;
+     the flipped ↦-notations bind to it invisibly.  [is_kmem] (after the
+     section) is the one place that quantifies over it. *)
+  Context `{XIk : CurCtx}.
 
   Definition byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₘ b)%I.
-  (* THE CONTEXT-INDEXED WORD CELL (tso-port M3, the kmem worked instance):
-     an 8-byte little-endian word owned by the CURRENT THREAD OF CONTROL --
-     [↦c] is [ctx_pointsto cur_ctx], and the ambient context here is the
-     section's [XI], bound by the payload wrapper at every [kmem_res]
-     mention.  These are the facts that live UNDER the kmem lock (the
-     freelist head cell, each free page's next pointer): deposited at the
-     releaser's identity, handed to the acquirer at its own
-     ([SpecAcquire]'s [R cur_ctx]).  The alignment conjunct mirrors
-     [word_pointsto_unfold]'s shape, so the mem bridges below are
-     one-liners. *)
-  (* THE CONTEXT IS AN EXPLICIT ARGUMENT, NOT AMBIENT -- the audited rule
-     (tso-port.md §2d): a definition that is genuinely a function of the
-     thread of control must NAME it, because an ambient [CurCtx] left to
-     instance resolution inside the payload wrapper resolves differently
-     at different elaboration sites (measured here: one site bound the
-     wrapper's context, another silently bound the file's -- the
-     silent-drop hazard, verbatim).  Converted payloads are spelled
-     [(λ ξ, kmem_res ξ …)]; the [<{ }>] wrapper remains for UNCONVERTED
-     constant payloads only, where the ambiguity is harmless. *)
-  Definition word_at (ξc : CtxId) (a : mword 64) (w : mword 64) : iProp Σ :=
-    (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
-     [∗ list] j ∈ seq 0 8,
-       ctx_pointsto ξc (pa_add a j) (DfracOwn 1) (nth_byte w j))%I.
-
-  (* THE MEM BRIDGES -- the file's ctx↔mem seam, derived from the shim
-     (SC-only; at cutover the flip has converted the byte tier and these
-     die with their last consumer). *)
-  Lemma word_at_of_mem {ξc : CtxId} (a : mword 64) (w : mword 64) :
-    word_pointsto a (DfracOwn 1) w -∗ word_at ξc a w.
-  Proof.
-    rewrite word_pointsto_unfold /word_at. iIntros "[$ H]".
-    iApply (big_sepL_impl with "H").
-    iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_of_mem.
-  Qed.
-
-  Lemma word_at_to_mem {ξc : CtxId} (a : mword 64) (w : mword 64) :
-    word_at ξc a w -∗ word_pointsto a (DfracOwn 1) w.
-  Proof.
-    rewrite word_pointsto_unfold /word_at. iIntros "[$ H]".
-    iApply (big_sepL_impl with "H").
-    iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_to_mem.
-  Qed.
+  (* an 8-byte little-endian word, now expressed via the word points-to
+     abstraction (so it also carries the doubleword-alignment of [a]). *)
+  Definition word_at (a : mword 64) (w : mword 64) : iProp Σ :=
+    (a ↦₈ w)%I.
   Definition page_head8 (p : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 8, byte_any (pa_add p j))%I.
   Definition page_rest (p : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 8 4088, byte_any (pa_add p j))%I.
   Definition page_own (p : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 4096, byte_any (pa_add p j))%I.
-  Definition run_page (ξc : CtxId) (p next : mword 64) : iProp Σ :=
-    (word_at ξc p next ∗ page_rest p)%I.
+  Definition run_page (p next : mword 64) : iProp Σ :=
+    (word_at p next ∗ page_rest p)%I.
 
   (* Seal the big-op leaves so [iFrame]/typeclass search treat each as an atom
-     rather than recursing into its ~4096 per-byte conjuncts. *)
-  Typeclasses Opaque byte_any word_at page_head8 page_rest page_own run_page.
+     rather than recursing into its ~4096 per-byte conjuncts.  GLOBAL since
+     the M1 flip: the [CtxMorph] instances live outside this section (they
+     quantify over the context it fixes), and an unsealed [page_rest] there
+     sent [iFrame] crawling through the 4088 conjuncts -- the same class of
+     degeneracy as the ProofKfree/157GB lesson, caught by [coqc -time]. *)
+  Global Typeclasses Opaque byte_any word_at page_head8 page_rest page_own run_page.
 
   Lemma page_own_split p : page_own p ⊣⊢ page_head8 p ∗ page_rest p.
   Proof.
@@ -178,18 +151,17 @@ Section Kalloc.
     rewrite seq_app big_sepL_app //.
   Qed.
 
-  Lemma word_at_head8 {ξc : CtxId} p w : word_at ξc p w ⊢ page_head8 p.
+  Lemma word_at_head8 p w : word_at p w ⊢ page_head8 p.
   Proof.
-    iIntros "H". iDestruct (word_at_to_mem with "H") as "H".
-    rewrite /page_head8 word_pointsto_unfold. iDestruct "H" as "[_ H]".
+    rewrite /word_at /page_head8 ctx_word_pointsto_unfold. iIntros "[_ H]".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb". iExists _. iExact "Hb".
   Qed.
 
   (* the converse direction kfree's [sd r->next] needs: the 8 arbitrary bytes of
      a page's head slot can be viewed as SOME 64-bit word window ready to be
      overwritten (word_pointsto also carries the required 8-alignment). *)
-  Lemma page_head8_word_at {ξc : CtxId} p :
-    page_valid p -> page_head8 p ⊢ ∃ w : mword 64, word_at ξc p w.
+  Lemma page_head8_word_at p :
+    page_valid p -> page_head8 p ⊢ ∃ w : mword 64, word_at p w.
   Proof.
     intros Hv. rewrite /page_head8 /byte_any.
     change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat.
@@ -200,8 +172,8 @@ Section Kalloc.
     iDestruct "H6" as (b6) "H6". iDestruct "H7" as (b7) "H7".
     set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
     set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
-    iExists w. iApply word_at_of_mem.
-    rewrite /word_pointsto.
+    iExists w.
+    rewrite /word_at /ctx_word_pointsto.
     iSplitR; [iPureIntro; by apply page_valid_aligned8|].
     assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
     assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
@@ -215,22 +187,22 @@ Section Kalloc.
     rewrite E0 E1 E2 E3 E4 E5 E6 E7. iFrame.
   Qed.
 
-  Lemma run_page_page_own {ξc : CtxId} p next : run_page ξc p next ⊢ page_own p.
+  Lemma run_page_page_own p next : run_page p next ⊢ page_own p.
   Proof.
     rewrite /run_page page_own_split. iIntros "[Hw $]". by iApply word_at_head8.
   Qed.
 
   (* the free list: [pages] chained through each page's [next] field *)
-  Fixpoint freelist_chain (ξc : CtxId) (head : mword 64) (pages : list (mword 64)) : iProp Σ :=
+  Fixpoint freelist_chain (head : mword 64) (pages : list (mword 64)) : iProp Σ :=
     match pages with
     | [] => ⌜head = nullp⌝
     | p :: ps => ⌜head = p⌝ ∗ ⌜page_valid p⌝ ∗
-                 (∃ nxt : mword 64, run_page ξc p nxt ∗ freelist_chain ξc nxt ps)
+                 (∃ nxt : mword 64, run_page p nxt ∗ freelist_chain nxt ps)
     end%I.
 
-  Lemma freelist_chain_cons {ξc : CtxId} head p ps :
-    freelist_chain ξc head (p :: ps)
-    = (⌜head = p⌝ ∗ ⌜page_valid p⌝ ∗ (∃ nxt : mword 64, run_page ξc p nxt ∗ freelist_chain ξc nxt ps))%I.
+  Lemma freelist_chain_cons head p ps :
+    freelist_chain head (p :: ps)
+    = (⌜head = p⌝ ∗ ⌜page_valid p⌝ ∗ (∃ nxt : mword 64, run_page p nxt ∗ freelist_chain nxt ps))%I.
   Proof. reflexivity. Qed.
 
   (* ===== the page-count ghost (see the header) ===== *)
@@ -334,78 +306,19 @@ Section Kalloc.
   (* the allocator's protected resource: the global freelist head pointer at
      [fl], ownership of every page currently in the list, and the count
      authority tied to the list's length. *)
-  Definition kmem_res (ξc : CtxId) (γk : gname * gname) (fl : mword 64) : iProp Σ :=
+  Definition kmem_res (γk : gname * gname) (fl : mword 64) : iProp Σ :=
     (∃ (head : mword 64) (pages : list (mword 64)),
-        word_at ξc fl head ∗ freelist_chain ξc head pages ∗
+        word_at fl head ∗ freelist_chain head pages ∗
         kmem_avail_auth γk (length pages))%I.
 
-  (* the whole allocator = a spinlock whose resource is [kmem_res].  Persistent. *)
-  Definition is_kmem (γ : gname) (γk : gname * gname) (lk fl : mword 64) : iProp Σ :=
-    is_lock γ lk "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl).
-  Global Instance is_kmem_persistent γ γk lk fl : Persistent (is_kmem γ γk lk fl).
-  Proof. apply _. Qed.
+  (* [is_kmem], the spinlock over [kmem_res], is defined AFTER the section:
+     it is the one definition that must range over contexts rather than sit
+     at the ambient one. *)
 
-  Lemma kmem_res_close {ξc : CtxId} γk fl head pages :
-    word_at ξc fl head ∗ freelist_chain ξc head pages ∗ kmem_avail_auth γk (length pages)
-    ⊢ kmem_res ξc γk fl.
+  Lemma kmem_res_close γk fl head pages :
+    word_at fl head ∗ freelist_chain head pages ∗ kmem_avail_auth γk (length pages)
+    ⊢ kmem_res γk fl.
   Proof. iIntros "H". iExists head, pages. iExact "H". Qed.
-
-  (* ==================================================================
-     THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3): the obligation the
-     acquire/release Parameters carry, exported beside the sealed
-     definitions ([Typeclasses Opaque] above stops structural search from
-     unfolding them, so each sealed shape gets its one instance here).
-     These are REAL morphs -- the word cells re-index between threads of
-     control -- unlike the constant embeddings of unconverted payloads;
-     the page bodies ([page_rest]) are still context-free and ride the
-     const instance until the M1 flip. *)
-  Global Instance word_at_morph (a w : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, word_at ξ0 a w).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /word_at.
-    iDestruct "H" as "[%Hal H]".
-    (* instance search cannot do the higher-order big-op unification, so
-       the structural instances are applied as terms *)
-    iMod (ctx_morph_big_sepL (seq 0 8)
-            (λ _ j ξ0, ctx_pointsto ξ0 (pa_add a j) (DfracOwn 1) (nth_byte w j))
-            (λ i x, ctx_morph_pointsto _ _ _ _)
-            ξ ξ' with "Hd H") as "[Hd H]".
-    iModIntro. iFrame "Hd". iSplit; [done|]. iExact "H".
-  Qed.
-
-  Global Instance run_page_morph (p next : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, run_page ξ0 p next).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /run_page.
-    iDestruct "H" as "[Hw Hr]".
-    iMod (word_at_morph p next ξ ξ' with "Hd Hw") as "[Hd Hw]".
-    iModIntro. iFrame.
-  Qed.
-
-  Global Instance freelist_chain_morph (head : mword 64)
-      (pages : list (mword 64)) :
-    CtxMorph (λ ξ0 : CtxId, freelist_chain ξ0 head pages).
-  Proof.
-    revert head. induction pages as [|p ps IH] => head.
-    - iIntros (ξ ξ') "Hd H". iModIntro. iFrame.
-    - iIntros (ξ ξ') "Hd H". simpl.
-      iDestruct "H" as "(%Hh & %Hv & %nxt & Hrun & Hchain)".
-      iMod (run_page_morph p nxt ξ ξ' with "Hd Hrun") as "[Hd Hrun]".
-      iMod (IH nxt ξ ξ' with "Hd Hchain") as "[Hd Hchain]".
-      iModIntro. iFrame "Hd".
-      iSplit; [done|]. iSplit; [done|]. iExists nxt. iFrame.
-  Qed.
-
-  Global Instance kmem_res_morph (γk : gname * gname) (fl : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, kmem_res ξ0 γk fl).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /kmem_res.
-    iDestruct "H" as (head pages) "(Hw & Hchain & Hauth)".
-    iMod (word_at_morph fl head ξ ξ' with "Hd Hw") as "[Hd Hw]".
-    iMod (freelist_chain_morph head pages ξ ξ' with "Hd Hchain")
-      as "[Hd Hchain]".
-    iModIntro. iFrame "Hd". iExists head, pages. iFrame.
-  Qed.
 
   (* kalloc's logical core: the opened invariant either has an empty list (put
      it back unchanged, kalloc returns null -- [kalloc_avail_zero] pins the
@@ -416,14 +329,14 @@ Section Kalloc.
   (* kfree's logical core: after the function has written [p->next := oldhead]
      and [fl := p], the pieces refold into the invariant with [p] prepended and
      the count stepped up. *)
-  Lemma kmem_res_push {ξc : CtxId} γk fl p oldhead pages on :
+  Lemma kmem_res_push γk fl p oldhead pages on :
     page_valid p ->
     kalloc_avail γk on -∗
-    word_at ξc fl p -∗
-    run_page ξc p oldhead -∗
-    freelist_chain ξc oldhead pages -∗
+    word_at fl p -∗
+    run_page p oldhead -∗
+    freelist_chain oldhead pages -∗
     kmem_avail_auth γk (length pages) ==∗
-    kalloc_avail γk (avail_inc on) ∗ kmem_res ξc γk fl.
+    kalloc_avail γk (avail_inc on) ∗ kmem_res γk fl.
   Proof.
     iIntros (Hp) "Hav Hfl Hrun Hchain Hauth".
     iMod (kmem_avail_inc γk on (length pages) with "Hav Hauth") as "[Hav Hauth]".
@@ -459,3 +372,88 @@ Section Kalloc.
        {{ is_kmem γ γk lk fl ∗ kfree_pre p ∗ kalloc_avail γk on }}
            kfree(p)  {{ kalloc_avail γk (avail_inc on) }}                  *)
 End Kalloc.
+
+Section KallocCtx.
+  Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
+  Context `{XI : CurCtx}.
+
+  (* ==================================================================
+     THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3): the transport
+     obligation the acquire/release Parameters carry.  Outside the
+     section because each quantifies over the context the section fixes.
+     Instance search cannot do the higher-order big-op unification, so
+     the structural instances are applied AS TERMS throughout (the
+     recipe's rule 3). *)
+
+  Global Instance byte_any_morph (a : Arch.pa) :
+    CtxMorph (λ ξ0 : CtxId, byte_any (XIk := ξ0) a).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /byte_any.
+    iDestruct "H" as (b) "H".
+    iMod (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iExists b. iExact "H".
+  Qed.
+
+  Global Instance word_at_morph (a w : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, word_at (XIk := ξ0) a w).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /word_at.
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iExact "H".
+  Qed.
+
+  Global Instance page_rest_morph (p : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, page_rest (XIk := ξ0) p).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /page_rest.
+    iMod (ctx_morph_big_sepL (seq 8 4088)
+            (λ _ j ξ0, byte_any (XIk := ξ0) (pa_add p j))
+            (λ i x, byte_any_morph _)
+            ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance run_page_morph (p next : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, run_page (XIk := ξ0) p next).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /run_page.
+    iDestruct "H" as "[Hw Hr]".
+    iMod (word_at_morph p next ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iMod (page_rest_morph p ξ ξ' with "Hd Hr") as "[Hd Hr]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance freelist_chain_morph (head : mword 64)
+      (pages : list (mword 64)) :
+    CtxMorph (λ ξ0 : CtxId, freelist_chain (XIk := ξ0) head pages).
+  Proof.
+    revert head. induction pages as [|p ps IH] => head.
+    - iIntros (ξ ξ') "Hd H". iModIntro. iFrame.
+    - iIntros (ξ ξ') "Hd H". simpl.
+      iDestruct "H" as "(%Hh & %Hv & %nxt & Hrun & Hchain)".
+      iMod (run_page_morph p nxt ξ ξ' with "Hd Hrun") as "[Hd Hrun]".
+      iMod (IH nxt ξ ξ' with "Hd Hchain") as "[Hd Hchain]".
+      iModIntro. iFrame "Hd".
+      iSplit; [done|]. iSplit; [done|]. iExists nxt. iFrame.
+  Qed.
+
+  Global Instance kmem_res_morph (γk : gname * gname) (fl : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, kmem_res (XIk := ξ0) γk fl).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /kmem_res.
+    iDestruct "H" as (head pages) "(Hw & Hchain & Hauth)".
+    iMod (word_at_morph fl head ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iMod (freelist_chain_morph head pages ξ ξ' with "Hd Hchain")
+      as "[Hd Hchain]".
+    iModIntro. iFrame "Hd". iExists head, pages. iFrame.
+  Qed.
+
+  (* the whole allocator = a spinlock whose resource is [kmem_res], stated
+     at WHATEVER context the holder runs in -- the λ names the payload's
+     context (recipe rule 1: never the ambient wrapper for a converted
+     payload).  Persistent. *)
+  Definition is_kmem (γ : gname) (γk : gname * gname) (lk fl : mword 64) : iProp Σ :=
+    is_lock γ lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl).
+  Global Instance is_kmem_persistent γ γk lk fl : Persistent (is_kmem γ γk lk fl).
+  Proof. apply _. Qed.
+End KallocCtx.

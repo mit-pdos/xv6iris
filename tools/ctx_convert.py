@@ -23,6 +23,26 @@ Modes:
                       sie_cap_gpr/context vocabulary, and add the TsoCtx
                       import.  Idempotent.  Default is a dry-run report.
 
+  ambient [--apply]   M1 NOTATION FLIP: give every Section an ambient
+                      `{XI : CurCtx}` if (a) the file imports TsoCtx (so its
+                      ↦ₘ/↦₈ notations are the flipped, cur_ctx-relative
+                      ones), (b) the section's own span uses the flipped
+                      vocabulary (↦ₘ/↦₈/↦c/cur_ctx/is_lock family), and
+                      (c) no enclosing section already binds CurCtx.  This
+                      is the pass `binders` cannot do: `binders` keys on
+                      CpuId vocabulary, and the ~30 invariant-definition
+                      files (KallocInv, LogInv, ConsoleInv, ...) are
+                      hart-free -- after the flip their ↦-statements need a
+                      context with no hart in sight.  SECTION binders only:
+                      they self-clean (a definition captures XI only if it
+                      uses it), which is what makes over-inclusion safe;
+                      the SchedCtx/boot lesson says a TOP-LEVEL phantom
+                      binder is what breaks adequacy, so top-level
+                      declarations are left to fail loudly and be fixed by
+                      hand.  Boot/adequacy files are blacklisted: their
+                      statements deliberately stay on the raw/explicit-ξ
+                      side of the seam.
+
 The per-function spec conversion (`↦ₘ`→`↦c`) and call-site patch modes are
 added as they stabilize; the reference diffs are SpecMemset.v (spec) and
 ProofBalloc.v (call site).
@@ -50,10 +70,12 @@ BLACKLIST = {"RiscvLang.v", "RiscvPtsto.v", "Ktier.v", "TsoMem.v",
              # quantifies two harts explicitly, so it could not infer a
              # context even if one were meaningful.
              "HartTp.v",
-             # register/instruction level: PC + GPR file + physical stack
-             # carve.  Hart-indexed, thread-INdependent -- a context binder
-             # here is a phantom that propagates into every consumer.
-             "InstrBytes.v", "WpGpr.v", "StackOwn.v",
+             # register/instruction level: PC + GPR file.  Hart-indexed,
+             # thread-INdependent -- a context binder here is a phantom that
+             # propagates into every consumer.  (StackOwn LEFT this list at
+             # the M1 flip: a stack FRAME is thread data, and keeping it raw
+             # made every function proof's prologue/epilogue a shim seam.)
+             "InstrBytes.v", "WpGpr.v",
              # [cpu_ctx_free] (top-level, above the section) is the raw 14
              # save-area words at [a_cpu_ctx cid_word] with NOBODY parked in
              # them -- per-cpu geometry, no thread of control; its phantom
@@ -200,15 +222,206 @@ def convert_caps(path: pathlib.Path, apply: bool):
         path.write_text(text2)
     return (n_open, n_frame, n_split)
 
+# ------------------------------------------------------------- ambient
+
+# the flipped vocabulary: any of these inside a section means its
+# definitions/statements elaborate cur_ctx (directly, or through is_lock's
+# implicit XI, or through a ctx-parametric definition) and the section needs
+# the ambient binder.  The definition names are HARVESTED as conversions
+# land -- vocabulary scanning cannot see ctx-ness that arrives through a
+# converted definition, so each new ctx-parametric family gets its heads
+# added here (the build's "?XI : CurCtx" existential errors are the signal).
+FLIPPED = re.compile(r"↦ₘ|↦₈|↦c|cur_ctx|is_lock|lock_openable|lock_inv|<\{"
+                     r"|byte_any|word_at|page_own|page_rest|page_head8"
+                     r"|run_page|freelist_chain|kmem_res|buf_own|bb_bytes"
+                     r"|bb_word|wordw_pointsto|kernel_data_window"
+                     r"|kernel_data_bytes|bytes_own|stat_at|fentry_raw"
+                     r"|ftable_res|free_slot_res|free_cell_res|uw_saved"
+                     r"|uw_slot|console_caps|is_conslock|is_txlock"
+                     r"|disk_res_at|lw_res|lw_close|file_core|file_fields"
+                     r"|fd_slot|proc_priv|is_pipe|pipe_ref|fentry|disk_res")
+
+# boot/adequacy: statements stay raw or explicit-ξ; a phantom ambient here is
+# the boot_hart_res/eight-hart lesson.  (BootCarve talks to the flipped world
+# through qualified TsoCtxShim names, no ambient.)
+AMBIENT_BLACKLIST = {"RiscvAdequacy.v", "SystemAdequacy.v", "BootChain.v",
+                     "BootShared.v", "BootBridge.v", "BootCarve.v",
+                     "BootCarveMain.v", "DiskBoot.v", "FsCfgBoot.v",
+                     "TsoCtx.v", "TsoCtxShim.v", "TsoCtxTwin.v",
+                     "TsoCtxTwin2.v", "TsoCtxRehearsal.v"}
+
+def convert_ambient(path: pathlib.Path, apply: bool):
+    if path.name in AMBIENT_BLACKLIST or path.name in BLACKLIST:
+        return None
+    text = path.read_text()
+    if "Require Import TsoCtx" not in text:
+        return None            # notations not flipped in this file
+    # a file that binds XI INLINE on declarations manages its own axis --
+    # a section binder would clash ("XI is already used"), and stripping
+    # the inline binder breaks module-signature argument order (the
+    # ProofProcMapstacks lesson).  Skip; its uncovered sections surface as
+    # build errors and are fixed by hand.
+    if re.search(r"^(?!\s*Context).*`\{XI : CurCtx\}", text, re.M):
+        return "skip-inline"
+    lines = text.splitlines(keepends=True)
+    stripped = [strip_comments(l) for l in lines]
+
+    # section spans, nesting-aware
+    stack, sections = [], []   # sections: (start, end, name)
+    for i, l in enumerate(stripped):
+        st = l.strip()
+        m = re.match(r"Section (\w+)\.", st)
+        if m:
+            stack.append((i, m.group(1)))
+        elif st.startswith("End ") and stack:
+            j, name = stack.pop()
+            if st == f"End {name}.":
+                sections.append((j, i, name))
+
+    def span_has(rx, a, b):
+        return any(rx.search(stripped[k]) for k in range(a, b + 1))
+
+    inserts = []               # line index to insert AFTER
+    for (a, b, _name) in sorted(sections):
+        if not span_has(FLIPPED, a, b):
+            continue
+        if any(oa < a and b < ob and any(
+                   "Context" in stripped[k] and "CurCtx" in stripped[k]
+                   for k in range(oa, ob))
+               for (oa, ob, _n) in sections):
+            pass               # an outer binder covers inner sections too --
+                               # but only if it precedes; checked below
+        # own or enclosing binder already present?
+        covered = False
+        for (oa, ob, _n) in sections:
+            if oa <= a and b <= ob:
+                for k in range(oa, min(b, ob) + 1):
+                    s = stripped[k].strip()
+                    if s.startswith("Context") and "CurCtx" in s:
+                        covered = True
+        if covered:
+            continue
+        # insertion point: after the section's leading Context/blank prologue
+        ins = a
+        k = a + 1
+        while k <= b:
+            s = stripped[k].strip()
+            if s == "" or s.startswith("Context ") or s.startswith("Import ") \
+               or s.startswith("Local Open Scope") or s.startswith("Implicit Types"):
+                if s.startswith("Context "):
+                    ins = k
+                k += 1
+                continue
+            break
+        if ins == a:
+            ins = a            # no Context prologue: right after Section line
+        inserts.append(ins)
+
+    if not inserts:
+        return None
+    indent_of = lambda i: re.match(r"\s*", lines[i]).group(0) if \
+        lines[i].strip().startswith("Context") else "  "
+    for i in sorted(set(inserts), reverse=True):
+        lines.insert(i + 1, f"{indent_of(i)}Context `{{XI : CurCtx}}.\n")
+    if apply:
+        path.write_text("".join(lines))
+    return len(set(inserts))
+
+# ------------------------------------------------------------- inline
+
+DECL_RE = re.compile(
+    r"^(\s*)((?:Local |Global )?(?:Lemma|Definition|Instance|Corollary|Theorem))"
+    r"\s+([\w']+)", re.M)
+
+def convert_inline(path: pathlib.Path, apply: bool):
+    """For files that manage the context axis with INLINE binders (the
+    ambient pass skips them): give every declaration whose span uses the
+    flipped vocabulary -- and which binds neither CurCtx nor CpuId (the
+    CpuId ones were handled by `binders`) -- its own `{XI : CurCtx}`,
+    right after the name.  The vocabulary gate is what keeps the binder
+    from being a phantom (the SchedCtx lesson)."""
+    if path.name in AMBIENT_BLACKLIST or path.name in BLACKLIST:
+        return None
+    text = path.read_text()
+    if "Require Import TsoCtx" not in text:
+        return None
+    decls = list(DECL_RE.finditer(text))
+    if not decls:
+        return None
+    # a decl inside a section whose Context (possibly a COMBINED
+    # `{GEN}`{CID}`{XI} line) already binds CurCtx must not re-bind it
+    covered_at = []            # (offset, covered?) events
+    depth = []
+    off = 0
+    for line in text.splitlines(keepends=True):
+        st = line.lstrip()
+        if st.startswith("Section "):
+            depth.append(depth[-1] if depth else False)
+        elif st.startswith("End ") and depth:
+            depth.pop()
+        elif st.startswith("Context ") and "CurCtx" in line and depth:
+            depth[-1] = True
+        covered_at.append((off, bool(depth) and depth[-1]))
+        off += len(line)
+    def covered(o):
+        c = False
+        for (start, v) in covered_at:
+            if start > o: break
+            c = v
+        return c
+    out, pos, count = [], 0, 0
+    for i, m in enumerate(decls):
+        span_end = decls[i + 1].start() if i + 1 < len(decls) else len(text)
+        span = strip_comments(text[m.start():span_end])
+        header_end = span.find("Proof.")
+        header = span if header_end < 0 else span[:header_end]
+        if "CurCtx" in header or "CpuId" in header or covered(m.start()):
+            continue
+        if not FLIPPED.search(span):
+            continue
+        out.append(text[pos:m.end()])
+        out.append(" `{XI : CurCtx}")
+        pos = m.end()
+        count += 1
+    if not count:
+        return None
+    out.append(text[pos:])
+    if apply:
+        path.write_text("".join(out))
+    return count
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["binders", "caps"])
+    ap.add_argument("mode", choices=["binders", "caps", "ambient", "inline"])
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--files", nargs="*", help="restrict to these files")
     args = ap.parse_args()
 
     files = ([IRIS / f for f in args.files] if args.files
              else sorted(IRIS.glob("*.v")))
+    if args.mode == "inline":
+        tot = nf = 0
+        for p in files:
+            r = convert_inline(p, args.apply)
+            if r:
+                nf += 1; tot += r
+                print(f"{p.name}: {r} inline binder(s)")
+        print(f"-- inline: {nf} files, {tot} binders"
+              f"{' (APPLIED)' if args.apply else ' (dry run)'}")
+        return
+    if args.mode == "ambient":
+        tot = nf = nskip = 0
+        for p in files:
+            r = convert_ambient(p, args.apply)
+            if r == "skip-inline":
+                nskip += 1
+                print(f"{p.name}: SKIP (manages its own inline XI binders)")
+            elif r:
+                nf += 1; tot += r
+                print(f"{p.name}: {r} section binder(s)")
+        print(f"-- ambient: {nf} files, {tot} binders, {nskip} inline-skips"
+              f"{' (APPLIED)' if args.apply else ' (dry run)'}")
+        return
     if args.mode == "caps":
         tot_o = tot_f = tot_s = nf = 0
         for p in files:

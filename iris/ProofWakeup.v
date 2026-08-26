@@ -71,7 +71,7 @@ Local Open Scope Z_scope.
 (* wakeup's 7-entry callee-save frame, over [SpecWakeupParts.wk_fcell]: ra/s0
    and s1..s5 at spF+56 down to spF+8, written by the prologue and read back
    by the epilogue. *)
-Definition wk_frame `{!riscvGS Σ} (spF : mword 64)
+Definition wk_frame `{XI : CurCtx} `{!riscvGS Σ} (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) : iProp Σ :=
   (wk_fcell spF 7 ↦₈[KT1] vra ∗ wk_fcell spF 6 ↦₈[KT1] vs0 ∗ wk_fcell spF 5 ↦₈[KT1] vs1 ∗
    wk_fcell spF 4 ↦₈[KT1] vs2 ∗ wk_fcell spF 3 ↦₈[KT1] vs3 ∗ wk_fcell spF 2 ↦₈[KT1] vs4 ∗

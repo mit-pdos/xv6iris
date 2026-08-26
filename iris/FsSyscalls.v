@@ -266,7 +266,7 @@ Section FsBundles.
      CALLER's [bmapstart]/[size], exactly as it spells [cov]/[logstart] at
      the caller's.  Those two already ride here as equations, so the bitmap
      row costs exactly what every other row costs: two more of the same. *)
-  Definition fs_world (γpr γa : gname) (γs : list gname)
+  Definition fs_world `{XI : CurCtx} (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
       (γfs : fs_names) (γi : gname) (cn : ic_names) (gtl : gname)
@@ -284,7 +284,7 @@ Section FsBundles.
      is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> ∗
      FsReady.fs_ready)%I.
 
-  Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
+  Global Instance fs_world_persistent `{XI : CurCtx} γpr γa γs γu γd γk pd pav pu bn glog
       γfs γi cn gtl cov logstart bmapstart inodestart nib size dev :
     Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
                          cov logstart bmapstart inodestart nib size dev).
@@ -295,7 +295,7 @@ Section FsBundles.
      destructs ONE row and gets the eighteen constituents spelled the way
      its callee spells them.  The substitution happens here, once, instead
      of in every consumer. *)
-  Lemma fs_world_all γpr γa γs γu γd γk pd pav pu bn glog
+  Lemma fs_world_all `{XI : CurCtx} γpr γa γs γu γd γk pd pav pu bn glog
       γfs γi cn gtl cov logstart bmapstart inodestart nib size dev :
     fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
              cov logstart bmapstart inodestart nib size dev -∗
@@ -374,7 +374,7 @@ Section FsBundles.
      lemmas rather than one [⊣⊢]: the pages are universally quantified going
      down (any [pd] whose [disk_geom] you can show) and existentially coming
      back (the witness [fs_ready] already holds). *)
-  Lemma fs_world_ready γs pd pav pu :
+  Lemma fs_world_ready `{XI : CurCtx} γs pd pav pu :
     fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
              pd pav pu fsc_bio icfg_log fsc_fs fsc_ireg
              fsc_ic fsc_itlock fsc_cov fsc_logst fsc_bmapstart icfg_ist
@@ -386,7 +386,7 @@ Section FsBundles.
                  & _ & _ & _ & _ & _ & $)".
   Qed.
 
-  Lemma fs_ready_world γs :
+  Lemma fs_ready_world `{XI : CurCtx} γs :
     FsReady.fs_ready ⊢
     ∃ pd pav pu, fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
                    pd pav pu fsc_bio icfg_log fsc_fs fsc_ireg

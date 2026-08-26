@@ -147,18 +147,18 @@ Section CtBodies.
   (* ---- the frame, in two pieces ------------------------------------ *)
 
   (* the three the prologue saves unconditionally *)
-  Definition ct_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition ct_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1))%I.
 
   (* slots 4 and 5 (s2/s3's shrink-wrap) and slot 6, which nothing writes *)
-  Definition ct_rest (sp0 : mword 64) : iProp Σ :=
+  Definition ct_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : mword 64, pa_stk sp0 4 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 5 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w))%I.
 
-  Lemma ct_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma ct_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     ct_saved sp0 m0 -∗ ct_rest sp0 -∗ stack_own (KTR := KT1) sp0 6.
   Proof.
     iIntros "(H1 & H2 & H3) (H4 & H5 & H6)".

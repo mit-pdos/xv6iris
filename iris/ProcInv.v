@@ -87,6 +87,7 @@ Require Import RiscvExtras.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -193,6 +194,7 @@ Proof. simpl. apply length_insert. Qed.
 
 Section ProcInv.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* The scalar private cells.                                           *)
@@ -756,7 +758,7 @@ Section ProcInv.
     tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
-    iApply word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
+    iApply ctx_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
@@ -1352,7 +1354,7 @@ Section ProcInv.
     a ↦₈ w ⊣⊢ a ↦₈{DfracOwn (1/4)} w ∗ a ↦₈{DfracOwn (3/4)} w.
   Proof.
     assert (Hq : DfracOwn 1 = DfracOwn (1/4 + 3/4)) by (f_equal; compute_done).
-    rewrite {1}Hq. apply word_pointsto_frac_split.
+    rewrite {1}Hq. apply (ctx_word_pointsto_frac_split cur_ctx).
   Qed.
 
   Local Lemma word_split14 (a w : mword 64) :

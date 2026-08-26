@@ -116,7 +116,7 @@ Section StatBuf.
 
   (* THE FIVE FIELDS stati WRITES, and only those: bytes 12..15 (the
      alignment hole) are NOT part of this bundle. *)
-  Definition stat_at (st : mword 64)
+  Definition stat_at `{XI : CurCtx} (st : mword 64)
       (dev ino : mword 32) (ty nl : mword 16) (sz : mword 64) : iProp Σ :=
     (* the [struct stat] is the CALLER's frame local (filestat's [st], which
        sys_fstat then copies out), so it is at the post-boot tier. *)
@@ -126,9 +126,15 @@ Section StatBuf.
      st_nlink st ↦₂[KT1] nl  ∗
      st_size  st ↦₈[KT1] sz)%I.
 
-  Global Instance stat_at_timeless st dev ino ty nl sz :
+  Global Instance stat_at_timeless `{XI : CurCtx} st dev ino ty nl sz :
     Timeless (stat_at st dev ino ty nl sz).
-  Proof. rewrite /stat_at. apply _. Qed.
+  Proof.
+    rewrite /stat_at.
+    repeat apply bi.sep_timeless;
+      first [ apply ctx_pointsto_timeless
+            | apply ctx_word_pointsto_timeless
+            | apply _ ].
+  Qed.
 End StatBuf.
 
 (* stati's own frame is 16 bytes (2 slots); it calls nothing. *)

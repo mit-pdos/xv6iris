@@ -339,7 +339,10 @@ End CpuOwn.
 (* [wp_next]'s conditional equality.  Chain the per-step equalities with   *)
 (* [wp_next_chain] and apply this once. *)
 (* ===================================================================== *)
-Lemma cpu_own_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+(* ONE context however many harts the statement names: the hart may move
+   under a trap, the thread's context does not -- the flip makes that
+   design point a binder. *)
+Lemma cpu_own_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{XI : CurCtx}
     (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
     (b : bool) {lks : gset string} :
   (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->

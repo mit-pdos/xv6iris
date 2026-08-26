@@ -60,7 +60,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
   sie_cap_gpr KT0 m K b pcur -∗
   cpu_own ncnt eb pcur b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk "kmem"%string (λ ξ : CtxId, kmem_res ξ γk fl) -∗
+  is_lock γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
   kalloc_avail γk (Some 0%nat) -∗
   wp_next b pcur (fun (CID : CpuId) =>

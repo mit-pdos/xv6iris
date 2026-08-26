@@ -659,7 +659,7 @@ Section InstallTransDefs.
   Qed.
 
   (* the ten saved slots (ra, s0..s8): every one is written *)
-  Definition it_frame (m : regfile) : iProp Σ :=
+  Definition it_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -907,7 +907,7 @@ Section InstallTransDefs.
   (* the two directions memmove's contract needs, applied (not rewritten):
      both sides carry beta-redexes, which unification sees through and
      ssreflect's [rewrite] does not. *)
-  Lemma it_data_fwd (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
+  Lemma it_data_fwd `{XI : CurCtx} (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
     length bs = len ->
     ([∗ list] j ↦ x ∈ bs, pa_add q j ↦ₘ x) ⊢
     ([∗ list] j ∈ seq 0 len, (pa_add q j) ↦ₘ (bs !!! j)).
@@ -916,7 +916,7 @@ Section InstallTransDefs.
     iIntros "$".
   Qed.
 
-  Lemma it_data_back (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
+  Lemma it_data_back `{XI : CurCtx} (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
     length bs = len ->
     ([∗ list] j ∈ seq 0 len, (pa_add q j) ↦ₘ (bs !!! j)) ⊢
     ([∗ list] j ↦ x ∈ bs, pa_add q j ↦ₘ x).

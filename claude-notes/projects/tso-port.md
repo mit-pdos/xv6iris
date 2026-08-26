@@ -207,6 +207,121 @@ at baseline.  Next payloads repeat 1–4; after the M1 flip, step 3's
 bridges die and step 1's spelling is what the flip's review must keep
 deterministic.
 
+### 0.8′ THE M1 NOTATION FLIP, STAGE 1 (2026-08-25/26) — ↦ₘ AND ↦₈ ARE CONTEXT-INDEXED
+
+**What flipped.** `TsoCtx.v` re-declares all four `↦ₘ` spellings as
+`ctx_pointsto cur_ctx …` and all four `↦₈` spellings as
+`ctx_word_pointsto cur_ctx …` (a full word tower — `ctx_word_pointsto`
+plus unfold/aligned_p/bytes/intro/frac_split/persist/agree and
+`ctx_morph_word` — lives above the sealed byte).  Import order decides:
+a file that imports `TsoCtx` (last) parses the flipped meaning, a file
+that does not stays raw, and definitions are opaque names to their
+consumers, so the honest fallout is exactly the fact-passing SEAMS —
+found by ~30 error-driven build rounds, not by prediction.  `↦ₓ`/`↦ᵣ`
+never flip; `↦₂`/`↦₄`/`↦ₛ`/`↦ₚ` are stage 2 (each remaining
+`TsoCtxShim` use at a `↦₄`-split/join or string extraction is a stage-2
+worklist entry).
+
+**KMEM REDONE MINIMAL-DIFF (the acceptance test).** `KallocInv.v` is
+the SC file plus: one section binder (`Context `{XIk : CurCtx}` — every
+body byte-identical, `word_at` now the `↦₈` notation), `is_kmem` moved
+below the section with the payload spelled
+`(λ ξ : CtxId, kmem_res (XIk := ξ) γk fl)` (rule 1), and the `CtxMorph`
+block (structural instances applied as terms; `page_rest` now honestly
+morphs its 4088 bytes).  The `word_at_of_mem/to_mem` bridges are GONE;
+`ProofKalloc`/`ProofKfree`/`ProofKinit` are their SC texts verbatim
+except the payload-λ spelling at ~6 acquire/release/newlock sites.
+GOTCHA: the big-op seal (`Typeclasses Opaque byte_any word_at …`) must
+be `Global` — the morph section sits outside the section that declared
+it, and an unsealed `page_rest` sent `iFrame` crawling through 4088
+conjuncts (caught with `coqc -time`; the fix is one word).
+
+**Rulings the flip forced (each is a design decision, revisit welcome):**
+1. **`kernel_data` is ∀-CONTEXT** (`∀ ξ, [∗ map] … ctx_pointsto ξ …`):
+   image bytes predate every thread (the twin's timestamp-0 story), the
+   one boot mint serves every consumer at its own ambient, and all ~169
+   mention sites are textually unchanged.  `kernel_data_string` keeps
+   its raw `↦ₛ` conclusion via one shim use (the "flip ↦ₛ" marker); its
+   proof instantiates the ∀ at a CONCRETE `MkCtxId inhabitant
+   inhabitant` so the lemma does not capture the ambient (capture
+   shifted call-site elaboration — ProofPanic/ProofFilewriteParts broke
+   until de-captured).
+2. **Lock metadata stays RAW; lock-internal cells go ∃-context.**
+   `lock_name`/`sl_name` (the name field) are spelled raw
+   `word_pointsto` — a context in the persistent HANDLE would make a
+   boot-minted `is_lock` unstatable elsewhere.  `lk_cpu_res`'s owner
+   cell is `∃ ξ, ctx_word_pointsto ξ …` (the cell belongs to whichever
+   hart last stored it); the `lk_cpu_res_free/win/held` unfold lemmas
+   keep their ambient statements via `WpLock.lk_cpu_cell_acc` (shim).
+   Both are M4 markers — lock-internal cells become racy-kit facts.
+3. **`<{ P }>` IS A COMBINATOR (`const_pay`), NOT A λ.**  Any
+   `CurCtx`-typed binder — even anonymous — is a TC candidate inside
+   `P`, and elaboration picked it at some sites and the outer ambient
+   at others (the silent-drop hazard, observed as ~40 `proc_lock_res`
+   mention sites refusing to unify).  `const_pay P` elaborates `P` as an
+   ARGUMENT, outside any binder: deterministic, and `ctx_morph_const_pay`
+   serves it.  The proc lock therefore STAYS on the constant embedding
+   — its λ-conversion was attempted, hit the real M2 wall (the payload's
+   `▷ proc_ctx`/chain-fixpoint transport), and was reverted; converting
+   it is M2/M3 work with `SchedCtx`'s parked-record design, not a flip
+   chore.
+4. **`StackOwn` FLIPPED (left the binder blacklist).**  A stack frame is
+   thread data; keeping it raw made every function proof's
+   prologue/epilogue a shim seam (7 files patched one iFrame at a time
+   before the pattern was recognized; the flip deleted the class).
+   `stack_own_phys` stays raw; `BootBridge.phys_word_to_word` mints the
+   ctx words at the boot hand-off; `stack_own_reindex` (shim-tier) is
+   the swtch crossing's SC placeholder, used once in `ProofSwtch`.
+5. **`cpu_ctx_free` is ∃-CONTEXT** (nobody is parked in a free save
+   area), preserving the eight-hart adequacy story its header records;
+   `SwtchCtx.ctx_cells_reindex` (shim-tier, outside the section) trades
+   the ∃ for the scheduler's ambient — an M2 worklist entry.
+6. **`wordw_pointsto`/`bb_*`/`kxc_*` interior towers** were re-spelled
+   ctx so leaf plumbing frames syntactically; the machine seam
+   (`s_win_write`, `gen_heap` edges, phys tier) converts through
+   `TsoCtxShim.ctx_buf_of/to_mem` and the new `ctx_eslot_of/to_mem`.
+
+**The seal is unification-PERMEABLE at SC.**  `Global Opaque
+ctx_pointsto` does not stop `iApply`/`iExact`/`iMod` unification from
+proving ctx-vs-mem convertible (that is also why `iExact` works as a
+direction-agnostic crossing where syntactic `iFrame` fails).  Two
+consequences: some seams pass SILENTLY (they surface at cutover as
+compile errors, which is acceptable — the cutover list is the ultimate
+inventory), and unifying two DIFFERENT context variables under the seal
+can CRAWL (UsertrapRes went 35+ min on one `iExact "Hcaps"` — see
+below).  `coqc -time` on the GCP VM is the diagnostic.
+
+**Tooling (kept, per owner instruction, for the re-application to
+main):** `tools/ctx_convert.py` gained `ambient` (section binders for
+TsoCtx-importing files whose sections use the flipped vocabulary;
+inline-skip guard; boot/adequacy blacklist) and `inline` (per-decl
+binders in inline-managed files, gated on the harvested vocabulary and
+enclosing-section coverage).  The harvest list in `FLIPPED` grows as
+conversions land — vocabulary scanning cannot see ctx-ness that arrives
+through a converted definition name, so the build's `?XI : CurCtx`
+existential errors are the signal to extend it.
+
+**NOT GREEN YET — the open tail (all M2-shaped):**
+- `UsertrapRes.ut_res_bare_park` — the park lemma's continuation binds
+  the RESUMING context (`∀ h Xc`), and `iExact "Hcaps"` pits
+  `devintr_caps` at the outer ambient against the same at `Xc`; the
+  permeable-seal unification crawls (35 min, killed).  Needs a
+  shim-tier `devintr_caps` transport (or `devintr_caps_any`, which the
+  file already defines for exactly this hart-free crossing) — genuine
+  M2 park/resume work.
+- `ProofKernelvec` (~1681) — the trap RESUME crossing: the kerneltrap
+  continuation's `sie_cap_gpr` will not instantiate against the
+  caller's (hidden index mismatch); same family.
+- Last few binder/seam stragglers surfaced by the most recent round
+  (BootCarveMain disk records, ProofSysOpenParts/ProofSysUnlink/
+  SpecKexecB2) have fixes applied but not yet verified green.
+
+**Where the flip's honesty lives now:** grep `TsoCtxShim` (imports =
+seams), `Local Transparent ctx_pointsto` (one use, `SchedCtx`'s
+proc-payload morph attempt — currently unused after the revert; remove
+if it stays dead), and `reindex`/`eslot`/`cell_acc` (the SC-only
+transports that die with the shim and become the M2/M4 worklists).
+
 ---
 
 **The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5

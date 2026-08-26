@@ -238,7 +238,7 @@ Section SpecSysOpen.
      [upd_upt], so this predicate is purely about the DESCRIPTORS).
 
      Both arms hand the fd unit back: see the header's file-table ledger. *)
-  Definition sys_open_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_open_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (W : pprivate) (r : mword 64) : iProp Σ :=
     ((* FAILURE, on any of the seven arms.  The descriptor array is EXACTLY
         as it came in: no arm that installed a descriptor can fail after

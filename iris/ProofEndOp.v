@@ -561,7 +561,7 @@ Section EoData.
       exact (IH (fun i y => P (S i) y)).
   Qed.
 
-  Lemma eo_data_fwd (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
+  Lemma eo_data_fwd `{XI : CurCtx} (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
     length bs = len ->
     ([∗ list] j ↦ x ∈ bs, pa_add q j ↦ₘ x) ⊢
     ([∗ list] j ∈ seq 0 len, (pa_add q j) ↦ₘ (bs !!! j)).
@@ -570,7 +570,7 @@ Section EoData.
     iIntros "$".
   Qed.
 
-  Lemma eo_data_back (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
+  Lemma eo_data_back `{XI : CurCtx} (q : Arch.pa) (bs : list (bv 8)) (len : nat) :
     length bs = len ->
     ([∗ list] j ∈ seq 0 len, (pa_add q j) ↦ₘ (bs !!! j)) ⊢
     ([∗ list] j ↦ x ∈ bs, pa_add q j ↦ₘ x).
@@ -727,25 +727,25 @@ Section EndOpDefs.
      UNCONDITIONALLY (slots 1..4); slots 5,6,7 (s3@24, s4@16, s5@8) are
      written only on the two arms that clobber them, and slot 8 (offset 0)
      is never touched at all. *)
-  Definition eo_frame4 (m : regfile) : iProp Σ :=
+  Definition eo_frame4 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
-  Definition eo_frameJ (m : regfile) : iProp Σ :=
+  Definition eo_frameJ `{XI : CurCtx} (m : regfile) : iProp Σ :=
     ((∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] v) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] v) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] v))%I.
 
-  Definition eo_frameS (m : regfile) : iProp Σ :=
+  Definition eo_frameS `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] v))%I.
 
-  Lemma eo_frameS_J (m : regfile) : eo_frameS m -∗ eo_frameJ m.
+  Lemma eo_frameS_J `{XI : CurCtx} (m : regfile) : eo_frameS m -∗ eo_frameJ m.
   Proof.
     rewrite /eo_frameS /eo_frameJ. iIntros "(H5 & H6 & H7 & H8)".
     iSplitL "H5"; [iExists _; iExact "H5"|].

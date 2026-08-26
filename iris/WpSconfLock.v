@@ -135,11 +135,13 @@ Section WpSconfLock.
     iDestruct (wordw_claim_of (KTR := KT0) 4 lk (DfracOwn 1) w ltac:(lia)
                  with "Hword") as "#Hc4".
     iEval (rewrite /lk_cpu_res) in "Hcpu". iDestruct "Hcpu" as "[Hcell Hfr]".
+    iEval (rewrite lk_cpu_cell_acc) in "Hcell".
     iDestruct (wordw_claim_of (KTR := KT0) 8 (lock_cpu lk) (DfracOwn 1)
                  (lk_cpu_val st) ltac:(lia) with "Hcell") as "#Hc8".
     iMod ("Hclose" with "[Hword Hcell Hfr Hg Hbr]") as "_".
     { iNext. iExists w, st. iFrame "Hword Hg Hbr".
-      rewrite /lk_cpu_res. iFrame "Hcell Hfr". }
+      rewrite /lk_cpu_res. iFrame "Hfr". rewrite lk_cpu_cell_acc.
+      iExact "Hcell". }
     iModIntro. iFrame "Hc4 Hc8 HT".
   Qed.
 
@@ -425,13 +427,14 @@ Section WpSconfLock.
          (WpLock.v's owner-field block). *)
       iEval (rewrite /lk_cpu_res) in "Hcpures".
       iDestruct "Hcpures" as "[Hcpu Hrest]".
+      iEval (rewrite lk_cpu_cell_acc) in "Hcpu".
       iDestruct (Hview st with "Hg Hrest HT") as %Hphi.
       iModIntro. iExists (lk_cpu_val st).
       iSplitL "Hcpu"; [ rewrite -Hpacpu; iExact "Hcpu" | ].
       iIntros "Hcpu".
       iMod ("Hclose" with "[Hword Hcpu Hrest Hg Hbr]") as "_".
       { iNext. iExists w, st. iFrame "Hword Hg Hbr".
-        rewrite /lk_cpu_res. iFrame "Hrest".
+        rewrite /lk_cpu_res. iFrame "Hrest". rewrite lk_cpu_cell_acc.
         rewrite -Hpacpu. iExact "Hcpu". }
       iModIntro. iFrame "HT". iPureIntro. exact Hphi. }
     iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (%Hphi & HT)".

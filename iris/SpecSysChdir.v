@@ -160,7 +160,7 @@ Section SpecSysChdir.
      gives it back with a NEW one, whose reference is the one namei made and
      ilock/iunlock left intact.  [ipv] is existential because the entry the
      path resolves to is not something the caller named. *)
-  Definition sys_chdir_post (γf : gname) (pa : mword 64) (pid : mword 32)
+  Definition sys_chdir_post `{XI : CurCtx} (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf pa pid V
      ∨ ∃ ipv : mword 64,

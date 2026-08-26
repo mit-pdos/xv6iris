@@ -50,6 +50,10 @@ Require Import RiscvExtras PowerBoot.   (* [boot_uint_pa]: the RAM-range address
 Require Import StackOwn.                (* [pa_stk] / [uint_pa_stk] / [stack_own_phys] *)
 Require Import KernelText.             (* the [kernel_text] bundle this produces *)
 Require Import KernelDataInv.          (* ... and the [kernel_data] one *)
+(* [Require] WITHOUT [Import]: this file's ↦-statements stay RAW (it is the
+   boot carve -- adequacy's side of the seam); the shim is named qualified,
+   only to mint the every-context [kernel_data] from the raw image bytes. *)
+Require TsoCtxShim.
 From Kernel Require KernelInstrs KernelData.
 Local Open Scope Z_scope.
 
@@ -527,6 +531,7 @@ Section BootCarve.
     ([∗ map] a ↦ b ∈ ran_bytes g text_end rodata_end, a ↦ₘ□ b) -∗ kernel_data.
   Proof.
     iIntros (Hmem) "#Hd". rewrite /kernel_data /kdata_ro.
+    iIntros (ξ).
     iApply big_sepM_intro. iIntros "!>" (a b Hlk).
     apply map_lookup_filter_Some in Hlk. destruct Hlk as [Hlk [Hge Hlt]].
     cbn in Hge, Hlt.
@@ -534,6 +539,7 @@ Section BootCarve.
     unfold KernelData.kernel_data_lo, KernelData.kernel_data_hi in Hr.
     assert (Hram : ram_lo <= a < ram_hi)
       by (unfold ram_lo, ram_hi, text_end in *; lia).
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (big_sepM_lookup _ _ (pa_of_z a) b with "Hd").
     rewrite /ran_bytes. apply map_lookup_filter_Some_2.
     - rewrite <- (boot_byte_data a b Hge Hlk). exact (Hmem a Hram).

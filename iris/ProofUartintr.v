@@ -139,7 +139,7 @@ Section UiCont.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* the frame the prologue spilled *)
-  Definition ui_frame (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition ui_frame `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗

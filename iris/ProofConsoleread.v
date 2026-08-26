@@ -188,7 +188,7 @@ Section CrBodies.
   (* ---- the frame, in two pieces ------------------------------------ *)
 
   (* the eight the prologue saves unconditionally *)
-  Definition cr_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition cr_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
@@ -201,13 +201,13 @@ Section CrBodies.
   (* slot 7 (s5's shrink-wrap) and the three local slots, contents free.
      [cbuf] lives in slot 11 and is written by the [sb] at +0x9a, so the
      locals are carried as WORDS everywhere except across that store. *)
-  Definition cr_rest (sp0 : mword 64) : iProp Σ :=
+  Definition cr_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : mword 64, pa_stk sp0 7  ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 10 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 11 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 12 ↦₈[KT1] w))%I.
 
-  Lemma cr_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma cr_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     cr_saved sp0 m0 -∗ cr_rest sp0 -∗ stack_own (KTR := KT1) sp0 12.
   Proof.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H8 & H9) (H7 & H10 & H11 & H12)".

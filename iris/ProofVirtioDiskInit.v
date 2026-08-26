@@ -639,6 +639,7 @@ End VdiLeaves.
 
 Section VdiLease.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma vdi_page_static (p : mword 64) :
     page_valid p ->

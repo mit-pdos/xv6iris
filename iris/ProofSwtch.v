@@ -71,8 +71,8 @@ Section ProofSwtch.
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
-    apply big_sepL_timeless. intros ? ?.
-    rewrite /word_pointsto /mem_pointsto. apply _.
+    apply big_sepL_timeless. intros ? ? _.
+    apply ctx_word_pointsto_timeless.
   Qed.
 
   (* Field 1 of a context record is the saved sp.  Proved ONCE over an
@@ -314,6 +314,9 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
+    (* the target thread's stack, re-indexed to ITS context: the swtch
+       hand-off is the M2 seam; SC crosses it through the shim. *)
+    iDestruct (stack_own_reindex _ XIt with "Hstk_t") as "Hstk_t".
     iAssert (sie_cap (XI := XIt) KT1 (vregs_den rho swtch_regs1) av_t false p)
       with "[Hstk_t Htr Hq0 Hctx_t]" as "Hcap_t".
     { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit Hctx_t". iExact "Hq0". }

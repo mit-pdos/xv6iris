@@ -89,6 +89,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import IrefSlots.  (* [iref_frac]: an ftable entry holds one unit.
      NO CYCLE -- IrefSlots reaches only ProcGeom and FdSlots, which is exactly
      why [NFILE] was moved to FdSlots (see the note below). *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -557,6 +558,7 @@ Section FileInv.
      so it names them individually; everything above takes [xv6G]. *)
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- the content cells, at an arbitrary fraction ----
 

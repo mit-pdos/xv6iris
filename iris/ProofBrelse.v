@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* stack slots cross the ctx/mem seam at the AU cells *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -665,7 +666,9 @@ Section ProofBrelse.
          CONTEXT, not the bundle (optimization.md). *)
       iMod (escrow_swap_park_now _ bn V k true dev bno bs
               with "Hbody Hvalid Hbdev Hbuf Hbpayload") as "[Hbody Hpark]".
-      iModIntro. iExists vr24. iFrame "Hr24".
+      iModIntro. iExists vr24.
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hr24") as "Hr24".
+      iFrame "Hr24".
       iIntros "Hcell". iEval (rgpeel) in "Hcell".
       iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
       iModIntro. iFrame "Hcell Hpark". }

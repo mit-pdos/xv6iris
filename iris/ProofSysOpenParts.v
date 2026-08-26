@@ -616,12 +616,12 @@ Section ProofSysOpenPublish.
      ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
      [f->ip] cell is the first 8-byte user of, the invariant's half and the
      reference's half being exactly this shape. *)
-  Local Lemma so_word_half_join (a : mword 64) (w : mword 64) :
+  Local Lemma so_word_half_join `{XI : CurCtx} (a : mword 64) (w : mword 64) :
     a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈ w.
   Proof.
     iIntros "H1 H2".
     iDestruct (bi.equiv_entails_1_2 _ _
-                 (word_pointsto_frac_split a (1/2) (1/2) w) with "[H1 H2]")
+                 (ctx_word_pointsto_frac_split cur_ctx a (1/2) (1/2) w) with "[H1 H2]")
       as "H"; [iFrame "H1 H2" |].
     iEval (rewrite Qp.div_2) in "H". iExact "H".
   Qed.
@@ -643,7 +643,7 @@ Section ProofSysOpenPublish.
      is where that reference lives.  The entry holds exactly one unit's worth
      either way, which is what makes sys_open's whole allowance come back
      ([SpecSysOpen]'s ledger) rather than leak one per successful open. *)
-  Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) (Cf : fcontent) :
+  Lemma so_open_slot `{XI : CurCtx} (E : coPset) (gf : gname) (kf : nat) (Cf : fcontent) :
     ↑(offN .@ kf) ⊆ E ->
     fc_type Cf = FD_NONE ->
     file_ref gf kf 1 Cf ={E}=∗
@@ -674,7 +674,7 @@ Section ProofSysOpenPublish.
     iFrame "Hcore Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
   Qed.
 
-  Lemma so_publish (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
+  Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
       (pn : fpnames) (om : mword 32) (voff : mword 32) :
     ↑fileipN ⊆ E -> ↑(offN .@ kf) ⊆ E ->
@@ -908,7 +908,7 @@ Definition so_al (sp0 : mword 64) : Prop :=
 Section ProofSysOpenFrame.
   Context `{!riscvGS Σ}.
 
-  Lemma so_frame_carve (sp0 : mword 64) :
+  Lemma so_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 24 -∗
     ⌜so_al sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗

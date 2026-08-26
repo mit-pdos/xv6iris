@@ -77,7 +77,7 @@ Section SpecEitherCopyin.
      and stays at the ambient tier. *)
 
   (* What comes back, keyed by the flag and by the returned a0. *)
-  Definition either_copyin_post (ktb kts : ktier) (user : bool) (γf : gname) (p : mword 64)
+  Definition either_copyin_post `{XI : CurCtx} (ktb kts : ktier) (user : bool) (γf : gname) (p : mword 64)
       (pid : mword 32) (V : pprivate) (dst src : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user

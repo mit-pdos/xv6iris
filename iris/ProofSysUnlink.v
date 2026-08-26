@@ -558,7 +558,7 @@ Section ProofSysUnlinkBody.
     by rewrite {1}(Qp.div_2 q) in Hc.
   Qed.
 
-  Lemma su_dot_window `{GEN : GenId} (a : mword 64) :
+  Lemma su_dot_window `{XI : CurCtx} `{GEN : GenId} (a : mword 64) :
     a = mword_of_int su_dot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dot_f j).
   Proof.
@@ -570,7 +570,7 @@ Section ProofSysUnlinkBody.
     exfalso. lia.
   Qed.
 
-  Lemma su_dotdot_window `{GEN : GenId} (a : mword 64) :
+  Lemma su_dotdot_window `{XI : CurCtx} `{GEN : GenId} (a : mword 64) :
     a = mword_of_int su_dotdot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dotdot_f j).
   Proof.
@@ -588,7 +588,7 @@ Section ProofSysUnlinkBody.
   (*  for that file's whole-function reason.                             *)
   (* ================================================================== *)
 
-  Lemma su_del_split (a : Arch.pa) (f : nat -> bv 8) :
+  Lemma su_del_split `{XI : CurCtx} (a : Arch.pa) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j)
     ⊣⊢ ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] f j)
        ∗ ([∗ list] j ∈ seq 0 14, pa_add (pa_add a 2) j ↦ₘ[KT1] f (2 + j)%nat).

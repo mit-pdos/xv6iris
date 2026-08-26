@@ -58,6 +58,8 @@ Require Import PageFields.
 Require Import Pt4kWalk.
 Require Import PtTree.
 Require Import KvmMap.
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the KT0 identity-map peek crosses the ctx/mem seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -176,6 +178,7 @@ Qed.
 
 Section rekey.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* A KT0 datum's tier pin IS [pa_of ppn va = va], so the physical byte it
      owns sits at [va] itself: a KT0 [↦ₘ] is a [↦ₚ] with no claim, no
@@ -185,8 +188,11 @@ Section rekey.
   Lemma mem_kt0_phys (va : mword 64) dq b :
     va ↦ₘ[KT0]{dq} b ⊢ va ↦ₚ{dq} b.
   Proof.
-    rewrite /mem_pointsto /phys_pointsto.
-    iIntros "H". iDestruct "H" as (ppn) "(_ & _ & %Hram & %Hpin & Hpt)".
+    iIntros "H".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iEval (rewrite /mem_pointsto) in "H".
+    rewrite /phys_pointsto.
+    iDestruct "H" as (ppn) "(_ & _ & %Hram & %Hpin & Hpt)".
     cbn in Hpin. rewrite Hpin in Hram. iEval (rewrite Hpin) in "Hpt".
     iFrame "Hpt". iPureIntro. exact Hram.
   Qed.
@@ -242,6 +248,7 @@ End rekey.
 
 Section ladder.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* [PageFields.page_words8] with the alignment side condition taken as a
      hypothesis instead of derived from [page_valid].  A kalloc'd stack page
@@ -328,6 +335,7 @@ End ladder.
 
 Section mint.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* One stack.  The claim [kvm_M_mint] minted plus the page kvminit handed
      out ARE the whole KSTACK(i) page owned at its virtual address, KT1 --

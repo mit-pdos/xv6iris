@@ -30,6 +30,8 @@ Require Import VirtioModel DiskPtsto DiskInv.
 Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ joins cross the seam *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
@@ -318,7 +320,7 @@ Section VdrwDefs.
   (* one entry of [disk_res]'s eight-element free-descriptor conjunct *)
   Definition free_cell_res (pd : Arch.pa) (fr : nat -> bool) (i : nat) : iProp Σ :=
     (d_free_cell i ↦ₘ (if fr i then Z_to_bv 8 1 else byte_zero) ∗
-     (if fr i then free_slot_res pd i else emp))%I.
+     (if fr i then free_slot_res (XI := XI) pd i else emp))%I.
 
   Lemma free_bundles_cells (pd : Arch.pa) (fr : nat -> bool) :
     free_bundles pd fr ⊣⊢ [∗ list] i ∈ seq 0 8, free_cell_res pd fr i.
@@ -500,6 +502,7 @@ Qed.
 
 Section VdrwbDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* [free_bundles] only reads [fr] below 8, so a pointwise agreement there
      is all a re-fold needs.  The partial-free tail re-marks the descriptors
@@ -569,6 +572,8 @@ Section VdrwbDefs.
     iDestruct (word_pointsto_join4 (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11
                  with "Hx2 Hxp") as "H11".
     rewrite /vdrw_scratch. iExists (word_of_words v2 vp), (word_of_words v0 v1).
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H11") as "H11".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H12") as "H12".
     iFrame "H11 H12".
   Qed.
 
@@ -579,7 +584,6 @@ End VdrwbDefs.
 (* ---- from ProofVirtioDiskRwC.v ---- *)
 
 Require Import WpSmodeHalf.
-Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -994,6 +998,7 @@ Qed.
 
 Section VdrwcDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* the parts of a descriptor slot's bundle P3 does NOT touch: [free_desc]
      wants them back at P6, so they ride through unchanged. *)

@@ -368,6 +368,7 @@ Qed.
 
 Section LogInv.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{XI : CurCtx}.
   (* the ambient generation: [log_ctx] carries this era's SWAP RECEIPT, which
      is what every WAL fupd curries to prove the crash record's arm is its
      own ([FsCrash.fs_arm_acc]).  Implicit, so no spec statement changes. *)

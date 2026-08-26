@@ -291,7 +291,7 @@ Section SpProps.
 
   (* the scratch slots: 3/4/5 (only spilled on the loop path), 6 and 8 (never
      touched at all).  Slot 7 is the [int n] local and rides separately. *)
-  Definition sp_free (sp0 : mword 64) : iProp Σ :=
+  Definition sp_free `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : bv 64, pa_stk sp0 3 ↦₈[KT1] w) ∗ (∃ w : bv 64, pa_stk sp0 4 ↦₈[KT1] w) ∗
      (∃ w : bv 64, pa_stk sp0 5 ↦₈[KT1] w) ∗ (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) ∗
      (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w))%I.
@@ -299,7 +299,7 @@ Section SpProps.
   (* the right to put frame slot 7 back together once the [int n] cell is
      done with -- the lower half plus its 8-alignment, packaged so no join
      predicate has to carry a pure alignment fact. *)
-  Definition sp_join7 (sp0 : mword 64) : iProp Σ :=
+  Definition sp_join7 `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w)%I.
 
   (* +0x7e -- the shared epilogue.  [r] is the value already parked in a0. *)
@@ -2128,7 +2128,13 @@ Section ProofSysPause.
       iApply ("Hacq" $! A1 (mword_of_int 0 : mword 32)
                 with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }
-      { rewrite /sp_free. iFrame "S3 S4 S5 S6 S8". }
+      { rewrite /sp_free.
+        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S3") as "S3".
+        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S4") as "S4".
+        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S5") as "S5".
+        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S6") as "S6".
+        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S8") as "S8".
+        iFrame "S3 S4 S5 S6 S8". }
     - (* n >= 0: fall through to +0x1a *)
       iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pause + 0x16))
                 (mword_of_int 128 : mword 13) (mword_of_int 15 : mword 5) A1 (av - 8)%nat true

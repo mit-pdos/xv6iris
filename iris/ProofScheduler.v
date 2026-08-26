@@ -504,9 +504,10 @@ Section ProofScheduler.
        arrives as its own premise (SpecScheduler.v hoisted it out of
        [cpu_own]'s slot) rather than out of the bundle. *)
     iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & Hhcs)".
-    iDestruct "Hfree" as (ctx0) "[%Hctx0len Hctx0]".
+    iDestruct "Hfree" as (ctx0 ξ0) "[%Hctx0len Hctx0]".
     iAssert (own_ctx (a_cpu_ctx cid_word)) with "[Hctx0]" as "Hown".
-    { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len | iExact "Hctx0"]. }
+    { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len |].
+      iApply (ctx_cells_reindex ξ0 with "Hctx0"). }
     (* ------------------------------------------------------------------ *)
     (* Prologue: 80-byte frame (push 10), save ra/s0..s8.                  *)
     (* ------------------------------------------------------------------ *)

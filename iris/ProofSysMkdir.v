@@ -275,7 +275,7 @@ Proof. vm_compute. discriminate. Qed.
 Section ProofSysMkdirFrame.
   Context `{!riscvGS Σ}.
 
-  Lemma md_frame_carve (sp0 : mword 64) :
+  Lemma md_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 18 -∗
     ⌜forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true⌝ ∗
@@ -300,10 +300,12 @@ Section ProofSysMkdirFrame.
       iSplitL "H6"; [iExact "H6" |]. iSplitL "H5"; [iExact "H5" |].
       iSplitL "H4"; [iExact "H4" |]. iSplitL "H3"; [iExact "H3" |].
       done. }
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H2") as "H2".
     iFrame "H1 H2 Hb". iPureIntro. exact Hal.
   Qed.
 
-  Lemma md_frame_join (sp0 : mword 64) (w1 w2 : mword 64) :
+  Lemma md_frame_join `{XI : CurCtx} (sp0 : mword 64) (w1 w2 : mword 64) :
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true) ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
@@ -332,18 +334,18 @@ Section ProofSysMkdirFrame.
 
   (* the buffer, as bytes and back: argstr / create both speak the
      [seq]-indexed byte window, not [bytes_own] *)
-  Lemma md_bytes_name (a : mword 64) (N : nat) :
+  Lemma md_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma md_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma md_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): create reads the NUL-terminated prefix, the rest
      rides through untouched *)
-  Lemma md_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma md_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -355,7 +357,7 @@ Section ProofSysMkdirFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma md_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma md_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,

@@ -53,6 +53,7 @@ Require Import KMap.
 Require Import Pt4kWalk.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the ↦ₚ₈/↦₈ bridge crosses the ctx/mem seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -424,6 +425,10 @@ Qed.
 
 Section PtSlotBridge.
   Context `{!riscvGS Σ}.
+  (* the ↦₈ side of the bridge is context-indexed since the M1 flip; the
+     ↦ₚ₈ side (the physical claim tier) is not.  The crossing is licensed
+     by the shim until the cutover kit re-proves it against the machine. *)
+  Context `{XI : CurCtx}.
 
   (* svpn of a within-page address is its ppn field: [x = b*4096 + r],
      [0 <= r < 4096], canonical *)
@@ -498,7 +503,7 @@ Section PtSlotBridge.
     u_pte_addr b idx ↦₈{dq} w.
   Proof.
     iIntros "(%Hkd & %Hpv & #Hk) Hw".
-    iApply word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
+    iApply ctx_word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
@@ -506,6 +511,7 @@ Section PtSlotBridge.
     destruct (u_pte_slot_facts b idx (0 + k)%nat Hkd ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (u_pte_addr b idx) (0 + k))) b KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_to_mem_claim (pa_add (u_pte_addr b idx) (0 + k)) b dq (nth_byte w (0 + k))
               Hid Hram Hcan with "Hk' Hp").
   Qed.
@@ -519,13 +525,14 @@ Section PtSlotBridge.
   Proof.
     iIntros "(%Hkd & %Hpv & #Hk) Hw".
     iApply phys_word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
-    iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
     apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
     destruct (u_pte_slot_facts b idx (0 + k)%nat Hkd ltac:(lia)) as (Hid & _ & _ & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (u_pte_addr b idx) (0 + k))) b KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hp") as "Hp".
     iApply (mem_to_phys_claim (pa_add (u_pte_addr b idx) (0 + k)) b dq (nth_byte w (0 + k))
               Hid with "Hk' Hp").
   Qed.

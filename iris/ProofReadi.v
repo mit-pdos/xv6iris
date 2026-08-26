@@ -169,7 +169,7 @@ Section ReadiDefs.
 
   (* the SEVEN unconditional saves (+0x008..+0x014), which is all the
      return block may assume. *)
-  Definition rd_fr7 (m : regfile) : iProp Σ :=
+  Definition rd_fr7 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -186,7 +186,7 @@ Section ReadiDefs.
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...plus s3's slot, pinned from +0x02a to the [c.ldsp s3] at +0xda *)
-  Definition rd_fr8 (m : regfile) : iProp Σ :=
+  Definition rd_fr8 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -203,7 +203,7 @@ Section ReadiDefs.
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...and all thirteen, which is what the loop holds (+0x038..+0x040) *)
-  Definition rd_fr13 (m : regfile) : iProp Σ :=
+  Definition rd_fr13 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -234,7 +234,7 @@ Section ReadiDefs.
      while the kernel arm -- which reaches memmove, not copyout -- comes back
      at the [V] it went in at.  One slot forced both to the same term and made
      the post unstatable. *)
-  Definition rd_dst (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+  Definition rd_dst `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
       (user : bool) (Vc Vk : pprivate) (dstb : mword 64) (n : nat)
       (bytes : nat -> bv 8) : iProp Σ :=
     (if user
@@ -254,7 +254,7 @@ Section ReadiDefs.
      full [proc_priv_core] block (giving up only [cwd_ref] for the duration),
      the kernel arm holds it outright.  Either way the block goes back before
      either_copyout, which wants it whole. *)
-  Lemma rd_dst_bare (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+  Lemma rd_dst_bare `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
       (user : bool) (Vc Vk : pprivate) (dstb : mword 64) (n : nat)
       (bytes : nat -> bv 8) :
     rd_dst γf j pidv dq user Vc Vk dstb n bytes -∗

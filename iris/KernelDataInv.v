@@ -25,6 +25,11 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KernelText.
 From Kernel Require KernelData KernelSyms.
 Require Import TsoCtx.
+(* the ONE seam import: [kernel_data_string]'s conclusion is the raw string
+   tower (↦ₛ does not flip until its own stage), so its bytes cross the
+   ctx/mem boundary here.  Dies with the shim; the leftover error at cutover
+   IS the "flip ↦ₛ" worklist entry. *)
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -91,8 +96,16 @@ Section KernelDataInv.
      remaining byte resides at its physical address as a DfracDiscarded
      (`↦ₘ□`) points-to -- hence persistent and duplicable, like
      [kernel_text]. *)
+  (* EVERY-CONTEXT, not ambient-context: the image bytes predate every
+     thread, so each context can hold them (they sit below every context's
+     bound -- the timestamp-0 story, same ruling as kernel text).  The ∀
+     keeps [kernel_data] a CLOSED iProp: the one persistent fact minted at
+     boot serves every consumer at ITS OWN ambient context, and no mention
+     site anywhere in the tree changes spelling. *)
   Definition kernel_data : iProp Σ :=
-    ([∗ map] a↦b ∈ kdata_ro, (mword_of_int a : Arch.pa) ↦ₘ□ b)%I.
+    (∀ ξ : CtxId,
+       [∗ map] a↦b ∈ kdata_ro,
+         ctx_pointsto ξ (mword_of_int a : Arch.pa) DfracDiscarded b)%I.
 
   Global Instance kernel_data_persistent : Persistent kernel_data.
   Proof. apply _. Qed.
@@ -112,10 +125,12 @@ Section KernelDataInv.
        KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some (f j)) ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 W, (pa_add a j) ↦ₘ□ f j).
   Proof.
-    iIntros (-> HA HR Hbytes) "#Hd". iApply big_sepL_intro. iIntros "!>" (k j Hk).
+    iIntros (-> HA HR Hbytes) "#Hd".
+    iDestruct ("Hd" $! cur_ctx) as "#Hd'".
+    iApply big_sepL_intro. iIntros "!>" (k j Hk).
     apply lookup_seq in Hk. destruct Hk as [-> Hlt]. simpl.
     rewrite pa_add_mword.
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (f k) with "Hd").
+    iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (f k) with "Hd'").
     apply kdata_ro_lookup; [apply Hbytes; exact Hlt | lia | lia].
   Qed.
 
@@ -145,14 +160,21 @@ Section KernelDataInv.
        KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some b) ->
     kernel_data -∗ a ↦ₛ□ s.
   Proof.
-    iIntros (-> HA HR Hbytes) "#Hd". rewrite /string_pointsto.
+    iIntros (-> HA HR Hbytes) "#Hd".
+    (* a CONCRETE context, not the ambient one: the conclusion is the raw
+       string tower, so using [cur_ctx] here would capture the section's
+       [XI] into the lemma's arguments and shift every existing call site;
+       any context serves, since the shim discards it. *)
+    iDestruct ("Hd" $! (MkCtxId inhabitant inhabitant)) as "#Hd'".
+    rewrite /string_pointsto.
     iApply big_sepL_intro. iIntros "!>" (j b Hj).
     rewrite pa_add_mword.
     (* the index is inside the NUL-terminated byte list, so [A + j] is inside
        the window the caller's [HR] bounds *)
     assert (Hjlt : (j < S (String.length s))%nat)
       by (rewrite <- cstring_bytes_length; eapply lookup_lt_Some, Hj).
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd").
+    iApply TsoCtxShim.ctx_pointsto_to_mem.
+    iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd'").
     apply kdata_ro_lookup; [by apply Hbytes | lia | lia].
   Qed.
 

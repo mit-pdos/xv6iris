@@ -3527,6 +3527,7 @@ Section IcacheTable.
   Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* [inode_ident] and [inode_ref] are [IcacheRef.v]'s; only the JOIN
      helper below stayed, because [islot_rest_join] uses it. *)
