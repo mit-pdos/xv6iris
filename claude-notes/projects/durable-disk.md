@@ -2782,13 +2782,64 @@ so it never wanted that shape.
     `Some ROOTINO`, so `ireg_ups` is zero at every image inum and both
     clauses collapse to arithmetic.  The tripwire did NOT fire.
 
-  **WHAT REMAINS.**  6d/6e are blocked on (D1) alone now.  The owner has to
-  pick a repair (fs-state.md §6½); under repair 1 the lane is: state the
-  region-side `p`↔register tie, re-derive (D1) off it (dropping `ilinkdp`),
-  then delete `dir_links`, `dlc_*`, the `wl`/`wdu`/`wdt`/`g` columns, (L1),
-  `ireg_dir_ok`/`ireg_dir_wl0`/`ireg_link_ok_free`, `IcacheBoot.image_dir_wl0`,
-  `FsCfgBoot.dir_links_of_region`/`_of_image` and the `fl` index, keeping
-  `p`, `ireg_par_ok` and `dir_par_tie` (relocated out of `DirLinks.v`).
+  **WHAT REMAINS.**  6d/6e are blocked on (D1) alone now; fs-state.md §6½
+  is the RULING that decides how, and lane G4's paragraph below is what
+  was learnt building the repair it superseded.
+
+  **AS LANDED — G4: NOTHING IN `iris/`.  THE SUPERSEDED REPAIR IS BUILT AND
+  GREEN ON A BRANCH; WHAT IS BELOW IS WHAT THE RULING NEEDS THAT IS NOT
+  OBVIOUS.**
+
+  - **THE TWO-HOLDER REPAIR WORKS, and it is on branch
+    `g4-superseded-ptie` (one commit) if the ruling's route ever stalls:
+    whole tree green, `make audit-only` at the three-entry baseline.**  The
+    `p` column's two halves become `IcacheRef.iparent` TWICE -- one in a
+    new LAST conjunct `InodeRegion.ireg_ptie` beside the child's own
+    authority, one payload-side in `DirLinks.dir_par_tie` -- and `ilinkdp`
+    keeps its `wdt` unit while losing its register fraction, so the flavour
+    index's shape does not move.  (D1) is then
+    `InodeRegion.ireg_lnk_namer` / `IregLinkNz.ireg_par_namer`.  The one
+    mechanism worth remembering is that **sys_link's unattributed mint has
+    to be NEGATIVE** (`Some (-1)`): the re-value runs after `iunlock(ip)`,
+    a re-valuation at a directory would move a `pv` whose other half is in
+    a payload, and no inum is negative, so at a directory both arms of the
+    tie refute an unattributed unit and the case does not arise.  The
+    RULING deletes the re-value outright, which is the better answer to the
+    same problem.
+
+  - **THE RULING'S PACKAGE IS ONE EDIT, and it is worth knowing before
+    starting.**  Deleting the re-value forces sys_link's unit to its final
+    value under `ilock(ip)`, which is `None`; `None` is what G3's (U1)
+    prices, so (U1) goes; (U1) is what makes (U2) inductive, so (U2) goes;
+    (U2) is S7-unlink's (D2), so (D2) must land payload-side in the SAME
+    edit -- which is the `dlinks` swap, which takes `DirLinks.dir_links`,
+    the `fl` index and the `wl`/`wdu`/`wdt`/`g` columns with it.  There is
+    no smaller green step; 6c and 6d/6e are one checkpoint.
+
+  - **`ent_toks` DOES NOT HAVE TO READ THE TARGET'S TYPE, and this is what
+    makes the ruling's value-side clause "in one place" true.**  At the
+    RESOURCE level the entry token can carry its value existentially --
+    `∃ v, par_tok Γ t v ∗ ⌜v = None ∨ v = Some self⌝` at a name record,
+    `None` at a dot record -- so `ent_toks`' arity does not move and
+    `iris/FsParRefute.v`'s refutation (which is about a side that must know
+    the target's type) does not apply.  (D1) still falls out at rmdir: the
+    child's count is ONE, so `size P ≤ nlink` makes its multiset a
+    SINGLETON, so the payload's `..`-unit clause (`ups P < nlink` at a live
+    directory, G3's (U2) moved payload-side) forces that one element onto
+    the `Some` arm, and the content clause then names it the `..` target.
+    Only the VALUE layer -- `FsStateInode.ent_elem` / `link_elem_node`,
+    where the whole `I : gmap Z fs_node` is in hand -- has to consult the
+    target's type, which is the one place the ruling means.
+
+  - **(D2) NEEDS THE ROOT'S SLACK WRITTEN INTO THE PAYLOAD'S OWN CLAUSE.**
+    Region-side it was `ireg_keep`'s unspendable token; payload-side the
+    keep-alive is on the COUNT authority, which stays in the region, so the
+    namer clause has to carry it itself: `size P + (if self = ireg_root
+    then 1 else 0) ≤ nlink`.  At a non-root live directory the multiset is
+    `{Some gp} ⊎ {None × subdirs}` and `size P = nlink` exactly; at the
+    root it is `{None × subdirs}` and the `+1` is the slack the image's
+    `nlink = 1` at count zero already carries.  With the child's `..` unit
+    in hand, both give `2 ≤ nlink dp`.
 
 ## Sizing notes for whoever runs the lanes
 
