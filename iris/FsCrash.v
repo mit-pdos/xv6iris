@@ -1269,25 +1269,14 @@ Definition fs_rec_wf (r : fs_rec) (P : Z -> list (bv 8))
    whole-state pure sweep, with body [True].  Ruling 3
    (claude-notes/design/fs-state.md) has no whole-state pure predicate at
    all: the durable file system is a family of nested SEPARATION-LOGIC
-   predicates at the view [Gamma_D], so the conjunct is an [iProp], it
-   lives in [P_fs] beside the byte view's authority, and this layer keeps
-   it OPAQUE ([LogDefs.fs_dview]).  What survives here is exactly what the
-   WAL layer proves for itself: recovery, the history's last element and
-   the on-disk header's invariant. *)
+   predicates over its OWN ghost names, so the conjunct is an [iProp] and it
+   lives in [P_fs] as [FsDurSnap.P_dur (fr_D r)].  What survives here is
+   exactly what the WAL layer proves for itself: recovery, the history's
+   last element and the on-disk header's invariant. *)
 
 Lemma fs_rec_wf_hist_ne r P cov logstart :
   fs_rec_wf r P cov logstart -> fr_hist r <> [].
 Proof. intros (_ & Hlast & _) Hnil. rewrite Hnil in Hlast. discriminate. Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 1d'. THE DURABLE BYTE VIEW, AND THE FS LAYER'S OPAQUE CONJUNCT          *)
-(*      (durable-disk 1d; claude-notes/design/fs-state.md §1 and §4).      *)
-(* ---------------------------------------------------------------------- *)
-
-(* [fs_dbytes] -- the byte flattening of a committed block view -- and
-   [fs_dview] / [fs_dstep] with it, live in [LogDefs.v] (durable-disk 1d'):
-   the LOG has to state the commit's prepared step and may not import this
-   file.  This file re-exports [LogDefs], so nothing downstream moved. *)
 
 
 (* ---------------------------------------------------------------------- *)
@@ -1736,19 +1725,16 @@ Section fs_crash.
      conjunct; the index is what makes it a statement about the REAL disk
      rather than about a ghost. *)
   (* ==================================================================== *)
-  (* 2c. [P_wf]: THE FS LAYER'S HALF OF THE CRASH PREDICATE                *)
-  (*     (durable-disk 1d; claude-notes/design/fs-state.md §1 and §4)      *)
+  (* 2c. THE FS LAYER'S HALF OF THE CRASH PREDICATE                        *)
+  (*     (durable-fs-plan.md sections 1 and 3)                             *)
   (* ==================================================================== *)
 
-  (* [P_wf]'s body -- [LogDefs.fs_dview] -- and the commit's prepared step
-     [LogDefs.fs_dstep] were moved DOWN to [LogDefs.v] by durable-disk 1d',
-     because [LogInv.log_psi_commit] has to STATE the step and the log layer
-     may not import this file.  Their headers, including why [P_wf] is a
-     sealed definition rather than a parameter, are there.  [fs_dstep]'s
-     gname is a PARAMETER since durable-disk 2c-pre; the seam section below
-     instantiates it at [RiscvPtsto.riscv_dview_name], which is also the
-     [gamma_v] every definition in THIS section threads.  This file
-     re-exports [LogDefs], so every reading of [fs_dview] is unchanged. *)
+  (* It is the DURABLE SNAPSHOT [FsDurSnap.P_dur (fr_D r)], a function of
+     the committed map alone.  The [gamma_v] parameter this section threads
+     (instantiated at [RiscvPtsto.riscv_dview_name] by the seam section
+     below) is no longer read by anything here; it survives only so that the
+     ~90 files that name [fs_crash_seam] keep their statements, and its
+     deletion is a separate sweep of [Pc]'s arity. *)
 
   Definition P_fs (γs : fs_crash_names) (γv : gname)
       (Γd : fs_dur_names) (cov : gset Z)

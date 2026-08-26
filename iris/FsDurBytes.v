@@ -5,14 +5,12 @@
    is durable-disk 2c-img, leaf 1.
 
    [LogDefs.fs_dbytes] flattens a BLOCK view [D : gmap Z (list (bv 8))] into
-   the BYTE map [P_wf]'s authority is held at: block [b]'s [i]th byte lives
-   at [b * BSIZE + i].  It had four use sites and no theory at all -- every
-   one of them re-based the whole map with [fs_dview_rebase] and never
-   looked inside.  Stage 2c's [P_wf] does look inside: it has to say that
-   the byte elements at [fs_dbytes D] ARE the file system's per-block
-   ownership, one [FsStateDefs.blk_owned] per entry of [D].  That is
-   [fs_dbelems_dbytes] below, and everything above it in this file exists to
-   get there.
+   the BYTE map a durable instance's authority is held at: block [b]'s [i]th
+   byte lives at [b * BSIZE + i].  What a durable instance needs is to look
+   INSIDE it: that the byte elements at [fs_dbytes D] ARE the file system's
+   per-block ownership, one [FsStateDefs.blk_owned] per entry of [D].  That
+   is [fs_dbelems_dbytes] below, and everything above it in this file exists
+   to get there.
 
    THE ONE PREMISE IS A LENGTH BOUND, and it is what makes the flattening
    injective: two blocks' byte ranges are disjoint exactly because a block
@@ -40,7 +38,7 @@ From iris.base_logic.lib Require Import iprop ghost_map.
 Require Import BioDefs.        (* [BSIZE] -- the flattening's stride       *)
 Require Import RiscvPtsto.     (* [fs_dur_names] -- Gamma_D's two gnames   *)
 Require Import FsImg.          (* [BSIZE_z] -- [byte_range]'s own stride   *)
-Require Import LogDefs.        (* [fs_dbytes] / [fs_dview]                 *)
+Require Import LogDefs.        (* [fs_dbytes] -- the byte flattening       *)
 (* LAST, so its [byte_range]/[blk_owned] win over the block layer's twins
    wherever a consumer imports both (durable-notes.md, AND WHERE THAT
    IMPORT COLLIDES PUT IT EARLY). *)
@@ -357,19 +355,14 @@ End DbytesGen.
 
 Section DurBytes.
   (* [diskImgG] is the tree's UNIQUE [ghost_mapG Σ Z (bv 8)] -- the class
-     [LogDefs.fs_dview] itself is stated over, and the one [γD]'s authority
-     lives at ([RiscvPtsto.riscv_dview_name]). *)
+     the durable byte maps are stated over. *)
   Context `{!diskImgG Σ}.
 
-  (* [LogDefs.fs_dview]'s BODY, named.  [fs_dview] is [Typeclasses Opaque]
-     and rightly so; the theory below is about the body, and the two are
-     one [rewrite] apart ([fs_dview_dbelems]). *)
+  (* the byte elements of a whole byte map, named.  It is the shape the
+     snapshot's own ledger is handed in ([FsDurSnap.snap_ledger_of_elems]),
+     and the theory below is about it. *)
   Definition fs_dbelems (g : gname) (B : gmap Z (bv 8)) : iProp Σ :=
     ([∗ map] a ↦ v ∈ B, a ↪[g] v)%I.
-
-  Lemma fs_dview_dbelems (g : gname) (B : gmap Z (bv 8)) :
-    fs_dview g B ⊣⊢ fs_dbelems g B.
-  Proof. rewrite /fs_dview /fs_dbelems //. Qed.
 
   Global Instance fs_dbelems_timeless g B : Timeless (fs_dbelems g B).
   Proof. rewrite /fs_dbelems. apply _. Qed.
@@ -445,17 +438,6 @@ Section DurBytes.
     fs_dbelems g (fs_dbytes D)
     ⊣⊢ ([∗ map] b ↦ bs ∈ D, blk_owned (fs_gamma_D g Γd) b bs).
   Proof. exact (fs_dbytes_blocks (fs_gamma_D g Γd) D). Qed.
-
-  (* ...and the reading at [LogDefs.fs_dview], which is the shape [P_wf]'s
-     body and [LogDefs.fs_dstep] are stated in *)
-  Corollary fs_dview_dbytes (g : gname) (Γd : fs_dur_names)
-      (D : gmap Z (list (bv 8))) :
-    (forall b bs, D !! b = Some bs -> length bs = BSIZE) ->
-    fs_dview g (fs_dbytes D)
-    ⊣⊢ ([∗ map] b ↦ bs ∈ D, blk_owned (fs_gamma_D g Γd) b bs).
-  Proof.
-    intros Hlen. rewrite fs_dview_dbelems (fs_dbelems_dbytes g Γd D Hlen) //.
-  Qed.
 
 End DurBytes.
 

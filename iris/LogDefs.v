@@ -279,75 +279,19 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* THE DURABLE BYTE VIEW, AND THE COMMIT'S PREPARED STEP (durable-disk     *)
-(* 1d'; claude-notes/design/fs-state.md section 1 and section 4).          *)
-(*                                                                         *)
-(* [fs_dview] is [P_wf] -- the FS layer's half of the crash predicate --    *)
-(* and [fs_dstep] is the basic update the CLIENT prepares and the commit    *)
-(* permit runs.  Both live here, in the geometry's own file, and not        *)
-(* beside [P_fs] in [FsCrash.v], for one reason: the LOG has to STATE the   *)
-(* prepared step (it is what [LogInv.log_psi_commit] returns) and the log   *)
-(* layer may not import the crash layer.  [FsCrash.v] re-exports this file, *)
-(* so every existing reading of [fs_dview] is unchanged.                    *)
+(* THE BYTE FLATTENING OF A COMMITTED BLOCK VIEW                           *)
 (* ---------------------------------------------------------------------- *)
 
-(* THE BYTE FLATTENING of a committed block view: block [b]'s [i]th byte
-   lives at [b * BSIZE + i], which is the addressing [DiskImg.disk_img_bytes]
-   and [FsBlocks.byte_range] already use.  [gamma_D]'s authority is held at
-   this map inside [P_fs], so the committed view is a BYTE map exactly as
+(* Block [b]'s [i]th byte lives at [b * BSIZE + i], which is the addressing
+   [DiskImg.disk_img_bytes] and [FsBlocks.byte_range] already use.  The
+   DURABLE SNAPSHOT's own byte authority is held at this map
+   ([FsDurSnap.fs_snap]), so the committed view is a BYTE map exactly as
    [fs-state.md] section 1 asks, while the WAL layer goes on reasoning about
-   the BLOCK map [fr_D] it recovers. *)
+   the BLOCK map [fr_D] it recovers.  It lives here, in the geometry's own
+   file, because the log layer uses it and may not import the crash layer. *)
 Definition fs_dbytes (D : gmap Z (list (bv 8))) : gmap Z (bv 8) :=
   map_fold (fun (b : Z) (bs : list (bv 8)) (acc : gmap Z (bv 8)) =>
               map_seqZ (b * Z.of_nat BSIZE) bs ∪ acc) ∅ D.
-
-Section FsDurableView.
-  Context `{!diskImgG Σ}.
-
-  (* THE DURABLE VIEW'S OWNERSHIP: the FULL element of the byte-keyed
-     [ghost_map Z (bv 8)] for every byte of the committed view.  This is
-     [fs-state.md] section 1's [Phi_D] over the whole home range, and it is
-     what [P_fs] holds beside the byte view's AUTHORITY -- so the two meet
-     only inside [crashN], and no thread that can die ever owns a durable
-     resource (crash.md, principle 1).
-
-     A SEALED DEFINITION AND NOT A PARAMETER, and that is a measured
-     deviation of lane 1d: [FsCrash.P_fs_any] sits inside
-     [FsCrash.fs_crash_seam], which is threaded -- by name, in the
-     STATEMENT -- through 90 files, up to [SpecKexec.fs_fabric],
-     [FsReady.fs_ready] and [UsertrapRes].  An [iProp]-valued parameter
-     reaches all of them whether it is an explicit argument (arity) or an
-     ambient class (a [Context] line per section, and then per section of
-     every file that mentions any of THEIR statements).  So the slot is a
-     definition with honest content, sealed, and stage 2 REPLACES the body
-     by [fs_view Gamma_D] -- which CONTAINS this, since
-     [Phi_D a v := a -> v at gamma_D]. *)
-  Definition fs_dview (g : gname) (B : gmap Z (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ v ∈ B, a ↪[g] v)%I.
-
-  Global Instance fs_dview_timeless g B : Timeless (fs_dview g B).
-  Proof. rewrite /fs_dview. apply _. Qed.
-
-  (* [iFrame] must treat a whole-disk [big_sepM] as ONE atom
-     (durable-notes.md, "a big-op behind a Definition is a hang"). *)
-  Global Typeclasses Opaque fs_dview.
-
-  (* WHAT A COMMIT DOES TO IT: auth and elements together move to any byte
-     view at all.  Whole-map delete then whole-map insert -- no domain
-     premise, because the elements ARE the domain. *)
-  Lemma fs_dview_rebase (g : gname) (B B' : gmap Z (bv 8)) :
-    ghost_map_auth g 1 B -∗ fs_dview g B ==∗
-      ghost_map_auth g 1 B' ∗ fs_dview g B'.
-  Proof.
-    rewrite /fs_dview. iIntros "Ha Hd".
-    iMod (ghost_map_delete_big B with "Ha Hd") as "Ha".
-    rewrite map_difference_diag.
-    iMod (ghost_map_insert_big B' with "Ha") as "[Ha Hd]";
-      [apply map_disjoint_empty_r|].
-    rewrite right_id_L. by iFrame.
-  Qed.
-
-End FsDurableView.
 
 (* THE LOGGED VIEW'S ONE MOVE: a [log_write] AT A HOME BLOCK.  Its two
    siblings above say what does NOT move the reading -- a write to a log

@@ -43,8 +43,8 @@ Local Open Scope Z_scope.
    crash record's fourth conjunct was [fs_durable_wf (fr_D r)] with body
    [True]; ruling 3 (claude-notes/design/fs-state.md) has no whole-state
    pure well-formedness at all, so the slot is now a SEPARATION-LOGIC
-   conjunct of [FsCrash.P_fs] over the durable byte view
-   ([FsCrash.fs_dview]) and nothing pure survives here.  What the rest of
+   conjunct of [FsCrash.P_fs] -- the durable SNAPSHOT [FsDurSnap.P_dur] --
+   and nothing pure survives here.  What the rest of
    this file still provides -- [dv_of_D], [fs_durable_wf_view] and the
    [FsEff*]/[FsOp*] theory over it -- stays until stage 2 decides its fate
    (fs-state.md §6); NOTHING in the crash or log layer reads it any
