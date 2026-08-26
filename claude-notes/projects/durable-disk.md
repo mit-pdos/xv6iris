@@ -2842,8 +2842,9 @@ so it never wanted that shape.
     in hand, both give `2 ≤ nlink dp`.
 
   **AS LANDED — G5: THE TYPE REGISTER, THE PER-DIRECTORY EXACTNESS AND
-  THE WALKS.  ONE FILE RED (branch `lane-g5-typereg`, 1334 of 1335
-  `iris/` files green; `ProofCreate.v` alone is red, at ONE identified
+  THE WALKS.  ONE FILE RED (branch `lane-g5-typereg`, 1316 of 1335
+  `iris/` files green -- `ProofCreate.v` is the only file with an error,
+  and the other 18 are its dependents -- at ONE identified
   accounting seam in create's FAIL contracts).**
 
   The orchestrator's four rulings were taken as written and all four hold.
@@ -2948,29 +2949,47 @@ so it never wanted that shape.
     spare fragments are its `"."` and the region's keep-alive.
     `img_link_elem_ok` is the value-side clause at the same choice.
 
-  - **WHAT IS RED, AND WHY (the one open seam).**  `ProofCreate.v` stops at
-    its mkdir SHORT-WRITE fail entry (`cr_fail_mkdir_body`'s call site,
+  - **WHAT IS RED, AND WHY (the one open seam).**  `ProofCreate.v` stops
+    at its mkdir fail entries (`cr_fail_mkdir_half`, first at
     ProofCreate.v:10675).  The cause is an ACCOUNTING seam, not a design
-    one: create's fail contracts (`cr_cont_body`, `cr_fail_body`,
-    `cr_fail_mkdir_body`) each demand the whole pile the fill minted --
-    `link_reps (cr_delta ty) (cr_ity ty dp)` -- because under the OLD
-    design a directory's `"."` record was tokenless and the walk kept
-    every unit in hand until the `ip->nlink = 0` flush.  Under G5 the
-    `"."` record OWES a unit, so on every path PAST
-    `dirlink(ip, ".", ip)` the walk holds one fewer: the second unit is
-    inside the child's own `ent_toks`, where it is the (D1) pin.
-    The `ip->nlink = 0` flush still needs `ireg_dot_delta = 2`.
+    one, and it is entirely inside create's own contract plumbing.
 
-    THE FIX, measured: the three contracts' pile becomes a FUNCTION of the
-    child's record -- `cr_delta ty` while `dir_nrec (di_size dc) = 0` (no
-    `"."` yet) and `1` after -- and the fail body's teardown (the
-    `dlinks` rebuild at the orphaned child, ProofCreate.v:7795) RECOVERS
-    the missing unit out of the payload instead of dropping it, which is
-    `FsStateEra.ent_toks_era_orphan` at `nrec >= 2` and a DOT-only twin of
-    it at `nrec = 1`.  Seven call sites pass the pile; each needs its own
-    arm's count.  Nothing above `ProofCreate` moves, and no lemma in
-    `FsStateLink`/`FsStateInode`/`FsStateEra`/`InodeRegion` moves either --
-    this is entirely inside create's own contract plumbing.
+    Under the OLD design a directory's `"."` record was TOKENLESS, so the
+    whole pile the fill minted stayed in the walk's hand until the
+    `ip->nlink = 0` flush, and all three fail/continue contracts
+    (`cr_cont_body`, `cr_fail_body`, `cr_fail_mkdir_body`) could demand it
+    whole: `link_reps (cr_delta ty) (cr_ity ty dp)`.  Under G5 the `"."`
+    record OWES a unit — it is the (D1) pin — so `dirlink(ip, ".", ip)`
+    SPENDS one of the two, and every path past it reaches a fail entry
+    holding ONE while the flush still needs `ireg_dot_delta = 2`.
+
+    THE FIX, in the order it has to be done:
+      (i) SPLIT the `"."` `dirlink` on its own short-write arm.
+          `FsStateEra.ent_toks_dirlink_arm` takes the entry's `ent_tok`
+          unconditionally and DROPS it on the `tot = 0` branch, so today
+          the unit is lost even when nothing was written.  Destruct
+          `Hatom1` first and use `ent_toks_dirlink_nop` on the short arm,
+          which takes no token — then the `tot1 < 16` fail entry
+          (ProofCreate.v:10866, child `dc1`) keeps the whole pile and needs
+          nothing else.
+     (ii) RECOVER the unit at the two fail entries that follow a WRITTEN
+          `"."` (ProofCreate.v:10675 and :10775, child `dc2`).  The fail
+          body takes the child WITHOUT its `dir_links` and MINTS a fresh
+          grey one out of `ireg_inv` (`cr_grey_dir_links`, ProofCreate.v:7770),
+          so the child's old `ent_toks` — and with it the `"."` fragment —
+          is dropped at the CALLER's boundary.  Before each call, open the
+          child's `dlinks`, take the fragment with
+          `FsStateInode.ent_toks_dot_take`, value it against the sibling
+          with `IregLinkNz.ireg_toks_agree`, and re-form the pile with
+          `FsStateLink.link_toks_reps_S`.  Every lemma that needs is
+          already landed and green; the `"."` entry's own witness is
+          `Hc2ddix Ht162` (and `Hc1ddix` at the other), read through
+          `DirView.dir_view_live` exactly as `Hdot1` is in the mkdir
+          preamble.
+
+    Nothing above `ProofCreate` moves and no lemma in `FsStateLink` /
+    `FsStateInode` / `FsStateEra` / `InodeRegion` / `IregLinkNz` /
+    `FsDurImg` moves either.
 
   - **PERFORMANCE, twice (and it is the standing trap in this file).**
     Two sentences ran for >15 minutes on the shared VM before being cut:
