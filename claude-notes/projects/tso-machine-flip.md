@@ -1,5 +1,15 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
+STEP 5, THE A6.26 TRANCHE (2026-08-26, later session).  A6.24 IS LANDED
+(`KptTree` + both callers), A6.17's cascade is landed at its leaves
+(`StackOwn`/`WpMmodeLoad`/`WpTimerinit`), and `WpUart`'s plumbing is
+A6.11-shaped with ONE open goal.  Clean build: **513 of 1330, EIGHT red**.
+A6.27–A6.31 are the record; **A6.31 is the frontier**, A6.29 and A6.30 are
+the two reported stops, and A6.30 is the one to read first — it measures
+that the A6.24 payer has no payee anywhere above it and names the lane
+(`HartSKpt`'s `wpte_obl_at` seam) where the A/D write-back is actually
+payable.
+
 STATUS (2026-08-26, end of session): design of record, AND steps 1–4 of
 §7 are IMPLEMENTED and compiling — `TsoMemPa.v` (new), `TsoGhost.v`
 (new), the Ztso arms in `RiscvLang.v`, the era ghosts + `tso_interp_at`
@@ -2155,6 +2165,291 @@ verified only at the statement level.
   not a token substitution.  Give the new form a notation first.
 - `Require Import` does not re-export: a notation body that mentions a name
   from a transitively-required module must spell it QUALIFIED.
+
+### A6.27 A6.24 IS LANDED AT THE CORE AND ITS TWO CALLERS — AND THE
+### KERNEL PAGE TABLE HAS LEFT THE CONTEXT (step-5, A6.26 tranche)
+
+**`KptTree.ptree_translateAddr_own` TAKES ITS PAYER, exactly as A6.24
+characterised it, and `KptTree.v` is GREEN.**  What landed:
+
+- the core gained `Context (PTT : option CtxId)` — it is stated at
+  `PtTree.ptree_own_at PTT`, so it serves both A6.21 tiers — plus the two
+  parameters `(Sto : iProp Σ) (Stoq : mword 64 -> iProp Σ)` and the payer
+  wand A6.24 wrote out verbatim (gen_heap AND the caller's currency
+  together, because every gate in `TsoCtx` takes `gen_heap_interp` and
+  `tso_interp_at` together);
+- **the pure disjunct BECAME the resource disjunct** rather than gaining a
+  neighbour, and that was forced, not tidy: the two disjuncts
+  (`t' = t` vs `t' = ptree_set_leaf …`) are not provably exclusive, so a
+  caller holding the pure fact beside a separate `Sto ∨ Stoq` could not
+  decide which currency it had.  Tied to one disjunct, it can.  Every
+  caller re-derives the old pure fact in three lines
+  (`iDestruct … as "[[%He Hs] | Hq]"`), which is A6.24's "no caller gains a
+  case split it did not already have" paid in the shape the proofmode
+  actually needs;
+- O1 and O2 `iClear "Hpay"` — the payer is genuinely unused when nothing
+  moved — and O3 replaces `phys_word_pointsto_write` with `iMod ("Hpay" …)`.
+
+**AND THE KERNEL TABLE MOVED TO `PTT = None`, WHICH IS WHAT MAKES THE
+KERNEL CALLER PAYABLE AT ALL.**  `KptTree.tlb_inv_pt` and
+`KptShare.kpt_body`/`kpt_inv_alloc` now hold `kptree_own`
+(= `ptree_own_at None`, the notation A6.21 had already prepared), and BOTH
+sections dropped their `` `{XI : CurCtx} `` binder.  That is A6.20's ruling
+finally realised in the files that own the cells: `kpt_body` is the body of
+a bare `inv` shared by every S-mode thread, so it may not name a context —
+and it does not need to, because a PTE is read at `Read_ttw` (RULING 1's
+flat arm) and only the A/D write-back needs a gate.  Had the kernel table
+stayed at `Some cur_ctx`, its caller would have had to supply
+`own_context`, which an invariant-holder has no business owning (§0.13′:
+"a thread's AMBIENT context is its identity").
+
+`KptShare.tlb_res_pt_translateAddr_at` and
+`UptTree.utlb_inv_pt_translateAddr` (+ its `_tramp_fetch` / `_tf_load`
+wrappers) thread the payer; all three files are GREEN.
+
+**THE WRAPPERS' PAYER IS ADDRESS- AND OLD-VALUE-GENERIC, AND `Stoq` LOSES
+ITS INDEX.**  A6.24's core premise names the slot (`pt_addr0 p1 vpn`) and
+the old word, because the core has `p1`, `w`, `a0`, `d0` in its binder
+list.  A WRAPPER does not: which leaf slot the walk lands on is decided
+inside its own proof, by the kmap/`upt_spec` lookup.  So a wrapper's
+premise quantifies `∀ a wold wnew` and its conclusion is the un-indexed
+`Sto ∨ Stoq`.  This is not a weakening: the discharger instantiates
+`Stoq` with whatever ∃-packaging it wants (a bundle at "some appended
+log"), and the wrapper's proof builds the core's pinned premise from the
+generic one in three lines (`iAssert … with "[Hpay]" as "Hpay'"`).
+
+### A6.28 THE M-MODE BOOT STACK IS A LEDGER REGION, AND A6.10 UNDERCOUNTED
+### THE M-MODE LOADS BY EXACTLY TWO (A6.17's cascade; landed)
+
+A6.17's cascade turned out to have a piece neither it nor A6.10 named, and
+it is a correction to a claim, not a new design:
+
+> **A6.10 says "M-mode's only 8-byte data load in this tree is `entry`'s
+> `ld sp, stack0`, a link-time constant".  That is wrong.**  `timerinit`'s
+> EPILOGUE reloads the `ra`/`s0` its own PROLOGUE stored
+> (`WpTimerinit.v` instructions 26 and 27, `c.ldsp`), and a byte that was
+> just stored to can never be pristine — a pristine byte's timestamp
+> element is DISCARDED, which is precisely what forbids the update a store
+> needs.  So `wp_cldsp_gpr_tor`'s pristine premise is UNSATISFIABLE at its
+> only two call sites in the tree.
+
+What landed, all green:
+
+- **`StackOwn.stack_own_phys` flipped to the registered ledger word**
+  (`TsoCtx.ctx_phys_word_pointsto` at an ambient `` `{XI : CurCtx} ``) —
+  same name, same arity, so its whole lemma suite and its eight consumers
+  are textually unchanged.  A6.17's "real bill" stands: the residue itself
+  is minted at adequacy.
+- **`HartMLoad.robl_ram_ctx`** — the mirror of `HartMStore.wobl_ram_ctx`:
+  "`robl_ram` says WHAT is owed; this says WHO can pay it for a byte that
+  is WRITTEN at run time".  Twelve lines, `ctx_phys_load_bytes_ok` at
+  `gs_of` through the A6.1a bridge.  **The `tv' ≤ length log` half of
+  `robl_ram` is simply not needed** — the gate's conclusion is ∀ tv' above
+  the hart's own view with no upper bound, exactly as A6.10 noted for the
+  pristine gate.
+- **`WpMmodeLoad.wp_ld_gpr_tor` and `wp_cldsp_gpr_tor` moved to the ctx
+  tier**: `pristine_win ea 8` out, `own_context cur_ctx` in, on both sides
+  of the continuation.  `wp_ld_gpr` KEEPS the pristine shape — `entry`'s
+  `ld sp, stack0` really is an image constant, and it is the tree's only
+  one.  So the two leaf families now say which kind of M-mode byte they
+  read, which is the honest split.
+- **`WpTimerinit.wp_timerinit`** takes and returns `own_context cur_ctx`
+  and is GREEN.
+
+**THE RULE THIS LEAVES:** a pristine premise is a claim that the address is
+never stored to, and the cheap audit for it is to look for a STORE to the
+same effective address in the same lemma's own instruction stream.  Both
+offenders here were four instructions apart.
+
+### A6.29 `WpUart`: THE PLUMBING IS DONE, THE DMA COMPLETION'S APPEND IS
+### REPORTED — AND IT NEEDS ONE MORE THING THAN A6.9's SKETCH SAID
+
+**The pure plumbing (A6.26 item 3's first half) is LANDED.**
+`wp_disk_loop` is reshaped to A6.11's `wp_disk_step`: the callback now
+takes `(d' W log')` with `⌜disk_step d m d' W⌝` and the log disjunct, and
+**five of the six arms close** — CAPTURE, DRAIN, LATCH, IDLE by
+`RiscvExec.tso_interp_of_disk_idle` after `W = ∅` collapses the disjunct
+(`destruct Hlog as [[_ ->] | [Hne _]]` plus one `left_id_L`), and WILD is
+refuted as before.
+
+**`TsoCtx.ledger_store_ok`'s AUTHOR IS NOW A PARAMETER** (A6.26's
+one-liner, done): `(auth : agent)` in place of `hart_agent cpu_id`.  The
+proof never used the hart-ness — `msg_byte` ignores `pm_tid` and both
+`latest_app_*` laws are author-blind — and the context-free ledger has no
+author tie to keep.  `ledger_store_win_ok` passes `hart_agent cpu_id`.
+`CID` stays: the `gtv` premises quantify over harts.
+
+**THE STOP, precisely.**  The DMA COMPLETION arm's non-empty-write-set case
+is the one open goal in the file (the build now fails with
+`[Focus] Wrong bullet` exactly there, and nowhere else).  Closing it needs
+**two** things, and the second is the one A6.9's sketch did not name:
+
+1. **the lease's byte family flipped to `TsoCtx.phys_ledger`** —
+   `WpVirtio.dma_own` and `VirtioProto.phys_map` / `phys_word2` /
+   `phys_word4` / `phys_list` are RAW `phys_pointsto`, so `dom w` has no
+   timestamp elements (A6.9).  ~185 occurrences over seven files
+   (`VirtioProto` 88, `ProofVirtioDiskRwD` 36, `DiskInv` 16,
+   `ProofVirtioDiskIntr` 14, `WpVirtio` 11, `ProofVirtioDiskRwF` 11,
+   `ProofVirtioDiskInit` 8), all of them behind the current frontier.
+2. **`VirtioProto.virtio_proto_step` TURNED INSIDE OUT INTO AN ACCESSOR**
+   (235 lines).  It currently performs the gen_heap update itself and
+   hands back `gen_heap_interp (w ∪ m)`.  The gate CANNOT be split —
+   `ledger_store_ok` takes `gen_heap_interp` and `tso_interp_at` TOGETHER
+   because the interp's own tie relates the flat cell to the ledger — so
+   the caller (`wp_disk_loop`, the only holder of the bundle) must be the
+   one that moves the memory.  The lemma therefore has to hand OUT the old
+   bytes at `dom w` and take back the new ones, in the style its own
+   `dma_own_acc` family already has, rather than doing the update.
+
+A6.9's sketch — "the lease holds the elements; `wp_disk_step`'s callback
+moves them" — is right about WHERE the elements must be and WHO must move
+them, and silent about the fact that the lemma standing between them
+currently owns the update.  That is the extra item, and it is why this is
+reported rather than improvised.
+
+### A6.30 THE A6.24 PAYER HAS NO PAYEE ABOVE IT — MEASURED, AND IT CHANGES
+### WHAT THE REST OF THAT CASCADE IS WORTH
+
+The upward caller closure of `ptree_translateAddr_own` was computed in
+full (1 880 declarations from the `KptShare` root alone) and every
+ancestor's STATEMENT tested for `tso_interp_of` / `tso_interp_at`, both
+literally and transitively through the bundle-carrying definitions
+(`Mobl_ram`, `Wobl_ram`, `wobl_ram`, `xread_obl(_ex)`, `wpte_obl(_at)`,
+`era_interp`).  **Zero hits, in every chain.**
+
+> **A payer threaded up from the exec-lane translation lemmas is threaded
+> to the top of the tower and never paid.**  `mstate_interp`
+> (`RiscvPtsto.v:1978`) is `reg_interp ∗ gen_heap_interp ∗ dev_interp` and
+> does NOT carry the bundle, and it is the widest thing these statements
+> hold.
+
+Two consequences, and the second is the useful one.
+
+**(a) THE EXEC LANE DEAD-ENDS, so threading it costs little and buys
+little.**  `KptShare.tlb_res_pt_translateAddr_at` → `SRegime.res_absorb`
+(and `res_absorb_wit`, `IntrDefs.strans_absorb(_wit)`) → the RECORD FIELDS
+`sr_absorb` / `sr_absorb_wit` (`SRegime.v:389`/`:456`, three instances:
+`bare_regime`, `kpt_share_regime`, `strans_regime`) →
+`SRegime.sr_absorb_ktier` → `SmodeCorePt.s_regime_fetch` →
+`SmodeCorePt.tlb_inv_pt_fetch`, **which has ZERO callers**.  The U-mode
+chain likewise ends at `UserMemAccess.user_pt_vmem_read_addr_load` /
+`_write_addr_store`, zero callers.  So the `exec`-shaped translation face
+is, today, consumer-free at the top: threading `Sto`/`Stoq` through it is
+mechanical and terminates, but nothing downstream is unblocked by it.
+
+**(b) THE LIVE LANE IS THE `swp` FACE, AND THERE THE PAYER IS ALREADY
+PAYABLE — BECAUSE THE OBLIGATION RECEIVES THE BUNDLE INSTEAD OF HOLDING
+IT.**  `HartSKpt.kpt_leaf_write_node` (`HartSKpt.v:507`) →
+`swp_translate_kpt` (`:585`) → `SRegime.kpt_swp_translate` (`:1374`), and
+`swp_translate_kpt` feeds its `Hwr` into
+`HartSTrans.swp_translate_hit_ex` / `_miss_ex`, whose premises are
+**`PtTreeAdue.xread_obl_ex` and `wpte_obl_at`** — and `wpte_obl_at`
+(`PtTreeAdue.v:1220`) is
+
+```coq
+  (∀ σ img log V, ⌜read_bytes σ.(mem) pa 8 = Some w⌝ -∗
+     mstate_interp σ -∗ tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+      ▷ (|={∅,⊤}=∗ mstate_interp (MState … (write_bytes …) …) ∗
+           wobl_ram img σ log V 8 req ∗ R))
+```
+
+i.e. an obligation that is HANDED the bundle.  `HartSKpt` builds a
+bundle-FREE `Hwr` (`HartSKpt.v:514–522`) today; giving it the
+bundle-carrying shape and discharging it with `ledger_store_ok` against
+the `None`-tier slot the kernel invariant now holds (A6.27) is the whole
+of the A/D write-back's real payment.  **That is the seam A6.21 named
+("`HartSKpt`'s `iAssert`-built `Hrdx`/`Hwr` seams"), and this measurement
+says it is the ONLY one that matters** — `Hrdx` needs framing only (an
+exclusive/`Read_ttw` read is flat).
+
+**THE RULE TO CARRY:** before threading a payer upward, compute the
+closure and check that something up there HOLDS the bundle.  If nothing
+does, the obligation belongs on a lane where the bundle is handed DOWN as
+a callback — which, in this tree, is always the `swp` lane, never the
+`exec` one.
+
+### A6.31 THE FRONTIER AFTER THE A6.26 TRANCHE — EIGHT RED, 513 OF 1330,
+### AND THE COUNT WENT UP FOR THE FIRST TIME IN THREE TRANCHES
+
+**ONE CLEAN BUILD** (`iris/*.vo` deleted wholesale, the model's kept, a
+single `make -f CoqMakefile -j12 -k`).  The integrity check A6.26 asks for
+holds exactly: **521 files ATTEMPTED, 513 `.vo` produced, 8 errors** —
+every file `make` reached is accounted for, none silently skipped.
+
+> **513 of 1330 fresh-green (A6.26's clean number was 505), and the red set
+> is EIGHT.**  This is the first tranche in which the honest clean count
+> ROSE while the red set grew, and both movements are the same fact:
+> `KptTree` is green, so its cone became REACHABLE, and eight files inside
+> it are now known-red instead of unreached.  A6.25's rule again — a file
+> leaving or joining an error list means "fixed", "newly reachable", or "no
+> longer reached", and only the `.vo` timestamp says which.
+
+    WpUart.v       A6.29 — REPORTED STOP (the DMA completion's append).
+                           Everything else in the file is A6.11-shaped and
+                           closes; this is the single open goal.
+    HartSKpt.v     A6.27 + A6.30(b).  Two things, and only the second is
+                   :132   design: (i) its walk nodes still say [ptree_own]
+                           (= [Some cur_ctx]) while [kpt_body] is now the
+                           [None] tier -- a rename to the [_at None] forms;
+                           (ii) [kpt_leaf_write_node]'s bundle-free [Hwr]
+                           must become [PtTreeAdue.wpte_obl_at]-shaped and
+                           pay with a [wobl_ram_ledger] (the ledger twin of
+                           [HartMStore.wobl_ram_ctx], not yet written).
+                           THIS IS THE A/D WRITE-BACK'S REAL PAYMENT POINT.
+    UserPtTree.v   A6.27's cascade — [utlb_inv_pt_translateAddr_u] and its
+                   :1382  four siblings thread [Sto]/[Stoq]; mechanical, and
+                           the closure above it is 11 callers ending at
+                           [UserMemAccess]'s two consumer-free lemmas.
+    TransPt.v      A6.27's cascade, same shape one lane over: an [↦ₚ₈]
+                   :910   write applied to an [↦ₚₜ] slot.  The A/D
+                           write-back on the user-PT walk lane.
+    WpStartNew.v   A6.28's cascade — [wp_store_gpr] now takes
+                   :1138  [ctx_phys_word_pointsto] + [own_context]; the four
+                           M-mode prologue/epilogue sites and the
+                           [Entry]/[BootChain] threading above them.
+    BootCarve.v    A6.28's OTHER end, and it is NOT a binder fix.
+                   :1162  [boot_stack_own_phys] builds [stack_own_phys] out
+                           of RAW carve bytes; now that the M-mode stack is
+                           a ledger region, it cannot -- A6.9 says no rule
+                           above the interpretation mints a timestamp
+                           element.  **The fix is A6.10's shape one tier
+                           down**: the carve gains a premise handing the
+                           range's ledger residue, and [TsoCtx] gains the
+                           physical twin of [ctx_pointsto_of_pristine] --
+                           an EXCLUSIVE one, since the stack is written:
+                           [phys_pointsto a dq v ∗ a ↪[ts]{dq} 0 ⊢
+                            ctx_phys_pointsto ξ a dq v] through the
+                           [⌜t = 0⌝] arm of [llb].  Then adequacy mints it,
+                           which is where A6.17 always said the bill lands.
+    KstackOwn.v    A6.16 verbatim, from A6.26's verification list: the last
+                   :215   two [TsoCtxShim.ctx_pointsto_of_mem] uses
+                           ([kstack_byte_rekey] / [kstack_word_rekey], the
+                           KT0↔KT1 rekey).  [TsoCtx.ctx_pointsto_of_phys] is
+                           the replacement; NO new kit.
+    PtWalkCert.v   A6.7(B)'s OWN leftover, and it was predicted: the file is
+                   :840   on the "STILL TO ABSORB" list.  The patched
+                           [checked_mem_read] no longer exposes
+                           [liftR (read_kind_of_flags …)] until the
+                           [(access, res)] match is reduced.  Same one-line
+                           fix as [SmodePte]'s.
+
+**THE VERIFICATION LIST BEHIND `KptTree` (A6.26), WALKED BY `.vo` AND NOT
+BY THE ERROR LIST — AND THE ANSWER IS "STILL UNREACHED".**  Of the seven,
+`HartSKpt` and `KstackOwn` are RED (above), and **`UserBytes`, `UmodeMem`,
+`ProcPtOwn`, `PtWalkCert` and `WpSconfMem` have NO `.vo` AT ALL**: they sit
+behind `HartSKpt` / `KstackOwn` / `PtWalkCert` in the DAG and `make -k`
+never reached them.  They are neither green nor known-red, exactly as
+A6.25's rule warns — and this is the second tranche running in which
+`WpSconfMem`'s A6.18 textual-invariance acceptance test could NOT be
+confirmed by the build.  **`make WpSconfMem.vo` is still the first thing to
+do once `HartSKpt` closes**, and until then A6.18 stands verified at the
+statement level only.  (`PtWalkCert` is on both lists: it was an A6.26
+verification entry AND is red on A6.7(B)'s own leftover.)
+
+**WHAT THE TRANCHE LANDED, for the record:** `KptTree`, `KptShare`,
+`UptTree`, `PtTree`/`PtBuild`'s consumers, `StackOwn`, `HartMLoad`,
+`WpMmodeLoad`, `WpTimerinit`, `TsoCtx` (the author-generic ledger gate),
+and `WpUart`'s five closing arms.
 
 ## 7. Order of work
 
