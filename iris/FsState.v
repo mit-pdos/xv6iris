@@ -245,6 +245,24 @@ Section FsState.
       iPureIntro. rewrite /link_elem (big_opM_delete _ I i n) //.
   Qed.
 
+  (* ...AND THE SAME READING WITH A SPARE FRAGMENT IN HAND (durable-disk
+     lane E-clauses).  [FsDurSnap.sk_links] is the family's validity
+     SLACKED by one token at the root, and the commit's supplier is the
+     inode region's own keep-alive token ([InodeRegion.ireg_keep]) beside
+     the collected [fs_links].  Gathering the two into ONE [own] is all it
+     takes; the accumulator form of the gather is what makes the empty map
+     a non-case. *)
+  Lemma fs_links_valid_tok g I i k :
+    fs_links g I -∗ own g (link_tok_elem i k) -∗
+    ⌜✓ (link_elem I ⋅ link_tok_elem i k)⌝.
+  Proof.
+    iIntros "HI Ht".
+    iDestruct (own_gather_map (A := fsLinkUR) g link_elem_node I
+                 (link_tok_elem i k) with "Ht HI") as "H".
+    iDestruct (own_valid with "H") as %Hv.
+    iPureIntro. rewrite comm. exact Hv.
+  Qed.
+
   Lemma fs_links_alloc (I : gmap Z fs_node) :
     ✓ link_elem I -> ⊢ |==> ∃ g : gname, fs_links g I.
   Proof.
@@ -386,6 +404,30 @@ Section FsState.
     iMod (fs_links_full_alloc IL) as (gl) "Hl".
     iMod (ghost_map_alloc IT) as (gt) "[Ha Hf]".
     iModIntro. iExists gl, gt. iFrame.
+  Qed.
+
+  (* THE BOOT MINT'S ALLOCATION, AT THE SLACKED ELEMENT (durable-disk lane
+     E-clauses).  [FsDurSnap.sk_links] is [✓ (link_elem I ⋅ link_tok_elem
+     ROOTINO 1)], and ONE [own_alloc] at that element yields the whole
+     [fs_links] bundle PLUS the spare token the inode region parks as
+     [InodeRegion.ireg_keep] -- so the mint never has to split a family it
+     has already handed out.  The root inum is a PARAMETER: this file sits
+     below [InodeRegion], and [ireg_root] is [FsImg.ROOTINO]. *)
+  Lemma fs_boot_alloc_root_slack (I : gmap Z fs_node) (r : Z) :
+    ✓ (link_elem I ⋅ link_tok_elem r 1%nat) ->
+    ⊢ |==> ∃ gl gt : gname,
+        ghost_map_auth gt 1 I
+        ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
+        ∗ fs_links gl I
+        ∗ own gl (link_tok_elem r 1%nat).
+  Proof.
+    intros Hv.
+    iMod (own_alloc (link_elem I ⋅ link_tok_elem r 1%nat)) as (gl) "H";
+      [done |].
+    iDestruct (own_op with "H") as "[Hl Ht]".
+    iMod (ghost_map_alloc I) as (gt) "[Ha Hf]".
+    iModIntro. iExists gl, gt. iFrame "Ha Hf Ht".
+    rewrite /fs_links /link_elem. by iApply big_opM_own_1.
   Qed.
 
   (* THE DEGENERATE INSTANCE, and it is what durable-disk 2c's fixed-layer

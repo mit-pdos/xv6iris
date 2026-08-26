@@ -565,7 +565,19 @@ Section Collect.
      free_bitmap_at (fs_gamma_L γfs) (sb_bmapstart sb) (sb_size sb) used ∗
      col_recs γfs γi ist nib m ∗
      ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) ∗
-     fs_links (fs_link γfs) I)%I.
+     fs_links (fs_link γfs) I ∗
+     (* THE ROOT'S KEEP-ALIVE TOKEN (durable-disk lane E-clauses).  The
+        region parks one spare fragment at [ireg_root] beside the per-inum
+        authority ([InodeRegion.ireg_keep], a conjunct of [ireg_lnk]) --
+        [FsStateInode.ent_tokenless] exempts a SELF record, so the root's
+        [".."] carries no token and the image's [nlink = 1] at the root is
+        accounted for by nothing else.  Gathered with the family's own
+        elements it is [FsDurSnap.sk_links], the SLACKED validity the boot
+        mint allocates from.  The collection already PRODUCES it at every
+        inum ([col_link_of]'s second conjunct, dropped until now); this row
+        is the one at the root being kept.  LAST, so no destructuring
+        pattern above moves. *)
+     ireg_keep γfs ireg_root)%I.
 
   (* the abstract state the hand describes: the superblock the region was
      configured from, block 1's bytes, the map the [ftop_inv] authority
@@ -1095,7 +1107,7 @@ Section Collect.
     col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
     ⌜snap_bytes (col_state sb sbb I used) (col_view C home)⌝.
   Proof.
-    iIntros "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk)".
+    iIntros "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk & Hkeep)".
     rewrite /sb_owned. iDestruct "Hsb" as "[Hsbb %Hparse]".
     rewrite /free_bitmap_at. iDestruct "Hbm" as "[Hbmb Hpool]".
     (* ---- the byte agreements ---- *)
@@ -1118,8 +1130,12 @@ Section Collect.
                  Hg Hdi with "Hsbb Hbmb Hrec Hb") as %Hnotmeta.
     iDestruct (col_meta_used γfs Lb C home γi I m sb sbb ist nib used
                  Hg Hdi with "Hau Hsbb Hbmb Hpool Hrec") as %Hmetau.
-    (* ---- the link family's own validity ---- *)
-    iDestruct (fs_links_valid with "Hlk") as %Hlinks.
+    (* ---- the link family's own validity, SLACKED AT THE ROOT: the
+       collected elements gathered with the region's spare fragment, read
+       by ONE [own_valid] ([FsState.fs_links_valid_tok]) ---- *)
+    rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl)
+            /FsStateLink.link_tok /FsStateLink.link_toks /=.
+    iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
     iPureIntro.
     split; rewrite /col_state /=.
     - exact (col_view_len C home HdomC Hlens).

@@ -463,10 +463,17 @@ Section CollectAll.
       ∗ ghost_map_auth γi 1 m
       ∗ ghost_map_auth (fs_top γfs) 1 I
       ∗ ([∗ set] z ∈ Rs,
-           ∃ n : fs_node,
-             ⌜I !! z = Some n⌝
-             ∗ col_bundle γfs γi z n
-             ∗ own (fs_link γfs) (link_elem_node z n)).
+           (∃ n : fs_node,
+              ⌜I !! z = Some n⌝
+              ∗ col_bundle γfs γi z n
+              ∗ own (fs_link γfs) (link_elem_node z n))
+           (* the region's keep-alive token, [emp] everywhere but the root
+              (durable-disk lane E-clauses).  [FsCollect.col_link_of] has
+              always produced it; KEEPING it is what supplies
+              [FsCollect.col_hand]'s last row, hence the SLACK in
+              [FsDurSnap.sk_links].  It rides OUTSIDE the existential so
+              that [big_sepS_sep] splits it off as its own column. *)
+           ∗ ireg_keep γfs z).
   Proof.
     induction Rs as [| z Rs Hnz IH] using set_ind_L; intros Hr.
     - iIntros "Ht Hm Hi _". rewrite !big_sepS_empty.
@@ -492,9 +499,22 @@ Section CollectAll.
       iDestruct (col_bundle_rec with "Hm Hb") as %Hmz.
       rewrite Hmd in Hmz. injection Hmz as Hrec.
       iFrame "Ht Hm Hi".
-      iExists n. iSplitR; [iPureIntro; exact HIz |]. iFrame "Hb".
       iDestruct (col_link_of γfs z n d (eq_sym Hrec) with "Hlnk Hte")
-        as "[$ _]".
+        as "[Hle Hkp]".
+      iSplitR "Hkp"; [| iExact "Hkp"].
+      iExists n. iSplitR; [iPureIntro; exact HIz |]. iFrame "Hb Hle".
+  Qed.
+
+  (* ...and the ONE token that survives the collection: [ireg_keep] is [emp]
+     at every inum but the root, so the column's whole content is the root's
+     keep-alive fragment (durable-disk lane E-clauses). *)
+  Lemma col_keeps_root (γfs : fs_names) (nib : nat) :
+    ireg_root ∈ region_inums nib ->
+    ([∗ set] z ∈ region_inums nib, ireg_keep γfs z) -∗ ireg_keep γfs ireg_root.
+  Proof.
+    intros Hin. iIntros "H".
+    rewrite (big_sepS_delete _ (region_inums nib) ireg_root Hin).
+    iDestruct "H" as "[$ _]".
   Qed.
 
 
@@ -609,6 +629,15 @@ Section CollectAll.
     { rewrite big_sepS_sep. iFrame "HR Hslots". }
     iDestruct (col_sides_bundles γfs γi m I (region_inums nib) Hwide
                  with "Htx Hm Hi HR") as "(Htx & Hm & Hi & HB)".
+    (* ---- the keep-alive column comes off, and only the root's is not
+       [emp] (durable-disk lane E-clauses) ---- *)
+    assert (Hrootin : ireg_root ∈ region_inums nib).
+    { apply region_inums_spec.
+      pose proof (sbo_ninodes sb (cg_sbok Hgeom)).
+      pose proof (cg_nin Hgeom).
+      unfold ireg_root, FsImg.ROOTINO in *. lia. }
+    rewrite big_sepS_sep. iDestruct "HB" as "[HB Hkeeps]".
+    iDestruct (col_keeps_root γfs nib Hrootin with "Hkeeps") as "Hkeep".
     iDestruct (col_bundles_domsub with "HB") as %Hdom.
     (* ---- the abstract state is the map RESTRICTED to the region ---- *)
     assert (HdomIq : dom (col_reg_map nib I) = region_inums nib)
@@ -625,7 +654,7 @@ Section CollectAll.
     (* ---- and that IS [FsCollect.col_hand] ---- *)
     iAssert (col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used
                (col_reg_map nib I) m Lb C (fs_home_set cov ls))%I
-      with "[Hauth Hsbb Hbm Hm Hrecs Hbund Hlnks]" as "Hhand".
+      with "[Hauth Hsbb Hbm Hm Hrecs Hbund Hlnks Hkeep]" as "Hhand".
     { rewrite /col_hand.
       iSplitR; [iPureIntro; exact Hgeom |].
       iSplitR.
@@ -637,7 +666,7 @@ Section CollectAll.
       iSplitL "Hbm"; [iExact "Hbm" |].
       iSplitL "Hm Hrecs".
       { rewrite /col_recs. iFrame "Hm Hrecs". }
-      iFrame "Hbund Hlnks". }
+      iFrame "Hbund Hlnks Hkeep". }
     iDestruct (col_snap_ok_ex with "Hhand") as %Hok.
     iPureIntro. exact Hok.
   Qed.

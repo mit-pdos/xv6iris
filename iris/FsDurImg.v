@@ -628,18 +628,26 @@ Proof.
 Qed.
 
 (* THE REDUCTION.  [FsState.link_full_map_valid] is unconditional, and
-   validity is downward closed, so the whole obligation is one inclusion. *)
-Lemma link_elem_valid_of_root (I : gmap Z fs_node) (d : Z) (nd : fs_node) :
+   validity is downward closed, so the whole obligation is one inclusion.
+
+   IT CARRIES A SLACK ELEMENT [e] (durable-disk lane E-clauses), because
+   [FsDurSnap.sk_links] is the family's validity WITH one spare fragment at
+   the root: the boot mint has to allocate the region's keep-alive token
+   ([InodeRegion.ireg_keep]) out of the same [own_alloc].  At [e = ε] this
+   is the plain statement, and nothing about the proof changes -- the slack
+   rides through the same inclusion into [link_full_map]. *)
+Lemma link_elem_valid_of_root (I : gmap Z fs_node) (d : Z) (nd : fs_node)
+    (e : fsLinkUR) :
   I !! d = Some nd ->
   (forall i n, I !! i = Some n -> i <> d -> dir_entries n = ∅) ->
-  ent_ops d nd ≼ link_toks_of I ->
-  ✓ link_elem I.
+  ent_ops d nd ⋅ e ≼ link_toks_of I ->
+  ✓ (link_elem I ⋅ e).
 Proof.
   intros Hd Hrest [x Hx].
-  apply (cmra_valid_included (link_elem I) (link_full_map I)
+  apply (cmra_valid_included (link_elem I ⋅ e) (link_full_map I)
            (link_full_map_valid I)).
   rewrite link_full_map_split link_elem_split (ent_ops_one I d nd Hd Hrest).
-  rewrite Hx. exists x. rewrite assoc //.
+  rewrite Hx. exists x. rewrite !assoc //.
 Qed.
 
 (* ---- 9b.   A LIST OF TOKENS AS ONE RA ELEMENT ----------------------- *)
@@ -1010,11 +1018,20 @@ Qed.
 
 (* ---- 9g.   THE BRIDGE ------------------------------------------------ *)
 
+(* IT CARRIES THE ROOT'S KEEP-ALIVE TOKEN (durable-disk lane E-clauses).
+   The slack rides as one extra [ROOTINO] at the HEAD of the ticket list --
+   [toks_of_list_cons] is exactly [link_tok_elem ROOTINO 1] beside the
+   root's own tickets -- so step two's per-key arithmetic closes it with
+   the ONE image fact [FsImg.fsimg_wf_root_link]: the root receives no
+   ticket at all ([fs_link_count P sb ROOTINO = 0], W9's directory arm)
+   while its record says [nlink = 1], so 0 + 1 <= 1.  That is the
+   non-vacuity witness plan section 7 demands, at xv6's own mkfs image. *)
 Lemma img_link_incl (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
   fsimg_wf P sb = true -> fs_links_eq P sb = true ->
   fs_root_no_self P sb = true ->
   FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
   ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO)
+    ⋅ link_tok_elem FsImg.ROOTINO 1%nat
     ≼ link_toks_of (img_nodes P sb nib).
 Proof.
   intros Hwf Heq Hns Hnib.
@@ -1025,15 +1042,48 @@ Proof.
   { pose proof (sbo_ninodes sb (fsimg_wf_sb P sb Hwf)).
     unfold FsImg.ROOTINO in *. lia. }
   pose proof (fsimg_wf_dir P sb FsImg.ROOTINO Hwf Hnin Hty) as Hdok.
+  (* the root's own ticket list is part of the image's whole supply, AT
+     EVERY KEY -- the one arithmetic step both branches of step two use *)
+  assert (Hjoin : forall t : Z,
+    (fs_tick_count (fs_dir_tickets P FsImg.ROOTINO
+                      (fs_dinode P sb FsImg.ROOTINO)) t
+     <= fs_link_count P sb t)%nat).
+  { intros t. rewrite /fs_link_count /fs_all_tickets.
+    apply fs_tick_count_join. apply elem_of_list_fmap.
+    exists (Z.to_nat FsImg.ROOTINO). split.
+    - rewrite Z2Nat.id; [| unfold FsImg.ROOTINO; lia].
+      rewrite /fs_dir_tickets_at. cbv zeta.
+      rewrite (proj2 (Z.eqb_eq _ _) Hty) //.
+    - apply elem_of_seq. unfold FsImg.ROOTINO in *. lia. }
   apply (cmra_included_trans _
-           (toks_of_list (fs_dir_tickets P FsImg.ROOTINO
-                            (fs_dinode P sb FsImg.ROOTINO)))).
-  (* STEP ONE: the root's tokens are covered by the root's tickets *)
-  { rewrite /ent_ops (img_root_entries P sb Hwf).
+           (toks_of_list (FsImg.ROOTINO
+                          :: fs_dir_tickets P FsImg.ROOTINO
+                               (fs_dinode P sb FsImg.ROOTINO)))).
+  (* STEP ONE: the root's tokens are covered by the root's tickets, and the
+     keep-alive token by the consed head *)
+  { rewrite toks_of_list_cons.
+    rewrite (comm op (ent_ops FsImg.ROOTINO (img_node P sb FsImg.ROOTINO))
+               (link_tok_elem FsImg.ROOTINO 1%nat)).
+    apply cmra_mono_l.
+    rewrite /ent_ops (img_root_entries P sb Hwf).
     apply view_ops_incl_tickets. intros k Hk Hlv Hc.
     exact (fs_root_no_self_at P sb k Hns Hk Hlv Hc). }
-  (* STEP TWO: the root's tickets are covered by the inodes' nlinks *)
+  (* STEP TWO: the tickets -- the root's own plus the keep-alive one -- are
+     covered by the inodes' nlinks *)
   apply toks_of_list_incl. intros z Hz.
+  rewrite fs_tick_count_cons in Hz |- *.
+  destruct (decide (FsImg.ROOTINO = z)) as [<- | Hzne].
+  { (* THE KEEP-ALIVE KEY.  The root's own records never ticket the root
+       ([fs_link_count P sb ROOTINO = 0]) and mkfs writes [nlink = 1]
+       there, so the one spare fragment is exactly covered. *)
+    rewrite (bool_decide_eq_true_2 (FsImg.ROOTINO = FsImg.ROOTINO) eq_refl).
+    exists (img_node P sb FsImg.ROOTINO). split.
+    { apply img_nodes_lookup. apply region_inums_spec.
+      unfold FsImg.ROOTINO in *. lia. }
+    destruct (fsimg_wf_root_link P sb Hwf) as [Hcnt Hnl1].
+    pose proof (Hjoin FsImg.ROOTINO) as Hj. rewrite Hcnt in Hj.
+    rewrite /fn_nlink img_node_rec Hnl1. lia. }
+  rewrite (bool_decide_eq_false_2 (FsImg.ROOTINO = z) Hzne) in Hz |- *.
   pose proof (fs_tick_count_elem _ z Hz) as Hin.
   rewrite /fs_dir_tickets in Hin.
   apply elem_of_list_omap in Hin as (k & Hk & Hkt).
@@ -1063,19 +1113,7 @@ Proof.
                 Hc) as (_ & _ & Hr).
     exact (Hself Hr). }
   pose proof (fs_links_eq_at P sb t Heq Htran Hlive Hnd) as Hnl.
-  (* the root's own tickets are part of the image's whole supply *)
-  assert (Hjoin :
-    (fs_tick_count (fs_dir_tickets P FsImg.ROOTINO
-                      (fs_dinode P sb FsImg.ROOTINO)) t
-     <= fs_link_count P sb t)%nat).
-  { rewrite /fs_link_count /fs_all_tickets.
-    apply fs_tick_count_join. apply elem_of_list_fmap.
-    exists (Z.to_nat FsImg.ROOTINO). split.
-    - rewrite Z2Nat.id; [| unfold FsImg.ROOTINO; lia].
-      rewrite /fs_dir_tickets_at. cbv zeta.
-      rewrite (proj2 (Z.eqb_eq _ _) Hty) //.
-    - apply elem_of_seq. unfold FsImg.ROOTINO in *. lia. }
-  rewrite /fn_nlink img_node_rec Hnl Nat2Z.id. exact Hjoin.
+  rewrite /fn_nlink img_node_rec Hnl Nat2Z.id. exact (Hjoin t).
 Qed.
 
 (* ---- 9h.   THE FAMILY'S VALIDITY, AS A THEOREM ----------------------- *)
@@ -1084,7 +1122,8 @@ Lemma img_link_valid (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
   fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
   fs_links_eq P sb = true -> fs_root_no_self P sb = true ->
   FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
-  ✓ link_elem (img_nodes P sb nib).
+  ✓ (link_elem (img_nodes P sb nib)
+     ⋅ link_tok_elem FsImg.ROOTINO 1%nat).
 Proof.
   intros Hwf Hrw Heq Hns Hnin.
   pose proof (sbo_ninodes sb (fsimg_wf_sb P sb Hwf)) as Hni.
@@ -1092,7 +1131,7 @@ Proof.
   assert (Hrootin : FsImg.ROOTINO ∈ region_inums nib)
     by (apply region_inums_spec; rewrite /FsImg.ROOTINO; lia).
   apply (link_elem_valid_of_root _ FsImg.ROOTINO
-           (img_node P sb FsImg.ROOTINO)
+           (img_node P sb FsImg.ROOTINO) _
            (img_nodes_lookup P sb nib FsImg.ROOTINO Hrootin));
     [| exact (img_link_incl P sb nib Hwf Heq Hns Hnin)].
   intros i n Hi Hne.

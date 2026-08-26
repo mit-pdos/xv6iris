@@ -287,8 +287,25 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
   (* the region's inums are all named *)
   sk_dom    : forall i, 0 <= i < sb_ninodes (fss_sb S) ->
                 is_Some (fss_inodes S !! i);
-  (* the link family's own validity *)
-  sk_links  : ✓ link_elem (fss_inodes S);
+  (* THE LINK FAMILY'S OWN VALIDITY, WITH THE ROOT'S KEEP-ALIVE SLACK
+     (durable-disk lane E-clauses; plan section 5's third missing clause).
+     The plain [✓ link_elem (fss_inodes S)] is the tokens-<=-nlink law of
+     the family, which is what [FsState.fs_links_alloc] needs; the SLACK --
+     one spare fragment at [ROOTINO] -- is what a BOOT MINT needs on top of
+     it, because the era's inode region parks a keep-alive token at the root
+     ([InodeRegion.ireg_keep], [ireg_root] being [ROOTINO]) that no
+     directory entry accounts for: [FsStateInode.ent_tokenless] exempts a
+     SELF record, so the root's [".."] carries none and the image's
+     [nlink = 1] at the root would otherwise be unclaimed.  Stated as ONE
+     clause rather than two because the plain form is its own left factor
+     ([sk_links_plain] below) and the record has exactly two readers.
+     [FsState.fs_boot_alloc_root_slack] is the mint's [own_alloc] at it:
+     one allocation yields [fs_links] plus the spare token.
+     The IMAGE discharges it from [FsImg.fsimg_wf_root_link] through
+     [FsDurImg.img_link_valid]; the COMMIT reads it off the region's own
+     [ireg_keep] beside the collected [FsState.fs_links]
+     ([FsState.fs_links_valid_tok]). *)
+  sk_links  : ✓ (link_elem (fss_inodes S) ⋅ link_tok_elem ROOTINO 1%nat);
   (* ---- THE USED-SET COUPLING ---- *)
   (* the metadata roles are MARKED IN USE, so a block whose bit reads clear
      is none of them *)
@@ -357,6 +374,12 @@ Global Arguments sk_sbok {_ _} _.
 Global Arguments sk_reg {_ _} _.
 Global Arguments sk_slot {_ _} _.
 Global Arguments sk_regdom {_ _} _.
+
+(* the plain family validity, which is [sk_links]'s own left factor: the
+   allocator ([FsState.fs_links_alloc]) takes this, the mint takes the
+   slacked form. *)
+Definition sk_links_plain {S D} (H : snap_bytes S D)
+  : ✓ link_elem (fss_inodes S) := cmra_valid_op_l _ _ (sk_links H).
 
 (* ===================================================================== *)
 (*  1b'. THE THREE METADATA ROLES ARE THREE DIFFERENT BLOCKS             *)
@@ -1863,7 +1886,7 @@ Section Snap.
   Proof.
     intros Hok.
     iMod (snap_bytes_alloc (fs_dbytes D)) as (g) "[Hba Hbe]".
-    iMod (fs_links_alloc (fss_inodes S) (sk_links (sk_bytes Hok)))
+    iMod (fs_links_alloc (fss_inodes S) (sk_links_plain (sk_bytes Hok)))
       as (gl) "Hlinks".
     iMod (ghost_map_alloc (fss_inodes S)) as (gt) "[Hta Htf]".
     iModIntro. iExists g, gl, gt.
@@ -2004,8 +2027,97 @@ End Snap.
 (*  So the check is stated, not described.                                *)
 (* ===================================================================== *)
 
+(* ===================================================================== *)
+(*  9a. THE HOME BRIDGE (durable-disk lane E-clauses)                     *)
+(*                                                                        *)
+(*  WHAT THE BOOT MINT MEETS.  At a clean header recovery is the IDENTITY  *)
+(*  on the home blocks ([FsCrash.fs_recovery_clean]), so the committed map *)
+(*  the snapshot describes is literally                                    *)
+(*  [fs_restrict P (fs_home_set cov logstart)] -- a map whose DOMAIN is    *)
+(*  the home set ([LogDefs.fs_restrict_dom]).  The mint's input, on the    *)
+(*  other hand, is the boot thread's own per-block ownership: one          *)
+(*  [FsBlocks.fsblock] per home block.  Those are the SAME RESOURCE, and   *)
+(*  [blk_ledger_of_home] below is the equation -- [blk_ledger] is the      *)
+(*  big-op over the map, a set big-op is the big-op over its domain, and   *)
+(*  [FsBytesGamma.gamma_blk_owned] is the vocabulary.                      *)
+(*                                                                        *)
+(*  THE POINT IS THE DOMAIN, and it is what makes the coverage /           *)
+(*  log-disjointness pair of [InodeLock.inode_ok] free.  Every block the   *)
+(*  snapshot NAMES -- block 1, the bitmap block, an inode region block, a  *)
+(*  node's data or indirect block, a free-pool block -- is a block of [D]  *)
+(*  by one of [sk_sb]/[sk_bmap]/[sk_rec]/[sk_blk]/[sk_ind]/[sk_pool], and  *)
+(*  a block of [fs_restrict P home] is a HOME block                        *)
+(*  ([snap_names_home]).  A home block is in [cov] and outside the log     *)
+(*  region by [LogDefs.fs_home_set]'s own definition                       *)
+(*  ([snap_names_cov]).  So the mint owes NO new clause for either half:   *)
+(*  this is pure bookkeeping over [fs_restrict].                           *)
+(* ===================================================================== *)
+
+(* every block any clause of [snap_bytes] reads.  [snap_meta] is already
+   the three metadata roles; the other two arms are a node's own blocks and
+   the free pool. *)
+Definition snap_names (S : fs_state_rec) (b : Z) : Prop :=
+  snap_meta S b
+  \/ (exists i n, fss_inodes S !! i = Some n /\ fn_owns n b)
+  \/ (0 <= b < sb_size (fss_sb S) /\ b ∉ fss_used S).
+
+Lemma snap_names_dom (S : fs_state_rec) (D : gmap Z (list (bv 8))) (b : Z) :
+  snap_bytes S D -> snap_names S b -> is_Some (D !! b).
+Proof.
+  intros Hb [Hmeta | [(i & n & Hi & Hown) | [Hrange Hfree]]].
+  - destruct Hmeta as [-> | [-> | (i & [n Hi] & ->)]].
+    + exists (fss_sbb S). exact (sk_sb Hb).
+    + eexists. exact (sk_bmap Hb).
+    + destruct (sk_rec Hb i n Hi) as (bs & Hbs & _). by exists bs.
+  - destruct Hown as [(k & [bs Hbs] & <-) | [Hnz <-]].
+    + exists bs. exact (sk_blk Hb i n k bs Hi Hbs).
+    + eexists. exact (sk_ind Hb i n Hi Hnz).
+  - exact (sk_pool Hb b Hrange Hfree).
+Qed.
+
+(* ...AND AT THE RECOVERED MAP, WHICH IS THE MINT'S: a named block is a
+   home block, hence covered and outside the log region. *)
+Lemma snap_names_home (S : fs_state_rec) (P : Z -> list (bv 8))
+    (home : gset Z) (b : Z) :
+  snap_bytes S (fs_restrict P home) -> snap_names S b -> b ∈ home.
+Proof.
+  intros Hb Hn.
+  destruct (snap_names_dom S (fs_restrict P home) b Hb Hn) as [bs Hbs].
+  exact (proj1 (proj1 (fs_restrict_lookup_Some P home b bs) Hbs)).
+Qed.
+
+Lemma snap_names_cov (S : fs_state_rec) (P : Z -> list (bv 8))
+    (cov : gset Z) (logstart b : Z) :
+  snap_bytes S (fs_restrict P (fs_home_set cov logstart)) ->
+  snap_names S b ->
+  b ∈ cov /\ b ∉ log_region_set logstart.
+Proof.
+  intros Hb Hn.
+  pose proof (snap_names_home S P (fs_home_set cov logstart) b Hb Hn) as Hh.
+  rewrite /fs_home_set elem_of_difference in Hh. exact Hh.
+Qed.
+
 Section LedgerEra.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !fsLinkG Σ, !fsTopG Σ}.
+
+  (* THE LEDGER THE MINT HANDS THE ALLOCATOR CORE, spelled at the home set:
+     one [FsBlocks.fsblock] per home block IS [blk_ledger] at the restricted
+     map, with no side condition at all (both shapes carry the block's own
+     length clause). *)
+  Lemma blk_ledger_of_home (γfs : fs_names) (P : Z -> list (bv 8))
+      (home : gset Z) :
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (P b))
+    ⊣⊢ blk_ledger (fs_gamma_L γfs) (fs_restrict P home).
+  Proof.
+    rewrite /blk_ledger.
+    rewrite (big_sepM_proper (fun b bs => blk_owned (fs_gamma_L γfs) b bs)
+               (fun b (_ : list (bv 8)) => fsblock (fs_bytes γfs) b (P b))
+               (fs_restrict P home)); last first.
+    { intros b bs Hbs.
+      destruct (proj1 (fs_restrict_lookup_Some P home b bs) Hbs) as [_ ->].
+      exact (gamma_blk_owned γfs b (P b)). }
+    rewrite big_sepM_dom fs_restrict_dom //.
+  Qed.
 
   Lemma fs_state_of_ledger_era (γfs : fs_names) S D :
     snap_ok S D ->
