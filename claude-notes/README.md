@@ -164,10 +164,17 @@ first four were audited against the tree 2026-08-22):
   whole era instance, the durable allocator, and the COMMIT's snapshot step
   (the crash predicate carries one copy of the FS predicate at the committed
   map, and "the disk recovers to a committed view that IS a file system" is
-  exported at every reachable state).  What is left is the BOOT mint from
-  that snapshot, which is blocked on boot ORDER (the era's byte view is born
-  at the raw disk, before recovery runs) — so `Himg` is still assumed and
-  `xv6_power_adequacy` is still vacuous.  Lanes A–G in the file.
+  exported at every reachable state), plus two of the three snapshot clauses
+  the boot mint needs (`FsStateInode.inl_bare_free`, `FsDurSnap.sk_regdom`).
+  What is left is the BOOT mint from that snapshot.  Boot ORDER is NOT what
+  blocks it (the clean-header fact `initlog` already carries makes the
+  committed view equal the raw home blocks, so the mint stays at PowerOn);
+  the blocker is the OLD link ledger — boot's only directory stock,
+  `DirLinks.dir_links_of_plain`, forces every live directory to `nlink ≤ 1`
+  and to BE the root, which `iris/FsBootWall.v` refutes for any era where
+  `mkdir` has run.  So lane G's demolition of `DirLinks` precedes lane E, and
+  meanwhile `Himg` is still assumed and `xv6_power_adequacy` is still vacuous.
+  Lanes A–G in the file.
   History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`

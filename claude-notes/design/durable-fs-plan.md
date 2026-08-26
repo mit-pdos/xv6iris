@@ -291,6 +291,67 @@ by block; the same shape as the runtime mid-install state, where the
 physical disk lags `L` on dirty buffers.  That is stage 4's design; it
 does not move the mint.
 
+**THE SNAPSHOT'S TIE WAS THREE CLAUSES SHORT; TWO ARE LANDED (lane E-boot).**
+Measured against `fs_cfg_alloc`'s premises, every one is supplied by a `sk_*`
+field or by `snap_local` except:
+
+- the region's TAIL inums were not named.  `sk_dom` says `0 ≤ i < ninodes`;
+  the era needs the region's WIDTH (`ireg_recs` is sixteen records per region
+  block, and `ftop_alloc`/`ipool_alloc` run over `region_inums nib`).  LANDED
+  as `FsDurSnap.sk_regdom` at `0 ≤ i < 16·(ninodes/16 + 1)` — the width off
+  `S`'s own superblock, since a `snap_bytes` clause is a function of `S` and
+  `D` alone.  Image witness `FsDurImg.img_snap_ok`; commit supplier
+  `FsCollect.col_snap_bytes`, off `col_hand`'s domain row against the new
+  `col_geom` field `cg_width : nib = ninodes/16 + 1`.
+- a FREE inum's node was not known to be BARE.  LANDED as
+  `FsStateInode.inl_bare_free` (`fn_type n = 0 → fn_bare n`), the LAST field
+  of `inode_local`.  It swept NOTHING: `inode_local` has exactly two
+  constructors, and `FsStateEra.inode_local_of_ok` is vacuous at it because
+  `inode_ok` carries `di_type ≠ 0`.
+- the ROOT's keep-alive slack (`InodeRegion.ireg_keep` holds one spare
+  `link_tok` at `ROOTINO`, and `sk_links` gives only tokens ≤ nlink).  NOT
+  landed: its form is `✓ (link_elem (fss_inodes S) ⋅ link_tok_elem ROOTINO 1)`
+  beside `sk_links` — the form the mint consumes, since one `own_alloc` then
+  yields `fs_links` plus the spare token — the image discharges it from
+  `FsImg.fsimg_wf_root_link` through `FsDurImg.img_link_valid`, and the
+  COMMIT's supplier is the region's `ireg_keep`, i.e. a new `col_hand` row and
+  a new region opening in `FsCollectAll`.  Only the mint consumes it, so §7's
+  discipline says it lands with the mint.
+
+**WHAT BLOCKS THE MINT IS THE OLD LINK LEDGER**, and `iris/FsBootWall.v` is
+the machine-checked statement.  The file-system predicate's own content IS
+reachable from `snap_ok`: the node map and abstract map (`fs_boot_alloc_full`
+/ `ftop_alloc` at `fss_inodes S` with `snap_local`), the records and the
+region's ∀-over-decodings premises (`sk_rec` + `rec_in_blk_inj`, then
+`inl_type`/`inl_nlink`/`inl_free`/`inl_bare_free`), the bitmap and free pool
+(`sk_bmap`/`sk_pool`/`fss_used`), and the NEW link family (`sk_links` IS
+`fs_links_alloc`'s premise, and `inode_link_iff` splits it into the region's
+authority and each directory's `ent_toks`).  What is not is `DirLinks`:
+`IcacheBoot.ipool_alloc`'s per-inum bundle wants `IcacheEscrow.dlinks`, whose
+first conjunct is `DirLinks.dir_links`, and boot's only constructor for a
+directory is the ALL-PLAIN stock `DirLinks.dir_links_of_plain`, whose
+`dlc_bound (λ _, false)` IS `nlink ≤ 1` and whose parent-tie premise says a
+live directory with a `..` IS the root.  Both are mkfs-image facts, false at
+any era where `mkdir` has run — create's mkdir arm does `dp->nlink++`.
+Region-side the same fact is `IcacheBoot.image_dir_wl0` /
+`InodeRegion.ireg_dir_wl0`.  Choosing a d-flavoured `F` instead needs the
+TARGET's type (cross-inode) plus the exact accounting `nlink ≤ 1 + #subdirs`,
+the parent registers minted off record 1, and `ireg_alloc`'s ledger premise
+generalised to nonzero `wdu`/`wdt`.  All of it lives in the ledger lane G is
+to DEMOLISH, so **lane G precedes the mint**; after it, `dlinks = ent_toks`
+and the pool's bundle is `snap_ok`-reachable.  Three further per-object
+clauses `ipool_alloc` needs and `snap_ok` lacks — `DirView.dir_ok`,
+`dir_dots_ix` (POSITIONAL: records 0 and 1 ARE the dots, which
+`inl_dir_dot`/`inl_dir_dotdot` do NOT say — those are about the name→inum
+view `dir_entries`, blind to which record carries the name) and
+`dir_orphan_clean` — are then one `snap_local` sweep, each already re-proved
+at every `iunlock` by the escrow's deposit arms.
+
+**Two era-0-only conjuncts cannot be re-derived at all**: `fs_cfg_alloc`'s
+`dv_pin`/`fv_pin` name the mkfs image's root directory and `/init`'s bytes at
+inum 7, and no snapshot at era N carries "/init is at inum 7".  They stay
+behind an era-0 hypothesis.
+
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
 table at `inum` is `create_made ty major minor` and the parent's

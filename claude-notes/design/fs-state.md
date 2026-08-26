@@ -1299,8 +1299,11 @@ does not name and the accumulation cannot do without.
 - **`snap_ok S D = snap_bytes S D ∧ snap_local S`.**  `snap_bytes` is the
   byte tie (the superblock's block, the bitmap block at `bm_bytes`, the
   free blocks present, each inode's record at its own slot, its data
-  blocks, its indirect block) plus `sk_dom` / `sk_links` / `sk_bsz`, the
-  REPRESENTATION clauses and THE COUPLING.  It is true EVEN MID-OP and is
+  blocks, its indirect block) plus `sk_dom` / `sk_regdom` / `sk_links` /
+  `sk_bsz`, the REPRESENTATION clauses and THE COUPLING.  (`sk_regdom` is
+  lane E-boot's: `sk_dom` names the inums below `ninodes`, the boot mint
+  needs the inode REGION's width `16·(ninodes/16 + 1)` — a domain row, no
+  content.)  It is true EVEN MID-OP and is
   what a batch accumulates.  `snap_local` is the per-inode `inode_local`
   and does not mention `D` at all, so no write can disturb it.
   `fs_state_of_ledger` / `fs_snap_alloc` / `P_dur` and every spike reading
@@ -1660,7 +1663,13 @@ Left out, with the reason:
   the ONE mover for both the claim box and the corpse: only the record's
   bytes move, `nlink` is 0 on both sides so the auth passes through
   untouched, and `inode_local` of the target is re-established rather than
-  assumed.  There is deliberately no second lemma.
+  assumed.  There is deliberately no second lemma.  **Since lane E-boot
+  `inode_local`'s LAST clause `inl_bare_free` is the converse at type 0** —
+  a FREE node IS bare — which is what makes a free inum's abstract value the
+  canonical `InodeRegion.free_node` of its own record, the form the region
+  parks and the form a boot mint from the durable snapshot re-founds it at.
+  It swept nothing: `inode_local_bare` has `fn_bare` in hand and
+  `inode_local_of_ok` is vacuous at it (`inode_ok` carries `di_type ≠ 0`).
 - **`rec_owned_at Γ istart z dn`** is the geometry-free record ownership (64
   bytes at offset `64·(z mod 16)` of block `istart + z/16`), the
   `free_bitmap_at` pattern; `rec_owned` is its superblock reading

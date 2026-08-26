@@ -2243,6 +2243,81 @@ so it never wanted that shape.
     (region tail inums, free nodes bare, root keep-alive) witnessed at the
     image and supplied by the commit.  `xv6_power_adequacy`'s statement
     and `Himg` untouched.
+
+    **AS ATTEMPTED — E-boot: TWO CLAUSES LANDED, AND THE MINT IS BLOCKED BY
+    THE OLD LINK LEDGER (`DirLinks`), NOT BY THE SNAPSHOT.**  Boot order is
+    confirmed not to be a wall (the ruling's reading is right: at the clean
+    header `initlog` already carries, `D` IS the raw home blocks, so
+    `pool_blk`/`bytes_tie`/the mirror/`lm_view` all hold with the mint left
+    at PowerOn).
+
+    CLAUSE (2) IS `FsStateInode.inl_bare_free` — `fn_type n = 0 → fn_bare n`,
+    the LAST field of `inode_local`.  It cost NO sweep: the record has
+    exactly two constructors, `inode_local_bare` (which holds `fn_bare`
+    outright) and `FsStateEra.inode_local_of_ok` (VACUOUS at it, since
+    `FsStateEra.inode_ok` carries `di_type ≠ 0`), and every site in the tree
+    goes through one of them — the ~40-proof price CE priced is zero.
+    `fn_bare` moves up in `FsStateInode.v` to just before `inode_local`.
+
+    CLAUSE (1) IS `FsDurSnap.sk_regdom`, the LAST field of `snap_bytes`:
+    `0 ≤ i < 16·(ninodes/16 + 1) → is_Some (fss_inodes S !! i)`, the width
+    off `S`'s OWN superblock (a `snap_bytes` clause is a function of `S` and
+    `D` alone) and `ninodes/16 + 1` IS `nib`.  Image witness
+    `FsDurImg.img_snap_ok`; commit supplier `FsCollect.col_snap_bytes` off
+    `col_hand`'s domain row against ONE new `col_geom` field,
+    `cg_width : nib = ninodes/16 + 1` (LAST), discharged at both producers
+    (`FsCollectImg.img_col_geom`, `FirstTok.col_geom_of_image`) by a
+    hypothesis each already had.
+
+    CLAUSE (3), the ROOT's keep-alive slack, is NOT landed: its form is
+    `✓ (link_elem (fss_inodes S) ⋅ link_tok_elem ROOTINO 1)` beside
+    `sk_links` (one `own_alloc` then yields `fs_links` plus the spare token),
+    the image discharges it from `FsImg.fsimg_wf_root_link` through
+    `FsDurImg.img_link_valid`, and the COMMIT's supplier is the region's
+    `InodeRegion.ireg_keep` — a new `col_hand` row plus a new region opening
+    in `FsCollectAll`.  Only the mint consumes it, so under §7 it lands with
+    the mint.
+
+    THE MINT: the file-system predicate's content is `snap_ok`-reachable (the
+    node and abstract maps off `fs_boot_alloc_full`/`ftop_alloc` at
+    `fss_inodes S` + `snap_local`; the records and `ireg_alloc`'s
+    ∀-over-decodings premises off `sk_rec` + `rec_in_blk_inj` +
+    `inl_type`/`inl_nlink`/`inl_free`/`inl_bare_free`; the bitmap and pool off
+    `sk_bmap`/`sk_pool`/`fss_used`; the NEW link family off `sk_links`, which
+    IS `fs_links_alloc`'s premise, with `inode_link_iff` splitting it into the
+    region's authority and each directory's `ent_toks`, so `FsCfgBoot`'s ~350
+    lines of image ticket routing — `dir_links_of_*`, `ent_toks_of_*`,
+    `big_sepS_tick_route` — would have no reader left).  MEASURED, not built.
+    What is NOT reachable is the OLD ledger, and `iris/FsBootWall.v` is the
+    machine-checked statement: `IcacheBoot.ipool_alloc`'s per-inum bundle
+    wants `IcacheEscrow.dlinks`, whose first conjunct is
+    `DirLinks.dir_links`, and boot's only directory constructor is the
+    ALL-PLAIN stock `DirLinks.dir_links_of_plain` — at `F = λ _, false` the
+    flavour count is 0, so `dlc_bound` IS `nlink ≤ 1`
+    (`plain_stock_iff_nlink_le1`), false of any directory containing a
+    subdirectory since create's mkdir arm runs `dp->nlink++`
+    (`boot_plain_stock_refuted`); its other premise, "a live directory with a
+    `..` IS the root", fails the same way, and `dir_links_of_plain`'s own
+    header already says a rich post-crash image breaks it.  Region-side the
+    same fact is `IcacheBoot.image_dir_wl0` / `InodeRegion.ireg_dir_wl0`
+    (`boot_dir_wl0_refuted`), because `ireg_alloc` hands the region
+    `link_auth z (W z) 0 0 0 None 0 None …` — d-columns and parent register
+    at zero.  A d-flavoured `F` does not rescue it: `F` must indicate records
+    naming a DIRECTORY (cross-inode — the TARGET's type), `dlc_bound F` then
+    needs `nlink ≤ 1 + #subdirs`, the `dir_par_tie` registers must be minted
+    off record 1, and `ireg_alloc`'s ledger premise must admit nonzero
+    `wdu`/`wdt`.  Three FURTHER per-object clauses `ipool_alloc` needs and
+    `snap_ok` lacks: `DirView.dir_ok`, `dir_dots_ix` (POSITIONAL — records 0
+    and 1 ARE the dots, which `inl_dir_dot`/`inl_dir_dotdot` do NOT say:
+    those are about the name→inum view `dir_entries`, blind to which record
+    carries the name) and `dir_orphan_clean`; all three are re-proved at
+    every `iunlock` by the escrow's deposit arms, so each is a `snap_local`
+    sweep once the ledger question is settled.
+
+    CONSEQUENCE: **lane G's demolition of `DirLinks` precedes E-boot's mint**
+    (`IcacheEscrow.dlinks`' own header anticipates it — "when `DirLinks.v`
+    goes, this definition loses its first conjunct").  After it,
+    `dlinks = ent_toks` and the pool's bundle is `snap_ok`-reachable.
   - **E-recover** (fs-log.md stage 4) — real `n > 0` recovery in
     `initlog`/`install_trans` (`ProofInitlog`'s copy loop is dead code
     today; `SpecInstallTrans` restricts to `recovering = false ∨ n = 0`),
