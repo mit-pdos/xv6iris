@@ -2337,6 +2337,45 @@ Section EraRes.
       rewrite (bool_decide_ext (s' ∈ ({[s]} ∪ D)) (s' ∈ D)); [done | set_solver].
   Qed.
 
+  (* the LIVE arm's entry map, as a pure equation: the appended record
+     inserts exactly its own name.  [dir_entries_dirlink_grow]'s sharper
+     twin, and what a caller that has to show the NEW name is an entry
+     ([FsStateInode.ent_dset_ok] at a grown marker set) wants. *)
+  Lemma dir_entries_dirlink_ins (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : fname) (nrec k0 : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (length s <= 14)%nat -> nonul s ->
+    inum <> bv_0 16 ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    di_type dn' = di_type dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + 16)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + 16)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_first data nrec s = None ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    dir_entries (era_node dn' bm' data')
+    = <[s := bv_unsigned inum]> (dir_entries (era_node dn bm data)).
+  Proof.
+    intros Hnrec Hk0 Hlen Hs Hnz Hty Hty' Hsz Hrng Hnone Hh Hh' Hb Hb'.
+    assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
+      by (rewrite Hty'; exact Hty).
+    assert (Hents : dir_entries (era_node dn bm data) = dir_view data nrec).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Hty) Hnrec //. }
+    rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+      (bool_decide_eq_true_2 _ Hty2) Hents.
+    exact (dir_view_dirlink dn dn' data data' inum s nrec k0
+             Hnrec Hk0 Hlen Hs Hnz Hsz Hrng Hnone).
+  Qed.
+
   (* CREATE'S [dirlink(ip, "..", dp)] (durable-disk G5).  The one write in
      the kernel that MOVES a directory's [".."] target -- off [None], at
      the fresh child -- so it is the one write that has to RE-PIN the

@@ -8603,9 +8603,9 @@ Section ProofCreateMain.
     iAssert (dlinks γfs (bv_unsigned cinum)
                (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc)%I
       as "Hcdlnk0i".
-    assert (Hc1dok : FsStateInode.ent_dset_ok (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) ∅)
+    assert (Hc1dokE : FsStateInode.ent_dset_ok (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) ∅)
       by (intros tz Htz; exfalso; set_solver).
-    assert (Hc1xact : FsStateInode.node_exact (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) ∅).
+    assert (Hc1xactE : FsStateInode.node_exact (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) ∅).
     { intros _.
       assert (Hfn1 : fn_nlink (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) = 1%nat)
         by (rewrite /fn_nlink era_node_rec cr_setf_nlink;
@@ -8613,8 +8613,9 @@ Section ProofCreateMain.
       rewrite /fn_orphan Hfn1
         (bool_decide_eq_false_2 (1%nat = 0%nat) ltac:(lia)) size_empty //. }
     { rewrite /dlinks. iSplitR;
-        [| iExists ∅; iSplitR; [by iPureIntro |];
-           iSplitR; [by iPureIntro |];
+        [| rewrite /FsStateInode.ent_toks_x; iExists ∅;
+           iSplitR; [iPureIntro; exact Hc1dokE |];
+           iSplitR; [iPureIntro; exact Hc1xactE |];
            iApply FsStateEra.ent_toks_era_nrec0;
            rewrite cr_setf_size; exact Hcnrec0].
       rewrite /dir_links.
@@ -9858,8 +9859,12 @@ Section ProofCreateMain.
                     (* pin = false: mkdir's [dp->nlink++] is RULING A's one
                        free site -- a live directory the caller has locked --
                        so it pays the PURE arm (§3.9). *) false
-                    (FsStateInode.ent_par_val (bv_unsigned cinum)
-                       (bname 14 cr_dotdot_f))
+                    (* NO VALUE IS CHOSEN (lane G5): [dp]'s register already
+                       stands, and the unit that comes out carries whatever
+                       it holds -- which is all the child's [".."] entry
+                       needs ([FsStateInode.ent_ty_ok]'s dotdot arm is
+                       [True]). *)
+                    None
                     pidv
                     (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                     V4 (K - 10)%nat eb b lks
@@ -9870,12 +9875,8 @@ Section ProofCreateMain.
                           exact Hdntdir)
                     ltac:(intros Hc; discriminate Hc)
                     ltac:(intros pvw Hc; injection Hc as Hc; discriminate Hc)
-                    (* (U1)/(U2): THE one site in the kernel that mints an
-                       up-pointing unit.  [dp] is a directory and create's
-                       own orphan guard refused a [dp] at count zero. *)
-                    ltac:(intros _; split;
-                          [rewrite cr_setf_type Hp3ty; exact Hdntdir
-                          | exact Hp3nlnz])
+                    (* the FILL's premise: vacuous, nothing is filled *)
+                    ltac:(intros vz Hc; discriminate Hc)
                     Hmtbump Hmtgrd
                     Hmtaddr Hmtdirlen
                     Hj Hgs HV4a0 Heb
@@ -9889,7 +9890,10 @@ Section ProofCreateMain.
             rewrite /InodeRegion.ireg_link_pin. exact Hp3nlnz. }
           iIntros (CIDh7 Hsh7 mmt)
             "%Hcsmt Hcg Hcnt Hpc Hppid Hidev Hiinum Hmeta Hmap Hsbi Hdiat
-             Hilinkd Htokend Hpin Hbs2 Hop".
+             Hilinkd (%vend & [%Hvokend _] & Htokend) Hpin Hbs2 Hop".
+          (* [dp] is a LIVE directory, so its multiplicity rises by one *)
+          iEval (rewrite (InodeRegion.ireg_dot_delta_live _ _ Hp3nlnz)
+                         FsStateLink.link_reps_1) in "Htokend".
           (* THE COUNT'S LOWER BOUND AT THE BUMPED RECORD, and it has to be
              taken HERE: the [link_tok] the flush just minted is the only
              witness, and three lines below it is spent into the child's
@@ -9905,9 +9909,9 @@ Section ProofCreateMain.
                   (cr_setf dp3 (di_major dp3) (di_minor dp3)
                      (add_vec (di_nlink dp3 : mword 16)
                         (mword_of_int 1 : mword 16)))
-                  ltac:(solve_ndisj) Hdib
+                  vend ltac:(solve_ndisj) Hdib
                   with "Hiregi Hdiat Htokend")
-            as "(%Hmtnz & Hdiat & Htokend)".
+            as "([%Hmtnz _] & Hdiat & Htokend)".
           iModIntro.
           (* THE FUSED DEPOSIT, DEFERRED TO HERE (see the note at +0x13a):
              the read-back [Hmtnz] is what turns the machine's [++] into
@@ -9919,6 +9923,65 @@ Section ProofCreateMain.
           { rewrite cr_setf_nlink. rewrite <- Hp3nl.
             apply dlc_bv_add1_nz_eq.
             rewrite cr_setf_nlink in Hmtnz. exact Hmtnz. }
+          (* ============ THE MARKER SET AND THE ["."] RE-PIN ==========
+             Everything the two [dirlink]s below owe the type register, in
+             the ONE place where the walk still holds BOTH units the fill
+             minted (durable-disk G5).  [Htoken] is the second one -- the
+             first went into the child's ["."] entry at +0x10a -- and it is
+             what values the ["."] fragment by the register's own
+             agreement, which is what re-pins that fragment's clause when
+             [dirlink(ip, "..", dp)] moves the child's [".."] target. *)
+          assert (Htdirm : ty = SpecDirlookup.T_DIR).
+          { apply bv_eq. rewrite -Hc1ty Hc1tyd. reflexivity. }
+          destruct (dir_dots_miss_not_dots (bv_unsigned dind) dn data
+                      (bname 14 nf) Hdntdir Hdnnlnz Hddix Hnone)
+            as [Hnfd1m Hnfd2m].
+          assert (Hnfd'm : bname 14 nf <> DOT)
+            by (rewrite FsStateEra.DOT_dot; exact Hnfd1m).
+          assert (Hnfdd'm : bname 14 nf <> DOTDOT)
+            by (rewrite FsStateEra.DOTDOT_dotdot; exact Hnfd2m).
+          assert (HsDm : bname 14 nf ∉ D).
+          { intros Hin. destruct (Hdok0 _ Hin) as ([tt Htt] & _ & _).
+            rewrite (dir_entries_era_node dn bm data Hholes Hszcap)
+              (bool_decide_eq_true_2 _ Hdntdir)
+              (proj2 (dir_view_lookup_None data _ (bname 14 nf)) Hnone)
+              in Htt. discriminate. }
+          (* the child's marker set is EMPTY: its count is exact and one *)
+          assert (Hc1fn1 : fn_nlink (era_node dc1 bm1 dat1) = 1%nat)
+            by (rewrite /fn_nlink era_node_rec Hc1nl; vm_compute; reflexivity).
+          assert (Hc1dz : bv_unsigned (di_type dc1) = T_DIR_z)
+            by (rewrite Hc1tyd; vm_compute; reflexivity).
+          assert (Horph1 : fn_orphan (era_node dc1 bm1 dat1) = false)
+            by (rewrite /fn_orphan Hc1fn1
+                  (bool_decide_eq_false_2 (1%nat = 0%nat) ltac:(lia)) //).
+          assert (HDc1 : Dc1 = ∅).
+          { pose proof (Hcxact1 ltac:(rewrite /fn_is_dir /fn_type era_node_rec;
+                                      apply bool_decide_eq_true;
+                                      exact Hc1dz)) as Hex.
+            rewrite Hc1fn1 Horph1 in Hex.
+            assert (Hsz0 : size Dc1 = 0%nat) by lia.
+            apply size_empty_inv in Hsz0. set_solver. }
+          assert (Hdot1 : dir_entries (era_node dc1 bm1 dat1) !! DOT
+                          = Some (bv_unsigned cinum)).
+          { rewrite (dir_entries_era_node dc1 bm1 dat1 Hholes1 (Hcap1 Hccap))
+              (bool_decide_eq_true_2 _ Hc1dz) Hc1nrec -Hcl16 -Hd1inum.
+            replace DOT with (dir_bname dat1 0%nat)
+              by (rewrite /dir_bname Hd1name DOT_dot_name; reflexivity).
+            exact (dir_view_live dat1 1%nat 0%nat (Hc1duq Hc1dz)
+                     ltac:(lia) Hd1live). }
+          iDestruct (FsStateInode.ent_toks_dot_take (fs_gamma_L γfs)
+                       (bv_unsigned cinum) (era_node dc1 bm1 dat1) Dc1
+                       Hdot1 Horph1 with "Hcetk2")
+            as "[(%vdot0 & Hdot0) Hcnodot]".
+          iEval (rewrite (cr_delta_dir ty Htdirm)) in "Htoken".
+          iEval (rewrite FsStateLink.link_reps_1) in "Htoken".
+          iApply fupd_wp.
+          iMod (IregLinkNz.ireg_toks_agree ⊤ γi γfs inodestart nib cinum _
+                  vdot0 (cr_ity ty (bv_unsigned dind))
+                  ltac:(solve_ndisj) Hcinb
+                  with "Hiregi Hcdiat Hdot0 Htoken")
+            as "([%Hvdot0 _] & Hcdiat & Hdot0 & Htoken)".
+          iModIntro.
           iDestruct (dir_links_dirlink_d (bv_unsigned dind) dn
                        (cr_setf dp3 (di_major dp3) (di_minor dp3)
                           (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
@@ -9937,27 +10000,84 @@ Section ProofCreateMain.
                        (cr_low16 cinum) (bname 14 nf)
                        (dir_nrec (bv_unsigned (di_size dn)))
                        (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
-                       tot3 eq_refl eq_refl Hatom3
+                       tot3 D true eq_refl eq_refl Hatom3
                        (bname_length_le 14 nf) (cut_nul_nonul _)
                        Hdntdir Hp3ty Hp3nl Hp3szmax Hrng3 Hnone
-                       Hholes Hholes3 Hszcap (Hcap3 Hszcap)
-                       with "Hetk [Htoken Hptok]") as "Hetk".
+                       Hholes Hholes3 Hszcap (Hcap3 Hszcap) HsDm Hnfdd'm
+                       with "Hetk [Htoken]") as "Hetk".
           { iEval (rewrite -Hcl16) in "Htoken".
-            iEval (rewrite -Hcl16) in "Hptok".
             iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned dind)
-                      (fn_orphan (era_node dn bm data)) (bname 14 nf)
+                      (FsStateInode.fn_dd (era_node dn bm data))
+                      (fn_orphan (era_node dn bm data)) true (bname 14 nf)
                       (bv_unsigned (cr_low16 cinum))
-                      ltac:(intros _; apply fn_orphan_era_nz; exact Hdnnlnz)
-                      with "Htoken Hptok"). }
+                      (cr_ity ty (bv_unsigned dind))
+                      ltac:(apply FsStateInode.ent_ty_ok_name;
+                            [exact Hnfd'm | exact Hnfdd'm |
+                             exact (cr_ity_dir ty (bv_unsigned dind) Htdirm)])
+                      with "Htoken"). }
           iDestruct (ent_toks_era_nlink (fs_gamma_L γfs) (bv_unsigned dind)
                        dp3 (cr_setf dp3 (di_major dp3) (di_minor dp3)
                           (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16))) bm3 dat3
+                       ({[bname 14 nf]} ∪ D)
                        (cr_setf_type dp3 _ _ _) (cr_setf_size dp3 _ _ _)
                        ltac:(rewrite Hp3nl; exact Hdnnlnz)
                        ltac:(rewrite cr_setf_nlink;
                              rewrite cr_setf_nlink in Hmtnz; exact Hmtnz)
                        with "Hetk") as "Hetk".
-          iDestruct (dlinks_intro with "Hdlnk Hetk") as "Hdlnk".
+          (* THE COUNT AND THE MARKER SET RISE TOGETHER (G5's (D2), the
+             write half): the appended name IS a subdirectory's, and the
+             [++] two instructions back is what pays for it. *)
+          assert (Hins3 := dir_entries_dirlink_ins dn dp3 bm bm3 data dat3
+                     (cr_low16 cinum) (bname 14 nf)
+                     (dir_nrec (bv_unsigned (di_size dn)))
+                     (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
+                     eq_refl eq_refl
+                     (bname_length_le 14 nf) (cut_nul_nonul _) Hcl16nz
+                     Hdntdir Hp3ty ltac:(rewrite Hp3szmax Ht163; reflexivity)
+                     ltac:(rewrite Ht163 in Hrng3; exact Hrng3) Hnone
+                     Hholes Hholes3 Hszcap (Hcap3 Hszcap)).
+          assert (Hgrow3 := dir_entries_dirlink_grow dn dp3 bm bm3 data dat3
+                     (cr_low16 cinum) (bname 14 nf)
+                     (dir_nrec (bv_unsigned (di_size dn)))
+                     (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
+                     tot3 eq_refl eq_refl Hatom3
+                     (bname_length_le 14 nf) (cut_nul_nonul _)
+                     Hdntdir Hp3ty Hp3szmax Hrng3 Hnone
+                     Hholes Hholes3 Hszcap (Hcap3 Hszcap)).
+          assert (Hbumpdok : FsStateInode.ent_dset_ok
+                    (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
+                       (add_vec (di_nlink dp3 : mword 16)
+                          (mword_of_int 1 : mword 16))) bm3 dat3) ({[bname 14 nf]} ∪ D)).
+          { intros t Ht.
+            assert (Hents3 : dir_entries (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
+                       (add_vec (di_nlink dp3 : mword 16)
+                          (mword_of_int 1 : mword 16))) bm3 dat3)
+                             = dir_entries (era_node dp3 bm3 dat3))
+              by (rewrite /dir_entries /fn_is_dir /fn_type /fn_nrec /fn_size
+                    /fn_data !era_node_rec cr_setf_type cr_setf_size //).
+            rewrite Hents3.
+            destruct (decide (t = bname 14 nf)) as [-> | Hne].
+            - split_and!; [| exact Hnfd'm | exact Hnfdd'm].
+              rewrite Hins3 lookup_insert. by eexists.
+            - destruct (Hdok0 t ltac:(set_solver)) as (Hsome & Hd & Hdd).
+              split_and!; [exact (Hgrow3 t Hsome) | exact Hd | exact Hdd]. }
+          assert (Hbumpxact : FsStateInode.node_exact
+                    (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
+                       (add_vec (di_nlink dp3 : mword 16)
+                          (mword_of_int 1 : mword 16))) bm3 dat3) ({[bname 14 nf]} ∪ D)).
+          { apply (FsStateInode.node_exact_bump (era_node dn bm data)
+                     (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
+                       (add_vec (di_nlink dp3 : mword 16)
+                          (mword_of_int 1 : mword 16))) bm3 dat3) D (bname 14 nf)).
+            - rewrite /fn_is_dir /fn_type !era_node_rec cr_setf_type Hp3ty //.
+            - rewrite /fn_nlink !era_node_rec Hbumpeq.
+              pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+            - rewrite /fn_nlink era_node_rec. intros Hc. apply Hdnnlnz.
+              pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+            - exact HsDm.
+            - exact Hxact0. }
+          iDestruct (dlinks_intro _ _ _ _ _ ({[bname 14 nf]} ∪ D)
+                       Hbumpdok Hbumpxact with "Hdlnk Hetk") as "Hdlnk".
           assert (Hpcmt : ret_pc (V4 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x144)) by (rewrite HV4ra; pcw).
           iEval (rewrite Hpcmt) in "Hpc".
@@ -9990,26 +10110,55 @@ Section ProofCreateMain.
              minted goes into the child's [".."] entry (durable-disk
              2b-inode-5).  The [".."] side condition of
              [ent_tok_of_link] is the child's own [nlink = 1]. *)
-          iDestruct (ent_toks_dirlink_arm (fs_gamma_L γfs) (bv_unsigned cinum)
-                       dc1 dc2 bm1 bm2 dat1 dat2
-                       (cr_low16 dind) (bname 14 cr_dotdot_f)
-                       1%nat 1%nat tot2 (eq_sym Hc1nrec) (eq_sym Hc1k0)
-                       Hatom2
-                       (bname_length_le 14 cr_dotdot_f) (cut_nul_nonul _)
-                       ltac:(rewrite Hc1ty Htdir; vm_compute; reflexivity)
-                       Hc2ty0 Hc2nl0 Hc2szmax Hrng2
-                       (cr_first_miss_dotdot dat1 (cr_low16 cinum) Hwin1)
+          (* THE ["."] FRAGMENT IS RE-PINNED HERE (durable-disk G5): this
+             is the write that moves the child's [".."] target off [None],
+             so it is the one write in the kernel whose ["."] clause has to
+             be re-established.  The value comes from the agreement taken
+             above, against the sibling unit the fill minted. *)
+          assert (Hdlne1 : bv_unsigned (cr_low16 dind) <> bv_unsigned cinum)
+            by (rewrite Hdl16; intros Hc; apply Hcl16ne;
+                rewrite Hcl16; exact (eq_sym Hc)).
+          assert (Hdl16nz : cr_low16 dind <> bv_0 16).
+          { intros Hc. assert (Hz : bv_unsigned (cr_low16 dind) = 0)
+              by (rewrite Hc; vm_compute; reflexivity).
+            rewrite Hdl16 in Hz. exact (Hdindnz Hz). }
+          assert (Hddname : bname 14 cr_dotdot_f = DOTDOT)
+            by (rewrite ProofCreateParts.cr_dotdot_name DOTDOT_dotdot;
+                reflexivity).
+          iDestruct (ent_toks_dirlink_dotdot (fs_gamma_L γfs)
+                       (bv_unsigned cinum) dc1 dc2 bm1 bm2 dat1 dat2
+                       (cr_low16 dind) 1%nat 1%nat Dc1 vdot0
+                       (cr_ity ty (bv_unsigned dind))
+                       (eq_sym Hc1nrec) (eq_sym Hc1k0) Hdl16nz
+                       ltac:(rewrite Hc1ty Htdirm; vm_compute; reflexivity)
+                       Hc2ty0 Hc2nl0
+                       ltac:(rewrite Hc2szmax Htot162; reflexivity)
+                       ltac:(rewrite -Hddname;
+                             rewrite Htot162 in Hrng2; exact Hrng2)
+                       ltac:(rewrite -Hddname;
+                             exact (cr_first_miss_dotdot dat1
+                                      (cr_low16 cinum) Hwin1))
                        Hholes1 Hholes2 (Hcap1 Hccap) (Hcap2 (Hcap1 Hccap))
-                       with "Hcetk2 [Htokend Hptokd]") as "Hcetk3".
-          { iEval (rewrite -Hdl16) in "Htokend".
-            iEval (rewrite -Hdl16) in "Hptokd".
-            iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned cinum)
-                      (fn_orphan (era_node dc1 bm1 dat1))
-                      (bname 14 cr_dotdot_f) (bv_unsigned (cr_low16 dind))
-                      ltac:(intros _; apply fn_orphan_era_nz;
-                            rewrite Hc1nl; vm_compute; discriminate)
-                      with "Htokend Hptokd"). }
-          iDestruct (dlinks_intro with "Hcdlnk2 Hcetk3") as "Hcdlnk2".
+                       ltac:(rewrite HDc1; set_solver) Hdlne1 Hdot1 Horph1
+                       ltac:(rewrite -Hvdot0
+                                     (cr_ity_dir ty (bv_unsigned dind) Htdirm)
+                                     -Hdl16; reflexivity)
+                       with "Hcnodot Hdot0 [Htokend]") as "Hcetk3".
+          { iEval (rewrite -Hdl16) in "Htokend". iExact "Htokend". }
+          assert (Hc2dok : FsStateInode.ent_dset_ok
+                             (era_node dc2 bm2 dat2) Dc1)
+            by (rewrite HDc1; intros tz Htz; exfalso; set_solver).
+          assert (Hc2xact : FsStateInode.node_exact
+                              (era_node dc2 bm2 dat2) Dc1).
+          { intros _.
+            assert (Hfn : fn_nlink (era_node dc2 bm2 dat2) = 1%nat)
+              by (rewrite /fn_nlink era_node_rec Hc2nl;
+                  vm_compute; reflexivity).
+            rewrite Hfn /fn_orphan Hfn
+              (bool_decide_eq_false_2 (1%nat = 0%nat) ltac:(lia)) HDc1
+              size_empty //. }
+          iDestruct (dlinks_intro _ _ _ _ _ Dc1 Hc2dok Hc2xact
+                       with "Hcdlnk2 Hcetk3") as "Hcdlnk2".
           (* ===== +0x144 c.j +0xe0 : into ARM C-OK's own block ======= *)
           assert (Htg0e0 : add_vec (mword_of_int (CK + 0x144) : mword 64)
                     (sign_extend' 64 (sign_extend' 21
@@ -10414,11 +10563,34 @@ Section ProofCreateMain.
                                    (bname 14 nf)) !!! j)
                        (dir_nrec (bv_unsigned (di_size dn)))
                        (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
-                       0%nat eq_refl (dir_slot_le _ _) eq_refl
+                       0%nat D eq_refl (dir_slot_le _ _) eq_refl
                        Hp3ty Hp3nl Hp3szmax Hrng3
                        Hholes Hholes3 Hszcap (Hcap3 Hszcap)
                        with "Hetk") as "Hetk".
-          iDestruct (dlinks_intro with "Hdlnk Hetk") as "Hdlnk".
+          assert (Heqentm := dir_entries_dirlink_nop_eq dn dp3 bm bm3 data dat3
+                     (fun j => dirent_bytes (de_of_name (cr_low16 cinum)
+                                 (bname 14 nf)) !!! j)
+                     (dir_nrec (bv_unsigned (di_size dn)))
+                     (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
+                     0%nat eq_refl (dir_slot_le _ _) eq_refl
+                     Hp3ty Hp3szmax Hrng3
+                     Hholes Hholes3 Hszcap (Hcap3 Hszcap)).
+          assert (Hgrowm : forall s',
+                     is_Some (dir_entries (era_node dn bm data) !! s')
+                     -> is_Some (dir_entries (era_node dp3 bm3 dat3) !! s'))
+            by (intros s' Hs'; rewrite Heqentm; exact Hs').
+          iDestruct (dlinks_intro _ _ _ _ _ D
+                       ltac:(exact (FsStateInode.ent_dset_ok_grow _ _ D
+                                      Hgrowm Hdok0))
+                       ltac:(exact (FsStateInode.node_exact_cong
+                                      (era_node dn bm data)
+                                      (era_node dp3 bm3 dat3) D
+                                      ltac:(rewrite /fn_is_dir /fn_type
+                                              !era_node_rec Hp3ty //)
+                                      ltac:(rewrite /fn_nlink !era_node_rec
+                                              Hp3nl //)
+                                      Hxact0))
+                       with "Hdlnk Hetk") as "Hdlnk".
           iApply (wp_blt_x0_taken_s_sconf (mword_of_int (CK + 0x130))
                     (mword_of_int 22 : mword 13) Ra0 md3 (K - 10)%nat b
                     ltac:(nz)
