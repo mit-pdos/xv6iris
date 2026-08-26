@@ -2236,13 +2236,17 @@ so it never wanted that shape.
   "The header is clean at every boot" is refutable exactly as `Himg` is
   and must not be introduced.  Two lanes, and nothing is fixed until both
   land:
-  - **E-boot** — the era's instance minted at PowerOn FROM THE SNAPSHOT
-    (`fs_state_of_ledger_era` off `snap_ok S D` read through the crash
-    predicate; `L` minted = `D`), the `img_*` decoders confined to era 0
-    inside `P_fs_alloc`/`FsDurImg`, the three `snap_ok` clauses CE named
-    (region tail inums, free nodes bare, root keep-alive) witnessed at the
-    image and supplied by the commit.  `xv6_power_adequacy`'s statement
-    and `Himg` untouched.
+  - **E-boot** — the era's instance minted FROM THE SNAPSHOT inside
+    `fsinit` after `initlog` (plan §5 ruling; `fs_state_of_ledger_era` off
+    `snap_ok S D` read through the crash predicate), the `img_*` decoders
+    confined to era 0 inside `P_fs_alloc`/`FsDurImg`, the snapshot clauses
+    of lane E-clauses witnessed at the image and supplied by the commit.
+    `xv6_power_adequacy`'s statement and `Himg` untouched.  The era-0
+    exec-of-`/init` pins (`dv_pin`/`fv_pin`, `NameiInitPinned`/`DirViewPin`,
+    kexec-at-`/init`'s-entry) are DISABLED on the boot chain (commented
+    out, not deleted; owner) — the boot uses the generic exec contract at
+    whatever inum 7 holds; the port is handed to the fs-syscall-specs
+    project (`namei-pinned-lookup.md`'s banner).
 
     **AS ATTEMPTED — E-boot: TWO CLAUSES LANDED, AND THE MINT IS BLOCKED BY
     THE OLD LINK LEDGER (`DirLinks`), NOT BY THE SNAPSHOT.**  Boot order is
