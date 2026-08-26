@@ -42,14 +42,27 @@
    WP-time existential.  The contract stays GENERAL in [γ] -- it is the
    era fupd, not this statement, that instantiates [γ := icfg_log].
 
-   STAGE 2 IS THE CLEAN-IMAGE FORM.  The premise [hdr_n bs_hdr = 0] says the
-   on-disk header's [n] field reads zero -- true of a freshly mkfs'd image,
-   and of any image that was cleanly unmounted.  It makes read_head's copy
-   loop dead (blez at +0x40 taken), makes the [install_trans(1)] call return
-   from its own pre-frame test having done nothing, and makes the closing
-   [write_head] write a header that still says n = 0.  REAL RECOVERY -- a
-   committed on-disk log to install -- is stage 4, the consumer of the crash
-   receipt [P_fs] (claude-notes/design/fs-log.md).
+   THIS CONTRACT IS GENERAL IN [n], AND HAS BEEN SINCE durable-disk 1a.
+   There is NO clean-image premise: the header decodes to whatever it
+   decodes to, read_head's copy loop is LIVE, [install_trans(1)] installs
+   every entry, and the closing [write_head] clears a header that said [n].
+   What the contract asks about the header instead is [FsCrash.hdr_wf] at
+   the block's content (the three pure conjuncts below) -- true of a clean
+   image for free and delivered by the durable header invariant at a real
+   crash.
+
+   WHAT REAL RECOVERY COSTS THE CALLER, and it is the whole of what is left
+   of fs-log.md stage 4 item (1): initlog takes the ENTRIES' HOME BYTE RUNS
+   ([Bh i] below) and hands them back at the INSTALLED contents, because the
+   recovering install moves the logged view [L] from the crashed bytes to
+   the slots' logged bytes, one entry at a time.  A caller therefore has to
+   OWN the pending home blocks' byte elements across the call.  [fsinit] --
+   the only caller -- cannot: at a dirty log the pending set is not confined
+   to [FirstTok]'s coverage remainder, and every other home block's byte
+   elements were spent into the era's file-system instance at PowerOn.  That
+   is why [SpecFsinit] still carries [hdr_n bs_hdr = 0] and this file does
+   not; see SpecFsinit.v's premise (g) for the measurement and the two
+   exits.
 
    WHAT COMES IN, PIECE BY PIECE.
      - the two ARGUMENTS: a0 = dev (sign-extended, RV64 ABI), a1 = sb, plus
@@ -378,10 +391,15 @@ Definition wp_initlog_sconf_body
       pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
       (* only initlog's own working pair: the other 32 are the batch's pool *)
       bslots 2 -∗
-      (* the entries' home halves back, at the INSTALLED (logged) contents
-         -- existential, exactly as the slots' own halves came in *)
+      (* THE ENTRIES' HOME HALVES BACK, AT THE INSTALLED CONTENTS, NAMED.
+         This is recovery's COMPLETENESS claim in the form a boot mint can
+         consume: entry [i]'s home block holds log slot [i]'s content, which
+         the era's born-true mirror names, which is exactly [FsCrash.fr_D]'s
+         value there ([fs_install] writes the slot's bytes at the home
+         block).  It used to be an existential, which said only that the
+         run still existed. *)
       ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2,
-         ∃ bs : list (bv 8), fsblock (fs_bytes γfs) b bs) -∗
+         fsblock (fs_bytes γfs) b (lm_view M (log_slot_bno logstart i))) -∗
       (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
          initlog was handed is now sealed inside the "log" spinlock's
          resource.  No existential: the names came in, so the boot client

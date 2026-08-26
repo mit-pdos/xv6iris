@@ -345,14 +345,56 @@ Definition wp_fsinit_sconf_body
   bmapstart ∈ cov ->
   ~ (bmapstart ∈ log_region_set logstart) ->
   cov_below cov size ->
-  (* (g) initlog's STAGE-2 CLEAN-IMAGE precondition: the on-disk log header
-         says n = 0, so read_head's copy loop and install_trans's recovery
-         pass are both dead.  [SpecInitlog] itself no longer asks for it
-         (durable-disk 1a: initlog's contract is general and its recovering
-         arms are ghost no-ops); what still needs it HERE is fsinit's own
-         supply of the entries' home client halves, which at a dirty log
-         would have to be routed out of the coverage remainder by the
-         decoded write set.  That is old H3 and it is a separate lane. *)
+  (* (g) THE CLEAN-IMAGE PREMISE, AND WHY IT IS STILL HERE (lane E-recover's
+         measurement; durable-fs-plan.md section 5).  It says the on-disk log
+         header reads n = 0, so read_head's copy loop and install_trans's
+         recovery pass are both dead.  IT IS AS REFUTABLE AS [Himg] -- any
+         trace with a mid-commit crash boots on a dirty log -- so it may not
+         survive; but it cannot be deleted HERE, and the obstruction is not
+         in this file.
+
+         [SpecInitlog] has been general in n since durable-disk 1a: its copy
+         loop is live, [SpecInstallTrans] carries both arms at any n, and the
+         recovering install MOVES the logged view [L] entry by entry from the
+         crashed bytes to the slots' logged bytes.  The price is that initlog
+         takes the ENTRIES' HOME BYTE RUNS across the call.  fsinit is the
+         only caller, and at a dirty log it cannot supply them:
+
+           - a pending home block is any covered home block, so the pending
+             set is NOT confined to [FirstTok]'s coverage remainder (the
+             blocks the era mint did not spend).  The log's whole purpose is
+             to write blocks the file system owns;
+           - every other home block's byte run was spent into the era's
+             file-system instance in the PowerOn fupd -- distributed into
+             [InodeRegion.ireg_recs], the icache escrows, the pool and
+             [BitmapInv.bitmap_inv] -- and nothing short of the commit's
+             collection at quiescence takes them back out.
+
+         THE TWO EXITS, both of them rulings above this file:
+
+           (1) THE ERA'S BYTE VIEW IS MINTED AT [FsCrash.fr_D], not at the
+               crashed bytes.  Then recovery is a ghost no-op on [L] and
+               initlog needs no home runs -- but the CACHE map and the
+               physical disk still read the crashed bytes on the pending set,
+               so [FsBlocks.bytes_tie] (not [BioInv.pool_blk]: the disk and
+               the cache still agree) is false there until the recovering
+               install's bwrites land.  That exception set is WAL-owned, it
+               lives in [fs_bytes_body], the recovering install shrinks it
+               block by block, and it must be SEALED empty before any
+               crossing lemma ([fs_bytes_agree] and its four siblings) is
+               sound.  The seal has to reach all three carriers of the byte
+               row -- [LogInv.log_ctx], [BitmapInv.bitmap_inv],
+               [InodeRegion.ireg_inv] -- and the last two are minted at
+               PowerOn, before recovery has run.
+           (2) THE FILE-SYSTEM INSTANCE IS MINTED AFTER RECOVERY, inside
+               fsinit between initlog's return and ireclaim's call, out of
+               the whole home ledger threaded through this contract at the
+               crashed bytes.  Then [L] moves during recovery exactly as it
+               does today, no exception set exists, and this premise is
+               simply deleted.
+
+         Either way the ruling is about WHERE THE ERA'S INSTANCE IS BORN, and
+         it is [FsCfgBoot]/[BootShared]'s, not this file's. *)
   hdr_n bs_hdr = 0 ->
   (* (g') THE ERA'S TWO READINGS OF ONE IMAGE (durable-disk 1a): the logged
          view and the era's born-true mirror agree on the covered range.

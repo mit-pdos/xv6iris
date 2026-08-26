@@ -2233,15 +2233,20 @@ Section ProofInitlog.
         apply lookup_seq in Hy as [-> _].
         rewrite length_seq.
         iIntros "H". iExists _. iExact "H". }
-    (* the installed home halves, under the postcondition's existential *)
+    (* THE INSTALLED HOME HALVES, AT THE SLOTS' CONTENTS -- recovery's
+       completeness claim, named rather than existentially closed.  The
+       install returned each entry's run at [ys !!! i], and [Hysmir] is
+       what says that is the era's picture of log slot [i]. *)
     iAssert ([∗ list] i ↦ bb ∈ (hdr_dec bs_hdr).2,
-               ∃ bs0 : list (bv 8), fsblock (fs_bytes γfs) bb bs0)%I
+               fsblock (fs_bytes γfs) bb (lm_view M (log_slot_bno logstart i)))%I
       with "[Hhomes]" as "Hhomesout".
     { iEval (rewrite -(il_W_uint bs_hdr)).
       iEval (change (map uint ?l) with (uint <$> l)).
       iEval (rewrite big_sepL_fmap).
       iApply (big_sepL_mono with "Hhomes"). intros k y Hy.
-      iIntros "H". iExists _. iExact "H". }
+      assert (Hklt : (k < LOGBLOCKS)%nat).
+      { apply lookup_lt_Some in Hy. rewrite il_W_length in Hy. lia. }
+      rewrite -(Hysmir k Hklt). iIntros "H". iExact "H". }
     assert (Hpp70 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x6c) : mword 64) 4
                     = mword_of_int (KernelSyms.initlog + 0x70))
       by (apply bv_eq; vm_compute; reflexivity).
