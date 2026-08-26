@@ -548,7 +548,6 @@ Definition wp_dirlookup_tree_body
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
     (dpi : Z) (ents : gmap fname Z)                   (* THE TREE-LEVEL NODE *)
-    (D : gset fname)      (* the directory's own SUBDIRECTORY markers (G5) *)
 
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
@@ -625,9 +624,7 @@ Definition wp_dirlookup_tree_body
      conjunct for them, so they ride as their own premise; nothing in the
      tree builds an [fdir] anyway (FsTree.v's §"the demonstration
      layer"). *)
-  dir_links dpi dn data -∗
-  FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
-    (FsStateEra.era_node dn bm data) D -∗
+  dlinks γfs dpi dn bm data -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
@@ -645,9 +642,7 @@ Definition wp_dirlookup_tree_body
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslot -∗
-      dir_links dpi dn data -∗
-      FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
-        (FsStateEra.era_node dn bm data) D -∗
+      dlinks γfs dpi dn bm data -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
          survives because a caller needs it: sys_unlink names the offset
          [16k] with it, and iget's reference is at that record's inum. *)
@@ -693,7 +688,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
-      (dpi : Z) (ents : gmap fname Z) (D : gset fname)
+      (dpi : Z) (ents : gmap fname Z)
       (fn : nat -> bv 8)
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
@@ -701,7 +696,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                              γa γf cov logstart inodestart nib dev ip bm data dn
-                             dpi ents D fn hasp pofv pidv dq dqd dqn
+                             dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
@@ -709,7 +704,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
            Heb Hlkb.
     iIntros "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap Hfdir
              Hname Hpoff Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
-             Hitb2 Hitbl Hesc Hireg Hisl Hedges Hetk Hcont".
+             Hitb2 Hitbl Hesc Hireg Hisl Hedges Hcont".
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
     (* licence (c)'s only demand on the record: an allocated one.  The
        tree layer has it by construction -- a directory node's type is
@@ -717,15 +712,10 @@ Module FsLookupTree (DL : DIRLOOKUP).
     assert (Htynz : bv_unsigned (di_type dn) <> 0)
       by (rewrite (node_rep_dir ents dn data Hrep); unfold T_DIR_z; lia).
     (* the ticket list, re-keyed from the tree's [Z] to the region's word *)
-    iAssert (dir_links (bv_unsigned (inum_of dpi)) dn data)
-      with "[Hedges]" as "Hedges".
-    { rewrite (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     pose proof (inum_of_unsigned dpi Hdpi) as Hkeq.
-    iAssert (FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs)
-               (bv_unsigned (inum_of dpi)) (FsStateEra.era_node dn bm data))
-      with "[Hetk]" as "Hetk".
-    { rewrite Hkeq. iExact "Hetk". }
-    iDestruct (dlinks_intro with "Hedges Hetk") as "Hedges".
+    iAssert (dlinks γfs (bv_unsigned (inum_of dpi)) dn bm data)
+      with "[Hedges]" as "Hedges".
+    { rewrite Hkeq. iExact "Hedges". }
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
               γa γf cov logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
@@ -743,15 +733,12 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iIntros (CIDd Hgd mf found k kslot q)
       "%Hcs Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
        Hedges Hdiat Harm".
-    iDestruct (dlinks_open with "Hedges") as "[Hedges Hetk]".
-    iEval (rewrite Hkeq) in "Hetk".
-    iAssert (dir_links dpi dn data) with "[Hedges]" as "Hedges".
-    { rewrite (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
+    iEval (rewrite Hkeq) in "Hedges".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDd Hgd
                  with "Hcont") as "Hcont".
     iApply ("Hcont" $! mf found k kslot q
               with "[] Hcg Hcnt Hpc Hidev Hmeta Hmap
-                    [Hdiat Hblocks] Hname Hppid Hbslot Hedges Hetk [Harm]").
+                    [Hdiat Hblocks] Hname Hppid Hbslot Hedges [Harm]").
     - iPureIntro. exact Hcs.
     - iApply (fdir_intro γi γfs dpi ents dn bm data Hrep with "Hdiat Hblocks").
     - destruct found.

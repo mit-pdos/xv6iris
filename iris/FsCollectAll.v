@@ -453,7 +453,7 @@ Section CollectAll.
           ⌜~ ✓ (dq ⋅ dq)⌝
           ∗ ⌜node_dir_local z icfg_nib n⌝
           ∗ inode_owned_era_q γfs dq γi w n
-          ∗ ent_toks (fs_gamma_L γfs) z n.
+          ∗ ent_toks_x (fs_gamma_L γfs) z n.
   Proof.
     intros <-. iIntros "Ht Hs Hr".
     iApply (col_region_quiesce_take with "Ht Hs Hr").
@@ -483,7 +483,7 @@ Section CollectAll.
               [FsCollect.col_hand]'s last row, hence the SLACK in
               [FsDurSnap.sk_links].  It rides OUTSIDE the existential so
               that [big_sepS_sep] splits it off as its own column. *)
-           ∗ ireg_keep γfs z).
+           ∗ ∃ kv : ity, ireg_keep γfs z kv).
   Proof.
     induction Rs as [| z Rs Hnz IH] using set_ind_L; intros Hr.
     - iIntros "Ht Hm Hi _". rewrite !big_sepS_empty.
@@ -521,7 +521,8 @@ Section CollectAll.
      keep-alive fragment (durable-disk lane E-clauses). *)
   Lemma col_keeps_root (γfs : fs_names) (nib : nat) :
     ireg_root ∈ region_inums nib ->
-    ([∗ set] z ∈ region_inums nib, ireg_keep γfs z) -∗ ireg_keep γfs ireg_root.
+    ([∗ set] z ∈ region_inums nib, ∃ kv : ity, ireg_keep γfs z kv) -∗
+    ∃ kv : ity, ireg_keep γfs ireg_root kv.
   Proof.
     intros Hin. iIntros "H".
     rewrite (big_sepS_delete _ (region_inums nib) ireg_root Hin).

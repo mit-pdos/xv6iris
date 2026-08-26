@@ -1512,6 +1512,18 @@ Section InodeOwned.
     - destruct (ent_tokenless self true s t); iIntros "H"; done.
   Qed.
 
+  (* THE READING LICENCE (a) TAKES: at a LIVE home a record that does not
+     name the home carries a fragment, whatever its NAME is -- which is
+     what a [".."] lookup needs, since a non-root [".."] names the parent
+     and is not exempt. *)
+  Lemma ent_tokenless_ne self orph s t :
+    t <> self -> orph = false -> ent_tokenless self orph s t = false.
+  Proof.
+    intros Hne ->. rewrite /ent_tokenless
+      (bool_decide_eq_false_2 (t = self) Hne) /=.
+    by destruct (bool_decide (s = DOT)), (bool_decide (s = DOTDOT)).
+  Qed.
+
   Lemma ent_tok_open Γ self dd orph isd s t :
     ent_tokenless self orph s t = false ->
     ent_tok Γ self dd orph isd s t

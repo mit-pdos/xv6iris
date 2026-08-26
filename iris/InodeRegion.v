@@ -2408,6 +2408,19 @@ Section InodeRegion.
     if bool_decide (ty = ireg_dir_ty) && bool_decide (n = 0)
     then 2%nat else 1%nat.
 
+  Lemma ireg_dot_delta_not_dir (ty n : Z) :
+    ty <> ireg_dir_ty -> ireg_dot_delta ty n = 1%nat.
+  Proof.
+    intros H. rewrite /ireg_dot_delta (bool_decide_eq_false_2 _ H) //.
+  Qed.
+
+  Lemma ireg_dot_delta_live (ty n : Z) :
+    n <> 0 -> ireg_dot_delta ty n = 1%nat.
+  Proof.
+    intros H. rewrite /ireg_dot_delta (bool_decide_eq_false_2 (n = 0) H)
+      andb_false_r //.
+  Qed.
+
   Lemma ireg_mult_bump d d' :
     bv_unsigned (di_nlink d') = bv_unsigned (di_nlink d) + 1 ->
     bv_unsigned (di_type d') = bv_unsigned (di_type d) ->

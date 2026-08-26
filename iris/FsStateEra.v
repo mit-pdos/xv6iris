@@ -2799,40 +2799,40 @@ Section EraRes.
     bv_unsigned (di_nlink dn) <> 0 ->
     dir_first data (dir_nrec (bv_unsigned (di_size dn)))
       (dir_bname data k) = Some k ->
-    dir_bname data k <> DOT ->
-    dir_bname data k <> DOTDOT ->
     bv_unsigned (dir_inum data k) <> self ->
     blk_holes_zero bm data ->
     bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     ent_toks Γ self (era_node dn bm data) D -∗
-      ∃ ty, ⌜if bool_decide (dir_bname data k ∈ D)
-             then ty = TDir self else ty = TFile⌝
-            ∗ FsStateLink.link_tok Γ (bv_unsigned (dir_inum data k)) ty
+      ∃ ty, FsStateLink.link_tok Γ (bv_unsigned (dir_inum data k)) ty
             ∗ (FsStateLink.link_tok Γ (bv_unsigned (dir_inum data k)) ty
                -∗ ent_toks Γ self (era_node dn bm data) D).
   Proof.
-    intros Hty Hnl Hfirst Hnd Hndd Hne Hh Hsz.
+    intros Hty Hnl Hfirst Hne Hh Hsz.
     assert (Hlk : dir_entries (era_node dn bm data) !! dir_bname data k
                   = Some (bv_unsigned (dir_inum data k))).
     { rewrite (dir_entries_era_node dn bm data Hh Hsz)
         (bool_decide_eq_true_2 (bv_unsigned (di_type dn) = T_DIR_z) Hty)
         dir_view_lookup Hfirst //. }
+    assert (Htl : ent_tokenless self (fn_orphan (era_node dn bm data))
+                    (dir_bname data k) (bv_unsigned (dir_inum data k)) = false)
+      by exact (ent_tokenless_ne self _ _ _ Hne
+                  (fn_orphan_era_nz dn bm data Hnl)).
     rewrite /ent_toks.
     iIntros "H".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hlk with "H") as "[Ht Hback]".
-    iEval (rewrite (ent_tok_ne Γ self (fn_dd (era_node dn bm data))
+    iEval (rewrite (ent_tok_open Γ self (fn_dd (era_node dn bm data))
                       (fn_orphan (era_node dn bm data))
                       (bool_decide (dir_bname data k ∈ D))
                       (dir_bname data k)
-                      (bv_unsigned (dir_inum data k)) Hnd Hndd Hne)) in "Ht".
+                      (bv_unsigned (dir_inum data k)) Htl)) in "Ht".
     iDestruct "Ht" as (ty) "[Ht %Hok]".
-    iExists ty. iSplitR; [by iPureIntro |]. iFrame "Ht".
+    iExists ty. iFrame "Ht".
     iIntros "Ht". iApply "Hback".
-    iEval (rewrite (ent_tok_ne Γ self (fn_dd (era_node dn bm data))
+    iEval (rewrite (ent_tok_open Γ self (fn_dd (era_node dn bm data))
                       (fn_orphan (era_node dn bm data))
                       (bool_decide (dir_bname data k ∈ D))
                       (dir_bname data k)
-                      (bv_unsigned (dir_inum data k)) Hnd Hndd Hne)).
+                      (bv_unsigned (dir_inum data k)) Htl)).
     iExists ty. by iFrame.
   Qed.
 
