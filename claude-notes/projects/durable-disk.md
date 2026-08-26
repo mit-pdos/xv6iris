@@ -2319,18 +2319,16 @@ so it never wanted that shape.
   instantiates it at `(fn_rec n, bm_of n, fn_data n)`.  `BootShared`'s
   plumbing is ~14 code lines.  Consumers whose statements move:
   `fs_boot_image_wf`'s 20-odd sites and `fs_boot_supply`'s ~15.
-- [ ] **Lane D — the durability theorem, and its worked instance (plan §5).  DEFERRED (owner): runs AFTER lane E lands.**
-  The GENERAL statement is the commit's receipt itself: after a commit, the
-  current snapshot's abstract state IS the era's abstract state (the
-  `ftop_inv` map the transactions produced) — state it once as a theorem
-  over `P_dur_tie`/`P_dur_node_of_slot`, since every syscall spec already
-  states its effect on that map (`top_frag`/`ireg_top_retag`).  Then ONE
-  worked instance, `mknod_durable`: `ProofSysMknod` keeps `create`'s
-  `made` clause (today discarded at its `iDestruct`, ~`:1690`) and the
-  snapshot's inode at `inum` is `create_made ty major minor` with the
-  parent's entries containing `(name ↦ inum)`.  This lane is the vacuity
-  check of plan §7, not a step in lane E; other syscalls' durable
-  corollaries are the same two lines and are written only on request.
+- [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
+  individual syscalls (`mknod_durable` and its siblings) belong to the
+  file-system BEHAVIOUR specification project
+  ([`../design/fs-syscall-specs.md`](../design/fs-syscall-specs.md)), which
+  states every syscall's effect on the abstract state and subsumes them.
+  What this project leaves for it: `FsCrash.fs_commit_receipt` (after a
+  commit the snapshot's state is the abstract state the transactions
+  produced), `FsDurSnap.P_dur_tie`/`P_dur_node_of_slot`/
+  `snap_dir_entry_of_first` (the readings), and `SystemAdequacy.fs_boot_pure`
+  (`∃ S, snap_ok S D` at every reachable state).  Not worked here.
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two
