@@ -463,6 +463,21 @@ The count coupling `icnt_half z n` and the pin `ireg_ref_ok r rc n c d`
 `ireg_rcol` beside the authority, with `rc` existentially bound so no
 destructure site ever names it.
 
+**ALL NINE COLUMNS ARE STILL LIVE, and the reason is one file.**  The
+demolition (worklist lane G, slice 6d) would keep `c`/`r`/`rc`/`f` and
+drop `wl`/`wdu`/`wdt`/`g`/`p`, but every one of those five is read through
+`DirLinks.dir_links` — the first conjunct of `IcacheEscrow.dlinks`, which
+~40 payload sites carry: `dir_link_at` is `ilink ∨ (igrey ∗ nlink = 0)`,
+`dir_link_at_f` routes the flavoured ticket through `dlc_tick`
+(`ilinkdp`/`ilinkd`/`ilink`), and `dir_par_tie` is the `iparent` half of
+the `p` register.  So 6d is downstream of 6c (`dlinks` → `ent_toks`, the
+`DirLinks.v` deletion) and nothing narrower is available; the same holds
+for the `fl` index (6e), which is the flavour selector of the `ilink_fl`
+payout `SpecIupdate.wp_iupdate_link` hands the walks precisely so they can
+re-seal `dir_links`.  What DID come out ahead of 6c is in §3b′ (the (L1)
+readers) and the six caller-less instance wrappers of
+`InodeRegion.ireg_write_link_fl`/`_unlink_fl`.
+
 ### 3b′. The link-counting RA's per-inum AUTHORITY — `ireg_lnk`
 
 Beside the ledger above, and a different ghost entirely: `fs-state.md` §2's
@@ -528,13 +543,21 @@ directory whose count is ONE is not the root"; that is
 fed with the very token the zeroed entry just released
 (`FsStateEra.ent_toks_unlink`) and handing it straight back.
 
-**(L1) IS STILL READ, and that is what keeps it in `ireg_slot`.**  Its
-three consumers are `InodeRegion.ireg_link_ok_alloc` / `_free` (the
-ledger's own "an outstanding fragment means an ALLOCATED record" chain, at
-`ireg_link_alloc` and at the claim mover) and `IregLinkNz.ireg_link_nz`,
-whose callers are `ProofSysLinkTails` and `ProofCreate`.  All three read it
-against the icache ledger's `wl/wdu/wdt` columns, so (L1) can only go when
-those columns do.
+**(L1) IS STILL READ, BUT BY ONE CONSUMER NOW** (lane G, slice 6b).  The
+"a name means an ALLOCATED record" chain is off the ledger entirely:
+`InodeRegion.ireg_link_alloc` and `ireg_link_ok_alloc` are deleted (their
+reading is `ireg_lnk_tok_nz` + (L3), which is what `IgetLic`'s licence (a)
+already does), and the accessor at a record the caller NAMES is
+`IregLinkNz.ireg_tok_nz` — `link_tok` in, `1 ≤ nlink` out, the token
+borrowed and handed straight back, replacing the flavour pair
+`ireg_link_nz`/`_fl`.  Its two callers (`ProofSysLinkTails`' `nlink--`
+guard, `ProofCreate`'s read-back at the mkdir arm's `dp->nlink++`) gained
+no premise: `wp_iupdate_link` pays the token out beside the colour, and
+`wp_iupdate_unlink` takes it back.  The ONE reader left is
+`ireg_link_ok_free`: at a type-0 record (L1)+(L3) collapse `wl+wdu+wdt` to
+zero, and that collapse is what makes the claim mover's preservation of
+(T1)/(T1') legal for the record it writes.  So (L1) still goes exactly
+when the `wl/wdu/wdt` columns do, which is 6d, which is downstream of 6c.
 
 **BOOT SPENDS NO IMAGE SWEEP, AND W9 IS THE WHOLE ARITHMETIC.**
 `FsState.fs_boot_alloc_full` allocates the family at `FsCfgBoot.img_nodes`

@@ -2463,6 +2463,58 @@ so it never wanted that shape.
   listed; `fs_boot_bundle` (no callers); `SpecBfree`'s two dead premises
   are already gone.
 
+  **AS LANDED — G1 (6b, 6e-wrappers, 6f).  THE COLUMN DELETIONS 6d/6e ARE
+  DOWNSTREAM OF 6c AND NOTHING NARROWER EXISTS.**
+
+  Landed, whole tree green, `make audit-only` at the three-entry baseline:
+
+  - **6f.**  `FsRep.fedges` (a definitional restatement of
+    `DirLinks.dir_links`) and `FsRep.fedges_acc` are deleted — neither had
+    a consumer.  Contract changed: `FsLookup.wp_dirlookup_tree_body`'s
+    edge premise and its post's hand-back are spelt `dir_links dpi dn
+    data`.  The resource is unchanged and the premise cannot go: the body
+    feeds it to `IcacheEscrow.dlinks_intro` for the `dirlookup` call.
+    Nothing outside `FsLookup.v` consumes that body.
+  - **6b.**  `IregLinkNz.ireg_link_nz`/`ireg_link_nz_fl` are replaced by
+    `IregLinkNz.ireg_tok_nz`, which takes `FsStateLink.link_tok` and reads
+    `1 ≤ di_nlink` off `InodeRegion.ireg_lnk_tok_nz`.  Flavour-blind, so
+    the pair collapses to one; no caller gained a premise (both already
+    hold the token beside the colour).  Re-pointed: `ProofSysLinkTails`
+    (sys_link's `nlink--` guard) and `ProofCreate` (the mkdir arm's
+    `dp->nlink++` read-back).  Deleted with them:
+    `InodeRegion.ireg_link_alloc` (caller-less since `IgetLic`'s licence
+    (a) became a token reading), `InodeRegion.ireg_link_ok_alloc`,
+    `InodeRegion.ireg_rcol_wsum_ge`, `IcacheRef.link_wsum_ge`.
+    **(L1) itself STAYS**: its last reader is `ireg_link_ok_free`, which
+    collapses `wl+wdu+wdt` to 0 at a type-0 record — the step that makes
+    the claim mover's preservation of (T1)/(T1') legal for the record it
+    writes.  (L1) goes with the columns, not before.
+  - **6e, the wrapper half.**  The six caller-less instance wrappers of
+    the two flavour-indexed movers —
+    `InodeRegion.ireg_write_link`/`_d`/`_p` and
+    `ireg_write_unlink`/`_d`/`_p` — are deleted (260 lines).
+    `ProofIupdate` applies `ireg_write_link_fl`/`_unlink_fl` directly.
+
+  **BLOCKED, and the block is 6c, not the snapshot.**  Every one of 6d's
+  five columns is read through `DirLinks.dir_links`
+  (`iris/DirLinks.v:566`), the first conjunct of `IcacheEscrow.dlinks`
+  that ~40 payload sites carry and that the 6c ruling leaves in place for
+  lane G2: `dir_link_at` (`:120`) is `ilink ∨ (igrey ∗ nlink = 0)`;
+  `dir_link_at_f` (`:326`) routes the flavoured ticket through `dlc_tick`
+  (`:209`), which is `ilinkdp`/`ilinkd`/`ilink`; `dir_par_tie` (`:464`) is
+  the `iparent` half of the `p` register.  So `wl`/`wdu`/`wdt`/`g`/`p` and
+  the `linkElemUR0` narrowing (`Xv6Cameras.v:591`) all wait for `DirLinks`,
+  and so do the pure clauses on them (`ireg_link_ok`'s (L1),
+  `ireg_dir_ok`, `ireg_dir_wl0`, `ireg_par_ok`, `IcacheBoot.image_dir_wl0`
+  — `ireg_dir_wl0`'s reader `IregDirBit.ireg_link_not_dir` feeds
+  `ProofSysUnlink`'s rmdir arm, which the ruling also keeps).  The `fl`
+  index (6e proper) is in the same position: it is the flavour selector of
+  the `ilink_fl fl` payout `SpecIupdate.wp_iupdate_link_body`
+  (`SpecIupdate.v:1009`) hands the walks *so that they can re-seal
+  `dir_links`*, and `wp_iupdate_unlink_body` (`:1154`) spends the same
+  fragment.  **G2 should do 6c and 6d/6e in one lane**; splitting them
+  again buys nothing.
+
 ## Sizing notes for whoever runs the lanes
 
 - Big cones: `ProofEndOp` (commit path), `ProofInitlog` (2748 lines —
