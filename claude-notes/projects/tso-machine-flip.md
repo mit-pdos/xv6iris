@@ -1799,7 +1799,50 @@ context-free ledger, `Some ξ` = the registered one), sound because
 `ctx_phys_pointsto ξ … ⊢ phys_ledger …` is proven, so `Some ξ` is strictly
 stronger and the kernel invariant simply takes `None`.
 
-**This is `HartSKpt`'s blocker and it is a design decision, not a repair**,
+**DISPOSITION (owner, 2026-08-26): RATIFIED and LANDED in `PtTree.v`.**
+`Section PtTreeIris` gained `Context (PTT : option CtxId)` and the slot
+family
+
+    pt_slot_own a dq w := match PTT with
+                          | None    => phys_ledger_word a dq w
+                          | Some xi => ctx_phys_word_pointsto xi a dq w
+                          end
+
+with `pt_slot_own_forget` (BOTH tiers forget to the raw physical word,
+which is all the pure memory facts ever wanted of a slot — this is why the
+index costs the walk lane nothing) and the two `reflexivity` equations
+`pt_slot_own_Some` / `pt_slot_own_None` (needed because `iFrame` matches
+SYNTACTICALLY and will not iota-reduce a slot on its own).
+
+**THREE REALISATION NOTES, each of which saved a file-wide wave:**
+
+1. **The old names survive as NOTATIONS, not definitions.**
+   `Notation pt_page_own := (pt_page_own_at (Some TsoCtx.cur_ctx))` — and
+   likewise `ptree_own`, `pt_kids_own`, `pt_frame` and the eight
+   accessors.  A `Notation` is expanded AT THE USE SITE, so `cur_ctx`
+   resolves to the consumer's own ambient instance — the same trick the M1
+   flip used for `↦ₘ`.  That is what keeps ~50 consumer files textually
+   unchanged where a `Definition` would have changed every arity.
+2. **The notation must spell `TsoCtx.cur_ctx` QUALIFIED.**  `PtTree` does
+   `Require Import TsoCtx`, which does not re-export; a consumer that only
+   `Require`s `PtTree` has the module LOADED but not the names, so an
+   unqualified `cur_ctx` in the notation body fails at the use site with
+   an error that names neither file.
+3. **The slot got its own notation** (`a ↦ₚₜ{dq} w` for the user tier,
+   `↦ₖₜ` for the kernel one).  The consumers spelled a slot `a ↦ₚ₈{dq} w`
+   — an INFIX — while the tiered slot's head is a PREFIX, so without a
+   notation the conversion is a re-parenthesisation of every occurrence
+   rather than a token substitution.  (Measured the hard way: a regex over
+   the infix form mangled four continuation wands in `PtBuild`.)
+
+`PtTree.v` and `PtBuild.v` are GREEN.  `PtBuild.zero_page_to_node` — the
+node builder — now takes CTX bytes and is the file's tier decision in one
+line: **a fresh kalloc page is a THREAD's, so a node is built at the user
+tier, and installing it in the shared kernel table FORGETS the
+registration (`ctx_phys_word_ledger`), which is exactly right — it stops
+being any one thread's.**
+
+**This was `HartSKpt`'s blocker and it is a design decision, not a repair**,
 which is why it is reported rather than improvised.  The chain is
 `HartSKpt`'s `iAssert`-built `Hrdx`/`Hwr` seams → `PtTreeAdue`'s
 `xread_obl_ex`/`wpte_obl_at` (already ported, already bundle-carrying) →
@@ -1835,6 +1878,52 @@ whether the site owns bytes at all.  The register-only walks (the WFI
 loop, the waiting step, the trap prelude, the CSR windows) do not, and
 they are a large fraction of the ~60 `bytes_own` consumers.
 
+### A6.24 THE A/D WRITE-BACK'S CORE IS TIER-GENERIC, SO IT MUST TAKE ITS
+### PAYER RATHER THAN BE ONE — the new design class the A6.21 wave surfaced
+### (CHARACTERISED, NOT IMPLEMENTED)
+
+With A6.21 landed the wave runs clean down to ONE place, and it is a design
+point rather than a repair.
+
+**THE FACT.**  `KptTree.ptree_translateAddr_own` is the shared translation
+core.  It has exactly two callers — `KptShare.v:343` (the KERNEL page
+table, inside `kpt_inv`) and `UptTree.v:757` (a USER page table) — so it
+is used at BOTH of A6.21's tiers.  And it performs the Svadu A/D
+write-back itself, at `KptTree.v:1165`, with `phys_word_pointsto_write`
+against `gen_heap` alone.  Post-flip that store owes the append, and the
+lemma is at the wrong ALTITUDE to pay it: its statement is
+`reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ … ==∗ …` — an
+`mstate`-level fact with **no memory-model bundle anywhere in it**.
+
+**WHY IT CANNOT SIMPLY GAIN THE BUNDLE.**  The two tiers pay differently:
+
+  - kernel (`PTT = None`): `TsoCtx.ledger_store_ok` — no context, no token;
+  - user (`PTT = Some ξ`): `TsoCtx.ctx_store_win_ok` — needs
+    `own_context ξ`, which the translating thread does have (it is its own
+    page table) but which the kernel caller has no business supplying.
+
+A single bundle-carrying statement would have to demand the token
+unconditionally, and the kernel caller cannot honour it — it holds an
+invariant, not an identity.
+
+**THE SHAPE THAT WORKS, and it has a precedent in this very port.**  The
+core should not pay the append; it should **take the payer**, as a
+threaded premise of the shape
+
+    (∀ w', pt_slot_own PTT (pt_addr0 p1 vpn) (DfracOwn 1) p0 -∗ … ==∗
+           … ∗ pt_slot_own PTT (pt_addr0 p1 vpn) (DfracOwn 1) w')
+
+exactly as A6.9's consequence 1 already forced for `HartPilot`'s pilot
+rule ("its store's append is now a THREADED premise, not a discharged
+one").  Each caller then supplies its own tier's gate: `KptShare` supplies
+`ledger_store_ok`, `UptTree` supplies `ctx_store_win_ok` with the thread's
+token.  **This is the honest reading of A6.21: the INDEX says which ledger
+a slot is in, and the PAYER says who may move it.**
+
+Cost: one statement change on `ptree_translateAddr_own`, its two callers,
+and whatever hands them the interp (`PtTreeAdue` → `WpSmodePtEngine` →
+`SmodeCorePt`).  Reported rather than improvised, per the stop rule.
+
 ### A6.23 THE FRONTIER AFTER THE A6.18 TRANCHE
 
 **Two identical full `-k` sweeps** (the second compiled exactly the eight
@@ -1866,6 +1955,53 @@ fresh-green.**  Green this tranche: `HartSMem` (the Σ-seam's own file),
 A6.21 is the decision they wait on.  That is the honest shape of the
 remaining frontier: it is no longer a list of repairs, it is one
 parameterisation plus two small conversions plus one design item.
+
+### A6.25 THE FRONTIER AFTER THE A6.21 TRANCHE — THREE FILES, AND ONE OF
+### THEM IS THE ONLY REMAINING DESIGN ITEM ON THE PT LANE
+
+**Two identical full `-k` sweeps** (the second compiled exactly the three
+red retries and nothing else).  **THREE red files, 630 of 1330
+fresh-green.**
+
+    KptTree.v       A6.24 — the A/D write-back's core must TAKE its payer
+    WpTimerinit.v   A6.17 — the M-mode boot-stack threading cascade
+    WpUart.v        A6.9  — the DMA lease
+
+Green this tranche: `PtTree`, `PtBuild` (the A6.21 parameterisation
+itself), and — through the `swp_hmrun_of_exec_reg` form of A6.22 —
+`HartStepFull` and `UserTrap`.
+
+**READ THE RED SET CAREFULLY, AND DO NOT MISREAD IT AS I FIRST DID.**
+`HartSKpt`, `UserBytes`, `UmodeMem`, `PtWalkCert`, `ProcPtOwn`,
+`KstackOwn` and `WpSconfMem` have LEFT THE ERROR LIST WITHOUT BEING
+VERIFIED: their `.vo`s are still the stale Aug-25 ones, and they are
+simply BEHIND `KptTree` in the dependency DAG, which `make` never reached.
+They are neither green nor known-red.  The A6.21 index is what will make
+them reachable, but the evidence that it fixes them is not in yet — the
+first thing after A6.24 lands is to walk that list and check each.
+**A file dropping off a `-k` error list means one of two things, and only
+the `.vo` timestamp says which.**
+
+**THE COUNT WENT DOWN AGAIN (646 → 630) AND THE REASON IS THE ABOVE.**
+`KptTree` — which HAD been green — is a much deeper node than the files
+that left the error list, so its cone (the whole user-PT walk lane and
+everything above it, the other seven included) is now the blocked set.
+**Red-set size and fresh-green count move in opposite directions whenever
+a frontier file is replaced by a deeper one; neither number alone reads
+the progress, and the error list alone reads it wrongly.**  The honest
+measure here is that the remaining WORK is three named items — one design
+decision (A6.24) and two known cascades — with a seven-file verification
+pass behind the first of them.
+
+CAVEAT ON THE MEASUREMENT: three sweeps were briefly running CONCURRENTLY
+on this tree earlier in the session (a detached `make` outlived the
+command that started it).  Concurrent `make -j` on one tree can in
+principle leave a half-written `.vo` that is newer than its dependencies
+and so never rebuilt.  Sweeps L and M were run singly and agree, and the
+files compiled in them load hundreds of `.vo`s without complaint, so the
+tree is very likely clean — but a `make clean`-and-rebuild is the only
+thing that would prove it, and it has not been done.  **Do not start a
+sweep with `&` inside a compound command; use `setsid` and wait on it.**
 
 ## 7. Order of work
 
