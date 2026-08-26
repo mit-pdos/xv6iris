@@ -2337,6 +2337,106 @@ Section EraRes.
       rewrite (bool_decide_ext (s' ∈ ({[s]} ∪ D)) (s' ∈ D)); [done | set_solver].
   Qed.
 
+  (* CREATE'S [dirlink(ip, "..", dp)] (durable-disk G5).  The one write in
+     the kernel that MOVES a directory's [".."] target -- off [None], at
+     the fresh child -- so it is the one write that has to RE-PIN the
+     ["."] fragment's clause.  The caller hands the fragment back in at a
+     value it has PROVED ([IregLinkNz.ireg_toks_agree] against the sibling
+     the fill minted), and hands in the [".."] entry's own fragment, which
+     stands at the PARENT and is what [dp->nlink++] paid for.  Every other
+     entry is blind to [fn_dd] ([FsStateInode.ent_tok_dd_ne]).
+
+     THE RECORD IS LIVE HERE ([inum <> 0]): create's [dirlink] panics on
+     failure, and the dead-write arm has no [".."] to pin. *)
+  Lemma ent_toks_dirlink_dotdot (Γ : fs_view_names Σ) (i : Z)
+      (dn dn' : dinode) (bm bm' : blkmap)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (nrec k0 : nat) (D : gset fname) (vdot vp : ity) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    inum <> bv_0 16 ->
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + 16)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + 16)%nat)
+         then dirent_bytes (de_of_name inum DOTDOT) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_first data nrec DOTDOT = None ->
+    blk_holes_zero bm data -> blk_holes_zero bm' data' ->
+    bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+    DOTDOT ∉ D ->
+    bv_unsigned inum <> i ->
+    dir_entries (era_node dn bm data) !! DOT = Some i ->
+    fn_orphan (era_node dn bm data) = false ->
+    vdot = TDir (bv_unsigned inum) ->
+    FsStateInode.ent_toks_nodot Γ i (era_node dn bm data) D -∗
+    link_tok Γ i vdot -∗
+    link_tok Γ (bv_unsigned inum) vp -∗
+    ent_toks Γ i (era_node dn' bm' data') D.
+  Proof.
+    intros Hnrec Hk0 Hnz Hty Hty' Hnl Hsz Hrng Hnone Hh Hh' Hb Hb'
+           HddD Hpne Hdot Ho Hvdot.
+    assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
+      by (rewrite Hty'; exact Hty).
+    assert (Hents : dir_entries (era_node dn bm data) = dir_view data nrec).
+    { rewrite (dir_entries_era_node dn bm data Hh Hb)
+        (bool_decide_eq_true_2 _ Hty) Hnrec //. }
+    assert (Hents' : dir_entries (era_node dn' bm' data')
+                     = <[DOTDOT := bv_unsigned inum]> (dir_view data nrec)).
+    { rewrite (dir_entries_era_node dn' bm' data' Hh' Hb')
+        (bool_decide_eq_true_2 _ Hty2).
+      exact (dir_view_dirlink dn dn' data data' inum DOTDOT nrec k0
+               Hnrec Hk0 ltac:(rewrite /DOTDOT /=; lia)
+               ltac:(rewrite /nonul /DOTDOT;
+                     apply Forall_cons_2;
+                       [| apply Forall_cons_2; [| apply Forall_nil_2]];
+                     intros Hc;
+                     (assert (Hcu : bv_unsigned
+                                      (mword_of_int 46 : mword 8)
+                                    = bv_unsigned NUL)
+                        by (rewrite Hc; reflexivity));
+                     vm_compute in Hcu; discriminate Hcu)
+               Hnz Hsz Hrng Hnone). }
+    assert (Hfresh : dir_view data nrec !! DOTDOT = None)
+      by (apply dir_view_lookup_None; exact Hnone).
+    assert (Horph : fn_orphan (era_node dn' bm' data')
+                    = fn_orphan (era_node dn bm data))
+      by (rewrite /fn_orphan /fn_nlink !era_node_rec Hnl //).
+    assert (Hdd' : FsStateInode.fn_dd (era_node dn' bm' data')
+                   = Some (bv_unsigned inum))
+      by (rewrite /FsStateInode.fn_dd Hents' lookup_insert //).
+    assert (Hdotv : dir_view data nrec !! DOT = Some i)
+      by (rewrite -Hents; exact Hdot).
+    iIntros "Hrest Hdt Hpt".
+    rewrite /ent_toks Hents' Horph Ho Hdd'.
+    rewrite (big_sepM_insert _ (dir_view data nrec) DOTDOT
+               (bv_unsigned inum) Hfresh).
+    iSplitL "Hpt".
+    { iApply (FsStateInode.ent_tok_of_link Γ i (Some (bv_unsigned inum))
+                false (bool_decide (DOTDOT ∈ D)) DOTDOT (bv_unsigned inum) vp
+                (FsStateInode.ent_ty_ok_dotdot _ _ _ _) with "Hpt"). }
+    rewrite (big_sepM_delete _ (dir_view data nrec) DOT i Hdotv).
+    iSplitL "Hdt".
+    { iApply (FsStateInode.ent_tok_of_link Γ i (Some (bv_unsigned inum))
+                false (bool_decide (DOT ∈ D)) DOT i vdot
+                ltac:(apply FsStateInode.ent_ty_ok_dot;
+                      intros p q Hp Hq; rewrite Hvdot in Hp;
+                      injection Hp as <-; injection Hq as <-; reflexivity)
+                with "Hdt"). }
+    rewrite /FsStateInode.ent_toks_nodot Hents Ho.
+    iApply (big_sepM_mono with "Hrest"). intros s t Hs.
+    assert (Hne : s <> DOT)
+      by (intros ->; rewrite lookup_delete in Hs; discriminate).
+    iApply (FsStateInode.ent_tok_dd_ne Γ i
+              (FsStateInode.fn_dd (era_node dn bm data))
+              (Some (bv_unsigned inum)) false (bool_decide (s ∈ D)) s t Hne).
+  Qed.
+
   (* THE NO-WRITE ARM ([tot = 0]): the bytes did not move and neither did
      the record count, so the entry map -- hence the token map -- is the
      same one.  The [then] branch of the range clause is a PARAMETER, so a
@@ -2949,12 +3049,13 @@ Section EraRes.
         (bool_decide_eq_true_2 (i = i) eq_refl) //. }
     rewrite /ent_toks. iIntros "H".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hlk with "H") as "[Ht Hback]".
-    rewrite /FsStateInode.ent_tok Htl.
+    iEval (rewrite /FsStateInode.ent_tok Htl) in "Ht".
     iSplitL "Ht".
     - iDestruct "Ht" as (ty) "[Ht %Hok]". iExists ty. iFrame "Ht".
       iPureIntro. rewrite /FsStateInode.ent_ty_ok
         (bool_decide_eq_true_2 (DOT = DOT) eq_refl) in Hok. exact Hok.
-    - iIntros "Ht". iApply "Hback". rewrite /FsStateInode.ent_tok Htl.
+    - iIntros "Ht". iApply "Hback".
+      iEval (rewrite /FsStateInode.ent_tok Htl).
       iDestruct "Ht" as (ty) "[Ht %Hok]". iExists ty. iFrame "Ht".
       iPureIntro. rewrite /FsStateInode.ent_ty_ok
         (bool_decide_eq_true_2 (DOT = DOT) eq_refl). exact Hok.

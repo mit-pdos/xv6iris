@@ -748,6 +748,15 @@ Section InodeOwned.
     ([∗ map] s ↦ t ∈ dir_entries n,
        ent_tok Γ i (fn_dd n) (fn_orphan n) (bool_decide (s ∈ D)) s t)%I.
 
+  (* A DIRECTORY'S TOKENS WITHOUT ITS ["."] ONE (durable-disk G5).  The
+     ["."] fragment is the ONE entry whose clause reads [fn_dd], so it is
+     the one create's [dirlink(ip, "..", dp)] has to RE-PIN; this is the
+     rest of the map, which that write leaves alone. *)
+  Definition ent_toks_nodot Γ (i : Z) (n : fs_node) (D : gset fname)
+    : iProp Σ :=
+    ([∗ map] s ↦ t ∈ delete DOT (dir_entries n),
+       ent_tok Γ i (fn_dd n) (fn_orphan n) (bool_decide (s ∈ D)) s t)%I.
+
   (* ---------------------------------------------------------------- *)
   (*  4b. PER-DIRECTORY EXACTNESS (fs-state.md section 6.5's (D2))      *)
   (*                                                                    *)
@@ -1548,6 +1557,45 @@ Section InodeOwned.
   Qed.
 
   (* THE FORM A WALK HANDS IN. *)
+  (* every entry BUT ["."] is blind to the home's [".."] target *)
+  Lemma ent_ty_ok_dd_ne (self : Z) (dd dd' : option Z) (isd : bool)
+      (s : fname) (ty : ity) :
+    s <> DOT -> ent_ty_ok self dd isd s ty -> ent_ty_ok self dd' isd s ty.
+  Proof.
+    intros Hne. rewrite /ent_ty_ok (bool_decide_eq_false_2 (s = DOT) Hne).
+    done.
+  Qed.
+
+  Lemma ent_tok_dd_ne Γ self dd dd' orph isd s t :
+    s <> DOT ->
+    ent_tok Γ self dd orph isd s t -∗ ent_tok Γ self dd' orph isd s t.
+  Proof.
+    intros Hne. rewrite /ent_tok.
+    destruct (ent_tokenless self orph s t); [iIntros "Hx"; iExact "Hx" |].
+    iIntros "(%ty & Ht & %Hok)". iExists ty. iFrame "Ht". iPureIntro.
+    exact (ent_ty_ok_dd_ne self dd dd' isd s ty Hne Hok).
+  Qed.
+
+  (* THE ["."] FRAGMENT, TAKEN OUT (durable-disk G5).  Its clause is
+     discarded: the caller is about to MOVE the [".."] target, so the old
+     pin is worthless and the new one is re-established by
+     [FsStateEra.ent_toks_dirlink_dotdot] from the value the caller proves
+     against a sibling fragment it holds. *)
+  Lemma ent_toks_dot_take Γ (i : Z) (n : fs_node) (D : gset fname) :
+    dir_entries n !! DOT = Some i -> fn_orphan n = false ->
+    ent_toks Γ i n D -∗ (∃ v0, link_tok Γ i v0) ∗ ent_toks_nodot Γ i n D.
+  Proof.
+    intros Hlk Ho.
+    assert (Htl : ent_tokenless i (fn_orphan n) DOT i = false).
+    { rewrite /ent_tokenless Ho
+        (bool_decide_eq_true_2 (DOT = DOT) eq_refl)
+        (bool_decide_eq_true_2 (i = i) eq_refl) //. }
+    rewrite /ent_toks /ent_toks_nodot.
+    rewrite (big_sepM_delete _ (dir_entries n) DOT i Hlk).
+    iIntros "[Ht $]". rewrite /ent_tok Htl.
+    iDestruct "Ht" as (ty) "[Ht _]". iExists ty. iExact "Ht".
+  Qed.
+
   Lemma ent_tok_of_link Γ self dd orph isd s t ty :
     ent_ty_ok self dd isd s ty ->
     link_tok Γ t ty -∗ ent_tok Γ self dd orph isd s t.

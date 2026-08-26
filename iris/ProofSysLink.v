@@ -3063,10 +3063,9 @@ Section ProofSysLinkBody.
                                          (dir_nrec (bv_unsigned (di_size dnd)))
                                          (dir_slot datd
                                             (dir_nrec (bv_unsigned (di_size dnd))))
-                                         tot eq_refl eq_refl Hatom
+                                         tot Dd false eq_refl eq_refl Hatom
                                          (bname_length_le 14 nf) (cut_nul_nonul _)
-                                         ltac:(clear -Htyd; rewrite Htyd;
-                                               vm_compute; reflexivity)
+                                         Hdzd
                                          Htyeq Hnleq Hszmax Hrng Hnone
                                          (proj1 (proj2 (proj2 (proj2 (proj2
                                             (proj2 Hdiok))))))

@@ -5070,7 +5070,7 @@ Section ProofSysUnlinkBody.
        that token is exactly what pays for [ip->nlink--] below. *)
     assert (Hkknotdd : dir_bname datd kk <> DOTDOT).
     { rewrite /dir_bname Hkkname. intro Hc. apply Hnotdd.
-      rewrite Hc DOTDOT_dotdot_name. reflexivity. }
+      rewrite Hc DOTDOT_dotdot. reflexivity. }
     iDestruct (dlinks_open with "Hdlnkd")
       as "[Hdlnkd (%Dd & [%Hdokd %Hxactd] & Hetkd)]".
     iDestruct (ent_toks_unlink (fs_gamma_L gfs) (bv_unsigned dinum)
@@ -6776,7 +6776,7 @@ Section ProofSysUnlinkBody.
       rewrite Hc DOT_dot_name. reflexivity. }
     assert (Hkknotdd : dir_bname datd kk <> DOTDOT).
     { rewrite /dir_bname Hkkname. intro Hc. apply Hnotdd.
-      rewrite Hc DOTDOT_dotdot_name. reflexivity. }
+      rewrite Hc DOTDOT_dotdot. reflexivity. }
     (* ===== VERDICT #1 (dir arm): [dir_links_unlink] at the record the
        [+0x146] tail is ABOUT to flush -- the [b = true] flavour needs no
        refutation, because the [dp->nlink--] pays the unit.  It runs before
@@ -6876,15 +6876,12 @@ Section ProofSysUnlinkBody.
     assert (Hdoti : dir_entries (era_node dni bmi dati) !! DOT
                     = Some (bv_unsigned (zero_extend' 32
                         (dir_inum datd kk : mword 16) : mword 32))).
-    { rewrite Hentsi.
-      rewrite -(su_zext32_unsigned (dir_inum datd kk)) -Hself0i.
-      rewrite -{2}(DOT_dot_name) -Hname0i.
+    { rewrite Hentsi -Hself0i DOT_dot_name -Hname0i.
       exact (dir_view_live dati _ 0%nat (Hduqi Htyzi)
                ltac:(lia) Hlv0i). }
     assert (Hddi : FsStateInode.fn_dd (era_node dni bmi dati)
                    = Some (bv_unsigned (dir_inum dati 1%nat))).
-    { rewrite /FsStateInode.fn_dd Hentsi.
-      rewrite -{2}(DOTDOT_dotdot_name) -Hname1i.
+    { rewrite /FsStateInode.fn_dd Hentsi DOTDOT_dotdot -Hname1i.
       exact (dir_view_live dati _ 1%nat (Hduqi Htyzi) Hnrec2i Hlv1i). }
     iDestruct (ent_toks_era_borrow_dot (fs_gamma_L gfs)
                  (bv_unsigned (zero_extend' 32
@@ -6919,9 +6916,9 @@ Section ProofSysUnlinkBody.
                                apply bool_decide_eq_true; exact Htydz)) as Hex.
       rewrite /fn_nlink era_node_rec (fn_orphan_era_nz dnd bmd datd Hdplive)
         in Hex.
-      assert (Hsz1 : (1 <= size Dd)%nat).
-      { rewrite -(size_singleton (dir_bname datd kk)).
-        apply subseteq_size. set_solver. }
+      pose proof (subseteq_size {[dir_bname datd kk]} Dd
+                    ltac:(set_solver)) as Hsz1.
+      rewrite size_singleton in Hsz1.
       pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dnd))) as Hnn.
       lia. }
     (* ===== [ip] IS NOT THE ROOT: two fragments at its inum, and its own
@@ -6942,7 +6939,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite FsStateLink.link_toks_reps_S FsStateLink.link_reps_1)
       in "Hpair".
     iDestruct "Hpair" as "[Htokb Hdott]".
-    iEval (rewrite -Hvag) in "Hdott".
+    iEval (rewrite Hvag) in "Hdott".
     assert (Hipnroot : bv_unsigned (zero_extend' 32
                          (dir_inum datd kk : mword 16) : mword 32)
                        <> dl_root).
@@ -7039,11 +7036,12 @@ Section ProofSysUnlinkBody.
                                apply bool_decide_eq_true; exact Htydz)) as Hex.
       rewrite /fn_nlink era_node_rec (fn_orphan_era_nz dnd bmd datd Hdplive)
         in Hex.
-      assert (Hszd : size (Dd ∖ {[dir_bname datd kk]}) = (size Dd - 1)%nat).
-      { rewrite size_difference; [| set_solver]. rewrite size_singleton //. }
-      assert (Hsz1 : (1 <= size Dd)%nat).
-      { rewrite -(size_singleton (dir_bname datd kk)).
-        apply subseteq_size. set_solver. }
+      pose proof (subseteq_size {[dir_bname datd kk]} Dd
+                    ltac:(set_solver)) as Hsz1.
+      rewrite size_singleton in Hsz1.
+      pose proof (size_difference {[dir_bname datd kk]} Dd
+                    ltac:(set_solver)) as Hszd.
+      rewrite size_singleton in Hszd.
       rewrite /fn_nlink /fn_orphan era_node_rec.
       rewrite (fn_orphan_era_nz (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -7325,9 +7323,9 @@ Section ProofSysUnlinkBody.
                       : mword 64)) 31 0)))) bmi dati (bv_unsigned dinum) Di
                  (su_setnl_type _ _) (su_setnl_size _ _) Hnlzi Hnl2za
                  Htyzi Hhzi Hszcapi (Hduqi Htyzi) Hnrec2i Hlv1i
-                 ltac:(rewrite -DOTDOT_dotdot_name; exact Hname1i) Hpar
-                 Hlv0i ltac:(rewrite -DOT_dot_name; exact Hname0i)
-                 ltac:(rewrite -Hself0i su_zext32_unsigned; reflexivity)
+                 ltac:(rewrite DOTDOT_dotdot; exact Hname1i) Hpar
+                 Hlv0i ltac:(rewrite DOT_dot_name; exact Hname0i)
+                 Hself0i
                  ltac:(intro Hc; exact (Hz1ne (eq_trans Hpar Hc)))
                  with "Hetki")
       as "[(%tyup & Htokend) [(%tydot & Hdotf & %Hdotok) Hetki]]".

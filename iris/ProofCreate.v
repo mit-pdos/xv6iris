@@ -7782,12 +7782,20 @@ Section ProofCreateMain.
     assert (Hzcap : bv_unsigned (di_size (cr_setf dc major minor (mword_of_int 0 : mword 16)))
                     <= Z.of_nat MAXFILE * Z.of_nat BSIZE).
     { exact (proj1 (proj2 (proj2 (proj2 (proj2 Hciok))))). }
+    assert (Hzdok : FsStateInode.ent_dset_ok (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc datc) ∅)
+      by (intros tz Htz; exfalso; set_solver).
+    assert (Hzxact : FsStateInode.node_exact (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc datc) ∅).
+    { intros _.
+      assert (Hfn0 : fn_nlink (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc datc) = 0%nat)
+        by (rewrite /fn_nlink era_node_rec Hznl //).
+      rewrite /fn_orphan Hfn0
+        (bool_decide_eq_true_2 (0%nat = 0%nat) eq_refl) size_empty //. }
     iAssert (dlinks γfs (bv_unsigned cinum) (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc datc)
       with "[Hcdlnk]" as "Hcdlnk".
-    { iApply (dlinks_intro with "Hcdlnk []").
+    { iApply (dlinks_intro _ _ _ _ _ ∅ Hzdok Hzxact with "Hcdlnk []").
       iApply (FsStateEra.ent_toks_era_dots_only (fs_gamma_L γfs)
                 (bv_unsigned cinum) (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc datc
-                Hznl Hzholes Hzcap
+                ∅ Hznl Hzholes Hzcap
                 (dir_dots_only_of dc _ datc
                    ltac:(first [reflexivity
                                | rewrite cr_setf_size; reflexivity])
@@ -7860,15 +7868,12 @@ Section ProofCreateMain.
               V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab Htyz0
               Hdec
-              (* (U2): this arm writes [nlink = 0]. *)
-              ltac:(intros jz _; left; rewrite cr_setf_nlink;
-                    vm_compute; reflexivity)
               Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
                     Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink [Htoken] [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
-    { rewrite (cr_delta_eq ty major minor dnc (mword_of_int 0 : mword 16)
+    { rewrite (cr_delta_eq ty major minor dc (mword_of_int 0 : mword 16)
                  Htyc ltac:(vm_compute; reflexivity)). iExact "Htoken". }
     { iLeft. iSplit; iPureIntro; [exact Hglog | exact Hist]. }
     iIntros (CIDG4 HsG4 mfl)
@@ -8598,8 +8603,20 @@ Section ProofCreateMain.
     iAssert (dlinks γfs (bv_unsigned cinum)
                (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc)%I
       as "Hcdlnk0i".
-    { rewrite /dlinks. iSplitR; [| iApply FsStateEra.ent_toks_era_nrec0;
-                                   rewrite cr_setf_size; exact Hcnrec0].
+    assert (Hc1dok : FsStateInode.ent_dset_ok (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) ∅)
+      by (intros tz Htz; exfalso; set_solver).
+    assert (Hc1xact : FsStateInode.node_exact (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) ∅).
+    { intros _.
+      assert (Hfn1 : fn_nlink (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) = 1%nat)
+        by (rewrite /fn_nlink era_node_rec cr_setf_nlink;
+            vm_compute; reflexivity).
+      rewrite /fn_orphan Hfn1
+        (bool_decide_eq_false_2 (1%nat = 0%nat) ltac:(lia)) size_empty //. }
+    { rewrite /dlinks. iSplitR;
+        [| iExists ∅; iSplitR; [by iPureIntro |];
+           iSplitR; [by iPureIntro |];
+           iApply FsStateEra.ent_toks_era_nrec0;
+           rewrite cr_setf_size; exact Hcnrec0].
       rewrite /dir_links.
       destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
                   (mword_of_int 1 : mword 16))) = T_DIR_z)) as [_ | Hnd];
@@ -8810,21 +8827,71 @@ Section ProofCreateMain.
       (* ...and the counting RA's half: the ["."] record is a SELF record,
          so the entry it creates is TOKENLESS and no unit is spent
          (durable-disk 2b-inode-5, [FsStateInode.ent_tokenless]). *)
+      (* THE ["."] ENTRY OWES A FRAGMENT NOW (lane G5).  The fill minted
+         TWO -- this one and the one [dirlink(dp, name, ip)] files -- and
+         this one is what PINS the child's [".."] target once the next
+         [dirlink] writes it ([FsStateInode.ent_ty_ok]'s dot arm).  Its
+         clause is VACUOUS here: the child has no records at all, so its
+         [fn_dd] is [None]. *)
+      assert (Htdirc : ty = SpecDirlookup.T_DIR).
+      { apply bv_eq. rewrite -Htyc -(cr_setf_type dnc major minor
+          (mword_of_int 1 : mword 16)) Hcdz. vm_compute. reflexivity. }
+      assert (Hcfn1 : fn_nlink (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) = 1%nat)
+        by (rewrite /fn_nlink era_node_rec cr_setf_nlink;
+            vm_compute; reflexivity).
+      assert (HDc : Dc = ∅).
+      { pose proof (Hcxact ltac:(rewrite /fn_is_dir /fn_type era_node_rec;
+                                 apply bool_decide_eq_true; exact Hcdz)) as Hex.
+        rewrite Hcfn1 /fn_orphan Hcfn1
+          (bool_decide_eq_false_2 (1%nat = 0%nat) ltac:(lia)) in Hex.
+        assert (Hsz0 : size Dc = 0%nat) by lia.
+        apply size_empty_inv in Hsz0. set_solver. }
+      assert (Hcents0 : dir_entries (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) = ∅).
+      { rewrite /dir_entries.
+        destruct (fn_is_dir (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc)); [| reflexivity].
+        change (fn_nrec (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc))
+          with (dir_nrec (bv_unsigned (di_size (cr_setf dnc major minor (mword_of_int 1 : mword 16))))).
+        rewrite cr_setf_size Hcnrec0 dir_view_nil //. }
+      assert (Hcddnone : FsStateInode.fn_dd (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc) = None)
+        by (rewrite /FsStateInode.fn_dd Hcents0 lookup_empty //).
+      iEval (rewrite (cr_delta_dir ty Htdirc)
+                     FsStateLink.link_toks_reps_S FsStateLink.link_reps_1)
+        in "Htoken".
+      iDestruct "Htoken" as "[Htokdot Htoken]".
       iDestruct (ent_toks_dirlink_arm (fs_gamma_L γfs) (bv_unsigned cinum)
                    (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dc1
                    bmc bm1 datc dat1 (cr_low16 cinum) (bname 14 cr_dot_f)
-                   0%nat 0%nat tot1 (eq_sym Hcnrec0) (eq_sym Hck0) Hatom1
+                   0%nat 0%nat tot1 Dc false (eq_sym Hcnrec0) (eq_sym Hck0)
+                   Hatom1
                    (bname_length_le 14 cr_dot_f) (cut_nul_nonul _)
                    Hcdz Hc1ty0 Hc1nl0 Hc1szmax Hrng1
                    (cr_first_0 datc (bname 14 cr_dot_f))
                    Hcholes Hholes1 Hccap (Hcap1 Hccap)
-                   with "Hcetk []") as "Hcetk1".
-      { iApply (ent_tok_self_of (fs_gamma_L γfs) (bv_unsigned cinum)
-                  (fn_orphan (era_node
-                     (cr_setf dnc major minor (mword_of_int 1 : mword 16))
-                     bmc datc))
-                  (bname 14 cr_dot_f) (bv_unsigned (cr_low16 cinum)) Hcl16). }
-      iDestruct (dlinks_intro with "Hcdlnk1 Hcetk1") as "Hcdlnk1".
+                   ltac:(rewrite HDc; set_solver)
+                   ltac:(rewrite ProofCreateParts.cr_dot_name -DOT_dot_name;
+                         exact FsStateInode.dot_ne_dotdot)
+                   with "Hcetk [Htokdot]") as "Hcetk1".
+      { iEval (rewrite -Hcl16) in "Htokdot".
+        iApply (ent_tok_of_link (fs_gamma_L γfs) (bv_unsigned cinum)
+                  (FsStateInode.fn_dd (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc))
+                  (fn_orphan (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc)) false
+                  (bname 14 cr_dot_f) (bv_unsigned (cr_low16 cinum))
+                  (cr_ity ty (bv_unsigned dind))
+                  ltac:(rewrite Hcddnone;
+                        apply FsStateInode.ent_ty_ok_dot_none)
+                  with "Htokdot"). }
+      assert (Hc1dok' : FsStateInode.ent_dset_ok (era_node dc1 bm1 dat1) Dc)
+        by (rewrite HDc; intros tz Htz; exfalso; set_solver).
+      assert (Hc1xact' : FsStateInode.node_exact (era_node dc1 bm1 dat1) Dc).
+      { intros _.
+        assert (Hfn : fn_nlink (era_node dc1 bm1 dat1) = 1%nat)
+          by (rewrite /fn_nlink era_node_rec Hc1nl0 -era_node_rec
+                      -/(fn_nlink (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc datc)); exact Hcfn1).
+        rewrite Hfn /fn_orphan Hfn
+          (bool_decide_eq_false_2 (1%nat = 0%nat) ltac:(lia)) HDc
+          size_empty //. }
+      iDestruct (dlinks_intro _ _ _ _ _ Dc Hc1dok' Hc1xact'
+                   with "Hcdlnk1 Hcetk1") as "Hcdlnk1".
       (* THE FIRST LINK ALLOCATED, and the whole arm's ledger rests on it *)
       assert (Hc1sz : bv_unsigned (di_size dc1) = 16).
       { rewrite Hc1szmax Hcsz0 Ht161. lia. }
