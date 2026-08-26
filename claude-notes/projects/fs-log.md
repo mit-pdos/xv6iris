@@ -13,6 +13,18 @@
 > a dirty log), tracked as durable-disk's "old H3". Items (2) and the
 > phase-D2 decision stand. Read the passages naming the deleted family as
 > history.
+>
+> RE-AUDITED (lane E-recover): the log layer's half is confirmed complete —
+> `SpecInitlog` asks for `FsCrash.hdr_wf` at the header block and nothing
+> about `n`, the copy loop is live, `SpecInstallTrans` carries both arms at
+> any `n`, the recovering install runs `fs_install_v_seq_permit` per entry
+> and the closing `write_head` runs `fs_clear_keep_seq_permit`, and initlog
+> now returns each entry's home byte run AT THE INSTALLED CONTENTS by name
+> (`lm_view M (log_slot_bno logstart i)`, which `FsCrash.fs_install_hit`
+> reads as `fr_D`'s own value there) instead of under an existential.  What
+> is left of item (1) is `SpecFsinit`'s premise (g) alone, and it is a
+> RULING about where the era's file-system instance is born — see that
+> premise's comment for the measurement and the two exits.
 
 > **Audited 2026-08-22 — STILL OPEN, and it is proof work, not cleanup.**
 > What remains: (1) real `n > 0` recovery — `SpecInitlog.v:164` still takes

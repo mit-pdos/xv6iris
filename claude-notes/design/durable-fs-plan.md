@@ -281,15 +281,52 @@ premise of the theorem — no "clean header at every boot" trace
 assumption exists or may be added.  `Himg` stays in the theorem's
 statement until real recovery lands and both go together; the
 theorem's assumption list is then era 0's image and nothing else
-(the `make audit-only` baseline is the check).  Real recovery (`n > 0`) is where the
-pre-install window appears: the ≤ LOGSIZE pending home blocks read raw on
-the physical disk while `L = D` says otherwise.  That discrepancy is the
-WAL's to carry — it owns the physical disk and the log region inside the
-crash predicate and knows the pending set exactly — as a WAL-owned
-exception set on `pool_blk`/`bytes_tie` that `install_trans` shrinks block
-by block; the same shape as the runtime mid-install state, where the
-physical disk lags `L` on dirty buffers.  That is stage 4's design; it
-does not move the mint.
+(the `make audit-only` baseline is the check).
+
+**REAL RECOVERY IS LANDED AT THE LOG LAYER, AND WHAT IS LEFT IS THIS
+RULING** (lane E-recover's measurement).  `initlog`/`install_trans` are
+general in `n` today: the copy loop is live, the recovering install runs
+`FsCrash.fs_install_v_seq_permit` per entry and the closing `write_head`
+runs `fs_clear_keep_seq_permit`, and initlog returns each entry's home byte
+run at the INSTALLED contents by name.  The price is that the recovering
+install MOVES the era's byte view `L` from the crashed bytes to the slots'
+logged bytes, so initlog's caller must own the pending home blocks' byte
+runs across the call — and `fsinit`, the only caller, cannot, because a
+pending block is any covered home block (not just one of `FirstTok`'s
+coverage remainder) and every other home run was spent into the era's
+instance in the PowerOn fupd.  That is the whole of why `SpecFsinit` still
+carries `hdr_n = 0`, and it is a ruling about WHERE THE ERA'S INSTANCE IS
+BORN, with two exits:
+
+- **`L` minted at `D` (the mint stays at PowerOn).**  Recovery is then a
+  ghost no-op on `L` and initlog needs no home runs.  The exception set is
+  on `FsBlocks.bytes_tie`, NOT on `BioInv.pool_blk`: the CACHE map and the
+  physical disk still agree at the crashed bytes on the pending set, so the
+  pool's disk-cell tie is honest and it is the cache-against-byte-view row
+  that is false there.  It lives in `fs_bytes_body`, the recovering install
+  shrinks it block by block (moving the CACHE map, not `L`), and it must be
+  SEALED empty before any crossing lemma (`fs_bytes_agree` and its four
+  siblings) is sound — which means the seal has to reach all three carriers
+  of the byte row, `LogInv.log_ctx`, `BitmapInv.bitmap_inv` and
+  `InodeRegion.ireg_inv`, and the last two are minted at PowerOn, before
+  recovery has run.  Footprint: `fs_bytes_inv` in 14 files, ~28 crossing
+  sites, `fs_names` one field.
+- **The instance minted AFTER recovery**, inside `fsinit` between initlog's
+  return and `ireclaim`'s call, out of the whole home ledger threaded
+  through `SpecFsinit` at the crashed bytes.  No exception set exists at
+  all, `L` moves during recovery exactly as it does today, and the premise
+  is simply deleted.  The gnames still come from `fs_cfg_alloc` at PowerOn;
+  what moves is only the DISTRIBUTION into region/bitmap/escrow/pool.
+
+**AND EITHER WAY, ONE DURABLE INVARIANT IS STILL MISSING:** the on-disk
+log's write set never names BLOCK 1.  `fsinit` reads the superblock off the
+RAW disk at `readsb`, before recovery has run, so `first_fsinit_pures`'
+superblock facts are about the raw bytes while the snapshot describes `D`;
+without `1 ∉ (hdr_dec …).2` those two cannot be identified, and `hdr_wf`
+does not say it (it says only "covered home blocks").  It is provable —
+block 1's run sits at fraction 1 in `SbPark.sb_park` inside `log_ctx`, so
+no `log_write` can ever name it — but it costs a row in `LogInv.log_state`,
+the refutation at `log_write`, and a conjunct on `hdr_wf`.
 
 **THE SNAPSHOT'S TIE WAS THREE CLAUSES SHORT; TWO ARE LANDED (lane E-boot).**
 Measured against `fs_cfg_alloc`'s premises, every one is supplied by a `sk_*`

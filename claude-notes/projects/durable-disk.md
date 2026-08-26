@@ -2319,15 +2319,65 @@ so it never wanted that shape.
     goes, this definition loses its first conjunct").  After it,
     `dlinks = ent_toks` and the pool's bundle is `snap_ok`-reachable.
   - **E-recover** (fs-log.md stage 4) — real `n > 0` recovery in
-    `initlog`/`install_trans` (`ProofInitlog`'s copy loop is dead code
-    today; `SpecInstallTrans` restricts to `recovering = false ∨ n = 0`),
-    with the WAL-owned exception set on `pool_blk`/`bytes_tie` for the
+    `initlog`/`install_trans`, with the WAL-owned exception set for the
     ≤ LOGSIZE pending home blocks that `install_trans` shrinks (plan §5);
     `SpecInitlog`/`SpecFsinit`/`FirstTok` lose `hdr_n = 0`; THEN delete
     `Himg`/`fs_boot_image_eras`/`fsimg_at_every_era`.  Definition of
     done: `xv6_power_adequacy` assumes era 0's image (`fs_boot_image_wf`
     at `g`'s disk, once) and nothing else; `make audit-only` at the
     three-entry baseline.
+
+    **AS LANDED (E-recover, first pass).**  The lane's premise was wrong
+    about the tree: `SpecInitlog` has carried NO clean-image premise since
+    1a (it asks for `FsCrash.hdr_wf` at the header block), `ProofInitlog`'s
+    copy loop is LIVE, and `SpecInstallTrans` carries both arms at any `n`
+    — the `recovering = false ∨ n = 0` restriction is gone.  The recovering
+    install runs `fs_install_v_seq_permit` per entry and the closing
+    `write_head` runs `fs_clear_keep_seq_permit`, as fs-log.md's banner
+    says.  What landed here: initlog's post returns each entry's home byte
+    run AT THE INSTALLED CONTENTS by name, `lm_view M (log_slot_bno
+    logstart i)` — recovery's completeness claim, which `fs_install_hit`
+    reads as `fr_D`'s own value there — instead of under an existential
+    (`SpecInitlog.wp_initlog_sconf_body`'s post; `ProofInitlog` proves it
+    off its own `Hysmir`).  No other contract's statement moved.
+
+    **THE WALL, and it is a RULING, not proof work.**  `SpecFsinit`'s
+    `hdr_n bs_hdr = 0` cannot be deleted from below.  The recovering
+    install MOVES the era's byte view `L` from the crashed bytes to the
+    slots' logged bytes, so initlog's caller must own the pending home
+    blocks' byte runs across the call; `fsinit` cannot, because a pending
+    block is any covered home block — not just one of `FirstTok`'s
+    coverage remainder — and every other home run was spent into the era's
+    instance in the PowerOn fupd.  The two exits are written out in
+    `SpecFsinit.v`'s premise (g) and in plan §5, which this pass rewrote:
+    (1) mint `L` at `D` and carry a WAL-owned exception set — and the
+    measurement says it lands on `FsBlocks.bytes_tie`, NOT on
+    `BioInv.pool_blk` (the cache map and the disk still agree at the
+    crashed bytes, so the pool's tie is honest), with the cost being a
+    SEAL that must reach all three carriers of the byte row (`log_ctx`,
+    `bitmap_inv`, `ireg_inv`) of which the last two are minted at PowerOn;
+    (2) mint the era's instance AFTER recovery inside `fsinit`, out of the
+    whole home ledger threaded through its contract — no exception set at
+    all.  Exit (2) is strictly cheaper at the WAL and moves E-boot's mint;
+    exit (1) keeps the mint and pays ~28 crossing sites plus a seal in two
+    PowerOn-minted invariants.
+
+    **AND A SEPARATE MISSING INVARIANT, needed under BOTH exits:** the
+    on-disk log's write set never names BLOCK 1.  `fsinit` reads the
+    superblock off the RAW disk at `readsb`, before recovery runs, while
+    the snapshot describes `D`; `hdr_wf` says only "covered home blocks".
+    Provable (block 1 sits at fraction 1 in `SbPark.sb_park` inside
+    `log_ctx`, so no `log_write` can name it), but it costs a row in
+    `LogInv.log_state`, the refutation at `log_write`, and a conjunct on
+    `hdr_wf`.  Nobody has scoped it.
+
+    **Item 4's grep (what still depends on the image at an era > 0):**
+    nothing in any contract this lane touched.  The whole era > 0
+    dependency is `BootShared.boot_shared_alloc`'s `fs_boot_image_wf`
+    premise, fed at every era from `SystemAdequacy.v:314` via `:560`/`:735`
+    (`Himg g' Hbf`), from which `FirstTok.first_fsinit_pures_of_image`
+    produces both `hdr_n = 0` and the superblock image facts.  That is
+    E-boot's lane.
 - [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
   individual syscalls (`mknod_durable` and its siblings) belong to the
   file-system BEHAVIOUR specification project

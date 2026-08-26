@@ -49,6 +49,24 @@ before it) holds the cache's parked half `fs_chalf`.
 | `fs_dirty` | second `ghost_map` in `fs_names` | per-block pinned/dirty flag tying the buffer cache to the log's write set; its authority, and the log's own halves over the whole covered range, are conjuncts of `LogInv.log_state`. |
 | `bio_ctx` / `fs_view` | the buffer-cache invariant | owns the physical buffer array and the `fs_cache`/`fs_dirty` payload halves; `fs_view γfs γd dev cov` is the fs-side lens on it. |
 
+**THE ROW THAT REAL RECOVERY WOULD HAVE TO WEAKEN, AND WHICH ONE**
+(durable-fs-plan.md §5; lane E-recover's measurement).  If a boot at
+`n > 0` mints the byte view `L` at `FsCrash.fr_D` — the exit that keeps the
+era's instance born at PowerOn — then on the ≤ LOGSIZE pending home blocks
+the CACHE map and the physical disk still read the crashed bytes while `L`
+reads the installed ones.  `BioInv.pool_blk` is therefore STILL TRUE (it
+ties the disk cell to the cache half, and those two agree); it is
+`bytes_tie` — the cache-against-byte-view row inside `fs_bytes_body` — that
+is false there.  The exception set is WAL-owned, lives in that body, and
+the recovering install shrinks it by moving the CACHE map (not `L`) block
+by block.  Every crossing lemma (`fs_bytes_agree`, `_q`, `_any`, `_any_q`,
+`fsblock_update`, `byte_range_log_update`) is unsound while it is
+non-empty, so it must be SEALED — and the seal has to reach all three
+carriers of the byte row, which is the cost: `log_ctx` is built at
+initlog's END and can carry it, but `bitmap_inv` and `ireg_inv` are minted
+at PowerOn.  Nothing of this is in the tree; the other exit (mint the
+instance after recovery) needs none of it.
+
 **THE BYTE POINTS-TO IS FRACTION-INDEXED, AND ¾/¼ IS THE WHOLE REASON.**
 `FsStateDefs.fsΦ` takes a leading `dfrac`, so `byte_range`/`blk_owned`/
 `ind_owned`/`inode_owned_era` all have `_q` twins with the unsuffixed names
@@ -137,6 +155,7 @@ post-seal reads it off `fs_ready`.
 | piece | type / home | meaning |
 |---|---|---|
 | `log_ctx γ bn γfs cov logstart dev` | the persistent bundle every log function threads (`LogInv.v`) | the sealed "log" lock, the two frozen cells, the era's swap receipt `swap_lb`, the byte view's row `fs_bytes_inv`, block 1's park `sb_parked`, and the file system's LAW `LogSnapLaw.snap_law`.  IT NAMES NO FILE-SYSTEM PAYLOAD — a `log_write` proves nothing about the file system, so the lock resource carries no client proposition and the law is PURE-FACT-PRODUCING: the WAL supplies nothing to it and reads nothing out of it but a `⌜ ⌝`.  There is no existential closure over a parked client proposition and no `_at_` projection family; `log_ctx` IS the bundle, at the arity the ~75 files that thread it have.  Projections: `log_ctx_lock`/`_frozen`/`_bytes`/`_bytes_any`/`_swap`/`_sb`/`_snap_law`. |
+| (not in the tree) the byte view's EXCEPTION SEAL | what the `L`-minted-at-`D` exit of durable-fs-plan.md §5 would add to `log_ctx` | recovery's pending set is empty by the time `log_ctx` exists, so this bundle is the natural carrier — but `BitmapInv.bitmap_inv` and `InodeRegion.ireg_inv` hand out the same byte row and are minted at PowerOn, so the seal cannot reach every crossing through `log_ctx` alone.  That, and not anything in `initlog`, is what `SpecFsinit`'s `hdr_n = 0` is waiting on. |
 | `log_res γ bn γfs cov logstart` | the "log" lock's resource (`LogInv.v`) | the ledger (`ghost_map_auth (ln_ops γ) 1 om` at the open ops), the epoch and the append registry, the OPEN-TRANSACTION authority `ghost_map_auth (ln_tx γ) 1 T` with the pure tie `⌜size T = size om⌝`, and — outside the committing arm — `log_state`.  The transaction authority sits HERE and not in `log_state` because a commit is exactly the instant it must be READABLE, and `log_state` is checked out then; and because it is the ledger's own twin, and the ledger's authority is here. |
 | `log_tx γ` | `∃ t, t ↪[ln_tx γ] ()` (`LogInv.v`) | **the open-transaction token**: one WHOLE ghost-map element at a transaction id nobody ever names.  `begin_op` mints it, `end_op` consumes it, and the tie to the ledger is CARDINALITY rather than identity — a retiring transaction hands back an element whose id it never named, and `log_tx_empty_of_ops` reads `size T = size om` at zero, which is the commit's "no transaction is open". |
 | `log_op γ u` | `log_opb γ u ∗ log_tx γ` | the transaction token as a client holds it: the BUDGET half `log_opb` (`u` units of write budget — the pre-transaction `log_op` verbatim, which is why no callee below it moved) beside the tx element.  `log_op_split`/`log_opb_op` are the two directions. |
