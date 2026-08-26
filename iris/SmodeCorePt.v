@@ -377,12 +377,14 @@ Section SmodeCorePt.
       iMod (IH Hxs mm with "Hk Hm Hrest") as "[Hm Hrest]".
       iAssert (kmap_at (svpn_of (pa_add va x)) ppn KP_rw)%I as "#Hkx".
       { rewrite (svpn_of_pa_add va x Hcan Hx). iExact "Hk". }
+      iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Ha") as "Ha".
       iDestruct (mem_pointsto_pin (pa_add va x) (DfracOwn 1) (gold x) ppn with "Hkx Ha")
         as "(%Hc & %Hd & %Hid & Hp & _)".
       simpl foldr.
       rewrite -(pa_of_pa_add ppn va x Hcan Hx).
       iMod (gen_heap_update _ (pa_of ppn (pa_add va x)) (gold x) (gnew x) with "Hm Hp") as "[Hm Hp]".
       iModIntro. iFrame "Hm". simpl. iFrame "Hrest".
+      iApply TsoCtxShim.ctx_pointsto_of_mem.
       iExists ppn. iFrame "Hkx Hp". iPureIntro.
       split; [exact Hc | split; [exact Hd | exact Hid]].
   Qed.
@@ -400,7 +402,6 @@ Section SmodeCorePt.
     intros Hcan Hoff. iIntros "#Hk Hm Hw".
     iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hb".
     iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 8)
             ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
@@ -408,7 +409,7 @@ Section SmodeCorePt.
             mm with "Hk Hm Hb") as "[Hm Hb]".
     iModIntro. unfold write_bytes. change (N.to_nat 8) with 8%nat. iFrame "Hm".
     iApply ctx_word_pointsto_intro; [exact Hal | ].
-    iApply (TsoCtxShim.ctx_buf_of_mem with "Hb").
+    iExact "Hb".
   Qed.
 
   (* 4-byte claim-keyed write (the width-4 analogue). *)
@@ -423,12 +424,14 @@ Section SmodeCorePt.
     intros Hcan Hoff. iIntros "#Hk Hm Hw".
     iDestruct (word4_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (word4_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hb") as "Hb".
     iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 4)
             ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj4]; pose proof (Nat2Z.inj_lt j 4) as Hnz;
                   change (Z.of_nat 4) with 4%Z in Hnz; lia)
             mm with "Hk Hm Hb") as "[Hm Hb]".
     iModIntro. unfold write_bytes. change (N.to_nat 4) with 4%nat. iFrame "Hm".
+    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hb".
     iApply word4_pointsto_intro; [exact Hal | iExact "Hb"].
   Qed.
 

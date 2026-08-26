@@ -43,6 +43,7 @@ Require Import SpecPrepareReturn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* tier weakening rides the raw law *)
 Local Open Scope Z_scope.
 
 Notation FR := KernelSyms.forkret.
@@ -351,6 +352,8 @@ Section ForkretRodata.
     iIntros "Hkd".
     iDestruct (fkr_init_path_run0 with "Hkd") as "H".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (mem_ktier_mono _ KT1 with "H").
   Qed.
 

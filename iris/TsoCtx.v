@@ -114,8 +114,26 @@ Section ctx.
      lives inside [sie_cap_gpr] (ruling 2) and is born at boot
      ([own_context_boot], one per hart), exchanged at swtch, and dropped
      at a zombie park. *)
-  Definition own_context `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
+  (* CUTOVER REHEARSAL (2026-08-26): the five surface facts are sealed
+     HERMETICALLY -- Qed-opaque via the sig-projection idiom -- so that
+     NOTHING can convert them to their SC bodies except the named
+     [_unseal] equations (used by this file's law proofs and by
+     TsoCtxShim).  Under the ordinary [Global Opaque] seal, unification
+     falls back to delta as a last resort, and the tree grew SILENT
+     ctx/mem crossings that no grep can list; every such crossing is now
+     a compile error, which is exactly the failure set the real
+     TsoCtxTwin2 swap would produce at the statement level.  Revert this
+     block (plain definitions again) to go back to the permeable SC
+     seal. *)
+  Definition own_context_def `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
     (∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
+  Lemma own_context_aux : { f | f = @own_context_def }.
+  Proof. by eexists. Qed.
+  Definition own_context `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
+    proj1_sig own_context_aux CID ξ.
+  Lemma own_context_unseal `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ = own_context_def ξ.
+  Proof. unfold own_context. by rewrite (proj2_sig own_context_aux). Qed.
 
   (* THE PARKED TOKEN: a thread of control not running anywhere -- ξ's
      authorities with no hart tie, stamped at [T] (at TSO: the bound the
@@ -123,8 +141,15 @@ Section ctx.
      record and a fresh fork child hold ([SwtchCtx.valid_context_pre],
      [ProofForkretPark]).  Deliberately NOT hart-ambient: a parked record
      is migratable, and this token is why that is type-correct. *)
-  Definition ctx_parked (ξ : CtxId) (T : nat) : iProp Σ :=
+  Definition ctx_parked_def (ξ : CtxId) (T : nat) : iProp Σ :=
     (∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
+  Lemma ctx_parked_aux : { f | f = ctx_parked_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_parked (ξ : CtxId) (T : nat) : iProp Σ :=
+    proj1_sig ctx_parked_aux ξ T.
+  Lemma ctx_parked_unseal (ξ : CtxId) (T : nat) :
+    ctx_parked ξ T = ctx_parked_def ξ T.
+  Proof. unfold ctx_parked. by rewrite (proj2_sig ctx_parked_aux). Qed.
 
   (* THE STABLE HART-VIEW LOWER BOUND (tso-port checkpoint 0.4 item 3;
      [TsoCtxTwin2.view_lb]): "this hart's view has passed K".  Persistent
@@ -133,18 +158,25 @@ Section ctx.
      below the seam (the AMO-acquire leaf, [TsoCtxTwin2.twin_passed_get]);
      at SC it is trivial and the shim provides it, which is the licensed
      stopgap until the M2 sweep threads it out of [SpecAcquire]. *)
-  Definition hart_view_lb `{CID : CpuId} (K : nat) : iProp Σ := True%I.
+  Definition hart_view_lb_def `{CID : CpuId} (K : nat) : iProp Σ := True%I.
+  Lemma hart_view_lb_aux : { f | f = @hart_view_lb_def }.
+  Proof. by eexists. Qed.
+  Definition hart_view_lb `{CID : CpuId} (K : nat) : iProp Σ :=
+    proj1_sig hart_view_lb_aux CID K.
+  Lemma hart_view_lb_unseal `{CID : CpuId} (K : nat) :
+    hart_view_lb K = hart_view_lb_def K.
+  Proof. unfold hart_view_lb. by rewrite (proj2_sig hart_view_lb_aux). Qed.
 
   Global Instance hart_view_lb_persistent `{CID : CpuId} K :
     Persistent (hart_view_lb K).
-  Proof. rewrite /hart_view_lb. apply _. Qed.
+  Proof. rewrite hart_view_lb_unseal /hart_view_lb_def. apply _. Qed.
   Global Instance hart_view_lb_timeless `{CID : CpuId} K :
     Timeless (hart_view_lb K).
-  Proof. rewrite /hart_view_lb. apply _. Qed.
+  Proof. rewrite hart_view_lb_unseal /hart_view_lb_def. apply _. Qed.
 
   Lemma hart_view_lb_le `{CID : CpuId} (K K' : nat) :
     (K' ≤ K)%nat → hart_view_lb K -∗ hart_view_lb K'.
-  Proof. auto. Qed.
+  Proof. rewrite !hart_view_lb_unseal /hart_view_lb_def. auto. Qed.
 
   (* Exclusivity, in all three pairings: one bound authority per context,
      one token.  ([TsoCtxTwin2.own_context_excl] / [ctx_parked_excl] /
@@ -153,6 +185,7 @@ Section ctx.
   Lemma own_context_excl {CID1 CID2 : CpuId} (ξ : CtxId) :
     own_context (CID := CID1) ξ -∗ own_context (CID := CID2) ξ -∗ False.
   Proof.
+    rewrite !own_context_unseal /own_context_def.
     iIntros "[%c1 H1] [%c2 H2]".
     iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
     exfalso. by apply (Qp.not_add_le_l 1 1).
@@ -161,6 +194,7 @@ Section ctx.
   Lemma ctx_parked_excl (ξ : CtxId) (T1 T2 : nat) :
     ctx_parked ξ T1 -∗ ctx_parked ξ T2 -∗ False.
   Proof.
+    rewrite !ctx_parked_unseal /ctx_parked_def.
     iIntros "[%c1 H1] [%c2 H2]".
     iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
     exfalso. by apply (Qp.not_add_le_l 1 1).
@@ -169,6 +203,7 @@ Section ctx.
   Lemma own_context_parked_excl `{CID : CpuId} (ξ : CtxId) (T : nat) :
     own_context ξ -∗ ctx_parked ξ T -∗ False.
   Proof.
+    rewrite own_context_unseal /own_context_def ctx_parked_unseal /ctx_parked_def.
     iIntros "[%c1 H1] [%c2 H2]".
     iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
     exfalso. by apply (Qp.not_add_le_l 1 1).
@@ -176,9 +211,9 @@ Section ctx.
 
   Global Instance own_context_timeless `{CID : CpuId} ξ :
     Timeless (own_context ξ).
-  Proof. rewrite /own_context. apply _. Qed.
+  Proof. rewrite own_context_unseal /own_context_def. apply _. Qed.
   Global Instance ctx_parked_timeless ξ T : Timeless (ctx_parked ξ T).
-  Proof. rewrite /ctx_parked. apply _. Qed.
+  Proof. rewrite ctx_parked_unseal /ctx_parked_def. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The token lifecycle (ruling 4's three primitives, plus deposit)    *)
@@ -193,7 +228,9 @@ Section ctx.
   Lemma ctx_parked_alloc : ⊢ |==> ∃ ξc : CtxId, ctx_parked ξc 0.
   Proof.
     iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant), (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists (MkCtxId γ inhabitant).
+    rewrite ctx_parked_unseal /ctx_parked_def.
+    iExists (0%fin : CPU). iExact "Hv".
   Qed.
 
   (* BOOT'S MINT: a hart's FIRST running token.  One per hart, at
@@ -205,7 +242,9 @@ Section ctx.
   Lemma own_context_boot `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
     iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant), (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists (MkCtxId γ inhabitant).
+    rewrite own_context_unseal /own_context_def.
+    iExists (0%fin : CPU). iExact "Hv".
   Qed.
 
   (* PARK: publish and let go of the hart.  One ghost step, no machine
@@ -213,7 +252,12 @@ Section ctx.
      ([TsoCtxTwin2.twin_park], interp-free.) *)
   Lemma ctx_park `{CID : CpuId} (ξ : CtxId) :
     own_context ξ ==∗ ∃ T, ctx_parked ξ T.
-  Proof. iIntros "[%c H]". iModIntro. iExists 0%nat, c. iExact "H". Qed.
+  Proof.
+    rewrite own_context_unseal /own_context_def.
+    iIntros "[%c H]". iModIntro. iExists 0%nat.
+    rewrite ctx_parked_unseal /ctx_parked_def.
+    iExists c. iExact "H".
+  Qed.
 
   (* RESUME: re-host a parked context on THIS hart.  The premise is the
      stable pair -- a persistent view receipt dominating the parked stamp.
@@ -222,7 +266,10 @@ Section ctx.
   Lemma ctx_resume `{CID : CpuId} (ξ : CtxId) (T K : nat) :
     (T ≤ K)%nat →
     hart_view_lb K -∗ ctx_parked ξ T ==∗ own_context ξ.
-  Proof. iIntros (HTK) "_ [%c H]". iModIntro. iExists c. iExact "H". Qed.
+  Proof.
+    rewrite ctx_parked_unseal /ctx_parked_def own_context_unseal /own_context_def.
+    iIntros (HTK) "_ [%c H]". iModIntro. iExists c. iExact "H".
+  Qed.
 
   (* THE SWTCH EXCHANGE: a hart always runs exactly one thread, so the
      primitive crossing swaps the running token against a parked one --
@@ -249,9 +296,18 @@ Section ctx.
      being what survives a change of hart.  The M1 sweep points the
      [↦ₘ]-notation tower here at [cur_ctx]; until then the tree's
      spellings are untouched. *)
-  Definition ctx_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+  Definition ctx_pointsto_def `{KTR : !CurKtier} (ξ : CtxId)
       (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
     mem_pointsto (KTR := KTR) va dq v.
+  Lemma ctx_pointsto_aux : { f | f = @ctx_pointsto_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_pointsto `{KTR : !CurKtier} (ξ : CtxId)
+      (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+    proj1_sig ctx_pointsto_aux KTR ξ va dq v.
+  Lemma ctx_pointsto_unseal `{KTR : !CurKtier} (ξ : CtxId)
+      (va : Arch.pa) (dq : dfrac) (v : bv 8) :
+    ctx_pointsto ξ va dq v = mem_pointsto (KTR := KTR) va dq v.
+  Proof. unfold ctx_pointsto. by rewrite (proj2_sig ctx_pointsto_aux). Qed.
 
   (* The law surface, mirroring [mem_pointsto]'s (RiscvPtsto.v).  Each is
      proved by unfolding HERE and must hold of the TSO twin; a law that
@@ -259,32 +315,32 @@ Section ctx.
 
   Global Instance ctx_pointsto_timeless (KTR : CurKtier) ξ a dq v :
     Timeless (ctx_pointsto (KTR := KTR) ξ a dq v).
-  Proof. rewrite /ctx_pointsto. apply _. Qed.
+  Proof. rewrite ctx_pointsto_unseal. apply _. Qed.
 
   Global Instance ctx_pointsto_discarded_persistent (KTR : CurKtier) ξ a v :
     Persistent (ctx_pointsto (KTR := KTR) ξ a DfracDiscarded v).
-  Proof. rewrite /ctx_pointsto. apply _. Qed.
+  Proof. rewrite ctx_pointsto_unseal. apply _. Qed.
 
   (* agreement is CROSS-context (two registered facts about one byte name
      one lattice cell): sound at TSO, and the form invariants need. *)
   Lemma ctx_pointsto_agree {kt1 kt2 : ktier} ξ1 ξ2 a dq1 b1 dq2 b2 :
     ctx_pointsto (KTR := kt1) ξ1 a dq1 b1 -∗
     ctx_pointsto (KTR := kt2) ξ2 a dq2 b2 -∗ ⌜b1 = b2⌝.
-  Proof. rewrite /ctx_pointsto. apply mem_pointsto_agree. Qed.
+  Proof. rewrite !ctx_pointsto_unseal. apply mem_pointsto_agree. Qed.
 
   Lemma ctx_pointsto_ne {kt1 kt2 : ktier} ξ1 ξ2 a1 a2 dq b1 b2 :
     ctx_pointsto (KTR := kt1) ξ1 a1 (DfracOwn 1) b1 -∗
     ctx_pointsto (KTR := kt2) ξ2 a2 dq b2 -∗ ⌜a1 ≠ a2⌝.
-  Proof. rewrite /ctx_pointsto. apply mem_pointsto_ne. Qed.
+  Proof. rewrite !ctx_pointsto_unseal. apply mem_pointsto_ne. Qed.
 
   Lemma ctx_pointsto_frac_split `{KTR : !CurKtier} ξ a q1 q2 b :
     ctx_pointsto ξ a (DfracOwn (q1 + q2)) b ⊣⊢
     ctx_pointsto ξ a (DfracOwn q1) b ∗ ctx_pointsto ξ a (DfracOwn q2) b.
-  Proof. rewrite /ctx_pointsto. apply mem_pointsto_frac_split. Qed.
+  Proof. rewrite !ctx_pointsto_unseal. apply mem_pointsto_frac_split. Qed.
 
   Lemma ctx_pointsto_persist `{KTR : !CurKtier} ξ a dq b :
     ctx_pointsto ξ a dq b ==∗ ctx_pointsto ξ a DfracDiscarded b.
-  Proof. rewrite /ctx_pointsto. apply mem_pointsto_persist. Qed.
+  Proof. rewrite !ctx_pointsto_unseal. apply mem_pointsto_persist. Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The context-indexed WORD tower (the M1 notation flip's carrier)    *)
@@ -409,7 +465,12 @@ Section ctx.
      persistent there (a persistent domination would license registering
      later facts -- the unsound step the `weak-memory` branch's notes call
      out), so nothing here may mark it persistent either. *)
-  Definition ctx_dom (ξ ξ' : CtxId) : iProp Σ := True%I.
+  Definition ctx_dom_def (ξ ξ' : CtxId) : iProp Σ := True%I.
+  Lemma ctx_dom_aux : { f | f = ctx_dom_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_dom (ξ ξ' : CtxId) : iProp Σ := proj1_sig ctx_dom_aux ξ ξ'.
+  Lemma ctx_dom_unseal (ξ ξ' : CtxId) : ctx_dom ξ ξ' = ctx_dom_def ξ ξ'.
+  Proof. unfold ctx_dom. by rewrite (proj2_sig ctx_dom_aux). Qed.
 
   (* A context-indexed payload that transports along domination.  This is
      the obligation lock payloads pick up in the M3 sweep: any payload
@@ -439,7 +500,11 @@ Section ctx.
 
   Global Instance ctx_morph_pointsto (kt : ktier) a dq v :
     CtxMorph (λ ξ, ctx_pointsto (KTR := kt) ξ a dq v).
-  Proof. iIntros (ξ ξ') "Hd HP !>". rewrite /ctx_pointsto. iFrame. Qed.
+  Proof.
+    iIntros (ξ ξ') "Hd HP !>". iFrame "Hd".
+    iEval (rewrite ctx_pointsto_unseal) in "HP".
+    rewrite ctx_pointsto_unseal. iExact "HP".
+  Qed.
 
   Global Instance ctx_morph_sep (R1 R2 : CtxId → iProp Σ) :
     CtxMorph R1 → CtxMorph R2 → CtxMorph (λ ξ, R1 ξ ∗ R2 ξ)%I.
@@ -508,7 +573,7 @@ Section ctx.
   Proof.
     iIntros "Hrun Hpk HR".
     iMod (ctx_morph ξ ξc with "[] HR") as "[_ HR]".
-    { rewrite /ctx_dom. done. }
+    { rewrite ctx_dom_unseal /ctx_dom_def. done. }
     iModIntro. iFrame "Hrun". iExists T. iFrame "Hpk HR". done.
   Qed.
 

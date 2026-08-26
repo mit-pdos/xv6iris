@@ -21,6 +21,7 @@ Require Import MemAccessGen.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the S-mode leaf's gen_heap seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1379,9 +1380,11 @@ Section WpSmodePtMemLeaves.
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1489,6 +1492,7 @@ Section WpSmodePtMemLeaves.
           - (* THE RAM OBLIGATION, off the word the leaf owns *)
             iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+            iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
             iDestruct (s_mem_chunk (KTR := kt') sigma
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
@@ -1500,7 +1504,8 @@ Section WpSmodePtMemLeaves.
             { iPureIntro. intros j Hj. apply Hbf. exact Hj. }
             iNext. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev".
-            rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
+            iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
+            rewrite /ctx_word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & Hword)".
       (* the landing file back onto the tower, at ITS OWN tlb value *)
@@ -1990,9 +1995,11 @@ Section WpSmodePtMemLeaves.
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".

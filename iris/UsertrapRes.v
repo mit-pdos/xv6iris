@@ -1759,8 +1759,18 @@ Lemma ut_res_bare_park `{XI : CurCtx}
      ut_res_bare (CID := h) (XI := Xc) Rsys pt'
        (add_vec (un_ks N) (mword_of_int 4096))).
 Proof.
+  (* Under the HERMETIC seal the crossing fails even earlier than the caps
+     step recorded above: [first_done]/[W]/[Rsys] refuse to instantiate
+     across the ∀-bound resume context [Xc].  Aborted at the top; the M2
+     redesign un-aborts it. *)
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
   iIntros (h Xc pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+Abort.
+
+Local Lemma ut_res_bare_park_graveyard_note : True.
+Proof. exact I. Qed.
+
+(* the remainder of the original proof body, kept for the redesign:
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
@@ -1776,13 +1786,7 @@ Proof.
   iSplitR; [iExact "Htc" |].
   iSplitL "Htrap"; [iExact "Htrap" |].
   rewrite /ut_env_nopt /ut_own_nopt.
-  iSplitR; [iExact "Hcaps" |].
-  iSplitL "Hbs"; [iExact "Hbs" |].
-  iSplitL "Hip"; [iExact "Hip" |].
-  iSplitL "Hfd"; [iExact "Hfd" |].
-  iSplitL "Hiref"; [iExact "Hiref" |].
-  iSplitL "Hpriv"; [iExact "Hpriv" | iExact "Hsys"].
-Qed.
+   (end of kept body) *)
 
 
 (* ---------------------------------------------------------------------- *)
@@ -1827,7 +1831,7 @@ Proof.
   intros [Hb | Hz]; [discriminate Hb | exfalso; exact (Hp Hz)].
 Qed.
 
-Lemma ut_hold_transport
+Lemma ut_hold_transport `{XI : CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) :

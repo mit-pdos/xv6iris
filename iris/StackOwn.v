@@ -381,6 +381,7 @@ Section stack_own.
     assert (Hs : seq 0 8 = (0%nat :: seq 1 7)%list) by reflexivity.
     rewrite Hs. iDestruct "Hbs" as "[Hb0 _]".
     rewrite pa_add_0.
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_canonical with "Hb0") as %Hc.
     iPureIntro.
     rewrite uint_unsigned. rewrite uint_unsigned in Hc.

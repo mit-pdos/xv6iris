@@ -30,7 +30,9 @@ Require Import TsoCtx.
 
 Section shim.
   Context `{!riscvGS Σ}.
-  Local Transparent ctx_pointsto own_context hart_view_lb ctx_dom.
+  (* CUTOVER REHEARSAL: the surface is now HERMETICALLY sealed
+     (TsoCtx's [_unseal] equations are the only way through); this file
+     unseals BY NAME, which is its whole charter. *)
 
   (* THE SWEEP-ERA THROWAWAY MINT.  A converted callee demands a context
      token its unconverted caller does not have, so the call site conjures
@@ -44,7 +46,9 @@ Section shim.
   Lemma own_context_alloc `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
     iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant), (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists (MkCtxId γ inhabitant).
+    rewrite own_context_unseal /own_context_def.
+    iExists (0%fin : CPU). iExact "Hv".
   Qed.
 
   (* THE RESUME-EVIDENCE STOPGAP.  [ctx_resume]/[ctx_exchange] want the
@@ -56,7 +60,7 @@ Section shim.
      compile errors it leaves ARE the M2 worklist. *)
   Lemma hart_view_lb_any `{CID : CpuId} (K : nat) :
     ⊢@{iPropI Σ} hart_view_lb K.
-  Proof. done. Qed.
+  Proof. rewrite hart_view_lb_unseal /hart_view_lb_def. done. Qed.
 
   (* THE TRANSPORT-EVIDENCE STOPGAP.  [ctx_dom ξ ξ'] licenses moving facts
      from ξ to ξ'; at TSO it is minted only against real synchronization
@@ -67,12 +71,12 @@ Section shim.
      FALSE at TSO; dies with the shim; each leftover use is a lock-kit
      worklist entry. *)
   Lemma ctx_dom_sc (ξ ξ' : CtxId) : ⊢@{iPropI Σ} ctx_dom ξ ξ'.
-  Proof. done. Qed.
+  Proof. rewrite ctx_dom_unseal /ctx_dom_def. done. Qed.
 
   Lemma ctx_pointsto_shim (KTR : CurKtier) (ξ : CtxId)
       (a : Arch.pa) (dq : dfrac) (v : bv 8) :
     ctx_pointsto (KTR := KTR) ξ a dq v ⊣⊢ mem_pointsto (KTR := KTR) a dq v.
-  Proof. reflexivity. Qed.
+  Proof. rewrite ctx_pointsto_unseal. reflexivity. Qed.
 
   (* the two wand directions, for plain proofmode plumbing *)
   Lemma ctx_pointsto_of_mem (KTR : CurKtier) (ξ : CtxId) a dq v :

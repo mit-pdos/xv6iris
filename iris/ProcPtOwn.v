@@ -3184,6 +3184,7 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
     iApply (mem_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
   Qed.
@@ -3199,6 +3200,7 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia))
               (page_valid_ram ppn (0 + k)%nat Hv ltac:(lia))
@@ -3359,6 +3361,7 @@ Section ProcPt.
     iIntros "!>" (k x Hx) "Hj".
     apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
     iEval (rewrite pa_add_add) in "Hj".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hj") as "Hj".
     iApply (mem_ident_phys (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
               (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia)) with "Hb Hj").
   Qed.
@@ -3609,6 +3612,7 @@ Section ProcPt.
     iIntros "!>" (k x Hx) "Hj".
     apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite pa_add_add.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
               (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia))
               (page_valid_ram ppn (off + k)%nat Hv ltac:(lia))

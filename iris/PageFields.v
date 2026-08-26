@@ -280,7 +280,8 @@ Section PageFields.
     a ↦₄ w ⊢ [∗ list] j ∈ seq 0 4, byte_any (pa_add a j).
   Proof.
     rewrite word4_pointsto_bytes. apply big_sepL_mono.
-    intros k j _. iIntros "H". by iExists (nth_byte w j).
+    intros k j _. iIntros "H". rewrite /byte_any. iExists (nth_byte w j).
+    iApply (TsoCtxShim.ctx_pointsto_of_mem with "H").
   Qed.
 
   Lemma word8_bwin (a : mword 64) (w : mword 64) :

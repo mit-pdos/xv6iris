@@ -210,7 +210,7 @@ Section ProcDefs.
     stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) KSTACK_AV.
   Proof.
     iIntros "#Hks (%ks' & #Hks' & Hstk)".
-    iDestruct (word_pointsto_agree with "Hks Hks'") as %<-.
+    iDestruct (ctx_word_pointsto_agree with "Hks Hks'") as %<-.
     iExact "Hstk".
   Qed.
 

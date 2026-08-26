@@ -60,6 +60,7 @@ Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the leaf's gen_heap seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -101,12 +102,26 @@ Section WpSconfMem.
      [wordw_pointsto width a dq w] is unchanged and an explicit-tier one is
      [wordw_pointsto (KTR := ktd) width a dq w]. *)
   Definition wordw_pointsto `{KTR : !CurKtier} (width : Z) (a : Arch.pa) (dq : dfrac) (w : mword (8*width)) : iProp Σ :=
-    (* members spelled with the FLIPPED ↦ₘ (ctx at the ambient context): the
-       leaf's statements went ctx at the M1 flip, so its internal window
-       plumbing ([s_win_write]'s lists) must be ctx too or every [iFrame]
-       across it dies syntactically. *)
+    (* RAW members, deliberately (cutover rehearsal ruling): this window is
+       the LEAF-INTERIOR form -- it faces the raw ↦₂/↦₄ towers and the
+       gen_heap machinery on both sides -- and the two places it touches a
+       context-indexed fact go through the shim by name. *)
     (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
-     [∗ list] j ∈ seq 0 (Z.to_nat width), pa_add a j ↦ₘ{dq} nth_byte w j)%I.
+     [∗ list] j ∈ seq 0 (Z.to_nat width), mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+
+  (* the 8-byte window IS the (context-indexed) ↦₈ cell, THROUGH THE SHIM:
+     the leaf wrappers' statements are the flipped ↦₈ while the engine
+     machinery below is the raw window; one equivalence, setoid-rewritten
+     through each wrapper's statement (cutover rehearsal: this used to be a
+     SILENT delta-crossing). *)
+  Lemma wordw8_ctx `{KTR2 : !CurKtier} `{XI2 : CurCtx} (a : Arch.pa)
+      (dq : dfrac) (v : mword 64) :
+    wordw_pointsto (KTR := KTR2) 8 a dq v
+    ⊣⊢ ctx_word_pointsto (KTR := KTR2) cur_ctx a dq v.
+  Proof.
+    rewrite TsoCtxShim.ctx_word_shim /wordw_pointsto word_pointsto_unfold.
+    by change (Z.to_nat 8) with 8%nat.
+  Qed.
 
   (* THE ADDRESS CLAIM, AND WHY THE ATOMIC-UPDATE FORMS TAKE IT.
      Per node, an access TRANSLATES before it reads, and the translation
@@ -136,6 +151,7 @@ Section WpSconfMem.
     a ↦ₘ{dq} b -∗ mem_claim a.
   Proof.
     iIntros "Hb".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb") as "Hb".
     iDestruct (mem_pointsto_acc with "Hb")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & _ & _)".
     iExists ppn. iFrame "Hk". done.
@@ -157,6 +173,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 _]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iSplitR; [done|]. iApply (mem_pointsto_claim with "Hb0").
   Qed.
 
@@ -191,6 +208,7 @@ Section WpSconfMem.
   Proof.
     intros Hw0 Hcan Hoff. iIntros "#Hk Hm Hw". rewrite /wordw_pointsto.
     iDestruct "Hw" as "(%Hal & Hb)".
+    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hb") as "Hb".
     iMod (s_win_write a ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 (Z.to_nat width))
             ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hjw];
@@ -200,7 +218,8 @@ Section WpSconfMem.
             mm with "Hk Hm Hb") as "[Hm Hb]".
     iModIntro. iSplitL "Hm".
     - unfold write_bytes. replace (N.to_nat (Z.to_N width)) with (Z.to_nat width) by lia. iFrame "Hm".
-    - iFrame "Hb". iPureIntro. exact Hal.
+    - iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hb".
+      iFrame "Hb". iPureIntro. exact Hal.
   Qed.
 
   (* claim-keyed single-byte write (width-1 store): writes at [pa_of ppn a]. *)
@@ -785,12 +804,14 @@ Section WpSconfMem.
       iSplit; [iPureIntro; change (is_aligned_vaddr (Virtaddr pa) 1 = true);
                unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity | ].
       change (Z.to_nat 1) with 1%nat.
-      rewrite big_sepL_singleton pa_add_0 nth_byte0_id. iExact "Hbyte". }
+      rewrite big_sepL_singleton pa_add_0 nth_byte0_id.
+      iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hbyte"). }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".
     iEval (rewrite /wordw_pointsto) in "Hbw".
     iDestruct "Hbw" as "(_ & Hbw)".
     iEval (change (Z.to_nat 1) with 1%nat;
            rewrite big_sepL_singleton pa_add_0 nth_byte0_id) in "Hbw".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hbw") as "Hbw".
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
@@ -860,10 +881,15 @@ Section WpSconfMem.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw8_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_gen (ktd := ktd) 8 true pc rd rs1 imm m n v v b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* [SrcOk rs1]: the base register's read, see the family note above
@@ -887,10 +913,15 @@ Section WpSconfMem.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw8_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_load_s_sconf_gen (ktd := ktd) 8 false pc rd rs1 imm m n v v b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* [SrcOk rs1]: the base register's read, see the family note above
@@ -1306,10 +1337,15 @@ Section WpSconfMem.
     assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw8_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (ktd := ktd) 8 true pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
 
@@ -1340,10 +1376,15 @@ Section WpSconfMem.
     assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iEval (rewrite -(wordw8_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (ktd := ktd) 8 false pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
@@ -1503,9 +1544,11 @@ Section WpSconfMem.
   (* ==================================================================== *)
   (* the width-1 window IS one byte: [wordw_pointsto 1]'s alignment conjunct
      is [Z.rem _ 1 = 0] and its list is the single byte at offset 0. *)
+
+
   Lemma wordw1_byte `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac)
       (w : mword (8*1)) :
-    wordw_pointsto 1 a dq w ⊣⊢ a ↦ₘ{dq} w.
+    wordw_pointsto 1 a dq w ⊣⊢ mem_pointsto a dq w.
   Proof.
     rewrite /wordw_pointsto. change (Z.to_nat 1) with 1%nat.
     rewrite big_sepL_singleton pa_add_0 nth_byte0_id.

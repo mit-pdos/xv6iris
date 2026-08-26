@@ -103,6 +103,7 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -988,13 +989,22 @@ Section ProofSysOpenFrame.
   Lemma so_omode_split `{XI : CurCtx} (sp0 : mword 64) (w : mword 64) :
     (pa_stk sp0 23) ↦₈[KT1] w ⊢
     (pa_stk sp0 23) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] word_hi w.
-  Proof. apply word_pointsto_split4. Qed.
+  Proof.
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
+    iIntros "H". iDestruct (TsoCtxShim.ctx_word_to_mem with "H") as "H".
+    iDestruct (word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iFrame "Hlo Hhi".
+  Qed.
 
   Lemma so_omode_join `{XI : CurCtx} (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     (pa_stk sp0 23) ↦₄[KT1] lo -∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] hi -∗
     (pa_stk sp0 23) ↦₈[KT1] word_of_words lo hi.
-  Proof. intro Hal. apply word_pointsto_join4. exact Hal. Qed.
+  Proof.
+    intro Hal. iIntros "Hlo Hhi".
+    iApply TsoCtxShim.ctx_word_of_mem.
+    iApply (word_pointsto_join4 _ _ _ _ Hal with "Hlo Hhi").
+  Qed.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak
      the [seq]-indexed byte window, not [bytes_own]. *)

@@ -432,7 +432,7 @@ Section KexecB2Res.
     ([∗ list] j ∈ seq 0 (4096 - nn), pa_add (pa_add q nn) j ↦ₘ f (nn + j)%nat) -∗
     page_own q.
   Proof.
-    intro Hn. iIntros "A B". rewrite /page_own.
+    intro Hn. iIntros "A B". rewrite /page_own /byte_any.
     iApply (bb_named_any q 4096 (fun j => if decide (j < nn)%nat then h j
                                           else f j)).
     rewrite (bb_split3 q nn (4096 - nn) 0 4096
@@ -565,7 +565,7 @@ Section KexecB2Res.
     rewrite (bb_split3 (KTR := KT1) a o 8 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
+    { iApply (ctx_word_pointsto_intro (KTR := KT1) _ _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }

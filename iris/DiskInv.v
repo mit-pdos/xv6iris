@@ -478,6 +478,7 @@ Section DiskInv.
     iApply (big_sepL_impl with "Hbytes").
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
     iApply (mem_ident_phys (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
               (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
   Qed.
@@ -512,6 +513,7 @@ Section DiskInv.
     iIntros (Hj) "Hbytes".
     iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hbytes") as "Hb".
     { rewrite lookup_seq_lt; [reflexivity | exact Hj]. }
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb") as "Hb".
     iApply (mem_canonical with "Hb").
   Qed.
 
@@ -528,6 +530,7 @@ Section DiskInv.
     kmap_static_claims -∗ a ↦₂ w -∗ phys_word2 a w.
   Proof.
     iIntros (Hs) "#Hb [_ Hbytes]". rewrite /phys_word2.
+    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
     iApply (mem_win_to_phys a 2 (DfracOwn 1) (fun j => nth_byte w j) Hs
               with "Hb Hbytes").
   Qed.
@@ -551,6 +554,7 @@ Section DiskInv.
     kmap_static_claims -∗ a ↦₄ w -∗ phys_word4 a w.
   Proof.
     iIntros (Hs) "#Hb [_ Hbytes]". rewrite /phys_word4.
+    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
     iApply (mem_win_to_phys a 4 (DfracOwn 1) (fun j => nth_byte w j) Hs
               with "Hb Hbytes").
   Qed.
@@ -600,7 +604,11 @@ Section DiskInv.
   Lemma byte_to_phys (a : Arch.pa) (b : bv 8) :
     kmap_static (svpn_of a) KP_rw ->
     kmap_static_claims -∗ a ↦ₘ b -∗ phys_pointsto a (DfracOwn 1) b.
-  Proof. iIntros (Hs) "#Hb H". iApply (mem_ident_phys a (DfracOwn 1) b Hs with "Hb H"). Qed.
+  Proof.
+    iIntros (Hs) "#Hb H".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iApply (mem_ident_phys a (DfracOwn 1) b Hs with "Hb H").
+  Qed.
 
   Lemma phys_to_byte (a : Arch.pa) (b : bv 8) :
     kmap_static (svpn_of a) KP_rw ->
@@ -609,6 +617,7 @@ Section DiskInv.
   Proof.
     iIntros (Hs Hc) "#Hb H".
     iDestruct (phys_pointsto_ram with "H") as %Hram.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem a (DfracOwn 1) b Hs Hram Hc with "Hb H").
   Qed.
 

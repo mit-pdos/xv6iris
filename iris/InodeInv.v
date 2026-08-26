@@ -1286,7 +1286,9 @@ Section InodeRes.
         rewrite /word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
         apply big_sepL_proper. intros i jj Hj.
         apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-        rewrite (ind_bytes_cons_lo w l i Hlt). reflexivity.
+        rewrite (ind_bytes_cons_lo w l i Hlt).
+        (* HERMETIC SEAL: the ↦₄ tower's raw bytes against the flipped ↦ₘ *)
+        symmetry. apply TsoCtxShim.ctx_pointsto_shim.
       + (* the tail, at base [a + 4] *)
         transitivity ([∗ list] j ∈ seq 0 (4 * length l)%nat,
                         pa_add (pa_add a 4%nat) j ↦ₘ (ind_bytes l !!! j))%I.

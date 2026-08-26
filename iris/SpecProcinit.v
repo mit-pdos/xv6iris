@@ -356,7 +356,7 @@ Section ProcinitProcsInv.
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
     { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
-      iMod (word_pointsto_persist with "Hks") as "#Hksp".
+      iMod (ctx_word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
       (* THE DEPOSIT: the persisted cell is [is_kstack], and with the words
          beside it the slot's stack is sealed into the dormant block. *)

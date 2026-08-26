@@ -163,7 +163,6 @@ Section WpMemsetArray.
     iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ[ktb] olds j)%I
       with "[Hbuf0]" as "Hbuf".
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
-      iDestruct (ctx_pointsto_to_mem with "H") as "H".
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- prefix/loop/suffix instr resources --- *)
     (* the value-coupling premises for the setup and the loop *)
@@ -276,7 +275,7 @@ Section WpMemsetArray.
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
       iEval (rewrite ms_pa_ms_addr) in "H".
-      iApply (ctx_pointsto_of_mem with "H").
+      iExact "H".
     - (* callee_saved m0 mfin: only sp/s0 moved *)
       assert (Hcatch : forall r : regidx,
                 r <> Regidx (mword_of_int 1 : mword 5) -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->

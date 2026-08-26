@@ -69,10 +69,10 @@ Section FileInv.
     iIntros "(Ht1 & Hr1 & Hw1 & Hp1 & Hi1 & Hm1)".
     iIntros "(Ht2 & Hr2 & Hw2 & Hp2 & Hi2 & Hm2)".
     iDestruct (word4_pointsto_agree with "Ht1 Ht2") as %E1.
-    iDestruct (mem_pointsto_agree with "Hr1 Hr2") as %E2.
-    iDestruct (mem_pointsto_agree with "Hw1 Hw2") as %E3.
-    iDestruct (word_pointsto_agree with "Hp1 Hp2") as %E4.
-    iDestruct (word_pointsto_agree with "Hi1 Hi2") as %E5.
+    iDestruct (ctx_pointsto_agree with "Hr1 Hr2") as %E2.
+    iDestruct (ctx_pointsto_agree with "Hw1 Hw2") as %E3.
+    iDestruct (ctx_word_pointsto_agree with "Hp1 Hp2") as %E4.
+    iDestruct (ctx_word_pointsto_agree with "Hi1 Hi2") as %E5.
     iDestruct (word2_pointsto_agree with "Hm1 Hm2") as %E7.
     iPureIntro. destruct C1, C2; cbn in *. congruence.
   Qed.

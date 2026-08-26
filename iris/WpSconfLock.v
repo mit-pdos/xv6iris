@@ -54,6 +54,7 @@ Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the owner cell against the raw window machinery *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -136,12 +137,13 @@ Section WpSconfLock.
                  with "Hword") as "#Hc4".
     iEval (rewrite /lk_cpu_res) in "Hcpu". iDestruct "Hcpu" as "[Hcell Hfr]".
     iEval (rewrite lk_cpu_cell_acc) in "Hcell".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
     iDestruct (wordw_claim_of (KTR := KT0) 8 (lock_cpu lk) (DfracOwn 1)
                  (lk_cpu_val st) ltac:(lia) with "Hcell") as "#Hc8".
     iMod ("Hclose" with "[Hword Hcell Hfr Hg Hbr]") as "_".
     { iNext. iExists w, st. iFrame "Hword Hg Hbr".
       rewrite /lk_cpu_res. iFrame "Hfr". rewrite lk_cpu_cell_acc.
-      iExact "Hcell". }
+      iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
     iModIntro. iFrame "Hc4 Hc8 HT".
   Qed.
 

@@ -520,9 +520,9 @@ Section FsReady.
   Proof.
     rewrite /disk_geom.
     iIntros "(Hd & Ha & Hu & _) (Hd' & Ha' & Hu' & _)".
-    iDestruct (word_pointsto_agree with "Hd Hd'") as %Hd.
-    iDestruct (word_pointsto_agree with "Ha Ha'") as %Ha.
-    iDestruct (word_pointsto_agree with "Hu Hu'") as %Hu.
+    iDestruct (ctx_word_pointsto_agree with "Hd Hd'") as %Hd.
+    iDestruct (ctx_word_pointsto_agree with "Ha Ha'") as %Ha.
+    iDestruct (ctx_word_pointsto_agree with "Hu Hu'") as %Hu.
     iPureIntro. split_and!; assumption.
   Qed.
 

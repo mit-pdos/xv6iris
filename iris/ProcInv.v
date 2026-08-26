@@ -766,6 +766,7 @@ Section ProcInv.
     destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_to_mem_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
               Hid Hram Hcan with "Hk' Hp").
   Qed.
@@ -778,13 +779,14 @@ Section ProcInv.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
     iApply phys_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
-    iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
     apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
     destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & _ & _ & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hp") as "Hp".
     iApply (mem_to_phys_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
               Hid with "Hk' Hp").
   Qed.

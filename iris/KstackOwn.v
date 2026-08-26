@@ -212,6 +212,7 @@ Section rekey.
     assert (Hram : addr_is_ram (pa_of ppn (pa_add (kstack_va i) j))).
     { rewrite (kstack_va_pa_of ppn i j Hi Hj).
       exact (kstack_ident_ram ppn j Hkd Hj). }
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_to_mem_map KT1 (pa_add (kstack_va i) j) ppn dq b
               Hram (kstack_va_canon_add i j Hi Hj) I with "[] [Hp]").
     - rewrite (kstack_va_svpn_add i j Hi Hj). iExact "Hcl".
@@ -236,6 +237,8 @@ Section rekey.
     iIntros "!>" (k j Hk) "Hb".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite !pa_add_add.
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb") as "Hb".
+    iApply TsoCtxShim.ctx_pointsto_to_mem.
     iApply (kstack_byte_rekey i ppn (o + (0 + k))%nat (DfracOwn 1) (nth_byte w (0 + k)%nat)
               Hi Hkd ltac:(lia) with "Hcl Hb").
   Qed.
@@ -278,7 +281,8 @@ Section ladder.
       iExists (ws ++ [w])%list.
       iSplit; [iPureIntro; rewrite length_app Hlen /=; lia|].
       rewrite big_sepL_app big_sepL_singleton Hlen.
-      iFrame "Hws". rewrite Nat.add_0_r. iExact "Hw".
+      iFrame "Hws". rewrite Nat.add_0_r.
+      iApply (TsoCtxShim.ctx_word_to_mem with "Hw").
   Qed.
 
   (* forget the contents of an indexed run: [∗ list] over the values becomes
@@ -324,7 +328,7 @@ Section ladder.
     intros k j _. iIntros "H".
     assert (Hj : pa_add base (8 * j)%nat = add_vec_int base (8 * Z.of_nat j)).
     { unfold pa_add. rewrite Nat2Z.inj_mul. change (Z.of_nat 8) with 8. reflexivity. }
-    rewrite -Hj. iExact "H".
+    rewrite -Hj. iApply (TsoCtxShim.ctx_eslot_of_mem with "H").
   Qed.
 
 End ladder.

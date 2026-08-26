@@ -69,7 +69,7 @@ Section ParkCap.
   (* THE PACKAGE a parker hands in ([SpecForkretParkPaid.forkret_park_pkg]
      is this, verbatim).  [W] is what the residue closer is handed at the
      resume beside [first_done] and the timer capability. *)
-  Definition park_pkg
+  Definition park_pkg `{XI : CurCtx}
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64)
       (pid : mword 32) (av : nat) : iProp Σ :=
@@ -107,7 +107,7 @@ Section ParkCap.
         URB h Xc pt' (add_vec ks (mword_of_int 4096))))%I.
 
   (* the child's own rows, the ones the park spends *)
-  Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
+  Definition park_child `{XI : CurCtx} (γs : list gname) (γf : gname) (pa ks : mword 64)
       (rest : list (mword 64)) (pid : mword 32) (V : pprivate) : iProp Σ :=
     (is_kstack pa ks ∗
      ctx_cells (p_context pa) (park_forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
@@ -117,7 +117,7 @@ Section ParkCap.
 
   (* THE CAP, at a given [W]: the statement of
      [SpecForkretParkPaid.forkret_park_paid_body], as a [□] wand *)
-  Definition park_cap
+  Definition park_cap `{XI : CurCtx}
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
@@ -135,7 +135,7 @@ Section ParkCap.
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for
      [γs] ever parks *)
-  Definition park_chan
+  Definition park_chan `{XI : CurCtx}
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (N : ut_names) (av : nat),
@@ -157,23 +157,23 @@ Section ParkCap.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
      token itself] *)
-  Definition park_token_F (γs : list gname) (X : iProp Σ) : iProp Σ :=
+  Definition park_token_F `{XI : CurCtx} (γs : list gname) (X : iProp Σ) : iProp Σ :=
     (∃ URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ,
        park_cap URB X γs ∗ park_chan URB X γs)%I.
 
-  Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
+  Local Instance park_token_F_contractive `{XI : CurCtx} γs : Contractive (park_token_F γs).
   Proof.
     rewrite /park_token_F /park_cap /park_chan /park_pkg.
     solve_contractive.
   Qed.
 
-  Definition park_token (γs : list gname) : iProp Σ := fixpoint (park_token_F γs).
+  Definition park_token `{XI : CurCtx} (γs : list gname) : iProp Σ := fixpoint (park_token_F γs).
 
-  Lemma park_token_unfold (γs : list gname) :
+  Lemma park_token_unfold `{XI : CurCtx} (γs : list gname) :
     park_token γs ⊣⊢ park_token_F γs (park_token γs).
   Proof. apply (fixpoint_unfold (park_token_F γs)). Qed.
 
-  Global Instance park_token_persistent γs : Persistent (park_token γs).
+  Global Instance park_token_persistent `{XI : CurCtx} γs : Persistent (park_token γs).
   Proof.
     rewrite /Persistent park_token_unfold /park_token_F.
     iIntros "H". iDestruct "H" as (URB) "[#Hcap #Hchan]".
@@ -183,7 +183,7 @@ Section ParkCap.
   (* ------------------------------------------------------------------- *)
   (* USING IT: what userinit and kfork do at their park.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma park_token_park (N : ut_names) (rest : list (mword 64)) (V : pprivate) :
+  Lemma park_token_park `{XI : CurCtx} (N : ut_names) (rest : list (mword 64)) (V : pprivate) :
     ut_wf N ->
     length rest = 12%nat ->
     park_token (un_s N) -∗
@@ -227,7 +227,7 @@ Section ParkCap.
   (* one caller: the cap is [forkret_park_paid] and the channel is          *)
   (* [usertrap_res_bare_park], both at [URB := usertrap_res_bare].          *)
   (* ------------------------------------------------------------------- *)
-  Lemma park_token_intro_of
+  Lemma park_token_intro_of `{XI : CurCtx}
       (URB : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (γs : list gname) :
     (forall N av, ut_park_intro_body URB (park_token (un_s N)) N av) ->
     park_cap URB (park_token γs) γs -∗

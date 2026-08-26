@@ -48,6 +48,7 @@ Require Import RiscvModelBytes RiscvPtsto.
 Require Import InstrBytes.
 Require Import KallocInv.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the ↦₄ window and the raw byte tower cross the seam *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -632,12 +633,14 @@ Section ByteBuf.
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (word4_pointsto_intro _ _ _ Hal).
+      iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hmid") as "Hmid".
       iApply (big_sepL_mono with "Hmid"). intros i jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (bb_mk_byte f o i Hlt). reflexivity. }
     iIntros (w) "Hw".
     rewrite (bb_split3 a o 4 r n (bb_set f o w) (DfracOwn 1) Hn).
     iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hw") as "Hw".
     iSplitL "Hpre".
     { iApply (big_sepL_mono with "Hpre"). intros i jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

@@ -171,12 +171,12 @@ Section ProofSysOpenBody.
   (* the 1/2 + 1/2 SPLIT at [↦₈] -- [ProofSysOpenParts]' [so_word_half_join]
      read backwards, which is what hands [so_publish] the invariant's half of
      [f->ip] after the [sd s1,24(s2)] wrote the cell whole. *)
-  Local Lemma so_ip_split (a w : mword 64) :
+  Local Lemma so_ip_split `{XI : CurCtx} (a w : mword 64) :
     a ↦₈ w -∗ a ↦₈{DfracOwn (1/2)} w ∗ a ↦₈{DfracOwn (1/2)} w.
   Proof.
     iIntros "H".
     iDestruct (bi.equiv_entails_1_1 _ _
-                 (word_pointsto_frac_split a (1/2) (1/2) w) with "[H]")
+                 (ctx_word_pointsto_frac_split cur_ctx a (1/2) (1/2) w) with "[H]")
       as "[$ $]".
     { iEval (rewrite Qp.div_2). iExact "H". }
   Qed.

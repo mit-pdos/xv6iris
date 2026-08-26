@@ -54,13 +54,11 @@ Section ProofMemsetPage.
     (* memset's contract is context-indexed; this caller is not yet
        converted -- the buffer crosses through the shim at the ambient
        context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT0 cur_ctx with "Hbuf") as "Hbuf".
     iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (CID1 Hs1 mfin) "Hcg Hpc Hbuf %Hcs".
-    iDestruct (ctx_buf_to_mem with "Hbuf") as "Hbuf".
     iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
     (* the bytes come back NAMED -- that is the whole of this form *)
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").

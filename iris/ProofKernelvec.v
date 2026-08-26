@@ -1678,7 +1678,7 @@ Section KernelvecHandler.
       iSplitL "Hctx"; [ iExact "Hctx" |]. iExact "Hwit0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
-    iApply (Kerneltrap.wp_kerneltrap_sconf (GEN := GEN) (CID := CID) (XI := XI) γu γv γdk γtl γs pd pav pu
+    iApply (Kerneltrap.wp_kerneltrap_sconf (GEN := GEN) (CID := CID) (XI := XIc) γu γv γdk γtl γs pd pav pu
               (kv_m2 Me) (58 + av) p pc0 sc tv ∅
               Hgs ltac:(lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
