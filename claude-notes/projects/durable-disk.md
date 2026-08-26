@@ -2841,6 +2841,167 @@ so it never wanted that shape.
     `nlink = 1` at count zero already carries.  With the child's `..` unit
     in hand, both give `2 ≤ nlink dp`.
 
+  **AS LANDED — G5: NOT GREEN.  THE TYPE REGISTER IS BUILT AND THE REGION
+  IS PORTED (branch `lane-g5-typereg`, 1024 of 1335 `iris/` files); THREE
+  FILES ARE THE BUILD FRONT AND ONE OF THEM IS A DESIGN WALL.**
+
+  Green through `InodeRegion` / `IregLinkNz` / `IgetLic` and everything
+  below (`Xv6Cameras`, `FsStateLink`, `FsStateInode`, `FsState`,
+  `FsDurSnap`).  The front is `FsStateEra` (mechanical), `SpecIupdate`
+  (mechanical) and `FsDurLedger` (the wall); 311 files above them are
+  unattempted, and no walk proof, no boot routing and none of slice 6's
+  demolition was touched.  What follows is what the ruling gets right,
+  the three places its arithmetic has to change, and the one place it
+  does not close.
+
+  - **THE RA IS RIGHT AND IT IS CHEAP.**  `Xv6Cameras.fsLinkUR =
+    gmapUR Z (authUR (gmultisetUR ity))`, `ity := TFile | TDir (p : Z)`
+    (`Countable` by `inj_countable'` through `option Z`).  The authority
+    is `link_reps n ty = n *: {[+ ty +]}`, so validity is ONE lemma with
+    two readings (`FsStateLink.link_auth_toks_le`: `size Q ≤ n` and
+    `∀ x ∈ Q, x = ty`) and there is no local-update chain over a wide
+    `prodUR` anywhere.  The best part is not in the ruling: at
+    multiplicity zero `link_reps 0 ty = ∅` for every `ty`, so
+    `link_auth Γ i 0 ty` and `link_auth Γ i 0 ty'` are the SAME
+    proposition (`link_auth_zero_retype`) — the kernel's two type writes
+    are an EQUALITY, not an update, and `InodeRegion.ireg_lnk_free_retype`
+    keeps its premise list exactly.
+
+  - **THE MULTIPLICITY IS `nlink + [DIR ∧ nlink ≠ 0]`, NOT `nlink + [DIR]`.**
+    With the ruling's uniform bonus the CLAIM's type write (`0 → T_DIR` at
+    `nlink = 0`) moves the multiplicity `0 → 1` and has to mint a fragment
+    inside `ireg_claim_au`, which then has to cross the whole claim-box
+    window to create's `dirlink(ip, ".", ip)`; and `iput`'s free path has
+    to return it before the type-0 write, from a payload `itrunc` has
+    already emptied.  Under the `∧ live` guard both type writes stand at
+    multiplicity zero and neither mover moves.  The price is that the
+    `0 ↔ 1` crossing AT A DIRECTORY moves TWO units, which is
+    `InodeRegion.ireg_dot_delta` — `2` at exactly two sites (create's
+    fresh-directory fill, rmdir's `ip->nlink--`) and `1` at the other
+    seven.  `ireg_write_link_fl` / `_unlink_fl` carry it as a function of
+    the record, so no call site gained a numeric parameter.
+
+  - **`ireg_keep` CANNOT GO, and `IgetLic.RootL` is why.**  namei's
+    `iget(ROOTINO)` holds NOTHING, so the root's liveness has to be
+    readable from `iregN` alone.  Delete the self exemption outright, as
+    the ruling says, and every fragment at the root lives in the root's
+    own checked-out payload, which `iregN` cannot reach: licence (f) then
+    has no source at all.  So the exemption survives NARROWED to the one
+    record that pays for it —
+    `ent_tokenless self orph s t := ((s = DOT ∨ s = DOTDOT) ∧ orph)
+    ∨ (s = DOTDOT ∧ t = self)` — the root's `".."` alone, and `ireg_keep`
+    stays as a type-register fragment (`ireg_keep γfs z v`, one per
+    root).  `sk_links`' root-slack factor stays with it (its VALUE is now
+    existential).  The reading weakens: `ireg_lnk_root_min2` becomes
+    `ireg_lnk_root_le` — `k` held fragments give `k ≤ nlink` at the root,
+    since the keep is the `(k+1)`-th — so rmdir's "a directory at count
+    one is not the root" needs TWO fragments in hand, which is exactly
+    what (D1) leaves it holding.
+
+  - **THE REGISTER'S VALUE IS NOT A FUNCTION OF THE NODE, AND MKDIR IS
+    WHY.**  It is fixed at the FILL — the flush that takes the
+    multiplicity off zero, where a retype is free — and xv6 writes the
+    child's `".."` TWO `dirlink`s later.  A value read off the `".."`
+    ENTRY (`TDir (fn_dotdot n)`) would therefore have to MOVE at that
+    write, at a multiplicity of two, which is not a frame-preserving
+    update.  So the bundle binds it existentially
+    (`inode_ghost Γ i n := ∃ v, ⌜fn_ity_ok n v⌝ ∗ link_auth Γ i
+    (fn_mult n) v ∗ ent_toks Γ i n ∗ ⌜inode_local i n⌝`, `fn_ity_ok`
+    tying it to the TYPE alone) and the `"."` fragment carries the parent
+    under a GUARD: `∀ p q, ty = TDir p → fn_dd n = Some q → q = p`, which
+    is vacuous exactly across create's window and discharged everywhere
+    rmdir reads it (`inl_dir_dotdot` gives a live directory its `".."`).
+
+  - **AND THE GUARD IS RE-PINNED BY THE RA'S OWN AGREEMENT, not by a pure
+    premise.**  At create's `dirlink(ip, "..", dp)` the walk still HOLDS
+    the second unit the fill minted — the one `dirlink(dp, name, ip)` will
+    file — at the value it CHOSE, `TDir dp`; `ireg_lnk_toks_agree` (two
+    fragments at one inum carry the same value, because the authority is
+    uniform) collapses the borrowed `"."` fragment onto it, and the new
+    guard follows.  One region opening, everything borrowed.  That step
+    is why `FsStateEra.ent_toks_dirlink` has to SPLIT: the `s ≠ DOTDOT`
+    arm is pure (`fn_dd` does not move) and the `".."` arm is a
+    resource-level re-pin that does not exist yet.  It is the ONLY new
+    proof obligation the ruling creates in a walk, and it is small.
+
+  - **THE WALL IS `FsDurLedger`, AND IT IS THE VALUE SIDE — SO THE
+    TRIPWIRE FIRES, in the shape the owner named.**  The fold's hand
+    `thand` is a FUNCTION of the ledger, but every unit's value is
+    existential in the bundle it came from: a `GMint`'s is the node's own
+    register value, a `BDel`'s is the target's.  Only the units a
+    `GIns`/`BIns` files into a NAME record need their value known (the
+    clause is `∀ p, ty = TDir p → p = self`), and exactly ONE of those is
+    not free — mkdir's `dirlink(dp, name, ip)`; a FILE's value is `TFile`
+    by `fn_ity_ok` so the clause is vacuous, `".."`'s clause is `True`,
+    and `"."`'s is the guard above.  Three ways out, none of them small:
+    (i) SPLIT THE HAND into a value-known pocket and a value-blind one
+    (`thand` × `gmap Z nat`), giving `GBurn` a source index — local to
+    `FsDurLedger`, which has NO dependents; (ii) make the register value a
+    FIELD of `FsNode.fs_node`, which makes the value a function of the
+    state again, the ledger a transcription and the `"."` guard a pure
+    clause — at the cost of every `fs_node` constructor in the tree;
+    (iii) let the fold read the value CROSS-INODE off the target's own
+    bundle, which it holds (`dbody` carries the whole `fs_state`).
+    `FsDurLedger` is a leaf, so it is the LAST file to port, not the
+    first — the rest of the lane does not wait on this.
+
+  - **(D2) HAS NO SUPPLIER ON THE BRANCH.**  Deleting the parent register
+    deleted G3's `ireg_ups`/(U1)/(U2)/`ireg_par_up_min2` with it, and the
+    ruling's replacement — the per-directory EXACTNESS clause
+    (`nlink = #{TDir name records} + [live]`) — is NOT built: it needs a
+    per-entry marker inside `ent_toks` (a `gset fname`, or the `tyf` the
+    gather already chooses) and it has to survive create's window, where
+    `dp->nlink++` runs BEFORE `dirlink(dp, name, ip)` and the equation is
+    off by one for three instructions.  Until it exists, `su_w5_dir`'s
+    (D2) has to go back to `IregDirBit.dir_links_subdir_nlink2`, which is
+    recoverable verbatim from `a33a4e45^` and still has its carrier
+    (`DirView.dlc_lower` is maintained inside `DirLinks.dir_links`).  That
+    is also why NONE of slice 6's demolition is done: `DirLinks`, the five
+    columns and the `fl` index are untouched, and they cannot go until
+    exactness lands.
+
+  - **Contracts whose statement changed** (all green):
+    `FsStateLink` entire (the file is rewritten: `link_reps`,
+    `link_auth Γ i n ty`, `link_toks Γ i Q`, `link_tok Γ i ty`,
+    `link_auth_toks_le`/`_tok_agree`/`_zero_retype`, `link_mint`/`_reps`,
+    `link_return`/`_reps`, `link_full_elem i n ty`);
+    `FsStateInode.fn_ity_ok`/`fn_mult`/`fn_dd`/`ent_tokenless`/
+    `ent_ty_ok`/`ent_tok` (a `dd : option Z` parameter)/`ent_tok_at`/
+    `ent_elem`/`link_elem_node i n v tyf`/`node_ent_ok`/`inode_ghost`
+    (existential value)/`ent_toks_delete`/`_insert`/`_orphan`/
+    `dir_owned_unlink`/`_link`/`_orphan`/`inode_link_tok_nz`;
+    `FsState.link_choice` (the per-inum choice is a PAIR now),
+    `link_elem_ok`/`link_elem`/`fs_link_node`/`link_full_map`/
+    `fs_links_full`/`fs_boot_alloc_full`/`fs_boot_alloc_root_slack`/
+    `fs_links_valid_tok`;
+    `InodeRegion.ireg_mult_at`/`ireg_mult`/`ireg_dot_delta`/
+    `ireg_mult_bump`/`_drop`/`ireg_reg_ok`/`ireg_keep`/`ireg_lnk_at`/
+    `ireg_lnk_bump`/`ireg_lnk_fill` (NEW: the caller chooses the value at
+    multiplicity zero)/`ireg_lnk_drop`/`ireg_lnk_toks_le`/`_tok_nz`/
+    `_tok_ty` (NEW)/`_toks_agree` (NEW, (D1)'s engine)/`_root_alive`/
+    `_root_le`; `ireg_write_link_fl` (`prv : option Z` becomes
+    `oty : option ity`, the FILL's choice) and `_unlink_fl`
+    (`uty : ity`, a PILE at `ireg_dot_delta`);
+    `IregLinkNz.ireg_tok_nz` (returns the value's type reading too),
+    `ireg_tok_root_le`; `IgetLic.LinkedL` carries the value
+    (the licence is BORROWED, so it cannot hide it);
+    `FsDurSnap.sk_links` (the slack fragment's value is existential).
+    **Deleted:** `Xv6Cameras.fsParUR`, `FsStateLink.par_auth`/`par_tok`/
+    `par_toks`/`par_reps`/`par_alloc`/`par_dealloc`/`par_auth_tok_in`/
+    `_eq`, `FsStateInode.ent_par_val`/`fn_par_ok`/`inode_par`/`fn_ity`,
+    `InodeRegion.ireg_ups`/`ireg_par`/(U1)/(U2)/`ireg_lnk_up_min2`/
+    `ireg_lnk_par_move`, `IregLinkNz.ireg_par_revalue`/`ireg_par_up_min2`.
+    `iris/FsParRefute.v` is OFF `_CoqProject` with a header saying why —
+    the shape it refutes (a separate parent register) no longer exists.
+
+  - **Footprints, measured.**  `par_*` was named in 17 files, the
+    `FsStateLink` names in 24.  `FsDurLedger`'s `dcfg`/`dhand`/`thand`
+    apparatus is 118 hits in ONE file and has no dependents.
+    `IgetLic.LinkedL` is 15 hits in 5 files.  `FsDurImg`'s link section
+    (~750 lines, sections 8–9) is reachable only through
+    `img_snap_ok`'s `sk_links` obligation and is otherwise dead.
+    Nothing outside `FsDurLedger` names the fold's configuration.
+
 ## Sizing notes for whoever runs the lanes
 
 - Big cones: `ProofEndOp` (commit path), `ProofInitlog` (2748 lines —

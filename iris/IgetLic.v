@@ -131,7 +131,12 @@ Local Open Scope Z_scope.
     closed and still seven constructors, [destruct l] is still exhaustive,
     and the two standing greps are unaffected. *)
 Inductive ilic :=
-  | LinkedL
+  (* (a) CARRIES THE FRAGMENT'S VALUE since lane G5: the type register's
+     fragment is [{[ty]}] at the target's key, and the licence is BORROWED
+     -- the walk that lends it out of its directory's [ent_toks] has to put
+     the SAME unit back, so the value cannot be hidden behind an
+     existential here. *)
+  | LinkedL (ty : ity)
   | HeldL (d : dinode)
   | ClaimL (ty : bv 16) (t : nat) (q : Qp)
   | BufL (bno : Z) (ds : list dinode)
@@ -209,8 +214,8 @@ Section IgetLic.
                    (inum : bv 32) (l : ilic)
     : iProp Σ :=
     match l with
-    | LinkedL => FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs)
-                   (bv_unsigned inum)                                (* a *)
+    | LinkedL ty => FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs)
+                      (bv_unsigned inum) ty                          (* a *)
     (* (c) STRENGTHENED BY iclaim-ledger.md §2.6: the held record's link
        count is NONZERO.  That is what makes [HeldL] refutable at an
        in-transition box -- both pins carry [di_nlink = 0], and
@@ -286,14 +291,14 @@ Section IgetLic.
       authority the law is read against, which is the whole reason
       2b-inode-4 put it there. *)
   Lemma iname_linked_alloc (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (ty : ity) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    iname γi γfs inodestart inum LinkedL ={E}=∗
+    iname γi γfs inodestart inum (LinkedL ty) ={E}=∗
     ⌜bv_unsigned (di_type dn) <> 0⌝ ∗
-    dinode_at γi inum dn ∗ iname γi γfs inodestart inum LinkedL.
+    dinode_at γi inum dn ∗ iname γi γfs inodestart inum (LinkedL ty).
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hfrag". rewrite /iname.
     pose proof (islot_lt inum) as Hsl.
@@ -560,7 +565,7 @@ Section IgetLic.
     iIntros "Ha Hla Hlnk Hshp Hl".
     iDestruct (ireg_shp_split with "Hshp") as "[Hsh _]".
     rewrite /iname.
-    destruct l as [| d' | tyc tc qc | bno ds |].
+    destruct l as [tyl | d' | tyc tc qc | bno ds |].
     - (* (a) LinkedL -- the RA's law at the target's own authority *)
       iDestruct (ireg_lnk_tok_nz with "Hlnk Hl") as %Hnl1.
       iApply "Hnz". iPureIntro. exact Hnl1.
@@ -691,7 +696,7 @@ Section IgetLic.
                  (ireg_claim_ok_shape (Some x) f (ds !!! islot inum)
                     ltac:(discriminate) Hclm)). }
     iIntros "Ha Hla Hlnk Hsh Hl". rewrite /iname /is_claim.
-    destruct l as [| d' | tyc tc qc | bno ds0 |].
+    destruct l as [tyl | d' | tyc tc qc | bno ds0 |].
     - (* (a) LinkedL -- the RA's law at the target's own authority *)
       iDestruct (ireg_lnk_tok_nz with "Hlnk Hl") as %Hnl1.
       destruct (Hnzb Hnl1) as [H1 H2].

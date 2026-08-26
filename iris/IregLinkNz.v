@@ -88,7 +88,7 @@ Section IregLinkNz.
     FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v
     ={E}=∗
     ⌜bv_unsigned (di_nlink dn) <> 0
-     /\ ireg_ty_ok (bv_unsigned (di_type dn)) v⌝ ∗
+     /\ ireg_reg_ok (bv_unsigned (di_type dn)) v⌝ ∗
     dinode_at γi inum dn ∗
     FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v.
   Proof.
@@ -206,11 +206,11 @@ Section IregLinkNz.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
-      (link_reps k v) ={E}=∗
+      (FsStateLink.link_reps k v) ={E}=∗
     ⌜bv_unsigned inum = ireg_root -> Z.of_nat k <= bv_unsigned (di_nlink dn)⌝ ∗
     dinode_at γi inum dn ∗
     FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
-      (link_reps k v).
+      (FsStateLink.link_reps k v).
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hfrag".
     pose proof (islot_lt inum) as Hsl.

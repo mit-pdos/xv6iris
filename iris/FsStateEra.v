@@ -2198,7 +2198,7 @@ Section EraRes.
     bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     ent_toks Γ i (era_node dn bm data) -∗
-    ent_tok Γ i (fn_orphan (era_node dn bm data)) s (bv_unsigned inum) -∗
+    ent_tok Γ i (fn_dd (era_node dn bm data)) (fn_orphan (era_node dn bm data)) s (bv_unsigned inum) -∗
     ent_toks Γ i (era_node dn' bm' data').
   Proof.
     intros Hnrec Hk0 Hlen Hs Hty Hty' Hnl Hsz Hrng Hnone Hh Hh' Hb Hb'.
@@ -2519,7 +2519,7 @@ Section EraRes.
     bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     ent_toks Γ i (era_node dn bm data) -∗
-    ent_tok Γ i (fn_orphan (era_node dn bm data)) s (bv_unsigned inum) -∗
+    ent_tok Γ i (fn_dd (era_node dn bm data)) (fn_orphan (era_node dn bm data)) s (bv_unsigned inum) -∗
     ent_toks Γ i (era_node dn' bm' data').
   Proof.
     intros Hnrec Hk0 Hatom Hlen Hs Hty Hty' Hnl Hsz Hrng Hnone Hh Hh' Hb Hb'.
