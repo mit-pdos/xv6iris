@@ -345,7 +345,7 @@ Section DirLinks.
   (* [dir_link_at] IS THE UNFLAVOURED INSTANCE, and it is stated in
      expanded form rather than as [dir_link_at_f (fun _ => false)] on
      purpose: every landed consumer of the plain ticket
-     ([IregLinkNz.dir_link_at_nlink_drop], [FsRep.fedges_acc],
+     ([IregLinkNz.dir_link_at_nlink_drop],
      [ProofCreate.cr_grey_links], [ProofSysUnlinkParts]'s two record
      lemmas) opens it with [rewrite /dir_link_at] and then [destruct]s the
      guard, which only fires on the literal [if].  The two are convertible

@@ -60,8 +60,9 @@
     and nobody had noticed").  In the tree the fact is free and it is named
     rather than positional: [fnode_dotdot] turns [ents !! ".." = Some dp]
     into the RECORD INDEX dirlookup would stop at, live and naming [dp],
-    and [fedges_acc] hands out that index's ticket.  **That pair is the
-    clearest single place where the tree layer pays for itself.**          *)
+    and a caller that holds [DirLinks.dir_links] can open it at that
+    index.  **[fnode_dotdot] is the clearest single place where the tree
+    layer pays for itself.**                                              *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -178,40 +179,14 @@ Section FsRep.
   (*  2.  THE EDGES -- [dir_links], VERBATIM                             *)
   (* ------------------------------------------------------------------ *)
 
-  (* A NAME, NOT A RESOURCE (§2(ii)).  It exists so that a reader of this
-     file sees where the out-edges of node [i] live, and so that nobody is
-     tempted to build a second edge resource beside the landed one. *)
-  Definition fedges (i : Z) (dn : dinode) (data : nat -> list (bv 8))
-    : iProp Σ := dir_links i dn data.
-
-  (* ONE RECORD'S TICKET, BORROWED AND RETURNED.  The accessor S7's grey
-     conversion needs: give it the index and it hands back that record's
-     [dir_link_at] plus the wand that re-parks it.  [fnode_dotdot] below is
-     what SUPPLIES the index. *)
-  Lemma fedges_acc (self : Z) (dn : dinode) (data : nat -> list (bv 8))
-      (k : nat) :
-    bv_unsigned (di_type dn) = T_DIR_z ->
-    (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
-    fedges self dn data -∗
-      ∃ F : nat -> bool,
-        dir_link_at_f F self dn data k ∗
-        (dir_link_at_f F self dn data k -∗ fedges self dn data).
-  Proof.
-    intros Hty Hk. rewrite /fedges /dir_links decide_True; [| exact Hty].
-    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & Htie & H)".
-    iDestruct (big_sepL_lookup_acc _ (seq 0 (dir_nrec (bv_unsigned (di_size dn))))
-                 k k with "H") as "[Hk Hback]".
-    { apply lookup_seq. lia. }
-    (* THE FLAVOUR MAP COMES OUT WITH THE TICKET (V2).  The borrow returns
-       the SAME record at the SAME flavour, so the count clause is handed
-       back untouched -- which is why it does not appear in the statement. *)
-    iExists F. iSplitL "Hk"; [iExact "Hk" |].
-    iIntros "Hk". iExists F. iSplitR; [iPureIntro; exact Hbnd |].
-    iSplitR; [iPureIntro; exact Hlow |].
-    (* V5': the parent tie rides the borrow untouched *)
-    iSplitL "Htie"; [iExact "Htie" |].
-    iApply ("Hback" with "Hk").
-  Qed.
+  (* NOTHING HERE ANY MORE (durable-disk lane G, slice 6f).  The tree layer
+     used to restate [DirLinks.dir_links] under the name [fedges], with an
+     accessor [fedges_acc] handing out one record's ticket.  Neither had a
+     consumer -- [fnode_dotdot] below supplies the index, but no proof in
+     the tree ever asked for the ticket -- so both are gone and the one
+     place that did need the resource ([FsLookup.wp_dirlookup_tree_body])
+     names [dir_links] outright.  The edge map itself belongs to the byte
+     layer and dies with the old link ledger (slice 6c). *)
 
   (* ------------------------------------------------------------------ *)
   (*  3.  READING AN ENTRY OFF A DIRECTORY NODE                          *)
@@ -264,8 +239,8 @@ Section FsRep.
      owed for.  This is [fnode_ent] at [s := DOTDOT], stated on its own
      because the fact it delivers -- "[ip]'s parent link is the record at
      index [k], and that record is live and names [dp]" -- is the premise
-     S7 could not previously write down at all.  Feed [k] to [fedges_acc]
-     and the [ilink dp] to convert is in hand. *)
+     S7 could not previously write down at all.  Open [DirLinks.dir_links]
+     at [k] and the [ilink dp] to convert is in hand. *)
   Lemma fnode_dotdot (γi : gname) (γfs : fs_names) (ip dp : Z)
       (ents : gmap fname Z) :
     ents !! DOTDOT = Some dp ->

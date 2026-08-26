@@ -505,7 +505,7 @@ End FsLookup.
            and the tree keys it at [dpi : Z]; [FsRep.inum_of_unsigned] is
            the round trip and this is its premise.  It IS the tree's own
            [FsTree.fs_inums_ok] at one node, so every client has it.
-     (iv)  [FsRep.fedges dpi dn data]                  -- NOT sanctioned,
+     (iv)  [DirLinks.dir_links dpi dn data]            -- NOT sanctioned,
            and it is the substantive one: a RESOURCE, the directory's
            out-edges.  §1.3 makes edges a primitive client-held fragment
            beside the node, so a client of this triple does hold it -- but
@@ -624,7 +624,7 @@ Definition wp_dirlookup_tree_body
      conjunct for them, so they ride as their own premise; nothing in the
      tree builds an [fdir] anyway (FsTree.v's §"the demonstration
      layer"). *)
-  fedges dpi dn data -∗
+  dir_links dpi dn data -∗
   FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
     (FsStateEra.era_node dn bm data) -∗
   wp_next true pj (fun (CID : CpuId) =>
@@ -644,7 +644,7 @@ Definition wp_dirlookup_tree_body
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslot -∗
-      fedges dpi dn data -∗
+      dir_links dpi dn data -∗
       FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
         (FsStateEra.era_node dn bm data) -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
@@ -718,7 +718,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     (* the ticket list, re-keyed from the tree's [Z] to the region's word *)
     iAssert (dir_links (bv_unsigned (inum_of dpi)) dn data)
       with "[Hedges]" as "Hedges".
-    { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
+    { rewrite (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     pose proof (inum_of_unsigned dpi Hdpi) as Hkeq.
     iAssert (FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs)
                (bv_unsigned (inum_of dpi)) (FsStateEra.era_node dn bm data))
@@ -744,8 +744,8 @@ Module FsLookupTree (DL : DIRLOOKUP).
        Hedges Hdiat Harm".
     iDestruct (dlinks_open with "Hedges") as "[Hedges Hetk]".
     iEval (rewrite Hkeq) in "Hetk".
-    iAssert (fedges dpi dn data) with "[Hedges]" as "Hedges".
-    { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
+    iAssert (dir_links dpi dn data) with "[Hedges]" as "Hedges".
+    { rewrite (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDd Hgd
                  with "Hcont") as "Hcont".
     iApply ("Hcont" $! mf found k kslot q
