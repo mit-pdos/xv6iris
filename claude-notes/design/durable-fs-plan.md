@@ -254,74 +254,36 @@ image (`FirstTok.first_fsinit_pures`) and nowhere else.
 
 ## 5. Boot, adequacy, and the theorem
 
-**Boot** (stage 4, NOT BUILT — the wall is BOOT ORDER, not the ghost
-theory).  The intent stands: the SAME allocator core
-(`FsDurSnap.fs_state_of_ledger` — Γ-generic, value-plus-pure-facts in,
-instance out) clones the current snapshot onto fresh era ghosts, followed by
-the era-only extras and the distribution into the region/bitmap/escrow/pool,
-REPLACING the boot-time decoding of `fs.img`.  Three things have to move
-first, and none of them is about the snapshot:
+**Boot** (stage 4, lane E-boot): the SAME allocator core
+(`FsDurSnap.fs_state_of_ledger_era` — Γ-generic, value-plus-pure-facts in,
+instance out) clones the current snapshot onto fresh era ghosts at
+PowerOn, inside `BootShared.boot_shared_alloc` where `FsCfgBoot.fs_cfg_alloc`
+runs today, followed by the era-only extras and the distribution into
+region/bitmap/escrow/pool — REPLACING the boot-time decoding of `fs.img`,
+which survives only at era 0 inside `P_fs_alloc`/`FsDurImg` (it produces
+era 0's snapshot).  The value the mint takes is `D = fr_D` of the boot
+recovery record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
+`P_dur_tie` — pure content, so it rides `riscv_power_adequacy`'s
+`Hproj`/`Ppure` with no new parameter).
 
-- **The era's byte view and cache map are born at the RAW disk, and the
-  snapshot stands at the COMMITTED one.**  `FsCfgBoot.fs_cfg_alloc` runs at
-  PowerOn (`BootShared.boot_shared_alloc`), takes `disk_bytes γv 0 (disk_read
-  dk 0 ndisk)`, and mints `fs_cache`/`fs_bytes` through `FsBoot.fs_boot_ghosts`
-  → `FsBlocks.fs_alloc` at ONE value map, `fs_blocks dk`.  Two invariants pin
-  it there: `BioInv.pool_blk`'s single existential `∃ bs, disk_block γv b bs ∗
-  fs_mclean γfs b bs` (the disk cell and the cache half must name the same
-  list, and the cell comes exclusive from `FsBoot.fs_boot_carve`), and
-  `FsBlocks.fs_bytes_body`'s `bytes_tie` (the byte view reads off the cache
-  map).  At an era whose on-disk log is DIRTY the committed view differs from
-  the raw home blocks at exactly the batch's entries, so a mint at `D` makes
-  one of those two false.  The only instant `L = D` on the home set is AFTER
-  `install_trans`/`write_head` — inside `initlog`, which runs at `forkret` →
-  `fsinit`, thousands of instructions after `fs_cfg_alloc`.
-- **So the FS ghost mint has to move behind recovery**: everything from
-  `fs_cfg_alloc`'s `fs_boot_alloc_full` onward (`ftop_alloc`, `ireg_alloc`,
-  the two `*_lend_mint`s, `ipool_alloc`, `bitmap_inv_alloc`, the byte-run
-  peels) — the block layer's half stays at PowerOn.  `IcacheBoot.icache_boot_at`
-  then also has to move or to seal an EMPTY pool, because it consumes
-  `ipool_rows` at `main+0x92`, before `fsinit` runs.  `SpecFsinit` and
-  `ProofFsinit` still carry "the on-disk header is clean" as a premise, which
-  is the same wall from the other side (the dirty-log arm has to route the
-  recovered entries' home halves out of the coverage remainder).
-- **Two era-0-only conjuncts cannot be re-derived at all**: `fs_cfg_alloc`'s
-  `dv_pin`/`fv_pin` name the mkfs image's root directory and `/init`'s bytes
-  at inum 7, and no snapshot at era N carries "/init is at inum 7".  They
-  stay behind an era-0 hypothesis.
-
-**AND THE SNAPSHOT'S TIE IS THREE CLAUSES SHORT of what the mint reads.**
-Measured against `fs_cfg_alloc`'s premises, every one is supplied by a
-`sk_*` field or by `snap_local` except:
-
-- the region's TAIL inums are not named.  `sk_dom` says `0 ≤ i < ninodes →
-  is_Some (fss_inodes S !! i)`; the era needs it at the region's WIDTH,
-  `0 ≤ i < 16·nib` (`ireg_recs` is sixteen records per region block, and
-  `ftop_alloc`/`ipool_alloc` run over `region_inums nib`).  A domain row, and
-  the commit CAN supply it — the collection's state is the `ftop` map
-  restricted to the region (`FsCollect.col_reg_map`).
-- a FREE inum's node is not known to be BARE: `fn_type n = 0 → fn_bare n`
-  (size 0, thirteen zero addresses).  PER-OBJECT, so it may go into
-  `snap_local`; it is witnessed at the image by `FsImg.fs_region_bare`
-  (conjunct (14), already inside `fs_boot_image_wf`), and the price is that
-  every `iunlock` re-proves it.
-- the ROOT's keep-alive slack: `InodeRegion.ireg_keep` holds one spare
-  `link_tok` at `ROOTINO`, and `sk_links` gives only tokens ≤ nlink without
-  the `+1` there.  PER-OBJECT (one inum), witnessed at the image by
-  `FsImg.fsimg_wf_root_link`.
-
-None of the three is a cross-inode content clause, so all three are
-admissible under §4's rule; each is a separate sweep.  Until the mint lands,
-`Himg`/`fs_boot_image_eras` cannot be deleted and `xv6_power_adequacy` stays
-vacuous.
-
-**WHAT DOES REACH EVERY ERA TODAY** is the snapshot's PURE tie, through the
-projection channel: `FsCrash.P_fs_project` reads `∃ S, snap_ok S D` off
-`P_dur` and `SystemAdequacy.fs_boot_pure` carries it, so
-"the physical disk recovers to a committed view that IS a file system" holds
-at every state the operational semantics can reach (`xv6_trace_pure`, §4b's
-corollary).  That is the durability property, exported; what it does not do
-is re-found an era, which is what deleting `Himg` needs.
+**Ghost-wise recovery is a NO-OP.**  `D` is a pure function of the raw
+disk — the header says `n = 0` and `D` is the raw home blocks, or `n > 0`
+and `D` is the raw disk with the batch installed — the snapshot describes
+`D`, and `install_trans` moves only the PHYSICAL home blocks toward `D`.
+The era's logged view `L` is therefore minted EQUAL TO `D` (§1), never to
+the raw bytes as such.  Under the clean-header premise `initlog` carries
+today (`n = 0`, fs-log.md stage 4) `D` IS the raw home set, so every
+existing boot tie (`BioInv.pool_blk`, `FsBlocks.bytes_tie`, the mirror at
+`mirror_of (fs_blocks dk)`, `SpecInitlog`'s `lm_view` row) holds unchanged
+and the mint needs no reordering.  Real recovery (`n > 0`) is where the
+pre-install window appears: the ≤ LOGSIZE pending home blocks read raw on
+the physical disk while `L = D` says otherwise.  That discrepancy is the
+WAL's to carry — it owns the physical disk and the log region inside the
+crash predicate and knows the pending set exactly — as a WAL-owned
+exception set on `pool_blk`/`bytes_tie` that `install_trans` shrinks block
+by block; the same shape as the runtime mid-install state, where the
+physical disk lags `L` on dirty buffers.  That is stage 4's design; it
+does not move the mint.
 
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
