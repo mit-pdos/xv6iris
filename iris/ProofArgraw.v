@@ -275,10 +275,10 @@ Section ProofArgraw.
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     sie_cap_gpr KT1 M k b p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) gapv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
@@ -523,10 +523,10 @@ Section ProofArgraw.
     pc_is (mword_of_int (KernelSyms.argraw + 0x22) : mword 64) -∗
     p_trapframe p ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) vgap -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) vgap -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\

@@ -340,6 +340,61 @@ proc-payload morph attempt — currently unused after the revert; remove
 if it stays dead), and `reindex`/`eslot`/`cell_acc` (the SC-only
 transports that die with the shim and become the M2/M4 worklists).
 
+### 0.9′ THE CUTOVER REHEARSAL: THE SEAL WENT HERMETIC (2026-08-26)
+
+The experiment the owner asked for -- "cut over to the real thing, see
+what breaks, oscillate back if needed" -- run in its cheapest faithful
+form: `TsoCtx`'s five surface facts are now **Qed-opaque** (the
+sig-projection seal; each has a named `_unseal` equation, and
+`TsoCtxShim` unseals by name).  This makes `ctx_pointsto` genuinely
+non-convertible to `mem_pointsto` everywhere -- the exact
+statement-level failure set the `TsoCtxTwin2` swap produces -- without
+the tsoG camera threading and machine-interp swap the full swap needs.
+
+**The result validates the conversion's shape.**  First hermetic build:
+4 red files out of ~430.  Full inventory after the error-driven rounds:
+~15 files, every one in the tier the plan already expected to be
+kit/seam territory:
+- the gen_heap leaves (WpSconfMem, WpSmodePtLeaves, WpSmodePtMem,
+  SmodeCorePt): acc/pin/chunk/win-write now cross through named shim
+  bridges; the ↦₈ leaf wrappers get ONE equivalence
+  (`WpSconfMem.wordw8_ctx`) with a hand-written continuation adapter --
+  `setoid_rewrite` fails with undefined evars under `wp_next`'s binder,
+  so the adapter re-intros the continuation and rewrites the fact at
+  the top level on both sides;
+- the phys/ident tier (DiskInv, ProcPtOwn, KstackOwn, ProcInv,
+  BootBridge);
+- the unflipped ↦₂/↦₄ towers (word2/4 intro/bytes/split/join sites);
+- `mem_ktier_mono` (tier weakening rides the raw law between two
+  shims);
+- the boot mints (BootCarveMain).
+Notably the rehearsal DELETED several flip-era conversions that had
+been wrong-direction no-ops the permeable seal silently tolerated --
+the hermetic seal is also a correctness audit of the shim usage itself.
+
+**It also strengthened the M2 finding**: under the hermetic seal the
+park lemma fails at `first_done`/`W`, not just at the caps -- every
+fact crossing the ∀-bound resume context is real M2 transport.  The
+`Abort` moved to the top of that proof.
+
+**Where this leaves the oscillation**: going back to SC-permeable is
+one edit (plain definitions in `TsoCtx` again); staying hermetic is
+STRICTLY better discipline (silent seams cannot re-grow, failures are
+fast instead of 35-minute unification crawls) and is the recommended
+resting state.  The remaining distance to the REAL swap is now sharply
+scoped: (1) the tsoG ghost class threading (TsoCtxTwin2 carries its own
+Σ assumptions), (2) replacing the `_def` bodies with the twin's and
+re-proving the law surface (each law already has a named twin image),
+(3) the kit re-proofs against TsoMem where today's shim bridges sit --
+the `Require TsoCtxShim` grep is now an HONEST inventory again, plus
+(4) the two M2 protocol items (park/resume, trap-handler caps).
+
+Residual red at the rehearsal commit (8f675587): BootCarveMain's
+`bpay_raw`/`buf_raw` whole-body conversion wants a named bridge
+(address equations + shim on the byte run); the adapted leaf wrappers
+and the `SpecSyscall.syscall_env_park` Parameter binder pending one
+verification round.
+
 ---
 
 **The PRE-REPAIR checkpoint follows, as history.** Its §0.1–§0.5

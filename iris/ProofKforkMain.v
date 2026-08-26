@@ -292,9 +292,9 @@ Section KforkArms.
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
-    iAssert (∃ w4', word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
+    iAssert (∃ w4', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
     { iExists w4. iExact "Hb4". }
-    iAssert (∃ w5', word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
+    iAssert (∃ w5', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull

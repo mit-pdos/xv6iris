@@ -192,10 +192,10 @@ Section ProofSysFstat.
     sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_fstat + 0x32) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

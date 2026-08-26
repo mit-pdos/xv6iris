@@ -316,7 +316,7 @@ Module Type SYSCALL.
      record -- everything it says that is not already [fclose_ties]. *)
   Parameter syscall_env_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf γw γft γtk : gname) (fn : fclose_names),
       fclose_ties fn ->
       (fcn_j fn < NPROC)%nat ->
@@ -340,12 +340,12 @@ Module Type SYSCALL.
   (* ...and read back out, for fork's sake *)
   Parameter syscall_env_world :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names),
       syscall_env γf pj bn fn -∗ park_world (fcn_procs fn).
   Parameter syscall_env_token :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names),
       syscall_env γf pj bn fn -∗ park_token (fcn_procs fn).
 

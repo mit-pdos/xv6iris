@@ -1505,18 +1505,18 @@ Section ProofFilewrite.
     InstrBytes.pc_is (mword_of_int (FW + 0xd4) : mword 64) -∗
     procs_inv gs -∗
     (* the twelve frame slots, none of which the body touches *)
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     file_ref gf kx qx Cf -∗
     proc_priv_core pj pidv (upd_upt V PI) -∗
     KvmSpec.kalloc_env ga None -∗

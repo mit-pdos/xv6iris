@@ -93,10 +93,10 @@ Proof. unfold NARG. lia. Qed.
    dead and belongs to the page the dying thread donates
    ([ProcDefs.kstack_closer_frame]). *)
 Lemma sex_frame_stack `{XI : CurCtx} `{!riscvGS Σ} (sp0 w1 w2 w3 w4 : mword 64) :
-  word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) w1 -∗
-  word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) w2 -∗
-  word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-  word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) w1 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) w2 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
   stack_own (KTR := KT1) sp0 4.
 Proof.
   iIntros "H1 H2 H3 H4". rewrite /stack_own.

@@ -1974,7 +1974,7 @@ Section WpSmodePtMemLeaves.
     iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-    iDestruct (word_pointsto_aligned_p (KTR := kt') with "Hbytes")
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := kt') with "Hbytes")
       as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr
               (Virtaddr (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))) 8
@@ -1990,7 +1990,7 @@ Section WpSmodePtMemLeaves.
         %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     subst misa0.
     (* the window's own claim, off byte 0, then the word refolded *)
-    iDestruct (word_pointsto_bytes (KTR := kt') with "Hbytes") as "Hbytes".
+    iDestruct (ctx_word_pointsto_bytes (KTR := kt') with "Hbytes") as "Hbytes".
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes")
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }

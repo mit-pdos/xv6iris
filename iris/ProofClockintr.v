@@ -123,8 +123,8 @@ Section ProofClockintr.
     timer_cap -∗
     sie_cap_gpr KT1 M k false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.clockintr + 0x0e) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     ( ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
           Mf !!! Regidx s0_idx = s00 /\

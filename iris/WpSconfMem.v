@@ -1588,10 +1588,12 @@ Section WpSconfMem.
               ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
-    { iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) vold). iExact "Hbyte". }
+    { iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) vold).
+      iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hbyte"). }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".
     iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
-    iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval). iExact "Hbw".
+    iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
+    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hbw").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1750,12 +1752,17 @@ Section WpSconfMem.
               (subrange_vec_dec (rget m (mword_of_int 0 : mword 5)) (8*8-1) 0)
               : mword (8*8)) = storeval).
     { unfold storeval, rget. rewrite Hx0. exact (store_ext_8 zero_reg). }
+    iEval (rewrite -(wordw8_ctx (KTR2 := ktd))) in "Hbytes".
     iApply (wp_store_s_sconf_gen (ktd := ktd) 8 false pc
               (mword_of_int 0 : mword 5) rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
               ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 Hsv
-              with "Hcg Hpc Hinstr Hbytes Hcont").
+              with "Hcg Hpc Hinstr Hbytes [Hcont]").
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
   Qed.
 
   (* c.sw x0 store (width-4 sibling of wp_sd_zero_s_sconf); moved here from

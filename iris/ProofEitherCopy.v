@@ -175,12 +175,12 @@ Section EitherCopyEpilogue.
     instr q36 true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) -∗
     instr q38 true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) -∗
     pc_is q2a -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

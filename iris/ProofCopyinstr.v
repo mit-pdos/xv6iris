@@ -304,18 +304,18 @@ Section ProofCopyinstr.
     sie_cap_gpr KT1 Mt (av - 12)%nat b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) s70 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) s80 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) s90 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) gap -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) s70 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) s80 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) s90 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) gap -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = res⌝ -∗

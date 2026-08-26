@@ -80,14 +80,14 @@ Section ProofKfork.
      depends on the path; every exit therefore takes them EXISTENTIALLY and
      the epilogue never reads them.  Slot 8 is the unused padding word. *)
   Definition kfk_frame (sp0 ra0 s00 s10 s50 : mword 64) : iProp Σ :=
-    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     (∃ w4, word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4) ∗
-     (∃ w5, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) ∗
-     (∃ w6, word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6) ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 ∗
-     (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8))%I.
+    (ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     (∃ w4, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4) ∗
+     (∃ w5, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5) ∗
+     (∃ w6, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6) ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 ∗
+     (∃ w8, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8))%I.
 
   (* ... AND THE SAME FRAME WITH THE LAZY SLOTS PINNED.                   *)
   (*                                                                      *)
@@ -102,14 +102,14 @@ Section ProofKfork.
   (* two mid-function continuations carry this form and weaken to           *)
   (* [kfk_frame] only at the exit that does not care.                       *)
   Definition kfk_frame_at (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) : iProp Σ :=
-    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 ∗
-     (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8))%I.
+    (ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 ∗
+     (∃ w8, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8))%I.
 
   Lemma kfk_frame_at_weaken (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) :
     kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 w6 -∗ kfk_frame sp0 ra0 s00 s10 s50.
@@ -268,14 +268,14 @@ Section ProofKfork.
     sie_cap_gpr KT1 Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xf6) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
