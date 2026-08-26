@@ -2338,6 +2338,22 @@ so it never wanted that shape.
   produced), `FsDurSnap.P_dur_tie`/`P_dur_node_of_slot`/
   `snap_dir_entry_of_first` (the readings), and `SystemAdequacy.fs_boot_pure`
   (`∃ S, snap_ok S D` at every reachable state).  Not worked here.
+- [ ] **Lane H — the allocator becomes a RESOURCE TRANSPORT (owner,
+  first cleanup after the theorem).**  `FsDurSnap.fs_state_of_ledger`
+  is value-first (a byte map + `snap_bytes`' pure disjointness/cut
+  clauses `sk_disj`/`sk_own_used`/`sk_meta_used`/`sk_sbok`/`sk_reg`/
+  `sk_slot`/`sk_pool`/`sk_regdom`) because it predates 4c (exclusive
+  snapshot elements) and C-8 (the collection holds the era's fragments as
+  resources).  Both ends of every transport are now `fs_state`s, so the
+  lemma is `fs_state Γ S ∗ auth Γ ==∗ fs_state Γ S ∗ auth Γ ∗ fs_state Γ'
+  S ∗ auth Γ'` — fresh ghost map built by insertion, one fragment at a
+  time, values by agreement with the source auth, the fresh-key side
+  condition from the source fragments' exclusivity INSIDE the lemma.
+  `snap_bytes` then loses every whole-map and cut clause; `snap_ok` is the
+  byte agreements plus `snap_local`; `FsCollectAll.fs_collect_snap_ok`
+  concludes with the instance, not a pure fact; the era-0 image path
+  produces a resource instance directly (`FsDurImg`).  Contained to
+  `FsDurSnap`/`FsCollect*`/`FsDurImg`/the two allocator call sites.
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two
