@@ -266,131 +266,29 @@ recovery record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
 `P_dur_tie` — pure content, so it rides `riscv_power_adequacy`'s
 `Hproj`/`Ppure` with no new parameter).
 
-**Ghost-wise recovery is a NO-OP.**  `D` is a pure function of the raw
-disk — the header says `n = 0` and `D` is the raw home blocks, or `n > 0`
-and `D` is the raw disk with the batch installed — the snapshot describes
-`D`, and `install_trans` moves only the PHYSICAL home blocks toward `D`.
-The era's logged view `L` is therefore minted EQUAL TO `D` (§1), never to
-the raw bytes as such.  Under the clean-header premise the BOOT PATH still
-carries — `SpecFsinit`'s (g); `initlog` itself has had none since 1a — `D`
-IS the raw home set, so every existing boot tie (`BioInv.pool_blk`,
-`FsBlocks.bytes_tie`, the mirror at `mirror_of (fs_blocks dk)`,
-`SpecInitlog`'s `lm_view` row) holds unchanged and the mint needs no
-reordering.  THAT PREMISE IS AS REFUTABLE AS `Himg` (any trace with a
-mid-commit crash), so it is NEVER restated as a premise of the theorem —
-no "clean header at every boot" trace assumption exists or may be added.
-AND IT IS EXACTLY WHAT KEEPS THE MINT AT POWERON FREE: the paragraph below
-is the measurement of what the mint costs once that premise goes, and "boot
-order is not a wall" is a statement about the tree WITH it, not without.  `Himg` stays in the theorem's
-statement until real recovery lands and both go together; the
-theorem's assumption list is then era 0's image and nothing else
-(the `make audit-only` baseline is the check).
-
-**REAL RECOVERY IS LANDED AT THE LOG LAYER, AND WHAT IS LEFT IS THIS
-RULING** (lane E-recover's measurement).  `initlog`/`install_trans` are
-general in `n` today: the copy loop is live, the recovering install runs
-`FsCrash.fs_install_v_seq_permit` per entry and the closing `write_head`
-runs `fs_clear_keep_seq_permit`, and initlog returns each entry's home byte
-run at the INSTALLED contents by name.  The price is that the recovering
-install MOVES the era's byte view `L` from the crashed bytes to the slots'
-logged bytes, so initlog's caller must own the pending home blocks' byte
-runs across the call — and `fsinit`, the only caller, cannot, because a
-pending block is any covered home block (not just one of `FirstTok`'s
-coverage remainder) and every other home run was spent into the era's
-instance in the PowerOn fupd.  That is the whole of why `SpecFsinit` still
-carries `hdr_n = 0`, and it is a ruling about WHERE THE ERA'S INSTANCE IS
-BORN, with two exits:
-
-- **`L` minted at `D` (the mint stays at PowerOn).**  Recovery is then a
-  ghost no-op on `L` and initlog needs no home runs.  The exception set is
-  on `FsBlocks.bytes_tie`, NOT on `BioInv.pool_blk`: the CACHE map and the
-  physical disk still agree at the crashed bytes on the pending set, so the
-  pool's disk-cell tie is honest and it is the cache-against-byte-view row
-  that is false there.  It lives in `fs_bytes_body`, the recovering install
-  shrinks it block by block (moving the CACHE map, not `L`), and it must be
-  SEALED empty before any crossing lemma (`fs_bytes_agree` and its four
-  siblings) is sound — which means the seal has to reach all three carriers
-  of the byte row, `LogInv.log_ctx`, `BitmapInv.bitmap_inv` and
-  `InodeRegion.ireg_inv`, and the last two are minted at PowerOn, before
-  recovery has run.  Footprint: `fs_bytes_inv` in 14 files, ~28 crossing
-  sites, `fs_names` one field.
-- **The instance minted AFTER recovery**, inside `fsinit` between initlog's
-  return and `ireclaim`'s call, out of the whole home ledger threaded
-  through `SpecFsinit` at the crashed bytes.  No exception set exists at
-  all, `L` moves during recovery exactly as it does today, and the premise
-  is simply deleted.  The gnames still come from `fs_cfg_alloc` at PowerOn;
-  what moves is only the DISTRIBUTION into region/bitmap/escrow/pool.
-
-**AND EITHER WAY, ONE DURABLE INVARIANT IS STILL MISSING:** the on-disk
-log's write set never names BLOCK 1.  `fsinit` reads the superblock off the
-RAW disk at `readsb`, before recovery has run, so `first_fsinit_pures`'
-superblock facts are about the raw bytes while the snapshot describes `D`;
-without `1 ∉ (hdr_dec …).2` those two cannot be identified, and `hdr_wf`
-does not say it (it says only "covered home blocks").  It is provable —
-block 1's run sits at fraction 1 in `SbPark.sb_park` inside `log_ctx`, so
-no `log_write` can ever name it — but it costs a row in `LogInv.log_state`,
-the refutation at `log_write`, and a conjunct on `hdr_wf`.
-
-**THE SNAPSHOT'S TIE WAS THREE CLAUSES SHORT; TWO ARE LANDED (lane E-boot).**
-Measured against `fs_cfg_alloc`'s premises, every one is supplied by a `sk_*`
-field or by `snap_local` except:
-
-- the region's TAIL inums were not named.  `sk_dom` says `0 ≤ i < ninodes`;
-  the era needs the region's WIDTH (`ireg_recs` is sixteen records per region
-  block, and `ftop_alloc`/`ipool_alloc` run over `region_inums nib`).  LANDED
-  as `FsDurSnap.sk_regdom` at `0 ≤ i < 16·(ninodes/16 + 1)` — the width off
-  `S`'s own superblock, since a `snap_bytes` clause is a function of `S` and
-  `D` alone.  Image witness `FsDurImg.img_snap_ok`; commit supplier
-  `FsCollect.col_snap_bytes`, off `col_hand`'s domain row against the new
-  `col_geom` field `cg_width : nib = ninodes/16 + 1`.
-- a FREE inum's node was not known to be BARE.  LANDED as
-  `FsStateInode.inl_bare_free` (`fn_type n = 0 → fn_bare n`), the LAST field
-  of `inode_local`.  It swept NOTHING: `inode_local` has exactly two
-  constructors, and `FsStateEra.inode_local_of_ok` is vacuous at it because
-  `inode_ok` carries `di_type ≠ 0`.
-- the ROOT's keep-alive slack (`InodeRegion.ireg_keep` holds one spare
-  `link_tok` at `ROOTINO`, and `sk_links` gives only tokens ≤ nlink).  NOT
-  landed: its form is `✓ (link_elem (fss_inodes S) ⋅ link_tok_elem ROOTINO 1)`
-  beside `sk_links` — the form the mint consumes, since one `own_alloc` then
-  yields `fs_links` plus the spare token — the image discharges it from
-  `FsImg.fsimg_wf_root_link` through `FsDurImg.img_link_valid`, and the
-  COMMIT's supplier is the region's `ireg_keep`, i.e. a new `col_hand` row and
-  a new region opening in `FsCollectAll`.  Only the mint consumes it, so §7's
-  discipline says it lands with the mint.
-
-**WHAT BLOCKS THE MINT IS THE OLD LINK LEDGER**, and `iris/FsBootWall.v` is
-the machine-checked statement.  The file-system predicate's own content IS
-reachable from `snap_ok`: the node map and abstract map (`fs_boot_alloc_full`
-/ `ftop_alloc` at `fss_inodes S` with `snap_local`), the records and the
-region's ∀-over-decodings premises (`sk_rec` + `rec_in_blk_inj`, then
-`inl_type`/`inl_nlink`/`inl_free`/`inl_bare_free`), the bitmap and free pool
-(`sk_bmap`/`sk_pool`/`fss_used`), and the NEW link family (`sk_links` IS
-`fs_links_alloc`'s premise, and `inode_link_iff` splits it into the region's
-authority and each directory's `ent_toks`).  What is not is `DirLinks`:
-`IcacheBoot.ipool_alloc`'s per-inum bundle wants `IcacheEscrow.dlinks`, whose
-first conjunct is `DirLinks.dir_links`, and boot's only constructor for a
-directory is the ALL-PLAIN stock `DirLinks.dir_links_of_plain`, whose
-`dlc_bound (λ _, false)` IS `nlink ≤ 1` and whose parent-tie premise says a
-live directory with a `..` IS the root.  Both are mkfs-image facts, false at
-any era where `mkdir` has run — create's mkdir arm does `dp->nlink++`.
-Region-side the same fact is `IcacheBoot.image_dir_wl0` /
-`InodeRegion.ireg_dir_wl0`.  Choosing a d-flavoured `F` instead needs the
-TARGET's type (cross-inode) plus the exact accounting `nlink ≤ 1 + #subdirs`,
-the parent registers minted off record 1, and `ireg_alloc`'s ledger premise
-generalised to nonzero `wdu`/`wdt`.  All of it lives in the ledger lane G is
-to DEMOLISH, so **lane G precedes the mint**; after it, `dlinks = ent_toks`
-and the pool's bundle is `snap_ok`-reachable.  Three further per-object
-clauses `ipool_alloc` needs and `snap_ok` lacks — `DirView.dir_ok`,
-`dir_dots_ix` (POSITIONAL: records 0 and 1 ARE the dots, which
-`inl_dir_dot`/`inl_dir_dotdot` do NOT say — those are about the name→inum
-view `dir_entries`, blind to which record carries the name) and
-`dir_orphan_clean` — are then one `snap_local` sweep, each already re-proved
-at every `iunlock` by the escrow's deposit arms.
-
-**Two era-0-only conjuncts cannot be re-derived at all**: `fs_cfg_alloc`'s
-`dv_pin`/`fv_pin` name the mkfs image's root directory and `/init`'s bytes at
-inum 7, and no snapshot at era N carries "/init is at inum 7".  They stay
-behind an era-0 hypothesis.
+**Ghost-wise recovery is a NO-OP, and the mint runs AFTER it (RULING).**
+`D` is a pure function of the raw disk — the header says `n = 0` and `D`
+is the raw home blocks, or `n > 0` and `D` is the raw disk with the
+batch installed — the snapshot describes `D`, and `install_trans` moves
+only the physical home blocks toward `D`.  Real `n > 0` recovery IS
+PROVEN at the log layer (`SpecInitlog` takes `hdr_wf`, its copy loop is
+live, `SpecInstallTrans` is general); what `initlog` does to the era's
+byte view is MOVE `L` on the pending home blocks from the crashed bytes
+to the logged ones, so its caller must OWN those runs across the call.
+Hence the era's file-system instance is minted inside `fsinit`, after
+`initlog` returns and before `ireclaim`: at PowerOn the block layer and
+the WAL are minted as today (`L` at the raw disk, every home run in the
+boot thread's hand), `fsinit` hands `initlog` the pending runs and gets
+them back at `D`, and the mint from the snapshot then finds every run
+equal to `D` — no exception set, no change to the WAL's ties.  The
+icache's slot escrows and pool are sealed EMPTY at PowerOn (`iinit`
+needs only the lock) and stocked by the same mint; `fs_ready_establish`
+already runs after `fsinit`, so every downstream credential comes from
+`fsinit`'s post.  `SpecFsinit`'s clean-header premise disappears with
+the ownership it stood in for.  One small fact the mint needs under any
+placement: the log's write set never names block 1 (`fsinit` reads the
+superblock off the raw disk before recovery; `sb_park`'s full-fraction
+run refutes any `log_write` at block 1 — a row of `log_state`).
 
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
