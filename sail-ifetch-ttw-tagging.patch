@@ -1,0 +1,98 @@
+From 00046a778f1f62212d37ac7199f415b43b260764 Mon Sep 17 00:00:00 2001
+From: Nickolai Zeldovich <kolyaz@gmail.com>
+Date: Wed, 26 Aug 2026 11:02:31 -0400
+Subject: [PATCH] Tag instruction fetches and page-table walks at the
+ concurrency interface
+
+A fetch, a translation-table walk and an ordinary data load were
+indistinguishable at the Mem_read_request: read_kind_of_flags chooses the
+read kind from the acquire/release/reserved flags alone, so every one of
+them arrived as AK_explicit {AV_plain; AS_normal}.  AK_ifetch had a
+producer only via Read_ifetch, which nothing in the model ever passes,
+and AK_ttw had no producer at all.
+
+That makes a memory model unable to state the standard architectural
+split: the ISA memory model governs EXPLICIT accesses, while fetch and
+walk coherence are separate axes (Zifencei / Svvptc / sfence.vma).  A
+consumer that wants to keep fetches and walks coherent while giving
+explicit accesses a relaxed semantics has nothing to key on.
+
+So decide the read kind from the ACCESS TYPE:
+
+  - InstructionFetch()   -> Read_ifetch  -> AK_ifetch()
+  - Load(PageTableEntry) -> Read_ttw     -> AK_ttw()      (new kind)
+  - everything else      -> unchanged, read_kind_of_flags(aq, rl, res)
+
+A RESERVED read keeps its exclusive kind whatever it is reading: the
+A/D-bit update reads its PTE through read_pte_exclusive with res = true
+and must stay an exclusive access, so the match is guarded on res and it
+falls through to the flag-based choice.
+
+Read_plain therefore still means exactly what it meant -- an explicit
+data load -- and no existing kind changes meaning.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JydfJbMNN5S3672igkhL7e
+---
+ model/core/phys_mem_interface.sail |  9 +++++++++
+ model/sys/mem.sail                 | 17 ++++++++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/model/core/phys_mem_interface.sail b/model/core/phys_mem_interface.sail
+index 688350c..cb41ca5 100644
+--- a/model/core/phys_mem_interface.sail
++++ b/model/core/phys_mem_interface.sail
+@@ -30,6 +30,14 @@ enum write_kind = {
+ enum read_kind = {
+   Read_plain,
+   Read_ifetch,
++  // A translation-table walk's read of a PTE.  Like an instruction fetch
++  // this is NOT an explicit access: the ISA memory model governs explicit
++  // accesses, and walk coherence is a separate architectural axis (Svvptc /
++  // sfence.vma discipline).  It therefore gets its own kind, mapping to the
++  // concurrency interface's AK_ttw, so that a memory model downstream can
++  // tell a walk from a data load.  Before this, a walk was indistinguishable
++  // from a plain load at the interface and AK_ttw had no producer at all.
++  Read_ttw,
+   // Note: Read_RISCV_acquire and Read_RISCV_strong_acquire are currently
+   // unused but removing them may break Isla, and they might be used in future
+   // by Zalasr.
+@@ -128,6 +136,7 @@ function read_ram(rk, Physaddr(addr), width, read_meta) = {
+     access_kind = match rk {
+       Read_plain => AK_explicit(struct { variety = AV_plain, strength = AS_normal }),
+       Read_ifetch => AK_ifetch(),
++      Read_ttw => AK_ttw(),
+       Read_RISCV_acquire => internal_error(__FILE__, __LINE__, "Read_RISCV_acquire is unused"),
+       Read_RISCV_strong_acquire => internal_error(__FILE__, __LINE__, "Read_RISCV_strong_acquire is unused"),
+       Read_RISCV_reserved => AK_explicit(struct { variety = AV_exclusive, strength = AS_normal }),
+diff --git a/model/sys/mem.sail b/model/sys/mem.sail
+index eca43a5..f0e6eac 100644
+--- a/model/sys/mem.sail
++++ b/model/sys/mem.sail
+@@ -278,7 +278,22 @@ private function checked_mem_read forall 'n, 0 < 'n <= max_mem_access . (
+   var i : range(0, 'N - 1) = first;
+   var finished : bool = false;
+ 
+-  let rk = read_kind_of_flags(aq, rl, res);
++  // THE READ KIND IS DECIDED BY THE ACCESS TYPE, not by the ordering flags
++  // alone.  An instruction fetch and a translation-table walk are not
++  // EXPLICIT accesses, and the concurrency interface has kinds that say so
++  // (AK_ifetch / AK_ttw); tagging them here is what lets a downstream memory
++  // model govern explicit accesses without also governing fetch and walk
++  // coherence, which are separate architectural axes.
++  //
++  // A RESERVED read keeps its exclusive kind whatever it is reading: the
++  // A/D-bit update reads its PTE with res = true (read_pte_exclusive) and
++  // must stay an exclusive access, so it deliberately falls through to the
++  // flag-based choice below.
++  let rk : read_kind = match (access, res) {
++    (InstructionFetch(), false)   => Read_ifetch,
++    (Load(PageTableEntry), false) => Read_ttw,
++    (_, _)                        => read_kind_of_flags(aq, rl, res),
++  };
+ 
+   repeat {
+     let offset = i;
+-- 
+2.53.0
+
