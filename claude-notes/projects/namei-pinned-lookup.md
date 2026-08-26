@@ -1,3 +1,16 @@
+> **OWNER DECISION (durable-disk lane E): the era-0 exec-of-`/init` machinery
+> is DISABLED on the boot chain, not ported.**  `FsCfgBoot.dv_pin`/`fv_pin`
+> (the root's contents are the image's; `/init` is inum 7 with the tracked
+> bytes), `NameiInitPinned`/`DirViewPin`, and kexec's "loads `/init` at its
+> entry" are image-content facts that are false at any era after a crash
+> and are not file-system-durability facts.  The era's file system is
+> minted from the durable snapshot; the boot chain uses the generic exec
+> contract at whatever inum 7 holds.  The pinned-lookup results are kept
+> in the tree but commented out / off the boot chain, to be PORTED by the
+> file-system BEHAVIOUR specification project
+> ([`../design/fs-syscall-specs.md`](../design/fs-syscall-specs.md)) onto
+> its user-process-perspective abstract state.  Not worked further here.
+
 # namei, pinned: a ghost-state spec for WHICH inode the walk returns
 
 > **Audited 2026-08-22.** Stages N-1 through N-5.2B are LANDED and linked
