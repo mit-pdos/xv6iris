@@ -2419,6 +2419,58 @@ so it never wanted that shape.
     SystemAdequacy); `log_state` is constructed only in ProofInitlog,
     ProofBeginOp, ProofLogWrite, ProofEndOp and the install path, and in NO
     forbidden file.
+
+    **AS LANDED (E-blk1): THE WALL IS DOWN, AND IT COST NO CALL SITE
+    ANYTHING.**  `LogInv.log_state`'s write-set row gained a third conjunct,
+    `uint w <> FsImg.SB_BNO`, LAST *inside* the row -- so `log_state`'s own
+    arity did not move and every pass-through pack/unpack (`ProofBeginOp`'s
+    `bo_batch_lhn`, `ProofInitlog`'s boot pack at `W = []`, `ProofEndOp`'s
+    `eo_open_of_batch`/`eo_open_to_batch`) is untouched; what moved is the
+    eight sites that read the row AS A PAIR, each by one `proj`.
+    `FsCrash.hdr_wf` gains the same conjunct in the same position, so the
+    fact survives a power cycle, and `fs_commit_L_sector0_rec` /
+    `fs_commit_L_seq_permit` -- the only permits that write a NONZERO header
+    -- each gained ONE premise, `∀ b ∈ Ws, b ≠ SB_BNO`, discharged in
+    `ProofEndOp` by the new `eo_hdr_ne_sb` off that row.  Every other
+    `hdr_wf` producer is `hdr_wf_zero` or a header-unchanged congruence and
+    did not move; `SpecInitlog` takes `hdr_wf`'s three clauses SEPARATELY and
+    its third stays the two-way one (its supplier is at a clean header).
+
+    THE REFUTATION IS A RESOURCE, AND THE MASK IS WHAT MADE IT ONE.
+    `log_write`'s byte-range AU hands the callee the caller's window at
+    FRACTION 1 and `SbPark`'s park holds block 1's whole run at fraction 1
+    inside `log_ctx`, so two full owners of one byte refute the write
+    (`FsBlocks.fsblock_byte_range_ne`, the sub-block reading of
+    `fsblock_ne_full`; `SbPark.sb_parked_bno_ne` is the fupd `ProofLogWrite`
+    fires).  But the only instant at which the caller's run exists is INSIDE
+    the update's window, whose mask is the caller's `Efs`, and about which
+    the contract promises exactly one thing: `↑logN ⊆ Efs`.  So `logN` became
+    a namespace FAMILY -- the byte view's own invariant moved to
+    `FsBlocks.fsbN = logN .@ "b"` and the park to `SbPark.sbN = logN .@ "sb"`,
+    SIBLINGS because the commit holds the byte view open while the collection
+    reads block 1.  `logN`'s own value did not move, so every `↑logN ⊆ E`
+    premise in the tree is byte-identical and no caller of `wp_log_write_*`
+    gained a premise (the alternative the E-clauses banner priced would have
+    landed on ~20 of them).  What did move: the seven `inv_acc E logN` inside
+    `FsBlocks`/`BitmapInv`/`FsStateEra` (now `fsbN`, via `FsBlocks.fsbN_sub`),
+    the committer's own open (`ProofEndOp.eo_snap_law_of_auth`), the constant
+    `LogSnapLaw`'s closure is disjoint from (`↑logN ## N` → `↑fsbN ## N`, and
+    `snap_law_run`'s mask `⊤ ∖ ↑logN` → `⊤ ∖ ↑fsbN`), and
+    `FsCollectAll.fs_snap_law_build`'s `solve_ndisj`, which has to be spelled
+    out now that `sbN` sits inside `logN`.  `SbPark.logN_sbN_disj` is
+    `fsbN_sbN_disj`.
+
+    WHAT THE MINT READS.  `FsCrash.fs_recovery_untouched` keeps its general
+    statement and its hypothesis is now DISCHARGED:
+    `FsCrash.fs_recovery_sb_raw` says `fr_D r !! SB_BNO = Some (P SB_BNO)`
+    off `hdr_wf` plus `SB_BNO ∈ fs_home_set cov logstart` (which
+    `FsCollectImg.img_sb_home` supplies from the image's geometry), and
+    `FsCrash.fs_recovery_sb_parse` reads that against the snapshot's own two
+    superblock clauses (`FsDurSnap.sk_sb`/`sk_parse`): the bytes `readsb`
+    parses off the RAW disk ARE `fss_sbb S`, hence its record IS `fss_sb S`.
+    `fsinit`'s superblock and the snapshot's superblock are one record, which
+    is what E-boot's mint was missing.  Nothing in `SpecFsinit`/`ProofFsinit`
+    moved -- consuming these two is E-boot's step.
   - **E-recover** (fs-log.md stage 4) — real `n > 0` recovery in
     `initlog`/`install_trans`, with the WAL-owned exception set for the
     ≤ LOGSIZE pending home blocks that `install_trans` shrinks (plan §5);
