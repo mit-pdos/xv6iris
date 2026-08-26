@@ -364,11 +364,16 @@ Definition wp_fsinit_sconf_body
              set is NOT confined to [FirstTok]'s coverage remainder (the
              blocks the era mint did not spend).  The log's whole purpose is
              to write blocks the file system owns;
-           - every other home block's byte run was spent into the era's
-             file-system instance in the PowerOn fupd -- distributed into
-             [InodeRegion.ireg_recs], the icache escrows, the pool and
-             [BitmapInv.bitmap_inv] -- and nothing short of the commit's
-             collection at quiescence takes them back out.
+           - and the remainder is not a route in any case: [FsCfgBoot]'s own
+             note on [fs_kit_spent] says what is left in it is "whatever
+             [cov] holds that the file system's own geometry does not name
+             -- AT THE LITERAL IMAGE, NOTHING".  The era mint spends block 1,
+             the log region, the inode region, the bitmap block AND the whole
+             free pool, and every live inode's blocks;
+           - every home block's byte run therefore sits inside the era's
+             file-system instance -- [InodeRegion.ireg_recs], the icache
+             escrows, the pool, [BitmapInv.bitmap_inv] -- and nothing short
+             of the commit's collection at quiescence takes one back out.
 
          THE TWO EXITS, both of them rulings above this file:
 

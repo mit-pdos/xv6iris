@@ -2345,10 +2345,15 @@ so it never wanted that shape.
     `hdr_n bs_hdr = 0` cannot be deleted from below.  The recovering
     install MOVES the era's byte view `L` from the crashed bytes to the
     slots' logged bytes, so initlog's caller must own the pending home
-    blocks' byte runs across the call; `fsinit` cannot, because a pending
-    block is any covered home block — not just one of `FirstTok`'s
-    coverage remainder — and every other home run was spent into the era's
-    instance in the PowerOn fupd.  The two exits are written out in
+    blocks' byte runs across the call; `fsinit` cannot.  The old comment's
+    route — peel them out of `FirstTok`'s coverage remainder — is vacuous:
+    `FsCfgBoot`'s own note on `fs_kit_spent` says the remainder holds
+    "whatever `cov` holds that the file system's own geometry does not name
+    — at the literal image, NOTHING", the mint having spent block 1, the log
+    region, the inode region, the bitmap block, the whole free pool and
+    every live inode's blocks.  Every home run is inside the era's
+    instance, and nothing short of the commit's collection at quiescence
+    takes one back out.  The two exits are written out in
     `SpecFsinit.v`'s premise (g) and in plan §5, which this pass rewrote:
     (1) mint `L` at `D` and carry a WAL-owned exception set — and the
     measurement says it lands on `FsBlocks.bytes_tie`, NOT on
