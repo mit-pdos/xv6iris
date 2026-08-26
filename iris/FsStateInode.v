@@ -625,124 +625,146 @@ Section InodeOwned.
      ∗ ind_owned Γ n)%I.
 
   (* ---------------------------------------------------------------- *)
-  (*  4.  The link tokens an inode's directory entries carry           *)
+  (*  4.  The TYPE REGISTER's fragments an inode's entries carry       *)
+  (*      (fs-state.md section 6.5 -- lane G5's ruling)                *)
   (* ---------------------------------------------------------------- *)
 
-  (* THREE EXEMPTIONS, and each of them is the kernel's own arithmetic.
-
-     - A SELF RECORD -- an entry whose TARGET is the home inum.  That is
-       the image's own counting rule verbatim ([FsImg.fs_rec_ticket]'s
-       [negb (dir_inum = self)] guard), and it covers both of the cases
-       the kernel cares about: ["."], which xv6 deliberately does not
-       count ("No ip->nlink++ for '.': avoid cyclic ref count"), and the
-       ROOT's [".."], which names the root.
-       What the SELF exemption buys beyond ["."] is the ROOT KEEP-ALIVE
-       TOKEN: with root's [".."] tokenless the image's [nlink = 1] is
-       unaccounted for, so the inode region can park one [link_tok] at
-       [ireg_root] that nothing ever spends, and "the root is allocated"
-       becomes a reading of the RA's own law rather than a maintained
-       clause.  Stating it at the TARGET rather than at the NAME is also
-       what makes the boot's token supply come out of W9: the image's
-       ticket list exempts exactly the self records, so a name-keyed
-       token demand never exceeds the record-keyed ticket count.
-     - EITHER DOT NAME AT AN ORPHAN.  [".."] is the parent's: it took that
-       token back when it removed the directory's name, and the record it
-       left behind is exactly this kernel's grey ".." (fs-icache.md
-       section 20).  ["."] is the home's OWN, and at a LIVE directory the
-       self rule above already covers it -- [inl_dir_dot] says a live
-       directory's ["."] names its home.  At an ORPHAN that clause is
-       withdrawn ([inl_dir_dot] is guarded by [fn_nlink <> 0]) and there is
-       no longer anything to tie the record to its home, so the exemption
-       has to be stated at the NAME as well; create's [fail:] arm parks
-       exactly such a record.
-       IT IS GUARDED BY [orph] AND THAT IS LOAD-BEARING (durable-disk
-       2b-inode-5, step 3).  An unconditional ["."] exemption would make
-       licence (a)'s borrow ([FsStateEra.ent_toks_borrow]) owe "the matched
-       record is not a dot record" at every [dirlookup] -- a fact whose
-       only source is [DirView.dir_dots_ix], which create's own [mkdir]
-       arms provably cannot supply (a fresh child has [nrec = 0], and after
-       the ["."] write [nrec = 1], while [dir_dots_ix] demands two).  Under
-       the guard the borrow owes only [orph = false], which the found arm
-       already holds out of [SpecDirlookup.dl_lic_live]. *)
-  Definition ent_tokenless (self : Z) (orph : bool) (s : fname) (t : Z)
-    : bool :=
-    bool_decide (t = self)
-    || ((bool_decide (s = DOT) || bool_decide (s = DOTDOT)) && orph).
-
-  (* THE REGISTER UNIT AN ENTRY CARRIES BESIDE ITS TOKEN (fs-state.md
-     section 6.5; FsParRefute.v for why THIS shape).  A NAME record of
-     [self] is a namer of its target and says so, [Some self]; an
-     up-pointing record is NOT ([None]) -- it points the other way -- but
-     still carries a unit, because it still holds one link and the bound
-     [size P <= nlink] has to survive the decrement that removes it.
-     It never asks what the target's TYPE is, which is what makes it
-     definable one inode at a time. *)
-  Definition ent_par_val (self : Z) (s : fname) : option Z :=
-    if bool_decide (s = DOT) || bool_decide (s = DOTDOT)
-    then None else Some self.
-
-  Definition ent_tok Γ (self : Z) (orph : bool) (s : fname) (t : Z)
-    : iProp Σ :=
-    (if ent_tokenless self orph s t then emp
-     else link_tok Γ t ∗ par_tok Γ t (ent_par_val self s))%I.
-
-  Definition ent_toks Γ (i : Z) (n : fs_node) : iProp Σ :=
-    ([∗ map] s ↦ t ∈ dir_entries n, ent_tok Γ i (fn_orphan n) s t)%I.
-
-  (* the same thing as ONE resource-algebra element -- what the mint
-     allocates (fs-state.md section 1, "Functoriality") *)
-  Definition ent_elem (self : Z) (orph : bool) (s : fname) (t : Z)
-    : fsLinkUR :=
-    if ent_tokenless self orph s t then ε
-    else link_tok_elem t 1 ⋅ par_tok_elem t (ent_par_val self s).
-
-
-  (* ---------------------------------------------------------------- *)
-  (*  4b. THE PARENT REGISTER's AUTHORITY                              *)
-  (*      (fs-state.md section 6.5; FsParRefute.v for why THIS shape)   *)
-  (*                                                                   *)
-  (*  The fragments ride with the entry tokens above.  What is left is  *)
-  (*  the inum's OWN authority, which lives in ITS OWN bundle -- where  *)
-  (*  ITS OWN data is in hand, so "a LIVE DIRECTORY admits only its own *)
-  (*  up-pointing target as a namer" is a clause about ONE inode.       *)
-  (* ---------------------------------------------------------------- *)
-
-  (* a live directory's up-pointing target: the ONE inum that may name it.
+  (* a directory's up-pointing target: the inum its [".."] names.
      [inl_dir_dotdot] makes the [default] unreachable where it is read. *)
   Definition fn_dotdot (n : fs_node) : Z :=
     default 0 (dir_entries n !! DOTDOT).
 
-  (* THE CLAUSE ON THE AUTHORITY, and it is about ONE inode.  The bound
-     [size P <= nlink] is what makes a FREED inum's register EMPTY, so the
-     next mkdir can install its own singleton (FsParRefute.v section 2 is
-     the refutation of every shape that cannot); it survives every count
-     move because every token carries exactly one register unit.
+  (* THE NODE'S REGISTER VALUE IS NOT A FUNCTION OF THE NODE, and create's
+     mkdir arm is why.  The value is FIXED at the FILL -- the flush that
+     takes the multiplicity from zero, where a retype is free -- and xv6
+     writes the child's [".."] only AFTER it ([dirlink(ip, "..", dp)] runs
+     two instructions later).  A value read off the [".."] ENTRY would
+     therefore have to MOVE at that write, at a multiplicity of two, which
+     is not a frame-preserving update.
 
-     THE DIRECTORY CLAUSE IS NOT HERE YET, and where it goes is decided:
-     "a live directory admits only its own up-pointing target as a namer"
-     reads the node's DATA, so it can only be stated where the data is --
-     the checked-out payload ([IcacheEscrow.dlinks], whose [data] parameter
-     is right there), not the inode region, whose slot carries the record
-     alone.  Until [dlinks] loses [DirLinks.dir_links] and gains this
-     authority, the register's authority parks region-side under the bound
-     alone and the fragments' VALUES are carried but not yet read. *)
-  Definition fn_par_ok (n : fs_node) (P : gmultiset (option Z)) : Prop :=
-    (size P <= fn_nlink n)%nat.
+     So the bundle binds the value existentially, tied to the node only
+     through its TYPE ([fn_ity_ok]), and the ["."] fragment carries the
+     PARENT -- under a guard: "if my [".."] entry exists, it names the [p]
+     my value carries".  The guard is vacuous exactly across create's
+     window and is discharged everywhere rmdir's (D1) reads it, because a
+     LIVE directory has a [".."] ([inode_local]'s [inl_dir_dotdot]). *)
+  Definition fn_ity_ok (n : fs_node) (v : ity) : Prop :=
+    match v with
+    | TFile => fn_is_dir n = false
+    | TDir _ => fn_is_dir n = true
+    end.
 
-  Definition inode_par Γ (i : Z) (n : fs_node) : iProp Σ :=
-    (∃ P, par_auth Γ i P ∗ ⌜fn_par_ok n P⌝)%I.
+  Lemma fn_ity_ok_ex n : exists v, fn_ity_ok n v.
+  Proof.
+    destruct (fn_is_dir n) eqn:E; [exists (TDir 0) | exists TFile]; exact E.
+  Qed.
 
-  Definition link_elem_node (i : Z) (n : fs_node) (P : gmultiset (option Z))
-    : fsLinkUR :=
-    (link_auth_elem i (fn_nlink n) ⋅ par_auth_elem i P)
-    ⋅ ([^op map] s ↦ t ∈ dir_entries n, ent_elem i (fn_orphan n) s t).
+  (* ...AND ITS MULTIPLICITY: one unit per COUNTED dirent, plus the ["."]
+     a LIVE directory holds in its own bundle -- the [+1] xv6 deliberately
+     does not count ("No ip->nlink++ for '.'").  An ORPHAN directory's
+     dots are tokenless, so its multiplicity is its count, namely zero,
+     and the free path's type write needs no fragment. *)
+  Definition fn_mult (n : fs_node) : nat :=
+    (fn_nlink n + if fn_is_dir n && negb (fn_orphan n) then 1%nat else 0%nat)%nat.
 
-  (* the Φ-FREE part of an inode: the link ghosts and the local clauses.
-     [inode_par] is LAST, so no destructuring pattern above it moves
-     (durable-notes.md). *)
+  (* at [nlink = 0] there is no bonus WHATEVER the type is, so an orphan's
+     -- and a free record's -- register is empty and the type write is not
+     an update at all *)
+  Lemma fn_mult_zero n : fn_nlink n = 0%nat -> fn_mult n = 0%nat.
+  Proof.
+    intros Hz. rewrite /fn_mult Hz /fn_orphan
+      (bool_decide_eq_true_2 (fn_nlink n = 0%nat) Hz) andb_false_r //.
+  Qed.
+
+  Lemma fn_mult_ge n : (fn_nlink n <= fn_mult n)%nat.
+  Proof. rewrite /fn_mult. destruct (_ && _)%bool; lia. Qed.
+
+  (* TWO EXEMPTIONS, and each is the kernel's own arithmetic.
+
+     - EITHER DOT NAME AT AN ORPHAN.  [".."] is the parent's: it took that
+       unit back when it removed the directory's name, and the record it
+       left behind is exactly this kernel's grey ".." (fs-icache.md
+       section 20).  ["."] is the home's OWN and it is the [+1] above,
+       which an orphan does not have -- so it goes at the same step, and
+       [ip->nlink--] at a directory returns TWO units (the name's and the
+       ["."]'s), which is rmdir's own arithmetic.
+     - THE ROOT'S [".."], which names the ROOT.  With it tokenless the
+       image's [nlink = 1] at the root is unaccounted for by any entry,
+       and the inode region can park one unspendable fragment there
+       ([InodeRegion.ireg_keep]) -- which is the ONLY source
+       [IgetLic]'s licence (f) has, since namei's [iget(ROOTINO)] holds
+       nothing at all and every other fragment at the root lives in the
+       root's own checked-out payload.
+
+     THERE IS NO GENERAL SELF EXEMPTION any more (lane G5): ["."] at a
+     LIVE directory carries a fragment, and it is that fragment that ties
+     the region's existential parent to the [".."] entry. *)
+  Definition ent_tokenless (self : Z) (orph : bool) (s : fname) (t : Z)
+    : bool :=
+    ((bool_decide (s = DOT) || bool_decide (s = DOTDOT)) && orph)
+    || (bool_decide (s = DOTDOT) && bool_decide (t = self)).
+
+  (* WHAT THE HOLDER ASSERTS ABOUT THE FRAGMENT'S VALUE, per flavour:
+
+     - a NAME record (neither dot) in [self]: "if my target is a
+       directory, its parent is ME".  It needs nothing about the target's
+       type -- the fragment reveals it.
+     - ["."]: the home's OWN value [sty].  At a directory that is
+       [TDir (fn_dotdot n)], so this fragment is the TIE between the
+       region's authority and the [".."] entry: rmdir's (D1).
+     - [".."]: nothing.  The parent's own value is about the
+       grandparent. *)
+  Definition ent_ty_ok (self : Z) (dd : option Z) (s : fname) (ty : ity)
+    : Prop :=
+    if bool_decide (s = DOT)
+    then forall p q, ty = TDir p -> dd = Some q -> q = p
+    else if bool_decide (s = DOTDOT) then True
+    else forall p, ty = TDir p -> p = self.
+
+  (* the fragment at a KNOWN value -- the shape the pack/scatter and the
+     boot's routing walk *)
+  Definition ent_tok_at Γ (self : Z) (orph : bool) (s : fname) (t : Z)
+      (ty : ity) : iProp Σ :=
+    (if ent_tokenless self orph s t then emp else link_tok Γ t ty)%I.
+
+  Definition ent_tok Γ (self : Z) (dd : option Z) (orph : bool) (s : fname)
+      (t : Z) : iProp Σ :=
+    (if ent_tokenless self orph s t then emp
+     else ∃ ty, link_tok Γ t ty ∗ ⌜ent_ty_ok self dd s ty⌝)%I.
+
+  Definition fn_dd (n : fs_node) : option Z := dir_entries n !! DOTDOT.
+
+  Definition ent_toks Γ (i : Z) (n : fs_node) : iProp Σ :=
+    ([∗ map] s ↦ t ∈ dir_entries n,
+       ent_tok Γ i (fn_dd n) (fn_orphan n) s t)%I.
+
+  (* the same thing as ONE resource-algebra element -- what the mint
+     allocates (fs-state.md section 1, "Functoriality") *)
+  Definition ent_elem (self : Z) (orph : bool) (s : fname) (t : Z)
+      (ty : ity) : fsLinkUR :=
+    if ent_tokenless self orph s t then ε else link_tok_elem t ty.
+
+  (* THE PER-INODE ELEMENT.  [tyf] is the node's own choice of value for
+     each of its entries; the CLAUSE on it is [node_ent_ok] below, and at
+     the value level (FsState) it is read off the TARGET's node -- the one
+     cross-inode reading in the whole design. *)
+  Definition link_elem_node (i : Z) (n : fs_node) (v : ity)
+      (tyf : fname -> ity) : fsLinkUR :=
+    link_auth_elem i (fn_mult n) v
+    ⋅ ([^op map] s ↦ t ∈ dir_entries n,
+         ent_elem i (fn_orphan n) s t (tyf s)).
+
+  Definition node_ent_ok (i : Z) (n : fs_node) (v : ity)
+      (tyf : fname -> ity) : Prop :=
+    fn_ity_ok n v
+    /\ forall s t, dir_entries n !! s = Some t ->
+         ent_tokenless i (fn_orphan n) s t = false ->
+         ent_ty_ok i (fn_dd n) s (tyf s).
+
+  (* the Φ-FREE part of an inode: the link ghosts and the local clauses. *)
   Definition inode_ghost Γ (i : Z) (n : fs_node) : iProp Σ :=
-    (link_auth Γ i (fn_nlink n) ∗ ent_toks Γ i n ∗ ⌜inode_local i n⌝
-     ∗ inode_par Γ i n)%I.
+    (∃ v : ity, ⌜fn_ity_ok n v⌝ ∗ link_auth Γ i (fn_mult n) v
+     ∗ ent_toks Γ i n ∗ ⌜inode_local i n⌝)%I.
 
   Definition inode_owned Γ (sb : fs_sb) (i : Z) (n : fs_node) : iProp Σ :=
     (inode_phi Γ sb i n ∗ inode_ghost Γ i n)%I.
@@ -757,7 +779,7 @@ Section InodeOwned.
 
   Lemma inode_owned_local Γ sb i n :
     inode_owned Γ sb i n -∗ ⌜inode_local i n⌝.
-  Proof. iIntros "[_ (_ & _ & $ & _)]". Qed.
+  Proof. iIntros "[_ (%v & _ & _ & _ & $)]". Qed.
 
   Lemma dir_owned_of Γ sb d n :
     fn_is_dir n = true -> inode_owned Γ sb d n ⊢ dir_owned Γ sb d n.
@@ -779,18 +801,23 @@ Section InodeOwned.
     Timeless (inode_phi Γ sb i n).
   Proof. rewrite /inode_phi. apply _. Qed.
 
-  Global Instance ent_tok_timeless Γ self orph s t :
-    Timeless (ent_tok Γ self orph s t).
+  Global Instance ent_tok_at_timeless Γ self orph s t ty :
+    Timeless (ent_tok_at Γ self orph s t ty).
+  Proof. rewrite /ent_tok_at. destruct (ent_tokenless self orph s t); apply _. Qed.
+
+  Global Instance ent_tok_timeless Γ self dd orph s t :
+    Timeless (ent_tok Γ self dd orph s t).
   Proof. rewrite /ent_tok. destruct (ent_tokenless self orph s t); apply _. Qed.
 
-  (* the congruence at the READINGS: two nodes whose entry maps and orphan
-     flags agree carry the same tokens, whatever their records are *)
+  (* the congruence at the READINGS: two nodes whose entry maps, orphan
+     flags and register values agree carry the same fragments, whatever
+     their records are *)
   Lemma ent_toks_cong_ent Γ i n n' :
     fn_orphan n' = fn_orphan n -> dir_entries n' = dir_entries n ->
     ent_toks Γ i n ⊣⊢ ent_toks Γ i n'.
-  Proof. intros Ho He. rewrite /ent_toks He Ho //. Qed.
+  Proof. intros Ho He. rewrite /ent_toks /fn_dd He Ho //. Qed.
 
-  (* a NON-directory owns no entries and therefore no tokens *)
+  (* a NON-directory owns no entries and therefore no fragments *)
   Lemma ent_toks_not_dir Γ i n : fn_is_dir n = false -> ⊢ ent_toks Γ i n.
   Proof.
     intros H. rewrite /ent_toks /dir_entries H big_sepM_empty. done.
@@ -808,74 +835,6 @@ Section InodeOwned.
   Global Instance ent_toks_timeless Γ i n : Timeless (ent_toks Γ i n).
   Proof. rewrite /ent_toks. apply _. Qed.
 
-  (* ---- the REGISTER AUTHORITY's payload laws, beside the token ones -- *)
-
-  Global Instance inode_par_timeless Γ i n : Timeless (inode_par Γ i n).
-  Proof. rewrite /inode_par. apply _. Qed.
-
-  (* AN EMPTY REGISTER IS AN [inode_par] AT ANY NODE, which is what makes a
-     freed inum's bundle re-parkable at whatever the next allocation writes
-     into it. *)
-  Lemma inode_par_of_empty Γ i n : par_auth Γ i ∅ -∗ inode_par Γ i n.
-  Proof.
-    iIntros "Ha". iExists ∅. iFrame. iPureIntro.
-    rewrite /fn_par_ok gmultiset_size_empty. lia.
-  Qed.
-
-  (* ...and at [nlink = 0] it is the ONLY one: [size P <= nlink] forces it. *)
-  Lemma inode_par_empty Γ i n :
-    fn_nlink n = 0%nat -> inode_par Γ i n -∗ par_auth Γ i ∅.
-  Proof.
-    iIntros (Hz) "[%P [Ha %Hok]]".
-    rewrite /fn_par_ok Hz in Hok.
-    assert (HP : P = ∅) by (apply gmultiset_size_empty_inv; lia).
-    by rewrite HP.
-  Qed.
-
-  (* the record-only congruence: a flush that does not lower the count and
-     does not move the up-pointing target leaves the register where it is *)
-  Lemma inode_par_cong Γ i n n' :
-    (fn_nlink n <= fn_nlink n')%nat ->
-    inode_par Γ i n -∗ inode_par Γ i n'.
-  Proof.
-    iIntros (Hle) "[%P [Ha %Hok]]". iExists P. iFrame.
-    iPureIntro. rewrite /fn_par_ok in Hok |- *. lia.
-  Qed.
-
-  (* THE MINT: a freed inum's empty register takes the unit of the record
-     that is about to name it, and the unit goes OUT to that record. *)
-  (* THE MINT: the count grows by one and the register takes the unit of
-     the record that is about to hold the new link, which goes OUT to that
-     record. *)
-  Lemma inode_par_mint Γ i n n' v :
-    S (fn_nlink n) = fn_nlink n' ->
-    inode_par Γ i n ==∗ inode_par Γ i n' ∗ par_tok Γ i v.
-  Proof.
-    iIntros (Hnl) "[%P [Ha %Hok]]".
-    iMod (par_alloc Γ i P v with "Ha") as "[Ha $]".
-    iModIntro. iExists (P ⊎ {[+ v +]}). iFrame. iPureIntro.
-    rewrite /fn_par_ok in Hok |- *.
-    rewrite gmultiset_size_disj_union gmultiset_size_singleton. lia.
-  Qed.
-
-  (* THE RETIREMENT: the unit the zeroed record released goes back, and the
-     count drops by exactly one with it. *)
-  Lemma inode_par_retire Γ i n n' v :
-    S (fn_nlink n') = fn_nlink n ->
-    inode_par Γ i n -∗ par_tok Γ i v ==∗ inode_par Γ i n'.
-  Proof.
-    iIntros (Hnl) "[%P [Ha %Hok]] Ht".
-    iDestruct (par_auth_tok_in with "Ha Ht") as %Hin.
-    assert (HP : P = (P ∖ {[+ v +]}) ⊎ {[+ v +]}) by multiset_solver.
-    rewrite {1}HP.
-    iMod (par_dealloc Γ i (P ∖ {[+ v +]}) v with "Ha Ht") as "Ha".
-    iModIntro. iExists (P ∖ {[+ v +]}). iFrame. iPureIntro.
-    rewrite /fn_par_ok in Hok |- *.
-    assert (Hsz' : (S (size (P ∖ {[+ v +]})) = size P)%nat).
-    { rewrite {2}HP gmultiset_size_disj_union gmultiset_size_singleton. lia. }
-    lia.
-  Qed.
-
   (* the up-pointing target under a delete that is not the up-pointing
      record itself *)
   Lemma fn_dotdot_delete n n' s :
@@ -883,22 +842,6 @@ Section InodeOwned.
     fn_dotdot n' = fn_dotdot n.
   Proof.
     intros Hne Hdel. rewrite /fn_dotdot Hdel lookup_delete_ne //.
-  Qed.
-
-  Lemma ent_par_val_dotname self s :
-    s = DOT \/ s = DOTDOT -> ent_par_val self s = None.
-  Proof.
-    intros [-> | ->]; rewrite /ent_par_val.
-    - rewrite (bool_decide_eq_true_2 (DOT = DOT) eq_refl) //.
-    - rewrite (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl) orb_true_r //.
-  Qed.
-
-  Lemma ent_par_val_name self s :
-    s <> DOT -> s <> DOTDOT -> ent_par_val self s = Some self.
-  Proof.
-    intros Hd Hdd. rewrite /ent_par_val
-      (bool_decide_eq_false_2 (s = DOT) Hd)
-      (bool_decide_eq_false_2 (s = DOTDOT) Hdd) //.
   Qed.
 
   Global Instance inode_ghost_timeless Γ i n : Timeless (inode_ghost Γ i n).
@@ -918,95 +861,151 @@ Section InodeOwned.
   (*  These are the two halves of the mint's transport (FsState.v):     *)
   (*  gathering reads the family's VALIDITY off the durable instance's  *)
   (*  own [own]; scattering hands the freshly allocated one back out.   *)
+  (*                                                                    *)
+  (*  The per-entry value is EXISTENTIAL in [ent_toks] and a FUNCTION in *)
+  (*  [link_elem_node], so the gather has to CHOOSE it -- one function   *)
+  (*  per node, built by induction over the entry map.                  *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma inode_link_gather Γ i n P (x : fsLinkUR) :
-    own (γlink Γ) x -∗ link_auth Γ i (fn_nlink n) -∗ par_auth Γ i P -∗
-    ent_toks Γ i n -∗
-    own (γlink Γ) (x ⋅ link_elem_node i n P).
+  Lemma ent_toks_choose Γ (self : Z) (dd : option Z) (orph : bool)
+      (m : gmap fname Z) :
+    ([∗ map] s ↦ t ∈ m, ent_tok Γ self dd orph s t) -∗
+    ∃ tyf : fname -> ity,
+      ⌜forall s t, m !! s = Some t ->
+         ent_tokenless self orph s t = false -> ent_ty_ok self dd s (tyf s)⌝
+      ∗ ([∗ map] s ↦ t ∈ m, ent_tok_at Γ self orph s t (tyf s)).
   Proof.
-    iIntros "Hx Ha Hp Ht".
-    iDestruct (own_op with "[$Ha $Hp]") as "Hap".
-    iDestruct (own_op with "[$Hx $Hap]") as "Hxap".
-    iDestruct (own_gather_map_opt (γlink Γ)
-                 (fun (s : fname) (t : Z) =>
-                    link_tok_elem t 1 ⋅ par_tok_elem t (ent_par_val i s))
-                 (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
-                 (dir_entries n)
-                 (x ⋅ (link_auth_elem i (fn_nlink n) ⋅ par_auth_elem i P))
-                with "Hxap [Ht]") as "H".
-    { iApply (big_sepM_mono with "Ht"). intros s t _; simpl.
-      rewrite /ent_tok /link_tok /link_toks /par_tok.
-      destruct (ent_tokenless i (fn_orphan n) s t);
-        [done | rewrite own_op //]. }
-    rewrite /link_elem_node /ent_elem -assoc //.
+    induction m as [| s t m Hs IH] using map_ind.
+    - iIntros "_". iExists (fun _ => TFile). iSplitR.
+      { iPureIntro. intros s' t' Hlk. rewrite lookup_empty in Hlk. done. }
+      rewrite big_sepM_empty. done.
+    - rewrite big_sepM_insert //. iIntros "[Ht Hm]".
+      iDestruct (IH with "Hm") as (tyf) "[%Hok Hm]".
+      rewrite /ent_tok.
+      destruct (ent_tokenless self orph s t) eqn:Etl.
+      + iExists tyf. iSplitR.
+        { iPureIntro. intros s' t' Hlk Hnt.
+          destruct (decide (s' = s)) as [-> | Hne].
+          - rewrite lookup_insert in Hlk. inversion Hlk; subst t'.
+            rewrite Etl in Hnt. done.
+          - rewrite lookup_insert_ne // in Hlk. exact (Hok s' t' Hlk Hnt). }
+        rewrite big_sepM_insert //. rewrite /ent_tok_at Etl. iFrame.
+      + iDestruct "Ht" as (ty) "[Ht %Hty]".
+        iExists (fun s' => if decide (s' = s) then ty else tyf s').
+        iSplitR.
+        { iPureIntro. intros s' t' Hlk Hnt.
+          destruct (decide (s' = s)) as [-> | Hne].
+          - exact Hty.
+          - rewrite lookup_insert_ne // in Hlk. exact (Hok s' t' Hlk Hnt). }
+        rewrite big_sepM_insert //.
+        iSplitL "Ht".
+        { rewrite /ent_tok_at Etl decide_True //. }
+        iApply (big_sepM_mono with "Hm"). intros s' t' Hlk; simpl.
+        assert (Hne : s' <> s) by (intros ->; rewrite Hs in Hlk; done).
+        rewrite decide_False //.
   Qed.
 
-  (* the same, with no accumulator: the two auths ARE the accumulator *)
-  Lemma inode_link_pack Γ i n P :
-    link_auth Γ i (fn_nlink n) -∗ par_auth Γ i P -∗ ent_toks Γ i n -∗
-    own (γlink Γ) (link_elem_node i n P).
+  Lemma ent_toks_of_at Γ (self : Z) (dd : option Z) (orph : bool)
+      (m : gmap fname Z) (tyf : fname -> ity) :
+    (forall s t, m !! s = Some t ->
+       ent_tokenless self orph s t = false -> ent_ty_ok self dd s (tyf s)) ->
+    ([∗ map] s ↦ t ∈ m, ent_tok_at Γ self orph s t (tyf s)) -∗
+    ([∗ map] s ↦ t ∈ m, ent_tok Γ self dd orph s t).
   Proof.
-    iIntros "Ha Hp Ht".
-    iDestruct (own_op with "[$Ha $Hp]") as "Hap".
+    intros Hok. iIntros "H".
+    iApply (big_sepM_mono with "H"). intros s t Hlk; simpl.
+    rewrite /ent_tok_at /ent_tok.
+    destruct (ent_tokenless self orph s t) eqn:Etl; [done |].
+    iIntros "Ht". iExists (tyf s). iFrame. iPureIntro.
+    exact (Hok s t Hlk Etl).
+  Qed.
+
+  Lemma inode_link_pack Γ i n v tyf :
+    link_auth Γ i (fn_mult n) v -∗
+    ([∗ map] s ↦ t ∈ dir_entries n, ent_tok_at Γ i (fn_orphan n) s t (tyf s)) -∗
+    own (γlink Γ) (link_elem_node i n v tyf).
+  Proof.
+    iIntros "Ha Ht".
     iDestruct (own_gather_map_opt (γlink Γ)
-                 (fun (s : fname) (t : Z) =>
-                    link_tok_elem t 1 ⋅ par_tok_elem t (ent_par_val i s))
+                 (fun (s : fname) (t : Z) => link_tok_elem t (tyf s))
                  (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
                  (dir_entries n)
-                 (link_auth_elem i (fn_nlink n) ⋅ par_auth_elem i P)
-                with "Hap [Ht]") as "H".
+                 (link_auth_elem i (fn_mult n) v)
+                with "Ha [Ht]") as "H".
     { iApply (big_sepM_mono with "Ht"). intros s t _; simpl.
-      rewrite /ent_tok /link_tok /link_toks /par_tok.
-      destruct (ent_tokenless i (fn_orphan n) s t);
-        [done | rewrite own_op //]. }
+      rewrite /ent_tok_at /link_tok /link_toks /link_tok_elem.
+      destruct (ent_tokenless i (fn_orphan n) s t); done. }
     rewrite /link_elem_node /ent_elem //.
   Qed.
 
-  Lemma inode_link_scatter Γ i n P :
-    own (γlink Γ) (link_elem_node i n P) ⊢
-    (link_auth Γ i (fn_nlink n) ∗ par_auth Γ i P) ∗ ent_toks Γ i n.
+  Lemma inode_link_gather Γ i n v tyf (x : fsLinkUR) :
+    own (γlink Γ) x -∗ link_auth Γ i (fn_mult n) v -∗
+    ([∗ map] s ↦ t ∈ dir_entries n, ent_tok_at Γ i (fn_orphan n) s t (tyf s)) -∗
+    own (γlink Γ) (x ⋅ link_elem_node i n v tyf).
   Proof.
-    rewrite /link_elem_node own_op. iIntros "[Hap Ht]".
-    iDestruct (own_op with "Hap") as "[$ $]".
+    iIntros "Hx Ha Ht".
+    iDestruct (own_op with "[$Hx $Ha]") as "Hxa".
+    iDestruct (own_gather_map_opt (γlink Γ)
+                 (fun (s : fname) (t : Z) => link_tok_elem t (tyf s))
+                 (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
+                 (dir_entries n)
+                 (x ⋅ link_auth_elem i (fn_mult n) v)
+                with "Hxa [Ht]") as "H".
+    { iApply (big_sepM_mono with "Ht"). intros s t _; simpl.
+      rewrite /ent_tok_at /link_tok /link_toks /link_tok_elem.
+      destruct (ent_tokenless i (fn_orphan n) s t); done. }
+    rewrite /link_elem_node /ent_elem -assoc //.
+  Qed.
+
+  Lemma inode_link_scatter Γ i n v tyf :
+    own (γlink Γ) (link_elem_node i n v tyf) ⊢
+    link_auth Γ i (fn_mult n) v
+    ∗ ([∗ map] s ↦ t ∈ dir_entries n, ent_tok_at Γ i (fn_orphan n) s t (tyf s)).
+  Proof.
+    rewrite /link_elem_node own_op. iIntros "[$ Ht]".
     iDestruct (own_scatter_map_opt (γlink Γ)
-                 (fun (s : fname) (t : Z) =>
-                    link_tok_elem t 1 ⋅ par_tok_elem t (ent_par_val i s))
+                 (fun (s : fname) (t : Z) => link_tok_elem t (tyf s))
                  (fun (s : fname) (t : Z) => ent_tokenless i (fn_orphan n) s t)
                  (dir_entries n) with "[Ht]") as "H".
     { rewrite /ent_elem //. }
     iApply (big_sepM_mono with "H"). intros s t _; simpl.
-    rewrite /ent_tok /link_tok /link_toks /par_tok.
-    destruct (ent_tokenless i (fn_orphan n) s t); [done | rewrite own_op //].
+    rewrite /ent_tok_at /link_tok /link_toks /link_tok_elem.
+    destruct (ent_tokenless i (fn_orphan n) s t); done.
   Qed.
 
-  Lemma inode_link_iff Γ i n P :
-    (link_auth Γ i (fn_nlink n) ∗ par_auth Γ i P) ∗ ent_toks Γ i n
-    ⊣⊢ own (γlink Γ) (link_elem_node i n P).
+  Lemma inode_link_iff Γ i n :
+    (∃ v, ⌜fn_ity_ok n v⌝ ∗ link_auth Γ i (fn_mult n) v) ∗ ent_toks Γ i n
+    ⊣⊢ ∃ v tyf, ⌜node_ent_ok i n v tyf⌝
+                ∗ own (γlink Γ) (link_elem_node i n v tyf).
   Proof.
     iSplit.
-    - iIntros "[[Ha Hp] Ht]". iApply (inode_link_pack with "Ha Hp Ht").
-    - iApply inode_link_scatter.
+    - iIntros "[(%v & %Hv & Ha) Ht]".
+      iDestruct (ent_toks_choose with "Ht") as (tyf) "[%Hok Ht]".
+      iExists v, tyf. iSplitR; [iPureIntro; split; [exact Hv | exact Hok] |].
+      iApply (inode_link_pack with "Ha Ht").
+    - iIntros "(%v & %tyf & %Hok & Hown)".
+      iDestruct (inode_link_scatter with "Hown") as "[Ha Ht]".
+      iSplitL "Ha"; [iExists v; iSplitR; [iPureIntro; exact (proj1 Hok) | iExact "Ha"] |].
+      iApply (ent_toks_of_at Γ i (fn_dd n) (fn_orphan n) (dir_entries n) tyf
+                (proj2 Hok) with "Ht").
   Qed.
 
-  (* the per-inode shape [FsState.fs_links] iterates: the whole
-     link/register contribution as ONE [own] under the existential the
-     inum's authority is bound by. *)
+  (* the per-inode shape [FsState.fs_links] iterates: the whole register
+     contribution as ONE [own] under the existential its choice function
+     is bound by. *)
   Lemma inode_ghost_iff Γ i n :
     inode_ghost Γ i n
-    ⊣⊢ (∃ P, ⌜fn_par_ok n P⌝ ∗ own (γlink Γ) (link_elem_node i n P))
+    ⊣⊢ (∃ v tyf, ⌜node_ent_ok i n v tyf⌝
+                 ∗ own (γlink Γ) (link_elem_node i n v tyf))
        ∗ ⌜inode_local i n⌝.
   Proof.
-    rewrite /inode_ghost /inode_par.
+    rewrite /inode_ghost -inode_link_iff.
     iSplit.
-    - iIntros "(Ha & Ht & %Hl & (%P & Hpa & %Hok))".
-      iSplitL "Ha Ht Hpa"; [| by iPureIntro].
-      iExists P. iSplitR; [by iPureIntro |].
-      iApply (inode_link_pack with "Ha Hpa Ht").
-    - iIntros "[(%P & %Hok & Hown) %Hl]".
-      iDestruct (inode_link_scatter with "Hown") as "[[Ha Hpa] Ht]".
-      iFrame "Ha Ht". iSplitR; [by iPureIntro |].
-      iExists P. iFrame "Hpa". by iPureIntro.
+    - iIntros "(%v & %Hv & Ha & Ht & %Hl)".
+      iFrame "Ht". iSplitL "Ha"; [| by iPureIntro].
+      iExists v. by iFrame.
+    - iIntros "[[(%v & %Hv & Ha) Ht] %Hl]".
+      iExists v. by iFrame.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1062,15 +1061,22 @@ Section InodeOwned.
     assert (Hnl0 : fn_nlink n = 0%nat)
       by (destruct Hb as (_ & _ & _ & _ & Hnl); exact Hnl).
     rewrite /inode_owned /inode_phi /inode_ghost.
-    iIntros "[(Hr & _ & _) (Ha & _ & _ & Hp)]". iFrame "Hr". iIntros "Hr".
+    iIntros "[(Hr & _ & _) (%v & _ & Ha & _ & _)]". iFrame "Hr". iIntros "Hr".
     iSplitL "Hr".
     { rewrite Hblk' big_sepM_empty /ind_owned (decide_True _ _ Hind').
       iFrame "Hr". auto. }
-    iDestruct (inode_par_empty Γ i n Hnl0 with "Hp") as "Hp".
-    rewrite /ent_toks Hent' big_sepM_empty Hnn.
+    destruct (fn_ity_ok_ex n') as [v' Hv'].
+    assert (Hmz : fn_mult n = 0%nat) by exact (fn_mult_zero n Hnl0).
+    assert (Hmz' : fn_mult n' = 0%nat) by exact (fn_mult_zero n' Hnl').
+    iEval (rewrite Hmz) in "Ha".
+    iEval (rewrite (link_auth_zero_retype Γ i v v')) in "Ha".
+    assert (Hnr' : fn_nrec n' = 0%nat)
+      by (rewrite /fn_nrec Hsz' dir_nrec_zero //).
+    rewrite Hmz'.
+    iExists v'. iSplitR; [by iPureIntro |].
     iSplitL "Ha"; [iExact "Ha" |].
-    iSplitR; [auto |]. iSplitR; [iPureIntro; exact Hloc' |].
-    iApply (inode_par_of_empty with "Hp").
+    iSplitR; [iApply (ent_toks_nrec0 Γ i n' Hnr') |].
+    iPureIntro. exact Hloc'.
   Qed.
 
   (* the record write inside a whole inode.  The addresses may move (this is
@@ -1228,13 +1234,15 @@ Section InodeOwned.
 
   Lemma ent_toks_delete Γ i n n' s t :
     fn_orphan n' = fn_orphan n ->
+    fn_dd n' = fn_dd n ->
     dir_entries n !! s = Some t ->
     dir_entries n' = delete s (dir_entries n) ->
-    ent_toks Γ i n -∗ ent_tok Γ i (fn_orphan n) s t ∗ ent_toks Γ i n'.
+    ent_toks Γ i n -∗
+    ent_tok Γ i (fn_dd n) (fn_orphan n) s t ∗ ent_toks Γ i n'.
   Proof.
-    intros Horph Hs Hdel.
+    intros Horph Hdd Hs Hdel.
     rewrite /ent_toks (big_sepM_delete _ (dir_entries n) s t) //.
-    iIntros "[$ H]". rewrite Hdel Horph //.
+    iIntros "[$ H]". rewrite Hdel Horph Hdd //.
   Qed.
 
   (* THE INSERT TAKES THE RECORD DELTA, NOT THE ENTRY-MAP DELTA.  Its
@@ -1244,165 +1252,243 @@ Section InodeOwned.
      rather than an equation about the view. *)
   Lemma ent_toks_insert Γ i n n' k0 s z :
     fn_orphan n' = fn_orphan n ->
+    fn_dd n' = fn_dd n ->
     fn_is_dir n = true -> fn_is_dir n' = true ->
     dir_first (fn_data n) (fn_nrec n) s = None ->
     dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
-    ent_toks Γ i n -∗ ent_tok Γ i (fn_orphan n) s (bv_unsigned z) -∗
+    ent_toks Γ i n -∗
+    ent_tok Γ i (fn_dd n) (fn_orphan n) s (bv_unsigned z) -∗
     ent_toks Γ i n'.
   Proof.
-    intros Horph Hd Hd' Hnone Hins.
-    rewrite /ent_toks (dir_entries_write n n' k0 s z Hd Hd' Hnone Hins) Horph.
+    intros Horph Hdd Hd Hd' Hnone Hins.
+    rewrite /ent_toks (dir_entries_write n n' k0 s z Hd Hd' Hnone Hins)
+      Horph Hdd.
     rewrite big_sepM_insert; [| exact (dir_entries_fresh n s Hnone)].
     iIntros "H Ht". iFrame.
   Qed.
 
-  (* the ORPHAN step: the directory's own [nlink] reaches 0, the parent takes
-     its ".." token back, and the entry becomes tokenless.  Everything else
-     keeps its token, because [ent_tokenless] differs at ".." only. *)
+  (* ...AND THE ONE THAT WRITES [".."] ITSELF, where the guard on the
+     ["."] clause is DISCHARGED (create's mkdir arm).  Every other entry's
+     clause is blind to [fn_dd], so only the ["."] record has to be
+     re-proved -- and the fragment it holds is the one the FILL chose,
+     which is exactly [TDir] of the [".."] target now being written. *)
+  Lemma ent_toks_insert_dd Γ i n n' k0 z :
+    fn_orphan n' = fn_orphan n ->
+    fn_dd n = None ->
+    fn_is_dir n = true -> fn_is_dir n' = true ->
+    dir_first (fn_data n) (fn_nrec n) DOTDOT = None ->
+    dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0
+      DOTDOT z ->
+    (forall ty, ent_ty_ok i (fn_dd n) DOT ty ->
+       ent_ty_ok i (fn_dd n') DOT ty) ->
+    ent_toks Γ i n -∗
+    ent_tok Γ i (fn_dd n') (fn_orphan n) DOTDOT (bv_unsigned z) -∗
+    ent_toks Γ i n'.
+  Proof.
+    intros Horph Hnone0 Hd Hd' Hnone Hins Hup.
+    rewrite /ent_toks (dir_entries_write n n' k0 DOTDOT z Hd Hd' Hnone Hins)
+      Horph.
+    rewrite big_sepM_insert; [| exact (dir_entries_fresh n DOTDOT Hnone)].
+    iIntros "H Ht". iFrame "Ht".
+    iApply (big_sepM_mono with "H"). intros s v Hs; simpl.
+    rewrite /ent_tok. destruct (ent_tokenless i (fn_orphan n) s v); [done |].
+    iIntros "(%ty & Ht & %Hok)". iExists ty. iFrame "Ht". iPureIntro.
+    destruct (decide (s = DOT)) as [-> | Hne]; [exact (Hup ty Hok) |].
+    rewrite /ent_ty_ok (bool_decide_eq_false_2 (s = DOT) Hne) in Hok |- *.
+    exact Hok.
+  Qed.
+
+  (* ---- the exemption's own arithmetic ------------------------------ *)
+
   Lemma dot_ne_dotdot : DOT <> DOTDOT.
   Proof. rewrite /DOT /DOTDOT. intros H. inversion H. Qed.
+
+  (* a NAME record (neither dot) is never exempt, at any orphan flag *)
+  Lemma ent_tokenless_name self orph s t :
+    s <> DOT -> s <> DOTDOT -> ent_tokenless self orph s t = false.
+  Proof.
+    intros Hnd Hne. rewrite /ent_tokenless
+      (bool_decide_eq_false_2 (s = DOT) Hnd)
+      (bool_decide_eq_false_2 (s = DOTDOT) Hne).
+    by destruct orph, (bool_decide (t = self)).
+  Qed.
 
   Lemma ent_tokenless_orphan_ne self orph orph' s t :
     s <> DOT -> s <> DOTDOT ->
     ent_tokenless self orph' s t = ent_tokenless self orph s t.
   Proof.
-    intros Hnd Hne. rewrite /ent_tokenless
-      (bool_decide_eq_false_2 (s = DOT) Hnd)
-      (bool_decide_eq_false_2 (s = DOTDOT) Hne).
-    by rewrite !orb_false_l !andb_false_l.
+    intros Hnd Hne.
+    rewrite (ent_tokenless_name self orph' s t Hnd Hne)
+            (ent_tokenless_name self orph s t Hnd Hne) //.
   Qed.
 
-  (* ...and the ORPHANING step is MONOTONE at every other entry: going
-     orphan only ever REMOVES a token demand, so an entry's unit is simply
-     dropped rather than transported.  This is what replaces the equality
-     above at [s = DOT], where the flag now matters. *)
+  (* ...and the ORPHANING step is MONOTONE at every entry: going orphan
+     only ever REMOVES a demand, so an entry's unit is simply dropped
+     rather than transported. *)
   Lemma ent_tokenless_orph_up self s t :
     ent_tokenless self false s t = true -> ent_tokenless self true s t = true.
   Proof.
-    rewrite /ent_tokenless andb_false_r orb_false_r. intros H.
-    by rewrite H orb_true_l.
+    rewrite /ent_tokenless.
+    destruct (bool_decide (s = DOT)), (bool_decide (s = DOTDOT)),
+             (bool_decide (t = self)); simpl; auto.
   Qed.
 
   Lemma ent_tokenless_dotdot self orph t :
     ent_tokenless self orph DOTDOT t = (orph || bool_decide (t = self)).
   Proof.
-    rewrite /ent_tokenless.
-    rewrite (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl) orb_true_r
-      andb_true_l.
-    apply orb_comm.
+    rewrite /ent_tokenless
+      (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl).
+    destruct (bool_decide (DOTDOT = DOT)), orph, (bool_decide (t = self));
+      reflexivity.
   Qed.
 
-  (* the ["."] twin, and it is the same statement -- both dot names are
-     exempt exactly at an orphan *)
+  (* the ["."] twin, and it is NOT the same statement any more: a live
+     directory's ["."] carries a fragment -- the [+1] of [fn_mult] and the
+     tie rmdir's (D1) reads. *)
   Lemma ent_tokenless_dot self orph t :
-    ent_tokenless self orph DOT t = (orph || bool_decide (t = self)).
+    ent_tokenless self orph DOT t = orph.
   Proof.
-    rewrite /ent_tokenless.
-    rewrite (bool_decide_eq_true_2 (DOT = DOT) eq_refl) orb_true_l
-      andb_true_l.
-    apply orb_comm.
+    rewrite /ent_tokenless (bool_decide_eq_true_2 (DOT = DOT) eq_refl)
+      (bool_decide_eq_false_2 (DOT = DOTDOT) dot_ne_dotdot).
+    by destruct orph, (bool_decide (t = self)).
   Qed.
 
-
-  (* the SELF exemption, at the point of use: an entry naming its own home
-     carries no token whatever its name is *)
-  Lemma ent_tokenless_self self orph s : ent_tokenless self orph s self = true.
+  Lemma ent_ty_ok_dot self dd ty :
+    (forall p q, ty = TDir p -> dd = Some q -> q = p) ->
+    ent_ty_ok self dd DOT ty.
   Proof.
-    rewrite /ent_tokenless (bool_decide_eq_true_2 (self = self) eq_refl)
-      orb_true_l //.
+    intros H. rewrite /ent_ty_ok
+      (bool_decide_eq_true_2 (DOT = DOT) eq_refl). exact H.
   Qed.
 
-  Lemma ent_tok_self Γ self orph s : ent_tok Γ self orph s self ⊣⊢ emp.
-  Proof. rewrite /ent_tok ent_tokenless_self //. Qed.
+  Lemma ent_ty_ok_dot_none self ty : ent_ty_ok self None DOT ty.
+  Proof. apply ent_ty_ok_dot. intros p q _ Hc. discriminate. Qed.
 
-  Lemma ent_tok_self_of Γ self orph s t :
-    t = self -> ⊢ ent_tok Γ self orph s t.
-  Proof. intros ->. rewrite ent_tok_self. done. Qed.
-
-  (* ...and the two readings a producer of a token needs: a non-self entry
-     of a LIVE directory carries one. *)
-  Lemma ent_tokenless_ne self orph s t :
-    t <> self -> orph = false -> ent_tokenless self orph s t = false.
+  (* THE (D1) READING, at the payload: a LIVE directory's ["."] fragment
+     is [TDir] of its own [".."] target. *)
+  Lemma ent_ty_ok_dot_read self dd p ty :
+    ent_ty_ok self dd DOT ty -> ty = TDir p ->
+    forall q, dd = Some q -> q = p.
   Proof.
-    intros Hne ->. rewrite /ent_tokenless.
-    rewrite (bool_decide_eq_false_2 (t = self) Hne) orb_false_l.
-    by rewrite andb_false_r.
+    rewrite /ent_ty_ok (bool_decide_eq_true_2 (DOT = DOT) eq_refl).
+    intros H Hty q Hq. exact (H p q Hty Hq).
   Qed.
 
-  (* THE FORM A WALK HANDS IN.  A [dirlink] holds the counting RA's unit
+  Lemma ent_ty_ok_dotdot self dd ty : ent_ty_ok self dd DOTDOT ty.
+  Proof.
+    rewrite /ent_ty_ok (bool_decide_eq_false_2 (DOTDOT = DOT)
+                          (fun H => dot_ne_dotdot (eq_sym H)))
+      (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl) //.
+  Qed.
+
+  Lemma ent_ty_ok_name self dd s ty :
+    s <> DOT -> s <> DOTDOT -> (forall p, ty = TDir p -> p = self) ->
+    ent_ty_ok self dd s ty.
+  Proof.
+    intros Hd Hdd Hp. rewrite /ent_ty_ok
+      (bool_decide_eq_false_2 (s = DOT) Hd)
+      (bool_decide_eq_false_2 (s = DOTDOT) Hdd) //.
+  Qed.
+
+  (* THE FORM A WALK HANDS IN.  A [dirlink] holds the register fragment
      for the inum it is about to name; whether the entry it creates PAYS
-     for it is the exemption's business, and at a self record the unit is
-     simply dropped (the logic is affine, and that is the same drop
-     [DirLinks.dir_link_at_dirlink] makes of a ticket).  So no
-     disequality is owed at the call site -- only that a [".."] is not
-     being written into an ORPHAN, which is free at a live directory. *)
-  Lemma ent_tok_of_link Γ self orph s t :
-    ((s = DOT \/ s = DOTDOT) -> orph = false) ->
-    link_tok Γ t -∗ par_tok Γ t (ent_par_val self s) -∗
-    ent_tok Γ self orph s t.
+     for it is the exemption's business, and at an exempt record the unit
+     is simply dropped (the logic is affine). *)
+  Lemma ent_tok_of_link Γ self dd orph s t ty :
+    ent_ty_ok self dd s ty ->
+    link_tok Γ t ty -∗ ent_tok Γ self dd orph s t.
   Proof.
-    intros Hdd. rewrite /ent_tok /ent_tokenless.
-    destruct (bool_decide (t = self)); [iIntros "_ _"; done |].
-    rewrite orb_false_l.
-    destruct (bool_decide (s = DOT)) eqn:Hd.
-    - rewrite (Hdd (or_introl (proj1 (bool_decide_eq_true (s = DOT)) Hd)))
-        andb_false_r. iIntros "$ $".
-    - rewrite orb_false_l.
-      destruct (bool_decide (s = DOTDOT)) eqn:Hs;
-        [| rewrite andb_false_l; iIntros "$ $"].
-      rewrite (Hdd (or_intror (proj1 (bool_decide_eq_true (s = DOTDOT)) Hs)))
-        andb_false_r. iIntros "$ $".
+    intros Hok. rewrite /ent_tok.
+    destruct (ent_tokenless self orph s t); [iIntros "_"; done |].
+    iIntros "Ht". iExists ty. by iFrame.
   Qed.
 
   (* the ORPHANING WEAKENING, at the resource: see [ent_tokenless_orph_up] *)
-  Lemma ent_tok_orph_up Γ self s t :
-    ent_tok Γ self false s t -∗ ent_tok Γ self true s t.
+  Lemma ent_tok_orph_up Γ self dd s t :
+    ent_tok Γ self dd false s t -∗ ent_tok Γ self dd true s t.
   Proof.
     rewrite /ent_tok. destruct (ent_tokenless self false s t) eqn:H0.
     - rewrite (ent_tokenless_orph_up self s t H0). iIntros "$".
     - destruct (ent_tokenless self true s t); iIntros "H"; done.
   Qed.
 
-  Lemma ent_tok_ne Γ self orph s t :
-    t <> self -> orph = false ->
-    ent_tok Γ self orph s t ⊣⊢ link_tok Γ t ∗ par_tok Γ t (ent_par_val self s).
+  Lemma ent_tok_open Γ self dd orph s t :
+    ent_tokenless self orph s t = false ->
+    ent_tok Γ self dd orph s t
+    ⊣⊢ ∃ ty, link_tok Γ t ty ∗ ⌜ent_ty_ok self dd s ty⌝.
+  Proof. intros H. rewrite /ent_tok H //. Qed.
+
+  Lemma ent_tok_ne Γ self dd orph s t :
+    s <> DOT -> s <> DOTDOT ->
+    ent_tok Γ self dd orph s t
+    ⊣⊢ ∃ ty, link_tok Γ t ty ∗ ⌜forall p, ty = TDir p -> p = self⌝.
   Proof.
-    intros Hne Ho.
-    rewrite /ent_tok (ent_tokenless_ne self orph s t Hne Ho) //.
+    intros Hd Hdd.
+    rewrite (ent_tok_open Γ self dd orph s t
+               (ent_tokenless_name self orph s t Hd Hdd)).
+    rewrite /ent_ty_ok (bool_decide_eq_false_2 (s = DOT) Hd)
+      (bool_decide_eq_false_2 (s = DOTDOT) Hdd) //.
   Qed.
 
-  Lemma ent_tok_dotdot Γ self orph t :
-    ent_tok Γ self orph DOTDOT t
-    ⊣⊢ (if orph || bool_decide (t = self) then emp
-        else link_tok Γ t ∗ par_tok Γ t None).
+  Lemma ent_tok_dotdot Γ self dd orph t :
+    ent_tok Γ self dd orph DOTDOT t
+    ⊣⊢ (if orph || bool_decide (t = self) then emp else ∃ ty, link_tok Γ t ty).
   Proof.
-    rewrite /ent_tok ent_tokenless_dotdot
-      (ent_par_val_dotname self DOTDOT (or_intror eq_refl)) //.
+    rewrite /ent_tok ent_tokenless_dotdot.
+    destruct (orph || bool_decide (t = self)); [done |].
+    iSplit.
+    - iIntros "(%ty & Ht & _)". iExists ty. iFrame.
+    - iIntros "(%ty & Ht)". iExists ty. iFrame.
+      iPureIntro. exact (ent_ty_ok_dotdot self dd ty).
   Qed.
 
-  (* [t <> i] is the SELF-PARENT exclusion: a directory whose [".."] names
-     ITSELF is the root, whose record already carries no token (see
-     [ent_tokenless]) -- there is nothing to hand back, and no kernel path
-     orphans the root anyway. *)
+  Lemma ent_tok_dot Γ self dd orph t :
+    ent_tok Γ self dd orph DOT t
+    ⊣⊢ (if orph then emp
+        else ∃ ty, link_tok Γ t ty ∗ ⌜ent_ty_ok self dd DOT ty⌝).
+  Proof. rewrite /ent_tok ent_tokenless_dot. by destruct orph. Qed.
+
+  (* THE ORPHAN STEP: the directory's own count reaches zero, BOTH its dot
+     records become exempt, and the two fragments come out -- the [".."]'s,
+     which is what pays for the parent's own [dp->nlink--], and the ["."]'s,
+     which is the [+1] a live directory holds and which pays for the child's
+     own second decrement.  The ["."]'s comes out WITH its clause, which is
+     rmdir's (D1): its value is [TDir] of this directory's [".."] target.
+
+     [t <> i] is the SELF-PARENT exclusion: a directory whose [".."] names
+     ITSELF is the root, which carries no [".."] unit to hand back and which
+     no kernel path orphans anyway. *)
   Lemma ent_toks_orphan Γ i n n' t :
     dir_entries n' = dir_entries n ->
     fn_orphan n = false ->
     fn_orphan n' = true ->
     dir_entries n !! DOTDOT = Some t ->
+    dir_entries n !! DOT = Some i ->
     t <> i ->
     ent_toks Γ i n -∗
-    (link_tok Γ t ∗ par_tok Γ t None) ∗ ent_toks Γ i n'.
+    (∃ ty, link_tok Γ t ty)
+    ∗ (∃ ty, link_tok Γ i ty ∗ ⌜ent_ty_ok i (fn_dd n) DOT ty⌝)
+    ∗ ent_toks Γ i n'.
   Proof.
-    intros Hents Ho Ho' Hdd Hne.
-    rewrite /ent_toks Hents Ho Ho'.
-    rewrite (big_sepM_delete (fun s t => ent_tok Γ i false s t)
+    intros Hents Ho Ho' Hdd Hdt Hne.
+    assert (Hdd' : fn_dd n' = fn_dd n) by (rewrite /fn_dd Hents //).
+    rewrite /ent_toks Hents Ho Ho' Hdd'.
+    rewrite (big_sepM_delete (fun s t => ent_tok Γ i (fn_dd n) false s t)
                (dir_entries n) DOTDOT t) //.
-    rewrite (big_sepM_delete (fun s t => ent_tok Γ i true s t)
+    rewrite (big_sepM_delete (fun s t => ent_tok Γ i (fn_dd n) true s t)
                (dir_entries n) DOTDOT t) //.
-    rewrite !ent_tok_dotdot.
+    assert (Hdt' : delete DOTDOT (dir_entries n) !! DOT = Some i)
+      by (rewrite lookup_delete_ne;
+          [exact Hdt | exact (fun H => dot_ne_dotdot (eq_sym H))]).
+    rewrite (big_sepM_delete (fun s t => ent_tok Γ i (fn_dd n) false s t)
+               (delete DOTDOT (dir_entries n)) DOT i) //.
+    rewrite (big_sepM_delete (fun s t => ent_tok Γ i (fn_dd n) true s t)
+               (delete DOTDOT (dir_entries n)) DOT i) //.
+    rewrite !ent_tok_dotdot !ent_tok_dot.
     rewrite (bool_decide_eq_false_2 (t = i) Hne).
     cbn [orb].
-    iIntros "[Hd H]". iFrame "Hd". iSplitR; [done |].
+    iIntros "[Hdd [Hdt H]]". iFrame "Hdd Hdt".
+    iSplitR; [done |]. iSplitR; [done |].
     iApply (big_sepM_mono with "H"). intros s v Hs; simpl.
     iApply ent_tok_orph_up.
   Qed.
@@ -1443,92 +1529,106 @@ Section InodeOwned.
 
   (* ---------------------------------------------------------------- *)
   (*  10. The DIRENT moves at [dir_owned], and the link reading        *)
-  (*                                                                   *)
-  (*  Each hands the writer the Φ-part (whose bytes the log moves, by  *)
-  (*  [inode_phi_blk_move]) and does the token move beside it.  The    *)
-  (*  premise is a pure fact about ONE directory's own bytes: the      *)
-  (*  removal's entry-map delta, which [dir_entries_zero] proves       *)
-  (*  outright, and the link's RECORD delta, which                     *)
-  (*  [dir_entries_write] turns into the view's.                       *)
   (* ---------------------------------------------------------------- *)
 
   (* the direction safety uses: at [nlink = 0] no entry points here *)
-  Lemma inode_link_tok_nz Γ sb i n :
-    inode_owned Γ sb i n -∗ link_tok Γ i -∗ ⌜fn_nlink n <> 0%nat⌝.
+  Lemma inode_link_tok_nz Γ sb i n ty :
+    inode_owned Γ sb i n -∗ link_tok Γ i ty -∗ ⌜fn_nlink n <> 0%nat⌝.
   Proof.
-    iIntros "[_ (Ha & _ & _ & _)] Ht".
+    iIntros "[_ (%v & _ & Ha & _ & _)] Ht".
     destruct (decide (fn_nlink n = 0%nat)) as [Hz | Hnz]; [| done].
-    rewrite Hz. iDestruct (link_auth_zero_no_tok with "Ha Ht") as "[]".
+    rewrite (fn_mult_zero n Hz).
+    iDestruct (link_auth_zero_no_tok with "Ha Ht") as "[]".
   Qed.
 
   Lemma dir_owned_unlink Γ sb d n n' s t :
     fn_orphan n' = fn_orphan n ->
     fn_nlink n' = fn_nlink n ->
+    fn_dd n' = fn_dd n ->
+    fn_is_dir n' = fn_is_dir n ->
     s <> DOTDOT ->
     dir_entries n !! s = Some t ->
     dir_entries n' = delete s (dir_entries n) ->
     inode_local d n' -> fn_is_dir n' = true ->
     dir_owned Γ sb d n ⊢
       inode_phi Γ sb d n
-      ∗ ent_tok Γ d (fn_orphan n) s t
+      ∗ ent_tok Γ d (fn_dd n) (fn_orphan n) s t
       ∗ (inode_phi Γ sb d n' -∗ dir_owned Γ sb d n').
   Proof.
-    intros Horph Hnl Hdd Hs Hdel Hloc Hdir.
-    pose proof (fn_dotdot_delete n n' s Hdd Hdel) as Hdt.
-    iIntros "[[$ (Ha & Ht & _ & Hpa)] %Hdir0]".
-    iDestruct (ent_toks_delete Γ d n n' s t Horph Hs Hdel with "Ht") as "[$ Ht]".
-    iDestruct (inode_par_cong Γ d n n' with "Hpa") as "Hpa";
-      [lia |].
+    intros Horph Hnl Hdd Hdir0 Hne Hs Hdel Hloc Hdir.
+    iIntros "[[$ (%v & %Hv & Ha & Ht & _)] %Hdir1]".
+    iDestruct (ent_toks_delete Γ d n n' s t Horph Hdd Hs Hdel with "Ht")
+      as "[$ Ht]".
     iIntros "Hphi".
-    rewrite /dir_owned /inode_owned /inode_ghost Hnl. by iFrame.
+    rewrite /dir_owned /inode_owned /inode_ghost /fn_mult Hnl Horph Hdir0.
+    iFrame "Hphi". iSplitL; [| by iPureIntro].
+    iExists v. iSplitR.
+    { iPureIntro. rewrite /fn_ity_ok in Hv |- *.
+      destruct v; rewrite Hdir0; exact Hv. }
+    iFrame "Ha Ht". by iPureIntro.
   Qed.
 
   Lemma dir_owned_link Γ sb d n n' k0 s z :
     fn_orphan n' = fn_orphan n ->
     fn_nlink n' = fn_nlink n ->
+    fn_dd n' = fn_dd n ->
     fn_is_dir n = true ->
     dir_first (fn_data n) (fn_nrec n) s = None ->
     dir_insert_at (fn_data n) (fn_data n') (fn_nrec n) (fn_nrec n') k0 s z ->
     inode_local d n' -> fn_is_dir n' = true ->
-    dir_entries n' !! DOTDOT = dir_entries n !! DOTDOT ->
     dir_owned Γ sb d n ⊢
       inode_phi Γ sb d n
-      ∗ (inode_phi Γ sb d n' -∗ ent_tok Γ d (fn_orphan n) s (bv_unsigned z)
+      ∗ (inode_phi Γ sb d n' -∗
+         ent_tok Γ d (fn_dd n) (fn_orphan n) s (bv_unsigned z)
          -∗ dir_owned Γ sb d n').
   Proof.
-    intros Horph Hnl Hd Hnone Hins Hloc Hdir Hdd.
-    iIntros "[[$ (Ha & Ht & _ & Hpa)] _]".
+    intros Horph Hnl Hdd Hd Hnone Hins Hloc Hdir.
+    iIntros "[[$ (%v & %Hv & Ha & Ht & _)] _]".
     iIntros "Hphi Htok".
-    iDestruct (ent_toks_insert Γ d n n' k0 s z Horph Hd Hdir Hnone Hins
+    iDestruct (ent_toks_insert Γ d n n' k0 s z Horph Hdd Hd Hdir Hnone Hins
                  with "Ht Htok") as "Ht".
-    iDestruct (inode_par_cong Γ d n n' with "Hpa") as "Hpa";
-      [lia |].
-    rewrite /dir_owned /inode_owned /inode_ghost Hnl. by iFrame.
+    rewrite /dir_owned /inode_owned /inode_ghost /fn_mult Hnl Horph Hd Hdir.
+    iFrame "Hphi". iSplitL; [| by iPureIntro].
+    iExists v. iSplitR.
+    { iPureIntro. rewrite /fn_ity_ok in Hv |- *.
+      destruct v; rewrite Hdir; rewrite Hd in Hv; exact Hv. }
+    iFrame "Ha Ht". by iPureIntro.
   Qed.
 
-  (* the child's side of "unlink a directory": its [nlink] reaches 0, its
-     ".." entry becomes TOKENLESS, and the token it held goes back to the
-     parent.  The caller supplies the new [link_auth] because the RA move
-     ([link_return] at the parent's own auth) is its to make. *)
+  (* the child's side of "unlink a directory": its [nlink] reaches 0, BOTH
+     its dot records become exempt, and the two fragments they held go
+     out.  The caller supplies the new [link_auth] because the RA move is
+     its to make. *)
   Lemma dir_owned_orphan Γ sb d n n' t :
     dir_entries n' = dir_entries n ->
     fn_orphan n = false -> fn_orphan n' = true ->
+    fn_is_dir n' = fn_is_dir n ->
     dir_entries n !! DOTDOT = Some t ->
+    dir_entries n !! DOT = Some d ->
     t <> d ->
     inode_local d n' -> fn_is_dir n' = true ->
     dir_owned Γ sb d n ⊢
-      inode_phi Γ sb d n ∗ link_auth Γ d (fn_nlink n)
-      ∗ (link_tok Γ t ∗ par_tok Γ t None)
-      ∗ inode_par Γ d n
-      ∗ (inode_phi Γ sb d n' -∗ link_auth Γ d (fn_nlink n')
-         -∗ inode_par Γ d n' -∗ dir_owned Γ sb d n').
+      inode_phi Γ sb d n
+      ∗ ∃ v, ⌜fn_ity_ok n v /\ ent_ty_ok d (fn_dd n) DOT v⌝
+             ∗ link_auth Γ d (fn_mult n) v
+             ∗ (∃ ty, link_tok Γ t ty) ∗ link_tok Γ d v
+             ∗ (inode_phi Γ sb d n' -∗ link_auth Γ d (fn_mult n') v
+                -∗ dir_owned Γ sb d n').
   Proof.
-    intros Hents Ho Ho' Hdd Hne Hloc Hdir.
-    iIntros "[[$ (Ha & Ht & _ & $)] _]". iFrame "Ha".
-    iDestruct (ent_toks_orphan Γ d n n' t Hents Ho Ho' Hdd Hne with "Ht")
-      as "[$ Ht]".
-    iIntros "Hphi Ha Hpa".
-    rewrite /dir_owned /inode_owned /inode_ghost. by iFrame.
+    intros Hents Ho Ho' Hdir0 Hdd Hdt Hne Hloc Hdir.
+    iIntros "[[$ (%v & %Hv & Ha & Ht & _)] _]".
+    iDestruct (ent_toks_orphan Γ d n n' t Hents Ho Ho' Hdd Hdt Hne
+                 with "Ht") as "[Hup [(%ty & Hdotv & %Hok) Ht]]".
+    iDestruct (link_auth_tok_agree with "Ha Hdotv") as %[-> _].
+    iExists v. iFrame "Ha Hup Hdotv".
+    iSplitR; [iPureIntro; split; [exact Hv | exact Hok] |].
+    iIntros "Hphi Ha".
+    rewrite /dir_owned /inode_owned /inode_ghost.
+    iFrame "Hphi". iSplitL; [| by iPureIntro].
+    iExists v. iSplitR.
+    { iPureIntro. rewrite /fn_ity_ok in Hv |- *.
+      destruct v; rewrite Hdir0; exact Hv. }
+    iFrame "Ha Ht". by iPureIntro.
   Qed.
 
 End InodeOwned.

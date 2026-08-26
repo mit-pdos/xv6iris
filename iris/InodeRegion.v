@@ -2356,98 +2356,145 @@ Section InodeRegion.
       the ROOT's keep-alive token. *)
   Definition ireg_nl (d : dinode) : nat := Z.to_nat (bv_unsigned (di_nlink d)).
 
-  (* THE ROOT KEEP-ALIVE TOKEN.  [ent_tokenless] exempts a SELF record, so
-     the root's [".."] -- which names the root -- carries no token and the
-     image's [nlink = 1] at the root is unaccounted for by any directory.
-     The region parks that one token here, where nothing can ever spend it,
-     and "the root is allocated" IS a reading of the RA's own law
-     ([FsStateLink.link_auth_toks_le]) -- there is no pure clause about the
-     root anywhere in the slot. *)
-  Definition ireg_keep (γfs : fs_names) (z : Z) : iProp Σ :=
-    (if bool_decide (z = ireg_root)
-     then FsStateLink.link_tok (fs_gamma_L γfs) z else emp)%I.
+  (* THE MULTIPLICITY a record's own fields fix (fs-state.md section 6.5):
+     one unit per COUNTED dirent, plus the ["."] a LIVE DIRECTORY holds in
+     its own bundle -- the [+1] xv6 deliberately does not count.  At
+     [nlink = 0] there is no bonus WHATEVER the type is, which is what
+     keeps the kernel's two TYPE writes (the claim's [0 -> ty] and the free
+     deposit's [ty -> 0]) at multiplicity zero, where the register is empty
+     and the value is not mentioned at all. *)
+  Definition ireg_mult_at (n : nat) (ty : Z) : nat :=
+    (n + if bool_decide (ty = ireg_dir_ty) && negb (bool_decide (n = 0%nat))
+         then 1%nat else 0%nat)%nat.
 
-  Global Instance ireg_keep_timeless γfs z : Timeless (ireg_keep γfs z).
-  Proof. rewrite /ireg_keep. case_bool_decide; apply _. Qed.
+  Definition ireg_mult (d : dinode) : nat :=
+    ireg_mult_at (ireg_nl d) (bv_unsigned (di_type d)).
 
-  (* the count-indexed form, which is what BOOT hands over: the region's
-     shape at a slot is a function of the record's [nlink] alone.
-
-     THE TOKENS ARE NOT HERE.  A directory's tokens ride in its CHECKED-OUT
-     PAYLOAD ([IcacheEscrow.ic_loaded]'s [FsStateInode.ent_toks]); what the
-     region keeps is the per-inum AUTHORITY, plus the root's one keep-alive
-     token.  The authority is region-side because [IgetLic]'s licence (a)
-     reads the RA's law at the TARGET's authority and the presenter of the
-     licence does not hold the target -- see the banner above. *)
-  (* THE PARENT REGISTER's AUTHORITY (fs-state.md section 6.5).  Its
-     fragments ride with the entry TOKENS in the payloads; the authority
-     parks here beside the count's, under the ONE bound the region's slot
-     can state -- [size P <= nlink] -- because that bound is a reading of
-     the RECORD, which is what a slot carries.  The clause that gives the
-     register its content ("a live directory admits only its own
-     up-pointing target as a namer") reads the node's DATA and therefore
-     belongs in the checked-out payload; it arrives when
-     [IcacheEscrow.dlinks] loses [DirLinks.dir_links]. *)
-  (* THE UP-POINTING PART OF A REGISTER: how many of an inum's namers point
-     the OTHER way.  [FsStateInode.ent_par_val] values a NAME record at
-     [Some self] and a dot record at [None], so [ireg_ups P] counts exactly
-     the [".."] records that name this inum -- i.e. its SUBDIRECTORIES. *)
-  Definition ireg_ups (P : gmultiset (option Z)) : nat := multiplicity None P.
-
-  (* (U1) ONLY A DIRECTORY IS NAMED BY AN UP-POINTING RECORD, and (U2) A
-     LIVE INUM HAS AT LEAST ONE NAME.  Both are readings of the RECORD, so
-     both can stand here beside the bound; together they are S7-unlink's
-     (D2), which used to be the ledger's [DirView.dlc_lower] (V4):
-
-       [dp] holds a live subdirectory record, so the child's [".."] puts a
-       [None] in [dp]'s register; (U2) says [dp]'s own count exceeds its
-       up-pointing namers; hence [2 <= nlink dp].
-
-     (U2) IS NOT SPECIAL AT THE ROOT.  The root's [".."] names the root and
-     is a SELF record, hence TOKENLESS ([FsStateInode.ent_tokenless]), so it
-     contributes no unit: an empty root has [ups = 0 < 1 = nlink], and each
-     subdirectory raises both sides by one.  That is the same unit of slack
-     [ireg_keep] parks, read from the other end.
-
-     (U1) IS WHAT MAKES (U2) INDUCTIVE.  Dropping a NAME unit at a node that
-     stays live has to leave a name behind, and the only nodes where that is
-     locally evident are the ones with no up-pointing namers at all -- which
-     (U1) pins to "not a directory".  The kernel's own two shapes match:
-     a file loses one of several names ([sys_unlink]'s file arm, [ups = 0]),
-     a directory loses its ONLY name and dies with it (rmdir, [nlink' = 0],
-     because [isdirempty] refused a non-empty one). *)
-  Definition ireg_par (γfs : fs_names) (z : Z) (n : nat) (ty : Z) : iProp Σ :=
-    (∃ P, FsStateLink.par_auth (fs_gamma_L γfs) z P
-          ∗ ⌜(size P <= n)%nat⌝
-          ∗ ⌜ty <> ireg_dir_ty -> ireg_ups P = 0%nat⌝
-          ∗ ⌜n <> 0%nat -> (ireg_ups P < n)%nat⌝)%I.
-
-  Global Instance ireg_par_timeless γfs z n ty : Timeless (ireg_par γfs z n ty).
-  Proof. rewrite /ireg_par. apply _. Qed.
-
-  (* an EMPTY register satisfies both clauses at any record *)
-  Lemma ireg_ups_empty : ireg_ups ∅ = 0%nat.
-  Proof. rewrite /ireg_ups multiplicity_empty //. Qed.
-
-  Lemma ireg_ups_add (P : gmultiset (option Z)) (v : option Z) :
-    ireg_ups (P ⊎ {[+ v +]})
-    = (ireg_ups P + (if decide (v = None) then 1 else 0))%nat.
+  Lemma ireg_mult_at_zero ty : ireg_mult_at 0%nat ty = 0%nat.
   Proof.
-    rewrite /ireg_ups multiplicity_disj_union.
-    destruct v as [j |].
-    - rewrite (multiplicity_singleton_ne None (Some j) ltac:(discriminate)).
-      destruct (decide (@Some Z j = None)) as [Hc | _]; [discriminate | lia].
-    - rewrite multiplicity_singleton.
-      destruct (decide (@None Z = None)) as [_ | Hc];
-        [lia | destruct (Hc eq_refl)].
+    rewrite /ireg_mult_at (bool_decide_eq_true_2 (0%nat = 0%nat) eq_refl)
+      andb_false_r //.
   Qed.
 
-  (* [ireg_par] is LAST, so no destructuring pattern above it moves
-     (durable-notes.md). *)
+  Lemma ireg_mult_at_ge n ty : (n <= ireg_mult_at n ty)%nat.
+  Proof. rewrite /ireg_mult_at. destruct (_ && _)%bool; lia. Qed.
+
+  Lemma ireg_mult_at_le n ty : (ireg_mult_at n ty <= S n)%nat.
+  Proof. rewrite /ireg_mult_at. destruct (_ && _)%bool; lia. Qed.
+
+  Lemma ireg_mult_at_nz n ty : ireg_mult_at n ty <> 0%nat -> n <> 0%nat.
+  Proof.
+    intros Hm Hz. apply Hm. rewrite Hz. exact (ireg_mult_at_zero ty).
+  Qed.
+
+  Lemma ireg_mult_zero d :
+    bv_unsigned (di_nlink d) = 0 -> ireg_mult d = 0%nat.
+  Proof.
+    intros Hz. rewrite /ireg_mult /ireg_nl Hz Z2Nat.inj_0.
+    exact (ireg_mult_at_zero _).
+  Qed.
+
+  Lemma ireg_mult_nl d : (ireg_nl d <= ireg_mult d <= S (ireg_nl d))%nat.
+  Proof.
+    split; [exact (ireg_mult_at_ge _ _) | exact (ireg_mult_at_le _ _)].
+  Qed.
+
+  (* HOW MANY FRAGMENTS A [nlink]-BY-ONE MOVE MOVES: one for the record
+     that pays, plus -- when a DIRECTORY crosses the live boundary -- the
+     ["."] the live form holds and the orphan form does not.  It is TWO at
+     exactly two sites in the kernel (create's fresh-directory fill and
+     rmdir's [ip->nlink--]) and ONE everywhere else. *)
+  Definition ireg_dot_delta (ty : Z) (n : Z) : nat :=
+    if bool_decide (ty = ireg_dir_ty) && bool_decide (n = 0)
+    then 2%nat else 1%nat.
+
+  Lemma ireg_mult_bump d d' :
+    bv_unsigned (di_nlink d') = bv_unsigned (di_nlink d) + 1 ->
+    bv_unsigned (di_type d') = bv_unsigned (di_type d) ->
+    ireg_mult d' = (ireg_mult d
+                    + ireg_dot_delta (bv_unsigned (di_type d))
+                                     (bv_unsigned (di_nlink d)))%nat.
+  Proof.
+    intros Hnl Hty.
+    pose proof (di_nlink_nonneg d) as Hnn.
+    rewrite /ireg_mult /ireg_mult_at /ireg_nl /ireg_dot_delta Hty Hnl.
+    repeat case_bool_decide; simpl in *; lia.
+  Qed.
+
+  Lemma ireg_mult_drop d d' :
+    bv_unsigned (di_nlink d) = bv_unsigned (di_nlink d') + 1 ->
+    bv_unsigned (di_type d') = bv_unsigned (di_type d) ->
+    ireg_mult d = (ireg_mult d'
+                   + ireg_dot_delta (bv_unsigned (di_type d'))
+                                    (bv_unsigned (di_nlink d')))%nat.
+  Proof.
+    intros Hnl Hty.
+    pose proof (di_nlink_nonneg d') as Hnn.
+    rewrite /ireg_mult /ireg_mult_at /ireg_nl /ireg_dot_delta Hty Hnl.
+    repeat case_bool_decide; simpl in *; lia.
+  Qed.
+
+  (* THE TIE between the record's TYPE FIELD and the register's VALUE.
+     [TDir p]'s [p] is NOT read here -- the slot carries the record alone
+     and cannot see the [".."] entry; what pins it is the ["."] fragment
+     in the directory's own checked-out payload
+     ([FsStateInode.ent_ty_ok] at [DOT]), which is rmdir's (D1). *)
+  Definition ireg_ty_ok (ty : Z) (v : ity) : Prop :=
+    match v with
+    | TFile => ty <> ireg_dir_ty
+    | TDir _ => ty = ireg_dir_ty
+    end.
+
+  Lemma ireg_ty_ok_ex (ty : Z) : exists v, ireg_ty_ok ty v.
+  Proof.
+    destruct (decide (ty = ireg_dir_ty)) as [H | H];
+      [exists (TDir 0) | exists TFile]; exact H.
+  Qed.
+
+  Lemma ireg_ty_ok_dir ty v :
+    ireg_ty_ok ty v -> ty = ireg_dir_ty -> exists p, v = TDir p.
+  Proof.
+    destruct v as [| p]; intros Hok Hd; [destruct (Hok Hd) | by exists p].
+  Qed.
+
+  Lemma ireg_ty_ok_file ty v :
+    ireg_ty_ok ty v -> ty <> ireg_dir_ty -> v = TFile.
+  Proof. destruct v as [| p]; intros Hok Hd; [done | destruct (Hd Hok)]. Qed.
+
+  (* THE ROOT KEEP-ALIVE FRAGMENT.  [ent_tokenless] exempts the ROOT's
+     [".."] -- which names the root -- so the image's [nlink = 1] at the
+     root is unaccounted for by any entry, and the region parks that one
+     fragment here, where nothing can ever spend it.  "The root is
+     allocated" is then a reading of the RA's own law and there is no pure
+     clause about the root anywhere in the slot.
+
+     IT IS THE ONLY SOURCE [IgetLic]'s licence (f) HAS: namei's
+     [iget(ROOTINO)] holds nothing at all, and every other fragment at the
+     root lives in the root's own checked-out payload, which [iregN] cannot
+     reach. *)
+  Definition ireg_keep (γfs : fs_names) (z : Z) (v : ity) : iProp Σ :=
+    (if bool_decide (z = ireg_root)
+     then FsStateLink.link_tok (fs_gamma_L γfs) z v else emp)%I.
+
+  Global Instance ireg_keep_timeless γfs z v : Timeless (ireg_keep γfs z v).
+  Proof. rewrite /ireg_keep. case_bool_decide; apply _. Qed.
+
+  (* the count-and-type-indexed form, which is what BOOT hands over: the
+     region's shape at a slot is a function of the record's [nlink] and
+     [di_type] alone.
+
+     THE FRAGMENTS ARE NOT HERE.  A directory's fragments ride in its
+     CHECKED-OUT PAYLOAD ([IcacheEscrow.ic_loaded]'s
+     [FsStateInode.ent_toks]); what the region keeps is the per-inum
+     AUTHORITY, plus the root's one keep-alive.  The authority is
+     region-side because [IgetLic]'s licence (a) reads the RA's law at the
+     TARGET's authority and the presenter of the licence does not hold the
+     target -- see the banner above. *)
   Definition ireg_lnk_at (γfs : fs_names) (z : Z) (n : nat) (ty : Z)
     : iProp Σ :=
-    (FsStateLink.link_auth (fs_gamma_L γfs) z n ∗ ireg_keep γfs z
-     ∗ ireg_par γfs z n ty)%I.
+    (∃ v : ity, ⌜ireg_ty_ok ty v⌝
+       ∗ FsStateLink.link_auth (fs_gamma_L γfs) z (ireg_mult_at n ty) v
+       ∗ ireg_keep γfs z v)%I.
 
   Definition ireg_lnk (γfs : fs_names) (z : Z) (d : dinode) : iProp Σ :=
     ireg_lnk_at γfs z (ireg_nl d) (bv_unsigned (di_type d)).
@@ -2464,269 +2511,210 @@ Section InodeRegion.
   Global Instance ireg_lnk_timeless γfs z d : Timeless (ireg_lnk γfs z d).
   Proof. rewrite /ireg_lnk. apply _. Qed.
 
-  (* every mover that leaves the COUNT alone carries it by this one line *)
+  (* the multiplicity is a function of the two record fields, so a mover
+     that moves neither moves nothing *)
   Lemma ireg_lnk_stable γfs z d d' :
     bv_unsigned (di_nlink d') = bv_unsigned (di_nlink d) ->
-    (* ...AND THE TYPE, which (U1) reads.  Every ordinary flush carries it
-       already ([InodeRegion.di_type_stable] is a standing premise of all
-       five [iupdate] bodies); the two movers that DO write a type -- the
-       claim (0 -> ty) and the free deposit (ty -> 0) -- stand at
-       [nlink = 0], where the whole register is empty and both clauses are
-       vacuous, and they use [ireg_lnk_free_retype] below instead. *)
     bv_unsigned (di_type d') = bv_unsigned (di_type d) ->
     ireg_lnk γfs z d -∗ ireg_lnk γfs z d'.
   Proof.
-    intros Heq Hty. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl Heq Hty.
+    intros Heq Hty. rewrite /ireg_lnk /ireg_nl Heq Hty.
     iIntros "H"; iExact "H".
   Qed.
 
   (* ...AND THE TYPE-WRITING ONE: at a record whose count is zero the
-     register is EMPTY ([size P <= 0]), so both clauses hold at any type at
-     all and the slot may be retyped freely.  That is the claim's move
-     ([0 -> ty] at a fresh box) and the free deposit's ([ty -> 0] at a
-     corpse), which are the only two writes of [di_type] in the kernel. *)
+     multiplicity is zero WHATEVER the type is, so the authority is the
+     empty one and the value is not mentioned -- the slot may be retyped
+     freely.  That is the claim's move ([0 -> ty] at a fresh box) and the
+     free deposit's ([ty -> 0] at a corpse), the only two writes of
+     [di_type] in the kernel.  At the ROOT the premises are contradictory
+     (the keep-alive fragment cannot stand against an empty authority),
+     which is how the root's slot survives the lemma. *)
   Lemma ireg_lnk_free_retype γfs z d d' :
     bv_unsigned (di_nlink d) = 0 ->
     bv_unsigned (di_nlink d') = 0 ->
     ireg_lnk γfs z d -∗ ireg_lnk γfs z d'.
   Proof.
-    intros Hz Hz'. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl /ireg_par Hz Hz'
-      Z2Nat.inj_0.
-    iIntros "(Ha & $ & (%P & Hp & %Hsz & _ & _))". iFrame "Ha".
-    assert (HP : P = ∅) by (apply gmultiset_size_empty_inv; lia).
-    iExists P. iFrame "Hp". iPureIntro. rewrite HP. split_and!.
-    - rewrite gmultiset_size_empty. lia.
-    - intros _. exact ireg_ups_empty.
-    - intros Hc. destruct (Hc eq_refl).
+    intros Hz Hz'. rewrite /ireg_lnk /ireg_nl Hz Hz' Z2Nat.inj_0.
+    rewrite !ireg_mult_at_zero.
+    iIntros "(%v & _ & Ha & Hk)".
+    destruct (ireg_ty_ok_ex (bv_unsigned (di_type d'))) as [v' Hok'].
+    iExists v'. iSplitR; [by iPureIntro |].
+    rewrite (FsStateLink.link_auth_zero_retype _ z v v'). iFrame "Ha".
+    rewrite /ireg_keep. case_bool_decide as Hr; [| done].
+    rewrite (FsStateLink.link_auth_zero_retype _ z v' v).
+    iDestruct (FsStateLink.link_auth_zero_no_tok with "Ha Hk") as "[]".
   Qed.
 
-  (* the RAISING flush ([ip->nlink++; iupdate]): one [link_mint], and the
-     minted token goes OUT -- to the [dirlink] that files it in a
-     directory's [FsStateInode.ent_toks] -- together with the REGISTER unit
-     that entry carries beside it, at the value the naming record fixes
-     ([FsStateInode.ent_par_val] of the namer and the name). *)
-  Lemma ireg_lnk_bump γfs z d d' (v : option Z) :
-    bv_unsigned (di_nlink d') = bv_unsigned (di_nlink d) + 1 ->
+  (* THE RAISING FLUSH ([ip->nlink++; iupdate]), at a record whose type
+     does not move: [k] fragments come out, and they go to the [dirlink]s
+     that file them in directories' [FsStateInode.ent_toks].  [k] is ONE
+     everywhere except create's fresh-DIRECTORY fill, where the
+     multiplicity crosses [0 -> 2] (the name in the parent, and the
+     child's own ["."]). *)
+  Lemma ireg_lnk_bump γfs z d d' (k : nat) :
+    ireg_mult d' = (ireg_mult d + k)%nat ->
     bv_unsigned (di_type d') = bv_unsigned (di_type d) ->
-    (* THE UP-POINTING MINT'S OWN TWO PREMISES ((U1)/(U2) above).  A [None]
-       unit is minted by exactly ONE site in the kernel -- mkdir's
-       [dp->nlink++], paying for the fresh child's [".."] -- and both halves
-       are free there: [dp] is the directory the walk has locked, and
-       create's own orphan guard (xv6 f60ff58, ARM G) has just refused a
-       [dp] whose count is zero.  Every other mint is at [Some _] and pays
-       nothing. *)
-    (v = None -> bv_unsigned (di_type d') = ireg_dir_ty
-                 /\ bv_unsigned (di_nlink d) <> 0) ->
     ireg_lnk γfs z d ==∗
     ireg_lnk γfs z d'
-    ∗ FsStateLink.link_tok (fs_gamma_L γfs) z
-    ∗ FsStateLink.par_tok (fs_gamma_L γfs) z v.
+    ∗ ∃ v, ⌜ireg_ty_ok (bv_unsigned (di_type d)) v⌝
+           ∗ FsStateLink.link_toks (fs_gamma_L γfs) z (link_reps k v).
   Proof.
-    intros Heq Hty Hup. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl /ireg_par Hty.
-    pose proof (di_nlink_nonneg d) as Hnn.
-    assert (Hs : Z.to_nat (bv_unsigned (di_nlink d'))
-                 = S (Z.to_nat (bv_unsigned (di_nlink d)))) by lia.
-    rewrite Hs. iIntros "(Ha & $ & (%P & Hp & %Hsz & %Hu1 & %Hu2))".
-    iMod (FsStateLink.link_mint with "Ha") as "[$ $]".
-    iMod (FsStateLink.par_alloc _ z P v with "Hp") as "[Hp $]".
-    iModIntro. iExists (P ⊎ {[+ v +]}). iFrame. iPureIntro.
-    rewrite ireg_ups_add. split_and!.
-    - rewrite gmultiset_size_disj_union gmultiset_size_singleton. lia.
-    - intros Hnd. destruct (decide (v = None)) as [Hv | _].
-      + exfalso. destruct (Hup Hv) as [Hc _]. apply Hnd. rewrite -Hty. exact Hc.
-      + rewrite (Hu1 Hnd). lia.
-    - intros _. destruct (decide (v = None)) as [Hv | _].
-      + destruct (Hup Hv) as [_ Hnz].
-        assert (Hnz' : Z.to_nat (bv_unsigned (di_nlink d)) <> 0%nat) by lia.
-        pose proof (Hu2 Hnz'). lia.
-      + assert (Hle : (ireg_ups P <= Z.to_nat (bv_unsigned (di_nlink d)))%nat).
-        { destruct (decide (Z.to_nat (bv_unsigned (di_nlink d)) = 0%nat))
-            as [Hz | Hnz].
-          - assert (HP : P = ∅) by (apply gmultiset_size_empty_inv; lia).
-            rewrite HP ireg_ups_empty. lia.
-          - pose proof (Hu2 Hnz). lia. }
-        lia.
+    intros Hm Hty. rewrite /ireg_lnk /ireg_lnk_at.
+    iIntros "(%v & %Hok & Ha & Hk)".
+    iMod (FsStateLink.link_mint_reps _ z (ireg_mult d) k v with "Ha")
+      as "[Ha Hts]".
+    iModIntro.
+    iSplitL "Ha Hk".
+    - iExists v. iSplitR; [iPureIntro; rewrite Hty; exact Hok |].
+      rewrite -/(ireg_mult d') -Hm. iFrame "Ha".
+      rewrite /ireg_keep. iExact "Hk".
+    - iExists v. iFrame "Hts". by iPureIntro.
   Qed.
 
-  (* ...and the LOWERING one ([ip->nlink--; iupdate]): one [link_return],
-     paid for by the token the removed directory entry gave up. *)
-  Lemma ireg_lnk_drop γfs z d d' (v : option Z) :
-    bv_unsigned (di_nlink d) = bv_unsigned (di_nlink d') + 1 ->
+  (* ...AND THE FILL, where the multiplicity was ZERO and the caller
+     CHOOSES the value.  That is mkdir's fresh child: the register is set
+     to [TDir dp] at the flush that writes [nlink = 1], which is what makes
+     the parent's name record able to assert "my target's parent is ME". *)
+  Lemma ireg_lnk_fill γfs z d d' (v : ity) (k : nat) :
+    ireg_mult d = 0%nat ->
+    ireg_mult d' = k ->
+    ireg_ty_ok (bv_unsigned (di_type d')) v ->
+    ireg_lnk γfs z d ==∗
+    ireg_lnk γfs z d'
+    ∗ FsStateLink.link_toks (fs_gamma_L γfs) z (link_reps k v).
+  Proof.
+    intros Hz Hm Hok'. rewrite /ireg_lnk /ireg_lnk_at.
+    iIntros "(%v0 & %Hok & Ha)".
+    rewrite -/(ireg_mult d) Hz.
+    iDestruct "Ha" as "[Ha Hk]".
+    rewrite (FsStateLink.link_auth_zero_retype _ z v0 v).
+    iMod (FsStateLink.link_mint_reps _ z 0%nat k v with "Ha") as "[Ha $]".
+    iModIntro. iExists v. iSplitR; [by iPureIntro |].
+    rewrite -/(ireg_mult d') Hm Nat.add_0_l. iFrame "Ha".
+    rewrite /ireg_keep. case_bool_decide as Hr; [| done].
+    rewrite (FsStateLink.link_auth_zero_retype _ z v v0).
+    iDestruct (FsStateLink.link_auth_zero_no_tok with "Ha Hk") as "[]".
+  Qed.
+
+  (* ...and the LOWERING one ([ip->nlink--; iupdate]): [k] fragments in,
+     paid for by the entries that gave them up.  [k] is ONE everywhere
+     except rmdir's [ip->nlink--], where the child's multiplicity crosses
+     [2 -> 0] (its name in the parent, and its own ["."]). *)
+  Lemma ireg_lnk_drop γfs z d d' (v : ity) (k : nat) :
+    ireg_mult d = (ireg_mult d' + k)%nat ->
     bv_unsigned (di_type d') = bv_unsigned (di_type d) ->
-    (* THE NAME-DROP's OWN PREMISE ((U2) above).  Retiring a NAME unit at a
-       node that stays LIVE has to leave a name behind, and the two shapes
-       the kernel has both make it evident: a file loses one of several
-       names (not a directory, so (U1) says it has no up-pointing namers at
-       all), or a directory loses its ONLY name and dies with it -- rmdir
-       refused a non-empty one, so its count was exactly one. *)
-    (forall j, v = Some j ->
-       bv_unsigned (di_nlink d') = 0 \/ bv_unsigned (di_type d) <> ireg_dir_ty) ->
-    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z -∗
-    FsStateLink.par_tok (fs_gamma_L γfs) z v ==∗
+    ireg_lnk γfs z d -∗
+    FsStateLink.link_toks (fs_gamma_L γfs) z (link_reps k v) ==∗
     ireg_lnk γfs z d'.
   Proof.
-    intros Heq Hty Hnm. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl /ireg_par Hty.
-    pose proof (di_nlink_nonneg d') as Hnn.
-    assert (Hs : Z.to_nat (bv_unsigned (di_nlink d))
-                 = S (Z.to_nat (bv_unsigned (di_nlink d')))) by lia.
-    rewrite Hs. iIntros "(Ha & $ & (%P & Hp & %Hsz & %Hu1 & %Hu2)) Htk Hpt".
-    iMod (FsStateLink.link_return with "Ha Htk") as "$".
-    iDestruct (FsStateLink.par_auth_tok_in with "Hp Hpt") as %Hin.
-    assert (HP : P = (P ∖ {[+ v +]}) ⊎ {[+ v +]}) by multiset_solver.
-    assert (Hsz' : (S (size (P ∖ {[+ v +]})) = size P)%nat).
-    { rewrite {2}HP gmultiset_size_disj_union gmultiset_size_singleton. lia. }
-    assert (Hups : ireg_ups P
-                   = (ireg_ups (P ∖ {[+ v +]})
-                      + (if decide (v = None) then 1 else 0))%nat).
-    { rewrite {1}HP ireg_ups_add //. }
-    assert (Hu2' : (Z.to_nat (bv_unsigned (di_nlink d')) <> 0)%nat ->
-                   (ireg_ups (P ∖ {[+ v +]})
-                    < Z.to_nat (bv_unsigned (di_nlink d')))%nat).
-    { intros Hnz.
-      assert (Hnz0 : S (Z.to_nat (bv_unsigned (di_nlink d'))) <> 0%nat)
-        by lia.
-      pose proof (Hu2 Hnz0) as Hlt.
-      destruct (decide (v = None)) as [Hv | Hv]; [lia |].
-      destruct v as [j |]; [| destruct (Hv eq_refl)].
-      destruct (Hnm j eq_refl) as [Hz0 | Hnd]; [lia |].
-      rewrite (Hu1 Hnd) in Hups. lia. }
-    rewrite {1}HP.
-    iMod (FsStateLink.par_dealloc _ z (P ∖ {[+ v +]}) v with "Hp Hpt") as "Hp".
-    iModIntro. iExists (P ∖ {[+ v +]}). iFrame. iPureIntro. split_and!.
-    - lia.
-    - intros Hnd. rewrite (Hu1 Hnd) in Hups. lia.
-    - exact Hu2'.
+    intros Hm Hty. rewrite /ireg_lnk /ireg_lnk_at.
+    iIntros "(%v0 & %Hok & Ha & Hk) Hts".
+    rewrite -/(ireg_mult d) Hm.
+    iMod (FsStateLink.link_return_reps _ z (ireg_mult d') k v0 v
+            with "Ha Hts") as "Ha".
+    iModIntro. iExists v0. iSplitR; [iPureIntro; rewrite Hty; exact Hok |].
+    rewrite -/(ireg_mult d'). iFrame "Ha". rewrite /ireg_keep. iExact "Hk".
   Qed.
 
-  (* THE REGISTER UNIT'S VALUE IS NOT FIXED AT THE MINT, and it cannot be:
-     xv6's [sys_link] runs [ip->nlink++] BEFORE [nameiparent] resolves the
-     directory the new record will live in, so the flush that mints the
-     unit does not yet know the namer.  The unit is therefore minted at an
-     arbitrary value and RE-VALUED at the [dirlink] that files it, which is
-     one dealloc plus one alloc on this slot's own authority -- the count
-     does not move, so the bound rides. *)
-  Lemma ireg_lnk_par_move γfs z n ty (v w : option Z) :
-    (* the re-valuation may not CREATE an up-pointing namer: sys_link's is
-       the only one in the kernel and it goes the other way, from the
-       unattributed [Some] the [++] minted to the [Some dp] the deposited
-       record fixes. *)
-    (w = None -> v = None) ->
-    ireg_lnk_at γfs z n ty -∗ FsStateLink.par_tok (fs_gamma_L γfs) z v ==∗
-    ireg_lnk_at γfs z n ty ∗ FsStateLink.par_tok (fs_gamma_L γfs) z w.
+  (* ------------------------------------------------------------------ *)
+  (*  THE READINGS                                                       *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the general one, which is what licence (a) reads: any pile of
+     fragments standing at this inum bounds the record's own multiplicity
+     from below. *)
+  Lemma ireg_lnk_toks_le γfs z d Q :
+    ireg_lnk γfs z d -∗ FsStateLink.link_toks (fs_gamma_L γfs) z Q -∗
+    ⌜(size Q <= ireg_mult d)%nat⌝.
   Proof.
-    intros Hwv. rewrite /ireg_lnk_at /ireg_par.
-    iIntros "(Ha & $ & (%P & Hp & %Hsz & %Hu1 & %Hu2)) Ht".
-    iDestruct (FsStateLink.par_auth_tok_in with "Hp Ht") as %Hin.
-    assert (HP : P = (P ∖ {[+ v +]}) ⊎ {[+ v +]}) by multiset_solver.
-    assert (Hsz' : (S (size (P ∖ {[+ v +]})) = size P)%nat).
-    { rewrite {2}HP gmultiset_size_disj_union gmultiset_size_singleton. lia. }
-    assert (Hups : ireg_ups P
-                   = (ireg_ups (P ∖ {[+ v +]})
-                      + (if decide (v = None) then 1 else 0))%nat).
-    { rewrite {1}HP ireg_ups_add //. }
-    assert (Hupsw : ireg_ups ((P ∖ {[+ v +]}) ⊎ {[+ w +]})
-                    = (ireg_ups (P ∖ {[+ v +]})
-                       + (if decide (w = None) then 1 else 0))%nat)
-      by (rewrite ireg_ups_add //).
-    assert (Hle : (ireg_ups ((P ∖ {[+ v +]}) ⊎ {[+ w +]}) <= ireg_ups P)%nat).
-    { rewrite Hupsw. destruct (decide (w = None)) as [Hw | Hw].
-      - destruct (decide (v = None)) as [_ | Hv];
-          [lia | destruct (Hv (Hwv Hw))].
-      - lia. }
-    rewrite {1}HP.
-    iMod (FsStateLink.par_dealloc _ z (P ∖ {[+ v +]}) v with "Hp Ht") as "Hp".
-    iMod (FsStateLink.par_alloc _ z (P ∖ {[+ v +]}) w with "Hp") as "[Hp $]".
-    iModIntro. iFrame "Ha". iExists ((P ∖ {[+ v +]}) ⊎ {[+ w +]}).
-    iFrame "Hp". iPureIntro. split_and!.
-    - rewrite gmultiset_size_disj_union gmultiset_size_singleton. lia.
-    - intros Hnd. pose proof (Hu1 Hnd). lia.
-    - intros Hnz. pose proof (Hu2 Hnz). lia.
+    rewrite /ireg_lnk /ireg_lnk_at. iIntros "(%v & _ & Ha & _) Htk".
+    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htk") as %[Hle _].
+    by iPureIntro.
   Qed.
 
-  (* THE ROOT'S READING: the parked keep-alive token cannot be spent, so
-     the RA's own law says the root's count is at least one. *)
+  (* ONE fragment says the record is LIVE: at [nlink = 0] the multiplicity
+     is zero whatever the type is. *)
+  Lemma ireg_lnk_tok_nz γfs z d v :
+    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z v -∗
+    ⌜bv_unsigned (di_nlink d) <> 0⌝.
+  Proof.
+    iIntros "Hl Ht".
+    iDestruct (ireg_lnk_toks_le γfs z d {[+ v +]} with "Hl Ht") as %Hle.
+    iPureIntro. intros Hz.
+    rewrite (ireg_mult_zero d Hz) gmultiset_size_singleton in Hle. lia.
+  Qed.
+
+  (* ...AND ITS VALUE IS THE RECORD'S TYPE.  The agreement half of the RA's
+     law, at the region's own authority: a fragment standing at an inum
+     tells the holder whether that inum is a DIRECTORY, and if it is, which
+     inum the region believes is its parent. *)
+  Lemma ireg_lnk_tok_ty γfs z d v :
+    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z v -∗
+    ⌜ireg_ty_ok (bv_unsigned (di_type d)) v⌝.
+  Proof.
+    rewrite /ireg_lnk /ireg_lnk_at. iIntros "(%v0 & %Hok & Ha & _) Ht".
+    iDestruct (FsStateLink.link_auth_tok_agree with "Ha Ht") as %[-> _].
+    by iPureIntro.
+  Qed.
+
+  (* THE (D1) ENGINE: two fragments at one inum carry the SAME value, since
+     the authority is a UNIFORM multiset.  rmdir reads the child's ["."]
+     fragment (which is [TDir] of the child's own [".."] target) against
+     the parent's NAME-record fragment (whose holder asserts [TDir] of
+     ITSELF) and the two collapse. *)
+  Lemma ireg_lnk_toks_agree γfs z d v v' :
+    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z v -∗
+    FsStateLink.link_tok (fs_gamma_L γfs) z v' -∗ ⌜v = v'⌝.
+  Proof.
+    rewrite /ireg_lnk /ireg_lnk_at. iIntros "(%v0 & _ & Ha & _) Ht Ht'".
+    iDestruct (FsStateLink.link_auth_tok_agree with "Ha Ht") as %[-> _].
+    iDestruct (FsStateLink.link_auth_tok_agree with "Ha Ht'") as %[-> _].
+    by iPureIntro.
+  Qed.
+
+  (* THE ROOT'S READING: the parked keep-alive cannot be spent, so the RA's
+     own law says the root's count is at least one. *)
   Lemma ireg_lnk_root_alive γfs d :
     ireg_lnk γfs ireg_root d -∗ ⌜1 <= bv_unsigned (di_nlink d)⌝.
   Proof.
     rewrite /ireg_lnk /ireg_lnk_at /ireg_keep bool_decide_eq_true_2 //.
-    iIntros "(Ha & Htk & _)".
-    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htk") as %Hle.
-    iPureIntro. rewrite /ireg_nl in Hle.
-    pose proof (di_nlink_nonneg d). lia.
-  Qed.
-
-  (* ...and the general one, which is what licence (a) reads: any token
-     standing at this inum bounds the record's own count from below. *)
-  Lemma ireg_lnk_toks_le γfs z d k :
-    ireg_lnk γfs z d -∗ FsStateLink.link_toks (fs_gamma_L γfs) z k -∗
-    ⌜Z.of_nat k <= bv_unsigned (di_nlink d)⌝.
-  Proof.
-    rewrite /ireg_lnk /ireg_lnk_at. iIntros "[Ha _] Htk".
-    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htk") as %Hle.
-    iPureIntro. rewrite /ireg_nl in Hle.
-    pose proof (di_nlink_nonneg d). lia.
-  Qed.
-
-  Lemma ireg_lnk_tok_nz γfs z d :
-    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z -∗
-    ⌜bv_unsigned (di_nlink d) <> 0⌝.
-  Proof.
-    iIntros "Hl Ht".
-    iDestruct (ireg_lnk_toks_le γfs z d 1 with "Hl Ht") as %Hle.
-    iPureIntro. lia.
-  Qed.
-
-  (* ===== S7-unlink's (D2), AT THE REGISTER (durable-disk G3) =========
-     A directory holding a LIVE SUBDIRECTORY record has at least TWO links.
-     The child's [".."] puts an up-pointing unit in the parent's register,
-     so (U2) -- "a live inum's count exceeds its up-pointing namers" --
-     reads the second link straight off.  No ledger, no data, no root
-     exception: the root's own [".."] is a SELF record and carries no unit
-     at all, so an empty root sits at [0 < 1] and each subdirectory raises
-     both sides by one.
-
-     This replaces [IregDirBit.dir_links_subdir_nlink2], whose carrier was
-     [DirView.dlc_lower] inside [DirLinks.dir_links]. *)
-  Lemma ireg_lnk_up_min2 γfs z d :
-    ireg_lnk γfs z d -∗
-    FsStateLink.par_tok (fs_gamma_L γfs) z None -∗
-    ⌜2 <= bv_unsigned (di_nlink d)⌝.
-  Proof.
-    rewrite /ireg_lnk /ireg_lnk_at /ireg_par /ireg_nl.
-    iIntros "(_ & _ & (%P & Hp & %Hsz & _ & %Hu2)) Ht".
-    iDestruct (FsStateLink.par_auth_tok_in with "Hp Ht") as %Hin.
+    iIntros "(%v & _ & Ha & Htk)".
+    iDestruct (FsStateLink.link_auth_tok_agree with "Ha Htk") as %[_ Hle].
     iPureIntro.
-    assert (Hups : (1 <= ireg_ups P)%nat).
-    { rewrite /ireg_ups. multiset_solver. }
     pose proof (di_nlink_nonneg d) as Hnn.
-    destruct (decide (Z.to_nat (bv_unsigned (di_nlink d)) = 0%nat))
-      as [Hz | Hnz].
-    - exfalso.
-      assert (HP : P = ∅) by (apply gmultiset_size_empty_inv; lia).
-      rewrite HP ireg_ups_empty in Hups. lia.
-    - pose proof (Hu2 Hnz). lia.
+    destruct (decide (bv_unsigned (di_nlink d) = 0)) as [Hz | Hnz]; [| lia].
+    exfalso. rewrite -/(ireg_mult d) (ireg_mult_zero d Hz) in Hle. lia.
   Qed.
 
-  (* ...AND THE ROOT'S MINIMUM AT A HELD TOKEN.  The keep-alive token
-     cannot be spent and the caller's is a SECOND one, so the RA's law puts
-     the root's count at TWO -- hence a directory whose count is ONE is not
-     the root, which is S7-unlink's dir arm's (D1) step 2.  Vacuous
-     elsewhere: at any other inum [ireg_keep] is [emp] and the implication
-     has no antecedent to fire on. *)
-  Lemma ireg_lnk_root_min2 γfs z d :
-    ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z -∗
-    ⌜z = ireg_root -> 2 <= bv_unsigned (di_nlink d)⌝.
+  (* ...AND THE ROOT'S MINIMUM AT A HELD PILE.  The keep-alive is a fragment
+     the caller's pile does not include, so [k] fragments in hand put the
+     root's own count at [k] -- hence a directory whose count is ONE and
+     which two held fragments stand at is not the root, which is
+     S7-unlink's dir arm's (D1) step 2.  Vacuous elsewhere: at any other
+     inum [ireg_keep] is [emp] and the implication has no antecedent. *)
+  Lemma ireg_lnk_root_le γfs z d (k : nat) (v : ity) :
+    ireg_lnk γfs z d -∗
+    FsStateLink.link_toks (fs_gamma_L γfs) z (link_reps k v) -∗
+    ⌜z = ireg_root -> Z.of_nat k <= bv_unsigned (di_nlink d)⌝.
   Proof.
-    rewrite /ireg_lnk /ireg_lnk_at /ireg_keep /FsStateLink.link_tok.
+    rewrite /ireg_lnk /ireg_lnk_at /ireg_keep.
     case_bool_decide as Hz; last first.
     { iIntros "_ _". iPureIntro. intro Hc. exfalso. exact (Hz Hc). }
-    iIntros "(Ha & Hkeep & _) Htk".
-    iAssert (FsStateLink.link_toks (fs_gamma_L γfs) z (1 + 1))
-      with "[Hkeep Htk]" as "Htks".
+    iIntros "(%v0 & _ & Ha & Hkeep) Htk".
+    iAssert (FsStateLink.link_toks (fs_gamma_L γfs) z
+               ({[+ v0 +]} ⊎ link_reps k v))%I with "[Hkeep Htk]" as "Htks".
     { rewrite FsStateLink.link_toks_split. iFrame "Hkeep Htk". }
-    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htks") as %Hle.
-    iPureIntro. intros _. rewrite /ireg_nl in Hle.
-    pose proof (di_nlink_nonneg d). lia.
+    iDestruct (FsStateLink.link_auth_toks_le with "Ha Htks") as %[Hle _].
+    iPureIntro. intros _.
+    rewrite gmultiset_size_disj_union gmultiset_size_singleton
+      link_reps_size in Hle.
+    pose proof (ireg_mult_at_le (ireg_nl d) (bv_unsigned (di_type d))) as Hub.
+    rewrite -/(ireg_mult d) in Hle.
+    pose proof (di_nlink_nonneg d) as Hnn.
+    rewrite /ireg_mult /ireg_nl in Hub.
+    rewrite /ireg_nl in Hub.
+    lia.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -5354,14 +5342,16 @@ Section InodeRegion.
       iPureIntro. exact (ireg_frz_ok_nz f n d Hnlnz Hfrz).
   Qed.
 
-  (* [pv] is the PARENT REGISTER's value for the record the minted token is
-     about to pay for ([FsStateInode.ent_par_val] of the naming directory
-     and the name it writes).  The register unit rides out beside the count
-     unit and is filed in the same [ent_tok]. *)
+  (* [oty] is the TYPE REGISTER's value the caller CHOOSES, and it is
+     available exactly where the register is empty -- create's fresh-child
+     fill, which is where mkdir sets the child's value to [TDir dp] so that
+     the parent's name record can assert "my target's parent is me".  At
+     [None] the mover keeps whatever value the region holds and hands it
+     back existentially (lane G5). *)
   Lemma ireg_write_link_fl (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
       (bsl : list (bv 8)) (fl : option (option Z)) (pin : bool)
-      (prv : option Z) :
+      (oty : option ity) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn' ->
@@ -5404,15 +5394,13 @@ Section InodeRegion.
        frees the register.  [fresh_shape_nlink] at the one caller. *)
     (forall pv : Z,
        fl = Some (Some pv) -> bv_unsigned (di_nlink dn) = 0) ->
-    (* THE UP-POINTING MINT'S PREMISE ((U1)/(U2), [ireg_lnk_bump]).  An
-       unattributed register unit is minted at [None] ONLY by mkdir's
-       [dp->nlink++]; every other raising flush in the kernel fixes a
-       [Some].  Both halves are free at that one site -- [dp] is a
-       directory, and create's orphan guard has refused a [dp] at count
-       zero.  LAST in the pure list, so no landed caller's argument
-       positions move (durable-notes.md). *)
-    (prv = None -> bv_unsigned (di_type dn') = ireg_dir_ty
-                   /\ bv_unsigned (di_nlink dn) <> 0) ->
+    (* THE FILL'S PREMISE (lane G5, [ireg_lnk_fill]).  A caller may CHOOSE
+       the register's value only where the register is empty, i.e. at a
+       record whose multiplicity is zero -- create's fresh child, the one
+       site in the kernel that installs a value.  LAST in the pure list, so
+       no landed caller's argument positions move (durable-notes.md). *)
+    (forall v : ity, oty = Some v ->
+       ireg_mult dn = 0%nat /\ ireg_ty_ok (bv_unsigned (di_type dn')) v) ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     (* THE FREEZE PIN'S PRICE, IN ITS RULING A-prime FORM (iclaim-ledger.md
@@ -5453,8 +5441,12 @@ Section InodeRegion.
           OUT -- to the [dirlink] that files it in a directory's
           [FsStateInode.ent_toks] inside that directory's checked-out
           payload.  The region keeps only the AUTHORITY. *)
-       ∗ FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum)
-       ∗ FsStateLink.par_tok (fs_gamma_L γfs) (bv_unsigned inum) prv ∗
+       ∗ (∃ v : ity,
+            ⌜ireg_ty_ok (bv_unsigned (di_type dn')) v
+             /\ (forall w, oty = Some w -> v = w)⌝
+            ∗ FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned inum)
+                (link_reps (ireg_dot_delta (bv_unsigned (di_type dn))
+                              (bv_unsigned (di_nlink dn))) v)) ∗
        ireg_link_pin pin (bv_unsigned inum) dn).
   Proof.
     iIntros (HE Hin Hdn' Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp Hup)
@@ -5612,9 +5604,33 @@ Section InodeRegion.
     assert (Htyeq : bv_unsigned (di_type dn') = bv_unsigned (di_type dn))
       by (destruct Hstab as [H0 | Heq];
           [exfalso; exact (Hnz H0) | rewrite Heq; reflexivity]).
-    iMod (ireg_lnk_bump γfs (bv_unsigned inum) dn dn' prv Hnl Htyeq Hup
-            with "Hlnk")
-      as "(Hlnk & Htok & Hptok)".
+    assert (Hmb : ireg_mult dn'
+                  = (ireg_mult dn
+                     + ireg_dot_delta (bv_unsigned (di_type dn))
+                         (bv_unsigned (di_nlink dn)))%nat)
+      by exact (ireg_mult_bump dn dn' Hnl Htyeq).
+    iAssert (|==> ireg_lnk γfs (bv_unsigned inum) dn'
+             ∗ ∃ v : ity,
+                 ⌜ireg_ty_ok (bv_unsigned (di_type dn')) v
+                  /\ (forall w, oty = Some w -> v = w)⌝
+                 ∗ FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned inum)
+                     (link_reps (ireg_dot_delta (bv_unsigned (di_type dn))
+                                   (bv_unsigned (di_nlink dn))) v))%I
+      with "[Hlnk]" as ">[Hlnk Htok]".
+    { destruct oty as [v |].
+      - destruct (Hup v eq_refl) as [Hz0 Hokv].
+        iMod (ireg_lnk_fill γfs (bv_unsigned inum) dn dn' v
+                (ireg_dot_delta (bv_unsigned (di_type dn))
+                   (bv_unsigned (di_nlink dn))) Hz0
+                ltac:(rewrite Hmb Hz0; lia) Hokv with "Hlnk") as "[$ Hts]".
+        iModIntro. iExists v. iFrame "Hts". iPureIntro. split; [exact Hokv |].
+        intros w Hw. by injection Hw.
+      - iMod (ireg_lnk_bump γfs (bv_unsigned inum) dn dn'
+                (ireg_dot_delta (bv_unsigned (di_type dn))
+                   (bv_unsigned (di_nlink dn))) Hmb Htyeq with "Hlnk")
+          as "[$ (%v & %Hokv & Hts)]".
+        iModIntro. iExists v. iFrame "Hts". iPureIntro.
+        split; [rewrite Htyeq; exact Hokv | intros w Hw; discriminate]. }
     iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
@@ -5657,7 +5673,7 @@ Section InodeRegion.
       iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | exact (proj2 Ht2)] | iExact "Hmk"] | iExact "Hrf"]. }
     (* ...and the pin premise goes back out, unspent (§3.9's
        borrowed-and-returned). *)
-    iModIntro. iFrame "Hdn Hfrag Htok Hptok Hpin".
+    iModIntro. iFrame "Hdn Hfrag Htok Hpin".
   Qed.
 
   (* THE THREE INSTANCE WRAPPERS ARE GONE (durable-disk lane G, slice 6e).
@@ -5687,22 +5703,13 @@ Section InodeRegion.
      ([ireg_dir_ok_le]). *)
   Lemma ireg_write_unlink_fl (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (bsl : list (bv 8)) (fl : option (option Z)) (prv : option Z) :
+      (bsl : list (bv 8)) (fl : option (option Z)) (uty : ity) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn' ->
     bv_unsigned (di_type dn') <> 0 ->
     di_type_stable dn' dn ->
     bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn') + 1 ->
-    (* THE NAME-DROP's PREMISE ((U2), [ireg_lnk_drop]).  Retiring a NAME
-       unit at a node that stays live has to leave a name behind; the two
-       shapes this kernel has are a FILE (not a directory, so (U1) says it
-       has no up-pointing namers at all) and a directory dying with its
-       only name (rmdir, whose [isdirempty] refused a non-empty one).
-       LAST in the pure list (durable-notes.md). *)
-    (forall j : Z, prv = Some j ->
-       bv_unsigned (di_nlink dn') = 0
-       \/ bv_unsigned (di_type dn) <> ireg_dir_ty) ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     ilink_fl fl (bv_unsigned inum) -∗
@@ -5712,10 +5719,13 @@ Section InodeRegion.
        authority -- the token the directory entry whose removal this
        decrement pays for gave up out of its own
        [FsStateInode.ent_toks]. *)
-    FsStateLink.link_tok (fs_gamma_L γfs) (bv_unsigned inum) -∗
-    (* ...and the PARENT REGISTER's unit beside it, at the value the
-       removed record carried ([FsStateInode.ent_par_val]). *)
-    FsStateLink.par_tok (fs_gamma_L γfs) (bv_unsigned inum) prv -∗
+    (* ...AND IT IS A PILE, not a single unit: at rmdir's [ip->nlink--] the
+       child's multiplicity crosses [2 -> 0], so the ["."] the live form
+       held comes back beside the name's ([ireg_dot_delta]).  The value is
+       the caller's; the RA's agreement law forces it to be the region's. *)
+    FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned inum)
+      (link_reps (ireg_dot_delta (bv_unsigned (di_type dn'))
+                    (bv_unsigned (di_nlink dn'))) uty) -∗
     (* the RECORD-GRANULAR form (durable-disk 2b-inode-1), with the
        observation counter [v] riding beside the run exactly as it did
        beside the block. *)
@@ -5740,7 +5750,7 @@ Section InodeRegion.
          (Z.of_nat (64 * islot inum)) (dinode_bytes dn')
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
-    iIntros (HE Hin Hdn' Hnz Hstab Hnl Hnm) "#Hinv Hdn Hfrag Htok Hptok".
+    iIntros (HE Hin Hdn' Hnz Hstab Hnl) "#Hinv Hdn Hfrag Htok".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -5901,8 +5911,11 @@ Section InodeRegion.
     assert (Htyeq : bv_unsigned (di_type dn') = bv_unsigned (di_type dn))
       by (destruct Hstab as [H0 | Heq];
           [exfalso; exact (Hnz H0) | rewrite Heq; reflexivity]).
-    iMod (ireg_lnk_drop γfs (bv_unsigned inum) dn dn' prv Hnl Htyeq Hnm
-            with "Hlnk Htok Hptok")
+    iMod (ireg_lnk_drop γfs (bv_unsigned inum) dn dn' uty
+            (ireg_dot_delta (bv_unsigned (di_type dn'))
+               (bv_unsigned (di_nlink dn')))
+            (ireg_mult_drop dn dn' Hnl Htyeq) Htyeq
+            with "Hlnk Htok")
       as "Hlnk".
 
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".

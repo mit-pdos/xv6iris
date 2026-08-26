@@ -305,13 +305,14 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
      [FsDurImg.img_link_valid]; the COMMIT reads it off the region's own
      [ireg_keep] beside the collected [FsState.fs_links]
      ([FsState.fs_links_valid_tok]).
-     THE CHOICE FUNCTION rides in front of it (durable-disk G2): the
-     register authority's value is existential in the bundle, so the
-     family's element is indexed by one multiset per inum, each satisfying
-     that inum's own [FsStateInode.fn_par_ok]. *)
-  sk_links  : exists f, link_elem_ok (fss_inodes S) f
-                        /\ ✓ (link_elem (fss_inodes S) f
-                              ⋅ link_tok_elem ROOTINO 1%nat);
+     THE CHOICE FUNCTION rides in front of it (durable-disk G5): each
+     entry's register value is existential in the bundle, so the family's
+     element is indexed by one value function per inum, each satisfying that
+     inum's own [FsStateInode.node_ent_ok]; the SLACK fragment's value is
+     existential for the same reason. *)
+  sk_links  : exists f v, link_elem_ok (fss_inodes S) f
+                          /\ ✓ (link_elem (fss_inodes S) f
+                                ⋅ link_tok_elem ROOTINO v);
   (* ---- THE USED-SET COUPLING ---- *)
   (* the metadata roles are MARKED IN USE, so a block whose bit reads clear
      is none of them *)
@@ -436,7 +437,7 @@ Qed.
 Lemma sk_links_plain {S D} (H : snap_bytes S D) :
   exists f, link_elem_ok (fss_inodes S) f /\ ✓ link_elem (fss_inodes S) f.
 Proof.
-  destruct (sk_links H) as (f & Hok & Hv). exists f. split; [exact Hok |].
+  destruct (sk_links H) as (f & v & Hok & Hv). exists f. split; [exact Hok |].
   exact (cmra_valid_op_l _ _ Hv).
 Qed.
 
@@ -1846,10 +1847,13 @@ Section Ledger.
              rewrite (blk_owned_run Γ (fn_indb n) (ind_bytes (fn_ent n))
                         (sk_bsz Hok _ _ (sk_ind Hok i n Hi Hnz))).
              rewrite -byte_range_run. iExact "Hb".
-      + iDestruct "Hl" as (P) "[%Hokp Hl]".
-        iDestruct (inode_link_scatter with "Hl") as "[[Ha Hpa] Ht]".
-        iFrame "Ha Ht". iSplitR; [iPureIntro; exact (Hloc i n Hi) |].
-        iExists P. iFrame "Hpa". by iPureIntro.
+      + iDestruct "Hl" as (vv tyf) "[%Hokp Hl]".
+        iDestruct (inode_link_scatter with "Hl") as "[Ha Ht]".
+        rewrite /inode_ghost. iExists vv.
+        iSplitR; [iPureIntro; exact (proj1 Hokp) |]. iFrame "Ha".
+        iSplitL "Ht"; [| iPureIntro; exact (Hloc i n Hi)].
+        iApply (ent_toks_of_at Γ i (fn_dd n) (fn_orphan n) (dir_entries n)
+                  tyf (proj2 Hokp) with "Ht").
     - (* the bitmap block and the free pool *)
       rewrite /free_bitmap /free_bitmap_at. iSplitL "Hbm".
       + iEval (rewrite fp_bmap_blk fp_bmap_off (fp_bmap_bs S D)) in "Hbm".

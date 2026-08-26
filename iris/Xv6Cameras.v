@@ -496,32 +496,40 @@ Proof. solve_inG. Qed.
    NAMED [fsLinkUR], not [linkUR]: the inode cache's own ledger camera
    (section 11 below) already owns that name in this file.
 
-   THE SECOND COLUMN IS THE PARENT REGISTER (fs-state.md section 6.5).
-   rmdir pays [dp->nlink--] with the child's [".."] token and therefore
-   needs the child's [".."] to NAME [dp] -- a cross-inode fact that no
-   per-inode clause can carry.  The column that carries it is
-   [authUR (gmultisetUR Z)] AT THE CHILD'S KEY: the multiset of inums that
-   hold a NAME record for this inum.
+   THE COUNT AND THE TYPE ARE ONE RA -- THE TYPE REGISTER (fs-state.md
+   section 6.5, lane G5).  Per inum: [authUR (gmultisetUR ity)] with
+   [ity := TFile | TDir p].  The AUTHORITY is a UNIFORM multiset
+   [(nlink + [type = DIR and live]) copies of ty] parked in the inode
+   region beside the record and tied to it; the FRAGMENTS are singletons
+   [{[ty]}], one per counted dirent, and they ride in the naming
+   directory's checked-out payload ([FsStateInode.ent_toks]).
 
-   - the AUTHORITY [par_auth] rides in the inum's OWN bundle, where the
-     directory's data is in hand, so the clause "a LIVE DIRECTORY's
-     authority is at most the singleton of its own [".."] target" is
-     LOCAL (it reads the [".."] entry off the very node that owns it);
-   - the FRAGMENT [par_tok] rides with the entry TOKEN of every NAME
-     record ([".."] records carry the count token alone), tagged with the
-     naming directory's inum -- also local, and unconditional: it does not
-     ask what the target's TYPE is, which is what makes both halves
-     definable one inode at a time.
+   Validity gives the two readings at once: a fragment's element IS the
+   authority's [ty] (AGREEMENT -- a uniform multiset has one element), and
+   #fragments <= multiplicity (the COUNT law, which is what the free path
+   reads).  Retyping is legal exactly at multiplicity zero, where the
+   authority is [auth-empty] and the type is not mentioned at all.
 
-   The agreement is then the RA's own law: the parent's fragment says
-   [dp] names the child, the child's authority says only its [".."] target
-   may, so [dp] IS the [".."] target.  A FILE's authority is unconstrained
-   (it has many namers), which is why the authority's value is
-   existentially bound in the bundle under [size P <= nlink] -- that bound
-   is what makes a FREED inum's register empty again, so the next [mkdir]
-   can install its own singleton. *)
-Definition fsParUR : ucmra := authUR (gmultisetUR (option Z)).
-Definition fsLinkElemUR : ucmra := prodUR (authUR natUR) fsParUR.
+   This replaces the [prodUR (authUR natUR) fsParUR] of lanes G2/G3: there
+   is no separate count column any more (the link count IS the fragment
+   count) and no separate parent register (a directory's [ty] carries its
+   parent, and its ["."] fragment ties that to its [".."] entry). *)
+Inductive ity : Type := TFile | TDir (p : Z).
+
+Global Instance ity_eq_dec : EqDecision ity.
+Proof. solve_decision. Defined.
+
+Global Instance ity_countable : Countable ity.
+Proof.
+  refine (inj_countable'
+            (fun t => match t with TFile => None | TDir p => Some p end)
+            (fun o => match o with None => TFile | Some p => TDir p end) _).
+  by intros [].
+Defined.
+
+Global Instance ity_inhabited : Inhabited ity := populate TFile.
+
+Definition fsLinkElemUR : ucmra := authUR (gmultisetUR ity).
 Definition fsLinkUR : ucmra := gmapUR Z fsLinkElemUR.
 
 Class fsLinkG (Σ : gFunctors) := FsLinkG {

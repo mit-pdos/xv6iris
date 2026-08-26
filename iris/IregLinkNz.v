@@ -80,15 +80,17 @@ Section IregLinkNz.
      at the flush this fact licences ([ireg_tok_root_min2] below borrows
      its token the same way). *)
   Lemma ireg_tok_nz (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (v : ity) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) ={E}=∗
-    ⌜bv_unsigned (di_nlink dn) <> 0⌝ ∗
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v
+    ={E}=∗
+    ⌜bv_unsigned (di_nlink dn) <> 0
+     /\ ireg_ty_ok (bv_unsigned (di_type dn)) v⌝ ∗
     dinode_at γi inum dn ∗
-    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum).
+    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v.
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hfrag".
     pose proof (islot_lt inum) as Hsl.
@@ -112,7 +114,8 @@ Section IregLinkNz.
     { specialize (Hcp (islot inum) Hsl).
       rewrite -ireg_key_split in Hcp. congruence. }
     iDestruct (ireg_lnk_tok_nz with "Hlnk Hfrag") as %Hnz0.
-    rewrite Hdeq in Hnz0.
+    iDestruct (ireg_lnk_tok_ty with "Hlnk Hfrag") as %Hty0.
+    rewrite Hdeq in Hnz0. rewrite Hdeq in Hty0.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
     iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
@@ -126,64 +129,8 @@ Section IregLinkNz.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
-    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz0.
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. split; [exact Hnz0 | exact Hty0].
   Qed.
-
-  (* THE REGISTER UNIT'S VALUE, MOVED WITH THE REGION OPEN.  [sys_link]
-     raises [ip->nlink] before [nameiparent] names the directory the new
-     record will live in, so the unit that flush mints cannot carry the
-     namer yet; the [dirlink] that files it re-values it here, at one
-     mask-preserving step, exactly as [ireg_tok_nz] reads the count. *)
-  Lemma ireg_par_revalue (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (v w : option Z) :
-    ↑iregN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    (* the move may not CREATE an up-pointing namer ([InodeRegion]'s (U1)/
-       (U2)): sys_link's is the only re-valuation in the kernel and it goes
-       the other way, onto the [Some dp] the deposited NAME record fixes. *)
-    (w = None -> v = None) ->
-    ireg_inv γi γfs inodestart nib -∗
-    FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) v
-    ={E}=∗
-    FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) w.
-  Proof.
-    iIntros (HE Hin Hwv) "#Hinv Hfrag".
-    pose proof (islot_lt inum) as Hsl.
-    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
-                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
-    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
-    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
-                with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
-                with "Hsls") as "[Hslot Hslback]".
-    iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
-    iMod (ireg_lnk_par_move γfs (bv_unsigned inum)
-            (ireg_nl (ds !!! islot inum))
-            (bv_unsigned (di_type (ds !!! islot inum))) v w Hwv
-            with "Hlnk Hfrag")
-      as "[Hlnk Hout]".
-    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
-    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
-    { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
-      iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      iSplitL "Hfsb"; [iExact "Hfsb" |].
-      iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
-      rewrite Hkey.
-      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
-    iModIntro. iExact "Hout".
-  Qed.
-
 
   (* ------------------------------------------------------------------ *)
   (*  THE BOOT SHELTER, AS A THEOREM (fs-fragments.md §7.12 / §7.1.7)     *)
@@ -251,16 +198,19 @@ Section IregLinkNz.
      [ireg_lnk]; this is its ACCESSOR, and the token is BORROWED and handed
      straight back, exactly as [ireg_tok_nz] borrows its token -- the caller
      still has to spend it at the [nlink--] this refutation licences. *)
-  Lemma ireg_tok_root_min2 (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
+  Lemma ireg_tok_root_le (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
+      (k : nat) (v : ity) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) ={E}=∗
-    ⌜bv_unsigned inum = ireg_root -> 2 <= bv_unsigned (di_nlink dn)⌝ ∗
+    FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+      (link_reps k v) ={E}=∗
+    ⌜bv_unsigned inum = ireg_root -> Z.of_nat k <= bv_unsigned (di_nlink dn)⌝ ∗
     dinode_at γi inum dn ∗
-    FsStateLink.link_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum).
+    FsStateLink.link_toks (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
+      (link_reps k v).
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hfrag".
     pose proof (islot_lt inum) as Hsl.
@@ -283,68 +233,7 @@ Section IregLinkNz.
     assert (Hdeq : ds !!! islot inum = dn).
     { specialize (Hcp (islot inum) Hsl).
       rewrite -ireg_key_split in Hcp. congruence. }
-    iDestruct (ireg_lnk_root_min2 with "Hlnk Hfrag") as %Hmin0.
-    rewrite Hdeq in Hmin0.
-    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
-    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hfrcp]") as "_".
-    { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hlnk Hslback Hcnt Hfdisj Hfrcp]"); [done |].
-      iExists ds. iSplitR; [done |]. iSplitR; [done |].
-      iSplitL "Hfsb"; [iExact "Hfsb" |].
-      iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
-      rewrite Hkey.
-      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
-                with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
-    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin0.
-  Qed.
-
-  (* S7-unlink's (D2), AT THE REGISTER (durable-disk G3): a directory
-     holding a LIVE SUBDIRECTORY record has at least TWO links.  The
-     child's [".."] puts an up-pointing unit in the parent's register, and
-     [InodeRegion]'s (U2) reads the second link off it.  The unit is
-     BORROWED and handed straight back -- the caller still has to spend it
-     at the [dp->nlink--] this reading licences.
-
-     It replaces [IregDirBit.dir_links_subdir_nlink2], whose carrier was
-     [DirView.dlc_lower] inside [DirLinks.dir_links]: (D2) is off the
-     ledger, and with it one of 6d's two blockers. *)
-  Lemma ireg_par_up_min2 (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
-    ↑iregN ⊆ E ->
-    bv_unsigned inum < 16 * Z.of_nat nib ->
-    ireg_inv γi γfs inodestart nib -∗
-    dinode_at γi inum dn -∗
-    FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum)
-      None ={E}=∗
-    ⌜2 <= bv_unsigned (di_nlink dn)⌝ ∗
-    dinode_at γi inum dn ∗
-    FsStateLink.par_tok (FsBytesGamma.fs_gamma_L γfs) (bv_unsigned inum) None.
-  Proof.
-    iIntros (HE Hin) "#Hinv Hdn Hfrag".
-    pose proof (islot_lt inum) as Hsl.
-    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
-                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
-    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
-    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
-                with "Hblks") as "[Hblk Hback]".
-    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
-    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
-                with "Hsls") as "[Hslot Hslback]".
-    iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
-    rewrite /dinode_at.
-    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
-    assert (Hdeq : ds !!! islot inum = dn).
-    { specialize (Hcp (islot inum) Hsl).
-      rewrite -ireg_key_split in Hcp. congruence. }
-    iDestruct (ireg_lnk_up_min2 with "Hlnk Hfrag") as %Hmin0.
+    iDestruct (ireg_lnk_root_le with "Hlnk Hfrag") as %Hmin0.
     rewrite Hdeq in Hmin0.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }

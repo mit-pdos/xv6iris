@@ -1,45 +1,49 @@
-(* FsStateLink.v -- the link-counting resource algebra.
+(* FsStateLink.v -- the TYPE REGISTER: link counts and inode types in ONE RA.
 
-   Design of record: claude-notes/design/fs-state.md section 2, "Links are a
-   counting RA, not an equation".
+   Design of record: claude-notes/design/fs-state.md section 6.5 (lane G5),
+   which supersedes section 2's plain counting RA and lanes G2/G3's separate
+   parent register.
 
-   [inode_owned Γ i n] holds [link_auth Γ i (nlink n)]; every directory entry
-   other than "." (and, in the ORPHAN form, other than "..") holds one
-   [link_tok Γ target].  The RA's own law gives
+   THE RA.  Per inum, at [γlink Γ], one [authUR (gmultisetUR ity)] with
 
-       link_auth Γ i n ∗ (k tokens at i)  ⊢  k ≤ n
+       ity := TFile | TDir (p : Z)
 
-   and THAT is the direction safety uses: at [nlink = 0] no entry points at
-   the inode, so it may be freed.  The other direction (no under-count) would
-   only rule out an unfreeable file -- a leak, not a corruption -- and is not
-   stated anywhere.
+   ([TFile] covers T_FILE and T_DEVICE; [TDir p] carries the directory's
+   PARENT).  The AUTHORITY is a UNIFORM multiset -- [link_reps n ty], i.e.
+   [n] copies of one [ty] -- and lives in the inode region beside the
+   record, tied to it ([InodeRegion.ireg_lnk]): [n] is the record's
+   [nlink] plus one for a LIVE DIRECTORY (the ["."] the kernel does not
+   count), and [ty] is [TDir _] exactly at [T_DIR].  The FRAGMENTS are
+   singletons [{[+ ty +]}], one per counted dirent, and they ride in the
+   naming directory's checked-out payload ([FsStateInode.ent_toks]).
 
-   THE RA, AND WHY.  One [own] at the family gname [γlink Γ], over
+   THE LAW is ONE lemma with TWO readings ([link_auth_toks_le]):
 
-       fsLinkUR := gmapUR Z (authR natUR)
+       link_auth Γ i n ty ∗ link_toks Γ i Q
+         ⊢  size Q ≤ n   ∧   ∀ x ∈ Q, x = ty
 
-   i.e. ONE auth-of-nat PER INUM, keyed by the inum, in a single ghost map
-   element.  Two reasons for this shape over the alternatives:
+   the COUNT (what the free path and [IgetLic]'s licence (a) read: at
+   [n = 0] no entry points here) and the AGREEMENT (what rmdir's (D1)
+   reads: a fragment's element IS the target's current type, so a
+   directory's ["."] fragment names its parent).  Both fall out of
+   [auth_both_valid_discrete] plus [gmultiset_included], and there is no
+   local-update chain over a wide [prodUR] anywhere.
 
-   - [natUR]'s [op] is [+] and its [≼] is [≤] (iris.algebra.numbers), so the
-     counting law IS [auth_both_valid_discrete] plus [nat_included] -- no new
-     algebra, no local-update chain over a wide [prodUR] (which costs seconds
-     per [apply], durable-notes.md).  [k] separate tokens compose to [◯ k]
-     because [◯ 1 ⋅ ◯ 1 = ◯ 2].
-   - Per-inum auths sit in ONE gmap camera rather than one gname per inum, so
-     the whole family is allocated by a single [own_alloc] -- which is exactly
-     what [fs_state_mint] needs (it must produce every logged-view auth and
-     every token in one step).  A [ghost_map] of counters cannot serve: its
-     elements are exclusive, so it cannot express "k tokens".
+   RETYPING IS FREE AT MULTIPLICITY ZERO and impossible above it: at
+   [n = 0] the authority is [● ∅] whatever [ty] is, so
+   [link_auth Γ i 0 ty] and [link_auth Γ i 0 ty'] are the SAME
+   proposition ([link_auth_zero_retype]) -- which is exactly the kernel's
+   two type writes (ialloc's claim, iput's free deposit), both at
+   [nlink = 0].  Above zero a frame [◯ {[ty]}] survives every update, so
+   no retype is a frame-preserving one.
 
-   THE CAMERA AND ITS CAPACITY CLASS LIVE IN [Xv6Cameras.v] (the camera is
-   [fsLinkUR] there, since this file's [linkUR] name is already the inode
-   cache's ledger camera), and since durable-disk 2b-inode-4 [fsLinkG] is an
-   [Xv6G.xv6G] MEMBER: a checked-out payload carries its directory's tokens
-   and the inode region parks the per-inum authority, so the class reaches
-   [InodeRegion.ireg_inv] and every payload site.  The standing rule applies
-   -- this file sits BELOW the bundle, so it binds the member and not
-   [xv6G]. *)
+   THE CAMERA AND ITS CAPACITY CLASS LIVE IN [Xv6Cameras.v] ([fsLinkUR],
+   [fsLinkG], and the type [ity] itself), since this file's [linkUR] name
+   is already the inode cache's ledger camera; [fsLinkG] is an
+   [Xv6G.xv6G] MEMBER because a checked-out payload carries its
+   directory's fragments and the inode region parks the per-inum
+   authority.  The standing rule applies -- this file sits BELOW the
+   bundle, so it binds the member and not [xv6G]. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -47,312 +51,308 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap gmultiset numbers updates local_updates.
 From iris.base_logic.lib Require Import iprop own.
 Require Export FsStateDefs.
-Require Import Xv6Cameras.  (* [fsLinkUR] / [fsLinkG] -- capacity class, must be IMPORTed *)
+Require Import Xv6Cameras.  (* [ity] / [fsLinkUR] / [fsLinkG] -- must be IMPORTed *)
 
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
-(*  1.  The camera and its capacity class                              *)
+(*  1.  The uniform multiset                                           *)
 (* ------------------------------------------------------------------ *)
+
+(* [n] copies of one type value -- the ONLY shape an authority ever takes,
+   which is what makes the agreement reading available. *)
+Definition link_reps (n : nat) (ty : ity) : gmultiset ity :=
+  n *: ({[+ ty +]} : gmultiset ity).
+
+Lemma link_reps_0 ty : link_reps 0 ty = ∅.
+Proof. rewrite /link_reps gmultiset_scalar_mul_0 //. Qed.
+
+Lemma link_reps_S n ty : link_reps (S n) ty = {[+ ty +]} ⊎ link_reps n ty.
+Proof. rewrite /link_reps gmultiset_scalar_mul_S_l //. Qed.
+
+Lemma link_reps_1 ty : link_reps 1 ty = {[+ ty +]}.
+Proof. rewrite /link_reps gmultiset_scalar_mul_1 //. Qed.
+
+Lemma link_reps_size n ty : size (link_reps n ty) = n.
+Proof.
+  rewrite /link_reps gmultiset_size_scalar_mul gmultiset_size_singleton. lia.
+Qed.
+
+Lemma link_reps_add n m ty :
+  link_reps (n + m) ty = link_reps n ty ⊎ link_reps m ty.
+Proof.
+  induction n as [| n IH]; [rewrite link_reps_0; multiset_solver |].
+  replace (S n + m)%nat with (S (n + m))%nat by lia.
+  rewrite !link_reps_S IH. multiset_solver.
+Qed.
+
+Lemma link_reps_elem_of n ty x : x ∈ link_reps n ty -> x = ty.
+Proof.
+  rewrite /link_reps gmultiset_elem_of_scalar_mul.
+  intros [_ Hx]. by apply gmultiset_elem_of_singleton in Hx.
+Qed.
+
+(* the two readings of [Q ⊆ link_reps n ty], which is what validity gives *)
+Lemma link_reps_sub_size (Q : gmultiset ity) n ty :
+  Q ⊆ link_reps n ty -> (size Q <= n)%nat.
+Proof.
+  intros Hsub. apply gmultiset_subseteq_size in Hsub.
+  rewrite link_reps_size in Hsub. lia.
+Qed.
+
+Lemma link_reps_sub_elem (Q : gmultiset ity) n ty x :
+  Q ⊆ link_reps n ty -> x ∈ Q -> x = ty.
+Proof.
+  intros Hsub Hx.
+  exact (link_reps_elem_of n ty x (gmultiset_elem_of_subseteq _ _ _ Hx Hsub)).
+Qed.
 
 Section Link.
   Context `{!fsLinkG Σ}.
   Implicit Types Γ : fs_view_names Σ.
+  Implicit Types Q : gmultiset ity.
 
   (* ---------------------------------------------------------------- *)
   (*  2.  The two shapes                                               *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_auth_elem (i : Z) (n : nat) : fsLinkUR :=
-    {[ i := ((● n : authUR natUR), (ε : fsParUR)) ]}.
-  Definition link_tok_elem (i : Z) (k : nat) : fsLinkUR :=
-    {[ i := ((◯ k : authUR natUR), (ε : fsParUR)) ]}.
+  Definition link_auth_elem (i : Z) (n : nat) (ty : ity) : fsLinkUR :=
+    {[ i := (● (link_reps n ty) : fsLinkElemUR) ]}.
+  Definition link_toks_elem (i : Z) (Q : gmultiset ity) : fsLinkUR :=
+    {[ i := (◯ Q : fsLinkElemUR) ]}.
+  Definition link_tok_elem (i : Z) (ty : ity) : fsLinkUR :=
+    link_toks_elem i {[+ ty +]}.
 
-  (* ---- the PARENT REGISTER's two shapes (fs-state.md section 6.5) ----
+  (* "inum [i]'s register stands at multiplicity [n] and type [ty]".
+     Parked in the inode region beside the record. *)
+  Definition link_auth Γ (i : Z) (n : nat) (ty : ity) : iProp Σ :=
+    own (γlink Γ) (link_auth_elem i n ty).
 
-     [par_auth Gamma i P] is inum [i]'s own authority: "the inums holding
-     a NAME record for me are among [P]".  It rides in [i]'s bundle, where
-     [i]'s data is in hand, so a directory can pin [P] to the singleton of
-     its own [".."] target without any cross-inode clause.
+  (* a whole PILE of fragments at one key, as one resource *)
+  Definition link_toks Γ (i : Z) (Q : gmultiset ity) : iProp Σ :=
+    own (γlink Γ) (link_toks_elem i Q).
 
-     [par_tok Gamma i j] is the fragment "[j] holds a name record for
-     [i]", minted beside the entry TOKEN at every name record and returned
-     with it.  Unconditional in [j]'s bundle -- it never asks what [i]'s
-     type is. *)
-  (* THE VALUE IS AN [option Z]: [Some j] is "the NAME record of [j]",
-     [None] is "an up-pointing record" -- whose home is NOT a namer of this
-     inum, but which still holds one link and so must still hold one
-     register unit, or the [size P <= nlink] bound could not survive the
-     decrement that removes it. *)
-  Definition par_auth_elem (i : Z) (P : gmultiset (option Z)) : fsLinkUR :=
-    {[ i := ((ε : authUR natUR), (● P : fsParUR)) ]}.
-  Definition par_toks_elem (i : Z) (P : gmultiset (option Z)) : fsLinkUR :=
-    {[ i := ((ε : authUR natUR), (◯ P : fsParUR)) ]}.
+  (* "one counted directory entry points at inum [i], and [i]'s type is
+     [ty]".  Held inside the naming directory's [ent_toks]. *)
+  Definition link_tok Γ (i : Z) (ty : ity) : iProp Σ :=
+    link_toks Γ i {[+ ty +]}.
 
-  Definition par_tok_elem (i : Z) (v : option Z) : fsLinkUR :=
-    par_toks_elem i {[+ v +]}.
-
-  (* "inum [i]'s on-disk record says [n] links".  Held by [inode_owned]. *)
-  Definition link_auth Γ (i : Z) (n : nat) : iProp Σ :=
-    own (γlink Γ) (link_auth_elem i n).
-
-  (* [k] tokens at inum [i], as ONE resource. *)
-  Definition link_toks Γ (i : Z) (k : nat) : iProp Σ :=
-    own (γlink Γ) (link_tok_elem i k).
-
-  (* "one directory entry points at inum [i]".  Held inside [dir_owned]. *)
-  Definition link_tok Γ (i : Z) : iProp Σ := link_toks Γ i 1.
-
-  Global Instance link_auth_timeless Γ i n : Timeless (link_auth Γ i n).
+  Global Instance link_auth_timeless Γ i n ty : Timeless (link_auth Γ i n ty).
   Proof. rewrite /link_auth. apply _. Qed.
-  Global Instance link_toks_timeless Γ i k : Timeless (link_toks Γ i k).
+  Global Instance link_toks_timeless Γ i Q : Timeless (link_toks Γ i Q).
   Proof. rewrite /link_toks. apply _. Qed.
-  Global Instance link_tok_timeless Γ i : Timeless (link_tok Γ i).
+  Global Instance link_tok_timeless Γ i ty : Timeless (link_tok Γ i ty).
   Proof. rewrite /link_tok. apply _. Qed.
 
-  (* "the inums holding a NAME record for [i] are among [P]" -- inum [i]'s
-     OWN half of the parent register, carried by [i]'s bundle. *)
-  Definition par_auth Γ (i : Z) (P : gmultiset (option Z)) : iProp Σ :=
-    own (γlink Γ) (par_auth_elem i P).
+  (* AT MULTIPLICITY ZERO THE TYPE IS NOT THERE AT ALL: the two type
+     writes the kernel does (ialloc's claim, iput's free deposit) are this
+     equality, not an update. *)
+  Lemma link_auth_zero_retype Γ i ty ty' :
+    link_auth Γ i 0 ty ⊣⊢ link_auth Γ i 0 ty'.
+  Proof. rewrite /link_auth /link_auth_elem !link_reps_0 //. Qed.
 
-  (* "[j] holds a name record for [i]" -- the fragment that rides beside
-     the entry token of every NAME record in [j]. *)
-  Definition par_tok Γ (i : Z) (v : option Z) : iProp Σ :=
-    own (γlink Γ) (par_tok_elem i v).
-
-  (* a whole PILE of fragments at one key, as one resource -- the shape the
-     boot's routing splits and the "all at home" family below carries. *)
-  Definition par_toks Γ (i : Z) (P : gmultiset (option Z)) : iProp Σ :=
-    own (γlink Γ) (par_toks_elem i P).
-
-  Global Instance par_toks_timeless Γ i P : Timeless (par_toks Γ i P).
-  Proof. rewrite /par_toks. apply _. Qed.
-
-  Lemma par_toks_split Γ i P Q :
-    par_toks Γ i (P ⊎ Q) ⊣⊢ par_toks Γ i P ∗ par_toks Γ i Q.
+  Lemma link_toks_split Γ i Q1 Q2 :
+    link_toks Γ i (Q1 ⊎ Q2) ⊣⊢ link_toks Γ i Q1 ∗ link_toks Γ i Q2.
   Proof.
-    rewrite /par_toks /par_toks_elem -own_op singleton_op.
-    by rewrite -pair_op_2 -auth_frag_op.
+    rewrite /link_toks /link_toks_elem -own_op singleton_op.
+    by rewrite -auth_frag_op.
   Qed.
 
-  Lemma par_toks_one Γ i j : par_toks Γ i {[+ j +]} ⊣⊢ par_tok Γ i j.
+  Lemma link_toks_one Γ i ty : link_toks Γ i {[+ ty +]} ⊣⊢ link_tok Γ i ty.
   Proof. done. Qed.
 
-  (* [n] copies of one value -- the shape the BOOT's per-inum pile takes,
-     where every unit comes from the one directory the image has. *)
-  Fixpoint par_reps (n : nat) (v : option Z) : gmultiset (option Z) :=
-    match n with 0%nat => ∅ | S m => {[+ v +]} ⊎ par_reps m v end.
-
-  Lemma par_reps_size n v : size (par_reps n v) = n.
-  Proof.
-    induction n as [| n IH]; [apply gmultiset_size_empty |].
-    simpl. rewrite gmultiset_size_disj_union gmultiset_size_singleton IH //.
-  Qed.
-
-  Lemma par_reps_add n m v :
-    par_reps (n + m) v = par_reps n v ⊎ par_reps m v.
-  Proof.
-    induction n as [| n IH]; [multiset_solver |].
-    simpl. rewrite IH. multiset_solver.
-  Qed.
-
-  (* take a PREFIX of a pile and drop the rest, [link_toks_le_split]'s twin *)
-  Lemma par_toks_le_split Γ i n k v :
-    (k <= n)%nat ->
-    par_toks Γ i (par_reps n v)
-    ⊢ par_toks Γ i (par_reps k v) ∗ par_toks Γ i (par_reps (n - k) v).
-  Proof.
-    intros Hle.
-    assert (Hn : n = (k + (n - k))%nat) by lia.
-    rewrite {1}Hn par_reps_add par_toks_split. done.
-  Qed.
-
-  (* ...and the LIST form the boot's routing walks *)
-  Lemma par_toks_list_at Γ i k v j :
-    par_toks Γ i (par_reps k v) ⊢ [∗ list] _ ∈ seq j k, par_tok Γ i v.
-  Proof.
-    revert j. induction k as [| k IH]; intros j; [iIntros "_"; done |].
-    replace (seq j (S k)) with (j :: seq (S j) k) by reflexivity.
-    rewrite big_sepL_cons.
-    simpl. rewrite par_toks_split. iIntros "[$ Ht]".
-    iApply (IH (S j) with "Ht").
-  Qed.
-
-  Lemma par_toks_list Γ i k v :
-    par_toks Γ i (par_reps k v) ⊢ [∗ list] _ ∈ seq 0 k, par_tok Γ i v.
-  Proof. exact (par_toks_list_at Γ i k v 0). Qed.
-
-  Global Instance par_auth_timeless Γ i P : Timeless (par_auth Γ i P).
-  Proof. rewrite /par_auth. apply _. Qed.
-  Global Instance par_tok_timeless Γ i j : Timeless (par_tok Γ i j).
-  Proof. rewrite /par_tok. apply _. Qed.
-
-  Lemma link_toks_split Γ i k1 k2 :
-    link_toks Γ i (k1 + k2) ⊣⊢ link_toks Γ i k1 ∗ link_toks Γ i k2.
-  Proof.
-    rewrite /link_toks /link_tok_elem -own_op singleton_op.
-    by rewrite -pair_op_1 -auth_frag_op.
-  Qed.
-
-  Lemma link_toks_one Γ i : link_toks Γ i 1 ⊣⊢ link_tok Γ i.
-  Proof. done. Qed.
+  Lemma link_toks_reps_S Γ i n ty :
+    link_toks Γ i (link_reps (S n) ty)
+    ⊣⊢ link_tok Γ i ty ∗ link_toks Γ i (link_reps n ty).
+  Proof. rewrite link_reps_S link_toks_split //. Qed.
 
   (* take a PREFIX of a pile and drop the rest (the ambient logic is
-     affine, so a surplus token is thrown away rather than carried) *)
-  Lemma link_toks_le_split Γ i n k :
-    (k <= n)%nat -> link_toks Γ i n ⊢ link_toks Γ i k ∗ link_toks Γ i (n - k).
+     affine, so a surplus fragment is thrown away rather than carried) *)
+  Lemma link_toks_le_split Γ i n k ty :
+    (k <= n)%nat ->
+    link_toks Γ i (link_reps n ty)
+    ⊢ link_toks Γ i (link_reps k ty) ∗ link_toks Γ i (link_reps (n - k) ty).
   Proof.
     intros Hle.
     assert (Hn : n = (k + (n - k))%nat) by lia.
-    rewrite {1}Hn link_toks_split. done.
+    rewrite {1}Hn link_reps_add link_toks_split. done.
   Qed.
 
   (* ...and the LIST form, which is the shape the boot's ticket routing
      takes ([FsCfgBoot.big_sepS_tick_route] walks a pile as a [big_sepL]).
-     One direction only: at [k = 0] the pile is [own _ {[i := ◯ 0]}], which
-     an [emp] cannot rebuild, and no consumer wants that direction. *)
-  Lemma link_toks_list_at Γ i k j :
-    link_toks Γ i k ⊢ [∗ list] _ ∈ seq j k, link_tok Γ i.
+     One direction only, and no consumer wants the other. *)
+  Lemma link_toks_list_at Γ i k ty j :
+    link_toks Γ i (link_reps k ty) ⊢ [∗ list] _ ∈ seq j k, link_tok Γ i ty.
   Proof.
     revert j. induction k as [| k IH]; intros j; [iIntros "_"; done |].
     replace (seq j (S k)) with (j :: seq (S j) k) by reflexivity.
-    rewrite big_sepL_cons.
-    replace (S k) with (1 + k)%nat by lia.
-    rewrite link_toks_split. iIntros "[$ Ht]".
+    rewrite big_sepL_cons link_toks_reps_S. iIntros "[$ Ht]".
     iApply (IH (S j) with "Ht").
   Qed.
 
-  Lemma link_toks_list Γ i k :
-    link_toks Γ i k ⊢ [∗ list] _ ∈ seq 0 k, link_tok Γ i.
-  Proof. exact (link_toks_list_at Γ i k 0). Qed.
+  Lemma link_toks_list Γ i k ty :
+    link_toks Γ i (link_reps k ty) ⊢ [∗ list] _ ∈ seq 0 k, link_tok Γ i ty.
+  Proof. exact (link_toks_list_at Γ i k ty 0). Qed.
 
   (* ---------------------------------------------------------------- *)
-  (*  3.  THE LAW                                                      *)
+  (*  3.  THE LAW -- both readings at once                             *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma link_auth_toks_le Γ i n k :
-    link_auth Γ i n -∗ link_toks Γ i k -∗ ⌜(k <= n)%nat⌝.
+  Lemma link_auth_toks_valid Γ i n ty Q :
+    link_auth Γ i n ty -∗ link_toks Γ i Q -∗ ⌜Q ⊆ link_reps n ty⌝.
   Proof.
     iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %Hv.
     iPureIntro.
-    rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op in Hv.
-    apply singleton_valid, pair_valid in Hv as [Hv _].
+    rewrite /link_auth_elem /link_toks_elem singleton_op in Hv.
+    apply singleton_valid in Hv.
     apply auth_both_valid_discrete in Hv as [Hle _].
-    by apply nat_included in Hle.
+    by apply gmultiset_included in Hle.
   Qed.
 
-  (* the [nlink = 0] reading the free path uses: no entry points here *)
-  Lemma link_auth_zero_no_tok Γ i :
-    link_auth Γ i 0 -∗ link_tok Γ i -∗ False.
+  Lemma link_auth_toks_le Γ i n ty Q :
+    link_auth Γ i n ty -∗ link_toks Γ i Q -∗
+    ⌜(size Q <= n)%nat /\ forall x, x ∈ Q -> x = ty⌝.
   Proof.
     iIntros "Ha Hf".
-    iDestruct (link_auth_toks_le with "Ha Hf") as %Hle. lia.
+    iDestruct (link_auth_toks_valid with "Ha Hf") as %Hsub.
+    iPureIntro. split.
+    - exact (link_reps_sub_size Q n ty Hsub).
+    - intros x Hx. exact (link_reps_sub_elem Q n ty x Hsub Hx).
+  Qed.
+
+  (* THE COUNT reading, at a pile of [k] *)
+  Lemma link_auth_reps_le Γ i n ty k ty' :
+    link_auth Γ i n ty -∗ link_toks Γ i (link_reps k ty') -∗ ⌜(k <= n)%nat⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (link_auth_toks_le with "Ha Hf") as %[Hle _].
+    iPureIntro. rewrite link_reps_size in Hle. lia.
+  Qed.
+
+  (* THE AGREEMENT reading, at ONE fragment: its element IS the target's
+     current type, and the multiplicity is at least one. *)
+  Lemma link_auth_tok_agree Γ i n ty ty' :
+    link_auth Γ i n ty -∗ link_tok Γ i ty' -∗ ⌜ty' = ty /\ (1 <= n)%nat⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (link_auth_toks_le with "Ha Hf") as %[Hle Hall].
+    iPureIntro. rewrite gmultiset_size_singleton in Hle.
+    split; [| lia].
+    apply Hall, gmultiset_elem_of_singleton. reflexivity.
+  Qed.
+
+  (* the [n = 0] reading the free path uses: no entry points here *)
+  Lemma link_auth_zero_no_tok Γ i ty ty' :
+    link_auth Γ i 0 ty -∗ link_tok Γ i ty' -∗ False.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (link_auth_tok_agree with "Ha Hf") as %[_ Hle]. lia.
   Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  4.  The two moves                                                *)
   (* ---------------------------------------------------------------- *)
 
-  (* mint a token from the auth, incrementing n (create/link/mkdir) *)
-  Lemma link_mint Γ i n :
-    link_auth Γ i n ==∗ link_auth Γ i (S n) ∗ link_tok Γ i.
+  (* mint a fragment from the authority, raising the multiplicity by one
+     (create / link / mkdir, and a directory's own ["."]) *)
+  Lemma link_mint Γ i n ty :
+    link_auth Γ i n ty ==∗ link_auth Γ i (S n) ty ∗ link_tok Γ i ty.
   Proof.
     iIntros "Ha".
-    iAssert (|==> own (γlink Γ) (link_auth_elem i (S n) ⋅ link_tok_elem i 1))%I
+    iAssert (|==> own (γlink Γ) (link_auth_elem i (S n) ty
+                                 ⋅ link_tok_elem i ty))%I
       with "[Ha]" as ">H".
     { iApply (own_update with "Ha").
-      rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op_1.
-      apply singleton_update, prod_update; simpl; [| done].
-      apply auth_update_alloc.
-      apply (nat_local_update n 0%nat (S n) 1%nat). lia. }
-    iModIntro. rewrite own_op. iDestruct "H" as "[$ $]".
-  Qed.
-
-  (* return a token to the auth, decrementing n (unlink/iput) *)
-  Lemma link_return Γ i n :
-    link_auth Γ i (S n) -∗ link_tok Γ i ==∗ link_auth Γ i n.
-  Proof.
-    iIntros "Ha Hf".
-    iAssert (own (γlink Γ) (link_auth_elem i (S n) ⋅ link_tok_elem i 1))%I
-      with "[Ha Hf]" as "H".
-    { rewrite own_op. iFrame. }
-    iApply (own_update with "H").
-    rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op_1.
-    apply singleton_update, prod_update; simpl; [| done].
-    apply auth_update_dealloc.
-    apply (nat_local_update (S n) 1%nat n 0%nat). lia.
-  Qed.
-
-  (* ---------------------------------------------------------------- *)
-  (*  4b. THE PARENT REGISTER's law and its two moves                  *)
-  (*                                                                   *)
-  (*  The law is [auth]'s own: a fragment is included in the authority. *)
-  (*  Read at a LIVE DIRECTORY, whose bundle pins the authority to the  *)
-  (*  singleton of its own [".."] target, it says the namer IS the      *)
-  (*  [".."] target -- which is the whole content of the register.      *)
-  (* ---------------------------------------------------------------- *)
-
-  Lemma par_auth_tok_in Γ i P j :
-    par_auth Γ i P -∗ par_tok Γ i j -∗ ⌜j ∈ P⌝.
-  Proof.
-    iIntros "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
-    iPureIntro.
-    rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op in Hv.
-    apply singleton_valid, pair_valid in Hv as [_ Hv].
-    apply auth_both_valid_discrete in Hv as [Hle _].
-    apply gmultiset_included in Hle.
-    multiset_solver.
-  Qed.
-
-  (* THE READING rmdir takes: at a live directory the authority is at most
-     the singleton of the directory's own [".."] target, so any namer of it
-     IS that target. *)
-  Lemma par_auth_tok_eq Γ i p j :
-    par_auth Γ i {[+ p +]} -∗ par_tok Γ i j -∗ ⌜j = p⌝.
-  Proof.
-    iIntros "Ha Hf".
-    iDestruct (par_auth_tok_in with "Ha Hf") as %Hin.
-    iPureIntro. by apply gmultiset_elem_of_singleton in Hin.
-  Qed.
-
-  (* mint the fragment for a new name record (create / link / mkdir) *)
-  Lemma par_alloc Γ i P j :
-    par_auth Γ i P ==∗ par_auth Γ i (P ⊎ {[+ j +]}) ∗ par_tok Γ i j.
-  Proof.
-    iIntros "Ha".
-    iAssert (|==> own (γlink Γ) (par_auth_elem i (P ⊎ {[+ j +]})
-                                 ⋅ par_tok_elem i j))%I with "[Ha]" as ">H".
-    { iApply (own_update with "Ha").
-      rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op_2.
-      apply singleton_update, prod_update; simpl; [done |].
+      rewrite /link_auth_elem /link_tok_elem /link_toks_elem singleton_op.
+      apply singleton_update.
+      rewrite link_reps_S.
       apply auth_update_alloc, gmultiset_local_update. multiset_solver. }
     iModIntro. rewrite own_op. iDestruct "H" as "[$ $]".
   Qed.
 
-  (* ...and give it back when the record goes (unlink / rmdir) *)
-  Lemma par_dealloc Γ i P j :
-    par_auth Γ i (P ⊎ {[+ j +]}) -∗ par_tok Γ i j ==∗ par_auth Γ i P.
+  (* ...and give one back, lowering the multiplicity by one (unlink /
+     rmdir / iput) *)
+  Lemma link_return Γ i n ty ty' :
+    link_auth Γ i (S n) ty -∗ link_tok Γ i ty' ==∗ link_auth Γ i n ty.
   Proof.
     iIntros "Ha Hf".
-    iAssert (own (γlink Γ) (par_auth_elem i (P ⊎ {[+ j +]})
-                            ⋅ par_tok_elem i j))%I with "[Ha Hf]" as "H".
+    iDestruct (link_auth_tok_agree with "Ha Hf") as %[-> _].
+    iAssert (own (γlink Γ) (link_auth_elem i (S n) ty ⋅ link_tok_elem i ty))%I
+      with "[Ha Hf]" as "H".
     { rewrite own_op. iFrame. }
     iApply (own_update with "H").
-    rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op_2.
-    apply singleton_update, prod_update; simpl; [done |].
+    rewrite /link_auth_elem /link_tok_elem /link_toks_elem singleton_op.
+    apply singleton_update.
+    rewrite link_reps_S.
     apply auth_update_dealloc, gmultiset_local_update. multiset_solver.
+  Qed.
+
+  (* AN EMPTY PILE IS NOT [emp] -- it is [own _ {[i := auth-frag-empty]}],
+     which is the AUTHORITY's own unit factor.  Splitting it off is the
+     [k = 0] corner every [k]-at-a-time mover below has. *)
+  Lemma link_toks_elem_empty i :
+    link_toks_elem i (∅ : gmultiset ity) = {[ i := (ε : fsLinkElemUR) ]}.
+  Proof. reflexivity. Qed.
+
+  Lemma link_auth_elem_frag_empty i n ty :
+    link_auth_elem i n ty ≡ link_auth_elem i n ty ⋅ link_toks_elem i ∅.
+  Proof.
+    rewrite link_toks_elem_empty /link_auth_elem singleton_op right_id //.
+  Qed.
+
+  Lemma link_toks_empty Γ i n ty :
+    link_auth Γ i n ty ⊣⊢ link_auth Γ i n ty ∗ link_toks Γ i ∅.
+  Proof.
+    rewrite /link_auth /link_toks -own_op.
+    by rewrite -link_auth_elem_frag_empty.
+  Qed.
+
+  (* the [k]-at-a-time forms, for the movers that cross the DIRECTORY
+     boundary (a live directory's multiplicity is [nlink + 1]) *)
+  Lemma link_mint_reps Γ i n k ty :
+    link_auth Γ i n ty ==∗
+    link_auth Γ i (n + k) ty ∗ link_toks Γ i (link_reps k ty).
+  Proof.
+    iIntros "Ha".
+    iInduction k as [| k IH] "IH" forall (n).
+    { iModIntro. rewrite link_reps_0 Nat.add_0_r.
+      by iApply link_toks_empty. }
+    iMod (link_mint with "Ha") as "[Ha Ht]".
+    iMod ("IH" with "Ha") as "[Ha Hts]".
+    iModIntro. replace (n + S k)%nat with (S n + k)%nat by lia.
+    iFrame "Ha". rewrite link_reps_S link_toks_split. iFrame.
+  Qed.
+
+  (* THE RETURN TAKES A PILE AT ANY VALUE: at [k = 0] there is nothing to
+     return, and above it the agreement law forces the caller's value to be
+     the authority's. *)
+  Lemma link_return_reps Γ i n k ty ty' :
+    link_auth Γ i (n + k) ty -∗ link_toks Γ i (link_reps k ty') ==∗
+    link_auth Γ i n ty.
+  Proof.
+    iIntros "Ha Ht".
+    destruct k as [| k'].
+    { rewrite Nat.add_0_r. by iFrame. }
+    iAssert (⌜ty' = ty⌝)%I with "[Ha Ht]" as %->.
+    { rewrite link_reps_S link_toks_split. iDestruct "Ht" as "[Ht _]".
+      iDestruct (link_auth_tok_agree with "Ha Ht") as %[-> _]. done. }
+    iClear "%".
+    iInduction (S k') as [| k IH] "IH" forall (n).
+    { rewrite Nat.add_0_r. by iFrame. }
+    rewrite link_reps_S link_toks_split.
+    iDestruct "Ht" as "[Ht Hts]".
+    replace (n + S k)%nat with (S (n + k))%nat by lia.
+    iMod (link_return with "Ha Ht") as "Ha".
+    iApply ("IH" with "Ha Hts").
   Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  5.  Allocation of a whole family                                 *)
   (*                                                                   *)
   (*  [γlink] is ONE gname for the whole file system, so a fresh        *)
-  (*  instance's auths and tokens are allocated together, in one step,  *)
-  (*  from one element.  That element's VALIDITY is where the           *)
-  (*  "#tokens ≤ nlink" fact comes from at the mint -- it is read off   *)
-  (*  the durable instance's own [own] (section 7), never proved.       *)
+  (*  instance's authorities and fragments are allocated together, in   *)
+  (*  one step, from one element.                                      *)
   (* ---------------------------------------------------------------- *)
 
   Lemma link_family_alloc (M : fsLinkUR) :
@@ -360,65 +360,42 @@ Section Link.
   Proof. intros HM. iMod (own_alloc M) as (g) "H"; [done |]. by iExists g. Qed.
 
   (* ---------------------------------------------------------------- *)
-  (*  5b. THE FULL ELEMENT: an authority with all its tokens AT HOME    *)
+  (*  5b. THE FULL ELEMENT: an authority with all its fragments AT HOME *)
   (*                                                                    *)
-  (*  The shape the INODE REGION parks (durable-disk 2b-inode-4): one    *)
-  (*  auth per inum, standing at the record's own [nlink], together with *)
-  (*  exactly that many tokens.  Nothing is outstanding, so its          *)
-  (*  VALIDITY is free -- no image sweep is spent at boot.  A directory  *)
-  (*  entry's token is drawn out of this pile by [link_mint] at the      *)
-  (*  [iupdate] that raises the count and put back by [link_return] at   *)
-  (*  the one that lowers it.                                           *)
+  (*  The shape the BOOT allocates: one authority per inum, standing at  *)
+  (*  the record's own multiplicity, together with exactly that many     *)
+  (*  fragments.  Nothing is outstanding, so its VALIDITY is free -- no  *)
+  (*  image sweep is spent at boot.                                     *)
   (* ---------------------------------------------------------------- *)
 
-  Definition par_full_elem (i : Z) (P : gmultiset (option Z)) : fsLinkUR :=
-    par_auth_elem i P ⋅ par_toks_elem i P.
+  Definition link_full_elem (i : Z) (n : nat) (ty : ity) : fsLinkUR :=
+    link_auth_elem i n ty ⋅ link_toks_elem i (link_reps n ty).
 
-  Definition link_full_elem (i : Z) (n : nat) (P : gmultiset (option Z)) : fsLinkUR :=
-    (link_auth_elem i n ⋅ link_tok_elem i n) ⋅ par_full_elem i P.
-
-  Lemma link_toks_full_singleton i n :
-    link_auth_elem i n ⋅ link_tok_elem i n
-    ≡ {[ i := ((● n ⋅ ◯ n : authUR natUR), (ε : fsParUR)) ]}.
+  Lemma link_full_elem_singleton i n ty :
+    link_full_elem i n ty
+    ≡ {[ i := (● (link_reps n ty) ⋅ ◯ (link_reps n ty) : fsLinkElemUR) ]}.
   Proof.
-    rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op_1 //.
+    rewrite /link_full_elem /link_auth_elem /link_toks_elem singleton_op //.
   Qed.
 
-  Lemma par_full_elem_singleton i P :
-    par_full_elem i P
-    ≡ {[ i := ((ε : authUR natUR), (● P ⋅ ◯ P : fsParUR)) ]}.
+  Lemma link_full_elem_valid i n ty : ✓ link_full_elem i n ty.
   Proof.
-    rewrite /par_full_elem /par_auth_elem /par_toks_elem singleton_op
-            -pair_op_2 //.
+    rewrite link_full_elem_singleton. apply singleton_valid.
+    apply auth_both_valid_discrete. split; [| done].
+    apply gmultiset_included. done.
   Qed.
 
-  Lemma link_full_elem_singleton i n P :
-    link_full_elem i n P
-    ≡ {[ i := ((● n ⋅ ◯ n : authUR natUR), (● P ⋅ ◯ P : fsParUR)) ]}.
-  Proof.
-    rewrite /link_full_elem link_toks_full_singleton par_full_elem_singleton
-            singleton_op -pair_op right_id left_id //.
-  Qed.
+  Lemma link_full_split Γ i n ty :
+    own (γlink Γ) (link_full_elem i n ty)
+    ⊣⊢ link_auth Γ i n ty ∗ link_toks Γ i (link_reps n ty).
+  Proof. rewrite /link_full_elem own_op //. Qed.
 
-  Lemma link_full_elem_valid i n P : ✓ link_full_elem i n P.
-  Proof.
-    rewrite link_full_elem_singleton. apply singleton_valid, pair_valid.
-    split.
-    - apply auth_both_valid_discrete. split; [apply nat_included; lia | done].
-    - apply auth_both_valid_discrete. split; [by apply gmultiset_included | done].
-  Qed.
-
-  Lemma link_full_split Γ i n P :
-    own (γlink Γ) (link_full_elem i n P)
-    ⊣⊢ (link_auth Γ i n ∗ link_toks Γ i n) ∗ (par_auth Γ i P ∗ par_toks Γ i P).
-  Proof. rewrite /link_full_elem /par_full_elem !own_op //. Qed.
-
-  Lemma link_auth_of_elem Γ i n :
-    own (γlink Γ) (link_auth_elem i n) ⊣⊢ link_auth Γ i n.
+  Lemma link_auth_of_elem Γ i n ty :
+    own (γlink Γ) (link_auth_elem i n ty) ⊣⊢ link_auth Γ i n ty.
   Proof. done. Qed.
 
-  Lemma link_toks_of_elem Γ i k :
-    own (γlink Γ) (link_tok_elem i k) ⊣⊢ link_toks Γ i k.
+  Lemma link_toks_of_elem Γ i Q :
+    own (γlink Γ) (link_toks_elem i Q) ⊣⊢ link_toks Γ i Q.
   Proof. done. Qed.
 
 End Link.
@@ -429,12 +406,12 @@ End Link.
 (*  [big_opM_own_1] distributes one [own] of a big-op into a [big_sepM] *)
 (*  of [own]s; the converse needs the map to be non-empty, so it is     *)
 (*  stated here with an ACCUMULATOR instead, which is what every use    *)
-(*  site actually has (an auth to gather the tokens into, or one        *)
-(*  element chosen out of a non-empty map).                            *)
+(*  site actually has (an authority to gather the fragments into, or    *)
+(*  one element chosen out of a non-empty map).                        *)
 (*                                                                     *)
 (*  The [_opt] forms carry the [emp]/[ε] split that the tokenless       *)
-(*  entries ("." always; ".." in the orphan form) need: an entry that   *)
-(*  owns nothing contributes the unit.                                 *)
+(*  entries (an orphan's dot records; the root's [".."]) need: an entry *)
+(*  that owns nothing contributes the unit.                            *)
 (* ------------------------------------------------------------------ *)
 
 Section Gather.
@@ -521,49 +498,56 @@ End Gather.
 (* ------------------------------------------------------------------ *)
 (*  7.  THE LAW, in its big-op form                                    *)
 (*                                                                     *)
-(*  [link_auth Γ i n ∗ (k separate tokens at i) ⊢ k ≤ n] -- the shape  *)
-(*  a directory's [∗] over its entries actually presents.  Needs the   *)
-(*  gathering of section 6, hence a section of its own.                *)
+(*  The shape a directory's [∗] over its entries actually presents: a   *)
+(*  LIST of fragments, each at the same key.  Needs the gathering of    *)
+(*  section 6, hence a section of its own.                             *)
 (* ------------------------------------------------------------------ *)
 
 Section LinkLaw.
   Context `{!fsLinkG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
-  Lemma link_tok_elem_add i k1 k2 :
-    link_tok_elem i k1 ⋅ link_tok_elem i k2 ≡ link_tok_elem i (k1 + k2)%nat.
-  Proof. rewrite /link_tok_elem singleton_op -pair_op_1 -auth_frag_op //. Qed.
+  Lemma link_toks_elem_add i Q1 Q2 :
+    link_toks_elem i Q1 ⋅ link_toks_elem i Q2 ≡ link_toks_elem i (Q1 ⊎ Q2).
+  Proof. rewrite /link_toks_elem singleton_op -auth_frag_op //. Qed.
 
-  Lemma tok_elem_list i (l : list unit) :
+  Lemma tok_elem_list i ty (l : list unit) :
     (0 < length l)%nat ->
-    ([^op list] _ ∈ l, link_tok_elem i 1) ≡ link_tok_elem i (length l).
+    ([^op list] _ ∈ l, link_tok_elem i ty)
+    ≡ link_toks_elem i (link_reps (length l) ty).
   Proof.
     induction l as [| u l IH]; [simpl; lia |].
     intros _. rewrite big_opL_cons.
     destruct l as [| v l'].
-    - rewrite big_opL_nil right_id //.
+    - rewrite big_opL_nil right_id /link_tok_elem.
+      simpl. rewrite link_reps_1 //.
     - assert (Hl : (0 < length (v :: l'))%nat) by (simpl; lia).
-      rewrite (IH Hl) link_tok_elem_add //.
+      rewrite (IH Hl) /link_tok_elem link_toks_elem_add.
+      replace (length (u :: v :: l')) with (S (length (v :: l')))%nat
+        by reflexivity.
+      rewrite link_reps_S //.
   Qed.
 
-  Lemma link_auth_tok_list Γ i n (l : list unit) :
-    link_auth Γ i n -∗ ([∗ list] _ ∈ l, link_tok Γ i) -∗
+  Lemma link_auth_tok_list Γ i n ty ty' (l : list unit) :
+    link_auth Γ i n ty -∗ ([∗ list] _ ∈ l, link_tok Γ i ty') -∗
     ⌜(length l <= n)%nat⌝.
   Proof.
     destruct l as [| u l].
     - iIntros "_ _". iPureIntro. simpl. lia.
     - iIntros "Ha Hl".
       iDestruct (own_gather_list (A := fsLinkUR) (γlink Γ)
-                   (fun _ : unit => link_tok_elem i 1) (u :: l)
-                   (link_auth_elem i n) with "Ha Hl") as "H".
+                   (fun _ : unit => link_tok_elem i ty') (u :: l)
+                   (link_auth_elem i n ty) with "Ha Hl") as "H".
       iDestruct (own_valid with "H") as %Hv.
       iPureIntro.
       assert (Hpos : (0 < length (u :: l))%nat) by (simpl; lia).
-      rewrite (tok_elem_list i (u :: l) Hpos) in Hv.
-      rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op in Hv.
-      apply singleton_valid, pair_valid in Hv as [Hv _].
+      rewrite (tok_elem_list i ty' (u :: l) Hpos) in Hv.
+      rewrite /link_auth_elem /link_toks_elem singleton_op in Hv.
+      apply singleton_valid in Hv.
       apply auth_both_valid_discrete in Hv as [Hle _].
-      by apply nat_included in Hle.
+      apply gmultiset_included in Hle.
+      apply link_reps_sub_size in Hle.
+      rewrite link_reps_size in Hle. lia.
   Qed.
 
 End LinkLaw.
