@@ -82,7 +82,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac excl numbers.
+From iris.algebra Require Import auth gmap gmultiset frac excl numbers.
 From iris.base_logic.lib Require Import iprop own ghost_map mono_nat.
 Require Import SailStdpp.Operators_mwords.
 Require Import RiscvPtsto.
@@ -693,7 +693,8 @@ Qed.
 
 Lemma toks_of_list_lookup_pos (L : list Z) (z : Z) :
   (0 < fs_tick_count L z)%nat ->
-  toks_of_list L !! z ≡ Some (◯ (fs_tick_count L z) : authR natUR).
+  toks_of_list L !! z
+  ≡ Some ((◯ (fs_tick_count L z) : authUR natUR), (ε : fsParUR)).
 Proof.
   induction L as [| t L IH]; intros Hp.
   - rewrite /fs_tick_count /= in Hp. lia.
@@ -706,7 +707,8 @@ Proof.
       * rewrite (toks_of_list_lookup_zero L z H0) H0 right_id. reflexivity.
       * assert (Heq : (1%nat ⋅ fs_tick_count L z) = S (fs_tick_count L z))
           by (rewrite nat_op; lia).
-        rewrite (IH ltac:(lia)) -Some_op -auth_frag_op Heq. reflexivity.
+        rewrite (IH ltac:(lia)) -Some_op -pair_op_1 -auth_frag_op Heq.
+        reflexivity.
     + rewrite (bool_decide_eq_false_2 (t = z) Hne) in Hp |- *.
       rewrite /link_tok_elem lookup_singleton_ne; [| exact Hne].
       rewrite left_id. exact (IH Hp).
@@ -715,7 +717,8 @@ Qed.
 (* ...and the boot family's token half, as an fmap ([link_full_map_fmap]'s
    twin at the fragment column) *)
 Lemma link_toks_of_fmap (I : gmap Z fs_node) :
-  link_toks_of I ≡ (fun n => (◯ (fn_nlink n) : authR natUR)) <$> I.
+  link_toks_of I
+  ≡ (fun n => ((◯ (fn_nlink n) : authUR natUR), (ε : fsParUR))) <$> I.
 Proof.
   induction I as [| i n I Hi IH] using map_ind.
   - rewrite /link_toks_of big_opM_empty fmap_empty //.
@@ -737,7 +740,8 @@ Proof.
   - destruct (H z ltac:(lia)) as (n & Hn & Hle).
     rewrite (toks_of_list_lookup_pos L z ltac:(lia)).
     rewrite (link_toks_of_fmap I) lookup_fmap Hn /=.
-    apply Some_included_2. right. apply auth_frag_mono, nat_included. lia.
+    apply Some_included_2. right. apply pair_included.
+    split; [apply auth_frag_mono, nat_included; lia | apply ucmra_unit_least].
 Qed.
 
 (* ---- 9c.   THE COUNT OVER A JOINED TICKET SUPPLY --------------------- *)

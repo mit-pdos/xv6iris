@@ -44,7 +44,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap numbers.
+From iris.algebra Require Import auth gmap gmultiset numbers updates local_updates.
 From iris.base_logic.lib Require Import iprop own.
 Require Export FsStateDefs.
 Require Import Xv6Cameras.  (* [fsLinkUR] / [fsLinkG] -- capacity class, must be IMPORTed *)
@@ -63,8 +63,26 @@ Section Link.
   (*  2.  The two shapes                                               *)
   (* ---------------------------------------------------------------- *)
 
-  Definition link_auth_elem (i : Z) (n : nat) : fsLinkUR := {[ i := ● n ]}.
-  Definition link_tok_elem (i : Z) (k : nat) : fsLinkUR := {[ i := ◯ k ]}.
+  Definition link_auth_elem (i : Z) (n : nat) : fsLinkUR :=
+    {[ i := ((● n : authUR natUR), (ε : fsParUR)) ]}.
+  Definition link_tok_elem (i : Z) (k : nat) : fsLinkUR :=
+    {[ i := ((◯ k : authUR natUR), (ε : fsParUR)) ]}.
+
+  (* ---- the PARENT REGISTER's two shapes (fs-state.md section 6.5) ----
+
+     [par_auth Gamma i P] is inum [i]'s own authority: "the inums holding
+     a NAME record for me are among [P]".  It rides in [i]'s bundle, where
+     [i]'s data is in hand, so a directory can pin [P] to the singleton of
+     its own [".."] target without any cross-inode clause.
+
+     [par_tok Gamma i j] is the fragment "[j] holds a name record for
+     [i]", minted beside the entry TOKEN at every name record and returned
+     with it.  Unconditional in [j]'s bundle -- it never asks what [i]'s
+     type is. *)
+  Definition par_auth_elem (i : Z) (P : gmultiset Z) : fsLinkUR :=
+    {[ i := ((ε : authUR natUR), (● P : fsParUR)) ]}.
+  Definition par_tok_elem (i j : Z) : fsLinkUR :=
+    {[ i := ((ε : authUR natUR), (◯ {[+ j +]} : fsParUR)) ]}.
 
   (* "inum [i]'s on-disk record says [n] links".  Held by [inode_owned]. *)
   Definition link_auth Γ (i : Z) (n : nat) : iProp Σ :=
@@ -84,11 +102,26 @@ Section Link.
   Global Instance link_tok_timeless Γ i : Timeless (link_tok Γ i).
   Proof. rewrite /link_tok. apply _. Qed.
 
+  (* "the inums holding a NAME record for [i] are among [P]" -- inum [i]'s
+     OWN half of the parent register, carried by [i]'s bundle. *)
+  Definition par_auth Γ (i : Z) (P : gmultiset Z) : iProp Σ :=
+    own (γlink Γ) (par_auth_elem i P).
+
+  (* "[j] holds a name record for [i]" -- the fragment that rides beside
+     the entry token of every NAME record in [j]. *)
+  Definition par_tok Γ (i j : Z) : iProp Σ :=
+    own (γlink Γ) (par_tok_elem i j).
+
+  Global Instance par_auth_timeless Γ i P : Timeless (par_auth Γ i P).
+  Proof. rewrite /par_auth. apply _. Qed.
+  Global Instance par_tok_timeless Γ i j : Timeless (par_tok Γ i j).
+  Proof. rewrite /par_tok. apply _. Qed.
+
   Lemma link_toks_split Γ i k1 k2 :
     link_toks Γ i (k1 + k2) ⊣⊢ link_toks Γ i k1 ∗ link_toks Γ i k2.
   Proof.
     rewrite /link_toks /link_tok_elem -own_op singleton_op.
-    by rewrite -auth_frag_op.
+    by rewrite -pair_op_1 -auth_frag_op.
   Qed.
 
   Lemma link_toks_one Γ i : link_toks Γ i 1 ⊣⊢ link_tok Γ i.
@@ -133,8 +166,8 @@ Section Link.
     iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %Hv.
     iPureIntro.
-    rewrite /link_auth_elem /link_tok_elem singleton_op in Hv.
-    apply singleton_valid in Hv.
+    rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op in Hv.
+    apply singleton_valid, pair_valid in Hv as [Hv _].
     apply auth_both_valid_discrete in Hv as [Hle _].
     by apply nat_included in Hle.
   Qed.
@@ -159,8 +192,9 @@ Section Link.
     iAssert (|==> own (γlink Γ) (link_auth_elem i (S n) ⋅ link_tok_elem i 1))%I
       with "[Ha]" as ">H".
     { iApply (own_update with "Ha").
-      rewrite /link_auth_elem /link_tok_elem singleton_op.
-      apply singleton_update, auth_update_alloc.
+      rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op_1.
+      apply singleton_update, prod_update; simpl; [| done].
+      apply auth_update_alloc.
       apply (nat_local_update n 0%nat (S n) 1%nat). lia. }
     iModIntro. rewrite own_op. iDestruct "H" as "[$ $]".
   Qed.
@@ -174,9 +208,71 @@ Section Link.
       with "[Ha Hf]" as "H".
     { rewrite own_op. iFrame. }
     iApply (own_update with "H").
-    rewrite /link_auth_elem /link_tok_elem singleton_op.
-    apply singleton_update, auth_update_dealloc.
+    rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op_1.
+    apply singleton_update, prod_update; simpl; [| done].
+    apply auth_update_dealloc.
     apply (nat_local_update (S n) 1%nat n 0%nat). lia.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  4b. THE PARENT REGISTER's law and its two moves                  *)
+  (*                                                                   *)
+  (*  The law is [auth]'s own: a fragment is included in the authority. *)
+  (*  Read at a LIVE DIRECTORY, whose bundle pins the authority to the  *)
+  (*  singleton of its own [".."] target, it says the namer IS the      *)
+  (*  [".."] target -- which is the whole content of the register.      *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma par_auth_tok_in Γ i P j :
+    par_auth Γ i P -∗ par_tok Γ i j -∗ ⌜j ∈ P⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    iPureIntro.
+    rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op in Hv.
+    apply singleton_valid, pair_valid in Hv as [_ Hv].
+    apply auth_both_valid_discrete in Hv as [Hle _].
+    apply gmultiset_included in Hle.
+    multiset_solver.
+  Qed.
+
+  (* THE READING rmdir takes: at a live directory the authority is at most
+     the singleton of the directory's own [".."] target, so any namer of it
+     IS that target. *)
+  Lemma par_auth_tok_eq Γ i p j :
+    par_auth Γ i {[+ p +]} -∗ par_tok Γ i j -∗ ⌜j = p⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (par_auth_tok_in with "Ha Hf") as %Hin.
+    iPureIntro. by apply gmultiset_elem_of_singleton in Hin.
+  Qed.
+
+  (* mint the fragment for a new name record (create / link / mkdir) *)
+  Lemma par_alloc Γ i P j :
+    par_auth Γ i P ==∗ par_auth Γ i (P ⊎ {[+ j +]}) ∗ par_tok Γ i j.
+  Proof.
+    iIntros "Ha".
+    iAssert (|==> own (γlink Γ) (par_auth_elem i (P ⊎ {[+ j +]})
+                                 ⋅ par_tok_elem i j))%I with "[Ha]" as ">H".
+    { iApply (own_update with "Ha").
+      rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op_2.
+      apply singleton_update, prod_update; simpl; [done |].
+      apply auth_update_alloc, gmultiset_local_update. multiset_solver. }
+    iModIntro. rewrite own_op. iDestruct "H" as "[$ $]".
+  Qed.
+
+  (* ...and give it back when the record goes (unlink / rmdir) *)
+  Lemma par_dealloc Γ i P j :
+    par_auth Γ i (P ⊎ {[+ j +]}) -∗ par_tok Γ i j ==∗ par_auth Γ i P.
+  Proof.
+    iIntros "Ha Hf".
+    iAssert (own (γlink Γ) (par_auth_elem i (P ⊎ {[+ j +]})
+                            ⋅ par_tok_elem i j))%I with "[Ha Hf]" as "H".
+    { rewrite own_op. iFrame. }
+    iApply (own_update with "H").
+    rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op_2.
+    apply singleton_update, prod_update; simpl; [done |].
+    apply auth_update_dealloc, gmultiset_local_update. multiset_solver.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -209,12 +305,17 @@ Section Link.
     link_auth_elem i n ⋅ link_tok_elem i n.
 
   Lemma link_full_elem_singleton i n :
-    link_full_elem i n = {[ i := (● n ⋅ ◯ n : authR natUR) ]}.
-  Proof. rewrite /link_full_elem /link_auth_elem /link_tok_elem singleton_op //. Qed.
+    link_full_elem i n
+    ≡ {[ i := ((● n ⋅ ◯ n : authUR natUR), (ε : fsParUR)) ]}.
+  Proof.
+    rewrite /link_full_elem /link_auth_elem /link_tok_elem singleton_op
+            -pair_op_1 //.
+  Qed.
 
   Lemma link_full_elem_valid i n : ✓ link_full_elem i n.
   Proof.
-    rewrite link_full_elem_singleton. apply singleton_valid.
+    rewrite link_full_elem_singleton. apply singleton_valid, pair_valid.
+    split; [| apply ucmra_unit_valid].
     apply auth_both_valid_discrete. split; [apply nat_included; lia | done].
   Qed.
 
@@ -341,7 +442,7 @@ Section LinkLaw.
 
   Lemma link_tok_elem_add i k1 k2 :
     link_tok_elem i k1 ⋅ link_tok_elem i k2 ≡ link_tok_elem i (k1 + k2)%nat.
-  Proof. rewrite /link_tok_elem singleton_op -auth_frag_op //. Qed.
+  Proof. rewrite /link_tok_elem singleton_op -pair_op_1 -auth_frag_op //. Qed.
 
   Lemma tok_elem_list i (l : list unit) :
     (0 < length l)%nat ->
@@ -369,8 +470,8 @@ Section LinkLaw.
       iPureIntro.
       assert (Hpos : (0 < length (u :: l))%nat) by (simpl; lia).
       rewrite (tok_elem_list i (u :: l) Hpos) in Hv.
-      rewrite /link_auth_elem /link_tok_elem singleton_op in Hv.
-      apply singleton_valid in Hv.
+      rewrite /link_auth_elem /link_tok_elem singleton_op -pair_op in Hv.
+      apply singleton_valid, pair_valid in Hv as [Hv _].
       apply auth_both_valid_discrete in Hv as [Hle _].
       by apply nat_included in Hle.
   Qed.

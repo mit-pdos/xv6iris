@@ -28,7 +28,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap numbers.
+From iris.algebra Require Import auth gmap gmultiset numbers.
 From iris.base_logic.lib Require Import iprop own ghost_map.
 Require Import BioDefs.
 Require Import BitmapEnc.
@@ -290,7 +290,8 @@ Section FsState.
      contribution to the family is its own auth. *)
   Lemma link_elem_no_ents (I : gmap Z fs_node) :
     (forall i n, I !! i = Some n -> dir_entries n = ∅) ->
-    link_elem I ≡ (fun n => (● (fn_nlink n) : authR natUR)) <$> I.
+    link_elem I ≡ (fun n => ((● (fn_nlink n) : authUR natUR),
+                             (ε : fsParUR))) <$> I.
   Proof.
     induction I as [| i n I Hi IH] using map_ind; intros Hall.
     - rewrite /link_elem big_opM_empty fmap_empty //.
@@ -311,7 +312,8 @@ Section FsState.
     intros Hall. rewrite (link_elem_no_ents I Hall).
     intros j. rewrite lookup_fmap.
     destruct (I !! j) as [n |] eqn:E; [| done].
-    rewrite /= Some_valid. by apply auth_auth_valid.
+    rewrite /= Some_valid. apply pair_valid.
+    split; [by apply auth_auth_valid | apply ucmra_unit_valid].
   Qed.
 
   (* BOTH era ghosts, allocated together from a map of nodes: the top map's
@@ -367,7 +369,8 @@ Section FsState.
 
   Lemma link_full_map_fmap (I : gmap Z fs_node) :
     link_full_map I
-    ≡ (fun n => (● (fn_nlink n) ⋅ ◯ (fn_nlink n) : authR natUR)) <$> I.
+    ≡ (fun n => ((● (fn_nlink n) ⋅ ◯ (fn_nlink n) : authUR natUR),
+                 (ε : fsParUR))) <$> I.
   Proof.
     induction I as [| i n I Hi IH] using map_ind.
     - rewrite /link_full_map big_opM_empty fmap_empty //.
@@ -380,7 +383,9 @@ Section FsState.
   Proof.
     rewrite link_full_map_fmap. intros j. rewrite lookup_fmap.
     destruct (I !! j) as [n |] eqn:E; [| done].
-    rewrite /= Some_valid. apply auth_both_valid_discrete.
+    rewrite /= Some_valid. apply pair_valid.
+    split; [| apply ucmra_unit_valid].
+    apply auth_both_valid_discrete.
     split; [apply nat_included; lia | done].
   Qed.
 

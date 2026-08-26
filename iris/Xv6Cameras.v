@@ -65,7 +65,7 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap
-     gset numbers updates local_updates.
+     gset gmultiset numbers updates local_updates.
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var ghost_map saved_prop
@@ -494,8 +494,35 @@ Proof. solve_inG. Qed.
    binds it alone.
 
    NAMED [fsLinkUR], not [linkUR]: the inode cache's own ledger camera
-   (section 11 below) already owns that name in this file. *)
-Definition fsLinkUR : ucmra := gmapUR Z (authR natUR).
+   (section 11 below) already owns that name in this file.
+
+   THE SECOND COLUMN IS THE PARENT REGISTER (fs-state.md section 6.5).
+   rmdir pays [dp->nlink--] with the child's [".."] token and therefore
+   needs the child's [".."] to NAME [dp] -- a cross-inode fact that no
+   per-inode clause can carry.  The column that carries it is
+   [authUR (gmultisetUR Z)] AT THE CHILD'S KEY: the multiset of inums that
+   hold a NAME record for this inum.
+
+   - the AUTHORITY [par_auth] rides in the inum's OWN bundle, where the
+     directory's data is in hand, so the clause "a LIVE DIRECTORY's
+     authority is at most the singleton of its own [".."] target" is
+     LOCAL (it reads the [".."] entry off the very node that owns it);
+   - the FRAGMENT [par_tok] rides with the entry TOKEN of every NAME
+     record ([".."] records carry the count token alone), tagged with the
+     naming directory's inum -- also local, and unconditional: it does not
+     ask what the target's TYPE is, which is what makes both halves
+     definable one inode at a time.
+
+   The agreement is then the RA's own law: the parent's fragment says
+   [dp] names the child, the child's authority says only its [".."] target
+   may, so [dp] IS the [".."] target.  A FILE's authority is unconstrained
+   (it has many namers), which is why the authority's value is
+   existentially bound in the bundle under [size P <= nlink] -- that bound
+   is what makes a FREED inum's register empty again, so the next [mkdir]
+   can install its own singleton. *)
+Definition fsParUR : ucmra := authUR (gmultisetUR Z).
+Definition fsLinkElemUR : ucmra := prodUR (authUR natUR) fsParUR.
+Definition fsLinkUR : ucmra := gmapUR Z fsLinkElemUR.
 
 Class fsLinkG (Σ : gFunctors) := FsLinkG {
   fs_link_inG :: inG Σ fsLinkUR;
