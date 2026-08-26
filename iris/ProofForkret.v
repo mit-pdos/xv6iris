@@ -681,35 +681,29 @@ Qed.
 (* ===================================================================== *)
 (*  THE BOOT ARM: +0x14 to +0x62, i.e. all of [if (first)].               *)
 (* ===================================================================== *)
-(* NOT PROVED YET, and the obstruction is NOT in this file.
+(* PROVED.  [fkr_boot] below is the whole arm --
 
      fsinit(ROOTDEV);
      __atomic_store_n(&first, 0, __ATOMIC_RELEASE);
      p->trapframe->a0 = kexec("/init", (char *[]){"/init", 0});
      if (p->trapframe->a0 == -1) panic("exec");
 
-   Every resource the arm spends is already here -- that is what the four
-   [FirstTok] rows below are, and [FirstTok.first_fsinit_open] hands them
-   out in [SpecFsinit]'s own premise order.  What is missing is that
-   forkret reaches fsinit WITH INTERRUPTS OFF.  This revision's scheduler
-   runs [intr_on(); intr_off();] before [acquire(&p->lock)], so push_off
-   records [intena = 0] and forkret's own [release] at +0x10 does not
-   re-enable; the arm therefore runs at [eb = false] and at [b = false].
-   [SpecFsinit], [SpecInitlog], [SpecIreclaim], [SpecKexec], [SpecNamei],
-   [SpecNamex] and [SpecDirlookup] all still carry [eb = true ->] --
-   exactly the ~25 contracts claude-notes/completed/eb-generic-sweep.md's
-   closing section lists as "reached from a syscall or from boot with an
-   enabled base", on the strength of an assumption this arm refutes.
+   -- +0x14 to +0x62 plus the panic tail at +0x9a, with BOTH arms of the
+   [a0 == -1] test walked: the ok arm meets [fkr_tail], the failure arm
+   reaches [panic("exec")].  Every resource it spends comes out of
+   [FirstTok]'s boot disjunct (the four rows below), not out of
+   [SpecForkret]'s precondition.  The [eb = false] obstruction this banner
+   used to record is gone: the seven contracts it named (fsinit ->
+   initlog/ireclaim, kexec -> namei -> namex -> dirlookup) carry no
+   [eb = true ->] premise any more -- claude-notes/completed/eb-generic-sweep.md
+   is that port's recipe, and claude-notes/completed/forkret-boot-arm.md is
+   the record of what this arm cost.
 
-   So the prerequisite is one more round of that sweep over those seven
-   functions -- drop the premise, thread [trap_csrs_ext eb] /
-   [cpu_claim_ext eb pj] in and out -- and that file is the recipe.  This
-   contract already holds the complement (it is [Hext] / [Hcx] below, the
-   [_ext] halves [IntrDefs.arm_pay_ext_split] produced at the release), so
-   nothing here or in [SpecForkret.v] changes when the sweep lands.
-
-   The statement is exactly the goal at +0x14 on the arm the token's boot
-   disjunct selects, so proving it is a matter of writing the walk. *)
+   IT USES THE UNPINNED [SpecKexec.wp_kexec_sconf].  Nothing here says
+   which inode ["/init"] names or what bytes it holds: the era-0 pinned
+   theorems ([NameiInitPinned], [SpecKexecPinned]/[ProofKexecPinned]) are a
+   standalone story, and durable-disk lane E-unpin took them off the build
+   entirely -- see claude-notes/projects/namei-pinned-lookup.md's banner. *)
 (* ---- the trapframe page is a real page: the fact [pt_node_claim_from_static]
        needs before the physical trapframe words can be read as MEMORY.  It
        rides inside the descriptor's well-formedness, so [proc_priv] has it.

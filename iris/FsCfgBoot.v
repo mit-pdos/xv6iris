@@ -1494,11 +1494,15 @@ End FsCfgBootBitmap.
 (*  THE TWO BOOT KITS (ruling R6), GHOST ROWS ONLY                         *)
 (* ====================================================================== *)
 
-(* [fs_cfg_alloc]'s mask premise, NAMED.  Its one caller ([BootShared]) does
-   not import [InodeRegion], so it cannot spell [iregN]; and an inline
-   [ltac:(solve_ndisj)] inside the application term is elaborated before the
-   conclusion is unified, which stopped working when the era fupd's post grew
-   its B3 rows.  A named lemma is neither. *)
+(* [fs_cfg_alloc]'s former mask premise, NAMED.  It was there for the era-0
+   /init pins' mint ([dv_lend_mint] opens the inode region), which lane
+   E-unpin removed, so [fs_cfg_alloc] no longer takes a mask premise and this
+   lemma has NO CALLER today.  Kept because it is the recorded answer to a
+   trap that will recur: [BootShared] does not import [InodeRegion], so it
+   cannot spell [iregN]; and an inline [ltac:(solve_ndisj)] inside the
+   application term is elaborated before the conclusion is unified, which
+   stopped working when the era fupd's post grew its B3 rows.  A named lemma
+   is neither. *)
 Lemma fs_cfg_iregN_top : (↑iregN : coPset) ⊆ ⊤.
 Proof. solve_ndisj. Qed.
 
@@ -2060,13 +2064,6 @@ Section FsCfgBootEra.
     fs_cov_in cov ndisk ->
     (forall b : Z, 1 <= b < fs_data_start sb -> b ∈ cov) ->
     (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
-    (* ---- N-5.1 (W5a): THE BOOT MINT'S MASK ----
-       The stocking mint below fires [InodeRegion.dv_lend_mint], which opens
-       the inode region.  [ireg_alloc] allocates [iregN] a few lines EARLIER
-       in the same chain, so the handle exists; what the era fupd did not
-       say before is that its own mask can hold the region's namespace.  The
-       one caller ([BootShared.boot_shared_alloc]) runs this at [⊤]. *)
-    ↑iregN ⊆ E ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     (* THE BIO SLOT SUPPLY, THREADED IN.  Its ghost name is canonical
        ([Xv6Cameras.bioslot_name]), so it exists before this era fupd runs
@@ -2089,31 +2086,19 @@ Section FsCfgBootEra.
          authority at that record's [nlink], with all its tokens still at
          home) and routed into the inode region, where the RA's law is
          readable.  Neither ghost leaves this lemma. *)
-      (* ---- N-5.1 (W5a): ROOT'S PIN, THE ONE NEW CONJUNCT ----
-         The stocking spends [ROOTINO]'s mint licence while it still holds
-         the root directory's contents element WHOLE, so the pin leaves boot
-         naming the IMAGE's root contents.  It is the first conjunct rather
-         than the last so that a caller with no consumer drops it in one
-         step and the ten ties + two kits below stay byte-identical to
-         [fs_boot_supply].  Its client is [NameiInitPinned.v], which turns
-         it into [DirViewPin.dv_pin_ent] at [("init", 7)]. *)
-      dv_pin (bv_unsigned InodeInv.ROOTINO)
-        (dv_of (fs_dinode (fs_blocks dk) sb (bv_unsigned InodeInv.ROOTINO))
-               (fs_data_of (fs_blocks dk)
-                  (fs_dinode (fs_blocks dk) sb
-                     (bv_unsigned InodeInv.ROOTINO)))) ∗
-      (* ---- N-5.2A: /init's CONTENTS PIN, the second new conjunct ----
-         The same move one level down: the stocking spends inum 7's fview
-         mint licence while it still holds that file's contents element
-         WHOLE, so the pin leaves boot naming the IMAGE's bytes of /init.
-         SEVEN is the image's own witness ([FsImgCheck.v:399],
-         [path_at .. ROOTINO [fname_init] = Some 7]) -- the very inum
-         N-5.1's theorem proves namei("/init") returns -- so the two pins
-         are about the same file and compose at the kexec walk (N-5.2B).
-         Its consumer discards it until then, exactly as root's does. *)
-      fv_pin 7
-        (fv_of (fs_dinode (fs_blocks dk) sb 7)
-               (fs_data_of (fs_blocks dk) (fs_dinode (fs_blocks dk) sb 7))) ∗
+      (* ---- durable-disk lane E-unpin: THE ERA-0 /init PINS ARE GONE.
+         This post used to carry [dv_pin ROOTINO ...] and [fv_pin 7 ...] --
+         "the root's contents are mkfs's" and "/init is inum 7 with the
+         tracked bytes" -- minted by cutting root's dview lend and inum 7's
+         fview lend inside the proof.  They are image-CONTENT facts, false
+         at any era after a crash, and they made the adequacy theorem carry
+         hard-coded content hooks for no durability reason.  Removed from
+         the boot chain (era 0 included); the era's file system is minted
+         from the durable snapshot and the boot chain uses the generic exec
+         contract at whatever inum 7 holds.  The pinned-lookup theorems that
+         consumed them are kept in the tree but commented out of
+         [iris/_CoqProject], for the fs-syscall-specs project to port; see
+         claude-notes/projects/namei-pinned-lookup.md's banner. *)
       ⌜icfg_dev = ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
       ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
@@ -2124,7 +2109,7 @@ Section FsCfgBootEra.
       fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk)
         (fs_kit_spent (fs_blocks dk) sb nib (fs_live_set (fs_blocks dk) sb)).
   Proof.
-    intros Hwf Hrw Hbare Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata HiregE.
+    intros Hwf Hrw Hbare Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata.
     iIntros "Hdisk Hsa Hsf".
     (* ---- 1. the log's four gnames, at their genesis values ---------- *)
     iMod log_ghost_alloc as (γlog) "Hlogtok".
@@ -2419,78 +2404,30 @@ Section FsCfgBootEra.
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
     (* ================================================================== *)
-    (* ---- N-5.1 (W5a): THE BOOT MINT -------------------------------- *)
-    (* [ireg_alloc] has just stocked the lend column NONE at every inum and
-       paid out the per-inum MINT LICENCES; the stocking still holds every
-       directory's contents element WHOLE (the sweep above stopped at
-       [dv_hold] for exactly this).  So this is the one instant at which
-       root's lend can be cut: spend [ROOTINO]'s licence here, park the ¾
-       ride arm on the custody chain from now on, and carry the pin out with
-       the era fupd's post.
-       ORDER, checked: [ireg_inv] and the licences BOTH arrive from the line
-       above, and the pool ([ipool_alloc_of_image]) has not run yet, so the
-       ride the pool parks is already the post-mint one -- nothing has to be
-       renegotiated downstream.  Every OTHER inum's licence is dropped: no
-       consumer, and the licence is affine.  (A runtime mint window is
-       future work; see namei-pinned-lookup.md §11.5.) *)
-    assert (Hrz : bv_unsigned InodeInv.ROOTINO = 1)
-      by (vm_compute; reflexivity).
-    assert (Hrootin : bv_unsigned InodeInv.ROOTINO ∈ region_inums icfg_nib)
-      by (apply region_inums_spec; rewrite Hrz; lia).
-    assert (Hrootdom : dvl_dom (bv_unsigned InodeInv.ROOTINO))
-      by (rewrite /dvl_dom Hrz; lia).
-    iDestruct (big_sepS_delete _ _ _ Hrootin with "Hlics") as "[Hlicr Hlics]".
-    iClear "Hlics".
-    iDestruct (big_sepS_delete _ _ _ Hrootin with "Hdv") as "[Hdvr Hdv]".
-    iMod (dv_lend_mint E γi γfs (FsImg.sb_inodestart sb) icfg_nib
-            (bv_unsigned InodeInv.ROOTINO)
-            (dv_of (fs_dinode (fs_blocks dk) sb (bv_unsigned InodeInv.ROOTINO))
-                   (fs_data_of (fs_blocks dk)
-                      (fs_dinode (fs_blocks dk) sb
-                         (bv_unsigned InodeInv.ROOTINO))))
-            HiregE Hrootdom
-            with "Hireginv Hlicr Hdvr") as "[Hrider Hpinr]".
-    (* ---- N-5.2A: /INIT'S CONTENTS MINT, at the same instant --------
-       The fview sweep also stopped at the WHOLE [fv_hold], and
-       [ireg_alloc] paid out one fview licence per inum beside the dview
-       ones, so inum 7's lend is cut here and nowhere else: the ONLY
-       [fv_lend_mint] call site in the tree.  Every other inum's fview
-       licence is dropped, for root's licence's reason verbatim. *)
-    assert (Hinitin : (7 : Z) ∈ region_inums icfg_nib)
-      by (apply region_inums_spec; lia).
-    assert (Hinitdom : dvl_dom (7 : Z))
-      by (rewrite /dvl_dom; lia).
-    iDestruct (big_sepS_delete _ _ _ Hinitin with "Hflics") as "[Hflicr Hflics]".
-    iClear "Hflics".
-    iDestruct (big_sepS_delete _ _ _ Hinitin with "Hfv") as "[Hfvr Hfv]".
-    iMod (fv_lend_mint E γi γfs (FsImg.sb_inodestart sb) icfg_nib (7 : Z)
-            (fv_of (fs_dinode (fs_blocks dk) sb 7)
-                   (fs_data_of (fs_blocks dk)
-                      (fs_dinode (fs_blocks dk) sb 7)))
-            HiregE Hinitdom
-            with "Hireginv Hflicr Hfvr") as "[Hfrider Hfpinr]".
-    (* the custody chain, back as ONE big-op: the ¾ arm at root, the whole
-       arm everywhere else *)
+    (* ---- durable-disk lane E-unpin: NO LEND IS CUT AT BOOT ---------
+       [ireg_alloc] has just stocked the lend column NONE at every inum and
+       paid out the per-inum dview and fview MINT LICENCES.  Boot used to
+       spend two of them here -- [ROOTINO]'s dview licence and inum 7's
+       fview licence -- to carry the era-0 /init pins out of this fupd.
+       Those pins are gone (see the post above), so EVERY licence is
+       dropped and every inum's ride goes in WHOLE, by [dv_ride_of_hold] /
+       [fv_ride_of_hold], exactly as every non-root inum's already did.
+       [InodeRegion.dv_lend_mint]/[fv_lend_mint] thereby lose their only
+       call sites; they stay in [InodeRegion.v] as lemmas. *)
+    iClear "Hlics". iClear "Hflics".
     iAssert ([∗ set] z ∈ region_inums icfg_nib,
                dv_ride z (dv_of (fs_dinode (fs_blocks dk) sb z)
                             (fs_data_of (fs_blocks dk)
                                (fs_dinode (fs_blocks dk) sb z))))%I
-      with "[Hdv Hrider]" as "Hdv".
-    { rewrite (big_sepS_delete _ (region_inums icfg_nib)
-                 (bv_unsigned InodeInv.ROOTINO) Hrootin).
-      iSplitL "Hrider"; [rewrite /dv_ride; iRight; iExact "Hrider" |].
-      iApply (big_sepS_mono with "Hdv"). intros z _. iIntros "H".
+      with "[Hdv]" as "Hdv".
+    { iApply (big_sepS_mono with "Hdv"). intros z _. iIntros "H".
       iApply (dv_ride_of_hold with "H"). }
-    (* ...and the fview chain the same way: the ¾ arm at inum 7, the whole
-       arm everywhere else *)
     iAssert ([∗ set] z ∈ region_inums icfg_nib,
                fv_ride z (fv_of (fs_dinode (fs_blocks dk) sb z)
                             (fs_data_of (fs_blocks dk)
                                (fs_dinode (fs_blocks dk) sb z))))%I
-      with "[Hfv Hfrider]" as "Hfv".
-    { rewrite (big_sepS_delete _ (region_inums icfg_nib) (7 : Z) Hinitin).
-      iSplitL "Hfrider"; [rewrite /fv_ride; iRight; iExact "Hfrider" |].
-      iApply (big_sepS_mono with "Hfv"). intros z _. iIntros "H".
+      with "[Hfv]" as "Hfv".
+    { iApply (big_sepS_mono with "Hfv"). intros z _. iIntros "H".
       iApply (fv_ride_of_hold with "H"). }
     (* the payout is at the DECODED record; restate it at [FsImg]'s own *)
     iAssert ([∗ set] z ∈ region_inums icfg_nib,
@@ -2635,9 +2572,6 @@ Section FsCfgBootEra.
     (* ---- B3: NEITHER era ghost is in the post any more (durable-disk
        2b-inode-3 / 2b-inode-4): the top map is routed into [ftop_inv] and
        the free pool, the link family into the inode region. ---- *)
-    (* ---- N-5.1 (W5a): root's pin, the post's first conjunct ---- *)
-    iSplitL "Hpinr"; [iExact "Hpinr" |].
-    iSplitL "Hfpinr"; [iExact "Hfpinr" |].
     (* ---- the ten ties ---- *)
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].

@@ -1185,9 +1185,12 @@ ProofNamei.v
 LinkNamei.v
 ProofNameiTr.v
 LinkNameiTr.v
-DirViewPin.v
-NameiInitPinned.v
-LinkNameiPinned.v
+# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
+# Source kept; to be ported by the fs-syscall-specs project -- see the banner
+# at the top of claude-notes/projects/namei-pinned-lookup.md.
+# DirViewPin.v
+# NameiInitPinned.v
+# LinkNameiPinned.v
 ProofNameiRoot.v
 LinkNameiRoot.v
 # namei's root corner at the BOOT client's premises (the tree's one assumed
@@ -1240,7 +1243,10 @@ CodeSysExec.v
 CodeKexec.v
 KexecOkQ.v
 SpecKexec.v
-SpecKexecPinned.v
+# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
+# Source kept; to be ported by the fs-syscall-specs project -- see the banner
+# at the top of claude-notes/projects/namei-pinned-lookup.md.
+# SpecKexecPinned.v
 SpecFlags2perm.v
 ProofFlags2perm.v
 LinkFlags2perm.v
@@ -1267,8 +1273,11 @@ ProofKexecParts.v
 ProofKexecTail.v
 ProofKexecSeam.v
 ProofKexecA.v
-ProofKexecPinnedA.v
-ProofKexecPinned.v
+# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
+# Source kept; to be ported by the fs-syscall-specs project -- see the banner
+# at the top of claude-notes/projects/namei-pinned-lookup.md.
+# ProofKexecPinnedA.v
+# ProofKexecPinned.v
 ProofKexecB.v
 SpecKexecB2.v
 ProofKexecB2.v
@@ -1278,7 +1287,10 @@ ProofKexecC.v
 ProofKexecD.v
 ProofKexec.v
 LinkKexec.v
-LinkKexecPinned.v
+# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
+# Source kept; to be ported by the fs-syscall-specs project -- see the banner
+# at the top of claude-notes/projects/namei-pinned-lookup.md.
+# LinkKexecPinned.v
 SpecSysExec.v
 ProofSysExec.v
 LinkSysExec.v

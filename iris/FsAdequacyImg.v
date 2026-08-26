@@ -20,6 +20,13 @@
 (* a citation, and the whole leaf compiles in seconds given                *)
 (* [FsImgCheck.vo].                                                        *)
 (*                                                                        *)
+(* THE TWO COROLLARIES ARE OFF THE BUILD since durable-disk lane E-unpin:  *)
+(* both take "the literal image is on the disk at EVERY era", which is      *)
+(* [Himg] restated and refutable the same way.  §3/§4 below are commented   *)
+(* out; the banner there says what replaces them.  What this file still     *)
+(* DOES is the era-0 discharge -- [fsimg_image_wf] and [fsimg_snap_ok] --   *)
+(* which the boot chain uses and which nothing here weakens.                *)
+(*                                                                        *)
 (* THE TWO COROLLARIES, AND WHY THEIR NAMES ARE NOT SYMMETRIC.             *)
 (* [xv6_fs_adequacy_xv6Σ] MOVED here from [SystemAdequacy.v] unchanged in   *)
 (* meaning (same statement, plus the new era hypothesis).                   *)
@@ -172,6 +179,27 @@ Proof.
            fsimg_cov fsimg_image_wf).
 Qed.
 
+(* ====================================================================== *)
+(*  OFF THE BUILD BELOW (durable-disk lane E-unpin).                       *)
+(*                                                                        *)
+(*  [fsimg_at_every_era] says THE LITERAL IMAGE IS ON THE DISK AT EVERY    *)
+(*  ERA -- it is [Himg] again, and it is refutable for exactly [Himg]'s    *)
+(*  reason: era N's disk is whatever era N-1 WROTE, so a single [create]   *)
+(*  or [unlink] falsifies it.  Its bridge [fsimg_boot_image_eras] and the  *)
+(*  two corollaries built on it ([xv6_power_adequacy_fsimg] and            *)
+(*  [xv6_fs_adequacy_xv6Σ]) inherit that premise, so all four are          *)
+(*  commented out rather than left standing as image-content hypotheses    *)
+(*  nobody can discharge.                                                  *)
+(*                                                                        *)
+(*  WHAT REPLACES THEM.  Lane E's mint takes the era's file system from    *)
+(*  the DURABLE SNAPSHOT rather than from the image, and when [Himg]       *)
+(*  ([SystemAdequacy.fs_boot_image_eras]) goes, the general theorem is     *)
+(*  stated at every era with no image hypothesis at all; era 0's discharge *)
+(*  is [fsimg_image_wf] above, which STAYS and is what the boot chain      *)
+(*  uses.  Restore these four at that point, or delete them, but do not    *)
+(*  re-introduce the premise.  Source kept, not deleted.                   *)
+(* ====================================================================== *)
+(*
 (* ---------------------------------------------------------------------- *)
 (* 3.  ...AT EVERY ERA.                                                    *)
 (*                                                                        *)
@@ -282,3 +310,5 @@ Proof.
     rewrite Hdisk. exact (FsImgDisk.fsimg_recovery fsimg_cov).
   - exact (fsimg_boot_image_eras g Hdisk').
 Qed.
+
+*)

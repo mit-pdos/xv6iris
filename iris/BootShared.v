@@ -1488,25 +1488,16 @@ Section BootAlloc.
          that gname is the era's -- the same one-line restatement this
          lemma's postcondition used to do at its very end *)
       rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
-    (* THE MASK PREMISE IS NAMED, not spliced: an inline [ltac:] inside the
-       application term is elaborated BEFORE the conclusion is unified, and
-       this file cannot spell [iregN] anyway (durable-notes inline-[ltac:]
-       trap).  [FsCfgBoot.fs_cfg_iregN_top] is that fact. *)
+    (* durable-disk lane E-unpin: [fs_cfg_alloc]'s post is the ten ties and
+       the two kits, nothing else.  It used to lead with root's dview pin
+       and /init's fview pin (N-5.1 W5a / N-5.2A), which this proof received
+       and immediately dropped; those era-0 image-CONTENT facts are off the
+       boot chain now, so there is no pin to drop and no mask premise to
+       thread (the mask was [dv_lend_mint]'s).  See
+       claude-notes/projects/namei-pinned-lookup.md's banner. *)
     iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
             Hwf Hrw Hbare Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
-            fs_cfg_iregN_top
-            with "Hdimg Hbsauth Hbslots") as (ICFG FSC)
-        "[Hpinr [Hfpinr Hfs]]".
-    (* N-5.1 (W5a) / N-5.2A: ROOT'S PIN AND /INIT'S CONTENTS PIN ARE BOTH
-       DROPPED HERE, deliberately.  They are affine, and nothing on this side
-       of the boot chain consumes them: transporting either would mean
-       widening [fs_boot_supply] and, past it, the (f)-payload and the
-       forkret cone -- which is M2 / decisions D1-D2's business, not this
-       stage's (namei-pinned-lookup.md §11.3, §12, §13).  Their proved
-       consumers are [NameiInitPinned.wp_namei_init_pinned] and, for the
-       fview pin, N-5.2B's kexec re-walk; both are stated against
-       [fs_cfg_alloc]'s conjuncts directly. *)
-    iClear "Hpinr". iClear "Hfpinr".
+            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried
        by [ireg_inv]) and its per-inum fragments are the free pool's; the
