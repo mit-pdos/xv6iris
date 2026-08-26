@@ -1538,46 +1538,70 @@ The rest is deleted when the `Γ`-predicates replace their consumers, not
 before.
 
 
-## 6½. The parent link is a REGISTER IN THE LINK RA, not a clause (RULING, lane G4)
+## 6½. Link counts and types are ONE RA: the type register (RULING, lane G5)
 
-Every dirent owns one unit of its TARGET's link count, tagged with the
-directory that holds the dirent: the per-inum link RA at `γlink` is
-`auth nat × auth (gmultiset (option Z))` — the COUNT authority, and the
-NAMER-MULTISET authority.  `..` is not special: it is a dirent in the
-child owning a unit at `dp`.  The one asymmetry is xv6's, not ours: `.`
-is uncounted by the kernel, so it is tokenless.
+Per inode, at `γlink`: `auth (gmultiset ity)` with `ity := TFile | TDir (p : Z)`
+(`TFile` covers `T_FILE` and `T_DEVICE`).  The AUTHORITY is a UNIFORM
+multiset `(nlink + [type = DIR]) · {[ty]}` and lives in the inode-region
+invariant beside the record, tied to it: `T_DIR ⇒ ty = TDir p` for some
+`p`; `T_FILE`/`T_DEVICE ⇒ ty = TFile`; a free record has multiplicity 0.
+FRAGMENTS are `{[ty]}`, one per counted dirent; validity gives agreement
+(a fragment's element IS the target's current type) and
+#fragments ≤ multiplicity at once.  Retyping is legal exactly at
+multiplicity 0 (no frame), i.e. when the inode is free.  The link count
+IS the fragment count: there is no separate count RA.
 
-- **Where the two authorities live.**  The count authority stays
-  REGION-SIDE (`InodeRegion.ireg_lnk_at`): `iget`'s licence confronts a
-  token with the target's authority without holding the target.  The
-  namer authority lives IN THE INODE'S OWN PAYLOAD (`IcacheEscrow.dlinks`,
-  beside its data and its record); the product RA splits componentwise.
-- **No re-value.**  A FILE's unit is minted at its `nlink++` under its
-  own lock (`sys_link`, before `nameiparent`) as `None` and stays `None`
-  — nobody needs a file's namers to be exact.  A DIRECTORY's units are
-  minted only by `mkdir`, under the child's lock, by a walk that knows
-  `dp`: `Some dp`.  So the namer authority is only ever touched under the
-  target's lock, which is what lets it sit in the payload.
-- **The content clause is one-holder** (`inode_par_namer`, in the
-  payload): for a live directory (type DIR, `nlink ≠ 0`), every `Some j`
-  in its namer multiset has `j` = its `..` entry's target, and
-  `size P ≤ nlink` off its own record.
-- **rmdir** (both locked): the child's payload says namers = {`Some X`}
-  with `X` its `..` target; `dp`'s dirent unit for the child is `Some dp`;
-  hence `dp = X`, and `dp->nlink--` is paid with the child's `..` unit.
-  `2 ≤ nlink dp` is TRUE and needed (an orphan directory holds only dots;
-  `dp` still has entries) and is read off `dp`'s payload: its `..`-unit
-  count is below `nlink` at a live directory.
-- **What dies:** the old ledger's `p`/`iparent`/`ilinkdp` column,
-  `DirLinks.dir_par_tie`, `dir_links`, the flavoured columns — every
-  two-holder tie.  `iris/FsParRefute.v` records why a ½-agreement in
-  `dp`'s bundle keyed by the target's type cannot be stated.
+Which dirents carry a fragment of their TARGET's register, and what the
+holder asserts:
+- a NAME record (neither dot) in directory `d` for target `t`:
+  `∃ ty, {[ty]} at t ∗ ⌜∀ p, ty = TDir p → p = d⌝` — a directory holding
+  a fragment `TDir p` says the parent is itself.  It needs nothing about
+  `t`'s type; the fragment reveals it.
+- `.`: the inode's own self-fragment, in its own bundle (this is the `+1`
+  for a directory, which xv6 does not count).  A directory ties its `..`
+  DATA to its type through it: its `.`-fragment says `TDir p` and its
+  `..` entry names `p`.
+- `..`: an ordinary fragment of the PARENT's register, asserting nothing
+  (the parent's `p` is the grandparent).  An orphan's `..` holds none —
+  it was returned when the parent's entry for it was removed.
+- root's `..` names root: a fragment of its own register; mkfs's
+  `nlink = 1` is `.` + `..`.
 
-The snapshot states nothing new: `sk_links` is `✓ link_elem S`; validity
-is the fact; read off the collected resources at a commit (`own_valid`),
-allocated and distributed at boot like the tokens (the value-first form
-lane H deletes — a directory child's token is `Some dp`, a file's `None`,
-which at the value level reads the target's type in one place).
+EXACTNESS, per directory, in its own bundle (the fragments it holds
+reveal its entries' types, so this is one-holder):
+    nlink = #{name records whose fragment is TDir _} + [nlink ≠ 0]
+i.e. an orphan (`nlink = 0`) has no subdirectory entries, and a live
+directory has `nlink = 1 + #subdirectories` — xv6's own accounting.
+Maintained by `mkdir` (`TDir` entry, `nlink++`), `create`/`link` of a
+file (`TFile` entry), `unlink`, `rmdir`.  Nothing bounds a FILE's count
+from above (a stray fragment is a leak, not a corruption; unstated).
+
+The rmdir arm (`c` in `dp`, both locked):
+- (D1) `c`'s `.`-fragment `TDir p` and `dp`'s name-record fragment
+  `TDir dp` against `c`'s authority (open the region once): `p = dp`, so
+  `c`'s `..` fragment is at `dp` and pays `dp->nlink--`.
+- `dp`'s exactness: its entry for `c` is `TDir`, so `nlink dp ≥ 2` and
+  `dp` stays live after the decrement.
+- `c`'s exactness: `isdirempty` ⇒ no entries ⇒ `nlink c = 1` ⇒
+  `ip->nlink--` makes it exactly 0, an orphan; `iput` takes its free arm.
+
+`iget`'s licence: a dirent's fragment at `t` ⇒ multiplicity ≥ 1 ⇒
+`nlink + [DIR] ≥ 1` ⇒ `t` is allocated.  Movers: `mkdir` fills the child
+(multiplicity 0 → `TDir dp`, mints its parent's fragment and the child's
+`.`/`..`), `sys_link` mints a `TFile` fragment at `ip->nlink++` under
+`ilock(ip)` and `dirlink` merely files it (no authority is touched at
+`dirlink`), `unlink` returns the entry's fragment at `nlink--`, `itrunc`
+returns `.`/`..` before the type-0 write.
+
+Snapshot: `sk_links` is `✓ type_elem S` — each inode's authority from
+its own record and `..`, each dirent's fragment from its target's type
+(the one cross-inode read at the VALUE level, in one place; lane H
+deletes it).  Read off the collected resources at a commit; allocated and
+distributed at boot.  What dies: `DirLinks.v`, the `wl/wdu/wdt/g/p`
+columns, `dir_par_tie`, the `fl` index, G2's per-holder tags and
+re-tagging, G3's `ups` counter, G4's `p`-column repair
+(`g4-superseded-ptie`).  `iris/FsParRefute.v` records why a
+type-conditional half in the parent's bundle cannot be stated.
 
 ## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
 
