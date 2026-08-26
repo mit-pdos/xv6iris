@@ -317,6 +317,25 @@ Record snap_bytes (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
                    0 <= i /\ i `div` 16 < sb_bmapstart (fss_sb S)
                                           - sb_inodestart (fss_sb S);
   sk_slot      : forall i n, fss_inodes S !! i = Some n -> fn_slot_inj n;
+  (* ---- THE REGION'S TAIL INUMS ARE NAMED (durable-disk lane E-boot;
+     plan section 5's first missing clause).  [sk_dom] names the inums below
+     [ninodes]; a BOOT MINT has to re-found the inode region, whose width is
+     [16 * nib] with [nib = ninodes/16 + 1] -- mkfs rounds [ninodes] up to a
+     whole block, and [InodeRegion.ireg_recs] is sixteen records per region
+     block, so [IcacheBoot.ireg_alloc] / [ipool_alloc] / [ftop_alloc] all run
+     over [region_inums nib] and not over [[0, ninodes)].  The width is
+     spelled off [S]'s own superblock rather than taken as a parameter,
+     because [snap_bytes] is a function of [S] and [D] alone.
+
+     IT IS A DOMAIN ROW AND NOT A CONTENT CLAUSE, so section 0's local rule
+     is untouched: it says nothing about any node.  Both producers have it:
+     the image's node map IS [region_inums nib]
+     ([FsCfgBoot.img_nodes_keys]), and at a commit the collected state is
+     the [ftop] map restricted to the region ([FsCollect.col_hand]'s domain
+     row, against [col_geom]'s width tie [cg_width]).
+     LAST, so no destructuring pattern above moves. *)
+  sk_regdom : forall i, 0 <= i < 16 * (sb_ninodes (fss_sb S) / 16 + 1) ->
+                is_Some (fss_inodes S !! i);
 }.
 
 Global Arguments sk_bsz {_ _} _.
@@ -337,6 +356,7 @@ Global Arguments sk_disj {_ _} _.
 Global Arguments sk_sbok {_ _} _.
 Global Arguments sk_reg {_ _} _.
 Global Arguments sk_slot {_ _} _.
+Global Arguments sk_regdom {_ _} _.
 
 (* ===================================================================== *)
 (*  1b'. THE THREE METADATA ROLES ARE THREE DIFFERENT BLOCKS             *)
@@ -804,6 +824,7 @@ Proof.
   - exact (sk_sbok Hok).
   - exact (sk_reg Hok).
   - exact (sk_slot Hok).
+  - exact (sk_regdom Hok).
 Qed.
 
 (* ...and the reading at the whole tie, for a consumer that holds both

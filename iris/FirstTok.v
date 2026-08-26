@@ -711,6 +711,9 @@ Section FirstTok.
       apply elem_of_difference in Hb as [Hb _].
       pose proof (Hcovok b Hb) as Hb0. pose proof (Hcb b Hb) as Hb1.
       rewrite -Hszq. lia.
+    - (* [cg_width] (durable-disk lane E-boot): the region's width tie, which
+         is this lemma's own hypothesis. *)
+      exact Hnibw.
   Qed.
 
   Lemma first_fsinit_pures_of_image (dk : Z -> bv 8) (sb : FsImg.fs_sb)

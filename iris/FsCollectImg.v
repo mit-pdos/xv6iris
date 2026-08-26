@@ -74,6 +74,8 @@ Proof.
   - intros b Hb.
     rewrite /fs_home_set in Hb. apply elem_of_difference in Hb as [Hb _].
     destruct (Hcov b Hb) as [Hb0 Hbn]. lia.
+  - (* [cg_width] (durable-disk lane E-boot) is conjunct (6) itself. *)
+    exact Hnibeq.
 Qed.
 
 (* THE SUPERBLOCK'S BLOCK IS A HOME BLOCK, which is the half of

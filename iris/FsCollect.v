@@ -531,6 +531,15 @@ Section Collect.
     cg_nin   : sb_ninodes sb <= 16 * Z.of_nat nib;
     cg_wide  : 16 * Z.of_nat nib <= 2 ^ 32;
     cg_size  : forall b : Z, b ∈ home -> 0 <= b < sb_size sb;
+    (* THE REGION'S WIDTH TIE (durable-disk lane E-boot): mkfs rounds
+       [ninodes] up to a whole block, so the region is exactly
+       [ninodes/16 + 1] blocks wide.  [cg_reg] and [cg_nin] only BOUND the
+       width; [FsDurSnap.sk_regdom] needs the equation, because it spells
+       the region off [S]'s own superblock and the collected map's domain is
+       [region_inums nib].  Its producer is [FirstTok.col_geom_of_image],
+       which is stated at that tie already ([fs_geom_ok_of_image]'s), so the
+       boot chain pays nothing new.  LAST, so no destructuring moves. *)
+    cg_width : Z.of_nat nib = sb_ninodes sb / 16 + 1;
   }.
 
   Global Arguments cg_sbok {_ _ _ _} _.
@@ -539,6 +548,7 @@ Section Collect.
   Global Arguments cg_nin {_ _ _ _} _.
   Global Arguments cg_wide {_ _ _ _} _.
   Global Arguments cg_size {_ _ _ _} _.
+  Global Arguments cg_width {_ _ _ _} _.
 
   (* THE HAND.  Every conjunct is a piece the era already parks somewhere an
      invariant opening reaches (plan section 4's second bullet); assembling
@@ -1140,6 +1150,12 @@ Section Collect.
         by (apply Z.div_lt_upper_bound; lia).
       pose proof (cg_reg Hg). pose proof (cg_ist Hg). lia.
     - exact Hslot.
+    - (* sk_regdom (durable-disk lane E-boot): the collected state IS the
+         [ftop] map restricted to the region, whose domain row is
+         [col_hand]'s [Hdi]; [cg_width] turns the region's width into the
+         superblock's own [ninodes/16 + 1]. *)
+      intros i Hi. apply elem_of_dom. apply Hdi.
+      pose proof (cg_width Hg). lia.
   Qed.
 
   (* THE WHOLE OF WHAT [FsDurSnap.fs_snap_alloc] TAKES, and it is the pure

@@ -1649,6 +1649,13 @@ Proof.
                  ltac:(lia) ltac:(lia) ltac:(lia)). }
       apply (img_node_slot_inj (fs_blocks dk) sb i).
       exact (fsimg_wf_slot_inj (fs_blocks dk) sb i Hwf Hran Hnz).
+  - (* sk_regdom (durable-disk lane E-boot) -- the region's TAIL inums are
+       named too, and at the image that is by construction: [img_nodes]'
+       domain IS [region_inums nib], and [fs_boot_image_wf]'s width tie
+       [Hnibq] is exactly [nib = ninodes/16 + 1]. *)
+    rewrite Hpsb Hpin. intros i Hi.
+    exists (img_node (fs_blocks dk) sb i).
+    apply img_nodes_lookup, region_inums_spec. lia.
 Qed.
 
 (* ===================================================================== *)
