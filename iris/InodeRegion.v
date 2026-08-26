@@ -2439,26 +2439,26 @@ Section InodeRegion.
      and cannot see the [".."] entry; what pins it is the ["."] fragment
      in the directory's own checked-out payload
      ([FsStateInode.ent_ty_ok] at [DOT]), which is rmdir's (D1). *)
-  Definition ireg_ty_ok (ty : Z) (v : ity) : Prop :=
+  Definition ireg_reg_ok (ty : Z) (v : ity) : Prop :=
     match v with
     | TFile => ty <> ireg_dir_ty
     | TDir _ => ty = ireg_dir_ty
     end.
 
-  Lemma ireg_ty_ok_ex (ty : Z) : exists v, ireg_ty_ok ty v.
+  Lemma ireg_reg_ok_ex (ty : Z) : exists v, ireg_reg_ok ty v.
   Proof.
     destruct (decide (ty = ireg_dir_ty)) as [H | H];
       [exists (TDir 0) | exists TFile]; exact H.
   Qed.
 
-  Lemma ireg_ty_ok_dir ty v :
-    ireg_ty_ok ty v -> ty = ireg_dir_ty -> exists p, v = TDir p.
+  Lemma ireg_reg_ok_dir ty v :
+    ireg_reg_ok ty v -> ty = ireg_dir_ty -> exists p, v = TDir p.
   Proof.
     destruct v as [| p]; intros Hok Hd; [destruct (Hok Hd) | by exists p].
   Qed.
 
-  Lemma ireg_ty_ok_file ty v :
-    ireg_ty_ok ty v -> ty <> ireg_dir_ty -> v = TFile.
+  Lemma ireg_reg_ok_file ty v :
+    ireg_reg_ok ty v -> ty <> ireg_dir_ty -> v = TFile.
   Proof. destruct v as [| p]; intros Hok Hd; [done | destruct (Hd Hok)]. Qed.
 
   (* THE ROOT KEEP-ALIVE FRAGMENT.  [ent_tokenless] exempts the ROOT's
@@ -2492,7 +2492,7 @@ Section InodeRegion.
      target -- see the banner above. *)
   Definition ireg_lnk_at (γfs : fs_names) (z : Z) (n : nat) (ty : Z)
     : iProp Σ :=
-    (∃ v : ity, ⌜ireg_ty_ok ty v⌝
+    (∃ v : ity, ⌜ireg_reg_ok ty v⌝
        ∗ FsStateLink.link_auth (fs_gamma_L γfs) z (ireg_mult_at n ty) v
        ∗ ireg_keep γfs z v)%I.
 
@@ -2535,15 +2535,15 @@ Section InodeRegion.
     bv_unsigned (di_nlink d') = 0 ->
     ireg_lnk γfs z d -∗ ireg_lnk γfs z d'.
   Proof.
-    intros Hz Hz'. rewrite /ireg_lnk /ireg_nl Hz Hz' Z2Nat.inj_0.
+    intros Hz Hz'. rewrite /ireg_lnk /ireg_lnk_at /ireg_nl Hz Hz' Z2Nat.inj_0.
     rewrite !ireg_mult_at_zero.
     iIntros "(%v & _ & Ha & Hk)".
-    destruct (ireg_ty_ok_ex (bv_unsigned (di_type d'))) as [v' Hok'].
-    iExists v'. iSplitR; [by iPureIntro |].
-    rewrite (FsStateLink.link_auth_zero_retype _ z v v'). iFrame "Ha".
-    rewrite /ireg_keep. case_bool_decide as Hr; [| done].
-    rewrite (FsStateLink.link_auth_zero_retype _ z v' v).
-    iDestruct (FsStateLink.link_auth_zero_no_tok with "Ha Hk") as "[]".
+    destruct (ireg_reg_ok_ex (bv_unsigned (di_type d'))) as [v' Hok'].
+    rewrite /ireg_keep. case_bool_decide as Hr.
+    - iDestruct (FsStateLink.link_auth_zero_no_tok with "Ha Hk") as "[]".
+    - iExists v'. iSplitR; [by iPureIntro |].
+      rewrite (FsStateLink.link_auth_zero_retype _ z v v').
+      iFrame "Ha".
   Qed.
 
   (* THE RAISING FLUSH ([ip->nlink++; iupdate]), at a record whose type
@@ -2557,7 +2557,7 @@ Section InodeRegion.
     bv_unsigned (di_type d') = bv_unsigned (di_type d) ->
     ireg_lnk γfs z d ==∗
     ireg_lnk γfs z d'
-    ∗ ∃ v, ⌜ireg_ty_ok (bv_unsigned (di_type d)) v⌝
+    ∗ ∃ v, ⌜ireg_reg_ok (bv_unsigned (di_type d)) v⌝
            ∗ FsStateLink.link_toks (fs_gamma_L γfs) z (link_reps k v).
   Proof.
     intros Hm Hty. rewrite /ireg_lnk /ireg_lnk_at.
@@ -2579,22 +2579,20 @@ Section InodeRegion.
   Lemma ireg_lnk_fill γfs z d d' (v : ity) (k : nat) :
     ireg_mult d = 0%nat ->
     ireg_mult d' = k ->
-    ireg_ty_ok (bv_unsigned (di_type d')) v ->
+    ireg_reg_ok (bv_unsigned (di_type d')) v ->
     ireg_lnk γfs z d ==∗
     ireg_lnk γfs z d'
     ∗ FsStateLink.link_toks (fs_gamma_L γfs) z (link_reps k v).
   Proof.
     intros Hz Hm Hok'. rewrite /ireg_lnk /ireg_lnk_at.
-    iIntros "(%v0 & %Hok & Ha)".
+    iIntros "(%v0 & %Hok & Ha & Hk)".
     rewrite -/(ireg_mult d) Hz.
-    iDestruct "Ha" as "[Ha Hk]".
-    rewrite (FsStateLink.link_auth_zero_retype _ z v0 v).
-    iMod (FsStateLink.link_mint_reps _ z 0%nat k v with "Ha") as "[Ha $]".
-    iModIntro. iExists v. iSplitR; [by iPureIntro |].
-    rewrite -/(ireg_mult d') Hm Nat.add_0_l. iFrame "Ha".
-    rewrite /ireg_keep. case_bool_decide as Hr; [| done].
-    rewrite (FsStateLink.link_auth_zero_retype _ z v v0).
-    iDestruct (FsStateLink.link_auth_zero_no_tok with "Ha Hk") as "[]".
+    rewrite /ireg_keep. case_bool_decide as Hr.
+    - iDestruct (FsStateLink.link_auth_zero_no_tok with "Ha Hk") as "[]".
+    - rewrite (FsStateLink.link_auth_zero_retype _ z v0 v).
+      iMod (FsStateLink.link_mint_reps _ z 0%nat k v with "Ha") as "[Ha $]".
+      iModIntro. iExists v. iSplitR; [by iPureIntro |].
+      rewrite -/(ireg_mult d') Hm Nat.add_0_l. iFrame "Ha".
   Qed.
 
   (* ...and the LOWERING one ([ip->nlink--; iupdate]): [k] fragments in,
@@ -2651,7 +2649,7 @@ Section InodeRegion.
      inum the region believes is its parent. *)
   Lemma ireg_lnk_tok_ty γfs z d v :
     ireg_lnk γfs z d -∗ FsStateLink.link_tok (fs_gamma_L γfs) z v -∗
-    ⌜ireg_ty_ok (bv_unsigned (di_type d)) v⌝.
+    ⌜ireg_reg_ok (bv_unsigned (di_type d)) v⌝.
   Proof.
     rewrite /ireg_lnk /ireg_lnk_at. iIntros "(%v0 & %Hok & Ha & _) Ht".
     iDestruct (FsStateLink.link_auth_tok_agree with "Ha Ht") as %[-> _].
@@ -2709,11 +2707,10 @@ Section InodeRegion.
     iPureIntro. intros _.
     rewrite gmultiset_size_disj_union gmultiset_size_singleton
       link_reps_size in Hle.
-    pose proof (ireg_mult_at_le (ireg_nl d) (bv_unsigned (di_type d))) as Hub.
     rewrite -/(ireg_mult d) in Hle.
+    pose proof (ireg_mult_nl d) as [Hlo Hhi].
     pose proof (di_nlink_nonneg d) as Hnn.
-    rewrite /ireg_mult /ireg_nl in Hub.
-    rewrite /ireg_nl in Hub.
+    rewrite /ireg_nl in Hhi.
     lia.
   Qed.
 
@@ -5400,7 +5397,7 @@ Section InodeRegion.
        site in the kernel that installs a value.  LAST in the pure list, so
        no landed caller's argument positions move (durable-notes.md). *)
     (forall v : ity, oty = Some v ->
-       ireg_mult dn = 0%nat /\ ireg_ty_ok (bv_unsigned (di_type dn')) v) ->
+       ireg_mult dn = 0%nat /\ ireg_reg_ok (bv_unsigned (di_type dn')) v) ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     (* THE FREEZE PIN'S PRICE, IN ITS RULING A-prime FORM (iclaim-ledger.md
@@ -5442,7 +5439,7 @@ Section InodeRegion.
           [FsStateInode.ent_toks] inside that directory's checked-out
           payload.  The region keeps only the AUTHORITY. *)
        ∗ (∃ v : ity,
-            ⌜ireg_ty_ok (bv_unsigned (di_type dn')) v
+            ⌜ireg_reg_ok (bv_unsigned (di_type dn')) v
              /\ (forall w, oty = Some w -> v = w)⌝
             ∗ FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned inum)
                 (link_reps (ireg_dot_delta (bv_unsigned (di_type dn))
@@ -5611,7 +5608,7 @@ Section InodeRegion.
       by exact (ireg_mult_bump dn dn' Hnl Htyeq).
     iAssert (|==> ireg_lnk γfs (bv_unsigned inum) dn'
              ∗ ∃ v : ity,
-                 ⌜ireg_ty_ok (bv_unsigned (di_type dn')) v
+                 ⌜ireg_reg_ok (bv_unsigned (di_type dn')) v
                   /\ (forall w, oty = Some w -> v = w)⌝
                  ∗ FsStateLink.link_toks (fs_gamma_L γfs) (bv_unsigned inum)
                      (link_reps (ireg_dot_delta (bv_unsigned (di_type dn))
