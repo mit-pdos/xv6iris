@@ -2346,8 +2346,9 @@ so it never wanted that shape.
 - [ ] **Lane G — cleanups (independent, run in the gaps).**  The
   demolition slices 6b–6f of the old link ledger (`DirLinks.v` 2009
   lines, `IcacheRef`'s five columns, `IregLinkNz.v`, the `fl` index,
-  `FsRep.fedges`; 6c's rmdir question "`2 ≤ nlink dp` has no token-side
-  reading a walk can reach" needs a design answer first); the
+  `FsRep.fedges`; 6c's rmdir question is RULED — fs-state.md §6½: the
+  parent link is a register in the link RA, `2 ≤ nlink dp` is false and
+  dropped; G1 does 6b/6d/6e/6f, G2 does 6c on that ruling); the
   `eo_minst`/`lm_install` unification; the lemma relocations 2c-img
   listed; `fs_boot_bundle` (no callers); `SpecBfree`'s two dead premises
   are already gone.

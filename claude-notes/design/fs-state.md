@@ -1537,6 +1537,31 @@ owned block; …), which become lemmas beside the predicate that uses them.
 The rest is deleted when the `Γ`-predicates replace their consumers, not
 before.
 
+
+## 6½. RULING: the parent link is a REGISTER IN THE LINK RA, not a clause
+
+rmdir pays `dp->nlink--` with the child's `..` token, and needs the
+child's `..` to NAME `dp`.  That is cross-inode as a pure fact and is
+never stated as one.  The per-inum link RA at `γlink` is
+`auth nat × option (dfrac_agree Z)`: the count authority as before, plus a
+directory's PARENT REGISTER — `par_half Γ child dp`, a ½ of `agree dp` at
+the child's key.  The child's `inode_owned` holds one half beside its
+`..` entry (which names `dp`); `dp`'s holds the other beside its entry
+for `child` (an entry whose target is a directory).  Agreement of the
+two halves IS "child's `..` = dp".  `mkdir` mints the pair, rmdir retires
+it (the walk holds both bundles, so both halves); an orphan directory
+(`nlink = 0`) has no register, matching the `..`-of-an-orphan token
+exemption.  `Γ` is unchanged.
+
+The snapshot states nothing new: `snap_bytes`' `sk_links` is
+`✓ link_elem (fss_inodes S)`, the validity of the RA element built from
+`S`, and with the richer RA that element carries the register halves —
+its validity IS the parent fact.  Read off the collected halves at a
+commit (`own_valid`), allocated and distributed at boot exactly like the
+tokens.  The rmdir arm's other old reading, `2 ≤ nlink dp`, is FALSE
+(rmdir inside an unlinked cwd takes `dp` to 0 and `iput` frees it) and is
+not stated; the decrement needs only the token in hand.
+
 ## 7. As built — stage 2a (`FsState*.v`, 2026-08-23)
 
 Five files, 1687 lines, all in `iris/_CoqProject` after `BitmapEnc.v`:
