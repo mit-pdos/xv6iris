@@ -244,6 +244,26 @@ measures as a proof-performance hazard, moving it definitionally into
 `RiscvPtsto.v` is a MECHANICAL follow-up — a marker to that effect stays
 in the `RiscvExec.v` header.
 
+A6.1a **THE GATE BRIDGE** (found while wiring §6's `Mobl_ram_plain` to
+its discharge; resolved, no seam touched).  A6.1 and the step-4 kit were
+designed against DIFFERENT assumptions and meet at the load gate:
+`TsoCtx.ctx_load_ok` — whose own header names `Mobl_ram_plain` as its
+consumer — is stated at a `gstate` and `tso_interp_at`, while A6.1 says a
+LEAF must never see a `gstate` and so hands over `tso_interp_of`.
+
+They reconcile without moving either statement, because `tso_interp_at`
+READS ONLY four fields of its `gstate` (`gimg`, `gmem`, `glog`, `gtv`):
+the bundle can RECONSTRUCT one, the other five filled with anything.
+`RiscvExec.gs_of` does that and `tso_interp_of_at_gs` is the `⊣⊢`, both
+directions so a gate can be applied and the bundle handed back.
+
+WHAT MAKES IT WORK IS THE BUNDLE'S THIRD PURE TIE.  The reconstruction
+needs `avf (gs_of …) =₁ V`, and `avf` answers `length log` off the hart
+range — so without `⌜∀ h, NCPU ≤ h → V h = length log⌝` the view function
+would be unconstrained exactly there.  That tie was added in tranche 2
+for `vstep`'s idle case; it turns out to be what makes the kit's gate
+reachable from a leaf at all.
+
 A6.2 **THE DMA'S FOUR GHOST STEPS ARE `wp_disk_step`'s, AND THE
 TIMESTAMP AUTHORITY IS A CALLBACK OBLIGATION.**  §2's disk arm appends
 `PWMsg W disk_agent`, so `wp_disk_step` owes the same four steps
@@ -397,6 +417,286 @@ obligation verbatim, currently INSTANCE-FREE) and
 forms.  The bare names `wp_hart_ram_read`/`swp_hart_ram_read` are GONE ON
 PURPOSE, so every call site is forced to say which it means and the red
 list is exactly the set of decisions this ruling settles.
+
+**RULING: (B).**  RULING 1 already commits the SEMANTICS ("fetches and
+walks read the FLAT memory"); if the machine cannot distinguish those
+accesses then the semantics literally cannot SAY RULING 1, so (B) is its
+only faithful implementation.  (A) and (C) are AMENDMENTS to the ruling,
+not implementations of it: (A) pulls the fetch-geometry and PT lanes into
+the port — the very thing RULING 1 exists to prevent, and even the text
+half would then owe a "no log message ever hits a text address" W^X fact;
+(C) bakes an address-class policy into the MACHINE, which is not what
+hardware does, and leaves the PT half an unjustified coherence
+assumption.
+
+### A6.7(B) — THE TAGGING SEAM DOES NOT EXIST IN HAND-WRITTEN CODE (STOP)
+
+Implementing (B) was scoped under "tag at the request-construction seam
+in the hand-written wrapper only; do not edit generated files".  That
+seam is not there.  Four facts, each checked:
+
+1. **The read kind is chosen from the wrong information, in generated
+   code.**  Generated `checked_mem_read` binds
+   `rk := read_kind_of_flags aq rl res` (`rv64d.v:23966`), and
+   `read_kind_of_flags` (`rv64d.v:23693`) is generated and sees ONLY the
+   acquire/release/reserved flags.  The `MemoryAccessType` (`access`) IS
+   in scope at that point — it is passed to `pmpCheck` and `mmio_read`
+   two lines away — but it never reaches the read-kind choice.
+2. **The request record is built in generated code**, inside `read_ram`
+   (`rv64d.v:6964–6997`), and the outcome is emitted by `sail_mem_read`,
+   which lives in the OPAM PACKAGE
+   (`SailStdpp/ConcurrencyInterfaceBuiltins.v`) — outside the tree
+   entirely.
+3. **The hand-written files are nowhere near the read path.**
+   `model-xv6iris/` contains exactly two: `riscv_extras.v` (41 lines:
+   bit-shift helpers, `get_time_ns`, reservation/terminal axioms) and
+   `xv6iris_extras.v` (105 lines: reservation and `plat_term_write`
+   realisations).  Neither ever sees a `MemoryAccessType`.
+4. **`AK_ttw` IS UNREACHABLE BY CONSTRUCTION** — it occurs ZERO times in
+   `rv64d.v` and `rv64d_types.v`.  `read_kind` has seven constructors and
+   none is a walk (`Read_plain`, `Read_ifetch`, `Read_RISCV_acquire`,
+   `Read_RISCV_strong_acquire`, and the three reserved ones), and
+   `read_ram` has no arm producing `AK_ttw`.  So the WALKER half of (B)
+   is not a tagging change at all: it needs a NEW read kind (or a new
+   `read_ram` arm keyed on the access type).
+
+**REGENERATING FROM A FRESH CLONE: THE SMT-CACHE TRAP.**
+`tools/regen_sail_model.sh` passes
+`--memo-z3-path "$SAIL_RISCV_DIR/build/model/sail_smt_cache"`, and
+`build/model/` is a CMAKE BUILD DIRECTORY that `git clone` does not
+create.  The long-lived checkout at `/shared/xv6rocq/sail-riscv` has one
+(with a ~600 KB `sail_smt_cache` in it), which is why the script has
+always worked there; a fresh clone dies at the very END of the run with
+
+    Error: …/sail-riscv/build/model/sail_smt_cache: No such file or directory
+    Fatal error: exception Sys_error(…)
+
+after sail has already done all of its work.  THE FAILURE MODE IS THE
+DANGEROUS PART: `set -e` aborts before the install step, so
+`model-xv6iris/` is never written, and a `cmp` of the output against a
+pre-run snapshot reports IDENTICAL — a green-looking idempotence result
+from a run that produced nothing.  Fix before regenerating:
+`mkdir -p $SAIL_RISCV_DIR/build/model`, and seed it by copying the
+reference clone's `sail_smt_cache` (the cold run costs many minutes of
+Z3; the warm one is a fraction of that).  Check the script's exit status,
+not just the diff.
+
+CONSEQUENCE: (B) is a MODEL-SOURCE change (`core/phys_mem_interface.sail`
+— `checked_mem_read`/`read_kind_of_flags`, plus a walk kind) followed by
+a regeneration, not a wrapper edit.  And it cannot be started from this
+tree: `model-xv6iris/` holds no `.sail` sources at all (only the
+generated `.v`, the two extras, `sail-config-rv64d.json` and
+`sail-modules.txt`), so it needs the upstream Sail checkout and a
+`make model`.  Per the stop rule this is reported rather than improvised;
+it reopens the choice between (B)-as-model-change and the (A)/(C)
+amendments.
+
+### A6.7(B) — THE PROTOTYPE (local only; ratification package)
+
+Built entirely in the fliptree; nothing pushed, nothing outward-facing.
+The `sail-riscv` fork is cloned at `FLIPTREE/sail-riscv`, detached at the
+pinned `23dcf8fd…`, with the patch as ONE local commit on top —
+**`00046a7` "Tag instruction fetches and page-table walks at the
+concurrency interface"**.  That commit is the artifact to ratify.
+
+**IDEMPOTENCE: PASS.**  Regenerating at the pinned rev UNPATCHED with
+sail 0.20.2 reproduces the checked-in model byte-for-byte:
+
+    rv64d.v         IDENTICAL   (45060 lines)
+    rv64d_types.v   IDENTICAL   (14813 lines)
+    riscv_extras.v  IDENTICAL   (41 lines)
+
+(mtimes confirm the files were really rewritten, not skipped — see the
+SMT-cache trap above for why that check matters.)  The version-skew worry
+does not arise: the pinned rev's `cmake/sail_required_version.txt` asks
+for **0.20.2**, exactly the sail installed, so the script's "asks for
+0.20.1" note is stale.  A clean baseline means the (B) diff below is
+attributable entirely to the patch.
+
+**THE PATCH** — 25 insertions, 1 deletion, two files.
+
+`model/core/phys_mem_interface.sail`: a new `read_kind` constructor and
+one arm in `read_ram`'s access-kind match —
+
+    enum read_kind = {
+      Read_plain,
+      Read_ifetch,
+    + Read_ttw,                       // + an 8-line comment
+      …
+    }
+
+        Read_ifetch => AK_ifetch(),
+    +   Read_ttw => AK_ttw(),
+
+`model/sys/mem.sail`, inside `checked_mem_read` — the whole behavioural
+change is this one `let`:
+
+    - let rk = read_kind_of_flags(aq, rl, res);
+    + let rk : read_kind = match (access, res) {
+    +   (InstructionFetch(), false)   => Read_ifetch,
+    +   (Load(PageTableEntry), false) => Read_ttw,
+    +   (_, _)                        => read_kind_of_flags(aq, rl, res),
+    + };
+
+THE `res` GUARD IS LOAD-BEARING.  The fork's A/D-bit atomic update reads
+its PTE through `read_pte_exclusive` (`sys/vmem.sail:76`), i.e.
+`mem_read_priv(Load(PageTableEntry), …, res = true)`.  An unguarded
+`Load(PageTableEntry) => Read_ttw` would have swallowed it and turned an
+EXCLUSIVE read into a walk read, destroying the reservation and
+`resv_ok`.  Guarded, it falls through to `Read_RISCV_reserved`, which is
+correct and strictly stronger (RiscvLang's exclusive arm: flat read, view
+to the top).  `Read_plain` therefore still means exactly what it meant —
+an explicit data load — and no existing kind changes meaning.
+
+**THE REGENERATED DIFF** (patched vs the byte-identical baseline, so all
+of it is attributable to the patch):
+
+    rv64d.v         100 changed lines
+    rv64d_types.v    23 changed lines
+    riscv_extras.v    0 changed lines
+
+`rv64d.v`'s 100 collapse to **32 once sail's fresh-variable gensyms
+(`exNNNNNN_`) are normalised away**, and of those 32 the SEMANTIC delta is
+about a dozen lines:
+
+  - `Read_ttw;` in `undefined_read_kind`'s pick list;
+  - `Read_ttw => returnM ((AK_ttw (tt)))` in `read_ram`;
+  - the nine-line `match (access, res) with … end >>= fun (rk : read_kind) =>`
+    replacing the single `liftR ((read_kind_of_flags (aq) (rl) (res))) >>= fun rk =>`.
+
+The rest is mechanical noise worth naming so nobody hunts it: six lines of
+MONADIC BINDER RENUMBERING (`w__2/w__3/w__4` → `w__3/w__4/w__5`, because
+the new match adds a bind) and four lines where `internal_error`'s
+`__FILE__`/`__LINE__` literals shift by 8–9 (the patch adds that many lines
+above them in `phys_mem_interface.sail`).  Nothing in `iris/` matches on
+those strings.
+
+`rv64d_types.v`'s 23 are entirely the enum plus its numbering helpers:
+the `Read_ttw` constructor, and `num_of_read_kind` / `read_kind_of_num`
+renumbered from 6 to 7 — none of which has a user in `iris/`.
+
+The regenerated model COMPILES CLEAN under `coqc` (the script's own
+compile-check, and a fresh `make -f CoqMakefile -j8` of `model-xv6iris`).
+
+**THE PROOF FALLOUT** — small, and ADDITIVE by construction.  The rule
+that kept it small: every `*_plain_*` certificate is consumed by DATA
+loads (`UserMem`, `SmodeCore`, `WpSconfMem`, `WpAu4`, `WpSmodeHalf`,
+`HartMLoad`, the disk lanes), which the patch does not touch, so nothing
+existing was retargeted — the fetch and walk lanes got TWINS instead.
+Each twin's proof is its `_plain_` original verbatim: after
+`unfold read_ram; cbn match` the arm contributes only the request's
+`access_kind` field, and nothing downstream inspects it
+(`run_MemRead_ram_intro` / `exec_MemRead` care only about
+`dev_addr (ReadReq.pa req)`).
+
+Files changed, with what each needed:
+
+  - `HartMemAsm.v` — `rk_ram_ok` gains `Read_ttw`.  ONE LINE, and the
+    patch's only SILENT hazard: the match's `_ => false` wildcard means
+    omitting it costs no error, just every walk classified as
+    not-reaching-RAM.
+  - `RiscvTryStep.v` — `run_read_ram_ifetch_4_pin` (twin).
+  - `RiscvFetchExec.v` — `exec_read_ram_ifetch_4`,
+    `run_read_ram_ifetch_2_pin`, `exec_read_ram_ifetch_2` (twins); the two
+    `exec_checked_mem_read_ram*` sites take the `Read_ifetch` arm, which
+    is a `returnR`, not a `liftR` of `read_kind_of_flags`.
+  - `WpLoad.v` — `exec_read_ram_ttw_8` (twin, beside the existing
+    `exec_read_ram_resv_8`).
+  - `SmodePte.v` — the non-reserved PTE read takes the `Read_ttw` arm;
+    the RESERVED one (`res = true`, the A/D update) still falls through to
+    `Read_RISCV_reserved`, but its `(access, res)` match must be reduced
+    before the `liftR` is exposed.
+  - `HartMFetch.v` — fetch-variant request records rather than edits to
+    the shared ones (`mread_req`/`mread_req2` are also consumed by
+    `HartSMem`/`SmodeCorePt`, `mread_req8` by `HartMLoad`):
+    `mread_req_ifetch`, `mread_req2_ifetch` and their
+    `hread_req_at_*`/`hread_resume_*` lemmas, carrying `AK_ifetch tt`.
+  - `MemAccessGen.v` (+ its 2 consumers in `UserMemMis.v`) — the generic
+    split engine keeps `acc` ABSTRACT, so the new match does not reduce.
+    Fixed with a side condition `rk_from_flags acc = true` and a rewriting
+    lemma `rk_select_flags` that restores the old shape, leaving the long
+    proof script untouched.  Two lemma statements gained a hypothesis
+    (`exec_checked_mem_read_split`, `goodmb_checked_mem_read_split`); both
+    are narrowly consumed (2 and 1 call sites, all in `UserMemMis.v`).
+
+STILL TO ABSORB when their cone is reachable: `SmodeCorePt.v` (S-mode
+fetch, widths 4/2 → the `_ifetch` twins), `PtTreeAdue.v` (8-byte PTE reads
+→ needs an `mread_req8_ttw` twin carrying `AK_ttw tt`).
+
+**AND THE PAYOFF IS VISIBLE ALREADY.**  `HartMFetch`'s two fetch sites now
+take **`swp_hart_ram_read_strong`** — §6's `Mobl_ram`, the FLAT rule —
+discharging `ak_strong … = true` by `reflexivity`.  That is RULING 1
+actually holding: the fetch reads flat memory and never touches the store
+buffer, and the fetch-geometry lane stays out of the port.  Before the
+patch that rule had no instances at all.
+
+**TWO-KIND, NOT ONE-KIND.**  Adding a real walk kind rather than reusing
+`Read_ifetch` costs almost nothing on the proof side:
+`num_of_read_kind` / `read_kind_of_num` / `undefined_read_kind` have ZERO
+users in `iris/`, and the only match over `read_kind` in the whole tree is
+`HartMemAsm.rk_ram_ok`, which has a `_ => false` wildcard — so it
+compiles unchanged but would silently classify a walk as not-reaching-RAM.
+One line (`Read_ttw` into its `true` list) is the entire enum-side
+fallout.  The honest form was therefore taken.
+
+### A6.7(B) — WHAT REMAINS AFTER THE PROTOTYPE
+
+The model patch's own fallout is CLOSED (list above, all green).  What is
+left in the tree is the leaf/kit tier, and it splits three ways.  Recorded
+so the next session does not re-derive it.
+
+**DONE — the fetch/PTW half of §7 step 5's consumers.**  `HartMFetch`,
+`SmodeCore`, `UserMem` (M-, S- and U-mode fetch) now take
+`swp_hart_ram_read_strong`, discharging `ak_strong … = true` by
+`reflexivity`.  §6's `Mobl_ram` — today's flat obligation, verbatim —
+holds for them, which is RULING 1 actually working.  `SmodePte` reads its
+PTE at `Read_ttw`.  These lanes are OUT of the port, as intended.
+
+**THE DATA HALF IS A Σ-SURFACE RESTRUCTURING, NOT A REPAIR.**  Measured at
+`WpMmodeLoad` (the first site that must DISCHARGE rather than thread
+`Mobl_ram_plain`): it holds `phys_word_pointsto ea dq v` — a gen_heap
+fact — and proves the old flat obligation with `phys_word_read_bytes`.
+The new obligation is
+`∀ tv' ≥ tv, tso_read_bytes img log h tv' ea 8 v`, and **that is not
+provable from a bare points-to at all** — a flat cell says nothing about
+what a view below the top can see.  It needs `ctx_pointsto + own_context`
+through `TsoCtx.ctx_load_ok` (+ the A6.1a bridge).  So every M-mode data
+load's SPEC has to carry the context fact instead of the physical one.
+This is the flip working as designed, not breakage: it is exactly the
+`mem_pointsto` → `ctx_pointsto` migration the kit exists for.  Threading
+is already in place beneath it (`HartMLoad`'s `robl_ram`, `HartMStore`'s
+`wobl_ram`), so the obligation reaches this one place.
+
+**THE (iii) WORKLIST, from `TsoCtxShim`'s deliberately-removed
+equivalences.**  Each compile error is one entry, as that file's header
+says.  `_to_mem` directions are true-but-unproven under the real bodies
+(drop the timestamp and the bit); `_of_mem` directions are FALSE at TSO —
+a timestamp fragment cannot be conjured — so those sites need their
+surrounding invariant to carry `ctx_pointsto` from the start:
+
+  - `DiskInv.v` — `ctx_buf_{to,of}_mem`, `ctx_pointsto_{to,of}_mem`
+  - `StackOwn.v` — `ctx_word_{to,of}_mem`, `ctx_pointsto_to_mem`
+  - `WpLock.v` — `ctx_word_{to,of}_mem`
+  - `KernelDataInv.v` — `ctx_pointsto_to_mem`
+
+**AND THREE TRANCHE-3 LEAVES** (fallout of the `HartEvents` split, not of
+the model patch): `HartMemRun` and `WpUart` (callbacks gained binders —
+`WpUart`'s is A6.2's DMA conjunct in `wp_disk_step`), and `HartPilot`,
+whose two pilot lemmas have NO consumers and are free to reshape.
+
+### A6.7 — WHAT IT GATES
+
+The read side is blocked as expected (`HartMFetch`, `HartMLoad`,
+`HartMemRun`, `SmodeCorePt`, `PtTreeAdue`, and `HartPilot`'s pilot
+lemma).  The measured surprise is that **the WRITE side's BUILD is gated
+too, though its statements are not**: `HartMStore.vo`'s prerequisite cone
+runs through `HartMFetch.vo` (the fetch lane) and `HartPilot.vo`, so no
+`.vo` below `HartSMem` can be produced until the read classification is
+settled — even though every write statement is already ported.
+`HartPilot`'s two pilot lemmas (`wp_hart_rw_seq`,
+`wp_pilot_started_store`) have NO consumers, so they are free to change
+shape when the ruling lands; only its `phys_*` byte lemmas are used
+elsewhere (`HartLift2`, `PtTreeAdue`, `WpMmodeLoad`, `HartMemRun`).
 
 ## 7. Order of work
 
