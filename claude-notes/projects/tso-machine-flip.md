@@ -189,9 +189,19 @@ de-confliction project, not for this port.  Consequences:
   (`/shared/xv6iris-3-fliptree-backup/sail-riscv`, commit 00046a7) as
   the ready-made prerequisite for the de-confliction project — which
   WILL need the model to tell the access classes apart;
-- kernel text and boot-built PT mappings discharge their plain-load
-  obligations via the pristine/timestamp-0 tier (visible at every
-  view — no fence reasoning); own-hart PT writes via store
+- kernel TEXT discharges its plain-load obligations via the
+  pristine/timestamp-0 tier (era-image bytes are visible at every
+  view).  KERNEL-PT MAPPINGS ARE NOT PRISTINE — owner correction
+  2026-08-26: `kvminit()` builds them with ordinary stores at WP time,
+  so they are t > 0 and the pristine tier never applies.  Their read
+  story is MESSAGE-PASSING: hart 0 writes the PT (log ≤ B) then the
+  `started` flag (position F > B); a secondary reading `started = 1`
+  on the plain arm has necessarily advanced its view past F ≥ B (the
+  MP litmus shape Ztso forbids going stale on), and the flag-read
+  leaf mints the persistent receipt `view_lb h F`; every later walk
+  on that hart discharges from the inv-opened slot fact (value +
+  ⌜timestamp ≤ B⌝ + stable-modulo-A/D) ∗ the receipt.  Hart 0's own
+  walks are store forwarding, no receipt.  Own-hart PT writes via
   forwarding; cross-hart handoffs via the lock acquires the proofs
   already pass through;
 - THE ONE GENUINELY NEW OBLIGATION: kernel-PTE low bytes are racy at
@@ -2682,6 +2692,63 @@ not even have the same sequencing lemma).  Worse, its two instantiations
 made WRONG.  This is `MemAccessGen`'s case exactly, and it wants
 `MemAccessGen`'s fix: a side condition plus a `rk_select_*` rewriting
 lemma, so the long proof script is untouched.
+
+### A6.36 THE OVERRULING, IMPLEMENTED AT THE MACHINE — ONE PLAIN READ ARM,
+### AND THE STRONG RULE IS DELETED RATHER THAN DEPRECATED
+
+Implements the rewritten RULING 1.  Landed and green at the machine and
+leaf tiers:
+
+- **`RiscvLang.v`**: the strongly-ordered RAM-read arm of `mnode_step` is
+  GONE and `ak_strong` with it; the plain arm's guard is `ak_excl = false`
+  alone.  Exclusive arm, write arms, barriers, MMIO and DMA are untouched,
+  exactly as the redirect said.  The fallout inside the file was three
+  `MemRead` destructurings (`mnode_step_v_disk`, the `resv_ok` preservation
+  and the frame lemma) losing one disjunct and one conjunct each.
+- **The generated model is RESTORED to the pinned baseline**, bit-identical
+  to the main repo's `model-xv6iris/` (`rv64d.v` and `rv64d_types.v` were
+  the only two files the patch touched — 100 and 23 lines).  The patch
+  commit `00046a7` is PARKED, untouched, in both `FLIPTREE/sail-riscv` and
+  `/shared/xv6iris-3-fliptree-backup/sail-riscv`.
+- **`HartEvents.v`**: `wp_hart_ram_read_strong` and `swp_hart_ram_read_strong`
+  are **DELETED, not deprecated**, and the reason is worth recording because
+  the redirect left it open:
+
+> **The strong rule is NOT a derivable special case of the plain one.**  It
+> concludes from a FLAT `read_bytes σ.(mem)` fact with no view advance, and
+> a flat cell says nothing about what a view BELOW the top can see — the
+> same measurement A6.7(B) made at `WpMmodeLoad`.  It was sound only
+> because the machine had an arm that read flat; with that arm gone the
+> rule has no proof, so keeping it as "deprecated" would mean keeping an
+> unprovable statement.  A comment block in its place records what it was,
+> why it went, and that the de-confliction project restores it together
+> with the parked Sail patch.
+
+  The two plain rules lost their now-meaningless `ak_strong … = false`
+  premise (positional, so every call site drops one argument).
+- **`HartBlock.v`** (the solo-era bracket) and **`HartMemRun.v`** (the user
+  tier's walker) collapsed their three-way RAM-read case split to two.
+  `HartMemRun`'s is the instructive one: A6.16 had it split
+  exclusive / `ak_strong` / plain, and the fetch branch discharged
+  `bytes_own_read` flat.  **Now every non-exclusive read of the walker's
+  own bytes owes `Mobl_ram_plain`** — and that costs the user tier nothing,
+  because A6.16 had already moved `bytes_own` to `ctx_phys_pointsto`.  The
+  overruling lands cheapest exactly where the ledger was already carried.
+- **`HartMemAsm.rk_ram_ok`** drops `Read_ttw` (the constructor no longer
+  exists).  The wildcard hazard A6.7(B) recorded is unchanged and still
+  worth the comment: omitting a kind from the true list costs no error.
+
+**AND THE REVERT IS SMALLER THAN IT LOOKS, because `Read_ifetch` SURVIVED
+THE UNPATCHING.**  The patch added `Read_ttw` and the `(access, res)`
+selection; `Read_ifetch` is an ORIGINAL constructor of the pinned model.
+So the A6.7(B) twins that carry `Read_ifetch` (`RiscvTryStep`'s
+`run_read_ram_ifetch_4_pin`, `RiscvFetchExec`'s three) still typecheck and
+compile untouched — they are simply instance-free now.  Only the `Read_ttw`
+mentions and the `(access, res)` reductions have to go: `WpLoad`'s
+`exec_read_ram_ttw_8`, `SmodePte`'s arm reduction, and
+`MemAccessGen.rk_from_flags`/`rk_select_flags` with their side condition in
+`UserMemMis`.  Worth knowing before anyone budgets the revert as the mirror
+image of the patch: it is not.
 
 ## 7. Order of work
 
