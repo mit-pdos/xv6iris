@@ -1878,52 +1878,6 @@ whether the site owns bytes at all.  The register-only walks (the WFI
 loop, the waiting step, the trap prelude, the CSR windows) do not, and
 they are a large fraction of the ~60 `bytes_own` consumers.
 
-### A6.24 THE A/D WRITE-BACK'S CORE IS TIER-GENERIC, SO IT MUST TAKE ITS
-### PAYER RATHER THAN BE ONE — the new design class the A6.21 wave surfaced
-### (CHARACTERISED, NOT IMPLEMENTED)
-
-With A6.21 landed the wave runs clean down to ONE place, and it is a design
-point rather than a repair.
-
-**THE FACT.**  `KptTree.ptree_translateAddr_own` is the shared translation
-core.  It has exactly two callers — `KptShare.v:343` (the KERNEL page
-table, inside `kpt_inv`) and `UptTree.v:757` (a USER page table) — so it
-is used at BOTH of A6.21's tiers.  And it performs the Svadu A/D
-write-back itself, at `KptTree.v:1165`, with `phys_word_pointsto_write`
-against `gen_heap` alone.  Post-flip that store owes the append, and the
-lemma is at the wrong ALTITUDE to pay it: its statement is
-`reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ … ==∗ …` — an
-`mstate`-level fact with **no memory-model bundle anywhere in it**.
-
-**WHY IT CANNOT SIMPLY GAIN THE BUNDLE.**  The two tiers pay differently:
-
-  - kernel (`PTT = None`): `TsoCtx.ledger_store_ok` — no context, no token;
-  - user (`PTT = Some ξ`): `TsoCtx.ctx_store_win_ok` — needs
-    `own_context ξ`, which the translating thread does have (it is its own
-    page table) but which the kernel caller has no business supplying.
-
-A single bundle-carrying statement would have to demand the token
-unconditionally, and the kernel caller cannot honour it — it holds an
-invariant, not an identity.
-
-**THE SHAPE THAT WORKS, and it has a precedent in this very port.**  The
-core should not pay the append; it should **take the payer**, as a
-threaded premise of the shape
-
-    (∀ w', pt_slot_own PTT (pt_addr0 p1 vpn) (DfracOwn 1) p0 -∗ … ==∗
-           … ∗ pt_slot_own PTT (pt_addr0 p1 vpn) (DfracOwn 1) w')
-
-exactly as A6.9's consequence 1 already forced for `HartPilot`'s pilot
-rule ("its store's append is now a THREADED premise, not a discharged
-one").  Each caller then supplies its own tier's gate: `KptShare` supplies
-`ledger_store_ok`, `UptTree` supplies `ctx_store_win_ok` with the thread's
-token.  **This is the honest reading of A6.21: the INDEX says which ledger
-a slot is in, and the PAYER says who may move it.**
-
-Cost: one statement change on `ptree_translateAddr_own`, its two callers,
-and whatever hands them the interp (`PtTreeAdue` → `WpSmodePtEngine` →
-`SmodeCorePt`).  Reported rather than improvised, per the stop rule.
-
 ### A6.23 THE FRONTIER AFTER THE A6.18 TRANCHE
 
 **Two identical full `-k` sweeps** (the second compiled exactly the eight
@@ -1956,12 +1910,108 @@ A6.21 is the decision they wait on.  That is the honest shape of the
 remaining frontier: it is no longer a list of repairs, it is one
 parameterisation plus two small conversions plus one design item.
 
+### A6.24 THE A/D WRITE-BACK'S CORE IS TIER-GENERIC, SO IT MUST TAKE ITS
+### PAYER RATHER THAN BE ONE — the new design class the A6.21 wave surfaced
+### (CHARACTERISED, NOT IMPLEMENTED)
+
+With A6.21 landed the wave runs clean down to ONE place, and it is a design
+point rather than a repair.
+
+**THE FACT.**  `KptTree.ptree_translateAddr_own` is the shared translation
+core.  It has exactly two callers — `KptShare.v:343` (the KERNEL page
+table, inside `kpt_inv`) and `UptTree.v:757` (a USER page table) — so it
+is used at BOTH of A6.21's tiers.  And it performs the Svadu A/D
+write-back itself, at `KptTree.v:1165`, with `phys_word_pointsto_write`
+against `gen_heap` alone.  Post-flip that store owes the append, and the
+lemma is at the wrong ALTITUDE to pay it: its statement is
+`reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ … ==∗ …` — an
+`mstate`-level fact with **no memory-model bundle anywhere in it**.
+
+**WHY IT CANNOT SIMPLY GAIN THE BUNDLE.**  The two tiers pay differently:
+
+  - kernel (`PTT = None`): `TsoCtx.ledger_store_ok` — no context, no token;
+  - user (`PTT = Some ξ`): `TsoCtx.ctx_store_win_ok` — needs
+    `own_context ξ`, which the translating thread does have (it is its own
+    page table) but which the kernel caller has no business supplying.
+
+A single bundle-carrying statement would have to demand the token
+unconditionally, and the kernel caller cannot honour it — it holds an
+invariant, not an identity.
+
+**THE SHAPE THAT WORKS.**  The core should not pay the append; it should
+**take the payer**, as a threaded premise — the move A6.9's consequence 1
+already forced for `HartPilot`'s pilot rule ("its store's append is now a
+THREADED premise, not a discharged one").  Each caller then supplies its
+own tier's gate: `KptShare` supplies `ledger_store_ok`, `UptTree` supplies
+`ctx_store_win_ok` with the thread's token.
+
+> **RULING (owner, 2026-08-26): RATIFIED, and this is the amendment's
+> principle, kept verbatim —**
+>
+> > **the index says which ledger a slot is in; the payer says who may
+> > move it.**
+
+**AND `HartPilot`'s PREMISE CANNOT BE COPIED VERBATIM — measured, and it
+would have been the obvious wrong turn.**  `wp_pilot_started_store`'s
+threaded premise takes ONLY the bundle:
+
+    (∀ σw img log tv V, ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       tso_interp_of … img σw.(mem) log V ==∗
+       tso_interp_of … img (write_bytes …) (log ++ [PWMsg …]) (vstep …))
+
+with the gen_heap update done by the rule itself.  **No gate can pay
+that.**  `ctx_store_ok` and `ledger_store_ok` both take `gen_heap_interp`
+AND `tso_interp_at` TOGETHER, because the interp's own tie
+(`TM !! a = Some t → ∃ v, gmem !! a = Some v ∧ latest img log a t v`)
+relates the two — a gate that moved the ledger without the flat cell would
+have to break that tie transiently and could not restore it.  `HartPilot`
+gets away with it only because its pilot lemmas have NO consumers (A6.7's
+own note); `KptTree`'s premise will have two real ones.
+
+**So the payer premise must take BOTH, and the caller's append currency
+must be threaded through it rather than closed over** (a wand that
+consumed the caller's bundle could not give it back).  Two parameters:
+
+    (Sto : iProp Σ) (Stoq : mword 64 -> iProp Σ)
+
+    (* the A/D write-back's payer *)
+    (∀ wnew : mword 64,
+       gen_heap_interp σ.(mem) -∗ Sto -∗
+       pt_slot_own PTT (pt_addr0 p1 (svpn_of va)) (DfracOwn 1) p0 ==∗
+       gen_heap_interp (write_bytes σ.(mem)
+                          (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
+       Stoq wnew ∗
+       pt_slot_own PTT (pt_addr0 p1 (svpn_of va)) (DfracOwn 1) wnew)
+
+The kernel caller instantiates `Sto := tso_interp_of … log V` and
+`Stoq w := tso_interp_of … (log ++ [PWMsg (snap_of … w) …]) (vstep …)` and
+discharges with `ledger_store_ok`; the user caller does the same with
+`ctx_store_win_ok` plus its `own_context`.
+
+**THE CONDITIONAL IS ALREADY THERE, AND THAT MAKES THE CONCLUSION CHEAP.**
+The proof splits three ways on `ptree_translateAddr_cases`
+(`KptTree.v:1124`): **O1** nothing moved, **O2** a TLB fill with the
+current leaf, **O3** the Svadu write-back — and ONLY O3 touches memory.
+O1 and O2 both report `t' = t`, O3 reports the right disjunct.  So the
+resource disjunction the conclusion needs is EXACTLY the pure one the
+statement already carries
+(`⌜t' = t ∨ ∃ a1 d1, t' = ptree_set_leaf t vpn (pte_set_ad w a1 d1)⌝`):
+return `Sto` on the `t' = t` side and `Stoq w'` on the other, tied to the
+same disjunct.  **No caller gains a case split it did not already have.**
+
+Cost: one statement change on `ptree_translateAddr_own` (~200 lines with a
+delicate case analysis), its two callers, and whatever hands them the
+interp (`PtTreeAdue` → `WpSmodePtEngine` → `SmodeCorePt`).
+
 ### A6.25 THE FRONTIER AFTER THE A6.21 TRANCHE — THREE FILES, AND ONE OF
 ### THEM IS THE ONLY REMAINING DESIGN ITEM ON THE PT LANE
 
 **Two identical full `-k` sweeps** (the second compiled exactly the three
 red retries and nothing else).  **THREE red files, 630 of 1330
-fresh-green.**
+fresh-green** — but see A6.26: a subsequent CLEAN build put the honest
+number at **505**, the 630 having been inflated by ~125 `.vo`s that were
+green against the pre-A6.21 `PtTree`.  The RED SET is the same either way,
+and it is the number that matters here.
 
     KptTree.v       A6.24 — the A/D write-back's core must TAKE its payer
     WpTimerinit.v   A6.17 — the M-mode boot-stack threading cascade
@@ -2002,6 +2052,104 @@ files compiled in them load hundreds of `.vo`s without complaint, so the
 tree is very likely clean — but a `make clean`-and-rebuild is the only
 thing that would prove it, and it has not been done.  **Do not start a
 sweep with `&` inside a compound command; use `setsid` and wait on it.**
+
+### A6.26 HANDOFF — WHERE THE NEXT LANE PICKS UP
+
+Written at a clean boundary rather than pushed through, per the owner's
+standing instruction.  Nothing below is speculative: every shape named has
+either been proven in the kit or measured against the build.
+
+> **THE HYGIENE REBUILD IS DONE, AND IT CORRECTS A NUMBER.**
+> `fliptree/iris/*.vo` was deleted wholesale (the model's kept) and ONE
+> `make -j12 -k` run from scratch under `setsid`.  Result:
+>
+> > **505 of 1330 files built from source, and EXACTLY the three expected
+> > error files — `KptTree`, `WpTimerinit`, `WpUart` — with nothing else
+> > surfacing.**
+>
+> Two things follow, and the second is the important one.
+>
+> 1. **The half-written-`.vo` caveat of A6.25 is DISCHARGED.**  505 files
+>    compiled from source reproduce the incremental frontier exactly; the
+>    concurrent-`make` incident left no corruption.
+> 2. **THE TRUE FRESH-GREEN COUNT IS 505, NOT A6.25's 630.**  The 630 was
+>    inflated by ~125 stale-but-valid `.vo`s built while `KptTree` was
+>    still green — i.e. against the PRE-A6.21 `PtTree`.  Once `KptTree`
+>    is red from the start, its whole cone is unreachable and never gets
+>    built at all.  **An incremental fresh-green count silently keeps
+>    files that were green against an EARLIER version of a file that is
+>    now red; only a clean build tells you how much of the tree the
+>    current sources actually prove.**  Read every earlier count in this
+>    note with that in mind.
+>
+> The tree is now in the state that clean build left it: 505 `.vo`s, the
+> three red files, and their cones unbuilt.
+
+**THE KIT IS COMPLETE FOR EVERYTHING THAT REMAINS.**  `TsoCtx.v` now
+carries, all proven:
+
+    ctx_pointsto / ctx_word{,2,4}_pointsto        the VA ledger (M1)
+    ctx_phys_pointsto / ctx_phys_word_pointsto    the PHYSICAL ledger (A6.16)
+    phys_ledger / phys_ledger_word                the CONTEXT-FREE ledger (A6.20)
+    ctx_pointsto_phys                             VA ⊣⊢ kmap ∗ physical
+    ctx_pointsto_{to,of}_phys                     the identity-mapped crossing
+    ctx_phys_pointsto_ledger / ctx_phys_word_ledger   registered ⊢ unregistered
+    *_forget                                      every tier ⊢ the raw one
+    ctx_load_ok / ctx_phys_load_ok / _bytes_ok    the load gates
+    pristine_read_{ok,bytes_ok}                   the image-byte gate (A6.10)
+    ctx_store_ok / _win_ok / _sub_ok              the store gate, three shapes
+    ledger_store_ok / _win_ok                     the context-free store gate
+    ctx_phys_win_map / phys_ledger_win_map        list ⊣⊢ the message's map
+    hart_view_lb_get / ctx_dom_of_parked          the receipt and the acquire mint
+
+**NO NEW KIT IS NEEDED** for A6.24, A6.17's cascade, or A6.9's lease.  What
+remains is threading and two statement changes.
+
+**THE THREE ITEMS, in the owner's order.**
+
+1. **A6.24** — the shape is written out in full in that amendment,
+   including the two parameters and why `HartPilot`'s premise cannot be
+   copied.  Start at `KptTree.v:1165`.
+2. **A6.17's cascade (`WpTimerinit`)** — `wp_csdsp_gpr_tor` now takes
+   `ctx_phys_word_pointsto` and `own_context` (A6.17, landed at
+   `WpMmodeStore`).  Both have to reach the four M-mode store sites from
+   `BootChain.boot_entry_bridge`, which already HOLDS the token across the
+   whole M-mode bracket — the threading is through `Entry.wp_entry_boot`,
+   `WpStartNew` and `WpTimerinit`, four statements.  The stack bytes' own
+   ledger residue is minted at adequacy (A6.17's "real bill").
+3. **A6.9's lease (`WpUart`)** — two independent pieces, and the first is
+   pure plumbing: `wp_disk_loop` is still written against the PRE-A6.11
+   `wp_disk_step` (it destructures `disk_step`'s arms with a post-state
+   `m'` where the rule now hands `(d' W log')` plus `⌜disk_step d m d' W⌝`).
+   Reshape that first; four of the six arms then close with
+   `RiscvExec.tso_interp_of_disk_idle`.  Only the DMA completion arm is the
+   real item, and **A6.20 is its shape**: the lease is invariant-owned, so
+   it is context-free ledger, and `ledger_store_ok` is the gate — with its
+   author generalised from `hart_agent cpu_id` to an `agent` parameter for
+   this one caller (a one-line generalisation of the gate; the proof never
+   uses the hart-ness).
+
+**THE VERIFICATION LIST BEHIND `KptTree`** (A6.25's correction): once
+A6.24 lands, walk these and check each `.vo`, do not infer from the error
+list — `HartSKpt`, `UserBytes`, `UmodeMem`, `PtWalkCert`, `ProcPtOwn`,
+`KstackOwn`, and **`WpSconfMem`**, whose A6.18 acceptance test is still
+verified only at the statement level.
+
+**PROCESS NOTES EARNED THIS SESSION.**
+
+- Never start a sweep with `&` inside a compound command; use `setsid` and
+  wait on it.  Three concurrent `make -j12`s on one tree is how the
+  half-written-`.vo` caveat got created.
+- A file leaving a `-k` error list means either "fixed" or "no longer
+  reached".  Only the `.vo` timestamp says which.
+- Inside an `Ltac` body, a bare identifier is resolved as a TERM at
+  definition time (`iMod ("H" $! _ img log …)` fails naming `img`); and a
+  `let … := fresh` name shadows the Coq hypothesis an intro pattern
+  introduces.  Take the fact as an Iris hypothesis and `iExact` it.
+- Converting an INFIX spelling to a PREFIX head is a re-parenthesisation,
+  not a token substitution.  Give the new form a notation first.
+- `Require Import` does not re-export: a notation body that mentions a name
+  from a transitively-required module must spell it QUALIFIED.
 
 ## 7. Order of work
 
