@@ -2361,6 +2361,10 @@ so it never wanted that shape.
   to `FsDurSnap`/`FsCollect*`/`FsDurImg` and the two allocator call
   sites (the commit permit, the boot mint).  Green and working as built,
   which is the only reason it is not being redone before the theorem.
+  OWNER DECISION: the boot mint (lane E) is ALSO built on the value-first
+  allocator, deliberately, to keep this cleanup out of the critical path
+  to `Himg`; once `Himg` is closed THIS LANE IS MANDATORY — both call
+  sites move to the transport and the carve is deleted.
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two
