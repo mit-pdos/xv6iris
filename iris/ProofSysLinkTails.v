@@ -1243,8 +1243,9 @@ Section ProofSysLinkTails.
     (* THE COUNTING RA's OWN FACT: the token this arm is about to spend
        bounds the record's count below.  Nothing in the WALK can say it. *)
     iApply fupd_wp.
-    iMod (ireg_tok_nz ⊤ gi gfs inodestart nib inum dn ltac:(solve_ndisj) Hinb
-            with "Hireg Hdiat Htoken") as "(%Hnz & Hdiat & Htoken)".
+    iMod (ireg_tok_nz ⊤ gi gfs inodestart nib inum dn uty
+            ltac:(solve_ndisj) Hinb
+            with "Hireg Hdiat Htoken") as "([%Hnz %Htyok] & Hdiat & Htoken)".
     iModIntro.
     (* ===== +0xfa lhu a5,74(s1) ===== *)
     iApply (wp_lhu_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0xfa)) Ra5 Rs1
@@ -1390,14 +1391,15 @@ Section ProofSysLinkTails.
               Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
               Htynz Hdec
-              (* (U2): [ip] is not a directory -- sys_link's ARM C refused
-                 [T_DIR] and [ity_shot_agree] pinned the type. *)
-              ltac:(intros j _; right; exact Hnotdir)
               Haddreq Hdirlen Hj Hgl HP4a0 Heb
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum Hmeta Hmap
-                    Hsbi Hireg Hdiat Hilink Htoken [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
+                    Hsbi Hireg Hdiat Hilink [Htoken] [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
                     Hop").
+    { assert (Hdn'ty : bv_unsigned (di_type dn') <> T_DIR_z)
+        by (rewrite /dn' sl_setnl_type; exact Hnotdir).
+      rewrite (InodeRegion.ireg_dot_delta_not_dir _ _ Hdn'ty)
+        FsStateLink.link_reps_1. iExact "Htoken". }
     { iLeft. iSplit; iPureIntro; assumption. }
     iIntros (CID9 Hq9 miu)
       "%Hcsiu Hcg Hown Hpc Hpid Hidev Hiinum Hmeta Hmap Hsbi Hdiat Hbs2 Hop".
