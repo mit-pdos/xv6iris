@@ -6926,7 +6926,7 @@ Section ProofSysUnlinkBody.
                     ltac:(apply singleton_subseteq_l; exact HmarkD)) as Hsz1.
       rewrite size_singleton in Hsz1.
       pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dnd))) as Hnn.
-      lia. }
+      clear -Hex Hsz1 Hnn. lia. }
     (* ===== [ip] IS NOT THE ROOT: two fragments at its inum, and its own
        record says [nlink = 1] ===== *)
     iAssert (FsStateLink.link_toks (fs_gamma_L gfs)
@@ -7365,7 +7365,7 @@ Section ProofSysUnlinkBody.
                                apply bool_decide_eq_true; exact Htyzi)) as Hex.
       rewrite /fn_nlink era_node_rec Hnl1
         (fn_orphan_era_nz dni bmi dati Hnlzi) in Hex.
-      change (Z.to_nat 1) with 1%nat in Hex. lia. }
+      change (Z.to_nat 1) with 1%nat in Hex. clear -Hex. lia. }
     assert (HdokiZ : FsStateInode.ent_dset_ok (era_node (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
                             : mword 64)
