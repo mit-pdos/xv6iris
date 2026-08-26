@@ -10,6 +10,29 @@
 > file-system BEHAVIOUR specification project
 > ([`../design/fs-syscall-specs.md`](../design/fs-syscall-specs.md)) onto
 > its user-process-perspective abstract state.  Not worked further here.
+>
+> **AS LANDED (lane E-unpin).**  `FsCfgBoot.fs_cfg_alloc`'s post no longer
+> carries `dv_pin ROOTINO …` / `fv_pin 7 …`, and its proof no longer cuts a
+> lend: every inum's dview and fview ride goes in whole, every mint licence
+> is dropped, and the lemma's `↑iregN ⊆ E` mask premise (which existed only
+> for `dv_lend_mint`) is gone, as are `BootShared.boot_shared_alloc`'s two
+> `iClear`s.  `InodeRegion.dv_lend_mint`/`fv_lend_mint` and
+> `FsCfgBoot.fs_cfg_iregN_top` therefore have NO caller in the tree; they are
+> left in place as lemmas.  The SEVEN files whose only purpose is this story
+> are commented out of `iris/_CoqProject` (source kept, each carrying an
+> off-the-build header):
+>
+> - `DirViewPin.v` — the generic pinned walk (nothing live imported it;
+>   `DirViewLend.v`, the lend kit underneath, STAYS in the build)
+> - `NameiInitPinned.v`, `LinkNameiPinned.v`
+> - `SpecKexecPinned.v`, `ProofKexecPinnedA.v`, `ProofKexecPinned.v`,
+>   `LinkKexecPinned.v`
+>
+> `FsImgCheck.fsimg_init_path` / `fsimg_root_type` stay: they are members of
+> the image's own `/init`-`/sh`-`/echo`-`/sync` path family, cost nothing
+> beyond what that family already pays, and are not pinned-lookup results.
+> The port has to re-derive the two pins from the fs-syscall-specs abstract
+> state; nothing else about these files changed.
 
 # namei, pinned: a ghost-state spec for WHICH inode the walk returns
 

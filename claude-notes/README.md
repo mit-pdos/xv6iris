@@ -204,9 +204,14 @@ first four were audited against the tree 2026-08-22):
   `prim_step` soundness bridge that `HartBlock.v`'s header already defers to.
 - **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
   ghost-state spec for WHICH inode `namei` returns: N-1 through N-5.2B
-  (kexec loads `/init` at its entry) are landed; M2 (`dvrt`, the pin through
-  the trap seam) and stage C (threading `proc_ptm` through kexec) are gated
-  on the owner's call. §10 is the long-run tree-level direction.
+  (kexec loads `/init` at its entry) are proven, but they are era-0
+  image-CONTENT results, so **they are OFF THE BUILD** — the owner ruled the
+  `/init` pins off the boot chain, `FsCfgBoot.fs_cfg_alloc` no longer mints
+  them, and the seven `*Pinned*`/`DirViewPin` rows of `iris/_CoqProject` are
+  commented out (source kept). The banner lists them and says who ports
+  them. M2 (`dvrt`, the pin through the trap seam) and stage C (threading
+  `proc_ptm` through kexec) are gated on the owner's call. §10 is the
+  long-run tree-level direction.
 
 ## `completed/` — finished projects, archived for reference
 

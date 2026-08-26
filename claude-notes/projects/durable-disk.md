@@ -2322,6 +2322,30 @@ so it never wanted that shape.
     (`IcacheEscrow.dlinks`' own header anticipates it — "when `DirLinks.v`
     goes, this definition loses its first conjunct").  After it,
     `dlinks = ent_toks` and the pool's bundle is `snap_ok`-reachable.
+
+    **AS LANDED — E-unpin (the pins, off the boot chain).**
+    `FsCfgBoot.fs_cfg_alloc`'s post is the ten ties and the two kits and
+    nothing else: `dv_pin ROOTINO …` and `fv_pin 7 …` are gone, and with
+    them the two lend cuts inside the proof.  Every inum's dview and fview
+    ride now goes in WHOLE (`dv_ride_of_hold`/`fv_ride_of_hold`) and every
+    per-inum mint licence `ireg_alloc` pays out is dropped, so the ¾-at-one-
+    inum reassembly and the `↑iregN ⊆ E` mask premise (which existed only
+    because `dv_lend_mint` opens the region) both went too;
+    `BootShared.boot_shared_alloc` lost its two `iClear`s and its
+    destructuring pattern.  `InodeRegion.dv_lend_mint`/`fv_lend_mint` and
+    `FsCfgBoot.fs_cfg_iregN_top` now have NO caller — left in place as
+    lemmas, since the runtime mint window will want them.  The seven
+    pinned-`/init` files are commented out of `iris/_CoqProject` (source
+    kept, each with an off-the-build header); the list and the port's owner
+    are in `namei-pinned-lookup.md`'s banner.  `FsAdequacyImg`'s
+    `fsimg_at_every_era`, its bridge `fsimg_boot_image_eras` and the two
+    corollaries over them (`xv6_power_adequacy_fsimg`,
+    `xv6_fs_adequacy_xv6Σ`) are commented out for `Himg`'s reason — era 0's
+    discharge (`fsimg_image_wf`, `fsimg_snap_ok`) stays and is what the boot
+    chain uses.  Nothing on `SystemAdequacy`'s cone moved: the audit is at
+    the three-entry baseline.  `ProofForkret.fkr_boot`'s "NOT PROVED YET"
+    banner was stale and now says what the arm is.
+
   - **E-recover** (fs-log.md stage 4) — real `n > 0` recovery in
     `initlog`/`install_trans`, with the WAL-owned exception set for the
     ≤ LOGSIZE pending home blocks that `install_trans` shrinks (plan §5);
