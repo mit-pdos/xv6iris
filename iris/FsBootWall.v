@@ -85,3 +85,128 @@
 (*  [iris/DirLinks.v] and [iris/IregDirBit.v]; read their headers for the  *)
 (*  mechanism this file refuted.                                          *)
 (* ====================================================================== *)
+
+(* ====================================================================== *)
+(*  A SECOND WALL, AND THIS ONE IS OPEN: THE MINT'S *PLACEMENT*.          *)
+(*  (durable-disk lane E-mint)                                            *)
+(*                                                                        *)
+(*  The wall above was about the mint's VALUE side and it is down.  What   *)
+(*  is written down below is the wall the same lane met next, which is     *)
+(*  about WHERE the mint may run.                                         *)
+(*                                                                        *)
+(*  THE RULING (durable-fs-plan.md section 5) is that the era's            *)
+(*  file-system instance is minted INSIDE [fsinit], after [initlog]        *)
+(*  returns -- because at a header with [n > 0] the RAW home blocks are a  *)
+(*  MIX of the old and the new committed values and are therefore no file  *)
+(*  system at all, so no instance can be minted before [install_trans] has *)
+(*  run.  The ruling adds: "the icache's slot escrows and pool are sealed  *)
+(*  EMPTY at PowerOn ([iinit] needs only the lock) and stocked by the same *)
+(*  mint".  The escrows are already sealed empty; THE POOL CANNOT BE.      *)
+(*                                                                        *)
+(*  WHY.  [userinit] runs BEFORE [fsinit] (main+0x9e; fsinit is called     *)
+(*  from forkret, on the park userinit performs) and its body ends in      *)
+(*  [p->cwd = namei("/")].  That walk is one [iget(ROOTDEV, ROOTINO)]      *)
+(*  ([SpecNameiRootBoot]'s header says so), and [iget] at a cache miss     *)
+(*  MOVES THE INUM'S POOL ROW into the slot escrow's MID arm --            *)
+(*  [ProofIget.v] ~:1378, [IcacheEscrow.ipool_take_lend].  So the root's   *)
+(*  row -- and, by the partition below, EVERY region inum's row -- has to  *)
+(*  be in [IcacheEscrow.ipool_body] at [IcacheBoot.icache_boot_at]'s       *)
+(*  ghost step, which is main+0x92, two calls before userinit and long     *)
+(*  before fsinit.  A pool row is not a marker: [IcacheEscrow.ipool_ord]   *)
+(*  carries [ipool_shape_np], whose allocated arm is the inode's whole     *)
+(*  era-side bundle (its record proxy, its data and indirect blocks' byte  *)
+(*  elements at the era's view, its [top_frag] and its [dlinks]).          *)
+(*                                                                        *)
+(*  The three lemmas below are the machine-checked half of that: at the    *)
+(*  three EMPTY keys [icache_boot_at] is handed ([ghost_var icfg_pext 1    *)
+(*  empty], [ghost_var icfg_ptrn 1 empty] and fifty DEAD identities, which *)
+(*  is [IcacheEscrow.ic_ids_of_live]), [ipool_body]'s partition row FORCES *)
+(*  the ordinary index to be the whole region.  There is no "unstocked"    *)
+(*  state of the pool to seal.                                            *)
+(*                                                                        *)
+(*  THE TWO EXITS, neither of which is this lane's to take:                *)
+(*                                                                        *)
+(*   (1) MINT [L] AT [D] AND KEEP THE MINT AT PowerOn.  The era's byte     *)
+(*       view is minted at the RECOVERED map rather than at the raw disk,  *)
+(*       so nothing about the file system waits for [install_trans]; what  *)
+(*       waits is the tie between the byte view and the buffer cache.      *)
+(*       [FsBlocks.bytes_tie] says every cache entry reads off [L] and     *)
+(*       [BioInv.pool_blk] pairs each covered block's cache half with the  *)
+(*       PHYSICAL disk cell at the same bytes, so for the <= LOGSIZE       *)
+(*       pending home blocks both are false in the recovery window.  The   *)
+(*       cost is an exception set inside [FsBlocks.fs_bytes_body] that     *)
+(*       [install_trans] shrinks, plus a persistent "recovery is done"     *)
+(*       seal on every reader of the tie (measured at ~28 crossing sites   *)
+(*       in the E-recover pass).  It lands on the WAL.                     *)
+(*                                                                        *)
+(*   (2) GIVE THE POOL AN UNMINTED ARM.  [ipool_shape_np] gains a third,   *)
+(*       content-free arm; [iget] may move an unminted row (nothing        *)
+(*       [ilock]s before fsinit); the mint inside fsinit fills every row.  *)
+(*       Its price is that the root's row is NOT in the pool by then --    *)
+(*       userinit took it -- so the mint has to reach into the fifty slot  *)
+(*       escrows as well as the pool, which is the commit's own            *)
+(*       fifty-invariant opening ([FsCollectAll]) run in the other         *)
+(*       direction, and every consumer of the pool's arms grows a case.    *)
+(*                                                                        *)
+(*  WHAT IS PLACEMENT-INDEPENDENT, and therefore what the lane built       *)
+(*  instead: the mint itself reading the SNAPSHOT rather than the image    *)
+(*  ([FsCfgSnap.fs_cfg_alloc_snap]).  Both exits need exactly that lemma;  *)
+(*  only the fupd it runs in differs.                                     *)
+(* ====================================================================== *)
+
+From Stdlib Require Import ZArith Lia List.
+From stdpp Require Import gmap list sets.
+Require Import SailStdpp.Values.   (* [mword] *)
+Require Import FsImg.              (* [ROOTINO] *)
+Require Import IcacheEscrow.       (* [region_inums], [ic_live_inums]      *)
+Local Open Scope Z_scope.
+
+(* THE PARTITION ROW OF [IcacheEscrow.ipool_body], at the state
+   [IcacheBoot.icache_boot_at] is handed: no inum in transition, no inum in
+   the transit ledger, no slot live.  The ordinary index IS the region. *)
+Lemma boot_pool_index_forced (nib : nat) (O : gset Z)
+    (ids : list (bool * mword 32 * mword 32)) :
+  ic_live_inums ids = ∅ ->
+  region_inums nib
+    = O ∪ (∅ : gset Z) ∪ dom (∅ : gmap Z (nat * Qp)) ∪ ic_live_inums ids ->
+  O = region_inums nib.
+Proof.
+  intros Hlive Hrow.
+  rewrite Hrow, Hlive, dom_empty_L, union_empty_r_L, union_empty_r_L,
+          union_empty_r_L.
+  reflexivity.
+Qed.
+
+(* ...so the root's row is in the pool at main+0x92, which is where
+   [namei("/")] finds it.  ([IcacheEscrow.ipool_take_lend] is what moves
+   it out; there is nothing else it could come from.) *)
+Lemma boot_pool_holds_root (nib : nat) (O : gset Z)
+    (ids : list (bool * mword 32 * mword 32)) :
+  (0 < nib)%nat ->
+  ic_live_inums ids = ∅ ->
+  region_inums nib
+    = O ∪ (∅ : gset Z) ∪ dom (∅ : gmap Z (nat * Qp)) ∪ ic_live_inums ids ->
+  ROOTINO ∈ O.
+Proof.
+  intros Hnib Hlive Hrow.
+  rewrite (boot_pool_index_forced nib O ids Hlive Hrow).
+  apply region_inums_spec. unfold ROOTINO. lia.
+Qed.
+
+(* ...AND THE EMPTY POOL IS REFUTED OUTRIGHT: at [0 < nib] the region is
+   inhabited, so no state of [ipool_body] with all four indices empty
+   exists.  This is the statement the ruling's "sealed EMPTY at PowerOn"
+   would need. *)
+Lemma boot_empty_pool_refuted (nib : nat) (O X : gset Z)
+    (T : gmap Z (nat * Qp)) (ids : list (bool * mword 32 * mword 32)) :
+  (0 < nib)%nat ->
+  region_inums nib = O ∪ X ∪ dom T ∪ ic_live_inums ids ->
+  O = ∅ -> X = ∅ -> T = ∅ -> ic_live_inums ids = ∅ -> False.
+Proof.
+  intros Hnib Hrow HO HX HT Hlive.
+  assert (Hin : ROOTINO ∈ region_inums nib)
+    by (apply region_inums_spec; unfold ROOTINO; lia).
+  rewrite Hrow, HO, HX, HT, Hlive, dom_empty_L, union_empty_r_L,
+          union_empty_r_L, union_empty_r_L in Hin.
+  exact (not_elem_of_empty ROOTINO Hin).
+Qed.
