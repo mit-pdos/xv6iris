@@ -2842,7 +2842,7 @@ so it never wanted that shape.
     in hand, both give `2 ≤ nlink dp`.
 
   **AS LANDED — G5: THE TYPE REGISTER, THE PER-DIRECTORY EXACTNESS AND
-  THE WALKS.  ONE FILE RED (branch `lane-g5-typereg`, 1316 of 1335
+  THE WALKS.  ONE FILE RED (branch `lane-g5-typereg`, 1314 of 1333
   `iris/` files green -- `ProofCreate.v` is the only file with an error,
   and the other 18 are its dependents -- at ONE identified
   accounting seam in create's FAIL contracts).**
