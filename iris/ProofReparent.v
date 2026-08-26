@@ -53,6 +53,9 @@ Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+(* the WaitInv parent table is still the RAW word fact; the named
+   crossings below are its shim seams (stage-2 worklist). *)
+Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]).  Written
@@ -798,7 +801,7 @@ Section ProofReparentLoop.
                 M av v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hcell]").
       { iApply (rpi_34 with "Htext"). }
-      { iEval (rewrite Hrgk9 Hs1 p_parent_sext). iExact "Hcell". }
+      { iEval (rewrite Hrgk9 Hs1 p_parent_sext). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
       iIntros (CIDl Hsl) "Hcg Hpc Hcell".
       iEval (rewrite Hrgk9 Hs1 p_parent_sext) in "Hcell".
       set (M34 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v]> M).
@@ -880,6 +883,7 @@ Section ProofReparentLoop.
         iIntros (CIDo Hso) "Hcg Hpc Hcell".
         iEval (rewrite Hrgn9 HM3a_9 p_parent_sext Hrgn10 HM3a_10) in "Hcell".
         (* close the accessor: slot [k] now holds [ip], i.e. [rp_slot pv ip v] *)
+        iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
         iDestruct ("Hback" $! ip with "Hcell") as "Hpar".
         assert (Hslot : rp_slot pv ip v = ip) by (unfold rp_slot; rewrite Hcmp; reflexivity).
         pose proof (rp_upto_step pv ip k ps v Hv) as Hstep.
@@ -1022,6 +1026,7 @@ Section ProofReparentLoop.
         iNext. iIntros (CIDm Hsm) "Hcg Hpc".
         iEval (rewrite Htgt2c) in "Hpc".
         (* the cell goes back unchanged, and [rp_slot pv ip v = v] *)
+        iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
         iDestruct ("Hback" $! v with "Hcell") as "Hpar".
         assert (Hslot : rp_slot pv ip v = v) by (unfold rp_slot; rewrite Hcmp; reflexivity).
         pose proof (rp_upto_step pv ip k ps v Hv) as Hstep.

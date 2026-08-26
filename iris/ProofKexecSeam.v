@@ -75,6 +75,7 @@ Require Import SpecKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₂/↦₄ windows are still RAW (M1 stage 2) *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -432,6 +433,10 @@ Section KexecBFrame.
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (word2_pointsto_intro (KTR := KT1) _ _ _ Hal).
+      (* stage 2: [word2_pointsto] is still the RAW byte tower while this run
+         is the flipped (ctx) one -- the seam is named here. *)
+      iDestruct (TsoCtxShim.ctx_buf_to_mem KT1 cur_ctx (pa_add a o) 2
+                   (fun j => f (o + j)%nat) (DfracOwn 1) with "Hmid") as "Hmid".
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity. }
@@ -440,6 +445,9 @@ Section KexecBFrame.
     iIntros "Hw".
     iDestruct (word2_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
+    (* stage 2 again, the other way: raw halfword bytes back into the run *)
+    iApply (TsoCtxShim.ctx_buf_of_mem KT1 cur_ctx (pa_add a o) 2
+              (fun j => f (o + j)%nat) (DfracOwn 1)).
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity.
@@ -459,12 +467,19 @@ Section KexecBFrame.
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (word4_pointsto_intro (KTR := KT1) _ _ _ Hal).
+      (* stage 2: [word4_pointsto] is still the RAW byte tower while this run
+         is the flipped (ctx) one -- the seam is named here. *)
+      iDestruct (TsoCtxShim.ctx_buf_to_mem KT1 cur_ctx (pa_add a o) 4
+                   (fun j => f (o + j)%nat) (DfracOwn 1) with "Hmid") as "Hmid".
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
     iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
+    (* stage 2 again, the other way: raw word bytes back into the run *)
+    iApply (TsoCtxShim.ctx_buf_of_mem KT1 cur_ctx (pa_add a o) 4
+              (fun j => f (o + j)%nat) (DfracOwn 1)).
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity.

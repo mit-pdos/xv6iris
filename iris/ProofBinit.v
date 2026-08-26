@@ -66,6 +66,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecBinit.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* BcacheInv's link cells ([blink_raw]/[bcache_lru]) are
+                         still the RAW word tower: every store/load of one
+                         crosses the ctx seam here. *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -631,6 +634,10 @@ Section ProofBinit.
     (* +0x34 sd a4,688(a5) : bcache.head.prev := &bcache.head *)
     iDestruct "Hhlink" as "[Hhp Hhn]".
     iDestruct "Hhp" as (vhp) "Hhp". iDestruct "Hhn" as (vhn) "Hhn".
+    (* [blink_raw] is BcacheInv's RAW word tower: cross into the ctx world
+       for the two stores and cross back for [bcache_lru_nil]. *)
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhp") as "Hhp".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhn") as "Hhn".
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.binit + 0x34)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 688 : mword 12)
               T4 (K - 6)%nat vhp b with "Hcg Hpc [] [Hhp]").
     { iApply (bii_34 with "Htext"). }
@@ -646,6 +653,9 @@ Section ProofBinit.
     { iEval (rgne). iEval (rewrite HT4a5 hbase_next). iExact "Hhn". }
     iIntros (CID20 Hs20) "Hcg Hpc Hhn".
     iEval (rgne; rgne) in "Hhn". iEval (rewrite HT4a5 hbase_next HT4a4) in "Hhn".
+    (* back across the ctx seam: [bcache_lru] is BcacheInv's RAW word tower *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhn") as "Hhn".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhp") as "Hhp".
     iPoseProof (bcache_lru_nil bhead with "Hhn Hhp") as "Hlru".
     assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.binit + 0x38) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3c) in "Hpc".
@@ -833,10 +843,16 @@ Section ProofBinit.
       iDestruct "Hlnk" as "[Hlnk0 Hlnk]".
       iDestruct "Hlnk0" as "[Hbp Hbn]".
       iDestruct "Hbp" as (vbp) "Hbp". iDestruct "Hbn" as (vbn) "Hbn".
+      (* the four link cells cross into the ctx world for the splice's four
+         accesses and cross back for [Hclose] (BcacheInv is RAW) *)
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hbp") as "Hbp".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hbn") as "Hbn".
       iDestruct "Hraw0" as (vlocked vlk vpid vlkname vcpu' vname') "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6p)".
       (* open the list: the head's next cell and the prev cell of whatever it
          points at, plus the wand that closes over the new node *)
       iPoseProof (bcache_lru_splice bhead l with "Hlru") as "(Hhn & Hhp & Hclose)".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhn") as "Hhn".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhp") as "Hhp".
       (* +0x50 ld a5,696(s2) : a5 := bcache.head.next *)
       iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.binit + 0x50)) (mword_of_int 15 : mword 5) s2i (mword_of_int 696 : mword 12)
                 M (K - 6)%nat (List.hd bhead l) b (dqm:=DfracOwn 1)
@@ -1030,6 +1046,10 @@ Section ProofBinit.
       iIntros (CIDm10 Hsm10) "Hcg Hpc Hhn".
       iEval (rgne; rgne) in "Hhn". iEval (rewrite HN1s2 hbase_next HN1s1) in "Hhn".
       (* the splice is complete: close the list over the new node *)
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhn") as "Hhn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhp") as "Hhp".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hbn") as "Hbn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hbp") as "Hbp".
       iPoseProof ("Hclose" $! (bnode j) with "Hhn Hhp Hbn Hbp") as "Hlru".
       assert (Hpp6e : add_vec_int (mword_of_int (KernelSyms.binit + 0x6a) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x6e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp6e) in "Hpc".

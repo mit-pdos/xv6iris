@@ -300,8 +300,9 @@ Section ProofSysMkdirFrame.
       iSplitL "H6"; [iExact "H6" |]. iSplitL "H5"; [iExact "H5" |].
       iSplitL "H4"; [iExact "H4" |]. iSplitL "H3"; [iExact "H3" |].
       done. }
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H1") as "H1".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H2") as "H2".
+    (* [stack_own] is flipped: H1/H2 already arrive at the ambient context
+       (the flip-era [ctx_eslot_of_mem] here was a no-op under the old
+       permeable seal and is now backwards). *)
     iFrame "H1 H2 Hb". iPureIntro. exact Hal.
   Qed.
 

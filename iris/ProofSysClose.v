@@ -60,6 +60,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -523,7 +524,9 @@ Section ProofSysClose.
     assert (Hnzfd : M6 !!! Regidx (mword_of_int 11 : mword 5) <> (zero_reg : mword 64)).
     { rewrite HM6a1 sc_addr_fd_base. apply stack_off_nonzero; [exact Hspb | lia]. }
     (* carve the [int fd] cell out of the upper half of frame slot 3 *)
-    iDestruct (word_pointsto_aligned_p with "Hs3") as %Hal3.
+    iDestruct (ctx_word_pointsto_aligned_p with "Hs3") as %Hal3.
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs3") as "Hs3".
     iDestruct (word_pointsto_split4 with "Hs3") as "[Hs3lo Hs3hi]".
     iEval (rewrite -HM6a1) in "Hs3hi".
     iEval (rewrite -HM6a2) in "Hs4".
@@ -613,6 +616,7 @@ Section ProofSysClose.
       iEval (rewrite HM6a1) in "Hfdcell".
       iEval (rewrite HM6a2) in "Hfcell".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs3") as "Hs3".
       iApply (sc_tail (CID0 := CID11) m A7 av (mword_of_int (-1) : mword 64) sp0 ra0 s00 _ w4 b p
                 ltac:(lia) eq_refl eq_refl eq_refl HA7sp HA7a5 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
@@ -886,6 +890,7 @@ Section ProofSysClose.
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot". }
       (* rejoin frame slot 3 *)
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs3") as "Hs3".
       (* the epilogue's register facts *)
       assert (HR8a5 : R8 !!! Regidx (mword_of_int 15 : mword 5) = (zero_reg : mword 64))
         by (rewrite /R8 upd_eq; reflexivity).

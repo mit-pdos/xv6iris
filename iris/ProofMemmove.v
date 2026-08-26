@@ -159,6 +159,26 @@ Section ProofMemmove.
   (* the source's and the destination's own tiers -- see SpecMemmove.v's note *)
   Context {kts ktw : ktier}.
   Context `{!KtierLe kts kt} `{!KtierLe ktw kt}.
+  (* THE CTX MIRROR of [RiscvPtsto.mem_bytes_notin_r].  After the M1 flip
+     BOTH sides of memmove's aliasing refutation are context facts, so this
+     is NOT a seam: the same induction runs over [TsoCtx]'s exported
+     [ctx_pointsto_ne] and no shim is involved. *)
+  Local Lemma ctx_bytes_notin_r {kt1 kt2 : ktier} (x1 x2 : CtxId)
+      (a c : Arch.pa) (k n : nat) (dq : dfrac) (f : nat -> bv 8) (v : bv 8) :
+    ([∗ list] j ∈ seq k n, ctx_pointsto (KTR := kt1) x1 (pa_add a j) dq (f j)) -∗
+    ctx_pointsto (KTR := kt2) x2 c (DfracOwn 1) v -∗
+    ⌜forall j, (k <= j < k + n)%nat -> pa_add a j <> c⌝.
+  Proof.
+    revert k. induction n as [|n IH]; intros k; simpl.
+    - iIntros "_ _". iPureIntro. intros j Hj. lia.
+    - iIntros "[Hh Ht] Hc".
+      iDestruct (ctx_pointsto_ne with "Hc Hh") as %Hne0.
+      iDestruct (IH (S k) with "Ht Hc") as %Hrest.
+      iPureIntro. intros j Hj.
+      destruct (decide (j = k)) as [->|Hjk]; [exact (fun H => Hne0 (eq_sym H))|].
+      apply Hrest. lia.
+  Qed.
+
   (* [callee_saved] from agreement on the twelve registers the function never
      touches, plus the two frame registers it saves and restores. *)
   Local Lemma cs_from_agree (m M : regfile) :
@@ -1011,7 +1031,7 @@ Section ProofMemmove.
           iEval (rewrite (seq_cons 0 len')) in "Hdst".
           iDestruct "Hdst" as "[Hd0 _]".
           iEval (rewrite pa_add_0) in "Hd0".
-          iDestruct (mem_bytes_notin_r with "Hsrc Hd0") as %Hnotin.
+          iDestruct (ctx_bytes_notin_r with "Hsrc Hd0") as %Hnotin.
           destruct (Hnotin j ltac:(lia) Hjeq).
       + (* src >=u dst: no overlap is possible, the ascending copy runs directly *)
         assert (Hp0e : add_vec_int (mword_of_int (KernelSyms.memmove + 0x0a) : mword 64) 4

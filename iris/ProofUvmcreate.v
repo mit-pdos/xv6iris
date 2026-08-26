@@ -555,7 +555,9 @@ Section ProofUvmcreate.
     iApply (MS.wp_memset_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf]").
-    { iApply (ctx_buf_of_mem KT0 cur_ctx).
+    { (* [page_own]'s bytes are ALREADY context-indexed (KallocInv's [byte_any]
+         flipped with ↦ₘ), so no shim crossing here: only the address form
+         differs. *)
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID13 Hs13 mfin) "Hcg Hpc Hbytes %Hmcs".
     iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".

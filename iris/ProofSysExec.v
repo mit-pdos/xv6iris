@@ -1762,15 +1762,14 @@ Section SysExecSetup.
       by (rewrite /N5 upd_ne; [exact HN4s0 | nz]).
     iDestruct (sx_bytes_name (pa_stk sp0 58) 256 with "Hab") as (af) "Haz".
     iEval (rewrite -HN5a0) in "Haz".
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "Haz") as "Haz".
+    (* memset's contract is context-indexed and so is the stack-byte window
+       the carve hands us (M1 flip): both sides already speak the ambient
+       context, so the flip-era [ctx_buf_of_mem] crossing here -- a no-op
+       under the old permeable seal -- is gone. *)
     iApply (Memset.wp_memset_sconf KT1 KT1 N5 (K - 60)%nat 256%nat
               (mword_of_int 0 : mword 64) af b pj
               K2 ltac:(lia) HN5a1 HN5a2 with "Hcg Htext Hpc Haz").
     iIntros (CIDa6 Hqa6 N6) "Hcg Hpc Haz %Hcsa6".
-    iDestruct (ctx_buf_to_mem with "Haz") as "Haz".
     iEval (rewrite HN5a0) in "Haz".
     assert (HN6sp : sx_sp sp0 N6).
     { rewrite /sx_sp (callee_saved_lookup Hcsa6 csp_rs1

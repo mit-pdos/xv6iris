@@ -87,6 +87,9 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+(* the WaitInv parent table is still the RAW word fact; the named
+   crossings below are its shim seams (stage-2 worklist). *)
+Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -405,11 +408,12 @@ Section ProofKforkB5.
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
               mr5 (trap_res b + (K - 8))%nat vold false with "Hcg Hpc [] [Hpcell]").
     { iApply (kfk_0d4 with "Htext"). }
-    { iEval (rewrite Hea_d4). iExact "Hpcell". }
+    { iEval (rewrite Hea_d4). iApply (TsoCtxShim.ctx_word_of_mem with "Hpcell"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
     iEval (rewrite Hea_d4) in "Hpcell".
     assert (Hst_rs5 : rget mr5 Rs5 = pme) by (rewrite (rget_ne mr5 Rs5 ltac:(vm_compute; discriminate)); exact Hr5s5).
     iEval (rewrite Hst_rs5) in "Hpcell".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpcell") as "Hpcell".
     iDestruct ("Hpoback" $! pme with "Hpcell") as "Hpo".
     iAssert (WaitInv.wait_res) with "[Hpo]" as "Hwaitres".
     { iExists (<[j := pme]> ps). iExact "Hpo". }

@@ -132,6 +132,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -1046,7 +1047,9 @@ Section ProofSysMknodBody.
     (* slot 19, carved into the two [int] cells.  The 8-alignment comes out
        FIRST -- the halves no longer carry it and the join wants it back
        (durable-notes, "A C LOCAL TAKEN BY ADDRESS"). *)
-    iDestruct (word_pointsto_aligned_p with "Hf19") as %Hal19.
+    iDestruct (ctx_word_pointsto_aligned_p with "Hf19") as %Hal19.
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hf19") as "Hf19".
     iDestruct (word_pointsto_split4 with "Hf19") as "[Hmin Hmaj]".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
@@ -1555,6 +1558,7 @@ Section ProofSysMknodBody.
       iDestruct (word4_pointsto_join2 (KTR := KT1) _ _ _ _
                    (aligned8_aligned4_hi _ Hal19) with "Hmajlo Hmajhi") as "Hmaj".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hf19") as "Hf19".
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)
       iApply (wp_cli_s_sconf (CID := CID22) (mword_of_int (MN + 0x3a)) Ra1
                 (mword_of_int 3 : mword 6)
@@ -1911,6 +1915,7 @@ Section ProofSysMknodBody.
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hf19") as "Hf19".
       iDestruct (proc_priv_bare_acc gf pj pid (upd_upt V P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID19 CID20 0 eb pj b

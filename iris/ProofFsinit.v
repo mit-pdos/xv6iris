@@ -98,6 +98,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the ↦₄ superblock fields are still RAW (M1 stage 2) *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -261,6 +262,10 @@ Section FsinitDefs.
   Proof.
     intros Hal Hf. iIntros "H". rewrite /word4_pointsto.
     iSplitR; [done |].
+    (* stage 2: [word4_pointsto] is still the RAW byte tower while these
+       bytes are the flipped (ctx) ones -- the seam is named here. *)
+    iDestruct (TsoCtxShim.ctx_buf_to_mem _ cur_ctx (pa_add a o) 4
+                 (fun jj => f (o + jj)%nat) (DfracOwn 1) with "H") as "H".
     iApply (big_sepL_mono with "H"). intros i x Hj.
     apply lookup_seq in Hj as [-> Hlt].
     rewrite (Hf (0 + i)%nat ltac:(lia)). done.

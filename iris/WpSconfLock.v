@@ -432,8 +432,13 @@ Section WpSconfLock.
       iEval (rewrite lk_cpu_cell_acc) in "Hcpu".
       iDestruct (Hview st with "Hg Hrest HT") as %Hphi.
       iModIntro. iExists (lk_cpu_val st).
+      (* the AU's datum premise is the RAW window ([WpSconfMem.wordw_pointsto],
+         deliberately raw); the invariant's cell is the flipped [↦₈].  One
+         named crossing each way, [WpSconfMem.wordw8_ctx]. *)
+      iEval (rewrite -wordw8_ctx) in "Hcpu".
       iSplitL "Hcpu"; [ rewrite -Hpacpu; iExact "Hcpu" | ].
       iIntros "Hcpu".
+      iEval (rewrite wordw8_ctx) in "Hcpu".
       iMod ("Hclose" with "[Hword Hcpu Hrest Hg Hbr]") as "_".
       { iNext. iExists w, st. iFrame "Hword Hg Hbr".
         rewrite /lk_cpu_res. iFrame "Hrest". rewrite lk_cpu_cell_acc.
@@ -678,8 +683,13 @@ Section WpSconfLock.
         as "(%Hstne & %Hstnne & Hg & Hcpu & Hback)".
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
       iModIntro. iExists (lk_cpu_val st).
+      (* the AU's datum premise is the RAW window; the exchange premise trades
+         in the flipped [↦₈].  One named crossing each way
+         ([WpSconfMem.wordw8_ctx]). *)
+      iEval (rewrite -wordw8_ctx) in "Hcpu".
       iSplitL "Hcpu"; [ rewrite -Hpacpu; iExact "Hcpu" | ].
       iIntros "Hcpu".
+      iEval (rewrite wordw8_ctx) in "Hcpu".
       iMod ("Hback" with "[Hcpu]") as "[Hcpures HT']".
       { rewrite Hsv -Hpacpu. iExact "Hcpu". }
       iMod ("Hclose" with "[Hword Hcpures Hg]") as "_".

@@ -2003,7 +2003,7 @@ Section WpSmodePtMemLeaves.
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
-    iDestruct (word_pointsto_intro (KTR := kt') _ _ _ Hpalign4 with "Hbytes")
+    iDestruct (ctx_word_pointsto_intro (KTR := kt') _ _ _ _ Hpalign4 with "Hbytes")
       as "Hword".
     iApply (wp_instr_s_config_folded R pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 8))

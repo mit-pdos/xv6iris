@@ -79,7 +79,7 @@ Section ProofKfork.
      spilled, so which of them holds a saved register and which holds junk
      depends on the path; every exit therefore takes them EXISTENTIALLY and
      the epilogue never reads them.  Slot 8 is the unused padding word. *)
-  Definition kfk_frame (sp0 ra0 s00 s10 s50 : mword 64) : iProp Σ :=
+  Definition kfk_frame `{XI : CurCtx} (sp0 ra0 s00 s10 s50 : mword 64) : iProp Σ :=
     (ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
      ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 ∗
      ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 ∗
@@ -101,7 +101,7 @@ Section ProofKfork.
   (* the caller's s2/s3/s4.  An existential slot cannot supply that, so the *)
   (* two mid-function continuations carry this form and weaken to           *)
   (* [kfk_frame] only at the exit that does not care.                       *)
-  Definition kfk_frame_at (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) : iProp Σ :=
+  Definition kfk_frame_at `{XI : CurCtx} (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) : iProp Σ :=
     (ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
      ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 ∗
      ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 ∗
@@ -111,7 +111,7 @@ Section ProofKfork.
      ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 ∗
      (∃ w8, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8))%I.
 
-  Lemma kfk_frame_at_weaken (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) :
+  Lemma kfk_frame_at_weaken `{XI : CurCtx} (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) :
     kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 w6 -∗ kfk_frame sp0 ra0 s00 s10 s50.
   Proof.
     rewrite /kfk_frame_at /kfk_frame.

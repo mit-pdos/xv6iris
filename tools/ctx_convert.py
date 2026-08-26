@@ -239,7 +239,8 @@ FLIPPED = re.compile(r"↦ₘ|↦₈|↦c|cur_ctx|is_lock|lock_openable|lock_inv
                      r"|ftable_res|free_slot_res|free_cell_res|uw_saved"
                      r"|uw_slot|console_caps|is_conslock|is_txlock"
                      r"|disk_res_at|lw_res|lw_close|file_core|file_fields"
-                     r"|fd_slot|proc_priv|is_pipe|pipe_ref|fentry|disk_res")
+                     r"|fd_slot|proc_priv|is_pipe|pipe_ref|fentry|disk_res"
+                     r"|park_cap|park_chan|park_token|park_pkg|park_env|park_child")
 
 # boot/adequacy: statements stay raw or explicit-ξ; a phantom ambient here is
 # the boot_hart_res/eight-hart lesson.  (BootCarve talks to the flipped world

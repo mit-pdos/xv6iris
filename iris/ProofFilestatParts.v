@@ -330,7 +330,9 @@ Section FilestatParts.
   Proof.
     iIntros "Hw". iDestruct (word4_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (kk jj Hk) "Hb". by iExists (nth_byte w jj).
+    (* ↦₄ has not flipped yet (M1 stage 2): the raw bytes cross here *)
+    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj).
+    by iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
   Qed.
 
   Lemma fst_w2_bytes `{XI : CurCtx} (a : Arch.pa) (w : mword 16) :
@@ -338,7 +340,9 @@ Section FilestatParts.
   Proof.
     iIntros "Hw". iDestruct (word2_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (kk jj Hk) "Hb". by iExists (nth_byte w jj).
+    (* ↦₂ has not flipped yet (M1 stage 2): the raw bytes cross here *)
+    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj).
+    by iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
   Qed.
 
   Lemma fst_stat_bytes `{XI : CurCtx} (st : mword 64) (dev ino : mword 32) (ty nl : mword 16)

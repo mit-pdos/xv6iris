@@ -276,8 +276,18 @@ Module Type SYSCALL.
      which genuinely is per-hart -- [TimerCap.timer_cap] holds this hart's
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
+  (* ...but NOT context-free.  The bundle's last conjunct is
+     [ParkCap.park_token], whose package names the child's stack
+     ([StackOwn] flipped at the M1 notation flip) and its context cells, so
+     the union carries the AMBIENT ξ exactly as [wp_syscall_sconf] and
+     [syscall_env_park] do.  The ξ-freedom [ParkCap]'s header aims at is
+     about the ∀-quantified RESUMER's context, not this one.  The binder
+     leads the list because that is where Section discharge puts it in
+     [ProofSyscall]'s definition, and module-signature matching is by
+     position. *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    forall {Σ : gFunctors} `{XI : CurCtx}
+           `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId},
       gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
   (* ===================================================================== *)

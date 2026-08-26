@@ -19,6 +19,8 @@ VirtioModel.v
 DiskImg.v
 DevModel.v
 TsoMem.v
+TsoMemPa.v
+TsoGhost.v
 TsoLitmus.v
 TsoCtxTwin.v
 TsoCtxRehearsal.v

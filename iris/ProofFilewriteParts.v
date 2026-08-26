@@ -89,6 +89,8 @@ Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the devsw slot is still a RAW word here; the [c.ld]
+                         leaf takes the ctx one *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -1255,12 +1257,16 @@ Section ProofFilewriteParts.
         [| apply bv_eq; vm_compute; reflexivity].
       by rewrite fr_addv64_moi. }
     iEval (rewrite -Hpsl) in "Hslot".
+    (* the devsw slot is held RAW in this statement; the [c.ld] leaf takes and
+       returns the ctx word, so the crossing is at the call *)
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hslot") as "Hslot".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x80)) Ra5 Ra5
               (mword_of_int 8 : mword 12) D4 K slot b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hslot").
     { iApply (fwri_080 with "Htext"). }
     iIntros (CID5 Hq5) "Hcg Hpc Hslot". iEval (rewrite Hpsl) in "Hslot".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
     set (D5 := <[Regidx Ra5 := regval_into_reg slot]> D4).
     assert (Hpp82 : add_vec_int (mword_of_int (FW + 0x80) : mword 64) 2
                     = mword_of_int (FW + 0x82)) by (apply bv_eq; vm_compute; reflexivity).

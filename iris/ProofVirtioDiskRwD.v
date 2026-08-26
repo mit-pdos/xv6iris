@@ -67,6 +67,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦ₚ has not flipped (M1 stage 2): ctx bytes cross into
+                         the raw physical-identity laws *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -1050,6 +1052,9 @@ Section VdrwdPinRes.
     iIntros (Hs) "#Hb H". rewrite /phys_list.
     iApply (big_sepL_impl with "H").
     iIntros "!>" (k x Hk) "Hx".
+    (* [↦ₚ] has not flipped (M1 stage 2): the ctx byte crosses into the raw
+       disassembly law *)
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hx") as "Hx".
     iApply (mem_ident_phys (pa_add a k) (DfracOwn 1) x
               (Hs k ltac:(apply lookup_lt_Some in Hk; lia)) with "Hb Hx").
   Qed.

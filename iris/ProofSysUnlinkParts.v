@@ -906,12 +906,8 @@ Section ProofSysUnlinkFrame.
       as "[%HalE HbE]".
     { cbn [seq]. iSplitL "H29"; [iExact "H29" |].
       iSplitL "H28"; [iExact "H28" |]. done. }
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H1") as "H1".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H2") as "H2".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H3") as "H3".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H4") as "H4".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H5") as "H5".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H6") as "H6".
+    (* [stack_own]'s slots are already context-indexed (StackOwn flipped):
+       the ∃-slots need no shim crossing. *)
     iFrame "H1 H2 H3 H4 H5 H6 HbD HbN HbP H27 HbE H30". iPureIntro.
     split_and!; assumption.
   Qed.

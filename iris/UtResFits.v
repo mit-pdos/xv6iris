@@ -55,7 +55,7 @@ Module Type USERTRAP_RES_PARK.
   Include SpecUsertrap.USERTRAP_RES.
   Parameter usertrap_res_bare_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (N : ut_names) (av : nat),
       ut_park_intro_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av.
@@ -68,7 +68,7 @@ Module Type USERTRAP_PARK.
   Include SpecUsertrap.USERTRAP.
   Parameter usertrap_res_bare_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (N : ut_names) (av : nat),
       ut_park_intro_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av.
@@ -155,7 +155,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
      moment anybody has it. *)
   Lemma usertrap_res_bare_park
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (N : ut_names) (av : nat) :
       ut_park_intro_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av.

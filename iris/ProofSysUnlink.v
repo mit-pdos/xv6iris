@@ -606,8 +606,14 @@ Section ProofSysUnlinkBody.
     iSplit.
     - iIntros "H".
       iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) (dir_inum data i) Hal).
-      iExact "H".
-    - iIntros "H". iApply (word2_pointsto_bytes (KTR := KT1) with "H").
+      (* stage 2: [word2_pointsto] is still the RAW byte tower while these
+         bytes are the flipped (ctx) ones -- the seam is named here. *)
+      iApply (ctx_buf_to_mem KT1 cur_ctx a 2
+                (fun j => nth_byte (dir_inum data i) j) (DfracOwn 1) with "H").
+    - iIntros "H".
+      iApply (ctx_buf_of_mem KT1 cur_ctx a 2
+                (fun j => nth_byte (dir_inum data i) j) (DfracOwn 1)).
+      iApply (word2_pointsto_bytes (KTR := KT1) with "H").
   Qed.
 
   Lemma su_name_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
@@ -2242,7 +2248,7 @@ Section ProofSysUnlinkBody.
                         = mword_of_int (SU + 0x5e)) by pcw.
         iEval (rewrite Hpp5e) in "Hpc".
         (* the [off] cell, carved out of slot 27's UPPER word *)
-        iDestruct (word_pointsto_aligned_p with "H27") as %Hal27.
+        iDestruct (ctx_word_pointsto_aligned_p with "H27") as %Hal27.
         iDestruct (su_off_split sp0 w27 with "H27") as "[H27lo H27hi]".
         (* ===== +0x5e addi a2,s0,-212 -- &off ===== *)
         iApply (wp_addi4_s_sconf (CID := CID15) (mword_of_int (SU + 0x5e)) Ra2
@@ -4592,10 +4598,9 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "HbD") as "HbD".
+    (* memset's contract is context-indexed AND so is this caller's buffer
+       (the M1 flip): both sides are [ctx_pointsto] now, so the sweep-era
+       shim crossing that used to sit here is gone. *)
     iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
@@ -4603,7 +4608,6 @@ Section ProofSysUnlinkBody.
               with "Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
     iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
-    iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x98)) by (rewrite HA5ra; pcw).
@@ -6144,10 +6148,9 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iDestruct (ctx_buf_of_mem KT1 cur_ctx with "HbD") as "HbD".
+    (* memset's contract is context-indexed AND so is this caller's buffer
+       (the M1 flip): both sides are [ctx_pointsto] now, so the sweep-era
+       shim crossing that used to sit here is gone. *)
     iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
@@ -6155,7 +6158,6 @@ Section ProofSysUnlinkBody.
               with "Hcg Htext Hpc [HbD]").
     { iEval (rewrite HA5a0). iExact "HbD". }
     iIntros (D6 Hd6 mms) "Hcg Hpc HbD %Hcsms".
-    iDestruct (ctx_buf_to_mem with "HbD") as "HbD".
     iEval (rewrite HA5a0) in "HbD".
     assert (Hpc98 : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x98)) by (rewrite HA5ra; pcw).

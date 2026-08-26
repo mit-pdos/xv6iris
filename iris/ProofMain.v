@@ -959,7 +959,7 @@ Section ProofMain.
        the one-shot -- so kvminithart below (and on every secondary hart)
        needs only the persistent [kpt_inv] + root cell. ---- *)
     iApply fupd_wp.
-    iMod (word_pointsto_persist with "Hkpt") as "#Hkptp".
+    iMod (ctx_word_pointsto_persist with "Hkpt") as "#Hkptp".
     iMod (kvm_M_mint pas with "Hkauth") as "(Hauth & #Htramp & #Hkstx)".
     (* ---- K1 -- THE MINT (claude-notes/projects/sp-migration.md).  The 64
        claims just minted, against the 64 identity-mapped pages kvminit
@@ -1642,9 +1642,9 @@ Section ProofMain.
     iEval (rewrite Heldk) in "Hdlnm".
     iEval (rewrite Heldk) in "Hdcpu".
     iApply fupd_wp.
-    iMod (word_pointsto_persist with "Hdd") as "#Hddp".
-    iMod (word_pointsto_persist with "Hda") as "#Hdap".
-    iMod (word_pointsto_persist with "Hdu") as "#Hdup".
+    iMod (ctx_word_pointsto_persist with "Hdd") as "#Hddp".
+    iMod (ctx_word_pointsto_persist with "Hda") as "#Hdap".
+    iMod (ctx_word_pointsto_persist with "Hdu") as "#Hdup".
     iAssert (disk_geom γv pd pav pu) as "#Hgeom".
     { rewrite /disk_geom.
       iSplitR; [iExact "Hddp"|]. iSplitR; [iExact "Hdap"|].

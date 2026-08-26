@@ -374,6 +374,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the unflipped towers (↦₄ / ↦ₛ) cross the seam here *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -2061,7 +2062,10 @@ Section SyscallVocab.
   Proof.
     rewrite /pname_bytes big_sepL_app /string_pointsto.
     apply bi.sep_proper; [| reflexivity].
-    apply big_sepL_proper. intros k x Hk. by rewrite sysc_name_addr.
+    (* ↦ₛ has not flipped (M1 stage 2): [string_pointsto] is still the raw
+       byte tower, so each of [pname_bytes]'s ctx bytes crosses the seam. *)
+    apply big_sepL_proper. intros k x Hk. rewrite sysc_name_addr.
+    apply TsoCtxShim.ctx_pointsto_shim.
   Qed.
 
   (* [&p->name] is never null: the proc array sits far above 0, exactly as

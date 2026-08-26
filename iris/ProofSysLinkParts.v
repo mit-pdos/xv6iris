@@ -633,10 +633,9 @@ Section ProofSysLinkFrame.
       iSplitL "H26"; [iExact "H26" |]. iSplitL "H25"; [iExact "H25" |].
       iSplitL "H24"; [iExact "H24" |]. iSplitL "H23"; [iExact "H23" |].
       done. }
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H1") as "H1".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H2") as "H2".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H3") as "H3".
-    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "H4") as "H4".
+    (* [stack_own] is flipped: H1..H4 already arrive at the ambient context
+       (the flip-era [ctx_eslot_of_mem] here was a no-op under the old
+       permeable seal and is now backwards). *)
     iFrame "H1 H2 H3 H4 HbN HbW HbO". iPureIntro.
     split_and!; assumption.
   Qed.

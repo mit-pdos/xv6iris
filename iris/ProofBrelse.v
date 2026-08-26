@@ -199,7 +199,18 @@ Section ProofBrelse.
               exec_write_ram_plain_8 (store_ext_8 (rget (CID := CID0) m0 rs2)) HkptEm
               with "Hcg Hpc Hinstr [] [HAU] Hcont").
     { rewrite Hsp. iExact "Hcl". }
-    { rewrite Hsp. iExact "HAU". }
+    { (* the AU's datum premise is the engine's RAW window
+         ([WpSconfMem.wordw_pointsto], deliberately raw); this wrapper's
+         statement is the flipped [↦₈].  One named crossing each way
+         ([WpSconfMem.wordw8_ctx]), done by hand under the [∃ vold] because
+         setoid_rewrite cannot reach under it here. *)
+      rewrite Hsp.
+      iMod "HAU" as (vold) "[Hw Hclose]".
+      iModIntro. iExists vold.
+      iEval (rewrite -(wordw8_ctx (KTR2 := KT1))) in "Hw".
+      iFrame "Hw". iIntros "Hw".
+      iEval (rewrite (wordw8_ctx (KTR2 := KT1))) in "Hw".
+      iApply ("Hclose" with "Hw"). }
   Qed.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
@@ -634,10 +645,15 @@ Section ProofBrelse.
     (* the store's ADDRESS CLAIM, read straight off the frame slot that is
        about to be deposited: [wordw_claim_of]'s conclusion is persistent, so
        [Hr24] is still here for the atomic update below. *)
+    (* the claim is read off the engine's RAW window; the frame slot is the
+       flipped [↦₈] ([StackOwn] is thread data), so the slot crosses by name
+       ([WpSconfMem.wordw8_ctx]) and crosses straight back. *)
+    iEval (rewrite -(wordw8_ctx (KTR2 := KT1))) in "Hr24".
     iDestruct (wordw_claim_of (KTR := KT1) 8
                  (add_vec (R1 !!! Regidx csp_rs1)
                     (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
                  (DfracOwn 1) vr24 ltac:(lia) with "Hr24") as "#Hclr24".
+    iEval (rewrite (wordw8_ctx (KTR2 := KT1))) in "Hr24".
     iApply (wp_csdsp_au_s_sconf (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
               R1 (K - 4)%nat
               ((add_vec (R1 !!! Regidx csp_rs1)
@@ -667,7 +683,8 @@ Section ProofBrelse.
       iMod (escrow_swap_park_now _ bn V k true dev bno bs
               with "Hbody Hvalid Hbdev Hbuf Hbpayload") as "[Hbody Hpark]".
       iModIntro. iExists vr24.
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hr24") as "Hr24".
+      (* (the flip-era [ctx_word_of_mem] here is gone: BOTH the frame slot and
+         the wrapper's atomic update are the flipped [↦₈] now.) *)
       iFrame "Hr24".
       iIntros "Hcell". iEval (rgpeel) in "Hcell".
       iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
@@ -1112,6 +1129,13 @@ Section ProofBrelse.
       iEval (cbn [List.map]) in "Hlru".
       iDestruct (bcache_lru_unlink bhead (bnode k) (map bnode o1) (map bnode o2)
                    with "Hlru") as "(Hbp & Hbn & Hpn & Hsp & Hrelink)".
+      (* BcacheInv's LRU cells are still the RAW word tower: the four cells
+         the unlink/splice touches cross the ctx seam here and cross back
+         when the list closes. *)
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hbp") as "Hbp".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hbn") as "Hbn".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hpn") as "Hpn".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hsp") as "Hsp".
       (* +0x34 c.ld a4,80(s1) : a4 := b->next *)
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x34)) Ra4 Rs1 (mword_of_int 80 : mword 12)
                 D2 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o2)) false
@@ -1191,10 +1215,14 @@ Section ProofBrelse.
       iIntros "Hcg Hpc Hpn".
       iEval (rgpeel) in "Hpn".
       iEval (rewrite HE3a5 HE3a4) in "Hpn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpn") as "Hpn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hsp") as "Hsp".
       iDestruct ("Hrelink" with "Hpn Hsp") as "Hlru".
       (* ---- reinsert after the head ---- *)
       iDestruct (bcache_lru_splice bhead (map bnode o1 ++ map bnode o2)%list with "Hlru")
         as "(Hhn & Hhp & Hsplice)".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhn") as "Hhn".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hhp") as "Hhp".
       assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.brelse + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.brelse + 0x3e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3e) in "Hpc".
@@ -1355,6 +1383,10 @@ Section ProofBrelse.
       iIntros "Hcg Hpc Hhn".
       iEval (rgpeel) in "Hhn".
       iEval (rewrite HE9hn HE9s1) in "Hhn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhn") as "Hhn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hhp") as "Hhp".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hbn") as "Hbn".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hbp") as "Hbp".
       iDestruct ("Hsplice" $! (bnode k) with "Hhn Hhp Hbn Hbp") as "Hlru".
       (* ---- the new order, still a permutation of [seq 0 NBUF] ---- *)
       assert (Hord' : (k :: (o1 ++ o2))%list ≡ₚ seq 0 NBUF).

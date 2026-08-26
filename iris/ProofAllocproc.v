@@ -1862,10 +1862,13 @@ Section ProofAllocproc.
         iApply (MS.wp_memset_sconf KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
                   ltac:(pose proof (ap_K2 K HK); lia) ltac:(vm_compute; reflexivity) HG4a1 HG4a2
                   with "Hcg Htext Hpc [Hbw]").
-        { iEval (rewrite HG4a0).
-          iApply (ctx_buf_of_mem KT0 cur_ctx with "Hbw"). }
+        (* the byte window is ALREADY a ctx fact (ByteBuf is flipped) and so is
+           memset's contract: the flip-era shim crossing here was a no-op under
+           the permeable seal and is simply wrong now. *)
+        { iEval (rewrite HG4a0). iExact "Hbw". }
         iApply wp_next_off_intro. iIntros (mms) "Hcg Hpc Hbw %Hcsms".
-        iDestruct (ctx_buf_to_mem with "Hbw") as "Hbw".
+        (* ...and [ProcInv.own_ctx_bytes]'s closer wants the ctx window back,
+           so no conversion here either. *)
         iEval (rewrite HG4a0) in "Hbw".
         assert (Hp66 : ret_pc (G4 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x66))
           by (rewrite HG4ra; apply bv_eq; vm_compute; reflexivity).

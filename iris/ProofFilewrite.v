@@ -370,6 +370,7 @@ Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* [fw_devidx]'s devsw slot is still RAW (M1 stage 2) *)
 
 Local Open Scope Z_scope.
 
@@ -3402,11 +3403,15 @@ Section ProofFilewrite.
                               = (mword_of_int (bv_unsigned (fc_major Cf)) : mword 64)).
              { rewrite HD4a5. apply fr_sext16_small. exact Hmj15. }
              iEval (rewrite /a_devsw_write /dev_major) in "Hslot".
+             (* stage 2: [fw_devidx] states the devsw slot with the RAW
+                [word_pointsto]; the flipped fact crosses through the shim. *)
+             iDestruct (TsoCtxShim.ctx_word_to_mem with "Hslot") as "Hslot".
              iApply (fw_devidx (CID0 := CID16) D4 (K - 12)%nat
                        (bv_unsigned (fc_major Cf)) (fwn_wp fn (dev_major Cf)) (fwn_dqv fn (dev_major Cf)) pj b
                        (conj Hmj0 Hmj16) HD4a5m
                        with "Hcg Htext Hpc Hslot").
              iIntros (CID17 Hs17 Dr) "%Hdr Hcg Hpc Hslot".
+             iDestruct (TsoCtxShim.ctx_word_of_mem _ cur_ctx with "Hslot") as "Hslot".
              destruct Hdr as (HDra5 & HDrthr).
              iEval (rewrite -(_ : a_devsw_write (dev_major Cf)
                                   = mword_of_int (KernelSyms.devsw

@@ -666,7 +666,7 @@ Section ProofSysOpenPublish.
     iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
     iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
     iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip1 & Hmaj)".
-    iDestruct (word_pointsto_agree with "Hip2 Hip1") as %->.
+    iDestruct (ctx_word_pointsto_agree with "Hip2 Hip1") as %->.
     iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
     iEval (rewrite (file_core_none 1 pn Cf Ht)) in "Hcore".
     iEval (rewrite -iref_slot_frac) in "Hcore".

@@ -124,6 +124,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the raw ↦₄ tower crosses the seam here (stage 2) *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -406,7 +407,8 @@ Section KexecAFrame.
     assert (Hj : (j < 4)%nat).
     { apply lookup_seq in Hij. lia. }
     rewrite (le_at_nth_byte 32 g 0 4 j ltac:(lia) Hj).
-    cbn [Nat.add]. iExact "Hb".
+    (* stage 2: the ↦₄ tower is still raw, so its bytes cross the seam. *)
+    cbn [Nat.add]. iApply (TsoCtxShim.ctx_pointsto_to_mem with "Hb").
   Qed.
 
   Lemma kxc_named_of_word4 (a : Arch.pa) (g : nat -> bv 8) :
@@ -419,7 +421,8 @@ Section KexecAFrame.
     { apply lookup_seq in Hij. lia. }
     assert (Hw : (8 * Z.of_nat 4 <= Z.of_N 32)%Z) by lia.
     iEval (rewrite (le_at_nth_byte 32 g 0 4 j Hw Hj); cbn [Nat.add]) in "Hb".
-    iExact "Hb".
+    (* stage 2: raw ↦₄ bytes back into the flipped ↦ₘ run. *)
+    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
   Qed.
 
   (* ---- the 50-slot middle (14..63) as ustack | elf | ph+2 ---- *)

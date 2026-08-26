@@ -10059,8 +10059,8 @@ Section ProofCreateMain.
     iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hfr".
     iDestruct "Hfr" as "(_ & _ & _ & _ & _ & _ & _ & _ & S9 & S10 & _)".
     iDestruct "S9" as (w9) "H9". iDestruct "S10" as (w10) "H10".
-    iDestruct (word_pointsto_aligned_p with "H9") as %Ha9.
-    iDestruct (word_pointsto_aligned_p with "H10") as %Ha10.
+    iDestruct (ctx_word_pointsto_aligned_p with "H9") as %Ha9.
+    iDestruct (ctx_word_pointsto_aligned_p with "H10") as %Ha10.
     iPureIntro. split; [exact Ha10 | exact Ha9].
   Qed.
 

@@ -66,6 +66,9 @@ Require Import InodeInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* M1 stage 2: [↦₂]/[↦₄] have NOT flipped, so the
+                         dinode field cells are still the RAW tower and each
+                         byte of [bb2_cell]/[bb4_cell] crosses the ctx seam. *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -520,7 +523,7 @@ Section IupdateRes.
     rewrite /word2_pointsto (bi.pure_True _ Hal) bi.True_sep.
     apply big_sepL_proper. intros i jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf;
-      [reflexivity | lia].
+      [apply TsoCtxShim.ctx_pointsto_shim | lia].
   Qed.
 
   Local Lemma bb4_cell (a : mword 64) (w : bv 32) (f : nat -> bv 8) :
@@ -532,7 +535,7 @@ Section IupdateRes.
     rewrite /word4_pointsto (bi.pure_True _ Hal) bi.True_sep.
     apply big_sepL_proper. intros i jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf;
-      [reflexivity | lia].
+      [apply TsoCtxShim.ctx_pointsto_shim | lia].
   Qed.
 
   (* THE SLOT, at an abstract naming function.  Out at [d], back at any

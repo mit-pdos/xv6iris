@@ -99,6 +99,9 @@ Require Import CodeKwait.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+(* the WaitInv parent table is still the RAW word fact; the named
+   crossings below are its shim seams (stage-2 worklist). *)
+Require Import TsoCtxShim.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -1315,9 +1318,10 @@ Section ProofKwait.
               (mword_of_int 56 : mword 12) Mr (trap_res eb + (K - 10))%nat pv false
               with "Hcg Hpc [] [Hcell]").
     { iApply (kwi_60 with "Htext"). }
-    { iEval (rewrite Hea60). iExact "Hcell". }
+    { iEval (rewrite Hea60). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hea60 Hsv60) in "Hcell".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
     iDestruct ("Hback" $! (zero_reg : mword 64) with "Hcell") as "Hps".
     assert (Hp64 : add_vec_int (mword_of_int (KW + 0x60) : mword 64) 4 = mword_of_int (KW + 0x64))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1873,13 +1877,19 @@ Section ProofKwait.
                 kw_len4 Hszb kw_ilvl2
                 with "Hcg Hown Htext Hpc Hpt Henv [Hbytes]").
       all: try lkbelow.
-      { iEval (rewrite HF6a3). iExact "Hbytes". }
+      (* stage 2: [word4_pointsto] is still the RAW byte tower while copyout's
+         source window is the flipped one -- the seam is named here. *)
+      { iEval (rewrite HF6a3).
+        iApply (TsoCtxShim.ctx_buf_of_mem KT0 cur_ctx (p_xstate (proc_addr k)) 4
+                  (fun i => nth_byte xs i) (DfracOwn 1) with "Hbytes"). }
       iApply wp_next_off_intro.
       iIntros (mco P') "Hcg Hown Hpc Hpt Hbytes %Hcsco %Hext %Hrv".
       assert (Hp5c : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KW + 0x5c))
         by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5c) in "Hpc".
       iEval (rewrite HF6a3) in "Hbytes".
+      iDestruct (TsoCtxShim.ctx_buf_to_mem KT0 cur_ctx (p_xstate (proc_addr k)) 4
+                   (fun i => nth_byte xs i) (DfracOwn 1) with "Hbytes") as "Hbytes".
       iDestruct (word4_pointsto_intro (p_xstate (proc_addr k)) (DfracOwn 1) xs Halx
                    with "Hbytes") as "Hxstate".
       iDestruct ("Hback" $! P' with "[%] Hsz Hpg Hpt") as "Hpriv"; [exact Hext |].
@@ -2145,9 +2155,10 @@ Section ProofKwait.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hcell]").
       { iApply (kwi_b2 with "Htext"). }
-      { iEval (rewrite Heab2). iExact "Hcell". }
+      { iEval (rewrite Heab2). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
       iEval (rewrite Heab2) in "Hcell".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
       iDestruct ("Hback" with "Hcell") as "Hps".
       set (S0 := <[Regidx Ra5 := regval_into_reg pv]> M).
       change (<[Regidx Ra5 := regval_into_reg pv]> M) with S0.

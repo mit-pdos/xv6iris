@@ -1893,10 +1893,14 @@ Section ProofSysPause.
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (vw1) "Hs1". iDestruct "S2" as (vw2) "Hs2".
     iDestruct "S7" as (w7) "Hs7".
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
+       4-byte tower through the shim, and the join crosses back. *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs7") as "Hs7".
     iDestruct (word_pointsto_aligned_p with "Hs7") as %Hal7.
     iDestruct (word_pointsto_split4 with "Hs7") as "[Hs7lo Hs7hi]".
     iAssert (sp_join7 sp0) with "[Hs7lo]" as "Hjoin7".
     { rewrite /sp_join7. iIntros (nv) "Hhi". iExists _.
+      iApply TsoCtxShim.ctx_word_of_mem.
       iApply (word_pointsto_join4 _ _ _ _ Hal7 with "Hs7lo Hhi"). }
     (* +0x02 c.sdsp ra,56(sp) *)
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1)
@@ -2129,11 +2133,7 @@ Section ProofSysPause.
                 with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }
       { rewrite /sp_free.
-        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S3") as "S3".
-        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S4") as "S4".
-        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S5") as "S5".
-        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S6") as "S6".
-        iDestruct (TsoCtxShim.ctx_eslot_of_mem with "S8") as "S8".
+        (* [stack_own]'s slots are already context-indexed: no crossing. *)
         iFrame "S3 S4 S5 S6 S8". }
     - (* n >= 0: fall through to +0x1a *)
       iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pause + 0x16))

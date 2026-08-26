@@ -51,6 +51,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the unflipped towers (↦₄ / ↦ₛ) cross the seam here *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -606,6 +607,9 @@ Section ProofSysSbrk.
     assert (HM2sp : M2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* the two [int] locals: the two halves of slot 5 *)
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
+       4-byte tower through the shim, and each join crosses back. *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs5") as "Hs5".
     iDestruct (word_pointsto_aligned_p with "Hs5") as %Hal5.
     iDestruct (word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
     (* ---- +0x0a: addi a1,s0,-40 -- a1 := &n ---- *)
@@ -988,6 +992,7 @@ Section ProofSysSbrk.
         + right. split; [exact Hrv |]. left. split; [left; exact Heager | exact Hgok].
         + left. split; [exact Hrv | split; [exact Hp | exact Hs]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
+        iApply TsoCtxShim.ctx_word_of_mem;
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- t <> SBRK_EAGER: look at the sign of n ---- *)
     assert (Hnoteager : ~ sbrk_eager v1).
@@ -1072,6 +1077,7 @@ Section ProofSysSbrk.
         + right. split; [exact Hrv |]. left. split; [right; exact Hnneg | exact Hgok].
         + left. split; [exact Hrv | split; [exact Hp | exact Hs]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
+        iApply TsoCtxShim.ctx_word_of_mem;
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ================================================================= *)
     (*  THE LAZY PATH: n >= 0 and t <> SBRK_EAGER.                        *)
@@ -1228,6 +1234,7 @@ Section ProofSysSbrk.
         rewrite /Y1 upd_ne; [| congruence]. apply HthrL4; assumption.
       - left. split; [reflexivity | split; reflexivity].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
+        iApply TsoCtxShim.ctx_word_of_mem;
         iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- it fits ---- *)
     assert (Hfits : (bv_unsigned (add_vec (pv_sz V) (sbrk_arg v0)) <= 274877898752)%Z).
@@ -1439,7 +1446,8 @@ Section ProofSysSbrk.
       split; [| reflexivity].
       rewrite uint_unsigned uvm_maxsz_val. rewrite -Hsum. exact Hfits.
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-      iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
+      iApply TsoCtxShim.ctx_word_of_mem;
+        iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.
 
 End ProofSysSbrk.
