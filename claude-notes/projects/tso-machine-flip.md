@@ -1,6 +1,14 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE RATIFIED TRANCHE (2026-08-26, latest session).  A6.30's rule
+STEP 5, THE OVERRULING TRANCHE (2026-08-26, latest session).  RULING 1's
+overruling is IMPLEMENTED at the machine and the leaves (A6.36), the Sail
+patch is reverted and parked, the kernel-PT read story is characterised
+with one route measured dead (A6.37), and the store-side tranche that was
+in flight is landed (A6.38).  Clean build: **244 of 1330, THREE red** —
+read A6.38's number paragraph before reading that as a regression.
+**A6.38 is the handoff.**
+
+STEP 5, THE RATIFIED TRANCHE (2026-08-26, earlier same day).  A6.30's rule
 is RATIFIED and implemented: **the A/D write-back is PAID**, at
 `HartSKpt`'s `wpte_obl_at` seam, and `HartSKpt` is GREEN along with
 `SRegime`/`IntrDefs` (the exec lane threaded) and `KstackOwn`.  The A6.18
@@ -2749,6 +2757,237 @@ mentions and the `(access, res)` reductions have to go: `WpLoad`'s
 `MemAccessGen.rk_from_flags`/`rk_select_flags` with their side condition in
 `UserMemMis`.  Worth knowing before anyone budgets the revert as the mirror
 image of the patch: it is not.
+
+### A6.37 THE KERNEL-PT READ STORY, EXACTLY — AND ONE MEASUREMENT THAT
+### KILLS THE ROUTE THE PLAN ASSUMED FOR HART 0
+
+Characterising the corrected discharge bullet.  The good news first: the
+weakening the ruling calls for is ALREADY IN THE TREE, and the exact
+statements needed are small.  The bad news is one measured fact about the
+model that the plan did not have.
+
+**FIRST, THE MODULO-A/D WEAKENING IS ALREADY BUILT — IT IS `ptree_canon`.**
+`HartSKpt.kpt_leaf_node_canon` (and `kpt_maps_across` under it) already
+conclude "∃ w, reads w ∧ `pte_canon w = pte_canon leaf0`", i.e. reads the
+leaf MODULO A/D, and the shared table's cross-opening invariant is
+`kpt_lb`, a snapshot up to `ptree_canon` — A/D-erased by construction.  So
+the certificate weakening the ruling asks for costs nothing: the walk
+lemmas were already stated at it.  What has to change is the OBLIGATION
+those lemmas discharge — from the flat `read_bytes σ.(mem)` to
+`HartSMem`'s `tso_read_bytes … tv'` at every reachable view.
+
+**SECOND, WITHIN ONE OPENING THE READ IS EXACT, and that is what makes the
+packaging lemma easy.**  `phys_ledger a dq v` is `phys_pointsto a dq v ∗
+a ↪[ts_name]{dq} t`, and `era_interp`'s tie says `TM !! a = Some t →
+latest img log a t v` — the element IS the LATEST write's timestamp and
+`v` its value.  So a holder of the FULL-fraction ledger byte knows there
+is no later message at that address at all, and a read at any `tv' ≥ t`
+returns exactly `v`.  No history predicate over the log is needed, and no
+"every later message is an A/D variant" invariant: the A/D write-back is
+itself a `ledger_store_ok` under the same `kptN` invariant, so it cannot
+interleave inside an opening.
+
+**THE TWO STATEMENTS THAT ARE ACTUALLY MISSING** (both additive over
+existing ghosts; neither is a new law about the seal):
+
+    (* TsoCtx: the ledger byte with its timestamp EXPOSED.  [phys_ledger]
+       hides [t] existentially, and every discharge below needs to compare
+       it against a receipt. *)
+    phys_ledger_at a dq v t := phys_pointsto a dq v ∗ a ↪[ts_name]{dq} t
+    phys_ledger_at_ledger    : phys_ledger_at a dq v t ⊢ phys_ledger a dq v
+    phys_ledger_of_at        : phys_ledger a dq v ⊢ ∃ t, phys_ledger_at a dq v t
+
+    (* TsoCtx: the packaging lemma the ruling asks for -- [ctx_phys_load_ok]
+       with the CONTEXT's bound replaced by the MACHINE's receipt.  Same
+       proof shape: [t ≤ F ≤ gtv h] makes the latest message visible, and
+       the interp's tie makes it the value. *)
+    ledger_read_ok `{CID} (g : gstate) (h : agent) (a : Arch.pa) (n : N)
+        (w : bv m) (dq : dfrac) (F : nat) :
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      view_lb view_name loglen_name h F -∗
+      ([∗ list] j ∈ seq 0 (N.to_nat n),
+         ∃ t, ⌜(t ≤ F)%nat⌝ ∗ phys_ledger_at (pa_add a j) dq (nth_byte w j) t) -∗
+      ⌜forall tv', (g.(gtv) … ≤ tv')%nat ->
+         tso_read_bytes g.(gimg) g.(glog) h tv' a n w⌝
+
+**AND `kpt_body` GAINS ONE PURE TIE PER SLOT** — the `⌜t ≤ B⌝` the ruling
+names — with `B` a parameter of `kpt_inv` published at boot.  `PtTree`'s
+tiered slot is the natural home: the `None` arm becomes
+`∃ t, ⌜t ≤ B⌝ ∗ phys_ledger_at a dq w t`, which keeps `pt_slot_own_forget`
+and every pure memory fact unchanged.
+
+**THE MEASUREMENT THAT CHANGES THE PLAN — `sfence.vma` EMITS NO BARRIER IN
+THIS MODEL.**  I checked, because the obvious route for hart 0 was "xv6's
+`kvminithart` fences before it writes `satp`, so hart 0's own buffer
+drains and the SAME receipt-based lemma serves it":
+
+> `execute_SFENCE_VMA` (`rv64d.v:41179`) is register reads, a TVM
+> privilege check and `flush_TLB` — **there is no `Interface.Barrier`
+> outcome anywhere in it.**  So `sfence.vma` is a register-only node in
+> this model, `fence_drains` never sees it, and hart 0's view does not
+> move.  (Nor is there a lock acquire between `kvminit`'s last PT store
+> and `kvminithart`'s first walk: xv6's `main` runs `kinit(); kvminit();
+> kvminithart();` back to back, and the last `kalloc` — hence the last AMO
+> that would have taken hart 0's view to the top — happens DURING PT
+> construction, i.e. below `B`.)
+
+**SO HART 0 REALLY IS STORE-FORWARDING-ONLY, AND FORWARDING NEEDS THE
+AUTHOR.**  `TsoMemPa.visibleb h tv log t`'s own-author arm asks for
+`pm_tid (log !! t) = h`, and nothing in `phys_ledger` records who wrote
+the byte.  The ingredient that can carry it EXISTS and is free — the
+`era_logm_name` entries are PERSISTED at append (§4), so the fragment
+`t ↪[logm_name]□ m` is duplicable — but exporting it, and having
+`ledger_store_ok` hand back its own append's fragment, is a NEW EXPORT on
+`TsoCtx`'s surface that the corrected plan did not name.  Concretely:
+
+    ledger_msg_at t m        := t ↪[logm_name]□ m          (persistent)
+    ledger_store_ok … ==∗ … ∗ ledger_msg_at (length g.(glog))
+                                 (PWMsg Pnew auth)
+    ledger_read_own_ok       : the [ledger_read_ok] twin whose premise is
+                               [ledger_msg_at t m ∗ ⌜pm_tid m = h⌝] in
+                               place of [view_lb h F ∗ ⌜t ≤ F⌝]
+
+**STOPPING POINT (for ratification).**  The secondary-hart half is fully
+determined and needs no ruling — `phys_ledger_at` + `ledger_read_ok` +
+the `⌜t ≤ B⌝` tie + the flag-read leaf's receipt, all over existing
+ghosts.  The HART-0 half needs a decision, because the plan's "no
+receipt, store forwarding" is only implementable with the author export
+above:
+
+  (a) EXPORT THE AUTHOR (the `ledger_msg_at` family): honest, small,
+      no new camera — but it widens the sealed surface with a fact about
+      the LOG, which nothing else in the kit exposes;
+  (b) GIVE `sfence.vma` A BARRIER OUTCOME in the machine (a `RiscvLang`
+      change, not a model change: the lifting could treat the SFENCE node
+      as draining).  This is the ISA-honest reading — `sfence.vma` is
+      exactly the fence that orders PT writes before implicit reads — and
+      it costs one arm plus a full rebuild.  It also pre-pays part of the
+      later de-confliction project;
+  (c) HAVE BOOT PUBLISH A TOP RECEIPT: make hart 0 take one AMO (or an
+      explicit drain) between `kvminit` and `kvminithart`.  That is a
+      KERNEL SOURCE change and is rejected on the standing rule that the
+      proof does not get to edit the program.
+
+I recommend (b): it needs no new exported ghost fact, it makes hart 0 and
+the secondaries use the SAME lemma, and it is the semantics the ISA
+already assigns to the instruction xv6 actually executes there.
+
+### A6.38 HANDOFF AFTER THE OVERRULING — WHAT LANDED, WHAT THE READ-SIDE
+### RE-PORT ACTUALLY COSTS, AND A MEASUREMENT TRAP THAT ALMOST GOT ME
+
+**RULING-INDEPENDENT WORK, LANDED AND GREEN** (all of it store-side or
+kit, none of it touched by the overruling):
+
+- **`SmodeCorePt`'s write family is bundle-carrying** (A6.33's ratified
+  shape).  `s_win_write` is replaced by `wordw_win_store_c` — one append
+  over the whole window through `TsoCtx.ctx_store_win_ok` at
+  `RiscvExec.gs_of` — with `word_pointsto_write_c` / `word4_pointsto_write_c`
+  restated on top of it, same names, new premises (`img σ log V` +
+  `own_context`).  Three supporting lemmas do the VA↔physical window
+  crossing: `win_pins` (reads the per-byte canonicality and TIER PIN off
+  the window itself, which is what lets it go back in at the tier it came
+  out of), `win_to_phys`, `win_of_phys`.  `TsoCtxShim` is gone from the
+  file.
+- **THE PAYER'S CURRENCY IS NOW MEMORY-INDEXED, AND THAT WAS FORCED.**
+  A6.27's `Sto`/`Stoq wnew` pair cannot serve a caller that translates
+  TWICE — and `SmodeCorePt.s_regime_fetch` does, on the straddling
+  (2-mod-4) fetch: the second translation would need a second `Sto` and
+  the currency is not duplicable.  Replacing the pair with a single
+  `S : TsoMemPa.bytemap -> iProp Σ` (in at `S σ.(mem)`, out at
+  `S σ'.(mem)`) makes "before" and "after" the same predicate at different
+  arguments, so n translations chain with no extra parameters; the payer
+  wand becomes `□` for the same reason.  **And it made the CORE simpler,
+  not harder**: `ptree_translateAddr_own`'s conclusion goes back to the
+  ORIGINAL pure `t'` disjunct (A6.27 had turned it into a resource
+  disjunct precisely because a one-shot currency had to be tied to a
+  branch), so every caller's `%Htsh` intro is verbatim what it was before
+  the tranche started.  Threaded and green through `KptTree`, `KptShare`,
+  `UptTree` (+2 wrappers), `SRegime` (both record fields, all instances),
+  `IntrDefs`, `SmodeCorePt`.
+- **`TsoMemPa.bytemap`** — a NAME for `gmap Arch.pa (bv 8)`.  Any file that
+  imports `SailStdpp.Base` elaborates a fresh binder of that type at the
+  SAIL key instances and it will not unify with the stdpp-keyed one
+  (durable-notes' binder trap; `RiscvLang.v` dodges it by importing
+  `SailStdpp.Base` LATE, which a leaf file cannot do).  Spelling the type
+  with this name is the fix, and it is what every `S`/`img` binder added
+  this tranche uses.
+
+**THE OVERRULING'S OWN WORK: see A6.36 (machine + leaves) and A6.37 (the
+kernel-PT read story, characterised, with one route measured dead).**
+
+**THE CLOSING CLEAN BUILD: 247 ATTEMPTED, 244 `.vo`, 3 ERRORS** (`iris/*.vo`
+deleted, one `make -j12 -k`; self-consistent, nothing silently skipped).
+
+> **244 of 1330 fresh-green, down from A6.35's 550, with the red set down
+> from EIGHT to THREE.**  A6.25's rule for the third time, and never more
+> sharply: **red-set size and fresh-green count move in opposite directions
+> whenever a frontier file is replaced by a DEEPER one.**  `HartMFetch` is
+> as deep as this tree gets — the whole fetch tier stands on it — so making
+> it red put ~300 files out of reach at a stroke, including every file the
+> earlier tranche had left red (they are now unREACHED, not fixed).  The
+> honest reading is not "the overruling cost 306 files"; it is "the
+> overruling moved the frontier from the top of the tree to the bottom of
+> the fetch lane, and everything above is queued behind two files."
+
+**THE READ-SIDE RE-PORT (redirect item 5) IS A TWO-FILE FRONTIER, AND THAT
+IS THE USEFUL MEASUREMENT.**  I expected the fetch tier to break wide
+(`HartMFetch`, `HartPilot`, `SmodeCore`, `UserMem`, `SmodeCorePt`'s fetch,
+`HartSMem`'s ttw-adjacent nodes).  A `-k` sweep after the machine change
+says otherwise: **`HartMFetch` and `HartPilot` are the only two**, because
+every other former strong-arm consumer sits ABOVE them in the DAG and is
+unreached.  So the re-port is a chain, not a fan-out, and it starts at:
+
+    HartMFetch.swp_checked_mem_read_ifetch4 / _ifetch2   (:721, :817)
+      -- take the PLAIN obligation instead of the flat one (mirror
+         [HartMLoad.swp_checked_mem_read_load8]'s [robl_ram] shape at
+         widths 4 and 2), drop the [(access, res)] reductions the Sail
+         patch needed, go back to [mread_req]/[mread_req2] and
+         [read_ram Read_plain], and use [swp_hart_ram_read_plain].
+         Their four call sites (:1525, :1582, :1647, :1654) then thread
+         the obligation, and kernel TEXT discharges it from the PRISTINE
+         tier -- [TsoCtx.pristine_read_bytes_ok], whose conclusion is
+         ∀ tv with NO lower bound, so the plain rule's premises are free.
+    HartPilot.hp_fetch_strong (:277) and the pilot rule (:366, :410)
+      -- [ak_strong] is gone; A6.7 already records that both pilot lemmas
+         have NO consumers, so they are free to reshape or delete.
+
+**THE MEASUREMENT TRAP, recorded because it nearly went into this note as
+a number.**  The incremental sweep after the machine change reported
+**550 `.vo` and only 3 errors**, which would have read as "the overruling
+cost almost nothing".  It is wrong: `make -k` deletes the `.glob` of a
+failed target but **LEAVES THE STALE `.vo`** (durable-notes says so; this
+is the first time it has bitten this project's numbers).  `HartMFetch.vo`
+and `HartPilot.vo` were still sitting there at 18:26, older than the
+`RiscvLang.vo` at 18:39 they were built against, and every one of the ~365
+files below the change was never revisited.  `ls -la --time-style=+%H:%M
+<file>.vo` against the changed file's `.vo` is the two-second check.
+**Only a clean rebuild counts, and after a MACHINE change the incremental
+number is not merely optimistic, it is meaningless.**
+
+**WHERE THE NEXT LANE PICKS UP**, in order:
+
+1. `HartMFetch` + `HartPilot` (above) — this is what gates everything.
+2. Then the next layer surfaces error-driven: `SmodeCore`, `UserMem`,
+   `SmodeCorePt`'s fetch, `PtTreeAdue`/`HartSMem`'s PTE reads, and the
+   `Read_ttw` leftovers of the revert (`WpLoad.exec_read_ram_ttw_8`,
+   `SmodePte`'s arm reduction, `MemAccessGen.rk_from_flags`/`rk_select_flags`
+   + its side condition in `UserMemMis`).  Note `Read_ifetch` SURVIVED the
+   unpatching (A6.36), so those twins compile untouched and only go if
+   someone wants them gone.
+3. A6.37's kit for the kernel-PT walk reads, once the hart-0 question is
+   ratified.
+4. The A6.33 tail that the overruling interrupted: `WpSconfMem` /
+   `WpSconfLock` (re-park `own_context` on the engine's bracket — the
+   escape hatch is the leaf's own `Ψ` slot, which a caller may instantiate
+   as `Ψ ∗ own_context cur_ctx`, so **no exported statement changes and
+   A6.18's textual-invariance test survives**), then
+   `WpSmodePtLeaves`/`WpSmodePtMem` with the ratified premise.
+5. `CpuOwn:110` (a raw `mem_pointsto_ne` on a ctx byte — M1's error class
+   (a), one twin away), `BootCarve` (A6.34's plumbing),
+   `WpStartNew`/`UserPtTree`/`TransPt` (A6.27/A6.28 threading), and
+   `WpUart` last (A6.29, ruling 1 of the earlier redirect).
+6. `PtWalkCert` is MOOT — its planned `MemAccessGen` treatment was A6.7(B)
+   fallout and dies with the patch.
 
 ## 7. Order of work
 
