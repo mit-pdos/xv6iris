@@ -51,6 +51,8 @@ Require Import BootChain BootShared.
 Require Import FsCfgBoot.   (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import RiscvAdequacy.
 Require Import FsCrash.
+Require Import FsDurSnap.   (* [snap_ok] -- [P_fs_alloc]'s durable premise *)
+Require Import FsDurImg.    (* [img_state] / [img_snap_ok]: era 0's discharge *)
 Require Import PowerBoot.   (* [boot_gstate]: one boot state, for the era-0 extent *)
 Require Import FirstTok.    (* [fs_extent_of_image] *)
 (* THE LITERAL mkfs IMAGE, for the generic FS theorem's [Hrec] vocabulary.
@@ -172,7 +174,15 @@ Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
   fs_extent cov ls XV6_DISK_BYTES /\
   exists D : gmap Z (list (bv 8)),
     fs_recovery (fs_blocks dk) D cov ls /\
-    hdr_wf (fs_blocks dk) cov ls.
+    hdr_wf (fs_blocks dk) cov ls /\
+    (* ...AND THE COMMITTED VIEW IS A FILE SYSTEM (lane CE).  This is the
+       durability claim: the map the machine would recover to right now is
+       the encoding of an abstract file-system state -- every inode's record
+       parses and is locally well formed, no two inodes share a block, and
+       the bitmap's bits are the used set ([FsDurSnap.snap_ok]).  It comes
+       off [FsCrash.P_fs]'s durable snapshot, which the commit re-establishes
+       at every group commit and nothing else ever moves. *)
+    exists S : fs_state_rec, snap_ok S D.
 
 (* ...AND THE SAME FACT AS A TRACE HOOK.  [fs_boot_pure] above is delivered
    INTO each boot, by [riscv_power_adequacy]'s [Hproj] channel.  This is the
@@ -472,6 +482,23 @@ Proof.
     destruct Hw as (Hwf & _).
     apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
     exact (FsImg.fsimg_wf_log _ _ Hwf). }
+  (* ...AND THE DURABLE SNAPSHOT'S PREMISE (lane CE): [FsCrash.P_fs] carries
+     one copy of the file-system predicate at the committed map, so the era-0
+     mint needs "[D0] IS a file system".  The image's log is clean, so [D0]
+     is exactly its home blocks, and [FsDurImg.img_snap_ok] is the theorem.
+     THIS IS THE ONLY PLACE THE IMAGE DECODER IS READ: every later era's boot
+     re-founds the file system from the snapshot the previous era committed. *)
+  assert (Hsnap0 : exists S : fs_state_rec, snap_ok S D0).
+  { pose proof (Himg (PowerBoot.boot_gstate g)
+                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+    assert (Hclean : hdr_n (fs_blocks (v_disk (g.(gdev).(dvirtio)))
+                              (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
+    { rewrite /hdr_n /log_hdr_bno.
+      exact (FsImg.fsimg_wf_log _ _ (proj1 Hw)). }
+    rewrite (proj1 (fs_recovery_clean _ D0 cov (FsImg.sb_logstart sb) Hclean)
+               Hrec).
+    exists (img_state (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib).
+    exact (img_snap_ok _ XV6_DISK_BYTES sb nib cov Hw). }
   (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
      and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
      initial image, handed over once by the power theorem and owned by the
@@ -485,7 +512,7 @@ Proof.
                  iMod fs_boot_alloc_empty as (gl gt) "_";
                  iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib))
                          _ D0 cov
-                         (FsImg.sb_logstart sb) Hrec Hhwf
+                         (FsImg.sb_logstart sb) Hrec Hhwf Hsnap0
                          with "[$Hsw $Hdv]") as (γs) "(%Hseq & HP & _)";
                  iModIntro; iExists (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib));
                  rewrite /P_fs_named;
@@ -634,6 +661,23 @@ Proof.
     destruct Hw as (Hwf & _).
     apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
     exact (FsImg.fsimg_wf_log _ _ Hwf). }
+  (* ...AND THE DURABLE SNAPSHOT'S PREMISE (lane CE): [FsCrash.P_fs] carries
+     one copy of the file-system predicate at the committed map, so the era-0
+     mint needs "[D0] IS a file system".  The image's log is clean, so [D0]
+     is exactly its home blocks, and [FsDurImg.img_snap_ok] is the theorem.
+     THIS IS THE ONLY PLACE THE IMAGE DECODER IS READ: every later era's boot
+     re-founds the file system from the snapshot the previous era committed. *)
+  assert (Hsnap0 : exists S : fs_state_rec, snap_ok S D0).
+  { pose proof (Himg (PowerBoot.boot_gstate g)
+                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+    assert (Hclean : hdr_n (fs_blocks (v_disk (g.(gdev).(dvirtio)))
+                              (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
+    { rewrite /hdr_n /log_hdr_bno.
+      exact (FsImg.fsimg_wf_log _ _ (proj1 Hw)). }
+    rewrite (proj1 (fs_recovery_clean _ D0 cov (FsImg.sb_logstart sb) Hclean)
+               Hrec).
+    exists (img_state (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib).
+    exact (img_snap_ok _ XV6_DISK_BYTES sb nib cov Hw). }
   (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
      and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
      initial image, handed over once by the power theorem and owned by the
@@ -647,7 +691,7 @@ Proof.
                  iMod fs_boot_alloc_empty as (gl gt) "_";
                  iMod (P_fs_alloc γsw γreg γst γdv (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib))
                          _ D0 cov
-                         (FsImg.sb_logstart sb) Hrec Hhwf
+                         (FsImg.sb_logstart sb) Hrec Hhwf Hsnap0
                          with "[$Hsw $Hdv]") as (γs) "(%Hseq & HP & _)";
                  iModIntro; iExists (MkFsDurNames gl gt (FsImg.sb_bmapstart sb) (FsImg.sb_inodestart sb) (16 * Z.of_nat nib));
                  rewrite /P_fs_named;
@@ -765,8 +809,9 @@ Qed.
 (* corollary is the demonstration that the slot is not vacuous: it         *)
 (* instantiates [phi] at [fs_boot_pure], the pure content of the FS's      *)
 (* DURABILITY invariant [FsCrash.P_fs_named] (the durable extent's         *)
-(* geometry, plus: the physical image recovers to a committed view that is *)
-(* FS-well-formed, and its log header is well-formed), and concludes it at *)
+(* geometry, plus: the physical image recovers to a committed view that IS *)
+(* A FILE SYSTEM -- [FsDurSnap.snap_ok] of some abstract state -- and its  *)
+(* log header is well-formed), and concludes it at                         *)
 (* EVERY state the CSL-free operational semantics can reach -- across      *)
 (* every power cycle, since [crash_inv] is fixed-layer and hence the same  *)
 (* invariant at every era.                                                 *)

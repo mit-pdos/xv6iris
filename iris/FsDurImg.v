@@ -1946,10 +1946,14 @@ Section DurImgSnap.
       the crash predicate of a CLEAN image at
       [D0 = fs_restrict (fs_blocks dk) (fs_home_set cov logstart)] -- that
       IS the record's own [fr_D] -- and W2 of [fsimg_wf] is exactly its
-      zero-log-header premise, so the bundle already carries it.  This is
-      that mint WITH the durable snapshot at the same [D0] beside it: lane
-      C's [P_fs] can carry [P_dur (fr_D r)] with no arity change and no new
-      premise on any caller, because the snapshot costs nothing to make.  *)
+      zero-log-header premise, so the bundle already carries it.
+
+      SINCE LANE CE the durable snapshot is [P_fs]'s own last conjunct, so
+      this lemma no longer hands one out beside it: what it does instead is
+      DISCHARGE [P_fs_alloc_clean]'s one pure premise -- "the committed map
+      is a file system" -- off [img_snap_ok], which is the image half of the
+      whole story.  Era 0 is the only place the image decoder is ever read;
+      every later era's boot mints from the previous era's snapshot.  *)
   Lemma img_boot_P_fs_dur (gsw greg gst gv : gname) (Gd : fs_dur_names)
       (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
       (cov : gset Z) :
@@ -1959,9 +1963,7 @@ Section DurImgSnap.
       ⌜fcn_swap gs = gsw /\ fcn_reg gs = greg /\ fcn_start gs = gst⌝ ∗
       P_fs gs gv Gd cov (FsImg.sb_logstart sb) dk ∗
       fs_receipt gs (fs_restrict (fs_blocks dk)
-                       (fs_home_set cov (FsImg.sb_logstart sb))) ∗
-      P_dur (fs_restrict (fs_blocks dk)
-               (fs_home_set cov (FsImg.sb_logstart sb))).
+                       (fs_home_set cov (FsImg.sb_logstart sb))).
   Proof.
     intros Himg.
     assert (Hclean : hdr_n (fs_blocks dk
@@ -1970,9 +1972,11 @@ Section DurImgSnap.
       exact (fsimg_wf_log (fs_blocks dk) sb (proj1 Himg)). }
     iIntros "H".
     iMod (P_fs_alloc_clean gsw greg gst gv Gd dk cov (FsImg.sb_logstart sb)
-            Hclean with "H") as (gs) "(%Heq & HP & Hrc)".
-    iMod (img_P_dur_alloc dk ndisk sb nib cov Himg) as "Hdur".
-    iModIntro. iExists gs. iFrame "HP Hrc Hdur".
+            Hclean
+            (ex_intro _ (img_state (fs_blocks dk) sb nib)
+               (img_snap_ok dk ndisk sb nib cov Himg))
+            with "H") as (gs) "(%Heq & HP & Hrc)".
+    iModIntro. iExists gs. iFrame "HP Hrc".
     iPureIntro. exact Heq.
   Qed.
 
