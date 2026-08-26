@@ -513,10 +513,19 @@ Section IcacheEscrow.
      handful of walks that actually SPEND or MINT a unit open the pair.
      When [DirLinks.v] goes, this definition loses its first conjunct and
      the payloads keep their arity again. *)
+  (* SINCE LANE G5 the second conjunct is the DEPOSIT-TIME form
+     [FsStateInode.ent_toks_x]: the marker set is existential and the
+     per-directory count is EXACT, which is where [ProofSysUnlink]'s (D2)
+     reads "a directory holding a live subdirectory record has at least two
+     links".  A checked-out walk OPENS it -- [dlinks_open] names the marker
+     set -- moves entries and counts freely, and re-seals at [dlinks_intro]
+     with the equation restored.  create's mkdir arm is exactly the window
+     that needs the freedom: it appends [dp]'s record for the child and
+     raises [dp->nlink] at two different instructions. *)
   Definition dlinks (γfs : fs_names) (self : Z) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) : iProp Σ :=
     (dir_links self dn data
-     ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self
+     ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) self
          (era_node dn bm data))%I.
 
   Global Instance dlinks_timeless γfs self dn bm data :
@@ -526,14 +535,25 @@ Section IcacheEscrow.
   Lemma dlinks_open γfs self dn bm data :
     dlinks γfs self dn bm data -∗
       dir_links self dn data
-      ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self (era_node dn bm data).
-  Proof. iIntros "H"; iExact "H". Qed.
+      ∗ ∃ D, ⌜FsStateInode.ent_dset_ok (era_node dn bm data) D
+              /\ FsStateInode.node_exact (era_node dn bm data) D⌝
+             ∗ FsStateInode.ent_toks (fs_gamma_L γfs) self
+                 (era_node dn bm data) D.
+  Proof.
+    iIntros "[$ (%D & %Hd & %Hx & Ht)]". iExists D.
+    iSplitR; [iPureIntro; split; [exact Hd | exact Hx] |]. iExact "Ht".
+  Qed.
 
-  Lemma dlinks_intro γfs self dn bm data :
+  Lemma dlinks_intro γfs self dn bm data D :
+    FsStateInode.ent_dset_ok (era_node dn bm data) D ->
+    FsStateInode.node_exact (era_node dn bm data) D ->
     dir_links self dn data -∗
-    FsStateInode.ent_toks (fs_gamma_L γfs) self (era_node dn bm data) -∗
+    FsStateInode.ent_toks (fs_gamma_L γfs) self (era_node dn bm data) D -∗
     dlinks γfs self dn bm data.
-  Proof. iIntros "H1 H2". iFrame. Qed.
+  Proof.
+    intros Hd Hx. iIntros "H1 H2". iFrame "H1". iExists D.
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |]. iExact "H2".
+  Qed.
 
   (* the two free discharges: a NON-directory owns no links at all, and
      neither does a record whose size is zero (a claim box, a corpse) *)
@@ -542,7 +562,7 @@ Section IcacheEscrow.
   Proof.
     intros Hne. rewrite /dlinks. iSplitR.
     - iApply (dir_links_not_dir self dn data Hne).
-    - iApply (FsStateEra.ent_toks_era_not_dir _ self dn bm data Hne).
+    - iApply (FsStateEra.ent_toks_x_era_not_dir _ self dn bm data Hne).
   Qed.
 
   Lemma dlinks_size_zero γfs self dn bm data :
@@ -551,7 +571,9 @@ Section IcacheEscrow.
   Proof.
     intros Hsz Hnl. rewrite /dlinks. iSplitR.
     - iApply (dir_links_size_zero self dn data Hsz Hnl).
-    - iApply (FsStateEra.ent_toks_era_size0 _ self dn bm data Hsz).
+    - iApply (FsStateEra.ent_toks_x_era_nrec0 _ self dn bm data
+                ltac:(rewrite Hsz /dir_nrec //)).
+      intros _. pose proof (di_nlink_nonneg dn). lia.
   Qed.
 
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
@@ -4021,7 +4043,7 @@ Section IcacheEscrow.
                   are what the collection's [FsState.fs_links] leg needs
                   beside the region's per-inum authority.  See
                   [ic_loaded_lend_owned] below. *)
-               ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
+               ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
 
   (* the two readings of a bundle at a share the cover's third alternative
      is built from, as accessors, so the proof never unfolds [ic_loaded] or
@@ -4049,9 +4071,9 @@ Section IcacheEscrow.
          cannot state [DirView.dir_ok] at all (it has no region width). *)
       ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
       ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum n
-       ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)
+       ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)
       ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
-          ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+          ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
            ic_loaded γfs γi cov logstart k inum dn bm).
   Proof.
     rewrite /ic_loaded. iIntros "H".
@@ -4078,9 +4100,9 @@ Section IcacheEscrow.
       (* ...and the read arm's own copy of the three, for the same reason *)
       ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
       ∗ (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-       ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)
+       ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)
       ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-          ∗ FsStateInode.ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+          ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
            ic_rd_arm γfs γi cov logstart inum).
   Proof.
     rewrite /ic_rd_arm. iIntros "H".
@@ -4136,7 +4158,7 @@ Section IcacheEscrow.
                      ∗ ic_pin_rest k
                      ∗ ic_mid cn k
                      ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
-                         ∗ FsStateInode.ent_toks (fs_gamma_L γfs)
+                         ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs)
                              (bv_unsigned inum) n) -∗
                           ic_loaded γfs γi cov logstart k inum dn bm))%I
                     with "[Hgid Hn Hte] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
@@ -4198,7 +4220,7 @@ Section IcacheEscrow.
                      ∗ ic_mid cn k
                      ∗ ic_pin_rest k
                      ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-                         ∗ FsStateInode.ent_toks (fs_gamma_L γfs)
+                         ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs)
                              (bv_unsigned inum) n) -∗
                           ic_rd_arm γfs γi cov logstart inum))%I
                     with "[Hgid Hn Hte] [Hdep Hres Hmt Hpin Hback] []").

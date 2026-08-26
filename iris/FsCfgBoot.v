@@ -1195,23 +1195,45 @@ Section FsCfgBootPool.
     base.NoDup ((omap (dir_entry data) (seq 0 nrec)).*1).
   Proof. rewrite dir_entry_fst. apply dir_wins_names_nodup. Qed.
 
-  (* ---- EVERY TICKETED RECORD OF THE IMAGE IS A NAME RECORD ----------
-     -- so its PARENT REGISTER unit is [Some z], and W9's (T) then makes
-     that [Some ROOTINO] at every ticket in the image.  A dot record of a
-     directory names the directory itself: ["."] by W6's [fdo_dot] at any
-     directory, [".."] by W7 at the root, which W9's (T) says is the only
-     directory there is.  A record that names its own home carries no
-     ticket, so a ticketed record's name is neither. *)
-  Lemma img_ticket_par (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) (k : nat) :
+  (* ---- THE IMAGE'S REGISTER VALUE AT EACH INUM ----------------------
+     A well-formed image has exactly ONE directory, the root (W9's (T)),
+     and the root's [".."] names the root itself (W7).  So the register's
+     value is [TDir ROOTINO] at the root and [TFile] everywhere else, and
+     [FsStateInode.fn_ity_ok] holds at every inum by construction. *)
+  Definition img_ity (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : ity :=
+    if bool_decide (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z)
+    then TDir ROOTINO else TFile.
+
+  Lemma img_ity_ok (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+    FsStateInode.fn_ity_ok (img_node P sb z) (img_ity P sb z).
+  Proof.
+    rewrite /FsStateInode.fn_ity_ok /img_ity /img_node /fn_is_dir /fn_type
+      era_node_rec.
+    destruct (bool_decide (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z));
+      reflexivity.
+  Qed.
+
+  (* ---- EVERY TICKETED RECORD OF THE IMAGE NAMES A FILE ---------------
+     A dot record of a directory names the directory itself (["."] by W6's
+     [fdo_dot], [".."] by W7 at the root, which W9's (T) says is the only
+     directory there is), and a record that names its own home carries no
+     ticket.  So a ticketed record's target is neither the home nor -- by
+     (T) again -- any directory at all, and its register value is
+     [TFile]. *)
+  Lemma img_ticket_file (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) (k : nat) :
     fsimg_wf P sb = true -> 0 <= z < FsImg.sb_ninodes sb ->
     bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
     (k < dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))%nat ->
     dir_live (fs_data_of P (fs_dinode P sb z)) k ->
     bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k) <> z ->
-    FsStateInode.ent_par_val z
-      (dir_bname (fs_data_of P (fs_dinode P sb z)) k) = Some ROOTINO.
+    0 <= bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k)
+         < FsImg.sb_ninodes sb ->
+    img_ity P sb (bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k))
+      = TFile
+    /\ dir_bname (fs_data_of P (fs_dinode P sb z)) k <> DOT
+    /\ dir_bname (fs_data_of P (fs_dinode P sb z)) k <> DOTDOT.
   Proof.
-    intros Hwf Hran Hty Hk Hlive Hne.
+    intros Hwf Hran Hty Hk Hlive Hne Htran.
     pose proof (fsimg_wf_dir P sb z Hwf Hran Hty) as Hdok.
     pose proof (fdo_unique P sb z (fs_dinode P sb z) Hdok) as Hu.
     pose proof (dir_view_live (fs_data_of P (fs_dinode P sb z))
@@ -1228,65 +1250,161 @@ Section FsCfgBootPool.
       rewrite /fs_file_data -Hzr in Hrd.
       rewrite Hrd in Hlk. injection Hlk as Hlk.
       apply Hne. rewrite -Hlk Hzr //. }
-    rewrite (FsStateInode.ent_par_val_name z
-               (dir_bname (fs_data_of P (fs_dinode P sb z)) k) Hnd Hndd) Hzr //.
+    split_and!; [| exact Hnd | exact Hndd].
+    assert (Hnotdir :
+              bv_unsigned (di_type (fs_dinode P sb
+                (bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k))))
+              <> T_DIR_z).
+    { intros Hc.
+      pose proof (fsimg_wf_dir_root P sb
+                    (bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k))
+                    Hwf Htran Hc) as Htr.
+      apply Hne. rewrite Htr Hzr //. }
+    rewrite /img_ity (bool_decide_eq_false_2 _ Hnotdir) //.
   Qed.
 
   (* ---- ONE DIRECTORY'S TOKENS, out of its own ticket sublist --------- *)
+
+  (* THE HOME'S OWN ["."] FRAGMENT (lane G5).  A LIVE DIRECTORY holds one
+     fragment at ITSELF -- the [+1] of [FsStateInode.fn_mult] that xv6 does
+     not count -- and it is what ties the region's existential register
+     value to the [".."] entry.  At the image only the ROOT is a live
+     directory, so this is one fragment in the whole boot; the count is
+     spelled per inum so the routing stays uniform. *)
+  Definition img_dotd (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : nat :=
+    if bool_decide (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z)
+       && negb (bool_decide (bv_unsigned (di_nlink (fs_dinode P sb z)) = 0))
+    then 1%nat else 0%nat.
+
+  (* the bonus IS the register's own: [fn_mult] at an image node is
+     [nlink + img_dotd] *)
+  Lemma img_mult_eq (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+    FsStateInode.fn_mult (img_node P sb z)
+    = (fn_nlink (img_node P sb z) + img_dotd P sb z)%nat.
+  Proof.
+    rewrite /FsStateInode.fn_mult /img_dotd /img_node /fn_is_dir /fn_type
+      /fn_orphan /fn_nlink era_node_rec.
+    destruct (bool_decide (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z));
+      [| reflexivity].
+    destruct (bool_decide (bv_unsigned (di_nlink (fs_dinode P sb z)) = 0))
+      eqn:Ez.
+    - apply bool_decide_eq_true in Ez.
+      rewrite (bool_decide_eq_true_2
+                 (Z.to_nat (bv_unsigned (di_nlink (fs_dinode P sb z))) = 0%nat)
+                 ltac:(rewrite Ez //)) //.
+    - apply bool_decide_eq_false in Ez.
+      pose proof (proj1 (bv_unsigned_in_range _ (di_nlink (fs_dinode P sb z)))).
+      rewrite (bool_decide_eq_false_2
+                 (Z.to_nat (bv_unsigned (di_nlink (fs_dinode P sb z))) = 0%nat)
+                 ltac:(lia)) //.
+  Qed.
+
+  Lemma img_dotd_dir (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+    bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
+    bv_unsigned (di_nlink (fs_dinode P sb z)) <> 0 ->
+    img_dotd P sb z = 1%nat.
+  Proof.
+    intros Hty Hnz. rewrite /img_dotd (bool_decide_eq_true_2 _ Hty)
+      (bool_decide_eq_false_2 _ Hnz) //.
+  Qed.
+
+  Lemma img_dotd_not_dir (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+    bv_unsigned (di_type (fs_dinode P sb z)) <> T_DIR_z ->
+    img_dotd P sb z = 0%nat.
+  Proof.
+    intros Hty. rewrite /img_dotd (bool_decide_eq_false_2 _ Hty) //.
+  Qed.
 
   Lemma ent_toks_of_tickets (gfs : fs_names) (P : Z -> list (bv 8))
       (sb : fs_sb) (z : Z) :
     fsimg_wf P sb = true -> 0 <= z < FsImg.sb_ninodes sb ->
     ([∗ list] t ∈ fs_dir_tickets_at P sb z,
-       FsStateLink.link_tok (fs_gamma_L gfs) t
-       ∗ FsStateLink.par_tok (fs_gamma_L gfs) t (Some ROOTINO)) -∗
-    FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z).
+       FsStateLink.link_tok (fs_gamma_L gfs) t (img_ity P sb t)) -∗
+    ([∗ list] _ ∈ seq 0 (img_dotd P sb z),
+       FsStateLink.link_tok (fs_gamma_L gfs) z (img_ity P sb z)) -∗
+    FsStateInode.ent_toks_x (fs_gamma_L gfs) z (img_node P sb z).
   Proof.
     intros Hwf Hran.
     rewrite /fs_dir_tickets_at /fs_dir_tickets. cbv zeta.
-    destruct (bv_unsigned (di_type (fs_dinode P sb z)) =? T_DIR_z) eqn:Htyb.
-    - apply Z.eqb_eq in Htyb.
-      assert (Hnz : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
-        by (rewrite Htyb /T_DIR_z; lia).
-      pose proof (fsimg_wf_inode P sb z Hwf Hran Hnz) as Hiok.
-      pose proof (fs_dinode_wf P sb z) as Hdwf.
-      assert (Hholes : blk_holes_zero (img_blkmap P (fs_dinode P sb z))
-                         (fs_data_of P (fs_dinode P sb z))).
-      { intros i Hi H0. apply fs_data_of_holes.
-        rewrite <- (img_blkmap_get P (fs_dinode P sb z) i Hdwf Hi). exact H0. }
-      assert (Hsz : bv_unsigned (di_size (fs_dinode P sb z))
-                    <= Z.of_nat MAXFILE * Z.of_nat BSIZE).
-      { rewrite MAXFILE_FS BSIZE_BSIZEz.
-        exact (fio_size P sb (fs_dinode P sb z) Hiok). }
-      assert (Hents : dir_entries (img_node P sb z)
-                      = dir_view (fs_data_of P (fs_dinode P sb z))
-                          (dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))).
-      { rewrite /img_node
-          (dir_entries_era_node (fs_dinode P sb z)
-             (img_blkmap P (fs_dinode P sb z))
-             (fs_data_of P (fs_dinode P sb z)) Hholes Hsz).
-        rewrite bool_decide_eq_true_2 //. }
-      assert (Hnl : bv_unsigned (di_nlink (fs_dinode P sb z)) = 1)
-        by exact (fsimg_wf_dir_nlink P sb z Hwf Hran Htyb).
-      assert (Horph : fn_orphan (img_node P sb z) = false).
-      { rewrite /img_node fn_orphan_era_node. apply bool_decide_eq_false_2.
-        rewrite Hnl. cbn. lia. }
-      rewrite /FsStateInode.ent_toks Hents Horph /dir_view.
+    destruct (bv_unsigned (di_type (fs_dinode P sb z)) =? T_DIR_z) eqn:Htyb;
+      last first.
+    { assert (Hne : bv_unsigned (di_type (fs_dinode P sb z)) <> T_DIR_z)
+        by (apply Z.eqb_neq; exact Htyb).
+      rewrite (img_dotd_not_dir P sb z Hne).
+      iIntros "_ _".
+      iApply (FsStateEra.ent_toks_x_era_not_dir _ z (fs_dinode P sb z)
+                (img_blkmap P (fs_dinode P sb z))
+                (fs_data_of P (fs_dinode P sb z)) Hne). }
+    apply Z.eqb_eq in Htyb.
+    assert (Hnz : bv_unsigned (di_type (fs_dinode P sb z)) <> 0)
+      by (rewrite Htyb /T_DIR_z; lia).
+    pose proof (fsimg_wf_inode P sb z Hwf Hran Hnz) as Hiok.
+    pose proof (fs_dinode_wf P sb z) as Hdwf.
+    pose proof (fsimg_wf_dir P sb z Hwf Hran Htyb) as Hdok.
+    assert (Hholes : blk_holes_zero (img_blkmap P (fs_dinode P sb z))
+                       (fs_data_of P (fs_dinode P sb z))).
+    { intros i Hi H0. apply fs_data_of_holes.
+      rewrite <- (img_blkmap_get P (fs_dinode P sb z) i Hdwf Hi). exact H0. }
+    assert (Hsz : bv_unsigned (di_size (fs_dinode P sb z))
+                  <= Z.of_nat MAXFILE * Z.of_nat BSIZE).
+    { rewrite MAXFILE_FS BSIZE_BSIZEz.
+      exact (fio_size P sb (fs_dinode P sb z) Hiok). }
+    assert (Hents : dir_entries (img_node P sb z)
+                    = dir_view (fs_data_of P (fs_dinode P sb z))
+                        (dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))).
+    { rewrite /img_node
+        (dir_entries_era_node (fs_dinode P sb z)
+           (img_blkmap P (fs_dinode P sb z))
+           (fs_data_of P (fs_dinode P sb z)) Hholes Hsz).
+      rewrite bool_decide_eq_true_2 //. }
+    assert (Hnl : bv_unsigned (di_nlink (fs_dinode P sb z)) = 1)
+      by exact (fsimg_wf_dir_nlink P sb z Hwf Hran Htyb).
+    assert (Horph : fn_orphan (img_node P sb z) = false).
+    { rewrite /img_node fn_orphan_era_node. apply bool_decide_eq_false_2.
+      rewrite Hnl. cbn. lia. }
+    rewrite (img_dotd_dir P sb z Htyb ltac:(rewrite Hnl; lia)).
+    (* ["."] NAMES THE HOME (W6's [fdo_dot]) *)
+    assert (Hdotlk : dir_entries (img_node P sb z) !! DOT = Some z)
+      by (rewrite Hents; exact (fdo_dot P sb z (fs_dinode P sb z) Hdok)).
+    (* THE MARKER SET IS EMPTY: the image has ONE directory (W9's (T)), so
+       no record of it names a directory, and the exactness equation is
+       [nlink = 0 + 1], which is W9's [fsimg_wf_dir_nlink] verbatim. *)
+    iIntros "H Hdot". iExists ∅.
+    iSplitR; [iPureIntro; exact (FsStateInode.ent_dset_ok_empty _) |].
+    iSplitR.
+    { iPureIntro. intros _.
+      rewrite Horph size_empty /fn_nlink /img_node era_node_rec Hnl //. }
+    (* route the tickets into every entry EXCEPT ["."], then put the home's
+       own fragment at ["."] *)
+    iAssert ([∗ map] s ↦ t ∈ dir_entries (img_node P sb z),
+               if bool_decide (s = DOT) then emp
+               else FsStateInode.ent_tok (fs_gamma_L gfs) z
+                      (FsStateInode.fn_dd (img_node P sb z)) (fn_orphan (img_node P sb z))
+                      (bool_decide (s ∈ (∅ : gset fname))) s t)%I
+      with "[H]" as "Hrest".
+    { rewrite Hents /dir_view.
       rewrite (big_sepM_list_to_map
-                 (fun s t => FsStateInode.ent_tok (fs_gamma_L gfs) z false s t)
+                 (fun s t => (if bool_decide (s = DOT) then emp
+                              else FsStateInode.ent_tok (fs_gamma_L gfs) z
+                                     (FsStateInode.fn_dd (img_node P sb z))
+                                     (fn_orphan (img_node P sb z))
+                                     (bool_decide (s ∈ (∅ : gset fname))) s t)%I)
                  _ (dir_entry_names_nodup _ _)).
-      iIntros "H".
       iApply (big_sepL_omap_pair_in
                 (fs_rec_ticket P z (fs_dinode P sb z))
                 (dir_entry (fs_data_of P (fs_dinode P sb z)))
                 (seq 0 (dir_nrec (bv_unsigned (di_size (fs_dinode P sb z)))))
-                (fun t => (FsStateLink.link_tok (fs_gamma_L gfs) t
-                           ∗ FsStateLink.par_tok (fs_gamma_L gfs) t
-                               (Some ROOTINO))%I)
-                (fun e => FsStateInode.ent_tok (fs_gamma_L gfs) z false e.1 e.2)
+                (fun t => FsStateLink.link_tok (fs_gamma_L gfs) t
+                            (img_ity P sb t))
+                (fun e => (if bool_decide (e.1 = DOT) then emp
+                           else FsStateInode.ent_tok (fs_gamma_L gfs) z
+                                  (FsStateInode.fn_dd (img_node P sb z))
+                                  (fn_orphan (img_node P sb z))
+                                  (bool_decide (e.1 ∈ (∅ : gset fname)))
+                                  e.1 e.2)%I)
                 with "H").
-      + (* a WINNING record that is not a self record: the ticket IS the
-           token *)
+      - (* a WINNING non-self record: the ticket IS the fragment, and its
+           value is [TFile] because the image has one directory *)
         intros k t e Hkin. rewrite /fs_rec_ticket /dir_entry. cbv zeta.
         destruct (dir_wins (fs_data_of P (fs_dinode P sb z)) k) eqn:Hw;
           [| intros _ Hc; discriminate Hc].
@@ -1302,14 +1420,32 @@ Section FsCfgBootPool.
         apply dir_wins_true in Hw as [Hlv _].
         apply elem_of_seq in Hkin.
         cbn [fst snd].
-        rewrite -(img_ticket_par P sb z k Hwf Hran Htyb
-                    ltac:(lia) Hlv Hne).
-        iIntros "[Ht Hp]".
-        iApply (FsStateInode.ent_tok_of_link (fs_gamma_L gfs) z false
+        assert (Htran : 0 <= bv_unsigned
+                          (dir_inum (fs_data_of P (fs_dinode P sb z)) k)
+                        < FsImg.sb_ninodes sb).
+        { pose proof (fdo_ent P sb z (fs_dinode P sb z) Hdok k
+                        ltac:(lia) Hlv) as Hr. lia. }
+        destruct (img_ticket_file P sb z k Hwf Hran Htyb ltac:(lia) Hlv Hne
+                    Htran) as (Hfile & Hnd & Hndd).
+        rewrite (bool_decide_eq_false_2
+                   (dir_bname (fs_data_of P (fs_dinode P sb z)) k = DOT) Hnd).
+        rewrite Hfile.
+        iIntros "Ht".
+        iApply (FsStateInode.ent_tok_of_link (fs_gamma_L gfs) z
+                  (FsStateInode.fn_dd (img_node P sb z))
+                  (fn_orphan (img_node P sb z))
+                  (bool_decide (dir_bname (fs_data_of P (fs_dinode P sb z)) k
+                                ∈ (∅ : gset fname)))
                   (dir_bname (fs_data_of P (fs_dinode P sb z)) k)
                   (bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k))
-                  ltac:(intros _; reflexivity) with "Ht Hp").
-      + (* a SELF record: no ticket, and no token owed either *)
+                  TFile with "Ht").
+        apply FsStateInode.ent_ty_ok_name; [exact Hnd | exact Hndd |].
+        destruct (bool_decide (dir_bname (fs_data_of P (fs_dinode P sb z)) k
+                               ∈ (∅ : gset fname))) eqn:Eb; [| reflexivity].
+        exfalso. apply bool_decide_eq_true in Eb. set_solver.
+      - (* a SELF record: no ticket.  ["."] is skipped here and supplied
+           below; every other self record is EXEMPT
+           ([FsStateInode.ent_tokenless_self_ne]). *)
         intros k e _. rewrite /fs_rec_ticket /dir_entry. cbv zeta.
         destruct (dir_wins (fs_data_of P (fs_dinode P sb z)) k) eqn:Hw;
           [| intros _ Hc; discriminate Hc].
@@ -1325,16 +1461,59 @@ Section FsCfgBootPool.
         { exfalso. rewrite (proj2 (dir_liveb_true _ _) Hlv) in Hd.
           discriminate Hd. }
         apply negb_false_iff, bool_decide_eq_true in Hs.
-        cbn [fst snd]. rewrite Hs.
-        rewrite (FsStateInode.ent_tok_self (fs_gamma_L gfs) z false
-                   (dir_bname (fs_data_of P (fs_dinode P sb z)) k)).
-        done.
-    - assert (Hne : bv_unsigned (di_type (fs_dinode P sb z)) <> T_DIR_z)
-        by (apply Z.eqb_neq; exact Htyb).
-      iIntros "_".
-      rewrite /FsStateInode.ent_toks /img_node
-        /dir_entries /fn_is_dir /fn_type era_node_rec.
-      rewrite (bool_decide_eq_false_2 _ Hne) big_sepM_empty. done.
+        cbn [fst snd].
+        destruct (bool_decide (dir_bname (fs_data_of P (fs_dinode P sb z)) k
+                               = DOT)) eqn:Hdotb; [done |].
+        iApply (FsStateInode.ent_tok_self_ne (fs_gamma_L gfs) z
+                  (FsStateInode.fn_dd (img_node P sb z))
+                  (fn_orphan (img_node P sb z))
+                  (bool_decide (dir_bname (fs_data_of P (fs_dinode P sb z)) k
+                                ∈ (∅ : gset fname)))
+                  (dir_bname (fs_data_of P (fs_dinode P sb z)) k)
+                  (bv_unsigned (dir_inum (fs_data_of P (fs_dinode P sb z)) k))
+                  Hs (proj1 (bool_decide_eq_false _) Hdotb)). }
+    (* ...and the home's own ["."] fragment, spread as a map so the two
+       sides combine pointwise *)
+    iAssert ([∗ map] s ↦ t ∈ dir_entries (img_node P sb z),
+               if bool_decide (s = DOT)
+               then FsStateLink.link_tok (fs_gamma_L gfs) z (img_ity P sb z)
+               else emp)%I with "[Hdot]" as "Hdots".
+    { rewrite (big_sepM_delete
+                 (fun s _ => (if bool_decide (s = DOT)
+                              then FsStateLink.link_tok (fs_gamma_L gfs) z
+                                     (img_ity P sb z)
+                              else emp)%I)
+                 (dir_entries (img_node P sb z)) DOT z Hdotlk).
+      iSplitL "Hdot".
+      - rewrite (bool_decide_eq_true_2 (DOT = DOT) eq_refl).
+        cbn [seq big_opL]. iDestruct "Hdot" as "[$ _]".
+      - iApply big_sepM_intro. iModIntro. iIntros (s t Hs).
+        assert (Hne : s <> DOT)
+          by (intros ->; rewrite lookup_delete in Hs; discriminate).
+        rewrite (bool_decide_eq_false_2 (s = DOT) Hne) //. }
+    iDestruct (big_sepM_sep_2 with "Hrest Hdots") as "H2".
+    rewrite /FsStateInode.ent_toks Horph.
+    iApply (big_sepM_mono with "H2"). intros s t Hs; simpl.
+    destruct (bool_decide (s = DOT)) eqn:Eb.
+    - apply bool_decide_eq_true in Eb. subst s.
+      assert (Ht : t = z) by (rewrite Hdotlk in Hs; by injection Hs).
+      subst t.
+      iIntros "[_ Hdot]".
+      iApply (FsStateInode.ent_tok_of_link (fs_gamma_L gfs) z
+                (FsStateInode.fn_dd (img_node P sb z)) false
+                (bool_decide (DOT ∈ (∅ : gset fname))) DOT z
+                (img_ity P sb z) with "Hdot").
+      apply FsStateInode.ent_ty_ok_dot. intros p q Hty Hq.
+      (* the register value at a directory of the image is [TDir ROOTINO],
+         and the image root's [".."] names the root (W7) *)
+      rewrite /img_ity (bool_decide_eq_true_2 _ Htyb) in Hty.
+      injection Hty as <-.
+      rewrite /FsStateInode.fn_dd Hents in Hq.
+      pose proof (fsimg_wf_dir_root P sb z Hwf Hran Htyb) as Hzr.
+      pose proof (fs_root_wf_dotdot P sb (fsimg_wf_root P sb Hwf)) as Hrd.
+      rewrite /fs_file_data -Hzr in Hrd. rewrite Hrd in Hq.
+      injection Hq as <-. exact Hzr.
+    - iIntros "[$ _]".
   Qed.
 
   (* ---- ...and the whole image's, off the flat ticket list ------------ *)
@@ -1344,27 +1523,53 @@ Section FsCfgBootPool.
     fsimg_wf P sb = true ->
     (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
     ([∗ list] t ∈ fs_all_tickets P sb,
-       FsStateLink.link_tok (fs_gamma_L gfs) t
-       ∗ FsStateLink.par_tok (fs_gamma_L gfs) t (Some ROOTINO)) -∗
-    [∗ set] z ∈ A, FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z).
+       FsStateLink.link_tok (fs_gamma_L gfs) t (img_ity P sb t)) -∗
+    ([∗ set] z ∈ region_inums icfg_nib,
+       [∗ list] _ ∈ seq 0 (img_dotd P sb z),
+         FsStateLink.link_tok (fs_gamma_L gfs) z (img_ity P sb z)) -∗
+    ⌜FsImg.sb_ninodes sb <= 16 * Z.of_nat icfg_nib⌝ -∗
+    [∗ set] z ∈ A, FsStateInode.ent_toks_x (fs_gamma_L gfs) z
+                     (img_node P sb z).
   Proof.
-    intros Hwf HA. iIntros "H".
+    intros Hwf HA. iIntros "H Hdots %Hnin".
+    (* the dot fragments, re-keyed onto the sweep's own index list *)
+    iAssert ([∗ list] i ∈ seq 0 (Z.to_nat (FsImg.sb_ninodes sb)),
+               [∗ list] _ ∈ seq 0 (img_dotd P sb (Z.of_nat i)),
+                 FsStateLink.link_tok (fs_gamma_L gfs) (Z.of_nat i)
+                   (img_ity P sb (Z.of_nat i)))%I with "[Hdots]" as "Hdots".
+    { set (Phi := fun z : Z =>
+                    ([∗ list] _ ∈ seq 0 (img_dotd P sb z),
+                       FsStateLink.link_tok (fs_gamma_L gfs) z
+                         (img_ity P sb z))%I).
+      set (L := Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb))).
+      assert (Hnd : base.NoDup L).
+      { apply NoDup_fmap_2_strong;
+          [intros a b _ _ Hab; lia | apply NoDup_seq]. }
+      assert (Hsub : list_to_set L ⊆ region_inums icfg_nib).
+      { apply elem_of_subseteq. intros z Hz.
+        apply elem_of_list_to_set, elem_of_list_fmap in Hz
+          as (i & -> & Hi).
+        apply elem_of_seq in Hi. apply region_inums_spec. lia. }
+      iDestruct (big_sepS_split_sub Phi (region_inums icfg_nib)
+                   (list_to_set L) Hsub with "Hdots") as "[Hdots _]".
+      rewrite (big_sepS_list_to_set Phi L Hnd).
+      rewrite /L big_sepL_fmap. iExact "Hdots". }
     rewrite /fs_all_tickets.
     iDestruct (big_sepL_mjoin
-                 (fun t => (FsStateLink.link_tok (fs_gamma_L gfs) t
-                            ∗ FsStateLink.par_tok (fs_gamma_L gfs) t
-                                (Some ROOTINO))%I) with "H")
+                 (fun t => FsStateLink.link_tok (fs_gamma_L gfs) t
+                             (img_ity P sb t)) with "H")
       as "H".
     rewrite big_sepL_fmap.
+    iDestruct (big_sepL_sep_2 with "H Hdots") as "H".
     iAssert ([∗ list] i ∈ seq 0 (Z.to_nat (FsImg.sb_ninodes sb)),
-               FsStateInode.ent_toks (fs_gamma_L gfs) (Z.of_nat i)
+               FsStateInode.ent_toks_x (fs_gamma_L gfs) (Z.of_nat i)
                  (img_node P sb (Z.of_nat i)))%I with "[H]" as "H".
     { iApply (big_sepL_mono with "H"). intros idx i Hi.
-      apply lookup_seq in Hi as [-> Hilt]. iIntros "Ht".
+      apply lookup_seq in Hi as [-> Hilt]. iIntros "[Ht Hd]".
       iApply (ent_toks_of_tickets gfs P sb (Z.of_nat (0 + idx)) Hwf
-                ltac:(lia) with "Ht"). }
+                ltac:(lia) with "Ht Hd"). }
     iAssert ([∗ list] z ∈ (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb))),
-               FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z))%I
+               FsStateInode.ent_toks_x (fs_gamma_L gfs) z (img_node P sb z))%I
       with "[H]" as "H".
     { rewrite big_sepL_fmap. iExact "H". }
     assert (Hnd : base.NoDup
@@ -1393,22 +1598,25 @@ Section FsCfgBootPool.
     (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
     ([∗ set] z ∈ region_inums icfg_nib,
        [∗ list] _ ∈ seq 0 (fs_link_count P sb z),
-         (FsStateLink.link_tok (fs_gamma_L gfs) z
-          ∗ FsStateLink.par_tok (fs_gamma_L gfs) z (Some ROOTINO))) -∗
-    [∗ set] z ∈ A, FsStateInode.ent_toks (fs_gamma_L gfs) z (img_node P sb z).
+         FsStateLink.link_tok (fs_gamma_L gfs) z (img_ity P sb z)) -∗
+    ([∗ set] z ∈ region_inums icfg_nib,
+       [∗ list] _ ∈ seq 0 (img_dotd P sb z),
+         FsStateLink.link_tok (fs_gamma_L gfs) z (img_ity P sb z)) -∗
+    [∗ set] z ∈ A, FsStateInode.ent_toks_x (fs_gamma_L gfs) z
+                     (img_node P sb z).
   Proof.
-    intros Hwf Hnin HA. iIntros "H".
-    iApply (ent_toks_of_image gfs P sb A Hwf HA).
-    iApply (big_sepS_tick_route
-              (fun z => (FsStateLink.link_tok (fs_gamma_L gfs) z
-                         ∗ FsStateLink.par_tok (fs_gamma_L gfs) z
-                             (Some ROOTINO))%I)
-              (fs_all_tickets P sb)
-              (region_inums icfg_nib) (fs_link_count P sb) with "H").
-    - intros t Ht.
-      pose proof (fs_all_tickets_range P sb t (fsimg_wf_dirs P sb Hwf) Ht).
-      apply region_inums_spec. lia.
-    - intros z. unfold fs_link_count. lia.
+    intros Hwf Hnin HA. iIntros "H Hdots".
+    iApply (ent_toks_of_image gfs P sb A Hwf HA with "[H] Hdots").
+    { iApply (big_sepS_tick_route
+                (fun z => FsStateLink.link_tok (fs_gamma_L gfs) z
+                            (img_ity P sb z))
+                (fs_all_tickets P sb)
+                (region_inums icfg_nib) (fs_link_count P sb) with "H").
+      - intros t Ht.
+        pose proof (fs_all_tickets_range P sb t (fsimg_wf_dirs P sb Hwf) Ht).
+        apply region_inums_spec. lia.
+      - intros z. unfold fs_link_count. lia. }
+    iPureIntro. exact Hnin.
   Qed.
 
   (* **ALL FIVE CLAUSES OF [ireg_alloc]'s DECODING SLOT**, which is what
@@ -2052,13 +2260,28 @@ Section FsCfgBootEra.
      durable instance, owes.  At the zero map it is free: no node has an entry,
      so no token exists and every inum's auth stands alone. *)
   Lemma fs_boot_inodes_ok (nib : nat) :
-    link_elem_ok (fs_boot_inodes nib) (fun _ => ∅).
+    link_elem_ok (fs_boot_inodes nib)
+      (fun _ => (∅, (TFile, fun _ => TFile))).
   Proof.
-    intros i n Hi. rewrite /fn_par_ok gmultiset_size_empty. lia.
+    intros i n Hi. rewrite /node_ent_ok /lc_D /lc_v /lc_tyf /=.
+    pose proof (fs_boot_inodes_no_ents nib i n Hi) as He.
+    assert (Hn : n = fn_zero).
+    { rewrite /fs_boot_inodes in Hi.
+      apply lookup_gset_to_gmap_Some in Hi as [_ Hn]. by symmetry. }
+    assert (Hnd : fn_is_dir n = false).
+    { rewrite Hn /fn_is_dir /fn_type /fn_zero /=.
+      apply bool_decide_eq_false_2. rewrite /DirView.T_DIR_z.
+      vm_compute. discriminate. }
+    split_and!.
+    - rewrite /FsStateInode.fn_ity_ok. exact Hnd.
+    - exact (FsStateInode.ent_dset_ok_empty n).
+    - exact (FsStateInode.node_exact_not_dir n ∅ Hnd).
+    - intros s t Hs. rewrite He lookup_empty in Hs. discriminate.
   Qed.
 
   Lemma fs_boot_inodes_valid (nib : nat) :
-    ✓ link_elem (fs_boot_inodes nib) (fun _ => ∅).
+    ✓ link_elem (fs_boot_inodes nib)
+        (fun _ => (∅, (TFile, fun _ => TFile))).
   Proof.
     apply link_elem_valid_no_ents. exact (fs_boot_inodes_no_ents nib).
   Qed.
@@ -2085,34 +2308,36 @@ Section FsCfgBootEra.
      the links step, which hands a directory's tokens to its checked-out
      payload, is what makes W9 + conjunct (13) [FsImg.fs_links_eq] come
      due. *)
-  (* THE IMAGE'S REGISTER CHOICE: every unit at an inum comes from the ONE
-     directory a well-formed image has (W9's (T)), so the pile is [nlink]
-     copies of [Some ROOTINO].  Its SIZE is what [InodeRegion.ireg_par]'s
-     bound reads; the values are what the entries demand. *)
-  Definition img_par (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
-    : gmultiset (option Z) :=
-    FsStateLink.par_reps (fn_nlink (img_node P sb z)) (Some ROOTINO).
-
+  (* THE IMAGE'S PER-INUM PILES, SPLIT THREE WAYS (lane G5).  The boot
+     allocates the type register in its FULL shape -- every inum's
+     authority at the record's own MULTIPLICITY with all its fragments
+     still at home -- and this lemma cuts each pile into the region's
+     keep, the directory's own ["."] fragment, and the tickets its
+     entries are about to claim. *)
   Lemma ireg_lnks_of_image (γfs : fs_names)
       (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
     fsimg_wf P sb = true ->
-    fs_links_full (fs_link γfs) (img_nodes P sb nib) (img_par P sb) -∗
+    fs_links_full (fs_link γfs) (img_nodes P sb nib) (img_ity P sb) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_lnk_at γfs z (fn_nlink (img_node P sb z))
          (bv_unsigned (di_type (fs_dinode P sb z))))
     ∗ ([∗ set] z ∈ region_inums nib,
          [∗ list] _ ∈ seq 0 (fs_link_count P sb z),
-           (FsStateLink.link_tok (fs_gamma_L γfs) z
-            ∗ FsStateLink.par_tok (fs_gamma_L γfs) z (Some ROOTINO))).
+           FsStateLink.link_tok (fs_gamma_L γfs) z (img_ity P sb z))
+    ∗ ([∗ set] z ∈ region_inums nib,
+         [∗ list] _ ∈ seq 0 (img_dotd P sb z),
+           FsStateLink.link_tok (fs_gamma_L γfs) z (img_ity P sb z)).
   Proof.
     intros Hwf.
-    (* THE ONE ARITHMETIC FACT, AND IT IS W9's (durable-disk 2b-inode-5).
-       At every inum the image's ticket demand is at most the record's own
-       [nlink] ([FsImg.fsimg_wf_link_le], W9's first clause, extended off
-       the sweep's range by [fs_link_count_out]); at the ROOT there is one
-       unit of SLACK on top of it, because the root's [".."] is a SELF
-       record and pays for nothing while W9 pins the root at count 0 and
-       [nlink = 1].  That slack IS the keep-alive token. *)
+    (* THE ONE ARITHMETIC FACT, AND IT IS W9's.  At every inum the image's
+       ticket demand is at most the record's own [nlink]
+       ([FsImg.fsimg_wf_link_le], extended off the sweep's range by
+       [fs_link_count_out]); at the ROOT there is one unit of SLACK on top
+       of it, because the root's [".."] is a SELF record that pays for
+       nothing while W9 pins the root at count 0 and [nlink = 1].  That
+       slack IS the keep-alive fragment.  The ["."] fragment is paid for by
+       the MULTIPLICITY's own bonus ([img_mult_eq]) and costs the count
+       nothing. *)
     assert (Hle : forall z : Z,
               (fs_link_count P sb z
                + (if bool_decide (z = InodeRegion.ireg_root) then 1 else 0)
@@ -2128,60 +2353,60 @@ Section FsCfgBootEra.
         assert (Hz1 : z = ROOTINO) by (rewrite Hr; reflexivity).
         rewrite Hz1 Hc0 Hnl. lia.
       - lia. }
-    assert (Hpc : forall z : Z,
-              (fs_link_count P sb z <= fn_nlink (img_node P sb z))%nat).
-    { intros z. pose proof (Hle z). lia. }
     rewrite /fs_links_full.
     rewrite (big_sepM_img_nodes
                (fun i n => own (fs_link γfs)
-                             (link_full_elem i (fn_nlink n) (img_par P sb i)))
+                             (link_full_elem i (FsStateInode.fn_mult n)
+                                (img_ity P sb i)))
                P sb nib).
-    rewrite -big_sepS_sep.
+    rewrite -!big_sepS_sep.
     iIntros "H". iApply (big_sepS_mono with "H"). intros z _.
-    rewrite (link_full_split (fs_gamma_L γfs) z (fn_nlink (img_node P sb z))
-               (img_par P sb z)).
-    iIntros "[[Ha Ht] [Hpa Hpt]]".
+    rewrite (link_full_split (fs_gamma_L γfs) z
+               (FsStateInode.fn_mult (img_node P sb z)) (img_ity P sb z)).
+    iIntros "[Ha Ht]".
+    rewrite (img_mult_eq P sb z).
+    (* the pile splits: the tickets, the keep-alive, and the ["."] *)
     iDestruct (FsStateLink.link_toks_le_split (fs_gamma_L γfs) z
-                 (fn_nlink (img_node P sb z))
+                 (fn_nlink (img_node P sb z) + img_dotd P sb z)
                  (fs_link_count P sb z
                   + (if bool_decide (z = InodeRegion.ireg_root)
-                     then 1%nat else 0%nat))
-                 (Hle z) with "Ht") as "[Ht _]".
-    iEval (rewrite FsStateLink.link_toks_split) in "Ht".
+                     then 1%nat else 0%nat)
+                  + img_dotd P sb z)
+                 (img_ity P sb z)
+                 ltac:(pose proof (Hle z); lia) with "Ht") as "[Ht _]".
+    iEval (rewrite FsStateLink.link_reps_add
+                   FsStateLink.link_toks_split) in "Ht".
+    iDestruct "Ht" as "[Ht Hdot]".
+    iEval (rewrite FsStateLink.link_reps_add
+                   FsStateLink.link_toks_split) in "Ht".
     iDestruct "Ht" as "[Htc Htk]".
-    rewrite /img_par.
-    iDestruct (FsStateLink.par_toks_le_split (fs_gamma_L γfs) z
-                 (fn_nlink (img_node P sb z)) (fs_link_count P sb z)
-                 (Some ROOTINO) (Hpc z) with "Hpt") as "[Hpt _]".
-    rewrite /ireg_lnk_at /InodeRegion.ireg_keep /InodeRegion.ireg_par.
-    iSplitR "Htc Hpt".
-    - iFrame "Ha". iSplitR "Hpa".
-      + destruct (bool_decide (z = InodeRegion.ireg_root));
-          [iExact "Htk" | iClear "Htk"; done].
-      + iExists (FsStateLink.par_reps (fn_nlink (img_node P sb z))
-                   (Some ROOTINO)).
-        (* (U1) AND (U2) ARE FREE AT AN IMAGE (InodeRegion): every unit the
-           image's register carries names the ROOT, so the pile holds NO
-           up-pointing namer at all -- [ireg_ups = 0] -- and both clauses
-           collapse to arithmetic.  W9's (T) is what makes it so: a
-           well-formed image has one directory and its two dot records are
-           SELF records that bear no unit. *)
-        assert (Hups : InodeRegion.ireg_ups
-                         (FsStateLink.par_reps (fn_nlink (img_node P sb z))
-                            (Some ROOTINO)) = 0%nat).
-        { rewrite /InodeRegion.ireg_ups.
-          generalize (fn_nlink (img_node P sb z)) as k. intro k.
-          induction k as [| k IH]; [rewrite multiplicity_empty // |].
-          cbn [FsStateLink.par_reps]. rewrite multiplicity_disj_union
-            (multiplicity_singleton_ne None (Some ROOTINO)
-               ltac:(discriminate)) IH //. }
-        iFrame "Hpa". iPureIntro. rewrite Hups. split_and!.
-        * rewrite FsStateLink.par_reps_size. lia.
-        * intros _. reflexivity.
-        * intros Hnz. lia.
-    - rewrite big_sepL_sep.
-      iSplitL "Htc"; [iApply (FsStateLink.link_toks_list with "Htc") |].
-      iApply (FsStateLink.par_toks_list with "Hpt").
+    iSplitR "Htc Hdot"; [| iSplitL "Htc"].
+    - (* the slot's authority, and the root's keep-alive *)
+      iExists (img_ity P sb z). iSplitR.
+      { iPureIntro. rewrite /InodeRegion.ireg_reg_ok /img_ity.
+        assert (Hdty : InodeRegion.ireg_dir_ty = T_DIR_z)
+          by (vm_compute; reflexivity).
+        destruct (bool_decide
+                    (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z))
+          eqn:Eb.
+        - apply bool_decide_eq_true in Eb. rewrite Hdty. exact Eb.
+        - apply bool_decide_eq_false in Eb. rewrite Hdty. exact Eb. }
+      assert (Hm : InodeRegion.ireg_mult_at (fn_nlink (img_node P sb z))
+                     (bv_unsigned (di_type (fs_dinode P sb z)))
+                   = (fn_nlink (img_node P sb z) + img_dotd P sb z)%nat).
+      { rewrite -(img_mult_eq P sb z) /InodeRegion.ireg_mult_at
+          /FsStateInode.fn_mult /img_node /fn_is_dir /fn_type /fn_orphan
+          /fn_nlink era_node_rec.
+        assert (Hdty : InodeRegion.ireg_dir_ty = T_DIR_z)
+          by (vm_compute; reflexivity).
+        rewrite Hdty //. }
+      rewrite Hm. iFrame "Ha".
+      rewrite /InodeRegion.ireg_keep.
+      destruct (bool_decide (z = InodeRegion.ireg_root));
+        [iEval (rewrite FsStateLink.link_reps_1) in "Htk"; iExact "Htk"
+        | done].
+    - iApply (FsStateLink.link_toks_list with "Htc").
+    - iApply (FsStateLink.link_toks_list with "Hdot").
   Qed.
 
   Lemma fs_cfg_alloc (γd : uart_names) (γv : disk_names)
@@ -2432,7 +2657,7 @@ Section FsCfgBootEra.
        W9 + conjunct (13) [FsImg.fs_links_eq] come due only when the links
        step hands a directory's tokens to its checked-out payload. *)
     iMod (fs_boot_alloc_full (img_nodes (fs_blocks dk) sb icfg_nib)
-            (img_nodes (fs_blocks dk) sb icfg_nib) (img_par (fs_blocks dk) sb))
+            (img_nodes (fs_blocks dk) sb icfg_nib) (img_ity (fs_blocks dk) sb))
       as (γlk γtp) "(Htopa & Htopf & Hlnk)".
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov (sb_logstart sb))
             ROOTDEV γlk γtp E Hcovin Hhomesub with "Hdisk")
@@ -2507,7 +2732,7 @@ Section FsCfgBootEra.
        lemma any more. *)
     iEval (rewrite -Hlk) in "Hlnk".
     iDestruct (ireg_lnks_of_image γfs (fs_blocks dk) sb icfg_nib Hwf
-                 with "Hlnk") as "[Hlnks Hetk]".
+                 with "Hlnk") as "[Hlnks [Hetk Hdots]]".
     (* ---- 5. THE PEELS ------------------------------------------------
        THE MINT ALREADY SPLIT THE LOG REGION OFF (durable-disk 1c-flip):
        [Hchl] is the log's own storage, at the parked cache halves
@@ -2592,8 +2817,8 @@ Section FsCfgBootEra.
        routed out of the per-inum piles [ireg_lnks_of_image] left over
        after the region kept the authorities and the root's keep-alive. *)
     iDestruct (ent_toks_of_region γfs (fs_blocks dk) sb
-                 (fs_live_set (fs_blocks dk) sb) Hwf Hnin HAran with "Hetk")
-      as "Hetks".
+                 (fs_live_set (fs_blocks dk) sb) Hwf Hnin HAran
+                 with "Hetk Hdots") as "Hetks".
     iDestruct (big_sepS_sep_2 with "Hdlk Hetks") as "Hdlk".
     iAssert ([∗ set] z ∈ fs_live_set (fs_blocks dk) sb,
                dlinks γfs z (fs_dinode (fs_blocks dk) sb z)
@@ -2601,7 +2826,8 @@ Section FsCfgBootEra.
                  (fs_data_of (fs_blocks dk) (fs_dinode (fs_blocks dk) sb z)))%I
       with "[Hdlk]" as "Hdlk".
     { iApply (big_sepS_mono with "Hdlk"). intros z _.
-      iIntros "[H1 H2]". iApply (dlinks_intro with "H1 H2"). }
+      iIntros "[H1 (%D & %Hd & %Hx & H2)]".
+      iApply (dlinks_intro _ _ _ _ _ D Hd Hx with "H1 H2"). }
     iDestruct (ipool_alloc_of_image γfs γi (fs_blocks dk) sb cov
                  (((cov ∖ ({[ (1:Z) ]} : gset Z))
                      ∖ log_region_set (sb_logstart sb))

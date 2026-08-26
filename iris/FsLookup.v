@@ -548,6 +548,7 @@ Definition wp_dirlookup_tree_body
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
     (dpi : Z) (ents : gmap fname Z)                   (* THE TREE-LEVEL NODE *)
+    (D : gset fname)      (* the directory's own SUBDIRECTORY markers (G5) *)
 
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
@@ -626,7 +627,7 @@ Definition wp_dirlookup_tree_body
      layer"). *)
   dir_links dpi dn data -∗
   FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
-    (FsStateEra.era_node dn bm data) -∗
+    (FsStateEra.era_node dn bm data) D -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
@@ -646,7 +647,7 @@ Definition wp_dirlookup_tree_body
       bslot -∗
       dir_links dpi dn data -∗
       FsStateInode.ent_toks (FsBytesGamma.fs_gamma_L γfs) dpi
-        (FsStateEra.era_node dn bm data) -∗
+        (FsStateEra.era_node dn bm data) D -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
          survives because a caller needs it: sys_unlink names the offset
          [16k] with it, and iget's reference is at that record's inum. *)
@@ -692,7 +693,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
-      (dpi : Z) (ents : gmap fname Z)
+      (dpi : Z) (ents : gmap fname Z) (D : gset fname)
       (fn : nat -> bv 8)
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
@@ -700,7 +701,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                              γa γf cov logstart inodestart nib dev ip bm data dn
-                             dpi ents fn hasp pofv pidv dq dqd dqn
+                             dpi ents D fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.

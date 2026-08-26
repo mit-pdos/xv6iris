@@ -594,7 +594,7 @@ Section Collect.
         mint allocates from.  The collection already PRODUCES it at every
         inum ([col_link_of]'s second conjunct, dropped until now); this row
         is the one at the root being kept. *)
-     ireg_keep γfs ireg_root ∗
+     (∃ kv : ity, ireg_keep γfs ireg_root kv) ∗
      (* THE THREE DIRECTORY CLAUSES, PER INODE (durable-disk lane
         E-clauses).  [IcacheEscrow.ic_loaded] and [ipool_alloc] carry them
         already -- the escrow's deposit arms re-prove them at every
@@ -1160,8 +1160,10 @@ Section Collect.
     (* ---- the link family's own validity, SLACKED AT THE ROOT: the
        collected elements gathered with the region's spare fragment, read
        by ONE [own_valid] ([FsState.fs_links_valid_tok]) ---- *)
+    iDestruct "Hkeep" as (kv) "Hkeep".
     rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl)
-            /FsStateLink.link_tok /FsStateLink.link_toks /=.
+            /FsStateLink.link_tok /FsStateLink.link_toks
+            /FsStateLink.link_tok_elem /=.
     iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
     iPureIntro.
     split; rewrite /col_state /=.
@@ -1180,7 +1182,9 @@ Section Collect.
     - exact Hindv.
     - intros i Hi. apply elem_of_dom. apply Hdi.
       pose proof (cg_nin Hg). lia.
-    - exact Hlinks.
+    - destruct Hlinks as (f & Hok & Hv). exists f, kv. split; [exact Hok |].
+      assert (Hr : ireg_root = ROOTINO) by (vm_compute; reflexivity).
+      rewrite -Hr. exact Hv.
     - exact Hmetau.
     - intros i n b Hi Hon.
       split; [exact (Hused i n b Hi Hon) | exact (Hnotmeta i n b Hi Hon)].
@@ -1515,15 +1519,15 @@ Section Collect.
             nothing. *)
          ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
          ∗ inode_owned_era_q γfs dq γi inum n
-         ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n)%I.
+         ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)%I.
 
   (* A FREE INUM OWNS NO ENTRY TOKENS: its record's type is zero, so the
      node is not a directory and [dir_entries] is empty. *)
   Lemma col_free_ent_toks γfs (i : Z) (d : dinode) :
     bv_unsigned (di_type d) = 0 ->
-    ⊢ ent_toks (fs_gamma_L γfs) i (free_node d).
+    ⊢ ent_toks_x (fs_gamma_L γfs) i (free_node d).
   Proof.
-    intros Ht0. iApply ent_toks_not_dir.
+    intros Ht0. iApply ent_toks_x_not_dir.
     rewrite /fn_is_dir /fn_type /free_node /= Ht0.
     apply bool_decide_eq_false_2. rewrite /DirView.T_DIR_z. lia.
   Qed.
@@ -1546,14 +1550,27 @@ Section Collect.
   Lemma col_link_of γfs (i : Z) (n : fs_node) (d : dinode) :
     fn_rec n = d ->
     ireg_lnk γfs i d -∗
-    ent_toks (fs_gamma_L γfs) i n -∗
-      fs_link_node (fs_link γfs) i n ∗ ireg_keep γfs i.
+    ent_toks_x (fs_gamma_L γfs) i n -∗
+      fs_link_node (fs_link γfs) i n ∗ ∃ kv : ity, ireg_keep γfs i kv.
   Proof.
-    intros Hrec. rewrite /ireg_lnk /ireg_lnk_at /ireg_par /ireg_nl -Hrec
-      /fn_nlink.
-    iIntros "(Hla & Hkp & (%P & Hpa & %Hsz & _ & _)) Hte". iFrame "Hkp".
-    iExists P. iSplitR; [by iPureIntro |].
-    iApply (inode_link_pack (fs_gamma_L γfs) i n P with "Hla Hpa Hte").
+    intros Hrec.
+    iIntros "Hlnk Hte".
+    iDestruct "Hlnk" as (v) "(%Hok & Hla & Hkp)".
+    iSplitR "Hkp"; [| by iExists v].
+    iApply (inode_link_iff (fs_gamma_L γfs) i n).
+    iSplitL "Hla"; [| iExact "Hte"].
+    iExists v.
+    assert (Hdty : ireg_dir_ty = DirView.T_DIR_z)
+      by (vm_compute; reflexivity).
+    iSplitR.
+    { iPureIntro. rewrite /fn_ity_ok /ireg_reg_ok /fn_is_dir /fn_type -Hrec
+        in Hok |- *.
+      destruct v.
+      - apply bool_decide_eq_false_2. rewrite Hdty in Hok. exact Hok.
+      - apply bool_decide_eq_true_2. rewrite Hdty in Hok. exact Hok. }
+    rewrite /ireg_mult /ireg_mult_at /ireg_nl /fn_mult /fn_nlink /fn_orphan
+      /fn_is_dir /fn_type -Hrec Hdty.
+    iExact "Hla".
   Qed.
 
   Lemma col_bundle_of_side γfs (γi : gname) (inum : bv 32) (n : fs_node)
@@ -1575,9 +1592,9 @@ Section Collect.
           ⌜~ ✓ (dq ⋅ dq)⌝
           ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
           ∗ inode_owned_era_q γfs dq γi inum n
-          ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n
+          ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
           ∗ ((inode_owned_era_q γfs dq γi inum n
-              ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+              ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
                col_side γfs γi inum
                ∗ ireg_slot γfs γi (bv_unsigned inum) d).
   Proof.
@@ -1671,7 +1688,7 @@ Section Collect.
           ⌜~ ✓ (dq ⋅ dq)⌝
           ∗ ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
           ∗ inode_owned_era_q γfs dq γi inum n
-          ∗ ent_toks (fs_gamma_L γfs) (bv_unsigned inum) n.
+          ∗ ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n.
   Proof.
     iIntros "Hauth Hside Hslot".
     iDestruct (col_region_slot_take γfs γi inum d with "Hauth Hslot")

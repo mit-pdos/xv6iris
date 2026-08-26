@@ -2548,6 +2548,7 @@ Section EraRes.
     bv_unsigned (dir_inum data k0) <> i ->
     dir_bname data k0 <> DOT ->
     dir_bname data k0 <> DOTDOT ->
+    bv_unsigned (dir_inum data k0) <> i ->
     dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))) ->
     dir_zeroed_at data data' k0 ->
     bv_unsigned (di_type dn) = T_DIR_z ->
@@ -2563,7 +2564,7 @@ Section EraRes.
               then ty = TDir i else ty = TFile⌝)
     ∗ ent_toks Γ i (era_node dn' bm' data') (D ∖ {[dir_bname data k0]}).
   Proof.
-    intros Hk0 Hlive Hne Hnd Hndd Hu Hzer Hty Hnz Hnz' Hty' Hsz Hh Hh' Hb.
+    intros Hk0 Hlive Hne Hnd Hndd Hne2 Hu Hzer Hty Hnz Hnz' Hty' Hsz Hh Hh' Hb.
     assert (Hb' : bv_unsigned (di_size dn')
                   <= Z.of_nat MAXFILE * Z.of_nat BSIZE) by (rewrite Hsz; exact Hb).
     assert (Hty2 : bv_unsigned (di_type dn') = T_DIR_z)
@@ -2596,7 +2597,8 @@ Section EraRes.
     rewrite (ent_tok_ne Γ i (fn_dd (era_node dn bm data))
                (fn_orphan (era_node dn bm data))
                (bool_decide (dir_bname data k0 ∈ D))
-               (dir_bname data k0) (bv_unsigned (dir_inum data k0)) Hnd Hndd).
+               (dir_bname data k0) (bv_unsigned (dir_inum data k0))
+               Hnd Hndd Hne2).
     iExact "Ht".
   Qed.
 
@@ -2757,6 +2759,7 @@ Section EraRes.
     dir_live data k ->
     dir_bname data k <> DOT ->
     dir_bname data k <> DOTDOT ->
+    bv_unsigned (dir_inum data k) <> i ->
     ent_toks Γ i (era_node dn bm data) D -∗
       (∃ ty, link_tok Γ (bv_unsigned (dir_inum data k)) ty
              ∗ ⌜if bool_decide (dir_bname data k ∈ D)
@@ -2766,7 +2769,7 @@ Section EraRes.
                    then ty = TDir i else ty = TFile⌝)
          -∗ ent_toks Γ i (era_node dn bm data) D).
   Proof.
-    intros Hnz Hty Hh Hb Hu Hnr Hlv Hnd Hndd.
+    intros Hnz Hty Hh Hb Hu Hnr Hlv Hnd Hndd Hne.
     assert (Hlk : dir_entries (era_node dn bm data) !! dir_bname data k
                   = Some (bv_unsigned (dir_inum data k))).
     { rewrite (dir_entries_era_node dn bm data Hh Hb)
@@ -2779,13 +2782,13 @@ Section EraRes.
                       (fn_orphan (era_node dn bm data))
                       (bool_decide (dir_bname data k ∈ D))
                       (dir_bname data k)
-                      (bv_unsigned (dir_inum data k)) Hnd Hndd)) in "Ht".
+                      (bv_unsigned (dir_inum data k)) Hnd Hndd Hne)) in "Ht".
     iFrame "Ht". iIntros "Ht". iApply "Hback".
     iEval (rewrite (ent_tok_ne Γ i (fn_dd (era_node dn bm data))
                       (fn_orphan (era_node dn bm data))
                       (bool_decide (dir_bname data k ∈ D))
                       (dir_bname data k)
-                      (bv_unsigned (dir_inum data k)) Hnd Hndd)).
+                      (bv_unsigned (dir_inum data k)) Hnd Hndd Hne)).
     iExact "Ht".
   Qed.
 
@@ -2798,6 +2801,7 @@ Section EraRes.
       (dir_bname data k) = Some k ->
     dir_bname data k <> DOT ->
     dir_bname data k <> DOTDOT ->
+    bv_unsigned (dir_inum data k) <> self ->
     blk_holes_zero bm data ->
     bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
     ent_toks Γ self (era_node dn bm data) D -∗
@@ -2807,7 +2811,7 @@ Section EraRes.
             ∗ (FsStateLink.link_tok Γ (bv_unsigned (dir_inum data k)) ty
                -∗ ent_toks Γ self (era_node dn bm data) D).
   Proof.
-    intros Hty Hnl Hfirst Hnd Hndd Hh Hsz.
+    intros Hty Hnl Hfirst Hnd Hndd Hne Hh Hsz.
     assert (Hlk : dir_entries (era_node dn bm data) !! dir_bname data k
                   = Some (bv_unsigned (dir_inum data k))).
     { rewrite (dir_entries_era_node dn bm data Hh Hsz)
@@ -2820,7 +2824,7 @@ Section EraRes.
                       (fn_orphan (era_node dn bm data))
                       (bool_decide (dir_bname data k ∈ D))
                       (dir_bname data k)
-                      (bv_unsigned (dir_inum data k)) Hnd Hndd)) in "Ht".
+                      (bv_unsigned (dir_inum data k)) Hnd Hndd Hne)) in "Ht".
     iDestruct "Ht" as (ty) "[Ht %Hok]".
     iExists ty. iSplitR; [by iPureIntro |]. iFrame "Ht".
     iIntros "Ht". iApply "Hback".
@@ -2828,7 +2832,7 @@ Section EraRes.
                       (fn_orphan (era_node dn bm data))
                       (bool_decide (dir_bname data k ∈ D))
                       (dir_bname data k)
-                      (bv_unsigned (dir_inum data k)) Hnd Hndd)).
+                      (bv_unsigned (dir_inum data k)) Hnd Hndd Hne)).
     iExists ty. by iFrame.
   Qed.
 

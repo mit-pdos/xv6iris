@@ -702,7 +702,7 @@ Section InodeOwned.
   Definition ent_tokenless (self : Z) (orph : bool) (s : fname) (t : Z)
     : bool :=
     ((bool_decide (s = DOT) || bool_decide (s = DOTDOT)) && orph)
-    || (bool_decide (s = DOTDOT) && bool_decide (t = self)).
+    || (bool_decide (t = self) && negb (bool_decide (s = DOT))).
 
   (* WHAT THE HOLDER ASSERTS ABOUT THE FRAGMENT'S VALUE, per flavour:
 
@@ -1372,23 +1372,47 @@ Section InodeOwned.
   Lemma dot_ne_dotdot : DOT <> DOTDOT.
   Proof. rewrite /DOT /DOTDOT. intros H. inversion H. Qed.
 
+
   (* a NAME record (neither dot) is never exempt, at any orphan flag *)
   Lemma ent_tokenless_name self orph s t :
-    s <> DOT -> s <> DOTDOT -> ent_tokenless self orph s t = false.
+    s <> DOT -> s <> DOTDOT -> t <> self ->
+    ent_tokenless self orph s t = false.
   Proof.
-    intros Hnd Hne. rewrite /ent_tokenless
+    intros Hnd Hne Hts. rewrite /ent_tokenless
       (bool_decide_eq_false_2 (s = DOT) Hnd)
-      (bool_decide_eq_false_2 (s = DOTDOT) Hne).
-    by destruct orph, (bool_decide (t = self)).
+      (bool_decide_eq_false_2 (s = DOTDOT) Hne)
+      (bool_decide_eq_false_2 (t = self) Hts).
+    by destruct orph.
+  Qed.
+
+  (* A SELF RECORD OTHER THAN ["."] IS EXEMPT -- the root's [".."] is the
+     one the kernel has, and it is what [InodeRegion.ireg_keep]'s slack
+     pays for.  ["."] itself is NOT exempt at a live directory: it is the
+     [+1] of [fn_mult] and the tie rmdir's (D1) reads. *)
+  Lemma ent_tokenless_self_ne self orph s t :
+    t = self -> s <> DOT -> ent_tokenless self orph s t = true.
+  Proof.
+    intros -> Hnd. rewrite /ent_tokenless
+      (bool_decide_eq_true_2 (self = self) eq_refl)
+      (bool_decide_eq_false_2 (s = DOT) Hnd) /=.
+    by destruct orph, (bool_decide (s = DOTDOT)).
+  Qed.
+
+  Lemma ent_tok_self_ne Γ self dd orph isd s t :
+    t = self -> s <> DOT -> ⊢ ent_tok Γ self dd orph isd s t.
+  Proof.
+    intros Ht Hnd. rewrite /ent_tok (ent_tokenless_self_ne self orph s t Ht Hnd).
+    done.
   Qed.
 
   Lemma ent_tokenless_orphan_ne self orph orph' s t :
     s <> DOT -> s <> DOTDOT ->
     ent_tokenless self orph' s t = ent_tokenless self orph s t.
   Proof.
-    intros Hnd Hne.
-    rewrite (ent_tokenless_name self orph' s t Hnd Hne)
-            (ent_tokenless_name self orph s t Hnd Hne) //.
+    intros Hnd Hne. rewrite /ent_tokenless
+      (bool_decide_eq_false_2 (s = DOT) Hnd)
+      (bool_decide_eq_false_2 (s = DOTDOT) Hne) /=.
+    by destruct orph, orph'.
   Qed.
 
   Lemma ent_tokenless_orph_up self s t :
@@ -1403,16 +1427,16 @@ Section InodeOwned.
     ent_tokenless self orph DOTDOT t = (orph || bool_decide (t = self)).
   Proof.
     rewrite /ent_tokenless
-      (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl).
-    destruct (bool_decide (DOTDOT = DOT)), orph, (bool_decide (t = self));
-      reflexivity.
+      (bool_decide_eq_true_2 (DOTDOT = DOTDOT) eq_refl)
+      (bool_decide_eq_false_2 (DOTDOT = DOT)
+         (fun H => dot_ne_dotdot (eq_sym H))) /=.
+    destruct orph, (bool_decide (t = self)); reflexivity.
   Qed.
 
   Lemma ent_tokenless_dot self orph t :
     ent_tokenless self orph DOT t = orph.
   Proof.
-    rewrite /ent_tokenless (bool_decide_eq_true_2 (DOT = DOT) eq_refl)
-      (bool_decide_eq_false_2 (DOT = DOTDOT) dot_ne_dotdot).
+    rewrite /ent_tokenless (bool_decide_eq_true_2 (DOT = DOT) eq_refl) /=.
     by destruct orph, (bool_decide (t = self)).
   Qed.
 
@@ -1495,14 +1519,14 @@ Section InodeOwned.
   Proof. intros H. rewrite /ent_tok H //. Qed.
 
   Lemma ent_tok_ne Γ self dd orph isd s t :
-    s <> DOT -> s <> DOTDOT ->
+    s <> DOT -> s <> DOTDOT -> t <> self ->
     ent_tok Γ self dd orph isd s t
     ⊣⊢ ∃ ty, link_tok Γ t ty
              ∗ ⌜if isd then ty = TDir self else ty = TFile⌝.
   Proof.
-    intros Hd Hdd.
+    intros Hd Hdd Hts.
     rewrite (ent_tok_open Γ self dd orph isd s t
-               (ent_tokenless_name self orph s t Hd Hdd)).
+               (ent_tokenless_name self orph s t Hd Hdd Hts)).
     rewrite /ent_ty_ok (bool_decide_eq_false_2 (s = DOT) Hd)
       (bool_decide_eq_false_2 (s = DOTDOT) Hdd) //.
   Qed.
