@@ -1265,7 +1265,7 @@ Section KexecAExit.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev.
   Proof.

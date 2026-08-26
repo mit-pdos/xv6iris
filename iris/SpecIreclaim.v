@@ -289,7 +289,7 @@ Definition wp_ireclaim_sconf_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   (* THREE slot units: iput's indirect arm is what forces three.  The scan's
      own bread holds one of them ACROSS iget (+0x8c .. +0x4c), but that
      reference is given back before [begin_op] at +0x54, so the three never

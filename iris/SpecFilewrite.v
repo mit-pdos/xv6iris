@@ -504,7 +504,7 @@ Section SpecFilewrite.
      (* the disk fabric *)
      dev_inv (fwn_uart fn) (fwn_disk fn) ∗
      disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) ∗
-     is_lock (fwn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> ∗
+     is_lock (fwn_dlock fn) d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) ∗
      (* THREE slot units: writei's peak (bmap's, and its own bread held
         across either_copyin and log_write).  ilock's bread and end_op's
         commit borrow from the same three, one transaction at a time. *)

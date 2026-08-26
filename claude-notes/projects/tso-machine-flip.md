@@ -1316,6 +1316,279 @@ every one of them is an A6.14/A6.9 item:
 M1 is now COMPLETE except for the deliberately-raw tiers
 (`↦ₓ`/`↦ᵣ`/`↦ₚ`/`↦ₛ` and the four A6.14 members' own resources).
 
+### A6.16 THE LEDGER HAS A PHYSICAL TIER — `ctx_store_ok` IS LANDED, AND IT
+### CHANGES WHAT A6.9 AND A6.14 SAY (2026-08-26, the A6.14 tranche)
+
+**THE GATE IS IN, AND IT IS STATED AT THE PHYSICAL BYTE.**  Porting
+`TsoCtxTwin2.twin_store_ok` to the surface types turned up the one thing
+the tranche's plan did not name, and it is what the whole A6.14 class was
+stuck on:
+
+> **ALL FIVE MEMBERS ARE PHYSICAL, AND THE FLIP ONLY BUILT THE VA TOWER.**
+> `HartMemRun.bytes_own` is a `gmap Arch.pa`; `WpMmodeStore` and `KptTree`
+> hold `↦ₚ₈`; `WpUart`'s lease is a `phys_map`; `HartSMem`'s data nodes
+> take a `pa`.  `ctx_pointsto` is keyed by VA and carries `mem_pointsto`'s
+> kernel-mapping plumbing, so "make `bytes_own` context-indexed" (A6.12's
+> shape) is not even type-correct without an identity-mapping assumption
+> the user tier does not have.
+
+So `TsoCtx.v` gained the family the machine actually works over:
+
+    ctx_phys_pointsto ξ a dq v  :=  ∃ t, phys_pointsto a dq v ∗
+                                      a ↪[ts_name]{dq} t ∗
+                                      (llb (ctx_bound_name ξ) t
+                                       ∨ (t,a) ↪[ctx_dirty_name ξ]{dq} ())
+
+— `ctx_pointsto`'s body with the VA plumbing stripped off, SEALED for
+exactly `ctx_pointsto`'s reason (a permeable seal lets ctx↔raw cross by δ;
+the rehearsal measured that), plus the 8-byte tower
+`ctx_phys_word_pointsto` (unsealed, like `ctx_word_pointsto`: a tower over
+a sealed byte leaks nothing).  **It is not a new tier**:
+
+    ctx_pointsto_phys : ctx_pointsto ξ va dq v ⊣⊢
+      ∃ ppn, kmap_at (svpn_of va) ppn KP_rw ∗ ⌜canonical⌝ ∗ ⌜ktier_pin⌝ ∗
+             ctx_phys_pointsto ξ (pa_of ppn va) dq v
+
+The VA family IS the kmap claim over this one, both directions, so the
+gates are stated ONCE, physically, and the VA forms are corollaries.
+
+**THE GATES, all proven and green:**
+
+    ctx_store_ok        (g g' : gstate) ξ (Pold Pnew : gmap Arch.pa (bv 8)) :
+      dom Pold = dom Pnew →
+      g'.(gimg) = g.(gimg) →
+      g'.(glog) = g.(glog) ++ [PWMsg Pnew (hart_agent cpu_id)] →
+      g'.(gmem) = Pnew ∪ g.(gmem) →
+      (∀ c, g'.(gtv) c = g.(gtv) c) →
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      own_context ξ -∗
+      ([∗ map] a ↦ v ∈ Pold, ctx_phys_pointsto ξ a (DfracOwn 1) v) ==∗
+      gen_heap_interp g'.(gmem) ∗ tso_interp_at riscv_eraGS g' ∗
+      own_context ξ ∗
+      ([∗ map] a ↦ v ∈ Pnew, ctx_phys_pointsto ξ a (DfracOwn 1) v)
+
+    ctx_store_win_ok    — the same at the leaf's shape: the arm's own
+                          `write_bytes g.(gmem) pa n vnew`, the arm's own
+                          `PWMsg (snap_of pa n vnew) (hart_agent cpu_id)`,
+                          and a byte WINDOW on both sides.
+    ctx_phys_load_ok       — `ctx_load_ok` without the VA plumbing; PURE
+                             conclusion, so nothing is consumed.
+    ctx_phys_load_bytes_ok — the window form, exactly
+                             `HartEvents.wp_hart_ram_read_plain`'s
+                             `Mobl_ram_plain` obligation.
+    ctx_phys_win_map       — the leaf's byte LIST and the message's byte
+                             MAP are one resource.
+
+**FOUR DESIGN POINTS WORTH KEEPING.**
+
+1. **THE MAP FORM IS THE PRIMITIVE, AND `write_bytes_union` IS WHY.**  A
+   window store is ONE append covering n bytes, so a fold of a byte gate
+   would be a different machine (n messages).  Stating the gate over a
+   footprint MAP `Pnew` with `gmem' = Pnew ∪ gmem` makes it match
+   `TsoMemPa.write_bytes_union` (`write_bytes m pa n v = snap_of pa n v ∪ m`)
+   character for character — the payload ruling of §1 paying off a second
+   time — and needs no address-distinctness anywhere in the proof.
+2. **DISTINCTNESS IS NEEDED ONLY AT THE LIST↔MAP BRIDGE**, and it is free:
+   `pa_add` is injective in its `nat` index.  `VirtioQueue.pa_add_inj` is
+   the fact but that file sits far above the kit, so the five short lemmas
+   are re-proven `Local` in `TsoCtx.v` (`tso_pa_add_inj` and friends).
+3. **THE POST-STATE IS GIVEN BY FIELD EQUATIONS, NOT BUILT.**  Only the
+   four fields `tso_interp_at` reads are constrained, so a leaf that
+   already has the machine's successor state applies the gate with no
+   `gs_of` round trip on the way out.
+4. **A PLAIN STORE MOVES EXACTLY ONE VIEW, AND IT IS NOT THE AUTHOR'S.**
+   The harts keep theirs (store buffering, §2); every BUS-MASTER agent is
+   pinned to the top (RULING 2), so the append carries the disk's view
+   with it and the gate pays one monotone `view_auth_update`.  This is the
+   step the `gtv`-only reading of "the view does not move" misses.
+
+**WHAT THIS REPAIRS.**
+
+- **A6.9's consequence 1 — "the phys tier cannot STORE either" — was
+  right about the ELEMENTS and wrong about the conclusion.**  A store's
+  `Wobl_ram` owes the γts update, which needs the timestamp elements; it
+  does NOT need the VA plumbing.  A tier that carries the elements can
+  store.  Ruling 6's "phys stays RAW" therefore splits: `↦ₚ` stays raw
+  (image bytes, pristine-rescued, the DMA window's flat half), and the
+  A6.14 members move to `ctx_phys_pointsto`, which is the SAME tier with
+  its ledger residue kept.
+- **A6.14's `KptTree` entry is CLOSED, and its "the residue trick fails"
+  reasoning is superseded.**  The reasoning was correct — a residue split
+  goes stale because the leaf STORES the slot — and beside the point: the
+  round trip never has to leave the ledger.  At the node's own identity
+  mapping (`pa_of b a = a`, from `pt_node_claim`) the VA family and the
+  physical family are the SAME resource under a persistent `kmap_at`, so
+  `pt_slot_phys_to_mem` / `pt_slot_mem_to_phys` are now an ISOMORPHISM
+  (`ctx_pointsto_of_phys` / `ctx_pointsto_to_phys`), lossless in both
+  directions, and `KptTree.v` is **GREEN** with its `TsoCtxShim` import
+  deleted.  CASCADE, deliberate: `PtTree.pt_page_own` holds its 512 slots
+  at `↦ₚ₈` and must move to `ctx_phys_word_pointsto`, and so must the ~10
+  `Proof*` walk files that thread it (`ProofFreewalk`, `ProofCopyout`,
+  `ProofIsmapped`, `ProofUvmcopy`, `ProofWalkaddr`, `ProofWalkNoalloc`,
+  …).  `PtTree.v` does not import `TsoCtx` today, so that is a section
+  binder plus the A6.12 same-name move.
+
+**THE REMAINING THREE MEMBERS, in the shape the gate now makes available**
+(none implemented this session):
+
+- `HartMemRun` — `bytes_own mm := [∗ map] a ↦ b ∈ mm, ctx_phys_pointsto
+  cur_ctx a (DfracOwn 1) b` (same name, same arity, one ambient
+  `CurCtx` binder on the definition, which every one of the ~60 consumers
+  already has), plus `own_context cur_ctx` on `swp_hmrun`.  The plain read
+  discharges by `ctx_phys_load_bytes_ok`, the write by `ctx_store_ok` —
+  the walker's own resource IS a map, so the map form applies with no
+  bridge at all.
+- `WpMmodeStore` — `↦ₚ₈` → `ctx_phys_word_pointsto`; see A6.17.
+- `WpUart` — the lease's `phys_map` becomes a parked context's
+  `ctx_phys_pointsto` map, and `wp_disk_step`'s callback pays the same
+  four steps with `ctx_store_ok` at `disk_agent` (A6.9's DMA-reclaim
+  shape, now with a gate to write it against; the gate is stated at
+  `hart_agent cpu_id` and needs its author generalised to an `agent`
+  parameter for this one caller).
+
+### A6.17 THE `WpMmodeStore` SOLO-ERA QUESTION, MEASURED — SOLO-ERA IS
+### REFUTED, AND THE EXPENSIVE HALF OF THE CTX SHAPE IS ALREADY PAID
+
+A6.14 ruling 4 asked for this measurement before either shape is built.
+Here it is.
+
+**THE STORES, exhaustively.**  Three leaves (`wp_store_gpr`,
+`wp_store_gpr_tor`, `wp_csdsp_gpr_tor`) and FOUR call sites in the whole
+tree: `WpStartNew.v:1133`/`:1146` and `WpTimerinit.v:363`/`:378`.
+`VcGen.v`'s mention of `wp_store_gpr` is a header comment, not a use.
+Every one of the four is a `c.sdsp` of `ra`/`s0` to the hart's own M-mode
+boot stack — `start()`'s and `timerinit()`'s prologue saves.
+
+**SOLO-ERA IS FALSE HERE.**  All eight harts enter `_entry` and run
+`start()`; `SystemAdequacy` mints eight contexts and runs eight harts'
+WPs side by side.  `TsoMemPa.all_own h log` fails at the second hart's
+first prologue save.  (A6.4 already recorded that no `gstate`-level
+producer for `all_own` is built and that the disk agent breaks it for any
+hart anyway; this adds that the M-mode bracket is not solo even before
+the disk exists.)  **So the solo-era shape is not available, and the
+ruling is the ctx conversion.**
+
+**AND THE HALF A6.12 CALLED "THE REAL COST" IS ALREADY PAID.**
+`own_context cur_ctx` is in hand throughout the M-mode bracket:
+`BootChain.boot_entry_bridge` TAKES it as a premise (its header explains
+why: taken, not minted, so main's cone stays context-implicit) before it
+applies `Entry.wp_entry_boot`, and only hands it on to
+`BootBridge.boot_bridge` at the far end.  There is exactly ONE token,
+held across the whole bracket — no `iApply` breakage of the kind A6.12
+budgeted for the user tier.  What it costs is threading that one token
+down through `wp_entry_boot` → `WpStartNew`'s and `WpTimerinit`'s lemmas
+→ the three store leaves: four statements.
+
+**WHAT IS NOT FREE EITHER WAY, and it is the real bill.**  The M-mode
+boot stack's bytes arrive as `stack_own_phys` — RAW, no timestamp
+elements — so the ledger residue for them has to be minted at ADEQUACY
+whichever shape is chosen.  That is why the solo-era shape would have
+bought nothing even if it were true: it removes the bit, not the element.
+
+**A THIRD SHAPE WAS FOUND AND REJECTED, worth recording because it is
+sound and will be right somewhere else.**  A store gate needs the
+elements but NOT a context: dropping the clean/dirty bit gives a
+"write-only ledger byte" (`phys_pointsto a dq v ∗ ∃ t, a ↪[ts_name]{dq} t`)
+that can be stored to for ever and licenses no load.  It fits these
+stores exactly — the M-mode prologue saves are DEAD (A6.10 already
+records that M-mode's only 8-byte data load in this tree is `entry`'s
+`ld sp, stack0`, a link-time constant).  Rejected because it is strictly
+more work here: it is a NEW resource with no producer, while
+`own_context` already exists and already arrives, and the resulting byte
+is weaker (unloadable).  Keep it in mind for a genuinely write-only
+region.
+
+### A6.18 THE Σ-SEAM STOP: `HartSMem`'s DISCHARGE POINT IS `WpSconfMem`'s
+### `wordw_pointsto`, AND IT IS A FORCED AMENDMENT TO §0.10′ RULING 4
+
+Reported rather than changed, per the tranche's own stop rule.
+
+**THE CHAIN.**  `HartSMem`'s S-mode data nodes (`swp_read_ram_node1/2/4/8`
+and their `_ex` / `_w` / `_w_ex` forms, all driven by the `node_read`
+tactic) read `Read_plain`, so post-A6.7(B) they take
+`wp_hart_ram_read_plain` and owe `Mobl_ram_plain` — a
+`tso_read_bytes img log h tv' pa n w` fact at EVERY admissible view, in
+place of today's `mem_bytes_at σ pa n bytes` against the flat cache.
+`HartSMem` has 28 internal uses and exactly ONE external
+(`WpSconfMem.v:503`, `swp_read_ram_node_w_ex`), and that is where the
+obligation is discharged: `WpSconfMem.v:521–534` opens the caller's
+atomic update, unfolds `wordw_pointsto`, and closes with `s_mem_chunk`
+against `sigma.(mem)`.  A flat cell cannot give the new fact (A6.7(B)'s
+measurement), so **the datum has to carry the ledger residue.**
+
+**THE EXACT STATEMENTS.**  The datum is
+
+```coq
+  (* WpSconfMem.v:104 *)
+  Definition wordw_pointsto `{KTR : !CurKtier} (width : Z) (a : Arch.pa)
+      (dq : dfrac) (w : mword (8*width)) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
+     [∗ list] j ∈ seq 0 (Z.to_nat width),
+        mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+```
+
+and it appears in the two ATOMIC-UPDATE roots
+
+```coq
+  wp_load_s_sconf_au  … (WpSconfMem.v:336)
+    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
+       wordw_pointsto (KTR := ktd) width ea dqm v ∗
+       (wordw_pointsto (KTR := ktd) width ea dqm v
+          ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗ …
+
+  wp_store_s_sconf_au … (WpSconfMem.v:1019)
+    (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword (8*width),
+       wordw_pointsto (KTR := ktd) width ea (DfracOwn 1) vold ∗
+       (wordw_pointsto (KTR := ktd) width ea (DfracOwn 1) sv
+          ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗ …
+```
+
+plus the three `_gen*` wrappers (`:602`, `:662`, `:700`), the store's
+`wp_store_s_sconf_gen` (`:1243`), and every S-mode instruction leaf built
+on them — `wp_lbu/lwu/cld/ld/clw/lw_s_sconf`, `wp_csd/sd/csw/sw_s_sconf`,
+`wp_sb_s_sconf`, `wp_cldsp/csdsp_s_sconf`, `wp_sd_zero/sw_zero_s_sconf`
+— about twenty exported statements, the whole S-mode load/store leaf
+family.  `wordw_claim`, `wordw1_byte` and `wordw8_ctx` ride along.
+
+**THE SHAPE THAT COSTS LEAST, and why the amendment is not as bad as it
+looks.**
+
+1. **`own_context` IS ALREADY THERE.**  Every one of those statements
+   takes `sie_cap_gpr kt m n b p`, and §0.13′ records that
+   `own_context cur_ctx` is a conjunct of `IntrDefs.sie_cap` — "a thread's
+   AMBIENT context is its identity".  So the A6.14 premise costs nothing
+   here: the token arrives with the capability the leaf already takes.
+2. **THE DATUM MOVES IN PLACE, SAME NAME AND SAME ARITY.**  Replace
+   `mem_pointsto` by `ctx_pointsto cur_ctx` in the body and give the
+   definition an ambient `` `{XI : CurCtx} `` binder.  Every one of the
+   ~20 exported statements is then TEXTUALLY UNCHANGED, `wordw8_ctx`
+   collapses to `reflexivity`, and the hand-written continuation adapters
+   §0.9′ built around it DIE — the same deletion `PageFields`/`ByteBuf`
+   got from M1 stage 2, for the same reason.
+3. **THE STORE HALF IS THE HIDDEN HALF.**  `wp_store_s_sconf_au` and its
+   eight instruction leaves are S-mode's stores of ALL kernel data, and
+   they owe `Wobl_ram` too — today `wordw_pointsto_write_c`
+   (`WpSconfMem.v:199`) discharges only the gen_heap update.  So
+   **`WpSconfMem` is an unlisted sixth A6.14 member**, hidden until now
+   only because `HartSMem.vo` is stale and the file has never been built
+   post-flip.
+
+**WHAT IT COSTS ELSEWHERE.**  `grep wordw_pointsto` outside the file
+names `WpSconfLock.v:435` (which already annotates the AU's datum as "the
+RAW window … deliberately raw"), `ProofBrelse.v:203` and
+`ProofVirtioDiskIntr.v:1043`; every other consumer supplies the datum
+through the `↦₈` wrappers, which are ALREADY context-indexed — which is
+itself the evidence that the raw spelling is the odd one out now.
+
+**THE RULING NEEDED.**  §0.10′ ruling 4 / §0.8′ ruling 6 declare
+`WpSconfMem.wordw_pointsto` deliberately RAW.  That ruling was made in
+the CUTOVER REHEARSAL, when the only cost of a ctx datum was crossing a
+seal for nothing.  Post-flip the ctx datum is the only one that can
+discharge either obligation, so the ruling has to be amended exactly the
+way A6.14 amended ruling 6.  **`HartSMem` cannot be closed until it is**
+— its 28 internal uses can be ported and the obligation threaded, but it
+would land at `WpSconfMem` with no payer.
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no

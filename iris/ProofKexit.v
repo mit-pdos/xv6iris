@@ -1580,7 +1580,7 @@ Section KexitRest.
     gen_cert -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bslots 3 -∗
     (* ---- the inode cache's persistent set, and the two regions ---- *)
     is_itable2 γtl cn γfs γi cov logstart nib dev -∗

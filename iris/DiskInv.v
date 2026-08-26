@@ -773,6 +773,113 @@ Section DiskInv.
 End DiskInv.
 
 (* ====================================================================== *)
+(* THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1).             *)
+(*                                                                        *)
+(* Outside the section because each quantifies over the context that      *)
+(* section fixes -- the [KallocInv.v:388] template.  [disk_res] is        *)
+(* ▷-free, [inv]-free, [cinv]-free and WP-free; its ξ-dependence is       *)
+(* exactly the [↦ₘ]/[↦₈] cells (the free-cell bytes, the descriptor and   *)
+(* ops words, the info-block pointers).  Everything else -- the ring      *)
+(* slots ([↦₂]), the used index ([↦₂]), the b_disk flags ([↦₄]), the      *)
+(* phys tier and every ghost row -- is stage-2/raw, hence ξ-CONSTANT.     *)
+(*                                                                        *)
+(* The structural instances are applied AS TERMS: instance search cannot  *)
+(* do the higher-order big-op unification (recipe rule 2).  The two       *)
+(* windows are [big_sepM]s, which is what [TsoCtx.ctx_morph_big_sepM] is  *)
+(* for.                                                                   *)
+(* ====================================================================== *)
+Section DiskCtx.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
+
+  Global Instance desc_entry_own_morph (pd : Arch.pa) (i : nat) :
+    CtxMorph (λ ξ0 : CtxId, desc_entry_own (XI := ξ0) pd i).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /desc_entry_own.
+    iDestruct "H" as (va vl vf vn) "(Ha & Hl & Hf & Hn)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Ha") as "[Hd Ha]".
+    iFrame "Hd". iExists va, vl, vf, vn. iFrame.
+  Qed.
+
+  Global Instance ops_own_morph (i : nat) :
+    CtxMorph (λ ξ0 : CtxId, ops_own (XI := ξ0) i).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ops_own.
+    iDestruct "H" as (t r s) "(Ht & Hr & Hs)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hs") as "[Hd Hs]".
+    iFrame "Hd". iExists t, r, s. iFrame.
+  Qed.
+
+  Global Instance free_slot_res_morph (pd : Arch.pa) (i : nat) :
+    CtxMorph (λ ξ0 : CtxId, free_slot_res (XI := ξ0) pd i).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /free_slot_res.
+    iDestruct "H" as "(Hde & Hop & (%sb & Hst) & (%w & Hb))".
+    iDestruct (desc_entry_own_morph pd i ξ ξ' with "Hd Hde") as "[Hd Hde]".
+    iDestruct (ops_own_morph i ξ ξ' with "Hd Hop") as "[Hd Hop]".
+    iDestruct (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hb") as "[Hd Hb]".
+    iFrame "Hd Hde Hop".
+    iSplitL "Hst"; [iExists sb; iExact "Hst" | iExists w; iExact "Hb"].
+  Qed.
+
+  Global Instance flight_res_morph (γ : disk_names) (p : nat) (v : dclaim) :
+    CtxMorph (λ ξ0 : CtxId, flight_res (XI := ξ0) γ p v).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /flight_res.
+    iDestruct "H" as "(Hwf & Hrc & Hb & Hi)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hi") as "[Hd Hi]".
+    iFrame.
+  Qed.
+
+  Global Instance parked_res_morph (γ : disk_names) (pav : Arch.pa)
+      (p : nat) (v : dclaim) :
+    CtxMorph (λ ξ0 : CtxId, parked_res (XI := ξ0) γ pav p v).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /parked_res.
+    iDestruct "H" as (bs) "(H1 & H2 & H3 & Hb & Hi & Hrest)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hi") as "[Hd Hi]".
+    iFrame "Hd". iExists bs. iFrame.
+  Qed.
+
+  (* one element of the free-descriptor walk: the marker byte plus the
+     slot's own resources when the marker says FREE. *)
+  Global Instance free_arm_morph (pd : Arch.pa) (fr : nat -> bool) (i : nat) :
+    CtxMorph (λ ξ0 : CtxId,
+                if fr i then free_slot_res (XI := ξ0) pd i else emp)%I.
+  Proof. destruct (fr i); apply _. Qed.
+
+  Global Instance disk_res_morph (γ : disk_names)
+      (pd pav pu : SailStdpp.Values.mword 64) :
+    CtxMorph (λ ξ0 : CtxId, disk_res (XI := ξ0) γ pd pav pu).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /disk_res.
+    iDestruct "H" as (np nr fl pk tr fr)
+      "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & Hpub & Hlb & Hauth & Hused &
+        Hfl & Hpk & Hfree & Hring)".
+    iDestruct (ctx_morph_big_sepM fl
+                 (λ (p : nat) (v : dclaim) (ξ0 : CtxId),
+                    flight_res (XI := ξ0) γ p v)
+                 (λ p v, flight_res_morph γ p v)
+                 ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
+    iDestruct (ctx_morph_big_sepM pk
+                 (λ (p : nat) (v : dclaim) (ξ0 : CtxId),
+                    parked_res (XI := ξ0) γ pav p v)
+                 (λ p v, parked_res_morph γ pav p v)
+                 ξ ξ' with "Hd Hpk") as "[Hd Hpk]".
+    iDestruct (ctx_morph_big_sepL (seq 0 8)
+                 (λ _ (i : nat) (ξ0 : CtxId),
+                    (ctx_pointsto ξ0 (d_free_cell i) (DfracOwn 1)
+                       (if fr i then Z_to_bv 8 1 else byte_zero) ∗
+                     (if fr i then free_slot_res (XI := ξ0) pd i else emp))%I)
+                 (λ _ i, ctx_morph_sep _ _ (ctx_morph_pointsto _ _ _ _)
+                                           (free_arm_morph pd fr i))
+                 ξ ξ' with "Hd Hfree") as "[Hd Hfree]".
+    iFrame "Hd". iExists np, nr, fl, pk, tr, fr. iFrame.
+  Qed.
+End DiskCtx.
+
+(* ====================================================================== *)
 (* The descriptor-triple counting argument (pure).                        *)
 (*                                                                        *)
 (* A publisher holds a fourth, disjoint, well-formed triple while the      *)

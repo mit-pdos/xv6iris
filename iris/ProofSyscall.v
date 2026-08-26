@@ -650,7 +650,7 @@ Section SyscallVocab.
         precondition is the SAME precondition, spelled where the pages
         actually live. *)
      disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
+     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -816,7 +816,7 @@ Section SyscallVocab.
     gen_cert ∗
     dev_inv (fcn_uart fn) (fcn_disk fn) ∗
     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-    is_lock (fcn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
+    is_lock (fcn_dlock fn) d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
     is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
       (λ ξ : CtxId, kmem_res (XIk := ξ) (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
     kalloc_avail (fcn_kalloc fn) None ∗

@@ -774,7 +774,7 @@ Section VdrwfP6.
     perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     vdrw_saved (KTR := KT1) sp0 m -∗
     b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
     (* NO caller-held [trap_csrs_pay]: the function is trap-CSR-balanced, so
@@ -1428,7 +1428,7 @@ Section VdrwfP6.
     assert (HH3sp : H3 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64)).
     { rewrite /H3 upd_ne; [| reg_neq]. rewrite /H2 upd_ne; [| reg_neq].
       rewrite /H1 upd_ne; [| reg_neq]. exact HG3sp. }
-    iApply (Release.wp_release_sconf KT1 (CID := CIDx) γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> H3 0%nat eb (proc_addr j) (K - 12)%nat
+    iApply (Release.wp_release_sconf KT1 (CID := CIDx) γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) H3 0%nat eb (proc_addr j) (K - 12)%nat
               ({["virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").

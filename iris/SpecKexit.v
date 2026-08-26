@@ -244,7 +244,7 @@ Definition wp_kexit_sconf_body
   gen_cert -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   bslots 3 -∗
   (* THE FILE SYSTEM, as [SpecFileclose] sees it: the ambient [fs_ready]
      and the ties that make [fn]'s names the ambient ones.  kexit hands them

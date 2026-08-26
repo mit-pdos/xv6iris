@@ -131,7 +131,7 @@ Definition wp_bread_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   (* the slot unit backing the new reference *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its

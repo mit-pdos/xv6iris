@@ -483,7 +483,7 @@ Section SpecFileread.
      (* the disk fabric *)
      dev_inv (frn_uart fn) (frn_disk fn) ∗
      disk_geom (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
-     is_lock (frn_dlock fn) d_lock "virtio_disk"%string <{ disk_res (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn) }> ∗
+     is_lock (frn_dlock fn) d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
      bslot)%I.

@@ -219,7 +219,7 @@ Definition wp_iunlockput_sconf_body
   procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+  is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
   bslots 3 -∗
   log_op g n -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
@@ -362,7 +362,7 @@ Definition wp_iunlockput_gen_body
   procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+  is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two

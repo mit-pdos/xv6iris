@@ -3,6 +3,42 @@
    LOOKS UP a file reference needs (starting with [ProcInv]'s [proc_priv],
    which threads a slot index through [p->ofile]).
 
+   ---- M3/tso: WHY [ftable_res] IS STILL [<{ }>]-EMBEDDED (2026-08-26) ----
+
+   The transport memo's ruling 2 -- "give [fpnames] an [fp_ctx : CtxId] and
+   state [off_content]/[off_body]/[off_raw]'s [a_fip] row at [fp_ctx pn]" --
+   was NOT implemented, because it does not close.  It makes [off_hold] a
+   closed term (which is what [CtxMorph ftable_res] needs), but it moves the
+   problem to the one place where the two halves of [a_fip] have to become a
+   WHOLE cell again: [ProofSysOpenParts.so_open_slot] cancels the UNARMED
+   off-cinv, gets that invariant's half at the MINTER's context, and joins it
+   with the reference's half at ITS OWN -- [so_word_half_join], which is
+   [TsoCtx.ctx_word_pointsto_frac_split], and that law is SINGLE-ξ.  The
+   sealed surface's only cross-context laws are the AGREE family
+   ([ctx_pointsto_agree]/[ctx_bytes_agree]/[ctx_word_pointsto_agree]); there
+   is no cross-context JOIN, and there cannot be one without a [ctx_dom],
+   which no party at that site holds over the minter's context.  MEASURED
+   under the hermetic seal: [NOTCONV ctx_pointsto], [JOIN-DOES-NOT-CROSS],
+   with the same tactic at one context [CONTROL-JOIN-OK].  The situation is
+   reachable on the FIRST open after boot: [FileInv.ftable_res_boot] mints
+   the unarmed cinv at the boot context.
+
+   The fix direction, for whoever takes it: the off-borrow cinv must stop
+   holding a points-to FRACTION of a flipped cell at all -- replace the
+   parked [a_fip k ↦₈{1/2}] with ghost state (an agreement pinning [ip] plus
+   the exclusive borrow marker), so [off_content] is ξ-free outright, the
+   whole [a_fip] cell rides the reference and re-indexes at every ftable
+   acquire, and no join is ever cross-context.  THAT SHAPE ALSO SURVIVES
+   STAGE 2, which the memo demanded of any stage-1 fix: when [↦₄] flips,
+   [off_raw]'s [a_foff k ↦₄ v] -- a cell the borrower genuinely READS AND
+   WRITES, not merely agrees on -- becomes ξ-dependent too, and pinning it
+   to an [fp_ctx] would break the borrower the same way.  Under the ghost
+   shape both cells live in the reference and stage 2 costs nothing here.
+
+   [inode_pay]'s cinv is NOT a second obstruction: MEASURED ξ-free (its body
+   [inode_held_short] is ghost plus [↦₄]).  Neither is [is_pipe], which was
+   λ-converted in the same tranche and is now a closed term.
+
    The design (and the reasoning behind the algebra) is written up in
    claude-notes/design/file-table.md; the short version:
 

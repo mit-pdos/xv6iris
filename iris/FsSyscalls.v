@@ -281,7 +281,7 @@ Section FsBundles.
      ⌜nib = icfg_nib⌝ ∗ ⌜dev = icfg_dev⌝ ∗
      ⌜bmapstart = fsc_bmapstart⌝ ∗ ⌜size = fsc_size⌝ ∗
      disk_geom γd pd pav pu ∗
-     is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> ∗
+     is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) ∗
      FsReady.fs_ready)%I.
 
   Global Instance fs_world_persistent `{XI : CurCtx} γpr γa γs γu γd γk pd pav pu bn glog
@@ -305,7 +305,7 @@ Section FsBundles.
     log_ctx glog bn γfs cov logstart dev ∗
     fs_crash_seam cov logstart ∗ gen_cert ∗
     dev_inv γu γd ∗ disk_geom γd pd pav pu ∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> ∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) ∗
     is_itable2 gtl cn γfs γi cov logstart nib dev ∗ itable_inv ∗
     ic_escrows cn γfs γi cov logstart ∗ ic_sleeplocks cn ∗
     ireg_inv γi γfs inodestart nib ∗ ireg_open ∗

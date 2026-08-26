@@ -601,7 +601,7 @@ Section ProofSysMkdirM1Tail.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_op g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗

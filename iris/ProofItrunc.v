@@ -243,7 +243,7 @@ Section ItruncTail.
     dinode_at γi inum dn0 -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bslots 3 -∗
     (* the tail flush's absorption credit, travelling to iupdate unchanged --
        a RESOURCE at the walk's own birth epoch (fs-log.md §G.20) *)
@@ -749,7 +749,7 @@ Section ItruncDLoop.
     bitmap_inv γfs bmapstart cov logstart size -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bslots 2 -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k -∗
     it_dexit (CID0 := CID0) γ γfs bn cov logstart bmapstart size dev
@@ -1324,7 +1324,7 @@ Section ItruncELoop.
     bitmap_inv γfs bmapstart cov logstart size -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bslots 2 -∗
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q -∗
@@ -1855,7 +1855,7 @@ Section ItruncIArm.
     bitmap_inv γfs bmapstart cov logstart size -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     (* the sixth frame slot -- this arm is the only writer *)
     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
     bslots 3 -∗

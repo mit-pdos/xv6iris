@@ -213,10 +213,50 @@ Section ConsoleInv.
   Global Instance cons_res_timeless : Timeless cons_res.
   Proof. apply _. Qed.
 
+End ConsoleInv.
+
+(* ==================================================================
+   THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1) and the
+   lock handle over the CONVERTED payload.  Outside the section above
+   because each quantifies over the context that section fixes -- the
+   [KallocInv.v:388] template, line for line.  [cons_res] is ▷-free,
+   [inv]-free and WP-free: its three index words are [↦₄] (stage 2,
+   still unflipped, hence ξ-constant) and its ring is a [↦ₘ] big-op.
+   Consequence: [is_conslock] is a CLOSED term -- no [CurCtx] in its
+   type -- which is what §4's ordering needs of the console. *)
+Section ConsoleCtx.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
+
+  (* Instance search cannot do the higher-order big-op unification, so the
+     structural instance is applied AS A TERM (recipe rule 2). *)
+  Global Instance cons_data_morph (bs : list (bv 8)) :
+    CtxMorph (λ ξ0 : CtxId, cons_data (XI := ξ0) bs).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /cons_data.
+    iDestruct (ctx_morph_big_sepL bs
+                 (λ (j : nat) (b : bv 8) (ξ0 : CtxId),
+                    ctx_pointsto ξ0 (pa_add a_cons (cons_buf_off + j))
+                                 (DfracOwn 1) b)
+                 (λ i x, ctx_morph_pointsto _ _ _ _)
+                 ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame.
+  Qed.
+
+  Global Instance cons_res_morph : CtxMorph (λ ξ0 : CtxId, cons_res (XI := ξ0)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /cons_res.
+    iDestruct "H" as (r w e bs) "(Hr & Hw & He & Hlen & Hdat)".
+    iDestruct (cons_data_morph bs ξ ξ' with "Hd Hdat") as "[Hd Hdat]".
+    iFrame "Hd". iExists r, w, e, bs. iFrame.
+  Qed.
+
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
-     caller of consoleread passes this and nothing else about the console. *)
+     caller of consoleread passes this and nothing else about the console.
+     The payload is spelled as a λ that NAMES its context (recipe rule 1):
+     the ring re-indexes to whichever context holds the lock. *)
   Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string <{ cons_res }>.
+    is_lock γ a_cons "cons"%string (λ ξ : CtxId, cons_res (XI := ξ)).
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.
@@ -506,7 +546,7 @@ Section ConsoleInv.
     intros Hlen Hlt. apply lookup_lt_is_Some_2. rewrite Hlen. exact Hlt.
   Qed.
 
-End ConsoleInv.
+End ConsoleCtx.
 
 (* ---- the address arithmetic the load's base computation needs -------
 

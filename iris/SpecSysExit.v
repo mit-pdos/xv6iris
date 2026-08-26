@@ -163,7 +163,7 @@ Definition wp_sys_exit_sconf_body
   gen_cert -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   bslots 3 -∗
   (* the inode cache and the two regions iput's truncate arm frees into,
      kexit's verbatim *)

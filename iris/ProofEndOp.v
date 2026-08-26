@@ -1904,7 +1904,7 @@ Section EndOpBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     eo_frame4 m -∗
     eo_frameS m -∗
     log_mirror_half Mc -∗
@@ -2667,7 +2667,7 @@ Section EndOpBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     eo_frame4 m -∗
     eo_frameS m -∗
     log_mirror_half Mc -∗

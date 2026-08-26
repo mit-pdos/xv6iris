@@ -421,7 +421,7 @@ Section ProofPipeclose.
     (* ================================================================= *)
     iDestruct (cpu_own_transport CID CID9 n eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }>
+    iApply (Acquire.wp_acquire_gen_sconf KT1 γl "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)
               (pipe_ref γp w 1) (pipe_dead γl γp) A4 n eb pme (av - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               ltac:(iApply pipe_ref_dead) ltac:(intro i; iApply locked_pre_dead)
@@ -521,7 +521,7 @@ Section ProofPipeclose.
            what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
            the acquire/release pair compose back to [N]. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (Release.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
+        iApply (Release.wp_release_gen_sconf KT1 γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi) (pipe_dead γl γp) emp%I
                   V2 n eb pme (av - 4)%nat ({["pipe"%string]} ∪ lks)
                   HlkaV2 ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
@@ -676,7 +676,7 @@ Section ProofPipeclose.
         apply kv_addv_zero. }
       (* same re-spelling as at the other release: [b] IS [outb]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (ReleaseCancel.wp_release_cancel_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }>
+      iApply (ReleaseCancel.wp_release_cancel_sconf KT1 γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)
                 (pipe_dead γl γp) (pipe_bytes pi) K2 n eb pme (av - 4)%nat
                 ({["pipe"%string]} ∪ lks)
                 HlkaK2 ltac:(lia)

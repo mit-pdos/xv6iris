@@ -476,8 +476,19 @@ Section ctx.
      the obligation lock payloads pick up in the M3 sweep: any payload
      failing it at SC is a payload the TSO flip would break -- found
      early, which is the point of the sweeps. *)
+  (* IT IS A PLAIN ENTAILMENT, NOT AN UPDATE (transport memo ruling 3,
+     2026-08-26).  The bare [==∗] this class carried until then was never
+     used: [TsoCtxTwin2.ctx_morph_pointsto] and the REAL kit's
+     [TsoCtx.ctx_morph_pointsto] both derive the timestamp bound by
+     [mono_nat_lb_own_valid] / [ghost_map_lookup] -- entailments -- and
+     rebuild the clean arm from [ctx_dom]'s persistent lower bound, with no
+     [iMod] anywhere.  Stating it as [-∗] is therefore a STRENGTHENING that
+     is provable at both instantiations, and it is what lets a payload
+     under a [▷] be transported by [bi.later_mono] rather than needing a
+     step.  ([ctx_deposit] below stays [==∗]: ITS update is
+     [ctx_dom_to_parked], not the morph.) *)
   Class CtxMorph (R : CtxId → iProp Σ) :=
-    ctx_morph : ∀ ξ ξ', ctx_dom ξ ξ' -∗ R ξ ==∗ ctx_dom ξ ξ' ∗ R ξ'.
+    ctx_morph : ∀ ξ ξ', ctx_dom ξ ξ' -∗ R ξ -∗ ctx_dom ξ ξ' ∗ R ξ'.
 
   (* The structural instances.  NOTE what is absent: no instance for
      [own_context] (the running-thread token never transfers by
@@ -496,12 +507,12 @@ Section ctx.
      [is_lock]/[R cur_ctx] hypothesis pins it -- which is what makes
      passing [_] for the payload at acquire/release call sites safe. *)
   Global Instance ctx_morph_const (P : iProp Σ) : CtxMorph (λ _, P) | 100.
-  Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
+  Proof. iIntros (ξ ξ') "Hd HP". iFrame. Qed.
 
   Global Instance ctx_morph_pointsto (kt : ktier) a dq v :
     CtxMorph (λ ξ, ctx_pointsto (KTR := kt) ξ a dq v).
   Proof.
-    iIntros (ξ ξ') "Hd HP !>". iFrame "Hd".
+    iIntros (ξ ξ') "Hd HP". iFrame "Hd".
     iEval (rewrite ctx_pointsto_unseal) in "HP".
     rewrite ctx_pointsto_unseal. iExact "HP".
   Qed.
@@ -510,17 +521,17 @@ Section ctx.
     CtxMorph R1 → CtxMorph R2 → CtxMorph (λ ξ, R1 ξ ∗ R2 ξ)%I.
   Proof.
     iIntros (H1 H2 ξ ξ') "Hd [HR1 HR2]".
-    iMod (ctx_morph with "Hd HR1") as "[Hd HR1]".
-    iMod (ctx_morph with "Hd HR2") as "[Hd HR2]".
-    iModIntro. iFrame.
+    iDestruct (ctx_morph with "Hd HR1") as "[Hd HR1]".
+    iDestruct (ctx_morph with "Hd HR2") as "[Hd HR2]".
+    iFrame.
   Qed.
 
   Global Instance ctx_morph_exist {A} (Φ : A → CtxId → iProp Σ) :
     (∀ x, CtxMorph (Φ x)) → CtxMorph (λ ξ, ∃ x, Φ x ξ)%I.
   Proof.
     iIntros (HΦ ξ ξ') "Hd [%x HR]".
-    iMod (ctx_morph with "Hd HR") as "[Hd HR]".
-    iModIntro. iFrame "Hd". iExists x. iExact "HR".
+    iDestruct (ctx_morph with "Hd HR") as "[Hd HR]".
+    iFrame "Hd". iExists x. iExact "HR".
   Qed.
 
   Global Instance ctx_morph_big_sepL {A} (l : list A)
@@ -529,11 +540,31 @@ Section ctx.
     CtxMorph (λ ξ, [∗ list] i ↦ x ∈ l, Φ i x ξ)%I.
   Proof.
     revert Φ. induction l as [|x l IH] => Φ HΦ.
-    - iIntros (ξ ξ') "Hd _ !>". by iFrame.
+    - iIntros (ξ ξ') "Hd _". by iFrame.
     - iIntros (ξ ξ') "Hd [HR HRs]".
-      iMod (ctx_morph with "Hd HR") as "[Hd HR]".
-      iMod (IH (λ i y, Φ (S i) y) _ ξ ξ' with "Hd HRs") as "[Hd HRs]".
-      iModIntro. iFrame.
+      iDestruct (ctx_morph with "Hd HR") as "[Hd HR]".
+      iDestruct (IH (λ i y, Φ (S i) y) _ ξ ξ' with "Hd HRs") as "[Hd HRs]".
+      iFrame.
+  Qed.
+
+  (* the map form.  [disk_res]'s in-flight and parked windows are
+     [big_sepM]s over ξ-indexed members, so the list instance above does
+     not reach them; the proof is the same induction, over [map_ind].
+     (Kit obligation: the twin's [CtxMorph] block needs the same
+     instance -- it is derivable from [ctx_morph] alone, exactly as
+     [ctx_morph_big_sepL] is.) *)
+  Global Instance ctx_morph_big_sepM `{Countable K} {A} (m : gmap K A)
+      (Φ : K → A → CtxId → iProp Σ) :
+    (∀ k x, CtxMorph (Φ k x)) →
+    CtxMorph (λ ξ, [∗ map] k ↦ x ∈ m, Φ k x ξ)%I.
+  Proof.
+    intros HΦ. induction m as [|k x m Hk IH] using map_ind.
+    - iIntros (ξ ξ') "Hd _". rewrite !big_sepM_empty. by iFrame.
+    - iIntros (ξ ξ') "Hd H". rewrite !big_sepM_insert //.
+      iDestruct "H" as "[HR HRs]".
+      iDestruct (ctx_morph with "Hd HR") as "[Hd HR]".
+      iDestruct (IH ξ ξ' with "Hd HRs") as "[Hd HRs]".
+      iFrame.
   Qed.
 
   (* the word cell's transport obligation, once for every payload *)
@@ -541,11 +572,11 @@ Section ctx.
     CtxMorph (λ ξ, ctx_word_pointsto (KTR := kt) ξ a dq w).
   Proof.
     iIntros (ξ ξ') "Hd [%Hal H]".
-    iMod (ctx_morph_big_sepL (seq 0 8)
+    iDestruct (ctx_morph_big_sepL (seq 0 8)
             (λ _ j ξ0, ctx_pointsto (KTR := kt) ξ0 (pa_add a j) dq (nth_byte w j))
             (λ i x, ctx_morph_pointsto _ _ _ _)
             ξ ξ' with "Hd H") as "[Hd H]".
-    iModIntro. iFrame "Hd". iSplit; [done|]. iExact "H".
+    iFrame "Hd". iSplit; [done|]. iExact "H".
   Qed.
 
   (* The composition acid test: a lock-payload-shaped assertion is
@@ -572,7 +603,7 @@ Section ctx.
     own_context ξ ∗ ∃ T', ⌜(T ≤ T')%nat⌝ ∗ ctx_parked ξc T' ∗ R ξc.
   Proof.
     iIntros "Hrun Hpk HR".
-    iMod (ctx_morph ξ ξc with "[] HR") as "[_ HR]".
+    iDestruct (ctx_morph ξ ξc with "[] HR") as "[_ HR]".
     { rewrite ctx_dom_unseal /ctx_dom_def. done. }
     iModIntro. iFrame "Hrun". iExists T. iFrame "Hpk HR". done.
   Qed.
@@ -638,7 +669,7 @@ Notation "<{ P }>" := (const_pay P%I)
    story as [ctx_morph_const] (which still serves bare λ-spellings). *)
 Global Instance ctx_morph_const_pay `{!riscvGS Σ} (P : iProp Σ) :
   CtxMorph (const_pay P) | 99.
-Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
+Proof. iIntros (ξ ξ') "Hd HP". iFrame. Qed.
 
 (* The class TYPE is transparent to typeclass unification: [CurCtx] is
    definitionally [CtxId], and instance search must see through the

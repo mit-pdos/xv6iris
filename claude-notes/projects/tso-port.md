@@ -951,6 +951,145 @@ where `iExact` is what crawls.  Results for the park's rows:
 `sie_cap_gpr`, `ut_trap_parked` all `NOTCONV`; `ut_tfk` `CONV`.
 `cpu_claim`, `locked` and `pc_is` take no `CurCtx` at all.
 
+### 0.14′ M3 STEP 1 IS LANDED; STEP 2 IS REFUTED (2026-08-26)
+
+Implements `tso-transport-memo.md` §4 steps 1–2 and its ruling 3.  Two
+of the three are landed and green; the third does not close, and the
+refutation is measured rather than argued.
+
+**RULING 3 — `CtxMorph` IS AN ENTAILMENT.  Landed.**  `TsoCtx.v:490`
+now reads `ctx_dom ξ ξ' -∗ R ξ -∗ ctx_dom ξ ξ' ∗ R ξ'`.  The memo's
+count was right to the site: `ProofAcquire.v:666` and
+`ProofRelease.v:576` (`iMod` → `iDestruct`), `KallocInv.v`'s six
+instance proofs, `TsoCtx.ctx_deposit`'s internal use.  `ctx_deposit`
+stays `==∗` (its update is `ctx_dom_to_parked`, not the morph).  Every
+structural instance lost its `iModIntro`; nothing else moved.
+**Consequence worth recording:** a payload can no longer re-mint its
+own ghost names on transport, so any future "the payload asserts its
+own ξ and updates a names ghost to move" design is foreclosed by this
+ruling — which is the right trade, but name it if it is ever revisited.
+
+**STEP 1 — THE LEAF PAYLOADS.  THE MEMO'S LIST WAS FIVE-EIGHTHS WRONG,
+AND THE ERROR WAS IN THE SAFE DIRECTION.**  Measured with §0.13′'s
+`Check @f` kit against the built tree, not read off the sources:
+
+| payload | memo said | MEASURED |
+|---|---|---|
+| `cons_res` (8 sites/3 files) | convert | ξ-INDEXED — converted |
+| `pipe_res` (19/5) | convert | ξ-INDEXED — converted |
+| `disk_res` (173/86) | convert | ξ-INDEXED — converted |
+| `tx_res` (10/5) | convert | **already ξ-FREE** (`∃ l, ghost_var`) |
+| `bcache_res` (14/6) | convert | **already ξ-FREE** (`bio_slot_res` is all `↦₄`) |
+| `itable_res` (17/6), `itable_res2` (16/5) | convert | **already ξ-FREE** (`inode_ident` is `↦₄`) |
+| `sl_res_gen`/`sl_res` (16+18) | convert | **already ξ-FREE** (`slk ↦₄` + ghost; its `R` is a plain `iProp` PARAMETER, so converting it would mean `R : CtxId → iProp` — a sleeplock-surface change, not a leaf conversion) |
+| `log_res` (20/6) | convert | **already ξ-FREE** |
+
+So §0.12′'s "already ξ-free and need nothing" row (`wait_res`,
+`nextpid_res`, `ticks_res`, `<{ emp }>`) is much longer than recorded:
+**five more payloads, ~111 more sites, are already closed terms and
+`<{ }>` is already the correct spelling for them.**  The rule the
+measurement teaches: *a payload is ξ-dependent iff it holds a `↦ₘ`/`↦₈`
+cell; `↦₄`/`↦₂` rows, the phys tier and every ghost row are ξ-constant
+at stage 1.*  Read the payload's LEAVES, not its size.
+
+Conversions followed §0.7′ verbatim (payload λ names its ξ; `CtxMorph`
+instances export beside the sealed definition, structural instances
+applied AS TERMS; call sites keep the payload EXPLICIT).  Two mechanical
+notes: (i) the lock HANDLE definition has to move below the section that
+binds the ambient (`is_conslock`, `is_pipe` — `cons_res (XI := ξ)` is
+not spellable inside the section that fixes `XI`), which is the
+`KallocInv` `is_kmem` move again; (ii) `Typeclasses Opaque` on the
+big-op seams must be `Global` for the same reason (`PipeInvDefs`'s
+`pipe_data`/`pipe_slack` were local and are now global).
+
+**ONE NEW STRUCTURAL INSTANCE:** `TsoCtx.ctx_morph_big_sepM`.
+`disk_res`'s in-flight and parked windows are `big_sepM`s over
+ξ-indexed members and the list instance does not reach them.  Same
+induction (`map_ind`), derivable from `ctx_morph` alone — **kit
+obligation: `TsoCtxTwin2`'s block needs the same instance at the
+swap.**  (`TsoCtxTwin2.v`'s own `CtxMorph` still says `==∗`; flipping it
+to `-∗` is a two-line follow-up the memo §1.1 already measured as free.)
+
+**WHAT STEP 1 BOUGHT, AND WHAT IT DID NOT.**  `is_conslock` and
+`is_pipe` are now CLOSED TERMS (`Check` prints no `CurCtx`), and so is
+the disk `is_lock` (spelled inline at all 173 sites; there is no named
+handle).  **`disk_geom` is NOT**, contra memo §4 step 1: its
+ξ-dependence is its own three `d_desc_ptr`/`d_avail_ptr`/`d_used_ptr`
+`↦₈□` cells, not `disk_res`, and no payload conversion touches them —
+they are the M1 flip's discarded-cell problem, whose answer is §0.8′
+ruling 1's ∀-context/timestamp-0 form or §5's
+`∃ C, □ (∀ ξ, C ξ)` restatement.  `console_caps` is now ξ-free in its
+BODY but still carries an unused `` `{XI : CurCtx} `` binder (hence
+convertible across ξ, but still printing one); dropping that binder is
+a one-line cleanup.  `trap_csrs` therefore stays `NOTCONV`: **the §4
+gate did NOT flip after step 1**, and the two rows still holding it are
+`disk_geom` and `procs_inv` (step 3).
+
+**STEP 2 — THE `off_hold` FIX IS REFUTED.  There is no cross-context
+JOIN, and ruling 2 needs one.**  Ruling 2 does make `off_hold` a closed
+term.  It then fails at the one site where the two halves of `a_fip`
+must become a whole cell again:
+
+> `ProofSysOpenParts.so_open_slot` cancels the UNARMED off-cinv, gets
+> that invariant's `a_fip k ↦₈{1/2}` half at the MINTER's context, and
+> joins it with the reference's half at ITS OWN — `so_word_half_join`,
+> i.e. `TsoCtx.ctx_word_pointsto_frac_split`, which is SINGLE-ξ.
+
+The memo's answer to the recombination worry (§2(c): "`fpay_tok_agree`
+forces the two shares' `pn`, hence their ξ, to agree") is about two
+shares of `file_pay` — the dup/split axis.  It does not reach this
+join, which is between the cinv's half and the reference's half, and
+those are at two contexts by construction: the reference re-indexes at
+every ftable acquire, the cinv body is frozen at whatever context
+minted it.  It is reachable on the FIRST open after boot
+(`FileInv.ftable_res_boot` mints at the boot context).  Moving the half
+to the other side (untyped slot keeps the whole cell in `file_fields`)
+does not help — it relocates the same join to `FileInv.off_hold_cancel`
+at fileclose's last-reference arm.  **Exactly one join exists and it is
+cross-context whichever way the halves are arranged.**
+
+MEASURED, under the hermetic seal, in one probe file (kept at
+`…/scratchpad/ZZJoinProbe.v`):
+
+```
+NOTCONV ctx_pointsto        (* two contexts are not convertible        *)
+JOIN-DOES-NOT-CROSS         (* frac_split at xj, halves at xi and xj   *)
+CONTROL-JOIN-OK             (* the same tactic, both halves at xj      *)
+```
+
+The sealed surface's only cross-context laws are the AGREE family
+(`ctx_pointsto_agree`, `ctx_bytes_agree`, `ctx_word_pointsto_agree`);
+a JOIN would need a `ctx_dom`, and no party at that site holds one over
+the minter's context (the ftable acquire's `ctx_dom` is over the
+PAYLOAD's parked ξ, which is not the cinv's).
+
+**RECOMMENDED RULING (owner decision, and it is a design change the
+memo did not rule):** the off-borrow cinv must stop holding a points-to
+FRACTION of a flipped cell.  Replace the parked `a_fip k ↦₈{1/2}` with
+ghost state — an agreement pinning `ip`, beside the existing exclusive
+borrow marker `off_mark` — so `off_content` is ξ-free outright, the
+whole `a_fip` cell rides the reference and re-indexes at every ftable
+acquire, and no join is ever cross-context.  **That shape also survives
+STAGE 2**, which the memo demanded of any stage-1 fix: `a_foff k ↦₄` is
+genuinely read AND written by the borrower, so pinning it to an
+`fp_ctx` would break the borrower the same way `a_fip` breaks the
+publisher; under the ghost shape both cells live in the reference and
+stage 2 costs nothing at the fd table.  Blast radius: `FileInvDefs`'s
+`off_*` block, `FileOff`'s checkout/return, `so_open_slot`/`so_publish`,
+`ProofFileclose`'s last-reference arm, `FileInv.ftable_res_boot`.  The
+finding is recorded in `FileInvDefs.v`'s header, where the next
+implementer will look.
+
+`inode_pay` is NOT a second obstruction inside `ftable_res` (MEASURED
+ξ-free: `inode_held_short` is ghost plus `↦₄`), so `off_hold` is the
+whole of it — the memo was right about that.
+
+**Red set unchanged:** `ProofForkretPark.v` (the deliberate `Abort`) and
+its 7-file cone.  Three consecutive full VM rounds; the 173-site
+`disk_res` sweep produced exactly ONE fallout site in the tree
+(`ProofFilewrite.v:1542`, a MODULE-QUALIFIED `<{ DiskInv.disk_res … }>`
+the unqualified grep missed — worth remembering for the next sweep).
+
 ---
 
 ---

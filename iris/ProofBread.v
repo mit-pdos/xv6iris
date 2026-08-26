@@ -658,7 +658,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv -∗
     bown bn k -∗
     bref bn k q dev bno -∗
@@ -1038,7 +1038,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1332,7 +1332,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1720,7 +1720,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2023,7 +2023,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2245,7 +2245,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.

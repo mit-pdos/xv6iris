@@ -328,7 +328,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_op g u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -556,7 +556,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_op g u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1184,7 +1184,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_op g u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1969,7 +1969,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_op g u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2423,7 +2423,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_opS g MAXOPBLOCKS Sb -∗
     bslots 3 -∗
     iref_slots ns -∗
@@ -2882,7 +2882,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
+    is_lock gk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) gd pd pav pu) -∗
     log_opS g MAXOPBLOCKS Sb -∗
     bslots 3 -∗
     iref_slots ns -∗

@@ -1077,7 +1077,7 @@ Section WriteiJoin.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     wi_fr8 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1467,7 +1467,7 @@ Section WriteiSize.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -2123,7 +2123,7 @@ Section WriteiLoop.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗

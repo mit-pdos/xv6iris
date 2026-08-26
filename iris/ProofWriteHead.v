@@ -562,7 +562,7 @@ Section WriteHeadBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     wh_frame m -∗
     wh_hold bn (fs_view γfs γd dev cov) k pidv dev bno f bsd0 -∗
     (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
@@ -1073,7 +1073,7 @@ Section WriteHeadBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
     wh_frame m -∗
     wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f bsd0 -∗
     (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗

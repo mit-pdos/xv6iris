@@ -1170,7 +1170,7 @@ Section ProofPiperead.
       rewrite (callee_saved_lookup HcsA0 Rs5 ltac:(vm_compute; reflexivity)). exact HP5s5. }
     iDestruct (cpu_own_transport CIDmp CIDp26 0 true pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }>
+    iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)
               (pipe_ref γp w q) (pipe_dead γl γp) A3 0%nat true pj (av - 12)%nat true
               _ pr_lvl0 ltac:(lia) Hbelow
               ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
@@ -1511,7 +1511,7 @@ Section ProofPiperead.
           replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
-        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi) (pipe_dead γl γp) emp%I
                   X4 0%nat true pj (av - 12)%nat ({["pipe"]} ∪ lks) HX4lka ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -2529,7 +2529,7 @@ Section ProofPiperead.
         { rewrite /N2 /N1.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMmk. }
-        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi) (pipe_dead γl γp) emp%I
                   N2 0%nat true pj (av - 12)%nat ({["pipe"]} ∪ lks) HN2lka ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -2730,7 +2730,7 @@ Section ProofPiperead.
       { rewrite /Sl4 /Sl3.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMkmsp. }
-      iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
+      iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi) (pipe_dead γl γp) emp%I
                 Sl4 0%nat true pj (av - 12)%nat ({["pipe"]} ∪ lks) HSl4lka ltac:(lia)
                 ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                 with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -2827,7 +2827,7 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMkmsl. }
       iDestruct (cpu_own_transport CIDsl0 CIDp41 0 true pj true ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }>
+      iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (λ ξ : CtxId, pipe_res (XI := ξ) γp pi)
                 (pipe_ref γp w q) (pipe_dead γl γp) Sl7 0%nat true pj (av - 12)%nat true
                 _ pr_lvl0 ltac:(lia) Hbelow
                 ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)

@@ -352,7 +352,7 @@ Definition wp_bmap_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   (* THREE slot units: bmap's own bread of the indirect block holds one
      across the interior balloc (which needs two of its own) and across
      log_write; brelse hands it back at the end. *)
@@ -521,7 +521,7 @@ Definition wp_bmap_gen_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   bslots 3 -∗
   log_opS γ n Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- bmap's bread/balloc
@@ -731,7 +731,7 @@ Definition wp_bmap_noalloc_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+  is_lock γk d_lock "virtio_disk"%string (λ ξ : CtxId, disk_res (XI := ξ) γd pd pav pu) -∗
   (* ONE slot unit: the interior bread's, handed back by brelse *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
