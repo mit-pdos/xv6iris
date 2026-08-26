@@ -1610,11 +1610,15 @@ End UsertrapRes.
    record is read at the context of whatever thread RESUMES it, which is
    not the context of the thread that wrote it -- and since the M1 flip an
    [is_lock]/[inv] handle over a [<{ P }>] payload is a DIFFERENT
-   proposition at a different ξ (measured: [procs_inv], [is_ftable],
-   [console_ready], [console_caps], [disk_geom], [is_kstack] and every
-   discarded cell all fail to cross; [is_tickslock], the wait lock, the
-   nextpid lock, [procs_avail], [wire_inv] and [kmap_at] do cross, because
-   their payloads are context-free terms).  Invariant bodies are not
+   proposition at a different ξ (measured: [procs_inv], [console_ready],
+   [disk_geom], [is_kstack] and every discarded cell all fail to be
+   CONVERTIBLE across two contexts; [is_tickslock], the wait lock, the
+   nextpid lock, [procs_avail], [wire_inv], [kmap_at], [console_caps] and --
+   since §0.16′ -- [is_ftable] do cross, because their payloads are
+   λ-converted and their handles are therefore context-free terms).  What
+   the M3 sweep buys where it lands is not convertibility but
+   TRANSPORTABILITY: a converted payload's handle is closed and the ACQUIRER
+   re-indexes the resource along its [ctx_dom].  Invariant bodies are not
    updatable, so no transport exists and none can be written.
 
    SO THE ξ-DEPENDENT ROWS MOVE INSIDE THE ∀ AND ARE SUPPLIED BY THE
@@ -1625,14 +1629,20 @@ End UsertrapRes.
    what [ut_caps] wants):
 
      [procs_inv γs]     the process table -- already a [wp_forkret] premise
-     [is_ftable γft γf] the open-file table's lock.  It CANNOT be made
-                        ξ-free by λ-converting its payload the way
-                        [KallocInv]'s [kmem_res] was: [ftable_res] reaches
-                        [FileInvDefs.off_hold]'s [cinv] over [off_content]
-                        and [file_core]'s [is_pipe], i.e. invariants whose
-                        BODIES are ξ-indexed, and [CtxMorph] cannot cross an
-                        invariant.  (tso-park-protocol-memo.md called this
-                        one bounded; it is not.)
+     [is_ftable γft γf] the open-file table's lock.  IT IS NOW A CLOSED
+                        TERM (tso-port.md §0.16′) and so it crosses for
+                        nothing -- but it stays in this bundle, because the
+                        rest of the bundle does not.  It used to be the
+                        blocker: [ftable_res] reached [FileInvDefs.off_hold]'s
+                        [cinv] over a ξ-indexed [off_content], i.e. an
+                        invariant whose BODY is ξ-indexed, which no
+                        [CtxMorph] can cross.  The off-borrow ruling made
+                        that body ξ-free and the payload was then
+                        λ-converted, exactly as [KallocInv]'s [kmem_res] was;
+                        [file_core]'s [is_pipe] was λ-converted a tranche
+                        earlier.  (tso-park-protocol-memo.md called this one
+                        bounded, §0.12′ called it blocked; it was blocked,
+                        and it is now done.)
      [console_caps] /
      [console_ready]    consoleinit's two rows, which [fs_ready] does not
                         carry
@@ -1644,7 +1654,9 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
     !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (ξ : CtxId) (γs : list gname) (γft γf : gname) : iProp Σ :=
   (procs_inv (XI := ξ) γs ∗
-   is_ftable (XI := ξ) γft γf ∗
+   (* [is_ftable] is a CLOSED TERM since the M3 λ-conversion of
+      [ftable_res] (FileInv.v's [FileLock] section), so it names no ξ. *)
+   is_ftable γft γf ∗
    console_caps fsc_uart ∗
    console_ready (XI := ξ) ∗
    (∃ ip : mword 64,
@@ -1655,6 +1667,36 @@ Global Instance park_globals_persistent `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !
     !irefslotG Σ, !pavG Σ} `{GEN : GenId} ξ γs γft γf :
   Persistent (park_globals ξ γs γft γf).
 Proof. rewrite /park_globals. apply _. Qed.
+
+(* ...AND IT TRANSPORTS (tso-port.md §0.16′).  The park has to hand this
+   bundle to a freshly minted child context, and what a [TsoCtx.ctx_deposit]
+   wants is not context-FREEDOM but TRANSPORTABILITY (§0.15′'s rule).  Every
+   row goes through: [procs_inv] and [console_ready] by their own instances,
+   [is_ftable] and [console_caps] because they are CLOSED TERMS (the M3
+   λ-conversions -- [ftable_res]'s landed at §0.16′), and the [initproc] cell
+   by [ctx_morph_word] applied AS A TERM (instance search does not do the ∃
+   unification -- MEASURED).
+
+   THIS INSTANCE IS THE RECORD OF WHAT IS PAYABLE.  Of the six rows
+   [ProofForkretPark.forkret_park_paid] must deposit into the child's
+   context, FIVE are: this one, [SchedCtx.procs_inv], [ProcDefs.is_kstack],
+   [SwtchCtx.ctx_cells] and [StackOwn.stack_own] (the last four resolve by
+   instance search alone).  The sixth, [ProcInv.proc_priv], is REFUTED --
+   see the comment block in [ProofForkretPark.v]. *)
+Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} (γs : list gname) (γft γf : gname) :
+  CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γft γf).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /park_globals.
+  iDestruct "H" as "(Hp & #Hft & #Hcc & Hcr & Hip)".
+  iDestruct (ctx_morph (R := λ ξ0 : CtxId, SchedCtx.procs_inv (XI := ξ0) γs)
+               ξ ξ' with "Hd Hp") as "[Hd Hp]".
+  iDestruct (ctx_morph (R := λ ξ0 : CtxId, ConsoleInv.console_ready (XI := ξ0))
+               ξ ξ' with "Hd Hcr") as "[Hd Hcr]".
+  iDestruct "Hip" as (ip) "Hip".
+  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
+  iFrame "Hd Hp Hft Hcc Hcr". iExists ip. iExact "Hip".
+Qed.
 
 (* ------------------------------------------------------------------- *)
 (* THE TWO CROSS-CONTEXT AGREEMENTS THE PINS ARE READ WITH.              *)

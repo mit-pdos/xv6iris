@@ -323,7 +323,7 @@ Section ProofFileclose.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string <{ ftable_res γf }> mA
+    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) mA
               n eb p (K - 8)%nat b lks
               HnZ ltac:(lia) ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -550,7 +550,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string <{ ftable_res γf }> E3 n eb p (K - 8)%nat
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) E3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -636,13 +636,15 @@ Section ProofFileclose.
              below deletes; and the join above is what makes the cancel token
              whole.  The type is not tested for another two hundred lines, so
              the cancel is uniform in [file_armed] -- an unarmed body has no
-             disjunction to refute.  What comes back are the two cells, which
-             go straight into a FRESH unarmed cinv for the free slot. ---- *)
+             disjunction to refute.  What comes back is the [f->off] cell,
+             which goes straight into a FRESH unarmed cinv for the free slot
+             ([f->ip] is not in the invariant since the off-borrow ruling; it
+             came back with the reference, whole). ---- *)
       iApply fupd_wp.
-      iMod (off_hold_cancel ⊤ γf (fp_ocv pn) (file_armed Cf) Mg k q
+      iMod (off_hold_cancel ⊤ γf (fp_ocv pn) (file_armed Cf) (fc_ip Cf) Mg k q
               ltac:(solve_ndisj) HMk with "Hoh Hauth Hrlv")
         as "(Hauth & Hrlv & Hraw)".
-      iMod (off_hold_alloc ⊤ γf k false with "Hraw") as (γo0) "Hoh0".
+      iMod (off_hold_alloc ⊤ γf k false (fc_ip Cf) with "Hraw") as (γo0) "Hoh0".
       set (pn0 := MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
                     (fp_ig pn) γo0).
       iMod (fpay_tok_update γf k pn pn0 with "Hpn") as "Hpn".
@@ -856,7 +858,7 @@ Section ProofFileclose.
          from what it does have. *)
       iAssert (file_pay γf k 1 C0) with "[Hpn Hoh0 Hiru]" as "Hpy0".
       { iExists pn0. iFrame "Hpn".
-        rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fp_ocv].
+        rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fc_ip fp_ocv].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -969,7 +971,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string <{ ftable_res γf }> G3 n eb p (K - 8)%nat
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) G3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)

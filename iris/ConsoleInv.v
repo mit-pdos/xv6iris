@@ -548,6 +548,60 @@ Section ConsoleCtx.
 
 End ConsoleCtx.
 
+(* ==================================================================
+   THE CONSOLE BUNDLE'S TRANSPORT (tso-port.md §0.16′)
+
+   [devsw_table] / [console_inv] / [console_ready] are ξ-INDEXED -- the
+   devsw table is [NDEV_max + 1] pairs of [↦₈□] cells -- and the park has
+   to hand them to a freshly minted child context, so each needs a
+   [CtxMorph].  They are NOT convertible across two contexts (the cells are
+   discarded at WP time, t > 0: §0.4 item 6), and they do not have to be:
+   what a deposit wants is TRANSPORTABILITY (§0.15′'s rule).
+
+   Below the section that binds the ambient, for the usual reason (a
+   section variable cannot be instantiated inside the section that binds
+   it), and the structural instances go in AS TERMS -- instance search does
+   not do the higher-order big-op or ∃ unification (MEASURED: with
+   [ctx_morph_big_sepL]/[ctx_morph_exist] reachable by a [Hint Extern] that
+   [eapply]s them, [devsw_table] still does not resolve). *)
+Section ConsoleMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+
+  Global Instance devsw_table_morph :
+    CtxMorph (λ ξ0 : CtxId, devsw_table (XI := ξ0)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /devsw_table.
+    iDestruct (ctx_morph_big_sepL (seq 0 (Z.to_nat NDEV_max + 1))
+                 (λ (_ : nat) (i : nat) (ξ0 : CtxId),
+                    (ctx_word_pointsto ξ0 (a_devsw_read (Z.of_nat i))
+                       DfracDiscarded (devsw_read_val (Z.of_nat i)) ∗
+                     ctx_word_pointsto ξ0 (a_devsw_write (Z.of_nat i))
+                       DfracDiscarded (devsw_write_val (Z.of_nat i)))%I)
+                 (λ i x, ctx_morph_sep _ _
+                           (ctx_morph_word _ _ _ _) (ctx_morph_word _ _ _ _))
+                 ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame.
+  Qed.
+
+  Global Instance console_inv_morph (γ : gname) :
+    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) γ).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /console_inv.
+    iDestruct "H" as "[Hlk Ht]".
+    iDestruct (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iFrame.
+  Qed.
+
+  Global Instance console_ready_morph :
+    CtxMorph (λ ξ0 : CtxId, console_ready (XI := ξ0)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /console_ready.
+    iDestruct "H" as (γ) "H".
+    iDestruct (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExists γ. iExact "H".
+  Qed.
+End ConsoleMorph.
+
 (* ---- the address arithmetic the load's base computation needs -------
 
    The code forms [a4 := cons + (r & 127)] with a [c.add] and then loads

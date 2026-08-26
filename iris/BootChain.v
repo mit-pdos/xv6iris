@@ -445,8 +445,20 @@ Section BootRun.
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
      (* the WHOLE [cpus[cid].proc] cell -- see [BootShared.boot_hart_bss].
-        It is private to this hart and goes into [IntrDefs.cpu_cells]. *)
-     cur_proc zero_reg ∗
+        It is private to this hart and goes into [IntrDefs.cpu_cells].
+
+        AT A ∀-QUANTIFIED CONTEXT, which is what makes this whole bundle
+        ξ-FREE (tso-port.md §0.16′).  It was the ONE ξ-indexed row here, and
+        the header of [boot_entry_bridge] below already says why that could
+        not stand: the carve runs ONCE, under one ambient, while the eight
+        harts run at eight DISTINCT [own_context_boot] identities, so a bundle
+        pinned at the carve's ξ can serve at most one of them.  The ∀ is sound
+        exactly here -- the cell is EXCLUSIVE (so the ∀ is not duplicable; it
+        is not under a [□]) and it is a TIMESTAMP-0 boot-image cell, §0.4
+        item 6's one sanctioned case.  [BootShared.boot_hart_pre] proves it by
+        doing the phys→ctx mint under the ∀; [boot_entry_bridge] instantiates
+        it at its own ambient. *)
+     (∀ ξ : CtxId, cur_proc (XI := ξ) zero_reg) ∗
      (* this hart's HELD-LOCK AUTHORITY at the empty set (LockSet.v), minted
         by adequacy beside the other per-hart ghosts.  It goes straight into
         [IntrDefs.cpu_priv] at the M->S bridge and is never named again. *)
@@ -513,6 +525,10 @@ Section BootRun.
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
               Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hthr Hcont".
+    (* the [proc] cell arrives ∀-CONTEXT (see [boot_hart_res]) -- this hart
+       takes it at its own ambient, which is the identity its [own_context]
+       names *)
+    iSpecialize ("Hproc" $! cur_ctx).
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".

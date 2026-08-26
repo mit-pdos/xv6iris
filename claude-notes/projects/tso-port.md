@@ -1272,6 +1272,392 @@ it hide in turn.  **Nothing above it can be checked until the park's
 **Red set unchanged:** `ProofForkretPark.v` (the deliberate `Abort`) and
 its 7-file cone.
 
+### 0.16′ THE OFF-BORROW RULING IS LANDED; THE PARK'S LAST ROW IS THE BCACHE ESCROW (2026-08-26)
+
+Executes §0.15′'s forced order.  Step (i) is **landed and green**; step (ii)
+was built, measured and **reverted**; step (iii) is **REFUTED by
+measurement**, on one row, and that row is not in the park at all -- it is in
+the buffer cache.
+
+#### STEP (i) -- THE OFF-BORROW REDESIGN.  LANDED.
+
+**The statement, old vs new.**
+
+```coq
+(* FileInvDefs, before *)                  (* FileInvDefs, after *)
+off_body γ k                               off_body γ k ip
+:= ∃ ip, a_fip k ↦₈{DfracOwn (1/2)} ip     := off_resident k
+        ∗ (off_resident k                        ∨ (off_mark ip ∗ flive_tok γ k)
+           ∨ (off_mark ip ∗ flive_tok γ k))
+
+off_raw k                                  off_raw k
+:= ∃ ip v, a_fip k ↦₈{DfracOwn (1/2)} ip   := ∃ v, a_foff k ↦₄ v ∗ ⌜off_wf v⌝
+        ∗ a_foff k ↦₄ v ∗ ⌜off_wf v⌝
+
+off_content γ k armed                      off_content γ k armed ip
+off_hold γ k γx armed q                    off_hold γ k γx armed ip q
+
+file_fields … a_fip k ↦₈{DfracOwn (q/2)}   file_fields … a_fip k ↦₈{DfracOwn q}
+file_payload := file_core q pn C           file_payload := file_core q pn C
+   ∗ off_hold γ k (fp_ocv pn) (file_armed C) q   ∗ off_hold γ k (fp_ocv pn)
+                                                     (file_armed C) (fc_ip C) q
+```
+
+**THE GHOST CHOSEN FOR THE `ip` AGREEMENT IS THE ONE THE SLOT ALREADY HAD.**
+The ruling said "replace the parked half with ghost state -- an agreement
+pinning `ip`".  No NEW ghost was minted, and the reason is worth the
+sentence: `off_hold` already takes two other C-derived arguments -- the cinv
+NAME `fp_ocv pn` and the ARMED bit `file_armed C` -- and every site that must
+reconcile two shares of one slot (`file_pay_split`, `file_rest_absorb`,
+`file_rest_join`, fileclose's last-reference arm) ALREADY runs the two
+agreements that pin them: `fpay_tok_agree` on `pn` and `FileInv.file_fields_agree`
+on `C`.  Adding `fc_ip C` as a third rides those and creates **zero new proof
+obligations anywhere**.  And `file_fields_agree` is a POINTS-TO agreement on
+the very `a_fip` cell, so the tie between the invariant's `ip` and the
+memory's is if anything tighter than the parked half was -- it is just paid
+at the reference instead of inside the invariant.  The alternatives were both
+worse: a fresh `own γ (to_agree ip)` needs a new `inG` in Σ (an adequacy-wide
+change), and a slot-keyed `agree` map under the existing `fileUR` cannot be
+RE-minted when a slot is republished.
+
+**MEASURED, and it is the whole point.**  With §0.13′'s `Check` kit on this
+tree:
+
+```
+@off_body, @off_content, @off_hold      -- no CurCtx  (CLOSED TERMS)
+@file_core, @file_payload, @file_pay    -- no CurCtx  (CLOSED TERMS)
+@file_fields, @fslot, @ftable_res       -- CurCtx     (ξ-INDEXED, as they should be)
+MORPH ftable_res OK
+```
+
+`file_core` came out closed for free (`is_pipe` was λ-converted a tranche
+earlier, `inode_pay` was measured ξ-free), so after the ruling **the whole
+ξ-dependence of an ftable slot is `file_fields`' four flipped cells.**
+`FileInv.ftable_res_morph` is then three structural instances applied AS
+TERMS, `is_ftable` moved below the section that binds the ambient and became
+`is_lock γl ftable_addr "ftable" (λ ξ, ftable_res (XI := ξ) γ)` -- a **CLOSED
+TERM** -- and §0.15′'s blocker (`NOTCONV is_ftable`, `NO-INSTANCE CtxMorph
+is_ftable`) is gone.
+
+**Blast radius, as landed** (9 files): `FileInvDefs` (the `off_*` block, the
+`file_fields` fraction, three new `CtxMorph` instances at the end),
+`FileInv` (`file_fields_ip`, `file_fields_frac_split`, `off_hold_cancel`,
+`ftable_res_boot`, the new `FileLock` section), `FileOff` (both borrow
+lemmas), `ProofSysOpenParts` (`so_open_slot`, `so_publish` -- and
+`so_word_half_join` is DELETED), `ProofSysOpen` (`so_ip_split` deleted, the
+`a_fip` half premise dropped from `so_tail_pub`), `ProofFileclose` (the
+last-reference arm), `SpecFileread` (`fileread_pay_carve`),
+`ProofFileread` / `ProofFilewrite` (five `DfracOwn (q/2)` → `DfracOwn q`),
+plus the 9 `<{ ftable_res γ }>` → `(λ ξ, ftable_res (XI := ξ) γ)` sites in
+`ProofMain` / `ProofFilealloc` / `ProofFileclose` / `ProofFiledup`.
+
+**THE `a_fip` PREMISE STAYS ON `off_checkout`/`off_checkin` AS A PASSENGER.**
+It is dead in the proof now, and it was kept deliberately: it is what ties
+`off_hold`'s `ip` argument to the borrower's own reference at the five call
+sites, and dropping it would have churned two 2500-line proofs for nothing.
+
+**STAGE 2 COSTS NOTHING AT THE FD TABLE, and the memo demanded this be said.**
+When `↦₄` flips, `off_resident`'s `a_foff k ↦₄ v` becomes ξ-dependent -- and
+that cell is genuinely READ AND WRITTEN by the borrower, so pinning it to an
+`fp_ctx` would break the borrower exactly the way pinning `a_fip` broke the
+publisher.  Under THIS shape the borrower takes the cell out and puts it back
+inside one borrow window under `ip->lock`, so the `ctx_dom` it needs is the
+one that sleeplock acquire already gives it; `a_fip`, the cell the PUBLISHER
+writes, is not in the invariant at all any more.  The stage-2 work is
+`FileOff.v`'s two lemmas and a `ctx_dom` premise, and NOTHING in
+`FileInvDefs` / `FileInv` / `ProofSysOpenParts` / `ProofFileclose`.  Recorded
+in `FileInvDefs.v`'s header, where the next implementer will look.
+
+**ONE MEASURED GOTCHA, worth keeping.**  `Global Typeclasses Opaque
+ftable_res` -- which §0.14′'s `PipeInvDefs` note would have you add to seal
+the big-op seam -- **breaks three files**: `IntoExist` IS a typeclass, so
+sealing an ∃-shaped definition breaks `iDestruct "H" as (M) "…"` at every
+consumer (`ProofFilealloc`, `ProofFileclose`, `ProofFiledup`).  The seal is
+not needed: the big-op inside `ftable_res` is reached only through
+`ftable_res_morph`, which applies `ctx_morph_big_sepL` AS A TERM and never
+searches there.  **Seal a big-op SEAM, not an ∃.**
+
+#### STEP (ii) -- BUILT, MEASURED, AND REVERTED
+
+Threading the parker's `own_context` through `ParkCap.park_cap` /
+`SpecForkretParkPaid.forkret_park_paid_body` was implemented as §0.15′ says
+(hart ∀-quantified beside the context, token handed straight back), together
+with the one thing §0.15′ did not foresee and which is the note worth
+keeping:
+
+> **THE PACKAGE'S `▷` HAS TO MOVE ONTO ITS CLOSER ROW ALONE.**  `park_cap`
+> takes `▷ park_pkg`, and the park must DEPOSIT three of that package's rows
+> (`procs_inv`, `park_globals`, `stack_own`) into the child's freshly minted
+> context.  `TsoCtx.ctx_deposit` is an update and `CtxMorph` needs its
+> `ctx_dom` AT THE TOP LEVEL, so nothing under a `▷` can be deposited --
+> `ctx_dom`'s non-persistence is exactly the obstruction
+> (`tso-transport-memo.md` §1.2), and there is no `▷`-crossing to be had.
+> Only the CLOSER row needs the later, and for the fixpoint's sake rather
+> than the proof's: it is the only row that names `W`.  With the `▷` inside
+> `park_pkg` on that row, `park_token_F_contractive` closes unchanged.
+
+It is **reverted** (`ParkCap.v`, `SpecForkretParkPaid.v` back at their
+committed text), because it buys nothing while step (iii) is refuted and it
+moves an exported shape.  The shape above is the whole of it; re-derive it
+when the escrow lands.  `IntrDefs.sie_cap`'s thread-of-control conjunct is
+where both parkers get the token from, and the peel is
+`sie_cap_gpr_split` / `sie_cap_gpr_join` around a six-way destructuring of
+`sie_cap` -- twelve lines, and it belongs in `ParkCap.v` rather than
+`IntrDefs.v` (425 files sit on the latter).
+
+#### STEP (iii) IS REFUTED, AND THE ROW IS `BioInv.buf_escrow`
+
+`ProofForkretPark.forkret_park_paid` stays at `Abort`.  **Five of the six
+rows the deposit must move are payable, and are now PROVED so** -- three of
+them by instances that did not exist before this tranche:
+
+```
+MORPH ftable_res OK      MORPH procs_inv OK       MORPH is_kstack OK
+MORPH ctx_cells OK       MORPH stack_own OK       MORPH console_ready OK
+MORPH park_globals OK    (UsertrapRes.park_globals_morph, landed)
+MORPH cwd_ref OK         MORPH file_ref OK        MORPH disk_geom OK
+```
+
+The sixth is `ProcInv.proc_priv`, and it does not close:
+
+```
+proc_priv -> proc_priv_core -> FirstTok.first_tok
+  -> (steady arm) FsReady.fs_ready            -> BioInv.bio_ctx
+  -> (boot arm)   FirstTok.first_boot_persist -> BioInv.bio_ctx
+  -> BioInv.buf_escrow = inv bioN (buf_escrow_body bn V k)
+
+@buf_escrow      : … → CurCtx → bio_names → bio_view Σ → nat → iProp Σ
+@buf_escrow_body : … → CurCtx → bio_names → bio_view Σ → nat → iProp Σ
+NOTCONV buf_escrow                 NOTCONV buf_escrow_body
+NO-INSTANCE CtxMorph buf_escrow    NO-INSTANCE CtxMorph bio_ctx
+```
+
+**An `inv` over a ξ-INDEXED body is the ONE shape `CtxMorph` cannot cross**
+(§0.12′'s rule: invariant bodies are not updatable, so no transport exists
+and none can be written).  It is the same shape the off-borrow ruling had to
+remove from `off_hold` -- **and the ruling's technique does not replay.**
+`off_content`'s ξ-dependence was a REDUNDANT COPY of a pointer, kept only so
+the invariant could name an inode, and a pinned argument replaced it for
+nothing.  `buf_escrow_body`'s is **the buffer's DATA**: `buf_parked` and
+`buf_mid` hold `buf_own (bpa k) …`, the cached block's bytes, parked there
+between bread and brelse.  That is what the escrow is FOR; it cannot be
+pinned away.
+
+**AND THE ROW CANNOT BE ROUTED AROUND.**  `first_tok` is a conjunct of
+`proc_priv_core` and BOTH its arms reach `bio_ctx`, so the boot arm -- which
+is exactly what userinit parks -- is no cheaper than the steady one.  Making
+it resumer-supplied the way `park_globals` and `first_done` already are is
+not available either: the FIRST resumer runs BEFORE `first_done` exists
+(forkret's own boot arm is the one instruction in the kernel that mints it),
+which is precisely why `proc_priv` carries `first_tok` and not `first_done`.
+
+**SO THE NEXT TRANCHE IS THE BCACHE ESCROW, AND IT NEEDS AN OWNER RULING.**
+The shape that would work is `WpLock.lock_inv`'s own: ∃-close the context
+INSIDE the escrow body (`inv bioN (∃ ξ, buf_escrow_body (XI := ξ) bn V k)`),
+which makes `buf_escrow` a closed term -- and then every OPENER (bget, bread,
+brelse, the recycler) needs a `ctx_dom` from the ∃-bound ξ to its own before
+it may read or write the block.  It is entitled to one by the bcache lock or
+the buffer sleeplock it is holding; that `ctx_dom` is not threaded to those
+proofs today.  Same seam as `SchedCtx.cpu_ctx_free`'s ∃-context records
+(§0.15′), one layer down.
+
+#### STEP (iv) -- THE `.bss` CARVE, AND THE EIGHT-HART TRAP IT WAS HIDING
+
+`BootShared.v` had been stale since the M1 flip because the deliberate `Abort`
+hid its whole cone from `make` (§0.12′'s lesson, third occurrence).  Repaired
+as §0.15′ prescribed, and then some:
+
+- `Section BootBss` / `Section BootBssChain` gained their `CurCtx` binder.
+- **~28 crossings**, all `TsoCtxShim.ctx_word_of_mem`, `BootCarveMain.v`'s
+  pattern verbatim: the 18 zeroed `devsw` slots, its two live ones, `kmem+24`,
+  `kernel_pagetable`, `initproc`, the three `disk` ring pointers.
+- **Three crossings that are NOT one cell each**, and each is worth naming:
+  the `p->chan` family (a `big_sepL_mono` under the big-op, because
+  `BootCarveMain.boot_procs_raw` is below the seam while `SchedCtx`'s p->lock
+  resource reads `p->chan` at the LOCK HOLDER's context); the two byte RUNS
+  (`sb`'s 32 and `disk.free`'s 8), for which `BootShared` now carries one
+  local `boot_bytes_ctx`; and `SchedCtx.cpu_ctx_free`, which ∃-QUANTIFIES the
+  save area's context (the cells belong to no thread while the slot is free)
+  and which the carve therefore WITNESSES rather than frames.
+- Two `iFrame`s became row-by-row `iExact`s, for the reason
+  `ParkCap.park_token_park` already records: **an ∃ does not frame against an
+  ∃**, and since the flip `own_ctx` is one.
+
+**AND THEN THE FILE ABOVE IT CRAWLED, WHICH IS THE REAL FINDING.**  With
+`BootShared` green the cone went green to `SystemAdequacy.v`, which then ran
+**23 minutes 34 seconds** (2 GB RSS) against a normal cost of ~100 s
+(durable-notes.md's measurement) before it was killed under §0.13′'s rule.
+`rocq compile -time` localises it exactly: the last command that completes is
+the `iModIntro` after `iMod (own_context_boot (CID := 0%fin))`, so the crawl
+is the `iApply (boot_hart_primary (XI := ξ0) …)` that follows.
+
+**THE EIGHT-HART ADEQUACY TRAP, stated once.**  The `.bss` carve runs ONCE,
+inside one fupd, before any hart has a thread of control; the eight harts then
+run at eight DISTINCT `own_context_boot` identities.  A bundle handed out at
+the carve's single ξ can serve at most one of them -- and
+`BootChain.boot_entry_bridge`'s own header had already asserted the intent
+("`boot_shared_alloc` hands its per-hart bundle out under one ambient `XI` …
+Keeping [`own_context`] a separate premise lets `SystemAdequacy` mint one
+token per hart and instantiate THIS lemma at that hart's ξ") without the
+statement being able to honour it.
+
+**MEASURED: `BootChain.boot_hart_res` had exactly ONE ξ-indexed row** --
+`ProcGeom.cur_proc`, the `cpus[h].proc` cell.  Everything else is registers,
+ghosts, the physical tier, or `cpu_ctx_free`, which already ∃-closes its own
+context.  So the fix is one row:
+
+```coq
+(* BootChain.boot_hart_res, before *)      (* after *)
+   cur_proc zero_reg ∗                        (∀ ξ : CtxId, cur_proc (XI := ξ) zero_reg) ∗
+```
+
+and `boot_hart_res` is a **CLOSED TERM** (`Check` prints no `CurCtx`).  The
+carve keeps the cell RAW (`RiscvPtsto.word_pointsto`, so `cpu_slot_raw` and
+`boot_hart_bss` spell it explicitly) and does the phys→ctx mint UNDER the ∀ in
+`boot_hart_pre`; `boot_entry_bridge` takes it at its own ambient with one
+`iSpecialize ("Hproc" $! cur_ctx)`.
+
+> **THE ∀-CONTEXT FORM IS SOUND EXACTLY HERE, and the two conditions are
+> worth spelling out because §0.15′'s rule reads as an outright ban.**  The
+> ban is on `□ (∀ ξ, C ξ)` over facts written at WP time: a PERSISTENT
+> ∀-context form hands the fact out at every ξ, and for a `t > 0` discarded
+> cell that is false at the flip.  This row is neither: the cell is
+> EXCLUSIVE, so the ∀ is a *choose-your-ξ wand* and cannot be instantiated
+> twice, and it is a TIMESTAMP-0 boot-image cell -- §0.4 item 6's one
+> sanctioned case.  `TsoCtxShim.ctx_word_of_mem` quantifies its ξ, which is
+> exactly what makes the ∀ provable from ONE raw cell.
+
+**AND THE FILE STILL DOES NOT CLOSE, ON A SECOND MULTI-CONTEXT INVARIANT.**
+With the trap answered, `SystemAdequacy` gets past `boot_hart_primary`'s
+first four premises and dies on the fifth.  MEASURED, in 0.75 s (see the
+performance note below):
+
+```
+@main_deposit : ... -> GenId -> CurCtx -> uart_names -> disk_names -> iProp
+@started_inv  : ... -> iProp -> iProp            (* a PLAIN payload *)
+@procs_inv    : ... -> GenId -> CurCtx -> list gname -> iProp
+
+iSpecialize: cannot instantiate (started_inv (main_deposit gd gv) -* ...)
+             with (started_inv (main_deposit gd gv))
+```
+
+The two sides print identically and differ in the implicit `CurCtx`.
+`StartedInv.started_inv` takes a PLAIN `iProp` and is handed
+`SpecMainSecondary.main_deposit`, which is ξ-INDEXED through
+`SchedCtx.procs_inv` -- so it is an **`inv` over a ξ-indexed body that ALL
+EIGHT harts need, each at its own `own_context_boot` identity.**  That is
+`BioInv.buf_escrow`'s refutation again, one layer up, and it wants the same
+ruling: ∃-close the context inside the invariant and give the opener a
+`ctx_dom` (here, out of the deposit's own hand-over).  It cannot be answered
+the way `cur_proc` was: `main_deposit` is PERSISTENT, so a ∀-context form
+over it would be `□`-duplicable across ξ, and `procs_inv` carries the
+per-slot `is_kstack` -- a `t > 0` discarded cell, §0.4 item 6's forbidden
+case exactly.
+
+**SO THE M1 FLIP LEFT EXACTLY TWO `inv`s OVER ξ-INDEXED BODIES THAT MUST
+SERVE MORE THAN ONE CONTEXT**, and they are the whole of what stands between
+here and a green tree: `BioInv.buf_escrow` (the park's row six) and
+`StartedInv.started_inv (main_deposit ...)` (the eight harts).  ONE RULING
+COVERS BOTH.
+
+**THE PERFORMANCE LESSON, and it is the one to carry forward.**  Until it was
+localised, that mismatch was a **23-minute, 2 GB crawl** inside
+`iApply (boot_hart_primary ... with "H1 ... H30")` -- `make` simply never
+finished, and the file's normal cost is seconds.  Rewritten as
+`iPoseProof ... as "HP"` plus thirty `iSpecialize ("HP" with "Hi")`, the same
+mismatch is reported **in 0.75 s, by name**.  The rewrite is in the tree.
+
+> **A 30-PREMISE `iApply ... with "..."` IS A PERFORMANCE BUG WAITING FOR A
+> MISMATCH.**  It builds the whole application and unifies it against the
+> goal in one go, so a bad premise deep in the list has nowhere to fail
+> fast; specialising one premise at a time gives the unifier a head symbol
+> to differ at.  §0.13′'s "a crawl IS the signature of an unprovable
+> crossing" applies to TACTICS as well as to goals -- and it is the same
+> lesson the tree already carries as "row by row, not one `iFrame`"
+> (`ParkCap.park_token_park`, and twice more in `BootShared` this tranche).
+> Spell long premise lists out.
+
+#### MEASUREMENT, AND ONE THING THAT DOES NOT WORK
+
+- **The `Check`/`reflexivity`/`apply _` kit is still the right instrument**,
+  and `tryif (apply _) then idtac "MORPH f OK" else idtac "MORPH f NO"` is the
+  third probe to keep beside §0.13′'s two: it answers "does this row's
+  transport obligation discharge?" in one cheap file with no crawl risk.
+- **`Hint Extern` DOES NOT RESCUE THE HIGHER-ORDER UNIFICATION** (measured).
+  §0.15′'s "structural instances must be applied AS TERMS" was recorded as a
+  mechanic; the natural workaround --
+  `Hint Extern 4 (CtxMorph (λ _, big_opL _ _ _)) => eapply ctx_morph_big_sepL`
+  and the same for `bi_exist`, so that `eapply`'s more aggressive unifier runs
+  instead of instance search's -- leaves `devsw_table`, `bio_ctx`,
+  `first_fsinit`, `fs_ready`, `first_tok`, `ofile_slot`, `proc_ofiles` and
+  `proc_priv` ALL still unresolved.  **The rule is a requirement; stop looking
+  for a way around it.**
+- **ξ-profile, measured, worth not re-deriving.**  Of `fs_ready`'s twenty
+  conjuncts exactly ONE is ξ-indexed: `bio_ctx`.  `kernel_text`,
+  `kernel_data`, `printk_env`, `log_ctx`, `fs_crash_seam`, `gen_cert`,
+  `dev_inv`, `is_itable2`, `itable_inv`, `ic_escrows`, `ic_sleeplocks`,
+  `ireg_inv`, `ireg_open`, `kalloc_avail`, `fs_sb_cells`, `bitmap_inv` all
+  print with no `CurCtx`, and `disk_geom` -- which does -- has an instance.
+  Inside `bio_ctx`: `bcache_res` and `bown` are ξ-FREE, `is_sleeplock` takes
+  its resource as a plain `iProp`; only `buf_escrow` carries the index.
+
+#### STEP (v) -- THE CONE, AND THE VERDICT
+
+Swept per §0.12′'s lesson: the deliberate `Abort` was stubbed once, the
+7-file cone forced, and the stub removed.  **Six of the seven are green**
+(`LinkForkretParkPaid`, `LinkMain`, `LinkUserinit`, `BootChain`,
+`BootShared`, `FsAdequacyImg`); the seventh, `SystemAdequacy`, is red on the
+second multi-context invariant above and is now red FAST rather than after
+23 minutes.
+
+**THE TREE IS NOT FULLY GREEN, and the red set is exactly the one this
+tranche inherited:** `ProofForkretPark.v`'s deliberate `Abort` and its
+7-file cone.  `make` stops at that file and never reaches the cone, so no
+build crawls and nothing above it is attempted; two consecutive full VM
+rounds report that ONE error and nothing else.  What changed underneath is
+that the cone is no longer HIDING anything: five of its files are proved
+green, and the two remaining obstructions are named, measured, and share one
+ruling.
+
+#### MEMO CORRECTIONS
+
+- **`tso-transport-memo.md` §2(c) ruling 2 ("add an `fp_ctx : CtxId` field to
+  `fpnames` and state `off_content` at `fp_ctx pn`")** -- refuted at §0.14′,
+  and its replacement is now LANDED.  The memo's own summary of the fix
+  ("Cost: `a_fip` has 32 occurrences in 9 files … This is the smallest of the
+  three fixes") is right about the size and wrong about the shape: the landed
+  fix touches the SAME files and is smaller still, because it DELETES two
+  half-cell lemmas (`ProofSysOpenParts.so_word_half_join`,
+  `ProofSysOpen.so_ip_split`) and one `Qp.div_add_distr` rather than adding a
+  record field.
+- **`tso-port.md` §0.14′'s recommended ruling ("replace the parked
+  `a_fip k ↦₈{1/2}` with ghost state -- an agreement pinning `ip`")** -- landed
+  IN SUBSTANCE, but **no ghost was minted**.  The agreement that pins `ip` is
+  the one the slot already ran (`file_fields_agree` on `C`, beside
+  `fpay_tok_agree` on `pn`), because `off_hold` is applied at `fc_ip C` and
+  its two other C-derived arguments were already reconciled by exactly those
+  two agreements at exactly the sites that need it.  A new ghost would have
+  cost a new `inG` in Σ and could not be re-minted at republication.
+- **`tso-port.md` §0.15′: "`proc_priv`'s own chain -- `first_tok` →
+  `first_done` → `fs_ready` -- is NOT measured … it is expected to go
+  through, but it is the next thing to check."**  CHECKED.  It does not go
+  through, and the obstruction is one row: `BioInv.buf_escrow`, an `inv` over
+  a ξ-indexed body.  §0.15′'s forced order was right as far as it went and one
+  item short: the bcache escrow comes BEFORE (ii) and (iii).
+- **`tso-transport-memo.md` §4 step 2** ("`off_hold`/`ftable_res` … After this
+  `is_ftable` is a closed term") -- **done, and true.**  §4 **step 5**
+  ("`ProofForkretPark.forkret_park_paid` closes") is still refuted, but no
+  longer on `is_ftable`: on `proc_priv`.  The memo's §8 correction ("its
+  replacement … is what unblocks the park, and it is now the ONLY thing that
+  does") is **wrong on the last clause** -- it unblocked one of two rows.
+- **`tso-park-protocol-memo.md` §2's "the ξ-dependence of every handle in the
+  tree is an artifact of the constant embedding, not of the semantics"**
+  (quoted from §0.11′) -- true of handles, and it is worth naming the
+  exception the park keeps running into: an `inv` that is not a lock handle
+  has no acquire to re-index at, so its body's ξ-dependence is NOT an
+  artifact.  `off_hold` was one such (fixed by removing the dependence);
+  `buf_escrow` is the other (not fixable that way).
+
 ---
 
 ---

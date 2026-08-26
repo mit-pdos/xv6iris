@@ -48,13 +48,9 @@ Section FileInv.
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
        [∗ list] k ∈ seq 0 NFILE, fslot γ M k)%I.
 
-  (* the whole table: the spinlock named "ftable" over that resource.
-     Persistent, so every core shares it. *)
-  Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string <{ ftable_res γ }>.
-
-  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
-  Proof. apply _. Qed.
+  (* the whole table: the spinlock named "ftable" over that resource.  ITS
+     HANDLE IS A CLOSED TERM and its definition therefore lives BELOW this
+     section -- see [FileLock] at the end of the file. *)
 
   (* ------------------------------------------------------------------ *)
   (*  Content: agreement and the fractional split                         *)
@@ -77,11 +73,12 @@ Section FileInv.
     iPureIntro. destruct C1, C2; cbn in *. congruence.
   Qed.
 
-  (* THE FILE'S INODE, read out of a reference at ANY fraction.  This is the
-     bridge the off-borrow invariant is opened with: the invariant holds the
-     OTHER half of the same cell, so agreement identifies the two. *)
+  (* THE FILE'S INODE, read out of a reference at ANY fraction -- the WHOLE
+     nominal fraction since the off-borrow ruling (FileInvDefs.v's header):
+     the invariant no longer keeps half of this cell, it takes [fc_ip C] as an
+     argument, so a borrower's own share is the whole of its share. *)
   Lemma file_fields_ip k q C :
-    file_fields k q C -∗ a_fip k ↦₈{DfracOwn (q/2)} fc_ip C.
+    file_fields k q C -∗ a_fip k ↦₈{DfracOwn q} fc_ip C.
   Proof. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
   Lemma file_ref_agree γ k q1 C1 q2 C2 :
@@ -101,8 +98,7 @@ Section FileInv.
     rewrite (ctx_pointsto_frac_split _ (a_fwritable k)).
     rewrite (ctx_word_pointsto_frac_split _ (a_fpipe k)).
     rewrite (word2_pointsto_frac_split (a_fmajor k)).
-    (* the ip cell is at HALF, and halving distributes over the sum *)
-    rewrite Qp.div_add_distr (ctx_word_pointsto_frac_split _ (a_fip k)).
+    rewrite (ctx_word_pointsto_frac_split _ (a_fip k)).
     iSplit.
     - iIntros "([A1 B1] & [A2 B2] & [A3 B3] & [A4 B4] & [A5 B5] & [A6 B6])".
       iFrame.
@@ -323,10 +319,11 @@ Section FileInv.
      refute.  fileclose never READS [off] (gcc emits no such load), so this
      is internal to the lock and [SpecFileclose] does not move. *)
   Lemma off_hold_cancel (E : coPset) (γ γx : gname) (armed : bool)
+      (ip : mword 64)
       (M : gmap nat (Qp * positive)) (k : nat) (qt : Qp) :
     ↑(offN .@ k) ⊆ E ->
     M !! k = Some (qt, 1%positive) ->
-    off_hold γ k γx armed 1 -∗ ftable_auth γ M -∗ flive_tok γ k
+    off_hold γ k γx armed ip 1 -∗ ftable_auth γ M -∗ flive_tok γ k
     ={E}=∗ ftable_auth γ M ∗ flive_tok γ k ∗ off_raw k.
   Proof.
     iIntros (HE HM) "[#Hci Hown] [Ha Hl] Hlv".
@@ -335,12 +332,12 @@ Section FileInv.
     iMod (cinv_cancel with "Hci Hown") as "H"; [exact HE|].
     iMod "H". rewrite /off_content. destruct armed; last first.
     { iModIntro. rewrite /ftable_auth. iFrame "Ha Hl Hlv". iExact "H". }
-    iDestruct "H" as (ip) "[Hip Hd]".
-    iDestruct "Hd" as "[Hres | [_ Hlv2]]"; last first.
+    rewrite /off_body.
+    iDestruct "H" as "[Hres | [_ Hlv2]]"; last first.
     { iExFalso. iApply (flive_excl_last γ (Mcount M) k Hml with "Hl Hlv Hlv2"). }
     iDestruct "Hres" as (v) "[Hc %Hwf]".
     iModIntro. rewrite /ftable_auth. iFrame "Ha Hl Hlv".
-    iExists ip, v. iFrame. done.
+    iExists v. iFrame. done.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -585,6 +582,62 @@ Section FileInv.
 
 End FileInv.
 
+(* ====================================================================
+   THE TABLE'S LOCK, AS A CLOSED TERM (tso-port M3, §0.16′)
+
+   [ftable_res] is ξ-INDEXED and stays so -- it holds [file_fields]' flipped
+   cells, and a lock resource SHOULD be at a context: at TSO an acquire is
+   exactly where a payload changes context.  What must be ξ-FREE is the
+   HANDLE, so that two harts holding "the ftable lock" hold the SAME
+   proposition and a freshly minted context can be given one.  That is the
+   M3 λ-conversion ([KallocInv.v]'s [is_kmem] is the reference): the payload
+   is handed to [is_lock] as [λ ξ, ftable_res (XI := ξ) γ] rather than as the
+   CONSTANT embedding [<{ ftable_res γ }>], and the acquirer re-indexes it
+   along its [ctx_dom] via [CtxMorph].
+
+   THIS SECTION DECLARES NO [CurCtx], deliberately: it must spell
+   [ftable_res (XI := ξ)], which is not possible inside the section that
+   binds the ambient, and with none in scope a forgotten annotation is an
+   elaboration error instead of a silent capture (§0.8′ rule 3).
+
+   WHAT MADE THE INSTANCE POSSIBLE: [FileInvDefs]' off-borrow ruling.  Before
+   it, [fslot] ended in a [cinv] over a ξ-indexed [off_content], i.e. an
+   INVARIANT over a ξ-indexed body, which no [CtxMorph] can cross -- MEASURED
+   §0.15′: [NOTCONV ftable_res], [NO-INSTANCE CtxMorph is_ftable].  Now the
+   whole ξ-dependence of a slot is [file_fields], and the instance is the
+   structural ones applied AS TERMS. *)
+Section FileLock.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+
+  Global Instance ftable_res_morph (γ : gname) :
+    CtxMorph (λ ξ0 : CtxId, ftable_res (XI := ξ0) γ).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ftable_res.
+    iDestruct "H" as (M) "(Ha & Hfd & %Hwf & Hs)".
+    iDestruct (ctx_morph_big_sepL (seq 0 NFILE)
+                 (λ _ k ξ0, fslot (XI := ξ0) γ M k)
+                 (λ i x, fslot_morph γ M _)
+                 ξ ξ' with "Hd Hs") as "[Hd Hs]".
+    iFrame "Hd". iExists M. iFrame. done.
+  Qed.
+
+  (* Persistent, so every core shares it. *)
+  Definition is_ftable (γl γ : gname) : iProp Σ :=
+    is_lock γl ftable_addr "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γ).
+
+  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
+  Proof. apply _. Qed.
+End FileLock.
+
+(* NO [Typeclasses Opaque ftable_res].  §0.14′'s [PipeInvDefs] note says the
+   big-op seams must be sealed so instance search does not walk into them --
+   but [ftable_res] is not a seam, it is an ∃, and sealing it breaks
+   [iDestruct "H" as (M) "..."] at all four of its consumers ([ProofFilealloc],
+   [ProofFileclose], [ProofFiledup]): [IntoExist] IS a typeclass, and it is
+   resolved by unfolding the definition.  MEASURED, three files, one round.
+   The big-op inside it is reached only through [ftable_res_morph], which
+   applies [ctx_morph_big_sepL] AS A TERM and so never searches there. *)
+
 (* ------------------------------------------------------------------ *)
 (*  Boot: minting the table's ghost                                     *)
 (* ------------------------------------------------------------------ *)
@@ -729,14 +782,11 @@ Section FileGhostAlloc.
       rewrite /fentry_raw.
       iDestruct "Hraw" as "(Hty & Href & (%r & Hrd) & (%w & Hwr) &
                             (%pp & Hpp) & (%ip & Hip) & Hoff & (%mj & Hmj))".
-      (* [f->ip] in half: the reference's half and the invariant's. *)
-      iDestruct (bi.equiv_entails_1_1 _ _
-                   (ctx_word_pointsto_frac_split _ (a_fip k) (1/2) (1/2) ip)
-                   with "[Hip]") as "[Hip1 Hip2]".
-      { iEval (rewrite Qp.div_2). iExact "Hip". }
-      iMod (off_hold_alloc E γ k false with "[Hip2 Hoff]") as (γx) "Hoffhold".
-      { rewrite /off_raw. iExists ip, (mword_of_int 0 : mword 32).
-        iFrame "Hip2 Hoff". iPureIntro. exact off_wf_zero. }
+      (* [f->ip] goes WHOLE into [file_fields]: since the off-borrow ruling
+         the invariant keeps no fraction of it (FileInvDefs.v's header). *)
+      iMod (off_hold_alloc E γ k false ip with "[Hoff]") as (γx) "Hoffhold".
+      { rewrite /off_raw. iExists (mword_of_int 0 : mword 32).
+        iFrame "Hoff". iPureIntro. exact off_wf_zero. }
       iMod (fpay_tok_update γ k pn
               (MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
                  (fp_ig pn) γx) with "Htok") as "Htok".
@@ -745,10 +795,10 @@ Section FileGhostAlloc.
       iSplitL "Href"; [iExact "Href"|].
       iExists (MkFContent FD_NONE r w pp ip mj).
       iSplitR; [iPureIntro; reflexivity|].
-      iSplitL "Hty Hrd Hwr Hpp Hip1 Hmj".
+      iSplitL "Hty Hrd Hwr Hpp Hip Hmj".
       { rewrite /file_fields.
         cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_major].
-        iFrame "Hty Hrd Hwr Hpp Hmj". iExact "Hip1". }
+        iFrame "Hty Hrd Hwr Hpp Hmj". iExact "Hip". }
       rewrite /file_pay /file_payload.
       iExists (MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
                  (fp_ig pn) γx).

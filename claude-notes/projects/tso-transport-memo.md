@@ -374,3 +374,59 @@ got wrong:
   memo's ruling 2 (the `fp_ctx` field) was already refuted at §0.14′; its
   replacement (the off-borrow cinv stops holding a points-to fraction) is
   what unblocks the park, and it is now the ONLY thing that does.
+
+---
+
+## 9. CORRECTIONS FROM THE §0.16′ LANDING (2026-08-26; see tso-port.md §0.16′)
+
+Ruling 2's REPLACEMENT is landed and the memo's §2(c) is now history in two
+directions.
+
+- **§2(c)'s "Recommended shape (c-XIp)" (an `fp_ctx : CtxId` field on
+  `fpnames`) was refuted at §0.14′ and is not what landed.**  What landed is
+  smaller than the memo's own estimate of its favourite: the off-borrow cinv
+  takes the inode as an ARGUMENT (`off_hold γ k γx armed ip q`, applied at
+  `fc_ip C` by `file_payload`), the whole `a_fip` cell rides `file_fields` at
+  the nominal fraction, and the change DELETES the two half-cell lemmas
+  (`ProofSysOpenParts.so_word_half_join`, `ProofSysOpen.so_ip_split`) rather
+  than adding a record field.
+- **No new ghost was minted, contra §0.14′'s wording ("replace the parked
+  half with ghost state -- an agreement pinning `ip`").**  The agreement that
+  pins `ip` is the one the slot already ran.  `off_hold`'s two other
+  C-derived arguments (`fp_ocv pn`, `file_armed C`) are already reconciled
+  between two shares of one slot by `fpay_tok_agree` and
+  `FileInv.file_fields_agree`, at every site that needs it; `fc_ip C` rides
+  those and adds NO proof obligation anywhere.  `file_fields_agree` is a
+  points-to agreement on the very `a_fip` cell, so the tie to memory is
+  tighter than the parked half was.
+- **§4 step 2 is DONE and step 5 is still refuted, but on a different row.**
+  §8's third bullet says the off-borrow fix "is what unblocks the park, and
+  it is now the ONLY thing that does".  **The last clause is wrong.**  It
+  unblocked ONE of two rows.  With `is_ftable` a closed term, five of the six
+  rows `forkret_park_paid` must deposit are payable (`MORPH ftable_res OK`,
+  `procs_inv`, `is_kstack`, `ctx_cells`, `stack_own`, `park_globals`); the
+  sixth, `ProcInv.proc_priv`, reaches `BioInv.buf_escrow` -- `inv bioN
+  (buf_escrow_body bn V k)` over a ξ-INDEXED body -- through `first_tok`,
+  and BOTH `first_tok`'s arms reach it (`fs_ready` and
+  `first_boot_persist` both carry `bio_ctx`).  MEASURED: `NOTCONV
+  buf_escrow`, `NOTCONV buf_escrow_body`, `NO-INSTANCE CtxMorph buf_escrow`,
+  `NO-INSTANCE CtxMorph bio_ctx`.
+- **§2(c)'s technique does not generalise, and that is the useful negative.**
+  It works when a body's ξ-dependence is a REDUNDANT COPY kept for naming
+  (`off_content`'s `a_fip` half).  It does not when the body OWNS the data
+  (`buf_escrow_body`'s `buf_own`, the cached block's bytes, parked between
+  bread and brelse).  For the second kind the shape is `WpLock.lock_inv`'s:
+  ∃-close the context inside the invariant and give every opener a `ctx_dom`
+  from whatever lock synchronises it.  That is the next tranche and it needs
+  an owner ruling.
+- **§5's "the cheapest experiment" grows a third probe, and one hope dies.**
+  Beside `Check @f` and the `reflexivity` convertibility test, add
+  `tryif (apply _) then idtac "MORPH f OK" else idtac "MORPH f NO"` -- it
+  answers "does this row's transport obligation discharge?" for nothing.  And
+  **`Hint Extern` does not rescue the higher-order unification**: adding
+  `Hint Extern 4 (CtxMorph (λ _, big_opL _ _ _)) => eapply
+  ctx_morph_big_sepL` (and the same for `bi_exist`), so that `eapply`'s
+  unifier runs instead of instance search's, leaves `devsw_table`,
+  `bio_ctx`, `first_fsinit`, `fs_ready`, `first_tok`, `ofile_slot`,
+  `proc_ofiles` and `proc_priv` ALL still unresolved.  §0.15′'s "structural
+  instances must be applied AS TERMS" is a requirement with no way around it.

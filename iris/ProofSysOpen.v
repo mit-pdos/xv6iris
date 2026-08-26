@@ -168,18 +168,11 @@ Section ProofSysOpenBody.
   Notation Ra5 := (mword_of_int 15 : mword 5).
   Notation Rz  := (mword_of_int 0 : mword 5).
 
-  (* the 1/2 + 1/2 SPLIT at [↦₈] -- [ProofSysOpenParts]' [so_word_half_join]
-     read backwards, which is what hands [so_publish] the invariant's half of
-     [f->ip] after the [sd s1,24(s2)] wrote the cell whole. *)
-  Local Lemma so_ip_split `{XI : CurCtx} (a w : mword 64) :
-    a ↦₈ w -∗ a ↦₈{DfracOwn (1/2)} w ∗ a ↦₈{DfracOwn (1/2)} w.
-  Proof.
-    iIntros "H".
-    iDestruct (bi.equiv_entails_1_1 _ _
-                 (ctx_word_pointsto_frac_split cur_ctx a (1/2) (1/2) w) with "[H]")
-      as "[$ $]".
-    { iEval (rewrite Qp.div_2). iExact "H". }
-  Qed.
+  (* THE 1/2 + 1/2 SPLIT at [↦₈] IS GONE.  It used to hand [so_publish] the
+     off-borrow invariant's half of [f->ip] after the [sd s1,24(s2)] wrote the
+     cell whole; the invariant keeps no fraction of that cell since the
+     off-borrow ruling (FileInvDefs.v's header, tso-port.md §0.16′), so the
+     stored cell goes into [file_fields] whole and nothing is split. *)
 
   (* ================================================================== *)
   (*  THE SYSCALL'S EXIT CONTINUATION, NAMED ONCE.                       *)
@@ -314,7 +307,6 @@ Section ProofSysOpenBody.
     flive_tok gf kf -∗
     file_fields kf 1 C -∗
     fpay_tok gf kf 1 pn -∗
-    a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
     a_foff kf ↦₄ voff -∗
     (* THE UNTYPED SLOT'S OWN UNIT, released when [so_open_slot] took the
        reference apart and handed straight back to the ledger here: the
@@ -356,7 +348,7 @@ Section ProofSysOpenBody.
     subst dev.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-              Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff
+              Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
               Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl
               Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
@@ -371,7 +363,7 @@ Section ProofSysOpenBody.
                     Hload Hshot Hfrz Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
                     Hf4
                     Hf5 Hf6 HbP H23 H24
-                    [Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff Hiru Hcback Howe
+                    [Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hiru Hcback Howe
                      Hsbb Hsbi Hbsl Hisl Hfds Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
@@ -382,7 +374,7 @@ Section ProofSysOpenBody.
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff
             ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb Hdir
             Hwf
-            with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
+            with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfoff")
       as "Href".
     iModIntro.
     iDestruct (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C Hfdlt Hlen
@@ -736,14 +728,13 @@ Section ProofSysOpenBody.
     (* ---- the published CONTENT, and the six cells as [file_fields] ---- *)
     set (C := MkFContent tyw (trunc8 (so_rd_word om)) (trunc8 (so_wr_word om))
                 pip (ientry kk) maj).
-    iDestruct (so_ip_split with "Hfip") as "[Hfip1 Hfip2]".
-    iAssert (file_fields kf 1 C) with "[Hfty Hfrd Hfwr Hfpip Hfip1 Hfmaj]"
+    iAssert (file_fields kf 1 C) with "[Hfty Hfrd Hfwr Hfpip Hfip Hfmaj]"
       as "Hflds".
     { rewrite /file_fields /C; cbn [fc_type fc_readable fc_writable fc_pipe
                                     fc_ip fc_major].
       rewrite /a_ftype /a_freadable /a_fwritable /a_fpipe /a_fip /a_fmajor
               /foff_of.
-      iFrame "Hfty Hfrd Hfwr Hfpip Hfip1 Hfmaj". }
+      iFrame "Hfty Hfrd Hfwr Hfpip Hfip Hfmaj". }
     (* ===== +0xa8 andi a5,a5,1024 -- O_TRUNC ===== *)
     iApply (wp_andi_s_sconf (CID := CID8) (mword_of_int (SO + 0xa8)) Ra5 Ra5
               (mword_of_int 1024 : mword 12) (so_and om 1024) N5 (K - 24)%nat b
@@ -811,7 +802,7 @@ Section ProofSysOpenBody.
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Hcont"). }
@@ -909,7 +900,7 @@ Section ProofSysOpenBody.
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Hcont"). }
@@ -1080,7 +1071,7 @@ Section ProofSysOpenBody.
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                    Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
                     Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                     Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     Hcont").

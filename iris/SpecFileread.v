@@ -641,8 +641,8 @@ Section SpecFileread.
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      off_hold γf k γx true q ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true q -∗
+      off_hold γf k γx true (fc_ip Cf) q ∗
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true (fc_ip Cf) q -∗
          file_pay γf k q Cf).
   Proof.
     intros Hty. iIntros "(%pn & Hpn & Hpl)".

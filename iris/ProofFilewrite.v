@@ -1902,7 +1902,7 @@ Section ProofFilewrite.
     iAssert (off_mark (fc_ip Cf)) with "[Hvalid]" as "Hmark".
     { rewrite /off_mark P8. iExact "Hvalid". }
     iApply fupd_wp.
-    iMod (off_checkout gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) ⊤
+    iMod (off_checkout gf γox kx qx (DfracOwn qx) (fc_ip Cf) ⊤
             ltac:(solve_ndisj) with "Hoh Hcip Hmark Hrlv")
       as "(Hoh & Hcip & Hoffc)".
     iModIntro.
@@ -2231,7 +2231,7 @@ Section ProofFilewrite.
     { intros r Hr N1. rewrite (Hxcs r Hr). exact (HW1cs r Hr N1). }
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
-    iMod (off_checkin gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) v2 ⊤
+    iMod (off_checkin gf γox kx qx (DfracOwn qx) (fc_ip Cf) v2 ⊤
             ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hcell")
       as "(Hoh & Hcip & Hmark & Hrlv)".
     (* THE MOVER (namei-pinned-lookup.md §9 W3, the file-write row): writei

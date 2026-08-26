@@ -372,15 +372,66 @@ Section SystemBoot.
         iApply fupd_wp.
         iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
         iModIntro.
-        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
+        (* ROW BY ROW, NOT ONE [iApply … with "H1 … H30"], and this is a
+           PERFORMANCE fix, not a style one (tso-port.md §0.16′).  MEASURED:
+           with one mismatched premise in the list, the single [iApply] runs
+           past TWENTY-THREE MINUTES at 2 GB and never reports; the
+           [iSpecialize] chain below names the offending premise in 0.75 s.
+           [iApply] with a spec list builds the whole application and unifies
+           it against the goal in one go, so a mismatch deep in the list has
+           nowhere to fail fast; specializing one premise at a time gives the
+           unifier a head symbol to differ at.  §0.13′'s rule -- "a crawl IS
+           the signature of an unprovable crossing" -- applies to tactics as
+           well as to goals: never leave a 30-premise [iApply] as the place a
+           mismatch has to surface. *)
+        iPoseProof (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) sb nib cov XV6_DISK_BYTES
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  Himg
-                  with "Htext Hdata Hh0 Hthr0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
-                        Hfs Hmir Hirslot Hirauth Hcert Hseam
-                        Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
-                        Hpages"). }
+                  Himg) as "HP".
+        iSpecialize ("HP" with "Htext").
+        iSpecialize ("HP" with "Hdata").
+        iSpecialize ("HP" with "Hh0").
+        iSpecialize ("HP" with "Hthr0").
+        (* THIS IS THE ONE THAT FAILS, and it is the M1 flip's second
+           multi-context invariant (tso-port.md §0.16′).
+           [StartedInv.started_inv] takes a PLAIN [iProp] and is handed
+           [SpecMainSecondary.main_deposit], which is ξ-INDEXED (through
+           [SchedCtx.procs_inv]) -- so it is an [inv] over a ξ-indexed body,
+           and ALL EIGHT harts need it, each at its own [own_context_boot]
+           identity.  That is structurally the same refutation as
+           [BioInv.buf_escrow]'s (which is what blocks the park), one layer
+           up, and it needs the same ruling: ∃-close the context inside the
+           invariant and give the opener a [ctx_dom].  Until then this file
+           is red BEHIND [ProofForkretPark.v]'s deliberate [Abort], which is
+           what stops [make] from ever reaching it. *)
+        iSpecialize ("HP" with "Hstarted").
+        iSpecialize ("HP" with "Hlk").
+        iSpecialize ("HP" with "Hgl").
+        iSpecialize ("HP" with "Hmfirst").
+        iSpecialize ("HP" with "Hmnext").
+        iSpecialize ("HP" with "Hpark").
+        iSpecialize ("HP" with "Hpst").
+        iSpecialize ("HP" with "Hpavail").
+        iSpecialize ("HP" with "Hfs").
+        iSpecialize ("HP" with "Hmir").
+        iSpecialize ("HP" with "Hirslot").
+        iSpecialize ("HP" with "Hirauth").
+        iSpecialize ("HP" with "Hcert").
+        iSpecialize ("HP" with "Hseam").
+        iSpecialize ("HP" with "Hdev").
+        iSpecialize ("HP" with "Hwinv").
+        iSpecialize ("HP" with "Htx").
+        iSpecialize ("HP" with "Hsent").
+        iSpecialize ("HP" with "Hlb").
+        iSpecialize ("HP" with "Hdlab").
+        iSpecialize ("HP" with "Hcfg").
+        iSpecialize ("HP" with "Hclaim").
+        iSpecialize ("HP" with "Hdone").
+        iSpecialize ("HP" with "Hkpt").
+        iSpecialize ("HP" with "Hkmap").
+        iSpecialize ("HP" with "Hpages").
+        iApply "HP". }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".

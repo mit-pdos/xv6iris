@@ -2074,7 +2074,7 @@ Section ProofFileread.
              { rewrite /inode_map. iFrame. }
              (* ---- CHECK OUT the offset cell ---- *)
              iApply fupd_wp.
-             iMod (off_checkout γf γox k q (DfracOwn (q/2)) (fc_ip Cf) ⊤
+             iMod (off_checkout γf γox k q (DfracOwn q) (fc_ip Cf) ⊤
                      ltac:(solve_ndisj) with "Hoh Hcip Hvalid Hrlv")
                as "(Hoh & Hcip & Hoffc)".
              iModIntro.
@@ -2356,7 +2356,7 @@ Section ProofFileread.
                 iEval (rewrite Htgt54) in "Hpc".
                 (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
-                iMod (off_checkin γf γox k q (DfracOwn (q/2)) (fc_ip Cf) v ⊤
+                iMod (off_checkin γf γox k q (DfracOwn q) (fc_ip Cf) v ⊤
                         ltac:(solve_ndisj) Hwf with "Hoh Hcip Hoff")
                   as "(Hoh & Hcip & Hvalid & Hrlv)".
                 iModIntro.
@@ -2638,7 +2638,7 @@ Section ProofFileread.
                 iEval (rewrite Hpp54) in "Hpc".
                 (* CHECK IN the advanced cell *)
                 iApply fupd_wp.
-                iMod (off_checkin γf γox k q (DfracOwn (q/2)) (fc_ip Cf)
+                iMod (off_checkin γf γox k q (DfracOwn q) (fc_ip Cf)
                         (mword_of_int (bv_unsigned v + Z.of_nat tot)) ⊤
                         ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hoff")
                   as "(Hoh & Hcip & Hvalid & Hrlv)".

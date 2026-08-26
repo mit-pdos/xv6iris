@@ -3,37 +3,68 @@
    LOOKS UP a file reference needs (starting with [ProcInv]'s [proc_priv],
    which threads a slot index through [p->ofile]).
 
-   ---- M3/tso: WHY [ftable_res] IS STILL [<{ }>]-EMBEDDED (2026-08-26) ----
+   ---- M3/tso: THE OFF-BORROW CINV HOLDS NO POINTS-TO AT ALL (2026-08-26,
+        tso-port.md §0.16′; the ruling recommended at §0.14′, RATIFIED) ----
 
-   The transport memo's ruling 2 -- "give [fpnames] an [fp_ctx : CtxId] and
-   state [off_content]/[off_body]/[off_raw]'s [a_fip] row at [fp_ctx pn]" --
-   was NOT implemented, because it does not close.  It makes [off_hold] a
-   closed term (which is what [CtxMorph ftable_res] needs), but it moves the
-   problem to the one place where the two halves of [a_fip] have to become a
-   WHOLE cell again: [ProofSysOpenParts.so_open_slot] cancels the UNARMED
-   off-cinv, gets that invariant's half at the MINTER's context, and joins it
-   with the reference's half at ITS OWN -- [so_word_half_join], which is
-   [TsoCtx.ctx_word_pointsto_frac_split], and that law is SINGLE-ξ.  The
-   sealed surface's only cross-context laws are the AGREE family
-   ([ctx_pointsto_agree]/[ctx_bytes_agree]/[ctx_word_pointsto_agree]); there
-   is no cross-context JOIN, and there cannot be one without a [ctx_dom],
-   which no party at that site holds over the minter's context.  MEASURED
-   under the hermetic seal: [NOTCONV ctx_pointsto], [JOIN-DOES-NOT-CROSS],
-   with the same tactic at one context [CONTROL-JOIN-OK].  The situation is
-   reachable on the FIRST open after boot: [FileInv.ftable_res_boot] mints
-   the unarmed cinv at the boot context.
+   THE OFF-CINV NO LONGER PARKS A FRACTION OF A FLIPPED CELL.  [off_body] used
+   to hold [a_fip k ↦₈{1/2} ip] -- half of the file's inode pointer -- so that
+   the invariant could NAME the inode whose lock excludes two borrowers.  That
+   made [off_content] ξ-INDEXED, hence [off_hold]'s [cinv] an invariant over a
+   ξ-indexed body, hence [ftable_res] and [FileInv.is_ftable] unable to cross a
+   context -- which is what blocked [ProofForkretPark.forkret_park_paid]'s
+   deposit into a freshly minted child context (§0.15′ step 5, MEASURED:
+   [NOTCONV is_ftable], [NO-INSTANCE CtxMorph is_ftable]).
 
-   The fix direction, for whoever takes it: the off-borrow cinv must stop
-   holding a points-to FRACTION of a flipped cell at all -- replace the
-   parked [a_fip k ↦₈{1/2}] with ghost state (an agreement pinning [ip] plus
-   the exclusive borrow marker), so [off_content] is ξ-free outright, the
-   whole [a_fip] cell rides the reference and re-indexes at every ftable
-   acquire, and no join is ever cross-context.  THAT SHAPE ALSO SURVIVES
-   STAGE 2, which the memo demanded of any stage-1 fix: when [↦₄] flips,
-   [off_raw]'s [a_foff k ↦₄ v] -- a cell the borrower genuinely READS AND
-   WRITES, not merely agrees on -- becomes ξ-dependent too, and pinning it
-   to an [fp_ctx] would break the borrower the same way.  Under the ghost
-   shape both cells live in the reference and stage 2 costs nothing here.
+   IT ALSO DID NOT WORK ON ITS OWN TERMS.  The transport memo's ruling 2 --
+   "give [fpnames] an [fp_ctx : CtxId] and state the [a_fip] row at
+   [fp_ctx pn]" -- makes [off_hold] a closed term but moves the problem to the
+   one place where the two halves of [a_fip] must become a WHOLE cell again:
+   [ProofSysOpenParts.so_open_slot] cancelled the UNARMED off-cinv, got that
+   invariant's half at the MINTER's context, and joined it with the reference's
+   half at ITS OWN -- [TsoCtx.ctx_word_pointsto_frac_split], which is SINGLE-ξ.
+   The sealed surface's only cross-context laws are the AGREE family
+   ([ctx_pointsto_agree]/[ctx_bytes_agree]/[ctx_word_pointsto_agree]); there is
+   no cross-context JOIN and there cannot be one without a [ctx_dom], which no
+   party at that site holds over the minter's context.  MEASURED under the
+   hermetic seal: [NOTCONV ctx_pointsto], [JOIN-DOES-NOT-CROSS], with the same
+   tactic at one context [CONTROL-JOIN-OK].  Reachable on the FIRST open after
+   boot ([FileInv.ftable_res_boot] mints the unarmed cinv at the boot context).
+
+   WHAT IS LANDED INSTEAD.  The [ip] the invariant names is now an ARGUMENT of
+   [off_body]/[off_content]/[off_hold], instantiated by [file_payload] at
+   [fc_ip C] -- so the WHOLE [a_fip] cell rides the reference ([file_fields] at
+   the full nominal fraction, no halving anywhere) and re-indexes at every
+   ftable acquire, and no join is ever cross-context.  The invariant's body is
+   then [off_resident] / ([off_mark ip] ∗ [flive_tok]) -- [↦₄] cells and ghost
+   -- i.e. ξ-FREE OUTRIGHT, and [CtxMorph ftable_res] follows from the
+   structural instances.
+
+   THE AGREEMENT THAT PINS [ip] IS THE ONE THE SLOT ALREADY HAD, and this is
+   why no new ghost was minted for it.  [off_hold]'s other two C-derived
+   arguments -- the cinv NAME ([fp_ocv pn]) and [armed] ([file_armed C]) --
+   are pinned across holders by exactly two agreements: [fpay_tok_agree] on
+   [pn] and [FileInv.file_fields_agree] on [C], the latter being a points-to
+   agreement ON THE VERY [a_fip] CELL and therefore STRONGER than any ghost.
+   Every site that must reconcile two shares of one slot ([file_pay_split],
+   [file_rest_absorb], [file_rest_join], fileclose's last-reference arm)
+   already runs both agreements to reconcile [fp_ocv]/[armed]; [fc_ip C] rides
+   along and creates NO new proof obligation anywhere.  A fresh [own γ
+   (to_agree ip)] would have needed either a new [inG] in Σ (an adequacy-wide
+   change) or a slot-keyed [agree] map that could not be RE-minted when a slot
+   is republished -- strictly more machinery for strictly less.
+
+   STAGE 2, and the memo demanded this of any stage-1 fix: when [↦₄] flips,
+   [off_resident]'s [a_foff k ↦₄ v] becomes ξ-dependent -- and that cell is
+   genuinely READ AND WRITTEN by the borrower, not merely agreed on, so
+   pinning it to an [fp_ctx] would break the borrower exactly the way pinning
+   [a_fip] broke the publisher.  Under THIS shape the cost at the fd table is
+   ZERO: the borrower takes the cell out and puts it back inside one borrow
+   window, under [ip->lock], so the [ctx_dom] it needs is the one that
+   sleeplock acquire already gives it -- and [a_fip], the cell the PUBLISHER
+   writes, is not in the invariant at all any more.  Nothing here has to move
+   again; the work at stage 2 is [FileOff.v]'s two lemmas and their [ctx_dom]
+   premise, and nothing in [FileInvDefs]/[FileInv]/[ProofSysOpenParts]/
+   [ProofFileclose].
 
    [inode_pay]'s cinv is NOT a second obstruction: MEASURED ξ-free (its body
    [inode_held_short] is ghost plus [↦₄]).  Neither is [is_pipe], which was
@@ -600,25 +631,25 @@ Section FileInv.
 
      SIX fields: [off] is gone (it is FileOff.v's), and [ref] was never here.
 
-     [a_fip] is held at HALF the nominal fraction, and that is the one piece of
-     asymmetry in this predicate.  The other half is held, PERMANENTLY, by the
-     off-borrow invariant -- which is how that invariant knows WHICH INODE
-     governs this slot's offset.  It has to know: [off] is protected by
-     [ip->lock], so the mutual exclusion between two borrowers of slot [k] is
-     the exclusivity of one inode's lock, and an invariant that cannot name the
-     inode cannot appeal to it.  Points-to agreement then hands a reference
-     holder "the invariant's inode is MY inode" for nothing, with no ghost and
-     no redundant copy of the pointer.  See FileOff.v.
+     ALL SIX ARE AT THE NOMINAL FRACTION, and [a_fip] is no longer the
+     exception.  It used to be held at HALF, the other half sitting PERMANENTLY
+     inside the off-borrow invariant so that that invariant could name WHICH
+     INODE governs this slot's offset -- [off] is protected by [ip->lock], so
+     the mutual exclusion between two borrowers of slot [k] IS the exclusivity
+     of one inode's lock, and an invariant that cannot name the inode cannot
+     appeal to it.  The invariant still names it; it takes the pointer as an
+     ARGUMENT ([off_hold]'s [ip], instantiated at [fc_ip C] by [file_payload])
+     rather than parking a fraction of the cell, so the WHOLE cell rides the
+     reference.  See this file's header for why, and FileOff.v for the borrow.
 
-     A [Qp] rather than a [dfrac]: every use is [DfracOwn], the half above is
-     not definable on a discarded share, and the whole design turns on
-     fractions adding back up to one. *)
+     A [Qp] rather than a [dfrac]: every use is [DfracOwn] and the whole design
+     turns on fractions adding back up to one. *)
   Definition file_fields (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
     (a_ftype k     ↦₄{DfracOwn q} fc_type C ∗
      a_freadable k ↦ₘ{DfracOwn q} fc_readable C ∗
      a_fwritable k ↦ₘ{DfracOwn q} fc_writable C ∗
      a_fpipe k     ↦₈{DfracOwn q} fc_pipe C ∗
-     a_fip k       ↦₈{DfracOwn (q/2)} fc_ip C ∗
+     a_fip k       ↦₈{DfracOwn q} fc_ip C ∗
      a_fmajor k    ↦₂{DfracOwn q} fc_major C)%I.
 
   (* ---- ONE FREE ENTRY, AS THE IMAGE LEAVES IT ----
@@ -631,9 +662,9 @@ Section FileInv.
      [off_wf]'s inductive bound.  THE OTHER FIVE FIELDS are
      contents-existential: nothing reads them until the slot is published,
      and a free [fslot] quantifies its [fcontent] anyway.  THE [f->ip] CELL
-     COMES OUT WHOLE, because it is the one field that is split in two --
-     [file_fields] keeps half at half the nominal fraction and the off-borrow
-     invariant keeps the other ([off_body]'s header says why).
+     COMES OUT WHOLE and goes STRAIGHT INTO [file_fields]: it used to be split
+     in two, half of it parked in the off-borrow invariant, and that is exactly
+     what this file's header ruling undid.
 
      [BootCarveMain] carves this out of the image and [FileInv.ftable_res_boot]
      turns [NFILE] of them into the ftable lock's resource.  Nothing else in
@@ -993,50 +1024,53 @@ Section FileInv.
   Definition off_mark (ip : mword 64) : iProp Σ :=
     (i_valid ip ↦₄ (mword_of_int 1 : mword 32))%I.
 
-  (* THE BODY.  It holds, for the life of the invariant, HALF OF THE [f->ip]
-     CELL -- which is how it knows WHICH INODE governs this slot's offset, and
-     hence how two borrowers of one slot exclude each other (both would have
-     to hold that inode's lock).  [file_fields] holds the other half, at half
-     the nominal fraction, for exactly this reason. *)
-  Definition off_body (γ : gname) (k : nat) : iProp Σ :=
-    (∃ ip : mword 64,
-       a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗
-       (off_resident k ∨ (off_mark ip ∗ flive_tok γ k)))%I.
+  (* THE BODY.  It NAMES the inode that governs this slot's offset -- which is
+     how two borrowers of one slot exclude each other (both would have to hold
+     that inode's lock) -- and it names it as an ARGUMENT.  It used to hold
+     HALF OF THE [f->ip] CELL instead, and this file's header says at length
+     why that had to go and what pins [ip] now: [off_hold] is applied at
+     [fc_ip C] by [file_payload], and the two agreements that already reconcile
+     [fp_ocv pn] and [file_armed C] between two shares of one slot reconcile
+     [fc_ip C] with them, for nothing.
+
+     WHAT IS LEFT IS ξ-FREE: [off_resident] is a [↦₄] cell, [off_mark] a [↦₄]
+     cell, [flive_tok] a ghost.  That is the whole point of the ruling --
+     [off_hold]'s [cinv] is now an invariant over a CLOSED body, so
+     [ftable_res] transports and [FileInv.is_ftable] is a closed term. *)
+  Definition off_body (γ : gname) (k : nat) (ip : mword 64) : iProp Σ :=
+    (off_resident k ∨ (off_mark ip ∗ flive_tok γ k))%I.
 
   (* Proven STRUCTURALLY, one connective at a time, not by a single
      [apply _] over the whole unfolded body.  The monolithic search
      backtracks across the ∃/∗/∨ tower and the two points-to abstractions
      underneath it: 12.7 s for a fact whose every leaf instance already
      exists.  (The general rule is in claude-notes/optimization.md.) *)
-  Global Instance off_body_timeless γ k : Timeless (off_body γ k).
+  Global Instance off_body_timeless γ k ip : Timeless (off_body γ k ip).
   Proof.
     rewrite /off_body /off_resident /off_mark.
-    apply bi.exist_timeless; intro ip.
-    apply bi.sep_timeless; [apply _ |].
     apply bi.or_timeless.
     - apply bi.exist_timeless; intro v.
       apply bi.sep_timeless; [apply _ | apply _].
     - apply bi.sep_timeless; [apply _ | apply _].
   Qed.
 
-  (* THE TWO CELLS, PLAIN -- what the publisher writes and what the last
-     closer puts back.  [off_body]'s resident disjunct IS this. *)
+  (* THE CELL, PLAIN -- what the publisher finds and what the last closer puts
+     back.  [off_body]'s resident disjunct IS this.  [f->ip] is NOT here any
+     more: it rides the reference whole ([file_fields]). *)
   Definition off_raw (k : nat) : iProp Σ :=
-    (∃ (ip : mword 64) (v : mword 32),
-       a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗ a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
 
-  Lemma off_raw_body (γ : gname) (k : nat) : off_raw k -∗ off_body γ k.
+  Lemma off_raw_body (γ : gname) (k : nat) (ip : mword 64) :
+    off_raw k -∗ off_body γ k ip.
   Proof.
-    iIntros "(%ip & %v & Hip & Hc & %Hwf)".
-    iExists ip. iFrame "Hip". iLeft. iExists v. iFrame. done.
+    iIntros "(%v & Hc & %Hwf)".
+    iLeft. iExists v. iFrame. done.
   Qed.
 
   Global Instance off_raw_timeless k : Timeless (off_raw k).
   Proof.
     rewrite /off_raw.
-    apply bi.exist_timeless; intro ip.
     apply bi.exist_timeless; intro v.
-    apply bi.sep_timeless; [apply _ |].
     apply bi.sep_timeless; [apply _ | apply _].
   Qed.
 
@@ -1070,19 +1104,21 @@ Section FileInv.
      name is per-slot and changes on every publication, which is why no fixed
      persistent FAMILY of off-invariants can exist and no environment carries
      one. *)
-  Definition off_content (γ : gname) (k : nat) (armed : bool) : iProp Σ :=
-    (if armed then off_body γ k else off_raw k)%I.
+  Definition off_content (γ : gname) (k : nat) (armed : bool)
+      (ip : mword 64) : iProp Σ :=
+    (if armed then off_body γ k ip else off_raw k)%I.
 
-  Global Instance off_content_timeless γ k armed : Timeless (off_content γ k armed).
+  Global Instance off_content_timeless γ k armed ip :
+    Timeless (off_content γ k armed ip).
   Proof. rewrite /off_content. destruct armed; apply _. Qed.
 
   Definition off_hold (γ : gname) (k : nat) (γx : gname) (armed : bool)
-      (q : Qp) : iProp Σ :=
-    (cinv (offN .@ k) γx (off_content γ k armed) ∗ cinv_own γx q)%I.
+      (ip : mword 64) (q : Qp) : iProp Σ :=
+    (cinv (offN .@ k) γx (off_content γ k armed ip) ∗ cinv_own γx q)%I.
 
-  Lemma off_hold_split γ k γx armed q1 q2 :
-    off_hold γ k γx armed (q1 + q2) ⊣⊢
-    off_hold γ k γx armed q1 ∗ off_hold γ k γx armed q2.
+  Lemma off_hold_split γ k γx armed ip q1 q2 :
+    off_hold γ k γx armed ip (q1 + q2) ⊣⊢
+    off_hold γ k γx armed ip q1 ∗ off_hold γ k γx armed ip q2.
   Proof.
     rewrite /off_hold cinv_own_fractional. iSplit.
     - iIntros "(#Hi & H1 & H2)". iFrame "Hi H1 H2".
@@ -1090,12 +1126,13 @@ Section FileInv.
   Qed.
 
   (* THE MINT, one lemma for both arms: an armed body's resident disjunct is
-     the raw cells ([off_raw_body]). *)
-  Lemma off_hold_alloc (E : coPset) (γ : gname) (k : nat) (armed : bool) :
-    off_raw k ={E}=∗ ∃ γx : gname, off_hold γ k γx armed 1.
+     the raw cell ([off_raw_body]). *)
+  Lemma off_hold_alloc (E : coPset) (γ : gname) (k : nat) (armed : bool)
+      (ip : mword 64) :
+    off_raw k ={E}=∗ ∃ γx : gname, off_hold γ k γx armed ip 1.
   Proof.
     iIntros "Hraw". rewrite /off_hold.
-    iMod (cinv_alloc E (offN .@ k) (off_content γ k armed) with "[Hraw]")
+    iMod (cinv_alloc E (offN .@ k) (off_content γ k armed ip) with "[Hraw]")
       as (γx) "[#Hi Hown]".
     { iNext. rewrite /off_content. destruct armed; [| iExact "Hraw"].
       by iApply off_raw_body. }
@@ -1105,8 +1142,9 @@ Section FileInv.
   (* THE UNARMED CANCEL: no disjunction, hence no credential beyond the
      token.  THIS IS WHAT LETS sys_open AND pipealloc WRITE [f->ip] AND
      [f->off] WITH NO LOCK HELD -- blocker 1's whole answer. *)
-  Lemma off_hold_cancel_raw (E : coPset) (γ : gname) (k : nat) (γx : gname) :
-    ↑(offN .@ k) ⊆ E -> off_hold γ k γx false 1 ={E}=∗ ▷ off_raw k.
+  Lemma off_hold_cancel_raw (E : coPset) (γ : gname) (k : nat) (γx : gname)
+      (ip : mword 64) :
+    ↑(offN .@ k) ⊆ E -> off_hold γ k γx false ip 1 ={E}=∗ ▷ off_raw k.
   Proof.
     iIntros (HE) "[#Hi Hown]".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
@@ -1211,9 +1249,16 @@ Section FileInv.
   Lemma file_armed_pipe C : fc_type C = FD_PIPE -> file_armed C = false.
   Proof. intro Ht. rewrite /file_armed Ht. by vm_compute. Qed.
 
+  (* THE OFF-CINV'S THREE C-DERIVED ARGUMENTS.  Its NAME is [fp_ocv pn], its
+     ARMED bit is [file_armed C], and -- since the header's ruling -- the inode
+     it names is [fc_ip C].  All three are pinned between two shares of one
+     slot by the two agreements the slot already runs ([fpay_tok_agree] on
+     [pn], [FileInv.file_fields_agree] on [C]), so the third costs nothing at
+     any join. *)
   Definition file_payload (γ : gname) (k : nat) (q : Qp) (pn : fpnames)
       (C : fcontent) : iProp Σ :=
-    (file_core q pn C ∗ off_hold γ k (fp_ocv pn) (file_armed C) q)%I.
+    (file_core q pn C ∗
+     off_hold γ k (fp_ocv pn) (file_armed C) (fc_ip C) q)%I.
 
   Lemma file_payload_split γ k q1 q2 pn C :
     file_payload γ k (q1 + q2) pn C ⊣⊢
@@ -1297,3 +1342,65 @@ Section FileInv.
          fd_slots (Pos.to_nat n))%I
     end.
 End FileInv.
+
+(* ====================================================================
+   THE TABLE'S CtxMorph INSTANCES (tso-port M3, §0.16′)
+
+   OUTSIDE the section above, because each one quantifies over the very
+   context that section FIXES: a section variable cannot be instantiated
+   inside the section that binds it (§0.15′'s mechanics), and this section
+   deliberately declares NO [CurCtx] at all, so a forgotten annotation is an
+   elaboration error rather than a silent capture (§0.8′ rule 3).
+
+   ONE LEAF, AND THAT IS THE POINT OF THE OFF-BORROW RULING.  MEASURED on
+   this tree with §0.13′'s [Check] kit: [off_body], [off_content],
+   [off_hold], [file_core], [file_payload] and [file_pay] all print with NO
+   [CurCtx] -- they are CLOSED TERMS -- because the off-cinv stopped holding
+   a fraction of [f->ip] (this file's header), [is_pipe] was λ-converted and
+   [inode_pay] was measured ξ-free, while [↦₄]/[↦₂] do not flip at stage 1.
+   So the whole ξ-dependence of a slot, and hence of [FileInv.ftable_res],
+   is [file_fields]' four flipped cells.
+
+   THE STRUCTURAL INSTANCES ARE APPLIED AS TERMS throughout: instance search
+   will not take the [cur_ctx] delta step under the notations (§0.15′'s
+   measured mechanic; [KallocInv.v]'s block is the template). *)
+Section FileMorph.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
+            !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ}.
+
+  Global Instance file_fields_morph (k : nat) (q : Qp) (C : fcontent) :
+    CtxMorph (λ ξ0 : CtxId, file_fields (XI := ξ0) k q C).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /file_fields.
+    iDestruct "H" as "(Hty & Hrd & Hwr & Hpp & Hip & Hmj)".
+    iDestruct (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd Hrd") as "[Hd Hrd]".
+    iDestruct (ctx_morph_pointsto _ _ _ _ ξ ξ' with "Hd Hwr") as "[Hd Hwr]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hpp") as "[Hd Hpp]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
+    iFrame.
+  Qed.
+
+  Global Instance file_rest_morph (γ : gname) (k : nat) (q : Qp) :
+    CtxMorph (λ ξ0 : CtxId, file_rest (XI := ξ0) γ k q).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /file_rest.
+    destruct (1 - q)%Qp as [q'|]; [| iFrame ].
+    iDestruct "H" as (C) "[Hf Hp]".
+    iDestruct (file_fields_morph k q' C ξ ξ' with "Hd Hf") as "[Hd Hf]".
+    iFrame "Hd". iExists C. iFrame.
+  Qed.
+
+  Global Instance fslot_morph (γ : gname) (M : gmap nat (Qp * positive))
+      (k : nat) :
+    CtxMorph (λ ξ0 : CtxId, fslot (XI := ξ0) γ M k).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /fslot.
+    destruct (M !! k) as [[q n]|].
+    - iDestruct "H" as "(%Hn & Hr & Hrest & Hfd)".
+      iDestruct (file_rest_morph γ k q ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
+      iFrame. done.
+    - iDestruct "H" as "[Hr (%C & %Ht & Hf & Hp)]".
+      iDestruct (file_fields_morph k 1 C ξ ξ' with "Hd Hf") as "[Hd Hf]".
+      iFrame "Hd Hr". iExists C. iFrame. done.
+  Qed.
+End FileMorph.

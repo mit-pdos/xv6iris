@@ -613,28 +613,24 @@ Section ProofSysOpenPublish.
      the same rule for the same reason. *)
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
-  (* the 1/2 + 1/2 join at [↦₈], which the tree has at [↦₄]
-     ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
-     [f->ip] cell is the first 8-byte user of, the invariant's half and the
-     reference's half being exactly this shape. *)
-  Local Lemma so_word_half_join `{XI : CurCtx} (a : mword 64) (w : mword 64) :
-    a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈ w.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (bi.equiv_entails_1_2 _ _
-                 (ctx_word_pointsto_frac_split cur_ctx a (1/2) (1/2) w) with "[H1 H2]")
-      as "H"; [iFrame "H1 H2" |].
-    iEval (rewrite Qp.div_2) in "H". iExact "H".
-  Qed.
+  (* THE 1/2 + 1/2 JOIN AT [↦₈] IS GONE, and its absence is the whole content
+     of the off-borrow ruling (FileInvDefs.v's header, tso-port.md §0.16′).
+     It used to sit here -- [so_word_half_join], the invariant's half of
+     [f->ip] joined to the reference's -- and it was the ONE CROSS-CONTEXT
+     JOIN in the tree: the cinv's half is frozen at the context that MINTED
+     it (the boot context, on the first open after boot) while the
+     reference's re-indexes at every ftable acquire, and the sealed surface
+     has agreement laws across two contexts but no JOIN.  The invariant now
+     keeps no fraction of the cell at all, so the reference alone hands
+     [f->ip] over WHOLE. *)
 
   (* ==== THE OTHER SIDE OF THE PUBLICATION: opening the fresh slot ======
      What filealloc hands over is a whole reference on an UNTYPED slot, and
-     what the six field stores need is the six cells PLAIN -- [f->ip] WHOLE,
-     which is the one the reference alone cannot give (the invariant keeps
-     half of it, [FileInvDefs.file_fields]'s one asymmetry).  Cancelling the
-     UNARMED off-cinv is what produces the other half, and there is nothing
-     to refute because an unarmed body carries no disjunction: blocker 1's
-     whole answer, spent in one line.
+     what the six field stores need is the six cells PLAIN -- which is now
+     exactly what the reference carries.  Cancelling the UNARMED off-cinv
+     produces the [f->off] cell, and there is nothing to refute because an
+     unarmed body carries no disjunction: blocker 1's whole answer, spent in
+     one line.
 
      AND IT HANDS BACK THE ENTRY'S OWN IREF UNIT.  An untyped slot's payload
      IS one unit ([FileInvDefs.file_core_none]), and the reference filealloc
@@ -663,11 +659,10 @@ Section ProofSysOpenPublish.
     intros HE Ht.
     iIntros "(Href & Hflds & (%pn & Hnames & Hcore & Hoff) & Hlive)".
     rewrite (file_armed_none Cf Ht).
-    iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
-    iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
-    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip1 & Hmaj)".
-    iDestruct (ctx_word_pointsto_agree with "Hip2 Hip1") as %->.
-    iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
+    iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) (fc_ip Cf) HE with "Hoff")
+      as "Hraw".
+    iMod "Hraw" as "(%voff & Hoffc & %Hwf)".
+    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip & Hmaj)".
     iEval (rewrite (file_core_none 1 pn Cf Ht)) in "Hcore".
     iEval (rewrite -iref_slot_frac) in "Hcore".
     iModIntro. iExists pn, voff.
@@ -704,13 +699,14 @@ Section ProofSysOpenPublish.
     flive_tok gf kf -∗
     file_fields kf 1 C -∗
     fpay_tok gf kf 1 pn -∗
-    (* the two cells the publisher wrote with the UNARMED cinv cancelled *)
-    a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
+    (* the cell the publisher wrote with the UNARMED cinv cancelled.
+       [f->ip] is NOT here: it went back into [file_fields] above, whole,
+       when the off-borrow ruling stopped the invariant keeping half of it. *)
     a_foff kf ↦₄ voff -∗
     |={E}=> file_ref gf kf 1 C.
   Proof.
     intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
-    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
+    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hoff".
     (* ---- the generation: name the returned share and pin it ---- *)
     rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %<-.
@@ -732,8 +728,8 @@ Section ProofSysOpenPublish.
             (so_pay_witness om ty C Hwrb Hdir) with "Hsh Hs Hshot")
       as (gx) "Hpay".
     (* ---- the off cinv, re-armed ---- *)
-    iMod (off_hold_alloc E gf kf true with "[Hip Hoff]") as (go) "Hoff".
-    { iExists (ientry kk), voff. iFrame "Hip Hoff". iPureIntro. exact Hwf. }
+    iMod (off_hold_alloc E gf kf true (ientry kk) with "[Hoff]") as (go) "Hoff".
+    { iExists voff. iFrame "Hoff". iPureIntro. exact Hwf. }
     (* ---- ONE names update installs both ---- *)
     iMod (fpay_tok_update gf kf pn
             (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go) with "Hnames")

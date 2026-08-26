@@ -331,7 +331,7 @@ Section ProofFilealloc.
        moved us to CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "ftable"%string <{ ftable_res γf }> mA
+    iApply (Acquire.wp_acquire_sconf KT1 γl "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -895,7 +895,7 @@ Section ProofFilealloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl ftable_addr "ftable"%string <{ ftable_res γf }> F4
+      iApply (Release.wp_release_sconf KT1 γl ftable_addr "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) F4
                 n eb p (K - 4)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
@@ -1000,7 +1000,7 @@ Section ProofFilealloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl ftable_addr "ftable"%string <{ ftable_res γf }> G3
+      iApply (Release.wp_release_sconf KT1 γl ftable_addr "ftable"%string (λ ξ : CtxId, ftable_res (XI := ξ) γf) G3
                 n eb p (K - 4)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
