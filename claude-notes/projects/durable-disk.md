@@ -2842,10 +2842,10 @@ so it never wanted that shape.
     in hand, both give `2 ≤ nlink dp`.
 
   **AS LANDED — G5: THE TYPE REGISTER, THE PER-DIRECTORY EXACTNESS AND
-  THE WALKS.  ONE FILE RED (branch `lane-g5-typereg`, 1314 of 1333
-  `iris/` files green -- `ProofCreate.v` is the only file with an error,
-  and the other 18 are its dependents -- at ONE identified
-  accounting seam in create's FAIL contracts).**
+  THE WALKS.  GREEN (branch `lane-g5-typereg`, all 1333 `iris/` files;
+  `make audit-only` at the THREE-ENTRY BASELINE -- `resv_matches`,
+  `resv_is_valid`, `functional_extensionality_dep` -- and nothing else).
+  `origin/main` had not moved off the base `16a89b0c`, so no rebase.**
 
   The orchestrator's four rulings were taken as written and all four hold.
   What follows is the design as it actually landed, the three refinements
@@ -2949,60 +2949,36 @@ so it never wanted that shape.
     spare fragments are its `"."` and the region's keep-alive.
     `img_link_elem_ok` is the value-side clause at the same choice.
 
-  - **WHAT IS RED, AND WHY (the one open seam).**  `ProofCreate.v` stops
-    at its mkdir fail entries (`cr_fail_mkdir_half`, first at
-    ProofCreate.v:10675).  The cause is an ACCOUNTING seam, not a design
-    one, and it is entirely inside create's own contract plumbing.
-
-    Under the OLD design a directory's `"."` record was TOKENLESS, so the
-    whole pile the fill minted stayed in the walk's hand until the
+  - **THE ONE SEAM THE `"."` FRAGMENT OPENED, AND HOW IT CLOSED.**  Under
+    the old design a directory's `"."` record was TOKENLESS, so the whole
+    pile create's fill minted stayed in the walk's hand until the
     `ip->nlink = 0` flush, and all three fail/continue contracts
     (`cr_cont_body`, `cr_fail_body`, `cr_fail_mkdir_body`) could demand it
     whole: `link_reps (cr_delta ty) (cr_ity ty dp)`.  Under G5 the `"."`
     record OWES a unit — it is the (D1) pin — so `dirlink(ip, ".", ip)`
-    SPENDS one of the two, and every path past it reaches a fail entry
-    holding ONE while the flush still needs `ireg_dot_delta = 2`.
+    SPENDS one of the two, and every fail entry past it arrived holding
+    ONE while the flush still needs `ireg_dot_delta = 2`.
 
-    THE FIX, in the order it has to be done:
-      (i) SPLIT the `"."` `dirlink` on its own short-write arm.
-          `FsStateEra.ent_toks_dirlink_arm` takes the entry's `ent_tok`
-          unconditionally and DROPS it on the `tot = 0` branch, so today
-          the unit is lost even when nothing was written.  Destruct
-          `Hatom1` first and use `ent_toks_dirlink_nop` on the short arm,
-          which takes no token — then the `tot1 < 16` fail entry
-          (ProofCreate.v:10866, child `dc1`) keeps the whole pile and needs
-          nothing else.
-     (ii) RECOVER the unit at the two fail entries that follow a WRITTEN
-          `"."` (`cr_fail_mkdir_half`, ProofCreate.v:10664 and :10764, both
-          at child `dc2`).  The fail body takes the child WITHOUT its
-          `dir_links` and MINTS a fresh grey one out of `ireg_inv`
-          (`cr_grey_dir_links`, ProofCreate.v:7770), so the child's old
-          `ent_toks` — and with it the `"."` fragment — is dropped at the
-          boundary.  The step itself is short and every lemma it needs is
-          landed and green:
+    It is closed WITHOUT touching a contract.  The two entries that follow
+    a written `"."` (`cr_fail_mkdir_half`, `ProofCreate.v` ~:10683 and
+    ~:10783) still hold the child's OPENED payload — `Hcetk2`, the
+    `ent_toks` `dlinks_open` left at :9152 — because the ghost `".."` move
+    that would have consumed it lives in a sibling arm.  So each entry now
+    takes the unit straight back out:
+    `FsStateInode.ent_toks_dot_take`, then
+    `IregLinkNz.ireg_toks_agree` against the sibling the walk still holds
+    to learn its value, then `FsStateLink.link_toks_reps_S` +
+    `link_reps_1` to re-form the pile.  The third entry (the `tot1 = 0`
+    arm, where the `"."` `dirlink` short-wrote) needs nothing: that arm
+    never ran the deposit, so its pile is whole.  The `"."` entry's own
+    reading (`Hdot1c`) is stated ONCE, in the arm that wrote the record
+    (`ProofCreate.v` ~:8935), off `cr_dot_record` through
+    `DirView.dir_view_live`.
 
-            open the child's `dlinks`; `FsStateInode.ent_toks_dot_take`;
-            value the fragment against the sibling the walk still holds
-            with `IregLinkNz.ireg_toks_agree`; re-form the pile with
-            `FsStateLink.link_toks_reps_S` + `link_reps_1`.  The `"."`
-            entry's own witness is `Hc2ddix Ht162` read through
-            `DirView.dir_view_live`, exactly as `Hdot1` is built in the
-            mkdir preamble at ProofCreate.v:9962.
-
-          MEASURED, AND THIS IS THE ONLY UNKNOWN LEFT: at both entries the
-          child's `dlinks` is NOT in the Iris context under `Hcdlnk2` — it
-          was consumed at ProofCreate.v:10533 into `ic_mk_loaded`'s
-          `Hcloadf`, which then went to the `+0x14c` continuation.  So the
-          two fail entries reach the child through the ESCROW rather than
-          through the walk, and the recovery has to happen wherever that
-          re-acquisition unpacks the payload (the contract's own phrase is
-          "THE LOCKED CHILD -- WITHOUT its [dir_links]", ProofCreate.v:7503).
-          Whoever finishes this should start by finding that unpack; the
-          `dlinks` it drops is where the unit is.
-
-    Nothing above `ProofCreate` moves and no lemma in `FsStateLink` /
-    `FsStateInode` / `FsStateEra` / `InodeRegion` / `IregLinkNz` /
-    `FsDurImg` moves either.
+    Neither of the orchestrator's two routes was needed: the escrow
+    checkout (a) is not reached for, and the deposit at :10533 (b) did not
+    have to move — it is in the SUCCESS arm, and the fail entries are its
+    siblings, not its successors.
 
   - **PERFORMANCE, twice (and it is the standing trap in this file).**
     Two sentences ran for >15 minutes on the shared VM before being cut:
@@ -3021,6 +2997,41 @@ so it never wanted that shape.
     with no TACTIC over 0.1 s (its four slowest sentences are `Qed.`, 5-11 s)
     and `ProofSysLink.v` likewise (slowest `Qed.` 17 s).
 
+
+  - **WHAT SLICE 6's DEMOLITION LANE DELETES, measured on this branch.**
+    Everything below is still BUILT and still carried through every flush,
+    and NOTHING in a walk reads it for (D1), (D2), or the count any more —
+    that was the precondition the demolition was waiting on.
+
+      * `iris/DirLinks.v` — 2009 lines, the whole file: `dir_links`,
+        `dir_par_tie`, `dlc_bound`/`dlc_lower`/`dlc_*`, `dir_links_of_plain`,
+        and the twenty-odd `dir_links_dirlink_*` / `dir_link_at_*` /
+        `dir_links_unlink` / `dir_links_empty_nlink` / `dir_links_dotdot_out`
+        movers.  It has 20 importers: `FsLookup`, `FsCfgBoot`, `FsRep`,
+        `IregLinkNz`, `IregDirBit`, `IcacheEscrow`, `IgetLic`, `IcacheBoot`,
+        `SpecDirlink`, `SpecDirlookup`, `SpecKexecB2`, and the nine
+        `Proof*` walks.
+      * `iris/IregDirBit.v` — 276 lines, the whole file (its last live
+        reader, `ProofSysUnlink`, now reads the register instead).
+      * `IcacheEscrow.dlinks`'s FIRST conjunct: `dlinks` becomes
+        `FsStateInode.ent_toks_x` alone, and `dlinks_open`/`dlinks_intro`
+        lose their `dir_links` argument.  Its own header already says so.
+      * `InodeRegion`'s FLAVOURED COLUMNS — the `wl`/`wdu`/`wdt`/`g`/`p`
+        slot components and every clause over them (`ireg_dir_wl0`,
+        (T1)/(T1')/(U1)/(U2)'s survivors, the disjointness and arming
+        rows): ~150 hits in `InodeRegion.v`, ~116 in `IcacheRef.v`, 11 in
+        `IregDirBit.v`, 8 in `EscrowDeposit.v`, 1 in `IcacheBoot.v`.
+      * `IcacheRef`'s `fl` INDEX — `ilink_fl`, `ilinkd`, `ilinkdp`,
+        `iparent`, `iparent_agree`, `link_claim_agree`'s flavour half — and
+        with it `SpecIupdate`'s `fl : option (option Z)` parameter and its
+        three flavour premises (`forall od, fl = Some od -> …`,
+        `fl = None -> …`, `forall pv, fl = Some (Some pv) -> …`) on BOTH
+        link bodies, plus the `ilink_fl` resource in and out.
+      * `DirView.dlc_*` (125 hits in `DirView.v`) go with `dir_links`.
+
+    `FsDurBytes.v` STAYS (`FsDurImg`/`FsCrash` import it).  `DirLinks.v`
+    cannot go before `IcacheEscrow.dlinks` loses its conjunct, and that
+    single edit is what unblocks `FsBootWall`'s (a)/(b)/(c).
 
 ## Sizing notes for whoever runs the lanes
 
