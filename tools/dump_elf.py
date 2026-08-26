@@ -687,6 +687,77 @@ def emit_lean_decode(items: list[object], out_path: str, elf: str,
     return n, len(lines)
 
 
+# Maximum number of entries in ONE generated Rocq list literal.
+#
+# `[e1; e2; ...; eN]` is a right-nested `cons` chain, and Rocq recurses once
+# per element to build it -- so a flat N-entry literal costs stack PROPORTIONAL
+# TO N, and the cost lands in whichever phase runs first (the parser reports
+# the whole command's location, the elaborator a single entry's).  The 23.7k
+# byte entries of the kernel text map overflow an 8 MB stack roughly one run in
+# three and a 4 MB stack every time -- `Error: Stack overflow` at the closing
+# `].`, with nothing wrong with the dump.  Chunking caps the depth at this many
+# entries per definition, and the chunks are rejoined by `List.concat` over a
+# short outer list; the resulting map is the SAME term after reduction, so
+# `vm_compute`-based consumers are unaffected.
+#
+# 1000 leaves an order of magnitude of headroom: the measured 4 MB failure
+# threshold is ~11.8k entries, so a chunk needs ~1/12 of that stack.
+ROCQ_LIST_CHUNK = 1000
+
+
+def rocq_chunked_list(w, name: str, elem_ty: str,
+                      entries: list[tuple[str | None, str]],
+                      chunk: int = ROCQ_LIST_CHUNK) -> list[str]:
+    """Emit `entries` as `<name>_chunk0 .. _chunkK`, each a `list elem_ty` of
+    at most `chunk` entries, and return the chunk names.
+
+    `entries` is a list of `(comment_line_or_None, entry_text)`; the entry text
+    is emitted one per line, prefixed by the list separator, so the per-line
+    shape the dump's other readers key on (tools/gen_code.py,
+    tools/fix_proof_imms.py, tools/proof_coverage.py) is unchanged.
+
+    Chunk boundaries fall on entry counts, never on comments: a comment
+    introducing an entry always stays with it."""
+    chunk_names: list[str] = []
+    first_in_chunk = True
+    for i, (comment, text) in enumerate(entries):
+        if i % chunk == 0:
+            if chunk_names:
+                w("].")
+                w("")
+            cn = f"{name}_chunk{len(chunk_names)}"
+            chunk_names.append(cn)
+            w(f"Definition {cn} : list ({elem_ty}) := [")
+            first_in_chunk = True
+        if comment is not None:
+            w(comment)
+        w(("  " if first_in_chunk else "; ") + text)
+        first_in_chunk = False
+    if chunk_names:
+        w("].")
+    else:
+        # An empty image: still emit a chunk, so the join below is uniform.
+        cn = f"{name}_chunk0"
+        chunk_names.append(cn)
+        w(f"Definition {cn} : list ({elem_ty}) := [].")
+    w("")
+    return chunk_names
+
+
+def rocq_list_to_map_of_chunks(w, chunk_names: list[str],
+                               per_line: int = 4) -> None:
+    """Emit the definition BODY `list_to_map (List.concat [chunk0; ...])`,
+    wrapped so no line runs away.  The outer list is short (one element per
+    `ROCQ_LIST_CHUNK` entries), so elaborating it is cheap, and reduction
+    reaches exactly the flat list the chunks spell out."""
+    w("  list_to_map (List.concat [")
+    for i in range(0, len(chunk_names), per_line):
+        row = chunk_names[i:i + per_line]
+        tail = ";" if i + per_line < len(chunk_names) else ""
+        w("    " + "; ".join(row) + tail)
+    w("  ]).")
+
+
 def rocq_range_lemmas(w, name: str, addrs: list[int]) -> None:
     """Emit the KEY-RANGE facts for a per-byte `gmap Z (bv 8)`.
 
@@ -738,9 +809,11 @@ def text_byte_map(items: list[object], elf_path: str) -> tuple[dict[int, int], i
     0xe0], where a c.ret sits 2 bytes before <kernelvec>.
 
     Only the WINDOW is filled -- for each instruction, bytes [addr, addr+4) --
-    not every gap.  Filling all of them added 1524 entries and pushed
-    `list_to_map` over a STACK OVERFLOW at ~24.8k; the window needs a few
-    hundred and no proof can fetch further than that anyway.
+    not every gap.  Filling all of them added 1524 entries for bytes no fetch
+    can reach: the window needs a few hundred and no proof can fetch further
+    than that anyway.  (It also used to overflow the stack at ~24.8k entries;
+    that limit is gone now the list is chunked -- see `ROCQ_LIST_CHUNK` -- but
+    the entries would still be dead weight in every `vm_compute` of the map.)
 
     Returns (map, number of padding bytes filled)."""
     insns = [it for it in items if isinstance(it, Insn)]
@@ -813,16 +886,18 @@ def emit_rocq(items: list[object], out_path: str, elf: str, objdump: str,
     w("   instruction at [pc] of width [W] bytes is just [W] consecutive byte")
     w(f"   lookups ([{name} !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte")
     w("   encodings and adjacent-byte windows need no special handling.  The map")
-    w("   is built from a single flat (address, byte) list with [list_to_map];")
-    w("   no chunking is needed because each entry is tiny (two numbers). *)")
+    w("   is built from an (address, byte) list with [list_to_map].  The list")
+    w(f"   is emitted in chunks of {ROCQ_LIST_CHUNK} entries and rejoined with")
+    w("   [List.concat]: one flat literal of this length overflows the OCaml")
+    w("   stack while it is being built (see [ROCQ_LIST_CHUNK] in the dumper).")
+    w("   Reduction sees the same list either way. *)")
     w("")
-    w(f"Definition {name} : gmap Z (bv 8) := list_to_map [")
-    for i, a in enumerate(addrs):
-        if a in comments:
-            w(comments[a])
-        sep = "  " if i == 0 else "; "
-        w(f"{sep}((0x{a:x})%Z, Z_to_bv 8 (0x{byte_map[a]:x})%Z)")
-    w("].")
+    entries = [(comments.get(a),
+                f"((0x{a:x})%Z, Z_to_bv 8 (0x{byte_map[a]:x})%Z)")
+               for a in addrs]
+    chunk_names = rocq_chunked_list(w, name, "Z * bv 8", entries)
+    w(f"Definition {name} : gmap Z (bv 8) :=")
+    rocq_list_to_map_of_chunks(w, chunk_names)
     w("")
     w(f"(* Total bytes = {nbytes} (from {n} instructions); keys are byte")
     w(f"   addresses, so [{name} !! addr] yields that byte. *)")
@@ -836,8 +911,9 @@ def emit_rocq(items: list[object], out_path: str, elf: str, objdump: str,
     w("")
     rocq_range_lemmas(w, name, addrs)
     # Auxiliary per-instruction DECODE-INDEX metadata: just (address, width-bits,
-    # encoding) per instruction, NO asm, so the flat list elaborates without
-    # chunking.  This is NOT the byte-storage format (that is the per-byte
+    # encoding) per instruction, NO asm.  Chunked like the byte map above --
+    # shorter, but the same right-nested-cons stack cost per entry.  This is
+    # NOT the byte-storage format (that is the per-byte
     # [<prefix>_bytes] above, which owns every byte); it only lets a proof name
     # the i-th instruction so it can pick the right decode lemma + fetch window.
     # The window bytes themselves are still extracted per-byte from the map.
@@ -848,21 +924,24 @@ def emit_rocq(items: list[object], out_path: str, elf: str, objdump: str,
     w("   of the i-th instruction.  [Typeclasses Opaque] so resolution never forces")
     w(f"   the map (cf. {name}). *)")
     cur_label2 = None
-    w(f"Definition {names.instrs} : gmap Z {names.record} := list_to_map [")
-    first2 = True
+    ientries: list[tuple[str | None, str]] = []
     insn_idx = 0
     for it in items:
         if isinstance(it, Label):
             cur_label2 = it
             continue
+        cmt = None
         if cur_label2 is not None:
-            w(f"  (* <{cur_label2.name}> @ 0x{cur_label2.addr:x} *)")
+            cmt = f"  (* <{cur_label2.name}> @ 0x{cur_label2.addr:x} *)"
             cur_label2 = None
-        sep = "  " if first2 else "; "
-        first2 = False
-        w(f"{sep}(({insn_idx})%Z, {names.ctor} (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z)")
+        ientries.append(
+            (cmt,
+             f"(({insn_idx})%Z, {names.ctor} (0x{it.addr:x})%Z "
+             f"{it.width}%nat (0x{it.enc:x})%Z)"))
         insn_idx += 1
-    w("].")
+    ichunks = rocq_chunked_list(w, names.instrs, f"Z * {names.record}", ientries)
+    w(f"Definition {names.instrs} : gmap Z {names.record} :=")
+    rocq_list_to_map_of_chunks(w, ichunks)
     w("")
     w(f"Global Typeclasses Opaque {names.instrs}.")
     w("")
@@ -880,9 +959,10 @@ def emit_rocq_data(items: list[object], out_path: str, elf: str,
     INCLUDING zero-init .bss), [<prefix>Entry] (the initial pc) and
     [<prefix>_segments] (the PT_LOAD table: what to map, and with what
     permissions).  [<prefix>_bytes] (code) + this map = the full on-disk image;
-    the BSS zero-init region is [MemBase, MemEnd) minus the loaded bytes.  ONE
-    flat [list_to_map] (no chunking; each entry is tiny), and [Typeclasses
-    Opaque] so resolution never forces the map."""
+    the BSS zero-init region is [MemBase, MemEnd) minus the loaded bytes.  The
+    entry list is CHUNKED and rejoined with [List.concat] (see
+    [ROCQ_LIST_CHUNK]), and [Typeclasses Opaque] keeps resolution from ever
+    forcing the map."""
     name, kernel = names.data, elf
     insns = [it for it in items if isinstance(it, Insn)]
     # exactly what <prefix>_bytes covers -- instructions AND the inter-function
@@ -958,11 +1038,11 @@ def emit_rocq_data(items: list[object], out_path: str, elf: str,
     w(f"   [{names.end}], i.e. the whole image is read-only.) *)")
     w(f"Definition {names.rodata_end} : Z := 0x{rodata_end(elf_info):x}%Z.")
     w("")
-    w(f"Definition {name} : gmap Z (bv 8) := list_to_map [")
-    for i, a in enumerate(data_addrs):
-        sep = "  " if i == 0 else "; "
-        w(f"{sep}((0x{a:x})%Z, Z_to_bv 8 (0x{image[a]:x})%Z)")
-    w("].")
+    dentries = [(None, f"((0x{a:x})%Z, Z_to_bv 8 (0x{image[a]:x})%Z)")
+                for a in data_addrs]
+    dchunks = rocq_chunked_list(w, name, "Z * bv 8", dentries)
+    w(f"Definition {name} : gmap Z (bv 8) :=")
+    rocq_list_to_map_of_chunks(w, dchunks)
     w("")
     # Keep typeclass resolution from ever forcing this giant map (cf. the code map).
     w(f"Global Typeclasses Opaque {name}.")

@@ -47,7 +47,7 @@ Definition kernel_segments : list (Z * Z * Z * Z) := [
    [kernelMemEnd], i.e. the whole image is read-only.) *)
 Definition kernelRodataEnd : Z := 0x8000a264%Z.
 
-Definition kernel_data : gmap Z (bv 8) := list_to_map [
+Definition kernel_data_chunk0 : list (Z * bv 8) := [
   ((0x80005ba0)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005ba1)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005ba2)%Z, Z_to_bv 8 (0x0)%Z)
@@ -1048,7 +1048,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80005f85)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005f86)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005f87)%Z, Z_to_bv 8 (0x0)%Z)
-; ((0x80005f88)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_data_chunk1 : list (Z * bv 8) := [
+  ((0x80005f88)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005f89)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005f8a)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005f8b)%Z, Z_to_bv 8 (0x0)%Z)
@@ -2048,7 +2051,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80006491)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006492)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006493)%Z, Z_to_bv 8 (0x0)%Z)
-; ((0x80006494)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_data_chunk2 : list (Z * bv 8) := [
+  ((0x80006494)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006495)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006496)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006497)%Z, Z_to_bv 8 (0x0)%Z)
@@ -3048,7 +3054,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80006879)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000687a)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000687b)%Z, Z_to_bv 8 (0x0)%Z)
-; ((0x8000687c)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_data_chunk3 : list (Z * bv 8) := [
+  ((0x8000687c)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000687d)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000687e)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000687f)%Z, Z_to_bv 8 (0x0)%Z)
@@ -4048,7 +4057,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80006c61)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006c62)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006c63)%Z, Z_to_bv 8 (0x0)%Z)
-; ((0x80006c64)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_data_chunk4 : list (Z * bv 8) := [
+  ((0x80006c64)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006c65)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006c66)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80006c67)%Z, Z_to_bv 8 (0x0)%Z)
@@ -5048,7 +5060,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80007049)%Z, Z_to_bv 8 (0x63)%Z)
 ; ((0x8000704a)%Z, Z_to_bv 8 (0x71)%Z)
 ; ((0x8000704b)%Z, Z_to_bv 8 (0x75)%Z)
-; ((0x8000704c)%Z, Z_to_bv 8 (0x69)%Z)
+].
+
+Definition kernel_data_chunk5 : list (Z * bv 8) := [
+  ((0x8000704c)%Z, Z_to_bv 8 (0x69)%Z)
 ; ((0x8000704d)%Z, Z_to_bv 8 (0x72)%Z)
 ; ((0x8000704e)%Z, Z_to_bv 8 (0x65)%Z)
 ; ((0x8000704f)%Z, Z_to_bv 8 (0x0)%Z)
@@ -6048,7 +6063,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80007431)%Z, Z_to_bv 8 (0x20)%Z)
 ; ((0x80007432)%Z, Z_to_bv 8 (0x6f)%Z)
 ; ((0x80007433)%Z, Z_to_bv 8 (0x66)%Z)
-; ((0x80007434)%Z, Z_to_bv 8 (0x20)%Z)
+].
+
+Definition kernel_data_chunk6 : list (Z * bv 8) := [
+  ((0x80007434)%Z, Z_to_bv 8 (0x20)%Z)
 ; ((0x80007435)%Z, Z_to_bv 8 (0x72)%Z)
 ; ((0x80007436)%Z, Z_to_bv 8 (0x61)%Z)
 ; ((0x80007437)%Z, Z_to_bv 8 (0x6e)%Z)
@@ -7048,7 +7066,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80007819)%Z, Z_to_bv 8 (0x52)%Z)
 ; ((0x8000781a)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000781b)%Z, Z_to_bv 8 (0x80)%Z)
-; ((0x8000781c)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_data_chunk7 : list (Z * bv 8) := [
+  ((0x8000781c)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000781d)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000781e)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000781f)%Z, Z_to_bv 8 (0x0)%Z)
@@ -8048,7 +8069,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80007c01)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x80007c02)%Z, Z_to_bv 8 (0xe)%Z)
 ; ((0x80007c03)%Z, Z_to_bv 8 (0x20)%Z)
-; ((0x80007c04)%Z, Z_to_bv 8 (0x48)%Z)
+].
+
+Definition kernel_data_chunk8 : list (Z * bv 8) := [
+  ((0x80007c04)%Z, Z_to_bv 8 (0x48)%Z)
 ; ((0x80007c05)%Z, Z_to_bv 8 (0x81)%Z)
 ; ((0x80007c06)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0x80007c07)%Z, Z_to_bv 8 (0x88)%Z)
@@ -9048,7 +9072,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80007fe9)%Z, Z_to_bv 8 (0x81)%Z)
 ; ((0x80007fea)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0x80007feb)%Z, Z_to_bv 8 (0x88)%Z)
-; ((0x80007fec)%Z, Z_to_bv 8 (0x4)%Z)
+].
+
+Definition kernel_data_chunk9 : list (Z * bv 8) := [
+  ((0x80007fec)%Z, Z_to_bv 8 (0x4)%Z)
 ; ((0x80007fed)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x80007fee)%Z, Z_to_bv 8 (0xc)%Z)
 ; ((0x80007fef)%Z, Z_to_bv 8 (0x8)%Z)
@@ -10048,7 +10075,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x800083d1)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x800083d2)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x800083d3)%Z, Z_to_bv 8 (0xb)%Z)
-; ((0x800083d4)%Z, Z_to_bv 8 (0x4c)%Z)
+].
+
+Definition kernel_data_chunk10 : list (Z * bv 8) := [
+  ((0x800083d4)%Z, Z_to_bv 8 (0x4c)%Z)
 ; ((0x800083d5)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x800083d6)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x800083d7)%Z, Z_to_bv 8 (0x0)%Z)
@@ -11048,7 +11078,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x800087b9)%Z, Z_to_bv 8 (0xc)%Z)
 ; ((0x800087ba)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0x800087bb)%Z, Z_to_bv 8 (0x30)%Z)
-; ((0x800087bc)%Z, Z_to_bv 8 (0x42)%Z)
+].
+
+Definition kernel_data_chunk11 : list (Z * bv 8) := [
+  ((0x800087bc)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x800087bd)%Z, Z_to_bv 8 (0xc9)%Z)
 ; ((0x800087be)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x800087bf)%Z, Z_to_bv 8 (0xd2)%Z)
@@ -12048,7 +12081,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80008ba1)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80008ba2)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80008ba3)%Z, Z_to_bv 8 (0x0)%Z)
-; ((0x80008ba4)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_data_chunk12 : list (Z * bv 8) := [
+  ((0x80008ba4)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80008ba5)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x80008ba6)%Z, Z_to_bv 8 (0xe)%Z)
 ; ((0x80008ba7)%Z, Z_to_bv 8 (0x30)%Z)
@@ -13048,7 +13084,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80008f89)%Z, Z_to_bv 8 (0x8)%Z)
 ; ((0x80008f8a)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80008f8b)%Z, Z_to_bv 8 (0x62)%Z)
-; ((0x80008f8c)%Z, Z_to_bv 8 (0xc1)%Z)
+].
+
+Definition kernel_data_chunk13 : list (Z * bv 8) := [
+  ((0x80008f8c)%Z, Z_to_bv 8 (0xc1)%Z)
 ; ((0x80008f8d)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x80008f8e)%Z, Z_to_bv 8 (0xc8)%Z)
 ; ((0x80008f8f)%Z, Z_to_bv 8 (0xc)%Z)
@@ -14048,7 +14087,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80009371)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0x80009372)%Z, Z_to_bv 8 (0x4e)%Z)
 ; ((0x80009373)%Z, Z_to_bv 8 (0xa)%Z)
-; ((0x80009374)%Z, Z_to_bv 8 (0xc1)%Z)
+].
+
+Definition kernel_data_chunk14 : list (Z * bv 8) := [
+  ((0x80009374)%Z, Z_to_bv 8 (0xc1)%Z)
 ; ((0x80009375)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x80009376)%Z, Z_to_bv 8 (0xc8)%Z)
 ; ((0x80009377)%Z, Z_to_bv 8 (0xc)%Z)
@@ -15048,7 +15090,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80009759)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x8000975a)%Z, Z_to_bv 8 (0xe)%Z)
 ; ((0x8000975b)%Z, Z_to_bv 8 (0x20)%Z)
-; ((0x8000975c)%Z, Z_to_bv 8 (0x46)%Z)
+].
+
+Definition kernel_data_chunk15 : list (Z * bv 8) := [
+  ((0x8000975c)%Z, Z_to_bv 8 (0x46)%Z)
 ; ((0x8000975d)%Z, Z_to_bv 8 (0x81)%Z)
 ; ((0x8000975e)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0x8000975f)%Z, Z_to_bv 8 (0x88)%Z)
@@ -16048,7 +16093,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80009b41)%Z, Z_to_bv 8 (0x14)%Z)
 ; ((0x80009b42)%Z, Z_to_bv 8 (0x99)%Z)
 ; ((0x80009b43)%Z, Z_to_bv 8 (0x16)%Z)
-; ((0x80009b44)%Z, Z_to_bv 8 (0x9a)%Z)
+].
+
+Definition kernel_data_chunk16 : list (Z * bv 8) := [
+  ((0x80009b44)%Z, Z_to_bv 8 (0x9a)%Z)
 ; ((0x80009b45)%Z, Z_to_bv 8 (0x18)%Z)
 ; ((0x80009b46)%Z, Z_to_bv 8 (0x5c)%Z)
 ; ((0x80009b47)%Z, Z_to_bv 8 (0xd6)%Z)
@@ -17048,7 +17096,10 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x80009f29)%Z, Z_to_bv 8 (0x93)%Z)
 ; ((0x80009f2a)%Z, Z_to_bv 8 (0xa)%Z)
 ; ((0x80009f2b)%Z, Z_to_bv 8 (0x48)%Z)
-; ((0x80009f2c)%Z, Z_to_bv 8 (0xd2)%Z)
+].
+
+Definition kernel_data_chunk17 : list (Z * bv 8) := [
+  ((0x80009f2c)%Z, Z_to_bv 8 (0xd2)%Z)
 ; ((0x80009f2d)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x80009f2e)%Z, Z_to_bv 8 (0xd3)%Z)
 ; ((0x80009f2f)%Z, Z_to_bv 8 (0x0)%Z)
@@ -17933,6 +17984,15 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 ; ((0x8000a29e)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x8000a29f)%Z, Z_to_bv 8 (0x0)%Z)
 ].
+
+Definition kernel_data : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    kernel_data_chunk0; kernel_data_chunk1; kernel_data_chunk2; kernel_data_chunk3;
+    kernel_data_chunk4; kernel_data_chunk5; kernel_data_chunk6; kernel_data_chunk7;
+    kernel_data_chunk8; kernel_data_chunk9; kernel_data_chunk10; kernel_data_chunk11;
+    kernel_data_chunk12; kernel_data_chunk13; kernel_data_chunk14; kernel_data_chunk15;
+    kernel_data_chunk16; kernel_data_chunk17
+  ]).
 
 Global Typeclasses Opaque kernel_data.
 

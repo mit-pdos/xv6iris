@@ -46,7 +46,7 @@ Definition sync_segments : list (Z * Z * Z * Z) := [
    [syncMemEnd], i.e. the whole image is read-only.) *)
 Definition syncRodataEnd : Z := 0x1000%Z.
 
-Definition sync_data : gmap Z (bv 8) := list_to_map [
+Definition sync_data_chunk0 : list (Z * bv 8) := [
   ((0x8c2)%Z, Z_to_bv 8 (0x75)%Z)
 ; ((0x8c3)%Z, Z_to_bv 8 (0x6c)%Z)
 ; ((0x8c4)%Z, Z_to_bv 8 (0x6c)%Z)
@@ -1047,7 +1047,10 @@ Definition sync_data : gmap Z (bv 8) := list_to_map [
 ; ((0xca7)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0xca8)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0xca9)%Z, Z_to_bv 8 (0x42)%Z)
-; ((0xcaa)%Z, Z_to_bv 8 (0xe)%Z)
+].
+
+Definition sync_data_chunk1 : list (Z * bv 8) := [
+  ((0xcaa)%Z, Z_to_bv 8 (0xe)%Z)
 ; ((0xcab)%Z, Z_to_bv 8 (0x10)%Z)
 ; ((0xcac)%Z, Z_to_bv 8 (0x44)%Z)
 ; ((0xcad)%Z, Z_to_bv 8 (0x81)%Z)
@@ -1202,6 +1205,11 @@ Definition sync_data : gmap Z (bv 8) := list_to_map [
 ; ((0xd42)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0xd43)%Z, Z_to_bv 8 (0xd6)%Z)
 ].
+
+Definition sync_data : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    sync_data_chunk0; sync_data_chunk1
+  ]).
 
 Global Typeclasses Opaque sync_data.
 

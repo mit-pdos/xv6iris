@@ -46,7 +46,7 @@ Definition init_segments : list (Z * Z * Z * Z) := [
    [initMemEnd], i.e. the whole image is read-only.) *)
 Definition initRodataEnd : Z := 0x1000%Z.
 
-Definition init_data : gmap Z (bv 8) := list_to_map [
+Definition init_data_chunk0 : list (Z * bv 8) := [
   ((0x96c)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x96d)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x96e)%Z, Z_to_bv 8 (0x0)%Z)
@@ -1047,7 +1047,10 @@ Definition init_data : gmap Z (bv 8) := list_to_map [
 ; ((0xd51)%Z, Z_to_bv 8 (0xc)%Z)
 ; ((0xd52)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0xd53)%Z, Z_to_bv 8 (0x60)%Z)
-; ((0xd54)%Z, Z_to_bv 8 (0x42)%Z)
+].
+
+Definition init_data_chunk1 : list (Z * bv 8) := [
+  ((0xd54)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0xd55)%Z, Z_to_bv 8 (0xc9)%Z)
 ; ((0xd56)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0xd57)%Z, Z_to_bv 8 (0xe)%Z)
@@ -1344,6 +1347,11 @@ Definition init_data : gmap Z (bv 8) := list_to_map [
 ; ((0x100e)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x100f)%Z, Z_to_bv 8 (0x0)%Z)
 ].
+
+Definition init_data : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    init_data_chunk0; init_data_chunk1
+  ]).
 
 Global Typeclasses Opaque init_data.
 

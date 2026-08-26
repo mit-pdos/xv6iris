@@ -16,10 +16,13 @@ Import ListNotations.
    instruction at [pc] of width [W] bytes is just [W] consecutive byte
    lookups ([sync_bytes !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte
    encodings and adjacent-byte windows need no special handling.  The map
-   is built from a single flat (address, byte) list with [list_to_map];
-   no chunking is needed because each entry is tiny (two numbers). *)
+   is built from an (address, byte) list with [list_to_map].  The list
+   is emitted in chunks of 1000 entries and rejoined with
+   [List.concat]: one flat literal of this length overflows the OCaml
+   stack while it is being built (see [ROCQ_LIST_CHUNK] in the dumper).
+   Reduction sees the same list either way. *)
 
-Definition sync_bytes : gmap Z (bv 8) := list_to_map [
+Definition sync_bytes_chunk0 : list (Z * bv 8) := [
   (* <main> @ 0x0 *)
   ((0x0)%Z, Z_to_bv 8 (0x41)%Z)
 ; ((0x1)%Z, Z_to_bv 8 (0x11)%Z)
@@ -1413,7 +1416,10 @@ Definition sync_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x3e6: li a5,45 *)
 ; ((0x3e6)%Z, Z_to_bv 8 (0x93)%Z)
 ; ((0x3e7)%Z, Z_to_bv 8 (0x7)%Z)
-; ((0x3e8)%Z, Z_to_bv 8 (0xd0)%Z)
+].
+
+Definition sync_bytes_chunk1 : list (Z * bv 8) := [
+  ((0x3e8)%Z, Z_to_bv 8 (0xd0)%Z)
 ; ((0x3e9)%Z, Z_to_bv 8 (0x2)%Z)
   (* 0x3ea: sb a5,-24(a0) *)
 ; ((0x3ea)%Z, Z_to_bv 8 (0x23)%Z)
@@ -2772,8 +2778,11 @@ Definition sync_bytes : gmap Z (bv 8) := list_to_map [
   (* <malloc> @ 0x7ce *)
 ; ((0x7ce)%Z, Z_to_bv 8 (0x39)%Z)
 ; ((0x7cf)%Z, Z_to_bv 8 (0x71)%Z)
+].
+
+Definition sync_bytes_chunk2 : list (Z * bv 8) := [
   (* 0x7d0: sd ra,56(sp) *)
-; ((0x7d0)%Z, Z_to_bv 8 (0x6)%Z)
+  ((0x7d0)%Z, Z_to_bv 8 (0x6)%Z)
 ; ((0x7d1)%Z, Z_to_bv 8 (0xfc)%Z)
   (* 0x7d2: sd s0,48(sp) *)
 ; ((0x7d2)%Z, Z_to_bv 8 (0x22)%Z)
@@ -3106,6 +3115,11 @@ Definition sync_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x8c1)%Z, Z_to_bv 8 (0x6e)%Z)
 ].
 
+Definition sync_bytes : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    sync_bytes_chunk0; sync_bytes_chunk1; sync_bytes_chunk2
+  ]).
+
 (* Total bytes = 2242 (from 842 instructions); keys are byte
    addresses, so [sync_bytes !! addr] yields that byte. *)
 
@@ -3136,7 +3150,7 @@ Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.
 (* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup
    of the i-th instruction.  [Typeclasses Opaque] so resolution never forces
    the map (cf. sync_bytes). *)
-Definition sync_instrs : gmap Z kinstr := list_to_map [
+Definition sync_instrs_chunk0 : list (Z * kinstr) := [
   (* <main> @ 0x0 *)
   ((0)%Z, MkKInstr (0x0)%Z 16%nat (0x1141)%Z)
 ; ((1)%Z, MkKInstr (0x2)%Z 16%nat (0xe406)%Z)
@@ -4024,5 +4038,10 @@ Definition sync_instrs : gmap Z kinstr := list_to_map [
 ; ((840)%Z, MkKInstr (0x8bc)%Z 16%nat (0x6b02)%Z)
 ; ((841)%Z, MkKInstr (0x8be)%Z 16%nat (0xb7f5)%Z)
 ].
+
+Definition sync_instrs : gmap Z kinstr :=
+  list_to_map (List.concat [
+    sync_instrs_chunk0
+  ]).
 
 Global Typeclasses Opaque sync_instrs.

@@ -16,10 +16,13 @@ Import ListNotations.
    instruction at [pc] of width [W] bytes is just [W] consecutive byte
    lookups ([sh_bytes !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte
    encodings and adjacent-byte windows need no special handling.  The map
-   is built from a single flat (address, byte) list with [list_to_map];
-   no chunking is needed because each entry is tiny (two numbers). *)
+   is built from an (address, byte) list with [list_to_map].  The list
+   is emitted in chunks of 1000 entries and rejoined with
+   [List.concat]: one flat literal of this length overflows the OCaml
+   stack while it is being built (see [ROCQ_LIST_CHUNK] in the dumper).
+   Reduction sees the same list either way. *)
 
-Definition sh_bytes : gmap Z (bv 8) := list_to_map [
+Definition sh_bytes_chunk0 : list (Z * bv 8) := [
   (* <getcmd> @ 0x0 *)
   ((0x0)%Z, Z_to_bv 8 (0x1)%Z)
 ; ((0x1)%Z, Z_to_bv 8 (0x11)%Z)
@@ -1385,8 +1388,11 @@ Definition sh_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x3e5)%Z, Z_to_bv 8 (0x7)%Z)
 ; ((0x3e6)%Z, Z_to_bv 8 (0xc0)%Z)
 ; ((0x3e7)%Z, Z_to_bv 8 (0x7)%Z)
+].
+
+Definition sh_bytes_chunk1 : list (Z * bv 8) := [
   (* 0x3e8: beq a5,a4,386 <gettoken+0x76> *)
-; ((0x3e8)%Z, Z_to_bv 8 (0xe3)%Z)
+  ((0x3e8)%Z, Z_to_bv 8 (0xe3)%Z)
 ; ((0x3e9)%Z, Z_to_bv 8 (0x8f)%Z)
 ; ((0x3ea)%Z, Z_to_bv 8 (0xe7)%Z)
 ; ((0x3eb)%Z, Z_to_bv 8 (0xf8)%Z)
@@ -2770,8 +2776,11 @@ Definition sh_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x7ce: ld s2,16(sp) *)
 ; ((0x7ce)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x7cf)%Z, Z_to_bv 8 (0x69)%Z)
+].
+
+Definition sh_bytes_chunk2 : list (Z * bv 8) := [
   (* 0x7d0: ld s3,8(sp) *)
-; ((0x7d0)%Z, Z_to_bv 8 (0xa2)%Z)
+  ((0x7d0)%Z, Z_to_bv 8 (0xa2)%Z)
 ; ((0x7d1)%Z, Z_to_bv 8 (0x69)%Z)
   (* 0x7d2: addi sp,sp,48 *)
 ; ((0x7d2)%Z, Z_to_bv 8 (0x45)%Z)
@@ -4146,8 +4155,11 @@ Definition sh_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0xbb5)%Z, Z_to_bv 8 (0x5f)%Z)
 ; ((0xbb6)%Z, Z_to_bv 8 (0xc0)%Z)
 ; ((0xbb7)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition sh_bytes_chunk3 : list (Z * bv 8) := [
   (* 0xbb8: slli a2,a2,0x20 *)
-; ((0xbb8)%Z, Z_to_bv 8 (0x2)%Z)
+  ((0xbb8)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0xbb9)%Z, Z_to_bv 8 (0x16)%Z)
   (* 0xbba: srli a2,a2,0x20 *)
 ; ((0xbba)%Z, Z_to_bv 8 (0x1)%Z)
@@ -5517,8 +5529,11 @@ Definition sh_bytes : gmap Z (bv 8) := list_to_map [
   (* 0xf9e: add a5,a5,s7 *)
 ; ((0xf9e)%Z, Z_to_bv 8 (0xde)%Z)
 ; ((0xf9f)%Z, Z_to_bv 8 (0x97)%Z)
+].
+
+Definition sh_bytes_chunk4 : list (Z * bv 8) := [
   (* 0xfa0: lbu a1,0(a5) *)
-; ((0xfa0)%Z, Z_to_bv 8 (0x83)%Z)
+  ((0xfa0)%Z, Z_to_bv 8 (0x83)%Z)
 ; ((0xfa1)%Z, Z_to_bv 8 (0xc5)%Z)
 ; ((0xfa2)%Z, Z_to_bv 8 (0x7)%Z)
 ; ((0xfa3)%Z, Z_to_bv 8 (0x0)%Z)
@@ -6521,6 +6536,12 @@ Definition sh_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x127f)%Z, Z_to_bv 8 (0x0)%Z)
 ].
 
+Definition sh_bytes : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    sh_bytes_chunk0; sh_bytes_chunk1; sh_bytes_chunk2; sh_bytes_chunk3;
+    sh_bytes_chunk4
+  ]).
+
 (* Total bytes = 4736 (from 1763 instructions); keys are byte
    addresses, so [sh_bytes !! addr] yields that byte. *)
 
@@ -6551,7 +6572,7 @@ Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.
 (* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup
    of the i-th instruction.  [Typeclasses Opaque] so resolution never forces
    the map (cf. sh_bytes). *)
-Definition sh_instrs : gmap Z kinstr := list_to_map [
+Definition sh_instrs_chunk0 : list (Z * kinstr) := [
   (* <getcmd> @ 0x0 *)
   ((0)%Z, MkKInstr (0x0)%Z 16%nat (0x1101)%Z)
 ; ((1)%Z, MkKInstr (0x2)%Z 16%nat (0xec06)%Z)
@@ -7576,8 +7597,11 @@ Definition sh_instrs : gmap Z kinstr := list_to_map [
 ; ((997)%Z, MkKInstr (0xa7c)%Z 16%nat (0x6402)%Z)
 ; ((998)%Z, MkKInstr (0xa7e)%Z 16%nat (0x141)%Z)
 ; ((999)%Z, MkKInstr (0xa80)%Z 16%nat (0x8082)%Z)
+].
+
+Definition sh_instrs_chunk1 : list (Z * kinstr) := [
   (* <strchr> @ 0xa82 *)
-; ((1000)%Z, MkKInstr (0xa82)%Z 16%nat (0x1141)%Z)
+  ((1000)%Z, MkKInstr (0xa82)%Z 16%nat (0x1141)%Z)
 ; ((1001)%Z, MkKInstr (0xa84)%Z 16%nat (0xe406)%Z)
 ; ((1002)%Z, MkKInstr (0xa86)%Z 16%nat (0xe022)%Z)
 ; ((1003)%Z, MkKInstr (0xa88)%Z 16%nat (0x800)%Z)
@@ -8378,5 +8402,10 @@ Definition sh_instrs : gmap Z kinstr := list_to_map [
 ; ((1761)%Z, MkKInstr (0x127a)%Z 16%nat (0x6b02)%Z)
 ; ((1762)%Z, MkKInstr (0x127c)%Z 16%nat (0xb7f5)%Z)
 ].
+
+Definition sh_instrs : gmap Z kinstr :=
+  list_to_map (List.concat [
+    sh_instrs_chunk0; sh_instrs_chunk1
+  ]).
 
 Global Typeclasses Opaque sh_instrs.

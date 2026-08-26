@@ -46,7 +46,7 @@ Definition echo_segments : list (Z * Z * Z * Z) := [
    [echoMemEnd], i.e. the whole image is read-only.) *)
 Definition echoRodataEnd : Z := 0x1000%Z.
 
-Definition echo_data : gmap Z (bv 8) := list_to_map [
+Definition echo_data_chunk0 : list (Z * bv 8) := [
   ((0x92c)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x92d)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x92e)%Z, Z_to_bv 8 (0x0)%Z)
@@ -1047,7 +1047,10 @@ Definition echo_data : gmap Z (bv 8) := list_to_map [
 ; ((0xd11)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0xd12)%Z, Z_to_bv 8 (0xc)%Z)
 ; ((0xd13)%Z, Z_to_bv 8 (0x8)%Z)
-; ((0xd14)%Z, Z_to_bv 8 (0x40)%Z)
+].
+
+Definition echo_data_chunk1 : list (Z * bv 8) := [
+  ((0xd14)%Z, Z_to_bv 8 (0x40)%Z)
 ; ((0xd15)%Z, Z_to_bv 8 (0x64)%Z)
 ; ((0xd16)%Z, Z_to_bv 8 (0xc1)%Z)
 ; ((0xd17)%Z, Z_to_bv 8 (0x42)%Z)
@@ -1232,6 +1235,11 @@ Definition echo_data : gmap Z (bv 8) := list_to_map [
 ; ((0xdca)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0xdcb)%Z, Z_to_bv 8 (0xd6)%Z)
 ].
+
+Definition echo_data : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    echo_data_chunk0; echo_data_chunk1
+  ]).
 
 Global Typeclasses Opaque echo_data.
 

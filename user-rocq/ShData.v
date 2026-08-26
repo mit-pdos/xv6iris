@@ -46,7 +46,7 @@ Definition sh_segments : list (Z * Z * Z * Z) := [
    [shMemEnd], i.e. the whole image is read-only.) *)
 Definition shRodataEnd : Z := 0x2000%Z.
 
-Definition sh_data : gmap Z (bv 8) := list_to_map [
+Definition sh_data_chunk0 : list (Z * bv 8) := [
   ((0x1280)%Z, Z_to_bv 8 (0x24)%Z)
 ; ((0x1281)%Z, Z_to_bv 8 (0x20)%Z)
 ; ((0x1282)%Z, Z_to_bv 8 (0x0)%Z)
@@ -1047,7 +1047,10 @@ Definition sh_data : gmap Z (bv 8) := list_to_map [
 ; ((0x1665)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x1666)%Z, Z_to_bv 8 (0xd8)%Z)
 ; ((0x1667)%Z, Z_to_bv 8 (0x42)%Z)
-; ((0x1668)%Z, Z_to_bv 8 (0xd9)%Z)
+].
+
+Definition sh_data_chunk1 : list (Z * bv 8) := [
+  ((0x1668)%Z, Z_to_bv 8 (0xd9)%Z)
 ; ((0x1669)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x166a)%Z, Z_to_bv 8 (0xe)%Z)
 ; ((0x166b)%Z, Z_to_bv 8 (0x0)%Z)
@@ -2047,7 +2050,10 @@ Definition sh_data : gmap Z (bv 8) := list_to_map [
 ; ((0x1a4d)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x1a4e)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x1a4f)%Z, Z_to_bv 8 (0x0)%Z)
-; ((0x1a50)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition sh_data_chunk2 : list (Z * bv 8) := [
+  ((0x1a50)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x1a51)%Z, Z_to_bv 8 (0x42)%Z)
 ; ((0x1a52)%Z, Z_to_bv 8 (0xe)%Z)
 ; ((0x1a53)%Z, Z_to_bv 8 (0x10)%Z)
@@ -2580,6 +2586,11 @@ Definition sh_data : gmap Z (bv 8) := list_to_map [
 ; ((0x200e)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x200f)%Z, Z_to_bv 8 (0x0)%Z)
 ].
+
+Definition sh_data : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    sh_data_chunk0; sh_data_chunk1; sh_data_chunk2
+  ]).
 
 Global Typeclasses Opaque sh_data.
 

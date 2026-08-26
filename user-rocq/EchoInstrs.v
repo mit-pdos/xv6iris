@@ -16,10 +16,13 @@ Import ListNotations.
    instruction at [pc] of width [W] bytes is just [W] consecutive byte
    lookups ([echo_bytes !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte
    encodings and adjacent-byte windows need no special handling.  The map
-   is built from a single flat (address, byte) list with [list_to_map];
-   no chunking is needed because each entry is tiny (two numbers). *)
+   is built from an (address, byte) list with [list_to_map].  The list
+   is emitted in chunks of 1000 entries and rejoined with
+   [List.concat]: one flat literal of this length overflows the OCaml
+   stack while it is being built (see [ROCQ_LIST_CHUNK] in the dumper).
+   Reduction sees the same list either way. *)
 
-Definition echo_bytes : gmap Z (bv 8) := list_to_map [
+Definition echo_bytes_chunk0 : list (Z * bv 8) := [
   (* <main> @ 0x0 *)
   ((0x0)%Z, Z_to_bv 8 (0x39)%Z)
 ; ((0x1)%Z, Z_to_bv 8 (0x71)%Z)
@@ -1413,8 +1416,11 @@ Definition echo_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x3e6: li a2,1 *)
 ; ((0x3e6)%Z, Z_to_bv 8 (0x5)%Z)
 ; ((0x3e7)%Z, Z_to_bv 8 (0x46)%Z)
+].
+
+Definition echo_bytes_chunk1 : list (Z * bv 8) := [
   (* 0x3e8: addi a1,s0,-17 *)
-; ((0x3e8)%Z, Z_to_bv 8 (0x93)%Z)
+  ((0x3e8)%Z, Z_to_bv 8 (0x93)%Z)
 ; ((0x3e9)%Z, Z_to_bv 8 (0x5)%Z)
 ; ((0x3ea)%Z, Z_to_bv 8 (0xf4)%Z)
 ; ((0x3eb)%Z, Z_to_bv 8 (0xfe)%Z)
@@ -2773,7 +2779,10 @@ Definition echo_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x7ce: bltu a3,a4,7e2 <free+0x30> *)
 ; ((0x7ce)%Z, Z_to_bv 8 (0x63)%Z)
 ; ((0x7cf)%Z, Z_to_bv 8 (0xea)%Z)
-; ((0x7d0)%Z, Z_to_bv 8 (0xe6)%Z)
+].
+
+Definition echo_bytes_chunk2 : list (Z * bv 8) := [
+  ((0x7d0)%Z, Z_to_bv 8 (0xe6)%Z)
 ; ((0x7d1)%Z, Z_to_bv 8 (0x0)%Z)
   (* 0x7d2: mv a5,a4 *)
 ; ((0x7d2)%Z, Z_to_bv 8 (0xba)%Z)
@@ -3249,6 +3258,11 @@ Definition echo_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x92b)%Z, Z_to_bv 8 (0x0)%Z)
 ].
 
+Definition echo_bytes : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    echo_bytes_chunk0; echo_bytes_chunk1; echo_bytes_chunk2
+  ]).
+
 (* Total bytes = 2348 (from 879 instructions); keys are byte
    addresses, so [echo_bytes !! addr] yields that byte. *)
 
@@ -3279,7 +3293,7 @@ Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.
 (* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup
    of the i-th instruction.  [Typeclasses Opaque] so resolution never forces
    the map (cf. echo_bytes). *)
-Definition echo_instrs : gmap Z kinstr := list_to_map [
+Definition echo_instrs_chunk0 : list (Z * kinstr) := [
   (* <main> @ 0x0 *)
   ((0)%Z, MkKInstr (0x0)%Z 16%nat (0x7139)%Z)
 ; ((1)%Z, MkKInstr (0x2)%Z 16%nat (0xfc06)%Z)
@@ -4204,5 +4218,10 @@ Definition echo_instrs : gmap Z kinstr := list_to_map [
 ; ((877)%Z, MkKInstr (0x926)%Z 16%nat (0x6b02)%Z)
 ; ((878)%Z, MkKInstr (0x928)%Z 16%nat (0xb7f5)%Z)
 ].
+
+Definition echo_instrs : gmap Z kinstr :=
+  list_to_map (List.concat [
+    echo_instrs_chunk0
+  ]).
 
 Global Typeclasses Opaque echo_instrs.

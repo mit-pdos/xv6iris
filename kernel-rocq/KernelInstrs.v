@@ -16,10 +16,13 @@ Import ListNotations.
    instruction at [pc] of width [W] bytes is just [W] consecutive byte
    lookups ([kernel_bytes !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte
    encodings and adjacent-byte windows need no special handling.  The map
-   is built from a single flat (address, byte) list with [list_to_map];
-   no chunking is needed because each entry is tiny (two numbers). *)
+   is built from an (address, byte) list with [list_to_map].  The list
+   is emitted in chunks of 1000 entries and rejoined with
+   [List.concat]: one flat literal of this length overflows the OCaml
+   stack while it is being built (see [ROCQ_LIST_CHUNK] in the dumper).
+   Reduction sees the same list either way. *)
 
-Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
+Definition kernel_bytes_chunk0 : list (Z * bv 8) := [
   (* <_entry> @ 0x80000000 *)
   ((0x80000000)%Z, Z_to_bv 8 (0x17)%Z)
 ; ((0x80000001)%Z, Z_to_bv 8 (0xa1)%Z)
@@ -1368,8 +1371,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x800003e5)%Z, Z_to_bv 8 (0xf0)%Z)
 ; ((0x800003e6)%Z, Z_to_bv 8 (0x7f)%Z)
 ; ((0x800003e7)%Z, Z_to_bv 8 (0xea)%Z)
+].
+
+Definition kernel_bytes_chunk1 : list (Z * bv 8) := [
   (* 0x800003e8: j 800003c0 <consoleintr+0x104> *)
-; ((0x800003e8)%Z, Z_to_bv 8 (0xe1)%Z)
+  ((0x800003e8)%Z, Z_to_bv 8 (0xe1)%Z)
 ; ((0x800003e9)%Z, Z_to_bv 8 (0xbf)%Z)
   (* 0x800003ea: li a0,10 *)
 ; ((0x800003ea)%Z, Z_to_bv 8 (0x29)%Z)
@@ -2694,8 +2700,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x800007cd)%Z, Z_to_bv 8 (0x91)%Z)
 ; ((0x800007ce)%Z, Z_to_bv 8 (0x7)%Z)
 ; ((0x800007cf)%Z, Z_to_bv 8 (0xec)%Z)
+].
+
+Definition kernel_bytes_chunk2 : list (Z * bv 8) := [
   (* 0x800007d0: beq s5,s11,800006aa <printk+0x1a8> *)
-; ((0x800007d0)%Z, Z_to_bv 8 (0xe3)%Z)
+  ((0x800007d0)%Z, Z_to_bv 8 (0xe3)%Z)
 ; ((0x800007d1)%Z, Z_to_bv 8 (0x8d)%Z)
 ; ((0x800007d2)%Z, Z_to_bv 8 (0xba)%Z)
 ; ((0x800007d3)%Z, Z_to_bv 8 (0xed)%Z)
@@ -4058,8 +4067,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80000bb6: sw a5,124(a0) *)
 ; ((0x80000bb6)%Z, Z_to_bv 8 (0x7c)%Z)
 ; ((0x80000bb7)%Z, Z_to_bv 8 (0xdd)%Z)
+].
+
+Definition kernel_bytes_chunk3 : list (Z * bv 8) := [
   (* 0x80000bb8: j 80000b98 <push_off+0x18> *)
-; ((0x80000bb8)%Z, Z_to_bv 8 (0xc5)%Z)
+  ((0x80000bb8)%Z, Z_to_bv 8 (0xc5)%Z)
 ; ((0x80000bb9)%Z, Z_to_bv 8 (0xb7)%Z)
   (* <acquire> @ 0x80000bba *)
 ; ((0x80000bba)%Z, Z_to_bv 8 (0x1)%Z)
@@ -5427,8 +5439,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x80000f9d)%Z, Z_to_bv 8 (0xe7)%Z)
 ; ((0x80000f9e)%Z, Z_to_bv 8 (0x17)%Z)
 ; ((0x80000f9f)%Z, Z_to_bv 8 (0x0)%Z)
+].
+
+Definition kernel_bytes_chunk4 : list (Z * bv 8) := [
   (* 0x80000fa0: sd a5,0(s2) *)
-; ((0x80000fa0)%Z, Z_to_bv 8 (0x23)%Z)
+  ((0x80000fa0)%Z, Z_to_bv 8 (0x23)%Z)
 ; ((0x80000fa1)%Z, Z_to_bv 8 (0x30)%Z)
 ; ((0x80000fa2)%Z, Z_to_bv 8 (0xf9)%Z)
 ; ((0x80000fa3)%Z, Z_to_bv 8 (0x0)%Z)
@@ -6827,8 +6842,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* <uvmfree> @ 0x80001386 *)
 ; ((0x80001386)%Z, Z_to_bv 8 (0x1)%Z)
 ; ((0x80001387)%Z, Z_to_bv 8 (0x11)%Z)
+].
+
+Definition kernel_bytes_chunk5 : list (Z * bv 8) := [
   (* 0x80001388: sd ra,24(sp) *)
-; ((0x80001388)%Z, Z_to_bv 8 (0x6)%Z)
+  ((0x80001388)%Z, Z_to_bv 8 (0x6)%Z)
 ; ((0x80001389)%Z, Z_to_bv 8 (0xec)%Z)
   (* 0x8000138a: sd s0,16(sp) *)
 ; ((0x8000138a)%Z, Z_to_bv 8 (0x22)%Z)
@@ -8253,8 +8271,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x8000176e: mv s8,s1 *)
 ; ((0x8000176e)%Z, Z_to_bv 8 (0x26)%Z)
 ; ((0x8000176f)%Z, Z_to_bv 8 (0x8c)%Z)
+].
+
+Definition kernel_bytes_chunk6 : list (Z * bv 8) := [
   (* 0x80001770: lui a5,0xa5 *)
-; ((0x80001770)%Z, Z_to_bv 8 (0xb7)%Z)
+  ((0x80001770)%Z, Z_to_bv 8 (0xb7)%Z)
 ; ((0x80001771)%Z, Z_to_bv 8 (0x57)%Z)
 ; ((0x80001772)%Z, Z_to_bv 8 (0xa)%Z)
 ; ((0x80001773)%Z, Z_to_bv 8 (0x0)%Z)
@@ -9624,8 +9645,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x80001b55)%Z, Z_to_bv 8 (0xf0)%Z)
 ; ((0x80001b56)%Z, Z_to_bv 8 (0xdf)%Z)
 ; ((0x80001b57)%Z, Z_to_bv 8 (0xe9)%Z)
+].
+
+Definition kernel_bytes_chunk7 : list (Z * bv 8) := [
   (* 0x80001b58: mv s2,a0 *)
-; ((0x80001b58)%Z, Z_to_bv 8 (0x2a)%Z)
+  ((0x80001b58)%Z, Z_to_bv 8 (0x2a)%Z)
 ; ((0x80001b59)%Z, Z_to_bv 8 (0x89)%Z)
   (* 0x80001b5a: sd a0,80(s1) *)
 ; ((0x80001b5a)%Z, Z_to_bv 8 (0xa8)%Z)
@@ -10986,8 +11010,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80001f3e: mv s1,a0 *)
 ; ((0x80001f3e)%Z, Z_to_bv 8 (0xaa)%Z)
 ; ((0x80001f3f)%Z, Z_to_bv 8 (0x84)%Z)
+].
+
+Definition kernel_bytes_chunk8 : list (Z * bv 8) := [
   (* 0x80001f40: jal 80000bba <acquire> *)
-; ((0x80001f40)%Z, Z_to_bv 8 (0xef)%Z)
+  ((0x80001f40)%Z, Z_to_bv 8 (0xef)%Z)
 ; ((0x80001f41)%Z, Z_to_bv 8 (0xe0)%Z)
 ; ((0x80001f42)%Z, Z_to_bv 8 (0xbf)%Z)
 ; ((0x80001f43)%Z, Z_to_bv 8 (0xc7)%Z)
@@ -12363,8 +12390,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80002326: sd s5,24(sp) *)
 ; ((0x80002326)%Z, Z_to_bv 8 (0x56)%Z)
 ; ((0x80002327)%Z, Z_to_bv 8 (0xec)%Z)
+].
+
+Definition kernel_bytes_chunk9 : list (Z * bv 8) := [
   (* 0x80002328: sd s6,16(sp) *)
-; ((0x80002328)%Z, Z_to_bv 8 (0x5a)%Z)
+  ((0x80002328)%Z, Z_to_bv 8 (0x5a)%Z)
 ; ((0x80002329)%Z, Z_to_bv 8 (0xe8)%Z)
   (* 0x8000232a: sd s7,8(sp) *)
 ; ((0x8000232a)%Z, Z_to_bv 8 (0x5e)%Z)
@@ -13709,7 +13739,10 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x8000270e: jal 8000083c <unreachable> *)
 ; ((0x8000270e)%Z, Z_to_bv 8 (0xef)%Z)
 ; ((0x8000270f)%Z, Z_to_bv 8 (0xe0)%Z)
-; ((0x80002710)%Z, Z_to_bv 8 (0xef)%Z)
+].
+
+Definition kernel_bytes_chunk10 : list (Z * bv 8) := [
+  ((0x80002710)%Z, Z_to_bv 8 (0xef)%Z)
 ; ((0x80002711)%Z, Z_to_bv 8 (0x92)%Z)
   (* 0x80002712: csrr a2,sepc *)
 ; ((0x80002712)%Z, Z_to_bv 8 (0x73)%Z)
@@ -15092,8 +15125,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80002af6: addi s0,sp,48 *)
 ; ((0x80002af6)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80002af7)%Z, Z_to_bv 8 (0x18)%Z)
+].
+
+Definition kernel_bytes_chunk11 : list (Z * bv 8) := [
   (* 0x80002af8: auipc a1,0x5 *)
-; ((0x80002af8)%Z, Z_to_bv 8 (0x97)%Z)
+  ((0x80002af8)%Z, Z_to_bv 8 (0x97)%Z)
 ; ((0x80002af9)%Z, Z_to_bv 8 (0x55)%Z)
 ; ((0x80002afa)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80002afb)%Z, Z_to_bv 8 (0x0)%Z)
@@ -16445,8 +16481,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80002ede: li a5,1 *)
 ; ((0x80002ede)%Z, Z_to_bv 8 (0x85)%Z)
 ; ((0x80002edf)%Z, Z_to_bv 8 (0x47)%Z)
+].
+
+Definition kernel_bytes_chunk12 : list (Z * bv 8) := [
   (* 0x80002ee0: sw a5,8(s3) *)
-; ((0x80002ee0)%Z, Z_to_bv 8 (0x23)%Z)
+  ((0x80002ee0)%Z, Z_to_bv 8 (0x23)%Z)
 ; ((0x80002ee1)%Z, Z_to_bv 8 (0xa4)%Z)
 ; ((0x80002ee2)%Z, Z_to_bv 8 (0xf9)%Z)
 ; ((0x80002ee3)%Z, Z_to_bv 8 (0x0)%Z)
@@ -17804,8 +17843,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x800032c5)%Z, Z_to_bv 8 (0x9)%Z)
 ; ((0x800032c6)%Z, Z_to_bv 8 (0x5)%Z)
 ; ((0x800032c7)%Z, Z_to_bv 8 (0x1)%Z)
+].
+
+Definition kernel_bytes_chunk13 : list (Z * bv 8) := [
   (* 0x800032c8: mv a0,s2 *)
-; ((0x800032c8)%Z, Z_to_bv 8 (0x4a)%Z)
+  ((0x800032c8)%Z, Z_to_bv 8 (0x4a)%Z)
 ; ((0x800032c9)%Z, Z_to_bv 8 (0x85)%Z)
   (* 0x800032ca: jal 80004018 <holdingsleep> *)
 ; ((0x800032ca)%Z, Z_to_bv 8 (0xef)%Z)
@@ -19167,8 +19209,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x800036ae: ld s2,80(sp) *)
 ; ((0x800036ae)%Z, Z_to_bv 8 (0x46)%Z)
 ; ((0x800036af)%Z, Z_to_bv 8 (0x69)%Z)
+].
+
+Definition kernel_bytes_chunk14 : list (Z * bv 8) := [
   (* 0x800036b0: ld s8,32(sp) *)
-; ((0x800036b0)%Z, Z_to_bv 8 (0x2)%Z)
+  ((0x800036b0)%Z, Z_to_bv 8 (0x2)%Z)
 ; ((0x800036b1)%Z, Z_to_bv 8 (0x7c)%Z)
   (* 0x800036b2: ld s9,24(sp) *)
 ; ((0x800036b2)%Z, Z_to_bv 8 (0xe2)%Z)
@@ -20555,8 +20600,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80003a96: sd s0,16(sp) *)
 ; ((0x80003a96)%Z, Z_to_bv 8 (0x22)%Z)
 ; ((0x80003a97)%Z, Z_to_bv 8 (0xe8)%Z)
+].
+
+Definition kernel_bytes_chunk15 : list (Z * bv 8) := [
   (* 0x80003a98: addi s0,sp,32 *)
-; ((0x80003a98)%Z, Z_to_bv 8 (0x0)%Z)
+  ((0x80003a98)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80003a99)%Z, Z_to_bv 8 (0x10)%Z)
   (* 0x80003a9a: addi a2,s0,-32 *)
 ; ((0x80003a9a)%Z, Z_to_bv 8 (0x13)%Z)
@@ -21905,8 +21953,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80003e7e: add a5,a5,a2 *)
 ; ((0x80003e7e)%Z, Z_to_bv 8 (0xb2)%Z)
 ; ((0x80003e7f)%Z, Z_to_bv 8 (0x97)%Z)
+].
+
+Definition kernel_bytes_chunk16 : list (Z * bv 8) := [
   (* 0x80003e80: lw a4,12(s1) *)
-; ((0x80003e80)%Z, Z_to_bv 8 (0xd8)%Z)
+  ((0x80003e80)%Z, Z_to_bv 8 (0xd8)%Z)
 ; ((0x80003e81)%Z, Z_to_bv 8 (0x44)%Z)
   (* 0x80003e82: sw a4,16(a5) *)
 ; ((0x80003e82)%Z, Z_to_bv 8 (0x98)%Z)
@@ -23275,8 +23326,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80004266: mv s1,a0 *)
 ; ((0x80004266)%Z, Z_to_bv 8 (0xaa)%Z)
 ; ((0x80004267)%Z, Z_to_bv 8 (0x84)%Z)
+].
+
+Definition kernel_bytes_chunk17 : list (Z * bv 8) := [
   (* 0x80004268: mv s2,a1 *)
-; ((0x80004268)%Z, Z_to_bv 8 (0x2e)%Z)
+  ((0x80004268)%Z, Z_to_bv 8 (0x2e)%Z)
 ; ((0x80004269)%Z, Z_to_bv 8 (0x89)%Z)
   (* 0x8000426a: mv s3,a2 *)
 ; ((0x8000426a)%Z, Z_to_bv 8 (0xb2)%Z)
@@ -24653,7 +24707,10 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x8000464e: sw a4,540(s1) *)
 ; ((0x8000464e)%Z, Z_to_bv 8 (0x23)%Z)
 ; ((0x8000464f)%Z, Z_to_bv 8 (0xae)%Z)
-; ((0x80004650)%Z, Z_to_bv 8 (0xe4)%Z)
+].
+
+Definition kernel_bytes_chunk18 : list (Z * bv 8) := [
+  ((0x80004650)%Z, Z_to_bv 8 (0xe4)%Z)
 ; ((0x80004651)%Z, Z_to_bv 8 (0x20)%Z)
   (* 0x80004652: andi a5,a5,511 *)
 ; ((0x80004652)%Z, Z_to_bv 8 (0x93)%Z)
@@ -26002,7 +26059,10 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80004a36: sd zero,-256(a5) *)
 ; ((0x80004a36)%Z, Z_to_bv 8 (0x23)%Z)
 ; ((0x80004a37)%Z, Z_to_bv 8 (0xb0)%Z)
-; ((0x80004a38)%Z, Z_to_bv 8 (0x7)%Z)
+].
+
+Definition kernel_bytes_chunk19 : list (Z * bv 8) := [
+  ((0x80004a38)%Z, Z_to_bv 8 (0x7)%Z)
 ; ((0x80004a39)%Z, Z_to_bv 8 (0xf0)%Z)
   (* 0x80004a3a: slli a4,s1,0x3 *)
 ; ((0x80004a3a)%Z, Z_to_bv 8 (0x13)%Z)
@@ -27368,7 +27428,10 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80004e1e: addi a5,a5,208 *)
 ; ((0x80004e1e)%Z, Z_to_bv 8 (0x93)%Z)
 ; ((0x80004e1f)%Z, Z_to_bv 8 (0x87)%Z)
-; ((0x80004e20)%Z, Z_to_bv 8 (0x7)%Z)
+].
+
+Definition kernel_bytes_chunk20 : list (Z * bv 8) := [
+  ((0x80004e20)%Z, Z_to_bv 8 (0x7)%Z)
 ; ((0x80004e21)%Z, Z_to_bv 8 (0xd)%Z)
   (* 0x80004e22: add a0,a0,a5 *)
 ; ((0x80004e22)%Z, Z_to_bv 8 (0x3e)%Z)
@@ -28706,7 +28769,10 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x80005206: lh a4,68(s1) *)
 ; ((0x80005206)%Z, Z_to_bv 8 (0x3)%Z)
 ; ((0x80005207)%Z, Z_to_bv 8 (0x97)%Z)
-; ((0x80005208)%Z, Z_to_bv 8 (0x44)%Z)
+].
+
+Definition kernel_bytes_chunk21 : list (Z * bv 8) := [
+  ((0x80005208)%Z, Z_to_bv 8 (0x44)%Z)
 ; ((0x80005209)%Z, Z_to_bv 8 (0x4)%Z)
   (* 0x8000520a: li a5,1 *)
 ; ((0x8000520a)%Z, Z_to_bv 8 (0x85)%Z)
@@ -30065,8 +30131,11 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* <plicinit> @ 0x800055ee *)
 ; ((0x800055ee)%Z, Z_to_bv 8 (0x41)%Z)
 ; ((0x800055ef)%Z, Z_to_bv 8 (0x11)%Z)
+].
+
+Definition kernel_bytes_chunk22 : list (Z * bv 8) := [
   (* 0x800055f0: sd ra,8(sp) *)
-; ((0x800055f0)%Z, Z_to_bv 8 (0x6)%Z)
+  ((0x800055f0)%Z, Z_to_bv 8 (0x6)%Z)
 ; ((0x800055f1)%Z, Z_to_bv 8 (0xe4)%Z)
   (* 0x800055f2: sd s0,0(sp) *)
 ; ((0x800055f2)%Z, Z_to_bv 8 (0x22)%Z)
@@ -31397,7 +31466,10 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
   (* 0x800059d6: addi a6,s3,88 *)
 ; ((0x800059d6)%Z, Z_to_bv 8 (0x13)%Z)
 ; ((0x800059d7)%Z, Z_to_bv 8 (0x88)%Z)
-; ((0x800059d8)%Z, Z_to_bv 8 (0x89)%Z)
+].
+
+Definition kernel_bytes_chunk23 : list (Z * bv 8) := [
+  ((0x800059d8)%Z, Z_to_bv 8 (0x89)%Z)
 ; ((0x800059d9)%Z, Z_to_bv 8 (0x5)%Z)
   (* 0x800059da: sd a6,0(a2) *)
 ; ((0x800059da)%Z, Z_to_bv 8 (0x23)%Z)
@@ -32377,6 +32449,16 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 ; ((0x80006123)%Z, Z_to_bv 8 (0x10)%Z)
 ].
 
+Definition kernel_bytes : gmap Z (bv 8) :=
+  list_to_map (List.concat [
+    kernel_bytes_chunk0; kernel_bytes_chunk1; kernel_bytes_chunk2; kernel_bytes_chunk3;
+    kernel_bytes_chunk4; kernel_bytes_chunk5; kernel_bytes_chunk6; kernel_bytes_chunk7;
+    kernel_bytes_chunk8; kernel_bytes_chunk9; kernel_bytes_chunk10; kernel_bytes_chunk11;
+    kernel_bytes_chunk12; kernel_bytes_chunk13; kernel_bytes_chunk14; kernel_bytes_chunk15;
+    kernel_bytes_chunk16; kernel_bytes_chunk17; kernel_bytes_chunk18; kernel_bytes_chunk19;
+    kernel_bytes_chunk20; kernel_bytes_chunk21; kernel_bytes_chunk22; kernel_bytes_chunk23
+  ]).
+
 (* Total bytes = 23748 (from 8607 instructions); keys are byte
    addresses, so [kernel_bytes !! addr] yields that byte. *)
 
@@ -32407,7 +32489,7 @@ Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.
 (* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup
    of the i-th instruction.  [Typeclasses Opaque] so resolution never forces
    the map (cf. kernel_bytes). *)
-Definition kernel_instrs : gmap Z kinstr := list_to_map [
+Definition kernel_instrs_chunk0 : list (Z * kinstr) := [
   (* <_entry> @ 0x80000000 *)
   ((0)%Z, MkKInstr (0x80000000)%Z 32%nat (0xa117)%Z)
 ; ((1)%Z, MkKInstr (0x80000004)%Z 32%nat (0x28813103)%Z)
@@ -33432,7 +33514,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((997)%Z, MkKInstr (0x80000b56)%Z 16%nat (0xe399)%Z)
 ; ((998)%Z, MkKInstr (0x80000b58)%Z 16%nat (0x4501)%Z)
 ; ((999)%Z, MkKInstr (0x80000b5a)%Z 16%nat (0x8082)%Z)
-; ((1000)%Z, MkKInstr (0x80000b5c)%Z 16%nat (0x1101)%Z)
+].
+
+Definition kernel_instrs_chunk1 : list (Z * kinstr) := [
+  ((1000)%Z, MkKInstr (0x80000b5c)%Z 16%nat (0x1101)%Z)
 ; ((1001)%Z, MkKInstr (0x80000b5e)%Z 16%nat (0xec06)%Z)
 ; ((1002)%Z, MkKInstr (0x80000b60)%Z 16%nat (0xe822)%Z)
 ; ((1003)%Z, MkKInstr (0x80000b62)%Z 16%nat (0xe426)%Z)
@@ -34463,7 +34548,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((1997)%Z, MkKInstr (0x8000153a)%Z 16%nat (0x8b36)%Z)
 ; ((1998)%Z, MkKInstr (0x8000153c)%Z 16%nat (0x8aba)%Z)
 ; ((1999)%Z, MkKInstr (0x8000153e)%Z 16%nat (0x7d7d)%Z)
-; ((2000)%Z, MkKInstr (0x80001540)%Z 16%nat (0x5cfd)%Z)
+].
+
+Definition kernel_instrs_chunk2 : list (Z * kinstr) := [
+  ((2000)%Z, MkKInstr (0x80001540)%Z 16%nat (0x5cfd)%Z)
 ; ((2001)%Z, MkKInstr (0x80001542)%Z 32%nat (0x1acdc93)%Z)
 ; ((2002)%Z, MkKInstr (0x80001546)%Z 16%nat (0x6c05)%Z)
 ; ((2003)%Z, MkKInstr (0x80001548)%Z 16%nat (0xa005)%Z)
@@ -35485,7 +35573,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((2997)%Z, MkKInstr (0x80001f8c)%Z 32%nat (0xcb7fe0ef)%Z)
 ; ((2998)%Z, MkKInstr (0x80001f90)%Z 32%nat (0x16848493)%Z)
 ; ((2999)%Z, MkKInstr (0x80001f94)%Z 32%nat (0x3348063)%Z)
-; ((3000)%Z, MkKInstr (0x80001f98)%Z 16%nat (0x8526)%Z)
+].
+
+Definition kernel_instrs_chunk3 : list (Z * kinstr) := [
+  ((3000)%Z, MkKInstr (0x80001f98)%Z 16%nat (0x8526)%Z)
 ; ((3001)%Z, MkKInstr (0x80001f9a)%Z 32%nat (0xc21fe0ef)%Z)
 ; ((3002)%Z, MkKInstr (0x80001f9e)%Z 16%nat (0x709c)%Z)
 ; ((3003)%Z, MkKInstr (0x80001fa0)%Z 32%nat (0xff2795e3)%Z)
@@ -36515,7 +36606,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((3997)%Z, MkKInstr (0x80002a2a)%Z 16%nat (0xe529)%Z)
 ; ((3998)%Z, MkKInstr (0x80002a2c)%Z 16%nat (0x854a)%Z)
 ; ((3999)%Z, MkKInstr (0x80002a2e)%Z 32%nat (0xcc6ff0ef)%Z)
-; ((4000)%Z, MkKInstr (0x80002a32)%Z 16%nat (0x8526)%Z)
+].
+
+Definition kernel_instrs_chunk4 : list (Z * kinstr) := [
+  ((4000)%Z, MkKInstr (0x80002a32)%Z 16%nat (0x8526)%Z)
 ; ((4001)%Z, MkKInstr (0x80002a34)%Z 32%nat (0xa0efe0ef)%Z)
 ; ((4002)%Z, MkKInstr (0x80002a38)%Z 32%nat (0xcf8ff0ef)%Z)
 ; ((4003)%Z, MkKInstr (0x80002a3c)%Z 16%nat (0x8526)%Z)
@@ -37537,7 +37631,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((4997)%Z, MkKInstr (0x80003522)%Z 16%nat (0xdbc1)%Z)
 ; ((4998)%Z, MkKInstr (0x80003524)%Z 16%nat (0x854a)%Z)
 ; ((4999)%Z, MkKInstr (0x80003526)%Z 32%nat (0xf50ff0ef)%Z)
-; ((5000)%Z, MkKInstr (0x8000352a)%Z 16%nat (0xbf7d)%Z)
+].
+
+Definition kernel_instrs_chunk5 : list (Z * kinstr) := [
+  ((5000)%Z, MkKInstr (0x8000352a)%Z 16%nat (0xbf7d)%Z)
 ; ((5001)%Z, MkKInstr (0x8000352c)%Z 16%nat (0x70e2)%Z)
 ; ((5002)%Z, MkKInstr (0x8000352e)%Z 16%nat (0x7442)%Z)
 ; ((5003)%Z, MkKInstr (0x80003530)%Z 16%nat (0x74a2)%Z)
@@ -38556,7 +38653,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((5997)%Z, MkKInstr (0x80003fc2)%Z 16%nat (0x4785)%Z)
 ; ((5998)%Z, MkKInstr (0x80003fc4)%Z 16%nat (0xc09c)%Z)
 ; ((5999)%Z, MkKInstr (0x80003fc6)%Z 32%nat (0x915fd0ef)%Z)
-; ((6000)%Z, MkKInstr (0x80003fca)%Z 16%nat (0x591c)%Z)
+].
+
+Definition kernel_instrs_chunk6 : list (Z * kinstr) := [
+  ((6000)%Z, MkKInstr (0x80003fca)%Z 16%nat (0x591c)%Z)
 ; ((6001)%Z, MkKInstr (0x80003fcc)%Z 16%nat (0xd49c)%Z)
 ; ((6002)%Z, MkKInstr (0x80003fce)%Z 16%nat (0x854a)%Z)
 ; ((6003)%Z, MkKInstr (0x80003fd0)%Z 32%nat (0xc73fc0ef)%Z)
@@ -39571,7 +39671,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((6997)%Z, MkKInstr (0x80004a6c)%Z 32%nat (0x7c703)%Z)
 ; ((6998)%Z, MkKInstr (0x80004a70)%Z 16%nat (0xc30d)%Z)
 ; ((6999)%Z, MkKInstr (0x80004a72)%Z 16%nat (0x785)%Z)
-; ((7000)%Z, MkKInstr (0x80004a74)%Z 32%nat (0x2f00693)%Z)
+].
+
+Definition kernel_instrs_chunk7 : list (Z * kinstr) := [
+  ((7000)%Z, MkKInstr (0x80004a74)%Z 32%nat (0x2f00693)%Z)
 ; ((7001)%Z, MkKInstr (0x80004a78)%Z 16%nat (0xa801)%Z)
 ; ((7002)%Z, MkKInstr (0x80004a7a)%Z 16%nat (0x8c4a)%Z)
 ; ((7003)%Z, MkKInstr (0x80004a7c)%Z 16%nat (0x4481)%Z)
@@ -40587,7 +40690,10 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((7997)%Z, MkKInstr (0x80005584)%Z 16%nat (0x74a2)%Z)
 ; ((7998)%Z, MkKInstr (0x80005586)%Z 16%nat (0x6121)%Z)
 ; ((7999)%Z, MkKInstr (0x80005588)%Z 16%nat (0x8082)%Z)
-; ((8000)%Z, MkKInstr (0x8000558a)%Z 16%nat (0x0)%Z)
+].
+
+Definition kernel_instrs_chunk8 : list (Z * kinstr) := [
+  ((8000)%Z, MkKInstr (0x8000558a)%Z 16%nat (0x0)%Z)
 ; ((8001)%Z, MkKInstr (0x8000558c)%Z 16%nat (0x0)%Z)
   (* <kernelvec> @ 0x80005590 *)
 ; ((8002)%Z, MkKInstr (0x80005590)%Z 16%nat (0x7111)%Z)
@@ -41206,5 +41312,12 @@ Definition kernel_instrs : gmap Z kinstr := list_to_map [
 ; ((8605)%Z, MkKInstr (0x8000611e)%Z 16%nat (0x7928)%Z)
 ; ((8606)%Z, MkKInstr (0x80006120)%Z 32%nat (0x10200073)%Z)
 ].
+
+Definition kernel_instrs : gmap Z kinstr :=
+  list_to_map (List.concat [
+    kernel_instrs_chunk0; kernel_instrs_chunk1; kernel_instrs_chunk2; kernel_instrs_chunk3;
+    kernel_instrs_chunk4; kernel_instrs_chunk5; kernel_instrs_chunk6; kernel_instrs_chunk7;
+    kernel_instrs_chunk8
+  ]).
 
 Global Typeclasses Opaque kernel_instrs.
