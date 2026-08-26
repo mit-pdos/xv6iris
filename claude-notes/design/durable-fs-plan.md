@@ -275,7 +275,13 @@ the raw bytes as such.  Under the clean-header premise `initlog` carries
 today (`n = 0`, fs-log.md stage 4) `D` IS the raw home set, so every
 existing boot tie (`BioInv.pool_blk`, `FsBlocks.bytes_tie`, the mirror at
 `mirror_of (fs_blocks dk)`, `SpecInitlog`'s `lm_view` row) holds unchanged
-and the mint needs no reordering.  Real recovery (`n > 0`) is where the
+and the mint needs no reordering.  THAT PREMISE IS AS REFUTABLE AS
+`Himg` (any trace with a mid-commit crash), so it is NEVER restated as a
+premise of the theorem — no "clean header at every boot" trace
+assumption exists or may be added.  `Himg` stays in the theorem's
+statement until real recovery lands and both go together; the
+theorem's assumption list is then era 0's image and nothing else
+(the `make audit-only` baseline is the check).  Real recovery (`n > 0`) is where the
 pre-install window appears: the ≤ LOGSIZE pending home blocks read raw on
 the physical disk while `L = D` says otherwise.  That discrepancy is the
 WAL's to carry — it owns the physical disk and the log region inside the
