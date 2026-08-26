@@ -2349,7 +2349,12 @@ so it never wanted that shape.
   one — `fs_state Γ S ∗ auth Γ ==∗ fs_state Γ S ∗ auth Γ ∗ fs_state Γ' S ∗
   auth Γ'`, the fresh map built by insertion one fragment at a time,
   values by agreement with the source auth, the fresh-key condition from
-  the source fragments' exclusivity INSIDE the lemma.  Then `snap_bytes`
+  the source fragments' exclusivity INSIDE the lemma.  THE CARVE IS AN
+  ARTIFACT OF THE INPUT TYPE: with the era's `fs_state` as input, each
+  inode's fresh elements are minted from that inode's OWN era fragments
+  (the ∗ shape is inherited bundle by bundle), so nothing is ever split
+  by a fact — `sk_disj` exists only because the allocator takes a byte
+  map.  Then `snap_bytes`
   loses every whole-map and cut clause; `snap_ok` is the byte agreements
   plus `snap_local`; `fs_collect_snap_ok` concludes with the instance;
   the era-0 image path produces a resource instance directly.  Contained
