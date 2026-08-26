@@ -2166,10 +2166,17 @@ Section ProofMain.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
-                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
+                  Hnproc with "Hhw Hmin Htext") as "#Hkvs".
+    (* THE CAPS FAMILY IS PINNED, not left to unification: the goal is
+       [?C cur_ctx] against a seven-conjunct bundle, which is higher-order.
+       And [(XI := ...)] stays ambient here on purpose -- this hart IS the
+       installer, so its own context is the one the deposit is made at. *)
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+                 (devintr_caps_fam γd γv γk γtl γs pd pav pu)
+                 kernelvec_tv_direct kernelvec_stvec_base
+                 with "Hq Hstvec [] []")
       as "Hintr".
+    { iModIntro. iExact "Hcaps". }
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu

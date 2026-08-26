@@ -59,20 +59,31 @@ Lemma kernelvec_stvec_base :
     = (mword_of_int KernelSyms.kernelvec : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
-(* THE FOUR PERSISTENT PREMISES ARE THE WHOLE CALLER SURFACE, and the reason
-   there are four rather than three is that kernelvec now calls the REAL
-   kerneltrap: its cone (devintr -> uartintr / virtio_disk_intr / clockintr)
-   needs the device invariants, the two locks, the timer capability, the tick
-   keeper and [procs_inv] -- all of which [devintr_caps]
-   bundles and all of which are persistent, so the [□] handler contract can
-   close over them.  Nothing else is needed: everything the HANDLER gets per
-   trap rides inside [IntrDefs.ihs_entry_of].
+(* THE THREE PERSISTENT PREMISES ARE THE WHOLE CALLER SURFACE.  kernelvec
+   calls the REAL kerneltrap, whose cone (devintr -> uartintr /
+   virtio_disk_intr / clockintr) needs the device invariants, the two locks,
+   the timer capability, the tick keeper and [procs_inv] -- all of which
+   [SpecDevintr.devintr_caps] bundles and all of which are persistent.
 
-   THE BOOT CONSEQUENCE, and it is an ORDERING one: whoever builds [intr_res]
-   must hold these, so [main] can no longer fold the resource the instant
-   trapinithart writes stvec -- the disk lock does not exist until
-   virtio_disk_init.  The stvec cell rides raw (that is what [trap_csrs_raw] is
-   for) until the last credential is in hand. *)
+   THERE USED TO BE A FOURTH PREMISE, [devintr_caps] itself, and the M2
+   RULING (tso-port.md §0.10′, design problem 2) MOVED IT INSIDE THE
+   CONTRACT'S ∀.  Why: since the M1 flip the bundle is genuinely
+   ξ-dependent (its [is_lock]/[inv] handles close over [<{ P }>] payloads
+   elaborated at the AMBIENT context), so a bundle captured HERE would be
+   the INSTALLING thread's, while the handler body runs on the TRAPPING
+   thread's stack, at the trapping thread's ξ, and the two are different
+   propositions.  The contract therefore names the credential FAMILY
+   ([SpecDevintr.devintr_caps_fam]) and takes its member at the trapping
+   thread's context, per invocation; the trapping thread supplies it out of
+   its own [IntrDefs.intr_res].  Everything else the HANDLER gets per trap
+   still rides inside [IntrDefs.ihs_entry_of].
+
+   THE BOOT CONSEQUENCE IS UNCHANGED, and it is still an ORDERING one:
+   whoever builds [intr_res] must hold the credentials AT ITS OWN CONTEXT,
+   so [main] can no longer fold the resource the instant trapinithart writes
+   stvec -- the disk lock does not exist until virtio_disk_init.  The stvec
+   cell rides raw (that is what [trap_csrs_raw] is for) until the last
+   credential is in hand. *)
 Definition kernelvec_handler_spec_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
@@ -81,8 +92,8 @@ Definition kernelvec_handler_spec_body
   hw_config -∗
   minstret_inv -∗
   kernel_text -∗
-  devintr_caps γu γv γdk γtl γs pd pav pu -∗
-  intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64).
+  intr_handler_spec KT1 (devintr_caps_fam γu γv γdk γtl γs pd pav pu)
+    (mword_of_int KernelSyms.kernelvec : mword 64).
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :

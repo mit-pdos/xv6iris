@@ -216,6 +216,188 @@ memory-model interp bundle; the σ-callback obligation shapes split:
 - Barrier/AMO leaves mint `hart_view_lb` (`twin_passed_get`) — the M2
   receipt's honest producer.
 
+### §6 amendments (orchestrator rulings, step-5 tranche 1)
+
+Four questions the paragraph above did not answer, raised by the
+`HartBlock`/`RiscvExec` port and ruled on here.  Same convention as the
+RULINGs: revisit is welcome, silence is consent.
+
+A6.1 **THE INTERP BUNDLE IS `tso_interp_of`, AND IT LIVES IN
+`RiscvExec.v`.**  `RiscvPtsto.tso_interp_at` is stated at a `gstate` and
+holds `view_auth … (avf g)` — the WHOLE per-agent view function — but a
+leaf works at `mstate` and must never see `g`.  The bundle handed to a
+leaf is therefore the gstate-free repackaging
+
+    tso_interp_of E (img mem : gmap Arch.pa (bv 8))
+                    (log : list pwmsg) (V : agent -> nat)
+
+= `tso_interp_at`'s body with `gimg/gmem/glog/avf g` abstracted, and
+`⌜mm_ok g⌝` restated as its two pure ties (`mem = flat img log` and
+`∀ h, V h ≤ length log`).  `V` is handed over ABSTRACTLY, together with
+`⌜V h = tv⌝` for the focused hart; the callback returns the bundle at the
+FUNCTION UPDATE (`λ h', if h' = h then tv' else V h'`) and the lifting
+rule discharges `that = avf g'`.  It lives in `RiscvExec.v` behind a
+`⊣⊢` with `tso_interp_at` rather than definitionally in `RiscvPtsto.v`:
+every leaf already `Require`s `RiscvExec`, and iterating on `RiscvPtsto`
+costs a ~20-minute rebuild per attempt.  If the `⊣⊢` unfolding later
+measures as a proof-performance hazard, moving it definitionally into
+`RiscvPtsto.v` is a MECHANICAL follow-up — a marker to that effect stays
+in the `RiscvExec.v` header.
+
+A6.2 **THE DMA'S FOUR GHOST STEPS ARE `wp_disk_step`'s, AND THE
+TIMESTAMP AUTHORITY IS A CALLBACK OBLIGATION.**  §2's disk arm appends
+`PWMsg W disk_agent`, so `wp_disk_step` owes the same four steps
+`Wobl_ram` owes (γts to the new top over `dom W`, γlogm persist,
+`mono_nat` bump, view).  The view half is FREE: `avf` pins the disk agent
+to `length glog`, so the append moves it with no update.  The γts half is
+NOT free and cannot be done by the rule alone — the `era_ts_name`
+fragments for `W`'s addresses ride inside the CLIENT's `ctx_pointsto` at
+the client's own dq — so the timestamp authority is handed to the
+callback exactly as the image auth already is, and the callback owes it
+back at the appended log.
+
+A6.3 **THE POWER ARMS' ERA WIPE LANDS WITH ADEQUACY (step 6).**  §2's
+last bullet (`gimg := reset memory`, `glog := []`, `gtv := λ_, 0`,
+`gmem := gimg`) has no lifting rule in `RiscvExec.v` and does not get one
+here; the fresh era's `tso_interp_at` allocation is part of step 6's
+initial-state ghosts.  A one-line marker sits where the lifting rules
+live.
+
+A6.4 **NO gstate-LEVEL `all_own` MACHINERY NOW** (open item for step 6).
+`HartBlock`'s solo-block bracket is proven under the per-step ties
+`s.(mem) = flat img log` and `all_own h log` (RULING 3, discharged);
+`RiscvExec.hart_block_exec` closes it against `exec`.  Neither has a
+CONSUMER anywhere in the tree, so the `gstate`-level fact that would feed
+them is deliberately not built.  The finding to carry into the adequacy
+work: at `gstate` level the solo era means "solo hart AND no DMA yet" —
+the disk arm appends `PWMsg W disk_agent`, which breaks `all_own` for any
+hart — so a boot bracket that wants it must be stated over the stretch
+before the disk thread's first DMA, not merely before the other harts are
+released.
+
+A6.5 **THE BARRIER STAYS A SILENT NODE, AND THE SILENT STRETCH CARRIES
+THE VIEW** (raised by the step-5 lifting port; NEEDS RATIFICATION).
+`HartLift.hsil_node` — the silent-stretch walker every register-only
+window is proven with — accepts `Interface.Barrier` along with the
+announce class.  Post-flip that is no longer view-neutral: a fence with a
+W→R edge DRAINS, so "silent node ⇒ the machine state is unchanged" is
+FALSE for `fence rw,rw`.  Three ways out were available; the one taken is
+the middle one, chosen because it is the only one that does not
+invalidate existing proofs:
+
+- drop `Barrier` from `hsil_node` (every silent stretch that walks over a
+  fence it does not care about breaks — rejected);
+- keep it silent and let the stretch CARRY the view: a new
+  `HartLift.hsil_tv` / `hbar_tv` names the node's view effect
+  (`fence_post` at a barrier, `tv` at everything else), the bridge lemmas
+  conclude at `hsil_tv …` instead of at `tv`, and `wp_hsil_node` /
+  `wp_hsil2_node` / `wp_hspan_node_local` pay one MONOTONE
+  `RiscvExec.tso_interp_of_advance` — TAKEN;
+- fuse the fence's receipt into the stretch (rejected: it would make
+  every silent window mint `hart_view_lb`, which is not sound to hand out
+  unconditionally).
+
+CONSEQUENCE FOR §6's BARRIER LEAF (ratified): it stays a SEPARATE rule
+over the same node, for the proof that wants the acquire receipt.  A
+barrier walked by a silent stretch drains but DELIBERATELY PRODUCES NO
+RECEIPT; a barrier stepped by the leaf drains and mints one.  Two ways to
+step a fence, both sound, the proof picks — and the LEAF IS THE ONLY
+PLACE A RECEIPT IS BORN, which is what keeps the receipt's meaning sharp.
+
+A6.6 **THE READ RULE SPLITS, AND THE RECEIPT IS MINTED WHERE THE VIEW
+AUTHORITY IS OPEN.**  Two decisions about `HartEvents.v`, the §6 leaf
+file.
+
+(a) THE SPLIT.  `wp_hart_ram_read` decided only `ak_excl`; the flipped
+`MemRead` arm has THREE RAM branches, so the rule becomes two:
+
+  - `ak_strong = true` (ifetch / page walk, RULING 1) keeps today's
+    obligation verbatim — a `read_bytes σ.(mem)` fact.  This is §6's
+    `Mobl_ram`.
+  - `ak_strong = false` (the plain explicit load) takes §6's
+    `Mobl_ram_plain`: the caller exhibits `w` and proves
+    `∀ j < n, ∀ tv', tv ≤ tv' → tv' ≤ length log →
+       tso_read img log (hart_agent cpu_id) (pa_add pa j) tv' =
+       Some (nth_byte w j)`,
+    and the rule then advances the view with
+    `RiscvExec.tso_interp_of_advance`.
+
+  The caller-side propagation is the INTENDED design, not collateral:
+  `HartMLoad` / `HartMFetch` / the PT trio start producing that
+  `tso_read` fact from `ctx_pointsto + own_context` through
+  `TsoCtx.twin_load_ok`'s image.  That is what the whole twin exists for.
+
+(b) THE RECEIPT.  The EXCLUSIVE READ rule — and the conditional/AMO write
+whose success arm takes the view past its own append — MINTS the
+machine-level receipt IN ITS POSTCONDITION, `TsoGhost.view_lb` at
+`(hart_agent cpu_id)` and the new top, handed to the callback beside the
+bundle.  Rationale: the rule is the one moment the view authority is in
+hand AT THE TOP; a separate `twin_passed_get` wrapper would have to
+re-open the interpretation later, which is strictly worse; and a
+persistent receipt costs a consumer that does not want it nothing.
+`TsoCtx.hart_view_lb` stays the Σ-SURFACE WRAPPER over this machine-level
+fact — `HartEvents.v` must NOT import `TsoCtx` to state it.
+
+A6.7 **RULING 1 HAS NO IMPLEMENTATION: `ak_strong` IS IDENTICALLY FALSE ON
+EVERYTHING THIS MODEL EMITS** (blocking; NEEDS A RULING).  Found while
+porting `HartEvents.v`; it is upstream of the whole leaf-consumer tier.
+
+THE FACT.  `RiscvLang.ak_strong` is `true` only for `AK_ifetch` and
+`AK_ttw`.  The generated model produces `AK_ifetch` from exactly one
+place — `read_ram`'s `Read_ifetch` arm — and **nothing in the model ever
+passes `Read_ifetch`**: it occurs only in that arm and in
+`undefined_read_kind`'s pick list.  `AK_ttw` is never produced at all.
+Every read this tree performs is built by
+`read_ram <kind> (Physaddr pa) n false`, and the resulting `ReadReq` is
+BYTE-FOR-BYTE IDENTICAL for an instruction fetch, a page-table walk and
+an ordinary data load:
+
+    access_kind = AK_explicit {AV_plain; AS_normal};  va = None;
+    translation = tt;  tag = false
+
+(`HartMFetch.mread_req`/`mread_req2`/`mread_req8`, `HartSMem.mread_req1`
+— all the same record).  Only the RESERVED reads differ
+(`AV_exclusive`).  So at the `MemRead` node there is NO INFORMATION
+distinguishing a fetch or a walk from a data load.
+
+THE CONSEQUENCE.  The strongly-ordered RAM-read arm of `mnode_step` is
+DEAD CODE, §6's `Mobl_ram` has no non-exclusive instances, and every
+fetch and every PTE read lands on the PLAIN TSO ARM — owing
+`Mobl_ram_plain`.  For TEXT that is cheap (timestamp 0 is visible at
+every view: `TsoMemPa.read_down_0`).  For PAGE TABLES it is not: xv6
+writes its page tables at run time (`kvmmake`, `uvmcreate`, `freewalk`,
+the Svadu A/D write-back), so those bytes live in the LOG and the walker
+would need the full `ctx_pointsto + own_context` twin.  That is exactly
+the expansion RULING 1 was written to prevent ("this keeps the whole
+fetch-geometry and TLB lanes' proofs against `gen_heap`(flat) … out of
+the port").
+
+THE THREE WAYS OUT (a ruling is needed before the consumer tier can move):
+
+- **(A) No strong arm; "flat" callers discharge `Mobl_ram_plain` from a
+  STABILITY fact.**  No `RiscvLang.v` change, no full rebuild.  Text is a
+  one-liner (`latest img log a 0 v` + `tso_read_of_latest`), but the PT
+  lanes genuinely enter the port.  Honest, and does NOT deliver RULING 1.
+- **(B) Make the machine's fetch/PTW arm real** by having the model
+  wrapper emit `AK_ifetch`/`AK_ttw` for those accesses.  Delivers RULING
+  1 exactly as written and keeps the fetch/TLB lanes flat, but touches
+  the generated-model boundary: every `mread_req*` record and its
+  `hread_req_at_*` lemma moves, plus a full rebuild.
+- **(C) Classify by ADDRESS CLASS, not by request.**  Two leaf rules, the
+  flat one gated on a predicate (`addr_is_text`, "in a kernel page-table
+  page").  No model change, keeps the walker flat, matches the standing
+  "text is timestamp-0" ruling — but the page-table half is a real
+  coherence assumption (nobody stores to a PTE concurrently with a walk)
+  that has to be justified, not gifted.
+
+WHAT IS ALREADY IN PLACE.  `HartEvents.v` is green and carries BOTH read
+rules — `wp_hart_ram_read_strong` (§6's `Mobl_ram`, today's flat
+obligation verbatim, currently INSTANCE-FREE) and
+`wp_hart_ram_read_plain` (§6's `Mobl_ram_plain`) — plus their `swp`
+forms.  The bare names `wp_hart_ram_read`/`swp_hart_ram_read` are GONE ON
+PURPOSE, so every call site is forced to say which it means and the red
+list is exactly the set of decisions this ruling settles.
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no

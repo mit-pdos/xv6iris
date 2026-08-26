@@ -551,6 +551,10 @@ rounds at ~3-6 files each; the loop and fix recipes are
    line 1429 — the remaining mismatch is the caps premise).  Fix
    direction: caps premise moves inside `intr_handler_spec`'s ∀,
    supplied by the trapping thread.
+   **LANDED 2026-08-26 — SEE §0.11′, which governs.**  The direction
+   held; the supply channel had to be designed (the premise cannot be
+   a new hypothesis on the trap engine — 425 files state
+   `sie_cap_gpr`), and `intr_res` is context-indexed as a result.
 
 **What the REAL cutover still needs after all the above is green:**
 (i) add the real construction's ghost state — one mono_nat per context
@@ -564,6 +568,118 @@ gen_heap — exactly the sites now marked by shim conversions, so
 `grep -l TsoCtxShim iris/*.v` is that worklist, honest again;
 (iv) the two design problems above (they are prerequisites: their
 fixes remove the last is_lock-handle crossings).
+
+### 0.11′ DESIGN PROBLEM 2 IS LANDED — THE TRAP HANDLER'S CAPS ARE TRAPPER-SUPPLIED (2026-08-26)
+
+**Status: green.** After this change the full tree is red at
+`UtResFits.v:169` ONLY (design problem 1, the deliberate `Abort`).
+`ProofKernelvec.v:1681` is gone.
+
+**The statement change, old vs new.**
+
+```
+  (* IntrDefs, before *)                  (* IntrDefs, after *)
+  ires_of (S : CPU -d> iProp)             ires_of (T : caps_fam -d> CPU -d> mword 64 -d> iProp)
+    : CPU -d> iProp                         : CtxId -d> CPU -d> iProp
+  := λ c, ∃ h b, … ∗ ▷ S c h             := λ ξ c, ∃ h b (C : caps_fam),
+                                                     … ∗ □ C ξ ∗ ▷ T C c h
+  ihs_body_of kt R handler                ihs_body_of kt R C handler
+  := □ ∀ XIb m av p pc0 sc tv,            := □ ∀ XIb m av p pc0 sc tv,
+       ihs_trap_of (XI:=XIb) kt R …            □ C XIb -∗
+                                               ihs_trap_of (XI:=XIb) kt (R XIb) …
+  intr_handler_spec kt handler            intr_handler_spec kt C handler
+  intr_res kt   (ξ-FREE)                  intr_res kt   (arity unchanged, ξ-INDEXED:
+                                            ∃ C, … ∗ □ C cur_ctx ∗ ▷ ihs kt C h)
+  kernelvec_handler_spec_body:            kernelvec_handler_spec_body:
+    … -∗ devintr_caps γ… -∗                 … -∗
+    intr_handler_spec KT1 kernelvec         intr_handler_spec KT1
+                                              (devintr_caps_fam γ…) kernelvec
+```
+
+`caps_fam := CtxId -d> iPropO Σ`, and `SpecDevintr.devintr_caps_fam
+γu γv γdk γtl γs pd pav pu := λ ξ, devintr_caps (XI := ξ) …` is the
+NAMED persistent family (with `devintr_caps_fam_at`, the
+member-at-a-named-context bridge).  Named deliberately: the park
+protocol's resumer-supplied bundle wants the same shape.
+
+**Why the obvious readings of the fix do not work, and what does.**
+- `intr_handler_spec` lives in `IntrDefs`, at leaf altitude; it CANNOT
+  name `devintr_caps` (SpecDevintr sits above it, through WpLock /
+  SchedCtx / DiskInv / SpecClockintr / SpecConsoleintr).  So the caps
+  premise had to become an ABSTRACT family parameter.
+- "the trapping thread supplies it at each trap" cannot be read as a
+  new premise on the trap engine: `WpIntrInv.wp_exec_step_intr` is
+  what `WpSmodeIntr.wp_instr_s_sconf` runs, and **425 files** state
+  `sie_cap_gpr`.  A premise there is the whole tree.
+- THE CHANNEL THAT COSTS NOTHING is `intr_res` itself.  It is the
+  trapping thread's own resource (it rides `trap_csrs` inside the
+  enabled arm), so it is already stated at the holder's ambient
+  context in every file.  Binding the family EXISTENTIALLY inside it
+  (`∃ C, □ C cur_ctx ∗ ▷ ihs kt C h`) keeps `intr_res` / `trap_csrs` /
+  `sie_arm` / `sie_cap` / `sie_cap_gpr` at their current ARITIES — so
+  the 425 files are untouched — while making the resource re-supply
+  the credentials at whatever context is holding it when the trap
+  fires.  Only `intr_handler_spec` names the family, because only
+  kernelvec's producer and the engine have to agree on WHICH
+  credentials a given installed handler wants.
+
+**Two things §0.10′ got wrong.**
+1. It described the fix as local ("the caps premise moves inside
+   `intr_handler_spec`'s ∀, supplied by the trapping thread").  The
+   premise move is right, but the SUPPLY had to be designed: there is
+   no channel from a trapping thread to the handler except
+   `ihs_entry_of`/`intr_res`, both at IntrDefs altitude.
+2. It implied `intr_res` could stay context-free.  It cannot: the
+   supply is what makes it context-indexed.  The old header comment
+   ("`ihs`/`intr_res`/`trap_csrs` therefore do NOT depend on the
+   ambient XI") is now false for the last two and is corrected in
+   place.  **`ihs` itself IS still context-generic** — which is why
+   `ires_of` had to take ξ as an EXPLICIT argument rather than reading
+   the ambient: reading the ambient captures the INSTALLER's context
+   inside the fixpoint and re-creates the bug one level down (caught
+   by `sie_cap_gpr_of_eq` failing to rewrite at `XIc`).
+
+**MEASURED, and worth keeping:** of `devintr_caps`' seven conjuncts,
+only `dev_inv` and `timer_cap` cross two context variables; the other
+five (`console_caps`, `disk_geom`, the disk `is_lock`, `tick_keeper`,
+`procs_inv`) fail an `iExact` under the hermetic seal.  All five fail
+for ONE reason: `is_lock γ lk s R` is ξ-free GIVEN `R`, and the tree
+spells its payloads `<{ P }>` (`const_pay`, i.e. `P` at the ambient).
+So the ξ-dependence of every handle in the tree is an artifact of the
+constant embedding, not of the semantics — and the alternative fix
+(λ-convert those payloads, kmem recipe, so the handles become closed
+terms) is blocked only by `CtxMorph proc_lock_res`, i.e. by exactly
+the ▷/fixpoint-capable transport design problem 1 needs.  **The two
+design problems have the same root; this one was routed around it,
+design problem 1 still faces it.**
+
+**What the change did NOT disturb, which was the risk:** `trap_csrs`
+rides the swtch payload (`SchedCtx.p_sched`, both directions), so
+making it context-indexed could have broken the park/resume chain.  It
+did not — the whole scheduler cone (`SchedCtx`, `ProofSched`,
+`ProofScheduler`, `ProofSwtch`, `ProofYield`, `ProofSleep`) compiled
+UNCHANGED, because each proof is internally at one ambient context.
+The only mechanical fallout was: `∃`-binder + one `_` at the six
+`rewrite /intr_res` destructuring sites (`WpSconfSret`, `WpSconfCsr`
+×3, `ProofPrepareReturn`, `ProofKernelvec` ×2, `WpIntrInv`), a caps
+slot on `intr_res_intro`'s five callers, a `C` parameter on
+`WpIntrInv.intr_psi` and on `UsertrapRes.ut_trap_csrs_fold` /
+`ut_csrs_raw_fold` / `ProofUsertrap.ud_hold`.  12 files, 4 build
+rounds.
+
+**Two gotchas, both worth the hour they cost:**
+- `solve_contractive` no longer discharges `ires_of_contractive`: the
+  recursive occurrence is applied THREE deep (`T C c h`), and the
+  tactic's `f_equiv` will not walk a three-fold discrete-fun
+  application down to the hypothesis.  Naming it in the fallback chain
+  (`solve_proper_core ltac:(fun _ => first [ (f_contractive; simpl) |
+  apply HT | f_equiv ])`) is the whole fix.
+- `(XI := …)` must be SPELLED at every site that touches a fact at the
+  trap context — `ProofKernelvec`'s two `_of_eq` bridges need
+  `(XI := XIc)`, and the caps family must be PINNED at
+  `intr_res_intro` in `ProofMain`/`ProofMainSecondary` (leaving `_`
+  makes the goal `?C cur_ctx` against a seven-conjunct bundle:
+  higher-order, fails).  §0.8′ rule 3's hazard, exactly.
 
 ---
 

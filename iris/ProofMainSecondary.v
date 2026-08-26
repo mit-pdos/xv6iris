@@ -686,10 +686,17 @@ Section ProofMainSecondary.
     { rewrite /devintr_caps.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γk γs pd pav pu
-                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
+                  Hnproc with "Hhw Hmin Htext") as "#Hkvs".
+    (* THE CAPS FAMILY IS PINNED, not left to unification: the goal is
+       [?C cur_ctx] against a seven-conjunct bundle, which is higher-order.
+       And [(XI := ...)] stays ambient here on purpose -- this hart IS the
+       installer, so its own context is the one the deposit is made at. *)
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+                 (devintr_caps_fam γd γv γk γk γs pd pav pu)
+                 kernelvec_tv_direct kernelvec_stvec_base
+                 with "Hq Hstvec [] []")
       as "Hintr".
+    { iModIntro. iExact "Hcaps". }
     { iApply bi.later_intro. iExact "Hkvs". }
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)

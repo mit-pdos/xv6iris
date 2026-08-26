@@ -415,7 +415,11 @@ Section UsertrapRes.
      [sie_ghost_flip] needs all three fractions and the quarter is not inside
      an [intr_res] to be found in.  xv6 writes stvec first and enables
      interrupts (the [csrsi] at +0xa2) only on the syscall arm, long after. *)
-  Lemma ut_trap_csrs_fold (ep sc st : mword 64) :
+  (* [C] AND [□ C cur_ctx] ARE THE M2 CAPS CHANNEL (tso-port §0.10′ design
+     problem 2): the installed contract names the credential family it wants,
+     and the thread folding the resource deposits ITS OWN member, at ITS OWN
+     context, for whichever thread later traps to read back out. *)
+  Lemma ut_trap_csrs_fold (C : CtxId -d> iPropO Σ) (ep sc st : mword 64) :
     sepc ↦ᵣ ep -∗
     scause ↦ᵣ sc -∗
     stval ↦ᵣ st -∗
@@ -423,10 +427,11 @@ Section UsertrapRes.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    □ C cur_ctx -∗
+    intr_handler_spec KT1 C (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
-    iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
+    iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hc #Hih".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
     - rewrite /trap_csrs_raw.
       iSplitL "Hep"; [iExists ep; iExact "Hep" |].
@@ -434,8 +439,8 @@ Section UsertrapRes.
       iSplitL "Hst"; [iExists st; iExact "Hst" |].
       iExists ('b"0" : mword 1), ('b"1" : mword 1). iExact "Hsret".
     - iApply (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64)
-                ('b"0" : mword 1) kernelvec_tv_direct kernelvec_stvec_base
-                with "Hq Hstv [Hih]").
+                ('b"0" : mword 1) C kernelvec_tv_direct kernelvec_stvec_base
+                with "Hq Hstv Hc [Hih]").
       iApply bi.later_intro. iExact "Hih".
   Qed.
 
@@ -1565,13 +1570,15 @@ Section UsertrapRes.
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
      kpt_on cpu_id)%I.
 
-  Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
+  Lemma ut_csrs_raw_fold (C : CtxId -d> iPropO Σ) (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    □ C cur_ctx -∗
+    intr_handler_spec KT1 C (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
-    iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".
-    iApply (ut_trap_csrs_fold ep sc st with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hih").
+    iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hc #Hih".
+    iApply (ut_trap_csrs_fold C ep sc st
+              with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hc Hih").
   Qed.
 
   (* EVERYTHING ELSE A BLOCK CARRIES, at its own SIE index: the per-cpu

@@ -160,6 +160,55 @@ Section DevintrCaps.
 
 End DevintrCaps.
 
+(* ===================================================================== *)
+(* THE SAME BUNDLE AS A CONTEXT-INDEXED FAMILY -- what the trap handler's  *)
+(* contract takes.                                                        *)
+(*                                                                        *)
+(* M2 RULING (tso-port.md §0.10′, design problem 2).  Since the M1 flip    *)
+(* [devintr_caps] is genuinely ξ-dependent: five of its seven conjuncts    *)
+(* (console_caps, disk_geom, the disk [is_lock], tick_keeper, procs_inv)   *)
+(* fail to cross two context variables, because an [is_lock] handle closes *)
+(* over its payload family and the tree spells those payloads [<{ P }>],   *)
+(* i.e. at the AMBIENT ξ.  So the handler contract can no longer CAPTURE   *)
+(* the bundle at the installing thread's ξ: it takes this FAMILY, and      *)
+(* whichever thread traps hands in the member at its own context           *)
+(* ([IntrDefs.intr_res] is the channel -- see the comment above            *)
+(* [IntrDefs.ires_of]).                                                    *)
+(*                                                                        *)
+(* IT IS A NAMED PREDICATE, not an inlined [λ ξ, …] at the two use sites,  *)
+(* deliberately: the park protocol's resumer-supplied bundle (design       *)
+(* problem 1) is the same shape minus [procs_inv] and [disk_geom], so a    *)
+(* named family lets the two fixes share one definition later instead of   *)
+(* re-plumbing both.                                                       *)
+(*                                                                        *)
+(* [(XI := ξ)] IS SPELLED OUT, and that is not decoration: [CurCtx] is a   *)
+(* definitional class over [CtxId], so the [CtxId]-typed binder [ξ] is     *)
+(* ITSELF a typeclass candidate inside the body -- leaving the index       *)
+(* ambient is exactly tso-port.md §0.8′ rule 3's silent-capture hazard.    *)
+(* ===================================================================== *)
+Section DevintrCapsFam.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Definition devintr_caps_fam (γu : uart_names) (γv : disk_names)
+      (γdk γtl : gname) (γs : list gname)
+      (pd pav pu : mword 64) : CtxId -d> iPropO Σ :=
+    fun ξ : CtxId => devintr_caps (XI := ξ) γu γv γdk γtl γs pd pav pu.
+
+  Global Instance devintr_caps_fam_persistent γu γv γdk γtl γs pd pav pu ξ :
+    Persistent (devintr_caps_fam γu γv γdk γtl γs pd pav pu ξ).
+  Proof. rewrite /devintr_caps_fam. apply _. Qed.
+
+  (* the member at a NAMED context -- the spelling every supply site uses,
+     so that no site has to rely on the beta-redex reducing under a wand. *)
+  Lemma devintr_caps_fam_at (ξ : CtxId) (γu : uart_names) (γv : disk_names)
+      (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    devintr_caps_fam γu γv γdk γtl γs pd pav pu ξ ⊣⊢
+    devintr_caps (XI := ξ) γu γv γdk γtl γs pd pav pu.
+  Proof. reflexivity. Qed.
+
+End DevintrCapsFam.
+
 (* devintr's own frame is 4 slots; the deepest callee is uartintr at
    [SpecUartintr.uartintr_stack] = 36 (virtio_disk_intr wants 22, clockintr
    20, plic_complete 6, plic_claim 4). *)
