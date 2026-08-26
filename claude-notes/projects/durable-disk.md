@@ -2232,93 +2232,27 @@ so it never wanted that shape.
   `snap_law_run` is stated at `⊤ ∖ ↑logN`; the committer meets it exactly
   there, opening `logN` itself for the byte authority.
 
-- [ ] **Lane E — boot and the theorem (plan §5).**  Stage 4: the era's
-  instance minted from the current snapshot by `fs_state_of_ledger` +
-  the era-only extras, distributed into region/bitmap/escrow/pool
-  (`fs_cfg_alloc`, `FsBoot`, `BootShared` lose every image premise;
-  `image_dinode_fs_dinode` disappears); [(14)/(15) are already conjuncts
-  of `fs_boot_image_wf` — lane C-img did that]; then Stage I: delete `Himg`/
-  `fs_boot_image_eras`/`fsimg_at_every_era`; adequacy assumes era 0's
-  image only.  Definition of done: the boot mint CONSUMES the snapshot.
-
-  **MEASURED (CE), AND THE WALL IS BOOT ORDER — not the ghost theory, and
-  not `riscv_power_adequacy`'s shape.**  The channel 3b'' asked for is
-  already built and needs no parameter: `P_dur`'s content is PURE, so
-  `FsCrash.P_fs_project` reads `∃ S, snap_ok S D` off it and
-  `SystemAdequacy.fs_boot_pure` carries it into every era through the
-  existing `Ppure`/`Hproj`.  What blocks the mint is where the era's byte
-  view comes from:
-
-  - `FsCfgBoot.fs_cfg_alloc` (650 lines, body 563) runs at **PowerOn**
-    (`BootShared.boot_shared_alloc`), takes the RAW disk
-    `disk_bytes γv 0 (disk_read dk 0 ndisk)`, and mints the era's `fs_cache`
-    AND `fs_bytes` at ONE value map — `fs_blocks dk` — through
-    `FsBoot.fs_boot_ghosts` → `FsBoot.fs_boot_carve` → `FsBlocks.fs_alloc`
-    (the byte map is grown from the cache halves, so the two cannot disagree
-    by construction).  Two invariants then pin that value: `BioInv.pool_blk`
-    (`∃ bs, disk_block γv b bs ∗ fs_mclean γfs b bs` — ONE existential over
-    the disk cell and the cache half, and the cell arrives exclusive at the
-    raw bytes) and `FsBlocks.fs_bytes_body`'s `bytes_tie`.  The snapshot
-    stands at the COMMITTED view, which equals the raw home blocks only when
-    the on-disk log header is clean.  At a dirty log a mint at `D` falsifies
-    one of those two, and the mirror born at `mirror_of (fs_blocks dk)` in
-    `RiscvAdequacy`'s PowerOn arm falsifies `SpecInitlog`'s
-    `L !! b = Some (lm_view M b)` row as well.
-  - The only instant `L = D` on the home set is AFTER `install_trans` /
-    `write_head`, i.e. inside `initlog`, which runs at `forkret` → `fsinit` —
-    thousands of instructions after `fs_cfg_alloc`.  So the FS half of the
-    mint (`fs_boot_alloc_full`, `ftop_alloc`, `ireg_alloc`, the two
-    `*_lend_mint`s, `ipool_alloc`, `bitmap_inv_alloc`, the byte-run peels)
-    has to move behind recovery, the block half staying at PowerOn.  And
-    `IcacheBoot.icache_boot_at` consumes `ipool_rows` at `main+0x92`, before
-    `fsinit`, so it must move too or seal an EMPTY pool and be stocked later
-    through the itable lock.  `SpecFsinit`/`ProofFsinit` still carry "the
-    header is clean" as a premise; that is the same wall from the other side.
-  - `fs_cfg_alloc`'s `dv_pin`/`fv_pin` name the mkfs image's root map and
-    `/init`'s bytes AT INUM 7.  No snapshot at era N carries that, and their
-    consumer (`NameiInitPinned`) needs it, so they stay behind an era-0
-    hypothesis whatever else moves.
-
-  **THE PREMISE→SUPPLIER TABLE.**  Of `fs_cfg_alloc`'s eleven premises,
-  `Hwf` (via `fsimg_wf_sb`) is `sk_sbok`; `img_nodes_local` is `snap_local`
-  verbatim; the W1–W8 sweep behind `ipool_alloc_of_image` is
-  `FsStateEra.inode_ok_of_local`/`inode_owned_era_ok` off `snap_local` plus
-  ownership; the bitmap group is `sk_bmap`/`sk_pool`/`sk_meta_used`/
-  `sk_own_used`/`sk_disj` (indeed `free_bitmap` is already a conjunct of
-  `fs_state`); `Hnin`/`Hnib32`/`Hnib0`/`Hnibeq` are `sk_sbok` arithmetic
-  (`Hnibeq` becomes a DEFINITION of `nib` from `S`, off `sbo_bmapstart`);
-  `Hrw`'s L4 is `snap_local`'s `inl_nlink`; `Hcovin`/`Hcovmeta` stay (facts
-  about `cov`/`ndisk`, and the LOG REGION is by construction not in `D`);
-  `Hcovdata` is `sk_blk`/`sk_ind`/`sk_pool` for every block anyone owns.
-  THREE HAVE NO SUPPLIER, and all three are admissible under §4's local rule:
-
-  1. **the region's TAIL inums.**  `sk_dom` names `0 ≤ i < ninodes`; the era
-     needs `0 ≤ i < 16·nib` (`ireg_recs` is sixteen records per region block;
-     `ftop_alloc`/`ipool_alloc` run over `region_inums nib`).  A DOMAIN row,
-     and the commit can supply it — the collection's state IS the `ftop` map
-     restricted to the region (`FsCollect.col_reg_map`).  Witness at the
-     image: `img_nodes` has exactly that domain.
-  2. **a FREE inum's node is BARE**: `fn_type n = 0 → fn_bare n` (size 0,
-     thirteen zero addresses).  PER-OBJECT ⇒ into `snap_local`.  Witnessed at
-     the image by `FsImg.fs_region_bare` (conjunct (14), already inside
-     `fs_boot_image_wf`, read by `FsCfgBoot.img_node_bare`).  The price is
-     that every `iunlock` re-proves it, i.e. `inode_local` grows a clause
-     that ~40 proofs destructure — put it LAST.
-  3. **the ROOT's keep-alive slack**: `InodeRegion.ireg_keep` holds one spare
-     `link_tok` at `ROOTINO`, and `sk_links` gives tokens ≤ nlink without the
-     `+1` there.  PER-OBJECT (one inum).  Witnessed at the image by
-     `FsImg.fsimg_wf_root_link` through `FsCfgBoot.ireg_lnks_of_image`.
-
-  **SIZES.**  `fs_cfg_alloc` 650 lines (96 body lines name an image
-  function); the era-0-only decode lemmas in `FsCfgBoot` total ~633 lines
-  (`ipool_alloc_of_image` 223, `image_ireg_premises` 72, `ireg_lnks_of_image`
-  56, `img_node_bare` 56, `bitmap_res_of_image` 34, `image_dinode_fs_dinode`
-  33, …); `IcacheBoot`'s image apparatus ~200 lines plus `ireg_alloc`'s
-  13-line ∀-over-decodings premise.  `IcacheBoot.ipool_alloc` (69 lines) is
-  ALREADY image-free and is the clean boundary: `inode_owned Γ_L i n`
-  instantiates it at `(fn_rec n, bm_of n, fn_data n)`.  `BootShared`'s
-  plumbing is ~14 code lines.  Consumers whose statements move:
-  `fs_boot_image_wf`'s 20-odd sites and `fs_boot_supply`'s ~15.
+- [ ] **Lane E — the theorem (plan §5).  RULING: NO TRACE PREMISE.**
+  "The header is clean at every boot" is refutable exactly as `Himg` is
+  and must not be introduced.  Two lanes, and nothing is fixed until both
+  land:
+  - **E-boot** — the era's instance minted at PowerOn FROM THE SNAPSHOT
+    (`fs_state_of_ledger_era` off `snap_ok S D` read through the crash
+    predicate; `L` minted = `D`), the `img_*` decoders confined to era 0
+    inside `P_fs_alloc`/`FsDurImg`, the three `snap_ok` clauses CE named
+    (region tail inums, free nodes bare, root keep-alive) witnessed at the
+    image and supplied by the commit.  `xv6_power_adequacy`'s statement
+    and `Himg` untouched.
+  - **E-recover** (fs-log.md stage 4) — real `n > 0` recovery in
+    `initlog`/`install_trans` (`ProofInitlog`'s copy loop is dead code
+    today; `SpecInstallTrans` restricts to `recovering = false ∨ n = 0`),
+    with the WAL-owned exception set on `pool_blk`/`bytes_tie` for the
+    ≤ LOGSIZE pending home blocks that `install_trans` shrinks (plan §5);
+    `SpecInitlog`/`SpecFsinit`/`FirstTok` lose `hdr_n = 0`; THEN delete
+    `Himg`/`fs_boot_image_eras`/`fsimg_at_every_era`.  Definition of
+    done: `xv6_power_adequacy` assumes era 0's image (`fs_boot_image_wf`
+    at `g`'s disk, once) and nothing else; `make audit-only` at the
+    three-entry baseline.
 - [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
   individual syscalls (`mknod_durable` and its siblings) belong to the
   file-system BEHAVIOUR specification project
