@@ -55,7 +55,6 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import FsTree.        (* [dir_wins] / [dir_entry] -- the view is an [omap] *)
-Require Import DirLinks.
 Require Import FsCrash.
 Require Import LogDefs.
 Require Import LogInv.
@@ -883,45 +882,6 @@ Section FsCfgBootPool.
   Qed.
 
 
-  (* ==================================================================== *)
-  (*  THE BRIDGE, SPENT: [ireg_alloc]'s THREE WIDENED IMAGE PREMISES        *)
-  (* ==================================================================== *)
-
-  (*  [IcacheBoot.ireg_alloc] states its image obligations at the record it
-      DECODED ([IcacheBoot.image_dinode dss z]); [FsImg]'s sweeps state
-      theirs at [fs_dinode P sb z].  [image_dinode_fs_dinode] above is the
-      tie, and this is where it is spent: at [W := FsImg.fs_link_count P sb]
-      the three stage-B premises are exactly W9's three readings.
-      (The two STAGE-A premises, [image_free_nlink] (L3) and
-      [image_nlink_short] (L4), are NOT here: neither is a conjunct of
-      [fsimg_wf] -- W3 sweeps only the LIVE records -- so they still owe
-      their own image sweeps.  Recorded, not smuggled.) *)
-  Lemma image_link_premises (P : Z -> list (bv 8)) (sb : fs_sb)
-      (dss : list (list dinode)) (nib : nat) :
-    fsimg_wf P sb = true ->
-    length dss = nib -> Forall diblk_wf dss ->
-    (forall bi : nat, (bi < nib)%nat ->
-       P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
-    16 * Z.of_nat nib <= 2 ^ 32 ->
-    image_link_le (fs_link_count P sb) dss nib
-    /\ image_dir_wl0 (fs_link_count P sb) dss nib.
-  Proof.
-    intros Hwf Hl Hdwf He Hnib.
-    assert (Hbr : forall z : Z, z ∈ region_inums nib ->
-              image_dinode dss z = fs_dinode P sb z).
-    { intros z Hz. apply region_inums_spec in Hz.
-      exact (image_dinode_fs_dinode P sb dss nib z Hl Hdwf He Hz Hnib). }
-    split.
-    { intros z Hz. rewrite (Hbr z Hz).
-      pose proof (fsimg_wf_link_le P sb z Hwf).
-      pose proof (proj1 (bv_unsigned_in_range _
-                           (di_nlink (fs_dinode P sb z)))). lia. }
-    { intros z Hz Hty. rewrite (Hbr z Hz) in Hty.
-      apply (fsimg_wf_link_dir P sb z Hwf).
-      (* [InodeRegion.ireg_dir_ty] and [DirView.T_DIR_z] are the same 1 *)
-      rewrite Hty. reflexivity. }
-  Qed.
-
   (* ================================================================== *)
   (*  THE SAME SUPPLY, NAME-KEYED: [FsStateInode.ent_toks]               *)
   (*  (durable-disk 2b-inode-5)                                          *)
@@ -1491,9 +1451,10 @@ Section FsCfgBootPool.
     iPureIntro. exact Hnin.
   Qed.
 
-  (* **ALL FIVE CLAUSES OF [ireg_alloc]'s DECODING SLOT**, which is what
-      [fs_cfg_alloc] actually has to hand over.  [image_link_premises] above
-      supplies the three STAGE-B ones; the two STAGE-A ones (fs-cfg-boot.md
+  (* **ALL CLAUSES OF [ireg_alloc]'s DECODING SLOT**, which is what
+      [fs_cfg_alloc] actually has to hand over.  (Lane G6 removed two of
+      them with the ledger they were about: (L1) [image_link_le] and (T1')
+      [image_dir_wl0].)  The STAGE-A pair (fs-cfg-boot.md
       (d1) debt B) are (L3) [image_free_nlink] and (L4) [image_nlink_short],
       and they are NOT readings of [fsimg_wf]: W3 skips a type-0 record
       entirely, so the free records' link counts are unswept, and nothing
@@ -1514,9 +1475,7 @@ Section FsCfgBootPool.
     (forall bi : nat, (bi < nib)%nat ->
        P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
     16 * Z.of_nat nib <= 2 ^ 32 ->
-    image_free_nlink dss nib /\ image_nlink_short dss nib /\
-    image_link_le (fs_link_count P sb) dss nib
-    /\ image_dir_wl0 (fs_link_count P sb) dss nib
+    image_free_nlink dss nib /\ image_nlink_short dss nib
     /\ image_ty_ok dss nib
     /\ image_nlink_at (fun z => fn_nlink (img_node P sb z)) dss nib
     /\ image_bare dss nib
@@ -1536,9 +1495,6 @@ Section FsCfgBootPool.
     { intros z Hz. rewrite (Hbr z Hz). apply region_inums_spec in Hz.
       exact (fs_region_nlink_short P sb nib z (fs_region_wf_nlink _ _ _ Hrw)
                Hz). }
-    destruct (image_link_premises P sb dss nib Hwf Hl Hdwf He Hnib)
-      as (Hle & Hw0).
-    split; [exact Hle |]. split; [exact Hw0 |].
     (* THE LINK RA's TIE (durable-disk 2b-inode-4) is [Hbr] and nothing
        else: [img_node]'s record IS [fs_dinode P sb z] ([era_node_rec]). *)
     split.
@@ -2089,11 +2045,9 @@ Section FsCfgBootEra.
       THE ORDER IS FORCED, and it is the plan's steps 1-6:
         (1) the log's gnames, so [icfg_log] can be filled;
         (2) [IcacheRef.icfg_alloc] at the four ALL-PLAIN boot maps -> ICFG;
-        (3) stage B: [link_boot_split] then [link_boot_mint_w] at
-            [W := FsImg.fs_link_count] -> the ledger authorities at the
-            image's counts AND the [ilink] tickets the old ledger needed
-            (the boot-map-split route is a measured >60 s [linkElemUR]
-            conversion -- do not retry it);
+        (3) [link_boot_split] -> the inode-reference authorities, all
+            plain (through G5 a stage-B mint bumped them to the image's
+            link counts for the old ledger's tickets; G6 deleted it);
         (4) [FsBoot.fs_boot_ghosts] -> γfs and the block ghosts;
         (5) THREE PEELS off [cov], because [ireg_alloc] must run before the
             pool and consumes the inode region's halves;
@@ -2453,14 +2407,12 @@ Section FsCfgBootEra.
           rewrite elem_of_singleton. lia.
         + intros Hc. pose proof (HlogI b Hc). lia.
       - intros Hc. pose proof (HiregI b Hc). lia. }
-    (* ---- 3. STAGE B: the ledger at the image's link counts ---------- *)
+    (* ---- 3. the inode-reference authorities, all-plain (durable-disk
+       G6: there is no ledger to stage at the image's link counts any
+       more) ---------------------------------------------------------- *)
     iDestruct (link_boot_split (region_inums icfg_nib) with "Hlk") as "Hlk".
     iEval (rewrite big_sepS_sep) in "Hlk".
     iDestruct "Hlk" as "[Hla Hoff]".
-    iMod (link_boot_mint_w (fs_link_count (fs_blocks dk) sb)
-            (region_inums icfg_nib) with "Hla") as "Hla".
-    iEval (rewrite big_sepS_sep) in "Hla".
-    iDestruct "Hla" as "[Hla Htk]".
     iDestruct (icnt_boot_split (region_inums icfg_nib) with "Hcnt") as "Hcnt".
     iEval (rewrite big_sepS_sep) in "Hcnt".
     iDestruct "Hcnt" as "[HcntR HcntP]".
@@ -2631,7 +2583,6 @@ Section FsCfgBootEra.
             (fs_home_set cov (sb_logstart sb))
             (fun bi : nat =>
                fs_blocks dk (FsImg.sb_inodestart sb + Z.of_nat bi))
-            (fs_link_count (fs_blocks dk) sb)
             (fun z => fn_nlink (img_node (fs_blocks dk) sb z))
             (fun z => fs_dinode (fs_blocks dk) sb z)
             Hnib32 eq_refl

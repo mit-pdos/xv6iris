@@ -344,7 +344,6 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import DirView.
-Require Import DirLinks.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and

@@ -103,7 +103,6 @@ Require Import DirView.
 Require Import SpecReadi SpecStrncpy SpecWritei SpecIput.
 Require Import CodeDirlink.
 Require Import SpecDirlookup.
-Require Import DirLinks.
 Require Import SpecDirlink.
 Require Import ProofDirlookupParts.
 From Kernel Require KernelSyms.

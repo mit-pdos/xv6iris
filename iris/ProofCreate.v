@@ -127,7 +127,6 @@ Require Import DirentEnc.
 Require Import BvShift.
 Require Import PathElems.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -9729,7 +9728,7 @@ Section ProofCreateMain.
                                  (mword_of_int 1 : mword 16))))
                             = bv_unsigned (di_nlink dn) + 1).
           { rewrite cr_setf_nlink. rewrite <- Hp3nl.
-            apply dlc_bv_add1_nz_eq.
+            apply nlink_add1_nz_eq.
             rewrite cr_setf_nlink in Hmtnz. exact Hmtnz. }
           (* ============ THE MARKER SET AND THE ["."] RE-PIN ==========
              Everything the two [dirlink]s below owe the type register, in

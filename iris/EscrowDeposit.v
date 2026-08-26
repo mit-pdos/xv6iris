@@ -195,7 +195,7 @@ Section EscrowDeposit.
        in-transition pins and the f column's boot-shelter clause all ride in
        the ∃ beside the seven original columns.  The region's own slot pattern
        verbatim -- every consumer of the slot destructures it identically. *)
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
     { iExFalso.
@@ -206,20 +206,12 @@ Section EscrowDeposit.
     assert (Hnl0' : bv_unsigned (di_nlink dn') = 0) by exact (proj2 Hnl Hz).
     assert (Hnl0 : bv_unsigned (di_nlink dn) = 0).
     { rewrite -(proj1 Hnl). exact Hnl0'. }
-    assert (Hw0 : (wl + wdu + wdt = 0)%nat)
-      by exact (ireg_wle_zero (bv_unsigned (di_nlink dn)) _ (proj1 Hlok) Hnl0).
-    destruct (ireg_sum_zero3 wl wdu wdt Hw0) as (Hzz1 & Hzz2 & Hzz3).
-    assert (Hlok' : ireg_link_ok dn' (wl + wdu + wdt)).
-    { rewrite Hzz1 Hzz2 Hzz3.
-      split_and!;
-        [lia | intros _; exact Hnl0' | rewrite Hnl0'; lia
+    assert (Hlok' : ireg_link_ok dn').
+    { split_and!;
+        [intros _; exact Hnl0' | rewrite Hnl0'; lia
         (* (L5) at the free deposit: the record it writes is TYPE 0, which
            is the clause's own first disjunct (durable-disk 2b-inode-3) *)
         | by left]. }
-    assert (Hdir' : ireg_dir_ok dn' (wdu + wdt))
-      by (rewrite Hzz2 Hzz3; exact (ireg_dir_ok_zero dn')).
-    assert (Hwl0' : ireg_dir_wl0 dn' wl)
-      by (rewrite Hzz1; exact (ireg_dir_wl0_zero dn')).
     (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's own
        [dinode_at] put this open on the MARKED arm, whose clause says
        [cl = None].  The deposit is a byte-writing mover, so §2.4's "writes
@@ -286,9 +278,9 @@ Section EscrowDeposit.
       as [Hrl0 Hrcl0].
     assert (Href0 : forall d0 : dinode, ireg_ref_ok rl rcl cn cl d0)
       by (intros d0; rewrite Hrl0 Hrcl0; exact (ireg_ref_ok_zero cn cl d0)).
-    iMod (link_freeze_step _ _ _ _ _ _ _ _ (FrzPost rg) FrzOff with "Hla Hfz")
+    iMod (link_freeze_step _ _ _ (FrzPost rg) FrzOff with "Hla Hfz")
       as "[Hla Hoff]".
-    iDestruct (ireg_rcol_intro (bv_unsigned inum) wl wdu wdt gl cl rl pl
+    iDestruct (ireg_rcol_intro (bv_unsigned inum) cl rl
                  (Some (Excl FrzOff)) cn rcl dn' (Href0 dn')
                  with "Hla") as "Hla".
     assert (Hfrz' : ireg_frz_ok (Some (Excl FrzOff)) cn dn')
@@ -365,9 +357,9 @@ Section EscrowDeposit.
       iSplitL "Hrecb"; [iExact "Hrecb" |].
       iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hlnk Hrh1 Hrh2 Hcnt Hrcpt Hmr Hpark Hcpin]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) dn' cl rl
                 (Some (Excl FrzOff)) cn
-                Hlok' Hdir' Hwl0' Hpar Hclm' Hfrz'
+                Hlok' Hclm' Hfrz'
                 with "Hla Hep Hlnk Hdisj Hcnt [Hcpin] [Hrcpt Hmr]").
       { iApply (ireg_shp_intro cl (Some (Excl FrzOff)) with "[] Hcpin").
         iApply ireg_fsh_off. }

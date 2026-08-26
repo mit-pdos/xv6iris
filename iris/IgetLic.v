@@ -58,7 +58,6 @@ Require Import LogInv.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import IcacheRef.
-Require Import DirLinks.
 Require Import InodeRegion.
 Require Import FsStateLink.    (* [fsLinkG] -- capacity class, must be IMPORTed *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]                                  *)
@@ -315,7 +314,7 @@ Section IgetLic.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     iDestruct (ireg_lnk_tok_nz with "Hlnk Hfrag") as %Hnl1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -324,7 +323,7 @@ Section IgetLic.
       rewrite -ireg_key_split in Hcp. congruence. }
     (* the RA's law, then (L3), both read at the caller's own record *)
     assert (Hnz : bv_unsigned (di_type dn) <> 0).
-    { rewrite -Hdeq. destruct Hlok as [_ [Hl3 _]]. intro Hty.
+    { rewrite -Hdeq. destruct Hlok as [Hl3 _]. intro Hty.
       exact (Hnl1 (Hl3 Hty)). }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
@@ -337,7 +336,7 @@ Section IgetLic.
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                cl rl fz cn Hlok Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
   Qed.
@@ -412,7 +411,7 @@ Section IgetLic.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -423,7 +422,7 @@ Section IgetLic.
       as %Halive.
     iEval (rewrite -Hroot) in "Hlnk".
     assert (Hnz : bv_unsigned (di_type dn) <> 0).
-    { rewrite -Hdeq. destruct Hlok as [_ [Hl3 _]]. intro Hty.
+    { rewrite -Hdeq. destruct Hlok as [Hl3 _]. intro Hty.
       rewrite (Hl3 Hty) in Halive. lia. }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
@@ -436,7 +435,7 @@ Section IgetLic.
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                cl rl fz cn Hlok Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hdn". iSplitR; [iPureIntro; exact Hnz | done].
   Qed.
@@ -540,14 +539,13 @@ Section IgetLic.
                       first row's.                                        *)
   Lemma iname_not_frozen (γi : gname) (γfs : fs_names) (inodestart : Z)
       (inum : bv 32) (l : ilic) (d : dinode) (mm : gmap Z dinode)
-      (wl wdu wdt g r : nat) (c : ctyUR)
-      (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat) :
-    ireg_link_ok d (wl + wdu + wdt) ->
+      (r : nat) (c : ctyUR) (f : frzUR) (n : nat) :
+    ireg_link_ok d ->
     ireg_claim_ok c f d ->
     ireg_frz_ok f n d ->
     mm !! bv_unsigned inum = Some d ->
     ghost_map_auth γi 1 mm -∗
-    ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n d -∗
+    ireg_rcol (bv_unsigned inum) c r f n d -∗
     ireg_lnk γfs (bv_unsigned inum) d -∗
     (* the slot's shelter conjunct, whole (durable-disk C-5): the c side is
        the claim window's parked share and rides straight back out, so a
@@ -669,16 +667,15 @@ Section IgetLic.
 
   Lemma iname_mint_ok (γi : gname) (γfs : fs_names) (inodestart : Z)
       (inum : bv 32) (l : ilic) (ds : list dinode) (mm : gmap Z dinode)
-      (wl wdu wdt g r : nat) (c : ctyUR)
-      (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat) :
+      (r : nat) (c : ctyUR) (f : frzUR) (n : nat) :
     diblk_wf ds ->
-    ireg_link_ok (ds !!! islot inum) (wl + wdu + wdt) ->
+    ireg_link_ok (ds !!! islot inum) ->
     ireg_claim_ok c f (ds !!! islot inum) ->
     mm !! bv_unsigned inum = Some (ds !!! islot inum) ->
     (* the [BufL] row's block transport, from [iname_buf_list] above *)
     (forall (bno : Z) (ds0 : list dinode), l = BufL bno ds0 -> ds0 = ds) ->
     ghost_map_auth γi 1 mm -∗
-    ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n (ds !!! islot inum) -∗
+    ireg_rcol (bv_unsigned inum) c r f n (ds !!! islot inum) -∗
     ireg_lnk γfs (bv_unsigned inum) (ds !!! islot inum) -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
     iname γi γfs inodestart inum l -∗
@@ -690,7 +687,7 @@ Section IgetLic.
     assert (Hnzb : bv_unsigned (di_nlink (ds !!! islot inum)) <> 0 ->
                    bv_unsigned (di_type (ds !!! islot inum)) <> 0 /\ c = None).
     { intros Hnl. split.
-      - intros H0. exact (Hnl (proj1 (proj2 Hlok) H0)).
+      - intros H0. exact (Hnl (proj1 Hlok H0)).
       - destruct c as [x |]; [| reflexivity]. exfalso. apply Hnl.
         exact (fresh_shape_nlink _
                  (ireg_claim_ok_shape (Some x) f (ds !!! islot inum)
@@ -774,13 +771,13 @@ Section IgetLic.
     iDestruct (ireg_slots_acc_upd γfs γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) [Hep Hlnk]]".
     (* the caller's token pins the column; the table says which phase *)
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %Hfeq.
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
     iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) m
-                 wl wdu wdt gl rl cl pl fz cn Hlok Hclm Hfrz Hmd
+                 rl cl fz cn Hlok Hclm Hfrz Hmd
                  with "Ha Hla Hlnk Hfdisj Hl") as %Hfz0.
     assert (Hph : ph = FrzOff).
     { rewrite Hfeq in Hfz0. by simplify_eq. }
@@ -797,7 +794,7 @@ Section IgetLic.
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hlnk Hcnt Hfdisj Hfrcp]").
       rewrite Hkey.
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+                cl rl fz cn Hlok Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp Harm"). }
     iModIntro. iFrame "Hl Hfz". iPureIntro. exact Hph.
   Qed.

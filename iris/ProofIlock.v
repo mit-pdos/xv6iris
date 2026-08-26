@@ -123,7 +123,6 @@ Require Import BioFs.  (* [bio_held_fs_L] *)
 Require Import BlockWords.
 Require Import InodeInv.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.

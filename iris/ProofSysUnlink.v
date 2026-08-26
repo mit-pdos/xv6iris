@@ -82,7 +82,6 @@ Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.
@@ -92,7 +91,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import IregDirBit.
 Require Import IregLinkNz.   (* V5' increment W: the root refutation at a
                                 released TOKEN ([ireg_tok_root_min2]) and the
                                 [dl_root]/[ireg_root] bridge, which is what

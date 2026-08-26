@@ -280,7 +280,7 @@ Section CollectAll.
     - rewrite /ipool_alloc.
       iDestruct "Halloc" as (dn0 bm0 data0)
         "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hdl & Hn & _ & _)".
-      rewrite /dlinks. iDestruct "Hdl" as "[_ Hte]".
+      rewrite /dlinks. iRename "Hdl" into "Hte".
       iRight. iExists (era_node dn0 bm0 data0), (DfracOwn 1).
       iSplitR;
         [iPureIntro; exact (FsStateDefs.dfrac_full_nvalid (DfracOwn 1)) |].

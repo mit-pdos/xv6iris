@@ -1380,8 +1380,7 @@ Section Collect.
                -∗ ireg_slot γfs γi (bv_unsigned inum) d))).
   Proof.
     iIntros "Hauth Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
-                            %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok &
                             #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
                             Harm) [Hep Hlnk]]".
     (* NO CLAIM IS STANDING (durable-disk C-5): a claim box parks a share
@@ -1396,7 +1395,7 @@ Section Collect.
         assert (Ht0 : bv_unsigned (di_type d) = 0)
           by exact (ireg_in_quiesce cl d Hc0 Hin1).
         assert (Hnl : bv_unsigned (di_nlink d) = 0)
-          by exact (proj1 (proj2 Hlok) Ht0).
+          by exact (proj1 Hlok Ht0).
         iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
           as "[%Hb Htop]".
         iRight. iSplitR; [iPureIntro; exact Ht0 |].
@@ -1407,16 +1406,14 @@ Section Collect.
         iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
         iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
           as "Hpk".
-        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl
-                  rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn Hlok Hclm Hfrz
                   with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hpk Hrf]").
         iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
         iLeft. iSplitR; [iPureIntro; exact Hin1 |]. iFrame "Hfr Hpk".
       + (* THE MARKED ARM: the record is checked out, and the collection
            reads this inum's bundle wherever the checkout parked it *)
         iLeft. iFrame "Hmk". iIntros "Hmk".
-        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl
-                  rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+        iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn Hlok Hclm Hfrz
                   with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hmk Hrf]").
         iLeft. iSplitR "Hrf"; [| iExact "Hrf"].
         iRight. iSplitR; [iPureIntro; exact Ht2 |]. iExact "Hmk".
@@ -1424,7 +1421,7 @@ Section Collect.
          clause, and its bundle is here for (D)'s reason verbatim *)
       iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
       assert (Hnl : bv_unsigned (di_nlink d) = 0)
-        by exact (proj1 (proj2 Hlok) Htp).
+        by exact (proj1 Hlok Htp).
       iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Htp with "Hpk")
         as "[%Hb Htop]".
       iRight. iSplitR; [iPureIntro; exact Htp |].
@@ -1434,8 +1431,7 @@ Section Collect.
       iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
       iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
         as "Hpk".
-      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d wl wdu wdt gl cl
-                rl pl fz cn Hlok Hdir Hwl0 Hpar Hclm Hfrz
+      iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn Hlok Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj Hfrcp [Hfr Hrh Hrp Hpk]").
       iRight. iSplitR; [iPureIntro; exact Htp |]. iFrame "Hfr Hrh Hrp Hpk".
   Qed.
@@ -1647,8 +1643,7 @@ Section Collect.
             ∗ inode_owned_era γfs γi inum (free_node d))).
   Proof.
     iIntros "Hauth Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
-                            %cnt & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cnt & Hla & %Hlok &
                             #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
                             Harm) [Hep Hlnk]]".
     iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
@@ -1659,7 +1654,7 @@ Section Collect.
       + assert (Ht0 : bv_unsigned (di_type d) = 0)
           by exact (ireg_in_quiesce cl d Hc0 Hin1).
         assert (Hnl : bv_unsigned (di_nlink d) = 0)
-          by exact (proj1 (proj2 Hlok) Ht0).
+          by exact (proj1 Hlok Ht0).
         iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
           as "[%Hb Htop]".
         iRight. iSplitR; [iPureIntro; exact Ht0 |].
@@ -1667,7 +1662,7 @@ Section Collect.
       + iLeft. iExact "Hmk".
     - iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
       assert (Hnl : bv_unsigned (di_nlink d) = 0)
-        by exact (proj1 (proj2 Hlok) Htp).
+        by exact (proj1 Hlok Htp).
       iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Htp with "Hpk")
         as "[%Hb Htop]".
       iRight. iSplitR; [iPureIntro; exact Htp |].
@@ -1838,8 +1833,7 @@ Section Collect.
     ireg_slot gfs gi (bv_unsigned inum) d -∗ False.
   Proof.
     intros Hph. iIntros "Hauth Hfz Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
-                            %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok &
                             #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
                             Harm) [Hep Hlnk]]".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
@@ -1933,8 +1927,7 @@ Section Collect.
     ireg_slot gfs gi z d -∗ reg_half z ge gr -∗ False.
   Proof.
     iIntros "Hslot Hrh".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz &
-                            %cn & Hla & %Hlok & %Hdir & %Hwl0 & %Hpar &
+    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cn & Hla & %Hlok &
                             #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
                             Harm) [Hep Hlnk]]".
     iDestruct "Harm" as "[[_ Hrf] | Hpend]".

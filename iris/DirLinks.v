@@ -1,7 +1,28 @@
 (* ======================================================================= *)
-(*  DirLinks.v -- THE RESOURCE TWIN OF [DirView.dir_ok]                     *)
-(*  design: claude-notes/design/fs-icache.md §20.3, stage B                 *)
+(*  DirLinks.v -- OFF [_CoqProject] SINCE durable-disk LANE G6.  SUPERSEDED *)
+(*  BY THE TYPE REGISTER: design/fs-state.md §6½.                           *)
+(*  design (historic): claude-notes/design/fs-icache.md §20.3, stage B      *)
 (* ======================================================================= *)
+
+(*  WHY IT IS RETIRED.  Everything below is the OLD LINK LEDGER's payload
+    half: [dir_links], one flavoured ticket per live non-self record of a
+    directory, drawn from [IcacheRef]'s [wl]/[wdu]/[wdt]/[g] counting
+    columns and the parent register [p].  Link counts and types are ONE
+    resource algebra now -- an [auth (gmultiset ity)] per inum, whose
+    FRAGMENTS are the counted dirents themselves ([Xv6Cameras.fsLinkUR],
+    [FsStateInode.ent_toks]) -- so a dirent's own unit reveals its target's
+    type directly and no separate ledger is carried through a flush.  The
+    five columns, [ilink]/[ilinkd]/[ilinkdp]/[iparent]/[igrey], the [fl]
+    index on [SpecIupdate]'s two link bodies and [DirView]'s [dlc_*] family
+    went with it.
+
+    The SOURCE is kept as the record of a mechanism the tree ran on for
+    several lanes, and of what it could not do: see the file's own comments
+    for the flavour split, the parent tie and the grey mint, and
+    [iris/FsBootWall.v] for why the ledger could never be minted at boot.
+    NOTHING IMPORTS IT; it does not compile against the narrowed
+    [IcacheRef].  The two pure [mword 16] increment facts it happened to
+    hold moved to [InodeRegion.nlink_add1_le] / [nlink_add1_nz_eq].         *)
 
 (*  WHY THIS FILE EXISTS, AND WHY IT IS NOT IN [DirView.v] (fs-sysfile S5h).
 

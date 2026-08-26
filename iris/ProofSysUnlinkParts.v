@@ -62,7 +62,6 @@ Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IcacheRef.
-Require Import DirLinks.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.

@@ -61,7 +61,6 @@ Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import DirLinks.              (* [dir_links_not_dir] *)
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED EARLY on purpose
    -- the [FsState*] stack exports [fs_view] and [byte_range], both of which

@@ -160,7 +160,6 @@ Require Import WpLock.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import DirLinks.
 Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload clause *)
 (* EXPORTED, not merely imported: [dv_ride] is a conjunct of [ipool_alloc] and
    [ic_loaded], so every file that destructs either one names it -- and its
@@ -4072,14 +4071,14 @@ Section IcacheEscrow.
     rewrite /ic_loaded. iIntros "H".
     iDestruct "H" as (data)
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
-    rewrite /dlinks. iDestruct "Hl" as "[Hdl Hte]".
+    rewrite /dlinks. iRename "Hl" into "Hte".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
     rewrite -inode_owned_era_1. iFrame "Hn Hte". iIntros "[Hn Hte]".
-    iExists data. rewrite /dlinks. iFrame "Hdl Hte Hn Hm Ha Hv Hw".
+    iExists data. rewrite /dlinks. iFrame "Hte Hn Hm Ha Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -4101,14 +4100,14 @@ Section IcacheEscrow.
     rewrite /ic_rd_arm. iIntros "H".
     iDestruct "H" as (dn bm data)
       "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hv & Hw)".
-    rewrite /dlinks. iDestruct "Hl" as "[Hdl Hte]".
+    rewrite /dlinks. iRename "Hl" into "Hte".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
     iFrame "Hn Hte". iIntros "[Hn Hte]".
-    iExists dn, bm, data. rewrite /dlinks. iFrame "Hdl Hte Hn Hv Hw".
+    iExists dn, bm, data. rewrite /dlinks. iFrame "Hte Hn Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].

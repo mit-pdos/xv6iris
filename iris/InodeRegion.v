@@ -1218,6 +1218,49 @@ Proof.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z. lia.
 Qed.
 
+(* THE MACHINE'S [++], CROSSED WITH NO GUARD AT ALL.  A sixteen-bit
+   increment raises the value by at most one -- true even at the wrap, which
+   lands at zero.  (Lane G6 moved this pair and the one below here from
+   [DirLinks.dlc_bv_add1_le] / [_nz_eq]: they are arithmetic about
+   [di_nlink]'s width and have nothing to do with the ledger that file
+   carried.) *)
+Lemma nlink_add1_le (h : mword 16) :
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <= bv_unsigned h + 1.
+Proof.
+  rewrite add_vec_unsigned.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 16) = 1)
+    by (vm_compute; reflexivity).
+  rewrite H1.
+  pose proof (bv_unsigned_in_range _ h) as Hr.
+  unfold bv_wrap. unfold bv_modulus in Hr |- *.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z
+    in Hr |- *.
+  apply Z.mod_le; lia.
+Qed.
+
+(* ...AND ITS EXACT FORM UNDER A NONZERO READ-BACK.  A sixteen-bit [++]
+   wraps only at 65535, where it lands at ZERO -- so an increment whose
+   result is known nonzero did not wrap.  The nonzero fact is the flush's
+   own read-back ([IregLinkNz.ireg_tok_nz] at the bumped record). *)
+Lemma nlink_add1_nz_eq (h : mword 16) :
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <> 0 ->
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16))
+  = bv_unsigned h + 1.
+Proof.
+  rewrite add_vec_unsigned.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 16) = 1)
+    by (vm_compute; reflexivity).
+  rewrite H1.
+  pose proof (bv_unsigned_in_range _ h) as Hr.
+  unfold bv_wrap. unfold bv_modulus in Hr |- *.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z
+    in Hr |- *.
+  intro Hnz.
+  destruct (Z.eq_dec (bv_unsigned h) 65535) as [He | Hne].
+  - exfalso. apply Hnz. rewrite He. vm_compute. reflexivity.
+  - rewrite Z.mod_small; lia.
+Qed.
+
 Lemma ireg_nlink_bump (h : mword 16) :
   bv_unsigned h <= 32767 ->
   h <> (mword_of_int 32767 : mword 16) ->

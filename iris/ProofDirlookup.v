@@ -101,7 +101,6 @@ Require Import FileInvDefs.
 Require Import DirView.
 Require Import SpecReadi SpecNamecmp SpecIget.
 Require Import CodeDirlookup.
-Require Import DirLinks.
 Require Import IgetLic.
 Require Import SpecDirlookup.
 Require Import ProofDirlookupParts.

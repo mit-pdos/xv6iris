@@ -708,7 +708,7 @@ ProofIinit.v
 LinkIinit.v
 InodeInv.v
 DirView.v
-DirLinks.v
+# DirLinks.v -- OFF (durable-disk G6): the old flavoured link ledger, superseded by the type register (design/fs-state.md §6½).  Source kept; see its header.
 FsTree.v
 DirViewG.v
 DirViewLend.v
@@ -1079,7 +1079,7 @@ EscrowDeposit.v
 FsRep.v
 IregLinkNz.v
 IgetLic.v
-IregDirBit.v
+# IregDirBit.v -- OFF (durable-disk G6): the ledger's d-bit accessors, superseded with it (design/fs-state.md §6½).
 IcacheEscrow.v
 IcacheBoot.v
 FsCfgBoot.v

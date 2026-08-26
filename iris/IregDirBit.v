@@ -1,8 +1,21 @@
 (* ======================================================================= *)
-(*  IregDirBit.v -- "AN OUTSTANDING [ilinkd] MEANS A DIRECTORY", stated at   *)
-(*  a record the caller NAMES.  (T1)'s accessor, and the bridge between the  *)
+(*  IregDirBit.v -- OFF [_CoqProject] SINCE durable-disk LANE G6.           *)
+(*  SUPERSEDED BY THE TYPE REGISTER: design/fs-state.md §6½.                *)
+(*                                                                          *)
+(*  Historic: "AN OUTSTANDING [ilinkd] MEANS A DIRECTORY", stated at a       *)
+(*  record the caller NAMES -- (T1)'s accessor, and the bridge between the   *)
 (*  region's own spelling of [T_DIR] and [DirView]'s.                        *)
 (* ======================================================================= *)
+
+(*  WHY IT IS RETIRED.  (T1) and (T1') were readings of the old ledger's
+    flavour columns: which column a paid record's ticket sat in told its
+    holder whether the target was a directory.  A type-register fragment
+    carries the target's TYPE outright ([FsStateInode.ent_ty_ok],
+    [IregLinkNz.ireg_tok_nz]), so [ProofSysUnlink]'s rmdir arm -- this
+    file's last live reader -- reads the fact off the entry unit it already
+    holds and the two clauses are deleted with the columns.  Nothing
+    imports this file; it does not compile against the narrowed
+    [InodeRegion].                                                          *)
 
 (*  WHY THIS FILE EXISTS.
 

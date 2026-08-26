@@ -74,7 +74,6 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeRegion.
 Require Import FsTree.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

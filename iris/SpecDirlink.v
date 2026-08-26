@@ -190,7 +190,6 @@ Require Import SpecPrintk.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IcacheInv.

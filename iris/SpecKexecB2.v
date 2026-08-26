@@ -92,7 +92,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeLock.
 Require Import ProcInv.
 Require Import UserPtTree.

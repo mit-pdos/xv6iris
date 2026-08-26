@@ -103,7 +103,6 @@ Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
-Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.
@@ -341,7 +340,7 @@ Proof.
   apply (inode_rec_local_same_type dn (sl_incnl dn) Hrl
            (sl_setnl_type dn _)).
   - rewrite /sl_incnl sl_setnl_nlink.
-    exact (sl_bump_short _ _ (dlc_bv_add1_le (di_nlink dn))
+    exact (sl_bump_short _ _ (nlink_add1_le (di_nlink dn))
              (proj1 (proj2 Hrl)) Hne').
   - intros Hd. exfalso. apply Hnd.
     rewrite /sl_incnl sl_setnl_type in Hd. exact Hd.

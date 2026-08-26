@@ -441,23 +441,18 @@ bundle.
 | `ireg_ep z d` | per-inum `mono_nat` (`icfg_iep z`) | the record's **epoch**: bumps at every flush, giving readers "no older record can reappear". |
 | `ireg_claim_no_out` (`InodeRegion.v`) | theorem, not a resource | a claimed inum's record is INSIDE the region — nobody holds its `dinode_at` — so ilock's non-fill routes die and §16.4's box fill is FORCED.  The §20.7 carrier; this is the load-bearing half of the `create_fresh_ty` proof. |
 
-### 3b. The per-inum link ledger — `link_auth z wl wdu wdt g c r p f rc`
+### 3b. The per-inum inode-reference element — `link_auth z c r f rc`
 
-One authority per inum (nine columns + the count), inside `ireg_slot` via
-`ireg_rcol` (`IcacheRef.v` defines the RA; filed as a `gmap` under the
-ambient gname `icfg_link`; the element is `lelemc`, with `lelemf`/`lelem`
-the rc-0/f-None defaulted aliases that keep old literals byte-stable).
+One authority per inum (four columns), inside `ireg_slot` via `ireg_rcol`
+(`IcacheRef.v` defines the RA; filed as a `gmap` under the ambient gname
+`icfg_link`; the element is `lelemc`, with `lelemf`/`lelem` the rc-0/f-None
+defaulted aliases that keep old literals byte-stable).
 
 | col | counts | fragment | minted / spent | why |
 |---|---|---|---|---|
-| `wl` | paid dirent records (plain) | `ilink z` | dirlink / unlink | pays for a live directory record naming `z`; `ireg_link_ok`: `wl+wdu+wdt ≤ nlink` **and** `nlink ≤ 32767` (L4). |
-| `wdu` | paid `".."`-units | `ilinkd z` | mkdir's dot-dot deposit | the d-flavour of the same payment; buys `ireg_dir_ok` (`0 < wd → type = T_DIR`). |
-| `wdt` | THE parent-record unit (≤1, `ireg_par_ok`) | `ilinkdp z pv` + `iparent z pv` | mkdir / rmdir | tagged unit carrying half the **parent register** `p` — the `".."`-tie. |
-| `g` | grey records — orphaned `".."`s nothing pays for | `igrey z` | unlink's grave-dot-dot | carries NO allocatedness; that is the point (§20.8). |
 | `c` | the claim, **TYPED AND TRANSACTION-KEYED**: `option (excl ctyval)`, `ctyval = bv 16 * (nat * Qp)` (`ctyUR`) | `iclaim z ty t q` | minted by `ireg_claim_au` at ialloc's type-write, at `ty = di_type dn'` and the claimant's `(t, q)`; spent by `ireg_withdraw`'s ClaimK CONVERSION at the claimant's ilock-fill | **exclusive allocation carrying the claimed type AND the claiming transaction** — the claim pin (3c) pays `di_type d = ty` back at the fill (`create_fresh_ty`'s content), and `(t, q)` is what re-identifies the share `ireg_cpin` parks for the claim box's duration (`FsCollect`'s residue (E)). |
 | `r` | outstanding PLAIN references — **ACTIVE** (item 7a) | `runit_plain z` (the renamed `iref_lic`; `runit_any := runit_plain`) | minted at iget by licence flavour, spent at iput's last close | the reference-provenance unit: every non-allocator reference carries one, and the pin `c ≠ None ⟹ r = 0` is how fifteen ilock sites DERIVE `c = None` at their fill. |
 | `rc` | outstanding CLAIM-flavoured references | `runit_claim z` | ialloc's own ClaimL iget mints it; the withdraw's conversion spends it (`rc→rc−1`, `r→r+1`) | keeps the allocator's reference counted without breaking the `r = 0` pin; `runit (b:bool) z` is the flavour-indexed form (`is_claim l`). |
-| `p` | parent register (`option (dfrac_agree Z)`) | rides `ilinkdp`/`iparent` | mkdir / rmdir | fractional agreement on who the parent is. |
 | `f` | the freeze phase: `frz := FrzOff \| FrzPre (rg:frzidx) \| FrzPost (rg:frzidx)` (`option (excl frz)`), `frzidx = bool * (nat * Qp)` | `ifreeze_off z`, `ifreeze_pre rg z`, `ifreeze_post rg z` | boot mints `FrzOff`; `ireg_freeze_au` steps Off→Pre; the +0x8a last close steps Pre→Post; the deposit retires Post→Off | **exclusive free-in-flight, carrying the REGIME INDEX `rg.1`** — which arm of `ireg_open ∨ ireg_boot` the freezer lent (RULING G′), so the deposit can return exactly it — **and the FREEZING TRANSACTION `rg.2`**, whose share `ireg_fsh` parks for the window's length (3c; the c column's device at the f column).  `ifreeze_off` rides the payload at rest (pool bundle / escrow tail / ilock holder's hand); the Pre/Post fragment stays in the FREER's hand from mint to deposit — it is what decides the escrow-tail disjunct at +0x70/+0x8a and what re-identifies the parked share. |
 
 The count coupling `icnt_half z n` and the pin `ireg_ref_ok r rc n c d`
@@ -465,94 +460,86 @@ The count coupling `icnt_half z n` and the pin `ireg_ref_ok r rc n c d`
 `ireg_rcol` beside the authority, with `rc` existentially bound so no
 destructure site ever names it.
 
-**ALL NINE COLUMNS ARE STILL LIVE, and the reason is one file** (lane G3
-took ONE of the two readings off it — S7-unlink's (D2) is §3b′'s (U1)/(U2)
-now, so `DirView.dlc_lower` is maintained-but-unread; (D1) is the one that
-keeps `DirLinks` alive, and fs-state.md §6½ says why it cannot move).  The
-demolition (worklist lane G, slice 6d) would keep `c`/`r`/`rc`/`f` and
-drop `wl`/`wdu`/`wdt`/`g`/`p`, but every one of those five is read through
-`DirLinks.dir_links` — the first conjunct of `IcacheEscrow.dlinks`, which
-~40 payload sites carry: `dir_link_at` is `ilink ∨ (igrey ∗ nlink = 0)`,
-`dir_link_at_f` routes the flavoured ticket through `dlc_tick`
-(`ilinkdp`/`ilinkd`/`ilink`), and `dir_par_tie` is the `iparent` half of
-the `p` register.  So 6d is downstream of 6c (`dlinks` → `ent_toks`, the
-`DirLinks.v` deletion) and nothing narrower is available; the same holds
-for the `fl` index (6e), which is the flavour selector of the `ilink_fl`
-payout `SpecIupdate.wp_iupdate_link` hands the walks precisely so they can
-re-seal `dir_links`.  What DID come out ahead of 6c is in §3b′ (the (L1)
-readers) and the six caller-less instance wrappers of
-`InodeRegion.ireg_write_link_fl`/`_unlink_fl`.
+**THE FIVE LINK-LEDGER COLUMNS ARE GONE (lane G6).**  Through G5 the element
+also carried `wl`/`wdu`/`wdt`/`g` — "live directory records naming `z`", in
+plain / untagged-d / tagged-d / grey flavours, with fragments
+`ilink`/`ilinkd`/`ilinkdp`/`igrey` — and a parent register `p`
+(`option (dfrac_agree Z)`) that the tagged unit carried half of.  Link
+counts and types are ONE resource algebra now (§3b′, fs-state.md §6½), so
+nothing in a walk reads a column.  Deleted with them: `ireg_link_ok`'s (L1)
+`wl+wdu+wdt ≤ nlink`, (T1) `ireg_dir_ok`, (T1′) `ireg_dir_wl0`,
+`ireg_par_ok`, `ireg_link_grey` (§20.8's free mint), `IcacheEscrow.dlinks`'s
+first conjunct, `SpecIupdate`'s `fl : option (option Z)` index and its three
+flavour premises on both link bodies, `IcacheBoot`'s stage-B mint
+(`link_boot_mint_w`) and its two image premises (`image_link_le`,
+`image_dir_wl0`), and the files `DirLinks.v` / `IregDirBit.v` (kept as
+sources, off `_CoqProject`).  `IcacheRef.link_agree` now reports the `r`
+column alone.  `iris/FsBootWall.v` is the record of the boot wall those
+columns were the whole of, and it is CLOSED.
 
-### 3b′. The link-counting RA's per-inum AUTHORITY — `ireg_lnk`
+### 3b′. The TYPE REGISTER's per-inum AUTHORITY — `ireg_lnk`
 
-Beside the ledger above, and a different ghost entirely: `fs-state.md` §2's
-counting RA (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (prodUR
-(authUR natUR) fsParUR)`, one element per inum in a single ghost element at
-`fs_link γfs`).  `ireg_slot` carries
+Beside the element above, and a different ghost entirely: fs-state.md §6½'s
+type register (`FsStateLink`, camera `Xv6Cameras.fsLinkUR = gmapUR Z (authUR
+(gmultisetUR ity))` with `ity := TFile | TDir (p : Z)`, one element per inum
+in a single ghost element at `fs_link γfs`).  **Link counts and types are the
+same RA**: the authority is the UNIFORM multiset `link_reps n ty = n *: {[+ ty +]}`
+and the FRAGMENTS are the counted dirents, so the link count IS the fragment
+count and there is no separate counting column anywhere.  `ireg_slot` carries
 
-    ireg_keep γfs z     := if z = ireg_root then link_tok (fs_gamma_L γfs) z else emp
-    ireg_ups P          := multiplicity None P
-    ireg_par γfs z n ty := ∃ P, par_auth (fs_gamma_L γfs) z P ∗ ⌜size P ≤ n⌝
-                                ∗ ⌜ty ≠ ireg_dir_ty → ireg_ups P = 0⌝        (U1)
-                                ∗ ⌜n ≠ 0 → ireg_ups P < n⌝                   (U2)
-    ireg_lnk γfs z d    := link_auth (fs_gamma_L γfs) z (ireg_nl d)
-                           ∗ ireg_keep γfs z
-                           ∗ ireg_par γfs z (ireg_nl d) (di_type d)
+    ireg_reg_ok ty v    := match v with TFile => ty ≠ T_DIR | TDir _ => ty = T_DIR end
+    ireg_mult_at n ty   := n + [ty = T_DIR ∧ n ≠ 0]        (* the "." bonus *)
+    ireg_keep γfs z v   := if z = ireg_root then link_tok (fs_gamma_L γfs) z v else emp
+    ireg_lnk_at γfs z n ty := ∃ v, ⌜ireg_reg_ok ty v⌝
+                                  ∗ link_auth (fs_gamma_L γfs) z (ireg_mult_at n ty) v
+                                  ∗ ireg_keep γfs z v
+    ireg_lnk γfs z d    := ireg_lnk_at γfs z (ireg_nl d) (bv_unsigned (di_type d))
 
-where `ireg_nl d = Z.to_nat (bv_unsigned (di_nlink d))`.  The value is tied
-to the slot's record BY CONSTRUCTION — the definition names `d` once — so
-"the authority stands at this record's `nlink`" is never a clause.
+where `ireg_nl d = Z.to_nat (bv_unsigned (di_nlink d))`.  Both the count and
+the type are tied to the slot's record BY CONSTRUCTION — the definition names
+`d` once — so "the authority stands at this record's `nlink` and type" is
+never a clause.  The register's VALUE is existential (G5 refinement 3: xv6
+writes a fresh child's `".."` two `dirlink`s after the fill, so a value read
+off that entry would have to MOVE at multiplicity two, which is not a
+frame-preserving update); the `"."` fragment carries the parent under a
+guard instead, re-pinned at create's `".."` write
+(`FsStateEra.ent_toks_dirlink_dotdot`).
 
-**THE SECOND COLUMN IS THE PARENT REGISTER** (`fsParUR = authUR (gmultisetUR
-(option Z))`, fs-state.md §6½): at the TARGET's key, the multiset of inums
-that hold a NAME record for it.  Its FRAGMENTS ride inside
-`FsStateInode.ent_tok` — one per token-bearing entry, at `ent_par_val self
-s`, which is `Some self` at a name record and `None` at a dot record — so
-every counting token in the tree travels with exactly one register unit,
-minted with it (`ireg_lnk_bump`), spent with it (`ireg_lnk_drop`), routed
-with it at boot and collected with it at a commit.  **The value is not fixed
-at the mint**: `sys_link` raises `ip->nlink` before `nameiparent` names the
-directory the record will live in, so the unit arrives unattributed and is
-RE-VALUED at the `dirlink` that files it (`IregLinkNz.ireg_par_revalue`, one
-mask-preserving step; `InodeRegion.ireg_lnk_par_move` is its RA half).
-`iris/FsParRefute.v` is the machine-checked refutation of every shape whose
-parent side has to know the target's TYPE.
+**THE MULTIPLICITY IS `nlink + [DIR ∧ live]`** (G5 refinement 1).  The extra
+unit at a live directory is its own `"."`, which xv6 does not count.  With
+the `∧ live` guard both of the kernel's TYPE writes stand at multiplicity
+zero, where `link_reps 0 ty = ∅` for every `ty` — so retyping is an EQUALITY
+(`link_auth_zero_retype`), not an update, and neither `ireg_claim_au` nor
+the free has to mint or spend anything.  The price is that the `0 ↔ 1`
+crossing AT A DIRECTORY moves TWO units: `InodeRegion.ireg_dot_delta`, `2` at
+create's fresh-directory fill and rmdir's `ip->nlink--`, `1` at the other
+seven sites, carried by `ireg_write_link_reg`/`_unlink_reg` as a function of
+the record so no call site gained a numeric parameter.
 
-**(U1)/(U2) ARE S7-UNLINK'S (D2)** (lane G3), and they are readings of the
-RECORD, which is why they can stand here: `dp` holds a live subdirectory
-record, so the child's `..` puts an up-pointing unit in `dp`'s register, and
-(U2) reads `2 ≤ nlink dp` off it — `InodeRegion.ireg_lnk_up_min2`, accessor
-`IregLinkNz.ireg_par_up_min2`.  That retires `IregDirBit.dir_links_subdir_nlink2`
-and leaves `DirView.dlc_lower` maintained-but-unread inside `dir_links`.
-There is NO root exception: the root's `..` is a SELF record and tokenless,
-so an empty root sits at `0 < 1`.  (U1) is what makes (U2) inductive — a
-name-drop at a node that stays live has to leave a name behind, and the only
-locally evident case is "no up-pointing namers", i.e. "not a directory".
-The premises the two movers gained are in fs-state.md §6½ and in
-`SpecIupdate`'s two bodies; the one that is not vacuous anywhere else is
-mkdir's `dp->nlink++`, the ONLY site in the kernel that mints a `None` unit.
+**WHAT THE FRAGMENTS BUY.**  Validity is one lemma with two readings
+(`FsStateLink.link_auth_toks_le`: `size Q ≤ n`, and `∀ x ∈ Q, x = ty`), so a
+held fragment gives BOTH "the target is allocated" (`IgetLic`'s licence (a),
+`IregLinkNz.ireg_tok_nz`) and "the target's type is `v`"
+(`ireg_tok_ty`) — which is what retired the old ledger's flavour columns.
+Two fragments at one inum agree (`ireg_toks_agree`), and that single line is
+rmdir's (D1): `dp`'s name record for `c` and `c`'s own `"."` fragment
+collapse, and the `"."` fragment's guard then reads `dir_inum dat 1 = dp`.
+(D2) is the per-directory EXACTNESS clause sealed into the payload's bundle
+(`FsStateInode.node_exact`, §5a), not a region clause at all.
 
-The clause that gives the register its remaining content — a live directory
-admits only its own `..` target as a namer, which is rmdir's (D1) — needs
-the node's `..` ENTRY and would belong in the checked-out payload.  **It
-cannot go there**: `sys_link` re-values `ip`'s unit at a `dirlink` that runs
-AFTER `iunlock(ip)`, so `ip`'s payload is checked in and
-`IregLinkNz.ireg_par_revalue` would have no authority to reach
-(`iris/ProofSysLink.v:2961`).  fs-state.md §6½ has the finding and the two
-repairs; (D1) therefore still runs on the `p` column.
-
-**THE TOKENS ARE NOT HERE.**  A directory's tokens ride in its CHECKED-OUT
+**THE TOKENS ARE NOT HERE.**  A directory's fragments ride in its CHECKED-OUT
 PAYLOAD (`FsStateInode.ent_toks`, inside `IcacheEscrow.ic_loaded` /
 `ipool_alloc`); what the region keeps is the per-inum AUTHORITY, plus
-`ireg_keep` — the ROOT's one keep-alive token, which nothing can spend.
-`ent_tokenless` exempts a SELF record (target = home inum) and, AT AN
-ORPHAN ONLY, either dot name.  The root's `".."` names the root, so it carries no
-token and the image's `nlink = 1` at the root is unaccounted for by any
-directory; that one unit of slack IS the keep-alive.
-`InodeRegion.ireg_lnk_root_alive` reads `1 ≤ di_nlink` off it by the RA's
-own law, and `ireg_lnk_root_min2` reads `2 ≤ di_nlink` off the keep-alive
-together with any ONE token a caller presents.  There is no pure clause
-about the root anywhere in `ireg_slot`.
+`ireg_keep` — the ROOT's one keep-alive fragment, which nothing can spend.
+`ent_tokenless self orph s t` exempts every self-naming record EXCEPT `"."`,
+and at an ORPHAN either dot name.  The root's `".."` names the root, so it
+carries no fragment and the image's `nlink = 1` at the root is unaccounted
+for by any directory; that one unit of slack IS the keep-alive.
+`InodeRegion.ireg_lnk_root_alive` reads `1 ≤ di_nlink` off it by the RA's own
+law, and `ireg_lnk_root_le` reads "`k` held fragments give `k ≤ nlink`" — so
+rmdir's "a directory at count one is not the root" spends the TWO fragments
+(D1) leaves it holding.  There is no pure clause about the root anywhere in
+`ireg_slot`.
 
 **Why REGION-side and not in the checked-out payload**, which is where
 `fs-state.md` §2 draws it.  Two reasons, and the first is a hard one:
@@ -570,66 +557,9 @@ about the root anywhere in `ireg_slot`.
   `link_mint`/`link_return` are basic updates, so they compose into that
   AU at no mask cost.
 
-The movers are `ireg_lnk_stable` (`nlink` AND `di_type` equal — every
-ordinary flush), `ireg_lnk_free_retype` (both counts zero — the kernel's two
-TYPE writes, the claim and the free deposit, where the register is empty and
-(U1)/(U2) are vacuous at any type), `ireg_lnk_bump` (`= +1`: one `link_mint` and one `par_alloc`, and
-the minted token and its register unit go **OUT**, to the `dirlink` that
-files them in a directory's `ent_toks` — `ireg_write_link_fl`) and
-`ireg_lnk_drop` (`link_return` + `par_dealloc`, paid for by the pair the
-caller brings **IN** out of the entry it is removing —
-`ireg_write_unlink_fl`).  Both flavour-indexed movers, and
-`SpecIupdate.wp_iupdate_link`/`_unlink` above them, carry the register
-value as a parameter `prv`.  The readers are `ireg_lnk_root_alive` and
-`ireg_lnk_toks_le` / `ireg_lnk_tok_nz` / `ireg_lnk_root_min2` (the RA's law
-at this slot).
-
-Those readers are `IgetLic`'s: licence (a) IS
-`link_tok (fs_gamma_L γfs) (bv_unsigned inum)` and `iname_linked_alloc`
-reads `ireg_lnk_tok_nz` then (L3); licence (f) is the root's keep-alive
-token through `ireg_lnk_root_alive`.  `iname_not_frozen` / `iname_mint_ok`
-take `ireg_lnk` as an argument.
-
-**S7-unlink's dir arm reads the keep-alive too.**  `(D1)` step 2 needs "a
-directory whose count is ONE is not the root"; that is
-`IregLinkNz.ireg_tok_root_min2`, the accessor form of `ireg_lnk_root_min2`,
-fed with the very token the zeroed entry just released
-(`FsStateEra.ent_toks_unlink`) and handing it straight back.
-
-**(L1) IS STILL READ, BUT BY ONE CONSUMER NOW** (lane G, slice 6b).  The
-"a name means an ALLOCATED record" chain is off the ledger entirely:
-`InodeRegion.ireg_link_alloc` and `ireg_link_ok_alloc` are deleted (their
-reading is `ireg_lnk_tok_nz` + (L3), which is what `IgetLic`'s licence (a)
-already does), and the accessor at a record the caller NAMES is
-`IregLinkNz.ireg_tok_nz` — `link_tok` in, `1 ≤ nlink` out, the token
-borrowed and handed straight back, replacing the flavour pair
-`ireg_link_nz`/`_fl`.  Its two callers (`ProofSysLinkTails`' `nlink--`
-guard, `ProofCreate`'s read-back at the mkdir arm's `dp->nlink++`) gained
-no premise: `wp_iupdate_link` pays the token out beside the colour, and
-`wp_iupdate_unlink` takes it back.  The ONE reader left is
-`ireg_link_ok_free`: at a type-0 record (L1)+(L3) collapse `wl+wdu+wdt` to
-zero, and that collapse is what makes the claim mover's preservation of
-(T1)/(T1') legal for the record it writes.  So (L1) still goes exactly
-when the `wl/wdu/wdt` columns do, which is 6d, which is downstream of 6c.
-
-**BOOT SPENDS NO IMAGE SWEEP, AND W9 IS THE WHOLE ARITHMETIC.**
-`FsState.fs_boot_alloc_full` allocates the family at `FsCfgBoot.img_nodes`
-— the IMAGE's records, one auth plus `nlink` tokens per inum, so its
-validity is free (`FsState.link_full_map_valid`).  `ireg_lnks_of_image`
-then splits each pile into the region's keep (one token at the root, none
-elsewhere) and `fs_link_count P sb z` tokens for the directories, and drops
-the rest; the ONE arithmetic premise is
-`fs_link_count z + keep z ≤ nlink z`, which is `FsImg.fsimg_wf_link_le`
-(W9's first clause, extended off the sweep's range by `fs_link_count_out`)
-plus `fsimg_wf_root_link` at the root.  `FsCfgBoot.ent_toks_of_region`
-routes the piles onto the image's flat ticket list
-(`big_sepS_tick_route`, unchanged) and then onto each directory's
-NAME-keyed `ent_toks` — `ent_toks_of_tickets`, whose whole content is that
-`FsTree.dir_view` is an `omap` over the SAME `seq 0 nrec` the ticket list
-is (`big_sepL_omap_pair`), and whose per-index obligation is exactly the
-SELF exemption.  `FsImg.fs_links_eq` is NOT needed.
-
-What is left region-side is the authority and the root's keep-alive.
+`iris/FsParRefute.v` (off `_CoqProject` since G5) is the machine-checked
+refutation of the G2/G3 *parent* register this replaced — every shape whose
+parent side has to know the target's TYPE.
 
 ### 3c. The pure/shelter clauses on `ireg_slot` (`InodeRegion.v`)
 
