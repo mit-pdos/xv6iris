@@ -1,0 +1,184 @@
+(* ====================================================================== *)
+(*  FsParRefute.v -- WHY THE PARENT REGISTER IS AN auth-OF-MULTISET AT     *)
+(*  THE CHILD'S KEY, AND NOT A PAIR OF dfrac_agree HALVES                  *)
+(*  (durable-disk lane G2; design of record: fs-state.md section 6.5)      *)
+(*                                                                        *)
+(*  A DOCUMENTED REFUTATION, in the family of [FsDurRefute.v] /            *)
+(*  [FsDurDefer.v] / [FsBootWall.v]: nothing above depends on it, and its  *)
+(*  purpose is to stop the next lane from re-deriving a register that      *)
+(*  cannot be defined one inode at a time.                                 *)
+(*                                                                        *)
+(*  THE TASK.  rmdir pays [dp->nlink--] with the CHILD's [".."] token, so  *)
+(*  it needs "the child's [".."] names [dp]".  That is cross-inode as a    *)
+(*  pure fact and is never stated as one, so it has to be a RESOURCE held  *)
+(*  by both parties: something in the child's bundle, something in [dp]'s, *)
+(*  and an RA law that collapses them.                                     *)
+(*                                                                        *)
+(*  THE SHAPE THAT DOES NOT WORK is "a half of [agree dp] at the CHILD's   *)
+(*  key, one half in the child's bundle beside its [".."] entry and one in *)
+(*  [dp]'s beside its entry FOR THE CHILD".  Its parent side is stated at  *)
+(*  "an entry whose target is a DIRECTORY", and a directory entry does not *)
+(*  record its target's type -- xv6's [dirent] is (inum, name).  So the    *)
+(*  parent's per-entry resource is either                                  *)
+(*                                                                        *)
+(*    (a) CONDITIONAL ON THE TARGET'S TYPE, which makes a directory's      *)
+(*        payload a function of the WHOLE inode map -- the arity of        *)
+(*        [FsStateInode.ent_toks], hence of [inode_owned], hence of every  *)
+(*        payload site -- and breaks fs-state.md section 0's local         *)
+(*        reasoning rule outright; the runtime payload has no such map at  *)
+(*        all, so there the condition can only be an EXISTENTIAL FLAVOUR   *)
+(*        refuted against the region's per-inum type clause, which is      *)
+(*        exactly the apparatus ([DirLinks.dir_link_at_f] + the ledger's   *)
+(*        (T1)) that this lane exists to delete; or                        *)
+(*    (b) UNCONDITIONAL -- every name record carries one -- and then the   *)
+(*        two theorems below kill it.                                      *)
+(*                                                                        *)
+(*  Theorem [par_half_three_namers]: a FILE may be named three times       *)
+(*  (xv6's [sys_link] has no link limit below [nlink <= 32767]), so an     *)
+(*  unconditional half puts THREE halves at one key and the element is     *)
+(*  invalid.  The only compositions that survive an unbounded number of    *)
+(*  holders are the CORE-ID ones ([agree]-like).                           *)
+(*                                                                        *)
+(*  Theorem [nondir_marker_stuck]: a core-id "this inum is not a live      *)
+(*  directory" marker can never be RETRACTED, so the inum can never become *)
+(*  a directory again -- and [ialloc] hands out freed inums for any type,  *)
+(*  so a file that is deleted and whose inum is then [mkdir]'d needs       *)
+(*  exactly that step.  Unbounded sharing and retractability are           *)
+(*  incompatible in a flat register at the child's key.                    *)
+(*                                                                        *)
+(*  WHAT IS BUILT INSTEAD ([FsStateLink], [Xv6Cameras.fsParUR]): an        *)
+(*  [authUR (gmultisetUR Z)] column at the CHILD's key, holding the        *)
+(*  multiset of inums that own a NAME record for it.                       *)
+(*                                                                        *)
+(*    - the parent's side is the FRAGMENT [par_tok Gamma t self], one per  *)
+(*      NAME record, UNCONDITIONAL: it never asks what the target's type   *)
+(*      is, and fragments compose for any number of namers                 *)
+(*      ([par_frag_any] below);                                            *)
+(*    - the child's side is the AUTHORITY [par_auth Gamma c P] in its OWN  *)
+(*      bundle, where its OWN data is in hand, so "a LIVE DIRECTORY's      *)
+(*      authority is at most the singleton of its own [".."] target" is a  *)
+(*      clause about ONE inode;                                            *)
+(*    - the collapse is [auth]'s own law ([FsStateLink.par_auth_tok_eq]),  *)
+(*      and [par_register_roundtrip] below is the non-vacuity witness at   *)
+(*      the real instance: mkdir mints the pair from an EMPTY register,    *)
+(*      every namer's fragment is then pinned to the [".."] target -- that *)
+(*      is the fact rmdir's [dp->nlink--] needs -- and rmdir's retirement  *)
+(*      leaves the register empty again, which is the reuse step           *)
+(*      [nondir_marker_stuck] refutes for the core-id marker.              *)
+(*                                                                        *)
+(*  A FILE's authority is unconstrained (it has many namers), which is why *)
+(*  the bundle binds it existentially under [size P <= nlink]: that bound  *)
+(*  is what makes a FREED inum's register provably empty, so the mint      *)
+(*  above always starts where [par_register_roundtrip] starts.             *)
+(* ====================================================================== *)
+
+From Stdlib Require Import ZArith Lia List.
+From stdpp Require Import gmap gmultiset.
+From iris.algebra Require Import auth agree csum dfrac frac gmap gmultiset
+     numbers updates.
+From iris.algebra.lib Require Import dfrac_agree.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import iprop own.
+Require Import Xv6Cameras.
+Require Import FsStateLink.
+
+Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(*  1.  AN UNCONDITIONAL HALF DIES AT THE THIRD HARD LINK                  *)
+(* ---------------------------------------------------------------------- *)
+
+Theorem par_half_three_namers (v : Z) :
+  ~ ✓ (to_dfrac_agree (DfracOwn (1/2)) (v : leibnizO Z)
+       ⋅ to_dfrac_agree (DfracOwn (1/2)) (v : leibnizO Z)
+       ⋅ to_dfrac_agree (DfracOwn (1/2)) (v : leibnizO Z)).
+Proof.
+  rewrite -dfrac_agree_op dfrac_agree_op_valid.
+  intros [Hv _]. revert Hv.
+  rewrite dfrac_op_own dfrac_valid_own. compute. intros H. by apply H.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  2.  A CORE-ID MARKER IS NEVER RETRACTED                                *)
+(* ---------------------------------------------------------------------- *)
+
+(* [Cinl (to_agree ())] is the only shape an UNCONDITIONAL parent-side
+   resource can take at a non-directory target (section 1 rules out every
+   fractional one).  It is core-id, so it is its own frame: no update away
+   from it is frame-preserving, and in particular the inum can never take
+   on the directory register [Cinr x] that a later [mkdir] would install. *)
+Theorem nondir_marker_stuck {A : cmra} `{!CmraDiscrete A} (x : A) :
+  ~ ((Cinl (to_agree ()) : csumR (agreeR unitO) A) ~~> Cinr x).
+Proof.
+  intros Hup.
+  assert (Hv : ✓ ((Cinl (to_agree ()) : csumR (agreeR unitO) A)
+                  ⋅? Some (Cinl (to_agree ())))).
+  { rewrite /= -Cinl_op agree_idemp. done. }
+  pose proof (proj1 (cmra_discrete_update _ _) Hup
+                (Some (Cinl (to_agree ()))) Hv) as Hbot.
+  by rewrite /= in Hbot.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  3.  ...AND THE MULTISET REGISTER HAS NEITHER PROBLEM                   *)
+(* ---------------------------------------------------------------------- *)
+
+(* The parent side composes for ANY number of namers: a lone [auth]
+   fragment is valid whatever the multiset. *)
+Theorem par_frag_any (c : Z) (Q : gmultiset Z) :
+  ✓ ({[ c := ((ε : authUR natUR), (◯ Q : fsParUR)) ]} : fsLinkUR).
+Proof.
+  apply singleton_valid, pair_valid.
+  split; [apply ucmra_unit_valid | by apply auth_frag_valid].
+Qed.
+
+(* ...and the law is read at a SATISFIABLE premise: the authority and the
+   fragment a [mkdir] mints stand together. *)
+Theorem par_pair_valid (c p : Z) :
+  ✓ (par_auth_elem c {[+ p +]} ⋅ par_tok_elem c p).
+Proof.
+  rewrite /par_auth_elem /par_tok_elem singleton_op -pair_op.
+  apply singleton_valid, pair_valid.
+  split; [by rewrite left_id; apply ucmra_unit_valid |].
+  apply auth_both_valid_discrete.
+  split; [by apply gmultiset_included | done].
+Qed.
+
+Section Roundtrip.
+  Context `{!fsLinkG Σ}.
+
+  (* THE WHOLE MECHANISM IN ONE STATEMENT.  From an EMPTY register -- what
+     [size P <= nlink] gives at a freed inum -- [mkdir] mints the pair; any
+     namer's fragment is then pinned to the parent [dp], which is (D1);
+     and rmdir's retirement returns the register to empty, so the inum is
+     reusable as a directory again. *)
+  Lemma par_register_mint (Γ : fs_view_names Σ) (c dp : Z) :
+    par_auth Γ c ∅ ==∗ par_auth Γ c {[+ dp +]} ∗ par_tok Γ c dp.
+  Proof.
+    iIntros "Ha".
+    iMod (par_alloc Γ c ∅ dp with "Ha") as "[Ha $]".
+    assert (Hemp : (∅ : gmultiset Z) ⊎ {[+ dp +]} = {[+ dp +]})
+      by multiset_solver.
+    rewrite Hemp. by iFrame.
+  Qed.
+
+  Lemma par_register_retire (Γ : fs_view_names Σ) (c dp : Z) :
+    par_auth Γ c {[+ dp +]} -∗ par_tok Γ c dp ==∗ par_auth Γ c ∅.
+  Proof.
+    iIntros "Ha Ht".
+    assert (Hemp : (∅ : gmultiset Z) ⊎ {[+ dp +]} = {[+ dp +]})
+      by multiset_solver.
+    iApply (par_dealloc Γ c ∅ dp with "[Ha] Ht"). rewrite Hemp. iFrame "Ha".
+  Qed.
+
+  Theorem par_register_roundtrip (Γ : fs_view_names Σ) (c dp : Z) :
+    par_auth Γ c ∅ ==∗ ∃ j : Z, ⌜j = dp⌝ ∗ par_auth Γ c ∅.
+  Proof.
+    iIntros "Ha".
+    iMod (par_register_mint with "Ha") as "[Ha Ht]".
+    iDestruct (par_auth_tok_eq with "Ha Ht") as %Hj.
+    iMod (par_register_retire with "Ha Ht") as "Ha".
+    iModIntro. iExists dp. by iFrame.
+  Qed.
+
+End Roundtrip.
