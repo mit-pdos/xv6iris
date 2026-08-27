@@ -2937,14 +2937,13 @@ so it never wanted that shape.
     at all (which is why `FsDurSnap.fs_state_of_ledger_era` has NO caller);
     it distributes region/bitmap/escrow/pool straight off the pure tie.
     Moving it to the transport is a rewrite of that 480-line mint.
-  - **`snap_ok` WAS DELIBERATELY NOT SHRUNK.**  `SystemAdequacy.fs_boot_pure`
-    exports `∃ S, snap_ok S D` as the theorem's durability claim, so
-    dropping `sk_disj` ("no two inodes share a block") from it weakens what
-    the theorem SAYS even though the text is unchanged.  The shrink is
-    downstream of both call-site moves and needs an owner ruling on what the
-    exported claim must keep.  Nothing was deleted: the value-first
-    allocator (`fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`,
-    `fp_*`) and `snap_bytes`' cut clauses all still have their two callers.
+  - **`snap_ok` WAS NOT SHRUNK, and lane H3 says it never has to be.**
+    `SystemAdequacy.fs_boot_pure` exports `∃ S, snap_ok S D` as the
+    theorem's durability claim, so dropping `sk_disj` would weaken what
+    the theorem SAYS.  H3 keeps the export whole and carries only the
+    geometry.  Nothing was deleted here: the value-first allocator
+    (`fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`, `fp_*`) and
+    `snap_bytes`' cut clauses all still have their two callers.
 
   **AS LANDED — H2.  THE LAW HANDS DOWN THE EPOCH; THE TRANSPORT STILL HAS
   NO CALL SITE, AND TWO SHAPES SAY WHY.**
@@ -2978,31 +2977,87 @@ so it never wanted that shape.
     name first.
   - **`dsnap_step_of` IS DELETED** (its `snap_ok` form had no caller left).
     `dsnap_step_id`/`_trans` remain caller-less, as before this lane.
-  - **WALL — `iris/FsDurXferWall.v`, and it is about the SHAPES.**  Item 3
-    of the brief (make `snap_ok` a reading off the snapshot's resources) is
-    REFUTED: `FsDurSnap.fs_snap Γ g B D S` mentions `D` in exactly one
-    place, the pure conjunct `⌜snap_ok S D⌝`, so a reading off the resources
-    would hold at every `D`, hence at `∅`, which no state fits
-    (`snap_ok_not_readable` over `snap_ok_empty_absurd`; `fs_snap_split` is
-    the D-freeness, `fs_snap_res_inhabited` the non-vacuity).  The cause is
-    not a missing lemma — `D` is a VALUE the WAL computes, and `P_dur`
-    cannot own a ledger of it beside `fs_state Γ S` at full fraction.  And
-    the commit's collection is not a legal transport source either:
-    `FsCollect.col_bundle`'s share is existential with the single constraint
-    "the double is invalid", which `DfracOwn (3/4)` meets
-    (`dfrac_34_no_pair`) and which cannot be promoted to the full element
-    `fs_state` wants (`phi_no_promote`).  Consequences for whoever takes
-    this next: `snap_ok` must still be MATERIALISED at every commit
-    (`FsCollect.col_snap_ok_ex`, `pure_keep` and `col_snap_bytes` all keep
-    their caller, so item 4's deletions beyond `dsnap_step_of` cannot
-    happen), and the transport at the commit needs (a) a PER-OBJECT-share
-    source — the disjointness survives, `phi_excl` is fraction-aware — and
-    (b) an accessor-shaped collection, which `pure_keep` cannot give.  Even
-    with both, `fs_snap_alloc_xfer` takes `snap_ok S D` BESIDE the instance,
-    so it is a strictly larger obligation than `P_dur_alloc` until the first
-    wall is fixed.  **The first wall is the one to take: it is a question
-    about what `P_dur` owns, and it is upstream of everything else in
-    lane H.**
+  - **WALL — the SHAPES, in `iris/FsDurXferWall.v`.**  Item 3 of H2's
+    brief (make `snap_ok` a reading off the snapshot's resources) needed
+    the snapshot to OWN something that pins `D`; lane H3 gave it one
+    (`FsDurRead.snap_auth`) and the wall's first half is retired there.
+    The second half stands: the commit's collection is not a legal
+    transport source, because `FsCollect.col_bundle`'s share is
+    existential with the single constraint "the double is invalid", which
+    `DfracOwn (3/4)` meets (`dfrac_34_no_pair`) and which cannot be
+    promoted to the full element (`phi_no_promote`).
+
+  **AS LANDED — H3.  THE EPOCH HAS AN IDENTITY, AND THE TIE IS A READING;
+  WHAT IS CARRIED IS THE GEOMETRY, AND THE COMMIT'S CALL SITE STILL HAS
+  NOT MOVED.**
+
+  Whole tree green, `make audit-only` at the three-entry baseline, the
+  theorem's statement and exported content untouched.
+
+  - **`iris/FsDurRead.v` is the identity** (fs-ghost-state.md §2b, plan
+    §2).  `snap_auth g B D` = `ghost_map_auth g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝` —
+    ONE equation between two VALUES, sealed `Typeclasses Opaque` so it is
+    one hypothesis at every reader.  Off it: `snap_run_read` (a run inside
+    a block IS that block's slice, over `FsBlocks.map_seqZ_slice` plus one
+    division — `fs_dbytes_block_of`), `snap_blk_read_full`, `snap_blk_dom`,
+    and two Γ-generic exclusivity tools the coupling needs,
+    `byte_range_q_overlap` / `blk_run_overlap` (cross-OFFSET, which
+    `FsStateDefs.byte_range_q_excl` is not) and `free_pool_used_run` (a
+    64-byte run refutes a clear bit exactly as a whole block does).
+  - **`FsDurSnap.fs_snap` carries the identity, the root's keep-alive
+    fragment, and ONE pure conjunct.**  `snap_shape S D` is seven clauses
+    of `snap_bytes` VERBATIM (`ss_bsz`, `ss_dombelow`, `ss_sbok`,
+    `ss_inum`, `ss_reg`, `ss_regdom`, `ss_dirloc`); `snap_shape_of_ok` is
+    seven projections, so no producer pays anything new.  The root's
+    keep-alive token is OWNED rather than stated, which is how `sk_links`'
+    slack becomes a reading (`fs_links_valid_tok`).
+  - **`fs_snap_read_ok : fs_snap Γ g B D S -∗ ⌜snap_ok S D⌝`** derives the
+    other fourteen clauses plus `snap_local`, consuming nothing (a pure
+    conclusion is free).  Byte ties by agreement through the identity;
+    `sk_disj`/`sk_own_used`/`sk_meta_used`/`sk_slot` off `phi_excl` at
+    `snap_gamma` (`fs_inodes_phi_disj`, `fs_inodes_phi_used`,
+    `fs_owns_not_meta`, `fs_meta_used`, `inode_dat_slot_inj`);
+    `snap_local`/`sk_repr`/`sk_parse` off `fs_state`'s ghost half;
+    `sk_dom` off `ss_regdom`.  **The split is EXACTLY
+    `FsCollect.col_snap_bytes`' split at the era's view**, which is why the
+    commit pays nothing new for it.  `P_dur_tie`/`_keep`/`P_dur_inode`/
+    `P_dur_node_of_slot`/`P_fs_project`/`fs_boot_pure` are unchanged in
+    statement and go through it.
+  - **The transport carries the SOURCE's authority.**  `phi_agree Γ A M`
+    = `(A ∗ fsΦ Γ dq a v) ⊢ ⌜M !! a = Some v⌝`, stated exactly as
+    `phi_excl` is; `fs_state_xfer`/`_tok` take it and output `⌜B ⊆ M⌝`, so
+    the identity is INHERITED and never computed.  `FsDurSnap.fs_bytes_auth`
+    names the era's authority in a section WITHOUT `diskImgG` — with both
+    class paths in scope `ghost_map_auth (fs_bytes γfs) 1 Lb` resolves to
+    the other one and no agreement law applies.  `fs_state_xfer_era` /
+    `fs_state_xfer_snap` are the non-vacuity checks at both instances.
+    `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` now take `snap_shape` and
+    NOTHING else — no byte tie, no cut clause, no used-set clause.
+  - **`iris/FsDurXferWall.v`'s first wall is RETIRED and replaced by a
+    sharper one.**  `snap_ok_not_readable`/`snap_ok_empty_absurd` are
+    deleted (the tied form defeats them).  What stands is
+    `snap_shape_not_readable`: grow `D` by one whole block above the
+    state's own `size` and every resource of the epoch still holds
+    (`fs_snap_res_grow`, over `fs_dbytes_grow` — the flattening is
+    monotone), while `ss_dombelow` fails there
+    (`snap_shape_grow_absurd`).  It is a fact about `ghost_map` — an
+    AUTHORITY may hold entries no fragment names — not a missing lemma, so
+    the geometry residue is irreducible under this shape.
+    `fs_snap_res_inhabited` is the non-vacuity at the tied form.  The
+    second wall (the commit's collection is not a legal transport source:
+    `dfrac_34_no_pair`, `phi_no_promote`) STANDS unchanged.
+  - **WHAT REMAINS.**  The commit still materialises `snap_ok` through
+    `FsCollect.col_snap_ok_ex` and calls `P_dur_alloc`, because
+    `col_bundle`'s share is existential: the transport needs a PER-OBJECT
+    share and the collection needs to become an ACCESSOR before the call
+    site can move, and only then does `col_hand`'s existing `col_geom` +
+    domain + `dirloc` rows discharge `snap_shape` directly.  So
+    `pure_keep` / `col_snap_bytes` / `col_snap_ok` / `col_snap_ok_ex` all
+    keep their callers, the value-first allocator (`fs_state_of_ledger`,
+    `blk_ledger_cut`, `ledger_carve`, `fp_*`) keeps its two, and the boot
+    mint (`FsCfgSnap.fs_cfg_alloc_snap`) is untouched.  Nothing was
+    deleted beyond the retired wall.
+
 - [ ] **Lane F — strengthening and receipts.**  Persistent snapshot
   copies as sync-style receipts (`sys_sync`'s spec — see the fs-syscall
   notes another session landed); the `P_log`/`P_fs` split as two

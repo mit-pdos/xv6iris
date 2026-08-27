@@ -90,11 +90,24 @@ live directory, unique names).  There is NO cross-inode pure clause:
   (`fsLinkG`/`fsTopG`) on `FsCrash`'s sections, which every consumer already
   has out of `Xv6G.xv6G`.  **THE ALLOCATOR IS A RESOURCE TRANSPORT**
   (`iris/FsDurXfer.v`, lane H): `fs_state Γ S ==∗ fs_state Γ S ∗ fs_state Γ' S`
-  over a fresh `Γ'`, with `phi_excl Γ` as its ONLY premise —
-  `FsDurSnap.fs_snap_alloc_xfer`/`P_dur_alloc_xfer` are the registry's
-  entry points at it.  Both ends of a transport are `fs_state`s and nothing
-  is computed from `S`; §4 says why the value-first form that survives
-  beside it is a mistake and what still blocks its two call sites.
+  over a fresh `Γ'`, with `phi_excl Γ` and the SOURCE'S OWN AUTHORITY
+  (`phi_agree Γ A M`, satisfied by one `ghost_map_lookup` at either
+  instance) as its premises — `FsDurSnap.fs_snap_alloc_xfer` /
+  `P_dur_alloc_xfer` are the registry's entry points at it.  Both ends of a
+  transport are `fs_state`s and nothing is computed from `S`; the output
+  map is a SUBSET of the source's, which is where a snapshot's IDENTITY
+  comes from.  §4 says why the value-first form that survives beside it is
+  a mistake and what still blocks its two call sites.
+- **The epoch's IDENTITY is a resource** (`FsDurRead.snap_auth`, lane H3):
+  the byte authority together with `⌜B ⊆ fs_dbytes D⌝`, one equation
+  between two VALUES.  With it, `FsDurSnap.fs_snap_read_ok` DERIVES
+  `snap_ok S D` from the epoch's own resources, and the only pure conjunct
+  a snapshot still carries is the GEOMETRY (`snap_shape`: block lengths,
+  the map's range, the superblock's shape, which inums the region names,
+  the directory clauses at the region's width).  That residue is
+  irreducible for a reason about `ghost_map` — an authority may hold
+  entries no fragment names, so nothing the epoch owns bounds `D`'s domain
+  (`FsDurXferWall.snap_shape_not_readable`).
 
 ## 3. The WAL's client-facing contracts
 
@@ -250,8 +263,9 @@ writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` still
 carries its used-set coupling clauses (`sk_own_used`, `sk_disj`) and its
 three cut clauses, because the VALUE-FIRST allocator
 (`fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`) needs them to
-SPLIT a linear ledger; at the commit they are read off the ∗, at boot off
-the snapshot.
+SPLIT a linear ledger.  NOTHING CARRIES THEM: at a commit they are read
+off the era's ∗, at a snapshot off the epoch's own
+(`FsDurSnap.fs_snap_read_ok`).
 
 **THE VALUE-FIRST ALLOCATOR IS A MISTAKE, AND THE TRANSPORT THAT REPLACES
 IT IS BUILT (lane H, `iris/FsDurXfer.v`).**  The carve is an artifact of
@@ -270,42 +284,34 @@ the snapshot's.
 
 `log_ctx`'s cone is no longer the obstacle: lane H2 made the law hand down
 `P_dur` (§3), so the WAL's commit permit no longer allocates anything and
-`dsnap_step_of` is deleted.  **BUT NEITHER CALL SITE USES THE TRANSPORT,
-AND TWO SHAPES SAY WHY** (`iris/FsDurXferWall.v`, machine-checked):
+`dsnap_step_of` is deleted.  Lane H3 then gave the epoch an IDENTITY and
+made the tie a READING, so what the transport owes at a commit is the
+GEOMETRY and nothing else.  **BUT THE COMMIT'S CALL SITE STILL HAS NOT
+MOVED, AND ONE SHAPE SAYS WHY** (`iris/FsDurXferWall.v`, machine-checked):
+`fs_state_xfer` takes byte legs at `DfracOwn 1`, while quiescence yields
+`FsCollect.col_bundle`, whose share is existential with the single
+constraint "the double is invalid" — a read-locked inode has handed a
+quarter away.  `DfracOwn (3/4)` satisfies that (`dfrac_34_no_pair`) and
+cannot be promoted (`phi_no_promote`).  The transport would first have to
+take a PER-OBJECT share — the disjointness survives, since `phi_excl` is
+fraction-aware — and the collection would have to become an ACCESSOR,
+which `FsCollectAll.pure_keep` cannot make it (a pure conclusion is free; a
+resource one is not).  Until then the commit goes on materialising
+`snap_ok` through `FsCollect.col_snap_ok_ex` and calling `P_dur_alloc`.
 
-- **The exported claim cannot be read off the snapshot's resources.**
-  `FsDurSnap.fs_snap Γ g B D S` mentions `D` in EXACTLY one place, its
-  pure conjunct `⌜snap_ok S D⌝`; everything else is a function of `S`
-  alone.  A reading lemma off the resources would therefore hold at every
-  `D`, including `∅`, which no state fits (`snap_ok_not_readable`,
-  `snap_ok_empty_absurd`).  The root cause is not a missing lemma: `D` is a
-  VALUE the WAL computes from its cache map, and tying a value to a
-  resource is a pure statement by construction — and `P_dur` cannot own a
-  ledger of `D` beside `fs_state Γ S` at full fraction, because the two
-  would overlap on every block `S` names.  So `snap_ok` stays CARRIED, and
-  every clause the theorem exports has to be materialised at each commit,
-  which is exactly what `FsCollect.col_snap_ok_ex` does.
-- **The commit's collection is not a legal transport source.**
-  `fs_state_xfer` takes byte legs at `DfracOwn 1`; quiescence yields
-  `FsCollect.col_bundle`, whose share is existential with the single
-  constraint "the double is invalid", because a read-locked inode has
-  handed a quarter away.  `DfracOwn (3/4)` satisfies that
-  (`dfrac_34_no_pair`) and cannot be promoted (`phi_no_promote`).  The
-  transport would first have to take a PER-OBJECT share — the disjointness
-  survives, since `phi_excl` is fraction-aware — and the collection would
-  have to become an accessor, which `FsCollectAll.pure_keep` cannot make it
-  (a pure conclusion is free; a resource one is not).
-
-And even with both fixed the transport buys nothing at the commit while the
-first wall stands: `fs_snap_alloc_xfer` takes `snap_ok S D` BESIDE the
-instance, so it is a strictly larger obligation than `P_dur_alloc`.  The
-BOOT mint is a separate rewrite — `FsCfgSnap.fs_cfg_alloc_snap` never
+The BOOT mint is a separate rewrite: `FsCfgSnap.fs_cfg_alloc_snap` never
 builds `fs_state (fs_gamma_L γfs) S` at all (which is why
 `fs_state_of_ledger_era` has no caller); it distributes the pieces straight
-into region/bitmap/escrow/pool off the pure tie.  SHRINKING `snap_ok` is
-downstream of the first wall: `SystemAdequacy.fs_boot_pure` exports
-`∃ S, snap_ok S D` as the theorem's durability claim, so dropping
-`sk_disj` from it weakens what the theorem says.
+into region/bitmap/escrow/pool off the pure tie.
+
+**AND `snap_ok` DOES NOT NEED SHRINKING ANY MORE.**  It was left whole
+because `SystemAdequacy.fs_boot_pure` exports `∃ S, snap_ok S D` as the
+theorem's durability claim, so dropping `sk_disj` would weaken what the
+theorem says.  With the reading in place the export is unchanged AND
+nothing but the geometry is carried: the seven `snap_shape` clauses are
+exactly the ones no resource can pin, every other clause -- the byte ties,
+the used-set coupling, both disjointness clauses, the local clauses -- is
+derived where it is needed.
 
 **THE COLLECTION IS `FsCollectAll.fs_collect_snap_ok`**, and what makes it
 possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields
@@ -319,17 +325,24 @@ image (`FirstTok.first_fsinit_pures`) and nowhere else.
 
 ## 5. Boot, adequacy, and the theorem
 
-**Boot** (stage 4, lane E-boot): the SAME allocator core
-(`FsDurSnap.fs_state_of_ledger_era` — Γ-generic, value-plus-pure-facts in,
-instance out) clones the current snapshot onto fresh era ghosts at
-PowerOn, inside `BootShared.boot_shared_alloc` where `FsCfgBoot.fs_cfg_alloc`
-runs today, followed by the era-only extras and the distribution into
-region/bitmap/escrow/pool — REPLACING the boot-time decoding of `fs.img`,
-which survives only at era 0 inside `P_fs_alloc`/`FsDurImg` (it produces
-era 0's snapshot).  The value the mint takes is `D = fr_D` of the boot
-recovery record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
+**Boot** (stage 4, lane E-boot), AS BUILT: `FsCfgSnap.fs_cfg_alloc_snap`
+re-founds the era at PowerOn, inside `BootShared.boot_shared_alloc` where
+`FsCfgBoot.fs_cfg_alloc` runs, off the PURE tie and a fresh byte map — it
+never builds `fs_state (fs_gamma_L γfs) S` at all, which is why
+`FsDurSnap.fs_state_of_ledger_era` (the Γ-generic core at the era's view)
+has no caller.  It REPLACES the boot-time decoding of `fs.img`, which
+survives only at era 0 inside `P_fs_alloc`/`FsDurImg` (it produces era 0's
+snapshot).  The value the mint takes is `D = fr_D` of the boot recovery
+record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
 `P_dur_tie` — pure content, so it rides `riscv_power_adequacy`'s
 `Hproj`/`Ppure` with no new parameter).
+
+**WHAT WOULD MAKE IT A TRANSPORT** (not done): the snapshot is a legal
+SOURCE — `FsDurSnap.fs_state_xfer_snap` is that check, at a snapshot's own
+byte authority — so a mint that LENT `fs_state (snap_gamma …) S` through
+`FsCrash.P_fs_dur_acc` and got it back could build the era's instance with
+no decode and no carve.  It is a rewrite of that 480-line mint, not a
+substitution.
 
 **Ghost-wise recovery is a NO-OP, and the mint runs AT POWERON (RULING,
 corrected by lane E-mint).**  `D` is a pure function of the raw disk —

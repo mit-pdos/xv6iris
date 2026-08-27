@@ -263,27 +263,38 @@ of a durable `fs_state` mean something.
 | piece | type / home | meaning |
 |---|---|---|
 | `FsDurXfer.snap_gamma g gl gt` | a `fs_view_names Σ` (`FsStateDefs.v`'s record) at three FRESH gnames | the snapshot's Γ: `fsΦ dq a v := a ↪[g]{dq} v` at a fresh element of the tree's unique `ghost_mapG Σ Z (bv 8)`, the link family at `gl`, the abstract map at `gt`.  `snap_gamma_excl` IS `phi_excl`, so `FsStateBitmap.free_pool_used` and `FsStateDefs.blk_owned_ne` read on the durable side exactly as they do at the era's view. |
-| `fs_snap Γ g B D S` | one epoch's whole instance | the byte authority at `B`, `γtop Γ`'s authority at `fss_inodes S`, every `top_frag`, `fs_state Γ S`, and the pure `⌜snap_ok S D⌝`.  Timeless whenever `Γ` is.  **`B` IS A PARAMETER, not `fs_dbytes D`**: the value-first allocator mints it at the whole of `fs_dbytes D` and carves the instance out of it, the TRANSPORT mints it at the flattening of the source instance's own runs (a record is 64 bytes of its region block, not the block).  Nothing reads it. |
+| `FsDurRead.snap_auth g B D` | the epoch's IDENTITY | `ghost_map_auth g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝` — the byte authority, and ONE equation between two VALUES saying it stands at the committed view's bytes.  SEALED (`Typeclasses Opaque`): it is one hypothesis at every reader.  It is not a consistency clause — it names no inode, no block role and no bitmap bit — and it is what turns every BYTE TIE of `snap_bytes` into a reading. |
+| `fs_snap Γ g B D S` | one epoch's whole instance | `snap_auth g B D`, `γtop Γ`'s authority at `fss_inodes S`, every `top_frag`, `fs_state Γ S`, the inode region's KEEP-ALIVE fragment at the root (`∃ kv, own (γlink Γ) (link_tok_elem ROOTINO kv)` — owned, not stated, which is how `sk_links`' slack becomes a reading), and the pure `⌜snap_shape S D⌝`.  Timeless whenever `Γ` is.  **`B` IS A PARAMETER, not `fs_dbytes D`**: the value-first allocator mints it at the whole of `fs_dbytes D`, the TRANSPORT at the flattening of the source instance's own runs (a record is 64 bytes of its region block, not the block).  Nothing reads it — the identity is the subset, not the value. |
 | `P_dur D` | `∃ g gl gt B S, fs_snap (snap_gamma g gl gt) g B D S` | THE REGISTRY: the CURRENT snapshot, at the committed block map alone.  The names, the byte map and the state are existential — an epoch is named only by the map it stands at, which is what makes `P_dur` a function of `D` and therefore droppable into `FsCrash.P_fs` with NO arity change. |
-| `P_dur_alloc S D` | `FsDurSnap.v` | `snap_ok S D` in, `P_dur D` out under a `bupd`.  The snapshot needs NO resource from anyone — a VALUE and pure facts.  It runs `fs_snap_alloc`, which allocates all three families in one update over the Γ-generic core `fs_state_of_ledger`. |
-| `fs_snap_alloc_xfer` / `P_dur_alloc_xfer` | `FsDurSnap.v` | THE SAME REGISTRY, FROM AN INSTANCE (see the transport block below): `phi_excl Γ` and `fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)` in, `P_dur D` out with the source HANDED BACK.  No cut clause of `snap_bytes` is used — the disjointness the value-first allocator carves by is read off the source's own exclusivity inside `FsDurXfer`.  `snap_ok S D` still rides as the registry's pure tie, because that is what every READER takes. |
+| `P_dur_alloc S D` | `FsDurSnap.v` | `snap_ok S D` in, `P_dur D` out under a `bupd`.  The VALUE-FIRST entry: no resource from anyone, a value and pure facts.  It runs `fs_snap_alloc`, which allocates all three families in one update over the Γ-generic core `fs_state_of_ledger` and gets the identity by `reflexivity` (`B = fs_dbytes D`).  Its ONE producer that has no source instance is era 0, off the mkfs image. |
+| `fs_snap_alloc_xfer` / `P_dur_alloc_xfer` | `FsDurSnap.v` | THE SAME REGISTRY, FROM AN INSTANCE (see the transport block below): `phi_excl Γ`, a source authority with `phi_agree Γ A (fs_dbytes D)`, `snap_shape S D`, and `fs_state Γ S ∗ own (γlink Γ) (link_tok_elem ROOTINO v)` in; `P_dur D` out with the source HANDED BACK.  **No byte tie, no disjointness clause and no used-set clause is a premise** — the disjointness is read off the source's own exclusivity inside `FsDurXfer`, and the identity is inherited from the source's authority.  What is left is the GEOMETRY and nothing else. |
 | `dsnap_step_xfer D D'` | `FsDurSnap.v` | the commit's step: `P_dur D' -∗ P_dur D ==∗ P_dur D'`.  The old epoch is DISCARDED and the NEXT ONE COMES IN FROM THE FILE SYSTEM (lane H2) — the WAL allocates nothing and reads nothing out of the old instance.  Its value-first predecessor `dsnap_step_of` (`snap_ok S' D'` in, the epoch built inside the permit) is DELETED.  `dsnap_step_id`/`_trans` are the readings a non-committing step takes, and have no caller. |
-| `P_dur_tie` / `P_dur_tie_keep` / `P_dur_inode` / `P_dur_node_of_slot` | `FsDurSnap.v` | what a consumer READS off the current snapshot.  The tie is pure, so a receipt is a COPY and nothing is borrowed: `P_dur_node_of_slot` turns a byte fact about the committed map's inode slot into a fact about the durable file system's inode, and `snap_dir_entry_of_first` does the same for a directory entry.  These are the readings the spike theorem is stated at. |
+| `fs_snap_read_ok` / `_keep` | `FsDurSnap.v` | **THE READING**: `fs_snap Γ g B D S -∗ ⌜snap_ok S D⌝`, nothing consumed (a pure conclusion is free).  Every byte tie by agreement with the epoch's own authority through the identity; the used-set coupling, `sk_disj` and `sk_slot` off `phi_excl` at `snap_gamma`; `snap_local`/`sk_repr`/`sk_parse` off `fs_state`'s own ghost half; `sk_links` off `fs_links_valid_tok` with the root's keep-alive fragment; `sk_dom` off `ss_regdom`.  The only inputs are the epoch's resources and `snap_shape`. |
+| `P_dur_tie` / `P_dur_tie_keep` / `P_dur_inode` / `P_dur_node_of_slot` | `FsDurSnap.v` | what a consumer READS off the current snapshot — all four go through `fs_snap_read_ok`, and their statements have not moved.  `P_dur_node_of_slot` turns a byte fact about the committed map's inode slot into a fact about the durable file system's inode, and `snap_dir_entry_of_first` does the same for a directory entry.  These are the readings the spike theorem is stated at. |
 
 **THE RESOURCE TRANSPORT (`iris/FsDurXfer.v`, lane H).**  BOTH ENDS OF A
 TRANSPORT ARE `fs_state`s, and nothing is computed from `S` but the state
 itself:
 
 ```
-fs_state_xfer_tok Γ (Hex : phi_excl Γ) S r v :
-  fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v) ==∗
-    fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
-    ∗ ∃ g gl gt B, ghost_map_auth g 1 B ∗ ghost_map_auth gt 1 (fss_inodes S)
-                   ∗ top_frags ∗ fs_state (snap_gamma g gl gt) S
-                   ∗ own gl (link_tok_elem r v)
+fs_state_xfer_tok Γ (Hex : phi_excl Γ) A M (Hag : phi_agree Γ A M) S r v :
+  A -∗ fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+    ∃ g gl gt B, ⌜B ⊆ M⌝
+                 ∗ A ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+                 ∗ ghost_map_auth g 1 B ∗ ghost_map_auth gt 1 (fss_inodes S)
+                 ∗ top_frags ∗ fs_state (snap_gamma g gl gt) S
+                 ∗ own gl (link_tok_elem r v)
 ```
 
-Its ONLY premise is `phi_excl Γ`.  Three allocations and not one decode:
+Its premises are `phi_excl Γ` and the SOURCE'S OWN AUTHORITY as a
+hypothesis: `phi_agree Γ A M` is `(A ∗ fsΦ Γ dq a v) ⊢ ⌜M !! a = Some v⌝`,
+stated exactly as `phi_excl` is, and both instances satisfy it by one
+`ghost_map_lookup` (`FsDurSnap.fs_gamma_L_agree` at the era's byte
+authority, `FsDurXfer.snap_gamma_agree` at a snapshot's).  **THE OUTPUT'S
+IDENTITY IS INHERITED**: the fresh map is the flattening of the SOURCE's
+runs, so `B ⊆ M`, and a caller whose source authority stands at the
+committed view's bytes gets `FsDurRead.snap_auth` for free.  Three
+allocations and not one decode:
 
 * the BYTE map.  `fs_footprint Γ S` IS a `∗` of byte runs, one per object,
   and `xr_fs S PM` names them (`xr_rec`/`xr_dat`/`xr_ind` per inode, the
@@ -304,15 +315,20 @@ Its ONLY premise is `phi_excl Γ`.  Three allocations and not one decode:
 * the LINK family: ONE `own_alloc` at the SOURCE'S own element, read off
   its resources by `FsState.fs_links_valid` / `fs_links_valid_tok` — the
   choice function is the gather's, never a function of `S`.  The `_tok`
-  form is what carries the root's keep-alive fragment across, so `sk_links`'
-  slack is not what a transport needs.
+  form is what carries the root's keep-alive fragment across, and the
+  snapshot then KEEPS it — which is what makes `sk_links`' slack a reading
+  rather than a carried clause.
 * the TOP map: `ghost_map_alloc` at `fss_inodes S`, the index of both ends.
 
 `FsDurSnap.fs_state_xfer_era` and `fs_state_xfer_snap` are the two
-NON-VACUITY CHECKS, stated rather than described: the transport applies
-VERBATIM at `FsBytesGamma.fs_gamma_L` (the era's full, non-`□`-able
-element — the commit's collection is a legal source) and at `snap_gamma`
-(the durable side — the boot mint's lent snapshot is a legal source).
+NON-VACUITY CHECKS, stated rather than described: the transport applies at
+`FsBytesGamma.fs_gamma_L` against the era's own byte authority (the full,
+non-`□`-able element — the commit's collection is a legal source) and at
+`snap_gamma` against a snapshot's (the boot mint's lent snapshot is a legal
+source).  **`FsDurSnap.fs_bytes_auth` names the era's authority in a
+section WITHOUT `diskImgG`**, because with both class paths in scope
+`ghost_map_auth (fs_bytes γfs) 1 Lb` resolves to the other one and no
+agreement law then applies (durable-notes, "one bundle per ghost class").
 
 **THE LAW HANDS DOWN THE EPOCH (lane H2), BUT NEITHER CALL SITE USES THE
 TRANSPORT.**  `LogSnapLaw.snap_law`'s conclusion is now
@@ -326,39 +342,56 @@ installs it (`dsnap_step_xfer`).  `LogInv`'s section gained
 across `end_op`'s lock release, with one `iEval` rewrite at the copy loop's
 back edge (a fill writes a log SLOT, so the map never moves).
 
-What the epoch is built BY is still `P_dur_alloc`, off the pure
-`FsCollect.col_snap_ok_ex`, and `iris/FsDurXferWall.v` is the
-machine-checked reason:
+**THE TIE IS A READING, EXCEPT FOR THE GEOMETRY (lane H3).**
+`FsDurSnap.fs_snap` carries the IDENTITY as a resource (`snap_auth`: the
+byte authority, standing at a map inside `LogDefs.fs_dbytes D`) and the
+GEOMETRY as its one pure conjunct.  `fs_snap_read_ok` derives the whole of
+`snap_ok S D` from that — fourteen of `snap_bytes`' twenty-one clauses plus
+`snap_local` come off the resources, and the split is EXACTLY the split
+`FsCollect.col_snap_bytes` already makes at the era's view, which is why the
+commit pays nothing new for it.
 
-* `FsDurSnap.fs_snap Γ g B D S` mentions `D` in EXACTLY one place — its
-  pure conjunct `⌜snap_ok S D⌝`.  So no reading lemma can recover the tie
-  from the resources: it would hold at every `D`, hence at `∅`, which no
-  state fits (`snap_ok_not_readable` over `snap_ok_empty_absurd`).  `D` is
-  a VALUE the WAL computes; tying a value to a resource is pure by
-  construction, and `P_dur` cannot own a ledger of `D` beside
-  `fs_state Γ S` at full fraction (they overlap on every block `S` names).
-* the COMMIT's collection is not a legal transport source.
-  `fs_state_xfer` wants byte legs at `DfracOwn 1`; `FsCollect.col_bundle`'s
-  share is existential with the single constraint "the double is invalid",
-  because a read-locked inode has handed a quarter away.  `DfracOwn (3/4)`
-  satisfies it (`dfrac_34_no_pair`) and cannot be promoted
-  (`phi_no_promote`).  A future lane needs a PER-OBJECT-share transport
-  (the disjointness survives — `phi_excl` is fraction-aware) AND an
-  accessor-shaped collection, which `pure_keep` cannot give (a pure
-  conclusion is free, a resource one is not).
-* the BOOT mint.  `FsCfgSnap.fs_cfg_alloc_snap` never builds
-  `fs_state (fs_gamma_L γfs) S` at all: it distributes the pieces straight
-  into region/bitmap/escrow/pool off the pure tie, which is why
-  `fs_state_of_ledger_era` has no caller.  Moving it to the transport is a
-  rewrite of that mint, not a substitution.
+```
+snap_shape S D :=  ss_bsz       every block of D is a whole block
+                   ss_dombelow  every block of D is below sb_size (fss_sb S)
+                   ss_sbok      fs_sb_ok (fss_sb S)
+                   ss_inum      a named inum is below 2^32
+                   ss_reg       a named inum sits in the region
+                   ss_regdom    every region inum is named
+                   ss_dirloc    node_dir_local i (snap_nib S) n
+```
 
-And while the first wall stands the transport is a strictly LARGER
-obligation at the commit than `P_dur_alloc`, because `fs_snap_alloc_xfer`
-takes `snap_ok S D` beside the instance.  Shrinking `snap_ok` to the byte
-agreements is downstream of that wall and was deliberately NOT done:
-`SystemAdequacy.fs_boot_pure` exports `∃ S, snap_ok S D` as the durability
-claim of the theorem, so dropping `sk_disj` ("no two inodes share a block")
-from it weakens what the theorem says.
+Every clause of it is a clause of `snap_bytes` VERBATIM
+(`snap_shape_of_ok` is seven projections), every one is a CONFIGURATION
+fact rather than a fact about the file system's contents, and both
+producers have it for free: `FsCollect.col_geom` plus `col_hand`'s domain
+and directory rows at a commit, the mkfs geometry at era 0.
+
+**WHY THE GEOMETRY CANNOT ALSO BE A READING** (`iris/FsDurXferWall.v`,
+machine-checked, and it is a fact about `ghost_map` rather than a missing
+lemma): an AUTHORITY may hold entries no fragment names, so an identity
+that says the epoch's bytes are INSIDE `fs_dbytes D` bounds nothing about
+`D`'s domain.  Grow `D` by one whole block above the state's own `size` and
+every resource of the epoch still holds (`fs_snap_res_grow`, because the
+flattening is monotone — `fs_dbytes_grow`), while `ss_dombelow` fails at
+that block (`snap_shape_grow_absurd`).  `snap_shape_not_readable` is the
+two together; `fs_snap_res_inhabited` is the non-vacuity at the tied form.
+
+**THE COMMIT'S CALL SITE HAS NOT MOVED, and one shape says why.**
+`fs_state_xfer` takes byte legs at `DfracOwn 1`; quiescence yields
+`FsCollect.col_bundle`, whose share is existential with the single
+constraint "the double is invalid", because a read-locked inode has handed
+a quarter away.  `DfracOwn (3/4)` satisfies it (`dfrac_34_no_pair`) and
+cannot be promoted (`phi_no_promote`).  A lane that wants the transport at
+the commit needs a PER-OBJECT-share source (the disjointness survives —
+`phi_excl` is fraction-aware) and an ACCESSOR-shaped collection, which
+`FsCollectAll.pure_keep` cannot give (a pure conclusion is free, a resource
+one is not).  What it would then owe `P_dur_alloc_xfer` is `snap_shape` and
+nothing else, which `FsCollect.col_hand` already carries as pure rows.  The
+BOOT mint is a separate rewrite: `FsCfgSnap.fs_cfg_alloc_snap` never builds
+`fs_state (fs_gamma_L γfs) S` at all (which is why `fs_state_of_ledger_era`
+has no caller); it distributes the pieces straight into
+region/bitmap/escrow/pool off the pure tie.
 
 **THE VALUE-FIRST ALLOCATOR TAKES A LINEAR LEDGER.**  `fs_state_of_ledger Γ S D` is the
 Γ-generic core — `snap_ok S D` plus the ledger of `D`'s byte elements in,
@@ -370,8 +403,10 @@ clauses.  `fs_state_of_ledger_era` is the same core at
 points-to is a full element and not `□`-able, satisfies it VERBATIM, and
 the lemma the boot mint calls.
 
-**`snap_ok S D = snap_bytes S D ∧ snap_local S`** (`FsDurSnap.v`), the tie
-the allocator takes; `sk_bytes`/`sk_local` are the projections.
+**`snap_ok S D = snap_bytes S D ∧ snap_local S`** (`FsDurSnap.v`), what a
+reader GETS (`fs_snap_read_ok`) and what the value-first allocator takes;
+`sk_bytes`/`sk_local` are the projections.  Only the seven `snap_shape`
+clauses of it are carried; the rest are read off the epoch's resources.
 `snap_local S` is per-inode and does not mention `D` at all — `∀ i n,
 fss_inodes S !! i = Some n → inode_local i n` — which is why no write can
 disturb it and why it is not carried through one.  `snap_bytes` is a
@@ -392,10 +427,12 @@ disturb it and why it is not carried through one.  `snap_bytes` is a
 * `sk_dirloc` — the three DIRECTORY clauses every escrow payload carries, at the node: `FsStateInode.node_dir_local i (snap_nib S) n` = `DirView.dir_ok` (every live entry's inum is inside the region) ∧ `dir_dots_ix` (a LIVE directory's records 0 and 1 POSITIONALLY are the dots — stronger than `inl_dir_dot`/`inl_dir_dotdot`, which are about the name→inum view) ∧ `dir_orphan_clean` (an orphan directory holds only dot records).  **It is here and not in `inode_local` because `dir_ok` needs the region's WIDTH** and `inode_local i n` takes an inum and a node and nothing else; a `snap_bytes` clause may read `S`'s superblock, exactly as `sk_regdom`/`sk_reg` do.  `IcacheEscrow.ipool_alloc` takes all three, so a boot mint that re-founds the pool needs them; `FsDurSnap.snap_node_dir_local` is that reading.
 
 `sk_meta_used`/`sk_own_used`/`sk_disj` are THE ONE SANCTIONED whole-state
-pure clause (plan §4): read off the `∗` at a commit (two full elements, or
-a full and a ¾, or two ¾, at one address are invalid), off the snapshot at
-boot, never maintained by any writer — `iris/FsDurTrunc.v` is the
-refutation of maintaining them per write.  The encoder injectivity the
+pure clause (plan §4), and nothing ever CARRIES them: they are read off the
+`∗` (two full elements, or a full and a ¾, or two ¾, at one address are
+invalid) — at a commit off the era's, at any reader off the epoch's
+(`fs_inodes_phi_disj`, `fs_inodes_phi_used`, `fs_owns_not_meta`,
+`fs_meta_used`, all in `FsDurSnap`) — and never maintained by any writer;
+`iris/FsDurTrunc.v` is the refutation of maintaining them per write.  The encoder injectivity the
 readings rest on is `dinode_bytes_inj`, `rec_in_blk_inj`,
 `snap_bytes_node_inj`.
 
