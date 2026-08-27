@@ -1033,14 +1033,16 @@ Section power.
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
       iSplitR.
       { iPureIntro.
-        exists [], PowerLoopE,
+        (* the step is OBSERVED: a power loss is a trace event (§3b') *)
+        exists [ObsPowerOff], PowerLoopE,
           (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)), [].
-        do 4 right. split_and!; auto. }
+        do 4 right. split_and!; [done|done|].
+        left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
         | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
-        | (_ & -> & -> & [ (_ & -> & ->) | (Hpw' & _) ]) ] ] ] ];
+        | (_ & -> & [ (_ & -> & -> & ->) | (Hpw' & _) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | | congruence ].
       iIntros "_".
@@ -1090,15 +1092,16 @@ Section power.
         (* SOMEWHERE TO GO: the canonical reset machine (PowerBoot.v) has the
            shape [boot_shape] demands -- reset registers, all of RAM holding
            the loaded image, reset devices, the disk image preserved. *)
-        exists [], PowerLoopE, (boot_gstate g), (power_fork g.(ggen)).
-        do 4 right. split_and!; auto.
-        right. split_and!; auto.
+        (* ... and OBSERVED: a power-on is a trace event too (§3b') *)
+        exists [ObsPowerOn], PowerLoopE, (boot_gstate g), (power_fork g.(ggen)).
+        do 4 right. split_and!; [done|done|].
+        right. split_and!; [done|done|done|].
         apply boot_shape_boot_gstate. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
         | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
-        | (_ & -> & -> & [ (Hpw' & _) | (_ & -> & Hbs) ]) ] ] ] ];
+        | (_ & -> & [ (Hpw' & _) | (_ & _ & -> & Hbs) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | congruence | ].
       iIntros "_".

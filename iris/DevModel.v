@@ -409,6 +409,8 @@ Lemma uart_recv_out (u : uart_state) (b : bv 8) : u_out (uart_recv u b) = u_out 
 Proof. reflexivity. Qed.
 Lemma uart_recv_tx (u : uart_state) (b : bv 8) : u_tx (uart_recv u b) = u_tx u.
 Proof. reflexivity. Qed.
+Lemma uart_recv_wire (u : uart_state) (b : bv 8) : u_wire (uart_recv u b) = u_wire u.
+Proof. reflexivity. Qed.
 Lemma uart_recv_lcr (u : uart_state) (b : bv 8) : u_lcr (uart_recv u b) = u_lcr u.
 Proof. reflexivity. Qed.
 
@@ -639,6 +641,32 @@ Proof.
   unfold uart_rx_push, uart_recv.
   destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
   intro H. injection H as <-. reflexivity.
+Qed.
+
+(* -- the wire trace [u_wire] -- *)
+
+(* What the drain step puts ON THE WIRE: the popped byte in normal mode,
+   nothing under LOOP (the byte goes back into this UART's own receiver, with
+   SOUT held marking).  This is the pure fact behind the language's UART
+   OUTPUT OBSERVATION (RiscvLang.uart_step): the observation list of a drain
+   step is exactly the wire's growth. *)
+Lemma uart_tx_pop_wire (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_tx_pop u = Some (b, u') ->
+  u_wire u' = if uart_loopback u then u_wire u else u_wire u ++ [b].
+Proof.
+  unfold uart_tx_pop. destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
+  destruct (uart_loopback u); intro H; injection H as <- <-.
+  - by rewrite uart_recv_wire.
+  - reflexivity.
+Qed.
+
+(* ... and a byte ARRIVING never touches the wire: SOUT is the transmitter's *)
+Lemma uart_rx_push_wire (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_rx_push u b = Some u' -> u_wire u' = u_wire u.
+Proof.
+  unfold uart_rx_push.
+  destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
+  intro H. injection H as <-. by rewrite uart_recv_wire.
 Qed.
 
 (* no MMIO access transmits anything: every [uart_write] branch, and every

@@ -805,7 +805,10 @@ Section DevLoops.
     (* No invariant is opened until the arm is known: each arm then opens
        exactly the one half of the fabric it moves. *)
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' Hstep).
+    (* the observation list [κ] is the arm's own I/O event (RiscvLang §3b');
+       no ghost here tracks it -- [uart_ghosts] mirrors the DEVICE state, and
+       the wire trace is already pinned by [u_wire] ([uart_step_wire]) *)
+    iNext. iIntros (κ d' Hstep).
     iMod "Hmask" as "_".
     destruct Hstep as [b u' Htx0 | b u' Hrx | p' Hirq Hlatch |].
     - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the

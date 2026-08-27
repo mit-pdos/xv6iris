@@ -33,7 +33,11 @@ per-milestone record):
   corpse step needs no resources: that is the whole trick. Thread identity
   is SYNTACTIC, which is what lets an old generation be abandoned rather
   than revoked (one thread can never revoke another's resources in Iris).
-- `PowerLoopE` — the ghost thread, the ONLY member of the initial pool:
+- `PowerLoopE` — the ghost thread, the ONLY member of the initial pool.
+  BOTH ARMS ARE OBSERVED (`RiscvLang.mobs` §3b'): PowerOff emits
+  `[ObsPowerOff]`, PowerOn `[ObsPowerOn]`, so a trace property can segment
+  the observable trace (UART I/O rides the same channel) by power cycle
+  with no ghost state. The corpse self-loops stay silent (`κ = []`).
   - **PowerOff** (enabled at `gpow = true`): `gpow := false` AND
     `ggen := ggen + 1`. Power loss kills the running generation instantly,
     so "gen is dead" is simply `ggen > gen` — one mono-nat lower bound,

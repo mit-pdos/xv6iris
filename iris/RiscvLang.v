@@ -320,6 +320,52 @@ Definition resv_ok (g : gstate) : Prop :=
   forall c r, g.(gresv) c = Some r -> r ⊆ g.(gmem).
 
 (* ---------------------------------------------------------------------- *)
+(* 3b'. OBSERVATIONS: what the machine does that the OUTSIDE WORLD can see. *)
+(*                                                                          *)
+(*   Iris threads a per-step observation list [κ] through [prim_step] and   *)
+(*   quantifies whole-trace adequacy over the concatenation, so a pure       *)
+(*   trace property over these events is available to a client's [phi]      *)
+(*   (claude-notes/design/adequacy.md).  Four events, on three arms:         *)
+(*                                                                          *)
+(*     ObsUartOut b  -- byte [b] left the UART on SOUT ([uart_step]'s drain  *)
+(*                      arm, NORMAL mode only: under LOOP the byte goes back  *)
+(*                      into this UART's own receiver and the host sees       *)
+(*                      nothing, so a loopback drain observes nothing).       *)
+(*                      The cumulative ObsUartOut trace IS [u_wire]           *)
+(*                      ([uart_step_wire] below) -- the same list the          *)
+(*                      differential test's [VTest.serial_of] compares.       *)
+(*     ObsUartIn b   -- byte [b] arrived from the outside world and was       *)
+(*                      ACCEPTED into the receive FIFO ([uart_step]'s rx      *)
+(*                      arm; a refused byte -- FIFO full, [uart_rx_push] =    *)
+(*                      None -- is flow control, not an event: nothing        *)
+(*                      entered the machine).                                 *)
+(*     ObsPowerOn /  -- the power thread's two arms.  A trace property can    *)
+(*     ObsPowerOff      therefore segment the observable trace by power       *)
+(*                      cycle without any ghost state.                        *)
+(*                                                                          *)
+(*   Everything else stays silent (κ = []): CPU MMIO pushes a byte only      *)
+(*   into the tx FIFO -- the wire event is the device's own later drain --   *)
+(*   and the disk's DMA traffic is machine-internal.  The corpse self-loops  *)
+(*   are silent too: a dead thread does nothing observable.                  *)
+(* ---------------------------------------------------------------------- *)
+
+Inductive mobs :=
+  | ObsUartIn  (b : bv 8)
+  | ObsUartOut (b : bv 8)
+  | ObsPowerOn
+  | ObsPowerOff.
+
+(* the OUTPUT bytes of an observation list -- [uart_step_wire]'s currency.
+   A direct Fixpoint (not stdpp's [omap] instance method) so [cbn] reduces
+   it on literal lists without unfolding through the typeclass. *)
+Fixpoint obs_wire (κ : list mobs) : list (bv 8) :=
+  match κ with
+  | [] => []
+  | ObsUartOut b :: κ' => b :: obs_wire κ'
+  | _ :: κ' => obs_wire κ'
+  end.
+
+(* ---------------------------------------------------------------------- *)
 (* 3c. The device execution contexts -- THREE of them, one per device.      *)
 (*                                                                          *)
 (*   The devices run CONCURRENTLY with the harts AND with each other:        *)
@@ -373,20 +419,24 @@ Definition resv_ok (g : gstate) : Prop :=
 
 (* The UART: drain a byte, accept a byte, latch ITS OWN interrupt source
    ([dev_irq_level d uart_irq_id] reduces to [uart_irq d.(duart)]), or
-   stutter.  Reads and writes [duart] and [dplic] and nothing else. *)
-Inductive uart_step (d : dev_state) : dev_state -> Prop :=
+   stutter.  Reads and writes [duart] and [dplic] and nothing else.
+   INDEXED BY THE OBSERVATION LIST (§3b'): the drain arm is the machine's
+   console OUTPUT event -- observed exactly when the byte reaches SOUT,
+   i.e. NOT under LOOP -- and the rx arm is its console INPUT event. *)
+Inductive uart_step (d : dev_state) : list mobs -> dev_state -> Prop :=
   | UartStepTx b u' :
       uart_tx_pop d.(duart) = Some (b, u') ->
-      uart_step d (set_duart d u')
+      uart_step d (if uart_loopback d.(duart) then [] else [ObsUartOut b])
+        (set_duart d u')
   | UartStepRx b u' :
       uart_rx_push d.(duart) b = Some u' ->
-      uart_step d (set_duart d u')
+      uart_step d [ObsUartIn b] (set_duart d u')
   | UartStepLatch p' :
       dev_irq_level d uart_irq_id = true ->
       plic_latch d.(dplic) uart_irq_id = Some p' ->
-      uart_step d (set_dplic d p')
+      uart_step d [] (set_dplic d p')
   (* the totality stutter -- see TOTALITY above *)
-  | UartStepIdle : uart_step d d.
+  | UartStepIdle : uart_step d [] d.
 
 (* A UART step never moves the disk IMAGE either (crash.md): each arm
    rebuilds the fabric through [set_duart]/[set_dplic], which keep
@@ -394,9 +444,30 @@ Inductive uart_step (d : dev_state) : dev_state -> Prop :=
    [state_interp]'s durable disk conjunct.  ([plic_step] and the disk's own
    latch/idle arms need no lemma: their [d'] is syntactically [d] or
    [set_dplic d _], so the framing is by conversion.) *)
-Lemma uart_step_v_disk (d d' : dev_state) :
-  uart_step d d' -> v_disk (dvirtio d') = v_disk (dvirtio d).
+Lemma uart_step_v_disk (d : dev_state) (κ : list mobs) (d' : dev_state) :
+  uart_step d κ d' -> v_disk (dvirtio d') = v_disk (dvirtio d).
 Proof. intros H. destruct H; reflexivity. Qed.
+
+(* THE OBSERVATIONS ARE FAITHFUL: a UART step's output observations are
+   exactly the wire's growth, so the cumulative ObsUartOut trace of any
+   execution IS [u_wire] -- what a console spec talks about, and what
+   [VTest.serial_of] compares against QEMU.  (The input side needs no
+   counterpart: an accepted byte is recorded nowhere cumulative -- the rx
+   FIFO is consumed -- so [ObsUartIn] is DEFINED as the acceptance event
+   rather than mirrored from state.) *)
+Lemma uart_step_wire (d : dev_state) (κ : list mobs) (d' : dev_state) :
+  uart_step d κ d' ->
+  u_wire (duart d') = u_wire (duart d) ++ obs_wire κ.
+Proof.
+  intros H. destruct H as [b u' Htx | b u' Hrx | p' _ _ |].
+  - cbn [duart set_duart]. rewrite (uart_tx_pop_wire _ _ _ Htx).
+    destruct (uart_loopback d.(duart)); cbn [obs_wire];
+      by rewrite ?app_nil_r.
+  - cbn [duart set_duart]. rewrite (uart_rx_push_wire _ _ _ Hrx).
+    cbn [obs_wire]. by rewrite app_nil_r.
+  - cbn [duart set_dplic obs_wire]. by rewrite app_nil_r.
+  - cbn [obs_wire]. by rewrite app_nil_r.
+Qed.
 
 (* The disk: complete a queued request by DMA, scribble anywhere if the queue
    the driver published is malformed, latch its own interrupt source, or
@@ -1198,7 +1269,8 @@ Definition power_fork (gen : nat) : list mexpr :=
 Definition thread_live (g : gstate) (gen : nat) : Prop :=
   g.(gpow) = true /\ g.(ggen) = gen.
 Definition mval := Empty_set.
-Definition mobs := Empty_set.
+(* [mobs] -- the observation type -- is §3b' above: it has to precede
+   [uart_step], whose drain/rx arms emit the UART I/O events. *)
 Definition of_val (v : mval) : mexpr := match v with end.
 Definition to_val (_ : mexpr) : option mval := None.
 
@@ -1217,12 +1289,15 @@ Definition prim_step
     ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
      \/ (~ thread_live g gen /\ e' = e /\ g' = g)))
   \/
-  (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
+  (* the UART arm carries the machine's console I/O OBSERVATIONS (§3b'):
+     [κ] is the step relation's own index, so the drain and rx arms emit
+     their events and the latch/idle arms stay silent *)
+  (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ efs = [] /\
     ((thread_live g gen /\
       exists d',
-        uart_step g.(gdev) d' /\
+        uart_step g.(gdev) κ d' /\
         g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv))
-     \/ (~ thread_live g gen /\ g' = g)))
+     \/ (~ thread_live g gen /\ κ = [] /\ g' = g)))
   \/
   (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
     ((thread_live g gen /\
@@ -1241,13 +1316,16 @@ Definition prim_step
         g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv))
      \/ (~ thread_live g gen /\ g' = g)))
   \/
-  (e = PowerLoopE /\ e' = PowerLoopE /\ κ = [] /\
-    ((g.(gpow) = true /\ efs = [] /\
+  (* both power arms are OBSERVED (§3b'): power loss and power-on are
+     exactly the trace events that let a client's [phi] segment the
+     observable trace by power cycle *)
+  (e = PowerLoopE /\ e' = PowerLoopE /\
+    ((g.(gpow) = true /\ κ = [ObsPowerOff] /\ efs = [] /\
        (* PowerOff: kill the running generation INSTANTLY -- the bump is
           what makes [ggen > gen] the one stable death certificate *)
        g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv))
      \/
-     (g.(gpow) = false /\ efs = power_fork g.(ggen) /\
+     (g.(gpow) = false /\ κ = [ObsPowerOn] /\ efs = power_fork g.(ggen) /\
        boot_shape g g'))).
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
@@ -1278,14 +1356,14 @@ Qed.
 
 Lemma prim_step_uart_inv gen g κ e' g' efs :
   prim_step (UartLoopE gen) g κ e' g' efs ->
-  e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
+  e' = UartLoopE gen /\ efs = [] /\
   ((thread_live g gen /\
-    exists d', uart_step g.(gdev) d' /\
+    exists d', uart_step g.(gdev) κ d' /\
       g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv))
-   \/ (~ thread_live g gen /\ g' = g)).
+   \/ (~ thread_live g gen /\ κ = [] /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
-         | [(gen0 & Heq & ? & ? & ? & Harm) | [(? & Heq & _)
+         | [(gen0 & Heq & ? & ? & Harm) | [(? & Heq & _)
          | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as ->. by split_and!.
@@ -1324,13 +1402,14 @@ Qed.
 
 Lemma prim_step_power_inv g κ e' g' efs :
   prim_step PowerLoopE g κ e' g' efs ->
-  e' = PowerLoopE /\ κ = [] /\
-  ((g.(gpow) = true /\ efs = [] /\
+  e' = PowerLoopE /\
+  ((g.(gpow) = true /\ κ = [ObsPowerOff] /\ efs = [] /\
      g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv))
-   \/ (g.(gpow) = false /\ efs = power_fork g.(ggen) /\ boot_shape g g')).
+   \/ (g.(gpow) = false /\ κ = [ObsPowerOn] /\ efs = power_fork g.(ggen) /\
+       boot_shape g g')).
 Proof.
   intros [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & ? & ? & Harm)]]]];
+         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & ? & Harm)]]]];
     try discriminate Heq.
   by split_and!.
 Qed.
@@ -1406,7 +1485,7 @@ Proof.
   intros Hstep Hnot Hnp.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & r' & _ & _ & ->)) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & _ & [ (_ & d' & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & m' & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
     | (-> & _) ] ] ] ];
@@ -1613,10 +1692,10 @@ Proof.
   intros Hstep Hok.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & _ & [ (_ & d' & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & m' & _ & Hkeep & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
-    | (-> & _ & _ & [ (_ & _ & ->) | (_ & _ & Hboot) ]) ] ] ] ];
+    | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];
     try exact Hok;
     try (by intros c rr Hc; exact (Hok c rr Hc)).
   - exact (hart_node_step_resv_ok _ _ _ _ _ _ Hn Hok).

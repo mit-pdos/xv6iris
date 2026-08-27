@@ -9,8 +9,20 @@
   (`UartLoop`/`DiskLoop`/`PlicLoop`, RiscvLang.v), each stepping its own
   relation. Folding each device's PLIC gateway latch into that device's own
   relation is what makes the relations pairwise DECOUPLED — none reads
-  another device's state: `uart_step d d'` reads/writes `duart` + `dplic`
-  (tx pop, rx push, latch of source 10, and an `Idle` stutter);
+  another device's state: `uart_step d κ d'` reads/writes `duart` + `dplic`
+  (tx pop, rx push, latch of source 10, and an `Idle` stutter) and is
+  INDEXED BY THE OBSERVATION LIST `κ` (`RiscvLang.mobs`, §3b' there): the
+  drain arm emits `[ObsUartOut b]` exactly when the byte reaches SOUT
+  (nothing under LOOP — the cumulative ObsUartOut trace IS `u_wire`, lemma
+  `uart_step_wire`; pure halves `uart_tx_pop_wire`/`uart_rx_push_wire`,
+  DevModel.v), the rx-accept arm emits `[ObsUartIn b]` (a FIFO-full
+  refusal is flow control, no event), latch/idle are silent, and
+  `wp_uart_step`'s continuation is ∀-quantified over `κ` accordingly.  A
+  CPU MMIO push stays silent — a THR write only queues; the wire event is
+  the device's own later drain — and the power thread's two arms emit
+  `ObsPowerOff`/`ObsPowerOn` (crash.md).  The logic still DISCARDS the
+  channel (`state_interp` ignores `κs` — adequacy.md on what a
+  trace-aware `phi` would need);
   `disk_step d m d' m'` reads/writes `dvirtio` + the byte memory + `dplic`
   (DMA completion `w ∪ m`, the wild step, latch of source 1, `Idle`);
   `plic_step d gr gr'` reads `dplic` and writes one hart's `sig_seip`
