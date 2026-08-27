@@ -4032,7 +4032,101 @@ the rows below and in `design/fs-ghost-state.md`).
   stop binding copies of `icfg`/`fscfg`'s per-boot constants
   (`γfs cov logstart cn γi γl nib inodestart dev`); the 339 tie equations
   vanish; `fs_world` collapses into `fs_ready`.  First slice `cn : ic_names`.
-  Design pass pending; owner rules on its plan before it runs.
+
+  **AS LANDED — R1a: THE PROBE AND THE WHOLE `cn : ic_names` SLICE.  Whole
+  tree green, `make audit-only` identical BY NAME to a pre-change run of the
+  same tree (the thirteen entries), and `SystemAdequacy.v` /
+  `SystemAssumptions.v` are byte-identical — the audited theorem's statement
+  never named `cn`.**
+
+  - **THE PROBE (`iris/ProbeR1a.v`, deliberately not in `_CoqProject`;
+    compile it by hand against a built tree).**  It settles the hazard at
+    the exact binder group of a group-B file, and both predicted answers
+    hold.  In a group that carries `!fileG Σ` AND a standalone `ICFG :
+    icfg`, ONE proposition splits across two records: `Set Printing All`
+    shows the ambient reading at `@file_icfg Σ fileG0` and the textually
+    identical local one at `ICFG`, while the `fsc_ic` conjunct is
+    `@file_fscfg Σ fileG0` in BOTH because `fscfg` has only one path.  They
+    are not convertible, `iFrame` says *"cannot frame (inode_held v)"*,
+    `iApply`/`iSpecialize` refuse, and the sealed shape — the two configs
+    quantified independently, which is what a `Module Type` does — is
+    perfectly statable and unprovable.  Deleting the standalone `ICFG` is
+    the whole cure: same term, framing and specialization go through, and a
+    toy `Module Type` / `Module … : T` pair plus a client functor
+    type-check.  Every `Fail` in the file has its CONTROL beside it in the
+    cured section, so a `Fail` that passed for an unrelated reason would
+    show up as its control failing.
+  - **`Link*.v` (finding iii).**  All 206 scanned outside comments for the
+    198 names that lose a parameter.  Exactly ONE code-level hit, and it is
+    positional: `LinkNameiRootBoot.v`'s `iApply (NameiRoot.wp_namei_root
+    fsc_itlock fsc_ic fsc_fs …)`.  Everything else is a functor application
+    over MODULE arguments, which no parameter change can reach; four more
+    files name a contract only in prose.
+  - **THE RULE THE RANK RUNS ON**: a sealed file has exactly ONE instance
+    path to each config — `fileG` alone (no standalone `ICFG`), or an
+    explicit `ICFG` + `FSC` pair with no `fileG`.  Group A (48 files) was
+    already right, group B (16) was cured by deleting 38 standalone `ICFG`
+    binders, group C (21) gained `FSC : fscfg` beside `ICFG` in 76 binder
+    groups.
+  - **THE CUT DOES NOT SPLIT.**  A partially de-threaded callee forces
+    `cn = fsc_ic` on its callers — a Spec GAINING a row — so the `cn` slice
+    is 79 contract files plus 9 boundary files in one step, not the ~25
+    leaves the plan sized.  198 declarations lost the parameter; over the 91
+    `.v` files touched, 1143 `cn` tokens became 3 (all prose), of which 245
+    were `(cn : ic_names)` binders and 898 argument/use sites.
+  - **Contracts whose statement changed** (each loses exactly one
+    parameter; none gains a premise): `wp_iget_sconf`, `wp_ilock_dep_sconf`
+    / `wp_ilock_tx_sconf`, `wp_iunlock_dep_sconf` / `wp_iunlock_tx_sconf`,
+    `wp_iunlockput_dep_gen` / `wp_iunlockput_tx_sconf` /
+    `wp_iunlockput_tx_gen`, `wp_iput_sconf` / `wp_iput_gen`,
+    `wp_idup_sconf`, `wp_ialloc_sconf` / `wp_ialloc_gen`,
+    `wp_fsinit_sconf`, `wp_ireclaim_sconf`, `wp_namei_*` / `wp_namex_*`
+    (incl. both root corners), `wp_nameiparent_*`, `wp_dirlink_*`,
+    `wp_dirlookup_sconf` / `wp_dirlookup_tree`, `wp_create_sconf`,
+    `wp_kexec_sconf`, `wp_kexit_sconf`, `wp_kfork_sconf`, and all nine
+    `wp_sys_*_sconf`.  The module types whose Parameters moved: `IGET ILOCK
+    IUNLOCK IUNLOCKPUT IPUT IDUP IALLOC FSINIT IRECLAIM NAMEI NAMEI_ROOT
+    NAMEI_TR NAMEIPARENT NAMEX NAMEX_ROOT NAMEX_TR DIRLINK DIRLOOKUP CREATE
+    KEXEC KEXECB2 KEXECB3 KEXIT KFORK FILECLOSE FILEREAD FILESTAT SYSCHDIR
+    SYSEXEC SYSEXIT SYSFORK SYSLINK SYSMKDIR SYSMKNOD SYSOPEN SYSUNLINK` —
+    thirty-six, and every `Module … : T` that discharges one still seals.
+  - **Ties deleted** (there is no threaded copy left for them to tie):
+    `FsSyscalls.fs_world`'s `⌜cn = fsc_ic⌝` — eighteen equations to
+    seventeen, and its `fs_world_all` proof is one `->` shorter;
+    `ProofSyscall.sysc_ties.sct_ic`; `SpecFileclose.fclose_ties.fct_ic`.
+  - **Five names records lose their icache field** — `fclose_names.fcn_ic`,
+    `fread_names.frn_ic`, `fwrite_names.fwn_ic`, `fstat_names.fsn_ic`,
+    `UsertrapRes.ut_names.un_cn`.  They existed only to hand a threaded
+    `cn` down, and their environments (`fileread_fs_env` & co.) state
+    `ic_escrows fsc_ic …` directly now.  KEEPING them was the alternative
+    and it is the forbidden one: `fread`/`fwrite`/`fstat` never had a tie,
+    so their contracts would have had to GAIN one.
+  - **THE CONE COST, MEASURED** (marginal transitive requires added by
+    `Require Import FsCfg`): +9 for `SpecIdup` and `SpecIunlock` (`FsCfg`
+    with `BufOwn DiskAddrs PermInv PlicPlan VirtioProto WireInv WpUart
+    WpVirtio`), +1 for `SpecFsinit SpecIalloc SpecIget SpecIlock SpecIput
+    SpecIreclaim`, and **+0 for the other 59** — they already reached
+    `FsCfg` transitively and needed only the `Import` for name scope.
+  - **THE TRAP THIS SLICE COST HALF AN HOUR**, worth copying: a file that
+    binds `` `{FSC : fscfg} `` without `Require Import FsCfg` still PARSES —
+    backtick generalization invents a fresh `fscfg : Type` — and the
+    failure surfaces far away as *"Could not find an instance for
+    `FsCfg.fscfg`"* at the first lemma that uses the class, with
+    `fscfg : Type` sitting in the printed environment as the tell.
+    `LinkNameiRootBoot.v`'s import comment already warned about this shape;
+    it is now measured.  The checker is one grep: no file may name `fscfg`
+    or `fsc_*` without requiring `FsCfg`.
+  - `IcacheEscrow` / `IcacheInv` / `IcacheBoot` / `FsCollectAll` KEEP their
+    `cn`, permanently: de-threading is a CONTRACT-SURFACE move and those
+    live below `FsCfg`.  `ic_sleeplocks_lookup` stays the sole accessor.
+  - **WHAT STAGE 1b OWES** (nothing of `cn` is left): the OTHER threaded
+    constants, on the same 88-file surface and by the same closed-cut rule —
+    `γfs cov logstart γi gtl nib inodestart dev g`.  The three tie
+    records are the meter: seventeen equations left in `fs_world`,
+    twenty-three fields in `sysc_ties`, seventeen in `fclose_ties`.
+    Each constant is its own closed cut and must be swept whole; expect the
+    same group-B cure to be a no-op now (those 16 files have no standalone
+    `ICFG` left).
 - [ ] **EV — the era-vocabulary unification** (approved): five staged
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs
