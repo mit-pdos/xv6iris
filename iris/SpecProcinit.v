@@ -280,7 +280,7 @@ Section ProcinitProcsInv.
     ([∗ list] i ∈ seq 0 n, lk_fresh (addr i) nm ∗ Q i)
     ==∗ ∃ γl : list gname, ⌜length γl = n⌝ ∗
         ([∗ list] i ↦ g ∈ γl,
-           (∀ R : CtxId → iProp Σ, R cur_ctx ={E}=∗ is_lock g (addr i) nm R) ∗ Q i).
+           (∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗ R cur_ctx ={E}=∗ is_lock g (addr i) nm R) ∗ Q i).
   Proof.
     induction n as [|n IH].
     { iIntros "_". iModIntro. iExists []. iSplit; [done|]. done. }
@@ -295,7 +295,7 @@ Section ProcinitProcsInv.
     iSplit.
     { iPureIntro. rewrite List.last_length. by rewrite Hlen. }
     rewrite (big_sepL_app
-               (fun i g => ((∀ R : CtxId → iProp Σ,
+               (fun i g => ((∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗
                                R cur_ctx ={E}=∗ is_lock g (addr i) nm R) ∗ Q i)%I)
                γl [g]).
     iSplitL "Hγl"; [iExact "Hγl"|].
@@ -349,7 +349,7 @@ Section ProcinitProcsInv.
     (* 3. γs is now fixed, so each lock can be paid its resource -- and the
           [p_kstack] cell persisted into the (persistent) [is_kstack]. *)
     iDestruct (big_sepL_impl
-                 (fun i g => ((∀ R : CtxId → iProp Σ,
+                 (fun i g => ((∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗
                                  R cur_ctx ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
                  (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string (λ ξ : CtxId, proc_lock_res (XI := ξ) γs g (proc_addr i)) ∗
@@ -364,7 +364,8 @@ Section ProcinitProcsInv.
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
       iMod ("Hmk" $! ((λ ξ : CtxId, proc_lock_res (XI := ξ) γs g (proc_addr i)))
-              with "[Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "#Hlk".
+              with "[%] [Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "#Hlk".
+      { (* the payload's transport obligation (§0.18') *) apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
                   with "Hst Hg Hch Hpub [Hdorm Hpark Hkst]").
         iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").

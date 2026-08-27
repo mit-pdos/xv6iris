@@ -2,12 +2,15 @@
 
 ## 0. CHECKPOINT — READ THIS FIRST
 
-**THE TREE IS FULLY GREEN (2026-08-26).  RED SET EMPTY.  READ §0.17′
-FIRST** — it is the landing note for the last blocker class (the two `inv`s
-over ξ-indexed bodies), for `ProofForkretPark.forkret_park_paid` (now
-`Qed`), and for the second half of the eight-hart adequacy trap that only a
-green park could reveal.  §0.10′–§0.16′ below are the road to it and are
-history where they conflict.
+**THE TREE IS FULLY GREEN (2026-08-26).  RED SET EMPTY.  READ §0.17′ AND
+§0.18′ FIRST** — §0.17′ is the landing note for the last blocker class (the
+two `inv`s over ξ-indexed bodies), for `ProofForkretPark.forkret_park_paid`
+(now `Qed`), and for the second half of the eight-hart adequacy trap that
+only a green park could reveal; §0.18′ is the LOCK KIT's convergence on the
+same parked-record idiom (release = `ctx_deposit`, acquire = `ctx_absorb`,
+`ctx_dom` off the lock's transport path, zero client files).
+§0.10′–§0.16′ below are the road to them and are history where they
+conflict.
 
 **Where the tree is.** Legs T and M are LANDED on branch `tso`.
 `iris/TsoMem.v` is the minimal Ztso machine; `TsoLitmus.v` its 8
@@ -1958,6 +1961,249 @@ replacing the `_def` bodies and re-proving the law surface (every law now has
 a named twin image, `ctx_absorb` included), the kit re-proofs where
 `TsoCtxShim` bridges sit, and the M2 protocol sweep — whose worklist is
 exactly the five `hart_view_lb_any` sites and the `ctx_dom_sc` uses.
+
+---
+
+### 0.18′ THE LOCK KIT CONVERGES ON THE PARKED-RECORD IDIOM (2026-08-26)
+
+Executes `tso-absorb-memo.md` §12 (owner-ratified).  **The lock's two
+transports are now the same two laws the escrow and the boot deposit run on:
+release is `ctx_deposit`, acquire is `ctx_absorb`, and `ctx_dom` has left the
+lock's transport path entirely.**  Eight files, ZERO client files; a CLEAN
+1331-file VM round at exit 0 and two consecutive rounds after it.
+
+#### THE STATEMENT CHANGES, OLD vs NEW
+
+```coq
+(* WpLock.v -- the free arm *)
+-  ... ∗ lock_frag γ None ∗ (∃ ξ : CtxId, R ξ)          ∨ ⌜st ≠ None⌝ ∗ ...
++  ... ∗ lock_frag γ None ∗ lock_pay R                  ∨ ⌜st ≠ None⌝ ∗ ...
++  Definition lock_pay R := (∃ (ξ : CtxId) (T : nat), ctx_parked ξ T ∗ R ξ)%I.
+
+(* WpLock.v -- the finisher, and the destroyer's return trip *)
+-  ... -∗ (∃ ξ : CtxId, R ξ) -∗ |={E ∖ ↑lockN, E}=> Out
++  ... -∗ lock_pay R          -∗ |={E ∖ ↑lockN, E}=> Out
+-  lock_finisher_destroy : (lock_frag γ None -∗ (∃ ξ, R ξ) ==∗ D ∗ Out) -∗ ...
++  lock_finisher_destroy : (lock_frag γ None -∗ lock_pay R ==∗ D ∗ Out) -∗ ...
+
+(* WpLock.v -- the creators.  [newlock] / [lock_inv_alloc] / [WpLockAt.newlock_at]
+   gain an IMPLICIT class binder (free at every call site, exactly as
+   SpecAcquire's did in §0.6′); the two DELAYED forms, whose R is chosen
+   inside the iProp, carry it as a ⌜⌝ premise (3 call sites). *)
+-  Lemma newlock E lk s (R : CtxId → iProp Σ) : ...
++  Lemma newlock E lk s (R : CtxId → iProp Σ) `{!CtxMorph R} : ...
+-  ... ==∗ ∃ γ, ∀ R,             R cur_ctx ={E}=∗ is_lock γ lk s R.
++  ... ==∗ ∃ γ, ∀ R, ⌜CtxMorph R⌝ -∗ R cur_ctx ={E}=∗ is_lock γ lk s R.
++  Lemma lock_pay_intro (R) `{!CtxMorph R} : R cur_ctx ==∗ lock_pay R.
+```
+
+**`SpecAcquire` and `SpecRelease` DID NOT MOVE — not one character.**
+`is_lock`, `locked`, `lock_openable`, `lock_state`, the two acquire tiers,
+the three release forms, `lock_finisher_close`: all unchanged.  Only
+`WpSconfLock`'s five internal `(∃ ξ : CtxId, R ξ)` occurrences and
+`ProofAcquire`'s private loop lemma re-spell the payload as `lock_pay R`,
+and their PROOFS are untouched (the leaves carry the payload opaquely).
+
+The two transport sites:
+
+```coq
+(* ProofRelease.wp_release_gen_sconf -- was one iAssert, is now the deposit *)
+-  iAssert (∃ ξ : CtxId, R ξ)%I with "[HR]" as "HR"; first by iExists cur_ctx.
++  iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
++  iMod ctx_parked_alloc as (ξc) "Hpk".
++  iMod (ctx_deposit R cur_ctx ξc 0%nat with "Hrun Hpk HR") as "(Hrun & Hdep)".
++  iDestruct "Hdep" as (T') "(_ & Hpk & HR)".
++  iDestruct ("Hcgb" with "Hrun") as "Hcg".
++  iAssert (lock_pay R) with "[Hpk HR]" as "HR". { iExists ξc, T'. iFrame. }
+
+(* ProofAcquire.wp_acquire_gen_fresh_sconf -- was the ctx_dom_sc morph *)
+-  iDestruct "HRes" as (ξ0) "HRes".
+-  iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
+-  iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
+-  iAssert (∃ K, hart_view_lb (CID := CIDpo) K)%I as "Hlb". { iExists 0%nat. ... }
++  iDestruct "HRes" as (ξ0 T0) "[Hpk0 HRes]".
++  iAssert (hart_view_lb (CID := CIDpo) T0)%I as "#HK0";
++    [ iApply hart_view_lb_any | ].
++  iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb";
++    [ iExists T0; iExact "HK0" | ].
++  iDestruct (sie_cap_gpr_own_ctx_acc (CID := CIDpo) with "Hcg") as "[Hrun Hcgb]".
++  iMod (ctx_absorb (CID := CIDpo) R ξ0 cur_ctx T0 T0 ltac:(lia)
++          with "Hrun HK0 Hpk0 HRes") as "(Hrun & _ & HRes)".
++  iDestruct ("Hcgb" with "Hrun") as "Hcg".
+```
+
+Acquire uses the SAME receipt it hands the client: `Hlb` is minted at
+`K := T0`, the record's own stamp, so the absorb's pure tie is reflexivity
+and there is exactly ONE receipt object on the path.  Both the running token
+and the receipt are at `CIDpo`, the hart that won the AMO — the entry hart's
+would be the wrong one, since the prologue may have migrated.
+
+#### THE TOKEN-TRAVEL CHOICE: NEITHER OF §12's TWO, AND THE MEASUREMENT SAYS WHY
+
+§12 offered "the token travels with the holder" or "it sits in the held arm".
+**Both are refuted, and the same wall refutes them: `ctx_absorb` needs the
+token, the payload AND an `own_context` IN ONE HAND, and `own_context` is
+only ever in hand OUTSIDE a WP leaf.**  Written out:
+
+- *Held arm.*  If the token stays in the invariant, the acquirer has nothing
+  to absorb WITH.  Putting the absorb inside the AMO leaf instead would then
+  force release's `ctx_deposit` inside the word-clear store's ATOMIC UPDATE
+  (`WpSconfLock.wp_sw_zero_lockfin_s_sconf`), and §0.17′'s measured rule —
+  NO DEPOSIT AND NO ABSORB CAN RUN INSIDE A `wp_..._au_...`, because the
+  bundle carrying `own_context` has already gone to the leaf — kills it.
+  Rescuing it needs a state-INDEXED held arm (the token present only at
+  `Some (i, true)`) plus two more lock leaves re-plumbed.
+- *Travels with the holder.*  The holder between acquire and release is
+  arbitrary client code, so the token would have to ride inside `locked`
+  (the acquire postcondition itself is an exported statement).  That is a
+  resource change under the 83 files that name `locked`, and it re-plumbs
+  the same two cpu-word leaves anyway (`lock_setcpu` would have to consume a
+  token, `lock_clrcpu` to yield one).
+
+**WHAT LANDED: a record is minted PER PUBLICATION — at release — and
+abandoned by the winner that claims it.**  `ctx_parked_alloc` is pure and
+`ctx_deposit` raises the fresh record's stamp to cover exactly the facts
+this release publishes, which is the honest per-generation tie; nothing
+needs a stamp that ratchets across generations, because a later acquire's
+receipt dominates a later release's store.  Cost: zero change to `locked`,
+zero change to the cpu-word leaves, zero client files.
+
+#### THE STAMP TIE, RECORDED BECAUSE IT IS LOAD-BEARING AT CUTOVER
+
+`ctx_deposit` returns some `T'`; what makes the record claimable is
+`T' ≤ t_release` (the log position of release's word clear) — **≤, not =**:
+every fact deposited was written before that store.  Today it is stronger
+than needed, because acquire's AMO drains to the top of the log and its
+receipt dominates every stamp, so the SC proof picks the trivially valid
+pair (`K := T`, reflexivity).  It becomes load-bearing exactly when an
+acquire path does NOT drain to top — a plain-load test-and-test-and-set spin
+before the AMO, or any acquire-like pattern built from plain loads plus the
+message-passing argument.  Same shape as the boot `started` flag and the
+kernel-page-table publication: **the lock bit IS the flag.**  The comment
+lives at `WpLock.lock_pay` and at both transport sites.
+
+#### THE SHIM LEDGER: ONE DIES, TWO SURVIVE, ONE IS NEW
+
+- **`ProofAcquire`'s `ctx_dom_sc` — DEAD.**  The acquire-side transport is
+  now `ctx_absorb` against a hart-local receipt.  This was the whole point:
+  `ctx_dom_of_parked`, the one lock-leaf step that reaches into the state
+  interpretation for at-the-top evidence, collapses into "receipt + absorb".
+- **`ProofAcquire`'s `hart_view_lb_any` — SURVIVES**, and is the SAME M2
+  item `SpecAcquire` already owed.  It is now instantiated at the record's
+  stamp rather than at 0.
+- **`ProofRelease`'s `ctx_dom_sc` — SURVIVES, at the CANCELLING instance
+  only**, and the reason is §0.17′'s rule met again: the destroyer's
+  completion wand is cashed INSIDE the word-clear store's atomic update,
+  where no `own_context` is in scope, so its return trip (`lock_pay R` back
+  to `R cur_ctx`) cannot be an absorb.  The record's token is dropped there
+  — the lock is being DESTROYED, so nothing will ever claim it.  The
+  ORDINARY release path has no shim at all.
+- **`WpLock.lock_pay_intro` — NEW, and it is the one this tranche adds.**  A
+  `newlock` caller holds its payload at its own context and has no
+  `own_context` to run `ctx_deposit` with; giving the creators one means
+  borrowing the running token through **19 direct call sites** (12 in the
+  `newlock` / `newlock_d` / `newlock_delayed` family, 7 more at
+  `WpLockAt.newlock_at`) and every creator wrapper above them
+  (`new_sleeplock*`, `new_tickslock`,
+  `delayed_locks_alloc`, `pipe_alloc`, `bcache_alloc`, …), exactly the way
+  `BioInv.bio_init` already does.  That cascade is priced and DEFERRED: the
+  creator transport is `ctx_dom_sc`, quarantined at ONE named lemma, and
+  when the shim burns that lemma is the single compile error naming the
+  whole cascade.  Net ledger: 2 `ctx_dom_sc` uses before, 2 after, but the
+  surviving pair is at a DESTROY path and a CREATE path — never on the
+  running acquire/release transport, which is now honest end to end.
+
+#### THE RECEIPT-THREADING ITEM IS REFUTED, AND THE REFUTATION IS THE RULE
+
+The tranche was also asked to retire `hart_view_lb_any` at `ProofBread`,
+`ProofBrelse` and `ProofMainSecondary` "where an HONEST receipt is in scope".
+**Measured: at none of the three is one in scope, and — the sharper half —
+even if one were, it could not be used.**
+
+> **A RECEIPT AND A RECORD'S STAMP CANNOT BE TIED AT SC.**  `ctx_absorb`'s
+> premise is `hart_view_lb K ∗ ⌜T ≤ K⌝` where `T` is EXISTENTIALLY BOUND BY
+> THE RECORD (`iDestruct "Hrec" as (xie Te) "…"`).  An honest receipt fixes
+> `K` independently, at the acquire that minted it; nothing at SC relates
+> the two, and the shim's value is precisely that it lets the site pick
+> `K := T`.  The tie is what the M2 sweep must MANUFACTURE (at TSO: the
+> record's stamp was set by a deposit that happens-before the release the
+> acquirer synchronised with), not something threading can supply.
+
+And the scope half, checked: `ProofBread.bd_tail` and
+`ProofBrelse.wp_brelse_sconf` take no receipt premise and have no acquire in
+their own instruction stream before the open (brelse's `acquire(&bcache.lock)`
+is 300 lines LATER); `SpecAcquiresleep.v` contains no `hart_view_lb`,
+`CtxMorph` or `cur_ctx` at all, so the sleeplock chain exports nothing —
+threading it would be a sleeplock-surface change on top of an unprovable
+tie.  `ProofMainSecondary`'s secondary hart has no acquire whatsoever.
+**All five `hart_view_lb_any` sites therefore stay, and they are ONE M2
+worklist item, not five.**
+
+#### CASCADE, AS LANDED (8 files, ZERO client files)
+
+`WpLock` (the free arm, `lock_pay`, `lock_pay_intro`, the finisher, four
+creators), `WpLockAt` (`newlock_at`), `WpSconfLock` (five payload
+re-spellings, no proof changes), `ProofAcquire` (the absorb + the private
+loop lemma's payload), `ProofRelease` (the deposit + the cancel bridge),
+and three CREATOR sites for the delayed forms' new `⌜CtxMorph R⌝` slot:
+`BioInv` (bcache), `PipeInv` (pipe), `SpecProcinit` (`delayed_locks_alloc`
+and `procs_inv_alloc`).  Every one of the three discharges it with
+`apply _`.
+
+**SLEEPLOCKS INHERIT WITH NO EDIT — verified, not assumed.**
+`SleepLock.is_sleeplock_gen` is `is_lock γl (sl_lk slk) "sleep lock"
+<{ sl_res_gen γ slk R H }>`, and a `<{ }>` payload's `CtxMorph` is
+`ctx_morph_const_pay`, found by search.  `SleepLock.v`, `SleepLockAt.v` and
+every sleeplock proof are byte-for-byte unchanged.
+
+**Rounds: the incremental round rebuilt the whole `WpLock` cone (672 files)
+at EXIT 0; a CLEAN round (`rm -f iris/*.vo` first) rebuilt all 1331 at
+EXIT 0; two further consecutive rounds after the receipt tidy-up, EXIT 0.
+No `Admitted`, no `Abort`, no `Axiom`.**
+
+#### MEMO CORRECTIONS
+
+- **`tso-absorb-memo.md` §12's "the token travels with the holder (or sits
+  in the held arm — implementer's pick, record which)"** — **BOTH REFUTED
+  by measurement, and the landed shape is a third one: a record per
+  PUBLICATION, minted at release and abandoned at acquire.**  The reason
+  both fail is one wall — `ctx_absorb` wants token + payload + `own_context`
+  in one hand, and `own_context` is only in hand outside a WP leaf
+  (§0.17′'s rule) — so a token that survives the held phase forces either a
+  deposit inside the word-clear store's atomic update or a resource change
+  to `locked`.  §12's own stamp analysis is what makes the third shape
+  correct: the tie is `T' ≤ t_release`, a PER-PUBLICATION fact, so nothing
+  needs a stamp that ratchets across generations.
+- **`tso-absorb-memo.md` §12's "Exported statements (`is_lock`,
+  `SpecAcquire`/`SpecRelease` shapes) should not move — the ~180 client
+  files are expected untouched."** — CONFIRMED exactly, and the count is
+  ZERO client files.  What §12 did not foresee is that the CREATORS move:
+  a parked record has to be minted from the payload, and `newlock` has no
+  `own_context`.  That is the `lock_pay_intro` entry above.
+- **`tso-absorb-memo.md` §12's "acquire = `ctx_absorb`, its premise
+  discharged from the AMO receipt (`SpecAcquire` already exports
+  `∃ K, hart_view_lb K`)"** — right, and sharper than stated: the exported
+  receipt and the absorb's receipt are the SAME object, minted once at
+  `K := T`.  There is no second mint and no `hart_view_lb_le` step.
+- **The tranche brief's "three sites use `hart_view_lb_any` where an HONEST
+  receipt is in scope — ProofBread …, ProofBrelse …, ProofMainSecondary"** —
+  **REFUTED on both halves**: no receipt is in scope at any of the three,
+  and the pure tie `T ≤ K` between a record's ∃-bound stamp and an acquire's
+  fixed `K` is not SC-provable in any case.  See the block above; this is
+  an M2-sweep obligation, not a threading one.
+- **`tso-port.md` §0.6′'s "The two shim steps in `ProofAcquire`
+  (`ctx_dom_sc` for the ∃ξ→cur_ctx morph at the win, `hart_view_lb_any` for
+  the receipt) are exactly where the cutover kit's direct proof puts the
+  AMO's honest evidence."** — half of it is now HISTORY: the `ctx_dom_sc`
+  step is gone, and what the cutover kit has to supply at the AMO is only
+  the receipt.  `TsoCtxTwin2.ctx_dom_of_parked` is no longer on the lock's
+  critical path at all.
+
+**RED SET: EMPTY.**  The distance to the real `TsoCtxTwin2` swap is
+§0.10′'s four items, with the fourth (the M2 protocol sweep) now a strictly
+smaller and better-defined job: FIVE `hart_view_lb_any` sites, all wanting
+the same thing (tie a record's stamp to the claiming hart's view), and TWO
+`ctx_dom_sc` uses, neither on a running transport.
 
 ---
 

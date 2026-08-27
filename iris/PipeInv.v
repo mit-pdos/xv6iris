@@ -288,7 +288,10 @@ Section PipeInv.
     iMod (newlock_d E pi with "Hword Hcpu") as (γl) "Hmake".
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
     iMod ("Hmake" $! ((λ ξ : CtxId, pipe_res (XI := ξ) γp pi)) (pipe_dead γl γp)
-            with "[Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk".
+            with "[%] [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk".
+    { (* the payload's transport obligation, discharged by search: the
+         §0.18' record mint needs it at the creator (WpLock.lock_pay_intro) *)
+      apply _. }
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
               (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.
       iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".

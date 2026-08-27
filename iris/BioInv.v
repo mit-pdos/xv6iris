@@ -1436,8 +1436,10 @@ Section BioInit.
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock over the assembled resource *)
-    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[Hauth Hsa Hslots Hlru Hpool]")
+    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[%] [Hauth Hsa Hslots Hlru Hpool]")
       as "#Hlock".
+    { (* the payload's transport obligation (§0.18'): a constant embedding *)
+      apply _. }
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),

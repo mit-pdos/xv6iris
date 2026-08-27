@@ -29,9 +29,13 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [ctx_dom_sc]/[hart_view_lb_any]: the SC-only
-   transport evidence and view receipt behind the context-shaped spec,
-   until the cutover kit mints them from the AMO (TsoCtxTwin2.v) *)
+Require Import SieCapCtx.    (* [sie_cap_gpr_own_ctx_acc]: the winner's own
+   running token, borrowed out of the bundle for the [ctx_absorb] below *)
+Require Import TsoCtxShim.   (* [hart_view_lb_any]: the SC-only VIEW RECEIPT
+   behind the context-shaped spec, until the cutover kit mints it from the
+   AMO ([TsoCtxTwin2.twin_passed_get]).  [ctx_dom_sc] is GONE from this
+   file: the acquire-side transport is now [TsoCtx.ctx_absorb] against
+   that receipt (tso-port.md §0.18′). *)
 Import Defs.
 
 (* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)
@@ -112,7 +116,7 @@ Section ProofAcquire.
     ( Tc -∗
       sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
-      locked_pre γl cpu_id -∗ (∃ ξ : CtxId, R ξ) -∗
+      locked_pre γl cpu_id -∗ lock_pay R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -655,17 +659,31 @@ Section ProofAcquire.
        Hs1..Hs7 (the seven pre-push_off leaf hops) plus [Hspo] (push_off's
        own conditional equality) gets us there via [wp_next_chain], with no
        case split on [b]. *)
-    (* THE CONTEXT HAND-OFF (tso-port M3): the payload came out of the
-       invariant at SOME context; re-index it to the caller's own, and
-       mint the view receipt.  Both evidence tokens are the shim's SC-only
-       stopgaps here; the cutover kit's direct proof mints them from the
-       AMO's at-the-top postcondition ([TsoCtxTwin2.ctx_dom_of_parked] /
-       [twin_passed_get]). *)
-    iDestruct "HRes" as (ξ0) "HRes".
-    iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-    iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
-    iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
-    { iExists 0%nat. iApply hart_view_lb_any. }
+    (* THE CONTEXT HAND-OFF (tso-port §0.18′): the payload came out of the
+       invariant as a PARKED RECORD -- the lock's facts beside the record's
+       own token -- and the winner CLAIMS them with [TsoCtx.ctx_absorb],
+       against its own hart's view receipt.  There is no [ctx_dom] here any
+       more: absorb's premise is HART-LOCAL and it is exactly the receipt
+       [SpecAcquire] already exports to every lock winner, so this site and
+       the client both see the SAME [hart_view_lb].
+       The running token comes out of [sie_cap_gpr]'s fourth conjunct and
+       goes straight back ([SieCapCtx]); it is at [CIDpo], the hart that
+       won the AMO, and so is the receipt -- the entry hart's would be the
+       wrong one (the prologue may have migrated).
+       THE ONE M2 DEBT, named: the receipt is the shim's [hart_view_lb_any]
+       at [K := T], the record's own stamp, so the pure tie [T <= K] is
+       reflexivity.  At cutover the AMO mints the receipt at the log top
+       ([TsoCtxTwin2.twin_passed_get]) and the tie becomes the release's
+       [T' <= t_release] (WpLock.v's [lock_pay] block). *)
+    iDestruct "HRes" as (ξ0 T0) "[Hpk0 HRes]".
+    iAssert (hart_view_lb (CID := CIDpo) T0)%I as "#HK0";
+      [ iApply hart_view_lb_any | ].
+    iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb";
+      [ iExists T0; iExact "HK0" | ].
+    iDestruct (sie_cap_gpr_own_ctx_acc (CID := CIDpo) with "Hcg") as "[Hrun Hcgb]".
+    iMod (ctx_absorb (CID := CIDpo) R ξ0 cur_ctx T0 T0 ltac:(lia)
+            with "Hrun HK0 Hpk0 HRes") as "(Hrun & _ & HRes)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay").
     { exact Hmsf. }

@@ -3833,3 +3833,33 @@ expected client-file invariance:
 `claude-notes/projects/tso-absorb-memo.md` §12.  Either way it is its
 own tranche against a green main tree, with the bcache escrow as the
 worked precedent.
+
+> **LANDED ON MAIN, 2026-08-26 — `tso-port.md` §0.18′.**  The tranche ran
+> on branch `tso` and the tree is green (clean 1315-file round, exit 0).
+> Two things this note says are corrected by it, and both matter when the
+> flip workspace reaches the lock tier:
+>
+> - **"token travels with the holder" is REFUTED, both it and the held-arm
+>   alternative.**  `ctx_absorb` wants the record's token, the payload and
+>   the claimer's `own_context` IN ONE HAND, and `own_context` is only in
+>   hand OUTSIDE a WP leaf (a deposit or absorb cannot run inside a
+>   `wp_..._au_...`; the bundle carrying it has already gone to the leaf).
+>   A token that survives the held phase therefore forces either a
+>   `ctx_deposit` inside the word-clear store's atomic update, or riding
+>   the token inside `locked` — a resource change under 83 files.  **What
+>   landed: a record minted PER PUBLICATION, at release, abandoned by the
+>   winner that claims it.**  §12's own stamp analysis is what makes that
+>   right: the tie `T' ≤ t_release` is per-publication, so no stamp needs
+>   to ratchet across generations.
+> - **Client-file invariance held exactly (ZERO), but the CREATORS moved.**
+>   `newlock` has no `own_context` to deposit with, so the creator-side
+>   transport is one quarantined `ctx_dom_sc` at `WpLock.lock_pay_intro`,
+>   plus a `CtxMorph` class binder on the `newlock` family (free at call
+>   sites; a `⌜⌝` slot on the two DELAYED forms, 3 sites).  At the real
+>   semantics that lemma is the single compile error naming the
+>   `own_context`-through-19-creator-call-sites cascade.
+>
+> Net for this workspace: at the lock tier, `ctx_dom_of_parked` is no
+> longer on the critical path at all — the only thing the AMO must mint is
+> the view receipt (`twin_passed_get`), and the acquire leaf's payload
+> transport is `ZZAbsorbProbe.twin_absorb` against it.

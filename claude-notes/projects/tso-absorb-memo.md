@@ -294,6 +294,20 @@ After the ruling lands, `ProofForkretPark.forkret_park_paid`'s six deposit rows 
 
 ## 12. OWNER-RATIFIED DIRECTION (2026-08-26): the lock kit converges on this idiom
 
+> **LANDED 2026-08-26 — see `tso-port.md` §0.18′ for the landing note, the
+> old-vs-new statements and the corrections to this section.**  Two of them
+> matter: (1) the "token travels with the holder / sits in the held arm"
+> choice below is **REFUTED BOTH WAYS** — a token that survives the held
+> phase forces either a `ctx_deposit` inside the word-clear store's atomic
+> update or a resource change to `locked`; what landed is a record minted
+> PER PUBLICATION, at release, and abandoned by the winner, which §12's own
+> per-publication stamp tie is what justifies; (2) the exported statements
+> did not move and ZERO client files were touched, but the CREATORS did:
+> `newlock` has no `own_context` to deposit with, so the creator-side
+> transport is one quarantined `ctx_dom_sc` (`WpLock.lock_pay_intro`) and
+> the `own_context`-threading cascade through the 13 creator call sites is
+> priced and deferred.
+
 Ratified by the owner in conversation, recorded here because this memo
 is where the relationship was first observed (§2: "absorb is
 `twin_resume` generalised from a whole token to a single payload, and

@@ -303,7 +303,7 @@ Section WpSconfLock.
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     lock_openable γl lk s R Dc -∗
     locked_pre γl cpu_id -∗
-    (∃ ξ : CtxId, R ξ) -∗
+    (lock_pay R) -∗
     lock_finisher γl lk s R Dc Out (⊤ ∖ ↑minstretN) -∗
     wp_next b p (fun (CID : CpuId) =>
       Out -∗
@@ -924,7 +924,7 @@ Section WpSconfLock.
         Tc -∗
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
-        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
+        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (lock_pay R)
          ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
@@ -939,7 +939,7 @@ Section WpSconfLock.
                    ⌜npc = add_vec_int pc 4⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m⌝ ∗
                    ⌜n' = n⌝ ∗ Tc ∗
-                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
+                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (lock_pay R)
                     ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝))%I
               with "Hcg Hpc Hinstr [HTc Hcont]").
     iNext.
@@ -1026,7 +1026,7 @@ Section WpSconfLock.
                     (fun _ => Tc)
                     (fun bytes => Tc ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
+                          locked_pre γl h0 ∗ (lock_pay R)
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
                     (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
@@ -1107,7 +1107,7 @@ Section WpSconfLock.
                     with "Hk Hmem Hw") as "[Hmem Hw]".
             iAssert (|={⊤ ∖ ↑lockN, ⊤}=>
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ ▷ (∃ ξ : CtxId, R ξ)
+                          locked_pre γl h0 ∗ ▷ (lock_pay R)
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
               with "[Hw Hcpu Hg Hbr Hcl]" as ">Hpay".
             { iDestruct "Hbr" as "[(>%Hnone & >%Hw0 & >Hfrag2 & HR) |
