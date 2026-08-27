@@ -6042,6 +6042,122 @@ now live in.
    scheduler/trap tier (A6.61).  Re-run the node-argument grep after it.
 
 
+### A6.66 THE LOCK KIT'S PARKED-RECORD IDIOM IS PORTED — AND HERE THE
+### TRANSPORT PATH IS HONEST END TO END, WHICH IT IS NOT AT SC
+
+`tso-port.md` §0.18′'s shape is in the fliptree, and the port produced a
+better result than the source, for the reason A6.39 predicted: **this tree
+has the real gates, so the receipts are real.**
+
+**THE ONE MISSING GATE, NOW WRITTEN: `TsoCtx.ctx_absorb`.**  Release's
+`ctx_deposit` was already here and is INTERP-FREE (a parked target's stamp
+may be raised at will).  Its dual was not, and the difference is the whole
+point:
+
+```coq
+  Lemma ctx_absorb `{CID : CpuId} (R : CtxId -> iProp Σ) `{!CtxMorph R}
+      (g : gstate) (ξ ξ' : CtxId) (T : nat) :
+    (length g.(glog) <= g.(gtv) cpu_id)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ' -∗ ctx_parked ξ T -∗ R ξ ==∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ' ∗ ctx_parked ξ T ∗ R ξ'.
+```
+
+Two lines of proof over `ctx_dom_of_parked` + `ctx_morph`, and the premise
+is the load-bearing part: **`length glog ≤ gtv cpu_id` is the AT-THE-TOP
+condition, and it is exactly what the AMO leaf establishes when it reads at
+the top** (A6.6's receipt ruling).
+
+> **COMPARE THE SAME LEMMA ON MAIN** (`WpLock`'s reference at HEAD): its
+> proof is `rewrite ctx_dom_unseal /ctx_dom_def. done.` and its statement
+> takes a `hart_view_lb K` that the caller CONJURES with
+> `hart_view_lb_any`.  At SC `ctx_dom` is vacuous, so the transport is free
+> and the receipt is fictional.  **Here the interp supplies the receipt and
+> `hart_view_lb_any` has no role left at the acquire at all** — the premise
+> is a strengthening of the statement and a weakening of what the caller
+> must invent.  This is the flip making the lock kit *better*, and it is
+> the first place in the port where that has been true.
+
+**THE FREE ARM IS THE PARKED RECORD.**  `lock_inv`'s free branch moved from
+the old `(∃ ξ : CtxId, R ξ)` to
+
+```coq
+  Definition lock_pay (R : CtxId -> iProp Σ) : iProp Σ :=
+    (∃ (ξ : CtxId) (T : nat), ctx_parked ξ T ∗ R ξ)%I.
+```
+
+per-publication, exactly as §0.18′ ruled: a record is minted at each
+release and abandoned by the winner that claims it, so no stamp ratchets
+across generations and **no token travels with the holder**.
+
+### AND THE CREATOR MINT IS DISCHARGEABLE HONESTLY HERE — CHECKED, NOT ASSUMED
+
+§0.18′'s one blemish is `lock_pay_intro`: on main the creator has no
+`own_context` to deposit with, so the transport is the shim's `ctx_dom_sc`,
+**quarantined at one site**, and "when the shim burns this lemma is the
+single compile error that names the whole cascade".
+
+The coordinator's instruction was to check before quarantining, and the
+check says **do not quarantine** — for the decisive reason that
+`ctx_dom_sc` no longer exists in this tree at all (A6.65: `TsoCtxShim.v` is
+down to one callerless declaration).  What replaced it is the honest proof:
+
+```coq
+  Lemma lock_pay_intro `{CID : CpuId} (R : CtxId -> iProp Σ) `{!CtxMorph R} :
+    own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R.
+  Proof.
+    iIntros "Hrun HR".
+    iMod ctx_parked_alloc as (ξc) "Hpk".
+    iMod (ctx_deposit R cur_ctx ξc 0 with "Hrun Hpk HR")
+      as "(Hrun & %T' & _ & Hpk & HR)".
+    iModIntro. iFrame "Hrun". iExists ξc, T'. iFrame "Hpk HR".
+  Qed.
+```
+
+**So the lock's transport path has NO quarantine at any point in this
+tree** — creator mint, release deposit and acquire absorb are all real
+laws.  The price is the one §0.18′ priced and deferred: `ctx_deposit`
+wants the creator's running token, so the creator family takes
+`own_context` and hands it straight back.  **That trade is the finding**:
+main bought the quarantine because it was cheaper than the cascade; here
+the cascade is the only option, and it buys a genuinely axiom-free kit.
+
+**LANDED IN `WpLock`, and the file is GREEN:** `lock_pay`,
+`lock_pay_intro`, `lock_inv`'s new free arm, the two `lock_finisher` slots
+at `lock_pay R`, and the creator family threaded — `lock_inv_alloc`,
+`newlock`, `newlock_d`, `newlock_delayed`.  The two DELAYED forms take
+`CtxMorph` as a `⌜⌝` premise on the inner ∀ (main's shape) plus the token
+beside it.  **All four creators also gained a `{CID : CpuId}` binder** —
+A6.64's lesson reaching the lock tier: `own_context` is CpuId-indexed, this
+section binds no hart, and the token a caller hands over is at ITS hart.
+
+### THE CASCADE, NAMED AT ITS BOUNDARY
+
+What the honest mint costs is now a compile-time fact rather than an
+estimate: every `newlock`-family caller must produce `own_context cur_ctx`
+and a `CtxMorph R`.  §0.18′ counted **19 direct sites** — 12 in this family
+and 7 more behind `WpLockAt.newlock_at`, each under a creator wrapper of
+its own (`new_sleeplock*`, `new_tickslock`, `delayed_locks_alloc`,
+`pipe_alloc`, `bcache_alloc`, …).  `BioInv.bio_init` already borrows the
+running token, so the pattern exists in the tree.
+
+**AND THE BOUNDARY IS MEASURED, NOT ESTIMATED: FOUR FILES.**  The rebuild
+behind the ported `WpLock` turns exactly four files red, and they are the
+creator WRAPPERS, not the 19 call sites: **`WpLockAt`, `SleepLock`,
+`TicksInv`, `PipeInv`**.  Every one of §0.18′'s 19 direct sites reaches the
+kit through one of these four, so the token and the `CtxMorph` premise are
+threaded four times, not nineteen.  That is a far better shape than the
+count suggested, and it is the argument for having taken the honest route:
+the wrappers are a choke point the quarantine would have hidden.
+
+**The five M2 sites A6.65 localised are what this unblocks**: with
+`ctx_absorb` in the kit, `ProofAcquire` ×2 and `ProofRelease` stop needing
+`ctx_dom_sc`, and per §0.18′ `ProofSwtch`'s `ctx_cells_reindex` price
+becomes an absorb from the record, with `ProofScheduler` following the same
+shape.  Those four files are the next tranche and they are now *possible*,
+which they were not when A6.65 was written.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
