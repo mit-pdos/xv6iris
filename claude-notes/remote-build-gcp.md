@@ -277,6 +277,104 @@ this development. After provisioning:
     coq.9.0.1 coq-iris.4.4.0 coq-sail-stdpp.0.20.1'
 ```
 
+### A second VM, for a collaborator
+
+Measured 2026-08-27, standing up `rocq-builder-bsdinis` (`c4d-standard-96`,
+`us-central1-b`) alongside `rocq-builder-v2`.
+
+**Override the names first, or you rebuild someone else's machine.**
+`config.sh` defaults to `rocq-builder-v2` / `rocq-data-v2`, and every step of
+`provision-gcp.sh` is check-then-create — so a default-config run finds the
+instance already there, skips creating it, and then `ensure_ssh_keys` rewrites
+`ssh-keys` **wholesale** from the *running* machine's local files. That revokes
+every key not in your own `authorized_keys`, on somebody else's VM. Always:
+
+```sh
+ROCQ_INSTANCE=rocq-builder-<who> ROCQ_DATA_DISK=rocq-data-<who> \
+  ROCQ_ZONE=... ROCQ_MACHINE_TYPE=... ./gcp-rocq/provision-gcp.sh
+```
+
+**Seed the data disk from a snapshot, not `--source-disk`.** The new disk must
+carry `/mnt/rocq/opam` and `/mnt/rocq/shared` or the VM cannot build at all —
+`provision-gcp.sh` installs no switch. Disk cloning is same-zone; a snapshot
+restores into *any* zone, which matters because you do not know in advance
+which zone will have capacity. Note the floor: **a disk restored from a
+snapshot cannot be smaller than its source**, so a 1 TB source yields a 1 TB
+clone even though only ~3 GB of it is load-bearing (`opam` 1.4 G + `shared`
+1.7 G; the other ~97 G was work trees). Going smaller means a blank disk plus
+an rsync of those two directories.
+
+**Spot capacity: land the instance first, build the disk afterwards.**
+`c4d-standard-96` Spot stocked out in `us-central1-a`, `-b` and `-c` on
+separate attempts minutes apart, and the `zonesAvailable` list Google returns
+inside the error was stale every time — a zone it named as free failed on the
+very next call. Do not shuffle a 1 TB disk between zones chasing it. Create the
+*instance* with no data disk, sweeping candidate zones until one lands; that
+instance now holds the capacity. Then restore the snapshot into its zone,
+`attach-disk`, and `reset`. The sweep that worked ran machine-type-major over
+`c4d-standard-96`, `c4-standard-96`, `c3d-standard-90`, `n4d-standard-96`,
+`c4n-standard-96`, `c3-standard-88` across 13 us-central1/us-east zones.
+Exclude `c4a` (Arm — the switch is x86-64) and `n2d` (Hyperdisk Balanced
+support is not a given, and the data disk is Hyperdisk).
+
+**`h4d` has no smaller shape.** `h4d-standard-192`, `h4d-highmem-192` and
+`h4d-highmem-192-lssd` are the whole family, in every zone. "Same machine, half
+the cores" does not exist; going below 192 means changing family.
+
+**Creating an instance before its data disk corrupts `/shared` silently.** This
+is the price of the trick above, and it does not present as a mount problem. On
+the first boot the startup script finds no `$DATA_DEV`, so it creates
+`/mnt/rocq/{trees,opam,shared}` **on the boot disk** and appends the
+`/mnt/rocq/shared /shared none bind,nofail` line to `/etc/fstab`. On the next
+boot systemd satisfies that bind from the stale boot-disk directory before the
+data disk mounts, and the script's own `mountpoint -q /shared` then sees a
+mountpoint and skips the real bind. Result: `/mnt/rocq` correct, `/shared` an
+empty directory on `/dev/root`, and a VM that fails much later and far away
+with `/shared/xv6rocq: No such file or directory`. The repair, and what the
+fstab line should have said all along:
+
+```sh
+umount /shared
+mkdir -p /tmp/rootfs && mount --bind / /tmp/rootfs     # reach the shadowed dirs
+rm -rf /tmp/rootfs/mnt/rocq/trees /tmp/rootfs/mnt/rocq/opam /tmp/rootfs/mnt/rocq/shared
+umount /tmp/rootfs && rmdir /tmp/rootfs
+sed -i 's#bind,nofail 0 0#bind,nofail,x-systemd.requires-mounts-for=/mnt/rocq 0 0#' /etc/fstab
+mount --bind /mnt/rocq/shared /shared
+```
+
+**apt races cloud-init on the first boot.** `bootstrap_vm` can die on
+`Could not get lock /var/lib/apt/lists/lock`, held by the boot-time `apt-get`.
+Transient: wait for `fuser` on the lock to come back empty, then re-run
+`provision-gcp.sh`. Watch the sentinel — `/var/lib/rocq-bootstrap-done` gets
+set by a run that succeeded, so a *later* failed run reports "already
+installed, skipping". Verify a package that only this project installs
+(`riscv64-linux-gnu-gcc`) rather than trusting that line.
+
+**Scoping a collaborator to one VM.** Compute Engine takes an IAM policy on an
+individual instance. It is not on the IAM & Admin page — in the console it is
+the instance's INFO PANEL, and on the command line:
+
+```sh
+gcloud compute instances add-iam-policy-binding rocq-builder-<who> \
+  --zone=... --member='user:...' --role='roles/compute.instanceAdmin.v1'
+```
+
+That covers `compute.instances.start`, which is the whole point — it is what
+recovers a preempted VM. Add `roles/compute.viewer` at the project so their
+console is not empty, and `roles/iam.serviceAccountUser` **on the attached
+service account only**; the project-wide form would let them attach
+`rocq-vm-admin` (which holds `compute.admin`) to a machine. What the scoping
+costs: no `instances list`, and no ability to *create* an instance, so a VM
+that gets deleted rather than stopped can only be rebuilt by the owner.
+
+Note the standing gap this does not close: both VMs run as the default compute
+service account, which holds `roles/editor`. Anyone with `setMetadata` on a VM
+can have it fetch that token. The instance's legacy OAuth scopes are what
+contain it — no compute, no IAM, leaving Editor-level *read* on GCS — so the
+real fix is `--no-service-account --no-scopes`, which also makes the
+`serviceAccountUser` grant unnecessary. It needs the instance stopped, which on
+a scarce Spot shape is its own gamble.
+
 ## Preemption and cost
 
 The instance is Spot with `--instance-termination-action=STOP`, so a preemption
@@ -399,10 +497,20 @@ its own. To pin it up (a long run you do not want interrupted):
 run-on-gcp --no-sync touch /mnt/rocq/.keep-awake   # rm to release
 ```
 
-Spot pricing is ~$1.68/hr for `c3d-standard-90` in `us-east4`, plus ~$110/mo
-for the 1 TB disk, which is charged whether or not the instance is running.
-Idle time costs far more than machine size does: leaving it up 24/7 is roughly
-10× the cost of using it a few hours a day.
+Spot pricing, read from the Cloud Billing catalog rather than a web page
+(`services/6F81-5844-456A/skus`, `us-central1`, 2026-08-27); the SKUs are
+`Spot Preemptible <family> Instance Core` and `... Instance Ram running in
+Americas`:
+
+| | Spot | on-demand |
+|---|---|---|
+| `c4d-standard-96` (96 vCPU, 372 GB) | $1.72/hr | $4.44/hr |
+| `c4d-standard-192` (192 vCPU, 744 GB) | $3.43/hr | $8.60/hr |
+| `h4d-standard-192` (192 vCPU, 720 GiB) | $3.46/hr | $7.85/hr |
+
+Add ~$88/mo per 1 TB Hyperdisk Balanced, charged whether or not the instance
+runs. Idle time costs far more than machine size does: leaving it up 24/7 is
+roughly 10× the cost of using it a few hours a day.
 
 **On sizing:** the build peaks at ~119 concurrent workers but spends a narrow
 head and about a minute of tail running 1–3 files wide, so 180 vCPU sat mostly
