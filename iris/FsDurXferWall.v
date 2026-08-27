@@ -1,7 +1,7 @@
 (* ====================================================================== *)
 (*  FsDurXferWall.v -- WHAT A SNAPSHOT'S RESOURCES DO NOT SAY, AND WHY THE *)
 (*  COMMIT'S COLLECTION IS STILL NOT A TRANSPORT SOURCE                    *)
-(*  (durable-disk lanes H2 / H3)                                          *)
+(*  (durable-disk lanes H2 / H3 / H4)                                     *)
 (*                                                                        *)
 (*  Lane H built the RESOURCE TRANSPORT ([FsDurXfer.fs_state_xfer]), lane  *)
 (*  H2 moved the COMMIT so that the file system builds its own epoch, and  *)
@@ -11,16 +11,34 @@
 (*  epoch's own resources ([FsDurSnap.fs_snap_read_ok]).  Two facts about  *)
 (*  the SHAPES are what is left; both are one-liners.                      *)
 (*                                                                        *)
-(*  (1)  THE GEOMETRY IS NOT READABLE, AND THAT IS A FACT ABOUT            *)
-(*       [ghost_map], NOT A MISSING LEMMA.  An AUTHORITY may hold entries  *)
-(*       no fragment names, so the identity -- which says the snapshot's   *)
-(*       own bytes are INSIDE [fs_dbytes D] -- bounds nothing about [D]'s  *)
-(*       domain.  Grow [D] by one whole block above the state's own        *)
-(*       [size]: every resource of the epoch still holds                   *)
-(*       ([fs_snap_res_grow], and the identity is monotone because the     *)
-(*       flattening is), while [FsDurSnap.ss_dombelow] fails at that block *)
-(*       ([snap_shape_grow_absurd]).  [snap_shape_not_readable] is the two *)
-(*       together.                                                        *)
+(*  (1)  THE GEOMETRY IS NOT READABLE, AND STRENGTHENING THE IDENTITY TO   *)
+(*       AN EQUALITY DOES NOT CHANGE THAT (lane H4).  The reason is one    *)
+(*       fact about the FLATTENING: [LogDefs.fs_dbytes] is BLIND to a      *)
+(*       block whose byte list is empty, so it is not injective, and       *)
+(*       "the snapshot's own map IS the flattening of [D]" therefore       *)
+(*       determines nothing about [D] at such a block.  Pad [D] with       *)
+(*       [b := []]: the flattening is UNCHANGED ([fs_dbytes_pad]), so      *)
+(*       every resource of the epoch holds at the padded map AT THE        *)
+(*       EQUALITY FORM TOO -- [fs_snap_res_eq_pad] is an [⊣⊢], not the     *)
+(*       one-way growth H3 had to use -- while [FsDurSnap.ss_bsz] fails    *)
+(*       at [b] ([snap_shape_pad_absurd]).                                *)
+(*       [snap_shape_not_readable_eq] is the two together, at the          *)
+(*       EQUALITY identity; [snap_shape_not_readable] is H3's, at the      *)
+(*       [⊆] one.  Neither is a missing lemma.                            *)
+(*                                                                        *)
+(*       AND THE EQUALITY IS NOT PROVABLE AT THE COMMIT EITHER, for a      *)
+(*       reason that is about xv6 and not about ghost state: nothing in    *)
+(*       the design says a block whose bitmap bit is SET belongs to some   *)
+(*       inode.  [FsDurSnap.sk_own_used] and [sk_meta_used] are both the   *)
+(*       "owned or metadata => used" direction; the converse is stated     *)
+(*       nowhere, and it is FALSE of this kernel (a crash between          *)
+(*       [balloc]'s bit and the record that names the block leaks it).     *)
+(*       [FsState.fs_footprint] owns block 1, the bitmap block, the        *)
+(*       region, every node's own blocks and the FREE pool -- a leaked     *)
+(*       block is in none of those, and it is a block of [D] all the       *)
+(*       same.  So the footprint's flattening is a PROPER subset of        *)
+(*       [fs_dbytes D] in general, which is why the identity is stated at  *)
+(*       [⊆] and why the transport can only ever produce [⊆].             *)
 (*                                                                        *)
 (*       So [FsDurSnap.snap_shape] -- block lengths, the map's range, the  *)
 (*       superblock's own geometry, which inums the region names, and the  *)
@@ -104,6 +122,33 @@ Proof.
            (dbytes_ok_head D b bs Hok) Hb).
 Qed.
 
+(* ...AND THE FLATTENING IS BLIND TO AN EMPTY BLOCK, which is what makes
+   the EQUALITY form no stronger than the [⊆] one (durable-disk lane H4).
+   [map_seqZ] of the empty list is the empty map, so padding [D] with
+   [b := []] leaves [fs_dbytes D] on the nose. *)
+Lemma fs_dbytes_pad (D : gmap Z (list (bv 8))) (b : Z) :
+  dbytes_ok D -> D !! b = None -> fs_dbytes (<[b := []]> D) = fs_dbytes D.
+Proof.
+  intros Hok Hb.
+  assert (Hok' : dbytes_ok (<[b := []]> D))
+    by (apply dbytes_ok_insert_2; [exact Hok | simpl; lia]).
+  rewrite (fs_dbytes_insert D b [] Hok' Hb).
+  rewrite (_ : (map_seqZ (b * Z.of_nat BSIZE) [] : gmap Z (bv 8)) = ∅);
+    [| reflexivity].
+  rewrite left_id_L //.
+Qed.
+
+(* ...and a padded map is no file system's: an empty block is not a whole
+   block ([FsDurSnap.ss_bsz]). *)
+Lemma snap_shape_pad_absurd (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+    (b : Z) :
+  snap_shape S (<[b := []]> D) -> False.
+Proof.
+  intros Hsh.
+  pose proof (ss_bsz Hsh b [] (lookup_insert D b [])) as Hlen.
+  simpl in Hlen. unfold BSIZE in Hlen. lia.
+Qed.
+
 Section Wall.
   Context `{!diskImgG Σ, !fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
@@ -152,6 +197,75 @@ Section Wall.
     iSplitR "Hrest"; [| iExact "Hrest"].
     iFrame "Ha". iPureIntro.
     exact (transitivity Hsub (fs_dbytes_grow D b bs Hok Hb)).
+  Qed.
+
+  (* ==================================================================== *)
+  (*  1b.  THE EQUALITY IDENTITY DOES NOT HELP (durable-disk lane H4)      *)
+  (*                                                                      *)
+  (*  [FsDurRead.snap_auth] ties the epoch's map to [D] by [⊆].  Making    *)
+  (*  it an EQUALITY is the obvious strengthening, and it buys nothing:    *)
+  (*  the flattening is blind to a block whose byte list is empty, so the  *)
+  (*  equation determines [D] nowhere.  Both refutations below are at the  *)
+  (*  equality form, and the first is an [⊣⊢] -- the padded map is         *)
+  (*  INDISTINGUISHABLE, not merely weaker.                               *)
+  (* ==================================================================== *)
+
+  Definition snap_auth_eq (g : gname) (B : gmap Z (bv 8))
+      (D : gmap Z (list (bv 8))) : iProp Σ :=
+    (ghost_map_auth g 1 B ∗ ⌜B = fs_dbytes D⌝)%I.
+
+  Definition fs_snap_res_eq Γ (g : gname) (B : gmap Z (bv 8))
+      (D : gmap Z (list (bv 8))) (S : fs_state_rec) : iProp Σ :=
+    (snap_auth_eq g B D
+     ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
+     ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
+     ∗ fs_state Γ S
+     ∗ ∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))%I.
+
+  (* ...and it is INHABITED at the tied form, so the refutation below is
+     not vacuous: [FsDurSnap.fs_snap_alloc] mints its authority at
+     [fs_dbytes D] on the nose, so the equality holds by [reflexivity]. *)
+  Lemma fs_snap_res_eq_inhabited (S : fs_state_rec)
+      (D : gmap Z (list (bv 8))) :
+    snap_ok S D ->
+    ⊢ |==> ∃ g gl gt : gname,
+        fs_snap_res_eq (snap_gamma g gl gt) g (fs_dbytes D) D S.
+  Proof.
+    intros Hok.
+    iMod (fs_snap_alloc S D Hok) as (g gl gt) "H".
+    iModIntro. iExists g, gl, gt.
+    rewrite fs_snap_split /fs_snap_res /fs_snap_res_eq /snap_auth_eq
+            /snap_auth.
+    iDestruct "H" as "[(Hau & H2 & H3 & H4 & H5) _]".
+    iDestruct "Hau" as "[Ha _]". iFrame "Ha H2 H3 H4 H5".
+    iPureIntro. reflexivity.
+  Qed.
+
+  (* THE PAD IS INVISIBLE TO THE EQUALITY. *)
+  Lemma fs_snap_res_eq_pad Γ (g : gname) (D : gmap Z (list (bv 8)))
+      (b : Z) (S : fs_state_rec) :
+    dbytes_ok D -> D !! b = None ->
+    fs_snap_res_eq Γ g (fs_dbytes D) D S
+    ⊣⊢ fs_snap_res_eq Γ g (fs_dbytes D) (<[b := []]> D) S.
+  Proof.
+    intros Hok Hb.
+    rewrite /fs_snap_res_eq /snap_auth_eq (fs_dbytes_pad D b Hok Hb) //.
+  Qed.
+
+  (* (1) AT THE EQUALITY IDENTITY.  A reading of the GEOMETRY off the
+     epoch's resources would survive padding [D] with an empty block, and
+     no state fits that. *)
+  Lemma snap_shape_not_readable_eq Γ (g : gname)
+      (D : gmap Z (list (bv 8))) (b : Z) (S : fs_state_rec) :
+    dbytes_ok D -> D !! b = None ->
+    (forall D' : gmap Z (list (bv 8)),
+       fs_snap_res_eq Γ g (fs_dbytes D) D' S ⊢ ⌜snap_shape S D'⌝) ->
+    fs_snap_res_eq Γ g (fs_dbytes D) D S ⊢ ⌜False⌝.
+  Proof.
+    intros Hok Hb Hread. iIntros "H".
+    rewrite (fs_snap_res_eq_pad Γ g D b S Hok Hb).
+    iDestruct (Hread (<[b := []]> D) with "H") as %Hsh.
+    iPureIntro. exact (snap_shape_pad_absurd S D b Hsh).
   Qed.
 
   (* (1), AS ONE LEMMA.  A reading of the GEOMETRY off the epoch's
