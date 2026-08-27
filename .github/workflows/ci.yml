@@ -247,28 +247,31 @@ jobs:
         env:
           SWITCH: ${{ github.workspace }}
         run: |
-          # BOTH rungs below the general theorem, reported separately, and
-          # NEITHER TRUSTED BASE CONTAINS THE OTHER -- measured 2026-08-27:
-          # 605 definitions vs 446, sharing 428.
-          #   * 177 are power-only.  Leaving [phi] free means the statement
-          #     carries the [Hphi] HYPOTHESIS, an iProp entailment, so the
-          #     Iris ghost-state layer is in its trusted base (Xv6G,
-          #     RiscvAdequacy, RiscvPtsto, FdSlots, IrefSlots, FileInvDefs,
-          #     ProcAvail, FsDurRead, FsDurXfer, FsStateBitmap, FsStateDefs,
-          #     DiskImg).
-          #   * 18 are fs-only: the pure FS-consistency vocabulary that only
-          #     [phi] names -- xv6_trace_pure, fs_boot_pure, snap_ok and its
-          #     cone, the link-count definitions.
+          # ALL THREE RUNGS OF THE LADDER, most general first.  Read the
+          # three tables as one story:
+          #   RiscvAdequacy.riscv_power_adequacy  -- the machine, an ABSTRACT
+          #     crash invariant [Pc], and any [phi].  This is the "any
+          #     provable pure trace property" theorem, and it is the CHEAPEST
+          #     of the three to state (MEASURED 2026-08-27: 431 definitions /
+          #     3493 lines) because it names no file system at all.
+          #   xv6_power_adequacy_xv6Sigma         -- xv6's instance: [Pc] is
+          #     fixed at [FsCrash.P_fs_named], the invariant xv6's boot cone
+          #     actually establishes, with [phi] still free.  605 / 4781: the
+          #     dearest of the three, because its statement names BOTH the
+          #     Iris ghost layer (via the [Hphi] hypothesis, an iProp
+          #     entailment) and the FS durability record.
+          #   xv6_fs_adequacy_xv6Sigma            -- [phi] chosen.  446 / 3460.
+          #
+          # NEITHER OF THE LOWER TWO CONTAINS THE OTHER: 605 vs 446, sharing
+          # 428; 177 are power-only (the ghost layer) and 18 are fs-only (the
+          # pure FS-consistency vocabulary only [phi] names -- xv6_trace_pure,
+          # fs_boot_pure, snap_ok and its cone, the link-count definitions).
           # AT FILE LEVEL IT LOOKS LIKE A SUPERSET AND IS NOT: those 18 live
           # in files the general theorem reaches for other reasons.  Do not
           # read containment off the file column.
-          #
-          # And note what the overlap means: [xv6_power_adequacy] is
-          # parametric in [phi] but NOT in the crash predicate -- [Hphi]'s
-          # type hardcodes [FsCrash.P_fs_named], so the FS's durability
-          # record is in the general statement whatever [phi] is.
           rc=0
-          for thm in SystemAdequacy.xv6_power_adequacy_xv6Σ \
+          for thm in RiscvAdequacy.riscv_power_adequacy \
+                     SystemAdequacy.xv6_power_adequacy_xv6Σ \
                      SystemAdequacy.xv6_fs_adequacy_xv6Σ; do
             log="$RUNNER_TEMP/tcb-${thm##*.}.log"
             if ./tools/tcb/tcb-report.sh "xv6iris.$thm" > "$log" 2>&1; then
