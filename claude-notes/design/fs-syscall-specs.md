@@ -20,6 +20,17 @@ against the union of states it might see.  The consumer-facing shape of
 v2 additionally matches DFSCQ's tree-sequence idea (crash = a recent
 past state), specialized by the WAL's batch atomicity.
 
+> **UPDATE (2026-08-27): the durable plan is PROVEN and the campaign is
+> OPEN.**  The adequacy theorem is true (`Himg` deleted; the ladder is
+> three rungs; lane H complete; the durable campaign's one open lane is
+> F — receipts).  The user's word: rank 4's finding first, then get
+> going.  The campaign worklist is
+> [`../projects/fs-syscall-specs.md`](../projects/fs-syscall-specs.md)
+> (lanes, gating, and the consumer-side input to the simplification
+> campaign's rank-4 ruling on the `dview`/`fview` island).  The
+> impact-note mapping below remains accurate; §5's grounding block is
+> rewritten to the as-landed names.
+
 > **IMPACT NOTE (2026-08-25): the durable plan underneath changed.**
 > [`durable-fs-plan.md`](durable-fs-plan.md) (ruling 4⁹) superseded the
 > fold/ledger commit this doc's internal story cites: the durable view
@@ -458,19 +469,29 @@ about what OTHER processes' ops do to durability beyond the monotone
   order gives the conjunction).  The dangerous middle — a free-floating
   durable state a spec could contradict — is unstatable BY DESIGN.
 
-**Grounding in the ghost state under construction:**
+**Grounding in the landed ghost state (rewritten 2026-08-27, after the
+snapshot design was proven through; the earlier fold-era version of this
+block is in git history):**
 
-- `flushed` = a mono-nat over the log's epoch counter (`LogInv.ln_ep`),
-  minted persistent at each commit — the receipt shape ruling 4⅞
-  decision 3 reserves, produced where `dur_stands_at_logged` concludes.
-- The carrier bound = one nat beside the `nview` agreement value; the
-  payload half's retag (already an AU at every mutation) stamps the
-  current epoch.  No new invariant; one field on a ghost the namei
-  campaign already routes.
-- `was_current`/SNAPSHOT = the adequacy-level recovery theorem, i.e. the
-  spike's end theorem generalized from "the durable view contains the
-  device inode" to "the durable view IS the epoch-B fold".  It consumes
-  the same `Psi_dec` bridge; nothing new below the spec layer.
+- `flushed` = a mono-nat lower bound on the EPOCH POINTER the crash
+  predicate carries (plan 4⁹.1) — and its persistent-receipt producer is
+  named by the durable campaign itself: "sync-style receipts are copies"
+  of the frozen snapshot certificate (4⁹.3), which is exactly durable
+  lane F's deliverable.  Nothing here is speculative any more; lane Y of
+  the campaign worklist consumes F.
+- The carrier bound = one nat beside the carrier's agreement value,
+  stamped at each mutation's retag.  WHICH ghost carries it is lane S0's
+  ruling (dview-extended `nview` vs a reading of `γtop`'s `top_frag` —
+  coupled to the simplification campaign's rank 4; see the worklist).
+- `was_current`/SNAPSHOT = readings of the frozen per-commit snapshot:
+  `FsCrash.fs_commit_receipt` (the snapshot's state after a commit is
+  the state the transactions produced), `FsDurSnap.P_dur_tie`/
+  `P_dur_node_of_slot`/`snap_dir_entry_of_first` (per-node readings —
+  PER-NODE PERSISTENCE is these, verbatim), and
+  `SystemAdequacy.fs_boot_pure` (`∃ S, snap_ok S D` at every reachable
+  state — the recovery half: the boot mint `FsCfgSnap.fs_cfg_alloc_snap`
+  re-founds the era FROM the snapshot, which IS "recovery yields a past
+  current state").  All landed; lane D assembles them.
 
 ## 6. Layering the tree spec on top (the later, single-program layer)
 
@@ -567,7 +588,10 @@ Deliberately different from both:
    FILES get their stability from the fd layer's refcount + inode lock
    instead (weaker: file values stable only while locked).  The
    fractional-agreement route is more uniform; the fd route is less new
-   state.  Which?
+   state.  Which?  *(2026-08-27: now COUPLED to the simplification
+   campaign's rank 4, and a third option exists post-G5: `nview` as a
+   READING of `γtop`'s per-inode `top_frag` — no new map at all.  Lane
+   S0 of the campaign worklist owns the decision.)*
 2. **`aview` vs raw `fs_node` at the spec boundary.**  §1 quotients to
    `absnode` (friendly, hides blocks).  The alternative — expose
    `fs_node` and let the tree layer quotient — saves one reading but
@@ -576,10 +600,12 @@ Deliberately different from both:
    for the quotient view.  Proposal: it is a READING of `γtop_L`'s
    authority (already in `ftop_inv`) — no new invariant, one
    `abs_of`-fmap.  Confirm nothing needs a separate `aviewN`.
-4. **Batch identity.**  Is `b` the log's epoch counter (`ln_ep`)
-   verbatim, or a spec-level counter tied to it by one ghost?  (`ln_ep`
-   verbatim is cheaper; a spec counter insulates the spec from log
-   refactors.)
+4. **Batch identity.**  ~~Is `b` the log's epoch counter (`ln_ep`)
+   verbatim, or a spec-level counter tied to it by one ghost?~~
+   *(ANSWERED by the landed design, 2026-08-27: the crash predicate now
+   carries an EPOCH POINTER for the snapshot family (plan 4⁹.1) — `b` is
+   that pointer's value; it is already spec-adjacent and insulated from
+   the log's internals, so the question dissolves.)*
 5. **How SNAPSHOT is formalized without a crash-WP framework.**  The
    honest options: (a) an adequacy-level recovery theorem only (the
    spike's shape — cheapest, and enough for verified user programs whose
