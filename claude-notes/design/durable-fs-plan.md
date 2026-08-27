@@ -279,18 +279,59 @@ view `L` is minted EQUAL TO `D` and the file-system instance from the
 snapshot at `D` (`FsCfgSnap.fs_cfg_alloc_snap`; era 0's snapshot comes
 from the image, `fs_cfg_alloc_img`), and the pre-install window at a
 dirty header — the ≤ LOGSIZE pending home blocks read raw on the physical
-disk and in the empty buffer cache's pool while `L = D` says the installed
-value — is the WAL's to carry: an EXCEPTION SET inside
-`FsBlocks.fs_bytes_body` (`bytes_tie` excepted on the pending set, whose
-logged values the log region holds and the mirror knows), which
-`install_trans` shrinks block by block and `write_head`'s `n := 0`
-empties; the byte-view readers (`fs_bytes_agree*`, `fsblock_update`,
-`byte_range_log_update`) run only after recovery, which the WAL seals as
-"recovery done".  `BioInv.pool_blk` (disk cell = cache half), the mirror
-row and `SpecInitlog`'s `lm_view` row stay true throughout.
-`SpecFsinit`'s clean-header premise disappears with the window.  Block
-1 is never logged (`FsCrash.fs_recovery_sb_raw`), so `fsinit`'s raw
-`readsb` and the snapshot's superblock are one record.
+disk and in the buffer cache while `L = D` says the installed value — is
+the WAL's to carry.
+
+**THE EXCEPTION SET, AS BUILT (lane E-except; the WAL half is landed).**
+`FsBlocks.fs_bytes_body` carries a set `X` and a FUNCTION `Xv` fixed at
+allocation: `bytes_tie` holds on `home ∖ X`, and on `X` the byte view
+holds `Xv b` — the LOGGED value, which is what the recovering install is
+about to write.  `Xv` is a parameter rather than a stored map because the
+log region is not written during recovery, so the values do not move; a
+map would have to be re-tied to the mirror at every step.  The set's
+authority is a ONE-KEY GHOST MAP, and that is what makes the seal free:
+`exc_own` is the WAL's exclusive handle (`install_trans` shrinks it one
+block per `bwrite`, `FsBlocks.fsblock_install_exc`), and PERSISTING that
+element at `∅` is `exc_sealed` — "recovery is done" — which a discarded
+ghost-map element makes permanent.  The seal rides `LogInv.log_ctx`'s
+last conjunct, so `fs_bytes_any` (row + seal) is unchanged for every
+runtime reader and NOT ONE crossing site above the WAL moved.
+
+The two invariants minted at PowerOn cannot carry a seal that `initlog`
+has not yet made, so `BitmapInv.bitmap_inv` and `InodeRegion.ireg_inv`
+SPLIT: `bitmap_reg`/`ireg_reg` are the PowerOn forms (bare byte row) and
+the sealed forms are built inside `fsinit`/`forkret` off `log_ctx`
+(`bitmap_inv_of`/`ireg_inv_of`).  The ONE reader that runs before
+recovery — boot's `userinit` doing `namei("/")` through `iget` — takes the
+PowerOn form all the way down, and its own crossing is licensed by a seal
+CARRIED IN THE LICENCE (`IgetLic.iname`'s `BufL` row), whose one presenter
+(`ireclaim`) runs after `initlog`.  `fsinit`'s own pre-recovery `readsb`
+uses the `b ∉ X` form, with `1 ∉ X` off `hdr_wf`'s block-1 row (E-blk1).
+
+`BioInv.pool_blk` (disk cell = cache half), the mirror row and
+`SpecInitlog`'s `lm_view` row stay true throughout: the CACHE map is
+minted raw, which is the whole reason the exception lands on the byte row
+and nowhere else.  `SpecFsinit`'s clean-header premise is GONE (its place
+is taken by `hdr_wf`'s clauses, which at era N come off the crash
+predicate's own `fs_boot_pure`).  Block 1 is never logged
+(`FsCrash.fs_recovery_sb_raw`), so `fsinit`'s raw `readsb` and the
+snapshot's superblock are one record.
+
+**WHAT IS NOT BUILT, and it is a VALUE-side wall (lane E-except).**  The
+mint still runs at the RAW home blocks: `FsCfgSnap.fs_cfg_alloc_snap`
+takes `snap_ok S (fs_restrict (fs_blocks dk) home)`.  Moving it to `D`
+means taking `S` from the crash predicate's `fs_boot_pure` — which
+already delivers `∃ S, snap_ok S D` and `hdr_wf` at every era — but
+`snap_ok S D` is a statement about `S` and `D` ALONE: nothing in it ties
+`fss_sb S` (hence the era's logstart, inodestart, bmapstart, ninodes and
+`nib`) to the era-invariant superblock the crash predicate's `cov`/`ls`
+and the boot chain's configuration are stated at.  `Himg` is what
+supplies that tie today.  Closing it is a STRENGTHENING OF THE CRASH
+PREDICATE — `P_fs` carries `ls` already, so the clause is
+`sb_logstart (fss_sb S) = ls` (and the geometry that follows), provable
+at era 0 from the image and preserved by the commit, which re-allocates
+the snapshot at the era's own state.  Until that lands, the mint cannot
+read `D` and `Himg` cannot be deleted.
 
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode

@@ -2642,6 +2642,94 @@ so it never wanted that shape.
     `InodeRegion.dv_lend_mint` was kept at E-unpin, for the lane that
     deletes `Himg` to sweep; a note at `FsCfgBoot.v`'s deletion site names
     each one's snapshot twin.
+
+    **AS LANDED (E-except): THE EXCEPTION SET AND ITS SEAL, AND RECOVERY
+    RUNS THROUGH THEM.  THE VALUE SIDE OF THE MINT IS THE WALL, SO `Himg`
+    IS STILL THERE.**
+
+    THE MEASUREMENT DECIDED THE SHAPE.  Of the crossings E-recover counted,
+    only six actually read `bytes_tie` (`fs_bytes_agree`/`_q`/`_any`/
+    `_any_q`, `byte_range_log_update`, `fsblock_update`); `fsblock_home`,
+    `byte_range_home` and their share forms read `bytes_dom` only and are
+    sound in the window.  So option (b) -- a seal the ~28 sites carry -- was
+    not needed: the seal went INTO `fs_bytes_any`, and NOT ONE crossing site
+    above the WAL moved.
+
+    THE INVARIANT.  `FsBlocks.fs_bytes_body` gains a set `X` and a FUNCTION
+    `Xv` fixed at allocation: `bytes_tie_exc` holds on `home ∖ X`, and on
+    `X` the byte view holds `Xv b`, the logged value (`bytes_exc_val`).
+    `Xv` is a parameter and not a stored map because the log region is not
+    written during recovery, so the values do not move; a map would have to
+    be re-tied to the mirror at every step.  The set's authority is a
+    ONE-KEY GHOST MAP (`Xv6Cameras.fsexc_inG`, `ghost_map unit (gset Z)`),
+    and that one object does both jobs: `exc_own` is the WAL's exclusive
+    handle, and PERSISTING the element at `∅` is `exc_sealed` -- a
+    discarded ghost-map element can never move again, which is exactly why
+    "recovery is done" is sound as a permanent certificate.  `fs_names`
+    gains `fs_exc` (LAST); `fs_bytes_any γ = fs_bytes_row γ ∗ exc_sealed`.
+
+    THE CARRIERS SPLIT, AND THAT IS THE WHOLE COST.  `LogInv.log_ctx` gains
+    the seal (LAST conjunct, `log_ctx_seal`) -- one edit, the sanctioned
+    one.  `BitmapInv.bitmap_inv` and `InodeRegion.ireg_inv` are minted at
+    PowerOn and cannot carry a seal `initlog` has not yet made, so each
+    splits into a PowerOn form (`bitmap_reg`, `ireg_reg`: the bare byte
+    row) and the sealed form, built inside `fsinit`/`forkret` off
+    `log_ctx`'s seal (`bitmap_inv_of`, `ireg_inv_of`).  Everything above --
+    `ilock`, `ialloc`, `iput`, `iupdate`, `balloc`, `bfree`, the
+    readi/writei/bmap cone, `fs_ready` -- takes the SEALED form and is
+    byte-identical.  The ONE pre-recovery reader is boot's `userinit`
+    running `namei("/")` through `iget`: its cone
+    (`SpecUserinit`/`SpecNameiRootBoot`/`SpecNamei`'s and `SpecNamex`'s ROOT
+    corners/`SpecIget`/`IcacheInv`'s four count movers/
+    `IcacheEscrow.ipool_take_lend`/`IgetLic.iname_freeze_off`) takes the
+    PowerOn form, and its own byte crossing is licensed by the seal now
+    CARRIED IN `IgetLic.iname`'s `BufL` row -- whose one presenter in the
+    tree (`ireclaim`) runs after `initlog`.  Six runtime sites project
+    (`ireg_inv_reg`).
+
+    RECOVERY THROUGH THE WINDOW.  `SpecInstallTrans` DROPS `Bh` -- the
+    entries' crashed home contents, which the caller had to own across the
+    call and demonstrably cannot -- and the per-entry `fsblock` rows with
+    it; the recovering arm takes `exc_own gX Xexc` instead and hands back
+    the residue.  Each step is `FsBlocks.fsblock_install_exc`: the home
+    `bwrite` has landed the logged value, so the CACHE moves to `Xv b`, the
+    tie is restored at that block, and the set shrinks by one.  The byte
+    view does not move at all -- which is the whole content of exit (1).
+    `ProofInstallTrans` carries it on `it_exc_rest Xexc W t`.
+    `SpecInitlog` takes the handle at the header's write set plus the one
+    premise that ties them ("at entry `i` the byte view holds log slot
+    `i`'s content, which the era's born-true mirror names"), discharges it
+    from its own `Hysmir`, and after the install SEALS.  Its `lm_view` post
+    row goes with the pre row.
+
+    `SpecFsinit`'S PREMISE (g) IS DELETED.  In its place stand
+    `FsCrash.hdr_wf`'s three clauses at the header block plus its block-1
+    row (E-blk1's), the `Xv`/slot tie, and the byte view's NAMED row;
+    `fsinit`'s `readsb` crossing, which runs at +0x26 BEFORE `initlog`,
+    uses `fs_bytes_agree_exc` with "block 1 is not in the write set".
+    `ProofForkret` still supplies the clean-header instance, so the tree's
+    behaviour is unchanged; what is left of `hdr_n = 0` is `FirstTok`'s
+    image pures.
+
+    **THE WALL IS THE MINT'S VALUE, AND IT IS THE CRASH PREDICATE'S.**
+    `FsCfgSnap.fs_cfg_alloc_snap` still takes `snap_ok S` at the RAW home
+    blocks.  Reading `D` means taking `S` from `SystemAdequacy.fs_boot_pure`
+    -- which ALREADY delivers `∃ S, snap_ok S D` and `hdr_wf` at every era,
+    so the pure channel is not the problem -- but `FsDurSnap.snap_ok S D` is
+    a statement about `S` and `D` ALONE.  Nothing in it ties `fss_sb S`
+    (hence the era's logstart, inodestart, bmapstart, ninodes and `nib`) to
+    the era-invariant superblock the crash predicate's `cov`/`ls` and the
+    whole boot chain's configuration are stated at, and `fs_cfg_alloc_snap`'s
+    premises are all about `fss_sb S`.  `Himg` is what supplies that tie
+    today.  THE FIX IS A STRENGTHENING OF `FsCrash.P_fs`, not a proof:
+    `P_fs` carries `ls` already, so the clause is
+    `sb_logstart (fss_sb S) = ls` beside the snapshot -- provable at era 0
+    from the image, and preserved by the commit, which re-allocates the
+    snapshot at the era's OWN state (whose superblock IS the era's).  With
+    it, `boot_shared_alloc` can spend `fs_boot_image_wf` only at era 0 and
+    `Himg`/`fs_boot_image_eras` go.  Until then they stay, and
+    `xv6_power_adequacy` is still vacuous.  Machine-checked record:
+    `iris/FsBootWall.v`'s second banner, exit (1).
 - [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
   individual syscalls (`mknod_durable` and its siblings) belong to the
   file-system BEHAVIOUR specification project

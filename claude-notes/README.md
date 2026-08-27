@@ -166,14 +166,17 @@ first four were audited against the tree 2026-08-22):
   map, and "the disk recovers to a committed view that IS a file system" is
   exported at every reachable state), plus two of the three snapshot clauses
   the boot mint needs (`FsStateInode.inl_bare_free`, `FsDurSnap.sk_regdom`).
-  What is left is the BOOT mint from that snapshot.  Boot ORDER is NOT what
-  blocks it (the clean-header fact `initlog` already carries makes the
-  committed view equal the raw home blocks, so the mint stays at PowerOn),
-  and neither is the OLD link ledger any more: lane G6 demolished it, so
-  `iris/FsBootWall.v` is CLOSED and the boot builds the type register's
-  fragments off `FsCfgBoot.ent_toks_of_region` instead of a per-record
-  ticket stock.  Meanwhile `Himg` is still assumed and
-  `xv6_power_adequacy` is still vacuous.
+  The boot mint READS THE SNAPSHOT now (`FsCfgSnap.fs_cfg_alloc_snap`;
+  the old link ledger stopped blocking it at lane G6, so
+  `iris/FsBootWall.v`'s first wall is closed), and the dirty-header window
+  it opens is carried at the WAL: `FsBlocks.fs_bytes_body` has an
+  EXCEPTION SET, the recovering `install_trans` shrinks it, `initlog`
+  SEALS it, and the seal rides `LogInv.log_ctx`, so no reader of the byte
+  view above the WAL changed.  `SpecFsinit`'s clean-header premise is
+  gone.  What is left is the mint's VALUE: it still runs at the RAW home
+  blocks, because nothing ties the crash predicate's snapshot state to the
+  era-invariant superblock/geometry the boot chain is configured at.  So
+  `Himg` is still assumed and `xv6_power_adequacy` is still vacuous.
   Lanes A–G in the file.
   History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
