@@ -427,7 +427,7 @@ Global Arguments sk_dombelow {_ _} _.
    inum space is [16 *] that.  It is the width [sk_regdom] is stated at and
    the one [sk_dirloc]'s [DirView.dir_ok] is bounded by; at the boot
    configuration it IS [IcacheRef.icfg_nib]
-   ([FirstTok.col_geom_of_image]'s own hypothesis). *)
+   ([FirstTok.col_geom_of_config]'s own hypothesis). *)
 Definition snap_nib (S : fs_state_rec) : nat :=
   Z.to_nat (sb_ninodes (fss_sb S) / 16 + 1).
 

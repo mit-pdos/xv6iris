@@ -543,8 +543,8 @@ Section Collect.
        [ninodes/16 + 1] blocks wide.  [cg_reg] and [cg_nin] only BOUND the
        width; [FsDurSnap.sk_regdom] needs the equation, because it spells
        the region off [S]'s own superblock and the collected map's domain is
-       [region_inums nib].  Its producer is [FirstTok.col_geom_of_image],
-       which is stated at that tie already ([fs_geom_ok_of_image]'s), so the
+       [region_inums nib].  Its producer is [FirstTok.col_geom_of_config],
+       which is stated at that tie already ([fs_geom_ok_of_snap]'s), so the
        boot chain pays nothing new.  LAST, so no destructuring moves. *)
     cg_width : Z.of_nat nib = sb_ninodes sb / 16 + 1;
     (* THE REGION'S WIDTH IS THE CACHE'S (durable-disk lane E-clauses).
@@ -554,7 +554,7 @@ Section Collect.
        its own [nib].  They are the same number, and saying so HERE is what
        lets [col_snap_bytes] turn the payloads' clause into
        [FsDurSnap.sk_dirloc] at [S]'s own superblock.  Both producers have
-       it for free: [FirstTok.col_geom_of_image] builds the record AT
+       it for free: [FirstTok.col_geom_of_config] builds the record AT
        [icfg_nib].  LAST, so no destructuring moves. *)
     cg_icfg : nib = icfg_nib;
   }.

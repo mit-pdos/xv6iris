@@ -2108,7 +2108,7 @@ Section ProofMain.
                   Hdevq Hnibq Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq).
     (* THE COLLECTION'S GEOMETRY RIDES THE SAME BLOCK (durable-disk C-8):
        it needs [fs_geom_ok] -- just produced -- and the region's width tie,
-       which is the very hypothesis [fs_geom_ok_of_image] above consumes. *)
+       which is the very hypothesis [fs_geom_ok_of_snap] above consumes. *)
     assert (Hpures : first_fsinit_pures dk sb Pb)
       by exact (first_fsinit_pures_of_snap dk S Pb sb cov Hsbeq Hsnb Hihwf
                   Hilogsub Hiagr Hislot

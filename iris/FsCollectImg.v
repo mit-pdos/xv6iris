@@ -65,7 +65,7 @@ Lemma img_col_geom (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
   fs_boot_image_wf dk ndisk sb nib cov ->
   (* the image's region width IS the cache's (durable-disk lane E-clauses;
      [FsCollect.cg_icfg]).  At the boot configuration the two are the same
-     number by construction -- [FirstTok.col_geom_of_image] builds the
+     number by construction -- [FirstTok.col_geom_of_config] builds the
      record AT [icfg_nib] -- so this hypothesis is what an image-side
      statement at an arbitrary [nib] owes. *)
   nib = icfg_nib ->
