@@ -245,18 +245,41 @@ Section WpSconfMem.
      physical [wordw_pointsto_write]).  Given the base [KP_rw] claim of a
      non-straddling VA window it overwrites the ACTUAL translated physical
      bytes at [pa_of ppn a] in step with the heap.  Width-agnostic via
-     [s_win_write]. *)
-  Local Lemma wordw_pointsto_write_c `{KTR : !CurKtier} (width : Z) (mm : _) (a : mword 64)
+     [s_win_write].
+
+     THE WRITER'S OWN CONTEXT IS A PREMISE (tso-machine-flip.md A6.33, and
+     it is the shape and not the SC content that matters here).  At SC the
+     window store is the flat [gen_heap] update and the token is threaded
+     straight through, untouched.  Post-flip a store is one APPEND to the
+     era log and NO value-changing law may move [gen_heap_interp] without
+     [tso_interp_of] and the writer's own [own_context] beside it -- so the
+     token has to be HERE, which is what forces the re-parking at the leaf
+     below (it used to ride the [swp_mono] POST bracket, where the write
+     node could not reach it). *)
+  (* THE CpuId IS AN EXPLICIT PARAMETER, and this is a finding, not a
+     flourish: [own_context] is CpuId-INDEXED (it ties the context to the
+     CURRENT hart's view state), and the write node runs at the STEPPING
+     hart's [CpuId] -- the one the instruction obligation binds -- not at
+     the section's.  Leaving the index ambient resolves it to the section
+     instance and the token the capability actually carries will not
+     match.  Post-flip the same parameter is what names the append's
+     author ([hart_agent cpu_id]), so it is needed there twice over. *)
+  Local Lemma wordw_pointsto_write_c `{KTR : !CurKtier} {CIDw : CpuId}
+      (width : Z) (mm : _) (a : mword 64)
       (ppn : mword 44) (vold vnew : mword (8*width)) :
     0 < width ->
     (uint a < 274877906944)%Z ->
     (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
     kmap_at (svpn_of a) ppn KP_rw -∗
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ wordw_pointsto width a (DfracOwn 1) vold ==∗
+    gen_heap_interp (hG:=riscv_memGS) mm -∗
+    own_context (CID := CIDw) cur_ctx -∗
+    wordw_pointsto width a (DfracOwn 1) vold ==∗
     gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn a) (Z.to_N width) vnew) ∗
+    own_context (CID := CIDw) cur_ctx ∗
     wordw_pointsto width a (DfracOwn 1) vnew.
   Proof.
-    intros Hw0 Hcan Hoff. iIntros "#Hk Hm Hw". rewrite /wordw_pointsto.
+    intros Hw0 Hcan Hoff. iIntros "#Hk Hm Hrun Hw". iFrame "Hrun".
+    rewrite /wordw_pointsto.
     iDestruct "Hw" as "(%Hal & Hb)".
     iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hb") as "Hb".
     iMod (s_win_write a ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 (Z.to_nat width))
@@ -1195,17 +1218,28 @@ Section WpSconfMem.
               = returnM Supervisor)
               by (rewrite Lmst;
                   exact (effectivePrivilege_mprv0 (Store Data) _ Supervisor HMPRV)).
-      (* [Hctx] -- the thread-of-control token -- travels with the rest of
-         the capability into the POST side of the [swp_mono], which is where
-         [sie_cap] is rebuilt; the [swp] side never touches it. *)
+      (* A6.33: [Hctx] -- the thread-of-control token -- NO LONGER travels
+         with the rest of the capability into the POST side.  A store's
+         value-changing law takes the writer's own context
+         ([wordw_pointsto_write_c] above), so the token goes DOWN to the
+         write node and comes back inside the leaf's payload; [sie_cap] is
+         rebuilt from it in the post exactly as before.  This is a re-park
+         of an EXISTING resource: every exported statement in this file is
+         textually unchanged, and the change lives in a [Local Lemma] and
+         this proof script. *)
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
       2:{ iApply (swp_execute_STORE_ram_Sw (CID := CID) width Hvw Hwdvd Huintw
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                     imm rs2 rs1 (tp_pin (CID := CID) m) (pa_of ppn ea) sv
                     pmar0 pcfg paddr
-                    Ψ (sr_swp_res (strans_regime (CID := CID))) rr
+                    (* the CpuId is the STEPPING hart's ([CID] here is the
+                       one [iIntros] just bound, not the section instance),
+                       because [own_context] is CpuId-indexed and the token
+                       arrived on THIS step's capability. *)
+                    (own_context (CID := CID) cur_ctx ∗ Ψ)%I
+                    (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
                     Lsv
                     Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
@@ -1232,7 +1266,7 @@ Section WpSconfMem.
                     HA Hord HW Hcov (pma_all_ram Hpma_all) Hkd0
                     ltac:(rewrite Hea; exact Halign)
                     (pa_aligned_div ppn ea width Hw0 Hwdvd Halign)
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU]").
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU Hctx]").
           - (* the data translation *)
         iIntros "Hfrag HRes Hrw Hro".
         rewrite Hea.
@@ -1243,21 +1277,28 @@ Section WpSconfMem.
         + exact eq_refl.
         + exact Hcan.
         + exact Hid.
-          - (* the RAM write node: the caller's atomic update, opened HERE *)
+          - (* the RAM write node: the caller's atomic update, opened HERE.
+               A6.33: the token [Hctx] is threaded through the node, because
+               post-flip the store gate needs it -- §0.17' is respected, no
+               deposit or absorb runs inside the update; the token is a plain
+               resource passed in and handed back. *)
             iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as (vold) "[Hbw Hcl]".
-            iMod (wordw_pointsto_write_c (KTR := ktd) width sigma.(mem) ea ppn
-                vold sv Hw0 Hcan Hoff with "Hk Hmem Hbw") as "[Hmem Hbw]".
+            iMod (wordw_pointsto_write_c (KTR := ktd) (CIDw := CID) width
+                sigma.(mem) ea ppn
+                vold sv Hw0 Hcan Hoff with "Hk Hmem Hctx Hbw")
+              as "(Hmem & Hctx & Hbw)".
             iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iNext. iMod "Hb2" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev HPsi". }
+            iFrame "Hreg Hmem Hdev Hctx HPsi". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hfile & Hland)".
-      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & HPsi & Hfrag)".
+      iDestruct "Hland" as (rsf)
+        "(%Hshape & Hrw & Hro & HRes & [Hctx HPsi] & Hfrag)".
       iSplitR; [done|].
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (CID := CID)

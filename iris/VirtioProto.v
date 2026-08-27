@@ -1799,16 +1799,30 @@ Section VirtioProto.
     virtio_req_step v mv = Some (v', w) ->
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
-      ∃ (kq : nat * gname) (wr : disk_wr),
+      ∃ (kq : nat * gname) (wr : disk_wr) (old : gmap Arch.pa (bv 8)),
         (* THE COMPLETION MOVES NO DISK BYTE (sector-atomic-disk.md): every
            sector of an OUT request's data landed at its own earlier step, so
            the index here is [None] in BOTH directions and the cell is at the
            sequential permit's LEAF -- nothing left to land. *)
         ⌜v_disk v' = wr_apply None (v_disk v)⌝ ∗
+        (* tso-machine-flip.md A6.48 ruling 4, THE INSIDE-OUT.  This lemma
+           used to perform the byte update itself and hand back
+           [gen_heap_interp (w ∪ m)].  Post-flip it cannot: the completion
+           APPENDS the write set to the era log, and [ledger_store_ok] moves
+           [gen_heap_interp] and [tso_interp_at] TOGETHER (the
+           interpretation's own tie relates the flat cell to the timestamp
+           element), so the update belongs to the one caller that holds both
+           -- [WpUart]'s disk loop.  What the protocol does instead, HERE
+           ALREADY, is hand the write set's OLD bytes OUT and take the NEW
+           ones back through the wand.  [gen_heap_interp m] goes in for
+           [dma_agree]'s pure fact and comes straight back UNTOUCHED. *)
+        ⌜dom old = dom w⌝ ∗
+        gen_heap_interp m ∗
+        ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ∗
         perm_pend (dn_perm γ) kq wr ∅ ∗
         (perm_done (dn_perm γ) kq wr -∗
-           gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
-           virtio_proto γ v').
+           ([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b) -∗
+           disk_img_auth (dn_img γ) (v_disk v') ∗ virtio_proto γ v').
   Proof.
     iIntros (Hview Hstep) "Hm Hauth Hp".
     iDestruct "Hauth" as (dmap) "[Hauth %Hdv]".
@@ -1900,7 +1914,8 @@ Section VirtioProto.
     assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl)))
       by (rewrite vslot_post_disk; exact Hdv).
     (* the byte lease and the counters *)
-    iMod (dma_update _ m dma HwDdma with "Hm Hdma") as "[Hm Hdma]".
+    iDestruct (dma_acc _ dma HwDdma with "Hdma")
+      as (old) "(%Hdomold & %Holdsub & Hold & Hdmaback)".
     assert (Hle : (vp_nc pr <= S (vp_nc pr))%nat) by lia.
     iMod (mono_nat_own_update (S (vp_nc pr)) Hle with "Hnc") as "[Hnc _]".
     (* the frames: every OTHER done record survives *)
@@ -1953,10 +1968,12 @@ Section VirtioProto.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
        out, and the caller owes the spent one back at the same key. *)
-    iModIntro. iExists (vs_perm sl), (vs_wr sl).
+    iModIntro. iExists (vs_perm sl), (vs_wr sl), old.
     iSplitR; [iPureIntro; apply vslot_post_wr|].
-    iFrame "Hpend0". iIntros "Hdone0".
-    iFrame "Hm".
+    iSplitR; [by iPureIntro|].
+    iFrame "Hm Hold".
+    iFrame "Hpend0". iIntros "Hdone0 Hnew".
+    iDestruct ("Hdmaback" with "Hnew") as "Hdma".
     iSplitL "Hauth".
     { iExists dmap. iFrame "Hauth". iPureIntro. exact Hdv'. }
     rewrite /virtio_proto vslot_post_cfg vslot_post_cache vslot_post_taken

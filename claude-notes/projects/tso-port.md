@@ -2,8 +2,13 @@
 
 ## 0. CHECKPOINT — READ THIS FIRST
 
-**THE TREE IS FULLY GREEN (2026-08-27).  RED SET EMPTY.  READ §0.19′,
-§0.17′ AND §0.18′ FIRST** — §0.19′ is M1 STAGE 2 (`↦₂`/`↦₄` flipped; M1
+**THE TREE IS FULLY GREEN (2026-08-27).  RED SET EMPTY.  READ §0.20′,
+§0.19′, §0.17′ AND §0.18′ FIRST** — §0.20′ is the CUTOVER BACK-PORTS (three
+flip-workspace shapes landed on main below the Σ seam: the virtio
+inside-out, the `HartMStore`/`HartMLoad` obligation pass-throughs, and
+`WpSconfMem`'s store-side engine-bracket re-parking — with two measured
+SKIPS and the `own_context`-is-CpuId-indexed finding the flip tree still
+carries unfound); — §0.19′ is M1 STAGE 2 (`↦₂`/`↦₄` flipped; M1
 closes) and is where the current shim ledger, the six λ-converted payloads,
 the four re-closed invariant bodies and the deliberately-raw tiers are
 recorded; — §0.17′ is the landing note for the last blocker class (the
@@ -2461,6 +2466,281 @@ icache owner flip and its `file_pay` chain) plus the five ∃-context cells
 (`lock_word`, `iref_cell`, `off_cell`/`off_mark`, `started_cell`,
 `inode_held_short_any`), each of which keeps its old spelling available
 through a named `_acc` equation.
+
+### 0.20′ THE CUTOVER BACK-PORTS: THREE FLIP-WORKSPACE SHAPES LAND ON MAIN (2026-08-27)
+
+M-leg work, and a different KIND of M-leg work from §0.8′–§0.19′: those
+sweeps added an AXIS (the ambient ξ, the notation towers).  This one adds
+no axis at all.  It takes three STATEMENT SHAPES that the flip workspace
+developed below the Σ seam, checks which of them are SC-provable as they
+stand, and lands those on main — so that the eventual `TsoCtxTwin2` swap
+changes MEANINGS and not STRUCTURE.  Every shape here is stated at its
+SC-degenerate spelling (the flat obligation main already uses); what
+transfers is the accessor form, the premise threading and the
+parameterization, never the TSO vocabulary.
+
+**Rule of engagement, applied throughout, and it disposed of two items:**
+a back-port earns its place only if it reduces the cutover EDIT.  A shape
+whose SC-degenerate form is vacuous — nothing to pay, nothing to thread —
+is mimicry, and mimicry that carries a measured compile hazard is worse
+than nothing.  Both skips below are of that kind and both are recorded
+with the measurement that decided them.
+
+#### ITEM 1 — THE VIRTIO INSIDE-OUT (A6.48 ruling 4).  LANDED.
+
+`VirtioProto.virtio_proto_step` no longer performs the DMA completion's
+byte update.  It hands the write set's OLD bytes OUT and takes the NEW
+ones back through the close-wand; `gen_heap_interp m` goes in for
+`dma_agree`'s pure fact and comes straight back UNTOUCHED.  The store is
+performed by the ONE caller that holds both authorities — `WpUart`'s
+`wp_disk_loop`.
+
+| | before | after |
+|---|---|---|
+| `WpVirtio.dma_update` | the updater (`gen_heap_interp (w ∪ m)` out) | kept, but as the SC store gate's engine only |
+| — | — | **`WpVirtio.dma_acc`** — the ACCESSOR: `old` out at `dom old = dom w`, `⌜old ⊆ dma⌝`, and a wand taking `w` back |
+| — | — | **`WpVirtio.phys_map_store`** — the SC store gate (`TsoCtx.ledger_store_ok`'s stand-in), stated over the bare big-op the accessor hands across |
+| `WpVirtio.virtio_lease_step` | `gen_heap_interp m ==∗ gen_heap_interp (w ∪ m) ∗ virtio_lease v'` | **`virtio_lease_acc`** — `gen_heap_interp m` in and back, `∃ old`, wand to `virtio_lease v'` |
+| `VirtioProto.virtio_proto_step` | `∃ kq wr`, wand yields `gen_heap_interp (w ∪ m) ∗ auth ∗ proto` | **`∃ kq wr old`**, `⌜dom old = dom w⌝ ∗ `gen_heap_interp m` ∗ old-bytes out; wand takes `perm_done` AND the new bytes, yields `auth ∗ proto` |
+| `WpUart.wp_disk_loop` | frames the updated heap out of `Hback` | performs the store itself (`phys_map_store w old m`) before closing |
+
+**The device-conformance tier did not move**, exactly as A6.48 predicted:
+`virtio_req_step`, `virtio_queue_ok_step`, `vproto_step_det` and every
+model-side statement are untouched, and so is `dma_own`'s tier (`↦ₚ`
+stays raw on main — `phys_ledger` is the flip's tier and is not
+statable here).
+
+**Why this is the highest-value item of the three.**  It is the only one
+whose SC-degenerate form is not degenerate at all: the accessor/gate split
+is a REAL restructuring that SC can carry in full, and it is forced by a
+fact that has nothing to do with SC-vs-TSO — that a value-changing law may
+not split two authorities that the interpretation ties together.  At
+cutover, `VirtioProto.v` and `WpVirtio.v` need only their TIER renamed
+(`phys_pointsto` → `phys_ledger`) and `phys_map_store`/`dma_update`
+deleted; not one accessor statement moves.
+
+#### ITEM 2 — THE OBLIGATION PASS-THROUGHS (A6.2 / A6.14 / A6.30 / A6.55).
+
+**(a) `HartMStore`'s TWELVE and `HartMLoad`'s FIVE.  LANDED.**
+
+Both chains are PASS-THROUGHS: nothing in either file owns a points-to, so
+no lemma in them discharges the memory obligation — each takes it and
+hands it down.  That is exactly the property that makes them cheap to
+cut over, and it was invisible because the obligation was INLINED at every
+statement.  It is now named, in two definitions per file:
+
+```coq
+  (* HartMStore *)
+  wobl_ram (σ : mstate) (n : N) (req : Interface.WriteReq.t n) : iProp Σ
+    := mstate_interp (MState σ.(sregs) (write_bytes σ.(mem)
+         (Interface.WriteReq.pa req) n (Interface.WriteReq.value req))
+         σ.(mdev)).
+  wobl_prem (n : N) (req : Interface.WriteReq.t n) (R : iProp Σ) : iProp Σ
+    := (∀ σ, mstate_interp σ ={⊤,∅}=∗ ▷ (|={∅,⊤}=> wobl_ram σ n req ∗ R))%I.
+
+  (* HartMLoad *)
+  robl_ram (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (w : bv 64) : Prop
+    := read_bytes mm pa 8 = Some w.
+  robl_prem (pa : Arch.pa) (bytes : bv 64) (R : iProp Σ) : iProp Σ
+    := (∀ σ, mstate_interp σ ={⊤,∅}=∗ ⌜robl_ram σ.(mem) pa bytes⌝ ∗
+              ▷ (|={∅,⊤}=> mstate_interp σ ∗ R))%I).
+```
+
+The twelve store statements now read `wobl_prem 4 (mwrite_req pa v) R -∗`
+(and the width-8 / `execute_STORE` variants), the five load statements
+`robl_prem pa bytes R -∗`.  **Seventeen five-line premises became
+seventeen one-line ones**, and the cutover's edit at these two files is
+now FOUR definition bodies instead of seventeen statements.
+
+TWO measurements worth keeping:
+
+- **the abbreviation is transparent to the proof mode almost everywhere.**
+  `iMod ("Hmem" $! σ with "Hσ")` sees through a plain `Definition`, so the
+  five load proofs and ten of the twelve store proofs needed NO change at
+  all — only the two innermost consumers
+  (`swp_checked_mem_write`/`_write8`, which actually open the callback)
+  carry a `rewrite /wobl_prem /wobl_ram`, and it is written there
+  deliberately rather than relied on.
+- **exactly one external caller noticed**, and it is the honest one:
+  `WpMmodeStore.v`'s two `swp_vmem_write_gen8` sites PROVE the obligation
+  and end at `rewrite st_write_value`, which cannot see a folded head; one
+  `rewrite /wobl_ram` each.  No other file in the tree consumes these
+  seventeen premises — `PtTreeAdue`, `HartSMem`, `HartMRun`, `WpMmodeLoad`
+  all mention the chain's lemmas but not its obligation slot.
+
+**(b) THE A6.30/A6.55 PAYER SITES.  MEASURED, AND SKIPPED — WITH THE
+REASON, WHICH IS A6.30's OWN RULE RUNNING IN MAIN's FAVOUR.**
+
+A6.30's ruling is NEGATIVE: *before threading a payer upward, compute the
+closure and check that something up there HOLDS the bundle; if nothing
+does, the obligation belongs on the lane where the bundle is handed DOWN
+as a callback — the `swp` lane, never the `exec` one.*  Checked on main,
+at the two lanes it names:
+
+- **the `exec` lane DOES perform its own update on main.**
+  `KptTree.ptree_translateAddr_own` / `_upd` (`:1069`, `:1199`) and
+  `KptShare.tlb_res_pt_translateAddr` (`:270`) take `gen_heap_interp
+  σ.(mem)` and return `gen_heap_interp σ'.(mem)`, doing the Svadu A/D
+  write-back inside (`ptree_own_path_upd` +
+  `PtTreeAdue.phys_word_pointsto_write`).  This is the site the question
+  asks about.  **But there is no SC-degenerate payer premise to add**: at
+  SC the payment IS the `gen_heap` update these lemmas already perform, and
+  A6.30 measured that threading a payer up this lane is paid by nobody
+  (`mstate_interp` does not carry the bundle, and it is the widest thing
+  the chain holds).  A back-port here would be a premise with no content
+  and no payee — mimicry by the rule of engagement above.  Recorded, not
+  landed.
+- **the `swp` lane is ALREADY the shape A6.30 endorses.**
+  `HartSKpt.kpt_leaf_write_node` (`:507`) concludes in a callback that is
+  HANDED `mstate_interp` and returns it written —
+  `PtTreeAdue.wpte_obl_at`'s SC-degenerate form, spelled inline — and
+  `PtTreeAdue`'s seven PTE read/write nodes take the same callback as a
+  premise.  Nothing structural is missing; the only delta left is that the
+  callbacks are inlined rather than named, which is item 2(a)'s treatment
+  applied to a file whose cone is the widest in the S-mode tier
+  (`HartSTrans`, `Pt2WalkPt`, `SmodeCorePt`, `UserPtTree`, `KptTree`).
+  **Deliberately deferred**, not refused: it is the same mechanical change
+  and it will pay off, but it is a whole-tier round of its own and it is
+  not what A6.30/A6.55 are about.
+
+A6.55's `pte_wb_ok` / `pte_slot_set` family is **not statable on main at
+all** — it is the pinned-byte-set vocabulary (`TsoMemPa.byteset`,
+`phys_ledger_pin`), which is TSO machinery by construction.  Skipped by
+the standing rule.
+
+#### ITEM 3 — `WpSconfMem`'s ENGINE-BRACKET RE-PARKING (A6.18 / A6.33).
+
+**THE STORE HALF: LANDED, AND EVERY EXPORTED STATEMENT IS TEXTUALLY
+UNCHANGED** — which is A6.18's own acceptance test, and it held here too.
+
+A6.33's finding was that `wp_store_s_sconf_au` already OWNS `own_context`
+(it is a conjunct of `IntrDefs.sie_cap`, so it arrives with the
+`sie_cap_gpr` the leaf already takes) but parks it on the `swp_mono` POST
+bracket, where the write node cannot reach it.  Re-routed:
+
+| | before | after |
+|---|---|---|
+| `swp_mono`'s post bracket | `[… Hstk Harm Hctx Hclose]` | `[… Hstk Harm Hclose]` |
+| the leaf's `R` | `Ψ` | `(own_context (CID := CID) cur_ctx ∗ Ψ)%I` |
+| the write node | `iIntros (sigma) "Hsi"`, then `wordw_pointsto_write_c … "Hk Hmem Hbw"` | `… "Hk Hmem Hctx Hbw"` as `"(Hmem & Hctx & Hbw)"`, and `iFrame "… Hctx HPsi"` |
+| the post | `(… & HPsi & Hfrag)` | `(… & [Hctx HPsi] & Hfrag)` |
+| `wordw_pointsto_write_c` (a `Local Lemma`) | `gen_heap_interp mm -∗ wordw_pointsto … ==∗ …` | `… -∗ own_context (CID := CIDw) cur_ctx -∗ wordw_pointsto … ==∗ … ∗ own_context (CID := CIDw) cur_ctx ∗ …` |
+
+**AND THE ONE THING THAT WAS NOT IN A6.33's PLAN, which is the finding to
+carry back to the flip: `own_context` IS CpuId-INDEXED, AND THE WRITE NODE
+RUNS AT A DIFFERENT `CpuId` THAN THE SECTION.**  `wp_store_s_sconf_au`'s
+proof does `rename CID into CID0; iIntros (CID Hs)` — the instruction
+obligation binds a FRESH `CpuId`, and the capability (hence the token) is
+at that one, while typeclass resolution inside the proof still finds the
+SECTION instance.  So both the leaf's `R` and the helper had to name the
+CpuId explicitly: `own_context (CID := CID) cur_ctx` at the `iApply`, and a
+new `{CIDw : CpuId}` binder on `wordw_pointsto_write_c` (a section variable
+cannot be instantiated from inside its own section — `(CID := …)` is
+rejected with "Wrong argument name CID").  It failed the way this class
+always fails: `iExact` refusing two terms that PRINT IDENTICALLY, and only
+`Local Set Printing All` names the difference (`@own_context Σ _ CID …`
+vs `… CID0 …`).  **The flip's `WpSconfMem` has the same re-parking with an
+AMBIENT index and has never compiled past its load half (A6.61), so it
+carries this bug unfound**; and post-flip the same parameter is needed
+twice over, because it also names the append's author (`hart_agent
+cpu_id`).
+
+**THE LOAD HALF: NOT ATTEMPTED, AND THE MEASUREMENT SAYS DO NOT.**
+A6.61 measured the flip's load-side re-park as a NON-TERMINATING
+elaboration — 35 min on the first attempt, 60 min with the partial `set`
+fix, at 1.34–1.39 GB RSS, against 4.57 s for the 195 sentences before it —
+because the leaf's `R` is a value-indexed LAMBDA occurring twice inside a
+forty-argument application (once alone, once under `Mobl_ram_ex`).  Main's
+load leaf has exactly that shape and would reproduce it.  Against that:
+main's SC read obligation is `s_mem_chunk` against `sigma.(mem)`, which
+needs NO token, so the SC-degenerate re-park has zero content — it is pure
+shape, and pure shape is not worth a measured 60-minute hazard.  A6.61's
+rigid-head recipe (`set` + `assert` + `clearbody`) remains the thing to
+try, and it should be tried where the goal is real.
+
+**`WpSconfLock` (A6.33's second "no new premise" site): SAME VERDICT,
+SAME REASON.**  `wp_amoswap_lockopen_s_sconf` parks `Hctx` on its post
+bracket at `:1027` and its engine payload is `(fun bytes => Tc ∗ …)` — the
+value-indexed lambda again, and its write node would additionally need
+`SmodeCorePt.word4_pointsto_write_c` to grow the token.  Recorded for the
+same lane as the load half.
+
+#### THE CUTOVER-DIFF REDUCTION, MEASURED
+
+Comment-stripped, whitespace-normalised line diffs of each main file
+against its flip-workspace twin (`/shared/xv6iris-3-fliptree-backup`),
+before and after this session:
+
+| file | before | after |
+|---|---|---|
+| `VirtioProto.v` | 55 | **39** |
+| `WpVirtio.v` | 79 | **55** |
+| `WpUart.v` | 88 | **82** |
+| `HartMLoad.v` | 86 | 84 |
+| `WpSconfMem.v` | 253 | 252 |
+| `HartMStore.v` | 386 | 435 |
+
+**READ THAT TABLE WITH ITS CAVEAT, because two of its rows are honest and
+misleading at the same time.**  Item 1 is a straight win and the number
+says so (222 → 176 across the three virtio files, −21%).  Items 2 and 3 are
+NOT measured by this metric and it is worth saying why:
+
+- `HartMStore` GREW because the flip file still spells its twelve premises
+  INLINE while main now names them.  The claim being made is not "the
+  textual diff against today's flip tree shrank"; it is that the cutover's
+  EDIT at this file drops from twelve statements to two definition bodies
+  — which requires the flip file to adopt `wobl_prem` too, and that is a
+  one-time mechanical change on the flip side.  (Most of the 386-line
+  baseline is the flip's ~358 lines of `wobl_ram_ledger*` payer lemmas,
+  which are TSO-only and unportable in either direction.)
+- `WpSconfMem` is flat because the file's biggest flip-side delta is the
+  `wordw_pointsto` DATUM going ctx-tier (A6.18's three lines) plus the
+  deletion of the `wordw{2,4}_ctx` adapters, none of which is statable
+  here.  The re-parking itself did converge exactly: the `swp_mono`
+  bracket at the store leaf is now CHARACTER-FOR-CHARACTER the flip's, and
+  the write-node block went 18 → 14 differing lines, with the 14 being
+  precisely the `img/log/tv/V` binders and `Htso` — i.e. all that is left
+  at that site is TSO vocabulary.
+
+#### THE TWO-ROUND VERDICT
+
+**ROUND 1** (full VM `make -f CoqMakefile -j180 -k` from the repo root):
+**814 files recompiled — the whole cone above the M-mode load/store chain —
+ZERO errors.**  No crawl: the worker table never showed a worker past ~90 s,
+and the tail was `SystemAdequacy.v` at seconds, as §0.19′ left it.
+
+**ROUND 2** (the same command, immediately after): `Nothing to be done for
+'real-all'`, `MAKE_EXIT=0`, **1331 `.v` / 1331 `.vo`** (the 1332nd source is
+`SystemAssumptions.v`, which `iris/_CoqProject` deliberately does not list —
+durable-notes.md's `make audit` note).  Zero errors, zero compiles.
+`make audit` re-run on top of it, and **the adequacy print is the baseline,
+unchanged**: exactly `functional_extensionality_dep`,
+`xv6iris_extras.resv_matches`, `xv6iris_extras.resv_is_valid` — nothing else,
+no `Link*` entry.
+
+Files changed: **7** — `VirtioProto.v`, `WpVirtio.v`, `WpUart.v`,
+`HartMStore.v`, `HartMLoad.v`, `WpSconfMem.v`, `WpMmodeStore.v`.
+No `Admitted`, no `admit`, no new `Axiom`.  No exported statement above
+the kit changed: the virtio device-conformance tier is untouched, the
+seventeen `HartMStore`/`HartMLoad` premises are the SAME PROPOSITION under
+a name, and `WpSconfMem`'s ~20 S-mode load/store leaf statements are
+textually identical.
+
+#### WHAT THIS LEAVES FOR THE NEXT LANE, RANKED
+
+1. **`WpSconfMem`'s LOAD half and `WpSconfLock`'s AMOSWAP engine** — both
+   blocked on A6.61's lambda-payload elaboration, not on any design
+   question.  Whoever tries the `clearbody` rigid-head recipe should do it
+   where the payload is real (the flip tree), and budget one 30-minute
+   compile per attempt.
+2. **`PtTreeAdue`'s obligation naming** (item 2(b)'s deferred half) — the
+   same `wobl_prem`/`robl_prem` treatment for the seven PTE read/write
+   nodes and `HartSKpt.kpt_leaf_write_node`'s conclusion.  Mechanical, but
+   the widest cone in the S-mode tier, so it wants its own round.
+3. **The flip side of item 2(a)** — `HartMStore`/`HartMLoad` in the flip
+   workspace should adopt `wobl_prem`/`robl_prem` so the cutover's edit at
+   those two files really is four definition bodies.  Until it does, the
+   naive `diff` against main GROWS there, which is the table's caveat.
 
 ---
 

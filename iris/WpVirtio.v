@@ -19,7 +19,7 @@
 (*       of [v] can produce ([virtio_dma_ok], VirtioModel §6).              *)
 (*                                                                         *)
 (*     The lease's pure side condition is stated over the configuration     *)
-(*     alone, which is why [virtio_lease_step] can hand it back after every *)
+(*     alone, which is why [virtio_lease_acc] can hand it back after every  *)
 (*     autonomous step with nothing to re-prove: only a DRIVER's MMIO write *)
 (*     can invalidate it, and re-establishing it there is precisely the     *)
 (*     obligation: the descriptors a driver publishes must point into memory *)
@@ -104,7 +104,18 @@ Section WpVirtio.
 
   (* Overwrite the leased bytes the device just wrote.  The lease's DOMAIN is
      unchanged (a write set inside the lease), so the same lease is handed
-     back with fresh contents. *)
+     back with fresh contents.
+
+     THE SC STORE GATE, AND IT IS THE PIECE THE CUTOVER DELETES
+     (tso-machine-flip.md A6.48 ruling 4).  Post-flip a device write is an
+     APPEND to the era log, and [TsoCtx.ledger_store_ok] moves
+     [gen_heap_interp] and [tso_interp_at] TOGETHER -- the interpretation's
+     own tie relates the flat cell to its timestamp element -- so the two
+     authorities cannot be split across two lemmas and the lease may not
+     perform its own write.  What survives the cutover is the ACCESSOR
+     ([dma_acc] below) and the shape it forces on everything above it; this
+     update and [phys_map_store] are its SC stand-ins, and at cutover the one
+     caller ([WpUart]'s disk loop) calls [TsoCtx.ledger_store_ok] instead. *)
   Lemma dma_update (w m dma : gmap Arch.pa (bv 8)) :
     dom w ⊆ dom dma ->
     gen_heap_interp m -∗ dma_own dma ==∗
@@ -126,6 +137,85 @@ Section WpVirtio.
     iDestruct ("Hback" $! b with "[Hp]") as "Hd".
     { rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hram. }
     iModIntro. rewrite -!insert_union_l. iFrame "Hm Hd".
+  Qed.
+
+  (* THE STORE GATE, AT THE SHAPE THE CUTOVER WANTS: the caller hands in the
+     write set's OLD bytes and takes the NEW ones back, and the heap moves
+     with them.  Stated over a bare big-op (not [dma_own]) because that is
+     what travels through [virtio_proto_step]'s accessor -- the lease itself
+     is rebuilt by the wand, not by this lemma.  At cutover this is
+     [TsoCtx.ledger_store_ok] and the bytes are [phys_ledger]s. *)
+  Lemma phys_map_store (w old m : gmap Arch.pa (bv 8)) :
+    dom old = dom w ->
+    gen_heap_interp m -∗
+    ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ==∗
+      gen_heap_interp (w ∪ m) ∗
+      ([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b).
+  Proof.
+    intros Hdom. iIntros "Hm Hold".
+    iMod (dma_update w m old ltac:(rewrite Hdom; reflexivity)
+            with "Hm Hold") as "[Hm Hd]".
+    iModIntro. iFrame "Hm".
+    assert (Hwo : w ∪ old = w).
+    { apply map_eq. intros a. destruct (w !! a) as [b|] eqn:Hw.
+      - by rewrite (lookup_union_Some_l _ _ _ _ Hw).
+      - rewrite (lookup_union_r _ _ _ Hw).
+        apply not_elem_of_dom. rewrite Hdom.
+        by apply not_elem_of_dom. }
+    rewrite /dma_own Hwo. iFrame "Hd".
+  Qed.
+
+  (* THE LEASE IS AN ACCESSOR, NOT AN UPDATER (tso-machine-flip.md A6.48
+     ruling 4, the INSIDE-OUT).  The lease hands its written-to bytes OUT,
+     the CALLER performs the one store gate, and the wand takes the new bytes
+     back.  The domain is unchanged (a write set inside the lease), so the
+     same lease comes back with fresh contents.
+
+     THE SHAPE IS THE POINT, not the tier: at SC the bytes are [↦ₚ] and the
+     gate is [phys_map_store] above; post-flip the bytes carry their
+     timestamp elements ([TsoCtx.phys_ledger]) and the gate is
+     [TsoCtx.ledger_store_ok].  Turning the lemma inside out is what lets the
+     ONE holder of both authorities do the write. *)
+  Lemma dma_acc (w dma : gmap Arch.pa (bv 8)) :
+    dom w ⊆ dom dma ->
+    dma_own dma -∗
+    ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗ ⌜old ⊆ dma⌝ ∗
+      ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ∗
+      (([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b) -∗ dma_own (w ∪ dma)).
+  Proof.
+    intros Hdom. iIntros "Hd".
+    iExists (filter (fun p => p.1 ∈ dom w) dma).
+    assert (Hsub : filter (fun p : Arch.pa * bv 8 => p.1 ∈ dom w) dma ⊆ dma)
+      by apply map_filter_subseteq.
+    assert (Hdomf : dom (filter (fun p : Arch.pa * bv 8 => p.1 ∈ dom w) dma)
+                    = dom w).
+    { apply set_eq. intros a. rewrite elem_of_dom. split.
+      - intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Ha]. exact Ha.
+      - intros Ha. apply Hdom in Ha as Hd'. apply elem_of_dom in Hd' as [b Hb].
+        exists b. apply map_lookup_filter_Some. by split. }
+    iSplit; [by iPureIntro|]. iSplit; [by iPureIntro|].
+    rewrite /dma_own -{1}(map_filter_union_complement
+              (fun p : Arch.pa * bv 8 => p.1 ∈ dom w) dma).
+    rewrite big_sepM_union; last apply map_disjoint_filter_complement.
+    iDestruct "Hd" as "[$ Hrest]".
+    iIntros "Hnew". rewrite /dma_own.
+    (* the new bytes replace the old ones pointwise: [w ∪ dma] is [w] over
+       the filtered part and [dma] elsewhere *)
+    assert (Hwd : w ∪ dma
+              = w ∪ filter (fun p : Arch.pa * bv 8 => ¬ (p.1 ∈ dom w)) dma).
+    { apply map_eq. intros a. destruct (w !! a) as [b|] eqn:Hw.
+      - by rewrite !(lookup_union_Some_l _ _ _ _ Hw).
+      - rewrite !(lookup_union_r _ _ _ Hw).
+        assert (Hnin : ¬ (a ∈ dom w))
+          by (rewrite not_elem_of_dom; exact Hw).
+        destruct (dma !! a) as [b|] eqn:Hda.
+        + symmetry. apply map_lookup_filter_Some. by split.
+        + symmetry. apply map_lookup_filter_None. by left. }
+    rewrite Hwd big_sepM_union; last first.
+    { apply map_disjoint_dom. intros a Ha Hb.
+      apply elem_of_dom in Hb as [b Hb'].
+      apply map_lookup_filter_Some in Hb' as [_ Hnin]. exact (Hnin Ha). }
+    iFrame "Hnew Hrest".
   Qed.
 
   (* -- the lease itself -- *)
@@ -191,13 +281,22 @@ Section WpVirtio.
      lease: the write set lands inside it (so the byte memory can be updated)
      and misses the control region (so the same control bytes are still pinned
      for the next request).  Nothing about the queue's contents is re-proved
-     here -- that was discharged once, by the driver, when it took the lease. *)
-  Lemma virtio_lease_step (v : virtio_state) (m : gmap Arch.pa (bv 8))
+     here -- that was discharged once, by the driver, when it took the lease.
+
+     ...and the same INSIDE OUT (A6.48 ruling 4): the lease no longer writes
+     the memory, it hands the write set's OLD bytes out and takes the NEW
+     ones back.  [gen_heap_interp] goes in for [dma_agree]'s pure fact and
+     comes straight back untouched -- the one store gate that moves it (and,
+     post-flip, the era log with it) belongs to the caller. *)
+  Lemma virtio_lease_acc (v : virtio_state) (m : gmap Arch.pa (bv 8))
       (mv : vmem) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
     mem_view m mv ->
     virtio_req_step v mv = Some (v', w) ->
-    gen_heap_interp m -∗ virtio_lease v ==∗
-      gen_heap_interp (w ∪ m) ∗ virtio_lease v'.
+    gen_heap_interp m -∗ virtio_lease v -∗
+      gen_heap_interp m ∗
+      ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗
+        ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ∗
+        (([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b) -∗ virtio_lease v').
   Proof.
     iIntros (Hview Hstep) "Hm Hl".
     iDestruct "Hl" as (ctl dma S ai) "(Hd & %Hctl & %Hok)".
@@ -207,8 +306,11 @@ Section WpVirtio.
       by (apply (mem_view_subseteq ctl m mv Hctlm Hview)).
     destruct (virtio_queue_ok_step v ctl (dom dma) S ai mv v' w Hok Hvctl Hstep)
       as (Hdw & Hdisj & Hok').
-    iMod (dma_update w m dma Hdw with "Hm Hd") as "[Hm Hd]".
-    iModIntro. iFrame "Hm".
+    iFrame "Hm".
+    iDestruct (dma_acc w dma Hdw with "Hd")
+      as (old) "(%Hdo & %Hos & Hold & Hback)".
+    iExists old. iFrame "Hold". iSplit; [by iPureIntro|].
+    iIntros "Hnew". iDestruct ("Hback" with "Hnew") as "Hd".
     iExists ctl, (w ∪ dma), S, ai.
     iFrame "Hd". iSplit.
     { iPureIntro. exact (virtio_ctl_union ctl w dma Hdisj Hctl). }

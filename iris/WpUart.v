@@ -928,7 +928,8 @@ Section DevLoops.
       (* the protocol step is an ACCESSOR over the permit channel: it hands
          out the completing request's PENDING token and owes the SPENT one *)
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
-              with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
+              with "Hmem Hdur Hlease")
+        as (kq wr old) "(%Hwr & %Hdomold & Hmem & Hold & Hpend & Hback)".
       (* the post-completion image, in the form the tie must move to: the
          IDENTITY, because every sector landed at its own earlier step *)
       assert (Hpost : wr_apply None (v_disk (dvirtio d)) = v_disk vnew)
@@ -966,12 +967,24 @@ Section DevLoops.
       iMod "Hmclose" as "_".
       iEval (rewrite Hpost) in "Htie".
       iMod ("Hcclose" with "HP") as "_".
-      iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
+      (* ================================================================ *)
+      (* THE DMA COMPLETION'S STORE (tso-machine-flip.md A6.48 ruling 4).  *)
+      (* The write is performed HERE, by the disk loop, and not inside     *)
+      (* [virtio_proto_step] -- that is what turning the protocol step     *)
+      (* inside out buys.  At SC the store is the plain gen_heap update    *)
+      (* ([WpVirtio.phys_map_store]); post-flip the device is an AGENT of  *)
+      (* the era log, its whole write set goes in as ONE message authored  *)
+      (* by [disk_agent], and this same line is [TsoCtx.ledger_store_ok]   *)
+      (* -- which is why the store has to sit with the ONE holder of both  *)
+      (* [gen_heap_interp] and the era bundle.                             *)
+      (* ================================================================ *)
+      iMod (phys_map_store w old m Hdomold with "Hmem Hold") as "[Hmem Hnew]".
+      iDestruct ("Hback" with "Hdone Hnew") as "(Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
-      iModIntro. iFrame "Hgr Hmem' Hdev'".
+      iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
       iEval (rewrite Himg) in "Hdauth'".
       iSplitL "Hdauth'".
