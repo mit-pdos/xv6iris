@@ -1,8 +1,9 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-M4, THE PREREQUISITE ROUND (2026-08-27, latest session).  **CLEAN ROUND:
-1088 of 1296, RED 9 — UNCHANGED**, over a round that rebuilt the whole
-tree from `RiscvLang` up and then `WpSconfMem`'s 281-file cone on top.
+M4, THE PREREQUISITE ROUND (2026-08-27, latest session).  **1091 of 1296,
+RED 9** as of A6.81 (1088 for the rounds A6.73-A6.80 describe), over
+rounds that rebuilt the whole tree from `RiscvLang` up and then
+`WpSconfMem`'s 281-file cone on top.
 **THE ATOMIC UNIT A6.77 HANDED OVER COULD NOT BE STARTED: three named
 pieces of "everything below is landed" do not exist**, and one of them —
 a degenerate window payload on the lock WORD — cannot be built at all
@@ -42,7 +43,28 @@ lemmas can take `boot_led_ran` beside `boot_raw_ran`, but
 `bpay_raw_buf_raw` and `file_node_raw_fentry` take no range at all — they
 convert already-carved raw BUNDLES — so the carve has to build ctx cells
 directly and those two lemmas die with their raw bundle definitions.
-**A6.78, A6.79 and A6.80 together are the record and the handoff.**
+**THEN THE BOOT 25 WAS PAID** (A6.81) -- and not by threading a second
+range: `BootCarveMain`'s carve is 121 cuts and 7 stride families, so the
+supplies are PAIRED in one predicate (`BootCarve.boot_cran`), the
+`boot_cran_*` family is `boot_ran_*`'s statement for statement with its
+CELL producers landing at the ctx tier directly, and the client's proof
+text is a RENAME.  `BootCarveMain` IS GREEN with its 25 shim calls gone;
+`power_boot_res` grew the element row the power arm never handed over;
+the store AU is generalised in place (`wp_store_s_sconf_au_dat`, ~55
+lines, not the ~350 estimated) and its `==∗` obligation is where a client
+may MINT.  **BUT THE MINT'S SITE IS REFUTED**: `ProofPipealloc` calls
+`initlock` on a `kalloc`'d page, whose cpu cell is at a timestamp `> 0`
+(`kfree` memsets every freed page), so `ledger_wpay_mint`'s `e.1 = 0`
+premise is unsatisfiable there and item 2's contract change would turn a
+green file red.  A6.81 §(4) puts the three-way ruling to the coordinator
+and the M4 line stops there; everything below the fork is landed.
+Off the M4 line, **`VcGenS` is GREEN** (the leaves' `own_context` threaded
+through the block WP) and its 85-file cone's two blockers are now measured
+at line numbers: `ProofSwtch:157`'s conjured resume receipt, and
+`ProofKernelvec:1704`'s ξ-indexed `devintr_caps` -- whose index enters
+through `<{ P }>` at a `P` that is itself ambient-ξ (`cons_res`,
+`tx_res`), not through `is_lock`, which is ξ-free.
+**A6.78 through A6.81 together are the record and the handoff.**
 
 STEP 5, THE RULINGS TRANCHE (2026-08-27, latest session).  **CLEAN ROUND:
 1083 of 1333, RED 14.**  Four owner rulings executed and one gate found missing.
@@ -9248,6 +9270,311 @@ files red, which is the one thing the standing discipline forbids.
 
 **ACCEPTANCE, unchanged:** the exported lock surface does not move, and
 `WpSconfLock`'s 160-file cone opens.
+
+
+### A6.81 THE BOOT 25 IS PAID BY A PAIRED RANGE, NOT BY A SECOND ARGUMENT —
+### AND THE MINT'S SITE IS REFUTED AT ONE OF `initlock`'s CALLERS
+
+Executing the coordinator's tranche after A6.80.  **Item 1 IS LANDED AND
+GREEN**; item 2's largest single piece is landed additively; **item 2's
+SITE is refuted by measurement** and items 2–3 therefore stop at a design
+question, which is §(4).  One separable file outside the M4 line went
+green on the way (`VcGenS`, §(5)), and it exposed the two ξ-indexing
+problems at concrete sites rather than as predictions.
+
+**1091 of 1296, RED 9** (from 1088 / red 9): `BootCarveMain`, `VcGenS`
+and `WpSwtchVc` are green; `ProofKernelvec` and `ProofSwtch`, which were
+UNREACHED behind `VcGenS`, are now red and measured.  **The confirm round
+recompiled exactly those nine targets and failed on all nine**, which is
+A6.73's two-consecutive-rounds check and rules out the mtime artefact.
+The model `.vo` was verified to postdate its source first (19:11 over
+18:37, A6.39's rule).  No `Admitted`, no `admit`, no new `Axiom`; the one
+`Abort` is still `UsertrapRes.ut_res_bare_park`.
+
+#### (1) THE MEASUREMENT THAT REPLACES "THREAD `boot_led_ran` ALONGSIDE"
+
+A6.80 priced the eleven range-taking lemmas as "take a `boot_led_ran`
+beside the `boot_raw_ran`".  Measured, that is the expensive spelling:
+**`BootCarveMain`'s carve is 121 `boot_ran_split`s, 16 `boot_ran_eq`s and
+7 stride families**, and a second range threaded beside the first doubles
+every one of them.
+
+**What it costs instead is ONE definition:**
+
+```coq
+  (* BootCarve *)
+  Definition boot_cran (g : gstate) (lo hi : Z) : iProp Σ :=
+    (boot_raw_ran g lo hi ∗ boot_led_ran g lo hi)%I.
+```
+
+plus a `boot_cran_*` family that is `boot_ran_*`'s **statement for
+statement** — same premises, same argument order — whose CELL producers
+land at the CTX tier directly (`boot_cran_cell8` / `_cell4` / `_cell2` /
+`_byte` / the three `_bss` pins / `_cell4_at` / `_mem_run` /
+`_bytes_list` / `_bytes_zero` / `_stride_family{,_seq}` / `_split` /
+`_eq`, 21 items).  Each is three lines: the raw producer on the left
+half, `boot_led_run` (`boot_led_word` generalised to any width) on the
+right, and `boot_ctx_of_mem_{byte,word,word2,word4}` to pair them.
+
+> **THE RULE, and it is the one to carry to the next carve of this
+> shape:** *when a crossing costs a second resource at every cell, pair
+> the two SUPPLIES in one predicate rather than threading the second
+> through every cut.*  The client's proof text is then a RENAME
+> (`boot_ran_X` → `boot_cran_X`), and the crossing lemma disappears from
+> the client entirely instead of appearing once per cell.
+
+**`BootCarveMain` IS GREEN AND ITS 25 SHIM CALLS ARE GONE**, with no
+`ctx_*_of_mem` replacement at any of them: the cells are born ctx.
+Measured cost — the rename, plus **nine shapes restated at the ctx tier**
+(the five local records `dinfo_raw` / `dops_raw` / `bpay_raw` /
+`file_node_raw` / `proc_slot_raw`, and the four conclusions
+`boot_word4_cells` / `boot_zero_cells` / `boot_name_cells` /
+`boot_procs_raw`) and **eight `` `{XI : CurCtx} `` binders added**.  The file does NOT `Import TsoCtx`: its bare `↦` notations stay
+the raw ones the range machinery is stated in, and the ctx tower is
+named qualified in exactly those seven shapes.  That is the whole of the
+"restructuring, not a rename" A6.80 named.
+
+> **AND A6.80's TWO BOLD LEMMAS DID NOT DIE — THEY BECAME FRAMINGS.**
+> `bpay_raw_buf_raw` and `file_node_raw_fentry` are now
+> `iIntros "$"` (their raw bundle definitions were restated at the ctx
+> tier, which is what "the carve builds ctx cells directly" means in
+> practice).  Keeping the NAMES is right and is worth the line: their
+> content is the ADDRESS agreement — that the `k`th record of the carve's
+> stride family is the `k`th buffer / file entry — and nothing else in
+> the tree says so.
+
+#### (2) THE ELEMENT SUPPLY HAD TO GROW A ROW IN `power_boot_res`
+
+The single-generation theorem hands the boot client
+`BootCarve.boot_led_ran g text_end ram_hi` (A6.80 §(1) checked this).
+**The POWER form does not**, and `BootShared` — the client both forms
+share — is where the carve runs.  So `RiscvAdequacy.power_boot_res` gains
+
+```coq
+     ([∗ map] a ↦ _ ∈ g'.(gmem),
+        ghost_map_elem (era_ts_name HE) a (DfracOwn 1)
+          ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) ∗
+```
+
+— the WHOLE map, exactly as it hands the whole raw one, cut by the client
+with `boot_led_all_split`.  Its supplier is the power loop's own
+`ghost_map_alloc` (`Htsfrags2`), which until now was allocated and
+dropped.
+
+> **IT SITS BEFORE `crash_inv`, NOT LAST, AND THE REASON IS THE UNPACK.**
+> `BootShared.power_boot_res_unpack` is one `iExact`, so the two right-
+> nested chains must associate identically; the fixed-layer tail
+> (`crash_inv ∗ gen_cert`) is ONE bundle at the unpack and three
+> conjuncts in `power_boot_res`, so a row appended after it does not
+> convert.  The new-conjunct rule ("put it last") is about DESTRUCTURING
+> churn; where an `iExact` bridges two spellings, the rule is *put it
+> before the bundled tail*.
+
+**`BootShared` is UPDATED BUT UNREACHED**, and honestly so: it was
+already stale before this round (its `boot_text_persist` call is
+two-argument and that lemma has taken the pristine elements since A6.63),
+and its only route to a compiler is `BootChain → LinkMain → ProofMain`,
+which is red on the publication's last mile.  Its edit is the mirror of
+`RiscvAdequacy`'s own carve: `boot_led_all_split`, `boot_led_text_persist`,
+`boot_text_persist` at three arguments, then `boot_cran_intro` pairing the
+data half back onto the raw range, and `boot_cran_raw` at the two ranges
+that stay raw (the rodata prefix that becomes `kernel_data`, and
+`_entry`'s GOT word).
+
+#### (3) LANDED ADDITIVELY: THE STORE AU IS A GENERALISATION IN PLACE
+
+A6.80 priced item 2's leaf as "a ~350-line leaf of its own, the
+`Wobl_ram` twin of `wp_load_s_sconf_au_exv`".  **A6.77's measurement
+applies again and the copy is not needed**: the entire ctx-specific
+content of `wp_store_s_sconf_au`'s 230-line proof is the write node's ONE
+`wordw_pointsto_write_c` call, so the datum abstracts in place:
+
+```coq
+  Lemma wp_store_s_sconf_au_dat … (Res Post : iProp Σ) :
+    …
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
+            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+       Res ==∗
+       gen_heap_interp … ∗ tso_interp_of … ∗
+       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗ Post) ->
+    … wordw_claim (KTR := ktd) width ea -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Post ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗ …
+```
+
+and `wp_store_s_sconf_au` survives below it, statement-identical, as the
+instance at `Res := ∃ vold, wordw_pointsto … vold` /
+`Post := wordw_pointsto … sv`.  **~55 lines, and it compiled first try.**
+
+> **THE MASK IS `==∗`, AND THAT IS WHAT MAKES THE OBLIGATION A MINT
+> SITE.**  The node has already closed to `∅` and the obligation runs
+> inside the caller's own atomic-update mask, so a caller may run
+> `ledger_wpay_mint` (or any other ghost update needing the interp) right
+> there.  This is A6.71's rule read FORWARDS: `tso_interp_at` is only in
+> hand inside a WP leaf, and this premise is how a leaf lends it out.
+>
+> `ktier_pin ktd ppn ea` is passed to the obligation as well as `Hcan`
+> and `Hoff`: a ledger-tier caller works at the PHYSICAL address
+> `pa_of ppn ea`, and at `KT0` that pin is `pa_of ppn ea = ea`
+> (`ktier_pin_id`) — the only bridge between the leaf's VA-keyed claim
+> and a `phys_ledger_*` cell.
+
+#### (4) THE MINT'S SITE IS REFUTED: `initlock` HAS A DYNAMIC CALLER
+
+**`ledger_wpay_mint`'s premise is `phys_ledger_at a … 0` — the element's
+own timestamp — and A6.79 justified the site by ".bss, never written in
+this era".  Measured: `initlock` is NOT only called on `.bss` locks.**
+
+`ProofPipealloc:1522` applies `Initlock.wp_initlock_sconf` to the lock
+inside a **`kalloc`'d page** (`ProofPipealloc:1379`'s
+`PipeInv.page_own_pipe_raw`, off `Kalloc.wp_kalloc_sconf`).  Every page
+on `kmem`'s free list has been written — `kfree` memsets it, and at boot
+`kinit`/`freerange` memsets every page there is — so its bytes are at a
+timestamp `> 0` and the mint's premise is **unsatisfiable at that call
+site**.  Strengthening `SpecInitlock`'s precondition to the exposed
+timestamp therefore turns a GREEN file red with no available discharge,
+which is the one thing the standing discipline forbids.
+
+**AND NEITHER OF THE OBVIOUS REPAIRS WORKS, for reasons already on the
+record:**
+
+- **Mint after the store instead.**  Conjunct (3) then needs, for every
+  OTHER hart, a timestamp visible at every one of its views that is also
+  that hart's last write to the cell.  `Some 0` serves a hart that never
+  wrote the byte; the hart that ran `kfree`'s memset DID write it, and
+  nothing local recovers its timestamp.  (A6.79's forced-order note is
+  the same argument one step earlier.)
+- **Keep `own h = Some 0` and lean on conjunct (1).**  `win_ok1`
+  conjunct (1) quantifies over the WHOLE log and allows exactly two
+  words per byte — the clear word `tw_z` and the author's own
+  `tw_cp h`.  The memset's messages wrote neither.
+
+> **WHAT THE REFUTATION ACTUALLY POINTS AT, and it is a shape the memo
+> already contains.**  The exclusion the `notheld` read needs is only
+> *"no message writes `cpus_ptr h` to this window except `h`'s own"* —
+> the memset's `0xff…` bytes are harmless to it.  What forbids them is
+> that `win_ok1`'s conjunct (1) is hard-coded to a two-word disjunction,
+> where `tso-m4-memo.md` §8's probed `wpin` is a PREDICATE per author
+> (`Wf : agent -> (nat -> option (bv 8)) -> Prop`).  So the question for
+> the coordinator is one of three:
+>
+> 1. **Generalise `ts_win`'s conjunct (1) to the memo's `wpin`
+>    predicate** (the probe is green and archived; the cost is `TsoMemPa`
+>    + `ts_ok` + the two store gates), which makes the mint's premise
+>    "every past message wrote something *allowed*" rather than
+>    "there are no past messages", and a `kalloc`'d page's history is
+>    then admissible because the kit may name the memset's word.
+> 2. **Fork `SpecInitlock`** into the `.bss` contract (payload-producing)
+>    and the plain one, by making `wp_initlock_sconf_body`
+>    DATUM-PARAMETRIC in the `lk->cpu` field — the same move §(3) just
+>    made one tier down, and the honest one if (1) is judged too big.
+>    Its cost is the `INITLOCK` module type and its ~19 client files.
+> 3. **Accept that `pipe`'s lock has no racy payload**, which is only
+>    viable if `holding()` can be discharged for it another way — and it
+>    cannot: `ProofHolding:281`'s `notheld` leaf is the single one every
+>    `acquire` runs.
+>
+> **Nothing below the fork moves either way**: §(3)'s AU, the four read
+> gates, both store gates, `ledger_wpay_mint` and `boot_ledger_at0_word`
+> are all landed and serve any of the three.
+
+#### (5) OFF THE M4 LINE: `VcGenS` IS GREEN, AND ITS CONE'S TWO BLOCKERS
+#### ARE NOW MEASURED RATHER THAN PREDICTED
+
+`VcGenS`'s red was A6.63's diagnosis exactly — the memory leaves take
+`TsoCtx.own_context` and hand it back, and the generated block WP did not
+carry it.  Threading it is **six statements and two induction bodies**,
+and it is mechanical: the token rides beside the symbolic heap
+(`vheap_own` / `vheap4_own`) in every one of them.  `VcGenS` and
+`WpSwtchVc` are green.
+
+**THE CONE DID NOT OPEN, AND WHERE IT STOPS IS THE RESULT.**  Of the 85
+files behind `VcGenS`, 82 are behind `ProofSwtch` and 12 behind
+`ProofKernelvec`; both are now RED (they were UNREACHED), and each is one
+of the two ξ/receipt problems, at a concrete site:
+
+- **`ProofSwtch:157`** still calls the shim's `hart_view_lb_any` — which
+  no longer exists — to feed `ctx_resume XIt Tt Tt`.  The honest receipt
+  is the acquire's (`hart_view_lb_get` at the AMO), so what is owed is
+  the park protocol's STAMP TIE: `valid_context` must publish a bound
+  `Tpark ≥ Tt` and the resumer must arrive holding `hart_view_lb Tpark`.
+  Same family as `UtResFits`' `ut_res_bare_park` abort.
+- **`ProofKernelvec:1704`** cannot hand `devintr_caps` to `kerneltrap`:
+  the handler is stated at a **∀-bound resume context** `XIc` while the
+  caps bundle was captured at the ambient one, and
+  `SpecDevintr.devintr_caps` is `{CID XI}`-indexed (measured with
+  `About`).  **This is the boot-captured-caps problem with a line
+  number, and the index's entry point is now named too.**
+  `WpLock.is_lock` is ξ-FREE by construction — its `R` is a
+  `CtxId → iProp Σ` — but the tree instantiates that slot with
+  `<{ P }>` (`TsoCtx.const_pay`), the CONSTANT function at a `P` that is
+  itself stated at the ambient ξ:
+
+  ```coq
+    is_conslock γ := is_lock γ a_cons "cons" <{ cons_res }>       (* ConsoleInv *)
+    is_txlock γl γu := is_lock γl a_tx_lock "uart" <{ tx_res γu }> ∗ …
+    console_caps γu := ∃ γtx γc, is_txlock γtx γu ∗ is_conslock γc ∗ …
+  ```
+
+  and `ConsoleInv.cons_res`'s cells are `ctx_pointsto XI` (that is what
+  `BootCarveMain.boot_cons_res` now produces directly, §(1)).
+  `disk_geom`'s three `↦₈□` pointers are the same story one bundle over.
+
+  > **SO THE SLOT IS PARAMETRIC AND THE PAYLOADS ARE NOT, AND THAT IS
+  > THE WHOLE OF IT.**  `const_pay` is the right shape only for a
+  > ξ-FREE resource.  The repair direction is per payload, not per
+  > handle: state `cons_res` (and `tx_res`, and `disk_geom`'s pointer
+  > row) as a FUNCTION of ξ and instantiate `R` with it, so that the
+  > acquirer gets the cells at ITS context — which is what
+  > `R : CtxId → iProp Σ` was introduced for.  `disk_geom`'s row is the
+  > cheap one: its three cells are `DfracDiscarded`, and a discarded ctx
+  > byte is re-indexable at any ξ by the same argument
+  > `TsoCtx.ctx_pointsto_of_ro` / `CtxKMap`'s `_ro_static` twins already
+  > make for the static image.  `cons_res`'s is the real one: it is
+  > OWNED and it is what the lock protects.
+
+`ProofKernelvec`'s token threading is landed anyway (four block lemmas
+plus the two call sites), because it is owed no matter how the caps
+question is settled and it is what turned the second error into a
+measurement.
+
+#### (6) THE SHIM LEDGER, AND IT IS DOWN TO ONE LIVE USE
+
+| what | where | count |
+|---|---|---|
+| live qualified use | `WpSconfLock:146` (`lock_claims`) | **1** |
+| dangling symbol (deleted) | `ProofAcquire:668`, `ProofSwtch:157` (`hart_view_lb_any`) | 2 |
+| surviving lemma with ZERO users | `TsoCtxShim.own_context_alloc` | 1 |
+| dead `Require Import TsoCtxShim` | 19 files, all GREEN | 19 |
+
+`BootCarveMain`'s 25 are gone with its `Require`.  **The 19 dead
+`Require`s are the cheapest remaining cleanup in the tree and were left
+alone on purpose**: each is one green file's cone, and none of them costs
+anything but a grep hit.
+
+#### HANDOFF
+
+1. **The M4 line is BLOCKED on §(4)'s three-way ruling.**  Everything
+   below the fork is landed; nothing above it can be built until the
+   ruling picks one.
+2. **`BootShared`** is written and unvalidatable until `ProofMain` greens
+   (the publication's last mile).  `ProofMain:996` is the single error:
+   `KptShare.kpt_inv_alloc` now takes `(B : nat)`, `kptree_own B 2 … t`
+   and `llb loglen_name B`, and `kvminit`'s post is `ptree_own`
+   (= `ptree_own_at (UTier cur_ctx)`).  `KptPublish.kptree_publish` is
+   the gate; its premise is the DRAIN, and main's only `fence rw,rw` is
+   AFTER `kvminithart`, which is the design question A6.70 left open.
+3. **`ProofSwtch` (82 behind) and `ProofKernelvec` (12)** — §(5)'s two
+   problems, both now at a line number.
+4. Unchanged: the DMA/virtio lane, `UtResFits`, the two U-mode files.
+
+**ACCEPTANCE for the M4 unit is unchanged** and is still gated on §(4).
 
 
 ## 7. Order of work
