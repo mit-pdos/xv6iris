@@ -74,7 +74,7 @@ Require Import FsCfgBoot.      (* the two boot kits *)
    runs here is its era-0 reading, which is the same mint applied to
    [FsDurImg.img_snap_ok].  That is the ONE place the image is still
    spent. *)
-Require Import FsCfgSnap.      (* [fs_cfg_alloc_img] *)
+Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:

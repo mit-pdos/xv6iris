@@ -2257,24 +2257,30 @@ Section FsCfgBootEra.
     - iApply (FsStateLink.link_toks_list with "Hdot").
   Qed.
 
-  (* ---- THE ERA MINT MOVED (durable-disk lane E-mint) ----------------
+  (* ---- THE ERA MINT MOVED (durable-disk lanes E-mint / E-himg) ------
      [fs_cfg_alloc] -- the era's file-system instance minted by DECODING
      fs.img -- is superseded by [FsCfgSnap.fs_cfg_alloc_snap], which mints
      the same instance from the DURABLE SNAPSHOT ([FsDurSnap.snap_ok S D])
-     and therefore needs no image at any era.  The era-0 reading, at this
-     lemma's own signature and premise bundle, is
-     [FsCfgSnap.fs_cfg_alloc_img]: it is the snapshot mint applied to
-     [FsDurImg.img_snap_ok], which is the ONE place [fs_boot_image_wf] is
-     still spent.  [BootShared.boot_shared_alloc] calls that.
+     and therefore needs no image at any era.  There is no era-0 reading
+     either: [BootShared.boot_shared_alloc] calls the snapshot mint at EVERY
+     era, and what the image still does is produce the FIRST snapshot, once,
+     inside [FsCrash.P_fs_alloc] at the top-level theorem
+     ([FsDurImg.img_snap_ok]).
 
-     WHAT IS LEFT IN THIS FILE AND HAS NO CALLER ANY MORE: the image-side
-     routing this lemma used -- [ipool_alloc_of_image], [ireg_lnks_of_image],
-     [ent_toks_of_region], [bitmap_res_of_image], [image_ireg_premises],
-     [img_nodes_local] and the [img_*] readings above them.  Their snapshot
+     THE IMAGE ROUTING IN THIS FILE HAS NO CALLER, measured: [fs_kit_spent],
+     [ipool_alloc_of_image], [ireg_lnks_of_image], [ent_toks_of_region],
+     [bitmap_res_of_image], [image_ireg_premises], [img_nodes_local],
+     [fs_live_blocks_range], [fs_live_blocks_used], [fs_bitmap_spent_bound],
+     [img_ity_ok], [fs_boot_inodes_ok], [fs_boot_inodes_valid], and the
+     helpers only those reach ([img_ity], [img_dotd], [ent_toks_of_image],
+     [ent_toks_of_tickets], [big_sepS_tick_route], the [big_sepL_omap_*]
+     family, [dir_entry_names_nodup] and their neighbours).  Their snapshot
      twins are [FsCfgSnap]'s [ipool_alloc_of_snap], [snap_link_route],
-     [bitmap_res_of_snap], [snap_ireg_premises] and [snap_inode_ok].  They
-     are kept, as [InodeRegion.dv_lend_mint] was kept at lane E-unpin, for
-     the lane that deletes [SystemAdequacy.Himg] to sweep. *)
+     [bitmap_res_of_snap], [snap_ireg_premises], [snap_inode_ok] and
+     [snap_spent].  Sweeping them is a CLEANUP with no correctness content:
+     nothing above [FsDurImg] reads an image decoder.  What must NOT be
+     swept with them is [img_node]/[img_nodes] and the [img_inode_*]
+     readings, which [FsDurImg] does read. *)
 
 End FsCfgBootEra.
 

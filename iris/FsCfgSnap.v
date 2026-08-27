@@ -1309,163 +1309,24 @@ Section SnapMint.
 End SnapMint.
 
 (* ====================================================================== *)
-(*  10.  ERA 0: THE IMAGE'S ONLY JOB IS TO PRODUCE THE FIRST SNAPSHOT      *)
+(*  10.  ERA 0 IS NOT A SPECIAL CASE ANY MORE (durable-disk lane E-himg).  *)
 (*                                                                        *)
-(*  [FsCfgBoot.fs_cfg_alloc] is now a COROLLARY of the mint above:         *)
-(*  [FsDurImg.img_snap_ok] turns [FsCfgBoot.fs_boot_image_wf] into         *)
-(*  [snap_ok (img_state ...) (fs_restrict ... home)] and the mint does the *)
-(*  rest.  The image DECODERS ([FsImg.fs_dinode], [FsCfgBoot.img_node],    *)
-(*  [img_nodes]) survive only here and inside [FsDurImg]; the boot chain   *)
-(*  below this lemma never names one.                                      *)
+(*  [fs_cfg_alloc_img] -- the mint applied to [FsDurImg.img_snap_ok], with *)
+(*  the spent-set weakening [fs_kit_fsinit_ghost_weaken] and the four      *)
+(*  [img_snap_*] readings it needed -- IS DELETED.                          *)
+(*  [BootShared.boot_shared_alloc] calls [fs_cfg_alloc_snap] at EVERY era, *)
+(*  era 0 included: the boot's file system comes off the crash predicate's *)
+(*  durable snapshot, and what the IMAGE still does is produce that        *)
+(*  snapshot once, inside [FsCrash.P_fs_alloc] at the top-level theorem    *)
+(*  ([FsDurImg.img_snap_ok], which stays).                                 *)
 (*                                                                        *)
-(*  The one thing the corollary owes is that the mint's own spent set is   *)
-(*  inside the one the boot kit is stated at ([FsCfgBoot.fs_kit_spent]),   *)
-(*  so that the coverage remainder can be weakened onto it.  The bitmap    *)
-(*  halves are the SAME set by construction; the live halves need the      *)
-(*  image's region-tail sweep ("above [ninodes] the type is 0") and        *)
-(*  [FsDurImg.img_node_owns_slot].                                         *)
+(*  WHAT THIS LEAVES CALLER-LESS in [FsCfgBoot.v] -- the image ROUTING the *)
+(*  deleted corollary was the last reader of, measured: [fs_kit_spent],    *)
+(*  [ipool_alloc_of_image], [ent_toks_of_region], [image_ireg_premises],   *)
+(*  [bitmap_res_of_image], [ireg_lnks_of_image], [img_nodes_local],        *)
+(*  [fs_live_blocks_range], [fs_live_blocks_used], [fs_bitmap_spent_bound],*)
+(*  [img_ity_ok], [fs_boot_inodes_ok], [fs_boot_inodes_valid] and the      *)
+(*  helpers only they reach.  Their snapshot twins are named at that       *)
+(*  file's own deletion note.  Sweeping them is a CLEANUP, not a           *)
+(*  correctness step: nothing above [FsDurImg] reads the image decoders.   *)
 (* ====================================================================== *)
-
-Lemma img_snap_node (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) (z : Z) :
-  z ∈ region_inums nib -> snap_node (img_state P sb nib) z = img_node P sb z.
-Proof.
-  intros Hz. rewrite /snap_node /img_state /=.
-  rewrite (lookup_total_correct _ _ _ (img_nodes_lookup P sb nib z Hz)) //.
-Qed.
-
-Lemma img_snap_blk_set (P : Z -> list (bv 8)) (sb : fs_sb) (z b : Z) :
-  fs_inode_ok P sb (fs_dinode P sb z) ->
-  b ∈ snap_blk_set (img_node P sb z) -> b ∈ fs_inode_blocks_set P sb z.
-Proof.
-  intros Hok Hb. apply elem_of_snap_blk_set in Hb.
-  destruct (img_node_owns_slot P sb z b Hb) as (k & Hk & Heq & Hnz).
-  rewrite /fs_inode_blocks_set elem_of_list_to_set -Heq.
-  apply (img_slot_in_inode_blocks P sb (fs_dinode P sb z) k Hok Hk).
-  rewrite Heq. exact Hnz.
-Qed.
-
-Lemma img_snap_live_set (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
-  fs_region_wf P sb nib = true ->
-  snap_live_set (img_state P sb nib) nib ⊆ fs_live_set P sb.
-Proof.
-  intros Hrw. apply elem_of_subseteq. intros z Hz.
-  apply elem_of_snap_live_set in Hz as [Hzr Hty].
-  rewrite (img_snap_node P sb nib z Hzr) /fn_type img_node_rec in Hty.
-  apply region_inums_spec in Hzr.
-  apply fs_live_set_elem_of. split; [| exact Hty].
-  split; [lia |].
-  destruct (Z_lt_ge_dec z (sb_ninodes sb)) as [Hlt | Hge]; [exact Hlt |].
-  exfalso. apply Hty.
-  exact (fs_region_free_spec P sb nib z (fs_region_wf_free _ _ _ Hrw)
-           ltac:(lia) ltac:(lia) ltac:(lia)).
-Qed.
-
-Lemma img_snap_spent (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
-  fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
-  snap_spent (img_state P sb nib) nib
-  ⊆ fs_kit_spent P sb nib (fs_live_set P sb).
-Proof.
-  intros Hwf Hrw.
-  apply elem_of_subseteq. intros b Hb.
-  rewrite /snap_spent /fs_kit_spent !elem_of_union in Hb |- *.
-  destruct Hb as [[[[H1 | Hlg] | Hir] | Hbm] | Hlive].
-  - by left; left; left; left.
-  - by left; left; left; right.
-  - by left; left; right.
-  - (* the two bitmap sets are the SAME set by construction *)
-    left; right. exact Hbm.
-  - (* the live halves *)
-    right.
-    apply elem_of_snap_live_blocks in Hlive as (z & Hz & Hbz).
-    pose proof Hz as Hz'.
-    apply elem_of_snap_live_set in Hz' as [Hzr Hty].
-    rewrite (img_snap_node P sb nib z Hzr) in Hbz.
-    rewrite (img_snap_node P sb nib z Hzr) /fn_type img_node_rec in Hty.
-    assert (Hzl : z ∈ fs_live_set P sb)
-      by (apply (img_snap_live_set P sb nib Hrw); exact Hz).
-    apply fs_live_set_elem_of in Hzl as Hzl'.
-    destruct Hzl' as [Hran _].
-    apply elem_of_fs_live_blocks. exists z. split; [exact Hzl |].
-    pose proof (img_snap_blk_set P sb z b
-                  (fsimg_wf_inode P sb z Hwf Hran Hty) Hbz) as Hin.
-    rewrite /fs_inode_blocks_set elem_of_list_to_set in Hin. exact Hin.
-Qed.
-
-Section SnapEra0.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId}.
-
-  (*  the coverage remainder is stated at a spent set; a BIGGER spent set is
-      a SMALLER remainder, so the kit weakens along [⊆]. *)
-  Lemma fs_kit_fsinit_ghost_weaken (ICFG : icfg) (FSC : fscfg)
-      (P : Z -> list (bv 8)) (R R' : gset Z)
-      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
-    R ⊆ R' ->
-    fs_kit_fsinit_ghost ICFG FSC P R Pb Xexc -∗
-    fs_kit_fsinit_ghost ICFG FSC P R' Pb Xexc.
-  Proof.
-    intros Hsub.
-    iIntros "H".
-    iDestruct (fs_kit_fsinit_ghost_open with "H")
-      as "(H1 & H2 & #H3 & H4 & H5 & H6 & H7 & H8 & #H9 & Hrem & #H10 & Hxo)".
-    assert (Hsub' : fsc_cov ∖ R' ⊆ fsc_cov ∖ R).
-    { apply elem_of_subseteq. intros b Hb.
-      apply elem_of_difference in Hb as [Hc Hn].
-      apply elem_of_difference. split; [exact Hc |].
-      intros Hr. exact (Hn (Hsub b Hr)). }
-    iDestruct (big_sepS_subseteq _ _ _ Hsub' with "Hrem") as "Hrem".
-    rewrite /fs_kit_fsinit_ghost.
-    iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 Hrem H10 Hxo".
-  Qed.
-
-  (*  THE ERA-0 MINT, at [FsCfgBoot.fs_cfg_alloc]'s own signature.  It is
-      the snapshot mint applied to the image's snapshot, and nothing else. *)
-  Lemma fs_cfg_alloc_img (γd : uart_names) (γv : disk_names)
-      (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (cov : gset Z)
-      (nib : nat) (E : coPset) :
-    fs_boot_image_wf dk ndisk sb nib cov ->
-    disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
-    bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
-    ∃ (ICFG : icfg) (FSC : fscfg),
-      ⌜icfg_dev = ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
-      ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
-      ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
-      ⌜fsc_logst = sb_logstart sb⌝ ∗
-      ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
-      ⌜fsc_size = sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
-      fs_kit_icache ICFG FSC ∗
-      fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
-        (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-           (fs_live_set (FsCrash.fs_blocks dk) sb))
-        (FsCrash.fs_blocks dk) ∅.
-  Proof.
-    intros Hbf.
-    pose proof Hbf as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq & Hcovin
-                       & Hcovmeta & _).
-    iIntros "Hdisk Hsa Hsf".
-    iMod (fs_cfg_alloc_snap γd γv dk ndisk (img_state (fs_blocks dk) sb nib)
-            cov nib E (fs_blocks dk) ∅
-            (img_snap_ok dk ndisk sb nib cov Hbf)
-            (fun b => fs_blocks_length dk b)
-            (empty_subseteq _) (not_elem_of_empty 1)
-            (fun b _ _ => eq_refl)
-            Hnibeq Hnib32 Hcovin Hcovmeta with "Hdisk Hsa Hsf")
-      as (ICFG FSC) "Hfs".
-    iModIntro. iExists ICFG, FSC.
-    iDestruct "Hfs" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & %E7 & %E8 &
-                         %E9 & %E10 & Hkit1 & Hkit2)".
-    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iSplitL "Hkit1"; [iExact "Hkit1" |].
-    iApply (fs_kit_fsinit_ghost_weaken ICFG FSC (fs_blocks dk)
-              (snap_spent (img_state (fs_blocks dk) sb nib) nib)
-              (fs_kit_spent (fs_blocks dk) sb nib
-                 (fs_live_set (fs_blocks dk) sb))
-              (fs_blocks dk) ∅
-              (img_snap_spent (fs_blocks dk) sb nib Hwf Hrw) with "Hkit2").
-  Qed.
-
-End SnapEra0.
