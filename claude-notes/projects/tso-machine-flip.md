@@ -1,6 +1,21 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE UNGATED TRANCHE (2026-08-26, latest session).  **`WpUart` is
+STEP 5, THE PIN'S MACHINE HALF (2026-08-26, latest session).  **The
+canon pin is BUILT AND GREEN from `TsoMemPa` up to `TsoCtx`** — the
+element-carried `ts_elem`, the one-conjunct `ts_ok` interp tie, the four
+pinned gates (`ledger_pin_mint` / `ledger_read_pin_ok` /
+`ledger_read_pin_bytes_ok` / `ledger_store_pin_ok`) and `HartEvents`'
+value-after-view rule pair, **with the old plain rule RE-DERIVED and all
+eleven call sites unmoved**.  §5.5's one unprobed pure step is green and
+lives in `PtAdBits`.  A6.48's four user-memory files are ONE item (the
+tier is forced by `HartMemRun.bytes_own`) and are green, as are
+`ProofEntry` and `BootCarve`.  Clean rebuild **551 of 1330, FOUR red**.
+A6.49–A6.52 are the record; **A6.52 is the handoff**, and it names the
+two design questions the pin memo did not answer (where `B` enters
+`pt_slot_own`'s `None` arm; `kpt_bound`'s gname) plus the OTHER frontier,
+the unstarted user-translation S-payer.
+
+STEP 5, THE UNGATED TRANCHE (2026-08-26, earlier session).  **`WpUart` is
 GREEN — A6.28/A6.29's DMA-completion append is PAID** (the lease flips to
 `phys_ledger`, `virtio_proto_step` turns inside out, the disk loop runs
 `ledger_store_ok` at `disk_agent`), and the A6.27/A6.28 threading is
@@ -3790,6 +3805,334 @@ checked FIRST per A6.39 — the model `.vo` at 19:11 postdates its source at
   `pt_page_own_maps` (landed) and has a second `bytes_own`-tier framing
   step left.  **These four gate the 377-file cone under `UserPtTree` and
   are the cheapest large win available.**
+
+### A6.49 THE USER-MEMORY TIER IS FORCED, NOT CHOSEN — AND THE FOUR
+### FILES A6.48 NAMED FALL OUT OF ONE SPELLING
+
+A6.48 called `ProcPtOwn` / `UmodeMem` / `UserBytes` / `UserMemPt` four
+independent M1/tier-spelling items.  They are ONE item, and the tier is
+not a choice: `HartMemRun.bytes_own` is already
+`[∗ map] a ↦ b ∈ mm, TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b` (it had
+to move when the plain load started owing `Mobl_ram_plain` and the store
+started owing the append), and `UserBytes.umem_any_bytes` /
+`umem_any_of_bytes` are a bijective RE-KEYING of the same cells.  Two
+tiers cannot be re-keyed into each other, so `UserPtTree.umem_own` and
+`udata_own` must sit at `ctx_phys_pointsto XI` too.
+
+**AND THE RE-KEYING COSTS NOTHING.**  `UserPtTree` is the 377-dependent
+file; its twelve `↦ₚ` occurrences are all inside `umem_own` / `udata_own`
+and their big-op algebra, which never unfolds the cell.  Flipping the
+spelling compiled with **zero proof changes**.  `UserBytes` was two
+`bigset_gather_reindex` predicate arguments.
+
+`ProcPtOwn` is the interesting one, because it is where the tier CROSSES.
+
+> **THE KALLOC BOUNDARY IS AN ISOMORPHISM, and the old route was the
+> wrong one.**  `page_own_to_phys` used to go `ctx_pointsto` →(forget)→
+> raw `↦ₘ` →`KMap.mem_ident_phys`→ raw `↦ₚ`, and `phys_to_page_own` came
+> back through the deleted `TsoCtxShim.ctx_pointsto_of_mem` — a mint
+> A6.9 forbids.  At the ledger tier the crossing is
+> `TsoCtx.ctx_pointsto_to_phys` / `ctx_pointsto_of_phys`, the SAME pair
+> `KptTree` uses for a PT slot: the timestamp element and the clean/dirty
+> bit ride through in both directions.  Landed as `ProcPtOwn.ctx_ident_phys`
+> / `phys_ident_ctx` (the identity-mapped-kdata specialisation, off
+> `kmap_static_claims_at` + `pa_of_id` + `ktier_pin_of_id`), and the four
+> crossings (`page_own_to_phys`, `phys_to_page_own`, `win_mem_to_phys`,
+> `win_phys_to_mem`) all go through them.  `ProcPtOwn` no longer mentions
+> `TsoCtxShim` at all.
+
+Also landed with it: `TsoCtx.ctx_phys_pointsto_ne` (the exclusivity law
+`UmodeMem.umem_inj` needs — the sealed tier wants a law, A6.48's
+`phys_map_disj` precedent) and `ProcPtOwn.phys_page_own_dup` off it.
+
+**`ProofEntry` IS GREEN, and the premise it needed was TWO.**  A6.48
+named `own_context cur_ctx`; `wp_entry` also wants A6.10's
+`TsoCtx.pristine_win entry_ld_ea 8` (the `stack0` word is a link-time
+constant read by an M-mode load).  Both are now premises of
+`SpecEntry.wp_entry_boot_body`, and `own_context` comes back in its
+continuation.  **This is a SPEC change above the kit** and is recorded
+here as such: the supplier of both is `BootChain.boot_entry_bridge` /
+the era's initial-state ghosts, i.e. the already-red boot lane.
+
+**`BootCarve` IS GREEN.**  A6.48's scope was right to the line.  The
+section took a `Context `{XI : TsoCtx.CurCtx}` (only the lemmas that
+mention it pick it up), and the element family is
+`boot_led_ran` / `boot_led_split` / `boot_led_bytes` / `boot_led_word`
+(`boot_ran_split`'s and `boot_ran_bytes`' proofs verbatim over
+`TsoCtx.ledger_elem0`) plus `boot_ctx_phys_word`, which pairs a raw boot
+word with its eight elements through `ctx_phys_pointsto_of_elem`.
+`boot_stack_own_phys` now takes `boot_led_ran g (uint sp − 8n) (uint sp)`
+as a second resource.  **NOTHING MINTS AN ELEMENT** — the family only
+cuts the era's big-op in step with `boot_raw_ran`'s.  The new premise
+lands on `BootShared` / `RiscvAdequacy`, as scoped.
+
+**WHAT THE CONE OPENED, and A6.48's rule ran again.**  Fixed as they
+surfaced: `UmodeCap` (a missing `CurCtx` binder — `uv_trap_frame` mentions
+it now), `UmodeFetch`'s `umem_fetch_byte` (`phys_valid` on a registered
+byte → `ctx_phys_pointsto_forget` first), and `PtFree` (a `CurCtx` binder
+plus the `↦ₚ₈` → `ctx_phys_word_pointsto XI` spelling on `pt_slots_any_phys`
+/ `pt_slots_kfree_pre` — freewalk's loose node slots come out of
+`pt_slot_own (Some ξ)`, which IS that tier, so the flip makes the caller's
+job easier rather than harder).
+**Characterised and NOT attempted** (they are lane items, not one-line M1
+fixes):
+
+- **`UserMemPt` — the user-execution STORE lane owes the append.**
+  `udata_own_upd` (`:409`) does the gen_heap update itself with
+  `phys_update`, which a ledger byte may not: `ledger_store_ok` moves
+  `gen_heap_interp` and `tso_interp_at` TOGETHER.  The shape it must take
+  is `HartMemRun.bytes_own_wobl`'s, verbatim one tier over — take
+  `tso_interp_of` + `own_context XI`, give them back at the appended log.
+  The threading then runs `udata_own_store_g` → `user_pt_store_data_g` →
+  `UserMemAccess.split_store_fold` → `UserMemMis`, i.e. A6.27/A6.28's
+  `S`-payer template applied to the user-store lane.  Four files.
+- **`RiscvAdequacy` — newly reached behind `BootCarve`**, and its error is
+  the pre-existing one A6.48 predicted (the era ghost allocation: `:634`
+  fails on `riscvEraGS`'s arity, and `era_ts_name` is still never
+  allocated).  Step 6 of §7, unchanged.
+
+### A6.50 THE CANON PIN: THE MACHINE HALF IS BUILT AND GREEN
+
+The pin memo's three rulings are implemented from `TsoMemPa` up to
+`TsoCtx`, and the closing sweep says the cost is what the memo predicted.
+
+**§5.5's ONE UNPROBED PURE STEP IS GREEN, first try, and it is smaller
+than the memo estimated.**  Probed against `PtAdBits.vo`, then ported into
+`PtAdBits.v` itself (which now `Require`s `RiscvModelBytes` for
+`nth_byte` / `bv_eq_of_bytes`):
+
+    nth_byte_testbit          the byte projection, bit by bit
+    pte_set_ad_nth_byte_high  (1 ≤ j < 8) -> nth_byte (pte_set_ad w a d) j
+                              = nth_byte w j          -- §2 AT THE BYTE
+    pte_bytes_canon           byte 0 in the A/D class + bytes 1..7 the
+                              leaf's own  ->  pte_canon w = pte_canon leaf0
+    pte_byte0_class{,_self,_set_ad}   the four-element class, and its two
+                              inhabitants: the mint's and the store's
+
+25 lines, not 40–60: once `pte_set_ad_nth_byte_high` is stated at the
+byte, the reassembly IS `bv_eq_of_bytes` + `pte_canon_set_ad`.
+
+**THE ELEMENT-CARRIED PIN, LANDED (ruling 2).**  `TsoMemPa` gained the
+pure layer (the archived probe's four lemmas verbatim, plus
+`pin_ok_mono`), and — NAMED THERE, for the `bytemap` binder-trap reason —
+
+    ts_elem := nat * option (gset (bv 8) * nat)
+    ts_ok img mem log a e :=
+      (∃ v, mem !! a = Some v ∧ latest img log a e.1 v)
+      ∧ (∀ Sv B, e.2 = Some (Sv, B) -> pin_ok img log a B Sv)
+
+**ONE interp conjunct, not two.**  The memo drew the pin tie as a new
+conjunct beside the latest tie; bundling them into `ts_ok` keeps every
+positional destructuring of `tso_interp_of` (`(_&_&_&_&_&_&_&_&%Hb&_)` in
+`HartLift` / `HartSpan` / `HartLift2`, the nine named ones in `TsoCtx`)
+textually unchanged.  That is the difference between a 4-site edit and a
+20-site one, and it costs two projections (`ts_ok_latest` / `ts_ok_pin`).
+
+`TsoGhost.tsomem_tsG` is now `ghost_mapG Σ Arch.pa TsoMemPa.ts_elem`.  The
+six sealed definitions pin the option to `None`
+(`ctx_pointsto_def`, `ctx_phys_pointsto_def`, `phys_ledger_def`,
+`phys_ledger_at`, `pristine_byte`, `ledger_elem0`, plus
+`RiscvPtsto.pristine_elem`), and both auth updates write `(S i, None)`.
+
+**THE MEMO'S CENTRAL CLAIM HELD: every existing store gate is sound with
+NO new premise.**  In `ctx_store_ok` / `ledger_store_ok`'s tie
+reconstruction the pinned half is discharged by `pin_ok_app_frame` off the
+footprint (the payer's element is `None` by definition, so no pinned
+address can be in it) and is vacuous on it.  Two proof lines each.
+
+**THE THREE GATES, in `TsoCtx`:**
+
+    phys_ledger_pin a dq v t B Sv := phys_pointsto a dq v ∗
+                                     a ↪[ts_name]{dq} (t, Some (Sv, B))
+    pin_map_own Pv dq B Sf         := [∗ map] a ↦ v ∈ Pv,
+                                        ∃ t, phys_ledger_pin a dq v t B (Sf a)
+
+    ledger_pin_mint g a v t B Sv :
+      (t ≤ B)%nat -> v ∈ Sv ->
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      phys_ledger_at a (DfracOwn 1) v t ==∗
+      gen_heap_interp g.(gmem) ∗ tso_interp_at riscv_eraGS g ∗
+      phys_ledger_pin a (DfracOwn 1) v t B Sv
+
+    ledger_read_pin_ok `{CID} g a dq v t B Sv :
+      tso_interp_at riscv_eraGS g -∗
+      view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+      phys_ledger_pin a dq v t B Sv -∗
+      ⌜∀ (h : agent) (tv' : nat), (g.(gtv) cpu_id ≤ tv')%nat ->
+         ∃ b, tso_read g.(gimg) g.(glog) h tv' a = Some b ∧ b ∈ Sv⌝
+      (+ ledger_read_pin_bytes_ok, the window form)
+
+    ledger_store_pin_ok g g' auth Pold Pnew B Sf :
+      dom Pold = dom Pnew ->
+      (∀ a v, Pnew !! a = Some v -> v ∈ Sf a) ->      (* THE ONE NEW PREMISE *)
+      … the same five gstate equations as [ledger_store_ok] …
+      gen_heap_interp g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗
+      pin_map_own Pold (DfracOwn 1) B Sf ==∗
+      gen_heap_interp g'.(gmem) ∗ tso_interp_at riscv_eraGS g' ∗
+      ledger_msg_at (length g.(glog)) (PWMsg Pnew auth) ∗
+      [∗ map] a ↦ v ∈ Pnew,
+        phys_ledger_pin a (DfracOwn 1) v (S (length g.(glog))) B (Sf a)
+
+Three notes on shapes the memo did not fix.  (a) `ledger_pin_mint` needs
+`gen_heap_interp` — the tie names `gmem !! a`, and only `phys_valid` ties
+that to the fragment's `v`; it is framed straight back.  (b)
+`ledger_read_pin_ok` is AGENT-GENERIC (`∀ h`), which is free and is what
+makes it usable inside `fobl_ram`'s ∀-quantified view.  (c) the pinned
+store's per-address sets ride as `Sf : Arch.pa -> gset (bv 8)`, so the auth
+update is a `map_imap` (`pin_tm`) and not an `fmap`; and
+`ledger_store_pin_bytes` has to hand the caller the OLD elements back
+(`∀ a ∈ dom Pnew, ∃ t, TM !! a = Some (t, Some (Sf a, B))`), because
+`pin_ok_app` needs the pin at the OLD log and the union shadows it.
+
+**HART 0'S WINDOW (ruling 3(b)) IS NOT YET MOVED** — `ProofMain`'s
+publication is untouched.  Nothing above `TsoCtx` consumes the pin yet, so
+this is queued, not pending.
+### A6.51 THE VALUE-AFTER-VIEW READ RULE (RULING 1), LANDED — AND THE
+### EXISTING PAIR REALLY IS RE-DERIVABLE
+
+`HartEvents` gained `wp_hart_ram_read_plain_ex` and
+`swp_hart_ram_read_plain_ex`, with the obligation INSIDE the ∀ [tv'] and
+the resumption's value handed to the continuation:
+
+    ⌜∀ tv', (tv ≤ tv')%nat -> (tv' ≤ length log)%nat ->
+       ∃ w, tso_read_bytes img log h tv' pa n w ∧ P w⌝ ∗
+    ▷ (|={∅,⊤}=> … ∗
+         (∀ tvn w, ⌜tv ≤ tvn⌝ -∗ ⌜tvn ≤ length log⌝ -∗
+            ⌜tso_read_bytes img log h tvn pa n w⌝ -∗ ⌜P w⌝ -∗
+            view_lb view_name loglen_name h tvn -∗
+            WP (C (hread_resume (bv_unsigned w) m))))
+
+**and `wp_hart_ram_read_plain`'s DIRECT PROOF IS GONE** — it is now nine
+lines off the `_ex` rule at `P := fun _ => True`, with the byte-wise
+determinism step (`bv_eq_of_bytes` on `Hrd tvn` vs the machine's
+`Hbytes'`) moved out of the machine reasoning and into the derivation,
+exactly as the memo predicted.  The `swp` twin is derived from the `wp`
+one the same way `swp_hart_ram_read_plain` is.  **The eleven existing call
+sites did not move** (`HartPilot`, `HartSMem` ×2, `HartMFetch` ×2,
+`HartMemRun`, `HartMLoad`, `PtTreeAdue` ×2, `SmodeCorePt` ×2): they are
+call sites of the OLD rule, whose statement is unchanged.
+
+For progress the `_ex` rule instantiates the ∀ at the reader's own `tv`
+(legal by `tso_interp_of_bound`) and names THAT value in the safety
+witness; the machine's chosen `tvn` then picks its own `w`, and the two
+agree byte-wise only when they must.  This is the piece that makes the
+rule sound where the old one is false.
+### A6.52 HANDOFF: THE PIN'S MACHINE HALF IS DONE, AND THE CONSUMER HALF
+### HAS TWO QUESTIONS THE MEMO DID NOT ANSWER
+
+**WHAT IS BUILT AND GREEN (the memo's §8 order, steps 1–6 of nine):**
+
+    TsoMemPa   §10 pin_ok + pin_ok_mint/_app/_app_frame/_mono +
+               read_down_app_frame;  §11 ts_elem + ts_ok (+3 projections)
+    TsoGhost   tsomem_tsG :: ghost_mapG Σ Arch.pa TsoMemPa.ts_elem
+    RiscvPtsto tso_interp_at's tie is now [ts_ok]; pristine_elem at (0, None)
+    RiscvExec  tso_interp_of, same one-conjunct restatement
+    TsoCtx     6 sealed defs pinned to [None]; 2 auth updates at (S i, None);
+               phys_ledger_pin, pin_map_own, ledger_pin_mint,
+               ledger_read_pin_ok (+ _bytes), ledger_store_pin_ok (+ the
+               pin_tm / ledger_store_pin_bytes loop); ctx_phys_pointsto_ne
+    PtAdBits   nth_byte_testbit, pte_set_ad_nth_byte_high, pte_bytes_canon,
+               pte_byte0_class{,_self,_set_ad}          (§5.5, probed green)
+    HartEvents wp/swp_hart_ram_read_plain_ex; the old pair RE-DERIVED
+
+**WHAT IS LEFT, in the memo's order, with what each now costs:**
+
+7. **`HartMFetch`/`PtTreeAdue` — `fobl_ram_ex`.**  `fobl_ram`
+   (`HartMFetch:589`) has to gain a predicate-indexed twin whose ∃ is
+   inside the ∀, matching `swp_hart_ram_read_plain_ex`'s obligation.  The
+   PT read at `PtTreeAdue:934` already asks for
+   `(∃ w, ⌜fobl_ram …⌝ ∗ ⌜P w⌝)`, i.e. the WRONG nesting — that is the one
+   obligation to restate.
+8. **`PtTree` — the `None` arm, AND THE FIRST OPEN QUESTION.**  The memo
+   says the arm moves from `phys_ledger_word` to its pinned twin.  It
+   cannot, as written: `pt_slot_own`'s tier index is
+   `PTT : option CtxId` and the pinned twin needs the BOUND `B`.  The
+   sets do NOT need a parameter (byte 0's is the four-element A/D class of
+   the slot's own word, bytes 1..7's are its own bytes —
+   `PtAdBits.pte_byte0_class` is exactly that predicate), so the question
+   is only where `B` enters.  Two shapes, and the owner should pick:
+   - **(α) existential + agreement**: `None ⇒ ∃ B, kpt_bound B ∗
+     phys_ledger_word_pin a dq w B (…)`.  `pt_slot_own`'s ARITY does not
+     move, and the reader pins `B` by `kpt_bound`'s agreement against its
+     own copy.  Cost: `PtTree` must see `KptGhost`, which today sits ABOVE
+     it (`KptGhost` requires `PtTree`) — so `kpt_bound` has to move DOWN,
+     into `PtTree` or a new leaf beside it.
+   - **(β) richer tier index**: `PTT : ptier` with `KTier (B : nat)` /
+     `UTier (ξ : CtxId)`.  No layering move, and **the sweep is
+     measurable, not tree-wide: only FIVE files spell the index
+     explicitly** (`PtTree`, `KptTree`, `KptShare`, `TransPt`, `HartSKpt`
+     — 39 sites); the other ~93 mentions go through the ambient-context
+     notations A6.21 created for exactly this reason.
+   I lean (β): it keeps `kpt_bound` where the memo put it and pays a
+   measured 39-site edit instead of a layering inversion.
+9. **`KptGhost` — `kpt_bound B`, a 30-line copy of `kpt_lb`'s csum shape,
+   AND THE SECOND OPEN QUESTION**: it needs its own gname.  `kpt_name` is
+   `era_kpt_name`, a field of `riscvEraGS` (`RiscvPtsto:194`) allocated in
+   `RiscvAdequacy:914`.  So `kpt_bound` costs a THIRD site — the era
+   record, its accessor, and the adequacy allocation.  **`RiscvAdequacy`
+   is already red** (and A6.48/A6.50 add `era_ts_name`'s allocation to its
+   bill anyway), so this is queued work, not new fallout.
+10. `KptShare` — the mint at the publication point, `kpt_body` UNCHANGED,
+    `kpt_bound` added to `tlb_res_pt`'s four touch points.
+11. `HartMStore` — the pinned twin of `wobl_ram_ledger_ex`, off
+    `TsoCtx.ledger_store_pin_ok`; its `vnew ∈ Sf a` premise is
+    `PtAdBits.pte_byte0_class_set_ad` at byte 0 and reflexivity elsewhere,
+    with `Hset : m0' = pte_set_ad q0 a d` already derived at
+    `HartSKpt:562`.
+12. `HartSKpt` — `kpt_leaf_node_canon_obl` off `ledger_read_pin_bytes_ok`
+    + `PtAdBits.pte_bytes_canon`; levels 2/1 keep `kpt_slot_node` verbatim.
+    Then `SmodeCorePt`'s unverified re-port finally COMPILES and gets its
+    A6.18-style verdict — **still not reached this session**.
+13. `ProofMain` — ruling 3(b): the publication moves to the
+    `__sync_synchronize` drain.  Untouched; nothing consumes the pin yet.
+
+**AND THE OTHER FRONTIER, which is NOT the pin: the user-translation
+S-payer is unstarted.**  A6.48 landed `UserPtTree.utlb_inv_pt_translateAddr_u`'s
+`S`-payer parameter but nothing above it was reachable at the time.  Now
+that the user-memory tier is green, the cone opens onto FOURTEEN call
+sites that pass their first Prop into `S`'s slot:
+`UmodeFetch` ×5, `UserFetchPt` ×5, `UserMemMis` ×2, `UserMemPt` ×2 — plus
+`UptTree`'s two wrappers, which are still parametric.  **Nobody has yet
+CHOSEN what `S` is for a user-mode access**, and that is the design
+question: the payer must own the process page table's slots at
+`ctx_phys_word_pointsto cur_ctx` across the access, which is
+`ProcPtOwn.proc_pt_own` / `upt_pages_own`'s territory.  Together with
+`UserMemPt`'s store lane (A6.49) this is the whole remaining user tier.
+
+**THE RED SET AND WHAT EACH IS** (closing clean rebuild, below):
+
+- `HartSKpt` — the pin's consumer half, items 7–12 above.  Behind it:
+  `SmodeCorePt` (unverified re-port) and the S-mode PT tier.
+- `RiscvAdequacy` — §7 step 6, the era ghosts.  Newly reached behind
+  `BootCarve`; `era_ts_name` was never allocated (A6.50's caveat), and
+  `kpt_bound` will add to the same bill.
+- `UserMemPt` — the user store lane owes the append (A6.49).
+- `UmodeFetch` — the S-payer, above.
+
+**THE CLOSING MODEL-AWARE CLEAN REBUILD: 554 ATTEMPTED, 549 `.vo`, 5
+ERRORS** (`iris/*.vo` deleted first; `ls -la --time-style=full-iso
+model-xv6iris/*.v *.vo` checked FIRST per A6.39 — the model `.vo` at
+19:11 postdates its source at 18:37; 554 − 5 = 549, self-consistent).
+The fifth error was `PtFree`, a first-time-reached file needing exactly
+the A6.48 budget (a `CurCtx` binder plus the `↦ₚ₈` → `ctx_phys_word_pointsto`
+spelling); fixing it and re-running the sweep on the clean base gives
+
+> **551 of 1330, FOUR red, up from A6.48's 535/7.**  Sixteen files went
+> green and three red files were closed (`ProofEntry`, `BootCarve`, and
+> the four-file user-memory tier), while two first-time-reached files
+> replaced them.  **And the pin's whole machine half — the element type,
+> both interp ties, `TsoCtx`'s four pinned gates, and `HartEvents`' rule
+> pair — landed inside that number with ZERO fallout: no file outside the
+> seven it touches changed, which is the memo's central claim measured.**
+
+**STILL RED, and what each is:**
+
+- `HartSKpt` — the pin's CONSUMER half (A6.52 items 7–12), with
+  `SmodeCorePt`'s unverified re-port behind it.  **Still not reached; no
+  A6.18-style verdict yet.**
+- `RiscvAdequacy` — §7 step 6, newly reached behind `BootCarve`.
+- `UserMemPt` — the user store lane owes the append (A6.49).
+- `UmodeFetch` — the user-translation S-payer, unstarted (A6.52).
 
 ## 7. Order of work
 
