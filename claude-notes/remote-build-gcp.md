@@ -57,6 +57,14 @@ run-on-gcp opam exec --switch=/shared/xv6rocq -- bash -c '
   make -f CoqMakefile -j180 -k'
 ```
 
+**Do NOT prefix that recipe with `touch kernel-rocq/*.v user-rocq/*.v`.** The
+touch belongs to the top-level-`make` recipe further down, where it exists to
+stop a dump rule re-deriving the tracked image; this recipe drives each
+sub-tree through its own `CoqMakefile` and never reaches a dump rule at all,
+so the touch buys nothing and costs a WHOLE-TREE rebuild -- every `.vo` in
+`iris/` is downstream of `kernel-rocq/`, so a 30-second incremental becomes
+six minutes (measured 2026-08-27, the hard way).
+
 Cold that is ~1320 files and finished well inside the usual full-build
 budget; `run-on-gcp --no-sync make audit-only` afterwards is the audit (it
 needs no `CoqMakefile` of its own — it reads the flags out of
