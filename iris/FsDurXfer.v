@@ -573,6 +573,23 @@ Section RunsQ.
     rewrite phi_runs_q_at. iExact "H".
   Qed.
 
+  Lemma gamma_q_1_runs Γ l :
+    phi_runs (gamma_q Γ (DfracOwn 1)) l ⊣⊢ phi_runs Γ l.
+  Proof.
+    rewrite /phi_runs. apply big_opL_proper. intros k r _.
+    rewrite gamma_q_byte_range -byte_range_1 //.
+  Qed.
+
+  Lemma phi_runs_ex_full Γ l : phi_runs Γ l ⊢ phi_runs_ex Γ l.
+  Proof.
+    iIntros "H". iExists (xq_at (DfracOwn 1) l).
+    iSplitR; [iPureIntro; exact (xq_strip_at (DfracOwn 1) l) |].
+    iSplitR;
+      [iPureIntro;
+       exact (xq_ok_at (DfracOwn 1) l (dfrac_full_nvalid (DfracOwn 1))) |].
+    rewrite phi_runs_q_at gamma_q_1_runs. iExact "H".
+  Qed.
+
   Lemma phi_runs_ex_app Γ F1 F2 :
     phi_runs_ex Γ F1 ∗ phi_runs_ex Γ F2 ⊢ phi_runs_ex Γ (F1 ++ F2).
   Proof.

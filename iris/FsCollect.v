@@ -272,7 +272,8 @@
 (*                                                                        *)
 (*  NONE of these is visible from inside this file, which is the point of  *)
 (*  stating [col_hand] as a named predicate: the collection is CLOSED      *)
-(*  (see [col_snap_ok]), and what remains is exactly its suppliers.        *)
+(*  (see [col_hand_mint] in [FsCollectAll]), and what remains is exactly   *)
+(*  its suppliers.                                                         *)
 (* ====================================================================== *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -302,6 +303,7 @@ Require Import FsState.       (* [fs_state_rec], [fs_links], [sb_owned]     *)
 Require Import FsStateEra.    (* [inode_owned_era_q]                        *)
 Require Import EscrowDefs.    (* [reg_full] / [reg_half] / [region_pending] *)
 Require Import InodeRegion.   (* [dinode_at], [ireg_recs], [ireg_couple]    *)
+Require Import FsDurBytes.    (* [fs_dbytes] and its lookup laws            *)
 Require Import FsDurXfer.     (* [dfrac_nvalid_pair], the run vocabulary    *)
 Require Import FsDurSnap.     (* [snap_bytes], [snap_local], [snap_ok]      *)
 
@@ -1061,129 +1063,201 @@ Section Collect.
   (*  6.  THE COLLECTION, AND WHAT THE ALLOCATOR TAKES                     *)
   (* ==================================================================== *)
 
-  Lemma col_snap_bytes γfs γi (ist : Z) (nib : nat) (sb : fs_sb)
+  (* [col_snap_bytes] / [col_snap_ok] / [col_snap_ok_ex] ARE DELETED
+     (durable-disk lane H4).  They materialised [FsDurSnap.snap_ok] at the
+     commit so that the VALUE-FIRST allocator could carve a freshly
+     allocated byte map by its disjointness clauses; the commit now mints
+     its epoch off [snap_mint] instead (section 6), where the disjointness
+     is the shape of the collected [∗] and is read where the [∗] is.  The
+     value-first allocator keeps its ONE caller, era 0's image
+     ([FsDurImg]). *)
+
+  (* ==================================================================== *)
+  (*  6.  WHAT THE MINT TAKES (durable-disk lane H4)                       *)
+  (*                                                                      *)
+  (*  [FsDurSnap.snap_mint] and nothing else: the GEOMETRY, the local      *)
+  (*  clauses, the superblock's parse, the link family's slacked validity, *)
+  (*  and the RUNS row.  Not one byte tie, no used-set coupling, no        *)
+  (*  [sk_disj], no cut clause -- the disjointness a linear ledger had to  *)
+  (*  be carved by is read off [FsStateDefs.phi_excl] where the [∗] is,    *)
+  (*  share-generically ([FsDurXfer.phi_runs_ex_disj]).                    *)
+  (* ==================================================================== *)
+
+  (* THE LOGGED BYTE MAP IS THE COMMITTED VIEW'S FLATTENING, one direction.
+     [bytes_dom] puts every key of [Lb] inside some home block's range,
+     [dom C = home] gives that block a value, and [bytes_tie] says [Lb]
+     holds it there.  It is what turns the transport's "the output map is
+     inside the SOURCE's" into the snapshot's own identity. *)
+  Lemma bytes_le_dbytes (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8)))
+      (home : gset Z) :
+    dom C = home ->
+    (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
+    bytes_tie Lb C -> bytes_dom Lb home ->
+    Lb ⊆ fs_dbytes (col_view C home).
+  Proof.
+    intros HdomC Hlens Htie Hdm.
+    pose proof dbytes_stride as Hstr.
+    assert (Hok : dbytes_ok (col_view C home)).
+    { intros b' bs' Hb'.
+      rewrite /col_view in Hb'.
+      apply fs_restrict_lookup_Some in Hb' as [Hh ->].
+      assert (Hin : is_Some (C !! b'))
+        by (apply elem_of_dom; rewrite HdomC; exact Hh).
+      destruct Hin as [x Hx]. rewrite /dv_of_D Hx /=.
+      rewrite (Hlens b' x Hx). reflexivity. }
+    apply map_subseteq_spec. intros a v Ha.
+    destruct (proj1 (Hdm a) ltac:(by exists v)) as (b & Hb & Hlo & Hhi).
+    assert (Hin : is_Some (C !! b))
+      by (apply elem_of_dom; rewrite HdomC; exact Hb).
+    destruct Hin as [bs Hbs].
+    pose proof (Hlens b bs Hbs) as Hlen.
+    pose proof (Htie b bs Hbs) as Hsub.
+    assert (Hk : (Z.to_nat (a - b * BSZ) < length bs)%nat)
+      by (rewrite Hlen; unfold BSZ in *; lia).
+    destruct (lookup_lt_is_Some_2 bs _ Hk) as [w Hw].
+    assert (Hrun : (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) !! a = Some w).
+    { apply lookup_map_seqZ_Some. split; [lia | exact Hw]. }
+    pose proof (lookup_weaken _ _ _ _ Hrun Hsub) as HLb.
+    rewrite Ha in HLb. injection HLb as Hwv. subst w.
+    assert (Hres : col_view C home !! b = Some bs).
+    { rewrite /col_view. apply fs_restrict_lookup_Some.
+      split; [exact Hb | rewrite /dv_of_D Hbs //]. }
+    pose proof (fs_dbytes_lookup (col_view C home) b bs
+                  (Z.to_nat (a - b * BSZ)) v Hok Hres Hw) as Hfd.
+    assert (Heq : b * Z.of_nat BSIZE + Z.of_nat (Z.to_nat (a - b * BSZ)) = a)
+      by (unfold BSZ in *; lia).
+    rewrite Heq in Hfd. exact Hfd.
+  Qed.
+
+  Lemma col_auth_dbytes γfs Lb C home :
+    col_auth γfs Lb C home -∗ ⌜Lb ⊆ fs_dbytes (col_view C home)⌝.
+  Proof.
+    iIntros "(_ & %Hdom & %Hlens & %Htie & %Hdm)".
+    iPureIntro. exact (bytes_le_dbytes Lb C home Hdom Hlens Htie Hdm).
+  Qed.
+
+  (* THE ERA'S OWN AUTHORITY, as the transport's [phi_agree] hypothesis:
+     one [ghost_map_lookup], stated HERE so that the element and the
+     authority are elaborated at one and the same [ghost_mapG] path
+     (durable-notes.md, "one bundle per ghost class"). *)
+  Lemma col_agree γfs Lb C home :
+    phi_agree (fs_gamma_L γfs) (col_auth γfs Lb C home) Lb.
+  Proof.
+    intros dq a v. rewrite /col_auth /fs_gamma_L /=.
+    iIntros "[(Ha & _ & _ & _ & _) Hv]".
+    iApply (ghost_map_lookup with "Ha Hv").
+  Qed.
+
+  (* ---- the GEOMETRY, off the boot configuration and the domain rows --- *)
+
+  (* [FsDurSnap.snap_shape]'s seven clauses, and they are [col_snap_bytes]'
+     seven verbatim: the block width off the view, the range off [cg_size],
+     the superblock off [cg_sbok], the inum bounds off the domain row and
+     [cg_wide], the region column off [cg_reg]/[cg_ist], the region's own
+     inums off [cg_width], and the directory clauses off the payloads'
+     row at [cg_icfg]'s width.  Nothing here is about CONTENT. *)
+  Lemma col_snap_shape γfs γi (ist : Z) (nib : nat) (sb : fs_sb)
       (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
       (m : gmap Z dinode) (Lb : gmap Z (bv 8))
       (C : gmap Z (list (bv 8))) (home : gset Z) :
     col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
-    ⌜snap_bytes (col_state sb sbb I used) (col_view C home)⌝.
+    ⌜snap_shape (col_state sb sbb I used) (col_view C home)⌝.
   Proof.
-    iIntros "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk & Hkeep
-              & %Hdirloc)".
-    rewrite /sb_owned. iDestruct "Hsb" as "[Hsbb %Hparse]".
-    rewrite /free_bitmap_at. iDestruct "Hbm" as "[Hbmb Hpool]".
-    (* ---- the byte agreements ---- *)
+    iIntros "(%Hg & %Hdi & Hau & _ & _ & _ & _ & _ & _ & %Hdirloc)".
     iDestruct (col_auth_pure with "Hau") as %[HdomC Hlens].
-    iDestruct (col_blk_full with "Hau Hsbb") as %[_ Hsbv].
-    iDestruct (col_blk_full with "Hau Hbmb") as %[_ Hbmv].
-    iDestruct (col_pool_dom γfs Lb C home (sb_size sb) used
-                 with "Hau Hpool") as %Hpoolv.
-    iDestruct (col_rec_tie γfs Lb C home γi I m sb ist nib Hg Hdi
-                 with "Hau Hrec Hb") as %Hrecv.
-    iDestruct (col_bundles_blk with "Hau Hb") as %Hblkv.
-    iDestruct (col_bundles_ind with "Hau Hb") as %Hindv.
-    (* ---- the local clauses and the two footprint refutations ---- *)
-    iDestruct (col_bundles_local with "Hb") as %Hloc.
-    iDestruct (col_bundles_slot with "Hb") as %Hslot.
-    iDestruct (col_bundles_disj with "Hb") as %Hdisj.
-    iDestruct (col_bundles_used γfs Lb C home γi I sb ist nib used Hg
-                 with "Hau Hpool Hb") as %Hused.
-    iDestruct (col_bundles_not_meta γfs γi I m sb sbb ist nib used home
-                 Hg Hdi with "Hsbb Hbmb Hrec Hb") as %Hnotmeta.
-    iDestruct (col_meta_used γfs Lb C home γi I m sb sbb ist nib used
-                 Hg Hdi with "Hau Hsbb Hbmb Hpool Hrec") as %Hmetau.
-    (* ---- the link family's own validity, SLACKED AT THE ROOT: the
-       collected elements gathered with the region's spare fragment, read
-       by ONE [own_valid] ([FsState.fs_links_valid_tok]) ---- *)
-    iDestruct "Hkeep" as (kv) "Hkeep".
-    rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl)
-            /FsStateLink.link_tok /FsStateLink.link_toks
-            /FsStateLink.link_tok_elem /=.
-    iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
-    iPureIntro.
-    split; rewrite /col_state /=.
+    iPureIntro. split; rewrite /col_state /=.
     - exact (col_view_len C home HdomC Hlens).
-    - exact Hsbv.
-    - exact Hparse.
-    - exact Hbmv.
-    - exact Hpoolv.
+    - intros b [bs Hbs]. rewrite /col_view in Hbs.
+      apply fs_restrict_lookup_Some in Hbs as [Hh _].
+      exact (cg_size Hg b Hh).
+    - exact (cg_sbok Hg).
     - intros i n Hi.
       assert (Hir : 0 <= i < 16 * Z.of_nat nib)
         by (apply Hdi; apply elem_of_dom; exists n; exact Hi).
       pose proof (cg_wide Hg). lia.
-    - intros i n Hi. exact (inode_repr_of_local i n (Hloc i n Hi)).
-    - exact Hrecv.
-    - exact Hblkv.
-    - exact Hindv.
-    - intros i Hi. apply elem_of_dom. apply Hdi.
-      pose proof (cg_nin Hg). lia.
-    - destruct Hlinks as (f & Hok & Hv). exists f, kv. split; [exact Hok |].
-      assert (Hr : ireg_root = ROOTINO) by (vm_compute; reflexivity).
-      rewrite -Hr. exact Hv.
-    - exact Hmetau.
-    - intros i n b Hi Hon.
-      split; [exact (Hused i n b Hi Hon) | exact (Hnotmeta i n b Hi Hon)].
-    - exact Hdisj.
-    - exact (cg_sbok Hg).
     - intros i n Hi.
       assert (Hir : 0 <= i < 16 * Z.of_nat nib)
         by (apply Hdi; apply elem_of_dom; exists n; exact Hi).
       assert (Hdlt : i `div` 16 < Z.of_nat nib)
         by (apply Z.div_lt_upper_bound; lia).
       pose proof (cg_reg Hg). pose proof (cg_ist Hg). lia.
-    - exact Hslot.
-    - (* sk_regdom (durable-disk lane E-boot): the collected state IS the
-         [ftop] map restricted to the region, whose domain row is
-         [col_hand]'s [Hdi]; [cg_width] turns the region's width into the
-         superblock's own [ninodes/16 + 1]. *)
-      intros i Hi. apply elem_of_dom. apply Hdi.
+    - intros i Hi. apply elem_of_dom. apply Hdi.
       pose proof (cg_width Hg). lia.
-    - (* sk_dirloc (durable-disk lane E-clauses): the payloads' three
-         directory clauses, restated at [S]'s own region width.  The
-         payloads use [icfg_nib]; [cg_icfg] and [cg_width] say that IS
-         [ninodes/16 + 1]. *)
-      assert (Hw : Z.to_nat (sb_ninodes sb / 16 + 1) = icfg_nib).
-      { pose proof (cg_width Hg) as Hcw. pose proof (cg_icfg Hg) as Hci.
+    - assert (Hw : snap_nib (col_state sb sbb I used) = icfg_nib).
+      { rewrite /snap_nib /col_state /=.
+        pose proof (cg_width Hg) as Hcw. pose proof (cg_icfg Hg) as Hci.
         rewrite -Hcw Nat2Z.id. exact Hci. }
-      rewrite Hw. exact Hdirloc.
-    - (* sk_dombelow (durable-disk lane E-himg): the collected view is the
-         restriction to the HOME set, and [cg_size] is that bound
-         verbatim. *)
-      intros b [bs Hbs]. rewrite /col_view in Hbs.
-      apply fs_restrict_lookup_Some in Hbs as [Hh _].
-      exact (cg_size Hg b Hh).
+      rewrite /col_state /= in Hw. rewrite Hw. exact Hdirloc.
   Qed.
 
-  (* THE WHOLE OF WHAT [FsDurSnap.fs_snap_alloc] TAKES, and it is the pure
-     fact plan section 4 says the commit RECONSTRUCTS.  It moves nothing:
-     the caller keeps every piece of [col_hand] and hands it straight back
-     to the invariants it borrowed them from. *)
-  Lemma col_snap_ok γfs γi (ist : Z) (nib : nat) (sb : fs_sb)
-      (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
-      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
-      (C : gmap Z (list (bv 8))) (home : gset Z) :
-    col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
-    ⌜snap_ok (col_state sb sbb I used) (col_view C home)⌝.
+  (* ---- the RUNS, one object at a time ------------------------------- *)
+
+  (* ONE INODE'S BLOCK LEGS, as runs at the bundle's own share.  The
+     bundle's data and indirect legs ARE [FsDurXfer.xr_dats]'s runs read at
+     the CONSTANT-SHARE view, which is the whole of what makes the
+     collection a legal transport source. *)
+  Lemma col_bundle_dats γfs γi (i : Z) (n : fs_node) :
+    col_bundle γfs γi i n
+    ⊢ ⌜node_lens n⌝ ∗ phi_runs_ex (fs_gamma_L γfs) (xr_dats n).
+  Proof.
+    iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "H".
+    rewrite /inode_owned_era_q.
+    iDestruct "H" as "(_ & Hblk & Hind & _ & _)".
+    iAssert (([∗ map] k ↦ bs ∈ fn_blk n,
+                blk_owned (gamma_q (fs_gamma_L γfs) dq) (fn_naddr n k) bs)
+             ∗ ind_owned (gamma_q (fs_gamma_L γfs) dq) n)%I
+      with "[Hblk Hind]" as "Hd".
+    { iSplitL "Hblk".
+      - iApply (big_sepM_mono with "Hblk"). intros k bs _.
+        rewrite gamma_q_blk_owned //.
+      - rewrite gamma_q_ind_owned. iExact "Hind". }
+    iDestruct (inode_dats_runs (gamma_q (fs_gamma_L γfs) dq) n with "Hd")
+      as "[%Hlens Hr]".
+    iSplitR; [by iPureIntro |].
+    iApply (phi_runs_ex_at (fs_gamma_L γfs) dq (xr_dats n) Hnv with "Hr").
+  Qed.
+
+  Lemma col_bundles_lens γfs γi (I : gmap Z fs_node) :
+    ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n) -∗
+    ⌜forall i n, I !! i = Some n -> node_lens n⌝.
   Proof.
     iIntros "H".
-    iDestruct (col_snap_bytes with "H") as %Hbytes.
-    iDestruct "H" as "(_ & _ & _ & _ & _ & _ & Hb & _)".
-    iDestruct (col_bundles_local with "Hb") as %Hloc.
-    iPureIntro. apply snap_ok_intro; [exact Hbytes |].
-    rewrite /snap_local /col_state /=. exact Hloc.
+    rewrite bi.pure_forall. iIntros (i).
+    rewrite bi.pure_forall. iIntros (n).
+    rewrite bi.pure_impl. iIntros (Hi).
+    iDestruct (big_sepM_lookup _ _ i n Hi with "H") as "Hb".
+    iDestruct (col_bundle_dats with "Hb") as "[$ _]".
   Qed.
 
-  (* ...and the form the commit's law is stated at: the state is not named
-     at the call site, only its existence. *)
-  Lemma col_snap_ok_ex γfs γi (ist : Z) (nib : nat) (sb : fs_sb)
-      (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
-      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
-      (C : gmap Z (list (bv 8))) (home : gset Z) :
-    col_hand γfs γi ist nib sb sbb used I m Lb C home -∗
-    ⌜exists S : fs_state_rec, snap_ok S (col_view C home)⌝.
+  (* ONE INODE'S RUNS: its record's, out of the REGION at fraction 1, and
+     its block legs', out of its own bundle at the bundle's share. *)
+  Lemma col_bundle_inum γfs γi (i : Z) (n : fs_node) :
+    col_bundle γfs γi i n -∗ ⌜0 <= i < 2 ^ 32⌝.
   Proof.
-    iIntros "H". iDestruct (col_snap_ok with "H") as %Hok.
-    iPureIntro. exists (col_state sb sbb I used). exact Hok.
+    iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "_".
+    iPureIntro. rewrite -Hbv.
+    pose proof (bv_unsigned_in_range _ inum) as [Hlo Hhi].
+    assert (H32 : bv_modulus 32 = (2 ^ 32)%Z) by (vm_compute; reflexivity).
+    rewrite H32 in Hhi. lia.
+  Qed.
+
+  Lemma col_inode_runs γfs γi (sb : fs_sb) (i : Z) (n : fs_node) :
+    rec_owned_at (fs_gamma_L γfs) (sb_inodestart sb) i (fn_rec n) -∗
+    col_bundle γfs γi i n -∗
+    phi_runs_ex (fs_gamma_L γfs) (xr_inode sb i n).
+  Proof.
+    iIntros "Hrec Hb".
+    iAssert (⌜0 <= i < 2 ^ 32⌝ ∧ col_bundle γfs γi i n)%I
+      with "[Hb]" as "[%Hi Hb]".
+    { iSplit; [iApply (col_bundle_inum with "Hb") | iExact "Hb"]. }
+    iDestruct (col_bundle_dats with "Hb") as "[_ Hdats]".
+    rewrite /xr_inode.
+    iApply (phi_runs_ex_cons (fs_gamma_L γfs) (DfracOwn 1) (xr_rec sb i n)
+              (xr_dats n) (dfrac_full_nvalid (DfracOwn 1))).
+    iSplitR "Hdats"; [| iExact "Hdats"].
+    rewrite -(rec_owned_sb (fs_gamma_L γfs) sb i (fn_rec n) Hi)
+            /rec_owned /xr_rec /xr_blk /xr_off /xr_bs /=.
+    iExact "Hrec".
   Qed.
 
   (* ==================================================================== *)

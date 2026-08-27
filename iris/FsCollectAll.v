@@ -4,8 +4,9 @@
 (*   quiescence"; FsCollect.v does the ARITHMETIC, this file finds the     *)
 (*   pieces)                                                              *)
 (*                                                                        *)
-(*  [FsCollect.col_snap_ok_ex] reads [FsDurSnap.snap_ok] off               *)
-(*  [FsCollect.col_hand] -- the era's pieces AS ALREADY COLLECTED.  This   *)
+(*  [col_hand_mint] below reads [FsDurSnap.snap_mint] -- what the epoch's  *)
+(*  mint takes, and NOT [snap_ok] -- off [FsCollect.col_hand], the era's   *)
+(*  pieces AS ALREADY COLLECTED.  This                                     *)
 (*  file COLLECTS them, at ONE ghost step with the WAL's [LogDefs.ln_tx]   *)
 (*  authority empty: the abstract map off [InodeRegion.ftop_inv], the      *)
 (*  records off [InodeRegion.ireg_inv], the used set and the free blocks   *)
@@ -14,6 +15,10 @@
 (*  and the fifty slot escrows ([IcacheEscrow.ic_escrow_body_cover_all]).  *)
 (*                                                                        *)
 (*  THE CONCLUSION IS PURE, AND THAT IS WHAT MAKES THE ASSEMBLY POSSIBLE.  *)
+(*  IT STAYS PURE UNDER LANE H4, which is why the collection never had to  *)
+(*  become an ACCESSOR: what the epoch's mint takes is a package of        *)
+(*  READINGS ([snap_mint]) and no resource at all, so the allocation runs  *)
+(*  AFTER every invariant has closed.                                      *)
 (*  [pure_keep] below is the whole trick: an entailment [R |- <pure phi>]  *)
 (*  yields [R |- <pure phi> * R], because a pure proposition is persistent *)
 (*  and this logic is affine.  So the collection itself may be entirely    *)
@@ -70,6 +75,7 @@ Require Import BitmapInv.
 Require Import SbPark.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
+Require Import FsDurXfer.       (* the run vocabulary: [xr_fs], [xf_shape] *)
 Require Import FsDurSnap.
 Require Import FsCollect.
 Require Import IregClean.
@@ -607,9 +613,180 @@ Section CollectAll.
       + exact (Hall i x Hi Hix).
   Qed.
 
+  (* ==================================================================== *)
+  (*  2b.  THE HAND'S OWN RUNS (durable-disk lane H4)                      *)
+  (*                                                                      *)
+  (*  What the mint takes off [FsCollect.col_hand] and what it does NOT.   *)
+  (*  It does not take an [FsState.fs_state]: quiescence never yields one  *)
+  (*  -- the records sit REGION-side at fraction 1 while the data legs are *)
+  (*  each at their own inode's share -- and it does not take a byte tie,  *)
+  (*  a used-set clause or a disjointness clause.  It takes the RUNS: the  *)
+  (*  same byte legs, listed, each with the share it actually arrived at,  *)
+  (*  and everything the transport wants is then read off them            *)
+  (*  ([FsDurXfer.phi_runs_ex_disj] off [phi_excl],                       *)
+  (*  [phi_runs_ex_in] off the era's own authority).                       *)
+  (* ==================================================================== *)
+
+  (* the region's records, re-indexed from (block, slot) to INUM.  The
+     resource does not move: [InodeRegion.ireg_recs] IS the sixteen record
+     runs, and [ireg_couple] names the map's value at each. *)
+  Lemma col_recs_by_inum (γfs : fs_names) (γi : gname) (ist : Z) (nib : nat)
+      (m : gmap Z dinode) :
+    ([∗ list] bi ∈ seq 0%nat nib,
+       ∃ ds : list dinode,
+         ⌜diblk_wf ds⌝ ∗ ⌜ireg_couple m bi ds⌝ ∗ ireg_recs γfs ist bi ds)
+    ⊢ [∗ set] z ∈ region_inums nib,
+        ∃ d : dinode, ⌜m !! z = Some d⌝
+                      ∗ rec_owned_at (fs_gamma_L γfs) ist z d.
+  Proof.
+    iIntros "H".
+    iAssert ([∗ list] bi ∈ seq 0%nat nib,
+               [∗ list] i ∈ seq 0%nat 16%nat,
+                 ∃ d : dinode,
+                   ⌜m !! (16 * Z.of_nat bi + Z.of_nat i)%Z = Some d⌝
+                   ∗ rec_owned_at (fs_gamma_L γfs) ist
+                       (16 * Z.of_nat bi + Z.of_nat i)%Z d)%I
+      with "[H]" as "H".
+    { iApply (big_sepL_impl with "H"). iIntros "!>" (j bi Hj) "Hb".
+      iDestruct "Hb" as (ds) "(%Hwf & %Hcpl & Hrecs)".
+      rewrite /ireg_recs.
+      iApply (big_sepL_impl with "Hrecs"). iIntros "!>" (p i Hp) "Hs".
+      apply lookup_seq in Hp as [-> Hlt]. rewrite Nat.add_0_l.
+      iExists (ds !!! p). iSplitR; [iPureIntro; exact (Hcpl p Hlt) |].
+      iExact "Hs". }
+    iApply nested_to_set. iExact "H".
+  Qed.
+
+  (* ...and the whole of it: [FsDurSnap.snap_mint] off the hand. *)
+  Lemma col_hand_mint (γfs : fs_names) (γi : gname) (nib : nat) (sb : fs_sb)
+      (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
+      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
+      (C : gmap Z (list (bv 8))) (home : gset Z) :
+    col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m Lb C home
+    ⊢ ⌜snap_mint (col_state sb sbb I used) (col_view C home)⌝.
+  Proof.
+    iIntros "Hhand".
+    (* ---- the GEOMETRY, off the boot configuration ---- *)
+    iAssert (⌜snap_shape (col_state sb sbb I used) (col_view C home)⌝
+             ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
+                 Lb C home)%I with "[Hhand]" as "[%Hsh Hhand]".
+    { iSplit; [iApply (col_snap_shape with "Hhand") | iExact "Hhand"]. }
+    iDestruct "Hhand" as "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk
+                           & Hkeep & %Hdirloc)".
+    (* ---- the superblock's parse and its block's width ---- *)
+    rewrite /sb_owned. iDestruct "Hsb" as "[Hsbb %Hparse]".
+    rewrite /blk_owned. iDestruct "Hsbb" as "[%Hsbl Hsbb]".
+    rewrite /free_bitmap_at. iDestruct "Hbm" as "[Hbmb Hpool]".
+    rewrite /blk_owned. iDestruct "Hbmb" as "[%Hbml Hbmb]".
+    (* ---- the local clauses and the block lengths, off the bundles ---- *)
+    iAssert (⌜forall i n, I !! i = Some n -> inode_local i n⌝
+             ∧ ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n))%I
+      with "[Hb]" as "[%Hloc Hb]".
+    { iSplit; [iApply (col_bundles_local with "Hb") | iExact "Hb"]. }
+    iAssert (⌜forall i n, I !! i = Some n -> node_lens n⌝
+             ∧ ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n))%I
+      with "[Hb]" as "[%Hlens Hb]".
+    { iSplit; [iApply (col_bundles_lens with "Hb") | iExact "Hb"]. }
+    (* ---- the records' values, against the region's own authority ---- *)
+    rewrite /col_recs. iDestruct "Hrec" as "[Hma Hrows]".
+    iAssert (⌜forall i n, I !! i = Some n -> m !! i = Some (fn_rec n)⌝
+             ∧ (ghost_map_auth γi 1 m
+                ∗ [∗ map] i ↦ n ∈ I, col_bundle γfs γi i n))%I
+      with "[Hma Hb]" as "[%Hmrec [Hma Hb]]".
+    { iSplit; [| iFrame "Hma Hb"].
+      rewrite bi.pure_forall. iIntros (i).
+      rewrite bi.pure_forall. iIntros (n).
+      rewrite bi.pure_impl. iIntros (Hi).
+      iDestruct (big_sepM_lookup _ _ i n Hi with "Hb") as "Hbi".
+      iApply (col_bundle_rec with "Hma Hbi"). }
+    (* ---- the link family's own validity, SLACKED AT THE ROOT ---- *)
+    iDestruct "Hkeep" as (kv) "Hkeep".
+    rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl)
+            /FsStateLink.link_tok /FsStateLink.link_toks
+            /FsStateLink.link_tok_elem /=.
+    iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
+    (* ---- the free pool's own map ---- *)
+    iDestruct (free_pool_runs (fs_gamma_L γfs) (FsImg.sb_size sb) used
+                 with "Hpool")
+      as (PM) "[%Hpm Hpool]".
+    (* ---- the records, by inum, zipped with the bundles ---- *)
+    iDestruct (col_recs_by_inum γfs γi (FsImg.sb_inodestart sb) nib m
+                 with "Hrows") as "Hrecs".
+    assert (HdomI : dom I = region_inums nib).
+    { apply set_eq. intros z. rewrite region_inums_spec. exact (Hdi z). }
+    rewrite -HdomI -big_sepM_dom.
+    iAssert ([∗ map] i ↦ n ∈ I,
+               rec_owned_at (fs_gamma_L γfs) (FsImg.sb_inodestart sb) i
+                 (fn_rec n))%I with "[Hrecs]" as "Hrecs".
+    { iApply (big_sepM_impl with "Hrecs"). iIntros "!>" (i n Hi) "Hr".
+      iDestruct "Hr" as (d Hd) "Hr".
+      rewrite (Hmrec i n Hi) in Hd. apply (inj Some) in Hd. subst d.
+      iExact "Hr". }
+    iAssert ([∗ map] i ↦ n ∈ I,
+               rec_owned_at (fs_gamma_L γfs) (FsImg.sb_inodestart sb) i
+                 (fn_rec n) ∗ col_bundle γfs γi i n)%I
+      with "[Hrecs Hb]" as "Hpairs".
+    { rewrite big_sepM_sep. iFrame "Hrecs Hb". }
+    (* ---- THE RUN LIST ---- *)
+    assert (Hone : forall p : Z * fs_node,
+              (rec_owned_at (fs_gamma_L γfs) (FsImg.sb_inodestart sb) p.1
+                 (fn_rec p.2) ∗ col_bundle γfs γi p.1 p.2)
+              ⊢ phi_runs_ex (fs_gamma_L γfs) (xr_inode sb p.1 p.2)).
+    { intros p. iIntros "[Hr Hbi]".
+      iApply (col_inode_runs γfs γi sb p.1 p.2 with "Hr Hbi"). }
+    iAssert (phi_runs_ex (fs_gamma_L γfs)
+               (xr_fs (col_state sb sbb I used) PM))%I
+      with "[Hsbb Hbmb Hpairs Hpool]" as "Hex".
+    { rewrite /xr_fs /col_state /=.
+      iApply (phi_runs_ex_cons (fs_gamma_L γfs) (DfracOwn 1)
+                ((SB_BNO, 0), sbb) _
+                (FsStateDefs.dfrac_full_nvalid (DfracOwn 1))).
+      iSplitL "Hsbb"; [iExact "Hsbb" |].
+      iApply (phi_runs_ex_cons (fs_gamma_L γfs) (DfracOwn 1)
+                ((FsImg.sb_bmapstart sb, 0), bm_bytes BSIZE used) _
+                (FsStateDefs.dfrac_full_nvalid (DfracOwn 1))).
+      iSplitL "Hbmb"; [iExact "Hbmb" |].
+      iApply phi_runs_ex_app. iSplitL "Hpairs".
+      - rewrite big_sepM_map_to_list.
+        iApply (phi_runs_ex_concat (fs_gamma_L γfs) (map_to_list I)
+                  (fun p : Z * fs_node => xr_inode sb p.1 p.2) _ Hone
+                  with "Hpairs").
+      - iApply (phi_runs_ex_full with "Hpool"). }
+    (* ---- and the two readings off it ---- *)
+    iAssert (⌜xr_disj (xr_fs (col_state sb sbb I used) PM)⌝
+             ∧ phi_runs_ex (fs_gamma_L γfs)
+                 (xr_fs (col_state sb sbb I used) PM))%I
+      with "[Hex]" as "[%Hdisj Hex]".
+    { iSplit; [| iExact "Hex"].
+      iApply (phi_runs_ex_disj (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
+                with "Hex"). }
+    iAssert (⌜Lb ⊆ fs_dbytes (col_view C home)⌝
+             ∧ col_auth γfs Lb C home)%I with "[Hau]" as "[%Hle Hau]".
+    { iSplit; [iApply (col_auth_dbytes with "Hau") | iExact "Hau"]. }
+    iDestruct (phi_runs_ex_in (fs_gamma_L γfs) (col_auth γfs Lb C home) Lb
+                 (col_agree γfs Lb C home) _ with "Hau Hex") as %Hin.
+    iPureIntro. split.
+    - exact Hsh.
+    - rewrite /snap_local /col_state /=. exact Hloc.
+    - rewrite /col_state /=. exact Hparse.
+    - destruct Hlinks as (f & Hfok & Hfv). exists f, kv.
+      split; [exact Hfok |].
+      assert (Hr : ireg_root = FsImg.ROOTINO) by (vm_compute; reflexivity).
+      rewrite -Hr. exact Hfv.
+    - exists PM. split; [| split].
+      + rewrite /xf_shape /col_state /=.
+        split; [exact Hsbl | split; [exact Hlens | exact Hpm]].
+      + exact Hdisj.
+      + exact (transitivity Hin Hle).
+  Qed.
+
   (* THE CORE.  Everything on the left is CONSUMED -- the caller gets it all
-     back through [pure_keep], because what comes out is pure. *)
-  Lemma col_bodies_snap_ok
+     back through [pure_keep], because what comes out is pure.  IT STAYS
+     PURE UNDER LANE H4: what the epoch's mint takes is
+     [FsDurSnap.snap_mint], a package of READINGS and not an instance, so
+     the collection never has to become an accessor and the allocation
+     happens after every invariant has closed. *)
+  Lemma col_bodies_mint
       (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z)
       (nib : nat) (sb : fs_sb) (sbb : list (bv 8)) (used : gset Z)
       (m : gmap Z dinode) (I : gmap Z fs_node) (O X : gset Z)
@@ -631,7 +808,7 @@ Section CollectAll.
      ∗ ic_ids cn ids
      ∗ ([∗ list] k ∈ seq 0%nat NINODE, ic_escrow_body cn γfs γi cov ls k))
     ⊢ ⌜exists S : fs_state_rec,
-         snap_ok S (col_view C (fs_home_set cov ls))⌝.
+         snap_mint S (col_view C (fs_home_set cov ls))⌝.
   Proof.
     intros Hgeom Hrow Hlen Hparse.
     assert (Hwide : forall z : Z, z ∈ region_inums nib -> 0 <= z < 2 ^ 32).
@@ -713,8 +890,9 @@ Section CollectAll.
       iPureIntro. intros i n Hi.
       apply col_reg_map_lookup in Hi as [HI Hz].
       exact (Hdirl i n Hz HI). }
-    iDestruct (col_snap_ok_ex with "Hhand") as %Hok.
-    iPureIntro. exact Hok.
+    iDestruct (col_hand_mint with "Hhand") as %Hok.
+    iPureIntro.
+    exists (col_state sb sbb (col_reg_map nib I) used). exact Hok.
   Qed.
 
 
@@ -821,7 +999,7 @@ Section CollectAll.
   (*  reason this lemma takes [col_auth] rather than [fs_bytes_inv].       *)
   (* ==================================================================== *)
 
-  Lemma fs_collect_snap_ok (E : coPset) (cn : ic_names)
+  Lemma fs_collect_mint (E : coPset) (cn : ic_names)
       (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z) (nib : nat)
       (sb : fs_sb) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) :
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
@@ -834,7 +1012,7 @@ Section CollectAll.
     sb_park γfs sb -∗
     col_auth γfs Lb C (fs_home_set cov ls) -∗
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E}=∗
-      ⌜exists S : fs_state_rec, snap_ok S (col_view C (fs_home_set cov ls))⌝
+      ⌜exists S : fs_state_rec, snap_mint S (col_view C (fs_home_set cov ls))⌝
       ∗ col_auth γfs Lb C (fs_home_set cov ls)
       ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof.
@@ -872,7 +1050,7 @@ Section CollectAll.
       as "[Hbodies Hcle]".
     (* ---- THE COLLECTION, and it gives everything back ---- *)
     iDestruct (pure_keep_wand _ _
-                 (col_bodies_snap_ok cn γfs γi cov ls nib sb sbb used m I O X
+                 (col_bodies_mint cn γfs γi cov ls nib sb sbb used m I O X
                     ids Lb C Hgeom Hrow Hlen Hparse)
                  with "[$Htx $Hauth $Hta $Hma $Hblks $Hbres $Hsbb $Hrows
                         $Hmks $Hids $Hbodies]")
@@ -944,7 +1122,7 @@ Section CollectAll.
     assert (Hsn : (↑sbN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hpn : (↑ipoolN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
-    iMod (fs_collect_snap_ok E cn γfs γi cov ls nib sb Lb C Hgeom
+    iMod (fs_collect_mint E cn γfs γi cov ls nib sb Lb C Hgeom
             Hft Hir Hbn Hsn Hpn Hen
             with "Hireg Hbm Hesc Hpool Hpark [Hb] Ht")
       as "(%Hok & Hauth & Ht)".
@@ -959,7 +1137,7 @@ Section CollectAll.
        [fs_restrict (dv_of_D C) home], so the registry stands at exactly the
        map the commit jumps to. *)
     destruct Hok as [S HS].
-    iMod (P_dur_alloc S (col_view C (fs_home_set cov ls)) HS) as "Hdur".
+    iMod (P_dur_alloc_mint S (col_view C (fs_home_set cov ls)) HS) as "Hdur".
     (* [iFrame] must NOT go first here: [P_dur] is an existential over a
        [∗] whose head conjunct is a byte AUTHORITY, so a bare
        [iFrame "Hb Ht"] happily unifies the SNAPSHOT's fresh gname with the
