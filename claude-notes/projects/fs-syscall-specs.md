@@ -26,11 +26,11 @@ things, and the answer differs:
    (`SpecNamexTr`/`ProofNamexTr`/`LinkNameiTr`).  The spec doc's §3
    path-resolution primitive IS the ghost trace, and §2's carrier
    (`nview`) is either dview-extended or a `γtop` reading — that choice
-   is precisely lane S0's question (§9 Q1 of the doc).  Deleting the
-   ghosts first pre-judges the answer the expensive way: re-threading a
-   payload ghost through every mutation site re-pays the N-1 campaign.
-   If S0 rules `nview` = reading of `γtop` (dview subsumed), the dview
-   column retires HERE, sequenced behind the ruling instead of before it.
+   was lane S0's question (§9 Q1 of the doc) and IS NOW RULED
+   (2026-08-27, doc v3): the carrier is a reading of `γtop`'s
+   `top_frag_q`, so the dview column retires HERE — lane A item (iii),
+   hop seam first, column second.  Deleting the ghosts before the hop
+   seam moves would still re-pay N-1; the sequencing stands.
 2. **The seven off-build pinned files — DELETE-OK, with one statement
    salvaged.**  `NameiInitPinned.v`, `LinkNameiPinned.v`,
    `SpecKexecPinned.v`, `ProofKexecPinnedA/­.v`, `LinkKexecPinned.v` are
@@ -45,16 +45,16 @@ things, and the answer differs:
 
 ## The lanes
 
-- [ ] **S0 — the carrier ruling + doc v3 (DESIGN; gated on rank 4's
-  finding and the owner's word on doc §9 Q1–Q3).**  Decide: `nview` as
-  dview-generalized ghost vs a reading of `γtop`'s per-inode fragments
-  (`top_frag` already exists at every inode — the campaign should not
-  build a second map that shadows it without a reason); the `aview`
-  quotient boundary (`abs_of : fs_node → anode` at the spec layer, §9
-  Q2); where `state av` lives (§9 Q3 — proposal: a reading of
-  `ftop_inv`'s authority, no new invariant).  Output: doc §§1–3
-  finalized as v3.  Q4 is ANSWERED by the landed design (the epoch
-  pointer); Q5 stays option (a) until a consumer objects.
+- [x] **S0 — the carrier ruling + doc v3.**  DONE 2026-08-27, on the
+  user's ruling "we can change the design to match better the kernel
+  specs": the carrier is a READING of `γtop`'s `top_frag_q` (no new
+  map; agreement/split/mover-discipline all landed), `aview` quotients
+  via `abs_of` INSIDE the carrier definition (kernel side never sees
+  `anode`), `state av` is a reading of `fs_view`'s authority, and the
+  batch bound left the carrier for persistent `dur_at` certificates
+  (doc §5 principle 3 v3).  `dview` retires inside this campaign, hop
+  seam first — see lane A.  Q4 answered earlier (epoch pointer); Q5
+  stays option (a).  Residual: owner reads v3.
 - [ ] **D — the durability readings (UNGATED; the first proof lane).**
   `mknod_durable` and siblings, as PER-NODE PERSISTENCE instances off
   what the durable campaign left: `FsCrash.fs_commit_receipt` (line
@@ -65,11 +65,16 @@ things, and the answer differs:
   parent's entries contain `(name ↦ inum)` — stated once in the doc's §5
   vocabulary, proven by reading; unlink and write's siblings follow the
   same shape.  This is durable-disk lane D's content, subsumed.
-- [ ] **A — the abstract state and carriers (after S0).**  `aview` as
-  the `abs_of`-fmap reading of `γtop`; the `state av` accessor; the
-  `i ↦ₐ{q} a [≤b]` carrier with its epoch bound; `path_at` off the
-  ghost trace (the salvaged `DirViewPin` statement, restated over the
-  spec carriers).
+- [ ] **A — the abstract state and carriers (S0 done; ready).**  Four
+  pieces, all readings: (i) `abs_of : fs_node → anode` + the carrier
+  `i ↦ₐ{q} a := ∃ n, top_frag_q _ q i n ∗ ⌜abs_of n = a⌝` + the
+  `state av` accessor off `fs_view`; (ii) `path_at` off the ghost trace
+  (the salvaged `DirViewPin` statement over the new carrier); (iii) THE
+  DVIEW RETIREMENT: re-fire `nx_hop` off the payload's `top_frag`
+  (`dv_lookup_found` restated over `dir_entries`), then take the
+  `dv_*` column off the payloads — hop seam FIRST, column second (the
+  reverse re-pays N-1); (iv) price the offset seam for the fd row (the
+  one datum with no ghost — lives in `fcontent` behind `file_ref`).
 - [ ] **W — the first increment's AU specs (after A).**  mknod →
   unlink → write, in that order (§9 Q6: spike-adjacent first, hardest
   in-memory arm second, per-chunk honesty third).  open/read/close/

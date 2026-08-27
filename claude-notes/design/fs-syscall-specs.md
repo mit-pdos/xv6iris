@@ -1,6 +1,13 @@
 # fs-syscall-specs — directory-based specs for the fs syscalls, one history, two boundaries
 
-STATUS: EXPLORATION, v2 (2026-08-24, Fable + owner).  A proposal, not a
+STATUS: v3 (2026-08-27, Fable, on the user's ruling: "we can change the
+design to match better the kernel specs").  v3's one move: every §2
+carrier is now DEFINED as a reading of a ghost the kernel proofs already
+maintain (`top_frag_q`, the fd-state fragments, `proc_priv`'s cwd leg,
+`fs_view`'s authority) — nothing is minted, `dview` is slated for
+retirement inside this campaign, and §9 Q1–Q3 are RULED.  §§2, 3, 5.3
+and 9 carry the changes; the rest of v2 stands.
+Previously: EXPLORATION, v2 (2026-08-24, Fable + owner).  A proposal, not a
 design of record.  v1 (same day) presented each syscall's spec as "the
 same delta read twice" — once at the logged view, once at the durable
 view — with per-op durable tokens.  The owner asked for a design that
@@ -84,10 +91,13 @@ The three principles (stated precisely in §5):
    view holds after recovery, with no crash-specific proof.
 2. **BOUND.**  A persistent, monotone `flushed b` says batches ≤ b are
    on disk; the one synchronous source is `end_op`-was-last-in-group.
-3. **PER-NODE PERSISTENCE.**  `i ↦ₐ a [≤b] ∗ flushed b ⊢ recovery
-   preserves i at a` — the node-local reading of SNAPSHOT, and the only
-   crash rule most consumers ever touch.  The version bound `[≤b]` rides
-   the carrier the consumer already holds; it is not a second resource.
+3. **PER-NODE PERSISTENCE.**  `dur_at b i a ∗ (share of i still held) ⊢
+   recovery preserves i at a` — the node-local reading of SNAPSHOT, and
+   the only crash rule most consumers ever touch.  `dur_at b i a` is a
+   PERSISTENT per-node certificate ("the batch-b snapshot has i at a"),
+   a copy of the frozen snapshot's row; the held share closes the gap
+   between b and the crash (nothing moved i since).  v3 change: no
+   version bound rides the fractional carrier — see §5.
 
 ## 1. Why directory-based, and what that means precisely
 
@@ -161,39 +171,63 @@ Decisions folded in, each inherited from a landed ruling:
   last fd closes (`iput`'s free).  Hiding it would make `sys_read` on an
   unlinked fd unspecifiable.
 
-## 2. The client-facing resources
+## 2. The client-facing resources (v3: readings of landed ghosts, nothing minted)
 
-Three carriers, all per-inum, none whole-state:
+The v2 carriers keep their meanings, but each is now DEFINED as a
+reading of ghost state the kernel proofs already maintain:
 
 ```
-i ↦ₐ{q} a [≤b]     (* fractional agreement: inum i's abstract node is a,
-                      last modified in batch ≤ b.  The dview
-                      generalization: the payload/escrow holds the other
-                      half; a client half makes the node's value STABLE
-                      against concurrent mutation.  The bound b is data
-                      ON the same carrier (a nat beside the agreement
-                      value), not a separate resource; it is monotone in
-                      the obvious sense and consumers may weaken it. *)
-i ↦ₐ a [≤b]        (* q = 1/2 shorthand; the client-held stability half *)
-root_is r          (* persistent; r = ROOTINO *)
-cwd ↦ i            (* per-process: the working directory ref (a held
-                      reference, not a lock) *)
-fd f ↦ (i, off, om) (* per-process file-table row: inum, offset, open mode.
-                      pipes/devices have their own row forms *)
+i ↦ₐ{q} a   :=  ∃ n, top_frag_q Γ_L (DfracOwn q) i n ∗ ⌜abs_of n = a⌝
+                (* FsState.top_frag_q — the landed per-inum ghost-map
+                   fragment (i ↪[γtop]{dq} n).  Agreement is
+                   top_frag_q_agree, splitting top_frag_q_split, and
+                   STABILITY is the landed mover discipline itself:
+                   every retag (InodeRegion.ireg_top_retag) needs the
+                   WHOLE element, so any outstanding share pins the
+                   node's value.  NO batch bound rides the carrier —
+                   see §5 principle 3 (v3) for where the bound went. *)
+root_is r    :=  ⌜r = ROOTINO⌝                    (* pure; a literal *)
+cwd ↦ i      :=  the cwd leg of ProcInv.proc_priv  (* landed; create and
+                   namex already consume it via proc_priv_cwd_pid *)
+fd f ↦ (i,om) :=  the landed fd-state fragment (FdSlots.fd_frags, row f):
+                   FdOpen (FdInode i) carries the INUM since d1411776;
+                   the mode rides fcontent's readable/writable.  The
+                   OFFSET is the one datum with no ghost of its own —
+                   it lives in fcontent behind file_ref, and the
+                   read/write AU forms bind it there (lane A prices
+                   whether a client-facing offset reading needs a seam).
+state av     :=  the abs_of-fmap reading of fs_view's γtop authority
+                   (FsState.fs_view = ∃ S, ghost_map_auth (γtop Γ) 1
+                   (fss_inodes S) ∗ fs_state Γ S) — §9 Q3, RULED as
+                   proposed: no new invariant, no aviewN.
 ```
 
-**Why fractional-agreement and not the `γtop` fragment itself.**  The
-custody theorem (`fs-fragments.md` §1.4) stands: `γtop_L`'s fragment
-rides in the checked-out payload (`ic_loaded`/`ipool_alloc`) and no
-client can hold it.  The thing a client CAN hold is precisely what the
-namei-pinned campaign built for directories (`dv_half`, ½-½
-`dfrac_agree` on the entry map, living BESIDE the payload custody):
-this proposal generalizes `dview` from `gmap fname Z` to `anode ×
-batch-bound` — one per-inum ½-agreement whose payload half moves at
-every retag (`ireg_top_retag` already moves `top_frag`; the same AU
-moves this).  N-4's fraction-split plan is the same mechanism; call the
-generalized carrier `nview` to keep `dview`'s name for the landed
-directory case.
+**`dview` retires (this rules §9 Q1 and answers rank 4 for the live
+substrate).**  Since 2b-inode-3 the icache payload carries `top_frag`
+(`IcacheEscrow.ic_loaded` holds it), and since N-1 it ALSO carries
+`dv_hold d (dv_of dn data)` — the same information at a coarser reading
+(`dir_entries` of the same node).  v2's plan to generalize `dview` to a
+per-inum `anode` map would have built a THIRD copy of what `γtop`
+already pins.  v3 defines the carrier off `top_frag` and retires the
+`dview` column inside this campaign: the trace's fire point
+(`SpecNamexTr`'s header — the hop fires in dirlookup's continuation off
+the lent `dv_hold`) re-fires off the payload's `top_frag` through the
+same `dv_lookup_found` bridge restated over `dir_entries` — one seam,
+not a re-threading.  Sequencing: the hop seam moves first, then the
+`dv_*` column comes off the payloads (the reverse order re-pays N-1).
+
+**Duration of a held share, honestly.**  The landed lending discipline
+is BORROW-scoped: `ilock`'s read arm lends a quarter and the unlock
+takes it back (B″-join); the checked-in escrow holds the element whole.
+So the stable forms hold for a client WITHIN a borrow window — which is
+all the AU corollaries (§3) need.  CROSS-SYSCALL stability — the tree
+layer's want — is not a fraction fact at all: no ghost share stops the
+CODE of a concurrent writer; what makes a subtree stable is that no
+other process HAS a path or fd into it, an exclusivity fact the tree
+layer (§6) states and consumes at the whole-system level, where the
+adequacy theorem knows every process (§9 Q5(a)).  v2's ambient "client
+half beside the payload" picture is dropped as the near-duplicate it
+was.
 
 **Two spec strengths per syscall, and both are honest:**
 
@@ -434,19 +468,34 @@ first instance), not a consumer-visible statement.
    be STATE-shaped — "batches ≤ b are durable" — which `flushed b` is:
    on the fast path the invariant hands it out directly (the log is
    empty, so durable = logged at the current epoch), no commit needed.
-3. **PER-NODE PERSISTENCE (the only rule most consumers use).**
+3. **PER-NODE PERSISTENCE (the only rule most consumers use) — v3
+   restatement.**  v2 stamped a batch bound `[≤b]` onto the fractional
+   carrier; v3's carrier is the bare landed `top_frag` reading (§2),
+   which carries no batch data — and it does not need to.  The bound is
+   DERIVED, in two steps that match the landed artifacts exactly:
 
    ```
-   i ↦ₐ{q} a [≤b] ∗ flushed b  ⊢  recovery preserves i at a
+   mint:  i ↦ₐ{q} a  held across a flushed-b-producing event
+            ⊢  dur_at b i a          (persistent)
+   use:   dur_at b i a ∗ i ↦ₐ{q} a held at the crash point
+            ⊢  recovery preserves i at a
    ```
 
-   Read: this node last changed in a flushed batch, so every reachable
-   snapshot contains it at `a`.  The bound comes from the carrier the
-   consumer already holds (§2); a syscall that mutates `i` returns the
-   carrier at `[≤ its own batch]`; untouched carriers keep their bound.
-   A consumer that wants file `f` crash-safe checks exactly two local
-   facts — its own carrier's bound and one `flushed` — and never
-   mentions the view, the history, or any other node.
+   `dur_at b i a` is a persistent COPY of the batch-b frozen snapshot's
+   row at `i` — exactly plan 4⁹.3's "sync-style receipts are copies",
+   produced from lane F's certificate + the landed per-node readings
+   (`P_dur_node_of_slot`/`snap_dir_entry_of_first`).  The mint is sound
+   because the share held across the sync pins `i` at `a` through the
+   covered commit; the use is sound because the share held from `b`
+   through the crash means no snapshot in `(b, crash]` moved `i`, and
+   SNAPSHOT says recovery lands on one of those boundaries (≥ the
+   flushed floor).  "Held at the crash point" is a statement at the
+   adequacy altitude (§9 Q5(a)): the whole-system theorem sees the
+   program's frame at the crash instant — no in-logic crash modality is
+   needed for the first increment.  A consumer that wants file `f`
+   crash-safe checks exactly two local facts — its certificate and its
+   held share — and never mentions the view, the history, or any other
+   node.
 
 **What a consumer reasons about, in full:** the current state (via §4's
 triples), plus — only if it cares about crashes — principle 3 for the
@@ -479,10 +528,10 @@ block is in git history):**
   of the frozen snapshot certificate (4⁹.3), which is exactly durable
   lane F's deliverable.  Nothing here is speculative any more; lane Y of
   the campaign worklist consumes F.
-- The carrier bound = one nat beside the carrier's agreement value,
-  stamped at each mutation's retag.  WHICH ghost carries it is lane S0's
-  ruling (dview-extended `nview` vs a reading of `γtop`'s `top_frag` —
-  coupled to the simplification campaign's rank 4; see the worklist).
+- The carrier = `top_frag_q`'s `abs_of` reading, RULED (v3, §2) — no
+  batch bound rides it; the bound is derived via the persistent `dur_at`
+  certificates (principle 3 above).  Lane S0's question is answered; what
+  remains of it is executing the `dview` retirement seam (§2).
 - `was_current`/SNAPSHOT = readings of the frozen per-commit snapshot:
   `FsCrash.fs_commit_receipt` (the snapshot's state after a commit is
   the state the transactions produced), `FsDurSnap.P_dur_tie`/
@@ -582,24 +631,18 @@ Deliberately different from both:
 
 ## 9. Open questions for the owner
 
-1. **Carrier scope for `nview` (§2).**  Generalizing `dview` to all
-   nodes is new ghost machinery on the payload path (the same seam N-4
-   already plans to touch).  Alternative: directories keep `dview`,
-   FILES get their stability from the fd layer's refcount + inode lock
-   instead (weaker: file values stable only while locked).  The
-   fractional-agreement route is more uniform; the fd route is less new
-   state.  Which?  *(2026-08-27: now COUPLED to the simplification
-   campaign's rank 4, and a third option exists post-G5: `nview` as a
-   READING of `γtop`'s per-inode `top_frag` — no new map at all.  Lane
-   S0 of the campaign worklist owns the decision.)*
-2. **`aview` vs raw `fs_node` at the spec boundary.**  §1 quotients to
-   `absnode` (friendly, hides blocks).  The alternative — expose
-   `fs_node` and let the tree layer quotient — saves one reading but
-   leaks `fn_blk` into every syscall post.  Proposal says quotient here.
-3. **Where `state av` lives.**  The AU forms need an ambient authority
-   for the quotient view.  Proposal: it is a READING of `γtop_L`'s
-   authority (already in `ftop_inv`) — no new invariant, one
-   `abs_of`-fmap.  Confirm nothing needs a separate `aviewN`.
+1. **Carrier scope for `nview` (§2).**  ~~Which of the three routes?~~
+   *(RULED, v3 2026-08-27, per the user's match-the-kernel word: the
+   carrier is a READING of `γtop`'s `top_frag_q` — no new map, no
+   payload-path ghost.  `dview` retires inside this campaign, hop seam
+   first (§2).  This also settles rank 4's live-substrate half.)*
+2. **`aview` vs raw `fs_node` at the spec boundary.**  ~~Which?~~
+   *(RULED, v3: quotient HERE, but as a zero-cost reading — the carrier
+   is defined with `abs_of` inside (§2), so the kernel-facing ghost is
+   the raw `fs_node` fragment and nothing kernel-side ever sees
+   `anode`.  Both layers get their native vocabulary from one ghost.)*
+3. **Where `state av` lives.**  ~~Confirm.~~  *(RULED, v3: a reading of
+   `fs_view`'s `γtop` authority, exactly as proposed; no `aviewN`.)*
 4. **Batch identity.**  ~~Is `b` the log's epoch counter (`ln_ep`)
    verbatim, or a spec-level counter tied to it by one ghost?~~
    *(ANSWERED by the landed design, 2026-08-27: the crash predicate now
