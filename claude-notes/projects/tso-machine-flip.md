@@ -6158,6 +6158,87 @@ shape.  Those four files are the next tranche and they are now *possible*,
 which they were not when A6.65 was written.
 
 
+### A6.67 THE FOUR CHOKE POINTS ARE GREEN, AND THE HONEST MINT'S COST IS
+### NOW A MEASURED RING, NOT AN ESTIMATE
+
+**ALL FOUR CASCADE-BOUNDARY FILES LANDED:** `WpLockAt`, `TicksInv`,
+`SleepLock`, `PipeInv`.  Each takes `own_context cur_ctx` and hands it
+straight back; the two DELAYED creator forms also take `⌜CtxMorph R⌝` on
+their inner ∀, which is main's shape.  Eleven creator entry points threaded
+in four files — the choke point A6.66 predicted held exactly.
+
+**AND `SleepLock` SHOWED WHAT A CHOKE POINT ACTUALLY LOOKS LIKE INSIDE**: it
+is not one wrapper but a CHAIN of seven, each calling the next
+(`new_sleeplock_gen_at` → `new_sleeplock_gen` → `new_sleeplock` →
+`sl_fresh_new_gen` / `sl_fresh_new` / `sl_fresh_new_gen_at` →
+`sl_fresh_new_tok`).  The token threads down the whole chain and every link
+is the same three-line edit.  Worth knowing before starting the next such
+file: **the count of `newlock` USES understates the work; the count of
+WRAPPERS is the real one.**
+
+**THREE MECHANICAL TRAPS, all of which cost a compile each and all of which
+are avoidable:**
+
+1. **`CpuId` is not in scope unqualified in most files.**  ``​`{CID : CpuId}``
+   in `WpLockAt`, `TicksInv`, `SleepLock`, `PipeInv` silently declares a
+   fresh `Type` variable named `CpuId` and the error moves one line instead
+   of away — the same trap `TfPage36` sprang in A6.63.  **Spell it
+   `RiscvLang.CpuId`** anywhere outside `RiscvLang`'s own importers.
+2. **`iMod (…) as "…"; iDestruct …` chains onto the SIDE GOAL** the `with`
+   pattern's brackets create, so the destruct runs on the wrong goal.  Put
+   the destruct after the `{ … }` block as its own sentence.
+3. **A premise added at the END of a statement must be introduced at the
+   END of the `iIntros` pattern.**  Adding `own_context` last and
+   introducing it second cost one compile in `PipeInv`.
+
+### WHAT THE SWEEP SAYS: THE RING ADVANCES BY EIGHT
+
+Behind the four choke points the next ring is now reached, and it is the
+newlock family's own callers: **`BioInv`, `IcacheBoot`, `SleepLockAt`,
+`ProofKinit`** (plus `ProofAcquiresleep`, `ProofBeginOp`, `ProofSysSync`,
+`ProofFilewriteParts`, which the same cone opened).  `BioInv.bio_init`
+already borrows the running token, so the pattern is in the tree; the
+others take it the same way.
+
+The count held at **875 of 1330** across the tranche — nothing regressed,
+and the movement is reachability, not loss: files behind a newly-red
+wrapper are unreached rather than failed.  **Read 875 as the floor it has
+been all along**; the lock cascade has to bottom out before it moves again.
+
+### THE SHIM IS NOT RETIRABLE YET, AND THE COUNT SAYS EXACTLY WHY
+
+The retirement condition (zero code references) is **not met**: 30 remain,
+in five files, and they are precisely the two blocks A6.62/A6.63 already
+named —
+
+| block | sites | blocked on |
+|---|---|---|
+| the boot carve | 26 (`BootCarveMain` 25, `BootBridge` 1) | the hand-written explicit-ξ tranche; the CARVE now supplies its elements (A6.63), so this is unblocked work, not a dependency |
+| the `↦ₛ`/rodata four | 4 (`ProofPrintk` ×2, `ProofSyscall`, `WpSconfLock`) | `ctx_pointsto_of_ro`'s consumers — the kit lemma exists (A6.63), the sites are not yet moved |
+
+**Nothing on the LOCK's path is in that list any more**, which is the
+tranche's real result: A6.66's claim that the transport is honest end to
+end survived contact with all four choke points.  When those 30 go, the
+tombstone can be written; writing it now would be a lie about 30 live
+references.
+
+### THE QUEUE
+
+1. **The eight-file ring** (`BioInv`, `IcacheBoot`, `SleepLockAt`,
+   `ProofKinit`, …) — the same three-line edit per wrapper, with the three
+   traps above pre-paid.
+2. **The five M2 sites** — `ProofAcquire` ×2, `ProofRelease` onto
+   `ctx_absorb`; `ProofSwtch`'s `ctx_cells_reindex` price paid as an absorb
+   from the record, `ProofScheduler` following.  **These are now possible**
+   (A6.65 recorded them as impossible; `ctx_absorb` is what changed).
+   Delete `ctx_cells_reindex` if it goes dead.
+3. The boot 26 (needs the word/buffer twins of `ctx_pointsto_of_ro`), then
+   the four rodata sites — and then the shim's tombstone.
+4. `RiscvAdequacy`'s power tail, `UmodeFetch` (7 sites, 2 files), the
+   `tramp_tr_obl` six, `UserMemPt`'s window accessor.
+5. `VcGenS` — characterize-only; re-run A6.65's node-argument grep after it.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
