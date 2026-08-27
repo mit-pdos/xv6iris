@@ -1,5 +1,30 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
+STEP 5, THE PT-CELL / BOOT-CONE TRANCHE (2026-08-27, latest session).
+**THE PT-CELL STATEMENT HALF WAS THE CORK: 900 → 1080 of 1333, RED 16.**
+The clean-round bill is paid (`rm -f *.vo`, model checked, one full round):
+**900 of 1333** — same red set as A6.68's incremental round, so that round
+was honest, but **the denominator is 1333 and A6.68's 901 counted a stale
+`SystemAssumptions.vo`**.  `ProcInv` + `TfPage36` were pure statement
+residue against A6.49's ledger-page move and gated the entire `Proof*`/boot
+cone; fixing them (a local `↦ₚ₈c` notation for `TfPage36`'s 108 sites,
+`ktier_pin_of_id` for `ProcInv`) bought 88 files at once and the cascade
+took it to 1080.  **`iris/CtxKMap.v` now carries the identity crossing in
+BOTH directions plus the `_ro_static` byte/buffer/word twins of
+`ctx_pointsto_of_ro`** — the kit item the boot 26 was waiting on — and
+`BootBridge`'s shim use is retired honestly (shim 30 → **29**; its problem
+was never the read-only mint, it was that `stack_own_phys` is already
+`ctx_phys` so the right primitive is the identity RE-ENTRY).  The boot 25
+are SURVEYED in full (four shapes, one section, 13 lemmas, and a supply
+chain `RiscvAdequacy:531` → `BootShared` (drops it) → `BootCarveMain`).
+Four real findings behind the mechanical sweep: **`BitmapInv.v` is the last
+unflipped raw-tower OWNER**; **`ProofMain` and `ProofKvminithart` are
+blocked on the A6.53 PIN's boot threading, not on the lock kit**; the
+virtio width-2 window is asymmetric post-flip (the DMA lease's own lane);
+and **`↦ₛ` has not flipped**, which is what the remaining rodata three
+cross on.  `WpSconfLock` untouched, parked as the M4 entry.  **A6.69 is the
+record and the handoff.**
+
 STEP 5, THE M2 TRANSPORT TRANCHE (2026-08-27, latest session).  **THE M2
 TRANSPORT IS PAID FOR THE FIRST TIME, AND THE GATE IT NEEDED IS ONE A6.66
 SAID DID NOT EXIST.**  `ctx_absorb`'s interp premise makes it unusable at
@@ -6290,7 +6315,11 @@ references.
 ### INTERP-FREE RECEIPT ABSORB, WHICH A6.66 SAID DID NOT EXIST
 
 **CLOSING NUMBER: 901 of 1334, RED 14** (up from 875 of 1330, red 34; the
-denominator moved because this tranche adds four files).  Two identical
+denominator moved because this tranche adds four files).
+> **CORRECTED BY A6.69's CLEAN ROUND: it is 900 of 1333.**  The RED SET was
+> exactly right; the count was inflated by one stale `SystemAssumptions.vo`
+> inherited with the tree copy, and `SystemAssumptions.v` is deliberately
+> out of `_CoqProject`, so the denominator is 1333.  Two identical
 INCREMENTAL `-k` sweeps at the same number; model `.vo` checked to postdate
 its source first (A6.39); no `Admitted`, no `Abort`, no `Axiom`.
 **HONEST QUALIFIER: this is not a clean number.**  A `rm -f iris/*.vo`
@@ -6563,6 +6592,261 @@ node-argument grep (A6.65) must be re-run after that tranche.
    `UserMemPt`'s window accessor.
 6. When the boot cascade opens: the eight `cpu_ctx_free` producers owe a
    `ctx_parked_alloc` + `view_lb_0` pair each.
+
+
+### A6.69 THE PT-CELL STATEMENT HALF WAS THE CORK: 900 → 1080, AND THE
+### RESIDUE IT UNCOVERED IS THREE MECHANICAL CLASSES AND FOUR REAL ONES
+
+**THE CLEAN-ROUND BILL, PAID FIRST, AND IT CORRECTS A6.68 BY ONE.**
+`rm -f iris/*.vo`, model `.vo` checked fresh, one full `-j12 -k`:
+**900 of 1333**, red 14 — the SAME fourteen files A6.68's incremental round
+named, so that round's red set was honest.  Its COUNT was not: **the
+denominator is 1333, not 1334** (`SystemAssumptions.v` is deliberately out
+of `_CoqProject` — its own header says why), and the 901st `.vo` was a
+stale `SystemAssumptions.vo` inherited with the tree copy.  **Quote 900,
+not 901.**
+
+**CLOSING NUMBER AFTER THE TRANCHE: 1080 of 1333, RED 16.**  Two identical
+`-k` sweeps at the same number.  No `Admitted`, no `Axiom` (the two
+`Abort.`s in `FastSetSolverTests.v` are its deliberate `Fail set_solver`
+regression tests).
+
+#### (1) `ProcInv` / `TfPage36` — TWO FILES, AND THEY WERE THE CORK
+
+Both were pure STATEMENT residue against A6.49's ledger-page move, and
+between them they gate the whole `Proof*`/boot cone.
+
+- **`TfPage36`**: 108 occurrences of the raw `↦ₚ₈` in its 36-way
+  open/close statements, while `ProcDefs.tf_words` has been
+  `TsoCtx.ctx_phys_word_pointsto XI` since A6.58.  Fixed as a LOCAL
+  NOTATION plus a token swap, not 108 spelled-out applications:
+
+```coq
+  Local Notation "a ↦ₚ₈c w" :=
+    (TsoCtx.ctx_phys_word_pointsto XI a (DfracOwn 1) w)
+    (at level 20, format "a  ↦ₚ₈c  w") : bi_scope.
+```
+
+  > **AND THAT IS WHERE THE MISSING KIT ITEM IS: the PHYS tier has no
+  > notation twin.**  `TsoCtx.v`'s notation block gives the VA tiers
+  > `↦ₘ`/`↦₈`/`↦₄`/`↦₂` and gives the PHYSICAL family nothing, so every
+  > phys-tier statement in the tree either spells
+  > `ctx_phys_word_pointsto` out or silently keeps meaning the RAW family.
+  > Adding `↦ₚc`/`↦ₚ₈c` to the kit would rebuild the tree for a display
+  > change; it is a cutover item, and until then **a `↦ₚ₈` in a statement
+  > means the raw tower and should be read as a flip residue.**
+
+- **`ProcInv`**: one wrong argument (`ctx_pointsto_of_phys`'s third premise
+  is `ktier_pin cur_ktier ppn a`, not the identity equation a second time
+  — `RiscvPtsto.ktier_pin_of_id` is the bridge, at any tier), plus twelve
+  raw `word4_pointsto_*` lemma names where the cells are `↦₄`.
+
+**Payoff: 900 → 988 in one round**, and the second-order cascade took it to
+1080.  A6.65's "settle `ProcInv`/`TfPage36` first" was right and was the
+single highest-value item on the queue.
+
+#### (2) THE KIT GREW FIVE LEMMAS, IN ONE LEAF FILE, AND ONE SHIM USE DIED
+
+`iris/CtxKMap.v` (A6.68's `ctx_mem_page_to_phys` file) now carries the
+whole identity crossing, both directions, at the tower:
+
+| lemma | direction |
+|---|---|
+| `ctx_mem_ident_phys` / `ctx_mem_page_to_phys` | VA-ctx → phys-ctx (A6.68) |
+| `ctx_phys_ident_mem` / `ctx_phys_word_ident_mem` | phys-ctx → VA-ctx |
+| `ctx_pointsto_of_ro_static` | raw byte + element → ctx byte |
+| `ctx_buf_of_ro_static` | the `n`-byte fold |
+| `ctx_word_pointsto_of_ro_static` | the 8-byte fold |
+
+The `_ro_static` three are **the word/buffer twins of
+`TsoCtx.ctx_pointsto_of_ro` the boot 26 needs** (A6.67 queue item 3).  The
+kit lemma asks for a `ppn` and its `kmap_at` and holds the element at
+`pa_of ppn a`; every boot site has neither and its elements
+(`BootCarve.boot_led_ran`) are keyed at the address itself.  At a STATIC
+kernel-data mapping the two coincide (`KMap.kmap_static_claims_at` pins the
+ppn to `kpt_leaf_ppn`, `KptPt.pa_of_id` gives `pa_of ppn a = a`), so the
+`_static` forms are the same mint with the identity discharged once.
+
+**`BootBridge` IS GREEN AND ITS SHIM USE IS RETIRED HONESTLY — and the
+diagnosis was not the expected one.**  `phys_word_to_word`'s premise was
+the raw `↦ₚ₈`, so it looked like a `ctx_pointsto_of_ro` site.  It is not:
+`StackOwn.stack_own_phys` has been `TsoCtx.ctx_phys_word_pointsto` since
+the ledger-page move, so the bridge never leaves the tower and the right
+primitive is the identity RE-ENTRY (`ctx_phys_word_ident_mem`), which needs
+no element at all.  **The old raw route was dropping the ledger residue and
+its return leg is the direction the flip makes false** — which is exactly
+why the shim use there could not be replaced in place.  Shim: **30 → 29.**
+
+#### THE BOOT 25, SURVEYED IN FULL — AND THE SUPPLY CHAIN IS THE WORK
+
+Not landed; measured, so the next tranche starts with the answer.
+
+**THE 25 USES ARE FOUR SHAPES, all in `BootCarveMain.v`:**
+
+| shim function | uses | shape it had |
+|---|---|---|
+| `ctx_word_of_mem` | 15 | `word_pointsto a dq w ⊢ ctx_word_pointsto cur_ctx a dq w` |
+| `ctx_pointsto_of_mem` | 6 | `mem_pointsto a dq v ⊢ ctx_pointsto cur_ctx a dq v` |
+| `ctx_eslot_of_mem` | 3 | the same under `∃ w` (an existential word slot) |
+| `ctx_buf_of_mem` | 1 | the byte-run fold |
+
+**ONE SECTION** (`BootCarveMain.v:477`, `Context {!riscvGS Σ, !xv6G Σ}` —
+**no `CurCtx`**, as the blacklist requires; every lemma binds
+`` `{XI : TsoCtx.CurCtx} `` itself), **13 enclosing lemmas**, and the
+internal call graph that must move in lockstep is `boot_lk_raw` (12 uses),
+`boot_proc_slot`, `boot_page_own`, `boot_ofile_cells`, `boot_own_ctx`,
+`boot_proc_name`.
+
+**THE SUPPLY CHAIN IS THE REAL COST, AND IT HAS A HOLE IN THE MIDDLE.**
+`RiscvAdequacy.v:531` is the ONLY supplier of `boot_led_ran g text_end
+ram_hi` in the system; `BootShared.v` threads only `boot_raw_ran` and drops
+the ledger half; `BootCarveMain.v` and `BootBridge.v` **do not mention the
+ledger at all** (`grep boot_led\|ledger_elem0\|pristine_elem` → zero hits).
+So the tranche is `RiscvAdequacy` → `BootShared` → `BootCarveMain`, and the
+threading is index-for-index free once started: `boot_led_ran g lo hi` is
+the ledger half of the SAME `ran_bytes g lo hi` map `boot_raw_ran g lo hi`
+is the raw half of, and `boot_led_split` cuts with the identical arithmetic
+as `boot_ran_split`.
+
+> **TWO LEMMAS HAVE NOWHERE TO GET ELEMENTS FROM AND MUST BE HANDLED
+> SEPARATELY:** `bpay_raw_buf_raw` (`:994`) and `file_node_raw_fentry`
+> (`:1446`) are PURE TRANSPORT — no `g`, no `boot_raw_ran` — so they need
+> a brand-new explicit element premise or must be inlined into their
+> callers.
+
+#### (3) THE `cpu_ctx_free` PRODUCER BILL IS SMALLER THAN A6.68 ESTIMATED
+
+A6.68 priced "eight producers, three lines apiece".  **Measured: the eight
+are mostly THREADING sites, which the record change does not touch** —
+`ProofMainSecondary`, `SpecMain`, `SpecMainSecondary` and `BootBridge` are
+all GREEN against the parked-record definition without a single edit.  Only
+a site that CONSTRUCTS the record owes anything, and the two candidates
+(`BootShared:1245`'s `rewrite /cpu_ctx_free`, `BootChain:454`) are still
+unreached behind `BootCarveMain`.  **The bill is at most two sites.**
+
+#### (4) THE MECHANICAL RESIDUE IS THREE CLASSES, AND ALL THREE ARE SCRIPTED
+
+Roughly forty files went green on nothing but these.  The scripts are worth
+rebuilding for the next tranche; each is a build-parse-patch loop.
+
+1. **A missing `` `{XI : CurCtx} `` on ONE declaration** (A6.68's class,
+   unchanged): a fixpoint, not one pass.  Two bugs worth pre-paying —
+   take the `File` line CLOSEST to the error (the notation warnings emit
+   their own at the top of every file), and check the error BLOCK for
+   `CurCtx`, not the `Error:` line (the message is usually `Could not find
+   an instance for the following existential variables:` with `?XI :
+   CurCtx` three lines down).  **Also match `Corollary`**, not just
+   `Definition|Lemma|Instance`.
+2. **A RAW lemma name against a CTX cell**: `word{,2,4}_pointsto_{agree,
+   half,half_split,half_join,frac_split,bytes,intro,aligned_p,persist,
+   unfold,split4,join4}` → the `ctx_` twin.  **The twins take the CONTEXT
+   as their first EXPLICIT argument**, so a call that passed positional
+   underscores needs one more, and `(KTR := kt) a …` becomes
+   `(KTR := kt) cur_ctx a …` — that shift is the whole second half of the
+   class and it bit in `ProofSysUnlink`, `ProofDirlink`, `ProofKexecSeam`,
+   `ProofSysPipe`.
+3. **A RAW window spelled with an explicit `(KTR := kt)` in a STATEMENT**:
+   `word4_pointsto (KTR := KT1) a dq w` is a statement that never got the
+   M1 flip; the ctx family takes the context right after the tier.
+   `ProofSysPipe`'s epilogue continuation and `ProofSysSbrk`'s were both
+   this.
+
+> **AND THE STALE COMMENTS ARE A HAZARD, NOT JUST NOISE.**  Five files
+> carried a comment saying "stage 2: `↦₄`/`↦₂` is still the raw tower, so
+> the ctx bytes cross here" beside a live `ctx_buf_forget`.  **`↦₄` and
+> `↦₂` HAVE flipped** (A6.58 already said the comment was stale), so every
+> one of those crossings is the IDENTITY and the right edit is to delete
+> the line: `ProofArgraw`, `ProofDirlink`, `ProofKwait`, `ProofSysPipe`
+> (×2).  A6.68's rule generalises: **the test is whose `↦` the next
+> consumer means** — a consumer above `TsoCtx` wants the ctx family and
+> the crossing is dead; one below it (`KMap`, `PtTree`, `BitmapInv`) wants
+> the raw family and the crossing is real.
+
+#### (5) FOUR REAL FINDINGS THE MECHANICAL SWEEP UNCOVERED
+
+- **`BitmapInv.v` IS AN UNFLIPPED RAW-TOWER OWNER, and it is the last one.**
+  It does not `Require TsoCtx`, so its two `↦₄` cells (`sb_size` and its
+  neighbour) are the RAW family, while ~90 consumers — all of which DO
+  import `TsoCtx` — read the same cells as ctx.  `ProofWritei:2271` is
+  where the seam first bites (`ProofBmap`'s `wp_bmap_gen` states its
+  premise at the ctx tower; `ProofWritei` hands it `BitmapInv`'s raw one).
+  **This is A6.58's "one decision per raw-tower OWNER" table with one row
+  left**, and the decision is the owner's: flip `BitmapInv` (two cells, ~90
+  consumers to re-check) or state `wp_bmap_gen`'s premise raw.
+  Characterised, not paid.
+- **`ProofMain` IS NOT BLOCKED ON THE LOCK KIT — it is blocked on the A6.53
+  PIN.**  Its eleven creator call sites are threaded (borrow at each,
+  return after; the shape is `SieCapCtx.sie_cap_gpr_own_ctx_acc` as
+  everywhere else) and the first three elaborate.  The file stops at
+  `:992` on something else entirely: `KptShare.kpt_inv_alloc` gained the
+  pin's bound `(B : nat)` and a `kptb_unset` premise, and main's boot chain
+  threads neither.  **`ProofKvminithart:236` is the same cause** —
+  `tlb_res_pt_intro` gained `(B0 : nat)` plus `kpt_bound B0` and
+  `view_lb … B0`, and the call still passes the pre-pin argument list.
+  The reference shapes are green and adjacent: `WpSconfSfence:434` and
+  `KptShare:289`.  **The pin's boot-side threading is the next tranche's
+  own item**, and it is what `ProofMain`, `ProofKvminithart` and (behind
+  them) `BootShared`/`BootChain` are all waiting on.
+  > The eleven `ProofMain` creator edits are therefore **PARTIALLY
+  > VALIDATED**: everything above `:992` elaborated, the eight below it
+  > has not been checked.
+- **THE VIRTIO WIDTH-2 WINDOW IS ASYMMETRIC POST-FLIP.**
+  `DiskInv.word2_to_phys` takes the CTX `↦₂` while `DiskInv.phys_to_word2`
+  returns the RAW `word2_pointsto`, and `ProofVirtioDiskIntr:1165` /
+  `ProofVirtioDiskRwD:686` do the round trip.  The honest repair is a
+  `phys_ledger → ctx` re-entry, and that is NOT the identity crossing
+  `CtxKMap` provides: `phys_ledger` carries the timestamp element but NOT
+  the clean/dirty bit, so re-entering the tower needs the DMA lease's own
+  pin (`TsoCtx.phys_ledger_at` / `phys_ledger_pin`, which exist for exactly
+  this).  **The virtio/DMA lease lane is its own tranche.**
+- **`ProofFilewrite:3405` is a KTIER mismatch, not a tower one** (`↦₈[KT1]`
+  wanted, `↦₈[KT0]` in hand).  `ProofFilewriteParts`'s twin was fixed by
+  moving the leaf's `(ktd := KT0)` to `KT1`; this one is inside
+  `fw_devidx` and was not chased.
+
+#### `WpSconfLock` — UNTOUCHED, AS INSTRUCTED
+
+Parked as the M4 racy-owner-cell entry.  A6.68's two-site split stands:
+`lock_claims` (`:139`) is payable with a context-free `wordw_claim` reader
+(the claim is an ADDRESS fact and survives `ctx_pointsto_forget` at ANY ξ),
+and that same reader is what `ProofVirtioDiskIntr` wants; the M4 content is
+`wp_ld_lkcpu_lockopen_gen` (`:432`), the plain load that promises the
+ledger's value for a cell it does not own.
+
+#### THE RED 16
+
+`BootCarveMain` (the 25), `ProofPrintk` (2) and `ProofSyscall` (1) — the
+shim's remaining 29 references, all on the `↦ₛ` / boot-carve path;
+`ProofMain` and `ProofKvminithart` — the A6.53 pin's boot threading;
+`ProofWritei` — the `BitmapInv` owner decision; `ProofFilewrite` — one
+ktier; `ProofVirtioDiskIntr` / `ProofVirtioDiskRwD` — the DMA lease lane;
+`UtResFits` (`ut_res_bare_park` missing), `UmodeFetch`, `UptWalkPt`,
+`UserMemPt`, `VcGenS`, `RiscvAdequacy`, `WpSconfLock` — A6.67's
+characterised list, unchanged.
+
+> **`↦ₛ` HAS NOT FLIPPED, AND THAT IS THE RODATA THREE.**
+> `RiscvPtsto.string_pointsto` is still the raw byte tower, which is what
+> `ProofPrintk`'s two and `ProofSyscall`'s one cross on.  Its uses are 34
+> files but only a handful of statements; **flipping `↦ₛ` is a smaller job
+> than moving its three consumers**, and it would retire three of the
+> twenty-nine shim references outright.  Worth costing before the boot 25.
+
+#### THE QUEUE
+
+1. **The A6.53 pin's boot threading** — `kpt_inv_alloc`'s `B`/`kptb_unset`
+   and `tlb_res_pt_intro`'s `B0`/`kpt_bound`/`view_lb` through `ProofMain`
+   and `ProofKvminithart`.  It unblocks `BootShared`, `BootChain` and the
+   whole boot tail, and `ProofMain`'s eleven threaded creators are waiting
+   behind it.
+2. **The boot 25** — the survey above is the plan; the `_ro_static` twins
+   are landed and waiting.  Cost the `↦ₛ` flip first (it may retire three
+   more shim references for less).
+3. **`BitmapInv`'s owner decision** (the last raw-tower owner).
+4. `RiscvAdequacy`'s power tail, `UmodeFetch` + `UptWalkPt`, the
+   `tramp_tr_obl` six, `UserMemPt`'s window accessor, `UtResFits`.
+5. `VcGenS` — still six statements and an induction; `ProofSwtch`,
+   `ProofAcquire` and `ProofRelease` sit behind it and `WpSconfLock`.
+6. The DMA/virtio lease lane; `WpSconfLock`'s M4 memo.
 
 
 ## 7. Order of work
