@@ -248,6 +248,30 @@ was already modest, while here W3's Δ goes 11.7 → ~6 kB under a 402-`iApply`,
 only that row. (The 6 kB is arithmetic on the printed sizes, not a second
 dump — what was measured is the wall and the `.vo`.)
 
+**GET THE `Definition`'s TYPECLASS BINDER LIST EXACTLY RIGHT — the two ways
+of getting it wrong fail in OPPOSITE directions, and only one of them
+errors.** Folding a bundle out of a proof file into a shared `Definition`
+means restating the `` `{!riscvGS Σ, …} `` list by hand, and:
+
+- **Too MANY classes** (one no row mentions) is a clean, immediate failure:
+  the extra binder is an argument every call site must supply, so any site
+  whose section context does not fix it reports *"Could not find an instance
+  for ProcAvail.pavG"* — or, on a whole statement, `UNDEFINED EVARS`.
+- **Too FEW classes** (one a row does need) does NOT error. Instance
+  resolution goes hunting through the `gFunctors` instances for the missing
+  evar and **DIVERGES**: `KexecOkQ.v` alone reached **300 GB** and had to be
+  killed, against 1.57 s / 768 MB with the right list. There is no error
+  message to read, and on a shared box it takes the machine with it.
+
+So derive the list, do not guess it: for each row, open the module that
+defines it and copy that section's `Context`. The one that catches people is
+`ProcInv` — `proc_priv` needs `` `{!riscvGS, !fileG, !xv6G, !bioslotG,
+!fdslotG, !irefslotG} ``, i.e. `fileG` and `fdslotG` even though nothing in
+the row's spelling mentions a file or an fd. **And cap the memory while
+experimenting**: `ulimit -v 25000000` before `coqc`/`make` is ~7x the largest
+legitimate file in the tree, so it never bites a real build and turns this
+failure into a fast one.
+
 **Still on the table in this file, not done**: its seven `iNext`s are 3.5 s at
 495 ms each, against the ~60 ms `iApply bi.later_intro` costs — which the same
 file already uses at thirteen other sites. See "Modalities and rewriting".

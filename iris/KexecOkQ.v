@@ -36,6 +36,12 @@
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
+(* the bi notations [⌜ ⌝] / [-∗] / [[∗ list]] that [kexec_closer] below is
+   written in; this file used to be pure Prop and needed none of them *)
+From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import auth gmap frac.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
+From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import SailStdpp.Operators_mwords.
 Require Import RiscvModelBytes.
@@ -45,6 +51,27 @@ Require Import UserPtTree.      (* [ud_tfp] / [ud_root] *)
 Require Import ProcInv.
 Require Import ElfEnc.          (* [le_at] -- the entry field's reader *)
 Require Import SpecKexec.       (* [kexec_ok] and its vocabulary       *)
+
+(* ...and the vocabulary [kexec_closer] below needs.  Every one of these is
+   already in this file's transitive cone through [SpecKexec]; naming them
+   here only brings them into SCOPE. *)
+Require Import Riscv.rv64d_types.  (* [Regidx]                          *)
+Require Import RegFile.         (* [regfile]                            *)
+Require Import RiscvPtsto.      (* the [↦₄]/[↦₈]/[↦ₘ] notations         *)
+Require Import InstrBytes.      (* [pc_is]                              *)
+Require Import IntrDefs.        (* [sie_cap_gpr], [trap_csrs_ext], ...  *)
+Require Import CpuOwn.          (* [cpu_own]                            *)
+Require Import WpNext.          (* [wp_next], [ret_pc]                  *)
+Require Import CalleeSaved.     (* [callee_saved]                       *)
+Require Import BioDefs.         (* [bslots]                             *)
+Require Import IrefSlots.       (* [iref_slots]                         *)
+Require Import BitmapInv.       (* [sb_bmapstart]                       *)
+Require Import InodeInv.        (* [sb_inodestart]                      *)
+Require Import KvmSpec.         (* [kalloc_env]                         *)
+Require Import Xv6G.            (* [xv6G]                               *)
+Require Import FdSlots.         (* [fdslotG]                            *)
+Require Import FileInvDefs.     (* [fileG]                              *)
+Require Import ProcAvail.       (* [pavG]                               *)
 
 Local Open Scope Z_scope.
 
@@ -103,6 +130,79 @@ Lemma kexec_ok_q_of_True (V V' : pprivate) (r entry spv szv' : mword 64)
   kexec_ok V V' r entry spv szv' na alen ->
   kexec_ok_q (fun _ => True) V V' r entry spv szv' na alen.
 Proof. intro H. by apply kexec_ok_q_True. Qed.
+
+(* ===================================================================== *)
+(*  1a.  THE EXIT CONTINUATION THAT RELAYS IT, NAMED ONCE                  *)
+(* ===================================================================== *)
+
+(*  THE OTHER HALF OF THIS FILE'S OWN OPENING PARAGRAPH.  That paragraph
+    says [kexec_ok] is spelled in thirty-one places "and every one of them
+    is a phase lemma RELAYING kexec's own exit continuation" -- and then
+    names the RELATION, leaving the CONTINUATION spelled out at all of
+    them.  It is thirteen rows, ~800 printed characters, and a count over
+    the cone finds THIRTY-NINE copies in twelve files (ProofKexecC x13,
+    B3 x6, B x5, Pinned x4, Tail x4, A x3, SpecKexecB2 x3, SpecKexecB3 x3,
+    Kexec x2, D x2, PinnedA x2, SpecKexecPinned x1), differing only in
+    bound-variable names and in which of [b]/[eb] and [lks]/[emptyset] the
+    caller passes.
+
+    claude-notes/optimization.md, "Seal a whole-function proof's
+    continuation" and the ProofSysUnlink case study beside it: an inline
+    continuation is re-embedded in the term of EVERY proofmode step that
+    carries it, so it is priced by |Delta| x steps, and in the kexec block
+    lemmas it measures 35-44 % of the statement.  Naming it changes no
+    proof script -- the constant is TRANSPARENT, so the [iApply ("Hcont"
+    $! ...)] sites unify straight through.
+
+    Kept TRANSPARENT for that reason, and NOT sealed: opacity would break
+    the specialisations rather than help them.                            *)
+Definition kexec_closer
+    (* EXACTLY the classes the rows below need, which is the kexec
+       contract's list MINUS [pavG]: [proc_priv] is [ProcInv]'s, and that
+       section takes `{!riscvGS, !fileG, !xv6G, !bioslotG, !fdslotG,
+       !irefslotG}; nothing here comes from [ProcAvail].
+
+       BOTH EDGES OF THIS LIST BITE, and they fail in opposite ways.
+       Carrying [pavG] when no row needs it makes it an unresolvable evar
+       at every call site whose context does not already fix it --
+       "Could not find an instance for ProcAvail.pavG" in ProofKexecD, and
+       an UNDEFINED EVARS on a whole statement in ProofKexecC.  Dropping a
+       class a row DOES need ([fileG]/[fdslotG], via [proc_priv]) is far
+       worse: it does not error, it DIVERGES -- resolution goes hunting
+       through the gFunctors instances and this file alone reached 300 GB
+       before it was killed.  A missing class is not a clean failure here;
+       cap the memory when experimenting with this binder list. *)
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Q : mword 64 -> Prop)
+    (gf ga : gname) (pj : mword 64) (pidv : mword 32) (V : pprivate)
+    (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
+    (lks : gset string) (dqb dqs : dfrac) (bmapstart inodestart : Z)
+    (na : nat) (alen : nat -> nat)
+    (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
+    (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
+    (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8)
+    : iProp Σ :=
+  (∀ (mf : regfile) (V' : pprivate) (entry spv szv' : mword 64),
+      ⌜callee_saved m mf⌝ -∗
+      ⌜kexec_ok_q Q V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
+                  entry spv szv' na alen⌝ -∗
+      sie_cap_gpr KT1 mf K b pj -∗
+      cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      kalloc_env ga None -∗
+      proc_priv gf pj pidv V' -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+      ([∗ list] i ∈ seq 0 na,
+         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+      bslots 3 -∗
+      iref_slots 2 -∗
+      WP (Loop : expr riscv_lang))%I.
 
 (* ===================================================================== *)
 (*  2.  THE ONE VALUE THE HOLE IS EVER PLUGGED WITH                       *)

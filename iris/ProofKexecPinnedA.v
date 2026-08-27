@@ -463,26 +463,9 @@ Section KexecPinnedABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      ∀ (mf : regfile) (V' : pprivate)
-        (entry spv szv' : mword 64),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jp) -∗
-          pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          kalloc_env ga None -∗
-          proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
-          ([∗ list] i ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots 3 -∗
-          iref_slots 2 -∗
-          WP (Loop : expr riscv_lang)) -∗
+      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
+           eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
+           av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x032.
            IT HANDS THE EXIT BACK.  [Hcont] above is linear and phase A's
            SECOND half owns a [-1] tail of its own (the +0x064 one), so a
@@ -1081,26 +1064,9 @@ Section KexecPinnedAMain.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      ∀ (mf : regfile) (V' : pprivate)
-        (entry spv szv' : mword 64),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) b lks -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jp) -∗
-          pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          kalloc_env ga None -∗
-          proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
-          ([∗ list] i ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots 3 -∗
-          iref_slots 2 -∗
-          WP (Loop : expr riscv_lang)) -∗
+      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
+           eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
+           av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090 ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)

@@ -852,26 +852,9 @@ Section KexecB3Body.
                w67 ef P i szv -∗
     (* ---- kexec's OWN continuation: the five [bad:] exits close it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (V' : pprivate)
-        (entry spv szv' : mword 64),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) eb ∅ -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jp) -∗
-          pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          kalloc_env ga None -∗
-          proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-          ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
-          ([∗ list] k ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-          bslots 3 -∗
-          iref_slots 2 -∗
-          WP (Loop : expr riscv_lang)) -∗
+      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
+           eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv
+           pfun av dqa avf aslen dqas afun) -∗
     (* ---- THE ONE OUTPUT: the back edge's verdict, and the exit back ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
@@ -893,26 +876,9 @@ Section KexecB3Body.
                        (m !!! Regidx Rs11) w67 ef P' szv'
                        (m !!! Regidx Rs11) ) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (V' : pprivate)
-            (entry spv szv2 : mword 64),
-              ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
-              sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) eb ∅ -∗
-              trap_csrs_ext KT1 eb -∗
-              cpu_claim_ext eb (proc_addr jp) -∗
-              pc_is (ret_pc ra0) -∗
-              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              kalloc_env ga None -∗
-              proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-              ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
-              ([∗ list] k ∈ seq 0 na,
-                 [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-              bslots 3 -∗
-              iref_slots 2 -∗
-              WP (Loop : expr riscv_lang)) -∗
+          KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
+               eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv
+               pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3027,26 +2993,9 @@ Section KexecB3Loop.
                (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                w67 ef P i szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (V' : pprivate)
-        (entry spv szv' : mword 64),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) eb ∅ -∗
-          trap_csrs_ext KT1 eb -∗
-          cpu_claim_ext eb (proc_addr jp) -∗
-          pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          kalloc_env ga None -∗
-          proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-          ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
-          ([∗ list] k ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-          bslots 3 -∗
-          iref_slots 2 -∗
-          WP (Loop : expr riscv_lang)) -∗
+      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
+           eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv
+           pfun av dqa avf aslen dqas afun) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
         kxc_at_1a4 jp bn g ga gf bmapstart inodestart
@@ -3058,26 +3007,9 @@ Section KexecB3Loop.
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                    w67 ef P' szv' (m !!! Regidx Rs11) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (V' : pprivate)
-            (entry spv szv2 : mword 64),
-              ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
-              sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) eb ∅ -∗
-              trap_csrs_ext KT1 eb -∗
-              cpu_claim_ext eb (proc_addr jp) -∗
-              pc_is (ret_pc ra0) -∗
-              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              kalloc_env ga None -∗
-              proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-              ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
-              ([∗ list] k ∈ seq 0 na,
-                 [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-              bslots 3 -∗
-              iref_slots 2 -∗
-              WP (Loop : expr riscv_lang)) -∗
+          KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
+               eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv
+               pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
