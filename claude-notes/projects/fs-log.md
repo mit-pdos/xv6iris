@@ -26,44 +26,21 @@
 > RULING about where the era's file-system instance is born — see that
 > premise's comment for the measurement and the two exits.
 
-> **Audited 2026-08-22 — STILL OPEN, and it is proof work, not cleanup.**
-> What remains: (1) real `n > 0` recovery — `SpecInitlog.v:164` still takes
-> `hdr_n bs_hdr = 0` and `:204` consumes `log_mirror_full`, `ProofInitlog`'s
-> copy loop is dead, `SpecInstallTrans.v:160` still restricts to
-> `recovering = false \/ n = 0`; (2) `sys_sync`'s postcondition
-> (`SpecSysSync.v:20` "THE CONTRACT IS EMPTY") — needs the partial-slot index
-> on `LogInv.log_mirror_at` and a commit counter for the receipt
-> `ProofEndOp.v:1783` drops; (3) the boot composition's WIRING is done
-> (forkret's boot arm → `fsinit` → `initlog` → `FsReady.fs_ready_establish`,
-> `completed/forkret-boot-arm.md`) but inherits the clean-image premise
-> (`SpecFsinit.v:316-319`, `FirstTok.v:276`) until (1) lands;
-> `FsBoot.fs_boot_bundle` was superseded by the `_at` boot mint
-> (`completed/fs-cfg-boot.md`); (4) the phase-D2 read-data-indexed-permit
-> decision is untaken, so even after (1) recovery is safety-only.
->
-> **HOW THIS SQUARES WITH THE CLOSED ADEQUACY THEOREM.**
-> `SystemAdequacy.xv6_power_adequacy` proves the system runs across
-> arbitrarily many crashes — under `Himg : fs_boot_image_eras`, i.e. EVERY
-> era boots on a disk satisfying `fs_boot_image_wf`, which contains
-> `FsImg.fsimg_wf`, which contains `fs_log_clean` (log header `n = 0`;
-> `FsImg.v:907`, `fsimg_wf_log`, consumed via
-> `FirstTok.first_fsinit_pures_of_image`). A crash with a committed,
-> not-yet-installed transaction leaves `n > 0`, so that disk falls OUTSIDE
-> the hypothesis and the theorem says nothing about it. The crash predicate
-> (`riscv_crash_pred = P_fs_any`, with `fs_recovery` stated at the
-> n-transaction install) describes such disks, but nothing connects it to
-> the next era's boot premise — the premise is a separate universal
-> assumption (`SystemAdequacy.v:126-145` says so: "boots twice on the image
-> is a hypothesis, not a theorem"). Items (1) and (3) above are what turn
-> it into a theorem: real recovery in `initlog`/`install_trans`, then
-> discharge `fs_log_clean` from the previous era's `P_fs` instead of
-> assuming it.
->
-> **THE HYPOTHESIS IS REFUTABLE, and the fix is ruled** (2026-08-22): see
-> [`durable-disk.md`](durable-disk.md) and `design/crash.md` "The durable
-> disk". Items (1)/(3) above are that project's stage D; this file stays
-> for item (2) (`sys_sync`'s postcondition) and item (4) (the D2 decision,
-> which the ruling settles as the read permit).
+> **RE-AUDITED (durable-disk lane E-himg): ITEM (1) IS DONE, END TO END.**
+> `SpecFsinit`'s clean-header premise is gone (lane E-except replaced it by
+> `FsCrash.hdr_wf` plus the WAL's exception set, which `install_trans`
+> shrinks and `initlog` seals), `FirstTok.first_fsinit_pures` carries
+> `hdr_wf` in its place, and the boot chain no longer assumes anything about
+> the disk at any era but the first: `SystemAdequacy.xv6_power_adequacy`
+> takes `fs_boot_image_wf` at `g`'s own disk ONCE and every later boot
+> re-founds its file system from the crash predicate's durable snapshot.
+> A crash with a committed, not-yet-installed transaction is INSIDE the
+> theorem now. Item (3) (the boot composition's wiring) went with it.
+> What is left of this file is item (2) — `sys_sync`'s empty postcondition,
+> which needs the partial-slot index on `LogInv.log_mirror_at` and a commit
+> counter for the receipt `ProofEndOp.v:1783` drops — and item (4), the
+> phase-D2 read-data-indexed-permit decision, which
+> [`durable-disk.md`](durable-disk.md)'s ruling settles as the read permit.
 
 Design: [`../design/fs-log.md`](../design/fs-log.md) — read its "stage-4
 architecture" section first; every durable finding of this effort has been

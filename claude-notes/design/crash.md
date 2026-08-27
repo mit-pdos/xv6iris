@@ -225,9 +225,8 @@ Three principles, in order of force:
    `v_disk g = fsimg_dk`.** The proof establishes `P_fs` from `fs.img` once
    (`HPc`), and `P_fs` is the loop invariant across eras: every PowerOn
    boots into a disk `P_fs` describes, including a disk with a committed,
-   uninstalled transaction. The (d2b) hypothesis `fs_boot_image_eras` — a ∀
-   over all `boot_facts` states, which is REFUTABLE (a zero disk satisfies
-   `boot_facts`) — is deleted; `Himg` never returns in any form.
+   uninstalled transaction. A ∀-over-eras image hypothesis is REFUTABLE (a
+   zero disk satisfies `boot_facts`) and must never return in any form.
 
 **What the per-era image ghost becomes.** The bio layer keeps an IN-MEMORY
 picture (its own per-era ghost map of what each cached buffer holds); the

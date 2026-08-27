@@ -317,44 +317,42 @@ predicate's own `fs_boot_pure`).  Block 1 is never logged
 (`FsCrash.fs_recovery_sb_raw`), so `fsinit`'s raw `readsb` and the
 snapshot's superblock are one record.
 
-**WHAT IS NOT BUILT, AND IT IS NOT A WALL — IT IS THE REST OF THE WORK
-(lane E-except, measured).**  `FsCfgSnap.fs_cfg_alloc_snap` now TAKES the
-byte view's value `Pb` and the exception set `Xexc`; era 0 passes the raw
-disk and `∅`, and passing `D` is what the boot chain has still to do.
-The pure channel is already there: `SystemAdequacy.fs_boot_pure` delivers
-`fs_extent`, `∃ D, fs_recovery … ∧ hdr_wf … ∧ ∃ S, snap_ok S D` at EVERY
-era, through `riscv_power_adequacy`'s `Hproj`/`Ppure`.  Four things are
-left, and none of them is a refutation:
+**THE BOOT'S PREMISE, AS BUILT (lane E-himg).**  What a boot takes is
+`FsCfgBoot.fs_boot_snap_wf`, and it is NOT an image hypothesis: the era's
+`sb`/`nib` ARE the snapshot's own (`fss_sb S`, `snap_nib S`), the committed
+view rides as a total BLOCK VIEW (`FsCrash.fs_rec_view P D`, whose exception
+set is the header's write set `hdr_wset P ls`), and the whole of it is read
+off `SystemAdequacy.fs_boot_pure` at every era.  Two rows CANNOT come from
+the snapshot and are read once at the initial machine
+(`SystemAdequacy.cov_facts_of_image`): `FsBoot.fs_cov_in cov ndisk` and
+`log_region_set ls ⊆ cov`, because `cov` and the crash predicate's `ls` are
+fixed across power cycles while `fss_sb S` is not.  The third such fact,
+`sb_logstart sb = 2`, is what identifies the two: `FsImg.sbo_logstart` pins
+the era's own at the same 2.
 
-1. **The era's configuration comes from `fss_sb S`, not from the
-   theorem's `sb`.**  `snap_ok S D` is about `S` and `D` alone, so it
-   cannot say `fss_sb S = sb` — and it does not have to: nothing pins the
-   era's superblock across a power cycle, and nothing needs to.
-   `FsImg.fs_sb_ok` (which `sk_sbok` delivers) already fixes
-   `logstart = 2`, `nlog = 31`, and `inodestart`/`bmapstart`/`size` as
-   functions of `ninodes`/`nblocks`, so the era's `logstart` IS the crash
-   predicate's `ls` for free.  What must change is that
-   `BootShared.boot_shared_alloc`'s `sb`/`nib` become EXISTENTIAL in its
-   post (bound by `xv6_boot_era` and instantiated into `SpecMain`'s), in
-   place of the theorem's parameters.
-2. **The two coverage corners**, `1 ≤ b < fs_data_start (fss_sb S) → b ∈ cov`
-   and `fs_data_start ≤ b < sb_size (fss_sb S) → b ∈ cov`, need a NEW pure
-   reading of `snap_ok`: every block below `sb_size (fss_sb S)` is either
-   in `dom D` (free by `sk_pool`, metadata by `sk_sb`/`sk_reg`/`sk_bmap`,
-   a node's by `sk_slot`) or in the log region.  With `dom D ⊆ home ⊆ cov`
-   and `log_region_set ls ⊆ cov` that IS the corner.  This is the only
-   genuine proof work left.
-3. **`FirstTok.first_fsinit_pures` needs a snapshot-side producer.**  Its
-   `hdr_n = 0` clause is replaced by `hdr_wf`'s three (off `fs_boot_pure`);
-   its parse/`fs_sb_ok` pair is `FsCrash.fs_recovery_sb_parse` + `sk_sbok`
-   (E-blk1 landed both); its block-1 BYTE SHAPE is
-   `FirstTok.first_sb_image_of_le`, which needs only `32 ≤ length`, so it
-   costs nothing; and `col_geom` is `sk_reg`/`sk_regdom`/`sk_sbok` against
-   the width tie the mint itself establishes.
-4. **`boot_shared_alloc` spends the image only at era 0**, and
-   `Himg`/`fs_boot_image_eras` go with `boot_hart_primary`'s use.
+The two readings of `snap_ok` this needs are `FsDurSnap.snap_cov_window`
+(every block of the metadata window is one the snapshot names, or a log
+block, hence covered) and `snap_cov_below` (every covered block is a real
+block of THIS era).  The second is the only bridge between the fixed `cov`
+and the era's `size`, and it rests on one clause, `sk_dombelow`: the
+ledger's keys are blocks below `sb_size (fss_sb S)`.  There is no DATA
+coverage corner — the mint spends only the free pool there and `sk_pool`
+already puts those in `D`.
 
-**The theorem** (the spike, `mknod_durable`): for the batch containing a
+**The theorem, AS BUILT (lane E-himg).**  `SystemAdequacy.xv6_power_adequacy`
+assumes `fs_boot_image_wf` at `g`'s own disk ONCE, plus `ggen = 0` and
+`gpow = false`, and concludes that every configuration reachable by ANY
+interleaving of power cycles, hart steps and device steps is reducible and
+satisfies the client's `phi`.  `xv6_fs_adequacy` adds mkfs's recovery
+obligation; `FsAdequacyImg`'s two corollaries discharge the image at
+`FsImgDisk.fsimg_dk` and instantiate `phi` at
+`SystemAdequacy.xv6_trace_pure`, so what they conclude at EVERY reachable
+state is that the physical disk still recovers to a committed view that IS a
+file system.  Nothing is assumed about any era but the first, and nothing
+about the header being clean; `Himg` / `fs_boot_image_eras` /
+`fsimg_at_every_era` are deleted and must never return in any form.
+
+**The spike** (`mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode
 table at `inum` is `create_made ty major minor` and the parent's
 directory entries contain `(name ↦ inum)` — read off the snapshot via

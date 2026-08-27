@@ -1192,8 +1192,8 @@ Supersedes the fold/ledger commit mechanism (and with it `dgeo_ok`, the
    boot at the snapshot's value (trivially readable if `P_snap` is
    persistent), followed by the era-only extras (cache/dirty/obs mints,
    distribution into the era invariants).  Stage 4's boot re-founding —
-   and with it the `Himg` deletion — is thereby mostly this one lemma's
-   second call site.
+   and with it the deletion of the top-level theorem's ∀-over-eras image
+   hypothesis — is thereby mostly this one lemma's second call site.
 
 7. **The batch's frame, resolved (orchestrator, 2026-08-25, over lane 4's
    residual).**  The accumulated pure tie (`snap_ok`) gains the USED-SET

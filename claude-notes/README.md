@@ -155,33 +155,26 @@ first four were audited against the tree 2026-08-22):
   the REGISTER-value vs SLOT-value distinction that a narrowed spill range
   forces, and how to tell a wrong proof from a slow one.
 
-- **[`durable-disk.md`](projects/durable-disk.md)** — HANDOFF WORKLIST
-  (2026-08-25) for xv6 correctness across crashes incl. FS consistency.
-  Design of record: `design/durable-fs-plan.md` (snapshot commits: the
-  durable FS predicate is re-allocated per commit, never updated; a
-  locked-inode registry keyed on transaction ids gives "all inodes clean
-  at commit").  Landed: the log's contract, the nested predicate, the
-  whole era instance, the durable allocator, and the COMMIT's snapshot step
-  (the crash predicate carries one copy of the FS predicate at the committed
-  map, and "the disk recovers to a committed view that IS a file system" is
-  exported at every reachable state), plus two of the three snapshot clauses
-  the boot mint needs (`FsStateInode.inl_bare_free`, `FsDurSnap.sk_regdom`).
-  The boot mint READS THE SNAPSHOT now (`FsCfgSnap.fs_cfg_alloc_snap`;
-  the old link ledger stopped blocking it at lane G6, so
-  `iris/FsBootWall.v`'s first wall is closed), and the dirty-header window
-  it opens is carried at the WAL: `FsBlocks.fs_bytes_body` has an
-  EXCEPTION SET, the recovering `install_trans` shrinks it, `initlog`
-  SEALS it, and the seal rides `LogInv.log_ctx`, so no reader of the byte
-  view above the WAL changed.  `SpecFsinit`'s clean-header premise is
-  gone, and the mint now TAKES the byte view's value and the exception set
-  (era 0 passes the raw disk and the empty set).  What is left is handing
-  it `FsCrash.fr_D`: the crash predicate's `fs_boot_pure` already delivers
-  `∃ S, snap_ok S D` and `hdr_wf` at every era, so what remains is one new
-  `snap_ok` reading (the coverage corners), a snapshot-side producer for
-  `FirstTok.first_fsinit_pures`, and making the boot chain's `sb`/`nib`
-  existential.  Until then `Himg` is still assumed and
-  `xv6_power_adequacy` is still vacuous.
-  Lanes A–G in the file.
+- **[`durable-disk.md`](projects/durable-disk.md)** — WORKLIST for xv6
+  correctness across crashes incl. FS consistency.  Design of record:
+  `design/durable-fs-plan.md` (snapshot commits: the durable FS predicate is
+  re-allocated per commit, never updated; a locked-inode registry keyed on
+  transaction ids gives "all inodes clean at commit").  **THE THEOREM IS
+  TRUE**: `SystemAdequacy.xv6_power_adequacy` assumes the file system's
+  image at `g`'s own disk ONCE and nothing about any later era, and
+  `FsAdequacyImg`'s two corollaries discharge that at the literal mkfs
+  image and conclude, at EVERY reachable state of every power cycle, that
+  the physical disk still recovers to a committed view that IS a file
+  system.  Landed: the log's contract, the nested predicate, the whole era
+  instance, the durable allocator, the COMMIT's snapshot step, the boot
+  mint READING THE SNAPSHOT (`FsCfgSnap.fs_cfg_alloc_snap`), the WAL's
+  EXCEPTION SET for the dirty-header recovery window (`initlog` seals it
+  into `LogInv.log_ctx`, so no reader of the byte view above the WAL
+  changed), and the boot chain's snapshot-side premise
+  (`FsCfgBoot.fs_boot_snap_wf`, with `FirstTok`'s `_of_snap` producers).
+  What is LEFT: lane H (the value-first allocator is a mistake to clean up)
+  and the caller-less image routing in `FsCfgBoot`/`FsCfgSnap`.
+  Lanes A–H in the file.
   History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`

@@ -2539,7 +2539,7 @@ The number goes up; that is the real one.
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
 every CI build since 85c21e9f) must show EXACTLY these three, and merge
 rounds diff against this list textually, not by count. The anchor stays
-IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_eras` premise
+IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_wf` premise
 undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
 **+10** (PrimString/PrimInt63 primitives), so the image-discharged
 corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
@@ -2612,22 +2612,17 @@ baseline.
 removed `Axiom` blocks** — verified by regenerating at the pinned rev and
 diffing — so this change costs the proofs nothing beyond the import edits.
 
-**THE BASELINE IS NOT THE WHOLE STORY (found 2026-08-22): `xv6_power_adequacy`
-is VACUOUS as stated.** Its premise `Himg : fs_boot_image_eras sb nib cov`
-is `∀ g', boot_facts g' → fs_boot_image_wf (v_disk g') …`, and
-`boot_facts` (`RiscvLang.v:1087`) leaves the disk bytes free (`∃ v0,
-dvirtio = virtio_reset v0`). `boot_facts` is satisfiable
-(`PowerBoot.boot_shape_boot_gstate`), so a `g'` with a zeroed disk
-satisfies it and fails conjunct (10) of `fs_boot_image_wf`
-(`fs_parse_sb` gives magic 0) — the premise is FALSE for every `sb nib
-cov`, and so is `FsAdequacyImg.fsimg_at_every_era`. `Print Assumptions`
-cannot see this; it is the §"GAP PREMISE" trap above, at the top-level
-theorem, since stage (d2b) (2026-08-20) replaced the era-0 equation with
-the ∀. The fix is RULED: `projects/durable-disk.md` / `design/crash.md` "The
-durable disk" — one fixed gname for the disk, `P_fs` owns its fragments,
-no mortal owner ever holds durable state, the theorem assumes only
-`v_disk g = fsimg_dk` at era 0 and `P_fs` is the cross-era loop
-invariant. The dirty-log boot arm then needs initlog's real recovery.
+**`Print Assumptions` DOES NOT SEE A REFUTABLE PREMISE, and the top-level
+theorem is where that costs most.** A ∀-over-eras image hypothesis
+(`fs_boot_image_eras`: `∀ g', boot_facts g' → fs_boot_image_wf (v_disk g') …`)
+stood on this theorem for five days and was FALSE for every `sb nib cov` —
+`boot_facts` (`RiscvLang.v:1087`) leaves the disk bytes free and is
+satisfiable by a zeroed disk, which fails `fs_parse_sb`'s magic. The audit
+was at its baseline throughout. It is gone (the premise is one equation
+about `g` now, and every later era reads its file system off the crash
+predicate's durable snapshot), and the rule it leaves is the §"GAP PREMISE"
+one above: a premise on the anchor theorem is worth a SATISFIABILITY WITNESS
+before it is worth an audit.
 
 **There is no assumed Link any more.** The last one,
 `LinkForkretPark.ForkretPark.forkret_park` (the runnable park — "where does a

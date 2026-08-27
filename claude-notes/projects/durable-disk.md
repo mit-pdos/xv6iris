@@ -11,15 +11,20 @@ Tree at handoff: `main` at the commit that lands this file; VM-green;
 lemmas tree-wide.
 
 **Goal (owner):** xv6 correctness across crashes INCLUDING file-system
-consistency.  `SystemAdequacy.xv6_power_adequacy` is vacuous today (its
-`Himg` premise is refutable); it becomes true when the durable snapshot
-carries the file system across eras and `Himg` is deleted (lane E).  The
-DURABILITY PROPERTY itself is proven and exported already: "the physical
-disk recovers to a committed view that IS a file system" is a conjunct of
-`SystemAdequacy.fs_boot_pure`, which the trace corollary instantiates `phi`
-at, so it holds at every reachable state.  What is missing is that the
-BOOT re-founds the era from it, which is what makes the whole theorem
-non-vacuous — lane E's wall, measured below.
+consistency.  **THE THEOREM IS TRUE.**
+`SystemAdequacy.xv6_power_adequacy` assumes `fs_boot_image_wf` at `g`'s own
+disk ONCE — the machine the system is switched on with — plus the two
+machine hypotheses, and nothing about any later era; `Himg` /
+`fs_boot_image_eras` / `fsimg_at_every_era` are deleted and must never
+return in any form.  Every boot after the first re-founds its file system
+from the DURABLE SNAPSHOT the previous era committed, delivered by
+`SystemAdequacy.fs_boot_pure` through `riscv_power_adequacy`'s
+`Hproj`/`Ppure`.  The durability property itself is exported at every
+reachable state: "the physical disk recovers to a committed view that IS a
+file system" is a conjunct of `fs_boot_pure`, which
+`SystemAdequacy.xv6_trace_invariant` and `FsAdequacyImg`'s two corollaries
+instantiate `phi` at.  What is LEFT is lane H (the value-first allocator)
+and the cleanups below — no wall, and nothing the theorem waits on.
 
 ## Working rules (keep; they proved out)
 
@@ -2232,7 +2237,8 @@ so it never wanted that shape.
   `snap_law_run` is stated at `⊤ ∖ ↑logN`; the committer meets it exactly
   there, opening `logN` itself for the byte authority.
 
-- [ ] **Lane E — the theorem (plan §5).  RULING: NO TRACE PREMISE.**
+- [x] **Lane E — the theorem (plan §5).  DONE at E-himg.  RULING: NO TRACE
+  PREMISE.**
   "The header is clean at every boot" is refutable exactly as `Himg` is
   and must not be introduced.  Two lanes, and nothing is fixed until both
   land:
@@ -2759,6 +2765,92 @@ so it never wanted that shape.
 
     Until they land `Himg` stays and `xv6_power_adequacy` is still vacuous.
     Machine-checked record: `iris/FsBootWall.v`'s second banner, exit (1).
+    **AS LANDED (E-himg): THE THEOREM.  `Himg` IS DELETED, AND THE DATA
+    COVERAGE CORNER WAS NEVER READ.**
+
+    `SystemAdequacy.xv6_power_adequacy` now reads, in full: for `Σ` with
+    the seven ghost classes, a `g`, a superblock `sb`, a region width
+    `nib`, a coverage set `cov`, a client `phi` with its `Hphi` hook,
+    `g.(ggen) = 0`, `g.(gpow) = false`, and
+    `fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES sb nib
+    cov` — every configuration reachable by any interleaving of power
+    cycles, hart steps and device steps is reducible, and `phi` holds at
+    it.  `xv6_fs_adequacy` is the same shape plus mkfs's `Hrec`.
+    `FsAdequacyImg.xv6_power_adequacy_fsimg` and `xv6_fs_adequacy_xv6Σ` are
+    back ON the build, each at one equation
+    (`v_disk (g.(gdev).(dvirtio)) = fsimg_dk`).
+
+    THE COVERAGE READING IS `FsDurSnap.snap_window_dom`, and it is smaller
+    than the plan expected: every block of the METADATA window is one the
+    snapshot NAMES — block 1 (`sk_sb`), an inode-region block (`sk_regdom`
+    at inum `16 j`, then `sk_rec`), the bitmap block (`sk_bmap`) — or a log
+    block, so `snap_cov_window` gives `1 ≤ b < fs_data_start → b ∈ cov`
+    with the caller's own `log_region_set ls ⊆ cov`.  **The DATA corner was
+    never read**: `fs_cfg_alloc_snap` spends only the FREE pool above
+    `fs_data_start`, and `sk_pool` already puts every free block below
+    `size` into `D`; the premise is deleted rather than proved.
+
+    THE CONVERSE READING IS WHAT COST A CLAUSE.  `FsReady.fgo_covbelow`
+    ("every covered block is a real file-system block") relates the FIXED
+    `cov` to the ERA's `sb_size`, and nothing outside the snapshot can:
+    `cov` does not move across a power cycle and `fss_sb S` does.  So
+    `snap_bytes` gains `sk_dombelow` (LAST): every key of `D` is below
+    `sb_size (fss_sb S)`.  Both producers have it free — the image's own
+    `fs_cov_in` against its disk-size bound (`FsDurImg.img_snap_ok`), and
+    `FsCollect.cg_size` verbatim (`col_snap_bytes`).  `snap_bytes_frame`
+    grows the matching range premise; it has no consumer yet.
+    `FsImg.fs_sb_ok`/`fs_sb_wf` gain `sbo_ushort`
+    (`16 * (ninodes/16 + 1) ≤ 2^16` — an inum is a `ushort` in a dirent),
+    because `sbo_one_bitmap` only bounds `16 * nib` by `2^17` and
+    `fgo_ushort` needs `2^16`.  It costs the image check one `Z.leb`.
+
+    THE SNAPSHOT-SIDE PRODUCERS are `FirstTok.fs_geom_ok_of_snap`,
+    `first_fsinit_pures_of_snap` and `col_geom_of_config` (the old
+    `col_geom_of_image`, renamed: it reads the ambient configuration and no
+    image at all).  The three `_of_image` producers are DELETED;
+    `fs_extent_of_image` stays, because the durable extent really is read
+    once at the initial machine.  `first_fsinit_pures` takes the byte
+    view's value `Pb`, replaces `hdr_n = 0` by `FsCrash.hdr_wf` and gains
+    (LAST) the exception set's slot tie; `ProofForkret` reads `SpecFsinit`'s
+    premise (g) straight off `hdr_wf` instead of deriving it from a clean
+    header, and its `exc_own` is already at the header's write set, so the
+    `hdr_dec_zero` rewrites are gone.  ONE PAPER CUT: stdpp's `NoDup` and
+    Stdlib's `List.NoDup` are different inductives — `hdr_wf` is at the
+    first and `SpecFsinit`'s premise at the second, and `NoDup_ListNoDup`
+    is the bridge.
+
+    THE BOOT CHAIN'S PREMISE IS `FsCfgBoot.fs_boot_snap_wf`, a drop-in
+    replacement for `fs_boot_image_wf` at the same position in
+    `boot_shared_alloc` / `boot_hart_primary` /
+    `wp_main_boot_sconf_body` / `mn_grp_fs`, with two extra parameters (the
+    state `S` and the byte view `Pb`).  Its nine rows: the era's `sb`/`nib`
+    ARE `S`'s (so nothing is existential — the caller instantiates them at
+    `fss_sb S` / `snap_nib S`), `snap_ok` at `fs_restrict Pb home`, `Pb`'s
+    length, `hdr_wf`, where `Pb` agrees with the raw disk and where it
+    holds the logged slot, and the two ERA-INDEPENDENT rows about `cov`
+    (`fs_cov_in`, `log_region_set ls ⊆ cov`) that a per-era snapshot
+    cannot carry.  `SystemAdequacy.cov_facts_of_image` reads those two plus
+    `sb_logstart sb = 2` — the third — off era 0's image once;
+    `FsImg.sbo_logstart` pins the era's `logstart` at the same 2, which is
+    what identifies the crash predicate's `ls` with the era's.
+
+    THE COMMITTED VIEW RIDES AS A BLOCK VIEW.  `FsCrash.fs_rec_view P D` is
+    `D` where `D` has a key and the raw disk elsewhere, `hdr_wset P ls` is
+    the header's write set, and `fs_recovery_restrict` /
+    `fs_recovery_dom` / `fs_rec_view_raw` / `fs_rec_view_slot` /
+    `fs_rec_view_len` are the five readings the mint's premises want.
+    `fs_boot_supply` and `FirstTok.first_fsinit` take the spent set and the
+    byte view as parameters/existentials (the exception set is SPELLED as
+    the header's write set, so no crossing site rewrites), and
+    `boot_shared_alloc` calls `FsCfgSnap.fs_cfg_alloc_snap` at EVERY era.
+
+    LEFT BEHIND FOR THE CLEANUP LANE: `FsCfgSnap.fs_cfg_alloc_img` and
+    `FsCfgBoot`'s image routing (`ipool_alloc_of_image`,
+    `ireg_lnks_of_image`, `ent_toks_of_region`, `bitmap_res_of_image`,
+    `image_ireg_premises`, `img_nodes_local`, `fs_kit_spent` and the
+    `img_*` readings above them) have NO caller.  `FsDurImg.img_snap_ok`
+    stays — it is era 0's snapshot, inside `P_fs_alloc`.
+
 - [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
   individual syscalls (`mknod_durable` and its siblings) belong to the
   file-system BEHAVIOUR specification project
