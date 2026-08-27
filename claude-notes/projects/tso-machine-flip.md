@@ -4997,12 +4997,13 @@ is a RIGID head, not merely a named one:**
     assert (HPsic : Psic = (fun bs => …)%I) by reflexivity.
     clearbody Psic.
 
-then `rewrite HPsic` in the TWO places that need the `∗`-shape back — inside
-the RAM-obligation arm before its `iFrame "… Hctx HPsi"`, and after the node
-closes (where `rewrite /Psic` stands today).  With `clearbody` the unifier
-cannot unfold `Psic` at all.  Untried here: each attempt costs a
-30-minute-minimum compile and the budget was spent proving the `set` form
-insufficient.  The `set` is LEFT IN THE FILE with this analysis beside it.
+then `rewrite HPsic` in the TWO places that need the `∗`-shape back.
+**TRIED IN A6.62′, AND IT DOES NOT WORK — read that note before acting on
+this paragraph.**  The rigid head was killed at 57 minutes with an RSS
+plateau matching the transparent run to 0.016%, which refutes the causal
+story above.  The `set` is left in the file as harmless style; the real
+cause is still open and A6.62′ names the one experiment that will settle
+it.
 
 > **THE DURABLE RULE, and it generalises past this file.**  At the
 > forty-argument leaf applications (`swp_execute_LOAD_ram_*`,
@@ -5358,6 +5359,200 @@ declaration still has no caller anywhere.
 6. The mechanical ~22, of which `ctx_pointsto_ktier_mono` is the one
    lemma that must be written.
 7. The element carve, after the five questions are answered.
+
+
+### A6.62′ THE RIGID HEAD DOES NOT PAY EITHER — AND A6.61's DIAGNOSIS OF
+### `WpSconfMem` IS REFUTED BY ITS OWN NEXT EXPERIMENT
+
+The commissioned one-attempt-at-the-hour-budget ran.  `set` + `assert` +
+`clearbody`, with `rewrite HPsic` restoring the `∗`-shape inside the
+RAM-obligation arm and after the node — i.e. a payload name the unifier
+**cannot** unfold.  **Killed at 57 minutes, same sentence, no `.vo`.**
+
+And the measurement that matters is not the wall clock, it is the memory:
+
+| run | payload | RSS plateau |
+|---|---|---|
+| A6.61 first | raw lambda ×2 | 1 339 520 B |
+| A6.61 second | `set`, transparent | 1 391 132 B |
+| this one | `clearbody`, RIGID | 1 391 352 B |
+
+**The transparent and the rigid run agree to 0.016% on a 1.39 GB working
+set.**  Two elaborations doing materially different higher-order guessing
+do not land that close.  So A6.61's causal story — "the unifier is guessing
+the abstraction at both positions" — **is refuted**: naming the payload,
+rigidly or not, changes nothing, and the duplicated lambda was a RED
+HERRING.  A6.61's "durable rule" survives only as style advice; it is not
+this file's bug and it should not be inherited as a diagnosis.
+
+**WHAT IS STILL TRUE AND WORTH KEEPING:** `-time` localised the cost to one
+sentence and that has not changed — 195 sentences at 4.57 s total, then the
+`iApply` at `WpSconfMem.v:530`.  The cost is inside that application, but
+it is NOT in the payload argument.
+
+**THE NEXT DIAGNOSTIC, and it is cheap and decisive.**  The `iApply` does
+two separable things: it ELABORATES a forty-argument application, and it
+UNIFIES the result with the WP goal.  Split them so `-time` can bill each:
+
+    iPoseProof (swp_execute_LOAD_ram_Sw_ex (CID := CID) width … all 40 …)
+      as "Hleaf".
+    iApply ("Hleaf" with "…").
+
+If the `iPoseProof` is the slow half, the problem is telescope elaboration
+— and the next suspect is the *other* computed argument,
+`Mobl_ram_ex width (pa_of ppn ea) Psic`, which should be `set` in its own
+right before anything else is tried.  If the `iApply` is slow, it is
+goal unification and the leaf's conclusion shape is what needs attention.
+**One compile answers it**, and no further guesses should be spent before
+that answer exists.
+
+**OPERATIONALLY, per the ruling:** the file is a standing cost.  It must
+not be allowed to block eleven idle cores again — schedule it LAST, and
+never diagnose it with a timed single-file `make`; run the whole-tree `-k`
+sweep and read `-time` out of a separate log.
+
+### A6.62 THE MECHANICAL TRANCHE IS DONE, AND IT ENDED BY FINDING THAT
+### THE `↦ₛ` RESIDUE IS BLOCKED ON THE ELEMENT CARVE
+
+Worked against the coordinator's rulings of 2026-08-27 (carve Q1–Q5, and
+the boot blacklist STANDS).  A6.61's shim residue went from **38 real
+sites in 11 files to 30 in 5**, and the 30 are now exactly two things: the
+boot carve's 26, which the ruling reserves for hand-written explicit-ξ
+statements, and **four sites that are not mechanical at all and were
+mis-classified twice**.
+
+**THE ONE NEW KIT LEMMA, as commissioned:** `TsoCtx.ctx_pointsto_ktier_mono`
+(`TsoCtx.v`, beside `ctx_pointsto_phys`) — the ctx twin of
+`RiscvPtsto.mem_ktier_mono`.  Sound for the raw lemma's reason and no new
+one: of `ctx_pointsto_def`'s seven conjuncts only `ktier_pin` mentions the
+tier and it weakens (`ktier_pin_mono`); **the timestamp, the ledger element
+and the clean/dirty bit are tier-BLIND**, which is why this is a weakening
+and not a re-mint and why A6.9's prohibition is not in play.  It retired
+the four sites that reached KT1 by dropping to the raw tower and crossing
+back (`ProofCreateParts` ×2, `ProofForkretParts`, and — differently —
+`ProofKexecTail`).
+
+**WHAT ELSE LANDED, all of it the same discovery repeated:** nearly every
+remaining "crossing" was a **round trip to nowhere**, because `↦ₘ`, `↦₂`,
+`↦₄` and `↦₈` are ALL the ctx towers already (`TsoCtx.v:3421–3468`) and
+only the *lemma names* in the proofs were still raw.
+
+| site | what it actually was |
+|---|---|
+| `ProofSysKill`, `ProofSysOpenParts`, `ProofSysPause`, `ProofSysUnlinkParts` | raw `word_pointsto_join4` + shim → `ByteBuf.ctx_word_pointsto_join4` |
+| `VirtioDiskRwDefs` ×2 | the same join, twice |
+| `ProofFilewriteParts.fw_devidx` | the file's **only** raw spelling — every other cell in it is already `ctx_word_pointsto`; the statement moved and the crossing/forget pair deleted |
+| `ProofSysPipe` ×2, `ProofKwait` | `↦₄`'s byte run IS copyout's context-indexed window; the "seam" was an identity |
+| `ProofDirlink`, `ProofDirlookupParts` | raw `word2_pointsto_bytes`/`_intro` on a ctx buffer |
+| `ProofKexecTail`'s `kxc_*_of_*` pair | stated over the raw `word4_pointsto` while its only consumer (`ProofKexecA:1449/1513`) feeds it straight to a `↦₄` leaf with **no crossing in between** — so the pair had to be ctx or the caller could never have typechecked |
+
+**AND 23 DEAD `Require TsoCtxShim.` LINES ARE GONE**, checked against a
+comment-stripped grep so a file is only unhooked when it has no real use
+left.
+
+### TWO CORRECTIONS TO A6.58's DISPOSITIONS, IN OPPOSITE DIRECTIONS
+
+**1. `DinodeSlot`'s two `⊣⊢` DO NOT WEAKEN — they were identities.**
+A6.58 (and A6.61's own table, inherited) listed `bb2_cell`/`bb4_cell` with
+`ProofSyscall.sysc_pname_app` as `⊣⊢` that must become `⊢`.  Wrong: **both
+sides of both are the context tower** (`↦ₘ` is `ctx_pointsto cur_ctx`,
+`↦₂`/`↦₄` are `ctx_word{2,4}_pointsto cur_ctx`), so the per-byte step is
+`reflexivity` and only the *unfold* had to name the ctx definition.  Same
+for `ProofDirlookupParts.dlk_half_acc`.  **Three `⊣⊢` statements keep their
+strength**; the "weakening" class is one member smaller than advertised and
+that member is item 2.
+
+**2. THE `↦ₛ`/RODATA SITES NEED THE OPPOSITE DIRECTION FROM THE ONE A6.58
+PRESCRIBED, AND A FORGET CANNOT PAY THEM.**  A6.58: "its sites take the
+forget".  Measured, they do not:
+
+- `ProofPrintk:1165` — the format string is rodata at the raw `↦ₛ` tower
+  and the byte must reach a **ctx** load slot: `mem → ctx`, the FALSE
+  direction.  The forget at the end of that accessor is the easy half.
+- `ProofPrintk:4429` — `kernel_data_string` is `KernelDataInv`'s RAW image
+  byte and `pk_digits` is the flipped `↦ₘ`: again `mem → ctx`.
+- `ProofSyscall:2058/2068` — `sysc_pname_app`'s `⊣⊢` really does weaken to
+  `⊢`, but **that is not the end of it**: `ProofSyscall:4759` uses the
+  BACKWARD direction to rebuild the proc-name buffer after the printk call
+  (`iDestruct (sysc_pname_app …) as "Hnm"` from `[Hstr Hpad]`).  Weakening
+  the lemma deletes a step the proof depends on.
+
+> **AND THE FIX IS ALREADY IN THE KIT — IT IS JUST NOT SUPPLIED YET.**
+> `TsoCtx.ctx_phys_pointsto_of_elem` (`:2174`) is exactly
+> `phys_pointsto a dq v -∗ ledger_elem0 a dq -∗ ctx_phys_pointsto ξ a dq v`,
+> and its proof is `iExists 0%nat … iLeft. iApply llb_0.` — **at timestamp
+> 0 the clean arm is FREE**.  A read-only byte therefore has everything it
+> needs for a ctx fact except the `ledger_elem0`, and **the era's
+> `ghost_map_alloc` in `RiscvAdequacy` is the only supplier of those in the
+> whole system (A6.9).  That allocation IS the element carve.**
+>
+> So the four residual non-boot sites are **BLOCKED ON A6.61's ELEMENT
+> CARVE**, and under carve Q2's ruling (the client persists the data half)
+> rodata at `[text_end, rodata_end)` lands in exactly the right half.  The
+> kit item this creates is the VA-level twin of the existing lemma —
+>
+>     Lemma ctx_pointsto_of_ro (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+>       mem_pointsto a dq v -∗ pristine_elem a -∗ ctx_pointsto ξ a dq v.
+>
+> — and it should be written WITH the carve, not before it.  This is a
+> dependency A6.59/A6.61 did not see: **the carve is not only step 6's last
+> structural piece, it is what unblocks the last of step 5's shim tail.**
+
+`WpSconfLock:146` is the fourth and is a different shape again: the cell is
+forgotten to raw so `wordw_claim_of` can derive a persistent `#Hc8`, then
+needed back as ctx.  Since the claim is persistent and derived, the honest
+repair is a ctx-tier `wordw_claim_of` (read-only, so the same timestamp-0
+argument applies) rather than a round trip.
+
+### WHAT IS AND IS NOT VALIDATED
+
+`TsoCtx.v` is edited, so the closing rebuild re-derives its whole cone —
+which is the only reason any of this tranche gets checked at all.
+**Everything else edited here lives in `WpSconfMem`'s unopened cone and is
+a promise until that one sentence elaborates.**  The tranche is mechanical
+by construction (every edit swaps a raw lemma name for the ctx twin that
+already exists, at a statement whose tier was already ctx), but mechanical
+is not the same as checked, and the next lane should read the first sweep
+behind `WpSconfMem` as the real news about all of it.
+
+### CLOSING NUMBER AND WHAT THE REBUILD PROVED
+
+**731 of 1330, and this one is REBUILD-VALIDATED.**  `TsoCtx.v` was edited
+(the new `ctx_pointsto_ktier_mono`), so the closing `make -j12 -k`
+re-derived its entire cone: **657 files recompiled**, model `.vo` checked
+to postdate its source first per A6.39 (19:11 vs 18:37), one make, nothing
+else running.  The red set came back **unchanged at seven** — no edit in
+this tranche broke anything that was green.
+
+The rebuild also drew the validation line exactly:
+
+| validated GREEN by this rebuild | still a promise (behind `WpSconfMem`) |
+|---|---|
+| `TsoCtx` (the new lemma), `ByteBuf`, `BcacheInv`, `WaitInv`, `BreadLru`, `WpSmodePtMem`, `WpSmodePtMemWrap` | every `Proof*` edit of A6.61 and A6.62 — the 21 owner-client deletions, all ten mechanical collapses, `DinodeSlot`, `ProofDirlookupParts`, `VirtioDiskRwDefs`, `ProofKexecTail`, `WpSconfLock` |
+
+**AND THE REBUILD MADE THE OPERATIONAL COST CONCRETE.**  The sweep reached
+657 compiles and then sat for ten minutes with **one** `rocqworker` alive
+and eleven cores idle — `WpSconfMem`, alone, gating roughly 600 files.
+That is the whole argument for scheduling it last: it is not merely slow,
+it converts a twelve-core sweep into a one-core one.
+
+### THE ORDER THAT NOW FOLLOWS FROM THE RULINGS
+
+1. `WpSconfMem`'s one sentence.  If the rigid head does not pay, the file
+   is a standing cost and should be scheduled LAST in every sweep so it
+   never blocks the other eleven cores again.
+2. The element carve, per Q1–Q5 — **promoted, because item 5 below now
+   depends on it**: client vocabulary (`boot_led_ran`, `supra_text_ran`
+   promoted to Global), one-row conclusion at `DfracOwn 1` with the client
+   persisting, `pristine_elem`/`pristine_byte` aliased with a tier-hygiene
+   comment (record the import-order direction), `power_boot_res`'s twin in
+   the same tranche, and the new persist lemma in `BootCarve` §9 rather
+   than churning a green statement.
+3. The boot carve's 26, hand-written explicit-ξ per the standing blacklist.
+4. `UmodeFetch`, then the `tramp_tr_obl` six and `UserMemPt`'s window
+   store.
+5. `ctx_pointsto_of_ro` and the four `↦ₛ`/rodata sites — after (2).
+6. `VcGenS` and the scheduler/trap tier (A6.61) — the successor tranche.
 
 
 ## 7. Order of work
