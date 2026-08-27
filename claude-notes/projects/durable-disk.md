@@ -3918,6 +3918,38 @@ banner says once rather than 21 times.
   - **`SystemAssumptions.v`'s header needed no correction**: it says
     THIRTEEN and lists ten primitives, which is what the audit prints.
 
+## The simplification campaign (owner-approved sequence, 2026-08-27)
+
+The theorem is TRUE and the tree is green at the thirteen-entry audit;
+what follows is cleanup, ranked by contract-surface reduction first.  The
+two read-only reviews that priced it are the era-vocabulary plan and the
+holistic ghost-state review (session scratch; their conclusions are in
+the rows below and in `design/fs-ghost-state.md`).
+
+- [ ] **S2 — the easy cleanups** (review ranks 2, 3, 8): `wp_iunlockput_dep_sconf`
+  out of the module type; the dead-code sweep (`EscrowDefs.regN` family,
+  `IcacheInv.is_itable`/`itable_res`/`islot_free`, `ic_frz_park`,
+  `log_opSw`, the `IcacheRef` fraction-1 readings, `FsDurImg`'s resource
+  half, …) and the `P_fs` arity sweep (`γv`/`Γd` unread; `fdn_*`);
+  `fs_snap`'s `B` existential; the duplicate `icM_wf`.
+- [ ] **Rank 1 — de-thread the ambient names** (AFTER S2): the fs contracts
+  stop binding copies of `icfg`/`fscfg`'s per-boot constants
+  (`γfs cov logstart cn γi γl nib inodestart dev`); the 339 tie equations
+  vanish; `fs_world` collapses into `fs_ready`.  First slice `cn : ic_names`.
+  Design pass pending; owner rules on its plan before it runs.
+- [ ] **EV — the era-vocabulary unification** (approved): five staged
+  lanes; three of the four holders are already predicate-vocabulary; the
+  payoff is the commit handing a real `fs_state` to the transport.  Runs
+  AFTER rank 1 or before it, never concurrently (same payload bodies).
+- [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
+  AWAITING RULING (keep for the fs-syscall-specs port, or delete).
+- [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
+  and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
+  ledger, `CrpPre`; ten `_no_ops` → one): AWAITING RULING; independent
+  of the others.
+- [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): probe-gated,
+  last.
+
 ## Sizing notes for whoever runs the lanes
 
 - Big cones: `ProofEndOp` (commit path), `ProofInitlog` (2748 lines —
