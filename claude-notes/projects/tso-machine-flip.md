@@ -1,6 +1,22 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE A6.52 RULINGS (2026-08-26, latest session).  Both are
+STEP 5, THE PIN'S CONSUMER HALF (2026-08-27, latest session).  **THE PIN
+IS DONE END TO END, `HartSKpt` IS GREEN, AND `SmodeCorePt`'s A6.18 VERDICT
+IS IN** (A6.56: four errors in 4,480 lines, only TWO of them genuine
+re-port bugs and both stale rewrite/index directions in the text-tier
+lemmas — the re-port's substance is sound).  A6.54's refutation of
+pin-memo §5.5 was ratified and then made moot: A6.55's allowed-byte family
+reads the LEAF BIT, so interior slots pin to singletons and keep their
+EXACT values, `HartSTrans` and `Pt2WalkPt` never move, and §5.5's
+conclusion is restored by a different mechanism.  Closing the two deepest
+frontier files opened the whole S-mode PT tier: **112 files went green**.
+Clean rebuild **663 of 1330, NINE red**, seven of them first-time-reached.
+A6.55–A6.57 are the record; **A6.57 is the handoff**, and it names the
+largest remaining block — the deleted shim's 240 references across 63
+files — and the `RiscvAdequacy` inventory (§7 step 6, the last structural
+piece never attempted).
+
+STEP 5, THE A6.52 RULINGS (2026-08-26, earlier session).  Both are
 IMPLEMENTED and green: **`PtTree`'s tier index now CARRIES the kernel
 tier's canon-pin bound** (`ptier := KTier B | UTier ξ`, option β — the
 measured 40-site sweep, and it cost ZERO net red), **`kpt_bound` has its
@@ -4312,6 +4328,14 @@ the plain arm now.
 > lemmas were built for.  **Do not try to recover exactness by carrying
 > `⌜t ≤ B⌝`: it would have to be per-slot, and the leaf's is false.**
 
+> **RATIFIED (owner, 2026-08-27), and then made moot.**  The weakening to
+> canon-equality is ratified: PPN and flags are canon-invariant, so
+> `kpt_pte2_node` / `kpt_pte1_node`'s consumers lose nothing the walk
+> needs.  **A6.55 then found a third option and the weakening was never
+> spent** — the allowed-byte family reads the leaf bit, so an interior slot
+> pins to singletons and keeps its EXACT value.  The ratification stands as
+> the fallback; nothing in the tree relies on it.
+
 **STILL RED, and what each is** (closing rebuild below):
 
 - `HartSKpt` — the tranche above.  Behind it: `SmodeCorePt`'s unverified
@@ -4341,6 +4365,234 @@ self-consistent).
 > closed inside the same sweep.  An index change at the bottom of a
 > 1330-file tree costing zero net red is the measurement that ruling 1's
 > option (β) was the right call.
+
+### A6.55 THE §5.5 WEAKENING IS NOT NECESSARY AFTER ALL — THE SET FAMILY
+### IS CONDITIONED ON LEAF-NESS, AND `HartSKpt` IS GREEN
+
+A6.54 refuted tso-pin-memo §5.5's "levels 2/1 keep `kpt_slot_node` verbatim"
+and the owner RATIFIED the fallback (interior reads weaken to
+canon-equality; PPN and flags are canon-invariant so the walk loses
+nothing).  **The ratification is recorded and was not needed.**  Building
+it turned up a third option the memo and the refutation both missed, and
+it restores §5.5's CONCLUSION by a different mechanism:
+
+> **§1's measurement is the fix.**  "A/D is defined only on LEAF PTEs, and
+> the tree agrees: every write path targets `pt_addr0 p1 vpn` and nothing
+> else."  So the allowed-byte family can READ the leaf bit:
+>
+>     pte_slot_set w j :=
+>       if j =? 0 then (if pte_nonleafb w then byteset_sing (nth_byte w 0)
+>                       else pte_ad_byte0 w)
+>       else byteset_sing (nth_byte w j)
+>
+> An INTERIOR slot pins to eight singletons, so its read is EXACT
+> (`pte_slot_set_exact`, and `ptree_maps` hands over the `pte_ptr` conjunct
+> that fires it).  A LEAF pins byte 0 to the four-element A/D class and its
+> read is canon-equal (`pte_slot_set_canon`).  **`kpt_pte2_node` /
+> `kpt_pte1_node` keep their exact values, `HartSTrans` and `Pt2WalkPt` do
+> not move at all**, and the ratified weakening is left unused.
+
+What the leaf-conditioning costs is ONE premise, and it is honest: the
+family is stable under the write-back (`pte_slot_set_set_ad`) and the
+write-back's bytes are allowed (`pte_slot_set_mem_set_ad`) only *for a
+leaf* — at a non-leaf both are FALSE, because `pte_set_ad` would move
+byte 0 out of a singleton.  So the payer wand's side condition is
+
+    pte_wb_ok wold wnew :=
+      pte_leaf wold /\ ∀ j < 8, nth_byte wnew j ∈ pte_slot_set wold j
+
+stated TIER-GENERICALLY (the `UTier` arm ignores it) and discharged at the
+one place that writes — the walk's O3 arm, whose `Hvar` already proves
+`pte_leaf` of the variant.  `pte_wb_ok_sets` is why the slot comes back
+pinned at the SAME family, i.e. why the shared table is canon-INVARIANT
+under its own write-back rather than merely canon-monotone.
+
+**`HartSKpt` IS GREEN.**  Its read lane was the last piece and it was
+A6.36's overruling catching up with the file: `kpt_slot_node` and friends
+were stated over the FLAT cache (`read_bytes σ.(mem)`), which was sound
+only while a PTE read was RULING 1's `Read_ttw` arm.  What landed:
+
+    kpt_slot_bytes_pin   the pin at the interp seam -- the A6.1a bridge
+                         ([tso_interp_of_pin] + [tso_interp_of_at_gs] at
+                         [gs_of]) exactly as [HartMFetch.fobl_ram_text]
+                         runs it, off [ledger_read_pin_bytes_ok]
+    fobl_of_sets         byte sets -> EXACT word   (interior)
+    fobl_ex_of_sets      byte sets -> canon-equal  (leaf; §5.5's reassembly,
+                         eight bytes destructed and reassembled with
+                         [PageGeom.nth_byte_assemble8])
+    kpt_path_obl         all three slots off ONE opening
+    kpt_obl / kpt_obl_ex the post-overruling obligation shapes
+    kpt_pte2_obl / kpt_pte1_obl / kpt_leaf_obl
+
+and the A/D write-back at `kpt_leaf_write_node` now runs on
+`HartMStore.wobl_ram_ledger_pin_ex`.  **The offset→address bridge A6.54
+flagged is a five-line `assert`**: `Sg a' := pte_slot_set q0 (Z.to_nat
+(uint a' − uint pa))`, and the no-wraparound fact comes from
+`kpt_addr_ok_own` applied to the slot itself — no new arithmetic lemma was
+needed after all.
+
+**THE READER'S CREDENTIALS ARE NOW EXPLICIT, and that is the design
+change.**  `swp_translate_kpt` gained `kpt_bound B` and
+`view_lb view_name loglen_name (hart_agent cpu_id) B`.  They ride as ONE
+persistent conjunct `KptShare.kpt_creds` in `tlb_res_pt` (hence in
+`SRegime.kpt_swp_res` / `kpt_res_at`, `WpSFrames.s_frames`,
+`SmodeCorePt.spt_res_pt` and `WpIntrInv`'s cell round trip), so
+`kpt_swp_translate`'s signature and IntrDefs' two call sites did not move.
+`KptTree.tlb_inv_pt` carries the receipt too, which is where pin-memo
+§5.6(b) lands: **hart 0's `__sync_synchronize` drain is now a stated
+obligation of the publisher** rather than an assumption inside the walk.
+`tlb_inv_pt_intro`'s producers (kvminithart / `ProofMain`) owe it.
+
+### A6.56 THE A6.18 VERDICT ON `SmodeCorePt`, AT LAST — AND IT IS GOOD
+
+`SmodeCorePt` has been carried as "the unverified re-port" since A6.46 and
+deferred three times.  **It compiles.**  The verdict, in the form A6.18
+asks for:
+
+> **FOUR errors in 4,480 lines, and NONE of them is a flip or pin issue.**
+> Two are mine (the `kpt_creds` conjunct in `spt_res_pt` and the
+> `tlb_res_pt_intro` rebuild), and **the only two genuine re-port bugs are
+> both in the TEXT-tier lemmas and both are stale index/rewrite
+> directions**:
+>
+> - `s_text_byte` rewrote its HYPOTHESES at `ppn` when `kmap_at_agree`
+>   yields `ppnj = ppn` — a no-op, leaving `iFrame` nothing to match.  The
+>   normalisation runs at `ppnj` and the GOAL is brought to it.
+> - `s_text_obl` rewrote `Hg` at index `k` where `lookup_seq` had left
+>   `0 + k`.  One `Nat.add_0_l`.
+>
+> Between them the file compiled 3,200 lines untouched — including its two
+> A/D payer wands, both of which had already been moved to the pinned tier
+> blind (A6.53) and were right.  **The re-port's substance is sound; what
+> it had was two typos that no amount of reading would have found and one
+> compile did.**  That is the answer to A6.18's question, and it is the
+> argument for compiling a re-port early rather than reviewing it.
+
+**AND CLOSING IT OPENED THE WHOLE S-MODE PT TIER**: the `.vo` count went
+from 551 to 600 in one sweep.  Four first-time-reached files came with it,
+three now green (`CpuOwn` — `ctx_pointsto_ne`, the A6.48 precedent again;
+`WpIntrInv` — the `kpt_creds` round trip; and `WpSmodePtLeaves` /
+`UptWalkPt` characterised below).
+
+### A6.57 HANDOFF: THE PIN IS DONE END TO END; WHAT IS LEFT IS THREE
+### NAMED LANES AND ONE INVENTORY
+
+**THE PIN'S WHOLE STORY IS NOW BUILT AND GREEN**, from `TsoMemPa`'s pure
+layer to the kernel-PT walk that consumes it:
+
+    TsoMemPa   pin_ok + the four laws; byteset/ts_elem/ts_ok
+    TsoGhost   the element type
+    RiscvPtsto/RiscvExec   the interp tie (one conjunct)
+    TsoCtx     phys_ledger_pin, the word tower, the four gates, the window
+               forms (phys_ledger_pin_win_map / ledger_store_win_pin_ok)
+    PtAdBits   §5.5's reassembly
+    PtTree     ptier, pte_slot_set (leaf-conditioned), pte_wb_ok
+    KptGhost   kpt_bound;  KptShare  kpt_creds, kpt_body, publication
+    HartEvents wp/swp_hart_ram_read_plain_ex (old pair re-derived)
+    HartMFetch fobl_ram_ex;  PtTreeAdue  the PT read
+    HartMStore wobl_ram_ledger_pin_ex
+    HartSKpt   the discharge AND the write-back        <- both green
+    SmodeCorePt / SRegime / IntrDefs / WpSFrames / WpIntrInv / CpuOwn
+
+**Nothing in the pin's design was refuted in the building** — the memo's
+three §8 rulings all stand as implemented, with two corrections recorded
+(A6.53's one-conjunct `ts_ok`, A6.55's leaf-conditioned set family, which
+restores §5.5's conclusion after A6.54 refuted its stated mechanism).
+
+**THE LANES LEFT, in the order they now gate things:**
+
+1. **`ProofMain` / kvminithart — the publisher's obligations.**
+   `KptTree.tlb_inv_pt` now demands `view_lb … B` and the tree at
+   `KTier B`, so the boot lane owes (a) `TsoCtx.ledger_pin_mint` per slot
+   at the exclusive tier, and (b) the `__sync_synchronize` drain that makes
+   the receipt free — pin-memo §5.6(b), and the LAST unimplemented ruling.
+   Nothing above it is blocked on this (the premise is threaded), but the
+   adequacy proof cannot close without it.
+2. **`UptWalkPt` / the trampoline lane — `own_context` through
+   `tramp_tr_obl`.**  `swp_translate_upt` now takes and returns the running
+   token (the USER tree's slots are ledger words, so its own A/D write-back
+   owes the append).  Its caller `TrampStepPt.tramp_tr_obl` does not carry
+   one; that is the A6.27/A6.28 threading applied to the trampoline fetch,
+   and it runs `TrampStepPt` → `SpecUsertrap` → `UservecExitPt`.
+3. **`WpSmodePtLeaves` — the S-mode LOAD/STORE leaf's RAM obligation.**
+   Its two claim reads are fixed (they used the deleted
+   `TsoCtxShim.ctx_pointsto_to_mem`; the sealed tier reads the claim
+   directly with `ctx_pointsto_phys`, and `ctx_phys_pointsto_ram` supplies
+   what `mem_pointsto_acc` used to).  What remains is the same shape as
+   `HartSKpt`'s read lane one tier over: the arm still calls
+   `TsoCtxShim.ctx_buf_to_mem` and states its obligation over the flat
+   cache.  `HartSKpt.kpt_slot_bytes_pin` + `fobl_of_sets` are the worked
+   precedent.
+4. **`UserMemPt` / `UmodeFetch` — the user tier (A6.49/A6.52), untouched.**
+   The store lane's `wobl` threading and the translation S-payer.
+5. **`WpSconfSfence` — one `own_context` at a `bytes_own ∅` call**, the
+   smallest item on the list and the same threading as (2).
+6. **`DiskBoot` / `SwtchCtx` / `WpSconfMem` — THE DELETED SHIM'S TAIL, and
+   it is a class, not three files.**  `TsoCtxShim` is gutted to its one
+   still-true mint (`own_context_alloc`), and **240 references across 63
+   files still name it** — mostly `Proof*` files that have never been
+   reached.  Three of them surfaced in this sweep, and the measurement
+   worth recording is that **they are NOT identities**: I tried deleting
+   the calls on the theory that M1 made `↦ₘ` the ctx byte, and
+   `word4_pointsto` / `↦₈` are still the RAW towers on the other side, so
+   the shim was doing a real tier move.  Each site needs the A6.13 law
+   (`ctx_pointsto_forget` / `ctx_ktier_mono` / their word forms) or a
+   re-tiering of the resource, decided per site.  **`grep -l TsoCtxShim\.`
+   is the worklist and it is the largest remaining block of the flip.**
+
+**AND THE `RiscvAdequacy` INVENTORY (its bill is FOUR items).**  The
+file has never compiled in this workspace; `:600` is where it stops today,
+and the errors are structural, not incremental:
+
+- **(i) the era-record arity, and the error NAMES the gap.**  `:600` fails
+  unifying `option riscvEraGS` with
+  `option (gname → gname → gname → gname → riscvEraGS)` — the allocation
+  still writes `RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs …`, i.e. it is
+  short by exactly the FOUR TSO gnames the flip added
+  (`era_ts_name`, `era_logm_name`, `era_loglen_name`, `era_view_name`),
+  plus `era_kptb_name` (A6.53) which sits beside `era_kpt_name`.  So the
+  arity gap IS the inventory: five allocations to write, in the record's
+  own order.
+- **(ii) `era_ts_name` is never allocated** (A6.50): the file has no
+  `ts_name` mention at all, so `tso_interp_at`'s ghost_map auth has no
+  origin.  The initial value is `dom TM = dom gmem` with every element
+  `(0, None)`, and `ts_ok` at the empty log is `latest img [] a 0 v`,
+  i.e. `img = gmem` — which is exactly `boot_shape`'s post-power state.
+- **(iii) `era_kptb_name`** (A6.53), one `kptb_ghost_alloc` beside the
+  existing `kpt_ghost_alloc`.
+- **(iv) the boot-lane premises the flip has been accumulating**:
+  `BootCarve.boot_led_ran` (A6.49) and `SpecEntry`'s two (A6.49) both
+  bottom out in the era's initial-state ghosts, i.e. here.
+
+None of (i)–(iv) is a design question; (ii) is the only one with content
+and its content is written above.  **It is §7 step 6, and it is now the
+only structural piece of the flip that has never been attempted.**
+
+**THE CLOSING MODEL-AWARE CLEAN REBUILD: 672 ATTEMPTED, 661 `.vo`, 11
+ERRORS** (`iris/*.vo` deleted first; `ls -la --time-style=full-iso
+model-xv6iris/*.v *.vo` checked FIRST per A6.39 — the model `.vo` at
+19:11:34 postdates its source at 18:37:36; 672 − 11 = 661,
+self-consistent).  Two of the eleven were first-time-reached files needing
+only a `CurCtx` binder (`SpecAllocpid`, `SpecProcdump`); fixing them and
+re-running the sweep on that clean base gives
+
+> **663 of 1330, NINE red, up from 551/4.**  `HartSKpt` and `SmodeCorePt`
+> were the two deepest frontier files in the tree and closing them opened
+> the entire S-mode PT tier: **112 files went green in one tranche**, and
+> seven of the nine red are first-time-reached.
+
+**STILL RED, and what each is:**
+
+- `RiscvAdequacy` — §7 step 6, inventory above.  The only structural piece
+  of the flip never attempted.
+- `DiskBoot`, `SwtchCtx`, `WpSconfMem` — the deleted shim's tail (lane 6).
+- `WpSmodePtLeaves` — the S-mode load leaf's RAM obligation (lane 3).
+- `UptWalkPt`, `WpSconfSfence` — `own_context` threading (lanes 2, 5).
+- `UserMemPt`, `UmodeFetch` — the user tier (lane 4).
+
+**Nothing on that list is a design question.**  The pin's design work is
+finished; what is left is threading, one inventory, and one large but
+uniform grep.
 
 ## 7. Order of work
 
