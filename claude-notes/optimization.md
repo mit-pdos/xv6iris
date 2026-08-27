@@ -420,6 +420,13 @@ worth 20× on individual files.
 
 ### `lia` IS A GENERAL-PURPOSE CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT
 
+**THE EXHIBITS ARE GONE, THE LESSON IS NOT.** `iris/FsEff*.v` and
+`iris/FsOp*.v` were deleted (2026-08-27) — the whole-state pure
+preservation layer `design/fs-state.md` §6 superseded, with no reader
+left. The measurements below stand as measurements; you just cannot
+open the files to re-read them. Every rule they produced applies
+unchanged to any monolithic proof with a wide context.
+
 The whole cost of the stage-F2 effect band (`iris/FsEff*.v`: eight PURE files,
 no Iris, no `set_solver`, no `vm_compute`) was one tactic. `coqc -profile-ltac`
 put **86.8 % of `FsEffCreateEntry.v` in `lia`** — `xlia` 70.3 % LOCAL,

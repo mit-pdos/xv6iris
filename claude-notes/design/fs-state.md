@@ -1542,8 +1542,23 @@ ENCODING vocabulary each `*_owned` predicate uses for its own tie
 block, from `FsImg.v`/`DinodeEnc.v`/`BitmapEnc.v`/`FsTree.v`), and the
 local facts (a dirent insert keeps names unique; a truncate frees every
 owned block; …), which become lemmas beside the predicate that uses them.
-The rest is deleted when the `Γ`-predicates replace their consumers, not
-before.
+
+**ALL OF IT IS NOW DELETED** (2026-08-27; `FsObj*.v`/`FsWfImg.v` had gone
+earlier).  The condition above — deleted once the `Γ`-predicates replace
+their consumers — turned out to be vacuous: the layer had no consumers
+left to replace.  `FsEff*.v`/`FsOp*.v` (17 files, 13.2k lines) formed a
+closed island nothing else required, outside the cone of every top-level
+theorem; and inside `FsWf.v` only `dv_of_D` was reachable from a live
+caller, so `fs_durable_wf_view`, `fs_durable_wf_body`, the agreement /
+extensionality suite and the mkfs discharge went with them (1019 → 47
+lines).  Note the trap that hid this: a single dead-code pass reports
+none of it, because the island and the suite reference each other — it
+takes the FIXPOINT (unreachable from any live root), not one pass.
+`FsWf.v` keeps `dv_of_D`, the junk-tolerant totalisation `FsCollect`,
+`FsCollectAll`, `FsCrash`, `LogSnapLaw` and `ProofEndOp` read, and keeps
+its seven now-code-unused imports: `FsCrash` writes qualified `FsImg.*`
+names without requiring `FsImg` itself, so dropping them needs the direct
+requires added there first.
 
 
 ## 6½. Link counts and types are ONE RA: the type register (RULING, lane G5)
