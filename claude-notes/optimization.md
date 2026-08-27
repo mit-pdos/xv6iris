@@ -846,6 +846,38 @@ and it did not move.
   `∃` and no big-op in 98 files, bought 1.0 s. **Filter candidates by
   `big_sep`/`[∗` in the body first; sort by breadth only within that set.**
 
+- **AN `∃` OVER A BIG-OP ALREADY SEALS IT — measured 2026-08-27, do not re-run.**
+  `FdSlots.fd_frags` is a sixteen-element big-op (one `fd_st` per descriptor)
+  and it rides in `UsertrapRes.ut_own` beside `proc_priv`, so it is in the
+  goal of every syscall arm: exactly the profile that paid for `tf_page` and
+  `inode_blocks`. It buys **nothing**. `Global Typeclasses Opaque fd_frags
+  fd_frags_any`, measured isolated, min of two runs:
+  | file | unsealed | sealed |
+  |---|---|---|
+  | `ProofSyscall` | 45.42 s | 45.87 s |
+  | `ProofSysPipe` | 34.83 s | 35.11 s |
+  | `ProofAllocproc` | 26.47 s | 26.30 s |
+  | `ProofKexit` | 16.06 s | 16.12 s |
+  | `ProofUserinit` | 10.81 s | 10.90 s |
+
+  Every delta is inside the run-to-run spread (0.3–0.6 s). **The mechanism is
+  the reason, and it generalises:** what these files actually hold is
+  `fd_frags_any γ = ∃ sts, fd_frags γ sts`, and `iFrame` will not instantiate
+  an existential to go looking inside it — so the big-op is never walked and
+  there is nothing for a seal to prevent. Check the shape a consumer holds,
+  not the shape of the definition: **if the big-op is under an `∃` at every
+  use site, it is already sealed and the `Typeclasses Opaque` is dead
+  weight.** `tf_page` and `inode_blocks` are bare in the goal, which is why
+  they paid.
+
+  Priced `ProcInv.proc_ofiles` (16 slots, bare inside `proc_priv`, hence in
+  every syscall goal) the cheap way in the same round — a LOCAL `Typeclasses
+  Opaque` in the consumer, no accessor refactor, the technique this file uses
+  for `pc_is`/`sie_cap_gpr` above: `ProofSyscall` 45.66 s against 45.42 s
+  unsealed. Also nothing. Sixteen elements is an order of magnitude under the
+  big-ops that paid (4096, NINODE, 8 × 92 files), and `proc_priv`'s frame cost
+  is dominated by `tf_page`, which is already sealed. **Do not pay the eight
+  accessor `rewrite /proc_ofiles`es it would cost.**
 - **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a
   `Typeclasses Opaque` right next to it.** Otherwise each `#`-intro re-derives
   the instance by unfolding and descending into the resource: one `iIntros
