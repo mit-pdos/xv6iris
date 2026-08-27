@@ -580,21 +580,24 @@ Section FirstTok.
     iPoseProof (log_ctx_seal with "HLp") as "#Hbseal".
     iDestruct (ireg_inv_of with "H15 Hbseal") as "#H15s".
     iDestruct (bitmap_inv_of with "H16 Hbseal") as "#H16s".
-    (* Names in [fs_ready_pre]'s conjunct order ([H16s] is [bitmap_inv], its
-       LAST conjunct, and used to be named 4th-from-last).  MEASURED: this
-       ordering is worth nothing here -- 13.68 s -> 13.56 s isolated, i.e.
-       noise -- so do not expect the optimization.md ordering rule to pay at
-       this site; it is kept only because it is the documented convention.
-       Two things that do NOT work, measured 2026-08-27: destructing
-       [first_boot_persist] intuitionistically (`#(H1 & ...)`) so the frame
-       needs no resource bookkeeping makes it FIVE TIMES WORSE (13.7 s ->
-       74.3 s -- [iFrame] then searches the intuitionistic context once per
-       goal conjunct); and the 5.7 s here is the goal-side walk over
-       [fs_ready_pre]'s 20 conjuncts, several of them big definitions
-       ([ic_escrows], [is_itable2], [bitmap_inv]).  The remaining lever is a
-       CONSTRUCTOR lemma beside [fs_ready_pre] in [FsReady.v] -- but that
-       only moves the assembly cost into that file, so it needs measuring
-       before it is worth doing. *)
+    (* THE 5.6 s HERE WAS [ic_sleeplocks], AND IT IS SEALED NOW
+       ([IcacheEscrow.v], [Global Typeclasses Opaque]): it is a [big_sepL]
+       over NINODE under a transparent name and a conjunct of
+       [fs_ready_pre], so [iFrame]'s [Frame] search unfolded it and tried
+       every candidate hypothesis against all fifty elements.  13.56 s ->
+       8.96 s for this file.  Bisected against fourteen other conjuncts: this
+       one was 4.7 s of the 5.6 s, and all fifteen together only 5.5 s.
+
+       TWO THINGS THAT DO NOT WORK, measured 2026-08-27 before the seal was
+       found -- both address how the frame is DRIVEN rather than what it
+       unfolds into, which is why they missed.  Giving the names in
+       [fs_ready_pre]'s conjunct order ([H16s] is [bitmap_inv], its last
+       conjunct, and used to be named 4th-from-last) is worth nothing:
+       13.68 s -> 13.56 s, noise; it is kept only as the documented
+       convention.  Destructing [first_boot_persist] intuitionistically, so
+       the frame needs no resource bookkeeping, is FIVE TIMES WORSE
+       (13.7 s -> 74.3 s) -- [iFrame] then searches the intuitionistic
+       context once per goal conjunct. *)
     iFrame "H1 H2 H3 H5 HLp H7 H8 H9 H10 H11 H12 H13 H14 H15s H17 HK HC H16s".
     iFrame "%".
   Qed.

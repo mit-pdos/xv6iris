@@ -381,7 +381,13 @@ Section ConsoleInv.
     rewrite (devsw_rest_body_ne 7 ltac:(done)).
     rewrite (devsw_rest_body_ne 8 ltac:(done)).
     rewrite (devsw_rest_body_ne 9 ltac:(done)).
-    iFrame.
+    (* NAMED, in the big-op's index order -- index 1 is [CONSOLE], hence [emp]
+       and no name.  A bare [iFrame] here searched all eighteen hypotheses
+       against all ten elements of [devsw_rest]'s [big_sepL] and cost 4.0 s of
+       this file's 8.4 s (optimization.md: "never bare [iFrame] in a large
+       context"). *)
+    iFrame "H0r H0w H2r H2w H3r H3w H4r H4w H5r H5w H6r H6w H7r H7w H8r H8w
+            H9r H9w".
   Qed.
 
   (* ...and the table, once consoleinit's two stores have landed.  An

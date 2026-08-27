@@ -6026,6 +6026,17 @@ Section IcacheEscrow.
   Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
   Proof. apply _. Qed.
 
+  (* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md,
+     the [InodeInv.inode_blocks] entry): [iFrame]'s [Frame] search unfolds a
+     transparent constant to get at the [big_sepL] underneath and then tries
+     every candidate hypothesis against every one of its NINODE elements.
+     This is the last-but-five conjunct of [FsReady.fs_ready_pre], so every
+     frame that rebuilds that bundle paid for it -- [FirstTok]'s
+     [first_persist_pre] was 5.6 s of one [iFrame], and 4.7 s of that was
+     this constant alone (measured 2026-08-27 by sealing it and nothing
+     else).  [Global], not bare: the bare form is compilation-local. *)
+  Global Typeclasses Opaque ic_sleeplocks.
+
   (* ...AND ITS ACCESSOR.  This is the ONLY copy of either; every consumer
      projects the family through this lemma.  Do not restate it in a
      caller's own file -- seven files did, and retiring the seven is what
