@@ -714,6 +714,24 @@ and it did not move.
     genuinely take the big-op apart keep working, and a `Timeless` instance
     proved `rewrite /X. apply _.` still goes through. Nothing in 1293 files
     broke on the `inode_blocks` seal.
+- **BREADTH IS NOT THE PREDICTOR -- A BIG-OP BODY IS.  Measured 2026-08-27, so
+  do not re-run it.** The tempting next step after sealing a few big-ops is to
+  seal the constants NAMED in the most files, whatever their body. It does not
+  pay. Ranked by how many other files name them, the top unsealed iProp
+  definitions are `pc_is` (483 files), `sie_cap_gpr` (418), `wp_next` (415),
+  `instr` (332) -- and none of them has a big-op body. Sealing `pc_is` and
+  `sie_cap_gpr` in `ProofSysUnlink`, the tree's most expensive file, measured
+  **150.36 s -> 151.49 s**: no gain, slightly negative. `wp_next` cannot be
+  sealed at all -- it is the WP continuation former that every proof
+  `iIntros` THROUGH, so the seal fails at `iIntro: cannot turn (wp_next ...)`.
+  The mechanism explains it: `iFrame`'s cost is (candidate hypotheses x
+  ELEMENTS of the goal conjunct), so unfolding a non-big-op is cheap however
+  many files do it. Compare the same experiment on bodies that ARE big-ops:
+  `bio_ctx` (92 files) bought 9.3 s in one file, `ic_sleeplocks` (NINODE) 4.7 s,
+  `word_pointsto` (8 bytes) 3.8 s -- while `disk_res`, a 47-line body with one
+  `∃` and no big-op in 98 files, bought 1.0 s. **Filter candidates by
+  `big_sep`/`[∗` in the body first; sort by breadth only within that set.**
+
 - **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a
   `Typeclasses Opaque` right next to it.** Otherwise each `#`-intro re-derives
   the instance by unfolding and descending into the resource: one `iIntros
