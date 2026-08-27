@@ -1,6 +1,18 @@
 # The machine flip: SC → Ztso in the kit, and the REAL Σ instantiation
 
-STEP 5, THE OVERRULING TRANCHE (2026-08-26, latest session).  RULING 1's
+STEP 5, THE READ-SIDE TRANCHE (2026-08-26, latest session).  **The model
+`.vo` had never been rebuilt after A6.36 reverted its source, so A6.38's
+number was measured against the PATCHED machine and is VOID (A6.39).**
+On the real pinned model: the read-side re-port is landed
+(`HartMFetch` + `HartPilot`, A6.40), the whole A6.7(B) revert tail is
+absorbed, A6.42's `ledger_read_ok` kit is in `TsoCtx`, `↦ₓ` now carries
+its own timestamp-0 element so kernel TEXT pays the plain arm with no
+change above the fetch leaves (A6.43), and the PT-read lane is threaded
+(A6.44).  **A6.37's ratified `sfence.vma` drain has NO NODE in this model
+and is a STOP (A6.41)**; the kernel-PT DISCHARGE point is located and is
+the one design gate left in that lane (A6.45).  **A6.46 is the handoff.**
+
+STEP 5, THE OVERRULING TRANCHE (2026-08-26, earlier session).  RULING 1's
 overruling is IMPLEMENTED at the machine and the leaves (A6.36), the Sail
 patch is reverted and parked, the kernel-PT read story is characterised
 with one route measured dead (A6.37), and the store-side tranche that was
@@ -3028,6 +3040,13 @@ at `RiscvLang.v` with a model-field error, while a REVERT that leaves the
 old `.vo` in place produces a tree that builds perfectly and proves
 statements about the wrong machine.
 
+> **THIS RULE BELONGS IN `durable-notes.md`'s Build section**, beside the
+> existing "a `git pull` that touches `model-xv6iris/` means `make model`
+> first" bullet — it is the same hazard with a worse failure mode and it is
+> not specific to this port.  It is recorded here only because this
+> session's write scope was this file; whoever lands the tranche should
+> move it.
+
 **WHAT IT COSTS.**  A6.38's 244/1330 is void.  The revert's real fallout
 is the A6.7(B) list, which had been recorded as "STILL TO ABSORB" but was
 in fact silently green: `RiscvTryStep`, `RiscvFetchExec`, `SmodeCore`,
@@ -3147,10 +3166,21 @@ THAT IS NOT THE PROBLEM.**  `kvminithart()` is
     w_satp(MAKE_SATP(kernel_pagetable));
     sfence_vma();                       // flush stale entries from the TLB
 
+and the disassembly agrees (`kernel.asm`, `kvminithart` at `0x80000ee4`):
+
+    80000eec:  12000073   sfence.vma          <- the FIRST fence, before
+    80000ef0:  00009797   auipc a5,0x9           anything else happens
+    80000ef4:  3c87b783   ld    a5,968(a5)    # 8000a2b8 <kernel_pagetable>
+    …                     w_satp(...)
+    80000f04:  12000073   sfence.vma          <- the SECOND, after satp
+
 so the first hardware walk (the fetch of the instruction after the second
 `sfence.vma`, once `satp` is live) happens AFTER both fences.  Had the
 drain a node to sit on, it would have sufficed exactly where the ruling
-expected.  The blocker is the model, not the program.
+expected.  The blocker is the model, not the program.  (Note the `ld` of
+`kernel_pagetable` between them: that is a plain DATA load of a global
+hart 0 wrote in `kvminit`, and it is paid by the ctx tier's dirty arm, not
+by any of this.)
 
 **WHAT THIS LEAVES, and it needs a ruling.**  A6.37's three options are
 now: (a) EXPORT THE AUTHOR (`ledger_msg_at` + `ledger_read_own_ok`) —
@@ -3169,8 +3199,16 @@ and never exposes.
 
 **AND ONE THING (a) DOES NOT COVER, found while checking the other half.**
 The SECONDARY-hart route needs the flag read to MINT `view_lb h F`, and
-xv6's flag read is `__atomic_load_n(&started, __ATOMIC_ACQUIRE)` — a
-plain `lw` plus a `fence r,rw`, NOT an exclusive read.  `fence_drains`
+xv6's flag read is `__atomic_load_n(&started, __ATOMIC_ACQUIRE)` — and the
+disassembly (`main` at `0x80000e30`) is
+
+    80000e46:  431c        lw    a5,0(a4)
+    80000e48:  0230000f    fence r,rw
+
+a plain load plus an acquire fence, NOT an exclusive read.  (The publishing
+side is symmetric: `fence rw,w` at `80000edc` then the store —
+`fence_drains` correctly declines that one too, a release fence has no
+W→R edge either.)  `fence_drains`
 correctly declines `r_rw` (no W→R edge), and A6.6(b) mints the receipt
 only at the EXCLUSIVE read and the AMO write, so **nothing on that path
 mints a receipt today**.  The honest fix is inside the existing design:
@@ -3325,6 +3363,116 @@ lemmas) must pay `fobl_ram` from A6.42's `ledger_read_ok` — which needs
 the `⌜t ≤ B⌝` tie in the slot and a `view_lb` receipt on the reading hart.
 For a secondary hart that receipt is the boot MP one (A6.41 records that
 the flag read does not mint it yet); for hart 0 it is A6.41's open ruling.
+
+### A6.45 THE PT-SLOT DISCHARGE POINT IS `HartSKpt.kpt_slot_node`, AND IT
+### IS THE DESIGN GATE — MEASURED, NOT PREDICTED
+
+Worth naming exactly, because it is the ONE place the kernel-PT read story
+has to be paid and everything else in that lane is threading:
+
+    Lemma kpt_slot_node root_ppn t0 vpn p2 p1 p0 a w :
+      ptree_maps t0 vpn p2 p1 p0 ->
+      (forall σ q0, pt_slot_mem σ … -> … -> pt_slot_mem σ a w) ->
+      kpt_lb t0 -∗ kpt_inv root_ppn -∗
+      (∀ σ, mstate_interp σ ={⊤,∅}=∗
+         ⌜read_bytes σ.(mem) a 8 = Some w⌝ ∗ ▷ (|={∅,⊤}=> mstate_interp σ))
+
+It opens `kpt_inv`, reads the three slots out as PURE `pt_slot_mem` facts
+(flat lookups in `σ.(mem)`), closes the invariant immediately — "everything
+taken out of it was pure", says the proof — and concludes the flat
+`read_bytes`.  Its two pinned specialisations (`kpt_pte2_node`,
+`kpt_pte1_node`) are one-liners over it, and `kpt_leaf_node` is the same
+shape modulo `pte_canon`.
+
+**WHAT IT NEEDS AND DOES NOT HAVE.**  The obligation is now
+`fobl_ram img log tv a 8 w`, and A6.42's `ledger_read_ok` pays it from
+`phys_ledger_at a dq w t` ∗ `⌜t ≤ F⌝` ∗ `view_lb h F`.  The slot fact is
+there — `kpt_body`'s tier is `phys_ledger` (A6.20), so the element comes
+out of the same opening as `∃ t, phys_ledger_at …` via
+`phys_ledger_of_at`.  What is missing is the pair `⌜t ≤ B⌝` (the
+`kpt_body` tie A6.37 specified, not yet landed) and a `view_lb` receipt on
+the reading hart, which is A6.41's open ruling for hart 0 and A6.41's
+unminted flag-read receipt for the secondaries.  **And there is no
+context-shaped escape**: `ctx_phys_load_bytes_ok` wants `own_context ξ`
+and A6.20's ruling makes `kpt_inv` context-FREE on purpose (a bare `inv`
+shared by every S-mode thread cannot name a context), so the walk cannot
+borrow the walker's token.  The gate is real.
+
+### A6.46 HANDOFF AFTER THE READ-SIDE TRANCHE
+
+**THE CLOSING CLEAN BUILD: 522 ATTEMPTED, 516 `.vo`, 6 ERRORS**
+(`iris/*.vo` deleted first, one `make -f CoqMakefile -j12 -k`; the three
+counts are self-consistent — 522 − 6 = 516 — so nothing was silently
+skipped, and `ls -la model-xv6iris/*.v *.vo` was checked: the model `.vo`
+now POSTDATES its source, which is the check A6.39 exists for).
+
+> **516 of 1330, SIX red.**  Not comparable to A6.38's 244 (that number was
+> measured against the patched model and is void, A6.39) and not comparable
+> to A6.35's 550 either (that one predates the overruling).  The honest
+> reading is the frontier's shape: the fetch tier is GREEN to its top, the
+> PT-read lane is threaded down to one discharge point, and the six red
+> files are five known items plus the one design gate.
+
+**WHAT LANDED, in the order it was worked:**
+
+1. The model `.vo` was actually reverted (A6.39) — without this nothing
+   else in the tranche means anything.
+2. `HartMFetch` + `HartPilot` (A6.40), and the A6.7(B) revert leftovers it
+   dragged in: `RiscvTryStep`, `RiscvFetchExec`, `SmodeCore`, `UserMem`,
+   `WpLoad`, `MemAccessGen`, `UserMemMis`, `SmodePte` — every one of them
+   reverted to the MAIN REPO's text, because a `diff` showed the fliptree
+   copy differed from main by the A6.7(B) hunks and nothing else.  That
+   `diff` against `/shared/xv6iris-3/iris/<f>.v` is the cheapest tool in
+   this whole tranche and it should be the FIRST thing tried on any file
+   whose only red is patch fallout.
+3. A6.42's `TsoCtx` kit (the `phys_ledger_at` family + `ledger_read_ok`).
+4. `HartMRun` (10 pass-through premises, one regex), `HartMLoad` /
+   `HartSMem` (the plain rule lost a positional argument when `ak_strong`
+   died — A6.36 said so and three call sites still had it).
+5. A6.43's `↦ₓ`-carries-its-timestamp change, and with it `WpInstrRun`,
+   `KMap`, `TrampText`, `BootCarve`'s text half, `HartLift2`, `InstrBytes`.
+6. `PtTreeAdue`'s two PTE reads (A6.44).
+
+**WHAT IS RED, and what each one is:**
+
+- `HartSKpt` — **the design gate (A6.45)**, and the only one that needs a
+  ruling.  Everything else in the S-mode PT lane is behind it
+  (`SRegime` → `SmodeCorePt` → `IntrDefs` → the whole S-mode tier).
+- `BootCarve` — A6.34's carve plumbing, unchanged and still mechanical.
+- `TransPt`, `UserPtTree`, `WpStartNew` — A6.27/A6.28's threading
+  (`↦ₚₜ` vs `↦ₚ₈`, the `S`-payer's shape at the boot store sites).
+- `WpUart` — A6.29, unchanged: the DMA completion's append with a
+  NON-EMPTY write set.  Not attempted this tranche, and the reason is the
+  one A6.29 already gave: closing it needs `virtio_proto_step` turned
+  inside out into an accessor, which is a device-conformance-tier
+  statement change, not re-plumbing.
+
+**ONE PIECE OF UNVERIFIED WORK, flagged because it cannot be compiled
+where it stands.**  `SmodeCorePt`'s re-port is WRITTEN — the two S-mode
+fetch leaves move to `swp_hart_ram_read_plain` (they still called the
+pre-split `swp_hart_ram_read`, a name that has not existed since A6.6), and
+`s_text_obl` is restated at `fobl_ram` with a new `s_text_byte` doing the
+per-byte extraction of the `pointsto` AND the pristine element at the
+TRANSLATED address (`svpn_of_pa_add` + `kmap_at_agree` + `pa_of_pa_add`,
+`s_fetch_chunk`'s own three steps).  It sits behind `SRegime`, hence behind
+`HartSKpt`, so **it has never been type-checked**.  Keeping it is strictly
+better than reverting — without it the file is certainly broken — but the
+first thing to do after `HartSKpt` goes green is compile it and expect
+work.
+
+**WHERE THE NEXT LANE PICKS UP:**
+
+1. **The A6.41 ruling** (hart 0's forwarding: export the author, or patch
+   the model to emit `TlbOp`).  Nothing in the kernel-PT lane moves without
+   it.
+2. With it: the `kpt_body` `⌜t ≤ B⌝` tie (A6.37), the flag-read receipt
+   mint (A6.41's last paragraph — `wp_hart_ram_read_plain` hands back
+   `view_lb h tvn`), and `HartSKpt.kpt_slot_node` on `ledger_read_ok`.
+   Then `SmodeCorePt` (above), then the S-mode tier surfaces
+   error-driven.
+3. `TransPt`/`UserPtTree`/`WpStartNew` (A6.27/A6.28) and `BootCarve`
+   (A6.34) are independent of all of that and can be worked in parallel.
+4. `WpUart` last, on its own ruling.
 
 ## 7. Order of work
 
