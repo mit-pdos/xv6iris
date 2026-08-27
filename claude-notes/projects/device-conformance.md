@@ -81,7 +81,8 @@ both and the README's "Findings fixed" table for the values.
   program must obey, and the FINDINGS TABLE (the authority — this file
   summarises, that file is maintained).
 - `vtest-rocq/` — the model side: `VSched.v` (the executable device
-  schedule), `VTest.v` (the harness), one `.v` per test.
+  schedule), `VTest.v` (the harness), one `.v` per test, and
+  `expected-pass.txt` (which of them CI requires).
 
 **What is NOT done, in the order it is worth doing, is §5.**
 
@@ -133,9 +134,22 @@ illegally; the only question is whether the model has a run that matches.
 
 Build targets: `make vtest-deps` (the ~14-file cone this needs — NOT all of
 `iris/`), `make vtest-gen` (re-run QEMU), `make vtest-check` (model against
-the checked-in captures; no QEMU, no toolchain — the CI target).
+the checked-in captures; no QEMU, no toolchain), `make vtest-check-ci` (the
+same, `-k`, reported per test against `vtest-rocq/expected-pass.txt`).
 Deliberately outside `make proofs`: a red device test is a finding, and must
 not break the proof build.
+
+**CI RUNS `vtest-check-ci` ON EVERY PUSH** (added 2026-08-27;
+`.github/workflows/ci.yml`, the last step), and what it runs it against is the CHECKED-IN captures — it never
+runs QEMU, so it hunts no new hardware behaviours; it re-checks that the
+executions already recorded from real hardware are still executions the model
+ADMITS.  Every test is compiled, expected-red ones included, because seeing
+them in the step summary is the point; `vtest-rocq/expected-pass.txt` says
+which failures are fatal (a bare name) and which are known red (`!Name
+reason`), and a test that file does not mention fails CI rather than defaulting
+either way.  There are no `!` rows today: all 56 pass, the eleven open findings
+included, because a divergence is pinned on both sides rather than left red.
+Adding a test now means adding a row there too.
 
 ## 3. The findings
 

@@ -1,0 +1,100 @@
+# WHICH DEVICE-CONFORMANCE TESTS ARE EXPECTED TO PASS.
+#
+# CI (.github/workflows/ci.yml) compiles EVERY test in _CoqProject with
+# `make -k`, so one red test does not hide the rest, and then
+# tools/vtest/vtest_status.py reads this file to decide what the result means.
+# A test passes by compiling: it is a `vm_cast_no_check`d equation between the
+# model's reached state and the QEMU capture checked in beside it.
+#
+# FORMAT, one row per test:
+#
+#   Name                a bare name is EXPECTED TO PASS.  Its failure is a
+#                       REGRESSION and fails CI.
+#   !Name  <reason>     KNOWN RED: still compiled, still reported in the run's
+#                       step summary with the reason, but its failure does not
+#                       fail CI.  A known-red test that PASSES is reported too,
+#                       so the row can be un-`!`ed.
+#
+# EVERY test in _CoqProject must appear here exactly once; a missing one is a
+# CI error rather than a silent default, because both defaults are wrong -- a
+# new test would arrive either as an unannounced regression the day it goes red
+# or as one nothing ever checks, and which it should be is the author's call.
+#
+# A `!` ROW IS NOT WHERE A FINDING IS RECORDED.  The findings table in
+# tools/vtest/README.md is the authority; the reason here is a pointer to the
+# row there.  And note that a KNOWN DIVERGENCE is normally not a red test at
+# all -- the convention (README, "Recording a divergence") is to pin the value
+# on BOTH sides, which stays green and goes red exactly when the model moves.
+# A `!` row is for a test that cannot be written that way.
+#
+# THERE ARE NO `!` ROWS TODAY: all 56 tests pass against the checked-in
+# captures, eleven open findings included.  The mechanism is here so that a
+# test which cannot be pinned green can still be run and reported.
+
+# ---- core: the CPU and ordinary memory ----
+CoreSmoke
+CoreRegsGpr
+CoreRegsMcsr
+CoreRegsScsr
+CoreRegsPmp
+CoreRegsHpm
+CoreRegsCtr
+CoreRegsFcsr
+CoreRegsFpr
+
+# ---- disk: the virtio-mmio block device ----
+DiskRw
+DiskOrder
+DiskIntr
+DiskIdent
+DiskIdentCap
+DiskIdentFeatsel
+DiskIdentDrvfsel
+DiskIdentConfgen
+DiskIdentQreset
+DiskIdentShmsel
+DiskIdentRd1
+DiskIdentRd2
+DiskIdentWr1
+DiskIdentQnum
+DiskIdentQsel
+DiskIdentNotify
+DiskErr
+DiskChain
+
+# ---- uart: the 16550 ----
+UartTx
+UartDlab
+UartRegs
+UartWidth
+UartLoop
+UartIrqTx
+UartIrqRx
+UartRx
+
+# ---- plic: the interrupt controller itself ----
+PlicArb
+PlicTie
+PlicThresh
+PlicMask
+PlicLevel
+PlicMctx
+PlicPrio0
+
+# ---- conc: shared memory between harts ----
+ConcSmoke
+ConcLost
+ConcSb
+ConcByte
+ConcAmo
+
+# ---- pt: Sv39 translation ----
+PtIdent
+PtAd
+PtAdu
+PtAde
+PtFault
+PtLevels
+PtTlb
+PtResv
+PtSuper

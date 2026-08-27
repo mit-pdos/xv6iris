@@ -6,6 +6,8 @@
 #   make vtest      regenerate the QEMU captures, then check the model
 #                   against them (needs qemu-system-riscv64 + the toolchain)
 #   make vtest-check  check the model against the CHECKED-IN captures only
+#   make vtest-check-ci  the same, but keep going and report per test against
+#                   vtest-rocq/expected-pass.txt (what CI runs)
 #   make vtest-deps build just the ~14 iris/ files vtest needs (not all of iris)
 #   make audit      build, then Print Assumptions on the system theorem
 #   make audit-only the same audit, against an already-built tree
@@ -105,7 +107,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
-        audit audit-only vtest vtest-check vtest-gen vtest-deps \
+        audit audit-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
         clean clean-proofs distclean model-gen
 
 all: proofs
@@ -322,6 +324,39 @@ vtest-check: $(VTEST)/CoqMakefile
 	$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile -j$(JOBS)
 
 vtest: vtest-gen vtest-check
+
+# WHAT CI RUNS, and it is `vtest-check` with the stopping rule moved.  Three
+# differences: `-k`, so one red test does not hide the other 55; make's exit
+# status is DISCARDED (the leading `-`); and tools/vtest/vtest_status.py decides
+# the verdict against $(VTEST)/expected-pass.txt -- a test listed there and
+# failing is a regression and fails here, a `!`-marked known-red one is
+# reported and forgiven, and an unlisted test is an error either way.  That is
+# the point of the split: a red conformance test is a FINDING about the model,
+# so which reds are expected has to be written down rather than inferred from
+# whether make came back 0.
+#
+# IT DELETES THE .vo FIRST, and that is not tidiness -- it is what makes the
+# report's "this test passed" mean anything.  The report reads the filesystem,
+# and a FAILED recompile LEAVES THE PREVIOUS .vo IN PLACE: coq_makefile's
+# .DELETE_ON_ERROR removes the .glob (which coqc had begun) but not a .vo that
+# this run never touched, so on a warm tree -- a self-hosted CI runner keeps
+# the gitignored artifacts between runs -- a newly red test would be reported
+# green off last run's output.  Measured: 117 files, ~600 s of CPU, longest
+# single file 33 s, so a clean re-check is one file's wall-clock wide on a
+# many-core machine and cheap next to the iris build it follows.  Anything
+# outside $(VTEST) (the iris/ cone, the kernel dump) is untouched and still
+# incremental.
+#
+# The log is piped through tee only so the report can quote each failure's
+# error text; `*.log` is gitignored.  Nothing here runs QEMU -- the captures
+# are checked in.
+VTEST_LOG ?= $(VTEST)/vtest-check.log
+
+vtest-check-ci: $(VTEST)/CoqMakefile
+	rm -f $(VTEST)/*.vo $(VTEST)/*.vos $(VTEST)/*.vok $(VTEST)/*.glob
+	-$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile -j$(JOBS) -k \
+	  --output-sync=target 2>&1 | tee $(VTEST_LOG)
+	$(PYTHON) tools/vtest/vtest_status.py --log $(VTEST_LOG)
 
 # ---- cleaning ----
 clean-proofs:

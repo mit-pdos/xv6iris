@@ -1,14 +1,19 @@
 name: CI
 
 # Builds the Sail-generated Rocq model (model-xv6iris/), the checked-in kernel
-# dump (kernel-rocq/), the checked-in user-program dumps (user-rocq/), and the
-# Iris proofs (iris/).
+# dump (kernel-rocq/), the checked-in user-program dumps (user-rocq/), the
+# Iris proofs (iris/), and the device-conformance tests (vtest-rocq/) against
+# the QEMU captures checked in beside them.
 #
 # It deliberately does NOT:
 #   * build the xv6 kernel ELF (the `xv6-riscv/` tree is .gitignored / absent),
 #   * regenerate kernel-rocq/KernelInstrs.v (or the sibling KernelData/KernelSyms),
-#   * regenerate the Sail model .v files (needs the `sail` compiler).
-# The .v files for all three are checked in; CI only (re)compiles them to .vo.
+#   * regenerate the Sail model .v files (needs the `sail` compiler),
+#   * run QEMU to look for new hardware behaviours (that is `make vtest-gen`,
+#     which needs qemu-system-riscv64 and the riscv64 toolchain and is run by
+#     hand; the captures it produces are checked in, and CI only re-checks the
+#     model against them).
+# The .v files for all four are checked in; CI only (re)compiles them to .vo.
 # After the build, it best-effort clones (but never builds) `xv6-riscv/` so the
 # proof-coverage report can attribute functions to source files; see the note
 # on that step below.
@@ -386,3 +391,55 @@ jobs:
         continue-on-error: true
         working-directory: iris
         run: python3 find_dead.py --dir . --triage
+
+      # ---- 5. Device conformance (vtest-rocq/): the model against QEMU ----
+      # The differential device tests, run against the QEMU captures that are
+      # CHECKED IN (`vtest-rocq/*Gen.v`) — no QEMU here, no riscv64 toolchain,
+      # nothing regenerated.  So this is not a hunt for new hardware behaviours
+      # (that is `make vtest-gen`, run by hand); it is the regression test that
+      # the executions already recorded from real hardware are still executions
+      # our system model ADMITS.  A test passes by COMPILING: it is a
+      # `vm_cast_no_check`d equation between the model's reached state and the
+      # capture, so there is nothing to check after coqc.  See
+      # tools/vtest/README.md and claude-notes/projects/device-conformance.md.
+      #
+      # EVERY test is compiled, the expected-red ones included, and the verdict
+      # is not make's exit status: `make vtest-check-ci` runs the suite with
+      # `-k` (one red test does not hide the other 55), discards make's status,
+      # and lets tools/vtest/vtest_status.py decide against
+      # vtest-rocq/expected-pass.txt — a test listed there and failing is a
+      # REGRESSION and fails this step; a `!`-marked known-red one is reported
+      # in the summary with its reason and forgiven; a test in _CoqProject that
+      # the manifest does not mention at all is an error.  That split is the
+      # point: a red conformance test is a FINDING about the model, so which
+      # reds are expected has to be written down rather than inferred.
+      #
+      # The build needs iris/'s .vo (RiscvExec + DevModel + ColdBoot and their
+      # cone) and kernel-rocq/'s, both already on disk from the steps above —
+      # nothing extra is compiled outside vtest-rocq/.  Measured on the dev VM:
+      # 117 files, ~600 s of CPU, longest single file 33 s (UartRx), so the
+      # wall-clock floor is one file and the step is minutes at most.
+      #
+      # LAST ON PURPOSE.  A step with no `if:` is skipped once an earlier one
+      # fails, so putting the conformance gate after the informational reports
+      # means a red test here still leaves the profile, coverage and dead-code
+      # reports in the summary — and the failure that stops the run is the one
+      # a reader wants at the bottom of it.  vtest_status.py is run twice: make
+      # runs it for the job log (plain text, with the failing test names), and
+      # the second call renders the same verdict as markdown into the summary.
+      # It only reads the filesystem and the log, so the two cannot disagree.
+      - name: Device conformance tests (vtest-rocq/, checked-in QEMU captures)
+        run: |
+          rc=0
+          make SWITCH="$GITHUB_WORKSPACE" vtest-check-ci \
+            VTEST_LOG="$RUNNER_TEMP/vtest-check.log" || rc=$?
+          # `|| rc=$?` and not a bare call: the reporter exits nonzero on a
+          # regression, and this job's shell is `bash -eo pipefail`, so an
+          # unguarded failure here would end the step before the annotation
+          # below is printed.
+          python3 tools/vtest/vtest_status.py --md \
+            --log "$RUNNER_TEMP/vtest-check.log" >> "$GITHUB_STEP_SUMMARY" || rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::A device-conformance test that is expected to pass did not, or vtest-rocq/expected-pass.txt is out of step with _CoqProject; see the step summary."
+          fi
+          exit $rc

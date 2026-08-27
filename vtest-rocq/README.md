@@ -11,13 +11,19 @@ The QEMU side is [`tools/vtest`](../tools/vtest); read its README and
   produced.  Regenerate with `make vtest-gen`, never edit.
 - **`<Name>.v`** -- the test: a handful of `vm_cast_no_check`d equations
   between a projection of the model's reached state and the capture.
+- **`expected-pass.txt`** -- which tests CI REQUIRES to pass, and which are
+  known red (and why).  CI compiles all of them either way and reports each
+  one; read the file's header, it is the format and the reasoning.
 
 ## Adding a test
 
 1. Write `tools/vtest/tests/<name>.S` (include `abi.h`, define `_vtest_body`).
 2. `make vtest-gen` -- runs it on QEMU and writes `<Name>Gen.v`.
 3. Write `<Name>.v` and add both to `_CoqProject`.
-4. `make vtest-check`.
+4. Add the test to `expected-pass.txt` -- a bare name if it passes, or
+   `!<Name>  <reason>` if it does not and cannot be pinned green.  CI fails on
+   a test the file does not mention: a new one must say which it is.
+5. `make vtest-check`, and `make vtest-check-ci` for what CI will say.
 
 ## What a red test means
 
