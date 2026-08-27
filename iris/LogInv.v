@@ -380,7 +380,16 @@ Proof.
 Qed.
 
 Section LogInv.
-  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ}.
+  (* [fsLinkG]/[fsTopG] are the DURABLE SNAPSHOT's two capacity classes
+     (durable-disk lane H2).  [log_ctx]'s last-but-one conjunct is the file
+     system's law, and since H2 the law HANDS DOWN the next epoch
+     ([LogSnapLaw.snap_law_out] = [FsDurSnap.P_dur]) rather than a pure
+     proposition, so this section has to be able to STATE it.  Both are
+     members of [Xv6G.xv6G] and this file sits below the bundle, so every
+     consumer that binds [xv6G] resolves them and no contract gains a
+     binder; the byte map's own class comes out of [riscvGS]. *)
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ,
+            !fsLinkG Σ, !fsTopG Σ}.
   (* the ambient generation: [log_ctx] carries this era's SWAP RECEIPT, which
      is what every WAL fupd curries to prove the crash record's arm is its
      own ([FsCrash.fs_arm_acc]).  Implicit, so no spec statement changes. *)
@@ -1290,13 +1299,15 @@ Section LogInv.
      sb_parked γfs ∗
      (* THE FILE SYSTEM'S LAW (durable-disk C-8, plan section 3's "Commit").
         Given the byte authority at the logged view and "no transaction is
-        open", it yields [∃ S, snap_ok S L] and hands both authorities back.
+        open", it yields THE NEXT DURABLE EPOCH ([FsDurSnap.P_dur] at the
+        logged view -- durable-disk lane H2; it used to yield a pure
+        [∃ S, snap_ok S L]) and hands both authorities back.
         ARITY-FREE for [sb_parked]'s reason verbatim: the mask it runs in is
         CLOSED OVER, with the one fact a committer needs beside it (that
         [fsbN] is not in it -- a committer runs the law with the byte view
         already open).  The WAL supplies nothing to it and reads nothing out
-        of it but a pure proposition, so the log's lock resource still
-        carries no client payload.  LAST, after the park, so no pattern that
+        of it but an epoch it immediately hands to its own commit permit,
+        so the log's lock resource still carries no client payload.  LAST, after the park, so no pattern that
         opens this bundle moves. *)
      snap_law γ γfs cov logstart ∗
      (* RECOVERY IS DONE (durable-disk lane E-except).  The byte view's
@@ -1574,8 +1585,9 @@ Section LogInv.
      beside the ledger's with [size T = size om], a commit is exactly the
      step at which the ledger is empty, and the byte authority is the one
      the committer has just taken out of [fs_bytes_inv].  It moves NO
-     durable resource -- both authorities come straight back -- so the
-     commit runs it at its own ghost step. *)
+     durable resource -- both authorities come straight back, and the epoch
+     it yields is ALLOCATED, not carved out of anything the WAL owns -- so
+     the commit runs it at its own ghost step. *)
   Lemma log_ctx_snap_law_of_ops (γ : log_names) (bn : bio_names)
       (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32)
@@ -1591,7 +1603,7 @@ Section LogInv.
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
     ghost_map_auth (ln_tx γ) 1 T ={⊤ ∖ ↑fsbN}=∗
-      ⌜snap_law_ok C (fs_home_set cov logstart)⌝
+      snap_law_out C (fs_home_set cov logstart)
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 T.
   Proof.

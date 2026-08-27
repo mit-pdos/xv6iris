@@ -954,7 +954,19 @@ Section CollectAll.
       iSplitR; [iPureIntro; exact Htie |].
       iPureIntro; exact Hdm. }
     rewrite /col_auth. iDestruct "Hauth" as "(Hb & _ & _ & _ & _)".
-    iModIntro. iFrame "Hb Ht". iPureIntro. exact Hok.
+    (* THE EPOCH IS BUILT HERE (durable-disk lane H2), at the file system's
+       own ghost step, and the WAL only receives it.  [col_view] IS
+       [fs_restrict (dv_of_D C) home], so the registry stands at exactly the
+       map the commit jumps to. *)
+    destruct Hok as [S HS].
+    iMod (P_dur_alloc S (col_view C (fs_home_set cov ls)) HS) as "Hdur".
+    (* [iFrame] must NOT go first here: [P_dur] is an existential over a
+       [∗] whose head conjunct is a byte AUTHORITY, so a bare
+       [iFrame "Hb Ht"] happily unifies the SNAPSHOT's fresh gname with the
+       ERA's [fs_bytes γfs] and leaves an unclosable goal.  Split the law's
+       conjunct off by name first. *)
+    iModIntro. rewrite /snap_law_out /col_view.
+    iSplitL "Hdur"; [iExact "Hdur" |]. iFrame "Hb Ht".
   Qed.
 
 End CollectAll.

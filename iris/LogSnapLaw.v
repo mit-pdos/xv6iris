@@ -20,8 +20,21 @@
 (*  committer holding [fsbN] open can still run it.                       *)
 (*                                                                        *)
 (*  THE AUTHORITY IS TAKEN AND RETURNED, not borrowed through an           *)
-(*  accessor: the law's whole content is a PURE fact, and                  *)
-(*  [FsCollectAll.pure_keep] is why producing it costs nothing.            *)
+(*  accessor: what the law PRODUCES is the next durable epoch itself       *)
+(*  ([FsDurSnap.P_dur] over fresh names), and the two authorities it is    *)
+(*  handed come straight back.  It still moves no durable resource: the    *)
+(*  epoch is ALLOCATED, not carved out of anything the WAL owns.           *)
+(*                                                                        *)
+(*  IT USED TO CONCLUDE A PURE [exists S, snap_ok S L] (durable-disk lane   *)
+(*  H2 moved it).  A pure conclusion crosses [end_op]'s lock release as a  *)
+(*  Coq hypothesis for free; a resource has to be carried in the walk's    *)
+(*  hand -- [ProofEndOp.eo_commit]/[eo_loop] carry it, and the copy loop   *)
+(*  writes only log SLOTS, so the map it stands at never moves             *)
+(*  ([ProofEndOp.eo_home_restrict_upd]).  What the move buys is that the   *)
+(*  WAL's commit permit no longer ALLOCATES the file system's snapshot     *)
+(*  from a value it cannot check: the file system builds its own epoch,    *)
+(*  at the one ghost step where its invariants are open, and the WAL only  *)
+(*  swaps the registry over ([FsDurSnap.dsnap_step_xfer]).                 *)
 (*                                                                        *)
 (*  WHY THE PREMISES ARE THE ROWS OF [FsBlocks.fs_bytes_body] AND NOT      *)
 (*  [FsCollect.col_auth].  This file sits BELOW [LogInv], which sits below *)
@@ -45,21 +58,27 @@ Require Import LogDefs.        (* [log_names], [ln_tx], [fs_restrict],
 Require Import FsWf.           (* [dv_of_D] *)
 Require Import FsBlocks.       (* [fs_names], [fs_bytes], [logN]/[fsbN],
                                   [bytes_tie], [bytes_dom]             *)
-Require Import FsDurSnap.      (* [snap_ok], [fs_state_rec] *)
+Require Import FsDurSnap.      (* [P_dur]: the durable epoch registry *)
 
 Local Open Scope Z_scope.
 
-(* THE CONCLUSION, AS ONE NAME.  [LogInv] must be able to STATE the law and
-   to read its output, and it deliberately imports no pure well-formedness
-   layer (see its header); wrapping the existential here is what keeps
-   [FsWf] and [FsDurSnap] out of [log_ctx]'s import list while leaving the
-   proposition exactly what [FsCollect.col_snap_ok_ex] concludes --
-   [FsCollect.col_view C home] IS [fs_restrict (dv_of_D C) home]. *)
-Definition snap_law_ok (C : gmap Z (list (bv 8))) (home : gset Z) : Prop :=
-  exists S : fs_state_rec, snap_ok S (fs_restrict (dv_of_D C) home).
-
 Section SnapLaw.
-  Context `{!riscvGS Σ, !fsLogG Σ, !logG Σ}.
+  (* [fsLinkG]/[fsTopG] are the snapshot's two capacity classes; [diskImgG]
+     -- the byte map's -- comes out of [riscvGS] ([RiscvPtsto.riscvF_diskGS]).
+     Both are members of [Xv6G.xv6G], so every consumer that binds the
+     bundle resolves them, and this file (like [LogInv]) sits BELOW the
+     bundle and therefore names the members. *)
+  Context `{!riscvGS Σ, !fsLogG Σ, !logG Σ, !fsLinkG Σ, !fsTopG Σ}.
+
+  (* THE CONCLUSION, AS ONE NAME.  [LogInv] must be able to STATE the law
+     and to hand its output on, and it deliberately imports no pure
+     well-formedness layer (see its header); wrapping the epoch here is
+     what keeps [FsWf]'s and [FsDurSnap]'s vocabulary out of [log_ctx]'s
+     text.  [FsCollect.col_view C home] IS [fs_restrict (dv_of_D C) home],
+     so this is the registry at exactly the map the commit jumps to. *)
+  Definition snap_law_out (C : gmap Z (list (bv 8))) (home : gset Z)
+    : iProp Σ :=
+    P_dur (fs_restrict (dv_of_D C) home).
 
   (* THE LAW, at a NAMED mask.  Every premise below is a row of
      [FsBlocks.fs_bytes_body] -- what a committer holds when it has [fsbN]
@@ -75,7 +94,7 @@ Section SnapLaw.
           ⌜bytes_dom Lb (fs_home_set cov logstart)⌝ -∗
           ghost_map_auth (fs_bytes γfs) 1 Lb -∗
           ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ={E}=∗
-            ⌜snap_law_ok C (fs_home_set cov logstart)⌝
+            snap_law_out C (fs_home_set cov logstart)
             ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
             ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit)))%I.
 
@@ -121,7 +140,7 @@ Section SnapLaw.
     snap_law γ γfs cov logstart -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
     ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ={⊤ ∖ ↑fsbN}=∗
-      ⌜snap_law_ok C (fs_home_set cov logstart)⌝
+      snap_law_out C (fs_home_set cov logstart)
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit).
   Proof.

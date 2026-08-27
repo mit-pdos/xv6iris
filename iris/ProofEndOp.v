@@ -111,7 +111,7 @@ Require Import BufOwn BcacheInv BioInv.
    [FsState], whose [fs_view]-family names would otherwise shadow the block
    layer's below. *)
 Require Import FsDurSnap.    (* [snap_ok] / [fs_state_rec]: the commit's tie *)
-Require Import LogSnapLaw.   (* [snap_law_ok]: what [log_ctx]'s law concludes *)
+Require Import LogSnapLaw.   (* [snap_law_out]: what [log_ctx]'s law hands down *)
 Require Import FsBlocks LogInv.
 Require Import CodeEndOp.
 Require Import KernelDataInv.
@@ -833,11 +833,12 @@ Section EndOpDefs.
 
   (* THE READING THE COMMITTER TAKES, at the AUTHORITY it holds.  Given the
      empty ledger -- so the transaction authority is empty too, by
-     [LogInv.log_res]'s cardinality tie -- the law parked in [log_ctx] yields
-     "the logged view IS a file system" and hands both authorities back.  It
-     moves NO durable resource; its whole content is a pure proposition, so
-     the commit can carry it as a Coq hypothesis from the critical section
-     (where the transaction authority lives) all the way to the write. *)
+     [LogInv.log_res]'s cardinality tie -- the law parked in [log_ctx] hands
+     down THE NEXT DURABLE EPOCH at the logged view, and both authorities
+     come straight back.  It takes NO durable resource out of the crash
+     predicate: the epoch is freshly allocated by the file system at its own
+     ghost step (durable-disk lane H2; it used to yield the PURE
+     [∃ S, snap_ok S L], which the commit carried as a Coq hypothesis). *)
   Lemma eo_snap_law_of_auth `{GEN : GenId} (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (om : gmap nat op_entry) (T : gmap nat unit)
@@ -846,8 +847,7 @@ Section EndOpDefs.
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_cache γfs) 1 L -∗
     ghost_map_auth (ln_tx γ) 1 T ={⊤}=∗
-      ⌜exists S : fs_state_rec,
-         snap_ok S (fs_restrict (dv_of_D L) (fs_home_set cov logstart))⌝ ∗
+      P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) ∗
       ghost_map_auth (fs_cache γfs) 1 L ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof.
@@ -866,13 +866,13 @@ Section EndOpDefs.
     iDestruct (eo_cache_body_sub γfs L C with "HcL HC") as %Hsub.
     iMod (log_ctx_snap_law_of_ops γ bn γfs cov logstart dev om T Lb C
             Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht")
-      as "(%Hlaw & Hba & Ht)".
+      as "(Hlaw & Hba & Ht)".
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
     { iNext. iExists Lb, C, ∅. by iFrame. }
-    iModIntro. iFrame "HcL Ht". iPureIntro.
-    destruct Hlaw as [S HS]. exists S.
+    iModIntro. iFrame "HcL Ht".
+    rewrite /snap_law_out.
     rewrite -(eo_restrict_of_sub C L (fs_home_set cov logstart) Hdom Hsub).
-    exact HS.
+    iExact "Hlaw".
   Qed.
 
   (* the header block is never a home block *)
@@ -1007,8 +1007,7 @@ Section EndOpDefs.
     log_ctx γ bn γfs cov logstart dev -∗
     eo_open bn γfs cov logstart n W L Db Lw t -∗
     ghost_map_auth (ln_tx γ) 1 T ={⊤}=∗
-      ⌜exists S : fs_state_rec,
-         snap_ok S (fs_restrict (dv_of_D L) (fs_home_set cov logstart))⌝ ∗
+      P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) ∗
       eo_open bn γfs cov logstart n W L Db Lw t ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof.
@@ -1017,8 +1016,8 @@ Section EndOpDefs.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
     iMod (eo_snap_law_of_auth γ bn γfs cov logstart dev om T L Hsz Hom
-            with "Hctx HauthL Ht") as "(%Hlaw & HauthL & Ht)".
-    iModIntro. iSplitR; [iPureIntro; exact Hlaw |]. iFrame.
+            with "Hctx HauthL Ht") as "(Hlaw & HauthL & Ht)".
+    iModIntro. iFrame "Hlaw Ht". rewrite /eo_open. iFrame.
   Qed.
 
   (* ---- the payload's pieces, extracted / re-assembled without a case
@@ -2002,17 +2001,6 @@ Section EndOpBlocks.
        with the two rows above it is everything the commit permit needs to
        conclude [D' = L|home] -- there is NO client premise here any more. *)
     log_mirror_tie_body Mc L cov logstart (list_to_set (map uint W)) ->
-    (* THE FILE SYSTEM'S LAW, ALREADY READ (lane CE, plan section 3's
-       "Commit").  The law lives in [log_ctx] and needs the WAL's transaction
-       authority, which sits inside [log_res] -- behind the log lock, which
-       [end_op] has RELEASED by the time control reaches here.  So the
-       committer runs it in the accounting critical section, where the ledger
-       is provably empty and the authority is in hand, and carries the
-       result down as a PURE hypothesis: nothing resource-shaped crosses the
-       release.  The copy loop writes only log SLOTS, so the map this is
-       stated at does not move ([eo_home_restrict_upd]). *)
-    (exists S : fs_state_rec,
-       snap_ok S (fs_restrict (dv_of_D L) (fs_home_set cov logstart))) ->
     eo_regs m M ->
     (* threaded through unchanged to [eo_tail]'s own re-acquire of "log" --
        [eo_commit] itself never touches the lock. *)
@@ -2039,15 +2027,25 @@ Section EndOpBlocks.
     eo_frameS m -∗
     log_mirror_half Mc -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
+    (* THE FILE SYSTEM'S LAW'S OUTPUT, ALREADY READ (lane CE, plan section
+       3's "Commit"; a RESOURCE since durable-disk lane H2).  The law lives
+       in [log_ctx] and needs the WAL's transaction authority, which sits
+       inside [log_res] -- behind the log lock, which [end_op] has RELEASED
+       by the time control reaches here.  So the committer runs it in the
+       accounting critical section, where the ledger is provably empty and
+       the authority is in hand, and carries THE NEXT DURABLE EPOCH down in
+       its hand.  The copy loop writes only log SLOTS, so the map this
+       stands at does not move ([eo_home_restrict_upd]). *)
+    P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hrow Hsnap Hregs
+    intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw HMchdr HMcslot Hrow Hregs
            Hbelow.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
-              Hopen Hcont".
+              Hopen Hepoch Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     (* the byte view's row, for install_trans's recovering arm (unused on
@@ -2105,7 +2103,7 @@ Section EndOpBlocks.
               lks Vpr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
-                    [Hmirc]").
+                    [Hmirc Hepoch]").
     all: try lkbelow.
     (* THE COMMIT POINT's fupd (phase C2b/D1 stage 4).  The durable state
        jumps to the log's contents over the home map -- computable from the
@@ -2130,9 +2128,7 @@ Section EndOpBlocks.
                       rewrite (HMcslot i
                                  ltac:(apply lookup_lt_Some in Hv; lia));
                       exact (HLw i v Hv))
-                (* THE SNAPSHOT'S PREMISE, read in the critical section *)
-                Hsnap
-                with "Hseam Hregc Hswlb Hmirc"). }
+                with "Hseam Hregc Hswlb Hmirc Hepoch"). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
     (* the mirror half back (the receipt is dropped: nothing in this stage
@@ -2760,13 +2756,6 @@ Section EndOpBlocks.
        the loop makes goes to a log SLOT, and a slot is not a home block, so
        neither [L] nor the picture moves anywhere the row looks. *)
     log_mirror_tie_body Mc L cov logstart (list_to_set (map uint W)) ->
-    (* THE FILE SYSTEM'S LAW RIDES THE FUEL INDUCTION AS A PURE TIE (lane
-       CE).  It was read in [end_op]'s accounting critical section, where the
-       WAL's transaction authority is in hand; every fill writes a log SLOT,
-       which is not a home block, so the map it is stated at is literally the
-       same term at the back edge ([eo_home_restrict_upd]). *)
-    (exists S : fs_state_rec,
-       snap_ok S (fs_restrict (dv_of_D L) (fs_home_set cov logstart))) ->
     eo_regs m M ->
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat t) : mword 64) ->
     M !!! Regidx Rs4 = log_addr ->
@@ -2793,6 +2782,13 @@ Section EndOpBlocks.
     eo_frameS m -∗
     log_mirror_half Mc -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
+    (* THE FILE SYSTEM'S LAW'S OUTPUT RIDES THE FUEL INDUCTION IN THE WALK'S
+       HAND (lane CE; a RESOURCE since durable-disk lane H2).  It was read in
+       [end_op]'s accounting critical section, where the WAL's transaction
+       authority is in hand; every fill writes a log SLOT, which is not a
+       home block, so the map it stands at is literally the same term at the
+       back edge ([eo_home_restrict_upd]). *)
+    P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2800,12 +2796,12 @@ Section EndOpBlocks.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
-      intros CID0 t M L Lw Mc Ht Hfuel HLw HMchdr HMcslot Hrow Hsnap Hregs
+      intros CID0 t M L Lw Mc Ht Hfuel HLw HMchdr HMcslot Hrow Hregs
              HMs2 HMs4 HMs5;
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
-              Hopen Hcont".
+              Hopen Hepoch Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     (* the byte view's row, for install_trans's recovering arm (unused on
@@ -3912,16 +3908,18 @@ Section EndOpBlocks.
     (* ROW (b) AT THE BUMPED CURSOR: the fill wrote a SLOT, so neither the
        key [L] moved at nor the block the picture moved at is a home
        block. *)
-    (* the law's map is untouched by a slot write (lane CE) *)
-    assert (Hsnap' : exists S : fs_state_rec,
-              snap_ok S (fs_restrict (dv_of_D (<[uint bnol := bs2]> L))
-                           (fs_home_set cov logstart))).
-    { rewrite (eo_home_restrict_upd L cov logstart (uint bnol) bs2
-                 ltac:(rewrite Hubnol;
-                       apply FsCrash.log_region_not_home;
-                       apply eo_slot_in_region;
-                       exact (eo_t_lt_lb t n Ht Hn30))).
-      exact Hsnap. }
+    (* the law's map is untouched by a slot write (lane CE), so the EPOCH in
+       the walk's hand is already at the bumped cursor's map -- one rewrite,
+       no re-reading of the law (durable-disk lane H2) *)
+    assert (Hsnapmap : fs_restrict (dv_of_D (<[uint bnol := bs2]> L))
+                         (fs_home_set cov logstart)
+                       = fs_restrict (dv_of_D L) (fs_home_set cov logstart))
+      by exact (eo_home_restrict_upd L cov logstart (uint bnol) bs2
+                  ltac:(rewrite Hubnol;
+                        apply FsCrash.log_region_not_home;
+                        apply eo_slot_in_region;
+                        exact (eo_t_lt_lb t n Ht Hn30))).
+    iEval (rewrite -Hsnapmap) in "Hepoch".
     assert (Hrow' : log_mirror_tie_body Mc'
                       (<[uint bnol := bs2]> L) cov logstart
                       (list_to_set (map uint W))).
@@ -3995,10 +3993,10 @@ Section EndOpBlocks.
       iDestruct (eo_cont_shift (CIDa := CIDa21) (CIDb := CIDa25)  j pidv dq m K eb eb lks Vpr
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Mc' Hlt
-                (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot Hrow' Hsnap'
+                (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot Hrow'
                 HJ3regs HJ3s2 HJ3s4 HJ3s5
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
-                      Hopen Hcont").
+                      Hopen Hepoch Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
       assert (Htn : S t = n) by lia.
       assert (Hcmp : zopz0zI_s (rget J3 Rs2) (rget J3 Ra5) = false).
@@ -4035,10 +4033,10 @@ Section EndOpBlocks.
                 Vpr HK (conj Hcovok Hlogsub) Hj Hgl (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
-                HMc'hdr HMc'slot Hrow' Hsnap'
+                HMc'hdr HMc'slot Hrow'
                 HJ3regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
-                      Hopen Hcont").
+                      Hopen Hepoch Hcont").
   Qed.
 
 
@@ -4799,13 +4797,13 @@ Section ProofEndOp.
       (*  [log_res]'s cardinality tie makes the transaction map empty with *)
       (*  it) and the authority is in hand.                               *)
       (*                                                                  *)
-      (*  WHAT CROSSES THE RELEASE IS A COQ HYPOTHESIS, nothing else: the  *)
-      (*  law's whole content is the PURE [snap_ok], which is exactly what *)
-      (*  makes it carryable ([FsCollectAll.pure_keep] is the same         *)
-      (*  observation one level down).  The batch is opened here rather    *)
-      (*  than after the release for the same reason -- the law is stated  *)
-      (*  at the logged view, and naming it needs the checked-out cache    *)
-      (*  authority.                                                      *)
+      (*  WHAT CROSSES THE RELEASE IS THE NEXT DURABLE EPOCH, in the walk's *)
+      (*  hand (durable-disk lane H2; it used to be a Coq hypothesis, the   *)
+      (*  law's PURE [snap_ok]).  It is an ordinary spatial resource from   *)
+      (*  here to the header write, and the copy loop never disturbs the    *)
+      (*  map it stands at.  The batch is opened here rather than after the *)
+      (*  release for the same reason as before -- the law is stated at the *)
+      (*  logged view, and naming it needs the checked-out cache authority. *)
       (* ================================================================ *)
       iDestruct (eo_open_of_batch with "Hbatch") as (W L Dd M0)
         "(%Hshape & %Hnd & %Hwok & %HM0hdr & %HLBW & %HM0row & Hmirc & Hopen)".
@@ -4815,7 +4813,7 @@ Section ProofEndOp.
       iMod (eo_open_snap_law γ bn γfs cov logstart dev
               (delete i0 om) (delete tt0 Tx) nl W L Dd (fun _ => []) 0
               Hsztd Hommt0 with "Hlctx Hopen Htxa")
-        as "(%Hsnap & Hopen & Htxa)".
+        as "(Hepoch & Hopen & Htxa)".
       iModIntro.
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = false).
       { rgne. rewrite HT4s2 (eo_neq0 (out - 1)%nat Hout3d) Hzero. reflexivity. }
@@ -5281,9 +5279,9 @@ Section ProofEndOp.
                   HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) M0 ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HM0hdr ltac:(intros i Hi; lia)
-                  HM0row Hsnap HY4regs HY4s2 HY4s4 HY4s5
+                  HM0row HY4regs HY4s2 HY4s4 HY4s5
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
-                        Hopen Hcont").
+                        Hopen Hepoch Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = true).
       { rgne. rewrite HT4s2 (eo_neq0 (out - 1)%nat Hout3d).

@@ -2127,16 +2127,17 @@ Section fs_crash.
      commit re-establishes it at the map its own receipt names -- the
      permit's conclusion is [fs_receipt_any (fs_restrict (dv_of_D L)
      (fs_home_set cov ls))], i.e. "[D'] = the logged view [L] on the home
-     maps", and [fs_commit_L_sector0_rec] allocates the snapshot at exactly
-     that [D'].  So this lemma read after a commit says: what the machine
-     would recover to is the file system the batch just made.
+     maps", and [fs_commit_L_sector0_rec] installs the epoch the file
+     system built at exactly that [D'].  So this lemma read after a commit
+     says: what the machine would recover to is the file system the batch
+     just made.
 
      PURE and NON-DESTRUCTIVE: the tie inside [P_dur] is a [⌜ ⌝], so
      reading it costs nothing ([FsDurSnap.P_dur_tie_keep]).
 
      THE STATE IS DETERMINED BY THE MAP, which is why the existential [S]
-     here (and inside [LogSnapLaw.snap_law_ok], where the WAL cannot name
-     the file system's own abstract state) loses nothing: any two states
+     here (and inside [FsDurSnap.P_dur], where the WAL cannot name the file
+     system's own abstract state) loses nothing: any two states
      that fit the same committed bytes have the same record, entry array and
      block map at every inum ([FsDurSnap.snap_bytes_node_inj]), the same
      superblock ([snap_bytes_sb_inj]) and the same used bits
@@ -2757,18 +2758,23 @@ Section fs_crash_seam.
     (* the batch's own entries: home block = its slot's logged content *)
     (forall (i : nat) (b : Z), Ws !! i = Some b ->
        L !! b = Some (V (log_slot_bno ls i))) ->
-    (* THE SNAPSHOT'S PREMISE (lane CE, plan section 3's "Commit").  The one
-       thing the new durable instance needs, and the ONLY new premise the
-       commit takes: the view this write jumps to IS a file system.  It is
-       PURE, it is what [LogSnapLaw.snap_law] concludes at the quiescent
-       era, and the committer reads it off [LogInv.log_ctx_snap_law_of_ops]
-       BEFORE it releases the log lock -- which is where the transaction
-       authority the law needs lives.  Nothing resource-shaped crosses. *)
-    (exists S' : fs_state_rec,
-       snap_ok S' (fs_restrict (dv_of_D L) (fs_home_set cov ls))) ->
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     ▷ log_mirror_half M0 -∗
+    (* THE SNAPSHOT'S PREMISE (lane CE, plan section 3's "Commit"; moved to
+       a RESOURCE by durable-disk lane H2).  The one thing the new durable
+       epoch needs, and the ONLY new premise the commit takes: THE EPOCH
+       ITSELF, at the view this write jumps to.  It is what
+       [LogSnapLaw.snap_law] hands down at the quiescent era, and the
+       committer reads it off [LogInv.log_ctx_snap_law_of_ops] BEFORE it
+       releases the log lock -- which is where the transaction authority the
+       law needs lives.  It used to be the PURE [∃ S, snap_ok S L], with the
+       WAL's permit ALLOCATING the file system's snapshot from a value it
+       cannot check; now the file system builds its own epoch at its own
+       ghost step and this permit only swaps the registry over
+       ([FsDurSnap.dsnap_step_xfer]).  Nothing is taken OUT of the crash
+       predicate, so plan section 8's refutation still does not bite. *)
+    P_dur (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     fs_rec_permit cov ls gen_id
       (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
              take virtio_sector_bytes bs))
@@ -2777,8 +2783,8 @@ Section fs_crash_seam.
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))
        ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
   Proof.
-    intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Htie Hslot [Sn Hsnap].
-    iIntros "#Hreg #Hswlb Hmir".
+    intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Htie Hslot.
+    iIntros "#Hreg #Hswlb Hmir Hepoch".
     assert (Hbound : ((hdr_dec bs).1 <= LOGBLOCKS)%nat) by (rewrite Hdec /=; lia).
     assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
       by (rewrite (sector0_len bs Hlen) bsize_two_sectors; lia).
@@ -2843,15 +2849,14 @@ Section fs_crash_seam.
       by (rewrite -Hres; exact (proj1 (fs_recovery_clean _ _ _ _ Hn0) Hrec)).
     (* ---- THE SNAPSHOT STEPS.  This is the one write kind that moves the
        committed view, so it is the one place the durable instance moves:
-       the old copy is DROPPED (affine) and a fresh one allocated at [D'] --
-       a [D'] the caller can NAME (it is [L] on the home set, computed just
-       above).  The allocator runs INSIDE the permit, under this basic
-       update, off the caller's pure tie alone; nothing resource-shaped is
-       asked of anybody, which is why the refutation of plan section 8
-       (deposited client fupds that MOVE durable resources) does not bite.
-       [D'] is [fs_restrict (dv_of_D L) (fs_home_set cov ls)], exactly the
-       map the premise is stated at. ---- *)
-    iMod (dsnap_step_of Sn (fr_D r) D' Hsnap with "Hdur") as "Hdur".
+       the old copy is DROPPED (affine) and the caller's fresh one installed
+       at [D'] -- a [D'] the caller can NAME (it is [L] on the home set,
+       computed just above).  Nothing is taken OUT of the crash predicate
+       and nothing is allocated here, which is why the refutation of plan
+       section 8 (deposited client fupds that MOVE durable resources) does
+       not bite.  [D'] is [fs_restrict (dv_of_D L) (fs_home_set cov ls)],
+       exactly the map the premise is stated at. ---- *)
+    iMod (dsnap_step_xfer (fr_D r) D' with "Hepoch Hdur") as "Hdur".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
     iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".
@@ -3249,22 +3254,23 @@ Section fs_crash_seam.
     (* the batch's own entries: home block = its slot's logged content *)
     (forall (i : nat) (b : Z), Ws !! i = Some b ->
        L !! b = Some (V (log_slot_bno ls i))) ->
-    (* THE SNAPSHOT'S PREMISE (lane CE): the view this commit jumps to IS a
-       file system.  PURE, and the committer reads it off
-       [LogInv.log_ctx_snap_law_of_ops] while it still holds the log lock;
-       see [fs_commit_L_sector0_rec]. *)
-    (exists S' : fs_state_rec,
-       snap_ok S' (fs_restrict (dv_of_D L) (fs_home_set cov ls))) ->
     fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_half M0 -∗
+    (* THE SNAPSHOT'S PREMISE (lane CE; a RESOURCE since durable-disk lane
+       H2): the NEXT DURABLE EPOCH, at the view this commit jumps to.  The
+       committer reads it off [LogInv.log_ctx_snap_law_of_ops] while it
+       still holds the log lock; see [fs_commit_L_sector0_rec].  It is used
+       on BOTH sector orders, which is sound because [disk_seq_permit_two]
+       offers them as a CONJUNCTION -- only one of them ever runs. *)
+    P_dur (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
   Proof.
-    intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Hrow Hslot Hsnap.
-    iIntros "#Hseam #Hreg #Hswlb Hmir".
+    intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Hrow Hslot.
+    iIntros "#Hseam #Hreg #Hswlb Hmir Hepoch".
     assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
       by exact (log_hdr_in_ext cov ls).
     assert (Hwfh : forall (M : log_mirror) (r : fs_rec) (dk : Z -> bv 8),
@@ -3287,7 +3293,7 @@ Section fs_crash_seam.
                  ∗ fs_receipt_any
                      (fs_restrict (dv_of_D L) (fs_home_set cov ls))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
-                with "[] [Hmir]").
+                with "[] [Hmir Hepoch]").
       { iIntros "(Hm & #Hrc & _)".
         iApply (fs_permit_of_rec with "Hseam").
         iApply (fs_rec_permit_mono cov ls gen_id _
@@ -3310,7 +3316,8 @@ Section fs_crash_seam.
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
       iApply (fs_commit_L_sector0_rec cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
-                Hin Hinsb HM0 Hoff Hrow Hslot Hsnap with "Hreg Hswlb [Hmir]").
+                Hin Hinsb HM0 Hoff Hrow Hslot
+                with "Hreg Hswlb [Hmir] Hepoch").
       iNext. iExact "Hmir".
     - (* SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit *)
       iApply (fs_permit_of_rec with "Hseam").
@@ -3318,7 +3325,7 @@ Section fs_crash_seam.
                 (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
                     (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
-                with "[] [Hmir]").
+                with "[Hepoch] [Hmir]").
       { iIntros "[Hm %Hlold]".
         assert (HM1 : lm_hdr (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs)) ls
@@ -3345,13 +3352,14 @@ Section fs_crash_seam.
                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                         (log_hdr_bno ls)) = BSIZE⌝)%I _
-                  with "[] [Hm]").
+                  with "[] [Hm Hepoch]").
         { iIntros "(Hm2 & Hrc & _)". iApply disk_write_permit_intro.
           iSplitL "Hm2".
           { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
           iExact "Hrc". }
         iApply (fs_commit_L_sector0_rec cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
-                  Hin Hinsb HM1 HoffM1 Hrow Hslot Hsnap with "Hreg Hswlb [Hm]").
+                  Hin Hinsb HM1 HoffM1 Hrow Hslot
+                  with "Hreg Hswlb [Hm] Hepoch").
         iNext. iExact "Hm". }
       iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs M0 Hlen Hext
                 (Hwfh M0) with "Hreg Hswlb [Hmir]").
