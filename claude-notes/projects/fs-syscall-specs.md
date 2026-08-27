@@ -76,8 +76,10 @@ things, and the answer differs:
   fstat/chdir after, mechanical.  NOTE (2026-08-27): the fd-state ghost
   landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
   open-or-closed + `fdtype`, two-halves algebra, commits 28d707dc +
-  3199a1b6) — the descriptor arms of these specs speak THAT carrier;
-  the campaign does not mint its own fd ghost.
+  3199a1b6; `FdInode` carries its INUM as of d1411776, riding on
+  `file_ref`'s index) — the descriptor arms of these specs speak THAT
+  carrier and can tie fd → inum → the §2 abstract node directly; the
+  campaign does not mint its own fd ghost.
 - [ ] **P — the /init pin port (after D; independent of S0).**  Era 0's
   exec-of-`/init` re-derived on the spec abstract state from era-0
   snapshot facts (era 0's snapshot IS the mkfs image: `fs_boot_pure` +
