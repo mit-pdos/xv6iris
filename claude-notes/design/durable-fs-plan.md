@@ -317,21 +317,42 @@ predicate's own `fs_boot_pure`).  Block 1 is never logged
 (`FsCrash.fs_recovery_sb_raw`), so `fsinit`'s raw `readsb` and the
 snapshot's superblock are one record.
 
-**WHAT IS NOT BUILT, and it is a VALUE-side wall (lane E-except).**  The
-mint still runs at the RAW home blocks: `FsCfgSnap.fs_cfg_alloc_snap`
-takes `snap_ok S (fs_restrict (fs_blocks dk) home)`.  Moving it to `D`
-means taking `S` from the crash predicate's `fs_boot_pure` — which
-already delivers `∃ S, snap_ok S D` and `hdr_wf` at every era — but
-`snap_ok S D` is a statement about `S` and `D` ALONE: nothing in it ties
-`fss_sb S` (hence the era's logstart, inodestart, bmapstart, ninodes and
-`nib`) to the era-invariant superblock the crash predicate's `cov`/`ls`
-and the boot chain's configuration are stated at.  `Himg` is what
-supplies that tie today.  Closing it is a STRENGTHENING OF THE CRASH
-PREDICATE — `P_fs` carries `ls` already, so the clause is
-`sb_logstart (fss_sb S) = ls` (and the geometry that follows), provable
-at era 0 from the image and preserved by the commit, which re-allocates
-the snapshot at the era's own state.  Until that lands, the mint cannot
-read `D` and `Himg` cannot be deleted.
+**WHAT IS NOT BUILT, AND IT IS NOT A WALL — IT IS THE REST OF THE WORK
+(lane E-except, measured).**  `FsCfgSnap.fs_cfg_alloc_snap` now TAKES the
+byte view's value `Pb` and the exception set `Xexc`; era 0 passes the raw
+disk and `∅`, and passing `D` is what the boot chain has still to do.
+The pure channel is already there: `SystemAdequacy.fs_boot_pure` delivers
+`fs_extent`, `∃ D, fs_recovery … ∧ hdr_wf … ∧ ∃ S, snap_ok S D` at EVERY
+era, through `riscv_power_adequacy`'s `Hproj`/`Ppure`.  Four things are
+left, and none of them is a refutation:
+
+1. **The era's configuration comes from `fss_sb S`, not from the
+   theorem's `sb`.**  `snap_ok S D` is about `S` and `D` alone, so it
+   cannot say `fss_sb S = sb` — and it does not have to: nothing pins the
+   era's superblock across a power cycle, and nothing needs to.
+   `FsImg.fs_sb_ok` (which `sk_sbok` delivers) already fixes
+   `logstart = 2`, `nlog = 31`, and `inodestart`/`bmapstart`/`size` as
+   functions of `ninodes`/`nblocks`, so the era's `logstart` IS the crash
+   predicate's `ls` for free.  What must change is that
+   `BootShared.boot_shared_alloc`'s `sb`/`nib` become EXISTENTIAL in its
+   post (bound by `xv6_boot_era` and instantiated into `SpecMain`'s), in
+   place of the theorem's parameters.
+2. **The two coverage corners**, `1 ≤ b < fs_data_start (fss_sb S) → b ∈ cov`
+   and `fs_data_start ≤ b < sb_size (fss_sb S) → b ∈ cov`, need a NEW pure
+   reading of `snap_ok`: every block below `sb_size (fss_sb S)` is either
+   in `dom D` (free by `sk_pool`, metadata by `sk_sb`/`sk_reg`/`sk_bmap`,
+   a node's by `sk_slot`) or in the log region.  With `dom D ⊆ home ⊆ cov`
+   and `log_region_set ls ⊆ cov` that IS the corner.  This is the only
+   genuine proof work left.
+3. **`FirstTok.first_fsinit_pures` needs a snapshot-side producer.**  Its
+   `hdr_n = 0` clause is replaced by `hdr_wf`'s three (off `fs_boot_pure`);
+   its parse/`fs_sb_ok` pair is `FsCrash.fs_recovery_sb_parse` + `sk_sbok`
+   (E-blk1 landed both); its block-1 BYTE SHAPE is
+   `FirstTok.first_sb_image_of_le`, which needs only `32 ≤ length`, so it
+   costs nothing; and `col_geom` is `sk_reg`/`sk_regdom`/`sk_sbok` against
+   the width tie the mint itself establishes.
+4. **`boot_shared_alloc` spends the image only at era 0**, and
+   `Himg`/`fs_boot_image_eras` go with `boot_hart_primary`'s use.
 
 **The theorem** (the spike, `mknod_durable`): for the batch containing a
 `mknod`'s transaction, after its commit the CURRENT snapshot's inode

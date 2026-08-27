@@ -173,10 +173,14 @@ first four were audited against the tree 2026-08-22):
   EXCEPTION SET, the recovering `install_trans` shrinks it, `initlog`
   SEALS it, and the seal rides `LogInv.log_ctx`, so no reader of the byte
   view above the WAL changed.  `SpecFsinit`'s clean-header premise is
-  gone.  What is left is the mint's VALUE: it still runs at the RAW home
-  blocks, because nothing ties the crash predicate's snapshot state to the
-  era-invariant superblock/geometry the boot chain is configured at.  So
-  `Himg` is still assumed and `xv6_power_adequacy` is still vacuous.
+  gone, and the mint now TAKES the byte view's value and the exception set
+  (era 0 passes the raw disk and the empty set).  What is left is handing
+  it `FsCrash.fr_D`: the crash predicate's `fs_boot_pure` already delivers
+  `∃ S, snap_ok S D` and `hdr_wf` at every era, so what remains is one new
+  `snap_ok` reading (the coverage corners), a snapshot-side producer for
+  `FirstTok.first_fsinit_pures`, and making the boot chain's `sb`/`nib`
+  existential.  Until then `Himg` is still assumed and
+  `xv6_power_adequacy` is still vacuous.
   Lanes A–G in the file.
   History in `completed/durable-disk-2026-08-23-to-25.md`.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the

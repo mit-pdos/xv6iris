@@ -2711,25 +2711,54 @@ so it never wanted that shape.
     behaviour is unchanged; what is left of `hdr_n = 0` is `FirstTok`'s
     image pures.
 
-    **THE WALL IS THE MINT'S VALUE, AND IT IS THE CRASH PREDICATE'S.**
-    `FsCfgSnap.fs_cfg_alloc_snap` still takes `snap_ok S` at the RAW home
-    blocks.  Reading `D` means taking `S` from `SystemAdequacy.fs_boot_pure`
-    -- which ALREADY delivers `∃ S, snap_ok S D` and `hdr_wf` at every era,
-    so the pure channel is not the problem -- but `FsDurSnap.snap_ok S D` is
-    a statement about `S` and `D` ALONE.  Nothing in it ties `fss_sb S`
-    (hence the era's logstart, inodestart, bmapstart, ninodes and `nib`) to
-    the era-invariant superblock the crash predicate's `cov`/`ls` and the
-    whole boot chain's configuration are stated at, and `fs_cfg_alloc_snap`'s
-    premises are all about `fss_sb S`.  `Himg` is what supplies that tie
-    today.  THE FIX IS A STRENGTHENING OF `FsCrash.P_fs`, not a proof:
-    `P_fs` carries `ls` already, so the clause is
-    `sb_logstart (fss_sb S) = ls` beside the snapshot -- provable at era 0
-    from the image, and preserved by the commit, which re-allocates the
-    snapshot at the era's OWN state (whose superblock IS the era's).  With
-    it, `boot_shared_alloc` can spend `fs_boot_image_wf` only at era 0 and
-    `Himg`/`fs_boot_image_eras` go.  Until then they stay, and
-    `xv6_power_adequacy` is still vacuous.  Machine-checked record:
-    `iris/FsBootWall.v`'s second banner, exit (1).
+    THE MINT IS PARAMETERIZED BY THE BYTE VIEW'S VALUE.
+    `FsCfgSnap.fs_cfg_alloc_snap` takes `(Pb, Xexc)` and reads `Pb` at every
+    byte-side spelling (the region's runs, the pool's, the bitmap's,
+    `snap_ireg_premises`/`snap_names_cov`/`ipool_alloc_of_snap`/
+    `bitmap_res_of_snap`); the CACHE map and the log region's parked halves
+    stay at `fs_blocks dk`.  Block 1's kit row is at the raw content by the
+    agreement premise plus `1 ∉ Xexc`.  `FsCfgBoot.fs_kit_fsinit_ghost`
+    carries `(Pb, Xexc)` and the byte view's row NAMED at `Pb`.  Era 0
+    passes `(fs_blocks dk, ∅)`, so nothing moves yet.
+
+    **WHAT IS LEFT IS NOT A WALL -- it is the rest of the work, measured.**
+    `SystemAdequacy.fs_boot_pure` ALREADY delivers `fs_extent`, the recovery
+    record, `FsCrash.hdr_wf` and `∃ S, snap_ok S D` at EVERY era, through
+    `riscv_power_adequacy`'s `Hproj`/`Ppure`, so the pure channel is not the
+    problem.  Four things remain:
+
+      1. THE ERA'S CONFIGURATION COMES FROM `fss_sb S`.  `snap_ok S D` is
+         about `S` and `D` alone, so it cannot say `fss_sb S = sb` -- and it
+         does not have to: nothing pins the era's superblock across a power
+         cycle and nothing needs to.  `FsImg.fs_sb_ok` (delivered by
+         `sk_sbok`) already fixes `logstart = 2`, `nlog = 31` and
+         `inodestart`/`bmapstart`/`size` as functions of
+         `ninodes`/`nblocks`, so the era's logstart IS the crash predicate's
+         `ls` FOR FREE.  What must change is that
+         `BootShared.boot_shared_alloc`'s `sb`/`nib` become EXISTENTIAL in
+         its post, bound by `xv6_boot_era` and instantiated into
+         `SpecMain`'s -- a refactor of the boot chain's parameter list, not
+         a new fact.
+      2. THE TWO COVERAGE CORNERS (`1 ≤ b < fs_data_start (fss_sb S)` and
+         `fs_data_start ≤ b < sb_size (fss_sb S)` imply `b ∈ cov`) need a
+         NEW pure reading of `snap_ok`: every block below
+         `sb_size (fss_sb S)` is in `dom D` (free by `sk_pool`, metadata by
+         `sk_sb`/`sk_reg`/`sk_bmap`, a node's by `sk_slot`) or in the log
+         region; with `dom D ⊆ home ⊆ cov` and `log_region_set ls ⊆ cov`
+         that IS the corner.  THIS IS THE ONLY GENUINE PROOF WORK LEFT.
+      3. `FirstTok.first_fsinit_pures` needs a SNAPSHOT-side producer.
+         Its `hdr_n = 0` clause is replaced by `hdr_wf`'s three; its
+         parse/`fs_sb_ok` pair is `FsCrash.fs_recovery_sb_parse` plus
+         `sk_sbok` (E-blk1 landed both); its block-1 BYTE SHAPE is
+         `FirstTok.first_sb_image_of_le`, whose only premise is
+         `32 ≤ length`, so it costs nothing; `FsCollect.col_geom` is
+         `sk_reg`/`sk_regdom`/`sk_sbok` against the width tie the mint
+         itself establishes.
+      4. `boot_shared_alloc` then spends `fs_boot_image_wf` only at era 0,
+         and `Himg`/`fs_boot_image_eras` go with `boot_hart_primary`'s use.
+
+    Until they land `Himg` stays and `xv6_power_adequacy` is still vacuous.
+    Machine-checked record: `iris/FsBootWall.v`'s second banner, exit (1).
 - [ ] **Lane D — HANDED OFF (owner).**  Durability statements about
   individual syscalls (`mknod_durable` and its siblings) belong to the
   file-system BEHAVIOUR specification project
