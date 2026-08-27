@@ -229,13 +229,6 @@ UserTranslate.v
 UserMem.v
 UserFetch.v
 UserStepFull.v
-# --- BEGIN verified Umode WP tier (sync/echo/sh/init) ---
-# Descoped from the hart-node-port build on 2026-08-19 and REVIVED on
-# 2026-08-20, ported onto per-node semantics; all 41 rows are in the build.
-# Distinct from the ProofUser/UserExec "run arbitrary user-mode code" tier,
-# and from LinkUserinit/SpecUserinit, which are the KERNEL's userinit path.
-# What the port cost, and why it cost so little, is in
-# claude-notes/projects/user-verified.md.
 UmodeMem.v
 UmodeCap.v
 UmodeFetch.v
@@ -277,7 +270,6 @@ UProofInitPrintf.v
 UProofInit.v
 UProofEchoA.v
 UProofEcho.v
-# --- END verified Umode WP tier ---
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
@@ -708,9 +700,6 @@ ProofIinit.v
 LinkIinit.v
 InodeInv.v
 DirView.v
-# OFF THE BUILD (durable-disk G6): the old flavoured link ledger, superseded
-# by the type register (design/fs-state.md §6½).  Source kept; see its header.
-# DirLinks.v
 FsTree.v
 DirViewG.v
 DirViewLend.v
@@ -1081,9 +1070,6 @@ EscrowDeposit.v
 FsRep.v
 IregLinkNz.v
 IgetLic.v
-# OFF THE BUILD (durable-disk G6): the ledger's d-bit accessors ((T1)/(T1')),
-# superseded with it (design/fs-state.md §6½).  Source kept; see its header.
-# IregDirBit.v
 IcacheEscrow.v
 IcacheBoot.v
 FsCfgBoot.v
@@ -1195,12 +1181,12 @@ LinkNameiTr.v
 # DirViewPin.v
 # NameiInitPinned.v
 # LinkNameiPinned.v
+# SpecKexecPinned.v
+# ProofKexecPinnedA.v
+# ProofKexecPinned.v
+# LinkKexecPinned.v
 ProofNameiRoot.v
 LinkNameiRoot.v
-# namei's root corner at the BOOT client's premises (the tree's one assumed
-# contract in the boot cone), and userinit -- specified, PROVEN and linked
-# against it.  Here rather than beside CodeUserinit.v only because
-# SpecAllocproc.v, whose budget userinit's premise is stated in, is above.
 SpecNameiRootBoot.v
 LinkNameiRootBoot.v
 SpecUserinit.v
@@ -1247,10 +1233,6 @@ CodeSysExec.v
 CodeKexec.v
 KexecOkQ.v
 SpecKexec.v
-# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
-# Source kept; to be ported by the fs-syscall-specs project -- see the banner
-# at the top of claude-notes/projects/namei-pinned-lookup.md.
-# SpecKexecPinned.v
 SpecFlags2perm.v
 ProofFlags2perm.v
 LinkFlags2perm.v
@@ -1277,11 +1259,6 @@ ProofKexecParts.v
 ProofKexecTail.v
 ProofKexecSeam.v
 ProofKexecA.v
-# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
-# Source kept; to be ported by the fs-syscall-specs project -- see the banner
-# at the top of claude-notes/projects/namei-pinned-lookup.md.
-# ProofKexecPinnedA.v
-# ProofKexecPinned.v
 ProofKexecB.v
 SpecKexecB2.v
 ProofKexecB2.v
@@ -1291,10 +1268,6 @@ ProofKexecC.v
 ProofKexecD.v
 ProofKexec.v
 LinkKexec.v
-# OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
-# Source kept; to be ported by the fs-syscall-specs project -- see the banner
-# at the top of claude-notes/projects/namei-pinned-lookup.md.
-# LinkKexecPinned.v
 SpecSysExec.v
 ProofSysExec.v
 LinkSysExec.v
@@ -1317,9 +1290,6 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
-# SIMP-2: the runtime file system as ONE persistent assertion, with the seal
-# that produces it.  A leaf BELOW the syscall layer, so anything can import
-# the predicate without importing the syscall bodies.
 FsCfg.v
 FsReady.v
 FirstTok.v
@@ -1372,13 +1342,6 @@ FsDurRead.v
 FsDurSnap.v
 FsDurImg.v
 FsCfgSnap.v
-# OFF THE BUILD (durable-disk G5): the per-object durable LEDGER and its
-# object row, superseded by the snapshot (design/fs-state.md §4⁹); and the
-# refutation of the G2/G3 PARENT register, whose shape no longer exists.
-# Sources kept; see their headers.
-# FsDurLedger.v
-# FsDurObj.v
-# FsParRefute.v
 FsDurXferWall.v
 FsDurRefute.v
 FsDurDefer.v
