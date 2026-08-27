@@ -19,7 +19,20 @@ cannot have a local one — `win_ok1` conjunct (1) quantifies over the whole
 log, and the READER's conjunct (3) needs an own-last record a hart that
 never touched the lock does not have.  Both close at the EMPTY LOG, so
 what is owed is a boot mint plus its carve-to-`newlock` threading.
-**A6.78 is the record and the handoff.**
+
+**THEN, ON THE COORDINATOR'S APPROVAL OF THAT TRANCHE, THE MINT WAS BUILT
+AND CAME OUT LOCAL** (`TsoCtx.ledger_wpay_mint`, A6.79): its premise is
+not the empty log but **the element's own timestamp being 0** -- the
+interp's tie at such an element says *no message in the log writes this
+byte*, which discharges conjunct (1), every agent's `own_last`, and the
+clear word at once.  So the tranche moves OFF the boot carve: no
+`newlock` creator cascade, no adequacy change, no barrier leaf.  The site
+is **`initlock`'s own `lk->cpu = 0` store** (`initlock + 0x0e`,
+`ProofInitlock:190`), mint-then-store in one leaf -- and its only
+prerequisite is the boot-25 lane, re-entered as a **timestamp-0** lane
+(`ctx_pointsto` hides `t`, so the witness must come from the carve, where
+`BootCarve.boot_ctx_phys_word` already builds the honest cell with no
+shim).  **A6.78 and A6.79 together are the record and the handoff.**
 
 STEP 5, THE RULINGS TRANCHE (2026-08-27, latest session).  **CLEAN ROUND:
 1083 of 1333, RED 14.**  Four owner rulings executed and one gate found missing.
@@ -8928,6 +8941,157 @@ the racy payload's MINT.
    both have to be re-done at the ledger tier.
    `lock_claims`' surviving `TsoCtxShim.ctx_word_of_mem` dies here.
 4. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+**ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
+`is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
+160-file cone opens.
+
+
+### A6.79 THE RACY MINT IS LANDED — AND ITS PREMISE IS LOCAL, WHICH MOVES
+### THE TRANCHE OFF THE BOOT CARVE ENTIRELY
+
+The coordinator ratified A6.78's `Hramtot` and approved the boot-mint
+tranche as characterised there.  Step 1 is LANDED AND GREEN, and it came
+out **stronger than the approval assumed**: the mint does not need the
+empty log, and therefore does not need `BootCarve`, the 19-site `newlock`
+creator cascade, or any adequacy change.  What it needs instead is one
+store leaf, and the site is named below.
+
+**CLEAN ROUND: 1088 of 1296, RED 9 — UNCHANGED.**  No `Admitted`, no
+`admit`, no new `Axiom`; the one `Abort` is still
+`UsertrapRes.ut_res_bare_park`.
+
+#### (1) `TsoCtx.ledger_wpay_mint` — AND THE PREMISE IS `e.1 = 0`
+
+```coq
+  Lemma ledger_wpay_mint1 (g : gstate) (a : Arch.pa) (v : bv 8) (W : ts_win) :
+    a = pa_add (tw_base W) (tw_j W) ->
+    (tw_j W < tw_n W)%nat ->
+    (forall k, (k < tw_n W)%nat -> is_Some (g.(gimg) !! pa_add (tw_base W) k)) ->
+    (forall h t, tw_own W h = Some t -> t = 0%nat) ->
+    tw_z W (tw_j W) = v ->
+    gen_heap_interp … -∗ tso_interp_at riscv_eraGS g -∗
+    phys_ledger_at a (DfracOwn 1) v 0%nat ==∗
+    gen_heap_interp … ∗ tso_interp_at riscv_eraGS g ∗
+    phys_ledger_wpay a (DfracOwn 1) v 0%nat W.
+```
+
+plus `ledger_wpay_mint`, its `n`-byte window form at
+`W j := TsWin base n j f cp (fun _ => Some 0%nat)`.
+
+**A6.78 said all three gaps close "at the empty log"; measured, they close
+at a WEAKER and LOCAL fact — the element's own timestamp.**  The interp's
+tie at a timestamp-0 element is `latest img log a 0 v`, whose SECOND half
+is *"no timestamp above 0 writes `a`"* — i.e. **no message in the log
+writes this byte at all**.  That single fact discharges, at once:
+
+- **conjunct (1)** — vacuously: its premise `is_Some (msg_byte m a)` is
+  false for every logged message, so the "clear word or the author's own"
+  disjunction is never asked;
+- **conjunct (3)'s `own_last log h a 0` for EVERY agent** — same reason,
+  and this is the half A6.78 filed as needing a boot-time record;
+- and the byte value: `log_byte img log 0 a = img !! a = Some v`, so
+  `tw_z` is forced to the cell's current value rather than chosen.
+
+**conjunct (2)** is A6.78's own image coverage, reached through
+`ledger_img_cover` off `phys_ledger_ram` — so the two landings of the
+previous round are what make this one a short proof.  `tw_cp` stays a free
+parameter (conjunct (1) is vacuous, so the author words are the caller's
+choice, and they are then fixed for the payload's life:
+`win_ok1_app_store` re-establishes the claim only at the same `z` and
+`cp`, and moves only `own`).
+
+> **THE RULE THIS LEAVES, and it is the one to carry forward:** *an
+> unwritten cell is a cell that can be given any history-shaped claim,
+> because it has no history.*  The pin's mint reads the address's LATEST
+> write; the window's reads the address's WHOLE past, and `e.1 = 0` is the
+> ledger's own certificate that the past is empty.  No new ghost, no boot
+> parameter, and no premise a client cannot hold.
+
+#### (2) WHERE IT CAN BE APPLIED — AND `BootCarve` IS NOT IT
+
+**`BootCarve` cannot mint: it has no interp.**  It is pure resource
+algebra over already-minted fragments (`boot_raw_ran` is a `big_sepM` of
+`pointsto`), and the `ghost_map_update` on `ts_name` needs the AUTHORITY,
+which lives in `tso_interp_at` and nowhere else.  That is A6.71's rule
+read in this direction:
+
+> `own_context` is only in hand OUTSIDE a WP leaf.
+> `tso_interp_at` is only in hand INSIDE one.
+
+So the approval's "BootCarve mints the lock cells before anything is
+written" is not executable as stated, and the honest replacement is
+CHEAPER.
+
+**THE SITE IS `initlock`'s OWN `lk->cpu = 0` STORE.**  `CodeInitlock`
+`ini_0e` is `sd zero,16(a0)` at `initlock + 0x0e`, proved in
+`ProofInitlock:190` by `wp_sd_zero_s_sconf` — an ordinary store leaf,
+which has the interp internally.  A wpay variant of it does BOTH halves in
+one node, in this order:
+
+1. **mint first**, while the cell is still at timestamp 0 (`.bss`, never
+   written in this era) — `ledger_wpay_mint` at
+   `z := nth_byte (zero_reg : mword 64)`, `cp h := nth_byte (cpus_ptr …)`,
+   `own := fun _ => Some 0`;
+2. **then store**, through `ledger_store_wpay_ok`'s RELEASE arm, which
+   writes the clear word and moves the AUTHOR's entry to the top while
+   leaving every other agent's at `Some 0` (its `Hoth` premise).
+
+> **THE ORDER IS FORCED, and it is worth stating because the obvious
+> alternative is unsound.**  Minting AFTER the store fails: conjunct (3)
+> would then need, for every OTHER hart, a timestamp visible at every view
+> holding the clear word, and only timestamp 0 is — but `own_last log h a 0`
+> has become "no message writes `a`", which hart 0's own store has just
+> falsified for itself and which no local fact re-establishes for the
+> others.  Mint-then-store keeps every non-author at `Some 0` and that is
+> exactly the entry `win_assemble_not_mine` consumes.
+
+**WHAT THIS COSTS, AND WHAT IT DOES NOT.**  It costs one new store leaf
+(the wpay twin of `wp_sd_zero_s_sconf`), `SpecInitlock`'s post, and
+`SpecProcinit.lk_fresh` — which is *already* initlock's post, so the
+payload rides to `WpLock.lock_inv_alloc` on a shape that exists.  It does
+NOT cost: `BootCarve`, the adequacy statement (again), the 19-site
+`newlock` creator cascade, or a barrier-leaf/`__sync_synchronize` move
+(A6.71's route (a), which the publication's last mile still needs and this
+does not).
+
+> **ONE THREADING OBLIGATION REMAINS AND IT IS THE BOOT 25.**  The mint
+> wants the cpu cell AT TIMESTAMP 0 when `initlock` reaches it, and
+> **`ctx_pointsto` HIDES the timestamp** — its body is
+> `∃ ppn t, kmap_at … ∗ … ∗ (pa_of ppn va) ↪[ts_name]{dq} (t, ts_pay_none) ∗ …`,
+> so no downstream lemma can recover `t = 0` from a `↦₈` cell.  The
+> witness therefore has to come from the CARVE, which is the one place it
+> is known (`RiscvAdequacy` allocates every element at `(0, ts_pay_none)`
+> and `BootCarve.boot_led_ran` hands them out as `ledger_elem0`).
+> **And the honest producer already exists**: `BootCarve.boot_ctx_phys_word`
+> pairs `boot_raw_ran`'s bytes with `boot_led_word`'s eight elements and
+> builds `ctx_phys_word_pointsto` with no shim at all — the cell shape
+> `BootCarveMain`'s 25 surviving `TsoCtxShim.ctx_word_of_mem` calls are
+> standing in for.  So the boot-25 lane and this obligation are ONE piece
+> of work, exactly as the approval hoped, just entered from the other end:
+> **thread `boot_led_ran` alongside `boot_raw_ran` through the
+> `boot_ran_cell*` family, and keep the element's timestamp exposed on the
+> lock's cpu word.**
+
+#### HANDOFF: THE ORDER, RE-COSTED
+
+1. **The boot-25 lane, entered as a timestamp-0 lane.** `BootCarve` gains
+   the ctx/ledger cell producers at exposed timestamp 0 (its `ledger_elem0`
+   supply is already there — `RiscvAdequacy`'s `boot_led_all_split`), and
+   `BootCarveMain`'s 25 shim calls die with it.  **3 files behind it, and
+   it is the mint's only prerequisite.**
+2. **The `initlock` wpay store leaf** (§(2)) + `SpecInitlock` + `lk_fresh`.
+3. **`WpLock.lk_cpu_res` at the eight `phys_ledger_wpay` fragments**; the
+   lock WORD still gets no payload (A6.78 §(2)), its free-path read is
+   `ledger_read_any_word_ok` and its holder read needs the AMO's
+   `ledger_msg_at` author fragment in the held arm.
+4. **`WpSconfLock`** — the three leaves on `wp_load_s_sconf_au_dat` /
+   `wp_load_s_sconf_au_exv`, the deletion, the stores/AMO on the parked
+   record; the AMO leaf's inline read AND write redone at the ledger tier.
+5. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+Items 3–5 remain ONE atomic unit; 1 and 2 are separable and additive, and
+1 is separable from 2.
 
 **ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
 `is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
