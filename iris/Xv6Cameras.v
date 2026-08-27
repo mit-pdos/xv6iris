@@ -356,9 +356,19 @@ Class fsLogG (Σ : gFunctors) := FsLogG {
      would break the disk image's own auth/fragment pairing. *)
   fsdirty_inG :: ghost_mapG Σ Z bool;
   fsown_inG :: ghost_mapG Σ Z unit;
+  (* THE BYTE VIEW'S EXCEPTION SET (durable-disk lane E-except).  A
+     ONE-KEY ghost map, so that its single element carries both jobs the
+     recovery window needs: the WAL's exclusive HANDLE on the pending set
+     ([FsBlocks.exc_own], which [install_trans] shrinks), and -- once the
+     element is persisted at [∅] -- the PERSISTENT SEAL
+     ([FsBlocks.exc_sealed]) that every runtime crossing of the byte view
+     reads "recovery is done" off.  A discarded element cannot be moved
+     again, which is exactly why the seal is sound. *)
+  fsexc_inG :: ghost_mapG Σ unit (gset Z);
 }.
 Definition fsLogΣ : gFunctors :=
-  #[ghost_mapΣ Z (list (bv 8)); ghost_mapΣ Z bool; ghost_mapΣ Z unit].
+  #[ghost_mapΣ Z (list (bv 8)); ghost_mapΣ Z bool; ghost_mapΣ Z unit;
+    ghost_mapΣ unit (gset Z)].
 Global Instance subG_fsLogΣ {Σ} : subG fsLogΣ Σ -> fsLogG Σ.
 Proof. solve_inG. Qed.
 

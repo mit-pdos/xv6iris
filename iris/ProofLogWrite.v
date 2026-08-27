@@ -1800,7 +1800,10 @@ Section ProofLogWrite.
     iDestruct "Hlctx2" as "(#Hlock & #Hdevc & #Hstc & _)".
     (* the byte view's invariant, off the context log_write already threads
        (durable-disk 1c-flip step 4) *)
-    iPoseProof (log_ctx_bytes with "Hlctx") as "#Hbinv".
+    iPoseProof (log_ctx_bytes with "Hlctx") as "#Hbrow".
+    iDestruct "Hbrow" as (Xv) "#Hbinv".
+    (* ...and the byte view's SEAL (durable-disk lane E-except) *)
+    iPoseProof (log_ctx_seal with "Hlctx") as "#Hbseal".
     (* BLOCK 1'S PARK, off the same context (durable-disk lane E-blk1) *)
     iPoseProof (log_ctx_sb with "Hlctx") as "#Hsbp".
     iAssert (lw_cont (CID0 := CID) bn γ γfs γd cov dev k pidv bno bs bsd Φfsb Bud
@@ -2273,11 +2276,11 @@ Section ProofLogWrite.
        LEARNED here, from the log's tie between the cache entry and the
        byte view, and the new cache content is the SPLICE -- which the
        shape premise then identifies with the buffer's own [bs]. *)
-    iMod (byte_range_log_update Efs (fs_bytes γfs) (fs_cache γfs)
-            (fs_home_set cov logstart) L (uint bno) off sub_old sub_new bsl
+    iMod (byte_range_log_update Efs (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+            (fs_home_set cov logstart) Xv L (uint bno) off sub_old sub_new bsl
             HlogE ltac:(lia) ltac:(lia)
             ltac:(intros Hlb; destruct (Hshape Hlenbs Hlb) as [Hsn _]; lia)
-            with "Hbinv HLauth Hfsb HpL")
+            with "Hbinv Hbseal HLauth Hfsb HpL")
       as "((%Hllk & %Hlenbsl & %Hslice) & HLauth & Hfsb & HpL)".
     (* the block's width is nameable only HERE, so the writer's shape
        obligation is discharged here too -- and the cache's new content is

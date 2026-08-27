@@ -1167,17 +1167,23 @@ Section ProofInitlog.
               #Hpenvpk Hhomes #Hcert Hmirf
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
-              Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow HLauth HDauth Hcovf Hfsb
+              Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow Hxo HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hb1 #Hlawf Hcont".
     (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
        half at a NAMED picture and the swap receipt PowerOn's custody hook
        already earned.  There is no boot swap here any more; every write
        below is a value-chained one. *)
     iDestruct "Hmirf" as "[Hmirh #Hswlb]".
+    (* THE SEAL (durable-disk lane E-except).  The exception set is empty
+       here -- the era's mint reads the raw home blocks -- so the handle is
+       spent for the certificate right away, and [log_ctx] carries it out.
+       When the mint moves to [FsCrash.fr_D] this is where the recovering
+       install's shrink lands, and the seal fires after the loop. *)
+    iMod (exc_seal (fs_exc γfs) with "Hxo") as "#Hseal".
     (* the home-set-free form install_trans takes *)
     iAssert (fs_bytes_any γfs) as "#Hbany".
-    { rewrite /fs_bytes_any. iExists (fs_home_set cov logstart).
-      iExact "Hbrow". }
+    { rewrite /fs_bytes_any /fs_bytes_row. iFrame "Hseal".
+      iExists (fs_home_set cov logstart). iExact "Hbrow". }
     (* THE eb-GUARD-TO-b-GUARD BRIDGE.  The complement's transports carry an
        [eb]-indexed guard and every chain fact a straight-line stretch
        produces is [b]-indexed; at level 0 [cpu_own_eb_agree] gives [eb = b]
@@ -2718,6 +2724,7 @@ Section ProofInitlog.
       iSplitR; [iExact "Hswlb"|].
       iSplitR; [iExact "Hbrow"|].
       iSplitR; [iExact "Hsbparked"|].
+      iSplitR; [| iExact "Hseal"].
       (* THE FILE SYSTEM'S LAW (durable-disk C-8).  The caller handed it in
          minus block 1's park, which is the one piece it could not have --
          nobody owns block 1 until the line above runs.  Composing the two

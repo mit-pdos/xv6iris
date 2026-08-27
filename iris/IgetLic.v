@@ -244,12 +244,22 @@ Section IgetLic.
        [iname_mint_ok] cannot meet it against the region's own half.  Stated
        here it is discharged once, by the one presenter in the tree
        ([ProofIreclaim]'s boot walk), and no other caller ever sees it. *)
+    (* AND THE BYTE VIEW'S SEAL (durable-disk lane E-except).  The [BufL]
+       row is the ONE licence whose reading crosses the byte view
+       ([iname_buf_list] below meets the presenter's cache half against the
+       region's exclusive byte run), and that crossing is sound only once
+       recovery has emptied the exception set.  Carrying the certificate IN
+       THE LICENCE is what keeps it off [SpecIget]'s contract -- boot's
+       [userinit] runs its [namei("/")] iget BEFORE [initlog], with no seal
+       in existence, and it presents a different constructor.  The one
+       presenter in the tree ([ProofIreclaim]'s boot walk) runs inside
+       fsinit, after initlog, and reads it off [LogInv.log_ctx].  LAST. *)
     | BufL bno ds =>
                  (fs_chalf γfs bno (diblk_bytes ds) ∗                  (* e *)
                   ⌜bno = IBLOCK inum inodestart⌝ ∗
                   ⌜diblk_wf ds⌝ ∗
                   ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝ ∗
-                  ireg_boot)
+                  ireg_boot ∗ exc_sealed (fs_exc γfs))
     | RootL   => ⌜bv_unsigned inum = ireg_root⌝                      (* f *)
     end%I.
 
@@ -465,7 +475,7 @@ Section IgetLic.
     dinode_at γi inum dn ∗ iname γi γfs inodestart inum (BufL bno ds).
   Proof.
     iIntros (HE HEl Hin) "#Hinv Hdn Hbuf". rewrite /iname.
-    iDestruct "Hbuf" as "(Hhalf & %Hb & %Hwf & %Hnz & Hboot)".
+    iDestruct "Hbuf" as "(Hhalf & %Hb & %Hwf & %Hnz & Hboot & #Hseal)".
     rewrite /fs_chalf.
     iMod (ireg_read E γi γfs inodestart nib inum dn
             bno (diblk_bytes ds) HE HEl Hin Hb
@@ -476,7 +486,7 @@ Section IgetLic.
     subst ds'.
     iModIntro. iSplitR.
     { iPureIntro. rewrite -Hslot. exact Hnz. }
-    iFrame "Hdn Hhalf Hboot".
+    iFrame "Hdn Hhalf Hboot Hseal".
     iPureIntro. split; [exact Hb | split; [exact Hwf | exact Hnz]].
   Qed.
 
@@ -578,7 +588,7 @@ Section IgetLic.
       iPureIntro.
       exact (ireg_claim_ok_off c f d ltac:(rewrite Hc; discriminate) Hclm).
     - (* (e) BufL -- the boot one-shot against the freeze's own shelter *)
-      iDestruct "Hl" as "(_ & _ & _ & _ & Hboot)".
+      iDestruct "Hl" as "(_ & _ & _ & _ & Hboot & _)".
       iApply (ireg_fsh_boot_off f with "Hsh Hboot").
     - (* (f) RootL -- the region's own keep-alive token *)
       iDestruct "Hl" as %Hroot.
@@ -629,12 +639,12 @@ Section IgetLic.
      off here and [iname_mint_ok] takes its result as a PURE premise, which
      keeps the five-row table an entailment and its one consumer's
      [iDestruct ... as %] shape.  Only the [BufL] row does any work. *)
-  Lemma iname_buf_list (E : coPset) (home : gset Z)
+  Lemma iname_buf_list (E : coPset) (home : gset Z) (Xv : Z -> list (bv 8))
       (γi : gname) (γfs : fs_names) (inodestart : Z)
       (inum : bv 32) (l : ilic) (ds : list dinode) :
     ↑logN ⊆ E ->
     diblk_wf ds ->
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv -∗
     fsblock (fs_bytes γfs) (IBLOCK inum inodestart) (diblk_bytes ds) -∗
     iname γi γfs inodestart inum l ={E}=∗
     ⌜forall (bno : Z) (ds0 : list dinode), l = BufL bno ds0 -> ds0 = ds⌝ ∗
@@ -649,11 +659,11 @@ Section IgetLic.
       |
       | iModIntro; iFrame "Hfsb Hl"; iPureIntro; intros ? ? Hc; discriminate ].
     iEval (rewrite /iname) in "Hl".
-    iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot)".
+    iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot & #Hseal)".
     iEval (rewrite Hbno /fs_chalf) in "Hhalf".
-    iMod (fs_bytes_agree E (fs_bytes γfs) (fs_cache γfs) home
+    iMod (fs_bytes_agree E (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv
             (IBLOCK inum inodestart) (diblk_bytes ds) (diblk_bytes ds0)
-            HE with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
+            HE with "Hbinv Hseal Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     assert (Hdseq : ds0 = ds)
       by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
     iModIntro. iFrame "Hfsb".
@@ -661,7 +671,7 @@ Section IgetLic.
     { iPureIntro. intros bno' ds1 Heq. injection Heq as _ <-. exact Hdseq. }
     rewrite /iname /fs_chalf.
     iEval (rewrite -Hbno) in "Hhalf".
-    iFrame "Hhalf Hboot". iPureIntro.
+    iFrame "Hhalf Hboot Hseal". iPureIntro.
     split; [exact Hbno | split; [exact Hwf0 | exact Hnz0]].
   Qed.
 
@@ -713,7 +723,7 @@ Section IgetLic.
                       ltac:(rewrite Hc; discriminate) Hclm)).
     - (* (e) BufL -- the buffer's type fact, transported; the boot one-shot
          against the c column's shelter *)
-      iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot)".
+      iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot & #Hseal)".
       assert (Hdseq : ds0 = ds) by exact (Hbuf bno ds0 eq_refl).
       subst ds0.
       iAssert (⌜c = None⌝)%I as %Hc0.
@@ -751,7 +761,7 @@ Section IgetLic.
       (inodestart : Z) (nib : nat) (inum : bv 32) (l : ilic) (ph : frz) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    ireg_inv γi γfs inodestart nib -∗
+    ireg_reg γi γfs inodestart nib -∗
     iname γi γfs inodestart inum l -∗
     ifreeze ph (bv_unsigned inum) ={E}=∗
     ⌜ph = FrzOff⌝ ∗ iname γi γfs inodestart inum l ∗ ifreeze ph (bv_unsigned inum).

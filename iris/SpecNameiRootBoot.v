@@ -170,7 +170,7 @@ Definition wp_namei_root_boot_body
              icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
-  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
+  ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE precondition that makes iget's mint safe, on both arms *)
   iref_slot -∗
   (* the path: [pv] holds '/' and [pv+1] holds the terminator.  The fraction

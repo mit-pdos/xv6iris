@@ -892,7 +892,7 @@ Section IcacheBootRegion.
     ([∗ set] z ∈ region_inums nib, ireg_top_boot γfs D z) -∗
     ([∗ list] bi ∈ seq 0 nib,
        fsblock (fs_bytes γfs) (inodestart + Z.of_nat bi) (bss bi)) -∗
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    fs_bytes_at γfs home -∗
     (* THE ERA'S TOP-MAP AUTHORITY, AS ITS INVARIANT (durable-disk
        2b-inode-3).  [ireg_inv] carries it, so this lemma has to be handed
        one; the caller ([FsCfgBoot.fs_cfg_alloc]) allocates it with
@@ -908,7 +908,7 @@ Section IcacheBootRegion.
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
       ⌜length dss = nib⌝ ∗ ⌜Forall diblk_wf dss⌝ ∗
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
-      ireg_inv γi γfs inodestart nib ∗
+      ireg_reg γi γfs inodestart nib ∗
       ireg_boot ∗
       (* N-4 PHASE B: one MINT LICENCE per inum, out with the caller.  The
          column itself stays inside the region, in its NONE state.
@@ -1117,8 +1117,8 @@ Section IcacheBootRegion.
         | iExact "Hsl"]. }
     iMod (inv_alloc iregN E (ireg_body γi γfs inodestart nib) with "[Hbody]")
       as "#Hinv"; [by iNext |].
-    iAssert (ireg_inv γi γfs inodestart nib) as "#Hrinv".
-    { rewrite /ireg_inv. iFrame "Hinv Hftopi". rewrite /fs_bytes_any.
+    iAssert (ireg_reg γi γfs inodestart nib) as "#Hrinv".
+    { rewrite /ireg_reg. iFrame "Hinv Hftopi". rewrite /fs_bytes_row.
       iExists home. iFrame "Hbinv". }
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].

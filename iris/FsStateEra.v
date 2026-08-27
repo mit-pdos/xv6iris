@@ -1609,20 +1609,20 @@ Section EraRes.
     ↑logN ⊆ E ->
     (k <= MAXFILE)%nat ->
     bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    fs_bytes_at γfs home -∗
     inode_owned_era γfs γi inum n ={E}=∗
       ⌜bv_unsigned (bm_slot (bm_of n) k) ∈ home⌝
       ∗ inode_owned_era γfs γi inum n.
   Proof.
-    iIntros (HE Hk Hnz) "#Hinv Hn".
+    iIntros (HE Hk Hnz) "#Hrow Hn". iDestruct "Hrow" as (Xv) "#Hinv".
     iDestruct (inode_owned_era_local with "Hn") as %Hl.
     iDestruct (inode_owned_era_to with "Hn") as "(Hd & Hi & Hb & Ht)".
     rewrite (bm_of_slot n k (inl_rec_wf Hl) Hk) in Hnz |- *.
     destruct (decide (k = MAXFILE)) as [-> | Hkm].
     - iEval (rewrite /ind_res /ind_blk bm_of_ind bm_of_ent
                      (decide_False _ _ Hnz)) in "Hi".
-      iMod (fsblock_home_open E (fs_bytes γfs) (fs_cache γfs) home
-              (fn_indb n) (ind_bytes (fn_ent n)) HE with "Hinv Hi")
+      iMod (fsblock_home_open E (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+              home Xv (fn_indb n) (ind_bytes (fn_ent n)) HE with "Hinv Hi")
         as "[%Hin Hi]".
       iModIntro. iSplitR; [done |].
       iApply (inode_owned_era_of γfs γi inum n Hl with "Hd [Hi] Hb Ht").
@@ -1639,8 +1639,8 @@ Section EraRes.
         as "[Hbk Hback]".
       iEval (rewrite /blk_res (bm_of_get n k (inl_rec_wf Hl) Hklt)
                      (decide_False _ _ Hnz)) in "Hbk".
-      iMod (fsblock_home_open E (fs_bytes γfs) (fs_cache γfs) home
-              (fn_naddr n k) (fn_data n k) HE with "Hinv Hbk")
+      iMod (fsblock_home_open E (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+              home Xv (fn_naddr n k) (fn_data n k) HE with "Hinv Hbk")
         as "[%Hin Hbk]".
       iModIntro. iSplitR; [done |].
       iApply (inode_owned_era_of γfs γi inum n Hl with "Hd Hi [Hbk Hback] Ht").
@@ -1661,17 +1661,18 @@ Section EraRes.
   Lemma inode_owned_era_home_all (E : coPset) (γfs : fs_names) (γi : gname)
       (inum : bv 32) (n : fs_node) (home : gset Z) :
     ↑logN ⊆ E ->
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    fs_bytes_at γfs home -∗
     inode_owned_era γfs γi inum n ={E}=∗
       ⌜forall k : nat, (k <= MAXFILE)%nat ->
           bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
           bv_unsigned (bm_slot (bm_of n) k) ∈ home⌝
       ∗ inode_owned_era γfs γi inum n.
   Proof.
-    iIntros (HE) "#Hinv Hn".
+    iIntros (HE) "#Hrow Hn". iDestruct "Hrow" as (Xv) "#Hinv".
     iDestruct "Hn" as "(Hd & Hb & Hi & Ht & %Hl)".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iAssert (⌜forall k : nat, (k <= MAXFILE)%nat ->
                bv_unsigned (bm_slot (bm_of n) k) <> 0 ->
                bv_unsigned (bm_slot (bm_of n) k) ∈ home⌝)%I as %Hall.
@@ -1689,8 +1690,8 @@ Section EraRes.
         iEval (rewrite gamma_blk_owned) in "Hbk".
         iApply (fsblock_home (fs_bytes γfs) L home (fn_naddr n k) bs Hdm
                   with "Ha Hbk"). }
-    iMod ("Hclose" with "[Ha HC]") as "_".
-    { iNext. iExists L, C. by iFrame. }
+    iMod ("Hclose" with "[Ha HC Hxa]") as "_".
+    { iNext. iExists L, C, X. by iFrame. }
     iModIntro. iSplitR; [done |].
     rewrite /inode_owned_era. iFrame. done.
   Qed.
@@ -1705,7 +1706,7 @@ Section EraRes.
       (inum : bv 32) (n : fs_node) (cov : gset Z) (ls : Z) :
     ↑logN ⊆ E ->
     bv_unsigned (di_type (fn_rec n)) <> 0 ->
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
+    fs_bytes_at γfs (fs_home_set cov ls) -∗
     inode_owned_era γfs γi inum n ={E}=∗
       ⌜inode_ok cov ls (fn_rec n) (bm_of n) (fn_data n)⌝
       ∗ inode_owned_era γfs γi inum n.
@@ -1993,7 +1994,7 @@ Section EraRes.
     ↑logN ⊆ E ->
     node_shape_ok dn bm data ->
     bv_unsigned (di_type dn) <> 0 ->
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
+    fs_bytes_at γfs (fs_home_set cov ls) -∗
     inode_owned_era γfs γi inum (era_node dn bm data) ={E}=∗
       ⌜inode_ok cov ls dn bm data⌝
       ∗ inode_owned_era γfs γi inum (era_node dn bm data).

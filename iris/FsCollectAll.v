@@ -827,8 +827,8 @@ Section CollectAll.
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
     ↑ftopN ⊆ E -> ↑iregN ⊆ E -> ↑bitmapN ⊆ E -> ↑sbN ⊆ E ->
     ↑ipoolN ⊆ E -> ↑icEscN ⊆ E ->
-    ireg_inv γi γfs (FsImg.sb_inodestart sb) nib -∗
-    bitmap_inv γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
+    ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
+    bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
     ipool_inv cn γfs γi cov ls nib -∗
     sb_park γfs sb -∗
@@ -913,8 +913,8 @@ Section CollectAll.
       (γi : gname) (cov : gset Z) (ls : Z) (nib : nat) (sb : fs_sb) :
     γ = icfg_log ->
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
-    ireg_inv γi γfs (FsImg.sb_inodestart sb) nib -∗
-    bitmap_inv γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
+    ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
+    bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
     ipool_inv cn γfs γi cov ls nib -∗
     sb_park γfs sb -∗

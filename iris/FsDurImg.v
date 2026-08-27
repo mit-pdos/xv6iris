@@ -160,7 +160,7 @@ Section DurImg.
      never read, so they are filled with the byte gname rather than with
      fresh ones and nothing is allocated. *)
   Definition fs_dur_bundle (g : gname) (Gd : fs_dur_names) : fs_names :=
-    MkFsNames g g g (fdn_link Gd) (fdn_top Gd).
+    MkFsNames g g g (fdn_link Gd) (fdn_top Gd) g.
 
   Lemma fs_gamma_dur (g : gname) (Gd : fs_dur_names) :
     fs_gamma_L (fs_dur_bundle g Gd) = fs_gamma_D g Gd.

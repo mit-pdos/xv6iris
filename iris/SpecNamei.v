@@ -449,7 +449,7 @@ Definition wp_namei_root_body
   (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_reg gi gfs inodestart nib -∗
   (* ...AND NOT [ireg_open]: the corner's regime premise is gone, forwarded
      from [SpecNamex.wp_namex_root_body], whose header says why.  The short
      version: [ireg_open] does not exist until fsinit's [ireg_boot] is shot,

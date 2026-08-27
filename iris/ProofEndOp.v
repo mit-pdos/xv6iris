@@ -852,16 +852,23 @@ Section EndOpDefs.
       ghost_map_auth (ln_tx γ) 1 T.
   Proof.
     intros Hsz Hom. iIntros "#Hctx HcL Ht".
-    iPoseProof (log_ctx_bytes with "Hctx") as "#Hbinv".
+    iPoseProof (log_ctx_bytes with "Hctx") as "#Hbrow".
+    iPoseProof (log_ctx_seal with "Hctx") as "#Hbseal".
+    iDestruct "Hbrow" as (Xv) "#Hbinv".
     rewrite /fs_bytes_inv.
     iMod (inv_acc ⊤ fsbN with "Hbinv") as "[Hbody Hclose]"; [exact fsbN_top |].
-    iDestruct "Hbody" as (Lb C) ">(Hba & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (Lb C X)
+      ">(Hba & HC & Hxa & %Hdom & %Hlens & %Htiex & %Hdm & %Hxs & %Hxv)".
+    (* RECOVERY IS DONE, so the tie has no exception (lane E-except): the
+       commit's collection reads the WHOLE cache map off the byte view. *)
+    iDestruct (exc_sealed_empty with "Hxa Hbseal") as %->.
+    assert (Htie : bytes_tie Lb C) by (apply bytes_tie_exc_empty; exact Htiex).
     iDestruct (eo_cache_body_sub γfs L C with "HcL HC") as %Hsub.
     iMod (log_ctx_snap_law_of_ops γ bn γfs cov logstart dev om T Lb C
             Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht")
       as "(%Hlaw & Hba & Ht)".
-    iMod ("Hclose" with "[Hba HC]") as "_".
-    { iNext. iExists Lb, C. by iFrame. }
+    iMod ("Hclose" with "[Hba HC Hxa]") as "_".
+    { iNext. iExists Lb, C, ∅. by iFrame. }
     iModIntro. iFrame "HcL Ht". iPureIntro.
     destruct Hlaw as [S HS]. exists S.
     rewrite -(eo_restrict_of_sub C L (fs_home_set cov logstart) Hdom Hsub).
@@ -2046,7 +2053,6 @@ Section EndOpBlocks.
     (* the byte view's row, for install_trans's recovering arm (unused on
        the commit path, but the contract is arm-agnostic) *)
     iPoseProof (log_ctx_bytes_any with "Hlctx") as "#Hbinv".
-    iPoseProof (log_ctx_bytes with "Hlctx") as "#Hbinvh".
     rewrite /eo_open.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".

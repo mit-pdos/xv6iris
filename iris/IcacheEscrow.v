@@ -5255,7 +5255,7 @@ Section IcacheEscrow.
     (k < NINODE)%nat ->
     bv_unsigned inum ∈ P ->
     (bv_unsigned inum < 16 * Z.of_nat nib)%Z ->
-    ireg_inv gi gfs inodestart nib -∗
+    ireg_reg gi gfs inodestart nib -∗
     ipool_inv cn gfs gi cov logstart nib -∗
     ipool gfs gi cov logstart P ∅ -∗
     ic_id cn k (1/4) false dv0 nu0 -∗

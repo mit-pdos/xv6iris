@@ -892,7 +892,7 @@ Definition wp_namex_root_body
   (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
-  ireg_inv gi gfs inodestart nib -∗
+  ireg_reg gi gfs inodestart nib -∗
   (* ...AND NOT [ireg_open].  THE CORNER'S REGIME PREMISE IS GONE, and its
      absence is the whole point of this contract for the boot caller.
      [ireg_open] is the SEALED regime -- [FsReady.fs_ready_seal] mints it by

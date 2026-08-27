@@ -996,8 +996,17 @@ Section SnapMint.
       as (γlk γtp) "(Htopa & Htopf & Hlnk & Hkeep)".
     iMod (fs_boot_ghosts γv dk ndisk cov
             (fs_home_set cov (sb_logstart (fss_sb S)))
-            ROOTDEV γlk γtp E Hcovin Hhomesub with "Hdisk")
-      as (γfs) "(%Hlkq & %Htp & Hpool & HaL & HaD & #Hbinv & Hdty & Hfsb & Hchl)".
+            ROOTDEV γlk γtp E (fs_blocks dk) ∅ Hcovin Hhomesub
+            ltac:(intros b _; apply fs_blocks_length)
+            ltac:(apply empty_subseteq)
+            ltac:(intros b _ _; reflexivity)
+            with "Hdisk")
+      as (γfs) "(%Hlkq & %Htp & Hpool & HaL & HaD & #Hbinv & Hxo & Hdty & Hfsb & Hchl)".
+    (* THE EXCEPTION HANDLE (durable-disk lane E-except) goes into
+       fsinit's kit: the mint runs at [X = ∅] -- the byte view is born
+       equal to the RAW home blocks -- and [initlog] is what seals it. *)
+    iAssert (fs_bytes_at γfs (fs_home_set cov (sb_logstart (fss_sb S))))
+      as "#Hbrow"; [iExists (fs_blocks dk); iExact "Hbinv" |].
     (* ---- THE TOP MAP IS ROUTED HERE --------------------------------- *)
     iEval (rewrite -Htp) in "Htopa".
     iEval (rewrite -Htp) in "Htopf".
@@ -1075,7 +1084,7 @@ Section SnapMint.
                            (fs_home_set cov (sb_logstart (fss_sb S)))
                            dss icfg_nib Hfull Hb Hloc Hnibeq Hnib32
                            Hdl Hdwf Hde))
-            with "Hla Hlnks HcntR Hrcpt HmirR Hep Htopreg Hbireg Hbinv Hftopi Hboot Hrauth")
+            with "Hla Hlnks HcntR Hrcpt HmirR Hep Htopreg Hbireg Hbrow Hftopi Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
                     Hout)".
     iDestruct "Hireginv" as "#Hireginv".
@@ -1199,7 +1208,7 @@ Section SnapMint.
     iDestruct (bitmap_res_of_snap γfs S (fs_blocks dk)
                  (fs_home_set cov (sb_logstart (fss_sb S))) Hb
                  with "Hbmspent") as "Hbmres".
-    iMod (bitmap_inv_alloc E with "Hbinv Hbmres") as "#Hbmres".
+    iMod (bitmap_inv_alloc E with "Hbrow Hbmres") as "#Hbmres".
     (* ---- 8. the gname-only mints, and the record -------------------- *)
     iMod (bio_names_ghost_alloc with "Hsa Hsf") as (bn) "Hbio".
     iMod lock_ghost_alloc as (git) "Hitlk".
@@ -1277,7 +1286,8 @@ Section SnapMint.
     iSplitL "Hdty"; [iExact "Hdty" |].
     iSplitL "Hhdr"; [iExact "Hhdr" |].
     iSplitL "Hslots"; [iExact "Hslots" |].
-    iSplitL "Hbmres"; [iExact "Hbmres" | iExact "Hrem"].
+    iSplitL "Hbmres"; [iExact "Hbmres" |].
+    iSplitL "Hrem"; [iExact "Hrem" | iExact "Hxo"].
   Qed.
 
 End SnapMint.
@@ -1379,14 +1389,14 @@ Section SnapEra0.
     intros Hsub.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
-      as "(H1 & H2 & #H3 & H4 & H5 & H6 & H7 & H8 & #H9 & Hrem)".
+      as "(H1 & H2 & #H3 & H4 & H5 & H6 & H7 & H8 & #H9 & Hrem & Hxo)".
     assert (Hsub' : fsc_cov ∖ R' ⊆ fsc_cov ∖ R).
     { apply elem_of_subseteq. intros b Hb.
       apply elem_of_difference in Hb as [Hc Hn].
       apply elem_of_difference. split; [exact Hc |].
       intros Hr. exact (Hn (Hsub b Hr)). }
     iDestruct (big_sepS_subseteq _ _ _ Hsub' with "Hrem") as "Hrem".
-    rewrite /fs_kit_fsinit_ghost. iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 Hrem".
+    rewrite /fs_kit_fsinit_ghost. iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 Hrem Hxo".
   Qed.
 
   (*  THE ERA-0 MINT, at [FsCfgBoot.fs_cfg_alloc]'s own signature.  It is

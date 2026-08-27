@@ -309,44 +309,67 @@ Section BitmapRes.
      carries [cov] and [ls], so the home set is NAMED here rather than
      bound, and the bitmap block's own membership rides beside it
      ([bitmap_geom_ok]'s). *)
+  (* THE BITMAP AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
+     E-except): the byte row is the bare one, since the era's mint cannot
+     seal a window that [initlog] has not yet closed. *)
+  Definition bitmap_reg (γfs : fs_names) (bms : Z) (cov : gset Z)
+      (ls size : Z) : iProp Σ :=
+    (inv bitmapN (bitmap_body γfs bms size) ∗
+     fs_bytes_at γfs (fs_home_set cov ls))%I.
+
+  (* ...and the form every consumer takes, with the byte row SEALED.
+     fsinit builds it out of [bitmap_reg] and [initlog]'s seal, so no
+     [balloc]/[bfree]/[itrunc] site had to learn about the window. *)
   Definition bitmap_inv (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) : iProp Σ :=
     (inv bitmapN (bitmap_body γfs bms size) ∗
-     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls))%I.
+     fs_bytes_any_at γfs (fs_home_set cov ls))%I.
+
+  Global Instance bitmap_reg_persistent γfs bms cov ls size :
+    Persistent (bitmap_reg γfs bms cov ls size).
+  Proof. rewrite /bitmap_reg. apply _. Qed.
 
   Global Instance bitmap_inv_persistent γfs bms cov ls size :
     Persistent (bitmap_inv γfs bms cov ls size).
   Proof. rewrite /bitmap_inv. apply _. Qed.
 
+  Lemma bitmap_inv_reg γfs bms cov ls size :
+    bitmap_inv γfs bms cov ls size -∗ bitmap_reg γfs bms cov ls size.
+  Proof. iIntros "($ & $ & _)". Qed.
+
+  Lemma bitmap_inv_of γfs bms cov ls size :
+    bitmap_reg γfs bms cov ls size -∗ exc_sealed (fs_exc γfs) -∗
+    bitmap_inv γfs bms cov ls size.
+  Proof. iIntros "($ & $) $". Qed.
+
   (* boot's one step: the image's bitmap, as built by
      [FsCfgBoot.bitmap_res_of_image], goes in and the set is forgotten *)
   Lemma bitmap_inv_alloc (E : coPset) (γfs : fs_names) (bms : Z)
       (cov : gset Z) (ls size : Z) (used : gset Z) :
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls) -∗
+    fs_bytes_at γfs (fs_home_set cov ls) -∗
     bitmap_res γfs bms size used ={E}=∗
-    bitmap_inv γfs bms cov ls size.
+    bitmap_reg γfs bms cov ls size.
   Proof.
     iIntros "#Hbinv H".
     iMod (inv_alloc bitmapN E (bitmap_body γfs bms size)
             with "[H]") as "#Hi".
     { iNext. rewrite /bitmap_body. iExists used. iExact "H". }
-    iModIntro. rewrite /bitmap_inv. iFrame "Hi Hbinv".
+    iModIntro. rewrite /bitmap_reg. iFrame "Hi Hbinv".
   Qed.
 
   (* the row at its NAMED home set -- what a client that has to build
      [LogInv.log_ctx] needs (fsinit, for initlog) *)
   Lemma bitmap_inv_bytes_at (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) :
-    bitmap_inv γfs bms cov ls size -∗
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov ls).
+    bitmap_reg γfs bms cov ls size -∗
+    fs_bytes_at γfs (fs_home_set cov ls).
   Proof. iIntros "(_ & $)". Qed.
 
   Lemma bitmap_inv_bytes (γfs : fs_names) (bms : Z) (cov : gset Z)
       (ls size : Z) :
     bitmap_inv γfs bms cov ls size -∗ fs_bytes_any γfs.
   Proof.
-    iIntros "(_ & Hb)". rewrite /fs_bytes_any.
-    iExists (fs_home_set cov ls). iExact "Hb".
+    iIntros "(_ & Hb)". iApply (fs_bytes_any_at_any with "Hb").
   Qed.
 
   (* [logN] and [bitmapN] are distinct namespaces *)
@@ -385,19 +408,20 @@ Section BitmapRes.
 
   (* ...and the whole of [bitmap_ok], in one opening of the byte view *)
   Lemma bitmap_pool_home (E : coPset) (γfs : fs_names) (home : gset Z)
-      (size : Z) (u : gset Z) :
+      (Xv : Z -> list (bv 8)) (size : Z) (u : gset Z) :
     ↑logN ⊆ E ->
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home -∗
+    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv -∗
     free_pool (fs_gamma_L γfs) size u ={E}=∗
       ⌜forall x : Z, 0 <= x < size -> x ∉ u -> x ∈ home⌝
       ∗ free_pool (fs_gamma_L γfs) size u.
   Proof.
     iIntros (HE) "#Hinv Hpool".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iDestruct (pool_home_pure γfs L home size u Hdm with "Ha Hpool") as %Hres.
-    iMod ("Hclose" with "[Ha HC]") as "_".
-    { iNext. iExists L, C. by iFrame. }
+    iMod ("Hclose" with "[Ha HC Hxa]") as "_".
+    { iNext. iExists L, C, X. by iFrame. }
     iModIntro. by iFrame.
   Qed.
 
@@ -481,16 +505,17 @@ Section BitmapRes.
     (bms ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl) "#Hinv Hhalf".
-    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
+    iDestruct "Hinv" as "(#Hbi & #Hrow0 & #Hseal)".
+    iDestruct "Hrow0" as (Xv) "#Hbinv".
     assert (HlogB : (↑logN : coPset) ⊆ E ∖ ↑bitmapN)
       by (apply subseteq_difference_r; [apply logN_bitmapN_disj | exact HEl]).
     iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (used) ">Hres".
     rewrite bitmap_res_open. iDestruct "Hres" as "[Hfsb Hpool]".
     iMod (fs_bytes_agree (E ∖ ↑bitmapN) (fs_bytes γfs) (fs_cache γfs)
-            (fs_home_set cov ls) bms (bitmap_bytes used) bsl HlogB
-            with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
-    iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) size used
+            (fs_exc γfs) (fs_home_set cov ls) Xv bms (bitmap_bytes used) bsl
+            HlogB with "Hbinv Hseal Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
+    iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) Xv size used
             HlogB with "Hbinv Hpool") as "(%Hhome & Hpool)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
     { iNext. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
@@ -516,20 +541,21 @@ Section BitmapRes.
     (bms ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl Hb) "#Hinv Hown Hhalf".
-    iDestruct "Hinv" as "(#Hbi & #Hbinv)".
+    iDestruct "Hinv" as "(#Hbi & #Hrow0 & #Hseal)".
+    iDestruct "Hrow0" as (Xv) "#Hbinv".
     assert (HlogB : (↑logN : coPset) ⊆ E ∖ ↑bitmapN)
       by (apply subseteq_difference_r; [apply logN_bitmapN_disj | exact HEl]).
     iMod (inv_acc E bitmapN with "Hbi") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (used) ">Hres".
     rewrite bitmap_res_open. iDestruct "Hres" as "[Hfsb Hpool]".
     iMod (fs_bytes_agree (E ∖ ↑bitmapN) (fs_bytes γfs) (fs_cache γfs)
-            (fs_home_set cov ls) bms (bitmap_bytes used) bsl HlogB
-            with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
+            (fs_exc γfs) (fs_home_set cov ls) Xv bms (bitmap_bytes used) bsl
+            HlogB with "Hbinv Hseal Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     iEval (rewrite -gamma_blk_owned) in "Hown".
     iDestruct (free_pool_used (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
                  size used b bs Hb with "Hpool Hown") as %Hin.
     iEval (rewrite gamma_blk_owned) in "Hown".
-    iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) size used
+    iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) Xv size used
             HlogB with "Hbinv Hpool") as "(%Hhome & Hpool)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
     { iNext. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.

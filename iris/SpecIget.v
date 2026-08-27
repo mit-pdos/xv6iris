@@ -245,7 +245,7 @@ Definition wp_iget_sconf_body
      refutes a standing freeze from [l] inside it, and its 0 -> 1 count move
      carries the ledger's [icnt] half.  Persistent, so it costs a caller a
      frame and nothing else. *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_reg γi γfs inodestart nib -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
   (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
      is the console bundle printk needs.  Note the arm fires while iget

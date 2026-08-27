@@ -2470,7 +2470,7 @@ Section IcacheRefInvReg.
        (durable-disk 1c-flip step 3) *)
     ↑logN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    ireg_inv γi γfs inodestart nib -∗
+    ireg_reg γi γfs inodestart nib -∗
     iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) n
     ={E, E ∖ ↑iregN}=∗
@@ -2524,8 +2524,8 @@ Section IcacheRefInvReg.
        against the licence's machinery half is an open of the byte view's
        invariant -- a fupd, run here, ahead of the (still pure) table. *)
     iEval (rewrite -(ireg_bi_iblock inum inodestart)) in "Hfsb".
-    iDestruct "Hrb" as (home) "#Hbinv".
-    iMod (iname_buf_list (E ∖ ↑iregN) home γi γfs inodestart inum l ds
+    iDestruct "Hrb" as (home Xv) "#Hbinv".
+    iMod (iname_buf_list (E ∖ ↑iregN) home Xv γi γfs inodestart inum l ds
             ltac:(apply subseteq_difference_r;
                   [apply logN_iregN_disj | exact HEl]) Hwf
             with "Hbinv Hfsb Hl") as "(%Hbuf & Hfsb & Hl)".
@@ -2633,7 +2633,7 @@ Section IcacheRefInvReg.
       (k : nat) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    ireg_inv γi γfs inodestart nib -∗
+    ireg_reg γi γfs inodestart nib -∗
     iname γi γfs inodestart inum l -∗
     frz_park k (bv_unsigned inum) ={E}=∗
       iname γi γfs inodestart inum l ∗ frzm_h (bv_unsigned inum) false ∗
@@ -2848,7 +2848,10 @@ Section IcacheRefInvReg.
          (* THE MINTED UNIT, flavoured by the licence presented *)
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER HEL Hin HMk Hno) "#Hinv #Hrinv Hhalf Htok Hislot Hoff Hcnt".
+    iIntros (HE HER HEL Hin HMk Hno) "#Hinv #Hrinv0 Hhalf Htok Hislot Hoff Hcnt".
+    (* the PowerOn form of the region is all the count move needs
+       (durable-disk lane E-except) *)
+    iPoseProof (ireg_inv_reg with "Hrinv0") as "#Hrinv".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -2920,7 +2923,7 @@ Section IcacheRefInvReg.
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_inv -∗ ireg_reg γi γfs inodestart nib -∗
     itable_half M -∗ isl_slot M k -∗
     (* RULING R-e: the ONE mover that holds no live slice of its own, so the
        ONE that has to spend the selector's OFF half to refute [live_slot]'s
@@ -3407,7 +3410,8 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER HEL Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hlv Hislot Hsel Hoff Hcnt".
+    iIntros (HE HER HEL Hin HMk Hq Hno) "#Hinv #Hrinv0 Hhalf Hlv Hislot Hsel Hoff Hcnt".
+    iPoseProof (ireg_inv_reg with "Hrinv0") as "#Hrinv".
     iMod (iref_incr_store_au Eo γi γfs inodestart nib M k inum l qt qn n
             HE HER HEL Hin HMk Hq Hno
             with "Hinv Hrinv Hhalf Hislot Hsel Hoff Hcnt")
@@ -3456,7 +3460,7 @@ Section IcacheRefInvReg.
     (k < NINODE)%nat ->
     M !! k = None ->
     (q < 1/2)%Qp ->
-    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_inv -∗ ireg_reg γi γfs inodestart nib -∗
     itable_half M -∗ isl_slot M k -∗
     (* RULING R, WIRED: the recycle's 0 -> 1 MINTS, and the mint's two side
        conditions can only come from the licence iget already presents.  So

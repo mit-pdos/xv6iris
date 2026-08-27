@@ -832,14 +832,15 @@ Section InstallTransDefs.
          crossing is [fsblock_update] rather than [fs_chalf_update] -- and
          it is what LEARNS the payload's bytes, so [it_pay_bs] is not
          needed on this arm any more. *)
-      iDestruct "Hrow" as (home) "#Hbinv".
+      iDestruct "Hrow" as "[Hrow0 #Hseal]".
+      iDestruct "Hrow0" as (home Xv) "#Hbinv".
       iDestruct (it_pay_d_auth with "HauthD Hpay") as %Hd2.
       rewrite (HD eq_refl) in Hd2. injection Hd2 as <-.
       iDestruct (it_pay_open_clean with "Hpay") as "[HLhalf Hdhalf]".
-      iMod (fsblock_update ⊤ (fs_bytes γfs) (fs_cache γfs) home
-              (it_rec_L_upto W Lw L t) (uint w) (Bh t) (Lw t) bs2
+      iMod (fsblock_update ⊤ (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+              home Xv (it_rec_L_upto W Lw L t) (uint w) (Bh t) (Lw t) bs2
               logN_top (Hlen eq_refl)
-              with "Hbinv HauthL Hsnd HLhalf")
+              with "Hbinv Hseal HauthL Hsnd HLhalf")
         as "((%Hbs2 & _) & HauthL & Hsnd & HLhalf)".
       iEval (rewrite -(it_rec_L_upto_S W Lw L t w Hw)) in "HauthL".
       iModIntro.

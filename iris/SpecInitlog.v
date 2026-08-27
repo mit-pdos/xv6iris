@@ -331,7 +331,16 @@ Definition wp_initlog_sconf_body
      needs it twice -- the RECOVERING install moves each home block's byte
      run ([ProofInstallTrans]'s recovering arm), and [LogInv.log_ctx] --
      which initlog is what builds -- carries it out to every log client. *)
-  fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart) -∗
+  fs_bytes_at γfs (fs_home_set cov logstart) -∗
+  (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except).  The
+     era's mint hands the WAL the set of home blocks on which the byte view
+     and the buffer cache disagree -- the pending blocks of a dirty on-disk
+     log header.  initlog is what empties it (the recovering install lands
+     each one) and SEALS it, and the seal is what [LogInv.log_ctx] carries
+     out to every client of the log layer.  It is [∅] while the era's mint
+     still reads the RAW home blocks; opening that window is what deletes
+     [SpecFsinit]'s clean-header premise. *)
+  exc_own (fs_exc γfs) ∅ -∗
   ghost_map_auth (fs_cache γfs) 1 L -∗
   ghost_map_auth (fs_dirty γfs) 1 D -∗
   (* the LOG SIDE's dirty halves, over the whole covered range, all false:

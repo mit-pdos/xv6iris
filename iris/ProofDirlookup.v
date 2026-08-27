@@ -2194,6 +2194,7 @@ Section ProofDirlookupMain.
                 iDestruct ("Hback" with "Hp") as "Hetk".
                 iApply (IcacheEscrow.dlinks_intro _ _ _ _ _ D Hdok Hxact
                           with "Hetk"). }
+            iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
@@ -2202,7 +2203,7 @@ Section ProofDirlookupMain.
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
-                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hislot
+                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hiregr Hpenv Hislot
                             Hlic").
             all: try lkbelow.
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hlic".

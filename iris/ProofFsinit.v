@@ -587,7 +587,7 @@ Section FsinitMain.
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
-              Hmirror Hlfree Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
+              Hmirror Hlfree Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
@@ -598,7 +598,7 @@ Section FsinitMain.
        put into [LogInv.log_ctx]; block 1's own read needs the home-set-free
        form. *)
     iPoseProof (bitmap_inv_bytes_at with "Hbm") as "#Hbrow".
-    iPoseProof (bitmap_inv_bytes with "Hbm") as "#Hbany".
+    iDestruct (bitmap_inv_bytes_at with "Hbm") as (Xv) "#Hbinv".
     (* THE FILE SYSTEM'S LAW, MINUS BLOCK 1'S PARK (durable-disk C-8).  It
        is assembled out of the four invariants fsinit already holds, read at
        the record block 1 DECODES to rather than at the config numbers --
@@ -609,9 +609,9 @@ Section FsinitMain.
     assert (Hcgeom' : col_geom sbrec (FsImg.sb_inodestart sbrec) nib
                         (fs_home_set cov logstart))
       by (rewrite (cg_ist Hcgeom); exact Hcgeom).
-    iAssert (ireg_inv γi γfs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
+    iAssert (ireg_reg γi γfs (FsImg.sb_inodestart sbrec) nib) as "#Hireg'".
     { rewrite (cg_ist Hcgeom). iExact "Hireg". }
-    iAssert (bitmap_inv γfs (FsImg.sb_bmapstart sbrec) cov logstart
+    iAssert (bitmap_reg γfs (FsImg.sb_bmapstart sbrec) cov logstart
                (FsImg.sb_size sbrec)) as "#Hbm'".
     { rewrite Hbmq Hszq. iExact "Hbm". }
     iPoseProof (is_itable2_pool with "Hitb2") as "#Hpoolinv".
@@ -853,8 +853,17 @@ Section FsinitMain.
     iDestruct (ds_held_L with "Hheld") as "[HpL Hheldback]".
     iEval (rewrite Hbnou) in "HpL".
     iApply fupd_wp.
-    iMod (fs_bytes_agree_any ⊤ γfs 1 bs_sb bs0 logN_top
-            with "Hbany Hfsb HpL") as "(%Hbs0 & Hfsb & HpL)".
+    (* RECOVERY HAS NOT RUN YET (durable-disk lane E-except): [readsb] is at
+       +0x26 and [initlog] at +0x4e, so what fsinit holds is the WAL's
+       EXCEPTION HANDLE, not the seal.  Block 1 is outside the exception
+       set -- it is outside the on-disk header's write set at all
+       ([FsCrash.hdr_wf]'s block-1 row, lane E-blk1) -- so the crossing is
+       the [b ∉ X] form. *)
+    assert (Hb1nin : (1 : Z) ∉ (∅ : gset Z)) by (apply not_elem_of_empty).
+    iMod (fs_bytes_agree_exc ⊤ (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+            (fs_home_set cov logstart) Xv ∅ 1 bs_sb bs0 logN_top Hb1nin
+            with "Hbinv [$Hxo] Hfsb HpL")
+      as "(%Hbs0 & Hxo & Hfsb & HpL)".
     iModIntro.
     iEval (rewrite -Hbnou) in "HpL".
     iDestruct ("Hheldback" with "HpL") as "Hheld".
@@ -1468,10 +1477,17 @@ Section FsinitMain.
                     Hpenv Hnilhomes Hgen Hmirror
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
-                    Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbrow HauthL HauthD
+                    Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbrow Hxo HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34 Hfsb Hlawf").
     all: try lkbelow.
     iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 _ Hlctx".
+    (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] has sealed
+       the byte view's exception set into [LogInv.log_ctx], so the region
+       and the bitmap can be upgraded from their PowerOn forms to the ones
+       every consumer above takes. *)
+    iPoseProof (log_ctx_seal with "Hlctx") as "#Hbseal".
+    iDestruct (ireg_inv_of with "Hireg Hbseal") as "#HiregS".
+    iDestruct (bitmap_inv_of with "Hbm Hbseal") as "#HbmS".
     assert (Hpc52 : ret_pc (Q9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x52))
       by (rewrite HQ9ra; pcw).
@@ -1552,7 +1568,7 @@ Section FsinitMain.
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0
               Hbelow eq_refl
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hkdata Hpenv Hbio Hlctx Hseam
-                    Hgen Hni Hist Hbms Hireg Hboot Hitb2 Hitbl Hesc Hslks Hbm Hppid
+                    Hgen Hni Hist Hbms HiregS Hboot Hitb2 Hitbl Hesc Hslks HbmS Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
     all: try lkbelow.
     iIntros (CID33 Hq33 mf) "%Hcsir Hcg Hcnt Hextc Hclmc Hpc Hni Hist Hbms Hppid

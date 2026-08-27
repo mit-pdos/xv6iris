@@ -245,8 +245,8 @@ Section FirstTok.
      itable_inv ∗
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
      ic_sleeplocks fsc_ic ∗
-     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
+     ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+     bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
        (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      ⌜fs_geom_ok⌝)%I.
@@ -365,9 +365,9 @@ Section FirstTok.
         log_free_tok icfg_log ∗
         fsblock (fs_bytes fsc_fs) 1 (FsCrash.fs_blocks dk 1) ∗
         ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
-        ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+        ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
         ireg_boot ∗
-        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
+        bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
         log_addr ↦₄ vlock ∗
         lock_name_field log_addr ↦₈ vname ∗ lock_cpu log_addr ↦₈ vcpu ∗
         l_start ↦₄ v_start ∗ l_dev ↦₄ v_dev ∗
@@ -391,7 +391,10 @@ Section FirstTok.
            first process's, R3 *)
         ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
                                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb),
-           fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b)).
+           fsblock (fs_bytes fsc_fs) b (FsCrash.fs_blocks dk b)) ∗
+        (* the byte view's exception handle, straight through to initlog
+           (durable-disk lane E-except) *)
+        exc_own (fs_exc fsc_fs) ∅.
   Proof.
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb vlock v_start v_dev v_nc v_n vname vcpu sb_old)
@@ -399,10 +402,10 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem)".
+           Hbmres & Hrem & Hxo)".
     iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
-            Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem".
+            Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hxo".
     iPureIntro. exact Hp.
   Qed.
 
@@ -531,7 +534,15 @@ Section FirstTok.
     iIntros "HP HK HL #HC". rewrite /fs_ready_pre /first_boot_persist.
     iDestruct "HP" as "(H1 & H2 & H3 & %H4 & H5 & H7 & H8 & H9 & H10 & H11 &
                         H12 & H13 & H14 & H15 & H16 & H17 & %H18)".
-    iFrame "H1 H2 H3 H5 HL H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 HK HC".
+    (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] sealed the
+       byte view's exception set into [log_ctx], so the region and the
+       bitmap main built at PowerOn are upgraded to the SEALED forms every
+       runtime consumer of [FsReady.fs_ready] takes. *)
+    iDestruct "HL" as "#HLp".
+    iPoseProof (log_ctx_seal with "HLp") as "#Hbseal".
+    iDestruct (ireg_inv_of with "H15 Hbseal") as "#H15s".
+    iDestruct (bitmap_inv_of with "H16 Hbseal") as "#H16s".
+    iFrame "H1 H2 H3 H5 HLp H7 H8 H9 H10 H11 H12 H13 H14 H15s H16s H17 HK HC".
     iFrame "%".
   Qed.
 

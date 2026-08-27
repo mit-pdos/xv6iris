@@ -1748,13 +1748,14 @@ Section IallocClaim.
         the receipt comes straight back below and travels on to [ia_arms].
         It is create's [ilock(ip)] that finally spends it, at
         [InodeRegion.ireg_withdraw]. *)
+    iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
               (ClaimL ty t qt)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hiregr Hpanenv Hiref
                     Hclaim").
     all: try lkbelow.
     (* SIMP-2: iget's post is ONE row ([IcacheRef.inode_refb]); the two

@@ -3428,14 +3428,46 @@ Section InodeRegion.
     iSplitR; [done |]. iPureIntro. exact Hcl.
   Qed.
 
+  (* THE REGION AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
+     E-except).  Its byte row is the bare [FsBlocks.fs_bytes_row]: the
+     era's mint runs at PowerOn, when the byte view's exception set may
+     still be nonempty, so nothing minted there can carry the seal.  This
+     is the form [IcacheBoot.ireg_alloc] produces and the form the ONE
+     pre-recovery reader of the region -- boot's [userinit] running
+     [namei("/")] through [iget] -- takes; that reader's own crossing is
+     licensed by the [BufL] row's carried seal, not by this bundle. *)
+  Definition ireg_reg (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) : iProp Σ :=
+    (inv iregN (ireg_body γi γfs inodestart nib) ∗
+     fs_bytes_row γfs ∗ ftop_inv γfs)%I.
+
+  (* ...AND THE REGION EVERY OTHER CONSUMER TAKES: the same three rows with
+     the byte row SEALED.  fsinit builds it out of [ireg_reg] and the seal
+     [initlog] made, and it is what [FsReady.fs_ready] carries, so not one
+     [ilock]/[ialloc]/[iput]/[iupdate] site had to learn about the window. *)
   Definition ireg_inv (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
     (inv iregN (ireg_body γi γfs inodestart nib) ∗
      ireg_bytes γfs ∗ ftop_inv γfs)%I.
 
+  Global Instance ireg_reg_persistent γi γfs inodestart nib :
+    Persistent (ireg_reg γi γfs inodestart nib).
+  Proof. apply _. Qed.
+
   Global Instance ireg_inv_persistent γi γfs inodestart nib :
     Persistent (ireg_inv γi γfs inodestart nib).
   Proof. apply _. Qed.
+
+  Lemma ireg_inv_reg γi γfs inodestart nib :
+    ireg_inv γi γfs inodestart nib -∗ ireg_reg γi γfs inodestart nib.
+  Proof.
+    iIntros "($ & Hb & $)". iApply (fs_bytes_any_row with "Hb").
+  Qed.
+
+  Lemma ireg_inv_of γi γfs inodestart nib :
+    ireg_reg γi γfs inodestart nib -∗ exc_sealed (fs_exc γfs) -∗
+    ireg_inv γi γfs inodestart nib.
+  Proof. iIntros "($ & Hb & $) Hs". iFrame. Qed.
 
   Lemma ireg_inv_bytes γi γfs inodestart nib :
     ireg_inv γi γfs inodestart nib -∗ fs_bytes_any γfs.
@@ -3636,7 +3668,8 @@ Section InodeRegion.
   Proof.
     iIntros (HE HEl Hin Hb) "#Hinv Hdn Hhalf".
     iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iDestruct "Hrb" as (home) "#Hbinv".
+    iDestruct "Hrb" as "[Hrb0 #Hseal]".
+    iDestruct "Hrb0" as (home Xv) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
@@ -3650,9 +3683,9 @@ Section InodeRegion.
     iDestruct (ireg_recs_to_blk γfs inodestart (ireg_bi inum) ds Hwf
                 with "Hrec") as "Hfsb".
     rewrite -(ireg_bi_iblock inum inodestart) -Hb.
-    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
-            b (diblk_bytes ds) bsl HlogI with "Hbinv Hfsb Hhalf")
-      as "(%Hbytes & Hfsb & Hhalf)".
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs)
+            (fs_exc γfs) home Xv b (diblk_bytes ds) bsl HlogI
+            with "Hbinv Hseal Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hslot : ds !!! islot inum = dn).
@@ -3830,7 +3863,8 @@ Section InodeRegion.
   Proof.
     iIntros (HE HEl Hbi) "#Hinv Hhalf".
     iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iDestruct "Hrb" as (home) "#Hbinv".
+    iDestruct "Hrb" as "[Hrb0 #Hseal]".
+    iDestruct "Hrb0" as (home Xv) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
@@ -3840,9 +3874,10 @@ Section InodeRegion.
     iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hrec & Hsl)".
     iDestruct (ireg_recs_to_blk γfs inodestart bi ds Hwf with "Hrec")
       as "Hfsb".
-    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
-            (inodestart + Z.of_nat bi) (diblk_bytes ds) bsl HlogI
-            with "Hbinv Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs)
+            (fs_exc γfs) home Xv (inodestart + Z.of_nat bi) (diblk_bytes ds)
+            bsl HlogI with "Hbinv Hseal Hfsb Hhalf")
+      as "(%Hbytes & Hfsb & Hhalf)".
     iMod ("Hclose" with "[Ha Hreg Hfsb Hsl Hback]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
       iApply ("Hback" $! m with "[%] [Hfsb Hsl]"); [done |].
@@ -4888,7 +4923,8 @@ Section InodeRegion.
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
     iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iDestruct "Hrb" as (home) "#Hbinv".
+    iDestruct "Hrb" as "[Hrb0 #Hseal]".
+    iDestruct "Hrb0" as (home Xv) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
       by (apply subseteq_difference_r; [apply logN_iregN_disj | exact HEl]).
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
@@ -4900,9 +4936,9 @@ Section InodeRegion.
     iDestruct (ireg_recs_to_blk γfs inodestart (ireg_bi inum) ds0 Hwf0
                 with "Hrec") as "Hfsb".
     rewrite -(ireg_bi_iblock inum inodestart) -Hb.
-    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs) home
-            b (diblk_bytes ds0) bsl HlogI with "Hbinv Hfsb Hhalf")
-      as "(%Hbytes & Hfsb & Hhalf)".
+    iMod (fs_bytes_agree (E ∖ ↑iregN) (fs_bytes γfs) (fs_cache γfs)
+            (fs_exc γfs) home Xv b (diblk_bytes ds0) bsl HlogI
+            with "Hbinv Hseal Hfsb Hhalf") as "(%Hbytes & Hfsb & Hhalf)".
     assert (Hds0 : ds0 = ds).
     { apply (diblk_bytes_inj ds0 ds Hwf0 Hwf). rewrite -Hbytes -Hbsl. reflexivity. }
     subst ds0.

@@ -1323,20 +1323,22 @@ Section IreclaimOrphan.
        presents (e) and it is a boot-thread proof, so the token is simply
        [Hboot], threaded here and taken straight back below -- BORROWED,
        exactly like the block half beside it. *)
+    iPoseProof (log_ctx_seal with "Hlctx") as "#Hbseal".
     iAssert (iname γi γfs inodestart inum (BufL (uint bno) ds))
       with "[HpL Hboot]" as "Hlic".
-    { rewrite /iname /fs_chalf -Hbseq. iFrame "HpL Hboot". iPureIntro.
+    { rewrite /iname /fs_chalf -Hbseq. iFrame "HpL Hboot Hbseal". iPureIntro.
       (* THE BLOCK TIE, discharged HERE and only here (SIMP-1): this walk is
          the one site in the tree that presents licence (e), and the real
          equation is its own [Hbnoeq]. *)
       split; [exact Hbnoeq | split; [exact Hdswf | exact Htnz]]. }
+    iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
               (BufL (uint bno) ds)
               O6 0%nat eb (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref Hlic").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hiregr Hpanenv Hiref Hlic").
     all: try lkbelow.
     iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts [Href Hru] Hlic".
     (* the minted unit.  [BufL] is not the claim licence, so what iget
@@ -1348,7 +1350,7 @@ Section IreclaimOrphan.
        not in scope in this file, and writing the target proposition out
        would import it for one line. *)
     iEval (rewrite /iname /fs_chalf -Hbseq) in "Hlic".
-    iDestruct "Hlic" as "(HpL & _ & _ & _ & Hboot)".
+    iDestruct "Hlic" as "(HpL & _ & _ & _ & Hboot & _)".
     iDestruct ("Hlkback" with "HpL") as "Hlk".
     iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0)
       with "[Hlk]" as "Hlk"; [rewrite /bio_locked; iExact "Hlk" |].

@@ -392,26 +392,40 @@ Section FsBoot.
      must not name [fs_node].  [FsCfgBoot.fs_cfg_alloc] allocates them from
      the era's inode map and passes them down; all this lemma does is put
      them in [γfs] and name them back to the caller. *)
+  (* THE BYTE VIEW IS MINTED AT [Dv], NOT AT THE RAW DISK (durable-disk
+     lane E-except).  [Dv] is the era's COMMITTED view [FsCrash.fr_D] and
+     [X] the set where it differs from the raw disk -- the pending home
+     blocks of a dirty on-disk log header.  The CACHE map stays raw (that
+     is what keeps [BioInv.pool_blk] honest), and the WAL's handle on the
+     difference comes out as [exc_own]. *)
   Lemma fs_boot_ghosts (γv : disk_names) (dk : Z -> bv 8) (ndisk : nat)
-      (cov home : gset Z) (dev : mword 32) (γlk γtp : gname) (E : coPset) :
+      (cov home : gset Z) (dev : mword 32) (γlk γtp : gname) (E : coPset)
+      (Dv : Z -> list (bv 8)) (X : gset Z) :
     fs_cov_in cov ndisk ->
     home ⊆ cov ->
+    (forall b, b ∈ home -> length (Dv b) = BSIZE) ->
+    X ⊆ home ->
+    (forall b, b ∈ home -> b ∉ X -> Dv b = fs_blocks dk b) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
     ∃ γfs : fs_names,
       ⌜fs_link γfs = γlk⌝ ∗ ⌜fs_top γfs = γtp⌝ ∗
       ([∗ set] b ∈ cov, pool_blk (fs_view γfs γv dev cov) b) ∗
       ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
-      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) home ∗
+      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Dv ∗
+      exc_own (fs_exc γfs) X ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
-      ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (fs_blocks dk b)) ∗
+      ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Dv b)) ∗
       ([∗ set] b ∈ cov ∖ home, fs_chalf γfs b (fs_blocks dk b)).
   Proof.
-    iIntros (Hcov Hsub) "Hm".
+    iIntros (Hcov Hsub HlD HXsub Hagr) "Hm".
     iDestruct (fs_boot_carve γv dk ndisk cov Hcov with "Hm") as "Hblk".
-    iMod (fs_alloc E γlk γtp (fs_C0 dk cov) home (fs_C0_lengths dk cov)
-            ltac:(rewrite fs_C0_dom; exact Hsub))
-      as (γfs) "(%Hlk & %Htp & HaL & HaD & #Hinv & Hpm & Hfb & Hcl)".
+    iMod (fs_alloc E γlk γtp (fs_C0 dk cov) home Dv X (fs_C0_lengths dk cov)
+            ltac:(rewrite fs_C0_dom; exact Hsub) HlD HXsub
+            ltac:(intros b bs Hb Hin Hnin;
+                  destruct (fs_C0_lookup_Some dk cov b bs Hb) as [_ ->];
+                  exact (Hagr b Hin Hnin)))
+      as (γfs) "(%Hlk & %Htp & HaL & HaD & #Hinv & Hxo & Hpm & Hfb & Hcl)".
     rewrite (fs_C0_filter_in dk cov home Hsub) (fs_C0_filter_out dk cov home).
     iDestruct (fs_C0_big with "Hfb") as "Hfb".
     iDestruct (fs_C0_big with "Hcl") as "Hcl".
@@ -428,7 +442,7 @@ Section FsBoot.
       iApply (big_sepS_mono with "H"). intros b Hb.
       iIntros "[Hd Hc]". rewrite /pool_blk /fs_view. cbn [bv_gd bv_clean].
       iExists (fs_blocks dk b). iFrame "Hd Hc". }
-    rewrite /fs_D0. iFrame "HaL HaD Hinv Hdty Hfb Hcl".
+    rewrite /fs_D0. iFrame "HaL HaD Hinv Hxo Hdty Hfb Hcl".
   Qed.
 
 (* ====================================================================== *)
@@ -555,7 +569,9 @@ Section FsBoot.
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
       (* THE BYTE VIEW'S ROW, persistent, re-exported to every consumer
          above (durable-disk 1c-flip step 1) *)
-      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart) ∗
+      fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
+                   (fs_home_set cov logstart) (fs_blocks dk) ∗
+      exc_sealed (fs_exc γfs) ∗
       fs_chalf γfs (log_hdr_bno logstart)
               (fs_blocks dk (log_hdr_bno logstart)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
@@ -571,12 +587,16 @@ Section FsBoot.
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
     destruct Hgeom as [Hcovok Hsub].
     iMod (fs_boot_ghosts γv dk ndisk cov (fs_home_set cov logstart) dev
-            γlk γtp E
+            γlk γtp E (fs_blocks dk) ∅
             Hcov ltac:(rewrite /fs_home_set; apply elem_of_subseteq;
                        intros x Hx; apply elem_of_difference in Hx as [Hc _];
                        exact Hc)
+            ltac:(intros b _; apply fs_blocks_length)
+            ltac:(apply empty_subseteq)
+            ltac:(intros b _ _; reflexivity)
             with "Hm")
-      as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hinv & Hdty & Hrest & Hlog)".
+      as (γfs) "(%Hlk & %Htp & Hpool & HaL & HaD & #Hinv & Hxo & Hdty & Hrest & Hlog)".
+    iMod (exc_seal (fs_exc γfs) with "Hxo") as "#Hseal".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
             with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
     iModIntro. iExists bn, γfs.
@@ -597,7 +617,7 @@ Section FsBoot.
         intros Hd. apply elem_of_difference in Hd as [_ Hn]. exact (Hn Hx). }
     rewrite Hcancel.
     iDestruct (fs_log_region_split with "Hlog") as "[Hhdr Hslots]".
-    iFrame "Hctx Hsl HaL HaD Hdty Hinv Hhdr Hslots Hrest".
+    iFrame "Hctx Hsl HaL HaD Hdty Hinv Hseal Hhdr Hslots Hrest".
   Qed.
 
 End FsBoot.

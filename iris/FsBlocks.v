@@ -85,6 +85,10 @@ Record fs_names := MkFsNames {
      era's [Γ_L.γlink] / [Γ_L.γtop]. *)
   fs_link : gname;   (* the link-counting family ([FsStateLink.linkUR])   *)
   fs_top  : gname;   (* the top-level abstract map ([Z -> fs_node])       *)
+  (* THE BYTE VIEW'S EXCEPTION SET (durable-disk lane E-except).  LAST, so
+     no positional [MkFsNames] moves.  See section [FsExc] below and the
+     banner at [fs_bytes_body]. *)
+  fs_exc  : gname;
 }.
 
 Section FsBlocks.
@@ -728,6 +732,104 @@ Section FsBytes.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  3b.  THE EXCEPTION SET, AND THE SEAL  (durable-disk lane E-except) *)
+  (*                                                                     *)
+  (*  THE ONE WINDOW IN WHICH THE TWO CONTENT MAPS DISAGREE is the       *)
+  (*  recovery window: at PowerOn on a DIRTY log header the era's byte   *)
+  (*  view [L] is minted at the COMMITTED view [FsCrash.fr_D] -- the raw *)
+  (*  home blocks with the on-disk log's batch installed -- while the    *)
+  (*  cache map [C] and the physical disk still read the CRASHED bytes.  *)
+  (*  So [bytes_tie] is false at exactly the home blocks the on-disk     *)
+  (*  header's write set names, and true everywhere else.  That set is   *)
+  (*  the EXCEPTION SET.  (Plan section 5; [BioInv.pool_blk], the        *)
+  (*  mirror row and [SpecInitlog]'s [lm_view] row all stay true --      *)
+  (*  the cache and the disk agree throughout, which is why the          *)
+  (*  exception lands here and nowhere else.)                            *)
+  (*                                                                     *)
+  (*  IT IS OWNED BY THE WAL, ONE-KEY GHOST MAP, AND THE HANDLE IS ALSO  *)
+  (*  THE SEAL.  [exc_auth] sits inside the byte view's own invariant;   *)
+  (*  [exc_own] is the WAL's exclusive handle on it -- minted at PowerOn  *)
+  (*  at the header's write set, threaded through [SpecFsinit] into      *)
+  (*  [SpecInitlog], SHRUNK one block at a time by the recovering        *)
+  (*  [install_trans] (each home [bwrite] lands the logged value in the  *)
+  (*  cache, which restores the tie AT THAT BLOCK), and spent EMPTY at   *)
+  (*  the end of recovery, where [exc_seal] PERSISTS the element at [∅]. *)
+  (*  A discarded ghost-map element can never move again, so             *)
+  (*  [exc_sealed] is a permanent certificate that the exception set is  *)
+  (*  empty -- "recovery is done".  It rides [LogInv.log_ctx], hence     *)
+  (*  [fs_bytes_any] (below), hence every runtime reader of the tie for  *)
+  (*  free: only [initlog]/[install_trans] and [fsinit]'s own pre-       *)
+  (*  recovery [readsb] ever run with a nonempty exception set, and      *)
+  (*  those three take [exc_own] and a [b ∉ X] premise instead.          *)
+  (*                                                                     *)
+  (*  WHAT [L] HOLDS ON THE EXCEPTION SET is the LOGGED value, and the   *)
+  (*  invariant records it as a FUNCTION [Xv] fixed at allocation (the   *)
+  (*  log region is not written during recovery, so it does not move).   *)
+  (*  That is what lets the recovering install restore the tie without   *)
+  (*  owning the byte run: it writes [Xv b] into the cache and the       *)
+  (*  invariant already knows [L] reads [Xv b] there.                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the authority, inside [fs_bytes_body] *)
+  Definition exc_auth (gX : gname) (X : gset Z) : iProp Σ :=
+    ghost_map_auth gX 1 ({[ tt := X ]} : gmap unit (gset Z)).
+
+  (* the WAL's exclusive handle *)
+  Definition exc_own (gX : gname) (X : gset Z) : iProp Σ :=
+    (tt ↪[gX] X)%I.
+
+  (* the PERSISTENT seal: the element, discarded at [∅] *)
+  Definition exc_sealed (gX : gname) : iProp Σ :=
+    (tt ↪[gX]□ (∅ : gset Z))%I.
+
+  Global Instance exc_auth_timeless gX X : Timeless (exc_auth gX X).
+  Proof. apply _. Qed.
+  Global Instance exc_own_timeless gX X : Timeless (exc_own gX X).
+  Proof. apply _. Qed.
+  Global Instance exc_sealed_persistent gX : Persistent (exc_sealed gX).
+  Proof. apply _. Qed.
+  Global Instance exc_sealed_timeless gX : Timeless (exc_sealed gX).
+  Proof. apply _. Qed.
+
+  Lemma exc_alloc (X : gset Z) :
+    ⊢ |==> ∃ gX : gname, exc_auth gX X ∗ exc_own gX X.
+  Proof.
+    iMod (ghost_map_alloc ({[ tt := X ]} : gmap unit (gset Z)))
+      as (gX) "[Ha Hf]".
+    rewrite big_sepM_singleton. iModIntro. iExists gX. iFrame.
+  Qed.
+
+  Lemma exc_agree gX X X' :
+    exc_auth gX X -∗ exc_own gX X' -∗ ⌜X = X'⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (ghost_map_lookup with "Ha Hf") as %Hlk.
+    rewrite lookup_singleton in Hlk. iPureIntro. congruence.
+  Qed.
+
+  (* THE SEAL, READ: a discarded element at [∅] against the authority. *)
+  Lemma exc_sealed_empty gX X :
+    exc_auth gX X -∗ exc_sealed gX -∗ ⌜X = ∅⌝.
+  Proof.
+    iIntros "Ha Hs".
+    iDestruct (ghost_map_lookup with "Ha Hs") as %Hlk.
+    rewrite lookup_singleton in Hlk. iPureIntro. congruence.
+  Qed.
+
+  Lemma exc_update gX X X' :
+    exc_auth gX X -∗ exc_own gX X ==∗ exc_auth gX X' ∗ exc_own gX X'.
+  Proof.
+    iIntros "Ha Hf".
+    iMod (ghost_map_update X' with "Ha Hf") as "[Ha Hf]".
+    rewrite insert_singleton. by iFrame.
+  Qed.
+
+  (* ...AND THE SEAL, MADE.  Spending the handle at [∅] persists it. *)
+  Lemma exc_seal gX :
+    exc_own gX ∅ ==∗ exc_sealed gX.
+  Proof. iIntros "Hf". by iMod (ghost_map_elem_persist with "Hf") as "$". Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  4.  THE LOG-LAYER INVARIANT: the cache map against the byte view   *)
   (* ------------------------------------------------------------------ *)
 
@@ -741,6 +843,27 @@ Section FsBytes.
     forall b bs, C !! b = Some bs ->
                  (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ⊆ L.
 
+  (* ...EXCEPTED ON [X] (section 3b): every cache entry OUTSIDE the
+     exception set reads off [L].  [bytes_tie] is the [X = ∅] instance. *)
+  Definition bytes_tie_exc (L : gmap Z (bv 8)) (C : gmap Z (list (bv 8)))
+      (X : gset Z) : Prop :=
+    forall b bs, C !! b = Some bs -> b ∉ X ->
+                 (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ⊆ L.
+
+  Lemma bytes_tie_exc_empty L C : bytes_tie_exc L C ∅ <-> bytes_tie L C.
+  Proof.
+    split.
+    - intros H b bs Hb. apply (H b bs Hb). set_solver.
+    - intros H b bs Hb _. exact (H b bs Hb).
+  Qed.
+
+  (* ON [X], [L] holds the LOGGED value, named by the invariant's own
+     function [Xv].  This is what the recovering install reads the tie
+     back off when its bwrite lands. *)
+  Definition bytes_exc_val (L : gmap Z (bv 8)) (Xv : Z -> list (bv 8))
+      (X : gset Z) : Prop :=
+    forall b, b ∈ X -> (map_seqZ (b * BSZ) (Xv b) : gmap Z (bv 8)) ⊆ L.
+
   (* THE BODY.  [gL] is the byte view's name, [gc] the cache's.  The
      invariant holds the byte AUTH and, per home block, the cache
      element's OTHER half -- the half the FS client used to hold.  That
@@ -752,23 +875,32 @@ Section FsBytes.
      TIMELESS, and it has to be: [log_write] opens it inside the same
      ghost step that fires the client's atomic update, with no program
      step left to absorb a later. *)
-  Definition fs_bytes_body (gL gc : gname) (home : gset Z) : iProp Σ :=
-    (∃ (L : gmap Z (bv 8)) (C : gmap Z (list (bv 8))),
+  (* THE EXCEPTION SET RIDES INSIDE (lane E-except): [X] is existential --
+     no consumer names it -- and its authority is what the WAL's handle
+     [exc_own] moves against.  The two pure rows about it go LAST, after
+     [bytes_dom], so every [destruct] of this body that predates the
+     window keeps its pattern's prefix. *)
+  Definition fs_bytes_body (gL gc gX : gname) (home : gset Z)
+      (Xv : Z -> list (bv 8)) : iProp Σ :=
+    (∃ (L : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) (X : gset Z),
        ghost_map_auth gL 1 L ∗
        ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#(1/2)} bs) ∗
+       exc_auth gX X ∗
        ⌜dom C = home⌝ ∗
        ⌜forall b bs, C !! b = Some bs -> length bs = BSIZE⌝ ∗
-       ⌜bytes_tie L C⌝ ∗ ⌜bytes_dom L home⌝)%I.
+       ⌜bytes_tie_exc L C X⌝ ∗ ⌜bytes_dom L home⌝ ∗
+       ⌜X ⊆ home⌝ ∗ ⌜bytes_exc_val L Xv X⌝)%I.
 
-  Global Instance fs_bytes_body_timeless gL gc home :
-    Timeless (fs_bytes_body gL gc home).
+  Global Instance fs_bytes_body_timeless gL gc gX home Xv :
+    Timeless (fs_bytes_body gL gc gX home Xv).
   Proof. apply _. Qed.
 
-  Definition fs_bytes_inv (gL gc : gname) (home : gset Z) : iProp Σ :=
-    inv fsbN (fs_bytes_body gL gc home).
+  Definition fs_bytes_inv (gL gc gX : gname) (home : gset Z)
+      (Xv : Z -> list (bv 8)) : iProp Σ :=
+    inv fsbN (fs_bytes_body gL gc gX home Xv).
 
-  Global Instance fs_bytes_inv_persistent gL gc home :
-    Persistent (fs_bytes_inv gL gc home).
+  Global Instance fs_bytes_inv_persistent gL gc gX home Xv :
+    Persistent (fs_bytes_inv gL gc gX home Xv).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -835,30 +967,41 @@ Section FsBytes.
      outside the log's own storage, the two facts bread and log_write
      demand of a block number -- is a CONSEQUENCE of holding it, not a
      clause anybody maintains. *)
-  Lemma fsblock_home_open (E : coPset) gL gc home b bs :
+  Lemma fsblock_home_open (E : coPset) gL gc gX home Xv b bs :
     ↑logN ⊆ E ->
-    fs_bytes_inv gL gc home -∗
+    fs_bytes_inv gL gc gX home Xv -∗
     fsblock gL b bs ={E}=∗ ⌜b ∈ home⌝ ∗ fsblock gL b bs.
   Proof.
     iIntros (HE) "#Hinv Hfb".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
-    iMod ("Hclose" with "[Ha HC]") as "_".
-    { iNext. iExists L, C. by iFrame. }
+    iMod ("Hclose" with "[Ha HC Hxa]") as "_".
+    { iNext. iExists L, C, X. by iFrame. }
     iModIntro. by iFrame.
   Qed.
 
-  Lemma fs_bytes_agree (E : coPset) gL gc home b bs bsm :
+  (* THE BREAD CLIENT'S CROSSING, AT THE SEAL (lane E-except).  Every
+     runtime reader of the tie runs THIS form: the persistent seal says
+     the exception set is empty, so the tie holds at every home block and
+     no reader carries a membership premise.  The pre-recovery form, which
+     takes the WAL's handle and [b ∉ X] instead, is [fs_bytes_agree_exc]
+     just below; it has exactly two callers ([fsinit]'s [readsb] and the
+     recovering install's own step). *)
+  Lemma fs_bytes_agree (E : coPset) gL gc gX home Xv b bs bsm :
     ↑logN ⊆ E ->
-    fs_bytes_inv gL gc home -∗
+    fs_bytes_inv gL gc gX home Xv -∗
+    exc_sealed gX -∗
     fsblock gL b bs -∗
     (b ↪[gc]{#(1/2)} bsm) ={E}=∗
       ⌜bsm = bs⌝ ∗ fsblock gL b bs ∗ (b ↪[gc]{#(1/2)} bsm).
   Proof.
-    iIntros (HE) "#Hinv Hfb Hm".
+    iIntros (HE) "#Hinv #Hseal Hfb Hm".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
+    iDestruct (exc_sealed_empty with "Hxa Hseal") as %->.
     iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
     assert (Hin : is_Some (C !! b)).
     { apply elem_of_dom. rewrite Hdom. exact Hb. }
@@ -871,11 +1014,48 @@ Section FsBytes.
     assert (Hbe : bs = bsi).
     { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
       - rewrite Hlb (Hlens b bsi Hbsi) //.
-      - exact (Htie b bsi Hbsi). }
-    iMod ("Hclose" with "[Ha Hback Hi]") as "_".
-    { iNext. iExists L, C. iFrame "Ha". iSplitL; [by iApply "Hback" |].
-      iPureIntro. auto. }
+      - exact (Htie b bsi Hbsi ltac:(set_solver)). }
+    iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
+    { iNext. iExists L, C, ∅. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
+      iPureIntro. auto 10. }
     iModIntro. iFrame "Hm". rewrite /fsblock. iFrame "Hr".
+    iSplit; [iPureIntro; congruence | done].
+  Qed.
+
+  (* ...AND THE SAME CROSSING INSIDE THE RECOVERY WINDOW: the WAL's handle
+     names the exception set and the caller says its block is outside it.
+     The handle comes back untouched. *)
+  Lemma fs_bytes_agree_exc (E : coPset) gL gc gX home Xv (X : gset Z)
+      b bs bsm :
+    ↑logN ⊆ E -> b ∉ X ->
+    fs_bytes_inv gL gc gX home Xv -∗
+    exc_own gX X -∗
+    fsblock gL b bs -∗
+    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
+      ⌜bsm = bs⌝ ∗ exc_own gX X ∗ fsblock gL b bs ∗ (b ↪[gc]{#(1/2)} bsm).
+  Proof.
+    iIntros (HE Hnin) "#Hinv Hxo Hfb Hm".
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
+    iDestruct "Hbody" as (L C X0)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
+    iDestruct (exc_agree with "Hxa Hxo") as %->.
+    iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
+    assert (Hin : is_Some (C !! b)).
+    { apply elem_of_dom. rewrite Hdom. exact Hb. }
+    destruct Hin as [bsi Hbsi].
+    iDestruct (big_sepM_lookup_acc _ _ b bsi Hbsi with "HC") as "[Hi Hback]".
+    iDestruct (ghost_map_elem_agree with "Hm Hi") as %->.
+    iDestruct "Hfb" as "[%Hlb Hr]".
+    iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
+    rewrite Z.add_0_r in Hsub.
+    assert (Hbe : bs = bsi).
+    { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
+      - rewrite Hlb (Hlens b bsi Hbsi) //.
+      - exact (Htie b bsi Hbsi Hnin). }
+    iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
+    { iNext. iExists L, C, X. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
+      iPureIntro. auto 10. }
+    iModIntro. iFrame "Hm Hxo". rewrite /fsblock. iFrame "Hr".
     iSplit; [iPureIntro; congruence | done].
   Qed.
 
@@ -919,17 +1099,18 @@ Section FsBytes.
               BSIZE_pos ltac:(rewrite Hlb; exact BSIZE_pos) with "Ha Hr").
   Qed.
 
-  Lemma fsblock_q_home_open (E : coPset) gL dq gc home b bs :
+  Lemma fsblock_q_home_open (E : coPset) gL dq gc gX home Xv b bs :
     ↑logN ⊆ E ->
-    fs_bytes_inv gL gc home -∗
+    fs_bytes_inv gL gc gX home Xv -∗
     fsblock_q gL dq b bs ={E}=∗ ⌜b ∈ home⌝ ∗ fsblock_q gL dq b bs.
   Proof.
     iIntros (HE) "#Hinv Hfb".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
-    iMod ("Hclose" with "[Ha HC]") as "_".
-    { iNext. iExists L, C. by iFrame. }
+    iMod ("Hclose" with "[Ha HC Hxa]") as "_".
+    { iNext. iExists L, C, X. by iFrame. }
     iModIntro. by iFrame.
   Qed.
 
@@ -937,16 +1118,19 @@ Section FsBytes.
      [fsblock_q] in place of [fsblock]: every step of it is a lookup against
      the byte auth or the cache half, and neither is a share of the byte
      run, so the quarter goes through unchanged. *)
-  Lemma fs_bytes_agree_q (E : coPset) gL dq gc home b bs bsm :
+  Lemma fs_bytes_agree_q (E : coPset) gL dq gc gX home Xv b bs bsm :
     ↑logN ⊆ E ->
-    fs_bytes_inv gL gc home -∗
+    fs_bytes_inv gL gc gX home Xv -∗
+    exc_sealed gX -∗
     fsblock_q gL dq b bs -∗
     (b ↪[gc]{#(1/2)} bsm) ={E}=∗
       ⌜bsm = bs⌝ ∗ fsblock_q gL dq b bs ∗ (b ↪[gc]{#(1/2)} bsm).
   Proof.
-    iIntros (HE) "#Hinv Hfb Hm".
+    iIntros (HE) "#Hinv #Hseal Hfb Hm".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
+    iDestruct (exc_sealed_empty with "Hxa Hseal") as %->.
     iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
     assert (Hin : is_Some (C !! b)).
     { apply elem_of_dom. rewrite Hdom. exact Hb. }
@@ -959,10 +1143,10 @@ Section FsBytes.
     assert (Hbe : bs = bsi).
     { apply (map_seqZ_inj bs bsi (b * BSZ) L); [| exact Hsub |].
       - rewrite Hlb (Hlens b bsi Hbsi) //.
-      - exact (Htie b bsi Hbsi). }
-    iMod ("Hclose" with "[Ha Hback Hi]") as "_".
-    { iNext. iExists L, C. iFrame "Ha". iSplitL; [by iApply "Hback" |].
-      iPureIntro. auto. }
+      - exact (Htie b bsi Hbsi ltac:(set_solver)). }
+    iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
+    { iNext. iExists L, C, ∅. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
+      iPureIntro. auto 10. }
     iModIntro. iFrame "Hm". rewrite /fsblock_q. iFrame "Hr".
     iSplit; [iPureIntro; congruence | done].
   Qed.
@@ -988,13 +1172,15 @@ Section FsBytes.
   (*  [length bsm] premise to give).                                      *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma byte_range_log_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
+  Lemma byte_range_log_update (E : coPset) gL gc gX home Xv
+      (C : gmap Z (list (bv 8)))
       (b : Z) (off : nat) (sub_old sub_new bs_old : list (bv 8)) :
     ↑logN ⊆ E ->
     (off + length sub_old <= BSIZE)%nat ->
     (0 < length sub_old)%nat ->
     (length bs_old = BSIZE -> length sub_new = length sub_old) ->
-    fs_bytes_inv gL gc home -∗
+    fs_bytes_inv gL gc gX home Xv -∗
+    exc_sealed gX -∗
     ghost_map_auth gc 1 C -∗
     byte_range gL b (Z.of_nat off) sub_old -∗
     (b ↪[gc]{#(1/2)} bs_old) ={E}=∗
@@ -1004,9 +1190,13 @@ Section FsBytes.
       byte_range gL b (Z.of_nat off) sub_new ∗
       (b ↪[gc]{#(1/2)} blk_splice off sub_new bs_old).
   Proof.
-    iIntros (HE Hoff Hpos Hshape) "#Hinv Hca Hr Hm".
+    iIntros (HE Hoff Hpos Hshape) "#Hinv #Hseal Hca Hr Hm".
     iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
-    iDestruct "Hbody" as (L C0) ">(Ha & HC & %Hdom & %Hlens & %Htie & %Hdm)".
+    iDestruct "Hbody" as (L C0 X)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie0 & %Hdm & %Hxs & %Hxv)".
+    iDestruct (exc_sealed_empty with "Hxa Hseal") as %->.
+    assert (Htie : bytes_tie L C0)
+      by (apply bytes_tie_exc_empty; exact Htie0).
     iDestruct (byte_range_home gL L home b off sub_old Hdm
                  ltac:(lia) Hpos with "Ha Hr") as %Hb.
     assert (Hin : is_Some (C0 !! b)).
@@ -1080,21 +1270,22 @@ Section FsBytes.
                         (map_seqZ (b * BSZ) bs_old : gmap Z (bv 8)) L) as [Hs _].
           apply (Hs (Htie b bs_old Hbsi) a v).
           apply lookup_map_seqZ_Some. split; [lia | exact Hbsl]. }
-    iMod ("Hclose" with "[Ha Hback Hi]") as "_".
+    iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
     { iNext.
       iExists ((map_seqZ (b * BSZ + Z.of_nat off) sub_new : gmap Z (bv 8)) ∪ L),
-              (<[b := blk_splice off sub_new bs_old]> C0).
-      iFrame "Ha".
+              (<[b := blk_splice off sub_new bs_old]> C0), ∅.
+      iFrame "Ha Hxa".
       iSplitL.
       { iApply ("Hback" with "Hi"). }
-      iPureIntro. split; [| split; [| split]].
+      iPureIntro.
+      split; [| split; [| split; [| split; [| split]]]].
       - rewrite dom_insert_L Hdom.
         assert (Hbh : b ∈ home) by exact Hb. set_solver.
       - intros b' bs' Hb'.
         destruct (decide (b' = b)) as [->|Hne].
         + rewrite lookup_insert in Hb'. congruence.
         + rewrite lookup_insert_ne in Hb'; [| done]. exact (Hlens b' bs' Hb').
-      - intros b' bs' Hb'.
+      - intros b' bs' Hb' _.
         destruct (decide (b' = b)) as [->|Hne].
         + rewrite lookup_insert in Hb'. injection Hb' as <-. exact Htieb.
         + rewrite lookup_insert_ne in Hb'; [| done].
@@ -1115,17 +1306,20 @@ Section FsBytes.
         + intros [v Hv]. apply lookup_union_Some_raw in Hv as [Hv | [_ Hv]].
           * apply elem_of_dom. apply Hnew_sub. apply elem_of_dom. by exists v.
           * by exists v.
-        + intros Hs. apply lookup_union_is_Some. by right. }
+        + intros Hs. apply lookup_union_is_Some. by right.
+      - set_solver.
+      - intros b'' Hb''. set_solver. }
     iModIntro. iFrame "Hca Hm Hr". iPureIntro. auto.
   Qed.
 
   (* THE WHOLE-BLOCK COROLLARY, at its old statement so that nothing which
      uses it moves: the writer that happens to own the entire run presents
      it at [off = 0], and the splice of a full-width run IS that run. *)
-  Lemma fsblock_update (E : coPset) gL gc home (C : gmap Z (list (bv 8)))
+  Lemma fsblock_update (E : coPset) gL gc gX home Xv (C : gmap Z (list (bv 8)))
       (b : Z) (bs bs_new bsm : list (bv 8)) :
     ↑logN ⊆ E -> length bs_new = BSIZE ->
-    fs_bytes_inv gL gc home -∗
+    fs_bytes_inv gL gc gX home Xv -∗
+    exc_sealed gX -∗
     ghost_map_auth gc 1 C -∗
     fsblock gL b bs -∗
     (b ↪[gc]{#(1/2)} bsm) ={E}=∗
@@ -1134,12 +1328,12 @@ Section FsBytes.
       fsblock gL b bs_new ∗
       (b ↪[gc]{#(1/2)} bs_new).
   Proof.
-    iIntros (HE Hlnew) "#Hinv Hca Hfb Hm".
+    iIntros (HE Hlnew) "#Hinv #Hseal Hca Hfb Hm".
     iDestruct "Hfb" as "[%Hlb Hr]".
-    iMod (byte_range_log_update E gL gc home C b 0%nat bs bs_new bsm HE
+    iMod (byte_range_log_update E gL gc gX home Xv C b 0%nat bs bs_new bsm HE
             ltac:(rewrite Hlb; lia) ltac:(rewrite Hlb; exact BSIZE_pos)
             ltac:(intros Hbm; rewrite Hlnew Hlb //)
-            with "Hinv Hca Hr Hm")
+            with "Hinv Hseal Hca Hr Hm")
       as "((%Hclk & %Hlbm & %Hslice) & Hca & Hr & Hm)".
     (* the buffer's parked bytes ARE the writer's run: [take BSIZE] of a
        block-wide list is the list *)
@@ -1153,6 +1347,67 @@ Section FsBytes.
     iFrame "Hca Hm Hr". iPureIntro. exact Hlnew.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  6b.  THE RECOVERING INSTALL'S GHOST STEP (lane E-except)           *)
+  (*                                                                     *)
+  (*  The one step that SHRINKS the exception set, and the reason the     *)
+  (*  window can be carried at all: the byte view does NOT move (it was   *)
+  (*  minted at the committed view, so it already reads the logged value  *)
+  (*  at [b]); what moves is the CACHE map, from the crashed bytes to     *)
+  (*  [Xv b] -- exactly what the home [bwrite] just put on the disk --    *)
+  (*  and that is what makes the tie true at [b] again.  So this step     *)
+  (*  needs NO byte run: the file system already owns [b]'s, at the value *)
+  (*  the install is landing.  That is the whole content of exit (1).     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma fsblock_install_exc (E : coPset) gL gc gX home Xv
+      (C : gmap Z (list (bv 8))) (X : gset Z) (b : Z) (bsm : list (bv 8)) :
+    ↑logN ⊆ E -> b ∈ X -> length (Xv b) = BSIZE ->
+    fs_bytes_inv gL gc gX home Xv -∗
+    exc_own gX X -∗
+    ghost_map_auth gc 1 C -∗
+    (b ↪[gc]{#(1/2)} bsm) ={E}=∗
+      ⌜C !! b = Some bsm⌝ ∗
+      exc_own gX (X ∖ {[b]}) ∗
+      ghost_map_auth gc 1 (<[b := Xv b]> C) ∗
+      (b ↪[gc]{#(1/2)} Xv b).
+  Proof.
+    iIntros (HE Hb HlXv) "#Hinv Hxo Hca Hm".
+    iMod (inv_acc E fsbN with "Hinv") as "[Hbody Hclose]"; [exact (fsbN_sub E HE) |].
+    iDestruct "Hbody" as (L C0 X0)
+      ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
+    iDestruct (exc_agree with "Hxa Hxo") as %->.
+    assert (Hbh : b ∈ home) by (apply Hxs; exact Hb).
+    assert (Hin : is_Some (C0 !! b)).
+    { apply elem_of_dom. rewrite Hdom. exact Hbh. }
+    destruct Hin as [bsi Hbsi].
+    iDestruct (big_sepM_insert_acc _ _ b bsi Hbsi with "HC") as "[Hi Hback]".
+    iDestruct (ghost_map_elem_agree with "Hm Hi") as %Hbso.
+    subst bsi.
+    iCombine "Hm Hi" as "He".
+    iDestruct (ghost_map_lookup with "Hca He") as %Hclk.
+    iMod (ghost_map_update (Xv b) with "Hca He") as "[Hca He]".
+    iDestruct "He" as "[Hm Hi]".
+    iMod (exc_update gX X (X ∖ {[b]}) with "Hxa Hxo") as "[Hxa Hxo]".
+    iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
+    { iNext. iExists L, (<[b := Xv b]> C0), (X ∖ {[b]}).
+      iFrame "Ha Hxa".
+      iSplitL. { iApply ("Hback" with "Hi"). }
+      iPureIntro. split; [| split; [| split; [| split; [| split]]]].
+      - rewrite dom_insert_L Hdom. set_solver.
+      - intros b' bs' Hb'.
+        destruct (decide (b' = b)) as [->|Hne].
+        + rewrite lookup_insert in Hb'. injection Hb' as <-. exact HlXv.
+        + rewrite lookup_insert_ne in Hb'; [| done]. exact (Hlens b' bs' Hb').
+      - intros b' bs' Hb' Hnin.
+        destruct (decide (b' = b)) as [->|Hne].
+        + rewrite lookup_insert in Hb'. injection Hb' as <-. exact (Hxv b Hb).
+        + rewrite lookup_insert_ne in Hb'; [| done].
+          apply (Htie b' bs' Hb'). set_solver.
+      - exact Hdm.
+      - set_solver.
+      - intros b'' Hb''. apply Hxv. set_solver. }
+    iModIntro. iFrame "Hxo Hca Hm". iPureIntro. exact Hclk.
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  7.  THE MINT                                                       *)
@@ -1245,24 +1500,67 @@ Section FsBytes.
       iExact "HC".
   Qed.
 
-  Lemma fs_bytes_alloc (E : coPset) (gc : gname) (C : gmap Z (list (bv 8))) :
+  (* THE MINT, AT A VALUE FUNCTION AND AN EXCEPTION SET (lane E-except).
+     [C] is the cache map the era boots on -- the RAW covered blocks --
+     and [Bv] is what the BYTE view is minted at: the committed view
+     [FsCrash.fr_D], which differs from [C] exactly on the pending set
+     [X].  Outside [X] the two agree, which is the fourth premise and is
+     what makes the tie true there at birth; on [X] the invariant records
+     [Bv] as its own [Xv], which is what the recovering install reads the
+     tie back off block by block.  At a CLEAN header [X = ∅], [Bv] is the
+     raw content and this is the old statement. *)
+  Lemma fs_bytes_alloc (E : coPset) (gc : gname) (C : gmap Z (list (bv 8)))
+      (Bv : Z -> list (bv 8)) (X : gset Z) :
     (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
+    (forall b, b ∈ dom C -> length (Bv b) = BSIZE) ->
+    X ⊆ dom C ->
+    (forall b bs, C !! b = Some bs -> b ∉ X -> Bv b = bs) ->
     ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#(1/2)} bs) ={E}=∗
-      ∃ gL : gname,
-        fs_bytes_inv gL gc (dom C) ∗
-        ([∗ map] b ↦ bs ∈ C, fsblock gL b bs).
+      ∃ gL gX : gname,
+        fs_bytes_inv gL gc gX (dom C) Bv ∗
+        exc_own gX X ∗
+        ([∗ map] b ↦ bs ∈ C, fsblock gL b (Bv b)).
   Proof.
-    iIntros (Hlen) "HC".
+    iIntros (Hlen HlB HXsub Hagr) "HC".
+    (* the byte view's own value map: [C]'s domain, [Bv]'s values *)
+    set (B := map_imap (fun (k : Z) (_ : list (bv 8)) => Some (Bv k)) C).
+    assert (HBlk : forall b, B !! b = (fun _ => Bv b) <$> (C !! b)).
+    { intros b. subst B. rewrite map_lookup_imap.
+      destruct (C !! b) as [x|]; done. }
+    assert (HBdom : dom B = dom C).
+    { apply set_eq. intros b. rewrite !elem_of_dom HBlk.
+      destruct (C !! b); split; intros [? ?]; try done; by eexists. }
+    assert (HBlen : forall b bs, B !! b = Some bs -> length bs = BSIZE).
+    { intros b bs Hb. rewrite HBlk in Hb.
+      destruct (C !! b) as [x|] eqn:Hc; [| done].
+      cbn in Hb. injection Hb as <-. apply HlB, elem_of_dom. by exists x. }
     iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (gL) "Ha".
-    iMod (byte_map_grow gL C ∅ ∅ Hlen with "Ha") as (L) "(%Hdm & %Htie & Ha & Hfb)".
+    iMod (byte_map_grow gL B ∅ ∅ HBlen with "Ha")
+      as (L) "(%Hdm & %Htie & Ha & Hfb)".
     { intros b' _. set_solver. }
     { intros a. split.
       - intros [v Hv]. rewrite lookup_empty in Hv. done.
       - intros (b' & Hb' & _). set_solver. }
-    rewrite left_id_L in Hdm.
-    iMod (inv_alloc fsbN E (fs_bytes_body gL gc (dom C)) with "[Ha HC]") as "#Hinv".
-    { iNext. iExists L, C. iFrame "Ha HC". iPureIntro. auto. }
-    iModIntro. iExists gL. iFrame "Hinv Hfb".
+    rewrite left_id_L HBdom in Hdm.
+    iMod (exc_alloc X) as (gX) "[Hxa Hxo]".
+    iMod (inv_alloc fsbN E (fs_bytes_body gL gc gX (dom C) Bv)
+            with "[Ha HC Hxa]") as "#Hinv".
+    { iNext. iExists L, C, X. iFrame "Ha HC Hxa". iPureIntro.
+      split; [done |]. split; [exact Hlen |].
+      split; [| split; [exact Hdm | split; [exact HXsub |]]].
+      - intros b bs Hb Hnin.
+        rewrite -(Hagr b bs Hb Hnin).
+        apply (Htie b (Bv b)). rewrite HBlk Hb //.
+      - intros b Hb.
+        apply (Htie b (Bv b)). rewrite HBlk.
+        destruct (proj1 (elem_of_dom C b) (HXsub b Hb)) as [x Hx].
+        rewrite Hx //. }
+    iModIntro. iExists gL, gX. iFrame "Hinv Hxo".
+    rewrite (big_sepM_dom (fun b => fsblock gL b (Bv b)) C) -HBdom
+            -(big_sepM_dom (fun b => fsblock gL b (Bv b)) B).
+    iApply (big_sepM_mono with "Hfb"). intros b bs Hb.
+    rewrite HBlk in Hb. destruct (C !! b) as [x|] eqn:Hc; [| done].
+    cbn in Hb. injection Hb as <-. done.
   Qed.
 
 End FsBytes.
@@ -1312,11 +1610,62 @@ Section FsMint.
      is what this says.  Three carriers hand it out and every client of the
      block layer holds one of them: [LogInv.log_ctx], [BitmapInv.bitmap_inv]
      and [InodeRegion.ireg_inv]. *)
+  (* THE ROW AT A NAMED HOME SET.  [Xv] is bound: it is the invariant's own
+     bookkeeping for the recovery window and no consumer above the WAL
+     names it. *)
+  Definition fs_bytes_at (γ : fs_names) (home : gset Z) : iProp Σ :=
+    (∃ Xv : Z -> list (bv 8),
+       fs_bytes_inv (fs_bytes γ) (fs_cache γ) (fs_exc γ) home Xv)%I.
+
+  Global Instance fs_bytes_at_persistent γ home :
+    Persistent (fs_bytes_at γ home).
+  Proof. apply _. Qed.
+
+  (* THE ROW ITSELF, minted at PowerOn: it says only that SOME byte-view
+     invariant over [γ] exists.  The three carriers hand this out. *)
+  Definition fs_bytes_row (γ : fs_names) : iProp Σ :=
+    (∃ home : gset Z, fs_bytes_at γ home)%I.
+
+  Global Instance fs_bytes_row_persistent γ : Persistent (fs_bytes_row γ).
+  Proof. apply _. Qed.
+
+  (* ...AND THE ROW A RUNTIME READER NEEDS (lane E-except): the row plus
+     the SEAL.  It is what [LogInv.log_ctx] carries, so every client of
+     the log layer gets it for free and not one crossing site above the
+     WAL changed.  [BitmapInv.bitmap_inv] and [InodeRegion.ireg_inv] are
+     minted at PowerOn, BEFORE recovery has run, so they carry only
+     [fs_bytes_row]; their own crossings take [exc_sealed] explicitly and
+     their callers read it off [log_ctx]. *)
   Definition fs_bytes_any (γ : fs_names) : iProp Σ :=
-    (∃ home : gset Z, fs_bytes_inv (fs_bytes γ) (fs_cache γ) home)%I.
+    (fs_bytes_row γ ∗ exc_sealed (fs_exc γ))%I.
 
   Global Instance fs_bytes_any_persistent γ : Persistent (fs_bytes_any γ).
   Proof. apply _. Qed.
+
+  Lemma fs_bytes_any_row γ : fs_bytes_any γ -∗ fs_bytes_row γ.
+  Proof. iIntros "[$ _]". Qed.
+
+  Lemma fs_bytes_any_seal γ : fs_bytes_any γ -∗ exc_sealed (fs_exc γ).
+  Proof. iIntros "[_ $]". Qed.
+
+  Lemma fs_bytes_any_of γ :
+    fs_bytes_row γ -∗ exc_sealed (fs_exc γ) -∗ fs_bytes_any γ.
+  Proof. iIntros "H1 H2". iFrame. Qed.
+
+  (* ...and the same pair at a NAMED home set, which is what
+     [BitmapInv.bitmap_inv] carries (it already names [cov]/[logstart]). *)
+  Definition fs_bytes_any_at (γ : fs_names) (home : gset Z) : iProp Σ :=
+    (fs_bytes_at γ home ∗ exc_sealed (fs_exc γ))%I.
+
+  Global Instance fs_bytes_any_at_persistent γ home :
+    Persistent (fs_bytes_any_at γ home).
+  Proof. apply _. Qed.
+
+  Lemma fs_bytes_any_at_any γ home :
+    fs_bytes_any_at γ home -∗ fs_bytes_any γ.
+  Proof.
+    iIntros "[Hat $]". rewrite /fs_bytes_row. iExists home. iExact "Hat".
+  Qed.
 
   (* the bread client's crossing, at that row: what used to be an auth-free
      half/half entailment is this fupd (durable-disk 1c-flip step 3) *)
@@ -1329,9 +1678,10 @@ Section FsMint.
       ⌜bsm = bs⌝ ∗ fsblock (fs_bytes γ) b bs ∗
       (b ↪[fs_cache γ]{#(1/2)} bsm).
   Proof.
-    iIntros (HE) "Hrow Hfb Hm". iDestruct "Hrow" as (home) "#Hinv".
-    iApply (fs_bytes_agree E (fs_bytes γ) (fs_cache γ) home b bs bsm HE
-              with "Hinv Hfb Hm").
+    iIntros (HE) "[Hrow #Hseal] Hfb Hm".
+    iDestruct "Hrow" as (home Xv) "#Hinv".
+    iApply (fs_bytes_agree E (fs_bytes γ) (fs_cache γ) (fs_exc γ) home Xv
+              b bs bsm HE with "Hinv Hseal Hfb Hm").
   Qed.
 
   (* THE SAME CROSSING AT A SHARE (lane B''-blk).  This is [readi]'s tie
@@ -1347,9 +1697,10 @@ Section FsMint.
       ⌜bsm = bs⌝ ∗ fsblock_q (fs_bytes γ) dq b bs ∗
       (b ↪[fs_cache γ]{#(1/2)} bsm).
   Proof.
-    iIntros (HE) "Hrow Hfb Hm". iDestruct "Hrow" as (home) "#Hinv".
-    iApply (fs_bytes_agree_q E (fs_bytes γ) dq (fs_cache γ) home b bs bsm HE
-              with "Hinv Hfb Hm").
+    iIntros (HE) "[Hrow #Hseal] Hfb Hm".
+    iDestruct "Hrow" as (home Xv) "#Hinv".
+    iApply (fs_bytes_agree_q E (fs_bytes γ) dq (fs_cache γ) (fs_exc γ) home Xv
+              b bs bsm HE with "Hinv Hseal Hfb Hm").
   Qed.
 
   (* the two halves of a map along a decidable predicate on the key *)
@@ -1376,24 +1727,35 @@ Section FsMint.
      content map, [home] the covered range minus the log's own storage.
      All FOUR client-side pieces come out explicitly: an affine [iFrame]
      dropping one of them compiles and strands initlog. *)
+  (* THE ERA'S BYTE VIEW IS MINTED AT [Dv], NOT AT THE CACHE (lane
+     E-except).  [Dv] is the COMMITTED view [FsCrash.fr_D]: the raw home
+     blocks with the on-disk log's batch installed.  [X] is the set where
+     the two differ -- the pending home blocks -- and it comes out as the
+     WAL's handle [exc_own].  At a clean header [X = ∅] and [Dv] IS the
+     raw content, which is the pre-E-except statement. *)
   Lemma fs_alloc (E : coPset) (γlk γtp : gname)
-      (L0 : gmap Z (list (bv 8))) (home : gset Z) :
+      (L0 : gmap Z (list (bv 8))) (home : gset Z)
+      (Dv : Z -> list (bv 8)) (X : gset Z) :
     (forall b bs, L0 !! b = Some bs -> length bs = BSIZE) ->
     home ⊆ dom L0 ->
+    (forall b, b ∈ home -> length (Dv b) = BSIZE) ->
+    X ⊆ home ->
+    (forall b bs, L0 !! b = Some bs -> b ∈ home -> b ∉ X -> Dv b = bs) ->
     ⊢ |={E}=> ∃ γ : fs_names,
       (* the two ghosts the caller allocated, named back to it *)
       ⌜fs_link γ = γlk⌝ ∗ ⌜fs_top γ = γtp⌝ ∗
       ghost_map_auth (fs_cache γ) 1 L0 ∗
       ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
-      fs_bytes_inv (fs_bytes γ) (fs_cache γ) home ∗
+      fs_bytes_inv (fs_bytes γ) (fs_cache γ) (fs_exc γ) home Dv ∗
+      exc_own (fs_exc γ) X ∗
       ([∗ map] bno ↦ bs ∈ L0,
          fs_mclean γ bno bs ∗ (bno ↪[fs_dirty γ]{#(1/2)} false)) ∗
       ([∗ map] bno ↦ bs ∈ filter (fun kv => kv.1 ∈ home) L0,
-         fsblock (fs_bytes γ) bno bs) ∗
+         fsblock (fs_bytes γ) bno (Dv bno)) ∗
       ([∗ map] bno ↦ bs ∈ filter (fun kv => kv.1 ∉ home) L0,
          fs_chalf γ bno bs).
   Proof.
-    iIntros (Hlen Hsub).
+    iIntros (Hlen Hsub HlD HXsub Hagr).
     iMod (ghost_map_alloc L0) as (γC) "[HaC HC]".
     iMod (ghost_map_alloc ((fun _ => false) <$> L0)) as (γD) "[HaD HD]".
     rewrite !big_sepM_fmap.
@@ -1408,15 +1770,20 @@ Section FsMint.
        by the byte invariant, the log region's stay parked as [fs_chalf] *)
     iDestruct (fs_split_filter L0 home (fun bno bs => bno ↪[γC]{#(1/2)} bs)%I
                  with "HCp") as "[HCh HCl]".
-    iMod (fs_bytes_alloc E γC (filter (fun kv => kv.1 ∈ home) L0)
-            with "HCh") as (γL) "[#Hinv Hfb]".
+    iMod (fs_bytes_alloc E γC (filter (fun kv => kv.1 ∈ home) L0) Dv X
+            with "HCh") as (γL γX) "(#Hinv & Hxo & Hfb)".
     { intros b bs Hb. apply map_lookup_filter_Some in Hb as [Hb _].
       exact (Hlen b bs Hb). }
+    { intros b Hb. apply HlD. rewrite (fs_filter_dom L0 home Hsub) in Hb.
+      exact Hb. }
+    { rewrite (fs_filter_dom L0 home Hsub). exact HXsub. }
+    { intros b bs Hb Hnin. apply map_lookup_filter_Some in Hb as [Hb Hin].
+      exact (Hagr b bs Hb Hin Hnin). }
     rewrite (fs_filter_dom L0 home Hsub).
-    iModIntro. iExists (MkFsNames γC γD γL γlk γtp).
+    iModIntro. iExists (MkFsNames γC γD γL γlk γtp γX).
     iSplitR; [done |]. iSplitR; [done |].
     rewrite /fs_chalf /fs_mclean /=.
-    iFrame "HaC HaD Hinv Hfb HCl".
+    iFrame "HaC HaD Hinv Hxo Hfb HCl".
     iAssert ([∗ map] bno ↦ bs ∈ L0,
                (bno ↪[γD]{#(1/2)} false) ∗ (bno ↪[γD]{#(1/2)} false))%I
       with "[HD]" as "HD".

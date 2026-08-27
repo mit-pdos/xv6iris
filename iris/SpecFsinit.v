@@ -446,10 +446,17 @@ Definition wp_fsinit_sconf_body
      to the image; and 32 bytes of RAW .bss at [&sb], which is all the
      superblock is until +0x26 runs. *)
   fsblock (fs_bytes γfs) 1 bs_sb -∗
+  (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except), from
+     the era's mint, threaded straight into [initlog], which empties it and
+     seals it into [LogInv.log_ctx].  fsinit itself spends it once, at the
+     [readsb] crossing above +0x4e: block 1 is never in the exception set
+     ([FsCrash.hdr_wf]'s block-1 row, lane E-blk1).  It is [∅] while the
+     era's mint still reads the RAW home blocks. *)
+  exc_own (fs_exc γfs) ∅ -∗
   ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ sb_old i) -∗
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
-  ireg_inv γi γfs inodestart nib -∗
+  ireg_reg γi γfs inodestart nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12), from [icfg_alloc] through
      the boot chain: fsinit frames it across bread/memmove/initlog and hands it
      to ireclaim, which is the only reason it is safe there (§7.1.7).  Returned
@@ -462,7 +469,7 @@ Definition wp_fsinit_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   ic_sleeplocks cn -∗
   (* itrunc's bitmap, through ireclaim's iput *)
-  bitmap_inv γfs bmapstart cov logstart size -∗
+  bitmap_reg γfs bmapstart cov logstart size -∗
   (* ---- initlog's RAW struct log cells, threaded straight through ---- *)
   log_addr ↦₄ vlock -∗
   lock_name_field log_addr ↦₈ vname -∗

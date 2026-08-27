@@ -910,7 +910,7 @@ Proof.
                                                 vname vcpu sb_old)
     "(%Hpures & Hmirf & Hlfree & Hb1 & Hsbraw & _ & Hboot & _ &
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
-      Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem)".
+      Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem & Hxo)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
                       [Hhdr0 [H1cov [H1log [Hsbparse [Hsbok
                        [Hcgeom [Hbmq Hszq]]]]]]]].
@@ -1002,7 +1002,7 @@ Proof.
             Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb Hhdr0 HLdk Hpkc Hjlt Hgl
             HB6a0 ltac:(lkbelow)
             with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseam Hgen
-                  Hmirf Hlfree Hb1 Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks
+                  Hmirf Hlfree Hb1 Hxo Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks
                   Hbits Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc
                   Hlhn Hlhblk HauthL HauthD Hdirty Hhdr Hlslots Hpbare Hpinv
                   Hdevi Hdgeom Hdlock Hsl35 Hirs1").
@@ -1266,6 +1266,12 @@ Proof.
     by (rewrite /D5 upd_ne; [exact HD4s1 | reg_neq]).
   iEval (rewrite fkr_kexec_tgt) in "Hpc".
   (* ---- the fabric, out of the seal we just minted ---- *)
+  (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] sealed the
+     byte view's exception set into [log_ctx], so the PowerOn region main
+     handed down is upgraded to the form the runtime fabric carries. *)
+  iPoseProof (log_ctx_seal with "Hlctx") as "#Hbseal".
+  iDestruct (InodeRegion.ireg_inv_of with "Hireg Hbseal") as "#HiregS".
+  iDestruct (BitmapInv.bitmap_inv_of with "Hbits Hbseal") as "#HbitsS".
   iDestruct (fs_ready_panic with "Hfsr") as "#Hpenv2".
   iDestruct (fs_ready_region with "Hfsr") as "[_ #Hropen]".
   iDestruct (fs_ready_kalloc with "Hfsr") as "#Hkaenv".
@@ -1286,7 +1292,7 @@ Proof.
     iSplitR; [iExact "Hitbl" |].
     iSplitR; [iExact "Hesc" |].
     iSplitR; [iExact "Hslks" |].
-    iSplitR; [iExact "Hireg" |].
+    iSplitR; [iExact "HiregS" |].
     iSplitR; [iExact "Hropen" |].
     iSplitR; [iExact "Hpinv" |].
     iSplitR; [iExact "Hdevi" |].
@@ -1350,7 +1356,7 @@ Proof.
             ltac:(intros; kxarith) ltac:(intros; exact fkr_init_path_cstr)
             ltac:(intros; kxarith)
             Hjlt Hgl
-            with "Hcg Hcpu Hextc Hclmc Htext Hpc Hfab Hkaenv Hbms Hist Hbits
+            with "Hcg Hcpu Hextc Hclmc Htext Hpc Hfab Hkaenv Hbms Hist HbitsS
                   Hpriv Hpath Hargv Hargs Hsl3 Hirs2").
   (* ================================================================== *)
   (*  +0x56 .. +0x60: [p->trapframe->a0 = kexec(...)], then the test.     *)

@@ -1835,7 +1835,7 @@ Section FsCfgBootEra.
      log_free_tok icfg_log ∗
      (* the boot shelter, carried through fsinit into ireclaim *)
      ireg_boot ∗
-     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+     ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* block 1: the superblock's own block, whose bytes pin what bread
         returns to the image *)
      fsblock (fs_bytes fsc_fs) 1 (P 1) ∗
@@ -1861,19 +1861,25 @@ Section FsCfgBootEra.
         [BitmapInv.bitmap_inv] ([bitmap_inv_alloc]); the set is forgotten
         there and nothing downstream ever names it.  Persistent, like
         [ireg_inv] above. *)
-     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
+     bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      (* THE COVERAGE REMAINDER, PAIRED: everything [cov] holds that the era
         did not spend.  At an image whose [cov] is exactly its own block
         range this is empty; it is kept because [cov] is a parameter. *)
      ([∗ set] b ∈ fsc_cov ∖ Rspent,
-        fsblock (fs_bytes fsc_fs) b (P b)))%I.
+        fsblock (fs_bytes fsc_fs) b (P b)) ∗
+     (* THE BYTE VIEW'S EXCEPTION HANDLE (durable-disk lane E-except).  The
+        era's mint hands the WAL the home blocks on which the byte view and
+        the buffer cache disagree; fsinit threads it into [initlog], which
+        empties it and seals it into [LogInv.log_ctx].  It is [∅] while the
+        mint reads the RAW home blocks.  LAST. *)
+     exc_own (fs_exc fsc_fs) ∅)%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
       (P : Z -> list (bv 8)) (Rspent : gset Z) :
     fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
       log_free_tok icfg_log ∗
       ireg_boot ∗
-      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+      ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
       fsblock (fs_bytes fsc_fs) 1 (P 1) ∗
       (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
          ⌜forall b : Z, b ∈ fsc_cov -> L !! b = Some (P b)⌝ ∗
@@ -1883,9 +1889,10 @@ Section FsCfgBootEra.
       fs_chalf fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
          ∃ bs : list (bv 8), fs_chalf fsc_fs (log_slot_bno fsc_logst i) bs) ∗
-      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
+      bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
       ([∗ set] b ∈ fsc_cov ∖ Rspent,
-         fsblock (fs_bytes fsc_fs) b (P b)).
+         fsblock (fs_bytes fsc_fs) b (P b)) ∗
+      exc_own (fs_exc fsc_fs) ∅.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -1993,7 +2000,7 @@ Section FsCfgBootEra.
   Lemma fs_kit_fsinit_ghost_ireg (ICFG : icfg) (FSC : fscfg)
       (P : Z -> list (bv 8)) (Rspent : gset Z) :
     fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
-      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+      ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
       fs_kit_fsinit_ghost ICFG FSC P Rspent.
   Proof.
     iIntros "H".
@@ -2011,7 +2018,7 @@ Section FsCfgBootEra.
   Lemma fs_kit_fsinit_ghost_bitmap (ICFG : icfg) (FSC : fscfg)
       (P : Z -> list (bv 8)) (Rspent : gset Z) :
     fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
-      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
+      bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
       fs_kit_fsinit_ghost ICFG FSC P Rspent.
   Proof.
     iIntros "H".

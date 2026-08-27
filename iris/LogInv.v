@@ -1281,8 +1281,7 @@ Section LogInv.
         entailment is gone: it opens THIS invariant instead.  It rides
         [log_ctx] because [log_ctx] is already threaded to [log_write] and
         already carries [cov] and [logstart], so not one call site moves. *)
-     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs)
-                  (fs_home_set cov logstart) ∗
+     fs_bytes_at γfs (fs_home_set cov logstart) ∗
      (* BLOCK 1, OWNED (durable-disk lane C-3a).  The superblock's byte run
         at FULL fraction, parked in [SbPark.sbN] with its parse; initlog
         allocates it out of the run fsinit hands down and this is where the
@@ -1299,7 +1298,18 @@ Section LogInv.
         of it but a pure proposition, so the log's lock resource still
         carries no client payload.  LAST, after the park, so no pattern that
         opens this bundle moves. *)
-     snap_law γ γfs cov logstart)%I.
+     snap_law γ γfs cov logstart ∗
+     (* RECOVERY IS DONE (durable-disk lane E-except).  The byte view's
+        exception set -- the pending home blocks of a dirty on-disk log
+        header, on which [FsBlocks.bytes_tie] is false until the recovering
+        install lands them -- is SEALED EMPTY by [initlog], which is the
+        function that builds this context.  So every client of the log
+        layer carries the certificate for free and not one crossing above
+        the WAL takes a membership premise.  [BitmapInv.bitmap_inv] and
+        [InodeRegion.ireg_inv] are minted at PowerOn and cannot carry it;
+        their own crossings read it off here.  LAST, so no pattern that
+        opens this bundle moves. *)
+     exc_sealed (fs_exc γfs))%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -1333,15 +1343,23 @@ Section LogInv.
   (* the byte view's row, off the context every log function threads *)
   Lemma log_ctx_bytes γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗
-    fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_home_set cov logstart).
+    fs_bytes_at γfs (fs_home_set cov logstart).
   Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
+
+  (* THE SEAL, off the same context (durable-disk lane E-except) *)
+  Lemma log_ctx_seal γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ exc_sealed (fs_exc γfs).
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & _ & $)". Qed.
 
   (* ...and the home-set-free form every bread client above takes *)
   Lemma log_ctx_bytes_any γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ fs_bytes_any γfs.
   Proof.
-    iIntros "H". iPoseProof (log_ctx_bytes with "H") as "Hb".
-    rewrite /fs_bytes_any. iExists (fs_home_set cov logstart). iExact "Hb".
+    iIntros "#H". rewrite /fs_bytes_any.
+    iPoseProof (log_ctx_bytes with "H") as "Hb".
+    iPoseProof (log_ctx_seal with "H") as "Hs".
+    iFrame "Hs". rewrite /fs_bytes_row.
+    iExists (fs_home_set cov logstart). iExact "Hb".
   Qed.
 
   Lemma log_ctx_swap γ bn γfs cov logstart dev :
@@ -1362,7 +1380,7 @@ Section LogInv.
      authorities back.  [LogSnapLaw.snap_law_run] is the reading. *)
   Lemma log_ctx_snap_law γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ snap_law γ γfs cov logstart.
-  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & $)". Qed.
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & $ & _)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)
