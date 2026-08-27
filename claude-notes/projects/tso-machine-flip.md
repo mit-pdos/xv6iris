@@ -8455,6 +8455,114 @@ the pin memo set for this kind of change, passed a second time.
 160-file cone opens.
 
 
+### A6.76 THE STORE GATE CLOSES THE GHOST TIER — AND ITS TWO ARMS ARE THE
+### LOCK'S TWO STORES, WHICH IS WHAT MAKES THE KIT HONEST
+
+`ledger_store_wpay_ok` is landed and green.  With it, **M4's whole ghost
+and gate tier is complete**: the payload, its three maintenance laws, the
+assembly theorems, all four read gates and now the store gate.  What is
+left of M4 is entirely above the ledger — the leaf tier — and is the
+handoff.
+
+#### (1) THE STORE GATE, AND THE DISJUNCTION IS THE DESIGN
+
+```coq
+  Lemma ledger_store_wpay_ok (g g' : gstate) (auth : agent)
+      (Pold Pnew : gmap Arch.pa (bv 8))
+      (base : Arch.pa) (n : nat) (z : nat -> bv 8)
+      (cp : agent -> nat -> bv 8) (own own' : agent -> option nat)
+      (Wold Wf : Arch.pa -> ts_win) :
+    …
+    ((forall j, (j < n)%nat -> Pnew !! pa_add base j = Some (z j))
+       /\ own' auth = Some (S (length g.(glog)))
+     \/ (forall j, (j < n)%nat -> Pnew !! pa_add base j = Some (cp auth j))
+       /\ own' auth = None) ->
+    (forall h, h <> auth -> own' h = own h) -> …
+```
+
+**THE TWO ARMS ARE `release` AND `acquire`, and nothing else fits.**  A
+release writes the CLEAR word and the author's own-last entry moves to the
+top — so the author may read "not mine" again.  An acquire writes the
+author's OWN word and the entry is **REVOKED** (`own' auth = None`) — the
+author is excluded from the racy conclusion until it releases.  That
+asymmetry is not a convenience: `win_ok1`'s conjunct (3) says an agent's
+recorded own-last write left the CLEAR there, so an agent that has just
+written its own word HAS no such record, and the only sound thing to do is
+drop it.  A one-armed gate would have been unprovable.
+
+Every OTHER agent's entry is untouched, and its four conjuncts frame on the
+author premise alone — `pm_tid msg = h -> msg_byte msg a = None`, which is
+**the same `auth` argument `ledger_store_ok` has always taken**.  The
+memo's ruling-3 note that "the author is already a parameter of every store
+gate" is therefore exactly right, and it is right for the window kit for
+the same reason it was right for `own_last`.
+
+`ledger_store_wpay_bytes` (the induction) is `ledger_store_pin_bytes` with
+the element function swapped — a mechanical transform, which is itself the
+evidence that the corrected per-byte payload sits in the shape the ledger
+already had.
+
+> **ONE NAMING TRAP, and it is worth the line.**  `ledger_store_win_ok`
+> ALREADY EXISTS in `TsoCtx` and means something else — "win" is the byte
+> WINDOW of an ordinary multi-byte store, not the racy payload.  The clash
+> reports as a flat `ledger_store_win_ok already exists` at the end of a
+> 180-line insertion.  The racy-payload family is therefore `wpay_`:
+> `phys_ledger_wpay` / `wpay_map_own` / `wpay_tm` /
+> `ledger_store_wpay_{bytes,ok}`.  Grep for `win_` in this file before
+> adding to it.
+
+#### (2) TWO ssreflect PAPER CUTS PAID IN `TsoMemPa`
+
+- **`case: … => [->|…]` REWRITES THE GOAL ONLY.**  In
+  `win_ok1_app_store` the hypothesis `Hown : own' h = Some t` still
+  mentioned `h` after the `->`, and the next `rewrite Ho in Hown` failed
+  with *"The LHS of Ho does not match any subterm of the goal"* — an error
+  that names the goal while the problem is in a hypothesis.  Use an
+  explicit equation plus `subst`.
+- **`by rewrite H in H'` does not close a `None = Some _` goal**; it leaves
+  the contradiction sitting in the context.  `(rewrite H in H'; discriminate H')`.
+
+#### (3) THE NUMBER
+
+**1088 of 1296, RED 9 — UNCHANGED**, over a round that rebuilt
+`TsoMemPa`'s whole cone from source again, plus a confirm round that
+recompiled exactly the nine red targets and failed on all nine.  No `Admitted`, no `admit`, no
+new `Axiom`; the one `Abort` is still `UsertrapRes.ut_res_bare_park`.
+**Three rounds of ghost-tier surgery — a grown element, a grown tie, four
+new gates and a new store gate — and the client count has not moved once.**
+
+#### HANDOFF: M4'S LEAF TIER, WHICH IS ALL THAT IS LEFT
+
+The ledger now offers everything the leaves need.  In order:
+
+1. **The phys-datum sibling AU** (A6.74 §(3)): `wp_load_s_sconf_au`'s twin
+   whose datum is the ledger rather than the ctx word tower, taking the
+   ledger resource as a PARAMETER plus one gate premise so that one leaf
+   serves all three routes.  Its three suppliers all exist now —
+   `ledger_read_bytes_vis_ok` (holder), `ledger_read_racy_word_ok`
+   (`notheld`), `ledger_read_any_ok` (free path) — and the `_exv` node lane
+   under it is landed.  **This is the file A6.64's forty-argument hazard
+   lives in**: keep the three payload spellings in agreement and move the
+   NODE argument with the obligation.
+2. **`WpLock.lk_cpu_res` at `phys_ledger_word`**, holding the eight
+   `phys_ledger_wpay` fragments (the reader assembles from them via
+   `ledger_read_racy_word_ok`), plus the held arm's `ledger_vis` residue.
+   Give the lock WORD a degenerate (`tw_n = 4`) payload at the same time —
+   that closes A6.75 §(3)'s named image-coverage residual, since
+   `ledger_win_img_cover` then supplies `ledger_read_any_ok`'s premise for
+   it too.
+3. **`WpSconfLock`**: delete the dead leaf; holder reads on
+   `ledger_vis_own` + `view_lb_0`; `notheld` on
+   `ledger_read_racy_word_ok`; free path on `ledger_read_any_ok`;
+   stores/AMO on the parked record and `ledger_store_wpay_ok`.
+   `lock_claims`' surviving `TsoCtxShim.ctx_word_of_mem` dies here.
+4. **`ProofHolding`**'s 2 call sites, statements unchanged.
+
+**ACCEPTANCE, unchanged:** `SpecAcquire` / `SpecRelease` / `SpecHolding` /
+`is_lock` / `locked` / `lock_openable` do not move, and `WpSconfLock`'s
+160-file cone opens — sweep it and report the honest number when it does.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
