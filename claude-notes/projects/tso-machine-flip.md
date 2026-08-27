@@ -12,11 +12,16 @@ other half of the tranche is A6.36's overruling reaching the S-mode leaves:
 a LOAD is the PLAIN arm, so `SmodeCorePt.wordw_win_load_c` (the read twin of
 `wordw_win_store_c`, PURE, hence runnable inside an atomic update) is what
 pays `Mobl_ram`, and every S-mode memory leaf now threads `own_context`.
-Five of A6.57's nine red are addressed, `RiscvAdequacy`'s five allocations
-are LANDED (A6.59) with `TsoGhost.view_auth_alloc` as the one new lemma, and
-step 6's remaining bill is ONE item — the element carve, which changes the
-adequacy theorem's CONCLUSION and is therefore its own tranche.
-A6.58–A6.60 are the record; **A6.60 is the handoff**.
+FOUR of A6.57's nine red are GREEN (`DiskBoot`, `SwtchCtx`,
+`WpSconfSfence`, `WpSmodePtLeaves`) and a fifth (`WpSconfMem`) is ported but
+**UNVERIFIED — its compile ran 30 minutes and was terminated, not failed**,
+which is this tranche's one real stop and leaves its whole `Proof*` cone
+unreached.  `RiscvAdequacy`'s five allocations are LANDED (A6.59) with
+`TsoGhost.view_auth_alloc` as the one new lemma, and step 6's remaining bill
+is ONE item — the element carve, which changes the adequacy theorem's
+CONCLUSION and is therefore its own tranche.  Clean model-aware rebuild
+**728 of 1330, up from 663**.  A6.58–A6.60 are the record; **A6.60 is the
+handoff**.
 
 STEP 5, THE PIN'S CONSUMER HALF (2026-08-27, latest session).  **THE PIN
 IS DONE END TO END, `HartSKpt` IS GREEN, AND `SmodeCorePt`'s A6.18 VERDICT
@@ -3836,7 +3841,10 @@ checked FIRST per A6.39 — the model `.vo` at 19:11 postdates its source at
 > all.  Every one of the four new red files is a first-time-reached file
 > with an M1-class error, not a regression.
 
-**STILL RED, and what each is:**
+**STILL RED — eight attempted-and-failed, plus `WpSconfMem`'s termination.
+Four of the eight were EDITED after the sweep had already given up on them
+(`WpSmodePtMemWrap`, `ProcInv`, `FsLookup`, `RiscvAdequacy`), so their next
+compile is the first real news about them:**
 
 - `HartSKpt` — PARKED on the history-invariant ruling (A6.45/A6.47), with
   `SmodeCorePt`'s unverified re-port behind it.  Untouched.
@@ -4172,7 +4180,10 @@ spelling); fixing it and re-running the sweep on the clean base gives
 > pair — landed inside that number with ZERO fallout: no file outside the
 > seven it touches changed, which is the memo's central claim measured.**
 
-**STILL RED, and what each is:**
+**STILL RED — eight attempted-and-failed, plus `WpSconfMem`'s termination.
+Four of the eight were EDITED after the sweep had already given up on them
+(`WpSmodePtMemWrap`, `ProcInv`, `FsLookup`, `RiscvAdequacy`), so their next
+compile is the first real news about them:**
 
 - `HartSKpt` — the pin's CONSUMER half (A6.52 items 7–12), with
   `SmodeCorePt`'s unverified re-port behind it.  **Still not reached; no
@@ -4599,7 +4610,10 @@ re-running the sweep on that clean base gives
 > the entire S-mode PT tier: **112 files went green in one tranche**, and
 > seven of the nine red are first-time-reached.
 
-**STILL RED, and what each is:**
+**STILL RED — eight attempted-and-failed, plus `WpSconfMem`'s termination.
+Four of the eight were EDITED after the sweep had already given up on them
+(`WpSmodePtMemWrap`, `ProcInv`, `FsLookup`, `RiscvAdequacy`), so their next
+compile is the first real news about them:**
 
 - `RiscvAdequacy` — §7 step 6, inventory above.  The only structural piece
   of the flip never attempted.
@@ -4807,20 +4821,44 @@ eight per-hart mints and the power-cycle era's re-allocation.
 directly — the shim crossing there was a tier move for no reason),
 `SwtchCtx` (A6.58's priced re-index), `WpSconfSfence` (A6.22's
 register-only instance, statement unmoved), `WpSmodePtLeaves` (the plain
-arm's price, both leaves).  `WpSconfMem` is the fifth and is the tranche's
-one long pole.
+arm's price, both leaves).  `WpSconfMem` is the fifth, is fully ported, and is
+**UNVERIFIED — its compile was TERMINATED, not failed.**
 
-> **AND ITS COST IS A MEASUREMENT WORTH RECORDING**: post-flip
-> `WpSconfMem.v` is a **~20-minute single-file compile** (steady ~1.2 GB
-> RSS, memory growing linearly — it is working, not looping).  Both of its
-> engines moved in this tranche (the read node to `wordw_pointsto_load_c`,
-> the write node to the ledger append) and each is a forty-argument leaf
-> application whose `R` is now a lambda rather than a variable.  Practical
-> consequence for anyone working this file: **it cannot be checked inside a
-> ten-minute worker budget**, so iterate on it with a whole-tree `-k` sweep
-> and read the error out of the log, never with a timed single-file make.
+> **THE COST IS THE MEASUREMENT, AND IT IS THE TRANCHE'S ONE REAL STOP.**
+> Post-flip `WpSconfMem.v` ran **30 minutes without finishing** and was then
+> killed (`Error 143` = SIGTERM in the log; note that this is NOT a proof
+> failure and must not be read as one).  It was WORKING, not looping —
+> steady ~1.2 GB RSS growing linearly the whole time.  Both of its engines
+> moved in this tranche (the read node onto `wordw_pointsto_load_c`, the
+> write node onto the ledger append) and each is a forty-argument leaf
+> application whose `R` is now a LAMBDA rather than a variable, which is the
+> first thing to suspect: higher-order unification against
+> `(fun bs => own_context ∗ Ψ bs)` at that arity is the plausible cost, and
+> the cheap experiment is to `set (Ψc := …)` first so the leaf sees a head
+> symbol instead of a lambda.
+>
+> Practical consequences, both worth carrying forward: **this file cannot be
+> checked inside a ten-minute worker budget**, so iterate on it with a
+> whole-tree `-k` sweep and read the error out of the log, never with a
+> timed single-file make; and **nothing behind it was reached in this
+> sweep** — the entire `Proof*` cone it gates, including the 35 files the
+> shim sweep edited, is still uncompiled.
+>
+> **AND A PROCESS TRAP THAT COST AN HOUR OF FALSE READINGS, worth the two
+> lines it takes to state.**  `pgrep -f "make -f CoqMakefile"` MATCHES ITS
+> OWN WAITER: a shell running `until ! pgrep -f "make -f CoqMakefile"; do
+> sleep; done` has that string in its own command line, so the loop never
+> terminates and every poll reports "still running" forever — including long
+> after the build is dead.  The same trap eats `pgrep -f rocqworker` (the
+> `grep` in the pipeline matches itself).  Poll a build with the bracket
+> idiom against the REAL process only —
+> `ps -eo etime,args | grep "[r]ocqworker --kind=compile"` — and never
+> conclude "the sweep is still running" from a bare `pgrep -f`.
 
-**STILL RED, and what each is:**
+**STILL RED — eight attempted-and-failed, plus `WpSconfMem`'s termination.
+Four of the eight were EDITED after the sweep had already given up on them
+(`WpSmodePtMemWrap`, `ProcInv`, `FsLookup`, `RiscvAdequacy`), so their next
+compile is the first real news about them:**
 
 - `UptWalkPt` — lane 2, and its price is now known exactly.
   `swp_translate_upt` already TAKES and RETURNS `own_context XI` (the user
@@ -4876,11 +4914,11 @@ quarantine's four sites are paid.
 
 **THE CLOSING MODEL-AWARE NUMBER: 728 of 1330** (`ls -la --time-style=full-iso
 model-xv6iris/*.v *.vo` checked FIRST per A6.39 — the model `.vo` at
-19:11:34 postdates its source at 18:37:36), **up from A6.57's 663**, with
-`WpSconfMem` still inside its ~20-minute compile when the count was taken.
-That number therefore UNDERSTATES the tranche: `WpSconfMem` gates a large
-`Proof*` cone, and the 35 files the shim sweep edited get their first
-compile behind it.  Read it as a floor, not a frontier.
+19:11:34 postdates its source at 18:37:36), **up from A6.57's 663**: 601
+files compiled in the sweep, EIGHT attempted-and-failed, and ONE
+(`WpSconfMem`) terminated after thirty minutes.  That number is a FLOOR,
+not a frontier: `WpSconfMem` gates a large `Proof*` cone and the 35 files
+the shim sweep edited never got their first compile behind it.
 
 **SWEEP-INTEGRITY NOTE, and it resolves itself.**  `ProcDefs.v` was GREEN
 when its two trapframe cells were re-tiered, so its `.vo` is now older than
@@ -4893,9 +4931,12 @@ was red or unreached.
 
 **FOR THE NEXT LANE, in the order they gate things:**
 
-1. Re-sweep.  `WpSconfMem` opens a large cone and the 35 shimfix-edited
-   files get their first compile; expect a batch of newly-reached
-   M1-class fixes, one per file, per the standing rule.
+1. **`WpSconfMem` first, and give it an hour.**  It is ported and its
+   compile was killed at 30 minutes, so nothing about it is known.  If it
+   is still unbounded, the lambda-`R` experiment above is the first thing to
+   try.  It gates a large cone, and the 35 shimfix-edited files get their
+   first compile behind it; expect a batch of newly-reached M1-class fixes,
+   one per file, per the standing rule.
 2. `WpSmodePtMem` (worked precedent, mechanical) and `WpSmodePtMemWrap`.
 3. The `tramp_tr_obl` token (lane 2) — small, but it moves a green file.
 4. `UserMemPt`'s window-shaped store (the one forced spec change).
