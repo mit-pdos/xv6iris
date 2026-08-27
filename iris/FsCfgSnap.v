@@ -375,3 +375,205 @@ Section SnapRes.
   Qed.
 
 End SnapRes.
+
+(* ====================================================================== *)
+(*  5.  THE WHOLE [inode_ok], AT THE SNAPSHOT'S NODE                       *)
+(*                                                                        *)
+(*  [FsStateEra.inode_ok_of_local] takes [inode_local] plus the two facts  *)
+(*  OWNERSHIP -- not a clause -- produces: the coverage / log-disjointness *)
+(*  pair and the slot injectivity.  Off the snapshot they are             *)
+(*  [FsDurSnap.snap_names_cov] (every block the snapshot names is a HOME   *)
+(*  block, hence covered and outside the log region -- section 9a's own    *)
+(*  bookkeeping) and [sk_slot].  So the mint owes no new clause for either *)
+(*  half, and [FsImgBridge.img_inode_ok]'s image sweep has no reader left. *)
+(* ====================================================================== *)
+
+Lemma fn_slot_owns (i : Z) (n : fs_node) (k : nat) :
+  inode_local i n -> (k <= FS_MAXFILE)%nat -> fn_slot n k <> 0 ->
+  fn_owns n (fn_slot n k).
+Proof.
+  intros Hl Hk Hnz.
+  destruct (decide (k = FS_MAXFILE)) as [-> | Hne].
+  - rewrite fn_slot_ind. rewrite fn_slot_ind in Hnz.
+    right. split; [exact Hnz | reflexivity].
+  - rewrite (fn_slot_data n k ltac:(lia)).
+    rewrite (fn_slot_data n k ltac:(lia)) in Hnz.
+    left. exists k. split; [| reflexivity].
+    exact (proj2 (inl_blk_dom Hl k ltac:(lia)) Hnz).
+Qed.
+
+Lemma snap_inode_ok (S : fs_state_rec) (P : Z -> list (bv 8))
+    (cov : gset Z) (ls : Z) (i : Z) (n : fs_node) :
+  snap_bytes S (fs_restrict P (fs_home_set cov ls)) ->
+  inode_local i n ->
+  fss_inodes S !! i = Some n ->
+  fn_type n <> 0 ->
+  inode_ok cov ls (fn_rec n) (bm_of n) (fn_data n).
+Proof.
+  intros Hb Hl Hi Hty.
+  pose proof (inl_rec_wf Hl) as Hwf.
+  pose proof MAXFILE_FS as HMF.
+  apply (inode_ok_of_local i n cov ls Hl).
+  - (* coverage and log-disjointness, off [snap_names_cov] *)
+    intros k Hk Hnz.
+    rewrite (bm_of_slot_fn n k Hwf Hk) in Hnz.
+    rewrite (bm_of_slot_fn n k Hwf Hk).
+    apply (snap_names_cov S P cov ls (fn_slot n k) Hb).
+    right; left. exists i, n. split; [exact Hi |].
+    exact (fn_slot_owns i n k Hl ltac:(lia) Hnz).
+  - (* the slot injectivity, off [sk_slot] *)
+    intros k j Hk Hj Hnz Heq.
+    apply (sk_slot Hb i n Hi k j ltac:(lia) ltac:(lia)).
+    + rewrite -(bm_of_slot_fn n k Hwf Hk). exact Hnz.
+    + rewrite -(bm_of_slot_fn n k Hwf Hk) -(bm_of_slot_fn n j Hwf Hj).
+      by rewrite Heq.
+  - exact Hty.
+Qed.
+
+(* ====================================================================== *)
+(*  6.  THE TYPE REGISTER, ROUTED OFF [FsState.fs_links]                   *)
+(*                                                                        *)
+(*  [FsCfgBoot.ireg_lnks_of_image] cuts the boot's FULL family (every      *)
+(*  inum's authority with all its fragments still at home) into the        *)
+(*  region's authorities, the root's keep-alive and the directories'       *)
+(*  tickets, and it spends [FsImg]'s W9 arithmetic to do it.  Off the      *)
+(*  snapshot there is nothing to cut: [FsDurSnap.sk_links] IS              *)
+(*  [FsState.fs_boot_alloc_root_slack]'s premise, so ONE [own_alloc]       *)
+(*  yields [fs_links] -- each inum's authority beside exactly the          *)
+(*  fragments its OWN entries claim -- plus the root's spare token, and    *)
+(*  [FsStateInode.inode_link_iff] is the whole of the routing.             *)
+(*                                                                        *)
+(*  The two arithmetic bridges are equations between spellings:            *)
+(*  [FsStateInode.fn_mult] IS [InodeRegion.ireg_mult_at] at the node's own *)
+(*  count and type, and [fn_ity_ok] IS [ireg_reg_ok].                      *)
+(*                                                                        *)
+(*  THE ROOT'S KEEP-ALIVE IS AT THE AUTHORITY'S OWN VALUE, and it is not   *)
+(*  assumed: [sk_links] binds the slack fragment's value existentially and *)
+(*  [FsStateLink.link_auth_tok_agree] reads it off the root's own          *)
+(*  authority -- one fragment's element IS the target's type.              *)
+(* ====================================================================== *)
+
+Lemma fn_mult_ireg (n : fs_node) :
+  fn_mult n = ireg_mult_at (fn_nlink n) (fn_type n).
+Proof. reflexivity. Qed.
+
+Lemma fn_ity_ok_ireg (n : fs_node) (v : ity) :
+  fn_ity_ok n v -> ireg_reg_ok (fn_type n) v.
+Proof.
+  destruct v as [| p]; rewrite /fn_ity_ok /ireg_reg_ok /fn_is_dir.
+  - intros Hf. exact (proj1 (bool_decide_eq_false _) Hf).
+  - intros Hf. exact (proj1 (bool_decide_eq_true _) Hf).
+Qed.
+
+Section SnapLinks.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  (*  A big-op over a MAP, read at its DOMAIN.  [FsCfgBoot]'s
+      [big_sepM_img_nodes] is this equation at the image's own node map,
+      where the domain is [region_inums] by construction; off the snapshot
+      the state's domain is only known to CONTAIN the region
+      ([FsDurSnap.sk_regdom]), so the general form is what is needed. *)
+  Lemma big_sepM_as_set {A : Type} `{Inhabited A}
+      (m : gmap Z A) (Phi : Z -> A -> iProp Σ) :
+    ([∗ map] i ↦ x ∈ m, Phi i x) ⊣⊢ ([∗ set] z ∈ dom m, Phi z (m !!! z)).
+  Proof.
+    induction m as [| k v m Hk IH] using map_ind.
+    { rewrite dom_empty_L big_sepM_empty big_sepS_empty //. }
+    assert (Hkd : k ∉ dom m) by (apply not_elem_of_dom; exact Hk).
+    rewrite (big_sepM_insert Phi m k v Hk).
+    rewrite dom_insert_L.
+    rewrite (big_sepS_insert
+               (fun z => Phi z (<[k := v]> m !!! z)) (dom m) k Hkd).
+    rewrite lookup_total_insert.
+    rewrite IH. f_equiv.
+    apply big_sepS_proper. intros z Hz.
+    assert (Hzk : k <> z) by (intros <-; exact (Hkd Hz)).
+    rewrite lookup_total_insert_ne; [done | exact Hzk].
+  Qed.
+
+  Lemma snap_links_to_set (γfs : fs_names) (S : fs_state_rec)
+      (D : gmap Z (list (bv 8))) (nib : nat) :
+    snap_bytes S D ->
+    Z.of_nat nib = sb_ninodes (fss_sb S) / 16 + 1 ->
+    fs_links (fs_link γfs) (fss_inodes S) -∗
+    [∗ set] z ∈ region_inums nib,
+      fs_link_node (fs_link γfs) z (snap_node S z).
+  Proof.
+    intros Hb Hw.
+    assert (Hsub : region_inums nib ⊆ dom (fss_inodes S)).
+    { apply elem_of_subseteq. intros z Hz.
+      apply elem_of_dom.
+      apply region_inums_spec in Hz. apply (sk_regdom Hb z). lia. }
+    rewrite /fs_links big_sepM_as_set.
+    iIntros "H".
+    iDestruct (big_sepS_subseteq _ _ _ Hsub with "H") as "H".
+    iExact "H".
+  Qed.
+
+  (*  THE ROUTING.  Each inum's contribution splits into the region's
+      per-inum authority (with the root's keep-alive parked on it) and the
+      directory's own entry tickets, which are what the free pool's bundle
+      carries as [IcacheEscrow.dlinks]. *)
+  Lemma snap_link_route (γfs : fs_names) (S : fs_state_rec)
+      (D : gmap Z (list (bv 8))) (nib : nat) (v0 : ity) :
+    snap_bytes S D ->
+    Z.of_nat nib = sb_ninodes (fss_sb S) / 16 + 1 ->
+    (0 < nib)%nat ->
+    fs_links (fs_link γfs) (fss_inodes S) -∗
+    link_tok (fs_gamma_L γfs) ireg_root v0 -∗
+      ([∗ set] z ∈ region_inums nib,
+         ireg_lnk_at γfs z (fn_nlink (snap_node S z))
+                     (fn_type (snap_node S z)))
+      ∗ ([∗ set] z ∈ region_inums nib,
+           ent_toks_x (fs_gamma_L γfs) z (snap_node S z)).
+  Proof.
+    intros Hb Hw Hnib.
+    assert (Hroot : ireg_root ∈ region_inums nib).
+    { apply region_inums_spec. rewrite /ireg_root. lia. }
+    iIntros "Hl Ht".
+    iDestruct (snap_links_to_set γfs S D nib Hb Hw with "Hl") as "Hl".
+    rewrite -big_sepS_sep.
+    (* the two [Phi]s are SPELLED OUT: [big_sepS_delete]'s left-hand side is
+       a big-op at an evar predicate, and ssreflect's [rewrite] does not
+       solve that higher-order pattern under the proofmode's [envs_entails]. *)
+    rewrite (big_sepS_delete
+               (fun z => (ireg_lnk_at γfs z (fn_nlink (snap_node S z))
+                            (fn_type (snap_node S z))
+                          ∗ ent_toks_x (fs_gamma_L γfs) z (snap_node S z))%I)
+               (region_inums nib) ireg_root Hroot).
+    iEval (rewrite (big_sepS_delete
+                      (fun z => fs_link_node (fs_link γfs) z (snap_node S z))
+                      (region_inums nib) ireg_root Hroot))
+      in "Hl".
+    iDestruct "Hl" as "[Hr Hrest]".
+    iSplitL "Hr Ht".
+    - (* THE ROOT: the keep-alive rides the authority *)
+      iDestruct (inode_link_iff (fs_gamma_L γfs) ireg_root
+                   (snap_node S ireg_root)) as "[_ Hback]".
+      iDestruct ("Hback" with "Hr") as "[Hav Htk]".
+      iDestruct "Hav" as (v) "[%Hv Ha]".
+      iDestruct (link_auth_tok_agree with "Ha Ht") as %[-> _].
+      iSplitR "Htk"; [| iExact "Htk"].
+      rewrite /ireg_lnk_at. iExists v.
+      iSplitR; [iPureIntro; exact (fn_ity_ok_ireg _ v Hv) |].
+      rewrite -fn_mult_ireg. iSplitL "Ha"; [iExact "Ha" |].
+      rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl).
+      iExact "Ht".
+    - (* EVERY OTHER INUM: the keep-alive is [emp] *)
+      iApply (big_sepS_mono with "Hrest"). intros z Hz.
+      assert (Hne : z <> ireg_root).
+      { apply elem_of_difference in Hz as [_ Hn]. intros ->.
+        apply Hn, elem_of_singleton. reflexivity. }
+      iIntros "H".
+      iDestruct (inode_link_iff (fs_gamma_L γfs) z (snap_node S z))
+        as "[_ Hback]".
+      iDestruct ("Hback" with "H") as "[Hav Htk]".
+      iDestruct "Hav" as (v) "[%Hv Ha]".
+      iSplitR "Htk"; [| iExact "Htk"].
+      rewrite /ireg_lnk_at. iExists v.
+      iSplitR; [iPureIntro; exact (fn_ity_ok_ireg _ v Hv) |].
+      rewrite -fn_mult_ireg. iSplitL "Ha"; [iExact "Ha" |].
+      rewrite /ireg_keep (bool_decide_eq_false_2 (z = ireg_root) Hne). done.
+  Qed.
+
+End SnapLinks.
