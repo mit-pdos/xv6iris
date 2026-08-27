@@ -1053,6 +1053,7 @@ IregLinkNz.v
 IgetLic.v
 IcacheEscrow.v
 IcacheBoot.v
+FsCfgKits.v
 FsCfgBoot.v
 CodeIget.v
 CodeDirlink.v

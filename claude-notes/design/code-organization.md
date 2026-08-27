@@ -194,6 +194,39 @@ Two invariants of `tools/gen_code.py` and its `tools/code_manifest.json`:
   `Code*Aux.v` files are hand-written and are legitimately in the sweep's
   scope.
 
+## A hand-off's STATEMENT is vocabulary; the proof that boot produces it is not
+
+Two different altitudes, and putting them in one file makes every consumer of
+the vocabulary pay for the proof.  `FsCfgBoot.v` held both halves of the boot
+kits — the five `fs_kit_*` definitions that say what the era's ghost
+allocation hands to each consumption site, AND the era fupd that proves boot
+can produce them.  `FirstTok` is a kit CONSUMPTION site: it names two of that
+file's seventy-six declarations, and dragged the whole allocation proof, plus
+`IcacheBoot`, onto the wall-weighted critical path for them.
+
+The tell is the profiler's edge annotation: a **weak** import (`2.6% (2/76)`)
+on the critical path means the consumer wants a small, statable part of a big
+file.  Weakness is not waste — it is good factoring inside the consumer — so
+the fix is never to inline the two declarations or to invent a file for them.
+It is to ask whether the file has two subjects.
+
+`LogDefs.v` vs `LogInv.v` is the same split, made earlier for the same reason
+(*dependency-light log names, shared with layers that do not need the log
+invariant*).  `FsCfgKits.v` vs `FsCfgBoot.v` is now the FS-config instance:
+the kits and their accessors on one side (12 declarations, 341 lines, and
+MEASURED to use nothing from `IcacheBoot` and nothing local to `FsCfgBoot`,
+so no proof had to move with them), the producers and the era fupd on the
+other.  `FsCfgBoot` re-EXPORTS the kits, so every existing spelling of a kit
+name still resolves and no other consumer changed.
+
+Result: `FsCfgBoot` (5.6 s) and `IcacheBoot` (9.1 s) both leave `FirstTok`'s
+cone — ~14.5 s off a 438 s critical path — and the same relief is available to
+every other kit consumer.  **Before splitting, check the cheap thing first:**
+`FsCfgBoot` was already the LOWEST file in the tree that could see all six of
+the kit's ingredients (`FsCfg` and `BitmapInv` are independent branches, so
+any home must sit above both), which is why moving the kit somewhere lower was
+never an option and the split had to be inside the file.
+
 ## Cleanups inherited from finished projects
 
 Two residuals outlived the projects that recorded them, and would have been

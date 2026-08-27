@@ -83,7 +83,11 @@ Require Import FsImgBridge.
    blocks stop below the bitmap, and nothing below [FsReady.fs_geom_ok]
    carries the width tie [nib = ninodes/16 + 1] it needs. *)
 Require Import FsCollect.
-Require Import FsCfgBoot.
+(* the KITS only ([fs_kit_fsinit_ghost] + its opener), not the era fupd that
+   produces them: this file is a kit CONSUMPTION site.  Requiring
+   [FsCfgBoot] here dragged its allocation proof, and [IcacheBoot] with it,
+   onto the critical path for two declarations out of seventy-six. *)
+Require Import FsCfgKits.
 Require Import FsReady.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.

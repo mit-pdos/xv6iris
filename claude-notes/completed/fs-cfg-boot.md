@@ -1,5 +1,13 @@
 # fs-cfg-boot — allocating the file system's ghost state and giving `fscfg` a value
 
+> **UPDATE 2026-08-27: the boot kits now live in `iris/FsCfgKits.v`.**
+> `FsCfgBoot.v` kept the producers and the era fupd and re-exports the
+> kits, so every spelling in this file still reads correctly; what moved
+> is the five `fs_kit_*` definitions and their seven accessors.  Why, and
+> the rule it instances, are in
+> [`design/code-organization.md`](../design/code-organization.md) under
+> "A hand-off's STATEMENT is vocabulary".
+
 Design of record: [`design/fs-ghost-state.md`](../design/fs-ghost-state.md) §7
 (`fs_ready`, the seal, the adoption audit),
 [`design/fs-icache.md`](../design/fs-icache.md) (the cache),
